@@ -57,7 +57,7 @@ class GcePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(GcePlacementGroupSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'project': (option_decoders.StringDecoder, {'none_ok': False}),
         'num_vms': (option_decoders.IntDecoder, {'none_ok': False}),
@@ -88,7 +88,7 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
       gce_placement_group_spec: Object containing the information needed to
         create an GcePlacementGroup.
     """
-    super(GcePlacementGroup, self).__init__(gce_placement_group_spec)
+    super().__init__(gce_placement_group_spec)
     self.project = gce_placement_group_spec.project
     self.region = gcp_util.GetRegionFromZone(gce_placement_group_spec.zone)
     self.zone = None

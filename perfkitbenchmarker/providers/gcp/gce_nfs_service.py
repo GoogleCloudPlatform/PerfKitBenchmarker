@@ -32,7 +32,7 @@ class GceNfsService(nfs_service.BaseNfsService):
   user_managed = False
 
   def __init__(self, disk_spec, zone):
-    super(GceNfsService, self).__init__(disk_spec, zone)
+    super().__init__(disk_spec, zone)
     self.name = 'nfs-%s' % FLAGS.run_uri
     self.server_directory = '/vol0'
 
@@ -47,10 +47,10 @@ class GceNfsService(nfs_service.BaseNfsService):
 
   def _Create(self):
     logging.info('Creating NFS server %s', self.name)
-    volume_arg = 'name={0},capacity={1}'.format(
+    volume_arg = 'name={},capacity={}'.format(
         self.server_directory.strip('/'), self.disk_spec.disk_size
     )
-    network_arg = 'name={0}'.format(self.network)
+    network_arg = 'name={}'.format(self.network)
     args = [
         '--file-share',
         volume_arg,

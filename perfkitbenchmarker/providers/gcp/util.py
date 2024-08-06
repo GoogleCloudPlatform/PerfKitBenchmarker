@@ -25,7 +25,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-import six
 
 FLAGS = flags.FLAGS
 
@@ -297,7 +296,7 @@ class GcloudCommand:
     cmd = [FLAGS.gcloud_path]
     cmd.extend(self.args)
     for flag_name, values in sorted(self.flags.items()):
-      flag_name_str = '--{0}'.format(flag_name)
+      flag_name_str = '--{}'.format(flag_name)
       if values is True:
         cmd.append(flag_name_str)
       elif values is None:
@@ -316,7 +315,7 @@ class GcloudCommand:
     return cmd
 
   def __repr__(self):
-    return '{0}({1})'.format(type(self).__name__, ' '.join(self.GetCommand()))
+    return '{}({})'.format(type(self).__name__, ' '.join(self.GetCommand()))
 
   @staticmethod
   def _IsIssueRateLimitMessage(text: str) -> bool:
@@ -535,7 +534,7 @@ def FormatTags(tags_dict: dict[str, str]):
     A string contains formatted tags
   """
   return ','.join(
-      '{0}={1}'.format(k, v) for k, v in sorted(six.iteritems(tags_dict))
+      '{}={}'.format(k, v) for k, v in sorted(tags_dict.items())
   )
 
 

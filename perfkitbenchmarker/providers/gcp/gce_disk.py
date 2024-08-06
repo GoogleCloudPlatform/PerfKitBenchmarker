@@ -211,7 +211,7 @@ class GceDiskSpec(disk.BaseDiskSpec):
       dict mapping config option names to values derived from the config
       values or flag values.
     """
-    super(GceDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['gce_ssd_interface'].present:
       config_values['interface'] = flag_values.gce_ssd_interface
     if flag_values['gce_num_local_ssds'].present:
@@ -233,7 +233,7 @@ class GceDiskSpec(disk.BaseDiskSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(GceDiskSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'interface': (option_decoders.StringDecoder, {'default': 'NVME'}),
         'num_local_ssds': (
@@ -260,7 +260,7 @@ class GceBootDisk(boot_disk.BootDisk):
 
   def __init__(self, vm, boot_disk_spec):
     """Initialize a Boot Diks."""
-    super(GceBootDisk, self).__init__(boot_disk_spec)
+    super().__init__(boot_disk_spec)
     self.name = vm.name
     self.image = None
     self.vm = vm
@@ -298,7 +298,7 @@ class GceBootDisk(boot_disk.BootDisk):
     self.boot_disk_type = response['type'].split('/')[-1]
 
   def GetResourceMetadata(self):
-    result = super(GceBootDisk, self).GetResourceMetadata()
+    result = super().GetResourceMetadata()
     result['boot_disk_type'] = self.boot_disk_type
     result['boot_disk_size'] = self.boot_disk_size
     if self.boot_disk_iops:
@@ -337,7 +337,7 @@ class GceLocalDisk(disk.BaseDisk):
   """Object representing a GCE Local Disk."""
 
   def __init__(self, disk_spec, name):
-    super(GceLocalDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.interface = disk_spec.interface
     self.metadata['interface'] = disk_spec.interface
     self.metadata.update(DISK_METADATA[disk_spec.disk_type])
@@ -363,7 +363,7 @@ class GceDisk(disk.BaseDisk):
       image_project=None,
       replica_zones=None,
   ):
-    super(GceDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.spec = disk_spec
     self.interface = disk_spec.interface
     self.attached_vm_name = None
@@ -560,7 +560,7 @@ class GceStripedDisk(disk.StripedDisk):
   """Object representing multiple GCP disks striped together."""
 
   def __init__(self, disk_spec, disks):
-    super(GceStripedDisk, self).__init__(disk_spec, disks)
+    super().__init__(disk_spec, disks)
     if len(disks) <= 1:
       raise ValueError(
           f'{len(disks)} disks found for GceStripedDisk'

@@ -30,7 +30,7 @@ class BigquerySlotResource(edw_compute_resource.EdwComputeResource):
   SERVICE_TYPE = 'bigquery_slots'
 
   def __init__(self, edw_service_spec):
-    super(BigquerySlotResource, self).__init__(edw_service_spec)
+    super().__init__(edw_service_spec)
     self.region = FLAGS.bq_slot_allocation_region
     self.project = FLAGS.bq_slot_allocation_project
     self.slot_num = FLAGS.bq_slot_allocation_num

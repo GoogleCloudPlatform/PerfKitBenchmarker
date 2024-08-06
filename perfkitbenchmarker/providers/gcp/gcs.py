@@ -295,7 +295,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     """
     vm.PushFile(service_key_src, service_key_des)
     key = 'gs_service_key_file'
-    with open(boto_src, 'r') as src_file:
+    with open(boto_src) as src_file:
       boto_path = os.path.join(
           temp_dir.GetRunDirPath(), posixpath.basename(boto_src)
       )

@@ -48,7 +48,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
   MEMORY_STORE = managed_memory_store.REDIS
 
   def __init__(self, spec):
-    super(CloudRedis, self).__init__(spec)
+    super().__init__(spec)
     self.project = FLAGS.project
     self.size = gcp_flags.REDIS_GB.value
     if self._clustered:

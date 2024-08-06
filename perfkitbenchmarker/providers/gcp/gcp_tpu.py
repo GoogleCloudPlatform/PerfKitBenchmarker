@@ -46,7 +46,7 @@ class GcpTpu(cloud_tpu.BaseTpu):
   DEFAULT_TPU_VERSION = '1.6'
 
   def __init__(self, tpu_spec):
-    super(GcpTpu, self).__init__(tpu_spec)
+    super().__init__(tpu_spec)
     self.spec = tpu_spec
     self.project = FLAGS.project or util.GetDefaultProject()
 
@@ -149,6 +149,6 @@ class GcpTpu(cloud_tpu.BaseTpu):
     Returns:
       metadata: dict of GCP cloud TPU metadata.
     """
-    metadata = super(GcpTpu, self).GetResourceMetadata()
+    metadata = super().GetResourceMetadata()
     metadata.update({'project': self.project, 'cloud': self.CLOUD})
     return metadata

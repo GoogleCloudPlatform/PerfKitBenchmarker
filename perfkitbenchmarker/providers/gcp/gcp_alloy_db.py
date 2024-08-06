@@ -66,7 +66,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
   REQUIRED_ATTRS = ['CLOUD', 'IS_MANAGED', 'ENGINE']
 
   def __init__(self, db_spec: relational_db_spec.RelationalDbSpec):
-    super(GCPAlloyRelationalDb, self).__init__(db_spec)
+    super().__init__(db_spec)
     self.cluster_id = self.instance_id + '-cluster'
     self.zone = self.spec.db_spec.zone
     self.replica_instance_id = None
@@ -90,7 +90,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     """
     if engine not in SUPPORTED_ALLOYDB_ENGINE_VERSIONS:
       raise NotImplementedError(
-          'Default engine not specified for engine {0}'.format(engine)
+          'Default engine not specified for engine {}'.format(engine)
       )
     return DEFAULT_ENGINE_VERSION
 

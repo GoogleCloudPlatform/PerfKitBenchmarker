@@ -39,7 +39,6 @@ from perfkitbenchmarker import sqlserver_iaas_relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
-from six.moves import range
 
 
 FLAGS = flags.FLAGS
@@ -114,7 +113,7 @@ class GCPSQLServerIAASRelationalDb(
   CLOUD = provider_info.GCP
 
   def __init__(self, relational_db_spec):
-    super(GCPSQLServerIAASRelationalDb, self).__init__(relational_db_spec)
+    super().__init__(relational_db_spec)
     self._reserved_ip_address = None
 
   def CreateIpReservation(self) -> str:
@@ -134,7 +133,7 @@ class GCPSQLServerIAASRelationalDb(
     return self._reserved_ip_address is None
 
   def _Delete(self):
-    super(GCPSQLServerIAASRelationalDb, self)._Delete()
+    super()._Delete()
     if self._reserved_ip_address:
       self._reserved_ip_address.Delete()
 
@@ -181,7 +180,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
   IS_MANAGED = True
 
   def __init__(self, relational_db_spec):
-    super(GCPRelationalDb, self).__init__(relational_db_spec)
+    super().__init__(relational_db_spec)
     self.project = FLAGS.project or util.GetDefaultProject()
 
   def _GetAuthorizedNetworks(self, vms):
@@ -194,7 +193,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         )
     # create the CIDR of the client VM that is configured to access
     # the database
-    return ','.join('{0}/32'.format(vm.ip_address) for vm in vms)
+    return ','.join('{}/32'.format(vm.ip_address) for vm in vms)
 
   def _CreateGcloudSqlInstance(self):
     storage_size = self.spec.db_disk_spec.disk_size
@@ -228,7 +227,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     if self.spec.engine == sql_engine_utils.SQLSERVER:
       # `--root-password` is required when creating SQL Server instances.
       cmd_string.append(
-          '--root-password={0}'.format(self.spec.database_password)
+          '--root-password={}'.format(self.spec.database_password)
       )
 
     if self.spec.db_spec.cpus and self.spec.db_spec.memory:
@@ -470,8 +469,8 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         'create',
         self.spec.database_username,
         '--host=%',
-        '--instance={0}'.format(self.instance_id),
-        '--password={0}'.format(self.spec.database_password),
+        '--instance={}'.format(self.instance_id),
+        '--password={}'.format(self.spec.database_password),
     )
     _, _, _ = cmd.Issue()
 
@@ -486,8 +485,8 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         'set-password',
         default_user,
         '--host=%',
-        '--instance={0}'.format(self.instance_id),
-        '--password={0}'.format(self.spec.database_password),
+        '--instance={}'.format(self.instance_id),
+        '--password={}'.format(self.spec.database_password),
     )
     _, _, _ = cmd.Issue()
 
@@ -539,7 +538,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     """
     if engine not in DEFAULT_ENGINE_VERSIONS:
       raise NotImplementedError(
-          'Default engine not specified for engine {0}'.format(engine)
+          'Default engine not specified for engine {}'.format(engine)
       )
     return DEFAULT_ENGINE_VERSIONS[engine]
 
@@ -560,15 +559,15 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     if engine not in GCP_DATABASE_VERSION_MAPPING:
       valid_databases = ', '.join(GCP_DATABASE_VERSION_MAPPING.keys())
       raise NotImplementedError(
-          'Database {0} is not supported,supported '
-          'databases include {1}'.format(engine, valid_databases)
+          'Database {} is not supported,supported '
+          'databases include {}'.format(engine, valid_databases)
       )
 
     version_mapping = GCP_DATABASE_VERSION_MAPPING[engine]
     if version not in version_mapping:
       valid_versions = ', '.join(version_mapping.keys())
       raise NotImplementedError(
-          'Version {0} is not supported,supported versions include {1}'.format(
+          'Version {} is not supported,supported versions include {}'.format(
               version, valid_versions
           )
       )

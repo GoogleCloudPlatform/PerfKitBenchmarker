@@ -84,7 +84,7 @@ class WindowsGceVirtualMachine(
     Args:
       vm_spec: virtual_machine.BaseVmSpec object of the vm.
     """
-    super(WindowsGceVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self.boot_metadata['windows-startup-script-ps1'] = (
         windows_virtual_machine.STARTUP_SCRIPT
     )
@@ -171,7 +171,7 @@ class WindowsGceVirtualMachine(
     Returns:
       dict mapping metadata key to value.
     """
-    result = super(WindowsGceVirtualMachine, self).GetResourceMetadata()
+    result = super().GetResourceMetadata()
     result['disable_rss'] = self.disable_rss
     return result
 
@@ -194,7 +194,7 @@ class WindowsGceVirtualMachine(
     self.RemoteCommand(command)
     try:
       self.RemoteCommand('Restart-NetAdapter -Name "Ethernet"')
-    except IOError:
+    except OSError:
       # Restarting the network adapter will always fail because
       # the winrm connection used to issue the command will be
       # broken.

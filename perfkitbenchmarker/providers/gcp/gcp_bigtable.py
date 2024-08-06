@@ -277,7 +277,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
       autoscaling_cpu_target: int | None,
       **kwargs,
   ):
-    super(GcpBigtableInstance, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     if name is not None:
       self.user_managed = True
     self.name: str = name or f'pkb-bigtable-{FLAGS.run_uri}'

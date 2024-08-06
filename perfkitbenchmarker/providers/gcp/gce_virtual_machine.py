@@ -56,7 +56,6 @@ from perfkitbenchmarker.providers.gcp import gce_disk_strategies
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
-import six
 import yaml
 
 
@@ -197,7 +196,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     self.gce_tags: List[str] = None
     self.min_node_cpus: int = None
     self.subnet_name: str = None
-    super(GceVmSpec, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     if not self.boot_disk_type:
       self.boot_disk_type = gce_disk.GetDefaultBootDiskType(self.machine_type)
     self.boot_disk_spec = boot_disk.BootDiskSpec(
@@ -236,7 +235,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
         provided config values.
     """
-    super(GceVmSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['gce_num_local_ssds'].present:
       config_values['num_local_ssds'] = flag_values.gce_num_local_ssds
     if flag_values['gce_ssd_interface'].present:
@@ -293,7 +292,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(GceVmSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'machine_type': (
             custom_virtual_machine_spec.MachineTypeDecoder,
@@ -358,7 +357,7 @@ class GceSoleTenantNodeTemplate(resource.BaseResource):
   """
 
   def __init__(self, name, node_type, zone, project):
-    super(GceSoleTenantNodeTemplate, self).__init__()
+    super().__init__()
     self.name = name
     self.node_type = node_type
     self.region = util.GetRegionFromZone(zone)
@@ -404,7 +403,7 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
   _counter = itertools.count()
 
   def __init__(self, node_type, zone, project):
-    super(GceSoleTenantNodeGroup, self).__init__()
+    super().__init__()
     with self._counter_lock:
       self.instance_number = next(self._counter)
     self.name = 'pkb-node-group-%s-%s' % (FLAGS.run_uri, self.instance_number)
@@ -426,7 +425,7 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
   def _CreateDependencies(self):
-    super(GceSoleTenantNodeGroup, self)._CreateDependencies()
+    super()._CreateDependencies()
     node_template_name = self.name.replace('group', 'template')
     node_template = GceSoleTenantNodeTemplate(
         node_template_name, self.node_type, self.zone, self.project
@@ -487,7 +486,7 @@ def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
       )
       + accelerator_type
   )
-  return 'type={0},count={1}'.format(gce_accelerator_type, accelerator_count)
+  return 'type={},count={}'.format(gce_accelerator_type, accelerator_count)
 
 
 def GetArmArchitecture(machine_type):
@@ -529,7 +528,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       errors.Config.InvalidValue: If the spec contains both "machine_type" and
           at least one of "cpus" or "memory".
     """
-    super(GceVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self.create_cmd: util.GcloudCommand = None
     self.boot_metadata = {}
     self.boot_metadata_from_file = {}
@@ -704,7 +703,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags.update(disk_.GetCreationCommand())
     if self.machine_type is None:
       cmd.flags['custom-cpu'] = self.cpus
-      cmd.flags['custom-memory'] = '{0}MiB'.format(self.memory_mib)
+      cmd.flags['custom-memory'] = '{}MiB'.format(self.memory_mib)
     else:
       cmd.flags['machine-type'] = self.machine_type
 
@@ -753,7 +752,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     parsed_metadata_from_file = flag_util.ParseKeyValuePairs(
         FLAGS.gcp_instance_metadata_from_file
     )
-    for key, value in six.iteritems(parsed_metadata_from_file):
+    for key, value in parsed_metadata_from_file.items():
       if key in metadata_from_file:
         logging.warning(
             (
@@ -765,7 +764,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         continue
       metadata_from_file[key] = value
     cmd.flags['metadata-from-file'] = ','.join(
-        ['%s=%s' % (k, v) for k, v in six.iteritems(metadata_from_file)]
+        ['%s=%s' % (k, v) for k, v in metadata_from_file.items()]
     )
 
     # passing sshKeys does not work with OS Login
@@ -781,7 +780,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         flag_util.ParseKeyValuePairs(FLAGS.gcp_instance_metadata)
     )
 
-    for key, value in six.iteritems(additional_metadata):
+    for key, value in additional_metadata.items():
       if key in metadata:
         logging.warning(
             (
@@ -805,7 +804,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     ):
       # Append the `--local-ssd` args only when it's a customized or old-gen VM.
       cmd.flags['local-ssd'] = [
-          'interface={0}'.format(self.ssd_interface)
+          'interface={}'.format(self.ssd_interface)
       ] * self.max_local_disks
 
     cmd.flags.update(self.create_disk_strategy.GetCreationCommand())
@@ -973,7 +972,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       )
 
   def _CreateDependencies(self):
-    super(GceVirtualMachine, self)._CreateDependencies()
+    super()._CreateDependencies()
     # Create necessary VM access rules *prior* to creating the VM, such that it
     # doesn't affect boot time.
     self.AllowRemoteAccessPorts()
@@ -1181,7 +1180,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     # If not, GCE firewall rules are created for all instances in a
     # network.
     if not self.gce_remote_access_firewall_rule:
-      super(GceVirtualMachine, self).AllowRemoteAccessPorts()
+      super().AllowRemoteAccessPorts()
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the VM.
@@ -1189,7 +1188,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       dict mapping string property key to value.
     """
-    result = super(GceVirtualMachine, self).GetResourceMetadata()
+    result = super().GetResourceMetadata()
     for attr_name in 'cpus', 'memory_mib', 'preemptible', 'project':
       attr_value = getattr(self, attr_name)
       if attr_value:
@@ -1557,13 +1556,13 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
   SUPPORTS_GVNIC = True
 
   def __init__(self, vm_spec):
-    super(BaseLinuxGceVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self._gvnic_version = None
 
   def GetResourceMetadata(self):
     """See base class."""
     metadata = (
-        super(BaseLinuxGceVirtualMachine, self).GetResourceMetadata().copy()
+        super().GetResourceMetadata().copy()
     )
     if self._gvnic_version:
       metadata['gvnic_version'] = self._gvnic_version
@@ -1572,7 +1571,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
 
   def OnStartup(self):
     """See base class.  Sets the _gvnic_version."""
-    super(BaseLinuxGceVirtualMachine, self).OnStartup()
+    super().OnStartup()
     self._gvnic_version = self.GetGvnicVersion()
 
   def GetGvnicVersion(self) -> str | None:
@@ -1769,7 +1768,7 @@ class CoreOsBasedGceVirtualMachine(
   SUPPORTS_GVNIC = False
 
   def __init__(self, vm_spec):
-    super(CoreOsBasedGceVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     # Fedora CoreOS only creates the core user
     self.user_name = 'core'
 

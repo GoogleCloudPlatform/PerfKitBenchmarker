@@ -32,7 +32,6 @@ from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
-import six
 
 FLAGS = flags.FLAGS
 
@@ -69,7 +68,7 @@ class GoogleContainerRegistry(container_service.BaseContainerRegistry):
   CLOUD = provider_info.GCP
 
   def __init__(self, registry_spec):
-    super(GoogleContainerRegistry, self).__init__(registry_spec)
+    super().__init__(registry_spec)
     self.project = self.project or util.GetDefaultProject()
 
   def GetFullRegistryTag(self, image: str) -> str:
@@ -171,7 +170,7 @@ class GkeCluster(container_service.KubernetesCluster):
     Returns:
       dict mapping string property key to value.
     """
-    result = super(GkeCluster, self).GetResourceMetadata()
+    result = super().GetResourceMetadata()
     result['project'] = self.project
     if self.cluster_version in RELEASE_CHANNELS:
       result['gke_release_channel'] = self.cluster_version
@@ -256,7 +255,7 @@ class GkeCluster(container_service.KubernetesCluster):
 
   def _CreateNodePools(self):
     """Creates additional nodepools for the cluster, if applicable."""
-    for name, nodepool in six.iteritems(self.nodepools):
+    for name, nodepool in self.nodepools.items():
       cmd = self._GcloudCommand(
           'container', 'node-pools', 'create', name, '--cluster', self.name
       )
@@ -326,7 +325,7 @@ class GkeCluster(container_service.KubernetesCluster):
       cmd.flags['node-locations'] = nodepool_config.zone
 
     if nodepool_config.machine_type is None:
-      cmd.flags['machine-type'] = 'custom-{0}-{1}'.format(
+      cmd.flags['machine-type'] = 'custom-{}-{}'.format(
           nodepool_config.cpus, nodepool_config.memory_mib
       )
     else:
@@ -356,7 +355,7 @@ class GkeCluster(container_service.KubernetesCluster):
 
   def _PostCreate(self):
     """Acquire cluster authentication."""
-    super(GkeCluster, self)._PostCreate()
+    super()._PostCreate()
     cmd = self._GcloudCommand(
         'container', 'clusters', 'get-credentials', self.name
     )

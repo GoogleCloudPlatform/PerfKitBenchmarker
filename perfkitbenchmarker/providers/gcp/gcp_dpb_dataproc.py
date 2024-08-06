@@ -212,7 +212,7 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
       if self.spec.worker_group.vm_spec.machine_type:
         self._AddToCmd(
             cmd,
-            '{0}-machine-type'.format(role),
+            '{}-machine-type'.format(role),
             self.spec.worker_group.vm_spec.machine_type,
         )
       # Set boot_disk_size
@@ -220,26 +220,26 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
         size_in_gb = '{}GB'.format(
             str(self.spec.worker_group.disk_spec.disk_size)
         )
-        self._AddToCmd(cmd, '{0}-boot-disk-size'.format(role), size_in_gb)
+        self._AddToCmd(cmd, '{}-boot-disk-size'.format(role), size_in_gb)
       # Set boot_disk_type
       if self.spec.worker_group.disk_spec.disk_type:
         self._AddToCmd(
             cmd,
-            '{0}-boot-disk-type'.format(role),
+            '{}-boot-disk-type'.format(role),
             self.spec.worker_group.disk_spec.disk_type,
         )
       # Set ssd count
       if self.spec.worker_group.vm_spec.num_local_ssds:
         self._AddToCmd(
             cmd,
-            'num-{0}-local-ssds'.format(role),
+            'num-{}-local-ssds'.format(role),
             self.spec.worker_group.vm_spec.num_local_ssds,
         )
       # Set SSD interface
       if self.spec.worker_group.vm_spec.ssd_interface:
         self._AddToCmd(
             cmd,
-            '{0}-local-ssd-interface'.format(role),
+            '{}-local-ssd-interface'.format(role),
             self.spec.worker_group.vm_spec.ssd_interface,
         )
     # Set zone
@@ -460,7 +460,7 @@ class GcpDpbDpgke(GcpDpbDataproc):
   SERVICE_TYPE = 'dataproc_gke'
 
   def __init__(self, dpb_service_spec):
-    super(GcpDpbDpgke, self).__init__(dpb_service_spec)
+    super().__init__(dpb_service_spec)
     required_spec_attrs = [
         'gke_cluster_name',
         'gke_cluster_nodepools',

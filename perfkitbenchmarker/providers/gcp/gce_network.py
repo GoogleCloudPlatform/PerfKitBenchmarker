@@ -38,7 +38,6 @@ from perfkitbenchmarker import vpn_service
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_placement_group
 from perfkitbenchmarker.providers.gcp import util
-import six
 
 FLAGS = flags.FLAGS
 NETWORK_RANGE = '10.0.0.0/8'
@@ -57,7 +56,7 @@ class GceVpnGateway(network.BaseVpnGateway):
   def __init__(
       self, name: str, network_name: str, region: str, cidr: str, project: str
   ):
-    super(GceVpnGateway, self).__init__()
+    super().__init__()
 
     self.forwarding_rules: Dict[str, GceForwardingRule] = {}
     self.forwarding_rules_lock = threading.Lock()
@@ -309,7 +308,7 @@ class GceVpnGatewayResource(resource.BaseResource):
   def __init__(
       self, name: str, network_name: str, region: str, cidr: str, project: str
   ):
-    super(GceVpnGatewayResource, self).__init__()
+    super().__init__()
     self.name = name
     self.network_name = network_name
     self.region = region
@@ -346,7 +345,7 @@ class GceIPAddress(resource.BaseResource):
   def __init__(
       self, project: str, region: str, name: str, subnet: str | None = None
   ):
-    super(GceIPAddress, self).__init__()
+    super().__init__()
     self.project = project
     self.region = region
     self.name = name
@@ -409,7 +408,7 @@ class GceStaticTunnel(resource.BaseResource):
       ike_version: str,
       psk: str,
   ):
-    super(GceStaticTunnel, self).__init__()
+    super().__init__()
     self.project = project
     self.region = region
     self.name = name
@@ -470,7 +469,7 @@ class GceRoute(resource.BaseResource):
       next_hop_region: str,
       project: str,
   ):
-    super(GceRoute, self).__init__()
+    super().__init__()
     self.name = route_name
     self.dest_cidr = dest_cidr
     self.next_hop_region = next_hop_region
@@ -509,7 +508,7 @@ class GceForwardingRule(resource.BaseResource):
       src_vpn_gateway: GceVpnGateway,
       port: int | None = None,
   ):
-    super(GceForwardingRule, self).__init__()
+    super().__init__()
     self.name = name
     self.protocol = protocol
     self.port = port
@@ -571,7 +570,7 @@ class GceFirewallRule(resource.BaseResource):
       network_name: str,
       source_range: str | None = None,
   ):
-    super(GceFirewallRule, self).__init__()
+    super().__init__()
     self.name = name
     self.project = project
     self.allow = allow
@@ -682,7 +681,7 @@ class GceFirewall(network.BaseFirewall):
       if key in self.firewall_rules:
         return
       allow = ','.join(
-          '{0}:{1}-{2}'.format(protocol, start_port, end_port)
+          '{}:{}-{}'.format(protocol, start_port, end_port)
           for protocol in ('tcp', 'udp')
       )
       firewall_rule = GceFirewallRule(
@@ -697,9 +696,9 @@ class GceFirewall(network.BaseFirewall):
 
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
-    for firewall_rule in six.itervalues(self.firewall_rules):
+    for firewall_rule in self.firewall_rules.values():
       firewall_rule.Delete()
-    for firewall_rule in six.itervalues(self.firewall_icmp_rules):
+    for firewall_rule in self.firewall_icmp_rules.values():
       firewall_rule.Delete()
 
   def AllowIcmp(self, vm):
@@ -753,7 +752,7 @@ class GceNetworkSpec(network.BaseNetworkSpec):
       subnet_name: Name of the existing subnet.
       **kwargs: Additional key word arguments passed to BaseNetworkSpec.
     """
-    super(GceNetworkSpec, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     self.project = project
     self.mtu = mtu
     self.machine_type = machine_type
@@ -766,7 +765,7 @@ class GceNetworkResource(resource.BaseResource):
   def __init__(
       self, name: str, mode: str, project: str, mtu: int | None = None
   ):
-    super(GceNetworkResource, self).__init__()
+    super().__init__()
     self.name = name
     self.mode = mode
     self.project = project
@@ -821,7 +820,7 @@ class GceSubnetResource(resource.BaseResource):
       addr_range: str,
       project: str,
   ):
-    super(GceSubnetResource, self).__init__()
+    super().__init__()
     self.name = name
     self.network_name = network_name
     self.region = region
@@ -878,7 +877,7 @@ class GceNetwork(network.BaseNetwork):
   CLOUD = provider_info.GCP
 
   def __init__(self, network_spec: GceNetworkSpec):
-    super(GceNetwork, self).__init__(network_spec)
+    super().__init__(network_spec)
     self.project: str | None = network_spec.project
     self.vpn_gateway: Dict[str, GceVpnGateway] = {}
 

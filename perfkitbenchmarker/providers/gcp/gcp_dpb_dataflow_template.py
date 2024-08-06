@@ -42,7 +42,7 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
   SERVICE_TYPE = 'dataflow_template'
 
   def __init__(self, dpb_service_spec):
-    super(GcpDpbDataflowTemplate, self).__init__(dpb_service_spec)
+    super().__init__(dpb_service_spec)
     self.project = util.GetDefaultProject()
     self.input_sub_empty = False
     self.job_drained = False

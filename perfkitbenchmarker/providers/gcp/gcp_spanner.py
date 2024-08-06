@@ -276,7 +276,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
   REQUIRED_ATTRS = ['CLOUD', 'IS_MANAGED', 'ENGINE']
 
   def __init__(self, db_spec: SpannerSpec, **kwargs):
-    super(GcpSpannerInstance, self).__init__(db_spec, **kwargs)
+    super().__init__(db_spec, **kwargs)
     self.instance_id = (
         db_spec.spanner_instance_id or f'pkb-instance-{FLAGS.run_uri}'
     )
