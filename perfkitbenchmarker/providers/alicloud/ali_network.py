@@ -31,7 +31,6 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.alicloud import util
-from six.moves import range
 
 FLAGS = flags.FLAGS
 MAX_NAME_LENGTH = 128
@@ -41,7 +40,7 @@ class AliVpc(resource.BaseResource):
   """An object representing an AliCloud VPC."""
 
   def __init__(self, name, region):
-    super(AliVpc, self).__init__()
+    super().__init__()
     self.region = region
     self.id = None
     self.name = name
@@ -115,7 +114,7 @@ class AliVSwitch(resource.BaseResource):
   """An object representing an AliCloud VSwitch."""
 
   def __init__(self, name, zone, vpc_id):
-    super(AliVSwitch, self).__init__()
+    super().__init__()
     self.region = util.GetRegionByZone(zone)
     self.id = None
     self.vpc_id = vpc_id
@@ -174,7 +173,7 @@ class AliSecurityGroup(resource.BaseResource):
   """Object representing an AliCloud Security Group."""
 
   def __init__(self, name, region, use_vpc=True, vpc_id=None):
-    super(AliSecurityGroup, self).__init__()
+    super().__init__()
     self.name = name
     self.region = region
     self.use_vpc = use_vpc
@@ -320,7 +319,7 @@ class AliNetwork(network.BaseNetwork):
   CLOUD = provider_info.ALICLOUD
 
   def __init__(self, spec):
-    super(AliNetwork, self).__init__(spec)
+    super().__init__(spec)
     self.name = 'perfkit-%s-%s' % (FLAGS.run_uri, str(uuid.uuid4())[-12:])
     self.region = util.GetRegionByZone(spec.zone)
     self.use_vpc = FLAGS.ali_use_vpc

@@ -54,7 +54,7 @@ class RackspaceSecurityGroup(resource.BaseResource):
   """An object representing a Rackspace Security Group."""
 
   def __init__(self, name):
-    super(RackspaceSecurityGroup, self).__init__()
+    super().__init__()
     self.name = name
     self.id = None
 
@@ -95,7 +95,7 @@ class RackspaceSecurityGroupRule(resource.BaseResource):
       port_range_max=PORT_RANGE_MAX,
       source_cidr=None,
   ):
-    super(RackspaceSecurityGroupRule, self).__init__()
+    super().__init__()
     self.id = None
     self.name = sec_group_rule_name
     self.sec_group_id = sec_group_id
@@ -156,7 +156,7 @@ class RackspaceSubnet(resource.BaseResource):
   """An object that represents a Rackspace Subnet,"""
 
   def __init__(self, network_id, cidr, ip_ver, name=None, tenant_id=None):
-    super(RackspaceSubnet, self).__init__()
+    super().__init__()
     self.id = None
     self.network_id = network_id
     self.cidr = cidr
@@ -197,7 +197,7 @@ class RackspaceNetworkSpec(network.BaseNetworkSpec):
   """Object containing the information needed to create a Rackspace network."""
 
   def __init__(self, tenant_id=None, region=None, **kwargs):
-    super(RackspaceNetworkSpec, self).__init__(**kwargs)
+    super().__init__(**kwargs)
     self.tenant_id = tenant_id
     self.region = region
 
@@ -206,7 +206,7 @@ class RackspaceNetworkResource(resource.BaseResource):
   """Object representing a Rackspace Network Resource."""
 
   def __init__(self, name, tenant_id=None):
-    super(RackspaceNetworkResource, self).__init__()
+    super().__init__()
     self.name = name
     self.tenant_id = tenant_id
     self.id = None
@@ -243,7 +243,7 @@ class RackspaceNetwork(network.BaseNetwork):
   CLOUD = provider_info.RACKSPACE
 
   def __init__(self, network_spec):
-    super(RackspaceNetwork, self).__init__(network_spec)
+    super().__init__(network_spec)
     self.tenant_id = network_spec.tenant_id
     name = FLAGS.rackspace_network_name or 'pkb-network-%s' % FLAGS.run_uri
     self.network_resource = RackspaceNetworkResource(name, self.tenant_id)

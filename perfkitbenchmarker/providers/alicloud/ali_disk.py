@@ -41,7 +41,7 @@ class AliDisk(disk.BaseDisk):
   vm_devices = {}
 
   def __init__(self, disk_spec, zone):
-    super(AliDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.id = None
     self.zone = zone
     self.region = util.GetRegionByZone(self.zone)

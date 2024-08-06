@@ -65,11 +65,11 @@ class BaseOpenStackNetworkTest(pkb_common_test_case.PkbCommonTestCase):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         benchmark_name, flag_values=FLAGS, **config_dict
     )
-    benchmark_module = next((
+    benchmark_module = next(
         b
         for b in linux_benchmarks.BENCHMARKS
         if b.BENCHMARK_NAME == benchmark_name
-    ))
+    )
     return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, _URI)
 
   def _CreateTestOpenStackVm(self):
@@ -80,7 +80,7 @@ class BaseOpenStackNetworkTest(pkb_common_test_case.PkbCommonTestCase):
 class OpenStackVirtualMachineTest(BaseOpenStackNetworkTest):
 
   def setUp(self):
-    super(OpenStackVirtualMachineTest, self).setUp()
+    super().setUp()
     self.mock_check_network_exists = self.enter_context(
         mock.patch.object(
             os_virtual_machine.OpenStackVirtualMachine, '_CheckNetworkExists'

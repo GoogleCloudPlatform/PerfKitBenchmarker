@@ -29,7 +29,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.cloudstack import cloudstack_disk
 from perfkitbenchmarker.providers.cloudstack import cloudstack_network
 from perfkitbenchmarker.providers.cloudstack import util
-from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -50,7 +49,7 @@ class CloudStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
-    super(CloudStackVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self.network = cloudstack_network.CloudStackNetwork.GetNetwork(self)
 
     self.cs = util.CsClient(

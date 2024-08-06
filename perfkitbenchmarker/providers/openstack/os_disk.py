@@ -115,7 +115,7 @@ class OpenStackDiskSpec(disk.BaseDiskSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
         provided config values.
     """
-    super(OpenStackDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if (
         flag_values['openstack_volume_size'].present
         and not flag_values['data_disk_size'].present
@@ -128,7 +128,7 @@ class OpenStackDiskSpec(disk.BaseDiskSpec):
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
-    decoders = super(OpenStackDiskSpec, cls)._GetOptionDecoderConstructions()
+    decoders = super()._GetOptionDecoderConstructions()
     decoders.update({
         'volume_type': (
             option_decoders.StringDecoder,
@@ -141,7 +141,7 @@ class OpenStackDiskSpec(disk.BaseDiskSpec):
 class OpenStackDisk(disk.BaseDisk):
 
   def __init__(self, disk_spec, name, zone, image=None):
-    super(OpenStackDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.attached_vm_id = None
     self.image = image
     self.name = name

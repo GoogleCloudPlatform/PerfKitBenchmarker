@@ -20,7 +20,6 @@ import shlex
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import vm_util
-import six
 
 ALI_PREFIX = ['aliyun']
 ROOT = 'root'
@@ -78,11 +77,11 @@ def GetRegionByZone(zone):
 
 def _BuildTagsList(**kwargs):
   tags_list = []
-  for index, (key, value) in enumerate(six.iteritems(kwargs)):
+  for index, (key, value) in enumerate(kwargs.items()):
     tags_list.extend([
-        '--Tag.{0}.Key'.format(index + 1),
+        '--Tag.{}.Key'.format(index + 1),
         str(key),
-        '--Tag.{0}.Value'.format(index + 1),
+        '--Tag.{}.Value'.format(index + 1),
         str(value),
     ])
 

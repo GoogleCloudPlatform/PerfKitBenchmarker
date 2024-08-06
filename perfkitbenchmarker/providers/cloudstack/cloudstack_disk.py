@@ -30,7 +30,7 @@ class CloudStackDisk(disk.BaseDisk):
   """Object representing a Cloudstack Disk."""
 
   def __init__(self, disk_spec, name, zone_id, project_id=None):
-    super(CloudStackDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
 
     self.cs = util.CsClient(
         FLAGS.CS_API_URL, FLAGS.CS_API_KEY, FLAGS.CS_API_SECRET

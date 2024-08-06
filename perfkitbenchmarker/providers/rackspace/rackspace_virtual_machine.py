@@ -44,9 +44,6 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.rackspace import rackspace_disk
 from perfkitbenchmarker.providers.rackspace import rackspace_network
 from perfkitbenchmarker.providers.rackspace import util
-import six
-from six.moves import range
-from six.moves import zip
 
 FLAGS = flags.FLAGS
 
@@ -124,7 +121,7 @@ class RackspaceVmSpec(virtual_machine.BaseVmSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
         provided config values.
     """
-    super(RackspaceVmSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['project'].present:
       config_values['project'] = flag_values.project
     if flag_values['rackspace_region'].present:
@@ -141,7 +138,7 @@ class RackspaceVmSpec(virtual_machine.BaseVmSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(RackspaceVmSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'project': (option_decoders.StringDecoder, {'default': None}),
         'rackspace_region': (
@@ -165,7 +162,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the VM.
     """
-    super(RackspaceVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self.boot_metadata = {}
     self.boot_device = None
     self.boot_disk_allocated = False
@@ -292,7 +289,7 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
       ])
     create_cmd.flags['user-data'] = tf.name
     metadata = ['owner=%s' % FLAGS.owner]
-    for key, value in six.iteritems(self.boot_metadata):
+    for key, value in self.boot_metadata.items():
       metadata.append('%s=%s' % (key, value))
     create_cmd.flags['metadata'] = ','.join(metadata)
     return create_cmd
@@ -365,13 +362,13 @@ class RackspaceVirtualMachine(virtual_machine.BaseVirtualMachine):
     cmd = util.RackCLICommand(self, 'servers', 'instance', 'update-metadata')
     cmd.flags['id'] = self.id
     cmd.flags['metadata'] = ','.join(
-        '{0}={1}'.format(key, value) for key, value in six.iteritems(kwargs)
+        '{}={}'.format(key, value) for key, value in kwargs.items()
     )
     cmd.Issue()
 
   def OnStartup(self):
     """Executes commands on the VM immediately after it has booted."""
-    super(RackspaceVirtualMachine, self).OnStartup()
+    super().OnStartup()
     self.boot_device = self._GetBootDevice()
 
   def CreateScratchDisk(self, _, disk_spec):

@@ -10,7 +10,7 @@ from perfkitbenchmarker.providers.openstack import swift
 class SwiftTest(unittest.TestCase):
 
   def setUp(self):
-    super(SwiftTest, self).setUp()
+    super().setUp()
     p = mock.patch(swift.__name__ + '.FLAGS')
     self.mock_flags = p.start()
     self.addCleanup(p.stop)

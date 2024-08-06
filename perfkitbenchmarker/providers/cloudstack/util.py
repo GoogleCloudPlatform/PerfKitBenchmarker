@@ -26,7 +26,7 @@ except ImportError:
 FLAGS = flags.FLAGS
 
 
-class CsClient(object):
+class CsClient:  # pylint: disable=missing-class-docstring
 
   def __init__(self, url, api_key, secret):
     self._cs = API(api_key, secret, url, logging=False)

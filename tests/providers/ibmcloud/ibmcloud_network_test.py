@@ -31,7 +31,7 @@ FIP_ID = 'fipid'
 class IbmcloudNetworkTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(IbmcloudNetworkTest, self).setUp()
+    super().setUp()
     # Patch the __init__ method for simplicity.
     with mock.patch.object(
         ibmcloud_network.IbmCloudNetwork,

@@ -76,7 +76,7 @@ class RackspaceDiskSpec(disk.BaseDiskSpec):
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
-    super(RackspaceDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['rackspace_region'].present:
       config_values['rackspace_region'] = flag_values.rackspace_region
     if flag_values['rack_profile'].present:
@@ -84,7 +84,7 @@ class RackspaceDiskSpec(disk.BaseDiskSpec):
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
-    result = super(RackspaceDiskSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'rackspace_region': (
             option_decoders.StringDecoder,
@@ -99,7 +99,7 @@ class RackspaceDisk(disk.BaseDisk):
   """Base class for Rackspace disks."""
 
   def __init__(self, disk_spec, name, region, project, image=None):
-    super(RackspaceDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.name = name
     self.zone = region
     self.region = disk_spec.rackspace_region
@@ -133,7 +133,7 @@ class RackspaceLocalDisk(RackspaceDisk):
   """
 
   def __init__(self, disk_spec, name, region, project, device_path, image=None):
-    super(RackspaceLocalDisk, self).__init__(
+    super().__init__(
         disk_spec, name, region, project, image
     )
     self.exists = False
@@ -159,7 +159,7 @@ class RackspaceBootDisk(RackspaceLocalDisk):
   """
 
   def __init__(self, disk_spec, zone, project, device_path, image):
-    super(RackspaceBootDisk, self).__init__(
+    super().__init__(
         disk_spec, 'boot-disk', zone, project, device_path, image
     )
     self.mount_point = disk_spec.mount_point
@@ -172,7 +172,7 @@ class RackspaceRemoteDisk(RackspaceDisk):
   """
 
   def __init__(self, disk_spec, name, region, project, image=None, media=None):
-    super(RackspaceRemoteDisk, self).__init__(
+    super().__init__(
         disk_spec, name, region, project, image
     )
     self.media = media

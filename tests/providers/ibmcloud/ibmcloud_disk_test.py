@@ -28,7 +28,7 @@ DEVICE_PATH = '/dev/vde'
 class IbmcloudDiskGetDevicePathTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(IbmcloudDiskGetDevicePathTest, self).setUp()
+    super().setUp()
     # Patch the __init__ method for simplicity.
     with mock.patch.object(
         ibmcloud_disk.IbmCloudDisk, '__init__', lambda self: None

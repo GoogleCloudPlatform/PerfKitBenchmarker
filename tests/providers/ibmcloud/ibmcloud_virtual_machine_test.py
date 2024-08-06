@@ -47,7 +47,7 @@ class TestIbmCloudVirtualMachine(
 class IbmCloudVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(IbmCloudVirtualMachineTest, self).setUp()
+    super().setUp()
     self.mock_create_instance = self.enter_context(
         mock.patch.object(ibm_api.IbmAPICommand, 'CreateInstance')
     )
@@ -98,11 +98,11 @@ class IbmCloudVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         benchmark_name, flag_values=FLAGS, **config_dict
     )
-    benchmark_module = next((
+    benchmark_module = next(
         b
         for b in linux_benchmarks.BENCHMARKS
         if b.BENCHMARK_NAME == benchmark_name
-    ))
+    )
     return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, URI)
 
   def _CreateTestIbmCloudVirtualMachine(self):

@@ -19,7 +19,6 @@ import mock
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import utils
-import six
 
 
 _OPENSTACK_CLI_PATH = 'path/openstack'
@@ -28,7 +27,7 @@ _OPENSTACK_CLI_PATH = 'path/openstack'
 class OpenStackResource(resource.BaseResource):
 
   def __init__(self, **kwargs):
-    for k, v in six.iteritems(kwargs):
+    for k, v in kwargs.items():
       setattr(self, k, v)
 
   def _Create(self):
@@ -44,7 +43,7 @@ class OpenStackResource(resource.BaseResource):
 class OpenStackCLICommandTestCase(unittest.TestCase):
 
   def setUp(self):
-    super(OpenStackCLICommandTestCase, self).setUp()
+    super().setUp()
     p = mock.patch(utils.__name__ + '.FLAGS')
     self.mock_flags = p.start()
     self.addCleanup(p.stop)

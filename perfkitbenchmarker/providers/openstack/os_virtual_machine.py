@@ -36,7 +36,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.openstack import os_disk
 from perfkitbenchmarker.providers.openstack import os_network
 from perfkitbenchmarker.providers.openstack import utils as os_utils
-from six.moves import range
 
 NONE = 'None'
 
@@ -66,7 +65,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
-    super(OpenStackVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self.key_name = 'perfkit_key_%s' % FLAGS.run_uri
     self.user_name = FLAGS.openstack_image_username
     self.image = self.image or self.DEFAULT_IMAGE
@@ -436,7 +435,7 @@ class OpenStackVirtualMachine(virtual_machine.BaseVirtualMachine):
     Returns:
       dict mapping string property key to value.
     """
-    result = super(OpenStackVirtualMachine, self).GetResourceMetadata()
+    result = super().GetResourceMetadata()
     if self.post_provisioning_script:
       result['post_provisioning_script'] = self.post_provisioning_script
     return result

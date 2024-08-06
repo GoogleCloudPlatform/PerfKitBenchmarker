@@ -143,7 +143,7 @@ class OpenStackFirewall(network.BaseFirewall):
     pass
 
 
-class OpenStackFloatingIPPool(object):
+class OpenStackFloatingIPPool:  # pylint: disable=missing-class-docstring
   _floating_ip_lock = threading.Lock()  # Guards floating IP allocation/release
 
   def __init__(self, floating_network_id):

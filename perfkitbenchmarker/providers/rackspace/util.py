@@ -18,12 +18,11 @@ from collections import OrderedDict
 
 from absl import flags
 from perfkitbenchmarker import vm_util
-import six
 
 FLAGS = flags.FLAGS
 
 
-class RackCLICommand(object):
+class RackCLICommand:
   """A rack cli command.
 
   Attributes:
@@ -51,7 +50,7 @@ class RackCLICommand(object):
     self.additional_flags = []
 
   def __repr__(self):
-    return '{0}({1})'.format(type(self).__name__, ' '.join(self._GetCommand()))
+    return '{}({})'.format(type(self).__name__, ' '.join(self._GetCommand()))
 
   def Issue(self, **kwargs):
     """Tries running the rack cli command once.
@@ -103,8 +102,8 @@ class RackCLICommand(object):
     cmd = [FLAGS.rack_path]
     cmd.extend(self.args)
     self._AddCommonFlags(self.resource)
-    for flag_name, value in six.iteritems(self.flags):
-      flag_name_str = '--{0}'.format(flag_name)
+    for flag_name, value in self.flags.items():
+      flag_name_str = '--{}'.format(flag_name)
       if value is True:
         cmd.append(flag_name_str)
       else:

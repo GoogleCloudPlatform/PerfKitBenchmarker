@@ -76,7 +76,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the VM.
     """
-    super(AliVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self.image = FLAGS.image
     self.user_name = FLAGS.ali_user_name
     self.key_pair_name = None
@@ -430,7 +430,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     util.AddTags(self.id, util.ResourceTypes.INSTANCE, self.region, **kwargs)
 
 
-class AliCloudKeyFileManager(object):
+class AliCloudKeyFileManager:
   """Object for managing AliCloud Keyfiles."""
 
   _lock = threading.Lock()
@@ -479,7 +479,7 @@ class AliCloudKeyFileManager(object):
 
   @classmethod
   def GetKeyNameForRun(cls):
-    return 'perfkit_key_{0}'.format(FLAGS.run_uri)
+    return 'perfkit_key_{}'.format(FLAGS.run_uri)
 
   @classmethod
   def GetPublicKey(cls):

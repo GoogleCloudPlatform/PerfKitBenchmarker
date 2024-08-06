@@ -27,7 +27,7 @@ class CloudStackNetwork(network.BaseNetwork):
   CLOUD = provider_info.CLOUDSTACK
 
   def __init__(self, spec):
-    super(CloudStackNetwork, self).__init__(spec)
+    super().__init__(spec)
 
     self.cs = util.CsClient(
         FLAGS.CS_API_URL, FLAGS.CS_API_KEY, FLAGS.CS_API_SECRET
