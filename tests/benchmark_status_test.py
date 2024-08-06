@@ -24,7 +24,7 @@ from perfkitbenchmarker import pkb
 from tests import pkb_common_test_case
 
 
-class MockSpec(object):
+class MockSpec:
   """A mock BenchmarkSpec class.
 
   We need to use this rather than a mock.MagicMock object because

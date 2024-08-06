@@ -20,9 +20,6 @@ import mock
 from perfkitbenchmarker import benchmark_sets
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_benchmarks
-# This import to ensure required FLAGS are defined.
-from perfkitbenchmarker import pkb  # NOQA
-import six
 import yaml
 
 FLAGS = flags.FLAGS
@@ -327,7 +324,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     flag_list = [
         benchmark_tuple[1]['flags'] for benchmark_tuple in benchmark_tuple_list
     ]
-    six.assertCountEqual(self, flag_list, EXPECTED_MATRIX_FLAGS)
+    self.assertCountEqual(flag_list, EXPECTED_MATRIX_FLAGS)
 
   def testZipWithDifferentAxesLengths(self):
     self.mock_flags.benchmarks = ['netperf']
@@ -348,7 +345,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     flag_list = [
         benchmark_tuple[1]['flags'] for benchmark_tuple in benchmark_tuple_list
     ]
-    six.assertCountEqual(self, flag_list, EXPECTED_ZIP_FLAGS)
+    self.assertCountEqual(flag_list, EXPECTED_ZIP_FLAGS)
 
   def testZipSingleAxis(self):
     self.mock_flags.benchmarks = ['netperf']
@@ -361,7 +358,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     flag_list = [
         benchmark_tuple[1]['flags'] for benchmark_tuple in benchmark_tuple_list
     ]
-    six.assertCountEqual(self, flag_list, EXPECTED_SINGLE_ZIP_FLAGS)
+    self.assertCountEqual(flag_list, EXPECTED_SINGLE_ZIP_FLAGS)
 
   def testZipAndMatrix(self):
     self.mock_flags.benchmarks = ['netperf']
@@ -374,7 +371,7 @@ class BenchmarkSetsTestCase(unittest.TestCase):
     flag_list = [
         benchmark_tuple[1]['flags'] for benchmark_tuple in benchmark_tuple_list
     ]
-    six.assertCountEqual(self, flag_list, EXPECTED_ZIP_AND_MATRIX_FLAGS)
+    self.assertCountEqual(flag_list, EXPECTED_ZIP_AND_MATRIX_FLAGS)
 
   def testFilters(self):
     self.mock_flags.benchmarks = ['netperf']

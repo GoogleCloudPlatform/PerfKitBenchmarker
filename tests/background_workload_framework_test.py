@@ -38,7 +38,7 @@ class TestBackgroundWorkloadFramework(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     self.last_call = 0
-    super(TestBackgroundWorkloadFramework, self).setUp()
+    super().setUp()
     FLAGS.cloud = provider_info.GCP
     FLAGS.temp_dir = 'tmp'
     self.addCleanup(context.SetThreadBenchmarkSpec, None)

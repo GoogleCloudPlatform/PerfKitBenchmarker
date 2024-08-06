@@ -26,7 +26,7 @@ class _FakeSmbService(smb_service.BaseSmbService):
   CLOUD = 'mock'
 
   def __init__(self, disk_spec, zone):
-    super(_FakeSmbService, self).__init__(disk_spec, zone)
+    super().__init__(disk_spec, zone)
     self.is_ready_called = False
 
   def _IsReady(self):

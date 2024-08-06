@@ -103,7 +103,7 @@ class FakeSQLServerRelationalDb(
 class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(RelationalDbUnmanagedTestCase, self).setUp()
+    super().setUp()
     FLAGS['run_uri'].value = '123456'
     self.min_mysql_spec = {
         'cloud': 'GCP',

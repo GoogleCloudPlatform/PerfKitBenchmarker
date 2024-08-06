@@ -61,7 +61,7 @@ class FakeTpu(cloud_tpu.BaseTpu):
 class TpuSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(TpuSpecTestCase, self).setUp()
+    super().setUp()
     FLAGS['run_uri'].parse('123')
 
     self.minimal_spec = {
@@ -71,7 +71,7 @@ class TpuSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     cloud_tpu._CLOUD_TPU_REGISTRY = {'GCP': FakeTpu(None)}
 
   def tearDown(self):
-    super(TpuSpecTestCase, self).tearDown()
+    super().tearDown()
     cloud_tpu._CLOUD_TPU_REGISTRY = {}
 
   def testMinimalConfig(self):
@@ -175,7 +175,7 @@ class TpuSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 class TpuSpecFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(TpuSpecFlagsTestCase, self).setUp()
+    super().setUp()
     FLAGS['run_uri'].parse('123')
 
     self.full_spec = {
@@ -192,7 +192,7 @@ class TpuSpecFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     cloud_tpu._CLOUD_TPU_REGISTRY = {'GCP': FakeTpu(None)}
 
   def tearDown(self):
-    super(TpuSpecFlagsTestCase, self).tearDown()
+    super().tearDown()
     cloud_tpu._CLOUD_TPU_REGISTRY = {}
 
   def testCloudFlag(self):

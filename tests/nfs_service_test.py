@@ -32,7 +32,7 @@ class _DemoNfsService(nfs_service.BaseNfsService):
   NFS_TIERS = (_DEFAULT_NFS_TIER,)
 
   def __init__(self, disk_spec, zone):
-    super(_DemoNfsService, self).__init__(disk_spec, zone)
+    super().__init__(disk_spec, zone)
     self.is_ready_called = False
 
   def _IsReady(self):
@@ -107,7 +107,7 @@ class UnmanagedNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_server_vm.RemoteCommand.return_value = None, None, None
 
   def setUp(self):
-    super(UnmanagedNfsServiceTest, self).setUp()
+    super().setUp()
     self._setUpDiskSpec()
     self._setUpMockServerVm()
     self.nfs_service = nfs_service.UnmanagedNfsService(

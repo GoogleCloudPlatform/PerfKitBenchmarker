@@ -117,7 +117,7 @@ edw_benchmark:
 class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(_BenchmarkSpecTestCase, self).setUp()
+    super().setUp()
     FLAGS.cloud = provider_info.GCP
     FLAGS.temp_dir = 'tmp'
     FLAGS.ignore_package_requirements = True

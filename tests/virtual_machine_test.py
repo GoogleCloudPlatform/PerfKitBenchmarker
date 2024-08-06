@@ -30,7 +30,7 @@ class TestVmSpec(virtual_machine.BaseVmSpec):
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
-    result = super(TestVmSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result['required_string'] = (option_decoders.StringDecoder, {})
     result['required_int'] = (option_decoders.IntDecoder, {})
     return result
@@ -162,7 +162,7 @@ def CreateTestVm():
 class TestInstallData(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(TestInstallData, self).setUp()
+    super().setUp()
     self.vm = CreateTestVm()
     self.preprovisioned_data = {'fake_pkg': 'fake_checksum'}
     self.module_name = 'fake_module'

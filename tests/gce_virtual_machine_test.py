@@ -166,7 +166,7 @@ class GceVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GceVirtualMachineTestCase, self).setUp()
+    super().setUp()
     p = mock.patch(
         gce_virtual_machine.__name__ + '.gce_network.GceNetwork.GetNetwork'
     )
@@ -393,7 +393,7 @@ def _CreateFakeDiskMetadata(image, fake_disk):
 class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GceVirtualMachineOsTypesTestCase, self).setUp()
+    super().setUp()
     FLAGS.gcp_instance_metadata_from_file = ''
     FLAGS.gcp_instance_metadata = ''
     FLAGS.gcloud_path = 'gcloud'
@@ -622,7 +622,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
 class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GCEVMFlagsTestCase, self).setUp()
+    super().setUp()
     FLAGS.cloud = provider_info.GCP
     FLAGS.gcloud_path = 'test_gcloud'
     FLAGS.run_uri = 'aaaaaa'
@@ -785,7 +785,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GCEVMCreateTestCase, self).setUp()
+    super().setUp()
     p = mock.patch(
         gce_virtual_machine.__name__ + '.gce_network.GceNetwork.GetNetwork'
     )
@@ -1134,7 +1134,7 @@ class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):
 class GceNetworkTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GceNetworkTest, self).setUp()
+    super().setUp()
     # need a benchmarkspec in the context to run
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         'cluster_boot', flag_values=FLAGS
@@ -1176,7 +1176,7 @@ class GvnicTest(GceVirtualMachineTestCase):
   """Tests specific to detecting gVNIC version."""
 
   def setUp(self):
-    super(GvnicTest, self).setUp()
+    super().setUp()
     vm_spec = gce_virtual_machine.GceVmSpec('test_component', project='test')
     self.vm = gce_virtual_machine.Ubuntu2004BasedGceVirtualMachine(vm_spec)
     self.vm.HasPackage = mock.Mock(return_value=False)

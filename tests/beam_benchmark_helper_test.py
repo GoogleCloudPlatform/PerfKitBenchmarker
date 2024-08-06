@@ -31,7 +31,7 @@ class BeamBenchmarkHelperTestCase(unittest.TestCase):
     # TODO(user): See exactly why this is needed and find a better way
     # to do this. Unittests in PKB should not have to add this call manually.
     FLAGS.mark_as_parsed()
-    super(BeamBenchmarkHelperTestCase, self).setUp()
+    super().setUp()
 
   def test_runner_option_override_use_override(self):
     test_option_val = 'TestVal'

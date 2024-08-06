@@ -43,7 +43,7 @@ _BASE_REDSHIFT_SPEC = {
 FLAGS = flags.FLAGS
 
 
-class ClientVm(object):
+class ClientVm:
   """A fake VM class that can proxies a remote command to execute query."""
 
   def RemoteCommand(self, command):
@@ -51,7 +51,7 @@ class ClientVm(object):
     pass
 
 
-class PreparedClientVm(object):
+class PreparedClientVm:
 
   def Install(self, package_name):
     if package_name != 'pip':
@@ -74,7 +74,7 @@ class FakeEdwService(edw_service.EdwService):
 class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(EdwServiceTest, self).setUp()
+    super().setUp()
     FLAGS.run_uri = _TEST_RUN_URI
     FLAGS.zones = [_AWS_ZONE_US_EAST_1A]
 

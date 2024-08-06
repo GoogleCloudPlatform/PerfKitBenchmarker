@@ -16,7 +16,6 @@
 import unittest
 
 from perfkitbenchmarker import sample
-from six.moves import range
 
 
 class SampleTestCase(unittest.TestCase):

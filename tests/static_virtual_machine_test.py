@@ -69,7 +69,7 @@ class StaticVmSpecTest(pkb_common_test_case.PkbCommonTestCase):
 class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(StaticVirtualMachineTest, self).setUp()
+    super().setUp()
     self._initial_pool = svm.StaticVirtualMachine.vm_pool
     svm.StaticVirtualMachine.vm_pool.clear()
 
@@ -79,7 +79,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.image = 'test_image'
 
   def tearDown(self):
-    super(StaticVirtualMachineTest, self).tearDown()
+    super().tearDown()
     svm.StaticVirtualMachine.vm_pool = self._initial_pool
 
   def _AssertStaticVMsEqual(self, vm1, vm2):

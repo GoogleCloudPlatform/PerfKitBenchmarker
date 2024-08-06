@@ -32,7 +32,7 @@ FLAGS = flags.FLAGS
 class LoadProvidersTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(LoadProvidersTestCase, self).setUp()
+    super().setUp()
     FLAGS.ignore_package_requirements = True
     p = mock.patch.object(providers, '_imported_providers', new=set())
     p.start()

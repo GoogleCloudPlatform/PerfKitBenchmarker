@@ -15,6 +15,7 @@
 """Tests for background cpu workload."""
 
 
+import itertools
 import unittest
 
 from absl import flags
@@ -28,8 +29,6 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import ping_benchmark
 from tests import pkb_common_test_case
-import six
-from six.moves import zip_longest
 
 FLAGS = flags.FLAGS
 
@@ -59,7 +58,7 @@ _MOCKED_VM_FUNCTIONS = 'Install', 'RemoteCommand'
 class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(TestBackgroundWorkload, self).setUp()
+    super().setUp()
     FLAGS.run_uri = 'fake_run_uri'
     FLAGS.cloud = provider_info.GCP
     FLAGS.temp_dir = 'tmp'
@@ -89,17 +88,17 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
     expected_call_counts.update(
         {group: non_working_expected_counts for group in non_working_groups}
     )
-    for group_name, vm_expected_call_counts in six.iteritems(
+    for group_name, vm_expected_call_counts in (
         expected_call_counts
-    ):
+    ).items():
       group_vms = spec.vm_groups[group_name]
       self.assertEqual(
           len(group_vms),
           1,
-          msg='VM group "{0}" had {1} VMs'.format(group_name, len(group_vms)),
+          msg='VM group "{}" had {} VMs'.format(group_name, len(group_vms)),
       )
       vm = group_vms[0]
-      iter_mocked_functions = zip_longest(
+      iter_mocked_functions = itertools.zip_longest(
           _MOCKED_VM_FUNCTIONS, vm_expected_call_counts
       )
       for function_name, expected_call_count in iter_mocked_functions:
@@ -108,8 +107,8 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
             call_count,
             expected_call_count,
             msg=(
-                'Expected {0} from VM group "{1}" to be called {2} times, but'
-                ' it was called {3} times.'.format(
+                'Expected {} from VM group "{}" to be called {} times, but'
+                ' it was called {} times.'.format(
                     function_name, group_name, expected_call_count, call_count
                 )
             ),
@@ -139,11 +138,11 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['os_type'].parse(os_types.WINDOWS2019_CORE)
     spec = self._CreateBenchmarkSpec(ping_benchmark.BENCHMARK_CONFIG)
     spec.ConstructVirtualMachines()
-    with self.assertRaisesRegexp(Exception, 'NotImplementedError'):
+    with self.assertRaisesRegex(Exception, 'NotImplementedError'):
       spec.Prepare()
-    with self.assertRaisesRegexp(Exception, 'NotImplementedError'):
+    with self.assertRaisesRegex(Exception, 'NotImplementedError'):
       spec.StartBackgroundWorkload()
-    with self.assertRaisesRegexp(Exception, 'NotImplementedError'):
+    with self.assertRaisesRegex(Exception, 'NotImplementedError'):
       spec.StopBackgroundWorkload()
 
   def testBackgroundWorkloadVM(self):

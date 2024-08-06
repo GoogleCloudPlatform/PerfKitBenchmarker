@@ -58,7 +58,7 @@ class FakeRelationalDb(relational_db.BaseRelationalDb):
 class RelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(RelationalDbSpecTestCase, self).setUp()
+    super().setUp()
     FLAGS['run_uri'].parse('123')
     FLAGS['use_managed_db'].parse(True)
 
@@ -154,7 +154,7 @@ class RelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 class RelationalDbMinimalSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(RelationalDbMinimalSpecTestCase, self).setUp()
+    super().setUp()
     FLAGS['run_uri'].parse('123')
 
     self.spec = {
@@ -166,14 +166,14 @@ class RelationalDbMinimalSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testDiskSpecRequired(self):
     del self.spec['db_disk_spec']
-    with self.assertRaisesRegexp(errors.Config.MissingOption, 'db_disk_spec'):
+    with self.assertRaisesRegex(errors.Config.MissingOption, 'db_disk_spec'):
       relational_db_spec.RelationalDbSpec(
           _COMPONENT, flag_values=FLAGS, **self.spec
       )
 
   def testVmSpecRequired(self):
     del self.spec['db_spec']
-    with self.assertRaisesRegexp(errors.Config.MissingOption, 'db_spec'):
+    with self.assertRaisesRegex(errors.Config.MissingOption, 'db_spec'):
       relational_db_spec.RelationalDbSpec(
           _COMPONENT, flag_values=FLAGS, **self.spec
       )
@@ -182,7 +182,7 @@ class RelationalDbMinimalSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(RelationalDbFlagsTestCase, self).setUp()
+    super().setUp()
     FLAGS['run_uri'].parse('123')
 
     self.full_spec = {

@@ -41,7 +41,7 @@ _COMPONENT = 'test_component'
 class _DiskMetadataTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(_DiskMetadataTestCase, self).setUp()
+    super().setUp()
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
 
     p = mock.patch(vm_util.__name__ + '.GetTempDir', return_value='/tmp/dir')

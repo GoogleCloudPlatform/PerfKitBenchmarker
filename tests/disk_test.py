@@ -19,7 +19,6 @@ import mock
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from tests import pkb_common_test_case
-import six
 
 FLAGS = flags.FLAGS
 
@@ -151,7 +150,7 @@ class _NfsDisk(disk.NfsDisk):
       disk_spec = disk.BaseNFSDiskSpec(_COMPONENT, flags)
     else:
       disk_spec = disk.BaseNFSDiskSpec(_COMPONENT)
-    super(_NfsDisk, self).__init__(
+    super().__init__(
         disk_spec, 'host1:/volume1', default_nfs_version
     )
 
@@ -171,7 +170,7 @@ class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def MountOptionsAsDict(self, mount_options_str):
     options = dict()
-    int_values = set(['retrans', 'rsize', 'timeo', 'wsize', 'nconnect'])
+    int_values = {'retrans', 'rsize', 'timeo', 'wsize', 'nconnect'}
     for entry in mount_options_str.split(','):
       parts = entry.split('=', 1)
       key = parts[0]
@@ -187,7 +186,7 @@ class NfsDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertEqual(nfs_disk.mount_options, nfs_disk.fstab_options)
     disk_meta = {}
-    for key, value in six.iteritems(self.MountOptions()):
+    for key, value in self.MountOptions().items():
       disk_meta['nfs_{}'.format(key)] = value
     disk_meta.update({'num_stripes': 1, 'size': None, 'type': 'nfs'})
     self.assertEqual(disk_meta, nfs_disk.metadata)
@@ -239,7 +238,7 @@ class _SmbDisk(disk.SmbDisk):
       disk_spec = disk.BaseSMBDiskSpec(_COMPONENT, FLAGS)
     else:
       disk_spec = disk.BaseSMBDiskSpec(_COMPONENT)
-    super(_SmbDisk, self).__init__(
+    super().__init__(
         disk_spec,
         'host1',
         {'user': 'username', 'pw': 'password'},
@@ -264,9 +263,9 @@ class SmbDiskTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def MountOptionsAsDict(self, mount_options_str):
     options = dict()
-    string_values = set(
-        ['vers', 'username', 'password', 'dir_mode', 'file_mode']
-    )
+    string_values = {
+        'vers', 'username', 'password', 'dir_mode', 'file_mode'
+    }
     for entry in mount_options_str.split(','):
       parts = entry.split('=', 1)
       key = parts[0]

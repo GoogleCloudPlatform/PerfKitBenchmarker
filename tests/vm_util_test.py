@@ -34,7 +34,7 @@ class ShouldRunOnInternalIpAddressTestCase(
 ):
 
   def setUp(self):
-    super(ShouldRunOnInternalIpAddressTestCase, self).setUp()
+    super().setUp()
     self.sending_vm = mock.MagicMock()
     self.receiving_vm = mock.MagicMock()
 
@@ -125,7 +125,7 @@ class WaitUntilSleepTimer(threading.Thread):
 class IssueCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(IssueCommandTestCase, self).setUp()
+    super().setUp()
     FLAGS.time_commands = True
 
   def testTimeoutNotReached(self):
@@ -240,7 +240,7 @@ class IssueCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
 class VmUtilTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(VmUtilTest, self).setUp()
+    super().setUp()
     self.mock_vm = mock.Mock()
 
   def testReplaceTextUsesCorrectCommand(self):

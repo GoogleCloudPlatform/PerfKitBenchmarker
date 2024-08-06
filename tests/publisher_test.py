@@ -45,7 +45,7 @@ class PrettyPrintStreamPublisherTestCase(unittest.TestCase):
     stream = six.StringIO()
     instance = publisher.PrettyPrintStreamPublisher(stream)
     instance.PublishSamples([])
-    self.assertRegexpMatches(
+    self.assertRegex(
         stream.getvalue(), r'^\s*-+PerfKitBenchmarker\sResults\sSummary-+\s*$'
     )
 
@@ -78,7 +78,7 @@ class PrettyPrintStreamPublisherTestCase(unittest.TestCase):
     instance.PublishSamples(samples)
 
     value = stream.getvalue()
-    self.assertRegexpMatches(value, re.compile(r'TESTA.*TESTB', re.DOTALL))
+    self.assertRegex(value, re.compile(r'TESTA.*TESTB', re.DOTALL))
 
 
 class LogPublisherTestCase(unittest.TestCase):
@@ -500,7 +500,7 @@ class CSVPublisherTestCase(unittest.TestCase):
     instance.PublishSamples(samples)
     self.tf.seek(0)
     rows = list(csv.DictReader(self.tf))
-    six.assertCountEqual(self, ['1', '2', '3'], [i['metric'] for i in rows])
+    self.assertCountEqual(['1', '2', '3'], [i['metric'] for i in rows])
 
   def testUsesUnionOfMetaKeys(self):
     instance = publisher.CSVPublisher(self.tf.name)
@@ -640,11 +640,11 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
     ]
     expected_sample_4 = [
         'owner=Rackspace',
-        'unit=Some\ MB',
+        r'unit=Some\ MB',
         'run_uri=323',
         'test=testc',
         'timestamp=123',
-        'metric=some\,metric',
+        r'metric=some\,metric',
         'official=1.0',
         'value=non',
         'sample_uri=33',
@@ -655,17 +655,17 @@ class InfluxDBPublisherTestCase(unittest.TestCase):
         'run_uri=323',
         'test=testc',
         'timestamp=123',
-        'metric=some\,metric',
+        r'metric=some\,metric',
         'official=1.0',
         'value=non',
         'sample_uri=\\"\\"',
     ]
 
-    six.assertCountEqual(self, sample_1_formatted_key_value, expected_sample_1)
-    six.assertCountEqual(self, sample_2_formatted_key_value, expected_sample_2)
-    six.assertCountEqual(self, sample_3_formatted_key_value, expected_sample_3)
-    six.assertCountEqual(self, sample_4_formatted_key_value, expected_sample_4)
-    six.assertCountEqual(self, sample_5_formatted_key_value, expected_sample_5)
+    self.assertCountEqual(sample_1_formatted_key_value, expected_sample_1)
+    self.assertCountEqual(sample_2_formatted_key_value, expected_sample_2)
+    self.assertCountEqual(sample_3_formatted_key_value, expected_sample_3)
+    self.assertCountEqual(sample_4_formatted_key_value, expected_sample_4)
+    self.assertCountEqual(sample_5_formatted_key_value, expected_sample_5)
 
   def testConstructSample(self):
     sample_with_metadata = {

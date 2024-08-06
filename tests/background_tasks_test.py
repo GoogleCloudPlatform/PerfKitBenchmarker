@@ -24,7 +24,6 @@ import unittest
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from tests import pkb_common_test_case
-from six.moves import range
 
 
 def _ReturnArgs(a, b=None):

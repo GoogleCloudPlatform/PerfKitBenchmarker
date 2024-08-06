@@ -23,13 +23,12 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import requirements
 import pkg_resources
 import six
-from six.moves import map
 
 
 _PATH = 'dir/file'
 
 
-class _MockOpenRequirementsFile(object):
+class _MockOpenRequirementsFile:
 
   def __init__(self, *args):
     self._io = deque(six.StringIO(a) for a in args)

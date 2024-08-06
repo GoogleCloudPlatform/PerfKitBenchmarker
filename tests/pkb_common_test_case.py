@@ -202,8 +202,6 @@ class TestGceLinuxVirtualMachine(  # pytype: disable=signature-mismatch  # overr
 ):
   """Test class that has VM methods for a GCE virtual machine."""
 
-  pass
-
 
 class TestGceVirtualMachine(TestOsMixin, gce_virtual_machine.GceVirtualMachine):  # pytype: disable=signature-mismatch  # overriding-return-type-checks
   pass
@@ -237,11 +235,11 @@ def CreateBenchmarkSpecFromConfigDict(
   config_spec = benchmark_config_spec.BenchmarkConfigSpec(
       benchmark_name, flag_values=FLAGS, **config_dict
   )
-  benchmark_module = next((
+  benchmark_module = next(
       b
       for b in linux_benchmarks.BENCHMARKS
       if b.BENCHMARK_NAME == benchmark_name
-  ))
+  )
   return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, 'name0')
 
 
@@ -257,7 +255,7 @@ class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):
   """
 
   def setUp(self):
-    super(PkbCommonTestCase, self).setUp()
+    super().setUp()
     saved_flag_values = flagsaver.save_flag_values()
     self.addCleanup(flagsaver.restore_flag_values, saved_flag_values)
 

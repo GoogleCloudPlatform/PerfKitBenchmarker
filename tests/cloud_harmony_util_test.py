@@ -27,7 +27,7 @@ class CloudHarmonyTest(pkb_common_test_case.PkbCommonTestCase):
     path = os.path.join(
         os.path.dirname(__file__), 'data/cloud_harmony_sample.csv'
     )
-    with open(path, mode='r') as fp:
+    with open(path) as fp:
       sample_csv = fp.read()
     metadata = cloud_harmony_util.ParseCsvResultsFromString(sample_csv, prefix)
 

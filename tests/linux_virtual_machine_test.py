@@ -125,7 +125,7 @@ class TestSysctl(pkb_common_test_case.PkbCommonTestCase):
 class TestDiskOperations(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(TestDiskOperations, self).setUp()
+    super().setUp()
     FLAGS['default_timeout'].parse(0)  # due to @retry
     patcher = mock.patch.object(
         pkb_common_test_case.TestLinuxVirtualMachine, 'RemoteHostCommand'
@@ -181,7 +181,7 @@ class TestDiskOperations(pkb_common_test_case.PkbCommonTestCase):
 class LogDmesgTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(LogDmesgTestCase, self).setUp()
+    super().setUp()
     self.vm = CreateTestLinuxVm()
 
   def testPreDeleteDoesNotCallDmesg(self):
@@ -740,7 +740,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'mds': 'Clear CPU buffers attempted, no microcode',
     }
     self.assertEqual(expected_vulnerability, cpu_vuln.vulnerabilities)
-    expected_notaffecteds = set(['srbds', 'tsx_async_abort'])
+    expected_notaffecteds = {'srbds', 'tsx_async_abort'}
     self.assertEqual(expected_notaffecteds, cpu_vuln.notaffecteds)
     expected_unknowns = {'made_up': 'Unknown Entry'}
     self.assertEqual(expected_unknowns, cpu_vuln.unknowns)

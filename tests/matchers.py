@@ -12,7 +12,6 @@ from typing import Any
 from unittest import mock
 
 from absl import logging
-import six
 
 
 class _NotEqualMixin:
@@ -47,7 +46,7 @@ class REGEXP(_NotEqualMixin):
     if (not self._f) ^ (not self._p):
       raise TypeError("%r is not a RE_Pattern" % pattern)
     if not self._f and not self._p:
-      if not isinstance(pattern, six.string_types):
+      if not isinstance(pattern, str):
         raise TypeError("%r is not a str" % pattern)
       try:
         c = re.compile(pattern, compile_flags)
@@ -400,7 +399,7 @@ def _FuncArgCount(f, builtin=1):
     # Check for bound methods.
     has_bound_self = 1 if getattr(f, method_self, None) is not None else 0
 
-    return six.get_function_code(f).co_argcount - has_bound_self
+    return f.__code__.co_argcount - has_bound_self
 
   except AttributeError:
     # Probably missing __call__ or func_code

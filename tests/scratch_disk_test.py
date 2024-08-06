@@ -45,7 +45,7 @@ _BENCHMARK_UID = 'uid'
 _COMPONENT = 'test_component'
 
 
-class ScratchDiskTestMixin(object):
+class ScratchDiskTestMixin:
   """Sets up and tears down some of the mocks needed to test scratch disks."""
 
   @abc.abstractmethod

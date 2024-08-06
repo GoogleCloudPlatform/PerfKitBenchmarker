@@ -30,14 +30,14 @@ class ValidateMeasurementsFlagTestCase(unittest.TestCase):
     """Passing an unrecognized value is not allowed."""
     exp_str = 'test: Invalid value for --timing_measurements'
     exp_regex = r'^%s$' % re.escape(exp_str)
-    with self.assertRaisesRegexp(flags.ValidationError, exp_regex):
+    with self.assertRaisesRegex(flags.ValidationError, exp_regex):
       timing_util.ValidateMeasurementsFlag(['test'])
 
   def testNoneWithAnother(self):
     """Passing none with another value is not allowed."""
     exp_str = 'none: Cannot combine with other --timing_measurements options'
     exp_regex = r'^%s$' % re.escape(exp_str)
-    with self.assertRaisesRegexp(flags.ValidationError, exp_regex):
+    with self.assertRaisesRegex(flags.ValidationError, exp_regex):
       timing_util.ValidateMeasurementsFlag(['none', 'runtimes'])
 
   def testValid(self):

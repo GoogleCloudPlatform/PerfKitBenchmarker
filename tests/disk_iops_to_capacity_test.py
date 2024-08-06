@@ -22,11 +22,11 @@ class DiskIOPSToCapacityTest(unittest.TestCase):
 
   def testSetCPUCountAWS(self):
     AWSconfig = disk_iops_to_capacity.DiskIOPSToCapacity(300, 'AWS')
-    self.assertEquals(AWSconfig.GetCPUCount(), 2)
+    self.assertEqual(AWSconfig.GetCPUCount(), 2)
 
   def testSetCPUCountGCP(self):
     GCPconfig = disk_iops_to_capacity.DiskIOPSToCapacity(300, 'GCP')
-    self.assertEquals(GCPconfig.GetCPUCount(), 1)
+    self.assertEqual(GCPconfig.GetCPUCount(), 1)
 
   def testSetNumberDisksAWS(self):
     AWSconfig1 = disk_iops_to_capacity.DiskIOPSToCapacity(300, 'AWS')

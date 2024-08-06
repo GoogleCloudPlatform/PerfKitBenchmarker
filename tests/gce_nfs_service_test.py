@@ -11,7 +11,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import gce_nfs_service
 from tests import pkb_common_test_case
-import six
 
 
 FLAGS = flags.FLAGS
@@ -76,7 +75,7 @@ def _FullGcloud(args, location):
 class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GceNfsServiceTest, self).setUp()
+    super().setUp()
     self.issue_cmd = self._CreatePatched(vm_util, 'IssueCommand')
     self._SetNetwork()
     FLAGS['gce_network_name'].parse(_NET_NAME)
@@ -97,7 +96,7 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     return mock_method
 
   def _NfsService(self, disk_size=1024, **kwargs):
-    for key, value in six.iteritems(kwargs):
+    for key, value in kwargs.items():
       FLAGS[key].parse(value)
     spec = disk.BaseDiskSpec('test_component', disk_size=disk_size)
     return gce_nfs_service.GceNfsService(spec, _ZONE)
@@ -147,7 +146,7 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     nfs = self._NfsService(disk_size=2048)
     nfs._Create()
     cmd = self.issue_cmd.call_args_list[0][0][0]
-    self.assertRegexpMatches(' '.join(cmd), 'capacity=2048')
+    self.assertRegex(' '.join(cmd), 'capacity=2048')
 
   def testGetRemoteAddress(self):
     self._SetResponses(_DescribeResult())

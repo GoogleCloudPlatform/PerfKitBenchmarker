@@ -56,7 +56,7 @@ def _AwsCommand(region, topic, *args):
 class AwsVolumeExistsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AwsVolumeExistsTestCase, self).setUp()
+    super().setUp()
     p = mock.patch(util.__name__ + '.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
@@ -91,7 +91,7 @@ class AwsVolumeExistsTestCase(pkb_common_test_case.PkbCommonTestCase):
 class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AwsVpcTestCase, self).setUp()
+    super().setUp()
     p = mock.patch(
         'perfkitbenchmarker.providers.aws.util.IssueRetryableCommand'
     )
@@ -330,7 +330,7 @@ def CreateTestAwsVm():
 class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AwsVirtualMachineTestCase, self).setUp()
+    super().setUp()
     FLAGS.cloud = provider_info.AWS
     FLAGS.run_uri = 'aaaaaa'
     FLAGS.temp_dir = 'tmp'
@@ -760,7 +760,7 @@ class AwsGetRegionFromZoneTestCase(pkb_common_test_case.PkbCommonTestCase):
 class AwsGetBlockDeviceMapTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(AwsGetBlockDeviceMapTestCase, self).setUp()
+    super().setUp()
     p = mock.patch(util.__name__ + '.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)
@@ -825,7 +825,7 @@ class AwsGetRootBlockDeviceSpecForImageTestCase(
 ):
 
   def setUp(self):
-    super(AwsGetRootBlockDeviceSpecForImageTestCase, self).setUp()
+    super().setUp()
     p = mock.patch(util.__name__ + '.IssueRetryableCommand')
     p.start()
     self.addCleanup(p.stop)

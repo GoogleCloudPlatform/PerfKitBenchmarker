@@ -32,7 +32,7 @@ FLAGS = flags.FLAGS
 class GceWindowsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(GceWindowsVirtualMachineTestCase, self).setUp()
+    super().setUp()
     self.spec = gce_virtual_machine.GceVmSpec(
         'test_component', machine_type='test_machine_type', project='p'
     )

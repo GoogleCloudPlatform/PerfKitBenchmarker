@@ -18,19 +18,18 @@ import unittest
 
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import errors
-import six
 
 
 _COMPONENT = 'test_component'
 _FLAGS = None
 
-_STRING_TYPE_NAME = six.string_types[0].__name__
+_STRING_TYPE_NAME = (str,)[0].__name__
 
 
 class MemoryDecoderTestCase(unittest.TestCase):
 
   def setUp(self):
-    super(MemoryDecoderTestCase, self).setUp()
+    super().setUp()
     self.decoder = custom_virtual_machine_spec.MemoryDecoder(option='memory')
 
   def testValidStrings(self):
@@ -135,7 +134,7 @@ class CustomMachineTypeSpecTestCase(unittest.TestCase):
 class MachineTypeDecoderTestCase(unittest.TestCase):
 
   def setUp(self):
-    super(MachineTypeDecoderTestCase, self).setUp()
+    super().setUp()
     self.decoder = custom_virtual_machine_spec.MachineTypeDecoder(
         option='machine_type'
     )
