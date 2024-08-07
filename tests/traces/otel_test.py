@@ -28,14 +28,14 @@ TEST_VM = 'test_vm0'
 class OtelTestCase(unittest.TestCase):
 
   def setUp(self):
-    super(OtelTestCase, self).setUp()
+    super().setUp()
     directory = os.path.join(os.path.dirname(__file__), '..', 'data')
 
     self.collector = otel._OTELCollector(output_directory=directory)
     self.collector._role_mapping[TEST_VM] = 'otel_output.txt'
 
     path = os.path.join(directory, 'otel_samples.json')
-    with open(path, 'r') as file_content:
+    with open(path) as file_content:
       self.contents = json.load(file_content)
 
   def testOtelAnalyze(self):

@@ -28,7 +28,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.traces import base_collector
-import six
 
 flags.DEFINE_boolean('otel', False, 'Run otel on VMs.')
 flags.DEFINE_integer(
@@ -192,7 +191,7 @@ class _OTELCollector(base_collector.BaseCollector):
       )
 
       with open(
-          os.path.join(self.output_directory, os.path.basename(file)), 'r'
+          os.path.join(self.output_directory, os.path.basename(file))
       ) as file_contents:
         for data_element in file_contents:
           data_element = json.loads(data_element)
@@ -226,7 +225,7 @@ class _OTELCollector(base_collector.BaseCollector):
         )
 
     background_tasks.RunThreaded(
-        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)]
+        _Analyze, [((k, w), {}) for k, w in self._role_mapping.items()]
     )
 
 

@@ -28,14 +28,13 @@ Usage:
 import logging
 import os
 import posixpath
-
+from urllib import parse
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import vm_util
-from six.moves.urllib.parse import urlparse
 
 FLAGS = flags.FLAGS
 
@@ -140,7 +139,7 @@ class PerfspectCollector:
     else:
       url = FLAGS.perfspect_url or PERFSPECT_ARCHIVE_URL
       logging.info('downloading PerfSpect from: %s', url)
-      filename = os.path.basename(urlparse(url).path)
+      filename = os.path.basename(parse.urlparse(url).path)
       local_archive_path = posixpath.join(vm_util.GetTempDir(), filename)
       vm_util.IssueCommand(
           ['curl', '-k', '-L', '-o', local_archive_path, url], timeout=None

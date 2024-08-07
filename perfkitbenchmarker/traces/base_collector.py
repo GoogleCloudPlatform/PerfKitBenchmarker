@@ -29,7 +29,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
-import six
 
 FLAGS = flags.FLAGS
 
@@ -64,7 +63,7 @@ def Register(parsed_flags):
   del parsed_flags  # unused
 
 
-class BaseCollector(object):
+class BaseCollector:
   """Object representing a Base Collector.
 
   A Collector is a utility that is ran alongside benchmarks to record stats
@@ -93,8 +92,8 @@ class BaseCollector(object):
     self.vm_groups = {}
 
     if not os.path.isdir(self.output_directory):
-      raise IOError(
-          'collector output directory does not exist: {0}'.format(
+      raise OSError(
+          'collector output directory does not exist: {}'.format(
               self.output_directory
           )
       )
@@ -114,21 +113,21 @@ class BaseCollector(object):
   def _KillCommand(self, vm, pid):
     """Command to kill off the collector."""
     if vm.BASE_OS_TYPE == os_types.WINDOWS:
-      return 'taskkill /PID {0} /F'.format(pid)
+      return 'taskkill /PID {} /F'.format(pid)
     else:
-      return 'kill -INT {0}'.format(pid)
+      return 'kill -INT {}'.format(pid)
 
   def _StartOnVm(self, vm, suffix=''):
     """Start collector, having it write to an output file."""
     self._InstallCollector(vm)
-    suffix = '{0}-{1}'.format(suffix, self._CollectorName())
+    suffix = '{}-{}'.format(suffix, self._CollectorName())
     if vm.BASE_OS_TYPE == os_types.WINDOWS:
       collector_file = os.path.join(
-          vm.temp_dir, '{0}{1}.log'.format(vm.name, suffix)
+          vm.temp_dir, '{}{}.log'.format(vm.name, suffix)
       )
     else:
       collector_file = posixpath.join(
-          vm_util.VM_TMP_DIR, '{0}{1}.log'.format(vm.name, suffix)
+          vm_util.VM_TMP_DIR, '{}{}.log'.format(vm.name, suffix)
       )
 
     cmd = self._CollectorRunCommand(vm, collector_file)
@@ -159,7 +158,7 @@ class BaseCollector(object):
 
   def Start(self, sender, benchmark_spec):
     """Install and start collector on VMs specified in trace vm groups'."""
-    suffix = '-{0}-{1}'.format(benchmark_spec.uid, str(uuid.uuid4())[:8])
+    suffix = '-{}-{}'.format(benchmark_spec.uid, str(uuid.uuid4())[:8])
     if _TRACE_VM_GROUPS.value:
       for vm_group in _TRACE_VM_GROUPS.value:
         if vm_group in benchmark_spec.vm_groups:
@@ -208,7 +207,7 @@ class BaseCollector(object):
         metadata={},
     )
     args = []
-    for role, vms in six.iteritems(self.vm_groups):
+    for role, vms in self.vm_groups.items():
       args.extend(
           [((vm, '%s_%s' % (role, idx)), {}) for idx, vm in enumerate(vms)]
       )

@@ -130,7 +130,7 @@ _PER_INTERVAL_SAMPLES = [
 class MpstatTestCase(parameterized.TestCase):
 
   def setUp(self):
-    super(MpstatTestCase, self).setUp()
+    super().setUp()
     # The example output was generated with the following commands on an
     # e2-standard-2:
     # stress -c 1 &

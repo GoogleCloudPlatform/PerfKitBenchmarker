@@ -23,11 +23,11 @@ from perfkitbenchmarker.traces import nvidia_power
 class NvidiaPowerTestCase(unittest.TestCase):
 
   def setUp(self):
-    super(NvidiaPowerTestCase, self).setUp()
+    super().setUp()
     path = os.path.join(
         os.path.dirname(__file__), '../data', 'nvidia_power_output.txt'
     )
-    with open(path, 'r') as fp:
+    with open(path) as fp:
       self.contents = fp.read()
 
   def testParseNvidiaPowerResult(self):

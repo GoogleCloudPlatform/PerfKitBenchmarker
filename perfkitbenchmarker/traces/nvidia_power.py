@@ -28,7 +28,6 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.benchmark_spec import BenchmarkSpec
 from perfkitbenchmarker.traces import base_collector
-import six
 
 _NVIDIA_POWER = flags.DEFINE_boolean(
     'nvidia_power',
@@ -201,7 +200,7 @@ class _NvidiaPowerCollector(base_collector.BaseCollector):
       interval: float = 1.0,
       output_directory: str = '',
   ) -> None:
-    super(_NvidiaPowerCollector, self).__init__(interval, output_directory)
+    super().__init__(interval, output_directory)
     self.selections = selections
     self.query_items = ['index', 'timestamp']
     if selections == 'all':
@@ -241,7 +240,6 @@ class _NvidiaPowerCollector(base_collector.BaseCollector):
     def _Analyze(role: str, collector_file: str) -> None:
       with open(
           os.path.join(self.output_directory, os.path.basename(collector_file)),
-          'r',
       ) as fp:
         metadata = {
             'event': 'nvidia_power',
@@ -253,7 +251,7 @@ class _NvidiaPowerCollector(base_collector.BaseCollector):
         )
 
     background_tasks.RunThreaded(
-        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)]
+        _Analyze, [((k, w), {}) for k, w in self._role_mapping.items()]
     )
 
 

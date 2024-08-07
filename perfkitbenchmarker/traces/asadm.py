@@ -26,7 +26,6 @@ from perfkitbenchmarker import events
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker.traces import base_collector
-import six
 
 flags.DEFINE_boolean(
     'enable_asadm_log', False, 'Collect Aerospike cluster info.'
@@ -86,8 +85,7 @@ class _AsadmSummaryCollector(base_collector.BaseCollector):
     def _Analyze(role, f):
       """Parse file and record samples."""
       with open(
-          os.path.join(self.output_directory, os.path.basename(f)), 'r'
-      ) as fp:
+          os.path.join(self.output_directory, os.path.basename(f))) as fp:
         output = fp.read()
         metadata = {
             'event': 'asadm_summary',
@@ -97,7 +95,7 @@ class _AsadmSummaryCollector(base_collector.BaseCollector):
         _AnalyzeAsadmSummaryResults(metadata, output, samples)
 
     background_tasks.RunThreaded(
-        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)]
+        _Analyze, [((k, w), {}) for k, w in self._role_mapping.items()]
     )
 
 
@@ -125,8 +123,7 @@ class _AsadmLatencyCollector(base_collector.BaseCollector):
     def _Analyze(role, f):
       """Parse file and record samples."""
       with open(
-          os.path.join(self.output_directory, os.path.basename(f)), 'r'
-      ) as fp:
+          os.path.join(self.output_directory, os.path.basename(f))) as fp:
         output = fp.read()
         metadata = {
             'event': 'asadm_latency',
@@ -136,7 +133,7 @@ class _AsadmLatencyCollector(base_collector.BaseCollector):
         _AnalyzeAsadmLatencyResults(metadata, output, samples)
 
     background_tasks.RunThreaded(
-        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)]
+        _Analyze, [((k, w), {}) for k, w in self._role_mapping.items()]
     )
 
 

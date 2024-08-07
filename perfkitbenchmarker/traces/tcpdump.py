@@ -78,7 +78,7 @@ class _TcpdumpCollector(base_collector.BaseCollector):
       snaplen=None,
       packet_count=None,
   ):
-    super(_TcpdumpCollector, self).__init__(None, None)
+    super().__init__(None, None)
     self.snaplen = snaplen
     self.packet_count = packet_count
     if include_ports:

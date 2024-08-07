@@ -32,7 +32,7 @@ flags.DEFINE_boolean(
 flags.DEFINE_string('collectd_output', None, 'Path to store collectd results.')
 
 
-class _CollectdCollector(object):
+class _CollectdCollector:
   """Manages running collectd during a test, and fetching the CSV results."""
 
   def __init__(self, target_dir):
@@ -79,8 +79,8 @@ def Register(parsed_flags):
 
   output_directory = parsed_flags.collectd_output or vm_util.GetTempDir()
   if not os.path.isdir(output_directory):
-    raise IOError(
-        'collectd output directory does not exist: {0}'.format(output_directory)
+    raise OSError(
+        'collectd output directory does not exist: {}'.format(output_directory)
     )
   collector = _CollectdCollector(output_directory)
   events.before_phase.connect(collector.Before, stages.RUN, weak=False)

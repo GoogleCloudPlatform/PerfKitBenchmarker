@@ -27,7 +27,7 @@ FLAGS = flags.FLAGS
 class DstatTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(DstatTestCase, self).setUp()
+    super().setUp()
     directory = os.path.join(os.path.dirname(__file__), '..', 'data')
     path = os.path.join(directory, 'dstat-result.csv')
     self.collector = dstat._DStatCollector(output_directory=directory)

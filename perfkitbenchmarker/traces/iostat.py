@@ -227,7 +227,6 @@ class IostatCollector(base_collector.BaseCollector):
     def _Analyze(role: str, collector_file: str) -> None:
       with open(
           os.path.join(self.output_directory, os.path.basename(collector_file)),
-          'r',
       ) as fp:
         metadata = {
             'event': 'iostat',

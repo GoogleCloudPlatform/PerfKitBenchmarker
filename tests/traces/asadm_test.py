@@ -30,7 +30,7 @@ TEST_VM = 'test_vm0'
 class AsadmTestCase(unittest.TestCase, test_util.SamplesTestMixin):
 
   def setUp(self):
-    super(AsadmTestCase, self).setUp()
+    super().setUp()
     directory = os.path.join(os.path.dirname(__file__), '..', 'data')
 
     self.interval = 60

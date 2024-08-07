@@ -32,7 +32,7 @@ _CMD_FORMAT = (
 class TcpdumpTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(TcpdumpTestCase, self).setUp()
+    super().setUp()
     self.enter_context(mock.patch('os.path.isdir', return_value=True))
 
   def assertRunLine(self, command):

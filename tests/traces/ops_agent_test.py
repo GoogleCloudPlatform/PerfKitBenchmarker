@@ -34,7 +34,7 @@ OPS_AGENT_BASH_SCRIPT_PATH = './ops_agent/add-google-cloud-ops-agent-repo.sh'
 class OpsAgentTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(OpsAgentTestCase, self).setUp()
+    super().setUp()
     self.enter_context(mock.patch('os.path.isdir', return_value=True))
     self.collector = ops_agent._OpsAgentCollector()
 

@@ -56,7 +56,6 @@ from perfkitbenchmarker import events
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker.traces import base_collector
-import six
 
 _MPSTAT = flags.DEFINE_boolean(
     'mpstat',
@@ -431,8 +430,7 @@ class MpstatCollector(base_collector.BaseCollector):
     def _Analyze(role, output):
       """Parse file and record samples."""
       with open(
-          os.path.join(self.output_directory, os.path.basename(output)), 'r'
-      ) as fp:
+          os.path.join(self.output_directory, os.path.basename(output))) as fp:
         output = json.loads(fp.read())
         metadata = {
             'event': 'mpstat',
@@ -448,7 +446,7 @@ class MpstatCollector(base_collector.BaseCollector):
         )
 
     background_tasks.RunThreaded(
-        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)]
+        _Analyze, [((k, w), {}) for k, w in self._role_mapping.items()]
     )
 
 

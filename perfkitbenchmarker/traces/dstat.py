@@ -30,7 +30,6 @@ from perfkitbenchmarker import stages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import dstat
 from perfkitbenchmarker.traces import base_collector
-import six
 
 flags.DEFINE_boolean(
     'dstat',
@@ -135,8 +134,7 @@ class _DStatCollector(base_collector.BaseCollector):
 
     def _Analyze(role, file):
       with open(
-          os.path.join(self.output_directory, os.path.basename(file)), 'r'
-      ) as f:
+          os.path.join(self.output_directory, os.path.basename(file))) as f:
         fp = iter(f)
         labels, out = dstat.ParseCsvFile(fp)
         background_tasks.RunThreaded(
@@ -145,7 +143,7 @@ class _DStatCollector(base_collector.BaseCollector):
         )
 
     background_tasks.RunThreaded(
-        _Analyze, [((k, w), {}) for k, w in six.iteritems(self._role_mapping)]
+        _Analyze, [((k, w), {}) for k, w in self._role_mapping.items()]
     )
 
 
