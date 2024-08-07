@@ -1,6 +1,14 @@
 """Implementation of a model & endpoint in Vertex AI.
 
 Uses gcloud python libraries to manage those resources.
+
+One time setup of service account:
+- We assume the existence of a
+"{PROJECT_NUMBER}-compute@developer.gserviceaccount.com" service account with
+the required permissions.
+- Follow instructions from
+https://cloud.google.com/vertex-ai/docs/general/custom-service-account
+to create it & give permissions if one doesn't exist.
 """
 
 import logging
@@ -22,12 +30,10 @@ from perfkitbenchmarker.resources import managed_ai_model_spec
 FLAGS = flags.FLAGS
 
 
-# TODO(user): Use flag defined project.
+# TODO(user): Create new bucket & unique service account.
 BUCKET_URI = 'gs://test-howellz-tmp-20240717162644-2ec5'
-SERVICE_ACCOUNT = '319419405142-compute@developer.gserviceaccount.com'
+SERVICE_ACCOUNT_BASE = '{}-compute@developer.gserviceaccount.com'
 STAGING_BUCKET = os.path.join(BUCKET_URI, 'temporal')
-# TODO(user): Package model specific details like args & docker image
-# into a spec class.
 MODEL_BUCKET = os.path.join(BUCKET_URI, 'llama2')
 VLLM_ARGS = [
     '--host=0.0.0.0',
@@ -51,6 +57,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     project: The project.
     endpoint: The PKB resource endpoint the model is deployed to.
     gcloud_model: Representation of the model in gcloud python library.
+    service_account: Name of the service account used by the model.
   """
 
   CLOUD = 'GCP'
@@ -63,6 +70,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   region: str
   project: str
   gcloud_model: aiplatform.Model | None
+  service_account: str
 
   def __init__(
       self, model_spec: managed_ai_model_spec.BaseManagedAiModelSpec, **kwargs
@@ -81,13 +89,19 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     )
     self.name = 'pkb' + FLAGS.run_uri
     self.endpoint = VertexAiEndpoint(name=self.name)
-    self.region = util.GetRegionFromZone(self.zone)
-    self.project = 'test-howellz'
+    self.region = 'us-east4'
+    self.project = FLAGS.project
+    if not self.project:
+      raise errors.Setup.InvalidConfigurationError(
+          'Project is required for Vertex AI but was not set.'
+      )
     self.gcloud_model = None
     self.metadata.update({
         'name': self.name,
         'model_name': self.model_name,
     })
+    project_number = util.GetProjectNumber(self.project)
+    self.service_account = SERVICE_ACCOUNT_BASE.format(project_number)
 
   def _Create(self) -> None:
     """Creates the underlying resource."""
@@ -112,7 +126,6 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
         accelerator_type=self.model_spec.accelerator_type,
         accelerator_count=1,
         deploy_request_timeout=1800,
-        service_account=SERVICE_ACCOUNT,
     )
 
   def _CreateDependencies(self):
@@ -120,6 +133,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
         project=self.project,
         location=self.region,
         staging_bucket=STAGING_BUCKET,
+        service_account=self.service_account,
     )
     self.endpoint.Create()
 
