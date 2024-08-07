@@ -15,6 +15,7 @@ except ImportError:
   from google.cloud import aiplatform
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
+from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources import managed_ai_model
 from perfkitbenchmarker.resources import managed_ai_model_spec
 
@@ -46,7 +47,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     model_name: The official name of the model in Model Garden, e.g. Llama2.
     model_bucket_path: Where the model bucket is located.
     name: The name of the created model in private model registry.
-    region: The region.
+    region: The region, derived from the zone.
     project: The project.
     endpoint: The PKB resource endpoint the model is deployed to.
     gcloud_model: Representation of the model in gcloud python library.
@@ -80,7 +81,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     )
     self.name = 'pkb' + FLAGS.run_uri
     self.endpoint = VertexAiEndpoint(name=self.name)
-    self.region = 'us-east4'
+    self.region = util.GetRegionFromZone(self.zone)
     self.project = 'test-howellz'
     self.gcloud_model = None
     self.metadata.update({

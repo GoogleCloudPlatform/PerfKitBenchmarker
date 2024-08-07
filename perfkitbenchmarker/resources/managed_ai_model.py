@@ -20,7 +20,11 @@ than simply for calls like with an API. This also gives the customer more
 control & ownership.
 """
 
+from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
+
+FLAGS = flags.FLAGS
 
 
 class BaseManagedAiModel(resource.BaseResource):
@@ -28,6 +32,14 @@ class BaseManagedAiModel(resource.BaseResource):
 
   RESOURCE_TYPE = 'BaseManagedAiModel'
   REQUIRED_ATTRS = ['CLOUD']
+
+  def __init__(self, **kwargs):
+    super().__init__(**kwargs)
+    if not FLAGS.zone:
+      raise errors.Setup.InvalidConfigurationError(
+          'Zone is required for Managed AI models but was not set.'
+      )
+    self.zone: str = FLAGS.zone[0]
 
 
 def GetManagedAiModelClass(
