@@ -41,7 +41,7 @@ class DockerDisk(disk.BaseDisk):
   """Object representing a Docker Volume."""
 
   def __init__(self, disk_spec, disk_num, vm_name):
-    super(DockerDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.vm_name = vm_name
     self.disk_num = disk_num
     self.volume_name = self.vm_name + '-volume' + str(self.disk_num)

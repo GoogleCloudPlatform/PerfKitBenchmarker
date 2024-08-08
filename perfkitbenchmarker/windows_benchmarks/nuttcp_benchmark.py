@@ -18,7 +18,6 @@ from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.windows_packages import nuttcp
-from six.moves import range
 
 FLAGS = flags.FLAGS
 

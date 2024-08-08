@@ -321,7 +321,7 @@ def RenderResults(base_result, head_result, template_name=TEMPLATE, **kwargs):
     else:
       return ''
 
-    return 'value-{0}-{1}'.format(direction, size)
+    return 'value-{}-{}'.format(direction, size)
 
   env = jinja2.Environment(
       loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
@@ -404,7 +404,7 @@ def main():
       '-f',
       '--flags',
       type=shlex.split,
-      help="""Command line flags (Default: {0})""".format(
+      help="""Command line flags (Default: {})""".format(
           ' '.join(DEFAULT_FLAGS)
       ),
   )
@@ -429,7 +429,7 @@ def main():
     if not (a.base_flags and a.head_flags):
       p.error(
           '--base-flags and --head-flags must be specified together.\n'
-          '\tbase flags={0}\n\thead flags={1}'.format(
+          '\tbase flags={}\n\thead flags={}'.format(
               a.base_flags, a.head_flags
           )
       )

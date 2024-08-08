@@ -187,7 +187,7 @@ class Snowflake(edw_service.EdwService):
   SERVICE_TYPE = None
 
   def __init__(self, edw_service_spec):
-    super(Snowflake, self).__init__(edw_service_spec)
+    super().__init__(edw_service_spec)
     self.warehouse = FLAGS.snowflake_warehouse
     self.database = FLAGS.snowflake_database
     self.schema = FLAGS.snowflake_schema
@@ -361,7 +361,7 @@ class Snowflake(edw_service.EdwService):
 
   def GetMetadata(self):
     """Return a metadata dictionary of the benchmarked Snowflake cluster."""
-    basic_data = super(Snowflake, self).GetMetadata()
+    basic_data = super().GetMetadata()
     basic_data['warehouse'] = self.warehouse
     basic_data['database'] = self.database
     basic_data['schema'] = self.schema

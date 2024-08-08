@@ -429,7 +429,7 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(
-          '{0} --kubeconfig={1} create -f'.format(_KUBECTL, _KUBECONFIG),
+          '{} --kubeconfig={} create -f'.format(_KUBECTL, _KUBECONFIG),
           command_string,
       )
 
@@ -520,7 +520,7 @@ class KubernetesVirtualMachineWithGpusTestCase(
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(
-          '{0} --kubeconfig={1} create -f'.format(_KUBECTL, _KUBECONFIG),
+          '{} --kubeconfig={} create -f'.format(_KUBECTL, _KUBECONFIG),
           command_string,
       )
 

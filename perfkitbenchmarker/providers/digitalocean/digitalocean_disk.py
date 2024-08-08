@@ -41,7 +41,7 @@ class DigitalOceanLocalDisk(disk.BaseDisk):
   """Dummy Object representing a DigitalOcean Disk."""
 
   def __init__(self, disk_spec):
-    super(DigitalOceanLocalDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.metadata.update(LOCAL_DISK_METADATA)
 
   def Attach(self, vm):
@@ -68,7 +68,7 @@ class DigitalOceanBlockStorageDisk(disk.BaseDisk):
   """Interface to DigitalOcean Block Storage."""
 
   def __init__(self, disk_spec, zone):
-    super(DigitalOceanBlockStorageDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.zone = zone
     if self.disk_type != BLOCK_STORAGE:
       raise ValueError('DigitalOcean data disks must have type block-storage.')

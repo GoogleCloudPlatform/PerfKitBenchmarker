@@ -29,7 +29,7 @@ FLAGS = flags.FLAGS
 class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(MaintenanceSimulationTest, self).setUp()
+    super().setUp()
     FLAGS.simulate_maintenance = True
 
   def testInitialization(self):

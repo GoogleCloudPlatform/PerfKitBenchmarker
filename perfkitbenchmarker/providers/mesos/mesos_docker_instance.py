@@ -45,7 +45,7 @@ class MesosDockerSpec(virtual_machine.BaseVmSpec):
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
-    result = super(MesosDockerSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'docker_cpus': (option_decoders.FloatDecoder, {'default': 1}),
         'docker_memory_mb': (option_decoders.IntDecoder, {'default': 2048}),
@@ -57,7 +57,7 @@ class MesosDockerSpec(virtual_machine.BaseVmSpec):
     return result
 
   def _ApplyFlags(self, config_values, flag_values):
-    super(MesosDockerSpec, self)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['docker_cpus'].present:
       config_values['docker_cpus'] = flag_values.docker_cpus
     if flag_values['docker_memory_mb'].present:
@@ -74,7 +74,7 @@ class MesosDockerInstance(virtual_machine.BaseVirtualMachine):
   CLOUD = provider_info.MESOS
 
   def __init__(self, vm_spec):
-    super(MesosDockerInstance, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self.user_name = USERNAME
     self.cpus = vm_spec.docker_cpus
     self.memory_mb = vm_spec.docker_memory_mb

@@ -34,7 +34,7 @@ class DockerContainerSpec(virtual_machine.BaseVmSpec):
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
-    result = super(DockerContainerSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'privileged_docker': (
             option_decoders.BooleanDecoder,
@@ -49,7 +49,7 @@ class DockerContainerSpec(virtual_machine.BaseVmSpec):
     return result
 
   def _ApplyFlags(self, config_values, flag_values):
-    super(DockerContainerSpec, self)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     logging.warn('APPLY FLAGS')
     if flag_values['privileged_docker'].present:
       config_values['privileged_docker'] = flag_values.privileged_docker

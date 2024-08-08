@@ -22,7 +22,7 @@ class MesosDisk(disk.BaseDisk):
   """Base class for Mesos Disks."""
 
   def __init__(self, disk_spec):
-    super(MesosDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.mount_point = disk_spec.mount_point
 
   def _Create(self):
@@ -49,7 +49,7 @@ class LocalDisk(MesosDisk):
   """
 
   def __init__(self, disk_num, disk_spec, name):
-    super(LocalDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.name = 'local-disk-%s-%s' % (name, disk_num)
 
   def AttachVolumeInfo(self, container_body):

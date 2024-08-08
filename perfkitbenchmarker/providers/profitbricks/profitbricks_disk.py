@@ -21,7 +21,7 @@ class ProfitBricksDisk(disk.BaseDisk):
   """Dummy Object representing a ProfitBricks Disk."""
 
   def __init__(self, disk_spec):
-    super(ProfitBricksDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
 
   def Attach(self, vm):
     pass

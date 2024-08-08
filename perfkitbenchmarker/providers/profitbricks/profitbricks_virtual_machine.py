@@ -27,7 +27,6 @@ from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers import profitbricks
 from perfkitbenchmarker.providers.profitbricks import profitbricks_disk
 from perfkitbenchmarker.providers.profitbricks import util
-import six
 import yaml
 
 PROFITBRICKS_API = profitbricks.PROFITBRICKS_API
@@ -52,7 +51,7 @@ class CustomMachineTypeSpec(spec.BaseSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(CustomMachineTypeSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'cores': (option_decoders.IntDecoder, {'min': 1}),
         'ram': (option_decoders.IntDecoder, {'min': 1024}),
@@ -64,7 +63,7 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
   """Decodes the machine_type option of a ProfitBricks VM config."""
 
   def __init__(self, **kwargs):
-    super(MachineTypeDecoder, self).__init__((six.string_types, dict), **kwargs)
+    super().__init__(((str,), dict), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Decodes the machine_type option of a ProfitBricks VM config.
@@ -84,10 +83,10 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    super(MachineTypeDecoder, self).Decode(
+    super().Decode(
         value, component_full_name, flag_values
     )
-    if isinstance(value, six.string_types):
+    if isinstance(value, str):
       return value
     return CustomMachineTypeSpec(
         self._GetOptionFullName(component_full_name),
@@ -109,7 +108,7 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
   CLOUD = provider_info.PROFITBRICKS
 
   def __init__(self, *args, **kwargs):
-    super(ProfitBricksVmSpec, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     if isinstance(self.machine_type, CustomMachineTypeSpec):
       logging.info('Using custom hardware configuration.')
       self.cores = self.machine_type.cores
@@ -131,7 +130,7 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
         provided config values.
     """
-    super(ProfitBricksVmSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['machine_type'].present:
       config_values['machine_type'] = yaml.safe_load(flag_values.machine_type)
     if flag_values['profitbricks_location'].present:
@@ -158,7 +157,7 @@ class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(ProfitBricksVmSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'machine_type': (MachineTypeDecoder, {}),
         'location': (option_decoders.StringDecoder, {'default': 'us/las'}),
@@ -192,7 +191,7 @@ class ProfitBricksVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
-    super(ProfitBricksVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
 
     # Get user authentication credentials
     user_config_path = os.path.expanduser(FLAGS.profitbricks_config)

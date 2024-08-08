@@ -31,7 +31,6 @@ from perfkitbenchmarker.configs import vm_group_decoders
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import pkb_common_test_case
-from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -52,7 +51,7 @@ def _GetFlagDict(flag_values):
 class PerCloudConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(PerCloudConfigSpecTestCase, self).setUp()
+    super().setUp()
     self._spec_class = spec.PerCloudConfigSpec
 
   def testDefaults(self):
@@ -91,7 +90,7 @@ class PerCloudConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 class PerCloudConfigDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(PerCloudConfigDecoderTestCase, self).setUp()
+    super().setUp()
     self._decoder = spec.PerCloudConfigDecoder(option=_OPTION)
 
   def testRejectNone(self):
@@ -120,7 +119,7 @@ class PerCloudConfigDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 class StaticVmDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(StaticVmDecoderTestCase, self).setUp()
+    super().setUp()
     self._decoder = static_vm_decoders.StaticVmDecoder()
 
   def testNone(self):
@@ -150,7 +149,7 @@ class StaticVmDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 class StaticVmListDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(StaticVmListDecoderTestCase, self).setUp()
+    super().setUp()
     self._decoder = static_vm_decoders.StaticVmListDecoder()
 
   def testNone(self):
@@ -176,7 +175,7 @@ class StaticVmListDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(VmGroupSpecTestCase, self).setUp()
+    super().setUp()
     self._spec_class = vm_group_decoders.VmGroupSpec
     self._kwargs = {
         'cloud': provider_info.GCP,
@@ -213,7 +212,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         str(cm.exception),
         'Invalid test_component.cloud value: "fake_provider". Value must be '
-        'one of the following: {0}.'.format(
+        'one of the following: {}.'.format(
             ', '.join(provider_info.VALID_CLOUDS)
         ),
     )
@@ -250,7 +249,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         str(cm.exception),
         (
             'Invalid test_component.os_type value: "fake_os_type". Value must'
-            ' be one of the following: {0}.'.format(', '.join(os_types.ALL))
+            ' be one of the following: {}.'.format(', '.join(os_types.ALL))
         ),
     )
 
@@ -423,7 +422,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 class VmGroupsDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(VmGroupsDecoderTestCase, self).setUp()
+    super().setUp()
     self._decoder = vm_group_decoders.VmGroupsDecoder()
 
   def testNone(self):
@@ -477,7 +476,7 @@ class VmGroupsDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 class CloudRedisDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(CloudRedisDecoderTestCase, self).setUp()
+    super().setUp()
     self._decoder = benchmark_config_spec._CloudRedisDecoder()
     FLAGS.cloud = provider_info.GCP
     FLAGS.run_uri = 'test'
@@ -505,7 +504,7 @@ class CloudRedisDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 class CloudRedisSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(CloudRedisSpecTestCase, self).setUp()
+    super().setUp()
     self._spec_class = benchmark_config_spec._CloudRedisSpec
 
   def testMissingValues(self):
@@ -525,7 +524,7 @@ class CloudRedisSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    super(BenchmarkConfigSpecTestCase, self).setUp()
+    super().setUp()
 
     self._spec_class = benchmark_config_spec.BenchmarkConfigSpec
     self._description = 'Test description.'

@@ -17,10 +17,10 @@ SUBSCRIPTION = 'pkb_test_subscription'
 class GCPPubSubClientTest(unittest.TestCase):
 
   def testPublishMessage(self, _, publisher_mock):
-    message = 'test_message'.encode('utf-8')
-    topic_path = (
-        publisher_mock.return_value.topic_path.return_value
-    ) = 'test_topic_path'
+    message = b'test_message'
+    topic_path = publisher_mock.return_value.topic_path.return_value = (
+        'test_topic_path'
+    )
 
     gcp_interface = gcp_pubsub_client.GCPPubSubClient(
         PROJECT, TOPIC, SUBSCRIPTION

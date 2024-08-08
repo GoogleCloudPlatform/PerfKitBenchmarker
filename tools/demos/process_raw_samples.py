@@ -2,7 +2,6 @@
 
 """Transform PKB json output into a csv format."""
 
-from __future__ import print_function
 import json
 import re
 import sys

@@ -14,6 +14,9 @@
 
 """Contains code related to lifecycle management of Docker Containers."""
 
+# TODO(user): Review if unused imports are safe to remove.
+# pylint: disable=unused-import
+
 import json
 import logging
 import os
@@ -48,7 +51,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
 
   def __init__(self, vm_spec):
     """Initialize a Docker Container."""
-    super(DockerContainer, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self.name = self.name.replace('_', '-')
     self.container_id = ''
     self.user_name = FLAGS.username
@@ -300,7 +303,7 @@ class DockerContainer(virtual_machine.BaseVirtualMachine):
     Returns:
       dict mapping string property key to value.
     """
-    result = super(DockerContainer, self).GetResourceMetadata()
+    result = super().GetResourceMetadata()
     logging.warn('GET RESOURCE METADATA')
 
     return result

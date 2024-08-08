@@ -39,7 +39,7 @@ class NtttcpBenchmarkTestCase(
     return contents
 
   def setUp(self):
-    super(NtttcpBenchmarkTestCase, self).setUp()
+    super().setUp()
     self.xml_tcp_send_results = self.getDataContents('ntttcp_tcp_sender.xml')
     self.xml_tcp_rec_results = self.getDataContents('ntttcp_tcp_receiver.xml')
     self.xml_udp_send_results = self.getDataContents('ntttcp_udp_sender.xml')

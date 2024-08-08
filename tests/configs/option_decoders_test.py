@@ -17,7 +17,6 @@ import unittest
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.configs import option_decoders
-import six
 
 _COMPONENT = 'test_component'
 _FLAGS = None
@@ -237,7 +236,7 @@ class StringDecoderTestCase(unittest.TestCase):
         (
             'Invalid test_component.test_option value: "5" (of type "int"). '
             'Value must be one of the following types: %s.'
-            % six.string_types[0].__name__
+            % (str,)[0].__name__
         ),
     )
 
@@ -356,7 +355,7 @@ class FloatDecoderTestCase(unittest.TestCase):
 class ListDecoderTestCase(unittest.TestCase):
 
   def setUp(self):
-    super(ListDecoderTestCase, self).setUp()
+    super().setUp()
     self._int_decoder = option_decoders.IntDecoder()
 
   def testNonListInputType(self):

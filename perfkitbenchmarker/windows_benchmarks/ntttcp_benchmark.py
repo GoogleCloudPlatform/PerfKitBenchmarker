@@ -77,7 +77,7 @@ def _RunTest(
     )
     publisher.PublishRunStageSamples(benchmark_spec, results)
     return True
-  except IOError:
+  except OSError:
     logging.info(
         'Failed to publish %s IP results for config %s', ip_type, str(conf)
     )

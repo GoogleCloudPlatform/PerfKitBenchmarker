@@ -279,7 +279,7 @@ def LoadWorkerOutput(output):
 def main():
   worker_output = None
   print('Reading worker output')
-  with open(sys.argv[1], 'r') as worker_out_file:
+  with open(sys.argv[1]) as worker_out_file:
     worker_output = json.loads(worker_out_file.read())
   print('Parsing worker output')
   start_times, latencies, _ = LoadWorkerOutput(worker_output)

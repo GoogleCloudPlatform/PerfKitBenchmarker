@@ -20,7 +20,6 @@ import unittest
 import mock
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
-from six.moves import range
 
 
 _COMPONENT = 'test_component'
@@ -44,7 +43,7 @@ class _TestFixedDecodeOrderSpec(spec.BaseSpec):
 class BaseSpecFixedDecodeOrderTestCase(unittest.TestCase):
 
   def setUp(self):
-    super(BaseSpecFixedDecodeOrderTestCase, self).setUp()
+    super().setUp()
     self.config_option_names = [str(i) for i in range(100)]
 
   def testSuccessfulDecode(self):

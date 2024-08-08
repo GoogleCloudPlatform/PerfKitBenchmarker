@@ -21,7 +21,6 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.digitalocean import digitalocean_disk
 from perfkitbenchmarker.providers.digitalocean import util
-from six.moves import range
 
 # DigitalOcean sets up the root account with a temporary
 # password that's set as expired, requiring it to be changed
@@ -61,7 +60,7 @@ class DigitalOceanVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
     """
-    super(DigitalOceanVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self.droplet_id = None
     self.max_local_disks = 1
     self.local_disk_counter = 0

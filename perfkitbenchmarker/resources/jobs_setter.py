@@ -28,7 +28,7 @@ class BaseJobSpec(spec.BaseSpec):
 
   @classmethod
   def _GetOptionDecoderConstructions(cls) -> Dict[str, Any]:
-    result = super(BaseJobSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'job_type': (
             option_decoders.StringDecoder,

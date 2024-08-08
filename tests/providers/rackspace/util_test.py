@@ -18,7 +18,6 @@ import unittest
 import mock
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.providers.rackspace import util
-import six
 
 
 _RACK_PATH = 'path/rack'
@@ -27,7 +26,7 @@ _RACK_PATH = 'path/rack'
 class RackspaceResource(resource.BaseResource):
 
   def __init__(self, **kwargs):
-    for k, v in six.iteritems(kwargs):
+    for k, v in kwargs.items():
       setattr(self, k, v)
 
   def _Create(self):
@@ -40,7 +39,7 @@ class RackspaceResource(resource.BaseResource):
 class RackCLICommandTestCase(unittest.TestCase):
 
   def setUp(self):
-    super(RackCLICommandTestCase, self).setUp()
+    super().setUp()
     p = mock.patch(util.__name__ + '.FLAGS')
     self.mock_flags = p.start()
     self.addCleanup(p.stop)
