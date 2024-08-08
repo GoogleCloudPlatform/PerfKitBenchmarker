@@ -489,7 +489,7 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
 
       command = issue_command.call_args[0][0]
       command_string = ' '.join(command)
-      self.assertIn('gsutil', command_string)
+      self.assertIn('gcloud storage', command_string)
 
 
 class KubernetesVirtualMachineWithGpusTestCase(

@@ -1807,7 +1807,7 @@ def GenerateDownloadPreprovisionedDataCommand(
   Returns:
     The gcloud command to run.
   """
-  return 'gsutil -q cp gs://%s/%s/%s %s' % (
+  return 'gcloud storage -q cp gs://%s/%s/%s %s' % (
       FLAGS.gcp_preprovisioned_data_bucket,
       module_name,
       filename,
