@@ -872,6 +872,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       filenames,
       install_path,
       fallback_url,
+      timeout=PREPROVISIONED_DATA_TIMEOUT,
   ):
     """Installs preprovisioned_data on this VM.
 
@@ -882,6 +883,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
         module.
       install_path: The path to download the data file.
       fallback_url: The dict mapping filenames to fallback url for downloading.
+      timeout: The timeout for downloading the data file.
 
     Raises:
       errors.Setup.BadPreprovisionedDataError: If the module or filename are
@@ -916,7 +918,9 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
         )
 
       if preprovisioned:
-        self.DownloadPreprovisionedData(install_path, module_name, filename)
+        self.DownloadPreprovisionedData(
+            install_path, module_name, filename, timeout
+        )
       elif url:
         self.Install('wget')
         file_name = os.path.basename(url)
@@ -938,7 +942,11 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
         )
 
   def InstallPreprovisionedBenchmarkData(
-      self, benchmark_name, filenames, install_path
+      self,
+      benchmark_name,
+      filenames,
+      install_path,
+      timeout=PREPROVISIONED_DATA_TIMEOUT,
   ):
     """Installs preprovisioned benchmark data on this VM.
 
@@ -964,6 +972,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       filenames: An iterable of preprovisioned data filenames for a particular
         benchmark.
       install_path: The path to download the data file.
+      timeout: The timeout for downloading the data file.
 
     Raises:
       errors.Setup.BadPreprovisionedDataError: If the benchmark or filename are
@@ -991,10 +1000,15 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
         filenames,
         install_path,
         fallback_url,
+        timeout,
     )
 
   def InstallPreprovisionedPackageData(
-      self, package_name, filenames, install_path
+      self,
+      package_name,
+      filenames,
+      install_path,
+      timeout=PREPROVISIONED_DATA_TIMEOUT,
   ):
     """Installs preprovisioned Package data on this VM.
 
@@ -1021,6 +1035,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       filenames: An iterable of preprovisioned data filenames for a particular
         package.
       install_path: The path to download the data file.
+      timeout: The timeout for downloading the data file.
 
     Raises:
       errors.Setup.BadPreprovisionedDataError: If the package or filename are
@@ -1042,7 +1057,12 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       )
     fallback_url = getattr(package_module, 'PACKAGE_DATA_URL', {})
     self._InstallData(
-        preprovisioned_data, package_name, filenames, install_path, fallback_url
+        preprovisioned_data,
+        package_name,
+        filenames,
+        install_path,
+        fallback_url,
+        timeout,
     )
 
   def ShouldDownloadPreprovisionedData(self, module_name, filename):

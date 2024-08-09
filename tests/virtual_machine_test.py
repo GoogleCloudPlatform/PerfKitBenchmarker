@@ -205,7 +205,7 @@ class TestInstallData(pkb_common_test_case.PkbCommonTestCase):
                 self.fallback_url,
             )
     download.assert_called_once_with(
-        self.install_path, self.module_name, 'fake_pkg'
+        self.install_path, self.module_name, 'fake_pkg', 600
     )
     remote_command.assert_not_called()
     check.assert_called_once_with(

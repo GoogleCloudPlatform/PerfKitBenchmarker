@@ -502,3 +502,4 @@
     (https://issues.apache.org/jira/browse/HDFS-631).
 -   Update OpenJDK version to default on Debian based OSes and latest on Red Hat
     based OSes.
+-   Update Chromium version to 127.0.6533.88.
