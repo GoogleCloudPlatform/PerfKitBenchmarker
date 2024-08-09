@@ -87,7 +87,7 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
         mock.patch(
             gce_network.__name__ + '.GceNetwork.GetNetwork',
             return_value=gce_network.GceNetwork(
-                gce_network.GceNetworkSpec('fakeproject')
+                gce_network.GceNetworkSpec('fakeproject', zone='us-central1-a')
             ),
         )
     )

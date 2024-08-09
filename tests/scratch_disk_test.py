@@ -196,7 +196,9 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
   def _CreateVm(self):
     vm_spec = gce_virtual_machine.GceVmSpec(
-        'test_vm_spec.GCP', machine_type='test_machine_type'
+        'test_vm_spec.GCP',
+        machine_type='test_machine_type',
+        zone='us-central1-a',
     )
     vm = gce_virtual_machine.Ubuntu2004BasedGceVirtualMachine(vm_spec)
     vm.GetNVMEDeviceInfo = mock.Mock()
