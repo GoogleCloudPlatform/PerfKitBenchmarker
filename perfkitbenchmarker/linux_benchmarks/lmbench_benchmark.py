@@ -69,25 +69,25 @@ def _ConfigureRun(vm):
   """Configure Lmbench tests."""
   logging.info('Set Lmbench run parameters')
   vm.RemoteCommand(
-      'cd {0} && mkdir bin && cd bin && mkdir x86_64-linux-gnu'.format(
+      'cd {} && mkdir bin && cd bin && mkdir x86_64-linux-gnu'.format(
           lmbench.LMBENCH_DIR
       )
   )
   vm.RobustRemoteCommand(
-      'cd {0} && cd scripts && echo "1" >>input.txt && '
+      'cd {} && cd scripts && echo "1" >>input.txt && '
       'echo "1" >>input.txt && ./config-run <input.txt'.format(
           lmbench.LMBENCH_DIR
       )
   )
   sed_cmd = (
       'sed -i -e "s/OUTPUT=\\/dev\\/tty/OUTPUT=\\/dev\\/null/" '
-      '{0}/bin/x86_64-linux-gnu/CONFIG.*'.format(lmbench.LMBENCH_DIR)
+      '{}/bin/x86_64-linux-gnu/CONFIG.*'.format(lmbench.LMBENCH_DIR)
   )
   vm.RemoteCommand(sed_cmd)
 
   if FLAGS.lmbench_mem_size:
     sed_cmd = (
-        'sed -i -e "s/MB=/MB={0}/" {1}/bin/x86_64-linux-gnu/CONFIG.*'.format(
+        'sed -i -e "s/MB=/MB={}/" {}/bin/x86_64-linux-gnu/CONFIG.*'.format(
             FLAGS.lmbench_mem_size, lmbench.LMBENCH_DIR
         )
     )
@@ -95,8 +95,8 @@ def _ConfigureRun(vm):
 
   if FLAGS.lmbench_hardware == _LMBENCH_HARDWARE_DEFAULT:
     sed_cmd = (
-        'sed -i -e "s/BENCHMARK_HARDWARE=YES/BENCHMARK_HARDWARE={0}/" '
-        '{1}/bin/x86_64-linux-gnu/CONFIG.*'.format(
+        'sed -i -e "s/BENCHMARK_HARDWARE=YES/BENCHMARK_HARDWARE={}/" '
+        '{}/bin/x86_64-linux-gnu/CONFIG.*'.format(
             FLAGS.lmbench_hardware, lmbench.LMBENCH_DIR
         )
     )
@@ -314,17 +314,17 @@ def Run(benchmark_spec):
 
   # Use the current configuration to run the benchmark tests.
   vm.RobustRemoteCommand(
-      'cd {0} && sudo make rerun'.format(lmbench.LMBENCH_DIR)
+      'cd {} && sudo make rerun'.format(lmbench.LMBENCH_DIR)
   )
 
   stdout, _ = vm.RobustRemoteCommand(
-      'cd {0} && cd results/x86_64-linux-gnu && cat *.*'.format(
+      'cd {} && cd results/x86_64-linux-gnu && cat *.*'.format(
           lmbench.LMBENCH_DIR
       )
   )
 
   vm.RobustRemoteCommand(
-      'cd {0} && cd results/x86_64-linux-gnu && '
+      'cd {} && cd results/x86_64-linux-gnu && '
       'mkdir -p /tmp/lmbench && '
       'sudo mv *.* /tmp/lmbench; '.format(lmbench.LMBENCH_DIR)
   )

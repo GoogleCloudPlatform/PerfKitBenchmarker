@@ -36,7 +36,6 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import cassandra
-from six.moves import range
 
 
 NUM_KEYS_PER_CORE = 2000000
@@ -453,19 +452,21 @@ def RunTestOnLoader(
     population_params: string. Representing additional population parameters.
   """
   if command == USER_COMMAND:
-    command += ' profile={profile} ops\({ops}\)'.format(
+    command += r' profile={profile} ops\({ops}\)'.format(
         profile=TEMP_PROFILE_PATH, ops=user_operations
     )
 
     schema_option = ''
   else:
     if command == MIXED_COMMAND:
-      command += ' ratio\({ratio}\)'.format(
+      command += r' ratio\({ratio}\)'.format(
           ratio=FLAGS.cassandra_stress_mixed_ratio
       )
     # TODO: Support more complex replication strategy.
-    schema_option = '-schema replication\(factor={replication_factor}\)'.format(
-        replication_factor=FLAGS.cassandra_stress_replication_factor
+    schema_option = (
+        r'-schema replication\(factor={replication_factor}\)'.format(
+            replication_factor=FLAGS.cassandra_stress_replication_factor
+        )
     )
   population_range = '%s..%s' % (
       loader_index * population_per_vm + 1,
@@ -476,7 +477,7 @@ def RunTestOnLoader(
   else:
     population_params = population_range
   if population_dist:
-    population_dist = '-pop dist=%s\(%s\)' % (
+    population_dist = r'-pop dist=%s\(%s\)' % (
         population_dist,
         population_params,
     )

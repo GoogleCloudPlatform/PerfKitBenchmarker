@@ -54,9 +54,6 @@ from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.sample import PercentileCalculator  # noqa
-import six
-from six.moves import range
-from six.moves import zip
 
 # Object Naming Schemes
 SEQUENTIAL_BY_STREAM = 'sequential_by_stream'
@@ -556,8 +553,8 @@ def ProcessMultiStreamResults(
   )
   metadata['object_naming'] = FLAGS.object_storage_object_naming_scheme
 
-  min_num_records = min((len(start_time) for start_time in start_times))
-  num_records = sum((len(start_time) for start_time in start_times))
+  min_num_records = min(len(start_time) for start_time in start_times)
+  num_records = sum(len(start_time) for start_time in start_times)
   logging.info('Processing %s total operation records', num_records)
 
   stop_times = [
@@ -565,12 +562,12 @@ def ProcessMultiStreamResults(
       for start_time, latency in zip(start_times, latencies)
   ]
 
-  last_start_time = max((start_time[0] for start_time in start_times))
-  first_stop_time = min((stop_time[-1] for stop_time in stop_times))
+  last_start_time = max(start_time[0] for start_time in start_times)
+  first_stop_time = min(stop_time[-1] for stop_time in stop_times)
 
   # Compute how well our synchronization worked
-  first_start_time = min((start_time[0] for start_time in start_times))
-  last_stop_time = max((stop_time[-1] for stop_time in stop_times))
+  first_start_time = min(start_time[0] for start_time in start_times)
+  last_stop_time = max(stop_time[-1] for stop_time in stop_times)
   start_gap = last_start_time - first_start_time
   stop_gap = last_stop_time - first_stop_time
   if (start_gap + stop_gap) / (
@@ -817,7 +814,7 @@ def _DistributionToBackendFormat(dist):
   if isinstance(dist, dict):
     val = {
         flag_util.StringToBytes(size): flag_util.StringToRawPercent(frequency)
-        for size, frequency in six.iteritems(dist)
+        for size, frequency in dist.items()
     }
   else:
     # We allow compact notation for point distributions. For instance,
@@ -828,13 +825,13 @@ def _DistributionToBackendFormat(dist):
   # with integer percentages. If we want to allow general decimal
   # percentages, all we have to do is replace this equality check with
   # approximate equality.
-  if sum(six.itervalues(val)) != 100.0:
+  if sum(val.values()) != 100.0:
     raise ValueError("Frequencies in %s don't add to 100%%!" % dist)
 
   return val
 
 
-class APIScriptCommandBuilder(object):
+class APIScriptCommandBuilder:
   """Builds command lines for the API test script.
 
   Attributes:
@@ -1281,7 +1278,7 @@ def _MultiStreamOneWay(
       latencies,
       sizes,
       operation.name,
-      list(six.iterkeys(size_distribution)),
+      list(size_distribution.keys()),
       results,
       metadata=metadata,
   )

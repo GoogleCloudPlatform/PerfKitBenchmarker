@@ -32,7 +32,6 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import glibc
-import six
 
 FLAGS = flags.FLAGS
 
@@ -149,22 +148,22 @@ def ParseOutput(glibc_output, upper_key, results, metadata):
     metadata: Common metadata to attach to samples.
   """
   jsondata = json.loads(glibc_output, object_pairs_hook=HelperParseOutput)
-  for function, items in six.iteritems(jsondata[upper_key]):
+  for function, items in jsondata[upper_key].items():
     # handle the jsondata with duplicate keys
     if isinstance(items, list):
       for item in items:
         current_metadata = metadata.copy()
-        for key, val in six.iteritems(item):
-          metric = '{0}:{1}'.format(function, key)
-          for subitem, value in six.iteritems(val):
+        for key, val in item.items():
+          metric = '{}:{}'.format(function, key)
+          for subitem, value in val.items():
             current_metadata[subitem] = value
           results.append(sample.Sample(metric, -1, '', current_metadata))
     # handle the jsondata with unique keys
     else:
       for item in items:
         current_metadata = metadata.copy()
-        metric = '{0}:{1}'.format(function, item)
-        for subitem, value in six.iteritems(items[item]):
+        metric = '{}:{}'.format(function, item)
+        for subitem, value in items[item].items():
           current_metadata[subitem] = value
         results.append(sample.Sample(metric, -1, '', current_metadata))
 
@@ -195,20 +194,20 @@ def Run(benchmark_spec):
   logging.info('Glibc Benchmark Tests Results:')
   # Parse the output for "bench-math", "bench-string" and "bench-pthread".
   if any(i in GLIBC_BENCH for i in FLAGS.glibc_benchset):
-    stdout, _ = vm.RemoteCommand('cat {0}/bench.out'.format(RESULTS_DIR))
+    stdout, _ = vm.RemoteCommand('cat {}/bench.out'.format(RESULTS_DIR))
     ParseOutput(stdout, 'functions', results, metadata)
   # Parse the output for "malloc-thread".
   if any(i in GLIBC_BENCH_MALLOC for i in FLAGS.glibc_benchset):
     thread_num = ['1', '8', '16', '32']
     for num in thread_num:
       stdout, _ = vm.RemoteCommand(
-          'cat {0}/bench-malloc-thread-{1}.out'.format(RESULTS_DIR, num)
+          'cat {}/bench-malloc-thread-{}.out'.format(RESULTS_DIR, num)
       )
       ParseOutput(stdout, 'functions', results, metadata)
   # Parse the output for "math-benchset".
   if any(i in GLIBC_MATH_BENCHSET for i in FLAGS.glibc_benchset):
     stdout, _ = vm.RemoteCommand(
-        'cat {0}/bench-math-inlines.out'.format(RESULTS_DIR)
+        'cat {}/bench-math-inlines.out'.format(RESULTS_DIR)
     )
     ParseOutput('{%s}' % stdout, 'math-inlines', results, metadata)
   return results

@@ -31,14 +31,13 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.configs import option_decoders
-import six
 
 
 class CopyThroughputBenchmarkSpec(benchmark_config_spec.BenchmarkConfigSpec):
 
   def __init__(self, component_full_name, **kwargs):
     self.data_size_in_mb = None
-    super(CopyThroughputBenchmarkSpec, self).__init__(
+    super().__init__(
         component_full_name, **kwargs
     )
 
@@ -51,9 +50,7 @@ class CopyThroughputBenchmarkSpec(benchmark_config_spec.BenchmarkConfigSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(
-        CopyThroughputBenchmarkSpec, cls
-    )._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'data_size_in_mb': (option_decoders.FloatDecoder, {'default': None}),
     })
@@ -299,8 +296,8 @@ def RunScpSingleDirection(
   results = []
   metadata = base_metadata.copy()
   for vm_specifier, vm in ('receiving', receiving_vm), ('sending', sending_vm):
-    for k, v in six.iteritems(vm.GetResourceMetadata()):
-      metadata['{0}_{1}'.format(vm_specifier, k)] = v
+    for k, v in vm.GetResourceMetadata().items():
+      metadata['{}_{}'.format(vm_specifier, k)] = v
 
   cmd_template = (
       'sudo sync; sudo sysctl vm.drop_caches=3; '

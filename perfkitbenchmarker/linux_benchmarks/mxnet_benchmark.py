@@ -27,7 +27,6 @@ from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import mxnet
 from perfkitbenchmarker.linux_packages import mxnet_cnn
 from perfkitbenchmarker.linux_packages import nvidia_driver
-from six.moves import range
 
 
 FLAGS = flags.FLAGS

@@ -376,7 +376,7 @@ def _BuildContext(launcher_vm, booter_template_vm):
     context.update({
         'group_name': booter_template_vm.placement_group.name,
         'image': booter_template_vm.image,
-        'key_name': 'perfkit-key-{0}'.format(FLAGS.run_uri),
+        'key_name': 'perfkit-key-{}'.format(FLAGS.run_uri),
         'region': aws_util.GetRegionFromZone(launcher_vm.zone),
         'subnet_id': booter_template_vm.network.subnet.id,
         'tags': aws_util.FormatTagSpecifications('instance', tags),

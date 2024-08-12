@@ -36,7 +36,6 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import gluster
-import six
 
 FLAGS = flags.FLAGS
 BENCHMARKS = ['VDI', 'DATABASE', 'SWBUILD', 'VDA', 'EDA']
@@ -211,9 +210,9 @@ def _ConfigureSpec(
   # that they don't interfere with sed.
   sed_expressions = ' '.join([
       '-e "s/{0}=.*/{0}={1}/"'.format(k, v)
-      for k, v in six.iteritems(configuration_overrides)
+      for k, v in configuration_overrides.items()
   ])
-  sed_cmd = 'sudo sed -i {0} {1}'.format(sed_expressions, config_path)
+  sed_cmd = 'sudo sed -i {} {}'.format(sed_expressions, config_path)
   prime_client.RemoteCommand(sed_cmd)
 
   mount_points = [f'{client.internal_ip} {_MOUNT_POINT}' for client in clients]
@@ -321,7 +320,7 @@ def _RunSpecSfs(benchmark_spec):
     A list of sample.Sample objects.
   """
   prime_client = benchmark_spec.vm_groups['clients'][0]
-  run_cmd = 'cd {0} && python3 sfsmanager -r sfs_rc {1}'.format(
+  run_cmd = 'cd {} && python3 sfsmanager -r sfs_rc {}'.format(
       _SPEC_DIR, '-a' if FLAGS.specsfs2014_auto_mode else ''
   )
   prime_client.RobustRemoteCommand(run_cmd, ignore_failure=True)

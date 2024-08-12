@@ -84,14 +84,14 @@ def Run(benchmark_spec):
   # extra header to identify the tests. This must match
   # RESULT_START_REGEX as used below.
   cmds = [
-      '(echo ";;; Java small"; cd {0} && java -cp {1} {2})'.format(
+      '(echo ";;; Java small"; cd {} && java -cp {} {})'.format(
           scimark2.PATH, scimark2.JAVA_JAR, scimark2.JAVA_MAIN
       ),
-      '(echo ";;; C small"; cd {0} && ./scimark2)'.format(scimark2.C_SRC),
-      '(echo ";;; Java large"; cd {0} && java -cp {1} {2} -large)'.format(
+      '(echo ";;; C small"; cd {} && ./scimark2)'.format(scimark2.C_SRC),
+      '(echo ";;; Java large"; cd {} && java -cp {} {} -large)'.format(
           scimark2.PATH, scimark2.JAVA_JAR, scimark2.JAVA_MAIN
       ),
-      '(echo ";;; C large"; cd {0} && ./scimark2 -large)'.format(
+      '(echo ";;; C large"; cd {} && ./scimark2 -large)'.format(
           scimark2.C_SRC
       ),
   ]
@@ -226,7 +226,7 @@ def ParseResults(results):
     datapoints = []
     if benchmark_language == 'C':
       for groups in regex_util.ExtractAllMatches(result_regex_c, result):
-        metric = '{0} {1}'.format(groups[0].strip(), groups[2].strip())
+        metric = '{} {}'.format(groups[0].strip(), groups[2].strip())
         metric = metric.strip().strip(':')  # Extra ':' in 'MonteCarlo:'.
         value = float(groups[1])
         datapoints.append((metric, value))

@@ -158,69 +158,71 @@ def Run(benchmark_spec):
         sample.Sample(result_label, float(matches[0]), result_metric)
     )
 
-  GetResults('\[OVERALL\], RunTime\(ms\), (\d+.?\d*)', 'OVERALL RunTime', 'ms')
+  GetResults(r'\[OVERALL\], RunTime\(ms\), (\d+.?\d*)', 'OVERALL RunTime', 'ms')
   GetResults(
-      '\[OVERALL\], Throughput\(ops\/sec\), (\d+.?\d*)',
+      r'\[OVERALL\], Throughput\(ops\/sec\), (\d+.?\d*)',
       'OVERALL Throughput',
       'ops/sec',
   )
-  GetResults('\[CLEANUP\], Operations, (\d+.?\d*)', 'CLEANUP Operations', 'ops')
   GetResults(
-      '\[CLEANUP\], AverageLatency\(us\), (\d+.?\d*)',
+      r'\[CLEANUP\], Operations, (\d+.?\d*)', 'CLEANUP Operations', 'ops'
+  )
+  GetResults(
+      r'\[CLEANUP\], AverageLatency\(us\), (\d+.?\d*)',
       'CLEANUP AverageLatency',
       'us',
   )
   GetResults(
-      '\[CLEANUP\], MinLatency\(us\), (\d+.?\d*)', 'CLEANUP MinLatency', 'us'
+      r'\[CLEANUP\], MinLatency\(us\), (\d+.?\d*)', 'CLEANUP MinLatency', 'us'
   )
   GetResults(
-      '\[CLEANUP\], MaxLatency\(us\), (\d+.?\d*)', 'CLEANUP MaxLatency', 'us'
+      r'\[CLEANUP\], MaxLatency\(us\), (\d+.?\d*)', 'CLEANUP MaxLatency', 'us'
   )
   GetResults(
-      '\[CLEANUP\], 95thPercentileLatency\(ms\), (\d+.?\d*)',
+      r'\[CLEANUP\], 95thPercentileLatency\(ms\), (\d+.?\d*)',
       'CLEANUP 95thPercentileLatency',
       'ms',
   )
   GetResults(
-      '\[CLEANUP\], 99thPercentileLatency\(ms\), (\d+.?\d*)',
+      r'\[CLEANUP\], 99thPercentileLatency\(ms\), (\d+.?\d*)',
       'CLEANUP 99thPercentileLatency',
       'ms',
   )
-  GetResults('\[READ\], Operations, (\d+.?\d*)', 'READ Operations', 'ops')
+  GetResults(r'\[READ\], Operations, (\d+.?\d*)', 'READ Operations', 'ops')
   GetResults(
-      '\[READ\], AverageLatency\(us\), (\d+.?\d*)', 'READ AverageLatency', 'us'
+      r'\[READ\], AverageLatency\(us\), (\d+.?\d*)', 'READ AverageLatency', 'us'
   )
-  GetResults('\[READ\], MinLatency\(us\), (\d+.?\d*)', 'READ MinLatency', 'us')
-  GetResults('\[READ\], MaxLatency\(us\), (\d+.?\d*)', 'READ MaxLatency', 'us')
+  GetResults(r'\[READ\], MinLatency\(us\), (\d+.?\d*)', 'READ MinLatency', 'us')
+  GetResults(r'\[READ\], MaxLatency\(us\), (\d+.?\d*)', 'READ MaxLatency', 'us')
   GetResults(
-      '\[READ\], 95thPercentileLatency\(ms\), (\d+.?\d*)',
+      r'\[READ\], 95thPercentileLatency\(ms\), (\d+.?\d*)',
       'READ 95thPercentileLatency',
       'ms',
   )
   GetResults(
-      '\[READ\], 99thPercentileLatency\(ms\), (\d+.?\d*)',
+      r'\[READ\], 99thPercentileLatency\(ms\), (\d+.?\d*)',
       'READ 99thPercentileLatency',
       'ms',
   )
-  GetResults('\[UPDATE\], Operations, (\d+.?\d*)', 'UPDATE Operations', 'us')
+  GetResults(r'\[UPDATE\], Operations, (\d+.?\d*)', 'UPDATE Operations', 'us')
   GetResults(
-      '\[UPDATE\], AverageLatency\(us\), (\d+.?\d*)',
+      r'\[UPDATE\], AverageLatency\(us\), (\d+.?\d*)',
       'UPDATE AverageLatency',
       'us',
   )
   GetResults(
-      '\[UPDATE\], MinLatency\(us\), (\d+.?\d*)', 'UPDATE MinLatency', 'us'
+      r'\[UPDATE\], MinLatency\(us\), (\d+.?\d*)', 'UPDATE MinLatency', 'us'
   )
   GetResults(
-      '\[UPDATE\], MaxLatency\(us\), (\d+.?\d*)', 'UPDATE MaxLatency', 'us'
+      r'\[UPDATE\], MaxLatency\(us\), (\d+.?\d*)', 'UPDATE MaxLatency', 'us'
   )
   GetResults(
-      '\[UPDATE\], 95thPercentileLatency\(ms\), (\d+.?\d*)',
+      r'\[UPDATE\], 95thPercentileLatency\(ms\), (\d+.?\d*)',
       'UPDATE 95thPercentileLatency',
       'ms',
   )
   GetResults(
-      '\[UPDATE\], 99thPercentileLatency\(ms\), (\d+.?\d*)',
+      r'\[UPDATE\], 99thPercentileLatency\(ms\), (\d+.?\d*)',
       'UPDATE 99thPercentileLatency',
       'ms',
   )

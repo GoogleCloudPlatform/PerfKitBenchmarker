@@ -136,9 +136,9 @@ def Run(benchmark_spec):
   # id is hardcoded as 001, which might change with different runspec
   # parameters. SPEC CPU2006 will generate different logs for build, test
   # run, training run and ref run.
-  if FLAGS.benchmark_subset in _SPECINT_BENCHMARKS | set(['int', 'all']):
+  if FLAGS.benchmark_subset in _SPECINT_BENCHMARKS | {'int', 'all'}:
     log_files.append('CINT2006.001.ref.txt')
-  if FLAGS.benchmark_subset in _SPECFP_BENCHMARKS | set(['fp', 'all']):
+  if FLAGS.benchmark_subset in _SPECFP_BENCHMARKS | {'fp', 'all'}:
     log_files.append('CFP2006.001.ref.txt')
   partial_results = FLAGS.benchmark_subset not in _SPECCPU_SUBSETS
 

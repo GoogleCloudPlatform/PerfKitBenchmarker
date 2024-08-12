@@ -326,7 +326,7 @@ def CreateDatabase(benchmark_spec, default_database_name, new_database_name):
     )
 
   db.client_vm_query_tools.IssueSqlCommand(
-      'CREATE DATABASE {0}'.format(new_database_name),
+      'CREATE DATABASE {}'.format(new_database_name),
       database_name=default_database_name,
   )
 

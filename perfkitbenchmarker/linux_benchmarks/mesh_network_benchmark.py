@@ -28,7 +28,6 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import netperf
-from six.moves import range
 
 
 flags.DEFINE_integer(

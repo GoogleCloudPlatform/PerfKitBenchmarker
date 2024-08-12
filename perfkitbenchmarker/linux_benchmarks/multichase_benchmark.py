@@ -88,7 +88,7 @@ class _MemorySizeParser(flag_util.UnitsParser):
   )
 
   def __init__(self):
-    super(_MemorySizeParser, self).__init__(
+    super().__init__(
         convertible_to=(units.byte, units.percent)
     )
 
@@ -105,12 +105,12 @@ class _MemorySizeParser(flag_util.UnitsParser):
       ValueError: If the input cannot be parsed, or if it parses to a value that
           does not meet the requirements described in self.syntactic_help.
     """
-    size = super(_MemorySizeParser, self).parse(inp)
+    size = super().parse(inp)
     if size.units != units.percent:
       size_byte_count = size.to(units.byte).magnitude
       if size_byte_count != int(size_byte_count):
         raise ValueError(
-            'Expression {0!r} parses to memory size {1!r}, which is not '
+            'Expression {!r} parses to memory size {!r}, which is not '
             'convertible to an integer number of bytes.'.format(inp, str(size))
         )
     return size
@@ -147,7 +147,7 @@ flags.DEFINE_integer(
     'multichase_chase_arg',
     1,
     'Argument to refine the chase type specified with --multichase_chase_type. '
-    'Applicable for the following types: {0}.'.format(
+    'Applicable for the following types: {}.'.format(
         ', '.join(_CHASES_WITH_ARGS)
     ),
 )
@@ -269,7 +269,7 @@ def CheckPrerequisites(benchmark_config):
     )
 
 
-class _MultichaseSpecificState(object):
+class _MultichaseSpecificState:
   """State specific to this benchmark that must be preserved between PKB stages.
 
   An instance of this class is attached to the VM as an attribute and is
@@ -303,7 +303,7 @@ def Prepare(benchmark_spec):
   vm_state.dir = remote_benchmark_dir
   vm_state.multichase_dir = posixpath.join(vm_state.dir, 'multichase')
   vm.RemoteCommand(
-      'cp -ar {0} {1}'.format(multichase.INSTALL_PATH, vm_state.multichase_dir)
+      'cp -ar {} {}'.format(multichase.INSTALL_PATH, vm_state.multichase_dir)
   )
 
 
@@ -336,7 +336,7 @@ def Run(benchmark_spec):
 
   chase_type = FLAGS.multichase_chase_type
   if _CHASES[chase_type]:
-    chase_type = '{0}:{1}'.format(chase_type, FLAGS.multichase_chase_arg)
+    chase_type = '{}:{}'.format(chase_type, FLAGS.multichase_chase_arg)
     base_metadata['chase_arg'] = FLAGS.multichase_chase_arg
   base_cmd.extend(('-c', chase_type))
 

@@ -31,7 +31,7 @@ kernel_compile:
 """
 
 
-class _Paths(object):
+class _Paths:
 
   def __init__(self, vm):
     self.working_dir = os.path.join(vm.GetScratchDir(), BENCHMARK_NAME)
@@ -46,7 +46,7 @@ def _GetVm(benchmark_spec):
   vms = benchmark_spec.vms
   if len(vms) != 1:
     raise ValueError(
-        'kernel_compile benchmark requires exactly one machine, found {0}'
+        'kernel_compile benchmark requires exactly one machine, found {}'
         .format(len(vms))
     )
   return vms[0]

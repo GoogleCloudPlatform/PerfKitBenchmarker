@@ -88,7 +88,7 @@ def _GetVmOperationDataSamples(
     samples.append(
         sample.Sample(f'{operation} Time', operation_time, 'seconds', metadata)
     )
-  os_types = set([vm.OS_TYPE for vm in vms])
+  os_types = {vm.OS_TYPE for vm in vms}
   metadata = {'num_vms': len(vms), 'os_type': ','.join(sorted(os_types))}
   samples.append(
       sample.Sample(

@@ -174,7 +174,7 @@ def Prepare(benchmark_spec):
     # custom scenario
     # Install memcached on all the servers
     servers = benchmark_spec.vm_groups['servers']
-    assert servers, 'No memcached servers: {0}'.format(benchmark_spec.vm_groups)
+    assert servers, 'No memcached servers: {}'.format(benchmark_spec.vm_groups)
     memcached_install_fns = [
         functools.partial(memcached_server.ConfigureAndStart, vm)
         for vm in servers

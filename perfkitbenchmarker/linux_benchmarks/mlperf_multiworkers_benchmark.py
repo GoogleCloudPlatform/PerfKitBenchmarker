@@ -13,7 +13,6 @@
 # limitations under the License.
 """Run MLPerf benchmarks on multiple workers."""
 
-from __future__ import print_function
 import posixpath
 from absl import flags
 from perfkitbenchmarker import background_tasks

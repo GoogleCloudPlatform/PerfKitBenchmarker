@@ -171,7 +171,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
     raise errors.Benchmarks.RunError('Job report not found.')
 
   results = []
-  with open(report_file, 'r') as file:
+  with open(report_file) as file:
     result = json.loads(file.read())
     results.append(
         sample.Sample(
@@ -249,7 +249,7 @@ def _GetSubstitutedSqlQuery(cluster: dpb_service.BaseDpbService):
   query_string = ''
   template_query_path = _DownloadTemplatedQuery(storage_service)
   substitute_dict = _GetQuerySubstitutions(cluster)
-  with open(template_query_path, 'r') as query_read:
+  with open(template_query_path) as query_read:
     for line in query_read:
       for subs in substitute_dict:
         line = line.replace(subs, substitute_dict[subs])

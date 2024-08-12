@@ -173,7 +173,7 @@ class ApacheBenchResults:
     ]
 
 
-class ApacheBenchRunMode(object):
+class ApacheBenchRunMode:
   """Enum of options for --apachebench_run_mode."""
 
   MAX_THROUGHPUT = 'MAX_THROUGHPUT'

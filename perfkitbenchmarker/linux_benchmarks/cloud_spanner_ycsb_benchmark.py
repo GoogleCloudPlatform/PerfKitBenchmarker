@@ -101,7 +101,7 @@ def CheckPrerequisites(_):
   """Validates correct flag usages before running this benchmark."""
   for scope in REQUIRED_SCOPES:
     if scope not in FLAGS.gcloud_scopes:
-      raise ValueError('Scope {0} required.'.format(scope))
+      raise ValueError('Scope {} required.'.format(scope))
   if ycsb.CPU_OPTIMIZATION.value and (
       ycsb.CPU_OPTIMIZATION_MEASUREMENT_MINS.value
       <= gcp_spanner.CPU_API_DELAY_MINUTES

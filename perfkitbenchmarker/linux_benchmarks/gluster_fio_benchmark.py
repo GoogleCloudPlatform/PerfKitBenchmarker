@@ -107,7 +107,7 @@ def _RunFio(vm, fio_params, metadata):
     A list of sample.Sample objects
   """
   stdout, _ = vm.RemoteCommand(
-      'sudo {0} {1}'.format(fio.GetFioExec(), fio_params)
+      'sudo {} {}'.format(fio.GetFioExec(), fio_params)
   )
   job_file_contents = fio.FioParametersToJob(fio_params)
   samples = fio.ParseResults(

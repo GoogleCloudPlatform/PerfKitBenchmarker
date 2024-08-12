@@ -29,7 +29,6 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker.linux_packages import redis_server
 from perfkitbenchmarker.linux_packages import ycsb
-from six.moves import range
 
 flags.DEFINE_integer(
     'redis_ycsb_processes',

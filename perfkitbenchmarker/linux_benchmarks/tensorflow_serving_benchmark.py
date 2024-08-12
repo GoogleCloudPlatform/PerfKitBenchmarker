@@ -175,10 +175,10 @@ def _PrepareClient(vm):
       linux_packages.INSTALL_DIR,
       posixpath.splitext(ILSVRC_VALIDATION_IMAGES_TAR)[0],
   )
-  vm.RemoteCommand('mkdir {0}'.format(extract_dir))
+  vm.RemoteCommand('mkdir {}'.format(extract_dir))
 
   vm.RemoteCommand(
-      'cd {0} && tar xvf {1} --directory {2}'.format(
+      'cd {} && tar xvf {} --directory {}'.format(
           linux_packages.INSTALL_DIR, ILSVRC_VALIDATION_IMAGES_TAR, extract_dir
       )
   )
@@ -197,10 +197,10 @@ def _PrepareServer(vm):
   )
 
   extract_dir = posixpath.join(TF_SERVING_BASE_DIRECTORY, 'resnet')
-  vm.RemoteCommand('mkdir {0}'.format(extract_dir))
+  vm.RemoteCommand('mkdir {}'.format(extract_dir))
 
   vm.RemoteCommand(
-      'cd {0} && tar --strip-components=2 --directory {1} -xvzf {2}'.format(
+      'cd {} && tar --strip-components=2 --directory {} -xvzf {}'.format(
           TF_SERVING_BASE_DIRECTORY, extract_dir, RESNET_NHWC_SAVEDMODEL_TGZ
       )
   )
@@ -258,9 +258,9 @@ def _StartServer(vm):
   # Use the docker development image to build the inception model
   vm.RemoteCommand(
       'sudo docker run -d --rm --name tfserving-server --network host '
-      '--mount type=bind,source={0},target=/models/resnet '
+      '--mount type=bind,source={},target=/models/resnet '
       '-e MODEL_NAME=resnet '
-      '-t benchmarks/tensorflow-serving --port={1}'.format(
+      '-t benchmarks/tensorflow-serving --port={}'.format(
           model_download_directory, SERVER_PORT
       )
   )
@@ -282,8 +282,8 @@ def _StartClient(vm, server_ip, client_thread_count):
       of CLIENT_SCRIPT (detected by looking at stderr).
   """
   stdout, stderr = vm.RemoteCommand(
-      'python3 {0} --server={1}:{2} --image_directory={3} '
-      '--runtime={4} --num_threads={5}'.format(
+      'python3 {} --server={}:{} --image_directory={} '
+      '--runtime={} --num_threads={}'.format(
           posixpath.join(linux_packages.INSTALL_DIR, CLIENT_SCRIPT),
           server_ip,
           SERVER_PORT,
@@ -306,7 +306,7 @@ def _StartClient(vm, server_ip, client_thread_count):
       and 'Ignore above cudart dlerror' not in stderr
   ):
     raise ClientWorkloadScriptExecutionError(
-        'Exception occurred during execution of client script: {0}'.format(
+        'Exception occurred during execution of client script: {}'.format(
             stderr
         )
     )

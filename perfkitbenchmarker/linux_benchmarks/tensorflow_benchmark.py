@@ -32,7 +32,6 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.linux_packages import tensorflow
-from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -592,7 +591,7 @@ def _GetTfCnnBenchmarkCommand(
           forward_only=benchmark_spec.forward_only,
           use_fp16=(benchmark_spec.precision == FP16),
           num_gpus='--num_gpus={}'.format(num_gpus) if num_gpus else '',
-          job_name='--job_name={0} {1}'.format(job_name, args) if args else '',
+          job_name='--job_name={} {}'.format(job_name, args) if args else '',
       )
   )
   return cmd

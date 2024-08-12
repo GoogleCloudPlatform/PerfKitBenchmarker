@@ -106,7 +106,7 @@ def _PrepareClient(vm):
   log_config = """<configuration><root level="WARN"/></configuration>"""
 
   vm.RemoteCommand(
-      "echo '{0}' > {1}/logback.xml".format(log_config, ycsb.YCSB_DIR)
+      "echo '{}' > {}/logback.xml".format(log_config, ycsb.YCSB_DIR)
   )
 
 

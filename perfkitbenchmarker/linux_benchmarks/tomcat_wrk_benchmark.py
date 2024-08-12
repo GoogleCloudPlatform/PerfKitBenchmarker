@@ -96,7 +96,7 @@ def _IncreaseMaxOpenFiles(vm):
 
 
 def _RemoveOpenFileLimit(vm):
-  vm.RemoteCommand('sudo rm -f {0}'.format(NOFILE_LIMIT_CONF))
+  vm.RemoteCommand('sudo rm -f {}'.format(NOFILE_LIMIT_CONF))
 
 
 def _PrepareServer(vm):
@@ -154,7 +154,7 @@ def Run(benchmark_spec):
   max_connections = FLAGS.tomcat_wrk_max_connections
 
   target = six.moves.urllib.parse.urljoin(
-      'http://{0}:{1}'.format(tomcat_vm.ip_address, tomcat.TOMCAT_HTTP_PORT),
+      'http://{}:{}'.format(tomcat_vm.ip_address, tomcat.TOMCAT_HTTP_PORT),
       SAMPLE_PAGE_PATH,
   )
 
@@ -202,12 +202,12 @@ def Run(benchmark_spec):
 
   # Annotate the sample with the best throughput
   max_throughput = max(all_by_metric, key=lambda x: x['throughput'].value)
-  for sample in six.itervalues(max_throughput):
+  for sample in max_throughput.values():
     sample.metadata.update(best_throughput=True)
 
   # ...and best 50th percentile latency
   min_p50 = min(all_by_metric, key=lambda x: x['p50 latency'].value)
-  for sample in six.itervalues(min_p50):
+  for sample in min_p50.values():
     sample.metadata.update(best_p50=True)
 
   sort_key = operator.attrgetter('metric')
@@ -215,11 +215,11 @@ def Run(benchmark_spec):
     samples = [
         sample
         for d in all_by_metric
-        for sample in sorted(six.itervalues(d), key=sort_key)
+        for sample in sorted(d.values(), key=sort_key)
     ]
   else:
-    samples = sorted(six.itervalues(min_p50), key=sort_key) + sorted(
-        six.itervalues(max_throughput), key=sort_key
+    samples = sorted(min_p50.values(), key=sort_key) + sorted(
+        max_throughput.values(), key=sort_key
     )
 
   for sample in samples:

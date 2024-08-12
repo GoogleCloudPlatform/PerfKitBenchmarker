@@ -30,7 +30,6 @@ from perfkitbenchmarker.linux_benchmarks import mnist_benchmark
 from perfkitbenchmarker.linux_benchmarks import resnet_benchmark
 from perfkitbenchmarker.linux_packages import cloud_tpu_models
 from perfkitbenchmarker.linux_packages import tensorflow
-from six.moves import range
 
 FLAGS = flags.FLAGS
 

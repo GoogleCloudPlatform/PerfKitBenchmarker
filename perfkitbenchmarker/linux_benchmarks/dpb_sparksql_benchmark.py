@@ -353,7 +353,7 @@ def _GetQuerySamples(
 
   samples = []
   for report_file in report_files:
-    with open(report_file, 'r') as file:
+    with open(report_file) as file:
       for line in file:
         result = json.loads(line)
         logging.info('Timing: %s', result)

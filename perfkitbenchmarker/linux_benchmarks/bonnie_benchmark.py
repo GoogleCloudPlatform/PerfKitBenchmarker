@@ -20,8 +20,6 @@ import logging
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
-import six
-from six.moves import range
 
 
 BENCHMARK_NAME = 'bonnieplusplus'
@@ -302,7 +300,7 @@ def ParseCSVResults(results):
     )
 
   field_index_mapping = {}
-  for field, value in six.iteritems(bonnie_results_mapping):
+  for field, value in bonnie_results_mapping.items():
     field_index_mapping[value] = field
   assert len(results) == len(bonnie_results_mapping)
   samples = []

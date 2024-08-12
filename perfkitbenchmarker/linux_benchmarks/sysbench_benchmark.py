@@ -170,12 +170,12 @@ SPANNER_TPCC = 'spanner-tpcc'
 # Parameters are defined in oltp_common.lua file
 # https://github.com/akopytov/sysbench
 _MAP_WORKLOAD_TO_VALID_UNIQUE_PARAMETERS = {
-    'tpcc': set(['scale']),
-    SPANNER_TPCC: set(['scale']),
-    'oltp_write_only': set(['table_size', 'auto-inc']),
-    'oltp_read_only': set(['table_size', 'auto-inc']),
-    'oltp_read_write': set(['table_size', 'auto-inc']),
-    'oltp_insert': set(['table_size', 'auto-inc']),
+    'tpcc': {'scale'},
+    SPANNER_TPCC: {'scale'},
+    'oltp_write_only': {'table_size', 'auto-inc'},
+    'oltp_read_only': {'table_size', 'auto-inc'},
+    'oltp_read_write': {'table_size', 'auto-inc'},
+    'oltp_insert': {'table_size', 'auto-inc'},
 }
 
 

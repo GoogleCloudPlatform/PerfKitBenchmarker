@@ -24,7 +24,6 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import act
-from six.moves import range
 
 BENCHMARK_NAME = 'aerospike_certification_tool'
 BENCHMARK_CONFIG = """

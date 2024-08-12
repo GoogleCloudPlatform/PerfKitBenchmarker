@@ -46,7 +46,6 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import oldisim_dependencies
-from six.moves import map
 
 FLAGS = flags.FLAGS
 
@@ -241,7 +240,7 @@ def Run(benchmark_spec):
   results = []
   qps_dict = dict()
 
-  fanout_list = set([1, FLAGS.oldisim_num_leaves])
+  fanout_list = {1, FLAGS.oldisim_num_leaves}
   for fanout in map(int, FLAGS.oldisim_fanout):
     if fanout > 1 and fanout < FLAGS.oldisim_num_leaves:
       fanout_list.add(fanout)

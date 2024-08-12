@@ -32,7 +32,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aerospike_client
 from perfkitbenchmarker.linux_packages import aerospike_server
-from six.moves import range
 
 
 FLAGS = flags.FLAGS

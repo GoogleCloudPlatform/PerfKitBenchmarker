@@ -239,7 +239,7 @@ def Run(benchmark_spec):
   results = []
 
   if vm_util.ShouldRunOnExternalIpAddress():
-    server_ips = list((vm.ip_address for vm in server_vms))
+    server_ips = list(vm.ip_address for vm in server_vms)
     external_ip_results = RunNetperfAggregate(client_vm, server_ips)
     for external_ip_result in external_ip_results:
       external_ip_result.metadata['ip_type'] = 'external'
@@ -253,7 +253,7 @@ def Run(benchmark_spec):
       break
 
   if run_internal:
-    server_ips = list((vm.internal_ip for vm in server_vms))
+    server_ips = list(vm.internal_ip for vm in server_vms)
     internal_ip_results = RunNetperfAggregate(client_vm, server_ips)
 
     for internal_ip_result in internal_ip_results:

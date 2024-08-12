@@ -142,9 +142,9 @@ def Run(benchmark_spec):
   nthreads = vm.NumCpusForBenchmark()
   logging.info('Silo running on %s', vm)
   command = (
-      'cd {0} && '
+      'cd {} && '
       'out-perf.masstree/benchmarks/dbtest '
-      '--bench {1} --num-threads {2} --verbose'.format(
+      '--bench {} --num-threads {} --verbose'.format(
           silo.SILO_DIR, FLAGS.silo_benchmark, nthreads
       )
   )

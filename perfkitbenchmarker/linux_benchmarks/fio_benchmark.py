@@ -546,7 +546,7 @@ def GetScenarioFromScenarioString(scenario_string):
     value = key_value[1]
     if key not in FIO_KNOWN_FIELDS_IN_JINJA:
       raise errors.Setup.InvalidFlagConfigurationError(
-          'Unrecognized FIO parameter {0} out of scenario {1}'.format(
+          'Unrecognized FIO parameter {} out of scenario {}'.format(
               key, scenario_string
           )
       )
@@ -715,7 +715,7 @@ def GenerateJobFileString(
   )
 
 
-FILENAME_PARAM_REGEXP = re.compile('filename\s*=.*$', re.MULTILINE)
+FILENAME_PARAM_REGEXP = re.compile(r'filename\s*=.*$', re.MULTILINE)
 
 
 def ProcessedJobFileString(fio_jobfile_contents, remove_filename):
@@ -921,7 +921,7 @@ def Prepare(benchmark_spec):
 def GetFileAsString(file_path):
   if not file_path:
     return None
-  with open(data.ResourcePath(file_path), 'r') as jobfile:
+  with open(data.ResourcePath(file_path)) as jobfile:
     return jobfile.read()
 
 

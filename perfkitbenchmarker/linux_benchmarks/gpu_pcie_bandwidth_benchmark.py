@@ -24,7 +24,6 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cuda_toolkit
-from six.moves import range
 
 DEFAULT_RANGE_START = 1 << 26  # 64 MB
 DEFAULT_RANGE_STEP = 1 << 26  # 64 MB
@@ -179,7 +178,7 @@ def _FindIndexOfLineThatStartsWith(lines, str):
     if line.startswith(str):
       return idx
   raise InvalidBandwidthTestOutputFormat(
-      'Unable to find {0} in bandwidthTest output'.format(str)
+      'Unable to find {} in bandwidthTest output'.format(str)
   )
 
 
@@ -304,7 +303,7 @@ def Run(benchmark_spec):
       % metadata['cuda_toolkit_home']
   )
   if mode == 'range':
-    run_command += ' --mode=range --start={0} --end={1} --increment={2}'.format(
+    run_command += ' --mode=range --start={} --end={} --increment={}'.format(
         transfer_size_range[0], transfer_size_range[1], transfer_size_range[2]
     )
 

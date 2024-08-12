@@ -246,12 +246,12 @@ def _RunIperf(
       total_stats = {}
 
       if thread_count == 1:
-        r = re.compile((
+        r = re.compile(
             r'\[\s*(?P<thread_num>\d+)\]\s+(?P<interval>\d+\.\d+-\d+\.\d+)\s+sec\s+'
             r'(?P<transfer>\d+\.?\d*)\s\w+\s+(?P<throughput>\d+\.?\d*)\sMbits\/sec\s+'
             r'(?P<write>\d+)\/(?P<err>\d+)\s+(?P<retry>\d+)\s+(?P<cwnd>-?\d+)(?P<cwnd_scale>\w*)\/'
             r'(?P<rtt>\d+)\s+(?P<rtt_unit>\w+)\s+(?P<netpwr>\d+\.?\d*)'
-        ))
+        )
         interval_stats = [m.groupdict() for m in r.finditer(stdout)]
 
         for count in range(0, len(interval_stats) - 1):
@@ -270,20 +270,20 @@ def _RunIperf(
 
       elif thread_count > 1:
         # Parse aggregates of multiple sending threads for each report interval
-        r = re.compile((
+        r = re.compile(
             r'\[SUM\]\s+(?P<interval>\d+\.\d+-\d+\.\d+)\s\w+\s+(?P<transfer>\d+\.?\d*)'
             r'\s\w+\s+(?P<throughput>\d+\.?\d*)\sMbits\/sec\s+(?P<write>\d+)'
             r'\/(?P<err>\d+)\s+(?P<retry>\d+)'
-        ))
+        )
         interval_sums = [m.groupdict() for m in r.finditer(stdout)]
 
         # Parse output for each individual thread for each report interval
-        r = re.compile((
+        r = re.compile(
             r'\[\s*(?P<thread_num>\d+)\]\s+(?P<interval>\d+\.\d+-\d+\.\d+)\s+sec\s+'
             r'(?P<transfer>\d+\.?\d*)\s\w+\s+(?P<throughput>\d+\.?\d*)\sMbits\/sec\s+(?P<write>\d+)\/'
             r'(?P<err>\d+)\s+(?P<retry>\d+)\s+(?P<cwnd>-?\d+)(?P<cwnd_scale>\w*)\/(?P<rtt>\d+)\s+'
             r'(?P<rtt_unit>\w+)\s+(?P<netpwr>\d+\.?\d*)'
-        ))
+        )
         interval_threads = [m.groupdict() for m in r.finditer(stdout)]
 
         # sum and average across threads for each interval report
@@ -386,11 +386,11 @@ def _RunIperf(
         err = int(match.group('err'))
         retry = int(match.group('retry'))
 
-      r = re.compile((
+      r = re.compile(
           r'\d+ Mbits\/sec\s+'
           r' \d+\/\d+\s+\d+\s+(?P<cwnd>-*\d+)(?P<cwnd_unit>\w+)\/(?P<rtt>\d+)'
           r'\s+(?P<rtt_unit>\w+)\s+(?P<netpwr>\d+\.\d+)'
-      ))
+      )
       match = [m.groupdict() for m in r.finditer(stdout)]
 
       cwnd = sum(float(i['cwnd']) for i in match) / len(match)

@@ -149,7 +149,7 @@ def CreateYCSBTable(
       },
   )
   # TODO(user): on HBase update, add '-n' flag.
-  command = '{0}/hbase shell {1}'.format(hbase.HBASE_BIN, remote)
+  command = '{}/hbase shell {}'.format(hbase.HBASE_BIN, remote)
   vm.RemoteCommand(command)
 
 
@@ -190,16 +190,16 @@ def Prepare(benchmark_spec):
   by_role = _GetVMsByRole(benchmark_spec.vm_groups)
 
   loaders = by_role['clients']
-  assert loaders, 'No loader VMs: {0}'.format(by_role)
+  assert loaders, 'No loader VMs: {}'.format(by_role)
 
   # HBase cluster
   hbase_vms = by_role['hbase_vms']
-  assert hbase_vms, 'No HBase VMs: {0}'.format(by_role)
+  assert hbase_vms, 'No HBase VMs: {}'.format(by_role)
   master = by_role['master']
   zk_quorum = by_role['zk_quorum']
-  assert zk_quorum, 'No zookeeper quorum: {0}'.format(by_role)
+  assert zk_quorum, 'No zookeeper quorum: {}'.format(by_role)
   workers = by_role['workers']
-  assert workers, 'No workers: {0}'.format(by_role)
+  assert workers, 'No workers: {}'.format(by_role)
 
   hbase_install_fns = [
       functools.partial(vm.Install, 'hbase') for vm in hbase_vms
