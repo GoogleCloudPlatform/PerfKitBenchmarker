@@ -57,7 +57,7 @@ def InstallTensorFlowServingAPI(vm):
       'build_pip_package {0}"'.format(pip_package_output_dir)
   )
 
-  vm.RemoteCommand('sudo pip3 install {0}'.format(pip_package))
+  vm.RemoteCommand('sudo pip3 install {}'.format(pip_package))
 
 
 def BuildDockerImages(vm):
@@ -65,7 +65,7 @@ def BuildDockerImages(vm):
 
   vm.InstallPackages('git')
   vm.RemoteHostCommand(
-      'cd {0} && git clone -b {1} https://github.com/tensorflow/serving'.format(
+      'cd {} && git clone -b {} https://github.com/tensorflow/serving'.format(
           linux_packages.INSTALL_DIR, FLAGS.tf_serving_branch
       )
   )

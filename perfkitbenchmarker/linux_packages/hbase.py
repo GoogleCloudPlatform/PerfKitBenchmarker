@@ -157,7 +157,7 @@ def ConfigureAndStart(master, regionservers, zk_nodes):
   background_tasks.RunThreaded(fn, vms)
 
   master.RemoteCommand(
-      '{0} dfs -mkdir /hbase'.format(posixpath.join(hadoop.HADOOP_BIN, 'hdfs'))
+      '{} dfs -mkdir /hbase'.format(posixpath.join(hadoop.HADOOP_BIN, 'hdfs'))
   )
 
   master.RemoteCommand(posixpath.join(HBASE_BIN, 'start-hbase.sh'))

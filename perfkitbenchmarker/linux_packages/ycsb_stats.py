@@ -488,7 +488,7 @@ def ParseResults(
     try:
       result_string = next(fp).strip()
     except StopIteration:
-      raise IOError(
+      raise OSError(
           f'Could not parse YCSB output: {ycsb_result_string}'
       ) from None
 
@@ -496,7 +496,7 @@ def ParseResults(
     lines.append(result_string)
   else:
     # Received unexpected header
-    raise IOError(f'Unexpected header: {client_string}')
+    raise OSError(f'Unexpected header: {client_string}')
 
   # Some databases print additional output to stdout.
   # YCSB results start with [<OPERATION_NAME>];
@@ -623,10 +623,10 @@ def _WeightedQuantile(x, weights, p):
   """
   if len(x) != len(weights):
     raise ValueError(
-        'Lengths do not match: {0} != {1}'.format(len(x), len(weights))
+        'Lengths do not match: {} != {}'.format(len(x), len(weights))
     )
   if p < 0 or p > 1:
-    raise ValueError('Invalid quantile: {0}'.format(p))
+    raise ValueError('Invalid quantile: {}'.format(p))
   n = sum(weights)
   target = n * float(p)
   cumulative = list(_CumulativeSum(weights))
@@ -655,10 +655,10 @@ def _PercentilesFromHistogram(ycsb_histogram, percentiles=_DEFAULT_PERCENTILES):
   histogram = sorted(ycsb_histogram)
   for percentile in percentiles:
     if percentile < 0 or percentile > 100:
-      raise ValueError('Invalid percentile: {0}'.format(percentile))
+      raise ValueError('Invalid percentile: {}'.format(percentile))
     if math.modf(percentile)[0] < 1e-7:
       percentile = int(percentile)
-    label = 'p{0}'.format(percentile)
+    label = 'p{}'.format(percentile)
     latencies, freqs = list(zip(*histogram))
     time_ms = _WeightedQuantile(latencies, freqs, percentile * 0.01)
     result[label] = time_ms
@@ -1064,7 +1064,7 @@ def CreateSamples(
       if include_histogram:
         for time_ms, count in group.data:
           yield sample.Sample(
-              '{0}_latency_histogram_{1}_ms'.format(group_name, time_ms),
+              '{}_latency_histogram_{}_ms'.format(group_name, time_ms),
               count,
               'count',
               meta,
@@ -1087,7 +1087,7 @@ def CreateSamples(
         hist_meta = meta.copy()
         hist_meta.update({'histogram': json.dumps(histogram)})
         yield sample.Sample(
-            '{0} latency histogram'.format(group_name), 0, '', hist_meta
+            '{} latency histogram'.format(group_name), 0, '', hist_meta
         )
 
     if group.data and group.data_type == TIMESERIES:

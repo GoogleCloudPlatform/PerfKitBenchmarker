@@ -31,7 +31,7 @@ CONFIG = 'config'
 
 THROUGHPUT_HEADER_REGEX = (
     r'(\w+[\w\- ]+\w+)\s*(\([0-9.]+% filled\))*\s*[\[\(]'
-    '([\w/]+)[\]\)]:([0-9\s.e\-+]+)'
+    r'([\w/]+)[\]\)]:([0-9\s.e\-+]+)'
 )
 THROUGHPUT_RESULT_REGEX = r'([0-9]+)\s*([0-9.e\-+]+)'
 FILLED_REGEX = r'([0-9.]+)% filled'

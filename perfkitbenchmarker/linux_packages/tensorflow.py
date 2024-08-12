@@ -87,10 +87,10 @@ def GetTensorFlowVersion(vm):
   Returns:
     installed python tensorflow version as a string
   """
-  stdout, _ = vm.RemoteCommand((
-      'echo -e "import tensorflow\nprint(tensorflow.__version__)" | {0}'
+  stdout, _ = vm.RemoteCommand(
+      'echo -e "import tensorflow\nprint(tensorflow.__version__)" | {}'
       ' python'.format(GetEnvironmentVars(vm))
-  ))
+  )
   return stdout.strip()
 
 

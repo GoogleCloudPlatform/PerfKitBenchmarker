@@ -15,10 +15,10 @@
 
 import os
 import posixpath
+from urllib import parse
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import linux_packages
-from six.moves.urllib.parse import urlparse
 
 flags.DEFINE_string('maven_version', '3.9.8', 'The version of maven')
 flags.DEFINE_string(
@@ -40,20 +40,20 @@ export PATH={maven_home}/bin:$PATH
 
 PACKAGE_NAME = 'maven'
 PREPROVISIONED_DATA = {
-    'apache-maven-{0}-bin.tar.gz'.format(
+    'apache-maven-{}-bin.tar.gz'.format(
         '3.6.1'
     ): '2528c35a99c30f8940cc599ba15d34359d58bec57af58c1075519b8cd33b69e7',
-    'apache-maven-{0}-bin.tar.gz'.format(
+    'apache-maven-{}-bin.tar.gz'.format(
         '3.6.3'
     ): '26ad91d751b3a9a53087aefa743f4e16a17741d3915b219cf74112bf87a438c5',
-    'apache-maven-{0}-bin.tar.gz'.format(
+    'apache-maven-{}-bin.tar.gz'.format(
         '3.9.8'
     ): '067672629075b740e3d0a928e21021dd615a53287af36d4ccca44e87e081d102',
 }
 PACKAGE_DATA_URL = {
-    'apache-maven-{0}-bin.tar.gz'.format('3.6.1'): MVN_URL.format('3', '3.6.1'),
-    'apache-maven-{0}-bin.tar.gz'.format('3.6.3'): MVN_URL.format('3', '3.6.3'),
-    'apache-maven-{0}-bin.tar.gz'.format('3.9.8'): MVN_URL.format('3', '3.9.8'),
+    'apache-maven-{}-bin.tar.gz'.format('3.6.1'): MVN_URL.format('3', '3.6.1'),
+    'apache-maven-{}-bin.tar.gz'.format('3.6.3'): MVN_URL.format('3', '3.6.3'),
+    'apache-maven-{}-bin.tar.gz'.format('3.9.8'): MVN_URL.format('3', '3.9.8'),
 }
 
 
@@ -75,14 +75,14 @@ def GetRunCommand(arguments):
   command = 'source {} && mvn {}'.format(MVN_ENV_PATH, arguments)
 
   if FLAGS['http_proxy'].present:
-    parsed_url = urlparse(FLAGS.http_proxy)
+    parsed_url = parse.urlparse(FLAGS.http_proxy)
     http_proxy_params = ' -Dhttp.proxyHost={host} -Dhttp.proxyPort={port}'
     command += http_proxy_params.format(
         host=parsed_url.hostname, port=parsed_url.port
     )
 
   if FLAGS['https_proxy'].present:
-    parsed_url = urlparse(FLAGS.https_proxy)
+    parsed_url = parse.urlparse(FLAGS.https_proxy)
     https_proxy_params = ' -Dhttps.proxyHost={host} -Dhttps.proxyPort={port}'
     command += https_proxy_params.format(
         host=parsed_url.hostname, port=parsed_url.port

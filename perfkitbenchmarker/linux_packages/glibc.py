@@ -64,25 +64,25 @@ def _Install(vm):
   vm.InstallPackages('bison texinfo')
 
   vm.RemoteCommand(
-      'cd {0} && mkdir binutils'.format(linux_packages.INSTALL_DIR)
+      'cd {} && mkdir binutils'.format(linux_packages.INSTALL_DIR)
   )
   vm.InstallPreprovisionedPackageData(
       PACKAGE_NAME, [BINUTILS_TAR], BINUTILS_DIR
   )
-  vm.RemoteCommand('cd {0} && tar xvf {1}'.format(BINUTILS_DIR, BINUTILS_TAR))
+  vm.RemoteCommand('cd {} && tar xvf {}'.format(BINUTILS_DIR, BINUTILS_TAR))
   vm.RemoteCommand(
-      'cd {0} && mkdir binutils-build && '
+      'cd {} && mkdir binutils-build && '
       'cd binutils-build/ && '
-      '../binutils-{1}/configure --prefix=/opt/binutils && '
+      '../binutils-{}/configure --prefix=/opt/binutils && '
       'make -j 4 && sudo make install'.format(BINUTILS_DIR, BINUTILS_VERSION)
   )
 
-  vm.RemoteCommand('cd {0} && mkdir glibc'.format(linux_packages.INSTALL_DIR))
+  vm.RemoteCommand('cd {} && mkdir glibc'.format(linux_packages.INSTALL_DIR))
   vm.InstallPreprovisionedPackageData(PACKAGE_NAME, [GLIBC_TAR], GLIBC_DIR)
-  vm.RemoteCommand('cd {0} && tar xvf {1}'.format(GLIBC_DIR, GLIBC_TAR))
+  vm.RemoteCommand('cd {} && tar xvf {}'.format(GLIBC_DIR, GLIBC_TAR))
   vm.RemoteCommand(
-      'cd {0} && mkdir glibc-build && cd glibc-build && '
-      '../glibc-{1}/configure --prefix=/usr/local/glibc --disable-profile '
+      'cd {} && mkdir glibc-build && cd glibc-build && '
+      '../glibc-{}/configure --prefix=/usr/local/glibc --disable-profile '
       '--enable-add-ons --with-headers=/usr/include '
       '--with-binutils=/opt/binutils/bin && make && sudo make install'.format(
           GLIBC_DIR, GLIBC_VERSION

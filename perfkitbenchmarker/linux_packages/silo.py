@@ -34,8 +34,8 @@ def _Install(vm):
   """Installs the Silo package on the VM."""
   nthreads = vm.NumCpusForBenchmark() * 2
   vm.Install('build_tools')
-  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, SILO_DIR))
-  vm.RemoteCommand('cd {0} && git checkout {1}'.format(SILO_DIR, GIT_TAG))
+  vm.RemoteCommand('git clone {} {}'.format(GIT_REPO, SILO_DIR))
+  vm.RemoteCommand('cd {} && git checkout {}'.format(SILO_DIR, GIT_TAG))
   # This is due to a failing clone command when executing behind a proxy.
   # Replacing the protocol to https instead of git fixes the issue.
   vm.RemoteCommand('git config --global url."https://".insteadOf git://')

@@ -247,15 +247,15 @@ def ConfigureAndStart(leader, workers, configure_s3=False):
       "rm -f {0} && ssh-keygen -q -t rsa -N '' -f {0}".format(SPARK_PRIVATE_KEY)
   )
 
-  public_key = leader.RemoteCommand('cat {0}.pub'.format(SPARK_PRIVATE_KEY))[0]
+  public_key = leader.RemoteCommand('cat {}.pub'.format(SPARK_PRIVATE_KEY))[0]
 
   def AddKey(vm):
-    vm.RemoteCommand('echo "{0}" >> ~/.ssh/authorized_keys'.format(public_key))
+    vm.RemoteCommand('echo "{}" >> ~/.ssh/authorized_keys'.format(public_key))
 
   background_tasks.RunThreaded(AddKey, vms)
 
   # HDFS setup and formatting, Spark startup
-  leader.RemoteCommand('bash {0}/start-all.sh'.format(SPARK_SBIN))
+  leader.RemoteCommand('bash {}/start-all.sh'.format(SPARK_SBIN))
 
   logging.info('Sleeping 10s for Spark nodes to join.')
   time.sleep(10)
@@ -264,7 +264,7 @@ def ConfigureAndStart(leader, workers, configure_s3=False):
   worker_online_count = _GetOnlineWorkerCount(leader)
   if worker_online_count != len(workers):
     raise ValueError(
-        'Not all nodes running Spark: {0} < {1}'.format(
+        'Not all nodes running Spark: {} < {}'.format(
             worker_online_count, len(workers)
         )
     )

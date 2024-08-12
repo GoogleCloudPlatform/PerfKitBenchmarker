@@ -614,7 +614,7 @@ def CollectVmToVmSamples(
   vm_internal_ip = vm.internal_ip
   vm_external_ip = vm.ip_address
 
-  with open(vm_util.PrependTempDir(TCPDUMP_OUTPUT), 'r') as f:
+  with open(vm_util.PrependTempDir(TCPDUMP_OUTPUT)) as f:
     tcpdump_output = f.read()
   runner_internal_ip, runner_external_ip = runner_ip
 

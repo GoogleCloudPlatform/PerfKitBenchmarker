@@ -130,7 +130,7 @@ def _GetAerospikeConfig(idx=None):
 
 
 def _InstallFromGit(vm):
-  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, _GetAerospikeDir()))
+  vm.RemoteCommand('git clone {} {}'.format(GIT_REPO, _GetAerospikeDir()))
   # Comment out Werror flag and compile. With newer compilers gcc7xx,
   # compilation is broken due to warnings.
   vm.RemoteCommand(

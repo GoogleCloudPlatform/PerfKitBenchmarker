@@ -138,7 +138,7 @@ def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
   """
   if posixpath.basename(runspec_config) != runspec_config:
     raise errors.Config.InvalidValue(
-        'Invalid runspec_config value: {0}{1}When running speccpu with a '
+        'Invalid runspec_config value: {}{}When running speccpu with a '
         'tar file, runspec_config cannot specify a file in a sub-directory. '
         'See README.md for information about running speccpu with a tar '
         'file.'.format(runspec_config, os.linesep)
@@ -151,7 +151,7 @@ def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
   vm.PushFile(local_cfg_file_path, speccpu_vm_state.cfg_file_path)
 
   scratch_dir = vm.GetScratchDir()
-  cfg_member = '{0}/config/{1}'.format(
+  cfg_member = '{}/config/{}'.format(
       speccpu_vm_state.base_spec_dir, runspec_config
   )
   required_members = itertools.chain(
@@ -245,7 +245,7 @@ def _GenerateMd5sum(file_name):
   return hash_md5.hexdigest()
 
 
-class SpecInstallConfigurations(object):
+class SpecInstallConfigurations:
   """Configs for SPEC CPU run that must be preserved between PKB stages.
 
   Specifies directories to look for install files and tracks install locations.
@@ -329,7 +329,7 @@ def InstallSPECCPU(vm, speccpu_vm_state):
     speccpu_vm_state: SpecInstallConfigurations. Install configuration for spec.
   """
   scratch_dir = vm.GetScratchDir()
-  vm.RemoteCommand('chmod 755 {0}'.format(scratch_dir))
+  vm.RemoteCommand('chmod 755 {}'.format(scratch_dir))
   try:
     # Since this will override 'build_tools' installation, install this
     # before we install 'build_tools' package
@@ -404,21 +404,21 @@ def _PrepareWithIsoFile(vm, speccpu_vm_state):
   scratch_dir = vm.GetScratchDir()
 
   # Make cpu2006 or cpu2017 directory on the VM.
-  vm.RemoteCommand('mkdir {0}'.format(speccpu_vm_state.spec_dir))
+  vm.RemoteCommand('mkdir {}'.format(speccpu_vm_state.spec_dir))
 
   # Copy the iso to the VM.
   local_iso_file_path = data.ResourcePath(speccpu_vm_state.base_iso_file_path)
   vm.PushFile(local_iso_file_path, scratch_dir)
 
   # Extract files from the iso to the cpu2006 or cpu2017 directory.
-  vm.RemoteCommand('mkdir {0}'.format(speccpu_vm_state.mount_dir))
+  vm.RemoteCommand('mkdir {}'.format(speccpu_vm_state.mount_dir))
   vm.RemoteCommand(
-      'sudo mount -t iso9660 -o loop {0} {1}'.format(
+      'sudo mount -t iso9660 -o loop {} {}'.format(
           speccpu_vm_state.iso_file_path, speccpu_vm_state.mount_dir
       )
   )
   vm.RemoteCommand(
-      'cp -r {0}/* {1}'.format(
+      'cp -r {}/* {}'.format(
           speccpu_vm_state.mount_dir, speccpu_vm_state.spec_dir
       )
   )
@@ -426,7 +426,7 @@ def _PrepareWithIsoFile(vm, speccpu_vm_state):
   # cpu2017 iso does not come with config directory nor clang.xml
   if speccpu_vm_state.clang_flag_file_path:
     vm.RemoteCommand(
-        'mkdir -p {0}'.format(
+        'mkdir -p {}'.format(
             os.path.dirname(speccpu_vm_state.clang_flag_file_path)
         )
     )
@@ -435,7 +435,7 @@ def _PrepareWithIsoFile(vm, speccpu_vm_state):
         speccpu_vm_state.clang_flag_file_path,
     )
 
-  vm.RemoteCommand('chmod -R 755 {0}'.format(speccpu_vm_state.spec_dir))
+  vm.RemoteCommand('chmod -R 755 {}'.format(speccpu_vm_state.spec_dir))
 
   # Copy the cfg to the VM.
   local_cfg_file_path = data.ResourcePath(speccpu_vm_state.runspec_config)
@@ -443,7 +443,7 @@ def _PrepareWithIsoFile(vm, speccpu_vm_state):
 
   # Run SPEC CPU2006 or 2017 installation.
   install_script_path = posixpath.join(speccpu_vm_state.spec_dir, 'install.sh')
-  vm.RobustRemoteCommand('yes | {0}'.format(install_script_path))
+  vm.RobustRemoteCommand('yes | {}'.format(install_script_path))
 
 
 def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
@@ -699,7 +699,7 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
   if FLAGS.runspec_define:
     for runspec_define in FLAGS.runspec_define.split(','):
       runspec_flags.append(('define', runspec_define))
-  fl = ' '.join('--{0}={1}'.format(k, v) for k, v in runspec_flags)
+  fl = ' '.join('--{}={}'.format(k, v) for k, v in runspec_flags)
 
   if version_specific_parameters:
     fl += ' '.join(version_specific_parameters)
@@ -713,7 +713,7 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
     )
 
   cmd = ' && '.join((
-      'cd {0}'.format(speccpu_vm_state.spec_dir),
+      'cd {}'.format(speccpu_vm_state.spec_dir),
       'rm -rf result',
       '. ./shrc',
       '. ./shrc',
@@ -732,9 +732,9 @@ def Uninstall(vm):
   if speccpu_vm_state:
     if speccpu_vm_state.mount_dir:
       try:
-        vm.RemoteCommand('sudo umount {0}'.format(speccpu_vm_state.mount_dir))
+        vm.RemoteCommand('sudo umount {}'.format(speccpu_vm_state.mount_dir))
       except errors.VirtualMachine.RemoteCommandError:
         # Even if umount failed, continue to clean up.
         logging.exception('umount failed.')
     targets = ' '.join(p for p in speccpu_vm_state.__dict__.values() if p)
-    vm.RemoteCommand('rm -rf {0}'.format(targets))
+    vm.RemoteCommand('rm -rf {}'.format(targets))

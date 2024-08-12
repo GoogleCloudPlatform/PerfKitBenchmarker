@@ -29,7 +29,6 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
-from six.moves import range
 
 
 JNA_JAR_URL = (
@@ -192,7 +191,7 @@ def Start(vm):
 
 def Stop(vm):
   """Stops Cassandra on 'vm'."""
-  vm.RemoteCommand('kill $(cat {0})'.format(CASSANDRA_PID), ignore_failure=True)
+  vm.RemoteCommand('kill $(cat {})'.format(CASSANDRA_PID), ignore_failure=True)
 
 
 def IsRunning(vm):
@@ -214,7 +213,7 @@ def CleanNode(vm):
     vm: VirtualMachine. VM to clean.
   """
   data_path = posixpath.join(vm.GetScratchDir(), 'cassandra')
-  vm.RemoteCommand('rm -rf {0}'.format(data_path))
+  vm.RemoteCommand('rm -rf {}'.format(data_path))
 
 
 def _StartCassandraIfNotRunning(vm):
@@ -253,6 +252,9 @@ def StartCluster(seed_vm, vms):
       will be started before all other VMs.
     vms: list of VirtualMachines. VMs *other than* seed_vm which should be
       started.
+
+  Raises:
+    OSError if cluster startup fails.
   """
 
   vm_count = len(vms) + 1
@@ -304,4 +306,4 @@ def StartCluster(seed_vm, vms):
     background_tasks.RunThreaded(_StartCassandraIfNotRunning, vms)
     time.sleep(NODE_START_SLEEP)
   else:
-    raise IOError('Failed to start Cassandra cluster.')
+    raise OSError('Failed to start Cassandra cluster.')

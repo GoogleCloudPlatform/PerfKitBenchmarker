@@ -162,7 +162,7 @@ def InstallGcsConnector(vm, install_dir=HADOOP_LIB_DIR):
       'https://storage.googleapis.com/hadoop-lib/gcs/'
       'gcs-connector-hadoop{}-latest.jar'.format(HadoopVersion().major)
   )
-  vm.RemoteCommand('cd {0} && curl -O {1}'.format(install_dir, connector_url))
+  vm.RemoteCommand('cd {} && curl -O {}'.format(install_dir, connector_url))
 
 
 # Scheduling constants.
@@ -280,7 +280,7 @@ def _RenderConfig(
 
 def _MakeFolders(paths_split_by_comma, vm):
   vm.RemoteCommand(
-      ('mkdir -p {0}').format(' '.join(paths_split_by_comma.split(',')))
+      ('mkdir -p {}').format(' '.join(paths_split_by_comma.split(',')))
   )
 
 
@@ -322,16 +322,16 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
       )
   )
 
-  public_key = master.RemoteCommand('cat {0}.pub'.format(HADOOP_PRIVATE_KEY))[0]
+  public_key = master.RemoteCommand('cat {}.pub'.format(HADOOP_PRIVATE_KEY))[0]
 
   def AddKey(vm):
-    vm.RemoteCommand('echo "{0}" >> ~/.ssh/authorized_keys'.format(public_key))
+    vm.RemoteCommand('echo "{}" >> ~/.ssh/authorized_keys'.format(public_key))
 
   # Add unmanaged Hadoop bin path to the environment PATH so that
   # hadoop/yarn/hdfs commands can be ran without specifying the full path.
   def ExportHadoopBinPath(vm):
     vm.RemoteCommand(
-        'echo "export PATH=$PATH:{0}" >> ~/.bashrc && source ~/.bashrc'.format(
+        'echo "export PATH=$PATH:{}" >> ~/.bashrc && source ~/.bashrc'.format(
             HADOOP_BIN
         )
     )
@@ -350,7 +350,7 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
   master.RenderTemplate(
       data.ResourcePath(START_HADOOP_SCRIPT), script_path, context=context
   )
-  master.RemoteCommand('bash {0}'.format(script_path))
+  master.RemoteCommand('bash {}'.format(script_path))
 
   logging.info('Sleeping 10s for Hadoop nodes to join.')
   time.sleep(10)
@@ -359,7 +359,7 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
   hdfs_online_count = _GetHDFSOnlineNodeCount(master)
   if hdfs_online_count != len(workers):
     raise ValueError(
-        'Not all nodes running HDFS: {0} < {1}'.format(
+        'Not all nodes running HDFS: {} < {}'.format(
             hdfs_online_count, len(workers)
         )
     )
@@ -371,7 +371,7 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
     yarn_online_count = _GetYARNOnlineNodeCount(master)
     if yarn_online_count != len(workers):
       raise ValueError(
-          'Not all nodes running YARN: {0} < {1}'.format(
+          'Not all nodes running YARN: {} < {}'.format(
               yarn_online_count, len(workers)
           )
       )

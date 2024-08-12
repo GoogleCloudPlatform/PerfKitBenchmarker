@@ -72,7 +72,7 @@ def _ParseOutput(output_text):
     (variable_name, value, unit) tuples.
   """
   if _CSV_PREFIX not in output_text:
-    raise ValueError('{0} not found in\n{1}'.format(_CSV_PREFIX, output_text))
+    raise ValueError('{} not found in\n{}'.format(_CSV_PREFIX, output_text))
   csv_fp = six.StringIO(str(output_text).rsplit(_CSV_PREFIX, 1)[-1])
   reader = csv.DictReader(csv_fp)
   if frozenset(reader.fieldnames) != frozenset(['variable', 'value', 'unit']):

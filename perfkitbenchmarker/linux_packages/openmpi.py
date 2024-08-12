@@ -161,7 +161,7 @@ def AptInstall(vm):
 
 def _Uninstall(vm):
   """Uninstalls the OpenMPI package on the VM."""
-  vm.RemoteCommand('cd {0} && sudo make uninstall'.format(GetMpiDir()))
+  vm.RemoteCommand('cd {} && sudo make uninstall'.format(GetMpiDir()))
 
 
 def YumUninstall(vm):

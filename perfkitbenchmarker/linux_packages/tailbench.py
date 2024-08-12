@@ -136,7 +136,7 @@ def _ParseResultsFile(input_file, name='') -> List[_TestResult]:
   service_values = []
   sojourn_values = []
   i = 0
-  with open(input_file, 'r') as f:
+  with open(input_file) as f:
     for line in f:
       i = i + 1
       if i < HEADER_LINES:

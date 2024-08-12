@@ -269,7 +269,7 @@ class MpiResultParser(Iterable[MpiResult]):
       't[usec]': 'time_avg',
   }
   # these columns are integers, others are floats
-  _INT_COLUMNS = set(['bytes', 'repetitions'])
+  _INT_COLUMNS = {'bytes', 'repetitions'}
 
   def __init__(self, lines: Sequence[str]):
     # _lines is a iterator over the input parameter lines

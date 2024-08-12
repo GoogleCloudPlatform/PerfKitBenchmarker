@@ -24,15 +24,15 @@ def _Install(vm):
   """Installs the AMD BLIS package on the VM."""
   vm.Install('build_tools')
   vm.Install('fortran')
-  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, AMDBLIS_DIR))
-  vm.RemoteCommand('cd {0} && git checkout {1}'.format(AMDBLIS_DIR, GIT_TAG))
+  vm.RemoteCommand('git clone {} {}'.format(GIT_REPO, AMDBLIS_DIR))
+  vm.RemoteCommand('cd {} && git checkout {}'.format(AMDBLIS_DIR, GIT_TAG))
   vm.RemoteCommand(
-      'cd {0} && ./configure --enable-cblas zen'.format(AMDBLIS_DIR)
+      'cd {} && ./configure --enable-cblas zen'.format(AMDBLIS_DIR)
   )
   vm.RemoteCommand(
       'sudo ln -s /usr/bin/python3 /usr/bin/python', ignore_failure=True
   )
-  vm.RemoteCommand('cd {0} && make -j'.format(AMDBLIS_DIR))
+  vm.RemoteCommand('cd {} && make -j'.format(AMDBLIS_DIR))
 
 
 def Install(vm):

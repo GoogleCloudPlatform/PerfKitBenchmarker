@@ -57,7 +57,7 @@ _IMAGES = [
 ]
 
 
-class _DockerImagePackage(object):
+class _DockerImagePackage:
   """Facsimile of a perfkitbenchmarker.linux_packages.<name> package."""
 
   def __init__(self, name):

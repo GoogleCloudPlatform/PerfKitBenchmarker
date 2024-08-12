@@ -112,12 +112,12 @@ def _LogEnvVariables(vm):
 
 def _InstallFromPreprovisionedData(vm):
   """Installs the MKL package from preprovisioned data on the VM."""
-  vm.RemoteCommand('cd {0} && mkdir MKL'.format(linux_packages.INSTALL_DIR))
+  vm.RemoteCommand('cd {} && mkdir MKL'.format(linux_packages.INSTALL_DIR))
   vm.InstallPreprovisionedBenchmarkData(BENCHMARK_NAME, [MKL_TGZ], MKL_DIR)
-  vm.RemoteCommand('cd {0} && tar zxvf {1}'.format(MKL_DIR, MKL_TGZ))
+  vm.RemoteCommand('cd {} && tar zxvf {}'.format(MKL_DIR, MKL_TGZ))
   vm.RemoteCommand(
       (
-          'cd {0}/{1} && '
+          'cd {}/{} && '
           'sed -i "s/decline/accept/g" silent.cfg && '
           'sudo ./install.sh --silent ./silent.cfg'
       ).format(MKL_DIR, MKL_TAG)

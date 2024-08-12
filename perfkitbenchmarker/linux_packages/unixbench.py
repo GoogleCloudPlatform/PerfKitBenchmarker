@@ -29,10 +29,10 @@ def _Install(vm):
   vm.Install('build_tools')
   vm.Install('wget')
   vm.RemoteCommand(
-      'wget {0} -P {1}'.format(UNIXBENCH_URL, linux_packages.INSTALL_DIR)
+      'wget {} -P {}'.format(UNIXBENCH_URL, linux_packages.INSTALL_DIR)
   )
   vm.RemoteCommand(
-      'cd {0} && tar xvzf {1}'.format(linux_packages.INSTALL_DIR, UNIXBENCH_TAR)
+      'cd {} && tar xvzf {}'.format(linux_packages.INSTALL_DIR, UNIXBENCH_TAR)
   )
 
 

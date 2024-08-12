@@ -95,13 +95,13 @@ def Install(vm):
   # install script to regenerate the runner scripts based on what spec detects
   # to be the vm architecture.
   vm.RemoteCommand(
-      'echo yes | {0}/cpu2017/install.sh'.format(vm.GetScratchDir())
+      'echo yes | {}/cpu2017/install.sh'.format(vm.GetScratchDir())
   )
 
   # Updates SPECCPU 2017.
   # spec17 had several updates, hence let's ensure to run the latest version
   vm.RemoteCommand(
-      'echo yes | {0}/cpu2017/bin/runcpu --update'.format(vm.GetScratchDir())
+      'echo yes | {}/cpu2017/bin/runcpu --update'.format(vm.GetScratchDir())
   )
 
 

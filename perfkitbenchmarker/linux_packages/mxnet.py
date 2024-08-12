@@ -51,11 +51,11 @@ def GetMXNetVersion(vm):
   Returns:
     installed python MXNet version as a string
   """
-  stdout, _ = vm.RemoteCommand((
-      'echo -e "import mxnet\nprint(mxnet.__version__)" | {0} python'.format(
+  stdout, _ = vm.RemoteCommand(
+      'echo -e "import mxnet\nprint(mxnet.__version__)" | {} python'.format(
           GetEnvironmentVars(vm)
       )
-  ))
+  )
   return stdout.strip()
 
 

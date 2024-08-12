@@ -23,7 +23,6 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
-from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -72,9 +71,9 @@ def _Install(vm):
   """Installs the act on the VM."""
   vm.Install('build_tools')
   vm.Install('openssl')
-  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, ACT_DIR))
+  vm.RemoteCommand('git clone {} {}'.format(GIT_REPO, ACT_DIR))
   vm.RemoteCommand(
-      'cd {0} && git checkout {1} && make'.format(ACT_DIR, ACT_COMMIT)
+      'cd {} && git checkout {} && make'.format(ACT_DIR, ACT_COMMIT)
   )
 
 
@@ -99,7 +98,7 @@ def RunActPrep(vm):
 
   def _RunActPrep(device):
     vm.RobustRemoteCommand(
-        'cd {0} && sudo ./target/bin/act_prep {1}'.format(
+        'cd {} && sudo ./target/bin/act_prep {}'.format(
             ACT_DIR, device.GetDevicePath()
         )
     )
@@ -119,10 +118,10 @@ def PrepActConfig(vm, load, index=None):
     disk_lst = vm.scratch_disks
     # Treat first few partitions as reserved.
     disk_lst = disk_lst[FLAGS.act_reserved_partitions :]
-    config_file = 'actconfig_{0}.txt'.format(load)
+    config_file = 'actconfig_{}.txt'.format(load)
   else:
     disk_lst = [vm.scratch_disks[index]]
-    config_file = 'actconfig_{0}_{1}.txt'.format(index, load)
+    config_file = 'actconfig_{}_{}.txt'.format(index, load)
   devices = ','.join([d.GetDevicePath() for d in disk_lst])
   num_disk = len(disk_lst)
   # render template:
@@ -145,27 +144,27 @@ def PrepActConfig(vm, load, index=None):
 def RunAct(vm, load, index=None):
   """Runs act binary with provided config."""
   if index is None:
-    config = 'actconfig_{0}.txt'.format(load)
-    output = 'output_{0}'.format(load)
+    config = 'actconfig_{}.txt'.format(load)
+    output = 'output_{}'.format(load)
     act_config_metadata = {'device_index': 'all'}
   else:
-    config = 'actconfig_{0}_{1}.txt'.format(index, load)
-    output = 'output_{0}_{1}'.format(index, load)
+    config = 'actconfig_{}_{}.txt'.format(index, load)
+    output = 'output_{}_{}'.format(index, load)
     act_config_metadata = {'device_index': index}
   # Push config file to remote VM.
   vm.RobustRemoteCommand(
-      'cd {0} && sudo ./target/bin/act_storage ~/{1} > ~/{2}'.format(
+      'cd {} && sudo ./target/bin/act_storage ~/{} > ~/{}'.format(
           ACT_DIR, config, output
       )
   )
   # Shows 1,2,4,8,..,64.
   out, _ = vm.RemoteCommand(
-      'cd {0} ; python3 ./analysis/act_latency.py -n 7 -e 1 -x -l ~/{1}; '
+      'cd {} ; python3 ./analysis/act_latency.py -n 7 -e 1 -x -l ~/{}; '
       'exit 0'.format(ACT_DIR, output),
       ignore_failure=True,
   )
   samples = ParseRunAct(out)
-  last_output_block, _ = vm.RemoteCommand('tail -n 100 ~/{0}'.format(output))
+  last_output_block, _ = vm.RemoteCommand('tail -n 100 ~/{}'.format(output))
 
   # Early termination.
   if "drive(s) can't keep up - test stopped" in last_output_block:

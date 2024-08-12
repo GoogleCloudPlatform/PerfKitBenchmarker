@@ -134,8 +134,8 @@ def AptInstall(vm):
   """Installs the mcperf package on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(APT_PACKAGES)
-  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MCPERF_DIR))
-  vm.RemoteCommand('cd {0} && sudo scons'.format(MCPERF_DIR))
+  vm.RemoteCommand('git clone {} {}'.format(GIT_REPO, MCPERF_DIR))
+  vm.RemoteCommand('cd {} && sudo scons'.format(MCPERF_DIR))
 
 
 def GetMetadata():

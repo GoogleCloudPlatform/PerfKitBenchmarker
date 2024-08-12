@@ -54,7 +54,7 @@ def Install(vm):
   vm.Install('azure_cli')
 
   # Copy credentials to VM
-  vm.RemoteCommand('mkdir -p {0}'.format(AZURE_CREDENTIAL_DIRECTORY))
+  vm.RemoteCommand('mkdir -p {}'.format(AZURE_CREDENTIAL_DIRECTORY))
   vm.PushFile(
       object_storage_service.FindCredentialFile(PROFILE_FILE), PROFILE_FILE
   )

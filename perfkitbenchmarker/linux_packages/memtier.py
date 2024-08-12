@@ -25,7 +25,7 @@ import random
 import re
 import statistics
 import time
-from typing import Any, Dict, List, Text, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 from absl import flags
 from absl import logging
@@ -80,7 +80,7 @@ MEMTIER_LARGE_CLUSTER = flags.DEFINE_bool(
 )
 
 
-class MemtierMode(object):
+class MemtierMode:
   """Enum of options for --memtier_run_mode."""
 
   MEASURE_CPU_LATENCY = 'MEASURE_CPU_LATENCY'
@@ -302,11 +302,11 @@ def YumInstall(vm):
   vm.Install('build_tools')
   vm.InstallPackages(YUM_PACKAGES)
 
-  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MEMTIER_DIR))
-  vm.RemoteCommand('cd {0} && git checkout {1}'.format(MEMTIER_DIR, GIT_TAG))
+  vm.RemoteCommand('git clone {} {}'.format(GIT_REPO, MEMTIER_DIR))
+  vm.RemoteCommand('cd {} && git checkout {}'.format(MEMTIER_DIR, GIT_TAG))
   pkg_config = 'PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}'
   vm.RemoteCommand(
-      'cd {0} && autoreconf -ivf && {1} ./configure && '
+      'cd {} && autoreconf -ivf && {} ./configure && '
       'sudo make install'.format(MEMTIER_DIR, pkg_config)
   )
 
@@ -315,8 +315,8 @@ def AptInstall(vm):
   """Installs the memtier package on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(APT_PACKAGES)
-  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, MEMTIER_DIR))
-  vm.RemoteCommand('cd {0} && git checkout {1}'.format(MEMTIER_DIR, GIT_TAG))
+  vm.RemoteCommand('git clone {} {}'.format(GIT_REPO, MEMTIER_DIR))
+  vm.RemoteCommand('cd {} && git checkout {}'.format(MEMTIER_DIR, GIT_TAG))
   if MEMTIER_LARGE_CLUSTER.value:
     vm.RemoteCommand(f'rm -rf {MEMTIER_DIR}')
     vm.InstallPreprovisionedPackageData(
@@ -326,7 +326,7 @@ def AptInstall(vm):
         f'tar -C {MEMTIER_DIR} -xvzf {MEMTIER_DIR}/{_LARGE_CLUSTER_TAR}'
     )
   vm.RemoteCommand(
-      'cd {0} && autoreconf -ivf && ./configure && sudo make install'.format(
+      'cd {} && autoreconf -ivf && ./configure && sudo make install'.format(
           MEMTIER_DIR
       )
   )
@@ -334,7 +334,7 @@ def AptInstall(vm):
 
 def _Uninstall(vm):
   """Uninstalls the memtier package on the VM."""
-  vm.RemoteCommand('cd {0} && sudo make uninstall'.format(MEMTIER_DIR))
+  vm.RemoteCommand('cd {} && sudo make uninstall'.format(MEMTIER_DIR))
 
 
 def YumUninstall(vm):
@@ -1190,7 +1190,7 @@ def _Run(
     json_path = os.path.join(vm_util.GetTempDir(), json_results_file_name)
     vm_util.IssueCommand(['rm', '-f', json_path])
     vm.PullFile(vm_util.GetTempDir(), json_results_file)
-    with open(json_path, 'r') as ts_json:
+    with open(json_path) as ts_json:
       time_series_json = ts_json.read()
       if not time_series_json:
         logging.warning('No metrics in time series json.')
@@ -1207,7 +1207,7 @@ def _Run(
         )
         time_series_json = json.loads(time_series_json)
 
-  with open(output_path, 'r') as output:
+  with open(output_path) as output:
     summary_data = output.read()
     logging.info(summary_data)
   return MemtierResult.Parse(summary_data, time_series_json)
@@ -1265,13 +1265,13 @@ class MemtierResult:
   ops_series: List[int] = dataclasses.field(default_factory=list)
   latency_series: Dict[str, List[int]] = dataclasses.field(default_factory=dict)
 
-  runtime_info: Dict[Text, Text] = dataclasses.field(default_factory=dict)
+  runtime_info: Dict[str, str] = dataclasses.field(default_factory=dict)
   metadata: Dict[str, Any] = dataclasses.field(default_factory=dict)
   parameters: MemtierBinarySearchParameters = MemtierBinarySearchParameters()
 
   @classmethod
   def Parse(
-      cls, memtier_results: Text, time_series_json: Dict[Any, Any] | None
+      cls, memtier_results: str, time_series_json: Dict[Any, Any] | None
   ) -> 'MemtierResult':
     """Parse memtier_benchmark result textfile and return results.
 
@@ -1538,7 +1538,7 @@ def AggregateMemtierResults(
 
 
 def _ParseHistogram(
-    memtier_results: Text,
+    memtier_results: str,
 ) -> Tuple[MemtierHistogram, MemtierHistogram]:
   """Parses the 'Request Latency Distribution' section of memtier output."""
   set_histogram = []
@@ -1572,7 +1572,7 @@ class MemtierAggregateResult:
 
 
 def _ParseTotalThroughputAndLatency(
-    memtier_results: Text,
+    memtier_results: str,
 ) -> 'MemtierAggregateResult':
   """Parses the 'TOTALS' output line and return throughput and latency."""
   columns = None

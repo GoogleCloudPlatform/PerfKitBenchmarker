@@ -57,7 +57,7 @@ def _Install(vm):
 
 
 def _Uninstall(vm):
-  vm.RemoteCommand('kill $(cat {0})'.format(PID_FILE), ignore_failure=True)
+  vm.RemoteCommand('kill $(cat {})'.format(PID_FILE), ignore_failure=True)
 
 
 def YumInstall(vm):

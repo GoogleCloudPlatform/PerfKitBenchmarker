@@ -227,7 +227,7 @@ def GetGpuType(vm):
     return NVIDIA_H100
   else:
     raise UnsupportedClockSpeedError(
-        'Gpu type {0} is not supported by PKB'.format(gpu_types[0])
+        'Gpu type {} is not supported by PKB'.format(gpu_types[0])
     )
 
 
@@ -367,7 +367,7 @@ def QueryGpuClockSpeed(vm, device_id):
   """
   query = (
       'sudo nvidia-smi --query-gpu=clocks.applications.memory,'
-      'clocks.applications.graphics --format=csv --id={0}'.format(device_id)
+      'clocks.applications.graphics --format=csv --id={}'.format(device_id)
   )
   stdout, _ = vm.RemoteCommand(query)
   clock_speeds = stdout.splitlines()[1]
@@ -403,7 +403,7 @@ def SetAutoboostDefaultPolicy(vm, autoboost_enabled):
     current_state = QueryAutoboostPolicy(vm, device_id)
     if current_state['autoboost_default'] != autoboost_enabled:
       vm.RemoteCommand(
-          'sudo nvidia-smi --auto-boost-default={0} --id={1}'.format(
+          'sudo nvidia-smi --auto-boost-default={} --id={}'.format(
               1 if autoboost_enabled else 0, device_id
           )
       )
@@ -426,7 +426,7 @@ def QueryAutoboostPolicy(vm, device_id):
   """
   autoboost_regex = r'Auto Boost\s*:\s*(\S+)'
   autoboost_default_regex = r'Auto Boost Default\s*:\s*(\S+)'
-  query = 'sudo nvidia-smi -q -d CLOCK --id={0}'.format(device_id)
+  query = 'sudo nvidia-smi -q -d CLOCK --id={}'.format(device_id)
   stdout, _ = vm.RemoteCommand(query)
   autoboost_match = re.search(autoboost_regex, stdout)
   autoboost_default_match = re.search(autoboost_default_regex, stdout)

@@ -66,13 +66,13 @@ def _Install(vm):
     vm.Install(p)
   for package in ('numpy', 'pandas'):
     vm.RemoteCommand(f'sudo pip3 install {package}')
-  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, FIO_DIR))
-  vm.RemoteCommand('cd {0} && git checkout {1}'.format(FIO_DIR, GIT_TAG))
+  vm.RemoteCommand('git clone {} {}'.format(GIT_REPO, FIO_DIR))
+  vm.RemoteCommand('cd {} && git checkout {}'.format(FIO_DIR, GIT_TAG))
 
   vm.PushDataFile('fio.patch', FIO_PATCH)
   vm.RemoteCommand(f'cd {FIO_DIR} && patch -l -p1 < fio.patch')
 
-  vm.RemoteCommand('cd {0} && ./configure && make'.format(FIO_DIR))
+  vm.RemoteCommand('cd {} && ./configure && make'.format(FIO_DIR))
   if flags.FLAGS.fio_hist_log:
     vm.PushDataFile(FIO_HIST_LOG_PARSER_PATCH)
     vm.RemoteCommand(

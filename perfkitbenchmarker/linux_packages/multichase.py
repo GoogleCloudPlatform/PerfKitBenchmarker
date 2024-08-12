@@ -48,4 +48,4 @@ def AptInstall(vm):
 
 
 def Uninstall(vm):
-  vm.RemoteCommand('rm -rf {0}'.format(INSTALL_PATH))
+  vm.RemoteCommand('rm -rf {}'.format(INSTALL_PATH))

@@ -603,7 +603,7 @@ def CheckPrerequisites():
   """
   for workload_file in GetWorkloadFileList():
     if not os.path.exists(workload_file):
-      raise IOError('Missing workload file: {0}'.format(workload_file))
+      raise OSError('Missing workload file: {}'.format(workload_file))
 
   if _YCSB_COMMIT.value and _YCSB_TAR_URL.value:
     raise errors.Config.InvalidValue(
@@ -844,13 +844,13 @@ class YCSBExecutor:
     for flag in self.FLAG_ATTRIBUTES:
       value = parameters.pop(flag, None)
       if value is not None:
-        command.extend(('-{0}'.format(flag), str(value)))
+        command.extend(('-{}'.format(flag), str(value)))
 
     for param_file in list(self.parameter_files) + list(parameter_files or []):
       command.extend(('-P', param_file))
 
     for parameter, value in parameters.items():
-      command.extend(('-p', '{0}={1}'.format(parameter, value)))
+      command.extend(('-p', '{}={}'.format(parameter, value)))
 
     path = f'export PATH=$PATH:{maven.MVN_DIR}/bin'
     command = ' '.join(command)
@@ -946,8 +946,8 @@ class YCSBExecutor:
     )
 
     if len(results) != len(vms):
-      raise IOError(
-          'Missing results: only {0}/{1} reported\n{2}'.format(
+      raise OSError(
+          'Missing results: only {}/{} reported\n{}'.format(
               len(results), len(vms), results
           )
       )
@@ -994,7 +994,7 @@ class YCSBExecutor:
     # output to get expected results.
     hdr_files_dir = kwargs.get('hdrhistogram.output.path', None)
     if hdr_files_dir:
-      vm.RemoteCommand('mkdir -p {0}'.format(hdr_files_dir))
+      vm.RemoteCommand('mkdir -p {}'.format(hdr_files_dir))
     stdout, stderr = vm.RobustRemoteCommand(command)
     return ycsb_stats.ParseResults(
         str(stderr + stdout),
@@ -1042,8 +1042,8 @@ class YCSBExecutor:
     background_tasks.RunThreaded(_Run, list(range(len(vms))))
 
     if len(results) != len(vms):
-      raise IOError(
-          'Missing results: only {0}/{1} reported\n{2}'.format(
+      raise OSError(
+          'Missing results: only {}/{} reported\n{}'.format(
               len(results), len(vms), results
           )
       )

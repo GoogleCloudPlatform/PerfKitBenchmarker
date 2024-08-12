@@ -19,7 +19,7 @@ import posixpath
 from perfkitbenchmarker import linux_packages
 
 # Use this directory for all data stored in the VM for this test.
-PATH = '{0}/scimark2'.format(linux_packages.INSTALL_DIR)
+PATH = '{}/scimark2'.format(linux_packages.INSTALL_DIR)
 
 # Download location for both the C and Java tests.
 BASE_URL = 'https://math.nist.gov/scimark2'
@@ -30,7 +30,7 @@ JAVA_MAIN = 'jnt.scimark2.commandline'
 
 # C-specific constants.
 C_ZIP = 'scimark2_1c.zip'
-C_SRC = '{0}/src'.format(PATH)
+C_SRC = '{}/src'.format(PATH)
 # SciMark2 does not set optimization flags, it leaves this to the
 # discretion of the tester. The following gets good performance and
 # has been used for LLVM and GCC regression testing, see for example
@@ -63,7 +63,7 @@ def Install(vm):
   )
   cmds = [
       '(mkdir {0} && cd {0} && unzip {1}/{2})'.format(C_SRC, PATH, C_ZIP),
-      '(cd {0} && make CFLAGS="{1}")'.format(C_SRC, C_CFLAGS),
+      '(cd {} && make CFLAGS="{}")'.format(C_SRC, C_CFLAGS),
   ]
   for cmd in cmds:
     vm.RemoteCommand(cmd)
@@ -71,4 +71,4 @@ def Install(vm):
 
 def Uninstall(vm):
   """Uninstalls scimark2 from the vm."""
-  vm.RemoteCommand('rm -rf {0}'.format(PATH))
+  vm.RemoteCommand('rm -rf {}'.format(PATH))

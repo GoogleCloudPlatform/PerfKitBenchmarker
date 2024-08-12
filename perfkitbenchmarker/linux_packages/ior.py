@@ -46,17 +46,17 @@ _MDTEST_SUMMARY_REGEX = r'(\d+) tasks, (\d+) files[^\n]*\n\s*\n(.*?)\n\s*\n'
 def Install(vm):
   """Installs IOR on the VM."""
   vm.Install('openmpi')
-  vm.RemoteCommand('git clone {0} {1}'.format(GIT_REPO, IOR_DIR))
-  vm.RemoteCommand('cd {0} && git checkout {1}'.format(IOR_DIR, GIT_TAG))
+  vm.RemoteCommand('git clone {} {}'.format(GIT_REPO, IOR_DIR))
+  vm.RemoteCommand('cd {} && git checkout {}'.format(IOR_DIR, GIT_TAG))
   vm.RemoteCommand(
-      'cd {0} && ./bootstrap && ./configure && make && '
+      'cd {} && ./bootstrap && ./configure && make && '
       'sudo make install'.format(IOR_DIR)
   )
 
 
 def Uninstall(vm):
   """Uninstalls IOR on the VM."""
-  vm.RemoteCommand('cd {0} && sudo make uninstall'.format(IOR_DIR))
+  vm.RemoteCommand('cd {} && sudo make uninstall'.format(IOR_DIR))
 
 
 def RunIOR(master_vm, num_tasks, script_path):

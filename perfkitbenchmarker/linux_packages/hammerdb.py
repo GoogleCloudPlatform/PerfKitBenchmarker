@@ -265,7 +265,7 @@ class HammerdbBenchmarkError(Exception):
   pass
 
 
-class HammerDbTclScript(object):
+class HammerDbTclScript:
   """Represents a TCL script that will be run inside of hammerdbcli."""
 
   def __init__(
@@ -316,7 +316,7 @@ class HammerDbTclScript(object):
         or 'Virtual Users remain running' in stdout
     ):
       raise HammerdbBenchmarkError(
-          'Script failed during the build phase with stdout {0}'.format(stdout)
+          'Script failed during the build phase with stdout {}'.format(stdout)
       )
 
   def Run(
@@ -325,7 +325,7 @@ class HammerDbTclScript(object):
       timeout: int | None = 60 * 60 * 6,
   ) -> str:
     """Run hammerdbcli script."""
-    script_location = '{0}/{1}'.format(
+    script_location = '{}/{}'.format(
         LocalWorkingDirectory(), self.tcl_script_name
     )
     cmd = ''
@@ -344,7 +344,7 @@ class HammerDbTclScript(object):
             HAMMERDB_RUN_LOCATION,
             'PATH="$PATH:/opt/mssql-tools/bin" &&'
             + cmd
-            + 'sudo -E ./hammerdbcli auto {0}'.format(script_location),
+            + 'sudo -E ./hammerdbcli auto {}'.format(script_location),
         ),
         timeout=timeout,
     )
@@ -402,7 +402,7 @@ TPCH_PARAMS = frozenset({
 })
 
 
-class TclScriptParameters(object):
+class TclScriptParameters:
   """Handle of the parameters that may be needed by a TCL script."""
 
   def __init__(
@@ -818,7 +818,7 @@ def LocalWorkingDirectory() -> str:
 
 
 def InDir(directory: str, command: str) -> str:
-  return 'cd {0} && {1}'.format(directory, command)
+  return 'cd {} && {}'.format(directory, command)
 
 
 def InLocalDir(command: str) -> str:
@@ -844,7 +844,7 @@ def SearchAndReplaceGuestFile(
   vm.RemoteCommand(
       InDir(
           directory,
-          "sed -i.bak 's:{0}:{1}:' {2}".format(search, replace, filename),
+          "sed -i.bak 's:{}:{}:' {}".format(search, replace, filename),
       )
   )
 
@@ -864,8 +864,8 @@ def Install(vm: virtual_machine.BaseVirtualMachine):
   """Installs hammerdbcli and dependencies on the VM."""
   vm.InstallPackages('curl')
   vm.InstallPackages('patch')
-  vm.RemoteCommand('mkdir -p {0}'.format(LocalWorkingDirectory()))
-  vm.RemoteCommand('sudo mkdir -p {0}'.format(HAMMERDB_RUN_LOCATION))
+  vm.RemoteCommand('mkdir -p {}'.format(LocalWorkingDirectory()))
+  vm.RemoteCommand('sudo mkdir -p {}'.format(HAMMERDB_RUN_LOCATION))
   vm.RemoteCommand(f'sudo chmod ugo+rwx {HAMMERDB_RUN_LOCATION}')
 
   tar_file = f'HammerDB-{HAMMERDB_VERSION.value}-Linux.tar.gz'
@@ -916,13 +916,13 @@ def SetupConfig(
 
   if db_engine not in SCRIPT_MAPPING:
     raise ValueError(
-        '{0} is currently not supported for running '
+        '{} is currently not supported for running '
         'hammerdb benchmarks.'.format(db_engine)
     )
 
   if hammerdb_script not in SCRIPT_MAPPING[db_engine]:
     raise ValueError(
-        '{0} is not a known hammerdb script.'.format(hammerdb_script)
+        '{} is not a known hammerdb script.'.format(hammerdb_script)
     )
 
   scripts = SCRIPT_MAPPING[db_engine][hammerdb_script]

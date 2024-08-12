@@ -488,7 +488,7 @@ class AsbenchResult:
   write_max: float
 
   def __init__(self, s: sample.Sample):
-    super(AsbenchResult, self).__init__()
+    super().__init__()
     self.ops = s.value
     self.timestamp = (
         s.metadata['start_timestamp'] + s.metadata['window'] - 1

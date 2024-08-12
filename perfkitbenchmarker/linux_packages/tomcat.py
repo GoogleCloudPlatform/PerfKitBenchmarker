@@ -62,9 +62,9 @@ def _Install(vm):
   vm.RemoteCommand(
       (
           """sed -i.bak -e '/Connector port="8080"/ """
-          's/protocol="[^"]\\+"/protocol="{0}"/\' '
+          's/protocol="[^"]\\+"/protocol="{}"/\' '
           '-e "/org.apache.catalina.valves.AccessLogValve/,+3d" '
-          '{1}'
+          '{}'
       ).format(_TOMCAT_PROTOCOL, _TOMCAT_SERVER_CONF)
   )
   # Quiet down localhost logs.
@@ -72,7 +72,7 @@ def _Install(vm):
       (
           'sed -i.bak '
           r"-e 's/\(2localhost.org.apache.*.level\)\s\+=.*$/\1 = WARN/' "
-          ' {0}'
+          ' {}'
       ).format(_TOMCAT_LOGGING_CONF)
   )
 
@@ -81,7 +81,7 @@ def _Install(vm):
       (
           'sed -i.bak '
           r"-e 's,\(<session-timeout>\)30\(</session-timeout>\),\11\2,' "
-          ' {0}'
+          ' {}'
       ).format(_TOMCAT_WEB_CONF)
   )
 
