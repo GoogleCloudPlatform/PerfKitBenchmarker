@@ -34,7 +34,6 @@ from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.azure import util
-from six.moves import range
 
 FLAGS = flags.FLAGS
 
@@ -97,8 +96,7 @@ AZURE_NO_TMP_DISK_TYPES = [
 def _ProductWithIncreasingLength(iterable, max_length):
   """Yields increasing length cartesian products of iterable."""
   for length in range(1, max_length + 1):
-    for p in itertools.product(iterable, repeat=length):
-      yield p
+    yield from itertools.product(iterable, repeat=length)
 
 
 def _GenerateDrivePathSuffixes():
@@ -137,7 +135,7 @@ class TooManyAzureDisksError(Exception):
 def LocalDiskIsSSD(machine_type):
   """Check whether the local disk is an SSD drive."""
 
-  return any((machine_type.startswith(prefix) for prefix in LOCAL_SSD_PREFIXES))
+  return any(machine_type.startswith(prefix) for prefix in LOCAL_SSD_PREFIXES)
 
 
 def LocalDriveIsNvme(machine_type):
@@ -162,7 +160,7 @@ class AzureDisk(disk.BaseDisk):
   _lock = threading.Lock()
 
   def __init__(self, disk_spec, vm, lun, is_image=False):
-    super(AzureDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.host_caching = FLAGS.azure_host_caching
     self.vm = vm
     self.vm_name = vm.name

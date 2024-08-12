@@ -19,7 +19,7 @@ Clusters can be paused and unpaused.
 import copy
 import json
 import os
-from typing import Dict, List, Text, Tuple
+from typing import Dict, List, Tuple
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -155,7 +155,7 @@ class CliClientInterface(edw_service.EdwClientInterface):
         )
     )
 
-  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(self, query_name: str) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
@@ -253,7 +253,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         package_name, [SYNAPSE_JDBC_JAR], ''
     )
 
-  def ExecuteQuery(self, query_name: Text) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(self, query_name: str) -> Tuple[float, Dict[str, str]]:
     """Executes a query and returns performance details.
 
     Args:
@@ -340,7 +340,7 @@ class Azuresqldatawarehouse(edw_service.EdwService):
   SERVICE_TYPE = 'azuresqldatawarehouse'
 
   def __init__(self, edw_service_spec):
-    super(Azuresqldatawarehouse, self).__init__(edw_service_spec)
+    super().__init__(edw_service_spec)
     self.whitelist_ip = None
     self.resource_group = edw_service_spec.resource_group
     self.server_name = edw_service_spec.server_name
@@ -464,7 +464,7 @@ class Azuresqldatawarehouse(edw_service.EdwService):
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""
-    basic_data = super(Azuresqldatawarehouse, self).GetMetadata()
+    basic_data = super().GetMetadata()
     basic_data['resource_group'] = self.resource_group
     basic_data['server_name'] = self.server_name
     basic_data.update(self.client_interface.GetMetadata())

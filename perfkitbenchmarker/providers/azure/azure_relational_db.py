@@ -120,7 +120,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
   database_name: str
 
   def __init__(self, relational_db_spec):
-    super(AzureRelationalDb, self).__init__(relational_db_spec)
+    super().__init__(relational_db_spec)
     if util.IsZone(self.spec.db_spec.zone):
       raise errors.Config.InvalidValue(
           'Availability zones are currently not supported by Azure DBs'
@@ -137,7 +137,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     Returns:
       metadata: dict of Azure  DB metadata.
     """
-    metadata = super(AzureRelationalDb, self).GetResourceMetadata()
+    metadata = super().GetResourceMetadata()
     metadata.update({
         'zone': self.spec.db_spec.zone,
     })
@@ -170,7 +170,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       return DEFALUT_SQLSERVER_VERSION
     else:
       raise relational_db.RelationalDbEngineNotFoundError(
-          'Unsupported engine {0}'.format(engine)
+          'Unsupported engine {}'.format(engine)
       )
 
   def GetAzCommandForEngine(self):
@@ -182,7 +182,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     elif engine == sql_engine_utils.SQLSERVER:
       return 'sql'
     raise relational_db.RelationalDbEngineNotFoundError(
-        'Unsupported engine {0}'.format(engine)
+        'Unsupported engine {}'.format(engine)
     )
 
   def GetConfigFromMachineType(self, machine_type):
@@ -199,7 +199,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     machine_type = machine_type.split('_')
     if len(machine_type) != 3:
       raise relational_db.UnsupportedError(
-          'Unsupported machine type {0}, sample machine type GP_Gen5_2'.format(
+          'Unsupported machine type {}, sample machine type GP_Gen5_2'.format(
               machine_type
           )
       )
@@ -266,7 +266,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       self.database_name = new_name
     else:
       raise relational_db.RelationalDbEngineNotFoundError(
-          'Unsupported engine {0}'.format(engine)
+          'Unsupported engine {}'.format(engine)
       )
 
   def _ApplyDbFlags(self):
@@ -278,7 +278,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       )
       if stderr:
         raise KeyError(
-            'Invalid MySQL flags: {0}.  Error {1}'.format(
+            'Invalid MySQL flags: {}.  Error {}'.format(
                 name_and_value, stderr
             )
         )
@@ -427,7 +427,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       self._CreateSqlServerInstance()
     else:
       raise NotImplementedError(
-          'Unknown how to create Azure data base engine {0}'.format(
+          'Unknown how to create Azure data base engine {}'.format(
               self.engine_type
           )
       )

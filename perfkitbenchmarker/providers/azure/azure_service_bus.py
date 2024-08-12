@@ -38,9 +38,9 @@ class AzureServiceBus(msgsvc.BaseMessagingService):
 
   def __init__(self):
     super().__init__()
-    self.topic_name = 'pkb-topic-{0}'.format(FLAGS.run_uri)
-    self.subscription_name = 'pkb-subscription-{0}'.format(FLAGS.run_uri)
-    self.namespace_name = 'pkb-namespace-{0}'.format(FLAGS.run_uri)
+    self.topic_name = 'pkb-topic-{}'.format(FLAGS.run_uri)
+    self.subscription_name = 'pkb-subscription-{}'.format(FLAGS.run_uri)
+    self.namespace_name = 'pkb-namespace-{}'.format(FLAGS.run_uri)
     self.resource_group = azure_network.GetResourceGroup()
 
   def _Create(self):

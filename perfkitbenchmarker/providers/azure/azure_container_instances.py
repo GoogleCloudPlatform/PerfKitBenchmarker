@@ -35,7 +35,7 @@ class AciContainer(container_service.BaseContainer):
   """Class representing an ACI container."""
 
   def __init__(self, container_spec, name, resource_group):
-    super(AciContainer, self).__init__(container_spec)
+    super().__init__(container_spec)
     self.name = name
     self.resource_group = resource_group
     benchmark_spec = context.GetThreadBenchmarkSpec()
@@ -151,7 +151,7 @@ class AciCluster(container_service.BaseContainerCluster):
   CLUSTER_TYPE = 'aci'
 
   def __init__(self, cluster_spec):
-    super(AciCluster, self).__init__(cluster_spec)
+    super().__init__(cluster_spec)
     self.region = util.GetRegionFromZone(self.zone)
     self.resource_group = azure_network.GetResourceGroup(self.region)
 

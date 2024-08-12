@@ -45,7 +45,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
   redis_version: str | None = None
 
   def __init__(self, spec):
-    super(AzureRedisCache, self).__init__(spec)
+    super().__init__(spec)
     self.redis_region = FLAGS.cloud_redis_region
     self.resource_group = azure_network.GetResourceGroup(self.redis_region)
     self.azure_redis_size = FLAGS.azure_redis_size

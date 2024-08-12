@@ -54,9 +54,7 @@ class AzurePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(
-        AzurePlacementGroupSpec, cls
-    )._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'resource_group': (
             option_decoders.StringDecoder,
@@ -88,7 +86,7 @@ class AzurePlacementGroup(placement_group.BasePlacementGroup):
       azure_placement_group_spec: Object containing the information needed to
         create an AzurePlacementGroup.
     """
-    super(AzurePlacementGroup, self).__init__(azure_placement_group_spec)
+    super().__init__(azure_placement_group_spec)
     self.resource_group = azure_placement_group_spec.resource_group
     self.name = '%s-%s' % (self.resource_group, self.zone)
     self.region = util.GetRegionFromZone(self.zone)

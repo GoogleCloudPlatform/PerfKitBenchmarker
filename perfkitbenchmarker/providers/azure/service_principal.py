@@ -91,7 +91,7 @@ class ServicePrincipal(resource.BaseResource):
         return cls()
 
   def __init__(self, name=None, app_id=None, password=None, user_managed=False):
-    super(ServicePrincipal, self).__init__(user_managed)
+    super().__init__(user_managed)
     # Service principals can be referred to by user provided name as long as
     # they are prefixed by http:// or by a server generated appId.
     # Prefer user provided ID for idempotence when talking to Active Directory.

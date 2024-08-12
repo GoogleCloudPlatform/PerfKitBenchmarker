@@ -284,11 +284,11 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     Returns:
       A list of top level subfolder names. Can be empty if there are no folders.
     """
-    unique_folders = set([
+    unique_folders = {
         obj.split('/')[0].strip()
         for obj in self.List(bucket)
         if obj and obj.contains('/')
-    ])
+    }
     return list(unique_folders)
 
   def EmptyBucket(self, bucket):

@@ -52,7 +52,6 @@ from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_disk_strategies
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import util
-import six
 import yaml
 
 FLAGS = flags.FLAGS
@@ -196,7 +195,7 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
   CLOUD = provider_info.AZURE
 
   def __init__(self, *args, **kwargs):
-    super(AzureVmSpec, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     if isinstance(
         self.machine_type,
         custom_virtual_machine_spec.AzurePerformanceTierDecoder,
@@ -220,7 +219,7 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
         provided config values.
     """
-    super(AzureVmSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['machine_type'].present:
       config_values['machine_type'] = yaml.safe_load(flag_values.machine_type)
     if flag_values['azure_accelerated_networking'].present:
@@ -239,7 +238,7 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(AzureVmSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'machine_type': (
             custom_virtual_machine_spec.AzureMachineTypeDecoder,
@@ -261,7 +260,7 @@ class AzurePublicIPAddress(resource.BaseResource):
   """Class to represent an Azure Public IP Address."""
 
   def __init__(self, region, availability_zone, name, dns_name=None):
-    super(AzurePublicIPAddress, self).__init__()
+    super().__init__()
     self.region = region
     self.availability_zone = availability_zone
     self.name = name
@@ -355,7 +354,7 @@ class AzureNIC(resource.BaseResource):
       accelerated_networking: bool,
       private_ip=None,
   ):
-    super(AzureNIC, self).__init__()
+    super().__init__()
     self.network = network
     self.name = name
     self.public_ip = public_ip
@@ -460,7 +459,7 @@ class AzureDedicatedHostGroup(resource.BaseResource):
   """
 
   def __init__(self, name, region, resource_group, availability_zone):
-    super(AzureDedicatedHostGroup, self).__init__()
+    super().__init__()
     self.name = name + 'Group'
     self.region = region
     self.resource_group = resource_group
@@ -556,7 +555,7 @@ class AzureDedicatedHost(resource.BaseResource):
   host_group_map = {}
 
   def __init__(self, name, region, resource_group, sku_type, availability_zone):
-    super(AzureDedicatedHost, self).__init__()
+    super().__init__()
     self.name = name + '-Host'
     self.region = region
     self.resource_group = resource_group
@@ -646,7 +645,7 @@ def _MachineTypeIsArm(machine_type):
 
 
 class AzureVirtualMachine(
-    six.with_metaclass(abc.ABCMeta, virtual_machine.BaseVirtualMachine)
+    virtual_machine.BaseVirtualMachine, metaclass=abc.ABCMeta
 ):
   """Object representing an Azure Virtual Machine."""
 
@@ -663,7 +662,7 @@ class AzureVirtualMachine(
     Args:
       vm_spec: virtual_machine.BaseVmSpec object of the vm.
     """
-    super(AzureVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
 
     # PKB zone can be either a region or a region with an availability zone.
     # Format for Azure availability zone support is "region-availability_zone"
@@ -1118,7 +1117,7 @@ class AzureVirtualMachine(
 
   def GetResourceMetadata(self):
     assert self.network is not None
-    result = super(AzureVirtualMachine, self).GetResourceMetadata()
+    result = super().GetResourceMetadata()
     result['accelerated_networking'] = self.nic.accelerated_networking
     result['boot_disk_type'] = self.create_os_disk_strategy.disk.disk_type
     result['boot_disk_size'] = self.create_os_disk_strategy.disk.disk_size
@@ -1279,7 +1278,7 @@ class BaseWindowsAzureVirtualMachine(
   IMAGE_URN = 'non-existent'
 
   def __init__(self, vm_spec):
-    super(BaseWindowsAzureVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     # The names of Windows VMs on Azure are limited to 15 characters so let's
     # drop the pkb prefix if necessary.
     if len(self.name) > 15:
@@ -1288,7 +1287,7 @@ class BaseWindowsAzureVirtualMachine(
     self.password = vm_util.GenerateRandomWindowsPassword()
 
   def _PostCreate(self):
-    super(BaseWindowsAzureVirtualMachine, self)._PostCreate()
+    super()._PostCreate()
     config_dict = {'commandToExecute': windows_virtual_machine.STARTUP_SCRIPT}
     config = json.dumps(config_dict)
     vm_util.IssueRetryableCommand(
@@ -1500,7 +1499,7 @@ def GenerateDownloadPreprovisionedDataCommand(
       )
   )
   if install_path:
-    return '{0} && {1}'.format(mkdir_command, download_command)
+    return '{} && {}'.format(mkdir_command, download_command)
   return download_command
 
 

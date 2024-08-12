@@ -84,7 +84,7 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
       return DEFAULT_MYSQL_VERSION
     else:
       raise relational_db.RelationalDbEngineNotFoundError(
-          'Unsupported engine {0}'.format(engine)
+          'Unsupported engine {}'.format(engine)
       )
 
   def _Create(self):
@@ -127,7 +127,7 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
     elif engine == sql_engine_utils.FLEXIBLE_SERVER_MYSQL:
       return 'mysql'
     else:
-      raise NotImplementedError('Unsupported engine {0}'.format(engine))
+      raise NotImplementedError('Unsupported engine {}'.format(engine))
     return engine
 
   def _PostCreate(self):
@@ -234,7 +234,7 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         # Azure might raise warning
         # WARNING: configuration_name is not a known attribute of class
         raise NotImplementedError(
-            'Invalid flags: {0}.  Error {1}'.format(name_and_value, stderr)
+            'Invalid flags: {}.  Error {}'.format(name_and_value, stderr)
         )
 
     self._Reboot()

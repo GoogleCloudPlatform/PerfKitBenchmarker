@@ -23,7 +23,6 @@ from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
-import six
 
 AZURE_PATH = azure.AZURE_PATH
 OUTPUT_JSON = ['--output', 'json']
@@ -78,7 +77,7 @@ def GetAzureStorageAccountKey(storage_account_name, resource_group_args):
 
 def FormatTag(key, value):
   """Format an individual tag for use with the --tags param of Azure CLI."""
-  return '{0}={1}'.format(key, value)
+  return '{}={}'.format(key, value)
 
 
 def FormatTags(tags_dict):
@@ -90,7 +89,7 @@ def FormatTags(tags_dict):
   Returns:
     A list of tags formatted as arguments for 'tag' parameter.
   """
-  return [FormatTag(k, v) for k, v in sorted(six.iteritems(tags_dict))]
+  return [FormatTag(k, v) for k, v in sorted(tags_dict.items())]
 
 
 def GetResourceTags(timeout_minutes):
@@ -166,7 +165,7 @@ def GetRegionFromZone(zone_or_region: str) -> str:
 def GetZonesInRegion(region: str) -> Set[str]:
   """Returns a set of zones in the region."""
   # As of 2021 all Azure AZs are numbered 1-3 for eligible regions.
-  return set([f'{region}-{i}' for i in range(1, 4)])
+  return {f'{region}-{i}' for i in range(1, 4)}
 
 
 def ShouldKeepZoneFromCLI(zone: str) -> bool:
@@ -197,9 +196,9 @@ def GetAllRegions() -> Set[str]:
       [AZURE_PATH, 'account', 'list-locations', '--output', 'json']
   )
   # Filter out staging regions from the output.
-  return set([
+  return {
       item['name'] for item in json.loads(stdout) if _IsRecommendedRegion(item)
-  ])
+  }
 
 
 def GetAllZones() -> Set[str]:
@@ -235,9 +234,9 @@ def GetRegionsInGeo(geo: str) -> Set[str]:
       '--query',
       f"[?metadata.geographyGroup == '{geo}']",
   ])
-  return set([
+  return {
       item['name'] for item in json.loads(stdout) if _IsRecommendedRegion(item)
-  ])
+  }
 
 
 def GetAvailabilityZoneFromZone(zone_or_region):

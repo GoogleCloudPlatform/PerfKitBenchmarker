@@ -83,7 +83,7 @@ class AzureResourceGroup(resource.BaseResource):
       timeout_minutes=None,
       raise_on_create_failure=True,
   ):
-    super(AzureResourceGroup, self).__init__()
+    super().__init__()
     AzureResourceGroup._log_az_version()
     self.name = name
     self.use_existing = use_existing
@@ -196,7 +196,7 @@ class AzureStorageAccount(resource.BaseResource):
       use_existing=False,
       raise_on_create_failure=True,
   ):
-    super(AzureStorageAccount, self).__init__()
+    super().__init__()
     self.storage_type = storage_type
     self.name = name
     self.resource_group = resource_group or GetResourceGroup()
@@ -308,7 +308,7 @@ class AzureVirtualNetwork(network.BaseNetwork):
   CLOUD = provider_info.AZURE
 
   def __init__(self, spec, region, name):
-    super(AzureVirtualNetwork, self).__init__(spec)
+    super().__init__(spec)
     self.name = name
     self.resource_group = GetResourceGroup()
     self.region = region
@@ -420,7 +420,7 @@ class AzureSubnet(resource.BaseResource):
   """Object representing an Azure Subnet."""
 
   def __init__(self, vnet, name):
-    super(AzureSubnet, self).__init__()
+    super().__init__()
     if azure_flags.AZURE_SUBNET_ID.value:
       # use pre-existing subnet
       self.id = azure_flags.AZURE_SUBNET_ID.value
@@ -491,7 +491,7 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
   """Object representing an Azure Network Security Group."""
 
   def __init__(self, region, subnet, name):
-    super(AzureNetworkSecurityGroup, self).__init__()
+    super().__init__()
 
     self.region = region
     self.subnet = subnet
@@ -712,7 +712,7 @@ class AzureNetwork(network.BaseNetwork):
   CLOUD = provider_info.AZURE
 
   def __init__(self, spec):
-    super(AzureNetwork, self).__init__(spec)
+    super().__init__(spec)
     self.resource_group = GetResourceGroup()
     self.region = util.GetRegionFromZone(self.zone)
     self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)

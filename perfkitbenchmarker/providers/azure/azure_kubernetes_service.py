@@ -36,7 +36,7 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
   CLOUD = provider_info.AZURE
 
   def __init__(self, registry_spec):
-    super(AzureContainerRegistry, self).__init__(registry_spec)
+    super().__init__(registry_spec)
     self.region = util.GetRegionFromZone(self.zone)
     self.resource_group = azure_network.GetResourceGroup(self.region)
     self.login_server = None
@@ -137,7 +137,7 @@ class AksCluster(container_service.KubernetesCluster):
 
   def __init__(self, spec):
     """Initializes the cluster."""
-    super(AksCluster, self).__init__(spec)
+    super().__init__(spec)
     self.region = util.GetRegionFromZone(self.zone)
     self.resource_group = azure_network.GetResourceGroup(self.region)
     self.node_resource_group = None
@@ -162,7 +162,7 @@ class AksCluster(container_service.KubernetesCluster):
     Returns:
       dict mapping string property key to value.
     """
-    result = super(AksCluster, self).GetResourceMetadata()
+    result = super().GetResourceMetadata()
     result['boot_disk_type'] = self.default_nodepool.disk_type
     result['boot_disk_size'] = self.default_nodepool.disk_size
     return result
@@ -285,7 +285,7 @@ class AksCluster(container_service.KubernetesCluster):
 
   def _PostCreate(self):
     """Tags the cluster resource group."""
-    super(AksCluster, self)._PostCreate()
+    super()._PostCreate()
     set_tags_cmd = [
         azure.AZURE_PATH,
         'group',

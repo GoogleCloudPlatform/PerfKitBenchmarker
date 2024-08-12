@@ -72,7 +72,7 @@ class AzureSmbService(smb_service.BaseSmbService):
   DEFAULT_TIER = 'Standard_LRS'
 
   def __init__(self, disk_spec, zone):
-    super(AzureSmbService, self).__init__(disk_spec, zone)
+    super().__init__(disk_spec, zone)
     self.name = 'azure-smb-fs-%s' % FLAGS.run_uri
     self.region = util.GetRegionFromZone(self.zone)
     self.resource_group = azure_network.GetResourceGroup(self.region)
