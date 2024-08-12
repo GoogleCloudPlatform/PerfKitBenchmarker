@@ -13,7 +13,8 @@
 # limitations under the License.
 
 
-class MemcacheService(object):
+# pylint: disable-next=missing-class-docstring
+class MemcacheService:
   CLOUD = None
 
   def __init__(self):

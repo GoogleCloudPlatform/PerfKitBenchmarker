@@ -81,7 +81,7 @@ def GetVPNServiceClass():
   return resource.GetResourceClass(VPNService)
 
 
-class VPN(object):
+class VPN:
   """An object representing the VPN.
 
   A VPN instance manages tunnel configurations for exactly 1 pair of endpoints.
@@ -207,7 +207,7 @@ class VPN(object):
     return ready
 
 
-class TunnelConfig(object):
+class TunnelConfig:
   """Object to hold all parms needed to configure a tunnel.
 
   tunnel_config =
@@ -231,7 +231,7 @@ class TunnelConfig(object):
   _tunnelconfig_lock = threading.Lock()
 
   def __init__(self, **kwargs):
-    super(TunnelConfig, self).__init__()
+    super().__init__()
     self.tunnel_name = kwargs.get('tunnel_name', 'unnamed_tunnel')
     self.endpoints = {}
     self.routing = kwargs.get('routing', None)
@@ -268,7 +268,7 @@ class VPNService(resource.BaseResource):
     Args:
       vpn_service_spec: spec of the vpn service.
     """
-    super(VPNService, self).__init__()
+    super().__init__()
     self.name = spec.name
     self.tunnel_count = spec.tunnel_count
     self.gateway_count = FLAGS.vpn_service_gateway_count

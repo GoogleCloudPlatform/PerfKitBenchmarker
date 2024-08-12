@@ -16,7 +16,7 @@
 from perfkitbenchmarker import resource
 
 
-class BootDiskSpec(object):
+class BootDiskSpec:
   """Stores the information needed to create a  boot disk.
 
   Attributes:

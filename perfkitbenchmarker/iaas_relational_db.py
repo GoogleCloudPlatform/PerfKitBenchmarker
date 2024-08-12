@@ -44,7 +44,7 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
     Raises:
       UnsupportedError: if high availability is requested for an unmanaged db.
     """
-    super(IAASRelationalDb, self).__init__(relational_db_spec)
+    super().__init__(relational_db_spec)
 
     self.spec.database_username = 'root'
     self.spec.database_password = 'perfkitbenchmarker'
@@ -149,7 +149,7 @@ class IAASRelationalDb(relational_db.BaseRelationalDb):
       (string): Default version for the given database engine.
     """
     raise NotImplementedError(
-        'Default engine not specified for engine {0}'.format(engine)
+        'Default engine not specified for engine {}'.format(engine)
     )
 
   def _Create(self):

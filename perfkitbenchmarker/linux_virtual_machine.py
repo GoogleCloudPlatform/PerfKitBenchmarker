@@ -367,7 +367,7 @@ class CpuVulnerabilities:
     return ret
 
 
-class KernelRelease(object):
+class KernelRelease:
   """Holds the contents of the linux kernel version returned from uname -r."""
 
   def __init__(self, uname: str):
@@ -434,7 +434,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
   _IGNORE_NETWORK_DEVICE_PREFIXES = ('lo', 'docker', 'ib')
 
   def __init__(self, *args, **kwargs):
-    super(BaseLinuxMixin, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     # N.B. If you override ssh_port you must override remote_access_ports and
     # primary_remote_access_port.
     self.ssh_port = DEFAULT_SSH_PORT
@@ -693,7 +693,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     pass
 
   def PrepareVMEnvironment(self):
-    super(BaseLinuxMixin, self).PrepareVMEnvironment()
+    super().PrepareVMEnvironment()
     self._SetNumCpus()
     self.SetupProxy()
     self._CreateVmTmpDir()
@@ -1246,14 +1246,14 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     # TODO(user): Allow custom disk formatting options.
     if FLAGS.disk_fs_type == 'xfs':
       block_size = FLAGS.disk_block_size or 512
-      fmt_cmd = 'sudo mkfs.xfs -f -i size={0} {1}'.format(
+      fmt_cmd = 'sudo mkfs.xfs -f -i size={} {}'.format(
           block_size, device_path
       )
     else:
       block_size = FLAGS.disk_block_size or 4096
       fmt_cmd = (
           'sudo mke2fs -F -E lazy_itable_init=0,discard -O '
-          '^has_journal -t ext4 -b {0} {1}'.format(block_size, device_path)
+          '^has_journal -t ext4 -b {} {}'.format(block_size, device_path)
       )
     self.os_metadata['disk_filesystem_type'] = FLAGS.disk_fs_type
     self.os_metadata['disk_filesystem_blocksize'] = block_size
@@ -2113,11 +2113,11 @@ class ClearMixin(BaseLinuxMixin):
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
-    super(ClearMixin, self).OnStartup()
+    super().OnStartup()
     self.RemoteHostCommand('sudo swupd autoupdate --disable')
     self.RemoteHostCommand('sudo mkdir -p /etc/sudoers.d')
     self.RemoteHostCommand(
-        "echo 'Defaults:{0} !requiretty' | sudo tee /etc/sudoers.d/pkb".format(
+        "echo 'Defaults:{} !requiretty' | sudo tee /etc/sudoers.d/pkb".format(
             self.user_name
         ),
         login_shell=True,
@@ -2129,13 +2129,13 @@ class ClearMixin(BaseLinuxMixin):
     Performs the normal package cleanup, then deletes the file
     added to the /etc/sudoers.d directory during startup.
     """
-    super(ClearMixin, self).PackageCleanup()
+    super().PackageCleanup()
     self.RemoteCommand('sudo rm /etc/sudoers.d/pkb')
 
   def SnapshotPackages(self):
     """See base class."""
     self.RemoteCommand(
-        'sudo swupd bundle-list > {0}/bundle_list'.format(
+        'sudo swupd bundle-list > {}/bundle_list'.format(
             linux_packages.INSTALL_DIR
         )
     )
@@ -2144,7 +2144,7 @@ class ClearMixin(BaseLinuxMixin):
     """See base class."""
     self.RemoteCommand(
         'sudo swupd bundle-list | grep --fixed-strings --line-regexp'
-        ' --invert-match --file {0}/bundle_list | xargs --no-run-if-empty sudo'
+        ' --invert-match --file {}/bundle_list | xargs --no-run-if-empty sudo'
         ' swupd bundle-remove'.format(linux_packages.INSTALL_DIR),
         ignore_failure=True,
     )
@@ -2152,12 +2152,12 @@ class ClearMixin(BaseLinuxMixin):
   def HasPackage(self, package):
     """Returns True iff the package is available for installation."""
     return self.TryRemoteCommand(
-        'sudo swupd bundle-list --all | grep {0}'.format(package)
+        'sudo swupd bundle-list --all | grep {}'.format(package)
     )
 
   def InstallPackages(self, packages: str) -> None:
     """Installs packages using the swupd bundle manager."""
-    self.RemoteCommand('sudo swupd bundle-add {0}'.format(packages))
+    self.RemoteCommand('sudo swupd bundle-add {}'.format(packages))
 
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
@@ -2171,7 +2171,7 @@ class ClearMixin(BaseLinuxMixin):
         package.Install(self)
       else:
         raise KeyError(
-            'Package {0} has no install method for Clear Linux.'.format(
+            'Package {} has no install method for Clear Linux.'.format(
                 package_name
             )
         )
@@ -2198,13 +2198,13 @@ class ClearMixin(BaseLinuxMixin):
   def GetOsInfo(self):
     """See base class."""
     stdout, _ = self.RemoteCommand('swupd info | grep Installed')
-    return 'Clear Linux build: {0}'.format(
+    return 'Clear Linux build: {}'.format(
         regex_util.ExtractGroup(CLEAR_BUILD_REGEXP, stdout)
     )
 
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
-    super(ClearMixin, self).SetupProxy()
+    super().SetupProxy()
     profile_file = '/etc/profile'
     commands = []
 
@@ -2301,7 +2301,7 @@ class BaseRhelMixin(BaseLinuxMixin):
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
-    super(BaseRhelMixin, self).OnStartup()
+    super().OnStartup()
     self.RemoteHostCommand(
         "echo 'Defaults:%s !requiretty' | sudo tee /etc/sudoers.d/pkb"
         % self.user_name,
@@ -2330,7 +2330,7 @@ class BaseRhelMixin(BaseLinuxMixin):
     Performs the normal package cleanup, then deletes the file
     added to the /etc/sudoers.d directory during startup.
     """
-    super(BaseRhelMixin, self).PackageCleanup()
+    super().PackageCleanup()
     self.RemoteCommand('sudo rm /etc/sudoers.d/pkb')
 
   def SnapshotPackages(self):
@@ -2416,7 +2416,7 @@ class BaseRhelMixin(BaseLinuxMixin):
 
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
-    super(BaseRhelMixin, self).SetupProxy()
+    super().SetupProxy()
     if self.PACKAGE_MANAGER == YUM:
       yum_proxy_file = '/etc/yum.conf'
     elif self.PACKAGE_MANAGER == DNF:
@@ -2566,7 +2566,7 @@ class BaseDebianMixin(BaseLinuxMixin):
   BASE_OS_TYPE = os_types.DEBIAN
 
   def __init__(self, *args, **kwargs):
-    super(BaseDebianMixin, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
     # Whether or not apt-get update has been called.
     # We defer running apt-get update until the first request to install a
@@ -2708,7 +2708,7 @@ class BaseDebianMixin(BaseLinuxMixin):
 
   def SetupProxy(self):
     """Sets up proxy configuration variables for the cloud environment."""
-    super(BaseDebianMixin, self).SetupProxy()
+    super().SetupProxy()
     apt_proxy_file = '/etc/apt/apt.conf'
     commands = []
 
@@ -2734,7 +2734,7 @@ class BaseDebianMixin(BaseLinuxMixin):
       target: int. The max number of ssh connection.
     """
     self.RemoteCommand(
-        r'sudo sed -i -e "s/.*MaxStartups.*/MaxStartups {0}/" '
+        r'sudo sed -i -e "s/.*MaxStartups.*/MaxStartups {}/" '
         '/etc/ssh/sshd_config'.format(target)
     )
     self.RemoteCommand('sudo service ssh restart')
@@ -2874,7 +2874,7 @@ class ContainerizedDebianMixin(BaseDebianMixin):
   BASE_DOCKER_IMAGE = 'ubuntu:xenial'
 
   def __init__(self, *args, **kwargs):
-    super(ContainerizedDebianMixin, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.docker_id = None
 
   def _CheckDockerExists(self):
@@ -2898,7 +2898,7 @@ class ContainerizedDebianMixin(BaseDebianMixin):
     # Has to be done after InitDocker() because it needs docker_id.
     self._CreateVmTmpDir()
 
-    super(ContainerizedDebianMixin, self).PrepareVMEnvironment()
+    super().PrepareVMEnvironment()
 
   def InitDocker(self):
     """Initializes the docker container daemon."""
@@ -3062,7 +3062,7 @@ def CreateLscpuSamples(vms):
   return samples
 
 
-class LsCpuResults(object):
+class LsCpuResults:
   """Holds the contents of the command lscpu."""
 
   def __init__(self, lscpu):
@@ -3135,7 +3135,7 @@ def CreateProcCpuSamples(vms):
   return samples
 
 
-class ProcCpuResults(object):
+class ProcCpuResults:
   """Parses /proc/cpuinfo text into grouped values.
 
   Most of the cpuinfo is repeated per processor.  Known ones that change per
@@ -3428,11 +3428,11 @@ class JujuMixin(BaseDebianMixin):
       resp, _ = self.RemoteHostCommand(
           'sudo add-apt-repository ppa:juju/stable'
       )
-    super(JujuMixin, self).SetupPackageManager()
+    super().SetupPackageManager()
 
   def PrepareVMEnvironment(self):
     """Install and configure a Juju environment."""
-    super(JujuMixin, self).PrepareVMEnvironment()
+    super().PrepareVMEnvironment()
     if self.is_controller:
       self.InstallPackages('juju')
 

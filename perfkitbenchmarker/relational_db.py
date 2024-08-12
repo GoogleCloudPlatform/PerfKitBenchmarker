@@ -25,7 +25,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sql_engine_utils
-import six
 
 # TODO(chunla): Move IAAS flag to file
 flags.DEFINE_string(
@@ -286,7 +285,7 @@ def VmsToBoot(vm_groups):
   # TODO(user): Enable replications.
   return {
       name: spec  # pylint: disable=g-complex-comprehension
-      for name, spec in six.iteritems(vm_groups)
+      for name, spec in vm_groups.items()
       if name == 'clients'
       or name == 'default'
       or name == 'controller'
@@ -307,7 +306,7 @@ class BaseRelationalDb(resource.BaseResource):
     Args:
       relational_db_spec: spec of the managed database.
     """
-    super(BaseRelationalDb, self).__init__(
+    super().__init__(
         enable_freeze_restore=relational_db_spec.enable_freeze_restore,
         create_on_restore_error=relational_db_spec.create_on_restore_error,
         delete_on_freeze_error=relational_db_spec.delete_on_freeze_error,
@@ -551,7 +550,7 @@ class BaseRelationalDb(resource.BaseResource):
     engine = sql_engine_utils.GetDbEngineType(self.spec.engine)
     if engine not in DEFAULT_PORTS:
       raise NotImplementedError(
-          'Default port not specified for engine {0}'.format(engine)
+          'Default port not specified for engine {}'.format(engine)
       )
     return DEFAULT_PORTS[engine]
 

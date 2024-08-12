@@ -23,8 +23,6 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_alias
 from perfkitbenchmarker import units
-import six
-from six.moves import range
 import yaml
 
 
@@ -34,7 +32,7 @@ INTEGER_GROUP_REGEXP = re.compile(r'(\d+)(-(\d+))?(-(\d+))?$')
 INTEGER_GROUP_REGEXP_COLONS = re.compile(r'(-?\d+)(:(-?\d+))?(:(-?\d+))?$')
 
 
-class IntegerList(object):
+class IntegerList:
   """An immutable list of nonnegative integers.
 
   The list contains either single integers (ex: 5) or ranges (ex:
@@ -61,7 +59,7 @@ class IntegerList(object):
 
     length = 0
     for elt in groups:
-      if isinstance(elt, six.integer_types):
+      if isinstance(elt, int):
         length += 1
       if isinstance(elt, tuple):
         length += len(self._CreateXrangeFromTuple(elt))
@@ -110,11 +108,10 @@ class IntegerList(object):
 
   def __iter__(self):
     for group in self.groups:
-      if isinstance(group, six.integer_types):
+      if isinstance(group, int):
         yield group
       else:
-        for val in self._CreateXrangeFromTuple(group):
-          yield val
+        yield from self._CreateXrangeFromTuple(group)
 
   def __str__(self):
     return IntegerListSerializer().serialize(self)
@@ -181,7 +178,7 @@ class IntegerListParser(flags.ArgumentParser):
   EXCEPTION = 'exception'
 
   def __init__(self, on_nonincreasing=None):
-    super(IntegerListParser, self).__init__()
+    super().__init__()
 
     self.on_nonincreasing = on_nonincreasing
 
@@ -253,7 +250,7 @@ class IntegerListSerializer(flags.ArgumentSerializer):
   def serialize(self, il):
     return ','.join([
         str(val)
-        if isinstance(val, six.integer_types)
+        if isinstance(val, int)
         else self._SerializeRange(val)
         for val in il.groups
     ])
@@ -270,7 +267,7 @@ def DEFINE_integerlist(
   flags.DEFINE(parser, name, default, help, flag_values, serializer, **kwargs)
 
 
-class OverrideFlags(object):
+class OverrideFlags:
   """Context manager that applies any config_dict overrides to flag_values."""
 
   def __init__(
@@ -296,7 +293,7 @@ class OverrideFlags(object):
     if not self._config_dict:
       return
 
-    for key, value in six.iteritems(self._config_dict):
+    for key, value in self._config_dict.items():
       if key not in self._flag_values:
         raise errors.Config.UnrecognizedOption(
             'Unrecognized option {0}.{1}. Each option within {0} must '
@@ -308,7 +305,7 @@ class OverrideFlags(object):
           self._flag_values[key].parse(value)  # Set 'present' to True.
         except flags.IllegalFlagValueError as e:
           raise errors.Config.InvalidValue(
-              'Invalid {0}.{1} value: "{2}" (of type "{3}").{4}{5}'.format(
+              'Invalid {}.{} value: "{}" (of type "{}").{}{}'.format(
                   'flags', key, value, value.__class__.__name__, os.linesep, e
               )
           )
@@ -317,7 +314,7 @@ class OverrideFlags(object):
     """Restores flag_values to its original state."""
     if not self._flags_to_reapply:
       return
-    for key, value in six.iteritems(self._flags_to_reapply):
+    for key, value in self._flags_to_reapply.items():
       self._flag_values[key].value = value
       self._flag_values[key].present = 0
 
@@ -344,7 +341,7 @@ class UnitsParser(flags.ArgumentParser):
         at least one of the specified Units, or the parse() method will raise a
         ValueError.
     """
-    if isinstance(convertible_to, (six.string_types, units.Unit)):
+    if isinstance(convertible_to, ((str,), units.Unit)):
       self.convertible_to = [units.Unit(convertible_to)]
     else:
       self.convertible_to = [units.Unit(u) for u in convertible_to]
@@ -383,8 +380,8 @@ class UnitsParser(flags.ArgumentParser):
         pass
     else:
       raise ValueError(
-          'Expression {0!r} is not convertible to an acceptable unit '
-          '({1}).'.format(inp, ', '.join(str(u) for u in self.convertible_to))
+          'Expression {!r} is not convertible to an acceptable unit '
+          '({}).'.format(inp, ', '.join(str(u) for u in self.convertible_to))
       )
 
     return quantity
@@ -500,7 +497,7 @@ class YAMLParser(flags.ArgumentParser):
         valid YAML document.
     """
 
-    if isinstance(inp, six.string_types):
+    if isinstance(inp, str):
       # This will work unless the user writes a config with a quoted
       # string that, if unquoted, would be parsed as a non-string
       # Python type (example: '123'). In that case, the first

@@ -26,8 +26,6 @@ from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import windows_benchmarks
 from perfkitbenchmarker import windows_packages
-import six
-from six.moves import zip
 
 FLAGS = flags.FLAGS
 
@@ -420,13 +418,13 @@ def _AssertFlagMatrixAndZipDefsExist(
       'flag_matrix_defs', {}
   ):
     raise FlagMatrixNotFoundException(
-        'No flag_matrix with name {0}'.format(flag_matrix_name)
+        'No flag_matrix with name {}'.format(flag_matrix_name)
     )
   if flag_zip_name and flag_zip_name not in benchmark_config.get(
       'flag_zip_defs', {}
   ):
     raise FlagZipNotFoundException(
-        'No flag_zip with name {0}'.format(flag_zip_name)
+        'No flag_zip with name {}'.format(flag_zip_name)
     )
 
 
@@ -511,7 +509,7 @@ def GetBenchmarksFromFlags():
     crossed_axes = []
     if flag_zip:
       flag_axes = []
-      for flag, values in six.iteritems(flag_zip):
+      for flag, values in flag_zip.items():
         flag_axes.append([{flag: v} for v in values])
 
       _AssertZipAxesHaveSameLength(flag_axes)
@@ -524,7 +522,7 @@ def GetBenchmarksFromFlags():
           [benchmark_tuple[1]['flags'] for benchmark_tuple in zipped_axes]
       )
 
-    for flag, values in sorted(six.iteritems(flag_matrix)):
+    for flag, values in sorted(flag_matrix.items()):
       crossed_axes.append([{flag: v} for v in values])
 
     for flag_config in itertools.product(*crossed_axes):

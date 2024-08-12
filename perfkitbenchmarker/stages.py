@@ -37,7 +37,7 @@ _VALID_FLAG_VALUES = PROVISION, PREPARE, RUN, CLEANUP, TEARDOWN, _ALL
 
 
 _SYNTACTIC_HELP = (
-    'A complete benchmark execution consists of {0} stages: {1}. Possible flag '
+    'A complete benchmark execution consists of {} stages: {}. Possible flag '
     'values include an individual stage, a comma-separated list of stages, or '
     "'all'. If a list of stages is provided, they must be in order without "
     'skipping any stage.'.format(len(STAGES), ', '.join(STAGES))
@@ -51,7 +51,7 @@ class RunStageParser(flags.ListParser):
   """
 
   def __init__(self, *args, **kwargs):
-    super(RunStageParser, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.syntactic_help = _SYNTACTIC_HELP
 
   def parse(self, argument):
@@ -67,11 +67,11 @@ class RunStageParser(flags.ListParser):
       ValueError: If argument does not conform to the guidelines explained in
           syntactic_help.
     """
-    stage_list = super(RunStageParser, self).parse(argument)
+    stage_list = super().parse(argument)
 
     if not stage_list:
       raise ValueError(
-          'Unable to parse {0}. Stage list cannot be empty.'.format(
+          'Unable to parse {}. Stage list cannot be empty.'.format(
               repr(argument)
           )
       )
@@ -79,7 +79,7 @@ class RunStageParser(flags.ListParser):
     invalid_items = set(stage_list).difference(_VALID_FLAG_VALUES)
     if invalid_items:
       raise ValueError(
-          'Unable to parse {0}. Unrecognized stages were found: {1}'.format(
+          'Unable to parse {}. Unrecognized stages were found: {}'.format(
               repr(argument), ', '.join(sorted(invalid_items))
           )
       )
@@ -87,7 +87,7 @@ class RunStageParser(flags.ListParser):
     if _ALL in stage_list:
       if len(stage_list) > 1:
         raise ValueError(
-            "Unable to parse {0}. If 'all' stages are specified, individual "
+            "Unable to parse {}. If 'all' stages are specified, individual "
             'stages cannot also be specified.'.format(repr(argument))
         )
       return list(STAGES)
@@ -97,14 +97,14 @@ class RunStageParser(flags.ListParser):
       expected_stages = _NEXT_STAGE.get(previous_stage)
       if not expected_stages:
         raise ValueError(
-            "Unable to parse {0}. '{1}' should be the last stage.".format(
+            "Unable to parse {}. '{}' should be the last stage.".format(
                 repr(argument), previous_stage
             )
         )
       if stage not in expected_stages:
         raise ValueError(
-            "Unable to parse {0}. The stage after '{1}' should be one of '{2}',"
-            " not '{3}'.".format(
+            "Unable to parse {}. The stage after '{}' should be one of '{}',"
+            " not '{}'.".format(
                 repr(argument), previous_stage, expected_stages, stage
             )
         )

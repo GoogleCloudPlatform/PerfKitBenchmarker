@@ -95,7 +95,7 @@ def AliasFlagsFromArgs(
       if original in LIST_TO_MULTISTRING_TRANSLATIONS:
         result = _GetMultiStringFromList(translation, m.group(2))
       else:
-        result[0] = re.sub(regex, r'\1{0}\2'.format(translation), arg)
+        result[0] = re.sub(regex, r'\1{}\2'.format(translation), arg)
       logging.warning(
           (
               'The flag %s is deprecated and will be removed in the future.'

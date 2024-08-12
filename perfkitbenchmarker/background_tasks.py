@@ -59,6 +59,7 @@ import ctypes
 import functools
 import logging
 import os
+import queue
 import signal
 import threading
 import time
@@ -68,10 +69,6 @@ from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import log_util
-import six
-from six.moves import queue
-from six.moves import range
-from six.moves import zip
 
 
 # For situations where an interruptable wait is necessary, a loop of waits with
@@ -112,8 +109,8 @@ def _GetCallString(target_arg_tuple):
     kwargs = inner_kwargs
     target = target.func
   arg_strings = [str(a) for a in args]
-  arg_strings.extend(['{0}={1}'.format(k, v) for k, v in six.iteritems(kwargs)])
-  return '{0}({1})'.format(
+  arg_strings.extend(['{}={}'.format(k, v) for k, v in kwargs.items()])
+  return '{}({})'.format(
       getattr(target, '__name__', target), ', '.join(arg_strings)
   )
 
@@ -151,7 +148,7 @@ def _WaitForCondition(condition_callback, timeout=None):
     delay = min(delay * 2, remaining_time, _WAIT_MAX_RECHECK_DELAY)
 
 
-class _SingleReaderQueue(object):
+class _SingleReaderQueue:
   """Queue to which multiple threads write but from which only one thread reads.
 
   A lightweight substitute for the Queue.Queue class that does not use
@@ -172,7 +169,7 @@ class _SingleReaderQueue(object):
     self._deque.append(item)
 
 
-class _NonPollingSingleReaderQueue(object):
+class _NonPollingSingleReaderQueue:
   """Queue to which multiple threads write but from which only one thread reads.
 
   Uses a threading.Lock to implement a non-interruptable Get that does not poll
@@ -208,7 +205,7 @@ class _NonPollingSingleReaderQueue(object):
     self._SignalAvailableItem()
 
 
-class _BackgroundTaskThreadContext(object):
+class _BackgroundTaskThreadContext:
   """Thread-specific information that can be inherited by a background task.
 
   Attributes:
@@ -226,7 +223,7 @@ class _BackgroundTaskThreadContext(object):
     context.SetThreadBenchmarkSpec(self.benchmark_spec)
 
 
-class _BackgroundTask(object):
+class _BackgroundTask:
   """Base class for a task executed in a child thread or process.
 
   Attributes:
@@ -258,7 +255,7 @@ class _BackgroundTask(object):
       self.traceback = traceback.format_exc()
 
 
-class _BackgroundTaskManager(six.with_metaclass(abc.ABCMeta, object)):
+class _BackgroundTaskManager(metaclass=abc.ABCMeta):
   """Base class for a context manager that manages state for background tasks.
 
   Attributes:
@@ -356,7 +353,7 @@ class _BackgroundThreadTaskManager(_BackgroundTaskManager):
   """Manages state for background tasks started in child threads."""
 
   def __init__(self, *args, **kwargs):
-    super(_BackgroundThreadTaskManager, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._response_queue = _SingleReaderQueue()
     self._task_queues = []
     self._threads = []
@@ -459,7 +456,7 @@ class _BackgroundProcessTaskManager(_BackgroundTaskManager):
   """
 
   def __init__(self, *args, **kwargs):
-    super(_BackgroundProcessTaskManager, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self._active_futures = {}
     self._executor = futures.ProcessPoolExecutor(self._max_concurrency)
 
@@ -557,7 +554,7 @@ def _RunParallelTasks(
         # for other tasks.
         stacktrace = task_manager.tasks[task_id].traceback
         if stacktrace:
-          msg = 'Exception occurred while calling {0}:{1}{2}'.format(
+          msg = 'Exception occurred while calling {}:{}{}'.format(
               _GetCallString(target_arg_tuples[task_id]), os.linesep, stacktrace
           )
           logging.error(msg)
@@ -578,7 +575,7 @@ def _RunParallelTasks(
     # type.
     raise parallel_exception_class(
         'The following exceptions occurred during parallel execution:'
-        '{0}{1}'.format(os.linesep, os.linesep.join(error_strings))
+        '{}{}'.format(os.linesep, os.linesep.join(error_strings))
     )
   results = [task.return_value for task in task_manager.tasks]
   assert len(target_arg_tuples) == len(results), (target_arg_tuples, results)

@@ -21,22 +21,20 @@ import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.configs import benchmark_config_spec
-import six
-from six.moves import range
 
 
 _BENCHMARK_NAME = 'test_benchmark'
 _BENCHMARK_UID = 'uid'
 
 
-class SamplesTestMixin(object):
+class SamplesTestMixin:
   """A mixin for unittest.TestCase that adds a type-specific equality
 
   predicate for samples.
   """
 
   def __init__(self, *args, **kwargs):
-    super(SamplesTestMixin, self).__init__(self, *args, **kwargs)
+    super().__init__(self, *args, **kwargs)
 
     self.addTypeEqualityFunc(sample.Sample, self.assertSamplesEqual)
 
@@ -140,7 +138,7 @@ def assertDiskMounts(benchmark_config, mount_point):
   """
 
   assert len(benchmark_config['vm_groups']) == 1
-  vm_group = next(six.itervalues(benchmark_config['vm_groups']))
+  vm_group = next(iter(benchmark_config['vm_groups'].values()))
   assert vm_group.get('num_vms', 1) == 1
   m = mock.MagicMock()
   m.BENCHMARK_NAME = _BENCHMARK_NAME

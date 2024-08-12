@@ -19,7 +19,6 @@ used for IsBenchmarkSupported
 """
 
 from absl import flags
-import six
 
 
 GCP = 'GCP'
@@ -80,12 +79,12 @@ class AutoRegisterProviderInfoMeta(type):
   """Metaclass which allows ProviderInfos to automatically be registered."""
 
   def __init__(cls, name, bases, dct):
-    super(AutoRegisterProviderInfoMeta, cls).__init__(name, bases, dct)
+    super().__init__(name, bases, dct)
     if hasattr(cls, 'CLOUD') and cls.CLOUD is not None:
       _PROVIDER_INFO_REGISTRY[cls.CLOUD] = cls
 
 
-class BaseProviderInfo(six.with_metaclass(AutoRegisterProviderInfoMeta)):
+class BaseProviderInfo(metaclass=AutoRegisterProviderInfoMeta):
   """Class that holds provider-related data."""
 
   CLOUD = None

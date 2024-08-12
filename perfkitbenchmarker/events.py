@@ -157,7 +157,7 @@ def RegisterTracingEvents():
   record_event.connect(AddEvent, weak=False)
 
 
-class TracingEvent(object):
+class TracingEvent:
   """Represents an event object.
 
   Attributes:

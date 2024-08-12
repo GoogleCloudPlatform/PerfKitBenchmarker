@@ -92,7 +92,7 @@ CLOUD_PROVIDERS_INFO = {
 }
 
 
-class DiskIOPSToCapacity(object):
+class DiskIOPSToCapacity:
   """Given iops and service provider requirements, return disk configurations.
 
   This class is used to translate an {IOPS, Cloud Provider} requirement

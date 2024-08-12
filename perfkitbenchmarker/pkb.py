@@ -110,8 +110,6 @@ from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
 from perfkitbenchmarker.linux_benchmarks import cuda_memcpy_benchmark
 from perfkitbenchmarker.linux_packages import build_tools
-import six
-from six.moves import zip
 
 # Add additional flags to ./flags.py
 # Keeping this flag here rather than flags.py to avoid a circular dependency
@@ -473,7 +471,7 @@ def _PrintHelpMD(matches=None):
       docstring = 'No description available'
       # Only pull doststrings from inside pkb source files.
       if isfile(module_link):
-        with open(module_link, 'r') as f:
+        with open(module_link) as f:
           source = f.read()
           # Get the triple quoted matches.
           docstring_match = re.search(docstring_regex, source)
@@ -745,7 +743,7 @@ def DoRunPhase(spec, collector, timer):
       benchmark module's Run function.
   """
   if FLAGS.before_run_pause:
-    six.moves.input('Hit enter to begin Run.')
+    input('Hit enter to begin Run.')
   deadline = time.time() + FLAGS.run_stage_time
   run_number = 0
   consecutive_failures = 0
@@ -843,7 +841,7 @@ def DoCleanupPhase(spec, timer):
       benchmark module's Cleanup function.
   """
   if FLAGS.before_cleanup_pause:
-    six.moves.input('Hit enter to begin Cleanup.')
+    input('Hit enter to begin Cleanup.')
   logging.info('Cleaning up benchmark %s', spec.name)
   events.before_phase.send(stages.CLEANUP, benchmark_spec=spec)
   if (
@@ -1422,10 +1420,10 @@ class ZoneRetryManager:
     region = self._utils.GetRegionFromZone(self._GetCurrentZoneFlag())
     self._regions_tried.add(region)
     regions_to_try = (
-        set(
+        {
             self._utils.GetRegionFromZone(zone)
             for zone in self._supported_zones
-        )
+        }
         - self._regions_tried
     )
     # Restart from empty if we've exhausted all alternatives.
@@ -1650,7 +1648,7 @@ def _GenerateBenchmarkDocumentation():
     total_vm_count = 0
     vm_str = ''
     scratch_disk_str = ''
-    for group in six.itervalues(vm_groups):
+    for group in vm_groups.values():
       group_vm_count = group.get('vm_count', 1)
       if group_vm_count is None:
         vm_str = 'variable'

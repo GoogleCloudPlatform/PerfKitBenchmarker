@@ -45,5 +45,5 @@ class BaseCapacityReservation(resource.BaseResource):
   RESOURCE_TYPE = 'BaseCapacityReservation'
 
   def __init__(self, vm_group):
-    super(BaseCapacityReservation, self).__init__()
+    super().__init__()
     self.vm_group = vm_group

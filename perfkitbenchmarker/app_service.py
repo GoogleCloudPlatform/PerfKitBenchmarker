@@ -87,7 +87,7 @@ class BaseAppServiceSpec(spec.BaseSpec):
 
   @classmethod
   def _GetOptionDecoderConstructions(cls) -> Dict[str, Any]:
-    result = super(BaseAppServiceSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'appservice_region': (
             option_decoders.StringDecoder,

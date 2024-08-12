@@ -71,7 +71,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
   load_machine_type: str
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
-    super(RelationalDbSpec, self).__init__(
+    super().__init__(
         component_full_name, flag_values=flag_values, **kwargs
     )
     # TODO(user): This is a lot of boilerplate, and is repeated
@@ -95,7 +95,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
           self.cloud, disk_config.get('disk_type', None)
       )
       self.db_disk_spec = disk_spec_class(
-          '{0}.db_disk_spec.{1}'.format(component_full_name, self.cloud),
+          '{}.db_disk_spec.{}'.format(component_full_name, self.cloud),
           flag_values=flag_values,
           **disk_config
       )
@@ -109,7 +109,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
         )
       db_vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
       self.db_spec = db_vm_spec_class(
-          '{0}.db_spec.{1}'.format(component_full_name, self.cloud),
+          '{}.db_spec.{}'.format(component_full_name, self.cloud),
           flag_values=flag_values,
           **db_vm_config
       )
@@ -132,7 +132,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       The pair specifies a decoder class and its __init__() keyword arguments
       to construct in order to decode the named option.
     """
-    result = super(RelationalDbSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'cloud': (
             option_decoders.EnumDecoder,
@@ -194,7 +194,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     # Currently the only way to modify the disk spec of the
     # db is to change the benchmark spec in the benchmark source code
     # itself.
-    super(RelationalDbSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
 
     # TODO(user): Rename flags 'managed_db_' -> 'db_'.
     has_db_machine_type = flag_values['db_machine_type'].present

@@ -14,7 +14,6 @@
 """Constants and helpers for reporting the success status of each benchmark."""
 
 import os
-from six.moves import zip
 
 SUCCEEDED = 'SUCCEEDED'
 FAILED = 'FAILED'
@@ -25,7 +24,7 @@ ALL = SUCCEEDED, FAILED, SKIPPED
 _COL_SEPARATOR = '  '
 
 
-class FailedSubstatus(object):
+class FailedSubstatus:
   """Failure modes for benchmarks."""
 
   # Failure due to insufficient quota, user preventable
@@ -170,7 +169,7 @@ def CreateSummary(benchmark_specs):
   return os.linesep.join((
       'Benchmark run statuses:',
       _CreateSummaryTable(benchmark_specs),
-      'Success rate: {0:.2f}% ({1}/{2})'.format(
+      'Success rate: {:.2f}% ({}/{})'.format(
           100.0 * successful_benchmark_count / benchmark_count,
           successful_benchmark_count,
           benchmark_count,

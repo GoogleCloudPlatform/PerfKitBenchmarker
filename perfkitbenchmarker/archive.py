@@ -45,7 +45,7 @@ def ArchiveRun(
     subprocess.CalledProcessError: subprocess call failed.
   """
   if not os.path.isdir(run_temp_directory):
-    raise ValueError('{0} is not a directory.'.format(run_temp_directory))
+    raise ValueError('{} is not a directory.'.format(run_temp_directory))
 
   tar_file_name = '{}{}.tar.gz'.format(
       prefix, datetime.datetime.now().strftime('%Y%m%d%H%M%S')
@@ -61,8 +61,8 @@ def ArchiveRun(
         '-',
         posixpath.join(target_bucket, tar_file_name),
     ]
-  except KeyError:
-    raise ValueError('Unsupported bucket name: {0}'.format(target_bucket))
+  except KeyError as e:
+    raise ValueError('Unsupported bucket name: {}'.format(target_bucket)) from e
 
   logging.info(
       'Streaming %s to %s\n%s', run_temp_directory, tar_file_name, ' '.join(cmd)

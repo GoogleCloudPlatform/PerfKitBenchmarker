@@ -29,7 +29,7 @@ def _CheckRequirements(requirements_file_path):
   Args:
     requirements_file_path: string. Path to a pip requirements file.
   """
-  with open(requirements_file_path, 'r') as fp:
+  with open(requirements_file_path) as fp:
     requirements_to_check = [(requirements_file_path, deque(fp.readlines()))]
   try:
     while requirements_to_check:
@@ -39,7 +39,7 @@ def _CheckRequirements(requirements_file_path):
         if line.startswith('-r'):
           requirements_to_check.append((file_path, lines))
           file_path = os.path.join(os.path.dirname(file_path), line[2:])
-          with open(file_path, 'r') as fp:
+          with open(file_path) as fp:
             lines = deque(fp.readlines())
         elif line:
           assert pkg_resources.require is not None

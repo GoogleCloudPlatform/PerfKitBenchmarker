@@ -314,7 +314,7 @@ class BaseDpbService(resource.BaseResource):
     is_user_managed = dpb_service_spec.static_dpb_service_instance is not None
     # Hand over the actual creation to the resource module which treats the
     # user_managed resources in a special manner and skips creation attempt
-    super(BaseDpbService, self).__init__(user_managed=is_user_managed)
+    super().__init__(user_managed=is_user_managed)
     self.spec = dpb_service_spec
     if dpb_service_spec.static_dpb_service_instance:
       self.cluster_id = dpb_service_spec.static_dpb_service_instance
@@ -758,7 +758,7 @@ class UnmanagedDpbService(BaseDpbService):
   """Object representing an un-managed dpb service."""
 
   def __init__(self, dpb_service_spec):
-    super(UnmanagedDpbService, self).__init__(dpb_service_spec)
+    super().__init__(dpb_service_spec)
     #  Dictionary to hold the cluster vms.
     self.vms = {}
     self.cloud = dpb_service_spec.worker_group.cloud
@@ -845,7 +845,7 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
   SERVICE_TYPE = dpb_constants.UNMANAGED_DPB_SVC_YARN_CLUSTER
 
   def __init__(self, dpb_service_spec):
-    super(UnmanagedDpbServiceYarnCluster, self).__init__(dpb_service_spec)
+    super().__init__(dpb_service_spec)
     self.cloud = dpb_service_spec.worker_group.cloud
 
   def GetDpbVersion(self) -> str | None:
@@ -943,7 +943,7 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
     }
 
   def __init__(self, dpb_service_spec):
-    super(UnmanagedDpbSparkCluster, self).__init__(dpb_service_spec)
+    super().__init__(dpb_service_spec)
     #  Dictionary to hold the cluster vms.
     self.vms = {}
     self.cloud = dpb_service_spec.worker_group.cloud

@@ -21,7 +21,7 @@ class Error(Exception):
   pass
 
 
-class Setup(object):
+class Setup:
   """Errors raised in setting up PKB."""
 
   class PythonPackageRequirementUnfulfilled(Error):
@@ -65,7 +65,7 @@ class Setup(object):
     pass
 
 
-class VirtualMachine(object):
+class VirtualMachine:
   """Errors raised by virtual_machine.py."""
 
   class RemoteCommandError(Error):
@@ -146,7 +146,7 @@ class VirtualMachine(object):
     pass
 
 
-class VmUtil(object):
+class VmUtil:
   """Errors raised by vm_util.py."""
 
   class RestConnectionError(Error):
@@ -171,7 +171,7 @@ class VmUtil(object):
     pass
 
 
-class Benchmarks(object):
+class Benchmarks:
   """Errors raised by individual benchmark."""
 
   class BucketCreationError(Error):
@@ -211,7 +211,7 @@ class Benchmarks(object):
     pass
 
 
-class Resource(object):
+class Resource:
   """Errors related to resource creation and deletion."""
 
   class CreationError(Error):
@@ -269,7 +269,7 @@ class Resource(object):
     pass
 
 
-class Config(object):
+class Config:
   """Errors related to configs."""
 
   class InvalidValue(Error):
@@ -293,7 +293,7 @@ class Config(object):
     pass
 
 
-class Juju(object):
+class Juju:
   """Errors related to the Juju OS_TYPE."""
 
   class TimeoutException(Error):

@@ -78,7 +78,7 @@ class BaseSmbService(resource.BaseResource):
   DEFAULT_SMB_VERSION = None
 
   def __init__(self, disk_spec, zone):
-    super(BaseSmbService, self).__init__()
+    super().__init__()
     self.disk_spec = disk_spec
     self.zone = zone
     self.smb_tier = FLAGS.smb_tier or self.DEFAULT_TIER

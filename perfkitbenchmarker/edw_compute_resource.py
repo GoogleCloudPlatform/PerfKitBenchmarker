@@ -46,7 +46,7 @@ class EdwComputeResource(resource.BaseResource):
   SERVICE_TYPE = 'abstract'
 
   def __init__(self, edw_service_spec):
-    super(EdwComputeResource, self).__init__()
+    super().__init__()
     self.compute_resource_identifier = None
 
   def GetLifecycleMetrics(self) -> List[sample.Sample]:

@@ -71,7 +71,7 @@ class AutoRegisterResourceMeta(abc.ABCMeta):
     auto_registry.RegisterClass(
         _RESOURCE_REGISTRY, cls, cls.REQUIRED_ATTRS, cls.RESOURCE_TYPE
     )
-    super(AutoRegisterResourceMeta, cls).__init__(name, bases, dct)
+    super().__init__(name, bases, dct)
 
   @classmethod
   def GetAttributes(mcs) -> list[tuple[Any, ...]]:
@@ -121,7 +121,7 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
       create_on_restore_error=False,
       delete_on_freeze_error=False,
   ):
-    super(BaseResource, self).__init__()
+    super().__init__()
     # Class level attributes does not persist after pickle
     # Copy required attributes to the object
     for attribute in self.REQUIRED_ATTRS:

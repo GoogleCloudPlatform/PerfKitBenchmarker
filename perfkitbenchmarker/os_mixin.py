@@ -38,13 +38,13 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
-import six
 
 
 FLAGS = flags.FLAGS
 
 
-class BaseOsMixin(six.with_metaclass(abc.ABCMeta, object)):
+# pylint: disable=g-missing-from-attributes,invalid-name
+class BaseOsMixin(metaclass=abc.ABCMeta):
   """The base class for OS Mixin classes.
 
   This class holds VM methods and attributes relating to the VM's guest OS.

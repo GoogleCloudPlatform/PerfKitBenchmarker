@@ -319,7 +319,7 @@ class BaseVmSpec(spec.BaseSpec):
     self.vm_metadata: Dict[str, Any] = None
     self.boot_startup_script: str = None
     self.internal_ip: str
-    super(BaseVmSpec, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -337,7 +337,7 @@ class BaseVmSpec(spec.BaseSpec):
       dict mapping config option names to values derived from the config
       values or flag values.
     """
-    super(BaseVmSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['image'].present:
       config_values['image'] = flag_values.image
     if flag_values['install_packages'].present:
@@ -398,7 +398,7 @@ class BaseVmSpec(spec.BaseSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(BaseVmSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'disable_interrupt_moderation': (
             option_decoders.BooleanDecoder,
@@ -530,7 +530,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     Args:
       vm_spec: virtual_machine.BaseVmSpec object of the vm.
     """
-    super(BaseVirtualMachine, self).__init__()
+    super().__init__()
     with self._instance_counter_lock:
       self.instance_number = self._instance_counter
       if _VM_INSTANCE_NAME_SUFFIX.value:
@@ -602,14 +602,14 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     raise NotImplementedError()
 
   def __repr__(self):
-    return '<BaseVirtualMachine [ip={0}, internal_ip={1}]>'.format(
+    return '<BaseVirtualMachine [ip={}, internal_ip={}]>'.format(
         self.ip_address, self.internal_ip
     )
 
   def __str__(self):
     if self.ip_address:
       return self.ip_address
-    return super(BaseVirtualMachine, self).__str__()
+    return super().__str__()
 
   def GetConnectionIp(self):
     """Gets the IP to use for connecting to the VM."""
@@ -651,18 +651,18 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     """Set up all scratch disks of the current VM."""
     # This method will be depreciate soon.
     # Prepare vm scratch disks:
-    if any((spec.disk_type == disk.RAM for spec in self.disk_specs)):
+    if any(spec.disk_type == disk.RAM for spec in self.disk_specs):
       disk_strategies.SetUpRamDiskStrategy(self, self.disk_specs[0]).SetUpDisk()
       return
-    if any((spec.disk_type == disk.NFS for spec in self.disk_specs)):
+    if any(spec.disk_type == disk.NFS for spec in self.disk_specs):
       disk_strategies.SetUpNFSDiskStrategy(self, self.disk_specs[0]).SetUpDisk()
       return
 
-    if any((spec.disk_type == disk.SMB for spec in self.disk_specs)):
+    if any(spec.disk_type == disk.SMB for spec in self.disk_specs):
       disk_strategies.SetUpSMBDiskStrategy(self, self.disk_specs[0]).SetUpDisk()
       return
 
-    if any((spec.disk_type == disk.LOCAL for spec in self.disk_specs)):
+    if any(spec.disk_type == disk.LOCAL for spec in self.disk_specs):
       self.SetupLocalDisks()
 
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
@@ -925,7 +925,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
         self.Install('wget')
         file_name = os.path.basename(url)
         self.RemoteCommand(
-            'wget -O {0} {1}'.format(os.path.join(install_path, file_name), url)
+            'wget -O {} {}'.format(os.path.join(install_path, file_name), url)
         )
       else:
         raise errors.Setup.BadPreprovisionedDataError(

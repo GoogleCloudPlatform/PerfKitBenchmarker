@@ -41,7 +41,7 @@ class NetType(enum.Enum):
   MULTI = 'multi'
 
 
-class BaseFirewall(object):
+class BaseFirewall:
   """An object representing the Base Firewall."""
 
   CLOUD = None
@@ -93,7 +93,7 @@ class BaseFirewall(object):
     pass
 
 
-class BaseNetworkSpec(object):
+class BaseNetworkSpec:
   """Object containing all information needed to create a Network."""
 
   def __init__(self, zone=None, cidr=None, machine_type=None):
@@ -112,7 +112,7 @@ class BaseNetworkSpec(object):
     return '%s(%r)' % (self.__class__, self.__dict__)
 
 
-class BaseVpnGateway(object, metaclass=abc.ABCMeta):
+class BaseVpnGateway(metaclass=abc.ABCMeta):
   """An object representing the Base VPN Gateway."""
 
   CLOUD = None
@@ -167,7 +167,7 @@ class BaseVpnGateway(object, metaclass=abc.ABCMeta):
     raise NotImplementedError()
 
 
-class BaseNetwork(object):
+class BaseNetwork:
   """Object representing a Base Network."""
 
   CLOUD = None
@@ -225,7 +225,7 @@ class BaseNetwork(object):
     int_regex = r'[0-9]+'
     octets_mask = regex_util.ExtractAllMatches(int_regex, str(cidr_raw))
     if len(octets_mask) != 5:  # expecting 4 octets plus 1 prefix mask.
-      raise ValueError('Invalid CIDR format: "{0}"'.format(cidr_raw))
+      raise ValueError('Invalid CIDR format: "{}"'.format(cidr_raw))
     return delim.join(octets_mask)
 
   @classmethod
@@ -276,7 +276,7 @@ class BaseNetwork(object):
     pass
 
 
-class BaseVPCPeeringSpec(object):
+class BaseVPCPeeringSpec:
   """Object containing all information needed to create a VPC Peering Object."""
 
   def __init__(self, network_a=None, network_b=None):
@@ -312,7 +312,7 @@ class BaseVPCPeering(resource.BaseResource):
     Args:
       vpc_peering_spec: BaseVPCPeeringSpec. Spec for VPC peering object.
     """
-    super(BaseVPCPeering, self).__init__()
+    super().__init__()
     self.network_a = vpc_peering_spec.network_a
     self.network_b = vpc_peering_spec.network_b
 

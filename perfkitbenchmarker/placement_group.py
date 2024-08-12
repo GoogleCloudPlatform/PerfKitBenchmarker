@@ -72,7 +72,7 @@ class BasePlacementGroupSpec(spec.BaseSpec):
       flag_values: flags.FlagValues. Runtime flags that may override the
         provided config values.
     """
-    super(BasePlacementGroupSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if FLAGS.placement_group_style:
       config_values['placement_group_style'] = FLAGS.placement_group_style
 
@@ -88,7 +88,7 @@ class BasePlacementGroupSpec(spec.BaseSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(BasePlacementGroupSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({'zone': (option_decoders.StringDecoder, {'none_ok': True})})
     return result
 
@@ -113,5 +113,5 @@ class BasePlacementGroup(resource.BaseResource):
       placement_group_spec: placement_group.BasePlacementGroupSpec object of the
         placement group.
     """
-    super(BasePlacementGroup, self).__init__()
+    super().__init__()
     self.zone = placement_group_spec.zone

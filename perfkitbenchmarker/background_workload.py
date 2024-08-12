@@ -17,7 +17,6 @@
 from typing import List
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
-import six
 
 BACKGROUND_WORKLOADS: List['BaseBackgroundWorkload'] = []
 
@@ -29,12 +28,12 @@ class AutoRegisterBackgroundWorkloadMeta(type):
   """Metaclass which allows BackgroundWorkloads to be auto-registered."""
 
   def __init__(cls, name, bases, dct):
-    super(AutoRegisterBackgroundWorkloadMeta, cls).__init__(name, bases, dct)
+    super().__init__(name, bases, dct)
     BACKGROUND_WORKLOADS.append(cls)  # pytype: disable=container-type-mismatch
 
 
 class BaseBackgroundWorkload(
-    six.with_metaclass(AutoRegisterBackgroundWorkloadMeta, object)
+    metaclass=AutoRegisterBackgroundWorkloadMeta
 ):
   """Baseclass for background workloads."""
 

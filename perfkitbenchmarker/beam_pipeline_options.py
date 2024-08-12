@@ -128,8 +128,8 @@ def ReadPipelineOptionConfigFile():
   dynamic_pipeline_options = []
   static_pipeline_options = []
   if FLAGS.beam_options_config_file:
-    with open(FLAGS.beam_options_config_file, 'r') as fileStream:
-      config = yaml.safe_load(fileStream)
+    with open(FLAGS.beam_options_config_file) as file_stream:
+      config = yaml.safe_load(file_stream)
       if config['static_pipeline_options']:
         static_pipeline_options = config['static_pipeline_options']
       if config['dynamic_pipeline_options']:

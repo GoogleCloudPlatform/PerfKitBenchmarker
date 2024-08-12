@@ -66,7 +66,7 @@ flags.DEFINE_enum(
 )
 
 
-class ThreadLogContext(object):
+class ThreadLogContext:
   """Per-thread context for log message prefix labels."""
 
   def __init__(self, thread_log_context=None):

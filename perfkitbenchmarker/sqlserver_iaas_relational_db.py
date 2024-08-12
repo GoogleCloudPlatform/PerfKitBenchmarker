@@ -461,12 +461,12 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
           sys.dm_hadr_availability_replica_states ars
           JOIN sys.availability_groups ag ON ars.group_id = ag.group_id
         WHERE
-          ag.name = '{0}'
+          ag.name = '{}'
           AND is_local = 1;\"
         """.format(sql_engine_utils.SQLSERVER_AOAG_NAME))
     if "PRIMARY" not in out:
       self.server_vm.RemoteCommand(
-          'sqlcmd -Q "ALTER AVAILABILITY GROUP [{0}] FAILOVER"'.format(
+          'sqlcmd -Q "ALTER AVAILABILITY GROUP [{}] FAILOVER"'.format(
               sql_engine_utils.SQLSERVER_AOAG_NAME))
 
   def ConfigureSQLServerHaAoag(self):
@@ -720,7 +720,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
 
     # Update variables user for connection to SQL server.
     self.spec.database_password = win_password
-    self.spec.endpoint = "fcidnn.{0}.local".format(perf_domain)
+    self.spec.endpoint = "fcidnn.{}.local".format(perf_domain)
     self.port = 1533
 
   def PushAndRunPowershellScript(

@@ -42,7 +42,7 @@ def _GetVersion():
           perfkitbenchmarker.__name__,
           _STATIC_VERSION_FILE,
       )
-    except IOError:
+    except OSError:
       # Could not determine version.
       return 'unknown'
   return version.rstrip('\n')

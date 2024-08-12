@@ -309,7 +309,7 @@ class PostgresCliQueryTools(ISQLQueryTools):
       database_name = self.DEFAULT_DATABASE
     if not endpoint:
       endpoint = self.connection_properties.endpoint
-    return "'host={0} user={1} password={2} dbname={3}'".format(
+    return "'host={} user={} password={} dbname={}'".format(
         endpoint,
         self.connection_properties.database_username,
         self.connection_properties.database_password,
@@ -327,7 +327,7 @@ class PostgresCliQueryTools(ISQLQueryTools):
 
   def GetSysbenchConnectionString(self):
     return (
-        '--pgsql-host={0} --pgsql-user={1} --pgsql-password="{2}" '
+        '--pgsql-host={} --pgsql-user={} --pgsql-password="{}" '
         '--pgsql-port=5432'
     ).format(
         self.connection_properties.endpoint,
@@ -460,14 +460,14 @@ class MysqlCliQueryTools(ISQLQueryTools):
   def GetConnectionString(self, endpoint=''):
     if not endpoint:
       endpoint = self.connection_properties.endpoint
-    return '-h {0} -P 3306 -u {1} -p{2}'.format(
+    return '-h {} -P 3306 -u {} -p{}'.format(
         self.connection_properties.endpoint,
         self.connection_properties.database_username,
         self.connection_properties.database_password,
     )
 
   def GetSysbenchConnectionString(self):
-    return ('--mysql-host={0} --mysql-user={1} --mysql-password="{2}" ').format(
+    return ('--mysql-host={} --mysql-user={} --mysql-password="{}" ').format(
         self.connection_properties.endpoint,
         self.connection_properties.database_username,
         self.connection_properties.database_password,

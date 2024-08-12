@@ -63,7 +63,6 @@ from perfkitbenchmarker.resources import base_job
 from perfkitbenchmarker.resources import example_resource
 from perfkitbenchmarker.resources import managed_ai_model
 import six
-from six.moves import range
 import six.moves._thread
 import six.moves.copyreg
 
@@ -238,9 +237,7 @@ class BenchmarkSpec:
     return '%s(%r)' % (self.__class__, self.__dict__)
 
   def __str__(self):
-    return 'Benchmark name: {0}\nFlags: {1}'.format(
-        self.name, self.config.flags
-    )
+    return 'Benchmark name: {}\nFlags: {}'.format(self.name, self.config.flags)
 
   @contextlib.contextmanager
   def RedirectGlobalFlags(self):
@@ -359,7 +356,7 @@ class BenchmarkSpec:
       # Ensure non cluster vms are not present in the spec.
       if self.vms_to_boot:
         raise errors.Benchmarks.UnsupportedConfigError(
-            'Invalid Non cluster vm group {0} when benchmarking '
+            'Invalid Non cluster vm group {} when benchmarking '
             'unmanaged dpb service'.format(self.vms_to_boot)
         )
 
@@ -437,7 +434,7 @@ class BenchmarkSpec:
     """Constructs the BenchmarkSpec's cloud TPU objects."""
     tpu_group_specs = self.config.tpu_groups
 
-    for group_name, group_spec in sorted(six.iteritems(tpu_group_specs)):
+    for group_name, group_spec in sorted(tpu_group_specs.items()):
       tpu = self.ConstructTpuGroup(group_spec)
 
       self.tpu_groups[group_name] = tpu
@@ -631,7 +628,7 @@ class BenchmarkSpec:
     """Construct capacity reservations for each VM group."""
     if not FLAGS.use_capacity_reservations:
       return
-    for vm_group in six.itervalues(self.vm_groups):
+    for vm_group in self.vm_groups.values():
       cloud = vm_group[0].CLOUD
       providers.LoadProvider(cloud)
       capacity_reservation_class = capacity_reservation.GetResourceClass(cloud)
@@ -651,7 +648,7 @@ class BenchmarkSpec:
 
     if not benchmark_ok:
       raise ValueError(
-          'Provider {0} does not support {1}.  Use '
+          'Provider {} does not support {}.  Use '
           '--benchmark_compatibility_checking=none '
           'to override this check.'.format(provider_info_class.CLOUD, self.name)
       )
@@ -679,7 +676,7 @@ class BenchmarkSpec:
     vm_group_specs = self.vms_to_boot
 
     clouds = {}
-    for group_name, group_spec in sorted(six.iteritems(vm_group_specs)):
+    for group_name, group_spec in sorted(vm_group_specs.items()):
       vms = self.ConstructVirtualMachineGroup(group_name, group_spec)
 
       if group_spec.os_type.startswith('juju'):
@@ -716,9 +713,9 @@ class BenchmarkSpec:
         self.dpb_service.vms['worker_group'] = []
 
   def ConstructPlacementGroups(self):
-    for placement_group_name, placement_group_spec in six.iteritems(
+    for placement_group_name, placement_group_spec in (
         self.placement_group_specs
-    ):
+    ).items():
       self.placement_groups[placement_group_name] = self._CreatePlacementGroup(
           placement_group_spec, placement_group_spec.CLOUD
       )
@@ -789,9 +786,7 @@ class BenchmarkSpec:
     # order based on dependencies, this key ordering can be used to avoid
     # deadlock by placing dependent networks later and their dependencies
     # earlier.
-    networks = [
-        self.networks[key] for key in sorted(six.iterkeys(self.networks))
-    ]
+    networks = [self.networks[key] for key in sorted(self.networks.keys())]
 
     background_tasks.RunThreaded(lambda net: net.Create(), networks)
 
@@ -807,7 +802,7 @@ class BenchmarkSpec:
 
     if self.container_registry:
       self.container_registry.Create()
-      for container_spec in six.itervalues(self.container_specs):
+      for container_spec in self.container_specs.values():
         if container_spec.static_image:
           continue
         container_spec.image = self.container_registry.GetOrBuild(
@@ -843,7 +838,7 @@ class BenchmarkSpec:
           vm for vm in self.vms if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES
       ]
       sshable_vm_groups = {}
-      for group_name, group_vms in six.iteritems(self.vm_groups):
+      for group_name, group_vms in self.vm_groups.items():
         sshable_vm_groups[group_name] = [
             vm
             for vm in group_vms
@@ -954,7 +949,7 @@ class BenchmarkSpec:
       for placement_group_object in self.placement_groups.values():
         placement_group_object.Delete()
 
-    for firewall in six.itervalues(self.firewalls):
+    for firewall in self.firewalls.values():
       try:
         firewall.DisallowAllPorts()
       except Exception:
@@ -968,7 +963,7 @@ class BenchmarkSpec:
       self.container_cluster.DeleteContainers()
       self.container_cluster.Delete()
 
-    for net in six.itervalues(self.networks):
+    for net in self.networks.values():
       try:
         net.Delete()
       except Exception:

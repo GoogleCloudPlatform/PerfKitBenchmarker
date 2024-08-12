@@ -96,7 +96,7 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
       zone: The VM's zone.
       **kwargs: Other args for the superclass.
     """
-    super(StaticVmSpec, self).__init__(component_full_name, **kwargs)
+    super().__init__(component_full_name, **kwargs)
     self.ip_address = ip_address
     self.user_name = user_name
     self.ssh_private_key = ssh_private_key
@@ -108,7 +108,7 @@ class StaticVmSpec(virtual_machine.BaseVmSpec):
     self.zone = zone
     self.disk_specs = [
         disk.BaseDiskSpec(
-            '{0}.disk_specs[{1}]'.format(component_full_name, i),
+            '{}.disk_specs[{}]'.format(component_full_name, i),
             flag_values=kwargs.get('flag_values'),
             **disk_spec
         )
@@ -150,7 +150,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       vm_spec: A StaticVmSpec object containing arguments.
     """
-    super(StaticVirtualMachine, self).__init__(vm_spec)
+    super().__init__(vm_spec)
     self.ip_address = vm_spec.ip_address
     self.user_name = vm_spec.user_name
     self.ssh_private_key = vm_spec.ssh_private_key
@@ -268,10 +268,10 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       extra_keys = sorted(item_keys - allowed_keys)
       missing_keys = required_keys - item_keys
       if extra_keys:
-        raise ValueError('Unexpected keys: {0}'.format(', '.join(extra_keys)))
+        raise ValueError('Unexpected keys: {}'.format(', '.join(extra_keys)))
       elif missing_keys:
         raise ValueError(
-            'Missing required keys: {0}'.format(', '.join(missing_keys))
+            'Missing required keys: {}'.format(', '.join(missing_keys))
         )
 
     for item in vm_arr:
@@ -287,12 +287,12 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
 
       if not isinstance(local_disks, list):
         raise ValueError(
-            'Expected a list of local disks, got: {0}'.format(local_disks)
+            'Expected a list of local disks, got: {}'.format(local_disks)
         )
       scratch_disk_mountpoints = item.get('scratch_disk_mountpoints', [])
       if not isinstance(scratch_disk_mountpoints, list):
         raise ValueError(
-            'Expected a list of disk mount points, got: {0}'.format(
+            'Expected a list of disk mount points, got: {}'.format(
                 scratch_disk_mountpoints
             )
         )

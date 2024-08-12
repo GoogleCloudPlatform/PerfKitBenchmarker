@@ -29,7 +29,7 @@ class _UnitRegistry(pint.UnitRegistry):
   """
 
   def __init__(self):
-    super(_UnitRegistry, self).__init__()
+    super().__init__()
     self.define('K- = 1000')
     # Kubernetes
     self.define('Ki = kibibyte')

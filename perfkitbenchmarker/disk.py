@@ -25,7 +25,6 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
-import six
 
 flags.DEFINE_boolean(
     'nfs_timeout_hard', True, 'Whether to use hard or soft for NFS mount.'
@@ -167,7 +166,7 @@ class BaseDiskSpec(spec.BaseSpec):
     self.provisioned_iops = None
     self.provisioned_throughput = None
     self.multi_writer_mode: bool = False
-    super(BaseDiskSpec, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -185,7 +184,7 @@ class BaseDiskSpec(spec.BaseSpec):
       dict mapping config option names to values derived from the config
       values or flag values.
     """
-    super(BaseDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['data_disk_size'].present:
       config_values['disk_size'] = flag_values.data_disk_size
     if flag_values['data_disk_type'].present:
@@ -219,7 +218,7 @@ class BaseDiskSpec(spec.BaseSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(BaseDiskSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'device_path': (
             option_decoders.StringDecoder,
@@ -280,7 +279,7 @@ class BaseNFSDiskSpec(BaseDiskSpec):
   def __init__(self, *args, **kwargs):
     self.device_path: str = None
     self.mount_point: str = None
-    super(BaseNFSDiskSpec, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
     self.disk_type = NFS
 
   @classmethod
@@ -299,7 +298,7 @@ class BaseNFSDiskSpec(BaseDiskSpec):
       dict mapping config option names to values derived from the config
       values or flag values.
     """
-    super(BaseNFSDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['nfs_version'].present:
       config_values['nfs_version'] = flag_values.nfs_version
     if flag_values['nfs_timeout_hard'].present:
@@ -333,7 +332,7 @@ class BaseNFSDiskSpec(BaseDiskSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(BaseNFSDiskSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'nfs_version': (option_decoders.StringDecoder, {'default': None}),
         'nfs_ip_address': (option_decoders.StringDecoder, {'default': None}),
@@ -360,7 +359,7 @@ class BaseSMBDiskSpec(BaseDiskSpec):
   def __init__(self, *args, **kwargs):
     self.device_path: str = None
     self.mount_point: str = None
-    super(BaseSMBDiskSpec, self).__init__(*args, **kwargs)
+    super().__init__(*args, **kwargs)
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -378,7 +377,7 @@ class BaseSMBDiskSpec(BaseDiskSpec):
       dict mapping config option names to values derived from the config
       values or flag values.
     """
-    super(BaseSMBDiskSpec, cls)._ApplyFlags(config_values, flag_values)
+    super()._ApplyFlags(config_values, flag_values)
     if flag_values['smb_version'].present:
       config_values['smb_version'] = flag_values.smb_version
 
@@ -394,7 +393,7 @@ class BaseSMBDiskSpec(BaseDiskSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(BaseSMBDiskSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'smb_version': (option_decoders.StringDecoder, {'default': '3.0'}),
     })
@@ -415,7 +414,7 @@ class BaseDisk(resource.BaseResource):
   is_striped = False
 
   def __init__(self, disk_spec):
-    super(BaseDisk, self).__init__()
+    super().__init__()
     self.disk_size = disk_spec.disk_size
     self.disk_type = disk_spec.disk_type
     self.mount_point = disk_spec.mount_point
@@ -539,7 +538,7 @@ class BaseDisk(resource.BaseResource):
       return self.detach_end_time - self.detach_start_time
 
   def GetSamples(self) -> List[sample.Sample]:
-    samples = super(BaseDisk, self).GetSamples()
+    samples = super().GetSamples()
     metadata = self.GetResourceMetadata()
     metadata['resource_class'] = self.__class__.__name__
     if self.GetAttachTime():
@@ -587,7 +586,7 @@ class StripedDisk(BaseDisk):
       disk_spec: A BaseDiskSpec containing the desired mount point.
       disks: A list of BaseDisk objects that constitute the StripedDisk.
     """
-    super(StripedDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.disks = disks
     self.metadata = disks[0].metadata.copy()
     if self.disk_size:
@@ -666,7 +665,7 @@ class NetworkDisk(BaseDisk):
   def mount_options(self):
     opts = []
     for key, value in sorted(
-        six.iteritems(self._GetNetworkDiskMountOptionsDict())
+        self._GetNetworkDiskMountOptionsDict().items()
     ):
       opts.append('%s' % key if value is None else '%s=%s' % (key, value))
     return ','.join(opts)
@@ -707,7 +706,7 @@ class NfsDisk(NetworkDisk):
       default_nfs_version=None,
       nfs_tier=None,
   ):
-    super(NfsDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.nfs_version = disk_spec.nfs_version or default_nfs_version
     self.nfs_timeout_hard = disk_spec.nfs_timeout_hard
     self.nfs_rsize = disk_spec.nfs_rsize
@@ -716,12 +715,12 @@ class NfsDisk(NetworkDisk):
     self.nfs_retries = disk_spec.nfs_retries
     self.nfs_nconnect = disk_spec.nfs_nconnect
     self.device_path = remote_mount_address
-    for key, value in six.iteritems(self._GetNetworkDiskMountOptionsDict()):
+    for key, value in self._GetNetworkDiskMountOptionsDict().items():
       self.metadata['nfs_{}'.format(key)] = value
     if nfs_tier:
       self.nfs_tier = nfs_tier
       self.metadata['nfs_tier'] = nfs_tier
-    super(NfsDisk, self).GetResourceMetadata()
+    super().GetResourceMetadata()
 
   def _GetNetworkDiskMountOptionsDict(self):
     """Default NFS mount options as a dict."""
@@ -765,7 +764,7 @@ class SmbDisk(NetworkDisk):
       default_smb_version=None,
       smb_tier=None,
   ):
-    super(SmbDisk, self).__init__(disk_spec)
+    super().__init__(disk_spec)
     self.smb_version = disk_spec.smb_version
     self.device_path = remote_mount_address
     self.storage_account_and_key = storage_account_and_key

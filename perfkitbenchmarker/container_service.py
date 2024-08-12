@@ -49,7 +49,6 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
 import requests
-import six
 import yaml
 
 BenchmarkSpec = Any  # benchmark_spec lib imports this module.
@@ -513,7 +512,7 @@ class BaseContainerCluster(resource.BaseResource):
   def GetResourceMetadata(self):
     """Returns a dictionary of cluster metadata."""
     nodepools_metadata = {}
-    for name, nodepool in six.iteritems(self.nodepools):
+    for name, nodepool in self.nodepools.items():
       nodepool_metadata = {
           'size': nodepool.num_nodes,
           'machine_type': nodepool.machine_type,

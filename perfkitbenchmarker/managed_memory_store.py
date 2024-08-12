@@ -30,7 +30,7 @@ _REDIS_SHARDS_REGEX = r'(?s)slots\n(\d+)\n(\d+).+?port\n(\d+)\nip\n(\S+)'
 FLAGS = flags.FLAGS
 
 
-class Failover(object):
+class Failover:
   """Enum for redis failover options."""
 
   FAILOVER_NONE = 'failover_none'
@@ -195,7 +195,7 @@ class BaseManagedMemoryStore(resource.BaseResource):
     Args:
       spec: spec of the managed memory store.
     """
-    super(BaseManagedMemoryStore, self).__init__()
+    super().__init__()
     self.spec = spec
     self.name: str = 'pkb-%s' % FLAGS.run_uri
     self._ip: str = None

@@ -149,7 +149,7 @@ def _GenerateIntervalSamples(interval, include_timestamps):
   return samples
 
 
-class IntervalTimer(object):
+class IntervalTimer:
   """Class that can measure time and generate samples for each measurement.
 
   Attributes:

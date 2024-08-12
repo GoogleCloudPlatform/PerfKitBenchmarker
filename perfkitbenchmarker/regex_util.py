@@ -54,13 +54,13 @@ def ExtractGroup(regex, text, group=1, flags=0):
   match = re.search(regex, text, flags=flags)
   if not match:
     raise NoMatchError(
-        'No match for pattern "{0}" in "{1}"'.format(regex, text)
+        'No match for pattern "{}" in "{}"'.format(regex, text)
     )
 
   try:
     return match.group(group)
-  except IndexError:
-    raise IndexError('No such group {0} in "{1}".'.format(group, regex))
+  except IndexError as e:
+    raise IndexError('No such group {} in "{}".'.format(group, regex)) from e
 
 
 def ExtractFloat(regex, text, group=1):
@@ -112,7 +112,7 @@ def ExtractIpv4Addresses(text):
   """
   match = re.findall(_IPV4_REGEX, text)
   if not match:
-    raise NoMatchError('No match for ipv4 addresses in "{0}"'.format(text))
+    raise NoMatchError('No match for ipv4 addresses in "{}"'.format(text))
   return match
 
 
@@ -138,7 +138,7 @@ def ExtractAllMatches(regex: Union[str, re.Pattern[str]], text, flags=0):
   match = re.findall(regex, text, flags=flags)
   if not match:
     raise NoMatchError(
-        'No match for pattern "{0}" in "{1}"'.format(regex, text)
+        'No match for pattern "{}" in "{}"'.format(regex, text)
     )
   return match
 
@@ -162,7 +162,7 @@ def ExtractExactlyOneMatch(regex, text):
   matches = ExtractAllMatches(regex, text)
   if len(matches) > 1:
     raise TooManyMatchesError(
-        'Pattern "{0}" matched "{1}" non-uniquely.'.format(regex, text)
+        'Pattern "{}" matched "{}" non-uniquely.'.format(regex, text)
     )
   return matches[0]
 
@@ -182,6 +182,6 @@ def Substitute(pattern, repl, text):
   """
   if not re.search(pattern, text):
     raise NoMatchError(
-        'No match for pattern "{0}" in "{1}"'.format(pattern, text)
+        'No match for pattern "{}" in "{}"'.format(pattern, text)
     )
   return re.sub(pattern, repl, text)

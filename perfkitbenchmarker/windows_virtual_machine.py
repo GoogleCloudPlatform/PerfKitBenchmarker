@@ -93,7 +93,7 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
   BASE_OS_TYPE = os_types.WINDOWS
 
   def __init__(self):
-    super(BaseWindowsMixin, self).__init__()
+    super().__init__()
     self.winrm_port = WINRM_PORT
     self.smb_port = SMB_PORT
     self.remote_access_ports = [self.winrm_port, self.smb_port, RDP_PORT]

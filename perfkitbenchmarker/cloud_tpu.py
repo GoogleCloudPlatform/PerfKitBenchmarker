@@ -84,7 +84,7 @@ class BaseTpu(resource.BaseResource):
     Args:
       tpu_spec: spec of the TPU.
     """
-    super(BaseTpu, self).__init__()
+    super().__init__()
     self.spec = tpu_spec
 
   def _Create(self):

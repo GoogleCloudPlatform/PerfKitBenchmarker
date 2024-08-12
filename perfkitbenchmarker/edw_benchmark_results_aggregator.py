@@ -71,7 +71,7 @@ class EdwQueryExecutionStatus(enum.Enum):
   SUCCESSFUL = 'query_execution_successful'
 
 
-class EdwQueryPerformance(object):
+class EdwQueryPerformance:
   """Class that represents the performance of an executed edw query.
 
   Attributes:
@@ -982,7 +982,7 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
     )
 
 
-class EdwBenchmarkPerformance(object):
+class EdwBenchmarkPerformance:
   """Class that represents the performance of an edw benchmark.
 
   Attributes:

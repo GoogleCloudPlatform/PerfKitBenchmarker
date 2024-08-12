@@ -20,7 +20,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.azure import flags as azure_flags
-import six
 
 
 class MemoryDecoder(option_decoders.StringDecoder):
@@ -48,34 +47,34 @@ class MemoryDecoder(option_decoders.StringDecoder):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    string = super(MemoryDecoder, self).Decode(
+    string = super().Decode(
         value, component_full_name, flag_values
     )
     match = self._CONFIG_MEMORY_PATTERN.match(string)
     if not match:
       raise errors.Config.InvalidValue(
-          'Invalid {0} value: "{1}". Examples of valid values: "1280MiB", '
+          'Invalid {} value: "{}". Examples of valid values: "1280MiB", '
           '"7.5GiB".'.format(
               self._GetOptionFullName(component_full_name), string
           )
       )
     try:
       memory_value = float(match.group(1))
-    except ValueError:
+    except ValueError as e:
       raise errors.Config.InvalidValue(
-          'Invalid {0} value: "{1}". "{2}" is not a valid float.'.format(
+          'Invalid {} value: "{}". "{}" is not a valid float.'.format(
               self._GetOptionFullName(component_full_name),
               string,
               match.group(1),
           )
-      )
+      ) from e
     memory_units = match.group(2)
     if memory_units == 'GiB':
       memory_value *= 1024
     memory_mib_int = int(memory_value)
     if memory_value != memory_mib_int:
       raise errors.Config.InvalidValue(
-          'Invalid {0} value: "{1}". The specified size must be an integer '
+          'Invalid {} value: "{}". The specified size must be an integer '
           'number of MiB.'.format(
               self._GetOptionFullName(component_full_name), string
           )
@@ -101,7 +100,7 @@ class CustomMachineTypeSpec(spec.BaseSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(CustomMachineTypeSpec, cls)._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     result.update({
         'cpus': (option_decoders.IntDecoder, {'min': 1}),
         'memory': (MemoryDecoder, {}),
@@ -113,8 +112,8 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
   """Decodes the machine_type option of a VM config."""
 
   def __init__(self, **kwargs):
-    super(MachineTypeDecoder, self).__init__(
-        (six.string_types + (dict,)), **kwargs
+    super().__init__(
+        ((str,) + (dict,)), **kwargs
     )
 
   def Decode(self, value, component_full_name, flag_values):
@@ -135,10 +134,10 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    super(MachineTypeDecoder, self).Decode(
+    super().Decode(
         value, component_full_name, flag_values
     )
-    if isinstance(value, six.string_types):
+    if isinstance(value, str):
       return value
     return CustomMachineTypeSpec(
         self._GetOptionFullName(component_full_name),
@@ -151,8 +150,8 @@ class AzureMachineTypeDecoder(option_decoders.TypeVerifier):
   """Decodes the machine_type option of a VM config."""
 
   def __init__(self, **kwargs):
-    super(AzureMachineTypeDecoder, self).__init__(
-        six.string_types + (dict,), **kwargs
+    super().__init__(
+        (str,) + (dict,), **kwargs
     )
 
   def Decode(self, value, component_full_name, flag_values):
@@ -173,10 +172,10 @@ class AzureMachineTypeDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    super(AzureMachineTypeDecoder, self).Decode(
+    super().Decode(
         value, component_full_name, flag_values
     )
-    if isinstance(value, six.string_types):
+    if isinstance(value, str):
       return value
     return AzurePerformanceTierDecoder(
         self._GetOptionFullName(component_full_name),
@@ -202,9 +201,7 @@ class AzurePerformanceTierDecoder(spec.BaseSpec):
           The pair specifies a decoder class and its __init__() keyword
           arguments to construct in order to decode the named option.
     """
-    result = super(
-        AzurePerformanceTierDecoder, cls
-    )._GetOptionDecoderConstructions()
+    result = super()._GetOptionDecoderConstructions()
     # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/acu
     # https://docs.microsoft.com/en-us/azure/sql-database/sql-database-service-tiers
     result.update({

@@ -84,7 +84,7 @@ class BaseNfsService(resource.BaseResource):
   DEFAULT_TIER = None
 
   def __init__(self, disk_spec: disk.BaseNFSDiskSpec, zone):
-    super(BaseNfsService, self).__init__()
+    super().__init__()
     self.disk_spec = disk_spec
     self.zone = zone
     self.server_directory = '/'
@@ -127,7 +127,7 @@ class StaticNfsService(BaseNfsService):
   CLOUD = 'Static'
 
   def __init__(self, disk_spec):
-    super(StaticNfsService, self).__init__(disk_spec, None)
+    super().__init__(disk_spec, None)
     self.ip_address = disk_spec.nfs_ip_address
     self.server_directory = disk_spec.nfs_directory or '/'
 
@@ -180,7 +180,7 @@ class UnmanagedNfsService(BaseNfsService):
       check_export_not_same_mount=True,
       server_directory=None,
   ):
-    super(UnmanagedNfsService, self).__init__(disk_spec, None)
+    super().__init__(disk_spec, None)
     self.server_vm = server_vm
     # Path on the server to export. Must be different from mount_point.
     if server_directory:

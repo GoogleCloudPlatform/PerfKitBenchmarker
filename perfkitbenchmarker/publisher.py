@@ -23,6 +23,7 @@ import copy
 import csv
 import datetime
 import fcntl
+import http.client as httplib
 import itertools
 import json
 import logging
@@ -44,7 +45,6 @@ from perfkitbenchmarker import vm_util
 import pytz
 import six
 from six.moves import urllib
-import six.moves.http_client as httplib
 
 FLAGS = flags.FLAGS
 
@@ -224,7 +224,7 @@ def GetLabelsFromDict(metadata: dict[Any, Any]) -> str:
     A string of labels, sorted by key, in the format that Perfkit uses.
   """
   labels = []
-  for k, v in sorted(six.iteritems(metadata)):
+  for k, v in sorted(metadata.items()):
     labels.append('|%s:%s|' % (k, v))
   return ','.join(labels)
 
@@ -246,7 +246,7 @@ def LabelsToDict(labels_str: str) -> dict[str, str]:
   return {k: v for k, v in split_entries}
 
 
-class MetadataProvider(six.with_metaclass(abc.ABCMeta, object)):
+class MetadataProvider(metaclass=abc.ABCMeta):
   """A provider of sample metadata."""
 
   @abc.abstractmethod
@@ -279,20 +279,20 @@ class DefaultMetadataProvider(MetadataProvider):
       )
     if benchmark_spec.container_cluster:
       cluster = benchmark_spec.container_cluster
-      for k, v in six.iteritems(cluster.GetResourceMetadata()):
+      for k, v in cluster.GetResourceMetadata().items():
         metadata['container_cluster_' + k] = v
 
     if benchmark_spec.relational_db:
       db = benchmark_spec.relational_db
-      for k, v in six.iteritems(db.GetResourceMetadata()):
+      for k, v in db.GetResourceMetadata().items():
         # TODO(user): Rename to relational_db.
         metadata['managed_relational_db_' + k] = v
 
-    for name, tpu in six.iteritems(benchmark_spec.tpu_groups):
-      for k, v in six.iteritems(tpu.GetResourceMetadata()):
+    for name, tpu in benchmark_spec.tpu_groups.items():
+      for k, v in tpu.GetResourceMetadata().items():
         metadata['tpu_' + k] = v
 
-    for name, vms in six.iteritems(benchmark_spec.vm_groups):
+    for name, vms in benchmark_spec.vm_groups.items():
       if len(vms) == 0:
         continue
 
@@ -300,17 +300,17 @@ class DefaultMetadataProvider(MetadataProvider):
       # machine type, and image.
       vm = vms[-1]
       name_prefix = '' if name == 'default' else name + '_'
-      for k, v in six.iteritems(vm.GetResourceMetadata()):
+      for k, v in vm.GetResourceMetadata().items():
         if k not in _VM_METADATA_TO_LIST_PLURAL:
           metadata[name_prefix + k] = v
       metadata[name_prefix + 'vm_count'] = len(vms)
-      for k, v in six.iteritems(vm.GetOSResourceMetadata()):
+      for k, v in vm.GetOSResourceMetadata().items():
         metadata[name_prefix + k] = v
 
       if vm.scratch_disks:
         data_disk = vm.scratch_disks[0]
         metadata[name_prefix + 'data_disk_count'] = len(vm.scratch_disks)
-        for key, value in six.iteritems(data_disk.GetResourceMetadata()):
+        for key, value in data_disk.GetResourceMetadata().items():
           metadata[name_prefix + 'data_disk_0_%s' % (key,)] = value
 
     # Get some metadata from all VMs:
@@ -346,7 +346,7 @@ class DefaultMetadataProvider(MetadataProvider):
 DEFAULT_METADATA_PROVIDERS = [DefaultMetadataProvider()]
 
 
-class SamplePublisher(six.with_metaclass(abc.ABCMeta, object)):
+class SamplePublisher(metaclass=abc.ABCMeta):
   """An object that can publish performance samples."""
 
   # Time series data is long. Turn this flag off to hide time series data.
@@ -394,7 +394,8 @@ class CSVPublisher(SamplePublisher):
     samples = list(samples)
     # Union of all metadata keys.
     meta_keys = sorted(
-        set(key for sample in samples for key in sample['metadata'])
+        # pylint: disable-next=g-complex-comprehension
+        {key for sample in samples for key in sample['metadata']}
     )
 
     logging.info('Writing CSV results to %s', self._path)
@@ -445,7 +446,7 @@ class PrettyPrintStreamPublisher(SamplePublisher):
     self.stream = stream or sys.stdout
 
   def __repr__(self):
-    return '<{0} stream={1}>'.format(type(self).__name__, self.stream)
+    return '<{} stream={}>'.format(type(self).__name__, self.stream)
 
   def _FindConstantMetadataKeys(self, samples):
     """Finds metadata keys which are constant across a collection of samples.
@@ -460,7 +461,7 @@ class PrettyPrintStreamPublisher(SamplePublisher):
     unique_values = {}
 
     for sample in samples:
-      for k, v in six.iteritems(sample['metadata']):
+      for k, v in sample['metadata'].items():
         if len(unique_values.setdefault(k, set())) < 2 and v.__hash__:
           unique_values[k].add(v)
 
@@ -471,14 +472,14 @@ class PrettyPrintStreamPublisher(SamplePublisher):
 
     return frozenset(
         k
-        for k, v in six.iteritems(unique_values)
+        for k, v in unique_values.items()
         if len(v) == 1 and None not in v
     )
 
   def _FormatMetadata(self, metadata):
     """Format 'metadata' as space-delimited key="value" pairs."""
     return ' '.join(
-        '{0}="{1}"'.format(k, v) for k, v in sorted(six.iteritems(metadata))
+        '{}="{}"'.format(k, v) for k, v in sorted(metadata.items())
     )
 
   def PublishSamples(self, samples):
@@ -515,37 +516,37 @@ class PrettyPrintStreamPublisher(SamplePublisher):
 
       benchmark_meta = {
           k: v
-          for k, v in six.iteritems(test_samples[0]['metadata'])
+          for k, v in test_samples[0]['metadata'].items()
           if k in locally_constant_keys
       }
-      result.write('{0}:\n'.format(benchmark.upper()))
+      result.write('{}:\n'.format(benchmark.upper()))
 
       if benchmark_meta:
-        result.write('  {0}\n'.format(self._FormatMetadata(benchmark_meta)))
+        result.write('  {}\n'.format(self._FormatMetadata(benchmark_meta)))
 
       for sample in test_samples:
         meta = {
             k: v
-            for k, v in six.iteritems(sample['metadata'])
+            for k, v in sample['metadata'].items()
             if k not in all_constant_meta
         }
         result.write(
-            '  {0:<30s} {1:>15f} {2:<30s}'.format(
+            '  {:<30s} {:>15f} {:<30s}'.format(
                 sample['metric'], sample['value'], sample['unit']
             )
         )
         if meta:
-          result.write(' ({0})'.format(self._FormatMetadata(meta)))
+          result.write(' ({})'.format(self._FormatMetadata(meta)))
         result.write('\n')
 
     global_meta = {
         k: v
-        for k, v in six.iteritems(samples[0]['metadata'])
+        for k, v in samples[0]['metadata'].items()
         if k in globally_constant_keys
     }
     result.write('\n' + dashes + '\n')
     result.write(
-        'For all tests: {0}\n'.format(self._FormatMetadata(global_meta))
+        'For all tests: {}\n'.format(self._FormatMetadata(global_meta))
     )
 
     value = result.getvalue()
@@ -570,7 +571,7 @@ class LogPublisher(SamplePublisher):
     self._pprinter = pprint.PrettyPrinter()
 
   def __repr__(self):
-    return '<{0} logger={1} level={2}>'.format(
+    return '<{} logger={} level={}>'.format(
         type(self).__name__, self.logger, self.level
     )
 
@@ -604,7 +605,7 @@ class NewlineDelimitedJSONPublisher(SamplePublisher):
     self.collapse_labels = collapse_labels
 
   def __repr__(self):
-    return '<{0} file_path="{1}" mode="{2}">'.format(
+    return '<{} file_path="{}" mode="{}">'.format(
         type(self).__name__, self.file_path, self.mode
     )
 
@@ -629,7 +630,7 @@ class BigQueryPublisher(SamplePublisher):
     bq_path: string. Path to the 'bq' executable'.
     service_account: string. Use this service account email address for
       authorization. For example, 1234567890@developer.gserviceaccount.com
-    service_account_private_key: Filename that contains the service account
+    service_account_private_key_file: Filename that contains the service account
       private key. Must be specified if service_account is specified.
     application_default_credential_file: Filename that holds Google applciation
       default credentials. Cannot be set alongside service_account.
@@ -672,7 +673,7 @@ class BigQueryPublisher(SamplePublisher):
       )
 
   def __repr__(self):
-    return '<{0} table="{1}">'.format(type(self).__name__, self.bigquery_table)
+    return '<{} table="{}">'.format(type(self).__name__, self.bigquery_table)
 
   def PublishSamples(self, samples):
     if not samples:
@@ -726,14 +727,16 @@ class CloudStoragePublisher(SamplePublisher):
 
   where <time> is the number of milliseconds since the Epoch, and <uri> is a
   random UUID.
-
-  Attributes:
-    bucket: string. The GCS bucket name to publish to.
-    gsutil_path: string. The path to the 'gsutil' tool.
-    sub_folder: Optional folder within the bucket to publish to.
   """
 
   def __init__(self, bucket, gsutil_path='gsutil', sub_folder=None):
+    """CloudStoragePublisher constructor.
+
+    Args:
+      bucket: string. The GCS bucket name to publish to.
+      gsutil_path: string. The path to the 'gsutil' tool.
+      sub_folder: Optional folder within the bucket to publish to.
+    """
     super().__init__()
     self.gsutil_path = gsutil_path
     if sub_folder:
@@ -766,14 +769,16 @@ class ElasticsearchPublisher(SamplePublisher):
   """Publish samples to an Elasticsearch server.
 
   Index and document type will be created if they do not exist.
-
-  Attributes:
-    es_uri: String. e.g. "http://localhost:9200"
-    es_index: String. Default "perfkit"
-    es_type: String. Default "result"
   """
 
   def __init__(self, es_uri=None, es_index=None, es_type=None):
+    """ElasticsearchPublisher constructor.
+
+    Args:
+      es_uri: String. e.g. "http://localhost:9200"
+      es_index: String. Default "perfkit"
+      es_type: String. Default "result"
+    """
     super().__init__()
     self.es_uri = es_uri
     self.es_index = es_index.lower()
@@ -884,6 +889,7 @@ class ElasticsearchPublisher(SamplePublisher):
           body=json.dumps(sample),
       )
 
+  # pylint: disable=g-doc-args,g-doc-return-or-yield,g-short-docstring-punctuation
   def _FormatTimestampForElasticsearch(self, epoch_us):
     """Convert the floating epoch timestamp in micro seconds epoch_us to
 
@@ -893,7 +899,9 @@ class ElasticsearchPublisher(SamplePublisher):
     num_dec = ('%.6f' % (epoch_us - math.floor(epoch_us))).split('.')[1]
     new_ts = '%s.%s' % (ts, num_dec)
     return new_ts
+  # pylint: enable=g-doc-args,g-doc-return-or-yield,g-short-docstring-punctuation
 
+  # pylint: disable-next=invalid-name
   def _deDotKeys(self, res):
     """Recursively replace dot with underscore in all keys in a dictionary."""
     for key, value in res.items():
@@ -932,9 +940,10 @@ class InfluxDBPublisher(SamplePublisher):
       self._CreateDB()
       body = '\n'.join(formated_samples)
       self._WriteData(body)
-    except (IOError, httplib.HTTPException) as http_exception:
+    except (OSError, httplib.HTTPException) as http_exception:
       logging.error('Error connecting to the database:  %s', http_exception)
 
+  # pylint: disable=missing-function-docstring
   def _ConstructSample(self, sample):
     sample['product_name'] = FLAGS.product_name
     timestamp = str(int((10**9) * sample['timestamp']))
@@ -971,12 +980,12 @@ class InfluxDBPublisher(SamplePublisher):
 
   def _FormatToKeyValue(self, sample):
     key_value_pairs = []
-    for k, v in six.iteritems(sample):
+    for k, v in sample.items():
       if v == '':
         v = '\\"\\"'
       v = str(v)
-      v = v.replace(',', '\,')
-      v = v.replace(' ', '\ ')
+      v = v.replace(',', r'\,')
+      v = v.replace(' ', r'\ ')
       key_value_pairs.append('%s=%s' % (k, v))
     return key_value_pairs
 
@@ -1008,6 +1017,7 @@ class InfluxDBPublisher(SamplePublisher):
       )
       raise httplib.HTTPException
 
+  # pylint: disable=missing-function-docstring
   def _WriteData(self, data):
     successful_http_request_codes = [200, 202, 204]
     params = data
@@ -1030,7 +1040,7 @@ class InfluxDBPublisher(SamplePublisher):
       raise httplib.HTTPException
 
 
-class SampleCollector(object):
+class SampleCollector:
   """A performance sample collector.
 
   Supports incorporating additional metadata into samples, and publishing
@@ -1204,7 +1214,7 @@ def RepublishJSONSamples(path):
     path: the path to the JSON file.
   """
 
-  with open(path, 'r') as file:
+  with open(path) as file:
     samples = [json.loads(s) for s in file if s]
   for sample in samples:
     # Chop '|' at the beginning and end of labels and split labels by '|,|'
