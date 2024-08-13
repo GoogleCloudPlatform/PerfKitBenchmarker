@@ -313,6 +313,7 @@ class HammerDbTclScript:
     if (
         'Error' in stdout
         or 'FAILED' in stdout
+        or 'failure' in stdout  # SQL Server failures
         or 'Virtual Users remain running' in stdout
     ):
       raise HammerdbBenchmarkError(
