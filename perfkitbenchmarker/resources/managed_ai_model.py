@@ -41,6 +41,12 @@ class BaseManagedAiModel(resource.BaseResource):
       )
     self.zone: str = FLAGS.zone[0]
 
+  def ListExistingModels(self, zone: str|None = None) -> list[str]:
+    """Returns a list of existing models in the same zone."""
+    raise NotImplementedError(
+        'ListExistingModels is not implemented for this model type.'
+    )
+
 
 def GetManagedAiModelClass(
     cloud: str,

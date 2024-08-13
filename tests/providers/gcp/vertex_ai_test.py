@@ -56,6 +56,38 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
         self.pkb_ai.service_account, '123-compute@developer.gserviceaccount.com'
     )
 
+  def test_existing_model_found(self):
+    self.MockIssueCommand({
+        '': [(
+            'ENDPOINT_ID          DISPLAY_NAME\n'
+            + '12345                some_endpoint_name',
+            '',
+            0,
+        )]
+    })
+    self.assertEqual(self.pkb_ai.ListExistingModels(), ['12345'])
+
+  def test_existing_models_found(self):
+    self.MockIssueCommand({
+        '': [(
+            'ENDPOINT_ID          DISPLAY_NAME\n'
+            + '12345                some_endpoint_name\n'
+            + '45678                another_endpoint_name\n',
+            '',
+            0,
+        )]
+    })
+    self.assertEqual(self.pkb_ai.ListExistingModels(), ['12345', '45678'])
+
+  def test_no_models_found(self):
+    self.MockIssueCommand({
+        '': [(
+            'ENDPOINT_ID          DISPLAY_NAME\n',
+            '',
+            0,
+        )]
+    })
+    self.assertEqual(self.pkb_ai.ListExistingModels(), [])
 
 if __name__ == '__main__':
   unittest.main()

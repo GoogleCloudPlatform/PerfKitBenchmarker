@@ -23,6 +23,7 @@ except ImportError:
   from google.cloud import aiplatform
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources import managed_ai_model
 from perfkitbenchmarker.resources import managed_ai_model_spec
@@ -89,7 +90,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     )
     self.name = 'pkb' + FLAGS.run_uri
     self.endpoint = VertexAiEndpoint(name=self.name)
-    self.region = 'us-east4'
+    self.region = util.GetRegionFromZone(self.zone)
     self.project = FLAGS.project
     if not self.project:
       raise errors.Setup.InvalidConfigurationError(
@@ -102,6 +103,28 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     })
     project_number = util.GetProjectNumber(self.project)
     self.service_account = SERVICE_ACCOUNT_BASE.format(project_number)
+
+  def ListExistingModels(self, zone: str | None = None) -> list[str]:
+    """Returns a list of existing model endpoint ids in the same zone."""
+    if zone:
+      region = util.GetRegionFromZone(self.zone)
+    else:
+      region = self.region
+    # Expected output example:
+    # ENDPOINT_ID          DISPLAY_NAME
+    # 12345                some_endpoint_name
+    out, _, _ = vm_util.IssueCommand([
+        'gcloud',
+        'ai',
+        'endpoints',
+        'list',
+        f'--region={region}',
+        f'--project={self.project}',
+    ])
+    lines = out.splitlines()
+    ids = [line.split()[0] for line in lines]
+    ids.pop(0)  # Remove the first line which just has titles
+    return ids
 
   def _Create(self) -> None:
     """Creates the underlying resource."""

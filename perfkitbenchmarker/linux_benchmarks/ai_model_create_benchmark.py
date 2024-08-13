@@ -17,7 +17,9 @@ import logging
 from typing import Any
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.resources import managed_ai_model
 
 BENCHMARK_NAME = 'ai_model_create'
 BENCHMARK_CONFIG = """
@@ -46,6 +48,17 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   del benchmark_spec
 
 
+def _ValidateExistingModels(ai_model: managed_ai_model.BaseManagedAiModel):
+  """Validates that there is only one model in the project."""
+  models = ai_model.ListExistingModels()
+  # Note this code runs after Create, so we should have one.
+  # The presence of other models in a region changes startup performance.
+  if len(models) != 1:
+    raise errors.Benchmarks.PrepareException(
+        f'Only one model expected but found all these models: {models}'
+    )
+
+
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Run the example benchmark.
 
@@ -58,6 +71,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """
   logging.info('Running Run phase of the example benchmark')
   ai_model = benchmark_spec.ai_model
+  _ValidateExistingModels(ai_model)
   # Every resource supplies create times by default.
   samples = ai_model.GetSamples()
   return samples
