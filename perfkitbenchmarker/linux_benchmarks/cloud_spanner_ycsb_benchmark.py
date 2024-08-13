@@ -222,6 +222,7 @@ def _BuildSchema():
 
 
 def _Install(vm):
+  """Installs YCSB on the VM."""
   vm.Install('ycsb')
 
   # Run custom VM installation commands.
