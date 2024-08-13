@@ -62,7 +62,7 @@ def GetFioExec():
 def _Install(vm):
   """Installs the fio package on the VM."""
   # TODO(user): Upgrade to python3.
-  for p in ['build_tools', 'python', 'pip3', 'python_dev']:
+  for p in ['build_tools', 'pip3']:
     vm.Install(p)
   for package in ('numpy', 'pandas'):
     vm.RemoteCommand(f'sudo pip3 install {package}')
