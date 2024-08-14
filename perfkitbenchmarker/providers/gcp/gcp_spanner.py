@@ -29,6 +29,7 @@ from absl import flags
 from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3 import query
 import numpy as np
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
