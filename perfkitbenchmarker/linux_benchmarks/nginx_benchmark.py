@@ -402,6 +402,7 @@ def _RunMultiClient(clients, target, rate, connections, duration, threads):
 
   error_rate = errors / requests
   metadata = {
+      'nginx_scenario': FLAGS.nginx_scenario,
       'connections': connections * num_clients,
       'threads': threads * num_clients,
       'duration': duration,
