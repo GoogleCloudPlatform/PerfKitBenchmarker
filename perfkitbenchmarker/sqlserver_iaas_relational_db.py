@@ -114,8 +114,8 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
       self.server_vm = vm_groups["servers"][0]
 
     if self.spec.high_availability:
-      assert len(vm_groups["servers"]) >= 2
-      self.replica_vms = vm_groups["servers"][1:]
+      assert len(vm_groups["servers_replicas"]) >= 1
+      self.replica_vms = vm_groups["servers_replicas"]
       self.controller_vm = vm_groups["controller"][0]
 
   def MoveSQLServerTempDb(self):

@@ -290,6 +290,7 @@ def VmsToBoot(vm_groups):
       or name == 'default'
       or name == 'controller'
       or (not FLAGS.use_managed_db and name == 'servers')
+      or (not FLAGS.use_managed_db and name == 'servers_replicas')
   }
 
 
