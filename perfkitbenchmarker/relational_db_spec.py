@@ -280,7 +280,11 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
         config_values['vm_groups']['servers']['vm_spec'][cloud]['zone'] = (
             flag_values.db_zone[0]
         )
-    elif flag_values['zone'].present:
+    elif (
+        flag_values['zone'].present
+        and 'db_spec' in config_values
+        and 'zones' in config_values
+    ):
       config_values['db_spec'][cloud]['zone'] = flag_values.zone[0]
       config_values['zones'] = flag_values.zone
       if has_unmanaged_dbs:
@@ -299,7 +303,11 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       config_values['vm_groups']['clients']['vm_spec'][cloud][
           'zone'
       ] = flag_values.client_vm_zone
-    elif flag_values['zone'].present:
+    elif (
+        flag_values['zone'].present
+        and 'vm_groups' in config_values
+        and 'clients' in config_values['vm_groups']
+    ):
       config_values['vm_groups']['clients']['vm_spec'][cloud]['zone'] = (
           flag_values.zone[0]
       )
@@ -307,6 +315,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     # Set zone for controller vm
     if (
         flag_values['zone'].present
+        and 'vm_groups' in config_values
         and 'controller' in config_values['vm_groups']
     ):
       config_values['vm_groups']['controller']['vm_spec'][cloud]['zone'] = (
