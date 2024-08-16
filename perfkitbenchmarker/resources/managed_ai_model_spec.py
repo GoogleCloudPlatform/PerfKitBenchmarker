@@ -28,6 +28,8 @@ class BaseManagedAiModelSpec(spec.BaseSpec):
 
   SPEC_TYPE = 'BaseManagedAiModelSpec'
   SPEC_ATTRS = ['CLOUD', 'MODEL_NAME']
+  CLOUD = None
+  MODEL_NAME = None
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     self.cloud: str

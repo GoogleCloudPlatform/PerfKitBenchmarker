@@ -343,10 +343,11 @@ class _ManagedAiModelSpecDecoder(option_decoders.TypeVerifier):
       errors.Config.InvalidValue upon invalid input value.
     """
     config = super().Decode(value, component_full_name, flag_values)
-    if 'cloud' in config and 'model_name' in config:
-      providers.LoadProvider(config['cloud'])
+    if 'cloud' in flag_values and 'model_name' in config:
+      cloud = flag_values['cloud'].value
+      providers.LoadProvider(cloud)
       spec_class = managed_ai_model_spec.GetManagedAiModelSpecClass(
-          config['cloud'], config['model_name']
+          cloud, config['model_name']
       )
     else:
       raise errors.Config.InvalidValue(
