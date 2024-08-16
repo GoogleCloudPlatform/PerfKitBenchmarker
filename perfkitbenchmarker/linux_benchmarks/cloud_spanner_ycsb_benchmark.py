@@ -56,6 +56,7 @@ cloud_spanner_ycsb:
     enable_freeze_restore: True
     vm_groups:
       default:
+        os_type: ubuntu2204  # Python 2
         vm_spec: *default_single_core
         vm_count: 1
   flags:

@@ -67,6 +67,7 @@ kubernetes_mongodb:
           Azure:
             machine_type: Standard_D4s_v5
       clients:
+        os_type: ubuntu2204  # Python 2
         vm_count: 1
         vm_spec:
           GCP:

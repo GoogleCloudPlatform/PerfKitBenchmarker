@@ -689,10 +689,12 @@ def CheckPrerequisites():
 def Install(vm):
   """Installs the YCSB and, if needed, hdrhistogram package on the VM."""
   vm.Install('openjdk')
-  # TODO(user): replace with Python 3 when supported.
-  # https://github.com/brianfrankcooper/YCSB/issues/1459
-  vm.Install('python')
-  vm.InstallPackages('curl')
+  # TODO(user): replace with Python 3 when
+  # https://github.com/brianfrankcooper/YCSB/commit/f8e7c64 is released in a
+  # version
+  vm.InstallPackages('python2.7 curl')
+  # ycsb.py uses /usr/bin/env python
+  vm.RemoteCommand('sudo ln -s /usr/bin/python2.7 /usr/local/bin/python')
   vm.Install('maven')
   install_cmd = (
       'mkdir -p {0} && curl -L {1} | '

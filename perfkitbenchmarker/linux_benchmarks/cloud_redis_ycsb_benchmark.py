@@ -34,6 +34,7 @@ cloud_redis_ycsb:
     redis_version: redis_3_2
   vm_groups:
     clients:
+      os_type: ubuntu2204  # Python 2
       vm_spec: *default_single_core
       vm_count: 2
 """

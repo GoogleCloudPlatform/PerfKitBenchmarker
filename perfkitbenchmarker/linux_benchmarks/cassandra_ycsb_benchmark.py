@@ -44,6 +44,7 @@ cassandra_ycsb:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
     clients:
+      os_type: ubuntu2204  # Python 2
       vm_spec: *default_single_core
 """
 

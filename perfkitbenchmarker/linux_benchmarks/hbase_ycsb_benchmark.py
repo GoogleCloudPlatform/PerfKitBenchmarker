@@ -74,6 +74,7 @@ hbase_ycsb:
       with --ycsb_client_vms.
   vm_groups:
     clients:
+      os_type: ubuntu2204  # Python 2
       vm_spec: *default_single_core
     master:
       vm_spec: *default_single_core

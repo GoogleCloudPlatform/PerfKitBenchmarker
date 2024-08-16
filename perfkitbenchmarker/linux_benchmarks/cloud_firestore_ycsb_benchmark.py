@@ -36,6 +36,7 @@ cloud_firestore_ycsb:
       Configure the number of VMs via --num-vms.
   vm_groups:
     default:
+      os_type: ubuntu2204  # Python 2
       vm_spec: *default_single_core
       vm_count: 1"""
 

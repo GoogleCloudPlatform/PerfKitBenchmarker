@@ -113,6 +113,7 @@ memcached_ycsb:
     servers:
       vm_spec: *default_single_core
     clients:
+      os_type: ubuntu2204  # Python 2
       vm_spec: *default_single_core
 """
 
