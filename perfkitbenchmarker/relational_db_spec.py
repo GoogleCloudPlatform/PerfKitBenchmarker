@@ -453,10 +453,10 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
             'zone'
         ] = flag_values.db_replica_zones[0]
 
-    # Clear all the zones if the zone flag is present. This will prevent zone
-    # values to be overwritten by the benchmark
-    # spec.ConstructVirtualMachineGroup() method.
-    if flag_values['zone'].present:
-      flag_values.zone.clear()
+      # Clear all the zones if the zone flag is present. This will prevent zone
+      # values to be overwritten by the benchmark
+      # spec.ConstructVirtualMachineGroup() method.
+      if flag_values['zone'].present:
+        flag_values.zone.clear()
 
     logging.warning('Relational db config values: %s', config_values)
