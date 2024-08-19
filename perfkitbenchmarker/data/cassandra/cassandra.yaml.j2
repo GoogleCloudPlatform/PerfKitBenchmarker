@@ -40,7 +40,7 @@ seed_provider:
     parameters:
       - seeds: "{{ seeds }}"
 concurrent_reads: {{ concurrent_reads }}
-concurrent_writes: {{ num_cpus * 8 }}
+concurrent_writes: {{ concurrent_writes }}
 concurrent_counter_writes: 32
 concurrent_materialized_view_writes: 32
 memtable_allocation_type: heap_buffers
@@ -75,7 +75,7 @@ cas_contention_timeout: 1000ms
 truncate_request_timeout: 60000ms
 request_timeout: 10000ms
 slow_query_log_timeout: 500ms
-endpoint_snitch: SimpleSnitch
+endpoint_snitch: GossipingPropertyFileSnitch
 dynamic_snitch_update_interval: 100ms
 dynamic_snitch_reset_interval: 600000ms
 dynamic_snitch_badness_threshold: 1.0

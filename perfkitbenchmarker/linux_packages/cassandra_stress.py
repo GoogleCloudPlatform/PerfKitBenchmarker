@@ -20,10 +20,9 @@ https://docs.datastax.com/en/cassandra/2.1/cassandra/tools/toolsCStress_t.html
 """
 
 import posixpath
-from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker.linux_packages import cassandra
 
-CASSANDRA_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'cassandra')
+CASSANDRA_DIR = cassandra.CASSANDRA_DIR
 
 
 def YumInstall(vm):

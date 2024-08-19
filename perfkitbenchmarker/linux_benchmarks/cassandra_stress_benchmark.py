@@ -19,14 +19,15 @@ cassandra-stress tool page:
 http://docs.datastax.com/en/cassandra/2.1/cassandra/tools/toolsCStress_t.html
 """
 
-
 import collections
+import copy
 import functools
 import logging
 import math
 import posixpath
 import time
 from typing import Union
+
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
@@ -110,6 +111,17 @@ flags.DEFINE_integer(
     'Number of retries when error encountered during stress.',
 )
 
+CASSANDRA_SERVER_ZONES = flags.DEFINE_list(
+    'cassandra_server_zones',
+    [],
+    'zones to launch the cassandra servers in. ',
+)
+
+CASSANDRA_CLIENT_ZONES = flags.DEFINE_list(
+    'cassandra_client_zones',
+    [],
+    'zones to launch the clients for the benchmark in. ',
+)
 # Use "./cassandra-stress help -pop" to get more details.
 # [dist=DIST(?)]: Seeds are selected from this distribution
 #  EXP(min..max):
@@ -213,7 +225,6 @@ cassandra_stress:
           machine_type: m6i.xlarge
           zone: us-east-1
       disk_spec: *default_500_gb
-      vm_count: 3
     client:
       vm_spec:
         GCP:
@@ -269,7 +280,25 @@ MAXIMUM_METRICS = {'latency max'}
 
 
 def GetConfig(user_config):
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  cloud = FLAGS.cloud
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  ConfigureVmGroups(
+      config, CASSANDRA_SERVER_ZONES.value, CASSANDRA_GROUP, cloud
+  )
+  ConfigureVmGroups(
+      config, CASSANDRA_CLIENT_ZONES.value, CLIENT_GROUP, cloud
+  )
+  return config
+
+
+def ConfigureVmGroups(config, flag, group_name, cloud):
+  for index, zone in enumerate(flag):
+    if index == 0:
+      config['vm_groups'][group_name]['vm_spec'][cloud]['zone'] = zone
+      continue
+    node = copy.deepcopy(config['vm_groups'][group_name])
+    node['vm_spec'][cloud]['zone'] = zone
+    config['vm_groups'][f'{group_name}_{index}'] = node
 
 
 def CheckPrerequisites(benchmark_config):
@@ -278,6 +307,14 @@ def CheckPrerequisites(benchmark_config):
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
+  if not CASSANDRA_SERVER_ZONES.value:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'Specify zones for cassandra servers in cassandra_server_zones flag'
+    )
+  if not CASSANDRA_CLIENT_ZONES.value:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'Specify zones for cassandra clients in cassandra_client_zones flag'
+    )
   cassandra.CheckPrerequisites()
   if FLAGS.cassandra_stress_command == USER_COMMAND:
     data.ResourcePath(FLAGS.cassandra_stress_profile)
@@ -298,12 +335,14 @@ def CheckMetadata(metadata):
       )
 
 
-def GenerateMetadataFromFlags(benchmark_spec):
+def GenerateMetadataFromFlags(benchmark_spec, cassandra_vms, client_vms):
   """Generate metadata from command-line flags.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
+    cassandra_vms: cassandra server vms.
+    client_vms: cassandra client vms.
 
   Returns:
     dict. Contains metadata for this benchmark.
@@ -326,8 +365,9 @@ def GenerateMetadataFromFlags(benchmark_spec):
 
   metadata.update({
       'concurrent_reads': FLAGS.cassandra_concurrent_reads,
-      'num_data_nodes': len(vm_dict[CASSANDRA_GROUP]),
-      'num_loader_nodes': len(vm_dict[CLIENT_GROUP]),
+      'concurent_writes': FLAGS.cassandra_concurrent_writes,
+      'num_data_nodes': len(cassandra_vms),
+      'num_loader_nodes': len(client_vms),
       'num_cassandra_stress_threads': FLAGS.num_cassandra_stress_threads,
       'command': FLAGS.cassandra_stress_command,
       'consistency_level': FLAGS.cassandra_stress_consistency_level,
@@ -354,12 +394,12 @@ def GenerateMetadataFromFlags(benchmark_spec):
   return metadata
 
 
-def PreloadCassandraServer(benchmark_spec, metadata):
+def PreloadCassandraServer(cassandra_vms, client_vms, metadata):
   """Preload cassandra cluster if necessary.
 
   Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-      required to run the benchmark.
+    cassandra_vms: cassandra server vms.
+    client_vms: client vms that run cassandra-stress.
     metadata: dict. Contains metadata for this benchmark.
   """
   if (
@@ -377,13 +417,24 @@ def PreloadCassandraServer(benchmark_spec, metadata):
       cassandra_stress_command,
   )
   RunCassandraStressTest(
-      benchmark_spec.vm_groups[CASSANDRA_GROUP],
-      benchmark_spec.vm_groups[CLIENT_GROUP],
+      cassandra_vms,
+      client_vms,
       metadata['num_preload_keys'],
       cassandra_stress_command,
   )
   logging.info('Waiting %s for keyspace to propagate.', PROPAGATION_WAIT_TIME)
   time.sleep(PROPAGATION_WAIT_TIME)
+
+
+def ParseVmGroups(vm_dict):
+  cassandra_vms = []
+  client_vms = []
+  for key, value in vm_dict.items():
+    if key.startswith(CASSANDRA_GROUP):
+      cassandra_vms.append(value[0])
+    elif key.startswith(CLIENT_GROUP):
+      client_vms.append(value[0])
+  return cassandra_vms, client_vms
 
 
 def Prepare(benchmark_spec):
@@ -394,8 +445,7 @@ def Prepare(benchmark_spec):
       required to run the benchmark.
   """
   vm_dict = benchmark_spec.vm_groups
-  cassandra_vms = vm_dict[CASSANDRA_GROUP]
-  client_vms = vm_dict[CLIENT_GROUP]
+  cassandra_vms, client_vms = ParseVmGroups(vm_dict)
   logging.info('VM dictionary %s', vm_dict)
 
   logging.info('Authorizing loader[0] permission to access all other vms.')
@@ -405,6 +455,7 @@ def Prepare(benchmark_spec):
   background_tasks.RunThreaded(
       lambda vm: vm.Install('cassandra'), cassandra_vms
   )
+
   background_tasks.RunThreaded(
       lambda vm: vm.Install('cassandra_stress'), client_vms
   )
@@ -412,14 +463,18 @@ def Prepare(benchmark_spec):
   configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
   background_tasks.RunThreaded(configure, cassandra_vms)
   cassandra.StartCluster(seed_vm, cassandra_vms[1:])
-
   if FLAGS.cassandra_stress_command == USER_COMMAND:
     for vm in client_vms:
       vm.PushFile(FLAGS.cassandra_stress_profile, TEMP_PROFILE_PATH)
-  metadata = GenerateMetadataFromFlags(benchmark_spec)
+  metadata = GenerateMetadataFromFlags(
+      benchmark_spec, cassandra_vms, client_vms
+  )
   if metadata['num_preload_keys']:
     CheckMetadata(metadata)
-  PreloadCassandraServer(benchmark_spec, metadata)
+  cassandra.CreateKeyspace(
+      seed_vm, replication_factor=FLAGS.cassandra_replication_factor
+  )
+  PreloadCassandraServer(cassandra_vms, client_vms, metadata)
 
 
 def _ResultFilePath(vm):
@@ -484,10 +539,11 @@ def RunTestOnLoader(
   else:
     population_dist = '-pop seq=%s' % population_params
   vm.RobustRemoteCommand(
-      'sudo cassandra-stress {command} cl={consistency_level} n={num_keys} '
-      '-node {nodes} {schema} {population_dist} '
-      '-log file={result_file} -rate threads={threads} '
-      '-errors retries={retries}'.format(
+      'sudo {cassandra_stress_command} {command} cl={consistency_level}'
+      ' n={num_keys} -node {nodes} {schema} {population_dist} -log'
+      ' file={result_file} -rate threads={threads} -errors retries={retries}'
+      .format(
+          cassandra_stress_command=cassandra.GetCassandraStressPath(vm),
           command=command,
           consistency_level=FLAGS.cassandra_stress_consistency_level,
           num_keys=operations_per_vm,
@@ -628,20 +684,17 @@ def CollectResultFile(vm, results):
     results[metric].append(value)
 
 
-def CollectResults(benchmark_spec, metadata):
+def CollectResults(loader_vms, metadata):
   """Collect and parse test results.
 
   Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-      required to run the benchmark.
+    loader_vms: client vms.
     metadata: dict. Contains metadata for this benchmark.
 
   Returns:
     A list of sample.Sample objects.
   """
   logging.info('Gathering results.')
-  vm_dict = benchmark_spec.vm_groups
-  loader_vms = vm_dict[CLIENT_GROUP]
   raw_results = collections.defaultdict(list)
   args = [((vm, raw_results), {}) for vm in loader_vms]
   background_tasks.RunThreaded(CollectResultFile, args)
@@ -674,13 +727,16 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-  metadata = GenerateMetadataFromFlags(benchmark_spec)
+  cassandra_vms, client_vms = ParseVmGroups(benchmark_spec.vm_groups)
+  metadata = GenerateMetadataFromFlags(
+      benchmark_spec, cassandra_vms, client_vms
+  )
   metadata['cassandra_version'] = cassandra.GetCassandraVersion(
       benchmark_spec.vm_groups[CASSANDRA_GROUP][0]
   )
   RunCassandraStressTest(
-      benchmark_spec.vm_groups[CASSANDRA_GROUP],
-      benchmark_spec.vm_groups[CLIENT_GROUP],
+      cassandra_vms,
+      client_vms,
       metadata['num_keys'],
       metadata['command'],
       metadata.get('operations'),
@@ -688,7 +744,7 @@ def Run(benchmark_spec):
       metadata['population_dist'],
       metadata['population_parameters'],
   )
-  return CollectResults(benchmark_spec, metadata)
+  return CollectResults(client_vms, metadata)
 
 
 def Cleanup(benchmark_spec):

@@ -38,18 +38,22 @@ JNA_JAR_URL = (
 CASSANDRA_GIT_REPRO = 'https://github.com/apache/cassandra.git'
 CASSANDRA_VERSION = 'cassandra-2.1'
 CASSANDRA_YAML_TEMPLATE = 'cassandra/cassandra.yaml.j2'
-CASSANDRA_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'cassandra')
+CASSANDRA_RACKDC_TEMPLATE = 'cassandra/cassandra-rackdc.properties.j2'
+CASSANDRA_KEYSPACE_TEMPLATE = (
+    'cassandra/create-keyspace-cassandra-stress.cql.j2'
+)
+CASSANDRA_VERSION = 'apache-cassandra-4.1.5'
+CASSANDRA_DIR = posixpath.join(linux_packages.INSTALL_DIR, CASSANDRA_VERSION)
 CASSANDRA_PID = posixpath.join(CASSANDRA_DIR, 'cassandra.pid')
 CASSANDRA_OUT = posixpath.join(CASSANDRA_DIR, 'cassandra.out')
 CASSANDRA_ERR = posixpath.join(CASSANDRA_DIR, 'cassandra.err')
-NODETOOL = posixpath.join(CASSANDRA_DIR, 'bin', 'nodetool')
 
 
 # Number of times to attempt to start the cluster.
 CLUSTER_START_TRIES = 10
-CLUSTER_START_SLEEP = 120
+CLUSTER_START_SLEEP = 30
 # Time, in seconds, to sleep between node starts.
-NODE_START_SLEEP = 60
+NODE_START_SLEEP = 30
 # for setting a maven repo with --cassandra_maven_repo_url
 _MAVEN_REPO_PARAMS = """
 artifact.remoteRepository.central: {0}
@@ -58,10 +62,16 @@ artifact.remoteRepository.apache: {0}
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('cassandra_replication_factor', 3, 'Num of replicas.')
-flags.DEFINE_integer(
+CASSANDRA_CONCURRENT_READS = flags.DEFINE_integer(
     'cassandra_concurrent_reads',
     32,
     'Concurrent read requests each server accepts.',
+)
+CASSANDRA_CONCURRENT_WRITES = flags.DEFINE_integer(
+    'cassandra_concurrent_writes',
+    None,
+    'Concurrent write requests each server accepts. Suggested number is'
+    ' Number of CPUs in the VM * 8',
 )
 # Partial list of known mirrors:
 # https://repo.maven.apache.org/maven2/.meta/repository-metadata.xml
@@ -78,30 +88,28 @@ def CheckPrerequisites():
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
   """
-  data.ResourcePath(CASSANDRA_YAML_TEMPLATE)
+  for resource in (CASSANDRA_YAML_TEMPLATE, CASSANDRA_RACKDC_TEMPLATE):
+    data.ResourcePath(resource)
 
 
 def _Install(vm):
-  """Installs Cassandra from a tarball."""
+  """Installs Cassandra as a debian package.
+
+  Args:
+    vm: VirtualMachine. The VM to install Cassandra on.
+  """
   vm.Install('openjdk')
   vm.Install('curl')
   vm.RemoteCommand(
-      'echo "deb [signed-by=/etc/apt/keyrings/apache-cassandra.asc]'
-      ' https://debian.cassandra.apache.org 50x main" | sudo tee -a'
-      ' /etc/apt/sources.list.d/cassandra.sources.list'
+      'curl -o /opt/pkb/cassandra.tar.gz'
+      ' https://archive.apache.org/dist/cassandra/4.1.5/apache-cassandra-4.1.5-bin.tar.gz'
   )
-  vm.RemoteCommand('sudo mkdir /etc/apt/keyrings/')
-  vm.RemoteCommand(
-      'sudo curl -o /etc/apt/keyrings/apache-cassandra.asc'
-      ' https://downloads.apache.org/cassandra/KEYS'
-  )
-  vm.RemoteCommand('sudo apt-get update')
-  vm.RemoteCommand('sudo apt-get -y install cassandra')
+  vm.RemoteCommand('tar xzvf /opt/pkb/cassandra.tar.gz --directory /opt/pkb')
 
 
 def GetCassandraVersion(vm) -> str:
   """Returns the Cassandra version installed on the VM."""
-  stdout, _ = vm.RemoteCommand('cassandra -v')
+  stdout, _ = vm.RemoteCommand(f'{GetCassandraPath()} -v')
   return stdout
 
 
@@ -164,19 +172,24 @@ def Configure(vm, seed_vms):
       'seeds': ','.join(f'{vm.internal_ip}:7000' for vm in seed_vms),
       'num_cpus': vm.NumCpusForBenchmark(),
       'cluster_name': 'Test cluster',
-      'concurrent_reads': FLAGS.cassandra_concurrent_reads,
+      'concurrent_reads': CASSANDRA_CONCURRENT_READS.value,
+      'concurrent_writes': (
+          CASSANDRA_CONCURRENT_WRITES.value
+          if CASSANDRA_CONCURRENT_WRITES.value
+          else 8 * vm.NumCpusForBenchmark()
+      ),
+      'datacenter': 'datacenter',
+      'rack': vm.zone,
   }
-  local_path = data.ResourcePath(CASSANDRA_YAML_TEMPLATE)
-  cassandra_conf_path = posixpath.join('/etc', 'cassandra')
-  remote_path = posixpath.join(
-      '~', os.path.splitext(os.path.basename(CASSANDRA_YAML_TEMPLATE))[0]
-  )
-  vm.RenderTemplate(local_path, remote_path, context=context)
-  vm.RemoteCommand(f'sudo cp {remote_path} {cassandra_conf_path}')
+  for template in [CASSANDRA_YAML_TEMPLATE, CASSANDRA_RACKDC_TEMPLATE]:
+    local_path = data.ResourcePath(template)
+    cassandra_conf_path = posixpath.join(CASSANDRA_DIR, 'conf')
+    remote_path = posixpath.join(
+        '~', os.path.splitext(os.path.basename(template))[0]
+    )
+    vm.RenderTemplate(local_path, remote_path, context=context)
+    vm.RemoteCommand(f'sudo cp {remote_path} {cassandra_conf_path}')
   vm.RemoteCommand(f'mkdir {vm.GetScratchDir()}/cassandra')
-  vm.RemoteCommand(
-      f'sudo chown -R cassandra:cassandra {vm.GetScratchDir()}/cassandra'
-  )
   vm.RemoteCommand(f'sudo chmod -R 755 {vm.GetScratchDir()}/cassandra')
 
 
@@ -186,7 +199,31 @@ def Start(vm):
   Args:
     vm: The target vm. Should already be configured via 'Configure'.
   """
-  vm.RemoteCommand('sudo service cassandra restart')
+  vm.RemoteCommand(f'{GetCassandraPath()}')
+
+
+def CreateKeyspace(vm, replication_factor):
+  """Create a keyspace on a VM."""
+  template_path = data.ResourcePath(CASSANDRA_KEYSPACE_TEMPLATE)
+  cassandra_conf_path = posixpath.join(CASSANDRA_DIR, 'conf')
+  file_name = os.path.basename(os.path.splitext(template_path)[0])
+  remote_path = os.path.join(
+      '~',
+      file_name,
+  )
+  vm.RenderTemplate(
+      template_path,
+      remote_path,
+      context={
+          'keyspace': 'keyspace1',
+          'replication_factor': replication_factor,
+      },
+  )
+  vm.RemoteCommand(f'sudo cp {remote_path} {cassandra_conf_path}')
+  vm.RemoteCommand(
+      f'cd {CASSANDRA_DIR}/bin && sudo ./cqlsh -f'
+      f' {cassandra_conf_path}/{file_name}'
+  )
 
 
 def Stop(vm):
@@ -197,7 +234,7 @@ def Stop(vm):
 def IsRunning(vm):
   """Returns a boolean indicating whether Cassandra is running on 'vm'."""
   try:
-    _, stderr = vm.RemoteCommand('nodetool status')
+    _, stderr = vm.RemoteCommand(f'{GetNodetoolPath()} status')
     if stderr:
       return False
     return True
@@ -227,6 +264,14 @@ def GetCassandraCliPath(_):
   return posixpath.join(CASSANDRA_DIR, 'bin', 'cassandra-cli')
 
 
+def GetCassandraPath():
+  return posixpath.join(CASSANDRA_DIR, 'bin', 'cassandra')
+
+
+def GetNodetoolPath():
+  return posixpath.join(CASSANDRA_DIR, 'bin', 'nodetool')
+
+
 def GetCassandraStressPath(_):
   return posixpath.join(CASSANDRA_DIR, 'tools', 'bin', 'cassandra-stress')
 
@@ -236,8 +281,13 @@ def GetNumberOfNodesUp(vm):
 
   Args:
     vm: VirtualMachine. The VM to use to check the cluster status.
+
+  Returns:
+    int. The number of VMs which are up in a Cassandra cluster.
   """
-  vms_up = vm.RemoteCommand('nodetool status | grep -c "^UN"')[0].strip()
+  vms_up = vm.RemoteCommand(f'{GetNodetoolPath()} status | grep -c "^UN"')[
+      0
+  ].strip()
   return int(vms_up)
 
 
@@ -254,9 +304,8 @@ def StartCluster(seed_vm, vms):
       started.
 
   Raises:
-    OSError if cluster startup fails.
+    OSError: if cluster startup fails.
   """
-
   vm_count = len(vms) + 1
 
   # Cassandra setup

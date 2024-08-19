@@ -1,0 +1,4 @@
+CREATE KEYSPACE keyspace1 WITH replication =
+  {'class': 'NetworkTopologyStrategy', 'replication_factor': {{replication_factor}}}
+  AND durable_writes = true;
+
