@@ -21,7 +21,7 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     self.enter_context(flagsaver.flagsaver(run_uri='123'))
     self.enter_context(flagsaver.flagsaver(project='my-project'))
-    self.enter_context(flagsaver.flagsaver(zone='us-west-1a'))
+    self.enter_context(flagsaver.flagsaver(zone=['us-west-1a']))
     self.enter_context(
         mock.patch.object(
             util,

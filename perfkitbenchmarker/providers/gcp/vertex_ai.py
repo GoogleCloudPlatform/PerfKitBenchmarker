@@ -90,7 +90,6 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     )
     self.name = 'pkb' + FLAGS.run_uri
     self.endpoint = VertexAiEndpoint(name=self.name)
-    self.region = util.GetRegionFromZone(self.zone)
     self.project = FLAGS.project
     if not self.project:
       raise errors.Setup.InvalidConfigurationError(
@@ -104,10 +103,13 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     project_number = util.GetProjectNumber(self.project)
     self.service_account = SERVICE_ACCOUNT_BASE.format(project_number)
 
+  def GetRegionFromZone(self, zone: str) -> str:
+    return util.GetRegionFromZone(zone)
+
   def ListExistingModels(self, zone: str | None = None) -> list[str]:
     """Returns a list of existing model endpoint ids in the same zone."""
     if zone:
-      region = util.GetRegionFromZone(self.zone)
+      region = self.GetRegionFromZone(zone)
     else:
       region = self.region
     # Expected output example:

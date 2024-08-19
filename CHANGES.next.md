@@ -195,6 +195,7 @@
     alive if any metrics satisfy the criteria passed into the flag.
 -   Add unmanaged_mysql_sysbench benchmark.
 -   Refactor nginx_benchmark to use reverse_proxy or api_gateway configurations.
+-   Add support for simple Vertex AI & AWS Sagemaker managed models.
 
 ### Enhancements:
 

@@ -33,15 +33,24 @@ class BaseManagedAiModel(resource.BaseResource):
   RESOURCE_TYPE = 'BaseManagedAiModel'
   REQUIRED_ATTRS = ['CLOUD']
 
+  region: str
+
   def __init__(self, **kwargs):
     super().__init__(**kwargs)
     if not FLAGS.zone:
       raise errors.Setup.InvalidConfigurationError(
-          'Zone is required for Managed AI models but was not set.'
+          'Zone flag is required for Managed AI models but was not set. Note AI'
+          ' only cares about region but PKB cares about zone.'
       )
-    self.zone: str = FLAGS.zone[0]
+    self.region: str = self.GetRegionFromZone(FLAGS.zone[0])
 
-  def ListExistingModels(self, zone: str|None = None) -> list[str]:
+  def GetRegionFromZone(self, zone: str) -> str:
+    """Returns the region a zone is in."""
+    raise NotImplementedError(
+        'GetRegionFromZone is not implemented for this model type.'
+    )
+
+  def ListExistingModels(self, zone: str | None = None) -> list[str]:
     """Returns a list of existing models in the same zone."""
     raise NotImplementedError(
         'ListExistingModels is not implemented for this model type.'
@@ -52,6 +61,4 @@ def GetManagedAiModelClass(
     cloud: str,
 ) -> resource.AutoRegisterResourceMeta | None:
   """Gets the managed AI model class for the given cloud."""
-  return resource.GetResourceClass(
-      BaseManagedAiModel, CLOUD=cloud
-  )
+  return resource.GetResourceClass(BaseManagedAiModel, CLOUD=cloud)
