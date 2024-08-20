@@ -653,6 +653,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
           FLAGS,
           image='image',
           machine_type='test_machine_type',
+          zone='us-central1-a',
       )
       vm = pkb_common_test_case.TestGceVirtualMachine(vm_spec)
       vm._CreateDependencies()
@@ -717,9 +718,30 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testNetworkInterfaceVIRTIO(self):
     """Tests that VirtIO can be set as the virtual NIC."""
-    cmd, call_count = self._CreateVmCommand(gce_nic_type='VIRTIO_NET')
+    cmd, call_count = self._CreateVmCommand(gce_nic_types=['VIRTIO_NET'])
     self.assertEqual(call_count, 1)
     self.assertIn('nic-type=VIRTIO_NET', cmd)
+
+  def testNetworkInterfaceIDPF(self):
+    """Tests that when IDPF is set the NIC type is ignored when calling the command."""
+    cmd, call_count = self._CreateVmCommand(gce_nic_types=['IDPF'])
+    self.assertEqual(call_count, 1)
+    self.assertIn('nic-type=IDPF', cmd)
+
+  def testMultipleNetworkInterfaces(self):
+    """Tests that multiple network interfaces can be set."""
+    cmd, call_count = self._CreateVmCommand(
+        gce_network_type='custom',
+        gce_subnet_name=['subnet1', 'subnet2'],
+        gce_nic_types=['GVNIC', 'VIRTIO_NET'],
+        gce_nic_queue_counts=['default', '16'],
+    )
+    self.assertEqual(call_count, 1)
+    self.assertIn('subnet=subnet1', cmd)
+    self.assertIn('nic-type=GVNIC', cmd)
+    self.assertIn('subnet=subnet2', cmd)
+    self.assertIn('nic-type=VIRTIO_NET', cmd)
+    self.assertIn('queue-count=16', cmd)
 
   def testEgressBandwidthTier(self):
     """Tests that egress bandwidth can be set as tier 1."""
