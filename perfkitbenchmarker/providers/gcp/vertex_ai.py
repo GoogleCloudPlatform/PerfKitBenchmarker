@@ -106,11 +106,9 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   def GetRegionFromZone(self, zone: str) -> str:
     return util.GetRegionFromZone(zone)
 
-  def ListExistingModels(self, zone: str | None = None) -> list[str]:
-    """Returns a list of existing model endpoint ids in the same zone."""
-    if zone:
-      region = self.GetRegionFromZone(zone)
-    else:
+  def ListExistingEndpoints(self, region: str | None = None) -> list[str]:
+    """Returns a list of existing model endpoint ids in the same region."""
+    if region is None:
       region = self.region
     # Expected output example:
     # ENDPOINT_ID          DISPLAY_NAME

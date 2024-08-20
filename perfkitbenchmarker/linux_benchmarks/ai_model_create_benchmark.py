@@ -50,12 +50,12 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
 
 def _ValidateExistingModels(ai_model: managed_ai_model.BaseManagedAiModel):
   """Validates that there is only one model in the project."""
-  models = ai_model.ListExistingModels()
+  endpoints = ai_model.ListExistingEndpoints()
   # Note this code runs after Create, so we should have one.
   # The presence of other models in a region changes startup performance.
-  if len(models) != 1:
+  if len(endpoints) != 1:
     raise errors.Benchmarks.PrepareException(
-        f'Only one model expected but found all these models: {models}'
+        f'Only one model expected but found all these models: {endpoints}'
     )
 
 

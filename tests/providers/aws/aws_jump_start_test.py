@@ -9,6 +9,7 @@ from perfkitbenchmarker.providers.aws import util
 from tests import pkb_common_test_case
 
 CRAWLER_ROLE = 'arn:aws:iam::123456789012:role/service-role/AWSGlueServiceRole-CrawlerTutorial'
+_ZONE = 'us-west-1a'
 
 
 class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
@@ -18,9 +19,15 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(
         mock.patch.object(util, 'GetAccount', return_value='1234')
     )
-    self.enter_context(flagsaver.flagsaver(zone=['us-west-1a']))
+    self.enter_context(flagsaver.flagsaver(zone=[_ZONE]))
     self.ai_model_spec = aws_jump_start.JumpStartLlama27bSpec('f_name')
     self.ai_model = aws_jump_start.JumpStartModelInRegistry(self.ai_model_spec)
+
+  def testRegionSet(self):
+    self.enter_context(flagsaver.flagsaver(zone=['us-east-1a']))
+    ai_model_spec = aws_jump_start.JumpStartLlama27bSpec('f_name')
+    ai_model = aws_jump_start.JumpStartModelInRegistry(ai_model_spec)
+    self.assertEqual(ai_model.region, 'us-east-1')
 
   def testEndpointNameParsedCreate(self):
     self.MockIssueCommand({
@@ -56,6 +63,70 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
         'meta-textgeneration-llama-2-7b-f-2025-08-16',
     )
 
+  def testListEndpointsParsesOutNames(self):
+    self.MockIssueCommand({
+        'aws sagemaker list-endpoints': [(
+            ("""{
+    "Endpoints": [
+        {
+            "EndpointName": "woo-test",
+            "EndpointArn": "arn:aws:sagemaker:us-west-2:1234:endpoint/woo-test",
+            "CreationTime": "2024-08-19T18:33:34.178000+00:00",
+            "LastModifiedTime": "2024-08-19T18:33:34.521000+00:00",
+            "EndpointStatus": "Creating"
+        },
+        {
+            "EndpointName": "meta-7b-f-2024-08",
+            "EndpointArn": "arn:aws:sagemaker:us-west-2:1234:endpoint/meta-7b-f-2024-08",
+            "CreationTime": "2024-08-16T17:59:22.752000+00:00",
+            "LastModifiedTime": "2024-08-16T18:10:43.808000+00:00",
+            "EndpointStatus": "InService"
+        }
+        ]}"""),
+            '',
+            0,
+        )]
+    })
+    endpoints = self.ai_model.ListExistingEndpoints()
+    self.assertEqual(endpoints, ['woo-test', 'meta-7b-f-2024-08'])
+
+  def testListEndpointsParsesOutEmpty(self):
+    self.MockIssueCommand({
+        'aws sagemaker list-endpoints': [(
+            ("""{"Endpoints": []}"""),
+            '',
+            0,
+        )]
+    })
+    endpoints = self.ai_model.ListExistingEndpoints()
+    self.assertEmpty(endpoints)
+
+  def testListEndpointsUsesAiModelRegion(self):
+    mock_cmd = self.MockIssueCommand({
+        'aws sagemaker list-endpoints': [(
+            ("""{"Endpoints": []}"""),
+            '',
+            0,
+        )]
+    })
+    self.ai_model.ListExistingEndpoints()
+    mock_cmd.func_to_mock.assert_called_once_with(
+        ['aws', 'sagemaker', 'list-endpoints', '--region=us-west-1']
+    )
+    self.assertEqual(self.ai_model.region, 'us-west-1')
+
+  def testListEndpointsUsesPassedInRegion(self):
+    mock_cmd = self.MockIssueCommand({
+        'aws sagemaker list-endpoints': [(
+            ("""{"Endpoints": []}"""),
+            '',
+            0,
+        )]
+    })
+    self.ai_model.ListExistingEndpoints('us-east-1')
+    mock_cmd.func_to_mock.assert_called_once_with(
+        ['aws', 'sagemaker', 'list-endpoints', '--region=us-east-1']
+    )
 
 if __name__ == '__main__':
   unittest.main()

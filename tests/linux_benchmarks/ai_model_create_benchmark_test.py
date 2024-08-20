@@ -35,13 +35,13 @@ class AiModelCreateBenchmarkTest(
     )
 
   def testBenchmarkPassesForOneModel(self):
-    self.bm_spec.ai_model.ListExistingModels.return_value = [
+    self.bm_spec.ai_model.ListExistingEndpoints.return_value = [
         'model1',
     ]
     ai_model_create_benchmark.Run(self.bm_spec)
 
   def testBenchmarkFailsIfMoreModelsFound(self):
-    self.bm_spec.ai_model.ListExistingModels.return_value = [
+    self.bm_spec.ai_model.ListExistingEndpoints.return_value = [
         'model1',
         'model2',
     ]

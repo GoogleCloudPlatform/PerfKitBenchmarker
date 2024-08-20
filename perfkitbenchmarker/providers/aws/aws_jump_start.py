@@ -7,6 +7,7 @@ One time step:
 https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-geospatial-roles-create-execution-role.html
 """
 
+import json
 import logging
 import re
 from absl import flags
@@ -120,9 +121,19 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
   def GetRegionFromZone(self, zone: str) -> str:
     return util.GetRegionFromZone(zone)
 
-  def ListExistingModels(self, zone: str | None = None) -> list[str]:
-    # TODO(user): Add real code here.
-    return [self.model_name]
+  def ListExistingEndpoints(self, region: str | None = None) -> list[str]:
+    """Returns list of endpoint names."""
+    if region is None:
+      region = self.region
+    out, _, _ = vm_util.IssueCommand(
+        ['aws', 'sagemaker', 'list-endpoints', f'--region={region}']
+    )
+    out_json = json.loads(out)
+    json_endpoints = out_json['Endpoints']
+    endpoints = []
+    for json_endpoint in json_endpoints:
+      endpoints.append(json_endpoint['EndpointName'])
+    return endpoints
 
   def _RunPythonCode(self, python_code: str) -> tuple[str, str]:
     """Runs the given python code on the Runner VM.
@@ -142,7 +153,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
       name = tf.name
       vm_util.IssueCommand(['cat', name])
       out, err, _ = vm_util.IssueCommand(
-          ['python3', name], raise_on_failure=False, timeout=60*30
+          ['python3', name], raise_on_failure=False, timeout=60 * 30
       )
       return out, err
 

@@ -50,8 +50,15 @@ class BaseManagedAiModel(resource.BaseResource):
         'GetRegionFromZone is not implemented for this model type.'
     )
 
-  def ListExistingModels(self, zone: str | None = None) -> list[str]:
-    """Returns a list of existing models in the same zone."""
+  def ListExistingEndpoints(self, region: str | None = None) -> list[str]:
+    """Returns a list of existing endpoints in the same region.
+
+    Args:
+      region: If not provided, uses self.region.
+
+    Returns:
+      List of endpoint names. Endpoints can actually serve traffic.
+    """
     raise NotImplementedError(
         'ListExistingModels is not implemented for this model type.'
     )
