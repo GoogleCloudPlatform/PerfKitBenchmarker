@@ -56,7 +56,7 @@ class CheckRequirementsTestCase(unittest.TestCase):
     """
     with self._MockOpen(requirements_content) as mocked_open:
       requirements._CheckRequirements(_PATH)
-    mocked_open.assert_called_once_with('dir/file', 'r')
+    mocked_open.assert_called_once_with('dir/file')
 
   def testMissingPackage(self):
     requirements_content = """
@@ -66,7 +66,7 @@ class CheckRequirementsTestCase(unittest.TestCase):
     with self._MockOpen(requirements_content) as mocked_open:
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
         requirements._CheckRequirements(_PATH)
-    mocked_open.assert_called_once_with('dir/file', 'r')
+    mocked_open.assert_called_once_with('dir/file')
 
   def testInstalledVersionLowerThanRequirement(self):
     requirements_content = """
@@ -76,7 +76,7 @@ class CheckRequirementsTestCase(unittest.TestCase):
     with self._MockOpen(requirements_content) as mocked_open:
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
         requirements._CheckRequirements(_PATH)
-    mocked_open.assert_called_once_with('dir/file', 'r')
+    mocked_open.assert_called_once_with('dir/file')
 
   def testInstalledVersionGreaterThanRequirement(self):
     requirements_content = """
@@ -86,7 +86,7 @@ class CheckRequirementsTestCase(unittest.TestCase):
     with self._MockOpen(requirements_content) as mocked_open:
       with self.assertRaises(errors.Setup.PythonPackageRequirementUnfulfilled):
         requirements._CheckRequirements(_PATH)
-    mocked_open.assert_called_once_with('dir/file', 'r')
+    mocked_open.assert_called_once_with('dir/file')
 
   def testIncludedFiles(self):
     top_file = """
@@ -110,11 +110,11 @@ class CheckRequirementsTestCase(unittest.TestCase):
       with mock.patch.object(pkg_resources, 'require') as mocked_require:
         requirements._CheckRequirements(_PATH)
     mocked_open.assert_has_calls((
-        mock.call('dir/file', 'r'),
-        mock.call('dir/subfile0', 'r'),
-        mock.call('dir/subdir/subfile2', 'r'),
-        mock.call('dir/../subfile3', 'r'),
-        mock.call('dir/subfile1', 'r'),
+        mock.call('dir/file'),
+        mock.call('dir/subfile0'),
+        mock.call('dir/subdir/subfile2'),
+        mock.call('dir/../subfile3'),
+        mock.call('dir/subfile1'),
     ))
     mocked_require.assert_has_calls(
         list(
