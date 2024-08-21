@@ -99,6 +99,8 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.metadata.update({
         'name': self.name,
         'model_name': self.model_name,
+        'machine_type': self.model_spec.machine_type,
+        'accelerator_type': self.model_spec.accelerator_type,
     })
     project_number = util.GetProjectNumber(self.project)
     self.service_account = SERVICE_ACCOUNT_BASE.format(project_number)

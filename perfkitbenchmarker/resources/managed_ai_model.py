@@ -43,6 +43,9 @@ class BaseManagedAiModel(resource.BaseResource):
           ' only cares about region but PKB cares about zone.'
       )
     self.region: str = self.GetRegionFromZone(FLAGS.zone[0])
+    self.metadata.update({
+        'region': self.region,
+    })
 
   def GetRegionFromZone(self, zone: str) -> str:
     """Returns the region a zone is in."""
