@@ -17,7 +17,7 @@ FLAGS = flags.FLAGS
 class BaseJob(resource.BaseResource):
   """Base class for representing a cloud job / instance.
 
-  Handles lifecycle management (creation & deletion) for a given Cloud Run Job.
+  Handles lifecycle management (creation & deletion) for a given job.
 
   Attributes:
     RESOURCE_TYPE: The class name.
