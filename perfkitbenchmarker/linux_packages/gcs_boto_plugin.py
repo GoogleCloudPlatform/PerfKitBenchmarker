@@ -18,7 +18,7 @@
 
 def _Install(vm):
   """Installs the GCS boto plugin on the VM."""
-  vm.Install('pip3')
+  vm.Install('pip')
   vm.RemoteCommand(
       'sudo pip3 install --ignore-installed gcs-oauth2-boto-plugin'
   )

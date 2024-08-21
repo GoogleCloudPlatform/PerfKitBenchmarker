@@ -237,7 +237,7 @@ def PrepareBenchmark(benchmark_spec, vm=None):
       f'if [ ! -d "$HOME/training_results_{VERSION.value}" ]; then   git clone'
       f' https://github.com/mlcommons/training_results_{VERSION.value}.git ; fi'
   )
-  vm.Install('pip3')
+  vm.Install('pip')
   if not HYPERTHREADS.value:
     if BERT in benchmark_spec.benchmark:
       vm_util.ReplaceText(

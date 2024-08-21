@@ -158,7 +158,7 @@ def _DownloadData(benchmark_spec, rank):
     rank: integer, the node rank in distributed training.
   """
   vm = benchmark_spec.vms[rank]
-  vm.Install('pip3')
+  vm.Install('pip')
   vm.Install('wget')
   vm.RemoteCommand(
       '[ -d $HOME/fairseq ] || git clone {git} -b {branch}'.format(

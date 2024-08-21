@@ -104,7 +104,7 @@ def SparkExamplesJarPath() -> str:
 def Install(vm):
   """Install spark on a vm."""
   vm.Install('openjdk')
-  vm.Install('python3')
+  vm.Install('python')
   vm.Install('curl')
   # Needed for HDFS not as a dependency.
   # Also used on Spark's classpath to support s3a client.

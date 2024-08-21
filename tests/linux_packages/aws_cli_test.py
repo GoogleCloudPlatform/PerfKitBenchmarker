@@ -33,7 +33,7 @@ class AwsCliTest(unittest.TestCase):
     self.vm.TryRemoteCommand.return_value = False
     awscli.Install(self.vm)
     self.vm.TryRemoteCommand.assert_called_once_with('aws --version')
-    self.vm.Install.assert_called_once_with('pip3')
+    self.vm.Install.assert_called_once_with('pip')
     self.vm.RemoteCommand.assert_called_once_with(
         'sudo pip3 install awscli --ignore-installed --force-reinstall'
     )

@@ -166,7 +166,7 @@ def _InstallFromPackage(vm):
       )
   )
   # Create log directory
-  vm.InstallPackages('python3')
+  vm.Install('python')
   vm.InstallPackages('dpkg')
   vm.InstallPackages('netcat')
   vm.RemoteCommand('sudo mkdir -p /var/log/aerospike')

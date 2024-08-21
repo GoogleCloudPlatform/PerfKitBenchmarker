@@ -129,7 +129,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     errors.Config.InvalidValue upon both GPUs and TPUs appear in the config
   """
   vm = bm_spec.vms[0]
-  vm.Install('pip3')
+  vm.Install('pip')
   vm.RemoteCommand('python3 -m pip install cmind -U')
   cm = 'PATH=~/.local/bin:$PATH cm'
   bm_spec.cm = cm

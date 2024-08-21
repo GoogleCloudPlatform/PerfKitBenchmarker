@@ -16,5 +16,5 @@
 
 def Install(vm):
   """Installs the boto package on the VM."""
-  vm.Install('pip3')
+  vm.Install('pip')
   vm.RemoteCommand('sudo pip3 install boto3')

@@ -47,7 +47,7 @@ NETPERF_EXAMPLE_DIR = NETPERF_DIR + '/doc/examples/'
 
 def _Install(vm):
   """Installs the netperf package on the VM."""
-  vm.Install('pip3')
+  vm.Install('pip')
   vm.RemoteCommand('sudo pip3 install absl-py')
   vm.Install('build_tools')
 

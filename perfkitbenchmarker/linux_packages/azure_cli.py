@@ -72,7 +72,7 @@ def _PipInstall(vm):
   Args:
     vm: Virtual Machine to install on.
   """
-  vm.Install('pip3')
+  vm.Install('pip')
   # azure-cli updated requirements.txt dependency, but not setupu.py:
   # https://github.com/Azure/azure-cli/pull/26671
   vm.RemoteCommand('sudo pip3 install --upgrade azure-cli pyOpenSSL>=23.2.0')

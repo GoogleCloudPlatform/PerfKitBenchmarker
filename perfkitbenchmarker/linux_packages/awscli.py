@@ -20,7 +20,7 @@ def Install(vm):
   # Check if AWS is already installed.
   if vm.TryRemoteCommand('aws --version'):
     return
-  vm.Install('pip3')
+  vm.Install('pip')
   vm.RemoteCommand(
       'sudo pip3 install awscli '
       # awscli depends on a specific PyYAML version, and the AWS Ubuntu AMI

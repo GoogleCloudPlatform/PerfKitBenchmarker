@@ -1694,7 +1694,7 @@ def CLIThroughputBenchmark(
 
 
 def PrepareVM(vm, service):
-  vm.Install('pip3')
+  vm.Install('pip')
   vm.RemoteCommand('sudo pip3 install absl-py pyyaml')
   vm.Install('openssl')
 

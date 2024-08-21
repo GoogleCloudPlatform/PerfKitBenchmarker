@@ -27,7 +27,7 @@ DPDK_AWS_VFIO_DRIVER_DIR = 'amzn-drivers/userspace/dpdk/enav2-vfio-patch'
 
 def _Install(vm):
   """Install DPDK after installing dependencies and applying patches."""
-  vm.Install('pip3')
+  vm.Install('pip')
   vm.RobustRemoteCommand(f'git clone {DPDK_GIT_REPO}')
   if vm.CLOUD == 'GCP':
     # Get out of tree driver
@@ -87,7 +87,7 @@ def AptInstall(vm):
 
 def YumInstall(vm):
   """Install DPDK using yum. Tested on Amazonlinux2023."""
-  vm.Install('pip3')
+  vm.Install('pip')
   vm.InstallPackages('git kernel-devel kernel-headers numactl-devel')
   vm.RemoteCommand('sudo pip3 install meson ninja pyelftools')
   if vm.CLOUD == 'AWS':

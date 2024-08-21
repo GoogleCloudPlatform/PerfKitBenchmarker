@@ -418,9 +418,6 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
   # Serializing calls to ssh with the -t option fixes the problem.
   _pseudo_tty_lock = threading.Lock()
 
-  # TODO(user): Remove all uses of Python 2.
-  PYTHON_2_PACKAGE = 'python2'
-
   # this command might change depending on the OS, but most linux distributions
   # can use the following command
   INIT_RAM_FS_CMD = 'sudo update-initramfs -u'
@@ -531,8 +528,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     """
     with self._remote_command_script_upload_lock:
       if not self._has_remote_command_script:
-        # Python3 is needed for RobustRemoteCommands
-        self.Install('python3')
+        # Python is needed for RobustRemoteCommands
+        self.Install('python')
 
         for f in (EXECUTE_COMMAND, WAIT_FOR_COMMAND):
           remote_path = os.path.join(vm_util.VM_TMP_DIR, os.path.basename(f))
@@ -2109,7 +2106,6 @@ class ClearMixin(BaseLinuxMixin):
 
   OS_TYPE = os_types.CLEAR
   BASE_OS_TYPE = os_types.CLEAR
-  PYTHON_2_PACKAGE = 'python-basic'
 
   def OnStartup(self):
     """Eliminates the need to have a tty to run sudo commands."""
@@ -2481,7 +2477,6 @@ class Rhel9Mixin(BaseRhelMixin):
   """Class holding RHEL 9 specific VM methods and attributes."""
 
   OS_TYPE = os_types.RHEL9
-  PYTHON_2_PACKAGE = None
 
   def SetupPackageManager(self):
     """Install EPEL."""
@@ -2493,7 +2488,6 @@ class Fedora36Mixin(BaseRhelMixin):
   """Class holding Fedora36 specific methods and attributes."""
 
   OS_TYPE = os_types.FEDORA36
-  PYTHON_2_PACKAGE = None
 
   def SetupPackageManager(self):
     """Fedora does not need epel."""
@@ -2503,7 +2497,6 @@ class Fedora37Mixin(BaseRhelMixin):
   """Class holding Fedora37 specific methods and attributes."""
 
   OS_TYPE = os_types.FEDORA37
-  PYTHON_2_PACKAGE = None
 
   def SetupPackageManager(self):
     """Fedora does not need epel."""
@@ -2513,7 +2506,6 @@ class CentOsStream9Mixin(BaseRhelMixin):
   """Class holding CentOS Stream 9 specific VM methods and attributes."""
 
   OS_TYPE = os_types.CENTOS_STREAM9
-  PYTHON_2_PACKAGE = None
 
   def SetupPackageManager(self):
     """Install EPEL."""
@@ -2799,8 +2791,6 @@ class Ubuntu2004Mixin(BaseUbuntuMixin):
   """Class holding Ubuntu2004 specific VM methods and attributes."""
 
   OS_TYPE = os_types.UBUNTU2004
-  # https://packages.ubuntu.com/focal/python2
-  PYTHON_2_PACKAGE = 'python2'
 
   def UpdateEnvironmentPath(self):
     """Add /snap/bin to default search path for Ubuntu2004.

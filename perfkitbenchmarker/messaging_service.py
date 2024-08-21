@@ -81,8 +81,8 @@ class BaseMessagingService(resource.BaseResource):
   def _InstallCommonClientPackages(self):
     """Installs common software for running benchmarks on the client VM."""
     # Install commom packages
-    self.client_vm.Install('python3')
-    self.client_vm.Install('pip3')
+    self.client_vm.Install('python')
+    self.client_vm.Install('pip')
     self.client_vm.RemoteCommand('sudo pip3 install absl-py numpy')
 
     # Upload common scripts

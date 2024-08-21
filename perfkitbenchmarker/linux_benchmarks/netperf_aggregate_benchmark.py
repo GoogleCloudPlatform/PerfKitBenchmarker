@@ -79,8 +79,8 @@ def GetConfig(user_config):
 def PrepareNetperfAggregate(vm):
   """Installs netperf on a single vm."""
 
-  vm.Install('python3')
-  vm.Install('pip3')
+  vm.Install('python')
+  vm.Install('pip')
   vm.RemoteCommand('sudo pip3 install --upgrade pip')
   vm.Install('texinfo')
   vm.Install('python_rrdtool')

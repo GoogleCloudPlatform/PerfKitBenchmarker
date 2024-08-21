@@ -60,7 +60,7 @@ class S64DAValueError(Exception):
 
 def AptInstall(vm: virtual_machine.BaseVirtualMachine) -> None:
   """Installs the s64da package on the VM."""
-  vm.Install('pip3')
+  vm.Install('pip')
   cmds = [
       (
           'wget '

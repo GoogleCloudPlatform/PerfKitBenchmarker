@@ -21,7 +21,7 @@ DRIVER_SCRIPT = 'http/poll_http_endpoint.py'
 
 def _Install(vm):
   vm.Install('curl')
-  vm.Install('pip3')
+  vm.Install('pip')
   vm.Install('python_dev')
   vm.RemoteCommand('sudo pip3 install absl-py')
   vm.RemoteCopy(data.ResourcePath(DRIVER_SCRIPT))

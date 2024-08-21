@@ -1297,7 +1297,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def SetupLMNotification(self):
     """Prepare environment for /scripts/gce_maintenance_notify.py script."""
-    self.Install('pip3')
+    self.Install('pip')
     self.RemoteCommand('sudo pip3 install requests')
     self.PushDataFile(self._LM_NOTICE_SCRIPT, vm_util.VM_TMP_DIR)
 
