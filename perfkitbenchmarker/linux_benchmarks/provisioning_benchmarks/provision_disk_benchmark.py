@@ -71,6 +71,17 @@ provision_disk:
         AWS:
           disk_type: gp2
           disk_size: 10
+    secondary:
+      vm_spec:
+        GCP:
+          machine_type: n2-standard-2
+          zone: us-central1-c
+        Azure:
+          machine_type: Standard_D2s_v5
+          zone: eastus2-2
+        AWS:
+          machine_type: m5.large
+          zone: us-east-1c
 """
 
 
@@ -109,7 +120,7 @@ def _WaitUntilAttached(vm, dsk) -> None:
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Runs the benchmark."""
-  vm: linux_virtual_machine.BaseLinuxVirtualMachine = bm_spec.vms[0]
+  vm = bm_spec.vm_groups['default'][0]
 
   # TODO(user) in order for this to be cloud agnostic, we need to
   # refactor the virtual machine code for all the clouds to use disk strategies
@@ -202,6 +213,35 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
           disk_metadata,
       )
   )
+
+  DetachDisks(vm)
+  vm_secondary = bm_spec.vm_groups['secondary'][0]
+
+  time.sleep(60)
+  # re-attach to a new VM
+  vm_secondary.create_disk_strategy = vm.create_disk_strategy
+  vm_secondary.create_disk_strategy.GetSetupDiskStrategy().AttachDisks()
+  time_to_visible_to_another_vm = (
+      vm_secondary.create_disk_strategy.GetSetupDiskStrategy().time_to_visible
+  )
+  time_to_reattach_to_another_vm = ParseAttachTimeFromScratchDisks(vm)
+  samples.append(
+      sample.Sample(
+          'Time to Re-attach to New VM',
+          time_to_reattach_to_another_vm,
+          'seconds',
+          disk_metadata,
+      )
+  )
+  samples.append(
+      sample.Sample(
+          'Time to Visible from Guest after Re-attach to New VM',
+          time_to_visible_to_another_vm,
+          'seconds',
+          disk_metadata,
+      )
+  )
+
   return samples
 
 
