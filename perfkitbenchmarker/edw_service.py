@@ -135,6 +135,8 @@ TYPE_2_PROVIDER = dict([
     ('snowflake_aws', 'aws'),
     ('snowflake_azure', 'azure'),
     ('snowflakeexternal_aws', 'aws'),
+    ('snowflakeicebergexternal_aws', 'aws'),
+    ('snowflakeicebergmanaged_aws', 'aws'),
     ('snowflakeexternal_azure', 'azure'),
     ('bigquery', 'gcp'),
     ('endor', 'gcp'),
@@ -153,6 +155,14 @@ TYPE_2_MODULE = dict([
     ),
     (
         'snowflakeexternal_aws',
+        'perfkitbenchmarker.providers.aws.snowflake_aws',
+    ),
+    (
+        'snowflakeicebergexternal_aws',
+        'perfkitbenchmarker.providers.aws.snowflake_aws',
+    ),
+    (
+        'snowflakeicebergmanaged_aws',
         'perfkitbenchmarker.providers.aws.snowflake_aws',
     ),
     (

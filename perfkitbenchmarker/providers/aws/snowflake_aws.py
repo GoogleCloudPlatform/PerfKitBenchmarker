@@ -38,3 +38,17 @@ class Snowflakeexternal(snowflake.Snowflake):
 
   CLOUD = provider_info.AWS
   SERVICE_TYPE = 'snowflakeexternal_aws'
+
+
+class Snowflakeicebergexternal(snowflake.Snowflake):
+  """Class representing Snowflake Iceberg External Warehouses on AWS."""
+
+  CLOUD = provider_info.AWS
+  SERVICE_TYPE = 'snowflakeicebergexternal_aws'
+
+
+class Snowflakeicebergmanaged(snowflake.Snowflake):
+  """Class representing Snowflake Iceberg Managed Warehouses on AWS."""
+
+  CLOUD = provider_info.AWS
+  SERVICE_TYPE = 'snowflakeicebergmanaged_aws'
