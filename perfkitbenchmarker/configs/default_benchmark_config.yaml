@@ -83,6 +83,7 @@ mysql_tpcc:
     hammerdbcli_tpcc_time_profile: True
     use_managed_db: False
     db_high_availability: False
+    iostat: True
     innodb_buffer_pool_ratio: 0.8
     timeout_minutes: 360
   relational_db:
@@ -129,6 +130,7 @@ postgres_tpcc:
     hammerdbcli_build_timeout: 19000
     use_managed_db: False
     db_high_availability: False
+    iostat: True
     postgres_shared_buffer_ratio: 0.25
     timeout_minutes: 360
   relational_db:
