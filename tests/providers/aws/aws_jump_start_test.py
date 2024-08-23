@@ -91,24 +91,28 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(endpoints, ['woo-test', 'meta-7b-f-2024-08'])
 
   def testListEndpointsParsesOutEmpty(self):
-    self.MockIssueCommand({
-        'aws sagemaker list-endpoints': [(
-            ("""{"Endpoints": []}"""),
-            '',
-            0,
-        )]
-    })
+    self.MockIssueCommand(
+        {
+            'aws sagemaker list-endpoints': [(
+                """{"Endpoints": []}""",
+                '',
+                0,
+            )]
+        }
+    )
     endpoints = self.ai_model.ListExistingEndpoints()
     self.assertEmpty(endpoints)
 
   def testListEndpointsUsesAiModelRegion(self):
-    mock_cmd = self.MockIssueCommand({
-        'aws sagemaker list-endpoints': [(
-            ("""{"Endpoints": []}"""),
-            '',
-            0,
-        )]
-    })
+    mock_cmd = self.MockIssueCommand(
+        {
+            'aws sagemaker list-endpoints': [(
+                """{"Endpoints": []}""",
+                '',
+                0,
+            )]
+        }
+    )
     self.ai_model.ListExistingEndpoints()
     mock_cmd.func_to_mock.assert_called_once_with(
         ['aws', 'sagemaker', 'list-endpoints', '--region=us-west-1']
@@ -116,17 +120,48 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(self.ai_model.region, 'us-west-1')
 
   def testListEndpointsUsesPassedInRegion(self):
-    mock_cmd = self.MockIssueCommand({
-        'aws sagemaker list-endpoints': [(
-            ("""{"Endpoints": []}"""),
-            '',
-            0,
-        )]
-    })
+    mock_cmd = self.MockIssueCommand(
+        {
+            'aws sagemaker list-endpoints': [(
+                """{"Endpoints": []}""",
+                '',
+                0,
+            )]
+        }
+    )
     self.ai_model.ListExistingEndpoints('us-east-1')
     mock_cmd.func_to_mock.assert_called_once_with(
         ['aws', 'sagemaker', 'list-endpoints', '--region=us-east-1']
     )
+
+  def testPromptResponseParsed(self):
+    expected_response = ''' Assistant: Here's how you can travel from Beijing to New York:
+
+Fly from Beijing Capital International Airport to John F. Kennedy International Airport or Newark Liberty International Airport.
+
+'''
+    self.MockIssueCommand({
+        'cat': [(
+            '#some code',
+            '',
+            0,
+        )],
+        'python3': [(
+            (f"""
+Response>>>>{expected_response}====
+"""),
+            '',
+            0,
+        )],
+    })
+    responses = self.ai_model.SendPrompt(
+        'How can you to get from Beijing to New York?', 512, 1.0
+    )
+    self.assertEqual(
+        responses[0],
+        expected_response,
+    )
+
 
 if __name__ == '__main__':
   unittest.main()

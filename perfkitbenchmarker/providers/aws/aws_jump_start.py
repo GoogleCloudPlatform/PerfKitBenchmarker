@@ -10,6 +10,7 @@ https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-geospatial-roles-creat
 import json
 import logging
 import re
+from typing import Any
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -43,21 +44,20 @@ predictor = predictor_lib.retrieve_default('{endpoint_name}',region='{region}',m
 _SEND_REQUEST_PYTHON = """
 def print_dialog(payload, response):
     dialog = payload["inputs"][0]
-    for msg in dialog:
-        print(f"{msg['role'].capitalize()}: {msg['content']}\n")
     print(
-        f">>>> {response[0]['generation']['role'].capitalize()}: {response[0]['generation']['content']}"
+        f"Response>>>> {{response[0]['generation']['role'].capitalize()}}: " +
+        f"{{response[0]['generation']['content']}}"
     )
-    print("\n==================================\n")
+    print("\\n====\\n")
 
-payload = {
+payload = {{
     "inputs": [
         [
-            {"role": "user", "content": "what is the recipe of mayonnaise?"},
+            {{"role": "user", "content": "{prompt}"}},
         ]
     ],
-    "parameters": {"max_new_tokens": 512, "top_p": 0.9, "temperature": 0.6},
-}
+    "parameters": {{"max_new_tokens": {max_tokens}, "temperature": {temperature}}},
+}}
 try:
     response = predictor.predict(payload, custom_attributes="accept_eula=true")
     print_dialog(payload, response)
@@ -156,6 +156,30 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
           ['python3', name], raise_on_failure=False, timeout=60 * 30
       )
       return out, err
+
+  def _SendPrompt(
+      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
+  ) -> list[str]:
+    """Sends a prompt to the model and returns the response."""
+    out, err = self._RunPythonCode(
+        _GET_MODEL_PYTHON.format(
+            endpoint_name=self.endpoint_name,
+            model_id=self.model_id,
+            model_version=self.model_version,
+            region=self.region,
+            role=self.execution_arn,
+        )
+        + _SEND_REQUEST_PYTHON.format(
+            prompt=prompt, max_tokens=max_tokens, temperature=temperature
+        )
+    )
+    matches = re.search('Response>>>>(.*)====', out, flags=re.DOTALL)
+    if not matches:
+      raise errors.Resource.GetError(
+          'Could not find response in endpoint call stdout.\nStdout:'
+          f' {out}\nStderr:{err}',
+      )
+    return [matches.group(1)]
 
   def _Create(self) -> None:
     """Creates the underlying resource."""

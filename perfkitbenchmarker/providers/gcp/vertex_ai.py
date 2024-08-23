@@ -13,6 +13,7 @@ to create it & give permissions if one doesn't exist.
 
 import logging
 import os
+from typing import Any
 from absl import flags
 # pylint: disable=g-import-not-at-top, g-statement-before-imports
 # External needs from google.cloud.
@@ -128,6 +129,18 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     ids.pop(0)  # Remove the first line which just has titles
     return ids
 
+  def _SendPrompt(
+      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
+  ) -> list[str]:
+    """Sends a prompt to the model and returns the response."""
+    assert self.endpoint.ai_endpoint
+    instances = self.model_spec.ConvertToInstances(
+        prompt, max_tokens, temperature, **kwargs
+    )
+    response = self.endpoint.ai_endpoint.predict(instances=instances)
+    str_responses = [str(response) for response in response.predictions]
+    return str_responses
+
   def _Create(self) -> None:
     """Creates the underlying resource."""
     logging.info('Creating the resource: %s for ai model.', self.model_name)
@@ -174,6 +187,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     logging.info('Deleting the resource: %s.', self.model_name)
     assert self.gcloud_model
     self.gcloud_model.delete()
+    self.gcloud_model = None  # Object is not picklable - none it out
 
   def _DeleteDependencies(self):
     self.endpoint.Delete()
@@ -199,6 +213,7 @@ class VertexAiEndpoint(resource.BaseResource):
     logging.info('Deleting the endpoint: %s.', self.name)
     assert self.ai_endpoint
     self.ai_endpoint.delete(force=True)
+    self.ai_endpoint = None  # Object is not picklable - none it out
 
 
 class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
@@ -235,6 +250,12 @@ class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
     del kwargs
     return {}
 
+  def ConvertToInstances(
+      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
+  ) -> list[dict[str, Any]]:
+    """Converts input to the form expected by the model."""
+    return []
+
 
 class VertexAiLlama27bSpec(VertexAiModelSpec):
   """Spec for running the Llama2 7b model."""
@@ -264,3 +285,17 @@ class VertexAiLlama27bSpec(VertexAiModelSpec):
         'MODEL_ID': kwargs['model_bucket_path'],
         'DEPLOY_SOURCE': 'notebook',
     }
+
+  def ConvertToInstances(
+      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
+  ) -> list[dict[str, Any]]:
+    """Converts input to the form expected by the model."""
+    instances = {
+        'prompt': prompt,
+        'max_tokens': max_tokens,
+        'temperature': temperature,
+    }
+    for params in ['top_p', 'top_k', 'raw_response']:
+      if params in kwargs:
+        instances[params] = kwargs[params]
+    return [instances]

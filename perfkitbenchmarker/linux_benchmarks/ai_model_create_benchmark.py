@@ -72,13 +72,28 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   logging.info('Running Run phase of the example benchmark')
   ai_model = benchmark_spec.ai_model
   _ValidateExistingModels(ai_model)
-  # Every resource supplies create times by default.
+  _SendPrompt(ai_model, 'Why do crabs walk sideways?')
+  _SendPrompt(ai_model, 'How can I save more money each month?')
+  # Every resource supplies create times by default, and ai models record
+  # reponse times as well.
   samples = ai_model.GetSamples()
   return samples
 
 
+def _SendPrompt(
+    ai_model: managed_ai_model.BaseManagedAiModel,
+    prompt: str,
+):
+  """Sends a prompt to the model and prints the response."""
+  responses = ai_model.SendPrompt(
+      prompt=prompt, max_tokens=512, temperature=0.8
+  )
+  for response in responses:
+    logging.info('Sent request & got response: %s', response)
+
+
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec):
-  """Cleanup resources to tjeor original state.
+  """Cleanup resources to their original state.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is

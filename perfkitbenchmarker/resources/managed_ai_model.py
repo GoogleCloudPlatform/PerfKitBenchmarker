@@ -19,10 +19,13 @@ resource, but the customer pays for the underlying resources it runs on, rather
 than simply for calls like with an API. This also gives the customer more
 control & ownership.
 """
+import time
+from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
 
@@ -43,6 +46,7 @@ class BaseManagedAiModel(resource.BaseResource):
           ' only cares about region but PKB cares about zone.'
       )
     self.region: str = self.GetRegionFromZone(FLAGS.zone[0])
+    self.response_timings: list[float] = []
     self.metadata.update({
         'region': self.region,
     })
@@ -65,6 +69,39 @@ class BaseManagedAiModel(resource.BaseResource):
     raise NotImplementedError(
         'ListExistingModels is not implemented for this model type.'
     )
+
+  def SendPrompt(
+      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
+  ) -> list[str]:
+    """Sends a prompt to the model, times it, and returns the response."""
+    start_time = time.time()
+    response = self._SendPrompt(prompt, max_tokens, temperature, **kwargs)
+    end_time = time.time()
+    self.response_timings.append(end_time - start_time)
+    return response
+
+  def _SendPrompt(
+      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
+  ) -> list[str]:
+    """Sends a prompt to the model and returns the response."""
+    raise NotImplementedError(
+        'SendPrompt is not implemented for this model type.'
+    )
+
+  def GetSamples(self) -> list[sample.Sample]:
+    """Gets samples relating to the provisioning of the resource."""
+    samples = super().GetSamples()
+    metadata = self.GetResourceMetadata()
+    for idx, timing in enumerate(self.response_timings):
+      samples.append(
+          sample.Sample(
+              f'response_time_{idx}',
+              timing,
+              'seconds',
+              metadata,
+          )
+      )
+    return samples
 
 
 def GetManagedAiModelClass(
