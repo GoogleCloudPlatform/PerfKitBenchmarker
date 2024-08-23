@@ -48,6 +48,7 @@ class CheckRequirementsTestCase(unittest.TestCase):
     with mock.patch.object(requirements, 'open', return_value=mocked_file) as m:
       yield m
 
+
   def testFulfilledRequirement(self):
     requirements_content = """
     # Comment line, blank line, and a fulfilled requirement.
@@ -146,6 +147,7 @@ class CheckProviderRequirementsTestCase(unittest.TestCase):
     # If a provider does not have a requirements file, then there can be no
     # unfulfilled requirement.
     requirements.CheckProviderRequirements('fakeprovider')
+
 
   def testUnfulfilledRequirements(self):
     # AWS does have a requirements file, but it contains packages that are not
