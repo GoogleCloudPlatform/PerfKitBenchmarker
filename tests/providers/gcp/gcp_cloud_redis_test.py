@@ -126,6 +126,7 @@ class GcpCloudRedisClusterTestCase(pkb_common_test_case.PkbCommonTestCase):
       managed_memory_store_cluster=True,
       managed_memory_store_shard_count=2,
       managed_memory_store_replicas_per_shard=2,
+      zone=['us-central1-a'],
   )
   def testShardAndNodeCount(self):
     test_instance = gcp_cloud_redis.CloudRedis(mock.Mock())

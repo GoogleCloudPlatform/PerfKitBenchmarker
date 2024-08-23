@@ -98,7 +98,7 @@ _REPLICAS_PER_SHARD = flags.DEFINE_integer(
 _ZONES = flags.DEFINE_list(
     'cloud_redis_zones',
     [],
-    'If using cluster mode, the zones to distribute shards between.',
+    'The preferred AZs to distribute shards between.',
 )
 flags.DEFINE_string(
     'cloud_redis_region',
@@ -209,13 +209,14 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self.replicas_per_shard = _REPLICAS_PER_SHARD.value
     self.node_count = self._GetNodeCount()
 
-    self.zones = _ZONES.value if self._clustered else []
+    self.zones = _ZONES.value
     self.enable_tls = _TLS.value
 
     self.metadata.update({
         'managed_memory_store_cloud': self.CLOUD,
         'managed_memory_store_type': self.MEMORY_STORE,
         'managed_memory_store_service_type': self.SERVICE_TYPE,
+        'managed_memory_store_zones': self.zones,
     })
     # Consider separating redis and memcached classes.
     if self.MEMORY_STORE == REDIS:

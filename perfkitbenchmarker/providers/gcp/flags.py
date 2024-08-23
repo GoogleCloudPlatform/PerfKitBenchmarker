@@ -228,7 +228,27 @@ flags.DEFINE_string(
 REDIS_GB = flags.DEFINE_integer(
     'gcp_redis_gb',
     5,
-    'Size of redis instance in gb.'
+    'Size of redis instance in gb. Ignored if --managed_memory_store_cluster is'
+    ' True.',
+)
+REDIS_NODE_TYPE = flags.DEFINE_enum(
+    'gcp_redis_node_type',
+    'redis-standard-small',
+    [
+        'redis-shared-core-nano',
+        'redis-standard-small',
+        'redis-highmem-medium',
+        'redis-highmem-xlarge',
+    ],
+    'Node type of redis instance. Only used if --managed_memory_store_cluster'
+    ' is True.',
+)
+REDIS_ZONE_DISTRIBUTION = flags.DEFINE_enum(
+    'gcp_redis_zone_distribution',
+    'single-zone',
+    ['single-zone', 'multi-zone'],
+    'Zones to distribute shards between. Only used if'
+    ' --managed_memory_store_cluster is True.',
 )
 flags.DEFINE_string(
     'gcp_service_account', None, 'Service account to use for authorization.'
