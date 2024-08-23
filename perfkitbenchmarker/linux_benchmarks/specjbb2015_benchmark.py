@@ -192,7 +192,7 @@ def Prepare(benchmark_spec):
 def _GetNumGroups(vm):
   """Returns integer number of backend groups to use for MultiJVM."""
   if FLAGS.specjbb_auto_groups:
-    return int(vm.CheckLsCpu().numa_node_count)
+    return len(numactl.GetNuma(vm))
   return FLAGS.specjbb_num_groups
 
 
