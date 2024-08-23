@@ -13,6 +13,7 @@ to create it & give permissions if one doesn't exist.
 
 import logging
 import os
+import time
 from typing import Any
 from absl import flags
 # pylint: disable=g-import-not-at-top, g-statement-before-imports
@@ -24,6 +25,7 @@ except ImportError:
   from google.cloud import aiplatform
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources import managed_ai_model
@@ -60,6 +62,8 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     endpoint: The PKB resource endpoint the model is deployed to.
     gcloud_model: Representation of the model in gcloud python library.
     service_account: Name of the service account used by the model.
+    model_deploy_time: Time it took to deploy the model.
+    model_upload_time: Time it took to upload the model.
   """
 
   CLOUD = 'GCP'
@@ -73,6 +77,8 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   project: str
   gcloud_model: aiplatform.Model | None
   service_account: str
+  model_deploy_time: float | None
+  model_upload_time: float | None
 
   def __init__(
       self, model_spec: managed_ai_model_spec.BaseManagedAiModelSpec, **kwargs
@@ -105,6 +111,8 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     })
     project_number = util.GetProjectNumber(self.project)
     self.service_account = SERVICE_ACCOUNT_BASE.format(project_number)
+    self.model_upload_time = None
+    self.model_deploy_time = None
 
   def GetRegionFromZone(self, zone: str) -> str:
     return util.GetRegionFromZone(zone)
@@ -129,6 +137,30 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     ids.pop(0)  # Remove the first line which just has titles
     return ids
 
+  def GetSamples(self) -> list[sample.Sample]:
+    """Gets samples relating to the provisioning of the resource."""
+    samples = super().GetSamples()
+    metadata = self.GetResourceMetadata()
+    if self.model_upload_time:
+      samples.append(
+          sample.Sample(
+              'Model Upload Time',
+              self.model_upload_time,
+              'seconds',
+              metadata,
+          )
+      )
+    if self.model_deploy_time:
+      samples.append(
+          sample.Sample(
+              'Model Deploy Time',
+              self.model_deploy_time,
+              'seconds',
+              metadata,
+          )
+      )
+    return samples
+
   def _SendPrompt(
       self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
   ) -> list[str]:
@@ -147,6 +179,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     env_vars = self.model_spec.GetEnvironmentVariables(
         model_bucket_path=self.model_bucket_path
     )
+    start_model_upload = time.time()
     self.gcloud_model = aiplatform.Model.upload(
         display_name=self.name,
         serving_container_image_uri=self.model_spec.container_image_uri,
@@ -158,6 +191,9 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
         serving_container_environment_variables=env_vars,
         artifact_uri=self.model_bucket_path,
     )
+    end_model_upload = time.time()
+    self.model_upload_time = end_model_upload - start_model_upload
+    start_model_deploy = time.time()
     self.gcloud_model.deploy(
         endpoint=self.endpoint.ai_endpoint,
         machine_type=self.model_spec.machine_type,
@@ -165,6 +201,8 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
         accelerator_count=1,
         deploy_request_timeout=1800,
     )
+    end_model_deploy = time.time()
+    self.model_deploy_time = end_model_deploy - start_model_deploy
 
   def _CreateDependencies(self):
     aiplatform.init(

@@ -45,9 +45,17 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
             return_value=self.platform_endpoint,
         )
     )
+    self.enter_context(mock.patch.object(vertex_ai.aiplatform, 'init'))
     self.ai_spec = vertex_ai.VertexAiLlama27bSpec('full_name')
     self.ai_spec.model_name = self.ai_spec.MODEL_NAME
     self.pkb_ai = vertex_ai.VertexAiModelInRegistry(self.ai_spec)
+
+  def test_model_create(self):
+    self.pkb_ai.Create()
+    samples = self.pkb_ai.GetSamples()
+    sampled_metrics = [sample.metric for sample in samples]
+    self.assertIn('Model Upload Time', sampled_metrics)
+    self.assertIn('Model Deploy Time', sampled_metrics)
 
   def test_model_inited(self):
     # Assert on values from setup
