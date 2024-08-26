@@ -2742,10 +2742,12 @@ class BaseDebianMixin(BaseLinuxMixin):
       self.Reboot()
 
 
-class Debian11Mixin(BaseDebianMixin):
+class Debian11Mixin(BaseDebianMixin, os_mixin.DeprecatedOsMixin):
   """Class holding Debian 11 specific VM methods and attributes."""
 
   OS_TYPE = os_types.DEBIAN11
+  ALTERNATIVE_OS = os_types.DEBIAN12
+  END_OF_LIFE = '2026-08-31'
 
   def PrepareVMEnvironment(self):
     # Missing in some images. Required by PrepareVMEnvironment to determine
