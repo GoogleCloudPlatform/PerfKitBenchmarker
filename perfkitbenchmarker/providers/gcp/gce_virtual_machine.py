@@ -195,7 +195,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     self.visible_core_count: int = None
     self.gce_tags: List[str] = None
     self.min_node_cpus: int = None
-    self.subnet_name: str = None
+    self.subnet_names: List[str] = None
     super().__init__(*args, **kwargs)
     if not self.boot_disk_type:
       self.boot_disk_type = gce_disk.GetDefaultBootDiskType(self.machine_type)
@@ -282,6 +282,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['gce_tags'] = [config_values['gce_tags']]
     if flag_values['gce_tags'].present:
       config_values['gce_tags'] = flag_values.gce_tags
+    if flag_values['gce_subnet_name'].present:
+      config_values['subnet_names'] = flag_values.gce_subnet_name
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -339,9 +341,12 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
                 'default': None,
             },
         ),
-        'subnet_name': (
-            option_decoders.StringDecoder,
-            {'none_ok': True, 'default': None},
+        'subnet_names': (
+            option_decoders.ListDecoder,
+            {
+                'item_decoder': option_decoders.StringDecoder(),
+                'default': None,
+            },
         ),
     })
     return result
@@ -549,7 +554,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.project = vm_spec.project or util.GetDefaultProject()
     self.image_project = vm_spec.image_project or self.GetDefaultImageProject()
     self.mtu: int | None = FLAGS.mtu
-    self.subnet_name = vm_spec.subnet_name
+    self.subnet_names = vm_spec.subnet_names
     self.network = self._GetNetwork()
     self.firewall = gce_network.GceFirewall.GetFirewall()
     self.boot_disk = gce_disk.GceBootDisk(self, vm_spec.boot_disk_spec)

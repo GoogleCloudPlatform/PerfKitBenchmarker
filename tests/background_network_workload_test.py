@@ -43,11 +43,13 @@ ping:
         vm_spec:
           GCP:
             machine_type: n1-standard-1
+            zone: us-central1-a
       vm_2:
         vm_spec:
           GCP:
             background_network_mbits_per_sec: 300
             machine_type: n1-standard-1
+            zone: us-central1-a
 """
 
 CONFIG_WITH_BACKGROUND_NETWORK_BAD_IPFLAG = """
@@ -60,11 +62,13 @@ ping:
             machine_type: n1-standard-1
             background_network_mbits_per_sec: 200
             background_network_ip_type: BOTH
+            zone: us-central1-a
       vm_2:
         vm_spec:
           GCP:
             background_network_mbits_per_sec: 300
             machine_type: n1-standard-1
+            zone: us-central1-a
 """
 
 CONFIG_WITH_BACKGROUND_NETWORK_IPFLAG = """
@@ -75,12 +79,14 @@ ping:
         vm_spec:
           GCP:
             machine_type: n1-standard-1
+            zone: us-central1-a
       vm_2:
         vm_spec:
           GCP:
             background_network_mbits_per_sec: 300
             background_network_ip_type: INTERNAL
             machine_type: n1-standard-1
+            zone: us-central1-a
 """
 
 _GROUP_1 = 'vm_1'

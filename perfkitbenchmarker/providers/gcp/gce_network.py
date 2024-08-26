@@ -738,25 +738,31 @@ class GceNetworkSpec(network.BaseNetworkSpec):
   def __init__(
       self,
       project: str | None = None,
+      zone: str | None = None,
+      cidr: str | None = None,
       mtu: int | None = None,
       machine_type: str | None = None,
-      subnet_name: str | None = None,
+      subnet_names: List[str] | None = None,
       **kwargs,
   ):
     """Initializes the GceNetworkSpec.
 
     Args:
       project: The project for which the Network should be created.
+      zone: The zone for which the subnet and/or network should be created.
+      cidr: The CIDR to use for the network.
       mtu: The MTU (max transmission unit) to use, if any.
       machine_type: The machine type of VM's in the network.
-      subnet_name: Name of the existing subnet.
+      subnet_names: List of existing subnets.
       **kwargs: Additional key word arguments passed to BaseNetworkSpec.
     """
     super().__init__(**kwargs)
     self.project = project
+    self.zone = zone
+    self.cidr = cidr
     self.mtu = mtu
     self.machine_type = machine_type
-    self.subnet_name = subnet_name
+    self.subnet_names = subnet_names
 
 
 class GceNetworkResource(resource.BaseResource):
@@ -897,10 +903,8 @@ class GceNetwork(network.BaseNetwork):
     self.is_existing_network = True
     self.subnet_names = []
     self.primary_subnet_name = None
-    if network_spec.subnet_name:
-      self.subnet_names = network_spec.subnet_name.split(',')
-    elif gcp_flags.GCE_SUBNET_NAMES.value:
-      self.subnet_names = gcp_flags.GCE_SUBNET_NAMES.value
+    if network_spec.subnet_names:
+      self.subnet_names = network_spec.subnet_names
     elif gcp_flags.GCE_NETWORK_NAMES.value:
       self.subnet_names = gcp_flags.GCE_NETWORK_NAMES.value
     else:
@@ -914,9 +918,9 @@ class GceNetwork(network.BaseNetwork):
     self.subnet_resources = []
     mode = gcp_flags.GCE_NETWORK_TYPE.value
     self.subnet_resource = None
-    if mode != 'custom':
-      mode = 'auto'
+    if not self.is_existing_network:
       for name in self.subnet_names:
+        mode = 'auto'
         self.network_resources.append(
             GceNetworkResource(name, mode, self.project, self.mtu)
         )
@@ -1147,7 +1151,7 @@ class GceNetwork(network.BaseNetwork):
         cidr=vm.cidr,
         mtu=vm.mtu,
         machine_type=vm.machine_type,
-        subnet_name=vm.subnet_name,
+        subnet_names=vm.subnet_names,
     )
 
   @classmethod
@@ -1158,8 +1162,11 @@ class GceNetwork(network.BaseNetwork):
     network_key = (cls.CLOUD, spec.project)
     if spec.cidr:
       network_key += (spec.cidr,)
-    if spec.subnet_name:
-      network_key += (spec.subnet_name,)
+    if spec.subnet_names:
+      if isinstance(spec.subnet_names, list):
+        network_key += (','.join(spec.subnet_names),)
+      else:
+        network_key += (spec.subnet_names,)
     return network_key
 
   def _GetNumberVms(self) -> int:

@@ -347,6 +347,8 @@
 -   Add a flag to allow users to specify a suffix for the GCP VM instance name.
 -   Add support for parsing testdfsio results.
 -   Mostly reconfigured Specjbb2015 to follow the user guide with 1 JVM group.
+-   Set --gce_subnet_name to override network_spec.subnet_name, which then would
+    clobber --gce_network_name.
 
 ### Bug fixes and maintenance updates:
 

@@ -64,6 +64,7 @@ cluster_boot:
         GCP:
           machine_type: n1-standard-4
           project: my-project
+          zone: us-central1-c
 """
 STATIC_VM_CONFIG = """
 static_vms:
@@ -100,6 +101,7 @@ cluster_boot:
       vm_spec:
         GCP:
           machine_type: n1-standard-4
+          zone: us-central1-c
 """
 
 _SIMPLE_EDW_CONFIG = """

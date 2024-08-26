@@ -43,11 +43,13 @@ ping:
         vm_spec:
           GCP:
             machine_type: n1-standard-1
+            zone: us-central1-a
       vm_2:
         vm_spec:
           GCP:
             background_cpu_threads: 3
             machine_type: n1-standard-1
+            zone: us-central1-a
 """
 
 _GROUP_1 = 'vm_1'
