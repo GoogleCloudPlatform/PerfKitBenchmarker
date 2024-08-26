@@ -99,19 +99,15 @@ mysql_tpcc:
             boot_disk_type: pd-ssd
         disk_spec:
           GCP:
-            disk_size: 2000
-            disk_type: pd-ssd
-          # These aim to match a 2 TB PD-SSD in performance and price. AWS can get better performance.
+            disk_size: 4000
+            disk_type: pd-balanced
+          # Aim for 40k iops, 1200 MB/s throughput, at least 2 TB capacity, not costing more than $400/month.
           AWS:
             disk_size: 500
             disk_type: gp3
             provisioned_iops: 10000
             provisioned_throughput: 300
             num_striped_disks: 4
-          # copybara:strip_begin(internal)
-          # TODO(user) - Add Azure iops/throughput/striping.
-          # copybara:strip_end
-          # Azure provisioned IOPS/Throughput and striping must be configured via run-time flags.
           Azure: # Premiumv2 disks matching 4TB pd-ssd
             disk_size: 2000
             disk_type: PremiumV2_LRS
