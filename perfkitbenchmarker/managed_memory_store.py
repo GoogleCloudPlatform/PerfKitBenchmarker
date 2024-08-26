@@ -210,6 +210,8 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self.node_count = self._GetNodeCount()
 
     self.zones = _ZONES.value
+    self.multi_az = self._clustered and len(self.zones) > 1
+
     self.enable_tls = _TLS.value
 
     self.metadata.update({
@@ -226,6 +228,7 @@ class BaseManagedMemoryStore(resource.BaseResource):
           'replicas_per_shard': self.replicas_per_shard,
           'node_count': self.node_count,
           'enable_tls': self.enable_tls,
+          'multi_az': self.multi_az,
       })
 
   def _GetNodeCount(self) -> int:
