@@ -198,7 +198,15 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
       if self.failover_style != managed_memory_store.Failover.FAILOVER_NONE:
         cmd += ['--automatic-failover-enabled', '--num-cache-clusters', '2']
     else:
-      cmd += ['--num-node-groups', str(self.node_count)]
+      cmd += [
+          '--num-node-groups',
+          str(self.shard_count),
+          '--replicas-per-node-group',
+          str(self.replicas_per_shard),
+      ]
+
+    if len(self.zones) > 1:
+      cmd.append('--multi-az-enabled')
 
     if self.enable_tls:
       cmd += [
