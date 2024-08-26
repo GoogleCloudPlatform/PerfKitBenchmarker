@@ -194,6 +194,9 @@ def GetConfig(user_config):
       config['relational_db']['vm_groups']['servers']['disk_spec'][FLAGS.cloud][
           'multi_writer_mode'
       ] = True
+      config['relational_db']['vm_groups']['servers']['disk_spec'][FLAGS.cloud][
+          'multi_writer_group_name'
+      ] = 'sqlsrv'
 
   return config
 

@@ -166,6 +166,7 @@ class BaseDiskSpec(spec.BaseSpec):
     self.provisioned_iops = None
     self.provisioned_throughput = None
     self.multi_writer_mode: bool = False
+    self.multi_writer_group_name: str = None
     super().__init__(*args, **kwargs)
 
   @classmethod
@@ -262,6 +263,10 @@ class BaseDiskSpec(spec.BaseSpec):
         ),
         'multi_writer_mode': (
             option_decoders.BooleanDecoder,
+            {'default': False, 'none_ok': True},
+        ),
+        'multi_writer_group_name': (
+            option_decoders.StringDecoder,
             {'default': False, 'none_ok': True},
         ),
     })

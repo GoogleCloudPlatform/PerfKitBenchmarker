@@ -64,7 +64,11 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
       disks = []
       for i in range(disk_spec.num_striped_disks):
         name = _GenerateDiskNamePrefix(
-            vm, disk_spec_id, disk_spec.multi_writer_mode, i
+            vm,
+            disk_spec.multi_writer_group_name,
+            disk_spec_id,
+            disk_spec.multi_writer_mode,
+            i,
         )
         data_disk = gce_disk.GceDisk(
             disk_spec,
@@ -94,7 +98,11 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
       for i in range(disk_spec.num_striped_disks):
         name = _GenerateDiskNamePrefix(
-            self.vm, disk_spec_id, disk_spec.multi_writer_mode, i
+            self.vm,
+            disk_spec.multi_writer_group_name,
+            disk_spec_id,
+            disk_spec.multi_writer_mode,
+            i,
         )
         cmd = util.GcloudCommand(
             self.vm, 'compute', 'disks', 'add-labels', name
@@ -394,11 +402,15 @@ class GCEPrepareScratchDiskStrategy(disk_strategies.PrepareScratchDiskStrategy):
 
 def _GenerateDiskNamePrefix(
     vm: 'virtual_machine. BaseVirtualMachine',
+    group_name: str,
     disk_spec_id: int,
     is_multiwriter: bool,
     index: int,
 ) -> str:
   """Generates a deterministic disk name given disk_spec_id and index."""
   if is_multiwriter:
-    return f'pkb-{FLAGS.run_uri}-multiwriter-{vm.vm_group}-{index}'
+    # if group_name is not specified, use the vm_group name
+    if not group_name:
+      group_name = vm.vm_group
+    return f'pkb-{FLAGS.run_uri}-multiwriter-{group_name}-{index}'
   return f'{vm.name}-data-{disk_spec_id}-{index}'
