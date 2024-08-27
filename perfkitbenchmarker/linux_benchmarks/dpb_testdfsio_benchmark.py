@@ -30,6 +30,7 @@ from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.linux_packages import hadoop
 
 BENCHMARK_NAME = 'dpb_testdfsio_benchmark'
 
@@ -160,6 +161,7 @@ def Run(benchmark_spec):
       elif FLAGS.cloud == 'AWS':
         metadata.update({'regional': True})
         metadata.update({'region': 'aws_default'})
+      metadata.update(hadoop.GetHadoopData())
 
       service.metadata.update(metadata)
 

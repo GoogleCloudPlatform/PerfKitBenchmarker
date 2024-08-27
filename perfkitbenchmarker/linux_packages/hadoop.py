@@ -22,6 +22,7 @@ import os
 import posixpath
 import re
 import time
+from typing import Any
 
 from absl import flags
 import bs4
@@ -45,6 +46,12 @@ _BLOCKSIZE_OVERRIDE = flags.DEFINE_integer(
     128,
     'Blocksize in MiB to be used by the HDFS filesystem. '
     'This is the chunksize in which the HDFS file will be divided into.',
+)
+
+_HADOOP_NAMENODE_OPTS = flags.DEFINE_string(
+    'hadoop_namenode_opts',
+    None,
+    'Additional options to be passed to the HDFS NameNode.',
 )
 
 DATA_FILES = [
@@ -263,6 +270,7 @@ def _RenderConfig(
       'block_size': block_size,
       'dfs_data_paths': dfs_data_paths,
       'mapreduce_cluster_local_paths': mapreduce_cluster_local_paths,
+      'hadoop_namenode_opts': _HADOOP_NAMENODE_OPTS.value,
   }
 
   for file_name in DATA_FILES:
@@ -377,3 +385,10 @@ def ConfigureAndStart(master, workers, start_yarn=True, configure_s3=False):
       )
     else:
       logging.info('YARN running on all %d workers', len(workers))
+
+
+def GetHadoopData() -> dict[str, Any]:
+  metadata = {}
+  if _HADOOP_NAMENODE_OPTS.value:
+    metadata['hadoop_namenode_opts'] = _HADOOP_NAMENODE_OPTS.value
+  return metadata

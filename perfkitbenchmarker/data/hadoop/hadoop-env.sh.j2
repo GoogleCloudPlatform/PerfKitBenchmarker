@@ -29,3 +29,6 @@ export YARN_NODEMANAGER_USER="{{user}}"
 {% if optional_tools %}
 export HADOOP_OPTIONAL_TOOLS="{{optional_tools}}"
 {% endif %}
+{% if hadoop_namenode_opts %}
+export HADOOP_NAMENODE_OPTS="{{hadoop_namenode_opts}} $HADOOP_NAMENODE_OPTS"
+{% endif %}

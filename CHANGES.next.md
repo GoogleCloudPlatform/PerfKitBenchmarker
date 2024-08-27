@@ -349,6 +349,7 @@
 -   Mostly reconfigured Specjbb2015 to follow the user guide with 1 JVM group.
 -   Set --gce_subnet_name to override network_spec.subnet_name, which then would
     clobber --gce_network_name.
+-   Add support of externalizing the HADOOP_NAMENODE_OPTS.
 
 ### Bug fixes and maintenance updates:
 
