@@ -694,7 +694,7 @@ def Install(vm):
   # version
   vm.InstallPackages('python2.7 curl')
   # ycsb.py uses /usr/bin/env python
-  vm.RemoteCommand('sudo ln -s /usr/bin/python2.7 /usr/local/bin/python')
+  vm.RemoteCommand('sudo ln -sf /usr/bin/python2.7 /usr/local/bin/python')
   vm.Install('maven')
   install_cmd = (
       'mkdir -p {0} && curl -L {1} | '
