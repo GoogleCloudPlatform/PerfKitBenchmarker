@@ -918,7 +918,7 @@ class GceNetwork(network.BaseNetwork):
     self.subnet_resources = []
     mode = gcp_flags.GCE_NETWORK_TYPE.value
     self.subnet_resource = None
-    if not self.is_existing_network:
+    if not self.is_existing_network or mode == 'legacy':
       for name in self.subnet_names:
         mode = 'auto'
         self.network_resources.append(
