@@ -151,7 +151,7 @@ nginx:
       vm_spec: *default_single_core
     upstream_servers:
       vm_spec: *default_dual_core
-      vm_count: 6
+      vm_count: 10
 """
 
 _CONTENT_FILENAME = 'random_content'
