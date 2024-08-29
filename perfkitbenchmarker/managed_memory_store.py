@@ -59,8 +59,18 @@ REDIS_3_2 = 'redis_3_2'
 REDIS_4_0 = 'redis_4_0'
 REDIS_5_0 = 'redis_5_0'
 REDIS_6_X = 'redis_6_x'
+REDIS_7_0 = 'redis_7_0'
+REDIS_7_2 = 'redis_7_2'
 REDIS_7_X = 'redis_7_x'
-REDIS_VERSIONS = [REDIS_3_2, REDIS_4_0, REDIS_5_0, REDIS_6_X, REDIS_7_X]
+REDIS_VERSIONS = [
+    REDIS_3_2,
+    REDIS_4_0,
+    REDIS_5_0,
+    REDIS_6_X,
+    REDIS_7_0,
+    REDIS_7_2,
+    REDIS_7_X,
+]
 
 flags.DEFINE_string(
     'managed_memory_store_service_type',
