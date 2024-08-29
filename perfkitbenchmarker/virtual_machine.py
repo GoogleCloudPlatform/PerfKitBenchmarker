@@ -1029,7 +1029,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
 
     Args:
       package_name: The name of the package file defining the preprovisoned
-        data. The default vaule is None. If the package_name is provided, the
+        data. The default value is None. If the package_name is provided, the
         package file must define the dict PREPROVISIONED_DATA mapping filenames
         to sha256sum hashes.
       filenames: An iterable of preprovisioned data filenames for a particular
