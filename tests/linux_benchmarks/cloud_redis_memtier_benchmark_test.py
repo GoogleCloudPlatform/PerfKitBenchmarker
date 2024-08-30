@@ -77,8 +77,8 @@ class CloudRedisMemtierBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     redis_version = 'redis_4_0'
     FLAGS.managed_memory_store_version = redis_version
     FLAGS['managed_memory_store_version'].present = 1
-    config = cloud_redis_memtier_benchmark.GetConfig({})
-    self.assertEqual(redis_version, config['cloud_redis']['redis_version'])
+    spec = _GetTestRedisSpec()
+    self.assertEqual(redis_version, spec.redis_version)
 
   def testPrepare(self):
     vm = mock.Mock()

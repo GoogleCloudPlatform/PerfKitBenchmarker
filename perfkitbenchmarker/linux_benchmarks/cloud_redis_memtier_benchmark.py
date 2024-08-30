@@ -48,9 +48,6 @@ _ManagedRedis = managed_memory_store.BaseManagedMemoryStore
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  # TODO(user) Remove version from config and make it a flag only
-  if FLAGS['managed_memory_store_version'].present:
-    config['cloud_redis']['redis_version'] = FLAGS.managed_memory_store_version
   if memtier.MEMTIER_RUN_MODE.value == memtier.MemtierMode.MEASURE_CPU_LATENCY:
     config['vm_groups']['clients']['vm_count'] += 1
   return config

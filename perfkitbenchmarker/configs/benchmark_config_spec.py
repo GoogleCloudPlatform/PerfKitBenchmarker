@@ -878,6 +878,8 @@ class _CloudRedisSpec(spec.BaseSpec):
     super()._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
+    if flag_values['managed_memory_store_version'].present:
+      config_values['redis_version'] = flag_values.managed_memory_store_version
 
 
 class _CloudRedisDecoder(option_decoders.TypeVerifier):
