@@ -66,7 +66,7 @@ _MPSTAT = flags.DEFINE_boolean(
 _MPSTAT_BREAKDOWN = flags.DEFINE_enum(
     'mpstat_breakdown',
     'SUM',
-    ['SUM', 'CPU', 'ALL'],
+    ['SUM', 'SCPU', 'CPU', 'ALL'],
     'Level of aggregation for statistics. Accepted '
     'values are "SUM", "CPU", "ALL". Defaults to SUM. See '
     'https://linux.die.net/man/1/mpstat for details.',
@@ -78,13 +78,13 @@ _MPSTAT_CPUS = flags.DEFINE_string(
 )
 _MPSTAT_INTERVAL = flags.DEFINE_integer(
     'mpstat_interval',
-    1,
-    'The amount of time in seconds between each mpstat report.Defaults to 1.',
+    5,
+    'The amount of time in seconds between each mpstat report.Defaults to 5.',
 )
 _MPSTAT_COUNT = flags.DEFINE_integer(
     'mpstat_count',
-    1,
-    'The number of reports generated at interval apart.Defaults to 1.',
+    12,
+    'The number of reports generated at interval apart.Defaults to 12.',
 )
 _MPSTAT_PUBLISH = flags.DEFINE_boolean(
     'mpstat_publish', False, 'Whether to publish mpstat statistics.'
