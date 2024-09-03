@@ -16,6 +16,7 @@ class TestAzureVirtualMachine(
     pkb_common_test_case.TestOsMixin, azure_virtual_machine.AzureVirtualMachine
 ):
   IMAGE_URN = 'test_image_urn'
+  GEN2_IMAGE_URN = 'test_image_urn-gen2'
 
 
 class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):

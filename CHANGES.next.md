@@ -350,6 +350,7 @@
 -   Set --gce_subnet_name to override network_spec.subnet_name, which then would
     clobber --gce_network_name.
 -   Add support of externalizing the HADOOP_NAMENODE_OPTS.
+-   Use Azure Gen 2 VMs by default.
 
 ### Bug fixes and maintenance updates:
 

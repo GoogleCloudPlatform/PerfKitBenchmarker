@@ -76,55 +76,36 @@ NUM_LOCAL_VOLUMES: dict[str, int] = {
     'Standard_L80as_v3': 10,
 }
 
-_MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES = (
-    'Standard_ND96asr_v4',
-    'Standard_ND96asr_A100_v4',
-    'Standard_ND96amsr_A100_v4',
-    'Standard_ND96isr_H100_v5',
-    'Standard_M208ms_v2',
-    'Standard_M208s_v2',
-    'Standard_M416ms_v2',
-    'Standard_M416s_v2',
-    'Standard_ND40rs_v2',
-    'Standard_M32ms_v2',
-    'Standard_M64s_v2',
-    'Standard_M64ms_v2',
-    'Standard_M128s_v2',
-    'Standard_M128ms_v2',
-    'Standard_M192is_v2',
-    'Standard_M192ims_v2',
-    'Standard_M32dms_v2',
-    'Standard_M64ds_v2',
-    'Standard_M128ds_v2',
-    'Standard_M128dms_v2',
-    'Standard_M192ids_v2',
-    'Standard_M192idms_v2',
-    'Standard_DC2s_v2',
-    'Standard_DC2s_v3',
-    'Standard_DC32ds_v3',
-    'Standard_DC32s_v3',
-    'Standard_DC48ds_v3',
-    'Standard_DC48s_v3',
-    'Standard_DC4ds_v3',
-    'Standard_DC4s_v2',
-    'Standard_DC4s_v3',
-    'Standard_DC8_v2',
-    'Standard_DC8ds_v3',
-    'Standard_DC8s_v3',
-    'Standard_FX12mds',
-    'Standard_FX24mds',
-    'Standard_FX36mds',
-    'Standard_FX48mds',
-    'Standard_FX4mds',
-    'Standard_M64dms_v2',
-    'Standard_DC16ds_v3',
-    'Standard_DC16s_v3',
-    'Standard_DC1ds_v3',
-    'Standard_DC1s_v3',
-    'Standard_DC24ds_v3',
-    'Standard_DC24s_v3',
-    'Standard_DC2ds_v3',
-    'Standard_DC1s_v2',
+_MACHINE_TYPES_ONLY_SUPPORT_GEN1_IMAGES = (
+    'Standard_A1_v2',
+    'Standard_A2_v2',
+    'Standard_A4_v2',
+    'Standard_A8_v2',
+    'Standard_D1_v2',
+    'Standard_D2_v2',
+    'Standard_D11_v2',
+    'Standard_D3_v2',
+    'Standard_D12_v2',
+    'Standard_D4_v2',
+    'Standard_D13_v2',
+    'Standard_D5_v2',
+    'Standard_D14_v2',
+    'Standard_D15_v2',
+    'Standard_D2_v3',
+    'Standard_D4_v3',
+    'Standard_D8_v3',
+    'Standard_D16_v3',
+    'Standard_D32_v3',
+    'Standard_D48_v3',
+    'Standard_D64_v3',
+    'Standard_E2_v3',
+    'Standard_E4_v3',
+    'Standard_E8_v3',
+    'Standard_E16_v3',
+    'Standard_E20_v3',
+    'Standard_E32_v3',
+    'Standard_E48_v3',
+    'Standard_E64_v3',
 )
 
 # https://docs.microsoft.com/en-us/azure/virtual-machines/windows/scheduled-events
@@ -718,18 +699,11 @@ class AzureVirtualMachine(
       self.is_aarch64 = True
     if vm_spec.image:
       self.image = vm_spec.image
-    elif self.machine_type in _MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES:
-      if hasattr(type(self), 'GEN2_IMAGE_URN'):
-        self.image = type(self).GEN2_IMAGE_URN
-      else:
-        raise errors.Benchmarks.UnsupportedConfigError('No Azure gen2 image.')
-    elif self.SupportsNVMe():
-      if hasattr(type(self), 'GEN2_IMAGE_URN'):
-        self.image = type(self).GEN2_IMAGE_URN
-        self.image_supports_nvme = True
-      else:
+    elif self.machine_type in _MACHINE_TYPES_ONLY_SUPPORT_GEN1_IMAGES:
+      if hasattr(type(self), 'IMAGE_URN'):
         self.image = type(self).IMAGE_URN
-        self.image_supports_nvme = False
+      else:
+        raise errors.Benchmarks.UnsupportedConfigError('No Azure gen1 image.')
     elif arm_arch:
       if hasattr(type(self), 'ARM_IMAGE_URN'):
         self.image = type(self).ARM_IMAGE_URN
@@ -738,7 +712,13 @@ class AzureVirtualMachine(
     elif self.machine_type_is_confidential:
       self.image = type(self).CONFIDENTIAL_IMAGE_URN
     else:
-      self.image = type(self).IMAGE_URN
+      if hasattr(type(self), 'GEN2_IMAGE_URN'):
+        self.image = type(self).GEN2_IMAGE_URN
+      else:
+        raise errors.Benchmarks.UnsupportedConfigError(
+            'No Azure gen2 image.  Set GEN2_IMAGE_URN or update'
+            ' _MACHINE_TYPES_ONLY_SUPPORT_GEN1_IMAGES.'
+        )
 
     self.host = None
     if self.use_dedicated_host:
@@ -847,7 +827,7 @@ class AzureVirtualMachine(
         + self.nic.args
         + tag_args
     )
-    if self.SupportsNVMe() and self.image_supports_nvme:
+    if self.SupportsNVMe():
       create_cmd.extend(['--disk-controller-type', 'NVMe'])
     if self.trusted_launch_unsupported_type:
       create_cmd.extend(['--security-type', 'Standard'])
@@ -915,7 +895,7 @@ class AzureVirtualMachine(
       elif "cannot boot Hypervisor Generation '1'" in stderr:
         raise errors.Resource.CreationError(
             f'Failed to create VM: {self.machine_type} is unable to support V1 '
-            'Hypervision. Please update _MACHINE_TYPES_ONLY_SUPPORT_GEN2_IMAGES'
+            'Hypervision. Please update _MACHINE_TYPES_ONLY_SUPPORT_GEN1_IMAGES'
             ' in azure_virtual_machine.py.\n\n'
             f' Full error: {stderr} return code: {retcode}'
         )
@@ -954,8 +934,7 @@ class AzureVirtualMachine(
       elif 'SkuNotAvailable' in stderr:
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       else:
-        raise errors.Resource.CreationError(
-        )
+        raise errors.Resource.CreationError()
 
   def _Exists(self):
     """Returns True if the VM exists."""
@@ -1398,6 +1377,7 @@ class Windows2019CoreAzureVirtualMachine(
 class Windows2022CoreAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine, windows_virtual_machine.Windows2022CoreMixin
 ):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2022-Datacenter-Core-g2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2022-Datacenter-Core:latest'
 
 
@@ -1421,6 +1401,7 @@ class Windows2022DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2022DesktopMixin,
 ):
+  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2022-Datacenter-g2:latest'
   IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2022-Datacenter:latest'
 
 
