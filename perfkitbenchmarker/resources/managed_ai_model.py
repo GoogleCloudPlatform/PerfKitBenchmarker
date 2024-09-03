@@ -49,6 +49,9 @@ class BaseManagedAiModel(resource.BaseResource):
     self.response_timings: list[float] = []
     self.metadata.update({
         'region': self.region,
+        # Add these to general ResourceMetadata rather than just Create/Delete.
+        'resource_type': self.RESOURCE_TYPE,
+        'resource_class': self.__class__.__name__,
     })
 
   def GetRegionFromZone(self, zone: str) -> str:
