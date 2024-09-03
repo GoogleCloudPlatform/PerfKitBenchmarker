@@ -15,7 +15,7 @@ _COMPONENT = 'test_component'
 class TestAzureVirtualMachine(
     pkb_common_test_case.TestOsMixin, azure_virtual_machine.AzureVirtualMachine
 ):
-  IMAGE_URN = 'test_image_urn'
+  GEN1_IMAGE_URN = 'test_image_urn'
   GEN2_IMAGE_URN = 'test_image_urn-gen2'
 
 
