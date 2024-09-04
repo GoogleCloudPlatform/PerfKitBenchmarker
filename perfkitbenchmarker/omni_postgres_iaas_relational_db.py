@@ -20,9 +20,11 @@ database for AlloyDB Omni.
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import iaas_relational_db
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 
+KB_TO_GB = 1.0 / 1000000
 
 FLAGS = flags.FLAGS
 DEFAULT_OMNI_POSTGRES_VERSION = '15'
@@ -32,6 +34,39 @@ class OmniPostgresIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
   """Object representing a IAAS relational database Service."""
 
   ENGINE = sql_engine_utils.OMNI
+
+  def __init__(self, relational_db_spec):
+    """Initialize the Postgres IAAS relational database object.
+
+    Args:
+      relational_db_spec: spec of the managed database.
+
+    Raises:
+      UnsupportedError: if high availability is requested for an unmanaged db.
+    """
+    super().__init__(relational_db_spec)
+    if self.spec.high_availability:
+      raise relational_db.UnsupportedError(
+          'High availability is unsupported for unmanaged databases.'
+      )
+    self.postgres_shared_buffer_size = FLAGS.postgres_shared_buffer_size
+
+  def SetVms(self, vm_groups):
+    super().SetVms(vm_groups)
+    if 'servers' in vm_groups:
+      if not self.postgres_shared_buffer_size:
+        self.postgres_shared_buffer_size = int(
+            self.server_vm.total_memory_kb
+            * KB_TO_GB
+            * FLAGS.postgres_shared_buffer_ratio
+        )
+
+  def GetResourceMetadata(self):
+    metadata = super().GetResourceMetadata()
+    metadata.update(
+        {'postgres_shared_buffer_size': self.postgres_shared_buffer_size}
+    )
+    return metadata
 
   def _IsReadyUnmanaged(self):
     """Return true if the underlying resource is ready.
@@ -61,9 +96,12 @@ class OmniPostgresIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     self.server_vm.RemoteCommand('sudo mkdir /scratch/omni')
 
     self.server_vm.RemoteCommand(
-        'sudo docker run --name omni -e POSTGRES_PASSWORD=perfkitbenchmarker -v'
+        'sudo docker run '
+        f' --shm-size={self.server_vm.total_memory_kb * KB_TO_GB}g'
+        ' --name omni -e POSTGRES_PASSWORD=perfkitbenchmarker -v'
         ' /scratch/omni:/var/lib/postgresql/data -p 5432:5432 -d'
         ' google/alloydbomni'
+        f' -c shared_buffers={self.postgres_shared_buffer_size}GB'
     )
 
     @vm_util.Retry(
