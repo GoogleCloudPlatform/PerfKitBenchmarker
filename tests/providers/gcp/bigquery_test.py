@@ -15,7 +15,9 @@
 
 import json
 import unittest
+from unittest import mock
 from absl import flags
+from absl.testing import parameterized
 from perfkitbenchmarker.providers.gcp import bigquery
 from tests import pkb_common_test_case
 
@@ -32,6 +34,20 @@ _BASE_BIGQUERY_SPEC = {
 }
 
 FLAGS = flags.FLAGS
+
+
+EDW_SERVICE_SPEC = mock.Mock(
+    snapshot=None,
+    concurrency=5,
+    node_type=None,
+    node_count=1,
+    endpoint=None,
+    db=None,
+    user=None,
+    password=None,
+    type='bqfederated',
+    cluster_identifier='proj.dataset',
+)
 
 
 class FakeRemoteVM:
@@ -220,6 +236,72 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     performance, details = interface.ExecuteQuery(QUERY_NAME)
     self.assertEqual(performance, 1.0)
     self.assertDictEqual(details, {'client': 'JAVA', 'job_id': 'JOB_ID'})
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='NoLocationNoTableFormat',
+          cluster_identifier=(
+              'mybqfederated.tpcds1000_parquet_compressed_partitioned_gcs'
+          ),
+          expected_fields={
+              'format': 'parquet',
+              'table_format': 'None',
+              'compression': 'compressed',
+              'partitioning': 'partitioned',
+              'storage': 'gcs',
+              'location': 'us',
+          },
+      ),
+      dict(
+          testcase_name='NoTableFormat',
+          cluster_identifier=(
+              'mybqfederated.tpcds1000_parquet_snappy_part_gcs_uscentral1'
+          ),
+          expected_fields={
+              'format': 'parquet',
+              'table_format': 'None',
+              'compression': 'snappy',
+              'partitioning': 'part',
+              'storage': 'gcs',
+              'location': 'uscentral1',
+          },
+      ),
+      dict(
+          testcase_name='WithTableFormat',
+          cluster_identifier=(
+              'mybqfederated.tpcds1000_parquet_iceberg_snappy_part_gcs_us'
+          ),
+          expected_fields={
+              'format': 'parquet',
+              'table_format': 'iceberg',
+              'compression': 'snappy',
+              'partitioning': 'part',
+              'storage': 'gcs',
+              'location': 'us',
+          },
+      ),
+      dict(
+          testcase_name='UnparseableClusterId',
+          cluster_identifier='mybqfederated.yolo',
+          expected_fields={
+              'format': 'unknown',
+              'table_format': 'unknown',
+              'compression': 'unknown',
+              'partitioning': 'unknown',
+              'storage': 'unknown',
+              'location': 'unknown',
+          },
+      ),
+  )
+  def testBqFederatedGetDataDetail(
+      self,
+      cluster_identifier: str,
+      expected_fields: dict[str, str],
+  ):
+    EDW_SERVICE_SPEC.cluster_identifier = cluster_identifier
+    edw = bigquery.Bqfederated(EDW_SERVICE_SPEC)
+    data_details = edw.GetDataDetails()
+    self.assertEqual(data_details, data_details | expected_fields)
 
 
 if __name__ == '__main__':
