@@ -152,8 +152,14 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
       tf.close()
       name = tf.name
       vm_util.IssueCommand(['cat', name])
+      # When run without the region variable, get the error:
+      # "ARN should be scoped to correct region: us-west-2"
+      env_vars = {'AWS_DEFAULT_REGION': self.region}
       out, err, _ = vm_util.IssueCommand(
-          ['python3', name], raise_on_failure=False, timeout=60 * 30
+          ['python3', name],
+          env=env_vars,
+          raise_on_failure=False,
+          timeout=60 * 30,
       )
       return out, err
 
