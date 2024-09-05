@@ -81,7 +81,10 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   model_upload_time: float | None
 
   def __init__(
-      self, model_spec: managed_ai_model_spec.BaseManagedAiModelSpec, **kwargs
+      self,
+      model_spec: managed_ai_model_spec.BaseManagedAiModelSpec,
+      name: str | None = None,
+      **kwargs,
   ):
     super().__init__(**kwargs)
     if not isinstance(model_spec, VertexAiModelSpec):
@@ -95,7 +98,10 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.model_bucket_path = os.path.join(
         BUCKET_URI, self.model_spec.model_bucket_suffix
     )
-    self.name = 'pkb' + FLAGS.run_uri
+    if name:
+      self.name = name
+    else:
+      self.name = 'pkb' + FLAGS.run_uri
     self.endpoint = VertexAiEndpoint(name=self.name)
     self.project = FLAGS.project
     if not self.project:
@@ -113,6 +119,10 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.service_account = SERVICE_ACCOUNT_BASE.format(project_number)
     self.model_upload_time = None
     self.model_deploy_time = None
+
+  def _InitializeNewModel(self) -> 'VertexAiModelInRegistry':
+    """Returns a new instance of the same class."""
+    return self.__class__(model_spec=self.model_spec, name=self.name + '2')
 
   def GetRegionFromZone(self, zone: str) -> str:
     return util.GetRegionFromZone(zone)
@@ -228,6 +238,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.gcloud_model = None  # Object is not picklable - none it out
 
   def _DeleteDependencies(self):
+    super()._DeleteDependencies()
     self.endpoint.Delete()
 
 

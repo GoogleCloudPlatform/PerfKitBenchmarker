@@ -37,6 +37,7 @@ class BaseManagedAiModel(resource.BaseResource):
   REQUIRED_ATTRS = ['CLOUD']
 
   region: str
+  child_models: list['BaseManagedAiModel'] = []
 
   def __init__(self, **kwargs):
     super().__init__(**kwargs)
@@ -47,12 +48,29 @@ class BaseManagedAiModel(resource.BaseResource):
       )
     self.region: str = self.GetRegionFromZone(FLAGS.zone[0])
     self.response_timings: list[float] = []
+    self.child_models = []
     self.metadata.update({
         'region': self.region,
         # Add these to general ResourceMetadata rather than just Create/Delete.
         'resource_type': self.RESOURCE_TYPE,
         'resource_class': self.__class__.__name__,
     })
+
+  def InitializeNewModel(self) -> 'BaseManagedAiModel':
+    """Returns a new instance of the same class."""
+    child_model = self._InitializeNewModel()
+    self.child_models.append(child_model)
+    return child_model
+
+  def _InitializeNewModel(self) -> 'BaseManagedAiModel':
+    """Returns a new instance of the same class."""
+    raise NotImplementedError(
+        'InitializeNewModel is not implemented for this model type.'
+    )
+
+  def _DeleteDependencies(self):
+    for child_model in self.child_models:
+      child_model.Delete()
 
   def GetRegionFromZone(self, zone: str) -> str:
     """Returns the region a zone is in."""

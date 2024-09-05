@@ -118,6 +118,10 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
         'model_name': self.model_name,
     })
 
+  def _InitializeNewModel(self) -> 'JumpStartModelInRegistry':
+    """Returns a new instance of the same class."""
+    return self.__class__(model_spec=self.model_spec)
+
   def GetRegionFromZone(self, zone: str) -> str:
     return util.GetRegionFromZone(zone)
 

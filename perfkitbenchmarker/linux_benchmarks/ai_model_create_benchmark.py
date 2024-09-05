@@ -15,6 +15,7 @@
 
 import logging
 from typing import Any
+from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -30,6 +31,13 @@ ai_model_create:
     model_name: 'llama2_7b'
     cloud: 'GCP'
 """
+
+
+_CREATE_SECOND_MODEL = flags.DEFINE_boolean(
+    'create_second_model',
+    False,
+    'Whether to create & benchmark a second model in addition to the first.',
+)
 
 
 def GetConfig(user_config: dict[Any, Any]) -> dict[Any, Any]:
@@ -69,15 +77,30 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   Returns:
     A list of sample.Sample instances.
   """
-  logging.info('Running Run phase of the example benchmark')
-  ai_model = benchmark_spec.ai_model
-  _ValidateExistingModels(ai_model)
+  logging.info('Running Run phase & gathering response times for model 1')
+  model1 = benchmark_spec.ai_model
+  _ValidateExistingModels(model1)
+  model1.metadata.update({'First Model': True})
+  SendPromptsForModel(model1)
+
+  if not _CREATE_SECOND_MODEL.value:
+    logging.info('Only benchmarking one model; returning')
+    return []
+  logging.info('Creating model 2 & gathering response times')
+  model2 = model1.InitializeNewModel()
+  model2.metadata.update({'First Model': False})
+  model2.Create()
+  benchmark_spec.resources.append(model2)
+  SendPromptsForModel(model2)
+  # All resource samples gathered by benchmark_spec automatically.
+  return []
+
+
+def SendPromptsForModel(
+    ai_model: managed_ai_model.BaseManagedAiModel,
+):
   _SendPrompt(ai_model, 'Why do crabs walk sideways?')
   _SendPrompt(ai_model, 'How can I save more money each month?')
-  # Every resource supplies create times by default, and ai models record
-  # reponse times as well.
-  samples = ai_model.GetSamples()
-  return samples
 
 
 def _SendPrompt(
@@ -99,4 +122,5 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec):
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
+  logging.info('Running Cleanup phase of the benchmark')
   del benchmark_spec
