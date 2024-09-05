@@ -31,6 +31,11 @@ TIMEOUT = 900
 EXISTS_RETRY_TIMES = 3
 EXISTS_RETRY_POLL = 30
 
+REDIS_VERSION_MAPPING = {
+    'redis_4_0': '4.0',
+    'redis_6_x': '6.0',
+}
+
 
 class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
   """Object representing an Azure Redis Cache."""
@@ -41,8 +46,6 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
 
   # Azure redis could take up to an hour to create
   READY_TIMEOUT = 60 * 60  # 60 minutes
-
-  redis_version: str | None = None
 
   def __init__(self, spec):
     super().__init__(spec)
@@ -56,6 +59,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
       self.azure_tier = 'Premium'
     else:
       self.azure_tier = 'Basic'
+    self.version = REDIS_VERSION_MAPPING[spec.config.cloud_redis.redis_version]
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cache.
@@ -69,7 +73,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
         'cloud_redis_azure_tier': self.azure_tier,
         'cloud_redis_azure_redis_size': self.azure_redis_size,
         'cloud_redis_version': managed_memory_store.ParseReadableVersion(
-            self.redis_version
+            self.version
         ),
     })
     return self.metadata
@@ -108,6 +112,8 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
         '--vm-size',
         self.azure_redis_size,
         '--enable-non-ssl-port',
+        '--redis-version',
+        self.version,
     ]
     vm_util.IssueCommand(cmd, timeout=TIMEOUT)
 
@@ -171,7 +177,6 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
         retcode == 0
         and json.loads(stdout).get('provisioningState', None) == 'Succeeded'
     ):
-      self.redis_version = json.loads(stdout).get('redisVersion', 'unspecified')
       return True
     return False
 

@@ -30,6 +30,7 @@ class AzureRedisCacheTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.project = 'project'
     FLAGS.zones = ['eastus']
     mock_spec = mock.Mock()
+    mock_spec.config.cloud_redis.redis_version = 'redis_6_x'
     mock_resource_group = mock.Mock()
     self.resource_group_patch = mock.patch.object(
         azure_network, 'GetResourceGroup'
@@ -56,6 +57,8 @@ class AzureRedisCacheTestCase(pkb_common_test_case.PkbCommonTestCase):
         '--vm-size',
         'C3',
         '--enable-non-ssl-port',
+        '--redis-version',
+        '6.0',
     ]
     self.redis._Create()
     self.mock_command.assert_called_once_with(expected_output, timeout=900)
