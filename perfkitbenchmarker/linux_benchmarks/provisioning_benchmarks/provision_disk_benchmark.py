@@ -21,8 +21,10 @@ TODO(user) this benchmark currently only works for GCE, and needs some
 refactoring to become cloud-agnostic.
 """
 
+import copy
 import time
 from typing import List
+
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
@@ -213,13 +215,17 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
           disk_metadata,
       )
   )
-
   DetachDisks(vm)
   vm_secondary = bm_spec.vm_groups['secondary'][0]
 
   time.sleep(60)
   # re-attach to a new VM
-  vm_secondary.create_disk_strategy = vm.create_disk_strategy
+  vm_secondary.create_disk_strategy = copy.copy(vm.create_disk_strategy)
+  vm_secondary.create_disk_strategy.vm = vm_secondary
+  vm_secondary.create_disk_strategy.setup_disk_strategy = copy.copy(
+      vm.create_disk_strategy.GetSetupDiskStrategy()
+  )
+  vm_secondary.create_disk_strategy.setup_disk_strategy.vm = vm_secondary
   vm_secondary.create_disk_strategy.GetSetupDiskStrategy().AttachDisks()
   time_to_visible_to_another_vm = (
       vm_secondary.create_disk_strategy.GetSetupDiskStrategy().time_to_visible
