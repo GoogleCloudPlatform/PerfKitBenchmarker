@@ -60,6 +60,11 @@ _Json = dict[str, Any]
 
 _REDIS_API_URL = 'https://api.redislabs.com/v1'
 
+REDIS_VERSION_MAPPING = {
+    'redis_6_x': '6.2',
+    'redis_7_x': '7.2',
+}
+
 
 @dataclasses.dataclass
 class _ShardConfiguration:
@@ -98,7 +103,7 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
     # pytype: enable=attribute-error
     self.subscription_id = ''
     self.database_id = ''
-    self.redis_version = ''
+    self.version = REDIS_VERSION_MAPPING[spec.config.cloud_redis.redis_version]
     self.shard_info: _ShardConfiguration = None
     self.peering_name = f'pkb-redis-cloud-peering-{FLAGS.run_uri}'
 
@@ -135,6 +140,9 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
         'redis_cloud_shard_dollars_per_hr': self.shard_info.dollars_per_hr,
         'redis_cloud_shard_size_gb': self.shard_info.size_gb,
         'cloud_redis_region': self.redis_region,
+        'cloud_redis_version': managed_memory_store.ParseReadableVersion(
+            self.version
+        ),
         'shard_count': self.shard_count,
         'replicas_per_shard': self.replicas_per_shard,
         'node_count': self.node_count,
@@ -228,6 +236,7 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
             },
             'quantity': 1,
         }],
+        'redisVersion': self.version,
     }
 
   def _Create(self):
@@ -296,7 +305,6 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
         json.dumps(subscription),
         json.dumps(database),
     )
-    self.redis_version = database['redisVersionCompliance']
     self.shard_info = self._GetShardType(subscription, database)
     self.shard_count = self.shard_info.quantity
     self.node_count = self._GetNodeCount()
