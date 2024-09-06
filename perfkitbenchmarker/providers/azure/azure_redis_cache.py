@@ -59,7 +59,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
       self.azure_tier = 'Premium'
     else:
       self.azure_tier = 'Basic'
-    self.version = REDIS_VERSION_MAPPING[spec.config.cloud_redis.redis_version]
+    self.version = REDIS_VERSION_MAPPING[spec.version]
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cache.

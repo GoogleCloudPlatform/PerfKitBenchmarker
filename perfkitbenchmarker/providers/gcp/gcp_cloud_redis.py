@@ -39,6 +39,8 @@ DEFAULT_PORT = 6379
 
 _SHARD_SIZE_GB = 13
 
+_DEFAULT_VERSION = managed_memory_store.REDIS_7_2
+
 
 class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
   """Object representing a GCP cloud redis instance."""
@@ -59,7 +61,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
       self.node_type = gcp_flags.REDIS_NODE_TYPE.value
       if self.zone_distribution == 'single-zone':
         self.zones = [FLAGS.zone[0]]
-    self.redis_version = spec.config.cloud_redis.redis_version
+    self.redis_version = spec.version or _DEFAULT_VERSION
     self.tier = self._GetTier()
     self.network = (
         'default'

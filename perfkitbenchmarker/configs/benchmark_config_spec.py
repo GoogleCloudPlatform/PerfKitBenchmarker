@@ -351,8 +351,7 @@ class _ManagedAiModelSpecDecoder(option_decoders.TypeVerifier):
       )
     else:
       raise errors.Config.InvalidValue(
-          'Required attribute missing from model spec '
-          f'config {config}.'
+          f'Required attribute missing from model spec config {config}.'
       )
     return spec_class(
         self._GetOptionFullName(component_full_name),
@@ -826,15 +825,8 @@ class _TpuGroupsDecoder(option_decoders.TypeVerifier):
     return result
 
 
-class _CloudRedisSpec(spec.BaseSpec):
-  """Specs needed to configure a cloud redis instance."""
-
-  redis_name: str
-
-  def __init__(self, component_full_name, flag_values=None, **kwargs):
-    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
-    if not self.redis_name:
-      self.redis_name = 'pkb-cloudredis-{}'.format(flag_values.run_uri)
+class _MemoryStoreSpec(spec.BaseSpec):
+  """Specs needed to configure a managed memory store instance."""
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -851,15 +843,26 @@ class _CloudRedisSpec(spec.BaseSpec):
             option_decoders.EnumDecoder,
             {'valid_values': provider_info.VALID_CLOUDS},
         ),
-        'redis_name': (
-            option_decoders.StringDecoder,
-            {'default': None, 'none_ok': False},
-        ),
-        'redis_version': (
+        'zone': (option_decoders.StringDecoder, _NONE_OK),
+        'version': (
             option_decoders.EnumDecoder,
             {
-                'default': managed_memory_store.REDIS_3_2,
+                'default': None,
                 'valid_values': managed_memory_store.REDIS_VERSIONS,
+            },
+        ),
+        'service_type': (
+            option_decoders.StringDecoder,
+            _NONE_OK,
+        ),
+        'memory_store_type': (
+            option_decoders.EnumDecoder,
+            {
+                'default': None,
+                'valid_values': [
+                    managed_memory_store.REDIS,
+                    managed_memory_store.MEMCACHED,
+                ],
             },
         ),
     })
@@ -878,15 +881,21 @@ class _CloudRedisSpec(spec.BaseSpec):
     super()._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
+    if flag_values['zone'].present:
+      config_values['zone'] = flag_values.zone[0]
     if flag_values['managed_memory_store_version'].present:
-      config_values['redis_version'] = flag_values.managed_memory_store_version
+      config_values['version'] = flag_values.managed_memory_store_version
+    if flag_values['managed_memory_store_service_type'].present:
+      config_values['service_type'] = (
+          flag_values.managed_memory_store_service_type
+      )
 
 
-class _CloudRedisDecoder(option_decoders.TypeVerifier):
-  """Validate the cloud_redis dictionary of a benchmark config object."""
+class _MemoryStoreDecoder(option_decoders.TypeVerifier):
+  """Validate the memory_store dictionary of a benchmark config object."""
 
   def Decode(self, value, component_full_name, flag_values):
-    """Verify cloud_redis dict of a benchmark config object.
+    """Verify memory_store dict of a benchmark config object.
 
     Args:
       value: dict. Config dictionary
@@ -896,16 +905,18 @@ class _CloudRedisDecoder(option_decoders.TypeVerifier):
         BaseSpec constructors.
 
     Returns:
-      _CloudRedis built from the config passed in in value.
+      _MemoryStoreSpec built from the config passed in value.
 
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    cloud_redis_config = super().Decode(value, component_full_name, flag_values)
-    result = _CloudRedisSpec(
+    memory_store_config = super().Decode(
+        value, component_full_name, flag_values
+    )
+    result = _MemoryStoreSpec(
         self._GetOptionFullName(component_full_name),
         flag_values,
-        **cloud_redis_config,
+        **memory_store_config,
     )
     return result
 
@@ -1385,7 +1396,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'edw_service': (_EdwServiceDecoder, {'default': None}),
         'example_resource': (_ExampleResourceDecoder, {'default': None}),
         'base_job': (_BaseJobDecoder, {'default': None}),
-        'cloud_redis': (_CloudRedisDecoder, {'default': None}),
+        'memory_store': (_MemoryStoreDecoder, {'default': None}),
         'vpn_service': (_VPNServiceDecoder, {'default': None}),
         'app_groups': (_AppGroupsDecoder, {'default': {}}),
         'vpc_peering': (

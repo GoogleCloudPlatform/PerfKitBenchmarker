@@ -12,12 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.aws.aws_elasticache_redis."""
+
+import inspect
 import unittest
+
 from absl import flags
 import mock
+from perfkitbenchmarker import managed_memory_store
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_elasticache_redis
 from tests import pkb_common_test_case
+
 
 FLAGS = flags.FLAGS
 
@@ -31,11 +37,13 @@ class AwsElasticacheRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.cloud_redis_region = 'us-east-1'
     FLAGS.run_uri = 'run12345'
     mock_spec = mock.Mock()
-    mock_spec.config.cloud_redis.redis_version = 'redis_4_0'
+    mock_spec.version = 'redis_4_0'
     mock_vm = mock.Mock()
     mock_vm.zone = FLAGS.zones[0]
-    mock_spec.vms = [mock_vm]
     self.redis = aws_elasticache_redis.ElastiCacheRedis(mock_spec)
+    self.enter_context(
+        mock.patch.object(self.redis, '_GetClientVm', return_value=mock_vm)
+    )
     self.mock_command = mock.patch.object(vm_util, 'IssueCommand').start()
 
   def testCreate(self):
@@ -98,6 +106,68 @@ class AwsElasticacheRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.mock_command.assert_called_once_with(
         expected_output, raise_on_failure=False
     )
+
+
+class ConstructElasticacheRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  def testInitialization(self):
+    test_spec = inspect.cleandoc(f"""
+    cloud_redis_memtier:
+      memory_store:
+        cloud: {provider_info.AWS}
+        service_type: elasticache
+        memory_store_type: {managed_memory_store.REDIS}
+        version: redis_6_x
+    """)
+    self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_string=test_spec, benchmark_name='cloud_redis_memtier'
+    )
+    self.test_bm_spec.vm_groups = {'clients': [mock.MagicMock()]}
+
+    self.test_bm_spec.ConstructMemoryStore()
+
+    instance = self.test_bm_spec.memory_store
+    with self.subTest('service_type'):
+      self.assertEqual(instance.SERVICE_TYPE, 'elasticache')
+    with self.subTest('memory_store_type'):
+      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
+    with self.subTest('redis_version'):
+      self.assertEqual(instance.version, '6.x')
+
+  def testInitializationFlagOverrides(self):
+    test_spec = inspect.cleandoc(f"""
+    cloud_redis_memtier:
+      memory_store:
+        service_type: memorystore
+        memory_store_type: {managed_memory_store.REDIS}
+        version: redis_3_2
+    """)
+    FLAGS['cloud'].parse('AWS')
+    FLAGS['managed_memory_store_service_type'].parse('elasticache')
+    FLAGS['managed_memory_store_version'].parse('redis_7_x')
+    FLAGS['elasticache_node_type'].parse('cache.m4.large')
+    FLAGS['cloud_redis_region'].parse('us-east-1')
+    FLAGS['elasticache_failover_zone'].parse('us-east-1a')
+    self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_string=test_spec, benchmark_name='cloud_redis_memtier'
+    )
+    self.test_bm_spec.vm_groups = {'clients': [mock.MagicMock()]}
+
+    self.test_bm_spec.ConstructMemoryStore()
+
+    instance = self.test_bm_spec.memory_store
+    with self.subTest('service_type'):
+      self.assertEqual(instance.SERVICE_TYPE, 'elasticache')
+    with self.subTest('memory_store_type'):
+      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
+    with self.subTest('version'):
+      self.assertEqual(instance.version, '7.1')
+    with self.subTest('node_type'):
+      self.assertEqual(instance.node_type, 'cache.m4.large')
+    with self.subTest('redis_region'):
+      self.assertEqual(instance.redis_region, 'us-east-1')
+    with self.subTest('failover_zone'):
+      self.assertEqual(instance.failover_zone, 'us-east-1a')
 
 
 if __name__ == '__main__':

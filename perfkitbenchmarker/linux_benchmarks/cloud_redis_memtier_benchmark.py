@@ -31,11 +31,13 @@ from perfkitbenchmarker.linux_packages import memtier
 FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'cloud_redis_memtier'
 
-BENCHMARK_CONFIG = """
+BENCHMARK_CONFIG = f"""
 cloud_redis_memtier:
   description: Run memtier against cloud redis
-  cloud_redis:
-    redis_version: redis_6_x
+  memory_store:
+    service_type: memorystore
+    memory_store_type: {managed_memory_store.REDIS}
+    version: redis_6_x
   vm_groups:
     clients:
       vm_spec: *default_single_core
@@ -53,35 +55,6 @@ def GetConfig(user_config):
   return config
 
 
-def CheckPrerequisites(benchmark_config):
-  """Verifies that the required resources are present.
-
-  Args:
-    benchmark_config: benchmark_config
-  """
-  _GetManagedMemoryStoreClass().CheckPrerequisites(benchmark_config)  # pytype: disable=attribute-error
-
-
-def _GetManagedMemoryStoreClass() -> (
-    type[managed_memory_store.BaseManagedMemoryStore]
-):
-  """Gets the cloud-specific redis memory store class."""
-  # This should eventually use a spec and create the resource in the provision
-  # phase.
-  return managed_memory_store.GetManagedMemoryStoreClass(
-      FLAGS.cloud,
-      FLAGS.managed_memory_store_service_type,
-      managed_memory_store.REDIS,
-  )
-
-
-def _GetManagedMemoryStore(
-    benchmark_spec,
-) -> managed_memory_store.BaseManagedMemoryStore:
-  """Get redis instance from the shared class."""
-  return _GetManagedMemoryStoreClass()(benchmark_spec)  # pytype: disable=not-instantiable
-
-
 def Prepare(benchmark_spec):
   """Prepare the cloud redis instance for memtier tasks.
 
@@ -93,12 +66,10 @@ def Prepare(benchmark_spec):
 
   memtier_vms = benchmark_spec.vm_groups['clients']
   background_tasks.RunThreaded(_Install, memtier_vms)
-
-  benchmark_spec.cloud_redis_instance = _GetManagedMemoryStore(benchmark_spec)
-  benchmark_spec.cloud_redis_instance.Create()
-  memory_store_ip = benchmark_spec.cloud_redis_instance.GetMemoryStoreIp()
-  memory_store_port = benchmark_spec.cloud_redis_instance.GetMemoryStorePort()
-  password = benchmark_spec.cloud_redis_instance.GetMemoryStorePassword()
+  cloud_redis_instance = benchmark_spec.memory_store
+  memory_store_ip = cloud_redis_instance.GetMemoryStoreIp()
+  memory_store_port = cloud_redis_instance.GetMemoryStorePort()
+  password = cloud_redis_instance.GetMemoryStorePassword()
 
   memtier.Load(memtier_vms, memory_store_ip, memory_store_port, password)
 
@@ -189,10 +160,10 @@ def Run(benchmark_spec):
     A list of sample.Sample instances.
   """
   memtier_vms = benchmark_spec.vm_groups['clients']
-  redis_instance: _ManagedRedis = benchmark_spec.cloud_redis_instance
+  redis_instance: _ManagedRedis = benchmark_spec.memory_store
   samples = _Run(memtier_vms, redis_instance)
   for s in samples:
-    s.metadata.update(benchmark_spec.cloud_redis_instance.GetResourceMetadata())
+    s.metadata.update(redis_instance.GetResourceMetadata())
 
   return samples
 
@@ -204,7 +175,7 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  benchmark_spec.cloud_redis_instance.Delete()
+  del benchmark_spec
 
 
 @vm_util.Retry(poll_interval=1)

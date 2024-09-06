@@ -12,13 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.gcp.gcp_cloud_redis."""
+
+import inspect
 import unittest
+
 from absl import flags
 from absl.testing import flagsaver
 import mock
+from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker.providers.gcp import gcp_cloud_redis
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
+
 
 FLAGS = flags.FLAGS
 
@@ -133,6 +138,66 @@ class GcpCloudRedisClusterTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(test_instance.shard_count, 2)
     self.assertEqual(test_instance.replicas_per_shard, 2)
     self.assertEqual(test_instance.node_count, 6)
+
+
+class ConstructCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  def testInitialization(self):
+    test_spec = inspect.cleandoc(f"""
+    cloud_redis_memtier:
+      memory_store:
+        service_type: memorystore
+        memory_store_type: {managed_memory_store.REDIS}
+        version: redis_6_x
+    """)
+    self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_string=test_spec, benchmark_name='cloud_redis_memtier'
+    )
+    self.test_bm_spec.vm_groups = {'clients': [mock.MagicMock()]}
+
+    self.test_bm_spec.ConstructMemoryStore()
+
+    instance = self.test_bm_spec.memory_store
+    with self.subTest('service_type'):
+      self.assertEqual(instance.SERVICE_TYPE, 'memorystore')
+    with self.subTest('memory_store_type'):
+      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
+    with self.subTest('redis_version'):
+      self.assertEqual(instance.redis_version, 'redis_6_x')
+
+  def testInitializationFlagOverrides(self):
+    test_spec = inspect.cleandoc(f"""
+    cloud_redis_memtier:
+      memory_store:
+        service_type: elasticache
+        memory_store_type: {managed_memory_store.REDIS}
+        version: redis_3_2
+    """)
+    FLAGS['managed_memory_store_service_type'].parse('memorystore')
+    FLAGS['managed_memory_store_version'].parse('redis_7_0')
+    FLAGS['gcp_redis_gb'].parse(100)
+    FLAGS['cloud_redis_region'].parse('us-central1')
+    FLAGS['gcp_redis_zone_distribution'].parse('multi-zone')
+    self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_string=test_spec, benchmark_name='cloud_redis_memtier'
+    )
+    self.test_bm_spec.vm_groups = {'clients': [mock.MagicMock()]}
+
+    self.test_bm_spec.ConstructMemoryStore()
+
+    instance = self.test_bm_spec.memory_store
+    with self.subTest('service_type'):
+      self.assertEqual(instance.SERVICE_TYPE, 'memorystore')
+    with self.subTest('memory_store_type'):
+      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
+    with self.subTest('redis_version'):
+      self.assertEqual(instance.redis_version, 'redis_7_0')
+    with self.subTest('size'):
+      self.assertEqual(instance.size, 100)
+    with self.subTest('redis_region'):
+      self.assertEqual(instance.redis_region, 'us-central1')
+    with self.subTest('zone_distribution'):
+      self.assertEqual(instance.zone_distribution, 'multi-zone')
 
 
 if __name__ == '__main__':

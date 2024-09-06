@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.azure.azure_redis_cache."""
+import inspect
 import unittest
 from absl import flags
 import mock
+from perfkitbenchmarker import managed_memory_store
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import azure_redis_cache
@@ -29,8 +32,9 @@ class AzureRedisCacheTestCase(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     FLAGS.project = 'project'
     FLAGS.zones = ['eastus']
+    FLAGS.cloud_redis_region = 'eastus'
     mock_spec = mock.Mock()
-    mock_spec.config.cloud_redis.redis_version = 'redis_6_x'
+    mock_spec.version = 'redis_6_x'
     mock_resource_group = mock.Mock()
     self.resource_group_patch = mock.patch.object(
         azure_network, 'GetResourceGroup'
@@ -49,7 +53,7 @@ class AzureRedisCacheTestCase(pkb_common_test_case.PkbCommonTestCase):
         '--resource-group',
         'az_resource',
         '--location',
-        'us-central1',
+        'eastus',
         '--name',
         'pkb-None',
         '--sku',
@@ -93,6 +97,65 @@ class AzureRedisCacheTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.mock_command.assert_called_once_with(
         expected_output, raise_on_failure=False
     )
+
+
+class ConstructAzureRedisCacheTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  def testInitialization(self):
+    test_spec = inspect.cleandoc(f"""
+    cloud_redis_memtier:
+      memory_store:
+        cloud: {provider_info.AZURE}
+        service_type: cache
+        memory_store_type: {managed_memory_store.REDIS}
+        version: redis_6_x
+    """)
+    self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_string=test_spec, benchmark_name='cloud_redis_memtier'
+    )
+    self.test_bm_spec.vm_groups = {'clients': [mock.MagicMock()]}
+
+    self.test_bm_spec.ConstructMemoryStore()
+
+    instance = self.test_bm_spec.memory_store
+    with self.subTest('service_type'):
+      self.assertEqual(instance.SERVICE_TYPE, 'cache')
+    with self.subTest('memory_store_type'):
+      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
+    with self.subTest('redis_version'):
+      self.assertEqual(instance.version, '6.0')
+
+  def testInitializationFlagOverrides(self):
+    test_spec = inspect.cleandoc(f"""
+    cloud_redis_memtier:
+      memory_store:
+        service_type: memorystore
+        memory_store_type: {managed_memory_store.REDIS}
+        version: redis_3_2
+    """)
+    FLAGS['cloud'].parse(provider_info.AZURE)
+    FLAGS['managed_memory_store_service_type'].parse('cache')
+    FLAGS['managed_memory_store_version'].parse('redis_6_x')
+    FLAGS['cloud_redis_region'].parse('eastus2')
+    FLAGS['azure_redis_size'].parse('P4')
+    self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_string=test_spec, benchmark_name='cloud_redis_memtier'
+    )
+    self.test_bm_spec.vm_groups = {'clients': [mock.MagicMock()]}
+
+    self.test_bm_spec.ConstructMemoryStore()
+
+    instance = self.test_bm_spec.memory_store
+    with self.subTest('service_type'):
+      self.assertEqual(instance.SERVICE_TYPE, 'cache')
+    with self.subTest('memory_store_type'):
+      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
+    with self.subTest('version'):
+      self.assertEqual(instance.version, '6.0')
+    with self.subTest('redis_region'):
+      self.assertEqual(instance.redis_region, 'eastus2')
+    with self.subTest('size'):
+      self.assertEqual(instance.azure_redis_size, 'P4')
 
 
 if __name__ == '__main__':

@@ -27,6 +27,7 @@ from perfkitbenchmarker.providers.aws import util
 
 
 MEMCACHED_VERSIONS = ['1.5.10', '1.5.16', '1.6.6']
+_DEFAULT_ZONE = 'us-east-1a'
 FLAGS = flags.FLAGS
 
 
@@ -40,7 +41,7 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
   def __init__(self, spec):
     super().__init__(spec)
     self.subnet_group_name = 'subnet-%s' % self.name
-    self.zone = self.spec.vms[0].zone
+    self.zone = spec.zone or _DEFAULT_ZONE
     self.region = util.GetRegionFromZone(self.zone)
     self.node_type = aws_flags.ELASTICACHE_NODE_TYPE.value
     self.version = FLAGS.managed_memory_store_version
@@ -66,7 +67,7 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
 
   def _CreateDependencies(self):
     """Create the subnet dependencies."""
-    subnet_id = self.spec.vms[0].network.subnet.id
+    subnet_id = self._GetClientVm().network.subnet.id
     cmd = [
         'aws',
         'elasticache',

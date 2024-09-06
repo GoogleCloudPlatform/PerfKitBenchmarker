@@ -22,8 +22,6 @@ import time
 from typing import Any
 
 from absl import flags
-from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import provider_info
@@ -92,18 +90,9 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
     self.name = f'pkb-{FLAGS.run_uri}'
     self.project = FLAGS.project or util.GetDefaultProject()
     self.redis_region = FLAGS.cloud_redis_region
-    # Network is required in order to enable VPC peering
-    bm_spec: benchmark_spec.BenchmarkSpec = context.GetThreadBenchmarkSpec()
-    # pytype: disable=attribute-error
-    self.network = (
-        bm_spec.vms[0].network.network_resource.name
-        if not gcp_flags.GCE_NETWORK_NAMES.value
-        else gcp_flags.GCE_NETWORK_NAMES.value[0]
-    )
-    # pytype: enable=attribute-error
     self.subscription_id = ''
     self.database_id = ''
-    self.version = REDIS_VERSION_MAPPING[spec.config.cloud_redis.redis_version]
+    self.version = REDIS_VERSION_MAPPING[spec.version]
     self.shard_info: _ShardConfiguration = None
     self.peering_name = f'pkb-redis-cloud-peering-{FLAGS.run_uri}'
 
@@ -149,12 +138,20 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
     })
     return self.metadata
 
+  def _GetNetwork(self) -> str:
+    """Returns the client VM network named used for peering."""
+    return (
+        self._GetClientVm().network.network_resource.name
+        if not gcp_flags.GCE_NETWORK_NAMES.value
+        else gcp_flags.GCE_NETWORK_NAMES.value[0]
+    )
+
   def _CreateVpcPeeringRequest(self):
     """Creates a VPC peering request for the Redis Enterprise instance."""
     payload = {
         'provider': 'GCP',
         'vpcProjectUid': self.project,
-        'vpcNetworkName': self.network,
+        'vpcNetworkName': self._GetNetwork(),
     }
     logging.info('Create peering request payload: %s', payload)
     result = requests.post(
@@ -176,7 +173,7 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
         self, 'compute', 'networks', 'peerings', 'create', self.peering_name
     )
     cmd.flags['project'] = self.project
-    cmd.flags['network'] = self.network
+    cmd.flags['network'] = self._GetNetwork()
     cmd.flags['peer-network'] = peering['redisNetworkName']
     cmd.flags['peer-project'] = peering['redisProjectUid']
     cmd.Issue()
@@ -395,7 +392,7 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
         self, 'compute', 'networks', 'peerings', 'delete', self.peering_name
     )
     cmd.flags['project'] = self.project
-    cmd.flags['network'] = self.network
+    cmd.flags['network'] = self._GetNetwork()
     cmd.Issue(raise_on_failure=False)
 
   def _Delete(self):

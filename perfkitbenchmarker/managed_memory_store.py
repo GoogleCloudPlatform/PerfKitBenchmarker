@@ -74,7 +74,7 @@ REDIS_VERSIONS = [
 
 flags.DEFINE_string(
     'managed_memory_store_service_type',
-    'memorystore',
+    None,
     (
         'The service type of the managed memory store, e.g. memorystore,'
         ' elasticache, etc.'
@@ -112,11 +112,8 @@ _ZONES = flags.DEFINE_list(
 )
 flags.DEFINE_string(
     'cloud_redis_region',
-    'us-central1',
-    (
-        'The region to spin up cloud redis in.'
-        'Defaults to the GCP region of us-central1.'
-    ),
+    None,
+    'The region to spin up cloud redis in.',
 )
 _TLS = flags.DEFINE_bool(
     'cloud_redis_tls', False, 'Whether to enable TLS on the instance.'
@@ -206,7 +203,6 @@ class BaseManagedMemoryStore(resource.BaseResource):
       spec: spec of the managed memory store.
     """
     super().__init__()
-    self.spec = spec
     self.name: str = 'pkb-%s' % FLAGS.run_uri
     self._ip: str = None
     self._port: int = None
@@ -223,6 +219,8 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self.multi_az = self._clustered and len(self.zones) > 1
 
     self.enable_tls = _TLS.value
+
+    self._client_vms = None
 
     self.metadata.update({
         'managed_memory_store_cloud': self.CLOUD,
@@ -301,3 +299,13 @@ class BaseManagedMemoryStore(resource.BaseResource):
   def GetInstanceSize(self) -> int:
     """Returns size of instance in gigabytes."""
     raise NotImplementedError()
+
+  def SetVms(self, vm_groups) -> None:
+    """Sets the VMs for the managed memory store."""
+    self._client_vms = vm_groups[
+        'clients' if 'clients' in vm_groups else 'default'
+    ]
+
+  def _GetClientVm(self):
+    """Conveniently returns the client VM to use for the instance."""
+    return self._client_vms[0]

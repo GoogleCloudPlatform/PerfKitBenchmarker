@@ -41,6 +41,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import key as cloud_key
+from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import messaging_service
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import non_relational_db
@@ -185,6 +186,7 @@ class BenchmarkSpec:
     self.smb_service = None
     self.messaging_service = None
     self.ai_model = None
+    self.memory_store = None
     self.data_discovery_service = None
     self.app_groups = {}
     self._zone_index = 0
@@ -302,6 +304,7 @@ class BenchmarkSpec:
     self.ConstructSmbService()
     self.ConstructDataDiscoveryService()
     self.ConstructBaseJob()
+    self.ConstructMemoryStore()
 
   def ConstructContainerCluster(self):
     """Create the container cluster."""
@@ -516,6 +519,23 @@ class BenchmarkSpec:
     model_class = managed_ai_model.GetManagedAiModelClass(cloud)
     self.ai_model = model_class(self.config.ai_model)  # pytype: disable=not-instantiable
     self.resources.append(self.ai_model)
+
+  def ConstructMemoryStore(self):
+    """Create the memory store instance."""
+    if self.config.memory_store is None:
+      return
+    cloud = self.config.memory_store.cloud
+    providers.LoadProvider(cloud)
+    managed_memory_store_class = (
+        managed_memory_store.GetManagedMemoryStoreClass(
+            cloud,
+            self.config.memory_store.service_type,
+            self.config.memory_store.memory_store_type,
+        )
+    )
+    self.memory_store = managed_memory_store_class(self.config.memory_store)  # pytype: disable=not-instantiable
+    self.memory_store.SetVms(self.vm_groups)
+    self.resources.append(self.memory_store)
 
   def ConstructNfsService(self):
     """Construct the NFS service object.
@@ -871,6 +891,8 @@ class BenchmarkSpec:
       self.edw_service.Create()
     if self.edw_compute_resource:
       self.edw_compute_resource.Create()
+    if hasattr(self, 'memory_store') and self.memory_store:
+      self.memory_store.Create()
     if self.example_resource:
       self.example_resource.Create()
 
@@ -919,6 +941,8 @@ class BenchmarkSpec:
       self.smb_service.Delete()
     if hasattr(self, 'messaging_service') and self.messaging_service:
       self.messaging_service.Delete()
+    if hasattr(self, 'memory_store') and self.memory_store:
+      self.memory_store.Delete()
     if hasattr(self, 'ai_model') and self.ai_model:
       self.ai_model.Delete()
     if hasattr(self, 'data_discovery_service') and self.data_discovery_service:
@@ -1164,3 +1188,5 @@ class BenchmarkSpec:
       self.dpb_service.CheckPrerequisites()
     if self.messaging_service:
       self.messaging_service.CheckPrerequisites()
+    if hasattr(self, 'memory_store') and self.memory_store:
+      self.memory_store.CheckPrerequisites()

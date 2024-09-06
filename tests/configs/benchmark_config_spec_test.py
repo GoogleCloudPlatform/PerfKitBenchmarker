@@ -473,11 +473,11 @@ class VmGroupsDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
 
 
-class CloudRedisDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
+class MemoryStoreDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
-    self._decoder = benchmark_config_spec._CloudRedisDecoder()
+    self._decoder = benchmark_config_spec._MemoryStoreDecoder()
     FLAGS.cloud = provider_info.GCP
     FLAGS.run_uri = 'test'
 
@@ -487,10 +487,10 @@ class CloudRedisDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testValidInput(self):
     result = self._decoder.Decode(
-        {'redis_version': 'redis_3_2'}, _COMPONENT, FLAGS
+        {'version': 'redis_3_2'}, _COMPONENT, FLAGS
     )
-    self.assertIsInstance(result, benchmark_config_spec._CloudRedisSpec)
-    self.assertEqual(result.redis_version, 'redis_3_2')
+    self.assertIsInstance(result, benchmark_config_spec._MemoryStoreSpec)
+    self.assertEqual(result.version, 'redis_3_2')
 
   def testInvalidInput(self):
     with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
@@ -501,11 +501,11 @@ class CloudRedisDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
 
 
-class CloudRedisSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
+class MemoryStoreSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
-    self._spec_class = benchmark_config_spec._CloudRedisSpec
+    self._spec_class = benchmark_config_spec._MemoryStoreSpec
 
   def testMissingValues(self):
     with self.assertRaises(errors.Config.MissingOption) as cm:
@@ -514,11 +514,6 @@ class CloudRedisSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         str(cm.exception),
         'Required options were missing from test_component: cloud.',
     )
-
-  def testDefaults(self):
-    result = self._spec_class(_COMPONENT, flag_values=FLAGS)
-    self.assertIsInstance(result, benchmark_config_spec._CloudRedisSpec)
-    self.assertEqual(result.redis_version, 'redis_3_2')
 
 
 class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
