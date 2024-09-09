@@ -354,7 +354,7 @@ class AzureDisk(disk.BaseDisk):
             'disk',
             'attach',
             '--vm-name',
-            self.vm.name,
+            vm.name,
             '--name',
             self.name,
         ]
