@@ -18,7 +18,6 @@ import builtins
 import contextlib
 import json
 import unittest
-
 from absl import flags
 from absl.testing import parameterized
 import mock
@@ -34,6 +33,7 @@ from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_windows_virtual_machine
 from perfkitbenchmarker.providers.gcp import util as gcp_utils
 from tests import pkb_common_test_case
+
 
 FLAGS = flags.FLAGS
 

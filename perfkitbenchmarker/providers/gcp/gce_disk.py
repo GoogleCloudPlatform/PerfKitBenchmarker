@@ -21,7 +21,10 @@ import json
 import logging
 import re
 import time
+from typing import Any
+
 from absl import flags
+import dateutil.parser
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import boot_disk
 from perfkitbenchmarker import custom_virtual_machine_spec
@@ -33,6 +36,8 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import util
+import requests
+from requests import adapters
 
 
 FLAGS = flags.FLAGS
@@ -462,6 +467,11 @@ class GceDisk(disk.BaseDisk):
   def Exists(self):
     return self._Exists()
 
+  def _GetAttachEndTime(self, cmd_issue_response: str):
+    """Returns the end time of the attach operation."""
+    attach_end_time = time.time()
+    return attach_end_time
+
   @vm_util.Retry(
       poll_interval=30,
       max_retries=10,
@@ -490,7 +500,8 @@ class GceDisk(disk.BaseDisk):
       cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
     self.attach_start_time = time.time()
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
-    self.attach_end_time = time.time()
+    self.attach_end_time = self._GetAttachEndTime(stdout)
+
     # Gcloud attach-disk commands may still attach disks despite being rate
     # limited.
     if retcode:
