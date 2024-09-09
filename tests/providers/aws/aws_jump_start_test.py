@@ -31,14 +31,6 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testEndpointNameParsedCreate(self):
     self.MockIssueCommand({
-        'cat': [(
-            (
-                'from sagemaker.jumpstart.model import JumpStartModel\n'
-                + '#more code..'
-            ),
-            '',
-            0,
-        )],
         'python3': [(
             (
                 'sagemaker.config INFO - Not applying SDK defaults from'
@@ -141,11 +133,6 @@ Fly from Beijing Capital International Airport to John F. Kennedy International 
 
 '''
     self.MockIssueCommand({
-        'cat': [(
-            '#some code',
-            '',
-            0,
-        )],
         'python3': [(
             (f"""
 Response>>>>{expected_response}====

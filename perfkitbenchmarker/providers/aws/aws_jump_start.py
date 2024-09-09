@@ -12,6 +12,7 @@ import logging
 import re
 from typing import Any
 from absl import flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
@@ -23,54 +24,9 @@ FLAGS = flags.FLAGS
 
 EXECUTION_ARN_BASE = 'arn:aws:iam::{account_number}:role/sagemaker-full-access'
 
-_CREATE_MODEL_PYTHON = """
-from sagemaker.jumpstart.model import JumpStartModel
-model = JumpStartModel(
-    model_id='{model_id}',
-    model_version='{model_version}',
-    region='{region}',
-    role='{role}',
-)
-predictor = model.deploy()
-print("Endpoint name: <" + predictor.endpoint_name + ">")
-"""
 
-_GET_MODEL_PYTHON = """
-from sagemaker import predictor as predictor_lib
-predictor = predictor_lib.retrieve_default('{endpoint_name}',region='{region}',model_id='{model_id}',model_version='{model_version}')
-"""
-
-# Must be combined with GET_MODEL above.
-_SEND_REQUEST_PYTHON = """
-def print_dialog(payload, response):
-    dialog = payload["inputs"][0]
-    print(
-        f"Response>>>> {{response[0]['generation']['role'].capitalize()}}: " +
-        f"{{response[0]['generation']['content']}}"
-    )
-    print("\\n====\\n")
-
-payload = {{
-    "inputs": [
-        [
-            {{"role": "user", "content": "{prompt}"}},
-        ]
-    ],
-    "parameters": {{"max_new_tokens": {max_tokens}, "temperature": {temperature}}},
-}}
-try:
-    response = predictor.predict(payload, custom_attributes="accept_eula=true")
-    print_dialog(payload, response)
-except Exception as e:
-    print(e)
-
-"""
-
-# Must be combined with GET_MODEL above.
-_DELETE_MODEL_PYTHON = """
-predictor.delete_model()
-predictor.delete_endpoint()
-"""
+# File located at google3/third_party/py/perfkitbenchmarker/scripts/
+AWS_RUNNER_SCRIPT = 'aws_jump_start_runner.py'
 
 
 class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
@@ -139,50 +95,48 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
       endpoints.append(json_endpoint['EndpointName'])
     return endpoints
 
-  def _RunPythonCode(self, python_code: str) -> tuple[str, str]:
-    """Runs the given python code on the Runner VM.
+  def _RunPythonScript(self, args: list[str]) -> tuple[str, str]:
+    """Calls the on-runner-vm python script with appropriate arguments.
 
     We do this rather than just run the python code in this file to avoid
     importing the AWS libraries.
     Args:
-      python_code: The python code to run.
+      args: Additional arguments for the python script.
 
     Returns:
       Tuple of [stdout, stderr].
     """
-    # TODO(user): Instead call a python script with flags.
-    with vm_util.NamedTemporaryFile(mode='w', delete=False) as tf:
-      tf.write(python_code)
-      tf.close()
-      name = tf.name
-      vm_util.IssueCommand(['cat', name])
-      # When run without the region variable, get the error:
-      # "ARN should be scoped to correct region: us-west-2"
-      env_vars = {'AWS_DEFAULT_REGION': self.region}
-      out, err, _ = vm_util.IssueCommand(
-          ['python3', name],
-          env=env_vars,
-          raise_on_failure=False,
-          timeout=60 * 30,
-      )
-      return out, err
+    python_script = data.ResourcePath(AWS_RUNNER_SCRIPT)
+    # When run without the region variable, get the error:
+    # "ARN should be scoped to correct region: us-west-2"
+    env_vars = {'AWS_DEFAULT_REGION': self.region}
+    out, err, _ = vm_util.IssueCommand(
+        [
+            'python3',
+            python_script,
+            # These arguments are needed for all operations.
+            f'--region={self.region}',
+            f'--model_id={self.model_id}',
+            f'--model_version={self.model_version}',
+        ]
+        + args,
+        env=env_vars,
+        raise_on_failure=False,
+        timeout=60 * 30,
+    )
+    return out, err
 
   def _SendPrompt(
       self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
   ) -> list[str]:
     """Sends a prompt to the model and returns the response."""
-    out, err = self._RunPythonCode(
-        _GET_MODEL_PYTHON.format(
-            endpoint_name=self.endpoint_name,
-            model_id=self.model_id,
-            model_version=self.model_version,
-            region=self.region,
-            role=self.execution_arn,
-        )
-        + _SEND_REQUEST_PYTHON.format(
-            prompt=prompt, max_tokens=max_tokens, temperature=temperature
-        )
-    )
+    out, err = self._RunPythonScript([
+        '--operation=prompt',
+        f'--endpoint_name={self.endpoint_name}',
+        f'--prompt={prompt}',
+        f'--max_tokens={max_tokens}',
+        f'--temperature={temperature}',
+    ])
     matches = re.search('Response>>>>(.*)====', out, flags=re.DOTALL)
     if not matches:
       raise errors.Resource.GetError(
@@ -194,13 +148,8 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
   def _Create(self) -> None:
     """Creates the underlying resource."""
     logging.info('Creating Jump Start Model: %s', self.model_id)
-    out, err = self._RunPythonCode(
-        _CREATE_MODEL_PYTHON.format(
-            model_id=self.model_id,
-            model_version=self.model_version,
-            region=self.region,
-            role=self.execution_arn,
-        )
+    out, err = self._RunPythonScript(
+        ['--operation=create', f'--role={self.execution_arn}']
     )
     # TODO(user): Handle errors rather than swallowing them.
     # Unfortunately even a correct run gives some errors.
@@ -214,19 +163,13 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
 
   def _CreateDependencies(self) -> None:
     vm_util.IssueCommand(['pip', 'install', 'sagemaker'])
+    vm_util.IssueCommand(['pip', 'install', 'absl-py'])
 
   def _Delete(self) -> None:
     """Deletes the underlying resource."""
     assert self.endpoint_name
-    self._RunPythonCode(
-        _GET_MODEL_PYTHON.format(
-            endpoint_name=self.endpoint_name,
-            model_id=self.model_id,
-            model_version=self.model_version,
-            region=self.region,
-            role=self.execution_arn,
-        )
-        + _DELETE_MODEL_PYTHON
+    self._RunPythonScript(
+        ['--operation=delete', f'--endpoint_name={self.endpoint_name}']
     )
 
 
