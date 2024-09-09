@@ -15,8 +15,8 @@
 
 This collector collects activities for processors using mpstat.
 Samples are reported in the form of mpstat_{metric} or mpstat_avg_{metric}.
-mpstat_{metric} is the reported {metric} for the given mpstat_interval and
-mpstat_count for a specific cpu. The cpu id is reported in the sample metadata.
+mpstat_{metric} is the reported {metric} for the given mpstat_interval for a
+specific cpu. The cpu id is reported in the sample metadata.
 mpstat_avg_{metric} is the average of {metric} over all cpus.
 Currently, only aggregated statistics are reported. Specifically, intr/s, %usr,
 %nice, %sys, %iowait, %irq, %soft, %steal, %guest, %idle. Individual stats can
@@ -80,11 +80,6 @@ _MPSTAT_INTERVAL = flags.DEFINE_integer(
     'mpstat_interval',
     5,
     'The amount of time in seconds between each mpstat report.Defaults to 5.',
-)
-_MPSTAT_COUNT = flags.DEFINE_integer(
-    'mpstat_count',
-    12,
-    'The number of reports generated at interval apart.Defaults to 12.',
 )
 _MPSTAT_PUBLISH = flags.DEFINE_boolean(
     'mpstat_publish', False, 'Whether to publish mpstat statistics.'
@@ -409,12 +404,10 @@ class MpstatCollector(base_collector.BaseCollector):
     # time formatting from mpstat
     return (
         'export S_TIME_FORMAT=ISO; mpstat -I {breakdown} -u -P '
-        '{processor_number} {interval} {count} -o JSON > {output} 2>&1 &'
-        .format(
+        '{processor_number} {interval} -o JSON > {output} 2>&1 &'.format(
             breakdown=FLAGS.mpstat_breakdown,
             processor_number=FLAGS.mpstat_cpus,
             interval=self.interval,
-            count=FLAGS.mpstat_count,
             output=collector_file,
         )
     )
