@@ -161,11 +161,7 @@ def Run(benchmark_spec):
   """
   memtier_vms = benchmark_spec.vm_groups['clients']
   redis_instance: _ManagedRedis = benchmark_spec.memory_store
-  samples = _Run(memtier_vms, redis_instance)
-  for s in samples:
-    s.metadata.update(redis_instance.GetResourceMetadata())
-
-  return samples
+  return _Run(memtier_vms, redis_instance)
 
 
 def Cleanup(benchmark_spec):

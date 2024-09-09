@@ -85,12 +85,7 @@ def Run(benchmark_spec):
     A list of sample.Sample instances.
   """
   ycsb_vms = benchmark_spec.vm_groups['clients']
-  samples = benchmark_spec.executor.LoadAndRun(ycsb_vms)
-
-  for sample in samples:
-    sample.metadata.update(benchmark_spec.memory_store.GetResourceMetadata())
-
-  return samples
+  return benchmark_spec.executor.LoadAndRun(ycsb_vms)
 
 
 def Cleanup(benchmark_spec):

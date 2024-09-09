@@ -288,6 +288,11 @@ class DefaultMetadataProvider(MetadataProvider):
         # TODO(user): Rename to relational_db.
         metadata['managed_relational_db_' + k] = v
 
+    if benchmark_spec.memory_store:
+      memory_store = benchmark_spec.memory_store
+      for k, v in memory_store.GetResourceMetadata().items():
+        metadata[k] = v
+
     for name, tpu in benchmark_spec.tpu_groups.items():
       for k, v in tpu.GetResourceMetadata().items():
         metadata['tpu_' + k] = v
