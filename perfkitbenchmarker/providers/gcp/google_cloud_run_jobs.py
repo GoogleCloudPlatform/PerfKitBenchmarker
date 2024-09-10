@@ -1,58 +1,51 @@
-"""Module containing implementation of the GoogleCloudRunJob resource.
+"""Module containing implementation of GoogleCloudRun service and builder.
 
 This module contains classes responsible for preparing the deployment artifacts
-and managing lifecycle of Google Cloud Run Jobs. More details at
+and managing lifecycle of Google Cloud Run jobs. More details at
 https://cloud.google.com/run/docs/quickstarts/jobs/create-execute
 """
 
 import logging
-import threading
-from absl import flags
+import time
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.resources import base_job
+from perfkitbenchmarker.resources import jobs_setter
 
 
-FLAGS = flags.FLAGS
-CLOUD_RUN_PRODUCT = 'GoogleCloudRunJobs'
+CLOUD_RUN_PRODUCT = 'GoogleCloudRunJob'
+_JOB_SPEC = jobs_setter.BaseJobSpec
+# For more info, see:
+# https://cloud.google.com/blog/products/serverless/cloud-run-gets-always-on-cpu-allocation
+_TWO_HOURS = 60 * 60 * 2  # Two hours in seconds
+# The p3rf-serverless-gcf2 project number.
+_P3RF_PROJECT_NUMBER = '89953586185'
 
 
-class GoogleCloudRunJob(resource.BaseResource):
-  """Class representing a Google Cloud Run Job."""
+class GoogleCloudRunJobsSpec(_JOB_SPEC):
+  """Spec storing various data needed to create cloud run jobs."""
 
-  RESOURCE_TYPE: str = 'CloudRunJob'
-  REQUIRED_ATTRS: list[str] = ['SERVICE']
-  SERVICE: str
+  SERVICE = CLOUD_RUN_PRODUCT
+  CLOUD = 'GCP'
+
+
+class GoogleCloudRunJob(base_job.BaseJob):
+  """Class representing a Google cloud Run Job / instance."""
+
   SERVICE = CLOUD_RUN_PRODUCT
   _default_region = 'us-central1'
-  _job_counter: int = 0
-  _job_counter_lock = threading.Lock()
 
-  def __init__(self, region, image):
-    """Initializes the GoogleCloudRunJob object."""
-    super().__init__()
-    self.name: str = self._GenerateName()
-    self.image = image
-    self.region = self._default_region or region
+  def __init__(self, job_spec: _JOB_SPEC, container_registry):
+    super().__init__(job_spec, container_registry)
+    self.region = self.region or self._default_region
     self.user_managed = False
+    self.metadata.update({
+        'Product_ID': self.SERVICE,
+        'region': self.region,
+        'Run_Environment': 'gen2',
+    })
 
-  def _GenerateName(self) -> str:
-    """Generates a unique name for the job.
-
-    Locking the counter variable allows for each created job name to be
-    unique within the python process.
-
-    Returns:
-      The newly generated name.
-    """
-    with self._job_counter_lock:
-      self.job_number: int = self._job_counter
-      name: str = f'pkb-{FLAGS.run_uri}'
-      name += f'-{self.job_number}'
-      GoogleCloudRunJob._job_counter += 1
-      return name
-
-  def _Create(self):
+  def _Create(self) -> None:
     """Creates the underlying resource."""
     # https://cloud.google.com/sdk/gcloud/reference/run/jobs/create
     cmd = [
@@ -61,12 +54,18 @@ class GoogleCloudRunJob(resource.BaseResource):
         'jobs',
         'create',
         self.name,
-        '--image=%s' % self.image,
+        '--image=%s' % self.container_image,
         '--region=%s' % self.region,
-        '--memory=%s' % '1Gi',
+        '--memory=%s' % self.backend,
         '--project=p3rf-serverless-gcf2',
     ]
-
+    self.metadata.update({
+        'container_image': self.container_image,
+    })
+    logging.info(
+        'Created Cloud Run Job. View internal stats at:\n%s',
+        self.GetMonitoringLink(),
+    )
     vm_util.IssueCommand(cmd)
 
   def _Delete(self):
@@ -110,7 +109,7 @@ class GoogleCloudRunJob(resource.BaseResource):
   def Execute(self):
     """Executes the job."""
     # https://cloud.google.com/sdk/gcloud/reference/run/jobs/execute
-
+    self.last_execution_start_time = time.time()
     cmd = [
         'gcloud',
         'run',
@@ -122,3 +121,15 @@ class GoogleCloudRunJob(resource.BaseResource):
         '--project=p3rf-serverless-gcf2',
     ]
     vm_util.IssueCommand(cmd)
+    self.last_execution_end_time = time.time()
+
+  def GetMonitoringLink(self):
+    """Returns link to internal Cloud Run Jobsmonitoring page."""
+
+    utc_end = int(time.time()) + _TWO_HOURS - 5 * 60
+
+    return (
+        'https://monitoring.corp.google.com/dashboard/run/jobs%2Finstances?'
+        f'scope=cloud_project_number%3D{_P3RF_PROJECT_NUMBER}&'
+        f'duration={_TWO_HOURS}&filters=module%3D{self.name}&utc_end={utc_end}'
+    )
