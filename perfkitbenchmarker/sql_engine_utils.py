@@ -380,7 +380,7 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
       )
     properties = self.connection_properties
     database_name = database_name or properties.database_name
-    self.vm.RemoteCommand(
+    command = (
         'java -jar pgadapter.jar '
         '-dir /tmp '
         f'-p {properties.project} '
@@ -389,6 +389,8 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
         f'{sessions_arg} '
         '&> /dev/null &'
     )
+
+    self.vm.RemoteCommand(command)
     # Connections need some time to startup, or the run command fails.
     time.sleep(_PGADAPTER_CONNECT_WAIT_SEC)
 
