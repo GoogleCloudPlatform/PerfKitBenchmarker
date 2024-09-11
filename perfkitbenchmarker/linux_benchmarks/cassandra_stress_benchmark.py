@@ -280,14 +280,25 @@ MAXIMUM_METRICS = {'latency max'}
 
 
 def GetConfig(user_config):
+  """Customize the config for the benchmark based on flags."""
   cloud = FLAGS.cloud
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if FLAGS.client_vm_machine_type:
+    vm_spec = config['vm_groups'][CLIENT_GROUP]['vm_spec']
+    for cloud in vm_spec:
+      config['vm_groups'][CLIENT_GROUP]['vm_spec'][cloud][
+          'machine_type'
+      ] = FLAGS.client_vm_machine_type
+  if FLAGS.db_machine_type:
+    vm_spec = config['vm_groups'][CASSANDRA_GROUP]['vm_spec']
+    for cloud in vm_spec:
+      config['vm_groups'][CASSANDRA_GROUP]['vm_spec'][cloud][
+          'machine_type'
+      ] = FLAGS.db_machine_type
   ConfigureVmGroups(
       config, CASSANDRA_SERVER_ZONES.value, CASSANDRA_GROUP, cloud
   )
-  ConfigureVmGroups(
-      config, CASSANDRA_CLIENT_ZONES.value, CLIENT_GROUP, cloud
-  )
+  ConfigureVmGroups(config, CASSANDRA_CLIENT_ZONES.value, CLIENT_GROUP, cloud)
   return config
 
 
