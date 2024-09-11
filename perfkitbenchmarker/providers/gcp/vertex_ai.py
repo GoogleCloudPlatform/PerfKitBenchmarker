@@ -235,11 +235,37 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     logging.info('Deleting the resource: %s.', self.model_name)
     assert self.gcloud_model
     self.gcloud_model.delete()
-    self.gcloud_model = None  # Object is not picklable - none it out
 
   def _DeleteDependencies(self):
     super()._DeleteDependencies()
     self.endpoint.Delete()
+
+  def __getstate__(self):
+    """Override pickling as the AI platform objects are not picklable."""
+    to_pickle_dict = {
+        'name': self.name,
+        'model_name': self.model_name,
+        'model_bucket_path': self.model_bucket_path,
+        'region': self.region,
+        'project': self.project,
+        'service_account': self.service_account,
+        'model_upload_time': self.model_upload_time,
+        'model_deploy_time': self.model_deploy_time,
+        'model_spec': self.model_spec,
+    }
+    return to_pickle_dict
+
+  def __setstate__(self, pickled_dict):
+    """Override pickling as the AI platform objects are not picklable."""
+    self.name = pickled_dict['name']
+    self.model_name = pickled_dict['model_name']
+    self.model_bucket_path = pickled_dict['model_bucket_path']
+    self.region = pickled_dict['region']
+    self.project = pickled_dict['project']
+    self.service_account = pickled_dict['service_account']
+    self.model_upload_time = pickled_dict['model_upload_time']
+    self.model_deploy_time = pickled_dict['model_deploy_time']
+    self.model_spec = pickled_dict['model_spec']
 
 
 class VertexAiEndpoint(resource.BaseResource):
