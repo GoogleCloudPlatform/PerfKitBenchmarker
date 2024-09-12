@@ -19,6 +19,7 @@ resource, but the customer pays for the underlying resources it runs on, rather
 than simply for calls like with an API. This also gives the customer more
 control & ownership.
 """
+import logging
 import time
 from typing import Any
 
@@ -90,6 +91,23 @@ class BaseManagedAiModel(resource.BaseResource):
     raise NotImplementedError(
         'ListExistingModels is not implemented for this model type.'
     )
+
+  def _IsReady(self):
+    """Return true if the underlying resource is ready.
+
+    Supplying this method is optional.  Use it when a resource can exist
+    without being ready.  If the subclass does not implement
+    it then it just returns true.
+
+    Returns:
+      True if the resource was ready in time, False if the wait timed out.
+    """
+    try:
+      self.SendPrompt('What is 2 + 2?', 100, 1.0)
+    except errors.Resource.GetError as ex:
+      logging.info('Tried sending prompt but got error %s', ex)
+      return False
+    return True
 
   def SendPrompt(
       self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any

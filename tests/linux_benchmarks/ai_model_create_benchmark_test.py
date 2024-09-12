@@ -103,6 +103,7 @@ class AiModelCreateBenchmarkTest(
             'Time to Ready',
             'response_time_0',
             'response_time_1',
+            'response_time_2',
         ],
     )
 
@@ -122,14 +123,16 @@ class AiModelCreateBenchmarkTest(
             'Time to Ready',
             'response_time_0',
             'response_time_1',
+            'response_time_2',
             'Time to Create',
             'Time to Ready',
             'response_time_0',
             'response_time_1',
+            'response_time_2',
         ],
     )
     model1_sample = samples[0]
-    model2_sample = samples[4]
+    model2_sample = samples[5]
     self.assertTrue(model1_sample.metadata['First Model'])
     self.assertFalse(model2_sample.metadata['First Model'])
 
