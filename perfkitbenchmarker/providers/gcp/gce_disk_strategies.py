@@ -284,6 +284,12 @@ class SetUpMultiWriterPDDiskStrategy(SetUpGCEResourceDiskStrategy):
   _GLOBAL_LOCK = threading.Lock()
 
   def __init__(self, vm, disk_specs: list[gce_disk.GceDiskSpec]):
+    if vm.OS_TYPE in os_types.LINUX_OS_TYPES:
+      raise errors.Error(
+          'MultiWriter disk(s) configuration is currently not supported for'
+          ' Linux vm.'
+      )
+
     super().__init__(vm, disk_specs[0])
     self.disk_specs = disk_specs
     self.scratch_disks = []
@@ -291,25 +297,31 @@ class SetUpMultiWriterPDDiskStrategy(SetUpGCEResourceDiskStrategy):
   def SetUpDisk(self):
     self._GLOBAL_LOCK.acquire()
     create_and_setup_disk = False
-    # Only supports one multiwriter disk now
     self.scratch_disks = self.vm.create_disk_strategy.remote_disk_groups[0]
-    scratch_disk = self.scratch_disks[0]
-    if scratch_disk.name not in self._MULTIWRITER_DISKS:
-      create_and_setup_disk = True
-      scratch_disk.Create()
-      self._MULTIWRITER_DISKS[scratch_disk.name] = True
+    for scratch_disk in self.scratch_disks:
+      if scratch_disk.name not in self._MULTIWRITER_DISKS:
+        create_and_setup_disk = True
+        scratch_disk.Create()
+        self._MULTIWRITER_DISKS[scratch_disk.name] = True
 
-    scratch_disk.Attach(self.vm)
-    # Device path is needed to stripe disks on Linux, but not on Windows.
-    # The path is not updated for Windows machines.
-    if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
-      nvme_devices = self.vm.GetNVMEDeviceInfo()
-      remote_nvme_devices = self.FindRemoteNVMEDevices(nvme_devices)
-      self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
+      scratch_disk.Attach(self.vm)
+      # Device path is needed to stripe disks on Linux, but not on Windows.
+      # The path is not updated for Windows machines.
+      if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
+        nvme_devices = self.vm.GetNVMEDeviceInfo()
+        remote_nvme_devices = self.FindRemoteNVMEDevices(nvme_devices)
+        self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
     if create_and_setup_disk:
       GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
-          self.vm, scratch_disk, self.disk_specs[0]
+          self.vm, self.scratch_disks[0], self.disk_specs[0]
       )
+
+    # Add scratch disk to the vm.scratch_disks list
+    for scratch_disk in self.scratch_disks:
+      # Add scratch_disk to vm.scratch_disks list
+      if (scratch_disk not in self.vm.scratch_disks):
+        self.vm.scratch_disks.append(scratch_disk)
+
     self._GLOBAL_LOCK.release()
 
 

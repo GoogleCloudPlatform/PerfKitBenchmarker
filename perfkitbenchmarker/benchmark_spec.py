@@ -963,7 +963,11 @@ class BenchmarkSpec:
 
     if self.vms:
       try:
+        # Delete VMs first to detach any multi-attached disks.
         background_tasks.RunThreaded(self.DeleteVm, self.vms)
+        background_tasks.RunThreaded(
+            lambda vm: vm.DeleteScratchDisks(), self.vms
+        )
       except Exception:
         logging.exception(
             'Got an exception deleting VMs. '
@@ -1118,7 +1122,6 @@ class BenchmarkSpec:
     if vm.is_static and vm.install_packages:
       vm.PackageCleanup()
     vm.Delete()
-    vm.DeleteScratchDisks()
 
   @staticmethod
   def _GetPickleFilename(uid):

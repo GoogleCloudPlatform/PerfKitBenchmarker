@@ -23,8 +23,10 @@ import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.providers.aws import aws_disk
@@ -35,6 +37,7 @@ from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
+from perfkitbenchmarker.providers.gcp import gce_windows_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case  # pylint:disable=unused-import
 
@@ -229,10 +232,39 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
 
 class GceMultiWriterDiskTest(GceScratchDiskTest, unittest.TestCase):
+  def _CreateVm(self):
+    vm_spec = gce_virtual_machine.GceVmSpec(
+        'test_vm_spec.GCP',
+        machine_type='test_machine_type',
+        zone='us-central1-a',
+        image_family=os_types.WINDOWS2022_SQLSERVER_2022_STANDARD
+    )
+    vm = gce_windows_virtual_machine.WindowsGceVirtualMachine(vm_spec)
+    vm.GetNVMEDeviceInfo = mock.Mock()
+    # This is modeled after N2 with Local SSDs.
+    # TODO(user): Add tests for Confidential/M3's and C3-lssd.
+    vm.GetNVMEDeviceInfo.return_value = [
+        {
+            'ModelNumber': 'nvme_card',
+            'DevicePath': '/dev/nvme0n1',
+        },
+        {
+            'ModelNumber': 'nvme_card',
+            'DevicePath': '/dev/nvme0n2',
+        },
+    ]
+    return vm
+
   def _PatchCloudSpecific(self):
     # Mock GceDisk Create and Attach methods
     self.patches.append(mock.patch(gce_disk.__name__ + '.GceDisk.Create'))
     self.patches.append(mock.patch(gce_disk.__name__ + '.GceDisk.Attach'))
+    self.patches.append(
+        mock.patch(
+            disk_strategies.__name__
+            + '.PrepareScratchDiskStrategy.PrepareScratchDisk'
+        )
+    )
 
   def testScratchDisks(self):
     # Unit test method from ScratchDiskTestMixin (not applicable)
