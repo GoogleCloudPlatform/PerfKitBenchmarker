@@ -75,6 +75,12 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
         sample.Sample('RX-missed', 0, 'errors', METADATA),
         sample.Sample('RX-bytes', 130100361984.0, 'bytes', METADATA),
         sample.Sample('RX-bytes-per-second', 2168339366, 'bytes/s', METADATA),
+        sample.Sample(
+            'packet-loss-per-second', 6359487.0, 'packets/s', METADATA
+        ),
+        sample.Sample(
+            'packet-loss-rate', 0.15803977003954967, 'rate', METADATA
+        ),
     ]
 
     self.bm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
@@ -95,11 +101,11 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
 
   def testClientServerRemoteCmd(self):
     self.bm_spec.vms[0].RobustRemoteCommand.return_value = (
-        'TX-packets: 0  TX-errors: 0  TX-bytes: 0',
+        'TX-packets: 60  TX-errors: 0  TX-bytes: 60',
         '',
     )
     self.bm_spec.vms[1].RobustRemoteCommand.return_value = (
-        'RX-packets: 0  RX-missed: 0  RX-bytes: 0',
+        'RX-packets: 60  RX-missed: 0  RX-bytes: 60',
         '',
     )
     _ = dpdk_benchmark.Run(self.bm_spec)

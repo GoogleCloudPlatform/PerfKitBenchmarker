@@ -275,6 +275,23 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
             metadata,
         ),
     ])
+  tx_pps = None
+  rx_pps = None
+  for output_sample in output_samples:
+    if output_sample.metric == 'TX-packets-per-second':
+      tx_pps = output_sample.value
+    elif output_sample.metric == 'RX-packets-per-second':
+      rx_pps = output_sample.value
+  if tx_pps is None or rx_pps is None:
+    raise errors.Benchmarks.RunError('TX or RX packets-per-second not found.')
+  output_samples.extend([
+      sample.Sample(
+          'packet-loss-per-second', tx_pps - rx_pps, 'packets/s', metadata
+      ),
+      sample.Sample(
+          'packet-loss-rate', (tx_pps - rx_pps) / tx_pps, 'rate', metadata
+      ),
+  ])
 
   return output_samples
 
