@@ -87,6 +87,7 @@
 -   Remove EOL Ubuntu 16, 18, and 23.10.
 -   Remove Broken Juju and Ubuntu Container OS types.
 -   Remove support for installing Python 2 in VMs.
+-   Make Ubuntu 24 the default os_type.
 
 ### New features:
 

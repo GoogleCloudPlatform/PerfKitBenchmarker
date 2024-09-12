@@ -200,7 +200,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(result.cloud, 'GCP')
     self.assertEqual(result.disk_count, 1)
     self.assertIsNone(result.disk_spec)
-    self.assertEqual(result.os_type, 'ubuntu2004')
+    self.assertEqual(result.os_type, 'ubuntu2404')
     self.assertEqual(result.static_vms, [])
     self.assertEqual(result.vm_count, 1)
     self.assertIsInstance(result.vm_spec, gce_virtual_machine.GceVmSpec)
@@ -394,7 +394,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         **self._kwargs
     )
     self.assertEqual(result.cloud, 'GCP')
-    self.assertEqual(result.os_type, 'ubuntu2004')
+    self.assertEqual(result.os_type, 'ubuntu2404')
     self.assertEqual(result.vm_count, 2)
 
   def testVmCountNone(self):
@@ -445,7 +445,7 @@ class VmGroupsDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(len(result), 1)
     self.assertIsInstance(result['default'], vm_group_decoders.VmGroupSpec)
     self.assertEqual(result['default'].cloud, 'GCP')
-    self.assertEqual(result['default'].os_type, 'ubuntu2004')
+    self.assertEqual(result['default'].os_type, 'ubuntu2404')
     self.assertIsInstance(
         result['default'].vm_spec, gce_virtual_machine.GceVmSpec
     )
@@ -546,7 +546,7 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         result.vm_groups['default'], vm_group_decoders.VmGroupSpec
     )
     self.assertEqual(result.vm_groups['default'].cloud, 'GCP')
-    self.assertEqual(result.vm_groups['default'].os_type, 'ubuntu2004')
+    self.assertEqual(result.vm_groups['default'].os_type, 'ubuntu2404')
     self.assertIsInstance(
         result.vm_groups['default'].vm_spec, gce_virtual_machine.GceVmSpec
     )
@@ -590,8 +590,8 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
             'VM groups in test_component may only have the following OS types:'
             " 'debian12', 'windows2019_core'. The following VM group options"
             " are invalid:{sep}test_component.vm_groups['rhel8_group'].os_type:"
-            " 'rhel8'{sep}test_component.vm_groups['ubuntu2004_group'].os_type:"
-            " 'ubuntu2004'".format(sep=os.linesep)
+            " 'rhel8'{sep}test_component.vm_groups['ubuntu2404_group'].os_type:"
+            " 'ubuntu2404'".format(sep=os.linesep)
         ),
     )
 
@@ -613,7 +613,7 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         result.vm_groups['default'], vm_group_decoders.VmGroupSpec
     )
     self.assertEqual(result.vm_groups['default'].cloud, 'AWS')
-    self.assertEqual(result.vm_groups['default'].os_type, 'ubuntu2004')
+    self.assertEqual(result.vm_groups['default'].os_type, 'ubuntu2404')
     self.assertIsInstance(
         result.vm_groups['default'].vm_spec, virtual_machine.BaseVmSpec
     )

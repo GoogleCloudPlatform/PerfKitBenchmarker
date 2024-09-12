@@ -35,7 +35,7 @@ class AerospikeServerTest(unittest.TestCase):
     self.vm.DownloadPreprovisionedData.return_value = ('', '')
     FLAGS.mark_as_parsed()
 
-  @flagsaver.flagsaver(aerospike_instances=1)
+  @flagsaver.flagsaver(aerospike_instances=1, os_type='ubuntu2004')
   def testInstallFromPackage(self):
     aerospike_server._InstallFromPackage(self.vm)
     self.vm.DownloadPreprovisionedData.assert_called_once()
