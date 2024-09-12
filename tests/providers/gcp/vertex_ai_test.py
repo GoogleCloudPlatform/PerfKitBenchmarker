@@ -4,7 +4,9 @@ import unittest
 
 from absl import flags
 from absl.testing import flagsaver
+from google.api_core import exceptions as google_exceptions
 import mock
+from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.providers.gcp import vertex_ai
 from tests import pkb_common_test_case
@@ -57,6 +59,15 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('Model Upload Time', sampled_metrics)
     self.assertIn('Model Deploy Time', sampled_metrics)
 
+  def test_model_quota_error(self):
+    self.platform_model.deploy.side_effect = google_exceptions.ServiceUnavailable(
+        '503 Machine type temporarily unavailable, please deploy with a'
+        ' different machine type or retry. 14: Machine type temporarily'
+        ' unavailable, please deploy with a different machine type or retry.'
+    )
+    with self.assertRaises(errors.Benchmarks.QuotaFailure):
+      self.pkb_ai.Create()
+
   def test_model_inited(self):
     # Assert on values from setup
     self.assertEqual(self.pkb_ai.name, 'pkb123')
@@ -88,14 +99,17 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(self.pkb_ai.ListExistingEndpoints(), ['12345', '45678'])
 
   def test_no_models_found(self):
-    self.MockIssueCommand({
-        '': [(
-            'ENDPOINT_ID          DISPLAY_NAME\n',
-            '',
-            0,
-        )]
-    })
+    self.MockIssueCommand(
+        {
+            '': [(
+                'ENDPOINT_ID          DISPLAY_NAME\n',
+                '',
+                0,
+            )]
+        }
+    )
     self.assertEqual(self.pkb_ai.ListExistingEndpoints(), [])
+
 
 if __name__ == '__main__':
   unittest.main()

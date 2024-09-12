@@ -23,6 +23,7 @@ try:
   from google.cloud.aiplatform import aiplatform
 except ImportError:
   from google.cloud import aiplatform
+from google.api_core import exceptions as google_exceptions
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
@@ -203,16 +204,20 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     )
     end_model_upload = time.time()
     self.model_upload_time = end_model_upload - start_model_upload
-    start_model_deploy = time.time()
-    self.gcloud_model.deploy(
-        endpoint=self.endpoint.ai_endpoint,
-        machine_type=self.model_spec.machine_type,
-        accelerator_type=self.model_spec.accelerator_type,
-        accelerator_count=1,
-        deploy_request_timeout=1800,
-    )
-    end_model_deploy = time.time()
-    self.model_deploy_time = end_model_deploy - start_model_deploy
+    try:
+      start_model_deploy = time.time()
+      self.gcloud_model.deploy(
+          endpoint=self.endpoint.ai_endpoint,
+          machine_type=self.model_spec.machine_type,
+          accelerator_type=self.model_spec.accelerator_type,
+          accelerator_count=1,
+          deploy_request_timeout=1800,
+      )
+      end_model_deploy = time.time()
+      self.model_deploy_time = end_model_deploy - start_model_deploy
+    except google_exceptions.ServiceUnavailable as ex:
+      logging.info('Tried to deploy model but got unavailable error %s', ex)
+      raise errors.Benchmarks.QuotaFailure(ex)
 
   def _CreateDependencies(self):
     aiplatform.init(
