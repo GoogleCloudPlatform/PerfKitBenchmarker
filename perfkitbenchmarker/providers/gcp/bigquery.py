@@ -684,7 +684,7 @@ class Bqfederated(Bigquery):
       A dictionary set to Federated service details.
     """
     basic_data = super().GetMetadata()
-    basic_data['edw_service_type'] = Bqfederated.SERVICE_TYPE
+    basic_data['edw_service_type'] = self.SERVICE_TYPE
     basic_data.update(self.client_interface.GetMetadata())
     basic_data.update(self.GetDataDetails())
     return basic_data
