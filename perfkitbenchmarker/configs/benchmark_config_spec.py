@@ -347,7 +347,7 @@ class _ManagedAiModelSpecDecoder(option_decoders.TypeVerifier):
       cloud = flag_values['cloud'].value
       providers.LoadProvider(cloud)
       spec_class = managed_ai_model_spec.GetManagedAiModelSpecClass(
-          cloud, config['model_name']
+          cloud, config['model_name'], config['model_size']
       )
     else:
       raise errors.Config.InvalidValue(

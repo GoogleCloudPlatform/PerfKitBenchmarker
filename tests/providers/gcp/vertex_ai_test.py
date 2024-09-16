@@ -9,6 +9,7 @@ import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.providers.gcp import vertex_ai
+from perfkitbenchmarker.resources import managed_ai_model_spec
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -48,9 +49,18 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
         )
     )
     self.enter_context(mock.patch.object(vertex_ai.aiplatform, 'init'))
-    self.ai_spec = vertex_ai.VertexAiLlama27bSpec('full_name')
-    self.ai_spec.model_name = self.ai_spec.MODEL_NAME
-    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(self.ai_spec)
+    config = {'model_name': 'llama2', 'model_size': '7b'}
+    self.ai_spec = vertex_ai.VertexAiLlama2Spec('full_name', None, **config)
+    self.pkb_ai: vertex_ai.VertexAiModelInRegistry = (
+        vertex_ai.VertexAiModelInRegistry(self.ai_spec)
+    )
+
+  def test_model_spec_found(self):
+    ai_spec = managed_ai_model_spec.GetManagedAiModelSpecClass(
+        'GCP', 'llama2', '7b'
+    )
+    self.assertIsNotNone(ai_spec)
+    self.assertEqual(ai_spec.__name__, 'VertexAiLlama2Spec')
 
   def test_model_create(self):
     self.pkb_ai.Create()

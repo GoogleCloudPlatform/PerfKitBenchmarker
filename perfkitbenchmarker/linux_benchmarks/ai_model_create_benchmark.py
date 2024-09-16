@@ -28,7 +28,8 @@ ai_model_create:
   description: >
     Times creation of a managed AI model.
   ai_model:
-    model_name: 'llama2_7b'
+    model_name: 'llama2'
+    model_size: '7b'
     cloud: 'GCP'
 """
 

@@ -72,6 +72,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.endpoint_name = None
     self.metadata.update({
         'model_name': self.model_name,
+        'model_size': self.model_spec.model_size,
     })
 
   def _InitializeNewModel(self) -> 'JumpStartModelInRegistry':
@@ -189,16 +190,17 @@ class JumpStartModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
     self.model_version: str
 
 
-class JumpStartLlama27bSpec(JumpStartModelSpec):
-  """Spec for running the Llama2 7b model.
+class JumpStartLlama2Spec(JumpStartModelSpec):
+  """Spec for running the Llama2 model.
 
   Source is this python notebook:
   https://github.com/aws/amazon-sagemaker-examples/blob/main/introduction_to_amazon_algorithms/jumpstart-foundation-models/llama-2-text-completion.ipynb
   """
 
-  MODEL_NAME = 'llama2_7b'
+  MODEL_NAME = 'llama2'
+  MODEL_SIZE = ['7b', '70b']
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
-    self.model_id = 'meta-textgeneration-llama-2-7b-f'
+    self.model_id = f'meta-textgeneration-llama-2-{self.model_size}-f'
     self.model_version = '2.*'

@@ -27,13 +27,15 @@ class BaseManagedAiModelSpec(spec.BaseSpec):
   """
 
   SPEC_TYPE = 'BaseManagedAiModelSpec'
-  SPEC_ATTRS = ['CLOUD', 'MODEL_NAME']
+  SPEC_ATTRS = ['CLOUD', 'MODEL_NAME', 'MODEL_SIZE']
   CLOUD = None
   MODEL_NAME = None
+  MODEL_SIZE = None
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     self.cloud: str
     self.model_name: str
+    self.model_size: str
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
 
   @classmethod
@@ -75,14 +77,24 @@ class BaseManagedAiModelSpec(spec.BaseSpec):
                 'default': '',
             },
         ),
+        'model_size': (
+            option_decoders.StringDecoder,
+            {
+                'none_ok': True,
+                'default': '',
+            },
+        ),
     })
     return result
 
 
 def GetManagedAiModelSpecClass(
-    cloud: str, model_name: str
+    cloud: str, model_name: str, model_size: str
 ) -> spec.BaseSpecMetaClass | None:
   """Gets the example spec class corresponding to the given attributes."""
   return spec.GetSpecClass(
-      BaseManagedAiModelSpec, CLOUD=cloud, MODEL_NAME=model_name
+      BaseManagedAiModelSpec,
+      CLOUD=cloud,
+      MODEL_NAME=model_name,
+      MODEL_SIZE=model_size,
   )

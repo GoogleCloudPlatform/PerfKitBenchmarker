@@ -20,12 +20,12 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(util, 'GetAccount', return_value='1234')
     )
     self.enter_context(flagsaver.flagsaver(zone=[_ZONE]))
-    self.ai_model_spec = aws_jump_start.JumpStartLlama27bSpec('f_name')
+    self.ai_model_spec = aws_jump_start.JumpStartLlama2Spec('f_name')
     self.ai_model = aws_jump_start.JumpStartModelInRegistry(self.ai_model_spec)
 
   def testRegionSet(self):
     self.enter_context(flagsaver.flagsaver(zone=['us-east-1a']))
-    ai_model_spec = aws_jump_start.JumpStartLlama27bSpec('f_name')
+    ai_model_spec = aws_jump_start.JumpStartLlama2Spec('f_name')
     ai_model = aws_jump_start.JumpStartModelInRegistry(ai_model_spec)
     self.assertEqual(ai_model.region, 'us-east-1')
 

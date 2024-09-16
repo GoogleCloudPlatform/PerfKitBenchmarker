@@ -113,8 +113,10 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.metadata.update({
         'name': self.name,
         'model_name': self.model_name,
+        'model_size': self.model_spec.model_size,
         'machine_type': self.model_spec.machine_type,
         'accelerator_type': self.model_spec.accelerator_type,
+        'accelerator_count': self.model_spec.accelerator_count,
     })
     project_number = util.GetProjectNumber(self.project)
     self.service_account = SERVICE_ACCOUNT_BASE.format(project_number)
@@ -210,7 +212,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
           endpoint=self.endpoint.ai_endpoint,
           machine_type=self.model_spec.machine_type,
           accelerator_type=self.model_spec.accelerator_type,
-          accelerator_count=1,
+          accelerator_count=self.model_spec.accelerator_count,
           deploy_request_timeout=1800,
       )
       end_model_deploy = time.time()
@@ -323,6 +325,7 @@ class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
     self.serving_container_predict_route: str
     self.serving_container_health_route: str
     self.machine_type: str
+    self.accelerator_count: int
     self.accelerator_type: str
 
   def GetEnvironmentVariables(self, **kwargs) -> dict[str, str]:
@@ -337,10 +340,11 @@ class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
     return []
 
 
-class VertexAiLlama27bSpec(VertexAiModelSpec):
+class VertexAiLlama2Spec(VertexAiModelSpec):
   """Spec for running the Llama2 7b model."""
 
-  MODEL_NAME = 'llama2_7b'
+  MODEL_NAME: str = 'llama2'
+  MODEL_SIZE: list[str] = ['7b', '70b']
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -351,12 +355,21 @@ class VertexAiLlama27bSpec(VertexAiModelSpec):
         '-m',
         'vllm.entrypoints.api_server',
     ]
-    self.model_bucket_suffix = os.path.join('llama2', 'llama2-7b-hf')
+    self.model_bucket_suffix = os.path.join(
+        'llama2', f'llama2-{self.model_size}-hf'
+    )
     self.serving_container_args = VLLM_ARGS
     self.serving_container_ports = [7080]
     self.serving_container_predict_route = '/generate'
     self.serving_container_health_route = '/ping'
-    self.machine_type = 'g2-standard-8'
+    # Machine type from deployment notebook:
+    # https://pantheon.corp.google.com/vertex-ai/colab/notebooks?e=13802955
+    if self.model_size == '7b':
+      self.machine_type = 'g2-standard-8'
+      self.accelerator_count = 1
+    else:
+      self.machine_type = 'g2-standard-96'
+      self.accelerator_count = 8
     self.accelerator_type = 'NVIDIA_L4'
 
   def GetEnvironmentVariables(self, **kwargs) -> dict[str, str]:
