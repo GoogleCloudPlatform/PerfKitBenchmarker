@@ -372,6 +372,7 @@ class BenchmarkSpec:
 
       master_group_spec = copy.copy(base_vm_spec)
       master_group_spec.vm_count = 1
+      master_group_spec.disk_spec = None
       self.vms_to_boot['master_group'] = master_group_spec
     self.resources.append(self.dpb_service)
 
