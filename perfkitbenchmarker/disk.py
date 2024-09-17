@@ -508,7 +508,7 @@ class BaseDisk(resource.BaseResource):
     """Detaches the disk from a VM."""
     self.detach_start_time = time.time()
     self._Detach()
-    self.detach_end_time = time.time()
+    self.detach_end_time = self.detach_end_time or time.time()
 
   def _Detach(self):
     """Detaches the disk from a VM."""

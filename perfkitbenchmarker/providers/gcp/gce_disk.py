@@ -425,9 +425,9 @@ class GceDisk(disk.BaseDisk):
     if self.multi_writer_disk:
       cmd.flags['access-mode'] = 'READ_WRITE_MANY'
     self.create_disk_start_time = time.time()
-    _, stderr, retcode = cmd.Issue(raise_on_failure=False)
+    stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
-    self.create_disk_end_time = time.time()
+    self.create_disk_end_time = self._GetCreateEndTime(stdout)
 
   def _Delete(self):
     """Deletes the disk."""
@@ -471,6 +471,16 @@ class GceDisk(disk.BaseDisk):
     """Returns the end time of the attach operation."""
     attach_end_time = time.time()
     return attach_end_time
+
+  def _GetCreateEndTime(self, cmd_issue_response: str):
+    """Returns the end time of the attach operation."""
+    create_end_time = time.time()
+    return create_end_time
+
+  def _GetDetachEndTime(self, cmd_issue_response: str):
+    """Returns the end time of the attach operation."""
+    detach_end_time = time.time()
+    return detach_end_time
 
   @vm_util.Retry(
       poll_interval=30,
@@ -553,8 +563,9 @@ class GceDisk(disk.BaseDisk):
 
     if self.replica_zones:
       cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
-    cmd.IssueRetryable()
+    stdout, _ = cmd.IssueRetryable()
     self.attached_vm_name = None
+    self.detach_end_time = self._GetDetachEndTime(stdout)
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
