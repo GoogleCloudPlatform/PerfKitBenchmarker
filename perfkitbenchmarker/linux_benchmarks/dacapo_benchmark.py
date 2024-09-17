@@ -64,6 +64,9 @@ dacapo:
   vm_groups:
     default:
       vm_spec: *default_single_core
+  flags:
+    # TODO(user): Upgrade if Dacapo is updated to 23.11+
+    openjdk_version: 11
 """
 _PASS_PATTERN = re.compile(r'^=====.*PASSED in (\d+) msec =====$')
 
