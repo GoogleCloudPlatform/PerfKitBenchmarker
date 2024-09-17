@@ -122,7 +122,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     """Moves the SQL Server temporary database to LocalSSD."""
     vms = [self.server_vm]
     if self.spec.high_availability_type == "AOAG" and self.replica_vms:
-      vms.append(self.replica_vms[0])
+      vms.append(self.replica_vms)
 
     # Moves the SQL Server temporary database to LocalSSD.
     for vm in vms:
@@ -162,8 +162,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
               )
           )
 
-        vm.RemoteCommand("net stop mssqlserver /y")
-        vm.RemoteCommand("net start mssqlserver")
+        vm.RemoteCommand("Restart-Service MSSQLSERVER -Force")
 
   def _SetupWindowsUnamangedDatabase(self):
     self.spec.database_username = "sa"
@@ -213,7 +212,9 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
       )
 
     self.spec.database_username = "sa"
-    self.spec.database_password = vm_util.GenerateRandomWindowsPassword()
+    self.spec.database_password = vm_util.GenerateRandomWindowsPassword(
+        password_length=vm_util.PASSWORD_LENGTH, special_chars="*!@#+"
+    )
 
     self.server_vm.Install(mssql_name)
     self.server_vm.RemoteCommand(
@@ -273,7 +274,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
   def MoveSQLServerTempDBLinux(self):
     vm = self.server_vm
     stdout, _ = vm.RemoteCommand(
-        "/opt/mssql-tools/bin/sqlcmd "
+        "/opt/mssql-tools/bin/sqlcmd -C "
         "-S localhost -U sa -P \'{}\' -h -1 -Q  \"SET NOCOUNT ON; "
         "SELECT f.name + SUBSTRING(f.physical_name, "
         "CHARINDEX('.', f.physical_name), LEN(f.physical_name) -1) "
@@ -291,7 +292,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     for tmp_db_file in tmp_db_files_list:
       tmp_db_name = tmp_db_file.split(".")[0]
       vm.RemoteCommand(
-          "/opt/mssql-tools/bin/sqlcmd "
+          "/opt/mssql-tools/bin/sqlcmd -C "
           "-S localhost -U sa -P \'{}\' -h -1 -Q "
           "\"ALTER DATABASE tempdb "
           "MODIFY FILE (NAME = [{}], "
@@ -752,9 +753,10 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
                                     " ".join(cmd_parameters)))
 
   def RestartDatabase(self):
+    """Restarts all the database services in the benchmark."""
     vms = [self.server_vm]
     if self.spec.high_availability and self.replica_vms:
-      vms.append(self.replica_vms[0])
+      vms.append(self.replica_vms)
     for vm in vms:
       if vm.BASE_OS_TYPE == os_types.WINDOWS:
         vm.RemoteCommand("Restart-Service MSSQLSERVER -Force")
@@ -872,10 +874,10 @@ def _TuneForSQL(vm):
 def ConfigureSQLServerLinux(vm, username: str, password: str):
   """Update the username and password on a SQL Server."""
   vm.RemoteCommand(
-      f'/opt/mssql-tools/bin/sqlcmd -Q "ALTER LOGIN {username} ENABLE;"'
+      f'/opt/mssql-tools/bin/sqlcmd -C -Q "ALTER LOGIN {username} ENABLE;"'
   )
   vm.RemoteCommand(
-      "/opt/mssql-tools/bin/sqlcmd -Q "
-      f"\"ALTER LOGIN sa WITH PASSWORD = '{password}' ;\""
+      "/opt/mssql-tools/bin/sqlcmd -C -Q "
+      f"\"ALTER LOGIN sa WITH PASSWORD = '{password}';\""
   )
   vm.RemoteCommand("sudo systemctl restart mssql-server")

@@ -42,3 +42,34 @@ def YumInstall(vm):
       r'echo export PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bashrc'
   )
   vm.RemoteCommand('source ~/.bashrc')
+
+
+def ZypperInstall(vm):
+  """Installs the ms sql package on the SLES VM."""
+  vm.RemoteCommand('sudo zypper install -y glibc')
+  vm.RemoteCommand(
+      'sudo zypper addrepo -fc'
+      ' https://packages.microsoft.com/config/sles/15/mssql-server-2019.repo'
+  )
+  vm.RemoteCommand(
+      'sudo zypper ar'
+      ' https://packages.microsoft.com/config/sles/15/prod.repo')
+  vm.RemoteCommand('sudo zypper --gpg-auto-import-keys refresh')
+  vm.RemoteCommand(
+      'sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc'
+  )
+  vm.RemoteCommand('sudo zypper install -y mssql-server')
+
+  vm.RemoteCommand(
+      'sudo ACCEPT_EULA=Y zypper install -y mssql-tools18 unixODBC-devel'
+      ' glibc-locale-base'
+  )
+
+  vm.RemoteCommand('sudo ln -s /opt/mssql-tools18 /opt/mssql-tools')
+  vm.RemoteCommand(r'echo PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bash_profile')
+  vm.RemoteCommand(
+      r'echo export PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bashrc'
+  )
+  vm.RemoteCommand('source ~/.bashrc')
+
+
