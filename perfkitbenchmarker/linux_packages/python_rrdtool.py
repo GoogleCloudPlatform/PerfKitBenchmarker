@@ -13,18 +13,21 @@
 # limitations under the License.
 
 
-"""Module containing build tools installation and cleanup functions."""
+"""Module containing Python RRDtool installation and cleanup functions."""
+
+
+def _Install(vm, dev_package: str):
+  """Installs python rrdtool on the VM."""
+  vm.Install('pip')
+  vm.InstallPackages('rrdtool ' + dev_package)
+  vm.RemoteCommand('sudo pip3 install rrdtool')
 
 
 def YumInstall(vm):
   """Installs python rrdtool on the VM."""
-  vm.InstallPackages('rrdtool')
-  vm.RemoteCommand('sudo dnf --enablerepo=powertools install -y rrdtool-devel')
-  vm.RemoteCommand('sudo pip3 install rrdtool')
+  _Install(vm, 'rrdtool-devel')
 
 
 def AptInstall(vm):
   """Installs python rrdtool on the VM."""
-  vm.InstallPackages('librrd-dev')
-  vm.InstallPackages('libpython3-dev')
-  vm.RemoteCommand('sudo pip install rrdtool')
+  _Install(vm, 'librrd-dev')
