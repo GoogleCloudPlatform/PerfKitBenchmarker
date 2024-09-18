@@ -26,13 +26,13 @@ def _Install(vm):
 
 def YumInstall(vm):
   """Installs the GCS boto plugin on the VM."""
-  vm.InstallPackages('gcc openssl-devel python-devel libffi-devel')
+  vm.InstallPackages('openssl-devel libffi-devel')
   _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the GCS boto plugin on the VM."""
-  vm.InstallPackages('gcc python-dev libffi-dev')
+  vm.InstallPackages('libffi-dev')
   _Install(vm)
 
 

@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Records system performance counters during benchmark runs using dstat.
+"""Records system performance counters during benchmark runs using pcp dstat.
 
-http://dag.wiee.rs/home-made/dstat/
+https://github.com/performancecopilot/pcp
 """
 
 
@@ -65,6 +65,11 @@ flags.DEFINE_string(
     '".*" to record all samples. Use "net" to record '
     'networking statistics.',
 )
+_DSTAT_FLAGS = flags.DEFINE_string(
+    'dstat_flags',
+    '',
+    'Flags to pass to dstat.',
+)
 FLAGS = flags.FLAGS
 
 
@@ -81,17 +86,11 @@ class _DStatCollector(base_collector.BaseCollector):
     vm.Install('dstat')
 
   def _CollectorRunCommand(self, vm, collector_file):
-    # List block devices so that I/O to each block device can be recorded.
-    block_devices, _ = vm.RemoteCommand(
-        'lsblk --nodeps --output NAME --noheadings'
-    )
-    block_devices = block_devices.splitlines()
     cmd = (
-        'pcp dstat --epoch -D total,{block_devices}'
-        ' -clrdngy -pms --noheaders --output {output} {dstat_interval} >'
-        ' /dev/null 2>&1 & echo $!'
+        'pcp dstat --epoch {flags} --noheaders --output {output} '
+        '{dstat_interval} > /dev/null 2>&1 & echo $!'
     ).format(
-        block_devices=','.join(block_devices),
+        flags=_DSTAT_FLAGS.value,
         output=collector_file,
         dstat_interval=self.interval or '',
     )
@@ -134,7 +133,8 @@ class _DStatCollector(base_collector.BaseCollector):
 
     def _Analyze(role, file):
       with open(
-          os.path.join(self.output_directory, os.path.basename(file))) as f:
+          os.path.join(self.output_directory, os.path.basename(file))
+      ) as f:
         fp = iter(f)
         labels, out = dstat.ParseCsvFile(fp)
         background_tasks.RunThreaded(

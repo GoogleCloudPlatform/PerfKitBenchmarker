@@ -13,11 +13,7 @@
 # limitations under the License.
 
 
-"""Module containing dstat installation and cleanup functions.
-
-TODO(user): Migrate to dool, because dstat is not maintained and broken
-in Python 3: https://github.com/dstat-real/dstat.
-"""
+"""Module containing Performance Co-Pilot installation and cleanup functions."""
 
 import csv
 import itertools
@@ -30,14 +26,14 @@ def ParseCsvFile(fp: TextIO) -> Tuple[List[str], np.ndarray]:
   """Parse pcp dstat results file in csv format.
 
   This is an example of a pcp dstat CSV output:
-      "pcp-dstat 5.0.3 CSV Output"
-      "Author:","PCP team <pcp@groups.io> and Dag Wieers <dag@wieers.com>"...
-      "Host:","pkb-d43f64f0-0",,,,"User:","perfkit"
-      "Cmdline:","pcp-dstat --epoch ... ,,,,"Date:","04 Aug 2023 01:14:42 UTC"
-      "epoch","total usage","load avg",,,"io/total",,,,"dsk/total",,"net/total",
-      "epoch",,"1m","5m","15m","read","writ","dsk/total:read"...,
-      1691111682,0.080,0.240,0.120,,,,,,,,,,,,,0,0,,224164,6772060...
-      1691111702,0.060,0.220,0.120,0,0.200,0,2.000,0,2.000,41...
+      "pcp-dstat 6.2.0 CSV Output"
+      "Author:","PCP team <pcp@groups.io> and Dag Wieers <dag@wieers.com>",,,...
+      "Host:","hostname",,,,"User:","perfkit"
+      "Cmdline:","pcp-dstat --epoch ... ,,,,"Date:","17 Sep 2024 00:51:58 UTC"
+      "epoch","total usage",,,,,"load avg",,,"io/total",,"dsk/nvme0n1",,"dsk/...
+      "epoch","total usage:usr","total usage:sys","total usage:idl","total us...
+      1726534318,,0.060,0.080,0.030,,,,,,,,,,,,0,0,,269852,15435280,61240,566...
+      1726534319,0.250,0,99.967,0,0,0.060,0.080,0.030,0,0,0,0,0,0,5266.245,67...
 
    There is always 4 lines of headers.
    Then comes a newline in some versions (not in 0.7.3).
