@@ -27,6 +27,7 @@ import datetime
 import functools
 import ipaddress
 import itertools
+import json
 import logging
 import os
 import re
@@ -630,6 +631,40 @@ class KubernetesPod:
     self.ip_address = pod.get('status', {}).get('podIP')
     return pod
 
+  def _ValidatePodHasNotFailed(self, status: dict[str, Any]):
+    """Raises an exception if the pod has failed."""
+    # Inspect the pod's status to determine if it succeeded, has failed, or is
+    # doomed to fail.
+    # https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/
+    phase = status['phase']
+    if phase == 'Succeeded':
+      return
+    elif phase == 'Failed':
+      raise FatalContainerException(
+          f'Pod {self.name} failed:\n{yaml.dump(status)}'
+      )
+    else:
+      for condition in status.get('conditions', []):
+        if (
+            condition['type'] == 'PodScheduled'
+            and condition['status'] == 'False'
+            and condition['reason'] == 'Unschedulable'
+        ):
+          # TODO(pclay): Revisit this when we scale clusters.
+          raise FatalContainerException(
+              f"Pod {self.name} failed to schedule:\n{condition['message']}"
+          )
+      for container_status in status.get('containerStatuses', []):
+        waiting_status = container_status['state'].get('waiting', {})
+        if waiting_status.get('reason') in [
+            'ErrImagePull',
+            'ImagePullBackOff',
+        ]:
+          raise FatalContainerException(
+              f'Failed to find container image for {self.name}:\n'
+              + yaml.dump(waiting_status.get('message'))
+          )
+
   def WaitForExit(self, timeout: int | None = None) -> dict[str, Any]:
     """Gets the finished running container."""
 
@@ -637,39 +672,13 @@ class KubernetesPod:
         timeout=timeout, retryable_exceptions=(RetriableContainerException,)
     )
     def _WaitForExit():
-      # Inspect the pod's status to determine if it succeeded, has failed, or is
-      # doomed to fail.
-      # https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/
       pod = self._GetPod()
       status = pod['status']
+      self._ValidatePodHasNotFailed(status)
       phase = status['phase']
       if phase == 'Succeeded':
         return pod
-      elif phase == 'Failed':
-        raise FatalContainerException(
-            f"Pod {self.name} failed:\n{yaml.dump(pod['status'])}"
-        )
       else:
-        for condition in status.get('conditions', []):
-          if (
-              condition['type'] == 'PodScheduled'
-              and condition['status'] == 'False'
-              and condition['reason'] == 'Unschedulable'
-          ):
-            # TODO(pclay): Revisit this when we scale clusters.
-            raise FatalContainerException(
-                f"Pod {self.name} failed to schedule:\n{condition['message']}"
-            )
-        for container_status in status.get('containerStatuses', []):
-          waiting_status = container_status['state'].get('waiting', {})
-          if waiting_status.get('reason') in [
-              'ErrImagePull',
-              'ImagePullBackOff',
-          ]:
-            raise FatalContainerException(
-                f'Failed to find container image for {status.name}:\n'
-                + yaml.dump(waiting_status.get('message'))
-            )
         raise RetriableContainerException(
             f'Pod phase ({phase}) not in finished phases.'
         )
@@ -693,6 +702,17 @@ class KubernetesContainer(KubernetesPod, BaseContainer):
         self.name,
         '--image=%s' % self.image,
         '--restart=Never',
+        # Allow scheduling on ARM nodes.
+        '--overrides',
+        json.dumps({
+            'spec': {
+                'tolerations': [{
+                    'operator': 'Exists',
+                    'key': 'kubernetes.io/arch',
+                    'effect': 'NoSchedule',
+                }]
+            }
+        }),
     ]
 
     limits = []
@@ -714,7 +734,9 @@ class KubernetesContainer(KubernetesPod, BaseContainer):
 
   def _IsReady(self):
     """Returns true if the container has stopped pending."""
-    return self._GetPod()['status']['phase'] != 'Pending'
+    status = self._GetPod()['status']
+    super()._ValidatePodHasNotFailed(status)
+    return status['phase'] != 'Pending'
 
 
 class KubernetesContainerService(BaseContainerService):
