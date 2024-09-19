@@ -285,14 +285,14 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS.client_vm_machine_type:
     vm_spec = config['vm_groups'][CLIENT_GROUP]['vm_spec']
-    for cloud in vm_spec:
-      config['vm_groups'][CLIENT_GROUP]['vm_spec'][cloud][
+    for cloud_value in vm_spec:
+      config['vm_groups'][CLIENT_GROUP]['vm_spec'][cloud_value][
           'machine_type'
       ] = FLAGS.client_vm_machine_type
   if FLAGS.db_machine_type:
     vm_spec = config['vm_groups'][CASSANDRA_GROUP]['vm_spec']
-    for cloud in vm_spec:
-      config['vm_groups'][CASSANDRA_GROUP]['vm_spec'][cloud][
+    for cloud_value in vm_spec:
+      config['vm_groups'][CASSANDRA_GROUP]['vm_spec'][cloud_value][
           'machine_type'
       ] = FLAGS.db_machine_type
   ConfigureVmGroups(
