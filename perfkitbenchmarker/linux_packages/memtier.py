@@ -40,7 +40,7 @@ from perfkitbenchmarker import vm_util
 import seaborn as sns
 
 GIT_REPO = 'https://github.com/RedisLabs/memtier_benchmark'
-GIT_TAG = '1.4.0'
+GIT_TAG = '2.1.1'
 MEMTIER_DIR = '%s/memtier_benchmark' % linux_packages.INSTALL_DIR
 APT_PACKAGES = (
     'build-essential autoconf automake libpcre3-dev '

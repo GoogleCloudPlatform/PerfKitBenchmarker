@@ -1799,7 +1799,7 @@ class MemtierTestCase(
             'memtier_run_count': 1,
             'memtier_run_mode': 'NORMAL_RUN',
             'memtier_threads': 4,
-            'memtier_version': '1.4.0',
+            'memtier_version': '2.1.1',
             'memtier_tls': False,
         },
     )
