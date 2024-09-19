@@ -427,7 +427,7 @@ class GceDisk(disk.BaseDisk):
     self.create_disk_start_time = time.time()
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
-    self.create_disk_end_time = self._GetCreateEndTime(stdout)
+    self.create_disk_end_time = self._GetEndTime(stdout)
 
   def _Delete(self):
     """Deletes the disk."""
@@ -467,20 +467,10 @@ class GceDisk(disk.BaseDisk):
   def Exists(self):
     return self._Exists()
 
-  def _GetAttachEndTime(self, cmd_issue_response: str):
+  def _GetEndTime(self, cmd_issue_response: str):
     """Returns the end time of the attach operation."""
-    attach_end_time = time.time()
-    return attach_end_time
-
-  def _GetCreateEndTime(self, cmd_issue_response: str):
-    """Returns the end time of the attach operation."""
-    create_end_time = time.time()
-    return create_end_time
-
-  def _GetDetachEndTime(self, cmd_issue_response: str):
-    """Returns the end time of the attach operation."""
-    detach_end_time = time.time()
-    return detach_end_time
+    end_time = time.time()
+    return end_time
 
   @vm_util.Retry(
       poll_interval=30,
@@ -510,7 +500,7 @@ class GceDisk(disk.BaseDisk):
       cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
     self.attach_start_time = time.time()
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
-    self.attach_end_time = self._GetAttachEndTime(stdout)
+    self.attach_end_time = self._GetEndTime(stdout)
 
     # Gcloud attach-disk commands may still attach disks despite being rate
     # limited.
@@ -565,7 +555,7 @@ class GceDisk(disk.BaseDisk):
       cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
     stdout, _ = cmd.IssueRetryable()
     self.attached_vm_name = None
-    self.detach_end_time = self._GetDetachEndTime(stdout)
+    self.detach_end_time = self._GetEndTime(stdout)
 
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""

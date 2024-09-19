@@ -651,6 +651,23 @@ class StripedDisk(BaseDisk):
         )
     return self.disk_create_time
 
+  def GetDetachTime(self):
+    if self.disk_detach_time:
+      return self.disk_detach_time
+    for disk_details in self.disks:
+      disk_details_detach_time = disk_details.GetDetachTime()
+      if not disk_details_detach_time:
+        raise ValueError(
+            'No create time found for disk %s' % disk_details.GetDeviceId()
+        )
+      if not self.disk_detach_time:
+        self.disk_detach_time = disk_details_detach_time
+      else:
+        self.disk_detach_time = max(
+            self.disk_detach_time, disk_details_detach_time
+        )
+    return self.disk_detach_time
+
   def IsNvme(self):
     for d in self.disks:
       if not d.IsNvme():
