@@ -24,6 +24,7 @@ from perfkitbenchmarker import virtual_machine
 # List of memory store types
 REDIS = 'REDIS'
 MEMCACHED = 'MEMCACHED'
+VALKEY = 'VALKEY'
 
 _REDIS_SHARDS_REGEX = r'(?s)slots\n(\d+)\n(\d+).+?port\n(\d+)\nip\n(\S+)'
 
@@ -72,6 +73,17 @@ REDIS_VERSIONS = [
     REDIS_7_X,
 ]
 
+# List of Valkey versions
+VALKEY_7_2 = 'VALKEY_7_2'
+VALKEY_VERSIONS = [
+    VALKEY_7_2,
+]  # pyformat: disable
+
+flags.DEFINE_string(
+    'managed_memory_store_type',
+    None,
+    'The type of the managed memory store, e.g. Redis, Valkey, etc.',
+)
 flags.DEFINE_string(
     'managed_memory_store_service_type',
     None,
@@ -229,7 +241,7 @@ class BaseManagedMemoryStore(resource.BaseResource):
         'managed_memory_store_zones': self.zones,
     })
     # Consider separating redis and memcached classes.
-    if self.MEMORY_STORE == REDIS:
+    if self.MEMORY_STORE in [REDIS, VALKEY]:
       self.metadata.update({
           'clustered': self._clustered,
           'shard_count': self.shard_count,

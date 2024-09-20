@@ -235,6 +235,10 @@ REDIS_NODE_TYPE = flags.DEFINE_enum(
     'gcp_redis_node_type',
     'redis-standard-small',
     [
+        'shared-core-nano',
+        'standard-small',
+        'highmem-medium',
+        'highmem-xlarge',
         'redis-shared-core-nano',
         'redis-standard-small',
         'redis-highmem-medium',
@@ -354,6 +358,11 @@ GCP_CREATE_DISKS_WITH_VM = flags.DEFINE_boolean(
 CLOUD_REDIS_API_OVERRIDE = flags.DEFINE_string(
     'gcp_cloud_redis_api_override',
     default='https://redis.googleapis.com/',
+    help='Cloud redis API endpoint override. Defaults to prod.',
+)
+CLOUD_VALKEY_API_OVERRIDE = flags.DEFINE_string(
+    'gcp_cloud_valkey_api_override',
+    default='https://memorystore.googleapis.com/',
     help='Cloud redis API endpoint override. Defaults to prod.',
 )
 GKE_API_OVERRIDE = flags.DEFINE_string(

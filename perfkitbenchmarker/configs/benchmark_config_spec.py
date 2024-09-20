@@ -848,7 +848,10 @@ class _MemoryStoreSpec(spec.BaseSpec):
             option_decoders.EnumDecoder,
             {
                 'default': None,
-                'valid_values': managed_memory_store.REDIS_VERSIONS,
+                'valid_values': (
+                    managed_memory_store.REDIS_VERSIONS
+                    + managed_memory_store.VALKEY_VERSIONS
+                ),
             },
         ),
         'service_type': (
@@ -862,6 +865,7 @@ class _MemoryStoreSpec(spec.BaseSpec):
                 'valid_values': [
                     managed_memory_store.REDIS,
                     managed_memory_store.MEMCACHED,
+                    managed_memory_store.VALKEY,
                 ],
             },
         ),
@@ -885,6 +889,8 @@ class _MemoryStoreSpec(spec.BaseSpec):
       config_values['zone'] = flag_values.zone[0]
     if flag_values['managed_memory_store_version'].present:
       config_values['version'] = flag_values.managed_memory_store_version
+    if flag_values['managed_memory_store_type'].present:
+      config_values['memory_store_type'] = flag_values.managed_memory_store_type
     if flag_values['managed_memory_store_service_type'].present:
       config_values['service_type'] = (
           flag_values.managed_memory_store_service_type
