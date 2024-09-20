@@ -689,7 +689,8 @@ class DebianBasedKubernetesVirtualMachine(
       # We assume that gsutil is installed to /usr/bin/gsutil on GCE VMs
       # ln -f is idempotent and can be called multiple times
       self.RemoteCommand(
-          f'ln -sf {google_cloud_sdk.GSUTIL_PATH} /usr/bin/gsutil'
+          'ln -sft /usr/bin '
+          f'{google_cloud_sdk.GCLOUD_PATH} {google_cloud_sdk.GSUTIL_PATH}'
       )
     elif self.cloud == 'AWS' and FLAGS.aws_preprovisioned_data_bucket:
       stat_function = aws_virtual_machine.GenerateStatPreprovisionedDataCommand

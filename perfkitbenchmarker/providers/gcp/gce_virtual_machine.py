@@ -1848,7 +1848,7 @@ def GenerateStatPreprovisionedDataCommand(
   Returns:
     The gcloud command to run.
   """
-  return 'gsutil stat gs://%s/%s/%s' % (
+  return 'gcloud storage ls gs://%s/%s/%s' % (
       FLAGS.gcp_preprovisioned_data_bucket,
       module_name,
       filename,
