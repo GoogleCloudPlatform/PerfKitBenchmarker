@@ -276,6 +276,10 @@ class BaseContainerRegistry(resource.BaseResource):
     """
     raise NotImplementedError()
 
+  def PreRemotePush(self, image: ContainerImage):
+    """Prepares registry to push an image built remotely."""
+    pass
+
   def PrePush(self, image: ContainerImage):
     """Prepares registry to push a given image."""
     pass
@@ -343,9 +347,10 @@ class BaseContainerRegistry(resource.BaseResource):
       image: The PKB name for the image (string).
     """
     image = ContainerImage(image)
-    build_start = time.time()
     if not FLAGS.local_container_build:
       try:
+        self.PreRemotePush(image)
+        build_start = time.time()
         # Build the image remotely using an image building service.
         self.RemoteBuild(image)
         self.remote_build_times[image.name] = time.time() - build_start

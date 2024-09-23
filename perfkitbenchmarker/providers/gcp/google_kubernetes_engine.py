@@ -62,47 +62,76 @@ def _CalculateCidrSize(nodes: int) -> int:
   return min(cidr_size, 19)
 
 
-class GoogleContainerRegistry(container_service.BaseContainerRegistry):
-  """Class for building and storing container images on GCP."""
+class GoogleArtifactRegistry(container_service.BaseContainerRegistry):
+  """Class for building/storing container images on GCP w/ Artifact Registry."""
 
   CLOUD = provider_info.GCP
 
   def __init__(self, registry_spec):
     super().__init__(registry_spec)
     self.project = self.project or util.GetDefaultProject()
+    self.region = util.GetRegionFromZone(self.zone)
+    self.hostname = f'{self.region}-docker.pkg.dev'
 
   def GetFullRegistryTag(self, image: str) -> str:
     """Gets the full tag of the image."""
-    region = util.GetMultiRegionFromRegion(util.GetRegionFromZone(self.zone))
-    hostname = '{region}.gcr.io'.format(region=region)
-    full_tag = '{hostname}/{project}/{name}'.format(
-        hostname=hostname, project=self.project.replace(':', '/'), name=image
-    )
+    project = self.project.replace(':', '/')
+    full_tag = f'{self.hostname}/{project}/{image}'
     return full_tag
 
   def Login(self):
     """Configure docker to be able to push to remote repo."""
     # TODO(pclay): Don't edit user's docker config. It is idempotent.
-    cmd = util.GcloudCommand(self, 'auth', 'configure-docker')
+    cmd = util.GcloudCommand(
+        self, 'auth', 'configure-docker', self.hostname
+    )
     del cmd.flags['zone']
     cmd.Issue()
+
+  def PreRemotePush(self, image: container_service.ContainerImage):
+    """Prepares registry to push an image built remotely."""
+    self.PrePush(image)
+
+  def PrePush(self, image: container_service.ContainerImage):
+    """Prepares registry to push a given image."""
+    if not _CONTAINER_REMOTE_BUILD_CONFIG.value:
+      repo = image.name.split('/')[0]
+    else:
+      repo = _CONTAINER_REMOTE_BUILD_CONFIG.value.split('/')[0]
+    describe_cmd = util.GcloudCommand(
+        self,
+        'artifacts',
+        'repositories',
+        'describe',
+        repo,
+        f'--location={self.region}',
+    )
+    del describe_cmd.flags['zone']
+    _, err, _ = describe_cmd.Issue(raise_on_failure=False)
+    if not err or 'NOT_FOUND' not in err:
+      # Command succeeded, repository exists.
+      return
+    create_cmd = util.GcloudCommand(
+        self,
+        'artifacts',
+        'repositories',
+        'create',
+        repo,
+        '--repository-format=docker',
+        f'--location={self.region}',
+    )
+    del create_cmd.flags['zone']
+    create_cmd.Issue()
 
   def RemoteBuild(self, image: container_service.ContainerImage):
     """Build the image remotely."""
     if not _CONTAINER_REMOTE_BUILD_CONFIG.value:
       full_tag = self.GetFullRegistryTag(image.name)
-      build_cmd = util.GcloudCommand(
-          self, 'builds', 'submit', '--tag', full_tag, image.directory
-      )
     else:
-      build_cmd = util.GcloudCommand(
-          self,
-          'builds',
-          'submit',
-          '--config',
-          _CONTAINER_REMOTE_BUILD_CONFIG.value,
-          image.directory,
-      )
+      full_tag = _CONTAINER_REMOTE_BUILD_CONFIG.value
+    build_cmd = util.GcloudCommand(
+        self, 'builds', 'submit', '--tag', full_tag, image.directory
+    )
     del build_cmd.flags['zone']
     build_cmd.Issue(timeout=None)
 

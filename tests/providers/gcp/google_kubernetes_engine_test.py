@@ -99,6 +99,53 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
     yield issue_command
 
 
+class GoogleContainerRegistryTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  class FakeContainerImage(container_service.ContainerImage):
+
+    def __init__(self, name):
+      self.name = name
+      self.directory = f'docker/{name}/Dockerfile'
+
+  def setUp(self):
+    super().setUp()
+    self.enter_context(
+        mock.patch.object(
+            google_kubernetes_engine.container_service,
+            'ContainerImage',
+            self.FakeContainerImage,
+        )
+    )
+
+  def testFullRegistryTag(self):
+    spec = container_spec.ContainerRegistrySpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+        },
+    )
+    spec.zone = 'us-west-1a'
+    registry = google_kubernetes_engine.GoogleArtifactRegistry(spec)
+    self.assertEqual(
+        registry.GetFullRegistryTag('fakeimage'),
+        'us-west-docker.pkg.dev/test_project/fakeimage',
+    )
+
+  def testRemoteBuildCreateSucceeds(self):
+    spec = container_spec.ContainerRegistrySpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+        },
+    )
+    spec.zone = 'us-west-1a'
+    registry = google_kubernetes_engine.GoogleArtifactRegistry(spec)
+    self.enter_context(
+        mock.patch.object(util.GcloudCommand, 'Issue', return_value=('', '', 0))
+    )
+    registry._Build('fakeimage')
+
+
 class GoogleKubernetesEngineCustomMachineTypeTestCase(
     pkb_common_test_case.PkbCommonTestCase
 ):
