@@ -253,3 +253,13 @@ def _ValidatePreprovisionedDataAccess(flag_values: dict[str, Any]) -> bool:
       or flag_values[AWS_EC2_INSTANCE_PROFILE.name]
       or flag_values[AWS_EKS_POD_IDENTITY_ROLE.name]
   )
+
+# MemoryDB Flags
+MEMORYDB_NODE_TYPE = flags.DEFINE_string(
+    'aws_memorydb_node_type',
+    'db.r7g.large',
+    'The AWS node type to use for MemoryDB clusters.',
+)
+MEMORYDB_FAILOVER_ZONE = flags.DEFINE_string(
+    'aws_memorydb_failover_zone', None, 'AWS MemoryDB failover zone'
+)
