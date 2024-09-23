@@ -76,7 +76,7 @@ class ConstructCloudValkeyTestCase(pkb_common_test_case.PkbCommonTestCase):
     """)
     FLAGS['managed_memory_store_type'].parse('VALKEY')
     FLAGS['managed_memory_store_service_type'].parse('memorystore')
-    FLAGS['managed_memory_store_version'].parse('VALKEY_8_0')
+    FLAGS['managed_memory_store_version'].parse('VALKEY_7_2')
     FLAGS['cloud_redis_region'].parse('us-central1')
     FLAGS['gcp_redis_zone_distribution'].parse('multi-zone')
     self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
@@ -92,7 +92,7 @@ class ConstructCloudValkeyTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.subTest('memory_store_type'):
       self.assertEqual(instance.MEMORY_STORE, managed_memory_store.VALKEY)
     with self.subTest('version'):
-      self.assertEqual(instance.version, 'VALKEY_8_0')
+      self.assertEqual(instance.version, 'VALKEY_7_2')
     with self.subTest('redis_region'):
       self.assertEqual(instance.location, 'us-central1')
     with self.subTest('zone_distribution'):
