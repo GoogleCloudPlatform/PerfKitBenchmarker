@@ -33,6 +33,12 @@ flags.DEFINE_integer(
     None,
     'Provisioned throughput (MB/s) for (SSD) volumes in AWS.',
 )
+AWS_NIC_QUEUE_COUNTS = flags.DEFINE_list(
+    'aws_nic_queue_counts',
+    None,
+    'The queue count of each NIC. Specify a list of key=value pairs, where key'
+    ' is the network device name and value is the queue count.',
+)
 
 flags.DEFINE_string(
     'aws_dax_node_type',
