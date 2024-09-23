@@ -53,9 +53,7 @@ def ExtractGroup(regex, text, group=1, flags=0):
   """
   match = re.search(regex, text, flags=flags)
   if not match:
-    raise NoMatchError(
-        'No match for pattern "{}" in "{}"'.format(regex, text)
-    )
+    raise NoMatchError('No match for pattern "{}" in "{}"'.format(regex, text))
 
   try:
     return match.group(group)
@@ -137,9 +135,7 @@ def ExtractAllMatches(regex: Union[str, re.Pattern[str]], text, flags=0):
   """
   match = re.findall(regex, text, flags=flags)
   if not match:
-    raise NoMatchError(
-        'No match for pattern "{}" in "{}"'.format(regex, text)
-    )
+    raise NoMatchError('No match for pattern "{}" in "{}"'.format(regex, text))
   return match
 
 
