@@ -8,7 +8,7 @@ __Overview__ and complete the following 3 sections:
 
 *   [__Set up__](#set-up)
 *   [__Task 1. Install PerfKit Benchmarker__](#task-1-install-perfkit-benchmarker)
-*   [__Task 2. Start one benchmark test__](#task-2-start-one-benchmark-test)
+*   [__Task 2. Code Changes and Testing__](#task-2-code-changes-and-testing)
 *   [__Task 5. Explore the results of a benchmark test__](#task-5-explore-the-results-of-a-benchmark-test)
 
 ## Overview
@@ -263,14 +263,40 @@ In this lab, you use Cloud Shell and the
 > reviewing the
 > [README in the PKB repo](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker).
 
-## Task 2. Testing
+## Task 2. Code Changes and Testing
 
-### Unit Tests
-Run the unit tests and make sure they succeed:
+### Making a code change
+1.    Use the "Open Editor" button on the top bar of Cloud Shell (towards the right side) to switch to IDE view.
 
-```
-python -m unittest discover -s tests -p '*test.py' -v
-```
+1.    Make any necessary change and add a unit test for the change.
+
+1.    Run unit tests and make sure they succeed:
+
+      ```
+      python -m unittest discover -s tests -p '*test.py' -v
+      ```
+
+1.    For a single test, run
+
+      ```
+      python -m unittest discover -s tests -p '{test_name}' -v
+      ```
+
+1.    Run the pyink formatter on the file(s) that were changed.
+
+      Check the changed file for formatting without changing the file:
+
+      ```
+      pyink --pyink-indentation 2 --pyink-use-majority-quotes --unstable --line-length=80 --check --diff {file_path}
+      ```
+
+      Format the file:
+
+      ```
+      pyink --pyink-indentation 2 --pyink-use-majority-quotes --unstable --line-length=80 {file_path}
+      ```
+
+1.    Switch back to IDE mode and verify any formatting change that was made.
 
 ### Benchmark Testing
 The `--benchmarks` flag is used to select the benchmark(s) run.
@@ -387,16 +413,6 @@ While __iperf__ is running, explore PKB benchmarks and flags.
     cd $HOME/PerfKitBenchmarker
     ```
 
-1.  Review all the global flags for PKB.
-
-    ```
-    ./pkb.py --helpmatch=pkb
-    ```
-
-    PKB includes the `--helpmatch` flag which can be used to discover details
-    about benchmarks and related configuration flags. You can pass `--helpmatch`
-    a regex and it will print related help text.
-
 1.  Review the full list of benchmarks available.
 
     ```
@@ -407,7 +423,7 @@ While __iperf__ is running, explore PKB benchmarks and flags.
     The `--benchmarks` flag, you used it previously, selects a specific
     benchmark or benchmark set.
 
-    You should see around 80 different benchmarks available to run, within the
+    You should see around 116+ different benchmarks available to run, within the
     linux_benchmarks and windows_benchmarks collections.
 
     PKB has a naming convention for benchmarks of
