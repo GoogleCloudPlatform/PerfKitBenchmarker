@@ -168,7 +168,7 @@ def GetCommonMetadata(custom_metadata: Dict[str, Any] | None = None) -> str:
 
 
 def GetMetadataSamples(
-    cloud_harmony_metadata: List[Dict[Any, Any]]
+    cloud_harmony_metadata: List[Dict[Any, Any]],
 ) -> List[sample.Sample]:
   """Returns the cloudharmony metadata as a list of samples.
 
