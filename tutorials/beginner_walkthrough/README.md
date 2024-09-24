@@ -238,10 +238,16 @@ In this lab, you use Cloud Shell and the
     export CLOUDSDK_PYTHON=$HOME/my_virtualenv/bin/python
     ```
 
-1.  Clone the PerfKitBenchmarker repository.
+1.  If you intend to submit pull requests, make a fork of the PerfKitBenchmarker repository. This can be done in the Github UI or using the github repo fork command. If using the fork command, reply 'Y' to cloning the repository.
 
     ```
-    cd $HOME && git clone https://github.com/GoogleCloudPlatform/PerfKitBenchmarker.git
+    gh repo fork GoogleCloudPlatform/PerfKitBenchmarker
+    ```
+
+1.  Clone the PerfKitBenchmarker repository if you did not clone the repository in the previous step. If you did not make a fork, the github_username will be GoogleCloudPlatform.
+
+    ```
+    cd $HOME && git clone https://github.com/{github_username}/PerfKitBenchmarker
     ```
 
     ```
