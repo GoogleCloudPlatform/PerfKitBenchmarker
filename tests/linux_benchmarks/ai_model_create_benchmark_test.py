@@ -1,4 +1,3 @@
-from typing import Any
 # Copyright 2024 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,39 +21,10 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import ai_model_create_benchmark
-from perfkitbenchmarker.resources import managed_ai_model
 from tests import pkb_common_test_case
+from tests.resources import fake_managed_ai_model
 
 FLAGS = flags.FLAGS
-
-
-class ManagedAiModelImplementation(managed_ai_model.BaseManagedAiModel):
-  CLOUD = 'TEST'
-
-  def __init__(self, **kwargs: Any) -> Any:
-    super().__init__(**kwargs)
-    self.existing_endpoints: list[str] = ['one-endpoint']
-
-  def GetRegionFromZone(self, zone: str) -> str:
-    return zone + '-region'
-
-  def _SendPrompt(
-      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
-  ) -> list[str]:
-    return [prompt]
-
-  def ListExistingEndpoints(self, region: str | None = None) -> list[str]:
-    del region
-    return self.existing_endpoints
-
-  def _Create(self) -> None:
-    pass
-
-  def _Delete(self) -> None:
-    pass
-
-  def _InitializeNewModel(self) -> managed_ai_model.BaseManagedAiModel:
-    return ManagedAiModelImplementation()
 
 
 class AiModelCreateBenchmarkTest(
@@ -70,7 +40,7 @@ class AiModelCreateBenchmarkTest(
     self.bm_spec = benchmark_spec.BenchmarkSpec(
         ai_model_create_benchmark, config_spec, 'benchmark_uid'
     )
-    self.bm_spec.ai_model = ManagedAiModelImplementation()
+    self.bm_spec.ai_model = fake_managed_ai_model.FakeManagedAiModel()
     self.bm_spec.resources.append(self.bm_spec.ai_model)
 
   def testBenchmarkPassesForOneModel(self):
