@@ -186,6 +186,36 @@ In Cloud Shell, disable OS Login for the project.
 gcloud compute project-info add-metadata --metadata enable-oslogin=FALSE
 ```
 
+### Set up python 3.11 virtual environment
+
+Perfkitbenchmarker requires python 3.11 to run. Default GCP cloud console comes with
+python 3.10. In this section, we will be installing python 3.11.
+
+1.  In Cloud Shell, run the following commands.
+
+    ```
+    # install pyenv to install python on persistent home directory
+    curl https://pyenv.run | bash
+
+    # add to path
+    echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bashrc
+    echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+    echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
+
+    # updating bashrc
+    source ~/.bashrc
+
+    # install python 3.11 and make default
+    pyenv install 3.11
+    pyenv global 3.11
+    ```
+
+1.  Verify that python 3.11 is installed:
+
+    ```
+    python -V
+    ```
+
 ## Task 1. Install PerfKit Benchmarker
 
 In this lab, you use Cloud Shell and the
@@ -195,7 +225,7 @@ In this lab, you use Cloud Shell and the
 
     ```
     sudo apt-get install python3-venv -y
-    python3 -m venv $HOME/my_virtualenv
+    python -m venv $HOME/my_virtualenv
     ```
 
     ```
@@ -223,6 +253,7 @@ In this lab, you use Cloud Shell and the
     ```
     pip install --upgrade pip
     pip install -r requirements.txt
+    pip install -r requirements-testing.txt
     ```
 
 > __Note__: As part of this lab, you will will run a few basic tests on Google
@@ -232,8 +263,16 @@ In this lab, you use Cloud Shell and the
 > reviewing the
 > [README in the PKB repo](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker).
 
-## Task 2. Start one benchmark test
+## Task 2. Testing
 
+### Unit Tests
+Run the unit tests and make sure they succeed:
+
+```
+python -m unittest discover -s tests -p '*test.py' -v
+```
+
+### Benchmark Testing
 The `--benchmarks` flag is used to select the benchmark(s) run.
 
 Not supplying `--benchmarks` is the same as using `--benchmarks="standard_set"`,

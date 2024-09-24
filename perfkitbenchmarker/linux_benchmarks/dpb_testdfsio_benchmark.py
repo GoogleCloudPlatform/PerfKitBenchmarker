@@ -22,8 +22,9 @@ parameter values. Each file is accessed in a separate map task.
 """
 
 import copy
+import logging
+import time
 from typing import List
-
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_constants
@@ -76,6 +77,11 @@ flags.DEFINE_list(
     'A list of number of dfsio files to use during individual runs.',
 )
 
+flags.DEFINE_integer(
+    'dfsio_delay_read_sec',
+    0,
+    'Time to wait in seconds before reading the files.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -194,6 +200,11 @@ def RunTestDfsio(service, command, data_dir, num_files, file_size):
       or data_dir.startswith('/')
   ):
     properties['fs.default.name'] = data_dir
+  if command == READ and FLAGS.dfsio_delay_read_sec:
+    logging.info(
+        'Sleeping for %s seconds before reading', FLAGS.dfsio_delay_read_sec
+    )
+    time.sleep(FLAGS.dfsio_delay_read_sec)
   return service.SubmitJob(
       classname='org.apache.hadoop.fs.TestDFSIO',
       properties=properties,
