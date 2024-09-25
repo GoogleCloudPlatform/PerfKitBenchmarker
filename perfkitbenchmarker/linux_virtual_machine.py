@@ -1882,6 +1882,22 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     )
     self.RemoteHostCommand(cmd)
 
+  def IsDiskFormatted(self, dev_name, num_partitions):
+    """Checks if the disk is formatted.
+
+    Args:
+      dev_name: The name of the device.
+      num_partitions: The number of new partitions to create.
+
+    Returns:
+      True if the disk is already formatted with given number of partitions.
+    """
+    # Check how many partition are already created for the given disk.
+    ret, _ = self.RemoteHostCommand(
+        f'ls /dev/disk/by-id/ | grep "{dev_name}-part" | wc -l'
+    )
+    return ret and int(ret) == num_partitions
+
   def PartitionDisk(self, dev_name, dev_path, num_partitions, partition_size):
     """Partitions the disk into smaller pieces.
 

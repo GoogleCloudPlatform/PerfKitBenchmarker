@@ -237,14 +237,25 @@ def Prepare(benchmark_spec):
   clients = benchmark_spec.vm_groups['clients']
   num_client_vms = len(clients)
   servers = benchmark_spec.vm_groups['workers']
+  # VMs where the server is not up yet.
+  servers_not_up = [
+      server
+      for server in servers
+      if not aerospike_server.IsServerUp(server)
+  ]
 
   seed_ips = [vm.internal_ip for vm in servers]
-  aerospike_install_fns = [
-      functools.partial(
-          aerospike_server.ConfigureAndStart, vm, seed_node_ips=seed_ips
-      )
-      for vm in servers
-  ]
+  aerospike_install_fns = []
+  if servers_not_up:
+    # Prepare the VMs where the server isn't up yet.
+    aerospike_install_fns = [
+        functools.partial(
+            aerospike_server.ConfigureAndStart,
+            vm,
+            seed_node_ips=seed_ips,
+        )
+        for vm in servers
+    ]
   if FLAGS.aerospike_enable_strong_consistency:
     for server in servers:
       aerospike_server.EnableStrongConsistency(

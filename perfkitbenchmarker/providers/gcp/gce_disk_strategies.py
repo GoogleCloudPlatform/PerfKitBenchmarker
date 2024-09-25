@@ -264,6 +264,9 @@ class SetUpPartitionedGceLocalDiskStrategy(SetUpGCEResourceDiskStrategy):
         raise errors.Error('Unknown Local SSD Interface.')
       raw_disk = gce_disk.GceLocalDisk(self.disk_spec, name)
       self.vm.local_disk_counter += 1
+      if self.vm.IsDiskFormatted(name, self.disk_spec.num_partitions):
+        # Skip if already partitioned/formatted.
+        continue
       partitions = self.vm.PartitionDisk(
           name,
           raw_disk.GetDevicePath(),
