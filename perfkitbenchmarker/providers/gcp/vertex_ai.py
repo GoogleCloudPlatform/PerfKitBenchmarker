@@ -43,7 +43,6 @@ MODEL_BUCKET = os.path.join(BUCKET_URI, 'llama2')
 VLLM_ARGS = [
     '--host=0.0.0.0',
     '--port=7080',
-    '--tensor-parallel-size=1',
     '--swap-space=16',
     '--gpu-memory-utilization=0.95',
     '--max-model-len=2048',
@@ -358,7 +357,6 @@ class VertexAiLlama2Spec(VertexAiModelSpec):
     self.model_bucket_suffix = os.path.join(
         'llama2', f'llama2-{self.model_size}-hf'
     )
-    self.serving_container_args = VLLM_ARGS
     self.serving_container_ports = [7080]
     self.serving_container_predict_route = '/generate'
     self.serving_container_health_route = '/ping'
@@ -371,6 +369,10 @@ class VertexAiLlama2Spec(VertexAiModelSpec):
       self.machine_type = 'g2-standard-96'
       self.accelerator_count = 8
     self.accelerator_type = 'NVIDIA_L4'
+    self.serving_container_args = VLLM_ARGS
+    self.serving_container_args.append(
+        f'--tensor-parallel-size={self.accelerator_count}'
+    )
 
   def GetEnvironmentVariables(self, **kwargs) -> dict[str, str]:
     """Returns container's environment variables needed by Llama2."""
