@@ -1563,13 +1563,6 @@ class YCSBExecutor:
       A list of samples from the YCSB test at the specified CPU utilization.
     """
 
-    def _ExtractThroughput(samples: list[sample.Sample]) -> float:
-      """Gets the throughput recorded in the samples."""
-      for result in samples:
-        if result.metric == 'overall Throughput':
-          return result.value
-      return 0.0
-
     def _GetReadAndUpdateProportion(workload: str) -> tuple[float, float]:
       """Gets the starting throughput to start the test with."""
       with open(workload) as f:
@@ -1611,7 +1604,9 @@ class YCSBExecutor:
           )
         target_qps = int((upper_bound + lower_bound) / 2)
         run_samples = _ExecuteWorkload(target_qps)
-        measured_qps = _ExtractThroughput(run_samples)
+        run_p50_stats = ycsb_stats.ExtractStats(run_samples, 'p50')
+        run_p99_stats = ycsb_stats.ExtractStats(run_samples, 'p99')
+        measured_qps = run_p50_stats.throughput
         end_timestamp = datetime.datetime.fromtimestamp(
             run_samples[0].timestamp, tz=datetime.timezone.utc
         )
@@ -1627,10 +1622,11 @@ class YCSBExecutor:
             )
         )
         logging.info(
-            'Run had throughput target %s and measured throughput %s, with CPU'
-            ' utilization %s.',
+            'Run had throughput target %s and measured stats \n %s \n %s, '
+            'with CPU utilization %s.',
             target_qps,
-            measured_qps,
+            run_p50_stats,
+            run_p99_stats,
             cpu_utilization,
         )
         if cpu_utilization < CPU_OPTIMIZATION_TARGET_MIN.value:
