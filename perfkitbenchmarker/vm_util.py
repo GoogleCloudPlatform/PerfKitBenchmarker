@@ -139,6 +139,16 @@ flags.DEFINE_integer(
     '--ssh_server_alive_interval to configure how long to '
     'wait for unresponsive servers.',
 )
+_SSH_PUBLIC_KEY = flags.DEFINE_string(
+    'ssh_public_key',
+    None,
+    'File path to the SSH public key. If None, use the newly generated one.',
+)
+_SSH_PRIVATE_KEY = flags.DEFINE_string(
+    'ssh_private_key',
+    None,
+    'File path to the SSH private key. If None, use the newly generated one.',
+)
 
 
 class RetryError(Exception):
@@ -207,6 +217,17 @@ class IpAddressMetadata:
   EXTERNAL = 'external'
 
 
+def UseProvidedSSHKeys():
+  if (
+      _SSH_PUBLIC_KEY.value
+      and _SSH_PRIVATE_KEY.value
+      and os.path.isfile(_SSH_PUBLIC_KEY.value)
+      and os.path.isfile(_SSH_PRIVATE_KEY.value)
+  ):
+    return True
+  return False
+
+
 def GetTempDir():
   """Returns the tmp dir of the current run."""
   return temp_dir.GetRunDirPath()
@@ -223,7 +244,10 @@ def GenTempDir():
 
 
 def SSHKeyGen():
-  """Create PerfKitBenchmarker SSH keys in the tmp dir of the current run."""
+  """Use provided SSH keys or create PerfKitBenchmarker SSH keys in the tmp dir of the current run."""
+  if UseProvidedSSHKeys():
+    return
+
   if not os.path.isdir(GetTempDir()):
     GenTempDir()
 
@@ -244,10 +268,14 @@ def SSHKeyGen():
 
 
 def GetPrivateKeyPath():
+  if UseProvidedSSHKeys():
+    return _SSH_PRIVATE_KEY.value
   return PrependTempDir(PRIVATE_KEYFILE)
 
 
 def GetPublicKeyPath():
+  if UseProvidedSSHKeys():
+    return _SSH_PUBLIC_KEY.value
   return PrependTempDir(PUBLIC_KEYFILE)
 
 

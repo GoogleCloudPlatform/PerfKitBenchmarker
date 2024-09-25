@@ -1796,11 +1796,8 @@ def _CollectMeminfoHandler(
   samples.extend(background_tasks.RunThreaded(CollectMeminfo, linux_vms))
 
 
-def Main():
-  """Entrypoint for PerfKitBenchmarker."""
-  assert sys.version_info >= (3, 11), 'PerfKitBenchmarker requires Python 3.11+'
-  log_util.ConfigureBasicLogging()
-  _InjectBenchmarkInfoIntoDocumentation()
+def ParseArgs():
+  """Parse command line arguments ."""
   argv = flag_alias.AliasFlagsFromArgs(sys.argv)
   _ParseFlags(argv)
   if FLAGS.helpmatch:
@@ -1818,4 +1815,12 @@ def Main():
 
   CheckVersionFlag()
   SetUpPKB()
+
+
+def Main():
+  """Entrypoint for PerfKitBenchmarker."""
+  assert sys.version_info >= (3, 11), 'PerfKitBenchmarker requires Python 3.11+'
+  log_util.ConfigureBasicLogging()
+  _InjectBenchmarkInfoIntoDocumentation()
+  ParseArgs()
   return RunBenchmarks()

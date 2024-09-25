@@ -148,6 +148,16 @@ _VM_INSTANCE_NAME_SUFFIX = flags.DEFINE_string(
         ' pkb-{run_uri}-{instance_number}-{vm_instance_name_suffix}'
     ),
 )
+_VM_NAME_PREFIX = flags.DEFINE_string(
+    'vm_name_prefix',
+    None,
+    (
+        'Optional, a prefix to add after the VM instance name. Without this,'
+        ' instance is named as pkb-{run_uri}-{instance_number}. With this'
+        ' option, the instance name will be'
+        ' {prefix}-{instance_number}-{vm_instance_name_suffix}'
+    ),
+)
 _REQUIRED_CPU_VERSION = flags.DEFINE_string(
     'required_cpu_version',
     None,
@@ -533,14 +543,19 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     super().__init__()
     with self._instance_counter_lock:
       self.instance_number = self._instance_counter
+      name_prefix = (
+          _VM_NAME_PREFIX.value
+          if _VM_NAME_PREFIX.value
+          else f'pkb-{FLAGS.run_uri}'
+      )
       if _VM_INSTANCE_NAME_SUFFIX.value:
-        self.name = 'pkb-%s-%d-%s' % (
-            FLAGS.run_uri,
+        self.name = '%s-%d-%s' % (
+            name_prefix,
             self.instance_number,
             _VM_INSTANCE_NAME_SUFFIX.value,
         )
       else:
-        self.name = 'pkb-%s-%d' % (FLAGS.run_uri, self.instance_number)
+        self.name = '%s-%d' % (name_prefix, self.instance_number)
       BaseVirtualMachine._instance_counter += 1
     self.disable_interrupt_moderation = vm_spec.disable_interrupt_moderation
     self.disable_rss = vm_spec.disable_rss
