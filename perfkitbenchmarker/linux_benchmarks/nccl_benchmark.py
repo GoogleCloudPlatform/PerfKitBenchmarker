@@ -124,7 +124,7 @@ RUN_CMD = (
     '--mca btl tcp,self '
     '--mca btl_tcp_if_exclude docker0,lo '
     '--bind-to none '
-    '-N {slots} -n {slots} '
+    '-N {slots} '
     '{env} '
     'nccl-tests/build/{operation}_perf '
     '--minbytes {minbytes} '
