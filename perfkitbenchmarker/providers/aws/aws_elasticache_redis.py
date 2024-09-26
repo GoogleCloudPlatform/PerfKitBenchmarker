@@ -93,9 +93,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
     """
     self.metadata.update({
         'cloud_redis_failover_style': self.failover_style,
-        'cloud_redis_version': managed_memory_store.ParseReadableVersion(
-            self.version
-        ),
+        'cloud_redis_version': self.GetReadableVersion(),
         'cloud_redis_node_type': self.node_type,
         'cloud_redis_region': self.redis_region,
         'cloud_redis_primary_zone': self._GetClientVm().zone,

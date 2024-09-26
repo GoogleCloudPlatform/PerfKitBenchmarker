@@ -74,25 +74,24 @@ class CloudValkey(managed_memory_store.BaseManagedMemoryStore):
     """
     self.metadata.update({
         'cloud_redis_region': self.location,
-        'cloud_redis_version': self.ParseReadableVersion(self.version),
+        'cloud_redis_version': self.GetReadableVersion(),
         'cloud_redis_node_type': self.node_type,
         'cloud_redis_zone_distribution': self.zone_distribution,
     })
     return self.metadata
 
-  @staticmethod
-  def ParseReadableVersion(version):
-    """Parses Redis major and minor version number."""
-    if version.count('_') < 2:
+  def GetReadableVersion(self):
+    """Parses Valkey major and minor version number."""
+    if self.version.count('_') < 2:
       logging.info(
           (
               'Could not parse version string correctly, '
-              'full Redis version returned: %s'
+              'full Valkey version returned: %s'
           ),
-          version,
+          self.version,
       )
-      return version
-    return '.'.join(version.split('_')[1:])
+      return self.version
+    return '.'.join(self.version.split('_')[1:])
 
   def _CreateServiceConnectionPolicy(self) -> None:
     """Creates a service connection policy for the VPC."""

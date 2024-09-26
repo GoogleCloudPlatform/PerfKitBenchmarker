@@ -129,9 +129,7 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
         'redis_cloud_shard_dollars_per_hr': self.shard_info.dollars_per_hr,
         'redis_cloud_shard_size_gb': self.shard_info.size_gb,
         'cloud_redis_region': self.redis_region,
-        'cloud_redis_version': managed_memory_store.ParseReadableVersion(
-            self.version
-        ),
+        'cloud_redis_version': self.GetReadableVersion(),
         'shard_count': self.shard_count,
         'replicas_per_shard': self.replicas_per_shard,
         'node_count': self.node_count,

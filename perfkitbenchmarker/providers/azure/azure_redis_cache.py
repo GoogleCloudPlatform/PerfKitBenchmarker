@@ -72,9 +72,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
         'cloud_redis_region': self.redis_region,
         'cloud_redis_azure_tier': self.azure_tier,
         'cloud_redis_azure_redis_size': self.azure_redis_size,
-        'cloud_redis_version': managed_memory_store.ParseReadableVersion(
-            self.version
-        ),
+        'cloud_redis_version': self.GetReadableVersion(),
     })
     return self.metadata
 

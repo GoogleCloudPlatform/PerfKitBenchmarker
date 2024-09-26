@@ -61,7 +61,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
       self.node_type = gcp_flags.REDIS_NODE_TYPE.value
       if self.zone_distribution == 'single-zone':
         self.zones = [FLAGS.zone[0]]
-    self.redis_version = spec.version or _DEFAULT_VERSION
+    self.version = spec.version or _DEFAULT_VERSION
     self.tier = self._GetTier()
     self.network = (
         'default'
@@ -112,7 +112,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
         'cloud_redis_failover_style': self.failover_style,
         'cloud_redis_size': self.size,
         'cloud_redis_region': self.redis_region,
-        'cloud_redis_version': self.ParseReadableVersion(self.redis_version),
+        'cloud_redis_version': self.GetReadableVersion(),
     })
     if self._clustered:
       self.metadata['cloud_redis_node_type'] = self.node_type
@@ -123,19 +123,18 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
       self.metadata['cloud_redis_tier'] = self.tier
     return self.metadata
 
-  @staticmethod
-  def ParseReadableVersion(version):
+  def GetReadableVersion(self):
     """Parses Redis major and minor version number."""
-    if version.count('_') < 2:
+    if self.version.count('_') < 2:
       logging.info(
           (
               'Could not parse version string correctly, '
               'full Redis version returned: %s'
           ),
-          version,
+          self.version,
       )
-      return version
-    return '.'.join(version.split('_')[1:])
+      return self.version
+    return '.'.join(self.version.split('_')[1:])
 
   def _CreateServiceConnectionPolicy(self) -> None:
     """Creates a service connection policy for the VPC."""
@@ -180,7 +179,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     cmd.flags['network'] = self.network
     cmd.flags['tier'] = self.tier
     cmd.flags['size'] = self.size
-    cmd.flags['redis-version'] = self.redis_version
+    cmd.flags['redis-version'] = self.version
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     return cmd
 

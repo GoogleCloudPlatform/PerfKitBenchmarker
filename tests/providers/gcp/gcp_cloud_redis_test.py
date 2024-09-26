@@ -68,14 +68,16 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertFalse(self.redis._Exists())
 
   def testReadableVersion(self):
-    self.assertEqual(self.redis.ParseReadableVersion('redis_6_x'), '6.x')
-    self.assertEqual(self.redis.ParseReadableVersion('redis_5_0'), '5.0')
+    self.redis.version = 'redis_6_x'
+    self.assertEqual(self.redis.GetReadableVersion(), '6.x')
 
   def testReadableVersionExtraneous(self):
-    self.assertEqual(self.redis.ParseReadableVersion('redis_8'), 'redis_8')
-    self.assertEqual(
-        self.redis.ParseReadableVersion('redis 9.7.5'), 'redis 9.7.5'
-    )
+    with self.subTest('redis_8'):
+      self.redis.version = 'redis_8'
+      self.assertEqual(self.redis.GetReadableVersion(), 'redis_8')
+    with self.subTest('redis 9.7.5'):
+      self.redis.version = 'redis 9.7.5'
+      self.assertEqual(self.redis.GetReadableVersion(), 'redis 9.7.5')
 
   class TimeSeries:
 
@@ -163,7 +165,7 @@ class ConstructCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.subTest('memory_store_type'):
       self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
     with self.subTest('redis_version'):
-      self.assertEqual(instance.redis_version, 'redis_6_x')
+      self.assertEqual(instance.version, 'redis_6_x')
 
   def testInitializationFlagOverrides(self):
     test_spec = inspect.cleandoc(f"""
@@ -191,7 +193,7 @@ class ConstructCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.subTest('memory_store_type'):
       self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
     with self.subTest('redis_version'):
-      self.assertEqual(instance.redis_version, 'redis_7_0')
+      self.assertEqual(instance.version, 'redis_7_0')
     with self.subTest('size'):
       self.assertEqual(instance.size, 100)
     with self.subTest('redis_region'):

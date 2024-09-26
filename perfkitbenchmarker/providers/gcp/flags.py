@@ -363,7 +363,7 @@ CLOUD_REDIS_API_OVERRIDE = flags.DEFINE_string(
 CLOUD_VALKEY_API_OVERRIDE = flags.DEFINE_string(
     'gcp_cloud_valkey_api_override',
     default='https://memorystore.googleapis.com/',
-    help='Cloud redis API endpoint override. Defaults to prod.',
+    help='Cloud valkey API endpoint override. Defaults to prod.',
 )
 GKE_API_OVERRIDE = flags.DEFINE_string(
     'gke_api_override',

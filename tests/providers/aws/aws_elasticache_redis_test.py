@@ -107,6 +107,24 @@ class AwsElasticacheRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
         expected_output, raise_on_failure=False
     )
 
+  def testReadableVersion(self):
+    """Test normal cases work as they should."""
+    with self.subTest('6.x'):
+      self.redis.version = '6.x'
+      self.assertEqual(self.redis.GetReadableVersion(), '6.x')
+    with self.subTest('4.0.10'):
+      self.redis.version = '4.0.10'
+      self.assertEqual(self.redis.GetReadableVersion(), '4.0')
+
+  def testReadableVersionExtraneous(self):
+    """Test weird cases just return the version number as is."""
+    with self.subTest('redis.8'):
+      self.redis.version = 'redis.8'
+      self.assertEqual(self.redis.GetReadableVersion(), 'redis.8')
+    with self.subTest('redis 9_7_5'):
+      self.redis.version = 'redis 9_7_5'
+      self.assertEqual(self.redis.GetReadableVersion(), 'redis 9_7_5')
+
 
 class ConstructElasticacheRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
 

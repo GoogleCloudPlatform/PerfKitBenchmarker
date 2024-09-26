@@ -161,29 +161,6 @@ def GetManagedMemoryStoreClass(
   )
 
 
-def ParseReadableVersion(version: str) -> str:
-  """Parses Redis major and minor version number.
-
-  Used for Azure and AWS versions.
-
-  Args:
-    version: String. Version string to get parsed.
-
-  Returns:
-    Parsed version
-  """
-  if version.count('.') < 1:
-    logging.info(
-        (
-            'Could not parse version string correctly,'
-            'full Redis version returned: %s'
-        ),
-        version,
-    )
-    return version
-  return '.'.join(version.split('.', 2)[:2])
-
-
 @dataclasses.dataclass
 class RedisShard:
   """An object representing a Redis shard.
@@ -232,6 +209,7 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self.zones = _ZONES.value
     self.multi_az = self._clustered and len(self.zones) > 1
 
+    self.version: str = None
     self.enable_tls = _TLS.value
 
     self._client_vms = None
@@ -323,3 +301,22 @@ class BaseManagedMemoryStore(resource.BaseResource):
   def _GetClientVm(self):
     """Conveniently returns the client VM to use for the instance."""
     return self._client_vms[0]
+
+  def GetReadableVersion(self) -> str:
+    """Parses Redis major and minor version number.
+
+    Used for Azure and AWS versions.
+
+    Returns:
+      Parsed version
+    """
+    if self.version.count('.') < 1:
+      logging.info(
+          (
+              'Could not parse version string correctly,'
+              'full Redis version returned: %s'
+          ),
+          self.version,
+      )
+      return self.version
+    return '.'.join(self.version.split('.', 2)[:2])
