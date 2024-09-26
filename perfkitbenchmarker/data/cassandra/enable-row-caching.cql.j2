@@ -1,0 +1,9 @@
+CREATE TABLE keyspace1.standard1 (
+    key blob PRIMARY KEY,
+    "C0" blob,
+    "C1" blob,
+    "C2" blob,
+    "C3" blob,
+    "C4" blob
+);
+ALTER TABLE keyspace1.standard1 WITH caching = {'keys': 'ALL', 'rows_per_partition': 'ALL'};

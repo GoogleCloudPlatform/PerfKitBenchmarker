@@ -40,7 +40,9 @@ from perfkitbenchmarker.linux_packages import cassandra
 
 
 NUM_KEYS_PER_CORE = 2000000
-PROPAGATION_WAIT_TIME = 30
+# Adding wait between prefill and the test workload to give some time
+# for the data to propage and for the cluster to stabilize.
+PROPAGATION_WAIT_TIME = 720
 
 # cassandra-stress command
 WRITE_COMMAND = 'write'
@@ -109,6 +111,19 @@ flags.DEFINE_integer(
     'cassandra_stress_retries',
     1000,
     'Number of retries when error encountered during stress.',
+)
+
+IS_ROW_CACHE_ENABLED = flags.DEFINE_bool(
+    'is_row_cache_enabled',
+    False,
+    'Enable row cache for the cassandra server.',
+)
+
+ROW_CACHE_SIZE = flags.DEFINE_integer(
+    'row_cache_size',
+    1000,
+    'Size of the row cache for cassandra in MiB if --is_row_cache_enabled is'
+    ' true.',
 )
 
 CASSANDRA_SERVER_ZONES = flags.DEFINE_list(
@@ -295,6 +310,30 @@ def GetConfig(user_config):
       config['vm_groups'][CASSANDRA_GROUP]['vm_spec'][cloud_value][
           'machine_type'
       ] = FLAGS.db_machine_type
+  if FLAGS.db_disk_type:
+    disk_spec = config['vm_groups'][CASSANDRA_GROUP]['disk_spec']
+    for cloud_value in disk_spec:
+      config['vm_groups'][CASSANDRA_GROUP]['disk_spec'][cloud_value][
+          'disk_type'
+      ] = FLAGS.db_disk_type
+  if FLAGS.db_disk_size:
+    disk_spec = config['vm_groups'][CASSANDRA_GROUP]['disk_spec']
+    for cloud_value in disk_spec:
+      config['vm_groups'][CASSANDRA_GROUP]['disk_spec'][cloud_value][
+          'disk_size'
+      ] = FLAGS.db_disk_size
+  if FLAGS.db_disk_iops:
+    disk_spec = config['vm_groups'][CASSANDRA_GROUP]['disk_spec']
+    for cloud_value in disk_spec:
+      config['vm_groups'][CASSANDRA_GROUP]['disk_spec'][cloud_value][
+          'provisioned_iops'
+      ] = FLAGS.db_disk_iops
+  if FLAGS.db_disk_throughput:
+    disk_spec = config['vm_groups'][CASSANDRA_GROUP]['disk_spec']
+    for cloud_value in disk_spec:
+      config['vm_groups'][CASSANDRA_GROUP]['disk_spec'][cloud_value][
+          'provisioned_throughput'
+      ] = FLAGS.db_disk_throughput
   ConfigureVmGroups(
       config, CASSANDRA_SERVER_ZONES.value, CASSANDRA_GROUP, cloud
   )
@@ -390,6 +429,8 @@ def GenerateMetadataFromFlags(benchmark_spec, cassandra_vms, client_vms):
       'population_parameters': ','.join(
           FLAGS.cassandra_stress_population_parameters
       ),
+      'is_row_cache_enabled': FLAGS.is_row_cache_enabled,
+      'row_cache_size': FLAGS.row_cache_size,
   })
 
   if FLAGS.cassandra_stress_command == USER_COMMAND:
@@ -767,6 +808,5 @@ def Cleanup(benchmark_spec):
   """
   vm_dict = benchmark_spec.vm_groups
   cassandra_vms = vm_dict[CASSANDRA_GROUP]
-
   background_tasks.RunThreaded(cassandra.Stop, cassandra_vms)
   background_tasks.RunThreaded(cassandra.CleanNode, cassandra_vms)

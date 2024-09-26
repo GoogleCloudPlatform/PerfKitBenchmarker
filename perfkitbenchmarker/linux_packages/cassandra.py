@@ -42,6 +42,7 @@ CASSANDRA_RACKDC_TEMPLATE = 'cassandra/cassandra-rackdc.properties.j2'
 CASSANDRA_KEYSPACE_TEMPLATE = (
     'cassandra/create-keyspace-cassandra-stress.cql.j2'
 )
+CASSANDRA_ROW_CACHE_TEMPLATE = 'cassandra/enable-row-caching.cql.j2'
 CASSANDRA_VERSION = 'apache-cassandra-4.1.5'
 CASSANDRA_DIR = posixpath.join(linux_packages.INSTALL_DIR, CASSANDRA_VERSION)
 CASSANDRA_PID = posixpath.join(CASSANDRA_DIR, 'cassandra.pid')
@@ -180,7 +181,11 @@ def Configure(vm, seed_vms):
       ),
       'datacenter': 'datacenter',
       'rack': vm.zone,
+      'row_cache_size': (
+          f'{FLAGS.row_cache_size}MiB' if FLAGS.is_row_cache_enabled else '0MiB'
+      ),
   }
+  logging.info('cassandra yaml context: %s', context)
   for template in [CASSANDRA_YAML_TEMPLATE, CASSANDRA_RACKDC_TEMPLATE]:
     local_path = data.ResourcePath(template)
     cassandra_conf_path = posixpath.join(CASSANDRA_DIR, 'conf')
@@ -204,8 +209,15 @@ def Start(vm):
 
 def CreateKeyspace(vm, replication_factor):
   """Create a keyspace on a VM."""
-  template_path = data.ResourcePath(CASSANDRA_KEYSPACE_TEMPLATE)
+  RunCql(vm, CASSANDRA_KEYSPACE_TEMPLATE, replication_factor)
+  if FLAGS.is_row_cache_enabled:
+    RunCql(vm, CASSANDRA_ROW_CACHE_TEMPLATE, replication_factor)
+
+
+def RunCql(vm, template, replication_factor):
+  """Run a CQL file on a VM."""
   cassandra_conf_path = posixpath.join(CASSANDRA_DIR, 'conf')
+  template_path = data.ResourcePath(template)
   file_name = os.path.basename(os.path.splitext(template_path)[0])
   remote_path = os.path.join(
       '~',
