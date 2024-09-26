@@ -154,13 +154,35 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
     )
     # TODO(user): Handle errors rather than swallowing them.
     # Unfortunately even a correct run gives some errors.
-    matches = re.search('Endpoint name: <(.+?)>', out)
-    if not matches:
-      raise errors.Resource.CreationError(
-          'Could not find endpoint name in python create output.\nStdout:'
-          f' {out}\nStderr:{err}',
-      )
-    self.endpoint_name = matches.group(1)
+    def _FindNameMatch(out: str, resource_type: str) -> str:
+      """Finds the name of the resource in the output of the python script."""
+      matches = re.search(f'{resource_type}: <(.+?)>', out)
+      if not matches:
+        raise errors.Resource.CreationError(
+            f'Could not find {resource_type} in python create output.\nStdout:'
+            f' {out}\nStderr:{err}',
+        )
+      return matches.group(1)
+    self.endpoint_name = _FindNameMatch(out, 'Endpoint name')
+    self.model_name = _FindNameMatch(out, 'Model name')
+
+  def _PostCreate(self) -> None:
+    """Adds tags after creation timing."""
+    self._AddTags('endpoint', self.endpoint_name)
+    self._AddTags('model', self.model_name)
+
+  def _AddTags(self, resource_type: str, resource_name: str) -> None:
+    """Adds tags to the resource with the given type & name."""
+    arn = f'arn:aws:sagemaker:{self.region}:{self.account_id}:{resource_type}/{resource_name}'
+    cmd = [
+        'aws',
+        'sagemaker',
+        'add-tags',
+        f'--region={self.region}',
+        f'--resource-arn={arn}',
+        '--tags',
+    ] + util.MakeFormattedDefaultTags()
+    vm_util.IssueCommand(cmd)
 
   def _CreateDependencies(self) -> None:
     vm_util.IssueCommand(['pip', 'install', 'sagemaker'])

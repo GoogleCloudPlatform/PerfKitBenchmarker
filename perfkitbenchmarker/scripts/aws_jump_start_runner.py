@@ -58,6 +58,7 @@ def Create():
       region=_REGION.value,
       role=_ROLE.value,
   )
+  print('Model name: <' + model.name + '>')
   predictor = model.deploy()
   print('Endpoint name: <' + predictor.endpoint_name + '>')
   return predictor

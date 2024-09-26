@@ -29,14 +29,15 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
     ai_model = aws_jump_start.JumpStartModelInRegistry(ai_model_spec)
     self.assertEqual(ai_model.region, 'us-east-1')
 
-  def testEndpointNameParsedCreate(self):
+  def testNamesParsedCreate(self):
     self.MockIssueCommand({
         'python3': [(
             (
+                'Model name: <meta-textgeneration-llama-2-7b-f-2025-08-16-05>'
                 'sagemaker.config INFO - Not applying SDK defaults from'
                 ' location: /etc/xdg/sagemaker/config.yaml\n'
                 '--!Endpoint name:'
-                ' <meta-textgeneration-llama-2-7b-f-2025-08-16>'
+                ' <meta-textgeneration-llama-2-7b-f-2025-08-16-06>'
             ),
             (
                 "For forward compatibility, pin to model_version='2.*' in"
@@ -51,9 +52,48 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
     })
     self.ai_model._Create()
     self.assertEqual(
-        self.ai_model.endpoint_name,
-        'meta-textgeneration-llama-2-7b-f-2025-08-16',
+        self.ai_model.model_name,
+        'meta-textgeneration-llama-2-7b-f-2025-08-16-05',
     )
+    self.assertEqual(
+        self.ai_model.endpoint_name,
+        'meta-textgeneration-llama-2-7b-f-2025-08-16-06',
+    )
+
+  def testTagsAddedCreate(self):
+    self.enter_context(
+        mock.patch.object(
+            util, 'MakeFormattedDefaultTags', return_value=['Key=K,Value=V']
+        )
+    )
+    mock_cmd = self.MockIssueCommand({
+        'aws sagemaker add-tags': [(
+            'Tags added',
+            '',
+            0,
+        )],
+    })
+    self.ai_model.endpoint_name = 'endpoint_name'
+    self.ai_model.model_name = 'model_name'
+    self.ai_model._PostCreate()
+    mock_cmd.func_to_mock.assert_any_call([
+        'aws',
+        'sagemaker',
+        'add-tags',
+        '--region=us-west-1',
+        '--resource-arn=arn:aws:sagemaker:us-west-1:1234:model/model_name',
+        '--tags',
+        'Key=K,Value=V',
+    ])
+    mock_cmd.func_to_mock.assert_any_call([
+        'aws',
+        'sagemaker',
+        'add-tags',
+        '--region=us-west-1',
+        '--resource-arn=arn:aws:sagemaker:us-west-1:1234:endpoint/endpoint_name',
+        '--tags',
+        'Key=K,Value=V',
+    ])
 
   def testListEndpointsParsesOutNames(self):
     self.MockIssueCommand({
@@ -127,16 +167,16 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
     )
 
   def testPromptResponseParsed(self):
-    expected_response = ''' Assistant: Here's how you can travel from Beijing to New York:
+    expected_response = """ Assistant: Here's how you can travel from Beijing to New York:
 
 Fly from Beijing Capital International Airport to John F. Kennedy International Airport or Newark Liberty International Airport.
 
-'''
+"""
     self.MockIssueCommand({
         'python3': [(
-            (f"""
+            f"""
 Response>>>>{expected_response}====
-"""),
+""",
             '',
             0,
         )],
