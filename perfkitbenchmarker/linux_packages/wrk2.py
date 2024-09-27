@@ -20,8 +20,8 @@ import posixpath
 import re
 
 from absl import flags
+from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 
 WRK2_URL = (
     'https://github.com/giltene/wrk2/archive/'
@@ -30,7 +30,7 @@ WRK2_URL = (
 WRK2_ARM_URL = (
     'https://github.com/giltene/wrk2/archive/60490fd5d8dde47cc12553131f940b32d3e02e6b.tar.gz'
 )
-WRK2_DIR = posixpath.join(vm_util.VM_TMP_DIR, 'wrk2')
+WRK2_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'wrk2')
 WRK2_PATH = posixpath.join(WRK2_DIR, 'wrk')
 
 _CORRECTED = flags.DEFINE_bool(
