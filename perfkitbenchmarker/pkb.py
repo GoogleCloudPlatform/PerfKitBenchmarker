@@ -625,7 +625,9 @@ def _SetFreezePath(spec: bm_spec.BenchmarkSpec) -> None:
     logging.info('Using freeze path, %s', spec.freeze_path)
 
 
-def DoProvisionPhase(spec, timer):
+def DoProvisionPhase(
+    spec: bm_spec.BenchmarkSpec, timer: timing_util.IntervalTimer
+):
   """Performs the Provision phase of benchmark execution.
 
   Args:
@@ -709,7 +711,9 @@ class InterruptChecker:
       raise errors.Benchmarks.InsufficientCapacityCloudFailure('Interrupt')
 
 
-def DoPreparePhase(spec, timer):
+def DoPreparePhase(
+    spec: bm_spec.BenchmarkSpec, timer: timing_util.IntervalTimer
+):
   """Performs the Prepare phase of benchmark execution.
 
   Args:
@@ -733,7 +737,11 @@ def DoPreparePhase(spec, timer):
   events.after_phase.send(stages.PREPARE, benchmark_spec=spec)
 
 
-def DoRunPhase(spec, collector, timer):
+def DoRunPhase(
+    spec: bm_spec.BenchmarkSpec,
+    collector: publisher.SampleCollector,
+    timer: timing_util.IntervalTimer,
+):
   """Performs the Run phase of benchmark execution.
 
   Args:
@@ -829,7 +837,9 @@ def DoRunPhase(spec, collector, timer):
       break
 
 
-def DoCleanupPhase(spec, timer):
+def DoCleanupPhase(
+    spec: bm_spec.BenchmarkSpec, timer: timing_util.IntervalTimer
+):
   """Performs the Cleanup phase of benchmark execution.
 
   Cleanup phase work should be delegated to spec.BenchmarkCleanup to allow
@@ -855,7 +865,11 @@ def DoCleanupPhase(spec, timer):
   events.after_phase.send(stages.CLEANUP, benchmark_spec=spec)
 
 
-def DoTeardownPhase(spec, collector, timer):
+def DoTeardownPhase(
+    spec: bm_spec.BenchmarkSpec,
+    collector: publisher.SampleCollector,
+    timer: timing_util.IntervalTimer,
+):
   """Performs the Teardown phase of benchmark execution.
 
   Teardown phase work should be delegated to spec.Delete to allow non-PKB based
@@ -984,7 +998,9 @@ def _IsException(e: Exception, exception_class: Type[Exception]) -> bool:
   return False
 
 
-def RunBenchmark(spec, collector):
+def RunBenchmark(
+    spec: bm_spec.BenchmarkSpec, collector: publisher.SampleCollector
+):
   """Runs a single benchmark and adds the results to the collector.
 
   Args:
