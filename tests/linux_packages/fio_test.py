@@ -63,7 +63,6 @@ class FioTestCase(
     )
     get_tmp_dir_mock.start()
     self.addCleanup(get_tmp_dir_mock.stop)
-    FLAGS.fio_pinning = False
 
   def testParseFioJobFile(self):
     parameter_dict = fio.ParseJobFile(self.job_contents)
@@ -134,7 +133,6 @@ class FioTestCase(
     self.assertDictEqual(parameter_dict, expected_result)
 
   def testParsePinnedFioJobFile(self):
-    FLAGS.fio_pinning = True
     file_str = """
 [global]
 ioengine=libaio
@@ -195,27 +193,22 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
       sequential_write_metadata = {
           'fio_job': 'sequential_write',
           'fio_version': 'fio-3.27',
-          'fio_pinning': False,
       }
       sequential_read_metadata = {
           'fio_job': 'sequential_read',
           'fio_version': 'fio-3.27',
-          'fio_pinning': False,
       }
       random_write_metadata = {
           'fio_job': 'random_write_test',
           'fio_version': 'fio-3.27',
-          'fio_pinning': False,
       }
       random_read_metadata = {
           'fio_job': 'random_read_test',
           'fio_version': 'fio-3.27',
-          'fio_pinning': False,
       }
       random_read_parallel_metadata = {
           'fio_job': 'random_read_test_parallel',
           'fio_version': 'fio-3.27',
-          'fio_pinning': False,
       }
       expected_result = [
           [

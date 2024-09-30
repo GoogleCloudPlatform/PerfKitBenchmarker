@@ -87,7 +87,7 @@ def _Install(vm):
 
 def YumInstall(vm):
   """Installs the fio package on the VM."""
-  vm.InstallPackages('libaio-devel numactl-devel libaio bc zlib-devel')
+  vm.InstallPackages('libaio-devel libaio bc zlib-devel')
   _Install(vm)
 
 
@@ -96,8 +96,7 @@ def AptInstall(vm):
   libaio1_pkg = 'libaio1'
   if vm.HasPackage('libaio1t64'):
     libaio1_pkg = 'libaio1t64'
-  vm.InstallPackages(f'libaio-dev libnuma-dev {libaio1_pkg} bc zlib1g-dev')
-  vm.InstallPackages('numactl')
+  vm.InstallPackages(f'libaio-dev {libaio1_pkg} bc zlib1g-dev')
   _Install(vm)
 
 
@@ -194,7 +193,7 @@ def ParseResults(
     skip_latency_individual_stats: Bool. If true, skips pulling latency stats
       that are not aggregate.
     require_merge: whether the result samples require merging from multiple fio
-      jobs. (in event jobs are pinned to CPUs or raw disks.)
+      jobs.
 
   Returns:
     A list of sample.Sample objects.
@@ -214,8 +213,7 @@ def ParseResults(
 
   for job in fio_json_result['jobs']:
     job_name = job['jobname'].split('.')[0]
-    parameters = {'fio_job': job_name,
-                  'fio_pinning': FLAGS.fio_pinning}
+    parameters = {'fio_job': job_name}
     if parameter_metadata:
       parameters.update(parameter_metadata[job_name])
     if base_metadata:

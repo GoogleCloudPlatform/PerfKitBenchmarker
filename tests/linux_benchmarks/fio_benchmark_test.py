@@ -57,8 +57,6 @@ blocksize=512k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 
 [sequential_read-io-depth-2-num-jobs-1]
 stonewall
@@ -66,9 +64,7 @@ rw=read
 blocksize=512k
 iodepth=2
 size=100%
-numjobs=1
-iodepth_batch_submit=2
-iodepth_batch_complete_max=2"""
+numjobs=1"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
@@ -82,7 +78,6 @@ iodepth_batch_complete_max=2"""
             10,
             True,
             ['randrepeat=0', 'offset_increment=1k'],
-            [0],
             ['/dev/sdb'],
             False,
         ),
@@ -110,8 +105,6 @@ blocksize=512k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 
 [sequential_read-io-depth-1-num-jobs-1]
 stonewall
@@ -120,8 +113,6 @@ blocksize=512k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 
 [random_write-io-depth-1-num-jobs-1]
 stonewall
@@ -130,8 +121,6 @@ blocksize=4k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 
 [random_read-io-depth-1-num-jobs-1]
 stonewall
@@ -140,8 +129,6 @@ blocksize=4k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 
 [random_read_write-io-depth-1-num-jobs-1]
 stonewall
@@ -150,8 +137,6 @@ blocksize=4k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 
 [sequential_trim-io-depth-1-num-jobs-1]
 stonewall
@@ -160,8 +145,6 @@ blocksize=512k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 
 [rand_trim-io-depth-1-num-jobs-1]
 stonewall
@@ -169,9 +152,7 @@ rw=randtrim
 blocksize=4k
 iodepth=1
 size=100%
-numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1"""
+numjobs=1"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
@@ -185,7 +166,6 @@ iodepth_batch_complete_max=1"""
             10,
             True,
             [],
-            [0],
             ['/dev/sdb'],
             False,
         ),
@@ -214,8 +194,6 @@ blocksize=512k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 
 [sequential_write-io-depth-1-num-jobs-1]
 stonewall
@@ -223,9 +201,7 @@ rw=write
 blocksize=512k
 iodepth=1
 size=100%
-numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1"""
+numjobs=1"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
@@ -239,7 +215,6 @@ iodepth_batch_complete_max=1"""
             10,
             True,
             ['randrepeat=0'],
-            [0],
             ['/dev/sdb'],
             False,
         ),
@@ -260,7 +235,6 @@ iodepth_batch_complete_max=1"""
         10,
         True,
         [],
-        [0],
         ['/dev/sdb'],
         False,
     )
@@ -285,7 +259,6 @@ iodepth_batch_complete_max=1"""
         10,
         False,
         [],
-        [0],
         ['/dev/sdb'],
         False,
     )
@@ -313,8 +286,6 @@ blocksize=64M
 iodepth=1
 size=10TB
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 
 [seq_64M_read_10TB-io-depth-2-num-jobs-1]
 stonewall
@@ -323,8 +294,6 @@ blocksize=64M
 iodepth=2
 size=10TB
 numjobs=1
-iodepth_batch_submit=2
-iodepth_batch_complete_max=2
 
 [seq_64M_read_10TB-io-depth-1-num-jobs-3]
 stonewall
@@ -333,8 +302,6 @@ blocksize=64M
 iodepth=1
 size=10TB
 numjobs=3
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 
 [seq_64M_read_10TB-io-depth-2-num-jobs-3]
 stonewall
@@ -343,8 +310,6 @@ blocksize=64M
 iodepth=2
 size=10TB
 numjobs=3
-iodepth_batch_submit=2
-iodepth_batch_complete_max=2
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-1-num-jobs-1]
 stonewall
@@ -354,8 +319,6 @@ blocksize=16k
 iodepth=1
 size=5TB
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-2-num-jobs-1]
 stonewall
@@ -365,8 +328,6 @@ blocksize=16k
 iodepth=2
 size=5TB
 numjobs=1
-iodepth_batch_submit=2
-iodepth_batch_complete_max=2
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-1-num-jobs-3]
 stonewall
@@ -376,8 +337,6 @@ blocksize=16k
 iodepth=1
 size=5TB
 numjobs=3
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-2-num-jobs-3]
 stonewall
@@ -386,9 +345,7 @@ rwmixread=65
 blocksize=16k
 iodepth=2
 size=5TB
-numjobs=3
-iodepth_batch_submit=2
-iodepth_batch_complete_max=2"""
+numjobs=3"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
@@ -402,7 +359,6 @@ iodepth_batch_complete_max=2"""
             10,
             True,
             ['randrepeat=0'],
-            [0],
             ['/dev/sdb'],
             False,
         ),
@@ -431,8 +387,6 @@ blocksize=64M
 iodepth=1
 size=10TB
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 
 [rand_16k_readwrite_5TB_rwmixread-65-io-depth-4-num-jobs-4]
 stonewall
@@ -441,9 +395,7 @@ rwmixread=65
 blocksize=16k
 iodepth=4
 size=5TB
-numjobs=4
-iodepth_batch_submit=4
-iodepth_batch_complete_max=4"""
+numjobs=4"""
 
     self.assertEqual(
         fio_benchmark.GenerateJobFileString(
@@ -460,7 +412,6 @@ iodepth_batch_complete_max=4"""
             10,
             True,
             ['randrepeat=0'],
-            [0],
             ['/dev/sdb'],
             False,
         ),
@@ -468,7 +419,6 @@ iodepth_batch_complete_max=4"""
     )
 
   def testGenerateJobFileStringWithSplitAcrossRawDisksAndNuma(self):
-    FLAGS.fio_pinning = True
     expected_jobfile = """
 [global]
 ioengine=libaio
@@ -490,9 +440,6 @@ blocksize=8k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-0
 
 [rand_8k_read_100%-io-depth-1-num-jobs-1.1]
@@ -501,9 +448,6 @@ blocksize=8k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
-numa_cpu_nodes=1
 filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-1
 
 [rand_8k_write_100%-io-depth-1-num-jobs-1.0]
@@ -513,9 +457,6 @@ blocksize=8k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
-numa_cpu_nodes=0
 filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-0
 
 [rand_8k_write_100%-io-depth-1-num-jobs-1.1]
@@ -524,9 +465,6 @@ blocksize=8k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
-numa_cpu_nodes=1
 filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-1"""
 
     self.assertEqual(
@@ -544,7 +482,6 @@ filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-1"""
             10,
             True,
             ['randrepeat=0'],
-            [0, 1, 2, 3],
             ['/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-0',
              '/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-1'],
             True,
@@ -574,8 +511,6 @@ blocksize=8k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-0
 
 [rand_8k_read_100%-io-depth-1-num-jobs-1.1]
@@ -584,8 +519,6 @@ blocksize=8k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-1
 
 [rand_8k_write_100%-io-depth-1-num-jobs-1.0]
@@ -595,8 +528,6 @@ blocksize=8k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-0
 
 [rand_8k_write_100%-io-depth-1-num-jobs-1.1]
@@ -605,8 +536,6 @@ blocksize=8k
 iodepth=1
 size=100%
 numjobs=1
-iodepth_batch_submit=1
-iodepth_batch_complete_max=1
 filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-1"""
 
     self.assertEqual(
@@ -624,7 +553,6 @@ filename=/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-1"""
             10,
             True,
             ['randrepeat=0'],
-            [0, 1, 2, 3],
             ['/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-0',
              '/dev/disk/by-id/google-pkb-46dd2ae9-0-data-0-1'],
             True,
