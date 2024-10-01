@@ -112,7 +112,20 @@ class BaseManagedAiModel(resource.BaseResource):
   def SendPrompt(
       self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
   ) -> list[str]:
-    """Sends a prompt to the model, times it, and returns the response."""
+    """Sends a prompt to the model, times it, and returns the response.
+
+    Args:
+      prompt: The prompt to send.
+      max_tokens: The max tokens to return.
+      temperature: The temperature to use.
+      **kwargs: Additional arguments to pass to _SendPrompt.
+
+    Throws:
+      errors.Resource.GetError if the prompt fails.
+
+    Returns:
+      The response from the model.
+    """
     start_time = time.time()
     response = self._SendPrompt(prompt, max_tokens, temperature, **kwargs)
     end_time = time.time()
