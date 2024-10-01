@@ -43,6 +43,13 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.platform_endpoint = mock.create_autospec(vertex_ai.aiplatform.Endpoint)
     self.enter_context(
         mock.patch.object(
+            vertex_ai.aiplatform,
+            'Endpoint',
+            return_value=self.platform_endpoint,
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
             vertex_ai.aiplatform.Endpoint,
             'create',
             return_value=self.platform_endpoint,
@@ -63,6 +70,13 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(ai_spec.__name__, 'VertexAiLlama2Spec')
 
   def test_model_create(self):
+    self.MockIssueCommand({
+        'gcloud ai endpoints create': [(
+            '',
+            'Created Vertex AI endpoint: endpoint-name.',
+            0,
+        )],
+    })
     self.pkb_ai.Create()
     samples = self.pkb_ai.GetSamples()
     sampled_metrics = [sample.metric for sample in samples]
@@ -70,6 +84,13 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('Model Deploy Time', sampled_metrics)
 
   def test_model_quota_error(self):
+    self.MockIssueCommand({
+        'gcloud ai endpoints create': [(
+            '',
+            'Created Vertex AI endpoint: endpoint-name.',
+            0,
+        )],
+    })
     self.platform_model.deploy.side_effect = google_exceptions.ServiceUnavailable(
         '503 Machine type temporarily unavailable, please deploy with a'
         ' different machine type or retry. 14: Machine type temporarily'
@@ -119,6 +140,73 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
         }
     )
     self.assertEqual(self.pkb_ai.ListExistingEndpoints(), [])
+
+
+class VertexAiEndpointTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.endpoint = vertex_ai.VertexAiEndpoint(
+        name='my-endpoint', project='my-project', region='us-east1'
+    )
+    self.enter_context(
+        mock.patch.object(
+            vertex_ai.aiplatform,
+            'Endpoint',
+            return_value=mock.create_autospec(vertex_ai.aiplatform.Endpoint),
+        )
+    )
+
+  def test_endpoint_create(self):
+    self.MockIssueCommand({
+        'gcloud ai endpoints describe': [(
+            ("""Using endpoint [https://us-east1-aiplatform.googleapis.com/]
+createTime: '2024-09-26T21:51:53.955656Z'
+deployedModels:
+- createTime: '2024-09-26T21:59:03.850181Z'
+  id: '12345'
+"""),
+            '',
+            0,
+        )],
+        'gcloud ai endpoints undeploy-model': [('', '', 0)],
+        'gcloud ai endpoints create': [(
+            '',
+            (
+                'Using endpoint'
+                ' [https://us-east1-aiplatform.googleapis.com/]\nWaiting for'
+                ' operation [3827]...done.\nCreated Vertex AI endpoint:'
+                ' projects/6789/locations/us-east1/endpoints/1234.'
+            ),
+            1,
+        )],
+    })
+    self.endpoint._Create()
+    self.assertEqual(
+        'projects/6789/locations/us-east1/endpoints/1234',
+        self.endpoint.endpoint_name,
+    )
+    self.assertIsNotNone(self.endpoint.ai_endpoint)
+
+  def test_endpoint_delete(self):
+    self.endpoint.endpoint_name = (
+        'projects/6789/locations/us-east1/endpoints/1234'
+    )
+    self.MockIssueCommand({
+        'gcloud ai endpoints describe': [(
+            ("""Using endpoint [https://us-east1-aiplatform.googleapis.com/]
+createTime: '2024-09-26T21:51:53.955656Z'
+deployedModels:
+- createTime: '2024-09-26T21:59:03.850181Z'
+  id: '12345'
+"""),
+            '',
+            0,
+        )],
+        'gcloud ai endpoints undeploy-model': [('', '', 0)],
+        'gcloud ai endpoints delete': [('', '', 0)],
+    })
+    self.endpoint._Delete()
 
 
 if __name__ == '__main__':

@@ -13,6 +13,7 @@ to create it & give permissions if one doesn't exist.
 
 import logging
 import os
+import re
 import time
 from typing import Any
 from absl import flags
@@ -33,6 +34,13 @@ from perfkitbenchmarker.resources import managed_ai_model
 from perfkitbenchmarker.resources import managed_ai_model_spec
 
 FLAGS = flags.FLAGS
+
+_USE_AI_SDK = flags.DEFINE_bool(
+    'use_ai_sdk',
+    False,
+    'If True, use the AI python SDK to perform operations. Otherwise, use'
+    ' gcloud commands.',
+)
 
 
 # TODO(user): Create new bucket & unique service account.
@@ -57,6 +65,8 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     model_name: The official name of the model in Model Garden, e.g. Llama2.
     model_bucket_path: Where the model bucket is located.
     name: The name of the created model in private model registry.
+    model_resource_name: The full resource name of the created model, e.g.
+      projects/123/locations/us-east1/models/1234.
     region: The region, derived from the zone.
     project: The project.
     endpoint: The PKB resource endpoint the model is deployed to.
@@ -95,6 +105,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       )
     self.model_spec = model_spec
     self.model_name = model_spec.model_name
+    self.model_resource_name = None
     self.model_bucket_path = os.path.join(
         BUCKET_URI, self.model_spec.model_bucket_suffix
     )
@@ -102,8 +113,10 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       self.name = name
     else:
       self.name = 'pkb' + FLAGS.run_uri
-    self.endpoint = VertexAiEndpoint(name=self.name)
     self.project = FLAGS.project
+    self.endpoint = VertexAiEndpoint(
+        name=self.name, region=self.region, project=self.project
+    )
     if not self.project:
       raise errors.Setup.InvalidConfigurationError(
           'Project is required for Vertex AI but was not set.'
@@ -203,6 +216,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
         serving_container_environment_variables=env_vars,
         artifact_uri=self.model_bucket_path,
     )
+    self.model_resource_name = self.gcloud_model.resource_name
     end_model_upload = time.time()
     self.model_upload_time = end_model_upload - start_model_upload
     try:
@@ -275,26 +289,91 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
 
 
 class VertexAiEndpoint(resource.BaseResource):
-  """Represents a Vertex AI endpoint."""
+  """Represents a Vertex AI endpoint.
 
-  def __init__(self, name: str, **kwargs):
+  Attributes:
+    name: The name of the endpoint.
+    project: The project.
+    region: The region, derived from the zone.
+    endpoint_name: The full resource name of the created endpoint, e.g.
+      projects/123/locations/us-east1/endpoints/1234.
+    ai_endpoint: The AIPlatform object representing the endpoint.
+  """
+
+  def __init__(self, name: str, project: str, region: str, **kwargs):
     super().__init__(**kwargs)
     self.name = name
     self.ai_endpoint = None
+    self.project = project
+    self.region = region
+    self.endpoint_name = None
 
   def _Create(self) -> None:
     """Creates the underlying resource."""
     logging.info('Creating the endpoint: %s.', self.name)
-    self.ai_endpoint = aiplatform.Endpoint.create(
-        display_name=f'{self.name}-endpoint'
+    if _USE_AI_SDK.value:
+      self.ai_endpoint = aiplatform.Endpoint.create(
+          display_name=f'{self.name}-endpoint'
+      )
+      return
+
+    _, err, _ = vm_util.IssueCommand(
+        [
+            'gcloud',
+            'ai',
+            'endpoints',
+            'create',
+            f'--display-name={self.name}-endpoint',
+            f'--project={self.project}',
+            f'--region={self.region}',
+        ],
+        raise_on_failure=False,
     )
+    self.endpoint_name = _FindRegexInOutput(
+        err, r'Created Vertex AI endpoint: (.+)\.'
+    )
+    self.ai_endpoint = aiplatform.Endpoint(self.endpoint_name)
 
   def _Delete(self) -> None:
     """Deletes the underlying resource."""
     logging.info('Deleting the endpoint: %s.', self.name)
-    assert self.ai_endpoint
-    self.ai_endpoint.delete(force=True)
-    self.ai_endpoint = None  # Object is not picklable - none it out
+    if _USE_AI_SDK.value:
+      assert self.ai_endpoint
+      self.ai_endpoint.delete(force=True)
+      self.ai_endpoint = None  # Object is not picklable - none it out
+      return
+    out, _, _ = vm_util.IssueCommand([
+        'gcloud',
+        'ai',
+        'endpoints',
+        'describe',
+        self.endpoint_name,
+    ])
+    model_id = _FindRegexInOutput(out, r'  id: \'(.+)\'')
+    vm_util.IssueCommand([
+        'gcloud',
+        'ai',
+        'endpoints',
+        'undeploy-model',
+        self.endpoint_name,
+        f'--deployed-model-id={model_id}',
+        '--quiet',
+    ])
+    vm_util.IssueCommand(
+        ['gcloud', 'ai', 'endpoints', 'delete', self.endpoint_name, '--quiet']
+    )
+    # None it out here as well, until all commands are supported over gcloud.
+    self.ai_endpoint = None
+
+
+def _FindRegexInOutput(output: str, regex: str) -> str:
+  """Returns the first match of the regex in the output."""
+  matches = re.search(regex, output)
+  if not matches:
+    raise errors.VmUtil.IssueCommandError(
+        f'Could not find {regex} in output.\n{output}',
+    )
+  return matches.group(1)
 
 
 class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
