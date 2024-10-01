@@ -63,6 +63,7 @@ from perfkitbenchmarker.configs import freeze_restore_spec
 from perfkitbenchmarker.resources import base_job
 from perfkitbenchmarker.resources import example_resource
 from perfkitbenchmarker.resources import managed_ai_model
+from perfkitbenchmarker.resources.pinecone import pinecone as pinecone_resource
 import six
 import six.moves._thread
 import six.moves.copyreg
@@ -186,6 +187,7 @@ class BenchmarkSpec:
     self.smb_service = None
     self.messaging_service = None
     self.ai_model = None
+    self.pinecone = None
     self.memory_store = None
     self.data_discovery_service = None
     self.app_groups = {}
@@ -305,6 +307,7 @@ class BenchmarkSpec:
     self.ConstructDataDiscoveryService()
     self.ConstructBaseJob()
     self.ConstructMemoryStore()
+    self.ConstructPinecone()
 
   def ConstructContainerCluster(self):
     """Create the container cluster."""
@@ -520,6 +523,17 @@ class BenchmarkSpec:
     model_class = managed_ai_model.GetManagedAiModelClass(cloud)
     self.ai_model = model_class(self.config.ai_model)  # pytype: disable=not-instantiable
     self.resources.append(self.ai_model)
+
+  def ConstructPinecone(self):
+    """Create an example_resource object. Also call this from pkb.py."""
+    if self.config.pinecone is None:
+      return
+    cloud = self.config.pinecone.cloud
+    providers.LoadProvider(cloud)
+    model_class = pinecone_resource.GetPineconeResourceClass(cloud)
+    self.pinecone = model_class(self.config.pinecone)  # pytype: disable=not-instantiable
+    self.pinecone.SetVms(self.vm_groups)
+    self.resources.append(self.pinecone)
 
   def ConstructMemoryStore(self):
     """Create the memory store instance."""
@@ -879,6 +893,8 @@ class BenchmarkSpec:
       background_tasks.RunThreaded(lambda tpu: tpu.Create(), self.tpus)
     if self.ai_model:
       self.ai_model.Create()
+    if self.pinecone:
+      self.pinecone.Create()
     if self.edw_service:
       if (
           not self.edw_service.user_managed
@@ -948,6 +964,8 @@ class BenchmarkSpec:
       self.ai_model.Delete()
     if hasattr(self, 'data_discovery_service') and self.data_discovery_service:
       self.data_discovery_service.Delete()
+    if hasattr(self, 'pinecone') and self.pinecone:
+      self.pinecone.Delete()
 
     # Note: It is ok to delete capacity reservations before deleting the VMs,
     # and will actually save money (mere seconds of usage).
