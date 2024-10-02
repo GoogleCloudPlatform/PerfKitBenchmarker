@@ -76,6 +76,11 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
             'Created Vertex AI endpoint: endpoint-name.',
             0,
         )],
+        'gcloud ai endpoints predict': [(
+            '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
+            '',
+            0,
+        )],
     })
     self.pkb_ai.Create()
     samples = self.pkb_ai.GetSamples()
@@ -88,6 +93,11 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
         'gcloud ai endpoints create': [(
             '',
             'Created Vertex AI endpoint: endpoint-name.',
+            0,
+        )],
+        'gcloud ai endpoints predict': [(
+            '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
+            '',
             0,
         )],
     })
@@ -140,6 +150,44 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
         }
     )
     self.assertEqual(self.pkb_ai.ListExistingEndpoints(), [])
+
+  def test_send_prompt(self):
+    self.pkb_ai.endpoint.endpoint_name = (
+        'projects/1234/locations/us-east1/endpoints/12345'
+    )
+    self.MockIssueCommand({
+        'gcloud ai endpoints predict': [(
+            '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
+            '',
+            0,
+        )],
+    })
+    self.assertEqual(
+        self.pkb_ai.SendPrompt('What is crab?', 512, 0.8),
+        ['Prompt:What is crab?\nOutput:Crabs are tasty.\n'],
+    )
+
+  def test_prompt_gives_samples(self):
+    self.pkb_ai.endpoint.endpoint_name = (
+        'projects/1234/locations/us-east1/endpoints/12345'
+    )
+    self.MockIssueCommand({
+        'gcloud ai endpoints predict': [(
+            '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
+            '',
+            0,
+        )],
+    })
+    self.pkb_ai.SendPrompt('What is crab?', 512, 0.8)
+    samples = self.pkb_ai.GetSamples()
+    metrics = [sample.metric for sample in samples]
+    self.assertEqual(
+        metrics,
+        [
+            'response_time_0',
+            'Max JSON Write Time',
+        ],
+    )
 
 
 class VertexAiEndpointTest(pkb_common_test_case.PkbCommonTestCase):

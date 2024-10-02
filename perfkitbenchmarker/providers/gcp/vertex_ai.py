@@ -11,6 +11,7 @@ https://cloud.google.com/vertex-ai/docs/general/custom-service-account
 to create it & give permissions if one doesn't exist.
 """
 
+import json
 import logging
 import os
 import re
@@ -74,6 +75,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     service_account: Name of the service account used by the model.
     model_deploy_time: Time it took to deploy the model.
     model_upload_time: Time it took to upload the model.
+    json_write_times: List of times it took to write the json request to disk.
   """
 
   CLOUD = 'GCP'
@@ -89,6 +91,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   service_account: str
   model_deploy_time: float | None
   model_upload_time: float | None
+  json_write_times: list[float]
 
   def __init__(
       self,
@@ -134,6 +137,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.service_account = SERVICE_ACCOUNT_BASE.format(project_number)
     self.model_upload_time = None
     self.model_deploy_time = None
+    self.json_write_times = []
 
   def _InitializeNewModel(self) -> 'VertexAiModelInRegistry':
     """Returns a new instance of the same class."""
@@ -184,19 +188,49 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
               metadata,
           )
       )
+    if self.json_write_times:
+      samples.append(
+          sample.Sample(
+              'Max JSON Write Time',
+              max(self.json_write_times),
+              'seconds',
+              metadata,
+          )
+      )
     return samples
 
   def _SendPrompt(
       self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
   ) -> list[str]:
     """Sends a prompt to the model and returns the response."""
-    assert self.endpoint.ai_endpoint
     instances = self.model_spec.ConvertToInstances(
         prompt, max_tokens, temperature, **kwargs
     )
-    response = self.endpoint.ai_endpoint.predict(instances=instances)
-    str_responses = [str(response) for response in response.predictions]
-    return str_responses
+    if _USE_AI_SDK.value:
+      assert self.endpoint.ai_endpoint
+      response = self.endpoint.ai_endpoint.predict(instances=instances)
+      str_responses = [str(response) for response in response.predictions]
+      return str_responses
+    instances_dict = {'instances': instances, 'parameters': {}}
+    name = ''
+    start_write_time = time.time()
+    with vm_util.NamedTemporaryFile(mode='w', delete=False) as tf:
+      tf.write(json.dumps(instances_dict))
+      tf.close()
+      name = tf.name
+    end_write_time = time.time()
+    write_time = end_write_time - start_write_time
+    self.json_write_times.append(write_time)
+    out, _, _ = vm_util.IssueCommand([
+        'gcloud',
+        'ai',
+        'endpoints',
+        'predict',
+        self.endpoint.endpoint_name,
+        f'--json-request={name}',
+    ])
+    responses = out.strip('[]').split(',')
+    return responses
 
   def _Create(self) -> None:
     """Creates the underlying resource."""
