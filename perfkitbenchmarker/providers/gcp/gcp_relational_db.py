@@ -257,6 +257,15 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     cmd.flags['project'] = self.project
     cmd.use_beta_gcloud = True
 
+    if self.spec.db_tier:
+      cmd.flags['edition'] = self.spec.db_tier
+      cmd.use_alpha_gcloud = True
+      cmd.use_beta_gcloud = False
+      if relational_db.ENABLE_DATA_CACHE.value:
+        cmd.flags['enable-data-cache'] = True
+      else:
+        cmd.flags['no-enable-data-cache'] = True
+
     _, stderr, retcode = cmd.Issue(timeout=CREATION_TIMEOUT)
 
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
@@ -525,6 +534,14 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
 
     if not self._IsReady():
       raise RuntimeError('Instance could not be set to ready after reboot')
+
+  def GetResourceMetadata(self):
+    metadata = super().GetResourceMetadata()
+    if relational_db.ENABLE_DATA_CACHE.value:
+      metadata['db_flags'] = metadata.get('db_flags', []) + [
+          'enable-data-cache'
+      ]
+    return metadata
 
   @staticmethod
   def GetDefaultEngineVersion(engine):
