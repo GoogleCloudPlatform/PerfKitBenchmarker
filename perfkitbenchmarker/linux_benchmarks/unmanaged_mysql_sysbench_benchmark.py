@@ -89,7 +89,7 @@ unmanaged_mysql_sysbench:
     sysbench_report_interval: 1
     sysbench_ssl_mode: required
     db_high_availability: True
-    sysbench_run_threads: 64,128,256,512,1024,2048
+    sysbench_run_threads: 1,64,128,256,512,1024,2048
     sysbench_run_seconds: 300
 """
 
