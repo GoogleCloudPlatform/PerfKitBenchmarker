@@ -55,10 +55,10 @@ PKB meets most of the needs of any end-to-end performance benchmarking project.
 
 Performance Benchmarking Process | PKB Architecture Stage
 -------------------------------- | ---------------------------------
-1. Identify criteria/problem     | Configuration
-2. Choose benchmark              | Configuration
-3. Execute benchmark tests       | Provisioning, Execution, Teardown
-4. Analyze test data             | Publish
+Identify criteria/problem     | Configuration
+Choose benchmark              | Configuration
+Execute benchmark tests       | Provisioning, Execution, Teardown
+Analyze test data             | Publish
 
 ## What you'll do
 
@@ -123,7 +123,7 @@ environment.
 This Cloud Shell virtual machine is loaded with all the development tools you'll
 need. It offers a persistent 5GB home directory, and runs on Google Cloud,
 greatly enhancing network performance and authentication. All of your work in
-this lab can be done within a browser on your Google Chromebook.
+this lab can be done within a browser on your laptop.
 
 Once connected to the Cloud Shell, you can verify your setup.
 
@@ -136,9 +136,10 @@ Once connected to the Cloud Shell, you can verify your setup.
     **Expected output**
 
     ```
-     Credentialed accounts:
-    ACTIVE  ACCOUNT
-    *       <myaccount>@<mydomain>.com
+    Credentialed accounts:
+
+    ACTIVE: *
+    ACCOUNT: <myaccount>@<mydomain>.com
     ```
 
     **Note:** `gcloud` is the powerful and unified command-line tool for Google
@@ -333,7 +334,7 @@ __n1-standard-1__.
 __Expected duration__: ~13-14min.
 
 ```
-./pkb.py --benchmarks=iperf
+./pkb.py --benchmarks=iperf --machine_type=e2-micro
 ```
 
 > __Note__: while the `iperf` test is running, continue through both _Task 3_,
