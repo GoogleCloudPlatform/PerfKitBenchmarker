@@ -16,6 +16,7 @@
 """Module containing aerospike server installation and cleanup functions."""
 
 import enum
+import hashlib
 import logging
 
 from absl import flags
@@ -400,8 +401,7 @@ def Uninstall(vm):
 
 
 def GetNodeId(vm):
-  # Assuming the instance name always follows the patten `pkb-xxxx-x`.
-  return vm.name.split('-')[2]
+  return int(hashlib.sha1(vm.name.encode('utf-8')).hexdigest(), 16) % (10 ** 5)
 
 
 def EnableStrongConsistency(vm, namespaces):
