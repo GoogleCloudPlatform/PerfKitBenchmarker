@@ -69,7 +69,7 @@ $ hooks/install.sh
 
 ### Create a branch
 
-Start from the master branch of the repository.  This is the default. 
+Start from the master branch of the repository.  This is the default.
 
 - Create a branch to contain your changes.
 ```
@@ -86,7 +86,7 @@ This can be done on github.com, or by installing and using the command line tool
 ```
 $ hub pull-request -h <your-branch-name>
 ```
-When making a pull request on GitHub, please the base branch of the Pull Request should be `master`.  This is usually the default.  
+When making a pull request on GitHub, please the base branch of the Pull Request should be `master`.  This is usually the default.
 
 ### Developer documentation
 We have added a lot of comments into the code to make it easy to;
@@ -96,3 +96,6 @@ We have added a lot of comments into the code to make it easy to;
 * etc...
 
 Even with lots of comments we make to support more detailed documention.  You will find the documatation we have on the [Wiki pages] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/wiki).  Missing documentation you want?  Start a page and/or open an [issue] (https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/issues) to get it added.
+
+### Updating the GitHub Pages site:
+The site requires [Jekyll](https://docs.github.com/en/pages/setting-up-a-github-pages-site-with-jekyll/about-github-pages-and-jekyll) in order to run.  Use `bundle install` and `bundle install` to update the dependencies in `Gemfile.lock`.
