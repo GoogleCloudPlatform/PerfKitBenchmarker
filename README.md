@@ -326,6 +326,38 @@ see if anything should be removed. To run all benchmarks in a named set, specify
 the set name in the benchmarks parameter (e.g., `--benchmarks="standard_set"`).
 Sets can be combined with individual benchmarks or other named sets.
 
+# Running selective stages of a benchmark
+
+This procedure demonstrates how to run only selective stages of a benchmark.
+This technique can be useful for examining a machine after it has been prepared,
+but before the benchmark runs.
+
+This example shows how to provision and prepare the `cluster_boot` benchmark
+without actually running the benchmark.
+
+1.  Change to your local version of PKB: `cd $HOME/PerfKitBenchmarker`
+
+1.  Run provision, prepare, and run stages of `cluster_boot`.
+
+    ```
+    ./pkb.py --benchmarks=cluster_boot --machine_type=n1-standard-2 --zones=us-central1-f --run_stage=provision,prepare,run
+    ```
+
+1.  The output from the console will tell you the run URI for your benchmark.
+    Try to ssh into the VM. The machine "Default-0" came from the VM group which
+    is specified in the benchmark_config for cluster_boot.
+
+    ```
+    ssh -F /tmp/perfkitbenchmarker/runs/<run_uri>/ssh_config default-0
+    ```
+
+1.  Now that you have examined the machines, teardown the instances that were
+    made and cleanup.
+
+    ```
+    ./pkb.py --benchmarks=cluster_boot --run_stage=teardown -run_uri=<run_uri>
+    ```
+
 # Useful Global Flags
 
 The following are some common flags used when configuring PerfKit Benchmarker.
