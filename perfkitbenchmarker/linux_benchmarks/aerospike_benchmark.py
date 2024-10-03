@@ -278,6 +278,7 @@ def Prepare(benchmark_spec):
   if FLAGS.aerospike_skip_db_prepopulation:
     return
 
+  @vm_util.Retry(max_retries=3)  # Retry if the server is no full up yet.
   def _Load(namespace, client_idx, process_idx):
     ips = ','.join(seed_ips)
     load_command = (
