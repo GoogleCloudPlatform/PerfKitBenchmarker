@@ -11,18 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Sample benchmark which uses a VM."""
+"""Sample benchmark which uses a VM & preprovisioned data."""
 
-import logging
+import posixpath
 from typing import Any
 
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 
-BENCHMARK_NAME = 'example_vm'
+BENCHMARK_NAME = 'example_preprovision'
 BENCHMARK_CONFIG = """
-example_vm:
+example_preprovision:
   description: Runs a sample benchmark.
   vm_groups:
     default:
@@ -30,8 +31,23 @@ example_vm:
       vm_count: null
 """
 
-# temp file
-_FILE = '/tmp/example_vm_benchmark.txt'
+# This benchmark uses preprovisioned data. Before running this benchmark on a
+# given cloud, you must add the file 'sample_preprovisioned_data.txt' to that
+# cloud by following the cloud-specific instructions. To create this file, run
+# the following command:
+#   echo "1234567890" > sample_preprovisioned_data.txt
+#
+# The value in this dict is the sha256sum hash for the file.
+#
+# The benchmark defines the constant BENCHMARK_DATA to contain the name of the
+# file (which is prepended by the benchmark name followed by an underscore)
+# mapped to the sha256sum hash. This ensures that when we change versions of the
+# benchmark data or binaries, we update the code.
+BENCHMARK_DATA = {
+    'preprovisioned_data.txt': (
+        '4795a1c2517089e4df569afd77c04e949139cf299c87f012b894fccf91df4594'
+    )
+}
 
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
@@ -49,9 +65,14 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
     benchmark_spec: The benchmark spec for this sample benchmark.
   """
   vm = benchmark_spec.vms[0]
+  vm.InstallPreprovisionedBenchmarkData(
+      BENCHMARK_NAME, BENCHMARK_DATA, vm_util.VM_TMP_DIR
+  )
 
-  _, _ = vm.RemoteCommand(f'echo "Hello World" > {_FILE}')
-  logging.info('Wrote "Hello World" to %s.', _FILE)
+  stdout, _ = vm.RemoteCommand(
+      'cat %s' % (posixpath.join(vm_util.VM_TMP_DIR, 'preprovisioned_data.txt'))
+  )
+  assert stdout.strip() == '1234567890'
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
@@ -66,13 +87,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   Returns:
     A list of performance samples.
   """
-  vm = benchmark_spec.vms[0]
-  stdout, _ = vm.RemoteCommand(f'cat {_FILE}')
-  logging.info('Read %s from %s.', stdout.strip(), _FILE)
+  del benchmark_spec
   # This is a sample benchmark that produces no meaningful data, but we return
   # a single sample as an example.
   metadata = dict()
-  metadata['sample_metadata'] = 'stdout'
+  metadata['sample_metadata'] = 'sample'
   return [sample.Sample('sample_metric', 123.456, 'sec', metadata)]
 
 
