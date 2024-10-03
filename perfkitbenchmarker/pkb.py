@@ -325,6 +325,7 @@ def ShouldTeardown(
     samples: MutableSequence[Mapping[str, Any]],
     vms: Sequence[virtual_machine.BaseVirtualMachine] | None = None,
     skip_teardown_zonal_vm_limit: int | None = None,
+    skip_teardown_on_command_timeout: bool = False,
 ) -> bool:
   """Checks all samples against all skip teardown conditions.
 
@@ -335,13 +336,25 @@ def ShouldTeardown(
     vms: list of VMs brought up by the benchmark
     skip_teardown_zonal_vm_limit: the maximum number of VMs in the zone that can
       be left behind.
+    skip_teardown_on_command_timeout: a boolean indicating whether to skip
+      teardown if the failure substatus is COMMAND_TIMEOUT
 
   Returns:
     True if the benchmark should teardown as usual, False if it should skip due
     to a condition being met.
   """
-  if not skip_teardown_conditions:
+  if not skip_teardown_conditions and not skip_teardown_on_command_timeout:
     return True
+  if skip_teardown_on_command_timeout:
+    for status_sample in samples:
+      if (
+          status_sample['metadata'].get('failed_substatus')
+          == benchmark_status.FailedSubstatus.COMMAND_TIMEOUT
+      ):
+        logging.warning(
+            'Skipping TEARDOWN phase due to COMMAND_TIMEOUT substatus.'
+        )
+        return False
   if skip_teardown_zonal_vm_limit:
     for vm in vms:
       num_lingering_vms = vm.GetNumTeardownSkippedVms()
@@ -1072,6 +1085,7 @@ def RunBenchmark(
                 collector.published_samples + collector.samples,
                 spec.vms,
                 pkb_flags.SKIP_TEARDOWN_ZONAL_VM_LIMIT.value,
+                pkb_flags.SKIP_TEARDOWN_ON_COMMAND_TIMEOUT.value,
             )
             if should_teardown:
               current_run_stage = stages.TEARDOWN

@@ -199,6 +199,8 @@
 -   Refactor nginx_benchmark to use reverse_proxy or api_gateway configurations.
 -   Add support for simple Vertex AI & AWS Sagemaker managed models.
 -   Add new pressure_stall trace.
+-   Add `--skip_teardown_on_command_timeout` flag to skip teardown if the
+    failure substatus is COMMAND_TIMEOUT.
 
 ### Enhancements:
 

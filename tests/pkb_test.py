@@ -788,6 +788,13 @@ class TestConditionalSkipTeardown(parameterized.TestCase):
           unit='seconds',
           timestamp=1678147200.0,
       ).asdict(),
+      sample.Sample(
+          metric='Failed Run',
+          value=1678147200.0,
+          unit='seconds',
+          timestamp=1678147200.0,
+          metadata={'failed_substatus': 'COMMAND_TIMEOUT'},
+      ).asdict(),
   ]
 
   @parameterized.named_parameters(
@@ -818,7 +825,7 @@ class TestConditionalSkipTeardown(parameterized.TestCase):
       },
       {
           'testcase_name': 'no_flag_passed',
-          'conditions': None,
+          'conditions': {},
       },
   )
   def testTeardownAsUsual(self, conditions):
@@ -867,12 +874,20 @@ class TestConditionalSkipTeardown(parameterized.TestCase):
               'metricminus10': {'lower_bound': None, 'upper_bound': 0.0},
           },
       },
+      {
+          'testcase_name': 'skip_teardown_on_command_timeout',
+          'conditions': {},
+          'skip_teardown_on_command_timeout': True,
+      },
   )
-  def testSkipTeardown(self, conditions):
+  def testSkipTeardown(
+      self, conditions, skip_teardown_on_command_timeout=False
+  ):
     self.assertFalse(
         pkb.ShouldTeardown(
             skip_teardown_conditions=conditions,
             samples=self.SAMPLES,
+            skip_teardown_on_command_timeout=skip_teardown_on_command_timeout,
         )
     )
 

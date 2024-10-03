@@ -496,6 +496,11 @@ SKIP_TEARDOWN_CONDITIONS = flags.DEFINE_list(
     'flag must have a spearate teardown procedure in place for resources with '
     'extended uptimes.',
 )
+SKIP_TEARDOWN_ON_COMMAND_TIMEOUT = flags.DEFINE_boolean(
+    'skip_teardown_on_command_timeout',
+    False,
+    'If true, skip teardown if the failure substatus is COMMAND_TIMEOUT.',
+)
 SKIP_TEARDOWN_ZONAL_VM_LIMIT = flags.DEFINE_integer(
     'skip_teardown_zonal_vm_limit',
     None,
