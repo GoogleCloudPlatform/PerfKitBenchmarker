@@ -299,8 +299,8 @@ export IBMCLOUD_ACCOUNT_ID=<account id>
 export IBMCLOUD_APIKEY=<API key>
 ```
 
-To change default region and zone, point IBMCLOUD_ENDPOINT to the correct endpoint
-and set these parameters.
+To change default region and zone, point IBMCLOUD_ENDPOINT to the correct
+endpoint and set these parameters.
 
 ```bash
 --ibmcloud_region=<region e.g. us-east>
@@ -315,7 +315,6 @@ Use os_type to change OS image.
 
 For cross zones network test, set zones to a comma separated string like
 us-east-1,us-east-2
-
 
 ```bash
 $ ./pkb.py --cloud=IBMCloud --benchmarks=iperf --machine_type=cx2-4x8 \
