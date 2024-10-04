@@ -353,19 +353,18 @@ class JavaClientInterface(GenericClientInterface):
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout
 
-  def ExecuteThroughput(self, concurrency_streams: list[list[str]]) -> str:
-    """Executes a throughput test and returns performance details.
-
-    Args:
-      concurrency_streams: List of streams to execute simultaneously, each of
-        which is a list of string names of queries.
-
-    Returns:
-      A serialized dictionary of execution details.
-    """
+  def ExecuteThroughput(
+      self,
+      concurrency_streams: list[list[str]],
+      labels: dict[str, str] | None = None,
+  ) -> str:
     key_file_name = FLAGS.gcp_service_account_key_file
     if '/' in FLAGS.gcp_service_account_key_file:
       key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
+    runlabels = ''
+    if labels:
+      for key, value in labels.items():
+        runlabels += f' --label {key}={value}'
     cmd = (
         'java -Xmx6g -cp {} '
         'com.google.cloud.performance.edw.Throughput --project {} '
@@ -376,6 +375,7 @@ class JavaClientInterface(GenericClientInterface):
             self.dataset_id,
             ' '.join([','.join(stream) for stream in concurrency_streams]),
         )
+        + runlabels
     )
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout

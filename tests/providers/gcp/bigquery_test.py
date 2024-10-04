@@ -27,6 +27,65 @@ PROJECT_ID = 'PROJECT_ID'
 QUERY_NAME = 'QUERY_NAME'
 _TEST_RUN_URI = 'fakeru'
 _GCP_ZONE_US_CENTRAL_1_C = 'us-central1-c'
+QUERY_STREAMS = [['QUERY_1', 'QUERY_2'], ['QUERY_2', 'QUERY_3']]
+THROUGHPUT_LABELS = {
+    'run_uri': _TEST_RUN_URI,
+    'type': 'tpt',
+    'iteration': '1',
+    'flavor': 'tpcds',
+    'scale': '1',
+    'minimal_run_key': f'pkb-{_TEST_RUN_URI}-1',
+}
+
+THROUGHPUT_RESPONSE_OBJECT = {
+    'throughput_start': 1,
+    'throughput_end': 10,
+    'throughput_wall_time_in_secs': 2.0,
+    'all_streams_performance_array': [
+        {
+            'stream_start': 1,
+            'stream_end': 10,
+            'stream_wall_time_in_secs': 2.0,
+            'stream_performance_array': [
+                {
+                    'query_wall_time_in_secs': 1.0,
+                    'query_end': 5,
+                    'query': 'QUERY_1',
+                    'query_start': 1,
+                    'details': {'job_id': 'JOB_ID_1'},
+                },
+                {
+                    'query_wall_time_in_secs': 1.0,
+                    'query_end': 10,
+                    'query': 'QUERY_2',
+                    'query_start': 5,
+                    'details': {'job_id': 'JOB_ID_2'},
+                },
+            ],
+        },
+        {
+            'stream_start': 2,
+            'stream_end': 10,
+            'stream_wall_time_in_secs': 2.0,
+            'stream_performance_array': [
+                {
+                    'query_wall_time_in_secs': 1.0,
+                    'query_end': 5,
+                    'query': 'QUERY_2',
+                    'query_start': 1,
+                    'details': {'job_id': 'JOB_ID_3'},
+                },
+                {
+                    'query_wall_time_in_secs': 1.0,
+                    'query_end': 10,
+                    'query': 'QUERY_3',
+                    'query_start': 5,
+                    'details': {'job_id': 'JOB_ID_4'},
+                },
+            ],
+        },
+    ],
+}
 
 _BASE_BIGQUERY_SPEC = {
     'type': 'bigquery',
@@ -154,6 +213,57 @@ class FakeRemoteVMForJavaClientInterfaceExecuteQuery:
     return response, None
 
 
+class FakeRemoteVMForJavaClientInterfaceExecuteThroughput:
+  """Class to setup a Fake VM that executes script on Client VM (JAVA Client)."""
+
+  def RemoteCommand(self, command):
+    if command == 'echo "\nMaxSessions 100" | sudo tee -a /etc/ssh/sshd_config':
+      return None, None
+
+    expected_command = (
+        'java -Xmx6g -cp bq-jdbc-simba-client-1.8-temp-labels.jar '
+        'com.google.cloud.performance.edw.Throughput --project {} '
+        '--credentials_file {} --dataset {} --query_streams {}'
+    ).format(
+        PROJECT_ID,
+        'SERVICE_ACCOUNT_KEY_FILE',
+        DATASET_ID,
+        ' '.join([','.join(stream) for stream in QUERY_STREAMS]),
+    )
+    if command != expected_command:
+      raise RuntimeError
+    response_object = THROUGHPUT_RESPONSE_OBJECT
+    response = json.dumps(response_object)
+    return response, None
+
+
+class FakeRemoteVMForJavaClientInterfaceExecuteThroughputWithLabels:
+  """Class to setup a Fake VM that executes script on Client VM (JAVA Client)."""
+
+  def RemoteCommand(self, command):
+    if command == 'echo "\nMaxSessions 100" | sudo tee -a /etc/ssh/sshd_config':
+      return None, None
+
+    expected_command = (
+        'java -Xmx6g -cp bq-jdbc-simba-client-1.8-temp-labels.jar '
+        'com.google.cloud.performance.edw.Throughput --project {} '
+        '--credentials_file {} --dataset {} --query_streams {}'
+    ).format(
+        PROJECT_ID,
+        'SERVICE_ACCOUNT_KEY_FILE',
+        DATASET_ID,
+        ' '.join([','.join(stream) for stream in QUERY_STREAMS]),
+    ) + ''.join(
+        map(lambda x: f' --label {x[0]}={x[1]}', THROUGHPUT_LABELS.items())
+    )
+
+    if command != expected_command:
+      raise RuntimeError
+    response_object = THROUGHPUT_RESPONSE_OBJECT
+    response = json.dumps(response_object)
+    return response, None
+
+
 class FakeBenchmarkSpec:
   """Fake BenchmarkSpec to use for setting client interface attributes."""
 
@@ -236,6 +346,34 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     performance, details = interface.ExecuteQuery(QUERY_NAME)
     self.assertEqual(performance, 1.0)
     self.assertDictEqual(details, {'client': 'JAVA', 'job_id': 'JOB_ID'})
+
+  def testJavaClientInterfaceExecuteThroughputWithoutLabels(self):
+    FLAGS.bq_client_interface = 'JAVA'
+    FLAGS.gcp_service_account_key_file = 'SERVICE_ACCOUNT_KEY_FILE'
+
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertIsInstance(interface, bigquery.JavaClientInterface)
+
+    bm_spec = FakeBenchmarkSpec(
+        FakeRemoteVMForJavaClientInterfaceExecuteThroughput()
+    )
+    interface.SetProvisionedAttributes(bm_spec)
+    response = interface.ExecuteThroughput(QUERY_STREAMS)
+    self.assertDictEqual(json.loads(response), THROUGHPUT_RESPONSE_OBJECT)
+
+  def testJavaClientInterfaceExecuteThroughputWithLabels(self):
+    FLAGS.bq_client_interface = 'JAVA'
+    FLAGS.gcp_service_account_key_file = 'SERVICE_ACCOUNT_KEY_FILE'
+
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertIsInstance(interface, bigquery.JavaClientInterface)
+
+    bm_spec = FakeBenchmarkSpec(
+        FakeRemoteVMForJavaClientInterfaceExecuteThroughputWithLabels()
+    )
+    interface.SetProvisionedAttributes(bm_spec)
+    response = interface.ExecuteThroughput(QUERY_STREAMS, THROUGHPUT_LABELS)
+    self.assertDictEqual(json.loads(response), THROUGHPUT_RESPONSE_OBJECT)
 
   @parameterized.named_parameters(
       dict(
