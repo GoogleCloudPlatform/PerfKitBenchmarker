@@ -204,20 +204,20 @@ def GetConfig(user_config):
           FLAGS.gce_ssd_interface = FLAGS.server_gce_ssd_interface
         config['vm_groups']['clients']['vm_spec']['GCP']['num_local_ssds'] = 0
 
-  if AEROSPIKE_SERVER_MACHINE_TYPE:
+  if AEROSPIKE_SERVER_MACHINE_TYPE.value:
     vm_spec = config['vm_groups']['workers']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = AEROSPIKE_SERVER_MACHINE_TYPE
-  if AEROSPIKE_CLIENT_MACHINE_TYPE:
+      vm_spec[cloud]['machine_type'] = AEROSPIKE_SERVER_MACHINE_TYPE.value
+  if AEROSPIKE_CLIENT_MACHINE_TYPE.value:
     vm_spec = config['vm_groups']['clients']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = AEROSPIKE_CLIENT_MACHINE_TYPE
+      vm_spec[cloud]['machine_type'] = AEROSPIKE_CLIENT_MACHINE_TYPE.value
 
   if FLAGS['aerospike_vms'].present:
     config['vm_groups']['workers']['vm_count'] = FLAGS.aerospike_vms
 
-  if AEROSPIKE_CLIENT_VMS.present:
-    config['vm_groups']['clients']['vm_count'] = AEROSPIKE_CLIENT_VMS
+  if FLAGS['aerospike_client_vms'].present:
+    config['vm_groups']['clients']['vm_count'] = AEROSPIKE_CLIENT_VMS.value
 
   if FLAGS.aerospike_instances > 1 and FLAGS.aerospike_vms > 1:
     raise errors.Setup.InvalidFlagConfigurationError(
@@ -259,7 +259,7 @@ def Prepare(benchmark_spec):
   if FLAGS.aerospike_enable_strong_consistency:
     for server in servers:
       aerospike_server.EnableStrongConsistency(
-          server, AEROSPIKE_NAMESPACES
+          server, AEROSPIKE_NAMESPACES.value
       )
   client_install_fns = [
       functools.partial(vm.Install, 'aerospike_client') for vm in clients
@@ -270,12 +270,12 @@ def Prepare(benchmark_spec):
   )
 
   loader_counts = [
-      int(AEROSPIKE_NUM_KEYS) // len(clients)
-      + (1 if i < (AEROSPIKE_NUM_KEYS % num_client_vms) else 0)
+      int(AEROSPIKE_NUM_KEYS.value) // len(clients)
+      + (1 if i < (AEROSPIKE_NUM_KEYS.value % num_client_vms) else 0)
       for i in range(num_client_vms)
   ]
 
-  if AEROSPIKE_SKIP_DB_PREPOPULATION:
+  if AEROSPIKE_SKIP_DB_PREPOPULATION.value:
     return
 
   @vm_util.Retry(max_retries=3)  # Retry if the server is no full up yet.
@@ -283,9 +283,9 @@ def Prepare(benchmark_spec):
     ips = ','.join(seed_ips)
     load_command = (
         'asbench '
-        f'--threads {AEROSPIKE_CLIENT_THREADS_FOR_LOAD_PHASE} '
+        f'--threads {AEROSPIKE_CLIENT_THREADS_FOR_LOAD_PHASE.value} '
         f'--namespace {namespace} --workload I '
-        f'--object-spec {AEROSPIKE_TEST_WORKLOAD_OBJECT_SPEC} '
+        f'--object-spec {AEROSPIKE_TEST_WORKLOAD_OBJECT_SPEC.value} '
         f'--keys {loader_counts[client_idx]} '
         f'--start-key {sum(loader_counts[:client_idx])} '
         f' -h {ips} -p {3 + process_idx}000'
@@ -293,7 +293,7 @@ def Prepare(benchmark_spec):
     clients[client_idx].RobustRemoteCommand(load_command)
 
   run_params = []
-  for namespace in AEROSPIKE_NAMESPACES:
+  for namespace in AEROSPIKE_NAMESPACES.value:
     for child_idx in range(len(clients)):
       for process_idx in range(FLAGS.aerospike_instances):
         run_params.append(((namespace, child_idx, process_idx), {}))
@@ -319,9 +319,9 @@ def Run(benchmark_spec):
   metadata = {}
 
   for threads in range(
-      AEROSPIKE_MIN_CLIENT_THREADS,
-      AEROSPIKE_MAX_CLIENT_THREADS + 1,
-      AEROSPIKE_CLIENT_THREADS_STEP_SIZE,
+      AEROSPIKE_MIN_CLIENT_THREADS.value,
+      AEROSPIKE_MAX_CLIENT_THREADS.value + 1,
+      AEROSPIKE_CLIENT_THREADS_STEP_SIZE.value,
   ):
     stdout_samples = []
 
@@ -332,10 +332,10 @@ def Run(benchmark_spec):
           f'--threads {threads} --namespace {namespace} '  # pylint: disable=cell-var-from-loop
           f'--workload "{op}" '
           f'{extra_arg_str} '
-          f'--object-spec {AEROSPIKE_TEST_WORKLOAD_OBJECT_SPEC} '
-          f'--keys {AEROSPIKE_NUM_KEYS} '
+          f'--object-spec {AEROSPIKE_TEST_WORKLOAD_OBJECT_SPEC.value} '
+          f'--keys {AEROSPIKE_NUM_KEYS.value} '
           f'--hosts {seed_ips} --port {3 + process_idx}000 '
-          f'--duration {AEROSPIKE_BENCHMARK_DURATION} '
+          f'--duration {AEROSPIKE_BENCHMARK_DURATION.value} '
           '--latency --percentiles 50,90,99,99.9,99.99 '
           '--output-file '
           f'result.{client_idx}.{process_idx}.{threads} '
@@ -343,10 +343,10 @@ def Run(benchmark_spec):
       )
       stdout, _ = clients[client_idx].RobustRemoteCommand(run_command)
       stdout_samples.extend(aerospike_client.ParseAsbenchStdout(stdout))  # pylint: disable=cell-var-from-loop
-    workload_types = AEROSPIKE_TEST_WORKLOAD_TYPES.split(';')
+    workload_types = AEROSPIKE_TEST_WORKLOAD_TYPES.value.split(';') 
     extra_args = (
-        AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS
-        if AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS
+        AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS.value
+        if AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS.value
         else [None] * len(workload_types)
     )
     if len(extra_args) != len(workload_types):
@@ -355,7 +355,7 @@ def Run(benchmark_spec):
           'aerospike_test_workload_types'
       )
     for op, extra_arg in zip(workload_types, extra_args):
-      for namespace in AEROSPIKE_NAMESPACES:
+      for namespace in AEROSPIKE_NAMESPACES.value:
         run_params = []
         for client_idx in range(len(clients)):
           for process_idx in range(FLAGS.aerospike_instances):
@@ -390,7 +390,7 @@ def Run(benchmark_spec):
       )
       temp_samples.extend(detailed_samples)
     metadata.update({
-        'num_clients_vms': FLAGS.aerospike_client_vms,
+        'num_clients_vms': AEROSPIKE_CLIENT_VMS.value,
         'num_aerospike_vms': len(servers),
         'num_aerospike_instances': FLAGS.aerospike_instances,
         'storage_type': FLAGS.aerospike_storage_type,
@@ -398,20 +398,20 @@ def Run(benchmark_spec):
         'service_threads': FLAGS.aerospike_service_threads,
         'replication_factor': FLAGS.aerospike_replication_factor,
         'client_threads': threads,
-        'read_percent': AEROSPIKE_READ_PERCENT,
+        'read_percent': AEROSPIKE_READ_PERCENT.value,
         'aerospike_edition': FLAGS.aerospike_edition.value,
         'aerospike_enable_strong_consistency': (
             FLAGS.aerospike_enable_strong_consistency
         ),
-        'aerospike_test_workload_types': AEROSPIKE_TEST_WORKLOAD_TYPES,
+        'aerospike_test_workload_types': AEROSPIKE_TEST_WORKLOAD_TYPES.value,
         'aerospike_test_workload_extra_args': (
-            AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS
+            AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS.value
         ),
         'aerospike_skip_db_prepopulation': (
-            AEROSPIKE_SKIP_DB_PREPOPULATION
+            AEROSPIKE_SKIP_DB_PREPOPULATION.value
         ),
         'aerospike_test_workload_object_spec': (
-            AEROSPIKE_TEST_WORKLOAD_OBJECT_SPEC
+            AEROSPIKE_TEST_WORKLOAD_OBJECT_SPEC.value
         ),
     })
     if FLAGS.aerospike_edition == aerospike_server.AerospikeEdition.ENTERPRISE:
