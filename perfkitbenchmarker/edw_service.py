@@ -263,7 +263,11 @@ class EdwClientInterface:
     """
     raise NotImplementedError
 
-  def ExecuteThroughput(self, concurrency_streams: List[List[str]]) -> str:
+  def ExecuteThroughput(
+      self,
+      concurrency_streams: List[List[str]],
+      labels: dict[str, str] | None = None,
+  ) -> str:
     """Executes a throughput test and returns performance details.
 
     Response format:
@@ -295,6 +299,9 @@ class EdwClientInterface:
     Args:
       concurrency_streams: List of streams to execute simultaneously, each of
         which is a list of string names of queries.
+      labels: A dictionary of labels to apply to the query for service-side
+        tracking and analysis. Must include the mandatory label
+        'minimal_run_key', which should be unique per individual iteration.
 
     Returns:
       A serialized dictionary of execution details.
