@@ -121,13 +121,13 @@ cluster_boot:
     always_call_cleanup: True
 """
 
-flags.DEFINE_boolean(
+_BOOT_TIME_REBOOT = flags.DEFINE_boolean(
     'cluster_boot_time_reboot',
     False,
     'Whether to reboot the VMs during the cluster boot benchmark to measure '
     'reboot performance.',
 )
-flags.DEFINE_boolean(
+_BOOT_TEST_PORT_LISTENING = flags.DEFINE_boolean(
     'cluster_boot_test_port_listening',
     False,
     'Test the time it takes to successfully connect to the port that is used '
@@ -321,7 +321,7 @@ def GetTimeToBoot(vms):
     samples.append(
         sample.Sample('Boot Time', boot_time_sec, 'seconds', metadata)
     )
-    if FLAGS.cluster_boot_test_port_listening:
+    if _BOOT_TEST_PORT_LISTENING.value:
       assert vm.port_listening_time
       assert vm.port_listening_time >= vm.create_start_time
       port_listening_time_sec = vm.port_listening_time - min_create_start_time
@@ -339,7 +339,7 @@ def GetTimeToBoot(vms):
 
     # TIME TO RDP LISTENING
     # TODO(pclay): refactor so Windows specifics aren't in linux_benchmarks
-    if FLAGS.cluster_boot_test_rdp_port_listening:
+    if _BOOT_TEST_PORT_LISTENING.value:
       assert vm.rdp_port_listening_time
       assert vm.rdp_port_listening_time >= vm.create_start_time
       rdp_port_listening_time_sec = (
@@ -366,7 +366,7 @@ def GetTimeToBoot(vms):
   samples.append(
       sample.Sample('Cluster Boot Time', max_boot_time_sec, 'seconds', metadata)
   )
-  if FLAGS.cluster_boot_test_port_listening:
+  if _BOOT_TEST_PORT_LISTENING.value:
     samples.append(
         sample.Sample(
             'Cluster Port Listening Time',
@@ -501,7 +501,7 @@ def Run(benchmark_spec):
               include_networking_samples=CollectNetworkSamples(),
           )
       )
-  if FLAGS.cluster_boot_time_reboot:
+  if _BOOT_TIME_REBOOT.value:
     samples.extend(_MeasureReboot(benchmark_spec.vms))
   return samples
 
