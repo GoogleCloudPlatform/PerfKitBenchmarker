@@ -90,14 +90,13 @@ def PrepareFileForTransfer(vm):
   """Creates a test file of specified size on the VM."""
   logging.info('Preparing the test file')
 
-  # Create directory with appropriate permissions
-  vm.RemoteCommand('sudo mkdir -p /data_for_transfer && sudo chmod 777 /data_for_transfer')
   # Create a random file of specified size
   file_size_gb = FLAGS.scp_file_size_gb
   block_size = '50M'          # 50MiB per block
   count = file_size_gb * 20   # 1GB = 1000MiB = 20 blocks
+  # Using default mount_point /scratch
   vm.RemoteCommand(
-    f'dd if=/dev/urandom of=/data_for_transfer/payload.img bs={block_size} count={count} status=progress'
+    f'dd if=/dev/urandom of=/scratch/payload.img bs={block_size} count={count} status=progress'
   )
 
 
@@ -112,11 +111,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   def TransferFile(vm_pair):
     source_vm, dest_vm = vm_pair
     # clear any existing received file from previous runs
-    dest_vm.RemoteCommand('rm -f /data_for_transfer/received.img')
+    dest_vm.RemoteCommand('rm -f /scratch/received.img')
 
     scp_cmd = (f'scp -o StrictHostKeyChecking=no -i ~/.ssh/scp_benchmark_key '
-               f'/data_for_transfer/payload.img '
-               f'{dest_vm.user_name}@{dest_vm.internal_ip}:/data_for_transfer/received.img')
+               f'/scratch/payload.img '
+               f'{dest_vm.user_name}@{dest_vm.internal_ip}:/scratch/received.img')
 
     start_time = time.time()
     source_vm.RemoteCommand(scp_cmd)
@@ -153,7 +152,7 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec):
   vms = benchmark_spec.vms
   
   for vm in vms:
-    vm.RemoteCommand('rm -rf /data_for_transfer')
+    vm.RemoteCommand('rm -rf /scratch')
     vm.RemoteCommand('rm -f ~/.ssh/scp_benchmark_key ~/.ssh/scp_benchmark_key.pub')
     vm.RemoteCommand("sed -i '/scp_benchmark_key/d' ~/.ssh/authorized_keys")
     # restore original state in case
