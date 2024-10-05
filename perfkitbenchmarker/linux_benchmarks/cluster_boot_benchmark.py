@@ -120,7 +120,6 @@ cluster_boot:
     # In case tcpdump is launched, always cleanup
     always_call_cleanup: True
 """
-
 CLUSTER_BOOT_TIME_REBOOT = flags.DEFINE_boolean(
     'cluster_boot_time_reboot',
     False,
