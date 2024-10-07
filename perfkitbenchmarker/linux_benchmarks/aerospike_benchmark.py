@@ -278,9 +278,12 @@ def Prepare(benchmark_spec):
   if AEROSPIKE_SKIP_DB_PREPOPULATION.value:
     return
 
-  @vm_util.Retry(max_retries=3)  # Retry if the server is no full up yet.
+  extra_args = FLAGS.aerospike_test_workload_extra_args or ['']
+  @vm_util.Retry(max_retries=3)  # Retry if the server is not fully up yet.
   def _Load(namespace, client_idx, process_idx):
     ips = ','.join(seed_ips)
+    # Default to use the first extra arg.
+    extra_arg_str = f'{extra_args[0]}' if extra_args[0] else ''
     load_command = (
         'asbench '
         f'--threads {AEROSPIKE_CLIENT_THREADS_FOR_LOAD_PHASE.value} '
@@ -288,7 +291,8 @@ def Prepare(benchmark_spec):
         f'--object-spec {AEROSPIKE_TEST_WORKLOAD_OBJECT_SPEC.value} '
         f'--keys {loader_counts[client_idx]} '
         f'--start-key {sum(loader_counts[:client_idx])} '
-        f' -h {ips} -p {3 + process_idx}000'
+        f' -h {ips} -p {3 + process_idx}000 '
+        f'{extra_arg_str}'
     )
     clients[client_idx].RobustRemoteCommand(load_command)
 
@@ -339,11 +343,10 @@ def Run(benchmark_spec):
           '--latency --percentiles 50,90,99,99.9,99.99 '
           '--output-file '
           f'result.{client_idx}.{process_idx}.{threads} '
-          '-d'
       )
       stdout, _ = clients[client_idx].RobustRemoteCommand(run_command)
       stdout_samples.extend(aerospike_client.ParseAsbenchStdout(stdout))  # pylint: disable=cell-var-from-loop
-    workload_types = AEROSPIKE_TEST_WORKLOAD_TYPES.value.split(';') 
+    workload_types = AEROSPIKE_TEST_WORKLOAD_TYPES.value.split(';')
     extra_args = (
         AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS.value
         if AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS.value

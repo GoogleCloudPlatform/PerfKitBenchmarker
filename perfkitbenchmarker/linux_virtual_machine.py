@@ -1230,6 +1230,11 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     """
     pass
 
+  def IsMounted(self, mount_point: str):
+    """Returns whether the given mount point is mounted."""
+    stdout, _ = self.RemoteHostCommand(f'mount | grep {mount_point} | wc -l')
+    return stdout and int(stdout) > 0
+
   @vm_util.Retry()
   def FormatDisk(self, device_path, disk_type=None):
     """Formats a disk attached to the VM."""
