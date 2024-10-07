@@ -49,6 +49,7 @@ PD_EXTREME = 'pd-extreme'
 HYPERDISK_THROUGHPUT = 'hyperdisk-throughput'
 HYPERDISK_EXTREME = 'hyperdisk-extreme'
 HYPERDISK_BALANCED = 'hyperdisk-balanced'
+HYPERDISK_BALANCED_HA = 'hyperdisk-balanced-high-availability'
 GCE_REMOTE_DISK_TYPES = [
     PD_STANDARD,
     PD_SSD,
@@ -57,17 +58,20 @@ GCE_REMOTE_DISK_TYPES = [
     HYPERDISK_THROUGHPUT,
     HYPERDISK_EXTREME,
     HYPERDISK_BALANCED,
+    HYPERDISK_BALANCED_HA,
 ]
 # Defaults picked to align with console.
 GCE_DYNAMIC_IOPS_DISK_TYPE_DEFAULTS = {
     PD_EXTREME: 100000,
     HYPERDISK_EXTREME: 100000,
     HYPERDISK_BALANCED: 3600,
+    HYPERDISK_BALANCED_HA: 3600,
 }
 # Defaults picked to align with console.
 GCE_DYNAMIC_THROUGHPUT_DISK_TYPE_DEFAULTS = {
     HYPERDISK_BALANCED: 290,
     HYPERDISK_THROUGHPUT: 180,
+    HYPERDISK_BALANCED_HA: 290,
 }
 
 REGIONAL_DISK_SCOPE = 'regional'
@@ -100,6 +104,10 @@ DISK_METADATA = {
     HYPERDISK_BALANCED: {
         disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.ZONE,
+    },
+    HYPERDISK_BALANCED_HA: {
+        disk.MEDIA: disk.SSD,
+        disk.REPLICATION: disk.REGION,
     },
     disk.LOCAL: {
         disk.MEDIA: disk.SSD,
@@ -498,6 +506,8 @@ class GceDisk(disk.BaseDisk):
 
     if self.replica_zones:
       cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
+      cmd.flags['region'] = self.region
+
     self.attach_start_time = time.time()
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
     self.attach_end_time = self._GetEndTime(stdout)
