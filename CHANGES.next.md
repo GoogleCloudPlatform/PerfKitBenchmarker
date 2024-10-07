@@ -201,6 +201,7 @@
 -   Add new pressure_stall trace.
 -   Add `--skip_teardown_on_command_timeout` flag to skip teardown if the
     failure substatus is COMMAND_TIMEOUT.
+-   Use Artifact Registry instead of the deprecated Google Container Registry
 
 ### Enhancements:
 

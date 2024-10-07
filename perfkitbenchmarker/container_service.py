@@ -86,13 +86,6 @@ flags.DEFINE_boolean(
     'not attempt to build it.',
 )
 
-flags.DEFINE_boolean(
-    'force_container_build',
-    False,
-    'Whether to force PKB to build container images even '
-    'if they already exist in the registry.',
-)
-
 flags.DEFINE_integer(
     'container_cluster_num_vms',
     None,
@@ -276,10 +269,6 @@ class BaseContainerRegistry(resource.BaseResource):
     """
     raise NotImplementedError()
 
-  def PreRemotePush(self, image: ContainerImage):
-    """Prepares registry to push an image built remotely."""
-    pass
-
   def PrePush(self, image: ContainerImage):
     """Prepares registry to push a given image."""
     pass
@@ -329,14 +318,7 @@ class BaseContainerRegistry(resource.BaseResource):
       The full image name (including the registry).
     """
     full_image = self.GetFullRegistryTag(image)
-    # Log in to the registry to see if image exists
     self.Login()
-    if not FLAGS.force_container_build:
-      # manifest inspect inpspects the registry's copy
-      inspect_cmd = ['docker', 'manifest', 'inspect', full_image]
-      _, _, retcode = vm_util.IssueCommand(inspect_cmd, raise_on_failure=False)
-      if retcode == 0:
-        return full_image
     self._Build(image)
     return full_image
 
@@ -349,7 +331,6 @@ class BaseContainerRegistry(resource.BaseResource):
     image = ContainerImage(image)
     if not FLAGS.local_container_build:
       try:
-        self.PreRemotePush(image)
         build_start = time.time()
         # Build the image remotely using an image building service.
         self.RemoteBuild(image)
@@ -358,6 +339,7 @@ class BaseContainerRegistry(resource.BaseResource):
       except NotImplementedError:
         pass
 
+    # TODO(pclay): Refactor ECR and remove.
     self.PrePush(image)
     # Build the image locally using docker.
     build_start = time.time()
