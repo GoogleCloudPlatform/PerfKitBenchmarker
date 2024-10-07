@@ -148,6 +148,18 @@ _VM_INSTANCE_NAME_SUFFIX = flags.DEFINE_string(
         ' pkb-{run_uri}-{instance_number}-{vm_instance_name_suffix}'
     ),
 )
+_VM_INSTANCE_NAME_SUFFIXES = flags.DEFINE_list(
+    'vm_instance_name_suffixes',
+    None,
+    (
+        'Optional, the list of suffixes to add after the VM instance name.'
+        ' Without this, instance is named as pkb-{run_uri}-{instance_number}.'
+        ' With this option, the instance name will be'
+        ' pkb-{run_uri}-{vm_instance_name_suffixes[instance_number]}.'
+        ' The number of suffixes must be equal to the total number of VMs'
+        ' (servers and clients).'
+    ),
+)
 _VM_NAME_PREFIX = flags.DEFINE_string(
     'vm_name_prefix',
     None,
@@ -553,6 +565,11 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
             name_prefix,
             self.instance_number,
             _VM_INSTANCE_NAME_SUFFIX.value,
+        )
+      elif _VM_INSTANCE_NAME_SUFFIXES.value:
+        self.name = '%s-%s' % (
+            name_prefix,
+            _VM_INSTANCE_NAME_SUFFIXES.value[self.instance_number],
         )
       else:
         self.name = '%s-%d' % (name_prefix, self.instance_number)
