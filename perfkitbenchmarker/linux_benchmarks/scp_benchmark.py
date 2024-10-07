@@ -20,9 +20,7 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('scp_file_size_gb', 1,
@@ -78,7 +76,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
 
   # Generate and exchange SSH keys
   GenerateAndExchangeSSHKeys(vms[0], vms[1])
-  
+
   # Create a payload file on both VM
   try:
     background_tasks.RunThreaded(PrepareFileForTransfer, vms)
@@ -92,11 +90,12 @@ def PrepareFileForTransfer(vm):
 
   # Create a random file of specified size
   file_size_gb = FLAGS.scp_file_size_gb
-  block_size = '50M'          # 50MiB per block
-  count = file_size_gb * 20   # 1GB = 1000MiB = 20 blocks
+  block_size = '50M'  # 50MiB per block
+  count = file_size_gb * 20  # 1GB = 1000MiB = 20 blocks
   # Using default mount_point /scratch
   vm.RemoteCommand(
-    f'dd if=/dev/urandom of=/scratch/payload.img bs={block_size} count={count} status=progress'
+      'dd if=/dev/urandom of=/scratch/payload.img'
+      f' bs={block_size} count={count} status=progress'
   )
 
 
@@ -113,9 +112,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     # clear any existing received file from previous runs
     dest_vm.RemoteCommand('rm -f /scratch/received.img')
 
-    scp_cmd = (f'scp -o StrictHostKeyChecking=no -i ~/.ssh/scp_benchmark_key '
-               f'/scratch/payload.img '
-               f'{dest_vm.user_name}@{dest_vm.internal_ip}:/scratch/received.img')
+    scp_cmd = (
+        'scp -o StrictHostKeyChecking=no -i ~/.ssh/scp_benchmark_key '
+        '/scratch/payload.img '
+        f'{dest_vm.user_name}@{dest_vm.internal_ip}:/scratch/received.img'
+    )
 
     start_time = time.time()
     source_vm.RemoteCommand(scp_cmd)
@@ -124,12 +125,12 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   # Run TransferFile on both VMs
   thread_params = [
-    (((vm1, vm2),), {}),  # VM1 to VM2
-    (((vm2, vm1),), {})   # VM2 to VM1
+      (((vm1, vm2),), {}),  # VM1 to VM2
+      (((vm2, vm1),), {}),  # VM2 to VM1
   ]
   transfer_times = background_tasks.RunThreaded(TransferFile, thread_params)
   transfer_time_1, transfer_time_2 = transfer_times
-  
+
   metadata = {
       'file_size_gb': FLAGS.scp_file_size_gb,
       'vm1_zone': vm1.zone,
@@ -150,13 +151,13 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec):
   """Cleans up after SCP benchmark completes."""
   vms = benchmark_spec.vms
-  
+
   for vm in vms:
     vm.RemoteCommand('rm -rf /scratch')
-    vm.RemoteCommand('rm -f ~/.ssh/scp_benchmark_key ~/.ssh/scp_benchmark_key.pub')
+    vm.RemoteCommand(
+        'rm -f ~/.ssh/scp_benchmark_key ~/.ssh/scp_benchmark_key.pub'
+    )
     vm.RemoteCommand("sed -i '/scp_benchmark_key/d' ~/.ssh/authorized_keys")
     # restore original state in case
     vm.RemoteCommand('sudo sysctl -p /tmp/original_sysctl.conf')
     vm.RemoteCommand('rm /tmp/original_sysctl.conf')
-
-  del benchmark_spec
