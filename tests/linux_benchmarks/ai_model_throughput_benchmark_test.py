@@ -1,3 +1,4 @@
+import time
 # Copyright 2024 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,18 +13,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+from typing import Any
 import unittest
+
 from absl import flags
 from absl.testing import flagsaver
+from absl.testing import parameterized
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import ai_model_throughput_benchmark
 from tests import pkb_common_test_case
 from tests.resources import fake_managed_ai_model
 
+
 FLAGS = flags.FLAGS
+
+
+class TimedFakeManagedAiModel(fake_managed_ai_model.FakeManagedAiModel):
+  """Fake managed AI model for testing."""
+
+  def __init__(self, **kwargs: Any) -> Any:
+    super().__init__(**kwargs)
+    self.wait_time = 0
+
+  def _SendPrompt(
+      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
+  ) -> list[str]:
+    time.sleep(self.wait_time)
+    return [prompt]
 
 
 class AiModelThroughputBenchmarkTest(
@@ -39,13 +58,14 @@ class AiModelThroughputBenchmarkTest(
     self.bm_spec = benchmark_spec.BenchmarkSpec(
         ai_model_throughput_benchmark, config_spec, 'benchmark_uid'
     )
-    self.bm_spec.ai_model = fake_managed_ai_model.FakeManagedAiModel()
+    self.bm_spec.ai_model = TimedFakeManagedAiModel()
     self.bm_spec.resources.append(self.bm_spec.ai_model)
     self.bm_spec.ai_model.existing_endpoints = [
         'model1',
     ]
 
-  def testBenchmarkPasses(self):
+  @flagsaver.flagsaver(ai_parallel_requests=1, ai_test_duration=5)
+  def testBenchmarkPassesWithCorrectMetrics(self):
     samples = ai_model_throughput_benchmark.Run(self.bm_spec)
     metrics = [sample.metric for sample in samples]
     self.assertEqual(
@@ -58,13 +78,43 @@ class AiModelThroughputBenchmarkTest(
         ],
     )
 
-  def testMoreRequestsSent(self):
-    self.enter_context(flagsaver.flagsaver(ai_parallel_requests=10))
+  @parameterized.named_parameters(
+      ('tiny test', 1, 2),
+      ('longer test', 10, 3),
+  )
+  def testCorrectRequestsReturned(self, duration, qps):
+    self.enter_context(flagsaver.flagsaver(ai_parallel_requests=qps))
+    self.enter_context(flagsaver.flagsaver(ai_test_duration=duration))
+    # Act
     samples = ai_model_throughput_benchmark.Run(self.bm_spec)
+    # Assert
     responses_samples = [s for s in samples if s.metric == 'total_responses']
     self.assertNotEmpty(responses_samples)
     responses_sample = responses_samples[0]
+    # Ignore a flaky off-by-one error
+    self.assertGreaterEqual(responses_sample.value, duration * qps)
+    self.assertLessEqual(responses_sample.value, (duration + 1) * qps)
+
+  def testTooMuchQpsThrowsError(self):
+    self.enter_context(flagsaver.flagsaver(ai_parallel_requests=50))
+    self.enter_context(flagsaver.flagsaver(ai_test_duration=5))
+    with self.assertRaises(errors.Benchmarks.RunError):
+      ai_model_throughput_benchmark.Run(self.bm_spec)
+
+  @flagsaver.flagsaver(ai_parallel_requests=2, ai_test_duration=5)
+  def testWaitDoesntTriggerError(self):
+    self.bm_spec.ai_model.wait_time = 15
+    # Act
+    samples = ai_model_throughput_benchmark.Run(self.bm_spec)
+    responses_samples = [s for s in samples if s.metric == 'total_responses']
+    # Assert
+    self.assertNotEmpty(responses_samples)
+    responses_sample = responses_samples[0]
     self.assertEqual(responses_sample.value, 10)
+    time_samples = [s for s in samples if s.metric == 'median_response_time']
+    self.assertNotEmpty(time_samples)
+    time_sample = time_samples[0]
+    self.assertGreaterEqual(time_sample.value, 15)
 
 
 if __name__ == '__main__':

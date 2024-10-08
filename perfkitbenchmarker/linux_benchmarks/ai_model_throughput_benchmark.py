@@ -49,6 +49,10 @@ _PARALLEL_REQUESTS = flags.DEFINE_integer(
     'ai_parallel_requests', 5, 'Number of requests to send in parallel.'
 )
 
+_TEST_DURATION = flags.DEFINE_integer(
+    'ai_test_duration', 60, 'Number of seconds over which requests are sent.'
+)
+
 
 def GetConfig(user_config: dict[Any, Any]) -> dict[Any, Any]:
   """Load and return benchmark config.
@@ -93,7 +97,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   model.metadata.update({'First Model': len(endpoints) == 1})
   # Confirm we can send one request.
   _SendPrompt(model, 'Why do crabs walk sideways?')
-  responses = SendParallelRequests(model, _PARALLEL_REQUESTS.value)
+  responses = SendQpsOverTime(
+      model, _PARALLEL_REQUESTS.value, _TEST_DURATION.value
+  )
   return _AggregateResponses(responses, model)
 
 
@@ -146,12 +152,10 @@ def _AggregateResponses(
 def SendParallelRequests(
     ai_model: managed_ai_model.BaseManagedAiModel,
     requests: int,
-):
+    output_queue: multiprocessing.Queue,
+) -> list[multiprocessing.Process]:
   """Sends X requests to the model in parallel."""
-  # Starttime
-  start = time.time()
   logging.info('Sending %s requests in parallel', requests)
-  output_queue = multiprocessing.Queue()
   processes = []
   for _ in range(requests):
     p = multiprocessing.Process(
@@ -159,32 +163,52 @@ def SendParallelRequests(
     )
     processes.append(p)
     p.start()
-  # Allocate list for results:
-  results = []
-  while len(results) < requests:
-    result = output_queue.get()
-    if result is None:
-      continue
-    else:
-      results.append(result)
-  # Now we can wait for all processes to finish
-  for p in processes:
-    p.join()
-  logging.info('All processes finished in: %s', time.time() - start)
-  logging.info('Dumping all response results: %s', results)
-  return results
+  return processes
 
 
-def SendQps(
+def SendQpsOverTime(
     ai_model: managed_ai_model.BaseManagedAiModel,
     qps: int,
     duration: int,
-):
-  """Sends QPS to the model for the duration."""
+) -> list[ModelResponse]:
+  """Sends X requests to the model in parallel over duration seconds."""
   start_time = time.time()
-  while time.time() - start_time < duration:
-    _SendPrompt(ai_model, 'Why do crabs walk sideways?')
-    time.sleep(1 / qps)
+  logging.info('Starting to send %s qps over %s duration', qps, duration)
+  output_queue = multiprocessing.Queue()
+  processes = []
+  # 0.2 is a fuzz for the above few lines of code.
+  while time.time() - start_time < duration + 0.2:
+    process_start_time = time.time()
+    processes += SendParallelRequests(ai_model, qps, output_queue)
+    process_startup_duration = time.time() - process_start_time
+    if process_startup_duration > 1:
+      elapsed_time = time.time() - start_time
+      raise errors.Benchmarks.RunError(
+          f'After running for {elapsed_time} seconds, the client took'
+          f' {elapsed_time} seconds to send {qps} requests, which is more than'
+          ' the one second needed to meet QPS. This means the client is not'
+          ' powerful enough & a CPU with more clients should be used.'
+      )
+    # Wait 1 second
+    while time.time() - process_start_time < 1:
+      time.sleep(0.1)
+  # Wait for all processes to finish.
+  for p in processes:
+    p.join()
+  # Allocate list for results:
+  results = []
+  while not output_queue.empty():
+    results.append(output_queue.get())
+  logging.info('All processes finished in: %s', time.time() - start_time)
+  logging.info('Dumping all response results: %s', results)
+  expected_results = duration * qps
+  if len(results) < expected_results:
+    raise errors.Benchmarks.RunError(
+        f'Expected to get {expected_results} results but only got'
+        f' {len(results)} from {len(processes)} processes. Some data has been'
+        ' dropped.'
+    )
+  return results
 
 
 def TimePromptsForModel(
