@@ -76,24 +76,36 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
     self.ai_model.endpoint_name = 'endpoint_name'
     self.ai_model.model_name = 'model_name'
     self.ai_model._PostCreate()
-    mock_cmd.func_to_mock.assert_any_call([
-        'aws',
-        'sagemaker',
-        'add-tags',
-        '--region=us-west-1',
-        '--resource-arn=arn:aws:sagemaker:us-west-1:1234:model/model_name',
-        '--tags',
-        'Key=K,Value=V',
-    ])
-    mock_cmd.func_to_mock.assert_any_call([
-        'aws',
-        'sagemaker',
-        'add-tags',
-        '--region=us-west-1',
-        '--resource-arn=arn:aws:sagemaker:us-west-1:1234:endpoint/endpoint_name',
-        '--tags',
-        'Key=K,Value=V',
-    ])
+    mock_cmd.func_to_mock.assert_any_call(
+        cmd=[
+            'aws',
+            'sagemaker',
+            'add-tags',
+            '--region=us-west-1',
+            '--resource-arn=arn:aws:sagemaker:us-west-1:1234:model/model_name',
+            '--tags',
+            'Key=K,Value=V',
+        ],
+        timeout=mock.ANY,
+        should_pre_log=mock.ANY,
+        stack_level=mock.ANY,
+        raise_on_failure=mock.ANY,
+    )
+    mock_cmd.func_to_mock.assert_any_call(
+        cmd=[
+            'aws',
+            'sagemaker',
+            'add-tags',
+            '--region=us-west-1',
+            '--resource-arn=arn:aws:sagemaker:us-west-1:1234:endpoint/endpoint_name',
+            '--tags',
+            'Key=K,Value=V',
+        ],
+        timeout=mock.ANY,
+        should_pre_log=mock.ANY,
+        stack_level=mock.ANY,
+        raise_on_failure=mock.ANY,
+    )
 
   def testListEndpointsParsesOutNames(self):
     self.MockIssueCommand({
@@ -147,7 +159,11 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.ai_model.ListExistingEndpoints()
     mock_cmd.func_to_mock.assert_called_once_with(
-        ['aws', 'sagemaker', 'list-endpoints', '--region=us-west-1']
+        cmd=['aws', 'sagemaker', 'list-endpoints', '--region=us-west-1'],
+        timeout=mock.ANY,
+        should_pre_log=mock.ANY,
+        stack_level=mock.ANY,
+        raise_on_failure=mock.ANY,
     )
     self.assertEqual(self.ai_model.region, 'us-west-1')
 
@@ -163,7 +179,11 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.ai_model.ListExistingEndpoints('us-east-1')
     mock_cmd.func_to_mock.assert_called_once_with(
-        ['aws', 'sagemaker', 'list-endpoints', '--region=us-east-1']
+        cmd=['aws', 'sagemaker', 'list-endpoints', '--region=us-east-1'],
+        timeout=mock.ANY,
+        should_pre_log=mock.ANY,
+        stack_level=mock.ANY,
+        raise_on_failure=mock.ANY,
     )
 
   def testPromptResponseParsed(self):

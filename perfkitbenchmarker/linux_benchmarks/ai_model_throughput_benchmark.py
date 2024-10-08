@@ -37,6 +37,12 @@ ai_model_throughput:
     model_name: 'llama2'
     model_size: '7b'
     cloud: 'GCP'
+  vm_groups:
+    default:
+      vm_spec: *default_dual_core
+      vm_count: 1
+  flags:
+    gcloud_scopes: cloud-platform
 """
 
 _PARALLEL_REQUESTS = flags.DEFINE_integer(

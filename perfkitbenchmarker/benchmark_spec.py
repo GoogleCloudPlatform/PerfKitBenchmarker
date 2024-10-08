@@ -522,6 +522,11 @@ class BenchmarkSpec:
     providers.LoadProvider(cloud)
     model_class = managed_ai_model.GetManagedAiModelClass(cloud)
     self.ai_model = model_class(self.config.ai_model)  # pytype: disable=not-instantiable
+    if self.vm_groups:
+      vm = self.vm_groups[
+          'clients' if 'clients' in self.vm_groups else 'default'
+      ][0]
+      self.ai_model.SetCli(vm)
     self.resources.append(self.ai_model)
 
   def ConstructPinecone(self):

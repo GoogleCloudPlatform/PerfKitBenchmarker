@@ -26,10 +26,10 @@ try:
 except ImportError:
   from google.cloud import aiplatform
 from google.api_core import exceptions as google_exceptions
+from perfkitbenchmarker import command_interface
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources import managed_ai_model
 from perfkitbenchmarker.resources import managed_ai_model_spec
@@ -75,6 +75,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     service_account: Name of the service account used by the model.
     model_deploy_time: Time it took to deploy the model.
     model_upload_time: Time it took to upload the model.
+    cli: A way to run commands on the machine.
     json_write_times: List of times it took to write the json request to disk.
   """
 
@@ -118,7 +119,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       self.name = 'pkb' + FLAGS.run_uri
     self.project = FLAGS.project
     self.endpoint = VertexAiEndpoint(
-        name=self.name, region=self.region, project=self.project
+        name=self.name, region=self.region, project=self.project, cli=self.cli
     )
     if not self.project:
       raise errors.Setup.InvalidConfigurationError(
@@ -153,14 +154,9 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     # Expected output example:
     # ENDPOINT_ID          DISPLAY_NAME
     # 12345                some_endpoint_name
-    out, _, _ = vm_util.IssueCommand([
-        'gcloud',
-        'ai',
-        'endpoints',
-        'list',
-        f'--region={region}',
-        f'--project={self.project}',
-    ])
+    out, _, _ = self.cli.RunCommand(
+        f'gcloud ai endpoints list --region={region} --project={self.project}'
+    )
     lines = out.splitlines()
     ids = [line.split()[0] for line in lines]
     ids.pop(0)  # Remove the first line which just has titles
@@ -212,23 +208,15 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       str_responses = [str(response) for response in response.predictions]
       return str_responses
     instances_dict = {'instances': instances, 'parameters': {}}
-    name = ''
     start_write_time = time.time()
-    with vm_util.NamedTemporaryFile(mode='w', delete=False) as tf:
-      tf.write(json.dumps(instances_dict))
-      tf.close()
-      name = tf.name
+    name = self.cli.WriteTemporaryFile(json.dumps(instances_dict))
     end_write_time = time.time()
     write_time = end_write_time - start_write_time
     self.json_write_times.append(write_time)
-    out, _, _ = vm_util.IssueCommand([
-        'gcloud',
-        'ai',
-        'endpoints',
-        'predict',
-        self.endpoint.endpoint_name,
-        f'--json-request={name}',
-    ])
+    out, _, _ = self.cli.RunCommand(
+        'gcloud ai endpoints predict'
+        f' {self.endpoint.endpoint_name} --json-request={name}',
+    )
     responses = out.strip('[]').split(',')
     return responses
 
@@ -334,12 +322,20 @@ class VertexAiEndpoint(resource.BaseResource):
     ai_endpoint: The AIPlatform object representing the endpoint.
   """
 
-  def __init__(self, name: str, project: str, region: str, **kwargs):
+  def __init__(
+      self,
+      name: str,
+      project: str,
+      region: str,
+      cli: command_interface.CommandInterface,
+      **kwargs,
+  ):
     super().__init__(**kwargs)
     self.name = name
     self.ai_endpoint = None
     self.project = project
     self.region = region
+    self.cli = cli
     self.endpoint_name = None
 
   def _Create(self) -> None:
@@ -351,21 +347,15 @@ class VertexAiEndpoint(resource.BaseResource):
       )
       return
 
-    _, err, _ = vm_util.IssueCommand(
-        [
-            'gcloud',
-            'ai',
-            'endpoints',
-            'create',
-            f'--display-name={self.name}-endpoint',
-            f'--project={self.project}',
-            f'--region={self.region}',
-        ],
-        raise_on_failure=False,
+    _, err, _ = self.cli.RunCommand(
+        f'gcloud ai endpoints create --display-name={self.name}-endpoint'
+        f' --project={self.project} --region={self.region}',
+        ignore_failure=True,
     )
     self.endpoint_name = _FindRegexInOutput(
         err, r'Created Vertex AI endpoint: (.+)\.'
     )
+    logging.info('Successfully creating endpoint %s', self.endpoint_name)
     self.ai_endpoint = aiplatform.Endpoint(self.endpoint_name)
 
   def _Delete(self) -> None:
@@ -376,25 +366,16 @@ class VertexAiEndpoint(resource.BaseResource):
       self.ai_endpoint.delete(force=True)
       self.ai_endpoint = None  # Object is not picklable - none it out
       return
-    out, _, _ = vm_util.IssueCommand([
-        'gcloud',
-        'ai',
-        'endpoints',
-        'describe',
-        self.endpoint_name,
-    ])
+    out, _, _ = self.cli.RunCommand(
+        f'gcloud ai endpoints describe {self.endpoint_name}',
+    )
     model_id = _FindRegexInOutput(out, r'  id: \'(.+)\'')
-    vm_util.IssueCommand([
-        'gcloud',
-        'ai',
-        'endpoints',
-        'undeploy-model',
-        self.endpoint_name,
-        f'--deployed-model-id={model_id}',
-        '--quiet',
-    ])
-    vm_util.IssueCommand(
-        ['gcloud', 'ai', 'endpoints', 'delete', self.endpoint_name, '--quiet']
+    self.cli.RunCommand(
+        'gcloud ai endpoints undeploy-model'
+        f' {self.endpoint_name} --deployed-model-id={model_id} --quiet',
+    )
+    self.cli.RunCommand(
+        f'gcloud ai endpoints delete {self.endpoint_name} --quiet'
     )
     # None it out here as well, until all commands are supported over gcloud.
     self.ai_endpoint = None

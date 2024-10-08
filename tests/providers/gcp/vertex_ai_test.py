@@ -6,6 +6,7 @@ from absl import flags
 from absl.testing import flagsaver
 from google.api_core import exceptions as google_exceptions
 import mock
+from perfkitbenchmarker import command_interface
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.providers.gcp import vertex_ai
@@ -194,8 +195,12 @@ class VertexAiEndpointTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
+    self.cli = command_interface.VmUtilCommandInterface()
     self.endpoint = vertex_ai.VertexAiEndpoint(
-        name='my-endpoint', project='my-project', region='us-east1'
+        name='my-endpoint',
+        project='my-project',
+        region='us-east1',
+        cli=self.cli,
     )
     self.enter_context(
         mock.patch.object(

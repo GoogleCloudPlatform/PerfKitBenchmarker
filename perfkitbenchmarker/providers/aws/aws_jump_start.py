@@ -12,9 +12,7 @@ import logging
 import re
 from typing import Any
 from absl import flags
-from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import util
 from perfkitbenchmarker.resources import managed_ai_model
 from perfkitbenchmarker.resources import managed_ai_model_spec
@@ -38,6 +36,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
     account_id: The AWS account id.
     endpoint_name: The name of the deployed endpoint, if initialized.
     execution_arn: The role the model uses to run.
+    cli: A cli to run commands on.
   """
 
   CLOUD = 'AWS'
@@ -86,7 +85,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
     """Returns list of endpoint names."""
     if region is None:
       region = self.region
-    out, _, _ = vm_util.IssueCommand(
+    out, _, _ = self.cli.RunCommand(
         ['aws', 'sagemaker', 'list-endpoints', f'--region={region}']
     )
     out_json = json.loads(out)
@@ -107,23 +106,20 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
     Returns:
       Tuple of [stdout, stderr].
     """
-    python_script = data.ResourcePath(AWS_RUNNER_SCRIPT)
+    python_script = self.cli.PrepareResourcePath(AWS_RUNNER_SCRIPT)
     # When run without the region variable, get the error:
     # "ARN should be scoped to correct region: us-west-2"
     env_vars = {'AWS_DEFAULT_REGION': self.region}
-    out, err, _ = vm_util.IssueCommand(
-        [
-            'python3',
-            python_script,
-            # These arguments are needed for all operations.
-            f'--region={self.region}',
-            f'--model_id={self.model_id}',
-            f'--model_version={self.model_version}',
-        ]
-        + args,
+    out, err, _ = self.cli.RunCommand(
+        # These arguments are needed for all operations.
+        'python3'
+        f' {python_script} --region={self.region} --model_id={self.model_id} '
+        f'--model_version={self.model_version} '
+        + ' '.join(args),
         env=env_vars,
         raise_on_failure=False,
         timeout=60 * 30,
+        stack_level=2,
     )
     return out, err
 
@@ -152,6 +148,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
     out, err = self._RunPythonScript(
         ['--operation=create', f'--role={self.execution_arn}']
     )
+
     # TODO(user): Handle errors rather than swallowing them.
     # Unfortunately even a correct run gives some errors.
     def _FindNameMatch(out: str, resource_type: str) -> str:
@@ -163,6 +160,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
             f' {out}\nStderr:{err}',
         )
       return matches.group(1)
+
     self.endpoint_name = _FindNameMatch(out, 'Endpoint name')
     self.model_name = _FindNameMatch(out, 'Model name')
 
@@ -174,19 +172,16 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
   def _AddTags(self, resource_type: str, resource_name: str) -> None:
     """Adds tags to the resource with the given type & name."""
     arn = f'arn:aws:sagemaker:{self.region}:{self.account_id}:{resource_type}/{resource_name}'
-    cmd = [
-        'aws',
-        'sagemaker',
-        'add-tags',
-        f'--region={self.region}',
-        f'--resource-arn={arn}',
-        '--tags',
-    ] + util.MakeFormattedDefaultTags()
-    vm_util.IssueCommand(cmd)
+    cmd = (
+        f'aws sagemaker add-tags --region={self.region} --resource-arn={arn} '
+        + '--tags '
+        + ' '.join(util.MakeFormattedDefaultTags())
+    )
+    self.cli.RunCommand(cmd)
 
   def _CreateDependencies(self) -> None:
-    vm_util.IssueCommand(['pip', 'install', 'sagemaker'])
-    vm_util.IssueCommand(['pip', 'install', 'absl-py'])
+    self.cli.RunCommand('pip install sagemaker')
+    self.cli.RunCommand('pip install absl-py')
 
   def _Delete(self) -> None:
     """Deletes the underlying resource."""
