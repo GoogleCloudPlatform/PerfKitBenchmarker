@@ -494,6 +494,7 @@ def Run(benchmark_spec):
       samples.extend(
           linux_boot.CollectBootSamples(
               vm,
+              vm.bootable_time - vm.create_start_time,
               GetCallbackIPs(),
               datetime.datetime.fromtimestamp(
                   vm.create_start_time, pytz.timezone('UTC')

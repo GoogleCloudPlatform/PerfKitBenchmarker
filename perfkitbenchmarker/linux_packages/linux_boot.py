@@ -65,6 +65,7 @@ def DatetimeToUTCSeconds(date: datetime.datetime) -> float:
 
 def CollectBootSamples(
     vm: virtual_machine.VirtualMachine,
+    boot_time_sec: float,
     runner_ip: Tuple[str, str],
     create_time: datetime.datetime,
     include_networking_samples: bool = False,
@@ -73,6 +74,7 @@ def CollectBootSamples(
 
   Args:
     vm: The boot vm.
+    boot_time_sec: The time it took between VM creation and SSH.
     runner_ip: Runner ip addresses to collect VM-to-VM metrics.
     create_time: VM creation time.
     include_networking_samples: Boolean, whether to include samples such as time
@@ -86,7 +88,9 @@ def CollectBootSamples(
       boot_output, create_time, CONSOLE_FIRST_START_MATCHERS
   )
   create_time_utc_seconds = DatetimeToUTCSeconds(create_time)
-  guest_samples = CollectGuestSamples(vm, create_time_utc_seconds)
+  guest_samples = CollectGuestSamples(
+      vm, create_time_utc_seconds, boot_time_sec
+  )
   kernel_offset = GetKernelStartTimestamp(vm) - create_time_utc_seconds
   kernel_samples = CollectKernelSamples(vm, kernel_offset)
 
@@ -191,7 +195,9 @@ def ScrapeConsoleLogLines(
 
 
 def CollectGuestSamples(
-    vm: virtual_machine.VirtualMachine, metric_start_time: float
+    vm: virtual_machine.VirtualMachine,
+    metric_start_time: float,
+    boot_time_sec: float,
 ) -> List[sample.Sample]:
   """Collect guest metrics.
 
@@ -204,12 +210,14 @@ def CollectGuestSamples(
   Args:
     vm: The vm to extract metrics from.
     metric_start_time: The start time to measure from, in utc seconds.
+    boot_time_sec: The time it took between VM creation and SSH.
 
   Returns:
     A list of sample.Sample objects.
   """
   samples = []
   kernel_start = GetKernelStartTimestamp(vm) - metric_start_time
+  kernel_start_to_ssh = boot_time_sec - kernel_start
   drift = GetServerTimeDrift(vm)
   logging.info('Server time drift: %d', drift)
 
@@ -232,6 +240,9 @@ def CollectGuestSamples(
   )
 
   samples.append(sample.Sample('kernel_start', kernel_start, 'second', {}))
+  samples.append(
+      sample.Sample('kernel_start_to_ssh', kernel_start_to_ssh, 'second', {})
+  )
 
   samples.append(
       sample.Sample('user_start', kernel_start + user_start, 'second', {})
