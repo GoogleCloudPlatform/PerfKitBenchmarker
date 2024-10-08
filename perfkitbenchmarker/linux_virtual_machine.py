@@ -1248,9 +1248,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     # TODO(user): Allow custom disk formatting options.
     if FLAGS.disk_fs_type == 'xfs':
       block_size = FLAGS.disk_block_size or 512
-      fmt_cmd = 'sudo mkfs.xfs -f -i size={} {}'.format(
-          block_size, device_path
-      )
+      fmt_cmd = 'sudo mkfs.xfs -f -i size={} {}'.format(block_size, device_path)
     else:
       block_size = FLAGS.disk_block_size or 4096
       fmt_cmd = (
@@ -1366,6 +1364,53 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
           % (retcode, full_cmd, stdout, stderr)
       )
       raise errors.VirtualMachine.RemoteCommandError(error_text)
+
+  def RunCommand(
+      self,
+      command: str | list[str],
+      ignore_failure: bool = False,
+      should_pre_log: bool = True,
+      stack_level: int = 1,
+      timeout: float | None = None,
+      **kwargs: Any,
+  ) -> tuple[str, str, int]:
+    """Runs a command.
+
+    Additional args can be supplied & are passed to lower level functions but
+    aren't required.
+
+    Args:
+      command: A valid bash command in string or list form.
+      ignore_failure: Ignore any failure if set to true.
+      should_pre_log: Whether to print the command being run or not.
+      stack_level: Number of stack frames to skip & get an "interesting" caller,
+        for logging. 1 skips this function, 2 skips this & its caller, etc..
+      timeout: The time to wait in seconds for the command before exiting. None
+        means no timeout.
+      **kwargs: Additional command arguments.
+
+    Returns:
+      A tuple of stdout and stderr from running the command.
+
+    Raises:
+      RemoteCommandError: If there was a problem issuing the command.
+    """
+    if not isinstance(command, str):
+      cmd_str = ' '.join(command)
+    else:
+      cmd_str = command
+    stack_level += 1
+    if 'raise_on_failure' in kwargs:
+      ignore_failure = not kwargs['raise_on_failure']
+      del kwargs['raise_on_failure']
+    return self.RemoteCommandWithReturnCode(
+        cmd_str,
+        ignore_failure=ignore_failure,
+        should_pre_log=should_pre_log,
+        stack_level=stack_level,
+        timeout=timeout,
+        **kwargs,
+    )
 
   def RemoteCommand(self, *args, **kwargs) -> Tuple[str, str]:
     """Runs a command on the VM.

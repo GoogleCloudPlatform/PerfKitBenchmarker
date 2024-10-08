@@ -27,11 +27,13 @@ import logging
 import os.path
 import socket
 import time
-from typing import Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
+import uuid
 
 from absl import flags
 import jinja2
 from perfkitbenchmarker import background_workload
+from perfkitbenchmarker import command_interface
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -44,7 +46,7 @@ FLAGS = flags.FLAGS
 
 
 # pylint: disable=g-missing-from-attributes,invalid-name
-class BaseOsMixin(metaclass=abc.ABCMeta):
+class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
   """The base class for OS Mixin classes.
 
   This class holds VM methods and attributes relating to the VM's guest OS.
@@ -128,6 +130,38 @@ class BaseOsMixin(metaclass=abc.ABCMeta):
       dict mapping string property key to value.
     """
     return self.os_metadata
+
+  def RunCommand(
+      self,
+      command: str | list[str],
+      ignore_failure: bool = False,
+      should_pre_log: bool = True,
+      stack_level: int = 1,
+      timeout: float | None = None,
+      **kwargs: Any,
+  ) -> tuple[str, str, int]:
+    """Runs a command.
+
+    Additional args can be supplied & are passed to lower level functions but
+    aren't required.
+
+    Args:
+      command: A valid bash command in string form.
+      ignore_failure: Ignore any failure if set to true.
+      should_pre_log: Whether to print the command being run or not.
+      stack_level: Number of stack frames to skip & get an "interesting" caller,
+        for logging. 1 skips this function, 2 skips this & its caller, etc..
+      timeout: The time to wait in seconds for the command before exiting. None
+        means no timeout.
+      **kwargs: Additional command arguments.
+
+    Returns:
+      A tuple of stdout and stderr from running the command.
+
+    Raises:
+      RemoteCommandError: If there was a problem issuing the command.
+    """
+    raise NotImplementedError()
 
   def RemoteCommand(
       self,
@@ -452,6 +486,44 @@ class BaseOsMixin(metaclass=abc.ABCMeta):
         remote machine.
     """
     self.RemoteCopy(local_path, remote_path, copy_to=False)
+
+  def WriteTemporaryFile(self, file_contents: str) -> str:
+    """Writes a temporary file to the VM.
+
+    Args:
+      file_contents: The contents of the file.
+
+    Returns:
+      The full filename.
+    """
+    name = '/tmp/' + str(uuid.uuid4())[-8:]
+    vm_util.CreateRemoteFile(self, file_contents, name)
+    return name
+
+  def PrepareResourcePath(self, resource_name, search_user_paths=True) -> str:
+    """Prepares a resource from local loaders & returns path on machine.
+
+    Loaders are searched in order until the resource is found.
+    If no loader provides 'resource_name', an exception is thrown.
+
+    If 'search_user_paths' is true, the directories specified by
+    "--data_search_paths" are consulted before the default paths.
+
+    Args:
+      resource_name: string. Name of a resource.
+      search_user_paths: boolean. Whether paths from "--data_search_paths"
+        should be searched before the default paths.
+
+    Returns:
+      A path to the resource on the local or remote machine's filesystem.
+
+    Raises:
+      ResourceNotFound: When resource was not found.
+    """
+    local_path = data.ResourcePath(resource_name, search_user_paths)
+    destination_path = '/tmp/' + resource_name
+    self.PushFile(local_path, destination_path)
+    return destination_path
 
   def PushDataFile(self, data_file, remote_path='', should_double_copy=None):
     """Upload a file in perfkitbenchmarker.data directory to the VM.
