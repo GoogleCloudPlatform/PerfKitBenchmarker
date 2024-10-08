@@ -39,37 +39,37 @@ FLAGS = flags.FLAGS
 _DEFAULT_NAMESPACES = ['test']
 
 
-flags.DEFINE_integer(
+AEROSPIKE_CLIENT_VMS = flags.DEFINE_integer(
     'aerospike_client_vms',
     1,
     'Number of client machines to use for running asbench.',
 )
-flags.DEFINE_integer(
+AEROSPIKE_CLIENT_THREADS_FOR_LOAD_PHASE = flags.DEFINE_integer(
     'aerospike_client_threads_for_load_phase',
     8,
     'The minimum number of client threads to use during the load phase.',
     lower_bound=1,
 )
-flags.DEFINE_integer(
+AEROSPIKE_MIN_CLIENT_THREADS = flags.DEFINE_integer(
     'aerospike_min_client_threads',
     8,
     'The minimum number of Aerospike client threads per vm.',
     lower_bound=1,
 )
-flags.DEFINE_integer(
+AEROSPIKE_MAX_CLIENT_THREADS = flags.DEFINE_integer(
     'aerospike_max_client_threads',
     128,
     'The maximum number of Aerospike client threads per vm.',
     lower_bound=1,
 )
-flags.DEFINE_integer(
+AEROSPIKE_CLIENT_THREADS_STEP_SIZE = flags.DEFINE_integer(
     'aerospike_client_threads_step_size',
     8,
     'The number to increase the Aerospike client threads '
     'per vm by for each iteration of the test.',
     lower_bound=1,
 )
-flags.DEFINE_integer(
+AEROSPIKE_READ_PERCENT = flags.DEFINE_integer(
     'aerospike_read_percent',
     90,
     'The percent of operations which are reads. This is on the path of'
@@ -77,7 +77,7 @@ flags.DEFINE_integer(
     lower_bound=0,
     upper_bound=100,
 )
-flags.DEFINE_integer(
+AEROSPIKE_NUM_KEYS = flags.DEFINE_integer(
     'aerospike_num_keys',
     1000000,
     'The number of keys to load Aerospike with. The index '
@@ -85,7 +85,7 @@ flags.DEFINE_integer(
     'data is being stored and each entry in the '
     'index requires 64 bytes.',
 )
-flags.DEFINE_integer(
+AEROSPIKE_BENCHMARK_DURATION = flags.DEFINE_integer(
     'aerospike_benchmark_duration',
     60,
     'Duration of each test iteration in secs.',
@@ -106,13 +106,13 @@ flags.DEFINE_integer(
     'aerospike_num_keys and client threads will be applied '
     'to each instance.',
 )
-flags.DEFINE_string(
+AEROSPIKE_CLIENT_MACHINE_TYPE = flags.DEFINE_string(
     'aerospike_client_machine_type',
     None,
     'Machine type to use for the aerospike client if different '
     'from aerospike server machine type.',
 )
-flags.DEFINE_list(
+AEROSPIKE_NAMESPACES = flags.DEFINE_list(
     'aerospike_namespaces',
     _DEFAULT_NAMESPACES,
     'The Aerospike namespaces to test against',
@@ -122,23 +122,23 @@ flags.DEFINE_boolean(
     False,
     'Whether or not to enable strong consistency for the Aerospike namespaces.',
 )
-flags.DEFINE_string(
+AEROSPIKE_TEST_WORKLOAD_TYPES = flags.DEFINE_string(
     'aerospike_test_workload_types',
     'RU, 75',
     'The test workload types to generate. If there are multuple types, they'
     ' should be separated by semicolon.',
 )
-flags.DEFINE_list(
+AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS = flags.DEFINE_list(
     'aerospike_test_workload_extra_args',
     None,
     'The extra args to use in asbench commands.',
 )
-flags.DEFINE_boolean(
+AEROSPIKE_SKIP_DB_PREPOPULATION = flags.DEFINE_boolean(
     'aerospike_skip_db_prepopulation',
     False,
     'Whether or not to skip pre-populating the Aerospike DB.',
 )
-flags.DEFINE_string(
+AEROSPIKE_TEST_WORKLOAD_OBJECT_SPEC = flags.DEFINE_string(
     'aerospike_test_workload_object_spec',
     'B1000',
     'The object spec to generate for the test workload.',
@@ -160,7 +160,7 @@ _PERCENTILES_TO_CAPTURE = flags.DEFINE_list(
         ' aerospike_publish_percentile_time_series is set.'
     ),
 )
-flags.DEFINE_string(
+AEROSPIKE_SERVER_MACHINE_TYPE = flags.DEFINE_string(
     'aerospike_server_machine_type',
     None,
     (
@@ -204,20 +204,20 @@ def GetConfig(user_config):
           FLAGS.gce_ssd_interface = FLAGS.server_gce_ssd_interface
         config['vm_groups']['clients']['vm_spec']['GCP']['num_local_ssds'] = 0
 
-  if FLAGS.aerospike_server_machine_type:
+  if AEROSPIKE_SERVER_MACHINE_TYPE.value:
     vm_spec = config['vm_groups']['workers']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = FLAGS.aerospike_server_machine_type
-  if FLAGS.aerospike_client_machine_type:
+      vm_spec[cloud]['machine_type'] = AEROSPIKE_SERVER_MACHINE_TYPE.value
+  if AEROSPIKE_CLIENT_MACHINE_TYPE.value:
     vm_spec = config['vm_groups']['clients']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = FLAGS.aerospike_client_machine_type
+      vm_spec[cloud]['machine_type'] = AEROSPIKE_CLIENT_MACHINE_TYPE.value
 
   if FLAGS['aerospike_vms'].present:
     config['vm_groups']['workers']['vm_count'] = FLAGS.aerospike_vms
 
   if FLAGS['aerospike_client_vms'].present:
-    config['vm_groups']['clients']['vm_count'] = FLAGS.aerospike_client_vms
+    config['vm_groups']['clients']['vm_count'] = AEROSPIKE_CLIENT_VMS.value
 
   if FLAGS.aerospike_instances > 1 and FLAGS.aerospike_vms > 1:
     raise errors.Setup.InvalidFlagConfigurationError(
@@ -259,7 +259,7 @@ def Prepare(benchmark_spec):
   if FLAGS.aerospike_enable_strong_consistency:
     for server in servers:
       aerospike_server.EnableStrongConsistency(
-          server, FLAGS.aerospike_namespaces
+          server, AEROSPIKE_NAMESPACES.value
       )
   client_install_fns = [
       functools.partial(vm.Install, 'aerospike_client') for vm in clients
@@ -270,30 +270,34 @@ def Prepare(benchmark_spec):
   )
 
   loader_counts = [
-      int(FLAGS.aerospike_num_keys) // len(clients)
-      + (1 if i < (FLAGS.aerospike_num_keys % num_client_vms) else 0)
+      int(AEROSPIKE_NUM_KEYS.value) // len(clients)
+      + (1 if i < (AEROSPIKE_NUM_KEYS.value % num_client_vms) else 0)
       for i in range(num_client_vms)
   ]
 
-  if FLAGS.aerospike_skip_db_prepopulation:
+  if AEROSPIKE_SKIP_DB_PREPOPULATION.value:
     return
 
-  @vm_util.Retry(max_retries=3)  # Retry if the server is no full up yet.
+  extra_args = FLAGS.aerospike_test_workload_extra_args or ['']
+  @vm_util.Retry(max_retries=3)  # Retry if the server is not fully up yet.
   def _Load(namespace, client_idx, process_idx):
     ips = ','.join(seed_ips)
+    # Default to use the first extra arg.
+    extra_arg_str = f'{extra_args[0]}' if extra_args[0] else ''
     load_command = (
         'asbench '
-        f'--threads {FLAGS.aerospike_client_threads_for_load_phase} '
+        f'--threads {AEROSPIKE_CLIENT_THREADS_FOR_LOAD_PHASE.value} '
         f'--namespace {namespace} --workload I '
-        f'--object-spec {FLAGS.aerospike_test_workload_object_spec} '
+        f'--object-spec {AEROSPIKE_TEST_WORKLOAD_OBJECT_SPEC.value} '
         f'--keys {loader_counts[client_idx]} '
         f'--start-key {sum(loader_counts[:client_idx])} '
-        f' -h {ips} -p {3 + process_idx}000'
+        f' -h {ips} -p {3 + process_idx}000 '
+        f'{extra_arg_str}'
     )
     clients[client_idx].RobustRemoteCommand(load_command)
 
   run_params = []
-  for namespace in FLAGS.aerospike_namespaces:
+  for namespace in AEROSPIKE_NAMESPACES.value:
     for child_idx in range(len(clients)):
       for process_idx in range(FLAGS.aerospike_instances):
         run_params.append(((namespace, child_idx, process_idx), {}))
@@ -319,9 +323,9 @@ def Run(benchmark_spec):
   metadata = {}
 
   for threads in range(
-      FLAGS.aerospike_min_client_threads,
-      FLAGS.aerospike_max_client_threads + 1,
-      FLAGS.aerospike_client_threads_step_size,
+      AEROSPIKE_MIN_CLIENT_THREADS.value,
+      AEROSPIKE_MAX_CLIENT_THREADS.value + 1,
+      AEROSPIKE_CLIENT_THREADS_STEP_SIZE.value,
   ):
     stdout_samples = []
 
@@ -332,21 +336,20 @@ def Run(benchmark_spec):
           f'--threads {threads} --namespace {namespace} '  # pylint: disable=cell-var-from-loop
           f'--workload "{op}" '
           f'{extra_arg_str} '
-          f'--object-spec {FLAGS.aerospike_test_workload_object_spec} '
-          f'--keys {FLAGS.aerospike_num_keys} '
+          f'--object-spec {AEROSPIKE_TEST_WORKLOAD_OBJECT_SPEC.value} '
+          f'--keys {AEROSPIKE_NUM_KEYS.value} '
           f'--hosts {seed_ips} --port {3 + process_idx}000 '
-          f'--duration {FLAGS.aerospike_benchmark_duration} '
+          f'--duration {AEROSPIKE_BENCHMARK_DURATION.value} '
           '--latency --percentiles 50,90,99,99.9,99.99 '
           '--output-file '
           f'result.{client_idx}.{process_idx}.{threads} '
-          '-d'
       )
       stdout, _ = clients[client_idx].RobustRemoteCommand(run_command)
       stdout_samples.extend(aerospike_client.ParseAsbenchStdout(stdout))  # pylint: disable=cell-var-from-loop
-    workload_types = FLAGS.aerospike_test_workload_types.split(';')
+    workload_types = AEROSPIKE_TEST_WORKLOAD_TYPES.value.split(';')
     extra_args = (
-        FLAGS.aerospike_test_workload_extra_args
-        if FLAGS.aerospike_test_workload_extra_args
+        AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS.value
+        if AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS.value
         else [None] * len(workload_types)
     )
     if len(extra_args) != len(workload_types):
@@ -355,7 +358,7 @@ def Run(benchmark_spec):
           'aerospike_test_workload_types'
       )
     for op, extra_arg in zip(workload_types, extra_args):
-      for namespace in FLAGS.aerospike_namespaces:
+      for namespace in AEROSPIKE_NAMESPACES.value:
         run_params = []
         for client_idx in range(len(clients)):
           for process_idx in range(FLAGS.aerospike_instances):
@@ -390,7 +393,7 @@ def Run(benchmark_spec):
       )
       temp_samples.extend(detailed_samples)
     metadata.update({
-        'num_clients_vms': FLAGS.aerospike_client_vms,
+        'num_clients_vms': AEROSPIKE_CLIENT_VMS.value,
         'num_aerospike_vms': len(servers),
         'num_aerospike_instances': FLAGS.aerospike_instances,
         'storage_type': FLAGS.aerospike_storage_type,
@@ -398,20 +401,20 @@ def Run(benchmark_spec):
         'service_threads': FLAGS.aerospike_service_threads,
         'replication_factor': FLAGS.aerospike_replication_factor,
         'client_threads': threads,
-        'read_percent': FLAGS.aerospike_read_percent,
+        'read_percent': AEROSPIKE_READ_PERCENT.value,
         'aerospike_edition': FLAGS.aerospike_edition.value,
         'aerospike_enable_strong_consistency': (
             FLAGS.aerospike_enable_strong_consistency
         ),
-        'aerospike_test_workload_types': FLAGS.aerospike_test_workload_types,
+        'aerospike_test_workload_types': AEROSPIKE_TEST_WORKLOAD_TYPES.value,
         'aerospike_test_workload_extra_args': (
-            FLAGS.aerospike_test_workload_extra_args
+            AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS.value
         ),
         'aerospike_skip_db_prepopulation': (
-            FLAGS.aerospike_skip_db_prepopulation
+            AEROSPIKE_SKIP_DB_PREPOPULATION.value
         ),
         'aerospike_test_workload_object_spec': (
-            FLAGS.aerospike_test_workload_object_spec
+            AEROSPIKE_TEST_WORKLOAD_OBJECT_SPEC.value
         ),
     })
     if FLAGS.aerospike_edition == aerospike_server.AerospikeEdition.ENTERPRISE:

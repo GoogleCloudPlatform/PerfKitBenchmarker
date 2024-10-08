@@ -122,6 +122,7 @@ class ScratchDiskTestMixin:
     vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
         return_value=12
     )
+    vm.RemoteHostCommand = mock.MagicMock(return_value=('0', ''))
     vm.SetupAllScratchDisks()
     assert len(vm.scratch_disks) == 2, 'Disk not added to scratch disks.'
 

@@ -71,57 +71,40 @@ class GoogleArtifactRegistry(container_service.BaseContainerRegistry):
     super().__init__(registry_spec)
     self.project = self.project or util.GetDefaultProject()
     self.region = util.GetRegionFromZone(self.zone)
-    self.hostname = f'{self.region}-docker.pkg.dev'
+    # Remove from gcloud commands
+    self.zone = None
+    self.endpoint = f'{self.region}-docker.pkg.dev'
 
   def GetFullRegistryTag(self, image: str) -> str:
     """Gets the full tag of the image."""
     project = self.project.replace(':', '/')
-    full_tag = f'{self.hostname}/{project}/{image}'
+    full_tag = f'{self.endpoint}/{project}/{self.name}/{image}'
     return full_tag
 
   def Login(self):
     """Configure docker to be able to push to remote repo."""
-    # TODO(pclay): Don't edit user's docker config. It is idempotent.
-    cmd = util.GcloudCommand(
-        self, 'auth', 'configure-docker', self.hostname
-    )
-    del cmd.flags['zone']
-    cmd.Issue()
+    util.GcloudCommand(self, 'auth', 'configure-docker', self.endpoint).Issue()
 
-  def PreRemotePush(self, image: container_service.ContainerImage):
-    """Prepares registry to push an image built remotely."""
-    self.PrePush(image)
-
-  def PrePush(self, image: container_service.ContainerImage):
-    """Prepares registry to push a given image."""
-    if not _CONTAINER_REMOTE_BUILD_CONFIG.value:
-      repo = image.name.split('/')[0]
-    else:
-      repo = _CONTAINER_REMOTE_BUILD_CONFIG.value.split('/')[0]
-    describe_cmd = util.GcloudCommand(
-        self,
-        'artifacts',
-        'repositories',
-        'describe',
-        repo,
-        f'--location={self.region}',
-    )
-    del describe_cmd.flags['zone']
-    _, err, _ = describe_cmd.Issue(raise_on_failure=False)
-    if not err or 'NOT_FOUND' not in err:
-      # Command succeeded, repository exists.
-      return
-    create_cmd = util.GcloudCommand(
+  def _Create(self):
+    util.GcloudCommand(
         self,
         'artifacts',
         'repositories',
         'create',
-        repo,
+        self.name,
         '--repository-format=docker',
         f'--location={self.region}',
-    )
-    del create_cmd.flags['zone']
-    create_cmd.Issue()
+    ).Issue()
+
+  def _Delete(self):
+    util.GcloudCommand(
+        self,
+        'artifacts',
+        'repositories',
+        'delete',
+        self.name,
+        f'--location={self.region}',
+    ).Issue()
 
   def RemoteBuild(self, image: container_service.ContainerImage):
     """Build the image remotely."""
@@ -132,7 +115,6 @@ class GoogleArtifactRegistry(container_service.BaseContainerRegistry):
     build_cmd = util.GcloudCommand(
         self, 'builds', 'submit', '--tag', full_tag, image.directory
     )
-    del build_cmd.flags['zone']
     build_cmd.Issue(timeout=None)
 
 
