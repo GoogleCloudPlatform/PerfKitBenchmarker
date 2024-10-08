@@ -187,7 +187,7 @@ aerospike:
 
 
 def GetConfig(user_config : Dict[str, Any] )  -> Dict[str, Any]:
-  config  = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS.aerospike_storage_type == aerospike_server.DISK:
     config['vm_groups']['workers']['disk_count'] = 1
     if FLAGS.data_disk_type == disk.LOCAL:

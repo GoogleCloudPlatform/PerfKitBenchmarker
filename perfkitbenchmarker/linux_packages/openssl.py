@@ -24,3 +24,6 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs OpenSSL on the VM."""
   vm.InstallPackages('openssl libssl-dev')
+
+def SafAptInstall(vm):
+  vm.remoteInstall
