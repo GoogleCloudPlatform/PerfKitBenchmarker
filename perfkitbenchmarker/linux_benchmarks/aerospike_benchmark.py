@@ -186,7 +186,7 @@ aerospike:
 """
 
 
-def GetConfig(user_config : Dict[str, Any] )  -> Dict[str, Any]:
+def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS.aerospike_storage_type == aerospike_server.DISK:
     config['vm_groups']['workers']['disk_count'] = 1
@@ -241,9 +241,7 @@ def Prepare(benchmark_spec: benchmark_spec.BenchmarkSpec) -> None:
   servers = benchmark_spec.vm_groups['workers']
   # VMs where the server is not up yet.
   servers_not_up = [
-      server
-      for server in servers
-      if not aerospike_server.IsServerUp(server)
+      server for server in servers if not aerospike_server.IsServerUp(server)
   ]
 
   seed_ips = [vm.internal_ip for vm in servers]
@@ -345,6 +343,7 @@ def Run(benchmark_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       )
       stdout, _ = clients[client_idx].RobustRemoteCommand(run_command)
       stdout_samples.extend(aerospike_client.ParseAsbenchStdout(stdout))  # pylint: disable=cell-var-from-loop
+
     workload_types = FLAGS.aerospike_test_workload_types.split(';')
     extra_args = (
         FLAGS.aerospike_test_workload_extra_args
