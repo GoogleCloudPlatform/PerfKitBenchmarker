@@ -169,6 +169,7 @@ def ParseAsbenchStdout(output):
         'AEROSPIKE_ERR_TIMEOUT' in line
         or 'AEROSPIKE_ERR_CONNECTION' in line
         or 'AEROSPIKE_ERR_SERVER_FULL' in line
+        or 'AEROSPIKE_ERR_DEVICE_OVERLOAD' in line
     ):
       continue
     elif 'Add node' in line or 'Remove node' in line:

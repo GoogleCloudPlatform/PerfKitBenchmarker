@@ -278,16 +278,22 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout
 
-  def ExecuteThroughput(self, concurrency_streams: List[List[str]]) -> str:
+  def ExecuteThroughput(
+      self,
+      concurrency_streams: list[list[str]],
+      labels: dict[str, str] | None = None,
+  ) -> str:
     """Executes a throughput test and returns performance details.
 
     Args:
       concurrency_streams: List of streams to execute simultaneously, each of
         which is a list of string names of queries.
+      labels: Not supported by this implementation.
 
     Returns:
       A serialized dictionary of execution details.
     """
+    del labels  # Not supported by this implementation.
     cmd = (
         'java -cp {} com.google.cloud.performance.edw.Throughput '
         '--endpoint {} --query_streams {}'.format(

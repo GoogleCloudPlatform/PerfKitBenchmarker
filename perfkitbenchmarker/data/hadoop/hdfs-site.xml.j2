@@ -10,10 +10,16 @@
     <name>dfs.blocksize</name>
     <value>{{ block_size }}</value>
   </property>
-  {% if dfs_data_paths is defined %}
+  {% if dfs_data_paths %}
   <property>
     <name>dfs.datanode.data.dir</name>
     <value>{{ dfs_data_paths }}</value>
+  </property>
+  {% endif %}
+  {% if dfs_replication %}
+  <property>
+    <name>dfs.replication</name>
+    <value>{{ dfs_replication }}</value>
   </property>
   {% endif %}
   <!-- TODO(pclay): consider dfs.client.read.shortcircuit (requires native libs) -->

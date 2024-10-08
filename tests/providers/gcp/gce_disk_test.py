@@ -240,6 +240,7 @@ class GCEPDDiskTest(GCEDiskTest):
         ('stdout', 'stderr', 0),
         ('20 20 201', 'stderr', 0),
         ('', 'stderr', 0),
+        ('0', 'stderr', 0),
         ('stdout', 'stderr', 0),
         ('stdout', 'stderr', 0),
         ('stdout', 'stderr', 0),
@@ -258,6 +259,7 @@ class GCEPDDiskTest(GCEDiskTest):
           ],
           ['sudo nvme --version'],
           ['sudo nvme list --output-format json'],
+          ['mount | grep /scratch | wc -l'],
           [
               '[[ -d /mnt ]] && sudo umount /mnt; sudo mke2fs -F -E'
               ' lazy_itable_init=0,discard -O ^has_journal -t ext4 -b 4096'
@@ -295,6 +297,7 @@ class GCEPDDiskTest(GCEDiskTest):
         ('stdout', 'stderr', 0),
         ('20 20 201', 'stderr', 0),
         ('', 'stderr', 0),
+        ('0', 'stderr', 0),
         ('', 'stderr', 0),
         ('', 'stderr', 0),
         ('', 'stderr', 0),
@@ -373,6 +376,7 @@ class GCEPDDiskTest(GCEDiskTest):
           ],
           ['sudo nvme --version'],
           ['sudo nvme list --output-format json'],
+          ['mount | grep /scratch | wc -l'],
           [
               '[[ -d /mnt ]] && sudo umount /mnt; sudo mke2fs -F -E'
               ' lazy_itable_init=0,discard -O ^has_journal -t ext4 -b 4096'
