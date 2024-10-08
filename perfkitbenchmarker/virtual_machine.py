@@ -186,6 +186,12 @@ _REQUIRED_CPU_VERSION_RETRIES = flags.DEFINE_integer(
     5,
     'The number of times to retry if the required CPU version does not match.',
 )
+_VM_USER_NAME = flags.DEFINE_string(
+    'vm_user_name',
+    DEFAULT_USERNAME,
+    'The user name to use for the VM. If not specified, the default user name'
+    ' "perfkit" is used.',
+)
 
 
 @enum.unique
@@ -591,7 +597,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     self.ip_address = None
     self.internal_ip = None
     self.internal_ips = []
-    self.user_name = DEFAULT_USERNAME
+    self.user_name = _VM_USER_NAME.value
     self.ssh_public_key = vm_util.GetPublicKeyPath()
     self.ssh_private_key = vm_util.GetPrivateKeyPath()
     self.disk_specs = []
