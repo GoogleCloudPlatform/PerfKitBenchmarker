@@ -23,12 +23,14 @@ by the "aerospike_storage_type" and "data_disk_type" flags.
 """
 
 import functools
-
+from typing import Any, Dict, List
 from absl import flags
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aerospike_client
 from perfkitbenchmarker.linux_packages import aerospike_server
@@ -184,8 +186,8 @@ aerospike:
 """
 
 
-def GetConfig(user_config):
-  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+def GetConfig(user_config : Dict[str, Any] )  -> Dict[str, Any]:
+  config  = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS.aerospike_storage_type == aerospike_server.DISK:
     config['vm_groups']['workers']['disk_count'] = 1
     if FLAGS.data_disk_type == disk.LOCAL:
@@ -227,7 +229,7 @@ def GetConfig(user_config):
   return config
 
 
-def Prepare(benchmark_spec):
+def Prepare(benchmark_spec: benchmark_spec.BenchmarkSpec) -> None:
   """Install Aerospike server and Aerospike tools on the other.
 
   Args:
@@ -301,7 +303,7 @@ def Prepare(benchmark_spec):
   background_tasks.RunThreaded(_Load, run_params)
 
 
-def Run(benchmark_spec):
+def Run(benchmark_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Runs a read/update load test on Aerospike.
 
   Args:
@@ -425,7 +427,7 @@ def Run(benchmark_spec):
   return samples
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(benchmark_spec: benchmark_spec.BenchmarkSpec) -> None:
   """Cleanup Aerospike.
 
   Args:
