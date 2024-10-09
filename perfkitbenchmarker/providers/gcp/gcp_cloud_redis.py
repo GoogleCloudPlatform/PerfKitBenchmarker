@@ -56,7 +56,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     self.node_type = ''
     self.redis_region = FLAGS.cloud_redis_region
     self.zone_distribution = gcp_flags.REDIS_ZONE_DISTRIBUTION.value
-    if self._clustered:
+    if self.clustered:
       self.size = self.node_count * _SHARD_SIZE_GB
       self.node_type = gcp_flags.REDIS_NODE_TYPE.value
       if self.zone_distribution == 'single-zone':
@@ -81,7 +81,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
   def _GetTier(self) -> str | None:
     """Returns the tier of the instance."""
     # See https://cloud.google.com/memorystore/docs/redis/redis-tiers."""
-    if self._clustered:
+    if self.clustered:
       return None
     if self.failover_style == managed_memory_store.Failover.FAILOVER_NONE:
       return BASIC_TIER
@@ -114,7 +114,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
         'cloud_redis_region': self.redis_region,
         'cloud_redis_version': self.GetReadableVersion(),
     })
-    if self._clustered:
+    if self.clustered:
       self.metadata['cloud_redis_node_type'] = self.node_type
       self.metadata['cloud_redis_zone_distribution'] = self.zone_distribution
     else:
@@ -186,7 +186,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
   def _Create(self):
     """Creates the instance."""
     cmd = self._GetCreateCommand()
-    if self._clustered:
+    if self.clustered:
       self._CreateServiceConnectionPolicy()
       cmd = self._GetClusterCreateCommand()
     cmd.flags['region'] = self.redis_region
@@ -195,14 +195,14 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
   def _IsReady(self):
     """Returns whether cluster is ready."""
     instance_details, _, _ = self.DescribeInstance()
-    if self._clustered:
+    if self.clustered:
       return json.loads(instance_details).get('state') == 'ACTIVE'
     return json.loads(instance_details).get('state') == 'READY'
 
   def _Delete(self):
     """Deletes the instance."""
     cmd = util.GcloudCommand(self, 'redis', 'instances', 'delete', self.name)
-    if self._clustered:
+    if self.clustered:
       cmd = util.GcloudCommand(self, 'redis', 'clusters', 'delete', self.name)
     cmd.flags['region'] = self.redis_region
     cmd.Issue(timeout=COMMAND_TIMEOUT, raise_on_failure=False)
@@ -219,7 +219,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
       stdout, stderr, and retcode.
     """
     cmd = util.GcloudCommand(self, 'redis', 'instances', 'describe', self.name)
-    if self._clustered:
+    if self.clustered:
       cmd = util.GcloudCommand(self, 'redis', 'clusters', 'describe', self.name)
     cmd.flags['region'] = self.redis_region
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
@@ -240,7 +240,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
       raise errors.Resource.RetryableGetError(
           'Failed to retrieve information on {}'.format(self.name)
       )
-    if self._clustered:
+    if self.clustered:
       self._ip = json.loads(stdout)['discoveryEndpoints'][0]['address']
       self._port = 6379
       return

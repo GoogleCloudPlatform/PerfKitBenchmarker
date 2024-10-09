@@ -181,7 +181,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
         self.subnet_group_name,
     ]
 
-    if not self._clustered:
+    if not self.clustered:
       cmd += ['--preferred-cache-cluster-a-zs', self._GetClientVm().zone]
       if (
           self.failover_style
@@ -288,7 +288,7 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
       raise errors.Resource.RetryableGetError(
           f'Failed to retrieve information on {self.name}'
       )
-    if self._clustered:
+    if self.clustered:
       primary_endpoint = cluster_info['ConfigurationEndpoint']
     else:
       primary_endpoint = cluster_info['NodeGroups'][0]['PrimaryEndpoint']

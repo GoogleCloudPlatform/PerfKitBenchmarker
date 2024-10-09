@@ -195,7 +195,7 @@ class CloudValkey(managed_memory_store.BaseManagedMemoryStore):
       raise errors.Resource.RetryableGetError(
           'Failed to retrieve information on {}'.format(self.name)
       )
-    if self._clustered:
+    if self.clustered:
       self._ip = json.loads(stdout)['discoveryEndpoints'][0]['address']
       self._port = 6379
       return

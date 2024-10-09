@@ -200,14 +200,14 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self._password: str = None
 
     self.failover_style = _FAILOVER_STYLE.value
-    self._clustered: bool = _MANAGED_MEMORY_STORE_CLUSTER.value
+    self.clustered: bool = _MANAGED_MEMORY_STORE_CLUSTER.value
     # Shards contain a primary node and its replicas.
-    self.shard_count = _SHARD_COUNT.value if self._clustered else 1
+    self.shard_count = _SHARD_COUNT.value if self.clustered else 1
     self.replicas_per_shard = _REPLICAS_PER_SHARD.value
     self.node_count = self._GetNodeCount()
 
     self.zones = _ZONES.value
-    self.multi_az = self._clustered and len(self.zones) > 1
+    self.multi_az = self.clustered and len(self.zones) > 1
 
     self.version: str = None
     self.enable_tls = _TLS.value
@@ -223,7 +223,7 @@ class BaseManagedMemoryStore(resource.BaseResource):
     # Consider separating redis and memcached classes.
     if self.MEMORY_STORE in [REDIS, VALKEY]:
       self.metadata.update({
-          'clustered': self._clustered,
+          'clustered': self.clustered,
           'shard_count': self.shard_count,
           'replicas_per_shard': self.replicas_per_shard,
           'node_count': self.node_count,
@@ -233,7 +233,7 @@ class BaseManagedMemoryStore(resource.BaseResource):
 
   def _GetNodeCount(self) -> int:
     """Returns the number of nodes in the cluster."""
-    if self._clustered:
+    if self.clustered:
       return self.shard_count * (1 + self.replicas_per_shard)
     if self.failover_style == Failover.FAILOVER_NONE:
       return 1

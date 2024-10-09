@@ -51,6 +51,11 @@ _OPS_PER_SEC = flags.DEFINE_integer(
     10000,
     'The number of operations per second for the redis instance.',
 )
+_ENABLE_VECTOR_SEARCH = flags.DEFINE_bool(
+    'redis_cloud_vector_search',
+    False,
+    'Whether to enable vector search for the redis instance.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -210,6 +215,21 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
     }
     if self.zones:
       region_config['preferredAvailabilityZones'] = self.zones
+    database_config = {
+        'name': f'pkb-{FLAGS.run_uri}',
+        'protocol': 'redis',
+        'datasetSizeInGb': _GB.value,
+        'supportOSSClusterApi': self.clustered,
+        'dataPersistence': 'none',
+        'replication': self.replicas_per_shard > 0,
+        'throughputMeasurement': {
+            'by': 'operations-per-second',
+            'value': _OPS_PER_SEC.value,
+        },
+        'quantity': 1,
+    }
+    if _ENABLE_VECTOR_SEARCH.value:
+      database_config['modules'] = [{'name': 'RediSearch'}]
     return {
         'name': self.name,
         'deploymentType': 'single-region',
@@ -218,28 +238,18 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
             'provider': 'GCP',
             'regions': [region_config],
         }],
-        'databases': [{
-            'name': f'pkb-{FLAGS.run_uri}',
-            'protocol': 'redis',
-            'datasetSizeInGb': _GB.value,
-            'supportOSSClusterApi': self._clustered,
-            'dataPersistence': 'none',
-            'replication': self.replicas_per_shard > 0,
-            'throughputMeasurement': {
-                'by': 'operations-per-second',
-                'value': _OPS_PER_SEC.value,
-            },
-            'quantity': 1,
-        }],
+        'databases': [database_config],
         'redisVersion': self.version,
     }
 
   def _Create(self):
     """Creates the instance."""
+    create_args = self._GetCreateArgs()
+    logging.info('Create subscription request: %s', create_args)
     result = requests.post(
         f'{_REDIS_API_URL}/subscriptions',
         headers=self.request_headers,
-        json=self._GetCreateArgs(),
+        json=create_args,
     )
     logging.info('Create subscription response: %s', result.text)
     task = self._GetTask(result.json()['taskId'])
