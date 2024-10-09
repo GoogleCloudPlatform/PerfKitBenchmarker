@@ -30,26 +30,12 @@ def AptInstallQAT(vm):
   """Installs QAT engine for accelerated OpenSSL."""
 
   vm.InstallPackages('autoconf build-essential libtool cmake cpuid libssl-dev pkg-config nasm')
-  
-  # Install Intel® Integrated Performance Primitives Cryptography lib  
-  vm.RemoteCommand('git clone https://github.com/intel/ipp-crypto.git')
-  vm.RemoteCommand('cd ipp-crypto')
-  vm.RemoteCommand('git checkout ippcp_2021.7.1')
-  vm.RemoteCommand('cd ipp-crypto/sources/ippcp/crypto_mb')
-  vm.RemoteCommand('cmake . -Bbuild -DCMAKE_INSTALL_PREFIX=/usr')
+
+  # Install Intel® Integrated Performance Primitives Cryptography lib
+  vm.RemoteCommand('git clone https://github.com/intel/ipp-crypto.git && cd ipp-crypto && git checkout ippcp_2021.7.1 && cd sources/ippcp/crypto_mb && cmake . -Bbuild -DCMAKE_INSTALL_PREFIX=/usr')
 
   # Install Intel® Multi-Buffer Crypto for IPsec Library lib
-  vm.RemoteCommand('git clone https://github.com/intel/intel-ipsec-mb.git')
-  vm.RemoteCommand('cd intel-ipsec-mb')
-  vm.RemoteCommand('git checkout v1.3')
-  vm.RemoteCommand('make -j')
-  vm.RemoteCommand('sudo make install NOLDCONFIG=y')
+  vm.RemoteCommand('git clone https://github.com/intel/intel-ipsec-mb.git && cd intel-ipsec-mb && git checkout v1.3 && make -j && sudo make install NOLDCONFIG=y')
 
   # Install QAT_Engine
-  vm.RemoteCommand('git clone https://github.com/intel/QAT_Engine.git')
-  vm.RemoteCommand('cd QAT_Engine')
-  vm.RemoteCommand('git checkout v1.2.0')
-  vm.RemoteCommand('./autogen.sh')
-  vm.RemoteCommand('./configure --enable-qat_sw')
-  vm.RemoteCommand('make -j')
-  vm.RemoteCommand('sudo make install')
+  vm.RemoteCommand('git clone https://github.com/intel/QAT_Engine.git && cd QAT_Engine && git checkout v1.2.0 && ./autogen.sh && ./configure --enable-qat_sw && make -j && sudo make install')
