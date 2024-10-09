@@ -23,12 +23,14 @@ by the "aerospike_storage_type" and "data_disk_type" flags.
 """
 
 import functools
-
+from typing import Any, Dict, List
 from absl import flags
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import aerospike_client
 from perfkitbenchmarker.linux_packages import aerospike_server
@@ -184,7 +186,7 @@ aerospike:
 """
 
 
-def GetConfig(user_config):
+def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS.aerospike_storage_type == aerospike_server.DISK:
     config['vm_groups']['workers']['disk_count'] = 1
@@ -227,7 +229,7 @@ def GetConfig(user_config):
   return config
 
 
-def Prepare(benchmark_spec):
+def Prepare(benchmark_spec: benchmark_spec.BenchmarkSpec) -> None:
   """Install Aerospike server and Aerospike tools on the other.
 
   Args:
@@ -239,9 +241,7 @@ def Prepare(benchmark_spec):
   servers = benchmark_spec.vm_groups['workers']
   # VMs where the server is not up yet.
   servers_not_up = [
-      server
-      for server in servers
-      if not aerospike_server.IsServerUp(server)
+      server for server in servers if not aerospike_server.IsServerUp(server)
   ]
 
   seed_ips = [vm.internal_ip for vm in servers]
@@ -305,7 +305,7 @@ def Prepare(benchmark_spec):
   background_tasks.RunThreaded(_Load, run_params)
 
 
-def Run(benchmark_spec):
+def Run(benchmark_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Runs a read/update load test on Aerospike.
 
   Args:
@@ -346,7 +346,9 @@ def Run(benchmark_spec):
       )
       stdout, _ = clients[client_idx].RobustRemoteCommand(run_command)
       stdout_samples.extend(aerospike_client.ParseAsbenchStdout(stdout))  # pylint: disable=cell-var-from-loop
+
     workload_types = AEROSPIKE_TEST_WORKLOAD_TYPES.value.split(';')
+
     extra_args = (
         AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS.value
         if AEROSPIKE_TEST_WORKLOAD_EXTRA_ARGS.value
@@ -428,7 +430,7 @@ def Run(benchmark_spec):
   return samples
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(benchmark_spec: benchmark_spec.BenchmarkSpec) -> None:
   """Cleanup Aerospike.
 
   Args:
