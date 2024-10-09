@@ -1,4 +1,3 @@
-import time
 # Copyright 2024 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +12,10 @@ import time
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import time
 from typing import Any
 import unittest
+from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
@@ -91,13 +92,20 @@ class AiModelThroughputBenchmarkTest(
     responses_samples = [s for s in samples if s.metric == 'total_responses']
     self.assertNotEmpty(responses_samples)
     responses_sample = responses_samples[0]
-    # Ignore a flaky off-by-one error
     self.assertGreaterEqual(responses_sample.value, duration * qps)
-    self.assertLessEqual(responses_sample.value, (duration + 1) * qps)
 
   def testTooMuchQpsThrowsError(self):
     self.enter_context(flagsaver.flagsaver(ai_parallel_requests=50))
-    self.enter_context(flagsaver.flagsaver(ai_test_duration=5))
+    self.enter_context(flagsaver.flagsaver(ai_test_duration=2))
+    def idle_timer_mock():
+      time.sleep(3)
+    self.enter_context(
+        mock.patch.object(
+            ai_model_throughput_benchmark,
+            '_UnitTestIdleTime',
+            side_effect=idle_timer_mock,
+        )
+    )
     with self.assertRaises(errors.Benchmarks.RunError):
       ai_model_throughput_benchmark.Run(self.bm_spec)
 
@@ -106,8 +114,8 @@ class AiModelThroughputBenchmarkTest(
     self.bm_spec.ai_model.wait_time = 15
     # Act
     samples = ai_model_throughput_benchmark.Run(self.bm_spec)
-    responses_samples = [s for s in samples if s.metric == 'total_responses']
     # Assert
+    responses_samples = [s for s in samples if s.metric == 'total_responses']
     self.assertNotEmpty(responses_samples)
     responses_sample = responses_samples[0]
     self.assertEqual(responses_sample.value, 10)

@@ -163,7 +163,13 @@ def SendParallelRequests(
     )
     processes.append(p)
     p.start()
+  _UnitTestIdleTime()
   return processes
+
+
+def _UnitTestIdleTime():
+  """Sleeps in unit test."""
+  pass
 
 
 def SendQpsOverTime(
@@ -176,8 +182,8 @@ def SendQpsOverTime(
   logging.info('Starting to send %s qps over %s duration', qps, duration)
   output_queue = multiprocessing.Queue()
   processes = []
-  # 0.2 is a fuzz for the above few lines of code.
-  while time.time() - start_time < duration + 0.2:
+  goal_bursts = duration
+  for _ in range(goal_bursts):
     process_start_time = time.time()
     processes += SendParallelRequests(ai_model, qps, output_queue)
     process_startup_duration = time.time() - process_start_time
