@@ -24,3 +24,18 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs OpenSSL on the VM."""
   vm.InstallPackages('openssl libssl-dev')
+
+
+def AptInstallQAT(vm):
+  """Installs QAT engine for accelerated OpenSSL."""
+
+  vm.InstallPackages('autoconf build-essential libtool cmake cpuid libssl-dev pkg-config nasm')
+
+  # Install Intel® Integrated Performance Primitives Cryptography lib
+  vm.RemoteCommand('git clone https://github.com/intel/ipp-crypto.git && cd ipp-crypto && git checkout ippcp_2021.7.1 && cd sources/ippcp/crypto_mb && cmake . -Bbuild -DCMAKE_INSTALL_PREFIX=/usr')
+
+  # Install Intel® Multi-Buffer Crypto for IPsec Library lib
+  vm.RemoteCommand('git clone https://github.com/intel/intel-ipsec-mb.git && cd intel-ipsec-mb && git checkout v1.3 && make -j && sudo make install NOLDCONFIG=y')
+
+  # Install QAT_Engine
+  vm.RemoteCommand('git clone https://github.com/intel/QAT_Engine.git && cd QAT_Engine && git checkout v1.2.0 && ./autogen.sh && ./configure --enable-qat_sw && make -j && sudo make install')
