@@ -312,7 +312,7 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
     )
     self.shard_info = self._GetShardType(subscription, database)
     self.shard_count = self.shard_info.quantity
-    self.node_count = self._GetNodeCount()
+    self.node_count = self.shard_count * (1 + self.replicas_per_shard)
 
   def _GetDatabase(self):
     """Returns the database associated with the subscription."""
