@@ -110,6 +110,10 @@ class BaseCollector:
   def _CollectorRunCommand(self, vm, collector_file):
     pass
 
+  @abc.abstractmethod
+  def _CollectorPostProcess(self, vm):
+    pass
+
   def _KillCommand(self, vm, pid):
     """Command to kill off the collector."""
     if vm.BASE_OS_TYPE == os_types.WINDOWS:
@@ -155,6 +159,8 @@ class BaseCollector:
     except errors.VirtualMachine.RemoteCommandError as ex:
       logging.exception('Failed fetching collector result from %s.', vm.name)
       raise ex
+
+    self._CollectorPostProcess(vm)
 
   def Start(self, sender, benchmark_spec):
     """Install and start collector on VMs specified in trace vm groups'."""

@@ -223,6 +223,8 @@ class BenchmarkSpec:
     # Used by redis_memtier and keydb_memtier
     self.redis_endpoint_ip: str
     self.keydb_endpoint_ip: str
+    # Used by mongodb_ycsb
+    self.mongodb_url: str
     # Used by dino_benchmark
     self.imagenet_dir: str
     # Used by mlperf_inference_cpu_benchmark

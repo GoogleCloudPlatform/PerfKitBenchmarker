@@ -26,6 +26,7 @@ import functools
 import json
 import posixpath
 import re
+import time
 from typing import Any
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -39,6 +40,22 @@ from perfkitbenchmarker.linux_packages import ycsb
 
 flags.DEFINE_integer(
     'mongodb_readahead_kb', None, 'Configure block device readahead settings.'
+)
+flags.DEFINE_bool(
+    'mongodb_primary_only', False, 'Run with a simple primary-only setup.'
+)
+flags.DEFINE_integer(
+    'mongodb_batchsize',
+    1,
+    'Client request batch size. Applies to inserts only (YCSB limitation).',
+)
+
+_MONGODB_LOG_LEVEL = flags.DEFINE_integer(
+    'mongodb_log_level',
+    None,
+    'MongoDB log level, verbosity increases with level',
+    1,
+    5,
 )
 
 FLAGS = flags.FLAGS
@@ -108,14 +125,24 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
   primary_count = config['vm_groups']['primary']['vm_count']
   secondary_count = config['vm_groups']['secondary']['vm_count']
   arbiter_count = config['vm_groups']['arbiter']['vm_count']
-  if any(
-      [count != 1 for count in [primary_count, secondary_count, arbiter_count]]
-  ):
-    raise errors.Config.InvalidValue(
-        'Must have exactly one primary, secondary, and arbiter VM.'
-    )
-  if FLAGS['ycsb_client_vms'].present:
-    config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
+
+  if FLAGS.mongodb_primary_only:
+    if primary_count != 1:
+      raise errors.Config.InvalidValue(
+          'Must have exactly one primary VM when using --mongodb_primary_only.'
+      )
+    if secondary_count != 0 or arbiter_count != 0:
+      raise errors.Config.InvalidValue(
+          'Must have exactly zero secondary and arbiter VMs when using'
+          ' --mongodb_primary_only.'
+      )
+  else:
+    if any([
+        count != 1 for count in [primary_count, secondary_count, arbiter_count]
+    ]):
+      raise errors.Config.InvalidValue(
+          'Must have exactly one primary, secondary, and arbiter VM.'
+      )
   return config
 
 
@@ -152,6 +179,13 @@ def _PrepareServer(vm: _LinuxVM) -> None:
 
   # Too many connections fails if we don't set file descriptor limit higher.
   vm.RemoteCommand('ulimit -n 64000 && sudo systemctl start mongod')
+
+  if _MONGODB_LOG_LEVEL.value is not None:
+    time.sleep(10)
+    mongosh.RunCommand(
+        vm,
+        f'db.setLogLevel({_MONGODB_LOG_LEVEL.value})',
+    )
 
 
 def _PrepareArbiter(vm: _LinuxVM) -> None:
@@ -214,7 +248,19 @@ def _PrepareClient(vm: _LinuxVM) -> None:
 
 def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
   """Returns the connection string used to connect to the instance."""
+
+  # all the connection strings here require committing to disk (journal)
+  #  prior to client acknowledgement. See
+  #  https://www.mongodb.com/docs/manual/reference/write-concern/#acknowledgment-behavior
+
   primary = benchmark_spec.vm_groups['primary'][0]
+
+  if FLAGS.mongodb_primary_only:
+    return (
+        f'"mongodb://{primary.internal_ip}:27017/ycsb'
+        '?w=1&j=true&compression=snappy&maxPoolSize=60000"'
+    )
+
   secondary = benchmark_spec.vm_groups['secondary'][0]
   arbiter = benchmark_spec.vm_groups['arbiter'][0]
   return (
@@ -233,30 +279,34 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       required to run the benchmark.
   """
   primary = benchmark_spec.vm_groups['primary'][0]
-  secondary = benchmark_spec.vm_groups['secondary'][0]
-  arbiter = benchmark_spec.vm_groups['arbiter'][0]
+  secondary = None
+  arbiter = None
   clients = benchmark_spec.vm_groups['clients']
-  server_partials = [
-      functools.partial(_PrepareServer, mongo_vm)
-      for mongo_vm in [primary, secondary]
-  ]
-  arbiter_partial = [functools.partial(_PrepareArbiter, arbiter)]
+
+  server_partials = [functools.partial(_PrepareServer, primary)]
+  arbiter_partial = []
   client_partials = [
       functools.partial(_PrepareClient, client) for client in clients
   ]
+
+  if not FLAGS.mongodb_primary_only:
+    secondary = benchmark_spec.vm_groups['secondary'][0]
+    arbiter = benchmark_spec.vm_groups['arbiter'][0]
+    server_partials += [functools.partial(_PrepareServer, secondary)]
+    arbiter_partial += [functools.partial(_PrepareArbiter, arbiter)]
+
   background_tasks.RunThreaded(
       (lambda f: f()), server_partials + arbiter_partial + client_partials
   )
 
-  _PrepareReplicaSet([primary, secondary], arbiter)
+  if not FLAGS.mongodb_primary_only:
+    _PrepareReplicaSet([primary, secondary], arbiter)
 
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
   benchmark_spec.mongodb_url = _GetMongoDbURL(benchmark_spec)
   benchmark_spec.mongodb_version = re.findall(
       _VERSION_REGEX,
-      mongosh.RunCommand(
-          benchmark_spec.vm_groups['primary'][0], 'db.version()'
-      )[0],
+      mongosh.RunCommand(primary, 'db.version()')[0],
   )[-1]
   load_kwargs = {
       'mongodb.url': benchmark_spec.mongodb_url,
@@ -264,14 +314,12 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       'mongodb.upsert': True,
       'core_workload_insertion_retry_limit': 10,
   }
-  benchmark_spec.executor.Load(
-      benchmark_spec.vm_groups['clients'],
-      load_kwargs=load_kwargs,
-  )
+  benchmark_spec.executor.Load(clients, load_kwargs=load_kwargs)
 
   # Print some useful loading stats
   mongosh.RunCommand(primary, 'db.stats()')
-  mongosh.RunCommand(primary, 'rs.conf()')
+  if not FLAGS.mongodb_primary_only:
+    mongosh.RunCommand(primary, 'rs.conf()')
   primary.RemoteCommand('df -h')
 
 
@@ -285,7 +333,12 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   Returns:
     A list of sample.Sample objects.
   """
-  run_kwargs = {'mongodb.url': benchmark_spec.mongodb_url}
+
+  run_kwargs = {
+      'mongodb.url': benchmark_spec.mongodb_url,
+      'mongodb.batchsize': FLAGS.mongodb_batchsize,
+      'mongodb.upsert': True,
+  }
   samples = list(
       benchmark_spec.executor.Run(
           benchmark_spec.vm_groups['clients'],
@@ -295,9 +348,16 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   if FLAGS.mongodb_readahead_kb is not None:
     for s in samples:
-      s.metadata['readahdead_kb'] = FLAGS.mongodb_readahead_kb
+      s.metadata['readahead_kb'] = FLAGS.mongodb_readahead_kb
       if hasattr(benchmark_spec, 'mongodb_version'):
         s.metadata['mongodb_version'] = benchmark_spec.mongodb_version
+
+  mongosh.RunTwoCommands(
+      benchmark_spec.vm_groups['primary'][0],
+      'use ycsb',
+      'db.usertable.stats()',
+  )
+
   return samples
 
 

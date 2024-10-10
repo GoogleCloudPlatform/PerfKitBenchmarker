@@ -166,7 +166,8 @@ _STATUS = flags.DEFINE_bool(
     'ycsb_status',
     False,
     'If true, run prints status which includes a throughput and latency time'
-    ' series and includes the results in the samples.',
+    ' series and includes the results in the samples. Requires'
+    ' --ycsb_measurement_type=HDRHISTOGRAM.',  # see line 646 below
 )
 _STATUS_INTERVAL_SEC = flags.DEFINE_integer(
     'ycsb_status_interval_sec',
@@ -203,7 +204,7 @@ flags.DEFINE_integer(
     'dataset of records total. Overrides recordcount value in '
     'all workloads of this run. Defaults to None, where '
     'recordcount value in each workload is used. If neither '
-    'is not set, ycsb default of 0 is used.',
+    'is set, ycsb default of 0 is used.',
 )
 flags.DEFINE_integer(
     'ycsb_operation_count', None, 'Number of operations *per client VM*.'

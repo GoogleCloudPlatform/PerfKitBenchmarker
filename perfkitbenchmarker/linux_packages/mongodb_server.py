@@ -40,9 +40,10 @@ def _Setup(vm):
   vm.RemoteCommand(
       f'sudo sed -i "s|bindIp: 127.0.0.1|bindIp: ::,0.0.0.0|" {config_path}'
   )
-  vm.RemoteCommand(
-      f'echo "replication:\n  replSetName: rs0" | sudo tee -a {config_path}'
-  )
+  if not FLAGS.mongodb_primary_only:
+    vm.RemoteCommand(
+        f'echo "replication:\n  replSetName: rs0" | sudo tee -a {config_path}'
+    )
 
 
 def YumSetup(vm):

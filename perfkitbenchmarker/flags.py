@@ -385,6 +385,11 @@ flags.DEFINE_integer(
     'The time in seconds to sleep after the prepare phase. This can be useful '
     'for letting burst tokens accumulate.',
 )
+BETWEEN_RUNS_SLEEP_TIME = flags.DEFINE_integer(
+    'between_runs_sleep_time',
+    0,
+    'The time in seconds to sleep between runs.',
+)
 flags.DEFINE_integer(
     'after_run_sleep_time',
     0,
@@ -430,6 +435,9 @@ flags.DEFINE_bool(
 )
 flags.DEFINE_boolean(
     'record_lscpu', True, 'Whether to record the lscpu output in a sample'
+)
+flags.DEFINE_boolean(
+    'record_ulimit', False, 'Whether to record the ulimit output in a sample'
 )
 RECORD_PROCCPU = flags.DEFINE_boolean(
     'record_proccpu',

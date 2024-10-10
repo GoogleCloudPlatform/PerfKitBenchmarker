@@ -85,6 +85,7 @@ _DEFAULT_DISK_FSTAB_OPTIONS = 'defaults'
 
 # regex for parsing lscpu and /proc/cpuinfo
 _COLON_SEPARATED_RE = re.compile(r'^\s*(?P<key>.*?)\s*:\s*(?P<value>.*?)\s*$')
+_BRACKET_SEPARATED_RE = re.compile(r'^\s*(?P<key>.*\))\s*(?P<value>.*?)\s*$')
 
 _SYSFS_CPU_PATH = '/sys/devices/system/cpu'
 
@@ -977,6 +978,16 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       part = proccpu_results.get('CPU part', 'UnknownPart')
       guest_arch = f'{implementer}_{arch}_{variant}_{part}'
     return guest_arch
+
+  def CheckUlimit(self) -> 'UlimitResults':
+    """Returns a UlimitResults from the host VM.
+
+    Do not cache these results, because many benchmarks change them.
+    The value can be different before and after runs.
+    """
+    ulimit, _ = self.RemoteCommand('ulimit -a')
+    self._ulimit_cache = UlimitResults(ulimit)
+    return self._ulimit_cache
 
   def CheckLsCpu(self):
     """Returns a LsCpuResults from the host VM."""
@@ -3081,13 +3092,14 @@ class ContainerizedDebianMixin(BaseDebianMixin):
       self.RemoteHostCommand('docker stop %s' % self.docker_id)
 
 
-def _ParseTextProperties(text):
+def _ParseTextProperties(text, key_value_regex=_COLON_SEPARATED_RE):
   """Parses raw text that has lines in "key:value" form.
 
   When comes across an empty line will return a dict of the current values.
 
   Args:
     text: Text of lines in "key:value" form.
+    key_value_regex: Regex to use to parse key and value from each line of text.
 
   Yields:
     Dict of [key,value] values for a section.
@@ -3095,7 +3107,7 @@ def _ParseTextProperties(text):
   current_data = {}
   for line in (line.strip() for line in text.splitlines()):
     if line:
-      m = _COLON_SEPARATED_RE.match(line)
+      m = key_value_regex.match(line)
       if m:
         current_data[m.group('key')] = m.group('value')
       else:
@@ -3107,6 +3119,57 @@ def _ParseTextProperties(text):
         current_data = {}
   if current_data:
     yield current_data
+
+
+def CreateUlimitSamples(
+    vms: list['BaseLinuxVirtualMachine'],
+) -> list[sample.Sample]:
+  """Creates samples from linux VMs of ulimit output."""
+  samples = []
+  for vm in vms:
+    metadata = {'node_name': vm.name}
+    metadata.update(vm.CheckUlimit().data)
+    samples.append(sample.Sample('ulimit', 0, '', metadata))
+  return samples
+
+
+class UlimitResults():
+  """Holds the contents of the command ulimit."""
+
+  def __init__(self, ulimit: str):
+    """UlimitResults Constructor.
+
+    The ulimit command does *not* have any option for
+    json output, so keep on using the text format.
+
+    Args:
+      ulimit: A string in the format of "ulimit -a" command
+
+    Raises:
+      ValueError: if the format of ulimit isn't what was expected for parsing
+
+    Example value of ulimit is:
+    real-time non-blocking time  (microseconds, -R) unlimited
+    core file size              (blocks, -c) 0
+    data seg size               (kbytes, -d) unlimited
+    scheduling priority                 (-e) 0
+    file size                   (blocks, -f) unlimited
+    pending signals                     (-i) 772515
+    max locked memory           (kbytes, -l) unlimited
+    max memory size             (kbytes, -m) unlimited
+    open files                          (-n) 131072
+    pipe size                (512 bytes, -p) 8
+    POSIX message queues         (bytes, -q) 819200
+    real-time priority                  (-r) 0
+    stack size                  (kbytes, -s) 8192
+    cpu time                   (seconds, -t) unlimited
+    max user processes                  (-u) 131072
+    virtual memory              (kbytes, -v) unlimited
+    file locks                          (-x) unlimited
+    """
+    self.data = {}
+    for stanza in _ParseTextProperties(ulimit, _BRACKET_SEPARATED_RE):
+      self.data.update(stanza)
 
 
 def CreateLscpuSamples(vms):

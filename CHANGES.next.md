@@ -205,6 +205,7 @@
 
 ### Enhancements:
 
+-   Additions to MongoDB in Artemis/PKB to facilitate workload analysis
 -   Updated `sar` switch to efficiently collect all sar metrics during the run,
     and download the file for hands-on analysis (no parsing).
 -   Added delay_time support for delete operations in object storage service.

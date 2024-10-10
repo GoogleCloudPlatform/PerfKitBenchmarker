@@ -36,3 +36,10 @@ def AptInstall(vm):
 def RunCommand(vm, command: str) -> tuple[str, str]:
   """Runs a mongosh command on the VM."""
   return vm.RemoteCommand(f'mongosh --eval "{command}" --verbose')
+
+
+def RunTwoCommands(vm, command1: str, command2: str) -> tuple[str, str]:
+  """Runs a mongosh command on the VM."""
+  return vm.RemoteCommand(
+      f'mongosh --eval "{command1}" --eval "{command2}"'
+  )

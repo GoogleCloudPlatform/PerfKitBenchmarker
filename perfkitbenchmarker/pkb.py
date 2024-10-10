@@ -813,6 +813,8 @@ def DoRunPhase(
 
     if FLAGS.record_lscpu:
       samples.extend(linux_virtual_machine.CreateLscpuSamples(spec.vms))
+    if FLAGS.record_ulimit:
+      samples.extend(linux_virtual_machine.CreateUlimitSamples(spec.vms))
 
     if pkb_flags.RECORD_PROCCPU.value:
       samples.extend(linux_virtual_machine.CreateProcCpuSamples(spec.vms))
@@ -839,6 +841,15 @@ def DoRunPhase(
     ):
       collector.PublishSamples()
       last_publish_time = time.time()
+
+    if pkb_flags.BETWEEN_RUNS_SLEEP_TIME.value > 0:
+      logging.info(
+          'Sleeping for %s seconds after run %d.',
+          FLAGS.between_runs_sleep_time,
+          run_number,
+      )
+      time.sleep(FLAGS.between_runs_sleep_time)
+
     run_number += 1
     if _IsRunStageFinished():
       if FLAGS.after_run_sleep_time:
