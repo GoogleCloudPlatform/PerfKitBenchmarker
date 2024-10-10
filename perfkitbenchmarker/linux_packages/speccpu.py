@@ -384,7 +384,7 @@ def _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state):
       scratch_dir,
   )
   vm.RemoteCommand(
-      'cd {dir} && tar xvfz {tar}'.format(
+      'cd {dir} && tar xfz {tar}'.format(
           dir=scratch_dir, tar=speccpu_vm_state.base_tar_file_path
       )
   )
