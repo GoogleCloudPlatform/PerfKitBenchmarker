@@ -79,6 +79,20 @@ class AiModelThroughputBenchmarkTest(
         ],
     )
 
+  @flagsaver.flagsaver(ai_parallel_requests=1, ai_test_duration=5)
+  def testBenchmarkPassesWithCorrectMetricMetadata(self):
+    samples = ai_model_throughput_benchmark.Run(self.bm_spec)
+    metadatas = [sample.metadata for sample in samples]
+    expected_metadata = {
+        'parallel_requests': 1,
+        'test_duration': 5,
+        'First Model': True,
+    }
+    self.assertDictContainsSubset(
+        expected_metadata,
+        metadatas[0],
+    )
+
   @parameterized.named_parameters(
       ('tiny test', 1, 2),
       ('longer test', 10, 3),

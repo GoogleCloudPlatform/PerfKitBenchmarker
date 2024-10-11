@@ -119,6 +119,11 @@ def _AggregateResponses(
       if response.status != 0
   ]
   logging.info('Failed response durations dump: %s', failed_durations)
+  metadata = model.GetResourceMetadata()
+  metadata.update({
+      'parallel_requests': _PARALLEL_REQUESTS.value,
+      'test_duration': _TEST_DURATION.value,
+  })
   samples = []
   if failed_durations:
     samples.append(
@@ -126,7 +131,7 @@ def _AggregateResponses(
             'failure_median_response_time',
             statistics.median(failed_durations),
             'seconds',
-            model.GetResourceMetadata(),
+            metadata,
         )
     )
   if not successful_durations:
@@ -136,7 +141,7 @@ def _AggregateResponses(
           'success_rate',
           len(successful_durations) / len(responses) * 100.0,
           'percent',
-          model.GetResourceMetadata(),
+          metadata,
       )
   )
   samples.append(
@@ -144,7 +149,7 @@ def _AggregateResponses(
           'total_responses',
           len(responses),
           'count',
-          model.GetResourceMetadata(),
+          metadata,
       )
   )
   samples.append(
@@ -152,7 +157,7 @@ def _AggregateResponses(
           'median_response_time',
           statistics.median(successful_durations),
           'seconds',
-          model.GetResourceMetadata(),
+          metadata,
       )
   )
   samples.append(
@@ -160,7 +165,7 @@ def _AggregateResponses(
           'mean_response_time',
           statistics.mean(successful_durations),
           'seconds',
-          model.GetResourceMetadata(),
+          metadata,
       )
   )
   return samples
