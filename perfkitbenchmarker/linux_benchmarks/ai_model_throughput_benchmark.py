@@ -107,17 +107,34 @@ def _AggregateResponses(
     responses: list[ModelResponse], model: managed_ai_model.BaseManagedAiModel
 ) -> list[sample.Sample]:
   """Aggregates the responses into samples."""
-  durations = [
+  successful_durations = [
       response.end_time - response.start_time
       for response in responses
       if response.status == 0
   ]
-  logging.info('Response durations dump: %s', durations)
+  logging.info('Successful response durations dump: %s', successful_durations)
+  failed_durations = [
+      response.end_time - response.start_time
+      for response in responses
+      if response.status != 0
+  ]
+  logging.info('Failed response durations dump: %s', failed_durations)
   samples = []
+  if failed_durations:
+    samples.append(
+        sample.Sample(
+            'failure_median_response_time',
+            statistics.median(failed_durations),
+            'seconds',
+            model.GetResourceMetadata(),
+        )
+    )
+  if not successful_durations:
+    return samples
   samples.append(
       sample.Sample(
           'success_rate',
-          len(durations) / len(responses) * 100.0,
+          len(successful_durations) / len(responses) * 100.0,
           'percent',
           model.GetResourceMetadata(),
       )
@@ -133,7 +150,7 @@ def _AggregateResponses(
   samples.append(
       sample.Sample(
           'median_response_time',
-          statistics.median(durations),
+          statistics.median(successful_durations),
           'seconds',
           model.GetResourceMetadata(),
       )
@@ -141,7 +158,7 @@ def _AggregateResponses(
   samples.append(
       sample.Sample(
           'mean_response_time',
-          statistics.mean(durations),
+          statistics.mean(successful_durations),
           'seconds',
           model.GetResourceMetadata(),
       )
