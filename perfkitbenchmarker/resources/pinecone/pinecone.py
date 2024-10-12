@@ -3,6 +3,7 @@
 from absl import flags
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.pinecone import flags as pinecone_flags
 
 FLAGS = flags.FLAGS
@@ -23,6 +24,8 @@ class PineconeServer(resource.BaseResource):
     self.server_environment = pinecone_spec.server_environment
     self.server_pod_type = pinecone_spec.server_pod_type
     self.server_api_key = pinecone_spec.server_api_key
+    if not self.server_api_key:
+      self.server_api_key = self._GetAPIKeyFromFile()
     self.index_name = 'pinecone-index-' + FLAGS.run_uri
 
   def _Create(self):
@@ -68,6 +71,12 @@ class PineconeServer(resource.BaseResource):
         'index_name': self.index_name,
     }
     return metadata
+
+  def _GetAPIKeyFromFile(self) -> str:
+    """Get the API key from a file."""
+    return vm_util.IssueCommand(
+        ['cat', pinecone_flags.PINECONE_API_KEY_PATH.value]
+    )[0].strip()
 
   def SetVms(self, vm_groups):
     self.client_vms = vm_groups[

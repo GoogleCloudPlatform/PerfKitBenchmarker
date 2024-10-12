@@ -18,39 +18,45 @@ from absl import flags
 POD = 'pod'
 SERVERLESS = 'serverless'
 
-flags.DEFINE_enum(
+PINECONE_SERVER_TYPE = flags.DEFINE_enum(
     'pinecone_server_type',
     POD,
     [POD, SERVERLESS],
     'Server type to use for pinecone.',
 )
 
-flags.DEFINE_string(
+PINECONE_API_KEY = flags.DEFINE_string(
     'pinecone_api_key',
     '',
     'API key to use for pinecone.',
 )
 
-flags.DEFINE_string(
+PINECONE_API_KEY_PATH = flags.DEFINE_string(
+    'pinecone_api_key_path',
+    '/pinecone_api_key.txt',
+    'Path to the file containing the API key to use for pinecone.',
+)
+
+PINECONE_SERVER_ENVIRONMENT = flags.DEFINE_string(
     'pinecone_server_environment',
     'us-west1-gcp',
     'Serverless environment to use for pinecone.',
 )
 
-flags.DEFINE_string(
+PINECONE_SERVER_POD_TYPE = flags.DEFINE_string(
     'pinecone_server_pod_type',
     'p1.x1',
     'Pod type to use for pinecone.',
 )
 
 
-flags.DEFINE_integer(
+PINECONE_SERVER_REPLICAS = flags.DEFINE_integer(
     'pinecone_server_replicas',
     1,
     'Replicas to use for pinecone.',
 )
 
-flags.DEFINE_integer(
+PINECONE_SERVER_SHARDS = flags.DEFINE_integer(
     'pinecone_server_shards',
     1,
     'Number of shards to use for pinecone.',
