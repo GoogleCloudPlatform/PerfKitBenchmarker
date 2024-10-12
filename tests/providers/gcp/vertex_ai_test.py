@@ -26,6 +26,7 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(flagsaver.flagsaver(run_uri='123'))
     self.enter_context(flagsaver.flagsaver(project='my-project'))
     self.enter_context(flagsaver.flagsaver(zone=['us-west-1a']))
+    self.enter_context(flagsaver.flagsaver(ai_bucket_uri='my-bucket'))
     self.enter_context(
         mock.patch.object(
             util,
@@ -88,6 +89,57 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     sampled_metrics = [sample.metric for sample in samples]
     self.assertIn('Model Upload Time', sampled_metrics)
     self.assertIn('Model Deploy Time', sampled_metrics)
+
+  @flagsaver.flagsaver(ai_bucket_uri=None)
+  def test_model_create_with_gcs_copy(self):
+    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(self.ai_spec)
+    self.MockIssueCommand({
+        'gcloud ai endpoints create': [(
+            '',
+            'Created Vertex AI endpoint: endpoint-name.',
+            0,
+        )],
+        'gcloud ai endpoints predict': [(
+            '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
+            '',
+            0,
+        )],
+        'gsutil': [('', '', 0)],
+    })
+    self.pkb_ai.Create()
+    samples = self.pkb_ai.GetSamples()
+    sampled_metrics = [sample.metric for sample in samples]
+    self.assertIn('GCS Bucket Copy Time', sampled_metrics)
+    self.assertEqual(
+        self.pkb_ai.model_bucket_path,
+        'gs://my-project-us-west-tmp-pkb123/llama2/llama2-7b-hf',
+    )
+
+  @flagsaver.flagsaver(ai_bucket_uri=None)
+  def test_model_create_with_reuse_gcs_bucket(self):
+    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(self.ai_spec)
+    model2 = self.pkb_ai.InitializeNewModel()
+    self.MockIssueCommand({
+        'gcloud ai endpoints create': [(
+            '',
+            'Created Vertex AI endpoint: endpoint-name.',
+            0,
+        )],
+        'gcloud ai endpoints predict': [(
+            '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
+            '',
+            0,
+        )],
+        'gsutil': [('', '', 0)],
+    })
+    model2.Create()
+    samples = self.pkb_ai.GetSamples()
+    sampled_metrics = [sample.metric for sample in samples]
+    self.assertNotIn('GCS Bucket Copy Time', sampled_metrics)
+    self.assertEqual(
+        self.pkb_ai.model_bucket_path,
+        'gs://my-project-us-west-tmp-pkb123/llama2/llama2-7b-hf',
+    )
 
   def test_model_quota_error(self):
     self.MockIssueCommand({

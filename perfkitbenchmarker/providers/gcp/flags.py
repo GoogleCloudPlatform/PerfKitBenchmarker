@@ -438,6 +438,21 @@ SPARK_BIGQUERY_CONNECTOR = flags.DEFINE_string(
     'The Spark BigQuery Connector jar to pass to the Spark Job',
 )
 
+AI_USE_SDK = flags.DEFINE_bool(
+    'use_ai_sdk',
+    False,
+    'If True, use the AI python SDK to perform operations. Otherwise, use'
+    ' gcloud commands.',
+)
+
+AI_BUCKET_URI = flags.DEFINE_string(
+    'ai_bucket_uri',
+    None,
+    'If set, use this pre-existing bucket for model upload. Otherwise will'
+    ' create a bucket & copy needed information to it at runtime. Should not'
+    ' have a gs:// prefix.',
+)
+
 
 def _ValidatePreemptFlags(flags_dict):
   if flags_dict['gce_preemptible_vms']:

@@ -30,25 +30,16 @@ from perfkitbenchmarker import command_interface
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
+from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources import managed_ai_model
 from perfkitbenchmarker.resources import managed_ai_model_spec
 
 FLAGS = flags.FLAGS
 
-_USE_AI_SDK = flags.DEFINE_bool(
-    'use_ai_sdk',
-    False,
-    'If True, use the AI python SDK to perform operations. Otherwise, use'
-    ' gcloud commands.',
-)
 
-
-# TODO(user): Create new bucket & unique service account.
-BUCKET_URI = 'gs://test-howellz-tmp-20240717162644-2ec5'
 SERVICE_ACCOUNT_BASE = '{}-compute@developer.gserviceaccount.com'
-STAGING_BUCKET = os.path.join(BUCKET_URI, 'temporal')
-MODEL_BUCKET = os.path.join(BUCKET_URI, 'llama2')
 VLLM_ARGS = [
     '--host=0.0.0.0',
     '--port=7080',
@@ -64,7 +55,6 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
 
   Attributes:
     model_name: The official name of the model in Model Garden, e.g. Llama2.
-    model_bucket_path: Where the model bucket is located.
     name: The name of the created model in private model registry.
     model_resource_name: The full resource name of the created model, e.g.
       projects/123/locations/us-east1/models/1234.
@@ -77,6 +67,12 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     model_upload_time: Time it took to upload the model.
     cli: A way to run commands on the machine.
     json_write_times: List of times it took to write the json request to disk.
+    gcs_bucket_copy_time: Time it took to copy the model to the GCS bucket.
+    gcs_client: The GCS client used to copy the model to the GCS bucket. Only
+      instantiated if ai_create_bucket flag is True.
+    bucket_uri: The GCS bucket where the model is stored.
+    model_bucket_path: Where the model bucket is located.
+    staging_bucket: The staging bucket used by the model.
   """
 
   CLOUD = 'GCP'
@@ -84,7 +80,6 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   endpoint: 'VertexAiEndpoint'
   model_spec: 'VertexAiModelSpec'
   model_name: str
-  model_bucket_path: str
   name: str
   region: str
   project: str
@@ -93,11 +88,17 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   model_deploy_time: float | None
   model_upload_time: float | None
   json_write_times: list[float]
+  gcs_bucket_copy_time: float | None
+  gcs_client: gcs.GoogleCloudStorageService | None
+  bucket_uri: str
+  model_bucket_path: str
+  staging_bucket: str
 
   def __init__(
       self,
       model_spec: managed_ai_model_spec.BaseManagedAiModelSpec,
       name: str | None = None,
+      bucket_uri: str | None = None,
       **kwargs,
   ):
     super().__init__(**kwargs)
@@ -110,9 +111,6 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.model_spec = model_spec
     self.model_name = model_spec.model_name
     self.model_resource_name = None
-    self.model_bucket_path = os.path.join(
-        BUCKET_URI, self.model_spec.model_bucket_suffix
-    )
     if name:
       self.name = name
     else:
@@ -139,10 +137,29 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.model_upload_time = None
     self.model_deploy_time = None
     self.json_write_times = []
+    self.gcs_client = None
+    if bucket_uri is not None:
+      self.bucket_uri = bucket_uri
+    elif gcp_flags.AI_BUCKET_URI.value is not None:
+      self.bucket_uri = gcp_flags.AI_BUCKET_URI.value
+    else:
+      self.gcs_client = gcs.GoogleCloudStorageService()
+      self.gcs_client.PrepareService(self.region)
+      self.bucket_uri = f'{self.project}-{self.region}-tmp-{self.name}'
+    self.model_bucket_path = 'gs://' + os.path.join(
+        self.bucket_uri, self.model_spec.model_bucket_suffix
+    )
+    self.staging_bucket = 'gs://' + os.path.join(self.bucket_uri, 'temporal')
+    self.gcs_bucket_copy_time = None
 
   def _InitializeNewModel(self) -> 'VertexAiModelInRegistry':
     """Returns a new instance of the same class."""
-    return self.__class__(model_spec=self.model_spec, name=self.name + '2')
+    return self.__class__(
+        model_spec=self.model_spec,
+        name=self.name + '2',
+        # Reuse the same bucket for the next model.
+        bucket_uri=self.bucket_uri,
+    )
 
   def GetRegionFromZone(self, zone: str) -> str:
     return util.GetRegionFromZone(zone)
@@ -193,6 +210,15 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
               metadata,
           )
       )
+    if self.gcs_bucket_copy_time:
+      samples.append(
+          sample.Sample(
+              'GCS Bucket Copy Time',
+              self.gcs_bucket_copy_time,
+              'seconds',
+              metadata,
+          )
+      )
     return samples
 
   def _SendPrompt(
@@ -202,7 +228,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     instances = self.model_spec.ConvertToInstances(
         prompt, max_tokens, temperature, **kwargs
     )
-    if _USE_AI_SDK.value:
+    if gcp_flags.AI_USE_SDK.value:
       assert self.endpoint.ai_endpoint
       response = self.endpoint.ai_endpoint.predict(instances=instances)
       str_responses = [str(response) for response in response.predictions]
@@ -257,10 +283,23 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       raise errors.Benchmarks.QuotaFailure(ex)
 
   def _CreateDependencies(self):
+    if self.gcs_client:
+      gcs_bucket_copy_start_time = time.time()
+      self.gcs_client.MakeBucket(
+          self.bucket_uri
+      )  # pytype: disable=attribute-error
+      self.gcs_client.Copy(
+          self.model_spec.model_garden_bucket,
+          self.model_bucket_path,
+          recursive=True,
+          timeout=60 * 40,
+      )  # pytype: disable=attribute-error
+      self.gcs_bucket_copy_time = time.time() - gcs_bucket_copy_start_time
+
     aiplatform.init(
         project=self.project,
         location=self.region,
-        staging_bucket=STAGING_BUCKET,
+        staging_bucket=self.staging_bucket,
         service_account=self.service_account,
     )
     self.endpoint.Create()
@@ -281,6 +320,10 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   def _DeleteDependencies(self):
     super()._DeleteDependencies()
     self.endpoint.Delete()
+    if self.gcs_client:
+      self.gcs_client.DeleteBucket(
+          self.bucket_uri
+      )  # pytype: disable=attribute-error
 
   def __getstate__(self):
     """Override pickling as the AI platform objects are not picklable."""
@@ -341,7 +384,7 @@ class VertexAiEndpoint(resource.BaseResource):
   def _Create(self) -> None:
     """Creates the underlying resource."""
     logging.info('Creating the endpoint: %s.', self.name)
-    if _USE_AI_SDK.value:
+    if gcp_flags.AI_USE_SDK.value:
       self.ai_endpoint = aiplatform.Endpoint.create(
           display_name=f'{self.name}-endpoint'
       )
@@ -361,7 +404,7 @@ class VertexAiEndpoint(resource.BaseResource):
   def _Delete(self) -> None:
     """Deletes the underlying resource."""
     logging.info('Deleting the endpoint: %s.', self.name)
-    if _USE_AI_SDK.value:
+    if gcp_flags.AI_USE_SDK.value:
       assert self.ai_endpoint
       self.ai_endpoint.delete(force=True)
       self.ai_endpoint = None  # Object is not picklable - none it out
@@ -403,6 +446,8 @@ class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
     serving_container_health_route: The route to use for health checks.
     machine_type: The machine type for model's cluster.
     accelerator_type: The type of the GPU/TPU.
+    model_bucket_suffix: Suffix with the particular version of the model (eg 7b)
+    model_garden_bucket: The bucket in Model Garden to copy from.
   """
 
   CLOUD = 'GCP'
@@ -412,6 +457,7 @@ class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
     # The pre-built serving docker images.
     self.container_image_uri: str
     self.model_bucket_suffix: str
+    self.model_garden_bucket: str
     self.serving_container_command: list[str]
     self.serving_container_args: list[str]
     self.serving_container_ports: list[int]
@@ -448,9 +494,11 @@ class VertexAiLlama2Spec(VertexAiModelSpec):
         '-m',
         'vllm.entrypoints.api_server',
     ]
-    self.model_bucket_suffix = os.path.join(
-        'llama2', f'llama2-{self.model_size}-hf'
+    size_suffix = os.path.join('llama2', f'llama2-{self.model_size}-hf')
+    self.model_garden_bucket = os.path.join(
+        'gs://vertex-model-garden-public-us-central1', size_suffix
     )
+    self.model_bucket_suffix = size_suffix
     self.serving_container_ports = [7080]
     self.serving_container_predict_route = '/generate'
     self.serving_container_health_route = '/ping'
