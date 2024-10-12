@@ -200,6 +200,8 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self._password: str = None
 
     self.failover_style = _FAILOVER_STYLE.value
+    # TODO(liubrandon): Remove `clustered` attr once all Redis resources support
+    # replicas_per_shard.
     self.clustered: bool = _MANAGED_MEMORY_STORE_CLUSTER.value
     # Shards contain a primary node and its replicas.
     self.shard_count = _SHARD_COUNT.value if self.clustered else 1

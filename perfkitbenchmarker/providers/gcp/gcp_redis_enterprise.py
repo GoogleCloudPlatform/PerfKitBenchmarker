@@ -100,6 +100,8 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
     self.version = REDIS_VERSION_MAPPING[spec.version]
     self.shard_info: _ShardConfiguration = None
     self.peering_name = f'pkb-redis-cloud-peering-{FLAGS.run_uri}'
+    self.multi_az = len(self.zones) > 1
+    self.metadata['multi_az'] = self.multi_az
 
     self._request_headers = None
 
