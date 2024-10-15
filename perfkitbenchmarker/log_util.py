@@ -43,6 +43,10 @@ log_local_path = None
 log_cloud_path = None
 LOG_FILE_NAME = 'pkb.log'
 
+GSUTIL_MV = 'mv'
+GSUTIL_CP = 'cp'
+GSUTIL_OPERATIONS = [GSUTIL_MV, GSUTIL_CP]
+
 
 _PKB_LOG_BUCKET = flags.DEFINE_string(
     'pkb_log_bucket',
@@ -51,6 +55,12 @@ _PKB_LOG_BUCKET = flags.DEFINE_string(
     'specified, then PKB logs will remain on the VM. This bucket must exist '
     'and the caller must have write permissions on the bucket for a successful '
     'export.',
+)
+_SAVE_LOG_TO_BUCKET_OPERATION = flags.DEFINE_enum(
+    'save_log_to_bucket_operation',
+    GSUTIL_MV,
+    GSUTIL_OPERATIONS,
+    'How to save the log to the bucket, available options are mv, cp',
 )
 flags.DEFINE_enum(
     'log_level',
@@ -240,7 +250,7 @@ def CollectPKBLogs() -> None:
         'gsutil',
         '-h',
         'Content-Type:text/plain',
-        'mv',
+        _SAVE_LOG_TO_BUCKET_OPERATION.value,
         '-Z',
         log_local_path,
         log_cloud_path,
