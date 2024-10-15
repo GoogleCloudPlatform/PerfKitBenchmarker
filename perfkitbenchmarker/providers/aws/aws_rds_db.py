@@ -106,6 +106,11 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     ):
       if self.spec.db_disk_spec.provisioned_iops:
         cmd.append('--iops=%s' % self.spec.db_disk_spec.provisioned_iops)
+      if self.spec.db_disk_spec.provisioned_throughput:
+        cmd.append(
+            '--storage-throughput=%s'
+            % self.spec.db_disk_spec.provisioned_throughput
+        )
 
     vm_util.IssueCommand(cmd)
 
