@@ -395,7 +395,7 @@ def _ParseHistogram(hist_log_file, mean_bin_vals):
       hist_list = []
       for idx, v in enumerate(r[HIST_BUCKET_START_IDX:]):
         if int(v):
-          hist_list.append((mean_bin_vals[idx], int(v)))
+          hist_list.append(((mean_bin_vals[idx])/1000, int(v)))
       todict = dict(hist_list)
       if key not in aggregates:
         aggregates[key] = collections.Counter()
