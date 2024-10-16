@@ -203,7 +203,9 @@
     failure substatus is COMMAND_TIMEOUT.
 -   Use Artifact Registry instead of the deprecated Google Container Registry
 -   Add `--capture_vm_logs` flag, which prompts PKB to capture `syslog`,
-    `journalctl`, and `sos report` (if supported) logs from Linux VMs.
+    `journalctl`, and `sos report` (if supported) logs from Linux test VMs.
+-   Add `--vm_log_bucket` flag, offering users the option to upload the
+    logs captured via the `--capture_vm_logs` flag to a GCS bucket.
 
 ### Enhancements:
 
