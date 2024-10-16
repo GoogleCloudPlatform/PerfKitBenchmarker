@@ -59,7 +59,7 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS.data_disk_type == disk.LOCAL:
     config['vm_groups']['default']['disk_count'] = (
-        config['vm_groups']['default']['disk_count'] or None
+        config['vm_groups']['default']['disk_count'] or 1
     )
   else:
     config['vm_groups']['default']['disk_count'] = (
