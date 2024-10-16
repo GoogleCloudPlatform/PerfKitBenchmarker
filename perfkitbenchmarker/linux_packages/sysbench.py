@@ -33,6 +33,11 @@ _IGNORE_CONCURRENT = flags.DEFINE_bool(
     'If true, ignores concurrent modification P0001 exceptions thrown by '
     'some databases.',
 )
+
+_SYSBENCH_SPANNER_OLTP_COMMIT_DELAY = flags.DEFINE_integer(
+    'sysbench_max_commit_delay', None, 'Max commit delay for spanner oltp in ms'
+)
+
 # release 1.0.20; committed Apr 24, 2020. When updating this, also update the
 # correct line for CONCURRENT_MODS, as it may have changed in between releases.
 DEFAULT_RELEASE_TAG = '1.0.20'
@@ -61,6 +66,7 @@ CONCURRENT_MODS = (
 
 # Sysbench TPCC-addon script
 SYSBENCH_TPCC_REPRO = 'https://github.com/Percona-Lab/sysbench-tpcc.git'
+SYSBENCH_COMMIT_DELAY = '{COMMIT_DELAY}'
 
 
 def _Install(vm, spanner_oltp=False):
@@ -83,10 +89,25 @@ def _Install(vm, spanner_oltp=False):
         'sysbench/spanner_oltp_git.diff',
         f'{SYSBENCH_DIR}/spanner_oltp_git.diff',
     )
+    vm.PushDataFile(
+        'sysbench/spanner_oltp_write_only.diff',
+        f'{SYSBENCH_DIR}/spanner_oltp_write_only.diff',
+    )
     vm.RemoteCommand(
         'cd ~/sysbench/ && git apply --reject --ignore-whitespace'
         ' spanner_oltp_git.diff'
     )
+
+    if _SYSBENCH_SPANNER_OLTP_COMMIT_DELAY.value:
+      vm.RemoteCommand(
+          f'sed -i "s/{SYSBENCH_COMMIT_DELAY}/'
+          f'{_SYSBENCH_SPANNER_OLTP_COMMIT_DELAY.value}/g" '
+          f'{SYSBENCH_DIR}/spanner_oltp_write_only.diff'
+      )
+      vm.RemoteCommand(
+          'cd ~/sysbench/ && git apply --reject --ignore-whitespace'
+          ' spanner_oltp_write_only.diff'
+      )
 
   vm.RemoteCommand(
       f'cd {SYSBENCH_DIR} && ./autogen.sh && ./configure --with-pgsql'
@@ -359,4 +380,8 @@ def GetMetadata(parameters: SysbenchInputParameters) -> dict[str, str]:
   for arg, value in args.items():
     if value is not None:
       metadata[arg] = str(value)
+  if _SYSBENCH_SPANNER_OLTP_COMMIT_DELAY.value:
+    metadata['sysbench_max_commit_delay'] = str(
+        _SYSBENCH_SPANNER_OLTP_COMMIT_DELAY.value
+    )
   return metadata
