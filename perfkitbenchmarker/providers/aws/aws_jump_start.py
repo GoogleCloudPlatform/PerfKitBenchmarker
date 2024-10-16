@@ -13,6 +13,7 @@ import re
 from typing import Any
 from absl import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import os_mixin
 from perfkitbenchmarker.providers.aws import util
 from perfkitbenchmarker.resources import managed_ai_model
 from perfkitbenchmarker.resources import managed_ai_model_spec
@@ -37,6 +38,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
     endpoint_name: The name of the deployed endpoint, if initialized.
     execution_arn: The role the model uses to run.
     cli: A cli to run commands on.
+    python_script: The path to the helper python script.
   """
 
   CLOUD = 'AWS'
@@ -49,6 +51,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
   account_id: str
   endpoint_name: str | None
   execution_arn: str
+  python_script: str
 
   def __init__(
       self, model_spec: managed_ai_model_spec.BaseManagedAiModelSpec, **kwargs
@@ -73,6 +76,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
         'model_name': self.model_name,
         'model_size': self.model_spec.model_size,
     })
+    self.python_script = ''
 
   def _InitializeNewModel(self) -> 'JumpStartModelInRegistry':
     """Returns a new instance of the same class."""
@@ -106,14 +110,13 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
     Returns:
       Tuple of [stdout, stderr].
     """
-    python_script = self.cli.PrepareResourcePath(AWS_RUNNER_SCRIPT)
     # When run without the region variable, get the error:
     # "ARN should be scoped to correct region: us-west-2"
     env_vars = {'AWS_DEFAULT_REGION': self.region}
     out, err, _ = self.cli.RunCommand(
         # These arguments are needed for all operations.
         'python3'
-        f' {python_script} --region={self.region} --model_id={self.model_id} '
+        f' {self.python_script} --region={self.region} --model_id={self.model_id} '
         f'--model_version={self.model_version} '
         + ' '.join(args),
         env=env_vars,
@@ -180,8 +183,13 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.cli.RunCommand(cmd)
 
   def _CreateDependencies(self) -> None:
+    if issubclass(self.cli.__class__, os_mixin.BaseOsMixin):
+      os_cli: os_mixin.BaseOsMixin = self.cli
+      os_cli.Install('pip')
+      os_cli.Install('awscli')
     self.cli.RunCommand('pip install sagemaker')
     self.cli.RunCommand('pip install absl-py')
+    self.python_script = self.cli.PrepareResourcePath(AWS_RUNNER_SCRIPT)
 
   def _Delete(self) -> None:
     """Deletes the underlying resource."""

@@ -1412,8 +1412,11 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       cmd_str = command
     stack_level += 1
     if 'raise_on_failure' in kwargs:
-      ignore_failure = not kwargs['raise_on_failure']
-      del kwargs['raise_on_failure']
+      ignore_failure = not kwargs.pop('raise_on_failure')
+    if 'env' in kwargs:
+      env_vars = kwargs.pop('env')
+      for var_name, var_value in env_vars.items():
+        cmd_str = f'export {var_name}={var_value} && {cmd_str}'
     return self.RemoteCommandWithReturnCode(
         cmd_str,
         ignore_failure=ignore_failure,
