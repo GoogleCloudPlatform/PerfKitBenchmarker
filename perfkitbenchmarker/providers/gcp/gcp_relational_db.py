@@ -36,6 +36,7 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import sqlserver_iaas_relational_db
+from perfkitbenchmarker import timescaledb_iaas_relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
@@ -164,6 +165,13 @@ class GCPOmniPostgresIAASRelationalDb(
     omni_postgres_iaas_relational_db.OmniPostgresIAASRelationalDb
 ):
   """A GCP Omni Postgres IAAS database resource."""
+  CLOUD = provider_info.GCP
+
+
+class GCPTimescaleDbPostgresIAASRelationalDb(
+    timescaledb_iaas_relational_db.TimescaleDbIAASRelationalDb
+):
+  """A TimescaleDB Postgres IAAS database resource."""
   CLOUD = provider_info.GCP
 
 

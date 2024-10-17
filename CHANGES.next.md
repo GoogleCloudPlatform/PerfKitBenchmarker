@@ -90,7 +90,7 @@
 -   Make Ubuntu 24 the default os_type.
 
 ### New features:
-
+-   Add support for TimescaleDB
 -   Add support for Omni
 -   Add support for systems running fedora36 and fedora37
 -   Add support for AlloyDB on GCP
