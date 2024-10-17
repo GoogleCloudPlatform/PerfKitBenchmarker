@@ -67,6 +67,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     model_upload_time: Time it took to upload the model.
     vm: A way to run commands on the machine.
     json_write_times: List of times it took to write the json request to disk.
+    json_cache: Cache from request JSON -> JSON request file.
     gcs_bucket_copy_time: Time it took to copy the model to the GCS bucket.
     gcs_client: The GCS client used to copy the model to the GCS bucket. Only
       instantiated if ai_create_bucket flag is True.
@@ -88,6 +89,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   model_deploy_time: float | None
   model_upload_time: float | None
   json_write_times: list[float]
+  json_cache: dict[str, str]
   gcs_bucket_copy_time: float | None
   gcs_client: gcs.GoogleCloudStorageService | None
   bucket_uri: str
@@ -138,6 +140,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.model_upload_time = None
     self.model_deploy_time = None
     self.json_write_times = []
+    self.json_cache = {}
     self.gcs_client = None
     if bucket_uri is not None:
       self.bucket_uri = bucket_uri
@@ -237,7 +240,12 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       return str_responses
     instances_dict = {'instances': instances, 'parameters': {}}
     start_write_time = time.time()
-    name = self.vm.WriteTemporaryFile(json.dumps(instances_dict))
+    json_dump = json.dumps(instances_dict)
+    if json_dump in self.json_cache:
+      name = self.json_cache[json_dump]
+    else:
+      name = self.vm.WriteTemporaryFile(json_dump)
+      self.json_cache[json_dump] = name
     end_write_time = time.time()
     write_time = end_write_time - start_write_time
     self.json_write_times.append(write_time)
