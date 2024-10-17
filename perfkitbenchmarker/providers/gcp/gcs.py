@@ -64,7 +64,14 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
   def PrepareService(self, location):
     self.location = location or DEFAULT_GCP_REGION
 
-  def MakeBucket(self, bucket, raise_on_failure=True, tag_bucket=True):
+  def MakeBucket(self, bucket_name, raise_on_failure=True, tag_bucket=True):
+    """Creates a GCS bucket.
+
+    Args:
+      bucket_name: The name of the bucket to create, without gs:// prefix.
+      raise_on_failure: If False, exceptions are swallowed.
+      tag_bucket: If True, tag the bucket with default tags.
+    """
     command = ['gsutil', 'mb']
     if self.location:
       command.extend(['-l', self.location])
@@ -79,7 +86,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       command.extend(
           ['--retention', f'{object_storage_service.OBJECT_TTL_DAYS.value}d']
       )
-    command.extend(['gs://%s' % bucket])
+    command.extend([f'gs://{bucket_name}'])
 
     _, stderr, ret_code = vm_util.IssueCommand(command, raise_on_failure=False)
     if ret_code and raise_on_failure:
@@ -89,7 +96,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       command = ['gsutil', 'label', 'ch']
       for key, value in util.GetDefaultTags().items():
         command.extend(['-l', f'{key}:{value}'])
-      command.extend([f'gs://{bucket}'])
+      command.extend([f'gs://{bucket_name}'])
       _, stderr, ret_code = vm_util.IssueCommand(
           command, raise_on_failure=False
       )
@@ -97,56 +104,79 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
         raise errors.Benchmarks.BucketCreationError(stderr)
 
   def Copy(self, src_url, dst_url, recursive=False, timeout=None):
-    """See base class."""
+    """See base class.
+
+    Args:
+      src_url: The source url to copy from. Both url parameters need a schema
+        prefix, e.g. gs://, local, or other.
+      dst_url: The destination url to copy to.
+      recursive: If True, copy the directory recursively.
+      timeout: The timeout for the copy command.
+    """
     cmd = ['gsutil', 'cp']
     if recursive:
       cmd += ['-r']
     cmd += [src_url, dst_url]
     vm_util.IssueCommand(cmd, timeout=timeout)
 
-  def CopyToBucket(self, src_path, bucket, object_path):
-    """See base class."""
-    dst_url = self.MakeRemoteCliDownloadUrl(bucket, object_path)
+  def CopyToBucket(self, src_path, bucket_name, object_path):
+    """See base class.
+
+    Args:
+      src_path: The source path to copy from. Needs a schema prefix, e.g. gs://,
+        local, or other.
+      bucket_name: GCS bucket, without gs://.
+      object_path: Path within the bucket to the object.
+    """
+    dst_url = self.MakeRemoteCliDownloadUrl(bucket_name, object_path)
     vm_util.IssueCommand(['gsutil', 'cp', src_path, dst_url])
 
-  def MakeRemoteCliDownloadUrl(self, bucket, object_path):
-    """See base class."""
-    path = posixpath.join(bucket, object_path)
+  def MakeRemoteCliDownloadUrl(self, bucket_name, object_path):
+    """See base class.
+
+    Args:
+      bucket_name: GCS bucket, without gs://.
+      object_path: Path within the bucket to the object.
+
+    Returns:
+      The full gs:// URL.
+    """
+    path = posixpath.join(bucket_name, object_path)
     return 'gs://' + path
 
   def GenerateCliDownloadFileCommand(self, src_url, local_path):
     """See base class."""
-    return 'gsutil cp "%s" "%s"' % (src_url, local_path)
+    return f'gsutil cp "{src_url}" "{local_path}"'
 
-  def List(self, bucket):
+  def List(self, bucket_name):
     """See base class."""
     # Full URI is required by gsutil.
-    if not bucket.startswith('gs://'):
-      bucket = 'gs://' + bucket
-    stdout, _, _ = vm_util.IssueCommand(['gsutil', 'ls', bucket])
+    if not bucket_name.startswith('gs://'):
+      bucket_name = 'gs://' + bucket_name
+    stdout, _, _ = vm_util.IssueCommand(['gsutil', 'ls', bucket_name])
     return stdout
 
-  def ListTopLevelSubfolders(self, bucket):
-    """Lists the top level folders (not files) in a bucket.
+  def ListTopLevelSubfolders(self, bucket_name):
+    """Lists the top level folders (not files) in a bucket_name.
 
     Each folder is returned as its full uri, eg. "gs://pkbtpch1/customer/", so
     just the folder name is extracted. When there's more than one, splitting
     on the newline returns a final blank row, so blank values are skipped.
 
     Args:
-      bucket: Name of the bucket to list the top level subfolders of.
+      bucket_name: Name of the bucket to list the top level subfolders of.
 
     Returns:
       A list of top level subfolder names. Can be empty if there are no folders.
     """
     return [
         obj.split('/')[-2].strip()
-        for obj in self.List(bucket).split('\n')
+        for obj in self.List(bucket_name).split('\n')
         if obj and obj.endswith('/')
     ]
 
   @vm_util.Retry()
-  def DeleteBucket(self, bucket):
+  def DeleteBucket(self, bucket_name):
     # We want to retry rm and rb together because it's possible that
     # we issue rm followed by rb, but then rb fails because the
     # metadata store isn't consistent and the server that handles the
@@ -154,7 +184,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     # possible for rm to fail because the metadata store is
     # inconsistent and rm doesn't find all objects, so can't delete
     # them all.
-    self.EmptyBucket(bucket)
+    self.EmptyBucket(bucket_name)
 
     def _bucket_not_found(stdout, stderr, retcode):
       del stdout  # unused
@@ -162,55 +192,60 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       return retcode and 'BucketNotFoundException' in stderr
 
     vm_util.IssueCommand(
-        ['gsutil', 'rb', 'gs://%s' % bucket], suppress_failure=_bucket_not_found
+        ['gsutil', 'rb', f'gs://{bucket_name}'],
+        suppress_failure=_bucket_not_found,
     )
 
-  def EmptyBucket(self, bucket):
+  def EmptyBucket(self, bucket_name):
     # Ignore failures here and retry in DeleteBucket.  See more comments there.
     vm_util.IssueCommand(
-        ['gsutil', '-m', 'rm', '-r', 'gs://%s/*' % bucket],
+        ['gsutil', '-m', 'rm', '-r', f'gs://{bucket_name}/*'],
         raise_on_failure=False,
     )
 
-  def AclBucket(self, entity: str, roles: TList[str], bucket: str):
+  def AclBucket(self, entity: str, roles: TList[str], bucket_name: str):
     """Updates access control lists.
 
     Args:
       entity: the user or group to grant permission.
       roles: the IAM roles to be granted.
-      bucket: the name of the bucket to change
+      bucket_name: the name of the bucket to change
     """
-    vm_util.IssueCommand(
-        ['gsutil', 'iam', 'ch', f"{entity}:{','.join(roles)}", f'gs://{bucket}']
-    )
+    vm_util.IssueCommand([
+        'gsutil',
+        'iam',
+        'ch',
+        f"{entity}:{','.join(roles)}",
+        f'gs://{bucket_name}',
+    ])
 
-  def MakeBucketPubliclyReadable(self, bucket, also_make_writable=False):
+  def MakeBucketPubliclyReadable(self, bucket_name, also_make_writable=False):
     """See base class."""
     roles = [READER]
-    logging.warning('Making bucket %s publicly readable!', bucket)
+    logging.warning('Making bucket %s publicly readable!', bucket_name)
     if also_make_writable:
       roles.append(WRITER)
-      logging.warning('Making bucket %s publicly writable!', bucket)
-    self.AclBucket('allUsers', roles, bucket)
+      logging.warning('Making bucket %s publicly writable!', bucket_name)
+    self.AclBucket('allUsers', roles, bucket_name)
 
   # Use JSON API over XML for URLs
-  def GetDownloadUrl(self, bucket, object_name, use_https=True):
+  def GetDownloadUrl(self, bucket_name, object_name, use_https=True):
     """See base class."""
     # https://cloud.google.com/storage/docs/downloading-objects
     scheme = 'https' if use_https else 'http'
     return (
         f'{scheme}://storage.googleapis.com/storage/v1/'
-        f'b/{bucket}/o/{object_name}?alt=media'
+        f'b/{bucket_name}/o/{object_name}?alt=media'
     )
 
-  def GetUploadUrl(self, bucket, object_name, use_https=True):
+  def GetUploadUrl(self, bucket_name, object_name, use_https=True):
     """See base class."""
     # https://cloud.google.com/storage/docs/uploading-objects
     # Note I don't believe GCS supports upload via HTTP.
     scheme = 'https' if use_https else 'http'
     return (
         f'{scheme}://storage.googleapis.com/upload/storage/v1/'
-        f'b/{bucket}/o?uploadType=media&name={object_name}'
+        f'b/{bucket_name}/o?uploadType=media&name={object_name}'
     )
 
   UPLOAD_HTTP_METHOD = 'POST'
@@ -348,7 +383,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
     # Detect if we need to install crcmod for gcp.
     # See "gsutil help crc" for details.
-    raw_result, _ = vm.RemoteCommand('%s version -l' % vm.gsutil_path)
+    raw_result, _ = vm.RemoteCommand(f'{vm.gsutil_path} version -l')
     logging.info('gsutil version -l raw result is %s', raw_result)
     search_string = 'compiled crcmod: True'
     result_string = re.findall(search_string, raw_result)
@@ -378,14 +413,14 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       vm.RemoveFile(object_storage_service.DEFAULT_BOTO_LOCATION_USER)
       vm.Uninstall('gcs_boto_plugin')
 
-  def CLIUploadDirectory(self, vm, directory, files, bucket):
+  def CLIUploadDirectory(self, vm, directory, files, bucket_name):
     return vm.RemoteCommand(
-        'time %s -m cp %s/* gs://%s/' % (vm.gsutil_path, directory, bucket)
+        'time %s -m cp %s/* gs://%s/' % (vm.gsutil_path, directory, bucket_name)
     )
 
-  def CLIDownloadBucket(self, vm, bucket, objects, dest):
+  def CLIDownloadBucket(self, vm, bucket_name, objects, dest):
     return vm.RemoteCommand(
-        'time %s -m cp gs://%s/* %s' % (vm.gsutil_path, bucket, dest)
+        'time %s -m cp gs://%s/* %s' % (vm.gsutil_path, bucket_name, dest)
     )
 
   def Metadata(self, vm):
