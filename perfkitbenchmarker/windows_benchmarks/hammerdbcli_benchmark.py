@@ -233,9 +233,15 @@ def Prepare(benchmark_spec):
   max_retries = 3
   for tries in range(max_retries):
     try:
-      # Drop tpcc database if it exists for retry
+      # Close all existing connections to tpcc database, roll back their
+      # transactions and drop tpcc database if it exists for retry
+      drop_sql = """IF EXISTS (SELECT name from sys.databases WHERE (name = N'tpcc'))
+          BEGIN
+              ALTER DATABASE tpcc SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+              DROP DATABASE tpcc;
+          END;"""
       relational_db.client_vm_query_tools.IssueSqlCommand(
-          'DROP DATABASE IF EXISTS tpcc;', timeout=60 * 5
+          drop_sql, timeout=60 * 20
       )
 
       is_azure = FLAGS.cloud == 'Azure' and FLAGS.use_managed_db
