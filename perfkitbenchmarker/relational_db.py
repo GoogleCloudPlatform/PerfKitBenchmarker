@@ -223,6 +223,10 @@ SERVER_GCE_SSD_INTERFACE = flags.DEFINE_enum(
     'The ssd interface for GCE local SSD.',
 )
 
+ENABLE_DATA_CACHE = flags.DEFINE_bool(
+    'gcp_db_enable_data_cache', False, 'Whether to enable data cache.'
+)
+
 
 BACKUP_TIME_REGULAR_EXPRESSION = r'^\d\d\:\d\d$'
 flags.register_validator(
