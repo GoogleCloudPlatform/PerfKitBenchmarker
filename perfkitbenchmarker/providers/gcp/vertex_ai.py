@@ -26,10 +26,10 @@ try:
 except ImportError:
   from google.cloud import aiplatform
 from google.api_core import exceptions as google_exceptions
-from perfkitbenchmarker import command_interface
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
@@ -65,7 +65,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     service_account: Name of the service account used by the model.
     model_deploy_time: Time it took to deploy the model.
     model_upload_time: Time it took to upload the model.
-    cli: A way to run commands on the machine.
+    vm: A way to run commands on the machine.
     json_write_times: List of times it took to write the json request to disk.
     gcs_bucket_copy_time: Time it took to copy the model to the GCS bucket.
     gcs_client: The GCS client used to copy the model to the GCS bucket. Only
@@ -96,12 +96,13 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
 
   def __init__(
       self,
+      vm: virtual_machine.BaseVirtualMachine,
       model_spec: managed_ai_model_spec.BaseManagedAiModelSpec,
       name: str | None = None,
       bucket_uri: str | None = None,
       **kwargs,
   ):
-    super().__init__(**kwargs)
+    super().__init__(vm, **kwargs)
     if not isinstance(model_spec, VertexAiModelSpec):
       raise errors.Config.InvalidValue(
           f'Invalid model spec class: "{model_spec.__class__.__name__}". '
@@ -117,7 +118,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       self.name = 'pkb' + FLAGS.run_uri
     self.project = FLAGS.project
     self.endpoint = VertexAiEndpoint(
-        name=self.name, region=self.region, project=self.project, cli=self.cli
+        name=self.name, region=self.region, project=self.project, vm=self.vm
     )
     if not self.project:
       raise errors.Setup.InvalidConfigurationError(
@@ -155,6 +156,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   def _InitializeNewModel(self) -> 'VertexAiModelInRegistry':
     """Returns a new instance of the same class."""
     return self.__class__(
+        vm=self.vm,
         model_spec=self.model_spec,
         name=self.name + '2',
         # Reuse the same bucket for the next model.
@@ -171,7 +173,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     # Expected output example:
     # ENDPOINT_ID          DISPLAY_NAME
     # 12345                some_endpoint_name
-    out, _, _ = self.cli.RunCommand(
+    out, _, _ = self.vm.RunCommand(
         f'gcloud ai endpoints list --region={region} --project={self.project}'
     )
     lines = out.splitlines()
@@ -235,11 +237,11 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       return str_responses
     instances_dict = {'instances': instances, 'parameters': {}}
     start_write_time = time.time()
-    name = self.cli.WriteTemporaryFile(json.dumps(instances_dict))
+    name = self.vm.WriteTemporaryFile(json.dumps(instances_dict))
     end_write_time = time.time()
     write_time = end_write_time - start_write_time
     self.json_write_times.append(write_time)
-    out, _, _ = self.cli.RunCommand(
+    out, _, _ = self.vm.RunCommand(
         'gcloud ai endpoints predict'
         f' {self.endpoint.endpoint_name} --json-request={name}',
     )
@@ -370,7 +372,7 @@ class VertexAiEndpoint(resource.BaseResource):
       name: str,
       project: str,
       region: str,
-      cli: command_interface.CommandInterface,
+      vm: virtual_machine.BaseVirtualMachine,
       **kwargs,
   ):
     super().__init__(**kwargs)
@@ -378,7 +380,7 @@ class VertexAiEndpoint(resource.BaseResource):
     self.ai_endpoint = None
     self.project = project
     self.region = region
-    self.cli = cli
+    self.vm = vm
     self.endpoint_name = None
 
   def _Create(self) -> None:
@@ -390,7 +392,7 @@ class VertexAiEndpoint(resource.BaseResource):
       )
       return
 
-    _, err, _ = self.cli.RunCommand(
+    _, err, _ = self.vm.RunCommand(
         f'gcloud ai endpoints create --display-name={self.name}-endpoint'
         f' --project={self.project} --region={self.region}',
         ignore_failure=True,
@@ -409,15 +411,15 @@ class VertexAiEndpoint(resource.BaseResource):
       self.ai_endpoint.delete(force=True)
       self.ai_endpoint = None  # Object is not picklable - none it out
       return
-    out, _, _ = self.cli.RunCommand(
+    out, _, _ = self.vm.RunCommand(
         f'gcloud ai endpoints describe {self.endpoint_name}',
     )
     model_id = _FindRegexInOutput(out, r'  id: \'(.+)\'')
-    self.cli.RunCommand(
+    self.vm.RunCommand(
         'gcloud ai endpoints undeploy-model'
         f' {self.endpoint_name} --deployed-model-id={model_id} --quiet',
     )
-    self.cli.RunCommand(
+    self.vm.RunCommand(
         f'gcloud ai endpoints delete {self.endpoint_name} --quiet'
     )
     # None it out here as well, until all commands are supported over gcloud.

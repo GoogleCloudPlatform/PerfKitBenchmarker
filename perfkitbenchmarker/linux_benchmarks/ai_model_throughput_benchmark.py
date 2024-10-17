@@ -92,6 +92,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """
   logging.info('Running Run phase & finding throughput')
   model = benchmark_spec.ai_model
+  assert model
   # Label whether it's the first model or not.
   endpoints = model.ListExistingEndpoints()
   model.metadata.update({'First Model': len(endpoints) == 1})

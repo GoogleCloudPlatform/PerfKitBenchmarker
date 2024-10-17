@@ -34,7 +34,6 @@ Usage:
 """
 
 import collections
-from typing import Any
 from unittest import mock
 from absl.testing import absltest
 from perfkitbenchmarker import virtual_machine
@@ -54,23 +53,26 @@ class MockCommand:
     call_to_response: A dictionary of commands to a list of responses. Commands
       just need to be a substring of the actual command. Each response is given
       in order, like with mock's normal iterating side_effect.
+    default_return_value: The value to return if no command is found.
   """
 
   def __init__(
       self,
       call_to_response: dict[str, list[ReturnValues]],
       mock_command_function: mock.MagicMock,
+      default_return_value: ReturnValues = ('', ''),
   ):
     self.progress_through_calls = collections.defaultdict(int)
     self.call_to_response = call_to_response
+    self.default_return_value = default_return_value
 
     mock_command_function.side_effect = self.mock_remote_command
 
-  def mock_remote_command(
-      self, cmd: str | list[str], **kwargs
-  ) -> ReturnValues:
+  def mock_remote_command(self, cmd: str | list[str], **kwargs) -> ReturnValues:
     """Mocks a command, returning the next response for the command."""
     del kwargs  # Unused but matches type signature.
+    if isinstance(cmd, list):
+      cmd = ' '.join(cmd)
     for call in self.call_to_response:
       if call in cmd:
         call_num = self.progress_through_calls[call]
@@ -82,7 +84,7 @@ class MockCommand:
           response = self.call_to_response[call]
         self.progress_through_calls[call] += 1
         return response
-    return '', ''
+    return self.default_return_value
 
 
 class MockRemoteCommand(MockCommand):
@@ -110,10 +112,4 @@ class MockIssueCommand(MockCommand):
             'IssueCommand',
         )
     )
-    super().__init__(call_to_response, self.func_to_mock)
-
-  def mock_remote_command(
-      self, cmd: str | list[str], **kwargs: Any
-  ) -> ReturnValues:
-    str_cmd = ' '.join(cmd)
-    return super().mock_remote_command(str_cmd, **kwargs)
+    super().__init__(call_to_response, self.func_to_mock, ('', '', 0))

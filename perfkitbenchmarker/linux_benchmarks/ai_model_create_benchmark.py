@@ -31,6 +31,12 @@ ai_model_create:
     model_name: 'llama2'
     model_size: '7b'
     cloud: 'GCP'
+  vm_groups:
+    default:
+      vm_spec: *default_dual_core
+      vm_count: 1
+  flags:
+    gcloud_scopes: cloud-platform
 """
 
 
@@ -80,6 +86,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """
   logging.info('Running Run phase & gathering response times for model 1')
   model1 = benchmark_spec.ai_model
+  assert model1
   _ValidateExistingModels(model1)
   model1.metadata.update({'First Model': True})
   SendPromptsForModel(model1)

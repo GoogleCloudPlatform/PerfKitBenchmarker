@@ -24,10 +24,10 @@ import time
 from typing import Any
 
 from absl import flags
-from perfkitbenchmarker import command_interface
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 
 FLAGS = flags.FLAGS
 
@@ -40,9 +40,9 @@ class BaseManagedAiModel(resource.BaseResource):
 
   region: str
   child_models: list['BaseManagedAiModel'] = []
-  cli: command_interface.CommandInterface
+  vm: virtual_machine.BaseVirtualMachine
 
-  def __init__(self, **kwargs):
+  def __init__(self, vm: virtual_machine.BaseVirtualMachine, **kwargs):
     super().__init__(**kwargs)
     if not FLAGS.zone:
       raise errors.Setup.InvalidConfigurationError(
@@ -58,10 +58,7 @@ class BaseManagedAiModel(resource.BaseResource):
         'resource_type': self.RESOURCE_TYPE,
         'resource_class': self.__class__.__name__,
     })
-    self.cli = command_interface.VmUtilCommandInterface()
-
-  def SetCli(self, cli: command_interface.CommandInterface):
-    self.cli = cli
+    self.vm: virtual_machine.BaseVirtualMachine = vm
 
   def InitializeNewModel(self) -> 'BaseManagedAiModel':
     """Returns a new instance of the same class."""

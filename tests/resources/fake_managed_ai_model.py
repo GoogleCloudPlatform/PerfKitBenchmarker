@@ -1,7 +1,9 @@
 """A fake implementation of a managed AI model for testing."""
 
 from typing import Any
+from unittest import mock
 
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.resources import managed_ai_model
 
 
@@ -11,9 +13,12 @@ class FakeManagedAiModel(managed_ai_model.BaseManagedAiModel):
   CLOUD = 'TEST'
 
   def __init__(self, **kwargs: Any) -> Any:
-    super().__init__(**kwargs)
+    super().__init__(
+        vm=mock.create_autospec(virtual_machine.BaseVirtualMachine), **kwargs
+    )
     self.existing_endpoints: list[str] = ['one-endpoint']
     self.zone = 'us-central1-a'
+    self.vm = None
 
   def GetRegionFromZone(self, zone: str) -> str:
     return zone + '-region'

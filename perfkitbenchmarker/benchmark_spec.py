@@ -474,7 +474,9 @@ class BenchmarkSpec:
         edw_service_class_name[0].upper() + edw_service_class_name[1:],
     )
     # Check if a new instance needs to be created or restored from snapshot
-    self.edw_service = edw_service_class(self.config.edw_service)  # pytype: disable=not-instantiable
+    self.edw_service = edw_service_class(
+        self.config.edw_service
+    )  # pytype: disable=not-instantiable
 
   def ConstructEdwComputeResource(self):
     """Create an edw_compute_resource object."""
@@ -501,7 +503,9 @@ class BenchmarkSpec:
     example_resource_class = example_resource.GetExampleResourceClass(
         example_resource_type
     )
-    self.example_resource = example_resource_class(self.config.example_resource)  # pytype: disable=not-instantiable
+    self.example_resource = example_resource_class(
+        self.config.example_resource
+    )  # pytype: disable=not-instantiable
     self.resources.append(self.example_resource)
 
   def ConstructBaseJob(self):
@@ -513,7 +517,9 @@ class BenchmarkSpec:
     providers.LoadProvider(cloud)
     job_class = base_job.GetJobClass(job_type)
 
-    self.base_job = job_class(self.config.base_job, self.container_registry)  # pytype: disable=not-instantiable
+    self.base_job = job_class(
+        self.config.base_job, self.container_registry
+    )  # pytype: disable=not-instantiable
     self.resources.append(self.base_job)
 
   def ConstructManagedAiModel(self):
@@ -523,12 +529,13 @@ class BenchmarkSpec:
     cloud = self.config.ai_model.cloud
     providers.LoadProvider(cloud)
     model_class = managed_ai_model.GetManagedAiModelClass(cloud)
-    self.ai_model = model_class(self.config.ai_model)  # pytype: disable=not-instantiable
-    if self.vm_groups:
-      vm = self.vm_groups[
-          'clients' if 'clients' in self.vm_groups else 'default'
-      ][0]
-      self.ai_model.SetCli(vm)
+    assert self.vm_groups
+    vm = self.vm_groups[
+        'clients' if 'clients' in self.vm_groups else 'default'
+    ][0]
+    self.ai_model = model_class(
+        vm, self.config.ai_model
+    )  # pytype: disable=not-instantiable
     self.resources.append(self.ai_model)
 
   def ConstructPinecone(self):
@@ -538,7 +545,9 @@ class BenchmarkSpec:
     cloud = self.config.pinecone.cloud
     providers.LoadProvider(cloud)
     model_class = pinecone_resource.GetPineconeResourceClass(cloud)
-    self.pinecone = model_class(self.config.pinecone)  # pytype: disable=not-instantiable
+    self.pinecone = model_class(
+        self.config.pinecone
+    )  # pytype: disable=not-instantiable
     self.pinecone.SetVms(self.vm_groups)
     self.resources.append(self.pinecone)
 
@@ -555,7 +564,9 @@ class BenchmarkSpec:
             self.config.memory_store.memory_store_type,
         )
     )
-    self.memory_store = managed_memory_store_class(self.config.memory_store)  # pytype: disable=not-instantiable
+    self.memory_store = managed_memory_store_class(
+        self.config.memory_store
+    )  # pytype: disable=not-instantiable
     self.memory_store.SetVms(self.vm_groups)
     self.resources.append(self.memory_store)
 
@@ -580,7 +591,9 @@ class BenchmarkSpec:
         cloud = group_spec.cloud
         providers.LoadProvider(cloud)
         nfs_class = nfs_service.GetNfsServiceClass(cloud)
-        self.nfs_service = nfs_class(disk_spec, group_spec.vm_spec.zone)  # pytype: disable=not-instantiable
+        self.nfs_service = nfs_class(
+            disk_spec, group_spec.vm_spec.zone
+        )  # pytype: disable=not-instantiable
       else:
         self.nfs_service = nfs_service.UnmanagedNfsService(
             disk_spec, self.vms[0]
@@ -606,7 +619,9 @@ class BenchmarkSpec:
       cloud = group_spec.cloud
       providers.LoadProvider(cloud)
       smb_class = smb_service.GetSmbServiceClass(cloud)
-      self.smb_service = smb_class(disk_spec, group_spec.vm_spec.zone)  # pytype: disable=not-instantiable
+      self.smb_service = smb_class(
+          disk_spec, group_spec.vm_spec.zone
+      )  # pytype: disable=not-instantiable
       logging.debug('SMB service %s', self.smb_service)
       break
 
@@ -674,7 +689,9 @@ class BenchmarkSpec:
       cloud = vm_group[0].CLOUD
       providers.LoadProvider(cloud)
       capacity_reservation_class = capacity_reservation.GetResourceClass(cloud)
-      self.capacity_reservations.append(capacity_reservation_class(vm_group))  # pytype: disable=not-instantiable
+      self.capacity_reservations.append(
+          capacity_reservation_class(vm_group)  # pytype: disable=not-instantiable
+      )
 
   def _CheckBenchmarkSupport(self, cloud):
     """Throw an exception if the benchmark isn't supported."""
@@ -1109,7 +1126,9 @@ class BenchmarkSpec:
 
     placement_group_class = placement_group.GetPlacementGroupClass(cloud)
     if placement_group_class:
-      return placement_group_class(placement_group_spec)  # pytype: disable=not-instantiable
+      return placement_group_class(
+          placement_group_spec
+      )  # pytype: disable=not-instantiable
     else:
       return None
 

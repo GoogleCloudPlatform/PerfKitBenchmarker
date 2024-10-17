@@ -22,6 +22,7 @@ from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import command_interface
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import linux_benchmarks
@@ -309,3 +310,27 @@ class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):
         call_to_response, vm
     )
     return vm
+
+  def MockRunCommand(
+      self,
+      call_to_response: dict[str, list[tuple[str, str, int]]],
+      cli: command_interface.CommandInterface | None = None,
+  ) -> command_interface.CommandInterface:
+    """Mocks RunCommand, returning response for the given call.
+
+    Args:
+      call_to_response: A dictionary of commands to a list of responses.
+        Commands just need to be a substring of the actual command. Each
+        response is given in order, like with mock's normal iterating
+        side_effect.
+      cli: A mocked CLI. If None, a mock is created.
+
+    Returns:
+      The mocked cli.
+    """
+    if cli is None:
+      cli = mock.create_autospec(command_interface.CommandInterface)
+    cli.RunCommand.mock_command = mock_command.MockCommand(
+        call_to_response, cli.RunCommand, ('', '', 0)
+    )
+    return cli

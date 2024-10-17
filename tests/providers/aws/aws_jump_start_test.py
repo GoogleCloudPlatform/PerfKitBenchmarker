@@ -4,6 +4,7 @@ import unittest
 from unittest import mock
 
 from absl.testing import flagsaver
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.providers.aws import aws_jump_start
 from perfkitbenchmarker.providers.aws import util
 from tests import pkb_common_test_case
@@ -21,35 +22,43 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.enter_context(flagsaver.flagsaver(zone=[_ZONE]))
     self.ai_model_spec = aws_jump_start.JumpStartLlama2Spec('f_name')
-    self.ai_model = aws_jump_start.JumpStartModelInRegistry(self.ai_model_spec)
+    self.ai_model = aws_jump_start.JumpStartModelInRegistry(
+        mock.create_autospec(virtual_machine.BaseVirtualMachine),
+        self.ai_model_spec,
+    )
 
   def testRegionSet(self):
     self.enter_context(flagsaver.flagsaver(zone=['us-east-1a']))
     ai_model_spec = aws_jump_start.JumpStartLlama2Spec('f_name')
-    ai_model = aws_jump_start.JumpStartModelInRegistry(ai_model_spec)
+    ai_model = aws_jump_start.JumpStartModelInRegistry(
+        mock.create_autospec(virtual_machine.BaseVirtualMachine), ai_model_spec
+    )
     self.assertEqual(ai_model.region, 'us-east-1')
 
   def testNamesParsedCreate(self):
-    self.MockIssueCommand({
-        'python3': [(
-            (
-                'Model name: <meta-textgeneration-llama-2-7b-f-2025-08-16-05>'
-                'sagemaker.config INFO - Not applying SDK defaults from'
-                ' location: /etc/xdg/sagemaker/config.yaml\n'
-                '--!Endpoint name:'
-                ' <meta-textgeneration-llama-2-7b-f-2025-08-16-06>'
-            ),
-            (
-                "For forward compatibility, pin to model_version='2.*' in"
-                ' your JumpStartModel or JumpStartEstimator definitions. Note'
-                ' that major version upgrades may have different EULA'
-                ' acceptance terms and input/output signatures.\nUsing'
-                ' vulnerable JumpStart model'
-                " 'meta-textgeneration-llama-2-7b-f' and version '2.0.4'."
-            ),
-            0,
-        )],
-    })
+    self.MockRunCommand(
+        {
+            'python3': [(
+                (
+                    'Model name:'
+                    ' <meta-textgeneration-llama-2-7b-f-2025-08-16-05>sagemaker.config'
+                    ' INFO - Not applying SDK defaults from location:'
+                    ' /etc/xdg/sagemaker/config.yaml\n--!Endpoint name:'
+                    ' <meta-textgeneration-llama-2-7b-f-2025-08-16-06>'
+                ),
+                (
+                    "For forward compatibility, pin to model_version='2.*' in"
+                    ' your JumpStartModel or JumpStartEstimator definitions.'
+                    ' Note that major version upgrades may have different EULA'
+                    ' acceptance terms and input/output signatures.\nUsing'
+                    ' vulnerable JumpStart model'
+                    " 'meta-textgeneration-llama-2-7b-f' and version '2.0.4'."
+                ),
+                0,
+            )],
+        },
+        self.ai_model.vm,
+    )
     self.ai_model._Create()
     self.assertEqual(
         self.ai_model.model_name,
@@ -66,18 +75,21 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
             util, 'MakeFormattedDefaultTags', return_value=['Key=K,Value=V']
         )
     )
-    mock_cmd = self.MockIssueCommand({
-        'aws sagemaker add-tags': [(
-            'Tags added',
-            '',
-            0,
-        )],
-    })
+    self.MockRunCommand(
+        {
+            'aws sagemaker add-tags': [(
+                'Tags added',
+                '',
+                0,
+            )],
+        },
+        self.ai_model.vm,
+    )
     self.ai_model.endpoint_name = 'endpoint_name'
     self.ai_model.model_name = 'model_name'
     self.ai_model._PostCreate()
-    mock_cmd.func_to_mock.assert_any_call(
-        cmd=[
+    self.ai_model.vm.RunCommand.assert_any_call(
+        command=' '.join([
             'aws',
             'sagemaker',
             'add-tags',
@@ -85,14 +97,10 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
             '--resource-arn=arn:aws:sagemaker:us-west-1:1234:model/model_name',
             '--tags',
             'Key=K,Value=V',
-        ],
-        timeout=mock.ANY,
-        should_pre_log=mock.ANY,
-        stack_level=mock.ANY,
-        raise_on_failure=mock.ANY,
+        ]),
     )
-    mock_cmd.func_to_mock.assert_any_call(
-        cmd=[
+    self.ai_model.vm.RunCommand.assert_any_call(
+        command=' '.join([
             'aws',
             'sagemaker',
             'add-tags',
@@ -100,17 +108,14 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
             '--resource-arn=arn:aws:sagemaker:us-west-1:1234:endpoint/endpoint_name',
             '--tags',
             'Key=K,Value=V',
-        ],
-        timeout=mock.ANY,
-        should_pre_log=mock.ANY,
-        stack_level=mock.ANY,
-        raise_on_failure=mock.ANY,
+        ]),
     )
 
   def testListEndpointsParsesOutNames(self):
-    self.MockIssueCommand({
-        'aws sagemaker list-endpoints': [(
-            ("""{
+    self.MockRunCommand(
+        {
+            'aws sagemaker list-endpoints': [(
+                ("""{
     "Endpoints": [
         {
             "EndpointName": "woo-test",
@@ -127,63 +132,60 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
             "EndpointStatus": "InService"
         }
         ]}"""),
-            '',
-            0,
-        )]
-    })
+                '',
+                0,
+            )]
+        },
+        self.ai_model.vm,
+    )
     endpoints = self.ai_model.ListExistingEndpoints()
     self.assertEqual(endpoints, ['woo-test', 'meta-7b-f-2024-08'])
 
   def testListEndpointsParsesOutEmpty(self):
-    self.MockIssueCommand(
+    self.MockRunCommand(
         {
             'aws sagemaker list-endpoints': [(
                 """{"Endpoints": []}""",
                 '',
                 0,
             )]
-        }
+        },
+        self.ai_model.vm,
     )
     endpoints = self.ai_model.ListExistingEndpoints()
     self.assertEmpty(endpoints)
 
   def testListEndpointsUsesAiModelRegion(self):
-    mock_cmd = self.MockIssueCommand(
+    self.MockRunCommand(
         {
             'aws sagemaker list-endpoints': [(
                 """{"Endpoints": []}""",
                 '',
                 0,
             )]
-        }
+        },
+        self.ai_model.vm,
     )
     self.ai_model.ListExistingEndpoints()
-    mock_cmd.func_to_mock.assert_called_once_with(
-        cmd=['aws', 'sagemaker', 'list-endpoints', '--region=us-west-1'],
-        timeout=mock.ANY,
-        should_pre_log=mock.ANY,
-        stack_level=mock.ANY,
-        raise_on_failure=mock.ANY,
+    self.ai_model.vm.RunCommand.assert_called_once_with(
+        command=['aws', 'sagemaker', 'list-endpoints', '--region=us-west-1'],
     )
     self.assertEqual(self.ai_model.region, 'us-west-1')
 
   def testListEndpointsUsesPassedInRegion(self):
-    mock_cmd = self.MockIssueCommand(
+    self.MockRunCommand(
         {
             'aws sagemaker list-endpoints': [(
                 """{"Endpoints": []}""",
                 '',
                 0,
             )]
-        }
+        },
+        self.ai_model.vm,
     )
     self.ai_model.ListExistingEndpoints('us-east-1')
-    mock_cmd.func_to_mock.assert_called_once_with(
-        cmd=['aws', 'sagemaker', 'list-endpoints', '--region=us-east-1'],
-        timeout=mock.ANY,
-        should_pre_log=mock.ANY,
-        stack_level=mock.ANY,
-        raise_on_failure=mock.ANY,
+    self.ai_model.vm.RunCommand.assert_called_once_with(
+        command=['aws', 'sagemaker', 'list-endpoints', '--region=us-east-1'],
     )
 
   def testPromptResponseParsed(self):
@@ -192,15 +194,18 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
 Fly from Beijing Capital International Airport to John F. Kennedy International Airport or Newark Liberty International Airport.
 
 """
-    self.MockIssueCommand({
-        'python3': [(
-            f"""
+    self.MockRunCommand(
+        {
+            'python3': [(
+                f"""
 Response>>>>{expected_response}====
 """,
-            '',
-            0,
-        )],
-    })
+                '',
+                0,
+            )],
+        },
+        self.ai_model.vm,
+    )
     responses = self.ai_model.SendPrompt(
         'How can you to get from Beijing to New York?', 512, 1.0
     )
