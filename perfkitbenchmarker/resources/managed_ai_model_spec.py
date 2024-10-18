@@ -36,6 +36,7 @@ class BaseManagedAiModelSpec(spec.BaseSpec):
     self.cloud: str
     self.model_name: str
     self.model_size: str
+    self.max_scale: int
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
 
   @classmethod
@@ -82,6 +83,13 @@ class BaseManagedAiModelSpec(spec.BaseSpec):
             {
                 'none_ok': True,
                 'default': '',
+            },
+        ),
+        'max_scale': (
+            option_decoders.IntDecoder,
+            {
+                'none_ok': True,
+                'default': 1,  # Default to 1 means no scaling.
             },
         ),
     })

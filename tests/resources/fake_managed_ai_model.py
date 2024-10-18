@@ -5,6 +5,7 @@ from unittest import mock
 
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.resources import managed_ai_model
+from perfkitbenchmarker.resources import managed_ai_model_spec
 
 
 class FakeManagedAiModel(managed_ai_model.BaseManagedAiModel):
@@ -13,8 +14,15 @@ class FakeManagedAiModel(managed_ai_model.BaseManagedAiModel):
   CLOUD = 'TEST'
 
   def __init__(self, **kwargs: Any) -> Any:
+    self.model_spec = mock.create_autospec(
+        managed_ai_model_spec.BaseManagedAiModelSpec
+    )
+    self.model_spec.model_name = 'llama2'
+    self.model_spec.max_scale = 1
     super().__init__(
-        vm=mock.create_autospec(virtual_machine.BaseVirtualMachine), **kwargs
+        model_spec=self.model_spec,
+        vm=mock.create_autospec(virtual_machine.BaseVirtualMachine),
+        **kwargs
     )
     self.existing_endpoints: list[str] = ['one-endpoint']
     self.zone = 'us-central1-a'

@@ -59,7 +59,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
       model_spec: managed_ai_model_spec.BaseManagedAiModelSpec,
       **kwargs,
   ):
-    super().__init__(vm, **kwargs)
+    super().__init__(model_spec, vm, **kwargs)
     if not isinstance(model_spec, JumpStartModelSpec):
       raise errors.Config.InvalidValue(
           f'Invalid model spec class: "{model_spec.__class__.__name__}". '

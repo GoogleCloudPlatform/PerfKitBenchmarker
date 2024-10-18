@@ -104,7 +104,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       bucket_uri: str | None = None,
       **kwargs,
   ):
-    super().__init__(vm, **kwargs)
+    super().__init__(model_spec, vm, **kwargs)
     if not isinstance(model_spec, VertexAiModelSpec):
       raise errors.Config.InvalidValue(
           f'Invalid model spec class: "{model_spec.__class__.__name__}". '
@@ -285,6 +285,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
           accelerator_type=self.model_spec.accelerator_type,
           accelerator_count=self.model_spec.accelerator_count,
           deploy_request_timeout=1800,
+          max_replica_count=self.max_scaling,
       )
       end_model_deploy = time.time()
       self.model_deploy_time = end_model_deploy - start_model_deploy

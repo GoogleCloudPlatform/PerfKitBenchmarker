@@ -28,12 +28,22 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker.resources import managed_ai_model_spec
 
 FLAGS = flags.FLAGS
 
 
 class BaseManagedAiModel(resource.BaseResource):
-  """A managed AI model."""
+  """A managed AI model.
+
+  Attributes:
+    model_name: The official name of the model, e.g. Llama2.
+    region: The region, derived from the zone.
+    vm: A way to run commands on the machine.
+    child_models: A list of child models that were created with
+      InitializeNewModel.
+    max_scaling: The max number of nodes to scale to.
+  """
 
   RESOURCE_TYPE = 'BaseManagedAiModel'
   REQUIRED_ATTRS = ['CLOUD']
@@ -41,8 +51,15 @@ class BaseManagedAiModel(resource.BaseResource):
   region: str
   child_models: list['BaseManagedAiModel'] = []
   vm: virtual_machine.BaseVirtualMachine
+  model_name: str
+  max_scaling: int
 
-  def __init__(self, vm: virtual_machine.BaseVirtualMachine, **kwargs):
+  def __init__(
+      self,
+      model_spec: managed_ai_model_spec.BaseManagedAiModelSpec,
+      vm: virtual_machine.BaseVirtualMachine,
+      **kwargs,
+  ):
     super().__init__(**kwargs)
     if not FLAGS.zone:
       raise errors.Setup.InvalidConfigurationError(
@@ -52,7 +69,10 @@ class BaseManagedAiModel(resource.BaseResource):
     self.region: str = self.GetRegionFromZone(FLAGS.zone[0])
     self.response_timings: list[float] = []
     self.child_models = []
+    self.model_name = model_spec.model_name
+    self.max_scaling = model_spec.max_scale
     self.metadata.update({
+        'max_scaling': self.max_scaling,
         'region': self.region,
         # Add these to general ResourceMetadata rather than just Create/Delete.
         'resource_type': self.RESOURCE_TYPE,
