@@ -2169,6 +2169,61 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
         response.append(device)
       return response
 
+  def GenerateAndCaptureLogs(self) -> list[str]:
+    """Generates and/or captures logs for this VM and returns the paths.
+
+    Currently supports syslog and journalctl, and generates an sos report if the
+    VM supports it.
+
+    Returns:
+      A list of paths where the logs are stored on the caller's machine.
+
+    """
+    # syslog
+    syslog_path = vm_util.PrependTempDir('syslog')
+    self.RemoteCopy(syslog_path, '/var/log/syslog', copy_to=False)
+    # journalctl
+    journalctl_path = vm_util.PrependTempDir('journalctl')
+    journalctl, _ = self.RemoteCommand('journalctl --no-pager')
+    with open(journalctl_path, 'w') as f:
+      f.write(journalctl)
+
+    log_files = [syslog_path, journalctl_path]
+    # sos report
+    sosreport_local_path = vm_util.PrependTempDir('sosreport.tar.xz')
+    if self.GenerateAndCaptureSosReport(sosreport_local_path):
+      log_files.append(sosreport_local_path)
+    return log_files
+
+  def GenerateAndCaptureSosReport(self, local_path: str) -> bool:
+    """Generates an sos report for the remote VM and captures it.
+
+    Following the instructions at:
+      https://cloud.google.com/container-optimized-os/docs/how-to/sosreport
+
+    Args:
+      local_path: The path to store the sos report on the caller's machine.
+
+    Returns:
+      True if the sos report was successfully generated and captured;
+      False otherwise.
+    """
+    _, _, retcode = self.RemoteCommandWithReturnCode(
+        'sudo sos report --all-logs --batch --tmp-dir=/tmp'
+    )
+    # sos reports are not supported on all OSes.
+    if retcode != 0:
+      logging.warning('Failed to generate sos report on %s', self.name)
+      return False
+    sosreport_path = '/tmp/sosreport-*.tar.xz'
+    # The report is owned by root and is not readable by other users, so we
+    # need to change the permissions to copy it.
+    self.RemoteCommand(
+        f'sudo chmod o+r {sosreport_path}'
+    )
+    self.RemoteCopy(local_path, sosreport_path, copy_to=False)
+    return True
+
 
 def _IncrementStackLevel(**kwargs: Any) -> Any:
   """Increments the stack_level variable stored in kwargs."""

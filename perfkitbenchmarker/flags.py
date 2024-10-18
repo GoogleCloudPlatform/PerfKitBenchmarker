@@ -525,3 +525,9 @@ SKIP_TEARDOWN_KEEP_UP_MINUTES = flags.DEFINE_integer(
     'kept alive through the --skip_teardown_conditions flag.\n'
     'Only implemented for GCE VMs.',
 )
+CAPTURE_VM_LOGS = flags.DEFINE_bool(
+    'capture_vm_logs',
+    False,
+    'Enables capture of VM logs. Currently limited to Linux syslogs, '
+    'journalctl, and sos report.',
+)

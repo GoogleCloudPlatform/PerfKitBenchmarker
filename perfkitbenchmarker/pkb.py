@@ -1088,6 +1088,7 @@ def RunBenchmark(
             interrupt_checker = None
 
           if stages.TEARDOWN in FLAGS.run_stage:
+            CaptureVMLogs(spec.vms)
             skip_teardown_conditions = ParseSkipTeardownConditions(
                 pkb_flags.SKIP_TEARDOWN_CONDITIONS.value
             )
@@ -1835,6 +1836,18 @@ def _CollectMeminfoHandler(
   ]
 
   samples.extend(background_tasks.RunThreaded(CollectMeminfo, linux_vms))
+
+
+def CaptureVMLogs(
+    vms: List[virtual_machine.BaseVirtualMachine],
+) -> None:
+  """Generates and captures VM logs."""
+  if pkb_flags.CAPTURE_VM_LOGS.value:
+    for vm in vms:
+      vm_log_files = vm.GenerateAndCaptureLogs()
+      logging.info(
+          'Captured the following logs for VM %s: %s', vm.name, vm_log_files
+      )
 
 
 def ParseArgs():

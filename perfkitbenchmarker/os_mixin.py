@@ -830,6 +830,10 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
     """Get the CPU version of the VM."""
     return None
 
+  def GenerateAndCaptureLogs(self) -> list[str]:
+    """Generates and captures logs from the VM."""
+    return []
+
 
 class DeprecatedOsMixin(BaseOsMixin):
   """Class that adds a deprecation log message to OsBasedVms."""

@@ -202,6 +202,8 @@
 -   Add `--skip_teardown_on_command_timeout` flag to skip teardown if the
     failure substatus is COMMAND_TIMEOUT.
 -   Use Artifact Registry instead of the deprecated Google Container Registry
+-   Add `--capture_vm_logs` flag, which prompts PKB to capture `syslog`,
+    `journalctl`, and `sos report` (if supported) logs from Linux VMs.
 
 ### Enhancements:
 
