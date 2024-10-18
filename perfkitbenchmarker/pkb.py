@@ -1848,6 +1848,8 @@ def CaptureVMLogs(
       logging.info(
           'Captured the following logs for VM %s: %s', vm.name, vm_log_files
       )
+      for log_path in vm_log_files:
+        log_util.CollectVMLogs(FLAGS.run_uri, log_path)
 
 
 def ParseArgs():

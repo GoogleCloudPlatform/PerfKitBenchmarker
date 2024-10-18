@@ -56,6 +56,13 @@ _PKB_LOG_BUCKET = flags.DEFINE_string(
     'and the caller must have write permissions on the bucket for a successful '
     'export.',
 )
+_VM_LOG_BUCKET = flags.DEFINE_string(
+    'vm_log_bucket',
+    None,
+    'The GCS bucket to store VM logs in. If not provided, VM logs will go to '
+    'the calling machine only. This only applies if --capture_vm_logs is '
+    'set.',
+)
 _SAVE_LOG_TO_BUCKET_OPERATION = flags.DEFINE_enum(
     'save_log_to_bucket_operation',
     GSUTIL_MV,
@@ -254,4 +261,31 @@ def CollectPKBLogs() -> None:
         '-Z',
         log_local_path,
         log_cloud_path,
+    ])
+
+
+def CollectVMLogs(run_uri: str, source_path: str) -> None:
+  """Move VM log files over to a GCS bucket (`vm_log_bucket` flag).
+
+  Args:
+    run_uri: The run URI of the benchmark run.
+    source_path: The path to the log file.
+  """
+  if _VM_LOG_BUCKET.value:
+    run_date = datetime.date.today()
+    source_filename = source_path.split('/')[-1]
+    gcs_path = (
+        f'gs://{_VM_LOG_BUCKET.value}/'
+        + f'{run_date.year:04d}/{run_date.month:02d}/'
+        + f'{run_date.day:02d}/'
+        + f'{run_uri}/{source_filename}'
+    )
+    vm_util.IssueRetryableCommand([
+        'gsutil',
+        '-h',
+        'Content-Type:text/plain',
+        'mv',
+        '-Z',
+        source_path,
+        gcs_path,
     ])
