@@ -79,17 +79,9 @@ AZURE_NVME_TYPES = [
 
 # https://docs.microsoft.com/en-us/azure/virtual-machines/azure-vms-no-temp-disk
 # D/Ev4 and D/E(i)sv4 VMs do not have tmp/OS disk; Dv3, Dsv3, and Ddv4 VMs do.
-# Same for *v5, including Milan and ARM machines.
 AZURE_NO_TMP_DISK_TYPES = [
     r'(Standard_D[0-9]+s?_v4)',
     r'(Standard_E[0-9]+i?s?_v4)',
-    r'(Standard_D[0-9]+l?s?_v5)',
-    r'(Standard_E[0-9]+i?s?_v5)',
-    r'(Standard_D[0-9]+as?_v5)',
-    r'(Standard_E[0-9]+i?as?_v5)',
-    r'(Standard_E[0-9]+i?bs?_v5)',
-    r'(Standard_D[0-9]+pl?s_v5)',
-    r'(Standard_E[0-9]+ps_v5)',
 ]
 
 
@@ -148,6 +140,14 @@ def LocalDriveIsNvme(machine_type):
 
 def HasTempDrive(machine_type):
   """Check if the machine type has the temp drive (sdb)."""
+  # Only applies to some gen 4 VMs.
+  series_number = util.GetMachineSeriesNumber(machine_type)
+  if series_number > 5:
+    # This method is assuming it's a SCSI drive.
+    # TODO(pclay): Support NVMe temp drives in v6 VMs.
+    return False
+  if series_number == 5:
+    return machine_type.endswith('ds_v5')
   return not any(
       re.search(machine_series, machine_type)
       for machine_series in AZURE_NO_TMP_DISK_TYPES

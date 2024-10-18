@@ -179,7 +179,7 @@ class AzureScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
 
   def _CreateVm(self):
     vm_spec = azure_virtual_machine.AzureVmSpec(
-        'test_vm_spec.Azure', zone='eastus2', machine_type='test_machine_type'
+        'test_vm_spec.Azure', zone='eastus', machine_type='test_machine_type_v5'
     )
     return azure_virtual_machine.Ubuntu2004BasedAzureVirtualMachine(vm_spec)
 
@@ -201,7 +201,7 @@ class GceScratchDiskTest(ScratchDiskTestMixin, unittest.TestCase):
   def _CreateVm(self):
     vm_spec = gce_virtual_machine.GceVmSpec(
         'test_vm_spec.GCP',
-        machine_type='test_machine_type',
+        machine_type='test_machine_type_v5',
         zone='us-central1-a',
     )
     vm = gce_virtual_machine.Ubuntu2004BasedGceVirtualMachine(vm_spec)

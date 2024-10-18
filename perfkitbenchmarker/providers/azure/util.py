@@ -264,3 +264,19 @@ def GetMachineFamily(machine_type):
   if match:
     return match.group(1) + match.group(2)
   return None
+
+
+def GetMachineSeriesNumber(machine_type: str) -> int:
+  """Returns the series numberof a machine type.
+
+  Not to be confused with the boot architecture generation number.
+  https://learn.microsoft.com/en-us/azure/virtual-machines/generation-2
+
+  Args:
+    machine_type: Azure machine type
+  """
+  match = re.search(r'_v([0-9]+)$', machine_type)
+  if match:
+    return int(match.group(1))
+  # Azure only adds a v after the first series,
+  return 1

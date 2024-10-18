@@ -128,7 +128,7 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
   )
   def testVmCreationError(self, stderror, expected_error):
     spec = azure_virtual_machine.AzureVmSpec(
-        _COMPONENT, machine_type='test_machine_type', zone='testing'
+        _COMPONENT, machine_type='Standard_D2s_v5', zone='testing'
     )
     vm = TestAzureVirtualMachine(spec)
     vm.SetDiskSpec(None, 0)
@@ -139,7 +139,7 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
   def testInsufficientSpotCapacity(self):
     spec = azure_virtual_machine.AzureVmSpec(
         _COMPONENT,
-        machine_type='test_machine_type',
+        machine_type='Standard_D2s_v5',
         zone='testing',
         low_priority=True,
     )
