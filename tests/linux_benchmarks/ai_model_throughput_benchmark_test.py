@@ -22,6 +22,7 @@ from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import test_util
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import ai_model_throughput_benchmark
 from perfkitbenchmarker.resources import managed_ai_model
@@ -51,18 +52,46 @@ class AiModelThroughputBenchmarkTest(
     self.bm_spec.ai_model.existing_endpoints = [
         'model1',
     ]
+    self.bm_spec.vm_groups = {
+        'default': [mock.create_autospec(virtual_machine.BaseVirtualMachine)]
+    }
+
     def _run_command_mock(command: str):
       return command, '', 0
 
-    self.enter_context(mock.patch.object(
-        throughput_load_driver,
-        '_RunCommand',
-        side_effect=_run_command_mock,
-    ))
+    self.enter_context(
+        mock.patch.object(
+            throughput_load_driver,
+            '_RunCommand',
+            side_effect=_run_command_mock,
+        )
+    )
 
-  @flagsaver.flagsaver(
-      ai_starting_requests=1, ai_test_duration=5
-  )
+    def _run_throughput_directly(
+        command: str,
+        throughput_script: str,
+        vm: virtual_machine.BaseVirtualMachine,
+        burst_requests: int,
+    ) -> list[throughput_load_driver.CommandResponse]:
+      """Calls throughput_load_driver directly rather than via VM."""
+      del throughput_script
+      del vm
+      return throughput_load_driver.BurstRequestsOverTime(
+          command,
+          burst_requests,
+          throughput_load_driver.TEST_DURATION.value,
+          throughput_load_driver.BURST_TIME.value,
+      )
+
+    self.enter_context(
+        mock.patch.object(
+            ai_model_throughput_benchmark,
+            '_BurstRequestsOverTime',
+            side_effect=_run_throughput_directly,
+        )
+    )
+
+  @flagsaver.flagsaver(ai_starting_requests=1, ai_test_duration=5)
   def testBenchmarkPassesWithCorrectMetrics(self):
     samples = ai_model_throughput_benchmark.Run(self.bm_spec)
     metrics = [sample.metric for sample in samples]
@@ -77,9 +106,7 @@ class AiModelThroughputBenchmarkTest(
         ],
     )
 
-  @flagsaver.flagsaver(
-      ai_starting_requests=1, ai_test_duration=5
-  )
+  @flagsaver.flagsaver(ai_starting_requests=1, ai_test_duration=5)
   def testBenchmarkPassesWithCorrectMetricMetadata(self):
     samples = ai_model_throughput_benchmark.Run(self.bm_spec)
     metadatas = [sample.metadata for sample in samples]
@@ -137,11 +164,13 @@ class AiModelThroughputBenchmarkTest(
       time.sleep(15)
       return command, '', 0
 
-    self.enter_context(mock.patch.object(
-        throughput_load_driver,
-        '_RunCommand',
-        side_effect=_run_command_mock,
-    ))
+    self.enter_context(
+        mock.patch.object(
+            throughput_load_driver,
+            '_RunCommand',
+            side_effect=_run_command_mock,
+        )
+    )
     # Act
     samples = ai_model_throughput_benchmark.Run(self.bm_spec)
     # Assert
@@ -173,21 +202,19 @@ class AiModelThroughputBenchmarkTest(
       ai_max_requests=20,
       ai_test_duration=1,
   )
-  def testMaxThroughputReachedByFailure(self):
+  def testMaxThroughputReachedByTooManyProcesses(self):
     # Arrange
     def time_prompt_queue_checker(
         ai_model: managed_ai_model.BaseManagedAiModel,
         output_queue: multiprocessing.Queue,
     ):
       del ai_model
-      status = 0
+      end_time = 0.5
       # qsize is not guaranteed to be accurate, but seems to work ok.
       if output_queue.qsize() > 11:
-        status = 1
+        end_time = 200
       output_queue.put(
-          throughput_load_driver.CommandResponse(
-              0, 0.5, 'response', status
-          )
+          throughput_load_driver.CommandResponse(0, end_time, 'response', '', 0)
       )
       time.sleep(0.5)
 
@@ -205,6 +232,68 @@ class AiModelThroughputBenchmarkTest(
     self.assertNotEmpty(throughput_samples)
     throughput_sample = throughput_samples[0]
     self.assertEqual(throughput_sample.value, 11)
+
+  @flagsaver.flagsaver(
+      ai_starting_requests=2,
+      ai_max_requests=20,
+      ai_test_duration=1,
+  )
+  def testMaxThroughputReachedByTimeoutWithMock(self):
+    # Arrange
+    short_responses = [
+        throughput_load_driver.CommandResponse(0, 0.5, 'response', '', 0)
+    ] * 11
+    long_responses = [
+        throughput_load_driver.CommandResponse(0, 100, 'response', '', 0)
+    ] * 11
+    self.enter_context(
+        mock.patch.object(
+            throughput_load_driver,
+            'BurstRequestsOverTime',
+            # 2 passes, 3rd fails.
+            side_effect=[short_responses, short_responses, long_responses],
+        )
+    )
+    # Act
+    samples = ai_model_throughput_benchmark.Run(self.bm_spec)
+    # Assert
+    throughput_samples = [s for s in samples if s.metric == 'max_throughput']
+    self.assertNotEmpty(throughput_samples)
+    throughput_sample = throughput_samples[0]
+    # steps go 2 -> 5 -> 8, so 5 is the max.
+    self.assertEqual(throughput_sample.value, 5)
+
+  @flagsaver.flagsaver(
+      ai_starting_requests=2,
+      ai_max_requests=20,
+      ai_test_duration=10,
+  )
+  def testMaxThroughputReachedWithNotEnoughResponses(self):
+    # Arrange
+    one_response = [
+        throughput_load_driver.CommandResponse(0, 0.5, 'response', '', 0)
+    ]
+    self.enter_context(
+        mock.patch.object(
+            throughput_load_driver,
+            'BurstRequestsOverTime',
+            # 2nd has expected number, 3rd does not.
+            side_effect=[
+                one_response * 20,
+                one_response * 50,
+                one_response * 60,
+            ]
+            + [one_response] * 10,
+        )
+    )
+    # Act
+    samples = ai_model_throughput_benchmark.Run(self.bm_spec)
+    # Assert
+    throughput_samples = [s for s in samples if s.metric == 'max_throughput']
+    self.assertNotEmpty(throughput_samples)
+    throughput_sample = throughput_samples[0]
+    # steps go 2 -> 5 -> 8, so 5 is the max.
+    self.assertEqual(throughput_sample.value, 5)
 
 
 if __name__ == '__main__':
