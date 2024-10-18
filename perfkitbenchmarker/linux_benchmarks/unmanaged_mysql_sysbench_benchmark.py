@@ -263,6 +263,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   sysbench_parameters = _GetSysbenchParameters(
       primary_server.internal_ip, _GetPassword())
   results = []
+  # a map of trasactions metric name to current sample with max value
+  max_transactions = {}
   for thread_count in FLAGS.sysbench_run_threads:
     sysbench_parameters.threads = thread_count
     cmd = sysbench.BuildRunCommand(sysbench_parameters)
@@ -279,7 +281,23 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     })
     results += sysbench.ParseSysbenchTimeSeries(stdout, metadata)
     results += sysbench.ParseSysbenchLatency([stdout], metadata)
-    results += sysbench.ParseSysbenchTransactions(stdout, metadata)
+    current_transactions = sysbench.ParseSysbenchTransactions(stdout, metadata)
+    results += current_transactions
+    for item in current_transactions:
+      metric = item.metric
+      metric_value = item.value
+      current_max_sample = max_transactions.get(metric, None)
+      if not current_max_sample or current_max_sample.value < metric_value:
+        max_transactions[metric] = item
+  # find the max tps/qps amongst all thread counts and report as a new metric.
+  for item in max_transactions.values():
+    metadata = copy.deepcopy(item.metadata)
+    metadata['searched_thread_counts'] = FLAGS.sysbench_run_threads
+    results.append(
+        sample.Sample(
+            'max_' + item.metric, item.value, item.unit, metadata=metadata
+        )
+    )
   return results
 
 
