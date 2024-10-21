@@ -234,6 +234,11 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
         'echo "export GOOGLE_CLOUD_ENABLE_DIRECT_PATH_XDS=true" | sudo tee -a'
         ' /etc/environment'
     )
+    # After 2.45.0 this is the way to enable TrafficDirector and DirectPath.
+    vm.RemoteCommand(
+        'echo "export CBT_ENABLE_DIRECTPATH=true" | sudo tee -a'
+        ' /etc/environment'
+    )
     if _ENABLE_RLS_ROUTING.value:
       vm.RemoteCommand(
           'echo "export GRPC_EXPERIMENTAL_XDS_RLS_LB=true" | sudo tee -a'
