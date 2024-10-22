@@ -273,6 +273,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
         serving_container_health_route=self.model_spec.serving_container_health_route,
         serving_container_environment_variables=env_vars,
         artifact_uri=self.model_bucket_path,
+        labels=util.GetDefaultTags(),
     )
     self.model_resource_name = self.gcloud_model.resource_name
     end_model_upload = time.time()
@@ -403,7 +404,8 @@ class VertexAiEndpoint(resource.BaseResource):
 
     _, err, _ = self.vm.RunCommand(
         f'gcloud ai endpoints create --display-name={self.name}-endpoint'
-        f' --project={self.project} --region={self.region}',
+        f' --project={self.project} --region={self.region}'
+        f' --labels={util.MakeFormattedDefaultTags()}',
         ignore_failure=True,
     )
     self.endpoint_name = _FindRegexInOutput(
