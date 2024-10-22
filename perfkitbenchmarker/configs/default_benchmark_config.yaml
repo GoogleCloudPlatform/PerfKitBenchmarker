@@ -120,6 +120,8 @@ postgres_tpcc:
     db_engine: postgres
     db_engine_version: '13'
     hammerdbcli_version: '4.3'
+    hammerdbcli_optimized_server_configuration: restorable
+    hammerdbcli_tpcc_all_warehouse: True
     hammerdbcli_tpcc_time_profile: True
     hammerdbcli_tpcc_log_transactions: True
     hammerdbcli_tpcc_duration: 30
