@@ -469,6 +469,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
 
   def _CreateVmTmpDir(self):
     self.RemoteCommand('mkdir -p %s' % vm_util.VM_TMP_DIR)
+    self.RemoteCommand('sudo chmod 755 %s' % vm_util.VM_TMP_DIR)
 
   def _SetTransparentHugepages(self):
     """Sets transparent hugepages based on --enable_transparent_hugepages.

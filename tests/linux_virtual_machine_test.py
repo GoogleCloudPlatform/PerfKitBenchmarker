@@ -691,6 +691,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'stat -c %z /proc/': '',
         'sudo mkdir -p /opt/pkb; sudo chmod a+rwxt /opt/pkb': '',
         'mkdir -p /tmp/pkb': '',
+        'sudo chmod 755 /tmp/pkb': '',
         'cat /proc/cpuinfo | grep processor | wc -l': '8',
     })
     vm.Reboot()
