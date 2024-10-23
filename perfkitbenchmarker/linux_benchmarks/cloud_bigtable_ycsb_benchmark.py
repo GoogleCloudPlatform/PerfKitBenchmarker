@@ -82,6 +82,11 @@ _USE_JAVA_VENEER_CLIENT = flags.DEFINE_boolean(
     False,
     'If true, will use the googlebigtableclient with ycsb.',
 )
+_ENABLE_DIRECT_PATH = flags.DEFINE_boolean(
+    'google_bigtable_enable_direct_path',
+    False,
+    'If true, sets an environment variable to enable DirectPath.',
+)
 _ENABLE_TRAFFIC_DIRECTOR = flags.DEFINE_boolean(
     'google_bigtable_enable_traffic_director',
     False,
@@ -234,11 +239,6 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
         'echo "export GOOGLE_CLOUD_ENABLE_DIRECT_PATH_XDS=true" | sudo tee -a'
         ' /etc/environment'
     )
-    # After 2.45.0 this is the way to enable TrafficDirector and DirectPath.
-    vm.RemoteCommand(
-        'echo "export CBT_ENABLE_DIRECTPATH=true" | sudo tee -a'
-        ' /etc/environment'
-    )
     if _ENABLE_RLS_ROUTING.value:
       vm.RemoteCommand(
           'echo "export GRPC_EXPERIMENTAL_XDS_RLS_LB=true" | sudo tee -a'
@@ -278,6 +278,13 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
         vm.RenderTemplate(file_path, os.path.splitext(remote_path)[0], context)
       else:
         vm.RemoteCopy(file_path, remote_path)
+
+  if _ENABLE_DIRECT_PATH.value:
+    # Requires minimum client bigtable 2.45.0 or bigtable-hbase 2.14.5.
+    vm.RemoteCommand(
+        'echo "export CBT_ENABLE_DIRECTPATH=true" | sudo tee -a'
+        ' /etc/environment'
+    )
 
 
 @vm_util.Retry()
@@ -441,6 +448,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
 
   metadata = {
       'ycsb_client_vms': len(vms),
+      'direct_path': _ENABLE_DIRECT_PATH.value
   }
   metadata.update(instance.GetResourceMetadata())
 
