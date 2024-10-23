@@ -945,7 +945,7 @@ class AzureVirtualMachine(
       elif 'SkuNotAvailable' in stderr:
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       else:
-        raise errors.Resource.CreationError()
+        raise errors.Resource.CreationError(stderr)
 
   def _Exists(self):
     """Returns True if the VM exists."""
