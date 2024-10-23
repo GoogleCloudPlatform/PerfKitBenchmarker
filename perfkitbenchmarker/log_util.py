@@ -69,6 +69,12 @@ _SAVE_LOG_TO_BUCKET_OPERATION = flags.DEFINE_enum(
     GSUTIL_OPERATIONS,
     'How to save the log to the bucket, available options are mv, cp',
 )
+_RELATIVE_GCS_LOG_PATH_AND_FILE_NAME = flags.DEFINE_string(
+    'relative_gcs_log_path_and_file_name',
+    None,
+    'The relative path inside the GCS bucket where to save the log. The full'
+    ' file path would be gs://<bucket>/<relative_gcs_log_path_and_file_name>',
+)
 flags.DEFINE_enum(
     'log_level',
     INFO,
@@ -195,13 +201,19 @@ def ConfigureLogging(
 
   # Set the GCS destination path global variable so it can be used by PKB.
   global log_cloud_path
-  run_date = datetime.date.today()
-  log_cloud_path = (
-      f'gs://{_PKB_LOG_BUCKET.value}/'
-      + f'{run_date.year:04d}/{run_date.month:02d}/'
-      + f'{run_date.day:02d}/'
-      + f'{run_uri}-{LOG_FILE_NAME}'
-  )
+  if _RELATIVE_GCS_LOG_PATH_AND_FILE_NAME.value:
+    log_cloud_path = (
+        f'gs://{_VM_LOG_BUCKET.value}/'
+        + f'{_RELATIVE_GCS_LOG_PATH_AND_FILE_NAME.value}'
+    )
+  else:
+    run_date = datetime.date.today()
+    log_cloud_path = (
+        f'gs://{_PKB_LOG_BUCKET.value}/'
+        + f'{run_date.year:04d}/{run_date.month:02d}/'
+        + f'{run_date.day:02d}/'
+        + f'{run_uri}-{LOG_FILE_NAME}'
+    )
 
   # Build the format strings for the stderr and log file message formatters.
   stderr_format = (
