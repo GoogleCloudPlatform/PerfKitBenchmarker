@@ -133,9 +133,11 @@ CONFIDENTIAL_MILAN_TYPES = [
 # https://learn.microsoft.com/en-us/azure/virtual-machines/trusted-launch#virtual-machines-sizes
 TRUSTED_LAUNCH_UNSUPPORTED_TYPES = [
     r'(Standard_A[0-9]+_v2)',
-    r'(Standard_[DE][0-9]+_v[2-9])',
+    r'(Standard_[DE][0-9]+_v[2-3])',
     r'(Standard_M[0-9]+.*)',
     r'(Standard_ND[0-9]+a.*)',
+    # Arm V5
+    r'(Standard_[DE][0-9]+pl?d?s_v5)',
 ]
 
 TRUSTED_LAUNCH_UNSUPPORTED_OS_TYPES = [
