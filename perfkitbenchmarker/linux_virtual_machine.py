@@ -535,9 +535,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
 
         for f in (EXECUTE_COMMAND, WAIT_FOR_COMMAND):
           remote_path = os.path.join(vm_util.VM_TMP_DIR, os.path.basename(f))
-          if os.path.basename(remote_path) and not self._RemoteFileExists(
-              remote_path
-          ):
+          if os.path.basename(remote_path):
             self.RemoteCommand('sudo rm -f ' + remote_path)
           self.PushDataFile(f, remote_path)
         self._has_remote_command_script = True
