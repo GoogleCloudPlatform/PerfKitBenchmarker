@@ -14,6 +14,13 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
+STANDARD = 'STANDARD'
+PREMIUM = 'PREMIUM'
+ZONAL = 'ZONAL'
+REGIONAL = 'REGIONAL'
+HIGH_SCALE_SSD = 'high-scale-ssd'
+ENTERPRISE = 'enterprise'
+
 
 class GceNFSDiskSpec(disk.BaseNFSDiskSpec):
   CLOUD = provider_info.GCP
@@ -23,10 +30,7 @@ class GceNfsService(nfs_service.BaseNfsService):
   """Resource for GCE NFS service."""
 
   CLOUD = provider_info.GCP
-  NFS_TIERS = (
-      'STANDARD',
-      'PREMIUM'
-  )
+  NFS_TIERS = (STANDARD, PREMIUM, ZONAL, REGIONAL, HIGH_SCALE_SSD, ENTERPRISE)
   DEFAULT_NFS_VERSION = '3.0'
   DEFAULT_TIER = 'STANDARD'
   user_managed = False
@@ -99,6 +103,8 @@ class GceNfsService(nfs_service.BaseNfsService):
     return self._NfsCommand('describe')
 
   def _GetLocation(self):
+    if self.nfs_tier in [ENTERPRISE, REGIONAL]:
+      return util.GetRegionFromZone(self.zone)
     return self.zone
 
   def _NfsCommand(self, verb, *args):
