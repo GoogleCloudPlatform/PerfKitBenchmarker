@@ -203,7 +203,7 @@ def ConfigureLogging(
   global log_cloud_path
   if _RELATIVE_GCS_LOG_PATH_AND_FILE_NAME.value:
     log_cloud_path = (
-        f'gs://{_VM_LOG_BUCKET.value}/'
+        f'gs://{_PKB_LOG_BUCKET.value}/'
         + f'{_RELATIVE_GCS_LOG_PATH_AND_FILE_NAME.value}'
     )
   else:
