@@ -122,11 +122,21 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
         'group-placement',
         self.name,
     )
-    if (
-        self.style == CLUSTERED
-        or gcp_flags.GCE_PLACEMENT_GROUP_MAX_DISTANCE.value
-    ):
-      # Only alpha API supported for CLUSTERED and max-distance.
+    # alpha API for CLUSTERED
+    # beta API for max-distance
+    # https://cloud.google.com/sdk/gcloud/reference/alpha/compute/resource-policies/create/group-placement
+    # https://cloud.google.com/sdk/gcloud/reference/beta/compute/resource-policies/create/group-placement
+    if gcp_flags.GCE_PLACEMENT_GROUP_MAX_DISTANCE.value:
+      cmd = gcp_util.GcloudCommand(
+          self,
+          'beta',
+          'compute',
+          'resource-policies',
+          'create',
+          'group-placement',
+          self.name,
+      )
+    if self.style == CLUSTERED:
       cmd = gcp_util.GcloudCommand(
           self,
           'alpha',
