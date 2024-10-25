@@ -222,7 +222,7 @@ class WindowsGceVirtualMachine(
 
   def SetupLMNotification(self):
     """Prepare environment for /scripts/gce_maintenance_notify.py script."""
-    self.Install('pip')
+    self.Install('python')
     self.RemoteCommand('pip install requests')
     self.PushDataFile(
         self._LM_NOTICE_SCRIPT, f'{self.temp_dir}\\{self._LM_NOTICE_SCRIPT}'

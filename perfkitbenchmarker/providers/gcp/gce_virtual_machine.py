@@ -1289,11 +1289,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     time.sleep(LM_UNAVAILABLE_STATUS_WAIT_TIME_MIN * 60)
     stdout, _, retcode = logcmd.Issue(raise_on_failure=False)
-    if retcode or 'error' in stdout:
-      raise errors.VirtualMachine.VirtualMachineError(
-          'Unable to get logs for simulate maintenance event.'
-      )
-    elif 'MIGRATION_TEMPORARILY_UNAVAILABLE' in stdout:
+    # if the migration is temporarily unavailable, retry the migration command
+    if not retcode and 'MIGRATION_TEMPORARILY_UNAVAILABLE' in stdout:
       stdout, _, retcode = cmd.Issue(raise_on_failure=False)
       if retcode or 'error' in stdout:
         raise errors.VirtualMachine.VirtualMachineError(
