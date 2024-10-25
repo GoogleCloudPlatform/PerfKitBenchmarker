@@ -87,7 +87,7 @@ _YCSB_TAR_URL = flags.DEFINE_string(
 _YCSB_COMMIT = flags.DEFINE_string(
     'ycsb_commit',
     None,
-    'If supplied, pulls YCSB from GitHub using the specified commit SHA.'
+    'If supplied, pulls YCSB from GitHub using the specified commit SHA.',
 )
 _YCSB_BINDING = flags.DEFINE_string(
     'ycsb_binding',
@@ -808,11 +808,18 @@ class YCSBExecutor:
         their own keyspace.
     burst_time_offset_sec: When running with --ycsb_burst_load, the amount of
       seconds to offset time series measurements during the increased load.
+    environment: Environment variables to set before running YCSB.
   """
 
   FLAG_ATTRIBUTES = 'cp', 'jvm-args', 'target', 'threads'
 
-  def __init__(self, database, parameter_files=None, **kwargs):
+  def __init__(
+      self,
+      database,
+      parameter_files=None,
+      environment: dict[str, str] = None,
+      **kwargs,
+  ):
     self.database = database
     self.loaded = False
     self.measurement_type = FLAGS.ycsb_measurement_type
@@ -830,9 +837,20 @@ class YCSBExecutor:
 
     self.burst_time_offset_sec = 0
 
-  def _BuildCommand(self, command_name, parameter_files=None, **kwargs):
+    self.environment = environment or {}
+
+  def _BuildCommand(
+      self,
+      command_name,
+      parameter_files=None,
+      **kwargs,
+  ):
     """Builds the YCSB command line."""
-    command = [YCSB_EXE, command_name, self.database]
+    command = []
+    if self.environment:
+      env_str = ' '.join([f'{k}={v}' for k, v in self.environment.items()])
+      command = [env_str]
+    command.extend([YCSB_EXE, command_name, self.database])
 
     parameters = self.parameters.copy()
     parameters.update(kwargs)

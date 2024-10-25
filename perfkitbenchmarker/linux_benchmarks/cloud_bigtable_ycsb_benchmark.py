@@ -404,10 +404,15 @@ def _GetYcsbExecutor(
   """Gets the YCSB executor class for loading and running the benchmark."""
   ycsb_memory = min(vms[0].total_memory_kb // 1024, 4096)
   jvm_args = pipes.quote(f' -Xmx{ycsb_memory}m')
+  env = {}
+  if _ENABLE_DIRECT_PATH.value:
+    env['CBT_ENABLE_DIRECTPATH'] = str(_ENABLE_DIRECT_PATH.value)
 
   if _USE_JAVA_VENEER_CLIENT.value:
     executor_flags = {'jvm-args': jvm_args, 'table': _GetTableName()}
-    return ycsb.YCSBExecutor('googlebigtable', **executor_flags)
+    return ycsb.YCSBExecutor(
+        'googlebigtable', environment=env, **executor_flags
+    )
 
   # Add hbase conf dir to the classpath.
   executor_flags = {
@@ -415,7 +420,9 @@ def _GetYcsbExecutor(
       'jvm-args': jvm_args,
       'table': _GetTableName(),
   }
-  return ycsb.YCSBExecutor(FLAGS.hbase_binding, **executor_flags)
+  return ycsb.YCSBExecutor(
+      FLAGS.hbase_binding, environment=env, **executor_flags
+  )
 
 
 def _LoadDatabase(
@@ -448,7 +455,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
 
   metadata = {
       'ycsb_client_vms': len(vms),
-      'direct_path': _ENABLE_DIRECT_PATH.value
+      'direct_path': _ENABLE_DIRECT_PATH.value,
   }
   metadata.update(instance.GetResourceMetadata())
 
