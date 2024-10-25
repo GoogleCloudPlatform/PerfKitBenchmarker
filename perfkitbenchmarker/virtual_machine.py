@@ -605,6 +605,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     self.max_local_disks = 0
     self.local_disk_counter = 0
     self.remote_disk_counter = 0
+    self.host = None
     self.background_cpu_threads = vm_spec.background_cpu_threads
     self.background_network_mbits_per_sec = (
         vm_spec.background_network_mbits_per_sec

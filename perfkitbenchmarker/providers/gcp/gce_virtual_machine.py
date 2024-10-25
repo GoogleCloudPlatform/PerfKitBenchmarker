@@ -561,7 +561,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.disks = [self.boot_disk]
     self.id = None
     self.node_type = vm_spec.node_type
-    self.node_group = None
+    self.host = None
     self.use_dedicated_host = vm_spec.use_dedicated_host
     self.num_vms_per_host = vm_spec.num_vms_per_host
     self.min_cpu_platform = vm_spec.min_cpu_platform
@@ -748,8 +748,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if not self.automatic_restart:
       cmd.flags['no-restart-on-failure'] = True
     self.metadata['automatic_restart'] = self.automatic_restart
-    if self.node_group:
-      cmd.flags['node-group'] = self.node_group.name
+    if self.host:
+      cmd.flags['node-group'] = self.host.name
     if self.gce_shielded_secure_boot:
       cmd.flags['shielded-secure-boot'] = True
 
@@ -919,7 +919,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             )
             self.host_list.append(host)
             host.Create()
-          self.node_group = self.host_list[-1]
+          self.host = self.host_list[-1]
         raise errors.Resource.RetryableCreationError()
     if (
         not self.use_dedicated_host
@@ -1002,9 +1002,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           host = GceSoleTenantNodeGroup(self.node_type, self.zone, self.project)
           self.host_list.append(host)
           host.Create()
-        self.node_group = self.host_list[-1]
+        self.host = self.host_list[-1]
         if self.num_vms_per_host:
-          self.node_group.fill_fraction += 1.0 / self.num_vms_per_host
+          self.host.fill_fraction += 1.0 / self.num_vms_per_host
 
     # Capture the public key, write it to a temp file, and save the filename.
     with open(self.ssh_public_key) as f:
@@ -1017,13 +1017,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.create_cmd = self._GenerateCreateCommand(tf.name)
 
   def _DeleteDependencies(self):
-    if self.node_group:
+    if self.host:
       with self._host_lock:
-        if self.node_group in self.host_list:
-          self.host_list.remove(self.node_group)
-        if self.node_group not in self.deleted_hosts:
-          self.node_group.Delete()
-          self.deleted_hosts.add(self.node_group)
+        if self.host in self.host_list:
+          self.host_list.remove(self.host)
+        if self.host not in self.deleted_hosts:
+          self.host.Delete()
+          self.deleted_hosts.add(self.host)
 
   def _ParseDescribeResponse(self, describe_response):
     """Sets the ID and IP addresses from a response to the describe command.
