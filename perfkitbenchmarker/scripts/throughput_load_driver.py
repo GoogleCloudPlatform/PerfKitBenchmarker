@@ -19,12 +19,15 @@ constants.
 """
 
 import dataclasses
+import json
 import logging
 import math
 import multiprocessing
+import os
 import subprocess
 import time
 
+from absl import app
 from absl import flags
 
 
@@ -63,9 +66,9 @@ THROW_ON_CLIENT_ERRORS = flags.DEFINE_bool(
 )
 
 
-_QUEUE_WAIT_TIME = 10 * 60
 # Sagemaker times out requests if they take longer than 95 seconds.
 _FAIL_LATENCY = 95
+_QUEUE_WAIT_TIME = _FAIL_LATENCY * 2
 
 
 @dataclasses.dataclass
@@ -75,6 +78,7 @@ class CommandResponse:
   start_time: float
   end_time: float
   response: str | None = None
+  error: str | None = None
   status: int = 0
 
 
@@ -82,18 +86,64 @@ class ClientError(Exception):
   """An error with the client sending requests."""
 
 
-def Run() -> list[CommandResponse]:
-  """Sends the load with command line flags.
+def main(argv):
+  """Sends the load with command line flags & writes results to a file."""
+  del argv
+  start_time = time.time()
+  Run()
+  logging.info(
+      'Took %s seconds to Run & write responses. throughput_load_driver is'
+      ' done.',
+      time.time() - start_time,
+  )
+  # Exit even if some processes are still running.
+  os._exit(0)
 
-  Returns:
-    A list of CommandResponses for each request processed.
-  """
-  return BurstRequestsOverTime(
+
+def Run() -> list[CommandResponse]:
+  """Sends the load with command line flags & writes results to a file."""
+  responses = BurstRequestsOverTime(
       _REQUEST_COMMAND.value,
       _PARALLEL_REQUESTS.value,
       TEST_DURATION.value,
       BURST_TIME.value,
   )
+  file_path = GetOutputFilePath(_PARALLEL_REQUESTS.value)
+  logging.info('Writing %s responses to %s', len(responses), file_path)
+  responses_dicts = [dataclasses.asdict(response) for response in responses]
+  with open(file_path, 'w') as f:
+    json.dump({'responses': responses_dicts}, f)
+  return responses
+
+
+def GetOutputFilePath(burst_requests: int) -> str:
+  """Returns the output file path for the given burst requests."""
+  return f'/tmp/throughput_results_{burst_requests}.json'
+
+
+def ReadJsonResponses(burst_requests: int) -> list[CommandResponse]:
+  """Reads the json responses from the file."""
+  with open(GetOutputFilePath(burst_requests), 'r') as f:
+    loaded_json = json.load(f)
+    responses_dicts = loaded_json['responses']
+  responses = [
+      CommandResponse(**response_dict) for response_dict in responses_dicts
+  ]
+  return responses
+
+
+def GetOverallTimeout() -> float:
+  """Returns an overall timeout for the throughput operation."""
+  return TEST_DURATION.value + _QUEUE_WAIT_TIME * 2
+
+
+def GetExpectedNumberResponses(
+    burst_requests: int,
+    total_duration: int,
+    time_between_bursts: float,
+) -> int:
+  """Returns the expected number of responses for the given parameters."""
+  return math.floor(total_duration / time_between_bursts) * burst_requests
 
 
 def BurstRequestsOverTime(
@@ -131,58 +181,74 @@ def BurstRequestsOverTime(
     # Wait to send next burst.
     while time.time() - process_start_time < time_between_bursts:
       time.sleep(0.1)
-  logging.info('Waiting for all queued results')
 
-  def EmptyQueue() -> list[CommandResponse]:
-    """Empties the queue, with a timeout & returns the results."""
-    results = []
-    queue_start_time = time.time()
-    queue_duration = 0
-    while not output_queue.empty():
-      results.append(output_queue.get())
-      queue_duration = time.time() - queue_start_time
-      if queue_duration > _QUEUE_WAIT_TIME:
-        _EncounterClientError(
-            'Waited more than %s seconds for the queue to empty. Exiting, but'
-            ' some data may have been dropped.' % _QUEUE_WAIT_TIME,
-        )
-        break
-    logging.info(
-        'All %s queue results collected in: %s.',
-        len(results),
-        queue_duration,
-    )
-    return results
-
-  results = EmptyQueue()
-  process_start_time = time.time()
-  process_duration = 0
-  for p in processes:
-    p.join(_FAIL_LATENCY)
-    process_duration = time.time() - process_start_time
-    if process_duration > _FAIL_LATENCY:
-      _EncounterClientError(
-          f'Waited more than {_FAIL_LATENCY} seconds for processes to join.'
-          ' Exiting, but some data may have been dropped.'
-      )
-      break
-  logging.info(
-      'All processes finished joining in %s seconds.',
-      process_duration,
-  )
-  if not results:
-    results = EmptyQueue()
-  logging.info('Dumping all response results: %s', results)
+  results = _EmptyQueue(output_queue)
+  _WaitForProcesses(processes)
+  results = results + _EmptyQueue(output_queue)
+  logging.info('Dumping all %s response results: %s', len(results), results)
+  if results:
+    logging.info('Logging one full response: %s', results[0])
   expected_results = goal_bursts * burst_requests
   if len(results) < expected_results:
     logging.info(
-        'Theoretically started %s results but only got %s from %s processes.'
+        'Theoretically started %s results but only got %s responses.'
         ' Exact reason is unknown, but this is not entirely unexpected.',
         expected_results,
         len(results),
-        len(processes),
     )
   return results
+
+
+def _EmptyQueue(output_queue: multiprocessing.Queue) -> list[CommandResponse]:
+  """Empties the queue, with a timeout & returns the results."""
+  logging.info('Waiting for all queued results')
+  results = []
+  queue_start_time = time.time()
+  queue_duration = 0
+  while not output_queue.empty():
+    results.append(output_queue.get())
+    queue_duration = time.time() - queue_start_time
+    if queue_duration > _QUEUE_WAIT_TIME:
+      _EncounterClientError(
+          f'Waited more than {_QUEUE_WAIT_TIME} seconds for the queue to'
+          ' empty. Exiting, but some data may have been dropped. Collected'
+          f' {len(results)} results in the meantime',
+      )
+      break
+  logging.info(
+      'All %s queue results collected in: %s.',
+      len(results),
+      queue_duration,
+  )
+  return results
+
+
+def _WaitForProcesses(processes: list[multiprocessing.Process]):
+  """Waits for processes to finish, terminating any after waiting too long."""
+  process_start_time = time.time()
+  process_duration = 0
+  original_process_count = len(processes)
+  num_joined = 0
+  while processes:
+    process = processes.pop()
+    if process_duration > _QUEUE_WAIT_TIME:
+      process.terminate()
+    else:
+      process.join(_FAIL_LATENCY)
+      num_joined += 1
+    process_duration = time.time() - process_start_time
+  if process_duration > _QUEUE_WAIT_TIME:
+    _EncounterClientError(
+        f'Waited more than {_QUEUE_WAIT_TIME} seconds for processes to join.'
+        ' Exiting, but some data may have been dropped. Collected'
+        f' {num_joined} out of'
+        f' {original_process_count} total processes with join'
+    )
+  logging.info(
+      'All %s processes finished joining or terimnated in %s seconds.',
+      original_process_count,
+      process_duration,
+  )
 
 
 def _SendParallelRequests(
@@ -221,9 +287,9 @@ def _TimeCommand(
 ):
   """Times the command & stores length + output in the queue."""
   start_time = time.time()
-  response, _, status = _RunCommand(command)
+  response, err, status = _RunCommand(command)
   end_time = time.time()
-  output_queue.put(CommandResponse(start_time, end_time, response, status))
+  output_queue.put(CommandResponse(start_time, end_time, response, err, status))
 
 
 def _RunCommand(
@@ -234,3 +300,7 @@ def _RunCommand(
       command.split(' '), check=False, capture_output=True, text=True
   )
   return result.stdout, result.stderr, result.returncode
+
+
+if __name__ == '__main__':
+  app.run(main)
