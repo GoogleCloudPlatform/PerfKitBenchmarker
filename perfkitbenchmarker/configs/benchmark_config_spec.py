@@ -1343,7 +1343,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
     super().__init__(component_full_name, **kwargs)
     if expected_os_types is not None:
       mismatched_os_types = []
-      for group_name, group_spec in sorted(self.vm_groups.items()):
+      for group_name, group_spec in self.vm_groups.items():
         if group_spec.os_type not in expected_os_types:
           mismatched_os_types.append(
               '{}.vm_groups[{}].os_type: {}'.format(

@@ -522,3 +522,5 @@
 -   Update OpenJDK version to default on Debian based OSes and latest on Red Hat
     based OSes.
 -   Update Chromium version to 127.0.6533.88.
+-   Create VM groups in the order they are listed in the YAML instead of
+    alphabetical order.

@@ -166,6 +166,7 @@ class BenchmarkSpec:
     self.firewalls = {}
     self.networks_lock = threading.Lock()
     self.firewalls_lock = threading.Lock()
+    # VM groups are created in the order they appear in the config.
     self.vm_groups = {}
     self.container_specs = benchmark_config.container_specs or {}
     self.container_registry = None
@@ -735,7 +736,10 @@ class BenchmarkSpec:
     vm_group_specs = self.vms_to_boot
 
     clouds = {}
-    for group_name, group_spec in sorted(vm_group_specs.items()):
+    logging.info(
+        'Creating the following vm_groups in order: %s',
+        ', '.join(vm_group_specs.keys()))
+    for group_name, group_spec in vm_group_specs.items():
       vms = self.ConstructVirtualMachineGroup(group_name, group_spec)
 
       if group_spec.os_type.startswith('juju'):

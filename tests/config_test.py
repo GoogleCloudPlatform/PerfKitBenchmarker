@@ -40,6 +40,14 @@ a:
     default:
       vm_spec: null
 """
+ORDERED_CONFIG = """
+a:
+  vm_groups:
+    server:
+      vm_spec: null
+    client:
+      vm_spec: null
+"""
 CONFIG_A = """
 a:
   flags:
@@ -87,6 +95,10 @@ class ConfigsTestCase(unittest.TestCase):
   def testLoadInvalidYaml(self):
     with self.assertRaises(errors.Config.ParseError):
       configs.LoadMinimalConfig(INVALID_YAML_CONFIG, CONFIG_NAME)
+
+  def testLoadOrderedYaml(self):
+    cfg = configs.LoadMinimalConfig(ORDERED_CONFIG, CONFIG_NAME)
+    self.assertEqual(['server', 'client'], list(cfg['vm_groups'].keys()))
 
   def testMergeBasicConfigs(self):
     old_config = yaml.safe_load(CONFIG_A)

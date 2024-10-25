@@ -450,6 +450,26 @@ class VmGroupsDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
         result['default'].vm_spec, gce_virtual_machine.GceVmSpec
     )
 
+  def testOrderedInput(self):
+    result = self._decoder.Decode(
+        {
+            'server': {
+                'cloud': provider_info.GCP,
+                'os_type': os_types.DEFAULT,
+                'vm_spec': _GCP_AWS_VM_CONFIG,
+            },
+            'client': {
+                'cloud': provider_info.GCP,
+                'os_type': os_types.DEFAULT,
+                'vm_spec': _GCP_AWS_VM_CONFIG,
+            },
+        },
+        _COMPONENT,
+        {},
+    )
+    self.assertIsInstance(result, dict)
+    self.assertEqual(list(result.keys()), ['server', 'client'])
+
   def testInvalidInput(self):
     with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
       self._decoder.Decode(
@@ -486,9 +506,7 @@ class MemoryStoreDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
       self._decoder.Decode(None, _COMPONENT, {})
 
   def testValidInput(self):
-    result = self._decoder.Decode(
-        {'version': 'redis_3_2'}, _COMPONENT, FLAGS
-    )
+    result = self._decoder.Decode({'version': 'redis_3_2'}, _COMPONENT, FLAGS)
     self.assertIsInstance(result, benchmark_config_spec._MemoryStoreSpec)
     self.assertEqual(result.version, 'redis_3_2')
 
@@ -589,10 +607,10 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         (
             'VM groups in test_component may only have the following OS types:'
             " 'debian12', 'windows2019_core'. The following VM group options"
-            " are invalid:{sep}test_component.vm_groups['rhel8_group'].os_type:"
-            " 'rhel8'{sep}test_component.vm_groups['ubuntu2404_group'].os_type:"
-            " 'ubuntu2404'".format(sep=os.linesep)
-        ),
+            ' are invalid:{sep}'
+            "test_component.vm_groups['ubuntu2404_group'].os_type: 'ubuntu2404'"
+            "{sep}test_component.vm_groups['rhel8_group'].os_type: 'rhel8'"
+        ).format(sep=os.linesep),
     )
 
   def testFlagOverridesPropagate(self):

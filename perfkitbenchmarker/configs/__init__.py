@@ -299,6 +299,8 @@ def LoadMinimalConfig(benchmark_config, benchmark_name):
   benchmark config prior to loading it. This allows the config to use
   references to anchors defined in the constants file.
 
+  Preserves order of keys in the configs.
+
   Args:
     benchmark_config: str. The default config in YAML format.
     benchmark_name: str. The name of the benchmark.

@@ -52,13 +52,13 @@ cluster_boot:
 MULTI_CLOUD_CONFIG = """
 cluster_boot:
   vm_groups:
-    group1:
+    server:
       cloud: AWS
       vm_spec:
         AWS:
           machine_type: c3.2xlarge
           zone: us-east-1a
-    group2:
+    client:
       cloud: GCP
       vm_spec:
         GCP:
@@ -242,9 +242,9 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
     spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
     spec.ConstructVirtualMachines()
 
-    self.assertEqual(len(spec.vms), 2)
-    self.assertIsInstance(spec.vm_groups['group1'][0], aws_vm.AwsVirtualMachine)
-    self.assertIsInstance(spec.vm_groups['group2'][0], gce_vm.GceVirtualMachine)
+    self.assertEqual(['server', 'client'], list(spec.vm_groups.keys()))
+    self.assertIsInstance(spec.vm_groups['server'][0], aws_vm.AwsVirtualMachine)
+    self.assertIsInstance(spec.vm_groups['client'][0], gce_vm.GceVirtualMachine)
 
   def testStaticVms(self):
     spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(STATIC_VM_CONFIG)
@@ -282,9 +282,9 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
     FLAGS.zone = ['us-east-1b', 'zone2']
     spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
     spec.ConstructVirtualMachines()
-    self.assertEqual(len(spec.vms), 2)
-    self.assertEqual(spec.vm_groups['group1'][0].zone, 'us-east-1b')
-    self.assertEqual(spec.vm_groups['group2'][0].zone, 'zone2')
+    self.assertEqual(['server', 'client'], list(spec.vm_groups.keys()))
+    self.assertEqual(spec.vm_groups['server'][0].zone, 'us-east-1b')
+    self.assertEqual(spec.vm_groups['client'][0].zone, 'zone2')
 
   @flagsaver.flagsaver
   def testZoneFlagWithZonesFlag(self):
@@ -293,9 +293,9 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
     pkb._ParseFlags(argv)
     spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(MULTI_CLOUD_CONFIG)
     spec.ConstructVirtualMachines()
-    self.assertEqual(len(spec.vms), 2)
-    self.assertEqual(spec.vm_groups['group1'][0].zone, 'us-east-1b')
-    self.assertEqual(spec.vm_groups['group2'][0].zone, 'us-west-2b')
+    self.assertEqual(['server', 'client'], list(spec.vm_groups.keys()))
+    self.assertEqual(spec.vm_groups['server'][0].zone, 'us-east-1b')
+    self.assertEqual(spec.vm_groups['client'][0].zone, 'us-west-2b')
 
 
 class RedirectGlobalFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
