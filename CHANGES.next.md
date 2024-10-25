@@ -363,6 +363,7 @@
 -   Use Azure Gen 2 VMs by default.
 -   Publish a `kernel_start_to_ssh` metric in the Cluster Boot benchmark
     (requires `--cluster_boot_linux_boot_metrics` flag).
+-   Publish a `Host Create Latency` metric in the Cluster Boot benchmark
 
 ### Bug fixes and maintenance updates:
 

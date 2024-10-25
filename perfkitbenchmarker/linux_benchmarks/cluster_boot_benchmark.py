@@ -356,6 +356,22 @@ def GetTimeToBoot(vms):
               metadata,
           )
       )
+    # Host Create Latency
+    if FLAGS.dedicated_hosts:
+      assert vm.host
+      assert vm.host.create_start_time
+      assert vm.host.create_start_time < vm.create_start_time
+      host_create_latency_sec = (
+          vm.create_start_time - vm.host.create_start_time
+      )
+      samples.append(
+          sample.Sample(
+              'Host Create Latency',
+              host_create_latency_sec,
+              'seconds',
+              metadata,
+          )
+      )
 
   # Add a total cluster boot sample as the maximum boot time.
   metadata = {
