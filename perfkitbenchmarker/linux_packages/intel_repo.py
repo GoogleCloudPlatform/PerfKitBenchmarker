@@ -100,10 +100,16 @@ def YumInstall(vm):
 
   # Disable GPG check as recommended by:
   # https://cloud.google.com/compute/docs/troubleshooting/known-issues#known_issues_for_linux_vm_instances
-  vm.RemoteCommand(
-      'sudo sed -i "s/repo_gpgcheck=1/repo_gpgcheck=0/g"'
-      ' /etc/yum.repos.d/intelproducts.repo'
-  )
+  if UseOneApi(): # account for different .repo when using OneAPI install
+    vm.RemoteCommand(
+        'sudo sed -i "s/repo_gpgcheck=1/repo_gpgcheck=0/g"'
+        ' /etc/yum.repos.d/oneAPI.repo'
+    )
+  else:
+    vm.RemoteCommand(
+        'sudo sed -i "s/repo_gpgcheck=1/repo_gpgcheck=0/g"'
+        ' /etc/yum.repos.d/intelproducts.repo'
+    )
   # the /etc/yum.repos.d/intelproducts.repo file has the gpgkey listed as the
   # _YUM_REPO_KEY, confirm that it is the same as our local copy
   vm.RemoteCommand(_YUM_DOWNLOAD_KEY_CMD)
