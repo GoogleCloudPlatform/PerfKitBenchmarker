@@ -163,6 +163,12 @@ class BaseManagedAiModel(resource.BaseResource):
         'SendPrompt is not implemented for this model type.'
     )
 
+  def GetPromptCommand(self, prompt: str, max_tokens: int, temperature: float):
+    """Returns the command needed to send a prompt to the model."""
+    raise NotImplementedError(
+        'GetPromptCommand is not implemented for this model type.'
+    )
+
   def GetSamples(self) -> list[sample.Sample]:
     """Gets samples relating to the provisioning of the resource."""
     samples = super().GetSamples()

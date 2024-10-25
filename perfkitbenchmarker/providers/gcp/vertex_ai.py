@@ -238,6 +238,19 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       response = self.endpoint.ai_endpoint.predict(instances=instances)
       str_responses = [str(response) for response in response.predictions]
       return str_responses
+    out, _, _ = self.vm.RunCommand(
+        self.GetPromptCommand(prompt, max_tokens, temperature, **kwargs),
+    )
+    responses = out.strip('[]').split(',')
+    return responses
+
+  def GetPromptCommand(
+      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
+  ) -> str:
+    """Returns the command to send a prompt to the model."""
+    instances = self.model_spec.ConvertToInstances(
+        prompt, max_tokens, temperature, **kwargs
+    )
     instances_dict = {'instances': instances, 'parameters': {}}
     start_write_time = time.time()
     json_dump = json.dumps(instances_dict)
@@ -249,12 +262,10 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     end_write_time = time.time()
     write_time = end_write_time - start_write_time
     self.json_write_times.append(write_time)
-    out, _, _ = self.vm.RunCommand(
+    return (
         'gcloud ai endpoints predict'
-        f' {self.endpoint.endpoint_name} --json-request={name}',
+        f' {self.endpoint.endpoint_name} --json-request={name}'
     )
-    responses = out.strip('[]').split(',')
-    return responses
 
   def _Create(self) -> None:
     """Creates the underlying resource."""

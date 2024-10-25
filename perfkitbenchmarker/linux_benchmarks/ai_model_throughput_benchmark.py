@@ -13,12 +13,8 @@
 # limitations under the License.
 """Benchmark to measure the throughput of a managed AI Model's inference."""
 
-import dataclasses
 import logging
-import math
-import multiprocessing
 import statistics
-import time
 from typing import Any
 
 from absl import flags
@@ -27,6 +23,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.resources import managed_ai_model
+from perfkitbenchmarker.scripts import throughput_load_driver
 
 
 BENCHMARK_NAME = 'ai_model_throughput'
@@ -58,21 +55,6 @@ _MAX_PARALLEL_REQUESTS = flags.DEFINE_integer(
     'Max number of requests to send in parallel before ending the test. Set to'
     ' None or the same number as starting requests to effectively run a QPS'
     ' test at only that value.',
-)
-
-_TEST_DURATION = flags.DEFINE_integer(
-    'ai_test_duration', 60, 'Number of seconds over which requests are sent.'
-)
-
-_BURST_TIME = flags.DEFINE_float(
-    'ai_burst_time', 1.0, 'Number of seconds between each burst of requests.'
-)
-
-_THROW_ON_CLIENT_ERRORS = flags.DEFINE_bool(
-    'ai_throw_on_client_errors',
-    False,
-    'Whether to throw an exception if the client is not powerful enough to'
-    ' send the desired QPS.',
 )
 
 
@@ -112,18 +94,8 @@ def CheckPrerequisites(benchmark_config):
     )
 
 
-@dataclasses.dataclass
-class ModelResponse:
-  """A response from the model."""
-
-  start_time: float
-  end_time: float
-  response: str | None = None
-  status: int = 0
-
-
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
-  """Run the example benchmark.
+  """Runs the throughput benchmark.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
@@ -139,7 +111,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   endpoints = model.ListExistingEndpoints()
   model.metadata.update({'First Model': len(endpoints) == 1})
   # Confirm we can send one request.
-  _SendPrompt(model, _SHARED_REQUEST)
+  model.SendPrompt(_SHARED_REQUEST, 512, 1.0)
   return FindMaxThroughput(model)
 
 
@@ -147,7 +119,10 @@ def FindMaxThroughput(
     ai_model: managed_ai_model.BaseManagedAiModel,
 ) -> list[sample.Sample]:
   """Finds the max throughput for the model."""
-  logging.info('Finding max throughput for model')
+  command = ai_model.GetPromptCommand(_SHARED_REQUEST, 512, 1.0)
+  logging.info(
+      'Finding max throughput & calling models with command: %s', command
+  )
   step = 3
   last_responses = []
   burst_requests = _STARTING_REQUESTS.value
@@ -156,8 +131,11 @@ def FindMaxThroughput(
   responses = []
   for burst_requests in range(_STARTING_REQUESTS.value, max_requests, step):
     logging.info('Sending %s qps', burst_requests)
-    responses = BurstRequestsOverTime(
-        ai_model, burst_requests, _TEST_DURATION.value, _BURST_TIME.value
+    responses = throughput_load_driver.BurstRequestsOverTime(
+        command,
+        burst_requests,
+        throughput_load_driver.TEST_DURATION.value,
+        throughput_load_driver.BURST_TIME.value,
     )
     failed_responses = [
         response
@@ -199,7 +177,7 @@ def FindMaxThroughput(
   samples.append(
       sample.Sample(
           'max_throughput',
-          last_successful_bursts / _BURST_TIME.value,
+          last_successful_bursts / throughput_load_driver.BURST_TIME.value,
           'count',
           metadata,
       )
@@ -208,8 +186,8 @@ def FindMaxThroughput(
 
 
 def _AggregateResponses(
-    responses: list[ModelResponse],
-    failed_responses: list[ModelResponse],
+    responses: list[throughput_load_driver.CommandResponse],
+    failed_responses: list[throughput_load_driver.CommandResponse],
     model: managed_ai_model.BaseManagedAiModel,
     burst_requests: int,
 ) -> list[sample.Sample]:
@@ -223,11 +201,11 @@ def _AggregateResponses(
   ]
   logging.info('Failed response durations dump: %s', failed_durations)
   metadata = model.GetResourceMetadata()
-  effective_qps = burst_requests / _BURST_TIME.value
+  effective_qps = burst_requests / throughput_load_driver.BURST_TIME.value
   metadata.update({
       'parallel_requests': burst_requests,
-      'test_duration': _TEST_DURATION.value,
-      'burst_time': _BURST_TIME.value,
+      'test_duration': throughput_load_driver.TEST_DURATION.value,
+      'burst_time': throughput_load_driver.BURST_TIME.value,
       'effective_qps': effective_qps,
   })
   samples = []
@@ -285,154 +263,6 @@ def _AggregateResponses(
       )
   )
   return samples
-
-
-def SendParallelRequests(
-    ai_model: managed_ai_model.BaseManagedAiModel,
-    requests: int,
-    output_queue: multiprocessing.Queue,
-) -> list[multiprocessing.Process]:
-  """Sends X requests to the model in parallel."""
-  logging.info('Sending %s requests in parallel', requests)
-  processes = []
-  for _ in range(requests):
-    p = multiprocessing.Process(
-        target=TimePromptsForModel, args=(ai_model, output_queue)
-    )
-    processes.append(p)
-    p.start()
-  _UnitTestIdleTime()
-  return processes
-
-
-def _UnitTestIdleTime():
-  """Sleeps in unit test."""
-  pass
-
-
-def _EncounterClientError(error_msg):
-  """Throws or logs a client error."""
-  if _THROW_ON_CLIENT_ERRORS.value:
-    raise errors.Benchmarks.RunError(error_msg)
-  logging.warning(error_msg)
-
-
-def BurstRequestsOverTime(
-    ai_model: managed_ai_model.BaseManagedAiModel,
-    burst_requests: int,
-    total_duration: int,
-    time_between_bursts: float = 1.0,
-) -> list[ModelResponse]:
-  """Sends X requests to the model in parallel over total_duration seconds."""
-  start_time = time.time()
-  goal_bursts = math.floor(total_duration / time_between_bursts)
-  logging.info(
-      'Starting to send %s requests every %s seconds over %s duration %s times',
-      burst_requests,
-      time_between_bursts,
-      total_duration,
-      goal_bursts,
-  )
-  output_queue = multiprocessing.Queue()
-  processes = []
-  for _ in range(goal_bursts):
-    process_start_time = time.time()
-    processes += SendParallelRequests(ai_model, burst_requests, output_queue)
-    process_startup_duration = time.time() - process_start_time
-    if process_startup_duration > time_between_bursts:
-      elapsed_time = time.time() - start_time
-      _EncounterClientError(
-          f'After running for {elapsed_time} seconds, the client took'
-          f' {process_startup_duration} seconds to send'
-          f' {burst_requests} requests, which is more than the'
-          f' {time_between_bursts} seconds needed to meet QPS. This means the'
-          ' client is not powerful enough & client with more CPUs should be'
-          ' used.'
-      )
-    # Wait to send next burst.
-    while time.time() - process_start_time < time_between_bursts:
-      time.sleep(0.1)
-  logging.info('Waiting for all queued results')
-
-  def EmptyQueue():
-    results = []
-    queue_start_time = time.time()
-    queue_duration = 0
-    while not output_queue.empty():
-      results.append(output_queue.get())
-      queue_duration = time.time() - queue_start_time
-      if queue_duration > _QUEUE_WAIT_TIME:
-        _EncounterClientError(
-            'Waited more than %s seconds for the queue to empty. Exiting, but'
-            ' some data may have been dropped.' % _QUEUE_WAIT_TIME,
-        )
-        break
-    logging.info(
-        'All %s queue results collected in: %s.',
-        len(results),
-        queue_duration,
-    )
-    return results
-
-  results = EmptyQueue()
-  process_start_time = time.time()
-  process_duration = 0
-  for p in processes:
-    p.join(_FAIL_LATENCY)
-    process_duration = time.time() - process_start_time
-    if process_duration > _FAIL_LATENCY:
-      _EncounterClientError(
-          f'Waited more than {_FAIL_LATENCY} seconds for processes to join.'
-          ' Exiting, but some data may have been dropped.'
-      )
-      break
-  logging.info(
-      'All processes finished joining in %s seconds.',
-      process_duration,
-  )
-  if not results:
-    results = EmptyQueue()
-  logging.info('Dumping all response results: %s', results)
-  expected_results = goal_bursts * burst_requests
-  if len(results) < expected_results:
-    logging.info(
-        'Theoretically started %s results but only got %s from %s processes.'
-        ' Exact reason is unknown, but this is not entirely unexpected.',
-        expected_results,
-        len(results),
-        len(processes),
-    )
-  return results
-
-
-def TimePromptsForModel(
-    ai_model: managed_ai_model.BaseManagedAiModel,
-    output_queue: multiprocessing.Queue,
-):
-  """Times the prompts for the model & stores timing in the output queue."""
-  start_time = time.time()
-  status = 0
-  response = None
-  try:
-    response = _SendPrompt(ai_model, _SHARED_REQUEST)
-    end_time = time.time()
-  except errors.Resource.GetError as ex:
-    end_time = time.time()
-    logging.info('Failed to send prompt: %s', ex)
-    status = 1
-  output_queue.put(ModelResponse(start_time, end_time, response, status))
-
-
-def _SendPrompt(
-    ai_model: managed_ai_model.BaseManagedAiModel,
-    prompt: str,
-):
-  """Sends a prompt to the model and prints the response."""
-  responses = ai_model.SendPrompt(
-      prompt=prompt, max_tokens=512, temperature=0.8
-  )
-  for response in responses:
-    logging.info('Sent request & got response: %s', response)
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec):

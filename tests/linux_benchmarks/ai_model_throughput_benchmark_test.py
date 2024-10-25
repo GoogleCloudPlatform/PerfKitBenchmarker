@@ -14,7 +14,6 @@
 
 import multiprocessing
 import time
-from typing import Any
 import unittest
 from unittest import mock
 
@@ -22,30 +21,16 @@ from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.linux_benchmarks import ai_model_throughput_benchmark
 from perfkitbenchmarker.resources import managed_ai_model
+from perfkitbenchmarker.scripts import throughput_load_driver
 from tests import pkb_common_test_case
 from tests.resources import fake_managed_ai_model
 
 
 FLAGS = flags.FLAGS
-
-
-class TimedFakeManagedAiModel(fake_managed_ai_model.FakeManagedAiModel):
-  """Fake managed AI model for testing."""
-
-  def __init__(self, **kwargs: Any) -> Any:
-    super().__init__(**kwargs)
-    self.wait_time = 0
-
-  def _SendPrompt(
-      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
-  ) -> list[str]:
-    time.sleep(self.wait_time)
-    return [prompt]
 
 
 class AiModelThroughputBenchmarkTest(
@@ -61,11 +46,19 @@ class AiModelThroughputBenchmarkTest(
     self.bm_spec = benchmark_spec.BenchmarkSpec(
         ai_model_throughput_benchmark, config_spec, 'benchmark_uid'
     )
-    self.bm_spec.ai_model = TimedFakeManagedAiModel()
+    self.bm_spec.ai_model = fake_managed_ai_model.FakeManagedAiModel()
     self.bm_spec.resources.append(self.bm_spec.ai_model)
     self.bm_spec.ai_model.existing_endpoints = [
         'model1',
     ]
+    def _run_command_mock(command: str):
+      return command, '', 0
+
+    self.enter_context(mock.patch.object(
+        throughput_load_driver,
+        '_RunCommand',
+        side_effect=_run_command_mock,
+    ))
 
   @flagsaver.flagsaver(
       ai_starting_requests=1, ai_test_duration=5
@@ -126,12 +119,12 @@ class AiModelThroughputBenchmarkTest(
 
     self.enter_context(
         mock.patch.object(
-            ai_model_throughput_benchmark,
+            throughput_load_driver,
             '_UnitTestIdleTime',
             side_effect=idle_timer_mock,
         )
     )
-    with self.assertRaises(errors.Benchmarks.RunError):
+    with self.assertRaises(throughput_load_driver.ClientError):
       ai_model_throughput_benchmark.Run(self.bm_spec)
 
   @flagsaver.flagsaver(
@@ -140,7 +133,15 @@ class AiModelThroughputBenchmarkTest(
       ai_throw_on_client_errors=True,
   )
   def testWaitDoesntTriggerError(self):
-    self.bm_spec.ai_model.wait_time = 15
+    def _run_command_mock(command: str):
+      time.sleep(15)
+      return command, '', 0
+
+    self.enter_context(mock.patch.object(
+        throughput_load_driver,
+        '_RunCommand',
+        side_effect=_run_command_mock,
+    ))
     # Act
     samples = ai_model_throughput_benchmark.Run(self.bm_spec)
     # Assert
@@ -184,7 +185,7 @@ class AiModelThroughputBenchmarkTest(
       if output_queue.qsize() > 11:
         status = 1
       output_queue.put(
-          ai_model_throughput_benchmark.ModelResponse(
+          throughput_load_driver.CommandResponse(
               0, 0.5, 'response', status
           )
       )
@@ -192,8 +193,8 @@ class AiModelThroughputBenchmarkTest(
 
     self.enter_context(
         mock.patch.object(
-            ai_model_throughput_benchmark,
-            'TimePromptsForModel',
+            throughput_load_driver,
+            '_TimeCommand',
             side_effect=time_prompt_queue_checker,
         )
     )

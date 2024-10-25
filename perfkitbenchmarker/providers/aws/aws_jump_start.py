@@ -103,7 +103,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
     return endpoints
 
   def _RunPythonScript(self, args: list[str]) -> tuple[str, str]:
-    """Calls the on-runner-vm python script with appropriate arguments.
+    """Calls the on-client-vm python script with appropriate arguments.
 
     We do this rather than just run the python code in this file to avoid
     importing the AWS libraries.
@@ -113,21 +113,25 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
     Returns:
       Tuple of [stdout, stderr].
     """
-    # When run without the region variable, get the error:
-    # "ARN should be scoped to correct region: us-west-2"
-    env_vars = {'AWS_DEFAULT_REGION': self.region}
     out, err, _ = self.vm.RunCommand(
-        # These arguments are needed for all operations.
-        'python3'
-        f' {self.python_script} --region={self.region} --model_id={self.model_id} '
-        f'--model_version={self.model_version} '
-        + ' '.join(args),
-        env=env_vars,
+        self._GetPythonScriptCommand(args),
         raise_on_failure=False,
         timeout=60 * 30,
         stack_level=2,
     )
     return out, err
+
+  def _GetPythonScriptCommand(self, args: list[str]) -> str:
+    """Returns the command to run the python script with the given args."""
+    # When run without the region variable, get the error:
+    # "ARN should be scoped to correct region: us-west-2"
+    return (
+        f'export AWS_DEFAULT_REGION={self.region} && '
+        # These arguments are needed for all operations.
+        'python3'
+        f' {self.python_script} --region={self.region} --model_id={self.model_id} '
+        f'--model_version={self.model_version} ' + ' '.join(args)
+    )
 
   def _SendPrompt(
       self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
@@ -147,6 +151,17 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
           f' {out}\nStderr:{err}',
       )
     return [matches.group(1)]
+
+  def GetPromptCommand(
+      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
+  ) -> str:
+    return self._GetPythonScriptCommand([
+        '--operation=prompt',
+        f'--endpoint_name={self.endpoint_name}',
+        f'--prompt={prompt}',
+        f'--max_tokens={max_tokens}',
+        f'--temperature={temperature}',
+    ])
 
   def _Create(self) -> None:
     """Creates the underlying resource."""

@@ -1,4 +1,4 @@
-"""Tests for google3.third_party.py.perfkitbenchmarker.providers.gcp.gcp_spanner."""
+"""Tests for gcp providers vertex_ai.py."""
 
 import unittest
 

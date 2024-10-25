@@ -36,6 +36,9 @@ class FakeManagedAiModel(managed_ai_model.BaseManagedAiModel):
   ) -> list[str]:
     return [prompt]
 
+  def GetPromptCommand(self, prompt: str, max_tokens: int, temperature: float):
+    return f'echo {prompt}'
+
   def ListExistingEndpoints(self, region: str | None = None) -> list[str]:
     del region
     return self.existing_endpoints
