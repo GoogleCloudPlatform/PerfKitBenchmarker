@@ -104,9 +104,14 @@ benchmarking. The following sections correspond to the individual tasks.
 
 In your browser, open the [Cloud Console](https://console.cloud.google.com), and
 create a new project or select an existing project using the project selector
-dropdown at the top of the page. The project should already have some APIs
-enabled including the BigQuery API. You need to enable additional APIs and check
-the quotas.
+dropdown at the top of the page. You need to enable several APIs and check
+their quotas.
+
+### Enable the BigQuery API
+
+To allow the results to be exported to BigQuery,
+[Click here](https://console.cloud.google.com/flows/enableapi?apiid=bigquery)
+to enable the BigQuery API for your project.
 
 ### Enable the Bigtable API
 
@@ -122,6 +127,15 @@ this lab, you also need to create a runner VM to run PKB within a docker
 container.
 [Click here](https://console.cloud.google.com/flows/enableapi?apiid=compute.googleapis.com)
 to enable the Compute Engine API for your project.
+
+> **Note**: The Compute Engine default service account needs to have an Owner
+IAM role.
+
+### Enable the Cloud Monitoring API
+
+Newer Cloud Bigtable clients publish metrics to the monitoring API.
+[Click here](https://console.cloud.google.com/flows/enableapi?apiid=monitoring.googleapis.com)
+to enable the Cloud Monitoring API for your project.
 
 ### Check the Quotas of Bigtable nodes and VM CPUs
 

@@ -524,3 +524,4 @@
 -   Update Chromium version to 127.0.6533.88.
 -   Create VM groups in the order they are listed in the YAML instead of
     alphabetical order.
+-   Update bigtable_walkthrough/README.md to help reduce the user frictions.
