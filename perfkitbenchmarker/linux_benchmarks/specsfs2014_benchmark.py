@@ -95,13 +95,13 @@ specsfs2014:
     copy your 'SPECsfs2014_SP2.iso' and 'netmist_license_key' files
     into the data/ directory.
   vm_groups:
-    clients:
-      vm_spec: *default_single_core
-      vm_count: null
     gluster_servers:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
       vm_count: 3
+    clients:
+      vm_spec: *default_single_core
+      vm_count: null
 """
 
 _SPEC_SFS_2014_ISO = 'SPECsfs2014_SP2.iso'

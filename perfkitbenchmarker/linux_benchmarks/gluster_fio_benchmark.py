@@ -41,13 +41,13 @@ gluster_fio:
   description: >
     Runs fio against a remote gluster cluster.
   vm_groups:
-    clients:
-      vm_spec: *default_single_core
-      vm_count: null
     gluster_servers:
       vm_spec: *default_single_core
       disk_spec: *default_500_gb
       vm_count: 1
+    clients:
+      vm_spec: *default_single_core
+      vm_count: null
 """
 
 _VOLUME_NAME = 'vol01'

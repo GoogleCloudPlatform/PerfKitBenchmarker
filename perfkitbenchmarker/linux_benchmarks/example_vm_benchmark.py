@@ -24,6 +24,8 @@ BENCHMARK_NAME = 'example_vm'
 BENCHMARK_CONFIG = """
 example_vm:
   description: Runs a sample benchmark.
+  # VM Groups are created in the order they appear in the config, thus
+  # bigger VMs (e.g. servers) should be defined before smaller ones (e.g. clients).
   vm_groups:
     default:
       vm_spec: *default_single_core

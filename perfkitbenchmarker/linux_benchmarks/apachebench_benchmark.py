@@ -187,13 +187,13 @@ BENCHMARK_CONFIG = """
 apachebench:
   description: Runs apachebench benchmark.
   vm_groups:
+    server:
+      os_type: ubuntu2004
+      vm_spec: *default_single_core
     client:
       os_type: ubuntu2004
       vm_spec: *default_single_core
       vm_count: 1
-    server:
-      os_type: ubuntu2004
-      vm_spec: *default_single_core
 """
 FLAGS = flags.FLAGS
 

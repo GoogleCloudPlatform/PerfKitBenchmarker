@@ -209,27 +209,6 @@ sysbench:
         #increments of 128000 MB up to maximum of 1024000 MB.
         disk_size: 128
     vm_groups:
-      clients:
-        vm_spec:
-          GCP:
-            machine_type: n1-standard-16
-            zone: us-central1-c
-          AWS:
-            machine_type: m4.4xlarge
-            zone: us-west-1a
-          Azure:
-            machine_type: Standard_B4ms
-            zone: westus
-        disk_spec:
-          GCP:
-            disk_size: 500
-            disk_type: pd-ssd
-          AWS:
-            disk_size: 500
-            disk_type: gp2
-          Azure:
-            disk_size: 500
-            disk_type: Premium_LRS
       servers:
         vm_spec:
           GCP:
@@ -254,6 +233,27 @@ sysbench:
             machine_type: Standard_B4ms
             zone: eastus
         disk_spec: *default_500_gb
+      clients:
+        vm_spec:
+          GCP:
+            machine_type: n1-standard-16
+            zone: us-central1-c
+          AWS:
+            machine_type: m4.4xlarge
+            zone: us-west-1a
+          Azure:
+            machine_type: Standard_B4ms
+            zone: westus
+        disk_spec:
+          GCP:
+            disk_size: 500
+            disk_type: pd-ssd
+          AWS:
+            disk_size: 500
+            disk_type: gp2
+          Azure:
+            disk_size: 500
+            disk_type: Premium_LRS
 """
 
 # Constants defined for Sysbench tests.

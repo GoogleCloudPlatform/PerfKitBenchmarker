@@ -83,7 +83,7 @@ BENCHMARK_CONFIG = """
 tensorflow_serving:
   description: Runs a Tensorflow Serving benchmark.
   vm_groups:
-    clients:
+    servers:
       vm_spec:
         GCP:
           boot_disk_size: 200
@@ -96,7 +96,7 @@ tensorflow_serving:
           boot_disk_size: 200
           machine_type: m5.2xlarge
           zone: us-east-1f
-    servers:
+    clients:
       vm_spec:
         GCP:
           boot_disk_size: 200

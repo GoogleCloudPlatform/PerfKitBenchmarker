@@ -33,16 +33,16 @@ BENCHMARK_CONFIG = """
 cloudharmony_network:
   description: Runs cloudharmony network tests.
   vm_groups:
-    client:
-      vm_spec:
-        GCP:
-          machine_type: n1-standard-2
-          boot_disk_type: pd-ssd
     server:
       disk_spec: *default_50_gb
       vm_spec:
         GCP:
           machine_type: n1-standard-2
+    client:
+      vm_spec:
+        GCP:
+          machine_type: n1-standard-2
+          boot_disk_type: pd-ssd
 """
 # network test service types
 COMPUTE = 'compute'

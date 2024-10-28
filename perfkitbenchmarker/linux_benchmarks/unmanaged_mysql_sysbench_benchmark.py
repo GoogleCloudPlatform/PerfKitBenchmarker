@@ -38,18 +38,6 @@ BENCHMARK_CONFIG = """
 unmanaged_mysql_sysbench:
   description: Mysql on a VM benchmarked using Sysbench.
   vm_groups:
-    client:
-      os_type: centos_stream9
-      vm_spec:
-        GCP:
-          machine_type: c3-standard-22
-          zone: us-east1-b
-        AWS:
-          machine_type: m7i.4xlarge
-          zone: us-east-1a
-        Azure:
-          machine_type: Standard_D16s_v5
-          zone: eastus
     server:
       os_type: centos_stream9
       vm_spec:
@@ -81,6 +69,18 @@ unmanaged_mysql_sysbench:
           provisioned_iops: 40000
           provisioned_throughput: 800
           num_striped_disks: 2
+    client:
+      os_type: centos_stream9
+      vm_spec:
+        GCP:
+          machine_type: c3-standard-22
+          zone: us-east1-b
+        AWS:
+          machine_type: m7i.4xlarge
+          zone: us-east-1a
+        Azure:
+          machine_type: Standard_D16s_v5
+          zone: eastus
   flags:
     sysbench_version: df89d34c410a2277e19f77e47e535d0890b2029b
     disk_fs_type: xfs

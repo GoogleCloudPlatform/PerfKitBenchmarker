@@ -145,7 +145,7 @@ BENCHMARK_CONFIG = textwrap.dedent("""\
           # and additional increments of 128000 MB up to maximum of 1024000 MB.
           disk_size: 128
       vm_groups:
-        clients:
+        servers:
           vm_spec:
             GCP:
               machine_type: n1-standard-16
@@ -157,7 +157,7 @@ BENCHMARK_CONFIG = textwrap.dedent("""\
               machine_type: Standard_A4m_v2
               zone: eastus
           disk_spec: *default_500_gb
-        servers:
+        clients:
           vm_spec:
             GCP:
               machine_type: n1-standard-16

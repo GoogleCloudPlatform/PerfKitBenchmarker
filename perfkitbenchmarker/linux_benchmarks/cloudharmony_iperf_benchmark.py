@@ -17,10 +17,10 @@ BENCHMARK_CONFIG = """
 cloudharmony_iperf:
   description: Runs cloudharmony iperf tests.
   vm_groups:
-    client:
+    server:
       os_type: ubuntu2004
       vm_spec: *default_single_core
-    server:
+    client:
       os_type: ubuntu2004
       vm_spec: *default_single_core
 """

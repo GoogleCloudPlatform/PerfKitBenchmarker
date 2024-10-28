@@ -59,28 +59,6 @@ hammerdbcli:
       Azure:
         disk_size: 128
     vm_groups:
-      clients:
-        os_type: debian11
-        vm_spec:
-          GCP:
-            machine_type: n1-standard-8
-            zone: us-central1-c
-          AWS:
-            machine_type: m4.xlarge
-            zone: us-east-1a
-          Azure:
-            machine_type: Standard_D4_v3
-            zone: eastus
-        disk_spec:
-          GCP:
-            disk_size: 500
-            disk_type: pd-ssd
-          AWS:
-            disk_size: 500
-            disk_type: gp2
-          Azure:
-            disk_size: 500
-            disk_type: StandardSSD_LRS
       servers:
         vm_spec:
           GCP:
@@ -105,6 +83,28 @@ hammerdbcli:
             machine_type: Standard_B4ms
             zone: eastus
         disk_spec: *default_500_gb
+      clients:
+        os_type: debian11
+        vm_spec:
+          GCP:
+            machine_type: n1-standard-8
+            zone: us-central1-c
+          AWS:
+            machine_type: m4.xlarge
+            zone: us-east-1a
+          Azure:
+            machine_type: Standard_D4_v3
+            zone: eastus
+        disk_spec:
+          GCP:
+            disk_size: 500
+            disk_type: pd-ssd
+          AWS:
+            disk_size: 500
+            disk_type: gp2
+          Azure:
+            disk_size: 500
+            disk_type: StandardSSD_LRS
 """
 
 

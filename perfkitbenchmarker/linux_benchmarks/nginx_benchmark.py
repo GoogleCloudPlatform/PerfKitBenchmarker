@@ -144,14 +144,14 @@ BENCHMARK_CONFIG = """
 nginx:
   description: Benchmarks Nginx server performance.
   vm_groups:
-    clients:
-      vm_spec: *default_single_core
-      vm_count: null
     server:
       vm_spec: *default_single_core
     upstream_servers:
       vm_spec: *default_dual_core
       vm_count: 6
+    clients:
+      vm_spec: *default_single_core
+      vm_count: null
 """
 
 _CONTENT_FILENAME = 'random_content'
