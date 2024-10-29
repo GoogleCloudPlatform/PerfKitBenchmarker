@@ -2173,23 +2173,30 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
   def GenerateAndCaptureLogs(self) -> list[str]:
     """Generates and/or captures logs for this VM and returns the paths.
 
-    Currently supports syslog and journalctl, and generates an sos report if the
-    VM supports it.
+    Currently supports syslog and journalctl, and/or sos reports depending on
+    what the VM supports.
 
     Returns:
       A list of paths where the logs are stored on the caller's machine.
 
     """
+    log_files = []
     # syslog
-    syslog_path = vm_util.PrependTempDir('syslog')
-    self.RemoteCopy(syslog_path, '/var/log/syslog', copy_to=False)
+    try:
+      syslog_path = vm_util.PrependTempDir('syslog')
+      self.RemoteCopy(syslog_path, '/var/log/syslog', copy_to=False)
+      log_files.append(syslog_path)
+    except errors.VirtualMachine.RemoteCommandError:
+      logging.warning('Failed to capture VM syslog on %s', self.name)
     # journalctl
-    journalctl_path = vm_util.PrependTempDir('journalctl')
-    journalctl, _ = self.RemoteCommand('journalctl --no-pager')
-    with open(journalctl_path, 'w') as f:
-      f.write(journalctl)
-
-    log_files = [syslog_path, journalctl_path]
+    try:
+      journalctl_path = vm_util.PrependTempDir('journalctl')
+      journalctl, _ = self.RemoteCommand('sudo journalctl --no-pager')
+      with open(journalctl_path, 'w') as f:
+        f.write(journalctl)
+      log_files.append(journalctl_path)
+    except errors.VirtualMachine.RemoteCommandError:
+      logging.warning('Failed to capture VM journalctl on %s', self.name)
     # sos report
     sosreport_local_path = vm_util.PrependTempDir('sosreport.tar.xz')
     if self.GenerateAndCaptureSosReport(sosreport_local_path):
@@ -2209,11 +2216,11 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       True if the sos report was successfully generated and captured;
       False otherwise.
     """
-    _, _, retcode = self.RemoteCommandWithReturnCode(
-        'sudo sos report --all-logs --batch --tmp-dir=/tmp'
-    )
-    # sos reports are not supported on all OSes.
-    if retcode != 0:
+    try:
+      self.RemoteCommandWithReturnCode(
+          'sudo sos report --all-logs --batch --tmp-dir=/tmp'
+      )
+    except errors.VirtualMachine.RemoteCommandError:
       logging.warning('Failed to generate sos report on %s', self.name)
       return False
     sosreport_path = '/tmp/sosreport-*.tar.xz'
