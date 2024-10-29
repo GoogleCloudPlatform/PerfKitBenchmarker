@@ -47,6 +47,10 @@ GSUTIL_MV = 'mv'
 GSUTIL_CP = 'cp'
 GSUTIL_OPERATIONS = [GSUTIL_MV, GSUTIL_CP]
 
+DEFAULT_LOG_ROTATING_INTERVAL = 1
+DEFAULT_LOG_ROTATING_UNIT = 'D'
+DEFAULT_LOG_ROTATING_BACKUP_COUNT = 5
+
 
 _PKB_LOG_BUCKET = flags.DEFINE_string(
     'pkb_log_bucket',
@@ -69,11 +73,12 @@ _SAVE_LOG_TO_BUCKET_OPERATION = flags.DEFINE_enum(
     GSUTIL_OPERATIONS,
     'How to save the log to the bucket, available options are mv, cp',
 )
-_RELATIVE_GCS_LOG_PATH_AND_FILE_NAME = flags.DEFINE_string(
-    'relative_gcs_log_path_and_file_name',
+_RELATIVE_GCS_LOG_PATH = flags.DEFINE_string(
+    'relative_gcs_log_path',
     None,
-    'The relative path inside the GCS bucket where to save the log. The full'
-    ' file path would be gs://<bucket>/<relative_gcs_log_path_and_file_name>',
+    'The relative path inside the GCS bucket where to save the log, e.g. '
+    '"root_dir/sub_dir", and the full file path would be '
+    'gs://<bucket>/<relative_gcs_log_path>',
 )
 flags.DEFINE_enum(
     'log_level',
@@ -201,19 +206,14 @@ def ConfigureLogging(
 
   # Set the GCS destination path global variable so it can be used by PKB.
   global log_cloud_path
-  if _RELATIVE_GCS_LOG_PATH_AND_FILE_NAME.value:
-    log_cloud_path = (
-        f'gs://{_PKB_LOG_BUCKET.value}/'
-        + f'{_RELATIVE_GCS_LOG_PATH_AND_FILE_NAME.value}'
-    )
-  else:
-    run_date = datetime.date.today()
-    log_cloud_path = (
-        f'gs://{_PKB_LOG_BUCKET.value}/'
-        + f'{run_date.year:04d}/{run_date.month:02d}/'
-        + f'{run_date.day:02d}/'
-        + f'{run_uri}-{LOG_FILE_NAME}'
-    )
+  run_date = datetime.date.today()
+  gcs_path_prefix = _GetGcsPathPrefix(_PKB_LOG_BUCKET.value)
+  log_cloud_path = (
+      f'{gcs_path_prefix}/'
+      + f'{run_date.year:04d}/{run_date.month:02d}/'
+      + f'{run_date.day:02d}/'
+      + f'{run_uri}-{LOG_FILE_NAME}'
+  )
 
   # Build the format strings for the stderr and log file message formatters.
   stderr_format = (
@@ -254,7 +254,12 @@ def ConfigureLogging(
 
   # Add handler for output to log file.
   logging.info('Verbose logging to: %s', log_local_path)
-  handler = logging.FileHandler(filename=log_local_path)
+  handler = logging.handlers.TimedRotatingFileHandler(
+      filename=log_local_path,
+      when=DEFAULT_LOG_ROTATING_UNIT,
+      interval=DEFAULT_LOG_ROTATING_INTERVAL,
+      backupCount=DEFAULT_LOG_ROTATING_BACKUP_COUNT,
+  )
   handler.addFilter(PkbLogFilter())
   handler.setLevel(file_log_level)
   handler.setFormatter(logging.Formatter(file_format))
@@ -286,8 +291,9 @@ def CollectVMLogs(run_uri: str, source_path: str) -> None:
   if _VM_LOG_BUCKET.value:
     run_date = datetime.date.today()
     source_filename = source_path.split('/')[-1]
+    gcs_path_prefix = _GetGcsPathPrefix(_VM_LOG_BUCKET.value)
     gcs_path = (
-        f'gs://{_VM_LOG_BUCKET.value}/'
+        f'{gcs_path_prefix}/'
         + f'{run_date.year:04d}/{run_date.month:02d}/'
         + f'{run_date.day:02d}/'
         + f'{run_uri}/{source_filename}'
@@ -301,3 +307,19 @@ def CollectVMLogs(run_uri: str, source_path: str) -> None:
         source_path,
         gcs_path,
     ])
+
+
+def _GetGcsPathPrefix(bucket: str) -> str:
+  """Returns the GCS path prefix, to where the logs should be saved.
+
+  Args:
+    bucket: The GCS bucket to save the logs to.
+
+  Returns:
+    The GCS path prefix, to where the logs should be saved. If
+    `relative_gcs_log_path` is specified, the prefix will be
+    gs://<bucket>/<relative_gcs_log_path>. Otherwise, it will be gs://<bucket>.
+  """
+  if _RELATIVE_GCS_LOG_PATH.value:
+    return f'gs://{bucket}/{_RELATIVE_GCS_LOG_PATH.value}'
+  return f'gs://{bucket}'
