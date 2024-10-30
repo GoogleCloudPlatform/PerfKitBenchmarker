@@ -82,6 +82,13 @@ _USE_JAVA_VENEER_CLIENT = flags.DEFINE_boolean(
     False,
     'If true, will use the googlebigtableclient with ycsb.',
 )
+# Temporary until old driver is deprecated.
+_USE_UPGRADED_DRIVER = flags.DEFINE_boolean(
+    'google_bigtable_use_upgraded_driver',
+    False,
+    'If true, will use the googlebigtableclient2 with ycsb. Requires'
+    ' --google_bigtable_use_java_veneer_client to be true.',
+)
 _ENABLE_DIRECT_PATH = flags.DEFINE_boolean(
     'google_bigtable_enable_direct_path',
     False,
@@ -207,6 +214,13 @@ def CheckPrerequisites(benchmark_config: Dict[str, Any]) -> None:
         f'measurement_mins {ycsb.CPU_OPTIMIZATION_MEASUREMENT_MINS.value} must'
         ' be greater than CPU_API_DELAY_MINUTES'
         f' {gcp_bigtable.CPU_API_DELAY_MINUTES}.'
+    )
+
+  # Temporary until old driver is deprecated.
+  if _USE_UPGRADED_DRIVER.value and not _USE_JAVA_VENEER_CLIENT.value:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        '--google_bigtable_use_upgraded_driver requires'
+        ' --google_bigtable_use_java_veneer_client to be true.'
     )
 
 
@@ -410,6 +424,11 @@ def _GetYcsbExecutor(
 
   if _USE_JAVA_VENEER_CLIENT.value:
     executor_flags = {'jvm-args': jvm_args, 'table': _GetTableName()}
+    # Temporary until old driver is deprecated.
+    if _USE_UPGRADED_DRIVER.value:
+      return ycsb.YCSBExecutor(
+          'googlebigtable2', environment=env, **executor_flags
+      )
     return ycsb.YCSBExecutor(
         'googlebigtable', environment=env, **executor_flags
     )
@@ -487,15 +506,26 @@ def _CommonArgs(instance: _Bigtable) -> Dict[str, str]:
     Arguments dict for YCSB.
   """
 
-  kwargs = {'columnfamily': COLUMN_FAMILY}
+  kwargs = {}
   if _USE_JAVA_VENEER_CLIENT.value:
-    kwargs['google.bigtable.instance.id'] = instance.name
-    kwargs['google.bigtable.app_profile.id'] = gcp_bigtable.APP_PROFILE_ID.value
-    kwargs['google.bigtable.project.id'] = FLAGS.project or _GetDefaultProject()
-    kwargs['google.bigtable.data.endpoint'] = (
-        gcp_bigtable.ENDPOINT.value + ':443'
-    )
-
+    # Temporary until old driver is deprecated.
+    if _USE_UPGRADED_DRIVER.value:
+      kwargs['googlebigtable2.project'] = FLAGS.project or _GetDefaultProject()
+      kwargs['googlebigtable2.instance'] = instance.name
+      kwargs['googlebigtable2.app-profile'] = gcp_bigtable.APP_PROFILE_ID.value
+      kwargs['googlebigtable2.family'] = COLUMN_FAMILY
+      kwargs['googlebigtable2.timestamp'] = '0'
+    else:
+      kwargs['google.bigtable.instance.id'] = instance.name
+      kwargs['google.bigtable.app_profile.id'] = (
+          gcp_bigtable.APP_PROFILE_ID.value
+      )
+      kwargs['google.bigtable.project.id'] = (
+          FLAGS.project or _GetDefaultProject()
+      )
+      kwargs['google.bigtable.data.endpoint'] = (
+          gcp_bigtable.ENDPOINT.value + ':443'
+      )
   return kwargs
 
 
