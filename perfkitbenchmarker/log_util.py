@@ -16,6 +16,7 @@
 from contextlib import contextmanager
 import datetime
 import logging
+from logging import handlers
 import sys
 import threading
 from absl import flags
@@ -254,7 +255,7 @@ def ConfigureLogging(
 
   # Add handler for output to log file.
   logging.info('Verbose logging to: %s', log_local_path)
-  handler = logging.handlers.TimedRotatingFileHandler(
+  handler = handlers.TimedRotatingFileHandler(
       filename=log_local_path,
       when=DEFAULT_LOG_ROTATING_UNIT,
       interval=DEFAULT_LOG_ROTATING_INTERVAL,
