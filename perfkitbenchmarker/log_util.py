@@ -41,7 +41,6 @@ LOG_LEVELS = {
 
 # Paths for log writing and exporting.
 log_local_path = None
-log_cloud_path = None
 LOG_FILE_NAME = 'pkb.log'
 
 GSUTIL_MV = 'mv'
@@ -205,17 +204,6 @@ def ConfigureLogging(
   global log_local_path
   log_local_path = log_path
 
-  # Set the GCS destination path global variable so it can be used by PKB.
-  global log_cloud_path
-  run_date = datetime.date.today()
-  gcs_path_prefix = _GetGcsPathPrefix(_PKB_LOG_BUCKET.value)
-  log_cloud_path = (
-      f'{gcs_path_prefix}/'
-      + f'{run_date.year:04d}/{run_date.month:02d}/'
-      + f'{run_date.day:02d}/'
-      + f'{run_uri}-{LOG_FILE_NAME}'
-  )
-
   # Build the format strings for the stderr and log file message formatters.
   stderr_format = (
       '%(asctime)s {} %(threadName)s %(pkb_label)s%(levelname)-8s %(message)s'
@@ -268,9 +256,16 @@ def ConfigureLogging(
   logging.getLogger('requests').setLevel(logging.ERROR)
 
 
-def CollectPKBLogs() -> None:
-  """Move PKB log files over to a GCS bucket (`pkb_log_bucket` flag)."""
+def CollectPKBLogs(run_uri: str) -> None:
+  """Move PKB log files over to a GCS bucket (`pkb_log_bucket` flag).
+
+  Args:
+    run_uri: The run URI of the benchmark run.
+  """
   if _PKB_LOG_BUCKET.value:
+    # Generate the log path to the cloud bucket based on the invocation date of
+    # this function.
+    gcs_log_path = GetPkbLogCloudPath(run_uri)
     vm_util.IssueRetryableCommand([
         'gsutil',
         '-h',
@@ -278,7 +273,7 @@ def CollectPKBLogs() -> None:
         _SAVE_LOG_TO_BUCKET_OPERATION.value,
         '-Z',
         log_local_path,
-        log_cloud_path,
+        gcs_log_path,
     ])
 
 
@@ -308,6 +303,25 @@ def CollectVMLogs(run_uri: str, source_path: str) -> None:
         source_path,
         gcs_path,
     ])
+
+
+def GetPkbLogCloudPath(run_uri: str) -> str:
+  """Returns the GCS path, to where the logs should be saved.
+
+  Args:
+    run_uri: The run URI of the benchmark run.
+
+  Returns:
+    The GCS path, to where the PKB logs should be saved.
+  """
+  run_date = datetime.date.today()
+  gcs_path_prefix = _GetGcsPathPrefix(_PKB_LOG_BUCKET.value)
+  return (
+      f'{gcs_path_prefix}/'
+      + f'{run_date.year:04d}/{run_date.month:02d}/'
+      + f'{run_date.day:02d}/'
+      + f'{run_uri}-{LOG_FILE_NAME}'
+  )
 
 
 def _GetGcsPathPrefix(bucket: str) -> str:
