@@ -443,6 +443,8 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     if (
         has_unmanaged_dbs
         and 'servers_replicas' in config_values['vm_groups']
+        and 'vm_count' in config_values['vm_groups']['servers_replicas']
+        and config_values['vm_groups']['servers_replicas']['vm_count'] > 0
     ):
       config_values['vm_groups']['servers_replicas'] = copy.deepcopy(
           config_values['vm_groups']['servers']
