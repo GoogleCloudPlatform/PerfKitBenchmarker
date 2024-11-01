@@ -1242,9 +1242,17 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     """
     pass
 
-  def IsMounted(self, mount_point: str):
+  def IsMounted(self, mount_point: str, dev_path: str):
     """Returns whether the given mount point is mounted."""
-    stdout, _ = self.RemoteHostCommand(f'mount | grep {mount_point} | wc -l')
+    # GCP disk uses a symlink for the device path, so we need to translate it
+    # to the actual device path. For other cloud providers, the device path
+    # should already be the actual device path and readlink will return the
+    # same path in the result.
+    stdout, _ = self.RemoteHostCommand(f'readlink -f {dev_path}')
+    device_path = stdout.strip()
+    stdout, _ = self.RemoteHostCommand(
+        f'mount | grep "{device_path} on {mount_point}" | wc -l'
+    )
     return stdout and int(stdout) > 0
 
   @vm_util.Retry()

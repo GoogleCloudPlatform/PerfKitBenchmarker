@@ -113,6 +113,12 @@ flags.DEFINE_integer(
     None,
     'Delay in seconds to delay in between boot tasks.',
 )
+_ENFORCE_DISK_MOUNT_POINT_OVERRIDE = flags.DEFINE_bool(
+    'enforce_disk_mount_point_override',
+    False,
+    'Enforce the use of the --scratch_dir flag to override the default'
+    ' mount_point in the disk spec.',
+)
 # pyformat: disable
 # TODO(user): Delete this flag after fulling updating gcl.
 flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED,
@@ -676,6 +682,8 @@ class BenchmarkSpec:
       vm = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
       vm.vm_group = group_name
       if disk_spec and not vm.is_static:
+        if _ENFORCE_DISK_MOUNT_POINT_OVERRIDE.value:
+          disk_spec.mount_point = FLAGS.scratch_dir
         vm.SetDiskSpec(disk_spec, group_spec.disk_count)
       vms.append(vm)
 

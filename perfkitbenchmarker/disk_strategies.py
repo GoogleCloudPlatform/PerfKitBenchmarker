@@ -334,7 +334,9 @@ class PrepareScratchDiskStrategy:
       raw_device_paths = [d.GetDevicePath() for d in scratch_disk.disks]
       vm.StripeDisks(raw_device_paths, scratch_disk.GetDevicePath())
 
-    if disk_spec.mount_point and not vm.IsMounted(disk_spec.mount_point):
+    if disk_spec.mount_point and not vm.IsMounted(
+        disk_spec.mount_point, scratch_disk.GetDevicePath()
+    ):
       vm.FormatDisk(scratch_disk.GetDevicePath(), disk_spec.disk_type)
       vm.MountDisk(
           scratch_disk.GetDevicePath(),
