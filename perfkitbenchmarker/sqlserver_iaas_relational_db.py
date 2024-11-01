@@ -122,7 +122,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     """Moves the SQL Server temporary database to LocalSSD."""
     vms = [self.server_vm]
     if self.spec.high_availability_type == "AOAG" and self.replica_vms:
-      vms.append(self.replica_vms)
+      vms.extend(self.replica_vms)
 
     # Moves the SQL Server temporary database to LocalSSD.
     for vm in vms:
