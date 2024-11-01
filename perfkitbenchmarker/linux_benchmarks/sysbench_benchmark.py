@@ -826,7 +826,7 @@ def Run(benchmark_spec):
   """
   logging.info('Start benchmarking, Cloud Provider is %s.', FLAGS.cloud)
   results = []
-  client_vms = benchmark_spec.vms
+  client_vms = benchmark_spec.vm_groups['clients']
   db = benchmark_spec.relational_db
 
   for thread_count in FLAGS.sysbench_run_threads:

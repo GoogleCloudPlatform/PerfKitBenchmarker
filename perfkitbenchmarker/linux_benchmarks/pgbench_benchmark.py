@@ -194,8 +194,10 @@ def Prepare(benchmark_spec):
     benchmark_spec: benchmark_spec object which contains the database server and
       client_vm
   """
-  vm = benchmark_spec.vms[0]
-  vm.Install('pgbench')
+  client_vms = benchmark_spec.vm_groups['clients']
+  assert len(client_vms) == 1
+  client_vm = client_vms[0]
+  client_vm.Install('pgbench')
 
   UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec)
 
@@ -235,7 +237,7 @@ def Prepare(benchmark_spec):
                 filler varchar(84)  NULL \\
             ); \\
             RUN BATCH;\"""")
-    vm.RobustRemoteCommand(
+    client_vm.RobustRemoteCommand(
         f"""pgbench "host=/tmp port=5432 dbname={TEST_DB_NAME} \\
         options='-c spanner.force_autocommit=on -c \\
         spanner.copy_max_parallelism=200 -c spanner.autocommit_dml_mode=\\'partitioned_non_atomic\\''" \\
@@ -243,7 +245,7 @@ def Prepare(benchmark_spec):
         --scale={benchmark_spec.scale_factor}"""
     )
   else:
-    vm.RobustRemoteCommand(
+    client_vm.RobustRemoteCommand(
         f'pgbench {connection_string} -i -s {benchmark_spec.scale_factor}'
     )
 
@@ -375,5 +377,7 @@ def GetMetaData(db_size, benchmark_spec):
 
 def Cleanup(benchmark_spec):
   """Uninstalls pgbench from the client vm."""
-  vm = benchmark_spec.vms[0]
-  vm.Uninstall('pgbench')
+  client_vms = benchmark_spec.vm_groups['clients']
+  assert len(client_vms) == 1
+  client_vm = client_vms[0]
+  client_vm.Uninstall('pgbench')
