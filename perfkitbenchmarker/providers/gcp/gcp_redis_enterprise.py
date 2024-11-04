@@ -94,7 +94,7 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
     super().__init__(spec)
     self.name = f'pkb-{FLAGS.run_uri}'
     self.project = FLAGS.project or util.GetDefaultProject()
-    self.redis_region = FLAGS.cloud_redis_region
+    self.redis_region = managed_memory_store.REGION.value
     self.subscription_id = ''
     self.database_id = ''
     self.version = REDIS_VERSION_MAPPING[spec.version]

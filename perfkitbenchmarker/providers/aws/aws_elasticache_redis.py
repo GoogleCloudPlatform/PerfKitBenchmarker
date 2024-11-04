@@ -25,6 +25,7 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_network
+from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
@@ -51,38 +52,29 @@ class ElastiCacheRedis(managed_memory_store.BaseManagedMemoryStore):
     super().__init__(spec)
     self.subnet_group_name = 'subnet-%s' % self.name
     self.version = REDIS_VERSION_MAPPING[spec.version]
-    self.node_type = FLAGS.elasticache_node_type
-    self.redis_region = FLAGS.cloud_redis_region
-    self.failover_zone = FLAGS.elasticache_failover_zone
+    self.node_type = aws_flags.ELASTICACHE_NODE_TYPE.value
+    self.redis_region = managed_memory_store.REGION.value
+    self.failover_zone = aws_flags.ELASTICACHE_FAILOVER_ZONE.value
     self.failover_subnet = None
 
     self.subnets = []
 
   def CheckPrerequisites(self):
-    if (
-        FLAGS.managed_memory_store_version
-        and FLAGS.managed_memory_store_version
-        not in managed_memory_store.REDIS_VERSIONS
-    ):
-      raise errors.Config.InvalidValue('Invalid Redis version.')
-    if FLAGS.redis_failover_style in [
+    if managed_memory_store.FAILOVER_STYLE.value in [
         managed_memory_store.Failover.FAILOVER_NONE,
         managed_memory_store.Failover.FAILOVER_SAME_ZONE,
     ]:
-      if FLAGS.elasticache_failover_zone:
+      if self.failover_zone:
         raise errors.Config.InvalidValue(
             'The aws_elasticache_failover_zone flag is ignored. '
             'There is no need for a failover zone when there is no failover. '
             'Same zone failover will fail over to the same zone.'
         )
     else:
-      if (
-          not FLAGS.elasticache_failover_zone
-          or FLAGS.elasticache_failover_zone[:-1] != FLAGS.cloud_redis_region
-      ):
+      if not self.failover_zone or self.failover_zone[:-1] != self.redis_region:
         raise errors.Config.InvalidValue(
-            'Invalid failover zone. A failover zone in %s must be specified. '
-            % FLAGS.cloud_redis_region
+            'Invalid failover zone. A failover zone in'
+            f' {self.redis_region} must be specified. '
         )
 
   def GetResourceMetadata(self):

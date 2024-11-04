@@ -39,7 +39,7 @@ class Failover:
   FAILOVER_SAME_REGION = 'failover_same_region'
 
 
-_FAILOVER_STYLE = flags.DEFINE_enum(
+FAILOVER_STYLE = flags.DEFINE_enum(
     'redis_failover_style',
     Failover.FAILOVER_NONE,
     [
@@ -94,7 +94,7 @@ flags.DEFINE_string(
         ' elasticache, etc.'
     ),
 )
-flags.DEFINE_string(
+MANAGED_MEMORY_STORE_VERSION = flags.DEFINE_string(
     'managed_memory_store_version',
     None,
     (
@@ -124,7 +124,7 @@ _ZONES = flags.DEFINE_list(
     [],
     'The preferred AZs to distribute shards between.',
 )
-flags.DEFINE_string(
+REGION = flags.DEFINE_string(
     'cloud_redis_region',
     None,
     'The region to spin up cloud redis in.',
@@ -199,7 +199,7 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self._port: int = None
     self._password: str = None
 
-    self.failover_style = _FAILOVER_STYLE.value
+    self.failover_style = FAILOVER_STYLE.value
     # TODO(liubrandon): Remove `clustered` attr once all Redis resources support
     # replicas_per_shard.
     self.clustered: bool = _MANAGED_MEMORY_STORE_CLUSTER.value

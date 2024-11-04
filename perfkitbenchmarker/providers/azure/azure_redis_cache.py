@@ -24,6 +24,7 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 
 FLAGS = flags.FLAGS
 # 15min timeout for issuing az redis delete command.
@@ -49,9 +50,9 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
 
   def __init__(self, spec):
     super().__init__(spec)
-    self.redis_region = FLAGS.cloud_redis_region
+    self.redis_region = managed_memory_store.REGION.value
     self.resource_group = azure_network.GetResourceGroup(self.redis_region)
-    self.azure_redis_size = FLAGS.azure_redis_size
+    self.azure_redis_size = azure_flags.REDIS_SIZE.value
     if (
         self.failover_style
         == managed_memory_store.Failover.FAILOVER_SAME_REGION
@@ -82,11 +83,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
     Raises:
       errors.Config.InvalidValue: Input flag parameters are invalid.
     """
-    if FLAGS.managed_memory_store_version:
-      raise errors.Config.InvalidValue(
-          'Custom Redis version not supported on Azure Redis. '
-      )
-    if FLAGS.redis_failover_style in [
+    if managed_memory_store.FAILOVER_STYLE.value in [
         managed_memory_store.Failover.FAILOVER_SAME_ZONE
     ]:
       raise errors.Config.InvalidValue(

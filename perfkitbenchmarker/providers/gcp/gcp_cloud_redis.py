@@ -54,7 +54,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     self.project = FLAGS.project
     self.size = gcp_flags.REDIS_GB.value
     self.node_type = ''
-    self.redis_region = FLAGS.cloud_redis_region
+    self.redis_region = managed_memory_store.REGION.value
     self.zone_distribution = gcp_flags.REDIS_ZONE_DISTRIBUTION.value
     if self.clustered:
       self.size = self.node_count * _SHARD_SIZE_GB
@@ -89,18 +89,12 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
 
   def CheckPrerequisites(self):
     if (
-        FLAGS.redis_failover_style
+        managed_memory_store.FAILOVER_STYLE.value
         == managed_memory_store.Failover.FAILOVER_SAME_ZONE
     ):
       raise errors.Config.InvalidValue(
           'GCP cloud redis does not support same zone failover'
       )
-    if (
-        FLAGS.managed_memory_store_version
-        and FLAGS.managed_memory_store_version
-        not in managed_memory_store.REDIS_VERSIONS
-    ):
-      raise errors.Config.InvalidValue('Invalid Redis version.')
 
   def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns a dict containing metadata about the instance.

@@ -110,7 +110,7 @@ ELASTICACHE_NODE_TYPE = flags.DEFINE_string(
     'cache.m4.large',
     'The AWS cache node type to use for elasticache clusters.',
 )
-flags.DEFINE_string(
+ELASTICACHE_FAILOVER_ZONE = flags.DEFINE_string(
     'elasticache_failover_zone', None, 'AWS elasticache failover zone'
 )
 flags.DEFINE_string(

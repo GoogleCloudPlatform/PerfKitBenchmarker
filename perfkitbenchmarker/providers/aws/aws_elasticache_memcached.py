@@ -44,13 +44,10 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
     self.zone = spec.zone or _DEFAULT_ZONE
     self.region = util.GetRegionFromZone(self.zone)
     self.node_type = aws_flags.ELASTICACHE_NODE_TYPE.value
-    self.version = FLAGS.managed_memory_store_version
+    self.version = managed_memory_store.MANAGED_MEMORY_STORE_VERSION.value
 
   def CheckPrerequisites(self):
-    if (
-        FLAGS.managed_memory_store_version
-        and FLAGS.managed_memory_store_version not in MEMCACHED_VERSIONS
-    ):
+    if self.version and self.version not in MEMCACHED_VERSIONS:
       raise errors.Config.InvalidValue('Invalid Memcached version.')
 
   def GetResourceMetadata(self):

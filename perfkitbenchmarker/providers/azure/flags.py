@@ -119,7 +119,7 @@ flags.DEFINE_integer(
     'Number of compute units to allocate for the machine type',
 )
 
-flags.DEFINE_enum(
+REDIS_SIZE = flags.DEFINE_enum(
     'azure_redis_size',
     'C3',
     VALID_CACHE_SIZES,

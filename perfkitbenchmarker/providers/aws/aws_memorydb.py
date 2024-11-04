@@ -55,7 +55,7 @@ class AwsMemoryDb(managed_memory_store.BaseManagedMemoryStore):
     self.subnet_group_name = 'subnet-%s' % self.name
     self.version = REDIS_VERSION_MAPPING[spec.version]
     self.node_type = aws_flags.MEMORYDB_NODE_TYPE.value
-    self.redis_region = FLAGS.cloud_redis_region
+    self.redis_region = managed_memory_store.REGION.value
     self.failover_zone = aws_flags.MEMORYDB_FAILOVER_ZONE.value
     self.failover_subnet = None
 
