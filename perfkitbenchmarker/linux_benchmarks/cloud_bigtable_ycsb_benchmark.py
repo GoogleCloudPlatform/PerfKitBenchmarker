@@ -506,7 +506,7 @@ def _CommonArgs(instance: _Bigtable) -> Dict[str, str]:
     Arguments dict for YCSB.
   """
 
-  kwargs = {}
+  kwargs = {'columnfamily': COLUMN_FAMILY}
   if _USE_JAVA_VENEER_CLIENT.value:
     # Temporary until old driver is deprecated.
     if _USE_UPGRADED_DRIVER.value:
@@ -515,6 +515,7 @@ def _CommonArgs(instance: _Bigtable) -> Dict[str, str]:
       kwargs['googlebigtable2.app-profile'] = gcp_bigtable.APP_PROFILE_ID.value
       kwargs['googlebigtable2.family'] = COLUMN_FAMILY
       kwargs['googlebigtable2.timestamp'] = '0'
+      kwargs.pop('columnfamily')
     else:
       kwargs['google.bigtable.instance.id'] = instance.name
       kwargs['google.bigtable.app_profile.id'] = (
