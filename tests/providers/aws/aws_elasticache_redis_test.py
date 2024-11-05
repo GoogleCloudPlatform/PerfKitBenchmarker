@@ -68,6 +68,7 @@ class AwsElasticacheRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
         'subnet-pkb-run12345',
         '--preferred-cache-cluster-a-zs',
         'us-east-1a',
+        '--no-transit-encryption-enabled',
         '--tags',
     ]
     self.redis._Create()
