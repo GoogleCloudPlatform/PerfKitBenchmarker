@@ -510,6 +510,7 @@ class DiskUtilTest(pkb_common_test_case.PkbCommonTestCase):
       ),
       ('n2', 'n2-standard-2', gce_disk.PKB_DEFAULT_BOOT_DISK_TYPE),
       ('c3a', 'c3a-standard-8', gce_disk.HYPERDISK_BALANCED),
+      ('c4a', 'c4a-standard-4', gce_disk.HYPERDISK_BALANCED),
   )
   def testGetDefaultBootDiskType(self, machine_type, expected_boot_disk_type):
     boot_disk = gce_disk.GetDefaultBootDiskType(machine_type)
