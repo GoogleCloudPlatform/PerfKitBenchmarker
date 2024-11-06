@@ -159,6 +159,8 @@ _EFA_V2_MACHINE_TYPES = (
     'trn1n.32xlarge',
 )
 
+_UNSUPPORTED = 'Unsupported'
+
 
 class AwsTransitionalVmRetryableError(Exception):
   """Error for retrying _Exists when an AWS VM is in a transitional state."""
@@ -313,7 +315,9 @@ class AwsDedicatedHost(resource.BaseResource):
         '--auto-placement=off',
         '--quantity=1',
     ]
-    vm_util.IssueCommand(create_cmd)
+    _, stderr, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
+    if _UNSUPPORTED in stderr:
+      raise errors.Benchmarks.UnsupportedConfigError(stderr)
 
   def _Delete(self):
     if self.id:
@@ -1127,7 +1131,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         stderr,
     ):
       raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
-    if 'Unsupported' in stderr:
+    if _UNSUPPORTED in stderr:
       raise errors.Benchmarks.UnsupportedConfigError(stderr)
     if retcode:
       raise errors.Resource.CreationError(

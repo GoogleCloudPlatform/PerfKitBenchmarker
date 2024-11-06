@@ -154,6 +154,8 @@ NVME_MACHINE_FAMILIES = [
     'Standard_Mds_v3',
 ]
 
+_SKU_NOT_AVAILABLE = 'SkuNotAvailable'
+
 
 class AzureVmSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a AzureVirtualMachine.
@@ -462,7 +464,13 @@ class AzureDedicatedHostGroup(resource.BaseResource):
     if self.availability_zone:
       create_cmd.extend(['--zone', self.availability_zone])
 
-    vm_util.IssueCommand(create_cmd)
+    _, stderr, retcode = vm_util.IssueCommand(
+        create_cmd, raise_on_failure=False
+    )
+    if _SKU_NOT_AVAILABLE in stderr:
+      raise errors.Benchmarks.UnsupportedConfigError(stderr)
+    elif retcode:
+      raise errors.VmUtil.IssueCommandError(stderr)
 
   def _Delete(self):
     """See base class."""
@@ -572,7 +580,13 @@ class AzureDedicatedHost(resource.BaseResource):
         '--platform-fault-domain',
         '0',
     ] + self.resource_group.args
-    vm_util.IssueCommand(create_cmd)
+    _, stderr, retcode = vm_util.IssueCommand(
+        create_cmd, raise_on_failure=False
+    )
+    if _SKU_NOT_AVAILABLE in stderr:
+      raise errors.Benchmarks.UnsupportedConfigError(stderr)
+    elif retcode:
+      raise errors.VmUtil.IssueCommandError(stderr)
 
   def _Delete(self):
     """See base class."""
@@ -942,7 +956,7 @@ class AzureVirtualMachine(
           and 'OverconstrainedZonalAllocationRequest' in stderr
       ):
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
-      elif 'SkuNotAvailable' in stderr:
+      elif _SKU_NOT_AVAILABLE in stderr:
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       else:
         raise errors.Resource.CreationError(stderr)
