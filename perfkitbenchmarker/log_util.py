@@ -52,7 +52,7 @@ DEFAULT_LOG_ROTATING_UNIT = 'D'
 DEFAULT_LOG_ROTATING_BACKUP_COUNT = 5
 
 
-_PKB_LOG_BUCKET = flags.DEFINE_string(
+PKB_LOG_BUCKET = flags.DEFINE_string(
     'pkb_log_bucket',
     None,
     'Name of the GCS bucket that PKB logs should route to. If this is not '
@@ -262,7 +262,7 @@ def CollectPKBLogs(run_uri: str) -> None:
   Args:
     run_uri: The run URI of the benchmark run.
   """
-  if _PKB_LOG_BUCKET.value:
+  if PKB_LOG_BUCKET.value:
     # Generate the log path to the cloud bucket based on the invocation date of
     # this function.
     gcs_log_path = GetPkbLogCloudPath(run_uri)
@@ -315,7 +315,7 @@ def GetPkbLogCloudPath(run_uri: str) -> str:
     The GCS path, to where the PKB logs should be saved.
   """
   run_date = datetime.date.today()
-  gcs_path_prefix = _GetGcsPathPrefix(_PKB_LOG_BUCKET.value)
+  gcs_path_prefix = _GetGcsPathPrefix(PKB_LOG_BUCKET.value)
   return (
       f'{gcs_path_prefix}/'
       + f'{run_date.year:04d}/{run_date.month:02d}/'
