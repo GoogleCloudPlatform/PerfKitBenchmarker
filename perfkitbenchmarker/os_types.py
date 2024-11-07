@@ -40,6 +40,7 @@ ROCKY_LINUX9_OPTIMIZED = 'rocky_linux9_optimized'
 UBUNTU2004 = 'ubuntu2004'
 UBUNTU2004_EFA = 'ubuntu2004_efa'
 UBUNTU2004_DL = 'ubuntu2004_dl'
+DEBIAN12_DL = 'debian12_dl'
 AMAZONLINUX2_DL = 'amazonlinux2_dl'
 UBUNTU2204 = 'ubuntu2204'
 UBUNTU2404 = 'ubuntu2404'
@@ -102,6 +103,7 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     DEBIAN11,
     DEBIAN11_BACKPORTS,
     DEBIAN12,
+    DEBIAN12_DL,
     FEDORA36,
     FEDORA37,
     RHEL8,

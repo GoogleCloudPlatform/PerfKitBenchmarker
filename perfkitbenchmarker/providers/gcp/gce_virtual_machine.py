@@ -131,6 +131,7 @@ _FIXED_GPU_MACHINE_TYPES = {
     'a3-highgpu-2g': (virtual_machine.GPU_H100, 2),
     'a3-highgpu-4g': (virtual_machine.GPU_H100, 4),
     'a3-highgpu-8g': (virtual_machine.GPU_H100, 8),
+    'a3-megagpu-8g': (virtual_machine.GPU_H100, 8),
     # L4 GPUs
     # https://cloud.google.com/compute/docs/accelerator-optimized-machines#g2-vms
     'g2-standard-4': (virtual_machine.GPU_L4, 1),
@@ -1811,6 +1812,41 @@ class Ubuntu2404BasedGceVirtualMachine(
 ):
   DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-2404-lts-amd64'
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
+
+
+class Debian12DeepLearningBasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Debian12DLMixin
+):
+  """Debian12 based Deeplearning image."""
+
+  # This is an self-made image that follow instructions from
+  # https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/examples/machine-learning/a3-megagpu-8g/slurm-a3mega-image.yaml
+  DEFAULT_IMAGE_PROJECT = ''
+  DEFAULT_X86_IMAGE_FAMILY = 'slurm-a3mega'
+
+  def __init__(self, vm_spec):
+    """Initialize a Debian12 Base DLVM virtual machine.
+
+    Args:
+      vm_spec: virtual_machine.BaseVirtualMachineSpec object of the vm.
+
+    Raises:
+      ValueError: If an incompatible vm_spec is passed.
+    """
+    super().__init__(vm_spec)
+    self._installed_packages.add('slurm')
+    self._installed_packages.add('cuda_toolkit')
+
+  def PrepareVMEnvironment(self):
+    super().PrepareVMEnvironment()
+    self.Install('tcpxo')
+    self.RemoteCommand('sudo mkdir -p /etc/slurm/', ignore_failure=True)
+    self.RemoteCommand(
+        'echo "cgroupPlugin=cgroup/v2" >> cgroup.conf; '
+        'echo "ConstrainCores=no" >> cgroup.conf; '
+        'echo "ConstrainRAMSpace=no" >> cgroup.conf; '
+    )
+    self.RemoteCommand('sudo mv cgroup.conf /etc/slurm/')
 
 
 def GenerateDownloadPreprovisionedDataCommand(

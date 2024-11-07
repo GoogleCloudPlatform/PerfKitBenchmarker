@@ -1715,6 +1715,7 @@ ENV LD_LIBRARY_PATH=/opt/aws-ofi-nccl/lib:/opt/amazon/efa:\$LD_LIBRARY_PATH
         'x86_64/mount-s3.deb'
     )
     self.RemoteCommand('sudo apt-get install ./mount-s3.deb')
+    self.RemoteCommand('rm mount-s3.deb')
 
 
 class AmazonLinux2EfaBasedAwsVirtualMachine(
