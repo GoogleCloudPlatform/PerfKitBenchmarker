@@ -72,6 +72,7 @@ class CloudValkey(managed_memory_store.BaseManagedMemoryStore):
     Returns:
       dict mapping string property key to value.
     """
+    # Metadata uses redis terminology for backwards compatibility.
     self.metadata.update({
         'cloud_redis_region': self.location,
         'cloud_redis_version': self.GetReadableVersion(),
