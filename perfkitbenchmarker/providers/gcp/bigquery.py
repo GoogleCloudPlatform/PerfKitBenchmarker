@@ -32,6 +32,8 @@ from perfkitbenchmarker.providers.gcp import util as gcp_util
 FLAGS = flags.FLAGS
 
 BQ_CLIENT_FILE = 'bq-jdbc-simba-client-1.8-temp-labels.jar'
+BQ_PYTHON_CLIENT_FILE = 'bq_python_driver.py'
+BQ_PYTHON_CLIENT_DIR = 'edw/bigquery/clients/python'
 DEFAULT_TABLE_EXPIRATION = 3600 * 24 * 365  # seconds
 
 BQ_JDBC_INTERFACES = [
@@ -75,6 +77,8 @@ def GetBigQueryClientInterface(
     return JavaClientInterface(project_id, dataset_id)
   if FLAGS.bq_client_interface in BQ_JDBC_INTERFACES:
     return JdbcClientInterface(project_id, dataset_id)
+  if FLAGS.bq_client_interface == 'PYTHON':
+    return PythonClientInterface(project_id, dataset_id)
   raise RuntimeError('Unknown BigQuery Client Interface requested.')
 
 
@@ -376,6 +380,68 @@ class JavaClientInterface(GenericClientInterface):
             ' '.join([','.join(stream) for stream in concurrency_streams]),
         )
         + runlabels
+    )
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    return stdout
+
+
+class PythonClientInterface(GenericClientInterface):
+  """Python Client Interface class for BigQuery."""
+
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.key_file_name = FLAGS.gcp_service_account_key_file
+    if '/' in FLAGS.gcp_service_account_key_file:
+      self.key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
+
+  def Prepare(self, package_name: str) -> None:
+    """Prepares the client vm to execute query."""
+    # Push the service account file to the working directory on client vm
+    if '/' in FLAGS.gcp_service_account_key_file:
+      self.client_vm.PushFile(FLAGS.gcp_service_account_key_file)
+    else:
+      self.client_vm.InstallPreprovisionedPackageData(
+          package_name, [FLAGS.gcp_service_account_key_file], ''
+      )
+
+    # Install dependencies for driver
+    self.client_vm.Install('pip')
+    self.client_vm.RemoteCommand('sudo pip install google-cloud-bigquery')
+    self.client_vm.RemoteCommand(
+        'sudo pip install google-cloud-bigquery-storage'
+    )
+    self.client_vm.RemoteCommand('sudo pip install pyarrow')
+
+    # Push driver script to client vm
+    self.client_vm.PushDataFile(
+        os.path.join(BQ_PYTHON_CLIENT_DIR, BQ_PYTHON_CLIENT_FILE)
+    )
+
+  def ExecuteQuery(self, query_name: str) -> tuple[float, dict[str, str]]:
+    """Executes a query and returns performance details."""
+    cmd = (
+        f'python3 {BQ_PYTHON_CLIENT_FILE} single --project'
+        f' {self.project_id} --credentials_file {self.key_file_name} --dataset'
+        f' {self.dataset_id} --query_file {query_name} --feature_config'
+        f' {FLAGS.edw_bq_feature_config}'
+    )
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    details = copy.copy(self.GetMetadata())
+    details.update(json.loads(stdout)['details'])
+    return json.loads(stdout)['query_wall_time_in_secs'], details
+
+  def ExecuteThroughput(
+      self,
+      concurrency_streams: list[list[str]],
+      labels: dict[str, str] | None = None,
+  ) -> str:
+    """Executes queries simultaneously on client and return performance details."""
+    cmd = (
+        f'python3 {BQ_PYTHON_CLIENT_FILE} throughput --project'
+        f' {self.project_id} --credentials_file {self.key_file_name} --dataset'
+        f" {self.dataset_id} --query_streams='{json.dumps(concurrency_streams)}'"
+        f' --feature_config {FLAGS.edw_bq_feature_config} --labels'
+        f" '{json.dumps(labels)}'"
     )
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout

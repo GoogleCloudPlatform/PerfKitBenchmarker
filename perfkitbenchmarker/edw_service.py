@@ -125,6 +125,16 @@ flags.DEFINE_enum(
     ['JDBC'],
     'The Runtime Interface used when interacting with Snowflake.',
 )
+flags.DEFINE_enum(
+    'edw_bq_feature_config',
+    'default',
+    ['default', 'smallquery'],
+    'Selects from among various BigQuery feature configurations. '
+    'Currently supported: default (no special features), smallquery '
+    '(enables job_creation_optional query preview feature). '
+    'Only supported for Python client.',
+)
+
 
 FLAGS = flags.FLAGS
 
