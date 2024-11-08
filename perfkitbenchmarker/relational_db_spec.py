@@ -451,9 +451,17 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       )
       # Set the zone for replica server (if specified)
       if flag_values['db_replica_zones'].present:
-        config_values['vm_groups']['servers_replicas']['vm_spec'][cloud][
-            'zone'
-        ] = flag_values.db_replica_zones[0]
+        if (
+            config_values['vm_groups']['servers']['vm_spec'][cloud]['zone']
+            == flag_values.db_replica_zones[0]
+        ):
+          config_values['vm_groups']['servers_replicas']['vm_spec'][cloud][
+              'zone'
+          ] = flag_values.db_replica_zones[1]
+        else:
+          config_values['vm_groups']['servers_replicas']['vm_spec'][cloud][
+              'zone'
+          ] = flag_values.db_replica_zones[0]
 
       # Clear all the zones if the zone flag is present. This will prevent zone
       # values to be overwritten by the benchmark

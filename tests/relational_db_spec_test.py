@@ -221,6 +221,17 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
                     }
                 },
                 'disk_spec': {'GCP': {'disk_size': 500, 'disk_type': 'pd-ssd'}},
+                'vm_count': 1,
+            },
+            'servers_replicas': {
+                'vm_spec': {
+                    'GCP': {
+                        'zone': 'us-central1-c',
+                        'machine_type': 'n1-standard-1',
+                    }
+                },
+                'disk_spec': {'GCP': {'disk_size': 500, 'disk_type': 'pd-ssd'}},
+                'vm_count': 1,
             },
         },
     }
@@ -310,6 +321,23 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertEqual(result.vm_groups['clients'].disk_spec.disk_size, 2000)
 
+  def testDbReplicaZonesFlag(self):
+    FLAGS['db_replica_zones'].parse(['us-central1-c', 'us-central1-d'])
+    result = relational_db_spec.RelationalDbSpec(
+        _COMPONENT, flag_values=FLAGS, **self.full_spec
+    )
+    self.assertEqual(
+        result.vm_groups['servers_replicas'].vm_spec.zone, 'us-central1-d'
+    )
+
+  def testReverseOrderedDbReplicaZonesFlag(self):
+    FLAGS['db_replica_zones'].parse(['us-central1-d', 'us-central1-c'])
+    result = relational_db_spec.RelationalDbSpec(
+        _COMPONENT, flag_values=FLAGS, **self.full_spec
+    )
+    self.assertEqual(
+        result.vm_groups['servers_replicas'].vm_spec.zone, 'us-central1-d'
+    )
 
 if __name__ == '__main__':
   unittest.main()
