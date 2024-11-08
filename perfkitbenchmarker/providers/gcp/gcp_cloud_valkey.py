@@ -29,7 +29,7 @@ FLAGS = flags.FLAGS
 
 COMMAND_TIMEOUT = 3600
 
-_DEFAULT_VERSION = 'VALKEY_7_2'
+_DEFAULT_VERSION = 'VALKEY_8_0'
 _DEFAULT_ZONE = 'us-central1-c'
 
 
@@ -72,6 +72,7 @@ class CloudValkey(managed_memory_store.BaseManagedMemoryStore):
     Returns:
       dict mapping string property key to value.
     """
+    # Metadata uses redis terminology for backwards compatibility.
     self.metadata.update({
         'cloud_redis_region': self.location,
         'cloud_redis_version': self.GetReadableVersion(),
