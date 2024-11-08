@@ -436,6 +436,13 @@ _INVALID_MACHINE_TYPE_REGEX = re.compile(
 )
 _INVALID_MACHINE_TYPE_MESSAGE = 'Creation failed due to invalid machine type: '
 
+_UNSUPPORTED_NODE_TYPE_REGEX = re.compile(
+    "The resource 'projects/.*?/zones/.*?/nodeTypes/.*?' was not found",
+)
+_UNSUPPORTED_NODE_TYPE_MESSAGE = (
+    'Creation failed due to unsupported node type: '
+)
+
 
 def CheckGcloudResponseKnownFailures(stderr: str, retcode: int):
   """Checks gcloud responses for quota exceeded errors.
@@ -456,6 +463,9 @@ def CheckGcloudResponseKnownFailures(stderr: str, retcode: int):
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)
     if _INVALID_MACHINE_TYPE_REGEX.search(stderr):
       message = _INVALID_MACHINE_TYPE_MESSAGE + stderr
+      raise errors.Benchmarks.UnsupportedConfigError(message)
+    if _UNSUPPORTED_NODE_TYPE_REGEX.search(stderr):
+      message = _UNSUPPORTED_NODE_TYPE_MESSAGE + stderr
       raise errors.Benchmarks.UnsupportedConfigError(message)
 
 

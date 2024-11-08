@@ -377,7 +377,8 @@ class GceSoleTenantNodeTemplate(resource.BaseResource):
     )
     cmd.flags['node-type'] = self.node_type
     cmd.flags['region'] = self.region
-    cmd.Issue()
+    _, stderr, retcode = cmd.Issue(raise_on_failure=False)
+    util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
   def _Exists(self):
     """Returns True if the node template exists."""
