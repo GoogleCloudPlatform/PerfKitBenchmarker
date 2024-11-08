@@ -318,6 +318,8 @@ class AwsDedicatedHost(resource.BaseResource):
     _, stderr, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=False)
     if _UNSUPPORTED in stderr:
       raise errors.Benchmarks.UnsupportedConfigError(stderr)
+    if 'InsufficientHostCapacity' in stderr:
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
 
   def _Delete(self):
     if self.id:
