@@ -94,7 +94,8 @@ def ConfigureSlurm(vms):
     tmp_cgroup_cfg = os.path.join(linux_packages.INSTALL_DIR, 'cgroup.conf')
     vm.RemoteCommand(f'sudo mkdir {SLURM_CONF_DIR}', ignore_failure=True)
     vm.RemoteCommand(f'sudo cp {tmp_slurm_cfg} {SLURM_CONF_DIR}')
-    vm.RemoteCommand(f'sudo cp {tmp_cgroup_cfg} {SLURM_CONF_DIR}')
+    # Do not overwrite the cgroup.conf file if already exists.
+    vm.RemoteCommand(f'sudo cp -n {tmp_cgroup_cfg} {SLURM_CONF_DIR}')
     vm.RemoteCommand('sudo systemctl stop slurmd.service', ignore_failure=True)
     vm.RemoteCommand(f'sudo chmod 755 {slurm_cfg}')
     vm.RemoteCommand(f'sudo slurmd -f {slurm_cfg}')
