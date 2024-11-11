@@ -1,0 +1,238 @@
+result link: https://browser.geekbench.com/v6/cpu/8695734
+Acer Nitro AN515-45
+1795
+Single-Core Score
+6627
+Multi-Core Score
+Geekbench 6.3.0 for Windows AVX2Valid
+Result Information
+Upload Date	November 07 2024 07:05 AM
+Views	5
+System Information
+System Information
+Operating System	Microsoft Windows 10 Home (64-bit)
+Model	Acer Nitro AN515-45
+Motherboard	CZ Scala_CAS
+Power Plan	Acer
+CPU Information
+Name	AMD Ryzen 7 5800H
+Topology	1 Processor, 8 Cores, 16 Threads
+Identifier	AuthenticAMD Family 25 Model 80 Stepping 0
+Base Frequency	3.20 GHz
+Cluster 1	8 Cores
+Maximum Frequency	4314 MHz
+Package	Socket FP6
+Codename	Cezanne
+L1 Instruction Cache	32.0 KB x 8
+L1 Data Cache	32.0 KB x 8
+L2 Cache	512 KB x 8
+L3 Cache	16.0 MB x 1
+Memory Information
+Size	16.00 GB
+Transfer Rate	3184 MT/s
+Type	DDR4 SDRAM
+Channels	2
+Single-Core Performance
+Single-Core Score	1795	
+File Compression
+1875
+269.3 MB/sec	
+ 
+Navigation
+1640
+9.88 routes/sec	
+ 
+HTML5 Browser
+1694
+34.7 pages/sec	
+ 
+PDF Renderer
+1795
+41.4 Mpixels/sec	
+ 
+Photo Library
+1702
+23.1 images/sec	
+ 
+Clang
+1808
+8.91 Klines/sec	
+ 
+Text Processing
+1716
+137.4 pages/sec	
+ 
+Asset Compression
+1909
+59.1 MB/sec	
+ 
+Object Detection
+999
+29.9 images/sec	
+ 
+Background Blur
+2342
+9.69 images/sec	
+ 
+Horizon Detection
+2573
+80.1 Mpixels/sec	
+ 
+Object Remover
+1744
+134.1 Mpixels/sec	
+ 
+HDR
+2120
+62.2 Mpixels/sec	
+ 
+Photo Filter
+2197
+21.8 images/sec	
+ 
+Ray Tracer
+1744
+1.69 Mpixels/sec	
+ 
+Structure from Motion
+1998
+63.3 Kpixels/sec	
+ 
+Multi-Core Performance
+Multi-Core Score	6627	
+File Compression
+3169
+455.1 MB/sec	
+ 
+Navigation
+8253
+49.7 routes/sec	
+ 
+HTML5 Browser
+5091
+104.2 pages/sec	
+ 
+PDF Renderer
+7590
+175.0 Mpixels/sec	
+ 
+Photo Library
+8266
+112.2 images/sec	
+ 
+Clang
+11929
+58.8 Klines/sec	
+ 
+Text Processing
+2315
+185.4 pages/sec	
+ 
+Asset Compression
+13665
+423.4 MB/sec	
+ 
+Object Detection
+2874
+86.0 images/sec	
+ 
+Background Blur
+6543
+27.1 images/sec	
+ 
+Horizon Detection
+8437
+262.5 Mpixels/sec	
+ 
+Object Remover
+9410
+723.5 Mpixels/sec	
+ 
+HDR
+8105
+237.8 Mpixels/sec	
+ 
+Photo Filter
+4776
+47.4 images/sec	
+ 
+Ray Tracer
+15486
+15.0 Mpixels/sec	
+ 
+Structure from Motion
+7647
+242.1 Kpixels/sec	
+Acer Nitro AN515-45
+88265
+OpenCL Score
+Geekbench 6.3.0 for Windows AVX2Valid
+Result Information
+Upload Date	November 07 2024 10:49 PM
+Views	1
+System Information
+System Information
+Operating System	Microsoft Windows 10 Home (64-bit)
+Model	Acer Nitro AN515-45
+Motherboard	CZ Scala_CAS
+Power Plan	Acer
+CPU Information
+Name	AMD Ryzen 7 5800H
+Topology	1 Processor, 8 Cores, 16 Threads
+Identifier	AuthenticAMD Family 25 Model 80 Stepping 0
+Base Frequency	3.20 GHz
+Cluster 1	8 Cores
+Maximum Frequency	4314 MHz
+Package	Socket FP6
+Codename	Cezanne
+L1 Instruction Cache	32.0 KB x 8
+L1 Data Cache	32.0 KB x 8
+L2 Cache	512 KB x 8
+L3 Cache	16.0 MB x 1
+Memory Information
+Size	16.00 GB
+Transfer Rate	3184 MT/s
+Type	DDR4 SDRAM
+Channels	2
+OpenCL Information
+Platform Vendor	NVIDIA Corporation
+Platform Name	NVIDIA CUDA
+Device Vendor	NVIDIA Corporation
+Device Name	NVIDIA GeForce RTX 3060 Laptop GPU
+Compute Units	30
+Maximum Frequency	1425 MHz
+Device Memory	6.00 GB
+OpenCL Performance
+OpenCL Score	88265	
+Background Blur
+40721
+168.5 images/sec	
+ 
+Face Detection
+25293
+82.6 images/sec	
+ 
+Horizon Detection
+126034
+3.92 Gpixels/sec	
+ 
+Edge Detection
+147170
+5.46 Gpixels/sec	
+ 
+Gaussian Blur
+101808
+4.44 Gpixels/sec	
+ 
+Feature Matching
+23461
+924.9 Mpixels/sec	
+ 
+Stereo Matching
+326910
+310.8 Gpixels/sec	
+ 
+Particle Physics
+246967
+10869.2 FPS	
+ 

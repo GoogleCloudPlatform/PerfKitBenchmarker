@@ -1,0 +1,224 @@
+CPU result: https://browser.geekbench.com/v6/cpu/8708408
+GPU result: https://browser.geekbench.com/v6/compute/3079319
+QEMU Standard PC (Q35 + ICH9, 2009)
+1803
+Single-Core Score
+5678
+Multi-Core Score
+Geekbench 6.3.0 for Linux AVX2
+Result Information
+Upload Date	November 08 2024 12:27 AM
+Views	4
+System Information
+System Information
+Operating System	Debian GNU/Linux 12 (bookworm)
+Model	QEMU Standard PC (Q35 + ICH9, 2009)
+Motherboard	N/A
+CPU Information
+Name	AMD EPYC Processor
+Topology	1 Processor, 4 Cores
+Identifier	AuthenticAMD Family 23 Model 1 Stepping 2
+Base Frequency	2.60 GHz
+Cluster 1	0 Cores
+L1 Instruction Cache	64.0 KB x 4
+L1 Data Cache	32.0 KB x 4
+L2 Cache	512 KB x 4
+L3 Cache	8.00 MB x 1
+Memory Information
+Size	15.58 GB
+Single-Core Performance
+Single-Core Score	1803	
+File Compression
+1793
+257.5 MB/sec	
+ 
+Navigation
+1615
+9.73 routes/sec	
+ 
+HTML5 Browser
+1946
+39.8 pages/sec	
+ 
+PDF Renderer
+1761
+40.6 Mpixels/sec	
+ 
+Photo Library
+1635
+22.2 images/sec	
+ 
+Clang
+1951
+9.61 Klines/sec	
+ 
+Text Processing
+1852
+148.3 pages/sec	
+ 
+Asset Compression
+1875
+58.1 MB/sec	
+ 
+Object Detection
+1045
+31.3 images/sec	
+ 
+Background Blur
+2433
+10.1 images/sec	
+ 
+Horizon Detection
+2346
+73.0 Mpixels/sec	
+ 
+Object Remover
+1782
+137.0 Mpixels/sec	
+ 
+HDR
+2001
+58.7 Mpixels/sec	
+ 
+Photo Filter
+1894
+18.8 images/sec	
+ 
+Ray Tracer
+1892
+1.83 Mpixels/sec	
+ 
+Structure from Motion
+1913
+60.6 Kpixels/sec	
+ 
+Multi-Core Performance
+Multi-Core Score	5678	
+File Compression
+4147
+595.5 MB/sec	
+ 
+Navigation
+5677
+34.2 routes/sec	
+ 
+HTML5 Browser
+6785
+138.9 pages/sec	
+ 
+PDF Renderer
+6159
+142.0 Mpixels/sec	
+ 
+Photo Library
+6108
+82.9 images/sec	
+ 
+Clang
+7476
+36.8 Klines/sec	
+ 
+Text Processing
+2320
+185.8 pages/sec	
+ 
+Asset Compression
+7093
+219.8 MB/sec	
+ 
+Object Detection
+3641
+109.0 images/sec	
+ 
+Background Blur
+6969
+28.8 images/sec	
+ 
+Horizon Detection
+8059
+250.8 Mpixels/sec	
+ 
+Object Remover
+5453
+419.3 Mpixels/sec	
+ 
+HDR
+6463
+189.7 Mpixels/sec	
+ 
+Photo Filter
+5628
+55.8 images/sec	
+ 
+Ray Tracer
+7476
+7.23 Mpixels/sec	
+ 
+Structure from Motion
+7505
+237.6 Kpixels/sec
+QEMU Standard PC (Q35 + ICH9, 2009)
+358153
+OpenCL Score
+Geekbench 6.3.0 for Linux AVX2
+Result Information
+Upload Date	November 07 2024 09:35 PM
+Views	5
+System Information
+System Information
+Operating System	Ubuntu 24.04 LTS
+Model	QEMU Standard PC (Q35 + ICH9, 2009)
+Motherboard	N/A
+CPU Information
+Name	Intel Xeon Gold 6434
+Topology	1 Processor, 16 Cores
+Identifier	GenuineIntel Family 6 Model 143 Stepping 8
+Base Frequency	3.70 GHz
+Cluster 1	0 Cores
+L1 Instruction Cache	32.0 KB x 16
+L1 Data Cache	32.0 KB x 16
+L2 Cache	4.00 MB x 16
+L3 Cache	16.0 MB x 1
+Memory Information
+Size	393.43 GB
+OpenCL Information
+Platform Vendor	NVIDIA Corporation
+Platform Name	NVIDIA CUDA
+Device Vendor	NVIDIA Corporation
+Device Name	NVIDIA L40
+Compute Units	142
+Maximum Frequency	2490 MHz
+Device Memory	44.3 GB
+OpenCL Performance
+OpenCL Score	358153	
+Background Blur
+130203
+538.9 images/sec	
+ 
+Face Detection
+113618
+370.9 images/sec	
+ 
+Horizon Detection
+417389
+13.0 Gpixels/sec	
+ 
+Edge Detection
+491859
+18.2 Gpixels/sec	
+ 
+Gaussian Blur
+548280
+23.9 Gpixels/sec	
+ 
+Feature Matching
+59186
+2.33 Gpixels/sec	
+ 
+Stereo Matching
+2276330
+2.16 Tpixels/sec	
+ 
+Particle Physics
+1206812
+53112.8 FPS
