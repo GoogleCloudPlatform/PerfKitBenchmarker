@@ -10,9 +10,11 @@ https://catalog.ngc.nvidia.com/orgs/nvidia/containers/hpc-benchmarks
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import nvidia_driver
+from perfkitbenchmarker.linux_packages import optimize_gpu
 from perfkitbenchmarker.linux_packages import slurm
 
 
@@ -24,7 +26,7 @@ nvidia_hpl:
     default:
       vm_spec:
         GCP:
-          machine_type: a3-highgpu-8g
+          machine_type: a3-megagpu-8g
           gpu_count: 8
           gpu_type: h100
           zone: us-east1-d
@@ -42,10 +44,20 @@ nvidia_hpl:
     preprovision_ignore_checksum: True
     gce_num_local_ssds: 16
     gce_ssd_interface: NVME
-    gcloud_scopes: https://www.googleapis.com/auth/devstorage.read_write
+    gcloud_scopes: https://www.googleapis.com/auth/devstorage.read_write,cloud-platform
 """
 
 FLAGS = flags.FLAGS
+
+
+def CheckPrerequisites(_):
+  """Perform flag checks."""
+  if FLAGS.cloud == 'GCP' and not FLAGS.image_project:
+    raise errors.Benchmarks.UnsupportedConfigError(
+        '--image_project is required. Please follow'
+        ' https://cloud.google.com/cluster-toolkit/docs/deploy/deploy-a3-mega-cluster'
+        ' to build your own image.'
+    )
 
 
 def GetConfig(user_config):
@@ -82,6 +94,8 @@ def Prepare(benchmark_spec):
   vms = benchmark_spec.vms
   background_tasks.RunThreaded(_PrepareNvidiaHPL, vms)
   slurm.ConfigureSlurm(vms)
+  background_tasks.RunThreaded(optimize_gpu.Install, vms)
+  optimize_gpu.BuildHostFile(vms[0], len(benchmark_spec.vms))
 
 
 def _CreateMetadata(vms, result_line_parts):
@@ -123,15 +137,26 @@ def Run(benchmark_spec):
   controller = benchmark_spec.vms[0]
   gpus_per_node = FLAGS.hpcg_gpus_per_node or nvidia_driver.QueryNumberOfGpus(
       benchmark_spec.vms[0])
-  provider_env = ''
-  if FLAGS.cloud == 'AWS':
-    provider_env = (
-        'export FI_PROVIDER=efa; '
-    )
-  stdout, _ = controller.RobustRemoteCommand(
+  provider_env = optimize_gpu.SetContainerEnv(controller)
+  hpl_command = (
+      './hpl.sh --dat /workspace/hpl-linux-x86_64/sample-dat/'
+      f'HPL-dgx-{len(benchmark_spec.vms)}N.dat'
+  )
+  # pylint: disable=protected-access
+  hostfile = controller._RemoteFileExists('/var/tmp/hostfile')
+  if hostfile:
+    hostfile_arg = 'export SLURM_HOSTFILE=/var/tmp/hostfile; '
+    slurm_args = ''
+  else:
+    hostfile_arg = ''
+    slurm_args = f'-N {len(benchmark_spec.vms)} '
+  mount_args = ','.join(optimize_gpu.GetContainerMounts(controller))
+  if mount_args:
+    slurm_args += f'--container-mounts="{mount_args}" '
+  stdout, _ = controller.RemoteCommand(
+      f'{hostfile_arg}'
       'export TMPDIR=/tmp; '
       'export NCCL_DEBUG=INFO; '
-      f'{provider_env}'
       'export HPL_FCT_COMM_POLICY=1; '
       'export HPL_P2P_AS_BCAST=0; '
       'export HPL_USE_NVSHMEM=0; '
@@ -139,15 +164,14 @@ def Run(benchmark_spec):
       'export OMPI_MCA_pml="ucx"; '
       'export UCX_MAX_RNDV_RAILS=8; '
       # environment variables to use
-      'srun '
-      f'-N {len(benchmark_spec.vms)} '
+      f'srun '
       f'--ntasks-per-node {gpus_per_node} '
       '--cpus-per-task '
       f'{int(controller.NumCpusForBenchmark() / gpus_per_node)} '
       '--cpu-bind=none --mpi=pmi2 '
       '--container-image="dockerd://pkb-hpc-image" '
-      './hpl.sh --dat /workspace/hpl-linux-x86_64/sample-dat/'
-      f'HPL-dgx-{len(benchmark_spec.vms)}N.dat')
+      f'{slurm_args} bash -c "{provider_env} {hpl_command}"'
+  )
   lines = stdout.splitlines()
   result_line_idx = None
   for line_idx, line in enumerate(lines):

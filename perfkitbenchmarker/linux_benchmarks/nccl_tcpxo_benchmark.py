@@ -5,6 +5,7 @@ from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_benchmarks import nccl_benchmark
+from perfkitbenchmarker.linux_packages import optimize_gpu
 from perfkitbenchmarker.linux_packages import slurm
 
 
@@ -61,24 +62,6 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def BuildTopoAwareHostFile(controller, nnodes):
-  """Build topo aware hostfile.
-
-  https://cloud.google.com/cluster-toolkit/docs/machine-learning/a3-mega-enable-gpudirect-tcpxo#run_nccl_test
-  Args:
-    controller: The controller VM
-    nnodes: The number of nodes in the cluster
-  """
-  controller.RemoteCommand(
-      'srun --mpi=pmi2 -n'
-      f' {nnodes * _GPUS_PER_NODE} --ntasks-per-node={_GPUS_PER_NODE} bash -c'
-      " 'curl -s"
-      ' "http://metadata.google.internal/computeMetadata/v1/instance/attributes/physical_host"'
-      ' -H "Metadata-Flavor: Google"; echo /$SLURMD_NODENAME\' | sort -t / -s'
-      ' -k 1,4 | awk -F "/" \'{print $NF}\' >/var/tmp/topo_sorted_hostfile'
-  )
-
-
 def Prepare(benchmark_spec):
   """Install and set up NCCL on the target vm.
 
@@ -89,21 +72,20 @@ def Prepare(benchmark_spec):
   nnodes = len(benchmark_spec.vms)
   for vm in benchmark_spec.vms:
     vm.AuthenticateVm()
+    vm.Install('optimize_gpu')
   slurm.ConfigureSlurm(benchmark_spec.vms)
   controller = benchmark_spec.vms[0]
   controller.RemoteCommand(f'srun -N {nnodes} enroot import {_IMAGE}')
   controller.RemoteCommand(
       f'srun -N {nnodes} git clone https://github.com/NVIDIA/nccl-tests.git'
   )
-  # controller.RemoteCommand(
-  #     'git clone https://github.com/NVIDIA/nccl-tests.git')
   controller.RemoteCommand(
       f'srun -N {nnodes} '
       '--container-mounts="$PWD:/nccl" '
       f'--container-image="{_SQSH_IMAGE}" '
       'bash -c "cd /nccl/nccl-tests/ && MPI=1 CC=mpicc CXX=mpicxx make -j"'
   )
-  BuildTopoAwareHostFile(controller, len(benchmark_spec.vms))
+  optimize_gpu.BuildHostFile(controller, len(benchmark_spec.vms))
 
 
 def Run(benchmark_spec):
@@ -117,25 +99,22 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   controller = benchmark_spec.vms[0]
+
   samples = []
+  mount_path = ','.join(
+      ['$PWD:/nccl'] + optimize_gpu.GetContainerMounts(benchmark_spec.vms[0])
+  )
   for operation in FLAGS.nccl_operations:
     stdout, _ = controller.RemoteCommand(
-        'export NCCL_DEBUG=INFO; '
-        'export NCCL_NET=FasTrak; '  # enforce using FasTrak
-        'export NCCL_LIB_DIR="/var/lib/tcpxo/lib64"; '
-        'export SLURM_HOSTFILE=/var/tmp/topo_sorted_hostfile; '
-        'source /var/lib/tcpxo/lib64/nccl-env-profile.sh; '
-        # pylint: disable=anomalous-backslash-in-string
-        'HOST_VARS=$(sed \'s/ \{1,\}/,/g\' <<<"${!NCCL*}"); '
+        'export SLURM_HOSTFILE=/var/tmp/hostfile; '
         'srun '
         '--mpi=pmi2 '
         f'--ntasks-per-node={_GPUS_PER_NODE} '
         f'--container-image="{_SQSH_IMAGE}" '
-        '--container-env="${HOST_VARS}" '
-        '--container-mounts="/var/tmp:/var/tmp,$PWD:/nccl,/var/lib/tcpxo/lib64/" '
-        'sh -c "'
-        'export LD_LIBRARY_PATH=/var/lib/tcpxo/lib64:/usr/lib/x86_64-linux-gnu:'
-        '\$LD_LIBRARY_PATH; '  # pylint: disable=anomalous-backslash-in-string
+        f'--container-mounts="{mount_path}" '
+        'bash -c "'
+        'export NCCL_DEBUG=INFO; '
+        f'{optimize_gpu.SetContainerEnv(benchmark_spec.vms[0])} '
         f'/nccl/nccl-tests/build/{operation}_perf '
         f'--minbytes {FLAGS.nccl_minbytes} '
         f'--maxbytes {FLAGS.nccl_maxbytes} '
