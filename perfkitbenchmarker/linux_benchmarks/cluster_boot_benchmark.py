@@ -74,6 +74,7 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import log_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -524,6 +525,11 @@ def Run(benchmark_spec):
 
 
 def Cleanup(benchmark_spec):
+  """Kill tcpdump process and upload and/or delete tcpdump output file.
+
+  Args:
+    benchmark_spec: The benchmark specification.
+  """
   if CollectNetworkSamples():
     pid = benchmark_spec.config.temporary['tcpdump_pid']
     logging.info('Terminating tcpdump process %s', pid)
@@ -532,8 +538,10 @@ def Cleanup(benchmark_spec):
     except ProcessLookupError:
       logging.warning('tcpdump process %s ended prematurely.', pid)
     try:
-      os.remove(benchmark_spec.config.temporary['tcpdump_output_path'])
+      tcpdump_path = benchmark_spec.config.temporary['tcpdump_output_path']
+      log_util.CollectVMLogs(FLAGS.run_uri, tcpdump_path)
+      os.remove(tcpdump_path)
     except FileNotFoundError:
-      logging.exception(
+      logging.warning(
           'tcpdump output file %s does not exist', linux_boot.TCPDUMP_OUTPUT
       )
