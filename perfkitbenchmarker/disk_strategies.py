@@ -324,11 +324,15 @@ class PrepareScratchDiskStrategy:
       scratch_disk: Scratch disk to be formatted and mounted.
       disk_spec: The BaseDiskSpec object corresponding to the disk.
     """
-    if isinstance(scratch_disk, disk.StripedDisk) and scratch_disk.is_striped:
-      # the scratch disk is a logical device stripped together from raw disks
-      # scratch disk device path == disk_spec device path
-      # scratch disk device path != raw disks device path
-      scratch_disk_device_path = '/dev/md%d' % len(vm.scratch_disks)
+    # the scratch disk is a logical device stripped together from raw disks
+    # scratch disk device path == disk_spec device path
+    # scratch disk device path != raw disks device path
+    scratch_disk_device_path = '/dev/md%d' % len(vm.scratch_disks)
+    if (
+        isinstance(scratch_disk, disk.StripedDisk)
+        and scratch_disk.is_striped
+        and not vm.hasStripedDiskDevice(scratch_disk_device_path)
+    ):
       scratch_disk.device_path = scratch_disk_device_path
       disk_spec.device_path = scratch_disk_device_path
       raw_device_paths = [d.GetDevicePath() for d in scratch_disk.disks]

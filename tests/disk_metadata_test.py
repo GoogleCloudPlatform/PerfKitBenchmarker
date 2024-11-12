@@ -151,6 +151,8 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
 
     azure_disk.AzureDisk.Create = mock.Mock()
     azure_disk.AzureDisk.Attach = mock.Mock()
+    # Disks are not striped
+    vm.hasStripedDiskDevice = mock.MagicMock(return_value=False)
     vm.StripeDisks = mock.Mock()
     vm.SetDiskSpec(disk_spec, 1)
     vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(

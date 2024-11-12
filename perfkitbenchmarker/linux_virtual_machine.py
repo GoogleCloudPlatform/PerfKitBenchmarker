@@ -1923,6 +1923,24 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
           f'sudo nvme --set-feature --feature-id=8 --value=0x101 {path}'
       )
 
+  def hasStripedDiskDevice(self, dev_name: str) -> bool:
+    """Checks if the striped disk device exists or not.
+
+    Args:
+      dev_name: The name of the device.
+
+    Returns:
+      True if the striped disk device exists.
+    """
+    # Suppress the error as it's not a blocker to the test if the command fails.
+    # The command would pass if the stripped device exists so the exit code of
+    # the command would be 0.
+    _, _, return_code = self.RemoteHostCommandWithReturnCode(
+        f'sudo mdadm "{dev_name}"', ignore_failure=True
+    )
+    # Return True if the command succeeds, otherwise False.
+    return return_code == 0
+
   def StripeDisks(self, devices, striped_device):
     """Raids disks together using mdadm.
 

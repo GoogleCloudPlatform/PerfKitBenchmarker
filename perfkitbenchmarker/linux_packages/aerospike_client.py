@@ -171,9 +171,9 @@ def ParseAsbenchStdout(output):
         or 'AEROSPIKE_ERR_CONNECTION' in line
         or 'AEROSPIKE_ERR_SERVER_FULL' in line
         or 'AEROSPIKE_ERR_DEVICE_OVERLOAD' in line
+        or ('Add node' in line or 'Remove node' in line)
     ):
-      continue
-    elif 'Add node' in line or 'Remove node' in line:
+      line_idx += 1
       continue
     find_read_hdr = False
     find_write_hdr = False
