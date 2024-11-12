@@ -255,13 +255,13 @@ class AzureDisk(disk.BaseDisk):
             self.availability_zone,
         ] + self.resource_group.args
       self.create_disk_start_time = time.time()
-      _, _, retcode = vm_util.IssueCommand(
+      _, stderr, retcode = vm_util.IssueCommand(
           cmd, raise_on_failure=False, timeout=600
       )
       self.create_disk_end_time = time.time()
       if retcode:
         raise errors.Resource.RetryableCreationError(
-            'Error creating Azure disk.'
+            f'Error creating Azure disk:\n{stderr}'
         )
 
       _, _, retcode = vm_util.IssueCommand(

@@ -104,7 +104,7 @@ class AzureResourceGroup(resource.BaseResource):
       # A resource group can own resources in multiple zones, but the
       # group itself needs to have a region. Therefore,
       # FLAGS.zone[0].
-      _, _, retcode = vm_util.IssueCommand(
+      _, stderr, retcode = vm_util.IssueCommand(
           [
               azure.AZURE_PATH,
               'group',
@@ -121,7 +121,7 @@ class AzureResourceGroup(resource.BaseResource):
 
       if retcode and self.raise_on_create_failure:
         raise errors.Resource.RetryableCreationError(
-            'Error creating Azure resource group'
+            f'Error creating Azure resource group:\n{stderr}'
         )
 
   def _Exists(self):
