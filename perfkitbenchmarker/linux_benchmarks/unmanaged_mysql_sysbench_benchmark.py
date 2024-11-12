@@ -268,14 +268,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   max_transactions = {}
   for thread_count in FLAGS.sysbench_run_threads:
     sysbench_parameters.threads = thread_count
-    cmd = sysbench.BuildRunCommand(sysbench_parameters)
-    logging.info('%s run command: %s', FLAGS.sysbench_testname, cmd)
-    try:
-      # TODO(arushigaur): Can be updated to use sysbench.Run to run sysbench..
-      stdout, _ = client.RemoteCommand(
-          cmd, timeout=2*FLAGS.sysbench_run_seconds,)
-    except errors.VirtualMachine.RemoteCommandError as e:
-      logging.exception('Failed to run sysbench command: %s', e)
+    stdout = sysbench.Run(client, sysbench_parameters)
+    if not stdout:
       continue
     metadata = sysbench.GetMetadata(sysbench_parameters)
     metadata.update({
