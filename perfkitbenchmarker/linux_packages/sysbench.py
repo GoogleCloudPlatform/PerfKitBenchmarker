@@ -260,9 +260,30 @@ def ParseSysbenchTransactions(sysbench_output, metadata) -> list[sample.Sample]:
   queries_per_second = regex_util.ExtractFloat(
       r'queries: *[0-9]* *\(([0-9]*[.]?[0-9]+) per sec.\)', sysbench_output
   )
+  # Associate the current latencies with the current transactions.
+  min_latency = regex_util.ExtractFloat(
+      'min: *([0-9]*[.]?[0-9]+)', sysbench_output)
+  average_latency = regex_util.ExtractFloat(
+      'avg: *([0-9]*[.]?[0-9]+)', sysbench_output)
+  max_latency = regex_util.ExtractFloat(
+      'max: *([0-9]*[.]?[0-9]+)', sysbench_output)
+  percentile_95_latency = None
+  try:
+    percentile_95_latency = regex_util.ExtractFloat(
+        '95th percentile: *([0-9]*[.]?[0-9]+)', sysbench_output
+    )
+  except regex_util.NoMatchError:
+    logging.info('P95 percentile not available in output.')
+
+  sample_metadata = metadata.copy()
+  sample_metadata['min_latency'] = min_latency
+  sample_metadata['average_latency'] = average_latency
+  sample_metadata['max_latency'] = max_latency
+  if percentile_95_latency:
+    sample_metadata['percentile_95_latency'] = percentile_95_latency
   return [
-      sample.Sample('tps', transactions_per_second, 'tps', metadata),
-      sample.Sample('qps', queries_per_second, 'qps', metadata),
+      sample.Sample('tps', transactions_per_second, 'tps', sample_metadata),
+      sample.Sample('qps', queries_per_second, 'qps', sample_metadata),
   ]
 
 
