@@ -95,6 +95,7 @@ def RunPgBench(
     job_counts,
     seconds_to_pause,
     seconds_per_test,
+    protocol,
     metadata,
     file=None,
     path=None,
@@ -110,6 +111,7 @@ def RunPgBench(
     job_counts: Number of job
     seconds_to_pause: Seconds to pause between test
     seconds_per_test: Seconds per test
+    protocol: Protocol to use for the benchmark
     metadata: Metadata of the benchmark
     file: Filename of the benchmark
     path: File path of the benchmar.
@@ -136,6 +138,8 @@ def RunPgBench(
     metadata['pgbench_file'] = file
 
   extended_protocol = ''
+  if protocol:
+    extended_protocol = ' --protocol=' + protocol
   if relational_db.engine_type == sql_engine_utils.SPANNER_POSTGRES:
     extended_protocol = ' --protocol=extended'
 

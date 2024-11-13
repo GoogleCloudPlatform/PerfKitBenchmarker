@@ -40,12 +40,25 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.linux_packages import pgbench
 
+# PGProtocal
+SIMPLE = 'simple'
+EXTENDED = 'extended'
+PREPARED = 'prepared'
+
 flags.DEFINE_integer(
     'pgbench_scale_factor',
     1,
     'scale factor used to fill the database',
     lower_bound=1,
 )
+
+flags.DEFINE_enum(
+    'pgbench_protocol',
+    None,
+    [SIMPLE, EXTENDED, PREPARED],
+    'Protocol to use for pgbench',
+)
+
 flags.DEFINE_integer(
     'pgbench_seconds_per_test',
     10,
@@ -167,6 +180,7 @@ def UpdateBenchmarkSpecWithRunStageFlags(benchmark_spec):
   benchmark_spec.seconds_to_pause = FLAGS.pgbench_seconds_to_pause_before_steps
   benchmark_spec.client_counts = FLAGS.pgbench_client_counts
   benchmark_spec.job_counts = FLAGS.pgbench_job_counts
+  benchmark_spec.pgbench_protocol = FLAGS.pgbench_protocol
 
 
 def GetDbSize(relational_db, db_name):
@@ -358,6 +372,7 @@ def Run(benchmark_spec):
       benchmark_spec.job_counts,
       benchmark_spec.seconds_to_pause,
       benchmark_spec.seconds_per_test,
+      benchmark_spec.pgbench_protocol,
       common_metadata,
   )
   return []
