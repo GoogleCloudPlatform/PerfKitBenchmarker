@@ -313,7 +313,7 @@ def _TuneNetworkStack(vm):
   """Tune the network stack to improve throughput.
 
   These settings are based on the recommendations in
-  https://learn.arm.com/learning-paths/servers-and-cloud-computing/nginx_tune.
+  https://armkeil.blob.core.windows.net/developer/Files/pdf/white-paper/guidelines-for-deploying-nginx-plus-on-aws.pdf.
 
   Args:
     vm: The VM to tune.
