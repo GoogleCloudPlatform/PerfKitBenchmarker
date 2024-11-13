@@ -542,11 +542,14 @@ def _GenerateRunKwargs(instance: _Bigtable) -> Dict[str, str]:
 
   run_kwargs = _CommonArgs(instance)
 
-  # By default YCSB uses a BufferedMutator for Puts / Deletes.
-  # This leads to incorrect update latencies, since since the call returns
-  # before the request is acked by the server.
-  # Disable this behavior during the benchmark run.
-  run_kwargs['clientbuffering'] = 'false'
+  if _USE_JAVA_VENEER_CLIENT.value and _USE_UPGRADED_DRIVER.value:
+    run_kwargs['googlebigtable2.use-batching'] = 'false'
+  else:
+    # By default YCSB uses a BufferedMutator for Puts / Deletes.
+    # This leads to incorrect update latencies, since since the call returns
+    # before the request is acked by the server.
+    # Disable this behavior during the benchmark run.
+    run_kwargs['clientbuffering'] = 'false'
 
   return run_kwargs
 
@@ -563,9 +566,13 @@ def _GenerateLoadKwargs(instance: _Bigtable) -> Dict[str, str]:
 
   load_kwargs = _CommonArgs(instance)
 
-  # During the load stage, use a buffered mutator with a single thread.
-  # The BufferedMutator will handle multiplexing RPCs.
-  load_kwargs['clientbuffering'] = 'true'
+  if _USE_JAVA_VENEER_CLIENT.value and _USE_UPGRADED_DRIVER.value:
+    load_kwargs['googlebigtable2.use-batching'] = 'true'
+  else:
+    # During the load stage, use a buffered mutator with a single thread.
+    # The BufferedMutator will handle multiplexing RPCs.
+    load_kwargs['clientbuffering'] = 'true'
+
   if not FLAGS['ycsb_preload_threads'].present:
     load_kwargs['threads'] = '1'
 
