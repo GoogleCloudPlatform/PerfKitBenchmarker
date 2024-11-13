@@ -40,7 +40,7 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.linux_packages import pgbench
 
-# PGProtocal
+# Postgresql protocol options
 SIMPLE = 'simple'
 EXTENDED = 'extended'
 PREPARED = 'prepared'
@@ -56,7 +56,8 @@ flags.DEFINE_enum(
     'pgbench_protocol',
     None,
     [SIMPLE, EXTENDED, PREPARED],
-    'Protocol to use for pgbench',
+    'Protocol to use for pgbench. See'
+    ' https://www.postgresql.org/docs/current/protocol-flow.html',
 )
 
 flags.DEFINE_integer(
