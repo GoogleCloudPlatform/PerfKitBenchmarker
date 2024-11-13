@@ -21,7 +21,6 @@ import re
 import statistics
 
 from absl import flags
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
@@ -86,10 +85,6 @@ def _Install(vm, spanner_oltp=False):
   if _IGNORE_CONCURRENT.value:
     driver_file = f'{SYSBENCH_DIR}/src/drivers/pgsql/drv_pgsql.c'
     vm.RemoteCommand(f"sed -i '{CONCURRENT_MODS}' {driver_file}")
-  vm.RemoteCommand('export PATH="$PATH:/usr/pgsql-16/bin"')
-  without_mysql = ''
-  if vm.db_driver == 'pgsql':
-    without_mysql = '--without-mysql'
   if spanner_oltp:
     vm.PushDataFile(
         'sysbench/spanner_oltp_git.diff',
@@ -117,7 +112,6 @@ def _Install(vm, spanner_oltp=False):
 
   vm.RemoteCommand(
       f'cd {SYSBENCH_DIR} && ./autogen.sh && ./configure --with-pgsql'
-      f' {without_mysql}'
   )
   vm.RemoteCommand(f'cd {SYSBENCH_DIR} && make -j && sudo make install')
 
@@ -130,14 +124,12 @@ def Uninstall(vm):
 def YumInstall(vm):
   """Installs the sysbench package on the VM."""
   mariadb_pkg_name = 'mariadb-devel'
-  if vm.OS_TYPE in os_types.AMAZONLINUX_TYPES and vm.db_driver == 'mysql':
+  if vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
     # Use mysql-devel according to sysbench documentation.
     mariadb_pkg_name = 'mysql-devel'
-  elif vm.OS_TYPE in os_types.AMAZONLINUX_TYPES and vm.db_driver == 'pgsql':
-    mariadb_pkg_name = ''
   vm.InstallPackages(
       f'make automake libtool pkgconfig libaio-devel {mariadb_pkg_name} '
-      'openssl-devel libpq-devel.x86_64'
+      'openssl-devel postgresql-devel'
   )
   _Install(vm)
 
@@ -311,7 +303,6 @@ class SysbenchInputParameters:
   host_ip: str | None = None
   ssl_setting: str | None = None
   mysql_ignore_errors: str | None = None
-  port: int | None = None
 
 
 def _BuildGenericCommand(
@@ -345,14 +336,9 @@ def _BuildGenericCommand(
   if sysbench_parameters.skip_trx:
     cmd += ['--skip_trx=on']
   cmd += GetSysbenchDatabaseFlags(
-      sysbench_parameters.db_driver,
-      sysbench_parameters.db_user,
-      sysbench_parameters.db_password,
-      sysbench_parameters.db_name,
-      sysbench_parameters.host_ip,
-      sysbench_parameters.ssl_setting,
-      sysbench_parameters.port,
-  )
+      sysbench_parameters.db_driver, sysbench_parameters.db_user,
+      sysbench_parameters.db_password, sysbench_parameters.db_name,
+      sysbench_parameters.host_ip, sysbench_parameters.ssl_setting)
   return cmd
 
 
@@ -378,7 +364,6 @@ def GetSysbenchDatabaseFlags(
     db_name: str,
     host_ip: str,
     ssl_setting: str | None = None,  # only available in sysbench ver 1.1+
-    port: int | None = None,
 ) -> list[str]:
   """Returns the database flags for sysbench."""
   if db_driver == 'mysql':
@@ -391,30 +376,7 @@ def GetSysbenchDatabaseFlags(
         f'--mysql-db={db_name}',
         f'--mysql-host={host_ip}',
     ]
-  elif db_driver == 'pgsql':
-    cmd = []
-    if ssl_setting:
-      cmd += [f'--pgsql-sslmode={ssl_setting}']
-    return cmd + [
-        f'--pgsql-user={db_user}',
-        f"--pgsql-password='{db_password}'",
-        f'--pgsql-db={db_name}',
-        f'--pgsql-host={host_ip}',
-        f'--pgsql-port={port}',
-    ]
   return []
-
-
-def Run(client, sysbench_parameters: SysbenchInputParameters):
-  cmd = BuildRunCommand(sysbench_parameters)
-  logging.info('%s run command: %s', FLAGS.sysbench_testname, cmd)
-  try:
-    stdout, _ = client.RemoteCommand(
-        cmd, timeout=2*FLAGS.sysbench_run_seconds,)
-  except errors.VirtualMachine.RemoteCommandError as e:
-    logging.exception('Failed to run sysbench command: %s', e)
-    return None
-  return stdout
 
 
 def GetMetadata(parameters: SysbenchInputParameters) -> dict[str, str]:

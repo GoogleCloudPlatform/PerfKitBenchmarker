@@ -207,7 +207,6 @@
 -   Add `--vm_log_bucket` flag, offering users the option to upload the
     logs captured via the `--capture_vm_logs` flag to a GCS bucket.
 -   Add chromium_compile_benchmark.
--   Add unmanaged_postgresql_sysbench benchmark.
 
 ### Enhancements:
 
