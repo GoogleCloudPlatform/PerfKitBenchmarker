@@ -863,18 +863,33 @@ class KubernetesCluster(BaseContainerCluster):
     service.Create()
 
   # TODO(pclay): Revisit instance methods that don't rely on instance data.
-  def ApplyManifest(self, manifest_file: str, **kwargs):
+  def ApplyManifest(self, manifest_file: str, **kwargs) -> str:
     """Applies a declarative Kubernetes manifest; possibly with jinja.
 
     Args:
       manifest_file: The name of the YAML file or YAML template.
       **kwargs: Arguments to the jinja template.
+
+    Returns:
+      The name of the deployment, e.g. deployment.apps/mydeploy.
     """
+
+    def _ParseApplyOutput(stdout: str) -> str:
+      """Parses the output of kubectl apply to get the name of the resource."""
+      # Example input: deployment.apps/pkb123 created
+      match = re.search(r'deployment[^\s]+', stdout)
+      if not match:
+        raise ValueError(
+            'Failed to parse the output of kubectl apply to get the name of'
+            ' the deployment.'
+        )
+      return match.group()
+
     filename = data.ResourcePath(manifest_file)
     if not filename.endswith('.j2'):
       assert not kwargs
-      RunKubectlCommand(['apply', '-f', filename])
-      return
+      out, _, _ = RunKubectlCommand(['apply', '-f', filename])
+      return _ParseApplyOutput(out)
 
     environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
     with open(filename) as template_file, vm_util.NamedTemporaryFile(
@@ -883,7 +898,8 @@ class KubernetesCluster(BaseContainerCluster):
       manifest = environment.from_string(template_file.read()).render(kwargs)
       rendered_template.write(manifest)
       rendered_template.close()
-      RunKubectlCommand(['apply', '-f', rendered_template.name])
+      out, _, _ = RunKubectlCommand(['apply', '-f', rendered_template.name])
+      return _ParseApplyOutput(out)
 
   def WaitForResource(
       self,
@@ -891,6 +907,7 @@ class KubernetesCluster(BaseContainerCluster):
       condition_name: str,
       namespace: str | None = None,
       timeout: int = vm_util.DEFAULT_TIMEOUT,
+      wait_for_all: bool = False,
   ):
     """Waits for a condition on a Kubernetes resource (eg: deployment, pod)."""
     run_cmd = [
@@ -901,6 +918,8 @@ class KubernetesCluster(BaseContainerCluster):
     ]
     if namespace:
       run_cmd.append(f'--namespace={namespace}')
+    if wait_for_all:
+      run_cmd.append('--all')
     RunKubectlCommand(run_cmd, timeout=timeout + 10)
 
   def WaitForRollout(self, resource_name: str):
@@ -1054,6 +1073,21 @@ class KubernetesCluster(BaseContainerCluster):
     pod_label = self.GetPodLabel(resource_name)
     return self.GetPodIpsByLabel('app', pod_label)
 
+  def GetAllPodNames(self) -> list[str]:
+    """Returns all pod names in the cluster."""
+    pods, _, _ = RunKubectlCommand([
+        'get',
+        'pods',
+        '--no-headers',
+        '-o',
+        'name',
+    ])
+    if not pods:
+      return []
+    pod_names_with_prefix = pods.split()
+    # Remove the 'pod/' prefix from each pod name.
+    return [pod_name.replace('pod/', '') for pod_name in pod_names_with_prefix]
+
   def RunKubectlExec(self, pod_name, cmd):
     run_cmd = ['exec', '-it', pod_name, '--'] + cmd
     RunKubectlCommand(run_cmd)
@@ -1117,19 +1151,27 @@ class KubernetesEvent:
     """Parse Kubernetes Event YAML output."""
     if 'message' not in yaml_data:
       return
-    # There are multiple timestamps. They should be equivalent.
-    raw_timestamp = yaml_data['lastTimestamp']
-    assert raw_timestamp
-    # Python 3.10 cannot handle Z as utc in ISO 8601 timestamps
-    python_3_10_compatible_timestamp = re.sub('Z$', '+00:00', raw_timestamp)
-    timestamp = calendar.timegm(
-        datetime.datetime.fromisoformat(
-            python_3_10_compatible_timestamp
-        ).timetuple()
-    )
-    return cls(
-        message=yaml_data['message'],
-        reason=yaml_data.get('reason'),
-        resource=KubernetesEventResource.FromDict(yaml_data['involvedObject']),
-        timestamp=timestamp,
-    )
+    try:
+      # There are multiple timestamps. They should be equivalent.
+      raw_timestamp = yaml_data['lastTimestamp']
+      assert raw_timestamp
+      # Python 3.10 cannot handle Z as utc in ISO 8601 timestamps
+      python_3_10_compatible_timestamp = re.sub('Z$', '+00:00', raw_timestamp)
+      timestamp = calendar.timegm(
+          datetime.datetime.fromisoformat(
+              python_3_10_compatible_timestamp
+          ).timetuple()
+      )
+      return cls(
+          message=yaml_data['message'],
+          reason=yaml_data.get('reason'),
+          resource=KubernetesEventResource.FromDict(
+              yaml_data['involvedObject']
+          ),
+          timestamp=timestamp,
+      )
+    except KeyError as e:
+      logging.exception(
+          'Tried parsing event: %s but ran into error: %s', yaml_data, e
+      )
+      raise e

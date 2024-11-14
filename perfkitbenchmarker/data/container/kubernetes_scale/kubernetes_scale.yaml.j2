@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{Name}}
+spec:
+  replicas: {{Replicas}}
+  selector:
+    matchLabels:
+      name: {{Name}}
+  template:
+    metadata:
+      labels:
+        name: {{Name}}
+    spec:
+      containers:
+      - image: k8s.gcr.io/pause:3.1
+        name: {{Name}}
+        resources:
+          requests:
+            cpu: {{CpuRequest}}
+            memory: {{MemoryRequest}}
+            ephemeral-storage: {{EphemeralStorageRequest}}
+          limits:
+            cpu: {{CpuRequest}}
+            memory: {{MemoryRequest}}
+            ephemeral-storage: {{EphemeralStorageRequest}}
+      terminationGracePeriodSeconds: 1
+      # Add not-ready/unreachable tolerations for 15 minutes so that node
+      # failure doesn't trigger pod deletion.
+      tolerations:
+      - key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 900
+      - key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        effect: "NoExecute"
+        tolerationSeconds: 900
