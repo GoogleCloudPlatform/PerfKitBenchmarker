@@ -39,6 +39,20 @@ def GetContainerMounts(vm):
   return []
 
 
+def MountFuse(vm, bucket, path):
+  """Mount fuse for the container."""
+  if FLAGS.cloud == 'GCP':
+    vm.RemoteCommand(
+        'sudo mount -t gcsfuse -o'
+        ' allow_other,uid=$USER,gid=$USER,dir_mode=777,file_mode=777,implicit_dirs'
+        f' {bucket} {path}'
+    )
+  elif FLAGS.cloud == 'AWS':
+    vm.RemoteCommand(f'sudo mount-s3 {bucket} {path}')
+  else:
+    raise NotImplementedError()
+
+
 def SetContainerEnv(vm):
   """Set container environment to use optimized network stack.
 
@@ -77,9 +91,8 @@ def SetContainerEnv(vm):
         'export NCCL_FASTRAK_USE_SNAP=1; '
         'export NCCL_FASTRAK_USE_LLCM=1; '
         'export NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY=/dev/aperture_devices; '
-        'export LD_LIBRARY_PATH=/var/lib/tcpxo/lib64:/usr/lib/x86_64-linux-gnu:'
         # pylint: disable=anomalous-backslash-in-string
-        '\$LD_LIBRARY_PATH; '
+        'export LD_LIBRARY_PATH=/var/lib/tcpxo/lib64:\$LD_LIBRARY_PATH; '
     )
 
 
