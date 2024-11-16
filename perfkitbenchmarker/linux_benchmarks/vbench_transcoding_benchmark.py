@@ -14,7 +14,7 @@
 
 """Runs the vbench transcoding benchmark with h.264 and vp9.
 
-Paper: http://www.cs.columbia.edu/~lottarini/test/data/vbench.pdf
+Paper: https://dl.acm.org/doi/pdf/10.1145/3296957.3173207
 Vbench suite download link: http://arcade.cs.columbia.edu/vbench/
 """
 
@@ -27,16 +27,19 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 
-CODEC_H264 = 'h264'
-CODEC_VP9 = 'vp9'
+ENCODER_LIBX264 = 'libx264'
+ENCODER_LIBX265 = 'libx265'
+ENCODER_VP9 = 'libvpx-vp9'
+ENCODER_H264_NVENC = 'h264_nvenc'
+ENCODER_HEVC_NVENC = 'hevc_nvenc'
 DEFAULT_H264_THREADS_LIST = [4, 8]
 DEFAULT_VP9_THREADS_LIST = [1]
 
-_FFMPEG_CODECS = flags.DEFINE_list(
-    'ffmpeg_codecs',
-    [CODEC_H264],
-    'List of the codecs to use for the transcoding benchmark. '
-    'For now, this is some combination of h264 and vp9.',
+_FFMPEG_ENCODERS = flags.DEFINE_list(
+    'ffmpeg_encoders',
+    [ENCODER_LIBX264, ENCODER_LIBX265],
+    'List of the encoders to use for the transcoding benchmark. '
+    'Default is libx264 and libx265.',
 )
 _FFMPEG_THREADS_LIST = flag_util.DEFINE_integerlist(
     'ffmpeg_threads_list',
@@ -54,9 +57,16 @@ _FFMPEG_DIR = flags.DEFINE_string(
     'ffmpeg_dir', '/usr/bin', 'Directory where ffmpeg and ffprobe are located.'
 )
 
-_VALID_CODECS = [CODEC_H264, CODEC_VP9]
+_VALID_ENCODERS = [
+    ENCODER_LIBX264,
+    ENCODER_LIBX265,
+    ENCODER_VP9,
+    ENCODER_H264_NVENC,
+    ENCODER_HEVC_NVENC,
+]
 flags.register_validator(
-    'ffmpeg_codecs', lambda codecs: all([c in _VALID_CODECS for c in codecs])
+    'ffmpeg_encoders',
+    lambda encoders: all([c in _VALID_ENCODERS for c in encoders]),
 )
 
 FLAGS = flags.FLAGS
@@ -150,35 +160,51 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   samples = []
   input_videos_dir = '/scratch/vbench/videos/crf0'
 
-  for codec in _FFMPEG_CODECS.value:
+  for encoder in _FFMPEG_ENCODERS.value:
+    cuda_args = ''
     jobs_list = (
         _FFMPEG_PARALLELISM_LIST.value
         if _FFMPEG_PARALLELISM_LIST
         else [vm.NumCpusForBenchmark()]
     )
-    if codec == CODEC_H264:
-      ffmpeg_args = '-c:v libx264 -preset medium -crf 18'
+    if encoder in [ENCODER_LIBX264, ENCODER_LIBX265]:
+      ffmpeg_args = f'-c:v {encoder} -preset medium -crf 18'
       threads_list = (
           _FFMPEG_THREADS_LIST.value
           if _FFMPEG_THREADS_LIST
           else DEFAULT_H264_THREADS_LIST
       )
-    elif codec == CODEC_VP9:
+    elif encoder == ENCODER_VP9:
       # A single VP9 ffmpeg thread almost saturates a CPU core. Increasing the
       # parallelism is counterproductive on all machines benchmarked so far.
-      ffmpeg_args = '-c:v libvpx-vp9 -crf 10 -b:v 0 -quality good'
+      ffmpeg_args = f'-c:v {encoder} -crf 10 -b:v 0 -quality good'
       threads_list = (
           _FFMPEG_THREADS_LIST.value
           if _FFMPEG_THREADS_LIST
           else DEFAULT_VP9_THREADS_LIST
       )
+    elif encoder in [ENCODER_H264_NVENC, ENCODER_HEVC_NVENC]:
+      jobs_list = (
+          _FFMPEG_PARALLELISM_LIST.value if _FFMPEG_PARALLELISM_LIST else [8]
+      )
+      cuda_args = '-hwaccel cuda -hwaccel_output_format cuda'
+      ffmpeg_args = (
+          f'-c:v {encoder} -preset medium -rc:v vbr -cq:v 18 -qmin 18 -qmax 18'
+      )
+      threads_list = (
+          _FFMPEG_THREADS_LIST.value
+          if _FFMPEG_THREADS_LIST
+          else DEFAULT_H264_THREADS_LIST
+      )
 
     for jobs, threads in itertools.product(jobs_list, threads_list):
-      jobs_arg = f'-j{jobs}'
+      jobs_arg = ''
+      if jobs:
+        jobs_arg = f'-j{jobs}'
       threads_arg = f'-threads {threads} '
       parallel_cmd = (
           f'parallel {jobs_arg} {_FFMPEG_DIR.value}/ffmpeg '
-          f'{threads_arg} -y -i {{}} {ffmpeg_args} '
+          f'{threads_arg} -y {cuda_args} -i {{}} {ffmpeg_args} '
           '{.}.out.mkv </dev/null >&/dev/null ::: *.mkv'
       )
 
@@ -206,7 +232,7 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
               'seconds',
               metadata={
                   'test': 'upload',
-                  'codec': codec,
+                  'encoder': encoder,
                   'num_files': 15,  # TODO(spencerkim): Count *.out* files.
                   'parallelism': jobs,
                   'threads': threads,

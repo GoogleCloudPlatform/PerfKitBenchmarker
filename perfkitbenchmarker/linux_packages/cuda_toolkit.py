@@ -19,6 +19,8 @@ This module installs CUDA toolkit from NVIDIA, configures gpu clock speeds
 and autoboost settings, and exposes a method to collect gpu metadata. Currently
 Tesla K80 and P100 gpus are supported, provided that there is only a single
 type of gpu per system.
+
+https://docs.nvidia.com/deploy/cuda-compatibility/index.html#binary-compatibility__table-toolkit-driver
 """
 
 
@@ -53,6 +55,7 @@ flags.DEFINE_enum(
         '12.0',
         '12.1',
         '12.2',
+        '12.6',
         'None',
         '',
     ],
@@ -72,7 +75,7 @@ _KEY = flags.DEFINE_string(
 FLAGS = flags.FLAGS
 
 CUDA_PIN = 'https://developer.download.nvidia.com/compute/cuda/repos/{os}/{cpu_arch}/cuda-{os}.pin'
-
+CUDA_12_6_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/12.6.0/local_installers/cuda-repo-{os}-12-6-local_12.6.0-560.28.03-1_{cpu_arch}.deb'
 CUDA_12_2_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/12.2.2/local_installers/cuda-repo-{os}-12-2-local_12.2.2-535.104.05-1_{cpu_arch}.deb'
 CUDA_12_1_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/12.1.1/local_installers/cuda-repo-{os}-12-1-local_12.1.1-530.30.02-1_{cpu_arch}.deb'
 CUDA_12_0_TOOLKIT = 'https://developer.download.nvidia.com/compute/cuda/12.0.1/local_installers/cuda-repo-{os}-12-0-local_12.0.1-525.85.12-1_{cpu_arch}.deb'
@@ -180,7 +183,19 @@ def GetCudaToolkitVersion(vm):
 
 
 def EnrollSigningKey(vm):
-  if FLAGS.cuda_toolkit_version in ('11.7', '11.8', '12.0', '12.1', '12.2'):
+  """Fetch GPG Keys for CUDA Toolkit.
+
+  Args:
+    vm: the virtual machine to install CUDA on.
+  """
+  if FLAGS.cuda_toolkit_version in (
+      '11.7',
+      '11.8',
+      '12.0',
+      '12.1',
+      '12.2',
+      '12.6',
+  ):
     version = FLAGS.cuda_toolkit_version.replace('.', '-')
     vm.RemoteCommand(
         'sudo cp'
@@ -412,6 +427,10 @@ def _InstallCuda12Point2(vm):
   _InstallCuda12Generic(vm, CUDA_12_2_TOOLKIT, '12-2')
 
 
+def _InstallCuda12Point6(vm):
+  _InstallCuda12Generic(vm, CUDA_12_6_TOOLKIT, '12-6')
+
+
 def _InstallCuda11Point0(vm):
   _InstallCuda11Generic(vm, CUDA_11_0_TOOLKIT, '11-0')
 
@@ -499,6 +518,8 @@ def AptInstall(vm):
     _InstallCuda12Point1(vm)
   elif version_to_install == '12.2':
     _InstallCuda12Point2(vm)
+  elif version_to_install == '12.6':
+    _InstallCuda12Point6(vm)
   else:
     raise UnsupportedCudaVersionError()
   DoPostInstallActions(vm)
