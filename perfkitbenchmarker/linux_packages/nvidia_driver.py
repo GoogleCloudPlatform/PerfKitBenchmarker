@@ -50,7 +50,7 @@ flags.DEFINE_boolean(
 
 flags.DEFINE_string(
     'nvidia_driver_version',
-    '535.104.05',
+    '550.127.05',
     (
         'The version of nvidia driver to install. '
         'For example, "418.67" or "418.87.01."'
