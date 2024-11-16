@@ -380,8 +380,12 @@ class TestGceNetworkNames(BaseGceNetworkTest):
     )
     net = gce_network.GceNetwork.GetNetwork(vm)
     self.assertTrue(net.is_existing_network)
-    self.assertEqual('my-network', net.network_resource.name)
-    self.assertEqual('my-network', net.subnet_resource.name)
+    name = (
+        net.subnet_resource.name
+        if net.subnet_resource
+        else net.network_resource.name
+    )
+    self.assertEqual('my-network', name)
 
   @flagsaver.flagsaver(
       gce_network_name=['my-network'],
@@ -410,8 +414,14 @@ class TestGceNetworkNames(BaseGceNetworkTest):
         subnet_names='default',
     )
     net = gce_network.GceNetwork.GetNetwork(vm)
+    name = (
+        net.subnet_resource.name
+        if net.subnet_resource
+        else net.network_resource.name
+    )
+
     self.assertTrue(net.is_existing_network)
-    self.assertEqual('default', net.subnet_resource.name)
+    self.assertEqual('default', name)
 
   ########
   # FireWall Names

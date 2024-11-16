@@ -918,13 +918,18 @@ class GceNetwork(network.BaseNetwork):
     self.subnet_resources = []
     mode = gcp_flags.GCE_NETWORK_TYPE.value
     self.subnet_resource = None
+
+    # Handle GCP network attachment on legacy networks.
     if not self.is_existing_network or mode == 'legacy':
       for name in self.subnet_names:
-        mode = 'auto'
+        if mode != 'custom':
+          mode = 'auto'
         self.network_resources.append(
             GceNetworkResource(name, mode, self.project, self.mtu)
         )
-    else:
+
+    # Create GCP network subnet for custom mode.
+    if mode == 'custom':
       subnet_region = util.GetRegionFromZone(network_spec.zone)
       for name in self.subnet_names:
         self.subnet_resources.append(
