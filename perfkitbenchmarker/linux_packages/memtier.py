@@ -301,20 +301,18 @@ def YumInstall(vm):
   """Installs the memtier package on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(YUM_PACKAGES)
-
-  vm.RemoteCommand('git clone {} {}'.format(GIT_REPO, MEMTIER_DIR))
-  vm.RemoteCommand('cd {} && git checkout {}'.format(MEMTIER_DIR, GIT_TAG))
-  pkg_config = 'PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH}'
-  vm.RemoteCommand(
-      'cd {} && autoreconf -ivf && {} ./configure && '
-      'sudo make install'.format(MEMTIER_DIR, pkg_config)
-  )
+  _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the memtier package on the VM."""
   vm.Install('build_tools')
   vm.InstallPackages(APT_PACKAGES)
+  _Install(vm)
+
+
+def _Install(vm):
+  """Installs the memtier package on the VM."""
   vm.RemoteCommand('git clone {} {}'.format(GIT_REPO, MEMTIER_DIR))
   vm.RemoteCommand('cd {} && git checkout {}'.format(MEMTIER_DIR, GIT_TAG))
   if MEMTIER_LARGE_CLUSTER.value:
@@ -325,26 +323,18 @@ def AptInstall(vm):
     vm.RemoteCommand(
         f'tar -C {MEMTIER_DIR} -xvzf {MEMTIER_DIR}/{_LARGE_CLUSTER_TAR}'
     )
+  # autoreconf is segfaulting on some runs. so retry.
+  vm_util.Retry(max_retries=10)(vm.RemoteCommand)(
+      f'cd {MEMTIER_DIR} && autoreconf -ifvvvvvvvvv'
+  )
   vm.RemoteCommand(
-      'cd {} && autoreconf -ivf && ./configure && sudo make install'.format(
-          MEMTIER_DIR
-      )
+      f'cd {MEMTIER_DIR} && ./configure && make && sudo make install'
   )
 
 
-def _Uninstall(vm):
+def Uninstall(vm):
   """Uninstalls the memtier package on the VM."""
   vm.RemoteCommand('cd {} && sudo make uninstall'.format(MEMTIER_DIR))
-
-
-def YumUninstall(vm):
-  """Uninstalls the memtier package on the VM."""
-  _Uninstall(vm)
-
-
-def AptUninstall(vm):
-  """Uninstalls the memtier package on the VM."""
-  _Uninstall(vm)
 
 
 def BuildMemtierCommand(
