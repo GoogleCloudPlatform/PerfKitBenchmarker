@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2024 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,14 +13,37 @@
 # limitations under the License.
 
 
-"""Module containing build tools installation and cleanup functions."""
+"""Module containing texinfo installation and cleanup functions."""
+
+from perfkitbenchmarker import os_types
 
 
-def YumInstall(_):
-  """Installs build tools on the VM."""
-  pass
+def YumInstall(vm):
+  """Installs the texinfo package on the VM."""
+  if vm.OS_TYPE == os_types.ROCKY_LINUX8:
+    vm.RemoteCommand('sudo dnf config-manager --set-enabled powertools')
+  elif vm.OS_TYPE == os_types.ROCKY_LINUX9:
+    vm.RemoteCommand('sudo dnf config-manager --set-enabled crb')
+  elif vm.OS_TYPE == os_types.RHEL8:
+    vm.RemoteCommand(
+        'sudo dnf config-manager --set-enabled'
+        ' rhui-codeready-builder-for-rhel-8-x86_64-rhui-rpms'
+    )
+  elif vm.OS_TYPE == os_types.RHEL9:
+    if vm.is_aarch64:
+      vm.RemoteCommand(
+          'sudo dnf config-manager --set-enabled'
+          ' rhui-codeready-builder-for-rhel-9-aarch64-rhui-rpms'
+      )
+    else:
+      vm.RemoteCommand(
+          'sudo dnf config-manager --set-enabled'
+          ' rhui-codeready-builder-for-rhel-9-x86_64-rhui-rpms'
+      )
+
+  vm.InstallPackages('texinfo')
 
 
 def AptInstall(vm):
-  """Installs build tools on the VM."""
+  """Installs the texinfo package on the VM."""
   vm.InstallPackages('texinfo')

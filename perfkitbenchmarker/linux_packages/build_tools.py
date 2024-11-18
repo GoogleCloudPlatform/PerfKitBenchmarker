@@ -82,7 +82,7 @@ def BuildGccFromSource(vm, gcc_version):
   gcc_components = gcc_version.split('.')
   major = int(gcc_components[0])
   if major >= 13:
-    vm.InstallPackages('texinfo')
+    vm.Install('texinfo')
 
   # build GCC on scratch disks for speed if possible
   build_dir = vm.GetScratchDir() if vm.scratch_disks else '~/'
