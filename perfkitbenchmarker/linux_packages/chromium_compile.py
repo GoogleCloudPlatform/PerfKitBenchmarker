@@ -2,8 +2,8 @@
 
 import logging
 import os.path
-
 from absl import flags
+from perfkitbenchmarker import vm_util
 
 CHROMIUM_COMPILE_TARGETS = flags.DEFINE_list(
     'chromium_compile_targets',
@@ -99,11 +99,9 @@ def AptInstall(vm):
       '| sudo debconf-set-selections'
   )
 
-  vm.RemoteCommand(
-      'cd {} && PATH="$PATH:{}" '
-      './src/build/install-build-deps.sh --no-prompt'.format(
-          local_working_directory, depot_tools_path
-      )
+  vm_util.Retry()(vm.RemoteCommand)(
+      f'cd {local_working_directory} && PATH="$PATH:{depot_tools_path}" '
+      './src/build/install-build-deps.sh --no-prompt'
   )
 
   if not is_preprovisioned:
