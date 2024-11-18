@@ -19,9 +19,11 @@ import logging
 import os
 import posixpath
 import re
+
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker.linux_packages import build_tools
@@ -355,6 +357,9 @@ def Install(vm):
   vm.Install('wget')
   vm.Install('fortran')
   vm.Install('build_tools')
+
+  if vm.OS_TYPE in os_types.EL_OS_TYPES:
+    vm.InstallPackages('libxcrypt-compat')
 
   # If runspec_build_tool_version is not set,
   # install 4.7 gcc/g++/gfortan. If either one of the flag is set, we assume
