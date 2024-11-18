@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# Starts ss collection for SsCollector.
+while "true" ; do ss {{ options }} >>$1 ; sleep {{ interval}} ; done

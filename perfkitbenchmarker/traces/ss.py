@@ -17,63 +17,78 @@
 import logging
 import os
 from absl import flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker import events
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.traces import base_collector
 
-flags.DEFINE_boolean(
-    'sar',
+FLAG_SS = flags.DEFINE_boolean(
+    'ss',
     False,
-    'Run sar (https://linux.die.net/man/1/sar) '
-    'on each VM to collect system performance metrics during '
-    'each benchmark run, and then download the full archive for analysis.',
+    'Run ss (https://linux.die.net/man/8/ss) '
+    'on each VM to collect TCP socket performance metrics during '
+    'each benchmark run, and then download the full text for analysis.',
 )
-flags.DEFINE_integer(
-    'sar_interval',
+FLAG_SS_INTERVAL = flags.DEFINE_integer(
+    'ss_interval',
     1,
-    'sar sample collection frequency, in seconds. Only '
-    'applicable when --sar is specified.',
+    'ss sample collection frequency, in seconds. Only '
+    'applicable when --ss is specified.',
 )
-FLAGS = flags.FLAGS
+FLAG_SS_OPTIONS = flags.DEFINE_string(
+    'ss_options',
+    '-tiepm "dport == 5001 or sport == 5001 or dport == 20000 or sport =='
+    ' 20000"',
+    'cmdline options to pass to ss; defaults will show TCP details for'
+    ' netperf(20000) and iperf(5001) ports',
+)
 
 
-class _SarCollector(base_collector.BaseCollector):
-  """sar archive collector for manual analysis.
+class _SsCollector(base_collector.BaseCollector):
+  """ss collector for manual analysis.
 
-  Installs sysstat and runs sar on a collection of VMs.
+  Runs ss on a collection of VMs.
   """
 
   def _CollectorName(self):
-    return 'sar'
+    return 'ss'
 
   def _InstallCollector(self, vm):
-    vm.InstallPackages('sysstat')
+    vm.RenderTemplate(
+        data.ResourcePath('ss.sh.j2'),
+        'ss.sh',
+        context={
+            'options': FLAG_SS_OPTIONS.value,
+            'interval': FLAG_SS_INTERVAL.value,
+        },
+    )
+    vm.RemoteCommand('chmod +x ss.sh')
 
   def _CollectorRunCommand(self, vm, collector_file):
-    """Starts sar in the background and returns the pid."""
+    """Starts ss in the background and returns the pid."""
     # NOTE that &>/dev/null is IMPORTANT, otherwise the command will get stuck
-    cmd = f'sar -o {collector_file} {FLAGS.sar_interval} &>/dev/null & echo $!'
+    cmd = f'./ss.sh {collector_file} &>/dev/null & echo $!'
     return cmd
 
 
 def Register(parsed_flags):
-  """Registers the sar collector if FLAGS.sar is set."""
-  if not parsed_flags.sar:
+  """Registers the ss collector if flag 'ss' is set."""
+  if not parsed_flags.ss:
     return
 
   output_directory = vm_util.GetTempDir()
 
   logging.debug(
-      'Registering sar collector with interval %s, output to %s.',
-      parsed_flags.sar_interval,
+      'Registering ss collector with interval %s, output to %s.',
+      FLAG_SS_INTERVAL.value,
       output_directory,
   )
 
   if not os.path.isdir(output_directory):
     os.makedirs(output_directory)
-  collector = _SarCollector(
-      interval=parsed_flags.sar_interval, output_directory=output_directory
+  collector = _SsCollector(
+      interval=FLAG_SS_INTERVAL.value, output_directory=output_directory
   )
   events.before_phase.connect(collector.Start, stages.RUN, weak=False)
   events.after_phase.connect(collector.Stop, stages.RUN, weak=False)
