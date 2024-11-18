@@ -117,6 +117,16 @@ flags.DEFINE_string(
     'Used by the PKB speccpu benchmarks. If set, the benchmark will execute '
     'this script instead of invoking runspec binary directly.',
 )
+flags.DEFINE_enum(
+    'runspec_tuned_profile',
+    None,
+    [
+        'throughput-performance',
+        'latency-performance',
+        'virtual-guest',
+    ],
+    'TuneD profile for SPEC CPU',
+)
 
 VM_STATE_ATTR = 'speccpu_vm_state'
 
@@ -360,6 +370,10 @@ def Install(vm):
 
   if vm.OS_TYPE in os_types.EL_OS_TYPES:
     vm.InstallPackages('libxcrypt-compat')
+
+  if FLAGS.runspec_tuned_profile:
+    vm.Install('tuned')
+    vm.RemoteCommand(f'sudo tuned-adm profile {FLAGS.runspec_tuned_profile}')
 
   # If runspec_build_tool_version is not set,
   # install 4.7 gcc/g++/gfortan. If either one of the flag is set, we assume
