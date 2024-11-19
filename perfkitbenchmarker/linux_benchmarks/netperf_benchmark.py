@@ -102,6 +102,24 @@ flags.DEFINE_integer(
     'If you try to set the MSS lower than 88 bytes, the default MSS will be '
     'used.',
 )
+NETPERF_NUMACTL_PHYSCPUBIND = flags.DEFINE_string(
+    'netperf_numactl_physcpubind',
+    None,
+    'Sets the cpus to run netperf. Please see --physcpubind on'
+    ' https://linux.die.net/man/8/numactl for format.',
+)
+NETPERF_NUMACTL_MEMBIND = flags.DEFINE_string(
+    'netperf_numactl_membind',
+    None,
+    'Sets the memory nodes to run netperf. Please see --membind on '
+    ' https://linux.die.net/man/8/numactl for format.',
+)
+FLAG_NETPERF_PERF_RECORD = flags.DEFINE_boolean(
+    'netperf_perf_record',
+    False,
+    'Run perf record on netperf. Note that this can be VERY INTRUSIVE and'
+    ' change the result.',
+)
 
 TCP_RR = 'TCP_RR'
 TCP_CRR = 'TCP_CRR'
@@ -525,6 +543,18 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
         f'./{REMOTE_SCRIPT} --netperf_cmd="{netperf_cmd}" '
         f'--num_streams={num_streams} --port_start={PORT_START+(server_ip_idx*2*num_streams)}'
     )
+
+    if NETPERF_NUMACTL_MEMBIND.value or NETPERF_NUMACTL_PHYSCPUBIND.value:
+      numactl_prefix = 'numactl '
+      if NETPERF_NUMACTL_PHYSCPUBIND.value:
+        numactl_prefix += f'--physcpubind {NETPERF_NUMACTL_PHYSCPUBIND.value} '
+      if NETPERF_NUMACTL_MEMBIND.value:
+        numactl_prefix += f'--membind {NETPERF_NUMACTL_MEMBIND.value} '
+      remote_cmd = f'{numactl_prefix} {remote_cmd}'
+
+    if FLAG_NETPERF_PERF_RECORD.value:
+      remote_cmd = f'sudo perf record -g -F 99 -- {remote_cmd}'
+
     remote_cmd_list.append(remote_cmd)
 
   # Give the remote script the max possible test length plus 5 minutes to

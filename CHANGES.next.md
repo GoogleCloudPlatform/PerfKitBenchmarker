@@ -211,6 +211,7 @@
 
 ### Enhancements:
 
+-   Add numactl and perf support to netperf for analysis
 -   Additions to MongoDB in Artemis/PKB to facilitate workload analysis
 -   Updated `sar` switch to efficiently collect all sar metrics during the run,
     and download the file for hands-on analysis (no parsing).
