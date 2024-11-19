@@ -23,6 +23,7 @@ Cassandra homepage: http://cassandra.apache.org
 import logging
 import os
 import posixpath
+import re
 import time
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -253,6 +254,46 @@ def IsRunning(vm):
   except errors.VirtualMachine.RemoteCommandError as ex:
     logging.warning('Exception: %s', ex)
     return False
+
+
+def GetCompactionStats(vm):
+  """Returns compaction stats for the given VM.
+
+  Args:
+    vm: VirtualMachine. The VM to get compaction stats from.
+
+  Sample Output of compaction stats:
+  pending tasks: 5
+  - keyspace1.standard1: 5
+
+  id  compaction type keyspace  table     completed  total      unit  progress
+  c69  Compaction    keyspace1 standard1 437886277  20868111340 bytes 2.10%
+  Active compaction remaining time :   0h05m33s
+  """
+  stdout, _ = vm.RemoteCommand(f'{GetNodetoolPath()} compactionstats')
+  return stdout
+
+
+def GetPendingTaskCountFromCompactionStats(cassandra_vms):
+  """Parses the compaction stats for the given VMs and returns the pending task count.
+
+  Args:
+    cassandra_vms: List of VirtualMachine. The Cassandra VMs to get compaction
+      stats from.
+
+  Returns:
+    List of int. The pending task count for each VM.
+  """
+  compaction_stats = background_tasks.RunThreaded(
+      GetCompactionStats, cassandra_vms
+  )
+  pending_tasks = []
+  for stats in compaction_stats:
+    line = re.search(r'pending tasks: *(\d*)', stats)
+    if line:
+      value = re.sub(r'pending tasks: *(\d*)', r'\1', line.group())
+      pending_tasks.append(int(value))
+  return pending_tasks
 
 
 def CleanNode(vm):

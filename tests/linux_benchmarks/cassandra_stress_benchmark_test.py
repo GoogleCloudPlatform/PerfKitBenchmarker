@@ -8,6 +8,24 @@ class CassandraStressBenchmarkTest(
     pkb_common_test_case.PkbCommonTestCase, test_util.SamplesTestMixin
 ):
 
+  def testSarRequestCount(self):
+    count = cassandra_stress_benchmark.CalculateNumberOfSarRequestsFromDuration(
+        '10m', 10
+    )
+    self.assertEqual(count, 60)
+    count = cassandra_stress_benchmark.CalculateNumberOfSarRequestsFromDuration(
+        '10s', 10
+    )
+    self.assertEqual(count, 1)
+    count = cassandra_stress_benchmark.CalculateNumberOfSarRequestsFromDuration(
+        '10h', 10
+    )
+    self.assertEqual(count, 3600)
+    count = cassandra_stress_benchmark.CalculateNumberOfSarRequestsFromDuration(
+        None, 10
+    )
+    self.assertEqual(count, 0)
+
   def testCassandraStressResponseParsing(self):
     sample_results = """
       Results:
