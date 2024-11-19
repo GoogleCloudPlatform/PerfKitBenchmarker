@@ -19,7 +19,6 @@ Use 'gcloud compute disk-types list' to determine valid disk types.
 
 import json
 import logging
-import re
 import time
 from typing import Any
 
@@ -27,7 +26,6 @@ from absl import flags
 import dateutil.parser
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import boot_disk
-from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
@@ -145,16 +143,6 @@ FIXED_SSD_MACHINE_TYPES = {
 }
 
 NVME_PD_MACHINE_FAMILIES = ['m3']
-# Some machine families cannot use pd-ssd
-HYPERDISK_ONLY_MACHINE_FAMILIES = [
-    'c3a',
-    'n4',
-    'c4',
-    'c4a',
-]
-# Default boot disk type in pkb.
-# Console defaults to pd-balanced & gcloud defaults to pd-standard as of 11/23
-PKB_DEFAULT_BOOT_DISK_TYPE = PD_BALANCED
 
 
 class GceServiceUnavailableError(Exception):
@@ -320,31 +308,6 @@ class GceBootDisk(boot_disk.BootDisk):
     if self.boot_disk_throughput:
       result['boot_disk_provisioned_throughput'] = self.boot_disk_throughput
     return result
-
-
-def GetDefaultBootDiskType(machine_type: str) -> str:
-  """Defaults the gce boot disk to pd-balanced/hyperdisk-balanced.
-
-  Console defaults to pd-balanced (ssd) and hyperdisk-balanced (ssd).
-  But gcloud tool defaults to pd-standard (hdd). This is a pkb default to
-  use a slightly better (lower latency) default of pd-balanced.
-  This lets us align with console and boot windows machines without
-  thinking about boot disk.
-
-  Args:
-    machine_type: machine type
-
-  Returns:
-    default boot disk type.
-  """
-  if not machine_type or isinstance(
-      machine_type, custom_virtual_machine_spec.CustomMachineTypeSpec
-  ):
-    return PKB_DEFAULT_BOOT_DISK_TYPE
-  family = machine_type.split('-')[0].lower()
-  if family in HYPERDISK_ONLY_MACHINE_FAMILIES:
-    return HYPERDISK_BALANCED
-  return PKB_DEFAULT_BOOT_DISK_TYPE
 
 
 class GceLocalDisk(disk.BaseDisk):

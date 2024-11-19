@@ -96,7 +96,6 @@ mysql_tpcc:
           # TODO(andytzhu) - Add AWS/Azure
           GCP:
             boot_disk_size: 200
-            boot_disk_type: pd-ssd
         disk_spec:
           GCP:
             disk_size: 4000
@@ -141,7 +140,6 @@ postgres_tpcc:
           # TODO(andytzhu) - Add AWS/Azure
           GCP:
             boot_disk_size: 200
-            boot_disk_type: pd-ssd
         disk_spec:
           GCP:
             disk_size: 4000

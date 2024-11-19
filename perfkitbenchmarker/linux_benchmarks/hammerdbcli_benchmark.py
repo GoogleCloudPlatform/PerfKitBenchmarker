@@ -64,6 +64,7 @@ hammerdbcli:
           GCP:
             machine_type: n1-standard-16
             zone: us-central1-c
+            boot_disk_size: 200
           AWS:
             machine_type: m4.4xlarge
             zone: us-west-1a

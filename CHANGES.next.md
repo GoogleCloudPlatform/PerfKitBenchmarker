@@ -526,3 +526,4 @@
     based OSes.
 -   Update Chromium version to 127.0.6533.88.
 -   Update bigtable_walkthrough/README.md to help reduce the user frictions.
+-   Remove default boot_disk_type in GCP.

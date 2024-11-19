@@ -459,7 +459,6 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
           command_string,
       )
       self.assertNotIn('--boot-disk-size', command_string)
-      self.assertIn('--boot-disk-type', command_string)
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       self.assertDictContainsSubset(
@@ -522,7 +521,6 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
         image=fake_image,
         image_project=fake_image_project,
         boot_disk_size=20,
-        boot_disk_type='fake-disk-type',
     )
     fake_disk = {
         'id': '123456',
@@ -545,7 +543,6 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn('gcloud compute instances create', command_string)
       self.assertIn('--boot-disk-size 20', command_string)
-      self.assertIn('--boot-disk-type fake-disk-type', command_string)
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
