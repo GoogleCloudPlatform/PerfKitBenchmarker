@@ -21,6 +21,7 @@ import re
 import statistics
 
 from absl import flags
+import immutabledict
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
@@ -68,9 +69,10 @@ CONCURRENT_MODS = (
 # Sysbench TPCC-addon script
 SYSBENCH_TPCC_REPRO = 'https://github.com/Percona-Lab/sysbench-tpcc.git'
 SYSBENCH_COMMIT_DELAY = '{COMMIT_DELAY}'
+DB_DRIVER_KEY = 'db_driver'
 
 
-def _Install(vm, spanner_oltp=False):
+def _Install(vm, spanner_oltp=False, args=immutabledict.immutabledict()):
   """Installs the sysbench package on the VM."""
   vm.RemoteCommand(f'sudo rm -rf {SYSBENCH_DIR}')
   if SYSBENCH_VERSION.value in RELEASE_TAGS:
@@ -85,6 +87,12 @@ def _Install(vm, spanner_oltp=False):
   if _IGNORE_CONCURRENT.value:
     driver_file = f'{SYSBENCH_DIR}/src/drivers/pgsql/drv_pgsql.c'
     vm.RemoteCommand(f"sed -i '{CONCURRENT_MODS}' {driver_file}")
+  without_mysql = ''
+  if (
+      DB_DRIVER_KEY in args
+      and args.get(DB_DRIVER_KEY) == 'pgsql'
+  ):
+    without_mysql = '--without-mysql'
   if spanner_oltp:
     vm.PushDataFile(
         'sysbench/spanner_oltp_git.diff',
@@ -112,6 +120,7 @@ def _Install(vm, spanner_oltp=False):
 
   vm.RemoteCommand(
       f'cd {SYSBENCH_DIR} && ./autogen.sh && ./configure --with-pgsql'
+      f' {without_mysql}'
   )
   vm.RemoteCommand(f'cd {SYSBENCH_DIR} && make -j && sudo make install')
 
@@ -121,26 +130,35 @@ def Uninstall(vm):
   vm.RemoteCommand(f'cd {SYSBENCH_DIR} && sudo make uninstall')
 
 
-def YumInstall(vm):
+def YumInstall(vm, args=immutabledict.immutabledict()):
   """Installs the sysbench package on the VM."""
   mariadb_pkg_name = 'mariadb-devel'
-  if vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
+  devel_pkg_name = 'postgresql-devel'
+  if (
+      DB_DRIVER_KEY in args
+      and args.get(DB_DRIVER_KEY) == 'pgsql'
+  ):
+    if vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
+      mariadb_pkg_name = ''
+    elif vm.OS_TYPE in os_types.CENTOS_TYPES:
+      devel_pkg_name = 'libpq-devel.x86_64'
+  elif vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
     # Use mysql-devel according to sysbench documentation.
     mariadb_pkg_name = 'mysql-devel'
   vm.InstallPackages(
       f'make automake libtool pkgconfig libaio-devel {mariadb_pkg_name} '
-      'openssl-devel postgresql-devel'
+      f'openssl-devel {devel_pkg_name}'
   )
-  _Install(vm)
+  _Install(vm, args=args)
 
 
-def AptInstall(vm, spanner_oltp=False):
+def AptInstall(vm, spanner_oltp=False, args=immutabledict.immutabledict()):
   """Installs the sysbench package on the VM."""
   vm.InstallPackages(
       'make automake libtool pkg-config libaio-dev default-libmysqlclient-dev '
       'libssl-dev libpq-dev'
   )
-  _Install(vm, spanner_oltp=spanner_oltp)
+  _Install(vm, spanner_oltp=spanner_oltp, args=args)
 
 
 def ParseSysbenchTimeSeries(sysbench_output, metadata) -> list[sample.Sample]:
@@ -303,6 +321,7 @@ class SysbenchInputParameters:
   host_ip: str | None = None
   ssl_setting: str | None = None
   mysql_ignore_errors: str | None = None
+  port: int | None = None
 
 
 def _BuildGenericCommand(
@@ -336,9 +355,14 @@ def _BuildGenericCommand(
   if sysbench_parameters.skip_trx:
     cmd += ['--skip_trx=on']
   cmd += GetSysbenchDatabaseFlags(
-      sysbench_parameters.db_driver, sysbench_parameters.db_user,
-      sysbench_parameters.db_password, sysbench_parameters.db_name,
-      sysbench_parameters.host_ip, sysbench_parameters.ssl_setting)
+      sysbench_parameters.db_driver,
+      sysbench_parameters.db_user,
+      sysbench_parameters.db_password,
+      sysbench_parameters.db_name,
+      sysbench_parameters.host_ip,
+      sysbench_parameters.ssl_setting,
+      sysbench_parameters.port,
+  )
   return cmd
 
 
@@ -364,6 +388,7 @@ def GetSysbenchDatabaseFlags(
     db_name: str,
     host_ip: str,
     ssl_setting: str | None = None,  # only available in sysbench ver 1.1+
+    port: int | None = None,
 ) -> list[str]:
   """Returns the database flags for sysbench."""
   if db_driver == 'mysql':
@@ -375,6 +400,17 @@ def GetSysbenchDatabaseFlags(
         f'--mysql-password={db_password}',
         f'--mysql-db={db_name}',
         f'--mysql-host={host_ip}',
+    ]
+  elif db_driver == 'pgsql':
+    cmd = []
+    if ssl_setting:
+      cmd += [f'--pgsql-sslmode={ssl_setting}']
+    return cmd + [
+        f'--pgsql-user={db_user}',
+        f"--pgsql-password='{db_password}'",
+        f'--pgsql-db={db_name}',
+        f'--pgsql-host={host_ip}',
+        f'--pgsql-port={port}',
     ]
   return []
 
