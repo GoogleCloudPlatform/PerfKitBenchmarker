@@ -528,3 +528,4 @@
 -   Update Chromium version to 127.0.6533.88.
 -   Update bigtable_walkthrough/README.md to help reduce the user frictions.
 -   Remove default boot_disk_type in GCP.
+-   Update AWS and Azure default disks to gp3 and PremiumV2_LRS respectively.

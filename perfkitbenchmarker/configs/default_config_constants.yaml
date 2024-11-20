@@ -91,11 +91,11 @@ default_500_gb: &default_500_gb
     disk_size: 500
     mount_point: /scratch
   Azure:
-    disk_type: Premium_LRS
+    disk_type: PremiumV2_LRS
     disk_size: 500
     mount_point: /scratch
   AWS:
-    disk_type: gp2
+    disk_type: gp3
     disk_size: 500
     mount_point: /scratch
   AliCloud:
@@ -148,11 +148,11 @@ default_50_gb: &default_50_gb
     disk_size: 50
     mount_point: /scratch
   Azure:
-    disk_type: Premium_LRS
+    disk_type: PremiumV2_LRS
     disk_size: 50
     mount_point: /scratch
   AWS:
-    disk_type: gp2
+    disk_type: gp3
     disk_size: 50
     mount_point: /scratch
   AliCloud:

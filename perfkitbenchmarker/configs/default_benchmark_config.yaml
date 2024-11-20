@@ -7,10 +7,10 @@ default_disk_spec: &default_disk_spec
     disk_type: pd-ssd
   AWS:
     disk_size: 200
-    disk_type: gp2
+    disk_type: gp3
   Azure:
     disk_size: 200
-    disk_type: Premium_LRS
+    disk_type: PremiumV2_LRS
 
 speccpu2017_int_rate_flags_base: &speccpu2017_int_rate_flags_base
   build_fortran: True
