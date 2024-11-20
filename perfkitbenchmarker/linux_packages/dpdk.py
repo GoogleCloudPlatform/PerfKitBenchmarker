@@ -175,7 +175,7 @@ def _BindNICToDPDKDriver(vm):
 
   # Bind secondary device to VFIO kernel module
   vm.RobustRemoteCommand(
-      'sudo dpdk/usertools/dpdk-devbind.py -b vfio-pci'
+      'sudo dpdk/usertools/dpdk-devbind.py -b vfio-pci --noiommu-mode'
       f' {vm.secondary_nic_bus_info}'
   )
 
