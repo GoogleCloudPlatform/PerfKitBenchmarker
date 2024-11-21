@@ -4,7 +4,7 @@
 default_disk_spec: &default_disk_spec
   GCP:
     disk_size: 200
-    disk_type: pd-ssd
+    disk_type: pd-balanced
   AWS:
     disk_size: 200
     disk_type: gp3
