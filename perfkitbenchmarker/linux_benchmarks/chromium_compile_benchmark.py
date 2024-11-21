@@ -34,8 +34,8 @@ chromium_compile:
       disk_spec:
         # Standardize with 720 MB/s bandwidth to minimize I/O impact.
         GCP:
-          disk_size: 1000
-          disk_type: pd-ssd
+          disk_size: 2070
+          disk_type: pd-balanced
           mount_point: /scratch
         AWS:
           num_striped_disks: 3
