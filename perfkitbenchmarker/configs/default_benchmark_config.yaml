@@ -97,6 +97,7 @@ mysql_tpcc:
           GCP:
             boot_disk_size: 200
         disk_spec:
+          # 4TB pd-balanced has 27k IOPS, 1260 MB/s throughput.
           GCP:
             disk_size: 4000
             disk_type: pd-balanced
@@ -107,7 +108,7 @@ mysql_tpcc:
             provisioned_iops: 10000
             provisioned_throughput: 300
             num_striped_disks: 4
-          Azure: # Premiumv2 disks matching 4TB pd-ssd
+          Azure:
             disk_size: 2000
             disk_type: PremiumV2_LRS
             provisioned_iops: 40000
