@@ -20,11 +20,10 @@ AMAZONLINUX2023 = 'amazonlinux2023'
 AMAZON_NEURON = 'amazon_neuron'
 CENTOS_STREAM9 = 'centos_stream9'
 CLEAR = 'clear'
-COS = 'cos'  # stable
+COS = 'cos'
+COS_DEV = 'cos_dev'
 COS109 = 'cos109'
 COS105 = 'cos105'
-COS101 = 'cos101'
-COS_DEV = 'cos_dev'
 CORE_OS = 'core_os'
 DEBIAN11 = 'debian11'
 DEBIAN11_BACKPORTS = 'debian11_backports'
@@ -89,7 +88,6 @@ CONTAINER_OS_TYPES = [
     COS,
     COS109,
     COS105,
-    COS101,
     COS_DEV,
 ]
 

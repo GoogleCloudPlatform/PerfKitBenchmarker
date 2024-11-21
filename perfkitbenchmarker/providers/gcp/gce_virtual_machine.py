@@ -1773,12 +1773,6 @@ class Cos105BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-105-lts'
 
 
-class Cos101BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
-  OS_TYPE = os_types.COS101
-  DEFAULT_X86_IMAGE_FAMILY = 'cos-101-lts'
-  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-101-lts'
-
-
 class CoreOsBasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.CoreOsMixin
 ):

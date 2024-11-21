@@ -90,6 +90,7 @@
 -   Make Ubuntu 24 the default os_type.
 
 ### New features:
+
 -   Add support for TimescaleDB
 -   Add support for Omni
 -   Add support for systems running fedora36 and fedora37
@@ -172,7 +173,7 @@
 -   Add support for multi-network creation/attachment. PKB currently does not
     handle subnet creation on an existing network.
 -   Add support for GCE Confidential VM's.
--   Add cos-dev, cost109, cos105, and cos101 OS support for GCP.
+-   Add cos-dev, cost109, and cos105 OS support for GCP.
 -   Add --object_ttl_days flag for lifecycle management of created buckets.
 -   Add support for multi-NIC netperf throughput on AWS.
 -   Added AWS/GCP support for Data Plane Development Kit (DPDK) on Linux VM's to
@@ -204,8 +205,8 @@
 -   Use Artifact Registry instead of the deprecated Google Container Registry
 -   Add `--capture_vm_logs` flag, which prompts PKB to capture `syslog`,
     `journalctl`, and `sos report` (if supported) logs from Linux test VMs.
--   Add `--vm_log_bucket` flag, offering users the option to upload the
-    logs captured via the `--capture_vm_logs` flag to a GCS bucket.
+-   Add `--vm_log_bucket` flag, offering users the option to upload the logs
+    captured via the `--capture_vm_logs` flag to a GCS bucket.
 -   Add chromium_compile_benchmark.
 -   Add unmanaged_postgresql_sysbench benchmark.
 
