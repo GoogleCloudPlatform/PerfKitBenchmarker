@@ -20,8 +20,10 @@ AMAZONLINUX2023 = 'amazonlinux2023'
 AMAZON_NEURON = 'amazon_neuron'
 CENTOS_STREAM9 = 'centos_stream9'
 CLEAR = 'clear'
-COS = 'cos'
+COS = 'cos'  # stable
 COS_DEV = 'cos_dev'
+COS117 = 'cos117'
+COS113 = 'cos113'
 COS109 = 'cos109'
 COS105 = 'cos105'
 CORE_OS = 'core_os'
@@ -86,6 +88,8 @@ WINDOWS = 'windows'
 CONTAINER_OS_TYPES = [
     CORE_OS,
     COS,
+    COS117,
+    COS113,
     COS109,
     COS105,
     COS_DEV,
