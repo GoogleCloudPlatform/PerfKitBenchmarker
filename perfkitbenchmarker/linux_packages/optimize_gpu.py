@@ -48,7 +48,14 @@ def MountFuse(vm, bucket, path):
         f' {bucket} {path}'
     )
   elif FLAGS.cloud == 'AWS':
-    vm.RemoteCommand(f'sudo mount-s3 {bucket} {path}')
+    vm.RemoteCommand(
+        'sudo sed -i "s/#user_allow_other/user_allow_other/g" /etc/fuse.conf'
+    )
+    vm.RemoteCommand(
+        'mount-s3 --allow-delete --allow-other --allow-overwrite '
+        f'{bucket} {path}'
+    )
+
   else:
     raise NotImplementedError()
 
