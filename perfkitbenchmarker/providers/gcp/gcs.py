@@ -114,6 +114,9 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       timeout: The timeout for the copy command.
     """
     cmd = ['gsutil', 'cp']
+    if recursive or timeout is not None:
+      # -m runs in parallel, which is faster.
+      cmd = ['gsutil', '-m', 'cp']
     if recursive:
       cmd += ['-r']
     cmd += [src_url, dst_url]
