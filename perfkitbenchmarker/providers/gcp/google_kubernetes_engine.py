@@ -447,3 +447,134 @@ class GkeCluster(container_service.KubernetesCluster):
     if node_pool != container_service.DEFAULT_NODEPOOL:
       cmd.flags['node-pool'] = node_pool
     cmd.Issue()
+
+
+class GkeAutopilotCluster(container_service.KubernetesCluster):
+  """Class representing an Autopilot GKE cluster, which has no nodepools."""
+
+  CLOUD = provider_info.GCP
+  CLUSTER_TYPE = 'Autopilot'
+
+  def __init__(self, spec: container_spec_lib.ContainerClusterSpec):
+    super().__init__(spec)
+    self.project = FLAGS.project
+    self.cluster_version = FLAGS.container_cluster_version
+    self.use_application_default_credentials = True
+    self.region = util.GetRegionFromZone(self.zones[0])
+    # Nodepools are not supported for Autopilot clusters, but default vm_spec
+    # still used for pod spec input.
+    self.nodepools = []
+
+  def InitializeNodePoolForCloud(
+      self,
+      vm_config: virtual_machine.BaseVirtualMachine,
+      nodepool_config: container_service.BaseNodePoolConfig,
+  ):
+    self.zones = [vm_config.zone]
+    nodepool_config.network = vm_config.network
+    return nodepool_config
+
+  @property
+  def zone(self) -> str:
+    if not self.zones:
+      raise errors.Resource.CreationInternalError(
+          'Cluster has not been initialized yet.'
+      )
+    return self.zones[0] or 'us-central1-a'
+
+  def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
+    """Fix zone and region."""
+    cmd = util.GcloudCommand(self, *args, **kwargs)
+    if 'zone' in cmd.flags:
+      del cmd.flags['zone']
+    cmd.flags['region'] = self.region
+    return cmd
+
+  def _Create(self):
+    """Creates the cluster."""
+    cmd = self._GcloudCommand(
+        'container',
+        'clusters',
+        'create-auto',
+        self.name,
+        '--no-autoprovisioning-enable-insecure-kubelet-readonly-port',
+    )
+
+    user = util.GetDefaultUser()
+    if FLAGS.gcp_service_account:
+      cmd.flags['service-account'] = FLAGS.gcp_service_account
+    # Matches service accounts that either definitely belongs to this project or
+    # are a GCP managed service account like the GCE default service account,
+    # which we can't tell to which project they belong.
+    elif re.match(SERVICE_ACCOUNT_PATTERN, user):
+      logging.info(
+          'Re-using configured service-account for GKE Cluster: %s', user
+      )
+      cmd.flags['service-account'] = user
+      self.use_application_default_credentials = False
+    else:
+      logging.info('Using default GCE service account for GKE cluster')
+      cmd.flags['scopes'] = 'cloud-platform'
+
+    if self.default_nodepool.network:
+      cmd.flags['network'] = self.default_nodepool.network.network_resource.name
+
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+    # cmd.args.append('--no-enable-shielded-nodes')
+    self._IssueResourceCreationCommand(cmd)
+
+  def _IssueResourceCreationCommand(self, cmd: util.GcloudCommand):
+    """Issues a command to gcloud to create resources."""
+
+    # This command needs a long timeout due to the many minutes it
+    # can take to provision a large GPU-accelerated GKE cluster.
+    _, stderr, retcode = cmd.Issue(timeout=ONE_HOUR, raise_on_failure=False)
+    if retcode:
+      util.CheckGcloudResponseKnownFailures(stderr, retcode)
+      raise errors.Resource.CreationError(stderr)
+
+  def _PostCreate(self):
+    """Acquire cluster authentication."""
+    super()._PostCreate()
+    cmd = self._GcloudCommand(
+        'container', 'clusters', 'get-credentials', self.name
+    )
+    env = os.environ.copy()
+    env['KUBECONFIG'] = FLAGS.kubeconfig
+    cmd.IssueRetryable(env=env)
+
+  def _GetInstanceGroups(self):
+    return []
+
+  def _IsDeleting(self):
+    cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
+    stdout, _, _ = cmd.Issue(raise_on_failure=False)
+    return True if stdout else False
+
+  def _Delete(self):
+    """Deletes the cluster."""
+    super()._Delete()
+    cmd = self._GcloudCommand('container', 'clusters', 'delete', self.name)
+    cmd.args.append('--async')
+    cmd.Issue(raise_on_failure=False)
+
+  def _Exists(self):
+    """Returns True if the cluster exits."""
+    cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
+    _, _, retcode = cmd.Issue(raise_on_failure=False)
+    return retcode == 0
+
+  def GetResourceMetadata(self) -> dict[str, Any]:
+    metadata = {
+        'cloud': self.CLOUD,
+        'cluster_type': 'KubernetesAutopilot',
+        'zone': self.zone,
+        'max_size': self.max_nodes,
+        'min_size': self.min_nodes,
+    }
+    return metadata
+
+  def ResizeNodePool(
+      self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
+  ):
+    raise NotImplementedError('Autopilot clusters do not support resizing.')
