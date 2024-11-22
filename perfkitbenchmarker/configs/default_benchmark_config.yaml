@@ -142,9 +142,10 @@ postgres_tpcc:
           GCP:
             boot_disk_size: 200
         disk_spec:
+          # 4TB pd-ssd has 27k IOPS, 1260 MB/s throughput.
           GCP:
             disk_size: 4000
-            disk_type: pd-ssd
+            disk_type: pd-balanced
           # These aim to match a 4 TB PD-SSD in performance and price. AWS can get better performance.
           AWS:
             disk_size: 1000
@@ -152,8 +153,7 @@ postgres_tpcc:
             provisioned_iops: 16000
             provisioned_throughput: 300
             num_striped_disks: 4
-          # TODO(andytzhu) - Add Azure iops/throughput/striping.
-          Azure: # Premiumv2 disks matching 4TB pd-ssd
+          Azure:
             disk_size: 2000
             disk_type: PremiumV2_LRS
             provisioned_iops: 64000
