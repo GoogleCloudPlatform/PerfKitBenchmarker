@@ -35,7 +35,7 @@ kubernetes_scale:
 
 
 NUM_NEW_INSTANCES = flags.DEFINE_integer(
-    'gke_num_scaled_instances', 5, 'Number of new instances to create'
+    'kubernetes_goal_replicas', 5, 'Number of new instances to create'
 )
 
 # kubectl pods don't allow _'s.
