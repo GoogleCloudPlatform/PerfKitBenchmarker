@@ -40,6 +40,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import hbase_ycsb_benchmark as hbase_ycsb
+from perfkitbenchmarker.linux_packages import google_cloud_bigtable_client
 from perfkitbenchmarker.linux_packages import google_cloud_cbt
 from perfkitbenchmarker.linux_packages import hbase
 from perfkitbenchmarker.linux_packages import ycsb
@@ -247,6 +248,7 @@ def _Install(vm: virtual_machine.VirtualMachine, bigtable: _Bigtable) -> None:
   """Install YCSB and CBT HBase client on 'vm'."""
   vm.Install('ycsb')
   vm.Install('google_cloud_cbt')  # we use the CLI to create and delete tables
+  vm.Install('maven')
 
   if _ENABLE_TRAFFIC_DIRECTOR.value and _USE_JAVA_VENEER_CLIENT.value:
     vm.RemoteCommand(
@@ -426,6 +428,9 @@ def _GetYcsbExecutor(
     executor_flags = {'jvm-args': jvm_args, 'table': _GetTableName()}
     # Temporary until old driver is deprecated.
     if _USE_UPGRADED_DRIVER.value:
+      client_version = google_cloud_bigtable_client.CLIENT_VERSION.value
+      if client_version:
+        env['MAVEN_ARGS'] = f'-Dgooglebigtable2.version={client_version}'
       return ycsb.YCSBExecutor(
           'googlebigtable2', environment=env, **executor_flags
       )

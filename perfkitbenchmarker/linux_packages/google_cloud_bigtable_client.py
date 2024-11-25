@@ -24,6 +24,8 @@ from perfkitbenchmarker.linux_packages import ycsb
 
 FLAGS = flags.FLAGS
 
+# TODO(liubrandon): Currently also used for veneer YCSB clients. Default
+# this flag to to "latest" once the switch to googlebigtable2 is complete.
 CLIENT_VERSION = flags.DEFINE_string(
     'google_bigtable_client_version',
     '2.5.0',
