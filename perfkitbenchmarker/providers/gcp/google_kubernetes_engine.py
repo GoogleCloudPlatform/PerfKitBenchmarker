@@ -185,14 +185,6 @@ class BaseGkeCluster(container_service.KubernetesCluster):
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
 
-    # GKE does not wait for kube-dns by default
-    logging.info('Waiting for kube-dns')
-    self.WaitForResource(
-        'deployment/kube-dns',
-        condition_name='Available',
-        namespace='kube-system',
-    )
-
   def _IsDeleting(self):
     cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
     stdout, _, _ = cmd.Issue(raise_on_failure=False)
@@ -423,6 +415,14 @@ class GkeCluster(BaseGkeCluster):
   def _PostCreate(self):
     """Installs nvidia drivers if needed."""
     super()._PostCreate()
+
+    # GKE does not wait for kube-dns by default
+    logging.info('Waiting for kube-dns')
+    self.WaitForResource(
+        'deployment/kube-dns',
+        condition_name='Available',
+        namespace='kube-system',
+    )
 
     should_install_nvidia_drivers = self.default_nodepool.gpu_count or any(
         pool.gpu_count for pool in self.nodepools.values()
