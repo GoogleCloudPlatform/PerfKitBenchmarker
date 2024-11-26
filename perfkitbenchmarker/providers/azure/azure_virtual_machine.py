@@ -152,6 +152,15 @@ NVME_MACHINE_FAMILIES = [
     'Standard_Ebds_v5',
     'Standard_Ms_v3',
     'Standard_Mds_v3',
+    'Standard_Das_v6',
+    'Standard_Dads_v6',
+    'Standard_Dals_v6',
+    'Standard_Dalds_v6',
+    'Standard_Eas_v6',
+    'Standard_Eads_v6',
+    'Standard_Fas_v6',
+    'Standard_Fals_v6',
+    'Standard_Fams_v6',
 ]
 
 _SKU_NOT_AVAILABLE = 'SkuNotAvailable'
@@ -852,8 +861,16 @@ class AzureVirtualMachine(
         + self.nic.args
         + tag_args
     )
+    # Always specify disk controller type.
+    # If a machine supports both NVMe and SCSI, it will use NVMe, but PKB will
+    # assume it defaults to SCSI and fail to find the disk.
+    # Note this does mean PKB will downgrade machines that support both to SCSI
+    # unless they are explicitly specified as NVMe.
+    # TODO(pclay): Detect whether SKUs support NVMe.
     if self.SupportsNVMe():
       create_cmd.extend(['--disk-controller-type', 'NVMe'])
+    else:
+      create_cmd.extend(['--disk-controller-type', 'SCSI'])
     if self.trusted_launch_unsupported_type:
       create_cmd.extend(['--security-type', 'Standard'])
     if self.boot_startup_script:
