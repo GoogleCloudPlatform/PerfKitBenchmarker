@@ -230,10 +230,13 @@ class BaseAppService(resource.BaseResource):
         )
     )
 
-  def Invoke(self, args: Any = None) -> http_poller.PollingResponse:
+  def Invoke(
+      self, retries: int = 0, args: Any = None
+  ) -> http_poller.PollingResponse:
     """Invokes a deployed app instance.
 
     Args:
+      retries: Number of retries to attempt.
       args: dict. Arguments passed to app.
 
     Returns:
@@ -243,6 +246,7 @@ class BaseAppService(resource.BaseResource):
     return self.poller.Run(
         self.vm,
         self.endpoint,
+        retries=retries,
         expected_response=self.builder.GetExpectedResponse(),
     )
 
