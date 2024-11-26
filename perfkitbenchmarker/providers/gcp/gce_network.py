@@ -920,8 +920,6 @@ class GceNetwork(network.BaseNetwork):
     self.subnet_resource = None
     if not self.is_existing_network or mode == 'legacy':
       for name in self.subnet_names:
-        if mode != 'custom':
-          mode = 'auto'
         self.network_resources.append(
             GceNetworkResource(name, mode, self.project, self.mtu)
         )

@@ -78,7 +78,7 @@ GCE_NETWORK_NAMES = flags.DEFINE_list(
 )
 GCE_NETWORK_TYPE = flags.DEFINE_enum(
     'gce_network_type',
-    None,
+    'auto',
     [
         'auto',
         'custom',
