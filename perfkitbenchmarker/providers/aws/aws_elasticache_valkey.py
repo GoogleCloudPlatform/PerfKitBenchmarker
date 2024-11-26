@@ -19,9 +19,10 @@ from perfkitbenchmarker.providers.aws import aws_elasticache_cluster
 
 FLAGS = flags.FLAGS
 
-_DEFAULT_VERSION = '7.2'
+_DEFAULT_VERSION = '8.0'
 _VALKEY_VERSION_MAPPING = {
     'VALKEY_7_2': '7.2',
+    'VALKEY_8_0': '8.0',
 }
 
 
