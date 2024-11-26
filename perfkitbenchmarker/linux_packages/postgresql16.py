@@ -258,7 +258,7 @@ def SetupReplica(primary_vm, replica_vm, replica_id, run_uri):
   replica_vm.RemoteCommand(
       'sudo su - postgres -c'
       f' "PGPASSWORD="{GetPsqlUserPassword(run_uri)}"'
-      f' pg_basebackup -h {primary_vm.internal_ip} -U repl -p 5432 -D'
+      f' pg_basebackup -h {primary_vm.internal_ip} -U repl -p 5432 -v -D'
       f' {data_path} -S slot{replica_id} -Fp -P -Xs -R"'
   )
   context = {
@@ -279,6 +279,10 @@ def SetupReplica(primary_vm, replica_vm, replica_id, run_uri):
       context,
   )
   replica_vm.RemoteCommand(f'sudo cp {remote_temp_config} {postgres_conf_path}')
+  replica_vm.RemoteCommand(
+      'sudo echo -e "\ninclude = postgresql-custom.conf" | sudo tee -a'
+      f' {os.path.join(conf_path, "postgresql.conf")}'
+  )
   # vm.RemoteCommand('sudo chmod 660 postgresql.conf ')
   replica_vm.RemoteCommand(
       'sudo sysctl -w'
@@ -300,6 +304,11 @@ def SetupReplica(primary_vm, replica_vm, replica_id, run_uri):
   )
   replica_vm.RemoteCommand(
       f'cat /etc/systemd/system.control/{GetOSDependentDefaults(replica_vm.OS_TYPE)["postgres_service_name"]}.service.d/50-MemoryMax.conf'
+  )
+  replica_vm.RemoteCommand(f'sudo chown -R postgres:root {data_path}')
+  replica_vm.RemoteCommand(f'sudo chown -R postgres:root {conf_path}')
+  replica_vm.RemoteCommand(
+      f'sudo chmod 700 {data_path}'
   )
   replica_vm.RemoteCommand(
       'sudo systemctl restart'
