@@ -203,7 +203,9 @@ class BaseGkeCluster(container_service.KubernetesCluster):
     super()._Delete()
     cmd = self._GcloudCommand('container', 'clusters', 'delete', self.name)
     cmd.args.append('--async')
-    cmd.Issue(raise_on_failure=False)
+    _, err, _ = cmd.Issue(raise_on_failure=False)
+    if 'Please wait and try again' in err:
+      raise errors.Resource.RetryableDeletionError(err)
 
   def _Exists(self):
     """Returns True if the cluster exits."""

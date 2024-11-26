@@ -122,6 +122,13 @@ spec:
     servicePort: 8080
 """
 RESOURCE_DELETE_SLEEP_SECONDS = 5
+_RETRYABLE_KUBECTL_ERRORS = [
+    (
+        '"unable to decode an event from the watch stream: http2: client'
+        ' connection lost"'
+    ),
+    'Unable to connect to the server: dial tcp',
+]
 
 
 class ContainerException(errors.Error):
@@ -153,6 +160,27 @@ def RunKubectlCommand(command: list[str], **kwargs):
     kwargs['stack_level'] = 2
   cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig] + command
   return vm_util.IssueCommand(cmd, **kwargs)
+
+
+class RetryableKubectlError(Exception):
+  """Exception for retryable kubectl errors."""
+
+
+@vm_util.Retry(retryable_exceptions=(RetryableKubectlError))
+def RunRetryableKubectlCommand(
+    run_cmd: list[str], **kwargs
+) -> tuple[str, str, int]:
+  """Runs a kubectl command, retrying somewhat exepected errors."""
+  out, err, code = RunKubectlCommand(run_cmd, raise_on_failure=False, **kwargs)
+  if err:
+    for error_substring in _RETRYABLE_KUBECTL_ERRORS:
+      if error_substring in err:
+        raise RetryableKubectlError(
+            f'Tried running {run_cmd} but it failed with the substring'
+            f' {error_substring}. Retrying. Full error is: {err}'
+        )
+    raise errors.VmUtil.IssueCommandError(err)
+  return out, err, code
 
 
 class BaseContainer(resource.BaseResource):
@@ -824,8 +852,7 @@ class KubernetesClusterCommands:
     cluster has been deleted.
     """
     run_cmd = ['delete', 'all', '--all', '-n', 'default']
-    RunKubectlCommand(run_cmd)
-
+    RunRetryableKubectlCommand(run_cmd, timeout=60 * 10)
     run_cmd = ['delete', 'pvc', '--all', '-n', 'default']
     RunKubectlCommand(run_cmd)
     # There maybe a slight race if resources are cleaned up in the background
@@ -836,10 +863,6 @@ class KubernetesClusterCommands:
         RESOURCE_DELETE_SLEEP_SECONDS,
     )
     time.sleep(RESOURCE_DELETE_SLEEP_SECONDS)
-
-  @staticmethod
-  def _Delete():
-    KubernetesClusterCommands._DeleteAllFromDefaultNamespace()
 
   @staticmethod
   def ApplyManifest(manifest_file: str, **kwargs) -> str:
@@ -904,16 +927,21 @@ class KubernetesClusterCommands:
     RunKubectlCommand(run_cmd, timeout=timeout + 10)
 
   @staticmethod
-  def WaitForRollout(resource_name: str):
+  def WaitForRollout(
+      resource_name: str, timeout: int = vm_util.DEFAULT_TIMEOUT
+  ):
     """Blocks until a Kubernetes rollout is completed."""
     run_cmd = [
         'rollout',
         'status',
-        '--timeout=%ds' % vm_util.DEFAULT_TIMEOUT,
+        '--timeout=%ds' % timeout,
         resource_name,
     ]
 
-    RunKubectlCommand(run_cmd)
+    RunRetryableKubectlCommand(
+        run_cmd,
+        timeout=timeout,
+    )
 
   @staticmethod
   @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))

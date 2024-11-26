@@ -25,14 +25,14 @@ spec:
             memory: {{MemoryRequest}}
             ephemeral-storage: {{EphemeralStorageRequest}}
       terminationGracePeriodSeconds: 1
-      # Add not-ready/unreachable tolerations for 15 minutes so that node
+      # Add not-ready/unreachable tolerations for X seconds so that node
       # failure doesn't trigger pod deletion.
       tolerations:
       - key: "node.kubernetes.io/not-ready"
         operator: "Exists"
         effect: "NoExecute"
-        tolerationSeconds: 900
+        tolerationSeconds: {{PodTimeout}}
       - key: "node.kubernetes.io/unreachable"
         operator: "Exists"
         effect: "NoExecute"
-        tolerationSeconds: 900
+        tolerationSeconds: {{PodTimeout}}

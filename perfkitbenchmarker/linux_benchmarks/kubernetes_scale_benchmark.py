@@ -88,6 +88,8 @@ def ScaleUpPods(
 
   # Request X new pods via YAML apply.
   num_new_instances = NUM_NEW_INSTANCES.value
+  # 10 minutes + 1 minute per 100 pods
+  max_wait_time = int(60 * 10 + (num_new_instances / 10 * 6))
   rollout_name = cluster.ApplyManifest(
       'container/kubernetes_scale/kubernetes_scale.yaml.j2',
       Name='pkb123',
@@ -95,11 +97,11 @@ def ScaleUpPods(
       CpuRequest='250m',
       MemoryRequest='250M',
       EphemeralStorageRequest='10Mi',
+      PodTimeout=max_wait_time,
   )
 
   start_polling_time = time.monotonic()
-
-  cluster.WaitForRollout(rollout_name)
+  cluster.WaitForRollout(rollout_name, timeout=max_wait_time)
 
   all_new_pods = set(cluster.GetAllPodNames()) - initial_pods
   if len(all_new_pods) < num_new_instances:
@@ -107,12 +109,19 @@ def ScaleUpPods(
         'Failed to scale up to %d pods, only found %d.'
         % (num_new_instances, len(all_new_pods))
     )
-  cluster.WaitForResource(
-      'pod',
-      condition_name='Ready',
-      timeout=60 * 10,
-      wait_for_all=True,
-  )
+  try:
+    cluster.WaitForResource(
+        'pod',
+        condition_name='Ready',
+        timeout=max_wait_time,
+        wait_for_all=True,
+    )
+  except errors.VmUtil.IssueCommandError as e:
+    logging.info(
+        'Failed to wait for all pods to be ready, even with retries: %s.'
+        ' Failure will be checked later by number of pods with ready events.',
+        e,
+    )
   end_polling_time = time.monotonic()
   logging.info(
       'In %d seconds, found all new pods %s',
