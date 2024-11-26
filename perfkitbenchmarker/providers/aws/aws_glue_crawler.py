@@ -87,7 +87,7 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
     vm_util.IssueCommand(cmd)
 
   def _Exists(self) -> bool:
-    return self._DbExists() and self._CrawlerExists()
+    return self._DbExists() and self._CrawlerExists()  # pytype: disable=bad-return-type
 
   def _IsReady(self, raise_on_crawl_failure=False) -> bool:
     stdout, _, _ = self._GetCrawler()

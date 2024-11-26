@@ -345,7 +345,7 @@ def _Run(bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float) -> bool:
   if _SCENARIOS.value == SERVER:
     return VALID in stdout
   elif _SCENARIOS.value == OFFLINE:
-    return _INVALID in stdout
+    return _INVALID in stdout  # pytype: disable=bad-return-type
 
 
 def _LastRunResults(bm_spec: benchmark_spec.BenchmarkSpec) -> str:
