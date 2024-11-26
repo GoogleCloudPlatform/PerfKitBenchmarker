@@ -900,7 +900,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           f'echo "{self.user_name} - memlock unlimited" | '
           'sudo tee -a /etc/security/limits.conf'
       )
-    self.RemoteCommand('cd aws-efa-installer; sudo ./efa_installer.sh -y')
+    self.RemoteCommand(
+        'cd aws-efa-installer; sudo ./efa_installer.sh -y --skip-kmod')
     if not self.TryRemoteCommand('ulimit -l | grep unlimited'):
       # efa_installer.sh should reboot enabling this change, reboot if necessary
       self.Reboot()
