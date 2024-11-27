@@ -171,6 +171,11 @@ def RunRetryableKubectlCommand(
     run_cmd: list[str], **kwargs
 ) -> tuple[str, str, int]:
   """Runs a kubectl command, retrying somewhat exepected errors."""
+  if 'stack_level' in kwargs:
+    kwargs['stack_level'] += 1
+  else:
+    # IssueCommand defaults stack_level to 1, so 2 skips this function.
+    kwargs['stack_level'] = 2
   out, err, code = RunKubectlCommand(run_cmd, raise_on_failure=False, **kwargs)
   if err:
     for error_substring in _RETRYABLE_KUBECTL_ERRORS:
