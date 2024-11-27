@@ -44,14 +44,14 @@ CONTAINER_NAME = 'hello-world'
 
 
 def GetConfig(user_config):
-  """Load and return benchmark config."""
+  """Loads and returns benchmark config."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   return config
 
 
 def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
-  """Provision container, because it's not handled by provision stage."""
-  del bm_spec
+  """Sets additional spec attributes."""
+  bm_spec.always_call_cleanup = True
 
 
 def _GetRolloutCreationTime(rollout_name: str) -> int:
@@ -64,6 +64,15 @@ def _GetRolloutCreationTime(rollout_name: str) -> int:
       'jsonpath={.metadata.creationTimestamp}',
   ])
   return ConvertToEpochTime(out)
+
+
+def _GetScaleTimeout() -> int:
+  """Returns the timeout for the scale up & teardown."""
+  base_timeout = 60 * 10
+  per_pod_timeout = NUM_NEW_INSTANCES.value * 3
+  proposed_timeout = base_timeout + per_pod_timeout
+  max_timeout = 2 * 60 * 60  # 2 hours
+  return min(proposed_timeout, max_timeout)
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
@@ -88,16 +97,15 @@ def ScaleUpPods(
 
   # Request X new pods via YAML apply.
   num_new_instances = NUM_NEW_INSTANCES.value
-  # 10 minutes + 1 minute per 100 pods
-  max_wait_time = int(60 * 10 + (num_new_instances / 10 * 6))
+  max_wait_time = int(60 * 10 + num_new_instances * 2)
   rollout_name = cluster.ApplyManifest(
       'container/kubernetes_scale/kubernetes_scale.yaml.j2',
-      Name='pkb123',
+      Name='kubernetes-scaleup',
       Replicas=num_new_instances,
       CpuRequest='250m',
       MemoryRequest='250M',
       EphemeralStorageRequest='10Mi',
-      PodTimeout=max_wait_time,
+      PodTimeout=max_wait_time + 10,
   )
 
   start_polling_time = time.monotonic()
@@ -213,5 +221,7 @@ def _SummarizeTimestamps(timestamps: list[float]) -> dict[str, float]:
 
 
 def Cleanup(_):
-  """Cleanup scale benchmark."""
-  pass
+  """Cleanups scale benchmark. Runs before teardown."""
+  container_service.RunRetryableKubectlCommand(
+      ['delete', '--all', 'pods', '-n', 'default'], timeout=_GetScaleTimeout()
+  )
