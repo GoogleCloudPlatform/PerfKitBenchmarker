@@ -19,7 +19,7 @@ class TestParseResults(unittest.TestCase):
         # Load content from geekbench_windows.txt file
         data_file_path = os.path.join(
             os.path.dirname(__file__), 
-            '..', 'perfkitbenchmarker', 'data', 'geekbench', 'geekbench_windows.txt'
+            'data', 'geekbench', 'geekbench_windows.txt'
         )
 
         # Load content from the specified file path

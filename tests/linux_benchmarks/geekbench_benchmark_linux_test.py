@@ -20,7 +20,7 @@ class TestParseResultsLinux(unittest.TestCase):
         # Load content from the Linux geekbench result file
         data_file_path = os.path.join(
             os.path.dirname(__file__), 
-            '..','..', 'perfkitbenchmarker', 'data', 'geekbench', 'geekbench_linux.txt'
+            '..', 'data', 'geekbench', 'geekbench_linux.txt'
         )
 
         # Load content from the specified file path
