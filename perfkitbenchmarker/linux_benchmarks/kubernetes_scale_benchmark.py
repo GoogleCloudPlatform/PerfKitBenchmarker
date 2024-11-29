@@ -98,7 +98,7 @@ def ScaleUpPods(
   # Request X new pods via YAML apply.
   num_new_instances = NUM_NEW_INSTANCES.value
   max_wait_time = int(60 * 10 + num_new_instances * 2)
-  rollout_name = cluster.ApplyManifest(
+  resource_names = cluster.ApplyManifest(
       'container/kubernetes_scale/kubernetes_scale.yaml.j2',
       Name='kubernetes-scaleup',
       Replicas=num_new_instances,
@@ -107,6 +107,10 @@ def ScaleUpPods(
       EphemeralStorageRequest='10Mi',
       PodTimeout=max_wait_time + 10,
   )
+
+  # Arbitrarily pick the first resource (it should be the only one.)
+  assert resource_names
+  rollout_name = next(resource_names)
 
   start_polling_time = time.monotonic()
   cluster.WaitForRollout(rollout_name, timeout=max_wait_time)

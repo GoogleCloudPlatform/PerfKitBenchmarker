@@ -32,7 +32,7 @@ import logging
 import os
 import re
 import time
-from typing import Any, Sequence
+from typing import Any, Sequence, Iterator
 
 from absl import flags
 import jinja2
@@ -865,7 +865,7 @@ class KubernetesClusterCommands:
     time.sleep(RESOURCE_DELETE_SLEEP_SECONDS)
 
   @staticmethod
-  def ApplyManifest(manifest_file: str, **kwargs) -> str:
+  def ApplyManifest(manifest_file: str, **kwargs) -> Iterator[str]:
     """Applies a declarative Kubernetes manifest; possibly with jinja.
 
     Args:
@@ -873,21 +873,16 @@ class KubernetesClusterCommands:
       **kwargs: Arguments to the jinja template.
 
     Returns:
-      The name of the deployment, e.g. deployment.apps/mydeploy.
+      Names of the resources, e.g. [deployment.apps/mydeploy, pod/foo]
     """
 
-    def _ParseApplyOutput(stdout: str) -> str:
+    def _ParseApplyOutput(stdout: str) -> Iterator[str]:
       """Parses the output of kubectl apply to get the name of the resource."""
       # Example input: deployment.apps/pkb123 created
-      match = re.search(r'deployment[^\s]+', stdout)
-      if not match:
-        match = re.search(r'daemonset[^\s]+', stdout)
-        if not match:
-          raise ValueError(
-              'Failed to parse the output of kubectl apply to get the name of'
-              ' the deployment.'
-          )
-      return match.group()
+      for line in stdout.splitlines():
+        match = re.search(r'([^\s/]+/[^\s/]+) created', line)
+        if match:
+          yield match.group(1)
 
     filename = data.ResourcePath(manifest_file)
     if not filename.endswith('.j2'):
