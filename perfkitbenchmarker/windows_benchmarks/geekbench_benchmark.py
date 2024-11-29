@@ -4,7 +4,7 @@ BENCHMARK_NAME = 'geekbench'
 # Define the configuration for the benchmark.
 # This includes VM groups and any flags specific to this benchmark.
 BENCHMARK_CONFIG = """
-geekbench:
+geekbench_benchmark:
   description: >
     Runs Geekbench 6 to evaluate system performance across CPU and GPU on
     Linux or Windows platforms.
@@ -17,6 +17,7 @@ geekbench:
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 
+
 def GetConfig(user_config):
     """
     Returns the configuration for the benchmark.
@@ -27,7 +28,8 @@ def Prepare(benchmark_spec):
     """
     Sets up the environment on the VM for the benchmark.
     """
-    pass 
+    vm = benchmark_spec.vms[0]
+    vm.install('geekbench') 
 
 def Run(benchmark_spec):
     """
@@ -45,49 +47,53 @@ def ParseResults(geekbench_output: str):
     """
     Parses Geekbench benchmark results to extract metrics for Single-Core, Multi-Core, 
     and OpenCL performance tests. Each metric entry in the output represents a specific 
-    test result with associated metadata.
+    test result encapsulated in a `sample.Sample` object.
 
     Args:
         geekbench_output (str): Raw output from a Geekbench benchmark as a string.
 
     Returns:
-        List[Dict]: A list of dictionaries where each dictionary represents a parsed metric 
-        sample. Each dictionary has the following structure:
+        List[sample.Sample]: A list of `sample.Sample` objects, where each object represents 
+        a parsed metric. Each sample has the following attributes:
         
-        - "metric_name" (str): The name of the metric, describing the test and 
+        - `metric` (str): The name of the metric, describing the test and 
           performance category. Examples include "Single-Core File Compression" or "Multi-Core Score".
         
-        - "metric_value" (float): The numerical result or score of the specific test. This could 
+        - `value` (float): The numerical result or score of the specific test. This could 
           be a throughput value, such as MB/sec, or a score in points.
 
-        - "metric_unit" (str): The unit associated with the metric value. For example, units 
+        - `unit` (str): The unit associated with the metric value. For example, units 
           can be "MB/sec" for throughput or "points" for scores.
 
-        - "metric_metadata" (dict): Additional metadata about the test, including:
-            - "category" (str): The performance category, such as "Single-Core", "Multi-Core", or "OpenCL".
-            - "test" (str, optional): The specific test name within the category, such as "File Compression" 
+        - `metadata` (dict): Additional metadata about the test, including:
+            - `category` (str): The performance category, such as "Single-Core", "Multi-Core", or "OpenCL".
+            - `test` (str, optional): The specific test name within the category, such as "File Compression" 
               or "HTML5 Browser". This key is present for detailed test metrics.
-            - "score" (int, optional): The individual test score associated with the metric, where applicable.
+            - `score` (int, optional): The individual test score associated with the metric, where applicable.
               For instance, if a throughput value is provided, the corresponding score is also included.
+
+        - `timestamp` (float): The Unix timestamp when the sample was created.
 
     Example Output:
         [
-            {
-                "metric_name": "Single-Core Score",
-                "metric_value": 1795,
-                "metric_unit": "points",
-                "metric_metadata": {"category": "Single-Core"}
-            },
-            {
-                "metric_name": "Single-Core File Compression",
-                "metric_value": 269.3,
-                "metric_unit": "MB/sec",
-                "metric_metadata": {
+            Sample(
+                metric="Single-Core Score",
+                value=1795,
+                unit="points",
+                metadata={"category": "Single-Core"},
+                timestamp=1699815932.123
+            ),
+            Sample(
+                metric="Single-Core File Compression",
+                value=269.3,
+                unit="MB/sec",
+                metadata={
                     "category": "Single-Core",
                     "test": "File Compression",
                     "score": 1875
-                }
-            }
+                },
+                timestamp=1699815932.123
+            )
         ]
     """
 
@@ -114,15 +120,15 @@ def ParseResults(geekbench_output: str):
         
         # Detect overall score lines, ensuring current_category is not None
         elif "Score" in line and current_category:
-            # Parse overall score based on the current category
             try:
                 score = int(line.split()[-1])
-                samples.append({
-                    "metric_name": f"{current_category} Score",
-                    "metric_value": score,
-                    "metric_unit": "points",
-                    "metric_metadata": {"category": current_category}
-                })
+                samples.append(sample.Sample(
+                    metric= f"{current_category} Score",
+                    value= score,
+                    unit = "points",
+                    metadata = {"category": current_category}
+                    )
+                )
             except ValueError:
                 # Handle the case where score parsing fails
                 continue
@@ -143,16 +149,17 @@ def ParseResults(geekbench_output: str):
                 unit = ' '.join(parts[1:]) if len(parts) > 1 else 'points'  # Remaining part is the unit
 
                 # Add the parsed data as a sample, including the last_score in metadata
-                samples.append({
-                    "metric_name": f"{current_category} {current_metric_name}",
-                    "metric_value": value,
-                    "metric_unit": unit,
-                    "metric_metadata": {
+                samples.append(sample.Sample(
+                    metric = f"{current_category} {current_metric_name}",
+                    value = value,
+                    unit = unit,
+                    metadata = {
                         "category": current_category,
                         "test": current_metric_name,
                         "score": last_score  
                     }
-                })
+                    )
+                )
 
                 # Reset the metric name and score after processing
                 current_metric_name = None
