@@ -35,12 +35,15 @@ def Run(benchmark_spec):
     """
     Runs Geekbench on the VM and returns performance samples.
     """
+     # TODO: Trigger Geekbench execution on the VM and parse the results
     return []
 
 def Cleanup(benchmark_spec):
     """
     Cleans up the environment on the VM after the benchmark.
     """
+    # TODO: Implement cleanup logic to remove Geekbench and any temporary files created during the benchmark
+
     pass 
 
 def ParseResults(geekbench_output: str):
