@@ -36,19 +36,27 @@ class TestParseResults(unittest.TestCase):
         samples = ParseResults(self.sample_output)
 
         # Example checks for a specific metric
-        single_core_score = next(s for s in samples if s['metric_name'] == "Single-Core Score")
-        self.assertEqual(single_core_score['metric_value'], 1795)
+        single_core_score = next(s for s in samples if s.metric == "Single-Core Score")
+        self.assertEqual(single_core_score.value, 1795)
+        self.assertEqual(single_core_score.unit, "points")
+        self.assertEqual(single_core_score.metadata["category"], "Single-Core")
 
-        single_core_file_compression = next(s for s in samples if s['metric_name'] == "Single-Core File Compression")
-        self.assertEqual(single_core_file_compression['metric_value'], 269.3)
-        self.assertEqual(single_core_file_compression['metric_unit'], "MB/sec")
-        self.assertEqual(single_core_file_compression['metric_metadata']['score'], 1875)
+        single_core_file_compression = next(s for s in samples if s.metric == "Single-Core File Compression")
+        self.assertEqual(single_core_file_compression.value, 269.3)
+        self.assertEqual(single_core_file_compression.unit, "MB/sec")
+        self.assertEqual(single_core_file_compression.metadata["score"], 1875)
+        self.assertEqual(single_core_file_compression.metadata["category"], "Single-Core")
+        self.assertEqual(single_core_file_compression.metadata["test"], "File Compression")
 
-        multi_core_score = next(s for s in samples if s['metric_name'] == "Multi-Core Score")
-        self.assertEqual(multi_core_score['metric_value'], 6627)
+        multi_core_score = next(s for s in samples if s.metric == "Multi-Core Score")
+        self.assertEqual(multi_core_score.value, 6627)
+        self.assertEqual(multi_core_score.unit, "points")
+        self.assertEqual(multi_core_score.metadata["category"], "Multi-Core")
 
-        opencl_score = next(s for s in samples if s['metric_name'] == "OpenCL Score")
-        self.assertEqual(opencl_score['metric_value'], 88265)
+        opencl_score = next(s for s in samples if s.metric == "OpenCL Score")
+        self.assertEqual(opencl_score.value, 88265)
+        self.assertEqual(opencl_score.unit, "points")
+        self.assertEqual(opencl_score.metadata["category"], "OpenCL")
     
     def test_print_parse_results(self):
         """
@@ -63,12 +71,7 @@ class TestParseResults(unittest.TestCase):
 
         # Print all parsed data for manual verification
         for sample in samples:
-            print({
-                "metric_name": sample["metric_name"],
-                "metric_value": sample["metric_value"],
-                "metric_unit": sample["metric_unit"],
-                "metric_metadata": sample["metric_metadata"]
-            })
+            print(sample.asdict())  # Convert the Sample object to a dictionary for easier inspection
 
 
 if __name__ == '__main__':
