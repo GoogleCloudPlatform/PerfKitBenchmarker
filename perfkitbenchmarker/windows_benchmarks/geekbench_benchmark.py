@@ -16,6 +16,7 @@ geekbench_benchmark:
 # Import necessary modules from PKB
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
+import logging
 
 
 def GetConfig(user_config):
@@ -163,12 +164,13 @@ def ParseResults(geekbench_output: str):
                     }
                     )
                 )
-
                 # Reset the metric name and score after processing
                 current_metric_name = None
                 last_score = None
-            except ValueError:
-                # Handle cases where conversion to float fails
+
+            except ValueError as e:
+                logging.info(f"Failed to parse line: '{line}'. Error: {e}")
                 continue
+
 
     return samples
