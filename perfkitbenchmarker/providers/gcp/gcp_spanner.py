@@ -329,6 +329,9 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     cmd.flags['description'] = self._description
     cmd.flags['config'] = self._config
 
+    if self.spec.db_tier:
+      cmd.flags['edition'] = self.spec.db_tier
+
     if self._autoscaler:
       cmd.use_beta_gcloud = True
       cmd.flags['autoscaling-min-processing-units'] = self._min_processing_units
