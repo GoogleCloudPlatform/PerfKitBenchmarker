@@ -725,9 +725,11 @@ class AzureVirtualMachine(
     if arm_arch:
       self.host_arch = arm_arch
       self.is_aarch64 = True
+    self.hypervisor_generation = 2
     if vm_spec.image:
       self.image = vm_spec.image
     elif self.machine_type in _MACHINE_TYPES_ONLY_SUPPORT_GEN1_IMAGES:
+      self.hypervisor_generation = 1
       if hasattr(type(self), 'GEN1_IMAGE_URN'):
         self.image = type(self).GEN1_IMAGE_URN
       else:
@@ -861,16 +863,17 @@ class AzureVirtualMachine(
         + self.nic.args
         + tag_args
     )
-    # Always specify disk controller type.
-    # If a machine supports both NVMe and SCSI, it will use NVMe, but PKB will
-    # assume it defaults to SCSI and fail to find the disk.
-    # Note this does mean PKB will downgrade machines that support both to SCSI
-    # unless they are explicitly specified as NVMe.
-    # TODO(pclay): Detect whether SKUs support NVMe.
-    if self.SupportsNVMe():
-      create_cmd.extend(['--disk-controller-type', 'NVMe'])
-    else:
-      create_cmd.extend(['--disk-controller-type', 'SCSI'])
+    if self.hypervisor_generation > 1:
+      # Always specify disk controller type if supported (gen 2 hypervisor).
+      # If a machine supports both NVMe and SCSI, it will use NVMe, but PKB will
+      # assume it defaults to SCSI and fail to find the disk.
+      # Note this does mean PKB will downgrade machines that support both to
+      # SCSI unless they are explicitly specified as NVMe.
+      # TODO(pclay): Detect whether SKUs support NVMe.
+      if self.SupportsNVMe():
+        create_cmd.extend(['--disk-controller-type', 'NVMe'])
+      else:
+        create_cmd.extend(['--disk-controller-type', 'SCSI'])
     if self.trusted_launch_unsupported_type:
       create_cmd.extend(['--security-type', 'Standard'])
     if self.boot_startup_script:
