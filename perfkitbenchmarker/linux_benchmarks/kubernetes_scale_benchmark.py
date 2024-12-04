@@ -84,6 +84,9 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   samples, rollout_name = ScaleUpPods(cluster)
   start_time = _GetRolloutCreationTime(rollout_name)
   samples += ParseEvents(cluster, start_time)
+  metadata = {'goal_replicas': NUM_NEW_INSTANCES.value}
+  for s in samples:
+    s.metadata.update(metadata)
   return samples
 
 
