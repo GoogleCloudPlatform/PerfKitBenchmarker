@@ -216,9 +216,10 @@ sparksql_tpcds_1t:
         GCP:
           num_local_ssds: 0
       disk_spec:
+        # Targeting 480MB/s bandwidth.
         GCP:
-          disk_size: 500
-          disk_type: pd-ssd
+          disk_size: 1214
+          disk_type: pd-balanced
         AWS:
           disk_size: 500
           disk_type: gp3
