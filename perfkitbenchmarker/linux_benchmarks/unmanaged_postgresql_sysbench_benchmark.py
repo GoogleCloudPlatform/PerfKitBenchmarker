@@ -156,9 +156,13 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
 
   primary_server = benchmark_spec.vm_groups['server'][0]
   postgresql16.InitializeDatabase(primary_server)
-  postgresql16.ConfigureAndRestart(primary_server, FLAGS.run_uri)
+  postgresql16.ConfigureAndRestart(
+      primary_server, FLAGS.run_uri, SHARED_BUFFER_SIZE.value
+  )
   for index, replica in enumerate(replica_servers):
-    postgresql16.SetupReplica(primary_server, replica, index, FLAGS.run_uri)
+    postgresql16.SetupReplica(
+        primary_server, replica, index, FLAGS.run_uri, SHARED_BUFFER_SIZE.value
+    )
   clients = benchmark_spec.vm_groups['client']
   for client in clients:
     client.InstallPackages('git')

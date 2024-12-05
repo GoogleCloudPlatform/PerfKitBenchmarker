@@ -166,15 +166,17 @@ def GetOSDependentDefaults(os_type: str) -> dict[str, str]:
     return OS_DEPENDENT_DEFAULTS['debian']
 
 
-def ConfigureAndRestart(vm, run_uri):
+def ConfigureAndRestart(vm, run_uri, buffer_size):
   """Configure and restart postgres.
 
   Args:
     vm: virtual machine to configure postgres on.
     run_uri: run uri to use for password generation.
+    buffer_size: buffer size to use for postgres.
   """
   conf_path = GetOSDependentDefaults(vm.OS_TYPE)['conf_dir']
   data_path = GetOSDependentDefaults(vm.OS_TYPE)['data_dir']
+  buffer_size_key = f'SIZE_{buffer_size}GB'
   conf_template_config = 'postgresql/postgresql-custom.conf.j2'
   remote_temp_config = '/tmp/my.cnf'
   postgres_conf_path = os.path.join(conf_path, 'postgresql-custom.conf')
@@ -183,11 +185,13 @@ def ConfigureAndRestart(vm, run_uri):
   database_setup_queries = 'postgresql/database_setup_queries.sql.j2'
   context = {
       'listen_address': vm.internal_ip,
-      'shared_buffers': SHARED_BUFFERS_CONF['SIZE_10GB']['shared_buffers'],
-      'effective_cache_size': SHARED_BUFFERS_CONF['SIZE_10GB'][
+      'shared_buffers': SHARED_BUFFERS_CONF[buffer_size_key]['shared_buffers'],
+      'effective_cache_size': SHARED_BUFFERS_CONF[buffer_size_key][
           'effective_cache_size'
       ],
       'data_directory': data_path,
+      'host_address': vm.internal_ip,
+      'password': GetPsqlUserPassword(run_uri),
   }
   vm.RenderTemplate(
       data.ResourcePath(conf_template_config),
@@ -218,7 +222,7 @@ def ConfigureAndRestart(vm, run_uri):
   vm.RemoteCommand(f'sudo chmod 755 {database_queries_path}')
   vm.RemoteCommand(
       'sudo sysctl -w'
-      f' vm.nr_hugepages={SHARED_BUFFERS_CONF["SIZE_10GB"]["nr_hugepages"]}'
+      f' vm.nr_hugepages={SHARED_BUFFERS_CONF[buffer_size_key]["nr_hugepages"]}'
   )
   vm.RemoteCommand(
       'sudo sysctl -w vm.hugetlb_shm_group=$(getent group postgres | cut -d:'
@@ -229,7 +233,7 @@ def ConfigureAndRestart(vm, run_uri):
   vm.RemoteCommand(
       'sudo systemctl set-property'
       f' {GetOSDependentDefaults(vm.OS_TYPE)["postgres_service_name"]}.service'
-      f' MemoryMax={SHARED_BUFFERS_CONF["SIZE_10GB"]["max_memory"]}'
+      f' MemoryMax={SHARED_BUFFERS_CONF[buffer_size_key]["max_memory"]}'
   )
   vm.RemoteCommand('sudo sync; echo 3 | sudo tee -a /proc/sys/vm/drop_caches')
   vm.RemoteCommand(
@@ -250,9 +254,11 @@ def ConfigureAndRestart(vm, run_uri):
   )
 
 
-def SetupReplica(primary_vm, replica_vm, replica_id, run_uri):
+def SetupReplica(primary_vm, replica_vm, replica_id, run_uri, buffer_size):
   """Setup postgres replica."""
+  buffer_size_key = f'SIZE_{buffer_size}GB'
   data_path = GetOSDependentDefaults(replica_vm.OS_TYPE)['data_dir']
+  conf_path = GetOSDependentDefaults(replica_vm.OS_TYPE)['conf_dir']
   replica_vm.RemoteCommand(f'sudo mkdir -p {data_path}')
   replica_vm.RemoteCommand(f'sudo chown postgres:root {data_path}')
   replica_vm.RemoteCommand(
@@ -263,13 +269,12 @@ def SetupReplica(primary_vm, replica_vm, replica_id, run_uri):
   )
   context = {
       'listen_address': 'localhost',
-      'shared_buffers': SHARED_BUFFERS_CONF['SIZE_10GB']['shared_buffers'],
-      'effective_cache_size': SHARED_BUFFERS_CONF['SIZE_10GB'][
+      'shared_buffers': SHARED_BUFFERS_CONF[buffer_size_key]['shared_buffers'],
+      'effective_cache_size': SHARED_BUFFERS_CONF[buffer_size_key][
           'effective_cache_size'
       ],
       'data_directory': data_path,
   }
-  conf_path = GetOSDependentDefaults(replica_vm.OS_TYPE)['conf_dir']
   conf_template_config = 'postgresql/postgresql-custom.conf.j2'
   remote_temp_config = '/tmp/my.cnf'
   postgres_conf_path = os.path.join(conf_path, 'postgresql-custom.conf')
@@ -286,7 +291,7 @@ def SetupReplica(primary_vm, replica_vm, replica_id, run_uri):
   # vm.RemoteCommand('sudo chmod 660 postgresql.conf ')
   replica_vm.RemoteCommand(
       'sudo sysctl -w'
-      f' vm.nr_hugepages={SHARED_BUFFERS_CONF["SIZE_10GB"]["nr_hugepages"]}'
+      f' vm.nr_hugepages={SHARED_BUFFERS_CONF[buffer_size_key]["nr_hugepages"]}'
   )
   replica_vm.RemoteCommand(
       'sudo sysctl -w vm.hugetlb_shm_group=$(getent group postgres | cut -d:'
@@ -297,7 +302,7 @@ def SetupReplica(primary_vm, replica_vm, replica_id, run_uri):
   replica_vm.RemoteCommand(
       'sudo systemctl set-property'
       f' {GetOSDependentDefaults(replica_vm.OS_TYPE)["postgres_service_name"]}.service'
-      f' MemoryMax={SHARED_BUFFERS_CONF["SIZE_10GB"]["max_memory"]}'
+      f' MemoryMax={SHARED_BUFFERS_CONF[buffer_size_key]["max_memory"]}'
   )
   replica_vm.RemoteCommand(
       'sudo sync; echo 3 | sudo tee -a /proc/sys/vm/drop_caches'
