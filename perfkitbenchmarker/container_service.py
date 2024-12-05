@@ -32,7 +32,7 @@ import logging
 import os
 import re
 import time
-from typing import Any, Sequence, Iterator
+from typing import Any, Iterator, Sequence
 
 from absl import flags
 import jinja2
@@ -127,6 +127,7 @@ _RETRYABLE_KUBECTL_ERRORS = [
         '"unable to decode an event from the watch stream: http2: client'
         ' connection lost"'
     ),
+    'read: connection reset by peer',
     'Unable to connect to the server: dial tcp',
 ]
 
@@ -166,21 +167,34 @@ class RetryableKubectlError(Exception):
   """Exception for retryable kubectl errors."""
 
 
-@vm_util.Retry(retryable_exceptions=(RetryableKubectlError))
 def RunRetryableKubectlCommand(
-    run_cmd: list[str], **kwargs
+    run_cmd: list[str], timeout: int | None = None, **kwargs
 ) -> tuple[str, str, int]:
   """Runs a kubectl command, retrying somewhat exepected errors."""
-  out, err, code = RunKubectlCommand(run_cmd, raise_on_failure=False, **kwargs)
-  if err:
-    for error_substring in _RETRYABLE_KUBECTL_ERRORS:
-      if error_substring in err:
-        raise RetryableKubectlError(
-            f'Tried running {run_cmd} but it failed with the substring'
-            f' {error_substring}. Retrying. Full error is: {err}'
-        )
-    raise errors.VmUtil.IssueCommandError(err)
-  return out, err, code
+  if 'stack_level' in kwargs:
+    kwargs['stack_level'] += 1
+  else:
+    # IssueCommand defaults stack_level to 1, so 2 skips this function.
+    kwargs['stack_level'] = 2
+
+  @vm_util.Retry(timeout=timeout, retryable_exceptions=(RetryableKubectlError,))
+  def _RunRetryablePart(run_cmd: list[str], **kwargs):
+    """Inner function retries command so timeout can be passed to decorator."""
+    kwargs['stack_level'] += 1
+    out, err, code = RunKubectlCommand(
+        run_cmd, raise_on_failure=False, **kwargs
+    )
+    if err:
+      for error_substring in _RETRYABLE_KUBECTL_ERRORS:
+        if error_substring in err:
+          raise RetryableKubectlError(
+              f'Tried running {run_cmd} but it failed with the substring'
+              f' {error_substring}. Retrying. Full error is: {err}'
+          )
+      raise errors.VmUtil.IssueCommandError(err)
+    return out, err, code
+
+  return _RunRetryablePart(run_cmd, timeout=timeout, **kwargs)
 
 
 class BaseContainer(resource.BaseResource):
@@ -851,18 +865,38 @@ class KubernetesClusterCommands:
     deleted here to prevent dynamically provisioned PDs from leaking once the
     cluster has been deleted.
     """
-    run_cmd = ['delete', 'all', '--all', '-n', 'default']
-    RunRetryableKubectlCommand(run_cmd, timeout=60 * 10)
-    run_cmd = ['delete', 'pvc', '--all', '-n', 'default']
-    RunKubectlCommand(run_cmd)
-    # There maybe a slight race if resources are cleaned up in the background
-    # where deleting the cluster immediately prevents the PVCs from being
-    # deleted.
-    logging.info(
-        'Sleeping for %s seconds to give resources time to delete.',
-        RESOURCE_DELETE_SLEEP_SECONDS,
-    )
-    time.sleep(RESOURCE_DELETE_SLEEP_SECONDS)
+    try:
+      # Delete deployments first as otherwise autorepair will redeploy deleted
+      # pods.
+      run_cmd = ['delete', 'deployment', '--all', '-n', 'default']
+      RunRetryableKubectlCommand(run_cmd)
+
+      timeout = 60 * 20
+      run_cmd = [
+          'delete',
+          'all',
+          '--all',
+          '-n',
+          'default',
+          f'--timeout={timeout}s',
+      ]
+      RunRetryableKubectlCommand(run_cmd, timeout=timeout)
+
+      run_cmd = ['delete', 'pvc', '--all', '-n', 'default']
+      RunKubectlCommand(run_cmd)
+      # There maybe a slight race if resources are cleaned up in the background
+      # where deleting the cluster immediately prevents the PVCs from being
+      # deleted.
+      logging.info(
+          'Sleeping for %s seconds to give resources time to delete.',
+          RESOURCE_DELETE_SLEEP_SECONDS,
+      )
+      time.sleep(RESOURCE_DELETE_SLEEP_SECONDS)
+    except errors.VmUtil.IssueCommandTimeoutError as e:
+      raise errors.Resource.RetryableDeletionError(
+          'Timed out while deleting all resources from default namespace. We'
+          ' should still continue trying to delete everything.'
+      ) from e
 
   @staticmethod
   def ApplyManifest(manifest_file: str, **kwargs) -> Iterator[str]:
