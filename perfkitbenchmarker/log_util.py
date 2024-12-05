@@ -60,7 +60,7 @@ PKB_LOG_BUCKET = flags.DEFINE_string(
     'and the caller must have write permissions on the bucket for a successful '
     'export.',
 )
-_VM_LOG_BUCKET = flags.DEFINE_string(
+VM_LOG_BUCKET = flags.DEFINE_string(
     'vm_log_bucket',
     None,
     'The GCS bucket to store VM logs in. If not provided, VM logs will go to '
@@ -265,7 +265,7 @@ def CollectPKBLogs(run_uri: str) -> None:
   if PKB_LOG_BUCKET.value:
     # Generate the log path to the cloud bucket based on the invocation date of
     # this function.
-    gcs_log_path = GetPkbLogCloudPath(run_uri)
+    gcs_log_path = GetLogCloudPath(PKB_LOG_BUCKET.value, f'{run_uri}-pkb.log')
     vm_util.IssueRetryableCommand([
         'gsutil',
         '-h',
@@ -284,16 +284,10 @@ def CollectVMLogs(run_uri: str, source_path: str) -> None:
     run_uri: The run URI of the benchmark run.
     source_path: The path to the log file.
   """
-  if _VM_LOG_BUCKET.value:
-    run_date = datetime.date.today()
+  if VM_LOG_BUCKET.value:
     source_filename = source_path.split('/')[-1]
-    gcs_path_prefix = _GetGcsPathPrefix(_VM_LOG_BUCKET.value)
-    gcs_path = (
-        f'{gcs_path_prefix}/'
-        + f'{run_date.year:04d}/{run_date.month:02d}/'
-        + f'{run_date.day:02d}/'
-        + f'{run_uri}/{source_filename}'
-    )
+    gcs_directory_path = GetLogCloudPath(VM_LOG_BUCKET.value, run_uri)
+    gcs_path = f'{gcs_directory_path}/{source_filename}'
     vm_util.IssueRetryableCommand([
         'gsutil',
         '-h',
@@ -305,22 +299,23 @@ def CollectVMLogs(run_uri: str, source_path: str) -> None:
     ])
 
 
-def GetPkbLogCloudPath(run_uri: str) -> str:
+def GetLogCloudPath(log_bucket: str, path_suffix: str) -> str:
   """Returns the GCS path, to where the logs should be saved.
 
   Args:
-    run_uri: The run URI of the benchmark run.
+    log_bucket: The GCS bucket to save the logs to.
+    path_suffix: The suffix to append to the GCS path.
 
   Returns:
-    The GCS path, to where the PKB logs should be saved.
+    The GCS path to where the logs should be saved.
   """
   run_date = datetime.date.today()
-  gcs_path_prefix = _GetGcsPathPrefix(PKB_LOG_BUCKET.value)
+  gcs_path_prefix = _GetGcsPathPrefix(log_bucket)
   return (
       f'{gcs_path_prefix}/'
       + f'{run_date.year:04d}/{run_date.month:02d}/'
       + f'{run_date.day:02d}/'
-      + f'{run_uri}-{LOG_FILE_NAME}'
+      + path_suffix
   )
 
 

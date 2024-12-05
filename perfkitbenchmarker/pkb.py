@@ -965,7 +965,13 @@ def _PublishRunStartedSample(spec):
   metadata = {'flags': str(flag_util.GetProvidedCommandLineFlags())}
   # Publish the path to this spec's PKB logs at the start of the runs.
   if log_util.PKB_LOG_BUCKET.value and FLAGS.run_uri:
-    metadata['pkb_log_path'] = log_util.GetPkbLogCloudPath(FLAGS.run_uri)
+    metadata['pkb_log_path'] = log_util.GetLogCloudPath(
+        log_util.PKB_LOG_BUCKET.value, f'{FLAGS.run_uri}-pkb.log'
+    )
+  if log_util.VM_LOG_BUCKET.value and FLAGS.run_uri:
+    metadata['vm_log_path'] = log_util.GetLogCloudPath(
+        log_util.VM_LOG_BUCKET.value, FLAGS.run_uri
+    )
 
   _PublishEventSample(spec, 'Run Started', metadata)
 
