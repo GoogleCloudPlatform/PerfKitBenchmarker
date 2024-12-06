@@ -125,6 +125,13 @@ flags.DEFINE_enum(
     ['JDBC'],
     'The Runtime Interface used when interacting with Snowflake.',
 )
+flags.DEFINE_boolean(
+    'edw_get_service_auxiliary_metrics',
+    'False',
+    'If set, the benchmark will collect service-specific metrics from the'
+    ' remote service after the benchmark has completed. Additional delay may be'
+    ' incurred due to the need to wait for metadata propogation.',
+)
 flags.DEFINE_enum(
     'edw_bq_feature_config',
     'default',
@@ -538,3 +545,20 @@ class EdwService(resource.BaseResource):
       A boolean value (True) if the warm suite is recommended.
     """
     return True
+
+  def GetIterationAuxiliaryMetrics(self, iter_run_key: str) -> Dict[str, Any]:
+    """Returns service-specific metrics derived from server-side metadata.
+
+      Must be run after the benchmark has completed.
+
+    Args:
+      iter_run_key: The unique identifier of the run and iteration to fetch
+        metrics for.
+
+    Returns:
+      A dictionary of the following format:
+        { 'metric_1': { 'value': 1, 'unit': 'imperial femtoseconds' },
+          'metric_2': { 'value': 2, 'unit': 'metric dollars' }
+        ...}
+    """
+    raise NotImplementedError

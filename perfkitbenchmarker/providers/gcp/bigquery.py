@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import re
+from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -56,9 +57,29 @@ BQ_JDBC_JAR_FILE = {
 }
 
 
+class GenericClientInterface(edw_service.EdwClientInterface):
+  """Generic Client Interface class for BigQuery.
+
+  Attributes:
+    project_id: String name of the BigQuery project to benchmark
+    dataset_id: String name of the BigQuery dataset to benchmark
+  """
+
+  def __init__(self, project_id: str, dataset_id: str):
+    self.project_id = project_id
+    self.dataset_id = dataset_id
+
+  def GetMetadata(self) -> dict[str, str]:
+    """Gets the Metadata attributes for the Client Interface."""
+    return {'client': FLAGS.bq_client_interface}
+
+  def RunQueryWithResults(self, query_name: str) -> str:
+    raise NotImplementedError
+
+
 def GetBigQueryClientInterface(
     project_id: str, dataset_id: str
-) -> edw_service.EdwClientInterface:
+) -> GenericClientInterface:
   """Builds and Returns the requested BigQuery client Interface.
 
   Args:
@@ -80,23 +101,6 @@ def GetBigQueryClientInterface(
   if FLAGS.bq_client_interface == 'PYTHON':
     return PythonClientInterface(project_id, dataset_id)
   raise RuntimeError('Unknown BigQuery Client Interface requested.')
-
-
-class GenericClientInterface(edw_service.EdwClientInterface):
-  """Generic Client Interface class for BigQuery.
-
-  Attributes:
-    project_id: String name of the BigQuery project to benchmark
-    dataset_id: String name of the BigQuery dataset to benchmark
-  """
-
-  def __init__(self, project_id: str, dataset_id: str):
-    self.project_id = project_id
-    self.dataset_id = dataset_id
-
-  def GetMetadata(self) -> dict[str, str]:
-    """Gets the Metadata attributes for the Client Interface."""
-    return {'client': FLAGS.bq_client_interface}
 
 
 class CliClientInterface(GenericClientInterface):
@@ -446,6 +450,16 @@ class PythonClientInterface(GenericClientInterface):
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     return stdout
 
+  def RunQueryWithResults(self, query_name: str) -> str:
+    """Executes a query and returns performance details and query output."""
+    cmd = (
+        f'python3 {BQ_PYTHON_CLIENT_FILE} single --project'
+        f' {self.project_id} --credentials_file {self.key_file_name} --dataset'
+        f' {self.dataset_id} --query_file {query_name} --print_results'
+    )
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    return stdout
+
 
 class Bigquery(edw_service.EdwService):
   """Object representing a Bigquery cluster.
@@ -456,6 +470,8 @@ class Bigquery(edw_service.EdwService):
 
   CLOUD = provider_info.GCP
   SERVICE_TYPE = 'bigquery'
+  RUN_COST_QUERY_TEMPLATE = 'edw/bigquery/run_cost_query.sql.j2'
+  client_interface: GenericClientInterface
 
   def __init__(self, edw_service_spec):
     super().__init__(edw_service_spec)
@@ -672,6 +688,18 @@ class Bigquery(edw_service.EdwService):
       cmd.append(f'{project_dataset}.{table}')
       vm_util.IssueCommand(cmd)
 
+  def GetDatasetRegion(self, dataset=None):
+    """Get the region that a dataset resides in."""
+    cmd = [
+        'bq',
+        'show',
+        '--format=prettyjson',
+        self.FormatProjectAndDatasetForCommand(dataset),
+    ]
+    dataset_metadata, _, _ = vm_util.IssueCommand(cmd)
+    metadata_json = json.loads(str(dataset_metadata))
+    return str(metadata_json['location']).lower()
+
   def OpenDataset(self, dataset: str):
     self.client_interface.dataset_id = dataset
 
@@ -681,6 +709,35 @@ class Bigquery(edw_service.EdwService):
 
     cmd = ['bq', 'cp', source, dest]
     vm_util.IssueCommand(cmd)
+
+  def GetAutoscaleSlotSeconds(self, run_iter_id: str) -> int:
+    query_file_name = f'cost_query_{run_iter_id}'
+    context = {
+        'run_identifier': run_iter_id,
+        'project_dot_region': f'{self.client_interface.project_id}.region-{self.GetDatasetRegion()}',
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.RUN_COST_QUERY_TEMPLATE),
+        query_file_name,
+        context,
+    )
+    output = json.loads(
+        self.client_interface.RunQueryWithResults(query_file_name)
+    )
+    run_cost = output['details']['query_results']['billed_slot_seconds'][0]
+    return run_cost
+
+  def GetIterationAuxiliaryMetrics(self, iter_run_key: str) -> dict[str, Any]:
+    service_auxiliary_metrics = {}
+    try:
+      run_cost = self.GetAutoscaleSlotSeconds(iter_run_key)
+      service_auxiliary_metrics['edw_bq_autoscale_slot_seconds'] = {
+          'value': run_cost,
+          'unit': 'slot-seconds',
+      }
+      return service_auxiliary_metrics
+    except NotImplementedError:  # No metrics support in client interface.
+      return {}
 
 
 class Endor(Bigquery):

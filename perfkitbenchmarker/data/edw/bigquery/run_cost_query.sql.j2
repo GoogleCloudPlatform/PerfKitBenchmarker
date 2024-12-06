@@ -1,0 +1,41 @@
+WITH
+  job_times AS (
+    SELECT MIN(start_time) AS start_time, MAX(end_time) AS end_time
+    FROM `{{project_dot_region}}`.INFORMATION_SCHEMA.JOBS
+    WHERE
+      EXISTS(
+        SELECT KEY, value
+        FROM UNNEST(labels)
+        WHERE KEY = 'minimal_run_key' AND VALUE = '{{run_identifier}}'
+      )
+  ),
+  per_second_times AS (
+    SELECT * FROM UNNEST(
+      GENERATE_TIMESTAMP_ARRAY(
+        TIMESTAMP_TRUNC(
+          (SELECT start_time FROM job_times), SECOND),
+        TIMESTAMP_TRUNC(
+          (SELECT end_time FROM job_times), SECOND),
+        INTERVAL 1 SECOND))
+      AS period_start
+  ),
+  res_empty_timeline AS (
+    SELECT
+      IFNULL(rc.change_timestamp, per_second_times.period_start) AS period_start_sec,
+      per_second_times.period_start,
+      autoscale
+    FROM per_second_times
+    LEFT JOIN
+      `{{project_dot_region}}`.INFORMATION_SCHEMA.RESERVATION_CHANGES rc
+      ON per_second_times.period_start = TIMESTAMP_TRUNC(rc.change_timestamp, SECOND)
+  ),
+  res_timeline AS (
+    SELECT
+      period_start,
+      period_start_sec,
+      LAST_VALUE(autoscale.current_slots IGNORE NULLS)
+        OVER (ORDER BY period_start_sec ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+        AS autoscale_current_slots
+    FROM res_empty_timeline
+  )
+SELECT SUM(autoscale_current_slots) AS billed_slot_seconds FROM res_timeline r
