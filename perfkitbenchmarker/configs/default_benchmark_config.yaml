@@ -14,6 +14,7 @@ default_disk_spec: &default_disk_spec
 
 speccpu2017_int_rate_flags_base: &speccpu2017_int_rate_flags_base
   build_fortran: True
+  runspec_build_tool_version: 11
   enable_transparent_hugepages: True
   runspec_estimate_spec: True
   runspec_iterations: 1
@@ -22,7 +23,7 @@ speccpu2017_int_rate_flags_base: &speccpu2017_int_rate_flags_base
   spec17_subset: intrate
   spec_runmode: base
 
-speccpu2017_int_rate_GCC11_O3_x86:
+speccpu2017_int_rate_GCC_O3_x86:
   name: speccpu2017
   flags:
     <<: *speccpu2017_int_rate_flags_base
@@ -32,7 +33,7 @@ speccpu2017_int_rate_GCC11_O3_x86:
     default:
       disk_spec: *default_disk_spec
 
-speccpu2017_int_rate_GCC11_OFAST_x86:
+speccpu2017_int_rate_GCC_OFAST_x86:
   name: speccpu2017
   flags:
     <<: *speccpu2017_int_rate_flags_base
@@ -42,7 +43,7 @@ speccpu2017_int_rate_GCC11_OFAST_x86:
     default:
       disk_spec: *default_disk_spec
 
-speccpu2017_int_rate_GCC11_O3_arm:
+speccpu2017_int_rate_GCC_O3_arm:
   name: speccpu2017
   flags:
     <<: *speccpu2017_int_rate_flags_base
@@ -52,7 +53,7 @@ speccpu2017_int_rate_GCC11_O3_arm:
     default:
       disk_spec: *default_disk_spec
 
-speccpu2017_int_rate_GCC11_OFAST_arm:
+speccpu2017_int_rate_GCC_OFAST_arm:
   name: speccpu2017
   flags:
     <<: *speccpu2017_int_rate_flags_base
