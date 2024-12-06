@@ -711,8 +711,11 @@ def Install(vm):
   )
   if _YCSB_COMMIT.value:
     vm.RemoteCommand(
-        f'git clone {GITHUB_URL} {YCSB_DIR}; cd {YCSB_DIR} && git checkout'
-        f' {_YCSB_COMMIT.value};'
+        f'mkdir -p {YCSB_DIR} && cd {YCSB_DIR} && git init && (git config'
+        # Check to see if the origin remote already exists before adding. This
+        # avoids a "remote already exists" error.
+        f' remote.origin.url >&- || git remote add origin {GITHUB_URL}.git) &&'
+        f' git fetch origin && git checkout {_YCSB_COMMIT.value};'
     )
     build_cmd = f'{linux_packages.INSTALL_DIR}/maven/bin/mvn clean package'
     if _YCSB_BINDING.value:

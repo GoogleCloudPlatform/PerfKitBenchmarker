@@ -530,3 +530,5 @@
 -   Update bigtable_walkthrough/README.md to help reduce the user frictions.
 -   Remove default boot_disk_type in GCP.
 -   Update AWS and Azure default disks to gp3 and PremiumV2_LRS respectively.
+-   When `--ycsb_commit` is set, YCSB at the given commit can be pulled into
+    `YCSB_DIR` even if the directory already exists.
