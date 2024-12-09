@@ -49,6 +49,7 @@ OS_DEPENDENT_DEFAULTS = {
         'conf_dir': '/etc/postgresql/16/main',
         'disk_mount_point': '/etc/postgresql/16/data',
         'postgres_service_name': 'postgresql',
+        'postgres_template_service_name': 'postgresql@16-main',
     },
     'amazonlinux': {
         'data_dir': '/var/lib/pgsql/data',
@@ -166,6 +167,11 @@ def GetOSDependentDefaults(os_type: str) -> dict[str, str]:
     return OS_DEPENDENT_DEFAULTS['debian']
 
 
+def IsUbuntu(vm):
+  """Returns whether the VM is Debian."""
+  return vm.OS_TYPE in os_types.UBUNTU_OS_TYPES
+
+
 def ConfigureAndRestart(vm, run_uri, buffer_size):
   """Configure and restart postgres.
 
@@ -235,7 +241,13 @@ def ConfigureAndRestart(vm, run_uri, buffer_size):
       f' {GetOSDependentDefaults(vm.OS_TYPE)["postgres_service_name"]}.service'
       f' MemoryMax={SHARED_BUFFERS_CONF[buffer_size_key]["max_memory"]}'
   )
-  vm.RemoteCommand('sudo sync; echo 3 | sudo tee -a /proc/sys/vm/drop_caches')
+  if IsUbuntu(vm):
+    vm.RemoteCommand(
+        'sudo systemctl set-property'
+        f' {GetOSDependentDefaults(vm.OS_TYPE)["postgres_template_service_name"]}.service'
+        f' MemoryMax={SHARED_BUFFERS_CONF[buffer_size_key]["max_memory"]}'
+    )
+  vm.RemoteCommand('sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches')
   vm.RemoteCommand(
       f'cat /etc/systemd/system.control/{GetOSDependentDefaults(vm.OS_TYPE)["postgres_service_name"]}.service.d/50-MemoryMax.conf'
   )
