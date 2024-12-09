@@ -173,10 +173,10 @@ hpcc_stream:
 redis_memtier_full_house_loaded:
   name: redis_memtier
   flags:
-    memtier_clients: 32
+    memtier_clients: 8
     memtier_requests: -1
-    memtier_run_duration: 800
-    memtier_threads: 4
+    memtier_run_duration: 300
+    memtier_threads: 16
     redis_eviction_policy: allkeys-lru
     redis_server_version: '5.0.14'
     redis_total_num_processes: 0
