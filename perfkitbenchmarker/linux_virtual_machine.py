@@ -2167,7 +2167,13 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     self.InstallPackages('nvme-cli')
     version_str, _ = self.RemoteCommand('sudo nvme --version')
     version_num = version_str.split()[2]
-    if packaging_version.parse(version_num) >= packaging_version.parse('1.5'):
+    # TODO(arushigaur): Version check can be removed and we can just parse
+    # the raw output.
+    if packaging_version.parse(version_num) >= packaging_version.parse(
+        '1.5'
+    ) and packaging_version.parse(version_num) < packaging_version.parse(
+        '2.11'
+    ):
       stdout, _ = self.RemoteCommand('sudo nvme list --output-format json')
       if not stdout:
         return []

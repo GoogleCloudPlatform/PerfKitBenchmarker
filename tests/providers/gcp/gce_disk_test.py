@@ -236,7 +236,11 @@ class GCEPDDiskTest(GCEDiskTest):
     fake_rets = [
         ('stdout', 'stderr', 0),
         ('stdout', 'stderr', 0),
-        ('20 20 201', 'stderr', 0),
+        (
+            'nvme version 2.8 (git 2.8)\nlibnvme version 1.8 (git 1.8)',
+            'stderr',
+            0,
+        ),
         ('', 'stderr', 0),
         ('/dev/nvme0n1', 'stderr', 0),
         ('0', 'stderr', 0),
@@ -295,7 +299,11 @@ class GCEPDDiskTest(GCEDiskTest):
         ('', '', 0),
         ('stdout', 'stderr', 0),
         ('stdout', 'stderr', 0),
-        ('20 20 201', 'stderr', 0),
+        (
+            'nvme version 2.8 (git 2.8)\nlibnvme version 1.8 (git 1.8)',
+            'stderr',
+            0,
+        ),
         ('', 'stderr', 0),
         ('/dev/nvme0n1', 'stderr', 0),
         ('0', 'stderr', 0),
