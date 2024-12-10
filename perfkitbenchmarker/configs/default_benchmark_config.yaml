@@ -14,7 +14,8 @@ default_disk_spec: &default_disk_spec
 
 speccpu2017_int_rate_flags_base: &speccpu2017_int_rate_flags_base
   build_fortran: True
-  runspec_build_tool_version: 11
+  # TODO(pclay): replace with --gcc-version=11
+  runspec_build_tool_version: "11"
   enable_transparent_hugepages: True
   runspec_estimate_spec: True
   runspec_iterations: 1
