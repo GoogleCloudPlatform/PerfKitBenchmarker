@@ -699,6 +699,8 @@ class GcpDpbDataprocServerless(
       result['spark.executor.memoryOverhead'] = (
           f'{self.spec.dataproc_serverless_memory_overhead}m'
       )
+    if self.spec.dataproc_serverless_runtime_engine == 'native':
+      result['spark.dataproc.runtimeEngine'] = 'native'
     result.update(super().GetJobProperties())
     return result
 
@@ -751,6 +753,7 @@ class GcpDpbDataprocServerless(
         'dpb_disk_size': self.metadata['dpb_disk_size'],
         'dpb_service_zone': self.metadata['dpb_service_zone'],
         'dpb_job_properties': self.metadata['dpb_job_properties'],
+        'dpb_runtime_engine': self.spec.dataproc_serverless_runtime_engine,
     }
 
   def CalculateLastJobCosts(self) -> dpb_service.JobCosts:

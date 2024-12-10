@@ -213,6 +213,13 @@ class _DpbServiceSpec(spec.BaseSpec):
             option_decoders.IntDecoder,
             {'default': None, 'none_ok': True},
         ),
+        'dataproc_serverless_runtime_engine': (
+            option_decoders.EnumDecoder,
+            {
+                'valid_values': ('spark', 'native'),
+                'default': 'spark',
+            },
+        ),
         'dataproc_serverless_memory_overhead': (
             option_decoders.IntDecoder,
             {'default': None, 'none_ok': True},
