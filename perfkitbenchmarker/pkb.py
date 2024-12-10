@@ -1167,6 +1167,8 @@ def RunBenchmark(
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.RETRIES_EXCEEDED
           )
+        elif _IsException(e, errors.Config.InvalidValue):
+          spec.failed_substatus = benchmark_status.FailedSubstatus.INVALID_VALUE
         else:
           spec.failed_substatus = benchmark_status.FailedSubstatus.UNCATEGORIZED
         spec.status_detail = str(e)

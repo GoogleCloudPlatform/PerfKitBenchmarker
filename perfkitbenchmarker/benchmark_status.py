@@ -70,6 +70,9 @@ class FailedSubstatus:
   # Failure when a retryable command execution exceeds the retry limit.
   RETRIES_EXCEEDED = 'RETRIES_EXCEEDED'
 
+  # Failure when config values are invalid.
+  INVALID_VALUE = 'INVALID_VALUE'
+
   # List of valid substatuses for use with --retries.
   # UNCATEGORIZED failures are not retryable. To make a specific UNCATEGORIZED
   # failure retryable, please raise an errors.Benchmarks.KnownIntermittentError.
