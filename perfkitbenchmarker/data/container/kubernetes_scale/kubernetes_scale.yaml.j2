@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   name: {{Name}}
 spec:
+  progressDeadlineSeconds: {{RolloutTimeout}}
   replicas: {{Replicas}}
   selector:
     matchLabels:
