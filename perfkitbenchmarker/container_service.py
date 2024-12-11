@@ -956,6 +956,23 @@ class KubernetesClusterCommands:
     RunKubectlCommand(run_cmd, timeout=timeout + 10)
 
   @staticmethod
+  def WaitForSucceeded(
+      resource_name: str,
+      namespace: str | None = None,
+      timeout: int = vm_util.DEFAULT_TIMEOUT,
+  ):
+    """Waits for a resource to complete (i.e. .status.phase=='Succeeded')."""
+    run_cmd = [
+        'wait',
+        '--for=jsonpath={.status.phase}=Succeeded',
+        f'--timeout={timeout}s',
+        resource_name,
+    ]
+    if namespace:
+      run_cmd.append(f'--namespace={namespace}')
+    RunKubectlCommand(run_cmd, timeout=timeout + 10)
+
+  @staticmethod
   def WaitForRollout(
       resource_name: str, timeout: int = vm_util.DEFAULT_TIMEOUT
   ):
