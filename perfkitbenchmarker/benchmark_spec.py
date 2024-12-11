@@ -405,6 +405,7 @@ class BenchmarkSpec:
           relational_db_class.GetDefaultEngineVersion(engine)
       )
     self.relational_db = relational_db_class(self.config.relational_db)
+    self.resources.append(self.relational_db)
 
   def ConstructNonRelationalDb(self) -> None:
     """Initializes the non_relational db."""
