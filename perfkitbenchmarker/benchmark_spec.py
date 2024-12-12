@@ -179,7 +179,7 @@ class BenchmarkSpec:
     self.uuid = '%s-%s' % (FLAGS.run_uri, uuid.uuid4())
     self.always_call_cleanup = pkb_flags.ALWAYS_CALL_CLEANUP.value
     self.dpb_service: dpb_service.BaseDpbService = None
-    self.container_cluster: container_service.BaseContainerCluster = None
+    self.container_cluster = None
     self.key = None
     self.relational_db = None
     self.non_relational_db = None
