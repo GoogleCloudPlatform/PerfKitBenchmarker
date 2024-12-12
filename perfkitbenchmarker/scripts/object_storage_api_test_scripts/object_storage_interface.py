@@ -15,10 +15,9 @@
 """The generic superclass for object storage API providers."""
 
 import abc
-import six
 
 
-class ObjectStorageServiceBase(six.with_metaclass(abc.ABCMeta, object)):
+class ObjectStorageServiceBase(metaclass=abc.ABCMeta):
   """Our interface to an object storage service."""
 
   @abc.abstractmethod
@@ -88,7 +87,7 @@ class ObjectStorageServiceBase(six.with_metaclass(abc.ABCMeta, object)):
     pass
 
   @abc.abstractmethod
-  def WriteObjectFromBuffer(self, bucket, object, stream, size):
+  def WriteObjectFromBuffer(self, bucket, object_name, stream, size):
     """Write an object to a bucket.
 
     Exceptions are propagated to the caller, which can decide whether
@@ -97,7 +96,7 @@ class ObjectStorageServiceBase(six.with_metaclass(abc.ABCMeta, object)):
 
     Args:
       bucket: the name of the bucket to write to.
-      object: the name of the object.
+      object_name: the name of the object.
       stream: a read()-able and seek()-able stream to transfer.
       size: the number of bytes to transfer.
 
@@ -108,7 +107,7 @@ class ObjectStorageServiceBase(six.with_metaclass(abc.ABCMeta, object)):
     pass
 
   @abc.abstractmethod
-  def ReadObject(self, bucket, object):
+  def ReadObject(self, bucket, object_name):
     """Read an object.
 
     Exceptions are propagated to the caller, which can decide whether
@@ -116,7 +115,7 @@ class ObjectStorageServiceBase(six.with_metaclass(abc.ABCMeta, object)):
 
     Args:
       bucket: the name of the bucket.
-      object: the name of the object.
+      object_name: the name of the object.
 
     Returns:
       A tuple of (start_time, latency)

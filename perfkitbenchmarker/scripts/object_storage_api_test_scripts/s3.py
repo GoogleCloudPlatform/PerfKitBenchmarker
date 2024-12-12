@@ -80,7 +80,14 @@ class S3Service(object_storage_interface.ObjectStorageServiceBase):
     start_time = time.time()
     stream.seek(0)
     obj = six.BytesIO(stream.read(size))
-    self.client.put_object(Body=obj, Bucket=bucket, Key=object_name)
+    # boto requires additional parameters to be not passed or valid.
+    # Passing StorageClass=None causes a type error. So use kwargs.
+    extra_kwargs = {}
+    if FLAGS.object_storage_class:
+      extra_kwargs['StorageClass'] = FLAGS.object_storage_class
+    self.client.put_object(
+        Body=obj, Bucket=bucket, Key=object_name, **extra_kwargs
+    )
     latency = time.time() - start_time
     return start_time, latency
 

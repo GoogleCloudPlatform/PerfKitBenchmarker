@@ -98,7 +98,7 @@ OBJECT_STORAGE_GCS_MULTIREGION = flags.DEFINE_string(
     'Storage multiregion for GCS in object storage benchmark.',
 )
 
-flags.DEFINE_string(
+OBJECT_STORAGE_STORAGE_CLASS = flags.DEFINE_string(
     'object_storage_storage_class',
     None,
     'Storage class to use in object storage benchmark.',
@@ -1939,6 +1939,9 @@ def Run(benchmark_spec):
     metadata['bucket_locality'] = 'regional'
 
   metadata.update(service.Metadata(vms[0]))
+
+  if OBJECT_STORAGE_STORAGE_CLASS.value:
+    metadata['object_storage_class'] = OBJECT_STORAGE_STORAGE_CLASS.value
 
   results = []
   test_script_path = '/tmp/run/%s' % API_TEST_SCRIPT
