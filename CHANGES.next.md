@@ -88,6 +88,7 @@
 -   Remove Broken Juju and Ubuntu Container OS types.
 -   Remove support for installing Python 2 in VMs.
 -   Make Ubuntu 24 the default os_type.
+-   Merged redundant `--runspec_build_tool_version` with `--gcc_version`.
 
 ### New features:
 

@@ -51,16 +51,6 @@ flags.DEFINE_string(
     'to None. '
     'See README.md for instructions if running with a repackaged .tgz file.',
 )
-flags.DEFINE_string(
-    'runspec_build_tool_version',
-    None,
-    'Version of gcc/g++/gfortran. This should match runspec_config. Note, if '
-    'neither runspec_config and runspec_build_tool_version is set, the test '
-    'install gcc/g++/gfortran-4.7, since that matches default config version. '
-    'If runspec_config is set, but not runspec_build_tool_version, default '
-    'version of build tools will be installed. Also this flag only works with '
-    'debian.',
-)
 flags.DEFINE_integer(
     'runspec_iterations',
     3,
@@ -366,6 +356,7 @@ def Install(vm):
   """Installs SPECCPU dependencies."""
   vm.Install('wget')
   vm.Install('fortran')
+  # Install gcc, g++, fortran according to --gcc_version
   vm.Install('build_tools')
 
   if vm.OS_TYPE in os_types.EL_OS_TYPES:
@@ -375,15 +366,6 @@ def Install(vm):
     vm.Install('tuned')
     vm.RemoteCommand(f'sudo tuned-adm profile {FLAGS.runspec_tuned_profile}')
 
-  # If runspec_build_tool_version is not set,
-  # install 4.7 gcc/g++/gfortan. If either one of the flag is set, we assume
-  # user is smart
-  if FLAGS.runspec_build_tool_version:
-    build_tool_version = FLAGS.runspec_build_tool_version or '4.7'
-    if 'debian' not in vm.OS_TYPE:
-      # do not reinstall gcc/g++/gfortran on Debian OS's;
-      # reinstallation may be done by setting FLAGS.gcc_version
-      build_tools.Reinstall(vm, version=build_tool_version)
   if FLAGS.runspec_enable_32bit:
     vm.Install('multilib')
   vm.Install('numactl')
