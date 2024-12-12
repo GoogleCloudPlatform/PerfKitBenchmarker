@@ -51,7 +51,10 @@ cloud_datastore_ycsb:
       vm_spec: *default_single_core
       vm_count: 1
   flags:
-    openjdk_version: 8"""
+    openjdk_version: 11
+    gcloud_scopes: >
+      datastore
+      cloud-platform"""
 
 # the name of the database entity created when running datastore YCSB
 # https://github.com/brianfrankcooper/YCSB/tree/master/googledatastore
@@ -81,9 +84,14 @@ flags.DEFINE_string(
     'The service account email associated withdatastore private key file',
 )
 flags.DEFINE_string(
-    'google_datastore_datasetId',
+    'google_datastore_projectId',
     None,
     'The project ID that has Cloud Datastore service',
+)
+flags.DEFINE_string(
+    'google_datastore_datasetId',
+    None,
+    'The database ID that has Cloud Datastore service',
 )
 flags.DEFINE_string(
     'google_datastore_debug', 'false', 'The logging level when running YCSB'
@@ -112,28 +120,15 @@ def GetConfig(user_config):
   return config
 
 
-def CheckPrerequisites(_):
-  """Verifies that the required resources are present.
-
-  Raises:
-    perfkitbenchmarker.data.ResourceNotFound: On missing resource.
-  """
-  # Before YCSB Cloud Datastore supports Application Default Credential,
-  # we should always make sure valid credential flags are set.
-  if not FLAGS.google_datastore_keyfile:
-    raise ValueError('"google_datastore_keyfile" must be set')
-  if not FLAGS.google_datastore_serviceAccount:
-    raise ValueError('"google_datastore_serviceAccount" must be set')
-  if not FLAGS.google_datastore_datasetId:
-    raise ValueError('"google_datastore_datasetId" must be set ')
-
-
 def _Install(vm):
   """Installs YCSB benchmark & copies datastore keyfile to client vm."""
   vm.Install('ycsb')
 
   # Copy private key file to VM
-  if FLAGS.google_datastore_keyfile.startswith('gs://'):
+  if (
+      FLAGS.google_datastore_keyfile
+      and FLAGS.google_datastore_keyfile.startswith('gs://')
+  ):
     vm.Install('google_cloud_sdk')
     vm.RemoteCommand(
         '{cmd} {datastore_keyfile} {private_keyfile}'.format(
@@ -143,7 +138,26 @@ def _Install(vm):
         )
     )
   else:
-    vm.RemoteCopy(FLAGS.google_datastore_keyfile, FLAGS.private_keyfile)
+    if FLAGS.google_datastore_keyfile and FLAGS.private_keyfile:
+      vm.RemoteCopy(FLAGS.google_datastore_keyfile, FLAGS.private_keyfile)
+
+
+def _GetCommonYcsbArgs():
+  """Returns common YCSB args."""
+  args = {
+      'googledatastore.projectId': FLAGS.google_datastore_projectId,
+      'googledatastore.debug': FLAGS.google_datastore_debug,
+  }
+  # if not provided, use the (default) database.
+  if FLAGS.google_datastore_datasetId:
+    args['googledatastore.datasetId'] = FLAGS.google_datastore_datasetId
+  if FLAGS.google_datastore_keyfile:
+    args['googledatastore.privateKeyFile'] = FLAGS.private_keyfile
+  if FLAGS.google_datastore_serviceAccount:
+    args['googledatastore.serviceAccountEmail'] = (
+        FLAGS.google_datastore_serviceAccount
+    )
+  return args
 
 
 def Prepare(benchmark_spec):
@@ -161,15 +175,8 @@ def Prepare(benchmark_spec):
   # Install required packages and copy credential files
   background_tasks.RunThreaded(_Install, vms)
 
-  load_kwargs = {
-      'googledatastore.datasetId': FLAGS.google_datastore_datasetId,
-      'googledatastore.privateKeyFile': FLAGS.private_keyfile,
-      'googledatastore.serviceAccountEmail': (
-          FLAGS.google_datastore_serviceAccount
-      ),
-      'googledatastore.debug': FLAGS.google_datastore_debug,
-      'core_workload_insertion_retry_limit': _INSERTION_RETRY_LIMIT,
-  }
+  load_kwargs = _GetCommonYcsbArgs()
+  load_kwargs['core_workload_insertion_retry_limit'] = _INSERTION_RETRY_LIMIT
   ycsb.YCSBExecutor('googledatastore').Load(vms, load_kwargs=load_kwargs)
 
 
@@ -189,16 +196,12 @@ def Run(benchmark_spec):
 
   executor = ycsb.YCSBExecutor('googledatastore')
   vms = benchmark_spec.vms
-  run_kwargs = {
-      'googledatastore.datasetId': FLAGS.google_datastore_datasetId,
-      'googledatastore.privateKeyFile': FLAGS.private_keyfile,
-      'googledatastore.serviceAccountEmail': (
-          FLAGS.google_datastore_serviceAccount
-      ),
-      'googledatastore.debug': FLAGS.google_datastore_debug,
+  run_kwargs = _GetCommonYcsbArgs()
+  run_kwargs.update({
+      'googledatastore.tracingenabled': True,
       'readallfields': True,
       'writeallfields': True,
-  }
+  })
   samples = list(executor.Run(vms, run_kwargs=run_kwargs))
   return samples
 
