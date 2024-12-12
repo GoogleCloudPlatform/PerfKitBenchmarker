@@ -76,7 +76,7 @@ redis_memtier:
     memtier_data_size: 1024
     memtier_pipeline: 1
     placement_group_style: none
-    redis_simulate_aof: False
+    redis_aof: False
     redis_server_io_threads: 0
   vm_groups:
     servers:
@@ -122,7 +122,7 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
     vm_spec = config['vm_groups']['servers']['vm_spec']
     for cloud in vm_spec:
       vm_spec[cloud]['machine_type'] = FLAGS.redis_memtier_server_machine_type
-  if not redis_server.REDIS_SIMULATE_AOF.value:
+  if not redis_server.REDIS_AOF.value:
     config['vm_groups']['servers']['disk_count'] = 0
   return config
 

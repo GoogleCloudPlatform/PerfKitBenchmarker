@@ -78,10 +78,10 @@ _EVICTION_POLICY = flags.DEFINE_enum(
     'Redis eviction policy when maxmemory limit is reached. This requires '
     'running clients with larger amounts of data than Redis can hold.',
 )
-REDIS_SIMULATE_AOF = flags.DEFINE_bool(
-    'redis_simulate_aof',
+REDIS_AOF = flags.DEFINE_bool(
+    'redis_aof',
     False,
-    'If true, simulate usage of disks on the server for aof backups. ',
+    'If true, use disks on the server for aof backups. ',
 )
 
 # Default port for Redis
@@ -174,7 +174,7 @@ def _BuildStartCommand(vm, port: int) -> str:
       f'--port {port}',
       '--protected-mode no',
   ]
-  if REDIS_SIMULATE_AOF.value:
+  if REDIS_AOF.value:
     cmd_args += [
         '--appendonly yes',
         f'--appendfilename backup_{port}',
@@ -245,6 +245,7 @@ def GetMetadata(vm) -> Dict[str, Any]:
       'redis_server_io_threads_cpu_affinity': _IO_THREAD_AFFINITY.value,
       'redis_server_enable_snapshots': _ENABLE_SNAPSHOTS.value,
       'redis_server_num_processes': num_processes,
+      'redis_aof': REDIS_AOF.value,
   }
 
 
