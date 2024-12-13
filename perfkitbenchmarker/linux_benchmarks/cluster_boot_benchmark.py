@@ -271,6 +271,9 @@ def GetTimeToBoot(vms):
         'num_vms': len(vms),
         'os_type': vm.OS_TYPE,
         'create_delay_sec': '%0.1f' % create_delay_sec,
+        'create_operation_name': (
+            vm.create_operation_name if vm.create_operation_name else 'N/A'
+        ),
     }
 
     # TIME TO CREATE ASYNC RETURN
