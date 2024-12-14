@@ -558,10 +558,13 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
       numactl_prefix = 'numactl '
       if NETPERF_NUMACTL_PHYSCPUBIND.value:
         numactl_prefix += f'--physcpubind {NETPERF_NUMACTL_PHYSCPUBIND.value} '
+        metadata['netperf_physcpubind'] = NETPERF_NUMACTL_PHYSCPUBIND.value
       if NETPERF_NUMACTL_CPUNODEBIND.value:
         numactl_prefix += f'--cpunodebind {NETPERF_NUMACTL_CPUNODEBIND.value} '
+        metadata['netperf_cpunodebind'] = NETPERF_NUMACTL_CPUNODEBIND.value
       if NETPERF_NUMACTL_MEMBIND.value:
         numactl_prefix += f'--membind {NETPERF_NUMACTL_MEMBIND.value} '
+        metadata['netperf_membind'] = NETPERF_NUMACTL_MEMBIND.value
       remote_cmd = f'{numactl_prefix} {remote_cmd}'
 
     if FLAG_NETPERF_PERF_RECORD.value:
