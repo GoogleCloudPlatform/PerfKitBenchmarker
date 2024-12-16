@@ -53,6 +53,7 @@ cloud_datastore_ycsb:
   flags:
     openjdk_version: 11
     gcloud_scopes: >
+      trace
       datastore
       cloud-platform"""
 
