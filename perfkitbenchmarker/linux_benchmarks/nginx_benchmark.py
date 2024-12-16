@@ -98,18 +98,18 @@ flags.DEFINE_string(
 flags.DEFINE_boolean(
     'nginx_use_ssl', True, 'Use HTTPs when connecting to nginx.'
 )
-flags.DEFINE_integer(
-    'nginx_worker_connections',
-    1024,
-    'The maximum number of simultaneous connections that can '
-    'be opened by a worker process.',
-)
 flags.DEFINE_enum(
     'nginx_scenario',
     'reverse_proxy',
     ['reverse_proxy', 'api_gateway'],
     'Benchmark scenario. Can be "reverse_proxy" or "api_gateway". Set to'
     ' "reverse_proxy" by default.',
+)
+_P99_LATENCY_THRESHOLD = flags.DEFINE_integer(
+    'nginx_p99_latency_threshold',
+    None,
+    'The p99 latency threshold (in milliseconds) for the benchmark to output'
+    ' results.',
 )
 _NGINX_SERVER_PORT = flags.DEFINE_integer(
     'nginx_server_port',
@@ -156,6 +156,10 @@ nginx:
 
 _CONTENT_FILENAME = 'random_content'
 _API_GATEWAY_PATH = 'api_old'  # refer to data/nginx/rp_apigw.conf
+_WORKER_CONNECTIONS = 1024
+_TARGET_RATE_LOWER_BOUND = 0
+_TARGET_RATE_UPPER_BOUND = 1000000
+_RPS_RANGE_THRESHOLD = 1000
 
 
 def GetConfig(user_config):
@@ -408,8 +412,9 @@ def _RunMultiClient(clients, target, rate, connections, duration, threads):
       'duration': duration,
       'target_rate': rate * num_clients,
       'nginx_throttle': FLAGS.nginx_throttle,
-      'nginx_worker_connections': FLAGS.nginx_worker_connections,
+      'nginx_worker_connections': _WORKER_CONNECTIONS,
       'nginx_use_ssl': FLAGS.nginx_use_ssl,
+      'p99_latency_threshold': _P99_LATENCY_THRESHOLD.value,
   }
   if not FLAGS.nginx_file_server_conf:
     metadata['caching'] = True
@@ -446,7 +451,8 @@ def Run(benchmark_spec):
   if FLAGS.nginx_scenario == 'reverse_proxy':
     # e.g. "https://10.128.0.36/random_content"
     target = f'{scheme}://{hoststr}{portstr}/{_CONTENT_FILENAME}'
-  elif FLAGS.nginx_scenario == 'api_gateway':
+  # FLAGS.nginx_scenario = 'api_gateway'
+  else:
     # e.g. "https://10.128.0.36/api_old/random_content"
     target = (
         f'{scheme}://{hoststr}{portstr}/{_API_GATEWAY_PATH}/{_CONTENT_FILENAME}'
@@ -462,6 +468,37 @@ def Run(benchmark_spec):
         threads=clients[0].NumCpusForBenchmark(),
     )
 
+  # Binary search for highest RPS under the p99 latency threshold.
+  if _P99_LATENCY_THRESHOLD.value:
+    lower_bound, upper_bound = (
+        _TARGET_RATE_LOWER_BOUND,
+        _TARGET_RATE_UPPER_BOUND,
+    )
+    target_rate = upper_bound
+    valid_results = []
+    while (upper_bound - lower_bound) > _RPS_RANGE_THRESHOLD:
+      results = _RunMultiClient(
+          clients,
+          target,
+          rate=target_rate,
+          connections=clients[0].NumCpusForBenchmark() * 10,
+          duration=60,
+          threads=clients[0].NumCpusForBenchmark(),
+      )
+      for result in results:
+        if result.metric == 'p99 latency':
+          p99_latency = result.value
+          if p99_latency > _P99_LATENCY_THRESHOLD.value:
+            upper_bound = target_rate
+          else:
+            lower_bound = target_rate
+            valid_results = results
+          target_rate = (lower_bound + upper_bound) // 2
+          break
+
+    return valid_results
+
+  results = []
   for config in FLAGS.nginx_load_configs:
     rate, duration, threads, connections = list(map(int, config.split(':')))
     results += _RunMultiClient(
