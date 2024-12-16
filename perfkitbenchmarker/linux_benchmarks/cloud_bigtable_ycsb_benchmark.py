@@ -520,6 +520,9 @@ def _CommonArgs(instance: _Bigtable) -> Dict[str, str]:
       kwargs['googlebigtable2.app-profile'] = gcp_bigtable.APP_PROFILE_ID.value
       kwargs['googlebigtable2.family'] = COLUMN_FAMILY
       kwargs['googlebigtable2.timestamp'] = '0'
+      kwargs['googlebigtable2.data-endpoint'] = (
+          gcp_bigtable.ENDPOINT.value + ':443'
+      )
       kwargs.pop('columnfamily')
     else:
       kwargs['google.bigtable.instance.id'] = instance.name
