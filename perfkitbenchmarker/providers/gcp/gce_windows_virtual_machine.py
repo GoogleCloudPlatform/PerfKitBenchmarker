@@ -68,9 +68,11 @@ class WindowsGceVirtualMachine(
       os_types.WINDOWS2016_CORE: 'windows-2016-core',
       os_types.WINDOWS2019_CORE: 'windows-2019-core',
       os_types.WINDOWS2022_CORE: 'windows-2022-core',
+      os_types.WINDOWS2025_CORE: 'windows-2025-core',
       os_types.WINDOWS2016_DESKTOP: 'windows-2016',
       os_types.WINDOWS2019_DESKTOP: 'windows-2019',
       os_types.WINDOWS2022_DESKTOP: 'windows-2022',
+      os_types.WINDOWS2025_DESKTOP: 'windows-2025',
   }
 
   GVNIC_DISABLED_OS_TYPES = []
@@ -272,8 +274,12 @@ class WindowsGceSqlServerVirtualMachine(WindowsGceVirtualMachine):
       os_types.WINDOWS2019_SQLSERVER_2019_ENTERPRISE: 'sql-ent-2019-win-2019',
       os_types.WINDOWS2022_SQLSERVER_2019_STANDARD: 'sql-std-2019-win-2022',
       os_types.WINDOWS2022_SQLSERVER_2019_ENTERPRISE: 'sql-ent-2019-win-2022',
-      os_types.WINDOWS2022_SQLSERVER_2022_ENTERPRISE: 'sql-ent-2022-win-2022',
       os_types.WINDOWS2022_SQLSERVER_2022_STANDARD: 'sql-std-2022-win-2022',
+      os_types.WINDOWS2022_SQLSERVER_2022_ENTERPRISE: 'sql-ent-2022-win-2022',
+      os_types.WINDOWS2025_SQLSERVER_2019_STANDARD: 'sql-std-2019-win-2025',
+      os_types.WINDOWS2025_SQLSERVER_2019_ENTERPRISE: 'sql-ent-2019-win-2025',
+      os_types.WINDOWS2025_SQLSERVER_2022_STANDARD: 'sql-std-2022-win-2025',
+      os_types.WINDOWS2025_SQLSERVER_2022_ENTERPRISE: 'sql-ent-2022-win-2025',
   }
 
   OS_TYPE = os_types.WINDOWS_SQLSERVER_OS_TYPES
