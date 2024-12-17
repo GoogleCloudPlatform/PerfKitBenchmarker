@@ -35,6 +35,7 @@ from google.cloud import datastore
 from google.oauth2 import service_account
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 
@@ -69,20 +70,10 @@ _CLEANUP_KIND_DELETE_PER_THREAD_BATCH_SIZE = 3000
 _CLEANUP_KIND_DELETE_OP_BATCH_SIZE = 500
 
 FLAGS = flags.FLAGS
-flags.DEFINE_string(
+_KEYFILE = flags.DEFINE_string(
     'google_datastore_keyfile',
     None,
-    'The path to Google API P12 private key file',
-)
-flags.DEFINE_string(
-    'private_keyfile',
-    '/tmp/key.p12',
-    'The path where the private key file is copied to on a VM.',
-)
-flags.DEFINE_string(
-    'google_datastore_serviceAccount',
-    None,
-    'The service account email associated withdatastore private key file',
+    'The path to Google API JSON private key file',
 )
 flags.DEFINE_string(
     'google_datastore_projectId',
@@ -103,13 +94,8 @@ flags.DEFINE_boolean(
     'If True, empty database & repopulate with new data.'
     'By default, tests are run with pre-populated data.',
 )
-# the JSON keyfile is needed to validate credentials when cleaning up the db
-flags.DEFINE_string(
-    'google_datastore_deletion_keyfile',
-    None,
-    'The path to Google API JSON private key file',
-)
 
+_KEYFILE_LOCAL_PATH = '/tmp/key.json'
 _INSERTION_RETRY_LIMIT = 100
 _SLEEP_AFTER_LOADING_SECS = 30 * 60
 
@@ -126,21 +112,14 @@ def _Install(vm):
   vm.Install('ycsb')
 
   # Copy private key file to VM
-  if (
-      FLAGS.google_datastore_keyfile
-      and FLAGS.google_datastore_keyfile.startswith('gs://')
-  ):
-    vm.Install('google_cloud_sdk')
-    vm.RemoteCommand(
-        '{cmd} {datastore_keyfile} {private_keyfile}'.format(
-            cmd='gsutil cp',
-            datastore_keyfile=FLAGS.google_datastore_keyfile,
-            private_keyfile=FLAGS.private_keyfile,
-        )
-    )
-  else:
-    if FLAGS.google_datastore_keyfile and FLAGS.private_keyfile:
-      vm.RemoteCopy(FLAGS.google_datastore_keyfile, FLAGS.private_keyfile)
+  if _KEYFILE.value:
+    if _KEYFILE.value.startswith('gs://'):
+      vm.Install('google_cloud_sdk')
+      vm.RemoteCommand(
+          f'gsutil cp {FLAGS.google_datastore_keyfile} {_KEYFILE_LOCAL_PATH}'
+      )
+    else:
+      vm.RemoteCopy(FLAGS.google_datastore_keyfile, _KEYFILE_LOCAL_PATH)
 
 
 def _GetCommonYcsbArgs():
@@ -152,13 +131,14 @@ def _GetCommonYcsbArgs():
   # if not provided, use the (default) database.
   if FLAGS.google_datastore_datasetId:
     args['googledatastore.datasetId'] = FLAGS.google_datastore_datasetId
-  if FLAGS.google_datastore_keyfile:
-    args['googledatastore.privateKeyFile'] = FLAGS.private_keyfile
-  if FLAGS.google_datastore_serviceAccount:
-    args['googledatastore.serviceAccountEmail'] = (
-        FLAGS.google_datastore_serviceAccount
-    )
   return args
+
+
+def _GetYcsbExecutor():
+  env = {}
+  if _KEYFILE.value:
+    env = {'GOOGLE_APPLICATION_CREDENTIALS': _KEYFILE_LOCAL_PATH}
+  return ycsb.YCSBExecutor('googledatastore', environment=env)
 
 
 def Prepare(benchmark_spec):
@@ -178,7 +158,8 @@ def Prepare(benchmark_spec):
 
   load_kwargs = _GetCommonYcsbArgs()
   load_kwargs['core_workload_insertion_retry_limit'] = _INSERTION_RETRY_LIMIT
-  ycsb.YCSBExecutor('googledatastore').Load(vms, load_kwargs=load_kwargs)
+  executor = _GetYcsbExecutor()
+  executor.Load(vms, load_kwargs=load_kwargs)
 
 
 def Run(benchmark_spec):
@@ -195,7 +176,7 @@ def Run(benchmark_spec):
     logging.info('Sleeping 30 minutes to allow for compaction.')
     time.sleep(_SLEEP_AFTER_LOADING_SECS)
 
-  executor = ycsb.YCSBExecutor('googledatastore')
+  executor = _GetYcsbExecutor()
   vms = benchmark_spec.vms
   run_kwargs = _GetCommonYcsbArgs()
   run_kwargs.update({
@@ -213,7 +194,7 @@ def Cleanup(_):
 
 def EmptyDatabase():
   """Deletes all entries in a datastore database."""
-  if FLAGS.google_datastore_deletion_keyfile:
+  if _KEYFILE.value:
     dataset_id = FLAGS.google_datastore_datasetId
     executor = concurrent.futures.ThreadPoolExecutor(
         max_workers=_CLEANUP_THREAD_POOL_WORKERS
@@ -242,18 +223,21 @@ def EmptyDatabase():
 
 def GetDatastoreDeleteCredentials():
   """Returns credentials to datastore db."""
-  if FLAGS.google_datastore_deletion_keyfile.startswith('gs://'):
+  if _KEYFILE.value is not None and _KEYFILE.value.startswith('gs://'):
     # Copy private keyfile to local disk
     cp_cmd = [
         'gsutil',
         'cp',
-        FLAGS.google_datastore_deletion_keyfile,
-        FLAGS.private_keyfile,
+        _KEYFILE.value,
+        _KEYFILE_LOCAL_PATH,
     ]
     vm_util.IssueCommand(cp_cmd)
-    credentials_path = FLAGS.private_keyfile
+    credentials_path = _KEYFILE_LOCAL_PATH
   else:
-    credentials_path = FLAGS.google_datastore_deletion_keyfile
+    credentials_path = _KEYFILE.value
+
+  if credentials_path is None:
+    raise errors.Benchmarks.RunError('Credentials path is None')
 
   credentials = service_account.Credentials.from_service_account_file(
       credentials_path,
