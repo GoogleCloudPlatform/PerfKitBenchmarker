@@ -2223,9 +2223,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     # journalctl
     try:
       journalctl_path = vm_util.PrependTempDir('journalctl')
-      journalctl, _ = self.RemoteCommand('sudo journalctl --no-pager')
-      with open(journalctl_path, 'w') as f:
-        f.write(journalctl)
+      self.RemoteCommand('sudo journalctl --no-pager > /tmp/journalctl.tmp')
+      self.PullFile(journalctl_path, '/tmp/journalctl.tmp')
       log_files.append(journalctl_path)
     except errors.VirtualMachine.RemoteCommandError:
       logging.warning('Failed to capture VM journalctl on %s', self.name)
