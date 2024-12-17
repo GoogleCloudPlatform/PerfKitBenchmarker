@@ -75,20 +75,20 @@ _KEYFILE = flags.DEFINE_string(
     None,
     'The path to Google API JSON private key file',
 )
-flags.DEFINE_string(
+_PROJECT_ID = flags.DEFINE_string(
     'google_datastore_projectId',
     None,
     'The project ID that has Cloud Datastore service',
 )
-flags.DEFINE_string(
+_DATASET_ID = flags.DEFINE_string(
     'google_datastore_datasetId',
     None,
     'The database ID that has Cloud Datastore service',
 )
-flags.DEFINE_string(
+_DEBUG = flags.DEFINE_string(
     'google_datastore_debug', 'false', 'The logging level when running YCSB'
 )
-flags.DEFINE_boolean(
+_REPOPULATE = flags.DEFINE_boolean(
     'google_datastore_repopulate',
     False,
     'If True, empty database & repopulate with new data.'
@@ -116,21 +116,21 @@ def _Install(vm):
     if _KEYFILE.value.startswith('gs://'):
       vm.Install('google_cloud_sdk')
       vm.RemoteCommand(
-          f'gsutil cp {FLAGS.google_datastore_keyfile} {_KEYFILE_LOCAL_PATH}'
+          f'gsutil cp {_KEYFILE.value} {_KEYFILE_LOCAL_PATH}'
       )
     else:
-      vm.RemoteCopy(FLAGS.google_datastore_keyfile, _KEYFILE_LOCAL_PATH)
+      vm.RemoteCopy(_KEYFILE.value, _KEYFILE_LOCAL_PATH)
 
 
 def _GetCommonYcsbArgs():
   """Returns common YCSB args."""
   args = {
-      'googledatastore.projectId': FLAGS.google_datastore_projectId,
-      'googledatastore.debug': FLAGS.google_datastore_debug,
+      'googledatastore.projectId': _PROJECT_ID.value,
+      'googledatastore.debug': _DEBUG.value,
   }
   # if not provided, use the (default) database.
-  if FLAGS.google_datastore_datasetId:
-    args['googledatastore.datasetId'] = FLAGS.google_datastore_datasetId
+  if _DATASET_ID.value:
+    args['googledatastore.datasetId'] = _DATASET_ID.value
   return args
 
 
@@ -148,7 +148,7 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  if FLAGS.google_datastore_repopulate:
+  if _REPOPULATE.value:
     EmptyDatabase()
 
   vms = benchmark_spec.vms
@@ -172,7 +172,7 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample instances.
   """
-  if FLAGS.google_datastore_repopulate and not FLAGS.ycsb_skip_run_stage:
+  if _REPOPULATE.value and not FLAGS.ycsb_skip_run_stage:
     logging.info('Sleeping 30 minutes to allow for compaction.')
     time.sleep(_SLEEP_AFTER_LOADING_SECS)
 
@@ -195,7 +195,7 @@ def Cleanup(_):
 def EmptyDatabase():
   """Deletes all entries in a datastore database."""
   if _KEYFILE.value:
-    dataset_id = FLAGS.google_datastore_datasetId
+    dataset_id = _DATASET_ID.value
     executor = concurrent.futures.ThreadPoolExecutor(
         max_workers=_CLEANUP_THREAD_POOL_WORKERS
     )
