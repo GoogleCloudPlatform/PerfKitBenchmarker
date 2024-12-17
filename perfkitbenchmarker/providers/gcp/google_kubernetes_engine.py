@@ -126,7 +126,21 @@ class BaseGkeCluster(container_service.KubernetesCluster):
     self.project: str = spec.vm_spec.project or FLAGS.project
     self.cluster_version: str = FLAGS.container_cluster_version
     self.use_application_default_credentials: bool = True
-    self.region: str
+    self.zones = (
+        self.default_nodepool.zone and self.default_nodepool.zone.split(',')
+    )
+    if not self.zones:
+      raise errors.Config.MissingOption(
+          'container_cluster.vm_spec.GCP.zone is required.'
+      )
+    elif len(self.zones) == 1 and util.IsRegion(self.default_nodepool.zone):
+      self.region: str = self.default_nodepool.zone
+      self.zones = []
+      logging.info(
+          "Interpreting zone '%s' as a region", self.default_nodepool.zone
+      )
+    else:
+      self.region: str = util.GetRegionFromZone(self.zones[0])
 
   def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
     """Creates a gcloud command."""
@@ -219,21 +233,6 @@ class GkeCluster(BaseGkeCluster):
 
   def __init__(self, spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(spec)
-    self.zones = (
-        self.default_nodepool.zone and self.default_nodepool.zone.split(',')
-    )
-    if not self.zones:
-      raise errors.Config.MissingOption(
-          'container_cluster.vm_spec.GCP.zone is required.'
-      )
-    elif len(self.zones) == 1 and util.IsRegion(self.default_nodepool.zone):
-      self.region = self.default_nodepool.zone
-      self.zones = []
-      logging.info(
-          "Interpreting zone '%s' as a region", self.default_nodepool.zone
-      )
-    else:
-      self.region = util.GetRegionFromZone(self.zones[0])
     # Update the environment for gcloud commands:
     if gcp_flags.GKE_API_OVERRIDE.value:
       os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER'] = (
@@ -475,7 +474,6 @@ class GkeAutopilotCluster(BaseGkeCluster):
 
   def __init__(self, spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(spec)
-    self.region = util.GetRegionFromZone(self.zones[0])
     # Nodepools are not supported for Autopilot clusters, but default vm_spec
     # still used for pod spec input.
     self.nodepools = []
@@ -485,17 +483,8 @@ class GkeAutopilotCluster(BaseGkeCluster):
       vm_config: virtual_machine.BaseVirtualMachine,
       nodepool_config: container_service.BaseNodePoolConfig,
   ):
-    self.zones = [vm_config.zone]
     nodepool_config.network = vm_config.network
     return nodepool_config
-
-  @property
-  def zone(self) -> str:
-    if not self.zones:
-      raise errors.Resource.CreationInternalError(
-          'Cluster has not been initialized yet.'
-      )
-    return self.zones[0] or 'us-central1-a'
 
   def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
     """Creates a gcloud command."""
