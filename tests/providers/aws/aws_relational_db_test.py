@@ -126,6 +126,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'create_on_restore_error': False,
         'delete_on_freeze_error': False,
         'db_flags': '',
+        'backup_enabled': True
     }
     if additional_spec_items:
       spec_dict.update(additional_spec_items)

@@ -112,6 +112,11 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
             % self.spec.db_disk_spec.provisioned_throughput
         )
 
+    if self.spec.backup_enabled:
+      cmd.append('--backup-retention-period=1')
+    else:
+      cmd.append('--backup-retention-period=0')
+
     vm_util.IssueCommand(cmd)
 
   def _PostCreate(self):
