@@ -642,6 +642,12 @@ class Windows2022CoreMixin(BaseWindowsMixin):
   OS_TYPE = os_types.WINDOWS2022_CORE
 
 
+class Windows2025CoreMixin(BaseWindowsMixin):
+  """Class holding Windows Server 2025 Server Core VM specifics."""
+
+  OS_TYPE = os_types.WINDOWS2025_CORE
+
+
 class Windows2016DesktopMixin(BaseWindowsMixin):
   """Class holding Windows Server 2016 with Desktop Experience VM specifics."""
 
@@ -658,6 +664,12 @@ class Windows2022DesktopMixin(BaseWindowsMixin):
   """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
 
   OS_TYPE = os_types.WINDOWS2022_DESKTOP
+
+
+class Windows2025DesktopMixin(BaseWindowsMixin):
+  """Class holding Windows Server 2025 with Desktop Experience VM specifics."""
+
+  OS_TYPE = os_types.WINDOWS2025_DESKTOP
 
 
 class Windows2019SQLServer2017Standard(BaseWindowsMixin):

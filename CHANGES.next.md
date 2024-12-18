@@ -370,6 +370,7 @@
     (requires `--cluster_boot_linux_boot_metrics` flag).
 -   Publish a `Host Create Latency` metric in the Cluster Boot benchmark
 -   Added `ss` switch to gather TCP/UDP socket perf stats
+-   Add support for Windows 2025 on AWS, Azure, and GCP.
 
 ### Bug fixes and maintenance updates:
 

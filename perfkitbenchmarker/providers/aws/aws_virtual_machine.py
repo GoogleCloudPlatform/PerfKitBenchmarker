@@ -2035,6 +2035,14 @@ class Windows2022CoreAwsVirtualMachine(
   )
 
 
+class Windows2025CoreAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine, windows_virtual_machine.Windows2025CoreMixin
+):
+  IMAGE_SSM_PATTERN = (
+      '/aws/service/ami-windows-latest/Windows_Server-2025-English-Core-Base'
+  )
+
+
 class Windows2016DesktopAwsVirtualMachine(
     BaseWindowsAwsVirtualMachine,
     windows_virtual_machine.Windows2016DesktopMixin,
@@ -2059,6 +2067,15 @@ class Windows2022DesktopAwsVirtualMachine(
 ):
   IMAGE_SSM_PATTERN = (
       '/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base'
+  )
+
+
+class Windows2025DesktopAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine,
+    windows_virtual_machine.Windows2025DesktopMixin,
+):
+  IMAGE_SSM_PATTERN = (
+      '/aws/service/ami-windows-latest/Windows_Server-2025-English-Full-Base'
   )
 
 

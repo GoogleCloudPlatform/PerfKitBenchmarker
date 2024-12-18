@@ -1432,6 +1432,17 @@ class Windows2022CoreAzureVirtualMachine(
   )
 
 
+class Windows2025CoreAzureVirtualMachine(
+    BaseWindowsAzureVirtualMachine, windows_virtual_machine.Windows2025CoreMixin
+):
+  GEN2_IMAGE_URN = (
+      'MicrosoftWindowsServer:WindowsServer:2025-Datacenter-Core-g2:latest'
+  )
+  GEN1_IMAGE_URN = (
+      'MicrosoftWindowsServer:WindowsServer:2025-Datacenter-Core:latest'
+  )
+
+
 class Windows2016DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2016DesktopMixin,
@@ -1456,6 +1467,16 @@ class Windows2022DesktopAzureVirtualMachine(
       'MicrosoftWindowsServer:WindowsServer:2022-Datacenter-g2:latest'
   )
   GEN1_IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2022-Datacenter:latest'
+
+
+class Windows2025DesktopAzureVirtualMachine(
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2025DesktopMixin,
+):
+  GEN2_IMAGE_URN = (
+      'MicrosoftWindowsServer:WindowsServer:2025-Datacenter-g2:latest'
+  )
+  GEN1_IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2025-Datacenter:latest'
 
 
 class Windows2019DesktopSQLServer2019StandardAzureVirtualMachine(
