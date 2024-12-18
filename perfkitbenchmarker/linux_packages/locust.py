@@ -2,11 +2,12 @@
 
 import csv
 import enum
+import logging
 import re
 from typing import Iterable, TYPE_CHECKING
 
 from perfkitbenchmarker import data
-from perfkitbenchmarker.sample import Sample
+from perfkitbenchmarker import sample
 
 if TYPE_CHECKING:
   from perfkitbenchmarker import linux_virtual_machine  # pylint: disable=g-import-not-at-top
@@ -68,7 +69,7 @@ def Prep(
 
 def Run(
     vm: 'linux_virtual_machine.BaseLinuxVirtualMachine', target_host: str
-) -> Iterable[Sample]:
+) -> Iterable[sample.Sample]:
   """Runs locust.
 
   This won't return until the test is complete. (Test length is defined by the
@@ -88,23 +89,36 @@ def Run(
       (Notably, if `prep()` was not previously called to install locust, then a
       RemoteCommandError will be raised.)
   """
-  vm.RunCommand([
-      'locust',
-      '-f',
-      'locustfile.py',
-      '--host',
-      target_host,
-      '--autostart',
-      '--csv',
-      'test1',
-      '--autoquit',
-      '5',
-  ])
+  _, stderr, code = vm.RunCommand(
+      [
+          'locust',
+          '-f',
+          'locustfile.py',
+          '--host',
+          target_host,
+          '--autostart',
+          '--csv',
+          'test1',
+          '--autoquit',
+          '5',
+      ],
+      ignore_failure=True,
+  )
+  if code != 0:
+    logging.info(
+        'Locust had non-zero exit code: %s and error: %s. This may just mean'
+        ' there were some number of failing requests, which is acceptable.',
+        code,
+        stderr,
+    )
   stdout, _, _ = vm.RunCommand(['cat', 'test1_stats_history.csv'])
   yield from _ConvertLocustResultsToSamples(stdout)
 
 
-def _ConvertLocustResultsToSamples(locust_results: str) -> Iterable[Sample]:
+def _ConvertLocustResultsToSamples(
+    locust_results: str,
+) -> Iterable[sample.Sample]:
+  """Converts each csv row from locust to a PKB sample."""
   lines = locust_results.splitlines()
   reader = csv.DictReader(lines)
 
@@ -115,7 +129,7 @@ def _ConvertLocustResultsToSamples(locust_results: str) -> Iterable[Sample]:
       if row[field] == 'N/A':
         continue
 
-      yield Sample(
+      yield sample.Sample(
           metric='locust/' + _SanitizeFieldName(field),
           value=float(row[field]),
           unit='',
