@@ -87,7 +87,6 @@ unmanaged_postgresql_sysbench:
     db_engine: postgresql
     sysbench_report_interval: 1
     sysbench_ssl_mode: required
-    db_high_availability: True
     sysbench_run_threads: 1,64,128,256,512,1024,2048
     sysbench_run_seconds: 300
     sysbench_load_threads: 128
