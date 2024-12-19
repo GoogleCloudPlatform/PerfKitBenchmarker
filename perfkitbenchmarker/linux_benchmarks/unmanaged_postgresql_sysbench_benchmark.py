@@ -65,7 +65,7 @@ unmanaged_postgresql_sysbench:
       disk_spec:
         GCP:
           disk_size: 500
-          disk_type: pd-ssd
+          disk_type: hyperdisk-balanced
           provisioned_iops: 160000
           provisioned_throughput: 2400
           num_striped_disks: 1
@@ -84,6 +84,13 @@ unmanaged_postgresql_sysbench:
   flags:
     sysbench_version: df89d34c410a2277e19f77e47e535d0890b2029b
     disk_fs_type: xfs
+    db_engine: postgresql
+    sysbench_report_interval: 1
+    sysbench_ssl_mode: required
+    db_high_availability: True
+    sysbench_run_threads: 1,64,128,256,512,1024,2048
+    sysbench_run_seconds: 300
+    sysbench_load_threads: 128
 """
 
 # The database name is used to create a database on the server.
@@ -122,14 +129,20 @@ def GetConfig(user_config):
         FLAGS.os_type
     )['disk_mount_point']
   # Update machine type for server/client.
-  if FLAGS.db_machine_type:
+  if FLAGS.db_machine_type or FLAGS.db_zone:
     vm_spec = config['vm_groups']['server']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = FLAGS.db_machine_type
-  if FLAGS.client_vm_machine_type:
+      if FLAGS.db_zone:
+        vm_spec[cloud]['zone'] = FLAGS.db_zone[0]
+      if FLAGS.db_machine_type:
+        vm_spec[cloud]['machine_type'] = FLAGS.db_machine_type
+  if FLAGS.client_vm_machine_type or FLAGS.client_vm_zone:
     vm_spec = config['vm_groups']['client']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = FLAGS.client_vm_machine_type
+      if FLAGS.client_vm_zone:
+        vm_spec[cloud]['zone'] = FLAGS.client_vm_zone
+      if FLAGS.client_vm_machine_type:
+        vm_spec[cloud]['machine_type'] = FLAGS.client_vm_machine_type
   # Add replica servers if configured.
   if FLAGS.db_high_availability:
     for index, zone in enumerate(FLAGS.db_replica_zones):
