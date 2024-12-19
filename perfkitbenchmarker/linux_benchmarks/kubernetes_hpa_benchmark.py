@@ -59,6 +59,8 @@ kubernetes_hpa:
             machine_type: m6i.xlarge
           Azure:
             machine_type: Standard_D4s_v5
+  flags:
+    locust_path: locust/rampup.py
 """
 
 
@@ -96,7 +98,7 @@ def _PrepareLocust(benchmark_spec: bm_spec.BenchmarkSpec):
   """Prepares a vm to run locust."""
   vm = benchmark_spec.vms[0]
   locust.Install(vm)
-  locust.Prep(vm, locust.Locustfile.RAMPUP)
+  locust.Prep(vm)
 
 
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):

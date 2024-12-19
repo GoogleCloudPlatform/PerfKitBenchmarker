@@ -5,6 +5,7 @@ import enum
 import logging
 import re
 from typing import Iterable, TYPE_CHECKING
+from absl import flags
 
 from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
@@ -13,12 +14,25 @@ if TYPE_CHECKING:
   from perfkitbenchmarker import linux_virtual_machine  # pylint: disable=g-import-not-at-top
 
 
+FLAGS = flags.FLAGS
+
+
 class Locustfile(enum.Enum):
+  """Enum with paths to predefined locustfiles."""
   SIMPLE = 'locust/simple.py'
   RAMPUP = 'locust/rampup.py'
 
   def GetPath(self):
     return data.ResourcePath(self.value)
+
+
+_LOCUST_FILE = flags.DEFINE_string(
+    'locust_path',
+    None,
+    'Path to the locust file to use. If not specified, a default locust file'
+    ' passed in by the benchmark will be used. Can also use enum values rather'
+    ' than paths.',
+)
 
 
 def Install(vm: 'linux_virtual_machine.BaseLinuxVirtualMachine') -> None:
@@ -42,7 +56,7 @@ def Install(vm: 'linux_virtual_machine.BaseLinuxVirtualMachine') -> None:
 
 def Prep(
     vm: 'linux_virtual_machine.BaseLinuxVirtualMachine',
-    locustfile_path: str | Locustfile,
+    locustfile_path: str | Locustfile | None = None,
 ) -> None:
   """Prepares a locustfile to run on the given VM.
 
@@ -62,6 +76,15 @@ def Prep(
   Raises:
     errors.VirtualMachine.RemoteCommandError: If an error occurred on the VM.
   """
+  if locustfile_path is None and _LOCUST_FILE.value is not None:
+    locustfile_path = _LOCUST_FILE.value
+    try:
+      locustfile_path = Locustfile(locustfile_path)
+    except ValueError:
+      # Not a predefined locustfile enum, rather a path. This is fine.
+      pass
+  if locustfile_path is None:
+    raise ValueError('Locustfile path must be specified via argument or flag.')
   if isinstance(locustfile_path, Locustfile):
     locustfile_path = locustfile_path.GetPath()
   vm.RemoteCopy(locustfile_path, 'locustfile.py')
