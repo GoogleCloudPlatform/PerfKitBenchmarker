@@ -36,6 +36,7 @@ from google.oauth2 import service_account
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
 
@@ -94,6 +95,11 @@ _REPOPULATE = flags.DEFINE_boolean(
     'If True, empty database & repopulate with new data.'
     'By default, tests are run with pre-populated data.',
 )
+_TARGET_LOAD_QPS = flags.DEFINE_integer(
+    'google_datastore_target_load_qps',
+    None,
+    'The target QPS to load the database at.',
+)
 
 _KEYFILE_LOCAL_PATH = '/tmp/key.json'
 _INSERTION_RETRY_LIMIT = 100
@@ -115,9 +121,7 @@ def _Install(vm):
   if _KEYFILE.value:
     if _KEYFILE.value.startswith('gs://'):
       vm.Install('google_cloud_sdk')
-      vm.RemoteCommand(
-          f'gsutil cp {_KEYFILE.value} {_KEYFILE_LOCAL_PATH}'
-      )
+      vm.RemoteCommand(f'gsutil cp {_KEYFILE.value} {_KEYFILE_LOCAL_PATH}')
     else:
       vm.RemoteCopy(_KEYFILE.value, _KEYFILE_LOCAL_PATH)
 
@@ -141,6 +145,45 @@ def _GetYcsbExecutor():
   return ycsb.YCSBExecutor('googledatastore', environment=env)
 
 
+def RampUpLoad(
+    ycsb_executor: ycsb.YCSBExecutor,
+    vms: list[virtual_machine.VirtualMachine],
+    load_kwargs: dict[str, str] = None,
+) -> None:
+  """Loads YCSB by gradually incrementing target QPS.
+
+  Note that this requires clients to be overprovisioned, as the target QPS
+  for YCSB is generally a "throttling" mechanism where the threads try to send
+  as much QPS as possible and then get throttled. If clients are
+  underprovisioned then it's possible for the run to not hit the desired
+  target, which may be undesired behavior.
+
+  See
+  https://cloud.google.com/datastore/docs/best-practices#ramping_up_traffic
+  for an example of why this is needed.
+
+  Args:
+    ycsb_executor: The YCSB executor to use.
+    vms: The client VMs to generate the load.
+    load_kwargs: Extra run arguments.
+  """
+  target_load_qps = _TARGET_LOAD_QPS.value
+  incremental_targets = ycsb_executor.GetIncrementalQpsTargets(target_load_qps)
+  logging.info('Incremental load stage target QPS: %s', incremental_targets)
+
+  ramp_up_args = load_kwargs.copy()
+  for target in incremental_targets:
+    target /= len(vms)
+    ramp_up_args['target'] = int(target)
+    ramp_up_args['threads'] = min(FLAGS.ycsb_preload_threads, int(target))
+    ramp_up_args['maxexecutiontime'] = ycsb.INCREMENTAL_TIMELIMIT_SEC
+    ycsb_executor.Load(vms, load_kwargs=ramp_up_args)
+
+  target_load_qps /= len(vms)
+  load_kwargs['target'] = int(target_load_qps)
+  ycsb_executor.Load(vms, load_kwargs=load_kwargs)
+
+
 def Prepare(benchmark_spec):
   """Prepare the virtual machines to run cloud datastore.
 
@@ -159,7 +202,7 @@ def Prepare(benchmark_spec):
   load_kwargs = _GetCommonYcsbArgs()
   load_kwargs['core_workload_insertion_retry_limit'] = _INSERTION_RETRY_LIMIT
   executor = _GetYcsbExecutor()
-  executor.Load(vms, load_kwargs=load_kwargs)
+  RampUpLoad(executor, vms, load_kwargs)
 
 
 def Run(benchmark_spec):

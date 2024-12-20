@@ -500,8 +500,8 @@ DEFAULT_PRELOAD_THREADS = 32
 _ycsb_tar_url = None
 
 # Parameters for incremental workload. Can be made into flags in the future.
-_INCREMENTAL_STARTING_QPS = 500
-_INCREMENTAL_TIMELIMIT_SEC = 60 * 5
+INCREMENTAL_STARTING_QPS = 500
+INCREMENTAL_TIMELIMIT_SEC = 60 * 5
 
 # The upper-bound number of milliseconds above the measured minimum after which
 # to stop the test.
@@ -1406,9 +1406,9 @@ class YCSBExecutor:
 
     return samples + burst_samples
 
-  def _GetIncrementalQpsTargets(self, target_qps: int) -> list[int]:
+  def GetIncrementalQpsTargets(self, target_qps: int) -> list[int]:
     """Returns incremental QPS targets."""
-    qps = _INCREMENTAL_STARTING_QPS
+    qps = INCREMENTAL_STARTING_QPS
     result = []
     while qps < target_qps:
       result.append(qps)
@@ -1449,11 +1449,11 @@ class YCSBExecutor:
     ending_qps = _INCREMENTAL_TARGET_QPS.value
     ending_length = FLAGS.ycsb_timelimit
     ending_threadcount = int(FLAGS.ycsb_threads_per_client[0])
-    incremental_targets = self._GetIncrementalQpsTargets(ending_qps)
+    incremental_targets = self.GetIncrementalQpsTargets(ending_qps)
     logging.info('Incremental targets: %s', incremental_targets)
 
     # Warm-up phase is shorter and doesn't need results parsing
-    FLAGS['ycsb_timelimit'].parse(_INCREMENTAL_TIMELIMIT_SEC)
+    FLAGS['ycsb_timelimit'].parse(INCREMENTAL_TIMELIMIT_SEC)
     for target in incremental_targets:
       target /= len(vms)
       run_params['target'] = int(target)
