@@ -29,6 +29,7 @@ from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_mixin
 from perfkitbenchmarker import pkb  # pylint:disable=unused-import
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -170,7 +171,7 @@ class TestVirtualMachine(
 ):
   """Test class that has dummy methods for a base virtual machine."""
 
-  CLOUD = 'test_vm_cloud'
+  CLOUD = provider_info.UNIT_TEST
 
   def _Start(self):
     pass
@@ -186,6 +187,15 @@ class TestVirtualMachine(
 
   def GetConnectionIp(self):
     pass
+
+
+class UbuntuTestVirtualMachine(
+    TestVirtualMachine
+):
+  """Test class that has dummy methods for a base virtual machine."""
+
+  CLOUD = provider_info.UNIT_TEST
+  OS_TYPE = 'ubuntu2404'
 
 
 # Need to provide implementations for all of the abstract methods in

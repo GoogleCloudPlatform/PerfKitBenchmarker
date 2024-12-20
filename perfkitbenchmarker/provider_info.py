@@ -36,6 +36,8 @@ PROFITBRICKS = 'ProfitBricks'
 # Though Docker is not a cloud provider, it's inclusion is useful
 # for performing on premise to cloud benchmarks
 DOCKER = 'Docker'
+# Likewise, UnitTest is not a cloud provider, but is useful for testing.
+UNIT_TEST = 'UnitTest'
 
 PROVIDER_DIRECTORY_NAMES = (
     GCP,
@@ -52,7 +54,7 @@ PROVIDER_DIRECTORY_NAMES = (
     DOCKER,
 )
 # TODO(user): Remove Kubernetes from VALID_CLOUDS.
-VALID_CLOUDS = tuple(list(PROVIDER_DIRECTORY_NAMES) + [KUBERNETES])
+VALID_CLOUDS = tuple(list(PROVIDER_DIRECTORY_NAMES) + [KUBERNETES, UNIT_TEST])
 
 _PROVIDER_INFO_REGISTRY = {}
 

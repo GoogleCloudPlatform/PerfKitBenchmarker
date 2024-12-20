@@ -34,6 +34,7 @@ Usage:
 """
 
 import collections
+import logging
 from unittest import mock
 from absl.testing import absltest
 from perfkitbenchmarker import virtual_machine
@@ -72,7 +73,16 @@ class MockCommand:
     """Mocks a command, returning the next response for the command."""
     del kwargs  # Unused but matches type signature.
     if isinstance(cmd, list):
-      cmd = ' '.join(cmd)
+      try:
+        cmd = ' '.join(cmd)
+      except TypeError as ex:
+        logging.warning(
+            'Tried joining command %s but not all elements were strings. Got'
+            ' exception: %s',
+            cmd,
+            ex,
+        )
+        raise ex
     for call in self.call_to_response:
       if call in cmd:
         call_num = self.progress_through_calls[call]

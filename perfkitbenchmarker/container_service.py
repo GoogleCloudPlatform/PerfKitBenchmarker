@@ -177,7 +177,10 @@ def RunRetryableKubectlCommand(
     # IssueCommand defaults stack_level to 1, so 2 skips this function.
     kwargs['stack_level'] = 2
 
-  @vm_util.Retry(timeout=timeout, retryable_exceptions=(RetryableKubectlError,))
+  @vm_util.Retry(
+      timeout=timeout,
+      retryable_exceptions=(RetryableKubectlError,),
+  )
   def _RunRetryablePart(run_cmd: list[str], **kwargs):
     """Inner function retries command so timeout can be passed to decorator."""
     kwargs['stack_level'] += 1
@@ -185,6 +188,7 @@ def RunRetryableKubectlCommand(
         run_cmd, raise_on_failure=False, **kwargs
     )
     if err:
+      logging.warning('Got error %s when running %s', err, run_cmd)
       for error_substring in _RETRYABLE_KUBECTL_ERRORS:
         if error_substring in err:
           raise RetryableKubectlError(
