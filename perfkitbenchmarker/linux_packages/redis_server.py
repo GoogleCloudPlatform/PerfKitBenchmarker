@@ -37,7 +37,7 @@ _VERSION = flags.DEFINE_string(
 )
 _IO_THREADS = flags.DEFINE_integer(
     'redis_server_io_threads',
-    4,
+    None,
     'Only supported for redis version >= 6, the '
     'number of redis server IO threads to use.',
 )
@@ -152,7 +152,12 @@ def AptInstall(vm) -> None:
 def _GetIOThreads(vm) -> int:
   if _IO_THREADS.value:
     return _IO_THREADS.value
-  return vm.NumCpusForBenchmark() // 2
+  # Redis docs suggests that i/o threads should not exceed number of cores.
+  nthreads_per_core = vm.CheckLsCpu().threads_per_core
+  if nthreads_per_core == 1:
+    return vm.NumCpusForBenchmark() - 1
+  else:
+    return vm.NumCpusForBenchmark() // 2
 
 
 def _BuildStartCommand(vm, port: int) -> str:
