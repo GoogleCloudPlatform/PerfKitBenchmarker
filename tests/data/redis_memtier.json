@@ -23,6 +23,7 @@
     "data_size": 1024,
     "data_offset": 0,
     "random_data": "true",
+    "distinct_client_seed": "true",
     "data_size_range": "0:0",
     "data_size_list": "",
     "data_size_pattern": "R",

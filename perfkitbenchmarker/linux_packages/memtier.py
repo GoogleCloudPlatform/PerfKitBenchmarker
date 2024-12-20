@@ -353,6 +353,7 @@ def BuildMemtierCommand(
     requests: Union[str, int] | None = None,
     run_count: int | None = None,
     random_data: bool | None = None,
+    distinct_client_seed: bool | None = None,
     test_time: int | None = None,
     outfile: pathlib.PosixPath | None = None,
     password: str | None = None,
@@ -393,6 +394,7 @@ def BuildMemtierCommand(
   # Arguments passed without a parameter
   no_param_args = {
       'random-data': random_data,
+      'distinct-client-seed': distinct_client_seed,
       'cluster-mode': cluster_mode,
       'tls': tls,
       # Don't skip certificate verification by default. keydb_memtier_benchmark
@@ -1160,6 +1162,7 @@ def _Run(
       key_minimum=1,
       key_maximum=MEMTIER_KEY_MAXIMUM.value,
       random_data=True,
+      distinct_client_seed=True,
       test_time=test_time,
       requests=requests,
       password=password,
