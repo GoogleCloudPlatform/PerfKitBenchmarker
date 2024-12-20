@@ -46,7 +46,6 @@ BENCHMARK_CONFIG = """
 kubernetes_redis_memtier:
   description: >
       Run memtier_benchmark against a K8s cluster.
-      Specify the number of client VMs with --redis_clients.
   container_cluster:
     cloud: GCP
     type: Kubernetes

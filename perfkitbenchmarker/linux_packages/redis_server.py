@@ -35,6 +35,9 @@ class RedisEvictionPolicy:
 _VERSION = flags.DEFINE_string(
     'redis_server_version', '6.2.1', 'Version of redis server to use.'
 )
+CLUSTER_MODE = flags.DEFINE_bool(
+    'redis_server_cluster_mode', False, 'Whether to use cluster mode.'
+)
 _IO_THREADS = flags.DEFINE_integer(
     'redis_server_io_threads',
     None,
@@ -57,7 +60,7 @@ _ENABLE_SNAPSHOTS = flags.DEFINE_bool(
     False,
     'If true, uses the default redis snapshot policy.',
 )
-_NUM_PROCESSES = flags.DEFINE_integer(
+NUM_PROCESSES = flags.DEFINE_integer(
     'redis_total_num_processes',
     1,
     'Total number of redis server processes. Useful when running with a redis '
@@ -101,7 +104,7 @@ def GetRedisDir() -> str:
 
 
 def _GetNumProcesses(vm) -> int:
-  num_processes = _NUM_PROCESSES.value
+  num_processes = NUM_PROCESSES.value
   if num_processes == 0 and vm is not None:
     num_processes = vm.NumCpusForBenchmark()
   assert num_processes >= 0, 'num_processes must be >=0.'
@@ -179,6 +182,10 @@ def _BuildStartCommand(vm, port: int) -> str:
       f'--port {port}',
       '--protected-mode no',
   ]
+  if CLUSTER_MODE.value:
+    cmd_args += [
+        '--cluster-enabled yes',
+    ]
   if REDIS_AOF.value:
     cmd_args += [
         '--appendonly yes',
@@ -239,10 +246,20 @@ def Start(vm) -> None:
     vm.RemoteCommand(_BuildStartCommand(vm, port))
 
 
+def StartCluster(server_vms) -> None:
+  """Start redis cluster; assumes redis shards started with cluster mode."""
+  cluster_create_cmd = f'sudo {GetRedisDir()}/src/redis-cli --cluster create '
+  for server_vm in server_vms:
+    cluster_create_cmd += f' {server_vm.internal_ip}:{DEFAULT_PORT}'
+  stdout, _ = server_vms[0].RemoteCommand(f'echo "yes" | {cluster_create_cmd}')
+  assert 'All 16384 slots covered' in stdout, 'incorrect redis cluster output'
+
+
 def GetMetadata(vm) -> Dict[str, Any]:
   num_processes = _GetNumProcesses(vm)
   return {
       'redis_server_version': _VERSION.value,
+      'redis_server_cluster_mode': CLUSTER_MODE.value,
       'redis_server_io_threads': (
           _GetIOThreads(vm) if _VERSION.value >= '6.2.1' else 0
       ),

@@ -371,6 +371,7 @@
 -   Publish a `Host Create Latency` metric in the Cluster Boot benchmark
 -   Added `ss` switch to gather TCP/UDP socket perf stats
 -   Add support for Windows 2025 on AWS, Azure, and GCP.
+-   Add support for Redis Cluster mode on VMs.
 
 ### Bug fixes and maintenance updates:
 
