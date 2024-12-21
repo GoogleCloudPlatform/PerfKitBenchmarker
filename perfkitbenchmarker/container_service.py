@@ -1121,20 +1121,22 @@ class KubernetesClusterCommands:
     return KubernetesClusterCommands.GetPodIpsByLabel('app', pod_label)
 
   @staticmethod
-  def GetAllPodNames() -> list[str]:
+  def GetPodNames() -> list[str]:
     """Returns all pod names in the cluster."""
-    pods, _, _ = RunKubectlCommand([
-        'get',
-        'pods',
-        '--no-headers',
-        '-o',
-        'name',
-    ])
-    if not pods:
-      return []
-    pod_names_with_prefix = pods.split()
-    # Remove the 'pod/' prefix from each pod name.
-    return [pod_name.replace('pod/', '') for pod_name in pod_names_with_prefix]
+    return KubernetesClusterCommands.GetAllNamesForResourceType('pods')
+
+  @staticmethod
+  def GetNodeNames() -> list[str]:
+    """Get the node names for the cluster."""
+    return KubernetesClusterCommands.GetAllNamesForResourceType('nodes')
+
+  @staticmethod
+  def GetAllNamesForResourceType(resource_type: str) -> list[str]:
+    """Get all names for the specified resource. Type should be plural."""
+    stdout, _, _ = RunKubectlCommand(
+        ['get', resource_type, '-o', 'jsonpath={.items[*].metadata.name}']
+    )
+    return stdout.split()
 
   @staticmethod
   def RunKubectlExec(pod_name, cmd):
@@ -1145,14 +1147,6 @@ class KubernetesClusterCommands:
   def _GetPvcs() -> Sequence[Any]:
     stdout, _, _ = RunKubectlCommand(['get', 'pvc', '-o', 'yaml'])
     return yaml.safe_load(stdout)['items']
-
-  @staticmethod
-  def GetNodeNames() -> list[str]:
-    """Get the node names for the cluster."""
-    stdout, _, _ = RunKubectlCommand(
-        ['get', 'nodes', '-o', 'jsonpath={.items[*].metadata.name}']
-    )
-    return stdout.split()
 
   @staticmethod
   def GetEvents():

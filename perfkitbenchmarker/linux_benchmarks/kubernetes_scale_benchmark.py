@@ -83,7 +83,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   samples, rollout_name = ScaleUpPods(cluster)
   start_time = _GetRolloutCreationTime(rollout_name)
-  samples += ParseEvents(cluster, start_time)
+  samples += ParseEvents(cluster, 'pod', start_time)
+  samples += ParseEvents(cluster, 'node', start_time)
   metadata = {'goal_replicas': NUM_NEW_INSTANCES.value}
   for s in samples:
     s.metadata.update(metadata)
@@ -95,7 +96,7 @@ def ScaleUpPods(
 ) -> tuple[list[sample.Sample], str]:
   """Scales up pods on a kubernetes cluster. Returns samples & rollout name."""
   samples = []
-  initial_pods = set(cluster.GetAllPodNames())
+  initial_pods = set(cluster.GetPodNames())
   logging.info('Initial pods: %s', initial_pods)
 
   # Request X new pods via YAML apply.
@@ -119,7 +120,7 @@ def ScaleUpPods(
   start_polling_time = time.monotonic()
   cluster.WaitForRollout(rollout_name, timeout=max_wait_time)
 
-  all_new_pods = set(cluster.GetAllPodNames()) - initial_pods
+  all_new_pods = set(cluster.GetPodNames()) - initial_pods
   if len(all_new_pods) < num_new_instances:
     raise errors.Benchmarks.RunError(
         'Failed to scale up to %d pods, only found %d.'
@@ -154,11 +155,15 @@ def ScaleUpPods(
   return samples, rollout_name
 
 
-def _GetPodStatusConditions(pod_name: str) -> list[dict[str, str]]:
-  """Returns the status conditions for a pod.
+def _GetResourceStatusConditions(
+    resource_type: str, resource_name: str
+) -> list[dict[str, str]]:
+  """Returns the status conditions for a resource.
 
   Args:
-    pod_name: The name of the pod to get the status conditions for.
+    resource_type: The type of the resource to get the status conditions for.
+    resource_name: The name of the resource to get the status conditions for.
+      Should not have a prefix (eg pods/).
 
   Returns:
     A list of status condition, where each condition is a dict with type &
@@ -166,8 +171,8 @@ def _GetPodStatusConditions(pod_name: str) -> list[dict[str, str]]:
   """
   out, _, _ = container_service.RunKubectlCommand([
       'get',
-      'pod',
-      pod_name,
+      resource_type,
+      resource_name,
       '-o',
       'jsonpath={.status.conditions[*]}',
   ])
@@ -184,13 +189,14 @@ def ConvertToEpochTime(timestamp: str) -> int:
 
 def ParseEvents(
     cluster: container_service.KubernetesCluster,
+    resource_type: str,
     start_time: float,
 ) -> list[sample.Sample]:
   """Parses events into samples."""
-  all_pods = cluster.GetAllPodNames()
+  all_resources = cluster.GetAllNamesForResourceType(resource_type + 's')
   overall_times = collections.defaultdict(list)
-  for pod in all_pods:
-    conditions = _GetPodStatusConditions(pod)
+  for resource in all_resources:
+    conditions = _GetResourceStatusConditions(resource_type, resource)
     for condition in conditions:
       str_time = condition['lastTransitionTime']
       overall_times[condition['type']].append(ConvertToEpochTime(str_time))
@@ -198,7 +204,7 @@ def ParseEvents(
   samples = []
   for event, timestamps in overall_times.items():
     summaries = _SummarizeTimestamps(timestamps)
-    prefix = f'pod_{event}_'
+    prefix = f'{resource_type}_{event}_'
     for percentile, value in summaries.items():
       samples.append(
           sample.Sample(
@@ -219,13 +225,13 @@ def ParseEvents(
 
 def _SummarizeTimestamps(timestamps: list[float]) -> dict[str, float]:
   """Returns a few metrics about a list of timestamps."""
-  return {
-      'p50': np.percentile(timestamps, 50),
-      'p90': np.percentile(timestamps, 90),
-      'p99.9': np.percentile(timestamps, 99.9),
-      'p10': np.percentile(timestamps, 10),
+  percentiles = [10, 50, 90, 95, 99.9]
+  summary = {
       'mean': np.mean(timestamps),
   }
+  for percentile in percentiles:
+    summary[f'p{percentile}'] = np.percentile(timestamps, percentile)
+  return summary
 
 
 def Cleanup(_):

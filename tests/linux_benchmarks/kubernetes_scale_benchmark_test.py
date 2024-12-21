@@ -21,7 +21,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.bm_spec = mock.create_autospec(benchmark_spec.BenchmarkSpec)
     self.cluster = mock.create_autospec(container_service.KubernetesCluster)
     self.bm_spec.container_cluster = self.cluster
-    self.expected_num_samples_per_reason = 6
+    self.expected_num_samples_per_reason = 7
 
   def testTimestampConvert(self):
     epoch_time = kubernetes_scale_benchmark.ConvertToEpochTime(
@@ -51,11 +51,13 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             ),
         )
     )
-    conditions = kubernetes_scale_benchmark._GetPodStatusConditions('pod123')
+    conditions = kubernetes_scale_benchmark._GetResourceStatusConditions(
+        'pod', 'pod123'
+    )
     self.assertLen(conditions, 5)
 
   def testOneStatForOnePod(self):
-    self.cluster.GetAllPodNames.return_value = ['pod1']
+    self.cluster.GetAllNamesForResourceType.return_value = ['pod1']
     self.enter_context(
         mock.patch.object(
             container_service,
@@ -69,7 +71,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             ],
         )
     )
-    samples = kubernetes_scale_benchmark.ParseEvents(self.cluster, 50)
+    samples = kubernetes_scale_benchmark.ParseEvents(self.cluster, 'pod', 50)
     self.assertLen(samples, self.expected_num_samples_per_reason)
     for s in samples:
       self.assertStartsWith(s.metric, 'pod_Ready')
@@ -80,7 +82,11 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(samples_by_metric['pod_Ready_count'].value, 1)
 
   def testOneStatForMultiplePods(self):
-    self.cluster.GetAllPodNames.return_value = ['pod1', 'pod2', 'pod3']
+    self.cluster.GetAllNamesForResourceType.return_value = [
+        'pod1',
+        'pod2',
+        'pod3',
+    ]
     self.enter_context(
         mock.patch.object(
             container_service,
@@ -104,7 +110,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             ],
         )
     )
-    samples = kubernetes_scale_benchmark.ParseEvents(self.cluster, 40)
+    samples = kubernetes_scale_benchmark.ParseEvents(self.cluster, 'pod', 40)
     self.assertLen(samples, self.expected_num_samples_per_reason)
     for s in samples:
       self.assertStartsWith(s.metric, 'pod_Ready')
@@ -118,7 +124,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(samples_by_metric['pod_Ready_count'].value, 3)
 
   def testMultipleStatForOnePod(self):
-    self.cluster.GetAllPodNames.return_value = ['pod1']
+    self.cluster.GetAllNamesForResourceType.return_value = ['pod1']
     self.enter_context(
         mock.patch.object(
             container_service,
@@ -135,13 +141,38 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             ],
         )
     )
-    samples = kubernetes_scale_benchmark.ParseEvents(self.cluster, 40)
+    samples = kubernetes_scale_benchmark.ParseEvents(self.cluster, 'pod', 40)
     self.assertLen(samples, self.expected_num_samples_per_reason * 2)
     for s in samples:
       self.assertStartsWith(s.metric, 'pod_')
     samples_by_metric = _SamplesByMetric(samples)
     self.assertIn('pod_Ready_p50', samples_by_metric.keys())
     self.assertIn('pod_ContainersReady_p50', samples_by_metric.keys())
+
+  def testOneStatForOneNode(self):
+    self.cluster.GetAllNamesForResourceType.return_value = ['node1']
+    self.enter_context(
+        mock.patch.object(
+            container_service,
+            'RunKubectlCommand',
+            side_effect=[
+                (
+                    '{"lastProbeTime":null,"lastTransitionTime":"1970-01-01T00:01:00Z","status":"True","type":"Ready"}',
+                    '',
+                    0,
+                ),
+            ],
+        )
+    )
+    samples = kubernetes_scale_benchmark.ParseEvents(self.cluster, 'node', 50)
+    self.assertLen(samples, self.expected_num_samples_per_reason)
+    for s in samples:
+      self.assertStartsWith(s.metric, 'node_Ready')
+    samples_by_metric = _SamplesByMetric(samples)
+    self.assertIn('node_Ready_p50', samples_by_metric.keys())
+    self.assertEqual(samples_by_metric['node_Ready_p50'].value, 10.0)
+    self.assertIn('node_Ready_count', samples_by_metric.keys())
+    self.assertEqual(samples_by_metric['node_Ready_count'].value, 1)
 
 
 if __name__ == '__main__':
