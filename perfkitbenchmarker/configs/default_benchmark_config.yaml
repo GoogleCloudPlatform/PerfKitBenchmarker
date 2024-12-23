@@ -181,22 +181,86 @@ redis_memtier_full_house_loaded:
     redis_server_version: '5.0.14'
     redis_total_num_processes: 0
 
-# TODO: redis_server_io_threads
-redis_memtier_single_process:
+redis_memtier_full_house_loaded:
   name: redis_memtier
   flags:
-    memtier_clients: 100
-    memtier_key_maximum: 10000000
-    memtier_load_key_maximum: 1
-    memtier_ratio: '1:10'
+    memtier_clients: 8
     memtier_requests: -1
-    memtier_run_duration: 1800
+    memtier_run_duration: 300
     memtier_threads: 16
-    redis_server_version: '6.2.1'
-    redis_total_num_processes: 1
+    redis_eviction_policy: allkeys-lru
+    redis_server_version: '5.0.14'
+    redis_total_num_processes: 0
+
+# memtier_key_maximum and redis_server_io_threads must be specified.
+redis_memtier_single_base: &redis_memtier_single_base
+  redis_server_io_threads_do_reads: True
+  memtier_clients: 12
+  memtier_threads: 32
+  memtier_requests: -1
+  memtier_run_duration: 300
+  redis_server_version: '6.2.16'
+  redis_total_num_processes: 1
+  enable_transparent_hugepages: False  # never
+
+redis_memtier_caching_single_node:
+  name: redis_memtier
+  flags:
+    <<: *redis_memtier_single_base
+    memtier_ratio: '1:4'
+
+redis_memtier_caching_cluster:
+  name: redis_memtier
+  flags:
+    <<: *redis_memtier_single_base
+    memtier_ratio: '1:4'
+    redis_server_cluster_mode: True
+    memtier_cluster_mode: True
   vm_groups:
-    clients:
-      vm_count: 1
+    servers:
+      vm_count: 3
+
+redis_memtier_session_storage_disk_spec: &redis_memtier_session_storage_disk_spec
+  disk_spec:
+    GCP:
+      disk_size: 500
+      disk_type: hyperdisk-balanced
+      provisioned_iops: 12000
+      provisioned_throughput: 1000
+    AWS:
+      disk_size: 500
+      disk_type: gp3
+      provisioned_iops: 12000
+      provisioned_throughput: 1000
+    Azure:
+      disk_size: 500
+      disk_type: PremiumV2_LRS
+      provisioned_iops: 12000
+      provisioned_throughput: 1000
+
+redis_memtier_session_storage_single_node:
+  name: redis_memtier
+  flags:
+    <<: *redis_memtier_single_base
+    memtier_ratio: '1:1'
+    redis_aof: True
+  vm_groups:
+    servers:
+      <<: *redis_memtier_session_storage_disk_spec
+
+redis_memtier_session_storage_cluster:
+  name: redis_memtier
+  flags:
+    <<: *redis_memtier_single_base
+    memtier_ratio: '1:1'
+    redis_aof: True
+    redis_server_cluster_mode: True
+    memtier_cluster_mode: True
+  vm_groups:
+    servers:
+      vm_count: 3
+      <<: *redis_memtier_session_storage_disk_spec
+
 
 sparksql_tpcds_1t:
   name: dpb_sparksql_benchmark
