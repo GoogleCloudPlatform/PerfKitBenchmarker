@@ -48,6 +48,9 @@ echo MSSQLSERVER is now running!
 sqlcmd.exe -Q "CREATE LOGIN [%COMPUTERNAME%\\perfkit] from windows;"
 sqlcmd.exe -Q "ALTER SERVER ROLE [sysadmin] ADD MEMBER [%COMPUTERNAME%\\perfkit]"
 """
+UPDATE_NETWORK_DRIVERS = """
+googet -noconfirm update
+"""
 
 
 class GceUnexpectedWindowsAdapterOutputError(Exception):
@@ -88,7 +91,7 @@ class WindowsGceVirtualMachine(
     """
     super().__init__(vm_spec)
     self.boot_metadata['windows-startup-script-ps1'] = (
-        windows_virtual_machine.STARTUP_SCRIPT
+        windows_virtual_machine.STARTUP_SCRIPT + UPDATE_NETWORK_DRIVERS
     )
 
   def DownloadPreprovisionedData(
