@@ -38,7 +38,7 @@ class SparkVersionsTest(pkb_common_test_case.PkbCommonTestCase):
   @requests_mock.Mocker()
   def testDefaultSparkVersion(self, mock_requests):
     mock_requests.get(
-        'https://downloads.apache.org/spark', text=SPARK_VERSION_LIST
+        'https://dlcdn.apache.org/spark', text=SPARK_VERSION_LIST
     )
     for _ in range(5):
       observed = spark.SparkVersion()
@@ -48,23 +48,23 @@ class SparkVersionsTest(pkb_common_test_case.PkbCommonTestCase):
 
   @requests_mock.Mocker()
   def testSparkVersionConnectionError(self, mock_requests):
-    mock_requests.get('https://downloads.apache.org/spark', status_code=404)
+    mock_requests.get('https://dlcdn.apache.org/spark', status_code=404)
     with self.assertRaisesRegex(
         errors.Setup.MissingExecutableError,
-        'Could not load https://downloads.apache.org/spark',
+        'Could not load https://dlcdn.apache.org/spark',
     ):
       spark.SparkVersion()
 
   @requests_mock.Mocker()
   def testSparkVersionParsingError(self, mock_requests):
     mock_requests.get(
-        'https://downloads.apache.org/spark',
+        'https://dlcdn.apache.org/spark',
         text='<html><body><a href="foo">bar</a></body></html>',
     )
     with self.assertRaisesRegex(
         errors.Setup.MissingExecutableError,
         'Could not find valid spark versions at '
-        'https://downloads.apache.org/spark',
+        'https://dlcdn.apache.org/spark',
     ):
       spark.SparkVersion()
 

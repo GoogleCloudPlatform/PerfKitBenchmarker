@@ -21,11 +21,11 @@ RUN apt-get update && \
 
 # Install hadoop to make s3 connector work
 RUN mkdir -p $HADOOP_HOME
-RUN curl -L https://downloads.apache.org/hadoop/common/hadoop-$hadoop_version/hadoop-$hadoop_version.tar.gz \
+RUN curl -L https://dlcdn.apache.org/hadoop/common/hadoop-$hadoop_version/hadoop-$hadoop_version.tar.gz \
     | tar -C $HADOOP_HOME --strip-components=1 -xzf -
 
 RUN mkdir -p $SPARK_HOME
-RUN curl -L https://downloads.apache.org/spark/spark-$spark_version/spark-$spark_version-bin-without-hadoop.tgz \
+RUN curl -L https://dlcdn.apache.org/spark/spark-$spark_version/spark-$spark_version-bin-without-hadoop.tgz \
     | tar -C $SPARK_HOME --strip-components=1 -xzf -
 
 # Install GCS connector

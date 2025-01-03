@@ -47,7 +47,7 @@ DATA_FILES = [
     'spark/workers.j2',
 ]
 
-SPARK_DOWNLOADS = 'https://downloads.apache.org/spark'
+SPARK_DOWNLOADS = 'https://dlcdn.apache.org/spark'
 SPARK_VERSION_DIR_PATTERN = re.compile(r'spark-([0-9.]+)/')
 
 SPARK_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'spark')

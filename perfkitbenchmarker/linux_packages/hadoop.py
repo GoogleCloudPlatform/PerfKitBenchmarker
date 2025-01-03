@@ -72,7 +72,7 @@ DATA_FILES = [
 ]
 START_HADOOP_SCRIPT = 'hadoop/start-hadoop.sh.j2'
 
-HADOOP_URL_BASE = 'https://downloads.apache.org/hadoop/common'
+HADOOP_URL_BASE = 'https://dlcdn.apache.org/hadoop/common'
 HADOOP_STABLE_URL = HADOOP_URL_BASE + '/stable'
 HADOOP_TAR_PATTERN = re.compile(r'hadoop-([0-9.]+)\.t(ar\.)?gz')
 
