@@ -163,6 +163,10 @@ class RetriesExceededRetryError(RetryError):
   """Exception that is raised when a retryable function hits its retry limit."""
 
 
+class ImageNotFoundError(Exception):
+  """Exception that is raised when an image is not found."""
+
+
 class IpAddressSubset:
   """Enum of options for --ip_addresses."""
 

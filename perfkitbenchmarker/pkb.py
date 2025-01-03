@@ -1169,6 +1169,8 @@ def RunBenchmark(
           )
         elif _IsException(e, errors.Config.InvalidValue):
           spec.failed_substatus = benchmark_status.FailedSubstatus.INVALID_VALUE
+        elif _IsException(e, vm_util.ImageNotFoundError):
+          spec.failed_substatus = benchmark_status.FailedSubstatus.UNSUPPORTED
         else:
           spec.failed_substatus = benchmark_status.FailedSubstatus.UNCATEGORIZED
         spec.status_detail = str(e)

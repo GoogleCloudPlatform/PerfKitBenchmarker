@@ -183,7 +183,7 @@ class AwsVmNotCreatedError(Exception):
   """Error indicating that VM does not have a create_start_time."""
 
 
-class AwsImageNotFoundError(Exception):
+class AwsImageNotFoundError(vm_util.ImageNotFoundError):
   """Error indicating no appropriate AMI could be found."""
 
 
