@@ -19,9 +19,7 @@ from typing import Any, Dict
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import errors
-from perfkitbenchmarker import regex_util
-from perfkitbenchmarker import sample
+from perfkitbenchmarker.linux_packages import dlrm_v2
 
 FLAGS = flags.FLAGS
 
@@ -68,6 +66,11 @@ dlrm_intel_cpu_inference:
   flags:
     disable_smt: True
 """
+BENCHMARK_DATA = {
+    'dlrm_int8.pt': (  # for intel dlrm inference only
+        'c6a4580c396c5440d5e667cc6b9726735f583cfe37e48fce82e91c4e0ea0d4e5'
+    ),
+}
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -93,6 +96,10 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   """
   vm = bm_spec.vms[0]
   vm.Install('dlrm_v2')
+  vm.DownloadPreprovisionedData(
+      dlrm_v2.MODEL_PATH, 'dlrm', 'dlrm_int8.pt',
+      dlrm_v2.DLRM_DOWNLOAD_TIMEOUT
+  )
   vm.Install('docker')
   vm.RemoteCommand('sudo chmod 666 /var/run/docker.sock')
   vm.RemoteCommand(
@@ -162,27 +169,7 @@ def Run(bm_spec):
       f'cat output/pytorch-cpu/dlrm/{_BENCHMARK_SCENARIO.value.capitalize()}/performance/'
       "run_1/mlperf_log_summary.txt'"
   )
-  metadata['valid'] = 'Result is : VALID' in stdout
-  if not metadata['valid']:
-    raise errors.Benchmarks.RunError(
-        'Result is invalid. Please check the log for details.'
-    )
-  samples_per_sec_field = 'Samples per second: '
-  if _BENCHMARK_SCENARIO.value == 'server':
-    samples_per_sec_field = 'Completed samples per second    : '
-  samples_per_sec = regex_util.ExtractFloat(
-      samples_per_sec_field + f'({regex_util.FLOAT_REGEX})', stdout
-  )
-  for percentile in ('50.00', '90.00', '95.00', '97.00', '99.00', '99.90'):
-    latency = regex_util.ExtractFloat(
-        percentile + r' percentile latency \(ns\)\s*: (\d+)', stdout
-    )
-    metadata[f'p{percentile}'] = latency
-  return [
-      sample.Sample(
-          'Samples per second', samples_per_sec, 'Samples/sec', metadata
-      )
-  ]
+  return dlrm_v2.ParseDlrmSummary(stdout, metadata, _BENCHMARK_SCENARIO.value)
 
 
 def Cleanup(bm_spec):

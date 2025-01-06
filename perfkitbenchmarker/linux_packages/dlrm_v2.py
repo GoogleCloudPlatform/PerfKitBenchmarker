@@ -13,6 +13,10 @@
 # limitations under the License.
 """Package for downloading DLRMv2 data and models."""
 
+from perfkitbenchmarker import errors
+from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import sample
+
 # "_" is not allowed in some cloud object storage services.
 PACKAGE_NAME = 'dlrm'
 PREPROVISIONED_DATA = {
@@ -24,9 +28,6 @@ PREPROVISIONED_DATA = {
     ),
     'day_23_sparse_multi_hot.npz': (
         '6d2afc30d35c16e8b98f1ef0531dd620b6a0f32072b3a1d1b4eb1badb2ac3d70'
-    ),
-    'dlrm_int8.pt': (  # for intel dlrm inference only
-        'c6a4580c396c5440d5e667cc6b9726735f583cfe37e48fce82e91c4e0ea0d4e5'
     ),
     'weights.zip': (
         '6fe76b56c15fef16903ff4f6837e01581c8b033709286945d7bb62bf3d9ec262'
@@ -62,3 +63,29 @@ def Install(vm):
   vm.DownloadPreprovisionedData(
       MODEL_PATH, PACKAGE_NAME, 'dlrm_int8.pt', DLRM_DOWNLOAD_TIMEOUT
   )
+
+
+def ParseDlrmSummary(summary, metadata, scenario):
+  """Parse MLPerf DLRM summary."""
+  metadata['valid'] = 'Result is : VALID' in summary
+  if not metadata['valid']:
+    raise errors.Benchmarks.RunError(
+        'Result is invalid. Please check the log for details.'
+    )
+  samples_per_sec_field = 'Samples per second: '
+  if scenario == 'server':
+    samples_per_sec_field = 'Completed samples per second    : '
+  samples_per_sec = regex_util.ExtractFloat(
+      samples_per_sec_field + f'({regex_util.FLOAT_REGEX})', summary
+  )
+  for percentile in ('50.00', '90.00', '95.00', '97.00', '99.00', '99.90'):
+    latency = regex_util.ExtractFloat(
+        percentile + r' percentile latency \(ns\)\s*: (\d+)', summary
+    )
+    metadata[f'p{percentile}'] = latency
+  return [
+      sample.Sample(
+          'Samples per second', samples_per_sec, 'Samples/sec', metadata
+      )
+  ]
+
