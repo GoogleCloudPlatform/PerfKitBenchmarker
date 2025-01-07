@@ -177,11 +177,14 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     return cmd
 
+  def _CreateDependencies(self):
+    if self.clustered:
+      self._CreateServiceConnectionPolicy()
+
   def _Create(self):
     """Creates the instance."""
     cmd = self._GetCreateCommand()
     if self.clustered:
-      self._CreateServiceConnectionPolicy()
       cmd = self._GetClusterCreateCommand()
     cmd.flags['region'] = self.redis_region
     cmd.Issue(timeout=COMMAND_TIMEOUT)
