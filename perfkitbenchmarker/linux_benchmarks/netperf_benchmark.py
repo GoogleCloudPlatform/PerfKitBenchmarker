@@ -665,6 +665,16 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
     # Create formatted output, following {benchmark_name}_Throughput_Xstream(s)
     # for TCP stream throughput metrics
     if benchmark_name.upper() == 'TCP_STREAM':
+      netperf_mss = None
+      for throughput_sample in throughput_samples:
+        sample_netperf_mss = throughput_sample.metadata['netperf_mss']
+        if netperf_mss is None:
+          netperf_mss = sample_netperf_mss
+        elif netperf_mss != sample_netperf_mss:
+          raise ValueError(
+              'Netperf MSS values do not match for multiple netperf threads.'
+          )
+      metadata['netperf_mss'] = netperf_mss if netperf_mss else 'unknown'
       samples.append(
           sample.Sample(
               f'{benchmark_name}_Throughput_{len(parsed_output)}streams',
