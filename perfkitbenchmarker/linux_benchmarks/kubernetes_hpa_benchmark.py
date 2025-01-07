@@ -13,7 +13,10 @@
 # limitations under the License.
 """Runs a locust based hpa benchmark on a k8s cluster."""
 
+from collections.abc import Callable
 import functools
+import threading
+import typing
 from typing import Any, Dict, List
 
 from absl import flags
@@ -131,11 +134,96 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
   ])
   addr = 'http://' + stdout.strip() + ':5000'
 
-  # Run locust against the SUT
   vm = benchmark_spec.vms[0]
-  samples = locust.Run(vm, addr)
+  cluster: container_service.KubernetesCluster = typing.cast(
+      container_service.KubernetesCluster, benchmark_spec.container_cluster
+  )
 
-  return list(samples)
+  samples = []
+  stop = threading.Event()
+
+  kmc = KubernetesMetricsCollector(samples, stop)
+
+  def RunLocust():
+    for s in locust.Run(vm, addr):
+      samples.append(s)
+    stop.set()
+
+  background_tasks.RunThreaded(
+      lambda f: f(),
+      [
+          lambda: kmc.ObserveNumReplicas(cluster, 'deploy/fib', 'fib'),
+          lambda: kmc.ObserveNumNodes(cluster),
+          RunLocust,
+      ],
+      max_concurrent_threads=3,
+  )
+
+  return samples
+
+
+class KubernetesMetricsCollector:
+  """Collects k8s cluster metrics."""
+
+  def __init__(self, samples: List[Sample], stop: threading.Event):
+    """Creates a KubernetesMetricsCollector.
+
+    Args:
+      samples: List of samples. Observed metrics will be added to this list.
+      stop: Event indicating when the test is over. Once set, the Observe*()
+        methods will stop.
+    """
+    self._samples = samples
+    self._stop = stop
+
+  def ObserveNumReplicas(
+      self,
+      cluster: container_service.KubernetesCluster,
+      resource_name: str,
+      namespace: str = '',
+  ) -> None:
+    """Periodically samples the number of replicas.
+
+    Adds the result to self._samples.
+
+    Expected to be run in a background thread. Never completes until self._stop
+    is signaled.
+
+    Args:
+      cluster: The cluster in question.
+      resource_name: The deployment/statefulset/etc's name, e.g.
+        'deployment/my_deployment'.
+      namespace: The namespace of the resource. If omitted, the 'default'
+        namespace will be used.
+    """
+    self._Observe(
+        lambda: cluster.GetNumReplicasSamples(resource_name, namespace)
+    )
+
+  def ObserveNumNodes(
+      self,
+      cluster: container_service.KubernetesCluster,
+  ) -> None:
+    """Periodically samples the number of nodes.
+
+    Adds result to self._samples.
+
+    Expected to be run in a background thread. Never completes until self._stop
+    is signaled.
+
+    Args:
+      cluster: The cluster in question.
+    """
+    self._Observe(cluster.GetNumNodesSamples)
+
+  def _Observe(
+      self,
+      observe_fn: Callable[[], List[Sample]],
+  ) -> None:
+    while True:
+      self._samples.extend(observe_fn())
+      if self._stop.wait(timeout=1.0):
+        return
 
 
 def Cleanup(benchmark_spec):

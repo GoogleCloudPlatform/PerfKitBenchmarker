@@ -32,7 +32,7 @@ import logging
 import os
 import re
 import time
-from typing import Any, Iterator, Sequence
+from typing import Any, Iterator, Optional, Sequence
 
 from absl import flags
 import jinja2
@@ -49,6 +49,7 @@ from perfkitbenchmarker import units
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
+from perfkitbenchmarker.sample import Sample
 import requests
 import yaml
 
@@ -152,7 +153,7 @@ class RetriableContainerException(
   pass
 
 
-def RunKubectlCommand(command: list[str], **kwargs):
+def RunKubectlCommand(command: list[str], **kwargs) -> tuple[str, str, int]:
   """Run a kubectl command."""
   if 'stack_level' in kwargs:
     kwargs['stack_level'] += 1
@@ -964,7 +965,8 @@ class KubernetesClusterCommands:
       resource_name: str,
       namespace: str | None = None,
       timeout: int = vm_util.DEFAULT_TIMEOUT,
-  ):
+      raise_on_failure: bool = True,
+  ) -> tuple[str, str, int]:
     """Waits for a resource to complete (i.e. .status.phase=='Succeeded')."""
     run_cmd = [
         'wait',
@@ -974,7 +976,9 @@ class KubernetesClusterCommands:
     ]
     if namespace:
       run_cmd.append(f'--namespace={namespace}')
-    RunKubectlCommand(run_cmd, timeout=timeout + 10)
+    return RunKubectlCommand(
+        run_cmd, timeout=timeout + 10, raise_on_failure=raise_on_failure
+    )
 
   @staticmethod
   def WaitForRollout(
@@ -1037,6 +1041,125 @@ class KubernetesClusterCommands:
       )
 
     return stdout
+
+  @staticmethod
+  def GetNumReplicasSamples(
+      resource_name: str, namespace: Optional[str] = None
+  ) -> list[Sample]:
+    """Returns a count of the replias (and state) for the specified resource.
+
+    The number of ready and unready replicas should always sum to the total
+    replicas.
+
+    Args:
+      resource_name: The deployment/statefulset/etc's name, e.g.
+        'deployment/my_deployment'.
+      namespace: The namespace of the resource. If omitted, the 'default'
+        namespace will be used.
+
+    Returns:
+      A list of the (total replicas, ready replicas, unready replicas) for this
+      resource (as `Sample`s), or an empty list if the resource cannot be found.
+    """
+    now = int(time.time())
+    if namespace is None:
+      namespace = 'default'
+    stdout, stderr, retcode = RunKubectlCommand(
+        [
+            'get',
+            resource_name,
+            '-n',
+            namespace,
+            "-o=jsonpath='{.status.replicas}, {.status.readyReplicas}'",
+        ],
+        raise_on_failure=False,
+    )
+    if retcode != 0:
+      if re.match('^Error from server \\(NotFound\\):.*', stderr) is not None:
+        # The specified resource wasn't found
+        return []
+      else:
+        # Some other error.
+        raise errors.VmUtil.IssueCommandError(
+            f'Unable to query list of replicas: {stderr}'
+        )
+
+    stdout = stdout.strip("' ")
+    replicas = int(stdout.split(',')[0])
+    ready_replicas = int(stdout.split(',')[1])
+    unready_replicas = replicas - ready_replicas
+
+    def _Sample(count: int, state: str) -> Sample:
+      return Sample(
+          metric='k8s/num_replicas_' + state,
+          value=count,
+          unit='',
+          metadata={
+              'namespace': namespace,
+              'resource_name': resource_name,
+          },
+          timestamp=now,
+      )
+
+    return [
+        _Sample(replicas, 'any'),
+        _Sample(ready_replicas, 'ready'),
+        _Sample(unready_replicas, 'unready'),
+    ]
+
+  @staticmethod
+  def GetNumNodesSamples() -> list[Sample]:
+    """Returns a count of nodes in each state for the cluster.
+
+    The number of ready, unready, and unknown nodes should always sum to the
+    total nodes.
+
+    Returns:
+      A List of the (total nodes, ready nodes, unready nodes, unknown nodes)
+      for this cluster as `Sample`s.
+    """
+    now = int(time.time())
+
+    jsonpath = (
+        '{range .items[*]}'
+        '{@.status.conditions[?(@.type=="Ready")].status}{"\\n"}'
+        '{end}'
+    )
+    stdout, _, _ = RunKubectlCommand(
+        ['get', 'nodes', f"-o=jsonpath='{jsonpath}'"]
+    )
+
+    total = ready = unready = unknown = 0
+    for line in stdout.splitlines():
+      status = line.strip("' ").lower()
+      if not status:
+        continue
+      elif status == 'true':
+        ready += 1
+      elif status == 'false':
+        unready += 1
+      else:
+        # status should be strictly 'unknown', but we'll also categorize any
+        # other unexpected response as 'unknown'
+        unknown += 1
+      total += 1
+
+    def _Sample(count: int, state: str) -> Sample:
+      # TOCONSIDER: maybe include the nodepool name in the metadata?
+      return Sample(
+          metric='k8s/num_nodes_' + state,
+          value=count,
+          unit='',
+          metadata={},
+          timestamp=now,
+      )
+
+    return [
+        _Sample(total, 'any'),
+        _Sample(ready, 'ready'),
+        _Sample(unready, 'unready'),
+        _Sample(unknown, 'unknown'),
+    ]
 
   @staticmethod
   def CreateConfigMap(name: str, from_file_dir: str):

@@ -1,3 +1,4 @@
+from typing import Iterable
 import unittest
 from unittest import mock
 from absl.testing import flagsaver
@@ -5,6 +6,7 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.configs import container_spec
+from perfkitbenchmarker.sample import Sample
 from tests import pkb_common_test_case
 
 
@@ -80,6 +82,89 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(out, 'pod1, pod2')
     self.assertEqual(err, '')
     self.assertEqual(ret, 0)
+
+  def test_GetNumReplicasSamples_found(self):
+    resource_name = 'deployment/my_deployment'
+    namespace = 'my_namespace'
+    self.MockIssueCommand({
+        f'get {resource_name} -n {namespace} -o=jsonpath=': [
+            ('456, 123', '', 0)
+        ]
+    })
+
+    def _Sample(count: int, state: str) -> Sample:
+      return Sample(
+          metric='k8s/num_replicas_' + state,
+          value=count,
+          unit='',
+          metadata={
+              'namespace': namespace,
+              'resource_name': resource_name,
+          },
+          timestamp=0,
+      )
+
+    samples = _ClearTimestamps(
+        container_service.KubernetesClusterCommands.GetNumReplicasSamples(
+            resource_name, namespace
+        )
+    )
+    self.assertCountEqual(
+        samples,
+        [
+            _Sample(456, 'any'),
+            _Sample(123, 'ready'),
+            _Sample(456 - 123, 'unready'),
+        ],
+    )
+
+  def test_GetNumReplicasSamples_not_found(self):
+    resource_name = 'deployment/my_deployment'
+    namespace = 'my_namespace'
+    self.MockIssueCommand({
+        f'get {resource_name} -n {namespace} -o=jsonpath=': [
+            ('', 'Error from server (NotFound): <details>', 1)
+        ]
+    })
+
+    samples = container_service.KubernetesClusterCommands.GetNumReplicasSamples(
+        resource_name, namespace
+    )
+    self.assertEmpty(samples)
+
+  def test_GetNumNodesSamples(self):
+    self.MockIssueCommand({
+        'get nodes -o=jsonpath=': [
+            ('True\nFalse\nTrue\nSomethingUnexpected\n', '', 0)
+        ]
+    })
+
+    def _Sample(count: int, state: str) -> Sample:
+      return Sample(
+          metric='k8s/num_nodes_' + state,
+          value=count,
+          unit='',
+          metadata={},
+          timestamp=0,
+      )
+
+    samples = _ClearTimestamps(
+        container_service.KubernetesClusterCommands.GetNumNodesSamples()
+    )
+    self.assertCountEqual(
+        samples,
+        [
+            _Sample(4, 'any'),
+            _Sample(2, 'ready'),
+            _Sample(1, 'unready'),
+            _Sample(1, 'unknown'),
+        ],
+    )
+
+
+def _ClearTimestamps(samples: Iterable[Sample]) -> Iterable[Sample]:
+  for s in samples:
+    yield Sample(s.metric, s.value, s.unit, s.metadata, timestamp=0)
 
 
 if __name__ == '__main__':
