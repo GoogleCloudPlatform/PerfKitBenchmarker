@@ -73,7 +73,7 @@ flags.DEFINE_list(
 )
 flags.DEFINE_boolean(
     'nginx_throttle',
-    True,
+    False,
     'If True, skip running the nginx_load_configs and run '
     'wrk2 once aiming to throttle the nginx server.',
 )
@@ -107,7 +107,7 @@ flags.DEFINE_enum(
 )
 _P99_LATENCY_THRESHOLD = flags.DEFINE_integer(
     'nginx_p99_latency_threshold',
-    None,
+    100,
     'The p99 latency threshold (in milliseconds) for the benchmark to output'
     ' results.',
 )
