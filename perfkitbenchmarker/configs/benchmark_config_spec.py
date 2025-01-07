@@ -216,8 +216,8 @@ class _DpbServiceSpec(spec.BaseSpec):
         'dataproc_serverless_runtime_engine': (
             option_decoders.EnumDecoder,
             {
-                'valid_values': ('spark', 'native'),
-                'default': 'spark',
+                'valid_values': ('default', 'native'),
+                'default': 'default',
             },
         ),
         'dataproc_serverless_memory_overhead': (
