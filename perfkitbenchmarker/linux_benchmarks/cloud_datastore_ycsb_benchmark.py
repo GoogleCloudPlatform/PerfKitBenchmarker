@@ -97,8 +97,10 @@ _REPOPULATE = flags.DEFINE_boolean(
 )
 _TARGET_LOAD_QPS = flags.DEFINE_integer(
     'google_datastore_target_load_qps',
-    None,
-    'The target QPS to load the database at.',
+    500,
+    'The target QPS to load the database at. See'
+    ' https://cloud.google.com/datastore/docs/best-practices#ramping_up_traffic'
+    ' for more info.',
 )
 
 _KEYFILE_LOCAL_PATH = '/tmp/key.json'
@@ -111,6 +113,14 @@ def GetConfig(user_config):
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
   return config
+
+
+def CheckPrerequisites(_):
+  if not ycsb.SKIP_LOAD_STAGE.value and not _TARGET_LOAD_QPS.value:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        '--google_datastore_target_load_qps must be set when loading the'
+        ' database.'
+    )
 
 
 def _Install(vm):
@@ -198,6 +208,9 @@ def Prepare(benchmark_spec):
 
   # Install required packages and copy credential files
   background_tasks.RunThreaded(_Install, vms)
+
+  if ycsb.SKIP_LOAD_STAGE.value:
+    return
 
   load_kwargs = _GetCommonYcsbArgs()
   load_kwargs['core_workload_insertion_retry_limit'] = _INSERTION_RETRY_LIMIT
