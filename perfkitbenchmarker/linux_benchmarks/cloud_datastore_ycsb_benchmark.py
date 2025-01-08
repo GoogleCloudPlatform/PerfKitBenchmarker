@@ -39,6 +39,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import ycsb
+from perfkitbenchmarker.providers.gcp import util
 
 
 BENCHMARK_NAME = 'cloud_datastore_ycsb'
@@ -138,8 +139,11 @@ def _Install(vm):
 
 def _GetCommonYcsbArgs():
   """Returns common YCSB args."""
+  project = _PROJECT_ID.value
+  if project is None:
+    project = FLAGS.project or util.GetDefaultProject()
   args = {
-      'googledatastore.projectId': _PROJECT_ID.value,
+      'googledatastore.projectId': project,
       'googledatastore.debug': _DEBUG.value,
   }
   # if not provided, use the (default) database.
