@@ -60,9 +60,6 @@ def Install(vm):
       f'cd {MLPERF_ROOT}; unzip weights.zip -d .; '
       'mv model_weights model-terabyte'
   )
-  vm.DownloadPreprovisionedData(
-      MODEL_PATH, PACKAGE_NAME, 'dlrm_int8.pt', DLRM_DOWNLOAD_TIMEOUT
-  )
 
 
 def ParseDlrmSummary(summary, metadata, scenario):
