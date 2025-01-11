@@ -115,17 +115,25 @@ def YumInstall(vm):
   if vm.OS_TYPE not in os_types.AMAZONLINUX_TYPES:
     vm.RemoteCommand('sudo dnf config-manager --set-enabled crb')
     vm.RemoteCommand('sudo dnf install -y epel-release epel-next-release')
+    if vm.is_aarch64:
+      repo = 'EL-9-aarch64'
+    else:
+      repo = 'EL-9-x86_64'
     vm.RemoteCommand(
         'sudo yum install -y https://download.postgresql.org/pub/repos/yum/'
-        'reporpms/EL-9-x86_64/pgdg-redhat-repo-latest.noarch.rpm --skip-broken'
+        f'reporpms/{repo}/pgdg-redhat-repo-latest.noarch.rpm --skip-broken'
     )
     vm.RemoteCommand('sudo dnf -qy module disable postgresql')
   else:
     vm.RemoteCommand('sudo dnf update')
   vm.RemoteCommand(
       'sudo yum install -y postgresql16-server postgresql16'
-      ' postgresql16-contrib'
+      ' postgresql16-contrib postgresql16-devel'
   )
+  vm.RemoteCommand(
+      'echo "export PATH=/usr/pgsql-16/bin:$PATH" | sudo tee -a ~/.bashrc'
+  )
+  vm.RemoteCommand('pg_config --version')
 
 
 def AptInstall(vm):

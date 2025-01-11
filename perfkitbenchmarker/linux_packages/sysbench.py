@@ -140,8 +140,6 @@ def YumInstall(vm, args=immutabledict.immutabledict()):
   ):
     if vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
       mariadb_pkg_name = ''
-    elif vm.OS_TYPE in os_types.CENTOS_TYPES:
-      devel_pkg_name = 'libpq-devel.x86_64'
   elif vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
     # Use mysql-devel according to sysbench documentation.
     mariadb_pkg_name = 'mysql-devel'
