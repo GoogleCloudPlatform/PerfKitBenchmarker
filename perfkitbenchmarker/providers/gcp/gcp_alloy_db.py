@@ -136,6 +136,10 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
         '--cpu-count=%s' % self.spec.db_spec.cpus,
         '--instance-type=PRIMARY',
     ]
+    if self.spec.high_availability:
+      cmd_string.append('--availability-type=REGIONAL')
+    else:
+      cmd_string.append('--availability-type=ZONAL')
 
     cmd = self._GetAlloyDbCommand(cmd_string)
     cmd.Issue(timeout=CREATION_TIMEOUT)
