@@ -126,9 +126,12 @@ def YumInstall(vm):
     vm.RemoteCommand('sudo dnf -qy module disable postgresql')
   else:
     vm.RemoteCommand('sudo dnf update')
+  postgres_devel = 'postgresql16-devel'
+  if vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
+    postgres_devel = 'postgresql-devel'
   vm.RemoteCommand(
       'sudo yum install -y postgresql16-server postgresql16'
-      ' postgresql16-contrib postgresql16-devel'
+      f' postgresql16-contrib {postgres_devel}'
   )
   vm.RemoteCommand(
       'echo "export PATH=/usr/pgsql-16/bin:$PATH" | sudo tee -a ~/.bashrc'

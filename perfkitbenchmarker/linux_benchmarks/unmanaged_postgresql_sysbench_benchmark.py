@@ -77,7 +77,7 @@ unmanaged_postgresql_sysbench:
           num_striped_disks: 5
         Azure:
           disk_size: 200
-          disk_type: Premium_LRS_V2
+          disk_type: PremiumV2_LRS
           provisioned_iops: 40000
           provisioned_throughput: 800
           num_striped_disks: 2
@@ -142,6 +142,7 @@ def GetConfig(user_config):
         vm_spec[cloud]['zone'] = FLAGS.client_vm_zone
       if FLAGS.client_vm_machine_type:
         vm_spec[cloud]['machine_type'] = FLAGS.client_vm_machine_type
+
   # Add replica servers if configured.
   if FLAGS.db_high_availability:
     for index, zone in enumerate(FLAGS.db_replica_zones):
