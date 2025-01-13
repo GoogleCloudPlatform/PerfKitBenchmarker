@@ -92,7 +92,7 @@ dataframe reader. e.g.:
   return parser.parse_args(args)
 
 
-def load_file(spark, object_path):
+def _load_file(spark, object_path):
   """Load an HCFS file into a string."""
   return '\n'.join(spark.sparkContext.textFile(object_path).collect())
 
@@ -110,7 +110,7 @@ def main(args):
     spark.catalog.setCurrentDatabase(args.database)
   table_metadata = []
   if args.table_metadata:
-    table_metadata = json.loads(load_file(spark, args.table_metadata)).items()
+    table_metadata = get_table_metadata(spark, args).items()
   for name, (fmt, options) in table_metadata:
     logging.info('Loading %s', name)
     spark.read.format(fmt).options(**options).load().createTempView(name)
@@ -170,6 +170,11 @@ def get_script_streams(args):
   ]
 
 
+def get_table_metadata(spark, args):
+  """Gets table metadata to create temporary views."""
+  return json.loads(_load_file(spark, args.table_metadata))
+
+
 def run_sql_script(
     spark_session, script_stream, stream_id, raise_query_execution_errors
 ):
@@ -178,7 +183,7 @@ def run_sql_script(
   results = []
   for script in script_stream:
     # Read script from object storage using rdd API
-    query = load_file(spark_session, script)
+    query = _load_file(spark_session, script)
 
     try:
       logging.info('Running %s', script)
