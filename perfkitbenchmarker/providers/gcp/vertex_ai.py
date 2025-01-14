@@ -422,6 +422,10 @@ class VertexAiEndpoint(resource.BaseResource):
     self.endpoint_name = _FindRegexInOutput(
         err, r'Created Vertex AI endpoint: (.+)\.'
     )
+    if not self.endpoint_name:
+      raise errors.VmUtil.IssueCommandError(
+          f'Could not find endpoint name in output {err}.'
+      )
     logging.info('Successfully creating endpoint %s', self.endpoint_name)
     self.ai_endpoint = aiplatform.Endpoint(self.endpoint_name)
 
@@ -437,10 +441,22 @@ class VertexAiEndpoint(resource.BaseResource):
         f'gcloud ai endpoints describe {self.endpoint_name}',
     )
     model_id = _FindRegexInOutput(out, r'  id: \'(.+)\'')
-    self.vm.RunCommand(
-        'gcloud ai endpoints undeploy-model'
-        f' {self.endpoint_name} --deployed-model-id={model_id} --quiet',
-    )
+    if model_id:
+      self.vm.RunCommand(
+          'gcloud ai endpoints undeploy-model'
+          f' {self.endpoint_name} --deployed-model-id={model_id} --quiet',
+      )
+    else:
+      if 'deployedModels:' not in out:
+        logging.info(
+            'No deployed models found; perhaps they failed to deploy or were'
+            ' already deleted?'
+        )
+      else:
+        raise errors.VmUtil.IssueCommandError(
+            'Found deployed models but Could not find model id in'
+            f' output.\n{out}'
+        )
     self.vm.RunCommand(
         f'gcloud ai endpoints delete {self.endpoint_name} --quiet'
     )
@@ -448,13 +464,11 @@ class VertexAiEndpoint(resource.BaseResource):
     self.ai_endpoint = None
 
 
-def _FindRegexInOutput(output: str, regex: str) -> str:
+def _FindRegexInOutput(output: str, regex: str) -> str | None:
   """Returns the first match of the regex in the output."""
   matches = re.search(regex, output)
   if not matches:
-    raise errors.VmUtil.IssueCommandError(
-        f'Could not find {regex} in output.\n{output}',
-    )
+    return None
   return matches.group(1)
 
 

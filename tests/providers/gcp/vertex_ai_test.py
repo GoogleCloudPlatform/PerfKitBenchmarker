@@ -344,7 +344,7 @@ deployedModels:
     self.endpoint.endpoint_name = (
         'projects/6789/locations/us-east1/endpoints/1234'
     )
-    self.MockRunCommand(
+    cli = self.MockRunCommand(
         {
             'gcloud ai endpoints describe': [(
                 ("""Using endpoint [https://us-east1-aiplatform.googleapis.com/]
@@ -362,6 +362,42 @@ deployedModels:
         self.endpoint.vm,
     )
     self.endpoint._Delete()
+    self.assertLen(cli.RunCommand.call_args_list, 3)  # pytype: disable=attribute-error
+    mock_cmd = cli.RunCommand.mock_command  # pytype: disable=attribute-error
+    self.assertEqual(
+        mock_cmd.progress_through_calls['gcloud ai endpoints delete'], 1
+    )
+    self.assertEqual(
+        mock_cmd.progress_through_calls['gcloud ai endpoints undeploy-model'], 1
+    )
+
+  def test_endpoint_delete_no_deployed_models(self):
+    self.endpoint.endpoint_name = (
+        'projects/6789/locations/us-east1/endpoints/1234'
+    )
+    cli = self.MockRunCommand(
+        {
+            'gcloud ai endpoints describe': [(
+                ("""Using endpoint [https://us-east1-aiplatform.googleapis.com/]
+createTime: '2024-09-26T21:51:53.955656Z'
+"""),
+                '',
+                0,
+            )],
+            'gcloud ai endpoints undeploy-model': [('', '', 0)],
+            'gcloud ai endpoints delete': [('', '', 0)],
+        },
+        self.endpoint.vm,
+    )
+    self.endpoint._Delete()
+    self.assertLen(cli.RunCommand.call_args_list, 2)  # pytype: disable=attribute-error
+    mock_cmd = cli.RunCommand.mock_command  # pytype: disable=attribute-error
+    self.assertEqual(
+        mock_cmd.progress_through_calls['gcloud ai endpoints delete'], 1
+    )
+    self.assertEqual(
+        mock_cmd.progress_through_calls['gcloud ai endpoints undeploy-model'], 0
+    )
 
 
 if __name__ == '__main__':
