@@ -158,32 +158,6 @@ def GetQueryIdsToStage() -> list[str]:
   return FLAGS.dpb_sparksql_order
 
 
-def GetTableMetadata(benchmark_spec):
-  """Compute map of table metadata for spark_sql_runner --table_metadata."""
-  metadata = {}
-  # TODO(user) : we support CSV format only when create_hive_tables
-  # is false.
-  if not FLAGS.dpb_sparksql_create_hive_tables:
-    for subdir in benchmark_spec.table_subdirs or []:
-      # Subdir is table name
-      option_params = {
-          'path': os.path.join(benchmark_spec.data_dir, subdir),
-      }
-      # support csv data format which contains a header and has delimiter
-      # defined by dpb_sparksql_csv_delimiter flag
-      if FLAGS.dpb_sparksql_data_format == 'csv':
-        # TODO(user): currently we only support csv with a header.
-        # If the csv does not have a header it will not load properly.
-        option_params['header'] = 'true'
-        option_params['delimiter'] = FLAGS.dpb_sparksql_csv_delimiter
-
-      metadata[subdir] = (
-          FLAGS.dpb_sparksql_data_format or 'parquet',
-          option_params,
-      )
-  return metadata
-
-
 def StageMetadata(
     json_metadata: Any,
     storage_service: object_storage_service.ObjectStorageService,
@@ -224,6 +198,7 @@ def Prepare(benchmark_spec):
     storage_service.CopyToBucket(src_url, cluster.bucket, script)
 
   benchmark_spec.table_subdirs = []
+  benchmark_spec.data_dir = None
   if FLAGS.dpb_sparksql_data:
     # Replace s3a scheme (used for S3 Express in Spark) with s3
     table_dir = re.sub(r'^s3a://', 's3://', FLAGS.dpb_sparksql_data)

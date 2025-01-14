@@ -10,7 +10,6 @@ from __future__ import print_function
 
 import argparse
 from concurrent import futures
-import json
 import logging
 import os
 import time
@@ -40,19 +39,44 @@ def parse_args(args=None):
       required=True,
       help='Object storage path where the SQL queries are located.',
   )
-  parser.add_argument('--database', help='Hive database to look for data in.')
+  group = parser.add_mutually_exclusive_group()
+  group.add_argument('--database', help='Hive database to look for data in.')
+  group.add_argument(
+      '--table-base-dir',
+      help=(
+          'Base HCFS path containing the table data to be registered into Spark'
+          ' temporary view.'
+      ),
+  )
+  group.add_argument(
+      '--bigquery-dataset',
+      help=(
+          'BQ Dataset containing the tables passed in --table-names to be'
+          ' registered into Spark temporary view.'
+      ),
+  )
   parser.add_argument(
-      '--table-metadata',
-      metavar='METADATA_FILE',
-      help="""\
-HCFS file containing JSON Object mapping table names to arrays of length 2.
-The arrays contain the format of the data and the options to pass to the
-dataframe reader. e.g.:
-{
-
-  "my_bq_table": ["bigquery", {"table": "bigquery_public_data:dataset.table"}],
-  "my_parquet_table": ["parquet", {"path": "gs://some/directory"}]
-}""",
+      '--table-names',
+      nargs='+',
+      help='Names of the tables to be registered into Spark temporary view.',
+  )
+  parser.add_argument(
+      '--table-format',
+      help=(
+          'Format of data to be registered into Spark temporary view as passed'
+          ' to `spark.read.format()`. Assumed to be "parquet", or "bigquery" if'
+          ' a BQ dataset is also specified.'
+      ),
+  )
+  parser.add_argument(
+      '--bigquery-read-data-format',
+      help=(
+          'The record format to use when connecting to BigQuery storage. See:'
+          ' https://github.com/GoogleCloudDataproc/spark-bigquery-connector#properties'
+      ),
+  )
+  parser.add_argument(
+      '--csv-delimiter', help='CSV delimiter to load CSV files', default=','
   )
   parser.add_argument(
       '--enable-hive',
@@ -108,10 +132,7 @@ def main(args):
   spark = builder.getOrCreate()
   if args.database:
     spark.catalog.setCurrentDatabase(args.database)
-  table_metadata = []
-  if args.table_metadata:
-    table_metadata = get_table_metadata(spark, args).items()
-  for name, (fmt, options) in table_metadata:
+  for name, (fmt, options) in get_table_metadata(args).items():
     logging.info('Loading %s', name)
     spark.read.format(fmt).options(**options).load().createTempView(name)
   if args.table_cache:
@@ -154,6 +175,27 @@ def main(args):
   )
 
 
+def get_table_metadata(args):
+  """Gets table metadata to create temporary views according to args passed."""
+  metadata = {}
+  if args.table_base_dir:
+    for table_name in args.table_names:
+      option_params = {'path': os.path.join(args.table_base_dir, table_name)}
+      if args.table_format == 'csv':
+        option_params['header'] = 'true'
+        option_params['delimiter'] = args.csv_delimiter
+      metadata[table_name] = (args.table_format or 'parquet', option_params)
+  elif args.bigquery_dataset:
+    for table_name in args.table_names:
+      bq_options = {
+          'table': '.'.join([args.bigquery_dataset, table_name])
+      }
+      if args.bigquery_read_data_format:
+        bq_options['readDataFormat'] = args.bigquery_read_data_format
+      metadata[table_name] = (args.table_format or 'bigquery', bq_options)
+  return metadata
+
+
 def get_script_streams(args):
   """Gets the script streams to run.
 
@@ -168,11 +210,6 @@ def get_script_streams(args):
       [os.path.join(args.sql_scripts_dir, q) for q in stream]
       for stream in args.sql_scripts
   ]
-
-
-def get_table_metadata(spark, args):
-  """Gets table metadata to create temporary views."""
-  return json.loads(_load_file(spark, args.table_metadata))
 
 
 def run_sql_script(

@@ -94,11 +94,17 @@ dpb_sparksql_benchmark:
     worker_count: 2
 """
 
-flags.DEFINE_list(
-    'bigquery_tables',
-    [],
-    'A list of BigQuery tables to load as Temporary Spark SQL views instead '
-    'of reading from external Hive tables.',
+_BIGQUERY_DATASET = flags.DEFINE_string(
+    'dpb_sparksql_bigquery_dataset',
+    None,
+    'BigQuery dataset with the tables to load as Temporary Spark SQL views'
+    ' instead of reading from external Hive tables.',
+)
+_BIGQUERY_TABLES = flags.DEFINE_list(
+    'dpb_sparksql_bigquery_tables',
+    None,
+    'BigQuery table names (unqualified) to load as Temporary Spark SQL views'
+    ' instead of reading from external Hive tables.',
 )
 flags.DEFINE_string(
     'bigquery_record_format',
@@ -132,15 +138,30 @@ def CheckPrerequisites(benchmark_config):
     raise errors.Config.InvalidValue(
         'You cannot create hive tables in a custom database.'
     )
+  if bool(_BIGQUERY_DATASET.value) != bool(_BIGQUERY_TABLES.value):
+    raise errors.Config.InvalidValue(
+        '--dpb_sparksql_bigquery_dataset and '
+        '--dpb_sparksql_bigquery_tables must be passed together.'
+    )
   if not (
       FLAGS.dpb_sparksql_data
-      or FLAGS.bigquery_tables
+      or _BIGQUERY_TABLES.value
       or FLAGS.dpb_sparksql_database
   ):
     # In the case of a static dpb_service, data could pre-exist
     logging.warning(
-        'You did not specify --dpb_sparksql_data, --bigquery_tables, '
-        'or dpb_sparksql_database. You will probably not have data to query!'
+        'You did not specify --dpb_sparksql_data,'
+        ' --dpb_sparksql_bigquery_tables, or dpb_sparksql_database. You will'
+        ' probably not have data to query!'
+    )
+  if sum([
+      bool(FLAGS.dpb_sparksql_data),
+      bool(_BIGQUERY_TABLES.value),
+      bool(FLAGS.dpb_sparksql_database),
+  ]) == 1:
+    logging.warning(
+        'You should only pass one of them: --dpb_sparksql_data,'
+        ' --dpb_sparksql_bigquery_tables, or --dpb_sparksql_database.'
     )
   if bool(FLAGS.dpb_sparksql_order) == bool(FLAGS.dpb_sparksql_streams):
     raise errors.Config.InvalidValue(
@@ -284,7 +305,6 @@ def _GetSampleMetadata(benchmark_spec):
 def _RunQueries(benchmark_spec) -> tuple[str, dpb_service.JobResult]:
   """Runs queries. Returns storage path with metrics and JobResult object."""
   cluster = benchmark_spec.dpb_service
-  storage_service = cluster.storage_service
   report_dir = '/'.join([cluster.base_dir, f'report-{int(time.time()*1000)}'])
   args = ['--sql-scripts-dir', benchmark_spec.query_dir]
   if FLAGS.dpb_sparksql_simultaneous:
@@ -299,18 +319,29 @@ def _RunQueries(benchmark_spec) -> tuple[str, dpb_service.JobResult]:
   args += ['--report-dir', report_dir]
   if FLAGS.dpb_sparksql_database:
     args += ['--database', FLAGS.dpb_sparksql_database]
-  table_metadata = _GetTableMetadata(benchmark_spec)
-  if table_metadata:
-    table_metadata_file = '/'.join([cluster.base_dir, 'metadata.json'])
-    dpb_sparksql_benchmark_helper.StageMetadata(
-        table_metadata, storage_service, table_metadata_file
-    )
-    args += ['--table-metadata', table_metadata_file]
-  else:
-    # If we don't pass in tables, we must be reading from hive.
+  if FLAGS.dpb_sparksql_create_hive_tables:
     # Note you can even read from Hive without --create_hive_tables if they
     # were precreated.
     args += ['--enable-hive', 'True']
+  else:
+    table_names = []
+    if _BIGQUERY_DATASET.value:
+      args += ['--bigquery-dataset', _BIGQUERY_DATASET.value]
+      table_names = _BIGQUERY_TABLES.value
+    elif benchmark_spec.data_dir:
+      args += ['--table-base-dir', benchmark_spec.data_dir]
+      table_names = benchmark_spec.table_subdirs or []
+    if table_names:
+      args += ['--table-names', *table_names]
+    if FLAGS.dpb_sparksql_data_format:
+      args += ['--table-format', FLAGS.dpb_sparksql_data_format]
+    if (
+        FLAGS.dpb_sparksql_data_format == 'csv'
+        and FLAGS.dpb_sparksql_csv_delimiter
+    ):
+      args += ['--csv-delim', FLAGS.dpb_sparksql_csv_delimiter]
+    if FLAGS.bigquery_record_format:
+      args += ['--bigquery-read-data-format', FLAGS.bigquery_record_format]
   if FLAGS.dpb_sparksql_table_cache:
     args += ['--table-cache', FLAGS.dpb_sparksql_table_cache]
   if dpb_sparksql_benchmark_helper.DUMP_SPARK_CONF.value:
@@ -500,17 +531,6 @@ def _GetDistCpMetadata(base_dir: str, subdirs: List[str], extra_metadata=None):
         FLAGS.dpb_sparksql_data_format or 'parquet',
         {'path': '/'.join([base_dir, subdir]), **extra_metadata},
     )]
-  return metadata
-
-
-def _GetTableMetadata(benchmark_spec):
-  metadata = dpb_sparksql_benchmark_helper.GetTableMetadata(benchmark_spec)
-  for table in FLAGS.bigquery_tables:
-    name = table.split('.')[-1]
-    bq_options = {'table': table}
-    if FLAGS.bigquery_record_format:
-      bq_options['readDataFormat'] = FLAGS.bigquery_record_format
-    metadata[name] = (FLAGS.dpb_sparksql_data_format or 'bigquery', bq_options)
   return metadata
 
 
