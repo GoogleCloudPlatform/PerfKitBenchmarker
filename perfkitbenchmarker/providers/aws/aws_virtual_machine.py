@@ -130,6 +130,7 @@ _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     'im4g': 'graviton2',
     'is4ge': 'graviton2',
     'x2g': 'graviton2',
+    'hpc7g': 'graviton3E',
 }
 
 # Parameters for use with Elastic Network Interface
