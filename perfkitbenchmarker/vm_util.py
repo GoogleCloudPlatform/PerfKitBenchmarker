@@ -387,7 +387,9 @@ def Retry(
             raise RetriesExceededRetryError() from e
           else:
             if log_errors:
-              logging.info('Retrying exception running %s: %s', f.__name__, e)
+              logging.info(
+                  'Retrying exception running %s: %s', f.__qualname__, repr(e)
+              )
             time.sleep(sleep_time)
 
     return WrappedFunction
