@@ -289,6 +289,19 @@ GKE_NCCL_FAST_SOCKET = flags.DEFINE_boolean(
     False,
     'Whether to enable NCCL fast socket on GKE.',
 )
+CONTAINER_REMOTE_BUILD_CONFIG = flags.DEFINE_string(
+    'container_remote_build_config',
+    None,
+    'The YAML or JSON file to use as the build configuration file.',
+)
+CONTAINER_RELEASE_CHANNEL = flags.DEFINE_enum(
+    'gke_release_channel',
+    None,
+    ['rapid', 'regular', 'stable'],
+    'The release channel to use for the container cluster. Different release'
+    ' channels support different Kubernetes versions and have different'
+    ' defaults.',
+)
 flags.DEFINE_string(
     'gcp_dataproc_subnet',
     None,

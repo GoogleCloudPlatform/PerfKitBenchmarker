@@ -35,18 +35,12 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
-_CONTAINER_REMOTE_BUILD_CONFIG = flags.DEFINE_string(
-    'container_remote_build_config',
-    None,
-    'The YAML or JSON file to use as the build configuration file.',
-)
 
 NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
 NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = (
     'nvidia_unrestricted_permissions_daemonset.yml'
 )
 SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
-RELEASE_CHANNELS = ['rapid', 'regular', 'stable']
 ONE_HOUR = 60 * 60
 
 
@@ -108,10 +102,10 @@ class GoogleArtifactRegistry(container_service.BaseContainerRegistry):
 
   def RemoteBuild(self, image: container_service.ContainerImage):
     """Builds the image remotely."""
-    if not _CONTAINER_REMOTE_BUILD_CONFIG.value:
+    if not gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value:
       full_tag = self.GetFullRegistryTag(image.name)
     else:
-      full_tag = _CONTAINER_REMOTE_BUILD_CONFIG.value
+      full_tag = gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value
     build_cmd = util.GcloudCommand(
         self, 'builds', 'submit', '--tag', full_tag, image.directory
     )
@@ -125,6 +119,7 @@ class BaseGkeCluster(container_service.KubernetesCluster):
     super().__init__(spec)
     self.project: str = spec.vm_spec.project or FLAGS.project
     self.cluster_version: str = FLAGS.container_cluster_version
+    self.release_channel: str | None = gcp_flags.CONTAINER_RELEASE_CHANNEL.value
     self.use_application_default_credentials: bool = True
     self.zones = (
         self.default_nodepool.zone and self.default_nodepool.zone.split(',')
@@ -142,21 +137,36 @@ class BaseGkeCluster(container_service.KubernetesCluster):
     else:
       self.region: str = util.GetRegionFromZone(self.zones[0])
 
+  def GetResourceMetadata(self) -> dict[str, Any]:
+    """Returns a dict containing metadata about the cluster.
+
+    Returns:
+      dict mapping string property key to value.
+    """
+    metadata = super().GetResourceMetadata()
+    metadata['project'] = self.project
+    if self.release_channel:
+      metadata['release_channel'] = self.release_channel
+    return metadata
+
   def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
     """Creates a gcloud command."""
     return util.GcloudCommand(self, *args, **kwargs)
 
   def _RunClusterCreateCommand(self, cmd: util.GcloudCommand):
     """Adds flags to the cluster create command and runs it."""
+    # All combinations of cluster-version and release-channel are supported.
+    # Specifying one uses default for the other. Specifying both can be needed
+    # as some versions are only supported in some release channels.
     if self.cluster_version:
-      if self.cluster_version in RELEASE_CHANNELS:
-        if FLAGS.gke_enable_alpha:
-          raise errors.Config.InvalidValue(
-              'Kubernetes Alpha is not compatible with release channels'
-          )
-        cmd.flags['release-channel'] = self.cluster_version
-      else:
-        cmd.flags['cluster-version'] = self.cluster_version
+      cmd.flags['cluster-version'] = self.cluster_version
+    if self.release_channel:
+      if FLAGS.gke_enable_alpha:
+        raise errors.Config.InvalidValue(
+            'Kubernetes Alpha is not compatible with release channels'
+        )
+      cmd.flags['release-channel'] = self.release_channel
+
     if FLAGS.gke_enable_alpha:
       cmd.args.append('--enable-kubernetes-alpha')
       cmd.args.append('--no-enable-autorepair')
@@ -280,10 +290,6 @@ class GkeCluster(BaseGkeCluster):
       dict mapping string property key to value.
     """
     result = super().GetResourceMetadata()
-    result['project'] = self.project
-    if self.cluster_version in RELEASE_CHANNELS:
-      result['gke_release_channel'] = self.cluster_version
-
     result['boot_disk_type'] = self.default_nodepool.disk_type
     result['boot_disk_size'] = self.default_nodepool.disk_size
     if self.default_nodepool.max_local_disks:
@@ -304,6 +310,8 @@ class GkeCluster(BaseGkeCluster):
       cmd.flags['network'] = self.default_nodepool.network.network_resource.name
 
     cmd.args.append('--no-enable-shielded-nodes')
+    if self.release_channel != 'rapid':
+      cmd.args.append('--no-enable-autoupgrade')
     self._AddNodeParamsToCmd(
         self.default_nodepool,
         cmd,
@@ -405,10 +413,6 @@ class GkeCluster(BaseGkeCluster):
     if nodepool_config.sandbox_config is not None:
       cmd.flags['sandbox'] = nodepool_config.sandbox_config.ToSandboxFlag()
 
-    # If using a fixed version (or the default) do not enable upgrades.
-    if self.cluster_version not in RELEASE_CHANNELS:
-      cmd.args.append('--no-enable-autoupgrade')
-
     cmd.flags['node-labels'] = f'pkb_nodepool={nodepool_config.name}'
 
   def _PostCreate(self):
@@ -476,7 +480,7 @@ class GkeAutopilotCluster(BaseGkeCluster):
     super().__init__(spec)
     # Nodepools are not supported for Autopilot clusters, but default vm_spec
     # still used for pod spec input.
-    self.nodepools = []
+    self.nodepools = {}
 
   def InitializeNodePoolForCloud(
       self,
@@ -510,12 +514,13 @@ class GkeAutopilotCluster(BaseGkeCluster):
     self._RunClusterCreateCommand(cmd)
 
   def GetResourceMetadata(self) -> dict[str, Any]:
-    metadata = {
-        'cloud': self.CLOUD,
-        'cluster_type': 'KubernetesAutopilot',
-        'zone': self.zone,
-        'region': self.region,
-    }
+    metadata = super().GetResourceMetadata()
+    metadata['zone'] = self.zone
+    metadata['region'] = self.region
+    # Override node specific metadata set in parent.
+    metadata['machine_type'] = self.CLUSTER_TYPE
+    metadata['size'] = self.CLUSTER_TYPE
+    metadata['nodepools'] = self.CLUSTER_TYPE
     return metadata
 
   def ResizeNodePool(

@@ -21,6 +21,7 @@ import unittest
 from unittest import mock
 
 from absl import flags as flgs
+from absl.testing import flagsaver
 import contextlib2
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
@@ -129,8 +130,7 @@ class GoogleContainerRegistryTestCase(pkb_common_test_case.PkbCommonTestCase):
       registry = google_kubernetes_engine.GoogleArtifactRegistry(spec)
       image = registry.GetFullRegistryTag('fakeimage')
     self.assertEqual(
-        image,
-        'us-west-docker.pkg.dev/test_project/pkbabc9876/fakeimage'
+        image, 'us-west-docker.pkg.dev/test_project/pkbabc9876/fakeimage'
     )
 
   def testRemoteBuildCreateSucceeds(self):
@@ -429,9 +429,9 @@ class GoogleKubernetesEngineVersionFlagTestCase(
     )
     return kubernetes_engine_spec
 
+  @flagsaver.flagsaver(container_cluster_version='fake-version')
   def testCreateCustomVersion(self):
     spec = self.create_kubernetes_engine_spec()
-    FLAGS.container_cluster_version = 'fake-version'
     with patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
@@ -454,9 +454,9 @@ class GoogleKubernetesEngineVersionFlagTestCase(
       self.assertNotIn('--cluster-version', command_string)
       self.assertIn('--no-enable-autoupgrade', command_string)
 
+  @flagsaver.flagsaver(gke_release_channel='rapid')
   def testCreateRapidChannel(self):
     spec = self.create_kubernetes_engine_spec()
-    FLAGS.container_cluster_version = 'rapid'
     with patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
@@ -736,6 +736,75 @@ class GoogleKubernetesEngineRegionalTestCase(
       )
       self.assertContainsSubsequence(
           create_nodepool2, ['--node-locations', 'us-west1-c']
+      )
+
+
+class GoogleKubernetesEngineAutopilotTestCase(
+    pkb_common_test_case.PkbCommonTestCase
+):
+
+  @staticmethod
+  def create_kubernetes_engine_spec():
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'type': 'Autopilot',
+            'vm_spec': {
+                'GCP': {
+                    'zone': 'us-central1-a',
+                    'project': 'fakeproject',
+                },
+            },
+        },
+    )
+    return kubernetes_engine_spec
+
+  def testCreate(self):
+    spec = self.create_kubernetes_engine_spec()
+    with patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
+      cluster._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud container clusters create-auto', command_string)
+      self.assertIn('--project fakeproject', command_string)
+      self.assertIn('--region us-central1', command_string)
+      self.assertIn('--format json', command_string)
+      self.assertIn('--labels foo=bar,timeout=yesterday', command_string)
+      self.assertNotIn('--machine-type', command_string)
+      self.assertNotIn('--num-nodes', command_string)
+
+  def testGetResourceMetadata(self):
+    spec = self.create_kubernetes_engine_spec()
+    with patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
+      metadata = cluster.GetResourceMetadata()
+      self.assertDictContainsSubset(
+          {
+              'project': 'fakeproject',
+              'cloud': 'GCP',
+              'cluster_type': 'Autopilot',
+              'region': 'us-central1',
+              'machine_type': 'Autopilot',
+              'size': 'Autopilot',
+              'nodepools': 'Autopilot',
+          },
+          metadata,
+      )
+
+  @flagsaver.flagsaver(gke_release_channel='rapid')
+  def testGetResourceMetadataIncludesReleaseChannel(self):
+    spec = self.create_kubernetes_engine_spec()
+    with patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
+      metadata = cluster.GetResourceMetadata()
+      self.assertDictContainsSubset(
+          {
+              'release_channel': 'rapid',
+          },
+          metadata,
       )
 
 
