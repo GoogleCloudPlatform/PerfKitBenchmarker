@@ -199,20 +199,22 @@ redis_memtier_single_base: &redis_memtier_single_base
   memtier_threads: 32
   memtier_requests: -1
   memtier_run_duration: 300
-  redis_server_version: '6.2.16'
   redis_total_num_processes: 1
   enable_transparent_hugepages: False  # never
+  redis_eviction_policy: allkeys-lru
 
 redis_memtier_caching_single_node:
   name: redis_memtier
   flags:
     <<: *redis_memtier_single_base
+    redis_server_version: '6.2.16'
     memtier_ratio: '1:4'
 
 redis_memtier_caching_cluster:
   name: redis_memtier
   flags:
     <<: *redis_memtier_single_base
+    redis_server_version: '6.2.16'
     memtier_ratio: '1:4'
     redis_server_cluster_mode: True
     memtier_cluster_mode: True
@@ -242,6 +244,7 @@ redis_memtier_session_storage_single_node:
   name: redis_memtier
   flags:
     <<: *redis_memtier_single_base
+    redis_server_version: '7.2.6'
     memtier_ratio: '1:1'
     redis_aof: True
   vm_groups:
@@ -252,6 +255,7 @@ redis_memtier_session_storage_cluster:
   name: redis_memtier
   flags:
     <<: *redis_memtier_single_base
+    redis_server_version: '7.2.6'
     memtier_ratio: '1:1'
     redis_aof: True
     redis_server_cluster_mode: True
