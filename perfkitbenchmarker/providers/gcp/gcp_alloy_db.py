@@ -108,6 +108,11 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     })
     return metadata
 
+  def _CreateDependencies(self):
+    util.SetupPrivateServicesAccess(
+        self.client_vm.network.network_resource.name, self.project
+    )
+
   def _Create(self) -> None:
     """Creates the Cloud SQL instance and authorizes traffic from anywhere.
 

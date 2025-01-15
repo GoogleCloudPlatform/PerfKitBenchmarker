@@ -543,9 +543,7 @@ def FormatTags(tags_dict: dict[str, str]):
   Returns:
     A string contains formatted tags
   """
-  return ','.join(
-      '{}={}'.format(k, v) for k, v in sorted(tags_dict.items())
-  )
+  return ','.join('{}={}'.format(k, v) for k, v in sorted(tags_dict.items()))
 
 
 def SplitTags(tags: str):
@@ -604,3 +602,52 @@ def GetAccessToken(application_default: bool = True) -> str:
   cmd.append('print-access-token')
   stdout, _, _ = vm_util.IssueCommand(cmd)
   return stdout.strip()
+
+
+def SetupPrivateServicesAccess(network: str, project: str) -> None:
+  """Setup private services access for the network.
+
+  Private services access is used by several GCP services and enables VMs to
+  connect to service producers using internal IP addressses. See
+  https://cloud.google.com/vpc/docs/configure-private-services-access for more
+  info.
+
+  Args:
+    network: The network (VPC) name to setup private services access for.
+    project: The project to setup private services access for.
+  """
+  cmd = GcloudCommand(
+      None,
+      'compute',
+      'addresses',
+      'create',
+      'google-service-range',
+  )
+  cmd.flags['global'] = True
+  cmd.flags['prefix-length'] = 16
+  cmd.flags['purpose'] = 'VPC_PEERING'
+  cmd.flags['network'] = network
+  cmd.flags['project'] = project
+  cmd.Issue(raise_on_failure=False)
+
+  cmd = GcloudCommand(None, 'services', 'vpc-peerings', 'connect')
+  cmd.flags['service'] = 'servicenetworking.googleapis.com'
+  cmd.flags['network'] = network
+  cmd.flags['ranges'] = 'google-service-range'
+  cmd.flags['project'] = project
+  _, stderr, _ = cmd.Issue(raise_on_failure=False)
+
+  # There are create errors when creating the connection for a second time.
+  # The workaround is to update the connection:
+  if 'Please use UpdateConnection' in stderr:
+    cmd = GcloudCommand(
+        None,
+        'services',
+        'vpc-peerings',
+        'update',
+    )
+    cmd.flags['network'] = network
+    cmd.flags['project'] = project
+    cmd.flags['ranges'] = 'google-service-range'
+    cmd.flags['force'] = True
+    cmd.Issue(raise_on_failure=False)

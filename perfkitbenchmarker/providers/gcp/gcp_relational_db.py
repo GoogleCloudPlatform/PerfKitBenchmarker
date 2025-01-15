@@ -165,6 +165,7 @@ class GCPOmniPostgresIAASRelationalDb(
     omni_postgres_iaas_relational_db.OmniPostgresIAASRelationalDb
 ):
   """A GCP Omni Postgres IAAS database resource."""
+
   CLOUD = provider_info.GCP
 
 
@@ -172,6 +173,7 @@ class GCPTimescaleDbPostgresIAASRelationalDb(
     timescaledb_iaas_relational_db.TimescaleDbIAASRelationalDb
 ):
   """A TimescaleDB Postgres IAAS database resource."""
+
   CLOUD = provider_info.GCP
 
 
@@ -191,23 +193,14 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     super().__init__(relational_db_spec)
     self.project = FLAGS.project or util.GetDefaultProject()
 
-  def _GetAuthorizedNetworks(self, vms):
-    """Get CIDR connections for list of VM specs that need to access the db."""
-    for vm in vms:
-      if not vm.HasIpAddress:
-        raise RuntimeError(
-            'Client vm needs to be initialized before database can '
-            'discover authorized network.'
-        )
-    # create the CIDR of the client VM that is configured to access
-    # the database
-    return ','.join('{}/32'.format(vm.ip_address) for vm in vms)
+  def _CreateDependencies(self):
+    util.SetupPrivateServicesAccess(
+        self.client_vm.network.network_resource.name, self.project
+    )
 
   def _CreateGcloudSqlInstance(self):
     storage_size = self.spec.db_disk_spec.disk_size
     instance_zone = self.spec.db_spec.zone
-
-    authorized_network = self._GetAuthorizedNetworks([self.client_vm])
 
     database_version_string = self._GetEngineVersionString(
         self.spec.engine, self.spec.engine_version
@@ -222,8 +215,9 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         '--quiet',
         '--format=json',
         '--activation-policy=ALWAYS',
-        '--assign-ip',
-        '--authorized-networks=%s' % authorized_network,
+        '--no-assign-ip',
+        '--network=%s' % self.client_vm.network.network_resource.name,
+        '--allocated-ip-range-name=google-service-range',
         '--zone=%s' % instance_zone,
         '--database-version=%s' % database_version_string,
         '--storage-size=%d' % storage_size,
@@ -584,8 +578,9 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     if engine not in GCP_DATABASE_VERSION_MAPPING:
       valid_databases = ', '.join(GCP_DATABASE_VERSION_MAPPING.keys())
       raise NotImplementedError(
-          'Database {} is not supported,supported '
-          'databases include {}'.format(engine, valid_databases)
+          'Database {} is not supported,supported databases include {}'.format(
+              engine, valid_databases
+          )
       )
 
     version_mapping = GCP_DATABASE_VERSION_MAPPING[engine]
