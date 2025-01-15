@@ -137,9 +137,21 @@ def Run(
   stdout, _, _ = vm.RunCommand(['cat', 'test1_stats_history.csv'])
   yield from _ConvertLocustResultsToSamples(stdout)
 
+  # Grab the last line again and re-export those samples as the "locust_overall"
+  # samples. NB:
+  # 1. CSV outputs sequentially so last line is last timestamp
+  # 2. Timestamps continue to aggregate, so last timestamp is "overall".
+  stdout, _, _ = vm.RunCommand(
+      '(head -n1 && tail -n1) < test1_stats_history.csv'
+  )
+  yield from _ConvertLocustResultsToSamples(
+      stdout, metric_namespace='locust_overall'
+  )
+
 
 def _ConvertLocustResultsToSamples(
     locust_results: str,
+    metric_namespace: str = 'locust',
 ) -> Iterable[sample.Sample]:
   """Converts each csv row from locust to a PKB sample."""
   lines = locust_results.splitlines()
@@ -153,7 +165,7 @@ def _ConvertLocustResultsToSamples(
         continue
 
       yield sample.Sample(
-          metric='locust/' + _SanitizeFieldName(field),
+          metric=metric_namespace + '/' + _SanitizeFieldName(field),
           value=float(row[field]),
           unit='',
           metadata={},
