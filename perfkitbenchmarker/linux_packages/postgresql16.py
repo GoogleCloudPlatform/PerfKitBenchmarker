@@ -247,9 +247,12 @@ def ConfigureAndRestart(vm, run_uri, buffer_size):
   )
   vm.RemoteCommand('cat /proc/meminfo | grep -i "^hugepage"')
   vm.RemoteCommand('sudo cat /proc/sys/vm/hugetlb_shm_group')
+  postgres_service_name = GetOSDependentDefaults(vm.OS_TYPE)[
+      'postgres_service_name'
+  ]
   vm.RemoteCommand(
       'sudo systemctl set-property'
-      f' {GetOSDependentDefaults(vm.OS_TYPE)["postgres_service_name"]}.service'
+      f' {postgres_service_name}.service'
       f' MemoryMax={SHARED_BUFFERS_CONF[buffer_size_key]["max_memory"]}'
   )
   if IsUbuntu(vm):
@@ -258,9 +261,12 @@ def ConfigureAndRestart(vm, run_uri, buffer_size):
         f' {GetOSDependentDefaults(vm.OS_TYPE)["postgres_template_service_name"]}.service'
         f' MemoryMax={SHARED_BUFFERS_CONF[buffer_size_key]["max_memory"]}'
     )
+    postgres_service_name = GetOSDependentDefaults(
+        vm.OS_TYPE
+    )['postgres_template_service_name']
   vm.RemoteCommand('sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches')
   vm.RemoteCommand(
-      f'cat /etc/systemd/system.control/{GetOSDependentDefaults(vm.OS_TYPE)["postgres_service_name"]}.service.d/50-MemoryMax.conf'
+      f'cat /etc/systemd/system.control/{postgres_service_name}.service.d/50-MemoryMax.conf'
   )
   vm.RemoteCommand(
       'sudo su - postgres -c "openssl req -new -x509 -days 365 -nodes -text'
@@ -272,6 +278,7 @@ def ConfigureAndRestart(vm, run_uri, buffer_size):
       'sudo systemctl restart'
       f' {GetOSDependentDefaults(vm.OS_TYPE)["postgres_service_name"]}'
   )
+  vm.RemoteCommand(f'sudo systemctl status {postgres_service_name}')
   vm.RemoteCommand(
       f'sudo su - postgres -c "psql -a -f {database_queries_path}"'
   )
