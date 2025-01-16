@@ -29,9 +29,7 @@ class Locustfile(enum.Enum):
 _LOCUST_FILE = flags.DEFINE_string(
     'locust_path',
     None,
-    'Path to the locust file to use. If not specified, a default locust file'
-    ' passed in by the benchmark will be used. Can also use enum values rather'
-    ' than paths.',
+    'Path to the locust file to use, e.g. `locust/simple.py`. Required.',
 )
 
 
@@ -56,7 +54,6 @@ def Install(vm: 'linux_virtual_machine.BaseLinuxVirtualMachine') -> None:
 
 def Prep(
     vm: 'linux_virtual_machine.BaseLinuxVirtualMachine',
-    locustfile_path: str | Locustfile | None = None,
 ) -> None:
   """Prepares a locustfile to run on the given VM.
 
@@ -68,25 +65,13 @@ def Prep(
 
   Args:
     vm: Already running VM where locust should be installed.
-    locustfile_path: Path of the locustfile; see
-      https://docs.locust.io/en/stable/writing-a-locustfile.html. NB: Two
-        pre-defined locust files exist in this module that you can use:
-        Locustfile.SIMPLE, Locustfile.RAMPUP.
 
   Raises:
     errors.VirtualMachine.RemoteCommandError: If an error occurred on the VM.
   """
-  if locustfile_path is None and _LOCUST_FILE.value is not None:
-    locustfile_path = _LOCUST_FILE.value
-    try:
-      locustfile_path = Locustfile(locustfile_path)
-    except ValueError:
-      # Not a predefined locustfile enum, rather a path. This is fine.
-      pass
-  if locustfile_path is None:
-    raise ValueError('Locustfile path must be specified via argument or flag.')
-  if isinstance(locustfile_path, Locustfile):
-    locustfile_path = locustfile_path.GetPath()
+  if _LOCUST_FILE.value is None:
+    raise ValueError('Locustfile path must be specified via flag.')
+  locustfile_path = data.ResourcePath(_LOCUST_FILE.value)
   vm.RemoteCopy(locustfile_path, 'locustfile.py')
 
 
@@ -168,7 +153,7 @@ def _ConvertLocustResultsToSamples(
           metric=metric_namespace + '/' + _SanitizeFieldName(field),
           value=float(row[field]),
           unit='',
-          metadata={},
+          metadata={'locustfile_path': _LOCUST_FILE.value},
           timestamp=int(row['Timestamp']),
       )
 
