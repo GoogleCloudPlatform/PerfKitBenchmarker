@@ -43,6 +43,8 @@ _IO_THREADS = flags.DEFINE_integer(
     None,
     'Only supported for redis version >= 6, the '
     'number of redis server IO threads to use.',
+    lower_bound=1,
+    upper_bound=128,
 )
 _IO_THREADS_DO_READS = flags.DEFINE_bool(
     'redis_server_io_threads_do_reads',
@@ -157,10 +159,11 @@ def _GetIOThreads(vm) -> int:
     return _IO_THREADS.value
   # Redis docs suggests that i/o threads should not exceed number of cores.
   nthreads_per_core = vm.CheckLsCpu().threads_per_core
+  num_cpus = vm.NumCpusForBenchmark()
   if nthreads_per_core == 1:
-    return vm.NumCpusForBenchmark() - 1
+    return max(num_cpus - 1, 1)
   else:
-    return vm.NumCpusForBenchmark() // 2
+    return num_cpus // 2
 
 
 def _BuildStartCommand(vm, port: int) -> str:
