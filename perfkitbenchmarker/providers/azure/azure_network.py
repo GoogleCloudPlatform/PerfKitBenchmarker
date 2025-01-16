@@ -187,63 +187,85 @@ class AzureStorageAccount(resource.BaseResource):
 
   def __init__(
       self,
-      storage_type,
-      region,
-      name,
-      kind=None,
-      access_tier=None,
-      resource_group=None,
-      use_existing=False,
-      raise_on_create_failure=True,
+      name: str,
+      region: str,
+      # TODO(pclay): Update default kind to StorageV2
+      kind: str = 'Storage',
+      storage_type: str | None = None,
+      access_tier: str | None = None,
+      resource_group: AzureResourceGroup | None = None,
+      use_existing: bool = False,
+      raise_on_create_failure: bool = True,
   ):
     super().__init__()
-    self.storage_type = storage_type
     self.name = name
     self.resource_group = resource_group or GetResourceGroup()
     self.region = region
-    self.kind = kind or 'Storage'
+    self.storage_type = storage_type
+    self.kind = kind
+    self.access_tier = access_tier
     self.use_existing = use_existing
     self.raise_on_create_failure = raise_on_create_failure
 
     AzureStorageAccount.total_storage_accounts += 1
 
-    if kind == 'BlobStorage':
-      self.access_tier = access_tier or 'Hot'
-    else:
-      # Access tiers are only valid for blob storage accounts.
-      assert access_tier is None
-      self.access_tier = access_tier
-
   def _Create(self):
     """Creates the storage account."""
-    if not self.use_existing:
-      create_cmd = (
-          [
-              azure.AZURE_PATH,
-              'storage',
-              'account',
-              'create',
-              '--kind',
-              self.kind,
-              '--sku',
-              self.storage_type,
-              '--name',
-              self.name,
-              '--tags',
-          ]
-          + util.GetTags(self.resource_group.timeout_minutes)
-          + self.resource_group.args
-      )
-      if self.region:
-        create_cmd.extend(['--location', self.region])
-      if self.kind == 'BlobStorage':
-        create_cmd.extend(['--access-tier', self.access_tier])
-      vm_util.IssueCommand(
-          create_cmd, raise_on_failure=self.raise_on_create_failure
-      )
+    if self.use_existing:
+      return
+    create_cmd = (
+        [
+            azure.AZURE_PATH,
+            'storage',
+            'account',
+            'create',
+            '--kind',
+            self.kind,
+            '--name',
+            self.name,
+            '--tags',
+        ]
+        + util.GetTags(self.resource_group.timeout_minutes)
+        + self.resource_group.args
+    )
+    if self.region:
+      create_cmd.extend(['--location', self.region])
+    if self.storage_type:
+      create_cmd.extend(['--sku', self.storage_type])
+    if self.access_tier:
+      create_cmd.extend(['--access-tier', self.access_tier])
+    vm_util.IssueCommand(
+        create_cmd, raise_on_failure=self.raise_on_create_failure
+    )
 
   def _PostCreate(self):
     """Get our connection string and our keys."""
+    # https://learn.microsoft.com/en-us/azure/templates/microsoft.storage/storageaccounts?pivots=deployment-language-bicep#resource-format
+    response = self._Get()
+    kind = response['kind']
+    if kind != self.kind:
+      raise ValueError(
+          f'Storage account {self.name} has kind {kind}, expected {self.kind}'
+      )
+    access_tier = response['accessTier']
+    if access_tier:
+      if not self.access_tier:
+        self.access_tier = access_tier
+      elif self.access_tier != access_tier:
+        raise ValueError(
+            f'Storage account {self.name} has access tier'
+            f' {access_tier}, expected {self.access_tier}'
+        )
+    sku = response['sku']['name']
+    if not self.storage_type:
+      self.storage_type = sku
+    elif sku != self.storage_type:
+      raise ValueError(
+          f'Storage account {self.name} has SKU {sku}, expected'
+          f' {self.storage_type}'
+      )
+
+    # These fields are sensitive and require their own RPCs
     self.connection_string = util.GetAzureStorageConnectionString(
         self.name, resource_group=self.resource_group.name
     )
@@ -254,6 +276,8 @@ class AzureStorageAccount(resource.BaseResource):
 
   def _Delete(self):
     """Deletes the storage account."""
+    if self.use_existing:
+      return
     delete_cmd = [
         azure.AZURE_PATH,
         'storage',
@@ -265,9 +289,9 @@ class AzureStorageAccount(resource.BaseResource):
     ] + self.resource_group.args
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
-  def _Exists(self):
-    """Returns true if the storage account exists."""
-    stdout, _, _ = vm_util.IssueCommand(
+  def _Get(self):
+    """Gets the storage account."""
+    stdout, stderr, retcode = vm_util.IssueCommand(
         [
             azure.AZURE_PATH,
             'storage',
@@ -281,11 +305,18 @@ class AzureStorageAccount(resource.BaseResource):
         + self.resource_group.args,
         raise_on_failure=False,
     )
+    if retcode or not stdout:
+      raise errors.Resource.GetError(
+          f'Error getting Azure storage account:\n{stderr}'
+      )
+    return json.loads(stdout)
 
+  def _Exists(self):
+    """Returns true if the storage account exists."""
     try:
-      json.loads(stdout)
+      self._Get()
       return True
-    except ValueError:
+    except errors.Resource.GetError:
       return False
 
 
@@ -769,9 +800,9 @@ class AzureNetwork(network.BaseNetwork):
     # awful naming scheme.
     suffix = 'storage%d' % AzureStorageAccount.total_storage_accounts
     self.storage_account = AzureStorageAccount(
-        FLAGS.azure_storage_type,
-        self.region,
-        storage_account_prefix[: 24 - len(suffix)] + suffix,
+        name=storage_account_prefix[: 24 - len(suffix)] + suffix,
+        region=self.region,
+        storage_type=FLAGS.azure_storage_type,
     )
 
     # Length restriction from https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftnetwork  pylint: disable=line-too-long
@@ -793,7 +824,7 @@ class AzureNetwork(network.BaseNetwork):
           self.region, self.subnet, self.subnet.name + '-nsg'
       )
 
-  @vm_util.Retry()
+  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
   def Create(self):
     """Creates the network."""
     # If the benchmark includes multiple zones,

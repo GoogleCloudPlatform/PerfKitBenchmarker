@@ -34,6 +34,12 @@ OBJECT_TTL_DAYS = flags.DEFINE_integer(
     None,
     'The object TTL in days to set on any bucket created.',
 )
+STORAGE_CLASS = flags.DEFINE_string(
+    'object_storage_storage_class',
+    None,
+    'Storage class to use in object storage benchmark.',
+)
+
 
 FLAGS = flags.FLAGS
 

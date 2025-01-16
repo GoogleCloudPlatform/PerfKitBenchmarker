@@ -25,6 +25,7 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 
 FLAGS = flags.FLAGS
 
@@ -113,10 +114,11 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
     # b) this account might be in a different location than any
     # VM-related account.
     self.storage_account = azure_network.AzureStorageAccount(
-        FLAGS.azure_storage_type,
-        region or DEFAULT_AZURE_REGION,
-        storage_account_name,
+        name=storage_account_name,
+        region=region or DEFAULT_AZURE_REGION,
+        storage_type=azure_flags.AZURE_BLOB_STORAGE_TYPE.value,
         kind=FLAGS.azure_blob_account_kind,
+        access_tier=object_storage_service.STORAGE_CLASS.value,
         resource_group=self.resource_group,
         use_existing=not try_to_create_storage_account_and_resource_group,
         raise_on_create_failure=raise_on_create_failure,
@@ -334,7 +336,10 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
 
   def Metadata(self, vm):
     return {
-        'azure_lib_version': linux_packages.GetPipPackageVersion(vm, 'azure')
+        'azure_lib_version': linux_packages.GetPipPackageVersion(vm, 'azure'),
+        'azure_storage_sku_type': self.storage_account.storage_type,
+        'azure_object_storage_account_kind': self.storage_account.kind,
+        'azure_object_storage_access_tier': self.storage_account.access_tier,
     }
 
   def APIScriptArgs(self):

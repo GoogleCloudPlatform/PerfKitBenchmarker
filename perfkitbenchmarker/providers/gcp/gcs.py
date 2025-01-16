@@ -78,8 +78,8 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     if self.location and '-' in self.location:
       # regional buckets
       command.extend(['-c', 'regional'])
-    elif FLAGS.object_storage_storage_class is not None:
-      command.extend(['-c', FLAGS.object_storage_storage_class])
+    elif object_storage_service.STORAGE_CLASS.value:
+      command.extend(['-c', object_storage_service.STORAGE_CLASS.value])
     if FLAGS.project:
       command.extend(['-p', FLAGS.project])
     if object_storage_service.OBJECT_TTL_DAYS.value:

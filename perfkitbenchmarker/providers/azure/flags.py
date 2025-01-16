@@ -31,10 +31,15 @@ flags.DEFINE_enum(
 LRS = 'Standard_LRS'
 ULRS = 'UltraSSD_LRS'
 PLRS = 'Premium_LRS'
+PZRS = 'Premium_ZRS'
 ZRS = 'Standard_ZRS'
 GRS = 'Standard_GRS'
+GZRS = 'Standard_GZRS'
 RAGRS = 'Standard_RAGRS'
+RAGZRS = 'Standard_RAGZRS'
 
+STORAGE_V2 = 'StorageV2'
+# These are deprecated in favor of StorageV2
 STORAGE = 'Storage'
 BLOB_STORAGE = 'BlobStorage'
 VALID_TIERS = ['Basic', 'Standard', 'Premium']
@@ -67,13 +72,20 @@ flags.DEFINE_enum(
     'VM creation will fail.',
 )
 
-flags.DEFINE_enum(
+AZURE_BLOB_STORAGE_ACCOUNT_KIND = flags.DEFINE_enum(
     'azure_blob_account_kind',
-    BLOB_STORAGE,
-    [STORAGE, BLOB_STORAGE],
-    'The type of storage account to use for blob storage. Choosing Storage '
-    'will let you use ZRS storage. Choosing BlobStorage will give you access '
-    'to Hot and Cold storage tiers.',
+    STORAGE_V2,
+    [STORAGE_V2, STORAGE, BLOB_STORAGE],
+    'Legacy flag. Leave on StorageV2.',
+)
+AZURE_BLOB_STORAGE_TYPE = flags.DEFINE_enum(
+    'azure_blob_storage_type',
+    ZRS,
+    [ZRS, LRS, PLRS, PZRS, GRS, RAGRS, GZRS, RAGZRS],
+    'Azure storage Account SKU to use for blob storage. Defaults to '
+    "'Standard_ZRS' unlike --azure_storage_type which defaults to "
+    "'Standard_LRS'. This is consistent with other clouds that default to "
+    'zonal disks, but regional object storage buckets.',
 )
 flags.DEFINE_string(
     'azure_preprovisioned_data_account',

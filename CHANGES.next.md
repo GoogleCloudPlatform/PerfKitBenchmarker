@@ -89,6 +89,8 @@
 -   Remove support for installing Python 2 in VMs.
 -   Make Ubuntu 24 the default os_type.
 -   Merged redundant `--runspec_build_tool_version` with `--gcc_version`.
+-   Create new flag `--azure_blob_storage_type` that defaults to `Standard_ZRS`
+    instead of former default `--azure_storage_type=Standard_LRS`.
 
 ### New features:
 
