@@ -16,7 +16,6 @@
 import json
 import os
 import re
-import typing
 from typing import Any
 
 from absl import flags
@@ -130,6 +129,7 @@ DUMP_SPARK_CONF = flags.DEFINE_bool(
 FLAGS = flags.FLAGS
 
 SCRIPT_DIR = 'spark_sql_test_scripts'
+QUERIES_PY_BASENAME = 'spark_sql_queries.py'
 SPARK_SQL_DISTCP_SCRIPT = os.path.join(SCRIPT_DIR, 'spark_sql_distcp.py')
 # Creates spark table using pyspark by loading the parquet data.
 # Args:
@@ -137,8 +137,12 @@ SPARK_SQL_DISTCP_SCRIPT = os.path.join(SCRIPT_DIR, 'spark_sql_distcp.py')
 # argv[2]: string, The data path of the table.
 SPARK_TABLE_SCRIPT = os.path.join(SCRIPT_DIR, 'spark_table.py')
 SPARK_SQL_RUNNER_SCRIPT = os.path.join(SCRIPT_DIR, 'spark_sql_runner.py')
+QUERIES_SCRIPT = os.path.join(SCRIPT_DIR, QUERIES_PY_BASENAME)
 SPARK_SQL_PERF_GIT = 'https://github.com/databricks/spark-sql-perf.git'
 SPARK_SQL_PERF_GIT_COMMIT = '6b2bf9f9ad6f6c2f620062fda78cded203f619c8'
+QUERIES_SUB_PATTERN = (
+    r'^#[\s]*spark_sql_queries:start[\s]*$.*^#[\s]*spark_sql_queries:end[\s]*$'
+)
 
 
 def GetStreams() -> list[list[str]]:
@@ -183,19 +187,20 @@ def Prepare(benchmark_spec):
   """Copies scripts and all the queries to cloud."""
   cluster = benchmark_spec.dpb_service
   storage_service = cluster.storage_service
-  benchmark_spec.query_dir = LoadAndStageQueries(
-      storage_service, cluster.base_dir
-  )
+  queries = _FetchQueryContents(storage_service)
+  rendered_runner_filepath = _RenderRunnerScriptWithQueries(queries)
   benchmark_spec.query_streams = GetStreams()
 
-  scripts_to_upload = [
-      SPARK_SQL_DISTCP_SCRIPT,
-      SPARK_TABLE_SCRIPT,
-      SPARK_SQL_RUNNER_SCRIPT,
-  ] + cluster.GetServiceWrapperScriptsToUpload()
-  for script in scripts_to_upload:
-    src_url = data.ResourcePath(script)
-    storage_service.CopyToBucket(src_url, cluster.bucket, script)
+  scripts_to_upload = {
+      data.ResourcePath(SPARK_SQL_DISTCP_SCRIPT): SPARK_SQL_DISTCP_SCRIPT,
+      data.ResourcePath(SPARK_TABLE_SCRIPT): SPARK_TABLE_SCRIPT,
+      rendered_runner_filepath: SPARK_SQL_RUNNER_SCRIPT,
+  }
+  service_scripts = cluster.GetServiceWrapperScriptsToUpload()
+  for script in service_scripts:
+    scripts_to_upload[data.ResourcePath(script)] = script
+  for local_path, bucket_dest in scripts_to_upload.items():
+    storage_service.CopyToBucket(local_path, cluster.bucket, bucket_dest)
 
   benchmark_spec.table_subdirs = []
   benchmark_spec.data_dir = None
@@ -214,67 +219,69 @@ def Prepare(benchmark_spec):
     benchmark_spec.data_dir = FLAGS.dpb_sparksql_data
 
 
-def LoadAndStageQueries(
-    storage_service: object_storage_service.ObjectStorageService, base_dir: str
-) -> str:
-  """Loads queries stages them in object storage if needed.
+def _FetchQueryContents(
+    storage_service: object_storage_service.ObjectStorageService,
+) -> dict[str, str]:
+  """Fetches query contents into a dict from a source depending on flags passed.
 
-  Queries are selected using --dpb_sparksql_query and --dpb_sparksql_order.
+  Queries are selected using --dpb_sparksql_query, --dpb_sparksql_order and
+  --dpb_sparksql_queries_url.
 
   Args:
     storage_service: object_storage_service to stage queries into.
-    base_dir: object storage directory to stage queries into.
 
   Returns:
-    The object storage path where the queries are staged into.
+    A dict where the key corresponds to the query ID and value to the actual
+    query SQL.
 
   Raises:
     PrepareException if a requested query is not found.
   """
-
   if _QUERIES_URL.value:
-    _GetQueryFilesFromUrl(storage_service, _QUERIES_URL.value)
-    # casting it, so it doesn't complain about being str | None
-    return typing.cast(str, _QUERIES_URL.value)
-  _StageQueriesFromRepo(storage_service, base_dir)
-  return base_dir
+    return _FetchQueryFilesFromUrl(storage_service, _QUERIES_URL.value)
+  return _FetchQueriesFromRepo()
 
 
-def _GetQueryFilesFromUrl(
+def _FetchQueryFilesFromUrl(
     storage_service: object_storage_service.ObjectStorageService,
     queries_url: str,
-) -> None:
+) -> dict[str, str]:
   """Checks if relevant query files from queries_url exist.
 
   Args:
-    storage_service: object_storage_service to list query files.
+    storage_service: object_storage_service to fetch query files.
     queries_url: Object Storage directory URL where the benchmark queries are
       contained.
+
+  Returns:
+    A dict where the key corresponds to the query ID and value to the actual
+    query SQL.
   """
+  temp_run_dir = temp_dir.GetRunDirPath()
+  spark_sql_queries = os.path.join(temp_run_dir, 'spark_sql_queries')
   query_paths = {q: os.path.join(queries_url, q) for q in GetQueryIdsToStage()}
+  queries = {}
   queries_missing = set()
   for q in query_paths:
     try:
-      storage_service.List(query_paths[q])
+      local_path = os.path.join(spark_sql_queries, q)
+      storage_service.Copy(query_paths[q], os.path.join(spark_sql_queries, q))
+      with open(local_path) as f:
+        queries[q] = f.read()
     except errors.VmUtil.IssueCommandError:  # Handling query not found
       queries_missing.add(q)
   if queries_missing:
     raise errors.Benchmarks.PrepareException(
         'Could not find queries {}'.format(', '.join(sorted(queries_missing)))
     )
+  return queries
 
 
-def _StageQueriesFromRepo(
-    storage_service: object_storage_service.ObjectStorageService, base_dir: str
-) -> None:
-  """Copies queries from default Github repo to object storage.
-
-  Args:
-    storage_service: object_storage_service to stage queries into.
-    base_dir: object storage directory to stage queries into.
-  """
+def _FetchQueriesFromRepo() -> dict[str, str]:
+  """Fetches queries from default Github repo to object storage."""
   temp_run_dir = temp_dir.GetRunDirPath()
   spark_sql_perf_dir = os.path.join(temp_run_dir, 'spark_sql_perf_dir')
+  queries = {}
 
   # Clone repo
   vm_util.IssueCommand(['git', 'clone', SPARK_SQL_PERF_GIT, spark_sql_perf_dir])
@@ -286,23 +293,59 @@ def _StageQueriesFromRepo(
   )
 
   # Search repo for queries
-  query_file = {}  # map query -> staged file
   queries_to_stage = GetQueryIdsToStage()
   for dir_name, _, files in os.walk(query_dir):
     for filename in files:
       query_id = GetQueryId(filename)
       if query_id:
-        # only upload specified queries
+        # only load specified queries
         if query_id in queries_to_stage:
-          src_file = os.path.join(dir_name, filename)
-          staged_filename = query_id
-          staged_file = '{}/{}'.format(base_dir, staged_filename)
-          storage_service.Copy(src_file, staged_file)
-          query_file[query_id] = staged_file
+          query_path = os.path.join(dir_name, filename)
+          with open(query_path) as f:
+            queries[query_id] = f.read()
 
   # Validate all requested queries are present.
-  missing_queries = set(queries_to_stage) - set(query_file.keys())
+  missing_queries = set(queries_to_stage) - set(queries.keys())
   if missing_queries:
     raise errors.Benchmarks.PrepareException(
         'Could not find queries {}'.format(missing_queries)
     )
+
+  return queries
+
+
+def _RenderRunnerScriptWithQueries(queries: dict[str, str]) -> str:
+  """Renders a Spark SQL runner file with a dict having all queries to be run.
+
+  The dict will be in the QUERIES variable inside the region delimited by
+  "# spark_sql_queries:start" and "# spark_sql_queries:end" in the original
+  script source.
+
+  Args:
+    queries: A dict where each key corresponds to the query ID and each value to
+      the actual query SQL.
+
+  Returns:
+    The python file rendered as a str.
+  """
+  lines = ['QUERIES = {']
+  for query_id, sql_str in queries.items():
+    lines.append(f'  {query_id!r}: {sql_str!r},')
+  lines.append('}')
+  queries_dict_source = ('\n'.join(lines) + '\n').replace('\\', '\\\\')
+  temp_run_dir = temp_dir.GetRunDirPath()
+  queries_py_filepath = os.path.join(
+      temp_run_dir, os.path.basename(SPARK_SQL_RUNNER_SCRIPT)
+  )
+  with open(data.ResourcePath(SPARK_SQL_RUNNER_SCRIPT)) as f:
+    runner_source = f.read()
+  contents = re.sub(
+      QUERIES_SUB_PATTERN,
+      queries_dict_source,
+      runner_source,
+      1,
+      re.MULTILINE | re.DOTALL,
+  )
+  with open(queries_py_filepath, 'w') as f:
+    f.write(contents)
+  return queries_py_filepath

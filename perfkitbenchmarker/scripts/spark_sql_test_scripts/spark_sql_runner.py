@@ -18,26 +18,28 @@ import py4j
 from pyspark import sql
 
 
+# This snippet will be replaced with an actual dict[str, str] from query_id to
+# SQL string before uploading this file. Not using a Jinja template, since we
+# also want to load this as a proper python file for unit testing.
+# spark_sql_queries:start
+QUERIES = {}
+# spark_sql_queries:end
+
+
 def parse_args(args=None):
   """Parse argv."""
 
   parser = argparse.ArgumentParser(description=__doc__)
   parser.add_argument(
-      '--sql-scripts',
+      '--sql-queries',
       action='append',
       type=lambda csv: csv.split(','),
       required=True,
       help=(
-          'Comma-separated list of SQL files to run located inside the object '
-          'storage directory specified with --sql-scripts-dir. If you pass '
-          'argument many times then it will run each SQL script list/stream '
-          'in parallel.'
+          'Comma-separated list of SQL files to run. If you pass this argument'
+          ' many times then it will run each SQL query list/stream in'
+          ' parallel.'
       ),
-  )
-  parser.add_argument(
-      '--sql-scripts-dir',
-      required=True,
-      help='Object storage path where the SQL queries are located.',
   )
   group = parser.add_mutually_exclusive_group()
   group.add_argument('--database', help='Hive database to look for data in.')
@@ -125,8 +127,8 @@ def main(args):
   builder = sql.SparkSession.builder.appName('Spark SQL Query')
   if args.enable_hive:
     builder = builder.enableHiveSupport()
-  script_streams = get_script_streams(args)
-  if len(script_streams) > 1:
+  query_streams = args.sql_queries
+  if len(query_streams) > 1:
     # this guarantees all query streams will use more or less the same resources
     builder = builder.config('spark.scheduler.mode', 'FAIR')
   spark = builder.getOrCreate()
@@ -157,13 +159,13 @@ def main(args):
 
   results = []
 
-  threads = len(script_streams)
+  threads = len(query_streams)
   executor = futures.ThreadPoolExecutor(max_workers=threads)
   result_futures = [
       executor.submit(
-          run_sql_script, spark, stream, i, args.fail_on_query_execution_errors
+          run_sql_query, spark, stream, i, args.fail_on_query_execution_errors
       )
-      for i, stream in enumerate(script_streams)
+      for i, stream in enumerate(query_streams)
   ]
   futures.wait(result_futures)
   results = []
@@ -196,34 +198,17 @@ def get_table_metadata(args):
   return metadata
 
 
-def get_script_streams(args):
-  """Gets the script streams to run.
-
-  Args:
-    args: Argument object as returned by ArgumentParser.parse_args().
-
-  Returns:
-    A list of list of str. Each list of str represents a sequence of full object
-    storage paths to SQL files that will be executed in order.
-  """
-  return [
-      [os.path.join(args.sql_scripts_dir, q) for q in stream]
-      for stream in args.sql_scripts
-  ]
-
-
-def run_sql_script(
-    spark_session, script_stream, stream_id, raise_query_execution_errors
+def run_sql_query(
+    spark_session, query_stream, stream_id, raise_query_execution_errors
 ):
-  """Runs a SQL script stream, returns list[pyspark.sql.Row] with durations."""
+  """Runs a SQL query stream, returns list[pyspark.sql.Row] with durations."""
 
   results = []
-  for script in script_stream:
-    # Read script from object storage using rdd API
-    query = _load_file(spark_session, script)
+  for query_id in query_stream:
+    query = QUERIES[query_id]
 
     try:
-      logging.info('Running %s', script)
+      logging.info('Running query %s', query_id)
       start = time.time()
       # spark-sql does not limit its output. Replicate that here by setting
       # limit to max Java Integer. Hopefully you limited the output in SQL or
@@ -235,7 +220,7 @@ def run_sql_script(
       # pylint: enable=protected-access
       duration = time.time() - start
       results.append(
-          sql.Row(stream=stream_id, script=script, duration=duration)
+          sql.Row(stream=stream_id, query_id=query_id, duration=duration)
       )
     # These correspond to errors in low level Spark Excecution.
     # Let ParseException and AnalysisException fail the job.
@@ -243,7 +228,7 @@ def run_sql_script(
         sql.utils.QueryExecutionException,
         py4j.protocol.Py4JJavaError,
     ) as e:
-      logging.error('Script %s failed', script, exc_info=e)
+      logging.error('Query %s failed', query_id, exc_info=e)
       if raise_query_execution_errors:
         raise
   return results

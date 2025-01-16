@@ -154,11 +154,14 @@ def CheckPrerequisites(benchmark_config):
         ' --dpb_sparksql_bigquery_tables, or dpb_sparksql_database. You will'
         ' probably not have data to query!'
     )
-  if sum([
-      bool(FLAGS.dpb_sparksql_data),
-      bool(_BIGQUERY_TABLES.value),
-      bool(FLAGS.dpb_sparksql_database),
-  ]) == 1:
+  if (
+      sum([
+          bool(FLAGS.dpb_sparksql_data),
+          bool(_BIGQUERY_TABLES.value),
+          bool(FLAGS.dpb_sparksql_database),
+      ])
+      == 1
+  ):
     logging.warning(
         'You should only pass one of them: --dpb_sparksql_data,'
         ' --dpb_sparksql_bigquery_tables, or --dpb_sparksql_database.'
@@ -306,16 +309,16 @@ def _RunQueries(benchmark_spec) -> tuple[str, dpb_service.JobResult]:
   """Runs queries. Returns storage path with metrics and JobResult object."""
   cluster = benchmark_spec.dpb_service
   report_dir = '/'.join([cluster.base_dir, f'report-{int(time.time()*1000)}'])
-  args = ['--sql-scripts-dir', benchmark_spec.query_dir]
+  args = []
   if FLAGS.dpb_sparksql_simultaneous:
     # Assertion true bc of --dpb_sparksql_simultaneous and
     # --dpb_sparksql_streams being mutually exclusive.
     assert len(benchmark_spec.query_streams) == 1
     for query in benchmark_spec.query_streams[0]:
-      args += ['--sql-scripts', query]
+      args += ['--sql-queries', query]
   else:
     for stream in benchmark_spec.query_streams:
-      args += ['--sql-scripts', ','.join(stream)]
+      args += ['--sql-queries', ','.join(stream)]
   args += ['--report-dir', report_dir]
   if FLAGS.dpb_sparksql_database:
     args += ['--database', FLAGS.dpb_sparksql_database]
@@ -388,7 +391,7 @@ def _GetQuerySamples(
       for line in file:
         result = json.loads(line)
         logging.info('Timing: %s', result)
-        query_id = dpb_sparksql_benchmark_helper.GetQueryId(result['script'])
+        query_id = result['query_id']
         assert query_id
         metadata_copy = base_metadata.copy()
         metadata_copy['query'] = query_id

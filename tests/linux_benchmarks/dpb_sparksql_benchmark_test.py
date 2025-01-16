@@ -2,10 +2,12 @@ import sys
 import unittest
 from unittest import mock
 
+from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
 import freezegun
 from perfkitbenchmarker import dpb_sparksql_benchmark_helper
+from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker.linux_benchmarks import dpb_sparksql_benchmark
 from tests import pkb_common_test_case
 
@@ -17,6 +19,7 @@ sys.modules['pyspark'] = PYSPARK_MOCK
 from perfkitbenchmarker.scripts.spark_sql_test_scripts import spark_sql_runner
 
 
+FLAGS = flags.FLAGS
 _TPCH_TABLES = [
     'customer',
     'lineitem',
@@ -35,8 +38,9 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     self.benchmark_spec_mock = mock.MagicMock()
     self.benchmark_spec_mock.dpb_service = mock.Mock(base_dir='gs://test2')
-    self.benchmark_spec_mock.query_dir = 'gs://test'
     self.benchmark_spec_mock.data_dir = 'gs://datasetbucket'
+    FLAGS.run_uri = 'fakeru'
+    temp_dir.CreateTemporaryDirectories()
 
   @freezegun.freeze_time('2023-03-29')
   @flagsaver.flagsaver(dpb_sparksql_order=['1', '2', '3'])
@@ -51,9 +55,7 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         kwargs['job_arguments'],
         [
-            '--sql-scripts-dir',
-            'gs://test',
-            '--sql-scripts',
+            '--sql-queries',
             '1,2,3',
             '--report-dir',
             'gs://test2/report-1680048000000',
@@ -79,13 +81,11 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         kwargs['job_arguments'],
         [
-            '--sql-scripts-dir',
-            'gs://test',
-            '--sql-scripts',
+            '--sql-queries',
             '1',
-            '--sql-scripts',
+            '--sql-queries',
             '2',
-            '--sql-scripts',
+            '--sql-queries',
             '3',
             '--report-dir',
             'gs://test2/report-1680048000000',
@@ -109,13 +109,11 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         kwargs['job_arguments'],
         [
-            '--sql-scripts-dir',
-            'gs://test',
-            '--sql-scripts',
+            '--sql-queries',
             '1,2,3',
-            '--sql-scripts',
+            '--sql-queries',
             '2,1,3',
-            '--sql-scripts',
+            '--sql-queries',
             '3,1,2',
             '--report-dir',
             'gs://test2/report-1680048000000',
@@ -141,9 +139,7 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         kwargs['job_arguments'],
         [
-            '--sql-scripts-dir',
-            'gs://test',
-            '--sql-scripts',
+            '--sql-queries',
             '1,2,3',
             '--report-dir',
             'gs://test2/report-1680048000000',
@@ -355,6 +351,37 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             ),
         },
     )
+
+  def testRenderRunnerScriptWithQueries(self):
+    # Arrange
+    queries = {
+        '1': 'SELECT * FROM hello;',
+        '10': "SELECT '\\n' AS newline_repr;",
+        '42': (
+            'WITH t AS (\n'
+            '  SELECT timestamp, value\n'
+            '  FROM pkb_data'
+            ') SELECT * FROM T LIMIT 1;'
+        ),
+    }
+
+    # Act
+    rendered_script_path = (
+        dpb_sparksql_benchmark_helper._RenderRunnerScriptWithQueries(queries)
+    )
+
+    # Assert
+    with open(rendered_script_path) as f:
+      rendered_script = f.read()
+    expected_substr = (
+        "\nQUERIES = {\n"
+        "  '1': 'SELECT * FROM hello;',\n"
+        "  '10': \"SELECT \'\\\\n\' AS newline_repr;\",\n"
+        "  '42': 'WITH t AS (\\n  SELECT timestamp, value\\n  FROM pkb_data)"
+        " SELECT * FROM T LIMIT 1;',\n"
+        "}\n"
+    )
+    self.assertIn(expected_substr, rendered_script)
 
 
 if __name__ == '__main__':
