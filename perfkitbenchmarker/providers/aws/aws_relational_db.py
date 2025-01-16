@@ -320,7 +320,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
     """Tears down all network resources that were created for the database."""
     for subnet_for_db in self.subnets_created:
       subnet_for_db.Delete()
-    if hasattr(self, 'db_subnet_group_name'):
+    if hasattr(self, 'db_subnet_group_name') and self.db_subnet_group_name:
       delete_db_subnet_group_cmd = util.AWS_PREFIX + [
           'rds',
           'delete-db-subnet-group',
