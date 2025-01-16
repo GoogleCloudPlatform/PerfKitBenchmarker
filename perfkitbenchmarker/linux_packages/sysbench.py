@@ -25,6 +25,7 @@ import immutabledict
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 
 
 FLAGS = flags.FLAGS
@@ -118,7 +119,7 @@ def _Install(vm, spanner_oltp=False, args=immutabledict.immutabledict()):
           ' spanner_oltp_write_only.diff'
       )
 
-  vm.RemoteCommand(
+  vm_util.Retry(max_retries=10)(vm.RemoteCommand)(
       f'cd {SYSBENCH_DIR} && ./autogen.sh && ./configure --with-pgsql'
       f' {without_mysql}'
   )
