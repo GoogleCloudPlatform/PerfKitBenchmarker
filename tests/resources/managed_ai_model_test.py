@@ -48,7 +48,12 @@ class ManagedAiModelTest(pkb_common_test_case.PkbCommonTestCase):
             'response_time_0',
             1,
             'seconds',
-            {'region': 'us-west-1a-region'},
+            metadata={
+                'region': 'us-west-1a-region',
+                'max_scaling': 1,
+                'resource_class': 'FakeManagedAiModel',
+                'resource_type': 'BaseManagedAiModel',
+            },
             timestamp=102,
         ),
     )
