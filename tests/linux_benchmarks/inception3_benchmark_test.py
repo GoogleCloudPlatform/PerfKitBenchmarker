@@ -21,10 +21,11 @@ from perfkitbenchmarker.sample import Sample
 
 
 class Inception3BenchmarkTestCase(
-    unittest.TestCase, test_util.SamplesTestMixin
+    test_util.SamplesTestMixin, unittest.TestCase
 ):
 
   def setUp(self):
+    super().setUp()
     path = os.path.join(
         os.path.dirname(__file__), '..', 'data', 'inception3_output.txt'
     )
@@ -63,7 +64,7 @@ class Inception3BenchmarkTestCase(
             self.metadata_output,
         ),
     ]
-    self.assertEqual(samples, golden)
+    self.assertSampleListsEqualUpToTimestamp(samples, golden)
 
 
 if __name__ == '__main__':

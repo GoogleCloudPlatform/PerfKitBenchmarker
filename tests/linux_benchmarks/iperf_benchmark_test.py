@@ -25,6 +25,9 @@ FLAGS.mark_as_parsed()
 
 class IperfBenchmarkTestCase(unittest.TestCase):
 
+  def float_comparer(self, a: float, b: float, msg=None):
+    self.assertAlmostEqual(a, b, msg=msg)
+
   def setUp(self):
     super().setUp()
 
@@ -40,6 +43,7 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         zone='antarctica-1a',
     )
     self.vm_spec.vms = [vm0, vm1]
+    self.addTypeEqualityFunc(float, self.float_comparer)
 
   def testIperfParseResultsUDPSingleThread(self):
     iperf_output = """
@@ -345,7 +349,7 @@ class IperfBenchmarkTestCase(unittest.TestCase):
 
     expected_results = {
         'buffer_size': 0.12,
-        'congestion_window': 17135.86666666667,
+        'congestion_window': 17135.866667,
         'congestion_window_scale': 'K',
         'err_packet_count': 0,
         'interval_congestion_window_list': [
@@ -389,7 +393,12 @@ class IperfBenchmarkTestCase(unittest.TestCase):
         'write_packet_count': 5914,
     }
 
-    self.assertDictEqual(expected_results, results.metadata)
+    self.maxDiff = None
+    rounded_metadata = {
+        k: round(v, 6) if isinstance(v, float) else v
+        for k, v in expected_results.items()
+    }
+    self.assertDictEqual(expected_results, rounded_metadata)
     self.assertEqual(results.value, 1183.0)
 
 

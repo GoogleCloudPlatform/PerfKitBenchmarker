@@ -18,6 +18,7 @@ import unittest
 from unittest import mock
 
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import s64da
 from tests import pkb_common_test_case
 
@@ -26,7 +27,9 @@ OLAP_RESULTS = 'olap_result.txt'
 OLTP_RESULTS = 'oltp_result.txt'
 
 
-class S64DATest(pkb_common_test_case.PkbCommonTestCase):
+class S64DATest(
+    test_util.SamplesTestMixin, pkb_common_test_case.PkbCommonTestCase
+):
 
   def S64daOutput(self, file: str) -> str:
     path = os.path.join(os.path.dirname(__file__), '..', 'data', file)
@@ -36,11 +39,11 @@ class S64DATest(pkb_common_test_case.PkbCommonTestCase):
   @mock.patch('time.time', mock.MagicMock(return_value=0))
   def testParseOLAPResults(self):
     results = s64da.ParseOLAPResults(self.S64daOutput(OLAP_RESULTS))
-    self.assertEqual(
+    self.assertSampleListsEqualUpToTimestamp(
         [
             sample.Sample(
                 metric='Query 2',
-                value=1.0979999999999999,
+                value=1.098,
                 unit='s',
                 metadata={},
                 timestamp=0,
@@ -82,7 +85,7 @@ class S64DATest(pkb_common_test_case.PkbCommonTestCase):
             ),
             sample.Sample(
                 metric='Query 8',
-                value=0.21400000000000002,
+                value=0.214,
                 unit='s',
                 metadata={},
                 timestamp=0,
@@ -106,14 +109,14 @@ class S64DATest(pkb_common_test_case.PkbCommonTestCase):
             ),
             sample.Sample(
                 metric='Query 22',
-                value=0.44800000000000006,
+                value=0.448,
                 unit='s',
                 metadata={},
                 timestamp=0,
             ),
             sample.Sample(
                 metric='Query 16',
-                value=4.5920000000000005,
+                value=4.592,
                 unit='s',
                 metadata={},
                 timestamp=0,
@@ -158,7 +161,7 @@ class S64DATest(pkb_common_test_case.PkbCommonTestCase):
             ),
             sample.Sample(
                 metric='Query 5',
-                value=1.3599999999999999,
+                value=1.36,
                 unit='s',
                 metadata={},
                 timestamp=0,
@@ -186,7 +189,7 @@ class S64DATest(pkb_common_test_case.PkbCommonTestCase):
             ),
             sample.Sample(
                 metric='query_times_geomean',
-                value=0.6943741551291615,
+                value=0.694374,
                 unit='s',
                 metadata={},
                 timestamp=0,

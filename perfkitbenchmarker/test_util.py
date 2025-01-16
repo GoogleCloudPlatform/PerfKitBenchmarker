@@ -34,13 +34,14 @@ class SamplesTestMixin:
   """
 
   def __init__(self, *args, **kwargs):
-    super().__init__(self, *args, **kwargs)
+    super().__init__(*args, **kwargs)
 
-    self.addTypeEqualityFunc(sample.Sample, self.assertSamplesEqual)
+    self.addTypeEqualityFunc(
+        sample.Sample, self.assertSamplesEqualUpToTimestamp
+    )
 
   def assertSamplesEqualUpToTimestamp(self, a, b, msg=None):
     """Assert that two samples are equal, ignoring timestamp differences."""
-
     self.assertEqual(
         a.metric,
         b.metric,
@@ -50,6 +51,7 @@ class SamplesTestMixin:
       self.assertAlmostEqual(
           a.value,
           b.value,
+          places=6,
           msg=msg or 'Samples %s and %s have different values' % (a, b),
       )
     else:
