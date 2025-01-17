@@ -540,7 +540,7 @@ class AzureNetworkSecurityGroup(resource.BaseResource):
     self.have_deny_all_rule = False
 
   def _Create(self):
-    vm_util.IssueCommand(
+    vm_util.IssueRetryableCommand(
         [
             azure.AZURE_PATH,
             'network',
@@ -824,7 +824,14 @@ class AzureNetwork(network.BaseNetwork):
           self.region, self.subnet, self.subnet.name + '-nsg'
       )
 
-  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
+  @vm_util.Retry(
+      retryable_exceptions=(
+          errors.Resource.RetryableCreationError,
+          # Many nested commands are not classified as retryable.
+          # Most should have their own retry logica and raise a different error.
+          errors.VmUtil.IssueCommandError,
+      )
+  )
   def Create(self):
     """Creates the network."""
     # If the benchmark includes multiple zones,
