@@ -237,37 +237,19 @@ def ConfigureAndRestart(vm, run_uri, buffer_size):
   )
   vm.RemoteCommand(f'sudo cp /tmp/queries.sql {database_queries_path}')
   vm.RemoteCommand(f'sudo chmod 755 {database_queries_path}')
-  vm.RemoteCommand(
-      'sudo sysctl -w'
-      f' vm.nr_hugepages={SHARED_BUFFERS_CONF[buffer_size_key]["nr_hugepages"]}'
-  )
-  vm.RemoteCommand(
-      'sudo sysctl -w vm.hugetlb_shm_group=$(getent group postgres | cut -d:'
-      ' -f3)'
-  )
-  vm.RemoteCommand('cat /proc/meminfo | grep -i "^hugepage"')
-  vm.RemoteCommand('sudo cat /proc/sys/vm/hugetlb_shm_group')
+  # changes made to /proc do not persist after a reboot
+  vm.RemoteCommand('sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches')
   postgres_service_name = GetOSDependentDefaults(vm.OS_TYPE)[
       'postgres_service_name'
   ]
-  vm.RemoteCommand(
-      'sudo systemctl set-property'
-      f' {postgres_service_name}.service'
-      f' MemoryMax={SHARED_BUFFERS_CONF[buffer_size_key]["max_memory"]}'
-  )
+  UpdateHugePages(vm, buffer_size_key)
+
   if IsUbuntu(vm):
-    vm.RemoteCommand(
-        'sudo systemctl set-property'
-        f' {GetOSDependentDefaults(vm.OS_TYPE)["postgres_template_service_name"]}.service'
-        f' MemoryMax={SHARED_BUFFERS_CONF[buffer_size_key]["max_memory"]}'
-    )
     postgres_service_name = GetOSDependentDefaults(
         vm.OS_TYPE
     )['postgres_template_service_name']
-  vm.RemoteCommand('sudo sync; echo 3 | sudo tee /proc/sys/vm/drop_caches')
-  vm.RemoteCommand(
-      f'cat /etc/systemd/system.control/{postgres_service_name}.service.d/50-MemoryMax.conf'
-  )
+  UpdateMaxMemory(vm, buffer_size_key, postgres_service_name)
+
   vm.RemoteCommand(
       'sudo su - postgres -c "openssl req -new -x509 -days 365 -nodes -text'
       f' -out {data_path}/server.crt -keyout'
@@ -281,6 +263,30 @@ def ConfigureAndRestart(vm, run_uri, buffer_size):
   vm.RemoteCommand(f'sudo systemctl status {postgres_service_name}')
   vm.RemoteCommand(
       f'sudo su - postgres -c "psql -a -f {database_queries_path}"'
+  )
+
+
+def UpdateHugePages(vm, buffer_size_key):
+  vm.RemoteCommand(
+      'sudo sysctl -w'
+      f' vm.nr_hugepages={SHARED_BUFFERS_CONF[buffer_size_key]["nr_hugepages"]}'
+  )
+  vm.RemoteCommand(
+      'sudo sysctl -w vm.hugetlb_shm_group=$(getent group postgres | cut -d:'
+      ' -f3)'
+  )
+  vm.RemoteCommand('cat /proc/meminfo | grep -i "^hugepage"')
+  vm.RemoteCommand('sudo cat /proc/sys/vm/hugetlb_shm_group')
+
+
+def UpdateMaxMemory(vm, buffer_size_key, postgres_service_name):
+  vm.RemoteCommand(
+      'sudo systemctl set-property'
+      f' {postgres_service_name}.service'
+      f' MemoryMax={SHARED_BUFFERS_CONF[buffer_size_key]["max_memory"]}'
+  )
+  vm.RemoteCommand(
+      f'cat /etc/systemd/system.control/{postgres_service_name}.service.d/50-MemoryMax.conf'
   )
 
 
@@ -318,28 +324,20 @@ def SetupReplica(primary_vm, replica_vm, replica_id, run_uri, buffer_size):
       'sudo echo -e "\ninclude = postgresql-custom.conf" | sudo tee -a'
       f' {os.path.join(conf_path, "postgresql.conf")}'
   )
-  # vm.RemoteCommand('sudo chmod 660 postgresql.conf ')
-  replica_vm.RemoteCommand(
-      'sudo sysctl -w'
-      f' vm.nr_hugepages={SHARED_BUFFERS_CONF[buffer_size_key]["nr_hugepages"]}'
-  )
-  replica_vm.RemoteCommand(
-      'sudo sysctl -w vm.hugetlb_shm_group=$(getent group postgres | cut -d:'
-      ' -f3)'
-  )
-  replica_vm.RemoteCommand('cat /proc/meminfo |grep -i "^hugepage"')
-  replica_vm.RemoteCommand('sudo cat /proc/sys/vm/hugetlb_shm_group')
-  replica_vm.RemoteCommand(
-      'sudo systemctl set-property'
-      f' {GetOSDependentDefaults(replica_vm.OS_TYPE)["postgres_service_name"]}.service'
-      f' MemoryMax={SHARED_BUFFERS_CONF[buffer_size_key]["max_memory"]}'
-  )
+  postgres_service_name = GetOSDependentDefaults(replica_vm.OS_TYPE)[
+      'postgres_service_name'
+  ]
+  UpdateHugePages(replica_vm, buffer_size_key)
+  UpdateMaxMemory(replica_vm, buffer_size_key, postgres_service_name)
   replica_vm.RemoteCommand(
       'sudo sync; echo 3 | sudo tee -a /proc/sys/vm/drop_caches'
   )
-  replica_vm.RemoteCommand(
-      f'cat /etc/systemd/system.control/{GetOSDependentDefaults(replica_vm.OS_TYPE)["postgres_service_name"]}.service.d/50-MemoryMax.conf'
-  )
+  if IsUbuntu(replica_vm):
+    postgres_service_name = GetOSDependentDefaults(
+        replica_vm.OS_TYPE
+    )['postgres_template_service_name']
+    UpdateMaxMemory(replica_vm, buffer_size_key, postgres_service_name)
+
   replica_vm.RemoteCommand(f'sudo chown -R postgres:root {data_path}')
   replica_vm.RemoteCommand(f'sudo chown -R postgres:root {conf_path}')
   replica_vm.RemoteCommand(
