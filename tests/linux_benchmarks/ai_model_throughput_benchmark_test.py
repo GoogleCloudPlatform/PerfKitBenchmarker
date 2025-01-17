@@ -110,15 +110,12 @@ class AiModelThroughputBenchmarkTest(
   def testBenchmarkPassesWithCorrectMetricMetadata(self):
     samples = ai_model_throughput_benchmark.Run(self.bm_spec)
     metadatas = [sample.metadata for sample in samples]
-    expected_metadata = {
+    expected = {
         'parallel_requests': 1,
         'test_duration': 5,
         'First Model': True,
     }
-    self.assertDictContainsSubset(
-        expected_metadata,
-        metadatas[0],
-    )
+    self.assertEqual(metadatas[0], {**metadatas[0], **expected})
 
   @parameterized.named_parameters(
       ('tiny test', 1, 2),

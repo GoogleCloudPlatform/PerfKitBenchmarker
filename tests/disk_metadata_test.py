@@ -63,23 +63,20 @@ class GcpDiskMetadataTest(_DiskMetadataTestCase):
         _COMPONENT, disk_size=2, disk_type=gce_disk.PD_STANDARD
     )
     disk_obj = gce_disk.GceDisk(disk_spec, 'name', 'zone', 'project')
-    self.assertDictContainsSubset(
-        {disk.MEDIA: disk.HDD, disk.REPLICATION: disk.ZONE}, disk_obj.metadata
-    )
+    expected = {disk.MEDIA: disk.HDD, disk.REPLICATION: disk.ZONE}
+    self.assertEqual(disk_obj.metadata, {**disk_obj.metadata, **expected})
 
   def testLocalSSD(self):
     disk_spec = gce_disk.GceDiskSpec(
         _COMPONENT, disk_size=2, disk_type=disk.LOCAL, interface=gce_disk.NVME
     )
     disk_obj = gce_disk.GceLocalDisk(disk_spec, 'name')
-    self.assertDictContainsSubset(
-        {
-            disk.MEDIA: disk.SSD,
-            disk.REPLICATION: 'none',
-            'interface': gce_disk.NVME,
-        },
-        disk_obj.metadata,
-    )
+    expected = {
+        disk.MEDIA: disk.SSD,
+        disk.REPLICATION: 'none',
+        'interface': gce_disk.NVME,
+    }
+    self.assertEqual(disk_obj.metadata, {**disk_obj.metadata, **expected})
 
 
 class AwsDiskMetadataTest(_DiskMetadataTestCase):
@@ -109,9 +106,10 @@ class AwsDiskMetadataTest(_DiskMetadataTestCase):
     )
     vm.create_disk_strategy.GetSetupDiskStrategy().SetUpDisk()
     # pytype: disable=attribute-error
-    self.assertDictContainsSubset(
-        {disk.MEDIA: goal_media, disk.REPLICATION: goal_replication},
+    expected = {disk.MEDIA: goal_media, disk.REPLICATION: goal_replication}
+    self.assertEqual(
         vm.scratch_disks[0].metadata,
+        {**vm.scratch_disks[0].metadata, **expected},
     )
 
   def testLocalSSD(self):
@@ -167,7 +165,10 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
     }
     if goal_host_caching:
       expected[azure_disk.HOST_CACHING] = goal_host_caching
-    self.assertDictContainsSubset(expected, vm.scratch_disks[0].metadata)
+    self.assertEqual(
+        vm.scratch_disks[0].metadata,
+        {**vm.scratch_disks[0].metadata, **expected},
+    )
 
   @flagsaver.flagsaver(azure_version_log=False)
   def testPremiumStorage(self):

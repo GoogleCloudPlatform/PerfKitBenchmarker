@@ -190,13 +190,17 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
-    self.assertDictContainsSubset(
-        {
-            'dedicated_host': False,
-            'machine_type': 'test_machine_type',
-            'project': 'p',
-        },
+    expected = {
+        'dedicated_host': False,
+        'machine_type': 'test_machine_type',
+        'project': 'p',
+    }
+    self.assertEqual(
         vm.GetResourceMetadata(),
+        {
+            **vm.GetResourceMetadata(),
+            **expected,
+        },
     )
 
   def testVmWithMachineTypePreemptible(self):
@@ -208,14 +212,18 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
-    self.assertDictContainsSubset(
-        {
-            'dedicated_host': False,
-            'machine_type': 'test_machine_type',
-            'preemptible': True,
-            'project': 'p',
-        },
+    expected = {
+        'dedicated_host': False,
+        'machine_type': 'test_machine_type',
+        'preemptible': True,
+        'project': 'p',
+    }
+    self.assertEqual(
         vm.GetResourceMetadata(),
+        {
+            **vm.GetResourceMetadata(),
+            **expected,
+        },
     )
 
   def testCustomVmNonPreemptible(self):
@@ -224,14 +232,18 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
-    self.assertDictContainsSubset(
-        {
-            'cpus': 1,
-            'memory_mib': 1024,
-            'project': 'p',
-            'dedicated_host': False,
-        },
+    expected = {
+        'cpus': 1,
+        'memory_mib': 1024,
+        'project': 'p',
+        'dedicated_host': False,
+    }
+    self.assertEqual(
         vm.GetResourceMetadata(),
+        {
+            **vm.GetResourceMetadata(),
+            **expected,
+        },
     )
 
   def testCustomVmPreemptible(self):
@@ -243,15 +255,19 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm.created = True
-    self.assertDictContainsSubset(
-        {
-            'cpus': 1,
-            'memory_mib': 1024,
-            'project': 'fakeproject',
-            'dedicated_host': False,
-            'preemptible': True,
-        },
+    expected = {
+        'cpus': 1,
+        'memory_mib': 1024,
+        'project': 'fakeproject',
+        'dedicated_host': False,
+        'preemptible': True,
+    }
+    self.assertEqual(
         vm.GetResourceMetadata(),
+        {
+            **vm.GetResourceMetadata(),
+            **expected,
+        },
     )
 
   def testCustomVmWithGpus(self):
@@ -265,16 +281,20 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm = pkb_common_test_case.TestGceVirtualMachine(spec)
     vm._GenerateCreateCommand('')
     vm.created = True
-    self.assertDictContainsSubset(
-        {
-            'cpus': 1,
-            'memory_mib': 1024,
-            'project': 'fakeproject',
-            'dedicated_host': False,
-            'gpu_count': 2,
-            'gpu_type': 'k80',
-        },
+    expected = {
+        'cpus': 1,
+        'memory_mib': 1024,
+        'project': 'fakeproject',
+        'dedicated_host': False,
+        'gpu_count': 2,
+        'gpu_type': 'k80',
+    }
+    self.assertEqual(
         vm.GetResourceMetadata(),
+        {
+            **vm.GetResourceMetadata(),
+            **expected,
+        },
     )
 
   @parameterized.named_parameters(
@@ -461,15 +481,19 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertNotIn('--boot-disk-size', command_string)
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
-      self.assertDictContainsSubset(
-          {
-              'image': fake_image,
-              'image_family': 'ubuntu-2004-lts',
-              'image_project': 'ubuntu-os-cloud',
-              'boot_disk_size': '10',
-              'boot_disk_type': 'pd-standard',
-          },
+      expected = {
+          'image': fake_image,
+          'image_family': 'ubuntu-2004-lts',
+          'image_project': 'ubuntu-os-cloud',
+          'boot_disk_size': '10',
+          'boot_disk_type': 'pd-standard',
+      }
+      self.assertEqual(
           vm.GetResourceMetadata(),
+          {
+              **vm.GetResourceMetadata(),
+              **expected,
+          },
       )
 
   def testCreateUbuntuInCustomProject(self):
@@ -503,9 +527,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
-      self.assertDictContainsSubset(
-          {'image': fake_image, 'image_project': 'fake-project'}, vm_metadata
-      )
+      expected = {'image': fake_image, 'image_project': 'fake-project'}
+      self.assertEqual(vm_metadata, {**vm_metadata, **expected})
       self.assertNotIn('image_family', vm_metadata)
 
   def testCreateUbuntuInCustomDisk(self):
@@ -546,14 +569,18 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
-      self.assertDictContainsSubset(
-          {
-              'image': fake_image,
-              'image_project': 'fake-project',
-              'boot_disk_size': 20,
-              'boot_disk_type': 'fake-disk-type',
-          },
+      expected = {
+          'image': fake_image,
+          'image_project': 'fake-project',
+          'boot_disk_size': 20,
+          'boot_disk_type': 'fake-disk-type',
+      }
+      self.assertEqual(
           vm_metadata,
+          {
+              **vm_metadata,
+              **expected,
+          },
       )
       self.assertNotIn('image_family', vm_metadata)
 
@@ -579,9 +606,8 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
-      self.assertDictContainsSubset(
-          {'image': fake_image, 'image_project': 'rhel-cloud'}, vm_metadata
-      )
+      expected = {'image': fake_image, 'image_project': 'rhel-cloud'}
+      self.assertEqual(vm_metadata, {**vm_metadata, **expected})
       self.assertNotIn('image_family', vm_metadata)
 
   def testCosVm(self):
@@ -606,13 +632,17 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       vm._PostCreate()
       self.assertEqual(issue_command.call_count, 3)
       vm_metadata = vm.GetResourceMetadata()
-      self.assertDictContainsSubset(
-          {
-              'image': fake_image,
-              'image_family': 'cos-stable',
-              'image_project': 'cos-cloud',
-          },
+      expected = {
+          'image': fake_image,
+          'image_family': 'cos-stable',
+          'image_project': 'cos-cloud',
+      }
+      self.assertEqual(
           vm_metadata,
+          {
+              **vm_metadata,
+              **expected,
+          },
       )
 
 

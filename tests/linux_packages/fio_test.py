@@ -1123,7 +1123,7 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
       )
 
       for result in results:
-        self.assertDictContainsSubset(BASE_METADATA, result.metadata)
+        self.assertEqual(result.metadata, {**result.metadata, **BASE_METADATA})
 
   def testFioCommandToJob(self):
     fio_parameters = (

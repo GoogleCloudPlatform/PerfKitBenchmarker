@@ -157,7 +157,7 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
 
     for i, meta in enumerate(expected_meta):
       self.assertIsInstance(result[i][3], dict)
-      self.assertDictContainsSubset(meta, result[i][3])
+      self.assertEqual(result[i][3], {**result[i][3], **meta})
 
   @parameterized.named_parameters(
       (

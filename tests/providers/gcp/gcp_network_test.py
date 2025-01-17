@@ -160,8 +160,11 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
     with PatchCriticalObjects([('', '', 0)]):
       spec.ConstructVirtualMachines()
 
-      self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
-      self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_2'])
+      expected = {'cidr': None}
+      actual_vm_1 = spec.custom_subnets['vm_1']
+      self.assertEqual(actual_vm_1, {**actual_vm_1, **expected})
+      actual_vm_2 = spec.custom_subnets['vm_2']
+      self.assertEqual(actual_vm_2, {**actual_vm_2, **expected})
       self.assertLen(spec.networks, 1)
       for k in spec.networks.keys():
         self.assertCountEqual(['10.0.0.0/8'], spec.networks[k].all_nets)
@@ -174,8 +177,11 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
     with PatchCriticalObjects([('', '', 0)]):
       spec.ConstructVirtualMachines()
 
-      self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
-      self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_2'])
+      expected = {'cidr': None}
+      actual_vm_1 = spec.custom_subnets['vm_1']
+      self.assertEqual(actual_vm_1, {**actual_vm_1, **expected})
+      actual_vm_2 = spec.custom_subnets['vm_2']
+      self.assertEqual(actual_vm_2, {**actual_vm_2, **expected})
       self.assertLen(spec.networks, 1)
       for k in spec.networks.keys():
         self.assertCountEqual(['1.2.3.4/33'], spec.networks[k].all_nets)
@@ -185,12 +191,13 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
     with PatchCriticalObjects([('', '', 0)]):
       spec.ConstructVirtualMachines()
 
-      self.assertDictContainsSubset(
-          {'cidr': '10.0.1.0/24'}, spec.custom_subnets['vm_1']
-      )
-      self.assertDictContainsSubset(
-          {'cidr': '192.168.1.0/24'}, spec.custom_subnets['vm_2']
-      )
+      expected_vm_1 = {'cidr': '10.0.1.0/24'}
+      actual_vm_1 = spec.custom_subnets['vm_1']
+      self.assertEqual(actual_vm_1, {**actual_vm_1, **expected_vm_1})
+
+      expected_vm_2 = {'cidr': '192.168.1.0/24'}
+      actual_vm_2 = spec.custom_subnets['vm_2']
+      self.assertEqual(actual_vm_2, {**actual_vm_2, **expected_vm_2})
       self.assertLen(spec.networks, 2)
       for k in spec.networks.keys():
         self.assertCountEqual(
@@ -205,12 +212,13 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
     with PatchCriticalObjects([('', '', 0)]):
       spec.ConstructVirtualMachines()
 
-      self.assertDictContainsSubset(
-          {'cidr': '10.0.1.0/24'}, spec.custom_subnets['vm_1']
-      )
-      self.assertDictContainsSubset(
-          {'cidr': '192.168.1.0/24'}, spec.custom_subnets['vm_2']
-      )
+      expected_vm_1 = {'cidr': '10.0.1.0/24'}
+      actual_vm_1 = spec.custom_subnets['vm_1']
+      self.assertEqual(actual_vm_1, {**actual_vm_1, **expected_vm_1})
+
+      expected_vm_2 = {'cidr': '192.168.1.0/24'}
+      actual_vm_2 = spec.custom_subnets['vm_2']
+      self.assertEqual(actual_vm_2, {**actual_vm_2, **expected_vm_2})
       self.assertLen(spec.networks, 2)
       for k in spec.networks.keys():
         self.assertCountEqual(
@@ -222,10 +230,13 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
     with PatchCriticalObjects([('', '', 0)]):
       spec.ConstructVirtualMachines()
 
-      self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
-      self.assertDictContainsSubset(
-          {'cidr': '192.168.1.0/24'}, spec.custom_subnets['vm_2']
-      )
+      expected_vm_1 = {'cidr': None}
+      actual_vm_1 = spec.custom_subnets['vm_1']
+      self.assertEqual(actual_vm_1, {**actual_vm_1, **expected_vm_1})
+
+      expected_vm_2 = {'cidr': '192.168.1.0/24'}
+      actual_vm_2 = spec.custom_subnets['vm_2']
+      self.assertEqual(actual_vm_2, {**actual_vm_2, **expected_vm_2})
       self.assertLen(spec.networks, 2)
       for k in spec.networks.keys():
         self.assertCountEqual(
@@ -240,10 +251,13 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
     with PatchCriticalObjects([('', '', 0)]):
       spec.ConstructVirtualMachines()
 
-      self.assertDictContainsSubset({'cidr': None}, spec.custom_subnets['vm_1'])
-      self.assertDictContainsSubset(
-          {'cidr': '192.168.1.0/24'}, spec.custom_subnets['vm_2']
-      )
+      expected_vm_1 = {'cidr': None}
+      actual_vm_1 = spec.custom_subnets['vm_1']
+      self.assertEqual(actual_vm_1, {**actual_vm_1, **expected_vm_1})
+
+      expected_vm_2 = {'cidr': '192.168.1.0/24'}
+      actual_vm_2 = spec.custom_subnets['vm_2']
+      self.assertEqual(actual_vm_2, {**actual_vm_2, **expected_vm_2})
       self.assertLen(spec.networks, 2)
       for k in spec.networks.keys():
         self.assertCountEqual(
@@ -255,12 +269,12 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
     with PatchCriticalObjects([('', '', 0)]):
       spec.ConstructVirtualMachines()
 
-      self.assertDictContainsSubset(
-          {'cidr': '10.0.1.0/24'}, spec.custom_subnets['vm_1']
-      )
-      self.assertDictContainsSubset(
-          {'cidr': '10.0.1.0/24'}, spec.custom_subnets['vm_2']
-      )
+      expected = {'cidr': '10.0.1.0/24'}  # Same expected CIDR for both VMs
+      actual_vm_1 = spec.custom_subnets['vm_1']
+      self.assertEqual(actual_vm_1, {**actual_vm_1, **expected})
+
+      actual_vm_2 = spec.custom_subnets['vm_2']
+      self.assertEqual(actual_vm_2, {**actual_vm_2, **expected})
       self.assertLen(spec.networks, 1)
       for k in spec.networks.keys():
         self.assertCountEqual(['10.0.1.0/24'], spec.networks[k].all_nets)
@@ -270,12 +284,13 @@ class TestGceNetworkConfig(BaseGceNetworkTest):
     with PatchCriticalObjects([('', '', 0)]):
       spec.ConstructVirtualMachines()
 
-      self.assertDictContainsSubset(
-          {'cidr': '10.0.1.0/24'}, spec.custom_subnets['vm_1']
-      )
-      self.assertDictContainsSubset(
-          {'cidr': '10.0.2.0/24'}, spec.custom_subnets['vm_2']
-      )
+      expected_vm_1 = {'cidr': '10.0.1.0/24'}
+      actual_vm_1 = spec.custom_subnets['vm_1']
+      self.assertEqual(actual_vm_1, {**actual_vm_1, **expected_vm_1})
+
+      expected_vm_2 = {'cidr': '10.0.2.0/24'}
+      actual_vm_2 = spec.custom_subnets['vm_2']
+      self.assertEqual(actual_vm_2, {**actual_vm_2, **expected_vm_2})
       self.assertLen(spec.networks, 2)
       for k in spec.networks.keys():
         self.assertCountEqual(

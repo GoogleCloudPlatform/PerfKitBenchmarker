@@ -265,18 +265,23 @@ class SampleCollectorTestCase(unittest.TestCase):
     self.assertEqual(1, len(self.instance.samples))
     collector_sample = self.instance.samples[0]
     metadata = collector_sample.pop('metadata')
-    self.assertDictContainsSubset(
-        {
-            'value': 100,
-            'metric': 'widgets',
-            'unit': 'oz',
-            'test': self.benchmark,
-            'product_name': 'PerfKitBenchmarker',
-        },
+    expected = {
+        'value': 100,
+        'metric': 'widgets',
+        'unit': 'oz',
+        'test': self.benchmark,
+        'product_name': 'PerfKitBenchmarker',
+    }
+    self.assertEqual(
         collector_sample,
+        {
+            **collector_sample,
+            **expected,
+        },
     )
     if contains_metadata:
-      self.assertDictContainsSubset({'foo': 'bar'}, metadata)
+      expected = {'foo': 'bar'}
+      self.assertEqual(metadata, {**metadata, **expected})
     else:
       self.assertNotIn('foo', metadata)
 
@@ -289,7 +294,10 @@ class SampleCollectorTestCase(unittest.TestCase):
     timestamp_sample = sample.Sample('widgets', 100, 'oz', {}, 1.0)
     samples = [timestamp_sample]
     self.instance.AddSamples(samples, self.benchmark, self.benchmark_spec)
-    self.assertDictContainsSubset({'timestamp': 1.0}, self.instance.samples[0])
+    expected = {'timestamp': 1.0}
+    self.assertEqual(
+        self.instance.samples[0], {**self.instance.samples[0], **expected}
+    )
 
 
 def CreateMockVM(hostname='Hostname', vm_id='12345', ip_address='1.2.3.4'):

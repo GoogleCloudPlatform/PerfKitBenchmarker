@@ -294,7 +294,7 @@ class KubernetesResourcesTestCase(BaseKubernetesVirtualMachineTestCase):
           'pod_memory_request_mb': 4096,
       }
       actual = kub_vm.GetResourceMetadata()
-      self.assertDictContainsSubset(subset_of_expected_metadata, actual)
+      self.assertEqual(actual, {**actual, **subset_of_expected_metadata})
 
   def testAnnotations(self):
     spec = self.create_virtual_machine_spec()
@@ -305,7 +305,7 @@ class KubernetesResourcesTestCase(BaseKubernetesVirtualMachineTestCase):
           'annotations': {'sriov_network': 'sriov-vlan50'}
       }
       actual = kub_vm.GetResourceMetadata()
-      self.assertDictContainsSubset(subset_of_expected_metadata, actual)
+      self.assertEqual(actual, {**actual, **subset_of_expected_metadata})
 
 
 class KubernetesVirtualMachineOsTypesTestCase(

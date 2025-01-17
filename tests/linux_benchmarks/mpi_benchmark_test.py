@@ -201,14 +201,18 @@ class MpiBenchmarkTestCase(
         'mpi_processes_per_group': 2,
         'histogram': histogram1,
     }
-    self.assertDictContainsSubset(meta1, histogram_data[0].metadata)
+    self.assertEqual(
+        histogram_data[0].metadata, {**histogram_data[0].metadata, **meta1}
+    )
     meta2 = {
         'bytes': 2048,
         'mpi_groups': 2,
         'mpi_processes_per_group': 2,
         'histogram': histogram2,
     }
-    self.assertDictContainsSubset(meta2, histogram_data[1].metadata)
+    self.assertEqual(
+        histogram_data[1].metadata, {**histogram_data[1].metadata, **meta2}
+    )
     self.assertEqual(4, self.mock_histo.call_count)
 
   @flagsaver.flagsaver(mpi_benchmarks=['Qubert', 'Broadcast', 'allTOaLL'])

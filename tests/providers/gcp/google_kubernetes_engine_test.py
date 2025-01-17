@@ -310,22 +310,20 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       cluster.created = True
       metadata = cluster.GetResourceMetadata()
       self.assertEqual(issue_command.call_count, 1)
-      self.assertDictContainsSubset(
-          {
-              'project': 'fakeproject',
-              'gce_local_ssd_count': 2,
-              'gce_local_ssd_interface': 'SCSI',
-              'machine_type': 'fake-machine-type',
-              'boot_disk_type': 'foo',
-              'boot_disk_size': 200,
-              'cloud': 'GCP',
-              'cluster_type': 'Kubernetes',
-              'zone': 'us-central1-a',
-              'size': 2,
-              'container_cluster_version': 'v1.2.3',
-          },
-          metadata,
-      )
+      expected = {
+          'project': 'fakeproject',
+          'gce_local_ssd_count': 2,
+          'gce_local_ssd_interface': 'SCSI',
+          'machine_type': 'fake-machine-type',
+          'boot_disk_type': 'foo',
+          'boot_disk_size': 200,
+          'cloud': 'GCP',
+          'cluster_type': 'Kubernetes',
+          'zone': 'us-central1-a',
+          'size': 2,
+          'container_cluster_version': 'v1.2.3',
+      }
+      self.assertEqual(metadata, {**metadata, **expected})
 
   def testCidrCalculations(self):
     self.assertEqual(google_kubernetes_engine._CalculateCidrSize(1), 19)
@@ -382,17 +380,15 @@ class GoogleKubernetesEngineAutoscalingTestCase(
       cluster.created = True
       metadata = cluster.GetResourceMetadata()
       self.assertEqual(issue_command.call_count, 1)
-      self.assertDictContainsSubset(
-          {
-              'project': 'fakeproject',
-              'cloud': 'GCP',
-              'cluster_type': 'Kubernetes',
-              'min_size': 1,
-              'size': 2,
-              'max_size': 30,
-          },
-          metadata,
-      )
+      expected = {
+          'project': 'fakeproject',
+          'cloud': 'GCP',
+          'cluster_type': 'Kubernetes',
+          'min_size': 1,
+          'size': 2,
+          'max_size': 30,
+      }
+      self.assertEqual(metadata, {**metadata, **expected})
 
   def testLabelDisks(self):
     with patch_critical_objects(stdout=_PVC_LIST) as issue_command:
