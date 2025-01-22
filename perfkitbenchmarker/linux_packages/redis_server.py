@@ -214,10 +214,17 @@ def _BuildStartCommand(vm, port: int) -> str:
   if _EVICTION_POLICY.value:
     cmd_args.append(f'--maxmemory-policy {_EVICTION_POLICY.value}')
 
-  # Set maxmemory flag for each redis instance. Total memory for all of the
-  # server instances combined should be 90% of server VM's total memory.
+  # If aof is not enabled, set maxmemory to 80% of server VM's total memory
+  # divided by the number of processes. This is to ensure that the redis
+  # instances don't consume too much memory and cause the server VM to become
+  # unresponsive.
+  # If aof is enabled, deduct 10.5GB from the maxmemory to account
+  # for the AOF and OS overheads.
   num_processes = _GetNumProcesses(vm)
-  max_memory_per_instance = int(vm.total_memory_kb * 0.9 / num_processes)
+  if REDIS_AOF.value:
+    max_memory_per_instance = int(vm.total_memory_kb - 11024384)
+  else:
+    max_memory_per_instance = int(vm.total_memory_kb * 0.8 / num_processes)
   cmd_args.append(f'--maxmemory {max_memory_per_instance}kb')
   return cmd.format(redis_dir=redis_dir, args=' '.join(cmd_args))
 
