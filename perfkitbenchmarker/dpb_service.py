@@ -20,14 +20,14 @@ the corresponding provider directory as a subclass of BaseDpbService.
 """
 
 import abc
-from collections.abc import MutableMapping
+from collections.abc import Callable, MutableMapping
 import dataclasses
 import datetime
 import logging
 import os
 import shutil
 import tempfile
-from typing import Dict, List, Type
+from typing import Dict, List, Type, TypeAlias
 
 from absl import flags
 import jinja2
@@ -164,18 +164,37 @@ class JobSubmissionError(errors.Benchmarks.RunError):
   pass
 
 
+FetchOutputFn: TypeAlias = Callable[[], tuple[str | None, str | None]]
+
+
 @dataclasses.dataclass
 class JobResult:
-  """Data class for the timing of a successful DPB job."""
+  """Data class for the timing of a successful DPB job.
 
-  # Service reported execution time
+  Attributes:
+    run_time: Service reported execution time.
+    pending_time: Service reported pending time (0 if service does not report).
+    stdout: Job's stdout. Call FetchOutput before to ensure it's populated.
+    stderr: Job's stderr. Call FetchOutput before to ensure it's populated.
+    fetch_output_fn: Callback expected to return a 2-tuple of str or None whose
+      values correspond to stdout and stderr respectively. This is called by
+      FetchOutput which updates stdout and stderr if their respective value in
+      this callback's return tuple is not None. Defaults to a no-op.
+  """
+
   run_time: float
-  # Service reported pending time (0 if service does not report).
   pending_time: float = 0
-  # Stdout of the job.
   stdout: str = ''
-  # Stderr of the job.
   stderr: str = ''
+  fetch_output_fn: FetchOutputFn = lambda: (None, None)
+
+  def FetchOutput(self):
+    """Populates stdout and stderr according to fetch_output_fn callback."""
+    stdout, stderr = self.fetch_output_fn()
+    if stdout is not None:
+      self.stdout = stdout
+    if stderr is not None:
+      self.stderr = stderr
 
   @property
   def wall_time(self) -> float:
@@ -795,7 +814,8 @@ class UnmanagedDpbService(BaseDpbService):
     if self.cloud == 'AWS' and not aws_flags.AWS_EC2_INSTANCE_PROFILE.value:
       raise ValueError(
           'EC2 based Spark and Hadoop services require '
-          '--aws_ec2_instance_profile.')
+          '--aws_ec2_instance_profile.'
+      )
 
   def GetClusterCreateTime(self) -> float | None:
     """Returns the cluster creation time.

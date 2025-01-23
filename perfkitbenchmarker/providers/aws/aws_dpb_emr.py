@@ -18,8 +18,10 @@ Clusters can be created and deleted.
 
 import collections
 import dataclasses
+import gzip
 import json
 import logging
+import os
 from typing import Any, Dict
 
 from absl import flags
@@ -28,6 +30,7 @@ from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_dpb_emr_serverless_prices
@@ -35,6 +38,7 @@ from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
+
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -551,6 +555,25 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
           ' spec.'
       ) from None
 
+  def _FetchLogs(self, step_id: str) -> str | None:
+    local_stdout_path = os.path.join(
+        temp_dir.GetRunDirPath(),
+        f'emr_{self.cluster_id}_{step_id}.stdout.gz',
+    )
+    get_stdout_cmd = self.cmd_prefix + [
+        's3',
+        'cp',
+        os.path.join(
+            self.base_dir,
+            f'{self.cluster_id}/steps/{step_id}/stderr.gz'
+        ),
+        local_stdout_path,
+    ]
+    _, _, _ = vm_util.IssueCommand(get_stdout_cmd)
+    with gzip.open(local_stdout_path, 'rt') as f:
+      stdout = f.read()
+    return stdout
+
 
 class AwsDpbEmrServerless(
     dpb_service.DpbServiceServerlessMixin, dpb_service.BaseDpbService
@@ -635,6 +658,11 @@ class AwsDpbEmrServerless(
           f'Unsupported job type {job_type} for AWS EMR Serverless.'
       )
 
+    s3_monitoring_config = {
+        's3MonitoringConfiguration': {
+            'logUri': os.path.join(self.base_dir, 'logs')
+        }
+    }
     # Create the application.
     stdout, _, _ = vm_util.IssueCommand(
         self.cmd_prefix
@@ -649,6 +677,8 @@ class AwsDpbEmrServerless(
             application_type,
             '--tags',
             json.dumps(util.MakeDefaultTags()),
+            '--monitoring-configuration',
+            json.dumps(s3_monitoring_config),
         ]
     )
     result = json.loads(stdout)
@@ -816,7 +846,33 @@ class AwsDpbEmrServerless(
       start_time = result['jobRun']['createdAt']
       end_time = result['jobRun']['updatedAt']
       self._job_run = self._ParseCostMetrics(result)
-      return dpb_service.JobResult(run_time=end_time - start_time)
+      return dpb_service.JobResult(
+          run_time=end_time - start_time,
+          fetch_output_fn=lambda: (
+              self._FetchLogs(job_run.application_id, job_run.job_run_id),
+              None,
+          ),
+      )
+
+  def _FetchLogs(self, application_id: str, job_run_id: str) -> str | None:
+    local_stdout_path = os.path.join(
+        temp_dir.GetRunDirPath(),
+        f'emrs8s_{application_id}_{job_run_id}.stdout.gz',
+    )
+    get_stdout_cmd = self.cmd_prefix + [
+        's3',
+        'cp',
+        os.path.join(
+            self.base_dir,
+            f'logs/applications/{application_id}/jobs/{job_run_id}/'
+            'SPARK_DRIVER/stdout.gz',
+        ),
+        local_stdout_path,
+    ]
+    _, _, _ = vm_util.IssueCommand(get_stdout_cmd)
+    with gzip.open(local_stdout_path, 'rt') as f:
+      stdout = f.read()
+    return stdout
 
   def _FillMetadata(self) -> None:
     """Gets a dict to initialize this DPB service instance's metadata."""

@@ -66,6 +66,22 @@ class AwsDpbGlue(
   def _glue_script_wrapper_url(self):
     return os.path.join(self.base_dir, self.SPARK_SQL_GLUE_WRAPPER_SCRIPT)
 
+  def _FetchStderr(self, job_run_id: str) -> str:
+    cmd = self.cmd_prefix + [
+        'logs',
+        'get-log-events',
+        '--log-group-name',
+        '/aws-glue/jobs/error',
+        '--log-stream-name',
+        job_run_id,
+        '--output',
+        'text',
+        '--query',
+        'events[*].[message]',
+    ]
+    stdout, _, _ = vm_util.IssueCommand(cmd)
+    return stdout
+
   def _GetCompletedJob(self, job_id):
     """See base class."""
     job_name, job_run_id = job_id
@@ -98,6 +114,7 @@ class AwsDpbGlue(
       return dpb_service.JobResult(
           run_time=execution_time,
           pending_time=completed_on - started_on - execution_time,
+          fetch_output_fn=lambda: (None, self._FetchStderr(job_run_id)),
       )
 
   def SubmitJob(

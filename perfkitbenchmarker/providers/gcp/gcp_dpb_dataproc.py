@@ -614,6 +614,7 @@ class GcpDpbDataprocServerless(
     _, stderr, retcode = cmd.Issue(timeout=None, raise_on_failure=False)
     if retcode != 0:
       raise dpb_service.JobSubmissionError(stderr)
+    job_stderr = stderr
 
     fetch_batch_cmd = self.DataprocGcloudCommand(
         'batches', 'describe', self.batch_name
@@ -641,6 +642,7 @@ class GcpDpbDataprocServerless(
     return dpb_service.JobResult(
         run_time=(done_time - start_time).total_seconds(),
         pending_time=(start_time - pending_time).total_seconds(),
+        fetch_output_fn=lambda: (None, job_stderr),
     )
 
   def GetJobProperties(self) -> Dict[str, str]:

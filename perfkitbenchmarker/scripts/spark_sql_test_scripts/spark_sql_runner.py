@@ -10,12 +10,21 @@ from __future__ import print_function
 
 import argparse
 from concurrent import futures
+import json
 import logging
 import os
 import time
 
 import py4j
 from pyspark import sql
+
+
+_results_logger = logging.getLogger('spark_sql_runner_results')
+_results_logger.propagate = False
+_results_logger.setLevel(logging.INFO)
+_results_logger_handler = logging.StreamHandler()
+_results_logger_handler.setFormatter(logging.Formatter())
+_results_logger.addHandler(_results_logger_handler)
 
 
 # This snippet will be replaced with an actual dict[str, str] from query_id to
@@ -41,16 +50,18 @@ def parse_args(args=None):
           ' parallel.'
       ),
   )
-  group = parser.add_mutually_exclusive_group()
-  group.add_argument('--database', help='Hive database to look for data in.')
-  group.add_argument(
+  data_group = parser.add_mutually_exclusive_group()
+  data_group.add_argument(
+      '--database', help='Hive database to look for data in.'
+  )
+  data_group.add_argument(
       '--table-base-dir',
       help=(
           'Base HCFS path containing the table data to be registered into Spark'
           ' temporary view.'
       ),
   )
-  group.add_argument(
+  data_group.add_argument(
       '--bigquery-dataset',
       help=(
           'BQ Dataset containing the tables passed in --table-names to be'
@@ -91,9 +102,19 @@ def parse_args(args=None):
       choices=['eager', 'lazy'],
       help='Whether to cache the tables in memory spilling to local-disk.',
   )
-  parser.add_argument(
+  results_group = parser.add_mutually_exclusive_group(required=True)
+  results_group.add_argument(
+      '--log-results',
+      type=bool,
+      default=False,
+      help=(
+          'Log query timings to stdout/stderr instead of writing them to some'
+          ' object storage location. Reduces runner latency (and hence its'
+          ' total wall time), but it is not supported by all DPB services.'
+      ),
+  )
+  results_group.add_argument(
       '--report-dir',
-      required=True,
       help='Directory to write out query timings to.',
   )
   parser.add_argument(
@@ -123,7 +144,22 @@ def _load_file(spark, object_path):
   return '\n'.join(spark.sparkContext.textFile(object_path).collect())
 
 
-def main(args):
+def get_results_logger(spark_context):
+  """Gets results logger.
+
+  Injected into main fn to be replaceable by wrappers.
+
+  Args:
+    spark_context: Spark API context.
+
+  Returns:
+    A python logger object.
+  """
+  del spark_context
+  return _results_logger
+
+
+def main(args, results_logger_getter=get_results_logger):
   builder = sql.SparkSession.builder.appName('Spark SQL Query')
   if args.enable_hive:
     builder = builder.enableHiveSupport()
@@ -157,8 +193,6 @@ def main(args):
         args.dump_spark_conf
     )
 
-  results = []
-
   threads = len(query_streams)
   executor = futures.ThreadPoolExecutor(max_workers=threads)
   result_futures = [
@@ -171,10 +205,26 @@ def main(args):
   results = []
   for f in result_futures:
     results += f.result()
-  logging.info('Writing results to %s', args.report_dir)
-  spark.createDataFrame(results).coalesce(1).write.mode('append').json(
-      args.report_dir
-  )
+
+  if args.log_results:
+    dumped_results = '\n'.join([
+        '----@spark_sql_runner:results_start@----',
+        json.dumps(results),
+        '----@spark_sql_runner:results_end@----',
+    ])
+    results_logger = results_logger_getter(spark.sparkContext)
+    results_logger.info(dumped_results)
+  else:
+    logging.info('Writing results to %s', args.report_dir)
+    results_as_rows = [
+        sql.Row(
+            stream=r['stream'], query_id=r['query_id'], duration=r['duration']
+        )
+        for r in results
+    ]
+    spark.createDataFrame(results_as_rows).coalesce(1).write.mode(
+        'append'
+    ).json(args.report_dir)
 
 
 def get_table_metadata(args):
@@ -189,9 +239,7 @@ def get_table_metadata(args):
       metadata[table_name] = (args.table_format or 'parquet', option_params)
   elif args.bigquery_dataset:
     for table_name in args.table_names:
-      bq_options = {
-          'table': '.'.join([args.bigquery_dataset, table_name])
-      }
+      bq_options = {'table': '.'.join([args.bigquery_dataset, table_name])}
       if args.bigquery_read_data_format:
         bq_options['readDataFormat'] = args.bigquery_read_data_format
       metadata[table_name] = (args.table_format or 'bigquery', bq_options)
@@ -201,7 +249,7 @@ def get_table_metadata(args):
 def run_sql_query(
     spark_session, query_stream, stream_id, raise_query_execution_errors
 ):
-  """Runs a SQL query stream, returns list[pyspark.sql.Row] with durations."""
+  """Runs a SQL query stream, returns list[dict] with durations."""
 
   results = []
   for query_id in query_stream:
@@ -210,17 +258,11 @@ def run_sql_query(
     try:
       logging.info('Running query %s', query_id)
       start = time.time()
-      # spark-sql does not limit its output. Replicate that here by setting
-      # limit to max Java Integer. Hopefully you limited the output in SQL or
-      # you are going to have a bad time. Note this is not true of all TPC-DS or
-      # TPC-H queries and they may crash with small JVMs.
-      # pylint: disable=protected-access
       df = spark_session.sql(query)
-      df.show(spark_session._jvm.java.lang.Integer.MAX_VALUE)
-      # pylint: enable=protected-access
+      df.collect()
       duration = time.time() - start
       results.append(
-          sql.Row(stream=stream_id, query_id=query_id, duration=duration)
+          {'stream': stream_id, 'query_id': query_id, 'duration': duration}
       )
     # These correspond to errors in low level Spark Excecution.
     # Let ParseException and AnalysisException fail the job.
