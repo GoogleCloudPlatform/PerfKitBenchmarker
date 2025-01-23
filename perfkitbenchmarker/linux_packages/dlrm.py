@@ -49,10 +49,9 @@ def Install(vm):
   """Download and configure the dlrm data on the VM."""
   vm.InstallPackages('unzip')
   vm.RemoteCommand(f'mkdir -p {DATA_PATH}')
-  for file_name in DLRM_DATA:
-    vm.DownloadPreprovisionedData(
-        DATA_PATH, PACKAGE_NAME, file_name, DLRM_DOWNLOAD_TIMEOUT
-    )
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, DLRM_DATA, DATA_PATH, DLRM_DOWNLOAD_TIMEOUT
+  )
   vm.DownloadPreprovisionedData(
       MLPERF_ROOT, PACKAGE_NAME, 'weights.zip', DLRM_DOWNLOAD_TIMEOUT
   )
@@ -85,4 +84,3 @@ def ParseDlrmSummary(summary, metadata, scenario):
           'Samples per second', samples_per_sec, 'Samples/sec', metadata
       )
   ]
-

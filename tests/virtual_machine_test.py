@@ -174,7 +174,7 @@ class TestInstallData(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(self.vm, 'ShouldDownloadPreprovisionedData') as show:
       with mock.patch.object(self.vm, 'RemoteCommand') as remote_command:
         with mock.patch.object(self.vm, 'CheckPreprovisionedData') as check:
-          show.side_effect = [False]
+          show.side_effect = [False, False]
           remote_command.side_effect = None
           self.vm._InstallData(
               self.preprovisioned_data,
@@ -183,7 +183,13 @@ class TestInstallData(pkb_common_test_case.PkbCommonTestCase):
               self.install_path,
               self.fallback_url,
           )
-    show.assert_called_once_with(self.module_name, 'fake_pkg')
+    self.assertSequenceEqual(
+        (
+            mock.call(self.module_name, 'fake_pkg'),
+            mock.call(self.module_name, 'fake_pkg_000.part')
+        ),
+        show.mock_calls,
+    )
     remote_command.assert_called_once_with(
         'wget -O /fake_path/fake_pkg.tar.gz https://fake_url/fake_pkg.tar.gz'
     )
@@ -212,11 +218,54 @@ class TestInstallData(pkb_common_test_case.PkbCommonTestCase):
         self.install_path, self.module_name, 'fake_pkg', 'fake_checksum'
     )
 
+  def testPreprovisionWithChunkedDataSucceed(self):
+    with mock.patch.object(self.vm, 'ShouldDownloadPreprovisionedData') as show:
+      with mock.patch.object(self.vm, 'DownloadPreprovisionedData') as download:
+        with mock.patch.object(self.vm, 'RemoteCommand') as remote_command:
+          with mock.patch.object(
+              self.vm, 'RecoverChunkedPreprovisionedData') as recover:
+            with mock.patch.object(self.vm, 'CheckPreprovisionedData') as check:
+              # file not exist, but having chunk_000, chunk_001
+              show.side_effect = [False, True, True, True, False]
+              self.vm._InstallData(
+                  self.preprovisioned_data,
+                  self.module_name,
+                  self.filenames,
+                  self.install_path,
+                  self.fallback_url,
+              )
+    self.assertSequenceEqual(
+        (
+            mock.call(self.module_name, 'fake_pkg'),
+            mock.call(self.module_name, 'fake_pkg_000.part'),
+            mock.call(self.module_name, 'fake_pkg_000.part'),
+            mock.call(self.module_name, 'fake_pkg_001.part'),
+            mock.call(self.module_name, 'fake_pkg_002.part')
+        ),
+        show.mock_calls,
+    )
+    self.assertSequenceEqual(
+        (
+            mock.call(
+                self.install_path, self.module_name, 'fake_pkg_000.part', 600),
+            mock.call(
+                self.install_path, self.module_name, 'fake_pkg_001.part', 600)
+        ),
+        download.mock_calls,
+    )
+    recover.assert_called_once_with(
+        self.install_path, 'fake_pkg'
+    )
+    remote_command.assert_not_called()
+    check.assert_called_once_with(
+        self.install_path, self.module_name, 'fake_pkg', 'fake_checksum'
+    )
+
   def testPreprovisionNotAvailableFallBackNotAvailable(self):
     with mock.patch.object(self.vm, 'ShouldDownloadPreprovisionedData') as show:
       with mock.patch.object(self.vm, 'RemoteCommand') as remote_command:
         with mock.patch.object(self.vm, 'CheckPreprovisionedData') as check:
-          show.side_effect = [False]
+          show.side_effect = [False, False]
           with self.assertRaises(errors.Setup.BadPreprovisionedDataError):
             self.vm._InstallData(
                 {}, self.module_name, self.filenames, self.install_path, {}

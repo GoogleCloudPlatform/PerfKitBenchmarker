@@ -760,6 +760,10 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
     """
     raise NotImplementedError()
 
+  def RecoverChunkedPreprovisionedData(self, path, filename):
+    """Recover chunked preprovisioned data."""
+    raise NotImplementedError()
+
   def CheckPreprovisionedData(
       self, install_path, module_name, filename, expected_sha256
   ):

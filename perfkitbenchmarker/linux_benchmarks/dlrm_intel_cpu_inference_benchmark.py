@@ -19,7 +19,7 @@ from typing import Any, Dict
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker.linux_packages import dlrm_v2
+from perfkitbenchmarker.linux_packages import dlrm
 
 FLAGS = flags.FLAGS
 
@@ -95,10 +95,9 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     errors.Config.InvalidValue upon both GPUs and TPUs appear in the config
   """
   vm = bm_spec.vms[0]
-  vm.Install('dlrm_v2')
+  vm.Install('dlrm')
   vm.DownloadPreprovisionedData(
-      dlrm_v2.MODEL_PATH, 'dlrm', 'dlrm_int8.pt',
-      dlrm_v2.DLRM_DOWNLOAD_TIMEOUT
+      dlrm.MODEL_PATH, 'dlrm', 'dlrm_int8.pt', dlrm.DLRM_DOWNLOAD_TIMEOUT
   )
   vm.Install('docker')
   vm.RemoteCommand('sudo chmod 666 /var/run/docker.sock')
@@ -169,7 +168,7 @@ def Run(bm_spec):
       f'cat output/pytorch-cpu/dlrm/{_BENCHMARK_SCENARIO.value.capitalize()}/performance/'
       "run_1/mlperf_log_summary.txt'"
   )
-  return dlrm_v2.ParseDlrmSummary(stdout, metadata, _BENCHMARK_SCENARIO.value)
+  return dlrm.ParseDlrmSummary(stdout, metadata, _BENCHMARK_SCENARIO.value)
 
 
 def Cleanup(bm_spec):

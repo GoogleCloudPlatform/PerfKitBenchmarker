@@ -1411,6 +1411,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
     """Returns whether or not preprovisioned data is available."""
+    logging.info('Testing if preprovisioned data is available %s', filename)
     return FLAGS.gcp_preprovisioned_data_bucket and self.TryRemoteCommand(
         GenerateStatPreprovisionedDataCommand(module_name, filename)
     )

@@ -2067,6 +2067,13 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
         )
     )
 
+  def RecoverChunkedPreprovisionedData(self, path, filename):
+    """Recover chunked preprovisioned data."""
+    self.RemoteCommand(
+        f'cd {path} && cat {filename}_*.part > {filename} && '
+        f'rm {filename}_*.part'
+    )
+
   def GetSha256sum(self, path, filename):
     """Gets the sha256sum hash for a filename in a path on the VM.
 
