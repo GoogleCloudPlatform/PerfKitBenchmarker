@@ -212,6 +212,7 @@
     captured via the `--capture_vm_logs` flag to a GCS bucket.
 -   Add chromium_compile_benchmark.
 -   Add unmanaged_postgresql_sysbench benchmark.
+-   Add new vmstat trace.
 
 ### Enhancements:
 
