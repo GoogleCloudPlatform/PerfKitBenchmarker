@@ -114,16 +114,15 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       r'https\:\/\/software.repos.intel.com\/python\/conda\/|g" Dockerfile && '
       'bash build_dlrm-v2-99_int8_container.sh'
   )
-  num_cpus = vm.NumCpusForBenchmark()
-  # CPUS_PER_SOCKET needs to be dividable by CPUS_PER_INSTANCE
-  cpus_per_socket = num_cpus // vm.numa_node_count // 2 * 2
+  # physical cores since we turn off SMT
+  cpus_per_socket = vm.CheckLsCpu().cores_per_socket
   vm.RemoteCommand(
       'cd mlcommons && docker run -td --privileged --net=host '
       '-v ./model-terabyte:/root/model '
       '-v ./data-terabyte:/root/data '
       '-e DATA_DIR=/root/data '
       '-e MODEL_DIR=/root/model '
-      f'-e NUM_SOCKETS={vm.numa_node_count} '
+      f'-e NUM_SOCKETS={vm.CheckLsCpu().socket_count} '
       f'-e CPUS_PER_SOCKET={cpus_per_socket} '
       f'-e CPUS_PER_PROCESS={cpus_per_socket} '
       '-e CPUS_PER_INSTANCE=2 '
@@ -150,12 +149,12 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
 def Run(bm_spec):
   """Runs DLRM inference intel implementation."""
   vm = bm_spec.vms[0]
-  cpus_for_benchmark = vm.NumCpusForBenchmark() // vm.numa_node_count // 2 * 2
+  cpus_per_socket = vm.CheckLsCpu().cores_per_socket
   metadata = {
       'scenario': f'{_BENCHMARK_SCENARIO.value}',
-      'num_sockets': vm.numa_node_count,
-      'cpus_per_socket': cpus_for_benchmark,
-      'cpus_per_process': cpus_for_benchmark,
+      'num_sockets': vm.CheckLsCpu().socket_count,
+      'cpus_per_socket': cpus_per_socket,
+      'cpus_per_process': cpus_per_socket,
       'cpus_for_loadgen': 1,
       'batch_size': 400,
       'cpus_per_instance': 2,
