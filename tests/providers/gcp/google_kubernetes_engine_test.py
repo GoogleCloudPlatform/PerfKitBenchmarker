@@ -321,7 +321,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
           'cluster_type': 'Kubernetes',
           'zone': 'us-central1-a',
           'size': 2,
-          'container_cluster_version': 'v1.2.3',
+          'version': 'v1.2.3',
       }
       self.assertEqual(metadata, {**metadata, **expected})
 
