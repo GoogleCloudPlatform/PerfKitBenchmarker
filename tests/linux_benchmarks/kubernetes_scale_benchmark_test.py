@@ -21,7 +21,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.bm_spec = mock.create_autospec(benchmark_spec.BenchmarkSpec)
     self.cluster = mock.create_autospec(container_service.KubernetesCluster)
     self.bm_spec.container_cluster = self.cluster
-    self.expected_num_samples_per_reason = 7
+    self.expected_num_samples_per_reason = 9
 
   def testTimestampConvert(self):
     epoch_time = kubernetes_scale_benchmark.ConvertToEpochTime(

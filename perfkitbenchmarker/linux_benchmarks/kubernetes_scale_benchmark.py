@@ -225,7 +225,7 @@ def ParseEvents(
 
 def _SummarizeTimestamps(timestamps: list[float]) -> dict[str, float]:
   """Returns a few metrics about a list of timestamps."""
-  percentiles = [10, 50, 90, 95, 99.9]
+  percentiles = [0, 10, 50, 90, 95, 99.9, 100]
   summary = {
       'mean': np.mean(timestamps),
   }
