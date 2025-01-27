@@ -212,7 +212,6 @@ class ClusterBootBenchmarkTest(
                   'num_vms': 1,
                   'os_type': 'ubuntu2204',
                   'create_delay_sec': '0.0',
-                  'create_operation_name': 'N/A',
               },
               timestamp=1678147200.0,
           )

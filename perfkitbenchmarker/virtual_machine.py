@@ -878,6 +878,8 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       result['ip_address'] = self.ip_address
     if pkb_flags.RECORD_PROCCPU.value and self.cpu_version:
       result['cpu_version'] = self.cpu_version
+    if self.create_operation_name is not None:
+      result['create_operation_name'] = self.create_operation_name
     return result
 
   def SimulateMaintenanceEvent(self):
