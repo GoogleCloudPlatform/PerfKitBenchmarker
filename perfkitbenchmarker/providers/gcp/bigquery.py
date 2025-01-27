@@ -38,22 +38,13 @@ BQ_PYTHON_CLIENT_DIR = 'edw/bigquery/clients/python'
 DEFAULT_TABLE_EXPIRATION = 3600 * 24 * 365  # seconds
 
 BQ_JDBC_INTERFACES = [
-    'SIMBA_JDBC_1_2_4_1007',
-    'SIMBA_JDBC_1_3_3_1004',
-    'SIMBA_JDBC_1_5_0_1001',
-    'SIMBA_JDBC_1_5_2_1005',
+    'SIMBA_JDBC_1_6_2_1003',
 ]
 BQ_JDBC_CLIENT_FILE = {
-    'SIMBA_JDBC_1_2_4_1007': 'bq-jdbc-client-1.0.jar',
-    'SIMBA_JDBC_1_3_3_1004': 'bq-jdbc-client-2.0.jar',
-    'SIMBA_JDBC_1_5_0_1001': 'bq-jdbc-client-2.1.jar',
-    'SIMBA_JDBC_1_5_2_1005': 'bq-jdbc-client-2.2.jar',
+    'SIMBA_JDBC_1_6_2_1003': 'bq-jdbc-client-2.3.jar',
 }
 BQ_JDBC_JAR_FILE = {
-    'SIMBA_JDBC_1_2_4_1007': 'GoogleBigQueryJDBC42.jar',
-    'SIMBA_JDBC_1_3_3_1004': 'GoogleBigQueryJDBC42-1.3.3.1004.jar',
-    'SIMBA_JDBC_1_5_0_1001': 'GoogleBigQueryJDBC42-1.5.0.1001.jar',
-    'SIMBA_JDBC_1_5_2_1005': 'GoogleBigQueryJDBC42-1.5.2.1005.jar',
+    'SIMBA_JDBC_1_6_2_1003': 'GoogleBigQueryJDBC42_1_6_2.jar',
 }
 
 
