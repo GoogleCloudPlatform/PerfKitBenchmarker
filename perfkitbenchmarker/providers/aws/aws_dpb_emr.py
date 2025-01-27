@@ -230,6 +230,13 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     super()._CreateDependencies()
     aws_virtual_machine.AwsKeyFileManager.ImportKeyfile(self.region)
 
+  def Create(self, restore: bool = False) -> None:
+    """Overrides parent to register creation timeout as KNOWN_INTERMITTENT."""
+    try:
+      super().Create()
+    except vm_util.RetryError as e:
+      raise errors.Resource.ProvisionTimeoutError from e
+
   def _Create(self):
     """Creates the cluster."""
     name = 'pkb_' + FLAGS.run_uri
