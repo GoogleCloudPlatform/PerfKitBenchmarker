@@ -18,10 +18,14 @@ import re
 from perfkitbenchmarker import errors
 
 DPDK_GIT_REPO = 'https://github.com/DPDK/dpdk.git'
+DPDK_GIT_REPO_TAG = 'v24.11'
 DPDK_GCP_DRIVER_GIT_REPO = (
     'https://github.com/google/compute-virtual-ethernet-dpdk'
 )
+# Head as of 2025-01-08.
+DPDK_GCP_DRIVER_GIT_REPO_COMMIT = '0342498eaa38e8db1cd663a99d470989fb60f803'
 DPDK_AWS_DRIVER_GIT_REPO = 'https://github.com/amzn/amzn-drivers'
+DPDK_AWS_DRIVER_GIT_REPO_TAG = 'ena_linux_2.13.2'
 DPDK_AWS_VFIO_DRIVER_DIR = 'amzn-drivers/userspace/dpdk/enav2-vfio-patch'
 
 
@@ -29,9 +33,14 @@ def _Install(vm):
   """Install DPDK after installing dependencies and applying patches."""
   vm.Install('pip')
   vm.RobustRemoteCommand(f'git clone {DPDK_GIT_REPO}')
+  vm.RobustRemoteCommand(f'cd dpdk && git checkout {DPDK_GIT_REPO_TAG}')
   if vm.CLOUD == 'GCP':
     # Get out of tree driver
     vm.RobustRemoteCommand(f'git clone {DPDK_GCP_DRIVER_GIT_REPO}')
+    vm.RobustRemoteCommand(
+        'cd compute-virtual-ethernet-dpdk && git checkout'
+        f' {DPDK_GCP_DRIVER_GIT_REPO_COMMIT}'
+    )
     vm.RemoteCommand(
         'cp -r compute-virtual-ethernet-dpdk/* dpdk/drivers/net/gve'
     )
@@ -72,6 +81,9 @@ def AptInstall(vm):
     vm.Reboot()
     vm.RemoteCommand(f'git clone {DPDK_AWS_DRIVER_GIT_REPO}')
     vm.RemoteCommand(
+        f'cd amzn-drivers && git checkout {DPDK_AWS_DRIVER_GIT_REPO_TAG}'
+    )
+    vm.RemoteCommand(
         'sudo sed -i "s/# deb-src/deb-src/g" /etc/apt/sources.list'
     )
     vm.RemoteCommand('sudo apt update')
@@ -92,6 +104,9 @@ def YumInstall(vm):
   vm.RemoteCommand('sudo pip3 install meson ninja pyelftools')
   if vm.CLOUD == 'AWS':
     vm.RemoteCommand(f'git clone {DPDK_AWS_DRIVER_GIT_REPO}')
+    vm.RemoteCommand(
+        f'cd amzn-drivers && git checkout {DPDK_AWS_DRIVER_GIT_REPO_TAG}'
+    )
     vm.RemoteCommand(
         'sudo sed -i "s/linux-image-unsigned-/linux-image-/g"'
         f' {DPDK_AWS_VFIO_DRIVER_DIR}/get-vfio-with-wc.sh'
