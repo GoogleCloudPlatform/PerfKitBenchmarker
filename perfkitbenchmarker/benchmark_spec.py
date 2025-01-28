@@ -29,6 +29,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import capacity_reservation
 from perfkitbenchmarker import cloud_tpu
+from perfkitbenchmarker import cluster
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import data_discovery_service
@@ -180,6 +181,7 @@ class BenchmarkSpec:
     self.always_call_cleanup = pkb_flags.ALWAYS_CALL_CLEANUP.value
     self.dpb_service: dpb_service.BaseDpbService = None
     self.container_cluster: container_service.BaseContainerCluster = None
+    self.cluster: cluster.BaseCluster = None
     self.key = None
     self.relational_db = None
     self.non_relational_db = None
@@ -316,6 +318,7 @@ class BenchmarkSpec:
     self.ConstructBaseJob()
     self.ConstructMemoryStore()
     self.ConstructPinecone()
+    self.ConstructCluster()
 
   def ConstructContainerCluster(self):
     """Create the container cluster."""
@@ -331,6 +334,16 @@ class BenchmarkSpec:
         self.config.container_cluster
     )
     self.resources.append(self.container_cluster)
+
+  def ConstructCluster(self):
+    """Create the cluster."""
+    if self.config.cluster is None:
+      return
+    cloud = self.config.cluster.cloud
+    providers.LoadProvider(cloud)
+    cluster_class = cluster.GetClusterClass(cloud)
+    self.cluster = cluster_class(self.config.cluster)
+    self.resources.append(self.cluster)
 
   def ConstructContainerRegistry(self):
     """Create the container registry."""
@@ -880,6 +893,9 @@ class BenchmarkSpec:
     if self.container_cluster:
       self.container_cluster.Create()
 
+    if self.cluster:
+      self.cluster.Create()
+
     # do after network setup but before VM created
     if self.nfs_service and self.nfs_service.CLOUD != nfs_service.UNMANAGED:
       self.nfs_service.Create()
@@ -1042,6 +1058,9 @@ class BenchmarkSpec:
       self.container_cluster.DeleteServices()
       self.container_cluster.DeleteContainers()
       self.container_cluster.Delete()
+
+    if self.cluster:
+      self.cluster.Delete()
 
     for net in self.networks.values():
       try:
