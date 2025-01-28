@@ -18,7 +18,6 @@ colorlog[windows]==2.6.0
 contextlib2>=0.5.1
 google-cloud-aiplatform
 google-cloud-core
-google-cloud-datastore
 google-cloud-monitoring>=2.0.0
 immutabledict
 jinja2>=2.10.2
