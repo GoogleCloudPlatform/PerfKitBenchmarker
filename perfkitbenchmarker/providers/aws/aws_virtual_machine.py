@@ -2122,6 +2122,20 @@ class Windows2022DesktopSQLServer2022EnterpriseAwsVirtualMachine(
   IMAGE_SSM_PATTERN = '/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-SQL_2022_Enterprise'
 
 
+class Windows2025DesktopSQLServer2022StandardAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine,
+    windows_virtual_machine.Windows2025SQLServer2022Standard,
+):
+  IMAGE_SSM_PATTERN = '/aws/service/ami-windows-latest/Windows_Server-2025-English-Full-SQL_2022_Standard'
+
+
+class Windows2025DesktopSQLServer2022EnterpriseAwsVirtualMachine(
+    BaseWindowsAwsVirtualMachine,
+    windows_virtual_machine.Windows2025SQLServer2022Enterprise,
+):
+  IMAGE_SSM_PATTERN = '/aws/service/ami-windows-latest/Windows_Server-2025-English-Full-SQL_2022_Enterprise'
+
+
 def GenerateDownloadPreprovisionedDataCommand(
     install_path, module_name, filename
 ):

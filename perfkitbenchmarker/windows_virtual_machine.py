@@ -718,3 +718,15 @@ class Windows2022SQLServer2022Enterprise(BaseWindowsMixin):
   """Class holding Windows Server 2022 with Desktop Experience VM specifics."""
 
   OS_TYPE = os_types.WINDOWS2022_SQLSERVER_2022_ENTERPRISE
+
+
+class Windows2025SQLServer2022Standard(BaseWindowsMixin):
+  """Class holding Windows Server 2022 with Desktop Experience VM specifics."""
+
+  OS_TYPE = os_types.WINDOWS2025_SQLSERVER_2022_STANDARD
+
+
+class Windows2025SQLServer2022Enterprise(BaseWindowsMixin):
+  """Class holding Windows Server 2022 with Desktop Experience VM specifics."""
+
+  OS_TYPE = os_types.WINDOWS2025_SQLSERVER_2022_ENTERPRISE
