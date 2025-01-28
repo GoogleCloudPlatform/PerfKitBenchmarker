@@ -52,6 +52,15 @@ Signal sent after a cloud provider's modules have been imported.
 Sender: string. Cloud provider name chosen from provider_info.VALID_CLOUDS.""",
 )
 
+register_tracers = _events.signal(
+    'register_tracers',
+    doc="""
+Signal sent at the beginning of a benchmark for tracers to be registered.
+
+Sender: None
+Payload: parsed_flags, the parsed FLAGS object.""",
+)
+
 benchmark_start = _events.signal(
     'benchmark-start',
     doc="""

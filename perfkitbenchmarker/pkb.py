@@ -144,8 +144,8 @@ DOCSTRING_REGEX = (  # Pattern that matches triple quoted comments.
 _TEARDOWN_EVENT = multiprocessing.Event()
 _ANY_ZONE = 'any'
 
-events.initialization_complete.connect(traces.RegisterAll)
-events.initialization_complete.connect(time_triggers.RegisterAll)
+events.register_tracers.connect(traces.RegisterAll)
+events.register_tracers.connect(time_triggers.RegisterAll)
 
 
 @flags.multi_flags_validator(
@@ -657,6 +657,8 @@ def DoProvisionPhase(
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.Pickle()
+
+  events.register_tracers.send(parsed_flags=FLAGS)
   events.benchmark_start.send(benchmark_spec=spec)
   try:
     with timer.Measure('Resource Provisioning'):
@@ -1579,8 +1581,6 @@ def SetUpPKB():
       static_virtual_machine.StaticVirtualMachine.ReadStaticVirtualMachineFile(
           fp
       )
-
-  events.initialization_complete.send(parsed_flags=FLAGS)
 
   benchmark_lookup.SetBenchmarkModuleFunction(benchmark_sets.BenchmarkModule)
   package_lookup.SetPackageModuleFunction(benchmark_sets.PackageModule)

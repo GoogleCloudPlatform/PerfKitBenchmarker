@@ -67,12 +67,14 @@ netperf_tcp_rr:
   name: netperf
   flags:
     netperf_benchmarks: TCP_RR
+    sar: True
 
 netperf_tcp_stream:
   name: netperf
   flags:
     netperf_benchmarks: TCP_STREAM
     netperf_num_streams: 1,8,16,200
+    sar: True
 
 mysql_tpcc:
   name: hammerdbcli
