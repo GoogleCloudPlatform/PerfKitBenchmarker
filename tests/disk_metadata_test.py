@@ -105,7 +105,6 @@ class AwsDiskMetadataTest(_DiskMetadataTestCase):
         return_value=12
     )
     vm.create_disk_strategy.GetSetupDiskStrategy().SetUpDisk()
-    # pytype: disable=attribute-error
     expected = {disk.MEDIA: goal_media, disk.REPLICATION: goal_replication}
     self.assertEqual(
         vm.scratch_disks[0].metadata,
