@@ -170,6 +170,7 @@ class BaseGkeCluster(container_service.KubernetesCluster):
     if FLAGS.gke_enable_alpha:
       cmd.args.append('--enable-kubernetes-alpha')
       cmd.args.append('--no-enable-autorepair')
+    cmd.flags['monitoring'] = 'SYSTEM,API_SERVER,SCHEDULER,CONTROLLER_MANAGER'
 
     user = util.GetDefaultUser()
     if FLAGS.gcp_service_account:
