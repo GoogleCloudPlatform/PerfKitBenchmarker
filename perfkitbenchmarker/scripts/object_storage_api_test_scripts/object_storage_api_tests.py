@@ -1351,7 +1351,7 @@ def ListConsistencyBenchmark(service):
   for i in range(LIST_CONSISTENCY_THREAD_COUNT):
     for j in range(len(per_thread_objects_written[i])):
       # Delete about 30% of the objects written so far.
-      if random.Random() < LIST_AFTER_UPDATE_DELETION_RATIO:
+      if random.random() < LIST_AFTER_UPDATE_DELETION_RATIO:
         per_thread_objects_to_delete[i].append(per_thread_objects_written[i][j])
 
   # Now issue the delete concurrently.

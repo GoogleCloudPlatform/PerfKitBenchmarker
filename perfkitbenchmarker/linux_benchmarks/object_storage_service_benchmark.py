@@ -100,7 +100,7 @@ OBJECT_STORAGE_GCS_MULTIREGION = flags.DEFINE_string(
 
 flags.DEFINE_enum(
     'object_storage_scenario',
-    'all',
+    'api_multistream',
     [
         'all',
         'cli',
@@ -406,14 +406,15 @@ STORAGE_TO_API_SCRIPT_DICT = {
 _SECONDS_PER_HOUR = 60 * 60
 
 
-class MultistreamOperationType(enum.Enum):
+class MultistreamOperationType(enum.StrEnum):
   """MultiStream Operations supported by object_storage_api_tests script."""
 
-  download = 1
-  upload = 2
-  delete = 3
-  bulk_delete = 4
-  redownload = 5
+  # pylint: disable=invalid-name
+  download = enum.auto()
+  upload = enum.auto()
+  delete = enum.auto()
+  bulk_delete = enum.auto()
+  redownload = enum.auto()
 
 
 def GetConfig(user_config):
@@ -1372,6 +1373,17 @@ def MultiStreamRWBenchmark(
     )
     logging.info('Finished multi-stream re-read test.')
 
+  # Pre-cleanup here, whre we know what the files are.
+  # Also records delete latencies, even though that's not really documented.
+  keep_bucket = (
+      FLAGS.object_storage_objects_written_file_prefix is not None
+      or FLAGS.object_storage_dont_delete_bucket
+  )
+  if not keep_bucket:
+    MultiStreamDelete(
+        results, metadata, vms, command_builder, service, bucket_name
+    )
+
 
 def MultiStreamWriteBenchmark(
     results, metadata, vms, command_builder, service, bucket_name
@@ -1983,16 +1995,12 @@ def Run(benchmark_spec):
     )
 
   # Clear the bucket if we're not saving the objects for later
-  # This is needed for long running tests, or else the objects would just pile
-  # up after each run.
   keep_bucket = (
       FLAGS.object_storage_objects_written_file_prefix is not None
       or FLAGS.object_storage_dont_delete_bucket
   )
   if not keep_bucket:
-    MultiStreamDelete(
-        results, metadata, vms, command_builder, service, bucket_name
-    )
+    service.EmptyBucket(bucket_name)
 
   service.UpdateSampleMetadata(results)
 
