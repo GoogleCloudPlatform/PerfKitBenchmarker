@@ -130,6 +130,7 @@ _RETRYABLE_KUBECTL_ERRORS = [
     ),
     'read: connection reset by peer',
     'Unable to connect to the server: dial tcp',
+    'Unable to connect to the server: net/http: TLS handshake timeout',
 ]
 
 
@@ -161,6 +162,36 @@ def RunKubectlCommand(command: list[str], **kwargs) -> tuple[str, str, int]:
     # IssueCommand defaults stack_level to 1, so 2 skips this function.
     kwargs['stack_level'] = 2
   cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig] + command
+
+  orig_suppress_failure = None
+  if 'suppress_failure' in kwargs:
+    orig_suppress_failure = kwargs['suppress_failure']
+
+  def _DetectTimeoutViaSuppressFailure(stdout, stderr, retcode):
+    # Check for kubectl timeout. If found, treat it the same as a regular
+    # timeout.
+    if retcode != 0:
+      for error_substring in _RETRYABLE_KUBECTL_ERRORS:
+        if error_substring in stderr:
+          # Raise timeout error regardless of raise_on_failure - as the intended
+          # semantics is to ignore expected errors caused by invoking the
+          # command not errors from PKB infrastructure.
+          raise_on_timeout = (
+              kwargs['raise_on_timeout']
+              if 'raise_on_timeout' in kwargs
+              else True
+          )
+          if raise_on_timeout:
+            raise errors.VmUtil.IssueCommandTimeoutError(stderr)
+    # Else, if the user supplied a suppress_failure function, try that.
+    if orig_suppress_failure is not None:
+      return orig_suppress_failure(stdout, stderr, retcode)
+
+    # Else, no suppression.
+    return False
+
+  kwargs['suppress_failure'] = _DetectTimeoutViaSuppressFailure
+
   return vm_util.IssueCommand(cmd, **kwargs)
 
 
@@ -172,6 +203,12 @@ def RunRetryableKubectlCommand(
     run_cmd: list[str], timeout: int | None = None, **kwargs
 ) -> tuple[str, str, int]:
   """Runs a kubectl command, retrying somewhat exepected errors."""
+  if 'raise_on_timeout' in kwargs and kwargs['raise_on_timeout']:
+    raise ValueError(
+        'RunRetryableKubectlCommand does not allow `raise_on_timeout=True`'
+        ' (since timeouts are retryable).'
+    )
+
   if 'stack_level' in kwargs:
     kwargs['stack_level'] += 1
   else:
@@ -180,24 +217,12 @@ def RunRetryableKubectlCommand(
 
   @vm_util.Retry(
       timeout=timeout,
-      retryable_exceptions=(RetryableKubectlError,),
+      retryable_exceptions=(errors.VmUtil.IssueCommandTimeoutError,),
   )
   def _RunRetryablePart(run_cmd: list[str], **kwargs):
     """Inner function retries command so timeout can be passed to decorator."""
     kwargs['stack_level'] += 1
-    out, err, code = RunKubectlCommand(
-        run_cmd, raise_on_failure=False, **kwargs
-    )
-    if err:
-      logging.warning('Got error %s when running %s', err, run_cmd)
-      for error_substring in _RETRYABLE_KUBECTL_ERRORS:
-        if error_substring in err:
-          raise RetryableKubectlError(
-              f'Tried running {run_cmd} but it failed with the substring'
-              f' {error_substring}. Retrying. Full error is: {err}'
-          )
-      raise errors.VmUtil.IssueCommandError(err)
-    return out, err, code
+    return RunKubectlCommand(run_cmd, raise_on_timeout=True, **kwargs)
 
   return _RunRetryablePart(run_cmd, timeout=timeout, **kwargs)
 

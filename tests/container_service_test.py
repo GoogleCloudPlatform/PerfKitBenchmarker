@@ -1,10 +1,12 @@
-from typing import Iterable
+import time
+from typing import Callable, Iterable, Protocol, Tuple
 import unittest
 from unittest import mock
 from absl.testing import flagsaver
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.sample import Sample
 from tests import pkb_common_test_case
@@ -23,6 +25,60 @@ class TestKubernetesCluster(container_service.KubernetesCluster):
 
   def _Delete(self):
     pass
+
+
+kubectl_timeout_tuple = (
+    '',
+    (
+        'Unable to connect to the server: dial tcp 10.42.42.42:443:'
+        'connect: connection timed out'
+    ),
+    1,
+)
+
+
+class _IssueCommandCallable(Protocol):
+
+  def __call__(
+      self,
+      cmd: Iterable[str],
+      suppress_failure: Callable[[str, str, int], bool] | None = None,
+      **kwargs,
+  ) -> Tuple[str, str, int]:
+    ...
+
+
+def _MockedIssueCommandSuppressing(
+    stderr: str,
+) -> _IssueCommandCallable:
+  def _MockedCommand(
+      cmd: Iterable[str],
+      suppress_failure: Callable[[str, str, int], bool] | None = None,
+      **kwargs,
+  ):
+    _ = cmd
+    _ = kwargs
+    stdout = ''
+    status = 1
+    if suppress_failure and suppress_failure(stdout, stderr, status):
+      return stdout, '', 0
+    return stdout, stderr, status
+
+  return _MockedCommand
+
+
+def _MockedIssueCommandFailure(
+    cmd: Iterable[str],
+    suppress_failure: Callable[[str, str, int], bool] | None = None,
+    **kwargs,
+) -> Tuple[str, str, int]:
+  return _MockedIssueCommandSuppressing(
+      stderr='A failure occurred',
+  )(
+      cmd,
+      suppress_failure=suppress_failure,
+      **kwargs,
+  )
 
 
 class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
@@ -62,26 +118,59 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertEqual(next(deploy_ids), 'deployment.apps/test-deployment')
 
-  def test_retriable_kubectl_command_fails_on_random_error(self):
-    self.MockIssueCommand(
-        {'get podpatchwork': [('', 'error: invalid syntax', 1)]}
-    )
+  @mock.patch.object(
+      vm_util,
+      'IssueCommand',
+      side_effect=[errors.VmUtil.IssueCommandError()],
+      autospec=True,
+  )
+  def test_retriable_kubectl_command_fails_on_random_error(self, _):
     with self.assertRaises(errors.VmUtil.IssueCommandError):
       container_service.RunRetryableKubectlCommand(['get', 'podpatchwork'])
 
-  def test_retriable_kubectl_command_retries_on_connection_reset(self):
-    self.MockIssueCommand({
-        'get pods': [
-            ('', 'error: read: connection reset by peer', 1),
-            ('pod1, pod2', '', 0),
-        ]
-    })
+  @mock.patch.object(
+      vm_util,
+      'IssueCommand',
+      side_effect=[
+          errors.VmUtil.IssueCommandTimeoutError(),
+          ('pod1, pod2', '', 0),
+      ],
+      autospec=True,
+  )
+  @mock.patch.object(time, 'sleep', autospec=True)
+  def test_retriable_kubectl_command_retries_on_retriable_error(
+      self, sleep_mock, issue_command_mock
+  ):
     out, err, ret = container_service.RunRetryableKubectlCommand(
         ['get', 'pods']
     )
     self.assertEqual(out, 'pod1, pod2')
     self.assertEqual(err, '')
     self.assertEqual(ret, 0)
+
+  def test_retriable_kubectl_command_passes_timeout_through(self):
+    def _VerifyTimeout(
+        cmd: Iterable[str],
+        timeout: int | None = vm_util.DEFAULT_TIMEOUT,
+        **kwargs,
+    ) -> Tuple[str, str, int]:
+      _ = cmd
+      _ = kwargs
+      self.assertEqual(
+          timeout,
+          1,
+          'timeout not correctly passed to underlying vm_util.IssueCommand()',
+      )
+      return 'ok', '', 0
+
+    with mock.patch.object(vm_util, 'IssueCommand', _VerifyTimeout):
+      container_service.RunRetryableKubectlCommand(['get', 'pods'], timeout=1)
+
+  def test_retriable_kubectl_command_fails_with_raise_on_timeout(self):
+    with self.assertRaises(ValueError):
+      container_service.RunRetryableKubectlCommand(
+          ['get', 'pods'], raise_on_timeout=True
+      )
 
   def test_GetNumReplicasSamples_found(self):
     resource_name = 'deployment/my_deployment'
@@ -160,6 +249,63 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
             _Sample(1, 'unknown'),
         ],
     )
+
+  @mock.patch.object(
+      vm_util,
+      'IssueCommand',
+      return_value=['stdout', 'stderr', 0],
+      autospec=True,
+  )
+  def test_RunKubectlCommand(self, issue_command_mock):
+    stdout, stderr, status = container_service.RunKubectlCommand(
+        ['get', 'pods']
+    )
+    self.assertEqual(stdout, 'stdout')
+    self.assertEqual(stderr, 'stderr')
+    self.assertEqual(status, 0)
+
+  @mock.patch.object(
+      vm_util,
+      'IssueCommand',
+      side_effect=errors.VmUtil.IssueCommandTimeoutError(),
+      autospec=True,
+  )
+  def test_RunKubectlCommand_CommandTimeoutPropagated(self, issue_command_mock):
+    with self.assertRaises(errors.VmUtil.IssueCommandTimeoutError):
+      container_service.RunKubectlCommand(['get', 'pods'])
+
+  def test_RunKubectlCommand_KubectlTimeoutRaisesCommandTimeout(self):
+    for err in container_service._RETRYABLE_KUBECTL_ERRORS:
+      with mock.patch.object(
+          vm_util, 'IssueCommand', _MockedIssueCommandSuppressing(stderr=err)
+      ):
+        with self.assertRaises(
+            errors.VmUtil.IssueCommandTimeoutError,
+            msg=f'Failed to raise timeout for error: {err}',
+        ):
+          container_service.RunKubectlCommand(['get', 'pods'])
+
+  def test_RunKubectlCommand_KubectlTimeoutWithSuppressFailureRaisesCommandTimeout(
+      self,
+  ):
+    for err in container_service._RETRYABLE_KUBECTL_ERRORS:
+      with mock.patch.object(
+          vm_util, 'IssueCommand', _MockedIssueCommandSuppressing(stderr=err)
+      ):
+        with self.assertRaises(
+            errors.VmUtil.IssueCommandTimeoutError,
+            msg=f'Failed to raise timeout for error: {err}',
+        ):
+          container_service.RunKubectlCommand(
+              ['get', 'pods'], suppress_failure=lambda x, y, z: True
+          )
+
+  @mock.patch.object(vm_util, 'IssueCommand', _MockedIssueCommandFailure)
+  def test_RunKubectlCommand_KubectlFailWithSuppressFailure(self):
+    _, _, status = container_service.RunKubectlCommand(
+        ['get', 'pods'], suppress_failure=lambda x, y, z: True
+    )
+    self.assertEqual(status, 0)
 
 
 def _ClearTimestamps(samples: Iterable[Sample]) -> Iterable[Sample]:

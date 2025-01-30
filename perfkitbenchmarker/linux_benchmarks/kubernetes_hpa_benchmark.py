@@ -24,6 +24,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import locust
 from perfkitbenchmarker.sample import Sample
 
@@ -226,8 +227,20 @@ class KubernetesMetricsCollector:
       self,
       observe_fn: Callable[[], List[Sample]],
   ) -> None:
+    """Call the specified function until self._stop is signalled.
+
+    Results are appended to self._samples. Timeouts are ignored.
+
+    Args:
+      observe_fn: The function to call.
+    """
     while True:
-      self._samples.extend(observe_fn())
+      try:
+        self._samples.extend(observe_fn())
+      except errors.VmUtil.IssueCommandTimeoutError:
+        # Ignore timeouts - there'll be a gap in the data, but that's ok.
+        pass
+
       if self._stop.wait(timeout=1.0):
         return
 
