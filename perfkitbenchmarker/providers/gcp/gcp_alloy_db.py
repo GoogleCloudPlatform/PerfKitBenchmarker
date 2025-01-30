@@ -5,13 +5,16 @@ performance with postgres.
 """
 
 import json
+import logging
 from typing import Any, Dict, List, Tuple
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
 from perfkitbenchmarker.providers.gcp import util
+import requests
 
 FLAGS = flags.FLAGS
 
@@ -127,6 +130,8 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
         'create',
         self.cluster_id,
         '--password=%s' % self.spec.database_password,
+        '--network=%s' % self.client_vm.network.network_resource.name,
+        '--allocated-ip-range-name=google-service-range',
     ]
 
     cmd = self._GetAlloyDbCommand(cmd_string)
@@ -200,6 +205,49 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
         _ENABLE_COLUMNAR_RECOMMENDATION.value,
         _ENABLE_AUTO_COLUMNARIZATION.value,
     )
+    self._UpdateLabels(util.GetDefaultTags())
+
+  def _DescribeCluster(self) -> Dict[str, Any]:
+    cmd = util.GcloudCommand(
+        self,
+        'alloydb',
+        'clusters',
+        'describe',
+        self.cluster_id,
+    )
+    cmd.flags['project'] = self.project
+    cmd.flags['zone'] = []
+    cmd.flags['region'] = self.region
+    stdout, _, _ = cmd.Issue()
+    return json.loads(stdout)
+
+  def _GetLabels(self) -> Dict[str, Any]:
+    """Gets labels from the current instance."""
+    return self._DescribeCluster().get('labels', {})
+
+  def _UpdateLabels(self, labels: Dict[str, Any]) -> None:
+    """Updates the labels of the current instance."""
+    header = {'Authorization': f'Bearer {util.GetAccessToken()}'}
+    url = (
+        'https://alloydb.googleapis.com/v1/'
+        f'projects/{self.project}/locations/{self.region}/clusters/{self.cluster_id}'
+    )
+    # Keep any existing labels
+    tags = self._GetLabels()
+    tags.update(labels)
+    response = requests.patch(
+        url,
+        headers=header,
+        params={'updateMask': 'labels'},
+        json={'labels': tags},
+    )
+    logging.info(
+        'Update labels: status code %s, %s', response.status_code, response.text
+    )
+    if response.status_code != 200:
+      raise errors.Resource.UpdateError(
+          f'Unable to update AlloyDB cluster: {response.text}'
+      )
 
   def AddTableToColumnarEngine(self, table: str, database_name: str) -> None:
     self.client_vm_query_tools.IssueSqlCommand(
@@ -281,7 +329,8 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     )
 
   def _GetAlloyDbCommand(
-      self, cmd_string: List[str], timeout: int | None = None
+      self,
+      cmd_string: List[str],
   ) -> util.GcloudCommand:
     """Used to issue alloydb command."""
     cmd_string = [self, 'alpha', 'alloydb'] + cmd_string
@@ -291,18 +340,10 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     cmd.flags['region'] = self.region
     return cmd
 
-  def _IsReady(self, timeout: int = IS_READY_TIMEOUT) -> bool:
-    """Return true if the underlying resource is ready.
-
-    Alloydb Creation is synchronous, therefore is ready is not needed.
-
-    Args:
-      timeout: how long to wait when checking if the DB is ready.
-
-    Returns:
-      True if the resource was ready in time, False if the wait timed out.
-    """
-    return True
+  def _IsReady(self) -> bool:
+    """Return true if the underlying resource is ready."""
+    cluster = self._DescribeCluster()
+    return cluster['state'] == 'READY'
 
   def _ApplyDbFlags(self):
     # Database flags is applied during creation.
