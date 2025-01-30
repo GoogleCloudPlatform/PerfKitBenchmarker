@@ -293,7 +293,11 @@ sparksql_tpcds_1t:
           provisioned_iops: 5000
           provisioned_throughput: 480
 
-sysbench_oltp_base: &sysbench_oltp_base
+mysql_sysbench_oltp_base: &mysql_sysbench_oltp_base
+  sysbench_table_size: 25000000
+  sysbench_tables: 8
+
+postgres_sysbench_oltp_base: &postgres_sysbench_oltp_base
   sysbench_table_size: 50000000
   sysbench_tables: 8
 
@@ -301,19 +305,19 @@ mysql_sysbench_oltp_read_write:
   name: unmanaged_mysql_sysbench
   flags:
     sysbench_testname: oltp_read_write
-    <<: *sysbench_oltp_base
+    <<: *mysql_sysbench_oltp_base
 
 mysql_sysbench_oltp_read_only:
   name: unmanaged_mysql_sysbench
   flags:
     sysbench_testname: oltp_read_only
-    <<: *sysbench_oltp_base
+    <<: *mysql_sysbench_oltp_base
 
 mysql_sysbench_oltp_write_only:
   name: unmanaged_mysql_sysbench
   flags:
     sysbench_testname: oltp_write_only
-    <<: *sysbench_oltp_base
+    <<: *mysql_sysbench_oltp_base
 
 mysql_sysbench_tpcc:
   name: unmanaged_mysql_sysbench
@@ -327,19 +331,19 @@ postgres_sysbench_oltp_read_write:
   name: unmanaged_postgresql_sysbench
   flags:
     sysbench_testname: oltp_read_write
-    <<: *sysbench_oltp_base
+    <<: *postgres_sysbench_oltp_base
 
 postgres_sysbench_oltp_read_only:
   name: unmanaged_postgresql_sysbench
   flags:
     sysbench_testname: oltp_read_only
-    <<: *sysbench_oltp_base
+    <<: *postgres_sysbench_oltp_base
 
 postgres_sysbench_oltp_write_only:
   name: unmanaged_postgresql_sysbench
   flags:
     sysbench_testname: oltp_write_only
-    <<: *sysbench_oltp_base
+    <<: *postgres_sysbench_oltp_base
 
 postgres_sysbench_tpcc:
   name: unmanaged_postgresql_sysbench
