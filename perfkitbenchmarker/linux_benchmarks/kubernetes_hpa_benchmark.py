@@ -95,6 +95,12 @@ def _PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec):
   )
 
   cluster.WaitForResource('deploy/fib', 'available', namespace='fib')
+  cluster.WaitForResource(
+      'service/fib',
+      '{.status.loadBalancer.ingress[0].ip}',
+      namespace='fib',
+      condition_type='jsonpath=',
+  )
 
 
 def _PrepareLocust(benchmark_spec: bm_spec.BenchmarkSpec):

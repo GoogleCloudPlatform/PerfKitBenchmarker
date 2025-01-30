@@ -946,11 +946,12 @@ class KubernetesClusterCommands:
       namespace: str | None = None,
       timeout: int = vm_util.DEFAULT_TIMEOUT,
       wait_for_all: bool = False,
+      condition_type='condition=',
   ):
     """Waits for a condition on a Kubernetes resource (eg: deployment, pod)."""
     run_cmd = [
         'wait',
-        f'--for=condition={condition_name}',
+        f'--for={condition_type}{condition_name}',
         f'--timeout={timeout}s',
         resource_name,
     ]
