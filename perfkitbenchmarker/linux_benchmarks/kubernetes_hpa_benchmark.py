@@ -51,18 +51,9 @@ kubernetes_hpa:
   container_cluster:
     cloud: GCP
     type: Kubernetes
-    vm_count: 1
+    min_vm_count: 3
+    max_vm_count: 50
     vm_spec: *default_dual_core
-    nodepools:
-      fibpool:
-        vm_count: 3
-        vm_spec:
-          GCP:
-            machine_type: n2-standard-4
-          AWS:
-            machine_type: m6i.xlarge
-          Azure:
-            machine_type: Standard_D4s_v5
   flags:
     locust_path: locust/rampup.py
 """
