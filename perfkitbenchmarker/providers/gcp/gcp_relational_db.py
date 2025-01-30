@@ -250,9 +250,9 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
 
     if self.spec.backup_enabled:
       cmd_string.append('--backup')
-      cmd_string.append(
-          '--backup-start-time={}'.format(self.spec.backup_start_time)
-      )
+      cmd_string.append('--enable-point-in-time-recovery')
+      cmd_string.append('--retained-backups-count=1')
+      cmd_string.append('--retained-transaction-log-days=1')
     else:
       cmd_string.append('--no-backup')
     cmd = util.GcloudCommand(*cmd_string)

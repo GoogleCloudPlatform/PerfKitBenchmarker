@@ -165,10 +165,6 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
             {'default': None},
         ),
         'backup_enabled': (option_decoders.BooleanDecoder, {'default': True}),
-        'backup_start_time': (
-            option_decoders.StringDecoder,
-            {'default': '07:00'},
-        ),
         'is_managed_db': (option_decoders.BooleanDecoder, {'default': True}),
         'db_tier': (option_decoders.StringDecoder, {'default': None}),
         'db_spec': (spec.PerCloudConfigDecoder, {}),
@@ -261,8 +257,6 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       )
     if flag_values['db_backup_enabled'].present:
       config_values['backup_enabled'] = flag_values.db_backup_enabled
-    if flag_values['db_backup_start_time'].present:
-      config_values['backup_start_time'] = flag_values.db_backup_start_time
     if flag_values['db_flags'].present:
       config_values['db_flags'] = flag_values.db_flags
     cloud = config_values['cloud']

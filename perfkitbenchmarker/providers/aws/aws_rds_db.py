@@ -92,6 +92,7 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
             '--engine-version=%s' % self.spec.engine_version,
             '--db-subnet-group-name=%s' % self.db_subnet_group_name,
             '--vpc-security-group-ids=%s' % self.security_group_id,
+            '--backup-retention-period=%s' % int(self.spec.backup_enabled),
             '--tags',
         ]
         + util.MakeFormattedDefaultTags()
@@ -111,11 +112,6 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
             '--storage-throughput=%s'
             % self.spec.db_disk_spec.provisioned_throughput
         )
-
-    if self.spec.backup_enabled:
-      cmd.append('--backup-retention-period=1')
-    else:
-      cmd.append('--backup-retention-period=0')
 
     vm_util.IssueCommand(cmd)
 
