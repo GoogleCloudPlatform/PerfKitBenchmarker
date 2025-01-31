@@ -39,6 +39,7 @@ from perfkitbenchmarker.resources.kubernetes import kubernetes_disk
 from perfkitbenchmarker.resources.kubernetes import kubernetes_pod_spec
 from perfkitbenchmarker.resources.kubernetes import kubernetes_resources_spec
 
+
 FLAGS = flags.FLAGS
 # Using root logger removes one function call logging.info adds.
 logger = logging.getLogger()
@@ -522,7 +523,7 @@ class DebianBasedKubernetesVirtualMachine(
     """
     file_name = vm_util.PrependTempDir(posixpath.basename(source_path))
     self.RemoteHostCopy(file_name, source_path, copy_to=False)
-    target.RemoteHostCopy(file_name, remote_path)
+    target.RemoteHostCopy(file_name, remote_path)  # pytype: disable=attribute-error
 
   def RemoteHostCopy(
       self,
@@ -685,7 +686,7 @@ class DebianBasedKubernetesVirtualMachine(
     """Returns whether or not preprovisioned data is available."""
     if self.cloud == 'GCP' and FLAGS.gcp_preprovisioned_data_bucket:
       stat_function = gce_virtual_machine.GenerateStatPreprovisionedDataCommand
-      gce_virtual_machine.GceVirtualMachine.InstallCli(self)
+      gce_virtual_machine.GceVirtualMachine.InstallCli(self)  # pytype: disable=wrong-arg-types
       # We assume that gsutil is installed to /usr/bin/gsutil on GCE VMs
       # ln -f is idempotent and can be called multiple times
       self.RemoteCommand(
@@ -694,12 +695,12 @@ class DebianBasedKubernetesVirtualMachine(
       )
     elif self.cloud == 'AWS' and FLAGS.aws_preprovisioned_data_bucket:
       stat_function = aws_virtual_machine.GenerateStatPreprovisionedDataCommand
-      aws_virtual_machine.AwsVirtualMachine.InstallCli(self)
+      aws_virtual_machine.AwsVirtualMachine.InstallCli(self)  # pytype: disable=wrong-arg-types
     elif self.cloud == 'Azure' and FLAGS.azure_preprovisioned_data_account:
       stat_function = (
           azure_virtual_machine.GenerateStatPreprovisionedDataCommand
       )
-      azure_virtual_machine.AzureVirtualMachine.InstallCli(self)
+      azure_virtual_machine.AzureVirtualMachine.InstallCli(self)  # pytype: disable=wrong-arg-types
     else:
       return False
     return self.TryRemoteCommand(stat_function(module_name, filename))

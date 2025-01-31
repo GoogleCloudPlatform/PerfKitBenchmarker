@@ -158,7 +158,7 @@ def ConfigureSystemSettings(vm: virtual_machine.VirtualMachine):
   """
   if vm.OS_TYPE not in os_types.LINUX_OS_TYPES:
     logging.error(
-        'System settings not configured for unsupported OS: %s', vm.os_info)
+        'System settings not configured for unsupported OS: %s', vm.os_info)  # pytype: disable=attribute-error
     return
   sysctl_append = 'sudo tee -a /etc/sysctl.conf'
   vm.RemoteCommand(f'echo "vm.swappiness=1" | {sysctl_append}')

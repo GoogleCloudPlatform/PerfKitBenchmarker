@@ -772,7 +772,7 @@ class BenchmarkSpec:
         for vm in vms:
           vm.controller = clouds[group_spec.cloud]
 
-        jujuvm.units.extend(vms)
+        jujuvm.units.extend(vms)  # pytype: disable=attribute-error
         if jujuvm and jujuvm not in self.vms:
           self.vms.extend([jujuvm])
           self.vm_groups['%s_juju_controller' % group_spec.cloud] = [jujuvm]
@@ -1184,7 +1184,7 @@ class BenchmarkSpec:
           % (os_type, cloud)
       )
 
-    return vm_class(vm_spec)
+    return vm_class(vm_spec)  # pytype: disable=not-instantiable
 
   def DeleteVm(self, vm):
     """Deletes a single vm and scratch disk if required.

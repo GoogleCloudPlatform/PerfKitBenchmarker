@@ -156,7 +156,8 @@ def _CollectGpuSamples(
     cmd = ' '.join(global_cmd + [f'--device={device}'])
     stdout, stderr, exit_code = vm.RemoteCommandWithReturnCode(
         cmd, ignore_failure=True
-    )
+    )  # pytype: disable=attribute-error
+
     if exit_code:
       logging.warning('Error with getting GPU stats: %s', stderr)
       continue

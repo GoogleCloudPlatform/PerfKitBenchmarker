@@ -190,6 +190,24 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
     """
     raise NotImplementedError()
 
+  def RemoteCommandWithReturnCode(
+      self, *args, **kwargs
+  ) -> Tuple[str, str, int]:
+    """Runs a command on the VM & returns error code.
+
+    Args:
+      *args: Generic arguments, lining up with RemoteCommand.
+      **kwargs: Additional arguments, including anything additional from child
+        implementations.
+
+    Returns:
+      A tuple of stdout, stderr, return_code from running the command.
+
+    Raises:
+      RemoteCommandError: If there was a problem establishing the connection.
+    """
+    raise NotImplementedError()
+
   def RobustRemoteCommand(
       self,
       command: str,
@@ -445,6 +463,10 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
   def Install(self, package_name):
     """Installs a PerfKit package on the VM."""
     raise NotImplementedError()
+
+  def InstallPackages(self, packages: str) -> None:
+    """Installs packages using the OS's package manager."""
+    pass
 
   def Uninstall(self, package_name):
     """Uninstalls a PerfKit package on the VM."""

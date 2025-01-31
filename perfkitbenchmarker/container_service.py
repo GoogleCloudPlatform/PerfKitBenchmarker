@@ -487,7 +487,7 @@ class BaseContainerCluster(resource.BaseResource):
     )
     default_vm_config: virtual_machine.BaseVirtualMachine = default_vm_class(
         cluster_spec.vm_spec
-    )
+    )  # pytype: disable=not-instantiable
     self.default_nodepool = self._InitializeDefaultNodePool(
         cluster_spec, default_vm_config
     )
@@ -495,7 +495,7 @@ class BaseContainerCluster(resource.BaseResource):
     for name, nodepool_spec in cluster_spec.nodepools.copy().items():
       vm_config: virtual_machine.BaseVirtualMachine = default_vm_class(
           nodepool_spec.vm_spec
-      )
+      )  # pytype: disable=not-instantiable
       nodepool = self._InitializeNodePool(name, nodepool_spec, vm_config)
       self.nodepools[nodepool.name] = nodepool
     self.min_nodes: int = (

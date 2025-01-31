@@ -518,7 +518,7 @@ def WaitForReady(
   while start_time + timeout > time.time():
     stdout, _, code = vm.RemoteCommandWithReturnCode(
         'sudo systemd-analyze', ignore_failure=True
-    )
+    )  # pytype: disable=attribute-error
     if code == 0:
       return ParseUserTotalTimes(stdout)
     time.sleep(1)

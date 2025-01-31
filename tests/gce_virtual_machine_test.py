@@ -19,6 +19,7 @@ import contextlib
 import copy
 import json
 import re
+import typing
 import unittest
 
 from absl import flags
@@ -455,8 +456,9 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     return fake_rets
 
   def testCreateUbuntu2004(self):
-    vm_class = virtual_machine.GetVmClass(
-        provider_info.GCP, os_types.UBUNTU2004
+    vm_class = typing.cast(
+        type(gce_virtual_machine.GceVirtualMachine),
+        virtual_machine.GetVmClass(provider_info.GCP, os_types.UBUNTU2004),
     )
     fake_image = 'fake-ubuntu2004'
     with PatchCriticalObjects(
@@ -512,7 +514,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)
     ) as issue_command:
-      vm = vm_class(spec)
+      vm = vm_class(spec)  # pytype: disable=not-instantiable
       vm._CreateDependencies()
       vm._Create()
       vm.created = True
@@ -557,7 +559,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image, fake_disk)
     ) as issue_command:
-      vm = vm_class(spec)
+      vm = vm_class(spec)  # pytype: disable=not-instantiable
       vm._CreateDependencies()
       vm._Create()
       vm.created = True
@@ -593,7 +595,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)
     ) as issue_command:
-      vm = vm_class(spec)
+      vm = vm_class(spec)  # pytype: disable=not-instantiable
       vm._CreateDependencies()
       vm._Create()
       vm.created = True
@@ -619,7 +621,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)
     ) as issue_command:
-      vm = vm_class(spec)
+      vm = vm_class(spec)  # pytype: disable=not-instantiable
       vm._CreateDependencies()
       vm._Create()
       vm.created = True

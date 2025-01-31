@@ -318,7 +318,7 @@ class KubernetesVirtualMachineOsTypesTestCase(
     vm_class = virtual_machine.GetVmClass(
         provider_info.GCP, os_type, provider_info.KUBERNETES
     )
-    kub_vm = vm_class(spec)
+    kub_vm = vm_class(spec)  # pytype: disable=not-instantiable
     kub_vm._WaitForPodBootCompletion = lambda: None
     kub_vm._Create()
 
@@ -350,7 +350,7 @@ class KubernetesVirtualMachineClassFoundTestCase(
     vm_class = virtual_machine.GetVmClass(
         provider_info.GCP, os_types.UBUNTU2404
     )
-    kub_vm = vm_class(spec)
+    kub_vm = vm_class(spec)  # pytype: disable=not-instantiable
     self.assertIsInstance(
         kub_vm,
         kubernetes_virtual_machine.Ubuntu2404BasedKubernetesVirtualMachine,
@@ -368,7 +368,7 @@ class KubernetesVirtualMachineClassFoundTestCase(
     vm_class = virtual_machine.GetVmClass(
         provider_info.AZURE, os_types.UBUNTU2004
     )
-    kub_vm = vm_class(spec)
+    kub_vm = vm_class(spec)  # pytype: disable=not-instantiable
     self.assertIsInstance(
         kub_vm,
         kubernetes_virtual_machine.Ubuntu2004BasedKubernetesVirtualMachine,
@@ -456,7 +456,7 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
         provider_info.AWS, os_types.UBUNTU2404, provider_info.KUBERNETES
     )
     with patch_critical_objects(flags=FLAGS) as (issue_command, _):
-      kub_vm = vm_class(spec)
+      kub_vm = vm_class(spec)  # pytype: disable=not-instantiable
       kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
 
       command = issue_command.call_args[0][0]
@@ -470,7 +470,7 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
         provider_info.AZURE, os_types.UBUNTU2404, provider_info.KUBERNETES
     )
     with patch_critical_objects() as (issue_command, _):
-      kub_vm = vm_class(spec)
+      kub_vm = vm_class(spec)  # pytype: disable=not-instantiable
       kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
 
       command = issue_command.call_args[0][0]
@@ -484,7 +484,7 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
     )
     spec = self.create_virtual_machine_spec()
     with patch_critical_objects() as (issue_command, _):
-      kub_vm = vm_class(spec)
+      kub_vm = vm_class(spec)  # pytype: disable=not-instantiable
       kub_vm.DownloadPreprovisionedData('path', 'name', 'filename')
 
       command = issue_command.call_args[0][0]
@@ -560,7 +560,7 @@ class KubernetesVirtualMachine(BaseKubernetesVirtualMachineTestCase):
         provider_info.GCP, os_types.UBUNTU2404, provider_info.KUBERNETES
     )
     with patch_critical_objects() as (_, temp_file):
-      kub_vm = vm_class(spec)
+      kub_vm = vm_class(spec)  # pytype: disable=not-instantiable
       # Need to set the name explicitly on the instance because the test
       # running is currently using a single PKB instance, so the BaseVm
       # instance counter is at an unpredictable number at this stage, and it is

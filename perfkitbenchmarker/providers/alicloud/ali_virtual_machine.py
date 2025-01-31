@@ -179,14 +179,14 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     If no default is configured, this will return None.
     """
-    if cls.IMAGE_NAME_FILTER is None:
+    if cls.IMAGE_NAME_FILTER is None:  # pytype: disable=attribute-error
       return None
 
     describe_cmd = util.ALI_PREFIX + [
         'ecs',
         'DescribeImages',
         '--RegionId %s' % region,
-        "--ImageName '%s'" % cls.IMAGE_NAME_FILTER,
+        "--ImageName '%s'" % cls.IMAGE_NAME_FILTER,  # pytype: disable=attribute-error
     ]
     describe_cmd = util.GetEncodedCmd(describe_cmd)
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
@@ -416,14 +416,14 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     else:
       data_disk.device_letter = DRIVE_START_LETTER
 
-    self.FormatDisk(data_disk.GetDevicePath(), disk_spec.disk_type)
+    self.FormatDisk(data_disk.GetDevicePath(), disk_spec.disk_type)  # pytype: disable=attribute-error
     self.MountDisk(
         data_disk.GetDevicePath(),
         disk_spec.mount_point,
         disk_spec.disk_type,
         data_disk.mount_options,
         data_disk.fstab_options,
-    )
+    )  # pytype: disable=attribute-error
 
   def AddMetadata(self, **kwargs):
     """Adds metadata to the VM."""

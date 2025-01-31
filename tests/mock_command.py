@@ -35,6 +35,7 @@ Usage:
 
 import collections
 import logging
+from typing import Any
 from unittest import mock
 from absl.testing import absltest
 from perfkitbenchmarker import virtual_machine
@@ -60,7 +61,7 @@ class MockCommand:
   def __init__(
       self,
       call_to_response: dict[str, list[ReturnValues]],
-      mock_command_function: mock.MagicMock,
+      mock_command_function: Any,
       default_return_value: ReturnValues = ('', ''),
   ):
     self.progress_through_calls = collections.defaultdict(int)

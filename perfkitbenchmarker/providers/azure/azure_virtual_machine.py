@@ -665,6 +665,14 @@ class AzureVirtualMachine(
   # globals guarded by _lock
   host_map = collections.defaultdict(list)
 
+  create_os_disk_strategy: azure_disk_strategies.AzureCreateOSDiskStrategy
+  nic: AzureNIC
+  public_ip: AzurePublicIPAddress | None = None
+  resource_group: azure_network.AzureResourceGroup
+  low_priority: bool
+  low_priority_status_code: int | None
+  spot_early_termination: bool
+
   def __init__(self, vm_spec):
     """Initialize an Azure virtual machine.
 
@@ -702,7 +710,7 @@ class AzureVirtualMachine(
     else:
       public_ip_name = None
       self.public_ip = None
-    self.nic = AzureNIC(
+    self.nic: AzureNIC = AzureNIC(
         self.network,
         self.name + '-nic',
         public_ip_name,
@@ -736,11 +744,11 @@ class AzureVirtualMachine(
         raise errors.Benchmarks.UnsupportedConfigError('No Azure gen1 image.')
     elif arm_arch:
       if hasattr(type(self), 'ARM_IMAGE_URN'):
-        self.image = type(self).ARM_IMAGE_URN
+        self.image = type(self).ARM_IMAGE_URN  # pytype: disable=attribute-error
       else:
         raise errors.Benchmarks.UnsupportedConfigError('No Azure ARM image.')
     elif self.machine_type_is_confidential:
-      self.image = type(self).CONFIDENTIAL_IMAGE_URN
+      self.image = type(self).CONFIDENTIAL_IMAGE_URN  # pytype: disable=attribute-error
     else:
       if hasattr(type(self), 'GEN2_IMAGE_URN'):
         self.image = type(self).GEN2_IMAGE_URN

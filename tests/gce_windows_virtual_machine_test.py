@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.gcp.gce_windows_virtual_machine."""
 
+import typing
 import unittest
 
 from absl import flags
@@ -70,7 +71,10 @@ class GceWindowsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       ),
   )
   def testWindowsConfig(self, os_type, gvnic, family, project):
-    vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_type)
+    vm_class = typing.cast(
+        type(gce_windows_virtual_machine.WindowsGceVirtualMachine),
+        virtual_machine.GetVmClass(provider_info.GCP, os_type),
+    )
     vm = vm_class(self.spec)
     self.assertEqual(vm.OS_TYPE, os_type)
     self.assertEqual(vm.SupportGVNIC(), gvnic)

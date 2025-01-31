@@ -744,7 +744,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     """
     if cmd_parameters is None:
       cmd_parameters = []
-    script_path_on_vm = ntpath.join(vm.temp_dir, script_name)
+    script_path_on_vm = ntpath.join(vm.temp_dir, script_name)  # pytype: disable=attribute-error
     script_path = data.ResourcePath(os.path.join(source_path, script_name))
     vm.PushFile(script_path, script_path_on_vm)
 

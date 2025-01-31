@@ -487,6 +487,8 @@ class AwsKeyFileManager:
     return 'perfkit-key-{}'.format(FLAGS.run_uri)
 
 
+# TODO(user): Remove pytype disable in follow up.
+# pytype: disable=attribute-error
 class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AWS Virtual Machine."""
 

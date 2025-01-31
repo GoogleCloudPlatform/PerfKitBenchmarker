@@ -18,6 +18,7 @@ import logging
 import math
 import os
 import re
+import typing
 from typing import Any
 
 from absl import flags
@@ -264,6 +265,7 @@ class GkeCluster(BaseGkeCluster):
       vm_config: virtual_machine.BaseVirtualMachine,
       nodepool_config: container_service.BaseNodePoolConfig,
   ):
+    vm_config = typing.cast(gce_virtual_machine.GceVirtualMachine, vm_config)
     nodepool_config.disk_type = vm_config.boot_disk.boot_disk_type
     nodepool_config.disk_size = vm_config.boot_disk.boot_disk_size
     nodepool_config.max_local_disks = vm_config.max_local_disks

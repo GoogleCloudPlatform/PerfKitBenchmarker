@@ -92,7 +92,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     if self.capture_live_migration_timestamps:
       vm.StartLMNotification()
     if SIMULATE_MAINTENANCE_WITH_LOG.value:
-      vm.SimulateMaintenanceWithLog()
+      vm.SimulateMaintenanceWithLog()  # pytype: disable=attribute-error
     else:
       vm.SimulateMaintenanceEvent()
 

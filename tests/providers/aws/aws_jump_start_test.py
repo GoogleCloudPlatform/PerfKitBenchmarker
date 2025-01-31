@@ -22,8 +22,9 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.enter_context(flagsaver.flagsaver(zone=[_ZONE]))
     self.ai_model_spec = aws_jump_start.JumpStartLlama2Spec('f_name')
+    self.mock_vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
     self.ai_model = aws_jump_start.JumpStartModelInRegistry(
-        mock.create_autospec(virtual_machine.BaseVirtualMachine),
+        self.mock_vm,
         self.ai_model_spec,
     )
 
@@ -31,7 +32,7 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(flagsaver.flagsaver(zone=['us-east-1a']))
     ai_model_spec = aws_jump_start.JumpStartLlama2Spec('f_name')
     ai_model = aws_jump_start.JumpStartModelInRegistry(
-        mock.create_autospec(virtual_machine.BaseVirtualMachine), ai_model_spec
+        self.mock_vm, ai_model_spec
     )
     self.assertEqual(ai_model.region, 'us-east-1')
 
@@ -57,7 +58,7 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
                 0,
             )],
         },
-        self.ai_model.vm,
+        self.mock_vm,
     )
     self.ai_model._Create()
     self.assertEqual(
@@ -83,12 +84,12 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
                 0,
             )],
         },
-        self.ai_model.vm,
+        self.mock_vm,
     )
     self.ai_model.endpoint_name = 'endpoint_name'
     self.ai_model.model_name = 'model_name'
     self.ai_model._PostCreate()
-    self.ai_model.vm.RunCommand.assert_any_call(
+    self.mock_vm.RunCommand.assert_any_call(
         command=' '.join([
             'aws',
             'sagemaker',
@@ -99,7 +100,7 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
             'Key=K,Value=V',
         ]),
     )
-    self.ai_model.vm.RunCommand.assert_any_call(
+    self.mock_vm.RunCommand.assert_any_call(
         command=' '.join([
             'aws',
             'sagemaker',
@@ -136,7 +137,7 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
                 0,
             )]
         },
-        self.ai_model.vm,
+        self.mock_vm,
     )
     endpoints = self.ai_model.ListExistingEndpoints()
     self.assertEqual(endpoints, ['woo-test', 'meta-7b-f-2024-08'])
@@ -150,7 +151,7 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
                 0,
             )]
         },
-        self.ai_model.vm,
+        self.mock_vm,
     )
     endpoints = self.ai_model.ListExistingEndpoints()
     self.assertEmpty(endpoints)
@@ -164,10 +165,10 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
                 0,
             )]
         },
-        self.ai_model.vm,
+        self.mock_vm,
     )
     self.ai_model.ListExistingEndpoints()
-    self.ai_model.vm.RunCommand.assert_called_once_with(
+    self.mock_vm.RunCommand.assert_called_once_with(
         command=['aws', 'sagemaker', 'list-endpoints', '--region=us-west-1'],
     )
     self.assertEqual(self.ai_model.region, 'us-west-1')
@@ -181,10 +182,10 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
                 0,
             )]
         },
-        self.ai_model.vm,
+        self.mock_vm,
     )
     self.ai_model.ListExistingEndpoints('us-east-1')
-    self.ai_model.vm.RunCommand.assert_called_once_with(
+    self.mock_vm.RunCommand.assert_called_once_with(
         command=['aws', 'sagemaker', 'list-endpoints', '--region=us-east-1'],
     )
 
@@ -204,7 +205,7 @@ Response>>>>{expected_response}====
                 0,
             )],
         },
-        self.ai_model.vm,
+        self.mock_vm,
     )
     responses = self.ai_model.SendPrompt(
         'How can you to get from Beijing to New York?', 512, 1.0
