@@ -31,6 +31,7 @@ import time
 import uuid
 from absl import flags
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_virtual_machine
@@ -487,8 +488,6 @@ class AwsKeyFileManager:
     return 'perfkit-key-{}'.format(FLAGS.run_uri)
 
 
-# TODO(user): Remove pytype disable in follow up.
-# pytype: disable=attribute-error
 class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing an AWS Virtual Machine."""
 
@@ -539,7 +538,26 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   _lock = threading.Lock()
   deleted_hosts = set()
   host_map = collections.defaultdict(list)
+  client_token: str
+  create_cmd: list[str] | None
+  create_disk_strategy: disk_strategies.CreateDiskStrategy
+  device_by_disk_spec_id: dict[int, str]
+  disk_identifiers_by_device: dict[str, aws_disk.AWSDiskIdentifiers]
+  host: AwsDedicatedHost | None
+  id: str | None
+  instance_profile: str | None
   machine_type: str
+  network_eni_count: int
+  network_card_count: int
+  region: str
+  spot_early_termination: bool
+  spot_status_code: str | None
+  use_spot_instance: bool
+  firewall: aws_network.AwsFirewall
+  spot_price: float | None
+  spot_block_duration_minutes: int | None
+  boot_disk_size: int | None
+  num_hosts: int | None
 
   def __init__(self, vm_spec):
     """Initialize a AWS virtual machine.
@@ -905,7 +923,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           'sudo tee -a /etc/security/limits.conf'
       )
     self.RemoteCommand(
-        'cd aws-efa-installer; sudo ./efa_installer.sh -y --skip-kmod')
+        'cd aws-efa-installer; sudo ./efa_installer.sh -y --skip-kmod'
+    )
     if not self.TryRemoteCommand('ulimit -l | grep unlimited'):
       # efa_installer.sh should reboot enabling this change, reboot if necessary
       self.Reboot()
@@ -1072,13 +1091,14 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _DeleteDependencies(self):
     """Delete VM dependencies."""
     AwsKeyFileManager.DeleteKeyfile(self.region)
-    if self.host:
-      with self._lock:
-        if self.host in self.host_list:
-          self.host_list.remove(self.host)
-        if self.host not in self.deleted_hosts:
-          self.host.Delete()
-          self.deleted_hosts.add(self.host)
+    if not self.host:
+      return
+    with self._lock:
+      if self.host in self.host_list:
+        self.host_list.remove(self.host)
+      if self.host not in self.deleted_hosts:
+        self.host.Delete()  # pytype: disable=attribute-error
+        self.deleted_hosts.add(self.host)
 
   def _Create(self):
     """Create a VM instance."""
@@ -1256,7 +1276,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--region=%s' % self.region,
           'ec2',
           'cancel-spot-instance-requests',
-          '--spot-instance-request-ids=%s' % self.spot_instance_request_id,
+          '--spot-instance-request-ids=%s' % self.spot_instance_request_id,  # pytype: disable=attribute-error
       ]
       vm_util.IssueCommand(cancel_cmd, raise_on_failure=False)
 
@@ -1488,7 +1508,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Adds metadata to the VM."""
     util.AddTags(self.id, self.region, **kwargs)
     if self.use_spot_instance:
-      util.AddDefaultTags(self.spot_instance_request_id, self.region)
+      util.AddDefaultTags(self.spot_instance_request_id, self.region)  # pytype: disable=attribute-error
 
   def InstallCli(self):
     """Installs the AWS cli and credentials on this AWS vm."""
@@ -1686,9 +1706,7 @@ class Ubuntu2004DeepLearningAMIBasedAWSVirtualMachine(
     Raises:
       ValueError: If an incompatible vm_spec is passed.
     """
-    super().__init__(
-        vm_spec
-    )
+    super().__init__(vm_spec)
     # Add preinstalled packages for Deep Learning AMI
     self._installed_packages.add('nccl')
     self._installed_packages.add('cuda_toolkit')
