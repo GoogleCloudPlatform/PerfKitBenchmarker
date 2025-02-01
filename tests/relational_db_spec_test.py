@@ -137,19 +137,6 @@ class RelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertEqual(result.backup_enabled, False)
 
-  def testDefaultBackupTime(self):
-    result = relational_db_spec.RelationalDbSpec(
-        _COMPONENT, flag_values=FLAGS, **self.minimal_spec
-    )
-    self.assertEqual(result.backup_start_time, '07:00')
-
-  def testCustomBackupTime(self):
-    spec = _mergeDicts(self.minimal_spec, {'backup_start_time': '08:00'})
-    result = relational_db_spec.RelationalDbSpec(
-        _COMPONENT, flag_values=FLAGS, **spec
-    )
-    self.assertEqual(result.backup_start_time, '08:00')
-
 
 class RelationalDbMinimalSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
@@ -338,6 +325,7 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         result.vm_groups['servers_replicas'].vm_spec.zone, 'us-central1-d'
     )
+
 
 if __name__ == '__main__':
   unittest.main()

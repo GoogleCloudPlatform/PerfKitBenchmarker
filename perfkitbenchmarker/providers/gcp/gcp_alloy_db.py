@@ -134,6 +134,13 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
         '--allocated-ip-range-name=google-service-range',
     ]
 
+    # Continuous backup is not enabled by default when using gcloud
+    if self.spec.backup_enabled:
+      cmd_string.append('--enable-continuous-backup')
+      cmd_string.append('--continuous-backup-recovery-window-days=1')
+    else:
+      cmd_string.append('--no-enable-continuous-backup')
+
     cmd = self._GetAlloyDbCommand(cmd_string)
     _, _, _ = cmd.Issue(timeout=CREATION_TIMEOUT)
 
