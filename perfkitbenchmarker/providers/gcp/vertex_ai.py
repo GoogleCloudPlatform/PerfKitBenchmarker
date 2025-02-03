@@ -44,7 +44,7 @@ VLLM_ARGS = [
     '--host=0.0.0.0',
     '--port=7080',
     '--swap-space=16',
-    '--gpu-memory-utilization=0.95',
+    '--gpu-memory-utilization=0.9',
     '--max-model-len=2048',
     '--max-num-batched-tokens=4096',
 ]
