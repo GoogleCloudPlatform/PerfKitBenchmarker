@@ -51,10 +51,14 @@ from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_disk_strategies
 from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.azure import util
 import yaml
 
+
 FLAGS = flags.FLAGS
+
+
 NUM_LOCAL_VOLUMES: dict[str, int] = {
     'Standard_L8s_v2': 1,
     'Standard_L16s_v2': 2,
@@ -829,17 +833,38 @@ class AzureVirtualMachine(
     os_disk_args = self.create_os_disk_strategy.GetCreationCommand()[
         'create-disk'
     ]
-    confidential_args = []
+    enable_secure_boot = azure_flags.AZURE_SECURE_BOOT.value
+    if (
+        self.trusted_launch_unsupported_type
+        and enable_secure_boot is not None
+    ):
+      raise errors.Benchmarks.UnsupportedConfigError(
+          "Please don't set --azure_secure_boot for"
+          f' {self.machine_type} machine_type. Attemping to update secure boot'
+          ' flag on a VM with standard security type fails with error "Use of'
+          ' UEFI settings is not supported...".',
+      )
+    security_args = []
+    secure_boot_args = []
+    # if machine is confidential or trusted launch, we can update secure boot
     if self.machine_type_is_confidential:
-      confidential_args = [
+      security_args = [
           '--enable-vtpm',
-          'true',
-          '--enable-secure-boot',
           'true',
           '--security-type',
           'ConfidentialVM',
           '--os-disk-security-encryption-type',
           'VMGuestStateOnly',
+      ]
+      if enable_secure_boot is None:
+        secure_boot_args = [
+            '--enable-secure-boot',
+            'true',
+        ]
+    if enable_secure_boot is not None:
+      secure_boot_args = [
+          '--enable-secure-boot',
+          str(enable_secure_boot).lower(),
       ]
 
     tags = {}
@@ -866,7 +891,8 @@ class AzureVirtualMachine(
             self.name,
         ]
         + os_disk_args
-        + confidential_args
+        + security_args
+        + secure_boot_args
         + self.resource_group.args
         + self.nic.args
         + tag_args

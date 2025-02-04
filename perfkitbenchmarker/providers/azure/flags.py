@@ -166,3 +166,9 @@ AZURE_ATTACH_DISK_WITH_CREATE = flags.DEFINE_boolean(
     True,
     'Whether to create PD disks at VM creation time. Defaults to True.',
 )
+AZURE_SECURE_BOOT = flags.DEFINE_bool(
+    'azure_secure_boot',
+    None,
+    'Enable/Disable secure boot of the VM to allow unsigned operating systems'
+    ' and drivers. Defaults to None to fallback to Azure default behavior',
+)
