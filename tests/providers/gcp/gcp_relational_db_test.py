@@ -127,7 +127,6 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'db_disk_spec': db_disk_spec,
         'high_availability': False,
         'backup_enabled': True,
-        'backup_start_time': '07:00',
         'vm_groups': VmGroupSpec(),
         'enable_freeze_restore': False,
         'create_on_restore_error': False,
@@ -172,7 +171,6 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--tier=db-n1-standard-1', command_string)
       self.assertIn('--storage-size=50', command_string)
       self.assertIn('--backup', command_string)
-      self.assertIn('--backup-start-time=07:00', command_string)
       self.assertIn('--zone=us-west1-b', command_string)
 
   def testCorrectVmGroupsPresent(self):
@@ -201,7 +199,6 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--tier=db-n1-standard-1', command_string)
       self.assertIn('--no-backup', command_string)
-      self.assertNotIn('--backup-start-time=07:00', command_string)
 
   def testDelete(self):
     with PatchCriticalObjects() as issue_command:
@@ -307,7 +304,6 @@ class GcpPostgresRelationlDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'db_disk_spec': db_disk_spec,
         'high_availability': False,
         'backup_enabled': True,
-        'backup_start_time': '07:00',
         'enable_freeze_restore': False,
         'create_on_restore_error': False,
         'delete_on_freeze_error': False,

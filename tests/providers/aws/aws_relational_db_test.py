@@ -126,7 +126,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'create_on_restore_error': False,
         'delete_on_freeze_error': False,
         'db_flags': '',
-        'backup_enabled': True
+        'backup_enabled': True,
     }
     if additional_spec_items:
       spec_dict.update(additional_spec_items)
@@ -251,7 +251,8 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
                 ' --master-user-password=fakepassword --region=us-east-1'
                 ' --db-subnet-group-name=fake_db_subnet'
                 ' --vpc-security-group-ids=fake_security_group_id'
-                ' --availability-zones=us-east-1a --storage-type=aurora --tags'
+                ' --availability-zones=us-east-1a --storage-type=aurora'
+                ' --backup-retention-period=1 --tags'
             ),
             (
                 'aws --output json rds create-db-instance'

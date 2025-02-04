@@ -33,7 +33,6 @@ RELATIONAL_DB_FLAGS_TO_TRANSLATE = {
     'managed_db_high_availability': 'db_high_availability',
     'managed_db_high_availability_type': 'db_high_availability_type',
     'managed_db_backup_enabled': 'db_backup_enabled',
-    'managed_db_backup_start_time': 'db_backup_start_time',
     'managed_db_zone': 'db_zone',
     'managed_db_machine_type': 'db_machine_type',
     'managed_db_cpus': 'db_cpus',

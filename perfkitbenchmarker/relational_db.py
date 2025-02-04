@@ -18,7 +18,6 @@ This is the base implementation of all relational db.
 """
 
 import abc
-import re
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
@@ -62,13 +61,6 @@ flags.DEFINE_string(
 )
 flags.DEFINE_boolean(
     'db_backup_enabled', True, 'Whether or not to enable automated backups'
-)
-flags.DEFINE_string(
-    'db_backup_start_time',
-    '07:00',
-    'Time in UTC that automated backups (if enabled) '
-    'will be scheduled. In the form HH:MM UTC. '
-    'Defaults to 07:00 UTC',
 )
 flags.DEFINE_list(
     'db_zone',
@@ -176,7 +168,7 @@ flags.DEFINE_float(
     'Ratio of the innodb buffer pool size to VM memory. '
     'Ignored if innodb_buffer_pool_size is set.',
     lower_bound=0,
-    upper_bound=1
+    upper_bound=1,
 )
 
 flags.DEFINE_bool(
@@ -200,7 +192,7 @@ flags.DEFINE_float(
     'Ratio of the shared buffer size to VM memory. '
     'Ignored if postgres_shared_buffer_size is set.',
     lower_bound=0,
-    upper_bound=1
+    upper_bound=1,
 )
 
 OPTIMIZE_DB_SYSCTL_CONFIG = flags.DEFINE_bool(
@@ -225,14 +217,6 @@ SERVER_GCE_SSD_INTERFACE = flags.DEFINE_enum(
 
 ENABLE_DATA_CACHE = flags.DEFINE_bool(
     'gcp_db_enable_data_cache', False, 'Whether to enable data cache.'
-)
-
-
-BACKUP_TIME_REGULAR_EXPRESSION = r'^\d\d\:\d\d$'
-flags.register_validator(
-    'db_backup_start_time',
-    lambda value: re.search(BACKUP_TIME_REGULAR_EXPRESSION, value) is not None,
-    message='--database_backup_start_time must be in the form HH:MM',
 )
 
 
@@ -425,7 +409,6 @@ class BaseRelationalDb(resource.BaseResource):
         'engine': self.spec.engine,
         'high_availability': self.spec.high_availability,
         'backup_enabled': self.spec.backup_enabled,
-        'backup_start_time': self.spec.backup_start_time,
         'engine_version': self.spec.engine_version,
         'client_vm_zone': self.spec.vm_groups['clients'].vm_spec.zone,
         'use_managed_db': self.is_managed_db,
@@ -582,8 +565,7 @@ class BaseRelationalDb(resource.BaseResource):
   def RestartDatabase(self):
     """Restarts all the database services in the benchmark.
 
-    Args:
-      None
+    Args: None
 
     Returns: none
     """
