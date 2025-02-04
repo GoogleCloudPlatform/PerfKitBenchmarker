@@ -31,7 +31,7 @@ DEFAULT_DATABASE_NAME = 'database'
 FLAGS = flags.FLAGS
 
 DISABLE_HA = 'Disabled'
-ENABLE_HA = 'SameZone'
+ENABLE_HA = 'ZoneRedundant'
 
 DEFAULT_MYSQL_VERSION = '8.0'
 DEFAULT_POSTGRES_VERSION = '13'
