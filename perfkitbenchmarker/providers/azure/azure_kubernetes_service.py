@@ -167,6 +167,13 @@ class AksCluster(container_service.KubernetesCluster):
     result['boot_disk_size'] = self.default_nodepool.disk_size
     return result
 
+  def _IsAutoscalerEnabled(self):
+    """Returns True if the cluster autoscaler is enabled."""
+    return (
+        self.min_nodes != self.default_nodepool.num_nodes
+        or self.max_nodes != self.default_nodepool.num_nodes
+    )
+
   def _Create(self):
     """Creates the AKS cluster."""
     cmd = [
@@ -189,10 +196,7 @@ class AksCluster(container_service.KubernetesCluster):
         '--nodepool-labels',
         f'pkb_nodepool={container_service.DEFAULT_NODEPOOL}',
     ] + self._GetNodeFlags(self.default_nodepool)
-    if (
-        self.min_nodes != self.default_nodepool.num_nodes
-        or self.max_nodes != self.default_nodepool.num_nodes
-    ):
+    if self._IsAutoscalerEnabled():
       cmd += [
           '--enable-cluster-autoscaler',
           f'--min-count={self.min_nodes}',
@@ -238,9 +242,9 @@ class AksCluster(container_service.KubernetesCluster):
     args = [
         '--node-vm-size',
         nodepool_config.machine_type,
-        '--node-count',
-        str(nodepool_config.num_nodes),
     ] + self.resource_group.args
+    if not self._IsAutoscalerEnabled():
+      args += ['--node-count', str(nodepool_config.num_nodes)]
     if self.default_nodepool.zone and self.default_nodepool.zone != self.region:
       zones = ' '.join(
           zone[-1] for zone in self.default_nodepool.zone.split(',')
