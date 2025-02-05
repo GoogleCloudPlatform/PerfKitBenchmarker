@@ -223,8 +223,6 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         '--storage-size=%d' % storage_size,
         '--labels=%s' % util.MakeFormattedDefaultTags(),
     ]
-    if self.spec.engine == sql_engine_utils.MYSQL:
-      cmd_string.append('--enable-bin-log')
 
     if self.spec.engine == sql_engine_utils.SQLSERVER:
       # `--root-password` is required when creating SQL Server instances.
@@ -250,9 +248,12 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
 
     if self.spec.backup_enabled:
       cmd_string.append('--backup')
-      cmd_string.append('--enable-point-in-time-recovery')
       cmd_string.append('--retained-backups-count=1')
       cmd_string.append('--retained-transaction-log-days=1')
+      if self.spec.engine == sql_engine_utils.MYSQL:
+        cmd_string.append('--enable-bin-log')
+      else:
+        cmd_string.append('--enable-point-in-time-recovery')
     else:
       cmd_string.append('--no-backup')
     cmd = util.GcloudCommand(*cmd_string)
