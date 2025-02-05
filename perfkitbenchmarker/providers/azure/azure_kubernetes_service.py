@@ -243,8 +243,11 @@ class AksCluster(container_service.KubernetesCluster):
         '--node-vm-size',
         nodepool_config.machine_type,
     ] + self.resource_group.args
-    if not self._IsAutoscalerEnabled():
-      args += ['--node-count', str(nodepool_config.num_nodes)]
+    node_count = nodepool_config.num_nodes
+    if self._IsAutoscalerEnabled():
+      node_count = max(self.min_nodes, node_count)
+      node_count = min(self.max_nodes, node_count)
+    args += [f'--node-count={node_count}']
     if self.default_nodepool.zone and self.default_nodepool.zone != self.region:
       zones = ' '.join(
           zone[-1] for zone in self.default_nodepool.zone.split(',')
