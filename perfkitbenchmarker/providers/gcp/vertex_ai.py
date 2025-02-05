@@ -289,6 +289,11 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.model_resource_name = self.gcloud_model.resource_name
     end_model_upload = time.time()
     self.model_upload_time = end_model_upload - start_model_upload
+    logging.info(
+        'Model resource uploaded with name: %s in %s seconds',
+        self.model_resource_name,
+        self.model_upload_time,
+    )
     try:
       start_model_deploy = time.time()
       self.gcloud_model.deploy(
@@ -426,7 +431,7 @@ class VertexAiEndpoint(resource.BaseResource):
       raise errors.VmUtil.IssueCommandError(
           f'Could not find endpoint name in output {err}.'
       )
-    logging.info('Successfully creating endpoint %s', self.endpoint_name)
+    logging.info('Successfully created endpoint %s', self.endpoint_name)
     self.ai_endpoint = aiplatform.Endpoint(self.endpoint_name)
 
   def _Delete(self) -> None:
