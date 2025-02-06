@@ -116,6 +116,13 @@ _DPDK_STATS_PERIOD = flags.DEFINE_integer(
 _DPDK_TXONLY_MULTI_FLOW = flags.DEFINE_bool(
     'dpdk_txonly_multi_flow', False, 'Generate multiple flows in txonly mode.'
 )
+_DPDK_BURST = flags.DEFINE_integer(
+    'dpdk_burst',
+    1,
+    'The number of packets per burst. Default value is 1.',
+    lower_bound=1,
+    upper_bound=512,
+)
 flags.register_validator(
     'dpdk_forward_mode', lambda fwd_mode_: len(fwd_mode_) == 2
 )
@@ -192,6 +199,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       f' --txq={_DPDK_TXQ.value}'
       f' --rxq={_DPDK_RXQ.value}'
       f' --nb-cores={_DPDK_NB_CORES.value}'
+      f' --burst={_DPDK_BURST.value}'
       f' --stats-period={_DPDK_STATS_PERIOD.value}'
   )
   if client_vm.CLOUD == 'AWS':
@@ -208,6 +216,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       f' --rxq={_DPDK_RXQ.value}'
       f' --nb-cores={_DPDK_NB_CORES.value}'
       f' --forward-mode={_DPDK_FORWARD_MODE.value[1]}'
+      f' --burst={_DPDK_BURST.value}'
       f' --stats-period={_DPDK_STATS_PERIOD.value}'
   )
 
