@@ -20,6 +20,7 @@ Alternatively, run with --fio_generate_scenarios.
 """
 
 import logging
+import time
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -144,9 +145,17 @@ def Run(benchmark_spec):
       filesize=FLAGS.fio_file_size, runtime=FLAGS.fio_runtime
   )
 
-  return linux_fio.RunWithExec(
-      vm, fio_exec, remote_job_file_path, job_file_contents
-  )
+  samples = []
+  logging.info('Running scenario: {FLAGS.fio_generate_scenarios}')
+  for scenario in FLAGS.fio_generate_scenarios:
+    samples.extend(
+        linux_fio.RunWithExec(
+            vm, fio_exec, remote_job_file_path, job_file_contents, [scenario]
+        )
+    )
+    # Sleep for 60 seconds to allow the fio process to complete.
+    time.sleep(180)
+  return samples
 
 
 def Cleanup(unused_benchmark_spec):

@@ -945,7 +945,13 @@ def RunFioOnVMs(vms):
   return samples
 
 
-def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
+def RunWithExec(
+    vm,
+    exec_path,
+    remote_job_file_path,
+    job_file_contents,
+    fio_generate_scenarios=None,
+):
   """Spawn fio and gather the results. Used by Windows FIO as well.
 
   Args:
@@ -953,18 +959,20 @@ def RunWithExec(vm, exec_path, remote_job_file_path, job_file_contents):
     exec_path: string path to the fio executable.
     remote_job_file_path: path, on the vm, to the location of the job file.
     job_file_contents: string contents of the fio job file.
+    fio_generate_scenarios: list of strings with scenrios to benchmark.
 
   Returns:
     A list of sample.Sample objects.
   """
   logging.info('FIO running on %s', vm)
-
+  if not fio_generate_scenarios:
+    fio_generate_scenarios = FLAGS.fio_generate_scenarios
   disks = vm.scratch_disks
   require_merge = len(disks) > 1
 
   job_file_string = GetOrGenerateJobFileString(
       FLAGS.fio_jobfile,
-      FLAGS.fio_generate_scenarios,
+      fio_generate_scenarios,
       AgainstDevice(),
       disks,
       FLAGS.fio_io_depths,
