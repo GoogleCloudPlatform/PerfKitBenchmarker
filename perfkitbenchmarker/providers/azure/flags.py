@@ -42,6 +42,7 @@ STORAGE_V2 = 'StorageV2'
 # These are deprecated in favor of StorageV2
 STORAGE = 'Storage'
 BLOB_STORAGE = 'BlobStorage'
+BLOCK_BLOB_STORAGE = 'BlockBlobStorage'
 VALID_TIERS = ['Basic', 'Standard', 'Premium']
 
 # Azure redis cache tiers. See
@@ -75,8 +76,11 @@ flags.DEFINE_enum(
 AZURE_BLOB_STORAGE_ACCOUNT_KIND = flags.DEFINE_enum(
     'azure_blob_account_kind',
     STORAGE_V2,
-    [STORAGE_V2, STORAGE, BLOB_STORAGE],
-    'Legacy flag. Leave on StorageV2.',
+    [STORAGE_V2, BLOCK_BLOB_STORAGE, BLOB_STORAGE, STORAGE],
+    'Type of Azure storage account to create for blob storage. Defaults to'
+    ' StorageV2. BlockBlobStorage is required for Premium block blobs. See'
+    ' https://learn.microsoft.com/en-us/azure/storage/common/storage-account-overview#types-of-storage-accounts'
+    ' for more information.',
 )
 AZURE_BLOB_STORAGE_TYPE = flags.DEFINE_enum(
     'azure_blob_storage_type',
