@@ -75,6 +75,13 @@ _CLI_PROFILE = flags.DEFINE_string(
     'Using an IAM user that only has DynamoDB access limits the scope of '
     'credentials copied into the VM.',
 )
+_RESTORE_VM_COUNT = flags.DEFINE_integer(
+    'aws_dynamodb_ycsb_restore_vm_count',
+    None,
+    'Number of VMs to use for the benchmark if the restore flag is set. This is'
+    ' used mostly as an override and should not generally be used manually. Use'
+    ' --ycsb_client_vms instead to set the VMs for a normal run.',
+)
 FLAGS = flags.FLAGS
 
 _TARGET_QPS_INCREMENT = 1000
@@ -103,6 +110,10 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['default']['vm_count'] = FLAGS.ycsb_client_vms
+  # Override the VM count for restore runs (i.e. when some do not need multiple
+  # VMs for loading).
+  if FLAGS['restore'].present and _RESTORE_VM_COUNT.value is not None:
+    config['vm_groups']['default']['vm_count'] = _RESTORE_VM_COUNT.value
   return config
 
 
@@ -121,7 +132,8 @@ def CheckPrerequisites(benchmark_config):
         '--aws_dynamodb_ycsb_cli_profile must be explicitly passed. "default" '
         'will use the default CLI profile and works with basic long lived '
         'credentials. Using DynamoDB specific credentials limits what is '
-        'copied into the VM.')
+        'copied into the VM.'
+    )
   ycsb.CheckPrerequisites()
 
 
