@@ -35,6 +35,13 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
+_HDRHISTOGRAM_START_TIME = flags.DEFINE_integer(
+    'ycsb_hdrhistogram_start_time',
+    None,
+    'The time in seconds to start collecting histogram data. Useful for'
+    ' ignoring higher latencies due to cold start.',
+)
+
 FLAGS = flags.FLAGS
 
 YCSB_URL_TEMPLATE = (
@@ -579,7 +586,7 @@ def ParseHdrLogFile(logfile: str) -> list[_HdrHistogramTuple]:
 
 
 def ParseHdrLogs(
-    hdrlogs: Mapping[str, str]
+    hdrlogs: Mapping[str, str],
 ) -> dict[str, list[_HdrHistogramTuple]]:
   """Parse a dict of group to hdr logs into a dict of group to histogram tuples.
 
@@ -970,9 +977,14 @@ def CombineHdrHistogramLogFiles(
       worker_vm.RemoteCommand(
           f'sudo chmod 755 {hdr_file} && echo "{hdr[:-1]}" >> {hdr_file}'
       )
-    hdrhistogram, stderr, retcode = worker_vm.RemoteCommandWithReturnCode(
+    cmd = (
         f'cd {hdr_install_dir} && ./HistogramLogProcessor -i'
-        f' {hdr_file} -outputValueUnitRatio 1 -v',
+        f' {hdr_file} -outputValueUnitRatio 1 -v'
+    )
+    if _HDRHISTOGRAM_START_TIME.value:
+      cmd += f' -start {_HDRHISTOGRAM_START_TIME.value}'
+    hdrhistogram, stderr, retcode = worker_vm.RemoteCommandWithReturnCode(
+        cmd,
         ignore_failure=True,
     )
     # It's possible for YCSB client VMs to output a malformed/truncated .hdr
@@ -1071,6 +1083,8 @@ def CreateSamples(
           )
 
     if group.data and group.data_type == HDRHISTOGRAM:
+      if _HDRHISTOGRAM_START_TIME.value:
+        meta['ycsb_hdrhistogram_start_time'] = _HDRHISTOGRAM_START_TIME.value
       # Strip percentile from the three-element tuples.
       histogram = [value_count[-2:] for value_count in group.data]
       percentiles = _PercentilesFromHistogram(histogram)
