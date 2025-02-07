@@ -248,7 +248,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
 
     if self.spec.backup_enabled:
       cmd_string.append('--backup')
-      cmd_string.append('--retained-backups-count=1')
+      cmd_string.append('--retained-backups-count=2')
       cmd_string.append('--retained-transaction-log-days=1')
       if self.spec.engine == sql_engine_utils.MYSQL:
         cmd_string.append('--enable-bin-log')
