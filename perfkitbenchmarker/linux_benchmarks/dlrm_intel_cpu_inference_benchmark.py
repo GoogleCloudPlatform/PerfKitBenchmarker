@@ -158,7 +158,14 @@ def Run(bm_spec):
       'cpus_for_loadgen': 1,
       'batch_size': 400,
       'cpus_per_instance': 2,
+      'target': dlrm.TARGET.value,
   }
+  dlrm.CheckAccuracy(vm.RemoteCommand(
+      'docker exec pkb-dlrm '
+      'bash -c '
+      "'cd /opt/workdir/code/dlrm-v2-99.9/pytorch-cpu-int8; "
+      f'bash run_main.sh {_BENCHMARK_SCENARIO.value} accuracy int8\''
+  )[0], dlrm.TARGET.value)
   stdout, _ = vm.RemoteCommand(
       'docker exec pkb-dlrm '
       'bash -c '

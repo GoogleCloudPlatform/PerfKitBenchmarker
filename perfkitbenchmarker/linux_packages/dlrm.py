@@ -13,6 +13,7 @@
 # limitations under the License.
 """Package for downloading DLRMv2 data and models."""
 
+from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
@@ -39,10 +40,14 @@ DLRM_DATA = (
     'day_23_sparse_multi_hot.npz',
 )
 DLRM_DOWNLOAD_TIMEOUT = 3600
+REFERENCE_ROC_AUC = 80.31
 
 MLPERF_ROOT = 'mlcommons'
 MODEL_PATH = f'{MLPERF_ROOT}/model-terabyte'
 DATA_PATH = f'{MLPERF_ROOT}/data-terabyte'
+TARGET = flags.DEFINE_enum(
+    'dlrm_target', '99.9', ['99', '99.9'],
+    'Target accuracy to achieve relative to reference implementation.')
 
 
 def Install(vm):
@@ -59,6 +64,17 @@ def Install(vm):
       f'cd {MLPERF_ROOT}; unzip weights.zip -d .; '
       'mv model_weights model-terabyte'
   )
+
+
+def CheckAccuracy(output, target='99.9'):
+  """Check if reach target accuracy."""
+  roc_auc = regex_util.ExtractFloat(
+      r'roc_auc=(\d+\.\d+)%', output
+  )
+  if roc_auc / REFERENCE_ROC_AUC * 100 < float(target):
+    raise ValueError(
+        f'ROC_AUC is {roc_auc}%, '
+        f'not reaching {target}% of target {REFERENCE_ROC_AUC}%.')
 
 
 def ParseDlrmSummary(summary, metadata, scenario):
