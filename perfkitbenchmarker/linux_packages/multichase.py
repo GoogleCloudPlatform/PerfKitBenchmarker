@@ -16,7 +16,7 @@
 """Module containing multichase installation and cleanup functions."""
 
 GIT_PATH = 'https://github.com/google/multichase'
-GIT_VERSION = '6188a9fba4cc2edd736e8082aa8911686ae6bc66'
+GIT_VERSION = 'master'
 INSTALL_PATH = 'multichase'
 
 

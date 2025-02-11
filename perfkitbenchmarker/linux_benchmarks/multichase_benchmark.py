@@ -22,6 +22,7 @@ multichase codebase: https://github.com/google/multichase
 import itertools
 import logging
 import posixpath
+import re
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -88,9 +89,7 @@ class _MemorySizeParser(flag_util.UnitsParser):
   )
 
   def __init__(self):
-    super().__init__(
-        convertible_to=(units.byte, units.percent)
-    )
+    super().__init__(convertible_to=(units.byte, units.percent))
 
   def parse(self, inp):
     """Parse the input.
@@ -132,8 +131,18 @@ def _DefineMemorySizeFlag(name, default, help, flag_values=FLAGS, **kwargs):
       help,
       flag_values,
       _UNITS_SERIALIZER,
-      **kwargs
+      **kwargs,
   )
+
+
+_MULTICHASE = 'multichase'
+_MULTILOAD = 'multiload'
+MULTICHASE_BENCHMARKS = [_MULTICHASE, _MULTILOAD]
+flags.DEFINE_list(
+    'multichase_benchmarks',
+    MULTICHASE_BENCHMARKS,
+    'The multichase benchmark(s) to run.',
+)
 
 
 flags.DEFINE_enum(
@@ -157,6 +166,35 @@ flag_util.DEFINE_integerlist(
     'Number of threads (one per core), to use when executing multichase. '
     'Passed to multichase via its -t flag.',
     module_name=__name__,
+)
+
+# TODO(user): Unitfy multiload_thread_count with multichase_thread_count.
+flags.DEFINE_integer(
+    'multiload_thread_count',
+    None,
+    'Number of threads to use when executing multiload. Different from '
+    'multichase_thread_count, and is passed to multiload via its -t flag. '
+    'When unset use the number of vCPUs on the machine.',
+)
+flags.DEFINE_integer(
+    'multiload_num_samples',
+    50,
+    'Multiload -n parameter',
+)
+flags.DEFINE_string(
+    'multiload_buffer_size',
+    '2g',
+    'Multiload -m parameter',
+)
+flags.DEFINE_integer(
+    'multiload_delay',
+    1,
+    'Multiload -d parameter',
+)
+flags.DEFINE_string(
+    'multiload_traffic_pattern',
+    'stream-triad',
+    'Multiload -l parameter',
 )
 _DefineMemorySizeFlag(
     'multichase_memory_size_min',
@@ -308,6 +346,42 @@ def Prepare(benchmark_spec):
 
 
 def Run(benchmark_spec):
+  """Run multichase and multiload benchmarks on the VM.
+
+  Args:
+    benchmark_spec: BenchmarkSpec.
+
+  Returns:
+    A list of sample.Sample objects.
+  """
+  samples = []
+  if _MULTICHASE in FLAGS.multichase_benchmarks:
+    samples.extend(RunMultichase(benchmark_spec))
+  if _MULTILOAD in FLAGS.multichase_benchmarks:
+    samples.extend(
+        RunMultiload(
+            benchmark_spec,
+            FLAGS.multiload_thread_count,
+            FLAGS.multiload_num_samples,
+            FLAGS.multiload_buffer_size,
+            FLAGS.multiload_delay,
+            FLAGS.multiload_traffic_pattern,
+        )
+    )
+    samples.extend(
+        RunMultiload(
+            benchmark_spec,
+            None,
+            50,
+            '2g',
+            0,
+            'stream-triad-nontemporal-injection-delay',
+        )
+    )
+  return samples
+
+
+def RunMultichase(benchmark_spec):
   """Run multichase on the VM.
 
   Args:
@@ -403,6 +477,69 @@ def Run(benchmark_spec):
         })
         samples.append(sample.Sample('latency', latency_ns, 'ns', metadata))
 
+  return samples
+
+
+def RunMultiload(
+    benchmark_spec,
+    num_threads,
+    num_samples,
+    buffer_size,
+    delay,
+    traffic_pattern,
+):
+  """Run multiload on the VM.
+
+  Args:
+    benchmark_spec: BenchmarkSpec.
+    num_threads: Number of CPU threads to use for the benchmark. If None, use
+      number of CPUs on the machine.
+    num_samples: Number of multiload samples to collect.
+    buffer_size: Memory buffer size.
+    delay: Time delay.
+    traffic_pattern: Memory traffic pattern.
+
+  Returns:
+    A list of sample.Sample objects.
+  """
+  samples = []
+  vm = benchmark_spec.vms[0]
+  vm_state = getattr(vm, _BENCHMARK_SPECIFIC_VM_STATE_ATTR)
+
+  base_cmd = []
+  if FLAGS.multichase_numactl_options:
+    base_cmd.extend(('numactl', FLAGS.multichase_numactl_options))
+
+  multiload_path = posixpath.join(vm_state.multichase_dir, 'multiload')
+  if not num_threads:
+    num_threads = vm.NumCpusForBenchmark()
+
+  run_cmd = (
+      f'{multiload_path} -t {num_threads} -n {num_samples} -m {buffer_size} -d'
+      f' {delay} -l {traffic_pattern}'
+  )
+  stdout, _ = vm.RemoteCommand(run_cmd)
+  lines = stdout.strip().splitlines()
+  header = [h.strip() for h in re.split(r',\s*', lines[0])]
+  data = [d.strip() for d in re.split(r',\s*', lines[1])]
+  result_dict = {k: v for k, v in zip(header, data)}
+  load_avg_mibs = int(result_dict['LdAvgMibs'])
+  load_max_mibs = int(result_dict['LdMaxMibs'])
+  metadata = {
+      'multichase_version': multichase.GIT_VERSION,
+      'numactl_options': FLAGS.multichase_numactl_options,
+      'num_samples': num_samples,
+      'buffer_size': buffer_size,
+      'delay': delay,
+      'traffic_pattern': traffic_pattern,
+  }
+  metadata.update(result_dict)
+  samples.append(
+      sample.Sample('LdAvgMibs', load_avg_mibs, 'Mibs', metadata.copy())
+  )
+  samples.append(
+      sample.Sample('LdMaxMibs', load_max_mibs, 'Mibs', metadata.copy())
+  )
   return samples
 
 
