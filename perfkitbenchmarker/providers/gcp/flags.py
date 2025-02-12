@@ -471,6 +471,13 @@ AI_BUCKET_URI = flags.DEFINE_string(
     ' have a gs:// prefix.',
 )
 
+GCLUSTER_PATH = flags.DEFINE_string(
+    'gcluster_path',
+    'gcluster',
+    # chmod 755, mv /usr/local/bin
+    'The path for the gcluster (cluster-toolkit) utility.',
+)
+
 
 def _ValidatePreemptFlags(flags_dict):
   if flags_dict['gce_preemptible_vms']:

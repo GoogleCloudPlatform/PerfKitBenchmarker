@@ -1,0 +1,71 @@
+# TODO(yuyanting): Add support for disks, NFS and other resources.
+blueprint_name: {{ name }}
+
+vars:
+  project_id: {{ project }}
+  deployment_name: {{ name }}
+  region: {{ region }}
+  zone: {{ zone }}
+
+deployment_groups:
+- group: primary
+  modules:
+  - id: network
+    source: modules/network/vpc
+    settings:
+      firewall_rules:
+      - name: {{ name }}-fw
+        direction: INGRESS
+        ranges: [0.0.0.0/0]
+        allow:
+        - protocol: tcp
+          ports: [22]
+        - protocol: icmp
+
+  - id: compute_nodeset
+    source: community/modules/compute/schedmd-slurm-gcp-v6-nodeset
+    use: [network]
+    settings:
+      enable_placement: true
+      node_count_dynamic_max: 0
+      node_count_static: {{ num_workers }}
+      enable_public_ips: true
+      enable_oslogin: false
+      machine_type: {{ worker_machine_type }}
+      disk_type: pd-balanced
+      bandwidth_tier: gvnic_enabled
+      allow_automatic_updates: false
+      instance_image_custom: true
+      enable_smt: {{ enable_smt }}
+      enable_spot_vm: {{ enabe_spot_vm }}
+      instance_image:
+        family: {{ image_family }}
+        project: {{ image_project }}
+      metadata:
+        {{ compute_tags }}
+
+  - id: compute_partition
+    source: community/modules/compute/schedmd-slurm-gcp-v6-partition
+    use:
+    - compute_nodeset
+    settings:
+      partition_name: compute
+      exclusive: false
+      is_default: true
+
+  - id: slurm_controller
+    source: community/modules/scheduler/schedmd-slurm-gcp-v6-controller
+    use:
+    - network
+    - compute_partition
+    settings:
+      disk_size_gb: {{ nfs_size }}
+      instance_image_custom: true
+      instance_image:
+        family: {{ image_family }}
+        project: {{ image_project }}
+      machine_type: {{ headnode_machine_type }}
+      enable_oslogin: false
+      metadata:
+        {{ controller_tags }}
+      enable_controller_public_ips: true

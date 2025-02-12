@@ -145,6 +145,7 @@ class BaseCluster(resource.BaseResource):
     super().__init__()
     self.zone: str = cluster_spec.workers.vm_spec.zone
     self.machine_type: str = cluster_spec.workers.vm_spec.machine_type
+    self.template: str = cluster_spec.template
     self.worker_machine_type: str = self.machine_type
     self.headnode_machine_type: str = cluster_spec.headnode.vm_spec.machine_type
     self.headnode_spec: virtual_machine.BaseVmSpec = (
@@ -167,7 +168,7 @@ class BaseCluster(resource.BaseResource):
         None
     )
     self.worker_vms: List[linux_virtual_machine.BaseLinuxVirtualMachine] = []
-    self.name: str = FLAGS.run_uri
+    self.name: str = f'pkb{FLAGS.run_uri}'[:10]
     self.nfs_path: str = None
 
   def GetResourceMetadata(self):
@@ -179,6 +180,7 @@ class BaseCluster(resource.BaseResource):
         'image': self.image,
         'os_type': self.os_type,
         'num_workers': self.num_workers,
+        'template': self.template
     }
 
   def __repr__(self):
