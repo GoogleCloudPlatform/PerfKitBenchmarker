@@ -7,8 +7,11 @@ https://cloud.google.com/run/docs/quickstarts/jobs/create-execute
 
 import logging
 import time
+
+from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources import base_job
 from perfkitbenchmarker.resources import jobs_setter
 
@@ -28,6 +31,8 @@ class GoogleCloudRunJobsSpec(_JOB_SPEC):
   SERVICE = CLOUD_RUN_PRODUCT
   CLOUD = 'GCP'
 
+FLAGS = flags.FLAGS
+
 
 class GoogleCloudRunJob(base_job.BaseJob):
   """Class representing a Google cloud Run Job / instance."""
@@ -39,6 +44,7 @@ class GoogleCloudRunJob(base_job.BaseJob):
     super().__init__(job_spec, container_registry)
     self.region = self.region or self._default_region
     self.user_managed = False
+    self.project = FLAGS.project or util.GetDefaultProject()
     self.metadata.update({
         'Product_ID': self.SERVICE,
         'region': self.region,
@@ -57,7 +63,7 @@ class GoogleCloudRunJob(base_job.BaseJob):
         '--image=%s' % self.container_image,
         '--region=%s' % self.region,
         '--memory=%s' % self.backend,
-        '--project=p3rf-serverless-gcf2',
+        '--project=%s' % self.project,
     ]
     self.metadata.update({
         'container_image': self.container_image,
@@ -78,7 +84,7 @@ class GoogleCloudRunJob(base_job.BaseJob):
         'delete',
         self.name,
         '--region=%s' % self.region,
-        '--project=p3rf-serverless-gcf2',
+        '--project=%s' % self.project,
         '--quiet',
     ]
 
@@ -92,7 +98,7 @@ class GoogleCloudRunJob(base_job.BaseJob):
         'describe',
         self.name,
         '--region=%s' % self.region,
-        '--project=p3rf-serverless-gcf2',
+        '--project=%s' % self.project,
     ]
     try:
       out = vm_util.IssueCommand(cmd)
@@ -118,7 +124,7 @@ class GoogleCloudRunJob(base_job.BaseJob):
         self.name,
         '--wait',  # wait for the execution to complete.
         '--region=%s' % self.region,
-        '--project=p3rf-serverless-gcf2',
+        '--project=%s' % self.project,
     ]
     vm_util.IssueCommand(cmd)
     self.last_execution_end_time = time.time()
