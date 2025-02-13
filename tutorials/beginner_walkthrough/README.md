@@ -289,13 +289,13 @@ In this lab, you use Cloud Shell and the
 1.  Run unit tests and make sure they succeed:
 
     ```
-      python -m unittest discover -s tests -p '*test.py' -v
+      set -Eeuo pipefail; for test in $(find tests/ | grep "test.py"); do echo ; echo "Running $test ...";  python -m unittest $test -v ; done
     ```
 
 1.  For a single test, run
 
     ```
-      python -m unittest discover -s tests -p '{test_file_name}' -v
+      python -m unittest '{test_file_path}' -v
     ```
 
 1.  Run the pyink formatter on the file(s) that were changed.
