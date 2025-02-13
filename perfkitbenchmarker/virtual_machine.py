@@ -880,6 +880,8 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       result['cpu_version'] = self.cpu_version
     if self.create_operation_name is not None:
       result['create_operation_name'] = self.create_operation_name
+    if self.create_start_time:
+      result['create_start_time'] = self.create_start_time
     return result
 
   def SimulateMaintenanceEvent(self):
