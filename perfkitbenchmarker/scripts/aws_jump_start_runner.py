@@ -59,7 +59,7 @@ def Create():
       role=_ROLE.value,
   )
   print('Model name: <' + model.name + '>')
-  predictor = model.deploy()
+  predictor = model.deploy(accept_eula=True)
   print('Endpoint name: <' + predictor.endpoint_name + '>')
   return predictor
 

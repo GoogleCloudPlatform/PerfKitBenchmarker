@@ -245,3 +245,19 @@ class JumpStartLlama2Spec(JumpStartModelSpec):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
     self.model_id = f'meta-textgeneration-llama-2-{self.model_size}-f'
     self.model_version = '2.*'
+
+
+class JumpStartLlama3Spec(JumpStartModelSpec):
+  """Spec for running the Llama3 model.
+
+  Source is this python notebook:
+  https://github.com/aws/amazon-sagemaker-examples/blob/main/introduction_to_amazon_algorithms/jumpstart-foundation-models/llama-3-text-completion.ipynb
+  """
+
+  MODEL_NAME = 'llama3'
+  MODEL_SIZE = ['8b', '70b']
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+    self.model_id = f'meta-textgeneration-llama-3-{self.model_size}'
+    self.model_version = '2.*'
