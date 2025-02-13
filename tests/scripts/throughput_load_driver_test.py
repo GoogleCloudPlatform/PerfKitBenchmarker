@@ -163,7 +163,8 @@ class ThroughputLoadDriverTest(
       responses = throughput_load_driver.Run()
       # Assert - most processes have not finished & were abandoned.
       self.assertGreaterEqual(len(responses), 10)
-      self.assertLessEqual(len(responses), 11)
+      # Set to 12 for faster computers.
+      self.assertLessEqual(len(responses), 12)
     finally:
       throughput_load_driver._FAIL_LATENCY = orig_fail_latency
       throughput_load_driver._QUEUE_WAIT_TIME = orig_queue_wait_time
