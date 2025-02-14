@@ -132,8 +132,12 @@ def ScaleUpPods(
         condition_name='Ready',
         timeout=max_wait_time,
         wait_for_all=True,
+        namespace='default',
     )
-  except errors.VmUtil.IssueCommandError as e:
+  except (
+      errors.VmUtil.IssueCommandError,
+      errors.VmUtil.IssueCommandTimeoutError,
+  ) as e:
     logging.info(
         'Failed to wait for all pods to be ready, even with retries: %s.'
         ' Failure will be checked later by number of pods with ready events.',
