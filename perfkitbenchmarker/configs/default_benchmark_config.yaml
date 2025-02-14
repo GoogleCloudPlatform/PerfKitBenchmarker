@@ -297,6 +297,7 @@ sparksql_tpcds_1t:
 mysql_sysbench_oltp_base: &mysql_sysbench_oltp_base
   sysbench_table_size: 25000000
   sysbench_tables: 8
+  sar: True
 
 postgres_sysbench_oltp_base: &postgres_sysbench_oltp_base
   sysbench_table_size: 50000000
@@ -323,6 +324,7 @@ mysql_sysbench_oltp_write_only:
 mysql_sysbench_tpcc:
   name: unmanaged_mysql_sysbench
   flags:
+    sar: True
     sysbench_testname: percona_tpcc
     sysbench_tables: 10
     sysbench_use_fk: False
