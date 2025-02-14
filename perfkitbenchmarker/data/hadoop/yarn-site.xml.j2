@@ -6,10 +6,17 @@
         <name>yarn.resourcemanager.hostname</name>
         <value>{{ master_ip }}</value>
     </property>
+    {%- if yarn_scheduler-%}
+    <property>
+        <name>yarn.resourcemanager.scheduler.class</name>
+        <value>{{ yarn_scheduler }}</value>
+    </property>
+    {%- else %}
     <property>
         <name>yarn.resourcemanager.scheduler.class</name>
         <value>org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler</value>
     </property>
+    {%- endif %}
     <property>
         <name>yarn.nodemanager.aux-services</name>
         <value>mapreduce_shuffle</value>
@@ -29,6 +36,12 @@
         <name>yarn.scheduler.minimum-allocation-mb</name>
         <value>1</value>
     </property>
+    {%- if yarn_memory_mb-%}
+    <property>
+        <name>yarn.scheduler.maximum-allocation-mb</name>
+        <value>{{ yarn_memory_mb }}</value>
+    </property>
+    {%- endif %}
     <property>
         <name>yarn.nodemanager.env-whitelist</name>
         <value>JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_MAPRED_HOME</value>

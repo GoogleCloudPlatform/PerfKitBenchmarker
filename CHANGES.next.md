@@ -213,6 +213,7 @@
 -   Add chromium_compile_benchmark.
 -   Add unmanaged_postgresql_sysbench benchmark.
 -   Add new vmstat trace.
+-   Add support for customizing Hadoop jobs scheduling
 
 ### Enhancements:
 

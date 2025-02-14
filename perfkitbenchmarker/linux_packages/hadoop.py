@@ -56,10 +56,31 @@ _DFS_REPLICATION_OVERRIDE = flags.DEFINE_integer(
     'not specified in create time.',
 )
 
+_YARN_SCHEDULER = flags.DEFINE_string(
+    'yarn_scheduler',
+    None,
+    'Override the default YARN Scheduler.',
+)
+
 _HADOOP_NAMENODE_OPTS = flags.DEFINE_string(
     'hadoop_namenode_opts',
     None,
     'Additional options to be passed to the HDFS NameNode.',
+)
+
+# Schedule slightly more tasks than vCPUs. This was found to be optimal for
+# sorting 240 GB using standard GCE virtual machines with sufficient disk.
+# Using a grid seach.
+# TODO(pclay): Confirm results generalize to larger data sizes.
+_MAP_SLOTS_PER_CORE = flags.DEFINE_float(
+    'hadoop_map_slots_per_core',
+    1.5,
+    'Number of map tasks to schedule per core.',
+)
+_REDUCE_SLOTS_PER_CORE = flags.DEFINE_float(
+    'hadoop_reduce_slots_per_core',
+    4 / 3,
+    'Number of reduce tasks to schedule per core.',
 )
 
 DATA_FILES = [
@@ -189,13 +210,6 @@ YARN_MEMORY_FRACTION = 0.9
 # rule of thumb.
 HEAP_MEMORY_RATIO = 0.8
 
-# Schedule slightly more tasks than vCPUs. This was found to be optimal for
-# sorting 240 GB using standard GCE virtual machines with sufficient disk.
-# Using a grid seach.
-# TODO(pclay): Confirm results generalize to larger data sizes.
-MAP_SLOTS_PER_CORE = 1.5
-REDUCE_SLOTS_PER_CORE = 4 / 3
-
 
 def _RenderConfig(
     vm,
@@ -217,11 +231,11 @@ def _RenderConfig(
   # by calculating memory in terms of cores. This means that changing
   # machine memory will not change scheduling simply change the memory given to
   # each task.
-  maps_per_node = int(worker_cores * MAP_SLOTS_PER_CORE)
+  maps_per_node = int(worker_cores * _MAP_SLOTS_PER_CORE.value)
   map_memory_mb = usable_memory_mb // maps_per_node
   map_heap_mb = int(map_memory_mb * HEAP_MEMORY_RATIO)
 
-  reduces_per_node = int(worker_cores * REDUCE_SLOTS_PER_CORE)
+  reduces_per_node = int(worker_cores * _REDUCE_SLOTS_PER_CORE.value)
   reduce_memory_mb = usable_memory_mb // reduces_per_node
   reduce_heap_mb = int(reduce_memory_mb * HEAP_MEMORY_RATIO)
 
@@ -280,6 +294,7 @@ def _RenderConfig(
       'mapreduce_cluster_local_paths': mapreduce_cluster_local_paths,
       'hadoop_namenode_opts': _HADOOP_NAMENODE_OPTS.value,
       'dfs_replication': _DFS_REPLICATION_OVERRIDE.value,
+      'yarn_scheduler': _YARN_SCHEDULER.value,
   }
 
   for file_name in DATA_FILES:
