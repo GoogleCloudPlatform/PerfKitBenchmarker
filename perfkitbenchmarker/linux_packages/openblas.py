@@ -21,6 +21,7 @@ from perfkitbenchmarker import linux_packages
 OPENBLAS_DIR = '%s/OpenBLAS' % linux_packages.INSTALL_DIR
 GIT_REPO = 'https://github.com/xianyi/OpenBLAS'
 GIT_TAG = 'v0.3.21'
+LATEST_GIT_TAG = 'v0.3.29'
 
 
 def _Install(vm):
@@ -35,10 +36,23 @@ def _Install(vm):
   try:
     vm.RemoteCommand('cd {} && make USE_THREAD=0'.format(OPENBLAS_DIR))
   except errors.VirtualMachine.RemoteCommandError:
-    logging.info('Attempting to recompile OpenBLAS with TARGET=SAPPHIRERAPIDS')
-    vm.RemoteCommand(
-        'cd {} && make TARGET=SAPPHIRERAPIDS USE_THREAD=0'.format(OPENBLAS_DIR)
-    )
+    try:
+      logging.info(
+          'Attempting to recompile OpenBLAS with TARGET=SAPPHIRERAPIDS'
+      )
+      vm.RemoteCommand(
+          'cd {} && make TARGET=SAPPHIRERAPIDS USE_THREAD=0'.format(
+              OPENBLAS_DIR
+          )
+      )
+    except errors.VirtualMachine.RemoteCommandError:
+      logging.info('Attempting to recompile OpenBLAS with %s', LATEST_GIT_TAG)
+      vm.RemoteCommand(
+          'cd {} && git checkout {}'.format(OPENBLAS_DIR, LATEST_GIT_TAG)
+      )
+      vm.RemoteCommand(
+          'cd {} && make clean && make USE_THREAD=0'.format(OPENBLAS_DIR)
+      )
 
 
 def YumInstall(vm):
@@ -49,3 +63,9 @@ def YumInstall(vm):
 def AptInstall(vm):
   """Installs the OpenBLAS package on the VM."""
   _Install(vm)
+
+
+def GetVersion(vm):
+  """Returns the version of the OpenBLAS package on the VM."""
+  return vm.RemoteCommand('cd {} && git describe --exact-match --tags'.format(
+      OPENBLAS_DIR))[0].strip()

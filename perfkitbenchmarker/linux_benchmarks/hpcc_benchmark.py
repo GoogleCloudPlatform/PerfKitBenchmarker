@@ -396,7 +396,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   PrepareBinaries(vms)
 
 
-def BaseMetadata() -> Dict[str, str]:
+def BaseMetadata(vm: linux_vm.BaseLinuxVirtualMachine) -> Dict[str, str]:
   """Update metadata with hpcc-related flag values."""
   metadata = {}
   metadata['memory_size_mb'] = FLAGS.memory_size_mb
@@ -411,7 +411,7 @@ def BaseMetadata() -> Dict[str, str]:
   if FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_MKL:
     metadata['math_library_version'] = mkl.MKL_VERSION.value
   elif FLAGS.hpcc_math_library == hpcc.HPCC_MATH_LIBRARY_OPEN_BLAS:
-    metadata['math_library_version'] = openblas.GIT_TAG
+    metadata['math_library_version'] = openblas.GetVersion(vm)
   metadata['openmpi_version'] = FLAGS.openmpi_version
   if FLAGS.hpcc_numa_binding:
     metadata['hpcc_numa_binding'] = FLAGS.hpcc_numa_binding
@@ -483,7 +483,7 @@ def _AddCommonMetadata(
 ) -> None:
   """Adds metadata common to all samples."""
   for item in samples:
-    item.metadata.update(BaseMetadata())
+    item.metadata.update(BaseMetadata(benchmark_spec.vms[0]))
     item.metadata['num_machines'] = len(benchmark_spec.vms)
     item.metadata.update(dimensions)
 
