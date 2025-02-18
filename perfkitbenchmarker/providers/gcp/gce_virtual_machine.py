@@ -331,9 +331,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
             {'default': None},
         ),
         'threads_per_core': (option_decoders.IntDecoder, {'default': None}),
-        'visible_core_count': (option_decoders.IntDecoder, {
-            'default': None
-        }),
+        'visible_core_count': (option_decoders.IntDecoder, {'default': None}),
         'gce_tags': (
             option_decoders.ListDecoder,
             {
@@ -663,7 +661,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       # TODO(pclay): remove when on-host-maintenance gets promoted to GA
       cmd.use_alpha_gcloud = True
       if gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value == 'sev':
-        cmd.flags.update({'confidential-compute': True})
+        cmd.flags.update({'confidential-compute-type': 'SEV'})
       cmd.flags.update({'on-host-maintenance': 'TERMINATE'})
 
     elif self.on_host_maintenance:
@@ -702,7 +700,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
                   f'nic-type={gce_nic_type}',
                   f'network-tier={self.gce_network_tier.upper()}',
               ]
-              + gce_nic_queue_count_arg + no_address_arg
+              + gce_nic_queue_count_arg
+              + no_address_arg
           ),
       ]
 
@@ -1575,9 +1574,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
 
   def GetResourceMetadata(self):
     """See base class."""
-    metadata = (
-        super().GetResourceMetadata().copy()
-    )
+    metadata = super().GetResourceMetadata().copy()
     if self._gvnic_version:
       metadata['gvnic_version'] = self._gvnic_version
 
@@ -1664,7 +1661,8 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
 
 
 class Debian11BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.Debian11Mixin,
+    BaseLinuxGceVirtualMachine,
+    linux_vm.Debian11Mixin,
 ):
   DEFAULT_X86_IMAGE_FAMILY = 'debian-11'
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
