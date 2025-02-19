@@ -359,6 +359,7 @@ flags.DEFINE_enum(
         'CLI',
         'JAVA',
         'SIMBA_JDBC_1_6_2_1003',
+        'GOOGLE_JDBC',
         'PYTHON',
     ],
     'The Runtime Interface used when interacting with BigQuery.',
