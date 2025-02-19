@@ -203,13 +203,13 @@ class BaseGkeCluster(container_service.KubernetesCluster):
 
   def _PostCreate(self):
     """Acquires cluster authentication."""
-    super()._PostCreate()
     cmd = self._GcloudCommand(
         'container', 'clusters', 'get-credentials', self.name
     )
     env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
+    super()._PostCreate()
 
   def _IsDeleting(self):
     cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)

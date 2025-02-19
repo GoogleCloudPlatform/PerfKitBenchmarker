@@ -460,6 +460,10 @@ class ContainerClusterSpec(spec.BaseSpec):
             option_decoders.IntDecoder,
             {'default': None, 'none_ok': True, 'min': 0},
         ),
+        'poll_for_events': (
+            option_decoders.BooleanDecoder,
+            {'default': False, 'none_ok': True},
+        ),
         # vm_spec is used to define the machine type for the default nodepool
         'vm_spec': (spec.PerCloudConfigDecoder, {}),
         # nodepools specifies a list of additional nodepools to create alongside

@@ -351,6 +351,7 @@ class AksCluster(container_service.KubernetesCluster):
   def _DeleteDependencies(self):
     """Deletes the resource group."""
     self.service_principal.Delete()
+    super()._DeleteDependencies()
 
   def GetDefaultStorageClass(self) -> str:
     """Get the default storage class for the provider."""

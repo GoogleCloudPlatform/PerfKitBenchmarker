@@ -50,6 +50,7 @@ provision_container_cluster:
     type: Kubernetes
     vm_count: 1
     vm_spec: *default_dual_core
+    poll_for_events: true
 """
 
 # kubectl pods don't allow _'s.

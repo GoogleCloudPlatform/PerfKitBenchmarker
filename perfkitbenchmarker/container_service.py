@@ -29,10 +29,12 @@ import ipaddress
 import itertools
 import json
 import logging
+import multiprocessing
+from multiprocessing import synchronize
 import os
 import re
 import time
-from typing import Any, Iterator, Optional, Sequence
+from typing import Any, Callable, Iterator, Optional, Sequence
 
 from absl import flags
 import jinja2
@@ -1298,15 +1300,91 @@ class KubernetesClusterCommands:
     return yaml.safe_load(stdout)['items']
 
   @staticmethod
-  def GetEvents():
+  def _GetEvents(**kwargs) -> set['KubernetesEvent']:
     """Get the events for the cluster."""
-    stdout, _, _ = RunKubectlCommand(['get', 'events', '-o', 'yaml'])
-    k8s_events = []
+    stdout, _, _ = RunKubectlCommand(['get', 'events', '-o', 'yaml'], **kwargs)
+    k8s_events = set()
     for item in yaml.safe_load(stdout)['items']:
       k8s_event = KubernetesEvent.FromDict(item)
       if k8s_event:
-        k8s_events.append(k8s_event)
+        k8s_events.add(k8s_event)
     return k8s_events
+
+
+class KubernetesEventPoller:
+  """Wrapper which polls for Kubernetes events."""
+
+  def __init__(self, get_events_fn: Callable[[], set['KubernetesEvent']]):
+    self.get_events_fn = get_events_fn
+    self.polled_events: set['KubernetesEvent'] = set()
+    self.stop_polling = multiprocessing.Event()
+    self.event_queue: multiprocessing.Queue = multiprocessing.Queue()
+    self.event_poller = multiprocessing.Process(
+        target=self.get_events_fn,
+        args=((
+            self.event_queue,
+            self.stop_polling,
+        )),
+    )
+    self.event_poller.daemon = True
+
+  def _PollForEvents(
+      self,
+      queue: multiprocessing.Queue,
+      stop_polling: synchronize.Event,
+  ):
+    """Polls for events & (ideally asynchronously) waits to poll again.
+
+    Results are appended to the queue. Timeouts are ignored.
+
+    Args:
+      queue: The queue to append events to.
+      stop_polling: Stop polling when set.
+    """
+    while True:
+      try:
+        k8s_events = self.get_events_fn()
+        logging.info(
+            'From async get events process, got %s events', len(k8s_events)
+        )
+        for event in k8s_events:
+          queue.put(event)
+      except errors.VmUtil.IssueCommandTimeoutError:
+        logging.info(
+            'Async get events command timed out. This may result in missing'
+            ' events, but is not a reason to fail the benchmark.'
+        )
+        pass
+      start_sleep_time = time.time()
+      while time.time() - start_sleep_time < 60 * 40:
+        time.sleep(1)
+        if stop_polling.is_set():
+          return
+
+  def StartPolling(self):
+    """Starts polling for events."""
+    self.event_poller.start()
+    # Stop polling events even if the resource is not deleted.
+    def _StopPollingConnected(unused1, **kwargs):
+      del unused1, kwargs
+      self.StopPolling()
+
+    events.benchmark_end.connect(_StopPollingConnected, weak=False)
+
+  def StopPolling(self):
+    """Stops polling for events, joining the poller process."""
+    self.stop_polling.set()
+    self.event_poller.join()
+    while not self.event_queue.empty():
+      self.polled_events.add(self.event_queue.get())
+
+  def GetEvents(self) -> set['KubernetesEvent']:
+    """Gets the events for the cluster, including previously polled events."""
+    k8s_events = self.get_events_fn()
+    self.polled_events.update(k8s_events)
+    while not self.event_queue.empty():
+      self.polled_events.add(self.event_queue.get())
+    return self.polled_events
 
 
 class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
@@ -1314,8 +1392,38 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
 
   CLUSTER_TYPE = KUBERNETES
 
+  def __init__(self, cluster_spec: container_spec_lib.ContainerClusterSpec):
+    super().__init__(cluster_spec)
+    self.event_poller: KubernetesEventPoller | None = None
+    if cluster_spec.poll_for_events:
+      def _GetEventsNoLogging():
+        return self._GetEvents(suppress_logging=True)
+      self.event_poller = KubernetesEventPoller(_GetEventsNoLogging)
+
+  def _PostCreate(self):
+    super()._PostCreate()
+    if self.event_poller:
+      self.event_poller.StartPolling()
+
   def _Delete(self):
     self._DeleteAllFromDefaultNamespace()
+
+  def _DeleteDependencies(self):
+    super()._DeleteDependencies()
+    if not self.event_poller:
+      return
+    self.event_poller.StopPolling()
+
+  def GetEvents(self) -> set['KubernetesEvent']:
+    """Gets the events for the cluster, including previously polled events."""
+    if self.event_poller:
+      return self.event_poller.GetEvents()
+    return self._GetEvents()
+
+  def __getstate__(self):
+    state = self.__dict__.copy()
+    del state['event_poller']
+    return state
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster."""
@@ -1372,20 +1480,20 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     raise NotImplementedError
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=True, frozen=True)
 class KubernetesEventResource:
   """Holder for Kubernetes event involved objects."""
 
   kind: str
-  name: str
+  name: str | None
 
   @classmethod
   def FromDict(cls, yaml_data: dict[str, Any]) -> 'KubernetesEventResource':
     """Parse Kubernetes Event YAML output."""
-    return cls(kind=yaml_data['kind'], name=yaml_data['name'])
+    return cls(kind=yaml_data['kind'], name=yaml_data.get('name'))
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=True, frozen=True)
 class KubernetesEvent:
   """Holder for Kubernetes event data."""
 
@@ -1399,7 +1507,7 @@ class KubernetesEvent:
   def FromDict(cls, yaml_data: dict[str, Any]) -> 'KubernetesEvent | None':
     """Parse Kubernetes Event YAML output."""
     if 'message' not in yaml_data:
-      return
+      return None
     try:
       # There are multiple timestamps. They should be equivalent.
       raw_timestamp = yaml_data['lastTimestamp']
@@ -1419,8 +1527,8 @@ class KubernetesEvent:
           ),
           timestamp=timestamp,
       )
-    except KeyError as e:
-      logging.exception(
+    except (AssertionError, KeyError) as e:
+      logging.warning(
           'Tried parsing event: %s but ran into error: %s', yaml_data, e
       )
-      raise e
+      return None

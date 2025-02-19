@@ -36,6 +36,36 @@ kubectl_timeout_tuple = (
     1,
 )
 
+_ELECTION_EVENT_NO_NAME = """
+apiVersion: v1
+items:
+- apiVersion: v1
+  count: 1
+  eventTime: null
+  firstTimestamp: "2025-02-10T17:42:18Z"
+  involvedObject:
+    apiVersion: v1
+    kind: ConfigMap
+  kind: Event
+  lastTimestamp: "2025-02-10T17:42:18Z"
+  message: gke-49fe-vm became leader
+  metadata:
+    creationTimestamp: "2025-02-10T17:42:18Z"
+    name: .1822e9ada6eadb76
+    namespace: default
+    resourceVersion: "96"
+    uid: 87ed48a4-109b-4c9f-8335-81b24e9d9bfa
+  reason: LeaderElection
+  reportingComponent: ""
+  reportingInstance: ""
+  source:
+    component: kubestore
+  type: Normal
+kind: List
+metadata:
+  resourceVersion: ""
+"""
+
 
 class _IssueCommandCallable(Protocol):
 
@@ -306,6 +336,24 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         ['get', 'pods'], suppress_failure=lambda x, y, z: True
     )
     self.assertEqual(status, 0)
+
+  @mock.patch.object(
+      vm_util, 'IssueCommand', return_value=(_ELECTION_EVENT_NO_NAME, '', 0)
+  )
+  def test_GetKubectlEvents_Success(self, unused_mock):
+    events = container_service.KubernetesClusterCommands._GetEvents()
+    self.assertLen(events, 1)
+    self.assertEqual(
+        events.pop(),
+        container_service.KubernetesEvent(
+            container_service.KubernetesEventResource(
+                kind='ConfigMap', name=None
+            ),
+            message='gke-49fe-vm became leader',
+            reason='LeaderElection',
+            timestamp=1739209338,
+        ),
+    )
 
 
 def _ClearTimestamps(samples: Iterable[Sample]) -> Iterable[Sample]:
