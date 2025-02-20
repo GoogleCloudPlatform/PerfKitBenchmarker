@@ -150,21 +150,23 @@ TRUSTED_LAUNCH_UNSUPPORTED_OS_TYPES = [
 ]
 
 NVME_MACHINE_FAMILIES = [
-    'Standard_Eibs_v5',
-    'Standard_Ebs_v5',
-    'Standard_Eibds_v5',
-    'Standard_Ebds_v5',
-    'Standard_Ms_v3',
-    'Standard_Mds_v3',
     'Standard_Das_v6',
     'Standard_Dads_v6',
     'Standard_Dals_v6',
     'Standard_Dalds_v6',
+    'Standard_Ds_v6',
     'Standard_Eas_v6',
     'Standard_Eads_v6',
+    'Standard_Eibs_v5',
+    'Standard_Ebs_v5',
+    'Standard_Eibds_v5',
+    'Standard_Ebds_v5',
+    'Standard_Es_v6',
     'Standard_Fas_v6',
     'Standard_Fals_v6',
     'Standard_Fams_v6',
+    'Standard_Ms_v3',
+    'Standard_Mds_v3',
 ]
 
 _SKU_NOT_AVAILABLE = 'SkuNotAvailable'
