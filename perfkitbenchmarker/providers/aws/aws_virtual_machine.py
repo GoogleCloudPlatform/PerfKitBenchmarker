@@ -163,6 +163,8 @@ _EFA_V2_MACHINE_TYPES = (
     'trn1n.32xlarge',
 )
 
+_EFA_V3_MACHINE_TYPES = ('p5en.48xlarge',)
+
 _UNSUPPORTED = 'Unsupported'
 
 
@@ -828,7 +830,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             network_interface['PrivateIpAddress']
         ] + self.internal_ips
       else:
-        self.internal_ips.append(network_interface['PrivateIpAddress'])
+        # EFAv3 only has internal IPs for every 4th NIC?
+        if (self.machine_type not in _EFA_V3_MACHINE_TYPES
+            or network_interface['Attachment']['NetworkCardIndex'] % 4 == 0):
+          self.internal_ips.append(network_interface['PrivateIpAddress'])
     if util.IsRegion(self.zone):
       self.zone = str(instance['Placement']['AvailabilityZone'])
 
@@ -951,6 +956,15 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.aws_tags.update(util.MakeDefaultTags())
       # Signal (along with timeout_utc) that VM is short lived.
       self.aws_tags['vm_nature'] = 'ephemeral'
+    reservation_id = aws_flags.AWS_CAPACITY_BLOCK_RESERVATION_ID.value
+    if reservation_id:
+      reservation_args = [
+          '--count=1',
+          '--instance-market-options=MarketType="capacity-block"',
+          '--capacity-reservation-specification=CapacityReservationTarget='
+          '{CapacityReservationId=%s}' % reservation_id]
+    else:
+      reservation_args = []
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'run-instances',
@@ -961,7 +975,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--key-name=%s' % AwsKeyFileManager.GetKeyNameForRun(),
         '--tag-specifications=%s'
         % util.FormatTagSpecifications('instance', self.aws_tags),
-    ]
+    ] + reservation_args
 
     if FLAGS.aws_vm_hibernate:
       create_cmd.extend([
@@ -996,8 +1010,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             'Groups': self.group_id,
             'SubnetId': self.network.subnet.id,
         })
+        # https://aws.amazon.com/blogs/aws/new-amazon-ec2-p5en-instances-with-nvidia-h200-tensor-core-gpus-and-efav3-networking/
+        if self.machine_type in _EFA_V3_MACHINE_TYPES and device_index % 4:
+          efa_params['InterfaceType'] = 'efa-only'
         if (
-            self.machine_type in _EFA_V2_MACHINE_TYPES
+            self.machine_type in _EFA_V2_MACHINE_TYPES + _EFA_V3_MACHINE_TYPES
             and efa_params['DeviceIndex']
         ):
           efa_params['DeviceIndex'] = 1
@@ -1721,12 +1738,13 @@ class Ubuntu2004DeepLearningAMIBasedAWSVirtualMachine(
 
   def UpdateDockerfile(self, dockerfile):
     """Add provider specific instructions to a docker file."""
-    installation_script = r"""RUN curl -O https://efa-installer.amazonaws.com/aws-efa-installer-1.31.0.tar.gz
-RUN tar -xf aws-efa-installer-1.31.0.tar.gz && cd aws-efa-installer && ./efa_installer.sh --mpi=openmpi4 -y -g -d --skip-kmod --skip-limit-conf --no-verify
+    installation_script = r"""RUN apt-get update
+RUN curl -O https://efa-installer.amazonaws.com/aws-efa-installer-1.37.0.tar.gz
+RUN tar -xf aws-efa-installer-1.37.0.tar.gz && cd aws-efa-installer && ./efa_installer.sh --mpi=openmpi4 -y -g -d --skip-kmod --skip-limit-conf --no-verify
 RUN apt-get install libhwloc-dev -y
-RUN wget https://github.com/aws/aws-ofi-nccl/releases/download/v1.8.1-aws/aws-ofi-nccl-1.8.1-aws.tar.gz
+RUN wget https://github.com/aws/aws-ofi-nccl/releases/download/v1.13.0-aws/aws-ofi-nccl-1.13.0.tar.gz
 RUN export PATH=/opt/amazon/openmpi/bin/:\$PATH
-RUN tar -xf aws-ofi-nccl-1.8.1-aws.tar.gz && cd aws-ofi-nccl-1.8.1-aws && ./configure --prefix=/opt/aws-ofi-nccl --with-mpi=/opt/amazon/openmpi --with-libfabric=/opt/amazon/efa --with-cuda=/usr/local/cuda --enable-platform-aws && make && make install
+RUN tar -xf aws-ofi-nccl-1.13.0.tar.gz && cd aws-ofi-nccl-1.13.0 && ./configure --prefix=/opt/aws-ofi-nccl --with-mpi=/opt/amazon/openmpi --with-libfabric=/opt/amazon/efa --with-cuda=/usr/local/cuda --enable-platform-aws && make && make install
 ENV LD_LIBRARY_PATH=/opt/aws-ofi-nccl/lib:/opt/amazon/efa:\$LD_LIBRARY_PATH
 """
     for line in installation_script.splitlines():

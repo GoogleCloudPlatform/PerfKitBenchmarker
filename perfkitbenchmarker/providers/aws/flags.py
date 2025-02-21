@@ -215,6 +215,9 @@ flags.DEFINE_integer(
     1,
     249,
 )
+AWS_CAPACITY_BLOCK_RESERVATION_ID = flags.DEFINE_string(
+    'aws_capacity_block_reservation_id',
+    None, 'Reservation id for capacity block.')
 AWS_CREATE_DISKS_WITH_VM = flags.DEFINE_boolean(
     'aws_create_disks_with_vm',
     True,

@@ -92,6 +92,7 @@ DUAL_NETWORK_CARD_MACHINES = frozenset([
     'p4d.24xlarge',
     'p4de.24xlarge',
     'p5.48xlarge',
+    'p5en.48xlarge',
     'r6idn.32xlarge',
     'r6idn.metal',
     'r6in.32xlarge',
@@ -361,12 +362,12 @@ class AwsVpc(resource.BaseResource):
       ValueError: when no additional subnets can be created.
     """
     with self._subnet_index_lock:
-      if self._subnet_index >= (1 << 8) - 1:
+      if self._subnet_index >= (1 << 12) - 1:
         raise ValueError(
             'Exceeded subnet limit ({}).'.format(self._subnet_index)
         )
       cidr = network.GetCidrBlock(
-          self.regional_network_index, self._subnet_index
+          self.regional_network_index, self._subnet_index, mask_size=20
       )
       self._subnet_index += 1
     return cidr
@@ -416,7 +417,7 @@ class AwsVpc(resource.BaseResource):
 class AwsSubnet(resource.BaseResource):
   """An object representing an Aws subnet."""
 
-  def __init__(self, zone, vpc_id, cidr_block='10.0.0.0/24', subnet_id=None):
+  def __init__(self, zone, vpc_id, cidr_block='10.0.0.0/20', subnet_id=None):
     super().__init__(subnet_id is not None)
     self.zone = zone
     self.region = util.GetRegionFromZone(zone)

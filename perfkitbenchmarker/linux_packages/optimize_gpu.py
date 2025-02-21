@@ -7,13 +7,15 @@ from perfkitbenchmarker.linux_packages import nvidia_driver
 FLAGS = flags.FLAGS
 
 _GPUS_PER_NODE = 8
+TUNER = flags.DEFINE_boolean('enable_ofi_tuner', False, 'Enable aws ofi tuner')
 
 
 def _CheckSupported(vm):
   """Check if the GPU type is supported."""
   # TODO(yuyanting): Add support for other GPU types.
-  if nvidia_driver.GetGpuType(vm) != nvidia_driver.NVIDIA_H100:
-    logging.warn('Skipping GPU optimization for non-H100 GPU.')
+  if nvidia_driver.GetGpuType(vm) not in (
+      nvidia_driver.NVIDIA_H100, nvidia_driver.NVIDIA_H200):
+    logging.warn('Skipping GPU optimization for non-H100, H200 GPU.')
     return False
   return True
 
@@ -25,7 +27,10 @@ def Install(vm):
   # Following:
   # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/optimize_gpu.html
   nvidia_driver.EnablePersistenceMode(vm)
-  vm.RemoteCommand('sudo nvidia-smi -ac 2619,1980')
+  if nvidia_driver.GetGpuType(vm) == nvidia_driver.NVIDIA_H100:
+    vm.RemoteCommand('sudo nvidia-smi -ac 2619,1980')
+  elif nvidia_driver.GetGpuType(vm) == nvidia_driver.NVIDIA_H200:
+    vm.RemoteCommand('sudo nvidia-smi -ac 3201,1980')
   # Consider moving driver installation to this module.
 
 
@@ -76,6 +81,14 @@ def SetContainerEnv(vm):
   """
   if not _CheckSupported(vm):
     return ''
+  tuner = ''
+  if TUNER.value:
+    tuner = (
+        'export NCCL_TUNER_PLUGIN=/opt/aws-ofi-nccl/lib/libnccl-ofi-tuner.so; '
+        'export FI_EFA_FORK_SAFE=1; '
+        'export NCCL_SOCKET_IFNAME=^docker,lo,veth_def_agent,eth; '
+        'export NCCL_BUFFSIZE=8388608; '
+        'export NCCL_P2P_NET_CHUNKSIZE=524288;')
   if FLAGS.cloud == 'AWS':
     return (
         'export LD_LIBRARY_PATH='
@@ -84,7 +97,7 @@ def SetContainerEnv(vm):
         # pylint: disable=anomalous-backslash-in-string
         'export PATH=/opt/amazon/openmpi/bin/:\$PATH; '
         'export FI_PROVIDER=efa; export FI_EFA_USE_DEVICE_RDMA=1;'
-    )
+    ) + tuner
   if FLAGS.cloud == 'GCP' and vm.machine_type == 'a3-megagpu-8g':
     return (
         'NCCL_LIB_DIR=/var/lib/tcpxo/lib64; '
