@@ -10,6 +10,7 @@ https://catalog.ngc.nvidia.com/orgs/nvidia/containers/hpc-benchmarks
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cuda_toolkit
@@ -78,10 +79,19 @@ def _PrepareNvidiaHPL(vm):
   nvidia_driver.EnablePersistenceMode(vm)
   vm.RemoteCommand('sudo mount -o remount,size=75% /run')
   vm.RemoteCommand(
-      'echo "FROM nvcr.io/nvidia/hpc-benchmarks:24.06" >> Dockerfile')
+      'echo "FROM nvcr.io/nvidia/hpc-benchmarks:24.09" >> Dockerfile')
   vm.RemoteCommand(
       'echo "WORKDIR /workspace" >> Dockerfile')
   vm.UpdateDockerfile('Dockerfile')
+  # TODO(yuyanting): Figure out proper math for other node counts
+  # 128 GPUs dat from Sam Skillman
+  vm.RemoteCopy(
+      data.ResourcePath('HPL-H200-128GPUs.dat')
+  )
+  vm.RemoteCommand(
+      'echo "COPY HPL-H200-128GPUs.dat '
+      '/workspace/hpl-linux-x86_64/sample-dat/HPL-H200-128GPUs.dat"'
+      ' >> Dockerfile')
   vm.RemoteCommand('docker build --network=host -t pkb-hpc-image .')
 
 
@@ -138,9 +148,21 @@ def Run(benchmark_spec):
   gpus_per_node = FLAGS.hpcg_gpus_per_node or nvidia_driver.QueryNumberOfGpus(
       benchmark_spec.vms[0])
   provider_env = optimize_gpu.SetContainerEnv(controller)
-  hpl_command = (
-      './hpl.sh --dat /workspace/hpl-linux-x86_64/sample-dat/'
-      f'HPL-dgx-{len(benchmark_spec.vms)}N.dat'
+  hpl_command = ''
+  if nvidia_driver.GetGpuType(controller) == nvidia_driver.NVIDIA_H100:
+    hpl_dat = f'HPL-dgx-{len(benchmark_spec.vms)}N.dat'
+  elif nvidia_driver.GetGpuType(controller) == nvidia_driver.NVIDIA_H200:
+    hpl_dat = f'HPL-H200-{len(benchmark_spec.vms) * 8}GPUs.dat'
+    if len(benchmark_spec.vms) > 4 and len(benchmark_spec.vms) != 16:
+      raise ValueError(
+          f'Unsupported number of nodes: {len(benchmark_spec.vms)}'
+      )
+  else:
+    raise ValueError(
+        f'Unsupported GPU type: {nvidia_driver.GetGpuType(controller)}'
+    )
+  hpl_command += (
+      f'./hpl.sh --dat /workspace/hpl-linux-x86_64/sample-dat/{hpl_dat}'
   )
   # pylint: disable=protected-access
   hostfile = controller._RemoteFileExists('/var/tmp/hostfile')

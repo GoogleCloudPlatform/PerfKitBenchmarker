@@ -1,0 +1,31 @@
+HPLinpack benchmark input file
+Innovative Computing Laboratory, University of Tennessee
+HPL.out # output file name (if any)
+6 # (FORTRAN) device out (6=stdout,7=stderr,file)
+1 # Number of problem sizes (N)
+1474560 # Problem sizes = 85% of total available memory
+1 # Number of block sizes (NBs)
+1024 # Block Sizes
+1 # PMAP process mapping (0=Row-Major, 1=Column-Major)
+1 # Number of grids, process grids (P * Q)
+8 # Ps, Dimension 1 parallelization
+16 # Qs, Dimension 2 parallelization
+16.0 # Threshold
+3 # Number of PFACTs, panel fact
+0 1 2 # PFACT values (0=Left, 1=Crout, 2=Right)
+2 # Number of NBMINs, recursive stopping criteria
+2 4 # NBMINs (>= 1)
+1 # Number of NDIVs, panels in recursion
+2  # NDIVs
+3 # Number of RFACTs, recursive panel fact.
+0 1 2 # RFACTs (0=Left, 1=Crout, 2=Right)
+1 # Number of BCASTs, broadcast
+0 # BCASTs (0=1rg,1=1rM,2=2rg,3=2rM,4=Lng,5=LnM,6=MKL BPUSH,7=AMD Hybrid Panel)
+1 # Number of DEPTHs, lookahead depth
+0 # DEPTHs (>=0)
+1 # SWAP (0=bin-exch, 1=long, 2=mix)
+192 # Swapping threshold
+1 # L1 in (0=transposed, 1=no-transposed) form
+0 # U in (0=transposed, 1=no-transposed) form
+0 # Equilibration (0=no, 1=yes)
+8 # Memory alignment in double (> 0)

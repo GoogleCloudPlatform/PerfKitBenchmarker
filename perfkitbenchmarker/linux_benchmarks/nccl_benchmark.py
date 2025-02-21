@@ -120,9 +120,9 @@ _SAMPLE_LINE_RE = re.compile(
 RUN_CMD = (
     '{mpi} '
     '--hostfile {hostfile} '
-    '--mca pml ^cm '
+    '--mca pml ^cm,ucx '
     '--mca btl tcp,self '
-    '--mca btl_tcp_if_exclude docker0,lo '
+    '--mca btl_tcp_if_exclude lo,docker0,veth_def_agent '
     '--bind-to none '
     '-N {slots} '
     '{env} '
