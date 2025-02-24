@@ -86,6 +86,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   project: str
   gcloud_model: aiplatform.Model | None
   service_account: str
+  model_resource_name: str | None
   model_deploy_time: float | None
   model_upload_time: float | None
   json_write_times: list[float]
@@ -269,24 +270,27 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
 
   def _Create(self) -> None:
     """Creates the underlying resource."""
-    logging.info('Creating the resource: %s for ai model.', self.model_name)
-    env_vars = self.model_spec.GetEnvironmentVariables(
-        model_bucket_path=self.model_bucket_path
-    )
     start_model_upload = time.time()
-    self.gcloud_model = aiplatform.Model.upload(
-        display_name=self.name,
-        serving_container_image_uri=self.model_spec.container_image_uri,
-        serving_container_command=self.model_spec.serving_container_command,
-        serving_container_args=self.model_spec.serving_container_args,
-        serving_container_ports=self.model_spec.serving_container_ports,
-        serving_container_predict_route=self.model_spec.serving_container_predict_route,
-        serving_container_health_route=self.model_spec.serving_container_health_route,
-        serving_container_environment_variables=env_vars,
-        artifact_uri=self.model_bucket_path,
-        labels=util.GetDefaultTags(),
-    )
-    self.model_resource_name = self.gcloud_model.resource_name
+    if gcp_flags.AI_USE_SDK.value:
+      env_vars = self.model_spec.GetEnvironmentVariables(
+          model_bucket_path=self.model_bucket_path
+      )
+      logging.info('Uploading ai model %s', self.model_name)
+      self.gcloud_model = aiplatform.Model.upload(
+          display_name=self.name,
+          serving_container_image_uri=self.model_spec.container_image_uri,
+          serving_container_command=self.model_spec.serving_container_command,
+          serving_container_args=self.model_spec.serving_container_args,
+          serving_container_ports=self.model_spec.serving_container_ports,
+          serving_container_predict_route=self.model_spec.serving_container_predict_route,
+          serving_container_health_route=self.model_spec.serving_container_health_route,
+          serving_container_environment_variables=env_vars,
+          artifact_uri=self.model_bucket_path,
+          labels=util.GetDefaultTags(),
+      )
+      self.model_resource_name = self.gcloud_model.resource_name
+    else:
+      self._UploadViaGcloudCommand()
     end_model_upload = time.time()
     self.model_upload_time = end_model_upload - start_model_upload
     logging.info(
@@ -294,21 +298,73 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
         self.model_resource_name,
         self.model_upload_time,
     )
-    try:
-      start_model_deploy = time.time()
-      self.gcloud_model.deploy(
-          endpoint=self.endpoint.ai_endpoint,
-          machine_type=self.model_spec.machine_type,
-          accelerator_type=self.model_spec.accelerator_type,
-          accelerator_count=self.model_spec.accelerator_count,
-          deploy_request_timeout=1800,
-          max_replica_count=self.max_scaling,
+    start_model_deploy = time.time()
+    if gcp_flags.AI_USE_SDK.value:
+      assert self.gcloud_model
+      try:
+        self.gcloud_model.deploy(
+            endpoint=self.endpoint.ai_endpoint,
+            machine_type=self.model_spec.machine_type,
+            accelerator_type=self.model_spec.accelerator_type,
+            accelerator_count=self.model_spec.accelerator_count,
+            deploy_request_timeout=1800,
+            max_replica_count=self.max_scaling,
+        )
+      except google_exceptions.ServiceUnavailable as ex:
+        logging.info('Tried to deploy model but got unavailable error %s', ex)
+        raise errors.Benchmarks.QuotaFailure(ex)
+    else:
+      accelerator_type = self.model_spec.accelerator_type.lower()
+      accelerator_type = accelerator_type.replace('_', '-')
+      self.vm.RunCommand(
+          f'gcloud ai endpoints deploy-model {self.endpoint.endpoint_name}'
+          f' --model={self.model_resource_name} --region={self.region}'
+          f' --project={self.project} --display-name={self.name}'
+          f' --machine-type={self.model_spec.machine_type}'
+          f' --accelerator=type={accelerator_type},count={self.model_spec.accelerator_count}'
+          f' --service-account={self.service_account}'
+          f' --max-replica-count={self.max_scaling}'
       )
-      end_model_deploy = time.time()
-      self.model_deploy_time = end_model_deploy - start_model_deploy
-    except google_exceptions.ServiceUnavailable as ex:
-      logging.info('Tried to deploy model but got unavailable error %s', ex)
-      raise errors.Benchmarks.QuotaFailure(ex)
+    end_model_deploy = time.time()
+    self.model_deploy_time = end_model_deploy - start_model_deploy
+    logging.info(
+        'Successfully deployed model in %s seconds', self.model_deploy_time
+    )
+
+  def _UploadViaGcloudCommand(self) -> None:
+    """Uploads the model via gcloud command."""
+    upload_cmd = (
+        f'gcloud ai models upload --display-name={self.name}'
+        f' --project={self.project} --region={self.region}'
+        f' --artifact-uri={self.model_bucket_path}'
+    )
+    if util.GetDefaultTags():
+      upload_cmd += f' --labels={util.MakeFormattedDefaultTags()}'
+    upload_cmd += self.model_spec.GetModelUploadCliArgs(
+        model_bucket_path=self.model_bucket_path
+    )
+    self.vm.RunCommand(upload_cmd)
+    out, _, _ = self.vm.RunCommand(
+        f'gcloud ai models list --project={self.project} --region={self.region}'
+    )
+    lines = out.splitlines()
+    for line in lines:
+      pieces = line.split()
+      if len(pieces) != 2:
+        continue
+      if pieces[1] == self.name:
+        self.model_resource_name = pieces[0]
+        logging.info(
+            'Model resource with name %s uploaded & found with model id %s',
+            self.name,
+            self.model_resource_name,
+        )
+        return
+
+    if not self.model_resource_name:
+      raise errors.Resource.CreationError(
+          'Could not find model resource with name %s' % self.name
+      )
 
   def _CreateDependencies(self):
     if self.gcs_client:
@@ -324,12 +380,13 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       )  # pytype: disable=attribute-error
       self.gcs_bucket_copy_time = time.time() - gcs_bucket_copy_start_time
 
-    aiplatform.init(
-        project=self.project,
-        location=self.region,
-        staging_bucket=self.staging_bucket,
-        service_account=self.service_account,
-    )
+    if gcp_flags.AI_USE_SDK.value:
+      aiplatform.init(
+          project=self.project,
+          location=self.region,
+          staging_bucket=self.staging_bucket,
+          service_account=self.service_account,
+      )
     self.endpoint.Create()
 
   def Delete(self, freeze: bool = False) -> None:
@@ -342,8 +399,14 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   def _Delete(self) -> None:
     """Deletes the underlying resource."""
     logging.info('Deleting the resource: %s.', self.model_name)
-    assert self.gcloud_model
-    self.gcloud_model.delete()
+    if gcp_flags.AI_USE_SDK.value:
+      assert self.gcloud_model
+      self.gcloud_model.delete()
+      return
+    self.vm.RunCommand(
+        'gcloud ai models delete'
+        f' {self.model_resource_name} --region={self.region} --project={self.project}'
+    )
 
   def _DeleteDependencies(self):
     super()._DeleteDependencies()
@@ -510,6 +573,29 @@ class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
     self.accelerator_count: int
     self.accelerator_type: str
 
+  def GetModelUploadCliArgs(self, **input_args) -> str:
+    """Returns the kwargs needed to upload the model."""
+    env_vars = self.GetEnvironmentVariables(**input_args)
+    env_vars_str = ','.join(f'{key}={value}' for key, value in env_vars.items())
+    ports_str = ','.join(str(port) for port in self.serving_container_ports)
+    return (
+        f' --container-image-uri={self.container_image_uri}'
+        f' --container-command={",".join(self.serving_container_command)}'
+        f' --container-args={",".join(self.serving_container_args)}'
+        f' --container-ports={ports_str}'
+        f' --container-predict-route={self.serving_container_predict_route}'
+        f' --container-health-route={self.serving_container_health_route}'
+        f' --container-env-vars={env_vars_str}'
+    )
+
+  def GetModelDeployKwargs(self) -> dict[str, Any]:
+    """Returns the kwargs needed to deploy the model."""
+    return {
+        'machine_type': self.machine_type,
+        'accelerator_type': self.accelerator_type,
+        'accelerator_count': self.accelerator_count,
+    }
+
   def GetEnvironmentVariables(self, **kwargs) -> dict[str, str]:
     """Returns container's environment variables, with whatever args needed."""
     del kwargs
@@ -554,7 +640,7 @@ class VertexAiLlama2Spec(VertexAiModelSpec):
       self.machine_type = 'g2-standard-96'
       self.accelerator_count = 8
     self.accelerator_type = 'NVIDIA_L4'
-    self.serving_container_args = VLLM_ARGS
+    self.serving_container_args = VLLM_ARGS.copy()
     self.serving_container_args.append(
         f'--tensor-parallel-size={self.accelerator_count}'
     )
@@ -563,7 +649,7 @@ class VertexAiLlama2Spec(VertexAiModelSpec):
     """Returns container's environment variables needed by Llama2."""
     return {
         'MODEL_ID': kwargs['model_bucket_path'],
-        'DEPLOY_SOURCE': 'notebook',
+        'DEPLOY_SOURCE': 'pkb',
     }
 
   def ConvertToInstances(

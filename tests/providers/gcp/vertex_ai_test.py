@@ -74,7 +74,8 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsNotNone(ai_spec)
     self.assertEqual(ai_spec.__name__, 'VertexAiLlama2Spec')
 
-  def test_model_create(self):
+  @flagsaver.flagsaver(use_ai_sdk=True)
+  def test_model_create_via_sdk(self):
     self.MockRunCommand(
         {
             'gcloud ai endpoints create': [(
@@ -97,6 +98,7 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('Model Deploy Time', sampled_metrics)
 
   @flagsaver.flagsaver(ai_bucket_uri=None)
+  @flagsaver.flagsaver(use_ai_sdk=True)
   def test_model_create_with_gcs_copy(self):
     self.pkb_ai = vertex_ai.VertexAiModelInRegistry(
         mock.create_autospec(virtual_machine.BaseVirtualMachine), self.ai_spec
@@ -132,6 +134,7 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
         'gs://my-project-us-west-tmp-pkb123/llama2/llama2-7b-hf',
     )
 
+  @flagsaver.flagsaver(use_ai_sdk=True)
   @flagsaver.flagsaver(ai_bucket_uri=None)
   def test_model_create_with_reuse_gcs_bucket(self):
     self.pkb_ai = vertex_ai.VertexAiModelInRegistry(
@@ -169,6 +172,7 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
         'gs://my-project-us-west-tmp-pkb123/llama2/llama2-7b-hf',
     )
 
+  @flagsaver.flagsaver(use_ai_sdk=True)
   def test_model_quota_error(self):
     self.MockRunCommand(
         {
@@ -192,6 +196,52 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     )
     with self.assertRaises(errors.Benchmarks.QuotaFailure):
       self.pkb_ai.Create()
+
+  def test_model_create_via_gcloud(self):
+    cli = self.MockRunCommand(
+        {
+            'gcloud ai models upload': [(
+                'uploaded',
+                '',
+                0,
+            )],
+            'gcloud ai models list': [(
+                'MODEL_ID             DISPLAY_NAME\n1234  pkb123',
+                '',
+                0,
+            )],
+            'gcloud ai endpoints deploy-model': [(
+                'Model deployed',
+                '',
+                0,
+            )],
+        },
+        self.pkb_ai.vm,
+    )
+    self.pkb_ai._Create()
+    cli.RunCommand.assert_has_calls([
+        mock.call(
+            'gcloud ai models upload --display-name=pkb123 --project=my-project'
+            ' --region=us-west'
+            ' --artifact-uri=gs://my-bucket/llama2/llama2-7b-hf'
+            ' --container-image-uri=us-docker.pkg.dev/vertex-ai/vertex-vision-model-garden-dockers/pytorch-vllm-serve:20240222_0916_RC00'
+            ' --container-command=python,-m,vllm.entrypoints.api_server'
+            ' --container-args=--host=0.0.0.0,--port=7080,--swap-space=16,--gpu-memory-utilization=0.9,--max-model-len=2048,--max-num-batched-tokens=4096,--tensor-parallel-size=1'
+            ' --container-ports=7080 --container-predict-route=/generate'
+            ' --container-health-route=/ping'
+            ' --container-env-vars=MODEL_ID=gs://my-bucket/llama2/llama2-7b-hf,DEPLOY_SOURCE=pkb'
+        ),
+        mock.call(
+            'gcloud ai models list --project=my-project --region=us-west'
+        ),
+        mock.call(
+            'gcloud ai endpoints deploy-model None --model=1234'
+            ' --region=us-west --project=my-project --display-name=pkb123'
+            ' --machine-type=g2-standard-8 --accelerator=type=nvidia-l4,count=1'
+            ' --service-account=123-compute@developer.gserviceaccount.com'
+            ' --max-replica-count=1'
+        ),
+    ])  # pytype: disable=attribute-error
 
   def test_model_inited(self):
     # Assert on values from setup
