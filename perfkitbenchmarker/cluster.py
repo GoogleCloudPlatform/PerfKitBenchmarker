@@ -135,6 +135,7 @@ class BaseCluster(resource.BaseResource):
 
   RESOURCE_TYPE = 'BaseCluster'
   REQUIRED_ATTRS = ['CLOUD']
+  DEFAULT_TEMPLATE = ''
 
   def __init__(self, cluster_spec: BaseClusterSpec):
     """Initialize BaseCluster class.
@@ -145,7 +146,7 @@ class BaseCluster(resource.BaseResource):
     super().__init__()
     self.zone: str = cluster_spec.workers.vm_spec.zone
     self.machine_type: str = cluster_spec.workers.vm_spec.machine_type
-    self.template: str = cluster_spec.template
+    self.template: str = cluster_spec.template or self.DEFAULT_TEMPLATE
     self.worker_machine_type: str = self.machine_type
     self.headnode_machine_type: str = cluster_spec.headnode.vm_spec.machine_type
     self.headnode_spec: virtual_machine.BaseVmSpec = (
@@ -258,6 +259,11 @@ class BaseCluster(resource.BaseResource):
     except errors.VirtualMachine.RemoteCommandError:
       return False
 
+  def InstantiateVm(self, vm_spec):
+    """Creates VM object."""
+    vm_class = virtual_machine.GetVmClass(vm_spec.CLOUD, self.os_type)
+    return vm_class(vm_spec)
+
   def BackfillVm(
       self,
       vm_spec: virtual_machine.BaseVmSpec,
@@ -272,8 +278,7 @@ class BaseCluster(resource.BaseResource):
     Returns:
       The newly created VM object.
     """
-    vm_class = virtual_machine.GetVmClass(vm_spec.CLOUD, self.os_type)
-    vm = vm_class(vm_spec)
+    vm = self.InstantiateVm(vm_spec)
     fn(vm)
     vm.disks = []
     vm._PostCreate()  # pylint: disable=protected-access

@@ -1,0 +1,56 @@
+Region: {{ region }}
+Image:
+  Os: {{ os_type }}
+Tags:
+{% for key,value in tags.items() %}
+  - Key: {{ key }}
+    Value: {{ value }}
+{% endfor %}
+SharedStorage:
+  - MountDir: /opt/apps
+    Name: nfs
+    StorageType: Ebs
+    EbsSettings:
+      VolumeType: gp3
+      Iops: 5000
+      Size: {{ nfs_size }}
+      Encrypted: True
+HeadNode:
+  InstanceType: {{ headnode_machine_type }}
+  Networking:
+    ElasticIp: true
+    SubnetId: {{ headnode_subnet_id }}
+  Ssh:
+    KeyName: {{ ssh_key }}
+  SharedStorageType: Ebs
+Scheduling:
+  Scheduler: slurm
+  SlurmQueues:
+  - Name: queue1
+    CapacityType: {{ "SPOT" if enable_spot_vm else "ONDEMAND" }}
+    ComputeResources:
+    - Name: {{ name }}
+      Instances:
+      - InstanceType: {{ worker_machine_type }}
+      MinCount: {{ num_workers }}
+      MaxCount: {{ num_workers }}
+      DisableSimultaneousMultithreading: {{ not enable_smt }}
+      Efa:
+        Enabled: {{ efa_enabled }}
+    Networking:
+      PlacementGroup:
+        Enabled: true
+      SubnetIds:
+      - {{ worker_subnet_id }}
+Monitoring:
+  Logs:
+    CloudWatch:
+      Enabled: false
+    Rotation:
+      Enabled: false
+  Dashboards:
+    CloudWatch:
+      Enabled: false
+  DetailedMonitoring: false
+  Alarms:
+    Enabled: false

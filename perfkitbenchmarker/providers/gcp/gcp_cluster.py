@@ -46,7 +46,7 @@ class GceCluster(cluster.BaseCluster):
   # TODO(yuyanting): Add cluster type as attributes.
   # We probably will need to implement different type of clusters with
   # different default templates and Render functions.
-  TEMPLATE_FILE = 'cluster/cluster_toolkit.yaml.j2'
+  DEFAULT_TEMPLATE = 'cluster/cluster_toolkit.yaml.j2'
 
   def __init__(self, cluster_spec: GceClusterSpec):
     """Initialize GceCluster class.
@@ -55,7 +55,6 @@ class GceCluster(cluster.BaseCluster):
       cluster_spec: cluster.GceClusterSpec object.
     """
     super().__init__(cluster_spec)
-    self.template: str = self.template or self.TEMPLATE_FILE
     self.project: str = cluster_spec.workers.vm_spec.project
     self._config_path: str = os.path.join(
         vm_util.GetTempDir(), _CONFIG_FILE_NAME)
@@ -83,7 +82,7 @@ class GceCluster(cluster.BaseCluster):
       template = jinja2.Template(
           content.read(), undefined=jinja2.StrictUndefined
       )
-      config = template.render(
+      self._config = template.render(
           name=self.name,
           zone=self.zone,
           region=util.GetRegionFromZone(self.zone),
@@ -100,11 +99,11 @@ class GceCluster(cluster.BaseCluster):
           enabe_spot_vm=FLAGS.gce_preemptible_vms,
           enable_smt=not FLAGS.disable_smt,
       )
-    with open(self._config_path, 'w') as config_file:
-      config_file.write(config)
 
   def _Create(self):
     """Create GCP cluster with cluster toolkit."""
+    with open(self._config_path, 'w') as config_file:
+      config_file.write(self._config)
     vm_util.IssueCommand([
         flags.GCLUSTER_PATH.value,
         'deploy',

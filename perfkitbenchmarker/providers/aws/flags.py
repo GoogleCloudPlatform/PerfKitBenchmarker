@@ -243,6 +243,12 @@ AWS_EKS_POD_IDENTITY_ROLE = flags.DEFINE_string(
     'The IAM role to associate with the pod identity for EKS clusters.',
 )
 
+PCLUSTER_PATH = flags.DEFINE_string(
+    'pcluster_path',
+    'pcluster',
+    'The path for the pcluster (parallel-cluster) utility.',
+)
+
 
 @flags.multi_flags_validator(
     [

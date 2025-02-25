@@ -44,7 +44,7 @@ class GcpClusterTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(vm_util, 'GenerateSSHConfig', autospec=True)
     )
 
-  def testPostCreateAuthenticate(self):
+  def testPostCreate(self):
     # Test _PostCreate
     self.cluster._PostCreate()
     self.assertEqual(
