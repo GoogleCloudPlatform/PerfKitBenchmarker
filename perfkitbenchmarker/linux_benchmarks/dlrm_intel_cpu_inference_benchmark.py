@@ -92,8 +92,8 @@ def _BuildDocker(vm):
       'git clone https://github.com/mlcommons/'
       f'inference_results_v{_VERSION.value}.git'
   )
-  # physical cores since we turn off SMT
   cpus_per_socket = vm.CheckLsCpu().cores_per_socket
+  number_cores = cpus_per_socket * vm.CheckLsCpu().socket_count
   if _VERSION.value == '4.0':
     vm.DownloadPreprovisionedData(
         dlrm.MODEL_PATH, 'dlrm', 'dlrm_int8.pt', dlrm.DLRM_DOWNLOAD_TIMEOUT
@@ -121,6 +121,7 @@ def _BuildDocker(vm):
         f'-e NUM_SOCKETS={vm.CheckLsCpu().socket_count} '
         f'-e CPUS_PER_SOCKET={cpus_per_socket} '
         f'-e CPUS_PER_PROCESS={cpus_per_socket} '
+        f'-e number_cores={number_cores} '
         '-e CPUS_PER_INSTANCE=2 '
         '-e CPUS_FOR_LOADGEN=1 '
         '-e BATCH_SIZE=400 '
@@ -152,6 +153,7 @@ def _BuildDocker(vm):
         f'-e NUM_SOCKETS={vm.CheckLsCpu().socket_count} '
         f'-e CPUS_PER_SOCKET={cpus_per_socket} '
         f'-e CPUS_PER_PROCESS={cpus_per_socket} '
+        f'-e number_cores={number_cores} '
         '-e CPUS_PER_INSTANCE=2 '
         '-e CPUS_FOR_LOADGEN=1 '
         '-e BATCH_SIZE=400 '
@@ -183,7 +185,11 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       ' "s/dlrm.Offline.target_qps = 8600.0/dlrm.Offline.target_qps ='
       ' 16000.0/g" user_default.conf; sed -i "s/dlrm.Server.target_qps ='
       f' 8200.0/dlrm.Server.target_qps = {_SERVER_TARGET_QPS.value}/g"'
-      " user_default.conf'"
+      ' user_default.conf; '
+      # run_local.sh depends on lscpu to find number of available cores, which
+      # may break when cores are offline.
+      # commenting out and setting number_cores explicitly as docker env.
+      'sed -i "s/export/#export/g" run_local.sh\''
   )
 
 

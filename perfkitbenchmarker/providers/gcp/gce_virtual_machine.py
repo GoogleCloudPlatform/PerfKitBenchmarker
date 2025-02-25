@@ -725,7 +725,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.min_cpu_platform:
       cmd.flags['min-cpu-platform'] = self.min_cpu_platform
 
-    if self.threads_per_core:
+    # metal instances do not support disable SMT.
+    if self.threads_per_core and 'metal' not in self.machine_type:
       cmd.flags['threads-per-core'] = self.threads_per_core
       self.metadata['threads_per_core'] = self.threads_per_core
 
