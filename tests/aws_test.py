@@ -222,7 +222,7 @@ class AwsVpcTestCase(pkb_common_test_case.PkbCommonTestCase):
         region,
         'create-subnet',
         '--vpc-id={}'.format(vpc_id),
-        '--cidr-block=10.0.0.0/20',
+        '--cidr-block=10.0.0.0/24',
         '--availability-zone={}'.format(zone),
     )
     describe_cmd = _AwsCommand(
