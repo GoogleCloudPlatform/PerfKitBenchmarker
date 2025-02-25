@@ -72,6 +72,7 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
   scratch_disks: List[disk.BaseDisk]  # mixed from BaseVirtualMachine
   name: str  # mixed from BaseVirtualMachine
   ssh_private_key: str  # mixed from BaseVirtualMachine
+  proxy_jump: str  # mixed from BaseVirtualMachine
   user_name: str  # mixed from BaseVirtualMachine
   disable_interrupt_moderation: str  # mixed from BaseVirtualMachine
   disable_rss: str  # mixed from BaseVirtualMachine
@@ -93,6 +94,7 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
     self.bootable_time = None
     self.port_listening_time = None
     self.hostname = None
+    self.proxy_jump = None
 
     # Ports that will be opened by benchmark_spec to permit access to the VM.
     self.remote_access_ports = []

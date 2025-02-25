@@ -1523,6 +1523,17 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
         self.ssh_private_key if self.is_static else vm_util.GetPrivateKeyPath()
     )
     ssh_cmd.extend(vm_util.GetSshOptions(ssh_private_key))
+    # TODO(yuyanting): Revisit implementing with "-o ProxyJump".
+    # Current proxy implementation relies on ssh_config file being generated,
+    # which happens at the end of the Provision stage. This causes circular
+    # depencency for regular VM (and thus only used in cluster provisioned VMs).
+    if self.proxy_jump:
+      ssh_cmd = [
+          'ssh',
+          '-F',
+          os.path.join(vm_util.GetTempDir(), 'ssh_config'),
+          self.name,
+      ]
 
     if should_pre_log:
       logger.info(
