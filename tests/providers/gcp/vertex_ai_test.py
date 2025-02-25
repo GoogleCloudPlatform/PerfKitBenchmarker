@@ -74,6 +74,13 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsNotNone(ai_spec)
     self.assertEqual(ai_spec.__name__, 'VertexAiLlama2Spec')
 
+  def test_model_spec_found_llama3(self):
+    ai_spec = managed_ai_model_spec.GetManagedAiModelSpecClass(
+        'GCP', 'llama3', '8b'
+    )
+    self.assertIsNotNone(ai_spec)
+    self.assertEqual(ai_spec.__name__, 'VertexAiLlama3Spec')
+
   @flagsaver.flagsaver(use_ai_sdk=True)
   def test_model_create_via_sdk(self):
     self.MockRunCommand(
@@ -226,7 +233,7 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
             ' --artifact-uri=gs://my-bucket/llama2/llama2-7b-hf'
             ' --container-image-uri=us-docker.pkg.dev/vertex-ai/vertex-vision-model-garden-dockers/pytorch-vllm-serve:20240222_0916_RC00'
             ' --container-command=python,-m,vllm.entrypoints.api_server'
-            ' --container-args=--host=0.0.0.0,--port=7080,--swap-space=16,--gpu-memory-utilization=0.9,--max-model-len=2048,--max-num-batched-tokens=4096,--tensor-parallel-size=1'
+            ' --container-args=--host=0.0.0.0,--port=7080,--swap-space=16,--gpu-memory-utilization=0.9,--max-model-len=1024,--max-num-batched-tokens=4096,--tensor-parallel-size=1'
             ' --container-ports=7080 --container-predict-route=/generate'
             ' --container-health-route=/ping'
             ' --container-env-vars=MODEL_ID=gs://my-bucket/llama2/llama2-7b-hf,DEPLOY_SOURCE=pkb'

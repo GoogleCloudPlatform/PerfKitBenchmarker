@@ -40,14 +40,6 @@ FLAGS = flags.FLAGS
 
 
 SERVICE_ACCOUNT_BASE = '{}-compute@developer.gserviceaccount.com'
-VLLM_ARGS = [
-    '--host=0.0.0.0',
-    '--port=7080',
-    '--swap-space=16',
-    '--gpu-memory-utilization=0.9',
-    '--max-model-len=2048',
-    '--max-num-batched-tokens=4096',
-]
 
 
 class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
@@ -597,22 +589,40 @@ class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
     }
 
   def GetEnvironmentVariables(self, **kwargs) -> dict[str, str]:
-    """Returns container's environment variables, with whatever args needed."""
-    del kwargs
-    return {}
+    """Returns container's environment variables needed by Llama2."""
+    return {
+        'MODEL_ID': kwargs['model_bucket_path'],
+        'DEPLOY_SOURCE': 'pkb',
+    }
 
   def ConvertToInstances(
       self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
   ) -> list[dict[str, Any]]:
     """Converts input to the form expected by the model."""
-    return []
+    instances = {
+        'prompt': prompt,
+        'max_tokens': max_tokens,
+        'temperature': temperature,
+    }
+    for params in ['top_p', 'top_k', 'raw_response']:
+      if params in kwargs:
+        instances[params] = kwargs[params]
+    return [instances]
 
 
 class VertexAiLlama2Spec(VertexAiModelSpec):
-  """Spec for running the Llama2 7b model."""
+  """Spec for running the Llama2 7b & 70b models."""
 
   MODEL_NAME: str = 'llama2'
   MODEL_SIZE: list[str] = ['7b', '70b']
+  VLLM_ARGS = [
+      '--host=0.0.0.0',
+      '--port=7080',
+      '--swap-space=16',
+      '--gpu-memory-utilization=0.9',
+      '--max-model-len=1024',
+      '--max-num-batched-tokens=4096',
+  ]
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -640,28 +650,63 @@ class VertexAiLlama2Spec(VertexAiModelSpec):
       self.machine_type = 'g2-standard-96'
       self.accelerator_count = 8
     self.accelerator_type = 'NVIDIA_L4'
-    self.serving_container_args = VLLM_ARGS.copy()
+
+    self.serving_container_args = self.VLLM_ARGS.copy()
     self.serving_container_args.append(
         f'--tensor-parallel-size={self.accelerator_count}'
     )
 
-  def GetEnvironmentVariables(self, **kwargs) -> dict[str, str]:
-    """Returns container's environment variables needed by Llama2."""
-    return {
-        'MODEL_ID': kwargs['model_bucket_path'],
-        'DEPLOY_SOURCE': 'pkb',
-    }
 
-  def ConvertToInstances(
-      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
-  ) -> list[dict[str, Any]]:
-    """Converts input to the form expected by the model."""
-    instances = {
-        'prompt': prompt,
-        'max_tokens': max_tokens,
-        'temperature': temperature,
-    }
-    for params in ['top_p', 'top_k', 'raw_response']:
-      if params in kwargs:
-        instances[params] = kwargs[params]
-    return [instances]
+class VertexAiLlama3Spec(VertexAiModelSpec):
+  """Spec for running the Llama3 70b model."""
+
+  MODEL_NAME: str = 'llama3'
+  MODEL_SIZE: str = '8b'
+  VLLM_ARGS = [
+      '--host=0.0.0.0',
+      '--port=8080',
+      '--swap-space=16',
+      '--gpu-memory-utilization=0.9',
+      '--max-model-len=1024',
+      '--dtype=auto',
+      '--max-loras=1',
+      '--max-cpu-loras=8',
+      '--max-num-seqs=256',
+      '--disable-log-stats',
+  ]
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+    # The pre-built serving docker images.
+    self.container_image_uri = 'us-docker.pkg.dev/vertex-ai/vertex-vision-model-garden-dockers/pytorch-vllm-serve:20241001_0916_RC00'
+    self.serving_container_command = [
+        'python',
+        '-m',
+        'vllm.entrypoints.api_server',
+    ]
+    size_suffix = os.path.join('llama3', 'llama3-8b-hf')
+    self.model_garden_bucket = os.path.join(
+        'gs://vertex-model-garden-public-us', size_suffix
+    )
+    self.model_bucket_suffix = size_suffix
+    self.serving_container_ports = [7080]
+    self.serving_container_predict_route = '/generate'
+    self.serving_container_health_route = '/ping'
+    # Machine type from deployment notebook:
+    # https://pantheon.corp.google.com/vertex-ai/publishers/meta/model-garden/llama3
+    self.machine_type = 'g2-standard-8'
+    self.accelerator_count = 1
+    self.accelerator_type = 'NVIDIA_L4'
+    self.serving_container_args = self.VLLM_ARGS.copy()
+    self.serving_container_args.append(
+        f'--tensor-parallel-size={self.accelerator_count}'
+    )
+
+  def GetModelUploadCliArgs(self, **input_args) -> str:
+    """Returns the kwargs needed to upload the model."""
+    upload_args = super().GetModelUploadCliArgs(**input_args)
+    upload_args += (
+        f' --container-shared-memory-size-mb={16 * 1024}'  # 16GB
+        f' --container-deployment-timeout-seconds={60 * 40}'
+    )
+    return upload_args

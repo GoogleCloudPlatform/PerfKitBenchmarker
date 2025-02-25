@@ -201,7 +201,7 @@
     alive if any metrics satisfy the criteria passed into the flag.
 -   Add unmanaged_mysql_sysbench benchmark.
 -   Refactor nginx_benchmark to use reverse_proxy or api_gateway configurations.
--   Add support for simple Vertex AI & AWS Sagemaker managed models.
+-   Add support for managed Llama 2 & 3 models in Vertex AI & AWS Sagemaker.
 -   Add new pressure_stall trace.
 -   Add `--skip_teardown_on_command_timeout` flag to skip teardown if the
     failure substatus is COMMAND_TIMEOUT.
