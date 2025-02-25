@@ -34,6 +34,13 @@ flags.DEFINE_string(
     'GPU identifiers are given as integer indices or as UUID strings.',
 )
 flags.DEFINE_list('nccl_extra_params', [], 'Export an environment variable')
+flags.DEFINE_spaceseplist(
+    'nccl_extra_params_spaceseplist',
+    [],
+    'Export an environment variable, treated same as nccl_extra_params, '
+    'but supports using space as delimiter '
+    '(some nccl parameters may contain comma).',
+)
 flags.DEFINE_string('nccl_minbytes', '8', 'Minimum size to start with')
 flags.DEFINE_string('nccl_maxbytes', '256M', 'Maximum size to start with')
 flags.DEFINE_integer(
@@ -202,6 +209,7 @@ def CreateMetadataDict():
   Returns:
     metadata dict
   """
+  extra_params = FLAGS.nccl_extra_params + FLAGS.nccl_extra_params_spaceseplist
   metadata = {
       'slots': FLAGS.nccl_slots,
       'minbytes': FLAGS.nccl_minbytes,
@@ -214,8 +222,8 @@ def CreateMetadataDict():
       'cuda_visible_devices': FLAGS.nccl_cuda_visible_devices,
       'nccl_version': FLAGS.nccl_version,
       'nccl_net_plugin': FLAGS.nccl_net_plugin,
-      'nccl_extra_params': FLAGS.nccl_extra_params,
-      'extra_params': FLAGS.nccl_extra_params,
+      'nccl_extra_params': extra_params,
+      'extra_params': extra_params,
   }
   if FLAGS.azure_infiniband:
     metadata['mofed_version'] = FLAGS.mofed_version
@@ -336,7 +344,9 @@ def Run(benchmark_spec):
   extra_params = collections.defaultdict(list)
   base_metadata = CreateMetadataDict()
   sample_results = []
-  for extra_param in FLAGS.nccl_extra_params:
+  for extra_param in (
+      FLAGS.nccl_extra_params + FLAGS.nccl_extra_params_spaceseplist
+  ):
     param_key, param_value = extra_param.split('=', 1)
     extra_params[param_key].append(param_value)
 
