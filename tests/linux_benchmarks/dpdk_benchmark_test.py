@@ -38,6 +38,7 @@ METADATA = {
     'dpdk_txpkts': 64,
     'dpdk_txq': 2,
     'dpdk_rxq': 2,
+    'dpdk_burst': 1,
     'dpdk_stats_period': 5,
     'dpdk_test_length': 60,
 }

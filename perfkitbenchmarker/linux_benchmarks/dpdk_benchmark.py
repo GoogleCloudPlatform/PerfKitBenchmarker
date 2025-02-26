@@ -178,6 +178,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   client_vm, server_vm = benchmark_spec.vms[:2]
 
   metadata = {
+      'dpdk_burst': _DPDK_BURST.value,
       'dpdk_num_forwarding_cores': _DPDK_NB_CORES.value,
       'dpdk_forward_mode': _DPDK_FORWARD_MODE.value,
       'dpdk_txpkts': _DPDK_TXPKTS.value,
