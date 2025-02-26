@@ -30,6 +30,7 @@ kubernetes_scale:
     min_vm_count: 1
     max_vm_count: 100
     vm_spec: *default_dual_core
+    poll_for_events: true
 """
 # Don't define container_registry so no GetOrBuild happens
 
@@ -83,8 +84,10 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   samples, rollout_name = ScaleUpPods(cluster)
   start_time = _GetRolloutCreationTime(rollout_name)
-  samples += ParseEvents(cluster, 'pod', start_time)
-  samples += ParseEvents(cluster, 'node', start_time)
+  pod_samples = ParseStatusChanges(cluster, 'pod', start_time)
+  samples += pod_samples
+  _CheckForFailures(cluster, pod_samples)
+  samples += ParseStatusChanges(cluster, 'node', start_time)
   metadata = {'goal_replicas': NUM_NEW_INSTANCES.value}
   for s in samples:
     s.metadata.update(metadata)
@@ -117,16 +120,11 @@ def ScaleUpPods(
   assert resource_names
   rollout_name = next(resource_names)
 
-  start_polling_time = time.monotonic()
-  cluster.WaitForRollout(rollout_name, timeout=max_wait_time)
-
-  all_new_pods = set(cluster.GetPodNames()) - initial_pods
-  if len(all_new_pods) < num_new_instances:
-    raise errors.Benchmarks.RunError(
-        'Failed to scale up to %d pods, only found %d.'
-        % (num_new_instances, len(all_new_pods))
-    )
   try:
+    start_polling_time = time.monotonic()
+    cluster.WaitForRollout(rollout_name, timeout=max_wait_time)
+
+    all_new_pods = set(cluster.GetPodNames()) - initial_pods
     cluster.WaitForResource(
         'pod',
         condition_name='Ready',
@@ -134,29 +132,77 @@ def ScaleUpPods(
         wait_for_all=True,
         namespace='default',
     )
+    end_polling_time = time.monotonic()
+    logging.info(
+        'In %d seconds, found all %s new pods',
+        end_polling_time - start_polling_time,
+        len(all_new_pods),
+    )
+    samples.append(
+        sample.Sample(
+            'pod_polling_duration',
+            end_polling_time - start_polling_time,
+            'seconds',
+        )
+    )
+    return samples, rollout_name
   except (
       errors.VmUtil.IssueCommandError,
       errors.VmUtil.IssueCommandTimeoutError,
   ) as e:
-    logging.info(
-        'Failed to wait for all pods to be ready, even with retries: %s.'
-        ' Failure will be checked later by number of pods with ready events.',
+    logging.warning(
+        'Kubernetes failed to wait for all the rollout and/or all pods to be'
+        ' ready, even with retries. Full error: %s. Continuing for now. Failure'
+        ' will be checked later by number of pods with ready events.',
         e,
     )
-  end_polling_time = time.monotonic()
-  logging.info(
-      'In %d seconds, found all new pods %s',
-      end_polling_time - start_polling_time,
-      all_new_pods,
+    return [], rollout_name
+
+
+def _CheckForFailures(
+    cluster: container_service.KubernetesCluster,
+    pod_samples: list[sample.Sample],
+):
+  """Fails the benchmark if not enough pods were created.
+
+  Args:
+    cluster: The cluster to check for failures on.
+    pod_samples: The samples from pod transition times which includes pod Ready
+      count.
+
+  Raises:
+    QuotaFailure: If a quota is exceeded.
+    RunError: If scale up failed for a non-quota reason.
+  """
+  ready_count_sample = next(
+      (s for s in pod_samples if s.metric == 'pod_Ready_count'), None
   )
-  samples.append(
-      sample.Sample(
-          'pod_polling_duration',
-          end_polling_time - start_polling_time,
-          'seconds',
+  if ready_count_sample is None:
+    raise errors.Benchmarks.RunError(
+        'No pod ready events were found; this should almost never happen.'
+    )
+  if ready_count_sample.value >= NUM_NEW_INSTANCES.value:
+    logging.info(
+        'Benchmark successfully scaled up %d pods, which is more than the goal'
+        ' of %d pods.',
+        ready_count_sample.value,
+        NUM_NEW_INSTANCES.value,
+    )
+    return
+  events = cluster.GetEvents()
+  for event in events:
+    if event.reason == 'FailedScaleUp' and 'quota exceeded' in event.message:
+      raise errors.Benchmarks.QuotaFailure(
+          'Failed to scale up to %d pods, at least one pod ran into a quota'
+          ' error: %s' % (NUM_NEW_INSTANCES.value, event.message)
       )
+
+  raise errors.Benchmarks.RunError(
+      'Benchmark attempted to scale up to  %d pods but only %d pods were'
+      ' created & ready. Check above "Kubernetes failed to wait for" logs for'
+      ' exact failure location.'
+      % (NUM_NEW_INSTANCES.value, ready_count_sample.value)
   )
-  return samples, rollout_name
 
 
 def _GetResourceStatusConditions(
@@ -191,12 +237,26 @@ def ConvertToEpochTime(timestamp: str) -> int:
   return parser.parse(timestamp).timestamp()
 
 
-def ParseEvents(
+def ParseStatusChanges(
     cluster: container_service.KubernetesCluster,
     resource_type: str,
     start_time: float,
 ) -> list[sample.Sample]:
-  """Parses events into samples."""
+  """Parses status transitions into samples.
+
+  Status transitions are pulled from the cluster, and include e.g. when a pod
+  transitions to PodScheduled or Ready. See tests for more example input/output.
+
+  Args:
+    cluster: The cluster to parse the status changes for.
+    resource_type: The type of the resource to parse the status changes for
+      (node or pod).
+    start_time: The start time of the scale up operation, subtracted from
+      timestamps.
+
+  Returns:
+    A list of samples, with various percentiles for each status condition.
+  """
   all_resources = cluster.GetAllNamesForResourceType(resource_type + 's')
   overall_times = collections.defaultdict(list)
   for resource in all_resources:

@@ -2,9 +2,11 @@
 
 import unittest
 
+from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark
 from tests import pkb_common_test_case
@@ -71,7 +73,9 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             ],
         )
     )
-    samples = kubernetes_scale_benchmark.ParseEvents(self.cluster, 'pod', 50)
+    samples = kubernetes_scale_benchmark.ParseStatusChanges(
+        self.cluster, 'pod', 50
+    )
     self.assertLen(samples, self.expected_num_samples_per_reason)
     for s in samples:
       self.assertStartsWith(s.metric, 'pod_Ready')
@@ -110,7 +114,9 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             ],
         )
     )
-    samples = kubernetes_scale_benchmark.ParseEvents(self.cluster, 'pod', 40)
+    samples = kubernetes_scale_benchmark.ParseStatusChanges(
+        self.cluster, 'pod', 40
+    )
     self.assertLen(samples, self.expected_num_samples_per_reason)
     for s in samples:
       self.assertStartsWith(s.metric, 'pod_Ready')
@@ -141,7 +147,9 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             ],
         )
     )
-    samples = kubernetes_scale_benchmark.ParseEvents(self.cluster, 'pod', 40)
+    samples = kubernetes_scale_benchmark.ParseStatusChanges(
+        self.cluster, 'pod', 40
+    )
     self.assertLen(samples, self.expected_num_samples_per_reason * 2)
     for s in samples:
       self.assertStartsWith(s.metric, 'pod_')
@@ -164,7 +172,9 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             ],
         )
     )
-    samples = kubernetes_scale_benchmark.ParseEvents(self.cluster, 'node', 50)
+    samples = kubernetes_scale_benchmark.ParseStatusChanges(
+        self.cluster, 'node', 50
+    )
     self.assertLen(samples, self.expected_num_samples_per_reason)
     for s in samples:
       self.assertStartsWith(s.metric, 'node_Ready')
@@ -173,6 +183,63 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(samples_by_metric['node_Ready_p50'].value, 10.0)
     self.assertIn('node_Ready_count', samples_by_metric.keys())
     self.assertEqual(samples_by_metric['node_Ready_count'].value, 1)
+
+  @flagsaver.flagsaver(kubernetes_goal_replicas=10)
+  def testCheckFailuresPassesWithCorrectNumberOfPods(self):
+    self.cluster.GetEvents.return_value = []
+    kubernetes_scale_benchmark._CheckForFailures(
+        self.cluster,
+        [
+            sample.Sample('pod_Ready_p90', 95.0, 'seconds'),
+            sample.Sample('pod_Ready_count', 10, 'count'),
+        ],
+    )
+
+  @flagsaver.flagsaver(kubernetes_goal_replicas=10)
+  def testCheckFailuresThrowsRegularError(self):
+    self.cluster.GetEvents.return_value = [
+        container_service.KubernetesEvent(
+            reason='PodReady',
+            message='Pod is ready',
+            resource=container_service.KubernetesEventResource(
+                name='pod',
+                kind='Pod',
+            ),
+            timestamp=100,
+        )
+    ]
+    with self.assertRaises(errors.Benchmarks.RunError):
+      kubernetes_scale_benchmark._CheckForFailures(
+          self.cluster,
+          [
+              sample.Sample('pod_Ready_count', 5, 'count'),
+          ],
+      )
+
+  @flagsaver.flagsaver(kubernetes_goal_replicas=10)
+  def testCheckFailuresThrowsQuotaExceeded(self):
+    self.cluster.GetEvents.return_value = [
+        container_service.KubernetesEvent(
+            reason='FailedScaleUp',
+            message=(
+                'Node scale up in zones us-west1-b associated with this pod'
+                ' failed: GCE quota exceeded. Pod is at risk of not being'
+                ' scheduled.'
+            ),
+            resource=container_service.KubernetesEventResource(
+                name='pod',
+                kind='Pod',
+            ),
+            timestamp=100,
+        )
+    ]
+    with self.assertRaises(errors.Benchmarks.QuotaFailure):
+      kubernetes_scale_benchmark._CheckForFailures(
+          self.cluster,
+          [
+              sample.Sample('pod_Ready_count', 5, 'count'),
+          ],
+      )
 
 
 if __name__ == '__main__':

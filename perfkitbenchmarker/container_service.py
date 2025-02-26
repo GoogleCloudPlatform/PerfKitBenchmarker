@@ -197,10 +197,6 @@ def RunKubectlCommand(command: list[str], **kwargs) -> tuple[str, str, int]:
   return vm_util.IssueCommand(cmd, **kwargs)
 
 
-class RetryableKubectlError(Exception):
-  """Exception for retryable kubectl errors."""
-
-
 def RunRetryableKubectlCommand(
     run_cmd: list[str], timeout: int | None = None, **kwargs
 ) -> tuple[str, str, int]:
