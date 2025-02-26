@@ -21,8 +21,6 @@ _JOB_SPEC = jobs_setter.BaseJobSpec
 # For more info, see:
 # https://cloud.google.com/blog/products/serverless/cloud-run-gets-always-on-cpu-allocation
 _TWO_HOURS = 60 * 60 * 2  # Two hours in seconds
-# The p3rf-serverless-gcf2 project number.
-_P3RF_PROJECT_NUMBER = '89953586185'
 
 
 class GoogleCloudRunJobsSpec(_JOB_SPEC):
@@ -50,6 +48,7 @@ class GoogleCloudRunJob(base_job.BaseJob):
         'region': self.region,
         'Run_Environment': 'gen2',
     })
+    self.project_number = util.GetProjectNumber(self.project)
 
   def _Create(self) -> None:
     """Creates the underlying resource."""
@@ -136,6 +135,6 @@ class GoogleCloudRunJob(base_job.BaseJob):
 
     return (
         'https://monitoring.corp.google.com/dashboard/run/jobs%2Finstances?'
-        f'scope=cloud_project_number%3D{_P3RF_PROJECT_NUMBER}&'
+        f'scope=cloud_project_number%3D{self.project_number}&'
         f'duration={_TWO_HOURS}&filters=module%3D{self.name}&utc_end={utc_end}'
     )
