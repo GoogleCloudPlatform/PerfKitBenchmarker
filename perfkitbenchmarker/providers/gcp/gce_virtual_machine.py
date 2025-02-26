@@ -825,8 +825,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     cmd.flags.update(self.create_disk_strategy.GetCreationCommand())
 
-    if FLAGS.gcloud_scopes:
-      cmd.flags['scopes'] = ','.join(re.split(r'[,; ]', FLAGS.gcloud_scopes))
+    if gcp_flags.GCE_VM_SERVICE_ACCOUNT.value:
+      cmd.flags['service-account'] = gcp_flags.GCE_VM_SERVICE_ACCOUNT.value
+    if gcp_flags.GCLOUD_SCOPES.value:
+      cmd.flags['scopes'] = ','.join(
+          re.split(r'[,; ]', gcp_flags.GCLOUD_SCOPES.value)
+      )
+
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     return cmd

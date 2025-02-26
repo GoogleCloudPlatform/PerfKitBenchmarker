@@ -30,7 +30,7 @@ flags.DEFINE_integer(
     '(see https://cloud.google.com/compute/docs/local-ssd), and '
     'only applies for vms that can have a variable number of local SSDs.',
 )
-flags.DEFINE_string(
+GCLOUD_SCOPES = flags.DEFINE_string(
     'gcloud_scopes',
     None,
     'If set, space-separated list of scopes to apply to every created machine',
@@ -261,6 +261,12 @@ REDIS_ZONE_DISTRIBUTION = flags.DEFINE_enum(
     'Zones to distribute shards between. Only used if'
     ' --managed_memory_store_cluster is True.',
 )
+GCE_VM_SERVICE_ACCOUNT = flags.DEFINE_string(
+    'gce_vm_service_account',
+    None,
+    'Service account to use for authorization from a GCE VM.',
+)
+# TODO(user): Replace usages of this flag with --gce_vm_service_account.
 flags.DEFINE_string(
     'gcp_service_account', None, 'Service account to use for authorization.'
 )
