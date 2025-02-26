@@ -39,7 +39,6 @@ unmanaged_mysql_sysbench:
   description: Mysql on a VM benchmarked using Sysbench.
   vm_groups:
     server:
-      os_type: centos_stream9
       vm_spec:
         GCP:
           machine_type: c3-highmem-22
@@ -70,7 +69,6 @@ unmanaged_mysql_sysbench:
           provisioned_throughput: 800
           num_striped_disks: 2
     client:
-      os_type: centos_stream9
       vm_spec:
         GCP:
           machine_type: c3-standard-22
