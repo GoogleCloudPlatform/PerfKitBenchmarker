@@ -268,7 +268,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
           cmd, timeout=2*FLAGS.sysbench_run_seconds,)
     except errors.VirtualMachine.RemoteCommandError as e:
       logging.exception('Failed to run sysbench command: %s', e)
-      continue
+      raise errors.Benchmarks.RunError(f'Error running sysbench command: {e}')
     metadata = sysbench.GetMetadata(sysbench_parameters)
     metadata.update({
         'shared_buffer_size': f'{SHARED_BUFFER_SIZE.value}GB',
