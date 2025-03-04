@@ -1316,7 +1316,7 @@ class KubernetesEventPoller:
     self.stop_polling = multiprocessing.Event()
     self.event_queue: multiprocessing.Queue = multiprocessing.Queue()
     self.event_poller = multiprocessing.Process(
-        target=self.get_events_fn,
+        target=self._PollForEvents,
         args=((
             self.event_queue,
             self.stop_polling,
