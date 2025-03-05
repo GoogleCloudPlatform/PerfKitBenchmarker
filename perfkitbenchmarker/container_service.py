@@ -920,7 +920,10 @@ class KubernetesClusterCommands:
           RESOURCE_DELETE_SLEEP_SECONDS,
       )
       time.sleep(RESOURCE_DELETE_SLEEP_SECONDS)
-    except errors.VmUtil.IssueCommandTimeoutError as e:
+    except (
+        errors.VmUtil.IssueCommandTimeoutError,
+        vm_util.TimeoutExceededRetryError,
+    ) as e:
       raise errors.Resource.RetryableDeletionError(
           'Timed out while deleting all resources from default namespace. We'
           ' should still continue trying to delete everything.'
@@ -1360,6 +1363,7 @@ class KubernetesEventPoller:
   def StartPolling(self):
     """Starts polling for events."""
     self.event_poller.start()
+
     # Stop polling events even if the resource is not deleted.
     def _StopPollingConnected(unused1, **kwargs):
       del unused1, kwargs
@@ -1392,8 +1396,10 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     super().__init__(cluster_spec)
     self.event_poller: KubernetesEventPoller | None = None
     if cluster_spec.poll_for_events:
+
       def _GetEventsNoLogging():
         return self._GetEvents(suppress_logging=True)
+
       self.event_poller = KubernetesEventPoller(_GetEventsNoLogging)
 
   def _PostCreate(self):

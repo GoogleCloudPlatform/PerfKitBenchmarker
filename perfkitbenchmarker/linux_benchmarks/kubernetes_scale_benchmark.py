@@ -13,6 +13,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 
 
 FLAGS = flags.FLAGS
@@ -149,6 +150,7 @@ def ScaleUpPods(
   except (
       errors.VmUtil.IssueCommandError,
       errors.VmUtil.IssueCommandTimeoutError,
+      vm_util.TimeoutExceededRetryError,
   ) as e:
     logging.warning(
         'Kubernetes failed to wait for all the rollout and/or all pods to be'
