@@ -17,6 +17,8 @@ class BaseJobSpec(spec.BaseSpec):
     job_region: The region to run in.
     job_backend: Amount of memory to use.
     image_directory: The directory to use for the image.
+    job_gpu_type: The type of GPU to use.
+    job_gpu_count: The number of GPUs to use.
   """
 
   SPEC_TYPE: str = 'BaseJobSpec'
@@ -25,6 +27,8 @@ class BaseJobSpec(spec.BaseSpec):
   job_backend: str
   image_directory: str
   CLOUD: str = 'GCP'
+  job_gpu_type: str = ''
+  job_gpu_count: int = 0
 
   @classmethod
   def _GetOptionDecoderConstructions(cls) -> Dict[str, Any]:
@@ -49,6 +53,14 @@ class BaseJobSpec(spec.BaseSpec):
         'image_directory': (
             option_decoders.StringDecoder,
             {'default': None, 'none_ok': True},
+        ),
+        'job_gpu_type': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'job_gpu_count': (
+            option_decoders.IntDecoder,
+            {'default': 0, 'none_ok': True},
         ),
     })
 

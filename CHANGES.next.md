@@ -377,6 +377,7 @@
 -   Add support for Windows 2025 on AWS, Azure, and GCP.
 -   Add support for Redis Cluster mode on VMs.
 -   Add support for multiload as part of Multichase benchmark.
+-   Add support for GPU parameters as part of cloud run job resource.
 
 ### Bug fixes and maintenance updates:
 

@@ -53,8 +53,12 @@ class GoogleCloudRunJob(base_job.BaseJob):
   def _Create(self) -> None:
     """Creates the underlying resource."""
     # https://cloud.google.com/sdk/gcloud/reference/run/jobs/create
-    cmd = [
-        'gcloud',
+    cmd = ['gcloud']
+    # TODO(user): Remove alpha once the feature is GA.
+    if self.job_gpu_type or self.job_gpu_count:
+      cmd.append('alpha')
+
+    cmd.extend([
         'run',
         'jobs',
         'create',
@@ -63,7 +67,13 @@ class GoogleCloudRunJob(base_job.BaseJob):
         '--region=%s' % self.region,
         '--memory=%s' % self.backend,
         '--project=%s' % self.project,
-    ]
+    ])
+
+    if self.job_gpu_type:
+      cmd.append('--gpu-type=%s' % self.job_gpu_type)
+    if self.job_gpu_count:
+      cmd.append('--gpu=%s' % self.job_gpu_count)
+
     self.metadata.update({
         'container_image': self.container_image,
     })
