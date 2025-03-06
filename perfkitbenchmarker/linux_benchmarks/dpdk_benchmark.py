@@ -104,15 +104,6 @@ _DPDK_NB_CORES = flags.DEFINE_integer(
     ),
     lower_bound=1,
 )
-_DPDK_STATS_PERIOD = flags.DEFINE_integer(
-    'dpdk_stats_period',
-    5,
-    (
-        'Display statistics every PERIOD seconds. The default value is 5. Set'
-        ' to 0 to not display statistics.'
-    ),
-    lower_bound=0,
-)
 _DPDK_TXONLY_MULTI_FLOW = flags.DEFINE_bool(
     'dpdk_txonly_multi_flow', False, 'Generate multiple flows in txonly mode.'
 )
@@ -158,9 +149,14 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
 
 def _CreateRemoteCommand(
-    vm: linux_virtual_machine.BaseLinuxVirtualMachine, cmd: str
+    vm: linux_virtual_machine.BaseLinuxVirtualMachine,
+    cmd: str,
+    duration: int,
 ) -> Tuple[str, str]:
-  return vm.RobustRemoteCommand(cmd, _DPDK_TEST_LENGTH.value, True)
+  interactive_cmd = (
+      f"(sleep {duration} && echo 'stop' && cat) | (echo 'start' && cat) | "
+  )
+  return vm.RobustRemoteCommand(interactive_cmd + cmd, ignore_failure=True)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
@@ -184,7 +180,6 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       'dpdk_txpkts': _DPDK_TXPKTS.value,
       'dpdk_txq': _DPDK_TXQ.value,
       'dpdk_rxq': _DPDK_RXQ.value,
-      'dpdk_stats_period': _DPDK_STATS_PERIOD.value,
       'dpdk_test_length': _DPDK_TEST_LENGTH.value,
   }
 
@@ -201,7 +196,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       f' --rxq={_DPDK_RXQ.value}'
       f' --nb-cores={_DPDK_NB_CORES.value}'
       f' --burst={_DPDK_BURST.value}'
-      f' --stats-period={_DPDK_STATS_PERIOD.value}'
+      ' -i'
   )
   if client_vm.CLOUD == 'AWS':
     client_cmd += f' --eth-peer=0,{server_vm.secondary_mac_addr}'
@@ -218,39 +213,43 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       f' --nb-cores={_DPDK_NB_CORES.value}'
       f' --forward-mode={_DPDK_FORWARD_MODE.value[1]}'
       f' --burst={_DPDK_BURST.value}'
-      f' --stats-period={_DPDK_STATS_PERIOD.value}'
+      ' -i'
   )
 
   remote_stdout_stderrs = background_tasks.RunParallelThreads(
       [
           (
-              lambda vm_: _CreateRemoteCommand(vm_, client_cmd),
-              [client_vm],
-              {},
-          ),
-          (
-              lambda vm_: _CreateRemoteCommand(vm_, server_cmd),
+              lambda vm_: _CreateRemoteCommand(
+                  vm_,
+                  server_cmd,
+                  _DPDK_TEST_LENGTH.value
+                  + 10,  # Ensure server stops after client.
+              ),
               [server_vm],
               {},
           ),
+          (
+              lambda vm_: _CreateRemoteCommand(
+                  vm_, client_cmd, _DPDK_TEST_LENGTH.value
+              ),
+              [client_vm],
+              {},
+          ),
       ],
-      2,
+      max_concurrency=2,
+      post_task_delay=5  # Ensure server starts before client.
   )
 
   output_samples = []
-  client_stdout = remote_stdout_stderrs[0][0]
-  server_stdout = remote_stdout_stderrs[1][0]
+  server_stdout = remote_stdout_stderrs[0][0]
+  client_stdout = remote_stdout_stderrs[1][0]
 
   tx_packet_last_match = re.findall(
-      r'(TX-packets):[\s]+([0-9]+)[\s]+'
-      r'(TX-errors):[\s]+([0-9]+)[\s]+'
-      r'(TX-bytes):[\s]+([0-9]+)',
+      r'(TX-packets):[\s]+([0-9]+)[\s]+(TX-dropped):[\s]+([0-9]+)[\s]+',
       client_stdout,
   )[-1]
   rx_packet_last_match = re.findall(
-      r'(RX-packets):[\s]+([0-9]+)[\s]+'
-      r'(RX-missed):[\s]+([0-9]+)[\s]+'
-      r'(RX-bytes):[\s]+([0-9]+)',
+      r'(RX-packets):[\s]+([0-9]+)[\s]+(RX-dropped):[\s]+([0-9]+)[\s]+',
       server_stdout,
   )[-1]
 
@@ -263,10 +262,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     (
         packets_label,
         packets_val,
-        errors_label,
-        errors_val,
-        bytes_label,
-        bytes_val,
+        dropped_label,
+        dropped_val,
     ) = match
     output_samples.extend([
         sample.Sample(packets_label, int(packets_val), 'packets', metadata),
@@ -276,14 +273,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
             'packets/s',
             metadata,
         ),
-        sample.Sample(errors_label, int(errors_val), 'errors', metadata),
-        sample.Sample(bytes_label, int(bytes_val), 'bytes', metadata),
-        sample.Sample(
-            bytes_label + '-per-second',
-            int(bytes_val) // _DPDK_TEST_LENGTH.value,
-            'bytes/s',
-            metadata,
-        ),
+        sample.Sample(dropped_label, int(dropped_val), 'dropped', metadata),
     ])
   tx_pps = None
   rx_pps = None

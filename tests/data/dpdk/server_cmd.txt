@@ -1,1 +1,1 @@
-sudo dpdk-testpmd -a 00:06.0 -l 0-2 -- --txq=2 --rxq=2 --nb-cores=2 --forward-mode=rxonly --burst=1 --stats-period=5
+(sleep 70 && echo 'stop' && cat) | (echo 'start' && cat) | sudo dpdk-testpmd -a 0000:00:04.0 -l 0-2 -- --txq=2 --rxq=2 --nb-cores=2 --forward-mode=rxonly --burst=1 -i

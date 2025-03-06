@@ -39,7 +39,6 @@ METADATA = {
     'dpdk_txq': 2,
     'dpdk_rxq': 2,
     'dpdk_burst': 1,
-    'dpdk_stats_period': 5,
     'dpdk_test_length': 60,
 }
 
@@ -62,25 +61,21 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     self.server_stdout = _load_data(DATA_FILENAMES[3])
 
     self.expected_output_samples = [
-        sample.Sample('TX-packets', 2414387378.0, 'packets', METADATA),
+        sample.Sample('TX-packets', 602201814.0, 'packets', METADATA),
         sample.Sample(
-            'TX-packets-per-second', 40239789.0, 'packets/s', METADATA
+            'TX-packets-per-second', 10036696.0, 'packets/s', METADATA
         ),
-        sample.Sample('TX-errors', 2635918.0, 'errors', METADATA),
-        sample.Sample('TX-bytes', 154520792192.0, 'bytes', METADATA),
-        sample.Sample('TX-bytes-per-second', 2575346536.0, 'bytes/s', METADATA),
-        sample.Sample('RX-packets', 2032818156.0, 'packets', METADATA),
+        sample.Sample('TX-dropped', 0, 'dropped', METADATA),
+        sample.Sample('RX-packets', 602121227.0, 'packets', METADATA),
         sample.Sample(
-            'RX-packets-per-second', 33880302.0, 'packets/s', METADATA
+            'RX-packets-per-second', 10035353.0, 'packets/s', METADATA
         ),
-        sample.Sample('RX-missed', 0, 'errors', METADATA),
-        sample.Sample('RX-bytes', 130100361984.0, 'bytes', METADATA),
-        sample.Sample('RX-bytes-per-second', 2168339366, 'bytes/s', METADATA),
+        sample.Sample('RX-dropped', 0, 'dropped', METADATA),
         sample.Sample(
-            'packet-loss-per-second', 6359487.0, 'packets/s', METADATA
+            'packet-loss-per-second', 1343.0, 'packets/s', METADATA
         ),
         sample.Sample(
-            'packet-loss-rate', 0.15803977003954967, 'rate', METADATA
+            'packet-loss-rate', 0.00013380897458685609, 'rate', METADATA
         ),
     ]
 
@@ -88,33 +83,33 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     self.bm_spec.vms = [mock.Mock(), mock.Mock()]
 
     self.bm_spec.vms[0].RemoteCommand.return_value = (
-        '0000:00:06.0.*drv=vfio-pci',
+        '0000:00:04.0.*drv=vfio-pci',
         '',
     )
     self.bm_spec.vms[1].RemoteCommand.return_value = (
-        '0000:00:06.0.*drv=vfio-pci',
+        '0000:00:04.0.*drv=vfio-pci',
         '',
     )
-    self.bm_spec.vms[0].internal_ips = ['', '10.0.0.214']
-    self.bm_spec.vms[1].internal_ips = ['', '10.0.0.215']
-    self.bm_spec.vms[0].secondary_nic_bus_info = '00:06.0'
-    self.bm_spec.vms[1].secondary_nic_bus_info = '00:06.0'
+    self.bm_spec.vms[0].internal_ips = ['', '10.220.0.33']
+    self.bm_spec.vms[1].internal_ips = ['', '10.220.0.32']
+    self.bm_spec.vms[0].secondary_nic_bus_info = '0000:00:04.0'
+    self.bm_spec.vms[1].secondary_nic_bus_info = '0000:00:04.0'
 
   def testClientServerRemoteCmd(self):
     self.bm_spec.vms[0].RobustRemoteCommand.return_value = (
-        'TX-packets: 60  TX-errors: 0  TX-bytes: 60',
+        'TX-packets: 60  TX-dropped: 0  ',
         '',
     )
     self.bm_spec.vms[1].RobustRemoteCommand.return_value = (
-        'RX-packets: 60  RX-missed: 0  RX-bytes: 60',
+        'RX-packets: 60  RX-dropped: 0  ',
         '',
     )
     _ = dpdk_benchmark.Run(self.bm_spec)
     self.bm_spec.vms[0].RobustRemoteCommand.assert_called_with(
-        self.expected_client_cmd, 60, True
+        self.expected_client_cmd, ignore_failure=True
     )
     self.bm_spec.vms[1].RobustRemoteCommand.assert_called_with(
-        self.expected_server_cmd, 60, True
+        self.expected_server_cmd, ignore_failure=True
     )
 
   def testClientServerStdout(self):
