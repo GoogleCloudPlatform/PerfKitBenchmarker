@@ -67,6 +67,7 @@ class GoogleCloudRunJob(base_job.BaseJob):
         '--region=%s' % self.region,
         '--memory=%s' % self.backend,
         '--project=%s' % self.project,
+        '--tasks=%s' % self.task_count,
     ])
 
     if self.job_gpu_type:
