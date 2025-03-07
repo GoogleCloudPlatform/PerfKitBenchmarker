@@ -19,9 +19,11 @@ import re
 
 from absl import flags
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import vm_util
 
 flags.DEFINE_integer(
     'netperf_histogram_buckets',
@@ -45,6 +47,9 @@ NETLIB_PATCH = NETPERF_DIR + '/netperf.patch'
 NETPERF_EXAMPLE_DIR = NETPERF_DIR + '/doc/examples/'
 
 
+@vm_util.Retry(
+    retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,),
+)
 def _Install(vm):
   """Installs the netperf package on the VM."""
   vm.Install('pip')

@@ -71,8 +71,8 @@ def _DownloadAndInstallPip(vm):
 
   # get_pip can suffer from various network issues.
   @vm_util.Retry(
-      max_retries=5,
-      retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,)
+      max_retries=10,
+      retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,),
   )
   def GetPipWithRetries():
     vm.RemoteCommand(

@@ -59,6 +59,9 @@ def GetFioExec():
   return 'sudo {path}'.format(path=FIO_PATH)
 
 
+@vm_util.Retry(
+    retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,),
+)
 def _Install(vm):
   """Installs the fio package on the VM."""
   for p in ['build_tools', 'pip']:
