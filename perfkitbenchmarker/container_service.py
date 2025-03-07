@@ -1408,13 +1408,9 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
       self.event_poller.StartPolling()
 
   def _Delete(self):
+    if self.event_poller:
+      self.event_poller.StopPolling()
     self._DeleteAllFromDefaultNamespace()
-
-  def _DeleteDependencies(self):
-    super()._DeleteDependencies()
-    if not self.event_poller:
-      return
-    self.event_poller.StopPolling()
 
   def GetEvents(self) -> set['KubernetesEvent']:
     """Gets the events for the cluster, including previously polled events."""

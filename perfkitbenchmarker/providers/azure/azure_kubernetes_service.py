@@ -297,6 +297,8 @@ class AksCluster(container_service.KubernetesCluster):
     #
     # If it has not yet been deleted it will be deleted along with the resource
     # group.
+    if self.event_poller:
+      self.event_poller.StopPolling()
     self._deleted = True
 
   def _PostCreate(self):
