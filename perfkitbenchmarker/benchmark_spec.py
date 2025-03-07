@@ -296,6 +296,7 @@ class BenchmarkSpec:
     self.ConstructContainerRegistry()
     # dpb service needs to go first, because it adds some vms.
     self.ConstructDpbService()
+    self.ConstructCluster()
     self.ConstructVirtualMachines()
     self.ConstructRelationalDb()
     self.ConstructNonRelationalDb()
@@ -318,7 +319,6 @@ class BenchmarkSpec:
     self.ConstructBaseJob()
     self.ConstructMemoryStore()
     self.ConstructPinecone()
-    self.ConstructCluster()
 
   def ConstructContainerCluster(self):
     """Create the container cluster."""
@@ -344,6 +344,8 @@ class BenchmarkSpec:
     cluster_class = cluster.GetClusterClass(cloud)
     self.cluster = cluster_class(self.config.cluster)
     self.resources.append(self.cluster)
+    self.vms_to_boot.update(
+        self.cluster.ExportVmGroupsForUnmanagedProvision())
 
   def ConstructContainerRegistry(self):
     """Create the container registry."""
@@ -893,9 +895,6 @@ class BenchmarkSpec:
     if self.container_cluster:
       self.container_cluster.Create()
 
-    if self.cluster:
-      self.cluster.Create()
-
     # do after network setup but before VM created
     if self.nfs_service and self.nfs_service.CLOUD != nfs_service.UNMANAGED:
       self.nfs_service.Create()
@@ -929,6 +928,12 @@ class BenchmarkSpec:
             if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES
         ]
       vm_util.GenerateSSHConfig(sshable_vms, sshable_vm_groups)
+    if self.cluster:
+      if self.cluster.unmanaged:
+        self.cluster.ImportVmGroups(
+            self.vm_groups['headnode'][0],
+            self.vm_groups['workers'])
+      self.cluster.Create()
     if self.dpb_service:
       self.dpb_service.Create()
     if hasattr(self, 'relational_db') and self.relational_db:

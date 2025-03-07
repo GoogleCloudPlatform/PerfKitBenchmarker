@@ -17,6 +17,7 @@ import typing
 from typing import Callable, List, Tuple
 
 from absl import flags
+from absl import logging
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
@@ -34,6 +35,12 @@ TEMPLATE_FILE = flags.DEFINE_string(
     None,
     'The template file to be used to create the cluster. None by default, '
     'each provider has a default template file.',
+)
+UNMANAGED = flags.DEFINE_boolean(
+    'cluster_unmanaged_provision',
+    False,
+    'Instead of creating with cluster toolset, relying on cloud provider CLI.'
+    ' e.g. gcloud for gcp, awscli for aws.'
 )
 
 
@@ -71,6 +78,8 @@ class BaseClusterSpec(spec.BaseSpec):
       config_values['cloud'] = flag_values.cloud
     if flag_values['cluster_template_file'].present:
       config_values['template'] = flag_values.cluster_template_file
+    if flag_values['cluster_unmanaged_provision'].present:
+      config_values['unmanaged'] = flag_values.cluster_unmanaged_provision
     cloud = config_values['cloud']
     # only apply to workers
     if flag_values['num_vms'].present:
@@ -106,6 +115,7 @@ class BaseClusterSpec(spec.BaseSpec):
         'headnode': (vm_group_decoders.VmGroupSpecDecoder, {}),
         'cloud': (option_decoders.StringDecoder, {'default': None}),
         'template': (option_decoders.StringDecoder, {'default': None}),
+        'unmanaged': (option_decoders.BooleanDecoder, {'default': False}),
     })
     return result
 
@@ -147,6 +157,8 @@ class BaseCluster(resource.BaseResource):
     self.zone: str = cluster_spec.workers.vm_spec.zone
     self.machine_type: str = cluster_spec.workers.vm_spec.machine_type
     self.template: str = cluster_spec.template or self.DEFAULT_TEMPLATE
+    self.unmanaged: bool = cluster_spec.unmanaged
+    self.spec: BaseClusterSpec = cluster_spec
     self.worker_machine_type: str = self.machine_type
     self.headnode_machine_type: str = cluster_spec.headnode.vm_spec.machine_type
     self.headnode_spec: virtual_machine.BaseVmSpec = (
@@ -181,7 +193,8 @@ class BaseCluster(resource.BaseResource):
         'image': self.image,
         'os_type': self.os_type,
         'num_workers': self.num_workers,
-        'template': self.template
+        'template': self.template,
+        'unmanaged': self.unmanaged
     }
 
   def __repr__(self):
@@ -289,6 +302,45 @@ class BaseCluster(resource.BaseResource):
     """Authenticate a remote machine to access all vms."""
     for vm in self.vms:
       vm.AuthenticateVm()
+
+  def ExportVmGroupsForUnmanagedProvision(self):
+    """Export VmGroups for unmanaged provisioning.
+
+    Returns:
+      Dictionary of VmGroupSpec for provisioning in BenchmarkSpec object.
+    """
+    if not self.unmanaged:
+      return {}
+    logging.info('Provisioning cluster resources with unmanaged VM creation.')
+    return {
+        'headnode': self.spec.headnode,
+        'workers': self.spec.workers,
+    }
+
+  def ImportVmGroups(self, headnode, workers):
+    """Imports VMGroups from unmanaged provision.
+
+    After VMs being created from unmanaged codepath. Add corresponding vm_groups
+    back to cluster object. So the benchmark hopefully do not care about
+    how underlying resources being created.
+
+    Args:
+      headnode: VirtualMachine object representing a headnode.
+      workers: List of VirtualMachine objects representing workers.
+    """
+    self.headnode_vm = headnode
+    self.worker_vms = workers
+    self.vms = [self.headnode_vm] + self.worker_vms
+
+  def Create(self):
+    if self.unmanaged:
+      return
+    super().Create()
+
+  def Delete(self):
+    if self.unmanaged:
+      return
+    super().Delete()
 
 
 Cluster = typing.TypeVar('Cluster', bound=BaseCluster)
