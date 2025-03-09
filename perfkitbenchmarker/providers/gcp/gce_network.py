@@ -769,20 +769,24 @@ class GceNetworkResource(resource.BaseResource):
   """Object representing a GCE Network resource."""
 
   def __init__(
-      self, name: str, mode: str, project: str, mtu: int | None = None
+      self, name: str, mode: str, project: str, mtu: int | None = None,
+      enable_ipv6: bool = False
   ):
     super().__init__()
     self.name = name
     self.mode = mode
     self.project = project
     self.mtu = mtu
+    self.enable_ipv6 = enable_ipv6
 
   def _Create(self):
     """Creates the Network resource."""
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'create', self.name)
-    cmd.flags['subnet-mode'] = self.mode
+    cmd.flags['subnet-mode'] = 'custom' if self.enable_ipv6 else self.mode
     if self.mtu:
-      cmd.flags['mtu'] = self.mtu
+        cmd.flags['mtu'] = self.mtu
+    if self.enable_ipv6:
+        cmd.flags['enable-ula-internal-ipv6'] = True
     cmd.Issue()
 
   def _Delete(self):
@@ -825,6 +829,7 @@ class GceSubnetResource(resource.BaseResource):
       region: str,
       addr_range: str,
       project: str,
+      enable_ipv6: bool = False
   ):
     super().__init__()
     self.name = name
@@ -832,6 +837,7 @@ class GceSubnetResource(resource.BaseResource):
     self.region = region
     self.addr_range = addr_range
     self.project = project
+    self.enable_ipv6 = enable_ipv6
 
   def UpdateProperties(self) -> None:
     """Updates the properties of the subnet resource."""
@@ -851,6 +857,9 @@ class GceSubnetResource(resource.BaseResource):
     cmd.flags['network'] = self.network_name
     cmd.flags['region'] = self.region
     cmd.flags['range'] = self.addr_range
+    if self.enable_ipv6:
+        cmd.flags['stack-type'] = 'IPV4_IPV6'
+        cmd.flags['ipv6-access-type'] = 'INTERNAL'
     cmd.Issue()
 
   def _Exists(self) -> bool:
@@ -916,30 +925,50 @@ class GceNetwork(network.BaseNetwork):
 
     self.network_resources = []
     self.subnet_resources = []
-    mode = gcp_flags.GCE_NETWORK_TYPE.value
+    mode = 'custom' if gcp_flags.GCP_USE_IPV6.value else gcp_flags.GCE_NETWORK_TYPE.value
     self.subnet_resource = None
+    
+    # Create network resources
     if not self.is_existing_network or mode == 'legacy':
       for name in self.subnet_names:
         self.network_resources.append(
-            GceNetworkResource(name, mode, self.project, self.mtu)
-        )
-    if (self.is_existing_network and mode != 'legacy') or (mode == 'custom'):
-      subnet_region = util.GetRegionFromZone(network_spec.zone)
-      for name in self.subnet_names:
-        self.subnet_resources.append(
-            GceSubnetResource(
-                name, name, subnet_region, self.cidr, self.project
+            GceNetworkResource(
+                name, 
+                mode, 
+                self.project, 
+                self.mtu,
+                enable_ipv6=gcp_flags.GCP_USE_IPV6.value
             )
         )
+    
+    # Create subnet resources for custom mode networks
+    subnet_region = util.GetRegionFromZone(network_spec.zone)
+    if (self.is_existing_network and mode != 'legacy') or mode == 'custom':
+      for name in self.subnet_names:
+        subnet = GceSubnetResource(
+            name, 
+            name, 
+            subnet_region, 
+            self.cidr, 
+            self.project,
+            enable_ipv6=gcp_flags.GCP_USE_IPV6.value
+        )
+        self.subnet_resources.append(subnet)
       self.subnet_resource = GceSubnetResource(
           self.primary_subnet_name,
           self.primary_subnet_name,
           subnet_region,
           self.cidr,
           self.project,
+          enable_ipv6=gcp_flags.GCP_USE_IPV6.value
       )
+    
     self.network_resource = GceNetworkResource(
-        self.primary_subnet_name, mode, self.project, self.mtu
+        self.primary_subnet_name, 
+        mode, 
+        self.project, 
+        self.mtu,
+        enable_ipv6=gcp_flags.GCP_USE_IPV6.value
     )
     # Stage FW rules.
     self.all_nets = self._GetNetworksFromSpec(
@@ -1186,9 +1215,18 @@ class GceNetwork(network.BaseNetwork):
   def Create(self):
     """Creates the actual network."""
     if not self.is_existing_network:
+      # Create the network first
       self.network_resource.Create()
+      
+      # Create all subnets if in custom mode
       if self.subnet_resource:
         self.subnet_resource.Create()
+        # Create additional subnets if any
+        for subnet in self.subnet_resources:
+          if subnet.name != self.primary_subnet_name:
+            subnet.Create()
+      
+      # Create firewall rules after network and subnets are ready
       if self.default_firewall_rule:
         self.default_firewall_rule.Create()
       if self.external_nets_rules:

@@ -485,6 +485,11 @@ GCLUSTER_PATH = flags.DEFINE_string(
     'The path for the gcluster (cluster-toolkit) utility.',
 )
 
+GCP_USE_IPV6 = flags.DEFINE_boolean(
+    'gcp_use_ipv6',
+    False,
+    'Enable IPv6 dual-stack networking for GCP networks and subnets.',
+)
 
 def _ValidatePreemptFlags(flags_dict):
   if flags_dict['gce_preemptible_vms']:
