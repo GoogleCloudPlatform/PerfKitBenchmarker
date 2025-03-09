@@ -32,7 +32,7 @@ import copy
 import json
 import logging
 import os
-import pipes
+import shlex
 import posixpath
 import re
 import threading
@@ -609,7 +609,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
                      '--stderr', stderr_file,
                      '--status', status_file,
                      '--exclusive', exclusive_file,
-                     '--command', pipes.quote(command)]  # pyformat: disable
+                     '--command', shlex.quote(command)]  # pyformat: disable
     if timeout:
       start_command.extend(['--timeout', str(timeout)])
 

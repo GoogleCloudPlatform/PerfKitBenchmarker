@@ -26,7 +26,7 @@ import datetime
 import json
 import logging
 import os
-import pipes
+import shlex
 import posixpath
 import subprocess
 from typing import Any, Dict, List
@@ -419,7 +419,7 @@ def _GetYcsbExecutor(
 ) -> ycsb.YCSBExecutor:
   """Gets the YCSB executor class for loading and running the benchmark."""
   ycsb_memory = min(vms[0].total_memory_kb // 1024, 4096)
-  jvm_args = pipes.quote(f' -Xmx{ycsb_memory}m')
+  jvm_args = shlex.quote(f' -Xmx{ycsb_memory}m')
   env = {}
   if _ENABLE_DIRECT_PATH.value:
     env['CBT_ENABLE_DIRECTPATH'] = str(_ENABLE_DIRECT_PATH.value)
