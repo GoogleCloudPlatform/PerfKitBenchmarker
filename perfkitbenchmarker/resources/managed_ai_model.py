@@ -127,8 +127,8 @@ class BaseManagedAiModel(resource.BaseResource):
     """
     try:
       self.SendPrompt('What is 2 + 2?', 100, 1.0)
-    except errors.Resource.GetError as ex:
-      logging.info('Tried sending prompt but got error %s', ex)
+    except (errors.Resource.GetError, errors.VmUtil.IssueCommandError) as ex:
+      logging.exception('Tried sending prompt but got error %s. Retrying.', ex)
       return False
     return True
 

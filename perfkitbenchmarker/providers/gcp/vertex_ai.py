@@ -30,6 +30,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
@@ -308,15 +309,36 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     else:
       accelerator_type = self.model_spec.accelerator_type.lower()
       accelerator_type = accelerator_type.replace('_', '-')
-      self.vm.RunCommand(
+      _, err, code = self.vm.RunCommand(
           f'gcloud ai endpoints deploy-model {self.endpoint.endpoint_name}'
           f' --model={self.model_resource_name} --region={self.region}'
           f' --project={self.project} --display-name={self.name}'
           f' --machine-type={self.model_spec.machine_type}'
           f' --accelerator=type={accelerator_type},count={self.model_spec.accelerator_count}'
           f' --service-account={self.service_account}'
-          f' --max-replica-count={self.max_scaling}'
+          f' --max-replica-count={self.max_scaling}',
+          ignore_failure=True,
       )
+      if code:
+        if (
+            'The operations may still be underway remotely and may still'
+            ' succeed'
+            in err
+        ):
+
+          @vm_util.Retry(
+              poll_interval=self.POLL_INTERVAL,
+              fuzz=0,
+              timeout=self.READY_TIMEOUT,
+              retryable_exceptions=(errors.Resource.RetryableCreationError,),
+          )
+          def WaitUntilReady():
+            if not self._IsReady():
+              raise errors.Resource.RetryableCreationError('Not yet ready')
+
+          WaitUntilReady()
+        else:
+          raise errors.VmUtil.IssueCommandError(err)
     end_model_deploy = time.time()
     self.model_deploy_time = end_model_deploy - start_model_deploy
     logging.info(

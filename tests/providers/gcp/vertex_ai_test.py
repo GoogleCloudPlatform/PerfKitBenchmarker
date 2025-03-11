@@ -246,9 +246,52 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
             ' --region=us-west --project=my-project --display-name=pkb123'
             ' --machine-type=g2-standard-8 --accelerator=type=nvidia-l4,count=1'
             ' --service-account=123-compute@developer.gserviceaccount.com'
-            ' --max-replica-count=1'
+            ' --max-replica-count=1', ignore_failure=True,
         ),
     ])  # pytype: disable=attribute-error
+
+  def test_model_create_via_gcloud_waits_until_ready(self):
+    self.pkb_ai.endpoint.endpoint_name = (
+        'projects/6789/locations/us-east1/endpoints/1234'
+    )
+    cli = self.MockRunCommand(
+        {
+            'gcloud ai models upload': [(
+                'uploaded',
+                '',
+                0,
+            )],
+            'gcloud ai models list': [(
+                'MODEL_ID             DISPLAY_NAME\n1234  pkb123',
+                '',
+                0,
+            )],
+            'gcloud ai endpoints deploy-model': [(
+                '',
+                (
+                    '(gcloud.ai.endpoints.deploy-model) Operation'
+                    ' https://us-central1-aiplatform.googleapis.com/v1beta1/projects/123/locations/us-central1/endpoints/123/operations/123'
+                    ' has not finished in 1800 seconds. The operations may'
+                    ' still be underway remotely and may still succeed; use'
+                    ' gcloud list and describe commands or'
+                    ' https://console.developers.google.com/ to check resource'
+                    ' state.'
+                ),
+                1,
+            )],
+            'gcloud ai endpoints predict': [
+                ('', 'No endpoint', 1),
+                (
+                    '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
+                    '',
+                    0,
+                ),
+            ],
+        },
+        self.pkb_ai.vm,
+    )
+    self.pkb_ai._Create()
+    self.assertEqual(cli.RunCommand.mock_command.progress_through_calls['gcloud ai endpoints predict'], 2)  # pytype: disable=attribute-error
 
   def test_model_inited(self):
     # Assert on values from setup

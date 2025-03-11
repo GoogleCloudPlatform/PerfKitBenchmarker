@@ -38,6 +38,7 @@ import logging
 from typing import Any
 from unittest import mock
 from absl.testing import absltest
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
@@ -72,7 +73,6 @@ class MockCommand:
 
   def mock_remote_command(self, cmd: str | list[str], **kwargs) -> ReturnValues:
     """Mocks a command, returning the next response for the command."""
-    del kwargs  # Unused but matches type signature.
     if isinstance(cmd, list):
       try:
         cmd = ' '.join(cmd)
@@ -94,6 +94,15 @@ class MockCommand:
           # Tester passed in one tuple rather than a list of tuples.
           response = self.call_to_response[call]
         self.progress_through_calls[call] += 1
+        if (
+            (
+                (len(response) == 3 and response[2] != 0)
+                or (len(response) == 2 and response[1])
+            )
+            and kwargs.get('raise_on_failure', True)
+            and not kwargs.get('ignore_failure', False)
+        ):
+          raise errors.VmUtil.IssueCommandError(response[1])
         return response
     return self.default_return_value
 
