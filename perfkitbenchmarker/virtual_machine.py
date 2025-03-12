@@ -192,6 +192,11 @@ _VM_USER_NAME = flags.DEFINE_string(
     'The user name to use for the VM. If not specified, the default user name'
     ' "perfkit" is used.',
 )
+SKIP_VM_PREPARATION = flags.DEFINE_bool(
+    'skip_vm_preparation',
+    False,
+    'Skips the PrepareAfterBoot step for VMs.',
+)
 
 
 @enum.unique

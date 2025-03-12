@@ -915,7 +915,10 @@ class BenchmarkSpec:
       )
       if self.nfs_service and self.nfs_service.CLOUD == nfs_service.UNMANAGED:
         self.nfs_service.Create()
-      background_tasks.RunThreaded(lambda vm: vm.PrepareAfterBoot(), self.vms)
+      if not FLAGS.skip_vm_preparation:
+        background_tasks.RunThreaded(lambda vm: vm.PrepareAfterBoot(), self.vms)
+      else:
+        logging.info('Skipping VM preparation.')
 
       sshable_vms = [
           vm for vm in self.vms if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES
