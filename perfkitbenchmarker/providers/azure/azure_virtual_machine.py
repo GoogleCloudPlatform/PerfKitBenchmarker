@@ -155,6 +155,7 @@ NVME_MACHINE_FAMILIES = [
     'Standard_Dals_v6',
     'Standard_Dalds_v6',
     'Standard_Ds_v6',
+    'Standard_Dds_v6',
     'Standard_Eas_v6',
     'Standard_Eads_v6',
     'Standard_Eibs_v5',
