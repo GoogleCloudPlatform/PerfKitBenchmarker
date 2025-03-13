@@ -73,7 +73,7 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
           'should be specified.   '
           'db_high_availability: {}  '
           'zone count: {} '.format(
-              zones_needed_for_high_availability, len(self.zones)
+              self.spec.high_availability, len(self.zones)
           )
       )
 
