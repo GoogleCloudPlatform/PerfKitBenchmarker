@@ -2250,6 +2250,10 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     sosreport_local_path = vm_util.PrependTempDir('sosreport.tar.xz')
     if self.GenerateAndCaptureSosReport(sosreport_local_path):
       log_files.append(sosreport_local_path)
+    # Serial port 1 (console)
+    serial_port_1_path = vm_util.PrependTempDir('serial_port_1')
+    if self.GenerateAndCaptureSerialPortOutput(serial_port_1_path):
+      log_files.append(serial_port_1_path)
     return log_files
 
   def GenerateAndCaptureSosReport(self, local_path: str) -> bool:
@@ -2280,6 +2284,24 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     )
     self.RemoteCopy(local_path, sosreport_path, copy_to=False)
     return True
+
+  def GenerateAndCaptureSerialPortOutput(self, local_path: str) -> bool:
+    """Generates and captures the serial port output for the remote VM.
+
+    Implemented per-provider
+
+    Args:
+      local_path: The path to store the serial port output on the caller's
+        machine.
+
+    Returns:
+      True if the serial port output was successfully generated and captured;
+      False otherwise.
+    """
+    logging.warning(
+        'Capturing serial port output is not implemented for this VM.'
+    )
+    return False
 
 
 def _IncrementStackLevel(**kwargs: Any) -> Any:

@@ -1665,6 +1665,30 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
       raise ValueError('DEFAULT_IMAGE_PROJECT can not be None')
     return self.DEFAULT_IMAGE_PROJECT
 
+  def GenerateAndCaptureSerialPortOutput(self, local_path: str) -> bool:
+    """Generates and captures the serial port output for the remote VM.
+
+    Args:
+      local_path: The path to store the serial port output on the caller's
+        machine.
+
+    Returns:
+      True if the serial port output was successfully generated and captured;
+      False otherwise.
+    """
+    cmd = util.GcloudCommand(
+        self, 'compute', 'instances', 'get-serial-port-output', self.name,
+    )
+    cmd.flags['zone'] = self.zone
+    cmd.flags['port'] = 1
+    stdout, _, retcode = cmd.Issue(raise_on_failure=False)
+    if retcode != 0:
+      logging.error('Failed to get serial port 1 output')
+      return False
+    with open(local_path, 'w') as f:
+      f.write(stdout)
+    return True
+
 
 class Debian11BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine,
