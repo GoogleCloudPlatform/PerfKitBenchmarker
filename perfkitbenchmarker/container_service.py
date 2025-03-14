@@ -1373,10 +1373,17 @@ class KubernetesEventPoller:
 
   def StopPolling(self):
     """Stops polling for events, joining the poller process."""
+    logging.info('Stopping event poller')
     self.stop_polling.set()
-    self.event_poller.join()
     while not self.event_queue.empty():
       self.polled_events.add(self.event_queue.get())
+    self.event_poller.join(timeout=30)
+    if self.event_poller.is_alive():
+      logging.warning(
+          'Event poller process did not join in 30 seconds; killing it.'
+      )
+      self.event_poller.kill()
+      self.event_poller.join(timeout=30)
 
   def GetEvents(self) -> set['KubernetesEvent']:
     """Gets the events for the cluster, including previously polled events."""
