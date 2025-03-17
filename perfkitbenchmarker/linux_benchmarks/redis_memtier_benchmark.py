@@ -193,26 +193,73 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
     server_vm.RemoteCommand(f'bash {_TOP_SCRIPT}')
 
   assert bm_spec.redis_endpoint_ip
-  raw_results = memtier.RunOverAllThreadsPipelinesAndClients(
-      client_vms,
-      bm_spec.redis_endpoint_ip,
-      redis_server.GetRedisPorts(server_vm),
+
+  # Sweep the number of IO threads to find the optimal value.
+  io_threads_to_sweep = (
+      [int(io_threads) for io_threads in redis_server.IO_THREADS.value]
+      if redis_server.IO_THREADS.value
+      else [None]
   )
-  redis_metadata = redis_server.GetMetadata(server_vm)
+
+  maximum_total_ops_throughput = 0.0
+  result_with_maximum_total_ops_throughput = None
+  all_results = []
+
+  for io_threads in io_threads_to_sweep:
+    # Override the io_threads and restart the server if io_threads is not None
+    if io_threads is not None:
+      _UpdateIOThreadsForRedisServer(bm_spec.vm_groups['servers'], io_threads)
+
+    raw_results = memtier.RunOverAllThreadsPipelinesAndClients(
+        client_vms,
+        bm_spec.redis_endpoint_ip,
+        redis_server.GetRedisPorts(server_vm),
+    )
+    redis_metadata = redis_server.GetMetadata(server_vm)
+
+    total_ops_throughput = 0.0
+    for server_result in raw_results:
+      if server_result.metric == 'Total Ops Throughput':
+        total_ops_throughput = server_result.value
+      server_result.metadata.update(redis_metadata)
+      server_result.metadata.update(benchmark_metadata)
+
+    if total_ops_throughput > maximum_total_ops_throughput:
+      maximum_total_ops_throughput = total_ops_throughput
+      result_with_maximum_total_ops_throughput = raw_results
+
+    # Add the results with the current io_threads value
+    if io_threads is not None:
+      for server_result in raw_results:
+        # Cannot assign to metric directly because it is an immutable namedtuple
+        server_result = server_result._replace(
+            metric=f'{server_result.metric} (io_threads={io_threads})'
+        )
+        all_results.append(server_result)
 
   top_results = []
   if measure_cpu_on_server_vm:
     top_results = _GetTopResults(server_vm)
 
-  for server_result in raw_results:
-    server_result.metadata.update(redis_metadata)
-    server_result.metadata.update(benchmark_metadata)
-
-  return raw_results + top_results
+  return result_with_maximum_total_ops_throughput + all_results + top_results
 
 
 def Cleanup(bm_spec: _BenchmarkSpec) -> None:
   del bm_spec
+
+
+def _UpdateIOThreadsForRedisServer(
+    server_vms: List[virtual_machine.BaseVirtualMachine], io_threads: int
+) -> None:
+  for server_vm in server_vms:
+    redis_server.Stop(server_vm)
+
+  for server_vm in server_vms:
+    redis_server.CURRENT_IO_THREADS = io_threads
+    redis_server.Start(server_vm)
+
+  if redis_server.CLUSTER_MODE.value:
+    redis_server.StartCluster(server_vms)
 
 
 def _GetTopResults(server_vm) -> List[sample.Sample]:

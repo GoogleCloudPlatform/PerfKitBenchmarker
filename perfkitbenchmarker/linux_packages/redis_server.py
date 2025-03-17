@@ -17,6 +17,7 @@ import logging
 from typing import Any, Dict, List
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
 
@@ -38,13 +39,11 @@ _VERSION = flags.DEFINE_string(
 CLUSTER_MODE = flags.DEFINE_bool(
     'redis_server_cluster_mode', False, 'Whether to use cluster mode.'
 )
-_IO_THREADS = flags.DEFINE_integer(
+IO_THREADS = flags.DEFINE_list(
     'redis_server_io_threads',
     None,
     'Only supported for redis version >= 6, the '
     'number of redis server IO threads to use.',
-    lower_bound=1,
-    upper_bound=128,
 )
 _IO_THREADS_DO_READS = flags.DEFINE_bool(
     'redis_server_io_threads_do_reads',
@@ -86,8 +85,9 @@ _EVICTION_POLICY = flags.DEFINE_enum(
 REDIS_AOF = flags.DEFINE_bool(
     'redis_aof',
     False,
-    'If true, use disks on the server for aof backups. ',
+    'If true, use disks on the server for aof backups.',
 )
+
 
 # Default port for Redis
 DEFAULT_PORT = 6379
@@ -95,6 +95,7 @@ REDIS_PID_FILE = 'redis.pid'
 FLAGS = flags.FLAGS
 REDIS_GIT = 'https://github.com/antirez/redis.git'
 REDIS_BACKUP = 'scratch'
+CURRENT_IO_THREADS = None
 
 
 def _GetRedisTarName() -> str:
@@ -114,8 +115,35 @@ def _GetNumProcesses(vm) -> int:
   return num_processes
 
 
+def CheckPrerequisites():
+  """Verifies if the flags are valid."""
+  values = IO_THREADS.value
+
+  try:
+    int_values = [int(v) for v in values] if values is not None else []
+  except ValueError as e:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'redis_server_io_threads must be a list of valid integers.'
+    ) from e
+
+  if not all(1 <= v <= 128 for v in int_values):
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'redis_server_io_threads must be a list of integers between 1 and 128.'
+    )
+
+  # TODO(user): Add support for cluster mode and session storage.
+  if (CLUSTER_MODE.value or REDIS_AOF.value) and len(int_values) > 1:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'Sweeping redis_server_io_threads is not supported for cluster mode or'
+        ' session storage configurations.'
+    )
+
+  return True
+
+
 def _Install(vm) -> None:
   """Installs the redis package on the VM."""
+  CheckPrerequisites()
   vm.Install('build_tools')
   vm.Install('wget')
   vm.RemoteCommand(f'cd {linux_packages.INSTALL_DIR}; git clone {REDIS_GIT}')
@@ -155,8 +183,8 @@ def AptInstall(vm) -> None:
 
 
 def _GetIOThreads(vm) -> int:
-  if _IO_THREADS.value:
-    return _IO_THREADS.value
+  if CURRENT_IO_THREADS is not None:
+    return CURRENT_IO_THREADS
   # Redis docs suggests that i/o threads should not exceed number of cores.
   nthreads_per_core = vm.CheckLsCpu().threads_per_core
   num_cpus = vm.NumCpusForBenchmark()
@@ -254,6 +282,24 @@ def Start(vm) -> None:
     logging.info('Fail to optimize overcommit_memory and socket connections.')
   for port in GetRedisPorts(vm):
     vm.RemoteCommand(_BuildStartCommand(vm, port))
+
+
+def Stop(vm) -> None:
+  """Stops redis server processes, flushes all keys, and resets the cluster."""
+  redis_dir = GetRedisDir()
+  ports = GetRedisPorts(vm)
+
+  for port in ports:
+    vm.TryRemoteCommand(f'sudo {redis_dir}/src/redis-cli -p {port} flushall')
+
+  for port in ports:
+    vm.TryRemoteCommand(
+        f'sudo {redis_dir}/src/redis-cli -p {port} cluster reset hard'
+    )
+
+  vm.TryRemoteCommand(
+      'sudo pkill -f redis-server || echo "No Redis server processes found"'
+  )
 
 
 def StartCluster(server_vms) -> None:
