@@ -1310,8 +1310,8 @@ class Rhel9BasedAzureVirtualMachine(
 class AlmaLinuxBasedAzureVirtualMachine(
     AzureVirtualMachine, linux_virtual_machine.RockyLinux8Mixin
 ):
-  GEN2_IMAGE_URN = 'almalinux:almalinux-hpc:8_7-hpc-gen2:latest'
-  GEN1_IMAGE_URN = 'almalinux:almalinux-hpc:8_7-hpc:latest'
+  GEN2_IMAGE_URN = 'almalinux:almalinux-hpc:8-hpc-gen2:latest'
+  GEN1_IMAGE_URN = 'almalinux:almalinux-hpc:8-hpc-gen1:latest'
 
 
 # Rocky Linux is now distributed via a community gallery:
