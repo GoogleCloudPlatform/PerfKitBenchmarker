@@ -1484,6 +1484,10 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     """Get the default storage class for the provider."""
     raise NotImplementedError
 
+  def GetJinjaNodeSelector(self) -> str:
+    """Get the node selector section of a yaml for the provider."""
+    return '# No node selector needed for this cluster.'
+
 
 @dataclasses.dataclass(eq=True, frozen=True)
 class KubernetesEventResource:

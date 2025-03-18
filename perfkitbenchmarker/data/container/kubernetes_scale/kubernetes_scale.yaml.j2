@@ -25,6 +25,8 @@ spec:
             cpu: {{CpuRequest}}
             memory: {{MemoryRequest}}
             ephemeral-storage: {{EphemeralStorageRequest}}
+      nodeSelector:
+        {{NodeSelector}}
       terminationGracePeriodSeconds: 1
       # Add not-ready/unreachable tolerations for X seconds so that node
       # failure doesn't trigger pod deletion.

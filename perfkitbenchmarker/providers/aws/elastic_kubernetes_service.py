@@ -284,3 +284,142 @@ class EksCluster(container_service.KubernetesCluster):
         '--wait',
     ]
     vm_util.IssueCommand(cmd)
+
+
+class EksAutoCluster(container_service.KubernetesCluster):
+  """Class representing an Elastic Kubernetes Service cluster with auto mode.
+
+  Automode supports auto scaling & ignores the concept of nodepools & selecting
+  machine types. It also automatically creates some related resources like a
+  load balancer & networks.
+  """
+
+  CLOUD = provider_info.AWS
+  CLUSTER_TYPE = 'Autopilot'
+
+  def __init__(self, spec):
+    # EKS requires a region and optionally a list of one or zones.
+    # Interpret the zone as a comma separated list of zones or a region.
+    self.control_plane_zones = spec.vm_spec.zone and spec.vm_spec.zone.split(
+        ','
+    )
+    # Do this before super, because commas in zones confuse EC2 virtual machines
+    if len(self.control_plane_zones) > 1:
+      # This will become self.zone
+      spec.vm_spec.zone = self.control_plane_zones[0]
+    super().__init__(spec)
+    if not self.control_plane_zones:
+      raise errors.Config.MissingOption(
+          'container_cluster.vm_spec.AWS.zone is required.'
+      )
+    if len(self.control_plane_zones) == 1 and util.IsRegion(self.zone):
+      self.region = self.zone
+      self.control_plane_zones = []
+      logging.info("Interpreting zone '%s' as a region", self.zone)
+    else:
+      self.region = util.GetRegionFromZones(self.control_plane_zones)
+    if len(self.control_plane_zones) == 1:
+      # eksctl essentially requires you pass --zones if you pass --node-zones
+      # and --zones must have at least 2 zones
+      # https://github.com/weaveworks/eksctl/issues/4735
+      self.control_plane_zones.append(
+          self.region + ('b' if self.zone.endswith('a') else 'a')
+      )
+    self.cluster_version = FLAGS.container_cluster_version
+    self.account = util.GetAccount()
+
+  def InitializeNodePoolForCloud(
+      self,
+      vm_config: virtual_machine.BaseVirtualMachine,
+      nodepool_config: container_service.BaseNodePoolConfig,
+  ):
+    pass
+
+  def _CreateDependencies(self):
+    """Set up the ssh key."""
+    aws_virtual_machine.AwsKeyFileManager.ImportKeyfile(self.region)
+
+  def _DeleteDependencies(self):
+    """Delete the ssh key."""
+    aws_virtual_machine.AwsKeyFileManager.DeleteKeyfile(self.region)
+
+  def _Create(self):
+    """Creates the control plane and worker nodes."""
+    tags = util.MakeDefaultTags()
+    eksctl_flags = {
+        'kubeconfig': FLAGS.kubeconfig,
+        'name': self.name,
+        'version': self.cluster_version,
+        'with-oidc': True,
+        'enable-auto-mode': True,
+        'region': self.region,
+        'tags': ','.join(f'{k}={v}' for k, v in tags.items()),
+    }
+    # If multiple zones are passed use them for the control plane.
+    # Otherwise EKS will auto-select control plane zones in the region.
+    if self.control_plane_zones:
+      eksctl_flags['zones'] = ','.join(self.control_plane_zones)
+
+    cmd = [FLAGS.eksctl, 'create', 'cluster'] + sorted(
+        '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v
+    )
+    stdout, _, retcode = vm_util.IssueCommand(
+        cmd, timeout=1800, raise_on_failure=False
+    )
+    if retcode:
+      # TODO(pclay): add other quota errors
+      if 'The maximum number of VPCs has been reached' in stdout:
+        raise errors.Benchmarks.QuotaFailure(stdout)
+      else:
+        raise errors.Resource.CreationError(stdout)
+
+    # Enable public and private access to the cluster.
+    vpc_cmd = [
+        FLAGS.eksctl,
+        'utils',
+        'update-cluster-vpc-config',
+        f'--cluster={self.name}',
+        f'--region={self.region}',
+        '--private-access=true',
+        '--public-access=true',
+        '--approve',
+    ]
+    vm_util.IssueCommand(vpc_cmd, timeout=900)
+
+  def _Delete(self):
+    """Deletes the control plane and worker nodes."""
+    super()._Delete()
+    cmd = [
+        FLAGS.eksctl,
+        'delete',
+        'cluster',
+        '--name',
+        self.name,
+        '--region',
+        self.region,
+    ]
+    vm_util.IssueCommand(cmd, timeout=1800)
+
+  def _IsReady(self):
+    """Returns True if cluster is running. Autopilot defaults to 0 nodes."""
+    stdout, _, _ = container_service.RunKubectlCommand(['cluster-info'])
+    # These two strings are printed in sequence, but with ansi color code
+    # escape characters in between.
+    return 'Kubernetes control plane' in stdout and 'is running at' in stdout
+
+  def GetDefaultStorageClass(self) -> str:
+    """Get the default storage class for the provider."""
+    return aws_disk.GP2
+
+  def ResizeNodePool(
+      self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
+  ):
+    """Change the number of nodes in the node group."""
+    # Autopilot does not support nodepools & manual resizes.
+    pass
+
+  def GetJinjaNodeSelector(self) -> str:
+    """Get the node selector section of a yaml for the provider."""
+    # Theoretically needed in mixed mode, but deployments fail without it:
+    # https://docs.aws.amazon.com/eks/latest/userguide/associate-workload.html#_require_a_workload_is_deployed_to_eks_auto_mode_nodes
+    return 'eks.amazonaws.com/compute-type: auto'

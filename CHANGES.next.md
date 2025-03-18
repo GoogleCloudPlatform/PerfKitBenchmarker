@@ -214,6 +214,7 @@
 -   Add unmanaged_postgresql_sysbench benchmark.
 -   Add new vmstat trace.
 -   Add support for customizing Hadoop jobs scheduling
+-   Add support for GKE Autopilot & EKS Auto, which don't require nodepools.
 
 ### Enhancements:
 

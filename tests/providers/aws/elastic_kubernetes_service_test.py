@@ -1,6 +1,7 @@
 import unittest
 from unittest import mock
 from absl.testing import flagsaver
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker import network
 from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.providers.aws import aws_network
@@ -164,6 +165,78 @@ class ElasticKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
         ],
         timeout=600,
     )
+
+
+class EksAutoClusterTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    mock_network = mock.create_autospec(aws_network.AwsNetwork)
+    mock_network.subnet = {'id': 'subnet1'}
+    mock_network.vpc = {'default_security_group_id': 'group1'}
+    mock_network.placement_group = None
+    self.enter_context(
+        mock.patch.object(util, 'GetAccount', return_value='1234')
+    )
+    self.enter_context(
+        mock.patch.object(
+            network.BaseNetwork,
+            'GetNetwork',
+            return_value=mock_network,
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            network.BaseFirewall,
+            'GetFirewall',
+            return_value=mock.create_autospec(aws_network.AwsFirewall),
+        )
+    )
+    self.enter_context(flagsaver.flagsaver(run_uri='123p'))
+
+  def testInitEksClusterWorks(self):
+    elastic_kubernetes_service.EksAutoCluster(EKS_SPEC)
+
+  def testEksClusterCreate(self):
+    issue_command = self.MockIssueCommand(
+        {'create cluster': [('Cluster created', '', 0)]}
+    )
+    cluster = elastic_kubernetes_service.EksAutoCluster(EKS_SPEC)
+    cluster._Create()
+    issue_command.func_to_mock.assert_any_call(
+        [
+            'eksctl',
+            'create',
+            'cluster',
+            '--enable-auto-mode=True',
+            '--name=pkb-123p',
+            '--region=us-west-1',
+            '--with-oidc=True',
+            '--zones=us-west-1a,us-west-1b',
+        ],
+        timeout=1800,
+        raise_on_failure=False,
+    )
+
+  def testEksClusterIsReady(self):
+    self.enter_context(
+        mock.patch.object(
+            container_service,
+            'RunKubectlCommand',
+            return_value=(
+                (
+                    r'^[[0;32mKubernetes control plane^[[0m is running at'
+                    r' ^[[0;33mhttps://RAND1234.gr7.us-west-1.eks.amazonaws.com^[[0mTo'
+                    " further debug and diagnose cluster problems, use 'kubectl"
+                    " cluster-info dump'."
+                ),
+                '',
+                0,
+            ),
+        )
+    )
+    cluster = elastic_kubernetes_service.EksAutoCluster(EKS_SPEC)
+    self.assertTrue(cluster._IsReady())
 
 
 if __name__ == '__main__':

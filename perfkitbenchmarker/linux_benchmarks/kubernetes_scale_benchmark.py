@@ -115,6 +115,7 @@ def ScaleUpPods(
       EphemeralStorageRequest='10Mi',
       RolloutTimeout=max_wait_time,
       PodTimeout=max_wait_time + 60,
+      NodeSelector=cluster.GetJinjaNodeSelector(),
   )
 
   # Arbitrarily pick the first resource (it should be the only one.)
