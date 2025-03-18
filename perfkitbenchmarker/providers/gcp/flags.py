@@ -198,6 +198,11 @@ GCE_CREATE_LOG_HTTP = flags.DEFINE_boolean(
     False,
     'If True, pass --log-http to gcloud compute instance create.',
 )
+GCE_NODE_GROUP = flags.DEFINE_string(
+    'gce_node_group',
+    None,
+    'The sole-tenant node group to use for the VM.',
+)
 
 flags.DEFINE_string(
     'gcp_node_type',

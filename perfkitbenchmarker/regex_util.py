@@ -63,9 +63,9 @@ def ExtractGroup(regex, text, group=1, flags=0):
     raise IndexError('No such group {} in "{}".'.format(group, regex)) from e
 
 
-def ExtractFloat(regex, text, group=1):
+def ExtractFloat(regex, text, group=1, flags=0):
   """Extracts a float from a regular expression matched to 'text'."""
-  return float(ExtractGroup(regex, text, group=group))
+  return float(ExtractGroup(regex, text, group=group, flags=flags))
 
 
 def ExtractInt(regex, text, group=1):

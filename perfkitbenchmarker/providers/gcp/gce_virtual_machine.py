@@ -647,6 +647,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if gcp_flags.GCE_CREATE_LOG_HTTP.value:
       cmd.flags['log-http'] = True
 
+    if gcp_flags.GCE_NODE_GROUP.value:
+      cmd.flags['node-group'] = gcp_flags.GCE_NODE_GROUP.value
+
     # Compute all flags requiring alpha first. Then if any flags are different
     # between alpha and GA, we can set the appropriate ones.
     if self.gce_egress_bandwidth_tier:
@@ -1007,7 +1010,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         ):
           host = GceSoleTenantNodeGroup(self.node_type, self.zone, self.project)
           self.host_list.append(host)
-          host.Create()
+          if gcp_flags.GCE_NODE_GROUP.value is None:
+            # GCE_NODE_GROUP is used to identify an existing node group.
+            host.Create()
         self.host = self.host_list[-1]
         if self.num_vms_per_host:
           self.host.fill_fraction += 1.0 / self.num_vms_per_host
