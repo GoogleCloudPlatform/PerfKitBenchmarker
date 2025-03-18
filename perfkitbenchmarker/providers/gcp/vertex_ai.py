@@ -337,6 +337,8 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
               raise errors.Resource.RetryableCreationError('Not yet ready')
 
           WaitUntilReady()
+        elif 'Machine type temporarily unavailable' in err:
+          raise errors.Benchmarks.QuotaFailure(err)
         else:
           raise errors.VmUtil.IssueCommandError(err)
     end_model_deploy = time.time()

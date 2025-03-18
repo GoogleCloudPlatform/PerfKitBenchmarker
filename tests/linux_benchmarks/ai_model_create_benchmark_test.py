@@ -54,7 +54,7 @@ class AiModelCreateBenchmarkTest(
         'model1',
         'model2',
     ]
-    with self.assertRaises(errors.Benchmarks.PrepareException):
+    with self.assertRaises(errors.Benchmarks.KnownIntermittentError):
       ai_model_create_benchmark.Run(self.bm_spec)
 
   def testBenchmarkRunGivesCorrectSamplesForOneModel(self):

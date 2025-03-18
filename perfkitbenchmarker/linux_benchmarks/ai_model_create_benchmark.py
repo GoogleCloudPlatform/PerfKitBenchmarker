@@ -60,17 +60,23 @@ def GetConfig(user_config: dict[Any, Any]) -> dict[Any, Any]:
 
 
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
+  model1 = benchmark_spec.ai_model
+  assert model1
+  _ValidateExistingModels(model1, 0)
   del benchmark_spec
 
 
-def _ValidateExistingModels(ai_model: managed_ai_model.BaseManagedAiModel):
-  """Validates that there is only one model in the project."""
+def _ValidateExistingModels(
+    ai_model: managed_ai_model.BaseManagedAiModel, expected_count: int
+):
+  """Validates that no other models are running in the region."""
   endpoints = ai_model.ListExistingEndpoints()
   # Note this code runs after Create, so we should have one.
   # The presence of other models in a region changes startup performance.
-  if len(endpoints) != 1:
-    raise errors.Benchmarks.PrepareException(
-        f'Only one model expected but found all these models: {endpoints}'
+  if len(endpoints) != expected_count:
+    raise errors.Benchmarks.KnownIntermittentError(
+        f'Expected {expected_count} model(s) but found all these models:'
+        f' {endpoints}'
     )
 
 
@@ -87,7 +93,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   logging.info('Running Run phase & gathering response times for model 1')
   model1 = benchmark_spec.ai_model
   assert model1
-  _ValidateExistingModels(model1)
+  _ValidateExistingModels(model1, 1)
   model1.metadata.update({'First Model': True})
   SendPromptsForModel(model1)
 
