@@ -171,6 +171,11 @@ hpcc_stream:
     hpcc_numa_binding: True
     num_vms: 1
 
+multiload:
+  name: multichase
+  flags:
+    multichase_benchmarks: multiload
+
 # TODO: memtier_key_maximum, memtier_load_key_maximum
 redis_memtier_full_house_loaded:
   name: redis_memtier
