@@ -19,6 +19,7 @@ Timing for creation of the cluster and pods are handled by resource.py
 the beginning of cluster creation through the pod running.
 """
 
+import json
 import logging
 import time
 from typing import Callable, List
@@ -162,13 +163,21 @@ def _BenchmarkClusterResize(
   cluster.WaitForRollout('daemonset/daemon-set')
 
   def GetPodOnNode() -> str:
-    pod, _, _ = container_service.RunKubectlCommand([
+    pods_json, _, _ = container_service.RunKubectlCommand([
         'get',
         'pod',
         '-o',
-        f'jsonpath={{.items[?(@.spec.nodeName=="{new_node}")].metadata.name}}',
+        'json',
     ])
-    return pod
+    # Kubectl's jsonpath does not support multiple filters, so we have to
+    # do the filtering manually.
+    pods = json.loads(pods_json)
+    for pod in pods['items']:
+      if pod['spec']['nodeName'] == new_node:
+        labels = pod['metadata'].get('labels')
+        if labels and labels.get('name') == 'daemon-set':
+          return pod['metadata']['name']
+    return ''
 
   new_pod = PollForData(
       GetPodOnNode,
