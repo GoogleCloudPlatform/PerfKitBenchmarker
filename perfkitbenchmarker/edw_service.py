@@ -135,9 +135,9 @@ flags.DEFINE_boolean(
 flags.DEFINE_enum(
     'edw_bq_feature_config',
     'default',
-    ['default', 'smallquery'],
+    ['default', 'job_optional'],
     'Selects from among various BigQuery feature configurations. '
-    'Currently supported: default (no special features), smallquery '
+    'Currently supported: default (no special features), job_optional '
     '(enables job_creation_optional query preview feature). '
     'Only supported for Python client.',
 )
