@@ -22,33 +22,20 @@ try {
           Get-PhysicalDiskStorageNodeView |
           Select-Object -Property StorageNodeObjectId) -like ('*' + $localServerName + '*') }
 
-  if ($ClusterDisks.count -gt 2) {
-    $Pool = New-StoragePool -StorageSubsystemFriendlyName 'Clustered*' -FriendlyName FciPool -PhysicalDisks $ClusterDisks -ResiliencySettingNameDefault Simple -Verbose
-    $Pool | New-Volume -FriendlyName 'Data' -FileSystem ReFS -AllocationUnitSize 65536 -ProvisioningType 'Fixed' -UseMaximumSize -DriveLetter D
-    Start-Sleep -Seconds 20
-    Write-Host 'Moving Cluster Groups'
-    Move-ClusterGroup -Name 'Available Storage' -Node $localServerName
-    $ClusterPool = Get-ClusterResource -name 'Cluster Pool 1'
-    Move-ClusterGroup -Name $ClusterPool.OwnerGroup -Node $localServerName
+  $diskCount = 0
+  [char]$initialDisk = 'D'
 
-    New-Item -ItemType Directory -Path 'D:\MSSQL'
-    Get-Date | Out-File -FilePath 'D:\MSSQL\fcimw.txt'
+  foreach($disk in $ClusterDisks) {
+    $diskLetter = [char]([byte]$initialDisk + $diskCount)
+
+    Initialize-Disk -Number $disk.DeviceId
+    New-Partition -DiskNumber $disk.DeviceId -UseMaximumSize  -DriveLetter $diskLetter | Format-Volume -FileSystem NTFS -newfilesystemlabel DataDisk -AllocationUnitSize 65536
+
+    Start-Sleep -Seconds 30
+    $initializedDisks.Add($diskLetter)
+    $diskCount = $diskCount + 1
   }
-  else {
-    $diskCount = 0
-    $diskLetters = 'D','E','F'
 
-    foreach($disk in $ClusterDisks) {
-      $diskLetter = $diskLetters[$diskCount]
-
-      Initialize-Disk -Number $disk.DeviceId
-      New-Partition -DiskNumber $disk.DeviceId -UseMaximumSize  -DriveLetter $diskLetter | Format-Volume -FileSystem NTFS -newfilesystemlabel DataDisk -AllocationUnitSize 65536
-
-      Start-Sleep -Seconds 30
-      $initializedDisks.Add($diskLetter)
-      $diskCount = $diskCount + 1
-    }
-  }
   Write-Host 'Test Cluster'
   Invoke-Command -ComputerName  $ad_dc.HostName -Credential $domainCredential -ArgumentList $node1,$node2 -ScriptBlock {
         Test-Cluster -Node $args[0],$args[1] -Include 'Inventory', 'Network', 'System Configuration' -Confirm:0;
