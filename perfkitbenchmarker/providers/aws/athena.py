@@ -18,7 +18,7 @@ import datetime
 import json
 import logging
 import re
-from typing import Dict, Tuple
+from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -150,11 +150,14 @@ class JavaClientInterface(GenericClientInterface):
         package_name, [LATEST_CLIENT_JAR], ''
     )
 
-  def ExecuteQuery(self, query_name: str) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
     """Executes a query and returns performance details.
 
     Args:
       query_name: String name of the query to execute
+      print_results: Whether to include query results in execution details.
 
     Returns:
       A tuple of (execution_time, run_metadata)
@@ -173,6 +176,8 @@ class JavaClientInterface(GenericClientInterface):
         f'--query_timeout_secs {FLAGS.athena_query_timeout} '
         f'--collect_metrics {FLAGS.athena_metrics_collection}'
     )
+    if print_results:
+      query_command += ' --print_results true'
 
     if not FLAGS.athena_metrics_collection:
       # execute the query in requested persistent workgroup

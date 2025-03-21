@@ -21,7 +21,7 @@ benchmarks.
 import copy
 import json
 import logging
-from typing import Union
+from typing import Any, Union
 from absl import flags
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import provider_info
@@ -72,11 +72,14 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         package_name, [self.jdbc_client], ''
     )
 
-  def ExecuteQuery(self, query_name: str) -> tuple[float, dict[str, str]]:
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = True
+  ) -> tuple[float, dict[str, Any]]:
     """Executes a query and returns performance details.
 
     Args:
       query_name: String name of the query to execute
+      print_results: Whether to include query results in execution details.
 
     Returns:
       A tuple of (execution_time, execution details)
@@ -91,9 +94,10 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         f'--warehouse {self.warehouse} '
         f'--database {self.database} '
         f'--schema {self.schema} '
-        f'--query_file {query_name} '
-        '--print_results true'
+        f'--query_file {query_name}'
     )
+    if print_results:
+      query_command += ' --print_results true'
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])

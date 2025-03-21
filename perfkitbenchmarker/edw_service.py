@@ -18,7 +18,7 @@ directory as a subclass of BaseEdwService.
 """
 import logging
 import os
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Union
 
 from absl import flags
 from perfkitbenchmarker import resource
@@ -240,11 +240,14 @@ class EdwClientInterface:
     """
     raise NotImplementedError
 
-  def ExecuteQuery(self, query_name: str) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
     """Executes a query and returns performance details.
 
     Args:
       query_name: String name of the query to execute
+      print_results: Whether to include query results in execution details.
 
     Returns:
       A tuple of (execution_time, execution details)
@@ -361,6 +364,8 @@ class EdwClientInterface:
 class EdwService(resource.BaseResource):
   """Object representing a EDW Service."""
 
+  SERVICE_TYPE = 'abstract'
+
   def __init__(self, edw_service_spec):
     """Initialize the edw service object.
 
@@ -463,6 +468,9 @@ class EdwService(resource.BaseResource):
   def GetDatasetLastUpdatedTime(self, dataset=None):
     """Get the formatted last modified timestamp of the dataset."""
     raise NotImplementedError
+
+  def SetDestinationTable(self, dataset: str):
+    pass
 
   def ExtractDataset(
       self, dest_bucket, dataset=None, tables=None, dest_format='CSV'

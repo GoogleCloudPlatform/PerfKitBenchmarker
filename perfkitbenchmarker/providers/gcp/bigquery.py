@@ -37,10 +37,7 @@ BQ_PYTHON_CLIENT_FILE = 'bq_python_driver.py'
 BQ_PYTHON_CLIENT_DIR = 'edw/bigquery/clients/python'
 DEFAULT_TABLE_EXPIRATION = 3600 * 24 * 365  # seconds
 
-BQ_JDBC_INTERFACES = [
-    'SIMBA_JDBC_1_6_2_1003',
-    'GOOGLE_JDBC'
-]
+BQ_JDBC_INTERFACES = ['SIMBA_JDBC_1_6_2_1003', 'GOOGLE_JDBC']
 BQ_JDBC_CLIENT_FILE = {
     'SIMBA_JDBC_1_6_2_1003': 'bq-jdbc-client-2.3.jar',
     'GOOGLE_JDBC': 'bq-google-jdbc-client-1.0.jar',
@@ -153,11 +150,14 @@ class CliClientInterface(GenericClientInterface):
         )
     )
 
-  def ExecuteQuery(self, query_name: str) -> tuple[float, dict[str, str]]:
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
     """Executes a query and returns performance details.
 
     Args:
       query_name: String name of the query to execute
+      print_results: Whether to include query results in execution details.
 
     Returns:
       A tuple of (execution_time, execution details)
@@ -170,6 +170,8 @@ class CliClientInterface(GenericClientInterface):
         'python script_driver.py --script={} --bq_project_id={} '
         '--bq_dataset_id={}'
     ).format(query_name, self.project_id, self.dataset_id)
+    if print_results:
+      query_command += ' --print_results=true'
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
@@ -223,11 +225,14 @@ class JdbcClientInterface(GenericClientInterface):
         '',
     )
 
-  def ExecuteQuery(self, query_name: str) -> tuple[float, dict[str, str]]:
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
     """Executes a query and returns performance details.
 
     Args:
       query_name: String name of the query to execute
+      print_results: Whether to include query results in execution details.
 
     Returns:
       A tuple of (execution_time, execution details)
@@ -249,6 +254,8 @@ class JdbcClientInterface(GenericClientInterface):
             query_name,
         )
     )
+    if print_results:
+      query_command += ' --print_results true'
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
@@ -287,11 +294,14 @@ class JavaClientInterface(GenericClientInterface):
         package_name, [BQ_CLIENT_FILE], ''
     )
 
-  def ExecuteQuery(self, query_name: str) -> tuple[float, dict[str, str]]:
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
     """Executes a query and returns performance details.
 
     Args:
       query_name: String name of the query to execute.
+      print_results: Whether to include query results in execution details.
 
     Returns:
       A tuple of (execution_time, execution details)
@@ -316,6 +326,8 @@ class JavaClientInterface(GenericClientInterface):
         self.dataset_id,
         query_name,
     )
+    if print_results:
+      query_command += ' --print_results true'
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
@@ -388,6 +400,7 @@ class PythonClientInterface(GenericClientInterface):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
+    self.destination: str | None = None
     self.key_file_name = FLAGS.gcp_service_account_key_file
     if '/' in FLAGS.gcp_service_account_key_file:
       self.key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
@@ -415,7 +428,9 @@ class PythonClientInterface(GenericClientInterface):
         os.path.join(BQ_PYTHON_CLIENT_DIR, BQ_PYTHON_CLIENT_FILE)
     )
 
-  def ExecuteQuery(self, query_name: str) -> tuple[float, dict[str, str]]:
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
     """Executes a query and returns performance details."""
     cmd = (
         f'python3 {BQ_PYTHON_CLIENT_FILE} single --project'
@@ -423,6 +438,10 @@ class PythonClientInterface(GenericClientInterface):
         f' {self.dataset_id} --query_file {query_name} --feature_config'
         f' {FLAGS.edw_bq_feature_config}'
     )
+    if print_results:
+      cmd += ' --print_results'
+    if self.destination:
+      cmd += f' --destination {self.destination}'
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     details = copy.copy(self.GetMetadata())
     details.update(json.loads(stdout)['details'])
@@ -708,7 +727,9 @@ class Bigquery(edw_service.EdwService):
     query_file_name = f'cost_query_{run_iter_id}'
     context = {
         'run_identifier': run_iter_id,
-        'project_dot_region': f'{self.client_interface.project_id}.region-{self.GetDatasetRegion()}',
+        'project_dot_region': (
+            f'{self.client_interface.project_id}.region-{self.GetDatasetRegion()}'
+        ),
     }
     self.client_interface.client_vm.RenderTemplate(
         data.ResourcePath(self.RUN_COST_QUERY_TEMPLATE),

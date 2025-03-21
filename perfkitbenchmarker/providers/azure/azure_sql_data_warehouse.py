@@ -19,7 +19,7 @@ Clusters can be paused and unpaused.
 import copy
 import json
 import os
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -155,11 +155,14 @@ class CliClientInterface(edw_service.EdwClientInterface):
         )
     )
 
-  def ExecuteQuery(self, query_name: str) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
     """Executes a query and returns performance details.
 
     Args:
       query_name: String name of the query to execute
+      print_results: Whether to include query results in execution details.
 
     Returns:
       A tuple of (execution_time, execution details)
@@ -179,6 +182,8 @@ class CliClientInterface(edw_service.EdwClientInterface):
         self.password,
         FLAGS.query_timeout,
     )
+    if print_results:
+      query_command += ' --print_results=true'
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())
@@ -253,11 +258,14 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         package_name, [SYNAPSE_JDBC_JAR], ''
     )
 
-  def ExecuteQuery(self, query_name: str) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
     """Executes a query and returns performance details.
 
     Args:
       query_name: String name of the query to execute
+      print_results: Whether to include query results in execution details.
 
     Returns:
       A tuple of (execution_time, execution details)
@@ -273,6 +281,8 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         f'--query_timeout {FLAGS.query_timeout} '
         f'--query_file {query_name}'
     )
+    if print_results:
+      query_command += ' --print_results true'
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())

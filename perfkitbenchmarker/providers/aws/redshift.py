@@ -20,7 +20,7 @@ and deleted.
 import copy
 import json
 import os
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
@@ -156,11 +156,14 @@ class CliClientInterface(edw_service.EdwClientInterface):
         )
     )
 
-  def ExecuteQuery(self, query_name: str) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
     """Executes a query and returns performance details.
 
     Args:
       query_name: String name of the query to execute
+      print_results: Whether to include query results in execution details.
 
     Returns:
       A tuple of (execution_time, execution details)
@@ -173,6 +176,8 @@ class CliClientInterface(edw_service.EdwClientInterface):
         'python script_driver.py --script={} --host={} '
         '--database={} --user={} --password={}'
     ).format(query_name, self.host, self.database, self.user, self.password)
+    if print_results:
+      query_command += ' --print_results=true'
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())
@@ -228,11 +233,14 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         package_name, [REDSHIFT_JDBC_JAR], ''
     )
 
-  def ExecuteQuery(self, query_name: str) -> Tuple[float, Dict[str, str]]:
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
     """Executes a query and returns performance details.
 
     Args:
       query_name: String name of the query to execute.
+      print_results: Whether to include query results in execution details.
 
     Returns:
       A tuple of (execution_time, execution details)
@@ -245,6 +253,8 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         'java -cp {} com.google.cloud.performance.edw.Single '
         '--endpoint {} --query_file {}'
     ).format(REDSHIFT_JDBC_JAR, self.host, query_name)
+    if print_results:
+      query_command += ' --print_results true'
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())
