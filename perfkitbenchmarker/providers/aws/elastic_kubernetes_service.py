@@ -38,16 +38,14 @@ from perfkitbenchmarker.providers.aws import util
 FLAGS = flags.FLAGS
 
 
-class EksCluster(container_service.KubernetesCluster):
-  """Class representing an Elastic Kubernetes Service cluster."""
-
-  CLOUD = provider_info.AWS
+class BaseEksCluster(container_service.KubernetesCluster):
+  """Shared base class for Elastic Kubernetes Service cluster auto mode & not."""
 
   def __init__(self, spec):
     # EKS requires a region and optionally a list of one or zones.
     # Interpret the zone as a comma separated list of zones or a region.
-    self.control_plane_zones = spec.vm_spec.zone and spec.vm_spec.zone.split(
-        ','
+    self.control_plane_zones: list[str] = (
+        spec.vm_spec.zone and spec.vm_spec.zone.split(',')
     )
     # Do this before super, because commas in zones confuse EC2 virtual machines
     if len(self.control_plane_zones) > 1:
@@ -58,16 +56,18 @@ class EksCluster(container_service.KubernetesCluster):
       raise errors.Config.MissingOption(
           'container_cluster.vm_spec.AWS.zone is required.'
       )
-    elif len(self.control_plane_zones) == 1 and util.IsRegion(self.zone):
+    self.region: str | None = None
+    if len(self.control_plane_zones) == 1 and util.IsRegion(self.zone):
       self.region = self.zone
       self.control_plane_zones = []
       logging.info("Interpreting zone '%s' as a region", self.zone)
     else:
       self.region = util.GetRegionFromZones(self.control_plane_zones)
-    # control_plane_zones must be a superset of the node zones
-    for nodepool in self.nodepools.values():
-      if nodepool.zone and nodepool.zone not in self.control_plane_zones:
-        self.control_plane_zones.append(nodepool.zone)
+    self.cluster_version: str = FLAGS.container_cluster_version
+    self.account: str = util.GetAccount()
+
+  def _ChooseSecondZone(self):
+    """Choose a second zone for the control plane if only one is specified."""
     if len(self.control_plane_zones) == 1:
       # eksctl essentially requires you pass --zones if you pass --node-zones
       # and --zones must have at least 2 zones
@@ -75,9 +75,65 @@ class EksCluster(container_service.KubernetesCluster):
       self.control_plane_zones.append(
           self.region + ('b' if self.zone.endswith('a') else 'a')
       )
-    self.cluster_version = FLAGS.container_cluster_version
-    # TODO(user) support setting boot disk type if EKS does.
-    self.account = util.GetAccount()
+
+  def _CreateDependencies(self):
+    """Set up the ssh key."""
+    aws_virtual_machine.AwsKeyFileManager.ImportKeyfile(self.region)
+
+  def _DeleteDependencies(self):
+    """Delete the ssh key."""
+    aws_virtual_machine.AwsKeyFileManager.DeleteKeyfile(self.region)
+
+  def _EksCtlCreate(self, eksctl_flags: dict[str, Any]):
+    """Creates the EKS cluster."""
+    # If multiple zones are passed use them for the control plane.
+    # Otherwise EKS will auto-select control plane zones in the region.
+    if self.control_plane_zones:
+      eksctl_flags['zones'] = ','.join(self.control_plane_zones)
+
+    cmd = [FLAGS.eksctl, 'create', 'cluster'] + sorted(
+        '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v
+    )
+    stdout, _, retcode = vm_util.IssueCommand(
+        cmd, timeout=1800, raise_on_failure=False
+    )
+    if retcode:
+      if 'The maximum number of VPCs has been reached' in stdout:
+        raise errors.Benchmarks.QuotaFailure(stdout)
+      else:
+        raise errors.Resource.CreationError(stdout)
+
+  def _Delete(self):
+    """Deletes the control plane and worker nodes."""
+    super()._Delete()
+    cmd = [
+        FLAGS.eksctl,
+        'delete',
+        'cluster',
+        '--name',
+        self.name,
+        '--region',
+        self.region,
+    ]
+    vm_util.IssueCommand(cmd, timeout=1800)
+
+  def GetDefaultStorageClass(self) -> str:
+    """Get the default storage class for the provider."""
+    return aws_disk.GP2
+
+
+class EksCluster(BaseEksCluster):
+  """Class representing an Elastic Kubernetes Service cluster."""
+
+  CLOUD = provider_info.AWS
+
+  def __init__(self, spec):
+    super().__init__(spec)
+    # control_plane_zones must be a superset of the node zones
+    for nodepool in self.nodepools.values():
+      if nodepool.zone and nodepool.zone not in self.control_plane_zones:
+        self.control_plane_zones.append(nodepool.zone)
+    self._ChooseSecondZone()
 
   def InitializeNodePoolForCloud(
       self,
@@ -98,14 +154,6 @@ class EksCluster(container_service.KubernetesCluster):
     result['boot_disk_size'] = self.default_nodepool.disk_size
     return result
 
-  def _CreateDependencies(self):
-    """Set up the ssh key."""
-    aws_virtual_machine.AwsKeyFileManager.ImportKeyfile(self.region)
-
-  def _DeleteDependencies(self):
-    """Delete the ssh key."""
-    aws_virtual_machine.AwsKeyFileManager.DeleteKeyfile(self.region)
-
   def _Create(self):
     """Creates the control plane and worker nodes."""
     eksctl_flags = {
@@ -118,9 +166,6 @@ class EksCluster(container_service.KubernetesCluster):
         'vpc-nat-mode': 'Disable',
         'with-oidc': True,
     }
-    # If multiple zones are passed use them for the control plane.
-    # Otherwise EKS will auto-select control plane zones in the region.
-    eksctl_flags['zones'] = ','.join(self.control_plane_zones)
     if self.min_nodes != self.max_nodes:
       eksctl_flags.update({
           'nodes-min': self.min_nodes,
@@ -128,18 +173,7 @@ class EksCluster(container_service.KubernetesCluster):
       })
     eksctl_flags.update(self._GetNodeFlags(self.default_nodepool))
 
-    cmd = [FLAGS.eksctl, 'create', 'cluster'] + sorted(
-        '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v
-    )
-    stdout, _, retcode = vm_util.IssueCommand(
-        cmd, timeout=1800, raise_on_failure=False
-    )
-    if retcode:
-      # TODO(pclay): add other quota errors
-      if 'The maximum number of VPCs has been reached' in stdout:
-        raise errors.Benchmarks.QuotaFailure(stdout)
-      else:
-        raise errors.Resource.CreationError(stdout)
+    self._EksCtlCreate(eksctl_flags)
 
     for _, node_group in self.nodepools.items():
       self._CreateNodeGroup(node_group)
@@ -235,20 +269,6 @@ class EksCluster(container_service.KubernetesCluster):
         ),
     }
 
-  def _Delete(self):
-    """Deletes the control plane and worker nodes."""
-    super()._Delete()
-    cmd = [
-        FLAGS.eksctl,
-        'delete',
-        'cluster',
-        '--name',
-        self.name,
-        '--region',
-        self.region,
-    ]
-    vm_util.IssueCommand(cmd, timeout=1800)
-
   def _IsReady(self):
     """Returns True if the workers are ready, else False."""
     get_cmd = [
@@ -261,11 +281,6 @@ class EksCluster(container_service.KubernetesCluster):
     stdout, _, _ = vm_util.IssueCommand(get_cmd)
     ready_nodes = len(re.findall('Ready', stdout))
     return ready_nodes >= self.min_nodes
-
-  def GetDefaultStorageClass(self) -> str:
-    """Get the default storage class for the provider."""
-    # https://docs.aws.amazon.com/eks/latest/userguide/storage-classes.html
-    return aws_disk.GP2
 
   def ResizeNodePool(
       self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
@@ -286,7 +301,7 @@ class EksCluster(container_service.KubernetesCluster):
     vm_util.IssueCommand(cmd)
 
 
-class EksAutoCluster(container_service.KubernetesCluster):
+class EksAutoCluster(BaseEksCluster):
   """Class representing an Elastic Kubernetes Service cluster with auto mode.
 
   Automode supports auto scaling & ignores the concept of nodepools & selecting
@@ -298,35 +313,8 @@ class EksAutoCluster(container_service.KubernetesCluster):
   CLUSTER_TYPE = 'Autopilot'
 
   def __init__(self, spec):
-    # EKS requires a region and optionally a list of one or zones.
-    # Interpret the zone as a comma separated list of zones or a region.
-    self.control_plane_zones = spec.vm_spec.zone and spec.vm_spec.zone.split(
-        ','
-    )
-    # Do this before super, because commas in zones confuse EC2 virtual machines
-    if len(self.control_plane_zones) > 1:
-      # This will become self.zone
-      spec.vm_spec.zone = self.control_plane_zones[0]
     super().__init__(spec)
-    if not self.control_plane_zones:
-      raise errors.Config.MissingOption(
-          'container_cluster.vm_spec.AWS.zone is required.'
-      )
-    if len(self.control_plane_zones) == 1 and util.IsRegion(self.zone):
-      self.region = self.zone
-      self.control_plane_zones = []
-      logging.info("Interpreting zone '%s' as a region", self.zone)
-    else:
-      self.region = util.GetRegionFromZones(self.control_plane_zones)
-    if len(self.control_plane_zones) == 1:
-      # eksctl essentially requires you pass --zones if you pass --node-zones
-      # and --zones must have at least 2 zones
-      # https://github.com/weaveworks/eksctl/issues/4735
-      self.control_plane_zones.append(
-          self.region + ('b' if self.zone.endswith('a') else 'a')
-      )
-    self.cluster_version = FLAGS.container_cluster_version
-    self.account = util.GetAccount()
+    self._ChooseSecondZone()
 
   def InitializeNodePoolForCloud(
       self,
@@ -334,14 +322,6 @@ class EksAutoCluster(container_service.KubernetesCluster):
       nodepool_config: container_service.BaseNodePoolConfig,
   ):
     pass
-
-  def _CreateDependencies(self):
-    """Set up the ssh key."""
-    aws_virtual_machine.AwsKeyFileManager.ImportKeyfile(self.region)
-
-  def _DeleteDependencies(self):
-    """Delete the ssh key."""
-    aws_virtual_machine.AwsKeyFileManager.DeleteKeyfile(self.region)
 
   def _Create(self):
     """Creates the control plane and worker nodes."""
@@ -355,23 +335,7 @@ class EksAutoCluster(container_service.KubernetesCluster):
         'region': self.region,
         'tags': ','.join(f'{k}={v}' for k, v in tags.items()),
     }
-    # If multiple zones are passed use them for the control plane.
-    # Otherwise EKS will auto-select control plane zones in the region.
-    if self.control_plane_zones:
-      eksctl_flags['zones'] = ','.join(self.control_plane_zones)
-
-    cmd = [FLAGS.eksctl, 'create', 'cluster'] + sorted(
-        '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v
-    )
-    stdout, _, retcode = vm_util.IssueCommand(
-        cmd, timeout=1800, raise_on_failure=False
-    )
-    if retcode:
-      # TODO(pclay): add other quota errors
-      if 'The maximum number of VPCs has been reached' in stdout:
-        raise errors.Benchmarks.QuotaFailure(stdout)
-      else:
-        raise errors.Resource.CreationError(stdout)
+    self._EksCtlCreate(eksctl_flags)
 
     # Enable public and private access to the cluster.
     vpc_cmd = [
