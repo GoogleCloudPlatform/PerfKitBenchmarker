@@ -15,6 +15,7 @@
 
 from collections.abc import Callable
 import functools
+import logging
 import threading
 import typing
 from typing import Any, Dict, List
@@ -225,14 +226,23 @@ class KubernetesMetricsCollector:
     Args:
       observe_fn: The function to call.
     """
+    success_count = 0
+    failure_count = 0
     while True:
       try:
         self._samples.extend(observe_fn())
+        success_count += 1
       except errors.VmUtil.IssueCommandTimeoutError:
         # Ignore timeouts - there'll be a gap in the data, but that's ok.
         pass
+      except errors.VmUtil.IssueCommandError as e:
+        # Ignore errors - there'll be a gap in the data, but that's ok.
+        logging.warning(
+            'Ignoring exception that occurred while observing cluster: %s', e)
+        failure_count += 1
 
       if self._stop.wait(timeout=1.0):
+        assert success_count / failure_count >= 0.90
         return
 
 
