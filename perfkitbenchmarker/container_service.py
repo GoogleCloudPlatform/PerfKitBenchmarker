@@ -930,11 +930,14 @@ class KubernetesClusterCommands:
       ) from e
 
   @staticmethod
-  def ApplyManifest(manifest_file: str, **kwargs) -> Iterator[str]:
+  def ApplyManifest(
+      manifest_file: str, should_log_file: bool = True, **kwargs
+  ) -> Iterator[str]:
     """Applies a declarative Kubernetes manifest; possibly with jinja.
 
     Args:
       manifest_file: The name of the YAML file or YAML template.
+      should_log_file: Whether to log the rendered manifest to stdout or not.
       **kwargs: Arguments to the jinja template.
 
     Returns:
@@ -962,6 +965,12 @@ class KubernetesClusterCommands:
       manifest = environment.from_string(template_file.read()).render(kwargs)
       rendered_template.write(manifest)
       rendered_template.close()
+      if should_log_file:
+        logging.info(
+            'Rendered manifest file %s with contents:\n%s',
+            rendered_template.name,
+            manifest,
+        )
       out, _, _ = RunKubectlCommand(['apply', '-f', rendered_template.name])
       return _ParseApplyOutput(out)
 
