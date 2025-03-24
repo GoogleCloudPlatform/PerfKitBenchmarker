@@ -108,6 +108,12 @@ SHARED_BUFFER_SIZE = flags.DEFINE_integer(
     10,
     'Size of the shared buffer in the postgresql cluster (in Gb).',
 )
+_MEASURE_MAX_QPS = flags.DEFINE_bool(
+    'postgresql_measure_max_qps',
+    True,
+    'Measure Max QPS of all the thread counts. Please set to'
+    " false if you don't want to measure max qps.",
+)
 
 
 def GetConfig(user_config):
@@ -259,6 +265,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   results = []
   # a map of transaction metric name (tps/qps) to current sample with max value
   max_transactions = {}
+  max_thread_qps = {}
   for thread_count in FLAGS.sysbench_run_threads:
     sysbench_parameters.threads = thread_count
     cmd = sysbench.BuildRunCommand(sysbench_parameters)
@@ -285,6 +292,28 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       current_max_sample = max_transactions.get(metric, None)
       if not current_max_sample or current_max_sample.value < metric_value:
         max_transactions[metric] = item
+    # store QPS at max threads
+    # current_transactions is an array of two samples, tps and qps.
+    if (
+        'thread_count' not in max_thread_qps
+        or max_thread_qps['thread_count'] < thread_count
+    ):
+      max_thread_qps['thread_count'] = thread_count
+      max_thread_qps['qps'] = current_transactions[1].value
+  # if we get max_qps at max thread_count, there is a possibility of a higher
+  # qps at increased thread count. if --postgresql_measure_max_qps is set to
+  # true, we want to make sure we achieve max QPS.
+  if (
+      _MEASURE_MAX_QPS.value
+      and 'qps' in max_thread_qps
+      and max_transactions.get('qps', sample.Sample('qps', 0, '', {})).value
+      == max_thread_qps['qps']
+  ):
+    raise errors.Benchmarks.RunError(
+        f'Max achieved at {max_thread_qps["thread_count"]} threads, possibility'
+        ' of not enough client load. Consider using'
+        ' --postgresql_measure_max_qps flag if you want to disable this check.'
+    )
   if not results:
     raise errors.Benchmarks.RunError(
         'None of the sysbench tests were successful.'
