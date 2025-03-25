@@ -54,7 +54,7 @@ def GetRegisteredClass(
         for (key, value) in registry.items()
         if key[0] == base_class.__name__
     }
-    logging.info(NO_SUBCLASS_DEFINED_ERROR, (base_class.__name__, kwargs))
+    logging.info(NO_SUBCLASS_DEFINED_ERROR, base_class.__name__, kwargs)
     logging.warning(
         'Did you mean one of these other classes that were registered for this '
         'base class? Possibilities: %s',
