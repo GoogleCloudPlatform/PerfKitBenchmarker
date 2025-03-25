@@ -215,6 +215,7 @@
 -   Add new vmstat trace.
 -   Add support for customizing Hadoop jobs scheduling
 -   Add support for GKE Autopilot & EKS Auto, which don't require nodepools.
+-   Add tutorial walking through an example GKE benchmark.
 
 ### Enhancements:
 
@@ -380,6 +381,7 @@
 -   Add support for multiload as part of Multichase benchmark.
 -   Add support for GPU and task count parameters as part of cloud run job
     resource.
+
 ### Bug fixes and maintenance updates:
 
 -   Add 'runcpu --update' and 'runcpu --version' commands to install phase.
