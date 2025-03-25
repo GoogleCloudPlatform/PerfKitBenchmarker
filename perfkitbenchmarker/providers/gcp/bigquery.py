@@ -417,11 +417,15 @@ class PythonClientInterface(GenericClientInterface):
 
     # Install dependencies for driver
     self.client_vm.Install('pip')
-    self.client_vm.RemoteCommand('sudo pip install google-cloud-bigquery')
     self.client_vm.RemoteCommand(
-        'sudo pip install google-cloud-bigquery-storage'
+        'sudo apt-get -qq update && DEBIAN_FRONTEND=noninteractive sudo apt-get'
+        ' -qq install python3.12-venv'
     )
-    self.client_vm.RemoteCommand('sudo pip install pyarrow')
+    self.client_vm.RemoteCommand('python3 -m venv .venv')
+    self.client_vm.RemoteCommand(
+        'source .venv/bin/activate && pip install google-cloud-bigquery'
+        ' google-cloud-bigquery-storage pyarrow'
+    )
 
     # Push driver script to client vm
     self.client_vm.PushDataFile(
@@ -433,7 +437,7 @@ class PythonClientInterface(GenericClientInterface):
   ) -> tuple[float, dict[str, Any]]:
     """Executes a query and returns performance details."""
     cmd = (
-        f'python3 {BQ_PYTHON_CLIENT_FILE} single --project'
+        f'.venv/bin/python {BQ_PYTHON_CLIENT_FILE} single --project'
         f' {self.project_id} --credentials_file {self.key_file_name} --dataset'
         f' {self.dataset_id} --query_file {query_name} --feature_config'
         f' {FLAGS.edw_bq_feature_config}'
