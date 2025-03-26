@@ -458,7 +458,7 @@ class PythonClientInterface(GenericClientInterface):
   ) -> str:
     """Executes queries simultaneously on client and return performance details."""
     cmd = (
-        f'python3 {BQ_PYTHON_CLIENT_FILE} throughput --project'
+        f'.venv/bin/python {BQ_PYTHON_CLIENT_FILE} throughput --project'
         f' {self.project_id} --credentials_file {self.key_file_name} --dataset'
         f" {self.dataset_id} --query_streams='{json.dumps(concurrency_streams)}'"
         f' --feature_config {FLAGS.edw_bq_feature_config} --labels'
@@ -470,7 +470,7 @@ class PythonClientInterface(GenericClientInterface):
   def RunQueryWithResults(self, query_name: str) -> str:
     """Executes a query and returns performance details and query output."""
     cmd = (
-        f'python3 {BQ_PYTHON_CLIENT_FILE} single --project'
+        f'.venv/bin/python {BQ_PYTHON_CLIENT_FILE} single --project'
         f' {self.project_id} --credentials_file {self.key_file_name} --dataset'
         f' {self.dataset_id} --query_file {query_name} --print_results'
     )
