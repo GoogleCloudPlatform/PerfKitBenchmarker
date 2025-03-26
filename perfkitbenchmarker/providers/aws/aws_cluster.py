@@ -86,12 +86,43 @@ class AWSCluster(cluster.BaseCluster):
         '--region',
         self.region,
     ])
+    resources_to_tag = []
     vpc_id = json.loads(stdout)['Vpcs'][0]['VpcId']
     self._vpc = aws_network.AwsVpc(self.region, vpc_id)
+    resources_to_tag.append(vpc_id)
     stdout, _, _ = vm_util.IssueCommand(['cat', subnet_config_path])
     subnet_ids = regex_util.ExtractAllMatches(r'(subnet-\w+)', stdout)
     self._headnode_subnet_id = subnet_ids[0]
     self._worker_subnet_id = subnet_ids[1]
+    resources_to_tag.extend(subnet_ids)
+    resources_to_tag.append(json.loads(vm_util.IssueCommand([
+        'aws',
+        'ec2',
+        'describe-internet-gateways',
+        '--filters',
+        f'Name=attachment.vpc-id,Values={vpc_id}',
+    ])[0])['InternetGateways'][0]['InternetGatewayId'])
+    route_tables = json.loads(vm_util.IssueCommand([
+        'aws',
+        'ec2',
+        'describe-route-tables',
+        '--filters',
+        f'Name=vpc-id,Values={vpc_id}',
+    ])[0])['RouteTables']
+    for table in route_tables:
+      if not table['Associations'][0]['Main']:
+        resources_to_tag.append(table['RouteTableId'])
+    nat = json.loads(vm_util.IssueCommand([
+        'aws',
+        'ec2',
+        'describe-nat-gateways',
+        '--filter',
+        f'Name=vpc-id,Values={vpc_id}',
+    ])[0])['NatGateways'][0]
+    resources_to_tag.append(nat['NatGatewayId'])
+    resources_to_tag.append(nat['NatGatewayAddresses'][0]['NetworkInterfaceId'])
+    for resource_to_tag in resources_to_tag:
+      util.AddDefaultTags(resource_to_tag, self.region)
     self._RenderClusterConfig()
 
   def _DeleteDependencies(self):

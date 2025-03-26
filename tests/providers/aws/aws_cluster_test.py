@@ -95,7 +95,65 @@ Scheduling:
     Networking:
       SubnetIds:
       - subnet-456
-         ''', None, None)
+         ''', None, None),
+        ('''{
+    "InternetGateways": [
+        {
+            "InternetGatewayId": "igw-123"
+        }
+    ]
+}
+''', None, None),  # Internet Gateway
+        ('''{
+    "RouteTables": [
+        {
+            "Associations": [
+                {
+                    "Main": false
+                }
+            ],
+            "RouteTableId": "rtb-123"
+        },
+        {
+            "Associations": [
+                {
+                    "Main": true
+                }
+            ],
+            "RouteTableId": "rtb-456"
+        },
+        {
+            "Associations": [
+                {
+                    "Main": false
+                }
+            ],
+            "RouteTableId": "rtb-789"
+        }
+    ]
+}''', None, None),  # Route Table
+        ('''{
+    "NatGateways": [
+        {
+            "NatGatewayAddresses": [
+                {
+                    "NetworkInterfaceId": "eni-123"
+                }
+            ],
+            "NatGatewayId": "nat-123"
+        }
+    ]
+}
+''', None, None),  # Nat Gateway,
+        # Mock tagging
+        ('', None, None),
+        ('', None, None),
+        ('', None, None),
+        ('', None, None),
+        ('', None, None),
+        ('', None, None),
+        ('', None, None),
+        ('', None, None),
     ]
     self.cluster._CreateDependencies()
     self.assertEqual(
