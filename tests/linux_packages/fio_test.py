@@ -249,6 +249,8 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
                       'p99.5': 847872,
                       'p99': 823296,
                       'p20': 440320,
+                      'p25': 440380,
+                      'p75': 450512,
                       'p99.99': 872448,
                       'p30': 444416,
                       'p50': 444416,
@@ -306,6 +308,12 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
               sequential_write_metadata,
           ],
           [
+              'sequential_write:write:latency:p25',
+              440380,
+              'usec',
+              sequential_write_metadata,
+          ],
+          [
               'sequential_write:write:latency:p30',
               444416,
               'usec',
@@ -332,6 +340,12 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
           [
               'sequential_write:write:latency:p70',
               448512,
+              'usec',
+              sequential_write_metadata,
+          ],
+          [
+              'sequential_write:write:latency:p75',
+              450512,
               'usec',
               sequential_write_metadata,
           ],
@@ -431,6 +445,8 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
                       'p30': 246784,
                       'p50': 264192,
                       'p40': 257024,
+                      'p25': 200680,
+                      'p75': 276480,
                   },
                   sequential_read_metadata,
               ),
@@ -484,6 +500,12 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
               sequential_read_metadata,
           ],
           [
+              'sequential_read:read:latency:p25',
+              200680,
+              'usec',
+              sequential_read_metadata,
+          ],
+          [
               'sequential_read:read:latency:p30',
               246784,
               'usec',
@@ -510,6 +532,12 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
           [
               'sequential_read:read:latency:p70',
               272384,
+              'usec',
+              sequential_read_metadata,
+          ],
+          [
+              'sequential_read:read:latency:p75',
+              276480,
               'usec',
               sequential_read_metadata,
           ],
@@ -609,6 +637,8 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
                       'p30': 494,
                       'p50': 510,
                       'p40': 502,
+                      'p25': 484,
+                      'p75': 536,
                   },
                   random_write_metadata,
               ),
@@ -662,6 +692,12 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
               random_write_metadata,
           ],
           [
+              'random_write_test:write:latency:p25',
+              484,
+              'usec',
+              random_write_metadata,
+          ],
+          [
               'random_write_test:write:latency:p30',
               494,
               'usec',
@@ -688,6 +724,12 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
           [
               'random_write_test:write:latency:p70',
               532,
+              'usec',
+              random_write_metadata,
+          ],
+          [
+              'random_write_test:write:latency:p75',
+              536,
               'usec',
               random_write_metadata,
           ],
@@ -787,6 +829,8 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
                       'p30': 3216,
                       'p50': 3280,
                       'p40': 3248,
+                      'p25': 3200,
+                      'p75': 3360,
                   },
                   random_read_metadata,
               ),
@@ -840,6 +884,12 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
               random_read_metadata,
           ],
           [
+              'random_read_test:read:latency:p25',
+              3200,
+              'usec',
+              random_read_metadata,
+          ],
+          [
               'random_read_test:read:latency:p30',
               3216,
               'usec',
@@ -866,6 +916,12 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
           [
               'random_read_test:read:latency:p70',
               3344,
+              'usec',
+              random_read_metadata,
+          ],
+          [
+              'random_read_test:read:latency:p75',
+              3360,
               'usec',
               random_read_metadata,
           ],
@@ -965,6 +1021,8 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
                       'p30': 197632,
                       'p50': 199680,
                       'p40': 197632,
+                      'p25': 194016,
+                      'p75': 203776,
                   },
                   random_read_parallel_metadata,
               ),
@@ -1018,6 +1076,12 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
               random_read_parallel_metadata,
           ],
           [
+              'random_read_test_parallel:read:latency:p25',
+              194016,
+              'usec',
+              random_read_parallel_metadata,
+          ],
+          [
               'random_read_test_parallel:read:latency:p30',
               197632,
               'usec',
@@ -1043,6 +1107,12 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
           ],
           [
               'random_read_test_parallel:read:latency:p70',
+              203776,
+              'usec',
+              random_read_parallel_metadata,
+          ],
+          [
+              'random_read_test_parallel:read:latency:p75',
               203776,
               'usec',
               random_read_parallel_metadata,

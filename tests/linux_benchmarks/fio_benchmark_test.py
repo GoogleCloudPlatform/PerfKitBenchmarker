@@ -47,6 +47,7 @@ filename=/test/filename
 do_verify=0
 verify_fatal=0
 group_reporting=1
+percentile_list=1:5:10:20:25:30:40:50:60:70:75:80:90:95:99:99.5:99.9:99.95:99.99
 randrepeat=0
 offset_increment=1k
 
@@ -97,6 +98,7 @@ filename=/test/filename
 do_verify=0
 verify_fatal=0
 group_reporting=1
+percentile_list=1:5:10:20:25:30:40:50:60:70:75:80:90:95:99:99.5:99.9:99.95:99.99
 
 [sequential_write-io-depth-1-num-jobs-1]
 stonewall
@@ -185,6 +187,7 @@ filename=/test/filename
 do_verify=0
 verify_fatal=0
 group_reporting=1
+percentile_list=1:5:10:20:25:30:40:50:60:70:75:80:90:95:99:99.5:99.9:99.95:99.99
 randrepeat=0
 
 [sequential_read-io-depth-1-num-jobs-1]
@@ -277,6 +280,7 @@ filename=/test/filename
 do_verify=0
 verify_fatal=0
 group_reporting=1
+percentile_list=1:5:10:20:25:30:40:50:60:70:75:80:90:95:99:99.5:99.9:99.95:99.99
 randrepeat=0
 
 [seq_64M_read_10TB-io-depth-1-num-jobs-1]
@@ -378,6 +382,7 @@ filename=/test/filename
 do_verify=0
 verify_fatal=0
 group_reporting=1
+percentile_list=1:5:10:20:25:30:40:50:60:70:75:80:90:95:99:99.5:99.9:99.95:99.99
 randrepeat=0
 
 [seq_64M_read_10TB-io-depth-1-num-jobs-1]
@@ -431,6 +436,7 @@ filename=/test/filename
 do_verify=0
 verify_fatal=0
 group_reporting=1
+percentile_list=1:5:10:20:25:30:40:50:60:70:75:80:90:95:99:99.5:99.9:99.95:99.99
 randrepeat=0
 
 [rand_8k_read_100%-io-depth-1-num-jobs-1.0]
@@ -502,6 +508,7 @@ filename=/test/filename
 do_verify=0
 verify_fatal=0
 group_reporting=1
+percentile_list=1:5:10:20:25:30:40:50:60:70:75:80:90:95:99:99.5:99.9:99.95:99.99
 randrepeat=0
 
 [rand_8k_read_100%-io-depth-1-num-jobs-1.0]
