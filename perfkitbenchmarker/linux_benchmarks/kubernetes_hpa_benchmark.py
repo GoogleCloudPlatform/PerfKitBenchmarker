@@ -232,17 +232,22 @@ class KubernetesMetricsCollector:
       try:
         self._samples.extend(observe_fn())
         success_count += 1
-      except errors.VmUtil.IssueCommandTimeoutError:
-        # Ignore timeouts - there'll be a gap in the data, but that's ok.
-        pass
-      except errors.VmUtil.IssueCommandError as e:
-        # Ignore errors - there'll be a gap in the data, but that's ok.
+      except (
+          errors.VmUtil.IssueCommandError,
+          errors.VmUtil.IssueCommandTimeoutError,
+      ) as e:
+        # Ignore errors, timeouts - there'll be a gap in the data, but that's
+        # ok.
         logging.warning(
             'Ignoring exception that occurred while observing cluster: %s', e)
         failure_count += 1
 
       if self._stop.wait(timeout=1.0):
-        assert success_count / failure_count >= 0.90
+        if success_count + failure_count == 0:
+          raise AssertionError(
+              'Unexpected: no successful OR unsuccessful attempts occurred?'
+          )
+        assert success_count / (success_count + failure_count) >= 0.90
         return
 
 
