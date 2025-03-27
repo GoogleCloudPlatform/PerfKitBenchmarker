@@ -34,6 +34,12 @@ SHARED_BUFFERS_CONF = {
         'max_memory': '150G',
         'nr_hugepages': '52736',
     },
+    'SIZE_80GB': {  # run with 40M table size and 8 tables to write 80GB of data
+        'shared_buffers': '80GB',
+        'effective_cache_size': '90GB',
+        'max_memory': '120G',
+        'nr_hugepages': '45000',
+    },
 }
 OS_DEPENDENT_DEFAULTS = {
     'centos': {
