@@ -60,7 +60,7 @@ flags.DEFINE_bool(
 )
 flag_util.DEFINE_integerlist(
     'netperf_num_streams',
-    flag_util.IntegerList([1]),
+    flag_util.IntegerList([1, 200]),
     'Number of netperf processes to run. Netperf '
     'will run once for each value in the list.',
     module_name=__name__,

@@ -75,6 +75,7 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     self.assertLessEqual(abs(stats['stddev'] - 1.538), 0.001)
 
   @flagsaver.flagsaver(netperf_benchmarks=netperf_benchmark.ALL_BENCHMARKS)
+  @flagsaver.flagsaver(netperf_num_streams=[1])
   def testExternalAndInternal(self):
     self._ConfigureIpTypes()
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
