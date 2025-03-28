@@ -15,6 +15,7 @@
 
 from collections.abc import Callable
 import functools
+import json
 import logging
 import threading
 import typing
@@ -59,6 +60,8 @@ kubernetes_hpa:
     locust_path: locust/rampup.py
 """
 
+_INGRESS_JSONPATH = '{.status.loadBalancer.ingress[0]}'
+
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   """Load and return benchmark config.
@@ -85,12 +88,13 @@ def _PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec):
       'container/kubernetes_hpa/fib.yaml.j2',
       fib_image=fib_image,
       runtime_class_name=FLAGS.kubernetes_hpa_runtime_class_name,
+      node_selector=cluster.GetJinjaNodeSelector(),
   )
 
   cluster.WaitForResource('deploy/fib', 'available', namespace='fib')
   cluster.WaitForResource(
       'service/fib',
-      '{.status.loadBalancer.ingress[0].ip}',
+      _INGRESS_JSONPATH,
       namespace='fib',
       condition_type='jsonpath=',
   )
@@ -119,19 +123,31 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
 
-def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
-  """Run a benchmark against the Nginx server."""
-
-  # Get the SUT address
+def _GetLoadBalancerURI() -> str:
+  """Returns the SUT Load Balancer URI."""
   stdout, _, _ = container_service.RunKubectlCommand([
       'get',
       '-n',
       'fib',
       'svc/fib',
       '-o',
-      "jsonpath='{.status.loadBalancer.ingress[0].ip}'",
+      f"jsonpath='{_INGRESS_JSONPATH}'",
   ])
-  addr = 'http://' + stdout.strip() + ':5000'
+  ingress = json.loads(stdout.strip("'"))
+  if 'ip' in ingress:
+    ip = ingress['ip']
+  elif 'hostname' in ingress:
+    ip = ingress['hostname']
+  else:
+    raise errors.Benchmarks.RunError(
+        'No IP or hostname found in ingress from stdout ' + stdout
+    )
+  return 'http://' + ip.strip() + ':5000'
+
+
+def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
+  """Run a benchmark against the Nginx server."""
+  addr = _GetLoadBalancerURI()
 
   vm = benchmark_spec.vms[0]
   cluster: container_service.KubernetesCluster = typing.cast(

@@ -32,6 +32,8 @@ spec:
             - containerPort: 5000
               name: "web"
               protocol: "TCP"
+      nodeSelector:
+        {{node_selector}}
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

@@ -2,6 +2,8 @@ import threading
 import time
 import unittest
 from unittest import mock
+from absl.testing import parameterized
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import kubernetes_hpa_benchmark
@@ -31,7 +33,7 @@ class KubernetesMetricsCollectorTest(pkb_common_test_case.PkbCommonTestCase):
         lambda timeout: sampler.get_samples_remaining() <= 0
     )
     self.kmc._Observe(sampler.get_sample)
-    self.assertEqual(len(self.samples), 99)
+    self.assertLen(self.samples, 99)
 
   def testObserve99PercentFailureRateIsFailure(self):
     sampler = Sampler(num_successes=1, num_failures=99)
@@ -72,6 +74,31 @@ def _sample() -> sample.Sample:
       metadata={},
       timestamp=time.time(),
   )
+
+
+class KubernetesHpaBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
+
+  @parameterized.named_parameters(
+      ('eks_auto', 'hostname', 'k8s-fib-fib-123.elb.us-east-1.amazonaws.com'),
+      ('gke', 'ip', '34.16.24.55'),
+  )
+  def testLoadBalancerUri(self, field_name, address):
+    self.enter_context(
+        mock.patch.object(
+            container_service,
+            'RunKubectlCommand',
+            return_value=(
+                # ex after f-string resolution: {"ip":"34.16.24.55"}
+                f'{{"{field_name}":"{address}"}}',
+                '',
+                0,
+            ),
+        )
+    )
+    self.assertEqual(
+        kubernetes_hpa_benchmark._GetLoadBalancerURI(),
+        f'http://{address}:5000',
+    )
 
 
 if __name__ == '__main__':
