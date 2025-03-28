@@ -102,7 +102,6 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
     result = (json.loads(stdout)['query_wall_time_in_secs'], details)
-    self._LogAndStripQueryResults(result)
     return result
 
   def ExecuteSimultaneous(

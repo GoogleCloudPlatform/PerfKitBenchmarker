@@ -18,7 +18,6 @@ import enum
 import functools
 import json
 import logging
-
 from typing import Any, Iterable
 
 from absl import flags
@@ -165,6 +164,7 @@ class EdwQueryPerformance:
 
 class EdwBaseIterationPerformance(abc.ABC):
   """Class that represents the performance of an iteration of edw queries."""
+
   id: str
 
   @abc.abstractmethod
@@ -261,6 +261,7 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
       EdwPerformanceAggregationError: If the query has already been added.
     """
     query_metadata = copy.copy(metadata)
+    self._log_and_strip_query_results(query_metadata)
     query_performance = EdwQueryPerformance(
         query_name=query_name, performance=performance, metadata=query_metadata
     )
@@ -274,6 +275,26 @@ class EdwPowerIterationPerformance(EdwBaseIterationPerformance):
     if query_performance.is_successful():
       self.successful_count += 1
     self.wall_time = self.wall_time + performance
+
+  def _log_and_strip_query_results(
+      self, metadata: dict[str, str | dict[Any, Any]]
+  ) -> None:
+    """Logs first 100 characters of query output, then removes from metadata.
+
+    Args:
+      metadata: A metadata dict with query detail fields resulting of a query
+        run via an EDW driver. If a key named 'output' exists in the dict, then
+        the first 100 characters of the associated value are printed, and the
+        key is deleted from the dict.
+    """
+    # Although normally only one of either 'output' or 'query_results' should be
+    # set, we want to err on the safe-side and remove both keys if they ever
+    # existed together and then log whichever.
+    output = metadata.pop('output', None)
+    query_results = metadata.pop('query_results', None)
+    stripped = output or query_results
+    if stripped:
+      logging.info('query results (first 100 chars): %s', str(stripped)[:100])
 
   def has_query_performance(self, query_name: str) -> bool:
     """Returns whether the query was run at least once in the iteration.

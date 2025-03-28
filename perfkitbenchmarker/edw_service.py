@@ -16,9 +16,8 @@
 Classes to wrap specific backend services are in the corresponding provider
 directory as a subclass of BaseEdwService.
 """
-import logging
 import os
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 
 from absl import flags
 from perfkitbenchmarker import resource
@@ -341,24 +340,6 @@ class EdwClientInterface:
   def GetMetadata(self) -> Dict[str, str]:
     """Returns the client interface metadata."""
     raise NotImplementedError
-
-  def _LogAndStripQueryResults(
-      self, query_results: tuple[float, dict[str, Union[str, dict[Any, Any]]]]
-  ) -> None:
-    """Logs first 100 characters of query output, then removes from metadata.
-
-    Args:
-      query_results: A tuple[float, dict[str, str]] representing the result of a
-        query run via an EDW driver. If a key named 'output' exists in the dict,
-        then the first 100 characters of the associated value are printed, and
-        the key is deleted from the dict.
-    """
-    if 'output' in query_results[1]:
-      logging.info(
-          'query results (first 100 chars): %s',
-          str(query_results[1]['output'])[:100],
-      )
-      del query_results[1]['output']
 
 
 class EdwService(resource.BaseResource):
