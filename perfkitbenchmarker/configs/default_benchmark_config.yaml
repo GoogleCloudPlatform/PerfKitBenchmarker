@@ -357,3 +357,13 @@ postgres_sysbench_tpcc:
     sysbench_tables: 10
     sysbench_scale: 100
     sysbench_use_fk: False
+
+gpu_jobs_provisioning:
+  name: jobs_benchmark
+  base_job:
+     job_type: 'GoogleCloudRunJob'
+     job_region: 'us-central1'
+     job_backend: '16Gi'
+     job_count: 1
+     job_gpu_count: 1
+     image_directory: 'serverless/echo_job'
