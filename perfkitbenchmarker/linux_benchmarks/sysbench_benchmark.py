@@ -316,6 +316,7 @@ def CreateMetadataFromFlags():
       'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
       'sysbench_report_interval': FLAGS.sysbench_report_interval,
+      'sysbench_rand_type': UNIFORM,
   }
   if FLAGS.sysbench_testname == SPANNER_TPCC:
     metadata['sysbench_use_fk'] = FLAGS.sysbench_use_fk
@@ -388,6 +389,7 @@ def _GetSysbenchPrepareCommand(
       ),
       ('--scale=%d' % FLAGS.sysbench_scale if _IsValidFlag('scale') else ''),
       '--threads=%d' % _LOAD_THREADS.value,
+      '--rand-type=%s' % UNIFORM,
   ]
 
   if _IsValidFlag('auto-inc'):
