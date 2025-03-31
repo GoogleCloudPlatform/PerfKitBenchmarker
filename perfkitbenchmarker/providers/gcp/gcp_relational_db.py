@@ -60,6 +60,8 @@ GCP_DATABASE_VERSION_MAPPING = {
         '13': 'POSTGRES_13',
         '14': 'POSTGRES_14',
         '15': 'POSTGRES_15',
+        '16': 'POSTGRES_16',
+        '17': 'POSTGRES_17',
     },
     sql_engine_utils.SQLSERVER: {
         '2017_Standard': 'SQLSERVER_2017_Standard',
