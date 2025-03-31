@@ -489,6 +489,11 @@ GCLUSTER_PATH = flags.DEFINE_string(
     # chmod 755, mv /usr/local/bin
     'The path for the gcluster (cluster-toolkit) utility.',
 )
+GKE_ENABLE_SHIELDED_NODES = flags.DEFINE_boolean(
+    'gke_enable_shielded_nodes',
+    False,
+    'Whether to enable shielded nodes.',
+)
 
 
 def _ValidatePreemptFlags(flags_dict):

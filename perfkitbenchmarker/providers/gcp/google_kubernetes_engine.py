@@ -312,7 +312,10 @@ class GkeCluster(BaseGkeCluster):
     if self.default_nodepool.network:
       cmd.flags['network'] = self.default_nodepool.network.network_resource.name
 
-    cmd.args.append('--no-enable-shielded-nodes')
+    if gcp_flags.GKE_ENABLE_SHIELDED_NODES.value:
+      cmd.args.append('--enable-shielded-nodes')
+    else:
+      cmd.args.append('--no-enable-shielded-nodes')
     if not self.release_channel:
       cmd.args.append('--no-enable-autoupgrade')
     self._AddNodeParamsToCmd(
