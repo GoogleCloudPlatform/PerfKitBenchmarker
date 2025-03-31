@@ -381,6 +381,8 @@
 -   Add support for multiload as part of Multichase benchmark.
 -   Add support for GPU and task count parameters as part of cloud run job
     resource.
+-   Explicitly pass --maintenance-policy=MIGRATE to gcloud when
+    --gce_migrate_on_maintenance is true (the default).
 
 ### Bug fixes and maintenance updates:
 

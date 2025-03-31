@@ -608,6 +608,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         or self.network.placement_group
     ):
       self.on_host_maintenance = 'TERMINATE'
+    else:
+      self.on_host_maintenance = 'MIGRATE'
+
     self.automatic_restart = FLAGS.gce_automatic_restart
     if self.preemptible:
       self.preempt_marker = f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/{self.name}'
