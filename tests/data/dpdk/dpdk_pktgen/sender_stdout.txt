@@ -1,0 +1,50 @@
+*** Copyright(c) <2010-2024>, Intel Corporation. All rights reserved.
+*** Pktgen  created by: Keith Wiles -- >>> Powered by <<<
+
+  Create: 'RX-L1/P0/S0     ' - Memory used (MBUFs  16384 x size   2176) =    34817 KB @ 0x17fefdf00
+  Create: 'TX-L1/P0/S0     ' - Memory used (MBUFs  16384 x size   2176) =    34817 KB @ 0x17d8f4c40
+  Create: 'SP-L1/P0/S0     ' - Memory used (MBUFs   1024 x size   2176) =     2177 KB @ 0x17b3ed980
+                                                      Total memory used =    71811 KB
+Initialize Port 0 ...
+   Allocate packet sequence array
+   Setup latency defaults
+   Setup fill pattern defaults
+   Configure device
+   Setup number of descriptors RX: 1024, TX: 2048
+           Updated descriptors RX: 1024, TX: 2048
+   Source MAC: 42:01:0a:dc:00:2b
+   Setup up Ptypes
+   Number of RX/TX queues 7/7
+   Setup port defaults
+   Start network device
+Initialize Port 0 sequence ...
+   Setup sequence defaults
+   Setting sequence defaults for port 0
+   Setup range defaults
+   Setup latency defaults
+   Setup clear stats
+   Setup random bits
+RX/TX lid   1, pid  0, qids  0/ 0 Mempool TX-L1/P0/S0      @ 0x17d8f4c40
+RX/TX lid   2, pid  0, qids  1/ 1 Mempool TX-L1/P0/S0      @ 0x17d8f4c40
+RX/TX lid   3, pid  0, qids  2/ 2 Mempool TX-L1/P0/S0      @ 0x17d8f4c40
+RX/TX lid   4, pid  0, qids  3/ 3 Mempool TX-L1/P0/S0      @ 0x17d8f4c40
+RX/TX lid   5, pid  0, qids  4/ 4 Mempool TX-L1/P0/S0      @ 0x17d8f4c40
+RX/TX lid   6, pid  0, qids  5/ 5 Mempool TX-L1/P0/S0      @ 0x17d8f4c40
+RX/TX lid   7, pid  0, qids  6/ 6 Mempool TX-L1/P0/S0      @ 0x17d8f4c40
+*** Logical core   8 has no work, skipping launch
+*** Logical core   9 has no work, skipping launch
+*** Logical core  10 has no work, skipping launch
+*** Logical core  11 has no work, skipping launch
+*** Logical core  12 has no work, skipping launch
+*** Logical core  13 has no work, skipping launch
+*** Logical core  14 has no work, skipping launch
+*** Logical core  15 has no work, skipping launch
+*** Logical core  16 has no work, skipping launch
+*** Logical core  17 has no work, skipping launch
+*** Logical core  18 has no work, skipping launch
+*** Logical core  19 has no work, skipping launch
+*** Logical core  20 has no work, skipping launch
+-<Main Page> Ports 0-0 of 1  Copyright(c) <2010-2024>, Intel CorporationPort:Flags            Link State            Pkts/s Rx                    Tx             MBits/s Rx/Tx         Total Rx Pkts               Tx Pkts               Rx/Tx MBs       Pkts/s Rx Max                Tx Max         Errors Rx/Tx          Broadcast             Multicast             Sizes 64                    65-127                128-255               256-511               512-1023              1024-1518       Runts/Jumbos          ARP/ICMP Pkts         Tx Count/% Rate       Pkt Size/Rx:Tx Burst  Port Src/Dest         Type:VLAN ID:Flags    IP  Destination           Source            MAC Destination           Source            NUMA/Vend:ID/PCI      ------------------------------------------------------------------------------- Pktgen 24.10.3  Powered by DPDK 24.11.0 (pid:67547) ::::::::::::::::::::::::::::::           Forever /100%             64 / 64: 32              1234/ 5678    IPv4 / TCP:0001:0010             192.168.1.1          192.168.0.1/24       00:00:00:00:00:00       42:01:0a:dc:00:2b -1/1ae0:42/0000:00:04.0        ---Total Rate---   0:-------      Single       <UP-935134639-FD>                       0                       0                     0/0                       0                       0                     0/0                       0                       0                     0/0                       0                       0                       0                       0                       0                       0                       0                       0                     0/0                     0/0                       0                       0                     0/0                       0                       0
+Executing 'pktgen.pkt'
+\<Main Page> Ports 0-0 of 1  Copyright(c) <2010-2024>, Intel CorporationPort:Flags            Link State            Pkts/s Rx                    Tx             MBits/s Rx/Tx         Total Rx Pkts               Tx Pkts               Rx/Tx MBs       Pkts/s Rx Max                Tx Max         Errors Rx/Tx          Broadcast             Multicast             Sizes 64                    65-127                128-255               256-511               512-1023              1024-1518       Runts/Jumbos          ARP/ICMP Pkts         Tx Count/% Rate       Pkt Size/Rx:Tx Burst  Port Src/Dest         Type:VLAN ID:Flags    IP  Destination           Source            MAC Destination           Source            NUMA/Vend:ID/PCI      ------------------------------------------------------------------------------- Pktgen 24.10.3  Powered by DPDK 24.11.0 (pid:67547) ::::::::::::::::::::::::::::::   Forever /0.000984367%             64 /  1:  1              1234/ 5678    IPv4 / TCP:0001:0010             192.168.1.1          192.168.0.1/24       00:00:00:00:00:00       42:01:0a:dc:00:2b -1/1ae0:42/0000:00:04.0        ---Total Rate---   0:-------       Range       <UP-935134639-FD>                       0                       0                     0/0                      11               670441705                0/450536                       1                 8099686                     0/0                     176                       0                       0                       0                       0                       0                       0                       0                   176/0                   176/0                       0                       0                     0/0                       0                       0
+** Version: DPDK 24.11.0, Command Line Interface

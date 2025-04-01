@@ -216,6 +216,7 @@
 -   Add support for customizing Hadoop jobs scheduling
 -   Add support for GKE Autopilot & EKS Auto, which don't require nodepools.
 -   Add tutorial walking through an example GKE benchmark.
+-   Add dpdk_pktgen_benchmark, a more feature-rich DPDK benchmark than dpdk_testpmd_benchmark.
 
 ### Enhancements:
 

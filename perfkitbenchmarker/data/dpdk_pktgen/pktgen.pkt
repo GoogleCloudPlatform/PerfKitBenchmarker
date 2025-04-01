@@ -1,0 +1,12 @@
+set all txburst 1
+set all rxburst 1
+set all rate <RATE>
+enable all range
+range all src ip <SRC_IP> <SRC_IP> <SRC_IP> 0.0.0.1
+range all dst ip <DST_IP> <DST_IP> <DST_IP> 0.0.0.1
+clr
+start all
+sleep <DURATION>
+stop all
+sleep 5
+exit

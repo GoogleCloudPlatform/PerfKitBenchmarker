@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for dpdk_benchmark."""
+"""Tests stdout parsing for dpdk_testpmd_benchmark."""
 
 import os
 import unittest
@@ -20,7 +20,7 @@ from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_benchmarks import dpdk_benchmark
+from perfkitbenchmarker.linux_benchmarks import dpdk_testpmd_benchmark
 
 FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
@@ -44,7 +44,9 @@ METADATA = {
 
 
 def _load_data(filename):
-  path = os.path.join(os.path.dirname(__file__), '..', 'data', 'dpdk', filename)
+  path = os.path.join(
+      os.path.dirname(__file__), '..', 'data', 'dpdk', 'dpdk_testpmd', filename
+  )
   with open(path) as fp:
     data = fp.read().strip('\n')
   return data
@@ -104,7 +106,7 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
         'RX-packets: 60  RX-dropped: 0  ',
         '',
     )
-    _ = dpdk_benchmark.Run(self.bm_spec)
+    _ = dpdk_testpmd_benchmark.Run(self.bm_spec)
     self.bm_spec.vms[0].RobustRemoteCommand.assert_called_with(
         self.expected_client_cmd, ignore_failure=True
     )
@@ -121,7 +123,7 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
         self.server_stdout,
         '',
     )
-    output_samples = dpdk_benchmark.Run(self.bm_spec)
+    output_samples = dpdk_testpmd_benchmark.Run(self.bm_spec)
 
     # Compare each element except timestamp for each sample
     self.assertEqual(len(output_samples), len(self.expected_output_samples))

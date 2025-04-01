@@ -1477,6 +1477,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       retries: int | None = None,
       ignore_failure: bool = False,
       login_shell: bool = False,
+      disable_tty_lock: bool = False,
       timeout: float | None = None,
       ip_address: str | None = None,
       should_pre_log: bool = True,
@@ -1494,6 +1495,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
         the flag ssh_retries.
       ignore_failure: Ignore any failure if set to true.
       login_shell: Run command in a login shell.
+      disable_tty_lock: Disables TTY lock. Multiple commands will try to take
+      control of the terminal.
       timeout: The timeout for IssueCommand.
       ip_address: The ip address to use to connect to host.  If None, uses
         self.GetConnectionIp()
@@ -1545,7 +1548,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     try:
       if login_shell:
         ssh_cmd.extend(['-t', '-t', 'bash -l -c "%s"' % command])
-        self._pseudo_tty_lock.acquire()
+        if not disable_tty_lock:
+          self._pseudo_tty_lock.acquire()
       else:
         ssh_cmd.append(command)
 
@@ -1561,7 +1565,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
         if retcode != RETRYABLE_SSH_RETCODE:
           break
     finally:
-      if login_shell:
+      if login_shell and not disable_tty_lock:
         self._pseudo_tty_lock.release()
 
     if retcode:

@@ -11,9 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Runs DPDK Benchmarks for high-performance networking.
+"""Runs DPDK Testpmd benchmarks for high-performance networking.
 
-DPDK Benchmark currently contains dpdk-testpmd (Poll-Mode Driver), which
+DPDK Testpmd Benchmark currently contains dpdk-testpmd (Poll-Mode Driver), which
 measures packets-per-second (PPS) using DPDK. DPDK bypasses the kernel
 networking stack, allowing for much higher PPS.
 
@@ -34,10 +34,10 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import dpdk
 
 
-BENCHMARK_NAME = 'dpdk'
+BENCHMARK_NAME = 'dpdk_testpmd'
 BENCHMARK_CONFIG = """
-dpdk:
-  description: Runs dpdk benchmarks
+dpdk_testpmd:
+  description: Runs dpdk testpmd benchmarks
   vm_groups:
     vm_1:
       vm_spec: *default_single_core
@@ -54,9 +54,6 @@ dpdk:
 
 FLAGS = flags.FLAGS
 
-_DPDK_BENCHMARKS = flags.DEFINE_list(
-    'dpdk_benchmarks', ['dpdk-testpmd'], 'The dpdk benchmark(s) to run.'
-)
 _DPDK_TEST_LENGTH = flags.DEFINE_integer(
     'dpdk_test_length',
     60,
