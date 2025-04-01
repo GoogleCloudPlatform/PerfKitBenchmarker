@@ -62,6 +62,12 @@ _DPDK_PKTGEN_PACKET_LOSS_THRESHOLDS = flags.DEFINE_multi_float(
     'Packet loss thresholds to record samples for.',
     lower_bound=0,
 )
+_DPDK_PKTGEN_NUM_FLOWS = flags.DEFINE_integer(
+    'dpdk_pktgen_num_flows',
+    1,
+    'Number of flows to use by taking a range of source ports.',
+    lower_bound=0,
+)
 
 # DPDK Pktgen maximum logical cores
 _MAX_LCORES = 128
@@ -138,8 +144,20 @@ def PrepareVM(
       f'sudo sed -i "s/<SRC_IP>/{sender_vm_ip}/g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
+  # Updating src port numbers for multiple flows.
+  vm.RemoteCommand(
+      'sudo sed -i "s/1234 1234 1234 0/1234 1234'
+      f' {1233+_DPDK_PKTGEN_NUM_FLOWS.value} 1/g"'
+      f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+  )
   vm.RemoteCommand(
       f'sudo sed -i "s/<DST_IP>/{receiver_vm_ip}/g"'
+      f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+  )
+  # Updating dst port numbers for multiple flows.
+  vm.RemoteCommand(
+      'sudo sed -i "s/5678 5678 5678 0/5678 5678'
+      f' {5677+_DPDK_PKTGEN_NUM_FLOWS.value} 1/g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
 
@@ -161,7 +179,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   num_lcores = min(sender_vm.NumCpusForBenchmark(), _MAX_LCORES)
   num_memory_channels_stdout, _ = sender_vm.RemoteCommand(
-      "sudo dmidecode --type memory | grep -c 'Size:'"
+      "lscpu | grep 'NUMA node(s)' | awk '{print $3}'"
   )
   num_memory_channels = int(num_memory_channels_stdout)
   metadata = {
@@ -169,6 +187,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       'dpdk_pktgen_lcores': num_lcores,
       'dpdk_pktgen_num_memory_channels': num_memory_channels,
       'dpdk_pktgen_duration': _DPDK_PKTGEN_DURATION.value,
+      'dpdk_pktgen_num_flows': _DPDK_PKTGEN_NUM_FLOWS.value,
   }
   cmd = (
       f'cd {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR} && sudo'

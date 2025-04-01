@@ -39,6 +39,7 @@ METADATA = {
     'dpdk_pktgen_num_memory_channels': 6,
     'dpdk_pktgen_duration': 60,
     'dpdk_pktgen_packet_loss_threshold': 0.01,
+    'dpdk_pktgen_num_flows': 1,
 }
 
 

@@ -17,7 +17,7 @@
 
 DPDK_PKTGEN_GIT_REPO = 'https://github.com/pktgen/Pktgen-DPDK'
 DPDK_PKTGEN_GIT_REPO_DIR = 'Pktgen-DPDK'
-DPDK_PKTGEN_GIT_REPO_TAG = 'pktgen-24.10.3'
+DPDK_PKTGEN_GIT_REPO_TAG = '0e3a9c50daedccc7a83597f187d96288264edac0'
 
 
 def _Install(vm):
