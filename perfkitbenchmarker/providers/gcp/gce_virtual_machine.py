@@ -606,6 +606,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         not FLAGS.gce_migrate_on_maintenance
         or self.gpu_count
         or self.network.placement_group
+        or self.preemptible
     ):
       self.on_host_maintenance = 'TERMINATE'
     else:
