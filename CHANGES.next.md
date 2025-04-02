@@ -547,3 +547,5 @@
 -   Update AWS and Azure default disks to gp3 and PremiumV2_LRS respectively.
 -   When `--ycsb_commit` is set, YCSB at the given commit can be pulled into
     `YCSB_DIR` even if the directory already exists.
+-   Retry transient SCP command failures in `linux_virtual_machine.py`
+    controlled by the `--ssh_retries` flag.

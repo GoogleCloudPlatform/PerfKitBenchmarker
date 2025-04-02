@@ -166,7 +166,10 @@ flags.DEFINE_bool(
 )
 
 flags.DEFINE_integer(
-    'ssh_retries', 10, 'Default number of times to retry SSH.', lower_bound=0
+    'ssh_retries',
+    10,
+    'Default number of times to retry transient failures on SSH/SCP commands.',
+    lower_bound=1,
 )
 
 flags.DEFINE_integer(
@@ -1352,10 +1355,10 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     remote_ip = '[%s]' % self.GetConnectionIp()
     remote_location = '%s@%s:%s' % (self.user_name, remote_ip, remote_path)
     scp_cmd = ['scp', '-P', str(self.ssh_port), '-pr']
-    # An scp is not retried, so increase the connection timeout.
     ssh_private_key = (
         self.ssh_private_key if self.is_static else vm_util.GetPrivateKeyPath()
     )
+    # Allow increasing the connection timeout since it can be useful.
     scp_cmd.extend(
         vm_util.GetSshOptions(
             ssh_private_key, connect_timeout=FLAGS.scp_connect_timeout
@@ -1373,9 +1376,28 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     logging.info(
         'Copying file with simplified command: %s', ' '.join(simplified_cmd)
     )
-    stdout, stderr, retcode = vm_util.IssueCommand(
-        scp_cmd, timeout=None, should_pre_log=False, raise_on_failure=False
-    )
+
+    stdout, stderr, retcode = '', '', 1  # placate uninitialized variable checks
+    for _ in range(FLAGS.ssh_retries):
+      stdout, stderr, retcode = vm_util.IssueCommand(
+          scp_cmd, timeout=None, should_pre_log=False, raise_on_failure=False
+      )
+
+      # Retry on 255 because this indicates an SSH failure
+      if retcode != RETRYABLE_SSH_RETCODE:
+        break
+
+      # Recursive scp is generally not idempotent so retrying is not perfectly
+      # safe. However, if the copy target (ie. remote_path if copy_to is True)
+      # does not include a matching dirname as the source, then the scp _is_
+      # idempotent. Callers should try to set the copy target accordingly to
+      # avoid this pitfall.
+      #
+      # For example, `scp -r /tmp/foo_dir perfkit@host:some_dir/foo_dir` is NOT
+      # idempotent but `scp -r /tmp/foo_dir perfkit@host:some_dir` is.
+      #
+      # See:
+      # https://www.tsmean.com/articles/command-line-tools/scp-and-idempotency/
 
     if retcode:
       full_cmd = ' '.join(scp_cmd)
@@ -1545,6 +1567,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
           command,
           stacklevel=stack_level,
       )
+    stdout, stderr, retcode = '', '', 1  # placate uninitialized variable checks
     try:
       if login_shell:
         ssh_cmd.extend(['-t', '-t', 'bash -l -c "%s"' % command])
