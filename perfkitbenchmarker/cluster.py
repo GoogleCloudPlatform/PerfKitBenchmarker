@@ -42,6 +42,12 @@ UNMANAGED = flags.DEFINE_boolean(
     'Instead of creating with cluster toolset, relying on cloud provider CLI.'
     ' e.g. gcloud for gcp, awscli for aws.'
 )
+TYPE = flags.DEFINE_string(
+    'cluster_type',
+    'default',
+    'Type of cluster to use. Chances are clusters vary quite differently and '
+    'may as well use its own template.'
+)
 
 
 class BaseClusterSpec(spec.BaseSpec):
@@ -127,7 +133,9 @@ def GetClusterSpecClass(cloud: str):
 
 def GetClusterClass(cloud: str):
   """Returns the cluster spec class corresponding to the given service."""
-  return resource.GetResourceClass(BaseCluster, CLOUD=cloud)
+  if UNMANAGED.value:
+    return BaseCluster
+  return resource.GetResourceClass(BaseCluster, CLOUD=cloud, TYPE=TYPE.value)
 
 
 class BaseCluster(resource.BaseResource):
@@ -144,7 +152,8 @@ class BaseCluster(resource.BaseResource):
   """
 
   RESOURCE_TYPE = 'BaseCluster'
-  REQUIRED_ATTRS = ['CLOUD']
+  TYPE = 'default'
+  REQUIRED_ATTRS = ['CLOUD', 'TYPE']
   DEFAULT_TEMPLATE = ''
 
   def __init__(self, cluster_spec: BaseClusterSpec):
@@ -331,6 +340,12 @@ class BaseCluster(resource.BaseResource):
     self.headnode_vm = headnode
     self.worker_vms = workers
     self.vms = [self.headnode_vm] + self.worker_vms
+
+  def _Create(self):
+    pass
+
+  def _Delete(self):
+    pass
 
   def Create(self):
     if self.unmanaged:

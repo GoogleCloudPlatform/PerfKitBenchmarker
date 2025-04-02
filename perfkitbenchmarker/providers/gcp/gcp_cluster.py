@@ -82,6 +82,10 @@ class GceCluster(cluster.BaseCluster):
       template = jinja2.Template(
           content.read(), undefined=jinja2.StrictUndefined
       )
+      # Disable SMT when possible (default in cluster toolkit)
+      threads_per_core = 0
+      if FLAGS['disable_smt'].present:
+        threads_per_core = 1 if FLAGS.disable_smt else 2
       self._config = template.render(
           name=self.name,
           zone=self.zone,
@@ -97,7 +101,7 @@ class GceCluster(cluster.BaseCluster):
           compute_tags=compute_tags,
           controller_tags=controller_tags,
           enabe_spot_vm=FLAGS.gce_preemptible_vms,
-          enable_smt=not FLAGS.disable_smt,
+          threads_per_core=threads_per_core,
       )
 
   def _Create(self):
@@ -111,6 +115,8 @@ class GceCluster(cluster.BaseCluster):
         '--force',
         '--auto-approve',
         f'--out={vm_util.GetTempDir()}',
+        '-l',
+        'IGNORE'
     ])
 
   def _PostCreate(self):
@@ -140,11 +146,12 @@ class GceCluster(cluster.BaseCluster):
               _UpdateWorker,
           )
       )
+    # The workers may provision as we issue this command for the first time.
     self.RemoteCommand(
         'sudo sed -i '
         '"s/PermitRootLogin no/PermitRootLogin yes/g" '
         '/etc/ssh/sshd_config',
-        timeout=120,
+        timeout=600,
     )
     self.RemoteCommand('sudo service sshd restart', timeout=120)
     self.headnode_vm.RemoteCommand(f'sudo chmod -R 755 {self.nfs_path}')
@@ -188,3 +195,27 @@ class GceCluster(cluster.BaseCluster):
       )
       vm.RemoteCommand('chmod 600 ~/.ssh/config')
       vm.has_private_key: bool = True
+
+
+class H4dCluster(GceCluster):
+  """Class representing a H4D cluster."""
+
+  DEFAULT_TEMPLATE = 'cluster/h4d.yaml.j2'
+  TYPE = 'h4d'
+
+  def _PostCreate(self):
+    super()._PostCreate()
+
+    def _InstallRdma(vm):
+      vm.RemoteCommand(
+          'wget https://raw.githubusercontent.com/GoogleCloudPlatform/'
+          'cluster-toolkit/refs/heads/main/modules/scripts/startup-script/'
+          'files/install_cloud_rdma_drivers.sh'
+      )
+      vm.RemoteHostCopy(
+          data.ResourcePath('cluster/set_ofi_cloud_rdma_tunables.sh'),
+          '/etc/profile.d/set_ofi_cloud_rdma_tunables.sh'
+      )
+      vm.RemoteCommand('bash install_cloud_rdma_drivers.sh')
+
+    background_tasks.RunThreaded(_InstallRdma, self.worker_vms)
