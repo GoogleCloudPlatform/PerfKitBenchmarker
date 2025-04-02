@@ -32,6 +32,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import regex_util
+from perfkitbenchmarker import vm_util
 import requests
 
 FLAGS = flags.FLAGS
@@ -166,7 +167,9 @@ def CheckPrerequisites():
     data.ResourcePath(resource)
 
 
+@vm_util.Retry(poll_interval=10)
 def _Install(vm):
+  """Installs Hadoop on the VM."""
   # Not all benhmarks know they are installing Hadooop so re-validate here.
   CheckPrerequisites()
   vm.Install('openjdk')
@@ -175,7 +178,7 @@ def _Install(vm):
 
   vm.RemoteCommand(
       (
-          'mkdir {0} && curl -L {1} | tar -C {0} --strip-components=1 -xzf -'
+          'mkdir -p {0} && curl -L {1} | tar -C {0} --strip-components=1 -xzf -'
       ).format(HADOOP_DIR, hadoop_url)
   )
 
