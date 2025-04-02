@@ -22,13 +22,17 @@ parameter values. Each file is accessed in a separate map task.
 """
 
 import copy
+import functools
 import logging
 import time
 from typing import List
 from absl import flags
+from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import hadoop
@@ -83,6 +87,10 @@ flags.DEFINE_integer(
     'Time to wait in seconds before reading the files.',
 )
 
+_READAHEAD_KB = flags.DEFINE_integer(
+    'dfsio_readahead_kb', None, 'Configure block device readahead settings.'
+)
+
 FLAGS = flags.FLAGS
 
 SUPPORTED_DPB_BACKENDS = [
@@ -120,8 +128,20 @@ def CheckPrerequisites(benchmark_config):
     )
 
 
-def Prepare(benchmark_spec):
-  del benchmark_spec  # unused
+def _PrepareNode(vm: linux_virtual_machine.BaseLinuxVirtualMachine) -> None:
+  if _READAHEAD_KB.value is not None:
+    vm.SetReadAhead(
+        _READAHEAD_KB.value * 2,
+        [d.GetDevicePath() for d in vm.scratch_disks],
+    )
+
+
+def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
+  nodes = benchmark_spec.dpb_service.vms['worker_group']
+  partials = [
+      functools.partial(_PrepareNode, node) for node in nodes
+  ]
+  background_tasks.RunThreaded((lambda f: f()), partials)
 
 
 def ParseResults(command: str, stdout: str) -> List[sample.Sample]:
