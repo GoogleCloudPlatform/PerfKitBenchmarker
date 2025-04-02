@@ -183,7 +183,7 @@ flags.DEFINE_integer(
 )
 flags.DEFINE_string(
     'multiload_buffer_size',
-    '2g',
+    '512M',
     'Multiload -m parameter',
 )
 flags.DEFINE_integer(
@@ -373,7 +373,7 @@ def Run(benchmark_spec):
             benchmark_spec,
             None,
             50,
-            '2g',
+            '512M',
             0,
             'stream-triad-nontemporal-injection-delay',
         )
