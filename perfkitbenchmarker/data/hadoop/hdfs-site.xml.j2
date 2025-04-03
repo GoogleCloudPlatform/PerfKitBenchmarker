@@ -10,6 +10,12 @@
     <name>dfs.blocksize</name>
     <value>{{ block_size }}</value>
   </property>
+  {% if client_readahead is defined %}
+  <property>
+    <name>dfs.client.cache.readahead</name>
+    <value>{{ client_readahead }}</value>
+  </property>
+  {% endif %}
   {% if dfs_data_paths %}
   <property>
     <name>dfs.datanode.data.dir</name>

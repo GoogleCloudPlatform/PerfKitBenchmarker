@@ -49,6 +49,13 @@ _BLOCKSIZE_OVERRIDE = flags.DEFINE_integer(
     'This is the chunksize in which the HDFS file will be divided into.',
 )
 
+_CLIENT_READAHEAD_OVERRIDE = flags.DEFINE_integer(
+    'hadoop_hdfs_client_readahead',
+    None,
+    'Client readahead in KiB to be used by the HDFS filesystem. '
+    'This is the readahead size in KiB for the HDFS client.',
+)
+
 _DFS_REPLICATION_OVERRIDE = flags.DEFINE_integer(
     'hadoop_hdfs_replication',
     None,
@@ -298,6 +305,7 @@ def _RenderConfig(
       'hadoop_namenode_opts': _HADOOP_NAMENODE_OPTS.value,
       'dfs_replication': _DFS_REPLICATION_OVERRIDE.value,
       'yarn_scheduler': _YARN_SCHEDULER.value,
+      'client_readahead': _CLIENT_READAHEAD_OVERRIDE.value,
   }
 
   for file_name in DATA_FILES:
