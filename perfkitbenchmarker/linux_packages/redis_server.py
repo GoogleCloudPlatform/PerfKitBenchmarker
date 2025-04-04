@@ -93,7 +93,7 @@ REDIS_AOF = flags.DEFINE_bool(
 DEFAULT_PORT = 6379
 REDIS_PID_FILE = 'redis.pid'
 FLAGS = flags.FLAGS
-REDIS_GIT = 'https://github.com/antirez/redis.git'
+REDIS_GIT = 'https://github.com/redis/redis.git'
 REDIS_BACKUP = 'scratch'
 CURRENT_IO_THREADS = None
 
