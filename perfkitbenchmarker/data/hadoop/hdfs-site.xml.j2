@@ -10,7 +10,7 @@
     <name>dfs.blocksize</name>
     <value>{{ block_size }}</value>
   </property>
-  {% if client_readahead is defined %}
+  {% if client_readahead is not none %}
   <property>
     <name>dfs.client.cache.readahead</name>
     <value>{{ client_readahead }}</value>
