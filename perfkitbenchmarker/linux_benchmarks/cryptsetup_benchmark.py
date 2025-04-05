@@ -58,8 +58,17 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   vm = benchmark_spec.vms[0]
   # TODO(user): Implement me
   samples = []
-  stdout, _ = vm.RemoteCommand('cryptsetup benchmark --help')
+  stdout, _ = vm.RemoteCommand('cryptsetup benchmark')
   logging.info('Benchmark output: %s', stdout)
+  line = stdout.splitlines()
+  line = line[1:5]
+  for line in stdout:
+      list = line.split()
+      metric = list[0] 
+      iteration = list[1]
+      unit = ''.join(list[2:4])
+      metadata = list[6]
+      samples.append(Sample(metric, iteration, unit, metadata))
   return samples
 
 
