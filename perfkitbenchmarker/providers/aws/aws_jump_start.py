@@ -206,6 +206,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.vm.RunCommand('pip install sagemaker')
     self.vm.RunCommand('pip install absl-py')
     self.python_script = self.vm.PrepareResourcePath(AWS_RUNNER_SCRIPT)
+    super()._CreateDependencies()
 
   def _Delete(self) -> None:
     """Deletes the underlying resource."""

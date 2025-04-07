@@ -333,8 +333,8 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.MockRunCommand(
         {
             '': [(
-                'ENDPOINT_ID          DISPLAY_NAME\n',
                 '',
+                'Listed 0 items',
                 0,
             )]
         },

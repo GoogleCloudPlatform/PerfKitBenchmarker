@@ -174,6 +174,8 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
         f'gcloud ai endpoints list --region={region} --project={self.project}'
     )
     lines = out.splitlines()
+    if not lines:
+      return []
     ids = [line.split()[0] for line in lines]
     ids.pop(0)  # Remove the first line which just has titles
     return ids
@@ -383,6 +385,15 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       )
 
   def _CreateDependencies(self):
+    """Creates the endpoint & copies the model to a bucket."""
+    if gcp_flags.AI_USE_SDK.value:
+      aiplatform.init(
+          project=self.project,
+          location=self.region,
+          staging_bucket=self.staging_bucket,
+          service_account=self.service_account,
+      )
+    super()._CreateDependencies()
     if self.gcs_client:
       gcs_bucket_copy_start_time = time.time()
       self.gcs_client.MakeBucket(
@@ -396,13 +407,6 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       )  # pytype: disable=attribute-error
       self.gcs_bucket_copy_time = time.time() - gcs_bucket_copy_start_time
 
-    if gcp_flags.AI_USE_SDK.value:
-      aiplatform.init(
-          project=self.project,
-          location=self.region,
-          staging_bucket=self.staging_bucket,
-          service_account=self.service_account,
-      )
     self.endpoint.Create()
 
   def Delete(self, freeze: bool = False) -> None:

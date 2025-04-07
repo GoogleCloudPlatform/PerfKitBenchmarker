@@ -22,7 +22,7 @@ class FakeManagedAiModel(managed_ai_model.BaseManagedAiModel):
     super().__init__(
         model_spec=self.model_spec,
         vm=mock.create_autospec(virtual_machine.BaseVirtualMachine),
-        **kwargs
+        **kwargs,
     )
     self.existing_endpoints: list[str] = ['one-endpoint']
     self.zone = 'us-central1-a'
@@ -50,4 +50,6 @@ class FakeManagedAiModel(managed_ai_model.BaseManagedAiModel):
     pass
 
   def _InitializeNewModel(self) -> managed_ai_model.BaseManagedAiModel:
-    return FakeManagedAiModel()
+    new_model = FakeManagedAiModel()
+    new_model.existing_endpoints = self.existing_endpoints
+    return new_model

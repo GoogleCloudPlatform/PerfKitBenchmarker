@@ -46,6 +46,12 @@ _CREATE_SECOND_MODEL = flags.DEFINE_boolean(
     'Whether to create & benchmark a second model in addition to the first.',
 )
 
+_VALIDATE_EXISTING_MODELS = flags.DEFINE_boolean(
+    'validate_existing_models',
+    True,
+    'Whether to fail the benchmark if there are other models in the region.',
+)
+
 
 def GetConfig(user_config: dict[Any, Any]) -> dict[Any, Any]:
   """Load and return benchmark config.
@@ -60,24 +66,26 @@ def GetConfig(user_config: dict[Any, Any]) -> dict[Any, Any]:
 
 
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
-  model1 = benchmark_spec.ai_model
-  assert model1
-  _ValidateExistingModels(model1, 0)
   del benchmark_spec
 
 
 def _ValidateExistingModels(
     ai_model: managed_ai_model.BaseManagedAiModel, expected_count: int
-):
+) -> int:
   """Validates that no other models are running in the region."""
   endpoints = ai_model.ListExistingEndpoints()
-  # Note this code runs after Create, so we should have one.
   # The presence of other models in a region changes startup performance.
   if len(endpoints) != expected_count:
-    raise errors.Benchmarks.KnownIntermittentError(
+    message = (
         f'Expected {expected_count} model(s) but found all these models:'
-        f' {endpoints}'
+        f' {endpoints}.'
     )
+    if _VALIDATE_EXISTING_MODELS.value:
+      raise errors.Benchmarks.KnownIntermittentError(message)
+    else:
+      message += ' Continuing benchmark as validate_existing_models is False.'
+      logging.warning(message)
+  return len(endpoints)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
@@ -93,16 +101,22 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   logging.info('Running Run phase & gathering response times for model 1')
   model1 = benchmark_spec.ai_model
   assert model1
-  _ValidateExistingModels(model1, 1)
-  model1.metadata.update({'First Model': True})
+  num_endpoints = _ValidateExistingModels(model1, 1)
   SendPromptsForModel(model1)
 
   if not _CREATE_SECOND_MODEL.value:
-    logging.info('Only benchmarking one model; returning')
+    logging.info('Only benchmarking one model by flag; returning')
     return []
+  if num_endpoints != 1:
+    logging.warning(
+        'Not creating a second model as there were already other models in the'
+        ' region before the first one this benchmark created. Ending benchmark'
+        ' with only one set of results.'
+    )
+    return []
+
   logging.info('Creating model 2 & gathering response times')
   model2 = model1.InitializeNewModel()
-  model2.metadata.update({'First Model': False})
   model2.Create()
   benchmark_spec.resources.append(model2)
   SendPromptsForModel(model2)

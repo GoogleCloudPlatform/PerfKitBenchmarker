@@ -79,10 +79,9 @@ class AiModelCreateBenchmarkTest(
 
   def testBenchmarkRunGivesCorrectSamplesForTwoModels(self):
     self.enter_context(flagsaver.flagsaver(create_second_model=True))
-    self.bm_spec.ai_model.existing_endpoints = [
-        'model1',
-    ]
+    self.bm_spec.ai_model.existing_endpoints = []
     self.bm_spec.ai_model.Create()
+    self.bm_spec.ai_model.existing_endpoints = ['existing-endpoint']
     ai_model_create_benchmark.Run(self.bm_spec)
     samples = self.bm_spec.GetSamples()
     metrics = [sample.metric for sample in samples]

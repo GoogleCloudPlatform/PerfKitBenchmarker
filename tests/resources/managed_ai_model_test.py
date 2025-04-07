@@ -5,6 +5,7 @@ import unittest
 from unittest import mock
 
 from absl.testing import flagsaver
+from absl.testing import parameterized
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from tests import pkb_common_test_case
@@ -37,6 +38,20 @@ class ManagedAiModelTest(pkb_common_test_case.PkbCommonTestCase):
     for i in range(1, 5):
       ai_model.SendPrompt('who?', 10, 1.0)
       self.assertLen(ai_model.GetSamples(), i)
+
+  @parameterized.named_parameters(
+      ('first_model', [], True),
+      ('second_model', ['one-endpoint'], False),
+  )
+  def testCreateDepdenciesAddsMetadata(
+      self, existing_endpoints, expected_metadata
+  ):
+    ai_model = fake_managed_ai_model.FakeManagedAiModel()
+    ai_model._CreateDependencies()
+    ai_model.existing_endpoints = existing_endpoints
+    self.assertContainsSubset(
+        {'First Model': expected_metadata}, ai_model.metadata
+    )
 
   def testSampleTimedSendingPrompt(self):
     ai_model = fake_managed_ai_model.FakeManagedAiModel()
