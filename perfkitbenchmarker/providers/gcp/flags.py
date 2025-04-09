@@ -300,6 +300,14 @@ GKE_NCCL_FAST_SOCKET = flags.DEFINE_boolean(
     False,
     'Whether to enable NCCL fast socket on GKE.',
 )
+GKE_IMAGE_TYPE = flags.DEFINE_string(
+    'gke_image_type',
+    None,
+    'Image type to pass to GKE. '
+    'One of'
+    ' https://cloud.google.com/kubernetes-engine/docs/concepts/node-images#available_node_images. '
+    'See https://cloud.google.com/kubernetes-engine/docs/how-to/node-images#specifying_a_node_image.',
+)
 CONTAINER_REMOTE_BUILD_CONFIG = flags.DEFINE_string(
     'container_remote_build_config',
     None,

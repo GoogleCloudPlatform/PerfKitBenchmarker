@@ -259,6 +259,7 @@ class GkeCluster(BaseGkeCluster):
         raise errors.Config.InvalidValue(
             'NCCL fast socket is only supported on secondary node pools.'
         )
+    self.image_type = gcp_flags.GKE_IMAGE_TYPE.value
 
   def InitializeNodePoolForCloud(
       self,
@@ -304,6 +305,8 @@ class GkeCluster(BaseGkeCluster):
     if 'nccl' in self.nodepools:
       result['gpu_type'] = self.nodepools['nccl'].gpu_type
       result['gpu_count'] = self.nodepools['nccl'].gpu_count
+    if self.image_type:
+      result['image_type'] = self.image_type
     return result
 
   def _Create(self):
@@ -418,6 +421,9 @@ class GkeCluster(BaseGkeCluster):
 
     if nodepool_config.sandbox_config is not None:
       cmd.flags['sandbox'] = nodepool_config.sandbox_config.ToSandboxFlag()
+
+    if self.image_type:
+      cmd.flags['image-type'] = self.image_type
 
     cmd.flags['node-labels'] = f'pkb_nodepool={nodepool_config.name}'
 
