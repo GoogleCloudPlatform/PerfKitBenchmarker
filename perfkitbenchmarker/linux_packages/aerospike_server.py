@@ -34,8 +34,8 @@ GIT_TAG = '6.0.0.2'
 AEROSPIKE_DIR = '%s/aerospike-server' % linux_packages.INSTALL_DIR
 
 AEROSPIKE_VERSION_NAME_FOR_OS = {
-    os_types.UBUNTU2004: 'ubuntu20_amd64',
-    os_types.RHEL8: 'el8_amd64',
+    os_types.UBUNTU2004: 'ubuntu20',
+    os_types.RHEL8: 'el8',
 }
 
 
@@ -52,7 +52,7 @@ DISK = 'disk'
 
 DEFAULT_VERSION = '6.2.0'
 DEFAULT_INSTALL_URL = (
-    'https://enterprise.aerospike.com/enterprise/download/server/{}/artifact/{}'
+    'https://enterprise.aerospike.com/enterprise/download/server/{}/artifact/{}_{}'
 )
 
 
@@ -164,6 +164,7 @@ def _InstallFromPackage(vm):
       + DEFAULT_INSTALL_URL.format(
           _AEROSPIKE_ENTERPRISE_VERSION.value,
           AEROSPIKE_VERSION_NAME_FOR_OS[FLAGS.os_type],
+          'arm64' if vm.is_aarch64 else 'amd64',
       )
   )
   # Create log directory

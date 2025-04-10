@@ -45,7 +45,7 @@ _AEROSPIKE_TOOLS_VERSION = flags.DEFINE_string(
     'Aerospike tools version to use'
 )
 
-PATH_FORMATTER = 'aerospike-tools_%s_%s_x86_64'
+PATH_FORMATTER = 'aerospike-tools_%s_%s_%s'
 TAR_FILE_FORMATTER = '%s.tgz'
 
 DOWNLOAD_URL_PREFIX = (
@@ -91,6 +91,7 @@ def _Install(vm):
   path = PATH_FORMATTER % (
       FLAGS.aerospike_tools_version,
       AEROSPIKE_TOOL_VERSION_NAME_FOR_OS[FLAGS.os_type],
+      vm.cpu_arch
   )
   tar_file = TAR_FILE_FORMATTER % path
   url = '/'.join(
