@@ -1582,6 +1582,7 @@ def GenerateDownloadPreprovisionedDataCommand(
       '--container-name {container_name} '
       '--name {name} '
       '--file {file} '
+      '--max-connections 10 '
       '--connection-string "{connection_string}"'.format(
           account_name=account_name,
           container_name=module_name_with_underscores_removed,
