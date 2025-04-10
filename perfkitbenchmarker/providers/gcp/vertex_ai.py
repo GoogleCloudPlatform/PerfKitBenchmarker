@@ -40,6 +40,8 @@ from perfkitbenchmarker.resources import managed_ai_model_spec
 FLAGS = flags.FLAGS
 
 
+CLI = 'CLI'
+SDK = 'SDK'
 SERVICE_ACCOUNT_BASE = '{}-compute@developer.gserviceaccount.com'
 
 
@@ -69,7 +71,8 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     staging_bucket: The staging bucket used by the model.
   """
 
-  CLOUD = 'GCP'
+  CLOUD: str = 'GCP'
+  INTERFACE: list[str] | str = [CLI, SDK]
 
   endpoint: 'VertexAiEndpoint'
   model_spec: 'VertexAiModelSpec'
@@ -114,7 +117,11 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
       self.name = 'pkb' + FLAGS.run_uri
     self.project = FLAGS.project
     self.endpoint = VertexAiEndpoint(
-        name=self.name, region=self.region, project=self.project, vm=self.vm
+        name=self.name,
+        region=self.region,
+        project=self.project,
+        vm=self.vm,
+        interface=self.INTERFACE,
     )
     if not self.project:
       raise errors.Setup.InvalidConfigurationError(
@@ -229,7 +236,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
     instances = self.model_spec.ConvertToInstances(
         prompt, max_tokens, temperature, **kwargs
     )
-    if gcp_flags.AI_USE_SDK.value:
+    if self.INTERFACE == SDK:
       assert self.endpoint.ai_endpoint
       response = self.endpoint.ai_endpoint.predict(instances=instances)
       str_responses = [str(response) for response in response.predictions]
@@ -266,7 +273,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   def _Create(self) -> None:
     """Creates the underlying resource."""
     start_model_upload = time.time()
-    if gcp_flags.AI_USE_SDK.value:
+    if self.INTERFACE == SDK:
       env_vars = self.model_spec.GetEnvironmentVariables(
           model_bucket_path=self.model_bucket_path
       )
@@ -294,7 +301,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
         self.model_upload_time,
     )
     start_model_deploy = time.time()
-    if gcp_flags.AI_USE_SDK.value:
+    if self.INTERFACE == SDK:
       assert self.gcloud_model
       try:
         self.gcloud_model.deploy(
@@ -386,7 +393,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
 
   def _CreateDependencies(self):
     """Creates the endpoint & copies the model to a bucket."""
-    if gcp_flags.AI_USE_SDK.value:
+    if self.INTERFACE == SDK:
       aiplatform.init(
           project=self.project,
           location=self.region,
@@ -406,7 +413,6 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
           timeout=60 * 40,
       )  # pytype: disable=attribute-error
       self.gcs_bucket_copy_time = time.time() - gcs_bucket_copy_start_time
-
     self.endpoint.Create()
 
   def Delete(self, freeze: bool = False) -> None:
@@ -419,7 +425,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   def _Delete(self) -> None:
     """Deletes the underlying resource."""
     logging.info('Deleting the resource: %s.', self.model_name)
-    if gcp_flags.AI_USE_SDK.value:
+    if self.INTERFACE == SDK:
       assert self.gcloud_model
       self.gcloud_model.delete()
       return
@@ -469,6 +475,7 @@ class VertexAiEndpoint(resource.BaseResource):
 
   Attributes:
     name: The name of the endpoint.
+    interface: The interface for making changes to the endpoint.
     project: The project.
     region: The region, derived from the zone.
     endpoint_name: The full resource name of the created endpoint, e.g.
@@ -479,6 +486,7 @@ class VertexAiEndpoint(resource.BaseResource):
   def __init__(
       self,
       name: str,
+      interface: str,
       project: str,
       region: str,
       vm: virtual_machine.BaseVirtualMachine,
@@ -487,6 +495,7 @@ class VertexAiEndpoint(resource.BaseResource):
     super().__init__(**kwargs)
     self.name = name
     self.ai_endpoint = None
+    self.interface = interface
     self.project = project
     self.region = region
     self.vm = vm
@@ -495,7 +504,7 @@ class VertexAiEndpoint(resource.BaseResource):
   def _Create(self) -> None:
     """Creates the underlying resource."""
     logging.info('Creating the endpoint: %s.', self.name)
-    if gcp_flags.AI_USE_SDK.value:
+    if self.interface == SDK:
       self.ai_endpoint = aiplatform.Endpoint.create(
           display_name=f'{self.name}-endpoint'
       )
@@ -520,7 +529,7 @@ class VertexAiEndpoint(resource.BaseResource):
   def _Delete(self) -> None:
     """Deletes the underlying resource."""
     logging.info('Deleting the endpoint: %s.', self.name)
-    if gcp_flags.AI_USE_SDK.value:
+    if self.interface == SDK:
       assert self.ai_endpoint
       self.ai_endpoint.delete(force=True)
       self.ai_endpoint = None  # Object is not picklable - none it out

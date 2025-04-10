@@ -46,7 +46,8 @@ class BaseManagedAiModel(resource.BaseResource):
   """
 
   RESOURCE_TYPE = 'BaseManagedAiModel'
-  REQUIRED_ATTRS = ['CLOUD']
+  REQUIRED_ATTRS = ['CLOUD', 'INTERFACE']
+  INTERFACE = ''
 
   region: str
   child_models: list['BaseManagedAiModel'] = []
@@ -77,6 +78,7 @@ class BaseManagedAiModel(resource.BaseResource):
         # Add these to general ResourceMetadata rather than just Create/Delete.
         'resource_type': self.RESOURCE_TYPE,
         'resource_class': self.__class__.__name__,
+        'interface': self.INTERFACE,
     })
     self.vm: virtual_machine.BaseVirtualMachine = vm
 
@@ -198,6 +200,9 @@ class BaseManagedAiModel(resource.BaseResource):
 
 def GetManagedAiModelClass(
     cloud: str,
+    interface: str,
 ) -> resource.AutoRegisterResourceMeta | None:
   """Gets the managed AI model class for the given cloud."""
-  return resource.GetResourceClass(BaseManagedAiModel, CLOUD=cloud)
+  return resource.GetResourceClass(
+      BaseManagedAiModel, CLOUD=cloud, INTERFACE=interface
+  )

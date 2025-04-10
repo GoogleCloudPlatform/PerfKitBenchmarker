@@ -12,6 +12,7 @@ class FakeManagedAiModel(managed_ai_model.BaseManagedAiModel):
   """Fake managed AI model for testing."""
 
   CLOUD = 'TEST'
+  INTERFACE = 'TEST'
 
   def __init__(self, **kwargs: Any) -> Any:
     self.model_spec = mock.create_autospec(

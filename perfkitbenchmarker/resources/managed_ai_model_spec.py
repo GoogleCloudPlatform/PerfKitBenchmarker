@@ -34,6 +34,7 @@ class BaseManagedAiModelSpec(spec.BaseSpec):
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     self.cloud: str
+    self.interface: str
     self.model_name: str
     self.model_size: str
     self.max_scale: int
@@ -69,6 +70,13 @@ class BaseManagedAiModelSpec(spec.BaseSpec):
             {
                 'valid_values': provider_info.VALID_CLOUDS,
                 'default': provider_info.GCP,
+            },
+        ),
+        'interface': (
+            option_decoders.EnumDecoder,
+            {
+                'valid_values': ['CLI', 'SDK', 'MODEL-GARDEN-CLI'],
+                'default': 'CLI',
             },
         ),
         'model_name': (

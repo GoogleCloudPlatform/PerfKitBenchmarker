@@ -476,13 +476,6 @@ SPARK_BIGQUERY_CONNECTOR = flags.DEFINE_string(
     'The Spark BigQuery Connector jar to pass to the Spark Job',
 )
 
-AI_USE_SDK = flags.DEFINE_bool(
-    'use_ai_sdk',
-    False,
-    'If True, use the AI python SDK to perform operations. Otherwise, use'
-    ' gcloud commands.',
-)
-
 AI_BUCKET_URI = flags.DEFINE_string(
     'ai_bucket_uri',
     None,

@@ -64,6 +64,7 @@ class ManagedAiModelTest(pkb_common_test_case.PkbCommonTestCase):
             1,
             'seconds',
             metadata={
+                'interface': 'TEST',
                 'region': 'us-west-1a-region',
                 'max_scaling': 1,
                 'resource_class': 'FakeManagedAiModel',

@@ -344,8 +344,7 @@ class BenchmarkSpec:
     cluster_class = cluster.GetClusterClass(cloud)
     self.cluster = cluster_class(self.config.cluster)
     self.resources.append(self.cluster)
-    self.vms_to_boot.update(
-        self.cluster.ExportVmGroupsForUnmanagedProvision())
+    self.vms_to_boot.update(self.cluster.ExportVmGroupsForUnmanagedProvision())
 
   def ConstructContainerRegistry(self):
     """Create the container registry."""
@@ -550,7 +549,9 @@ class BenchmarkSpec:
       return
     cloud = self.config.ai_model.cloud
     providers.LoadProvider(cloud)
-    model_class = managed_ai_model.GetManagedAiModelClass(cloud)
+    model_class = managed_ai_model.GetManagedAiModelClass(
+        cloud, self.config.ai_model.interface
+    )
     assert self.vm_groups
     vm = self.vm_groups[
         'clients' if 'clients' in self.vm_groups else 'default'
@@ -934,8 +935,8 @@ class BenchmarkSpec:
     if self.cluster:
       if self.cluster.unmanaged:
         self.cluster.ImportVmGroups(
-            self.vm_groups['headnode'][0],
-            self.vm_groups['workers'])
+            self.vm_groups['headnode'][0], self.vm_groups['workers']
+        )
       self.cluster.Create()
     if self.dpb_service:
       self.dpb_service.Create()

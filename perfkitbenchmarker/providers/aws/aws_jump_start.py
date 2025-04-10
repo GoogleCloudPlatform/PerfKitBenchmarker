@@ -42,6 +42,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
   """
 
   CLOUD = 'AWS'
+  INTERFACE = ['SDK']
 
   model_spec: 'JumpStartModelSpec'
   model_name: str

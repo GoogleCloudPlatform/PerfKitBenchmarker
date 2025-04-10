@@ -60,9 +60,11 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(mock.patch.object(vertex_ai.aiplatform, 'init'))
     config = {'model_name': 'llama2', 'model_size': '7b'}
     self.ai_spec = vertex_ai.VertexAiLlama2Spec('full_name', None, **config)
+    self.vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
+    vertex_ai.VertexAiModelInRegistry.INTERFACE = 'CLI'
     self.pkb_ai: vertex_ai.VertexAiModelInRegistry = (
         vertex_ai.VertexAiModelInRegistry(
-            mock.create_autospec(virtual_machine.BaseVirtualMachine),
+            self.vm,
             self.ai_spec,
         )
     )
@@ -81,8 +83,12 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsNotNone(ai_spec)
     self.assertEqual(ai_spec.__name__, 'VertexAiLlama3Spec')
 
-  @flagsaver.flagsaver(use_ai_sdk=True)
   def test_model_create_via_sdk(self):
+    vertex_ai.VertexAiModelInRegistry.INTERFACE = 'SDK'
+    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(
+        self.vm,
+        self.ai_spec,
+    )
     self.MockRunCommand(
         {
             'gcloud ai endpoints create': [(
@@ -105,11 +111,9 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('Model Deploy Time', sampled_metrics)
 
   @flagsaver.flagsaver(ai_bucket_uri=None)
-  @flagsaver.flagsaver(use_ai_sdk=True)
   def test_model_create_with_gcs_copy(self):
-    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(
-        mock.create_autospec(virtual_machine.BaseVirtualMachine), self.ai_spec
-    )
+    vertex_ai.VertexAiModelInRegistry.INTERFACE = 'SDK'
+    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(self.vm, self.ai_spec)
     self.MockRunCommand(
         {
             'gcloud ai endpoints create': [(
@@ -141,12 +145,10 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
         'gs://my-project-us-west-tmp-pkb123/llama2/llama2-7b-hf',
     )
 
-  @flagsaver.flagsaver(use_ai_sdk=True)
   @flagsaver.flagsaver(ai_bucket_uri=None)
   def test_model_create_with_reuse_gcs_bucket(self):
-    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(
-        mock.create_autospec(virtual_machine.BaseVirtualMachine), self.ai_spec
-    )
+    vertex_ai.VertexAiModelInRegistry.INTERFACE = 'SDK'
+    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(self.vm, self.ai_spec)
     model2 = self.pkb_ai.InitializeNewModel()
     self.MockRunCommand(
         {
@@ -179,8 +181,9 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
         'gs://my-project-us-west-tmp-pkb123/llama2/llama2-7b-hf',
     )
 
-  @flagsaver.flagsaver(use_ai_sdk=True)
   def test_model_quota_error(self):
+    vertex_ai.VertexAiModelInRegistry.INTERFACE = 'SDK'
+    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(self.vm, self.ai_spec)
     self.MockRunCommand(
         {
             'gcloud ai endpoints create': [(
@@ -246,7 +249,8 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
             ' --region=us-west --project=my-project --display-name=pkb123'
             ' --machine-type=g2-standard-8 --accelerator=type=nvidia-l4,count=1'
             ' --service-account=123-compute@developer.gserviceaccount.com'
-            ' --max-replica-count=1', ignore_failure=True,
+            ' --max-replica-count=1',
+            ignore_failure=True,
         ),
     ])  # pytype: disable=attribute-error
 
@@ -397,6 +401,7 @@ class VertexAiEndpointTest(pkb_common_test_case.PkbCommonTestCase):
         project='my-project',
         region='us-east1',
         vm=self.vm,
+        interface='CLI',
     )
     self.enter_context(
         mock.patch.object(
