@@ -118,13 +118,13 @@ _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     'a1': 'cortex-a72',
     'c6g': 'graviton2',
     'c7g': 'graviton3',
+    'c8g': 'graviton4',
     'g5g': 'graviton2',
     'm6g': 'graviton2',
     'm7g': 'graviton3',
+    'm8g': 'graviton4',
     'r6g': 'graviton2',
     'r7g': 'graviton3',
-    'm8g': 'graviton4',
-    'c8g': 'graviton4',
     'r8g': 'graviton4',
     'i8g': 'graviton4',
     't4g': 'graviton2',
@@ -132,6 +132,7 @@ _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     'is4ge': 'graviton2',
     'i4g': 'graviton2',
     'x2g': 'graviton2',
+    'x8g': 'graviton4',
     'hpc7g': 'graviton3E',
 }
 
