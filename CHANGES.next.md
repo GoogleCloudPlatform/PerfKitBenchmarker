@@ -202,6 +202,7 @@
 -   Add unmanaged_mysql_sysbench benchmark.
 -   Refactor nginx_benchmark to use reverse_proxy or api_gateway configurations.
 -   Add support for managed Llama 2 & 3 models in Vertex AI & AWS Sagemaker.
+-   Support CLI, SDK, & Model Garden CLI for Vertex AI.
 -   Add new pressure_stall trace.
 -   Add `--skip_teardown_on_command_timeout` flag to skip teardown if the
     failure substatus is COMMAND_TIMEOUT.

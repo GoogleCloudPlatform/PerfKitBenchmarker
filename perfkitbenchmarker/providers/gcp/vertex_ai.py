@@ -41,6 +41,7 @@ FLAGS = flags.FLAGS
 
 
 CLI = 'CLI'
+MODEL_GARDEN_CLI = 'MODEL-GARDEN-CLI'
 SDK = 'SDK'
 SERVICE_ACCOUNT_BASE = '{}-compute@developer.gserviceaccount.com'
 
@@ -72,7 +73,7 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
   """
 
   CLOUD: str = 'GCP'
-  INTERFACE: list[str] | str = [CLI, SDK]
+  INTERFACE: list[str] | str = [CLI, SDK, MODEL_GARDEN_CLI]
 
   endpoint: 'VertexAiEndpoint'
   model_spec: 'VertexAiModelSpec'
@@ -272,6 +273,9 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
 
   def _Create(self) -> None:
     """Creates the underlying resource."""
+    if self.INTERFACE == MODEL_GARDEN_CLI:
+      self._CreateModelGarden()
+      return
     start_model_upload = time.time()
     if self.INTERFACE == SDK:
       env_vars = self.model_spec.GetEnvironmentVariables(
@@ -356,6 +360,53 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
         'Successfully deployed model in %s seconds', self.model_deploy_time
     )
 
+  def _CreateModelGarden(self) -> None:
+    """Deploys the model via model garden CLI."""
+    deploy_start_time = time.time()
+    deploy_cmd = (
+        'gcloud beta ai model-garden models deploy'
+        f' --model={self.model_spec.GetModelGardenName()}'
+        f' --endpoint-display-name={self.name}'
+        f' --project={self.project} --region={self.region}'
+        f' --machine-type={self.model_spec.machine_type}'
+    )
+    _, err_out, _ = self.vm.RunCommand(deploy_cmd, timeout=60 * 60)
+    deploy_end_time = time.time()
+    self.model_deploy_time = deploy_end_time - deploy_start_time
+    operation_id = _FindRegexInOutput(
+        err_out,
+        r'gcloud ai operations describe (.*) --region',
+        errors.Resource.CreationError,
+    )
+    out, _, _ = self.vm.RunCommand(
+        'gcloud ai operations describe'
+        f' {operation_id} --project={self.project} --region={self.region}'
+    )
+    # Only get the model id, not the full resource name.
+    self.model_resource_name = _FindRegexInOutput(
+        out,
+        r'model:' rf' projects/(.*)/locations/{self.region}/models/(.*)@',
+        exception_type=errors.Resource.CreationError,
+        group_index=2,
+    )
+    self.endpoint.endpoint_name = _FindRegexInOutput(
+        out,
+        r'endpoint: (.*)\n',
+        exception_type=errors.Resource.CreationError,
+    )
+    logging.info(
+        'Model resource with name %s deployed & found with model id %s &'
+        ' endpoint id %s',
+        self.name,
+        self.model_resource_name,
+        self.endpoint.endpoint_name,
+    )
+
+  def _PostCreate(self):
+    super()._PostCreate()
+    if self.INTERFACE == MODEL_GARDEN_CLI:
+      self.endpoint.UpdateLabels()
+
   def _UploadViaGcloudCommand(self) -> None:
     """Uploads the model via gcloud command."""
     upload_cmd = (
@@ -401,6 +452,8 @@ class VertexAiModelInRegistry(managed_ai_model.BaseManagedAiModel):
           service_account=self.service_account,
       )
     super()._CreateDependencies()
+    if self.INTERFACE == MODEL_GARDEN_CLI:
+      return
     if self.gcs_client:
       gcs_bucket_copy_start_time = time.time()
       self.gcs_client.MakeBucket(
@@ -495,7 +548,7 @@ class VertexAiEndpoint(resource.BaseResource):
     super().__init__(**kwargs)
     self.name = name
     self.ai_endpoint = None
-    self.interface = interface
+    self.interface = (interface,)
     self.project = project
     self.region = region
     self.vm = vm
@@ -560,13 +613,39 @@ class VertexAiEndpoint(resource.BaseResource):
     # None it out here as well, until all commands are supported over gcloud.
     self.ai_endpoint = None
 
+  def UpdateLabels(self) -> None:
+    """Updates the labels of the endpoint."""
+    if self.interface == SDK:
+      return
+    self.vm.RunCommand(
+        f'gcloud ai endpoints update {self.endpoint_name} '
+        f' --project={self.project} --region={self.region}'
+        f' --update-labels={util.MakeFormattedDefaultTags()}',
+    )
 
-def _FindRegexInOutput(output: str, regex: str) -> str | None:
-  """Returns the first match of the regex in the output."""
+
+def _FindRegexInOutput(
+    output: str,
+    regex: str,
+    exception_type: type[errors.Error] | None = None,
+    group_index: int = 1,
+) -> str | None:
+  """Returns the 1st match of the regex in the output.
+
+  Args:
+    output: The output to search.
+    regex: The regex to search for.
+    exception_type: The exception type to raise if no match is found.
+    group_index: If there are multiple groups in the regex, which one to return.
+  """
   matches = re.search(regex, output)
   if not matches:
+    if exception_type:
+      raise exception_type(
+          f'Could not find match for regex {regex} in output {output}.'
+      )
     return None
-  return matches.group(1)
+  return matches.group(group_index)
 
 
 class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
@@ -646,6 +725,10 @@ class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
         instances[params] = kwargs[params]
     return [instances]
 
+  def GetModelGardenName(self) -> str:
+    """Returns the name of the model in Model Garden."""
+    return ''
+
 
 class VertexAiLlama2Spec(VertexAiModelSpec):
   """Spec for running the Llama2 7b & 70b models."""
@@ -681,7 +764,7 @@ class VertexAiLlama2Spec(VertexAiModelSpec):
     # Machine type from deployment notebook:
     # https://pantheon.corp.google.com/vertex-ai/colab/notebooks?e=13802955
     if self.model_size == '7b':
-      self.machine_type = 'g2-standard-8'
+      self.machine_type = 'g2-standard-12'
       self.accelerator_count = 1
     else:
       self.machine_type = 'g2-standard-96'
@@ -692,6 +775,10 @@ class VertexAiLlama2Spec(VertexAiModelSpec):
     self.serving_container_args.append(
         f'--tensor-parallel-size={self.accelerator_count}'
     )
+
+  def GetModelGardenName(self) -> str:
+    """Returns the name of the model in Model Garden."""
+    return f'meta/llama2@llama-2-{self.model_size}'
 
 
 class VertexAiLlama3Spec(VertexAiModelSpec):
@@ -731,7 +818,7 @@ class VertexAiLlama3Spec(VertexAiModelSpec):
     self.serving_container_health_route = '/ping'
     # Machine type from deployment notebook:
     # https://pantheon.corp.google.com/vertex-ai/publishers/meta/model-garden/llama3
-    self.machine_type = 'g2-standard-8'
+    self.machine_type = 'g2-standard-12'
     self.accelerator_count = 1
     self.accelerator_type = 'NVIDIA_L4'
     self.serving_container_args = self.VLLM_ARGS.copy()
@@ -747,3 +834,7 @@ class VertexAiLlama3Spec(VertexAiModelSpec):
         f' --container-deployment-timeout-seconds={60 * 40}'
     )
     return upload_args
+
+  def GetModelGardenName(self) -> str:
+    """Returns the name of the model in Model Garden."""
+    return f'meta/llama3@meta-llama-3-{self.model_size}'

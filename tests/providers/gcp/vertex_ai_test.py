@@ -247,12 +247,17 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
         mock.call(
             'gcloud ai endpoints deploy-model None --model=1234'
             ' --region=us-west --project=my-project --display-name=pkb123'
-            ' --machine-type=g2-standard-8 --accelerator=type=nvidia-l4,count=1'
+            ' --machine-type=g2-standard-12'
+            ' --accelerator=type=nvidia-l4,count=1'
             ' --service-account=123-compute@developer.gserviceaccount.com'
             ' --max-replica-count=1',
             ignore_failure=True,
         ),
     ])  # pytype: disable=attribute-error
+    self.assertEqual(
+        self.pkb_ai.model_resource_name,
+        '1234',
+    )
 
   def test_model_create_via_gcloud_waits_until_ready(self):
     self.pkb_ai.endpoint.endpoint_name = (
@@ -296,6 +301,53 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.pkb_ai._Create()
     self.assertEqual(cli.RunCommand.mock_command.progress_through_calls['gcloud ai endpoints predict'], 2)  # pytype: disable=attribute-error
+
+  def test_model_create_via_model_garden_cli(self):
+    vertex_ai.VertexAiModelInRegistry.INTERFACE = 'MODEL-GARDEN-CLI'
+    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(self.vm, self.ai_spec)
+    self.MockRunCommand(
+        {
+            'model-garden models deploy': [
+                (
+                    '',
+                    """
+                Using the selected deployment configuration:
+                 Machine type: g2-standard-12
+                Deploying the model to the endpoint. To check the deployment status, you can try one of the following methods:
+1) Look for endpoint `meta-meta-llama-3-8b-mg-cli-deploy` at the [Vertex AI] -> [Online prediction] tab in Cloud Console
+2) Use `gcloud ai operations describe 12345 --region=us-east1` to find the status of the deployment long-running operation
+Waiting for operation [12345]...done.
+""",
+                    0,
+                ),
+            ],
+            'ai operations describe': [(
+                """Using endpoint [https://us-east1-aiplatform.googleapis.com/]
+done: true
+metadata:
+  '@type': type.googleapis.com/google.cloud.aiplatform.v1beta1.DeployOperationMetadata
+  projectNumber: '123'
+  publisherModel: publishers/meta/models/llama3@meta-llama-3-8b
+name: projects/123/locations/us-west/operations/12345
+response:
+  '@type': type.googleapis.com/google.cloud.aiplatform.v1beta1.DeployResponse
+  endpoint: projects/123/locations/us-west/endpoints/fooendpoint
+  model: projects/123/locations/us-west/models/foomodel@1
+  publisherModel: publishers/meta/models/llama3@meta-llama-3-8b
+""",
+                '',
+                0,
+            )],
+            'ai endpoints describe update': [('', '', 0)],
+        },
+        self.pkb_ai.vm,
+    )
+    self.pkb_ai._Create()
+    self.assertEqual(self.pkb_ai.model_resource_name, 'foomodel')
+    self.assertEqual(
+        self.pkb_ai.endpoint.endpoint_name,
+        'projects/123/locations/us-west/endpoints/fooendpoint',
+    )
 
   def test_model_inited(self):
     # Assert on values from setup
