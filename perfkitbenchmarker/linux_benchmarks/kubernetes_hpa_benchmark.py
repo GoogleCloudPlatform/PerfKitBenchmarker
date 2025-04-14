@@ -88,7 +88,7 @@ def _PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec):
       'container/kubernetes_hpa/fib.yaml.j2',
       fib_image=fib_image,
       runtime_class_name=FLAGS.kubernetes_hpa_runtime_class_name,
-      node_selector=cluster.GetJinjaNodeSelector(),
+      node_selectors=cluster.GetNodeSelectors(),
   )
 
   cluster.WaitForResource('deploy/fib', 'available', namespace='fib')

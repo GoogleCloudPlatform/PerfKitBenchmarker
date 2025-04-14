@@ -1,32 +1,34 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{Name}}
+  name: {{ Name }}
 spec:
-  progressDeadlineSeconds: {{RolloutTimeout}}
-  replicas: {{Replicas}}
+  progressDeadlineSeconds: {{ RolloutTimeout }}
+  replicas: {{ Replicas }}
   selector:
     matchLabels:
-      name: {{Name}}
+      name: {{ Name }}
   template:
     metadata:
       labels:
-        name: {{Name}}
+        name: {{ Name }}
     spec:
       containers:
-      - image: k8s.gcr.io/pause:3.1
-        name: {{Name}}
+      - name: {{ Name }}
+        image: {{ Image }}
+        {%- if Command %}
+        command: {{ Command }}
+        {%- endif %}
         resources:
-          requests:
-            cpu: {{CpuRequest}}
-            memory: {{MemoryRequest}}
-            ephemeral-storage: {{EphemeralStorageRequest}}
           limits:
-            cpu: {{CpuRequest}}
-            memory: {{MemoryRequest}}
-            ephemeral-storage: {{EphemeralStorageRequest}}
+            cpu: {{ CpuRequest }}
+            memory: {{ MemoryRequest }}
+            ephemeral-storage: {{ EphemeralStorageRequest }}
+            nvidia.com/gpu: {{ NvidiaGpuRequest }}
       nodeSelector:
-        {{NodeSelector}}
+        {%- for NodeSelector in NodeSelectors %}
+        {{ NodeSelector }}
+        {%- endfor %}
       terminationGracePeriodSeconds: 1
       # Add not-ready/unreachable tolerations for X seconds so that node
       # failure doesn't trigger pod deletion.
@@ -34,8 +36,8 @@ spec:
       - key: "node.kubernetes.io/not-ready"
         operator: "Exists"
         effect: "NoExecute"
-        tolerationSeconds: {{PodTimeout}}
+        tolerationSeconds: {{ PodTimeout }}
       - key: "node.kubernetes.io/unreachable"
         operator: "Exists"
         effect: "NoExecute"
-        tolerationSeconds: {{PodTimeout}}
+        tolerationSeconds: {{ PodTimeout }}

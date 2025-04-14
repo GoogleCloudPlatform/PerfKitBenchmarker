@@ -33,7 +33,9 @@ spec:
               name: "web"
               protocol: "TCP"
       nodeSelector:
+        {%- for node_selector in node_selectors %}
         {{node_selector}}
+        {%- endfor %}
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

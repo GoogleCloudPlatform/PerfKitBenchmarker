@@ -535,6 +535,20 @@ class GkeAutopilotCluster(BaseGkeCluster):
     metadata['nodepools'] = self.CLUSTER_TYPE
     return metadata
 
+  def GetNodeSelectors(self) -> list[str]:
+    """Node selectors for instance capabilites in AutoPilot clusters."""
+    selectors = []
+    # https://cloud.google.com/kubernetes-engine/docs/how-to/autopilot-gpus#request-gpus
+    if virtual_machine.GPU_TYPE.value:
+      gpu_count = virtual_machine.GPU_COUNT.value or 1
+      gpu_type = f'nvidia-{virtual_machine.GPU_TYPE.value}'
+      selectors += [
+          'cloud.google.com/gke-accelerator: ' + gpu_type,
+          # Quote to avoid YAML parsing as int.
+          f"cloud.google.com/gke-accelerator-count: '{gpu_count}'",
+      ]
+    return selectors
+
   def ResizeNodePool(
       self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
   ):

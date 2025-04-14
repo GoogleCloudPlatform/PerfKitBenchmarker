@@ -254,12 +254,12 @@ VALID_GPU_TYPES = TESLA_GPU_TYPES + [GPU_L4, GPU_H100]
 CPUARCH_X86_64 = 'x86_64'
 CPUARCH_AARCH64 = 'aarch64'
 
-flags.DEFINE_integer(
+GPU_COUNT = flags.DEFINE_integer(
     'gpu_count',
     None,
     'Number of gpus to attach to the VM. Requires gpu_type to be specified.',
 )
-flags.DEFINE_enum(
+GPU_TYPE = flags.DEFINE_enum(
     'gpu_type',
     None,
     VALID_GPU_TYPES,

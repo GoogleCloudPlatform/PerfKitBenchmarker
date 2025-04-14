@@ -184,7 +184,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('node_Ready_count', samples_by_metric.keys())
     self.assertEqual(samples_by_metric['node_Ready_count'].value, 1)
 
-  @flagsaver.flagsaver(kubernetes_goal_replicas=10)
+  @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresPassesWithCorrectNumberOfPods(self):
     self.cluster.GetEvents.return_value = []
     kubernetes_scale_benchmark._CheckForFailures(
@@ -195,7 +195,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         ],
     )
 
-  @flagsaver.flagsaver(kubernetes_goal_replicas=10)
+  @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresThrowsRegularError(self):
     self.cluster.GetEvents.return_value = [
         container_service.KubernetesEvent(
@@ -216,7 +216,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
           ],
       )
 
-  @flagsaver.flagsaver(kubernetes_goal_replicas=10)
+  @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresThrowsQuotaExceeded(self):
     self.cluster.GetEvents.return_value = [
         container_service.KubernetesEvent(

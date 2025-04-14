@@ -1,8 +1,10 @@
 """Benchmark which runs spins up a large number of pods on kubernetes."""
 
 import collections
+import dataclasses
 import json
 import time
+from typing import Any
 
 from absl import flags
 from absl import logging
@@ -13,6 +15,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 
 
@@ -21,10 +24,7 @@ FLAGS = flags.FLAGS
 BENCHMARK_NAME = 'kubernetes_scale'
 BENCHMARK_CONFIG = """
 kubernetes_scale:
-  description: Scales up a large number of pods on kubernetes.
-  container_specs:
-    hello_world:
-      image: hello-world
+  description: Test scaling an auto-scaled Kubernetes cluster by adding pods.
   container_cluster:
     cloud: GCP
     type: Kubernetes
@@ -33,16 +33,45 @@ kubernetes_scale:
     vm_spec: *default_dual_core
     poll_for_events: true
 """
-# Don't define container_registry so no GetOrBuild happens
 
-
-NUM_NEW_INSTANCES = flags.DEFINE_integer(
-    'kubernetes_goal_replicas', 5, 'Number of new instances to create'
+NUM_PODS = flags.DEFINE_integer(
+    'kubernetes_scale_num_replicas', 5, 'Number of new instances to create'
+)
+REPORT_PERCENTILES = flags.DEFINE_boolean(
+    'kubernetes_scale_report_latency_percentiles',
+    True,
+    'Whether to report percentiles of event latencies',
+)
+REPORT_LATENCIES = flags.DEFINE_boolean(
+    'kubernetes_scale_report_individual_latencies',
+    False,
+    'Whether to report individual event latencies',
+)
+CPUS_PER_POD = flags.DEFINE_string(
+    'kubernetes_scale_pod_cpus', '250m', 'CPU limit per pod'
+)
+MEMORY_PER_POD = flags.DEFINE_string(
+    'kubernetes_scale_pod_memory', '250m', 'Memory limit per pod'
 )
 
-# kubectl pods don't allow _'s.
-SPEC_NAME = 'hello_world'
-CONTAINER_NAME = 'hello-world'
+MANIFEST_TEMPLATE = 'container/kubernetes_scale/kubernetes_scale.yaml.j2'
+DEFAULT_IMAGE = 'k8s.gcr.io/pause:3.1'
+NVIDIA_GPU_IMAGE = 'nvidia/cuda:11.0.3-runtime-ubuntu20.04'
+
+
+def _GetImage() -> str:
+  """Get the image for the scale deployment."""
+  if virtual_machine.GPU_COUNT.value:
+    return NVIDIA_GPU_IMAGE
+  return DEFAULT_IMAGE
+
+
+def CheckPrerequisites(_):
+  """Validate flags and config."""
+  if not REPORT_PERCENTILES.value and not REPORT_LATENCIES.value:
+    raise errors.Config.InvalidValue(
+        'At least one of percentiles or individual latencies must be reported.'
+    )
 
 
 def GetConfig(user_config):
@@ -71,7 +100,7 @@ def _GetRolloutCreationTime(rollout_name: str) -> int:
 def _GetScaleTimeout() -> int:
   """Returns the timeout for the scale up & teardown."""
   base_timeout = 60 * 10
-  per_pod_timeout = NUM_NEW_INSTANCES.value * 3
+  per_pod_timeout = NUM_PODS.value * 3
   proposed_timeout = base_timeout + per_pod_timeout
   max_timeout = 2 * 60 * 60  # 2 hours
   return min(proposed_timeout, max_timeout)
@@ -89,7 +118,15 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   samples += pod_samples
   _CheckForFailures(cluster, pod_samples)
   samples += ParseStatusChanges(cluster, 'node', start_time)
-  metadata = {'goal_replicas': NUM_NEW_INSTANCES.value}
+  metadata = {
+      'pod_memory': MEMORY_PER_POD.value,
+      'pod_cpu': CPUS_PER_POD.value,
+      'goal_replicas': NUM_PODS.value,
+      'image': _GetImage(),
+  }
+  if virtual_machine.GPU_COUNT.value:
+    metadata['gpu_count'] = virtual_machine.GPU_COUNT.value
+    metadata['gpu_type'] = virtual_machine.GPU_TYPE.value
   for s in samples:
     s.metadata.update(metadata)
   return samples
@@ -103,19 +140,27 @@ def ScaleUpPods(
   initial_pods = set(cluster.GetPodNames())
   logging.info('Initial pods: %s', initial_pods)
 
+  command = None
+  if virtual_machine.GPU_COUNT.value:
+    # Use nvidia-smi to validate NVIDIA_GPU is available.
+    command = ['sh', '-c', 'nvidia-smi && sleep 3600']
+
   # Request X new pods via YAML apply.
-  num_new_instances = NUM_NEW_INSTANCES.value
+  num_new_pods = NUM_PODS.value
   max_wait_time = _GetScaleTimeout()
   resource_names = cluster.ApplyManifest(
-      'container/kubernetes_scale/kubernetes_scale.yaml.j2',
+      MANIFEST_TEMPLATE,
       Name='kubernetes-scaleup',
-      Replicas=num_new_instances,
-      CpuRequest='250m',
-      MemoryRequest='250M',
+      Replicas=num_new_pods,
+      CpuRequest=CPUS_PER_POD.value,
+      MemoryRequest=MEMORY_PER_POD.value,
+      NvidiaGpuRequest=virtual_machine.GPU_COUNT.value,
+      Image=_GetImage(),
+      Command=command,
       EphemeralStorageRequest='10Mi',
       RolloutTimeout=max_wait_time,
       PodTimeout=max_wait_time + 60,
-      NodeSelector=cluster.GetJinjaNodeSelector(),
+      NodeSelectors=cluster.GetNodeSelectors(),
   )
 
   # Arbitrarily pick the first resource (it should be the only one.)
@@ -184,12 +229,12 @@ def _CheckForFailures(
     raise errors.Benchmarks.RunError(
         'No pod ready events were found; this should almost never happen.'
     )
-  if ready_count_sample.value >= NUM_NEW_INSTANCES.value:
+  if ready_count_sample.value >= NUM_PODS.value:
     logging.info(
         'Benchmark successfully scaled up %d pods, which is more than the goal'
         ' of %d pods.',
         ready_count_sample.value,
-        NUM_NEW_INSTANCES.value,
+        NUM_PODS.value,
     )
     return
   events = cluster.GetEvents()
@@ -197,20 +242,41 @@ def _CheckForFailures(
     if event.reason == 'FailedScaleUp' and 'quota exceeded' in event.message:
       raise errors.Benchmarks.QuotaFailure(
           'Failed to scale up to %d pods, at least one pod ran into a quota'
-          ' error: %s' % (NUM_NEW_INSTANCES.value, event.message)
+          ' error: %s' % (NUM_PODS.value, event.message)
       )
 
   raise errors.Benchmarks.RunError(
       'Benchmark attempted to scale up to  %d pods but only %d pods were'
       ' created & ready. Check above "Kubernetes failed to wait for" logs for'
-      ' exact failure location.'
-      % (NUM_NEW_INSTANCES.value, ready_count_sample.value)
+      ' exact failure location.' % (NUM_PODS.value, ready_count_sample.value)
   )
+
+
+@dataclasses.dataclass
+class KubernetesResourceStatusCondition:
+  """Stores the information of a Kubernetes resource status condition."""
+  resource_type: str
+  resource_name: str
+  epoch_time: int
+  event: str
+
+  @classmethod
+  def FromJsonPathResult(
+      cls, resource_type: str, resource_name: str, condition: dict[str, Any]
+  ) -> 'KubernetesResourceStatusCondition':
+    """Parses the json result of kubectl get."""
+    str_time = condition['lastTransitionTime']
+    return cls(
+        resource_type,
+        resource_name,
+        epoch_time=ConvertToEpochTime(str_time),
+        event=condition['type'],
+    )
 
 
 def _GetResourceStatusConditions(
     resource_type: str, resource_name: str
-) -> list[dict[str, str]]:
+) -> list[KubernetesResourceStatusCondition]:
   """Returns the status conditions for a resource.
 
   Args:
@@ -230,8 +296,14 @@ def _GetResourceStatusConditions(
       'jsonpath={.status.conditions[*]}',
   ])
   # Turn space separated individual json objects into a single json array.
-  conditions = '[' + out.replace('} {', '},{') + ']'
-  return json.loads(conditions)
+  conditions_str = '[' + out.replace('} {', '},{') + ']'
+  conditions = json.loads(conditions_str)
+  return [
+      KubernetesResourceStatusCondition.FromJsonPathResult(
+          resource_type, resource_name, condition
+      )
+      for condition in conditions
+  ]
 
 
 def ConvertToEpochTime(timestamp: str) -> int:
@@ -261,32 +333,47 @@ def ParseStatusChanges(
     A list of samples, with various percentiles for each status condition.
   """
   all_resources = cluster.GetAllNamesForResourceType(resource_type + 's')
-  overall_times = collections.defaultdict(list)
+  conditions = []
   for resource in all_resources:
-    conditions = _GetResourceStatusConditions(resource_type, resource)
-    for condition in conditions:
-      str_time = condition['lastTransitionTime']
-      overall_times[condition['type']].append(ConvertToEpochTime(str_time))
+    conditions += _GetResourceStatusConditions(resource_type, resource)
 
   samples = []
-  for event, timestamps in overall_times.items():
-    summaries = _SummarizeTimestamps(timestamps)
-    prefix = f'{resource_type}_{event}_'
-    for percentile, value in summaries.items():
+  if REPORT_PERCENTILES.value:
+    overall_times = collections.defaultdict(list)
+    for condition in conditions:
+      overall_times[condition.event].append(condition.epoch_time)
+    for event, timestamps in overall_times.items():
+      summaries = _SummarizeTimestamps(timestamps)
+      prefix = f'{resource_type}_{event}_'
+      for percentile, value in summaries.items():
+        samples.append(
+            sample.Sample(
+                prefix + percentile,
+                value - start_time,
+                'seconds',
+            )
+        )
       samples.append(
           sample.Sample(
-              prefix + percentile,
-              value - start_time,
-              'seconds',
+              prefix + 'count',
+              len(timestamps),
+              'count',
           )
       )
-    samples.append(
-        sample.Sample(
-            prefix + 'count',
-            len(timestamps),
-            'count',
+
+    if REPORT_LATENCIES.value:
+      for condition in conditions:
+        metadata = {
+            'k8s_resource_name': condition.resource_name,
+        }
+        samples.append(
+            sample.Sample(
+                f'{resource_type}_{condition.event}',
+                condition.epoch_time - start_time,
+                'seconds',
+                metadata,
+            )
         )
-    )
   return samples
 
 

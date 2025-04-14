@@ -1493,9 +1493,9 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     """Get the default storage class for the provider."""
     raise NotImplementedError
 
-  def GetJinjaNodeSelector(self) -> str:
-    """Get the node selector section of a yaml for the provider."""
-    return '# No node selector needed for this cluster.'
+  def GetNodeSelectors(self) -> list[str]:
+    """Get the node selectors section of a yaml for the provider."""
+    return []
 
 
 @dataclasses.dataclass(eq=True, frozen=True)
