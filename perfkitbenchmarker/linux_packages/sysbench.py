@@ -60,6 +60,17 @@ SYSBENCH_SLEEP_BETWEEN_RUNS_SEC = flags.DEFINE_integer(
     0,
     'The time in seconds to sleep between runs with different thread counts.',
 )
+SYSBENCH_VERBOSE_MODE = flags.DEFINE_integer(
+    'sysbench_verbose_mode',
+    None,
+    'Sets the logging verbosity for sysbench command.',
+)
+flags.register_validator(
+    SYSBENCH_VERBOSE_MODE,
+    lambda value: value is None or value in [0, 1, 2, 3, 4, 5],
+    'When specified, sysbench_verbose_mode must be between 0 (critical'
+    ' messages) and 5 (debug)',
+)
 
 GIT_REPO = 'https://github.com/akopytov/sysbench'
 SYSBENCH_DIR = '~/sysbench'
@@ -350,8 +361,11 @@ def _BuildGenericCommand(
       'rate': sysbench_parameters.rate,
       'use_fk': sysbench_parameters.use_fk,
       'trx_level': sysbench_parameters.trx_level,
-      'mysql_ignore_errors': sysbench_parameters.mysql_ignore_errors,
+      'mysql-ignore-errors': sysbench_parameters.mysql_ignore_errors,
   }
+  if SYSBENCH_VERBOSE_MODE.value:
+    args['verbosity'] = SYSBENCH_VERBOSE_MODE.value
+
   for arg, value in args.items():
     if value is not None:
       cmd.extend([f'--{arg}={value}'])

@@ -555,3 +555,5 @@
 -   Added `sysbench_sleep_between_runs_sec` flag with a default of 0 seconds.
     This flag adds a sleep before running the next benchmark when using
     different thread counts.
+-   Corrected use of `mysql-ignore-errors` flag and added a flag to control
+    sysbench logging verbosity.
