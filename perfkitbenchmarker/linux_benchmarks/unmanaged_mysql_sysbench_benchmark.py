@@ -19,6 +19,7 @@ This benchmark measures performance of Sysbench Databases on unmanaged MySQL.
 
 import copy
 import logging
+import time
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -262,7 +263,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   results = []
   # a map of trasactions metric name to current sample with max value
   max_transactions = {}
-  for thread_count in FLAGS.sysbench_run_threads:
+  for i, thread_count in enumerate(FLAGS.sysbench_run_threads):
     sysbench_parameters.threads = thread_count
     cmd = sysbench.BuildRunCommand(sysbench_parameters)
     logging.info('%s run command: %s', FLAGS.sysbench_testname, cmd)
@@ -286,6 +287,16 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       current_max_sample = max_transactions.get(metric, None)
       if not current_max_sample or current_max_sample.value < metric_value:
         max_transactions[metric] = item
+    # Sleep between runs if specified and not the last run
+    if (
+        sysbench.SYSBENCH_SLEEP_BETWEEN_RUNS_SEC.value > 0
+        and i < len(FLAGS.sysbench_run_threads) - 1
+    ):
+      logging.info(
+          'Sleeping for %d seconds before the next run.',
+          sysbench.SYSBENCH_SLEEP_BETWEEN_RUNS_SEC.value,
+      )
+      time.sleep(sysbench.SYSBENCH_SLEEP_BETWEEN_RUNS_SEC.value)
   # find the max tps/qps amongst all thread counts and report as a new metric.
   for item in max_transactions.values():
     metadata = copy.deepcopy(item.metadata)

@@ -552,3 +552,6 @@
     `YCSB_DIR` even if the directory already exists.
 -   Retry transient SCP command failures in `linux_virtual_machine.py`
     controlled by the `--ssh_retries` flag.
+-   Added `sysbench_sleep_between_runs_sec` flag with a default of 0 seconds.
+    This flag adds a sleep before running the next benchmark when using
+    different thread counts.

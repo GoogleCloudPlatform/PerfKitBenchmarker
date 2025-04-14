@@ -55,7 +55,11 @@ SYSBENCH_SSL_MODE = flags.DEFINE_string(
     None,
     'Sets the ssl mode to connect to the database. '
 )
-
+SYSBENCH_SLEEP_BETWEEN_RUNS_SEC = flags.DEFINE_integer(
+    'sysbench_sleep_between_runs_sec',
+    0,
+    'The time in seconds to sleep between runs with different thread counts.',
+)
 
 GIT_REPO = 'https://github.com/akopytov/sysbench'
 SYSBENCH_DIR = '~/sysbench'
