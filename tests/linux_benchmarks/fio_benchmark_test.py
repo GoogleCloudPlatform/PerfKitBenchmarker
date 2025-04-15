@@ -21,7 +21,7 @@ import mock
 from perfkitbenchmarker import temp_dir
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_benchmarks import fio_benchmark
+from perfkitbenchmarker.linux_benchmarks.fio import fio_benchmark
 from perfkitbenchmarker.linux_packages import numactl
 from tests import pkb_common_test_case
 
@@ -611,11 +611,11 @@ blocksize = 8k
     ), mock.patch(
         fio_name + '.fio.ParseResults'
     ), mock.patch(
-        fio_name + '.FLAGS'
+        fio_name + '.fio_flags'
     ) as mock_fio_flags, mock.patch.object(
         numactl, 'GetNuma', new=lambda vm: {'0': '0'}
     ):
-      mock_fio_flags.fio_target_mode = mode
+      mock_fio_flags.FIO_TARGET_MODE.value = mode
       benchmark_spec = mock.MagicMock()
       benchmark_spec.vms = [mock.MagicMock()]
       benchmark_spec.vms[0].RobustRemoteCommand = mock.MagicMock(
