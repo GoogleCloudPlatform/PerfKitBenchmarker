@@ -552,7 +552,8 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     server_vm.RemoteCommand(r"mkdir F:\DATA; mkdir F:\Logs; mkdir F:\Backup")
     replica_vms[0].RemoteCommand(
         r"mkdir F:\DATA; mkdir F:\Logs; mkdir F:\Backup")
-
+    self.PushAndRunPowershellScript(
+        server_vm, "check_sql_server_status.ps1")
     server_vm.RemoteCommand("""sqlcmd -Q \"
         USE [master]
         GO
@@ -597,6 +598,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     # create AOAG
     # running all the AOAG query from SQL server errors with Login
     # failed to for user 'NT AUTHORITY\ANONYMOUS LOGON double
+    self.PushAndRunPowershellScript(server_vm, "check_sql_server_status.ps1")
     server_vm.RemoteCommand(
         """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
         USE [master]
@@ -632,7 +634,8 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         GO\"
         """.format(perf_domain)
         )
-
+    self.PushAndRunPowershellScript(
+        replica_vms[0], "check_sql_server_status.ps1")
     replica_vms[0].RemoteCommand(
         """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
         USE [master]
@@ -671,7 +674,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         GO\"
         """.format(perf_domain)
         )
-
+    self.PushAndRunPowershellScript(server_vm, "check_sql_server_status.ps1")
     server_vm.RemoteCommand(
         """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
         USE [master]
@@ -692,7 +695,8 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
                    sql_engine_utils.SQLSERVER_AOAG_DB_NAME,
                    sql_engine_utils.SQLSERVER_AOAG_NAME,
                    perf_domain))
-
+    self.PushAndRunPowershellScript(
+        replica_vms[0], "check_sql_server_status.ps1")
     replica_vms[0].RemoteCommand(
         """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
         ALTER AVAILABILITY GROUP [{0}] JOIN;
@@ -706,12 +710,14 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     server_vm.RemoteCommand("Restart-Service MSSQLSERVER -Force")
     replica_vms[0].RemoteCommand("Restart-Service MSSQLSERVER -Force")
 
+    self.PushAndRunPowershellScript(server_vm, "check_sql_server_status.ps1")
     # Add DNN listener
     self.PushAndRunPowershellScript(
         server_vm,
         "add_dnn_listener.ps1",
         [sql_engine_utils.SQLSERVER_AOAG_NAME, "fcidnn", "1533"])
 
+    self.PushAndRunPowershellScript(server_vm, "check_sql_server_status.ps1")
     server_vm.RemoteCommand(
         """sqlcmd -Q \"
         ALTER AVAILABILITY GROUP [{1}] REMOVE DATABASE [{0}];

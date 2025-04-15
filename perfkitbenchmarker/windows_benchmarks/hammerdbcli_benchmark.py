@@ -17,7 +17,8 @@
 This benchmark uses Windows as the OS for both the database server and the
 HammerDB client(s).
 """
-
+import logging
+import time
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -283,6 +284,9 @@ def Prepare(benchmark_spec):
     except retryable_exceptions as e:
       if tries >= max_retries - 1:
         raise e
+      else:
+        logging.info('Wait 60 seconds before retrying prepare step.')
+        time.sleep(60)
 
 
 def SetMinimumRecover(relational_db):
