@@ -34,36 +34,17 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
             return_value='123',
         )
     )
-    self.platform_model = mock.create_autospec(vertex_ai.aiplatform.Model)
-    self.enter_context(
-        mock.patch.object(
-            vertex_ai.aiplatform.Model,
-            'upload',
-            return_value=self.platform_model,
-        )
-    )
-    self.platform_endpoint = mock.create_autospec(vertex_ai.aiplatform.Endpoint)
-    self.enter_context(
-        mock.patch.object(
-            vertex_ai.aiplatform,
-            'Endpoint',
-            return_value=self.platform_endpoint,
-        )
-    )
-    self.enter_context(
-        mock.patch.object(
-            vertex_ai.aiplatform.Endpoint,
-            'create',
-            return_value=self.platform_endpoint,
-        )
-    )
-    self.enter_context(mock.patch.object(vertex_ai.aiplatform, 'init'))
     config = {'model_name': 'llama2', 'model_size': '7b'}
     self.ai_spec = vertex_ai.VertexAiLlama2Spec('full_name', None, **config)
     self.vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
-    vertex_ai.VertexAiModelInRegistry.INTERFACE = 'CLI'
-    self.pkb_ai: vertex_ai.VertexAiModelInRegistry = (
-        vertex_ai.VertexAiModelInRegistry(
+
+
+class VertexAiCliInterfaceTest(VertexAiTest):
+
+  def setUp(self):
+    super().setUp()
+    self.pkb_ai: vertex_ai.CliVertexAiModel = (
+        vertex_ai.CliVertexAiModel(
             self.vm,
             self.ai_spec,
         )
@@ -82,130 +63,6 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertIsNotNone(ai_spec)
     self.assertEqual(ai_spec.__name__, 'VertexAiLlama3Spec')
-
-  def test_model_create_via_sdk(self):
-    vertex_ai.VertexAiModelInRegistry.INTERFACE = 'SDK'
-    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(
-        self.vm,
-        self.ai_spec,
-    )
-    self.MockRunCommand(
-        {
-            'gcloud ai endpoints create': [(
-                '',
-                'Created Vertex AI endpoint: endpoint-name.',
-                0,
-            )],
-            'gcloud ai endpoints predict': [(
-                '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
-                '',
-                0,
-            )],
-        },
-        self.pkb_ai.vm,
-    )
-    self.pkb_ai.Create()
-    samples = self.pkb_ai.GetSamples()
-    sampled_metrics = [sample.metric for sample in samples]
-    self.assertIn('Model Upload Time', sampled_metrics)
-    self.assertIn('Model Deploy Time', sampled_metrics)
-
-  @flagsaver.flagsaver(ai_bucket_uri=None)
-  def test_model_create_with_gcs_copy(self):
-    vertex_ai.VertexAiModelInRegistry.INTERFACE = 'SDK'
-    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(self.vm, self.ai_spec)
-    self.MockRunCommand(
-        {
-            'gcloud ai endpoints create': [(
-                '',
-                'Created Vertex AI endpoint: endpoint-name.',
-                0,
-            )],
-            'gcloud ai endpoints predict': [(
-                '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
-                '',
-                0,
-            )],
-        },
-        self.pkb_ai.vm,
-    )
-    self.MockIssueCommand({
-        'gsutil': [(
-            '',
-            '',
-            0,
-        )],
-    })
-    self.pkb_ai.Create()
-    samples = self.pkb_ai.GetSamples()
-    sampled_metrics = [sample.metric for sample in samples]
-    self.assertIn('GCS Bucket Copy Time', sampled_metrics)
-    self.assertEqual(
-        self.pkb_ai.model_bucket_path,
-        'gs://my-project-us-west-tmp-pkb123/llama2/llama2-7b-hf',
-    )
-
-  @flagsaver.flagsaver(ai_bucket_uri=None)
-  def test_model_create_with_reuse_gcs_bucket(self):
-    vertex_ai.VertexAiModelInRegistry.INTERFACE = 'SDK'
-    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(self.vm, self.ai_spec)
-    model2 = self.pkb_ai.InitializeNewModel()
-    self.MockRunCommand(
-        {
-            'gcloud ai endpoints create': [(
-                '',
-                'Created Vertex AI endpoint: endpoint-name.',
-                0,
-            )],
-            'gcloud ai endpoints predict': [(
-                '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
-                '',
-                0,
-            )],
-        },
-        model2.vm,
-    )
-    self.MockIssueCommand({
-        'gsutil': [(
-            '',
-            '',
-            0,
-        )],
-    })
-    model2.Create()
-    samples = self.pkb_ai.GetSamples()
-    sampled_metrics = [sample.metric for sample in samples]
-    self.assertNotIn('GCS Bucket Copy Time', sampled_metrics)
-    self.assertEqual(
-        self.pkb_ai.model_bucket_path,
-        'gs://my-project-us-west-tmp-pkb123/llama2/llama2-7b-hf',
-    )
-
-  def test_model_quota_error(self):
-    vertex_ai.VertexAiModelInRegistry.INTERFACE = 'SDK'
-    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(self.vm, self.ai_spec)
-    self.MockRunCommand(
-        {
-            'gcloud ai endpoints create': [(
-                '',
-                'Created Vertex AI endpoint: endpoint-name.',
-                0,
-            )],
-            'gcloud ai endpoints predict': [(
-                '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
-                '',
-                0,
-            )],
-        },
-        self.pkb_ai.vm,
-    )
-    self.platform_model.deploy.side_effect = google_exceptions.ServiceUnavailable(
-        '503 Machine type temporarily unavailable, please deploy with a'
-        ' different machine type or retry. 14: Machine type temporarily'
-        ' unavailable, please deploy with a different machine type or retry.'
-    )
-    with self.assertRaises(errors.Benchmarks.QuotaFailure):
-      self.pkb_ai.Create()
 
   def test_model_create_via_gcloud(self):
     cli = self.MockRunCommand(
@@ -302,53 +159,6 @@ class VertexAiTest(pkb_common_test_case.PkbCommonTestCase):
     self.pkb_ai._Create()
     self.assertEqual(cli.RunCommand.mock_command.progress_through_calls['gcloud ai endpoints predict'], 2)  # pytype: disable=attribute-error
 
-  def test_model_create_via_model_garden_cli(self):
-    vertex_ai.VertexAiModelInRegistry.INTERFACE = 'MODEL-GARDEN-CLI'
-    self.pkb_ai = vertex_ai.VertexAiModelInRegistry(self.vm, self.ai_spec)
-    self.MockRunCommand(
-        {
-            'model-garden models deploy': [
-                (
-                    '',
-                    """
-                Using the selected deployment configuration:
-                 Machine type: g2-standard-12
-                Deploying the model to the endpoint. To check the deployment status, you can try one of the following methods:
-1) Look for endpoint `meta-meta-llama-3-8b-mg-cli-deploy` at the [Vertex AI] -> [Online prediction] tab in Cloud Console
-2) Use `gcloud ai operations describe 12345 --region=us-east1` to find the status of the deployment long-running operation
-Waiting for operation [12345]...done.
-""",
-                    0,
-                ),
-            ],
-            'ai operations describe': [(
-                """Using endpoint [https://us-east1-aiplatform.googleapis.com/]
-done: true
-metadata:
-  '@type': type.googleapis.com/google.cloud.aiplatform.v1beta1.DeployOperationMetadata
-  projectNumber: '123'
-  publisherModel: publishers/meta/models/llama3@meta-llama-3-8b
-name: projects/123/locations/us-west/operations/12345
-response:
-  '@type': type.googleapis.com/google.cloud.aiplatform.v1beta1.DeployResponse
-  endpoint: projects/123/locations/us-west/endpoints/fooendpoint
-  model: projects/123/locations/us-west/models/foomodel@1
-  publisherModel: publishers/meta/models/llama3@meta-llama-3-8b
-""",
-                '',
-                0,
-            )],
-            'ai endpoints describe update': [('', '', 0)],
-        },
-        self.pkb_ai.vm,
-    )
-    self.pkb_ai._Create()
-    self.assertEqual(self.pkb_ai.model_resource_name, 'foomodel')
-    self.assertEqual(
-        self.pkb_ai.endpoint.endpoint_name,
-        'projects/123/locations/us-west/endpoints/fooendpoint',
-    )
-
   def test_model_inited(self):
     # Assert on values from setup
     self.assertEqual(self.pkb_ai.name, 'pkb123')
@@ -443,24 +253,234 @@ response:
     )
 
 
-class VertexAiEndpointTest(pkb_common_test_case.PkbCommonTestCase):
+class VertexAiModelGardenCliTest(VertexAiTest):
 
   def setUp(self):
     super().setUp()
-    self.vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
-    self.endpoint = vertex_ai.VertexAiEndpoint(
-        name='my-endpoint',
-        project='my-project',
-        region='us-east1',
-        vm=self.vm,
-        interface='CLI',
+    self.pkb_ai: vertex_ai.ModelGardenCliVertexAiModel = (
+        vertex_ai.ModelGardenCliVertexAiModel(
+            self.vm,
+            self.ai_spec,
+        )
     )
+
+  def test_model_create_via_model_garden_cli(self):
+    self.MockRunCommand(
+        {
+            'model-garden models deploy': [
+                (
+                    '',
+                    """
+                Using the selected deployment configuration:
+                 Machine type: g2-standard-12
+                Deploying the model to the endpoint. To check the deployment status, you can try one of the following methods:
+1) Look for endpoint `meta-meta-llama-3-8b-mg-cli-deploy` at the [Vertex AI] -> [Online prediction] tab in Cloud Console
+2) Use `gcloud ai operations describe 12345 --region=us-east1` to find the status of the deployment long-running operation
+Waiting for operation [12345]...done.
+""",
+                    0,
+                ),
+            ],
+            'ai operations describe': [(
+                """Using endpoint [https://us-east1-aiplatform.googleapis.com/]
+done: true
+metadata:
+  '@type': type.googleapis.com/google.cloud.aiplatform.v1beta1.DeployOperationMetadata
+  projectNumber: '123'
+  publisherModel: publishers/meta/models/llama3@meta-llama-3-8b
+name: projects/123/locations/us-west/operations/12345
+response:
+  '@type': type.googleapis.com/google.cloud.aiplatform.v1beta1.DeployResponse
+  endpoint: projects/123/locations/us-west/endpoints/fooendpoint
+  model: projects/123/locations/us-west/models/foomodel@1
+  publisherModel: publishers/meta/models/llama3@meta-llama-3-8b
+""",
+                '',
+                0,
+            )],
+            'ai endpoints describe update': [('', '', 0)],
+        },
+        self.pkb_ai.vm,
+    )
+    self.pkb_ai._Create()
+    self.assertEqual(self.pkb_ai.model_resource_name, 'foomodel')
+    self.assertEqual(
+        self.pkb_ai.endpoint.endpoint_name,
+        'projects/123/locations/us-west/endpoints/fooendpoint',
+    )
+
+
+class VertexAiSdkTest(VertexAiTest):
+
+  def setUp(self):
+    super().setUp()
+    self.platform_model = mock.create_autospec(vertex_ai.aiplatform.Model)
+    self.enter_context(
+        mock.patch.object(
+            vertex_ai.aiplatform.Model,
+            'upload',
+            return_value=self.platform_model,
+        )
+    )
+    self.platform_endpoint = mock.create_autospec(vertex_ai.aiplatform.Endpoint)
     self.enter_context(
         mock.patch.object(
             vertex_ai.aiplatform,
             'Endpoint',
-            return_value=mock.create_autospec(vertex_ai.aiplatform.Endpoint),
+            return_value=self.platform_endpoint,
         )
+    )
+    self.enter_context(
+        mock.patch.object(
+            vertex_ai.aiplatform.Endpoint,
+            'create',
+            return_value=self.platform_endpoint,
+        )
+    )
+    self.enter_context(mock.patch.object(vertex_ai.aiplatform, 'init'))
+    self.pkb_ai: vertex_ai.VertexAiPythonSdkModel = (
+        vertex_ai.VertexAiPythonSdkModel(
+            self.vm,
+            self.ai_spec,
+        )
+    )
+
+  def test_model_create_via_sdk(self):
+    self.MockRunCommand(
+        {
+            'gcloud ai endpoints create': [(
+                '',
+                'Created Vertex AI endpoint: endpoint-name.',
+                0,
+            )],
+            'gcloud ai endpoints predict': [(
+                '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
+                '',
+                0,
+            )],
+        },
+        self.pkb_ai.vm,
+    )
+    self.pkb_ai.Create()
+    samples = self.pkb_ai.GetSamples()
+    sampled_metrics = [sample.metric for sample in samples]
+    self.assertIn('Model Upload Time', sampled_metrics)
+    self.assertIn('Model Deploy Time', sampled_metrics)
+
+  @flagsaver.flagsaver(ai_bucket_uri=None)
+  def test_model_create_with_gcs_copy(self):
+    self.pkb_ai = (
+        vertex_ai.VertexAiPythonSdkModel(
+            self.vm,
+            self.ai_spec,
+        )
+    )
+    self.MockRunCommand(
+        {
+            'gcloud ai endpoints create': [(
+                '',
+                'Created Vertex AI endpoint: endpoint-name.',
+                0,
+            )],
+            'gcloud ai endpoints predict': [(
+                '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
+                '',
+                0,
+            )],
+        },
+        self.pkb_ai.vm,
+    )
+    self.MockIssueCommand({
+        'gsutil': [(
+            '',
+            '',
+            0,
+        )],
+    })
+    self.pkb_ai.Create()
+    samples = self.pkb_ai.GetSamples()
+    sampled_metrics = [sample.metric for sample in samples]
+    self.assertIn('GCS Bucket Copy Time', sampled_metrics)
+    self.assertEqual(
+        self.pkb_ai.model_bucket_path,
+        'gs://my-project-us-west-tmp-pkb123/llama2/llama2-7b-hf',
+    )
+
+  @flagsaver.flagsaver(ai_bucket_uri=None)
+  def test_model_create_with_reuse_gcs_bucket(self):
+    self.pkb_ai = (
+        vertex_ai.VertexAiPythonSdkModel(
+            self.vm,
+            self.ai_spec,
+        )
+    )
+    model2 = self.pkb_ai.InitializeNewModel()
+    self.MockRunCommand(
+        {
+            'gcloud ai endpoints create': [(
+                '',
+                'Created Vertex AI endpoint: endpoint-name.',
+                0,
+            )],
+            'gcloud ai endpoints predict': [(
+                '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
+                '',
+                0,
+            )],
+        },
+        model2.vm,
+    )
+    self.MockIssueCommand({
+        'gsutil': [(
+            '',
+            '',
+            0,
+        )],
+    })
+    model2.Create()
+    samples = self.pkb_ai.GetSamples()
+    sampled_metrics = [sample.metric for sample in samples]
+    self.assertNotIn('GCS Bucket Copy Time', sampled_metrics)
+    self.assertEqual(
+        self.pkb_ai.model_bucket_path,
+        'gs://my-project-us-west-tmp-pkb123/llama2/llama2-7b-hf',
+    )
+
+  def test_model_quota_error(self):
+    self.MockRunCommand(
+        {
+            'gcloud ai endpoints create': [(
+                '',
+                'Created Vertex AI endpoint: endpoint-name.',
+                0,
+            )],
+            'gcloud ai endpoints predict': [(
+                '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
+                '',
+                0,
+            )],
+        },
+        self.pkb_ai.vm,
+    )
+    self.platform_model.deploy.side_effect = google_exceptions.ServiceUnavailable(
+        '503 Machine type temporarily unavailable, please deploy with a'
+        ' different machine type or retry. 14: Machine type temporarily'
+        ' unavailable, please deploy with a different machine type or retry.'
+    )
+    with self.assertRaises(errors.Benchmarks.QuotaFailure):
+      self.pkb_ai.Create()
+
+
+class VertexAiCliEndpointTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
+    self.endpoint = vertex_ai.VertexAiCliEndpoint(
+        name='my-endpoint',
+        project='my-project',
+        region='us-east1',
+        vm=self.vm,
     )
 
   def test_endpoint_create(self):
@@ -495,7 +515,6 @@ deployedModels:
         'projects/6789/locations/us-east1/endpoints/1234',
         self.endpoint.endpoint_name,
     )
-    self.assertIsNotNone(self.endpoint.ai_endpoint)
 
   def test_endpoint_delete(self):
     self.endpoint.endpoint_name = (
