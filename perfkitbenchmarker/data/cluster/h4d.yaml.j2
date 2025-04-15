@@ -47,9 +47,15 @@ deployment_groups:
         - protocol: udp
         - protocol: icmp
 
+  - id: h4d_startup
+    source: modules/scripts/startup-script
+    settings:
+      install_cloud_rdma_drivers: true
+      set_ofi_cloud_rdma_tunables: true
+
   - id: compute_nodeset
     source: community/modules/compute/schedmd-slurm-gcp-v6-nodeset
-    use: [network]
+    use: [network, h4d_startup]
     settings:
       enable_placement: true
       node_count_dynamic_max: 0
@@ -94,6 +100,9 @@ deployment_groups:
       partition_name: compute
       exclusive: false
       is_default: true
+      partition_conf:
+        ResumeTimeout: 900
+        SuspendTimeout: 600
 
   - id: slurm_controller
     source: community/modules/scheduler/schedmd-slurm-gcp-v6-controller

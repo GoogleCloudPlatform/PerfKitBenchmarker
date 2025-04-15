@@ -95,30 +95,44 @@ class AWSCluster(cluster.BaseCluster):
     self._headnode_subnet_id = subnet_ids[0]
     self._worker_subnet_id = subnet_ids[1]
     resources_to_tag.extend(subnet_ids)
-    resources_to_tag.append(json.loads(vm_util.IssueCommand([
-        'aws',
-        'ec2',
-        'describe-internet-gateways',
-        '--filters',
-        f'Name=attachment.vpc-id,Values={vpc_id}',
-    ])[0])['InternetGateways'][0]['InternetGatewayId'])
-    route_tables = json.loads(vm_util.IssueCommand([
-        'aws',
-        'ec2',
-        'describe-route-tables',
-        '--filters',
-        f'Name=vpc-id,Values={vpc_id}',
-    ])[0])['RouteTables']
+    resources_to_tag.append(
+        json.loads(
+            vm_util.IssueCommand([
+                'aws',
+                'ec2',
+                'describe-internet-gateways',
+                '--filters',
+                f'Name=attachment.vpc-id,Values={vpc_id}',
+                '--region',
+                self.region,
+            ])[0]
+        )['InternetGateways'][0]['InternetGatewayId']
+    )
+    route_tables = json.loads(
+        vm_util.IssueCommand([
+            'aws',
+            'ec2',
+            'describe-route-tables',
+            '--filters',
+            f'Name=vpc-id,Values={vpc_id}',
+            '--region',
+            self.region,
+        ])[0]
+    )['RouteTables']
     for table in route_tables:
       if not table['Associations'][0]['Main']:
         resources_to_tag.append(table['RouteTableId'])
-    nat = json.loads(vm_util.IssueCommand([
-        'aws',
-        'ec2',
-        'describe-nat-gateways',
-        '--filter',
-        f'Name=vpc-id,Values={vpc_id}',
-    ])[0])['NatGateways'][0]
+    nat = json.loads(
+        vm_util.IssueCommand([
+            'aws',
+            'ec2',
+            'describe-nat-gateways',
+            '--filter',
+            f'Name=vpc-id,Values={vpc_id}',
+            '--region',
+            self.region,
+        ])[0]
+    )['NatGateways'][0]
     resources_to_tag.append(nat['NatGatewayId'])
     resources_to_tag.append(nat['NatGatewayAddresses'][0]['NetworkInterfaceId'])
     for resource_to_tag in resources_to_tag:

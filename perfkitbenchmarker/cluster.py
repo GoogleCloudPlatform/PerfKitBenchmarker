@@ -24,6 +24,7 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import vm_group_decoders
@@ -356,6 +357,20 @@ class BaseCluster(resource.BaseResource):
     if self.unmanaged:
       return
     super().Delete()
+
+  @vm_util.Retry(
+      fuzz=0,
+      timeout=1800,
+      max_retries=5,
+      retryable_exceptions=(errors.Resource.RetryableCreationError,),
+  )
+  def _WaitUntilReady(self):
+    if self.unmanaged:
+      return
+    if not self.headnode_vm.TryRemoteCommand(
+        f'srun -N {self.num_workers} hostname'
+    ):
+      raise errors.Resource.RetryableCreationError('Cluster not ready.')
 
 
 Cluster = typing.TypeVar('Cluster', bound=BaseCluster)

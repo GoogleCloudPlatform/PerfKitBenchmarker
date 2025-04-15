@@ -132,6 +132,7 @@ class GceCluster(cluster.BaseCluster):
       vm.name = f'{self.name}-controller'
 
     self.headnode_vm = self.BackfillVm(self.headnode_spec, _UpdateHeadNode)
+    self._WaitUntilReady()
     for i in range(self.num_workers):
 
       def _UpdateWorker(vm):
@@ -202,20 +203,3 @@ class H4dCluster(GceCluster):
 
   DEFAULT_TEMPLATE = 'cluster/h4d.yaml.j2'
   TYPE = 'h4d'
-
-  def _PostCreate(self):
-    super()._PostCreate()
-
-    def _InstallRdma(vm):
-      vm.RemoteCommand(
-          'wget https://raw.githubusercontent.com/GoogleCloudPlatform/'
-          'cluster-toolkit/refs/heads/main/modules/scripts/startup-script/'
-          'files/install_cloud_rdma_drivers.sh'
-      )
-      vm.RemoteHostCopy(
-          data.ResourcePath('cluster/set_ofi_cloud_rdma_tunables.sh'),
-          '/etc/profile.d/set_ofi_cloud_rdma_tunables.sh'
-      )
-      vm.RemoteCommand('bash install_cloud_rdma_drivers.sh')
-
-    background_tasks.RunThreaded(_InstallRdma, self.worker_vms)
