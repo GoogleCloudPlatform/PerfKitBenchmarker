@@ -265,8 +265,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   results = []
   # a map of transaction metric name (tps/qps) to current sample with max value
   max_transactions = {}
-  max_thread_qps = {}
-  for thread_count in FLAGS.sysbench_run_threads:
+  sorted_threads = sorted(FLAGS.sysbench_run_threads)
+  previous_qps = 0
+  reached_peak = False
+  for thread_count in sorted_threads:
     sysbench_parameters.threads = thread_count
     cmd = sysbench.BuildRunCommand(sysbench_parameters)
     logging.info('%s run command: %s', FLAGS.sysbench_testname, cmd)
@@ -294,23 +296,18 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
         max_transactions[metric] = item
     # store QPS at max threads
     # current_transactions is an array of two samples, tps and qps.
-    if (
-        'thread_count' not in max_thread_qps
-        or max_thread_qps['thread_count'] < thread_count
-    ):
-      max_thread_qps['thread_count'] = thread_count
-      max_thread_qps['qps'] = current_transactions[1].value
+    current_qps = current_transactions[1].value
+    if not reached_peak and current_qps < previous_qps:
+      reached_peak = True
   # if we get max_qps at max thread_count, there is a possibility of a higher
   # qps at increased thread count. if --postgresql_measure_max_qps is set to
   # true, we want to make sure we achieve max QPS.
   if (
       _MEASURE_MAX_QPS.value
-      and 'qps' in max_thread_qps
-      and max_transactions.get('qps', sample.Sample('qps', 0, '', {})).value
-      == max_thread_qps['qps']
+      and not reached_peak
   ):
     raise errors.Benchmarks.RunError(
-        f'Max achieved at {max_thread_qps["thread_count"]} threads, possibility'
+        f'Max achieved at {sorted_threads[-1]} threads, possibility'
         ' of not enough client load. Consider using'
         ' --postgresql_measure_max_qps flag if you want to disable this check.'
     )
