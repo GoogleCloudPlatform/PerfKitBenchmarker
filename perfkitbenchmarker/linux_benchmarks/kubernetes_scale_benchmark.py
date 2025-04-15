@@ -51,7 +51,7 @@ CPUS_PER_POD = flags.DEFINE_string(
     'kubernetes_scale_pod_cpus', '250m', 'CPU limit per pod'
 )
 MEMORY_PER_POD = flags.DEFINE_string(
-    'kubernetes_scale_pod_memory', '250m', 'Memory limit per pod'
+    'kubernetes_scale_pod_memory', '250M', 'Memory limit per pod'
 )
 
 MANIFEST_TEMPLATE = 'container/kubernetes_scale/kubernetes_scale.yaml.j2'

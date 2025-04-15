@@ -24,7 +24,9 @@ spec:
             cpu: {{ CpuRequest }}
             memory: {{ MemoryRequest }}
             ephemeral-storage: {{ EphemeralStorageRequest }}
+            {%- if NvidiaGpuRequest %}
             nvidia.com/gpu: {{ NvidiaGpuRequest }}
+            {%- endif %}
       nodeSelector:
         {%- for NodeSelector in NodeSelectors %}
         {{ NodeSelector }}
