@@ -1,0 +1,75 @@
+diff --git a/app/pktgen-port-cfg.c b/app/pktgen-port-cfg.c
+index 33a066c..25ebcda 100644
+--- a/app/pktgen-port-cfg.c
++++ b/app/pktgen-port-cfg.c
+@@ -160,6 +160,7 @@ initialize_port_info(uint16_t pid)
+     }
+ 
+     conf.rxmode.offloads &= pinfo->dev_info.rx_offload_capa;
++    conf.txmode.offloads |= (pinfo->dev_info.tx_offload_capa & (RTE_ETH_TX_OFFLOAD_IPV4_CKSUM | RTE_ETH_TX_OFFLOAD_TCP_CKSUM | RTE_ETH_TX_OFFLOAD_UDP_CKSUM));
+ 
+     pktgen_log_info("   Allocate packet sequence array");
+ 
+diff --git a/app/pktgen.c b/app/pktgen.c
+index 4d5fcf2..1d55c8d 100644
+--- a/app/pktgen.c
++++ b/app/pktgen.c
+@@ -87,37 +87,6 @@ pg_pktmbuf_dump(FILE *f, const struct rte_mbuf *m, unsigned dump_len)
+ }
+ #endif
+ 
+-/**
+- *
+- * wire_size - Calculate the wire size of the data in bits to be sent.
+- *
+- * DESCRIPTION
+- * Calculate the number of bytes/bits in a burst of traffic.
+- *
+- * RETURNS: Number of bytes in a burst of packets.
+- *
+- * SEE ALSO:
+- */
+-static uint64_t
+-pktgen_wire_size(port_info_t *pinfo)
+-{
+-    uint64_t i, size = 0;
+-
+-    if (pktgen_tst_port_flags(pinfo, SEND_PCAP_PKTS)) {
+-        pcap_info_t *pcap = l2p_get_pcap(pinfo->pid);
+-
+-        size = WIRE_SIZE(pcap->max_pkt_size, uint64_t);
+-    } else {
+-        if (unlikely(pinfo->seqCnt > 0)) {
+-            for (i = 0; i < pinfo->seqCnt; i++)
+-                size += WIRE_SIZE(pinfo->seq_pkt[i].pkt_size, uint64_t);
+-            size = size / pinfo->seqCnt; /* Calculate the average sized packet */
+-        } else
+-            size = WIRE_SIZE(pinfo->seq_pkt[SINGLE_PKT].pkt_size, uint64_t);
+-    }
+-    return (size * 8);
+-}
+-
+ /**
+  *
+  * pktgen_packet_rate - Calculate the transmit rate.
+@@ -132,18 +101,8 @@ pktgen_wire_size(port_info_t *pinfo)
+ void
+ pktgen_packet_rate(port_info_t *port)
+ {
+-    uint64_t link_speed, wire_size, pps, cpb;
+-
+-    wire_size = pktgen_wire_size(port);
+-    if (port->link.link_speed == 0) {
+-        port->tx_cycles = 0;
+-        port->tx_pps    = 0;
+-        return;
+-    }
+-
+-    link_speed = (uint64_t)port->link.link_speed * Million;
+-    pps        = (((link_speed / wire_size) * ((port->tx_rate == 0) ? 1.0 : port->tx_rate)) / 100);
+-    pps        = ((pps > 0) ? pps : 1);
++    uint64_t pps, cpb;
++    pps        = 100000000; /* Hard-coded PPS */
+     cpb        = (rte_get_timer_hz() / pps) * (uint64_t)port->tx_burst; /* Cycles per Burst */
+ 
+     port->tx_cycles = (uint64_t)l2p_get_txcnt(port->pid) * cpb;

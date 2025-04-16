@@ -22,10 +22,10 @@ DPDK_GIT_REPO_TAG = 'v24.11'
 DPDK_GCP_DRIVER_GIT_REPO = (
     'https://github.com/google/compute-virtual-ethernet-dpdk'
 )
-# Head as of 2025-01-08.
+# Head as of 2025-03-15.
 DPDK_GCP_DRIVER_GIT_REPO_COMMIT = '0342498eaa38e8db1cd663a99d470989fb60f803'
 DPDK_AWS_DRIVER_GIT_REPO = 'https://github.com/amzn/amzn-drivers'
-DPDK_AWS_DRIVER_GIT_REPO_TAG = 'ena_linux_2.13.2'
+DPDK_AWS_DRIVER_GIT_REPO_TAG = 'ena_linux_2.13.3'
 DPDK_AWS_VFIO_DRIVER_DIR = 'amzn-drivers/userspace/dpdk/enav2-vfio-patch'
 
 
@@ -67,30 +67,16 @@ def AptInstall(vm):
       ' python3-pyelftools libnuma-dev'
   )
   # https://github.com/amzn/amzn-drivers/tree/master/userspace/dpdk#6-vfio-pci-and-igb_uio
-  # Downgrade the kernel to the version where vfio-pci is distributed as a
-  # module so the AWS vfio patch can be applied.
   if vm.CLOUD == 'AWS':
-    vm.InstallPackages(
-        'linux-image-5.4.0-1060-aws linux-headers-5.4.0-1060-aws'
-        ' linux-tools-5.4.0-1060-aws'
-    )
-    vm.RemoteCommand(
-        """sudo sed -i 's/GRUB_DEFAULT=0/GRUB_DEFAULT="1>2"/g' /etc/default/grub"""
-    )
-    vm.RemoteCommand('sudo update-grub')
-    vm.Reboot()
     vm.RemoteCommand(f'git clone {DPDK_AWS_DRIVER_GIT_REPO}')
     vm.RemoteCommand(
         f'cd amzn-drivers && git checkout {DPDK_AWS_DRIVER_GIT_REPO_TAG}'
     )
     vm.RemoteCommand(
-        'sudo sed -i "s/# deb-src/deb-src/g" /etc/apt/sources.list'
+        "sudo sed -i 's/^Types: deb$/Types: deb deb-src/'"
+        ' /etc/apt/sources.list.d/ubuntu.sources'
     )
     vm.RemoteCommand('sudo apt update')
-    vm.RemoteCommand(
-        'sudo sed -i "s/linux-image-unsigned-/linux-image-/g"'
-        f' {DPDK_AWS_VFIO_DRIVER_DIR}/get-vfio-with-wc.sh'
-    )
     vm.RobustRemoteCommand(
         f'cd {DPDK_AWS_VFIO_DRIVER_DIR} && sudo ./get-vfio-with-wc.sh'
     )

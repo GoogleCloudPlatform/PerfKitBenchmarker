@@ -21,8 +21,7 @@ https://pktgen-dpdk.readthedocs.io/en/latest/getting_started.html
 https://toonk.io/building-a-high-performance-linux-based-traffic-generator-with-dpdk/index.html
 """
 
-import re
-from typing import Any, List, Mapping
+from typing import Any, Mapping
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -64,15 +63,14 @@ _DPDK_PKTGEN_PACKET_LOSS_THRESHOLDS = flags.DEFINE_multi_float(
 )
 _DPDK_PKTGEN_NUM_FLOWS = flags.DEFINE_integer(
     'dpdk_pktgen_num_flows',
-    1,
+    200,
     'Number of flows to use by taking a range of source ports.',
     lower_bound=0,
 )
 
 # DPDK Pktgen maximum logical cores
 _MAX_LCORES = 128
-# Starting packet transmission rate as a percentage.
-_START_RATE = 0.001
+_START_RATE = 100000000
 # Percent difference in PPS between consecutive iterations to terminate binary
 # search.
 _PPS_BINARY_SEARCH_THRESHOLD = 0.01
@@ -100,18 +98,19 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     benchmark_spec: The benchmark specification.
   """
   sender_vm, receiver_vm = benchmark_spec.vms[:2]
-
+  background_tasks.RunThreaded(
+      lambda vm: vm.Install('dpdk_pktgen'),
+      [sender_vm, receiver_vm],
+  )
   background_tasks.RunThreaded(
       lambda vm: PrepareVM(
           vm,
           sender_vm.internal_ips[1],
+          sender_vm.secondary_mac_addr,
           receiver_vm.internal_ips[1],
+          receiver_vm.secondary_mac_addr,
       ),
       [sender_vm, receiver_vm],
-  )
-  receiver_vm.RemoteCommand(
-      'sudo sed -i "s/set all rate <RATE>//g"'
-      f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
   receiver_vm.RemoteCommand(
       'sudo sed -i "s/start all//g"'
@@ -132,16 +131,21 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 def PrepareVM(
     vm: linux_virtual_machine.BaseLinuxVirtualMachine,
     sender_vm_ip: str,
+    sender_vm_mac: str,
     receiver_vm_ip: str,
+    receiver_vm_mac: str,
 ) -> None:
   """Prepares a VM to run DPDK Pktgen."""
-  vm.Install('dpdk_pktgen')
   vm.PushDataFile(
       'dpdk_pktgen/pktgen.pkt',
       f'{dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt',
   )
   vm.RemoteCommand(
       f'sudo sed -i "s/<SRC_IP>/{sender_vm_ip}/g"'
+      f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+  )
+  vm.RemoteCommand(
+      f'sudo sed -i "s/<SRC_MAC>/{sender_vm_mac}/g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
   # Updating src port numbers for multiple flows.
@@ -152,6 +156,10 @@ def PrepareVM(
   )
   vm.RemoteCommand(
       f'sudo sed -i "s/<DST_IP>/{receiver_vm_ip}/g"'
+      f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+  )
+  vm.RemoteCommand(
+      f'sudo sed -i "s/<DST_MAC>/{receiver_vm_mac}/g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
   # Updating dst port numbers for multiple flows.
@@ -189,13 +197,22 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       'dpdk_pktgen_duration': _DPDK_PKTGEN_DURATION.value,
       'dpdk_pktgen_num_flows': _DPDK_PKTGEN_NUM_FLOWS.value,
   }
+  pktgen_env_var = ''
+  # Incorrect llq_policy default:
+  # https://github.com/amzn/amzn-drivers/issues/331
+  aws_eal_arg = ''
+  if sender_vm.CLOUD == 'AWS':
+    pktgen_env_var = ' LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib64'
+    aws_eal_arg = f' -a "{receiver_vm.secondary_nic_bus_info},llq_policy=1"'
+
   cmd = (
-      f'cd {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR} && sudo'
-      f' ./usr/local/bin/pktgen -l 0-{num_lcores-1} -n {num_memory_channels} --'
-      f' -m "[1-7].0" -f pktgen.pkt > {_STDOUT_LOG_FILE}'
+      f'cd {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR} &&'
+      f' sudo{pktgen_env_var} ./usr/local/bin/pktgen -l 0-{num_lcores-1} -n'
+      f' {num_memory_channels}{aws_eal_arg} -- -m "[1-7].0" -f pktgen.pkt >'
+      f' {_STDOUT_LOG_FILE}'
   )
 
-  prev_rate = '<RATE>'
+  prev_rate = _START_RATE
   for packet_loss_threshold in _DPDK_PKTGEN_PACKET_LOSS_THRESHOLDS.value:
     metadata = metadata.copy()
     metadata['dpdk_pktgen_packet_loss_threshold'] = packet_loss_threshold
@@ -208,12 +225,17 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     lb, ub = 0, _START_RATE * 2
 
     while (
-        abs(curr_pps - prev_pps) / (curr_pps + 1)
-    ) > _PPS_BINARY_SEARCH_THRESHOLD:
+        (abs(curr_pps - prev_pps) / (curr_pps + 1))
+        > _PPS_BINARY_SEARCH_THRESHOLD
+    ) or (not valid_total_receiver_rx_pkts):
       curr_rate = (lb + ub) / 2
       sender_vm.RemoteCommand(
-          f'sudo sed -i "s/{prev_rate}/{curr_rate}/g"'
-          f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+          f'sudo sed -i "s/pps        = {prev_rate};/pps        ='
+          f' {curr_rate};/g"'
+          f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/app/pktgen.c'
+      )
+      sender_vm.RemoteCommand(
+          f'cd {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR} && make'
       )
 
       # Running Pktgen requires a terminal.
@@ -224,9 +246,19 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
           [receiver_vm, sender_vm],
           post_task_delay=1,  # Ensure receiver starts before sender.
       )
-      total_sender_tx_pkts, total_sender_rx_pkts, total_receiver_rx_pkts = (
-          _ParseStdout(sender_vm, receiver_vm)
+
+      # Parse ANSI codes.
+      stdout_rx_parser = (
+          f'cat {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/{_STDOUT_LOG_FILE} |'
+          r' grep -oP "\[7;22H\s*\K[0-9]+" | tail -1'
       )
+      stdout_tx_parser = (
+          f'cat {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/{_STDOUT_LOG_FILE} |'
+          r' grep -oP "\[8;22H\s*\K[0-9]+" | tail -1'
+      )
+      total_sender_tx_pkts, _ = sender_vm.RemoteCommand(stdout_tx_parser)
+      total_sender_rx_pkts, _ = sender_vm.RemoteCommand(stdout_rx_parser)
+      total_receiver_rx_pkts, _ = receiver_vm.RemoteCommand(stdout_rx_parser)
 
       packet_loss_rate = (
           int(total_sender_tx_pkts)
@@ -293,37 +325,6 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     ])
 
   return samples
-
-
-def _ParseStdout(
-    sender_vm: linux_virtual_machine.BaseLinuxVirtualMachine,
-    receiver_vm: linux_virtual_machine.BaseLinuxVirtualMachine,
-) -> List[str]:
-  """Parse stdout log file to obtain packets sent and received.
-
-  Args:
-    sender_vm: The sender VM.
-    receiver_vm: The receiver VM.
-
-  Returns:
-    A list of strings representing the total sender tx packets, total sender rx
-    packets, and total receiver rx packets.
-  """
-  # Filter out ANSI escape codes from stdout.
-  stdout_parser = (
-      f'cat {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/{_STDOUT_LOG_FILE} |'
-      r' sed "s/\x1B\[[0-9;]*[a-zA-Z]//g"'
-  )
-  receiver_stdout, _ = receiver_vm.RemoteCommand(stdout_parser)
-  sender_stdout, _ = sender_vm.RemoteCommand(stdout_parser)
-  total_sender_rx_pkts, total_sender_tx_pkts = re.findall(
-      r'Powered by DPDK.*', sender_stdout
-  )[-1].split()[30:32]
-  total_receiver_rx_pkts = re.findall(r'Powered by DPDK.*', receiver_stdout)[
-      -1
-  ].split()[30]
-
-  return [total_sender_tx_pkts, total_sender_rx_pkts, total_receiver_rx_pkts]
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:

@@ -1,10 +1,12 @@
 set all txburst 1
 set all rxburst 1
-set all rate <RATE>
 enable all range
+range all proto udp
 range all src ip <SRC_IP> <SRC_IP> <SRC_IP> 0.0.0.1
+range all src mac <SRC_MAC> <SRC_MAC> <SRC_MAC> 00:00:00:00:00:01
 range all src port 1234 1234 1234 0
 range all dst ip <DST_IP> <DST_IP> <DST_IP> 0.0.0.1
+range all dst mac <DST_MAC> <DST_MAC> <DST_MAC> 00:00:00:00:00:01
 range all dst port 5678 5678 5678 0
 clr
 start all

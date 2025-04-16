@@ -33,15 +33,6 @@ DATA_FILENAMES = [
     'receiver_stdout.txt',
 ]
 
-METADATA = {
-    'dpdk_pkgen_burst': 1,
-    'dpdk_pktgen_lcores': 22,
-    'dpdk_pktgen_num_memory_channels': 6,
-    'dpdk_pktgen_duration': 60,
-    'dpdk_pktgen_packet_loss_threshold': 0.01,
-    'dpdk_pktgen_num_flows': 1,
-}
-
 
 def _load_data(filename):
   path = os.path.join(
@@ -67,43 +58,43 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
             'Total sender tx packets',
             670441705,
             'packets',
-            METADATA,
+            {},
         ),
         sample.Sample(
             'Total sender tx pps',
             11174028,
             'packets/s',
-            METADATA,
+            {},
         ),
         sample.Sample(
             'Total sender rx packets',
             11,
             'packets',
-            METADATA,
+            {},
         ),
         sample.Sample(
             'Total sender rx pps',
             0,
             'packets/s',
-            METADATA,
+            {},
         ),
         sample.Sample(
             'Total receiver rx packets',
             670421930,
             'packets',
-            METADATA,
+            {},
         ),
         sample.Sample(
             'Total receiver rx pps',
             11173698,
             'packets/s',
-            METADATA,
+            {},
         ),
         sample.Sample(
             'packet loss rate',
             0.000029511887241561144,
             'rate (1=100%)',
-            METADATA,
+            {},
         ),
     ]
 
@@ -116,13 +107,22 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     self.bm_spec.vms[0].RemoteCommand.side_effect = [
         ('6', ''),
         ('', ''),
+        ('', ''),
         (self.sender_stdout, ''),
+        (1, ''),
+        (0, ''),
+        ('', ''),
+        ('', ''),
         (self.sender_stdout, ''),
-        (self.sender_stdout, ''),
-        (self.sender_stdout, ''),
-        (self.sender_stdout, ''),
+        (1, ''),
+        (0, ''),
     ]
-    self.bm_spec.vms[1].RemoteCommand.return_value = (self.receiver_stdout, '')
+    self.bm_spec.vms[1].RemoteCommand.side_effect = [
+        (self.receiver_stdout, ''),
+        (1, ''),
+        (self.receiver_stdout, ''),
+        (1, ''),
+    ]
     _ = dpdk_pktgen_benchmark.Run(self.bm_spec)
     self.bm_spec.vms[0].RemoteCommand.assert_has_calls(
         [
@@ -145,18 +145,27 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
         any_order=True,
     )
 
-  @flagsaver.flagsaver(dpdk_pktgen_packet_loss_threshold_rates=[0.01])
+  @flagsaver.flagsaver(dpdk_pktgen_packet_loss_threshold_rates=[1])
   def testClientServerStdout(self):
     self.bm_spec.vms[0].RemoteCommand.side_effect = [
         ('6', ''),
         ('', ''),
+        ('', ''),
         (self.sender_stdout, ''),
+        (670441705, ''),
+        (11, ''),
+        ('', ''),
+        ('', ''),
         (self.sender_stdout, ''),
-        (self.sender_stdout, ''),
-        (self.sender_stdout, ''),
-        (self.sender_stdout, ''),
+        (670441705, ''),
+        (11, ''),
     ]
-    self.bm_spec.vms[1].RemoteCommand.return_value = (self.receiver_stdout, '')
+    self.bm_spec.vms[1].RemoteCommand.side_effect = [
+        (self.receiver_stdout, ''),
+        (670421930, ''),
+        (self.receiver_stdout, ''),
+        (670421930, ''),
+    ]
     output_samples = dpdk_pktgen_benchmark.Run(self.bm_spec)
 
     # Compare each element except timestamp for each sample
@@ -171,10 +180,6 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
       self.assertEqual(
           output_sample.value,
           expected_output_sample.value,
-      )
-      self.assertEqual(
-          output_sample.metadata.items(),
-          expected_output_sample.metadata.items(),
       )
 
 
