@@ -377,7 +377,7 @@ flags.DEFINE_enum(
     [
         'CLI',
         'JAVA',
-        'SIMBA_JDBC_1_6_2_1003',
+        'SIMBA_JDBC_1_6_3_1004',
         'GOOGLE_JDBC',
         'PYTHON',
     ],
