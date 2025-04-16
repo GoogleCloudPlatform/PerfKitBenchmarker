@@ -338,13 +338,13 @@ def ParseStatusChanges(
     conditions += _GetResourceStatusConditions(resource_type, resource)
 
   samples = []
-  if REPORT_PERCENTILES.value:
-    overall_times = collections.defaultdict(list)
-    for condition in conditions:
-      overall_times[condition.event].append(condition.epoch_time)
-    for event, timestamps in overall_times.items():
-      summaries = _SummarizeTimestamps(timestamps)
-      prefix = f'{resource_type}_{event}_'
+  overall_times = collections.defaultdict(list)
+  for condition in conditions:
+    overall_times[condition.event].append(condition.epoch_time)
+  for event, timestamps in overall_times.items():
+    summaries = _SummarizeTimestamps(timestamps)
+    prefix = f'{resource_type}_{event}_'
+    if REPORT_PERCENTILES.value:
       for percentile, value in summaries.items():
         samples.append(
             sample.Sample(
@@ -353,13 +353,14 @@ def ParseStatusChanges(
                 'seconds',
             )
         )
-      samples.append(
-          sample.Sample(
-              prefix + 'count',
-              len(timestamps),
-              'count',
-          )
-      )
+    # Always report counts, because it is used in failure handling
+    samples.append(
+        sample.Sample(
+            prefix + 'count',
+            len(timestamps),
+            'count',
+        )
+    )
 
     if REPORT_LATENCIES.value:
       for condition in conditions:
