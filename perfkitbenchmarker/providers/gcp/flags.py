@@ -313,6 +313,14 @@ CONTAINER_REMOTE_BUILD_CONFIG = flags.DEFINE_string(
     None,
     'The YAML or JSON file to use as the build configuration file.',
 )
+GKE_GPU_DRIVER_VERSION = flags.DEFINE_enum(
+    'gke_gpu_driver_version',
+    'disabled',
+    ['disabled', 'latest', 'default'],
+    'The GPU driver version to use for all node pools in the container cluster.'
+    'Default behavior depends on GKE version. See '
+    'https://cloud.google.com/kubernetes-engine/docs/how-to/gpus#create-gpu-pool-auto-drivers.',
+)
 CONTAINER_RELEASE_CHANNEL = flags.DEFINE_enum(
     'gke_release_channel',
     None,

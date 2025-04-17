@@ -542,10 +542,15 @@ class GkeAutopilotCluster(BaseGkeCluster):
     if virtual_machine.GPU_TYPE.value:
       gpu_count = virtual_machine.GPU_COUNT.value or 1
       gpu_type = f'nvidia-{virtual_machine.GPU_TYPE.value}'
+      gpu_driver_version = gcp_flags.GKE_GPU_DRIVER_VERSION.value
       selectors += [
           'cloud.google.com/gke-accelerator: ' + gpu_type,
           # Quote to avoid YAML parsing as int.
           f"cloud.google.com/gke-accelerator-count: '{gpu_count}'",
+          (
+              'cloud.google.com/gke-gpu-driver-version:'
+              f" '{gpu_driver_version}'"
+          ),
       ]
     return selectors
 
