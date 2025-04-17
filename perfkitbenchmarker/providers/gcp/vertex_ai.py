@@ -464,7 +464,8 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
     # Only get the model id, not the full resource name.
     self.model_resource_name = _FindRegexInOutput(
         out,
-        r'model:' rf' projects/(.*)/locations/{self.region}/models/(.*)@',
+        r'model:'
+        rf' projects/(.*)/locations/{self.region}/models/([^(@|\n)]*)(@|\n)',
         exception_type=errors.Resource.CreationError,
         group_index=2,
     )

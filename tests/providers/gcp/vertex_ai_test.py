@@ -4,6 +4,7 @@ import unittest
 
 from absl import flags
 from absl.testing import flagsaver
+from absl.testing import parameterized
 from google.api_core import exceptions as google_exceptions
 import mock
 from perfkitbenchmarker import errors
@@ -12,6 +13,7 @@ from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.providers.gcp import vertex_ai
 from perfkitbenchmarker.resources import managed_ai_model_spec
 from tests import pkb_common_test_case
+
 
 FLAGS = flags.FLAGS
 
@@ -43,11 +45,9 @@ class VertexAiCliInterfaceTest(VertexAiTest):
 
   def setUp(self):
     super().setUp()
-    self.pkb_ai: vertex_ai.CliVertexAiModel = (
-        vertex_ai.CliVertexAiModel(
-            self.vm,
-            self.ai_spec,
-        )
+    self.pkb_ai: vertex_ai.CliVertexAiModel = vertex_ai.CliVertexAiModel(
+        self.vm,
+        self.ai_spec,
     )
 
   def test_model_spec_found(self):
@@ -264,7 +264,11 @@ class VertexAiModelGardenCliTest(VertexAiTest):
         )
     )
 
-  def test_model_create_via_model_garden_cli(self):
+  @parameterized.parameters(
+      '@1',
+      '',
+  )
+  def test_model_create_via_model_garden_cli(self, ending):
     self.MockRunCommand(
         {
             'model-garden models deploy': [
@@ -282,7 +286,7 @@ Waiting for operation [12345]...done.
                 ),
             ],
             'ai operations describe': [(
-                """Using endpoint [https://us-east1-aiplatform.googleapis.com/]
+                f"""Using endpoint [https://us-east1-aiplatform.googleapis.com/]
 done: true
 metadata:
   '@type': type.googleapis.com/google.cloud.aiplatform.v1beta1.DeployOperationMetadata
@@ -292,7 +296,7 @@ name: projects/123/locations/us-west/operations/12345
 response:
   '@type': type.googleapis.com/google.cloud.aiplatform.v1beta1.DeployResponse
   endpoint: projects/123/locations/us-west/endpoints/fooendpoint
-  model: projects/123/locations/us-west/models/foomodel@1
+  model: projects/123/locations/us-west/models/foomodel{ending}
   publisherModel: publishers/meta/models/llama3@meta-llama-3-8b
 """,
                 '',
@@ -369,11 +373,9 @@ class VertexAiSdkTest(VertexAiTest):
 
   @flagsaver.flagsaver(ai_bucket_uri=None)
   def test_model_create_with_gcs_copy(self):
-    self.pkb_ai = (
-        vertex_ai.VertexAiPythonSdkModel(
-            self.vm,
-            self.ai_spec,
-        )
+    self.pkb_ai = vertex_ai.VertexAiPythonSdkModel(
+        self.vm,
+        self.ai_spec,
     )
     self.MockRunCommand(
         {
@@ -408,11 +410,9 @@ class VertexAiSdkTest(VertexAiTest):
 
   @flagsaver.flagsaver(ai_bucket_uri=None)
   def test_model_create_with_reuse_gcs_bucket(self):
-    self.pkb_ai = (
-        vertex_ai.VertexAiPythonSdkModel(
-            self.vm,
-            self.ai_spec,
-        )
+    self.pkb_ai = vertex_ai.VertexAiPythonSdkModel(
+        self.vm,
+        self.ai_spec,
     )
     model2 = self.pkb_ai.InitializeNewModel()
     self.MockRunCommand(
