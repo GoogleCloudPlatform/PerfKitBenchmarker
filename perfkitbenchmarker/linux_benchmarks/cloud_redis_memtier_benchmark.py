@@ -18,6 +18,7 @@ Spins up a cloud redis instance, runs memtier against it, then spins it down.
 
 import collections
 import itertools
+import pprint
 from absl import flags
 from absl import logging
 from perfkitbenchmarker import background_tasks
@@ -107,7 +108,7 @@ def _GetConnections(
     vm = vms[vm_index]
     connections.append(memtier.MemtierConnection(vm, shard.ip, shard.port))
     shards_by_vm[vm].append(shard)
-  logging.info('Shards by VM: %s', shards_by_vm)
+  logging.info('Shards by VM: %s', pprint.pformat(shards_by_vm))
   return connections
 
 
