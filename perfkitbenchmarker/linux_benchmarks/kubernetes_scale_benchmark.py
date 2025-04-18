@@ -1,6 +1,7 @@
 """Benchmark which runs spins up a large number of pods on kubernetes."""
 
 import collections
+from collections import abc
 import dataclasses
 import json
 import time
@@ -112,12 +113,16 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   cluster = bm_spec.container_cluster
   assert isinstance(cluster, container_service.KubernetesCluster)
 
+  initial_nodes = set(cluster.GetNodeNames())
+
   samples, rollout_name = ScaleUpPods(cluster)
   start_time = _GetRolloutCreationTime(rollout_name)
   pod_samples = ParseStatusChanges(cluster, 'pod', start_time)
   samples += pod_samples
   _CheckForFailures(cluster, pod_samples)
-  samples += ParseStatusChanges(cluster, 'node', start_time)
+  samples += ParseStatusChanges(
+      cluster, 'node', start_time, resources_to_ignore=initial_nodes
+  )
   metadata = {
       'pod_memory': MEMORY_PER_POD.value,
       'pod_cpu': CPUS_PER_POD.value,
@@ -255,6 +260,7 @@ def _CheckForFailures(
 @dataclasses.dataclass
 class KubernetesResourceStatusCondition:
   """Stores the information of a Kubernetes resource status condition."""
+
   resource_type: str
   resource_name: str
   epoch_time: int
@@ -316,6 +322,7 @@ def ParseStatusChanges(
     cluster: container_service.KubernetesCluster,
     resource_type: str,
     start_time: float,
+    resources_to_ignore: abc.Set[str] = frozenset(),
 ) -> list[sample.Sample]:
   """Parses status transitions into samples.
 
@@ -328,13 +335,15 @@ def ParseStatusChanges(
       (node or pod).
     start_time: The start time of the scale up operation, subtracted from
       timestamps.
+    resources_to_ignore: A set of resource names to ignore.
 
   Returns:
     A list of samples, with various percentiles for each status condition.
   """
-  all_resources = cluster.GetAllNamesForResourceType(resource_type + 's')
+  all_resources = set(cluster.GetAllNamesForResourceType(resource_type + 's'))
+  all_resources -= resources_to_ignore
   conditions = []
-  for resource in all_resources:
+  for resource in sorted(all_resources):
     conditions += _GetResourceStatusConditions(resource_type, resource)
 
   samples = []
