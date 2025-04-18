@@ -22,6 +22,7 @@ OPENBLAS_DIR = '%s/OpenBLAS' % linux_packages.INSTALL_DIR
 GIT_REPO = 'https://github.com/xianyi/OpenBLAS'
 GIT_TAG = 'v0.3.21'
 LATEST_GIT_TAG = 'v0.3.29'
+GIT_TAG_FILE = 'git_tag'
 
 
 def _Install(vm):
@@ -53,6 +54,13 @@ def _Install(vm):
       vm.RemoteCommand(
           'cd {} && make clean && make USE_THREAD=0'.format(OPENBLAS_DIR)
       )
+  finally:
+    # write the git tag to a file
+    vm.RemoteCommand(
+        'cd {} && git describe --exact-match --tags > {}'.format(
+            OPENBLAS_DIR, GIT_TAG_FILE
+        )
+    )
 
 
 def YumInstall(vm):
@@ -66,6 +74,6 @@ def AptInstall(vm):
 
 
 def GetVersion(vm):
-  """Returns the version of the OpenBLAS package on the VM."""
-  return vm.RemoteCommand('cd {} && git describe --exact-match --tags'.format(
-      OPENBLAS_DIR))[0].strip()
+  """Returns the version of the OpenBLAS package on the VM by reading the git_tag file."""
+  return vm.RemoteCommand('cd {} && cat {}'.format(
+      OPENBLAS_DIR, GIT_TAG_FILE))[0].strip()
