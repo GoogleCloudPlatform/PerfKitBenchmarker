@@ -61,6 +61,7 @@ dlrm_amd_cpu_inference:
           boot_disk_size: 3000
   flags:
     disable_smt: True
+    sar: True
 """
 
 

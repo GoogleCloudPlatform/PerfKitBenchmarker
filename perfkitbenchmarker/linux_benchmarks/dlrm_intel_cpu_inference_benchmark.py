@@ -65,6 +65,7 @@ dlrm_intel_cpu_inference:
           boot_disk_size: 3000
   flags:
     disable_smt: True
+    sar: True
 """
 BENCHMARK_DATA = {
     'dlrm_int8.pt': (  # for intel dlrm inference only
