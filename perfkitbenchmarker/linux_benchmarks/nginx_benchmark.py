@@ -25,6 +25,7 @@ import ipaddress
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import wrk2
 
@@ -322,6 +323,12 @@ def _TuneNetworkStack(vm):
   Args:
     vm: The VM to tune.
   """
+  if vm.PLATFORM == provider_info.KUBERNETES:
+    # TODO(pclay): Support safe sysctls in Kubernetes.
+    # https://cloud.google.com/kubernetes-engine/docs/how-to/node-system-config
+    # https://kubernetes.io/docs/tasks/administer-cluster/sysctl-cluster/#safe-and-unsafe-sysctls
+    return
+
   max_port_num = 65535
   small_4k = 4096
   large_8m = 8388607
