@@ -296,6 +296,42 @@ RETRYABLE_SSH_RETCODE = 255
 logger = logging.getLogger()
 
 
+def ParseRangeList(csv_list: str) -> set[int]:
+  """Parses a comma separated list of numbers and/or ranges into a set of ints.
+
+  Args:
+    csv_list: The CSV list to parse.
+
+  Returns:
+    A set of integers.
+  """
+  if not csv_list:
+    return set()
+
+  answer: set[int] = set()
+  if ',' in csv_list:
+    items_to_convert = csv_list.split(',')
+  else:
+    items_to_convert = [csv_list]
+
+  for item_value in items_to_convert:
+    if '-' not in item_value:
+      answer.add(int(item_value))
+      continue
+
+    lhs, rhs = item_value.split('-')
+    try:
+      lhs = int(lhs)
+      rhs = int(rhs)
+    except ValueError as exc:
+      raise ValueError(f'Invalid range: [{item_value}]') from exc
+    if lhs > rhs:
+      raise ValueError(f'Invalid range found while parsing: [{lhs}-{rhs}]')
+    answer.update(range(lhs, rhs + 1))
+
+  return answer
+
+
 class CpuVulnerabilities:
   """The 3 different vulnerability statuses from vm.cpu_vulernabilities.
 
@@ -1763,30 +1799,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       The number of logical CPUs.
       For the example with input '1-2,4-5', it returns 4.
     """
-    if ',' in cpu_list:
-      num_cpus = 0
-      for sub_cpu_list in cpu_list.split(','):
-        num_cpus += self._ParseNumCpus(sub_cpu_list)
-      return num_cpus
-
-    if '-' in cpu_list:
-      lhs, rhs = cpu_list.split('-')
-      try:
-        lhs = int(lhs)
-        rhs = int(rhs)
-      except ValueError as exc:
-        raise ValueError(f'Invalid CPU range: [{cpu_list}]') from exc
-      if lhs > rhs:
-        raise ValueError(f'Invalid range found while parsing: [{lhs}-{rhs}]')
-
-      return rhs - lhs + 1
-
-    try:
-      int(cpu_list)
-    except ValueError as exc:
-      raise ValueError(f'Invalid cpu specified: [{cpu_list}]') from exc
-
-    return 1
+    return len(ParseRangeList(cpu_list))
 
   def _RemoteFileExists(self, file_path: str) -> bool:
     """Returns true if the file exists on the VM."""

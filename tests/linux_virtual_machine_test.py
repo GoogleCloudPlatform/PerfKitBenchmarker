@@ -842,5 +842,37 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertNotIn('disabled_cstates', vm.os_metadata)
 
 
+class RangeListUtilTest(parameterized.TestCase):
+
+  @parameterized.named_parameters(
+      ('empty', '', set()),
+      ('single_int', '1', set([1])),
+      ('range', '1-10', set(range(1, 11))),
+      ('multiple_ints', '1,2,3', set([1, 2, 3])),
+      ('multiple_ranges', '1-10,20-30', set(range(1, 11)) | set(range(20, 31))),
+      ('multiple_ints_and_ranges', '1,2,3-5', set([1, 2, 3, 4, 5])),
+      (
+          'multiple_ints_and_ranges_with_empty_spaces',
+          '1, 2, 3-5',
+          set([1, 2, 3, 4, 5]),
+      ),
+  )
+  def testParseRangeList(self, csv_list, expected_set):
+    self.assertEqual(linux_virtual_machine.ParseRangeList(csv_list),
+                     expected_set)
+
+  def testParseRangeListInvalidRange(self):
+    with self.assertRaises(ValueError):
+      linux_virtual_machine.ParseRangeList('10-1')
+
+  def testParseRangeListInvalidInt(self):
+    with self.assertRaises(ValueError):
+      linux_virtual_machine.ParseRangeList('x')
+
+  def testParseRangeListRangeParseError(self):
+    with self.assertRaises(ValueError):
+      linux_virtual_machine.ParseRangeList('10-x')
+
+
 if __name__ == '__main__':
   unittest.main()
