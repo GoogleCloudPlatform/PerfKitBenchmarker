@@ -110,7 +110,7 @@ SHARED_BUFFER_SIZE = flags.DEFINE_integer(
 )
 _MEASURE_MAX_QPS = flags.DEFINE_bool(
     'postgresql_measure_max_qps',
-    True,
+    False,
     'Measure Max QPS of all the thread counts. Please set to'
     " false if you don't want to measure max qps.",
 )
