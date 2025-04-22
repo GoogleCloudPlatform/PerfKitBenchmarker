@@ -522,7 +522,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         # AttributeError which is retried until the test times out.
         # See b/271465182 for more discussion.
         if cmd not in run_cmd_response:
-          raise SystemExit(f'Define response for {cmd}')
+          raise SystemExit(f'Define response for [{cmd}]')
         stdout = run_cmd_response[cmd]
       else:
         raise NotImplementedError()
@@ -596,12 +596,9 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'ls /sys/fs/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
             'file_not_exist'
         ),
-        'ls /dev/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
-            'file_not_exist'
-        ),
         'ls /proc/self/status >> /dev/null 2>&1 || echo file_not_exist': '',
-        'cat /proc/self/status | grep Cpus_allowed_list': (
-            'Cpus_allowed_list:\t0-3,7-8'
+        'cat /proc/self/status | grep Cpus_allowed_list |cut -d: -f2': (
+            '0-3,7-8'
         ),
     }
     responses.update(self.normal_boot_responses)
@@ -611,14 +608,12 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'ls /sys/fs/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
             'file_not_exist'
         ),
-        'ls /dev/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
-            'file_not_exist'
-        ),
         'ls /proc/self/status >> /dev/null 2>&1 || echo file_not_exist': (
             'file_not_exist'
         ),
         'ls /proc/cpuinfo >> /dev/null 2>&1 || echo file_not_exist': '',
-        'cat /proc/cpuinfo | grep processor | wc -l': '16',
+        r"""cat /proc/cpuinfo | sed -n 's/processor\s*\:\s*\([0-9]*\)/\1/p'"""
+        """| paste -sd,""": '0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15',
     }
     responses.update(self.normal_boot_responses)
     vm = self.CreateVm(responses, metadata=True)

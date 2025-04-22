@@ -1789,18 +1789,6 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     drop_caches_command = 'sudo /sbin/sysctl vm.drop_caches=3'
     self.RemoteCommand(drop_caches_command)
 
-  def _ParseNumCpus(self, cpu_list: str) -> int:
-    """Parses the cpu list string and returns the number of CPUs.
-
-    Args:
-      cpu_list: The CPU list string, e.g. 1-2,4-5
-
-    Returns:
-      The number of logical CPUs.
-      For the example with input '1-2,4-5', it returns 4.
-    """
-    return len(ParseRangeList(cpu_list))
-
   def _RemoteFileExists(self, file_path: str) -> bool:
     """Returns true if the file exists on the VM."""
     stdout, _ = self.RemoteCommand(
@@ -1808,57 +1796,56 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     )
     return not stdout
 
-  def _GetNumCpusFromMultiFiles(self):
-    """Extracts the number of logical CPUs from multiple files.
+  def GetCpusAllowedSet(self) -> set[int]:
+    r"""Returns the list of CPUs allowed for the current process.
 
-    Extracts the number of CPUs from /sys/fs/cgroup/cpuset.cpus.effective,
-    /dev/cgroup/cpuset.cpus.effective, /proc/self/status, or /proc/cpuinfo.
+    Processes the output of the following files in order:
+    1. /sys/fs/cgroup/cpuset.cpus.effective
+    2. /proc/self/status
+    3. /proc/cpuinfo
+
     Below are the example of their returns:
     $ cat XX/cpuset.cpus.effective :
           0-23
-    $ cat /proc/self/status | grep Cpus_allowed_list :
-          Cpus_allowed_list:    0-23
-    $ cat /proc/cpuinfo | grep processor | wc -l :
-          24
+    $ cat /proc/self/status | grep Cpus_allowed_list |cut -d: -f2
+          0-23
+    $ cat /proc/cpuinfo |sed -e 's/[[:blank:]]*//g' | grep ^processor
+      | cut -d: -f2 |tr '\n' ','
+      0,1,2,3
 
     Returns:
-      The number of logical CPUs.
+      A set of CPUs allowed for the current process.
     """
-
     if self._RemoteFileExists('/sys/fs/cgroup/cpuset.cpus.effective'):
       stdout, _ = self.RemoteCommand('cat /sys/fs/cgroup/cpuset.cpus.effective')
-      return self._ParseNumCpus(stdout)
     elif self._RemoteFileExists('/proc/self/status'):
       stdout, _ = self.RemoteCommand(
-          'cat /proc/self/status | grep Cpus_allowed_list'
+          'cat /proc/self/status | grep Cpus_allowed_list |cut -d: -f2'
       )
-      return self._ParseNumCpus(stdout.split(':\t')[-1])
     elif self._RemoteFileExists('/proc/cpuinfo'):
-      stdout, _ = self.RemoteCommand(
-          'cat /proc/cpuinfo | grep processor | wc -l'
+      cmd = 'cat /proc/cpuinfo '
+      cmd += r"| sed -n 's/processor\s*\:\s*\([0-9]*\)/\1/p'"
+      cmd += '| paste -sd,'
+      stdout, _ = self.RemoteCommand(cmd)
+    else:
+      raise ValueError(
+          'GetCpusAllowedSet failed, cannot read'
+          ' /sys/fs/cgroup/cpuset.cpus.effective, /proc/self/status, or'
+          ' /proc/cpuinfo.'
       )
-      try:
-        int(stdout)
-      except ValueError as exc:
-        raise ValueError(f'Invalid cpu specified: [{stdout}]') from exc
-      return int(stdout)
 
-    raise ValueError(
-        '_GetNumCpus failed, '
-        'cannot read /sys/fs/cgroup/cpuset.cpus.effective, '
-        '/dev/cgroup/cpuset.cpus.effective, /proc/self/status, /proc/cpuinfo.'
-    )
+    return ParseRangeList(stdout)
 
   def _GetNumCpus(self):
     """Returns the number of logical CPUs on the VM.
 
     If the flag `use_numcpu_multi_files` is true,
-    call _GetNumCpusFromMultiFiles function to get the number of CPUs.
+    call GetCpusAllowedSet function to help calculate the number of CPUs.
     Otherwise, extracts the value from `/proc/cpuinfo` file.
     This method does not cache results (unlike "num_cpus").
     """
     if FLAGS.use_numcpu_multi_files:
-      return self._GetNumCpusFromMultiFiles()
+      return len(self.GetCpusAllowedSet())
 
     stdout, _ = self.RemoteCommand('cat /proc/cpuinfo | grep processor | wc -l')
     return int(stdout)
