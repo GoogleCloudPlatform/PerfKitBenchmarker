@@ -557,3 +557,5 @@
     different thread counts.
 -   Corrected use of `mysql-ignore-errors` flag and added a flag to control
     sysbench logging verbosity.
+-   Changed YCSB time series metrics' timestamps from "seconds since run
+    starting" to epoch.

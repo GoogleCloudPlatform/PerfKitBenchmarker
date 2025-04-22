@@ -366,6 +366,7 @@ def ParseResults(
     data_type: str = 'histogram',
     error_rate_threshold: float = 1.0,
     timestamp_offset_sec: int = 0,
+    epoch_start_time: int = 0,
 ) -> 'YcsbResult':
   """Parse YCSB results.
 
@@ -451,6 +452,8 @@ def ParseResults(
     timestamp_offset_sec: The number of seconds to offset the timestamp by for
       runs measuring the status time series. Useful for if there are multiple
       runs back-to-back.
+    epoch_start_time: The epoch start time of the YCSB run, in seconds. Used to
+      convert the timestamp in the output to the epoch time.
 
   Returns:
     A YcsbResult object that contains the results from parsing YCSB output.
@@ -486,7 +489,7 @@ def ParseResults(
     match = re.search(_STATUS_PATTERN, result_string)
     if match is not None:
       timestamp, qps = int(match.group(1)), float(match.group(2))
-      timestamp += timestamp_offset_sec
+      timestamp += timestamp_offset_sec + epoch_start_time
       # Repeats in the printed status are erroneous, ignore.
       if timestamp not in status_time_series:
         status_time_series[timestamp] = _StatusResult(
