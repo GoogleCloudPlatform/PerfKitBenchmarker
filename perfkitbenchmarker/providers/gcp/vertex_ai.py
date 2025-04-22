@@ -44,6 +44,7 @@ CLI = 'CLI'
 MODEL_GARDEN_CLI = 'MODEL-GARDEN-CLI'
 SDK = 'SDK'
 SERVICE_ACCOUNT_BASE = '{}-compute@developer.gserviceaccount.com'
+_MODEL_DEPLOY_TIMEOUT = 60 * 60  # 1 hour
 
 
 class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
@@ -398,6 +399,7 @@ class CliVertexAiModel(BaseCliVertexAiModel):
         f' --service-account={self.service_account}'
         f' --max-replica-count={self.max_scaling}',
         ignore_failure=True,
+        timeout=_MODEL_DEPLOY_TIMEOUT,
     )
     if code:
       if (
@@ -449,7 +451,9 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
         f' --project={self.project} --region={self.region}'
         f' --machine-type={self.model_spec.machine_type}'
     )
-    _, err_out, _ = self.vm.RunCommand(deploy_cmd, timeout=60 * 60)
+    _, err_out, _ = self.vm.RunCommand(
+        deploy_cmd, timeout=_MODEL_DEPLOY_TIMEOUT
+    )
     deploy_end_time = time.time()
     self.model_deploy_time = deploy_end_time - deploy_start_time
     operation_id = _FindRegexInOutput(

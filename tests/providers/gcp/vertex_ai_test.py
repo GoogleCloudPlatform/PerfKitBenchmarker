@@ -109,6 +109,7 @@ class VertexAiCliInterfaceTest(VertexAiTest):
             ' --service-account=123-compute@developer.gserviceaccount.com'
             ' --max-replica-count=1',
             ignore_failure=True,
+            timeout=60*60,
         ),
     ])  # pytype: disable=attribute-error
     self.assertEqual(
