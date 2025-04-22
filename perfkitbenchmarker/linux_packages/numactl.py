@@ -31,17 +31,26 @@ def _ParseNuma(vm, regex: Union[str, Pattern[str]]) -> Dict[int, str]:
 def GetNuma(vm) -> Dict[int, int]:
   """Get NUMA CPU topology of the VM that only includes the available nodes.
 
+  This method provides the number of available vCPUs on each NUMA node.
+  While counting, it filters out the vCPUs that are not available to the current
+  process. For example: if there are 16 vCPUs in a NUMA node, but only 8 vCPUs
+  are available to the current process via taskset, etc., then only
+  8 vCPUs for that NUMA node will be reported.
+
   Args:
     vm: VirtualMachine.
 
   Returns:
-    A dictionary, key is the numa node, value is the
-    number of vCPUs on the node.
+    A dictionary, key is the numa node, value is the number of available vCPUs
+    on the node.
   """
-  all_numa_map = {
-      node: len(value.split())
-      for node, value in _ParseNuma(vm, NUMA_CPUS_REGEX).items()
-  }
+  all_numa_map = {}
+  allowed_cpu_set = vm.GetCpusAllowedSet()
+  for node, cpus_in_numa_str in _ParseNuma(vm, NUMA_CPUS_REGEX).items():
+    cpus_in_numa_csv = cpus_in_numa_str.strip().replace(' ', ',')
+    cpu_set_in_numa = linux_virtual_machine.ParseRangeList(cpus_in_numa_csv)
+    allowed_cpus_in_numa = allowed_cpu_set & cpu_set_in_numa
+    all_numa_map[node] = len(allowed_cpus_in_numa)
   stdout, _ = vm.RemoteCommand('cat /proc/self/status | grep Mems_allowed_list')
   available_numa_nodes = linux_virtual_machine.ParseRangeList(
       stdout.split(':\t')[-1]

@@ -30,7 +30,9 @@ node   0   1
 """
 
 
-def MockVm(run_cmd_response: dict[str, str]):
+def MockVm(
+    run_cmd_response: dict[str, str], allowed_cpus_arg: set[int] | None = None
+):
   vm = mock.Mock()
 
   def FakeRemoteHostCommand(cmd, **_):
@@ -42,32 +44,102 @@ def MockVm(run_cmd_response: dict[str, str]):
       raise NotImplementedError()
     return stdout, ''
 
+  allowed_cpus = set()
+  if allowed_cpus_arg is not None:
+    allowed_cpus = allowed_cpus_arg
+
   vm.RemoteCommand = mock.Mock(side_effect=FakeRemoteHostCommand)
+  vm.GetCpusAllowedSet = mock.Mock(return_value=allowed_cpus)
   return vm
 
 
 class NumactlTest(parameterized.TestCase):
 
   @parameterized.named_parameters(
-      ('singlenode', SINGLE_NUMA_NODE, {0: 8}, '0'),
-      ('twonode', TWO_NUMA_NODES, {0: 30, 1: 30}, '0-1'),
+      ('singlenode', SINGLE_NUMA_NODE, {0: 8}, '0', None, set(range(8))),
+      ('twonode', TWO_NUMA_NODES, {0: 30, 1: 30}, '0-1', None, set(range(60))),
+      (
+          'twonode_with_subset_cpus',
+          TWO_NUMA_NODES,
+          {0: 4, 1: 4},
+          '0-1',
+          '0-3,15-18',
+          set([0, 1, 2, 3, 15, 16, 17, 18]),
+      ),
+      (
+          'twonode_with_cpus_allowed_in_only_one_numa_node',
+          TWO_NUMA_NODES,
+          {1: 4},
+          '1',
+          '15-18',
+          set([15, 16, 17, 18]),
+      ),
   )
-  def testGetNuma(self, numactl_text, cpus, numa_list):
-    responses = {
-        'numactl --hardware': numactl_text,
-        'cat /proc/self/status | grep Mems_allowed_list': (
-            f'Mems_allowed_list:\t{numa_list}'
-        ),
-    }
-    self.assertEqual(cpus, numactl.GetNuma(MockVm(responses)))
+  def testGetNuma(
+      self,
+      numactl_text,
+      expected_cpus,
+      mems_allowed_list,
+      cpus_allowed_list,
+      cpu_allowed_set,
+  ):
+    responses = {'numactl --hardware': numactl_text}
+    if mems_allowed_list is not None:
+      responses['cat /proc/self/status | grep Mems_allowed_list'] = (
+          f'Mems_allowed_list:\t{mems_allowed_list}'
+      )
+    if cpus_allowed_list is not None:
+      responses['cat /sys/fs/cgroup/cpuset.cpus.effective'] = cpus_allowed_list
+    mock_vm = MockVm(responses, cpu_allowed_set)
+    actual_cpus = numactl.GetNuma(mock_vm)
+    self.assertEqual(expected_cpus, actual_cpus)
 
   @parameterized.named_parameters(
-      ('singlenode', SINGLE_NUMA_NODE, {0: 32116}),
-      ('twonode', TWO_NUMA_NODES, {0: 120889, 1: 120931}),
+      ('singlenode', SINGLE_NUMA_NODE, {0: 32116}, '0', None, None),
+      ('twonode', TWO_NUMA_NODES, {0: 120889, 1: 120931}, '0-1', None, None),
+      (
+          'twonode_with_subset_cpus',
+          TWO_NUMA_NODES,
+          {0: 120889, 1: 120931},
+          '0-1',
+          '0-3,15-18',
+          set([0, 1, 2, 3, 15, 16, 17, 18]),
+      ),
+      (
+          'twonode_with_cpus_allowed_in_only_one_numa_node',
+          TWO_NUMA_NODES,
+          {0: 120889, 1: 120931},
+          '1',
+          '15-18',
+          set([15, 16, 17, 18]),
+      ),
   )
-  def testGetNumaMemory(self, numactl_text, cpus):
+  def testGetNumaMemory(
+      self,
+      numactl_text,
+      mems,
+      mems_allowed_list,
+      cpus_allowed_list,
+      cpu_allowed_set,
+  ):
     responses = {'numactl --hardware': numactl_text}
-    self.assertEqual(cpus, numactl.GetNumaMemory(MockVm(responses)))
+    if mems_allowed_list is None:
+      responses[
+          'ls /proc/self/status >> /dev/null 2>&1 || echo file_not_exist'
+      ] = 'file_not_exist'
+    else:
+      responses['cat /proc/self/status | grep Mems_allowed_list'] = (
+          f'Mems_allowed_list:\t{mems_allowed_list}'
+      )
+    if cpus_allowed_list is None:
+      responses[
+          'ls /sys/fs/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo'
+          ' file_not_exist'
+      ] = 'file_not_exist'
+    else:
+      responses['cat /sys/fs/cgroup/cpuset.cpus.effective'] = cpus_allowed_list
+    actual_mems = numactl.GetNumaMemory(MockVm(responses, cpu_allowed_set))
+    self.assertEqual(mems, actual_mems)
 
 
 if __name__ == '__main__':
