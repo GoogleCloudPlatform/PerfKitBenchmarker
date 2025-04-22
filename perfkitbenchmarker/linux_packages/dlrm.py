@@ -57,8 +57,8 @@ def Install(vm):
   vm.InstallPreprovisionedPackageData(
       PACKAGE_NAME, DLRM_DATA, DATA_PATH, DLRM_DOWNLOAD_TIMEOUT
   )
-  vm.DownloadPreprovisionedData(
-      MLPERF_ROOT, PACKAGE_NAME, 'weights.zip', DLRM_DOWNLOAD_TIMEOUT
+  vm.InstallPreprovisionedPackageData(
+      PACKAGE_NAME, ['weights.zip'], MLPERF_ROOT, DLRM_DOWNLOAD_TIMEOUT
   )
   vm.RemoteCommand(
       f'cd {MLPERF_ROOT}; unzip weights.zip -d .; '

@@ -1160,11 +1160,15 @@ class AzureVirtualMachine(
     """
     # N.B. Should already be installed by ShouldDownloadPreprovisionedData
     self.Install('azure_cli')
-    self.RobustRemoteCommand(
+
+    @vm_util.Retry(max_retries=3)
+    def _DownloadPreprovisionedData(cmd):
+      self.RobustRemoteCommand(cmd, timeout)
+
+    _DownloadPreprovisionedData(
         GenerateDownloadPreprovisionedDataCommand(
             install_path, module_name, filename
-        ),
-        timeout=timeout,
+        )
     )
 
   def ShouldDownloadPreprovisionedData(self, module_name, filename):
