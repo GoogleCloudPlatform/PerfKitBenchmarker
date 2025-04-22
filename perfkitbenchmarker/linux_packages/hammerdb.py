@@ -877,29 +877,132 @@ def Install(vm: virtual_machine.BaseVirtualMachine):
       f'cd {HAMMERDB_RUN_LOCATION}; tar xzvf {tar_file}; '
       f'mv HammerDB-{HAMMERDB_VERSION.value}/* ./'
   )
-  # Push Hammerdb install files
-  if HAMMERDB_VERSION.value == HAMMERDB_4_0:
-    install_file = 'install_hammerdb_4_0.sh'
-    # Patches hammerdb 4.0 for Postgres on Azure and time profile frequency
-    files_required = [
-        'pgolap.tcl.patch',
-        'pgoltp.tcl.patch',
-        'postgresql.xml.patch',
-        'etprof-1.1.tm.patch',
-        install_file,
-    ]
-
-    for file in files_required:
-      PushCloudSqlTestFile(vm, file, P3RF_CLOUD_SQL_TEST_DIR)
-    vm.RemoteCommand(InLocalDir(f'chmod +x {install_file}'))
-    vm.RemoteCommand(InLocalDir(f'sudo ./{install_file}'))
 
   db_engine = sql_engine_utils.GetDbEngineType(FLAGS.db_engine)
-  if db_engine == sql_engine_utils.MYSQL:
-    # Install specific mysql library for hammerdb
-    vm.Install('libmysqlclient21')
+  if (
+      HAMMERDB_VERSION.value == HAMMERDB_4_3
+      and db_engine == sql_engine_utils.POSTGRES
+      and vm.is_aarch64
+  ):
+    # Install build dependencies and PostgreSQL client dev library for pgtcl
+    vm.InstallPackages(
+        'wget build-essential libreadline-dev zlib1g-dev libpq-dev'
+    )
 
-  vm.RemoteCommand('export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/')
+    # Define aarch64 specific flags
+    cflags = (
+        '"-O3 -mcpu=neoverse-n1 -march=armv8.2-a+lse+crc+crypto+dotprod'
+        ' -moutline-atomics -Wl,--build-id"'
+    )
+    cxxflags = cflags  # Same flags for CXX in the script
+    gcc_bin_dir = '/usr/bin'
+    hammerdb_dir = HAMMERDB_RUN_LOCATION
+
+    download_commands = [
+        f'cd {hammerdb_dir}',
+        'wget https://prdownloads.sourceforge.net/tcl/tcl8.6.11-src.tar.gz',
+        (
+            'wget https://sourceforge.net/projects/expect/files/Expect/5.45.4/expect5.45.4.tar.gz'
+        ),
+        (
+            'wget https://sourceforge.net/projects/pgtclng/files/pgtclng/2.1.1/pgtcl2.1.1.tar.gz'
+        ),
+    ]
+    vm.RemoteCommand(' && '.join(download_commands))
+
+    # Build Tcl
+    build_tcl_commands = [
+        f'cd {hammerdb_dir}',
+        'tar xf tcl8.6.11-src.tar.gz',
+        'rm -f bin/tclsh8.6',  # Remove existing tclsh
+        'cd tcl8.6.11/unix',
+        (
+            f'CC="{gcc_bin_dir}/gcc" CXX="{gcc_bin_dir}/g++"'
+            f' LD="{gcc_bin_dir}/gcc"'
+            f' CFLAGS={cflags} CXXFLAGS={cxxflags} ./configure'
+            f' --prefix="{hammerdb_dir}" --enable-64bit'
+        ),
+        'make -j $(nproc)',
+        'make install',
+    ]
+    vm.RemoteCommand(' && '.join(build_tcl_commands))
+
+    # Build Expect
+    build_expect_commands = [
+        f'cd {hammerdb_dir}',
+        'tar xf expect5.45.4.tar.gz',
+        'cd expect5.45.4',
+        'arch=$(uname -m)',
+        (
+            f'CC="{gcc_bin_dir}/gcc" CXX="{gcc_bin_dir}/g++"'
+            f' LD="{gcc_bin_dir}/gcc"'
+            f' CFLAGS={cflags} CXXFLAGS={cxxflags} ./configure'
+            f' --prefix="{hammerdb_dir}" --build=${{arch}}-unknown-linux-gnu'
+            ' --enable-64bit --with-tclinclude=../include'
+        ),
+        'make -j $(nproc)',
+        'make install',
+    ]
+    vm.RemoteCommand(' && '.join(build_expect_commands))
+
+    # Build pgtcl
+    build_pgtcl_commands = [
+        f'cd {hammerdb_dir}',
+        'tar xf pgtcl2.1.1.tar.gz',
+        'cd pgtcl2.1.1',
+        # Assuming standard paths for libpq-dev headers/libs
+        (
+            'pg_include_path=$(dpkg -L libpq-dev | grep "/libpq-fe\\.h$" | head'
+            ' -n 1 | xargs dirname)'
+        ),
+        (
+            'pg_lib_path=$(dpkg -L libpq-dev | grep "/libpq\\.so$" | head -n 1'
+            ' | xargs dirname)'
+        ),
+        f'CC="{gcc_bin_dir}/gcc" CXX="{gcc_bin_dir}/g++" LD="{gcc_bin_dir}/gcc"'
+        f' CFLAGS={cflags} CXXFLAGS={cxxflags} ./configure'
+        f' --prefix="{hammerdb_dir}" --enable-64bit '
+        '--with-postgres-include=${pg_include_path} '
+        '--with-postgres-lib=${pg_lib_path}',
+        'make -j $(nproc)',
+        'make install',
+    ]
+    vm.RemoteCommand(' && '.join(build_pgtcl_commands))
+
+    # clean up build directories and tarballs
+    clean_up_commands = [
+        f'cd {hammerdb_dir}',
+        'rm -rf expect*',
+        'rm -rf pgtcl*',
+        'rm -rf tcl*',
+    ]
+    vm.RemoteCommand(' && '.join(clean_up_commands))
+  else:
+    # normal install
+    # Push Hammerdb install files
+    if HAMMERDB_VERSION.value == HAMMERDB_4_0:
+      install_file = 'install_hammerdb_4_0.sh'
+      # Patches hammerdb 4.0 for Postgres on Azure and time profile frequency
+      files_required = [
+          'pgolap.tcl.patch',
+          'pgoltp.tcl.patch',
+          'postgresql.xml.patch',
+          'etprof-1.1.tm.patch',
+          install_file,
+      ]
+
+      for file in files_required:
+        PushCloudSqlTestFile(vm, file, P3RF_CLOUD_SQL_TEST_DIR)
+      vm.RemoteCommand(InLocalDir(f'chmod +x {install_file}'))
+      vm.RemoteCommand(InLocalDir(f'sudo ./{install_file}'))
+
+    if db_engine == sql_engine_utils.MYSQL:
+      # Install specific mysql library for hammerdb
+      vm.Install('libmysqlclient21')
+  if vm.is_aarch64:
+    vm.RemoteCommand('export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/')
+  else:
+    vm.RemoteCommand('export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/')
 
 
 def SetupConfig(
