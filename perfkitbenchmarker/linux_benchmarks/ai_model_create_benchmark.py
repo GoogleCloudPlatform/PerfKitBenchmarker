@@ -48,7 +48,7 @@ _CREATE_SECOND_MODEL = flags.DEFINE_boolean(
 
 _VALIDATE_EXISTING_MODELS = flags.DEFINE_boolean(
     'validate_existing_models',
-    True,
+    False,
     'Whether to fail the benchmark if there are other models in the region.',
 )
 

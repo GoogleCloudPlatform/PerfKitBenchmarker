@@ -49,6 +49,7 @@ class AiModelCreateBenchmarkTest(
     ]
     ai_model_create_benchmark.Run(self.bm_spec)
 
+  @flagsaver.flagsaver(validate_existing_models=True)
   def testBenchmarkFailsIfMoreModelsFound(self):
     self.bm_spec.ai_model.existing_endpoints = [
         'model1',
@@ -56,6 +57,14 @@ class AiModelCreateBenchmarkTest(
     ]
     with self.assertRaises(errors.Benchmarks.KnownIntermittentError):
       ai_model_create_benchmark.Run(self.bm_spec)
+
+  @flagsaver.flagsaver(validate_existing_models=False)
+  def testBenchmarkPassesWithoutValidation(self):
+    self.bm_spec.ai_model.existing_endpoints = [
+        'model1',
+        'model2',
+    ]
+    ai_model_create_benchmark.Run(self.bm_spec)
 
   def testBenchmarkRunGivesCorrectSamplesForOneModel(self):
     self.enter_context(flagsaver.flagsaver(create_second_model=False))
