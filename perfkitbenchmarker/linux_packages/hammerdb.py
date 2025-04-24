@@ -877,12 +877,19 @@ def Install(vm: virtual_machine.BaseVirtualMachine):
       f'cd {HAMMERDB_RUN_LOCATION}; tar xzvf {tar_file}; '
       f'mv HammerDB-{HAMMERDB_VERSION.value}/* ./'
   )
-
+  if vm.cpu_arch not in [
+      virtual_machine.CPUARCH_X86_64,
+      virtual_machine.CPUARCH_AARCH64,
+  ]:
+    raise HammerdbBenchmarkError(
+        'Unsupported architecture for hammerdb: {}. Only x86_64 and aarch64 are'
+        ' supported.'.format(vm.cpu_arch)
+    )
   db_engine = sql_engine_utils.GetDbEngineType(FLAGS.db_engine)
   if (
       HAMMERDB_VERSION.value == HAMMERDB_4_3
       and db_engine == sql_engine_utils.POSTGRES
-      and vm.is_aarch64
+      and vm.cpu_arch == virtual_machine.CPUARCH_AARCH64
   ):
     # Install build dependencies and PostgreSQL client dev library for pgtcl
     vm.InstallPackages(
@@ -999,7 +1006,7 @@ def Install(vm: virtual_machine.BaseVirtualMachine):
     if db_engine == sql_engine_utils.MYSQL:
       # Install specific mysql library for hammerdb
       vm.Install('libmysqlclient21')
-  if vm.is_aarch64:
+  if vm.cpu_arch == virtual_machine.CPUARCH_AARCH64:
     vm.RemoteCommand('export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu/')
   else:
     vm.RemoteCommand('export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/')
