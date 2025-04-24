@@ -7,6 +7,7 @@ from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import elastic_kubernetes_service
 from perfkitbenchmarker.providers.aws import util
+from tests import matchers
 from tests import pkb_common_test_case
 
 
@@ -54,6 +55,29 @@ class ElasticKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testInitEksClusterWorks(self):
     elastic_kubernetes_service.EksCluster(EKS_SPEC)
+
+  def testEksClusterCreateNoSpec(self):
+    issue_command = self.MockIssueCommand(
+        {'create cluster': [('Cluster created', '', 0)]}
+    )
+    spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'AWS',
+            'vm_spec': {
+                'AWS': {'machine_type': 'm5.large', 'zone': 'us-east-1'}
+            },
+        },
+    )  # {}, flag_values=flags.FLAGS)  #
+    cluster = elastic_kubernetes_service.EksCluster(spec)
+    cluster._Create()
+    issue_command.func_to_mock.assert_has_calls([
+        mock.call(
+            matchers.NOT(['node-zones']),
+            timeout=1800,
+            raise_on_failure=False,
+        ),
+    ])
 
   def testEksClusterCreate(self):
     issue_command = self.MockIssueCommand(

@@ -255,19 +255,21 @@ class EksCluster(BaseEksCluster):
   ) -> Dict[str, Any]:
     """Get common flags for creating clusters and node_groups."""
     tags = util.MakeDefaultTags()
-    return {
+    node_flags = {
         'nodes': nodepool_config.num_nodes,
         'node-labels': f'pkb_nodepool={nodepool_config.name}',
         'node-type': nodepool_config.machine_type,
         'node-volume-size': nodepool_config.disk_size,
-        # zone may be split a comma separated list
-        'node-zones': nodepool_config.zone,
         'region': self.region,
         'tags': ','.join(f'{k}={v}' for k, v in tags.items()),
         'ssh-public-key': (
             aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun()
         ),
     }
+    if self.control_plane_zones:
+      # zone may be split a comma separated list or simply a region
+      node_flags['node-zones'] = nodepool_config.zone
+    return node_flags
 
   def _IsReady(self):
     """Returns True if the workers are ready, else False."""
