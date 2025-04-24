@@ -65,7 +65,7 @@ _VERSION_REGEX = r'\d+\.\d+\.\d+'
 BENCHMARK_NAME = 'mongodb_ycsb'
 BENCHMARK_CONFIG = """
 mongodb_ycsb:
-  description: Run YCSB against a single MongoDB node.
+  description: Run YCSB against MongoDB.
   vm_groups:
     primary:
       vm_spec: *default_single_core
@@ -119,24 +119,25 @@ _LinuxVM = linux_virtual_machine.BaseLinuxVirtualMachine
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
   """Validates the user config dictionary."""
+  # Default config has 1 client, 1 primary, 1 secondary, and 1 arbiter VM.
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+
   if FLAGS['ycsb_client_vms'].present:
     config['vm_groups']['clients']['vm_count'] = FLAGS.ycsb_client_vms
-  primary_count = config['vm_groups']['primary']['vm_count']
-  secondary_count = config['vm_groups']['secondary']['vm_count']
-  arbiter_count = config['vm_groups']['arbiter']['vm_count']
 
+  primary_count = config['vm_groups']['primary']['vm_count']
   if FLAGS.mongodb_primary_only:
     if primary_count != 1:
       raise errors.Config.InvalidValue(
           'Must have exactly one primary VM when using --mongodb_primary_only.'
       )
-    if secondary_count != 0 or arbiter_count != 0:
-      raise errors.Config.InvalidValue(
-          'Must have exactly zero secondary and arbiter VMs when using'
-          ' --mongodb_primary_only.'
-      )
+    # Must have exactly zero secondary and arbiter VMs when using
+    # --mongodb_primary_only.
+    config['vm_groups']['secondary']['vm_count'] = 0
+    config['vm_groups']['arbiter']['vm_count'] = 0
   else:
+    secondary_count = config['vm_groups']['secondary']['vm_count']
+    arbiter_count = config['vm_groups']['arbiter']['vm_count']
     if any([
         count != 1 for count in [primary_count, secondary_count, arbiter_count]
     ]):

@@ -559,3 +559,5 @@
     sysbench logging verbosity.
 -   Changed YCSB time series metrics' timestamps from "seconds since run
     starting" to epoch.
+-   Fix a bug where running MongoDB YCSB benchmark with single node setup (flag
+    mongodb_primary_only) will fail.
