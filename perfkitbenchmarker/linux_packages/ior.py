@@ -82,7 +82,7 @@ def ParseIORResults(test_output):
       'Summary of all tests:\n(.*?)Finished', test_output, re.DOTALL
   )
   if not match:
-    raise errors.Benchmarks.RunError(f'Error parsing: "{test_output}"')
+    raise errors.Benchmarks.RunError('Error parsing: "{test_output}"')
   fp = io.StringIO(re.sub(' +', ' ', match.group(1)))
   result_dicts = csv.DictReader(fp, delimiter=' ')
   results = []

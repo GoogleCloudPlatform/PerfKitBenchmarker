@@ -62,6 +62,16 @@ JSON_OUT_FILE = 'json_data'
 MAX_PIPELINES_COUNT = 5000
 MAX_CLIENTS_COUNT = 30
 
+# Metrics aggregated for --memtier_distribution_binary_search
+MEMTIER_DISTRIBUTION_METRICS = {
+    'ops_per_sec': 'ops/s',
+    'kb_per_sec': 'KB/s',
+    'latency_ms': 'ms',
+    '90': 'ms',
+    '95': 'ms',
+    '99': 'ms',
+}
+
 MemtierHistogram = List[Dict[str, Union[float, int]]]
 
 FLAGS = flags.FLAGS
@@ -898,7 +908,7 @@ def MeasureLatencyCappedThroughputDistribution(
   logging.info(
       'Starting test iterations with parameters %s', parameters_for_test
   )
-  results = []
+  results: list[MemtierResult] = []
   for _ in range(MEMTIER_DISTRIBUTION_ITERATIONS.value):
     results_for_run = _RunParallelConnections(
         connections,
@@ -909,25 +919,19 @@ def MeasureLatencyCappedThroughputDistribution(
         parameters_for_test.pipelines,
         password,
     )
-    results.extend(results_for_run)
+    aggregate_result = _CombineResults(results_for_run)
+    logging.info('Aggregate result: %s', aggregate_result)
+    results.append(aggregate_result)
 
   samples = []
-  metrics = {
-      'ops_per_sec': 'ops/s',
-      'kb_per_sec': 'KB/s',
-      'latency_ms': 'ms',
-      '90': 'ms',
-      '95': 'ms',
-      '99': 'ms',
-  }
   metadata = {
       'distribution_iterations': MEMTIER_DISTRIBUTION_ITERATIONS.value,
       'threads': parameters_for_test.threads,
       'clients': parameters_for_test.clients,
       'pipelines': parameters_for_test.pipelines,
   }
-  for metric, units in metrics.items():
-    is_latency = metric.replace('.', '', 1).isdigit()
+  for metric, units in MEMTIER_DISTRIBUTION_METRICS.items():
+    is_latency = metric.isdigit()
     values = (
         [result.latency_dic[metric] for result in results]
         if is_latency
@@ -935,23 +939,26 @@ def MeasureLatencyCappedThroughputDistribution(
     )
     if is_latency:
       metric = f'p{metric} latency'
-    samples.extend([
+    samples.append(
         sample.Sample(
             f'Mean {metric}', statistics.mean(values), units, metadata
-        ),
-        sample.Sample(
-            f'Stdev {metric}',
-            statistics.stdev(values),
-            units,
-            metadata,
-        ),
-        sample.Sample(
-            f'Mode {metric}',
-            _CalculateMode(values),
-            units,
-            metadata,
-        ),
-    ])
+        )
+    )
+    if len(values) > 1:
+      samples.extend([
+          sample.Sample(
+              f'Stdev {metric}',
+              statistics.stdev(values),
+              units,
+              metadata,
+          ),
+          sample.Sample(
+              f'Mode {metric}',
+              _CalculateMode(values),
+              units,
+              metadata,
+          ),
+      ])
 
   return samples
 
