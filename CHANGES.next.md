@@ -561,3 +561,5 @@
     starting" to epoch.
 -   Fix a bug where running MongoDB YCSB benchmark with single node setup (flag
     mongodb_primary_only) will fail.
+-   `--google_bigtable_channel_count` now applies to the googlebigtable2 binding
+    as well.

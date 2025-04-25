@@ -81,13 +81,14 @@ _MONITORING_ADDRESS = flags.DEFINE_string(
 _USE_JAVA_VENEER_CLIENT = flags.DEFINE_boolean(
     'google_bigtable_use_java_veneer_client',
     False,
-    'If true, will use the googlebigtableclient with ycsb.',
+    'If true, will use the googlebigtable binding with ycsb rather than the '
+    'hbase* bindings using an HBase adapter client.',
 )
 # Temporary until old driver is deprecated.
 _USE_UPGRADED_DRIVER = flags.DEFINE_boolean(
     'google_bigtable_use_upgraded_driver',
     False,
-    'If true, will use the googlebigtableclient2 with ycsb. Requires'
+    'If true, will use the googlebigtable2 binding with ycsb. Requires'
     ' --google_bigtable_use_java_veneer_client to be true.',
 )
 _ENABLE_DIRECT_PATH = flags.DEFINE_boolean(
@@ -99,18 +100,18 @@ _ENABLE_TRAFFIC_DIRECTOR = flags.DEFINE_boolean(
     'google_bigtable_enable_traffic_director',
     False,
     'If true, will use the googlebigtable'
-    'client with ycsb to enable traffic through traffic director.',
+    'binding with ycsb to enable traffic through traffic director.',
 )
 _ENABLE_RLS_ROUTING = flags.DEFINE_boolean(
     'google_bigtable_enable_rls_routing',
     False,
-    'If true, will use the googlebigtableclient with ycsb to enable traffic'
+    'If true, will use the googlebigtable binding with ycsb to enable traffic'
     'through RLS with direct path',
 )
 _ENABLE_EXPERIMENTAL_LB_POLICY = flags.DEFINE_boolean(
     'google_bigtable_enable_experimental_lb_policy',
     False,
-    'If true, will use the googlebigtableclient with ycsb to enable beta LB'
+    'If true, will use the googlebigtable binding with ycsb to enable beta LB'
     'policy.',
 )
 _CHANNEL_COUNT = flags.DEFINE_integer(
@@ -118,7 +119,8 @@ _CHANNEL_COUNT = flags.DEFINE_integer(
     None,
     (
         'If specified, will use this many channels (i.e. connections) for '
-        'Bigtable RPCs instead of the default number.'
+        'Bigtable RPCs instead of the default number. Note: has no effect on '
+        'the googlebigtable binding.'
     ),
 )
 
@@ -524,6 +526,8 @@ def _CommonArgs(instance: _Bigtable) -> Dict[str, str]:
           gcp_bigtable.ENDPOINT.value + ':443'
       )
       kwargs.pop('columnfamily')
+      if _CHANNEL_COUNT.value:
+        kwargs['googlebigtable2.channel-pool-size'] = str(_CHANNEL_COUNT.value)
     else:
       kwargs['google.bigtable.instance.id'] = instance.name
       kwargs['google.bigtable.app_profile.id'] = (
