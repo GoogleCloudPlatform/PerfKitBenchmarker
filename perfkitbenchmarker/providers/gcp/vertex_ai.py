@@ -882,10 +882,10 @@ class VertexAiLlama2Spec(VertexAiModelSpec):
 
 
 class VertexAiLlama3Spec(VertexAiModelSpec):
-  """Spec for running the Llama3 70b model."""
+  """Spec for running the Llama3 8b & 70b model."""
 
   MODEL_NAME: str = 'llama3'
-  MODEL_SIZE: str = '8b'
+  MODEL_SIZE: list[str] = ['8b', '70b']
   VLLM_ARGS = [
       '--host=0.0.0.0',
       '--port=8080',
@@ -918,8 +918,12 @@ class VertexAiLlama3Spec(VertexAiModelSpec):
     self.serving_container_health_route = '/ping'
     # Machine type from deployment notebook:
     # https://pantheon.corp.google.com/vertex-ai/publishers/meta/model-garden/llama3
-    self.machine_type = 'g2-standard-12'
-    self.accelerator_count = 1
+    if self.model_size == '8b':
+      self.machine_type = 'g2-standard-12'
+      self.accelerator_count = 1
+    else:
+      self.machine_type = 'g2-standard-96'
+      self.accelerator_count = 8
     self.accelerator_type = 'NVIDIA_L4'
     self.serving_container_args = self.VLLM_ARGS.copy()
     self.serving_container_args.append(
