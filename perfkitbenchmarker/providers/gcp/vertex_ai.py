@@ -490,6 +490,14 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
     super()._PostCreate()
     self.endpoint.UpdateLabels()
 
+  def _CreateDependencies(self):
+    """Does not create any dependencies.
+
+    Skips the direct parent call (and its creating of the endpoint), but still
+    calls the grandparent managed_ai_model._CreateDependencies to add metadata.
+    """
+    super(BaseVertexAiModel, self)._CreateDependencies()
+
 
 class VertexAiPythonSdkModel(BaseVertexAiModel):
   """Vertex AI model managed via python SDK.

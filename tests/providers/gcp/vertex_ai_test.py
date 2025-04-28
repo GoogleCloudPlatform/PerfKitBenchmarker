@@ -304,10 +304,15 @@ response:
                 0,
             )],
             'ai endpoints describe update': [('', '', 0)],
+            'gcloud ai endpoints predict': [(
+                '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
+                '',
+                0,
+            )],
         },
         self.pkb_ai.vm,
     )
-    self.pkb_ai._Create()
+    self.pkb_ai.Create()
     self.assertEqual(self.pkb_ai.model_resource_name, 'foomodel')
     self.assertEqual(
         self.pkb_ai.endpoint.endpoint_name,
