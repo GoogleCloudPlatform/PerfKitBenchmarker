@@ -61,7 +61,7 @@ class CreateLocalDiskStrategy(AWSCreateDiskStrategy):
 
   def GetSetupDiskStrategy(self) -> disk_strategies.SetUpDiskStrategy:
     """Returns the SetUpDiskStrategy for the disk."""
-    return SetUpLocalDiskStrategy(self.vm, self.disk_specs)
+    return SetUpLocalDiskStrategy(self.vm, self.disk_specs)  # pytype: disable=wrong-arg-types
 
   def GetBlockDeviceMap(self) -> list[dict[str, str]]:
     mappings = []
@@ -125,7 +125,7 @@ class CreateRemoteDiskStrategy(AWSCreateDiskStrategy):
   def GetSetupDiskStrategy(self) -> disk_strategies.SetUpDiskStrategy:
     """Returns the SetUpDiskStrategy for the disk."""
     if self.setup_disk_strategy is None:
-      self.setup_disk_strategy = SetUpRemoteDiskStrategy(
+      self.setup_disk_strategy = SetUpRemoteDiskStrategy(  # pytype: disable=wrong-arg-types
           self.vm, self.disk_specs
       )
     return self.setup_disk_strategy
