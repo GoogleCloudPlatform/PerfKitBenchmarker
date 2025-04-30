@@ -192,23 +192,23 @@ filename=/dev/disk/by-id/google-pkb-67d581a7-0-data-0-1
       result = fio.ParseResults('', self.result_contents)
       sequential_write_metadata = {
           'fio_job': 'sequential_write',
-          'fio_version': 'fio-3.27',
+          'fio_version': 'fio-3.39',
       }
       sequential_read_metadata = {
           'fio_job': 'sequential_read',
-          'fio_version': 'fio-3.27',
+          'fio_version': 'fio-3.39',
       }
       random_write_metadata = {
           'fio_job': 'random_write_test',
-          'fio_version': 'fio-3.27',
+          'fio_version': 'fio-3.39',
       }
       random_read_metadata = {
           'fio_job': 'random_read_test',
-          'fio_version': 'fio-3.27',
+          'fio_version': 'fio-3.39',
       }
       random_read_parallel_metadata = {
           'fio_job': 'random_read_test_parallel',
-          'fio_version': 'fio-3.27',
+          'fio_version': 'fio-3.39',
       }
       expected_result = [
           [

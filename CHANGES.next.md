@@ -563,3 +563,4 @@
     mongodb_primary_only) will fail.
 -   `--google_bigtable_channel_count` now applies to the googlebigtable2 binding
     as well.
+-   Upgrade Fio Version to 3.39
