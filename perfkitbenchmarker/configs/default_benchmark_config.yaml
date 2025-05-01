@@ -358,6 +358,18 @@ postgres_sysbench_tpcc:
     sysbench_scale: 100
     sysbench_use_fk: False
 
+fio_latency:
+  name: fio
+  flags:
+    data_disk_size: 1024
+    provisioned_iops: 16000
+    provisioned_throughput: 1000
+    fio_generate_scenarios: rand_8k_read_100%,rand_8k_write_100%
+    fio_io_depths: 1
+    fio_num_jobs: 1
+    fio_runtime: 300
+    fio_target_mode: against_device_with_fill
+
 gpu_jobs_provisioning:
   name: jobs_benchmark
   base_job:
