@@ -43,7 +43,7 @@ BENCHMARK_CONFIG = """
 kubernetes_hpa:
   description: Benchmarks how quickly hpa reacts to load
   vm_groups:
-    default:
+    clients:
       vm_spec: *default_dual_core
       vm_count: 1
   container_specs:

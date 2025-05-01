@@ -32,7 +32,7 @@ ai_model_create:
     model_size: '7b'
     cloud: 'GCP'
   vm_groups:
-    default:
+    clients:
       vm_spec: *default_dual_core
       vm_count: 1
   flags:
