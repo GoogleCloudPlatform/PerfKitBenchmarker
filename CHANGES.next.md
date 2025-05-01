@@ -91,6 +91,8 @@
 -   Merged redundant `--runspec_build_tool_version` with `--gcc_version`.
 -   Create new flag `--azure_blob_storage_type` that defaults to `Standard_ZRS`
     instead of former default `--azure_storage_type=Standard_LRS`.
+-   Keep existing metadata rather than overwriting with metadata auto addded by
+    resources.
 
 ### New features:
 

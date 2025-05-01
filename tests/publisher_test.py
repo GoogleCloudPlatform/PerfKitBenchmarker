@@ -21,6 +21,7 @@ import tempfile
 import unittest
 import uuid
 from absl import flags
+from absl.testing import flagsaver
 import mock
 
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import
@@ -470,6 +471,28 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
         'vm_names': 'Hostname,foo,bar',
     }
     self._RunTest(mock_spec, expected)
+
+  @flagsaver.flagsaver(throw_on_metadata_conflict=False)
+  def testDontOverrideMetadata(self):
+    mock_spec = mock.MagicMock(vm_groups={'default': [self.mock_vm]})
+    input_metadata = {
+        'some_key': 'some_value',
+        'machine_type': 'unique-machine-type',
+    }
+    instance = publisher.DefaultMetadataProvider()
+    result = instance.AddMetadata(input_metadata, mock_spec)
+    self.assertEqual(result['machine_type'], 'unique-machine-type')
+
+  @flagsaver.flagsaver(throw_on_metadata_conflict=True)
+  def testOverridingMetadataThrows(self):
+    mock_spec = mock.MagicMock(vm_groups={'default': [self.mock_vm]})
+    input_metadata = {
+        'some_key': 'some_value',
+        'machine_type': 'unique-machine-type',
+    }
+    instance = publisher.DefaultMetadataProvider()
+    with self.assertRaises(ValueError):
+      instance.AddMetadata(input_metadata, mock_spec)
 
 
 class CSVPublisherTestCase(unittest.TestCase):

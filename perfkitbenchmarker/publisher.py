@@ -75,7 +75,7 @@ JSON_PATH = flags.DEFINE_string(
     DEFAULT_JSON_OUTPUT_NAME,
     'A path to write newline-delimited JSON results. '
     'Default: write to a run-specific temporary directory. '
-    'Passing '' skips local publishing.',
+    "Passing '' skips local publishing.",
 )
 flags.DEFINE_enum(
     'json_write_mode',
@@ -145,6 +145,13 @@ flags.DEFINE_multi_string(
     'A colon separated key-value pair that will be added to the labels field '
     'of all samples as metadata. Multiple key-value pairs may be specified '
     'by separating each pair by commas.',
+)
+
+_THROW_ON_METADATA_CONFLICT = flags.DEFINE_boolean(
+    'throw_on_metadata_conflict',
+    True,
+    'Behavior when default metadata conflicts with existing metadata. If true, '
+    'an error is raised. Otherwise, the existing metadata value is used.',
 )
 
 flags.DEFINE_string(
@@ -250,10 +257,8 @@ class MetadataProvider(metaclass=abc.ABCMeta):
   """A provider of sample metadata."""
 
   @abc.abstractmethod
-  def AddMetadata(self, metadata, benchmark_spec):
+  def AddMetadata(self, metadata, benchmark_spec) -> dict[str, Any]:
     """Add metadata to a dictionary.
-
-    Existing values will be overwritten.
 
     Args:
       metadata: dict. Dictionary of metadata to update.
@@ -268,39 +273,39 @@ class MetadataProvider(metaclass=abc.ABCMeta):
 class DefaultMetadataProvider(MetadataProvider):
   """Adds default metadata to samples."""
 
-  def AddMetadata(self, metadata, benchmark_spec):
-    metadata = metadata.copy()
-    metadata['perfkitbenchmarker_version'] = version.VERSION
+  def AddMetadata(self, metadata: dict[str, Any], benchmark_spec):
+    new_metadata = {}
+    new_metadata['perfkitbenchmarker_version'] = version.VERSION
     if FLAGS.simulate_maintenance:
-      metadata['simulate_maintenance'] = True
+      new_metadata['simulate_maintenance'] = True
     if FLAGS.hostname_metadata:
-      metadata['hostnames'] = ','.join(
+      new_metadata['hostnames'] = ','.join(
           [vm.hostname for vm in benchmark_spec.vms]
       )
     if benchmark_spec.container_cluster:
       cluster = benchmark_spec.container_cluster
       for k, v in cluster.GetResourceMetadata().items():
-        metadata['container_cluster_' + k] = v
+        new_metadata['container_cluster_' + k] = v
 
     if benchmark_spec.relational_db:
       db = benchmark_spec.relational_db
       for k, v in db.GetResourceMetadata().items():
         # TODO(user): Rename to relational_db.
-        metadata['managed_relational_db_' + k] = v
+        new_metadata['managed_relational_db_' + k] = v
 
     if benchmark_spec.pinecone:
       pinecone = benchmark_spec.pinecone
       for k, v in pinecone.GetResourceMetadata().items():
-        metadata['pinecone_' + k] = v
+        new_metadata['pinecone_' + k] = v
 
     if benchmark_spec.memory_store:
       memory_store = benchmark_spec.memory_store
       for k, v in memory_store.GetResourceMetadata().items():
-        metadata[k] = v
+        new_metadata[k] = v
 
     for name, tpu in benchmark_spec.tpu_groups.items():
       for k, v in tpu.GetResourceMetadata().items():
-        metadata['tpu_' + k] = v
+        new_metadata['tpu_' + k] = v
 
     for name, vms in benchmark_spec.vm_groups.items():
       if len(vms) == 0:
@@ -312,24 +317,24 @@ class DefaultMetadataProvider(MetadataProvider):
       name_prefix = '' if name == 'default' else name + '_'
       for k, v in vm.GetResourceMetadata().items():
         if k not in _VM_METADATA_TO_LIST_PLURAL:
-          metadata[name_prefix + k] = v
-      metadata[name_prefix + 'vm_count'] = len(vms)
+          new_metadata[name_prefix + k] = v
+      new_metadata[name_prefix + 'vm_count'] = len(vms)
       for k, v in vm.GetOSResourceMetadata().items():
-        metadata[name_prefix + k] = v
+        new_metadata[name_prefix + k] = v
 
       if vm.scratch_disks:
         data_disk = vm.scratch_disks[0]
-        metadata[name_prefix + 'data_disk_count'] = len(vm.scratch_disks)
+        new_metadata[name_prefix + 'data_disk_count'] = len(vm.scratch_disks)
         for key, value in data_disk.GetResourceMetadata().items():
-          metadata[name_prefix + 'data_disk_0_%s' % (key,)] = value
+          new_metadata[name_prefix + 'data_disk_0_%s' % (key,)] = value
 
-    # Get some metadata from all VMs:
+    # Get some new_metadata from all VMs:
     # Here having a lack of a prefix indicate the union of all groups, where it
     # signaled the default vm group above.
     vm_groups_and_all = benchmark_spec.vm_groups | {None: benchmark_spec.vms}
     for group_name, vms in vm_groups_and_all.items():
       name_prefix = group_name + '_' if group_name else ''
-      # since id and name are generic metadata prefix vm, so it is clear
+      # since id and name are generic new_metadata prefix vm, so it is clear
       # what the resource is.
       name_prefix += 'vm_'
       for key, key_plural in _VM_METADATA_TO_LIST_PLURAL.items():
@@ -338,16 +343,33 @@ class DefaultMetadataProvider(MetadataProvider):
           if value := vm.GetResourceMetadata().get(key):
             values.append(value)
         if values:
-          metadata[name_prefix + key_plural] = ','.join(values)
+          new_metadata[name_prefix + key_plural] = ','.join(values)
 
     if FLAGS.set_files:
-      metadata['set_files'] = ','.join(FLAGS.set_files)
+      new_metadata['set_files'] = ','.join(FLAGS.set_files)
     if FLAGS.sysctl:
-      metadata['sysctl'] = ','.join(FLAGS.sysctl)
+      new_metadata['sysctl'] = ','.join(FLAGS.sysctl)
 
+    # Add new values, keeping old ones in conflicts.
+    overlapping_keys = set(new_metadata.keys()).intersection(metadata.keys())
+    if overlapping_keys and _THROW_ON_METADATA_CONFLICT.value:
+      conflicts = []
+      for key in overlapping_keys:
+        if new_metadata[key] != metadata[key]:
+          conflicts.append(f'{key}: {new_metadata[key]} != {metadata[key]}')
+      if conflicts:
+        raise ValueError(
+            'Conflicting keys are already set in metadata & are being '
+            'overwritten by default metadata provider. Resolve by using a '
+            'different VM group, adding prefixes and/or different names to the '
+            'metadata keys, or by setting --throw_on_metadata_conflict=False.'
+            'Conflicts, with new value on left and old value on right: %s'
+            % conflicts
+        )
+    metadata = new_metadata | metadata
     # Flatten all user metadata into a single list (since each string in the
-    # FLAGS.metadata can actually be several key-value pairs) and then iterate
-    # over it.
+    # FLAGS.metadata can actually be several key-value pairs) and then
+    # iterate over it.
     parsed_metadata = flag_util.ParseKeyValuePairs(FLAGS.metadata)
     metadata.update(parsed_metadata)
     return metadata
@@ -481,16 +503,12 @@ class PrettyPrintStreamPublisher(SamplePublisher):
         unique_values[k].add(None)
 
     return frozenset(
-        k
-        for k, v in unique_values.items()
-        if len(v) == 1 and None not in v
+        k for k, v in unique_values.items() if len(v) == 1 and None not in v
     )
 
   def _FormatMetadata(self, metadata):
     """Format 'metadata' as space-delimited key="value" pairs."""
-    return ' '.join(
-        '{}="{}"'.format(k, v) for k, v in sorted(metadata.items())
-    )
+    return ' '.join('{}="{}"'.format(k, v) for k, v in sorted(metadata.items()))
 
   def PublishSamples(self, samples):
     # result will store the formatted text, then be emitted to self.stream and
@@ -909,6 +927,7 @@ class ElasticsearchPublisher(SamplePublisher):
     num_dec = ('%.6f' % (epoch_us - math.floor(epoch_us))).split('.')[1]
     new_ts = '%s.%s' % (ts, num_dec)
     return new_ts
+
   # pylint: enable=g-doc-args,g-doc-return-or-yield,g-short-docstring-punctuation
 
   # pylint: disable-next=invalid-name
