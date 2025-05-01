@@ -70,7 +70,7 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
         'meta-textgeneration-llama-2-7b-f-2025-08-16-06',
     )
 
-  def testTagsAddedCreate(self):
+  def testPostCreate(self):
     self.enter_context(
         mock.patch.object(
             util, 'MakeFormattedDefaultTags', return_value=['Key=K,Value=V']
@@ -80,6 +80,25 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
         {
             'aws sagemaker add-tags': [(
                 'Tags added',
+                '',
+                0,
+            )],
+            'aws sagemaker describe-endpoint --region': [(
+                (
+                    '{"EndpointConfigName":'
+                    ' "meta-textgeneration-llama-2-7b-f-2025-08-16-06"'
+                    '}'
+                ),
+                '',
+                0,
+            )],
+            'aws sagemaker describe-endpoint-config': [(
+                (
+                    '{"EndpointConfigName":'
+                    ' "meta-textgeneration-llama-2-7b-f-2025-08-16-06",'
+                    '"ProductionVariants": [{"InstanceType": "ml.g5.2xlarge"}]'
+                    '}'
+                ),
                 '',
                 0,
             )],
@@ -111,6 +130,7 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
             'Key=K,Value=V',
         ]),
     )
+    self.assertEqual(self.ai_model.metadata['machine_type'], 'ml.g5.2xlarge')
 
   def testListEndpointsParsesOutNames(self):
     self.MockRunCommand(

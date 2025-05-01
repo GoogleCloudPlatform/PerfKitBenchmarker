@@ -187,9 +187,29 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
     self.model_name = _FindNameMatch(out, 'Model name')
 
   def _PostCreate(self) -> None:
-    """Adds tags after creation timing."""
+    """Adds tags & metadata after creation timing."""
     self._AddTags('endpoint', self.endpoint_name)
     self._AddTags('model', self.model_name)
+    describe_cmd = (
+        f'aws sagemaker describe-endpoint --region={self.region} '
+        f'--endpoint-name={self.endpoint_name}'
+    )
+    describe_out, _, _ = self.vm.RunCommand(describe_cmd)
+    describe_json = json.loads(describe_out)
+    endpoint_config_name = describe_json['EndpointConfigName']
+    describe_endpoint_config_cmd = (
+        f'aws sagemaker describe-endpoint-config --region={self.region} '
+        f'--endpoint-config-name={endpoint_config_name}'
+    )
+    describe_endpoint_config_out, _, _ = self.vm.RunCommand(
+        describe_endpoint_config_cmd
+    )
+    describe_endpoint_config_json = json.loads(describe_endpoint_config_out)
+    self.metadata.update({
+        'machine_type': describe_endpoint_config_json['ProductionVariants'][0][
+            'InstanceType'
+        ]
+    })
 
   def _AddTags(self, resource_type: str, resource_name: str) -> None:
     """Adds tags to the resource with the given type & name."""
