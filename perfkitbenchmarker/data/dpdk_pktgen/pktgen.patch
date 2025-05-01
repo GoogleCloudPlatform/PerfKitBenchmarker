@@ -73,3 +73,16 @@ index 4d5fcf2..1d55c8d 100644
      cpb        = (rte_get_timer_hz() / pps) * (uint64_t)port->tx_burst; /* Cycles per Burst */
  
      port->tx_cycles = (uint64_t)l2p_get_txcnt(port->pid) * cpb;
+diff --git a/tools/pktgen-build.sh b/tools/pktgen-build.sh
+index fd1a95f..2f0491b 100755
+--- a/tools/pktgen-build.sh
++++ b/tools/pktgen-build.sh
+@@ -64,7 +64,7 @@ function run_meson() {
+        btype="-Dbuildtype="$buildtype
+ 
+     echo "meson $configure $btype $lua_enabled $build_dir"
+-       if ! meson $configure $btype $lua_enabled $build_dir; then
++       if ! meson $configure $btype $lua_enabled $build_dir -Dc_args="-Wno-error=stringop-overflow"; then
+         echo "*** ERROR: meson $configure $btype $lua_enabled $build_dir"
+         configure=""
+         return 1

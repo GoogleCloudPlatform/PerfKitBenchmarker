@@ -35,7 +35,7 @@ def _Install(vm):
       f'{DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.patch',
   )
   vm.RemoteCommand(
-      f'cd {DPDK_PKTGEN_GIT_REPO_DIR} && patch -p1 < pktgen.patch'
+      f'cd {DPDK_PKTGEN_GIT_REPO_DIR} && patch -l -p1 < pktgen.patch'
   )
   vm.RemoteCommand(f'cd {DPDK_PKTGEN_GIT_REPO_DIR} && make')
 
