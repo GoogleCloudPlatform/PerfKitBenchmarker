@@ -396,13 +396,18 @@ class GceDisk(disk.BaseDisk):
 
     if self.multi_writer_disk:
       cmd.flags['access-mode'] = 'READ_WRITE_MANY'
+    if self.spec.snapshot_name:
+      cmd.flags['source-snapshot'] = self.spec.snapshot_name
     self.create_disk_start_time = time.time()
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
     self.create_disk_end_time = self._GetEndTime(stdout)
 
   def _Delete(self):
-    """Deletes the disk."""
+    """Deletes the disk, as well as all associated snapshot and restore disks."""
+    if self.snapshots:
+      for snapshot in self.snapshots:
+        snapshot.Delete()
     cmd = util.GcloudCommand(self, 'compute', 'disks', 'delete', self.name)
     if self.replica_zones:
       cmd.flags['region'] = self.region
@@ -540,6 +545,126 @@ class GceDisk(disk.BaseDisk):
 
   def IsNvme(self):
     return self.interface == NVME
+
+  def CreateSnapshot(self):
+    """Creates a snapshot of the disk."""
+    self.snapshots.append(GceDiskSnapshot(self))
+    self.snapshots[-1].Create()
+
+
+class GceDiskSnapshot(disk.DiskSnapshot):
+  """Object representing a GCE Disk Snapshot.
+
+  Attributes:
+    source_disk: The GceDisk object that the snapshot is created from.
+    disk_spec: The disk spec of the source disk.
+    source_disk_name: The name of the source disk.
+    source_disk_size: The size of the source disk.
+    source_disk_type: The type of the source disk.
+    name: The name of the snapshot.
+    zone: The zone of the source disk.
+    region: The region of the source disk.
+    project: The project of the source disk.
+    storage_gb: The storage used by the snapshot in GB.
+    restore_disks: A list of GceDisk objects created from the snapshot.
+    num_restore_disks: The number of disks restored from this snapshot.
+  """
+
+  def __init__(self, source_disk):
+    super().__init__()
+    self.source_disk = source_disk
+    self.disk_spec = source_disk.spec
+    self.source_disk_name = source_disk.name
+    self.source_disk_size = source_disk.disk_size
+    self.source_disk_type = source_disk.disk_type
+    self.name = f'disk-snapshot-{self.source_disk_name}'
+    self.zone = source_disk.zone
+    self.region = util.GetRegionFromZone(self.zone)
+    self.project = source_disk.project
+
+  def _Create(self):
+    """Creates a snapshot of the disk.
+
+    Raises:
+      errors.VmUtil.CalledProcessException: When the command returns a non-zero
+      exit code.
+    """
+    cmd = util.GcloudCommand(self, 'compute', 'snapshots', 'create', self.name)
+    del cmd.flags['zone']
+    cmd.flags['source-disk'] = self.source_disk_name
+    cmd.flags['source-disk-zone'] = self.zone
+    cmd.flags['storage-location'] = self.region
+    cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+    self.creation_start_time = time.time()
+    stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
+    self.creation_end_time = self._Describe()
+
+    if retcode:
+      debug_text = 'Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' % (
+          ' '.join(cmd.GetCommand()),
+          retcode,
+          stdout,
+          stderr,
+      )
+      raise errors.VmUtil.CalledProcessException(
+          'Command returned a non-zero exit code:\n{}'.format(debug_text)
+      )
+
+  @vm_util.Retry(
+      poll_interval=0.5,
+      max_retries=10,
+      log_errors=True,
+      retryable_exceptions=(errors.Resource.RetryableCreationError,),
+  )
+  def _Describe(self):
+    """Describe the snapshot, storing the storage size in GB.
+
+    Returns:
+        float: The time when the snapshot was created.
+
+    Raises:
+        errors.Resource.RetryableCreationError: If the snapshot is not created
+        and ready.
+    """
+    cmd = util.GcloudCommand(
+        self, 'compute', 'snapshots', 'describe', self.name
+    )
+    del cmd.flags['zone']
+    stdout, _, _ = cmd.Issue(raise_on_failure=False)
+    result = json.loads(stdout)
+    self.storage_gb = int(result['storageBytes']) // (2**30)
+    snapshot_status = result['status']
+    if snapshot_status == 'READY':
+      return time.time()
+    logging.info(
+        'Disk %s snapshot %s has status %s.',
+        self.source_disk_name,
+        self.name,
+        snapshot_status,
+    )
+    raise errors.Resource.RetryableCreationError()
+
+  def Restore(self):
+    """Creates a disk from the snapshot."""
+    self.restore_disk_name = f'{self.name}-restore-{self.num_restore_disks}'
+    self.disk_spec.snapshot_name = self.name
+    restore_disk = GceDisk(
+        self.disk_spec, self.restore_disk_name, self.zone, self.project
+    )
+    restore_disk.Create()
+    self.restore_disks.append(restore_disk)
+    self.num_restore_disks += 1
+
+    return self.restore_disks[-1]
+
+  def Delete(self):
+    """Deletes the snapshot."""
+    if self.restore_disks:
+      for restore_disk in self.restore_disks:
+        restore_disk.Delete()
+        self.num_restore_disks -= 1
+    cmd = util.GcloudCommand(self, 'compute', 'snapshots', 'delete', self.name)
+    cmd.Issue(raise_on_failure=False)
 
 
 class GceStripedDisk(disk.StripedDisk):

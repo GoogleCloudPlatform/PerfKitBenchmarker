@@ -167,6 +167,7 @@ class BaseDiskSpec(spec.BaseSpec):
     self.provisioned_throughput = None
     self.multi_writer_mode: bool = False
     self.multi_writer_group_name: str = None
+    self.snapshot_name: str = None
     super().__init__(*args, **kwargs)
 
   @classmethod
@@ -427,6 +428,7 @@ class BaseDisk(resource.BaseResource):
     self.num_partitions = disk_spec.num_partitions
     self.partition_size = disk_spec.partition_size
     self.multi_writer_disk: bool = disk_spec.multi_writer_mode
+    self.snapshots = []
     self.metadata.update({
         'type': self.disk_type,
         'size': self.disk_size,
@@ -576,6 +578,10 @@ class BaseDisk(resource.BaseResource):
     return samples
 
   def IsNvme(self):
+    raise NotImplementedError()
+
+  def CreateSnapshot(self):
+    """Creates a snapshot of the disk."""
     raise NotImplementedError()
 
 
@@ -811,3 +817,34 @@ class SmbDisk(NetworkDisk):
   def Attach(self, vm):
     self.vm = vm
     self.vm.InstallPackages('cifs-utils')
+
+
+class DiskSnapshot(resource.BaseResource):
+  """Object representing a Disk Snapshot.
+
+  Attributes:
+    source_disk: The source disk of the snapshot.
+    storage_gb: The storage size of the snapshot in GB.
+    creation_start_time: The start time of snapshot creation.
+    creation_end_time: The end time of snapshot creation.
+    restore_disks: The disks restored from the snapshot.
+    num_restore_disks: The number of disks restored from the snapshot.
+  """
+
+  def __init__(self):
+    super().__init__()
+    self.source_disk = None
+    self.storage_gb = None
+    self.creation_start_time = None
+    self.creation_end_time = None
+    self.restore_disks = []
+    self.num_restore_disks = 0
+
+  def _Create(self):
+    raise NotImplementedError()
+
+  def _Delete(self):
+    raise NotImplementedError()
+
+  def Restore(self):
+    raise NotImplementedError()

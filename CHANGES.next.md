@@ -221,6 +221,8 @@
 -   Add tutorial walking through an example GKE benchmark.
 -   Add dpdk_pktgen_benchmark, a more feature-rich DPDK benchmark than dpdk_testpmd_benchmark.
 -   Add support for configuring readahead buffer size in DFSIO test
+-   Add disk_snapshot_benchmark, measuring compression, snapshot creation time,
+    and snapshot restore time.
 
 ### Enhancements:
 

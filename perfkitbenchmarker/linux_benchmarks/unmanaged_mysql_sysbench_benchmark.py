@@ -151,7 +151,7 @@ def _GetPassword():
   return FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
 
 
-def _GetSysbenchParameters(primary_server_ip: str | None, password: str):
+def GetSysbenchParameters(primary_server_ip: str | None, password: str):
   """Get sysbench parameters from flags."""
   sysbench_parameters = sysbench.SysbenchInputParameters(
       db_driver=_DATABASE_TYPE,
@@ -239,7 +239,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
       )
 
   loader_vm = benchmark_spec.vm_groups['client'][0]
-  sysbench_parameters = _GetSysbenchParameters(
+  sysbench_parameters = GetSysbenchParameters(
       primary_server.internal_ip, new_password)
   cmd = sysbench.BuildLoadCommand(sysbench_parameters)
   logging.info('%s load command: %s', FLAGS.sysbench_testname, cmd)
@@ -258,7 +258,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """
   primary_server = benchmark_spec.vm_groups['server'][0]
   client = benchmark_spec.vm_groups['client'][0]
-  sysbench_parameters = _GetSysbenchParameters(
+  sysbench_parameters = GetSysbenchParameters(
       primary_server.internal_ip, _GetPassword())
   results = []
   # a map of trasactions metric name to current sample with max value
