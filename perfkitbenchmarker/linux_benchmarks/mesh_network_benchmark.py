@@ -48,7 +48,7 @@ mesh_network:
     with --num_vms.
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 NETPERF_BENCHMARKSS = ['TCP_RR', 'TCP_STREAM']

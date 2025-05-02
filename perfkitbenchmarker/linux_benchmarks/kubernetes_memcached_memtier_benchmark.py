@@ -68,7 +68,7 @@ kubernetes_memcached_memtier:
         vm_count: 1
   vm_groups:
     clients:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
 """
 WAIT_FOR_REPLICA_TIMEOUT = '300s'

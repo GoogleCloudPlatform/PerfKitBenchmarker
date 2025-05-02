@@ -177,12 +177,12 @@ aerospike:
   description: Runs Aerospike.
   vm_groups:
     workers:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
       vm_count: null
       disk_count: 0
     clients:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 

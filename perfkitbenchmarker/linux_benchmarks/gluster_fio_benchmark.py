@@ -42,11 +42,11 @@ gluster_fio:
     Runs fio against a remote gluster cluster.
   vm_groups:
     gluster_servers:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
       vm_count: 1
     clients:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: null
 """
 

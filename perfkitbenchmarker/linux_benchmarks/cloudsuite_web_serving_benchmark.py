@@ -46,13 +46,13 @@ cloudsuite_web_serving:
     Run Cloudsuite web serving benchmark.
   vm_groups:
     backend:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
     frontend:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
     client:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
 """
 

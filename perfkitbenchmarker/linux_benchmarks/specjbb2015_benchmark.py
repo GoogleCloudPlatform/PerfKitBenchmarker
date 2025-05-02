@@ -34,7 +34,7 @@ specjbb2015:
   description: Run specjbb2015
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_50_gb
   flags:
     openjdk_version: 21

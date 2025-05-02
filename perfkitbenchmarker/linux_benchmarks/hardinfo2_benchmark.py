@@ -31,7 +31,7 @@ hardinfo2:
   description: Hardinfo2 benchmark.
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 

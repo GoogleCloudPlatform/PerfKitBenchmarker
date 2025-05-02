@@ -45,10 +45,10 @@ redis_ycsb:
       Specify the number of client VMs with --ycsb_client_vms.
   vm_groups:
     workers:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
     clients:
       os_type: ubuntu2204  # Python 2
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 

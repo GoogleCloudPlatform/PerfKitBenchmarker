@@ -20,7 +20,7 @@ omb:
   vm_groups:
     default:
       vm_count: 2
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 _BENCHMARKS_ARG = flags.DEFINE_multi_enum(

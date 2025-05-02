@@ -55,10 +55,10 @@ netperf_aggregate:
   description: simultaneous netperf to multiple endpoints
   vm_groups:
     servers:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 2
     client:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
   flags:
     placement_group_style: closest_supported
 """

@@ -35,7 +35,7 @@ ntttcp:
   description: Run ntttcp between two VMs.
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 2
   flags:
     placement_group_style: closest_supported

@@ -66,7 +66,7 @@ kubernetes_nginx:
             machine_type: Standard_D4s_v5
   vm_groups:
     clients:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
 """
 

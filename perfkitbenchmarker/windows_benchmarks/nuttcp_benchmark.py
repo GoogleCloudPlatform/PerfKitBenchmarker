@@ -27,9 +27,9 @@ nuttcp:
   description: Run nuttcp between two VMs.
   vm_groups:
     vm_1:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
     vm_2:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 

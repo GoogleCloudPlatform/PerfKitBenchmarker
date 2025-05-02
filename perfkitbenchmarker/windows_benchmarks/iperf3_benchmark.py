@@ -27,7 +27,7 @@ iperf3:
   description: Run iperf3 between two VMs.
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 2
 """
 

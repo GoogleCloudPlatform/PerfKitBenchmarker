@@ -34,9 +34,9 @@ ping:
   description: Benchmarks ping latency over internal IP addresses
   vm_groups:
     vm_1:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
     vm_2:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 METRICS = ('Min Latency', 'Average Latency', 'Max Latency', 'Latency Std Dev')

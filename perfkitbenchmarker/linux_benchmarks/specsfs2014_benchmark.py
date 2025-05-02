@@ -96,11 +96,11 @@ specsfs2014:
     into the data/ directory.
   vm_groups:
     gluster_servers:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
       vm_count: 3
     clients:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: null
 """
 

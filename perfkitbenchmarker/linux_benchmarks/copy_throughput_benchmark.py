@@ -80,7 +80,7 @@ copy_throughput:
   description: Get cp and scp performance between vms.
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
       disk_count: 2
       vm_count: 1
@@ -99,7 +99,7 @@ UNIT = 'MB/sec'
 
 
 def GetConfig(user_config):
-  """Decide number of vms needed and return infomation for copy benchmark."""
+  """Decide number of vms needed and return information for copy benchmark."""
 
   if FLAGS.copy_benchmark_mode == 'dd' and FLAGS.copy_benchmark_single_file_mb:
     raise errors.Setup.InvalidFlagConfigurationError(

@@ -35,10 +35,10 @@ cloudsuite_data_analytics:
     with --num_vms.
   vm_groups:
     master:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
     slaves:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 

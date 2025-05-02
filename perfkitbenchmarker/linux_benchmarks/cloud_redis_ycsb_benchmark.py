@@ -36,7 +36,7 @@ cloud_redis_ycsb:
   vm_groups:
     clients:
       os_type: ubuntu2204  # Python 2
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 2
 """
 

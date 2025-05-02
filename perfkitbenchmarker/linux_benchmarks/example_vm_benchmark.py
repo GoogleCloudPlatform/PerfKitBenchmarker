@@ -28,7 +28,7 @@ example_vm:
   # bigger VMs (e.g. servers) should be defined before smaller ones (e.g. clients).
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: null
 """
 

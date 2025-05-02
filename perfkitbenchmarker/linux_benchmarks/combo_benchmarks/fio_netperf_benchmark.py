@@ -39,10 +39,10 @@ fio_netperf:
   description: Run FIO and Netperf benchmarks in parallel
   vm_groups:
     vm_1:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
     vm_2:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
   flags:
     netperf_test_length: 300

@@ -111,10 +111,10 @@ memcached_ycsb:
     num_vms: 1
   vm_groups:
     servers:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
     clients:
       os_type: ubuntu2204  # Python 2
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 

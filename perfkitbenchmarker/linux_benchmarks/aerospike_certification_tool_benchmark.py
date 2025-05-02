@@ -31,7 +31,7 @@ aerospike_certification_tool:
   description: Runs aerospike certification tool.
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
       vm_count: 1
       disk_count: 0

@@ -66,7 +66,7 @@ kubernetes_redis_memtier:
         vm_count: 1
   vm_groups:
     clients:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
 """
 

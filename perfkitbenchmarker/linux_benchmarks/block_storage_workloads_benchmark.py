@@ -81,7 +81,7 @@ block_storage_workload:
       write modes to simulate various scenarios.
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
 """
 

@@ -189,10 +189,10 @@ apachebench:
   vm_groups:
     server:
       os_type: ubuntu2004
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
     client:
       os_type: ubuntu2004
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
 """
 FLAGS = flags.FLAGS
@@ -339,7 +339,7 @@ def _ParseRawRequestData(
 
   Column meanings:
     ctime: Time to establish a connection with the server.
-    dtime: Time from connection established to response recieved.
+    dtime: Time from connection established to response received.
     ttime: ctime + dtime
     wait: Time from request written to response from server.
 
@@ -529,7 +529,7 @@ def GetMetadata(
     run_config: ApacheBenchRunConfig,
     ip_config: ApacheBenchIpConfig,
 ) -> Dict[str, Any]:
-  """Returns the apachebench metadata as a dictonary.
+  """Returns the apachebench metadata as a dictionary.
 
   Args:
     results: The dictionary returned by _Run.
@@ -537,7 +537,7 @@ def GetMetadata(
     ip_config: The ApacheBenchIpConfig passed to _Run.
 
   Returns:
-    A dictonary of metadata to be included in all ApacheBench samples.
+    A dictionary of metadata to be included in all ApacheBench samples.
   """
 
   return {

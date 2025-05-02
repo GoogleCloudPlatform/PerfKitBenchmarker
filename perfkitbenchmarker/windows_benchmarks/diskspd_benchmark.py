@@ -26,7 +26,7 @@ diskspd:
   description: Run diskspd on a single machine
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
       disk_spec: *default_500_gb
 """

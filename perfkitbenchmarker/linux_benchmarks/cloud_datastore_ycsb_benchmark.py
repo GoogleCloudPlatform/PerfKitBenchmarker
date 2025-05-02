@@ -40,12 +40,12 @@ BENCHMARK_NAME = 'cloud_datastore_ycsb'
 BENCHMARK_CONFIG = """
 cloud_datastore_ycsb:
   description: >
-      Run YCSB agains Google Cloud Datastore.
+      Run YCSB against Google Cloud Datastore.
       Configure the number of VMs via --num-vms.
   vm_groups:
     default:
       os_type: ubuntu2204  # Python 2
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
   flags:
     openjdk_version: 11

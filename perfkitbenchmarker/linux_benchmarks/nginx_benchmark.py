@@ -146,12 +146,12 @@ nginx:
   description: Benchmarks Nginx server performance.
   vm_groups:
     server:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
     upstream_servers:
       vm_spec: *default_dual_core
       vm_count: 6
     clients:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: null
 """
 

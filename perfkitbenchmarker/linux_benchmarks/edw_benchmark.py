@@ -43,7 +43,7 @@ edw_benchmark:
     snapshot:
   vm_groups:
     client:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 flags.DEFINE_string(

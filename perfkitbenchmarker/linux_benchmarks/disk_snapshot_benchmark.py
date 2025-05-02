@@ -36,7 +36,7 @@ disk_snapshot:
   description: Runs disk snapshot.
   vm_groups:
     server:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec:
         GCP:
           disk_size: 500

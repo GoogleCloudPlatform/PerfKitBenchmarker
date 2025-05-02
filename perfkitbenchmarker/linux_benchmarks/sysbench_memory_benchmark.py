@@ -32,7 +32,7 @@ sysbench_memory:
   description: Runs sysbench memory on all vCPU's of a VM.
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 

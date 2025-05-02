@@ -323,7 +323,7 @@ fio:
   description: Runs fio in sequential, random, read and write modes.
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
       vm_count: null
   flags:
@@ -962,7 +962,7 @@ def RunWithExec(
     exec_path: string path to the fio executable.
     remote_job_file_path: path, on the vm, to the location of the job file.
     job_file_contents: string contents of the fio job file.
-    fio_generate_scenarios: list of strings with scenrios to benchmark.
+    fio_generate_scenarios: list of strings with scenarios to benchmark.
 
   Returns:
     A list of sample.Sample objects.

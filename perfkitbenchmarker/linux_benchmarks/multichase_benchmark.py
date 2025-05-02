@@ -72,7 +72,7 @@ multichase:
       Run a benchmark from the multichase benchmark suite.
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
   flags:
     enable_transparent_hugepages: True
 """

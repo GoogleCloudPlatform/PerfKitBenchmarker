@@ -58,7 +58,7 @@ REF_CONFIG = """
 a:
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 BAD_REF_CONFIG = """
 a:

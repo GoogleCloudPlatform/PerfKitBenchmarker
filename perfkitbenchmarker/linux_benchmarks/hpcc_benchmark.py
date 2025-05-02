@@ -16,7 +16,7 @@
 Homepage: http://icl.cs.utk.edu/hpcc/
 
 Most of the configuration of the HPC-Challenge revolves around HPL, the rest of
-the HPCC piggybacks upon the HPL configration.
+the HPCC piggybacks upon the HPL configuration.
 
 Homepage: http://www.netlib.org/benchmark/hpl/
 
@@ -89,7 +89,7 @@ hpcc:
   description: Runs HPCC. Specify the number of VMs with --num_vms
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: null
 """
 
@@ -252,7 +252,7 @@ def CheckPrerequisites(_) -> None:
     data.ResourcePath(FLAGS.hpcc_binary)
   if FLAGS.hpcc_numa_binding and FLAGS.num_vms > 1:
     raise errors.Setup.InvalidFlagConfigurationError(
-        'Numa binding with with multiple hpcc vm not supported.'
+        'Numa binding with multiple hpcc vm not supported.'
     )
   if CONFIG_DIMENSIONS.value:
     parts = CONFIG_DIMENSIONS.value.split(',')

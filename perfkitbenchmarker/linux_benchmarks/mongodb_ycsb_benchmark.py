@@ -68,7 +68,7 @@ mongodb_ycsb:
   description: Run YCSB against MongoDB.
   vm_groups:
     primary:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec:
         GCP:
           disk_size: 500
@@ -84,7 +84,7 @@ mongodb_ycsb:
           mount_point: /scratch
       vm_count: 1
     secondary:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec:
         GCP:
           disk_size: 500
@@ -100,11 +100,11 @@ mongodb_ycsb:
           mount_point: /scratch
       vm_count: 1
     arbiter:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
     clients:
       os_type: ubuntu2204  # Python 2
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
   flags:
     openjdk_version: 8

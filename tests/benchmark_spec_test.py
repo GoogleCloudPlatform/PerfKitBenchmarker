@@ -75,10 +75,10 @@ static_vms:
 cluster_boot:
   vm_groups:
     group1:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
     group2:
       vm_count: 3
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       static_vms:
        - *vm1
        - ip_address: 2.2.2.2
@@ -112,7 +112,7 @@ edw_benchmark:
     cluster_identifier: _fake_cluster_id_
   vm_groups:
     client:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 

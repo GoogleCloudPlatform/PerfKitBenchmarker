@@ -33,7 +33,7 @@ provision_memory_store:
     version: redis_7_x
   vm_groups:
     clients:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
 """
 

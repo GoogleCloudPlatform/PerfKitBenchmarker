@@ -43,7 +43,7 @@ object_storage_curl:
   description: Use cURL to upload and download data to object storage in parallel.
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
   flags:
     # Required
     object_storage_multistream_objects_per_stream: 1

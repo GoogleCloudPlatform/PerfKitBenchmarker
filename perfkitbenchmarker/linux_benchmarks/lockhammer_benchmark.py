@@ -31,7 +31,7 @@ lockhammer:
   description: Simple lock and synchronization benchmark.
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 

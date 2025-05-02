@@ -19,10 +19,10 @@ cloudharmony_iperf:
   vm_groups:
     server:
       os_type: ubuntu2004
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
     client:
       os_type: ubuntu2004
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 FLAGS = flags.FLAGS

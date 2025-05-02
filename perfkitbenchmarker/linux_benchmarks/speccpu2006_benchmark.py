@@ -86,7 +86,7 @@ speccpu2006:
   description: Runs SPEC CPU2006
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_50_gb
 """
 

@@ -38,7 +38,7 @@ scimark2:
   description: Runs SciMark2
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 

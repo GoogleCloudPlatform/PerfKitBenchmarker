@@ -40,9 +40,9 @@ cloudsuite_data_caching:
     Runs Cloudsuite3.0 Data Caching benchmark.
   vm_groups:
     server:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
     client:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 

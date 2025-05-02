@@ -107,7 +107,7 @@ netperf_hammerdbcli:
             disk_type: StandardSSD_LRS
   vm_groups:
     netperf_clients:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
   flags:
     netperf_test_length: 300

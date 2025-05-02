@@ -67,9 +67,9 @@ bidirectional_network:
     netperf_enable_histograms: false
   vm_groups:
     primary:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
     secondary:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 MBPS = 'Mbits/sec'

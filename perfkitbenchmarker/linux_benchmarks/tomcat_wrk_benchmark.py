@@ -71,9 +71,9 @@ tomcat_wrk:
   description: Run wrk against tomcat.
   vm_groups:
     server:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
     client:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 MAX_OPEN_FILES = 65536

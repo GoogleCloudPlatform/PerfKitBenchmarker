@@ -38,9 +38,9 @@ dpdk_pktgen:
   description: Runs dpdk testpmd benchmarks
   vm_groups:
     vm_1:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
     vm_2:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
   flags:
     placement_group_style: closest_supported
     gce_subnet_name: default,dpdk0

@@ -112,7 +112,7 @@ speccpu2017:
   description: Runs SPEC CPU2017
   vm_groups:
     default:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
 """
 

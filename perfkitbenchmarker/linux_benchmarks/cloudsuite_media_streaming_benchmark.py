@@ -33,10 +33,10 @@ cloudsuite_media_streaming:
     Run Cloudsuite media streaming benchmark.
   vm_groups:
     server:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
     client:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
 """
 

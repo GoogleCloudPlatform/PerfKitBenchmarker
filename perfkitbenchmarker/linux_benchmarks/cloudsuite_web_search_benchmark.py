@@ -64,10 +64,10 @@ cloudsuite_web_search:
     clients with --num_vms.
   vm_groups:
     servers:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
     clients:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
 """
 

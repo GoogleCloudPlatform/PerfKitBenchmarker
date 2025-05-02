@@ -74,14 +74,14 @@ hbase_ycsb:
       with --ycsb_client_vms.
   vm_groups:
     master:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
     workers:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       disk_spec: *default_500_gb
     clients:
       os_type: ubuntu2204  # Python 2
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 HBASE_SITE = 'hbase-site.xml'

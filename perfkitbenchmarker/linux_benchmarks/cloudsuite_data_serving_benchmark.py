@@ -51,13 +51,13 @@ cloudsuite_data_serving:
       --cloudsuite_data_serving_op_count.
   vm_groups:
     server_seed:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
     servers:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
     client:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
 """
 

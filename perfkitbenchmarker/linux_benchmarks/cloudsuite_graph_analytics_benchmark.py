@@ -41,10 +41,10 @@ cloudsuite_graph_analytics:
     VMs with --num_vms.
   vm_groups:
     master:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
       vm_count: 1
     workers:
-      vm_spec: *default_single_core
+      vm_spec: *default_dual_core
 """
 
 
