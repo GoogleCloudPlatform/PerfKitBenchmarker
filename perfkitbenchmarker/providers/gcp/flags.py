@@ -503,6 +503,12 @@ GKE_ENABLE_SHIELDED_NODES = flags.DEFINE_boolean(
     False,
     'Whether to enable shielded nodes.',
 )
+GCE_PERFORMANCE_MONITORING_UNIT = flags.DEFINE_enum(
+    'gce_performance_monitoring_unit',
+    None,
+    ['standard', 'architectural', 'enhanced'],
+    'Whether to enable PMU when creating a VM.'
+)
 
 
 def _ValidatePreemptFlags(flags_dict):

@@ -838,6 +838,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['scopes'] = ','.join(
           re.split(r'[,; ]', gcp_flags.GCLOUD_SCOPES.value)
       )
+    if gcp_flags.GCE_PERFORMANCE_MONITORING_UNIT.value:
+      cmd.flags['performance-monitoring-unit'] = (
+          gcp_flags.GCE_PERFORMANCE_MONITORING_UNIT.value
+      )
 
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
