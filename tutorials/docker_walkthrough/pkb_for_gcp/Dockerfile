@@ -21,8 +21,8 @@ ENV PATH=$PATH:/bin/google-cloud-sdk/bin
 ENV HOME /root
 WORKDIR $HOME
 RUN git clone https://github.com/GoogleCloudPlatform/PerfKitBenchmarker.git
-RUN pip3 install -r $HOME/PerfKitBenchmarker/requirements.txt --break-system-packages
+RUN python3.11 -m pip install -r $HOME/PerfKitBenchmarker/requirements.txt
 
 # Run PKB directly, example:
-# docker run -v ~/.config:/root/.config -it us-east1-docker.pkg.dev/saksena-test/pkb-test/pkb-for-gcp --project=saksena-test --benchmarks=iperf --machine_type=f1-micro
-ENTRYPOINT ["./PerfKitBenchmarker/pkb.py"]
+# docker run -v ~/.config:/root/.config -it us-east1-docker.pkg.dev/p3rf-gke/public/pkb-for-gcp --project=my-project --benchmarks=iperf --machine_type=f1-micro
+ENTRYPOINT ["python3.11", "./PerfKitBenchmarker/pkb.py"]
