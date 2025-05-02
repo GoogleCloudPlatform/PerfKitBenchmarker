@@ -150,11 +150,21 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
           command timed out.
     """
     logging.info('Running command on %s: %s', self, command, stacklevel=2)
-    s = winrm.Session(
-        'https://%s:%s' % (self.GetConnectionIp(), self.winrm_port),
-        auth=(self.user_name, self.password),
-        server_cert_validation='ignore',
-    )
+    if timeout is None:
+      s = winrm.Session(
+          'https://%s:%s' % (self.GetConnectionIp(), self.winrm_port),
+          auth=(self.user_name, self.password),
+          server_cert_validation='ignore',
+      )
+    else:
+      s = winrm.Session(
+          'https://%s:%s' % (self.GetConnectionIp(), self.winrm_port),
+          auth=(self.user_name, self.password),
+          server_cert_validation='ignore',
+          read_timeout_sec=timeout + 10,
+          operation_timeout_sec=timeout,
+      )
+
     encoded_command = six.ensure_str(
         base64.b64encode(command.encode('utf_16_le'))
     )
