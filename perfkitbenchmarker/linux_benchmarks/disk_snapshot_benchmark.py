@@ -24,8 +24,6 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import unmanaged_mysql_sysbench_benchmark
-from perfkitbenchmarker.linux_packages import mysql80
-from perfkitbenchmarker.linux_packages import sysbench
 
 
 FLAGS = flags.FLAGS
@@ -80,46 +78,35 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   Args:
     benchmark_spec: The benchmarks specification.
   """
-  # Taken from unmanaged_mysql_sysbench_benchmark.Prepare()
-  server_vm = benchmark_spec.vm_groups['server'][0]
-  mysql80.ConfigureSystemSettings(server_vm)
-  server_vm.Install('mysql80')
-  buffer_pool_size = unmanaged_mysql_sysbench_benchmark.GetBufferPoolSize()
-
-  new_password = FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
-  # mysql server ids needs to be positive integers.
-  mysql80.ConfigureAndRestart(server_vm, buffer_pool_size, 1)
-  mysql80.UpdatePassword(server_vm, new_password)
-  mysql80.CreateDatabase(server_vm, new_password, 'sysbench')
-
-  server_vm.InstallPackages('git')
-  server_vm.Install('sysbench')
-  sysbench_parameters = (
-      unmanaged_mysql_sysbench_benchmark.GetSysbenchParameters(
-          server_vm.internal_ip, new_password
-      )
-  )
-  cmd = sysbench.BuildLoadCommand(sysbench_parameters)
-  logging.info('%s load command: %s', FLAGS.sysbench_testname, cmd)
-  server_vm.RemoteCommand(cmd)
+  benchmark_spec.vm_groups['client'] = benchmark_spec.vm_groups['server']
+  unmanaged_mysql_sysbench_benchmark.Prepare(benchmark_spec)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Run the benchmark using the runner VM to manage snapshots."""
+  benchmark_spec.vm_groups['client'] = benchmark_spec.vm_groups['server']
   vms = benchmark_spec.vm_groups['server']
   all_samples = []
-  vm_samples = background_tasks.RunThreaded(CreateSnapshotOnVM, vms)
-  for samples in vm_samples:
-    all_samples.extend(samples)
+  vm_samples_before_run = background_tasks.RunThreaded(
+      lambda vm: CreateSnapshotOnVM(vm, 1), vms
+  )
+  all_samples.extend(vm_samples_before_run)
+
+  unmanaged_mysql_sysbench_benchmark.Run(benchmark_spec)
+  vm_samples_after_run = background_tasks.RunThreaded(
+      lambda vm: CreateSnapshotOnVM(vm, 2), vms
+  )
+  all_samples.extend(vm_samples_after_run)
   return all_samples
 
 
 def CreateSnapshotOnVM(
     vm: linux_virtual_machine.BaseLinuxVirtualMachine,
+    snapshot_num: int = 1,
 ) -> list[sample.Sample]:
   """Create a snapshot on the given vm."""
   used_disk_size, _ = vm.RemoteCommand(
-      'df -h | grep ".*/var/lib/mysql" | awk "{print $3}"'
+      'df -h | grep ".*/var/lib/mysql" | awk \'{print $3}\''
   )
   logging.info('Create snapshot on %s', vm)
   background_tasks.RunThreaded(
@@ -127,41 +114,44 @@ def CreateSnapshotOnVM(
       vm.scratch_disks,
   )
   background_tasks.RunThreaded(
-      lambda disk: disk.snapshot.Restore(), vm.scratch_disks
+      lambda disk: disk.snapshots[-1].Restore(), vm.scratch_disks
   )
   vm_samples = []
+  metadata = {'snapshot_number': snapshot_num}
   for disk in vm.scratch_disks:
     vm_samples.append(
         sample.Sample(
             'snapshot_storage_compression_ratio',
-            disk.snapshot.storage_gb / float(used_disk_size.strip().strip('G')),
+            disk.snapshots[-1].storage_gb
+            / float(used_disk_size.strip().strip('G')),
             'ratio',
-            {},
+            metadata,
         )
     )
     vm_samples.append(
         sample.Sample(
             'snapshot_storage_gb',
-            disk.snapshot.storage_gb,
+            disk.snapshots[-1].storage_gb,
             'GB',
-            {},
+            metadata,
         )
     )
     vm_samples.append(
         sample.Sample(
             'snapshot_creation_time',
-            disk.snapshot.creation_end_time - disk.snapshot.creation_start_time,
+            disk.snapshots[-1].creation_end_time
+            - disk.snapshots[-1].creation_start_time,
             'seconds',
-            {},
+            metadata,
         )
     )
     vm_samples.append(
         sample.Sample(
             'snapshot_restore_time',
-            disk.snapshot.restore_disk.create_disk_end_time
-            - disk.snapshot.restore_disk.create_disk_start_time,
+            disk.snapshots[-1].restore_disks[-1].create_disk_end_time
+            - disk.snapshots[-1].restore_disks[-1].create_disk_start_time,
             'seconds',
-            {},
+            metadata,
         )
     )
   return vm_samples

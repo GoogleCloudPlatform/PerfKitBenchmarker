@@ -548,8 +548,9 @@ class GceDisk(disk.BaseDisk):
 
   def CreateSnapshot(self):
     """Creates a snapshot of the disk."""
-    self.snapshots.append(GceDiskSnapshot(self))
-    self.snapshots[-1].Create()
+    snapshot = GceDiskSnapshot(self, len(self.snapshots) + 1)
+    snapshot.Create()
+    self.snapshots.append(snapshot)
 
 
 class GceDiskSnapshot(disk.DiskSnapshot):
@@ -570,14 +571,15 @@ class GceDiskSnapshot(disk.DiskSnapshot):
     num_restore_disks: The number of disks restored from this snapshot.
   """
 
-  def __init__(self, source_disk):
+  def __init__(self, source_disk, snapshot_num):
     super().__init__()
     self.source_disk = source_disk
     self.disk_spec = source_disk.spec
     self.source_disk_name = source_disk.name
     self.source_disk_size = source_disk.disk_size
     self.source_disk_type = source_disk.disk_type
-    self.name = f'disk-snapshot-{self.source_disk_name}'
+    self.snapshot_num = snapshot_num
+    self.name = f'disk-snapshot-{self.source_disk_name}-{self.snapshot_num}'
     self.zone = source_disk.zone
     self.region = util.GetRegionFromZone(self.zone)
     self.project = source_disk.project
