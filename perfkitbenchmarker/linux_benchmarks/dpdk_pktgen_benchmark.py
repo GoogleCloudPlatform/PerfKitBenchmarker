@@ -191,7 +191,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   )
   num_memory_channels = int(num_memory_channels_stdout)
   metadata = {
-      'dpdk_pkgen_burst': 1,
+      'dpdk_pktgen_burst': 1,
       'dpdk_pktgen_lcores': num_lcores,
       'dpdk_pktgen_num_memory_channels': num_memory_channels,
       'dpdk_pktgen_duration': _DPDK_PKTGEN_DURATION.value,
