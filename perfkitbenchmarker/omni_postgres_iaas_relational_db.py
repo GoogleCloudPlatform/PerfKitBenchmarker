@@ -88,7 +88,15 @@ class OmniPostgresIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
   def _ApplyDbFlags(self):
     """Apply Flags on the database."""
     if FLAGS.db_flags:
-      raise NotImplementedError('db_flags is not supported for Omni Postgres')
+      for flag in FLAGS.db_flags:
+        self.server_vm.RemoteCommand(
+            f'PGPASSWORD={self.spec.database_password} psql -h localhost -U'
+            f' postgres -c "ALTER SYSTEM SET {flag}"'
+        )
+
+    self.server_vm.RemoteCommand(
+        'sudo docker container restart omni'
+    )
 
   def _SetupLinuxUnmanagedDatabase(self):
     super()._SetupLinuxUnmanagedDatabase()
