@@ -110,6 +110,20 @@ _ycsb_tar_url = None
 _INCREMENTAL_STARTING_QPS = 500
 _INCREMENTAL_TIMELIMIT_SEC = 60 * 5
 
+# Taken from
+# https://github.com/brianfrankcooper/YCSB/blob/9858c4dab6dc45991871c9f137bd011752d9c21b/core/src/main/java/site/ycsb/Status.java#L98
+_OK_STATUSES = ['OK', 'BATCHED_OK']
+_FAILED_STATUSES = [
+    'ERROR',
+    'NOT_FOUND',
+    'NOT_IMPLEMENTED',
+    'UNEXPECTED_STATE',
+    'BAD_REQUEST',
+    'FORBIDDEN',
+    'SERVICE_UNAVAILABLE',
+]
+
+
 _ThroughputTimeSeries = dict[int, float]
 # Tuple of (percentile, latency, count)
 _HdrHistogramTuple = tuple[float, float, int]
@@ -347,13 +361,16 @@ def _ValidateErrorRate(result: YcsbResult, threshold: float) -> None:
   for operation in result.groups.values():
     name, stats = operation.group, operation.statistics
     # The operation count can be 0 or keys may be missing from the output
-    ok_count = stats.get('Return=OK', 0.0)
-    error_count = stats.get('Return=ERROR', 0.0)
-    count = ok_count + error_count
+    ok_count = sum(
+        stats.get(f'Return={status}', 0.0) for status in _OK_STATUSES
+    )
+    failed_count = sum(
+        stats.get(f'Return={status}', 0.0) for status in _FAILED_STATUSES
+    )
+    count = ok_count + failed_count
     if count == 0:
       continue
-    # These keys may be missing from the output.
-    error_rate = error_count / count
+    error_rate = failed_count / count
     if error_rate > threshold:
       raise errors.Benchmarks.RunError(
           f'YCSB had a {error_rate} error rate for {name}, higher than '
