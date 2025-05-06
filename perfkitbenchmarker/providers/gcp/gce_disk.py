@@ -121,6 +121,7 @@ NVME = 'NVME'
 FIXED_SSD_MACHINE_TYPES = {
     'z3-highmem-176': 12,
     'z3-highmem-88': 12,
+    'z3-highmem-88-standardlssd': 6,
     'c3-standard-4-lssd': 1,
     'c3-standard-8-lssd': 2,
     'c3-standard-22-lssd': 4,

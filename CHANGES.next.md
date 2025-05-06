@@ -568,3 +568,5 @@
 -   `--google_bigtable_channel_count` now applies to the googlebigtable2 binding
     as well.
 -   Upgrade Fio Version to 3.39
+-   Update GCE VM creation command logic to allow creating
+    z3-highmem-88-standardlssd
