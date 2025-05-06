@@ -27,6 +27,9 @@ from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import http_poller
 from perfkitbenchmarker.linux_packages import locust
 from perfkitbenchmarker.sample import Sample
 
@@ -154,6 +157,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
       container_service.KubernetesCluster, benchmark_spec.container_cluster
   )
 
+  # Confirm the server can be pinged.
+  vm.Install('http_poller')
+  _PollServer(vm, addr)
+
   samples = []
   stop = threading.Event()
 
@@ -174,7 +181,32 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
       max_concurrent_threads=3,
   )
 
+  failure_count = 0
+  total_requests = 0
+  for s in samples:
+    if s.metric == 'locust/Total_Failure_Count':
+      failure_count = s.value
+    elif s.metric == 'locust/Total_Request_Count':
+      total_requests = s.value
+  assert total_requests - failure_count >= 0.90 * total_requests, (
+      f'More than 10% of requests failed, with: {failure_count} failures out of'
+      f' {total_requests} total requestts'
+  )
+
   return samples
+
+
+@vm_util.Retry(
+    retryable_exceptions=(errors.Resource.RetryableGetError,),
+)
+def _PollServer(vm: virtual_machine.BaseVirtualMachine, addr: str) -> None:
+  """Polls the server to confirm it is responding."""
+  poller = http_poller.HttpPoller()
+  response = poller.Run(vm, addr + '/calculate')
+  if not response.success:
+    raise errors.Resource.RetryableGetError(
+        'Failed to contact server; got failing response: %s' % response
+    )
 
 
 class KubernetesMetricsCollector:
@@ -255,7 +287,8 @@ class KubernetesMetricsCollector:
         # Ignore errors, timeouts - there'll be a gap in the data, but that's
         # ok.
         logging.warning(
-            'Ignoring exception that occurred while observing cluster: %s', e)
+            'Ignoring exception that occurred while observing cluster: %s', e
+        )
         failure_count += 1
 
       if self._stop.wait(timeout=1.0):
