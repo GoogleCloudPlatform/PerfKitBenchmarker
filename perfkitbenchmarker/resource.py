@@ -240,6 +240,17 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     """
     pass
 
+  def _UserManagedSetup(self):
+    """Method that will be called once during Create() when user_managed = True.
+
+    Supplying this method is optional. If it is supplied, it will be called
+    once during Create() if the resource is user_managed. It is intended to
+    provide a place to populate important attributes (i.e. from describe) or
+    perform setup that are needed for benchmarking but do not affect the
+    resource lifecycle.
+    """
+    pass
+
   def _PostCreate(self):
     """Method that will be called once after _CreateResource() is called.
 
@@ -366,6 +377,7 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
         raise errors.Resource.RetryableCreationError('Not yet ready')
 
     if self.user_managed:
+      self._UserManagedSetup()
       return
 
     if restore and self.enable_freeze_restore:

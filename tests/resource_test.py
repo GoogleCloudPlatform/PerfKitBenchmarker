@@ -109,6 +109,21 @@ class ResourceTest(pkb_common_test_case.PkbCommonTestCase):
     test_resource.Delete()
     mock_delete.assert_not_called()
 
+  def testUserManagedLifeCycleIsCorrect(self):
+    test_resource = NonFreezeRestoreResource()
+    test_resource.user_managed = True
+
+    mock_create = self.enter_context(
+        mock.patch.object(test_resource, '_Create')
+    )
+    mock_setup = self.enter_context(
+        mock.patch.object(test_resource, '_UserManagedSetup')
+    )
+
+    test_resource.Create()
+    mock_create.assert_not_called()
+    mock_setup.assert_called_once()
+
 
 class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
 
