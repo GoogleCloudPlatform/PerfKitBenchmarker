@@ -1127,11 +1127,20 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self, 'compute', 'instances', 'describe', self.name
     )
     stdout, stderr, retcode = getinstance_cmd.Issue(raise_on_failure=False)
-    if 'The service is currently unavailable' in stderr:
+    transient_error_msgs = (
+        'The service is currently unavailable',
+        'Max retries exceeded with url',
+    )
+    if any(msg in stderr for msg in transient_error_msgs):
       logging.info('instances describe command failed, retrying.')
-      raise GceServiceUnavailableError()
+      raise GceServiceUnavailableError(stderr)
     elif retcode and re.search(r"The resource \'.*'\ was not found", stderr):
       return False
+    elif retcode:
+      raise errors.VmUtil.IssueCommandError(
+          f'Failed to check existence of VM {self.name}:\n{stderr}\n'
+          f'return code: {retcode}'
+      )
     response = json.loads(stdout)
     status = response['status']
     return status in INSTANCE_EXISTS_STATUSES

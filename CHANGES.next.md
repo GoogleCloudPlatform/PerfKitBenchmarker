@@ -570,3 +570,4 @@
 -   Upgrade Fio Version to 3.39
 -   Update GCE VM creation command logic to allow creating
     z3-highmem-88-standardlssd
+-   Slightly more robust Exists check for GCE VMs.
