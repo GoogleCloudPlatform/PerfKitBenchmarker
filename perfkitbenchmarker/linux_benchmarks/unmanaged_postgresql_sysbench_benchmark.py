@@ -20,6 +20,7 @@ postgreSQL.
 
 import copy
 import logging
+import time
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -268,7 +269,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   sorted_threads = sorted(FLAGS.sysbench_run_threads)
   previous_qps = 0
   reached_peak = False
-  for thread_count in sorted_threads:
+  for i, thread_count in enumerate(sorted_threads):
     sysbench_parameters.threads = thread_count
     cmd = sysbench.BuildRunCommand(sysbench_parameters)
     logging.info('%s run command: %s', FLAGS.sysbench_testname, cmd)
@@ -299,6 +300,16 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     current_qps = current_transactions[1].value
     if not reached_peak and current_qps < previous_qps:
       reached_peak = True
+    # Sleep between runs if specified and not the last run
+    if (
+        sysbench.SYSBENCH_SLEEP_BETWEEN_RUNS_SEC.value > 0
+        and i < len(sorted_threads) - 1
+    ):
+      logging.info(
+          'Sleeping for %d seconds before the next run.',
+          sysbench.SYSBENCH_SLEEP_BETWEEN_RUNS_SEC.value,
+      )
+      time.sleep(sysbench.SYSBENCH_SLEEP_BETWEEN_RUNS_SEC.value)
   # if we get max_qps at max thread_count, there is a possibility of a higher
   # qps at increased thread count. if --postgresql_measure_max_qps is set to
   # true, we want to make sure we achieve max QPS.
