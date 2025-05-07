@@ -278,15 +278,16 @@ class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
       self.gcs_bucket_copy_time = time.time() - gcs_bucket_copy_start_time
     self.endpoint.Create()
 
-  def Delete(self, freeze: bool = False) -> None:
-    """Deletes the underlying resource & its dependencies."""
+  def _PreDelete(self) -> None:
+    """Deletes dependencies before deleting the underlying resource."""
     # Normally _DeleteDependencies is called by parent after _Delete, but we
     # need to call it before.
     self._DeleteDependencies()
-    super().Delete(freeze)
 
   def _DeleteDependencies(self):
     super()._DeleteDependencies()
+    if self.deleted:
+      return
     self.endpoint.Delete()
     if self.gcs_client:
       self.gcs_client.DeleteBucket(
@@ -474,11 +475,14 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
         exception_type=errors.Resource.CreationError,
         group_index=2,
     )
+    # Above command created the endpoint & the model, so setup the endpoint as
+    # if it was created by the CLI.
     self.endpoint.endpoint_name = _FindRegexInOutput(
         out,
         r'endpoint: (.*)\n',
         exception_type=errors.Resource.CreationError,
     )
+    self.endpoint.created = True
     logging.info(
         'Model resource with name %s deployed & found with model id %s &'
         ' endpoint id %s',
@@ -577,13 +581,6 @@ class VertexAiPythonSdkModel(BaseVertexAiModel):
         service_account=self.service_account,
     )
     super()._CreateDependencies()
-
-  def Delete(self, freeze: bool = False) -> None:
-    """Deletes the underlying resource & its dependencies."""
-    # Normally _DeleteDependencies is called by parent after _Delete, but we
-    # need to call it before.
-    self._DeleteDependencies()
-    super().Delete(freeze)
 
   def _Delete(self) -> None:
     """Deletes the underlying resource."""
