@@ -128,6 +128,7 @@ class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
         'machine_type': self.model_spec.machine_type,
         'accelerator_type': self.model_spec.accelerator_type,
         'accelerator_count': self.model_spec.accelerator_count,
+        'project': self.project,
     })
     project_number = util.GetProjectNumber(self.project)
     self.service_account = SERVICE_ACCOUNT_BASE.format(project_number)
