@@ -851,6 +851,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
         'zone': self.zone,
         'cloud': self.CLOUD,
         'os_type': type(self).OS_TYPE,
+        'vm_platform': self.PLATFORM,
     })
     if self.cidr is not None:
       result['cidr'] = self.cidr
