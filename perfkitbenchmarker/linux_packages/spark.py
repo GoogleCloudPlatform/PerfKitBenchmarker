@@ -31,6 +31,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
 import requests
 
@@ -101,6 +102,7 @@ def SparkExamplesJarPath() -> str:
   )
 
 
+@vm_util.Retry(poll_interval=10)
 def Install(vm):
   """Install spark on a vm."""
   vm.Install('openjdk')
@@ -116,7 +118,7 @@ def Install(vm):
   )
   vm.RemoteCommand(
       (
-          'mkdir {0} && curl -L {1} | tar -C {0} --strip-components=1 -xzf -'
+          'mkdir -p {0} && curl -L {1} | tar -C {0} --strip-components=1 -xzf -'
       ).format(SPARK_DIR, spark_url)
   )
 
