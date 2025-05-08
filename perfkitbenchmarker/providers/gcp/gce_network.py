@@ -638,12 +638,22 @@ class GceFirewall(network.BaseFirewall):
     self.firewall_rules: Dict[Tuple[Any, ...], GceFirewallRule] = {}
     self.firewall_icmp_rules: Dict[Tuple[Any, ...], GceFirewallRule] = {}
 
+  @classmethod
+  def GetFirewall(cls):
+    """Decide whether to create a new firewall rule."""
+    if gcp_flags.GCE_NETWORK_NAMES.value:
+      # It's fine if different callers get different instances.
+      return network.ExistingNetworkFirewall(
+          gcp_flags.GCE_NETWORK_NAMES.value[0]
+      )
+    return super().GetFirewall()
+
   def AllowPort(
       self,
       vm,  # gce_virtual_machine.GceVirtualMachine
       start_port: int,
       end_port: int | None = None,
-      source_range: List[str] | None = None,
+      source_range: list[str] | None = None,
   ):
     """Opens a port on the firewall.
 
@@ -948,24 +958,31 @@ class GceNetwork(network.BaseNetwork):
     # Holds FW rules for any external subnets.
     self.external_nets_rules: Dict[str, GceFirewallRule] = {}
 
-    #  Set the default rule to allow all traffic within this network's subnet.
-    firewall_name = self._MakeGceFWRuleName()
-    self.default_firewall_rule = GceFirewallRule(
-        firewall_name,
-        self.project,
-        ALLOW_ALL,
-        self.primary_subnet_name,
-        self.cidr,
-    )
-
-    # Set external rules to allow traffic from other subnets in this benchmark.
-    for ext_net in self.all_nets:
-      if ext_net == self.cidr:
-        continue  # We've already added our own network to the default rule.
-      rule_name = self._MakeGceFWRuleName(dst_cidr=ext_net)
-      self.external_nets_rules[rule_name] = GceFirewallRule(
-          rule_name, self.project, ALLOW_ALL, self.primary_subnet_name, ext_net
+    self.default_firewall_rule = None
+    # Only modify firewall of new networks.
+    if not self.is_existing_network:
+      #  Set the default rule to allow all traffic within this network's subnet.
+      firewall_name = self._MakeGceFWRuleName()
+      self.default_firewall_rule = GceFirewallRule(
+          firewall_name,
+          self.project,
+          ALLOW_ALL,
+          self.primary_subnet_name,
+          self.cidr,
       )
+
+      # Set external rules to allow traffic from other subnets in this benchmark
+      for ext_net in self.all_nets:
+        if ext_net == self.cidr:
+          continue  # We've already added our own network to the default rule.
+        rule_name = self._MakeGceFWRuleName(dst_cidr=ext_net)
+        self.external_nets_rules[rule_name] = GceFirewallRule(
+            rule_name,
+            self.project,
+            ALLOW_ALL,
+            self.primary_subnet_name,
+            ext_net,
+        )
 
     # Add VpnGateways to the network.
     if FLAGS.use_vpn:
@@ -1214,7 +1231,7 @@ class GceNetwork(network.BaseNetwork):
             lambda gateway: self.vpn_gateway[gateway].Delete(),
             list(self.vpn_gateway.keys()),
         )
-      if self.default_firewall_rule.created:
+      if self.default_firewall_rule and self.default_firewall_rule.created:
         self.default_firewall_rule.Delete()
       if self.external_nets_rules:
         background_tasks.RunThreaded(

@@ -122,9 +122,8 @@ GCE_PLACEMENT_GROUP_MAX_DISTANCE = flags.DEFINE_integer(
 flags.DEFINE_string(
     'gce_remote_access_firewall_rule',
     None,
-    'The name of an '
-    'already created firewall rule which allows remote access '
-    'instead of creating a new one.',
+    'Obsolete. This was never used, but used to serve as a boolean similar to '
+    '--skip_firewall_rules, but specific to SSH, WinRM, and SMB.',
 )
 flags.DEFINE_multi_string(
     'gcp_instance_metadata_from_file',

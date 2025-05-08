@@ -566,7 +566,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.min_cpu_platform = vm_spec.min_cpu_platform
     self.threads_per_core = vm_spec.threads_per_core
     self.visible_core_count = vm_spec.visible_core_count
-    self.gce_remote_access_firewall_rule = FLAGS.gce_remote_access_firewall_rule
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
@@ -1214,16 +1213,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     # Add metadata to boot disk
     gce_disk.AddLabels(self, self.name)
     self.create_disk_strategy.AddMetadataToDiskResource()
-
-  def AllowRemoteAccessPorts(self):
-    """Creates firewall rules for remote access if required."""
-
-    # If gce_remote_access_firewall_rule is specified, access is already
-    # granted by that rule.
-    # If not, GCE firewall rules are created for all instances in a
-    # network.
-    if not self.gce_remote_access_firewall_rule:
-      super().AllowRemoteAccessPorts()
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the VM.

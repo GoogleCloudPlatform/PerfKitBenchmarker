@@ -91,8 +91,14 @@
 -   Merged redundant `--runspec_build_tool_version` with `--gcc_version`.
 -   Create new flag `--azure_blob_storage_type` that defaults to `Standard_ZRS`
     instead of former default `--azure_storage_type=Standard_LRS`.
--   Keep existing metadata rather than overwriting with metadata auto added by resources.
--   In default_config_constants.yaml, replace default_single_core with default_dual_core.
+-   Keep existing metadata rather than overwriting with metadata auto added by
+    resources.
+-   In default_config_constants.yaml, replace default_single_core with
+    default_dual_core.
+-   Stop modifying existing GCE firewall rules if the user passes
+    `--gce_(subnet|network)_name`. This requires ensuring that you have SSH
+    access from where you are running PerfKitBenchmarker for most Linux
+    benchmarks.
 
 ### New features:
 
@@ -219,7 +225,8 @@
 -   Add support for customizing Hadoop jobs scheduling
 -   Add support for GKE Autopilot & EKS Auto, which don't require nodepools.
 -   Add tutorial walking through an example GKE benchmark.
--   Add dpdk_pktgen_benchmark, a more feature-rich DPDK benchmark than dpdk_testpmd_benchmark.
+-   Add dpdk_pktgen_benchmark, a more feature-rich DPDK benchmark than
+    dpdk_testpmd_benchmark.
 -   Add support for configuring readahead buffer size in DFSIO test
 -   Add disk_snapshot_benchmark, measuring compression, snapshot creation time,
     and snapshot restore time.

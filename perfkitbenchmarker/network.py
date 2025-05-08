@@ -16,12 +16,12 @@
 
 The Firewall class provides a way of opening VM ports. The Network class allows
 VMs to communicate via internal ips and isolates PerfKitBenchmarker VMs from
-others in the
-same project.
+others in the same project.
 """
 
 import abc
 import enum
+import logging
 
 from absl import flags
 from perfkitbenchmarker import context
@@ -77,7 +77,12 @@ class BaseFirewall:
     """
     pass
 
-  def AllowPort(self, vm, start_port, end_port=None):
+  def AllowPort(
+      self,
+      vm,
+      start_port: int,
+      end_port: int | None = None,
+      source_range: list[str] | None = None):
     """Opens a port on the firewall.
 
     Args:
@@ -85,11 +90,61 @@ class BaseFirewall:
       start_port: The first local port in a range of ports to open.
       end_port: The last port in a range of ports to open. If None, only
         start_port will be opened.
+      source_range: List of source CIDRs to allow for this port. If none, all
+        sources are allowed.
     """
     pass
 
   def DisallowAllPorts(self):
     """Closes all ports on the firewall."""
+    pass
+
+
+class ExistingNetworkFirewall(BaseFirewall):
+  """An object representing a Firewall for an existing network.
+
+  PerfKitBenchmarker should never modify the firewalls of a network
+  that it did not create as that can corrupt a user's network.
+
+  This instead logs a warning any time the user tries to modify the firewall.
+  """
+
+  def __init__(self, network_name):
+    super().__init__()
+    self.network_name = network_name
+
+  def __eq__(self, other: 'ExistingNetworkFirewall') -> bool:
+    """Defines equality."""
+    return self.network_name == other.network_name
+
+  def AllowIcmp(self, vm):
+    """Logs a warning rather than opening ICMP."""
+    logging.warning(
+        'Benchmark tried to modify the firewalls of existing network %s to '
+        'allow ICMP. This will be ignored, but may cause connection issues. '
+        'Either allow PKB to provision a network/VPC or open ICMP manually.',
+        self.network_name,
+    )
+
+  def AllowPort(
+      self,
+      vm,
+      start_port: int,
+      end_port: int | None = None,
+      source_range: list[str] | None = None):
+    """Logs a warning rather than opening ports."""
+    logging.warning(
+        'Benchmark tried to modify the firewalls of existing network %s to '
+        'allow TCP connections to port(s) %s%s. This will be ignored, but may '
+        'cause connection issues. Either allow PKB to provision a network/VPC '
+        'or open the port(s) manually.',
+        self.network_name,
+        start_port,
+        f'-{end_port}' if end_port else '',
+    )
+
+  def DisallowAllPorts(self):
+    """Does nothing, because we didn't create any firewall rules."""
     pass
 
 
