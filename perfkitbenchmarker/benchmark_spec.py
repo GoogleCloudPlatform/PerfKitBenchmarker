@@ -944,6 +944,7 @@ class BenchmarkSpec:
       self.relational_db.SetVms(self.vm_groups)
       self.relational_db.Create(restore=should_restore)
     if self.non_relational_db:
+      self.non_relational_db.SetVms(self.vm_groups)
       self.non_relational_db.Create(restore=should_restore)
     if hasattr(self, 'key') and self.key:
       self.key.Create()

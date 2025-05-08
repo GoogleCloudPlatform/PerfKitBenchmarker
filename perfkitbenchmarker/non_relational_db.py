@@ -13,6 +13,8 @@
 # limitations under the License.
 """Module containing base class for non-relational databases."""
 
+import abc
+from typing import Any
 from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.configs import freeze_restore_spec
@@ -22,9 +24,19 @@ from perfkitbenchmarker.configs import spec
 # List of nonrelational database types
 DYNAMODB = 'dynamodb'
 BIGTABLE = 'bigtable'
+_VALID_TYPES = [
+    DYNAMODB,
+    BIGTABLE,
+]
 
 
 FLAGS = flags.FLAGS
+_SERVICE_TYPE = flags.DEFINE_enum(
+    'non_relational_db_service_type',
+    None,
+    _VALID_TYPES,
+    'The type of the non-relational database service, e.g. firestore',
+)
 
 
 class BaseNonRelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
@@ -58,14 +70,24 @@ class BaseNonRelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
             option_decoders.EnumDecoder,
             {
                 'default': None,
-                'valid_values': [
-                    DYNAMODB,
-                    BIGTABLE,
-                ],
+                'valid_values': _VALID_TYPES,
             },
         ),
     })
     return result
+
+  @classmethod
+  def _ApplyFlags(
+      cls, config_values: dict[str, Any], flag_values: flags.FlagValues
+  ) -> None:
+    """See base class."""
+    super()._ApplyFlags(config_values, flag_values)
+    option_name_from_flag = {
+        'non_relational_db_service_type': 'service_type',
+    }
+    for flag_name, option_name in option_name_from_flag.items():
+      if flag_values[flag_name].present:
+        config_values[option_name] = flag_values[flag_name].value
 
 
 class BaseNonRelationalDb(resource.BaseResource):
@@ -88,6 +110,38 @@ class BaseNonRelationalDb(resource.BaseResource):
     """
     del db_spec
     return cls()
+
+  def SetVms(self, vm_groups):
+    self._client_vms = vm_groups[
+        'clients' if 'clients' in vm_groups else 'default'
+    ]
+
+
+class BaseManagedMongoDb(BaseNonRelationalDb):
+  """Base class for managed MongoDB instances.
+
+  Attributes:
+    tls_enabled: Whether transport-layer security is enabled for the instance.
+    endpoint: The endpoint of the instance.
+    port: The port of the instance.
+  """
+
+  tls_enabled: bool
+  endpoint: str
+  port: int
+
+  @abc.abstractmethod
+  def GetConnectionString(self) -> str:
+    """Returns the connection string used to connect to the instance."""
+    raise NotImplementedError()
+
+  def SetupClientTls(self) -> None:
+    """Sets up client TLS."""
+    pass
+
+  def GetJvmTrustStoreArgs(self) -> str:
+    """Returns JVM args needed for using TLS."""
+    return ''
 
 
 def GetNonRelationalDbSpecClass(

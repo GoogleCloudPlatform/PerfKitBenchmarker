@@ -817,15 +817,19 @@ class _NonRelationalDbDecoder(option_decoders.TypeVerifier):
     non_relational_db_config = super().Decode(
         value, component_full_name, flag_values
     )
+    service_type = None
     if 'service_type' in non_relational_db_config:
-      db_spec_class = non_relational_db.GetNonRelationalDbSpecClass(
-          non_relational_db_config['service_type']
-      )
-    else:
+      service_type = non_relational_db_config['service_type']
+    if flag_values['non_relational_db_service_type'].present:
+      service_type = flag_values.non_relational_db_service_type
+    if not service_type:
       raise errors.Config.InvalidValue(
           'Required attribute `service_type` missing from non_relational_db '
           'config.'
       )
+    db_spec_class = non_relational_db.GetNonRelationalDbSpecClass(
+        service_type
+    )
     return db_spec_class(
         self._GetOptionFullName(component_full_name),
         flag_values,
