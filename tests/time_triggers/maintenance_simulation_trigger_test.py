@@ -17,6 +17,7 @@ import datetime
 import unittest
 from unittest import mock
 from absl import flags
+from absl.testing import flagsaver
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.sample import Sample
@@ -1122,6 +1123,326 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
             sample.Sample(
                 metric='degradation_percent',
                 value=0.0,
+                unit='%',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='total_missing_seconds',
+                value=4.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+        ],
+    )
+
+  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  @flagsaver.flagsaver(
+      (maintenance_simulation_trigger.MAINTENANCE_DEGRADATION_WINDOW, 1.0)
+  )
+  def testMaintenanceEventTriggerAppendSamplesWithMaintenanceDegradationWindow(
+      self,
+  ):
+    vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
+    trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
+    trigger.capture_live_migration_timestamps = True
+    # Sample with 5 seconds of lost data.
+    # Missing data at t=2 should be ignored, missing data at 5<=t<=8 should be
+    # 0.0.
+    s = sample.CreateTimeSeriesSample(
+        [1, 1, 1, 1, 1, 1, 1],
+        [1000 * i for i in range(1, 13) if not 5 <= i <= 8 and i != 2],
+        sample.TPM_TIME_SERIES,
+        'TPM',
+        1,
+        additional_metadata={'random': 'random'},
+    )
+    samples = [s]
+    trigger.trigger_time = datetime.datetime.fromtimestamp(4)
+    vm = mock.MagicMock()
+    vm.CollectLMNotificationsTime = mock.MagicMock(
+        return_value={'LM_total_time': 100, 'Host_maintenance_end': 11}
+    )
+    trigger.vms = [vm]
+    trigger.AppendSamples(None, vm_spec, samples)
+    # Assertions
+    self.assertEqual(
+        samples,
+        [
+            sample.Sample(
+                metric='TPM_time_series',
+                value=0.0,
+                unit='TPM',
+                metadata={
+                    'values': [1, 1, 1, 1, 1, 1, 1],
+                    'timestamps': [1000, 3000, 4000, 9000, 10000, 11000, 12000],
+                    'interval': 1,
+                    'random': 'random',
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='LM Total Time',
+                value=100.0,
+                unit='seconds',
+                metadata={
+                    'values': [1, 1, 1, 1, 1, 1, 1],
+                    'timestamps': [1000, 3000, 4000, 9000, 10000, 11000, 12000],
+                    'interval': 1,
+                    'random': 'random',
+                    'LM_total_time': 100,
+                    'Host_maintenance_end': 11,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_0_percent',
+                value=5.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_10_percent',
+                value=5.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_20_percent',
+                value=5.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_30_percent',
+                value=5.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_40_percent',
+                value=5.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_50_percent',
+                value=5.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_60_percent',
+                value=5.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_70_percent',
+                value=5.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_80_percent',
+                value=5.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_90_percent',
+                value=5.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='unresponsive_metric',
+                value=5.0,
+                unit='metric',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='total_loss_seconds',
+                value=5.0,
+                unit='seconds',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='degradation_percent',
+                value=0.0,
+                unit='%',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='total_missing_seconds',
+                value=4.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+        ],
+    )
+
+  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  @flagsaver.flagsaver(
+      (maintenance_simulation_trigger.MAINTENANCE_DEGRADATION_WINDOW, 1.0)
+  )
+  def testMaintenanceEventTriggerAppendSamplesWithRegressionOutsideMaintenanceWindow(
+      self,
+  ):
+    vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
+    trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
+    trigger.capture_live_migration_timestamps = True
+    # Sample with 5 seconds of lost data.
+    # Missing data at t=2 should be ignored, missing data at 5<=t<=8 should be
+    # 0.0.
+    s = sample.CreateTimeSeriesSample(
+        [1, 1, 1, 1, 1, 1, 1],
+        [1000 * i for i in range(1, 13) if not 5 <= i <= 8 and i != 2],
+        sample.TPM_TIME_SERIES,
+        'TPM',
+        1,
+        additional_metadata={'random': 'random'},
+    )
+    samples = [s]
+    trigger.trigger_time = datetime.datetime.fromtimestamp(4)
+    vm = mock.MagicMock()
+    vm.CollectLMNotificationsTime = mock.MagicMock(
+        return_value={'LM_total_time': 100, 'Host_maintenance_end': 8}
+    )
+    trigger.vms = [vm]
+    trigger.AppendSamples(None, vm_spec, samples)
+    # Assertions
+    self.assertEqual(
+        samples,
+        [
+            sample.Sample(
+                metric='TPM_time_series',
+                value=0.0,
+                unit='TPM',
+                metadata={
+                    'values': [1, 1, 1, 1, 1, 1, 1],
+                    'timestamps': [1000, 3000, 4000, 9000, 10000, 11000, 12000],
+                    'interval': 1,
+                    'random': 'random',
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='LM Total Time',
+                value=100.0,
+                unit='seconds',
+                metadata={
+                    'values': [1, 1, 1, 1, 1, 1, 1],
+                    'timestamps': [1000, 3000, 4000, 9000, 10000, 11000, 12000],
+                    'interval': 1,
+                    'random': 'random',
+                    'LM_total_time': 100,
+                    'Host_maintenance_end': 8,
+                },
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_0_percent',
+                value=0.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_10_percent',
+                value=0.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_20_percent',
+                value=0.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_30_percent',
+                value=0.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_40_percent',
+                value=0.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_50_percent',
+                value=0.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_60_percent',
+                value=0.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_70_percent',
+                value=0.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_80_percent',
+                value=0.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='seconds_dropped_below_90_percent',
+                value=0.0,
+                unit='s',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='unresponsive_metric',
+                value=0.0,
+                unit='metric',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='total_loss_seconds',
+                value=0.0,
+                unit='seconds',
+                metadata={'random': 'random'},
+                timestamp=0,
+            ),
+            sample.Sample(
+                metric='degradation_percent',
+                value=62.5,
                 unit='%',
                 metadata={'random': 'random'},
                 timestamp=0,

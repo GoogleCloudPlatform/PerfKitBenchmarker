@@ -68,6 +68,12 @@ SIMULATE_MAINTENANCE_DELAY = flags.DEFINE_integer(
     ),
 )
 
+MAINTENANCE_DEGRADATION_WINDOW = flags.DEFINE_float(
+    'maintenance_degradation_window',
+    None,
+    'Multiple of LM duration to consider the degradation after LM starts.',
+)
+
 CAPTURE_LIVE_MIGRATION_TIMESTAMPS = flags.DEFINE_boolean(
     'capture_live_migration_timestamps',
     False,
@@ -188,6 +194,8 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
 
     lm_start = sample.ConvertDateTimeToUnixMs(self.trigger_time)
 
+    lm_duration = lm_ends - lm_start
+
     base_line_values = []
     values_after_lm_starts = []
     values_after_lm_ends = []
@@ -213,7 +221,16 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
         if time <= lm_start:
           base_line_values.extend(interval_values)
         else:
-          values_after_lm_starts.extend(interval_values)
+          if MAINTENANCE_DEGRADATION_WINDOW.value is not None:
+            window = MAINTENANCE_DEGRADATION_WINDOW.value
+            assert 1 <= window <= 10, (
+                'maintenance_degradation_window must be between 1 and 10'
+                f' inclusive, or None. Got: {window}'
+            )
+            if time <= lm_start + lm_duration * window:
+              values_after_lm_starts.extend(interval_values)
+          else:
+            values_after_lm_starts.extend(interval_values)
 
         if time > lm_ends:
           values_after_lm_ends.extend(interval_values)
