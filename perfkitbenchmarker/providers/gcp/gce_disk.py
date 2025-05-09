@@ -342,7 +342,6 @@ class GceDisk(disk.BaseDisk):
       replica_zones=None,
   ):
     super().__init__(disk_spec)
-    self.spec = disk_spec
     self.interface = disk_spec.interface
     self.attached_vm_name = None
     self.image = image

@@ -340,9 +340,11 @@ class SetUpLocalDiskStrategy(AWSSetupDiskStrategy):
   def _CreateLocalDisk(self, disk_spec, spec_id, i):
     disk_spec_id = self.vm.create_disk_strategy.BuildDiskSpecId(spec_id, i)
     data_disk = aws_disk.AwsDisk(
-        disk_spec, self.vm.zone, self.vm.machine_type, disk_spec_id)
+        disk_spec, self.vm.zone, self.vm.machine_type, disk_spec_id
+    )
     device_letter = chr(
-        ord(self.LOCAL_DRIVE_START_LETTER) + self.vm.local_disk_counter)
+        ord(self.LOCAL_DRIVE_START_LETTER) + self.vm.local_disk_counter
+    )
     nvme_boot_drive_index = self._GetNvmeBootIndex()
     data_disk.AssignDeviceLetter(device_letter, nvme_boot_drive_index)  # pytype: disable=wrong-arg-types
     data_disk.disk_number = self.vm.local_disk_counter + 1
@@ -416,6 +418,15 @@ class SetUpRemoteDiskStrategy(AWSSetupDiskStrategy):
       AWSPrepareScratchDiskStrategy().PrepareScratchDisk(
           self.vm, scratch_disk, disk_spec
       )
+    for scratch_disk in self.scratch_disks:
+      if hasattr(scratch_disk, 'disk_spec_id'):
+        scratch_disk.disk_name = self.vm.device_by_disk_spec_id.get(
+            scratch_disk.disk_spec_id, None
+        )
+        if scratch_disk.disk_name in self.vm.disk_identifiers_by_device:
+          scratch_disk.id = self.vm.disk_identifiers_by_device[
+              scratch_disk.disk_name
+          ].volume_id
 
   def AttachDisks(self):
     attach_tasks = []

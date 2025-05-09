@@ -168,6 +168,7 @@ class BaseDiskSpec(spec.BaseSpec):
     self.multi_writer_mode: bool = False
     self.multi_writer_group_name: str = None
     self.snapshot_name: str = None
+    self.snapshot_id: str = None
     super().__init__(*args, **kwargs)
 
   @classmethod
@@ -421,6 +422,7 @@ class BaseDisk(resource.BaseResource):
 
   def __init__(self, disk_spec):
     super().__init__()
+    self.spec = disk_spec
     self.disk_size = disk_spec.disk_size
     self.disk_type = disk_spec.disk_type
     self.mount_point = disk_spec.mount_point

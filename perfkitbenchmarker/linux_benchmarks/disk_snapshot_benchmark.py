@@ -84,19 +84,22 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Run the benchmark using the runner VM to manage snapshots."""
-  benchmark_spec.vm_groups['client'] = benchmark_spec.vm_groups['server']
   vms = benchmark_spec.vm_groups['server']
   all_samples = []
-  vm_samples_before_run = background_tasks.RunThreaded(
+  all_vm_samples_before_run = background_tasks.RunThreaded(
       lambda vm: CreateSnapshotOnVM(vm, 1), vms
   )
-  all_samples.extend(vm_samples_before_run)
+  for samples in all_vm_samples_before_run:
+    all_samples.extend(samples)
 
+  benchmark_spec.vm_groups['client'] = benchmark_spec.vm_groups['server']
   unmanaged_mysql_sysbench_benchmark.Run(benchmark_spec)
-  vm_samples_after_run = background_tasks.RunThreaded(
+  all_vm_samples_after_run = background_tasks.RunThreaded(
       lambda vm: CreateSnapshotOnVM(vm, 2), vms
   )
-  all_samples.extend(vm_samples_after_run)
+  for samples in all_vm_samples_after_run:
+    all_samples.extend(samples)
+
   return all_samples
 
 
