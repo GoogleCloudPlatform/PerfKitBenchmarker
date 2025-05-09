@@ -24,9 +24,13 @@ from perfkitbenchmarker.configs import spec
 # List of nonrelational database types
 DYNAMODB = 'dynamodb'
 BIGTABLE = 'bigtable'
+DOCUMENTDB = 'documentdb'
+FIRESTORE = 'firestore'
 _VALID_TYPES = [
     DYNAMODB,
     BIGTABLE,
+    DOCUMENTDB,
+    FIRESTORE,
 ]
 
 
@@ -142,6 +146,12 @@ class BaseManagedMongoDb(BaseNonRelationalDb):
   def GetJvmTrustStoreArgs(self) -> str:
     """Returns JVM args needed for using TLS."""
     return ''
+
+  def GetResourceMetadata(self) -> dict[Any, Any]:
+    """See base class."""
+    metadata = super().GetResourceMetadata()
+    metadata.update({'managed_mongodb_tls': self.tls_enabled})
+    return metadata
 
 
 def GetNonRelationalDbSpecClass(
