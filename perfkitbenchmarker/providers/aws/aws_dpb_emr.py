@@ -64,6 +64,7 @@ DATAPROC_TO_EMR_CONF_FILES = {
     'hdfs': 'hdfs-site',
     # https://docs.aws.amazon.com/emr/latest/ReleaseGuide/emr-spark-configure.html
     'spark': 'spark-defaults',
+    'iceberg': 'iceberg-defaults',
 }
 
 
