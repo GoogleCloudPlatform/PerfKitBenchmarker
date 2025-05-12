@@ -109,7 +109,7 @@ class VertexAiCliInterfaceTest(VertexAiTest):
             ' --service-account=123-compute@developer.gserviceaccount.com'
             ' --max-replica-count=1',
             ignore_failure=True,
-            timeout=60*60,
+            timeout=60 * 60,
         ),
     ])  # pytype: disable=attribute-error
     self.assertEqual(
@@ -317,6 +317,15 @@ response:
     self.assertEqual(
         self.pkb_ai.endpoint.endpoint_name,
         'projects/123/locations/us-west/endpoints/fooendpoint',
+    )
+
+  def test_model_garden_llama4_init(self):
+    ai_spec = vertex_ai.VertexAiLlama4Spec('spec_name')
+    self.pkb_ai: vertex_ai.ModelGardenCliVertexAiModel = (
+        vertex_ai.ModelGardenCliVertexAiModel(
+            self.vm,
+            ai_spec,
+        )
     )
 
 

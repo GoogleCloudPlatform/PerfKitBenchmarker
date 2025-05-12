@@ -948,3 +948,30 @@ class VertexAiLlama3Spec(VertexAiModelSpec):
   def GetModelGardenName(self) -> str:
     """Returns the name of the model in Model Garden."""
     return f'meta/llama3@meta-llama-3-{self.model_size}'
+
+
+class VertexAiLlama4Spec(VertexAiModelSpec):
+  """Spec for running the Llama4 scout & maverick models.
+
+  Only currently works for Model Garden CLI.
+  """
+
+  MODEL_NAME: str = 'llama4'
+  MODEL_SIZE: list[str] = ['scout-17b', 'maverick-17b']
+  VLLM_ARGS = []
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+    self.machine_type = 'a3-highgpu-8g'
+    self.accelerator_count = 8
+    self.accelerator_type = 'NVIDIA_H100_80GB'
+    self.model_bucket_suffix = ''
+
+  def GetModelGardenName(self) -> str:
+    """Returns the name of the model in Model Garden."""
+    suffix = self.model_size
+    if self.model_size == 'scout-17b':
+      suffix += '-16e'
+    else:
+      suffix += '-128e'
+    return f'meta/llama4@llama-4-{suffix}'
