@@ -189,18 +189,18 @@ def IsUbuntu(vm):
   return vm.OS_TYPE in os_types.UBUNTU_OS_TYPES
 
 
-def ConfigureAndRestart(vm, run_uri, buffer_size):
+def ConfigureAndRestart(vm, run_uri, buffer_size, conf_template_path):
   """Configure and restart postgres.
 
   Args:
     vm: virtual machine to configure postgres on.
     run_uri: run uri to use for password generation.
     buffer_size: buffer size to use for postgres.
+    conf_template_path: path to the postgres conf template file.
   """
   conf_path = GetOSDependentDefaults(vm.OS_TYPE)['conf_dir']
   data_path = GetOSDependentDefaults(vm.OS_TYPE)['data_dir']
   buffer_size_key = f'SIZE_{buffer_size}GB'
-  conf_template_config = 'postgresql/postgresql-custom.conf.j2'
   remote_temp_config = '/tmp/my.cnf'
   postgres_conf_path = os.path.join(conf_path, 'postgresql-custom.conf')
   pg_hba_conf_path = os.path.join(conf_path, 'pg_hba.conf')
@@ -217,7 +217,7 @@ def ConfigureAndRestart(vm, run_uri, buffer_size):
       'password': GetPsqlUserPassword(run_uri),
   }
   vm.RenderTemplate(
-      data.ResourcePath(conf_template_config),
+      data.ResourcePath(conf_template_path),
       remote_temp_config,
       context,
   )
@@ -296,7 +296,9 @@ def UpdateMaxMemory(vm, buffer_size_key, postgres_service_name):
   )
 
 
-def SetupReplica(primary_vm, replica_vm, replica_id, run_uri, buffer_size):
+def SetupReplica(
+    primary_vm, replica_vm, replica_id, run_uri, buffer_size, conf_template_path
+):
   """Setup postgres replica."""
   buffer_size_key = f'SIZE_{buffer_size}GB'
   data_path = GetOSDependentDefaults(replica_vm.OS_TYPE)['data_dir']
@@ -317,11 +319,10 @@ def SetupReplica(primary_vm, replica_vm, replica_id, run_uri, buffer_size):
       ],
       'data_directory': data_path,
   }
-  conf_template_config = 'postgresql/postgresql-custom.conf.j2'
   remote_temp_config = '/tmp/my.cnf'
   postgres_conf_path = os.path.join(conf_path, 'postgresql-custom.conf')
   replica_vm.RenderTemplate(
-      data.ResourcePath(conf_template_config),
+      data.ResourcePath(conf_template_path),
       remote_temp_config,
       context,
   )

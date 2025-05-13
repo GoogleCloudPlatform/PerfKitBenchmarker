@@ -104,7 +104,7 @@ _OLTP_READ_ONLY = 'oltp_read_only'
 _OLTP_WRITE_ONLY = 'oltp_write_only'
 _OLTP = [_OLTP_READ_WRITE, _OLTP_READ_ONLY, _OLTP_WRITE_ONLY]
 
-SHARED_BUFFER_SIZE = flags.DEFINE_integer(
+_SHARED_BUFFER_SIZE = flags.DEFINE_integer(
     'postgresql_shared_buffer_size',
     10,
     'Size of the shared buffer in the postgresql cluster (in Gb).',
@@ -114,6 +114,11 @@ _MEASURE_MAX_QPS = flags.DEFINE_bool(
     False,
     'Measure Max QPS of all the thread counts. Please set to'
     " false if you don't want to measure max qps.",
+)
+_CONF_TEMPLATE_PATH = flags.DEFINE_string(
+    'postgresql_conf_template_path',
+    'postgresql/postgresql-custom.conf.j2',
+    'Path to the postgresql conf template file.',
 )
 
 
@@ -177,11 +182,19 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   primary_server = benchmark_spec.vm_groups['server'][0]
   postgresql16.InitializeDatabase(primary_server)
   postgresql16.ConfigureAndRestart(
-      primary_server, FLAGS.run_uri, SHARED_BUFFER_SIZE.value
+      primary_server,
+      FLAGS.run_uri,
+      _SHARED_BUFFER_SIZE.value,
+      _CONF_TEMPLATE_PATH.value,
   )
   for index, replica in enumerate(replica_servers):
     postgresql16.SetupReplica(
-        primary_server, replica, index, FLAGS.run_uri, SHARED_BUFFER_SIZE.value
+        primary_server,
+        replica,
+        index,
+        FLAGS.run_uri,
+        _SHARED_BUFFER_SIZE.value,
+        _CONF_TEMPLATE_PATH.value,
     )
   clients = benchmark_spec.vm_groups['client']
   for client in clients:
@@ -281,7 +294,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       raise errors.Benchmarks.RunError(f'Error running sysbench command: {e}')
     metadata = sysbench.GetMetadata(sysbench_parameters)
     metadata.update({
-        'shared_buffer_size': f'{SHARED_BUFFER_SIZE.value}GB',
+        'shared_buffer_size': f'{_SHARED_BUFFER_SIZE.value}GB',
     })
     results += sysbench.ParseSysbenchTimeSeries(stdout, metadata)
     results += sysbench.ParseSysbenchLatency([stdout], metadata)
