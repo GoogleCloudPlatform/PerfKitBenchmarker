@@ -27,8 +27,6 @@ FLAGS = flags.FLAGS
 FLAGS.mark_as_parsed()
 
 DATA_FILENAMES = [
-    'sender_cmd.txt',
-    'receiver_cmd.txt',
     'sender_stdout.txt',
     'receiver_stdout.txt',
 ]
@@ -48,10 +46,8 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
   def setUp(self):
     super().setUp()
     # Load data
-    self.expected_sender_cmd = _load_data(DATA_FILENAMES[0])
-    self.expected_receiver_cmd = _load_data(DATA_FILENAMES[1])
-    self.sender_stdout = _load_data(DATA_FILENAMES[2])
-    self.receiver_stdout = _load_data(DATA_FILENAMES[3])
+    self.sender_stdout = _load_data(DATA_FILENAMES[0])
+    self.receiver_stdout = _load_data(DATA_FILENAMES[1])
 
     self.expected_output_samples = [
         sample.Sample(
@@ -101,49 +97,6 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     self.bm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     self.bm_spec.vms = [mock.MagicMock(), mock.MagicMock()]
     self.bm_spec.vms[0].NumCpusForBenchmark.return_value = 22
-
-  @flagsaver.flagsaver(dpdk_pktgen_packet_loss_threshold_rates=[0.01])
-  def testClientServerRemoteCmd(self):
-    self.bm_spec.vms[0].RemoteCommand.side_effect = [
-        ('6', ''),
-        ('', ''),
-        ('', ''),
-        (self.sender_stdout, ''),
-        (1, ''),
-        (0, ''),
-        ('', ''),
-        ('', ''),
-        (self.sender_stdout, ''),
-        (1, ''),
-        (0, ''),
-    ]
-    self.bm_spec.vms[1].RemoteCommand.side_effect = [
-        (self.receiver_stdout, ''),
-        (1, ''),
-        (self.receiver_stdout, ''),
-        (1, ''),
-    ]
-    _ = dpdk_pktgen_benchmark.Run(self.bm_spec)
-    self.bm_spec.vms[0].RemoteCommand.assert_has_calls(
-        [
-            mock.call(
-                self.expected_sender_cmd,
-                login_shell=True,
-                disable_tty_lock=True,
-            )
-        ],
-        any_order=True,
-    )
-    self.bm_spec.vms[1].RemoteCommand.assert_has_calls(
-        [
-            mock.call(
-                self.expected_receiver_cmd,
-                login_shell=True,
-                disable_tty_lock=True,
-            )
-        ],
-        any_order=True,
-    )
 
   @flagsaver.flagsaver(dpdk_pktgen_packet_loss_threshold_rates=[1])
   def testClientServerStdout(self):

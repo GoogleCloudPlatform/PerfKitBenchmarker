@@ -1,1 +1,0 @@
-cd Pktgen-DPDK && sudo ./usr/local/bin/pktgen -l 0-21 -n 6 -- -m "[1-7].0" -f pktgen.pkt > pktgen_stdout.log

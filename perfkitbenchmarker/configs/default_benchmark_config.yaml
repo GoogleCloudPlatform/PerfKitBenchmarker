@@ -12,6 +12,15 @@ default_disk_spec: &default_disk_spec
     disk_size: 200
     disk_type: PremiumV2_LRS
 
+dpdk_pktgen_small_pkt_loss:
+  name: dpdk_pktgen
+  flags:
+    dpdk_pktgen_tx_burst: 128
+    dpdk_pktgen_rx_burst: 128
+    dpdk_pktgen_tx_cores: '[1:2]'
+    dpdk_pktgen_rx_cores: '[1:2]'
+    dpdk_pktgen_packet_loss_threshold_rates: 0.0001
+
 speccpu2017_int_rate_flags_base: &speccpu2017_int_rate_flags_base
   build_fortran: True
   gcc_version: "11"

@@ -57,7 +57,7 @@ _DPDK_PKTGEN_DURATION = flags.DEFINE_integer(
 )
 _DPDK_PKTGEN_PACKET_LOSS_THRESHOLDS = flags.DEFINE_multi_float(
     'dpdk_pktgen_packet_loss_threshold_rates',
-    [0, 0.00001, 0.0001],
+    [0],
     'Packet loss thresholds to record samples for.',
     lower_bound=0,
 )
@@ -66,6 +66,29 @@ _DPDK_PKTGEN_NUM_FLOWS = flags.DEFINE_integer(
     200,
     'Number of flows to use by taking a range of source ports.',
     lower_bound=0,
+)
+_DPDK_PKTGEN_TX_CORES = flags.DEFINE_string(
+    'dpdk_pktgen_tx_cores', '[1-7]', 'Cores assigned to TX.'
+)
+_DPDK_PKTGEN_RX_CORES = flags.DEFINE_string(
+    'dpdk_pktgen_rx_cores', '[1-7]', 'Cores assigned to RX.'
+)
+_DPDK_PKTGEN_NUM_MEMORY_CHANNELS_PER_NUMA = flags.DEFINE_integer(
+    'dpdk_pktgen_num_memory_channels_per_numa',
+    1,
+    'Number of memory channels per NUMA node.',
+)
+_DPDK_PKTGEN_TX_BURST = flags.DEFINE_integer(
+    'dpdk_pktgen_tx_burst', 1, 'The TX burst size.'
+)
+_DPDK_PKTGEN_RX_BURST = flags.DEFINE_integer(
+    'dpdk_pktgen_rx_burst', 1, 'The RX burst size.'
+)
+_DPDK_PKTGEN_TXD = flags.DEFINE_integer(
+    'dpdk_pktgen_txd', 2048, 'The size of the TX descriptor ring size.'
+)
+_DPDK_PKTGEN_RXD = flags.DEFINE_integer(
+    'dpdk_pktgen_rxd', 2048, 'The size of the RX descriptor ring size.'
 )
 
 # DPDK Pktgen maximum logical cores
@@ -168,6 +191,20 @@ def PrepareVM(
       f' {5677+_DPDK_PKTGEN_NUM_FLOWS.value} 1/g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
+  # Update burst sizes.
+  vm.RemoteCommand(
+      f'sudo sed -i "s/<TX_BURST>/{_DPDK_PKTGEN_TX_BURST.value}/g"'
+      f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+  )
+  vm.RemoteCommand(
+      f'sudo sed -i "s/<RX_BURST>/{_DPDK_PKTGEN_RX_BURST.value}/g"'
+      f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+  )
+
+
+def IssueCommand(vm: linux_virtual_machine.BaseLinuxVirtualMachine, cmd: str):
+  # Running Pktgen requires a terminal.
+  vm.RemoteCommand(cmd, login_shell=True, disable_tty_lock=True)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
@@ -186,16 +223,29 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   samples = []
 
   num_lcores = min(sender_vm.NumCpusForBenchmark(), _MAX_LCORES)
-  num_memory_channels_stdout, _ = sender_vm.RemoteCommand(
+  num_numa, _ = sender_vm.RemoteCommand(
       "lscpu | grep 'NUMA node(s)' | awk '{print $3}'"
   )
-  num_memory_channels = int(num_memory_channels_stdout)
+  num_memory_channels = (
+      int(num_numa) * _DPDK_PKTGEN_NUM_MEMORY_CHANNELS_PER_NUMA.value
+  )
   metadata = {
-      'dpdk_pktgen_burst': 1,
+      'dpdk_pktgen_tx_burst': _DPDK_PKTGEN_TX_BURST.value,
+      'dpdk_pktgen_rx_burst': _DPDK_PKTGEN_RX_BURST.value,
       'dpdk_pktgen_lcores': num_lcores,
       'dpdk_pktgen_num_memory_channels': num_memory_channels,
       'dpdk_pktgen_duration': _DPDK_PKTGEN_DURATION.value,
       'dpdk_pktgen_num_flows': _DPDK_PKTGEN_NUM_FLOWS.value,
+      'dpdk_pktgen_tx_cores': _DPDK_PKTGEN_TX_CORES.value,
+      'dpdk_pktgen_rx_cores': _DPDK_PKTGEN_RX_CORES.value,
+      'dpdk_pktgen_txd': _DPDK_PKTGEN_TXD.value,
+      'dpdk_pktgen_rxd': _DPDK_PKTGEN_RXD.value,
+      'dpdk_pktgen_mbuf_cache_sizes': (
+          dpdk_pktgen.DPDK_PKTGEN_MBUF_CACHE_SIZE.value
+      ),
+      'dpdk_pktgen_mbufs_per_port_multiplier': (
+          dpdk_pktgen.DPDK_PKTGEN_MBUFS_PER_PORT_MULTIPLIER.value
+      ),
   }
   pktgen_env_var = ''
   # Incorrect llq_policy default:
@@ -205,10 +255,20 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     pktgen_env_var = ' LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib64'
     aws_eal_arg = f' -a "{receiver_vm.secondary_nic_bus_info},llq_policy=1"'
 
-  cmd = (
+  tx_cmd = (
       f'cd {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR} &&'
       f' sudo{pktgen_env_var} ./usr/local/bin/pktgen -l 0-{num_lcores-1} -n'
-      f' {num_memory_channels}{aws_eal_arg} -- -m "[1-7].0" -f pktgen.pkt >'
+      f' {num_memory_channels}{aws_eal_arg} --'
+      f' --txd={_DPDK_PKTGEN_TXD.value} --rxd={_DPDK_PKTGEN_RXD.value} -m'
+      f' "{_DPDK_PKTGEN_TX_CORES.value}.0" -f pktgen.pkt >'
+      f' {_STDOUT_LOG_FILE}'
+  )
+  rx_cmd = (
+      f'cd {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR} &&'
+      f' sudo{pktgen_env_var} ./usr/local/bin/pktgen -l 0-{num_lcores-1} -n'
+      f' {num_memory_channels}{aws_eal_arg} --'
+      f' --txd={_DPDK_PKTGEN_TXD.value} --rxd={_DPDK_PKTGEN_RXD.value} -m'
+      f' "{_DPDK_PKTGEN_RX_CORES.value}.0" -f pktgen.pkt >'
       f' {_STDOUT_LOG_FILE}'
   )
 
@@ -237,14 +297,13 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       sender_vm.RemoteCommand(
           f'cd {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR} && make'
       )
-
-      # Running Pktgen requires a terminal.
-      background_tasks.RunThreaded(
-          lambda vm: vm.RemoteCommand(
-              cmd, login_shell=True, disable_tty_lock=True
-          ),
-          [receiver_vm, sender_vm],
+      background_tasks.RunParallelThreads(
+          [
+              (IssueCommand, [receiver_vm, rx_cmd], {}),
+              (IssueCommand, [sender_vm, tx_cmd], {}),
+          ],
           post_task_delay=1,  # Ensure receiver starts before sender.
+          max_concurrency=2,
       )
 
       # Parse ANSI codes.

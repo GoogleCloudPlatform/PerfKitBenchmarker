@@ -1,5 +1,5 @@
-set all txburst 1
-set all rxburst 1
+set all txburst <TX_BURST>
+set all rxburst <RX_BURST>
 enable all range
 range all proto udp
 range all src ip <SRC_IP> <SRC_IP> <SRC_IP> 0.0.0.1
