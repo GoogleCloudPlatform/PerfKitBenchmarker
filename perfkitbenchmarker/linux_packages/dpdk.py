@@ -86,7 +86,7 @@ def AptInstall(vm):
 def YumInstall(vm):
   """Install DPDK using yum. Tested on Amazonlinux2023."""
   vm.Install('pip')
-  vm.InstallPackages('git kernel-devel kernel-headers numactl-devel')
+  vm.InstallPackages('git kernel-devel kernel-headers libatomic numactl-devel')
   vm.RemoteCommand('sudo pip3 install meson ninja pyelftools')
   if vm.CLOUD == 'AWS':
     vm.RemoteCommand(f'git clone {DPDK_AWS_DRIVER_GIT_REPO}')
