@@ -3,6 +3,7 @@ from typing import Callable, Iterable, Protocol, Tuple
 import unittest
 from unittest import mock
 from absl.testing import flagsaver
+from absl.testing import parameterized
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
@@ -278,6 +279,18 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
             _Sample(1, 'unready'),
             _Sample(1, 'unknown'),
         ],
+    )
+
+  @parameterized.named_parameters(
+      ('eks_auto', 'hostname', 'k8s-fib-fib-123.elb.us-east-1.amazonaws.com'),
+      ('gke', 'ip', '34.16.24.55'),
+  )
+  def testGetIpFromIngress(self, field_name, address):
+    # ex after f-string resolution: {"ip":"34.16.24.55"}
+    ingress_out = f'{{"{field_name}":"{address}"}}'
+    self.assertEqual(
+        self.kubernetes_cluster._GetAddressFromIngress(ingress_out),
+        f'http://{address}',
     )
 
   @mock.patch.object(

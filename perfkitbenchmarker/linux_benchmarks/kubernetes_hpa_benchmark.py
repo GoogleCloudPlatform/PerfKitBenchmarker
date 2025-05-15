@@ -15,7 +15,6 @@
 
 from collections.abc import Callable
 import functools
-import json
 import logging
 import threading
 import typing
@@ -63,7 +62,7 @@ kubernetes_hpa:
     locust_path: locust/rampup.py
 """
 
-_INGRESS_JSONPATH = '{.status.loadBalancer.ingress[0]}'
+_PORT = 5000
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -92,20 +91,16 @@ def _PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec):
       fib_image=fib_image,
       runtime_class_name=FLAGS.kubernetes_hpa_runtime_class_name,
       node_selectors=cluster.GetNodeSelectors(),
+      port=_PORT,
   )
 
   cluster.WaitForResource('deploy/fib', 'available', namespace='fib')
-  cluster.WaitForResource(
-      'service/fib',
-      _INGRESS_JSONPATH,
-      namespace='fib',
-      condition_type='jsonpath=',
-  )
 
 
 def _PrepareLocust(benchmark_spec: bm_spec.BenchmarkSpec):
   """Prepares a vm to run locust."""
   vm = benchmark_spec.vms[0]
+  vm.Install('http_poller')
   locust.Install(vm)
   locust.Prep(vm)
 
@@ -126,39 +121,15 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
 
-def _GetLoadBalancerURI() -> str:
-  """Returns the SUT Load Balancer URI."""
-  stdout, _, _ = container_service.RunKubectlCommand([
-      'get',
-      '-n',
-      'fib',
-      'svc/fib',
-      '-o',
-      f"jsonpath='{_INGRESS_JSONPATH}'",
-  ])
-  ingress = json.loads(stdout.strip("'"))
-  if 'ip' in ingress:
-    ip = ingress['ip']
-  elif 'hostname' in ingress:
-    ip = ingress['hostname']
-  else:
-    raise errors.Benchmarks.RunError(
-        'No IP or hostname found in ingress from stdout ' + stdout
-    )
-  return 'http://' + ip.strip() + ':5000'
-
-
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
   """Run a benchmark against the Nginx server."""
-  addr = _GetLoadBalancerURI()
-
   vm = benchmark_spec.vms[0]
   cluster: container_service.KubernetesCluster = typing.cast(
       container_service.KubernetesCluster, benchmark_spec.container_cluster
   )
+  addr = cluster.DeployIngress('fib', 'fib', _PORT)
 
   # Confirm the server can be pinged.
-  vm.Install('http_poller')
   _PollServer(vm, addr)
 
   samples = []

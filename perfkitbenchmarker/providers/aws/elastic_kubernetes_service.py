@@ -121,6 +121,32 @@ class BaseEksCluster(container_service.KubernetesCluster):
     """Get the default storage class for the provider."""
     return aws_disk.GP2
 
+  def DeployIngress(self, name: str, namespace: str, port: int) -> str:
+    """Deploys an Ingress resource to the cluster."""
+    self.ApplyManifest(
+        'container/ingress.yaml.j2',
+        name=name,
+        namespace=namespace,
+        port=port,
+    )
+    self.WaitForResource(
+        'ingress',
+        container_service.INGRESS_JSONPATH,
+        namespace=namespace,
+        condition_type='jsonpath=',
+        extra_args=[name],
+    )
+    stdout, _, _ = container_service.RunKubectlCommand([
+        'get',
+        'ingress',
+        name,
+        '-n',
+        namespace,
+        '-o',
+        f'jsonpath={container_service.INGRESS_JSONPATH}',
+    ])
+    return self._GetAddressFromIngress(stdout)
+
 
 class EksCluster(BaseEksCluster):
   """Class representing an Elastic Kubernetes Service cluster."""

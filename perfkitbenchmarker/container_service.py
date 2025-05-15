@@ -134,6 +134,7 @@ _RETRYABLE_KUBECTL_ERRORS = [
     'Unable to connect to the server: dial tcp',
     'Unable to connect to the server: net/http: TLS handshake timeout',
 ]
+INGRESS_JSONPATH = '{.status.loadBalancer.ingress[0]}'
 
 
 class ContainerException(errors.Error):
@@ -986,6 +987,7 @@ class KubernetesClusterCommands:
       timeout: int = vm_util.DEFAULT_TIMEOUT,
       wait_for_all: bool = False,
       condition_type='condition=',
+      extra_args: list[str] | None = None,
   ):
     """Waits for a condition on a Kubernetes resource (eg: deployment, pod)."""
     run_cmd = [
@@ -998,6 +1000,8 @@ class KubernetesClusterCommands:
       run_cmd.append(f'--namespace={namespace}')
     if wait_for_all:
       run_cmd.append('--all')
+    if extra_args:
+      run_cmd.extend(extra_args)
     RunKubectlCommand(run_cmd, timeout=timeout + 10)
 
   @staticmethod
@@ -1500,6 +1504,52 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
   def GetNodeSelectors(self) -> list[str]:
     """Get the node selectors section of a yaml for the provider."""
     return []
+
+  def DeployIngress(self, name: str, namespace: str, port: int) -> str:
+    """Deploys an Ingress/load balancer resource to the cluster.
+
+    Args:
+      name: The name of the Ingress resource.
+      namespace: The namespace of the resource.
+      port: The port to expose to the internet.
+
+    Returns:
+      The address of the Ingress.
+    """
+    self.ApplyManifest(
+        'container/loadbalancer.yaml.j2',
+        name=name,
+        namespace=namespace,
+        port=port,
+    )
+    self.WaitForResource(
+        f'service/{name}',
+        INGRESS_JSONPATH,
+        namespace=namespace,
+        condition_type='jsonpath=',
+    )
+    stdout, _, _ = RunKubectlCommand([
+        'get',
+        '-n',
+        name,
+        f'svc/{name}',
+        '-o',
+        f'jsonpath={INGRESS_JSONPATH}',
+    ])
+    return f'{self._GetAddressFromIngress(stdout)}:{port}'
+
+  def _GetAddressFromIngress(self, ingress_out: str):
+    """Gets the endpoint address from the Ingress resource."""
+    ingress = json.loads(ingress_out.strip("'"))
+    if 'ip' in ingress:
+      ip = ingress['ip']
+    elif 'hostname' in ingress:
+      ip = ingress['hostname']
+    else:
+      raise errors.Benchmarks.RunError(
+          'No IP or hostname found in ingress from stdout ' + ingress_out
+      )
+    return 'http://' + ip.strip()
 
 
 @dataclasses.dataclass(eq=True, frozen=True)

@@ -1,0 +1,16 @@
+# A somewhat generic load balancer (but mostly for kubernetes_hpa).
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ name }}"
+  namespace: "{{ namespace }}"
+spec:
+  selector:
+    app: "{{ name }}"
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  ports:
+    - name: "tcp-port"
+      protocol: "TCP"
+      port: {{ port }}
+      targetPort: {{ port }}
