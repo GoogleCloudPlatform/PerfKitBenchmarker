@@ -46,6 +46,8 @@ _BATCH_SIZE = flags.DEFINE_integer(
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'managed_mongodb_ycsb'
+# 0.18.0-SNAPSHOT MongoDB YCSB requires using an older version of maven (<3.8)
+# to build, see https://github.com/brianfrankcooper/YCSB/issues/1278
 BENCHMARK_CONFIG = """
 managed_mongodb_ycsb:
   description: Run YCSB against a managed MongoDB instance.
@@ -59,7 +61,10 @@ managed_mongodb_ycsb:
   flags:
     openjdk_version: 11
     create_and_boot_post_task_delay: 5
-    ycsb_tar_url: https://storage.googleapis.com/p3rf-external/ycsb-0.18.0-liubrandon-SNAPSHOT.tar.gz
+    ycsb_commit: 58d587888b12e61d68b09efa21b7cb3f74cc046a
+    ycsb_version: 0.18.0-SNAPSHOT
+    ycsb_binding: mongodb
+    maven_version: 3.6.3
     gcloud_scopes: >
       trace
       datastore
