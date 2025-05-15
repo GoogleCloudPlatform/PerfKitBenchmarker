@@ -37,7 +37,12 @@ from perfkitbenchmarker.providers.gcp import firestore  # pylint: disable=unused
 _READ_PREFERENCE = flags.DEFINE_string(
     'managed_mongodb_ycsb_read_preference',
     'primary',
-    'The read preference to use for the DocumentDB cluster.',
+    'The read preference to use for the MongoDB cluster.',
+)
+_WRITE_CONCERN = flags.DEFINE_string(
+    'managed_mongodb_ycsb_write_concern',
+    'majority',
+    'The write concern to use for the MongoDB cluster.',
 )
 _BATCH_SIZE = flags.DEFINE_integer(
     'managed_mongodb_batch_size', None, 'The batch size to use for loading'
@@ -93,7 +98,12 @@ def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
   """Returns the connection string used to connect to the instance."""
   instance: _ManagedMongoDb = benchmark_spec.non_relational_db
   read_preference = _READ_PREFERENCE.value
-  return f'"{instance.GetConnectionString()}&readPreference={read_preference}"'
+  write_concern = _WRITE_CONCERN.value
+  return (
+      f'"{instance.GetConnectionString()}'
+      f'&readPreference={read_preference}'
+      f'&w={write_concern}"'
+  )
 
 
 def _GetCommonYcsbArgs(benchmark_spec: bm_spec.BenchmarkSpec) -> dict[str, Any]:
@@ -162,6 +172,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   for s in samples:
     s.metadata.update(instance.GetResourceMetadata())
     s.metadata['read_preference'] = _READ_PREFERENCE.value
+    s.metadata['write_concern'] = _WRITE_CONCERN.value
   return samples
 
 
