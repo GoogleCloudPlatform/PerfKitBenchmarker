@@ -237,6 +237,14 @@ class BaseGkeCluster(container_service.KubernetesCluster):
     # PD-SSD
     return 'premium-rwo'
 
+  def GetNodePoolNames(self) -> list[str]:
+    """Get node pool names for the cluster."""
+    cmd = self._GcloudCommand('container', 'node-pools', 'list')
+    cmd.flags['cluster'] = self.name
+    cmd.flags['format'] = 'value(name)'
+    stdout, _, _ = cmd.Issue()
+    return stdout.split()
+
 
 class GkeCluster(BaseGkeCluster):
   """Class representing a Google Kubernetes Engine cluster."""
@@ -325,6 +333,19 @@ class GkeCluster(BaseGkeCluster):
         self.default_nodepool,
         cmd,
     )
+    enable_autoprovisioning = False
+    if gcp_flags.MAX_CPU.value:
+      cmd.flags['max-cpu'] = gcp_flags.MAX_CPU.value
+      enable_autoprovisioning = True
+    if gcp_flags.MAX_MEMORY.value:
+      cmd.flags['max-memory'] = gcp_flags.MAX_MEMORY.value
+      enable_autoprovisioning = True
+    if gcp_flags.MAX_ACCELERATOR.value:
+      cmd.flags['max-accelerator'] = gcp_flags.MAX_ACCELERATOR.value
+      enable_autoprovisioning = True
+    if enable_autoprovisioning:
+      cmd.args.append('--enable-autoprovisioning')
+
     if (
         self.min_nodes != self.default_nodepool.num_nodes
         or self.max_nodes != self.default_nodepool.num_nodes

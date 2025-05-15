@@ -660,6 +660,10 @@ class BaseContainerCluster(resource.BaseResource):
     """Change the number of nodes in the node pool."""
     raise NotImplementedError
 
+  def GetNodePoolNames(self) -> list[str]:
+    """Get node pool names for the cluster."""
+    raise NotImplementedError
+
 
 def GetContainerClusterClass(
     cloud: str, cluster_type: str

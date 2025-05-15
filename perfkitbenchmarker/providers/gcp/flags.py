@@ -328,6 +328,23 @@ CONTAINER_RELEASE_CHANNEL = flags.DEFINE_enum(
     ' channels support different Kubernetes versions and have different'
     ' defaults.',
 )
+MAX_CPU = flags.DEFINE_integer(
+    'gke_max_cpu',
+    None,
+    'Maximum number of cores to which the cluster can scale. Required to enable'
+    ' autoprovisioning feature.',
+)
+MAX_MEMORY = flags.DEFINE_integer(
+    'gke_max_memory',
+    None,
+    'Maximum number of GB of memory to which the cluster can scale. Required to'
+    ' enable autoprovisioning feature.',
+)
+MAX_ACCELERATOR = flags.DEFINE_string(
+    'gke_max_accelerator',
+    None,
+    'Sets maximum limit for a single type of GPU in the cluster.',
+)
 flags.DEFINE_string(
     'gcp_dataproc_subnet',
     None,
@@ -506,7 +523,7 @@ GCE_PERFORMANCE_MONITORING_UNIT = flags.DEFINE_enum(
     'gce_performance_monitoring_unit',
     None,
     ['standard', 'architectural', 'enhanced'],
-    'Whether to enable PMU when creating a VM.'
+    'Whether to enable PMU when creating a VM.',
 )
 
 

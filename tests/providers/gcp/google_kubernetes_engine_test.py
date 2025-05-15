@@ -600,6 +600,25 @@ class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
       }
       self.assertEqual(expected, set(instance_groups))  # order doesn't matter
 
+  def testGetNodePoolNames(self):
+    output = ['default-pool', 'nap-e2-standard-2-iu4vquho', 'test-pool']
+    spec = self.create_kubernetes_engine_spec()
+    with patch_critical_objects(stdout='\n'.join(output)) as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      node_pools = cluster.GetNodePoolNames()
+
+      command_string = ' '.join(issue_command.call_args[0][0])
+      self.assertEqual(issue_command.call_count, 1)
+      self.assertIn('gcloud container node-pools list', command_string)
+      self.assertIn('--cluster', command_string)
+
+      expected = {
+          'default-pool',
+          'nap-e2-standard-2-iu4vquho',
+          'test-pool',
+      }
+      self.assertEqual(expected, set(node_pools))  # order doesn't matter
+
 
 class GoogleKubernetesEngineRegionalTestCase(
     pkb_common_test_case.PkbCommonTestCase
