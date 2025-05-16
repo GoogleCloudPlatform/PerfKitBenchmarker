@@ -185,7 +185,7 @@ class GCEDiskTest(pkb_common_test_case.PkbCommonTestCase):
     self.linux_vm.GetConnectionIp = mock.MagicMock(return_value='1.1.1.1')
     disk_spec = self.GetDiskSpec(mount_point='/mountpoint')
     self.linux_vm.SetDiskSpec(disk_spec, 2)
-    self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+    self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForRemoteDisksToVisibleFromVm = mock.MagicMock(
         return_value=12
     )
     self.mock_cmd = mock.Mock()
@@ -315,7 +315,7 @@ class GCEPDDiskTest(GCEDiskTest):
     ]
     with PatchCriticalObjects(fake_rets) as issue_command:
       self.linux_vm.SetDiskSpec(spec, 1)
-      self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+      self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForRemoteDisksToVisibleFromVm = mock.MagicMock(
           return_value=12
       )
       self.linux_vm.SetupAllScratchDisks()
@@ -465,7 +465,7 @@ class GCENFSDiskTest(GCEDiskTest):
     ]
 
     with PatchCriticalObjects(fake_rets) as issue_command:
-      self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+      self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForRemoteDisksToVisibleFromVm = mock.MagicMock(
           return_value=12
       )
       self.linux_vm.SetupAllScratchDisks()

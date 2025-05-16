@@ -436,7 +436,9 @@ class SetUpRemoteDiskStrategy(AWSSetupDiskStrategy):
         or not self.scratch_disks
     ):
       return
-    attach_tasks.append((self.WaitForDisksToVisibleFromVm, [start_time], {}))
+    attach_tasks.append(
+        (self.WaitForRemoteDisksToVisibleFromVm, [start_time], {})
+    )
     for scratch_disk in self.scratch_disks:
       attach_tasks.append((scratch_disk.Attach, [self.vm], {}))
     return_from_threads = background_tasks.RunParallelThreads(

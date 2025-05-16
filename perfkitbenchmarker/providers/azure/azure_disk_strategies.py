@@ -245,7 +245,9 @@ class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
     start_time = time.time()
     if not self.scratch_disks or FLAGS.azure_attach_disk_with_create:
       return
-    attach_tasks.append((self.WaitForDisksToVisibleFromVm, [start_time], {}))
+    attach_tasks.append(
+        (self.WaitForRemoteDisksToVisibleFromVm, [start_time], {})
+    )
     attach_tasks.append((self.AttachAzureDisks, (), {}))
     return_from_threads = background_tasks.RunParallelThreads(
         attach_tasks, max_concurrency=200

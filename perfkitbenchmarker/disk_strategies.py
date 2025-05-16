@@ -172,13 +172,13 @@ class SetUpDiskStrategy:
     )
 
   def GetTotalDiskCount(self) -> int:
-    total_disks = 0
+    remote_disks = 0
     for scratch_disk in self.scratch_disks:
       if isinstance(scratch_disk, disk.StripedDisk):
-        total_disks += len(scratch_disk.disks)
+        remote_disks += len(scratch_disk.disks)
       else:
-        total_disks += 1
-    return total_disks
+        remote_disks += 1
+    return remote_disks + self.vm.max_local_disks
 
   def CheckDisksVisibility(self):
     """Checks for all the disks to be visible from the VM.
@@ -198,7 +198,7 @@ class SetUpDiskStrategy:
       max_retries=200,
       retryable_exceptions=(DisksAreNotVisibleError,),
   )
-  def WaitForDisksToVisibleFromVm(self, start_time) -> float:
+  def WaitForRemoteDisksToVisibleFromVm(self, start_time) -> float:
     """Waits for the disks to be visible from the Guest.
 
     Args:
@@ -213,7 +213,6 @@ class SetUpDiskStrategy:
     # not implemented for Windows
     if self.vm.OS_TYPE not in os_types.LINUX_OS_TYPES:
       return -1
-    self.CheckDisksVisibility()
     if not self.CheckDisksVisibility():
       raise DisksAreNotVisibleError('Disks not visible')
     return time.time() - start_time
@@ -552,7 +551,7 @@ class DetachDiskStrategy:
       True : if all the disks are detached from the VM
     """
     non_boot_disks_attached = GetNonBootDiskCount(self.vm)
-    if non_boot_disks_attached == 0:
+    if non_boot_disks_attached - self.vm.max_local_disks == 0:
       return True
     else:
       return False
@@ -572,7 +571,6 @@ class DetachDiskStrategy:
     Raises:
       DisksAreNotDetachedError: if any disk is visible.
     """
-    self.CheckDisksDetach()
     if not self.CheckDisksDetach():
       raise DisksAreNotDetachedError('Disks not visible')
     return time.time()
