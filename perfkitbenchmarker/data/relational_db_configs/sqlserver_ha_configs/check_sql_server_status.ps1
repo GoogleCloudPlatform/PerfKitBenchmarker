@@ -6,7 +6,6 @@ function Get-SqlServiceStatus {
     if ($sqlServerService.Status -eq 'Running') {
       return $true
     }
-    return $false
   }
   return $false
 }
@@ -53,18 +52,28 @@ try {
   $sqlState = 0
 
   for (($i = 0); $i -lt 24; $i++) {
-    if ((Get-SqlServiceStatus -eq $true) -and (Get-ClusterStatus -eq $true) -and ((Get-SqlServerConnectionState -HostName $localServerName) -eq $true)) {
+
+    $serviceRunning = Get-SqlServiceStatus
+    $isClustered = Get-ClusterStatus
+    $canConnect = Get-SqlServerConnectionState -HostName $localServerName
+
+    if ($serviceRunning -and $isClustered -and $canConnect) {
       Write-Host 'SQL Server is healthy'
       $sqlState = 0
-      break
+      return
     }
     else {
-      Write-Host 'SQL Server is not healthy'
+      Write-Host 'SQL Server is not healthy on this attempt. Status details:'
+      Write-Host "  - SQL Service (MSSQLSERVER) Running: $serviceRunning"
+      Write-Host "  - Server is part of a cluster: $isClustered"
+      Write-Host "  - Can connect to SQL Server instance: $canConnect"
+
       $sqlState = 1
     }
     Start-Sleep 10
   }
-  exit $sqlState
+  # Throw exception if SQL Server is not healthy after 240 seconds
+  throw 'SQl Server not responding after 240 seconds'
 
 }
 catch {

@@ -47,6 +47,20 @@ flags.DEFINE_bool(
     'through the SetProcessPriorityToHigh function.',
 )
 
+flags.DEFINE_integer(
+    'winrm_retries',
+    3,
+    'Default number of times to retry transient failures on WinRM commands.',
+    lower_bound=1,
+)
+
+flags.DEFINE_integer(
+    'winrm_retry_interval',
+    10,
+    'Default time to wait between retries on WinRM commands.',
+    lower_bound=1,
+)
+
 # Windows disk letter starts from C, use a larger disk letter for attached disk
 # to avoid conflict. On Azure, D is reserved for DvD drive.
 ATTACHED_DISK_LETTER = 'F'
@@ -84,6 +98,34 @@ STARTUP_SCRIPT = 'powershell -EncodedCommand {encoded_command}'.format(
 
 class WaitTimeoutError(Exception):
   """Exception thrown if a wait operation takes too long."""
+
+
+def winrm_retry(func):
+  """A decorator that applies vm_util.Retry with WinRM-specific flag settings.
+
+  This decorator is a "decorator factory" that, when applied to a method,
+  returns a vm_util.Retry decorator configured with the *runtime* values
+  of absl flags.
+
+  Args:
+    func: The function to decorate vm_util.Retry.
+
+  Returns:
+    A function that wraps functions in retry logic. It can be used as a
+    decorator.
+  """
+  def wrapper(self, *args, **kwargs):
+
+    retried_func = vm_util.Retry(
+        log_errors=False,
+        max_retries=FLAGS.winrm_retries,
+        poll_interval=FLAGS.winrm_retry_interval,
+        retryable_exceptions=WaitTimeoutError,
+    )(func)
+
+    return retried_func(self, *args, **kwargs)
+
+  return wrapper
 
 
 class BaseWindowsMixin(os_mixin.BaseOsMixin):
@@ -127,6 +169,7 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
     """
     return self.RemoteCommand(command, ignore_failure, timeout)
 
+  @winrm_retry
   def RemoteCommand(
       self,
       command: str,

@@ -20,7 +20,7 @@ if ($sql_cluster_group.OwnerNode -ne $localServerName) {
 }
 
 if ($sql_cluster_group.State -ne 'Online') {
-  Write-Host 'SQL Rone not online'
+  Write-Host 'SQL Cluster Role not online'
   if ($sql_cluster_group.OwnerNode -ne $localServerName) {
     Move-ClusterGroup -Name $sql_cluster_group.Name -Node $localServerName
   }
