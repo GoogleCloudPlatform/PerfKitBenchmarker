@@ -579,3 +579,5 @@
 -   Update GCE VM creation command logic to allow creating
     z3-highmem-88-standardlssd
 -   Slightly more robust Exists check for GCE VMs.
+-   Added `sysbench_thread_init_timeout` flag to allow higher timeout limit when
+    initializing a high thread count (eg. 2048)

@@ -60,6 +60,11 @@ SYSBENCH_SLEEP_BETWEEN_RUNS_SEC = flags.DEFINE_integer(
     0,
     'The time in seconds to sleep between runs with different thread counts.',
 )
+SYSBENCH_THREAD_INIT_TIMEOUT = flags.DEFINE_integer(
+    'sysbench_thread_init_timeout',
+    30,
+    'The timeout in seconds for sysbench to initialize run threads.',
+)
 SYSBENCH_VERBOSE_MODE = flags.DEFINE_integer(
     'sysbench_verbose_mode',
     None,
@@ -395,6 +400,7 @@ def BuildRunCommand(sysbench_parameters: SysbenchInputParameters) -> str:
   cmd = _BuildGenericCommand(sysbench_parameters)
   cmd += [f'--time={FLAGS.sysbench_run_seconds}']
   cmd += ['run']
+  cmd += [f'--thread-init-timeout={SYSBENCH_THREAD_INIT_TIMEOUT.value}']
   return  f'cd {SYSBENCH_DIR} && ' + ' '.join(cmd)
 
 
