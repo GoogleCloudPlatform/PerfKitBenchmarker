@@ -185,6 +185,10 @@ multiload:
   flags:
     multichase_benchmarks: multiload
 
+# https://github.com/elastic/rally-tracks/tree/master/elastic/logs
+elasticsearch_rally_logging:
+  name: esrally
+
 # TODO: memtier_key_maximum, memtier_load_key_maximum
 redis_memtier_full_house_loaded:
   name: redis_memtier
