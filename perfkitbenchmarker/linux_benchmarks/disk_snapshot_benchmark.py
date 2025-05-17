@@ -39,20 +39,20 @@ disk_snapshot:
         GCP:
           disk_size: 500
           disk_type: hyperdisk-balanced
-          provisioned_iops: 3000
-          provisioned_throughput: 750
+          provisioned_iops: 16000
+          provisioned_throughput: 800
           mount_point: /var/lib/mysql
         AWS:
           disk_size: 500
           disk_type: gp3
-          provisioned_iops: 3000
-          provisioned_throughput: 750
+          provisioned_iops: 16000
+          provisioned_throughput: 800
           mount_point: /var/lib/mysql
         Azure:
           disk_size: 500
           disk_type: PremiumV2_LRS
-          provisioned_iops: 3000
-          provisioned_throughput: 750
+          provisioned_iops: 16000
+          provisioned_throughput: 800
           mount_point: /var/lib/mysql
   flags:
     sysbench_table_size: 50000000
