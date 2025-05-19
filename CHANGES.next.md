@@ -231,6 +231,7 @@
 -   Add disk_snapshot_benchmark, measuring compression, snapshot creation time,
     and snapshot restore time.
 -   Add support for Managed MongoDB services and a YCSB benchmark.
+-   Add ESRally (Elasticsearch Rally) benchmark.
 
 ### Enhancements:
 
