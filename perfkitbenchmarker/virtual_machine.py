@@ -848,11 +848,12 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     result = self.metadata.copy()
     result.update({
         'image': self.image,
-        'zone': self.zone,
         'cloud': self.CLOUD,
         'os_type': type(self).OS_TYPE,
         'vm_platform': self.PLATFORM,
     })
+    if self.zone is not None:
+      result['zone'] = self.zone
     if self.cidr is not None:
       result['cidr'] = self.cidr
     if self.machine_type is not None:
