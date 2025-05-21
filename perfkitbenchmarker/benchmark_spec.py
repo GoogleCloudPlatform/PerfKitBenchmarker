@@ -21,6 +21,7 @@ import logging
 import os
 import pickle
 import threading
+import time
 from typing import Any
 import uuid
 
@@ -906,14 +907,43 @@ class BenchmarkSpec:
       placement_group_object.Create()
 
     if self.vms:
-      # We separate out creating, booting, and preparing the VMs into two phases
-      # so that we don't slow down the creation of all the VMs by running
-      # commands on the VMs that booted.
-      background_tasks.RunThreaded(
-          lambda vm: vm.CreateAndBoot(),
-          self.vms,
-          post_task_delay=FLAGS.create_and_boot_post_task_delay,
-      )
+      # Iterate through VM groups to apply potential provision_delay_seconds
+      # and then call CreateAndBoot for each group.
+      # Sorting by provision_order ensures a deterministic order if delays
+      # are intended to create a sequence.
+      for group_name in sorted(
+          self.vm_groups.keys(),
+          key=lambda x: self.vms_to_boot[x].provision_order,
+      ):
+        group_vms = self.vm_groups[group_name]
+        if not group_vms:
+          continue
+
+        group_spec = self.vms_to_boot[group_name]
+        provision_delay_seconds = getattr(
+            group_spec, 'provision_delay_seconds', 0
+        )
+        if provision_delay_seconds:
+          logging.info(
+              'Delaying provisioning of VM group %s by %s seconds.',
+              group_name,
+              provision_delay_seconds,
+          )
+          time.sleep(provision_delay_seconds)
+
+        post_task_delay = FLAGS.create_and_boot_post_task_delay
+        logging.info(
+            "Starting CreateAndBoot for VM group '%s' with"
+            ' post_task_delay: %s.',
+            group_name,
+            post_task_delay,
+        )
+        background_tasks.RunThreaded(
+            lambda vm: vm.CreateAndBoot(),
+            group_vms,
+            post_task_delay=post_task_delay,
+        )
+
       if self.nfs_service and self.nfs_service.CLOUD == nfs_service.UNMANAGED:
         self.nfs_service.Create()
       if not FLAGS.skip_vm_preparation:
