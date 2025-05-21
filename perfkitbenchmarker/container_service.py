@@ -125,7 +125,7 @@ spec:
     servicePort: 8080
 """
 RESOURCE_DELETE_SLEEP_SECONDS = 5
-_RETRYABLE_KUBECTL_ERRORS = [
+RETRYABLE_KUBECTL_ERRORS = [
     (
         '"unable to decode an event from the watch stream: http2: client'
         ' connection lost"'
@@ -133,6 +133,11 @@ _RETRYABLE_KUBECTL_ERRORS = [
     'read: connection reset by peer',
     'Unable to connect to the server: dial tcp',
     'Unable to connect to the server: net/http: TLS handshake timeout',
+    # These come up in kubectl exec
+    'error dialing backend:',
+    'connect: connection timed out',
+    'error sending request:',
+    '(abnormal closure): unexpected EOF'
 ]
 INGRESS_JSONPATH = '{.status.loadBalancer.ingress[0]}'
 
@@ -174,7 +179,7 @@ def RunKubectlCommand(command: list[str], **kwargs) -> tuple[str, str, int]:
     # Check for kubectl timeout. If found, treat it the same as a regular
     # timeout.
     if retcode != 0:
-      for error_substring in _RETRYABLE_KUBECTL_ERRORS:
+      for error_substring in RETRYABLE_KUBECTL_ERRORS:
         if error_substring in stderr:
           # Raise timeout error regardless of raise_on_failure - as the intended
           # semantics is to ignore expected errors caused by invoking the

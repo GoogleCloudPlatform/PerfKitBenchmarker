@@ -318,7 +318,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
       container_service.RunKubectlCommand(['get', 'pods'])
 
   def test_RunKubectlCommand_KubectlTimeoutRaisesCommandTimeout(self):
-    for err in container_service._RETRYABLE_KUBECTL_ERRORS:
+    for err in container_service.RETRYABLE_KUBECTL_ERRORS:
       with mock.patch.object(
           vm_util, 'IssueCommand', _MockedIssueCommandSuppressing(stderr=err)
       ):
@@ -331,7 +331,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
   def test_RunKubectlCommand_KubectlTimeoutWithSuppressFailureRaisesCommandTimeout(
       self,
   ):
-    for err in container_service._RETRYABLE_KUBECTL_ERRORS:
+    for err in container_service.RETRYABLE_KUBECTL_ERRORS:
       with mock.patch.object(
           vm_util, 'IssueCommand', _MockedIssueCommandSuppressing(stderr=err)
       ):

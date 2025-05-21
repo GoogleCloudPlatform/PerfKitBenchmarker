@@ -49,9 +49,8 @@ SELECTOR_PREFIX = 'pkb'
 
 def _IsKubectlErrorEphemeral(retcode: int, stderr: str) -> bool:
   """Determine if kubectl error is retriable."""
-  return retcode == 1 and (
-      'error dialing backend:' in stderr
-      or 'connect: connection timed out' in stderr
+  return retcode == 1 and any(
+      error in stderr for error in container_service.RETRYABLE_KUBECTL_ERRORS
   )
 
 
