@@ -229,7 +229,7 @@ class AksCluster(container_service.KubernetesCluster):
         '--cluster-name',
         self.name,
         '--name',
-        nodepool_config.name,
+        _AzureNodePoolName(nodepool_config.name),
         '--labels',
         f'pkb_nodepool={nodepool_config.name}',
     ] + self._GetNodeFlags(nodepool_config)
@@ -373,7 +373,13 @@ class AksCluster(container_service.KubernetesCluster):
         '--cluster-name',
         self.name,
         '--name',
-        node_pool,
+        _AzureNodePoolName(node_pool),
         f'--node-count={new_size}',
     ] + self.resource_group.args
     vm_util.IssueCommand(cmd)
+
+
+def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
+  """Truncate nodepool name for AKS."""
+  # https://learn.microsoft.com/en-us/azure/aks/create-node-pools#limitations
+  return pkb_nodepool_name[:12]
