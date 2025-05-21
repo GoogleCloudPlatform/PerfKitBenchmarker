@@ -130,6 +130,12 @@ class CloudValkey(managed_memory_store.BaseManagedMemoryStore):
     cmd.flags['node-type'] = self.node_type
     cmd.flags['engine-version'] = self.version
 
+    if self.clustered:
+      cmd.flags['mode'] = 'cluster'
+    else:
+      cmd.flags['mode'] = 'cluster-disabled'
+      cmd.flags['shard-count'] = 1
+
     cmd.flags['zone-distribution-config-mode'] = self.zone_distribution
     if self.zone_distribution == 'single-zone':
       cmd.flags['zone-distribution-config'] = self.zones[0]
@@ -200,5 +206,15 @@ class CloudValkey(managed_memory_store.BaseManagedMemoryStore):
       self._ip = json.loads(stdout)['discoveryEndpoints'][0]['address']
       self._port = 6379
       return
+    connections = json.loads(stdout)['endpoints'][0]['connections']
+    for connection in connections:
+      if (
+          connection['pscAutoConnection']['connectionType']
+          == 'CONNECTION_TYPE_PRIMARY'
+      ):
+        self._ip = connection['pscAutoConnection']['ipAddress']
+        self._port = connection['pscAutoConnection']['port']
+        return
+
     self._ip = json.loads(stdout)['host']
     self._port = json.loads(stdout)['port']
