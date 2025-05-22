@@ -19,6 +19,7 @@ This benchmark measures performance of Sysbench Databases on unmanaged MySQL.
 
 import copy
 import logging
+import re
 import time
 
 from absl import flags
@@ -32,6 +33,28 @@ from perfkitbenchmarker.linux_packages import sysbench
 
 
 FLAGS = flags.FLAGS
+
+
+_MYSQL_BUFFER_POOL_SIZE = flags.DEFINE_string(
+    'mysql_buffer_pool_size',
+    None,
+    'Buffer pool size with units. Example: 8G, 16M, 32K or 64B.',
+)
+flags.register_validator(
+    _MYSQL_BUFFER_POOL_SIZE,
+    lambda value: (value is None) or re.fullmatch(r'^\d+[BKMG]?$', value),
+    'mysql_buffer_pool_size must be in the format of <size>[<unit>] where'
+    ' <unit> is one of (B, K, M, G) or None. If no unit is specified, B is'
+    ' assumed.',
+)
+flags.register_validator(
+    _MYSQL_BUFFER_POOL_SIZE,
+    lambda value: not (
+        value is not None and FLAGS.innodb_buffer_pool_size is not None
+    ),
+    'Both "mysql_buffer_pool_size" and "innodb_buffer_pool_size" cannot be set'
+    ' at the same time.',
+)
 
 
 BENCHMARK_NAME = 'unmanaged_mysql_sysbench'
@@ -193,6 +216,15 @@ def GetSysbenchParameters(primary_server_ip: str | None, password: str):
 
 def GetBufferPoolSize():
   """Get buffer pool size from flags."""
+  if _MYSQL_BUFFER_POOL_SIZE.value:
+    logging.info(
+        'Buffer pool size was set with mysql_buffer_pool_sizeflag: %s',
+        _MYSQL_BUFFER_POOL_SIZE.value,
+    )
+    if _MYSQL_BUFFER_POOL_SIZE.value.endswith('B'):
+      # MySQL expects the buffer pool size to have no unit if it is in bytes.
+      return _MYSQL_BUFFER_POOL_SIZE.value[:-1]
+    return f'{_MYSQL_BUFFER_POOL_SIZE.value}'
   if FLAGS.innodb_buffer_pool_size:
     return f'{FLAGS.innodb_buffer_pool_size}G'
   return f'{DEFAULT_BUFFER_POOL_SIZE}G'
@@ -240,7 +272,8 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
 
   loader_vm = benchmark_spec.vm_groups['client'][0]
   sysbench_parameters = GetSysbenchParameters(
-      primary_server.internal_ip, new_password)
+      primary_server.internal_ip, new_password
+  )
   cmd = sysbench.BuildLoadCommand(sysbench_parameters)
   logging.info('%s load command: %s', FLAGS.sysbench_testname, cmd)
   loader_vm.RemoteCommand(cmd)
@@ -259,7 +292,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   primary_server = benchmark_spec.vm_groups['server'][0]
   client = benchmark_spec.vm_groups['client'][0]
   sysbench_parameters = GetSysbenchParameters(
-      primary_server.internal_ip, _GetPassword())
+      primary_server.internal_ip, _GetPassword()
+  )
   results = []
   # a map of trasactions metric name to current sample with max value
   max_transactions = {}
@@ -269,7 +303,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     logging.info('%s run command: %s', FLAGS.sysbench_testname, cmd)
     try:
       stdout, _ = client.RemoteCommand(
-          cmd, timeout=2*FLAGS.sysbench_run_seconds,)
+          cmd,
+          timeout=2 * FLAGS.sysbench_run_seconds,
+      )
     except errors.VirtualMachine.RemoteCommandError as e:
       logging.exception('Failed to run sysbench command: %s', e)
       continue
