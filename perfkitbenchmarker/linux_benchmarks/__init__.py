@@ -24,13 +24,17 @@ def _LoadBenchmarks():
   return list(import_util.LoadModulesForPath(__path__, __name__))
 
 
-BENCHMARKS = _LoadBenchmarks()
+ALL_FILES = _LoadBenchmarks()
+BENCHMARKS = []
 
 VALID_BENCHMARKS = {}
-for module in BENCHMARKS:
-  if module.BENCHMARK_NAME in VALID_BENCHMARKS:
-    raise ValueError(
-        'There are multiple benchmarks with BENCHMARK_NAME "%s"'
-        % (module.BENCHMARK_NAME)
-    )
-  VALID_BENCHMARKS[module.BENCHMARK_NAME] = module
+for module in ALL_FILES:
+  if module.__name__.endswith('_benchmark'):
+    if module.BENCHMARK_NAME in VALID_BENCHMARKS:
+      raise ValueError(
+          'There are multiple benchmarks with BENCHMARK_NAME "%s"'
+          % (module.BENCHMARK_NAME)
+      )
+    BENCHMARKS.append(module)
+    VALID_BENCHMARKS[module.BENCHMARK_NAME] = module
+

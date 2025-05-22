@@ -24,7 +24,7 @@ import time
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker.linux_benchmarks import fio_benchmark as linux_fio
+from perfkitbenchmarker.linux_benchmarks.fio import fio_benchmark as linux_fio
 from perfkitbenchmarker.windows_packages import fio
 
 

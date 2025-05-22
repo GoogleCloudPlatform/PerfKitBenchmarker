@@ -31,10 +31,10 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_benchmarks.fio import flags as fio_flags
 from perfkitbenchmarker.linux_packages import fio
 
 
@@ -97,196 +97,13 @@ FILL_TARGET_MODES = frozenset(
 )
 
 
-flags.DEFINE_string(
-    'fio_jobfile',
-    None,
-    'Job file that fio will use. If not given, use a job file '
-    'bundled with PKB. Cannot use with '
-    '--fio_generate_scenarios.',
-)
-flags.DEFINE_list(
-    'fio_generate_scenarios',
-    [],
-    'Generate a job file with the given scenarios. Special '
-    "scenario 'all' generates all scenarios. Available "
-    'scenarios are sequential_write, sequential_read, '
-    'random_write, and random_read. Cannot use with '
-    '--fio_jobfile.   You can also specify a scenario in the '
-    'format accesspattern_blocksize_operation_workingset '
-    'for a custom workload.',
-)
-flags.DEFINE_bool(
-    'fio_use_default_scenarios',
-    True,
-    'Use the legacy scenario tables defined in fio_benchmark.py '
-    'to resolve the scenario name in generate scenarios',
-)
-flags.DEFINE_enum(
-    'fio_target_mode',
-    AGAINST_FILE_WITHOUT_FILL_MODE,
-    [
-        AGAINST_DEVICE_WITH_FILL_MODE,
-        AGAINST_DEVICE_WITHOUT_FILL_MODE,
-        AGAINST_FILE_WITH_FILL_MODE,
-        AGAINST_FILE_WITHOUT_FILL_MODE,
-    ],
-    'Whether to run against a raw device or a file, and whether to prefill.',
-)
-flags.DEFINE_string(
-    'fio_fill_size',
-    '100%',
-    'The amount of device to fill in prepare stage. '
-    'The valid value can either be an integer, which '
-    'represents the number of bytes to fill or a '
-    'percentage, which represents the percentage '
-    'of the device. A filesystem will be unmounted before '
-    'filling and remounted afterwards. Only valid when '
-    '--fio_target_mode is against_device_with_fill or '
-    'against_file_with_fill.',
-)
-flags.DEFINE_string(
-    'fio_fill_block_size',
-    '512k',
-    'The block size of the IO request to fill in prepare stage. '
-    'A filesystem will be unmounted before '
-    'filling and remounted afterwards. Only valid when '
-    '--fio_target_mode is against_device_with_fill or '
-    'against_file_with_fill.',
-)
-flag_util.DEFINE_integerlist(
-    'fio_io_depths',
-    flag_util.IntegerList([1]),
-    'IO queue depths to run on. Can specify a single '
-    'number, like --fio_io_depths=1, a range, like '
-    '--fio_io_depths=1-4, or a list, like '
-    '--fio_io_depths=1-4,6-8',
-    on_nonincreasing=flag_util.IntegerListParser.WARN,
-    module_name=__name__,
-)
-flag_util.DEFINE_integerlist(
-    'fio_num_jobs',
-    flag_util.IntegerList([1]),
-    'Number of concurrent fio jobs to run.',
-    on_nonincreasing=flag_util.IntegerListParser.WARN,
-    module_name=__name__,
-)
-flags.DEFINE_integer(
-    'fio_working_set_size',
-    None,
-    'The size of the working set, in GB. If not given, use '
-    'the full size of the device. If using '
-    '--fio_generate_scenarios and not running against a raw '
-    'device, you must pass --fio_working_set_size.',
-    lower_bound=0,
-)
-flag_util.DEFINE_units(
-    'fio_blocksize',
-    None,
-    'The block size for fio operations. Default is given by '
-    'the scenario when using --fio_generate_scenarios. This '
-    'flag does not apply when using --fio_jobfile.',
-    convertible_to=units.byte,
-)
-flags.DEFINE_integer(
-    'fio_runtime',
-    600,
-    'The number of seconds to run each fio job for.',
-    lower_bound=1,
-)
-flags.DEFINE_integer(
-    'fio_ramptime',
-    10,
-    'The number of seconds to run the specified workload '
-    'before logging any performance numbers',
-    lower_bound=0,
-)
-flags.DEFINE_list(
-    'fio_parameters',
-    ['randrepeat=0'],
-    'Parameters to apply to all PKB generated fio jobs. Each '
-    'member of the list should be of the form "param=value".',
-)
-flags.DEFINE_boolean(
-    'fio_lat_log', False, 'Whether to collect a latency log of the fio jobs.'
-)
-flags.DEFINE_boolean(
-    'fio_bw_log', False, 'Whether to collect a bandwidth log of the fio jobs.'
-)
-flags.DEFINE_boolean(
-    'fio_iops_log', False, 'Whether to collect an IOPS log of the fio jobs.'
-)
-flags.DEFINE_integer(
-    'fio_log_avg_msec',
-    1000,
-    'By default, this will average each log entry in the '
-    'fio latency, bandwidth, and iops logs over the specified '
-    'period of time in milliseconds. If set to 0, fio will '
-    'log an entry for every IO that completes, this can grow '
-    'very quickly in size and can cause performance overhead.',
-    lower_bound=0,
-)
-flags.DEFINE_boolean(
-    'fio_hist_log', False, 'Whether to collect clat histogram.'
-)
-flags.DEFINE_integer(
-    'fio_log_hist_msec',
-    1000,
-    'Same as fio_log_avg_msec, but logs entries for '
-    'completion latency histograms. If set to 0, histogram '
-    'logging is disabled.',
-)
-flags.DEFINE_integer(
-    'fio_command_timeout_sec', None, 'Timeout for fio commands in seconds.'
-)
-flags.DEFINE_enum(
-    'fio_rng',
-    'tausworthe64',
-    ['tausworthe', 'lfsr', 'tausworthe64'],
-    'Which RNG to use for 4k Random IOPS.',
-)
-flags.DEFINE_enum(
-    'fio_ioengine',
-    'libaio',
-    ['libaio', 'windowsaio'],
-    'Defines how the job issues I/O to the file',
-)
-_FIO_RATE_BANDWIDTH_LIMIT = flags.DEFINE_string(
-    'fio_rate_bandwidth_limit',
-    None,
-    'The bandwidth cap in bytes/sec. For example, using '
-    'rate=1m caps bandwidth to 1MiB/sec.',
-)
-_FIO_INCLUDE_LATENCY_PERCENTILES = flags.DEFINE_boolean(
-    'fio_include_latency_percentiles',
-    True,
-    'Whether to include FIO latency stats.',
-)
-_DIRECT_IO = flags.DEFINE_boolean(
-    'fio_direct',
-    True,
-    'Whether to use O_DIRECT to bypass OS cache. This is strongly '
-    'recommended, but not supported by all files.',
-)
-
-
-FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = frozenset({
-    'fio_generate_scenarios',
-    'fio_io_depths',
-    'fio_runtime',
-    'fio_ramptime',
-    'fio_blocksize',
-    'fio_num_jobs',
-    'fio_parameters',
-})
-
-
 def AgainstDevice():
   """Check whether we're running against a device or a file.
 
   Returns:
     True if running against a device, False if running against a file.
   """
-  return FLAGS.fio_target_mode in AGAINST_DEVICE_MODES
+  return fio_flags.FIO_TARGET_MODE.value in AGAINST_DEVICE_MODES
 
 
 def FillTarget():
@@ -295,7 +112,7 @@ def FillTarget():
   Returns:
     True if we should pre-fill our target, False if not.
   """
-  return FLAGS.fio_target_mode in FILL_TARGET_MODES
+  return fio_flags.FIO_TARGET_MODE.value in FILL_TARGET_MODES
 
 
 def FillDevice(vm, disk, fill_size, exec_path):
@@ -310,8 +127,9 @@ def FillDevice(vm, disk, fill_size, exec_path):
 
   command = (
       f'{exec_path} --filename={disk.GetDevicePath()} '
-      f'--ioengine={FLAGS.fio_ioengine} --name=fill-device '
-      f'--blocksize={FLAGS.fio_fill_block_size} --iodepth=64 --rw=write --direct=1 --size={fill_size}'
+      f'--ioengine={fio_flags.FIO_IOENGINE.value} --name=fill-device '
+      f'--blocksize={fio_flags.FIO_FILL_BLOCK_SIZE.value} --iodepth=64 '
+      f'--rw=write --direct=1 --size={fill_size}'
   )
 
   vm.RobustRemoteCommand(command)
@@ -461,7 +279,7 @@ def GetScenarioFromScenarioString(scenario_string):
   # look for legacy entries in the scenario map first
   result = (
       SCENARIOS.get(scenario_string, None)
-      if FLAGS.fio_use_default_scenarios
+      if fio_flags.FIO_USE_DEFAULT_SCENARIOS.value
       else None
   )
   if result:
@@ -572,7 +390,7 @@ def GenerateJobFileString(
     The contents of a fio job file, as a string.
   """
 
-  if 'all' in scenario_strings and FLAGS.fio_use_default_scenarios:
+  if 'all' in scenario_strings and fio_flags.FIO_USE_DEFAULT_SCENARIOS.value:
     scenarios = SCENARIOS.values()
   else:
     scenarios = [
@@ -630,8 +448,8 @@ def GenerateJobFileString(
   disks_list = [{'index': 0}]
 
   for scenario in jinja_scenarios:
-    if _FIO_RATE_BANDWIDTH_LIMIT.value:
-      scenario['rate'] = _FIO_RATE_BANDWIDTH_LIMIT.value
+    if fio_flags.FIO_RATE_BANDWIDTH_LIMIT.value:
+      scenario['rate'] = fio_flags.FIO_RATE_BANDWIDTH_LIMIT.value
     scenario['target_raw_device'] = require_merge
 
     if require_merge and raw_files:
@@ -649,7 +467,7 @@ def GenerateJobFileString(
 
   return str(
       job_file_template.render(
-          ioengine=FLAGS.fio_ioengine,
+          ioengine=fio_flags.FIO_IOENGINE.value,
           runtime=runtime,
           ramptime=ramptime,
           filename=filename,
@@ -774,10 +592,10 @@ NEED_SIZE_MESSAGE = (
 def WarnOnBadFlags():
   """Warn the user if they pass bad flag combinations."""
 
-  if FLAGS.fio_jobfile:
+  if fio_flags.FIO_JOBFILE.value:
     ignored_flags = {
         '--' + flag_name
-        for flag_name in FLAGS_IGNORED_FOR_CUSTOM_JOBFILE
+        for flag_name in fio_flags.FLAGS_IGNORED_FOR_CUSTOM_JOBFILE
         if FLAGS[flag_name].present
     }
 
@@ -788,9 +606,9 @@ def WarnOnBadFlags():
       )
 
   if (
-      FLAGS.fio_jobfile is None
-      and FLAGS.fio_generate_scenarios
-      and not FLAGS.fio_working_set_size
+      fio_flags.FIO_JOBFILE.value is None
+      and fio_flags.FIO_GENERATE_SCENARIOS.value
+      and not fio_flags.FIO_WORKING_SET_SIZE.value
       and not AgainstDevice()
   ):
     logging.error(NEED_SIZE_MESSAGE)
@@ -799,7 +617,7 @@ def WarnOnBadFlags():
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  if FLAGS.fio_target_mode != AGAINST_FILE_WITHOUT_FILL_MODE:
+  if fio_flags.FIO_TARGET_MODE.value != AGAINST_FILE_WITHOUT_FILL_MODE:
     disk_spec = config['vm_groups']['default']['disk_spec']
     for cloud in disk_spec:
       disk_spec[cloud]['mount_point'] = None
@@ -808,22 +626,26 @@ def GetConfig(user_config):
 
 def GetLogFlags(log_file_base):
   """Gets fio log files."""
-  collect_logs = FLAGS.fio_lat_log or FLAGS.fio_bw_log or FLAGS.fio_iops_log
+  collect_logs = (
+      fio_flags.FIO_LAT_LOG.value
+      or fio_flags.FIO_BW_LOG.value
+      or fio_flags.FIO_IOPS_LOG.value
+  )
   fio_log_flags = [
       (
-          FLAGS.fio_lat_log,
+          fio_flags.FIO_LAT_LOG.value,
           '--write_lat_log=%(filename)s',
       ),
       (
-          FLAGS.fio_bw_log,
+          fio_flags.FIO_BW_LOG.value,
           '--write_bw_log=%(filename)s',
       ),
       (
-          FLAGS.fio_iops_log,
+          fio_flags.FIO_IOPS_LOG.value,
           '--write_iops_log=%(filename)s',
       ),
       (
-          FLAGS.fio_hist_log,
+          fio_flags.FIO_HIST_LOG.value,
           '--write_hist_log=%(filename)s',
       ),
       (
@@ -832,15 +654,15 @@ def GetLogFlags(log_file_base):
       ),
   ]
   fio_command_flags = ' '.join([flag for given, flag in fio_log_flags if given])
-  if FLAGS.fio_hist_log:
+  if fio_flags.FIO_HIST_LOG.value:
     fio_command_flags = ' '.join(
         [fio_command_flags, '--log_hist_msec=%(hist_interval)d']
     )
 
   return fio_command_flags % {
       'filename': log_file_base,
-      'interval': FLAGS.fio_log_avg_msec,
-      'hist_interval': FLAGS.fio_log_hist_msec,
+      'interval': fio_flags.FIO_LOG_AVG_MSEC.value,
+      'hist_interval': fio_flags.FIO_LOG_HIST_MSEC.value,
   }
 
 
@@ -885,9 +707,13 @@ def PrepareWithExec(vm, exec_path):
   if FillTarget():
     logging.info(
         'Fill devices %s on %s',
-        [disk.GetDevicePath() for disk in vm.scratch_disks], vm)
+        [disk.GetDevicePath() for disk in vm.scratch_disks],
+        vm,
+    )
     background_tasks.RunThreaded(
-        lambda disk: FillDevice(vm, disk, FLAGS.fio_fill_size, exec_path),
+        lambda disk: FillDevice(
+            vm, disk, fio_flags.FIO_FILL_SIZE.value, exec_path
+        ),
         vm.scratch_disks,
     )
 
@@ -898,15 +724,15 @@ def PrepareWithExec(vm, exec_path):
   if len(vm.scratch_disks) > 1:
     if not AgainstDevice():
       raise errors.Setup.InvalidSetupError(
-          f'Target mode {FLAGS.fio_target_mode} tests against 1 file, '
-          'but multiple scratch disks are configured.'
+          f'Target mode {fio_flags.FIO_TARGET_MODE.value} tests against 1 file,'
+          ' but multiple scratch disks are configured.'
       )
     return
 
   disk = vm.scratch_disks[0]
-  if FLAGS.fio_target_mode == AGAINST_FILE_WITH_FILL_MODE:
+  if fio_flags.FIO_TARGET_MODE.value == AGAINST_FILE_WITH_FILL_MODE:
     disk.mount_point = FLAGS.scratch_dir or MOUNT_POINT
-    disk_spec = vm.disk_specs[0]
+    disk_spec = vm.create_disk_strategy.disk_specs[0]
     vm.FormatDisk(disk.GetDevicePath(), disk_spec.disk_type)
     vm.MountDisk(
         disk.GetDevicePath(),
@@ -969,23 +795,22 @@ def RunWithExec(
   """
   logging.info('FIO running on %s', vm)
   if not fio_generate_scenarios:
-    fio_generate_scenarios = FLAGS.fio_generate_scenarios
+    fio_generate_scenarios = fio_flags.FIO_GENERATE_SCENARIOS.value
   disks = vm.scratch_disks
   require_merge = len(disks) > 1
-
   job_file_string = GetOrGenerateJobFileString(
-      FLAGS.fio_jobfile,
+      fio_flags.FIO_JOBFILE.value,
       fio_generate_scenarios,
       AgainstDevice(),
       disks,
       FLAGS.fio_io_depths,
       FLAGS.fio_num_jobs,
-      FLAGS.fio_working_set_size,
+      fio_flags.FIO_WORKING_SET_SIZE.value,
       FLAGS.fio_blocksize,
-      FLAGS.fio_runtime,
-      FLAGS.fio_ramptime,
-      _DIRECT_IO.value,
-      FLAGS.fio_parameters,
+      fio_flags.FIO_RUNTIME.value,
+      fio_flags.FIO_RAMPTIME.value,
+      fio_flags.DIRECT_IO.value,
+      fio_flags.FIO_PARAMETERS.value,
       job_file_contents,
       require_merge,
   )
@@ -1005,22 +830,22 @@ def RunWithExec(
       filename_parameter = f'--filename={filenames}'
     fio_command = (
         f'{exec_path} --output-format=json '
-        f'--random_generator={FLAGS.fio_rng} '
+        f'--random_generator={fio_flags.FIO_RNG.value} '
         f'{filename_parameter} {remote_job_file_path}'
     )
   else:
     assert(len(disks) == 1)
     fio_command = (
         f'{exec_path} --output-format=json '
-        f'--random_generator={FLAGS.fio_rng} '
+        f'--random_generator={fio_flags.FIO_RNG.value} '
         f'--directory={disks[0].mount_point} {remote_job_file_path}'
     )
 
   collect_logs = any([
-      FLAGS.fio_lat_log,
-      FLAGS.fio_bw_log,
-      FLAGS.fio_iops_log,
-      FLAGS.fio_hist_log,
+      fio_flags.FIO_LAT_LOG.value,
+      fio_flags.FIO_BW_LOG.value,
+      fio_flags.FIO_IOPS_LOG.value,
+      fio_flags.FIO_HIST_LOG.value,
   ])
 
   log_file_base = ''
@@ -1034,13 +859,13 @@ def RunWithExec(
   logging.info('FIO Results:')
   start_time = time.time()
   stdout, _ = vm.RobustRemoteCommand(
-      fio_command, timeout=FLAGS.fio_command_timeout_sec
+      fio_command, timeout=fio_flags.FIO_COMMAND_TIMEOUT_SEC.value
   )
   end_time = time.time()
   bin_vals = []
   if collect_logs:
     vm.PullFile(vm_util.GetTempDir(), '%s*.log' % log_file_base)
-    if FLAGS.fio_hist_log:
+    if fio_flags.FIO_HIST_LOG.value:
       num_logs = int(
           vm.RemoteCommand('ls %s_clat_hist.*.log | wc -l' % log_file_base)[0]
       )
@@ -1056,7 +881,7 @@ def RunWithExec(
       log_file_base=log_file_base,
       bin_vals=bin_vals,
       skip_latency_individual_stats=(
-          not _FIO_INCLUDE_LATENCY_PERCENTILES.value
+          not fio_flags.FIO_INCLUDE_LATENCY_PERCENTILES.value
       ),
       require_merge=require_merge
   )
@@ -1069,10 +894,10 @@ def RunWithExec(
   )
 
   for item in samples:
-    item.metadata['fio_target_mode'] = FLAGS.fio_target_mode
-    item.metadata['fio_fill_size'] = FLAGS.fio_fill_size
-    item.metadata['fio_fill_block_size'] = FLAGS.fio_fill_block_size
-    item.metadata['fio_rng'] = FLAGS.fio_rng
+    item.metadata['fio_target_mode'] = fio_flags.FIO_TARGET_MODE.value
+    item.metadata['fio_fill_size'] = fio_flags.FIO_FILL_SIZE.value
+    item.metadata['fio_fill_block_size'] = fio_flags.FIO_FILL_BLOCK_SIZE.value
+    item.metadata['fio_rng'] = fio_flags.FIO_RNG.value
 
   return samples
 
@@ -1091,7 +916,7 @@ def Cleanup(benchmark_spec):
 def CleanupVM(vm):
   logging.info('FIO Cleanup up on %s', vm)
   vm.RemoveFile(REMOTE_JOB_FILE_PATH)
-  if not AgainstDevice() and not FLAGS.fio_jobfile:
+  if not AgainstDevice() and not fio_flags.FIO_JOBFILE.value:
     # If the user supplies their own job file, then they have to clean
     # up after themselves, because we don't know their temp file name.
     vm.RemoveFile(posixpath.join(vm.GetScratchDir(), DEFAULT_TEMP_FILE_NAME))
