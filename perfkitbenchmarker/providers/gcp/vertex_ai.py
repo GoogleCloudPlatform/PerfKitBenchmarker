@@ -853,7 +853,7 @@ class VertexAiLlama2Spec(VertexAiModelSpec):
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
     # The pre-built serving docker images.
-    self.container_image_uri = 'us-docker.pkg.dev/vertex-ai/vertex-vision-model-garden-dockers/pytorch-vllm-serve:20240222_0916_RC00'
+    self.container_image_uri = 'us-docker.pkg.dev/vertex-ai/vertex-vision-model-garden-dockers/pytorch-vllm-serve:20240715_0916_RC00'
     self.serving_container_command = [
         'python',
         '-m',

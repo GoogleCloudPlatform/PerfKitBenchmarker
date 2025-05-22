@@ -91,7 +91,7 @@ class VertexAiCliInterfaceTest(VertexAiTest):
             'gcloud ai models upload --display-name=pkb123 --project=my-project'
             ' --region=us-west'
             ' --artifact-uri=gs://my-bucket/llama2/llama2-7b-hf'
-            ' --container-image-uri=us-docker.pkg.dev/vertex-ai/vertex-vision-model-garden-dockers/pytorch-vllm-serve:20240222_0916_RC00'
+            ' --container-image-uri=us-docker.pkg.dev/vertex-ai/vertex-vision-model-garden-dockers/pytorch-vllm-serve:20240715_0916_RC00'
             ' --container-command=python,-m,vllm.entrypoints.api_server'
             ' --container-args=--host=0.0.0.0,--port=7080,--swap-space=16,--gpu-memory-utilization=0.9,--max-model-len=1024,--max-num-batched-tokens=4096,--tensor-parallel-size=1'
             ' --container-ports=7080 --container-predict-route=/generate'
