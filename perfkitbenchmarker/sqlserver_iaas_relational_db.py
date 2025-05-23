@@ -211,6 +211,11 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
           "Only 2019 and 2022 are supported.".format(self.spec.engine_version)
       )
 
+    if self.server_vm.OS_TYPE == os_types.UBUNTU2404:
+      raise NotImplementedError(
+          "SQL Server is not supported on {}".format(self.server_vm.OS_TYPE)
+      )
+
     self.spec.database_username = "sa"
     self.spec.database_password = vm_util.GenerateRandomWindowsPassword(
         password_length=vm_util.PASSWORD_LENGTH, special_chars="*!@#+"
@@ -262,8 +267,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         "traceflag.traceflag 3979"
     )
 
-    if self.server_vm.OS_TYPE == os_types.DEFAULT:
-      self.server_vm.Install("mssql_tools")
+    self.server_vm.Install("mssql_tools")
 
     self.MoveSQLServerTempDBLinux()
     self.server_vm.RemoteCommand("sudo systemctl restart mssql-server")
