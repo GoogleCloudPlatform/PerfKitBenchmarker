@@ -121,7 +121,17 @@ NVME = 'NVME'
 FIXED_SSD_MACHINE_TYPES = {
     'z3-highmem-176': 12,
     'z3-highmem-88': 12,
+    'z3-highmem-14-standardlssd': 1,
+    'z3-highmem-22-standardlssd': 2,
+    'z3-highmem-44-standardlssd': 3,
     'z3-highmem-88-standardlssd': 6,
+    'z3-highmem-176-standardlssd': 12,
+    'z3-highmem-8-highlssd': 1,
+    'z3-highmem-16-highlssd': 2,
+    'z3-highmem-22-highlssd': 3,
+    'z3-highmem-32-highlssd': 4,
+    'z3-highmem-44-highlssd': 6,
+    'z3-highmem-88-highlssd': 12,
     'c3-standard-4-lssd': 1,
     'c3-standard-8-lssd': 2,
     'c3-standard-22-lssd': 4,
@@ -223,6 +233,17 @@ class GceDiskSpec(disk.BaseDiskSpec):
       config_values['create_with_vm'] = flag_values.gcp_create_disks_with_vm
     if flag_values['data_disk_zones'].present:
       config_values['replica_zones'] = flag_values.data_disk_zones
+    # Striping all the local ssd disks by default if --num_striped_disks is
+    # not set. num_striped_disks is set in config_values if --num_striped_disks
+    # is set.
+    if 'num_striped_disks' not in config_values and (
+        config_values.get('disk_type', '') == 'local'
+        and flag_values['machine_type'].present
+        and flag_values.machine_type in FIXED_SSD_MACHINE_TYPES
+    ):
+      config_values['num_striped_disks'] = FIXED_SSD_MACHINE_TYPES.get(
+          flag_values.machine_type, 1
+      )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
