@@ -28,6 +28,7 @@ import logging
 
 from absl import flags
 import numpy
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 
@@ -449,8 +450,10 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  vm = benchmark_spec.vms[0]
-  vm.InstallPackages('stress-ng')
+  vms = benchmark_spec.vms
+  def _Install(vm):
+    vm.InstallPackages('stress-ng')
+  background_tasks.RunThreaded(_Install, vms)
 
 
 def _ParseStressngResult(
@@ -609,6 +612,40 @@ def _RunWorkload(vm, num_threads):
   return samples
 
 
+def _RunStressNgOnVm(vm):
+  """Runs stress-ng on a single VM for all workloads and adds machine_instance metadata.
+
+  Args:
+    vm: The target vm to run on.
+
+  Returns:
+    A list of sample.Sample objects from this VM.
+  """
+  vm_samples = []
+  num_cpus = vm.NumCpusForBenchmark()
+
+  for workload_type in FLAGS.stress_ng_thread_workloads:
+    if workload_type == 'small':
+      threads_for_workload = 1
+    elif workload_type == 'medium':
+      threads_for_workload = max(1, int(num_cpus / 2))
+    elif workload_type == 'large':
+      threads_for_workload = num_cpus
+    else:
+      logging.warning(
+          'Unknown workload type: %s for VM %s',
+          workload_type,
+          vm.name,
+      )
+      continue
+
+    current_samples = _RunWorkload(vm, threads_for_workload)
+    for s in current_samples:
+      s.metadata['machine_instance'] = vm.name
+    vm_samples.extend(current_samples)
+  return vm_samples
+
+
 def Run(benchmark_spec):
   """Runs stress-ng on the target vm.
 
@@ -619,19 +656,14 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
+  vms = benchmark_spec.vms
+  results = background_tasks.RunThreaded(_RunStressNgOnVm, vms)
 
-  vm = benchmark_spec.vms[0]
+  all_samples = []
+  for vm_result in results:
+    all_samples.extend(vm_result)
 
-  samples = []
-  for workload in FLAGS.stress_ng_thread_workloads:
-    if workload == 'small':
-      samples.extend(_RunWorkload(vm, 1))
-    elif workload == 'medium':
-      samples.extend(_RunWorkload(vm, vm.NumCpusForBenchmark() / 2))
-    elif workload == 'large':
-      samples.extend(_RunWorkload(vm, vm.NumCpusForBenchmark()))
-
-  return samples
+  return all_samples
 
 
 def Cleanup(benchmark_spec):
@@ -641,5 +673,7 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  vm = benchmark_spec.vms[0]
-  vm.Uninstall('stress-ng')
+  vms = benchmark_spec.vms
+  def _Uninstall(vm):
+    vm.Uninstall('stress-ng')
+  background_tasks.RunThreaded(_Uninstall, vms)
