@@ -239,9 +239,11 @@ class BaseGkeCluster(container_service.KubernetesCluster):
 
   def GetNodePoolNames(self) -> list[str]:
     """Get node pool names for the cluster."""
-    cmd = self._GcloudCommand('container', 'node-pools', 'list')
-    cmd.flags['cluster'] = self.name
-    cmd.flags['format'] = 'value(name)'
+    # Command `gcloud container node-pools list` does not work for Autopilot
+    # clusters - node pools are hidden and command results in 4xx.
+    cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
+    cmd.flags['flatten'] = 'nodePools'
+    cmd.flags['format'] = 'value(nodePools.name)'
     stdout, _, _ = cmd.Issue()
     return stdout.split()
 

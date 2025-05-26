@@ -68,6 +68,8 @@ provision_node_pools:
     cloud: GCP
     type: Kubernetes
     vm_spec: *default_dual_core
+    # max_vm_count is used to compute proper cidr range for the cluster.
+    max_vm_count: 130
   flags:
     # Below flags are required to enable node autoprovisioning on GKE standard clusters
     # (100 init_batch + 20 test_batch + 10 buffer) * 4 cores

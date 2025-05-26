@@ -609,8 +609,12 @@ class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
 
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud container node-pools list', command_string)
-      self.assertIn('--cluster', command_string)
+      self.assertIn(
+          'gcloud container clusters describe ' + cluster.name,
+          command_string,
+      )
+      self.assertIn('--flatten', command_string)
+      self.assertIn('--format', command_string)
 
       expected = {
           'default-pool',
