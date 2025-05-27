@@ -132,6 +132,9 @@ _FIXED_GPU_MACHINE_TYPES = {
     'a3-highgpu-4g': (virtual_machine.GPU_H100, 4),
     'a3-highgpu-8g': (virtual_machine.GPU_H100, 8),
     'a3-megagpu-8g': (virtual_machine.GPU_H100, 8),
+    # B200 GPUs
+    # https://cloud.google.com/compute/docs/gpus#b200-gpus
+    'a4-highgpu-8g': (virtual_machine.GPU_B200, 8),
     # L4 GPUs
     # https://cloud.google.com/compute/docs/accelerator-optimized-machines#g2-vms
     'g2-standard-4': (virtual_machine.GPU_L4, 1),
