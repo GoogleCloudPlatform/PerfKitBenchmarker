@@ -1691,7 +1691,8 @@ def _GenerateBenchmarkDocumentation():
   """Generates benchmark documentation to show in --help."""
   benchmark_docs = []
   for benchmark_module in (
-      linux_benchmarks.BENCHMARKS + windows_benchmarks.BENCHMARKS
+      linux_benchmarks.BENCHMARKS
+      + windows_benchmarks.BENCHMARKS
   ):
     benchmark_config = configs.LoadMinimalConfig(
         benchmark_module.BENCHMARK_CONFIG, benchmark_module.BENCHMARK_NAME
