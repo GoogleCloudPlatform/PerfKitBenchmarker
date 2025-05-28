@@ -714,8 +714,8 @@ class AzureFirewall(network.BaseFirewall):
       source_range: unsupported at present.
     """
 
-    if vm.network.nsg:
-      vm.network.nsg.AllowPort(
+    for nsg in vm.network.nsgs:
+      nsg.AllowPort(
           vm, start_port, end_port=end_port, source_range=source_range
       )
 
@@ -730,7 +730,8 @@ class AzureFirewall(network.BaseFirewall):
       vm: The BaseVirtualMachine object to open the ICMP protocol for.
     """
 
-    vm.network.nsg.AllowIcmp()
+    for nsg in vm.network.nsgs:
+      nsg.AllowIcmp()
 
 
 class AzureNetwork(network.BaseNetwork):
@@ -811,18 +812,25 @@ class AzureNetwork(network.BaseNetwork):
     if len(vnet_name) > 64:
       vnet_name = prefix[:59] + '-vnet'
     self.vnet = AzureVirtualNetwork.GetForRegion(spec, self.region, vnet_name)
-    subnet_name = vnet_name
+    zone_suffix = ''
     if self.availability_zone:
-      subnet_name += '-' + self.availability_zone
-    subnet_name += '-subnet'
-    self.subnet = AzureSubnet(self.vnet, subnet_name)
-    if azure_flags.AZURE_SUBNET_ID.value:
+      zone_suffix = '-' + self.availability_zone
+    subnet_name_base = vnet_name + zone_suffix + '-subnet'
+    self.subnets = []
+    self.nsgs = []
+    # TODO(andytzhu) - query az vm list-skus to enforce upper bound.
+    for nic_num in range(azure_flags.AZURE_NIC_COUNT.value):
+      subnet_name = subnet_name_base + str(nic_num)
+      subnet = AzureSubnet(self.vnet, subnet_name)
+      self.subnets.append(subnet)
       # usage of an nsg is not currently supported with an existing subnet.
-      self.nsg = None
-    else:
-      self.nsg = AzureNetworkSecurityGroup(
-          self.region, self.subnet, self.subnet.name + '-nsg'
-      )
+      if not azure_flags.AZURE_SUBNET_ID.value:
+        nsg = AzureNetworkSecurityGroup(
+            self.region, subnet, subnet.name + '-nsg'
+        )
+        self.nsgs.append(nsg)
+    # TODO(andytzhu) - Replace self.subnet with self.subnets.
+    self.subnet = self.subnets[0]
 
   @vm_util.Retry(
       retryable_exceptions=(
@@ -847,11 +855,11 @@ class AzureNetwork(network.BaseNetwork):
 
     if self.vnet:
       self.vnet.Create()
-    if self.subnet:
-      self.subnet.Create()
-    if self.nsg:
-      self.nsg.Create()
-      self.nsg.AttachToSubnet()
+    for subnet in self.subnets:
+      subnet.Create()
+    for nsg in self.nsgs:
+      nsg.Create()
+      nsg.AttachToSubnet()
 
   def Delete(self):
     """Deletes the network."""

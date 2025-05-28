@@ -216,7 +216,7 @@ def Prepare(benchmark_spec):
           (PrepareClientVM, [client_vm], {}),
           (
               PrepareServerVM,
-              [server_vm, client_vm.internal_ip, client_vm.ip_address],
+              [server_vm, client_vm.GetInternalIPs(), client_vm.ip_address],
               {},
           ),
       ],
@@ -237,12 +237,12 @@ def PrepareClientVM(client_vm):
   client_vm.RemoteCommand(f'sudo chmod 755 {REMOTE_SCRIPT}')
 
 
-def PrepareServerVM(server_vm, client_vm_internal_ip, client_vm_ip_address):
+def PrepareServerVM(server_vm, client_vm_internal_ips, client_vm_ip_address):
   """Install netperf and start netserver processes on server_vm.
 
   Args:
     server_vm: The VM that runs the netserver binary.
-    client_vm_internal_ip: Internal IP address of client_vm.
+    client_vm_internal_ips: Internal IP addresses of client_vm.
     client_vm_ip_address: All IP addresses of client_vm.
   """
   num_streams = max(FLAGS.netperf_num_streams) * max(
@@ -251,7 +251,8 @@ def PrepareServerVM(server_vm, client_vm_internal_ip, client_vm_ip_address):
 
   # See comments where _COS_RE is defined.
   if server_vm.image and re.search(_COS_RE, server_vm.image):
-    _SetupHostFirewall(server_vm, client_vm_internal_ip, client_vm_ip_address)
+    for internal_ip in client_vm_internal_ips:
+      _SetupHostFirewall(server_vm, internal_ip, client_vm_ip_address)
 
   # Start the netserver processes
   if vm_util.ShouldRunOnExternalIpAddress():

@@ -342,6 +342,7 @@ class AzureNIC(resource.BaseResource):
   def __init__(
       self,
       network: azure_network.AzureNetwork,
+      subnet: azure_network.AzureSubnet,
       name: str,
       public_ip: str | None,
       accelerated_networking: bool,
@@ -349,13 +350,13 @@ class AzureNIC(resource.BaseResource):
   ):
     super().__init__()
     self.network = network
+    self.subnet = subnet
     self.name = name
     self.public_ip = public_ip
     self.private_ip = private_ip
     self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
     self.region = self.network.region
-    self.args = ['--nics', self.name]
     self.accelerated_networking = accelerated_networking
 
   def _Create(self):
@@ -365,16 +366,16 @@ class AzureNIC(resource.BaseResource):
         '--name', self.name
     ]  # pyformat: disable
     cmd += self.resource_group.args
-    if self.network.subnet.id:
+    if self.subnet.id:
       # pre-existing subnet from --azure_subnet_id
-      cmd += ['--subnet', self.network.subnet.id]
+      cmd += ['--subnet', self.subnet.id]
     else:
       # auto created subnet
       cmd += [
           '--vnet-name',
-          self.network.subnet.vnet.name,
+          self.subnet.vnet.name,
           '--subnet',
-          self.network.subnet.name,
+          self.subnet.name,
       ]
     if self.public_ip:
       cmd += ['--public-ip-address', self.public_ip]
@@ -382,8 +383,9 @@ class AzureNIC(resource.BaseResource):
       cmd += ['--private-ip-address', self.private_ip]
     if self.accelerated_networking:
       cmd += ['--accelerated-networking', 'true']
-    if self.network.nsg:
-      cmd += ['--network-security-group', self.network.nsg.name]
+    for nsg in self.network.nsgs:
+      if nsg.subnet.name == self.subnet.name:
+        cmd += ['--network-security-group', nsg.name]
     vm_util.IssueCommand(cmd)
 
   def _Exists(self):
@@ -673,8 +675,8 @@ class AzureVirtualMachine(
   host_map = collections.defaultdict(list)
 
   create_os_disk_strategy: azure_disk_strategies.AzureCreateOSDiskStrategy
-  nic: AzureNIC
-  public_ip: AzurePublicIPAddress | None = None
+  nics: list[AzureNIC] = []
+  public_ips: list[AzurePublicIPAddress] = []
   resource_group: azure_network.AzureResourceGroup
   low_priority: bool
   low_priority_status_code: int | None
@@ -709,20 +711,25 @@ class AzureVirtualMachine(
     self.resource_group = azure_network.GetResourceGroup()
 
     # Configure NIC
-    if self.assign_external_ip:
-      public_ip_name = self.name + '-public-ip'
-      self.public_ip = AzurePublicIPAddress(
-          self.region, self.availability_zone, public_ip_name
+    self.nics: list[AzureNIC] = []
+    self.public_ips: list[AzurePublicIPAddress] = []
+
+    public_ip_name = None
+    for nic_num, subnet in enumerate(self.network.subnets):
+      if self.assign_external_ip:
+        public_ip_name = self.name + '-public-ip' + str(nic_num)
+        public_ip = AzurePublicIPAddress(
+            self.region, self.availability_zone, public_ip_name
+        )
+        self.public_ips.append(public_ip)
+      nic = AzureNIC(
+          self.network,
+          subnet,
+          self.name + '-' + subnet.name + '-nic',
+          public_ip_name,
+          vm_spec.accelerated_networking,
       )
-    else:
-      public_ip_name = None
-      self.public_ip = None
-    self.nic: AzureNIC = AzureNIC(
-        self.network,
-        self.name + '-nic',
-        public_ip_name,
-        vm_spec.accelerated_networking,
-    )
+      self.nics.append(nic)
 
     self.storage_account = self.network.storage_account
     self.machine_type_is_confidential = any(
@@ -798,9 +805,10 @@ class AzureVirtualMachine(
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
-    if self.public_ip:
-      self.public_ip.Create()
-    self.nic.Create()
+    for public_ip in self.public_ips:
+      public_ip.Create()
+    for nic in self.nics:
+      nic.Create()
 
     if self.use_dedicated_host:
       with self._lock:
@@ -897,7 +905,8 @@ class AzureVirtualMachine(
         + security_args
         + secure_boot_args
         + self.resource_group.args
-        + self.nic.args
+        + ['--nics']
+        + [nic.name for nic in self.nics]
         + tag_args
     )
     if self.hypervisor_generation > 1:
@@ -1052,8 +1061,11 @@ class AzureVirtualMachine(
         self.name,
     ] + self.resource_group.args
     vm_util.IssueCommand(start_cmd)
-    if self.public_ip:
-      self.ip_address = self.public_ip.GetIPAddress()
+    if self.public_ips:
+      self.ip_address = self.public_ips[0].GetIPAddress()
+      self.ip_addresses = [
+          public_ip.GetIPAddress() for public_ip in self.public_ips
+      ]
 
   def _Stop(self):
     """Stops the VM."""
@@ -1115,9 +1127,13 @@ class AzureVirtualMachine(
         ]
         + self.resource_group.args
     )
-    self.internal_ip = self.nic.GetInternalIP()
-    if self.public_ip:
-      self.ip_address = self.public_ip.GetIPAddress()
+    self.internal_ip = self.nics[0].GetInternalIP()
+    self.internal_ips = [nic.GetInternalIP() for nic in self.nics]
+    if self.public_ips:
+      self.ip_address = self.public_ips[0].GetIPAddress()
+      self.ip_addresses = [
+          public_ip.GetIPAddress() for public_ip in self.public_ips
+      ]
 
   def SetupAllScratchDisks(self):
     """Set up all scratch disks of the current VM."""
@@ -1183,7 +1199,7 @@ class AzureVirtualMachine(
   def GetResourceMetadata(self):
     assert self.network is not None
     result = super().GetResourceMetadata()
-    result['accelerated_networking'] = self.nic.accelerated_networking
+    result['accelerated_networking'] = self.nics[0].accelerated_networking
     result['boot_disk_type'] = self.create_os_disk_strategy.disk.disk_type
     result['boot_disk_size'] = self.create_os_disk_strategy.disk.disk_size
     if self.network.placement_group:

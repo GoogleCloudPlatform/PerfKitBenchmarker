@@ -400,6 +400,7 @@
 -   Explicitly pass --maintenance-policy=MIGRATE to gcloud when
     --gce_migrate_on_maintenance is true (the default).
 -   Add support for configuring client readahead in Hadoop
+-   Add support for multiple NICs on Azure VMs.
 
 ### Bug fixes and maintenance updates:
 
