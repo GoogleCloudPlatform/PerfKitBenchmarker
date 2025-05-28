@@ -494,10 +494,16 @@ flags.DEFINE_list(
     'multiple zones.',
 )
 
-SPARK_BIGQUERY_CONNECTOR = flags.DEFINE_string(
-    'spark_bigquery_connector',
+SPARK_BIGQUERY_CONNECTOR_VERSION = flags.DEFINE_string(
+    'spark_bigquery_connector_version',
     None,
-    'The Spark BigQuery Connector jar to pass to the Spark Job',
+    'The Spark BigQuery Connector jar version to pass to the Spark Job.',
+)
+
+SPARK_BIGQUERY_CONNECTOR_URL = flags.DEFINE_string(
+    'spark_bigquery_connector_url',
+    None,
+    'The Spark BigQuery Connector url to pass to the Spark Job.',
 )
 
 AI_BUCKET_URI = flags.DEFINE_string(

@@ -146,14 +146,28 @@ class GcpDpbDataprocTestCase(pkb_common_test_case.PkbCommonTestCase):
   @mock.patch.object(
       vm_util, 'IssueCommand', return_value=('fake_stdout', 'fake_stderr', 0)
   )
-  def testCreateWithBQConnector(self, mock_issue):
-    FLAGS.spark_bigquery_connector = 'gs://custom-bq-libs/bqconnector.jar'
+  def testCreateWithBQConnectorUrl(self, mock_issue):
+    FLAGS.spark_bigquery_connector_url = 'gs://custom-bq-libs/bqconnector.jar'
     cluster = LocalGcpDpbDataproc(GetClusterSpec())
     cluster._Create()
     self.assertEqual(mock_issue.call_count, 1)
     command_string = ' '.join(mock_issue.call_args[0][0])
     self.assertIn(
         '--metadata SPARK_BQ_CONNECTOR_URL=gs://custom-bq-libs/bqconnector.jar',
+        command_string,
+    )
+
+  @mock.patch.object(
+      vm_util, 'IssueCommand', return_value=('fake_stdout', 'fake_stderr', 0)
+  )
+  def testCreateWithBQConnectorVersion(self, mock_issue):
+    FLAGS.spark_bigquery_connector_version = '0.42.1'
+    cluster = LocalGcpDpbDataproc(GetClusterSpec())
+    cluster._Create()
+    self.assertEqual(mock_issue.call_count, 1)
+    command_string = ' '.join(mock_issue.call_args[0][0])
+    self.assertIn(
+        '--metadata SPARK_BQ_CONNECTOR_VERSION=0.42.1',
         command_string,
     )
 
@@ -319,7 +333,9 @@ class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
         'dpb_hdfs_type': hdfs_type,
         'dpb_disk_size': 42,
         'dpb_service_zone': 'us-central1-a',
-        'dpb_job_properties': f'spark.executor.cores=4,spark.driver.cores=4,spark.executor.instances=4,spark.dynamicAllocation.minExecutors=2,spark.dynamicAllocation.maxExecutors=10,spark.dataproc.driver.disk.size=42g,spark.dataproc.executor.disk.size=42g,spark.dataproc.driver.disk.tier={tier},spark.dataproc.executor.disk.tier={tier},spark.dataproc.driver.compute.tier={tier},spark.dataproc.executor.compute.tier={tier},spark.driver.memory=10000m,spark.executor.memory=10000m,spark.driver.memoryOverhead=4000m,spark.executor.memoryOverhead=4000m',
+        'dpb_job_properties': (
+            f'spark.executor.cores=4,spark.driver.cores=4,spark.executor.instances=4,spark.dynamicAllocation.minExecutors=2,spark.dynamicAllocation.maxExecutors=10,spark.dataproc.driver.disk.size=42g,spark.dataproc.executor.disk.size=42g,spark.dataproc.driver.disk.tier={tier},spark.dataproc.executor.disk.tier={tier},spark.dataproc.driver.compute.tier={tier},spark.dataproc.executor.compute.tier={tier},spark.driver.memory=10000m,spark.executor.memory=10000m,spark.driver.memoryOverhead=4000m,spark.executor.memoryOverhead=4000m'
+        ),
         'dpb_off_heap_memory_per_node': 'default',
         'dpb_runtime_engine': 'spark',
     }
@@ -384,6 +400,8 @@ class GcpDpbDataprocServerlessTest(pkb_common_test_case.PkbCommonTestCase):
                 '--quiet',
                 '--region',
                 'us-central1',
+                '--ttl',
+                't240m',
                 '--version',
                 'fake-4.2',
                 '--',

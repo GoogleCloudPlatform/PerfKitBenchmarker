@@ -269,9 +269,13 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
 
     metadata = util.GetDefaultTags()
     metadata.update(flag_util.ParseKeyValuePairs(FLAGS.gcp_instance_metadata))
-    if gcp_flags.SPARK_BIGQUERY_CONNECTOR.value:
+    if gcp_flags.SPARK_BIGQUERY_CONNECTOR_URL.value:
       metadata['SPARK_BQ_CONNECTOR_URL'] = (
-          gcp_flags.SPARK_BIGQUERY_CONNECTOR.value
+          gcp_flags.SPARK_BIGQUERY_CONNECTOR_URL.value
+      )
+    if gcp_flags.SPARK_BIGQUERY_CONNECTOR_VERSION.value:
+      metadata['SPARK_BQ_CONNECTOR_VERSION'] = (
+          gcp_flags.SPARK_BIGQUERY_CONNECTOR_VERSION.value
       )
     cmd.flags['metadata'] = util.FormatTags(metadata)
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
@@ -599,6 +603,8 @@ class GcpDpbDataprocServerless(
     if FLAGS.gcp_dataproc_image:
       cmd.flags['container-image'] = FLAGS.gcp_dataproc_image
 
+    cmd.flags['ttl'] = f't{FLAGS.timeout_minutes}m'
+
     all_properties = self.GetJobProperties()
     all_properties.update(properties or {})
     if all_properties:
@@ -703,6 +709,14 @@ class GcpDpbDataprocServerless(
       )
     if self.spec.dataproc_serverless_runtime_engine == 'native':
       result['spark.dataproc.runtimeEngine'] = 'native'
+    if gcp_flags.SPARK_BIGQUERY_CONNECTOR_URL.value:
+      result['dataproc.sparkBqConnector.uri'] = (
+          gcp_flags.SPARK_BIGQUERY_CONNECTOR_URL.value
+      )
+    if gcp_flags.SPARK_BIGQUERY_CONNECTOR_VERSION.value:
+      result['dataproc.sparkBqConnector.version'] = (
+          gcp_flags.SPARK_BIGQUERY_CONNECTOR_VERSION.value
+      )
     result.update(super().GetJobProperties())
     return result
 
