@@ -139,7 +139,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       'mongodb.upsert': True,
       'core_workload_insertion_retry_limit': 10,
   })
-  if _BATCH_SIZE.value:
+  if _BATCH_SIZE.value and _BATCH_SIZE.value > 1:
     load_kwargs['batchsize'] = _BATCH_SIZE.value
   return executor.Load(clients, load_kwargs=load_kwargs)
 
