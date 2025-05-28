@@ -400,9 +400,14 @@ def _InjectBenchmarkInfoIntoDocumentation():
 
 
 def _ParseFlags(argv):
-  """Parses the command-line flags."""
+  """Parses the command-line flags and returns the positional arguments."""
   try:
     argv = FLAGS(argv)
+    if len(argv) > 1:
+      raise flags.ValidationError(
+          f'Unexpected positional arguments: {argv[1:]}'
+      )
+    return argv
   except flags.Error as e:
     logging.error(e)
     logging.info('For usage instructions, use --helpmatch={module_name}')
@@ -1863,10 +1868,19 @@ def CaptureVMLogs(
         log_util.CollectVMLogs(FLAGS.run_uri, log_path)
 
 
-def ParseArgs():
-  """Parse command line arguments ."""
-  argv = flag_alias.AliasFlagsFromArgs(sys.argv)
-  _ParseFlags(argv)
+def ParseArgs(argv):
+  """Parse command line flags and returns positional arguments."""
+  canonical_argv = flag_alias.AliasFlagsFromArgs(argv)
+  return _ParseFlags(canonical_argv)
+
+
+def Main(argv):
+  """Entrypoint for PerfKitBenchmarker."""
+  del argv  # Unused.
+  assert sys.version_info >= (3, 11), 'PerfKitBenchmarker requires Python 3.11+'
+  log_util.ConfigureBasicLogging()
+  _InjectBenchmarkInfoIntoDocumentation()
+
   if FLAGS.helpmatch:
     _PrintHelp(FLAGS.helpmatch)
     return 0
@@ -1882,12 +1896,4 @@ def ParseArgs():
 
   CheckVersionFlag()
   SetUpPKB()
-
-
-def Main():
-  """Entrypoint for PerfKitBenchmarker."""
-  assert sys.version_info >= (3, 11), 'PerfKitBenchmarker requires Python 3.11+'
-  log_util.ConfigureBasicLogging()
-  _InjectBenchmarkInfoIntoDocumentation()
-  ParseArgs()
   return RunBenchmarks()
