@@ -437,6 +437,12 @@ RETRY_GCE_SUBNETWORK_NOT_READY = flags.DEFINE_boolean(
     True,
     'Retry Subnetwork not ready when provisioning resources.',
 )
+GCE_RESERVATION_ID = flags.DEFINE_string(
+    'gce_reservation_id',
+    None,
+    'ID of a capacity reservation to use when creating an instance',
+)
+
 
 # Flags required by dataflow_template provider
 flags.DEFINE_string(

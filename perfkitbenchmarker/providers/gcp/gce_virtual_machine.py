@@ -845,6 +845,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           gcp_flags.GCE_PERFORMANCE_MONITORING_UNIT.value
       )
 
+    if gcp_flags.GCE_RESERVATION_ID.value:
+      cmd.flags['reservation'] = gcp_flags.GCE_RESERVATION_ID.value
+      cmd.flags['reservation-affinity'] = 'specific'
+
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     return cmd
@@ -1267,6 +1271,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     for disk_ in self.disks:
       result.update(disk_.GetResourceMetadata())
+
+    if gcp_flags.GCE_RESERVATION_ID.value:
+      result['reservation_id'] = gcp_flags.GCE_RESERVATION_ID.value
+
     return result
 
   def SimulateMaintenanceWithLog(self):
