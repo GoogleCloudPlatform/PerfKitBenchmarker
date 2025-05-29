@@ -849,6 +849,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['reservation'] = gcp_flags.GCE_RESERVATION_ID.value
       cmd.flags['reservation-affinity'] = 'specific'
 
+    if gcp_flags.GCE_PROVISIONING_MODEL.value:
+      cmd.flags['provisioning-model'] = gcp_flags.GCE_PROVISIONING_MODEL.value
+
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     return cmd
@@ -1274,6 +1277,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if gcp_flags.GCE_RESERVATION_ID.value:
       result['reservation_id'] = gcp_flags.GCE_RESERVATION_ID.value
+
+    if gcp_flags.GCE_PROVISIONING_MODEL.value:
+      result['provisioning_model'] = gcp_flags.GCE_PROVISIONING_MODEL.value
 
     return result
 

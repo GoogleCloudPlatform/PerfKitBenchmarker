@@ -403,6 +403,7 @@
 -   Add support for configuring client readahead in Hadoop
 -   Add support for multiple NICs on Azure VMs.
 -   Add support for specifying a Reservation ID for GCE
+-   Add support for specifying GCE provisioning model
 
 ### Bug fixes and maintenance updates:
 

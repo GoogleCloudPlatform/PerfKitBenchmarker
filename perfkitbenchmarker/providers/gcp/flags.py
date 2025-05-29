@@ -443,6 +443,12 @@ GCE_RESERVATION_ID = flags.DEFINE_string(
     'ID of a capacity reservation to use when creating an instance',
 )
 
+GCE_PROVISIONING_MODEL = flags.DEFINE_enum(
+    'gce_provisioning_model',
+    None,
+    ['STANDARD', 'SPOT', 'RESERVATION_BOUND'],
+    'Provisioning model for GCE VM instances.',
+)
 
 # Flags required by dataflow_template provider
 flags.DEFINE_string(
