@@ -20,7 +20,7 @@ from absl import flags
 FLAGS = flags.FLAGS
 
 VERSION = flags.DEFINE_string(
-    'mongodb_version', '7.0', 'Version of mongodb package.'
+    'mongodb_version', '8.0', 'Version of mongodb package.'
 )
 
 
