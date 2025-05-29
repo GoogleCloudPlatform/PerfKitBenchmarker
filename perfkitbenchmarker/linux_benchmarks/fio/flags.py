@@ -1,3 +1,16 @@
+# Copyright 2025 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 """Flags for fio benchmark."""
 
 from absl import flags
@@ -191,19 +204,25 @@ FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = frozenset({
 
 FIO_LATENCY_TARGET = flags.DEFINE_integer(
     'latency_target',
-    None,
-    '',
+    2000,
+    'Fio latency target in microseconds.',
 )
-FIO_LATENCY_PERCENTILE = flags.DEFINE_integer(
+FIO_LATENCY_PERCENTILE = flags.DEFINE_float(
     'latency_percentile',
-    None,
-    '',
+    99,
+    'Fio latency percentile.',
 )
 
-FIO_LATENCY_WINDOW = flags.DEFINE_integer(
+FIO_LATENCY_WINDOW = flags.DEFINE_string(
     'latency_window',
-    None,
-    '',
+    '30s',
+    'Fio latency window is sample window, fio will run each depth for this'
+    ' duration. In microseconds if unit not specified.',
+)
+FIO_LATENCY_RUN = flags.DEFINE_integer(
+    'latency_run',
+    0,
+    'Fio latency run, 0 to disable and 1 to enable.',
 )
 
 FIO_SEPARATE_JOBS_FOR_DISKS = flags.DEFINE_bool(

@@ -1,0 +1,40 @@
+# This fio job is to measure IOPS under latency SLA. It is not a timebased fio
+# run to allow fio to manage and adjust iodepth. No runtime is required.
+[global]
+ioengine={{ioengine}}
+invalidate=1
+ramp_time={{ramptime}}
+direct={{direct}}
+filename={{filename}}
+do_verify=0
+verify_fatal=0
+group_reporting=1
+percentile_list=1:5:10:20:25:30:40:50:60:70:75:80:90:95:99:99.5:99.9:99.95:99.99
+randrepeat=0
+latency_target={{extra_params['latency_target']}}
+latency_percentile={{extra_params['latency_percentile']}}
+latency_window={{extra_params['latency_window']}}
+{%- if extra_params['latency_run'] == 1 %}
+latency_run={{extra_params['latency_run']}}
+runtime={{runtime}}
+{%- endif%}
+
+
+{%- for scenario in scenarios %}
+
+{%- for pair in disks_list %}
+
+[{{scenario['name']}}-io-depth-{{scenario['iodepth']}}-num-jobs-{{scenario['numjobs']}}{%- if separate_jobs == True %}.{{pair['index']}}{%- endif%}]
+{%- if pair['index'] == 0 %}
+stonewall
+{%- endif%}
+rw={{scenario['rwkind']}}
+blocksize={{scenario['blocksize']}}
+iodepth={{scenario['iodepth']}}
+size={{scenario['size']}}
+numjobs={{scenario['numjobs']}}
+{%- if pair['disk_filename'] is defined %}
+filename={{pair['disk_filename']}}
+{%- endif%}
+{%- endfor %}
+{%- endfor %}
