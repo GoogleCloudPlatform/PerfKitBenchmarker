@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from absl import app
-from perfkitbenchmarker import pkb
+import sys
 
+from perfkitbenchmarker.pkb import Main
 
-app.run(pkb.Main, flags_parser=pkb.ParseArgs)
+sys.exit(Main())

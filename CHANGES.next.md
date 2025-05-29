@@ -582,8 +582,6 @@
 -   Update GCE VM creation command logic to allow creating
     z3-highmem-88-standardlssd
 -   Slightly more robust Exists check for GCE VMs.
--   \_\_main\_\_.py calls absl.app.run(Main) as the entrypoint; unexpected
-    positional args are rejected rather than silently ignored
 -   Added `sysbench_thread_init_timeout` flag to allow higher timeout limit when
     initializing a high thread count (eg. 2048)
 -   Add Fio benchmark to measure IOPS under latency SLA
