@@ -56,9 +56,14 @@ try {
     -AllocationUnitSize 65536 -ProvisioningType 'Fixed' `
     -UseMaximumSize
 
+  Invoke-Command -ComputerName $ad_dc.HostName -Credential $domainCredential -ArgumentList $ad_dc.HostName -ScriptBlock {
+      $fileShareWitness = "\\$($args[0])\QWitness"
+      Set-ClusterQuorum -FileShareWitness $fileShareWitness -Cluster sql-fci
+  }
+
   Write-Host 'Verify Cluster'
   Invoke-Command -ComputerName $ad_dc.HostName -Credential $domainCredential -ArgumentList $node1,$node2 -ScriptBlock {
-        Test-Cluster -Node $args[0],$args[1] -Confirm:0;
+    Test-Cluster -Node $args[0],$args[1] -Confirm:0;
   }
   Write-Host 'Add SQL service account'
   Invoke-Command -ComputerName $ad_dc.HostName -Credential $domainCredential -ArgumentList $passwordSecureString -ScriptBlock {
