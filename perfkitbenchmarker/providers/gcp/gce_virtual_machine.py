@@ -1813,7 +1813,7 @@ class CosDevBasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
 
 
 class Cos121BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
-  OS_TYPE = os_types.COS117
+  OS_TYPE = os_types.COS121
   DEFAULT_X86_IMAGE_FAMILY = 'cos-121-lts'
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-121-lts'
 
