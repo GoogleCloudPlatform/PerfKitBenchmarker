@@ -232,6 +232,7 @@
     and snapshot restore time.
 -   Add support for Managed MongoDB services and a YCSB benchmark.
 -   Add ESRally (Elasticsearch Rally) benchmark.
+-   Add ability to collect memory size according to lsmem with --collect_lsmem.
 
 ### Enhancements:
 

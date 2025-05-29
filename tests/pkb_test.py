@@ -356,6 +356,67 @@ class TestMiscFunctions(
     self.assertSampleListsEqualUpToTimestamp([expected_sample], samples)
     vm.RemoteCommand.assert_called_with('cat /proc/meminfo')
 
+  def testCollectLsmemHandlerDefault(self):
+    # must set --collect_lsmem to collect samples
+    vm = mock.Mock()
+    benchmark_spec = mock.Mock(vms=[vm])
+    samples = []
+
+    pkb._CollectLsmemHandler(None, benchmark_spec, samples)
+
+    self.assertEmpty(samples)
+    vm.RemoteCommand.assert_not_called()
+
+  @flagsaver.flagsaver(collect_lsmem=True)
+  def testCollectLsmemHandlerIgnoreWindows(self):
+    vm = mock.Mock()
+    vm.OS_TYPE = 'windows2019_desktop'
+    benchmark_spec = mock.Mock(vms=[vm])
+    samples = []
+
+    pkb._CollectLsmemHandler(None, benchmark_spec, samples)
+
+    self.assertEmpty(samples)
+    vm.RemoteCommand.assert_not_called()
+
+  @flagsaver.flagsaver(collect_lsmem=True)
+  def testCollectLsmemHandler(self):
+    vm = mock.Mock()
+    vm.RemoteCommand.return_value = (
+        """{
+           "memory": [
+              {
+                 "size": 3221225472
+              },{
+                 "size": 134217728000
+              }
+           ]
+        }
+        """,
+        '',
+    )
+    vm.name = 'pkb-1234-0'
+    vm.OS_TYPE = 'ubuntu2004'
+    vm.machine_type = 'n1-standard-2'
+    benchmark_spec = mock.Mock(vms=[vm])
+    samples = []
+
+    pkb._CollectLsmemHandler(None, benchmark_spec, samples)
+
+    expected_metadata = {
+        'lsmem_machine_type': 'n1-standard-2',
+        'lsmem_os_type': 'ubuntu2004',
+        'lsmem_vmname': 'pkb-1234-0',
+    }
+    expected_sample = sample.Sample(
+        'lsmem_memory_size',
+        3221225472 + 134217728000,
+        'bytes',
+        expected_metadata,
+    )
+    self.assertSampleListsEqualUpToTimestamp([expected_sample], samples)
+    vm.RemoteCommand.assert_called_with('lsmem -b -J -o SIZE')
+
   def test_IsException_subclass(self):
     e = errors.Resource.CreationInternalError('internal error')
     self.assertTrue(pkb._IsException(e, errors.Resource.CreationInternalError))

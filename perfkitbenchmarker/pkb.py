@@ -1849,6 +1849,69 @@ def _CollectMeminfoHandler(
   samples.extend(background_tasks.RunThreaded(CollectMeminfo, linux_vms))
 
 
+@events.benchmark_samples_created.connect
+def _CollectLsmemHandler(
+    unused_sender,
+    benchmark_spec: bm_spec.BenchmarkSpec,
+    samples: List[sample.Sample],
+) -> None:
+  """Optionally creates lsmem sample of VM total memory.
+
+  If the flag --collect_lsmem is set, this function appends a sample.Sample of
+  total memory
+  size.
+
+  Parameter names cannot be changed as the method is called by events.send with
+  keyword arguments.
+
+  Args:
+    benchmark_spec: The benchmark spec.
+    samples: Generated samples that can be appended to.
+  """
+  if not pkb_flags.COLLECT_LSMEM.value:
+    return
+
+  def CollectLsmem(vm):
+    txt, _ = vm.RemoteCommand('lsmem -b -J -o SIZE')
+    try:
+      lsmem_json = json.loads(txt)
+    except json.JSONDecodeError:
+      logging.error('Failed to parse lsmem output: %s', txt)
+      return sample.Sample(
+          'lsmem_memory_size',
+          0,
+          'bytes',
+          {'lsmem_vmname': vm.name, 'lsmem_malformed': txt},
+      )
+    memory_bytes = 0
+    for memory_chunk in lsmem_json.get('memory', []):
+      memory_bytes += memory_chunk.get('size')
+    if not memory_bytes:
+      logging.error('Failed to parse memory size from lsmem')
+      return sample.Sample(
+          'lsmem_memory_size',
+          0,
+          'bytes',
+          {'lsmem_vmname': vm.name, 'lsmem_malformed': lsmem_json},
+      )
+    return sample.Sample(
+        'lsmem_memory_size',
+        memory_bytes,
+        'bytes',
+        {
+            'lsmem_vmname': vm.name,
+            'lsmem_machine_type': vm.machine_type,
+            'lsmem_os_type': vm.OS_TYPE,
+        },
+    )
+
+  linux_vms = [
+      vm for vm in benchmark_spec.vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES
+  ]
+
+  samples.extend(background_tasks.RunThreaded(CollectLsmem, linux_vms))
+
+
 def CaptureVMLogs(
     vms: List[virtual_machine.BaseVirtualMachine],
 ) -> None:
