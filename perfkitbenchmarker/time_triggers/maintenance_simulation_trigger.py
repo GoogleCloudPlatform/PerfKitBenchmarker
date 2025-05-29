@@ -70,7 +70,7 @@ SIMULATE_MAINTENANCE_DELAY = flags.DEFINE_integer(
 
 MAINTENANCE_DEGRADATION_WINDOW = flags.DEFINE_float(
     'maintenance_degradation_window',
-    0,
+    None,
     'Multiple of LM duration to consider the degradation after LM starts.',
 )
 
@@ -221,10 +221,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
         if time <= lm_start:
           base_line_values.extend(interval_values)
         else:
-          if (
-              MAINTENANCE_DEGRADATION_WINDOW.value is not None
-              and MAINTENANCE_DEGRADATION_WINDOW.value > 0
-          ):
+          if MAINTENANCE_DEGRADATION_WINDOW.value is not None:
             window = MAINTENANCE_DEGRADATION_WINDOW.value
             assert 1 <= window <= 10, (
                 'maintenance_degradation_window must be between 1 and 10'
