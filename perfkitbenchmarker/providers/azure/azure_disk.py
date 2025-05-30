@@ -22,6 +22,7 @@ information about azure disks.
 
 import itertools
 import json
+import logging
 import re
 import threading
 import time
@@ -165,6 +166,8 @@ class AzureDisk(disk.BaseDisk):
     self.vm = vm
     self.vm_name = vm.name
     self.name = self.vm_name + str(lun)
+    if self.spec.snapshot_name:
+      self.name += f'-{self.spec.snapshot_name}-restore'
     self.zone = vm.zone
     self.availability_zone = vm.availability_zone
     self.region = util.GetRegionFromZone(self.zone)
@@ -217,8 +220,12 @@ class AzureDisk(disk.BaseDisk):
           'Availability zones are specified with zone-\\d  e.g. '
           'eastus1-2 for availability zone 2 in zone eastus1'
       )
+    snapshot_args = []
+    # Used for disk_snapshot_benchmark.
+    if self.spec.snapshot_name:
+      snapshot_args = ['--source', self.spec.snapshot_name]
     with self._lock:
-      if FLAGS.azure_attach_disk_with_create:
+      if FLAGS.azure_attach_disk_with_create and not snapshot_args:
         cmd = [
             azure.AZURE_PATH,
             'vm',
@@ -239,21 +246,25 @@ class AzureDisk(disk.BaseDisk):
             str(self.disk_size),
         ] + self.resource_group.args
       else:
-        cmd = [
-            azure.AZURE_PATH,
-            'disk',
-            'create',
-            '--name',
-            self.name,
-            '--size-gb',
-            str(self.disk_size),
-            '--sku',
-            self.disk_type,
-            '--location',
-            self.region,
-            '--zone',
-            self.availability_zone,
-        ] + self.resource_group.args
+        cmd = (
+            [
+                azure.AZURE_PATH,
+                'disk',
+                'create',
+                '--name',
+                self.name,
+                '--size-gb',
+                str(self.disk_size),
+                '--sku',
+                self.disk_type,
+                '--location',
+                self.region,
+                '--zone',
+                self.availability_zone,
+            ]
+            + snapshot_args
+            + self.resource_group.args
+        )
       self.create_disk_start_time = time.time()
       _, stderr, retcode = vm_util.IssueCommand(
           cmd, raise_on_failure=False, timeout=600
@@ -310,6 +321,9 @@ class AzureDisk(disk.BaseDisk):
 
   def _Delete(self):
     """Deletes the disk."""
+    if self.snapshots:
+      for snapshot in self.snapshots:
+        snapshot.Delete()
     assert not self.is_image
     self._deleted = True
 
@@ -417,6 +431,164 @@ class AzureDisk(disk.BaseDisk):
       return self.vm.SupportsNVMe()
     else:
       return False
+
+  def CreateSnapshot(self):
+    """Creates a snapshot of the disk."""
+    snapshot = AzureDiskSnapshot(self, len(self.snapshots) + 1)
+    snapshot.Create()
+    self.snapshots.append(snapshot)
+
+
+class AzureDiskSnapshot(disk.DiskSnapshot):
+  """Object representing a Azure Disk Snapshot.
+
+  Attributes:
+    source_disk: The AzureDisk object that the snapshot is created from.
+    disk_spec: The disk spec of the source disk.
+    source_disk_name: The name of the source disk.
+    source_disk_size: The size of the source disk.
+    source_disk_type: The type of the source disk.
+    snapshot_num: The number of the snapshot.
+    name: The name of the snapshot.
+    zone: The zone of the source disk.
+    region: The region of the source disk.
+    storage_gb: The storage used by the snapshot in GB.
+    restore_disks: A list of GceDisk objects created from the snapshot.
+    num_restore_disks: The number of disks restored from this snapshot.
+  """
+
+  def __init__(self, source_disk, snapshot_num):
+    super().__init__()
+    self.source_disk = source_disk
+    self.disk_spec = source_disk.spec
+    self.source_disk_name = source_disk.name
+    self.source_disk_size = source_disk.disk_size
+    self.source_disk_type = source_disk.disk_type
+    self.snapshot_num = snapshot_num
+    self.name = f'disk-snapshot-{self.source_disk_name}-{self.snapshot_num}'
+    self.zone = source_disk.zone
+    self.region = util.GetRegionFromZone(self.zone)
+    self.resource_group = source_disk.resource_group
+
+  def _Create(self):
+    """Creates a snapshot of the disk.
+
+    Raises:
+      errors.VmUtil.CalledProcessException: When the command returns a non-zero
+      exit code.
+    """
+    create_cmd = [
+        azure.AZURE_PATH,
+        'snapshot',
+        'create',
+        '--name',
+        self.name,
+        '--source',
+        self.source_disk_name,
+        '--incremental',
+        'true',
+    ] + self.resource_group.args
+
+    logging.info(
+        'Creating snapshot for Azure disk %s.',
+        self.source_disk_name,
+    )
+    self.creation_start_time = time.time()
+    create_stdout, create_stderr, create_retcode = vm_util.IssueCommand(
+        create_cmd, raise_on_failure=False
+    )
+    self.creation_end_time = self._Describe()
+    update_cmd = [
+        azure.AZURE_PATH,
+        'snapshot',
+        'update',
+        '--name',
+        self.name,
+        '--set',
+        util.GetTagsJson(self.resource_group.timeout_minutes),
+    ] + self.resource_group.args
+    vm_util.IssueCommand(
+        update_cmd, raise_on_failure=False
+    )
+
+    if create_retcode:
+      debug_text = 'Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' % (
+          ' '.join(create_cmd),
+          create_retcode,
+          create_stdout,
+          create_stderr,
+      )
+      raise errors.VmUtil.CalledProcessException(
+          'Command returned a non-zero exit code:\n{}'.format(debug_text)
+      )
+
+  # Snapshots take hours to complete.
+  @vm_util.Retry(
+      poll_interval=5,
+      max_retries=-1,
+      timeout=10800,
+      log_errors=True,
+      retryable_exceptions=(errors.Resource.RetryableCreationError,),
+  )
+  def _Describe(self):
+    """Describe the snapshot, storing the storage size in GB.
+
+    Returns:
+        float: The time when the snapshot was created.
+
+    Raises:
+        errors.Resource.RetryableCreationError: If the snapshot is not created
+        and ready.
+    """
+    cmd = [
+        azure.AZURE_PATH,
+        'snapshot',
+        'show',
+        '--name',
+        self.name,
+    ] + self.resource_group.args
+    stdout, _, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    result = json.loads(stdout)
+    snapshot_state = result['provisioningState']
+    snapshot_status = int(result['completionPercent'])
+    if (snapshot_state == 'Succeeded') and (snapshot_status == 100):
+      logging.info(
+          'Disk %s snapshot %s has completed.',
+          self.source_disk_name,
+          self.name,
+      )
+      return time.time()
+
+    raise errors.Resource.RetryableCreationError()
+
+  def Restore(self):
+    """Creates a disk from the snapshot."""
+    self.restore_disk_name = f'{self.name}-restore-{self.num_restore_disks}'
+    self.disk_spec.snapshot_name = self.name
+    restore_disk = AzureDisk(
+        self.disk_spec, self.source_disk.vm, self.source_disk.lun
+    )
+    restore_disk.Create()
+    self.restore_disks.append(restore_disk)
+    self.num_restore_disks += 1
+
+    return self.restore_disks[-1]
+
+  def Delete(self):
+    """Deletes the snapshot."""
+    if self.restore_disks:
+      for restore_disk in self.restore_disks:
+        restore_disk.Delete()
+        self.num_restore_disks -= 1
+
+    delete_cmd = [
+        azure.AZURE_PATH,
+        'snapshot',
+        'delete',
+        '--name',
+        self.name,
+    ] + self.resource_group.args
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
 
 class AzureStripedDisk(disk.StripedDisk):

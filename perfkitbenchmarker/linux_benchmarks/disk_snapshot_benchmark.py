@@ -121,20 +121,32 @@ def CreateSnapshotOnVM(
   )
   vm_samples = []
   metadata = {'snapshot_number': snapshot_num}
+  if 'G' not in used_disk_size.strip()[-1]:
+    raise ValueError('Used disk size is not in GB.')
+  full_snapshot_size_gb = float(used_disk_size.strip().strip('G'))
   for disk in vm.scratch_disks:
+    snapshot_size = disk.snapshots[-1].storage_gb or full_snapshot_size_gb
     vm_samples.append(
         sample.Sample(
             'snapshot_storage_compression_ratio',
-            disk.snapshots[-1].storage_gb
-            / float(used_disk_size.strip().strip('G')),
+            snapshot_size / full_snapshot_size_gb,
             'ratio',
             metadata,
         )
     )
     vm_samples.append(
         sample.Sample(
+            'full_snapshot_size_gb',
+            full_snapshot_size_gb,
+            'GB',
+            metadata,
+        )
+    )
+    # TODO(andytzhu) - Find incremental snapshot sizes on AWS/Azure.
+    vm_samples.append(
+        sample.Sample(
             'snapshot_storage_gb',
-            disk.snapshots[-1].storage_gb,
+            snapshot_size,
             'GB',
             metadata,
         )
