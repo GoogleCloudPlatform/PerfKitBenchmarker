@@ -126,6 +126,13 @@ def CheckPrerequisites(benchmark_config):
             str(SUPPORTED_DPB_BACKENDS)
         )
     )
+  if (
+      _READAHEAD_KB.value
+      and dpb_service_type not in dpb_constants.UNMANAGED_SERVICES
+  ):
+    raise errors.Config.InvalidValue(
+        '--dfsio_readahead_kb is only supported by unmanaged DPB services.'
+    )
 
 
 def _PrepareNode(vm: linux_virtual_machine.BaseLinuxVirtualMachine) -> None:
@@ -137,17 +144,21 @@ def _PrepareNode(vm: linux_virtual_machine.BaseLinuxVirtualMachine) -> None:
 
 
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
+  # Only unmanaged dpb services are VM-aware
+  if benchmark_spec.dpb_service.CLOUD != 'Unmanaged':
+    return
   nodes = benchmark_spec.dpb_service.vms['worker_group']
-  partials = [
-      functools.partial(_PrepareNode, node) for node in nodes
-  ]
+  partials = [functools.partial(_PrepareNode, node) for node in nodes]
   background_tasks.RunThreaded((lambda f: f()), partials)
 
 
 def ParseResults(command: str, stdout: str) -> List[sample.Sample]:
   regex = r'Throughput mb/sec: (\d+.\d+)'
-  throughput = regex_util.ExtractFloat(regex, stdout)
-  return [sample.Sample(f'{command}_throughput', throughput, 'MB/s')]
+  try:
+    throughput = regex_util.ExtractFloat(regex, stdout)
+    return [sample.Sample(f'{command}_throughput', throughput, 'MB/s')]
+  except regex_util.NoMatchError:
+    return []
 
 
 def Run(benchmark_spec):
