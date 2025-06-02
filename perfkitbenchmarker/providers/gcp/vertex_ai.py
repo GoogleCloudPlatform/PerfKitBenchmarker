@@ -449,6 +449,8 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
     super().__init__(vm, model_spec, name, bucket_uri, **kwargs)
     # GCS client is not needed by Model Garden CLI.
     self.gcs_client = None
+    if gcp_flags.AI_FAST_TRYOUT.value:
+      self.metadata.update({'fast_tryout': True})
 
   def _Create(self) -> None:
     """Creates the underlying resource."""
