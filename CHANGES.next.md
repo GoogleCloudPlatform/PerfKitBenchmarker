@@ -585,6 +585,8 @@
     z3-highmem-88-standardlssd
 -   Slightly more robust Exists check for GCE VMs.
 -   \_\_main\_\_.py calls absl.app.run(Main) as the entrypoint
+-   Positional arguments passed to PKB are no longer silently ignored, they will
+    cause PKB to exit immediately with an error
 -   Added `sysbench_thread_init_timeout` flag to allow higher timeout limit when
     initializing a high thread count (eg. 2048)
 -   Add Fio benchmark to measure IOPS under latency SLA

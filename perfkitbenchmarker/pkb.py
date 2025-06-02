@@ -403,6 +403,10 @@ def _ParseFlags(argv):
   """Parses the command-line flags and returns the positional arguments."""
   try:
     argv = FLAGS(argv)
+    if len(argv) > 1:
+      raise flags.ValidationError(
+          f'Unexpected positional arguments: {argv[1:]}'
+      )
     return argv
   except flags.Error as e:
     logging.error(e)
