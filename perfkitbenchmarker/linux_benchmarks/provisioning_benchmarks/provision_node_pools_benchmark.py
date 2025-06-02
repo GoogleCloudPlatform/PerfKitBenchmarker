@@ -118,20 +118,25 @@ def _CreateJobsAndWait(
       time.monotonic() - apply_start,
   )
   start = time.monotonic()
-  container_service.RunKubectlCommand(
-      command=[
+  # wait up to 2 min per node pool + 45 min for master resizes
+  # synchronous NAP in GKE takes ~1 min per node pool
+  timeout = (jobs * 2 + 45) * 60
+  # RunRetryableKubectlCommand is required as sometimes during master resize
+  # the RunKubectlCommand fails before timeout.
+  container_service.RunRetryableKubectlCommand(
+      run_cmd=[
           "wait",
           "pod",
           "-l",
           "batch=%s" % batch_name,
           "--for",
           "jsonpath={.status.phase}=Running",
-          # wait up to 2 min per node pool + 45 min for master resizes
-          # synchronous NAP in GKE takes ~1 min per node pool
+          # Add additional 10 seconds to the timeout so that it is not restarted
+          # by RunRetryableKubectlCommand
           "--timeout",
-          "%ds" % ((jobs * 2 + 45) * 60),
+          "%ds" % (timeout + 10),
       ],
-      timeout=None,
+      timeout=timeout,
   )
   logging.info(
       "All %d jobs in batch '%s' are running. Wait time: %d seconds.",
