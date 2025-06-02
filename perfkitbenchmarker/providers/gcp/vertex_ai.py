@@ -56,7 +56,8 @@ class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
     model_resource_name: The full resource name of the created model, e.g.
       projects/123/locations/us-east1/models/1234.
     region: The region, derived from the zone.
-    project: The project.
+    project: The project (eg "my-project").
+    project_number: The GCP project number (eg "12345").
     endpoint: The PKB resource endpoint the model is deployed to.
     service_account: Name of the service account used by the model.
     model_deploy_time: Time it took to deploy the model.
@@ -81,6 +82,7 @@ class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
   name: str
   region: str
   project: str
+  project_number: str
   service_account: str
   model_resource_name: str | None
   model_deploy_time: float | None
@@ -116,6 +118,7 @@ class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
     else:
       self.name = 'pkb' + FLAGS.run_uri
     self.project = FLAGS.project
+    self.project_number = util.GetProjectNumber(self.project)
     self.endpoint = self._CreateEndpoint()
     if not self.project:
       raise errors.Setup.InvalidConfigurationError(
@@ -334,9 +337,13 @@ class BaseCliVertexAiModel(BaseVertexAiModel):
     end_write_time = time.time()
     write_time = end_write_time - start_write_time
     self.json_write_times.append(write_time)
+    return self._GetPromptCommand(name)
+
+  def _GetPromptCommand(self, json_file_name: str):
+    """Returns the prompting command once json file is written."""
     return (
         'gcloud ai endpoints predict'
-        f' {self.endpoint.endpoint_name} --json-request={name}'
+        f' {self.endpoint.endpoint_name} --json-request={json_file_name}'
     )
 
   def _Delete(self) -> None:
@@ -453,6 +460,8 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
         f' --project={self.project} --region={self.region}'
         f' --machine-type={self.model_spec.machine_type}'
     )
+    if gcp_flags.AI_FAST_TRYOUT.value:
+      deploy_cmd += ' --enable-fast-tryout'
     _, err_out, _ = self.vm.RunCommand(
         deploy_cmd, timeout=_MODEL_DEPLOY_TIMEOUT
     )
@@ -495,6 +504,21 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
     super()._PostCreate()
     self.endpoint.UpdateLabels()
 
+  def _GetPromptCommand(self, json_file_name: str):
+    """Returns the prompting command once json file is written."""
+    if not gcp_flags.AI_FAST_TRYOUT.value:
+      return super()._GetPromptCommand(json_file_name)
+    # Surprisingly, the URL is not in endpoint describe output.
+    url = (
+        f'https://{self.endpoint.short_endpoint_name}.{self.region}-fasttryout.'
+        f'prediction.vertexai.goog/v1/projects/{self.project_number}/locations/'
+        f'{self.region}/endpoints/{self.endpoint.short_endpoint_name}:predict'
+    )
+    return (
+        'curl -X POST -H "Content-Type: application/json" -H "Authorization:'
+        f' Bearer $(gcloud auth print-access-token)" {url} -d @{json_file_name}'
+    )
+
   def _CreateDependencies(self):
     """Does not create any dependencies.
 
@@ -502,6 +526,7 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
     calls the grandparent managed_ai_model._CreateDependencies to add metadata.
     """
     super(BaseVertexAiModel, self)._CreateDependencies()
+    self.vm.InstallPackages('curl')
 
 
 class VertexAiPythonSdkModel(BaseVertexAiModel):
@@ -640,7 +665,18 @@ class BaseVertexAiEndpoint(resource.BaseResource):
     self.project = project
     self.region = region
     self.vm = vm
-    self.endpoint_name = None
+    self.endpoint_name = str | None
+
+  @property
+  def short_endpoint_name(self) -> str | None:
+    """Returns the short name of the endpoint.
+
+    Returns: The short name.
+    ie 1234 rather than projects/123/locations/us-east1/endpoints/1234.
+    """
+    if self.endpoint_name is None:
+      return None
+    return self.endpoint_name.split('/')[-1]
 
   def UpdateLabels(self) -> None:
     """Updates the labels of the endpoint."""
@@ -891,7 +927,7 @@ class VertexAiLlama3Spec(VertexAiModelSpec):
   """Spec for running the Llama3 8b & 70b model."""
 
   MODEL_NAME: str = 'llama3'
-  MODEL_SIZE: list[str] = ['8b', '70b']
+  MODEL_SIZE: list[str] = ['8b', '8b-instruct', '70b']
   VLLM_ARGS = [
       '--host=0.0.0.0',
       '--port=8080',
@@ -927,9 +963,13 @@ class VertexAiLlama3Spec(VertexAiModelSpec):
     if self.model_size == '8b':
       self.machine_type = 'g2-standard-12'
       self.accelerator_count = 1
-    else:
+    elif self.model_size == '70b':
       self.machine_type = 'g2-standard-96'
       self.accelerator_count = 8
+    else:
+      # This machine type selected for instruct to use the quick deploy config.
+      self.machine_type = 'a2-ultragpu-1g'
+      self.accelerator_count = 1
     self.accelerator_type = 'NVIDIA_L4'
     self.serving_container_args = self.VLLM_ARGS.copy()
     self.serving_container_args.append(

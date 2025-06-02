@@ -526,6 +526,12 @@ AI_BUCKET_URI = flags.DEFINE_string(
     ' have a gs:// prefix.',
 )
 
+AI_FAST_TRYOUT = flags.DEFINE_boolean(
+    'ai_fast_tryout',
+    False,
+    'If set, passes --enable-fast-tryout to model garden deploy command.',
+)
+
 GCLUSTER_PATH = flags.DEFINE_string(
     'gcluster_path',
     'gcluster',

@@ -85,6 +85,9 @@ class VertexAiCliInterfaceTest(VertexAiTest):
         },
         self.pkb_ai.vm,
     )
+    self.pkb_ai.endpoint.endpoint_name = (
+        'projects/6789/locations/us-east1/endpoints/1234'
+    )
     self.pkb_ai._Create()
     cli.RunCommand.assert_has_calls([
         mock.call(
@@ -102,7 +105,8 @@ class VertexAiCliInterfaceTest(VertexAiTest):
             'gcloud ai models list --project=my-project --region=us-west'
         ),
         mock.call(
-            'gcloud ai endpoints deploy-model None --model=1234'
+            'gcloud ai endpoints deploy-model'
+            ' projects/6789/locations/us-east1/endpoints/1234 --model=1234'
             ' --region=us-west --project=my-project --display-name=pkb123'
             ' --machine-type=g2-standard-12'
             ' --accelerator=type=nvidia-l4,count=1'
@@ -304,7 +308,7 @@ response:
                 0,
             )],
             'ai endpoints describe update': [('', '', 0)],
-            'gcloud ai endpoints predict': [(
+            'curl': [(
                 '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
                 '',
                 0,
@@ -317,6 +321,21 @@ response:
     self.assertEqual(
         self.pkb_ai.endpoint.endpoint_name,
         'projects/123/locations/us-west/endpoints/fooendpoint',
+    )
+
+  @flagsaver.flagsaver(ai_fast_tryout=True)
+  def test_get_prompt_command_fast_tryout(self):
+    self.pkb_ai.endpoint.endpoint_name = (
+        'projects/pid1/locations/us-east1/endpoints/fooendpoint'
+    )
+    self.assertRegex(
+        self.pkb_ai.GetPromptCommand('How are you?', 512, 1.0),
+        r'curl -X .*'
+        r' https://fooendpoint.us-west-fasttryout.prediction.vertexai.goog/v1/projects/123/locations/us-west/endpoints/fooendpoint:predict .*',
+    )
+    self.assertEqual(
+        self.pkb_ai.endpoint.short_endpoint_name,
+        'fooendpoint',
     )
 
   def test_model_garden_llama4_init(self):
