@@ -438,6 +438,9 @@ class AzureDisk(disk.BaseDisk):
     snapshot.Create()
     self.snapshots.append(snapshot)
 
+  def GetLastIncrementalSnapshotSize(self):
+    return None
+
 
 class AzureDiskSnapshot(disk.DiskSnapshot):
   """Object representing a Azure Disk Snapshot.

@@ -126,27 +126,30 @@ def CreateSnapshotOnVM(
   full_snapshot_size_gb = float(used_disk_size.strip().strip('G'))
   for disk in vm.scratch_disks:
     snapshot_size = disk.snapshots[-1].storage_gb or full_snapshot_size_gb
-    vm_samples.append(
-        sample.Sample(
-            'snapshot_storage_compression_ratio',
-            snapshot_size / full_snapshot_size_gb,
-            'ratio',
-            metadata,
-        )
-    )
+    if snapshot_num > 1:
+      snapshot_size = disk.GetLastIncrementalSnapshotSize()
+    if snapshot_size:
+      vm_samples.append(
+          sample.Sample(
+              'snapshot_storage_compression_ratio',
+              snapshot_size / full_snapshot_size_gb,
+              'ratio',
+              metadata,
+          )
+      )
+      # TODO(andytzhu) - Find incremental snapshot sizes on Azure.
+      vm_samples.append(
+          sample.Sample(
+              'snapshot_storage_gb',
+              snapshot_size,
+              'GB',
+              metadata,
+          )
+      )
     vm_samples.append(
         sample.Sample(
             'full_snapshot_size_gb',
             full_snapshot_size_gb,
-            'GB',
-            metadata,
-        )
-    )
-    # TODO(andytzhu) - Find incremental snapshot sizes on AWS/Azure.
-    vm_samples.append(
-        sample.Sample(
-            'snapshot_storage_gb',
-            snapshot_size,
             'GB',
             metadata,
         )

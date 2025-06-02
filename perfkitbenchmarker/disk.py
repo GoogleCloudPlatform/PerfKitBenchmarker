@@ -586,6 +586,10 @@ class BaseDisk(resource.BaseResource):
     """Creates a snapshot of the disk."""
     raise NotImplementedError()
 
+  def GetLastIncrementalSnapshotSize(self):
+    """Gets last incremental snapshot size."""
+    raise NotImplementedError()
+
 
 class StripedDisk(BaseDisk):
   """Object representing several disks striped together."""

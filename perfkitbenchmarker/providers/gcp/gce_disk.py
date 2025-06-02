@@ -573,6 +573,9 @@ class GceDisk(disk.BaseDisk):
     snapshot.Create()
     self.snapshots.append(snapshot)
 
+  def GetLastIncrementalSnapshotSize(self):
+    return self.snapshots[-1].storage_gb
+
 
 class GceDiskSnapshot(disk.DiskSnapshot):
   """Object representing a GCE Disk Snapshot.

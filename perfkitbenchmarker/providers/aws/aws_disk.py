@@ -701,6 +701,40 @@ class AwsDisk(disk.BaseDisk):
     snapshot.Create()
     self.snapshots.append(snapshot)
 
+  def GetLastIncrementalSnapshotSize(self):
+    """Gets last incremental snapshot size."""
+    num_changed_blocks = 0
+    list_changed_cmd = util.AWS_PREFIX + [
+        'ebs',
+        'list-changed-blocks',
+        '--first-snapshot-id=%s' % self.snapshots[-2].id,
+        '--second-snapshot-id=%s' % self.snapshots[-1].id,
+        '--region=%s' % self.region,
+    ]
+    stdout, _ = util.IssueRetryableCommand(list_changed_cmd)
+    response = json.loads(stdout)
+    for changed_block in response['ChangedBlocks']:
+      # Only added and modified blocks count towards incremental snapshot size.
+      if 'SecondBlockToken' in changed_block:
+        num_changed_blocks += 1
+
+    while 'NextToken' in response:
+      list_changed_cmd_next_token = list_changed_cmd + [
+          '--next-token=%s' % response['NextToken'],
+      ]
+      stdout, _ = util.IssueRetryableCommand(list_changed_cmd_next_token)
+      response = json.loads(stdout)
+      for changed_block in response['ChangedBlocks']:
+        if 'SecondBlockToken' in changed_block:
+          num_changed_blocks += 1
+
+    incremental_snapshot_size_bytes = num_changed_blocks * int(
+        response['BlockSize']
+    )
+    incremental_snapshot_size_gb = incremental_snapshot_size_bytes / (1000**3)
+
+    return incremental_snapshot_size_gb
+
 
 class AwsDiskSnapshot(disk.DiskSnapshot):
   """Object representing a AWS Disk Snapshot.
