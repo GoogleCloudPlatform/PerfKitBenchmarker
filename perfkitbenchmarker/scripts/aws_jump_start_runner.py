@@ -83,13 +83,17 @@ def SendPrompt(predictor: predictor_lib.Predictor):
   assert _PAYLOAD_JSON.value
 
   def PrintDialog(response):
-    if 'choices' in response:
-      message = response['choices'][0]['message']
+    print('got back response:')
+    print(response)
+    if 'generated_text' in response:
+      output = response['generated_text']
     else:
-      message = response[0]['generation']
-    assumed_role = message['role'].capitalize()
-    content = message['content']
-    print(f'Response>>>> {assumed_role}: {content}')
+      if 'choices' in response:
+        message = response['choices'][0]['message']
+      else:
+        message = response[0]['generation']
+      output = f'{message['role'].capitalize()}: {message['content']}'
+    print(f'Response>>>> {output}')
     print('\n====\n')
 
   payload = json.loads(_PAYLOAD_JSON.value)

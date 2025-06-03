@@ -296,6 +296,18 @@ class JumpStartLlama3Spec(JumpStartModelSpec):
     self.model_id = f'meta-textgeneration-llama-3-{self.model_size}'
     self.model_version = '2.*'
 
+  def GetPayload(
+      self, prompt: str, max_tokens: int, temperature: float
+  ) -> dict[str, Any]:
+    """Returns the payload to send to the model."""
+    return {
+        'inputs': prompt,
+        'parameters': {
+            'max_new_tokens': max_tokens,
+            'temperature': temperature,
+        },
+    }
+
 
 class JumpStartLlama4Spec(JumpStartModelSpec):
   """Spec for running the Llama4 model."""
