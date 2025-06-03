@@ -88,7 +88,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
 
 def _GetRolloutCreationTime(rollout_name: str) -> int:
   """Returns the time when the rollout was created."""
-  out, _, _ = container_service.RunKubectlCommand([
+  out, _, _ = container_service.RunRetryableKubectlCommand([
       'rollout',
       'history',
       rollout_name,
@@ -294,13 +294,13 @@ def _GetResourceStatusConditions(
     A list of status condition, where each condition is a dict with type &
     lastTransitionTime.
   """
-  out, _, _ = container_service.RunKubectlCommand([
+  out, _, _ = container_service.RunRetryableKubectlCommand([
       'get',
       resource_type,
       resource_name,
       '-o',
       'jsonpath={.status.conditions[*]}',
-  ])
+  ], timeout=60 * 2)  # 2 minutes; should be a pretty fast call.
   # Turn space separated individual json objects into a single json array.
   conditions_str = '[' + out.replace('} {', '},{') + ']'
   conditions = json.loads(conditions_str)
