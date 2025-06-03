@@ -202,10 +202,11 @@ FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = frozenset({
     'fio_parameters',
 })
 
-FIO_LATENCY_TARGET = flags.DEFINE_integer(
+FIO_LATENCY_TARGET = flags.DEFINE_string(
     'latency_target',
-    2000,
-    'Fio latency target in microseconds.',
+    '1ms',
+    'Fio latency target, allowed units are ms, us and s. It is taken in'
+    ' microseconds if no unit is specified.',
 )
 FIO_LATENCY_PERCENTILE = flags.DEFINE_float(
     'latency_percentile',

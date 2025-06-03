@@ -149,18 +149,22 @@ def ValidateDefaultIODepthAndNumjobs(vm, iodepth, numjobs):
   latency_samples = [
       sample
       for sample in samples
-      if sample.metric.endswith(
-          f'latency:p{formatted_percentile}'
-      )
+      if sample.metric.endswith(f'latency:p{formatted_percentile}')
   ]
   for latency_sample in latency_samples:
-    if latency_sample.value < fio_flags.FIO_LATENCY_TARGET.value:
-      raise errors.Setup.InvalidFlagConfigurationError(
-          f'--latency_percentile latency of {latency_sample.value} for the'
+    if latency_sample.value < _ParseIntLatencyTarget(
+        fio_flags.FIO_LATENCY_TARGET.value
+    ):
+      # TODO(arushigaur) Add this exception back after adding max IOPS
+      # microbenchmark
+      logging.error(
+          '--latency_percentile latency of %s for the'
           ' default IODepth and NumJobs is less than latency_target'
-          f' {fio_flags.FIO_LATENCY_TARGET.value}, fio_latency_under_sla'
+          ' %s, fio_latency_under_sla'
           " benchmark won't reach the latency SLA. Please increae the default"
-          ' iodepth or numjobs and try again.'
+          ' iodepth or numjobs and try again.',
+          latency_sample.value,
+          fio_flags.FIO_LATENCY_TARGET.value,
       )
   iops_samples = [
       sample for sample in samples if sample.metric.endswith(':iops')
@@ -170,6 +174,16 @@ def ValidateDefaultIODepthAndNumjobs(vm, iodepth, numjobs):
       logging.info('read iops at default configuration: %s', iops_sample.value)
     if iops_sample.metric.endswith('write:iops'):
       logging.info('write iops at default configuration: %s', iops_sample.value)
+
+
+def _ParseIntLatencyTarget(latency_target_str):
+  if latency_target_str.endswith('ms'):
+    return int(latency_target_str[:-2])*1000
+  elif latency_target_str.endswith('us'):
+    return int(latency_target_str[:-2])
+  elif latency_target_str.endswith('s'):
+    return int(latency_target_str[:-1])*1000000
+  return int(latency_target_str)
 
 
 def Cleanup(_):
