@@ -782,15 +782,11 @@ class AwsDiskSnapshot(disk.DiskSnapshot):
       errors.VmUtil.CalledProcessException: When the command returns a non-zero
       exit code.
     """
-    formatted_tags = util.FormatTagSpecifications(
-        'snapshot', util.MakeDefaultTags()
-    )
     snapshot_cmd = util.AWS_PREFIX + [
         'ec2',
         'create-snapshot',
         '--volume-id=%s' % self.source_disk_id,
         '--region=%s' % self.region,
-        '--tag-specifications=%s' % formatted_tags,
     ]
     logging.info(
         'Creating snapshot for AWS volume %s.',
