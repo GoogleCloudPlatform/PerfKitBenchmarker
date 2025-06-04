@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Runs the vbench transcoding benchmark with h.264 and vp9.
+"""Runs the vbench transcoding benchmark.
 
 Paper: https://dl.acm.org/doi/pdf/10.1145/3296957.3173207
 Vbench suite download link: http://arcade.cs.columbia.edu/vbench/
@@ -32,14 +32,21 @@ ENCODER_LIBX265 = 'libx265'
 ENCODER_VP9 = 'libvpx-vp9'
 ENCODER_H264_NVENC = 'h264_nvenc'
 ENCODER_HEVC_NVENC = 'hevc_nvenc'
-DEFAULT_H264_THREADS_LIST = [4, 8]
 DEFAULT_VP9_THREADS_LIST = [1]
 
-_FFMPEG_ENCODERS = flags.DEFINE_list(
+_VALID_ENCODERS = [
+    ENCODER_LIBX264,
+    ENCODER_LIBX265,
+    ENCODER_VP9,
+    ENCODER_H264_NVENC,
+    ENCODER_HEVC_NVENC,
+]
+_FFMPEG_ENCODERS = flags.DEFINE_multi_enum(
     'ffmpeg_encoders',
-    [ENCODER_LIBX264, ENCODER_LIBX265],
+    [ENCODER_LIBX264],
+    _VALID_ENCODERS,
     'List of the encoders to use for the transcoding benchmark. '
-    'Default is libx264 and libx265.',
+    'Default is libx264.',
 )
 _FFMPEG_THREADS_LIST = flag_util.DEFINE_integerlist(
     'ffmpeg_threads_list',
@@ -53,26 +60,38 @@ _FFMPEG_PARALLELISM_LIST = flag_util.DEFINE_integerlist(
     'List of ffmpeg-jobs to run in parallel. Defaults to '
     '[number of logical CPUs].',
 )
+_FFMPEG_PRESET = flags.DEFINE_string(
+    'ffmpeg_preset',
+    'faster',
+    'Preset option that provides a certain encoding speed to compression ratio.'
+    ' A slower preset will provide better compression. Defaults to medium.',
+)
+_FFMPEG_CRF = flags.DEFINE_integer(
+    'ffmpeg_crf',
+    23,
+    'Constant Rate Factor (CRF) controls output quality. The range of the CRF'
+    ' scale is 0–51, where 0 is lossless, 23 is the default, and 51 is worst'
+    ' quality possible. Consider 17 or 18 to be visually lossless or'
+    ' nearly so.',
+)
+_FFMPEG_MAX_RATE = flags.DEFINE_integer(
+    'ffmpeg_max_rate',
+    2,
+    'Maximum bitrate (in Mbps) used for encoding. Useful for online streaming.'
+    ' Default value is 2.',
+)
+_FFMPEG_BUF_SIZE_MULTIPLIER = flags.DEFINE_integer(
+    'ffmpeg_buf_size_multiplier',
+    2,
+    'Multiplier of ffmpeg_max_rate to get the rate control buffer which checks'
+    ' to make sure the average bitrate is on target. Default value is 2.',
+)
+
 _FFMPEG_DIR = flags.DEFINE_string(
     'ffmpeg_dir', '/usr/bin', 'Directory where ffmpeg and ffprobe are located.'
 )
-
-_VALID_ENCODERS = [
-    ENCODER_LIBX264,
-    ENCODER_LIBX265,
-    ENCODER_VP9,
-    ENCODER_H264_NVENC,
-    ENCODER_HEVC_NVENC,
-]
-flags.register_validator(
-    'ffmpeg_encoders',
-    lambda encoders: all([c in _VALID_ENCODERS for c in encoders]),
-)
-
 FLAGS = flags.FLAGS
 
-# TODO(user): Refactor GCP/Azure disk to include IOPs/Throughput in
-# disk_spec
 BENCHMARK_NAME = 'vbench_transcoding'
 BENCHMARK_CONFIG = """
 vbench_transcoding:
@@ -81,34 +100,32 @@ vbench_transcoding:
     default:
       vm_spec:
         GCP:
-          machine_type: n2d-highcpu-8
-          zone: us-central1-f
+          machine_type: c4-standard-8
         AWS:
-          machine_type: c6g.2xlarge
-          zone: us-east-1a
+          machine_type: m7i.2xlarge
         Azure:
-          machine_type: Standard_F8s
-          zone: westus2
+          machine_type: Standard_D8s_v6
       disk_spec:
         # Standardize with 500 MB/s bandwidth.
         # The largest video file is ~300 MB; we want to minimize I/O impact.
         GCP:
-          disk_size: 542
-          disk_type: pd-ssd
+          disk_size: 500
+          disk_type: hyperdisk-balanced
+          provisioned_iops: 3000
+          provisioned_throughput: 500
           mount_point: /scratch
         AWS:
-          disk_size: 542
+          disk_size: 500
           disk_type: gp3
           provisioned_iops: 3000
           provisioned_throughput: 500
           mount_point: /scratch
         Azure:
-          disk_size: 542
+          disk_size: 500
           disk_type: PremiumV2_LRS
-          mount_point: /scratch
           provisioned_iops: 3000
           provisioned_throughput: 500
-      os_type: ubuntu2004
+          mount_point: /scratch
 """
 
 
@@ -131,9 +148,8 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec) -> None:
     spec: The benchmark specification. Contains all data that is required to run
       the benchmark.
   """
-  vm = spec.vms[0]
+  vm = spec.vm_groups['default'][0]
   home_dir = vm.RemoteCommand('echo $HOME')[0].strip()
-  # vm.InstallPreprovisionedBenchmarkData('vbench', ['vbench.zip'], home_dir)
   vm.DownloadPreprovisionedData(home_dir, 'vbench', 'vbench.zip')
   vm.InstallPackages('unzip')
   vm.RemoteCommand('unzip -o vbench.zip')
@@ -156,7 +172,7 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   Returns:
     samples: A list of samples including total time to transcode.
   """
-  vm = spec.vms[0]
+  vm = spec.vm_groups['default'][0]
   samples = []
   input_videos_dir = '/scratch/vbench/videos/crf0'
 
@@ -165,19 +181,25 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
     jobs_list = (
         _FFMPEG_PARALLELISM_LIST.value
         if _FFMPEG_PARALLELISM_LIST
-        else [vm.NumCpusForBenchmark()]
+        else [vm.NumCpusForBenchmark(report_only_physical_cpus=True)]
     )
     if encoder in [ENCODER_LIBX264, ENCODER_LIBX265]:
-      ffmpeg_args = f'-c:v {encoder} -preset medium -crf 18'
+      ffmpeg_args = (
+          f'-c:v {encoder} -preset {_FFMPEG_PRESET.value} -crf'
+          f' {_FFMPEG_CRF.value} -maxrate {_FFMPEG_MAX_RATE.value}M -bufsize'
+          f' {_FFMPEG_BUF_SIZE_MULTIPLIER.value * _FFMPEG_MAX_RATE.value}M'
+      )
       threads_list = (
           _FFMPEG_THREADS_LIST.value
           if _FFMPEG_THREADS_LIST
-          else DEFAULT_H264_THREADS_LIST
+          else [vm.NumCpusForBenchmark(report_only_physical_cpus=True)]
       )
     elif encoder == ENCODER_VP9:
       # A single VP9 ffmpeg thread almost saturates a CPU core. Increasing the
       # parallelism is counterproductive on all machines benchmarked so far.
-      ffmpeg_args = f'-c:v {encoder} -crf 10 -b:v 0 -quality good'
+      ffmpeg_args = (
+          f'-c:v {encoder} -crf {_FFMPEG_CRF.value} -b:v 0 -quality good'
+      )
       threads_list = (
           _FFMPEG_THREADS_LIST.value
           if _FFMPEG_THREADS_LIST
@@ -189,12 +211,14 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       )
       cuda_args = '-hwaccel cuda -hwaccel_output_format cuda'
       ffmpeg_args = (
-          f'-c:v {encoder} -preset medium -rc:v vbr -cq:v 18 -qmin 18 -qmax 18'
+          f'-c:v {encoder} -preset {_FFMPEG_PRESET.value} -rc:v vbr -cq:v'
+          f' {_FFMPEG_CRF.value} -qmin {_FFMPEG_CRF.value} -qmax'
+          f' {_FFMPEG_CRF.value}'
       )
       threads_list = (
           _FFMPEG_THREADS_LIST.value
           if _FFMPEG_THREADS_LIST
-          else DEFAULT_H264_THREADS_LIST
+          else [vm.NumCpusForBenchmark(report_only_physical_cpus=True)]
       )
 
     for jobs, threads in itertools.product(jobs_list, threads_list):
