@@ -592,3 +592,7 @@
 -   Add Fio benchmark to measure IOPS under latency SLA
 -   Update MongoDB version to 8.0 which is the latest stable version with
     performance improvement over 7.0.
+-   Increase connection pool size to 60000 to avoid maxWaitQueueSize (number of
+    threads waiting for a connection, default 500) being exceeded during MongoDB
+    YCSB benchmarks. This will also align the number between single node and PSA
+    setups.

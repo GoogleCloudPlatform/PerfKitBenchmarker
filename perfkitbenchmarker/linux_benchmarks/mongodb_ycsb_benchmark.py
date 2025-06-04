@@ -268,7 +268,7 @@ def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
       f'"mongodb://{primary.internal_ip}:27017,'
       f'{secondary.internal_ip}:27017,'
       f'{arbiter.internal_ip}:27017/ycsb'
-      '?replicaSet=rs0&w=majority&compression=snappy"'
+      '?replicaSet=rs0&w=majority&compression=snappy&maxPoolSize=60000"'
   )
 
 
