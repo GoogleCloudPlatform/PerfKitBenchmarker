@@ -295,7 +295,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       primary_server.internal_ip, _GetPassword()
   )
   results = []
-  # a map of trasactions metric name to current sample with max value
+  # a map of transactions metric name to current sample with max value
   max_transactions = {}
   for i, thread_count in enumerate(FLAGS.sysbench_run_threads):
     sysbench_parameters.threads = thread_count
@@ -341,6 +341,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
             'max_' + item.metric, item.value, item.unit, metadata=metadata
         )
     )
+  # Copy client and server logs to the scratch directory.
+  for _, vms in benchmark_spec.vm_groups.items():
+    for vm in vms:
+      vm.CopyLogs('/var/log')
   return results
 
 

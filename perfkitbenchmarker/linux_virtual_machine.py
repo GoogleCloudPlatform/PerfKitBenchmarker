@@ -2330,6 +2330,67 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     )
     return False
 
+  def CopyLogs(self, log_dir: str):
+    """Copies logs from the given directory on the VM to the scratch directory.
+
+    Log paths are converted to snake_case and .log extension is added if it is
+    missing. And VM name is prepended to the file name to distinguish between
+    multiple VMs.
+
+    Example:
+    VM: pkb-123456-0
+    Log path: /var/log/syslog
+
+    Copied file: /tmp/perkitbenchmarker/123456/pkb-123456-0__var_log_syslog.log
+
+    Args:
+      log_dir: The directory on the VM to copy the logs from.
+    """
+    try:
+      _, _, return_code = self.RemoteCommandWithReturnCode(
+          f'[[ -d "{log_dir}" ]]', ignore_failure=True
+      )
+      if return_code != 0:
+        logging.warning(
+            'Log directory %s does not exist or is not a directory on VM %s.'
+            ' Skipping log copying for this path.',
+            log_dir,
+            self.name,
+        )
+        return
+
+      stdout, stderr = self.RemoteCommand(f'sudo find {log_dir} -type f')
+      if not stdout:
+        logging.warning('Failed to find logs in %s: %s', log_dir, stderr)
+        return
+    except errors.VirtualMachine.RemoteCommandError as e:
+      logging.warning('Failed to find logs in %s: %s', log_dir, e)
+      return
+
+    for remote_file in [rf.strip() for rf in stdout.splitlines()]:
+      try:
+        # Join absolute path of the log file to preserve the directory
+        # structure.
+        target_file_name = f'{self.name}_{remote_file.replace("/", "_")}'
+        target_file_path = os.path.join(vm_util.GetTempDir(), target_file_name)
+        # Add .log extension if it is missing since Artemis only copied logs
+        # with this extension.
+        if not target_file_path.endswith('.log'):
+          target_file_path += '.log'
+        self.PullFile(target_file_path, remote_file)
+      except errors.VirtualMachine.RemoteCommandError as e:
+        logging.warning(
+            'Error copying logs %s from vm %s: %s',
+            remote_file,
+            self.name,
+            e,
+        )
+        # We attempt to copy all log files from the given directory. However,
+        # since vm.PullFile does not currently use sudo, it's possible that
+        # copying some files might fail. Failures in copying such log files
+        # should not block further log files from being copied.
+        pass
+
 
 def _IncrementStackLevel(**kwargs: Any) -> Any:
   """Increments the stack_level variable stored in kwargs."""
