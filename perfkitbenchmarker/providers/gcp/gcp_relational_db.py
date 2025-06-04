@@ -232,6 +232,16 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
           '--root-password={}'.format(self.spec.database_password)
       )
 
+    if self.spec.db_disk_spec.provisioned_iops:
+      cmd_string.append(
+          '--storage-provisioned-iops=%s'
+          % self.spec.db_disk_spec.provisioned_iops
+      )
+    if self.spec.db_disk_spec.provisioned_throughput:
+      cmd_string.append(
+          '--storage-provisioned-throughput=%s'
+          % self.spec.db_disk_spec.provisioned_throughput
+      )
     if self.spec.db_spec.cpus and self.spec.db_spec.memory:
       self._ValidateSpec()
       memory = self.spec.db_spec.memory
