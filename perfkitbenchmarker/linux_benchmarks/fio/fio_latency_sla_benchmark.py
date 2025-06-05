@@ -106,8 +106,6 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   ValidateDefaultIODepthAndNumjobs(
       vm, iodepth, numjobs
   )
-  # TODO(user): Add support for percentile outside of default
-  # percentile list in the job file.
   benchmark_params = {
       'latency_target': fio_flags.FIO_LATENCY_TARGET.value,
       'latency_percentile': fio_flags.FIO_LATENCY_PERCENTILE.value,

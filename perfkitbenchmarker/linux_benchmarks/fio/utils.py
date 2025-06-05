@@ -28,7 +28,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks.fio import constants
 from perfkitbenchmarker.linux_benchmarks.fio import fio_scenario_parser
 from perfkitbenchmarker.linux_benchmarks.fio import flags as fio_flags
-from perfkitbenchmarker.linux_packages import fio
+from perfkitbenchmarker.linux_benchmarks.fio import result_parser
 
 
 FLAGS = flags.FLAGS
@@ -253,8 +253,7 @@ def RunTest(vm, exec_path, job_file_string):
       fio_command, timeout=fio_flags.FIO_COMMAND_TIMEOUT_SEC.value
   )
   end_time = time.time()
-  # TODO(user): Move result parsing to linux_benchmarks/fio
-  samples = fio.ParseResults(
+  samples = result_parser.ParseResults(
       job_file_string,
       json.loads(stdout),
       require_merge=fio_flags.FIO_SEPARATE_JOBS_FOR_DISKS.value,
