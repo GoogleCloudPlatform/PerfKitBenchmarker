@@ -722,10 +722,14 @@ class AzureVirtualMachine(
             self.region, self.availability_zone, public_ip_name
         )
         self.public_ips.append(public_ip)
+
+      subnet_name = self.name + '-nic'
+      if not azure_flags.AZURE_SUBNET_ID.value:
+        subnet_name = self.name + '-' + subnet.name + '-nic'
       nic = AzureNIC(
           self.network,
           subnet,
-          self.name + '-' + subnet.name + '-nic',
+          subnet_name,
           public_ip_name,
           vm_spec.accelerated_networking,
       )
