@@ -5,6 +5,7 @@ from unittest import mock
 
 from absl.testing import flagsaver
 from absl.testing import parameterized
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.providers.aws import aws_jump_start
 from perfkitbenchmarker.providers.aws import util
@@ -71,6 +72,28 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
         self.ai_model.endpoint_name,
         'meta-textgeneration-llama-2-7b-f-2025-08-16-06',
     )
+
+  def testTracebackRaises(self):
+    self.MockRunCommand(
+        {
+            'python3': [(
+                (
+                    'Traceback  (most recent call'
+                    ' last)\n/tmp/aws_jump_start_runner.py:125 in <module>an'
+                    ' errorModel name:'
+                    ' <meta-textgeneration-llama-2-7b-f-2025-08-16-05>sagemaker.config'
+                    ' INFO - Not applying SDK defaults from location:'
+                    ' /etc/xdg/sagemaker/config.yaml\n--!Endpoint name:'
+                    ' <meta-textgeneration-llama-2-7b-f-2025-08-16-06>'
+                ),
+                'std error fine - warning only',
+                0,
+            )],
+        },
+        self.mock_vm,
+    )
+    with self.assertRaises(errors.VirtualMachine.RemoteCommandError):
+      self.ai_model._Create()
 
   def testPostCreate(self):
     self.enter_context(

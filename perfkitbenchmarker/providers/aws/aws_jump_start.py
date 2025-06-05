@@ -120,6 +120,11 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
         timeout=60 * 30,
         stack_level=2,
     )
+    if 'Traceback' in out:
+      raise errors.VirtualMachine.RemoteCommandError(
+          'Ran into stack trace exception while running'
+          f' {self.python_script}.\nFull output:\n{out}\nErr:\n{err}'
+      )
     return out, err
 
   def _GetPythonScriptCommand(self, args: list[str]) -> str:
