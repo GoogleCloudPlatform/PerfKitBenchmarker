@@ -13,14 +13,12 @@
 # limitations under the License.
 """Tests for providers.kubernetes.kubernetes_virtual_machine."""
 
-# pylint: disable=not-context-manager
-
 import builtins
+import contextlib
 import json
 import unittest
 from absl import flags as flgs
 from absl.testing import flagsaver
-import contextlib2
 import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
@@ -201,9 +199,9 @@ def get_write_mock_from_temp_file_mock(temp_file_mock):
   return temp_file_mock().__enter__().write
 
 
-@contextlib2.contextmanager
+@contextlib.contextmanager
 def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
-  with contextlib2.ExitStack() as stack:
+  with contextlib.ExitStack() as stack:
     retval = (stdout, stderr, return_code)
 
     flags.gcloud_path = 'gcloud'

@@ -62,6 +62,7 @@ VM specs, disk specs, or any component of the benchmark configuration
 dictionary.
 """
 
+import contextlib
 import copy
 import functools
 import json
@@ -69,7 +70,6 @@ import logging
 import re
 
 from absl import flags
-import contextlib2
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 import yaml
@@ -167,7 +167,7 @@ def _LoadDefaultConfig():
 def _LoadUserConfig(path):
   """Loads a user config from the supplied path."""
   config_files = _GetImportFiles(path)
-  with contextlib2.ExitStack() as stack:
+  with contextlib.ExitStack() as stack:
     files = [stack.enter_context(open(f)) for f in config_files]
     return yaml.safe_load(_ConcatenatedFiles(files))
 

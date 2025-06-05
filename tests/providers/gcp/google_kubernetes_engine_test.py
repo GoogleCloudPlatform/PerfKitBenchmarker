@@ -16,13 +16,13 @@
 # pylint: disable=not-context-manager
 
 import builtins
+import contextlib
 import os
 import unittest
 from unittest import mock
 
 from absl import flags as flgs
 from absl.testing import flagsaver
-import contextlib2
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -59,9 +59,9 @@ items:
 """
 
 
-@contextlib2.contextmanager
+@contextlib.contextmanager
 def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
-  with contextlib2.ExitStack() as stack:
+  with contextlib.ExitStack() as stack:
     flags.gcloud_path = 'gcloud'
     flags.run_uri = _RUN_URI
     flags.data_search_paths = ''
