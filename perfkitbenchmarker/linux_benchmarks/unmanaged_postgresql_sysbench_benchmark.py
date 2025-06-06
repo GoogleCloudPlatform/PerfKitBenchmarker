@@ -348,6 +348,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
             'max_' + item.metric, item.value, item.unit, metadata=metadata
         )
     )
+  # Copy client and server logs to the scratch directory.
+  for _, vms in benchmark_spec.vm_groups.items():
+    for vm in vms:
+      vm.CopyLogs('/var/log')
   return results
 
 
