@@ -317,6 +317,13 @@ class GkeCluster(BaseGkeCluster):
       result['gpu_count'] = self.nodepools['nccl'].gpu_count
     if self.image_type:
       result['image_type'] = self.image_type
+    if gcp_flags.MAX_CPU.value:
+      result['max-cpu'] = gcp_flags.MAX_CPU.value
+    if gcp_flags.MAX_MEMORY.value:
+      result['max-memory'] = gcp_flags.MAX_MEMORY.value
+    if gcp_flags.MAX_ACCELERATOR.value:
+      result['max-accelerator'] = gcp_flags.MAX_ACCELERATOR.value
+
     return result
 
   def _Create(self):
