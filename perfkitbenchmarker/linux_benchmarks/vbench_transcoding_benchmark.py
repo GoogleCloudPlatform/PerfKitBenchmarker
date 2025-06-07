@@ -211,14 +211,12 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       )
       cuda_args = '-hwaccel cuda -hwaccel_output_format cuda'
       ffmpeg_args = (
-          f'-c:v {encoder} -preset {_FFMPEG_PRESET.value} -rc:v vbr -cq:v'
+          f'-c:v {encoder} -preset medium -rc:v vbr -cq:v'
           f' {_FFMPEG_CRF.value} -qmin {_FFMPEG_CRF.value} -qmax'
           f' {_FFMPEG_CRF.value}'
       )
       threads_list = (
-          _FFMPEG_THREADS_LIST.value
-          if _FFMPEG_THREADS_LIST
-          else [vm.NumCpusForBenchmark(report_only_physical_cpus=True)]
+          _FFMPEG_THREADS_LIST.value if _FFMPEG_THREADS_LIST else [4, 8]
       )
 
     for jobs, threads in itertools.product(jobs_list, threads_list):
@@ -262,6 +260,9 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
                   'threads': threads,
                   'ffmpeg_compiled_from_source': FLAGS.build_ffmpeg_from_source,
                   'video_copies': 1,
+                  'ffmpeg_preset': _FFMPEG_PRESET.value,
+                  'ffmpeg_crf': _FFMPEG_CRF.value,
+                  'ffmpeg_max_rate': _FFMPEG_MAX_RATE.value,
               },
           )
       ])
