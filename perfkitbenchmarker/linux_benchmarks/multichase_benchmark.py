@@ -183,7 +183,7 @@ flags.DEFINE_integer(
 )
 flags.DEFINE_string(
     'multiload_buffer_size',
-    '512M',
+    '1G',
     'Multiload -m parameter',
 )
 flags.DEFINE_integer(
@@ -244,6 +244,12 @@ flags.DEFINE_string(
     'multichase_additional_flags',
     '-T 8m',
     "Additional flags to use when executing multichase. Example: '-O 16 -y'.",
+)
+flags.DEFINE_bool(
+    'skip_default_multiload_run',
+    False,
+    'If true, skip the default run of multiload with the'
+    ' stream-triad-nontemporal-injection-delay traffic pattern.',
 )
 
 
@@ -368,16 +374,17 @@ def Run(benchmark_spec):
             FLAGS.multiload_traffic_pattern,
         )
     )
-    samples.extend(
-        RunMultiload(
-            benchmark_spec,
-            None,
-            50,
-            '512M',
-            0,
-            'stream-triad-nontemporal-injection-delay',
-        )
-    )
+    if not FLAGS.skip_default_multiload_run:
+      samples.extend(
+          RunMultiload(
+              benchmark_spec,
+              None,
+              50,
+              '1G',
+              0,
+              'stream-triad-nontemporal-injection-delay',
+          )
+      )
   return samples
 
 
