@@ -222,6 +222,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
       "node_pools_test_batch": TEST_BATCH_SIZE.value,
       "node_pools_total": total_node_pools,
   }
+  for s in samples:
+    s.metadata.update(metadata)
   samples += [sample.Sample("total_time", elapsed, "seconds", metadata)]
   samples += [
       sample.Sample(
