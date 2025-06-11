@@ -41,6 +41,7 @@ from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 
 INIT_BATCH_SIZE = flags.DEFINE_integer(
@@ -94,7 +95,7 @@ def Prepare(_: bm_spec.BenchmarkSpec) -> None:
 def _CreateJobsAndWait(
     cluster: container_service.KubernetesCluster, batch_name: str, jobs: int
 ) -> None:
-  """Creates and waits for jobs to be running."""
+  """Creates jobs and waits for all pods to be running."""
   logging.info(
       "Creating batch '%s' of %d jobs, each job running in a separate node in a"
       " separate node pools",
@@ -111,7 +112,7 @@ def _CreateJobsAndWait(
         id="{:03d}".format(i + 1),
     )
   logging.info(
-      "Created %d jobs in batch '%s' in %d seconds. Waiting for all jobs to be"
+      "Created %d jobs in batch '%s' in %d seconds. Waiting for all pods to be"
       " running",
       jobs,
       batch_name,
@@ -123,21 +124,43 @@ def _CreateJobsAndWait(
   timeout = (jobs * 2 + 45) * 60
   # RunRetryableKubectlCommand is required as sometimes during master resize
   # the RunKubectlCommand fails before timeout.
-  container_service.RunRetryableKubectlCommand(
-      run_cmd=[
-          "wait",
-          "pod",
+  while True:
+    try:
+      stdout, _, _ = container_service.RunKubectlCommand([
+          "get",
+          "pods",
           "-l",
           "batch=%s" % batch_name,
-          "--for",
-          "jsonpath={.status.phase}=Running",
-          # Add additional 10 seconds to the timeout so that it is not restarted
-          # by RunRetryableKubectlCommand
-          "--timeout",
-          "%ds" % (timeout + 10),
-      ],
-      timeout=timeout,
-  )
+          "--field-selector",
+          "status.phase=Running",
+          "--output",
+          "jsonpath='{.items[*].metadata.name}'",
+      ])
+      running = 0 if not stdout else len(stdout.split())
+      if running >= jobs:
+        break
+      logging.info(
+          "Running jobs in batch '%s': %d/%d. Time: %d seconds.",
+          batch_name,
+          running,
+          jobs,
+          time.monotonic() - start,
+      )
+    except (
+        errors.VmUtil.IssueCommandError,
+        errors.VmUtil.IssueCommandTimeoutError,
+    ) as e:
+      logging.warning(
+          "Failed to get running jobs in batch '%s': %s. Retrying...",
+          batch_name,
+          e,
+      )
+    if time.monotonic() - start > timeout:
+      raise TimeoutError(
+          "Timed out waiting for all jobs in batch '%s' to be running."
+          % batch_name
+      )
+    time.sleep(60)
   logging.info(
       "All %d jobs in batch '%s' are running. Wait time: %d seconds.",
       jobs,
@@ -148,30 +171,44 @@ def _CreateJobsAndWait(
 
 def _AssertNodes(
     cluster: container_service.KubernetesCluster,
-    expected_nodes: int,
+    initial_nodes: int,
+    added_nodes: int,
 ) -> None:
   """Asserts expected number of nodes in the cluster."""
   nodes = len(cluster.GetNodeNames())
-  allowed_diff = 1
-  if abs(nodes - expected_nodes) > allowed_diff:
+  if nodes < added_nodes:
     raise ValueError(
-        "Cluster has %d nodes, but expected %d (+/- %d)"
-        % (nodes, expected_nodes, allowed_diff)
+        "Cluster has %d nodes, but expected >=%d)" % (nodes, added_nodes)
+    )
+  # Include a buffer of 3 nodes that can be created during master resize.
+  buffer = 3
+  max_nodes = initial_nodes + added_nodes + buffer
+  if nodes > max_nodes:
+    raise ValueError(
+        "Cluster has %d nodes, but expected <=%d" % (nodes, max_nodes)
     )
   logging.info("Cluster has %d nodes", nodes)
 
 
 def _AssertNodePools(
     cluster: container_service.KubernetesCluster,
-    expected_node_pools: int,
+    intital_node_pools: int,
+    added_node_pools: int,
 ) -> None:
   """Asserts expected number of node pools in the cluster."""
   node_pools = len(cluster.GetNodePoolNames())
-  allowed_diff = 1
-  if abs(node_pools - expected_node_pools) > allowed_diff:
+  if node_pools < added_node_pools:
     raise ValueError(
-        "Cluster has %d node pools, but expected %d (+/- %d)"
-        % (node_pools, expected_node_pools, allowed_diff)
+        "Cluster has %d node pools, but expected >=%d"
+        % (node_pools, added_node_pools)
+    )
+  # Include a buffer of 3 node pools that can be created during master resize.
+  buffer = 3
+  max_node_pools = intital_node_pools + added_node_pools + buffer
+  if node_pools > max_node_pools:
+    raise ValueError(
+        "Cluster has %d node pools, but expected <=%d"
+        % (node_pools, max_node_pools)
     )
   logging.info("Cluster has %d node pools", node_pools)
 
@@ -187,8 +224,8 @@ def _CreateNodePools(
   start = time.monotonic()
   _CreateJobsAndWait(cluster, batch_name, node_pools_to_add)
   elapsed = time.monotonic() - start
-  _AssertNodes(cluster, nodes_before + node_pools_to_add)
-  _AssertNodePools(cluster, nodes_pools_before + node_pools_to_add)
+  _AssertNodes(cluster, nodes_before, node_pools_to_add)
+  _AssertNodePools(cluster, nodes_pools_before, node_pools_to_add)
   metadata = {"node_pools_created": node_pools_to_add}
   metric_batch_name = batch_name.replace("-", "_")
   return [
