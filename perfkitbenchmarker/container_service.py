@@ -34,7 +34,7 @@ from multiprocessing import synchronize
 import os
 import re
 import time
-from typing import Any, Callable, Iterator, Optional, Sequence
+from typing import Any, Callable, Iterable, Iterator, Optional, Sequence
 
 from absl import flags
 import jinja2
@@ -512,6 +512,7 @@ class BaseContainerCluster(resource.BaseResource):
         collections.defaultdict(list)
     )
     self.services: dict[str, KubernetesContainerService] = {}
+    self._extra_samples: list[sample.Sample] = []
 
   @property
   def num_nodes(self) -> int:
@@ -616,6 +617,9 @@ class BaseContainerCluster(resource.BaseResource):
     """Deploys a ContainerSerivice according to the ContainerSpec."""
     raise NotImplementedError()
 
+  def AddSamples(self, samples: Iterable[sample.Sample]):
+    self._extra_samples += samples
+
   def GetSamples(self):
     """Return samples with information about deployment times."""
     samples = super().GetSamples()
@@ -659,6 +663,8 @@ class BaseContainerCluster(resource.BaseResource):
                 metadata,
             )
         )
+
+    samples += self._extra_samples
 
     return samples
 
@@ -1323,7 +1329,9 @@ class KubernetesClusterCommands:
   @staticmethod
   def _GetEvents(**kwargs) -> set['KubernetesEvent']:
     """Get the events for the cluster."""
-    stdout, _, _ = RunKubectlCommand(['get', 'events', '-o', 'yaml'], **kwargs)
+    stdout, _, _ = RunRetryableKubectlCommand(
+        ['get', 'events', '-o', 'yaml'], **kwargs
+    )
     k8s_events = set()
     for item in yaml.safe_load(stdout)['items']:
       k8s_event = KubernetesEvent.FromDict(item)
