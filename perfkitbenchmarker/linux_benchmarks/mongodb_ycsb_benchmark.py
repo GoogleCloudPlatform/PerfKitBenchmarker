@@ -58,6 +58,12 @@ _MONGODB_LOG_LEVEL = flags.DEFINE_integer(
     5,
 )
 
+_MONGODB_NVME_QUEUE_DEPTH = flags.DEFINE_integer(
+    'mongodb_nvme_queue_depth',
+    None,
+    'NVMe data disk queue depth. If unspecified, default value will be used.',
+)
+
 FLAGS = flags.FLAGS
 
 _VERSION_REGEX = r'\d+\.\d+\.\d+'
@@ -272,6 +278,36 @@ def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
   )
 
 
+def _GetNvmeDataDiskName(vm: _LinuxVM) -> str:
+  """Returns the name of the NVMe data disk."""
+  # --- Step 1: Find the name of the partition mounted on "/" ---
+  # The 'df /' command reports on the filesystem for the root directory.
+  # We get its source device and remove output headers.
+  root_partition_device_command = (
+      'ROOT_PARTITION_DEVICE=$(df / --output=source | tail -n 1)'
+  )
+
+  # --- Step 2: Find the parent disk for that root partition ---
+  # 'lsblk -no pkname' asks for the "parent kernel name" of a given device.
+  # This gives us the name of the boot disk (e.g., "nvme0n1").
+  boot_disk_command = 'BOOT_DISK=$(lsblk -no pkname "$ROOT_PARTITION_DEVICE")'
+
+  # --- Step 3: Find the data disk ---
+  # We list all devices of type 'disk' and use 'grep -v' to exclude the
+  # boot disk we just identified. The name that remains is the data disk.
+  data_disk_command = (
+      'lsblk -d -o NAME,TYPE | awk \'$2=="disk" {print $1}\' | grep -v'
+      ' "^$BOOT_DISK$"'
+  )
+
+  data_disk_name, _ = vm.RemoteCommand(
+      ';'.join(
+          [root_partition_device_command, boot_disk_command, data_disk_command]
+      )
+  )
+  return data_disk_name.strip()
+
+
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """Install MongoDB on one VM and YCSB on another.
 
@@ -279,7 +315,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
+  server_vms = []
   primary = benchmark_spec.vm_groups['primary'][0]
+  server_vms.append(primary)
   secondary = None
   arbiter = None
   clients = benchmark_spec.vm_groups['clients']
@@ -292,6 +330,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   if not FLAGS.mongodb_primary_only:
     secondary = benchmark_spec.vm_groups['secondary'][0]
+    server_vms.append(secondary)
     arbiter = benchmark_spec.vm_groups['arbiter'][0]
     server_partials += [functools.partial(_PrepareServer, secondary)]
     arbiter_partial += [functools.partial(_PrepareArbiter, arbiter)]
@@ -322,6 +361,21 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   if not FLAGS.mongodb_primary_only:
     mongosh.RunCommand(primary, 'rs.conf()')
   primary.RemoteCommand('df -h')
+
+  # Set NVMe queue depth on server VM(s) if value is provided.
+  if _MONGODB_NVME_QUEUE_DEPTH.value:
+    for server_vm in server_vms:
+      nvme_data_disk_name = _GetNvmeDataDiskName(server_vm)
+      server_vm.RemoteCommand(
+          f'cat /sys/block/{nvme_data_disk_name}/queue/nr_requests'
+      )
+      server_vm.RemoteCommand(
+          f'echo {_MONGODB_NVME_QUEUE_DEPTH.value} | sudo tee'
+          f' /sys/block/{nvme_data_disk_name}/queue/nr_requests'
+      )
+      server_vm.RemoteCommand(
+          f'cat /sys/block/{nvme_data_disk_name}/queue/nr_requests'
+      )
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:

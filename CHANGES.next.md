@@ -596,3 +596,5 @@
     threads waiting for a connection, default 500) being exceeded during MongoDB
     YCSB benchmarks. This will also align the number between single node and PSA
     setups.
+-   Add flag nvme_queue_depth to allow changing the value for server VMs' data
+    disks. One example use case is to match SCSI queue depth for comparison.
