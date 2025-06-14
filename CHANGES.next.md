@@ -599,3 +599,4 @@
 -   Add flag nvme_queue_depth to allow changing the value for server VMs' data
     disks. One example use case is to match SCSI queue depth for comparison.
 -   Add fio Write saturation IOPS benchmark.
+-   Add fio max IOPS microbenchmark

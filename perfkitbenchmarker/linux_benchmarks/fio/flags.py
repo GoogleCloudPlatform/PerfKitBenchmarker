@@ -229,3 +229,13 @@ FIO_LATENCY_RUN = flags.DEFINE_integer(
 FIO_SEPARATE_JOBS_FOR_DISKS = flags.DEFINE_bool(
     'fio_separate_jobs_for_disks', False, ''
 )
+
+FIO_OPERATION_TYPE = flags.DEFINE_enum(
+    'fio_operation_type',
+    constants.OPERATION_READ,
+    [
+        constants.OPERATION_READ,
+        constants.OPERATION_WRITE
+    ],
+    'Fio operation/workload type.',
+)
