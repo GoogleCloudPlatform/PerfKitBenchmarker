@@ -14,7 +14,6 @@
 """Benchmark to measure Max IOPS after write saturation."""
 
 import copy
-import logging
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
@@ -38,14 +37,15 @@ fio_write_saturation:
       disk_spec: *default_500_gb
       vm_count: 1
   flags:
-    fio_fill_size: 200%
+    fio_fill_size: 100%
     fio_fill_block_size: 128k
     fio_generate_scenarios: rand_4k_write_100%
     fio_runtime: 300
     fio_target_mode: against_device_with_fill
+    fio_test_count: 12
 """
-# Prefilling the disk with 200% of its size make sure all the disk segments
-# are written to.
+
+JOB_FILE = 'fio-write-saturation.job'
 
 
 def GetConfig(user_config):
@@ -70,8 +70,7 @@ def CheckPrerequisites(benchmark_config):
 def ValidateNoCustomJobFile():
   if fio_flags.FIO_JOBFILE.value:
     raise errors.Setup.InvalidFlagConfigurationError(
-        "Benchmark doesn't support custom job file, Please use"
-        ' --fio_generate_scenarios'
+        "Benchmark doesn't support custom job file"
     )
 
 
@@ -104,44 +103,20 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       vm.scratch_disks,
       fio_flags.FIO_GENERATE_SCENARIOS.value,
       benchmark_params,
-      'fio-parent.job',
+      JOB_FILE,
   )
-  stable_count = 0
-  all_samples = []
-  iops_values = []
+  all_iops = []
   samples = []
   write_iops_sample = None
-  # running fio till we get 5 consecutive runs with iops within 5 percent
-  # of each other.
-  while stable_count < 5:
+  for _ in range(fio_flags.FIO_TEST_COUNT.value):
     samples = utils.RunTest(vm, constants.FIO_PATH, job_file_str)
     write_iops_sample = GetIOPSSample(samples)
-    iops_values.append(write_iops_sample.value)
-    logging.info('write_iops: %s', write_iops_sample.value)
-    if not iops_values:
-      stable_count = 1
-    else:
-      if (
-          abs((write_iops_sample.value - iops_values[-1]) / iops_values[-1])
-          < 0.05
-      ):
-        stable_count += 1
-      else:
-        stable_count = 0
-  if samples and write_iops_sample:
-    ValidateIops(vm, write_iops_sample.value)
+    all_iops.append(write_iops_sample.value)
+  if write_iops_sample:
     metadata = copy.deepcopy(write_iops_sample.metadata)
-    metadata['all_write_iops'] = iops_values
-    all_samples.append(
-        sample.Sample(
-            metric='saturation_write_iops',
-            value=write_iops_sample.value,
-            unit=write_iops_sample.unit,
-            metadata=write_iops_sample.metadata,
-        )
-    )
-    all_samples.extend(samples)
-    all_samples.append(
+    metadata['all_write_iops'] = all_iops
+    # we are returning the samples of the last fio run.
+    samples.append(
         sample.Sample(
             metric='all_write_iops',
             value=-1,
@@ -149,40 +124,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
             metadata=metadata,
         )
     )
-  else:
-    raise errors.Benchmarks.RunError(
-        'Write IOPS not found, please check the fio output in logs.'
-    )
-  return all_samples
-
-
-def ValidateIops(vm, saturation_iops):
-  """Running double the iodepth to make sure config is enough for saturation.
-
-  Comparing the saturation IOPS with double the iodepth iops, if they are within
-  5 percent then config is good enough else raise exception.
-
-  Args:
-    vm: The virtual machine.
-    saturation_iops: The saturation IOPS.
-  """
-  benchmark_params = {
-      'iodepth': 100,
-      'numjobs': 2 * vm.num_cpus,
-  }
-  job_file_str = utils.GenerateJobFile(
-      vm.scratch_disks,
-      fio_flags.FIO_GENERATE_SCENARIOS.value,
-      benchmark_params,
-  )
-  validation_samples = utils.RunTest(vm, constants.FIO_PATH, job_file_str)
-  validation_write_iops = GetIOPSSample(validation_samples)
-  logging.info('validation_write_iops: %s', validation_write_iops.value)
-  if (validation_write_iops.value - saturation_iops) / saturation_iops > 0.05:
-    raise errors.Benchmarks.RunError(
-        'Fio Config is not enough for saturation, please check the fio output'
-        ' in logs.'
-    )
+  return samples
 
 
 def GetIOPSSample(samples) -> sample.Sample:

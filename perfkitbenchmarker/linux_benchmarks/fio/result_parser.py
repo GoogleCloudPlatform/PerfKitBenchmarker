@@ -135,7 +135,7 @@ def ParseResults(
             ('mean', _ConvertClat(clat_section['mean'])),
             ('stddev', _ConvertClat(clat_section['stddev'])),
         ]
-        if not skip_latency_individual_stats:
+        if 'percentile' in clat_section and not skip_latency_individual_stats:
           percentiles = clat_section['percentile']
           percentile_map = FormatPercentileMap(percentiles)
           for key, value in percentile_map.items():

@@ -239,3 +239,9 @@ FIO_OPERATION_TYPE = flags.DEFINE_enum(
     ],
     'Fio operation/workload type.',
 )
+
+FIO_TEST_COUNT = flags.DEFINE_integer(
+    'fio_test_count',
+    1,
+    'Number of fio tests to run.',
+)
