@@ -78,6 +78,15 @@ NUM_LOCAL_VOLUMES: dict[str, int] = {
     'Standard_L48as_v3': 6,
     'Standard_L64as_v3': 8,
     'Standard_L80as_v3': 10,
+    'Standard_L2s_v4': 1,
+    'Standard_L4s_v4': 2,
+    'Standard_L8s_v4': 4,
+    'Standard_L16s_v4': 4,
+    'Standard_L32s_v4': 8,
+    'Standard_L48s_v4': 6,
+    'Standard_L64s_v4': 8,
+    'Standard_L80s_v4': 10,
+    'Standard_L96s_v4': 12,
 }
 
 _MACHINE_TYPES_ONLY_SUPPORT_GEN1_IMAGES = (
@@ -166,6 +175,7 @@ NVME_MACHINE_FAMILIES = [
     'Standard_Fas_v6',
     'Standard_Fals_v6',
     'Standard_Fams_v6',
+    'Standard_Ls_v4',
     'Standard_Ms_v3',
     'Standard_Mds_v3',
 ]

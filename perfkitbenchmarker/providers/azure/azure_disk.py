@@ -76,6 +76,7 @@ LOCAL_SSD_PREFIXES = {'Standard_D', 'Standard_G', 'Standard_L'}
 AZURE_NVME_TYPES = [
     r'(Standard_L[0-9]+s_v2)',
     r'(Standard_L[0-9]+a?s_v3)',
+    r'(Standard_L[0-9]+a?s_v4)',
 ]
 
 # https://docs.microsoft.com/en-us/azure/virtual-machines/azure-vms-no-temp-disk

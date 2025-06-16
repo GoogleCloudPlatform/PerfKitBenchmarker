@@ -174,6 +174,12 @@ class AzureSetUpLocalSSDDiskStrategy(disk_strategies.SetUpDiskStrategy):
   def SetUpDisk(self):
     disks = []
 
+    if self.vm.SupportsNVMe():
+      nvme_devices = self.vm.GetNVMEDeviceInfo()
+      if len(nvme_devices) == self.vm.max_local_disks + 1:
+        # boot disk is nvme, and boot disk takes position 0
+        next(self.vm.lun_counter)
+
     for _ in range(self.disk_spec.num_striped_disks):
       data_disk = self._CreateLocalDisk()
       disks.append(data_disk)
