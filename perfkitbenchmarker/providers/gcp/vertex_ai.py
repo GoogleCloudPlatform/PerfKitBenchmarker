@@ -18,14 +18,6 @@ import re
 import time
 from typing import Any
 from absl import flags
-# pylint: disable=g-import-not-at-top, g-statement-before-imports
-# External needs from google.cloud.
-# pytype: disable=module-attr
-try:
-  from google.cloud.aiplatform import aiplatform
-except ImportError:
-  from google.cloud import aiplatform
-from google.api_core import exceptions as google_exceptions
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
@@ -42,7 +34,6 @@ FLAGS = flags.FLAGS
 
 CLI = 'CLI'
 MODEL_GARDEN_CLI = 'MODEL-GARDEN-CLI'
-SDK = 'SDK'
 SERVICE_ACCOUNT_BASE = '{}-compute@developer.gserviceaccount.com'
 _MODEL_DEPLOY_TIMEOUT = 60 * 60  # 1 hour
 
@@ -531,118 +522,6 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
     self.vm.InstallPackages('curl')
 
 
-class VertexAiPythonSdkModel(BaseVertexAiModel):
-  """Vertex AI model managed via python SDK.
-
-  Attributes:
-    gcloud_model: Representation of the model in gcloud python library.
-  """
-
-  INTERFACE: str = SDK
-
-  endpoint: 'VertexAiSdkEndpoint'
-  gcloud_model: aiplatform.Model
-
-  def _CreateEndpoint(self) -> 'VertexAiSdkEndpoint':
-    return VertexAiSdkEndpoint(
-        name=self.name,
-        region=self.region,
-        project=self.project,
-        vm=self.vm,
-    )
-
-  def _SendPrompt(
-      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
-  ) -> list[str]:
-    """Sends a prompt to the model and returns the response."""
-    instances = self.model_spec.ConvertToInstances(
-        prompt, max_tokens, temperature, **kwargs
-    )
-    assert self.endpoint.ai_endpoint
-    response = self.endpoint.ai_endpoint.predict(instances=instances)  # pytype: disable=attribute-error
-    str_responses = [str(response) for response in response.predictions]
-    return str_responses
-
-  def _UploadModel(self):
-    env_vars = self.model_spec.GetEnvironmentVariables(
-        model_bucket_path=self.model_bucket_path
-    )
-    logging.info(
-        'Uploading ai model %s with env vars %s', self.model_name, env_vars
-    )
-    self.gcloud_model = aiplatform.Model.upload(
-        display_name=self.name,
-        serving_container_image_uri=self.model_spec.container_image_uri,
-        serving_container_command=self.model_spec.serving_container_command,
-        serving_container_args=self.model_spec.serving_container_args,
-        serving_container_ports=self.model_spec.serving_container_ports,
-        serving_container_predict_route=self.model_spec.serving_container_predict_route,
-        serving_container_health_route=self.model_spec.serving_container_health_route,
-        serving_container_environment_variables=env_vars,
-        artifact_uri=self.model_bucket_path,
-        labels=util.GetDefaultTags(),
-    )
-    self.model_resource_name = self.gcloud_model.resource_name
-
-  def _DeployModel(self):
-    try:
-      assert self.gcloud_model
-      self.gcloud_model.deploy(
-          endpoint=self.endpoint.ai_endpoint,
-          machine_type=self.model_spec.machine_type,
-          accelerator_type=self.model_spec.accelerator_type,
-          accelerator_count=self.model_spec.accelerator_count,
-          deploy_request_timeout=1800,
-          max_replica_count=self.max_scaling,
-      )
-    except google_exceptions.ServiceUnavailable as ex:
-      logging.info('Tried to deploy model but got unavailable error %s', ex)
-      raise errors.Benchmarks.QuotaFailure(ex)
-
-  def _CreateDependencies(self):
-    """Creates the endpoint & copies the model to a bucket."""
-    aiplatform.init(
-        project=self.project,
-        location=self.region,
-        staging_bucket=self.staging_bucket,
-        service_account=self.service_account,
-    )
-    super()._CreateDependencies()
-
-  def _Delete(self) -> None:
-    """Deletes the underlying resource."""
-    logging.info('Deleting the resource: %s.', self.model_name)
-    assert self.gcloud_model
-    self.gcloud_model.delete()
-
-  def __getstate__(self):
-    """Override pickling as the AI platform objects are not picklable."""
-    to_pickle_dict = {
-        'name': self.name,
-        'model_name': self.model_name,
-        'model_bucket_path': self.model_bucket_path,
-        'region': self.region,
-        'project': self.project,
-        'service_account': self.service_account,
-        'model_upload_time': self.model_upload_time,
-        'model_deploy_time': self.model_deploy_time,
-        'model_spec': self.model_spec,
-    }
-    return to_pickle_dict
-
-  def __setstate__(self, pickled_dict):
-    """Override pickling as the AI platform objects are not picklable."""
-    self.name = pickled_dict['name']
-    self.model_name = pickled_dict['model_name']
-    self.model_bucket_path = pickled_dict['model_bucket_path']
-    self.region = pickled_dict['region']
-    self.project = pickled_dict['project']
-    self.service_account = pickled_dict['service_account']
-    self.model_upload_time = pickled_dict['model_upload_time']
-    self.model_deploy_time = pickled_dict['model_deploy_time']
-    self.model_spec = pickled_dict['model_spec']
-
-
 class BaseVertexAiEndpoint(resource.BaseResource):
   """Represents a Vertex AI endpoint independent of interface.
 
@@ -742,32 +621,6 @@ class VertexAiCliEndpoint(BaseVertexAiEndpoint):
     )
 
 
-class VertexAiSdkEndpoint(BaseVertexAiEndpoint):
-  """Represents a Vertex AI endpoint managed by the SDK.
-
-  Attributes:
-    ai_endpoint: The AIPlatform object representing the endpoint.
-  """
-
-  INTERFACE = SDK
-
-  ai_endpoint: aiplatform.Endpoint | None
-
-  def _Create(self) -> None:
-    """Creates the underlying resource."""
-    logging.info('Creating the endpoint: %s.', self.name)
-    self.ai_endpoint = aiplatform.Endpoint.create(
-        display_name=f'{self.name}-endpoint'
-    )
-
-  def _Delete(self) -> None:
-    """Deletes the underlying resource."""
-    logging.info('Deleting the endpoint: %s.', self.name)
-    assert self.ai_endpoint
-    self.ai_endpoint.delete(force=True)
-    self.ai_endpoint = None  # Object is not picklable - none it out
-
-
 def _FindRegexInOutput(
     output: str,
     regex: str,
@@ -783,6 +636,7 @@ def _FindRegexInOutput(
     group_index: If there are multiple groups in the regex, which one to return.
   """
   matches = re.search(regex, output)
+
   if not matches:
     if exception_type:
       raise exception_type(
@@ -839,14 +693,6 @@ class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
         f' --container-health-route={self.serving_container_health_route}'
         f' --container-env-vars={env_vars_str}'
     )
-
-  def GetModelDeployKwargs(self) -> dict[str, Any]:
-    """Returns the kwargs needed to deploy the model."""
-    return {
-        'machine_type': self.machine_type,
-        'accelerator_type': self.accelerator_type,
-        'accelerator_count': self.accelerator_count,
-    }
 
   def GetEnvironmentVariables(self, **kwargs) -> dict[str, str]:
     """Returns container's environment variables needed by Llama2."""
