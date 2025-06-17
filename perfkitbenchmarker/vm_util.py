@@ -28,7 +28,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from typing import Callable, Dict, Iterable, Tuple
+from typing import Any, Callable, Dict, Iterable, Tuple
 
 from absl import flags
 import jinja2
@@ -281,6 +281,26 @@ def GetPublicKeyPath():
   if UseProvidedSSHKeys():
     return _SSH_PUBLIC_KEY.value
   return PrependTempDir(PUBLIC_KEYFILE)
+
+
+def IncrementStackLevel(**kwargs: Any) -> Any:
+  """Increments the stack_level variable stored in kwargs.
+
+  This method should be called from "helper" functions whose usage is not
+  particularly interesting, but whose callers are.
+  A default of 1 (before being incremented) represents the caller of the
+  "helper" function.
+  Args:
+    **kwargs: The dictionary of arguments to modify, which may or may not
+      contain stack_level.
+
+  Returns:
+    The modified dictionary of arguments.
+  """
+  if 'stack_level' not in kwargs:
+    kwargs['stack_level'] = 1
+  kwargs['stack_level'] += 1
+  return kwargs
 
 
 def GetSshOptions(ssh_key_filename, connect_timeout=None):

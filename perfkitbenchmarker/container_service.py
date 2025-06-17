@@ -164,11 +164,7 @@ class RetriableContainerException(
 
 def RunKubectlCommand(command: list[str], **kwargs) -> tuple[str, str, int]:
   """Run a kubectl command."""
-  if 'stack_level' in kwargs:
-    kwargs['stack_level'] += 1
-  else:
-    # IssueCommand defaults stack_level to 1, so 2 skips this function.
-    kwargs['stack_level'] = 2
+  kwargs = vm_util.IncrementStackLevel(**kwargs)
   cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig] + command
 
   orig_suppress_failure = None
@@ -213,11 +209,7 @@ def RunRetryableKubectlCommand(
         ' (since timeouts are retryable).'
     )
 
-  if 'stack_level' in kwargs:
-    kwargs['stack_level'] += 1
-  else:
-    # IssueCommand defaults stack_level to 1, so 2 skips this function.
-    kwargs['stack_level'] = 2
+  kwargs = vm_util.IncrementStackLevel(**kwargs)
 
   @vm_util.Retry(
       timeout=timeout,

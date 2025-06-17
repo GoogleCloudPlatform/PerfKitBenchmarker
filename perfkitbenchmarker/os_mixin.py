@@ -238,6 +238,7 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
 
   def TryRemoteCommand(self, command: str, **kwargs):
     """Runs a remote command and returns True iff it succeeded."""
+    kwargs = vm_util.IncrementStackLevel(**kwargs)
     try:
       self.RemoteCommand(command, **kwargs)
       return True

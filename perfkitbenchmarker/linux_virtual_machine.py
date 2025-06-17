@@ -1507,7 +1507,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
-    kwargs = _IncrementStackLevel(**kwargs)
+    kwargs = vm_util.IncrementStackLevel(**kwargs)
     return self.RemoteCommandWithReturnCode(*args, **kwargs)[:2]
 
   def RemoteCommandWithReturnCode(
@@ -1526,7 +1526,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
-    kwargs = _IncrementStackLevel(**kwargs)
+    kwargs = vm_util.IncrementStackLevel(**kwargs)
     return self.RemoteHostCommandWithReturnCode(*args, **kwargs)
 
   def RemoteHostCommandWithReturnCode(
@@ -1656,7 +1656,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
-    kwargs = _IncrementStackLevel(**kwargs)
+    kwargs = vm_util.IncrementStackLevel(**kwargs)
     return self.RemoteHostCommandWithReturnCode(*args, **kwargs)[:2]
 
   def _CheckRebootability(self):
@@ -2390,17 +2390,6 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
         # copying some files might fail. Failures in copying such log files
         # should not block further log files from being copied.
         pass
-
-
-def _IncrementStackLevel(**kwargs: Any) -> Any:
-  """Increments the stack_level variable stored in kwargs."""
-  if 'stack_level' in kwargs:
-    kwargs['stack_level'] += 1
-  else:
-    # Default to 2 - one for helper function this is called from, & one for
-    # RemoteHostCommandWithReturnCode.
-    kwargs['stack_level'] = 2
-  return kwargs
 
 
 class ClearMixin(BaseLinuxMixin):
