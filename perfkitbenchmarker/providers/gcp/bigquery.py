@@ -46,6 +46,10 @@ BQ_JDBC_JAR_FILE = {
     'SIMBA_JDBC_1_6_3_1004': 'GoogleBigQueryJDBC42_1_6_3.jar',
     'GOOGLE_JDBC': 'jdbc-jar-with-dependencies-20250129.jar',
 }
+BQ_JDBC_JAVA_FLAGS = {
+    'SIMBA_JDBC_1_6_3_1004': '',
+    'GOOGLE_JDBC': '--add-opens=java.base/java.nio=ALL-UNNAMED',
+}
 
 
 class GenericClientInterface(edw_service.EdwClientInterface):
@@ -242,9 +246,10 @@ class JdbcClientInterface(GenericClientInterface):
       performance_details: A dictionary of query execution attributes eg. job_id
     """
     query_command = (
-        'java -cp {}:{} '
+        'java {} -cp {}:{} '
         'com.google.cloud.performance.edw.App --project {} --service_account '
         '{} --credentials_file {} --dataset {} --query_file {}'.format(
+            BQ_JDBC_JAVA_FLAGS[FLAGS.bq_client_interface],
             BQ_JDBC_CLIENT_FILE[FLAGS.bq_client_interface],
             BQ_JDBC_JAR_FILE[FLAGS.bq_client_interface],
             self.project_id,
