@@ -896,9 +896,12 @@ class KubernetesClusterCommands:
     cluster has been deleted.
     """
     try:
-      # Delete deployments first as otherwise autorepair will redeploy deleted
-      # pods.
+      # Delete deployments and jobs first as otherwise autorepair will redeploy
+      # deleted pods.
       run_cmd = ['delete', 'deployment', '--all', '-n', 'default']
+      RunRetryableKubectlCommand(run_cmd)
+
+      run_cmd = ['delete', 'job', '--all', '-n', 'default']
       RunRetryableKubectlCommand(run_cmd)
 
       timeout = 60 * 20

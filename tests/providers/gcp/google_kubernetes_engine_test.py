@@ -283,7 +283,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       cluster._Delete()
       command_string = ' '.join(issue_command.call_args[0][0])
 
-      self.assertEqual(issue_command.call_count, 4)
+      self.assertEqual(issue_command.call_count, 5)
       self.assertIn(
           'gcloud container clusters delete pkb-{}'.format(_RUN_URI),
           command_string,
