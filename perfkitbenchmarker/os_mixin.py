@@ -571,7 +571,9 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
     else:
       self.PushFile(file_path, remote_path)
 
-  def RenderTemplate(self, template_path, remote_path, context):
+  def RenderTemplate(
+      self, template_path, remote_path, context, should_log_file: bool = False
+  ):
     """Renders a local Jinja2 template and copies it to the remote host.
 
     The template will be provided variables defined in 'context', as well as a
@@ -581,6 +583,7 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
       template_path: string. Local path to jinja2 template.
       remote_path: string. Remote path for rendered file on the remote vm.
       context: dict. Variables to pass to the Jinja2 template during rendering.
+      should_log_file: bool. Whether to log the file after rendering.
 
     Raises:
       jinja2.UndefinedError: if template contains variables not present in
@@ -597,7 +600,16 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
     with vm_util.NamedTemporaryFile(
         prefix=prefix, dir=vm_util.GetTempDir(), delete=False, mode='w'
     ) as tf:
-      tf.write(template.render(vm=self, **context))
+      rendered_template = template.render(vm=self, **context)
+      if should_log_file:
+        logging.info(
+            'Rendered template from %s to %s with full text:\n%s',
+            template_path,
+            tf.name,
+            rendered_template,
+            stacklevel=2,
+        )
+      tf.write(rendered_template)
       tf.close()
       self.RemoteCopy(tf.name, remote_path)
 
