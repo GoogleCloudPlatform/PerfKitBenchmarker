@@ -43,9 +43,21 @@ FLAGS = flags.FLAGS
 NETWORK_RANGE = '10.0.0.0/8'
 ALLOW_ALL = 'tcp:1-65535,udp:1-65535,icmp'
 
-_PLACEMENT_GROUP_PREFIXES = frozenset(
-    ['c2', 'c3', 'n2', 'n2d', 'c2d', 'c3a', 'c3d', 'a2', 'a3', 'g2', 'h3', 'c4']
-)
+_PLACEMENT_GROUP_PREFIXES = frozenset([
+    'c2',
+    'c3',
+    'n2',
+    'n2d',
+    'c2d',
+    'c3a',
+    'c3d',
+    'a2',
+    'a3',
+    'g2',
+    'h3',
+    'c4',
+    'c4d',
+])
 
 
 class GceVpnGateway(network.BaseVpnGateway):
