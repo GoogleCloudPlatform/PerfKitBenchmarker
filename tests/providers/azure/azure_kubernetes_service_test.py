@@ -173,6 +173,28 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
         mock_cmd.func_to_mock.mock_calls[0].args[0],
     )
 
+  def testGetNodePoolNames(self):
+    self.MockIssueCommand(
+        {
+            'az aks nodepool list': [(
+                """[
+  {
+      "count": 4,
+      "name": "default"
+  },
+  {
+      "count": 1,
+      "name": "nodepool1"
+  }
+]
+""",
+                '',
+                0,
+            )],
+        },
+    )
+    self.assertEqual(self.aks.GetNodePoolNames(), ['default', 'nodepool1'])
+
 
 if __name__ == '__main__':
   unittest.main()
