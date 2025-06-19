@@ -75,9 +75,9 @@ from perfkitbenchmarker import benchmark_spec as bm_spec_lib
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.providers.gcp import util as gcp_util
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 FLAGS = flags.FLAGS
 
@@ -405,25 +405,6 @@ class _GcpZonalResource:
     self.zone = zone
 
 
-def _daemonset_yaml(image: str) -> str:
-  """Render the privileged benchmark DaemonSet manifest.
-
-  The manifest is a PKB data file rendered with Jinja2
-  (data/cluster/swap_encryption_daemonset.yaml.j2) rather than an inline
-  string, per PKB conventions.  The DaemonSet is pinned to the benchmark
-  nodepool via nodeSelector so it never lands on the dummy default pool.
-  """
-  return vm_util.ReadAndRenderJinja2Template(
-      'cluster/swap_encryption_daemonset.yaml.j2',
-      ds_name=_DS_NAME,
-      ds_namespace=_DS_NAMESPACE,
-      ds_label=_DS_LABEL,
-      benchmark_nodepool=_BENCHMARK_NODEPOOL,
-      image=image,
-      kernel_version=_KERNEL_VERSION.value,
-  )
-
-
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
   """Load and return benchmark config spec."""
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -665,12 +646,22 @@ def Cleanup(spec: _BenchmarkSpec) -> None:
 
 
 def _deploy_daemonset() -> None:
-  """Apply the benchmark DaemonSet manifest to the cluster."""
-  manifest = _daemonset_yaml(image=_DAEMONSET_IMAGE.value)
-  with vm_util.NamedTemporaryFile(mode='w', suffix='.yaml') as f:
-    f.write(manifest)
-    f.close()
-    kubectl.RunKubectlCommand(['apply', '-f', f.name])
+  """Apply the benchmark DaemonSet manifest to the cluster.
+
+  Uses kubernetes_commands.ApplyManifest which renders the Jinja2 template
+  from perfkitbenchmarker/data/cluster/swap_encryption_daemonset.yaml.j2,
+  writes it to a temp file, and calls kubectl apply -f — the standard PKB
+  pattern for deploying manifests.
+  """
+  kubernetes_commands.ApplyManifest(
+      'cluster/swap_encryption_daemonset.yaml.j2',
+      ds_name=_DS_NAME,
+      ds_namespace=_DS_NAMESPACE,
+      ds_label=_DS_LABEL,
+      benchmark_nodepool=_BENCHMARK_NODEPOOL,
+      image=_DAEMONSET_IMAGE.value,
+      kernel_version=_KERNEL_VERSION.value,
+  )
   logging.info('[swap_encryption] DaemonSet applied')
 
 
