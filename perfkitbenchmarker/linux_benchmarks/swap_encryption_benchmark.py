@@ -77,6 +77,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 FLAGS = flags.FLAGS
 
@@ -386,6 +387,22 @@ _oom_events: list[str] = []
 
 _BENCHMARK_NODEPOOL = 'benchmark'
 _DEFAULT_NODEPOOL = 'default-pool'
+
+
+class _GcpZonalResource:
+  """Minimal resource shim for gcp_util.GcloudCommand on compute operations.
+
+  gcp_util.GcloudCommand auto-injects --project and --zone from the resource
+  object passed to it.  GkeCluster._GcloudCommand() handles container/*
+  operations correctly but also switches --zone → --region for multi-zone
+  clusters, which is wrong for gcloud compute commands (--region creates
+  regional resources, not zonal ones).  This shim pins a single zone so all
+  gcloud compute calls target the correct AZ.
+  """
+
+  def __init__(self, project: str, zone: str) -> None:
+    self.project = project
+    self.zone = zone
 
 
 def _daemonset_yaml(image: str) -> str:
@@ -856,12 +873,6 @@ def _create_benchmark_node_pool(cluster) -> None:
   is_lssd = _BENCHMARK_LSSD.value or 'lssd' in machine_type.lower()
 
   # Determine zone/region from the cluster object.
-  zone_flags: list[str] = []
-  if getattr(cluster, 'zones', None):
-    zone_flags = ['--zone', cluster.zones[0]]
-  elif getattr(cluster, 'region', None):
-    zone_flags = ['--region', cluster.region]
-
   # LSSD configs only need a small boot disk (OS only; swap is on local NVMe).
   # Hyperdisk configs need 500 GiB to hit 80 000 IOPS (the IOPS/GiB ratio on
   # hyperdisk-balanced is 1:1 up to the provisioned ceiling, so a 100 GiB disk
@@ -870,31 +881,25 @@ def _create_benchmark_node_pool(cluster) -> None:
   disk_size_gb = 100 if is_lssd else _BOOT_DISK_SIZE_GB.value
 
   disk_type = _BOOT_DISK_TYPE.value
-  cmd = [
-      'gcloud',
+
+  # Use PKB's GcloudCommand wrapper: auto-injects --project, --zone/--region,
+  # and auth token refresh.  GkeCluster._GcloudCommand also handles the
+  # zone → region promotion for multi-zone / regional clusters.
+  cmd = cluster._GcloudCommand(
       'container',
       'node-pools',
       'create',
       _BENCHMARK_NODEPOOL,
       '--cluster',
       cluster.name,
-      '--project',
-      cluster.project,
-      '--machine-type',
-      machine_type,
-      '--image-type',
-      _NODE_IMAGE_TYPE.value,
-      '--disk-type',
-      disk_type,
-      '--disk-size',
-      str(disk_size_gb),
-      '--num-nodes',
-      '1',
-      '--node-labels',
-      f'pkb_nodepool={_BENCHMARK_NODEPOOL}',
-      '--no-enable-autoupgrade',
-      '--no-enable-autorepair',
-  ] + zone_flags
+  )
+  cmd.flags['machine-type'] = machine_type
+  cmd.flags['image-type'] = _NODE_IMAGE_TYPE.value
+  cmd.flags['disk-type'] = disk_type
+  cmd.flags['disk-size'] = disk_size_gb
+  cmd.flags['num-nodes'] = 1
+  cmd.flags['node-labels'] = f'pkb_nodepool={_BENCHMARK_NODEPOOL}'
+  cmd.args += ['--no-enable-autoupgrade', '--no-enable-autorepair']
 
   # IOPS and throughput provisioning only applies to hyperdisk-* types AND
   # only when the boot disk is also the swap device (non-LSSD configs).
@@ -902,21 +907,17 @@ def _create_benchmark_node_pool(cluster) -> None:
   # Provisioning 80k IOPS on a 100 GiB boot disk would exceed the
   # hyperdisk-balanced per-GiB cap (80 IOPS/GiB × 100 GiB = 8 000 max).
   if disk_type.startswith('hyperdisk') and not is_lssd:
-    cmd += [
-        '--boot-disk-provisioned-iops',
-        str(_BOOT_DISK_IOPS.value),
-        '--boot-disk-provisioned-throughput',
-        str(
-            _valid_hyperdisk_throughput(
-                _BOOT_DISK_IOPS.value, _BOOT_DISK_THROUGHPUT.value
-            )
-        ),
-    ]
+    # Hyperdisk boot-disk IOPS/throughput provisioning — not covered by
+    # GkeCluster._AddNodeParamsToCmd (which only handles secondary disks).
+    cmd.flags['boot-disk-provisioned-iops'] = _BOOT_DISK_IOPS.value
+    cmd.flags['boot-disk-provisioned-throughput'] = _valid_hyperdisk_throughput(
+        _BOOT_DISK_IOPS.value, _BOOT_DISK_THROUGHPUT.value
+    )
 
   # For LSSD machines, expose local NVMe as raw block devices so fio/mdadm
   # can access them directly (go/gke-swap-lssd uses local-nvme-ssd-block).
   if is_lssd:
-    cmd += ['--local-nvme-ssd-block', f'count={_LSSD_COUNT.value}']
+    cmd.flags['local-nvme-ssd-block'] = f'count={_LSSD_COUNT.value}'
 
   # ── GKE kubelet swap config ───────────────────────────────────────────────
   # Per Ajay's review comment (go/pkb-swap-encryption-pr1): the benchmark
@@ -937,7 +938,7 @@ def _create_benchmark_node_pool(cluster) -> None:
     )
     system_config_tmp.write(kubelet_yaml)
     system_config_tmp.flush()
-    cmd += ['--system-config-from-file', system_config_tmp.name]
+    cmd.flags['system-config-from-file'] = system_config_tmp.name
     logging.info(
         '[swap_encryption] kubeletConfig.memorySwapBehavior=%s (written to %s)',
         swap_behavior,
@@ -963,9 +964,7 @@ def _create_benchmark_node_pool(cluster) -> None:
   # GKE must also initialise the local NVMe devices before marking nodes Ready.
   # 1200 s (20 min) covers observed worst-case times on c4-lssd and n4 configs.
   try:
-    stdout, stderr, rc = vm_util.IssueCommand(
-        cmd, timeout=1200, raise_on_failure=False
-    )
+    _, stderr, rc = cmd.Issue(timeout=1200, raise_on_failure=False)
   finally:
     if system_config_tmp is not None:
       try:
@@ -1102,36 +1101,22 @@ def _attach_swap_disk(cluster) -> None:
       disk_size_gb,
       disk_type,
   )
-  create_cmd = [
-      'gcloud',
-      'compute',
-      'disks',
-      'create',
-      disk_name,
-      '--project',
-      project,
-      '--zone',
-      zone,
-      '--type',
-      disk_type,
-      '--size',
-      f'{disk_size_gb}GB',
-      '--quiet',
-  ]
-  if disk_type.startswith('hyperdisk'):
-    create_cmd += [
-        '--provisioned-iops',
-        str(_BOOT_DISK_IOPS.value),
-        '--provisioned-throughput',
-        str(
-            _valid_hyperdisk_throughput(
-                _BOOT_DISK_IOPS.value, _BOOT_DISK_THROUGHPUT.value
-            )
-        ),
-    ]
-  _, stderr, rc = vm_util.IssueCommand(
-      create_cmd, timeout=120, raise_on_failure=False
+  # Use PKB's GcloudCommand via _GcpZonalResource: auto-injects --project
+  # and --zone (always zonal — gcloud compute --region creates regional
+  # resources, which is not what we want for a node-attached swap disk).
+  gcp_res = _GcpZonalResource(project, zone)
+  create_cmd = gcp_util.GcloudCommand(
+      gcp_res, 'compute', 'disks', 'create', disk_name
   )
+  create_cmd.flags['type'] = disk_type
+  create_cmd.flags['size'] = f'{disk_size_gb}GB'
+  create_cmd.args.append('--quiet')
+  if disk_type.startswith('hyperdisk'):
+    create_cmd.flags['provisioned-iops'] = _BOOT_DISK_IOPS.value
+    create_cmd.flags['provisioned-throughput'] = _valid_hyperdisk_throughput(
+        _BOOT_DISK_IOPS.value, _BOOT_DISK_THROUGHPUT.value
+    )
+  _, stderr, rc = create_cmd.Issue(timeout=120, raise_on_failure=False)
   if rc != 0:
     raise errors.Benchmarks.RunError(
         f'[swap_encryption] Failed to create swap disk {disk_name}: {stderr}'
@@ -1141,25 +1126,13 @@ def _attach_swap_disk(cluster) -> None:
   logging.info(
       '[swap_encryption] Attaching swap disk %s to %s', disk_name, instance_name
   )
-  attach_cmd = [
-      'gcloud',
-      'compute',
-      'instances',
-      'attach-disk',
-      instance_name,
-      '--project',
-      project,
-      '--zone',
-      zone,
-      '--disk',
-      disk_name,
-      '--device-name',
-      'pkb-swap',
-      '--quiet',
-  ]
-  _, stderr, rc = vm_util.IssueCommand(
-      attach_cmd, timeout=120, raise_on_failure=False
+  attach_cmd = gcp_util.GcloudCommand(
+      gcp_res, 'compute', 'instances', 'attach-disk', instance_name
   )
+  attach_cmd.flags['disk'] = disk_name
+  attach_cmd.flags['device-name'] = 'pkb-swap'
+  attach_cmd.args.append('--quiet')
+  _, stderr, rc = attach_cmd.Issue(timeout=120, raise_on_failure=False)
   if rc != 0:
     raise errors.Benchmarks.RunError(
         f'[swap_encryption] Failed to attach swap disk to {instance_name}: '
@@ -1179,22 +1152,12 @@ def _delete_disk_by_name(disk_name: str, project: str, zone: str) -> bool:
   leaked.  Returns True if the disk is gone (deleted or already absent).
   """
   for attempt in range(1, 5):
-    users, _, rc = vm_util.IssueCommand(
-        [
-            'gcloud',
-            'compute',
-            'disks',
-            'describe',
-            disk_name,
-            '--project',
-            project,
-            '--zone',
-            zone,
-            '--format=value(users)',
-        ],
-        timeout=60,
-        raise_on_failure=False,
+    gcp_res = _GcpZonalResource(project, zone)
+    describe_cmd = gcp_util.GcloudCommand(
+        gcp_res, 'compute', 'disks', 'describe', disk_name
     )
+    describe_cmd.flags['format'] = 'value(users)'
+    users, _, rc = describe_cmd.Issue(timeout=60, raise_on_failure=False)
     if rc != 0:
       logging.info(
           '[swap_encryption] Swap disk %s not present — nothing to delete',
@@ -1207,40 +1170,17 @@ def _delete_disk_by_name(disk_name: str, project: str, zone: str) -> bool:
       logging.info(
           '[swap_encryption] Detaching swap disk %s from %s', disk_name, inst
       )
-      vm_util.IssueCommand(
-          [
-              'gcloud',
-              'compute',
-              'instances',
-              'detach-disk',
-              inst,
-              '--project',
-              project,
-              '--zone',
-              zone,
-              '--disk',
-              disk_name,
-              '--quiet',
-          ],
-          timeout=120,
-          raise_on_failure=False,
+      detach_cmd = gcp_util.GcloudCommand(
+          gcp_res, 'compute', 'instances', 'detach-disk', inst
       )
-    _, derr, drc = vm_util.IssueCommand(
-        [
-            'gcloud',
-            'compute',
-            'disks',
-            'delete',
-            disk_name,
-            '--project',
-            project,
-            '--zone',
-            zone,
-            '--quiet',
-        ],
-        timeout=180,
-        raise_on_failure=False,
+      detach_cmd.flags['disk'] = disk_name
+      detach_cmd.args.append('--quiet')
+      detach_cmd.Issue(timeout=120, raise_on_failure=False)
+    delete_cmd = gcp_util.GcloudCommand(
+        gcp_res, 'compute', 'disks', 'delete', disk_name
     )
+    delete_cmd.args.append('--quiet')
+    _, derr, drc = delete_cmd.Issue(timeout=180, raise_on_failure=False)
     if drc == 0:
       logging.info('[swap_encryption] Swap disk deleted: %s', disk_name)
       return True
@@ -1281,31 +1221,21 @@ def _delete_default_node_pool(cluster) -> None:
   requirement that a cluster must have at least one nodepool at creation time.
   Removing it stops the clock on its cost immediately.
   """
-  zone_flags: list[str] = []
-  if getattr(cluster, 'zones', None):
-    zone_flags = ['--zone', cluster.zones[0]]
-  elif getattr(cluster, 'region', None):
-    zone_flags = ['--region', cluster.region]
-
-  cmd = [
-      'gcloud',
+  # Use PKB's GcloudCommand: auto-injects --project, --zone/--region.
+  cmd = cluster._GcloudCommand(
       'container',
       'node-pools',
       'delete',
       _DEFAULT_NODEPOOL,
       '--cluster',
       cluster.name,
-      '--project',
-      cluster.project,
-      '--quiet',
-  ] + zone_flags
+  )
+  cmd.args.append('--quiet')
 
   logging.info(
       '[swap_encryption] Deleting default nodepool: %s', _DEFAULT_NODEPOOL
   )
-  stdout, stderr, rc = vm_util.IssueCommand(
-      cmd, timeout=300, raise_on_failure=False
-  )
+  _, stderr, rc = cmd.Issue(timeout=300, raise_on_failure=False)
   if rc != 0:
     logging.warning(
         '[swap_encryption] Could not delete default nodepool (rc=%d): %s',
