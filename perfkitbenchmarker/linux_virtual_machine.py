@@ -2330,63 +2330,122 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     )
     return False
 
-  def CopyLogs(self, log_dir: str):
-    """Copies logs from the given directory on the VM to the scratch directory.
+  def CopyLogs(self, log_path: str):
+    """Copies logs from the given path on the VM to the scratch directory.
+
+    If the provided path is a directory, all files within that directory are
+    copied. If the path is a file, only that file is copied.
 
     Log paths are converted to snake_case and .log extension is added if it is
     missing. And VM name is prepended to the file name to distinguish between
     multiple VMs.
 
-    Example:
+    Example (Directory):
     VM: pkb-123456-0
     Log path: /var/log/syslog
 
     Copied file: /tmp/perkitbenchmarker/123456/pkb-123456-0__var_log_syslog.log
 
+    Example (File):
+    VM: pkb-123456-0
+    Log path: /etc/mongod.conf
+
+    Copied file: /tmp/perkitbenchmarker/123456/pkb-123456-0__etc_mongod.conf.log
+
     Args:
-      log_dir: The directory on the VM to copy the logs from.
+      log_path: The directory or file path on the VM to copy the logs from.
     """
-    try:
-      _, _, return_code = self.RemoteCommandWithReturnCode(
-          f'[[ -d "{log_dir}" ]]', ignore_failure=True
+    def GetTargeFilePath(remote_file: str) -> str:
+      """Build the target file path for a given remote file."""
+      # Join absolute path of the log file to preserve the directory
+      # structure.
+      target_file_name = f'{self.name}_{remote_file.replace("/", "_")}'
+      target_file_path = os.path.join(vm_util.GetTempDir(), target_file_name)
+      # Add .log extension if it is missing since Artemis only copied logs
+      # with this extension.
+      if not target_file_path.endswith('.log'):
+        target_file_path += '.log'
+      return target_file_path
+
+    files_to_copy = []
+    # First, check if the path is a directory.
+    _, _, is_dir_code = self.RemoteCommandWithReturnCode(
+        f'[[ -d "{log_path}" ]]', ignore_failure=True
+    )
+    if is_dir_code == 0:
+      # Path is a directory, find all files within it.
+      try:
+        stdout, stderr = self.RemoteCommand(f'sudo find {log_path} -type f')
+        if not stdout:
+          logging.warning(
+              'No files found in directory %s: %s', log_path, stderr
+          )
+          return
+        files_to_copy = [rf.strip() for rf in stdout.splitlines()]
+      except errors.VirtualMachine.RemoteCommandError as e:
+        logging.warning('Failed to find logs in directory %s: %s', log_path, e)
+        return
+    else:
+      # Path is not a directory, check if it is a file.
+      _, _, is_file_code = self.RemoteCommandWithReturnCode(
+          f'[[ -f "{log_path}" ]]', ignore_failure=True
       )
-      if return_code != 0:
+      if is_file_code == 0:
+        # Path is a single file.
+        files_to_copy = [log_path]
+      else:
+        # Path does not exist or is not a regular file or directory.
         logging.warning(
-            'Log directory %s does not exist or is not a directory on VM %s.'
-            ' Skipping log copying for this path.',
-            log_dir,
+            'Log path %s does not exist or is not a regular file or '
+            'directory on VM %s. Skipping log copying for this path.',
+            log_path,
             self.name,
         )
         return
 
-      stdout, stderr = self.RemoteCommand(f'sudo find {log_dir} -type f')
-      if not stdout:
-        logging.warning('Failed to find logs in %s: %s', log_dir, stderr)
-        return
-    except errors.VirtualMachine.RemoteCommandError as e:
-      logging.warning('Failed to find logs in %s: %s', log_dir, e)
-      return
-
-    for remote_file in [rf.strip() for rf in stdout.splitlines()]:
+    for remote_file in files_to_copy:
       try:
-        # Join absolute path of the log file to preserve the directory
-        # structure.
-        target_file_name = f'{self.name}_{remote_file.replace("/", "_")}'
-        target_file_path = os.path.join(vm_util.GetTempDir(), target_file_name)
-        # Add .log extension if it is missing since Artemis only copied logs
-        # with this extension.
-        if not target_file_path.endswith('.log'):
-          target_file_path += '.log'
+        # Build the target file path for a given remote file.
+        target_file_path = GetTargeFilePath(remote_file)
+        # Pull the file from the VM to target_file_path. Note that vm.PullFile
+        # does not use sudo.
         self.PullFile(target_file_path, remote_file)
-      except errors.VirtualMachine.RemoteCommandError as e:
+      except errors.VirtualMachine.RemoteCommandError as scp_error:
         logging.warning(
-            'Error copying logs %s from vm %s: %s',
+            'Error copying log file %s from vm %s: %s',
             remote_file,
             self.name,
-            e,
+            scp_error,
         )
-        # We attempt to copy all log files from the given directory. However,
-        # since vm.PullFile does not currently use sudo, it's possible that
+
+        # Define a sudo cat remote command to read the file with elevated
+        # privileges.
+        sudo_cat_command = f'sudo cat {remote_file}'
+        try:
+          # Execute the command and capture the stdout, which is the content of
+          # the remote log file.
+          log_contents, _ = self.RemoteCommand(sudo_cat_command)
+          # Build the target file path for a given remote file.
+          target_file_path = GetTargeFilePath(remote_file)
+          # Write the captured stdout to target_file_path.
+          with open(target_file_path, 'w') as target_file:
+            target_file.write(log_contents)
+          logging.info(
+              'Successfully copied remote file %s from vm %s with sudo cat'
+              ' to %s',
+              remote_file,
+              self.name,
+              target_file_path,
+          )
+        except errors.VirtualMachine.RemoteCommandError as ssh_sudo_cat_error:
+          logging.warning(
+              'Error copying log file %s from vm %s with sudo cat: %s',
+              remote_file,
+              self.name,
+              ssh_sudo_cat_error,
+          )
+
+        # We attempt to copy all given log files. However, it's possible that
         # copying some files might fail. Failures in copying such log files
         # should not block further log files from being copied.
         pass
