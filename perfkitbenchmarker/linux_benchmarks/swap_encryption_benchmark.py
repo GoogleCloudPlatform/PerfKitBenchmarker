@@ -923,7 +923,34 @@ def _create_benchmark_node_pool(cluster) -> None:
   swap_behavior = _GKE_KUBELET_MEMORY_SWAP.value
   system_config_tmp = None
   if swap_behavior:
-    kubelet_yaml = f'kubeletConfig:\n  memorySwapBehavior: {swap_behavior}\n'
+    # Build system-config YAML for --system-config-from-file.
+    # Per Ajay's review (go/pkb-swap-encryption-pr1 #r3457877984):
+    #   kubeletConfig.memorySwapBehavior: kubelet allocates swap to pods.
+    #   linuxConfig.swapConfig: GKE enables node-level swap device.
+    #     For LSSD machines, dedicatedLocalSsdProfile tells GKE to use
+    #     the local NVMe as the swap device (avoids boot-disk overhead).
+    #   linuxConfig.sysctl: swap aggressiveness tuning so the benchmark
+    #     workloads can drive sustained swap I/O.
+    # Reference:
+    #   https://docs.cloud.google.com/kubernetes-engine/docs/how-to/
+    #   node-memory-swap#enable
+    if is_lssd:
+      swap_config_block = (
+          '  swapConfig:\n'
+          '    enabled: true\n'
+          '    dedicatedLocalSsdProfile:\n'
+          f'      diskCount: {_LSSD_COUNT.value}\n'
+      )
+    else:
+      swap_config_block = '  swapConfig:\n    enabled: true\n'
+    kubelet_yaml = (
+        f'kubeletConfig:\n  memorySwapBehavior: {swap_behavior}\nlinuxConfig:\n'
+        + swap_config_block
+        + '  sysctl:\n'
+        '    vm.min_free_kbytes: 200\n'
+        '    vm.watermark_scale_factor: 500\n'
+        '    vm.swappiness: 100\n'
+    )
     system_config_tmp = tempfile.NamedTemporaryFile(
         mode='w', suffix='.yaml', delete=False
     )
@@ -931,9 +958,12 @@ def _create_benchmark_node_pool(cluster) -> None:
     system_config_tmp.flush()
     cmd.flags['system-config-from-file'] = system_config_tmp.name
     logging.info(
-        '[swap_encryption] kubeletConfig.memorySwapBehavior=%s (written to %s)',
+        '[swap_encryption] system-config-from-file: '
+        'kubelet_swap=%s lssd=%s (written to %s):\n%s',
         swap_behavior,
+        is_lssd,
         system_config_tmp.name,
+        kubelet_yaml,
     )
 
   logging.info(

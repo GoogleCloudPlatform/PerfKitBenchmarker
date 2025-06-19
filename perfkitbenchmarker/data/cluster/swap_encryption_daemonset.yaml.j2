@@ -166,53 +166,15 @@ spec:
             tar -xf "$PKB_KTARBALL" -C "$PKB_KROOT" 2>&1 || \\
               echo "[pkb] WARNING: kernel source extraction failed" >&2
           fi
-          echo "[pkb] Unlocking container cgroup swap limits..."
-          # GKE cgroup v2 sets memory.swap.max=0 per-container, which
-          # prevents swap usage even when the node has a swap device and
-          # vm.swappiness>0.  Stress-ng gets OOM-killed in ~15s because
-          # the kernel can't page out to swap for this cgroup.
-          #
-          # NOTE: the old approach derived the cgroup path from
-          # /proc/self/cgroup, but inside a cgroup namespace that reports
-          # "0::/" — so the write targeted the host ROOT cgroup, silently
-          # no-op'd, and swap stayed locked (the OOM-in-15s symptom above).
-          # /sys is the host cgroup tree (hostPath mount) and this pod is
-          # privileged, so instead unlock swap across the entire kubepods
-          # hierarchy, which is guaranteed to contain our own container.
-          if [ -d /sys/fs/cgroup/kubepods.slice ] || \
-             [ -d /sys/fs/cgroup/kubepods ]; then
-            # cgroup v2: write 'max' to every memory.swap.max under kubepods*.
-            find /sys/fs/cgroup -path '*kubepods*' -name memory.swap.max \
-              2>/dev/null | while read -r _f; do
-                echo max > "$_f" 2>/dev/null || true
-              done
-          fi
-          # Best-effort: our own namespaced path and the unified root.
-          PKB_CG=$(awk -F: '$2==""{print $3; exit}' /proc/self/cgroup \
-            2>/dev/null)
-          for _cgf in "/sys/fs/cgroup${PKB_CG}/memory.swap.max" \
-                      /sys/fs/cgroup/memory.swap.max; do
-            [ -f "$_cgf" ] && { echo max > "$_cgf" 2>/dev/null || true; }
-          done
-          # cgroup v1 fallback: lift the combined RAM+swap hard ceiling.
-          find /sys/fs/cgroup/memory -path '*kubepods*' \
-            -name memory.memsw.limit_in_bytes 2>/dev/null \
-            | while read -r _f; do
-                echo -1 > "$_f" 2>/dev/null || true
-              done
-          # Verify and surface the result in the pod log.  grep -L lists
-          # files that do NOT contain 'max' on their first line, i.e. ones
-          # still capping swap.
-          PKB_STILL_CAPPED=$(find /sys/fs/cgroup -path '*kubepods*' \
-            -name memory.swap.max 2>/dev/null \
-            | xargs -r grep -L '^max' 2>/dev/null | head -1)
-          if [ -n "$PKB_STILL_CAPPED" ]; then
-            echo "[pkb] WARNING: cgroup swap still capped at \
-            $PKB_STILL_CAPPED=$(cat "$PKB_STILL_CAPPED" 2>/dev/null) — stress-ng may be \
-            OOM-killed before swap is exercised" >&2
-          else
-            echo "[pkb] cgroup swap unlocked (memory.swap.max=max across kubepods)"
-          fi
+          # Container cgroup swap limits are managed by the kubelet when
+          # kubeletConfig.memorySwapBehavior=LimitedSwap is set via
+          # --system-config-from-file (GKE) or kubelet-config.json (EKS).
+          # Manually writing memory.swap.max=max across kubepods is not
+          # required and is superseded by the kubelet swap config.
+          # Reference: Ajay's review comment go/pkb-swap-encryption-pr1
+          # #r3457928855 — https://github.com/GoogleCloudPlatform/
+          # PerfKitBenchmarker/pull/6776#discussion_r3457928855
+          echo "[pkb] Swap limits managed by kubelet (LimitedSwap config)."
           echo "[pkb] Tools installed. Writing ready sentinel."
           touch /tmp/pkb_ready
           sleep infinity
@@ -264,3 +226,4 @@ spec:
         hostPath:
           path: /lib/modules
           type: Directory
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
