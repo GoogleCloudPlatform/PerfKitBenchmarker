@@ -64,6 +64,8 @@ containerd cgroup hierarchy, etc.).
 """
 
 import logging
+import os
+import tempfile
 import textwrap
 import time
 from typing import Any
@@ -280,6 +282,18 @@ _ENABLE_DMCRYPT = flags.DEFINE_boolean(
     "(aes-xts-plain64, ephemeral random key) matching GKE's "
     'go/node:swap-encryption implementation.  Set False to measure plain '
     '(unencrypted) swap overhead as a baseline.',
+)
+
+_GKE_KUBELET_MEMORY_SWAP = flags.DEFINE_string(
+    'swap_encryption_gke_kubelet_memory_swap',
+    'LimitedSwap',
+    'Value for kubeletConfig.memorySwapBehavior injected via '
+    '--system-config-from-file when creating the GKE benchmark nodepool.  '
+    'LimitedSwap (default) — the kubelet allows pods to use swap up to their '
+    'memory limit; required for the DaemonSet pod to drive kernel swapping.  '
+    'NoSwap — disables swap at the kubelet level (use for a baseline run that '
+    'confirms zero swap activity).  Set empty string to omit the flag entirely '
+    'and rely on the cluster-level default.',
 )
 
 _SWAP_DEVICE = flags.DEFINE_string(
@@ -547,9 +561,10 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:
     )
   if _pod_lost:
     _degraded_reasons.append(
-        f'pod(s) NotFound during run: {", ".join(_pod_lost)} — pod died'
-        ' (eviction/exit); phases at/after that point (e.g.'
-        ' kernel-build, OpenSearch) produced invalid data'
+        'benchmark pod(s) went NotFound during the run'
+        f' ({", ".join(_pod_lost)}) — the pod died (node memory-pressure'
+        ' eviction or container exit) and any phase running at or after that'
+        ' point (e.g. kernel-build baseline, OpenSearch) produced invalid data'
     )
   if _oom_events:
     _degraded_reasons.append(
@@ -598,10 +613,9 @@ def Cleanup(spec: _BenchmarkSpec) -> None:
     _pod_exec(
         pod,
         textwrap.dedent("""
-          swapoff /dev/mapper/swap_encrypted 2>/dev/null || true
-          dmsetup remove --noudevrules --noudevsync \
-            swap_encrypted 2>/dev/null || true
-        """),
+      swapoff /dev/mapper/swap_encrypted 2>/dev/null || true
+      dmsetup remove --noudevrules --noudevsync swap_encrypted 2>/dev/null || true
+    """),
         ignore_failure=True,
     )
     # Clean up loop device backing files (single-disk fallback path).
@@ -622,9 +636,7 @@ def Cleanup(spec: _BenchmarkSpec) -> None:
         ignore_failure=True,
     )
     _pod_exec(
-        pod,
-        "pkill -9 'stress-ng|fio' 2>/dev/null || true",
-        ignore_failure=True,
+        pod, "pkill -9 'stress-ng|fio' 2>/dev/null || true", ignore_failure=True
     )
 
   _delete_daemonset()
@@ -672,8 +684,10 @@ def _wait_for_benchmark_pod(timeout: int = 900) -> str | None:
               '-n',
               _DS_NAMESPACE,
               '-o',
-              r'jsonpath={range .items[*]}{.metadata.name}'
-              r'{"\t"}{.status.phase}{"\n"}{end}',
+              (
+                  r'jsonpath={range'
+                  r' .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}'
+              ),
           ],
           raise_on_failure=False,
       )
@@ -721,15 +735,15 @@ def _wait_for_benchmark_pod(timeout: int = 900) -> str | None:
             '[swap_encryption] Pod %s ready (tools installed)', ready_pod
         )
         return ready_pod
-      # "container not found" means the container crashed (CrashLoopBackOff
-      # or exited) — hard reset: re-check pod phase on next iteration.
+      # "container not found" means the container crashed (CrashLoopBackOff or
+      # exited) — treat it as a hard reset: re-check pod phase on next iteration.
       if (
           'container not found' in sentinel_err
           or 'unable to upgrade connection' in sentinel_err
       ):
         logging.warning(
-            '[swap_encryption] Pod %s: container not running (%s)'
-            ' — will re-check pod state',
+            '[swap_encryption] Pod %s: container not running (%s) '
+            '— will re-check pod state',
             ready_pod,
             sentinel_err.strip(),
         )
@@ -749,7 +763,7 @@ def _wait_for_benchmark_pod(timeout: int = 900) -> str | None:
 
 
 def _log_pod_events(pod_name: str) -> None:
-  """Dump recent Kubernetes events for the pod to diagnose startup hangs."""
+  """Dump recent Kubernetes events for the pod to help diagnose startup hangs."""
   events_out, _, _ = kubectl.RunKubectlCommand(
       [
           'describe',
@@ -793,8 +807,9 @@ def _delete_daemonset() -> None:
   logging.info('[swap_encryption] DaemonSet deleted')
 
 
-# GCP Hyperdisk Balanced: max IOPS = 256 × MiB/s provisioned throughput.
-_HYPERDISK_MAX_IOPS_PER_MBPS = 256
+_HYPERDISK_MAX_IOPS_PER_MBPS = (
+    256  # GCP Hyperdisk Balanced: IOPS <= 256 x MiB/s
+)
 
 
 def _valid_hyperdisk_throughput(iops: int, throughput: int) -> int:
@@ -903,10 +918,36 @@ def _create_benchmark_node_pool(cluster) -> None:
   if is_lssd:
     cmd += ['--local-nvme-ssd-block', f'count={_LSSD_COUNT.value}']
 
+  # ── GKE kubelet swap config ───────────────────────────────────────────────
+  # Per Ajay's review comment (go/pkb-swap-encryption-pr1): the benchmark
+  # nodepool must be created with kubeletConfig.memorySwapBehavior=LimitedSwap
+  # so that the kubelet allocates swap to the DaemonSet pod.  Without this flag
+  # the Linux kernel swap device may exist but the kubelet blocks pod-level
+  # swap usage and the benchmark pod cannot drive swap I/O.
+  #
+  # Passed as --system-config-from-file pointing to a temp YAML, which is the
+  # same mechanism PKB's gke_node_system_config flag uses:
+  #   perfkitbenchmarker/providers/gcp/google_kubernetes_engine.py
+  swap_behavior = _GKE_KUBELET_MEMORY_SWAP.value
+  system_config_tmp = None
+  if swap_behavior:
+    kubelet_yaml = f'kubeletConfig:\n  memorySwapBehavior: {swap_behavior}\n'
+    system_config_tmp = tempfile.NamedTemporaryFile(
+        mode='w', suffix='.yaml', delete=False
+    )
+    system_config_tmp.write(kubelet_yaml)
+    system_config_tmp.flush()
+    cmd += ['--system-config-from-file', system_config_tmp.name]
+    logging.info(
+        '[swap_encryption] kubeletConfig.memorySwapBehavior=%s (written to %s)',
+        swap_behavior,
+        system_config_tmp.name,
+    )
+
   logging.info(
       '[swap_encryption] Creating benchmark nodepool: %s / %s / '
       'image=%s / disk=%dGiB / iops=%d / dmcrypt=%s / lssd=%s / '
-      'add_swap_disk=%s',
+      'add_swap_disk=%s / kubelet_swap=%s',
       _BENCHMARK_NODEPOOL,
       machine_type,
       _NODE_IMAGE_TYPE.value,
@@ -915,14 +956,22 @@ def _create_benchmark_node_pool(cluster) -> None:
       _ENABLE_DMCRYPT.value,
       is_lssd,
       _ADD_SWAP_DISK.value,
+      swap_behavior or 'unset',
   )
 
   # LSSD nodepools take longer to provision than PD-only nodepools because
   # GKE must also initialise the local NVMe devices before marking nodes Ready.
   # 1200 s (20 min) covers observed worst-case times on c4-lssd and n4 configs.
-  stdout, stderr, rc = vm_util.IssueCommand(
-      cmd, timeout=1200, raise_on_failure=False
-  )
+  try:
+    stdout, stderr, rc = vm_util.IssueCommand(
+        cmd, timeout=1200, raise_on_failure=False
+    )
+  finally:
+    if system_config_tmp is not None:
+      try:
+        os.unlink(system_config_tmp.name)
+      except OSError:
+        pass
 
   if rc != 0:
     # Idempotent prepare: if the nodepool already exists (e.g. re-running
@@ -1325,8 +1374,7 @@ def _pod_exec(
     out, err, rc = kubectl.RunKubectlCommand(
         ['exec', active, '-n', _DS_NAMESPACE, '--', 'bash', '-c', cmd],
         raise_on_failure=False,
-        # Retry loop in _pod_exec handles transient resets.
-        raise_on_timeout=False,
+        raise_on_timeout=False,  # let _pod_exec's own retry loop handle transient resets
         timeout=timeout,
     )
     is_transient = rc != 0 and any(e in err for e in _TRANSIENT_KUBECTL_ERRORS)
@@ -1366,13 +1414,15 @@ def _pod_exec(
       pod_gone = _is_pod_gone(active)
       if pod_gone:
         logging.warning(
-            '[swap_encryption] OOM-eviction (rc=137, pod gone) —'
-            ' recovering pod name (cmd not retried)'
+            '[swap_encryption] OOM-eviction detected (rc=137, pod gone) —'
+            ' recovering pod name for subsequent commands (not retrying this'
+            ' cmd)'
         )
       else:
         logging.warning(
-            '[swap_encryption] OOM-kill (rc=137, pod exists) —'
-            ' waiting for container restart before continuing'
+            '[swap_encryption] Container OOM-killed (rc=137, pod still exists)'
+            ' — waiting for container restart and tool re-install before'
+            ' continuing'
         )
       new_pod = _recover_pod(active)
       if new_pod != active:
@@ -1595,12 +1645,10 @@ def _collect_cost_sample(
   instance_type = ''
 
   # GCP: machine type is the last segment of the metadata URL value
-  _gcp_meta_url = (
-      'http://metadata.google.internal/computeMetadata/v1/instance/machine-type'
-  )
   gcp_type_out, _ = _pod_exec(
       pod,
-      f'curl -s -m 3 --fail {_gcp_meta_url}'
+      'curl -s -m 3 --fail'
+      ' http://metadata.google.internal/computeMetadata/v1/instance/machine-type'
       ' -H "Metadata-Flavor: Google" 2>/dev/null || echo ""',
       ignore_failure=True,
   )
@@ -1736,13 +1784,10 @@ def _build_metadata(pod: str, swap_dev: str) -> dict[str, Any]:
   # cloud metadata so that the field is always populated.
   instance_label = _INSTANCE_SIZE_LABEL.value
   if not instance_label:
-    _gcp_mt_url = (
-        'http://metadata.google.internal'
-        '/computeMetadata/v1/instance/machine-type'
-    )
     gcp_type_out, _ = _pod_exec(
         pod,
-        f'curl -s -m 3 --fail {_gcp_mt_url}'
+        'curl -s -m 3 --fail'
+        ' http://metadata.google.internal/computeMetadata/v1/instance/machine-type'
         ' -H "Metadata-Flavor: Google" 2>/dev/null || echo ""',
         ignore_failure=True,
     )
