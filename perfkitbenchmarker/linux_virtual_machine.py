@@ -1540,6 +1540,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       ip_address: str | None = None,
       should_pre_log: bool = True,
       stack_level: int = 1,
+      suppress_logging: bool = False,
   ) -> Tuple[str, str, int]:
     """Runs a command on the VM.
 
@@ -1561,6 +1562,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       should_pre_log: Whether to output a "Running command" log statement.
       stack_level: Number of stack frames to skip & get an "interesting" caller,
         for logging. 1 skips this function, 2 skips this & its caller, etc..
+      suppress_logging: A boolean indicated whether STDOUT and STDERR should be
+        suppressed. Used for sensitive information.
 
     Returns:
       A tuple of stdout, stderr, return_code from running the command.
@@ -1618,6 +1621,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
             timeout=timeout,
             should_pre_log=False,
             raise_on_failure=False,
+            suppress_logging=suppress_logging,
             stack_level=stack_level,
         )
         # Retry on 255 because this indicates an SSH failure
@@ -2424,7 +2428,9 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
         try:
           # Execute the command and capture the stdout, which is the content of
           # the remote log file.
-          log_contents, _ = self.RemoteCommand(sudo_cat_command)
+          log_contents, _ = self.RemoteCommand(
+              sudo_cat_command, suppress_logging=True
+          )
           # Build the target file path for a given remote file.
           target_file_path = GetTargeFilePath(remote_file)
           # Write the captured stdout to target_file_path.

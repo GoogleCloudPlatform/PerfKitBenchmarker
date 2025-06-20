@@ -339,6 +339,7 @@ class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
         timeout=None,
         should_pre_log=False,
         raise_on_failure=False,
+        suppress_logging=False,
         stack_level=mock.ANY,
     )
 
@@ -349,6 +350,7 @@ class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
         timeout=None,
         should_pre_log=False,
         raise_on_failure=False,
+        suppress_logging=False,
         stack_level=4,
     )
 
@@ -372,6 +374,7 @@ class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
         timeout=None,
         should_pre_log=False,
         raise_on_failure=False,
+        suppress_logging=False,
         stack_level=mock.ANY,
     )
 
