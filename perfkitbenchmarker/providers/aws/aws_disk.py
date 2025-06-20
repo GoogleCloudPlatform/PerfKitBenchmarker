@@ -378,6 +378,18 @@ NUM_LOCAL_VOLUMES = {
     'i7i.16xlarge': 4,
     'i7i.24xlarge': 6,
     'i7i.48xlarge': 12,
+    'm8gd.medium': 1,
+    'm8gd.large': 1,
+    'm8gd.xlarge': 1,
+    'm8gd.2xlarge': 1,
+    'm8gd.4xlarge': 1,
+    'm8gd.8xlarge': 1,
+    'm8gd.12xlarge': 3,
+    'm8gd.16xlarge': 2,
+    'm8gd.24xlarge': 3,
+    'm8gd.48xlarge': 6,
+    'm8gd.metal-24xl': 3,
+    'm8gd.metal-48xl': 6,
 }
 
 
