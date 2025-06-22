@@ -21,11 +21,11 @@ DPDK_PKTGEN_GIT_REPO_DIR = 'Pktgen-DPDK'
 DPDK_PKTGEN_GIT_REPO_TAG = '0e3a9c50daedccc7a83597f187d96288264edac0'
 
 DPDK_PKTGEN_MBUF_CACHE_SIZE = flags.DEFINE_integer(
-    'dpdk_pktgen_mbuf_cache_size', 128, 'The size of the mbuf cache per lcore.'
+    'dpdk_pktgen_mbuf_cache_size', 512, 'The size of the mbuf cache per lcore.'
 )
 DPDK_PKTGEN_MBUFS_PER_PORT_MULTIPLIER = flags.DEFINE_integer(
     'dpdk_pktgen_mbufs_per_port_multiplier',
-    8,
+    32,
     'The multiplier for the number of mbufs per port.',
 )
 

@@ -18,6 +18,10 @@ dpdk_pktgen_small_pkt_loss:
     dpdk_pktgen_tx_burst: 128
     dpdk_pktgen_rx_burst: 128
     dpdk_pktgen_packet_loss_threshold_rates: 0.0001
+    dpdk_pktgen_txd: 2048
+    dpdk_pktgen_rxd: 2048
+    dpdk_pktgen_mbuf_cache_size: 128
+    dpdk_pktgen_mbufs_per_port_multiplier: 8
 
 speccpu2017_int_rate_flags_base: &speccpu2017_int_rate_flags_base
   build_fortran: True

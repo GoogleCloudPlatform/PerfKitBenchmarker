@@ -98,7 +98,10 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     self.bm_spec.vms = [mock.MagicMock(), mock.MagicMock()]
     self.bm_spec.vms[0].NumCpusForBenchmark.return_value = 22
 
-  @flagsaver.flagsaver(dpdk_pktgen_packet_loss_threshold_rates=[1])
+  @flagsaver.flagsaver(
+      dpdk_pktgen_packet_loss_threshold_rates=[1],
+      dpdk_pktgen_tx_rx_lcores_list=['[8:1],[1:8]'],
+  )
   def testClientServerStdout(self):
     self.bm_spec.vms[0].RemoteCommand.side_effect = [
         ('6', ''),
@@ -112,6 +115,8 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
         (self.sender_stdout, ''),
         (670441705, ''),
         (11, ''),
+        ('', ''),
+        ('', ''),
     ]
     self.bm_spec.vms[1].RemoteCommand.side_effect = [
         (self.receiver_stdout, ''),
