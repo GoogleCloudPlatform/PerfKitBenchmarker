@@ -886,7 +886,9 @@ def CombineResults(
 
   result_list = list(result_list)
   result = copy.deepcopy(result_list[0])
-  DropUnaggregated(result)
+
+  if len(result_list) > 1:
+    DropUnaggregated(result)
 
   for indiv in result_list[1:]:
     for group_name, group in indiv.groups.items():
