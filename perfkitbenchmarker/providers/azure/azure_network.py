@@ -809,8 +809,8 @@ class AzureNetwork(network.BaseNetwork):
     # Length restriction from https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftnetwork  pylint: disable=line-too-long
     prefix = '%s-%s' % (self.resource_group.name, self.region)
     vnet_name = prefix + '-vnet'
-    if len(vnet_name) > 64:
-      vnet_name = prefix[:59] + '-vnet'
+    if len(vnet_name) > 60:
+      vnet_name = prefix[:55] + '-vnet'
     self.vnet = AzureVirtualNetwork.GetForRegion(spec, self.region, vnet_name)
     zone_suffix = ''
     if self.availability_zone:
