@@ -126,7 +126,9 @@ class ProvisionKubernetesClusterTest(pkb_common_test_case.PkbCommonTestCase):
     }
 
     self.assertEqual(events, expected_event_times)
-    mock_run_kubectl.assert_called_once_with(['get', 'events', '-o', 'yaml'])
+    mock_run_kubectl.assert_called_once_with(
+        ['get', 'events', '-o', 'yaml'],
+        raise_on_timeout=True, timeout=None, stack_level=3)
 
   @mock.patch.object(container_service, 'RunKubectlCommand')
   def test_GetMinimumKeyScalingEventTimes(self, mock_run_kubectl):
@@ -146,7 +148,9 @@ class ProvisionKubernetesClusterTest(pkb_common_test_case.PkbCommonTestCase):
     }
 
     self.assertEqual(events, expected_event_times)
-    mock_run_kubectl.assert_called_once_with(['get', 'events', '-o', 'yaml'])
+    mock_run_kubectl.assert_called_once_with(
+        ['get', 'events', '-o', 'yaml'],
+        raise_on_timeout=True, timeout=None, stack_level=3)
 
   @mock.patch.object(container_service, 'RunKubectlCommand')
   def test_NoMinimumEventsThrows(self, mock_run_kubectl):

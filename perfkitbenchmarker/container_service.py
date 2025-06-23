@@ -34,7 +34,7 @@ from multiprocessing import synchronize
 import os
 import re
 import time
-from typing import Any, Callable, Iterator, Optional, Sequence
+from typing import Any, Callable, Iterable, Iterator, Optional, Sequence
 
 from absl import flags
 import jinja2
@@ -215,7 +215,7 @@ def RunRetryableKubectlCommand(
       timeout=timeout,
       retryable_exceptions=(errors.VmUtil.IssueCommandTimeoutError,),
   )
-  def _RunRetryablePart(run_cmd: list[str], **kwargs):
+  def _RunRetryablePart(run_cmd: list[str], **kwargs) -> tuple[str, str, int]:
     """Inner function retries command so timeout can be passed to decorator."""
     kwargs['stack_level'] += 1
     return RunKubectlCommand(run_cmd, raise_on_timeout=True, **kwargs)
@@ -504,6 +504,7 @@ class BaseContainerCluster(resource.BaseResource):
         collections.defaultdict(list)
     )
     self.services: dict[str, KubernetesContainerService] = {}
+    self._extra_samples: list[sample.Sample] = []
 
   @property
   def num_nodes(self) -> int:
@@ -608,6 +609,9 @@ class BaseContainerCluster(resource.BaseResource):
     """Deploys a ContainerSerivice according to the ContainerSpec."""
     raise NotImplementedError()
 
+  def AddSamples(self, samples: Iterable[sample.Sample]):
+    self._extra_samples += samples
+
   def GetSamples(self):
     """Return samples with information about deployment times."""
     samples = super().GetSamples()
@@ -651,6 +655,8 @@ class BaseContainerCluster(resource.BaseResource):
                 metadata,
             )
         )
+
+    samples += self._extra_samples
 
     return samples
 
@@ -1318,7 +1324,9 @@ class KubernetesClusterCommands:
   @staticmethod
   def _GetEvents(**kwargs) -> set['KubernetesEvent']:
     """Get the events for the cluster."""
-    stdout, _, _ = RunKubectlCommand(['get', 'events', '-o', 'yaml'], **kwargs)
+    stdout, _, _ = RunRetryableKubectlCommand(
+        ['get', 'events', '-o', 'yaml'], **kwargs
+    )
     k8s_events = set()
     for item in yaml.safe_load(stdout)['items']:
       k8s_event = KubernetesEvent.FromDict(item)
@@ -1394,7 +1402,8 @@ class KubernetesEventPoller:
     self.stop_polling.set()
     while not self.event_queue.empty():
       self.polled_events.add(self.event_queue.get())
-    self.event_poller.join(timeout=30)
+    if self.event_poller.is_alive():
+      self.event_poller.join(timeout=30)
     if self.event_poller.is_alive():
       logging.warning(
           'Event poller process did not join in 30 seconds; killing it.'
