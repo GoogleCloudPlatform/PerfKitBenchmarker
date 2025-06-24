@@ -76,13 +76,13 @@ _FFMPEG_CRF = flags.DEFINE_integer(
 )
 _FFMPEG_MAX_RATE = flags.DEFINE_integer(
     'ffmpeg_max_rate',
-    2,
+    8,
     'Maximum bitrate (in Mbps) used for encoding. Useful for online streaming.'
     ' Default value is 2.',
 )
 _FFMPEG_BUF_SIZE_MULTIPLIER = flags.DEFINE_integer(
     'ffmpeg_buf_size_multiplier',
-    2,
+    16,
     'Multiplier of ffmpeg_max_rate to get the rate control buffer which checks'
     ' to make sure the average bitrate is on target. Default value is 2.',
 )
@@ -170,7 +170,8 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
     spec: The benchmark specification.
 
   Returns:
-    samples: A list of samples including total time to transcode.
+    A list of samples including total transcode time, aggregate bitrate, and
+    average PSNR.
   """
   vm = spec.vm_groups['default'][0]
   samples = []
@@ -220,9 +221,7 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       )
 
     for jobs, threads in itertools.product(jobs_list, threads_list):
-      jobs_arg = ''
-      if jobs:
-        jobs_arg = f'-j{jobs}'
+      jobs_arg = f'-j{jobs}' if jobs else ''
       threads_arg = f'-threads {threads} '
       parallel_cmd = (
           f'parallel {jobs_arg} {_FFMPEG_DIR.value}/ffmpeg '
@@ -245,26 +244,78 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
           threads,
           total_runtime,
       )
+
+      list_files_cmd = (
+          f'cd {input_videos_dir} && ls -1 -- *.out.mkv 2>/dev/null'
+      )
+      num_files_str, _ = vm.RemoteCommand(f'{list_files_cmd} | wc -l')
+      num_files = int(num_files_str.strip())
+      if num_files == 0:
+        raise ValueError('Number of files is zero.')
+
+      # Get the total size of all transcoded files.
+      total_size_bytes_str, _ = vm.RemoteCommand(
+          f"cd {input_videos_dir} && stat -c%s *.out.mkv | awk '{{sum+=$1}}"
+          " END {print sum}'"
+      )
+      total_size_bytes = int(total_size_bytes_str.strip())
+
+      # Compute aggregate bitrate and average PSNR (Peak Signal-to-Noise Ratio).
+      output_files_str, _ = vm.RemoteCommand(list_files_cmd)
+      output_files = output_files_str.strip().split()
+      total_duration_sec = 0.0
+      psnr_values = []
+      for out_file in output_files:
+        input_file = out_file.replace('.out.mkv', '.mkv')
+        remote_input_path = f'{input_videos_dir}/{input_file}'
+        remote_output_path = f'{input_videos_dir}/{out_file}'
+        duration_cmd = (
+            'ffprobe -v error -show_entries format=duration '
+            f'-of default=noprint_wrappers=1:nokey=1 "{remote_input_path}"'
+        )
+        duration_str, _ = vm.RemoteCommand(duration_cmd)
+        total_duration_sec += float(duration_str.strip())
+
+        psnr_cmd = (
+            f'ffmpeg -i "{remote_output_path}" -i "{remote_input_path}" '
+            '-lavfi psnr -f null - 2>&1 | '
+            "grep 'PSNR' | awk -F'average:' '{print $2}' | awk '{print $1}'"
+        )
+        psnr_str, _ = vm.RemoteCommand(psnr_cmd)
+        psnr_values.append(float(psnr_str.strip()))
+
+      aggregate_bitrate_kbps = (total_size_bytes * 8) / (
+          total_duration_sec * 1000
+      )
+      average_psnr = sum(psnr_values) / len(psnr_values)
+
       vm.RemoteCommand(f'cd {input_videos_dir} && rm -rf *.out.mkv')
 
+      metadata = {
+          'test': 'upload',
+          'encoder': encoder,
+          'num_files': num_files,
+          'parallelism': jobs,
+          'threads': threads,
+          'ffmpeg_compiled_from_source': FLAGS.build_ffmpeg_from_source,
+          'video_copies': 1,
+          'ffmpeg_preset': _FFMPEG_PRESET.value,
+          'ffmpeg_crf': _FFMPEG_CRF.value,
+          'ffmpeg_max_rate': _FFMPEG_MAX_RATE.value,
+          'average_psnr': average_psnr,
+          'psnr_values': psnr_values,
+      }
       samples.extend([
           sample.Sample(
-              'Total Transcode Time',
-              total_runtime,
-              'seconds',
-              metadata={
-                  'test': 'upload',
-                  'encoder': encoder,
-                  'num_files': 15,  # TODO(spencerkim): Count *.out* files.
-                  'parallelism': jobs,
-                  'threads': threads,
-                  'ffmpeg_compiled_from_source': FLAGS.build_ffmpeg_from_source,
-                  'video_copies': 1,
-                  'ffmpeg_preset': _FFMPEG_PRESET.value,
-                  'ffmpeg_crf': _FFMPEG_CRF.value,
-                  'ffmpeg_max_rate': _FFMPEG_MAX_RATE.value,
-              },
-          )
+              'Total Transcode Time', total_runtime, 'seconds', metadata
+          ),
+          sample.Sample(
+              'Aggregate Bitrate',
+              round(aggregate_bitrate_kbps, 2),
+              'kbps',
+              metadata,
+          ),
+          sample.Sample('Average PSNR', average_psnr, 'score', metadata),
       ])
   return samples
 
