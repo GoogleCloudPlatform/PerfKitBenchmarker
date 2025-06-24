@@ -101,7 +101,7 @@ MIN_CUSTOM_MACHINE_MEM_MB = 3840
 
 IS_READY_TIMEOUT = 600  # 10 minutes
 DELETE_INSTANCE_TIMEOUT = 600  # 10 minutes
-CREATION_TIMEOUT = 1200  # 20 minutes
+CREATION_TIMEOUT = 1800  # 30 minutes
 
 
 class UnsupportedDatabaseEngineError(Exception):
