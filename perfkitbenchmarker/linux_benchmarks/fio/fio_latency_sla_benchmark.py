@@ -101,7 +101,7 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec):
 def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Runs FIO benchmark with latency SLA."""
   vm = spec.vms[0]
-  iodepth = 50
+  iodepth = 100
   numjobs = 2 * vm.num_cpus
   ValidateDefaultIODepthAndNumjobs(
       vm, iodepth, numjobs
@@ -153,16 +153,15 @@ def ValidateDefaultIODepthAndNumjobs(vm, iodepth, numjobs):
     if latency_sample.value < _ParseIntLatencyTarget(
         fio_flags.FIO_LATENCY_TARGET.value
     ):
-      # TODO(arushigaur) Add this exception back after adding max IOPS
-      # microbenchmark
-      logging.error(
+      raise errors.Benchmarks.RunError(
           '--latency_percentile latency of %s for the'
           ' default IODepth and NumJobs is less than latency_target'
           ' %s, fio_latency_under_sla'
           " benchmark won't reach the latency SLA. Please increae the default"
-          ' iodepth or numjobs and try again.',
-          latency_sample.value,
-          fio_flags.FIO_LATENCY_TARGET.value,
+          ' iodepth or numjobs and try again.' % (
+              latency_sample.value,
+              fio_flags.FIO_LATENCY_TARGET.value,
+          )
       )
   iops_samples = [
       sample for sample in samples if sample.metric.endswith(':iops')

@@ -141,16 +141,6 @@ class FioScenarioParser:
         'numjobs': fio_parameters.numjobs,
         'name': fio_parameters.job_name,
     }
-
-    # The first four fields are well defined - after that, we use
-    # key value pairs to encode any extra fields we need
-    # The format is key-value for any additional fields appended
-    # e.g. rand_16k_readwrite_5TB_rwmixread-65
-    #          random access pattern
-    #          16k block size
-    #          readwrite operation
-    #          5 TB working set
-    #          rwmixread of 65. (so 65% reads and 35% writes)
     result.update(fio_parameters.extra_params)
     return result
 
