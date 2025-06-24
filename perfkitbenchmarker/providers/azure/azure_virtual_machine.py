@@ -760,7 +760,7 @@ class AzureVirtualMachine(
 
       subnet_name = self.name + '-nic'
       if not azure_flags.AZURE_SUBNET_ID.value:
-        subnet_name = self.name + '-' + subnet.name + '-nic'
+        subnet_name = f'{self.name}-nic{nic_num}'
       nic = AzureNIC(
           self.network,
           subnet,
