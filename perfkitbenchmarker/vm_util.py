@@ -916,6 +916,47 @@ def DictionaryToEnvString(dictionary, joiner=' '):
   )
 
 
+def RenderTemplate(
+    template_path, context, should_log_file: bool = False
+) -> str:
+  """Renders a local Jinja2 template and returns its file name.
+
+  The template will be provided variables defined in 'context'.
+
+  Args:
+    template_path: string. Local path to jinja2 template.
+    context: dict. Variables to pass to the Jinja2 template during rendering.
+    should_log_file: bool. Whether to log the file after rendering.
+
+  Raises:
+    jinja2.UndefinedError: if template contains variables not present in
+      'context'.
+
+  Returns:
+    The name of the temporary file containing the rendered template.
+  """
+  with open(template_path) as fp:
+    template_contents = fp.read()
+  environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
+  template = environment.from_string(template_contents)
+  prefix = 'pkb-' + os.path.basename(template_path)
+  with NamedTemporaryFile(
+      prefix=prefix, dir=GetTempDir(), delete=False, mode='w'
+  ) as tf:
+    rendered_template = template.render(**context)
+    if should_log_file:
+      logging.info(
+          'Rendered template from %s to %s with full text:\n%s',
+          template_path,
+          tf.name,
+          rendered_template,
+          stacklevel=2,
+      )
+    tf.write(rendered_template)
+    tf.close()
+    return tf.name
+
+
 def CreateRemoteFile(vm, file_contents, file_path):
   """Creates a file on the remote server."""
   with NamedTemporaryFile(mode='w') as tf:

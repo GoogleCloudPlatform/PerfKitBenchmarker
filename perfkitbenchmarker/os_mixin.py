@@ -24,14 +24,12 @@ confusingly coupled with BaseVirtualMachine.
 import abc
 import contextlib
 import logging
-import os.path
 import socket
 import time
 from typing import Any, Dict, List, Tuple, Union
 import uuid
 
 from absl import flags
-import jinja2
 from perfkitbenchmarker import background_workload
 from perfkitbenchmarker import command_interface
 from perfkitbenchmarker import data
@@ -590,28 +588,11 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
         'context'.
       RemoteCommandError: If there was a problem copying the file.
     """
-    with open(template_path) as fp:
-      template_contents = fp.read()
-
-    environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
-    template = environment.from_string(template_contents)
-    prefix = 'pkb-' + os.path.basename(template_path)
-
-    with vm_util.NamedTemporaryFile(
-        prefix=prefix, dir=vm_util.GetTempDir(), delete=False, mode='w'
-    ) as tf:
-      rendered_template = template.render(vm=self, **context)
-      if should_log_file:
-        logging.info(
-            'Rendered template from %s to %s with full text:\n%s',
-            template_path,
-            tf.name,
-            rendered_template,
-            stacklevel=2,
-        )
-      tf.write(rendered_template)
-      tf.close()
-      self.RemoteCopy(tf.name, remote_path)
+    context = {'vm': self} | context
+    rendered_template = vm_util.RenderTemplate(
+        template_path, context, should_log_file
+    )
+    self.RemoteCopy(rendered_template, remote_path)
 
   def DiskCreatedOnVMCreation(self, data_disk):
     """Returns whether the disk has been created during VM creation."""
