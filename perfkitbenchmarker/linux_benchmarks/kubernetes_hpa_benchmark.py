@@ -57,7 +57,12 @@ kubernetes_hpa:
     type: Kubernetes
     min_vm_count: 3
     max_vm_count: 50
-    vm_spec: *default_dual_core
+    vm_spec:
+      <<: *default_dual_core
+      GCP:
+        machine_type: n4-standard-2
+        zone: us-central1-a,us-central1-b,us-central1-c
+        image: null
   flags:
     locust_path: locust/rampup.py
 """
