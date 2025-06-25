@@ -30,6 +30,7 @@ from perfkitbenchmarker import sample
 ENCODER_LIBX264 = 'libx264'
 ENCODER_LIBX265 = 'libx265'
 ENCODER_VP9 = 'libvpx-vp9'
+ENCODER_AV1 = 'libaom-av1'
 ENCODER_H264_NVENC = 'h264_nvenc'
 ENCODER_HEVC_NVENC = 'hevc_nvenc'
 DEFAULT_VP9_THREADS_LIST = [1]
@@ -38,12 +39,13 @@ _VALID_ENCODERS = [
     ENCODER_LIBX264,
     ENCODER_LIBX265,
     ENCODER_VP9,
+    ENCODER_AV1,
     ENCODER_H264_NVENC,
     ENCODER_HEVC_NVENC,
 ]
 _FFMPEG_ENCODERS = flags.DEFINE_multi_enum(
     'ffmpeg_encoders',
-    [ENCODER_LIBX264],
+    [ENCODER_LIBX264, ENCODER_LIBX265, ENCODER_AV1],
     _VALID_ENCODERS,
     'List of the encoders to use for the transcoding benchmark. '
     'Default is libx264.',
