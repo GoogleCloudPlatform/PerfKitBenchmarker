@@ -101,6 +101,7 @@
     `--gce_(subnet|network)_name`. This requires ensuring that you have SSH
     access from where you are running PerfKitBenchmarker for most Linux
     benchmarks.
+-   Mark Ubuntu 20 EOL.
 
 ### New features:
 

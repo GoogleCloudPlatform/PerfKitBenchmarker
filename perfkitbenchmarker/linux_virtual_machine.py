@@ -3145,10 +3145,12 @@ class BaseUbuntuMixin(BaseDebianMixin):
       self.Reboot()
 
 
-class Ubuntu2004Mixin(BaseUbuntuMixin):
+class Ubuntu2004Mixin(BaseUbuntuMixin, os_mixin.DeprecatedOsMixin):
   """Class holding Ubuntu2004 specific VM methods and attributes."""
 
   OS_TYPE = os_types.UBUNTU2004
+  ALTERNATIVE_OS = os_types.UBUNTU2204
+  END_OF_LIFE = '2025-04-01'
 
   def UpdateEnvironmentPath(self):
     """Add /snap/bin to default search path for Ubuntu2004.
