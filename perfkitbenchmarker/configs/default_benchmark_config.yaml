@@ -188,13 +188,16 @@ multiload:
     multichase_benchmarks: multiload
 
 # https://github.com/elastic/rally-tracks/tree/master/elastic/logs
-elasticsearch_rally_logging_cpu:
+elasticsearch_rally_logging_single_node:
   name: esrally
+  vm_groups:
+    servers:
+      vm_count: 1
   flags:
-    # https://discuss.elastic.co/t/what-does-bulk-operation-mean-exactly-in-custom-track-on-es-rally/355278/2
-    # Use 2x vCPUs for indexing clients to maximize CPU usage at the expense of latency.
-    #  More clients may lead to errors.
-    esrally_track_params: 'bulk_indexing_clients:48'
+    # Increase dataset size, use the default of 8 bulk indexing clients 
+    # as increasing further does not improve performance and may lead to
+    # connection timeout errors
+    esrally_track_params: 'number_of_replicas:0,raw_data_volume_per_day:1.0GB'
 
 # TODO: memtier_key_maximum, memtier_load_key_maximum
 redis_memtier_full_house_loaded:

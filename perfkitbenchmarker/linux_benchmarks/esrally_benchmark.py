@@ -167,15 +167,15 @@ def Run(benchmark_spec):
   _CheckClusterStatus(server_vms[0])
 
   target_hosts = ','.join(f'{vm.internal_ip}:{HTTP_PORT}' for vm in server_vms)
-  extra_track_params = ' '.join(
-      f'--track-params={param}' for param in ESRALLY_TRACK_PARAMS.value
+  extra_track_params = ','.join(
+      f'{param}' for param in ESRALLY_TRACK_PARAMS.value
   )
   run_cmd = (
       f'{SET_ALL} && '
       'esrally race '
       f'--pipeline=benchmark-only --target-host={target_hosts} '
       f'--track={ESRALLY_TRACK.value} --challenge={ESRALLY_CHALLENGE.value} '
-      f'--race-id={race_id} {extra_track_params}'
+      f'--race-id={race_id} --track-params={extra_track_params}'
   )
   client_vm.RemoteCommand(run_cmd)
 
