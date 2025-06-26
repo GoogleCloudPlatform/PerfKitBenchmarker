@@ -603,3 +603,4 @@
     disks. One example use case is to match SCSI queue depth for comparison.
 -   Add fio Write saturation IOPS benchmark.
 -   Add fio max IOPS microbenchmark
+-   Add support for MongoDB PSS (Primary-Secondary-Secondary) setup.

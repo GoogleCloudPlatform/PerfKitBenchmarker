@@ -27,7 +27,7 @@ import json
 import posixpath
 import re
 import time
-from typing import Any
+from typing import Any, Optional
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
@@ -42,7 +42,17 @@ flags.DEFINE_integer(
     'mongodb_readahead_kb', None, 'Configure block device readahead settings.'
 )
 flags.DEFINE_bool(
-    'mongodb_primary_only', False, 'Run with a simple primary-only setup.'
+    'mongodb_primary_only',
+    False,
+    'Run with a simple primary-only setup. Mutually exclusive with'
+    ' --mongodb_pss. If both are False, the default PSA setup will be used.',
+)
+flags.DEFINE_bool(
+    'mongodb_pss',
+    False,
+    'Run with one primary and two secondaries, no arbiter. Mutually exclusive'
+    ' with --mongodb_primary_only. If both are False, the default PSA setup'
+    ' will be used.',
 )
 flags.DEFINE_integer(
     'mongodb_batchsize',
@@ -105,6 +115,22 @@ mongodb_ycsb:
           disk_type: Premium_LRS
           mount_point: /scratch
       vm_count: 1
+    secondary_2:
+      vm_spec: *default_dual_core
+      disk_spec:
+        GCP:
+          disk_size: 500
+          disk_type: pd-balanced
+          mount_point: /scratch
+        AWS:
+          disk_size: 500
+          disk_type: gp3
+          mount_point: /scratch
+        Azure:
+          disk_size: 500
+          disk_type: Premium_LRS
+          mount_point: /scratch
+      vm_count: 0
     arbiter:
       vm_spec: *default_dual_core
       vm_count: 1
@@ -141,6 +167,20 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
     # --mongodb_primary_only.
     config['vm_groups']['secondary']['vm_count'] = 0
     config['vm_groups']['arbiter']['vm_count'] = 0
+  elif FLAGS.mongodb_pss:
+    config['vm_groups']['secondary_2']['vm_count'] = 1
+    config['vm_groups']['arbiter']['vm_count'] = 0
+    secondary_count = config['vm_groups']['secondary']['vm_count']
+    secondary_2_count = config['vm_groups']['secondary_2']['vm_count']
+    arbiter_count = config['vm_groups']['arbiter']['vm_count']
+    if (
+        primary_count != 1
+        or secondary_count + secondary_2_count != 2
+        or arbiter_count != 0
+    ):
+      raise errors.Config.InvalidValue(
+          'Must have exactly one primary, two secondaries, and no arbiter VM.'
+      )
   else:
     secondary_count = config['vm_groups']['secondary']['vm_count']
     arbiter_count = config['vm_groups']['arbiter']['vm_count']
@@ -203,7 +243,7 @@ def _PrepareArbiter(vm: _LinuxVM) -> None:
 
 
 def _PrepareReplicaSet(
-    server_vms: Sequence[_LinuxVM], arbiter_vm: _LinuxVM
+    server_vms: Sequence[_LinuxVM], arbiter_vm: Optional[_LinuxVM]
 ) -> None:
   """Prepares the replica set for the benchmark.
 
@@ -217,28 +257,60 @@ def _PrepareReplicaSet(
     server_vms: The primary (index 0) and secondary (index 1) server VMs to use.
     arbiter_vm: The arbiter VM to use.
   """
-  args = {
-      '_id': '"rs0"',
-      'members': [
-          {
-              '_id': 0,
-              'host': f'"{server_vms[0].internal_ip}:27017"',
-              'priority': 1,
-          },
-          {
-              '_id': 1,
-              'host': f'"{server_vms[1].internal_ip}:27017"',
-              'priority': 0.5,
-          },
-          {
-              '_id': 2,
-              'host': f'"{arbiter_vm.internal_ip}:27017"',
-              'arbiterOnly': True,
-          },
-      ],
-  }
+  if FLAGS.mongodb_pss and len(server_vms) == 3 and arbiter_vm is None:
+    args = {
+        '_id': '"rs0"',
+        'members': [
+            {
+                '_id': 0,
+                'host': f'"{server_vms[0].internal_ip}:27017"',
+                'priority': 1,
+            },
+            {
+                '_id': 1,
+                'host': f'"{server_vms[1].internal_ip}:27017"',
+                'priority': 1,
+            },
+            {
+                '_id': 2,
+                'host': f'"{server_vms[2].internal_ip}:27017"',
+                'priority': 1,
+            },
+        ],
+    }
+  elif (
+      not FLAGS.mongodb_pss
+      and not FLAGS.mongodb_primary_only
+      and len(server_vms) == 2
+      and arbiter_vm is not None
+  ):
+    args = {
+        '_id': '"rs0"',
+        'members': [
+            {
+                '_id': 0,
+                'host': f'"{server_vms[0].internal_ip}:27017"',
+                'priority': 1,
+            },
+            {
+                '_id': 1,
+                'host': f'"{server_vms[1].internal_ip}:27017"',
+                'priority': 0.5,
+            },
+            {
+                '_id': 2,
+                'host': f'"{arbiter_vm.internal_ip}:27017"',
+                'arbiterOnly': True,
+            },
+        ],
+    }
+  else:
+    raise errors.Config.InvalidValue(
+        'Invalid number of server VMs and arbiter VM for replica set.'
+    )
   mongosh.RunCommand(server_vms[0], f'rs.initiate({json.dumps(args)})')
   mongosh.RunCommand(server_vms[0], 'rs.conf()')
+  mongosh.RunCommand(server_vms[0], 'rs.status()')
 
 
 def _PrepareClient(vm: _LinuxVM) -> None:
@@ -266,6 +338,16 @@ def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
     return (
         f'"mongodb://{primary.internal_ip}:27017/ycsb'
         '?w=1&j=true&compression=snappy&maxPoolSize=60000"'
+    )
+
+  if FLAGS.mongodb_pss:
+    secondary = benchmark_spec.vm_groups['secondary'][0]
+    secondary_2 = benchmark_spec.vm_groups['secondary_2'][0]
+    return (
+        f'"mongodb://{primary.internal_ip}:27017,'
+        f'{secondary.internal_ip}:27017,'
+        f'{secondary_2.internal_ip}:27017/ycsb'
+        '?replicaSet=rs0&w=majority&compression=snappy&maxPoolSize=60000"'
     )
 
   secondary = benchmark_spec.vm_groups['secondary'][0]
@@ -319,6 +401,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   primary = benchmark_spec.vm_groups['primary'][0]
   server_vms.append(primary)
   secondary = None
+  secondary_2 = None
   arbiter = None
   clients = benchmark_spec.vm_groups['clients']
 
@@ -329,18 +412,26 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   ]
 
   if not FLAGS.mongodb_primary_only:
-    secondary = benchmark_spec.vm_groups['secondary'][0]
-    server_vms.append(secondary)
-    arbiter = benchmark_spec.vm_groups['arbiter'][0]
-    server_partials += [functools.partial(_PrepareServer, secondary)]
-    arbiter_partial += [functools.partial(_PrepareArbiter, arbiter)]
+    if FLAGS.mongodb_pss:
+      secondary = benchmark_spec.vm_groups['secondary'][0]
+      server_vms.append(secondary)
+      secondary_2 = benchmark_spec.vm_groups['secondary_2'][0]
+      server_vms.append(secondary_2)
+      server_partials += [functools.partial(_PrepareServer, secondary)]
+      server_partials += [functools.partial(_PrepareServer, secondary_2)]
+    else:
+      secondary = benchmark_spec.vm_groups['secondary'][0]
+      server_vms.append(secondary)
+      arbiter = benchmark_spec.vm_groups['arbiter'][0]
+      server_partials += [functools.partial(_PrepareServer, secondary)]
+      arbiter_partial += [functools.partial(_PrepareArbiter, arbiter)]
 
   background_tasks.RunThreaded(
       (lambda f: f()), server_partials + arbiter_partial + client_partials
   )
 
   if not FLAGS.mongodb_primary_only:
-    _PrepareReplicaSet([primary, secondary], arbiter)
+    _PrepareReplicaSet(server_vms, arbiter)
 
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
   benchmark_spec.mongodb_url = _GetMongoDbURL(benchmark_spec)
@@ -360,6 +451,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   mongosh.RunCommand(primary, 'db.stats()')
   if not FLAGS.mongodb_primary_only:
     mongosh.RunCommand(primary, 'rs.conf()')
+    mongosh.RunCommand(primary, 'rs.status()')
   primary.RemoteCommand('df -h')
 
   # Set NVMe queue depth on server VM(s) if value is provided.
