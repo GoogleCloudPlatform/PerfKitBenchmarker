@@ -140,10 +140,8 @@ cloud_bigtable_ycsb:
       vm_count: null
   flags:
     openjdk_version: 8
-    gcloud_scopes: >
-      https://www.googleapis.com/auth/monitoring.write
-      https://www.googleapis.com/auth/bigtable.admin
-      https://www.googleapis.com/auth/bigtable.data"""
+    gcloud_scopes: cloud-platform
+"""
 
 METRICS_CORE_JAR = 'metrics-core-3.1.2.jar'
 DROPWIZARD_METRICS_CORE_URL = posixpath.join(
@@ -153,12 +151,6 @@ DROPWIZARD_METRICS_CORE_URL = posixpath.join(
 )
 HBASE_SITE = 'cloudbigtable/hbase-site.xml.j2'
 HBASE_CONF_FILES = [HBASE_SITE]
-
-REQUIRED_SCOPES = (
-    'https://www.googleapis.com/auth/monitoring.write',
-    'https://www.googleapis.com/auth/bigtable.admin',
-    'https://www.googleapis.com/auth/bigtable.data',
-)
 
 # TODO(user): Make table parameters configurable.
 COLUMN_FAMILY = 'cf'
@@ -198,16 +190,6 @@ def CheckPrerequisites(benchmark_config: Dict[str, Any]) -> None:
     hbase.CheckPrerequisites()
 
   ycsb.CheckPrerequisites()
-
-  for scope in REQUIRED_SCOPES:
-    if scope not in FLAGS.gcloud_scopes:
-      if (
-          scope == 'https://www.googleapis.com/auth/monitoring.write'
-          and not _USE_JAVA_VENEER_CLIENT.value
-      ):
-        # Client side metrics are only required with the Veneer client.
-        continue
-      raise ValueError('Scope {} required.'.format(scope))
 
   if ycsb.CPU_OPTIMIZATION.value and (
       ycsb.CPU_OPTIMIZATION_MEASUREMENT_MINS.value
