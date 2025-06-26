@@ -1674,6 +1674,7 @@ class Debian12BasedAwsVirtualMachine(
   # From https://wiki.debian.org/Cloud/AmazonEC2Image/Bookworm
   IMAGE_NAME_FILTER_PATTERN = 'debian-12-{alternate_architecture}-*'
   IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
   DEFAULT_USER_NAME = 'admin'
 
 
