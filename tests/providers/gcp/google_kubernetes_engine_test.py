@@ -24,7 +24,6 @@ from unittest import mock
 from absl import flags as flgs
 from absl.testing import flagsaver
 from perfkitbenchmarker import container_service
-from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
@@ -37,10 +36,6 @@ FLAGS = flgs.FLAGS
 
 _COMPONENT = 'test_component'
 _RUN_URI = 'abc9876'
-_NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
-_NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = (
-    'nvidia_unrestricted_permissions_daemonset.yml'
-)
 
 _INSTANCE_GROUPS_LIST_OUTPUT = (
     '../../../tests/data/gcloud_compute_instance_groups_list_instances.json'
@@ -530,6 +525,7 @@ class GoogleKubernetesEngineWithGpusTestCase(
     )
     return kubernetes_engine_spec
 
+  @flagsaver.flagsaver(gke_gpu_driver_version='latest')
   def testCreate(self):
     spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command:
@@ -542,7 +538,9 @@ class GoogleKubernetesEngineWithGpusTestCase(
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
       self.assertIn(
-          '--accelerator type=nvidia-tesla-k80,count=2', command_string
+          '--accelerator ' +
+          'type=nvidia-tesla-k80,count=2,gpu-driver-version=latest',
+          command_string
       )
 
   @mock.patch('perfkitbenchmarker.kubernetes_helper.CreateFromFile')
@@ -563,20 +561,6 @@ class GoogleKubernetesEngineWithGpusTestCase(
       self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
 
       self.assertEqual(mock_kubectl_command.call_count, 1)
-
-      expected_args_to_create_from_file = (
-          _NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT,
-          data.ResourcePath(_NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET),
-      )
-      expected_calls = [
-          mock.call(arg) for arg in expected_args_to_create_from_file
-      ]
-
-      # Assert that create_from_file was called twice,
-      # and that the args were as expected (should be the NVIDIA
-      # driver setup daemon set, followed by the
-      # NVIDIA unrestricted permissions daemon set.
-      create_from_file_patch.assert_has_calls(expected_calls)
 
 
 class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):

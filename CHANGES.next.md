@@ -102,6 +102,9 @@
     access from where you are running PerfKitBenchmarker for most Linux
     benchmarks.
 -   Mark Ubuntu 20 EOL.
+-   Stop manually installing GPU drivers on GKE and use the API functionality
+    via new flag `--gpu-driver-version`. This defaults to no driver installation
+    on clusters older than version 1.31.
 
 ### New features:
 

@@ -23,9 +23,7 @@ from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import container_service
-from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
@@ -36,11 +34,6 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
-
-NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
-NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = (
-    'nvidia_unrestricted_permissions_daemonset.yml'
-)
 SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
 ONE_HOUR = 60 * 60
 
@@ -395,11 +388,14 @@ class GkeCluster(BaseGkeCluster):
 
     if nodepool_config.gpu_count:
       if 'a2-' not in nodepool_config.machine_type:
-        cmd.flags['accelerator'] = (
-            gce_virtual_machine.GenerateAcceleratorSpecString(
-                nodepool_config.gpu_type, nodepool_config.gpu_count
-            )
+        accelerator_spec = gce_virtual_machine.GenerateAcceleratorSpecString(
+            nodepool_config.gpu_type, nodepool_config.gpu_count
         )
+        if gcp_flags.GKE_GPU_DRIVER_VERSION.value:
+          accelerator_spec += (
+              ',gpu-driver-version=' + gcp_flags.GKE_GPU_DRIVER_VERSION.value
+          )
+        cmd.flags['accelerator'] = accelerator_spec
 
     gce_tags = FLAGS.gce_tags
     if nodepool_config.gce_tags:
@@ -458,7 +454,7 @@ class GkeCluster(BaseGkeCluster):
     cmd.flags['node-labels'] = f'pkb_nodepool={nodepool_config.name}'
 
   def _PostCreate(self):
-    """Installs nvidia drivers if needed."""
+    """Waits for kube-dns to be available."""
     super()._PostCreate()
 
     # GKE does not wait for kube-dns by default
@@ -468,15 +464,6 @@ class GkeCluster(BaseGkeCluster):
         condition_name='Available',
         namespace='kube-system',
     )
-
-    should_install_nvidia_drivers = self.default_nodepool.gpu_count or any(
-        pool.gpu_count for pool in self.nodepools.values()
-    )
-    if should_install_nvidia_drivers:
-      kubernetes_helper.CreateFromFile(NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT)
-      kubernetes_helper.CreateFromFile(
-          data.ResourcePath(NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET)
-      )
 
   def _GetInstanceGroups(self):
     cmd = self._GcloudCommand('container', 'node-pools', 'list')
