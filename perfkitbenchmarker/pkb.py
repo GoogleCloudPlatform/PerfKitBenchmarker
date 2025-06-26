@@ -1101,6 +1101,7 @@ def RunBenchmark(
             interrupt_checker = None
 
           if stages.TEARDOWN in FLAGS.run_stage:
+            # This function will only do anything if --capture_vm_logs is passed
             CaptureVMLogs(spec.vms)
             skip_teardown_conditions = ParseSkipTeardownConditions(
                 pkb_flags.SKIP_TEARDOWN_CONDITIONS.value
@@ -1199,6 +1200,10 @@ def RunBenchmark(
         ):
           # Note that if TEARDOWN is specified, it will happen below.
           DoTeardownPhase(spec, collector, detailed_timer)
+
+        # Ensures log capture is attempted even if the run fails
+        # This function will only do anything if --capture_vm_logs is passed
+        CaptureVMLogs(spec.vms)
         raise
       # finally block will only clean up generic resources if teardown is
       # included in FLAGS.run_stage.
