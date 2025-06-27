@@ -86,10 +86,11 @@ flags.DEFINE_boolean(
     'Rebuild spec binaries, defaults to True. Set to False '
     'when using run_stage_iterations > 1 to avoid recompiling',
 )
-flags.DEFINE_string(
+SPEC17_GCC_FLAGS= flags.DEFINE_string(
     'spec17_gcc_flags',
-    '-O3',
-    'Flags to be used to override the default GCC -O3 used to compile SPEC.',
+    None,
+    'Flags to be used to override the default OPTIMIZE used to compile SPEC for'
+    ' GCC.',
 )
 flags.DEFINE_boolean(
     'spec17_best_effort',
@@ -270,10 +271,14 @@ def Run(benchmark_spec):
   return samples
 
 
-def _OverwriteGccO3(vm):
+def _OverwriteGccOptimize(vm):
+  """Update OPTIMIZE flag if compiler is gcc."""
+  if SPEC17_GCC_FLAGS.value is None:
+    return
   config = speccpu2017.GetSpecInstallConfig(vm.GetScratchDir())
   config_filepath = getattr(vm, speccpu.VM_STATE_ATTR, config).cfg_file_path
-  cmd = f"sed -i 's/-g -O3/{FLAGS.spec17_gcc_flags}/g' {config_filepath}"
+  cmd = f"sed -Ei 's/i(\\s+OPTIMIZE\\s+=).*/\\1 {SPEC17_GCC_FLAGS.value}/' "
+  cmd += config_filepath
   vm.RemoteCommand(cmd)
   return
 
@@ -290,7 +295,9 @@ def _Run(vm):
 
   # Make changes e.g. compiler flags to spec config file.
   if 'gcc' in FLAGS.runspec_config:
-    _OverwriteGccO3(vm)
+    # OPTIMIZE applies to all compilers, but our flag is only for gcc for
+    # legacy reasons.
+    _OverwriteGccOptimize(vm)
 
   # swap only if necessary; free local node memory and avoid remote memory;
   # reset caches; set stack size to unlimited
@@ -373,7 +380,7 @@ def _Run(vm):
   samples = speccpu.ParseOutput(vm, log_files, partial_results, None)
   for item in samples:
     item.metadata['vm_name'] = vm.name
-    item.metadata['spec17_gcc_flags'] = FLAGS.spec17_gcc_flags
+    item.metadata['spec17_gcc_flags'] = SPEC17_GCC_FLAGS.value or 'default'
     item.metadata['spec17_numa_bind_config'] = FLAGS.spec17_numa_bind_config
     item.metadata['spec17_copies'] = copies
 

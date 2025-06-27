@@ -39,6 +39,7 @@ speccpu2017_int_rate_GCC_O3_x86:
   flags:
     <<: *speccpu2017_int_rate_flags_base
     runspec_config: pkb-gcc-linux-x86.cfg
+    # Passing default explicitly for metadata
     spec17_gcc_flags: -O3 -march=native
   vm_groups:
     default:
@@ -194,7 +195,7 @@ elasticsearch_rally_logging_single_node:
     servers:
       vm_count: 1
   flags:
-    # Increase dataset size, use the default of 8 bulk indexing clients 
+    # Increase dataset size, use the default of 8 bulk indexing clients
     # as increasing further does not improve performance and may lead to
     # connection timeout errors
     esrally_track_params: 'number_of_replicas:0,raw_data_volume_per_day:1.0GB'
