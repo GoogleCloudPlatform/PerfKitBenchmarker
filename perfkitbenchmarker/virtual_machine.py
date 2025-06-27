@@ -50,6 +50,12 @@ QUOTA_EXCEEDED_MESSAGE = 'Creation failed due to quota exceeded: '
 PREPROVISIONED_DATA_TIMEOUT = 600
 
 
+class CpuVersionMismatch(errors.Resource.RetryableCreationError):
+  """When a VM does not match an expected CPU version."""
+
+  pass
+
+
 def ValidateVmMetadataFlag(options_list):
   """Verifies correct usage of the vm metadata flag.
 
@@ -768,23 +774,27 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
           _REQUIRED_CPU_VERSION.value
           and _REQUIRED_CPU_VERSION.value != self.cpu_version
       ):
-        self.Delete()
-        raise errors.Resource.RetryableCreationError(
+        error_msg = (
             f'Guest arch {self.cpu_version} is not enforced guest arch'
             f' {_REQUIRED_CPU_VERSION.value}. Deleting VM and scratch disk and'
-            ' recreating.',
+            ' recreating.'
         )
+        logging.error(error_msg)
+        self.Delete()
+        raise CpuVersionMismatch(error_msg)
 
     try:
       vm_util.Retry(
           max_retries=_REQUIRED_CPU_VERSION_RETRIES.value,
-          retryable_exceptions=errors.Resource.RetryableCreationError,
+          retryable_exceptions=CpuVersionMismatch,
       )(CreateAndBootOnce)()
     except vm_util.RetriesExceededRetryError as exc:
-      raise errors.Benchmarks.InsufficientCapacityCloudFailure(
-          f'{_REQUIRED_CPU_VERSION.value} was not obtained after'
-          f' {_REQUIRED_CPU_VERSION_RETRIES.value} retries.'
-      ) from exc
+      if isinstance(exc.__cause__, CpuVersionMismatch):
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+            f'{_REQUIRED_CPU_VERSION.value} was not obtained after'
+            f' {_REQUIRED_CPU_VERSION_RETRIES.value} retries.'
+        ) from exc
+      raise exc
 
   def PrepareAfterBoot(self):
     """Prepares a VM after it has booted.
