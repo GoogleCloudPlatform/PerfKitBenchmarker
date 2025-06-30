@@ -26,6 +26,7 @@ from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
@@ -415,3 +416,191 @@ class EksAutoCluster(BaseEksCluster):
     # Theoretically needed in mixed mode, but deployments fail without it:
     # https://docs.aws.amazon.com/eks/latest/userguide/associate-workload.html#_require_a_workload_is_deployed_to_eks_auto_mode_nodes
     return ['eks.amazonaws.com/compute-type: auto']
+
+
+_KARPENTER_NAMESPACE = 'kube-system'
+_KARPENTER_VERSION = '1.5.0'
+# TODO(user): Use a variable kubernetes version.
+_K8S_VERSION = '1.32'
+
+
+class EksKarpenterCluster(BaseEksCluster):
+  """Class representing an Elastic Kubernetes Service cluster with karpenter."""
+
+  CLOUD = provider_info.AWS
+  CLUSTER_TYPE = 'Karpenter'
+
+  def __init__(self, spec):
+    super().__init__(spec)
+    self._ChooseSecondZone()
+    self.stack_name = f'Karpenter-{self.name}'
+
+  def InitializeNodePoolForCloud(
+      self,
+      vm_config: virtual_machine.BaseVirtualMachine,
+      nodepool_config: container_service.BaseNodePoolConfig,
+  ):
+    pass
+
+  def _Create(self):
+    """Creates the control plane and worker nodes."""
+    template_filename = vm_util.PrependTempDir('cloud-formation-template.yaml')
+    vm_util.IssueCommand([
+        'curl',
+        '-fsSL',
+        f'https://raw.githubusercontent.com/aws/karpenter-provider-aws/v{_KARPENTER_VERSION}/website/content/en/preview/getting-started/getting-started-with-karpenter/cloudformation.yaml',
+        '-o',
+        template_filename,
+    ])
+    vm_util.IssueCommand([
+        'aws',
+        'cloudformation',
+        'deploy',
+        '--stack-name',
+        self.stack_name,
+        '--template-file',
+        template_filename,
+        '--capabilities',
+        'CAPABILITY_NAMED_IAM',
+        '--parameter-overrides',
+        f'ClusterName={self.name}',
+        '--region',
+        f'{self.region}',
+    ])
+    # TODO(user): Use an eksctl create command with args similar to other
+    # clusters in this file rather than a yaml.
+    create_yaml = vm_util.RenderTemplate(
+        data.ResourcePath('container/karpenter/cluster_create.yaml.j2'),
+        {
+            'CLUSTER_NAME': self.name,
+            'AWS_REGION': self.region,
+            'K8S_VERSION': _K8S_VERSION,
+            'KARPENTER_NAMESPACE': _KARPENTER_NAMESPACE,
+            'AWS_ACCOUNT_ID': self.account,
+        },
+        True,
+    )
+    vm_util.IssueCommand(
+        [FLAGS.eksctl, 'create', 'cluster', '-f', create_yaml], timeout=1800
+    )
+    # Download the kubeconfig since create via yaml doesn't auto make it.
+    vm_util.IssueCommand([
+        'aws',
+        'eks',
+        'update-kubeconfig',
+        '--region',
+        self.region,
+        '--name',
+        self.name,
+        '--kubeconfig',
+        FLAGS.kubeconfig,
+    ])
+
+  def _PostCreate(self):
+    """Performs post-creation steps for the cluster."""
+    super()._PostCreate()
+    vm_util.IssueCommand([
+        'helm',
+        'upgrade',
+        '--install',
+        'karpenter',
+        'oci://public.ecr.aws/karpenter/karpenter',
+        '--version',
+        str(_KARPENTER_VERSION),
+        '--namespace',
+        _KARPENTER_NAMESPACE,
+        '--create-namespace',
+        '--set',
+        f'settings.clusterName={self.name}',
+        '--set',
+        f'settings.interruptionQueue={self.name}',
+        '--set',
+        'controller.resources.requests.cpu=1',
+        '--set',
+        'controller.resources.requests.memory=1Gi',
+        '--set',
+        'controller.resources.limits.cpu=1',
+        '--set',
+        'controller.resources.limits.memory=1Gi',
+        '--set',
+        'logLevel=debug',
+        '--wait',
+    ])
+    # Get the AMI version for current kubernetes version.
+    # See e.g. https://karpenter.sh/docs/tasks/managing-amis/ for not using
+    # @latest.
+    image_id, _, _ = vm_util.IssueCommand([
+        'aws',
+        'ssm',
+        'get-parameter',
+        '--name',
+        f'/aws/service/eks/optimized-ami/{_K8S_VERSION}/amazon-linux-2023/x86_64/standard/recommended/image_id',
+        '--region',
+        self.region,
+        '--query',
+        'Parameter.Value',
+    ])
+    image_id = image_id.strip().strip('"')
+    full_version, _, _ = vm_util.IssueCommand([
+        'aws',
+        'ec2',
+        'describe-images',
+        '--query',
+        'Images[0].Name',
+        '--image-ids',
+        image_id,
+        '--region',
+        self.region,
+    ])
+    alias_version = (
+        'v' + full_version.strip().strip('"').split(f'{_K8S_VERSION}-v')[1]
+    )
+    self.ApplyManifest(
+        'container/karpenter/nodepool.yaml.j2',
+        CLUSTER_NAME=self.name,
+        ALIAS_VERSION=alias_version,
+    )
+
+  def _Delete(self):
+    """Deletes the control plane and worker nodes."""
+    super()._Delete()
+    cmd = [
+        FLAGS.eksctl,
+        'delete',
+        'cluster',
+        '--name',
+        self.name,
+        '--region',
+        self.region,
+    ]
+    vm_util.IssueCommand(cmd, timeout=1800)
+    vm_util.IssueCommand([
+        'aws',
+        'cloudformation',
+        'delete-stack',
+        '--stack-name',
+        self.stack_name,
+        '--region',
+        f'{self.region}',
+    ])
+
+  def _IsReady(self):
+    """Returns True if cluster is running. Autopilot defaults to 0 nodes."""
+    stdout, _, _ = container_service.RunKubectlCommand(['cluster-info'])
+    # These two strings are printed in sequence, but with ansi color code
+    # escape characters in between.
+    return 'Kubernetes control plane' in stdout and 'is running at' in stdout
+
+  def GetDefaultStorageClass(self) -> str:
+    """Get the default storage class for the provider."""
+    return aws_disk.GP2
+
+  def ResizeNodePool(
+      self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
+  ):
+    """Change the number of nodes in the node group."""
+    raise NotImplementedError()
+
+  def GetNodeSelectors(self) -> list[str]:
+    """Get the node selectors section of a yaml for the provider."""
+    return []

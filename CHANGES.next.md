@@ -105,6 +105,8 @@
 -   Stop manually installing GPU drivers on GKE and use the API functionality
     via new flag `--gpu-driver-version`. This defaults to no driver installation
     on clusters older than version 1.31.
+-   Added helm to list of AWS requirements. Only needed when running EKS with
+    Karpenter which is now supported.
 
 ### New features:
 

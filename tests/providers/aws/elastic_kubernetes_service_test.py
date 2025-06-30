@@ -263,5 +263,36 @@ class EksAutoClusterTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertTrue(cluster._IsReady())
 
 
+class EksKarpenterTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    mock_network = mock.create_autospec(aws_network.AwsNetwork)
+    mock_network.subnet = {'id': 'subnet1'}
+    mock_network.vpc = {'default_security_group_id': 'group1'}
+    mock_network.placement_group = None
+    self.enter_context(
+        mock.patch.object(util, 'GetAccount', return_value='1234')
+    )
+    self.enter_context(
+        mock.patch.object(
+            network.BaseNetwork,
+            'GetNetwork',
+            return_value=mock_network,
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            network.BaseFirewall,
+            'GetFirewall',
+            return_value=mock.create_autospec(aws_network.AwsFirewall),
+        )
+    )
+    self.enter_context(flagsaver.flagsaver(run_uri='123p'))
+
+  def testInitEksClusterWorks(self):
+    elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
+
+
 if __name__ == '__main__':
   unittest.main()
