@@ -23,6 +23,12 @@ flags.DEFINE_boolean(
     'Whether to allow mpirun to be run by the root user.',
 )
 
+flags.DEFINE_list(
+    'mpi_ranks_list',
+    [],
+    'Total mpi ranks to use. By default, same as total cores available.',
+)
+
 
 def CreateMachineFile(
     vms,
