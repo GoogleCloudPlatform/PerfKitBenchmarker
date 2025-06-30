@@ -53,7 +53,7 @@ flags.DEFINE_string(
 )
 flags.DEFINE_integer(
     'runspec_iterations',
-    3,
+    1,
     'Used by the PKB speccpu benchmarks. The number of benchmark iterations '
     'to execute, provided to the runspec binary via its --iterations flag.',
 )
@@ -75,7 +75,7 @@ flags.DEFINE_boolean(
 )
 flags.DEFINE_boolean(
     'runspec_keep_partial_results',
-    False,
+    True,
     'Used by the PKB speccpu benchmarks. If set, the benchmark will report '
     'an aggregate score even if some of the SPEC CPU component tests '
     'failed with status "NR". Available results will be saved, and PKB samples '
@@ -84,7 +84,7 @@ flags.DEFINE_boolean(
 )
 flags.DEFINE_boolean(
     'runspec_estimate_spec',
-    False,
+    True,
     'Used by the PKB speccpu benchmarks. If set, the benchmark will report '
     'an estimated aggregate score even if SPEC CPU did not compute one. '
     'This usually occurs when --runspec_iterations is less than 3.  '

@@ -21,7 +21,7 @@ FLAGS = flags.FLAGS
 
 flags.DEFINE_list(
     'spec17_subset',
-    ['intspeed', 'fpspeed', 'intrate', 'fprate'],
+    ['intrate'],
     'Specify which speccpu2017 tests to run. Accepts a list of '
     'benchmark suites (intspeed, fpspeed, intrate, fprate) '
     'or individual benchmark names. Defaults to all suites.',

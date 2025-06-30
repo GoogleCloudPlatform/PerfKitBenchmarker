@@ -23,21 +23,9 @@ dpdk_pktgen_small_pkt_loss:
     dpdk_pktgen_mbuf_cache_size: 128
     dpdk_pktgen_mbufs_per_port_multiplier: 8
 
-speccpu2017_int_rate_flags_base: &speccpu2017_int_rate_flags_base
-  build_fortran: True
-  gcc_version: "11"
-  enable_transparent_hugepages: True
-  runspec_estimate_spec: True
-  runspec_iterations: 1
-  runspec_keep_partial_results: True
-  runspec_tar: cpu2017-1.1.8.tar.gz
-  spec17_subset: intrate
-  spec_runmode: base
-
 speccpu2017_int_rate_GCC_O3_x86:
   name: speccpu2017
   flags:
-    <<: *speccpu2017_int_rate_flags_base
     runspec_config: pkb-gcc-linux-x86.cfg
     # Passing default explicitly for metadata
     spec17_gcc_flags: -O3 -march=native
@@ -48,7 +36,6 @@ speccpu2017_int_rate_GCC_O3_x86:
 speccpu2017_int_rate_GCC_OFAST_x86:
   name: speccpu2017
   flags:
-    <<: *speccpu2017_int_rate_flags_base
     runspec_config: pkb-gcc-linux-x86.cfg
     spec17_gcc_flags: -Ofast -funroll-loops -flto -ljemalloc -z muldefs -fallow-argument-mismatch -march=native
   vm_groups:
@@ -58,7 +45,6 @@ speccpu2017_int_rate_GCC_OFAST_x86:
 speccpu2017_int_rate_GCC_O3_arm:
   name: speccpu2017
   flags:
-    <<: *speccpu2017_int_rate_flags_base
     runspec_config: pkb-gcc-linux-aarch64-1.1.0.cfg
     spec17_gcc_flags: -O3 -mcpu=native
   vm_groups:
@@ -68,7 +54,6 @@ speccpu2017_int_rate_GCC_O3_arm:
 speccpu2017_int_rate_GCC_OFAST_arm:
   name: speccpu2017
   flags:
-    <<: *speccpu2017_int_rate_flags_base
     runspec_config: pkb-gcc-linux-aarch64-1.1.0.cfg
     spec17_gcc_flags: -Ofast -funroll-loops -flto -ljemalloc -z muldefs -fallow-argument-mismatch -march=native
   vm_groups:

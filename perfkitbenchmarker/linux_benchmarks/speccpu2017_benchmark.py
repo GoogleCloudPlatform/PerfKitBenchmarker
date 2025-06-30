@@ -115,6 +115,11 @@ speccpu2017:
     default:
       vm_spec: *default_dual_core
       disk_spec: *default_500_gb
+  flags:
+    build_fortran: True
+    gcc_version: "11"
+    enable_transparent_hugepages: True
+    runspec_tar: cpu2017-1.1.8.tar.gz
 """
 
 KB_TO_GB_MULTIPLIER = 1000000
