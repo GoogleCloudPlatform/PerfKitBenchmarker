@@ -138,19 +138,12 @@ def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
     errors.Config.InvalidValue: If the tar file is found, and runspec_config is
         not a valid file name.
   """
-  if posixpath.basename(runspec_config) != runspec_config:
-    raise errors.Config.InvalidValue(
-        'Invalid runspec_config value: {}{}When running speccpu with a '
-        'tar file, runspec_config cannot specify a file in a sub-directory. '
-        'See README.md for information about running speccpu with a tar '
-        'file.'.format(runspec_config, os.linesep)
-    )
-  if not examine_members:
-    return
-
   # Copy the cfg to the VM.
   local_cfg_file_path = data.ResourcePath(speccpu_vm_state.runspec_config)
   vm.PushFile(local_cfg_file_path, speccpu_vm_state.cfg_file_path)
+
+  if not examine_members:
+    return
 
   scratch_dir = vm.GetScratchDir()
   cfg_member = '{}/config/{}'.format(
@@ -343,6 +336,9 @@ def InstallSPECCPU(vm, speccpu_vm_state):
         speccpu_vm_state,
     )
   except errors.Setup.BadPreprovisionedDataError:
+    if not speccpu_vm_state.base_iso_file_path:
+      raise
+    logging.exception('Failed to set up tar. Trying ISO file.')
     _CheckIsoAndCfgFile(
         speccpu_vm_state.runspec_config,
         speccpu_vm_state.base_iso_file_path,
@@ -385,7 +381,7 @@ def _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state):
       scratch_dir,
   )
   vm.RemoteCommand(
-      'cd {dir} && tar xfz {tar}'.format(
+      'cd {dir} && tar xf {tar}'.format(
           dir=scratch_dir, tar=speccpu_vm_state.base_tar_file_path
       )
   )
