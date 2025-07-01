@@ -71,6 +71,7 @@ netperf_tcp_stream:
   flags:
     netperf_benchmarks: TCP_STREAM
     netperf_num_streams: 1,8,16,200
+    placement_group_style: none
     sar: True
 
 mysql_tpcc:
