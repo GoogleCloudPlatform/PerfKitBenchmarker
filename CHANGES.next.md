@@ -105,8 +105,6 @@
 -   Stop manually installing GPU drivers on GKE and use the API functionality
     via new flag `--gpu-driver-version`. This defaults to no driver installation
     on clusters older than version 1.31.
--   Added helm to list of AWS requirements. Only needed when running EKS with
-    Karpenter which is now supported.
 
 ### New features:
 
@@ -232,6 +230,7 @@
 -   Add new vmstat trace.
 -   Add support for customizing Hadoop jobs scheduling
 -   Add support for GKE Autopilot & EKS Auto, which don't require nodepools.
+-   Add support for EKS with Karpenter for autoscaling.
 -   Add tutorial walking through an example GKE benchmark.
 -   Add dpdk_pktgen_benchmark, a more feature-rich DPDK benchmark than
     dpdk_testpmd_benchmark.

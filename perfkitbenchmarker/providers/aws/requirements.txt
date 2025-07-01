@@ -15,4 +15,3 @@
 # Requirements for running PerfKit Benchmarker on AWS.
 awscli>=1.19.75
 colorama>=0.3.7
-helm>=3.0.0

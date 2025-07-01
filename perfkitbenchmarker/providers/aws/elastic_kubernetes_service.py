@@ -425,7 +425,10 @@ _K8S_VERSION = '1.32'
 
 
 class EksKarpenterCluster(BaseEksCluster):
-  """Class representing an Elastic Kubernetes Service cluster with karpenter."""
+  """Class representing an Elastic Kubernetes Service cluster with karpenter.
+
+  Requires installation of helm: https://helm.sh/docs/intro/install/
+  """
 
   CLOUD = provider_info.AWS
   CLUSTER_TYPE = 'Karpenter'
