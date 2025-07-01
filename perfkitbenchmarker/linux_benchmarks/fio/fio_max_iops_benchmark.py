@@ -139,6 +139,12 @@ def _GetMaxIOPSSample(samples) -> sample.Sample:
       if not max_iops_sample or sample_details.value > max_iops_sample.value:
         max_iops_sample = sample_details
   if max_iops_sample:
+    if int(max_iops_sample.metadata['numjobs']) == sorted(NUMJOBS)[-1]:
+      # The current numjobs might not be reaching max IOPS
+      raise errors.Benchmarks.RunError(
+          'Max IOPS found with the largest numjobs, possibility of not'
+          ' reaching the max.'
+      )
     return max_iops_sample
   raise errors.Benchmarks.RunError(
       'Max IOPS not found, please check the fio output in logs.'
