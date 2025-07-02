@@ -27,11 +27,29 @@ esrally:
   vm_groups:
     servers:
       vm_spec:
+        AWS:
+          machine_type: m6i.2xlarge
+          zone: us-east-1a
+        Azure:
+          machine_type: Standard_D8s_v5
+          zone: eastus2
         GCP:
           machine_type: n2-standard-8
           zone: us-central1-b
       disk_spec:
         # Standardize with 700 MB/s bandwidth to minimize I/O impact.
+        AWS:
+          disk_size: 500
+          disk_type: gp3
+          provisioned_iops: 12000
+          provisioned_throughput: 700
+          mount_point: /scratch
+        Azure:
+          disk_size: 500
+          disk_type: PremiumV2_LRS
+          provisioned_iops: 12000
+          provisioned_throughput: 700
+          mount_point: /scratch
         GCP:
           disk_size: 500
           disk_type: hyperdisk-balanced
@@ -42,6 +60,12 @@ esrally:
       vm_count: 3
     clients:
       vm_spec:
+        AWS:
+          machine_type: m6i.4xlarge
+          zone: us-east-1a
+        Azure:
+          machine_type: Standard_D16s_v5
+          zone: eastus2
         GCP:
           machine_type: n2-standard-16
           zone: us-central1-b
