@@ -1,8 +1,10 @@
+import tempfile
 import unittest
 from unittest import mock
 from absl.testing import flagsaver
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import network
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import elastic_kubernetes_service
@@ -263,6 +265,47 @@ class EksAutoClusterTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertTrue(cluster._IsReady())
 
 
+EXPECTED_EKS_CREATE_YAML = """apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: pkb-123p
+  region: us-west-1
+  version: "1.32"
+  tags:
+    karpenter.sh/discovery: pkb-123p
+    benchmark: "kubernetes_scale"
+    cloud: "aws"
+    owner: "cloud-performance"
+
+iam:
+  withOIDC: true
+  podIdentityAssociations:
+  - namespace: "kube-system"
+    serviceAccountName: karpenter
+    roleName: pkb-123p-karpenter
+    permissionPolicyARNs:
+    - arn:aws:iam::1234:policy/KarpenterControllerPolicy-pkb-123p
+
+iamIdentityMappings:
+- arn: "arn:aws:iam::1234:role/KarpenterNodeRole-pkb-123p"
+  username: system:node:{{EC2PrivateDNSName}}
+  groups:
+  - system:bootstrappers
+  - system:nodes
+
+managedNodeGroups:
+
+- instanceType: m5.large
+  amiFamily: AmazonLinux2023
+  name: default
+  desiredCapacity: 1
+  minSize: 1
+  maxSize: 1
+
+addons:
+- name: eks-pod-identity-agent"""
+
+
 class EksKarpenterTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
@@ -292,6 +335,31 @@ class EksKarpenterTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testInitEksClusterWorks(self):
     elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
+
+  def testEksYamlCreate(self):
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'GetTempDir',
+            return_value=tempfile.gettempdir(),
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            util,
+            'MakeDefaultTags',
+            return_value={
+                'benchmark': 'kubernetes_scale',
+                'cloud': 'aws',
+                'owner': 'cloud-performance',
+            },
+        )
+    )
+    cluster = elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
+    file = cluster._RenderEksCreateYamlToFile()
+    with open(file, 'r') as f:
+      contents = f.read()
+    self.assertEqual(EXPECTED_EKS_CREATE_YAML, contents)
 
 
 if __name__ == '__main__':

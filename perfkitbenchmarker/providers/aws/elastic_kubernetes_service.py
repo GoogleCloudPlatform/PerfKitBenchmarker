@@ -25,6 +25,7 @@ import re
 from typing import Any, Dict
 
 from absl import flags
+import jinja2
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -35,6 +36,7 @@ from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import util
+
 
 FLAGS = flags.FLAGS
 
@@ -92,6 +94,7 @@ class BaseEksCluster(container_service.KubernetesCluster):
     if self.control_plane_zones:
       eksctl_flags['zones'] = ','.join(self.control_plane_zones)
 
+    # TODO(user): Use yaml create rather than args.
     cmd = [FLAGS.eksctl, 'create', 'cluster'] + sorted(
         '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v
     )
@@ -420,8 +423,15 @@ class EksAutoCluster(BaseEksCluster):
 
 _KARPENTER_NAMESPACE = 'kube-system'
 _KARPENTER_VERSION = '1.5.0'
-# TODO(user): Use a variable kubernetes version.
-_K8S_VERSION = '1.32'
+_DEAULT_K8S_VERSION = '1.32'
+_NODEGROUP_YAML = """
+- instanceType: {{INSTANCE_TYPE}}
+  amiFamily: AmazonLinux2023
+  name: {{NODEGROUP_NAME}}
+  desiredCapacity: {{NUM_NODES}}
+  minSize: {{MIN_SIZE}}
+  maxSize: {{MAX_SIZE}}
+"""
 
 
 class EksKarpenterCluster(BaseEksCluster):
@@ -437,6 +447,7 @@ class EksKarpenterCluster(BaseEksCluster):
     super().__init__(spec)
     self._ChooseSecondZone()
     self.stack_name = f'Karpenter-{self.name}'
+    self.cluster_version: str = self.cluster_version or _DEAULT_K8S_VERSION
 
   def InitializeNodePoolForCloud(
       self,
@@ -444,6 +455,43 @@ class EksKarpenterCluster(BaseEksCluster):
       nodepool_config: container_service.BaseNodePoolConfig,
   ):
     pass
+
+  def _RenderNodeGroupYaml(
+      self, nodepool: container_service.BaseNodePoolConfig
+  ):
+    """Renders the node group yaml to a string."""
+    environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
+    template = environment.from_string(_NODEGROUP_YAML)
+    return template.render(
+        INSTANCE_TYPE=nodepool.machine_type,
+        NODEGROUP_NAME=nodepool.name,
+        NUM_NODES=nodepool.num_nodes,
+        MIN_SIZE=self.min_nodes,
+        MAX_SIZE=self.max_nodes,
+    )
+
+  def _RenderEksCreateYamlToFile(self) -> str:
+    """Renders the eksctl create yaml to a file.
+
+    Returns:
+      The file path of the rendered yaml.
+    """
+    tags = util.MakeDefaultTags()
+    logging.info('Creating cluster with tags %s', tags)
+    return vm_util.RenderTemplate(
+        data.ResourcePath('container/karpenter/cluster_create.yaml.j2'),
+        {
+            'CLUSTER_NAME': self.name,
+            'AWS_REGION': self.region,
+            'K8S_VERSION': self.cluster_version,
+            'KARPENTER_NAMESPACE': _KARPENTER_NAMESPACE,
+            'AWS_ACCOUNT_ID': self.account,
+            'NODEGROUP_YAML': self._RenderNodeGroupYaml(self.default_nodepool),
+            'TAGS': tags,
+        },
+        should_log_file=True,
+        trim_spaces=True,
+    )
 
   def _Create(self):
     """Creates the control plane and worker nodes."""
@@ -470,19 +518,7 @@ class EksKarpenterCluster(BaseEksCluster):
         '--region',
         f'{self.region}',
     ])
-    # TODO(user): Use an eksctl create command with args similar to other
-    # clusters in this file rather than a yaml.
-    create_yaml = vm_util.RenderTemplate(
-        data.ResourcePath('container/karpenter/cluster_create.yaml.j2'),
-        {
-            'CLUSTER_NAME': self.name,
-            'AWS_REGION': self.region,
-            'K8S_VERSION': _K8S_VERSION,
-            'KARPENTER_NAMESPACE': _KARPENTER_NAMESPACE,
-            'AWS_ACCOUNT_ID': self.account,
-        },
-        True,
-    )
+    create_yaml = self._RenderEksCreateYamlToFile()
     vm_util.IssueCommand(
         [FLAGS.eksctl, 'create', 'cluster', '-f', create_yaml], timeout=1800
     )
@@ -537,7 +573,7 @@ class EksKarpenterCluster(BaseEksCluster):
         'ssm',
         'get-parameter',
         '--name',
-        f'/aws/service/eks/optimized-ami/{_K8S_VERSION}/amazon-linux-2023/x86_64/standard/recommended/image_id',
+        f'/aws/service/eks/optimized-ami/{self.cluster_version}/amazon-linux-2023/x86_64/standard/recommended/image_id',
         '--region',
         self.region,
         '--query',
@@ -556,7 +592,8 @@ class EksKarpenterCluster(BaseEksCluster):
         self.region,
     ])
     alias_version = (
-        'v' + full_version.strip().strip('"').split(f'{_K8S_VERSION}-v')[1]
+        'v'
+        + full_version.strip().strip('"').split(f'{self.cluster_version}-v')[1]
     )
     self.ApplyManifest(
         'container/karpenter/nodepool.yaml.j2',

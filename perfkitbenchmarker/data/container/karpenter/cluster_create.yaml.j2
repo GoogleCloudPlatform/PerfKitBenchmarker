@@ -6,6 +6,9 @@ metadata:
   version: "{{K8S_VERSION}}"
   tags:
     karpenter.sh/discovery: {{CLUSTER_NAME}}
+{% for tag_key in TAGS %}
+    {{tag_key}}: "{{TAGS[tag_key]}}"
+{% endfor %}
 
 iam:
   withOIDC: true
@@ -24,13 +27,7 @@ iamIdentityMappings:
   - system:nodes
 
 managedNodeGroups:
-- instanceType: m5.large
-  amiFamily: AmazonLinux2023
-  name: {{CLUSTER_NAME}}-ng
-  # TODO(user): Support variable sizes.
-  desiredCapacity: 2
-  minSize: 1
-  maxSize: 10
+{{NODEGROUP_YAML}}
 
 addons:
 - name: eks-pod-identity-agent

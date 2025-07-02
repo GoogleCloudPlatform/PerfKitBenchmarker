@@ -917,7 +917,10 @@ def DictionaryToEnvString(dictionary, joiner=' '):
 
 
 def RenderTemplate(
-    template_path, context, should_log_file: bool = False
+    template_path,
+    context,
+    should_log_file: bool = False,
+    trim_spaces: bool = False,
 ) -> str:
   """Renders a local Jinja2 template and returns its file name.
 
@@ -927,6 +930,7 @@ def RenderTemplate(
     template_path: string. Local path to jinja2 template.
     context: dict. Variables to pass to the Jinja2 template during rendering.
     should_log_file: bool. Whether to log the file after rendering.
+    trim_spaces: bool. Value for both trim_blocks and lstrip_blocks.
 
   Raises:
     jinja2.UndefinedError: if template contains variables not present in
@@ -937,7 +941,11 @@ def RenderTemplate(
   """
   with open(template_path) as fp:
     template_contents = fp.read()
-  environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
+  environment = jinja2.Environment(
+      undefined=jinja2.StrictUndefined,
+      trim_blocks=trim_spaces,
+      lstrip_blocks=trim_spaces,
+  )
   template = environment.from_string(template_contents)
   prefix = 'pkb-' + os.path.basename(template_path)
   with NamedTemporaryFile(
