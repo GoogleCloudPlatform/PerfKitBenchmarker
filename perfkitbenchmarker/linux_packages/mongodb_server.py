@@ -15,13 +15,126 @@
 
 """Module containing mongodb installation and cleanup functions."""
 
+import logging
+
 from absl import flags
+import yaml
+
 
 FLAGS = flags.FLAGS
 
 VERSION = flags.DEFINE_string(
     'mongodb_version', '8.0', 'Version of mongodb package.'
 )
+
+MONGOD_CONF_WIRED_TIGER_CACHE_SIZE_GB = flags.DEFINE_integer(
+    'mongod_conf_wired_tiger_cache_size_gb',
+    None,
+    'The maximum amount of RAM, in gigabytes, that the WiredTiger storage'
+    ' engine uses for its internal cache to hold data and indexes. This is the'
+    ' most critical memory tuning parameter. Data in this cache is'
+    ' uncompressed. Default Value: 50% of (Total System RAM - 1 GB), or 256 MB,'
+    ' whichever is larger.',
+)
+
+MONGOD_CONF_WIRED_TIGER_SESSION_MAX = flags.DEFINE_string(
+    'mongod_conf_wired_tiger_session_max',
+    None,
+    'An internal WiredTiger parameter that sets the maximum number of'
+    ' concurrent sessions (or connections) the storage engine can handle. This'
+    ' is often aligned with the maximum number of client connections. Default'
+    ' value is 100 based on WiredTiger documentation.',
+)
+
+MONGOD_CONF_NETWORK_MAX_INCOMING_CONNECTIONS = flags.DEFINE_integer(
+    'mongod_conf_network_max_incoming_connections',
+    None,
+    'The maximum number of simultaneous client connections that the mongod'
+    ' process will accept on network layer. Default for Windows is 1,000,000.'
+    ' Default for Linux is (RLIMIT_NOFILE) * 0.8, which is OS-dependent.',
+)
+
+MONGOD_CONF_LOCK_CODE_SEGMENTS_IN_MEMORY = flags.DEFINE_boolean(
+    'mongod_conf_lock_code_segments_in_memory',
+    None,
+    'A hint to the operating system to try and keep the MongoDB server program'
+    ' code locked in physical RAM, which can prevent it from being paged out to'
+    ' disk and improve performance consistency. No mentioning in Monodb public'
+    ' doc. Possibly an Atlas-specific setting.',
+)
+
+MONGOD_CONF_INTERNAL_QUERY_STATS_RATE_LIMIT = flags.DEFINE_integer(
+    'mongod_conf_internal_query_stats_rate_limit',
+    None,
+    'The maximum rate at which query statistics are recorded. This helps limit'
+    ' the performance overhead of diagnostic logging. No mentioning in Monodb'
+    ' public doc. Possibly an Atlas-specific setting.',
+)
+
+MONGOD_CONF_MIN_SNAPSHOT_HISTORY_WINDOW_IN_SECONDS = flags.DEFINE_integer(
+    'mongod_conf_min_snapshot_history_window_in_seconds',
+    None,
+    'The minimum amount of time, in seconds, that the WiredTiger storage'
+    ' engine will retain snapshot history data. This data is used for things'
+    ' like replica set rollbacks. Default value is 300.',
+)
+
+MONGODB_LOG_LEVEL = flags.DEFINE_integer(
+    'mongodb_log_level',
+    None,
+    'MongoDB log level, verbosity increases with level. Default value is 0.',
+    0,
+    5,
+)
+
+MONGODB_QUERY_STATS_COMPONENT_LOG_LEVEL = flags.DEFINE_integer(
+    'mongodb_query_stats_component_log_level',
+    None,
+    'MongoDB log level for queryStats component, verbosity increases with'
+    ' level. Default value is 0.',
+    0,
+    5,
+)
+
+# For flags that are used to modify mongod.conf file, map the unique flag name
+# (a string) to its corresponding YAML path.
+FLAG_NAME_TO_PATH_MAP = {
+    MONGOD_CONF_WIRED_TIGER_CACHE_SIZE_GB.name: (
+        'storage',
+        'wiredTiger',
+        'engineConfig',
+        'cacheSizeGB',
+    ),
+    MONGOD_CONF_WIRED_TIGER_SESSION_MAX.name: (
+        'storage',
+        'wiredTiger',
+        'engineConfig',
+        'configString',
+    ),
+    MONGOD_CONF_NETWORK_MAX_INCOMING_CONNECTIONS.name: (
+        'net',
+        'maxIncomingConnections',
+    ),
+    MONGOD_CONF_LOCK_CODE_SEGMENTS_IN_MEMORY.name: (
+        'setParameter',
+        'lockCodeSegmentsInMemory',
+    ),
+    MONGOD_CONF_INTERNAL_QUERY_STATS_RATE_LIMIT.name: (
+        'setParameter',
+        'internalQueryStatsRateLimit',
+    ),
+    MONGOD_CONF_MIN_SNAPSHOT_HISTORY_WINDOW_IN_SECONDS.name: (
+        'setParameter',
+        'minSnapshotHistoryWindowInSeconds',
+    ),
+    MONGODB_LOG_LEVEL.name: ('systemLog', 'verbosity'),
+    MONGODB_QUERY_STATS_COMPONENT_LOG_LEVEL.name: (
+        'systemLog',
+        'component',
+        'queryStats',
+        'verbosity',
+    ),
+}
 
 
 def _GetServiceName():
@@ -37,13 +150,60 @@ def _GetConfigPath():
 def _Setup(vm):
   """Setup mongodb."""
   config_path = _GetConfigPath()
-  vm.RemoteCommand(
-      f'sudo sed -i "s|bindIp: 127.0.0.1|bindIp: ::,0.0.0.0|" {config_path}'
-  )
+
+  # Read the existing config file from the VM
+  stdout, _ = vm.RemoteCommand(f'sudo cat {config_path}')
+
+  # Initialize the PyYAML parser. Note: This will strip comments.
+  try:
+    config_data = yaml.safe_load(stdout)
+    if not config_data:
+      logging.warning(
+          'Existing mongod.conf file with basic settings should exist.'
+      )
+      config_data = {}
+  except yaml.YAMLError as e:
+    logging.warning('Could not parse existing mongod.conf: %s', e)
+    config_data = {}
+
+  # Apply static configurations
+  config_data.setdefault('net', {})['bindIp'] = '::,0.0.0.0'
   if not FLAGS.mongodb_primary_only:
-    vm.RemoteCommand(
-        f'echo "replication:\n  replSetName: rs0" | sudo tee -a {config_path}'
-    )
+    config_data.setdefault('replication', {})['replSetName'] = 'rs0'
+
+  # Apply flag-driven configurations
+
+  def SetNestedValue(d, path, value):
+    """Navigates a dictionary path and sets a value, creating keys if needed."""
+    for key in path[:-1]:
+      d = d.setdefault(key, {})
+    d[path[-1]] = value
+
+  # A list of the flags to be processed.
+  flags_to_process = [
+      MONGOD_CONF_WIRED_TIGER_CACHE_SIZE_GB,
+      MONGOD_CONF_WIRED_TIGER_SESSION_MAX,
+      MONGOD_CONF_NETWORK_MAX_INCOMING_CONNECTIONS,
+      MONGOD_CONF_LOCK_CODE_SEGMENTS_IN_MEMORY,
+      MONGOD_CONF_INTERNAL_QUERY_STATS_RATE_LIMIT,
+      MONGOD_CONF_MIN_SNAPSHOT_HISTORY_WINDOW_IN_SECONDS,
+      MONGODB_LOG_LEVEL,
+      MONGODB_QUERY_STATS_COMPONENT_LOG_LEVEL,
+  ]
+
+  # Loop through the flags and apply any that have been set by the user.
+  for flag in flags_to_process:
+    if flag.value is not None:
+      path = FLAG_NAME_TO_PATH_MAP.get(flag.name)
+      if path:
+        SetNestedValue(config_data, path, flag.value)
+
+  # Convert the data structure back to a YAML string
+  # default_flow_style=False ensures block-style output for readability.
+  new_config_content = yaml.dump(config_data, default_flow_style=False)
+
+  # Write the new configuration back to the file on the VM
+  vm.RemoteCommand(f'echo """{new_config_content}""" | sudo tee {config_path}')
 
 
 def YumSetup(vm):

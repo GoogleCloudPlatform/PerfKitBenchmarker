@@ -26,7 +26,6 @@ import functools
 import json
 import posixpath
 import re
-import time
 from typing import Any, Optional
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -58,14 +57,6 @@ flags.DEFINE_integer(
     'mongodb_batchsize',
     1,
     'Client request batch size. Applies to inserts only (YCSB limitation).',
-)
-
-_MONGODB_LOG_LEVEL = flags.DEFINE_integer(
-    'mongodb_log_level',
-    None,
-    'MongoDB log level, verbosity increases with level',
-    1,
-    5,
 )
 
 _MONGODB_NVME_QUEUE_DEPTH = flags.DEFINE_integer(
@@ -227,13 +218,6 @@ def _PrepareServer(vm: _LinuxVM) -> None:
   # Too many connections fails if we don't set file descriptor limit higher.
   vm.RemoteCommand('ulimit -n 64000 && sudo systemctl start mongod')
 
-  if _MONGODB_LOG_LEVEL.value is not None:
-    time.sleep(10)
-    mongosh.RunCommand(
-        vm,
-        f'db.setLogLevel({_MONGODB_LOG_LEVEL.value})',
-    )
-
 
 def _PrepareArbiter(vm: _LinuxVM) -> None:
   """Installs MongoDB on the arbiter."""
@@ -337,7 +321,7 @@ def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
   if FLAGS.mongodb_primary_only:
     return (
         f'"mongodb://{primary.internal_ip}:27017/ycsb'
-        '?w=1&j=true&compression=snappy&maxPoolSize=60000"'
+        '?w=1&j=true&compression=snappy&maxPoolSize=100000"'
     )
 
   if FLAGS.mongodb_pss:
@@ -347,7 +331,7 @@ def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
         f'"mongodb://{primary.internal_ip}:27017,'
         f'{secondary.internal_ip}:27017,'
         f'{secondary_2.internal_ip}:27017/ycsb'
-        '?replicaSet=rs0&w=majority&compression=snappy&maxPoolSize=60000"'
+        '?replicaSet=rs0&w=majority&compression=snappy&maxPoolSize=100000"'
     )
 
   secondary = benchmark_spec.vm_groups['secondary'][0]
@@ -356,7 +340,7 @@ def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
       f'"mongodb://{primary.internal_ip}:27017,'
       f'{secondary.internal_ip}:27017,'
       f'{arbiter.internal_ip}:27017/ycsb'
-      '?replicaSet=rs0&w=majority&compression=snappy&maxPoolSize=60000"'
+      '?replicaSet=rs0&w=majority&compression=snappy&maxPoolSize=100000"'
   )
 
 

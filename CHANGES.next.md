@@ -608,3 +608,4 @@
 -   Add fio Write saturation IOPS benchmark.
 -   Add fio max IOPS microbenchmark
 -   Add support for MongoDB PSS (Primary-Secondary-Secondary) setup.
+-   Add flags to allow modifying multiple settings in "mongod.conf".
