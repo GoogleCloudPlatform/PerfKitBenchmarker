@@ -133,22 +133,31 @@ def _GetFioTargetMode():
 
 def _GetMaxIOPSSample(samples) -> sample.Sample:
   """Returns Max IOPS sample from the list of samples of fio run."""
-  max_iops_sample = None
-  for sample_details in samples:
-    if sample_details.metric.endswith(':iops'):
-      if not max_iops_sample or sample_details.value > max_iops_sample.value:
-        max_iops_sample = sample_details
-  if max_iops_sample:
-    if int(max_iops_sample.metadata['numjobs']) == sorted(NUMJOBS)[-1]:
-      # The current numjobs might not be reaching max IOPS
-      raise errors.Benchmarks.RunError(
-          'Max IOPS found with the largest numjobs, possibility of not'
-          ' reaching the max.'
-      )
-    return max_iops_sample
-  raise errors.Benchmarks.RunError(
-      'Max IOPS not found, please check the fio output in logs.'
+  sorted_iops_samples = sorted(
+      list(filter(lambda x: x.metric.endswith(':iops'), samples)),
+      key=lambda x: x.value,
+      reverse=True,
   )
+  if not sorted_iops_samples:
+    raise errors.Benchmarks.RunError(
+        'Max IOPS not found, please check the fio output in logs.'
+    )
+  if int(sorted_iops_samples[0].metadata['numjobs']) == sorted(NUMJOBS)[
+      -1
+  ] and (
+      (
+          abs(sorted_iops_samples[0].value - sorted_iops_samples[1].value)
+          / sorted_iops_samples[1].value
+      )
+      > 0.02
+  ):
+    # The current numjobs might not be reaching max IOPS since the difference
+    # between the max two iops is more than 2 percent.
+    raise errors.Benchmarks.RunError(
+        'Max IOPS found with the largest numjobs, possibility of not'
+        ' reaching the max.'
+    )
+  return sorted_iops_samples[0]
 
 
 def Cleanup(_):
