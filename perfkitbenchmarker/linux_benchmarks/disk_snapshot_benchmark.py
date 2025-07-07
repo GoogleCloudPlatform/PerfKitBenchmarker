@@ -15,18 +15,27 @@
 """Runs disk snapshot benchmarks."""
 
 import logging
+import time
 from typing import Any, Mapping
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import disk
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import unmanaged_mysql_sysbench_benchmark
+from perfkitbenchmarker.linux_packages import fio
 
 
 FLAGS = flags.FLAGS
+
+REPORT_SNAPSHOT_FULL_RESTORE_TIME = flags.DEFINE_bool(
+    'report_snapshot_full_restore_time',
+    True,
+    'Whether to report the snapshot full restore time. Default value is false.',
+)
 
 BENCHMARK_NAME = 'disk_snapshot'
 BENCHMARK_CONFIG = """
@@ -80,6 +89,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """
   benchmark_spec.vm_groups['client'] = benchmark_spec.vm_groups['server']
   unmanaged_mysql_sysbench_benchmark.Prepare(benchmark_spec)
+  background_tasks.RunThreaded(
+      lambda vm: vm.Install('fio'), benchmark_spec.vm_groups['client']
+  )
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
@@ -103,6 +115,24 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   return all_samples
 
 
+def RestoreSnapshot(
+    source_disk: disk.BaseDisk,
+    vm: linux_virtual_machine.BaseLinuxVirtualMachine,
+):
+  """Restore the snapshot on the given vm."""
+  source_disk.snapshots[-1].Restore()
+  if REPORT_SNAPSHOT_FULL_RESTORE_TIME.value:
+    fio_exe = fio.GetFioExec()
+    dev_path = source_disk.GetDevicePath()
+    vm.RemoteCommand(
+        f'{fio_exe} --filename={dev_path} --rw=read --bs=1M --iodepth=64'
+        ' --numjobs=4 --ioengine=libaio --direct=1 --name=volume-initialize'
+    )
+  source_disk.snapshots[-1].restore_disks[
+      -1
+  ].create_disk_full_end_time = time.time()
+
+
 def CreateSnapshotOnVM(
     vm: linux_virtual_machine.BaseLinuxVirtualMachine,
     snapshot_num: int = 1,
@@ -117,17 +147,20 @@ def CreateSnapshotOnVM(
       vm.scratch_disks,
   )
   background_tasks.RunThreaded(
-      lambda disk: disk.snapshots[-1].Restore(), vm.scratch_disks
+      lambda disk: RestoreSnapshot(disk, vm), vm.scratch_disks
   )
+  # TODO(andytzhu) - Measure FIO Latency after restore.
   vm_samples = []
   metadata = {'snapshot_number': snapshot_num}
   if 'G' not in used_disk_size.strip()[-1]:
     raise ValueError('Used disk size is not in GB.')
   full_snapshot_size_gb = float(used_disk_size.strip().strip('G'))
-  for disk in vm.scratch_disks:
-    snapshot_size = disk.snapshots[-1].storage_gb or full_snapshot_size_gb
+  for scratch_disk in vm.scratch_disks:
+    snapshot_size = (
+        scratch_disk.snapshots[-1].storage_gb or full_snapshot_size_gb
+    )
     if snapshot_num > 1:
-      snapshot_size = disk.GetLastIncrementalSnapshotSize()
+      snapshot_size = scratch_disk.GetLastIncrementalSnapshotSize()
     if snapshot_size:
       vm_samples.append(
           sample.Sample(
@@ -157,17 +190,32 @@ def CreateSnapshotOnVM(
     vm_samples.append(
         sample.Sample(
             'snapshot_creation_time',
-            disk.snapshots[-1].creation_end_time
-            - disk.snapshots[-1].creation_start_time,
+            scratch_disk.snapshots[-1].creation_end_time
+            - scratch_disk.snapshots[-1].creation_start_time,
             'seconds',
             metadata,
         )
     )
     vm_samples.append(
         sample.Sample(
-            'snapshot_restore_time',
-            disk.snapshots[-1].restore_disks[-1].create_disk_end_time
-            - disk.snapshots[-1].restore_disks[-1].create_disk_start_time,
+            'snapshot_restore_time_to_first_byte',
+            scratch_disk.snapshots[-1].restore_disks[-1].create_disk_end_time
+            - scratch_disk.snapshots[-1]
+            .restore_disks[-1]
+            .create_disk_start_time,
+            'seconds',
+            metadata,
+        )
+    )
+    vm_samples.append(
+        sample.Sample(
+            'snapshot_full_restore_time',
+            scratch_disk.snapshots[-1]
+            .restore_disks[-1]
+            .create_disk_full_end_time
+            - scratch_disk.snapshots[-1]
+            .restore_disks[-1]
+            .create_disk_start_time,
             'seconds',
             metadata,
         )
