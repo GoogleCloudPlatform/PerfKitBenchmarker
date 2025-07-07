@@ -392,6 +392,89 @@ class AksCluster(container_service.KubernetesCluster):
     nodepools = json.loads(stdout)
     return [nodepool['name'] for nodepool in nodepools]
 
+class AksAutomaticCluster(AksCluster):
+  """Class representing an AKS Automatic cluster, which has managed node pools."""
+
+  CLOUD = provider_info.AZURE
+  CLUSTER_TYPE = 'Auto'
+
+  def __init__(self, spec):
+    """Initializes the cluster."""
+    super().__init__(spec)
+
+  def _Create(self):
+    """Creates the Automatic AKS cluster with tags."""
+    tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
+    tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'create',
+        '--name',
+        self.name,
+        '--location',
+        self.region,
+        '--ssh-key-value',
+        vm_util.GetPublicKeyPath(),
+        '--resource-group',
+        self.resource_group.name,
+        '--sku',
+        'automatic',
+        '--tags',
+    ] + tags_list
+    vm_util.Retry(timeout=300)(vm_util.IssueCommand)(
+        cmd,
+        # Half hour timeout on creating the cluster.
+        timeout=1800,
+    )
+
+  def _IsReady(self):
+    """Returns True if the cluster is ready."""
+    # Check provisioning state
+    show_cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'show',
+        '--name',
+        self.name,
+    ] + self.resource_group.args
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
+    try:
+        cluster = json.loads(stdout)
+        if cluster.get('provisioningState') != 'Succeeded':
+            return False
+    except Exception:
+        return False
+
+    vm_util.IssueCommand(
+        [
+            azure.AZURE_PATH,
+            'aks',
+            'get-credentials',
+            '--name',
+            self.name,
+            '--file',
+            FLAGS.kubeconfig,
+        ]
+        + self.resource_group.args
+    )
+    version_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'version']
+    _, _, retcode = vm_util.IssueCommand(version_cmd, raise_on_failure=False)
+    if retcode:
+      return False
+    # POD creation will fail until the default service account is created.
+    get_cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig',
+        FLAGS.kubeconfig,
+        'get',
+        'serviceAccounts',
+    ]
+    stdout, _, _ = vm_util.IssueCommand(get_cmd)
+    return 'default' in stdout
+  
+  def _PostCreate(self):
+    pass
 
 def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
   """Truncate nodepool name for AKS."""
