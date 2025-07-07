@@ -235,9 +235,16 @@ FIO_OPERATION_TYPE = flags.DEFINE_enum(
     constants.OPERATION_READ,
     [
         constants.OPERATION_READ,
-        constants.OPERATION_WRITE
+        constants.OPERATION_WRITE,
+        constants.OPERATION_READWRITE,
     ],
     'Fio operation/workload type.',
+)
+
+FIO_RW_MIX_READ = flags.DEFINE_integer(
+    'fio_rwmixread',
+    70,
+    'Percentage of a mixed workload that should be reads.',
 )
 
 FIO_TEST_COUNT = flags.DEFINE_integer(

@@ -19,6 +19,9 @@ randrepeat=0
 {%- if pair['index'] == 0 %}
 stonewall
 {%- endif%}
+{%- if scenario['rwmixread'] is defined %}
+rwmixread={{scenario['rwmixread']}}
+{%- endif%}
 rw={{scenario['rwkind']}}
 blocksize={{scenario['blocksize']}}
 iodepth={{scenario['iodepth']}}

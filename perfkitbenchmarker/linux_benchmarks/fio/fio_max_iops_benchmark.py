@@ -96,9 +96,15 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   samples = []
   fio_scenarios = []
   for numjobs in NUMJOBS:
-    fio_scenarios.append(
-        f'rand_4k_{fio_flags.FIO_OPERATION_TYPE.value}_100%_iodepth-{IODEPTH}_numjobs-{numjobs}'
-    )
+    if fio_flags.FIO_OPERATION_TYPE.value != constants.OPERATION_READWRITE:
+      scenario = (
+          f'rand_4k_{fio_flags.FIO_OPERATION_TYPE.value}_100%_iodepth-{IODEPTH}_numjobs-{numjobs}'
+      )
+    else:
+      scenario = (
+          f'rand_4k_{fio_flags.FIO_OPERATION_TYPE.value}_100%_iodepth-{IODEPTH}_numjobs-{numjobs}_rwmixread-{fio_flags.FIO_RW_MIX_READ.value}'
+      )
+    fio_scenarios.append(scenario)
   benchmark_params = {
       'numjobs_array': NUMJOBS,
   }
