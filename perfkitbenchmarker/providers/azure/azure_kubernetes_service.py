@@ -391,9 +391,10 @@ class AksCluster(container_service.KubernetesCluster):
     stdout, _, _ = vm_util.IssueCommand(cmd)
     nodepools = json.loads(stdout)
     return [nodepool['name'] for nodepool in nodepools]
-
+  
 class AksAutomaticCluster(AksCluster):
   """Class representing an AKS Automatic cluster, which has managed node pools."""
+  # https://learn.microsoft.com/en-us/azure/aks/automatic/quick-automatic-managed-network
 
   CLOUD = provider_info.AZURE
   CLUSTER_TYPE = 'Auto'
@@ -422,7 +423,7 @@ class AksAutomaticCluster(AksCluster):
         'automatic',
         '--tags',
     ] + tags_list
-    vm_util.Retry(timeout=300)(vm_util.IssueCommand)(
+    vm_util.IssueCommand(
         cmd,
         # Half hour timeout on creating the cluster.
         timeout=1800,
@@ -431,20 +432,16 @@ class AksAutomaticCluster(AksCluster):
   def _IsReady(self):
     """Returns True if the cluster is ready."""
     # Check provisioning state
-    show_cmd = [
-        azure.AZURE_PATH,
-        'aks',
-        'show',
-        '--name',
-        self.name,
-    ] + self.resource_group.args
-    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
-    try:
-        cluster = json.loads(stdout)
-        if cluster.get('provisioningState') != 'Succeeded':
-            return False
-    except Exception:
-        return False
+    vm_util.IssueCommand(
+        [
+          azure.AZURE_PATH,
+          'aks',
+          'show',
+          '--name',
+          self.name,
+        ]
+        + self.resource_group.args
+    )
 
     vm_util.IssueCommand(
         [
@@ -473,8 +470,50 @@ class AksAutomaticCluster(AksCluster):
     stdout, _, _ = vm_util.IssueCommand(get_cmd)
     return 'default' in stdout
   
+  def _CreateDependencies(self):
+    """Creates the resource group, service principal, and registers required AKS features."""
+    super()._CreateDependencies()
+
+    # Register the AutomaticSKUPreview feature
+    vm_util.IssueCommand(
+        [
+          azure.AZURE_PATH,
+          'feature',
+          'register',
+          '--namespace',
+          'Microsoft.ContainerService',
+          '--name',
+          'AutomaticSKUPreview',
+        ]
+    )
+
+    # Show the feature registration status
+    vm_util.IssueCommand(
+        [
+          azure.AZURE_PATH,
+          'feature',
+          'show',
+          '--namespace',
+          'Microsoft.ContainerService',
+          '--name',
+          'AutomaticSKUPreview',
+        ]
+    )
+    
+    # Register the provider
+    vm_util.IssueCommand(
+        [
+          azure.AZURE_PATH,
+          'provider',
+          'register',
+          '--namespace',
+          'Microsoft.ContainerService',
+        ]
+    )
+
   def _PostCreate(self):
     pass
+
 
 def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
   """Truncate nodepool name for AKS."""
