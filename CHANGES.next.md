@@ -240,6 +240,8 @@
 -   Add support for Managed MongoDB services and a YCSB benchmark.
 -   Add ESRally (Elasticsearch Rally) benchmark.
 -   Add ability to collect memory size according to lsmem with --collect_lsmem.
+-   Add k8s inference server resource to manage inference server workload in
+    cluster
 
 ### Enhancements:
 

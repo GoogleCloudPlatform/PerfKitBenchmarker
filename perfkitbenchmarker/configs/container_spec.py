@@ -26,6 +26,7 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.resources import kubernetes_inference_server_spec
 
 
 _DEFAULT_VM_COUNT = 1
@@ -304,9 +305,7 @@ class _NodepoolsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    nodepools_configs = super().Decode(
-        value, component_full_name, flag_values
-    )
+    nodepools_configs = super().Decode(value, component_full_name, flag_values)
     result = {}
     for nodepool_name, nodepool_config in nodepools_configs.items():
       result[nodepool_name] = NodepoolSpec(
@@ -384,6 +383,9 @@ class ContainerClusterSpec(spec.BaseSpec):
   cloud: str
   vm_spec: spec.PerCloudConfigSpec
   nodepools: dict[str, NodepoolSpec]
+  inference_server: (
+      kubernetes_inference_server_spec.BaseInferenceServerConfigSpec | None
+  )
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -469,6 +471,10 @@ class ContainerClusterSpec(spec.BaseSpec):
         # nodepools specifies a list of additional nodepools to create alongside
         # the default nodepool (nodepool created on cluster creation).
         'nodepools': (_NodepoolsDecoder, {'default': {}, 'none_ok': True}),
+        'inference_server': (
+            kubernetes_inference_server_spec.InferenceServerConfigDecoder,
+            {'default': None, 'none_ok': True},
+        ),
     })
     return result
 
