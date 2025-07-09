@@ -172,6 +172,14 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     if self.user_managed and not FLAGS.dpb_service_bucket:
       self.bucket = self._GetCluster()['config']['tempBucket']
 
+  def _InitializeMetadata(self) -> None:
+    super()._InitializeMetadata()
+    self.metadata['dataproc_tier'] = gcp_flags.GCP_DATAPROC_TIER.value
+    self.metadata['dataproc_engine'] = gcp_flags.GCP_DATAPROC_ENGINE.value
+    self.metadata['dataproc_lightning_engine_runtime'] = (
+        gcp_flags.GCP_DATAPROC_LIGHTNING_ENGINE_RUNTIME.value
+    )
+
   def GetClusterCreateTime(self) -> float | None:
     """Returns the cluster creation time.
 
@@ -259,6 +267,8 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
 
     if FLAGS.dpb_initialization_actions:
       cmd.flags['initialization-actions'] = FLAGS.dpb_initialization_actions
+
+    cmd.flags['tier'] = gcp_flags.GCP_DATAPROC_TIER.value
 
     # Ideally DpbServiceSpec would have a network spec, which we would create to
     # Resolve the name, but because EMR provisions its own VPC and we are
@@ -434,6 +444,15 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
         run_time=(done_time - start_time).total_seconds(),
         pending_time=(start_time - pending_time).total_seconds(),
     )
+
+  def GetJobProperties(self) -> Dict[str, str]:
+    """Returns a dict of job properties."""
+    properties = super().GetJobProperties()
+    properties['spark.dataproc.engine'] = gcp_flags.GCP_DATAPROC_ENGINE.value
+    properties['spark.dataproc.lightningEngine.runtime'] = (
+        gcp_flags.GCP_DATAPROC_LIGHTNING_ENGINE_RUNTIME.value
+    )
+    return properties
 
   def _AddToCmd(self, cmd, cmd_property, cmd_value):
     flag_name = cmd_property

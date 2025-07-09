@@ -34,7 +34,7 @@ from multiprocessing import synchronize
 import os
 import re
 import time
-from typing import Any, Callable, Iterable, Iterator, Optional, Sequence
+from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Sequence
 
 from absl import flags
 import jinja2
@@ -51,6 +51,7 @@ from perfkitbenchmarker import units
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
+from perfkitbenchmarker.resources import kubernetes_inference_server
 from perfkitbenchmarker.sample import Sample
 import requests
 import yaml
@@ -137,7 +138,7 @@ RETRYABLE_KUBECTL_ERRORS = [
     'error dialing backend:',
     'connect: connection timed out',
     'error sending request:',
-    '(abnormal closure): unexpected EOF'
+    '(abnormal closure): unexpected EOF',
 ]
 INGRESS_JSONPATH = '{.status.loadBalancer.ingress[0]}'
 
@@ -1334,6 +1335,105 @@ class KubernetesClusterCommands:
         k8s_events.add(k8s_event)
     return k8s_events
 
+  @staticmethod
+  def GetResourceMetadataByName(
+      resource_name: str,
+      resource_label: Optional[str] = None,
+      output_format: str = 'yaml',
+      output_formatter=yaml.safe_load,
+      **kwargs,
+  ) -> Dict[str, Any]:
+    """Gets the resource metadata from a Kubernetes resource."""
+    get_cmd = [
+        'get',
+        resource_name,
+    ]
+    if resource_label:
+      get_cmd.extend(['-l', resource_label])
+    get_cmd.extend(['-o', output_format])
+
+    stdout, _, _ = RunRetryableKubectlCommand(get_cmd, **kwargs)
+
+    return output_formatter(stdout)
+
+  @staticmethod
+  def RetryableGetPodNameFromJob(
+      job_name: str, timeout: int | None = None
+  ) -> str:
+    """Get the name of the pod from a job, retry until the pod is created.
+
+    Args:
+      job_name: The name of the job.
+      timeout: The timeout in seconds.
+
+    Returns:
+      The name of the pod.
+    """
+
+    class EmptyPodNameError(Exception):
+      pass
+
+    @vm_util.Retry(timeout=timeout, retryable_exceptions=EmptyPodNameError)
+    def _RetryFunction():
+      pod_name = KubernetesClusterCommands.GetResourceMetadataByName(
+          'pods', f'job-name={job_name}', 'jsonpath={.items[*].metadata.name}'
+      )
+      if not pod_name:
+        raise EmptyPodNameError(
+            f'No pod found for job {job_name}, the pod may not be created yet.'
+        )
+      return pod_name
+
+    return _RetryFunction()
+
+  @staticmethod
+  def DeleteResource(
+      resource_identifier: str, ignore_not_found: bool = True
+  ) -> None:
+    """Deletes a kubernetes resource."""
+    delete_cmd = [
+        'delete',
+        resource_identifier,
+    ]
+    if ignore_not_found:
+      delete_cmd.append('--ignore-not-found=true')
+    RunKubectlCommand(delete_cmd, raise_on_failure=False)
+
+  @staticmethod
+  def GetFileContentFromPod(pod_name: str, file_path: str) -> str:
+    """Get the content of a file from a pod.
+
+    Args:
+      pod_name: The name of the pod.
+      file_path: The path of the file to get.
+
+    Returns:
+      The content of the file.
+    """
+    get_cmd = [
+        'exec',
+        pod_name,
+        '--',
+        'cat',
+        file_path,
+    ]
+
+    stdout, _, _ = RunRetryableKubectlCommand(get_cmd)
+    return stdout
+
+  @staticmethod
+  def CopyFilesFromPod(
+      pod_name: str, src_path: str, target_path: str, **kwargs
+  ) -> None:
+    """Copy files from a pod source path to the target path on current VM."""
+    get_cmd = [
+        'cp',
+        f'{pod_name}:{src_path}',
+        target_path,
+    ]
+
+    RunRetryableKubectlCommand(get_cmd, **kwargs)
+
 
 class KubernetesEventPoller:
   """Wrapper which polls for Kubernetes events."""
@@ -1435,10 +1535,26 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
 
       self.event_poller = KubernetesEventPoller(_GetEventsNoLogging)
 
+    self.inference_server = (
+        kubernetes_inference_server.GetKubernetesInferenceServer(
+            cluster_spec.inference_server, self
+        )
+    )
+
+  def Create(self, restore: bool = False) -> None:
+    super().Create(restore)
+    if self.inference_server:
+      self.inference_server.Create()
+
   def _PostCreate(self):
     super()._PostCreate()
     if self.event_poller:
       self.event_poller.StartPolling()
+
+  def Delete(self, freeze: bool = False) -> None:
+    if self.inference_server:
+      self.inference_server.Delete()
+    super().Delete(freeze)
 
   def _Delete(self):
     if self.event_poller:
