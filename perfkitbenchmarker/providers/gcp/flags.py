@@ -14,6 +14,7 @@
 """Module containing flags applicable across benchmark run on GCP."""
 
 from absl import flags
+from perfkitbenchmarker import dpb_constants
 
 # Sentinel value for unspecified platform.
 GCP_MIN_CPU_PLATFORM_NONE = 'none'
@@ -548,6 +549,32 @@ GCE_PERFORMANCE_MONITORING_UNIT = flags.DEFINE_enum(
     None,
     ['standard', 'architectural', 'enhanced'],
     'Whether to enable PMU when creating a VM.',
+)
+GCP_DATAPROC_TIER = flags.DEFINE_enum(
+    'gcp_dataproc_tier',
+    dpb_constants.DATAPROC_STANDARD_TIER,
+    [dpb_constants.DATAPROC_STANDARD_TIER, dpb_constants.DATAPROC_PREMIUM_TIER],
+    'Dataproc tier to use for Dataproc GCE clusters.',
+)
+GCP_DATAPROC_ENGINE = flags.DEFINE_enum(
+    'gcp_dataproc_engine',
+    dpb_constants.DATAPROC_DEFAULT_ENGINE,
+    [
+        dpb_constants.DATAPROC_DEFAULT_ENGINE,
+        dpb_constants.DATAPROC_LIGHTNING_ENGINE,
+    ],
+    'Dataproc engine to use for Dataproc GCE clusters. Unlike gcloud it'
+    ' defaults to "default" regardless of chosen tier.',
+)
+GCP_DATAPROC_LIGHTNING_ENGINE_RUNTIME = flags.DEFINE_enum(
+    'gcp_dataproc_lightning_engine_runtime',
+    dpb_constants.DATAPROC_LIGHTNING_ENGINE_DEFAULT_RUNTIME,
+    [
+        dpb_constants.DATAPROC_LIGHTNING_ENGINE_DEFAULT_RUNTIME,
+        dpb_constants.DATAPROC_LIGHTNING_ENGINE_NATIVE_RUNTIME,
+    ],
+    'Dataproc Lightning Engine runtime to use. It defaults to "default"'
+    ' regardless of chosen engine.',
 )
 
 

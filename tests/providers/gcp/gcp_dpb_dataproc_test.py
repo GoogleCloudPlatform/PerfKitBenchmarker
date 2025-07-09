@@ -230,9 +230,15 @@ class GcpDpbDataprocTestCase(pkb_common_test_case.PkbCommonTestCase):
         'dpb_hdfs_type': hdfs_type,
         'dpb_disk_size': 42,
         'dpb_service_zone': 'us-central1-a',
-        'dpb_job_properties': '',
+        'dpb_job_properties': (
+            'spark.dataproc.engine=default,'
+            'spark.dataproc.lightningEngine.runtime=default'
+        ),
+        'dataproc_tier': 'standard',
         'dpb_cluster_properties': '',
         'dpb_dynamic_allocation': True,
+        'dataproc_engine': 'default',
+        'dataproc_lightning_engine_runtime': 'default',
     }
     self.assertEqual(cluster.GetResourceMetadata(), expected_metadata)
 
