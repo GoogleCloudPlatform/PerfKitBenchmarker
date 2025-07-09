@@ -393,8 +393,13 @@ class AksCluster(container_service.KubernetesCluster):
     return [nodepool['name'] for nodepool in nodepools]
   
 class AksAutomaticCluster(AksCluster):
-  """Class representing an AKS Automatic cluster, which has managed node pools."""
-  # https://learn.microsoft.com/en-us/azure/aks/automatic/quick-automatic-managed-network
+  """Class representing an AKS Automatic cluster, which has managed node pools.
+  
+  This feature is currently in preview. To provision an AKS Automatic cluster, 
+  you'll need to install the Azure CLI 'aks-preview' extension.
+  For more details, see the official documentation:
+  https://learn.microsoft.com/en-us/azure/aks/automatic/quick-automatic-managed-network
+  """
 
   CLOUD = provider_info.AZURE
   CLUSTER_TYPE = 'Auto'
