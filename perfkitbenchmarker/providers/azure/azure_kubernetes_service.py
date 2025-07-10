@@ -437,16 +437,21 @@ class AksAutomaticCluster(AksCluster):
   def _IsReady(self):
     """Returns True if the cluster is ready."""
     # Check provisioning state
-    vm_util.IssueCommand(
-        [
+    show_cmd = [
           azure.AZURE_PATH,
           'aks',
           'show',
           '--name',
           self.name,
-        ]
-        + self.resource_group.args
-    )
+        ] + self.resource_group.args
+    
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
+    try:
+        cluster = json.loads(stdout)
+        if cluster.get('provisioningState') not in ('Succeeded', 'Updating'):
+            return False
+    except Exception:
+        return False
 
     vm_util.IssueCommand(
         [
