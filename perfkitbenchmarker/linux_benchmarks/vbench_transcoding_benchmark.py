@@ -90,7 +90,8 @@ _FFMPEG_BUF_SIZE_MULTIPLIER = flags.DEFINE_integer(
 )
 
 _FFMPEG_DIR = flags.DEFINE_string(
-    'ffmpeg_dir', '/usr/bin', 'Directory where ffmpeg and ffprobe are located.'
+    'ffmpeg_dir', '', 'Directory (ending in "/") where ffmpeg and ffprobe are '
+    'located.'
 )
 FLAGS = flags.FLAGS
 
@@ -226,15 +227,15 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       jobs_arg = f'-j{jobs}' if jobs else ''
       threads_arg = f'-threads {threads} '
       parallel_cmd = (
-          f'parallel {jobs_arg} {_FFMPEG_DIR.value}/ffmpeg '
+          f'parallel {jobs_arg} {_FFMPEG_DIR.value}ffmpeg '
           f'{threads_arg} -y {cuda_args} -i {{}} {ffmpeg_args} '
           '{.}.out.mkv </dev/null >&/dev/null ::: *.mkv'
       )
 
       time_file = '~/parallel.time'
       run_cmd = (
-          f'cd {input_videos_dir} && /usr/bin/time -f "%e" -o {time_file} '
-          f'{parallel_cmd}'
+          f'cd {input_videos_dir} && PATH="$HOME/bin:$PATH" /usr/bin/time -f'
+          f' "%e" -o {time_file} {parallel_cmd}'
       )
       vm.RemoteCommand(run_cmd)
       total_runtime, _ = vm.RemoteCommand(
@@ -272,16 +273,17 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
         remote_input_path = f'{input_videos_dir}/{input_file}'
         remote_output_path = f'{input_videos_dir}/{out_file}'
         duration_cmd = (
-            'ffprobe -v error -show_entries format=duration '
-            f'-of default=noprint_wrappers=1:nokey=1 "{remote_input_path}"'
+            'PATH="$HOME/bin:$PATH" ffprobe -v error -show_entries'
+            ' format=duration -of default=noprint_wrappers=1:nokey=1'
+            f' "{remote_input_path}"'
         )
         duration_str, _ = vm.RemoteCommand(duration_cmd)
         total_duration_sec += float(duration_str.strip())
 
         psnr_cmd = (
-            f'ffmpeg -i "{remote_output_path}" -i "{remote_input_path}" '
-            '-lavfi psnr -f null - 2>&1 | '
-            "grep 'PSNR' | awk -F'average:' '{print $2}' | awk '{print $1}'"
+            f'PATH="$HOME/bin:$PATH" ffmpeg -i "{remote_output_path}" -i'
+            f' "{remote_input_path}" -lavfi psnr -f null - 2>&1 | grep \'PSNR\''
+            " | awk -F'average:' '{print $2}' | awk '{print $1}'"
         )
         psnr_str, _ = vm.RemoteCommand(psnr_cmd)
         psnr_values.append(float(psnr_str.strip()))
