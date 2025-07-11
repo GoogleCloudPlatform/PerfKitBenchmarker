@@ -326,7 +326,9 @@ class BenchmarkSpec:
     """Create the container cluster."""
     if self.config.container_cluster is None:
       return
-    self.SetContainerRegistry()
+    if self.config.container_cluster is None:
+        return
+
     cloud = self.config.container_cluster.cloud
     cluster_type = self.config.container_cluster.type
     providers.LoadProvider(cloud)
@@ -334,8 +336,10 @@ class BenchmarkSpec:
         cloud, cluster_type
     )
     self.container_cluster = container_cluster_class(
-        self.config.container_cluster
+        self.config.container_cluster,
+        self.container_registry
     )
+    self.resources.append(self.container_registry)
     self.resources.append(self.container_cluster)
 
   def ConstructCluster(self):
@@ -362,16 +366,6 @@ class BenchmarkSpec:
         self.config.container_registry
     )
     self.resources.append(self.container_registry)
-
-  def SetContainerRegistry(self):
-    """Sets the constructed container registry name."""
-
-    if self.container_registry:
-        self.container_registry_name = self.container_registry.name
-        logging.info('Container registry name: %s', self.container_registry_name)
-    else:
-        self.container_registry_name = None
-        logging.warning('No container registry constructed')
 
   def ConstructDpbService(self):
     """Create the dpb_service object and create groups for its vms."""

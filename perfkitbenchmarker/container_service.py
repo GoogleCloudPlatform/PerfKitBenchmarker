@@ -506,6 +506,7 @@ class BaseContainerCluster(resource.BaseResource):
     )
     self.services: dict[str, KubernetesContainerService] = {}
     self._extra_samples: list[sample.Sample] = []
+    self.container_registry = getattr(cluster_spec, 'container_registry', None)
 
   @property
   def num_nodes(self) -> int:
@@ -600,6 +601,9 @@ class BaseContainerCluster(resource.BaseResource):
           'min_size': self.min_nodes,
       })
 
+    if self.container_registry:
+        metadata['container_registry'] = self.container_registry
+
     return metadata
 
   def DeployContainer(self, name, container_spec):
@@ -676,6 +680,15 @@ def GetContainerClusterClass(
   return resource.GetResourceClass(
       BaseContainerCluster, CLOUD=cloud, CLUSTER_TYPE=cluster_type
   )
+
+def SetContainerRegistry(self):
+    """Sets the constructed container registry name."""
+    if self.container_registry:
+        self.container_registry_name = self.container_registry.name
+        logging.info('Container registry name: %s', self.container_registry_name)
+    else:
+        self.container_registry_name = None
+        logging.warning('No container registry constructed')
 
 
 class KubernetesPod:
