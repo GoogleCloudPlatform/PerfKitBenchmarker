@@ -91,6 +91,8 @@ def AptInstall(vm):
     vm.Install('build_tools')
 
     vm.RemoteCommand('mkdir -p ~/ffmpeg_sources ~/bin')
+    # Omitted installation of libfdk-aac, libmp3lame, libopus, libsvtav1, and
+    # libdav1d
     # Install NASM
     vm.RemoteCommand(
         'cd ~/ffmpeg_sources && wget https://www.nasm.us/pub/nasm/releasebuilds/'
@@ -134,29 +136,6 @@ def AptInstall(vm):
         ' --enable-vp9-highbitdepth --as=yasm && PATH="$HOME/bin:$PATH" make -j'
         ' && make install'
     )
-    # Install libfdk-aac
-    vm.RemoteCommand(
-        'cd ~/ffmpeg_sources && git -C fdk-aac pull 2> /dev/null || git clone '
-        '--depth 1 https://github.com/mstorsjo/fdk-aac && cd fdk-aac && '
-        'autoreconf -fiv && ./configure --prefix="$HOME/ffmpeg_build" '
-        '--disable-shared && make -j && make install'
-    )
-    # Install libmp3lame
-    vm.RemoteCommand(
-        'cd ~/ffmpeg_sources && wget -O lame-3.100.tar.gz '
-        'https://downloads.sourceforge.net/project/lame/lame/3.100/'
-        'lame-3.100.tar.gz && tar xzvf lame-3.100.tar.gz && cd lame-3.100 && '
-        'PATH="$HOME/bin:$PATH" ./configure --prefix="$HOME/ffmpeg_build" '
-        '--bindir="$HOME/bin" --disable-shared --enable-nasm && '
-        'PATH="$HOME/bin:$PATH" make -j && make install'
-    )
-    # Install libopus
-    vm.RemoteCommand(
-        'cd ~/ffmpeg_sources && git -C opus pull 2> /dev/null || git clone '
-        '--depth 1 https://github.com/xiph/opus.git && cd opus && '
-        './autogen.sh && ./configure --prefix="$HOME/ffmpeg_build" '
-        '--disable-shared && make -j && make install'
-    )
     # Install libaom
     vm.RemoteCommand(
         'cd ~/ffmpeg_sources && git -C aom pull 2> /dev/null || git clone '
@@ -166,24 +145,6 @@ def AptInstall(vm):
         '-DCMAKE_INSTALL_PREFIX="$HOME/ffmpeg_build" -DENABLE_TESTS=OFF '
         '-DENABLE_NASM=on ../aom && PATH="$HOME/bin:$PATH" make && make '
         'install'
-    )
-    # Install libsvtav1
-    vm.RemoteCommand(
-        'cd ~/ffmpeg_sources && git -C SVT-AV1 pull 2> /dev/null || git clone'
-        ' https://gitlab.com/AOMediaCodec/SVT-AV1.git && mkdir -p SVT-AV1/build'
-        ' && cd SVT-AV1/build && PATH="$HOME/bin:$PATH" cmake -G "Unix'
-        ' Makefiles" -DCMAKE_INSTALL_PREFIX="$HOME/ffmpeg_build"'
-        ' -DCMAKE_BUILD_TYPE=Release -DBUILD_DEC=OFF -DBUILD_SHARED_LIBS=OFF ..'
-        ' && PATH="$HOME/bin:$PATH" make && make install'
-    )
-    # Install libdav1d
-    vm.RemoteCommand(
-        'cd ~/ffmpeg_sources && git -C dav1d pull 2> /dev/null || git clone '
-        '--depth 1 https://code.videolan.org/videolan/dav1d.git && mkdir -p '
-        'dav1d/build && cd dav1d/build && meson setup -Denable_tools=false '
-        '-Denable_tests=false --default-library=static .. --prefix '
-        '"$HOME/ffmpeg_build" --libdir="$HOME/ffmpeg_build/lib" && ninja && '
-        'ninja install'
     )
     # Install FFmpeg
     vm.RemoteCommand(
@@ -195,9 +156,7 @@ def AptInstall(vm):
         '--pkg-config-flags="--static" --extra-cflags="-I$HOME/ffmpeg_build/'
         'include" --extra-ldflags="-L$HOME/ffmpeg_build/lib" '
         '--extra-libs="-lpthread -lm" --bindir="$HOME/bin" --enable-gpl '
-        '--enable-libaom --enable-libass --enable-libfdk-aac '
-        '--enable-libfreetype --enable-libmp3lame --enable-libopus '
-        '--enable-libsvtav1 --enable-libdav1d --enable-libvorbis '
-        '--enable-libvpx --enable-libx264 --enable-libx265 --enable-nonfree && '
-        'PATH="$HOME/bin:$PATH" make -j && make install'
+        '--enable-libaom --enable-libass --enable-libfreetype '
+        '--enable-libvorbis --enable-libvpx --enable-libx264 --enable-libx265 '
+        '--enable-nonfree && PATH="$HOME/bin:$PATH" make -j && make install'
     )
