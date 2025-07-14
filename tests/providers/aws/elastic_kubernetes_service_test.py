@@ -265,45 +265,59 @@ class EksAutoClusterTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertTrue(cluster._IsReady())
 
 
-EXPECTED_EKS_CREATE_YAML = """apiVersion: eksctl.io/v1alpha5
-kind: ClusterConfig
-metadata:
-  name: pkb-123p
-  region: us-west-1
-  version: "1.32"
-  tags:
-    karpenter.sh/discovery: pkb-123p
-    benchmark: "kubernetes_scale"
-    cloud: "aws"
-    owner: "cloud-performance"
-
-iam:
-  withOIDC: true
-  podIdentityAssociations:
-  - namespace: "kube-system"
-    serviceAccountName: karpenter
-    roleName: pkb-123p-karpenter
-    permissionPolicyARNs:
-    - arn:aws:iam::1234:policy/KarpenterControllerPolicy-pkb-123p
-
-iamIdentityMappings:
-- arn: "arn:aws:iam::1234:role/KarpenterNodeRole-pkb-123p"
-  username: system:node:{{EC2PrivateDNSName}}
-  groups:
-  - system:bootstrappers
-  - system:nodes
-
-managedNodeGroups:
-
-- instanceType: m5.large
-  amiFamily: AmazonLinux2023
-  name: default
-  desiredCapacity: 1
-  minSize: 1
-  maxSize: 1
-
-addons:
-- name: eks-pod-identity-agent"""
+EXPECTED_EKS_CREATE_FILE = """{
+  "apiVersion": "eksctl.io/v1alpha5",
+  "kind": "ClusterConfig",
+  "metadata": {
+    "name": "pkb-123p",
+    "region": "us-west-1",
+    "version": "1.32",
+    "tags": {
+      "benchmark": "kubernetes_scale",
+      "cloud": "aws",
+      "owner": "cloud-performance",
+      "karpenter.sh/discovery": "pkb-123p"
+    }
+  },
+  "iam": {
+    "withOidc": true,
+    "podIdentityAssociations": [
+      {
+        "namespace": "kube-system",
+        "serviceAccountName": "karpenter",
+        "roleName": "pkb-123p-karpenter",
+        "permissionPolicyARNs": [
+          "arn:aws:iam::1234:policy/KarpenterControllerPolicy-pkb-123p"
+        ]
+      }
+    ]
+  },
+  "iamIdentityMappings": [
+    {
+      "arn": "arn:aws:iam::1234:role/KarpenterNodeRole-pkb-123p",
+      "username": "system:node:{{EC2PrivateDNSName}}",
+      "groups": [
+        "system:bootstrappers",
+        "system:nodes"
+      ]
+    }
+  ],
+  "addons": [
+    {
+      "name": "eks-pod-identity-agent"
+    }
+  ],
+  "managedNodeGroups": [
+    {
+      "name": "default",
+      "instanceType": "m5.large",
+      "desiredCapacity": 1,
+      "amiFamily": "AmazonLinux2023",
+      "minSize": 1,
+      "maxSize": 1
+    }
+  ]
+}"""
 
 
 class EksKarpenterTest(pkb_common_test_case.PkbCommonTestCase):
@@ -356,10 +370,10 @@ class EksKarpenterTest(pkb_common_test_case.PkbCommonTestCase):
         )
     )
     cluster = elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
-    file = cluster._RenderEksCreateYamlToFile()
+    file = cluster._RenderEksCreateJsonToFile()
     with open(file, 'r') as f:
       contents = f.read()
-    self.assertEqual(EXPECTED_EKS_CREATE_YAML, contents)
+    self.assertEqual(EXPECTED_EKS_CREATE_FILE, contents)
 
 
 if __name__ == '__main__':

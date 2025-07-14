@@ -20,14 +20,13 @@ See https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html for
 instructions.
 """
 
+import json
 import logging
 import re
 from typing import Any, Dict
 
 from absl import flags
-import jinja2
 from perfkitbenchmarker import container_service
-from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
@@ -456,42 +455,68 @@ class EksKarpenterCluster(BaseEksCluster):
   ):
     pass
 
-  def _RenderNodeGroupYaml(
+  def _RenderNodeGroupJson(
       self, nodepool: container_service.BaseNodePoolConfig
-  ):
+  ) -> dict[str, Any]:
     """Renders the node group yaml to a string."""
-    environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
-    template = environment.from_string(_NODEGROUP_YAML)
-    return template.render(
-        INSTANCE_TYPE=nodepool.machine_type,
-        NODEGROUP_NAME=nodepool.name,
-        NUM_NODES=nodepool.num_nodes,
-        MIN_SIZE=self.min_nodes,
-        MAX_SIZE=self.max_nodes,
-    )
+    return {
+        'name': nodepool.name,
+        'instanceType': nodepool.machine_type,
+        'desiredCapacity': nodepool.num_nodes,
+        'amiFamily': 'AmazonLinux2023',
+        'minSize': self.min_nodes,
+        'maxSize': self.max_nodes,
+    }
 
-  def _RenderEksCreateYamlToFile(self) -> str:
-    """Renders the eksctl create yaml to a file.
+  def _RenderEksCreateJsonToFile(self) -> str:
+    """Renders the eksctl create json to a file.
 
     Returns:
-      The file path of the rendered yaml.
+      The file path of the rendered json.
     """
-    tags = util.MakeDefaultTags()
-    logging.info('Creating cluster with tags %s', tags)
-    return vm_util.RenderTemplate(
-        data.ResourcePath('container/karpenter/cluster_create.yaml.j2'),
-        {
-            'CLUSTER_NAME': self.name,
-            'AWS_REGION': self.region,
-            'K8S_VERSION': self.cluster_version,
-            'KARPENTER_NAMESPACE': _KARPENTER_NAMESPACE,
-            'AWS_ACCOUNT_ID': self.account,
-            'NODEGROUP_YAML': self._RenderNodeGroupYaml(self.default_nodepool),
-            'TAGS': tags,
+    tags = util.MakeDefaultTags() | {'karpenter.sh/discovery': self.name}
+    create_json: dict[str, Any] = {
+        'apiVersion': 'eksctl.io/v1alpha5',
+        'kind': 'ClusterConfig',
+        'metadata': {
+            'name': self.name,
+            'region': self.region,
+            'version': self.cluster_version,
+            'tags': tags,
         },
-        should_log_file=True,
-        trim_spaces=True,
-    )
+        'iam': {
+            'withOidc': True,
+            'podIdentityAssociations': [{
+                'namespace': _KARPENTER_NAMESPACE,
+                'serviceAccountName': 'karpenter',
+                'roleName': f'{self.name}-karpenter',
+                'permissionPolicyARNs': [
+                    f'arn:aws:iam::{self.account}:policy/KarpenterControllerPolicy-{self.name}'
+                ],
+            }],
+        },
+        'iamIdentityMappings': [{
+            'arn': (
+                f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}'
+            ),
+            'username': 'system:node:{{EC2PrivateDNSName}}',
+            'groups': ['system:bootstrappers', 'system:nodes'],
+        }],
+        'addons': [{'name': 'eks-pod-identity-agent'}],
+        'managedNodeGroups': [self._RenderNodeGroupJson(self.default_nodepool)],
+    }
+    with vm_util.NamedTemporaryFile(
+        dir=vm_util.GetTempDir(), delete=False, mode='w'
+    ) as tf:
+      rendered_json = json.dumps(create_json, indent=2)
+      logging.info(
+          'Writing to %s rendered eksctl create json: %s',
+          tf.name,
+          rendered_json,
+      )
+      tf.write(rendered_json)
+      tf.close()
+      return tf.name
 
   def _Create(self):
     """Creates the control plane and worker nodes."""
@@ -518,11 +543,11 @@ class EksKarpenterCluster(BaseEksCluster):
         '--region',
         f'{self.region}',
     ])
-    create_yaml = self._RenderEksCreateYamlToFile()
+    create_file = self._RenderEksCreateJsonToFile()
     vm_util.IssueCommand(
-        [FLAGS.eksctl, 'create', 'cluster', '-f', create_yaml], timeout=1800
+        [FLAGS.eksctl, 'create', 'cluster', '-f', create_file], timeout=1800
     )
-    # Download the kubeconfig since create via yaml doesn't auto make it.
+    # Download the kubeconfig since above command doesn't auto make it.
     vm_util.IssueCommand([
         'aws',
         'eks',
