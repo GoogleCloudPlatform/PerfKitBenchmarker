@@ -681,14 +681,10 @@ def GetContainerClusterClass(
       BaseContainerCluster, CLOUD=cloud, CLUSTER_TYPE=cluster_type
   )
 
-def SetContainerRegistry(self):
-    """Sets the constructed container registry name."""
-    if self.container_registry:
-        self.container_registry_name = self.container_registry.name
-        logging.info('Container registry name: %s', self.container_registry_name)
-    else:
-        self.container_registry_name = None
-        logging.warning('No container registry constructed')
+def SetContainerRegistry(self, container_registry):
+    """Sets the container registry for the cluster."""
+    self.container_registry = container_registry
+    logging.info("Container registry set: %s", self.container_registry.name)
 
 
 class KubernetesPod:
