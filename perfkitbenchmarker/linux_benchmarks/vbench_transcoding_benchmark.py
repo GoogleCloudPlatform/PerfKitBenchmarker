@@ -104,10 +104,13 @@ vbench_transcoding:
       vm_spec:
         GCP:
           machine_type: c4-standard-8
+          boot_disk_size: 200
         AWS:
           machine_type: m7i.2xlarge
+          boot_disk_size: 200
         Azure:
           machine_type: Standard_D8s_v6
+          boot_disk_size: 200
       disk_spec:
         # Standardize with 500 MB/s bandwidth.
         # The largest video file is ~300 MB; we want to minimize I/O impact.

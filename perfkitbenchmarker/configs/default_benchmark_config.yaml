@@ -368,14 +368,13 @@ postgres_sysbench_tpcc:
     sysbench_scale: 100
     sysbench_use_fk: False
 
-mongodb_ycsb:
+mongodb:
   name: mongodb_ycsb
   flags:
     mongodb_readahead_kb: 8
     iostat: True
     sar: True
     sar_interval: 1
-    detect_log4j2: True
     ycsb_fail_on_incomplete_loading: True
     ycsb_measurement_type: hdrhistogram
     ycsb_status: True
