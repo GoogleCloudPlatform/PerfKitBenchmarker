@@ -456,8 +456,9 @@ class BaseNodePoolConfig:
     self.num_nodes: int
     self.disk_type: str
     self.disk_size: int
-    # Defined by google_kubernetes_engine
+    # Defined by gce_virtual_machine. Used by google_kubernetes_engine
     self.max_local_disks: int | None
+    self.ssd_interface: str | None
     self.gpu_type: str | None
     self.gpu_count: int | None
     self.threads_per_core: int

@@ -308,6 +308,14 @@ GKE_IMAGE_TYPE = flags.DEFINE_string(
     ' https://cloud.google.com/kubernetes-engine/docs/concepts/node-images#available_node_images. '
     'See https://cloud.google.com/kubernetes-engine/docs/how-to/node-images#specifying_a_node_image.',
 )
+GKE_USE_LSSD_AS_EPHEMERAL_STORAGE = flags.DEFINE_boolean(
+    'gke_use_lssd_as_ephemeral_storage',
+    True,
+    'Whether to configure NVMe LSSDs to be available to pods as ephemeral '
+    'storage. Without this, using LSSDs require persistent volume claims that '
+    'no benchmarks currently use. See '
+    'https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/local-ssd.'
+)
 CONTAINER_REMOTE_BUILD_CONFIG = flags.DEFINE_string(
     'container_remote_build_config',
     None,

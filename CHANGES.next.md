@@ -413,6 +413,7 @@
 -   Add support for multiple NICs on Azure VMs.
 -   Add support for specifying a Reservation ID for GCE
 -   Add support for specifying GCE provisioning model
+-   Add support for NVMe local SSDs in GKE.
 
 ### Bug fixes and maintenance updates:
 
