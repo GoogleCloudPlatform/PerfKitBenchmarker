@@ -414,6 +414,7 @@
 -   Add support for specifying a Reservation ID for GCE
 -   Add support for specifying GCE provisioning model
 -   Add support for NVMe local SSDs in GKE.
+-   Add support for cluster to wait the resource on multiple conditions
 
 ### Bug fixes and maintenance updates:
 
