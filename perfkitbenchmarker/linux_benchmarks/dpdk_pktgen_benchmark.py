@@ -70,10 +70,10 @@ _DPDK_PKTGEN_NUM_FLOWS = flags.DEFINE_integer(
 _DPDK_PKTGEN_TX_RX_LCORES_LIST = flags.DEFINE_list(
     'dpdk_pktgen_tx_rx_lcores_list',
     [
-        '[8:1],[1:8]',
-        '[8:1-2],[1-2:8]',
-        '[8:1-4],[1-4:8]',
-        '[8:1-7],[1-7:8]',
+        '[8:1];[1:8]',
+        '[8:1-2];[1-2:8]',
+        '[8:1-4];[1-4:8]',
+        '[8:1-7];[1-7:8]',
     ],
     'A list of strings designating logical cores assigned to TX and RX. Each'
     ' string is in the form'
@@ -370,7 +370,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
     # Iterate over all combinations of Tx and Rx lcore configurations
     for tx_rx_lcores in _DPDK_PKTGEN_TX_RX_LCORES_LIST.value:
-      tx_cores, rx_cores = tx_rx_lcores.split(',')
+      tx_cores, rx_cores = tx_rx_lcores.split(';')
 
       # Build pktgen commands for the current core configuration
       tx_cmd = (

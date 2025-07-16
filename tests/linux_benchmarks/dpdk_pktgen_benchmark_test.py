@@ -100,7 +100,7 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
 
   @flagsaver.flagsaver(
       dpdk_pktgen_packet_loss_threshold_rates=[1],
-      dpdk_pktgen_tx_rx_lcores_list=['[8:1],[1:8]'],
+      dpdk_pktgen_tx_rx_lcores_list=['[8:1];[1:8]'],
   )
   def testClientServerStdout(self):
     self.bm_spec.vms[0].RemoteCommand.side_effect = [
