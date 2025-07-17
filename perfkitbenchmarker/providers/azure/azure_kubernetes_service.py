@@ -393,6 +393,52 @@ class AksCluster(container_service.KubernetesCluster):
     return [nodepool['name'] for nodepool in nodepools]
 
 
+class AksAutomaticCluster(AksCluster):
+  """Class representing an AKS Automatic cluster, which has managed node pools.
+
+  This feature is currently in preview. To provision an AKS Automatic cluster,
+  you'll need to install the Azure CLI 'aks-preview' extension.
+  For more details, see the official documentation:
+  https://learn.microsoft.com/en-us/azure/aks/automatic/quick-automatic-managed-network
+  """
+
+  CLOUD = provider_info.AZURE
+  CLUSTER_TYPE = 'Auto'
+
+  def _Create(self):
+    """Creates the Automatic AKS cluster with tags."""
+    tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
+    tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'create',
+        '--name',
+        self.name,
+        '--location',
+        self.region,
+        '--ssh-key-value',
+        vm_util.GetPublicKeyPath(),
+        '--resource-group',
+        self.resource_group.name,
+        '--sku',
+        'automatic',
+        '--tags',
+    ] + tags_list
+    vm_util.IssueCommand(
+        cmd,
+        # Half hour timeout on creating the cluster.
+        timeout=1800,
+    )
+
+  def _PostCreate(self):
+    """Skip the superclass's _PostCreate() method.
+
+    Needed as the node_resource_group doesn't exist for Automatic clusters.
+    """
+    super(container_service.KubernetesCluster, self)._PostCreate()
+
+
 def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
   """Truncate nodepool name for AKS."""
   # https://learn.microsoft.com/en-us/azure/aks/create-node-pools#limitations
