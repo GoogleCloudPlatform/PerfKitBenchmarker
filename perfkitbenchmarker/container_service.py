@@ -32,6 +32,7 @@ import logging
 import multiprocessing
 from multiprocessing import synchronize
 import os
+import queue as py_queue
 import re
 import time
 from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Sequence
@@ -456,8 +457,9 @@ class BaseNodePoolConfig:
     self.num_nodes: int
     self.disk_type: str
     self.disk_size: int
-    # Defined by google_kubernetes_engine
+    # Defined by gce_virtual_machine. Used by google_kubernetes_engine
     self.max_local_disks: int | None
+    self.ssd_interface: str | None
     self.gpu_type: str | None
     self.gpu_count: int | None
     self.threads_per_core: int
@@ -995,6 +997,7 @@ class KubernetesClusterCommands:
       wait_for_all: bool = False,
       condition_type='condition=',
       extra_args: list[str] | None = None,
+      **kwargs,
   ):
     """Waits for a condition on a Kubernetes resource (eg: deployment, pod)."""
     run_cmd = [
@@ -1009,7 +1012,69 @@ class KubernetesClusterCommands:
       run_cmd.append('--all')
     if extra_args:
       run_cmd.extend(extra_args)
-    RunKubectlCommand(run_cmd, timeout=timeout + 10)
+    RunKubectlCommand(run_cmd, timeout=timeout + 10, **kwargs)
+
+  @staticmethod
+  def WaitForResourceForMultiConditions(
+      resource_name: str,
+      conditions: Iterable[str],
+      namespace: str | None = None,
+      timeout: int = vm_util.DEFAULT_TIMEOUT,
+      wait_for_all: bool = False,
+      extra_args: list[str] | None = None,
+  ) -> str:
+    """Waits for multiple conditions on a Kubernetes resource (eg: deployment, pod)."""
+
+    def _WrappedWait(condition: str, queue: multiprocessing.Queue):
+      try:
+        KubernetesClusterCommands.WaitForResource(
+            resource_name,
+            condition,
+            namespace,
+            timeout,
+            wait_for_all,
+            '',
+            extra_args,
+            suppress_logging=True,
+        )
+        queue.put((condition, None))
+      except Exception as e:  # pylint: disable=broad-except
+        # Handle all exceptions and will raise it in main thread.
+        queue.put((condition, e))
+
+    queue = multiprocessing.Queue()
+    processes = []
+
+    for condition in conditions:
+      proc = multiprocessing.Process(
+          target=_WrappedWait, args=(condition, queue)
+      )
+      proc.daemon = True
+      proc.start()
+      processes.append(proc)
+
+    try:
+      # Wait for any one of the conditions to be met or timeout.
+      condition, exc = queue.get(timeout=timeout + 1)
+      logging.info('%s condition met: %s', resource_name, condition)
+    except py_queue.Empty:
+      condition = ''
+      exc = TimeoutError(
+          f'Timed out waiting for conditions on resource {resource_name}:'
+          f' {conditions} '
+      )
+
+    # Terminate any remaining waiting processes.
+    for proc in processes:
+      if proc.is_alive():
+        proc.terminate()
+      proc.join()
+
+    # TODO: cl/783410635 - Consider to raise the exception in child thread as
+    # well for easier debugging.
+    if exc is not None:
+      raise exc
+    return condition
 
   @staticmethod
   def WaitForSucceeded(
