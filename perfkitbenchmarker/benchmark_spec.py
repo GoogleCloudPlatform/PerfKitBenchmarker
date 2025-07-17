@@ -326,8 +326,6 @@ class BenchmarkSpec:
     """Create the container cluster."""
     if self.config.container_cluster is None:
       return
-    if self.config.container_cluster is None:
-        return
 
     cloud = self.config.container_cluster.cloud
     cluster_type = self.config.container_cluster.type
@@ -336,10 +334,12 @@ class BenchmarkSpec:
         cloud, cluster_type
     )
     self.container_cluster = container_cluster_class(
-        self.config.container_cluster,
-        self.container_registry
+        self.config.container_cluster
     )
-    self.resources.append(self.container_registry)
+
+    if self.container_registry:
+      self.container_cluster.SetContainerRegistry(self.container_registry)
+
     self.resources.append(self.container_cluster)
 
   def ConstructCluster(self):

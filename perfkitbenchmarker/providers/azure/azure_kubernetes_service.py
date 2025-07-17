@@ -316,7 +316,7 @@ class AksCluster(container_service.KubernetesCluster):
     ]
     vm_util.IssueCommand(set_tags_cmd)
 
-    if hasattr(self, 'container_registry') and self.container_registry:
+    if self.container_registry:
       attach_registry_cmd = [
           azure.AZURE_PATH,
           'aks',

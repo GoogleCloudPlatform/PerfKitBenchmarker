@@ -506,7 +506,7 @@ class BaseContainerCluster(resource.BaseResource):
     )
     self.services: dict[str, KubernetesContainerService] = {}
     self._extra_samples: list[sample.Sample] = []
-    self.container_registry = getattr(cluster_spec, 'container_registry', None)
+    self.container_registry: BaseContainerRegistry | None = None
 
   @property
   def num_nodes(self) -> int:
@@ -515,6 +515,11 @@ class BaseContainerCluster(resource.BaseResource):
   @property
   def zone(self) -> str:
     return self.default_nodepool.zone
+  
+  def SetContainerRegistry(self, container_registry):
+    """Sets the container registry for the cluster."""
+    self.container_registry = container_registry
+    logging.info("Container registry set: %s", self.container_registry.name)
 
   def _InitializeDefaultNodePool(
       self,
@@ -601,9 +606,6 @@ class BaseContainerCluster(resource.BaseResource):
           'min_size': self.min_nodes,
       })
 
-    if self.container_registry:
-        metadata['container_registry'] = self.container_registry
-
     return metadata
 
   def DeployContainer(self, name, container_spec):
@@ -680,11 +682,6 @@ def GetContainerClusterClass(
   return resource.GetResourceClass(
       BaseContainerCluster, CLOUD=cloud, CLUSTER_TYPE=cluster_type
   )
-
-def SetContainerRegistry(self, container_registry):
-    """Sets the container registry for the cluster."""
-    self.container_registry = container_registry
-    logging.info("Container registry set: %s", self.container_registry.name)
 
 
 class KubernetesPod:
