@@ -519,7 +519,6 @@ class BaseContainerCluster(resource.BaseResource):
   def SetContainerRegistry(self, container_registry):
     """Sets the container registry for the cluster."""
     self.container_registry = container_registry
-    logging.info("Container registry set: %s", self.container_registry.name)
 
   def _InitializeDefaultNodePool(
       self,
