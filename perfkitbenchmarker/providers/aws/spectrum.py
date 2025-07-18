@@ -87,6 +87,7 @@ class Spectrum(redshift.Redshift):
   """
 
   SERVICE_TYPE = 'spectrum'
+  QUERY_SET = 'redshift'
 
   def __init__(self, edw_service_spec):
     super().__init__(edw_service_spec)

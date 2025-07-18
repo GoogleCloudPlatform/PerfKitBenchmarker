@@ -330,6 +330,7 @@ class Redshift(edw_service.EdwService):
 
   CLOUD = provider_info.AWS
   SERVICE_TYPE = 'redshift'
+  QUERY_SET = 'redshift'
 
   READY_TIMEOUT = 7200
 

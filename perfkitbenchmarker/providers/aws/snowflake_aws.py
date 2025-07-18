@@ -31,6 +31,7 @@ class Snowflake(snowflake.Snowflake):
 
   CLOUD = provider_info.AWS
   SERVICE_TYPE = 'snowflake_aws'
+  QUERY_SET = 'snowflake_aws'
 
 
 class Snowflakeexternal(snowflake.Snowflake):
@@ -38,6 +39,7 @@ class Snowflakeexternal(snowflake.Snowflake):
 
   CLOUD = provider_info.AWS
   SERVICE_TYPE = 'snowflakeexternal_aws'
+  QUERY_SET = 'snowflake_aws'
 
 
 class Snowflakeicebergexternal(snowflake.Snowflake):
@@ -45,6 +47,7 @@ class Snowflakeicebergexternal(snowflake.Snowflake):
 
   CLOUD = provider_info.AWS
   SERVICE_TYPE = 'snowflakeicebergexternal_aws'
+  QUERY_SET = 'snowflake_aws'
 
 
 class Snowflakeicebergmanaged(snowflake.Snowflake):
@@ -52,3 +55,4 @@ class Snowflakeicebergmanaged(snowflake.Snowflake):
 
   CLOUD = provider_info.AWS
   SERVICE_TYPE = 'snowflakeicebergmanaged_aws'
+  QUERY_SET = 'snowflake_aws'

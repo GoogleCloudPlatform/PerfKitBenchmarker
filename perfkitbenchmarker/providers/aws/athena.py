@@ -258,6 +258,7 @@ class Athena(edw_service.EdwService):
 
   CLOUD = provider_info.AWS
   SERVICE_TYPE = 'athena'
+  QUERY_SET = 'athena'
 
   def __init__(self, edw_service_spec):
     super().__init__(edw_service_spec)
