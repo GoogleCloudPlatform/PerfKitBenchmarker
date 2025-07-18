@@ -2938,22 +2938,26 @@ class BaseDebianMixin(BaseLinuxMixin):
 
   def SnapshotPackages(self):
     """Grabs a snapshot of the currently installed packages."""
+    parent = linux_packages.INSTALL_DIR
     self.RemoteCommand(
-        'dpkg --get-selections > %s/dpkg_selections'
-        % linux_packages.INSTALL_DIR
+        f"dpkg-query -W -f='${{Package}}\\n' | sort > {parent}/pkg_snapshot"
     )
 
   def RestorePackages(self):
     """Restores the currently installed packages to those snapshotted."""
-    self.RemoteCommand('sudo dpkg --clear-selections')
+    parent = linux_packages.INSTALL_DIR
+    # Get all packages
     self.RemoteCommand(
-        'sudo dpkg --set-selections < %s/dpkg_selections'
-        % linux_packages.INSTALL_DIR
+        f"dpkg-query -W -f='${{Package}}\\n' | sort > {parent}/current_pkgs"
     )
+    # Get new packages only (diff with snapshot)
     self.RemoteCommand(
-        "sudo DEBIAN_FRONTEND='noninteractive' "
-        'apt-get --purge -y dselect-upgrade'
+        f"comm -13 {parent}/pkg_snapshot {parent}/current_pkgs > {parent}/new_pkgs"
     )
+    # Remove new packages only
+    self.RemoteCommand(f"xargs sudo apt-get remove -y < {parent}/new_pkgs")
+    self.RemoteCommand("sudo apt-get autoremove -y")
+    self.RemoteCommand("sudo apt-get autoclean")
 
   def HasPackage(self, package):
     """Returns True iff the package is available for installation."""
@@ -3026,7 +3030,6 @@ class BaseDebianMixin(BaseLinuxMixin):
       package.AptUninstall(self)
     elif hasattr(package, 'Uninstall'):
       package.Uninstall(self)
-    self._installed_packages.discard(package_name)
 
   def GetPathToConfig(self, package_name):
     """Returns the path to the config file for PerfKit packages.
