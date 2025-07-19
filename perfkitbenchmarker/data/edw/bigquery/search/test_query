@@ -1,0 +1,3 @@
+SELECT *
+FROM prototype_simple
+WHERE SEARCH(raw_log, 'ASIA') = TRUE;
