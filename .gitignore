@@ -10,3 +10,7 @@
 *.iml
 /.idea
 /*git_ignore*
+
+# Python virtual environment directories
+*env/
+.*env/
