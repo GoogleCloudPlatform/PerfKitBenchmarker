@@ -22,6 +22,7 @@ from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import edw_benchmark_results_aggregator as results_aggregator
 from perfkitbenchmarker import edw_service
+from perfkitbenchmarker import sample
 
 BENCHMARK_NAME = 'edw_index_benchmark'
 
@@ -82,43 +83,9 @@ def Run(benchmark_spec):
 
   all_queries = FLAGS.edw_power_queries.split(',')
 
-  # Accumulator for the entire benchmark's performance
-  benchmark_performance = results_aggregator.EdwBenchmarkPerformance(
-      total_iterations=FLAGS.edw_suite_iterations, expected_queries=all_queries
-  )
-
-  # Multiple iterations of the suite are performed to avoid cold start penalty
-  for i in range(1, FLAGS.edw_suite_iterations + 1):
-    iteration = str(i)
-    # Accumulator for the current suite's performance
-    iteration_performance = results_aggregator.EdwPowerIterationPerformance(
-        iteration_id=iteration, total_queries=len(all_queries)
-    )
-
-    for query in all_queries:
-      execution_time, metadata = client_interface.ExecuteQuery(query)
-      iteration_performance.add_query_performance(
-          query, execution_time, metadata
-      )
-    benchmark_performance.add_iteration_performance(iteration_performance)
-
-  # Execution complete, generate results only if the benchmark was successful.
-  benchmark_metadata = {}
-  benchmark_metadata.update(edw_service_instance.GetMetadata())
-  if benchmark_performance.is_successful():
-    query_samples = benchmark_performance.get_all_query_performance_samples(
-        metadata=benchmark_metadata
-    )
-    results.extend(query_samples)
-
-    geomean_samples = (
-        benchmark_performance.get_queries_geomean_performance_samples(
-            metadata=benchmark_metadata
-        )
-    )
-    results.extend(geomean_samples)
-  else:
-    logging.error('At least one query failed, so not reporting any results.')
+  for query in all_queries:
+    execution_time, metadata = client_interface.ExecuteQuery(query)
+    results.append(sample.Sample('query_execution_Time', execution_time, 'seconds', metadata))
   return results
 
 
