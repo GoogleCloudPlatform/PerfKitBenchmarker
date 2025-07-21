@@ -101,9 +101,9 @@ class BaseWGServingInferenceServer(
     """Returns the resource metadata."""
     result = super().GetResourceMetadata()
     result.update({
-        'model': self.model_id,
-        'tokenizer_id': self.tokenizer_id,
-        'model_server': self.spec.model_server,
+        'model': getattr(self, 'model_id', 'unknown'),
+        'tokenizer_id': getattr(self, 'tokenizer_id', 'unknown'),
+        'model_server': getattr(self, 'model_server', 'unknown'),
     })
 
     return result
@@ -390,7 +390,7 @@ class BaseWGServingInferenceServer(
   def _PreDelete(self) -> None:
     """Pre-deletion steps for the Kubernetes Inference Server."""
     if self._monitor_executor:
-      self._monitor_executor.shutdown(wait=True)
+      self._monitor_executor.shutdown(wait=False)
       self._monitor_executor = None
 
   def _Exists(self) -> bool:
@@ -682,6 +682,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     if self._hpa_poller_executor:
       self._hpa_poller_executor.shutdown(wait=False)
       self._hpa_poller_executor = None
+    logging.info('HPA polling stopped.')
 
   def EnableHPA(
       self, on_hpa_scale_event: Optional[Callable[[int, int, int], None]] = None

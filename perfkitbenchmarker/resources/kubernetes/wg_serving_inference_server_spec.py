@@ -18,7 +18,7 @@ from perfkitbenchmarker.resources import kubernetes_inference_server_spec
 
 # Register wg-serving Inference Server as the default inference server type.
 REGISTERED_INFERENCE_SERVER_TYPE = 'KubernetesWGServingInferenceServer'
-_DEFAULT_INFERENCE_SERVER_DEPLOYMENT_TIMEOUT = 720
+_DEFAULT_INFERENCE_SERVER_DEPLOYMENT_TIMEOUT = 1200
 _DEFAULT_HPA_CUSTOM_METRIC_NAME = 'vllm:num_requests_running'
 
 

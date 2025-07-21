@@ -273,6 +273,7 @@ class GkeCluster(BaseGkeCluster):
     nodepool_config.disk_type = vm_config.boot_disk.boot_disk_type
     nodepool_config.disk_size = vm_config.boot_disk.boot_disk_size
     nodepool_config.max_local_disks = vm_config.max_local_disks
+    nodepool_config.ssd_interface = vm_config.ssd_interface
     nodepool_config.gpu_type = vm_config.gpu_type
     nodepool_config.gpu_count = vm_config.gpu_count
     nodepool_config.threads_per_core = vm_config.threads_per_core
@@ -301,9 +302,7 @@ class GkeCluster(BaseGkeCluster):
     result['boot_disk_size'] = self.default_nodepool.disk_size
     if self.default_nodepool.max_local_disks:
       result['gce_local_ssd_count'] = self.default_nodepool.max_local_disks
-      # TODO(pclay): support NVME when it leaves alpha
-      # Also consider moving FLAGS.gce_ssd_interface into the vm_spec.
-      result['gce_local_ssd_interface'] = gce_virtual_machine.SCSI
+      result['gce_local_ssd_interface'] = self.default_nodepool.ssd_interface
     result['gke_nccl_fast_socket'] = self.enable_nccl_fast_socket
     if 'nccl' in self.nodepools:
       result['gpu_type'] = self.nodepools['nccl'].gpu_type
@@ -415,10 +414,18 @@ class GkeCluster(BaseGkeCluster):
     if nodepool_config.disk_type:
       cmd.flags['disk-type'] = nodepool_config.disk_type
     if nodepool_config.max_local_disks:
-      # TODO(pclay): Switch to local-ssd-volumes which support NVME when it
-      # leaves alpha. See
-      # https://cloud.google.com/sdk/gcloud/reference/alpha/container/clusters/create
-      cmd.flags['local-ssd-count'] = nodepool_config.max_local_disks
+      # https://cloud.google.com/kubernetes-engine/docs/concepts/local-ssd
+      if nodepool_config.ssd_interface == gce_virtual_machine.NVME:
+        if gcp_flags.GKE_USE_LSSD_AS_EPHEMERAL_STORAGE.value:
+          ssd_flag = 'ephemeral-storage-local-ssd'
+        else:
+          ssd_flag = 'local-nvme-ssd-block'
+        # Technically the count paramter is optional for gen 3+ VMs.
+        # However gce_virtual_machine always passes it explitly, so be
+        # consistent here.
+        cmd.flags[ssd_flag] = f'count={nodepool_config.max_local_disks}'
+      else:
+        cmd.flags['local-ssd-count'] = nodepool_config.max_local_disks
 
     cmd.flags['num-nodes'] = nodepool_config.num_nodes
     # zone may be split a comma separated list

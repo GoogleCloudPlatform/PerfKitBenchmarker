@@ -40,6 +40,12 @@ SHARED_BUFFERS_CONF = {
         'max_memory': '120G',
         'nr_hugepages': '45000',
     },
+    'SIZE_42GB': {
+        'shared_buffers': '42GB',
+        'effective_cache_size': '89.6GB',
+        'max_memory': '119.5GB',
+        'nr_hugepages': '21504',
+    },
 }
 OS_DEPENDENT_DEFAULTS = {
     'centos': {

@@ -125,8 +125,9 @@ def RestoreSnapshot(
     fio_exe = fio.GetFioExec()
     dev_path = source_disk.GetDevicePath()
     vm.RemoteCommand(
-        f'{fio_exe} --filename={dev_path} --rw=read --bs=1M --iodepth=64'
-        ' --numjobs=4 --ioengine=libaio --direct=1 --name=volume-initialize'
+        f'{fio_exe} --filename={dev_path} --size=100% --rw=read --bs=1M'
+        ' --iodepth=64 --numjobs=4 --ioengine=libaio --direct=1'
+        ' --name=volume-initialize'
     )
   source_disk.snapshots[-1].restore_disks[
       -1

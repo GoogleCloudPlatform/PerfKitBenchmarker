@@ -219,7 +219,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--min-cpu-platform skylake', command_string)
       self.assertIn('--disk-size 200', command_string)
       self.assertIn('--disk-type foo', command_string)
-      self.assertIn('--local-ssd-count 2', command_string)
+      self.assertIn('--ephemeral-storage-local-ssd count=2', command_string)
       self.assertIn('--no-enable-shielded-nodes', command_string)
       self.assertIn('--labels foo=bar,timeout=yesterday', command_string)
 
@@ -308,7 +308,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
       expected = {
           'project': 'fakeproject',
           'gce_local_ssd_count': 2,
-          'gce_local_ssd_interface': 'SCSI',
+          'gce_local_ssd_interface': 'NVME',
           'machine_type': 'fake-machine-type',
           'boot_disk_type': 'foo',
           'boot_disk_size': 200,
@@ -538,9 +538,9 @@ class GoogleKubernetesEngineWithGpusTestCase(
       self.assertIn('--num-nodes 2', command_string)
       self.assertIn('--machine-type fake-machine-type', command_string)
       self.assertIn(
-          '--accelerator ' +
-          'type=nvidia-tesla-k80,count=2,gpu-driver-version=latest',
-          command_string
+          '--accelerator '
+          + 'type=nvidia-tesla-k80,count=2,gpu-driver-version=latest',
+          command_string,
       )
 
   @mock.patch('perfkitbenchmarker.kubernetes_helper.CreateFromFile')

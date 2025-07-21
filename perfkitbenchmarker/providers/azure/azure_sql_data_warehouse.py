@@ -354,6 +354,7 @@ class Azuresqldatawarehouse(edw_service.EdwService):
 
   CLOUD = provider_info.AZURE
   SERVICE_TYPE = 'azuresqldatawarehouse'
+  QUERY_SET = 'azuresqldatawarehouse'
 
   def __init__(self, edw_service_spec):
     super().__init__(edw_service_spec)

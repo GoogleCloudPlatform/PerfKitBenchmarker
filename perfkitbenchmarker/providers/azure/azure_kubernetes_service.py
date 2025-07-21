@@ -408,11 +408,12 @@ class AksCluster(container_service.KubernetesCluster):
     stdout, _, _ = vm_util.IssueCommand(cmd)
     nodepools = json.loads(stdout)
     return [nodepool['name'] for nodepool in nodepools]
-  
+
+
 class AksAutomaticCluster(AksCluster):
   """Class representing an AKS Automatic cluster, which has managed node pools.
-  
-  This feature is currently in preview. To provision an AKS Automatic cluster, 
+
+  This feature is currently in preview. To provision an AKS Automatic cluster,
   you'll need to install the Azure CLI 'aks-preview' extension.
   For more details, see the official documentation:
   https://learn.microsoft.com/en-us/azure/aks/automatic/quick-automatic-managed-network
@@ -420,10 +421,6 @@ class AksAutomaticCluster(AksCluster):
 
   CLOUD = provider_info.AZURE
   CLUSTER_TYPE = 'Auto'
-
-  def __init__(self, spec):
-    """Initializes the cluster."""
-    super().__init__(spec)
 
   def _Create(self):
     """Creates the Automatic AKS cluster with tags."""
@@ -449,93 +446,6 @@ class AksAutomaticCluster(AksCluster):
         cmd,
         # Half hour timeout on creating the cluster.
         timeout=1800,
-    )
-
-  def _IsReady(self):
-    """Returns True if the cluster is ready."""
-    # Check provisioning state
-    show_cmd = [
-          azure.AZURE_PATH,
-          'aks',
-          'show',
-          '--name',
-          self.name,
-        ] + self.resource_group.args
-    
-    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
-    try:
-        cluster = json.loads(stdout)
-        if cluster.get('provisioningState') not in ('Succeeded', 'Updating'):
-            return False
-    except Exception:
-        return False
-
-    vm_util.IssueCommand(
-        [
-            azure.AZURE_PATH,
-            'aks',
-            'get-credentials',
-            '--name',
-            self.name,
-            '--file',
-            FLAGS.kubeconfig,
-        ]
-        + self.resource_group.args
-    )
-    version_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'version']
-    _, _, retcode = vm_util.IssueCommand(version_cmd, raise_on_failure=False)
-    if retcode:
-      return False
-    # POD creation will fail until the default service account is created.
-    get_cmd = [
-        FLAGS.kubectl,
-        '--kubeconfig',
-        FLAGS.kubeconfig,
-        'get',
-        'serviceAccounts',
-    ]
-    stdout, _, _ = vm_util.IssueCommand(get_cmd)
-    return 'default' in stdout
-  
-  def _CreateDependencies(self):
-    """Creates the resource group, service principal, and registers required AKS features."""
-    super()._CreateDependencies()
-
-    # Register the AutomaticSKUPreview feature
-    vm_util.IssueCommand(
-        [
-          azure.AZURE_PATH,
-          'feature',
-          'register',
-          '--namespace',
-          'Microsoft.ContainerService',
-          '--name',
-          'AutomaticSKUPreview',
-        ]
-    )
-
-    # Show the feature registration status
-    vm_util.IssueCommand(
-        [
-          azure.AZURE_PATH,
-          'feature',
-          'show',
-          '--namespace',
-          'Microsoft.ContainerService',
-          '--name',
-          'AutomaticSKUPreview',
-        ]
-    )
-    
-    # Register the provider
-    vm_util.IssueCommand(
-        [
-          azure.AZURE_PATH,
-          'provider',
-          'register',
-          '--namespace',
-          'Microsoft.ContainerService',
-        ]
     )
 
   def _PostCreate(self):

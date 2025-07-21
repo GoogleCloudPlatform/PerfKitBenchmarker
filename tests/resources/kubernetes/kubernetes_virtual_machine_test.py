@@ -182,6 +182,40 @@ _EXPECTED_CALL_BODY_WITH_VM_GROUP = """
 }
 """
 
+_EXPECTED_CALL_BODY_WITH_HOST_NETWORK = """
+{
+    "spec": {
+        "hostNetwork": true,
+        "dnsPolicy":
+            "ClusterFirstWithHostNet",
+        "volumes": [],
+        "containers": [{
+            "name": "fake_name",
+            "workingDir": "/root",
+            "volumeMounts": [],
+            "image": "test_image",
+            "securityContext": {
+                "privileged": true
+            },
+            "command": ["tail", "-f", "/dev/null"]
+        }],
+        "tolerations": [{
+            "key": "kubernetes.io/arch",
+            "operator": "Exists",
+            "effect": "NoSchedule"
+        }]
+    },
+    "kind": "Pod",
+    "metadata": {
+        "name": "fake_name",
+        "labels": {
+            "pkb": "fake_name"
+        }
+    },
+    "apiVersion": "v1"
+}
+"""
+
 
 def get_write_mock_from_temp_file_mock(temp_file_mock):
   """Returns the write method mock from the NamedTemporaryFile mock.
@@ -446,6 +480,24 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
       write_mock = get_write_mock_from_temp_file_mock(temp_file)
       self.assertJsonEqual(
           write_mock.call_args[0][0], _EXPECTED_CALL_BODY_WITHOUT_GPUS
+      )
+
+  def testCreatePodBodyWithHostNetwork(self):
+    spec = self.create_virtual_machine_spec()
+    spec.host_network = True
+    with patch_critical_objects() as (_, temp_file):
+      kub_vm = TestKubernetesVirtualMachine(spec)
+      # Need to set the name explicitly on the instance because the test
+      # running is currently using a single PKB instance, so the BaseVm
+      # instance counter is at an unpredictable number at this stage, and it is
+      # used to set the name.
+      kub_vm.name = _NAME
+      kub_vm._WaitForPodBootCompletion = lambda: None
+      kub_vm._Create()
+
+      write_mock = get_write_mock_from_temp_file_mock(temp_file)
+      self.assertJsonEqual(
+          write_mock.call_args[0][0], _EXPECTED_CALL_BODY_WITH_HOST_NETWORK
       )
 
   def testDownloadPreprovisionedDataAws(self):

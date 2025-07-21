@@ -346,6 +346,7 @@ class EdwService(resource.BaseResource):
   """Object representing a EDW Service."""
 
   SERVICE_TYPE = 'abstract'
+  QUERY_SET = 'abstract'
 
   def __init__(self, edw_service_spec):
     """Initialize the edw service object.
@@ -426,6 +427,7 @@ class EdwService(resource.BaseResource):
         'edw_cluster_identifier': self.cluster_identifier,
         'edw_cluster_node_type': self.node_type,
         'edw_cluster_node_count': self.node_count,
+        'edw_query_set': self.QUERY_SET,
     }
     return basic_data
 
