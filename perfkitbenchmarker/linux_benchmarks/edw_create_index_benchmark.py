@@ -12,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-
-
-
-
 """TODO
 
 Run command:
@@ -133,5 +128,7 @@ def Cleanup(benchmark_spec):
   Args:
     benchmark_spec: The benchmark specification.
   """
-  # TODO: Delete Index
   benchmark_spec.edw_service.Cleanup()
+  edw_service_instance = benchmark_spec.edw_service
+  client_interface = edw_service_instance.GetClientInterface()
+  client_interface.ExecuteQuery('delete_index_query')  
