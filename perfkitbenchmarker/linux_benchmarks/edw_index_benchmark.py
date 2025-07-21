@@ -13,6 +13,22 @@
 # limitations under the License.
 
 """TODO
+
+Run command:
+
+./pkb.py \
+--cloud=GCP  \
+--benchmarks=edw_index_benchmark \
+--bq_client_interface=PYTHON  \
+--config_override=edw_index_benchmark.edw_service.type=bigquery \
+--config_override=edw_index_benchmark.edw_service.cluster_identifier=p3rf-bq-search.search_index_dataset \
+--gcp_service_account=bigquery-testing-pkb@p3rf-bigquery-smallquery-slots.iam.gserviceaccount.com \
+--gcp_service_account_key_file=/Users/saksena/Downloads/p3rf-bigquery-smallquery-slots.json \
+--edw_index_local_query_dir=edw/bigquery/search \
+--edw_power_queries=test_query \
+--metadata=cloud:GCP \
+--project=saksena-test \
+--zones=us-central1-c 
 """
 
 
