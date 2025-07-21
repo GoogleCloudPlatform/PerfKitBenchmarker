@@ -32,6 +32,8 @@ DEBIAN11_BACKPORTS = 'debian11_backports'
 DEBIAN12 = 'debian12'
 FEDORA36 = 'fedora36'
 FEDORA37 = 'fedora37'
+OL8 = 'ol8'
+OL9 = 'ol9'
 RHEL8 = 'rhel8'
 RHEL9 = 'rhel9'
 ROCKY_LINUX8 = 'rocky_linux8'
@@ -122,6 +124,8 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     DEBIAN12_DL,
     FEDORA36,
     FEDORA37,
+    OL8,
+    OL9,
     RHEL8,
     RHEL9,
     ROCKY_LINUX8,
@@ -185,6 +189,8 @@ AMAZONLINUX_TYPES = [
 
 EL_OS_TYPES = [
     CENTOS_TYPES,
+    OL8,
+    OL9,
     RHEL8,
     RHEL9,
     ROCKY_LINUX8,

@@ -2840,6 +2840,24 @@ class Rhel9Mixin(BaseRhelMixin):
     self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(9)}')
 
 
+class Ol8Mixin(BaseRhelMixin):
+  """Class holding Oracle Linux 8 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.OL8
+
+  def SetupPackageManager(self):
+    """Oracle Linux images come with EPEL pre-installed."""
+
+
+class Ol9Mixin(BaseRhelMixin):
+  """Class holding Oracle Linux 9 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.OL9
+
+  def SetupPackageManager(self):
+    """Oracle Linux images come with EPEL pre-installed."""
+
+
 class Fedora36Mixin(BaseRhelMixin):
   """Class holding Fedora36 specific methods and attributes."""
 

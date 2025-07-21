@@ -1750,6 +1750,34 @@ class Rhel9BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
+class Ol8BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Ol8Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'oracle-linux-8'
+  DEFAULT_IMAGE_PROJECT = 'oracle-linux-cloud'
+
+  def PrepareVMEnvironment(self):
+    super().PrepareVMEnvironment()
+    # https://cloud.google.com/compute/docs/images/os-details#oracle_linux
+    self.RemoteCommand(
+        'sudo dnf install -y google-cloud-cli --enablerepo google-cloud-sdk'
+    )
+
+
+class Ol9BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Ol9Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'oracle-linux-9'
+  DEFAULT_IMAGE_PROJECT = 'oracle-linux-cloud'
+
+  def PrepareVMEnvironment(self):
+    super().PrepareVMEnvironment()
+    # https://cloud.google.com/compute/docs/images/os-details#oracle_linux
+    self.RemoteCommand(
+        'sudo dnf install -y google-cloud-cli --enablerepo google-cloud-sdk'
+    )
+
+
 class RockyLinux8BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.RockyLinux8Mixin
 ):
