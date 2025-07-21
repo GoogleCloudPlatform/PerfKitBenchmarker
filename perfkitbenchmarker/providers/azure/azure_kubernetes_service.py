@@ -301,20 +301,8 @@ class AksCluster(container_service.KubernetesCluster):
       self.event_poller.StopPolling()
     self._deleted = True
 
-  def _PostCreate(self):
-    """Tags the cluster resource group."""
-    super()._PostCreate()
-    set_tags_cmd = [
-        azure.AZURE_PATH,
-        'group',
-        'update',
-        '-g',
-        self.node_resource_group,
-        '--set',
-        util.GetTagsJson(self.resource_group.timeout_minutes),
-    ]
-    vm_util.IssueCommand(set_tags_cmd)
-
+  def _AttachContainerRegistry(self):
+    """Helper method to attach the container registry."""
     if self.container_registry:
       attach_registry_cmd = [
           azure.AZURE_PATH,
@@ -328,6 +316,21 @@ class AksCluster(container_service.KubernetesCluster):
           self.container_registry.name,
       ]
       vm_util.IssueCommand(attach_registry_cmd)
+  
+  def _PostCreate(self):
+    """Tags the cluster resource group."""
+    super()._PostCreate()
+    set_tags_cmd = [
+        azure.AZURE_PATH,
+        'group',
+        'update',
+        '-g',
+        self.node_resource_group,
+        '--set',
+        util.GetTagsJson(self.resource_group.timeout_minutes),
+    ]
+    vm_util.IssueCommand(set_tags_cmd)
+    self._AttachContainerRegistry()
 
   def _IsReady(self):
     """Returns True if the cluster is ready."""
@@ -536,19 +539,8 @@ class AksAutomaticCluster(AksCluster):
     )
 
   def _PostCreate(self):
-    if self.container_registry:
-      attach_registry_cmd = [
-          azure.AZURE_PATH,
-          'aks',
-          'update',
-          '--name',
-          self.name,
-          '--resource-group',
-          self.resource_group.name,
-          '--attach-acr',
-          self.container_registry.name,
-      ]
-      vm_util.IssueCommand(attach_registry_cmd)
+    """Run only the container registry attach."""
+    self._AttachContainerRegistry()
 
 
 def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
