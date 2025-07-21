@@ -492,6 +492,7 @@ class Bigquery(edw_service.EdwService):
 
   CLOUD = provider_info.GCP
   SERVICE_TYPE = 'bigquery'
+  QUERY_SET = 'bigquery'
   RUN_COST_QUERY_TEMPLATE = 'edw/bigquery/run_cost_query.sql.j2'
   client_interface: GenericClientInterface
 
@@ -858,6 +859,7 @@ class Bqfederated(Bigquery):
     Returns:
       A dictionary set to underlying data's details (format, etc.)
     """
+    # TODO(jguertin): Review & update for current datasets
     data_details = {}
     project_id, dataset_id = re.split(r'\.', self.cluster_identifier)
     data_details['metadata_caching'] = str('metadata-caching' in project_id)

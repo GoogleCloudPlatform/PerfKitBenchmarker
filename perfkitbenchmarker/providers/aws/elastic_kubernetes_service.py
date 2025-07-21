@@ -20,10 +20,11 @@ See https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html for
 instructions.
 """
 
+from collections import abc
 import json
 import logging
 import re
-from typing import Any, Dict
+from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import container_service
@@ -38,6 +39,30 @@ from perfkitbenchmarker.providers.aws import util
 
 
 FLAGS = flags.FLAGS
+
+
+def RecursivelyUpdateDictionary(
+    original: dict[str, Any], updates: dict[str, Any]
+) -> dict[str, Any]:
+  """Updates a nested dictionary.
+
+  Overwrites values in the original dictionary with the values in the updates
+  dictionary, but preserves nested dictionaries even if both have a value.
+
+  Args:
+    original: The original dictionary to update.
+    updates: The dictionary of updates to apply to the original dictionary.
+
+  Returns:
+    The updated dictionary, with keys + values from both.
+  """
+  # Copied from https://stackoverflow.com/questions/3232943
+  for k, v in updates.items():
+    if isinstance(v, abc.Mapping):
+      original[k] = RecursivelyUpdateDictionary(original.get(k, {}), v)
+    else:
+      original[k] = v
+  return original
 
 
 class BaseEksCluster(container_service.KubernetesCluster):
@@ -86,17 +111,39 @@ class BaseEksCluster(container_service.KubernetesCluster):
     """Delete the ssh key."""
     aws_virtual_machine.AwsKeyFileManager.DeleteKeyfile(self.region)
 
-  def _EksCtlCreate(self, eksctl_flags: dict[str, Any]):
+  def _EksCtlCreate(self, create_json: dict[str, Any]):
     """Creates the EKS cluster."""
     # If multiple zones are passed use them for the control plane.
     # Otherwise EKS will auto-select control plane zones in the region.
     if self.control_plane_zones:
-      eksctl_flags['zones'] = ','.join(self.control_plane_zones)
-
-    # TODO(user): Use yaml create rather than args.
-    cmd = [FLAGS.eksctl, 'create', 'cluster'] + sorted(
-        '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v
+      create_json['availabilityZones'] = self.control_plane_zones
+    # Schema for the cluster create command is here:
+    # https://schema.eksctl.io/
+    create_json = RecursivelyUpdateDictionary(
+        {
+            'apiVersion': 'eksctl.io/v1alpha5',
+            'kind': 'ClusterConfig',
+            'metadata': {
+                'name': self.name,
+                'region': self.region,
+                'version': self.cluster_version,
+                'tags': util.MakeDefaultTags(),
+            },
+            'iam': {
+                'withOidc': True,
+            },
+        },
+        create_json,
     )
+    filename = self._WriteJsonToFile(create_json)
+    cmd = [
+        FLAGS.eksctl,
+        'create',
+        'cluster',
+        '-f',
+        filename,
+        f'--kubeconfig={FLAGS.kubeconfig}',
+    ]
     stdout, _, retcode = vm_util.IssueCommand(
         cmd, timeout=1800, raise_on_failure=False
     )
@@ -105,6 +152,45 @@ class BaseEksCluster(container_service.KubernetesCluster):
         raise errors.Benchmarks.QuotaFailure(stdout)
       else:
         raise errors.Resource.CreationError(stdout)
+
+  def _RenderNodeGroupJson(
+      self, nodepool: container_service.BaseNodePoolConfig
+  ) -> dict[str, Any]:
+    """Renders the node group yaml to a string."""
+    return {
+        'name': nodepool.name,
+        'instanceType': nodepool.machine_type,
+        'desiredCapacity': nodepool.num_nodes,
+        'amiFamily': 'AmazonLinux2023',
+        'minSize': self.min_nodes,
+        'maxSize': self.max_nodes,
+        'tags': util.MakeDefaultTags(),
+        'labels': {
+            'pkb_nodepool': nodepool.name,
+        },
+    }
+
+  def _WriteJsonToFile(self, json_dict: dict[str, Any]) -> str:
+    """Renders the given json dict to a file.
+
+    Args:
+      json_dict: The json dict to render.
+
+    Returns:
+      The file path of the rendered json.
+    """
+    with vm_util.NamedTemporaryFile(
+        dir=vm_util.GetTempDir(), delete=False, mode='w'
+    ) as tf:
+      rendered_json = json.dumps(json_dict, indent=2)
+      logging.info(
+          'Writing to %s rendered eksctl create json: %s',
+          tf.name,
+          rendered_json,
+      )
+      tf.write(rendered_json)
+      tf.close()
+      return tf.name
 
   def _Delete(self):
     """Deletes the control plane and worker nodes."""
@@ -185,27 +271,28 @@ class EksCluster(BaseEksCluster):
 
   def _Create(self):
     """Creates the control plane and worker nodes."""
-    eksctl_flags = {
-        'kubeconfig': FLAGS.kubeconfig,
-        'managed': True,
-        'name': self.name,
-        'nodegroup-name': container_service.DEFAULT_NODEPOOL,
-        'version': self.cluster_version,
-        # NAT mode uses an EIP.
-        'vpc-nat-mode': 'Disable',
-        'with-oidc': True,
-    }
-    if self.min_nodes != self.max_nodes:
-      eksctl_flags.update({
-          'nodes-min': self.min_nodes,
-          'nodes-max': self.max_nodes,
-      })
-    eksctl_flags.update(self._GetNodeFlags(self.default_nodepool))
-
-    self._EksCtlCreate(eksctl_flags)
-
+    nodepool_jsons = [self._RenderNodeGroupJson(self.default_nodepool)]
     for _, node_group in self.nodepools.items():
-      self._CreateNodeGroup(node_group)
+      nodepool_jsons += [self._RenderNodeGroupJson(node_group)]
+    create_json: dict[str, Any] = {
+        'managedNodeGroups': nodepool_jsons,
+        'vpc': {
+            'nat': {'gateway': 'Disable'},
+        },
+    }
+    self._EksCtlCreate(create_json)
+
+    # Above create command passes "withOidc=true", but it doesn't seem to work &
+    # therefore this command is needed.
+    cmd = [
+        FLAGS.eksctl,
+        'utils',
+        'associate-iam-oidc-provider',
+        f'--cluster={self.name}',
+        f'--region={self.region}',
+        '--approve',
+    ]
+    vm_util.IssueCommand(cmd)
 
     # EBS CSI driver is required for creating EBS volumes in version > 1.23
     # https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
@@ -263,42 +350,29 @@ class EksCluster(BaseEksCluster):
       ]
       vm_util.IssueCommand(cmd)
 
-  def _CreateNodeGroup(
-      self, nodepool_config: container_service.BaseNodePoolConfig
-  ):
-    """Creates a node group."""
-    eksctl_flags = {
-        'cluster': self.name,
-        'name': nodepool_config.name,
-        # Support ARM: https://github.com/weaveworks/eksctl/issues/3569
-        'skip-outdated-addons-check': True,
-    }
-    eksctl_flags.update(self._GetNodeFlags(nodepool_config))
-    cmd = [FLAGS.eksctl, 'create', 'nodegroup'] + sorted(
-        '--{}={}'.format(k, v) for k, v in eksctl_flags.items() if v
-    )
-    vm_util.IssueCommand(cmd, timeout=600)
-
-  def _GetNodeFlags(
-      self, nodepool_config: container_service.BaseNodePoolConfig
-  ) -> Dict[str, Any]:
-    """Get common flags for creating clusters and node_groups."""
-    tags = util.MakeDefaultTags()
-    node_flags = {
-        'nodes': nodepool_config.num_nodes,
-        'node-labels': f'pkb_nodepool={nodepool_config.name}',
-        'node-type': nodepool_config.machine_type,
-        'node-volume-size': nodepool_config.disk_size,
-        'region': self.region,
-        'tags': ','.join(f'{k}={v}' for k, v in tags.items()),
-        'ssh-public-key': (
-            aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun()
-        ),
-    }
+  def _RenderNodeGroupJson(
+      self, nodepool: container_service.BaseNodePoolConfig
+  ) -> dict[str, Any]:
+    """Renders the node group yaml to a string."""
+    base_json = super()._RenderNodeGroupJson(nodepool)
+    if nodepool.disk_size:
+      base_json['volumeSize'] = nodepool.disk_size
+    base_json.update({
+        'ssh': {
+            'allow': True,
+            'publicKeyPath': (
+                aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun()
+            ),
+        },
+    })
     if self.control_plane_zones:
-      # zone may be split a comma separated list or simply a region
-      node_flags['node-zones'] = nodepool_config.zone
-    return node_flags
+      # zones can be a comma separated list or simply a region
+      if isinstance(nodepool.zone, str):
+        zones = [nodepool.zone]
+      else:
+        zones = nodepool.zone
+      base_json['availabilityZones'] = zones
+    return base_json
 
   def _IsReady(self):
     """Returns True if the workers are ready, else False."""
@@ -356,17 +430,7 @@ class EksAutoCluster(BaseEksCluster):
 
   def _Create(self):
     """Creates the control plane and worker nodes."""
-    tags = util.MakeDefaultTags()
-    eksctl_flags = {
-        'kubeconfig': FLAGS.kubeconfig,
-        'name': self.name,
-        'version': self.cluster_version,
-        'with-oidc': True,
-        'enable-auto-mode': True,
-        'region': self.region,
-        'tags': ','.join(f'{k}={v}' for k, v in tags.items()),
-    }
-    self._EksCtlCreate(eksctl_flags)
+    self._EksCtlCreate({'autoModeConfig': {'enabled': True}})
 
     # Enable public and private access to the cluster.
     vpc_cmd = [
@@ -423,14 +487,6 @@ class EksAutoCluster(BaseEksCluster):
 _KARPENTER_NAMESPACE = 'kube-system'
 _KARPENTER_VERSION = '1.5.0'
 _DEAULT_K8S_VERSION = '1.32'
-_NODEGROUP_YAML = """
-- instanceType: {{INSTANCE_TYPE}}
-  amiFamily: AmazonLinux2023
-  name: {{NODEGROUP_NAME}}
-  desiredCapacity: {{NUM_NODES}}
-  minSize: {{MIN_SIZE}}
-  maxSize: {{MAX_SIZE}}
-"""
 
 
 class EksKarpenterCluster(BaseEksCluster):
@@ -454,69 +510,6 @@ class EksKarpenterCluster(BaseEksCluster):
       nodepool_config: container_service.BaseNodePoolConfig,
   ):
     pass
-
-  def _RenderNodeGroupJson(
-      self, nodepool: container_service.BaseNodePoolConfig
-  ) -> dict[str, Any]:
-    """Renders the node group yaml to a string."""
-    return {
-        'name': nodepool.name,
-        'instanceType': nodepool.machine_type,
-        'desiredCapacity': nodepool.num_nodes,
-        'amiFamily': 'AmazonLinux2023',
-        'minSize': self.min_nodes,
-        'maxSize': self.max_nodes,
-    }
-
-  def _RenderEksCreateJsonToFile(self) -> str:
-    """Renders the eksctl create json to a file.
-
-    Returns:
-      The file path of the rendered json.
-    """
-    tags = util.MakeDefaultTags() | {'karpenter.sh/discovery': self.name}
-    create_json: dict[str, Any] = {
-        'apiVersion': 'eksctl.io/v1alpha5',
-        'kind': 'ClusterConfig',
-        'metadata': {
-            'name': self.name,
-            'region': self.region,
-            'version': self.cluster_version,
-            'tags': tags,
-        },
-        'iam': {
-            'withOidc': True,
-            'podIdentityAssociations': [{
-                'namespace': _KARPENTER_NAMESPACE,
-                'serviceAccountName': 'karpenter',
-                'roleName': f'{self.name}-karpenter',
-                'permissionPolicyARNs': [
-                    f'arn:aws:iam::{self.account}:policy/KarpenterControllerPolicy-{self.name}'
-                ],
-            }],
-        },
-        'iamIdentityMappings': [{
-            'arn': (
-                f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}'
-            ),
-            'username': 'system:node:{{EC2PrivateDNSName}}',
-            'groups': ['system:bootstrappers', 'system:nodes'],
-        }],
-        'addons': [{'name': 'eks-pod-identity-agent'}],
-        'managedNodeGroups': [self._RenderNodeGroupJson(self.default_nodepool)],
-    }
-    with vm_util.NamedTemporaryFile(
-        dir=vm_util.GetTempDir(), delete=False, mode='w'
-    ) as tf:
-      rendered_json = json.dumps(create_json, indent=2)
-      logging.info(
-          'Writing to %s rendered eksctl create json: %s',
-          tf.name,
-          rendered_json,
-      )
-      tf.write(rendered_json)
-      tf.close()
-      return tf.name
 
   def _Create(self):
     """Creates the control plane and worker nodes."""
@@ -543,22 +536,31 @@ class EksKarpenterCluster(BaseEksCluster):
         '--region',
         f'{self.region}',
     ])
-    create_file = self._RenderEksCreateJsonToFile()
-    vm_util.IssueCommand(
-        [FLAGS.eksctl, 'create', 'cluster', '-f', create_file], timeout=1800
-    )
-    # Download the kubeconfig since above command doesn't auto make it.
-    vm_util.IssueCommand([
-        'aws',
-        'eks',
-        'update-kubeconfig',
-        '--region',
-        self.region,
-        '--name',
-        self.name,
-        '--kubeconfig',
-        FLAGS.kubeconfig,
-    ])
+    create_json: dict[str, Any] = {
+        'metadata': {
+            'tags': {'karpenter.sh/discovery': self.name},
+        },
+        'iam': {
+            'podIdentityAssociations': [{
+                'namespace': _KARPENTER_NAMESPACE,
+                'serviceAccountName': 'karpenter',
+                'roleName': f'{self.name}-karpenter',
+                'permissionPolicyARNs': [
+                    f'arn:aws:iam::{self.account}:policy/KarpenterControllerPolicy-{self.name}'
+                ],
+            }],
+        },
+        'iamIdentityMappings': [{
+            'arn': (
+                f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}'
+            ),
+            'username': 'system:node:{{EC2PrivateDNSName}}',
+            'groups': ['system:bootstrappers', 'system:nodes'],
+        }],
+        'addons': [{'name': 'eks-pod-identity-agent'}],
+        'managedNodeGroups': [self._RenderNodeGroupJson(self.default_nodepool)],
+    }
+    self._EksCtlCreate(create_json)
 
   def _PostCreate(self):
     """Performs post-creation steps for the cluster."""
@@ -573,6 +575,8 @@ class EksKarpenterCluster(BaseEksCluster):
         str(_KARPENTER_VERSION),
         '--namespace',
         _KARPENTER_NAMESPACE,
+        '--kubeconfig',
+        FLAGS.kubeconfig,
         '--create-namespace',
         '--set',
         f'settings.clusterName={self.name}',
