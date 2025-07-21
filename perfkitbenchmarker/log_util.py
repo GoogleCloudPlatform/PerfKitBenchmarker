@@ -259,6 +259,9 @@ def ConfigureLogging(
 def CollectPKBLogs(run_uri: str) -> None:
   """Move PKB log files over to a GCS bucket (`pkb_log_bucket` flag).
 
+  All failures in the process of log collection are suppressed to avoid causing
+  a run to fail unnecessarily.
+
   Args:
     run_uri: The run URI of the benchmark run.
   """
@@ -266,19 +269,26 @@ def CollectPKBLogs(run_uri: str) -> None:
     # Generate the log path to the cloud bucket based on the invocation date of
     # this function.
     gcs_log_path = GetLogCloudPath(PKB_LOG_BUCKET.value, f'{run_uri}-pkb.log')
-    vm_util.IssueRetryableCommand([
-        'gsutil',
-        '-h',
-        'Content-Type:text/plain',
-        _SAVE_LOG_TO_BUCKET_OPERATION.value,
-        '-Z',
-        log_local_path,
-        gcs_log_path,
-    ])
+    vm_util.IssueCommand(
+        [
+            'gsutil',
+            '-h',
+            'Content-Type:text/plain',
+            _SAVE_LOG_TO_BUCKET_OPERATION.value,
+            '-Z',
+            log_local_path,
+            gcs_log_path,
+        ],
+        raise_on_failure=False,
+        raise_on_timeout=False,
+    )
 
 
 def CollectVMLogs(run_uri: str, source_path: str) -> None:
   """Move VM log files over to a GCS bucket (`vm_log_bucket` flag).
+
+  All failures in the process of log collection are suppressed to avoid causing
+  a run to fail unnecessarily.
 
   Args:
     run_uri: The run URI of the benchmark run.
@@ -288,15 +298,19 @@ def CollectVMLogs(run_uri: str, source_path: str) -> None:
     source_filename = source_path.split('/')[-1]
     gcs_directory_path = GetLogCloudPath(VM_LOG_BUCKET.value, run_uri)
     gcs_path = f'{gcs_directory_path}/{source_filename}'
-    vm_util.IssueRetryableCommand([
-        'gsutil',
-        '-h',
-        'Content-Type:text/plain',
-        'mv',
-        '-Z',
-        source_path,
-        gcs_path,
-    ])
+    vm_util.IssueCommand(
+        [
+            'gsutil',
+            '-h',
+            'Content-Type:text/plain',
+            'mv',
+            '-Z',
+            source_path,
+            gcs_path,
+        ],
+        raise_on_failure=False,
+        raise_on_timeout=False,
+    )
 
 
 def GetLogCloudPath(log_bucket: str, path_suffix: str) -> str:
