@@ -25,7 +25,7 @@ Example run command:
 --gcp_service_account=1036392050503-compute@developer.gserviceaccount.com \
 --gcp_service_account_key_file=/home/shuninglin/p3rf-bq-search-050c6559ed66.json \
 --edw_index_measure_query_dir=edw/bigquery/search_index/measure_performance \
---edw_power_queries=load_init_data_query,create_index_query,load_data_query,test_query \
+--edw_power_queries=load_init_data_query,create_index_query,concurrent_ingestion_query,search_query \
 --metadata=cloud:GCP \
 --project=p3rf-bq-search \
 --zones=us-central1-c 
@@ -92,21 +92,21 @@ def Prepare(benchmark_spec):
   any(vm.PushDataFile(query_loc) for query_loc in query_locations)
 
 
-def _execute_data_load(client_interface, load_data_query, load_time = 7):
+def _execute_data_load(client_interface, concurrent_ingestion_query, load_time = 7):
   """Executes the data loading query."""
   logging.info('Starting data loading loop')
   for i in range(load_time):
-    client_interface.ExecuteQuery(load_data_query)  # Only run data load query
+    client_interface.ExecuteQuery(concurrent_ingestion_query) 
   logging.info('Data loading loop completed')
 
 
-def _execute_index_queries(client_interface, test_query, results, num_queries=5, interval=0):
+def _execute_index_queries(client_interface, search_query, results, num_queries=5, interval=0):
   """Executes the index search query in a separate process."""
   logging.info('Starting index search query loop')
   for i in range(num_queries):
     time.sleep(interval)
     logging.info('Running index search query iteration %d', i + 1)
-    execution_time, metadata = client_interface.ExecuteQuery(test_query)  # Only run test query
+    execution_time, metadata = client_interface.ExecuteQuery(search_query) 
     logging.info('Index search query iteration %d completed in execution time: ', i + 1, execution_time)
     results.append(sample.Sample('query_execution_Time', execution_time, 'seconds', metadata))
   logging.info('Index search query loop completed')
@@ -122,15 +122,15 @@ def Run(benchmark_spec):
   client_interface.ExecuteQuery('load_init_data_query') 
   client_interface.ExecuteQuery('create_index_query') 
   
-  # Create separate processes for data loading and index querying
+  # Create separate processes for concurrent data ingestion and index querying
   data_load_process = multiprocessing.Process(
       target=_execute_data_load,
-      args=(client_interface, 'load_data_query')
+      args=(client_interface, 'concurrent_ingestion_query')
   )
 
   data_load_process.start()
 
-  _execute_index_queries(client_interface, 'test_query', results)
+  _execute_index_queries(client_interface, 'search_query', results)
   data_load_process.join()
 
 
