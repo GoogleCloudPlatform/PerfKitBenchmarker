@@ -1,0 +1,18 @@
+LOAD DATA OVERWRITE search_index_dataset.prototype_simple
+(
+    event_timestamp TIMESTAMP,
+    insert_id STRING,
+    hostname STRING,
+    process_id INT64,
+    parent_process_id INT64,
+    user_name STRING,
+    command_line STRING,
+    file_path STRING,
+    ip_address STRING,
+    raw_log STRING
+)
+FROM FILES (
+  format = 'CSV',
+  uris = ['gs://bq-search-index-bench-dataset/prototype_simple_init_bucket/*.csv'],
+  skip_leading_rows = 1
+  );

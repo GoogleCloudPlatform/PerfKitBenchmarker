@@ -1,0 +1,2 @@
+CREATE SEARCH INDEX IF NOT EXISTS prototype_simple_index
+ON `p3rf-bq-search.search_index_dataset.prototype_simple`(ALL COLUMNS);
