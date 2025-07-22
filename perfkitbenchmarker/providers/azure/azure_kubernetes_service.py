@@ -449,7 +449,11 @@ class AksAutomaticCluster(AksCluster):
     )
 
   def _PostCreate(self):
-    """Run only the container registry attach."""
+    """Skip the superclass's _PostCreate() method.
+
+    Needed as the node_resource_group is pre-configured and fully managed in Automatic clusters
+    """
+    super(container_service.KubernetesCluster, self)._PostCreate()
     self._AttachContainerRegistry()
 
 
