@@ -1453,7 +1453,7 @@ class KubernetesClusterCommands:
 
   @staticmethod
   def DeleteResource(
-      resource_identifier: str, ignore_not_found: bool = True
+      resource_identifier: str, ignore_not_found: bool = True, **kwargs
   ) -> None:
     """Deletes a kubernetes resource."""
     delete_cmd = [
@@ -1462,7 +1462,7 @@ class KubernetesClusterCommands:
     ]
     if ignore_not_found:
       delete_cmd.append('--ignore-not-found=true')
-    RunKubectlCommand(delete_cmd, raise_on_failure=False)
+    RunKubectlCommand(delete_cmd, raise_on_failure=False, **kwargs)
 
   @staticmethod
   def GetFileContentFromPod(pod_name: str, file_path: str) -> str:
