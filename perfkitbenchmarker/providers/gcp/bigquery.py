@@ -451,6 +451,7 @@ class PythonClientInterface(GenericClientInterface):
       cmd += ' --print_results'
     if self.destination:
       cmd += f' --destination {self.destination}'
+    cmd += f' --skip_results'
     stdout, _ = self.client_vm.RemoteCommand(cmd)
     details = copy.copy(self.GetMetadata())
     details.update(json.loads(stdout)['details'])
