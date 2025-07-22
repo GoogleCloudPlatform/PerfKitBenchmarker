@@ -25,7 +25,7 @@ Example run command:
 --gcp_service_account=1036392050503-compute@developer.gserviceaccount.com \
 --gcp_service_account_key_file=/home/shuninglin/p3rf-bq-search-050c6559ed66.json \
 --edw_index_measure_query_dir=edw/bigquery/search_index/measure_performance \
---edw_power_queries=load_data_query,test_query \
+--edw_power_queries=load_init_data_query,create_index_query,load_data_query,test_query \
 --metadata=cloud:GCP \
 --project=p3rf-bq-search \
 --zones=us-central1-c 
@@ -85,11 +85,11 @@ def Prepare(benchmark_spec):
   )
   edw_service_instance.GetClientInterface().Prepare('edw_common')
 
-  measurement_query_location = os.path.join(FLAGS.edw_index_measure_query_dir, 'test_query')
-  vm.PushDataFile(measurement_query_location)
-
-  load_query_location = os.path.join(FLAGS.edw_index_measure_query_dir, 'load_data_query')
-  vm.PushDataFile(load_query_location)
+  query_locations = [
+      os.path.join(FLAGS.edw_index_measure_query_dir, query)
+      for query in FLAGS.edw_power_queries.split(',')
+  ]
+  any(vm.PushDataFile(query_loc) for query_loc in query_locations)
 
 
 def _execute_data_load(client_interface, load_data_query, load_time = 7):
@@ -118,6 +118,9 @@ def Run(benchmark_spec):
 
   edw_service_instance = benchmark_spec.edw_service
   client_interface = edw_service_instance.GetClientInterface()
+
+  client_interface.ExecuteQuery('load_init_data_query') 
+  client_interface.ExecuteQuery('create_index_query') 
   
   # Create separate processes for data loading and index querying
   data_load_process = multiprocessing.Process(
