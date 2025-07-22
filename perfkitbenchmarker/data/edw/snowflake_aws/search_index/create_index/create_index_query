@@ -1,0 +1,2 @@
+CREATE SEARCH INDEX IF NOT EXISTS prototype_simple_small_index 
+ON prototype_simple_small(ALL COLUMNS);

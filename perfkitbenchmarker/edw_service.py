@@ -124,6 +124,11 @@ flags.DEFINE_enum(
     ['JDBC'],
     'The Runtime Interface used when interacting with Snowflake.',
 )
+flags.DEFINE_string(
+    'snowflake_jdbc_client_jar',
+    None,
+    'Local location of the snowflake_jdbc_client_jar.',
+)
 flags.DEFINE_boolean(
     'edw_get_service_auxiliary_metrics',
     'False',

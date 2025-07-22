@@ -29,6 +29,25 @@ Run command:
 --metadata=cloud:GCP \
 --project=saksena-test \
 --zones=us-central1-c 
+
+
+
+./pkb.py \
+--cloud=AWS \
+--benchmarks=edw_index_benchmark \
+--config_override=edw_index_benchmark.edw_service.type=snowflake_aws \
+--config_override=edw_index_benchmark.edw_service.cluster_identifier= \
+--edw_index_local_query_dir=edw/snowflake_aws/search_index/measure_performance \
+--edw_power_queries=test_query \
+--machine_type=m4.large \
+--metadata=cloud:AWS \
+--snowflake_client_interface=JDBC \
+--snowflake_jdbc_client_jar=/Users/saksena/Downloads/snowflake-jdbc-client-2.13-enterprise.jar \
+--snowflake_database=SEARCH_INDEX \
+--snowflake_schema=INDEX_TEST \
+--snowflake_warehouse=XSMALL_TEST \
+--zones=us-west-2a 
+
 """
 
 
