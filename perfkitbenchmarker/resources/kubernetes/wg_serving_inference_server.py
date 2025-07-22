@@ -45,6 +45,12 @@ FLAG_IMAGE_REPO = flags.DEFINE_string(
     ' gcr.io/gke-release)',
 )
 
+FLAG_GCS_BUCKET = flags.DEFINE_string(
+    'k8s_inference_server_gcs_bucket',
+    None,
+    'The GCS bucket that has model data for inference server to use.',
+)
+
 
 @dataclasses.dataclass
 class PodStartupMetrics:
@@ -82,7 +88,7 @@ class BaseWGServingInferenceServer(
       cluster: container_service.KubernetesCluster,
   ):
     super().__init__(spec, cluster)
-
+    self.model_load_timestamp = None
     self.deployment_metadata = None
     self.max_replicas: int = 1
     self._monitor_executor: Optional[concurrent.futures.ThreadPoolExecutor] = (
@@ -369,6 +375,26 @@ class BaseWGServingInferenceServer(
             )
         )
     return samples
+
+  def GetInferenceServerLogs(self) -> str:
+    """Returns the logs of the inference server."""
+    deployment_name = self.GetInferenceServerDeploymentName()
+    logs_cmd = [
+        'logs',
+        f'deployment/{deployment_name}',
+        '-c',
+        'inference-server',
+    ]
+    stdout, _, _ = container_service.RunKubectlCommand(logs_cmd)
+    return stdout
+
+  def GetInferenceServerDeploymentName(self) -> str:
+    """Returns the name of the inference server deployment."""
+    if not self.deployment_metadata:
+      raise errors.Resource.CreationError(
+          'Deployment metadata is required to get inference server details.'
+      )
+    return self.deployment_metadata['metadata']['name']
 
   def _PostCreate(self) -> None:
     """Post-creation steps for the Kubernetes Inference Server."""
@@ -772,6 +798,9 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       self._ParseInferenceServerDeploymentMetadata()
       return
 
+    if 'gcsfuse' in self.spec.catalog_components:
+      self._ApplyGCSFusePVC()
+
     logging.info('Creating new inference server')
     self._InjectDefaultHuggingfaceToken()
     inference_server_manifest = self._GetInferenceServerManifest()
@@ -792,6 +821,18 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         'available',
         timeout=self.spec.deployment_timeout,
     )
+
+  def _ApplyGCSFusePVC(self):
+    """Apply the PV & PVC to the environment."""
+    if not FLAG_GCS_BUCKET.value:
+      raise errors.Resource.CreationError(
+          'GCS bucket is required to apply GCSFuse PVC.'
+      )
+    self.cluster.ApplyManifest(
+        'container/kubernetes_ai_inference/gcsfuse_pv_pvc.yaml.j2',
+        gcs_bucket=FLAG_GCS_BUCKET.value,
+    )
+    logging.info('Successfully applied GCSFuse PVC.')
 
   def _CollectStartupMonitorMetrics(self) -> dict[str, PodStartupMetrics]:
     collected_metrics_map = super()._CollectStartupMonitorMetrics()
