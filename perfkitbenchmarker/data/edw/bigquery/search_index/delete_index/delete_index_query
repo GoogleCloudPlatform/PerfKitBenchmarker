@@ -1,1 +1,1 @@
-DROP SEARCH INDEX IF EXISTS prototype_simple_small_index ON prototype_simple_small;
+DROP SEARCH INDEX IF EXISTS prototype_simple_creation_benchmark_index ON prototype_simple_shuninglin_100GB;

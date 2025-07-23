@@ -1,2 +1,2 @@
-CREATE SEARCH INDEX IF NOT EXISTS prototype_simple_small_index 
-ON prototype_simple_small(ALL COLUMNS);
+CREATE SEARCH INDEX IF NOT EXISTS prototype_simple_creation_benchmark_index
+ON prototype_simple_shuninglin_100GB(ALL COLUMNS);

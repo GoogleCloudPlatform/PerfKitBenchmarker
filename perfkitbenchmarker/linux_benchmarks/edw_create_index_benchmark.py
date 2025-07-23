@@ -23,18 +23,19 @@ Run command:
 --config_override=edw_create_index_benchmark.edw_service.type=bigquery \
 --config_override=edw_create_index_benchmark.edw_service.cluster_identifier=p3rf-bq-search.search_index_dataset \
 --gcp_service_account=bigquery-testing-pkb@p3rf-bigquery-smallquery-slots.iam.gserviceaccount.com \
---gcp_service_account_key_file=/Users/saksena/Downloads/p3rf-bigquery-smallquery-slots.json \
+--gcp_service_account_key_file=/home/shuninglin/p3rf-bq-search-050c6559ed66.json \
 --edw_index_creation_query_dir=edw/bigquery/search_index/create_index \
 --edw_index_deletion_query_dir=edw/bigquery/search_index/delete_index \
+--edw_index_check_query_dir=edw/bigquery/search_index/check_index \
 --metadata=cloud:GCP \
---project=saksena-test \
+--project=p3rf-bq-search \
 --zones=us-central1-c 
 """
 
 """Benchmark for creating an index in an EDW service."""
 
-import logging
 import os
+import time
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import edw_service
@@ -63,6 +64,13 @@ flags.DEFINE_string(
 
 flags.DEFINE_string(
     'edw_index_deletion_query_dir',
+    '',
+    'Optional local directory containing all query files. '
+    'Can be absolute or relative to the executable.',
+)
+
+flags.DEFINE_string(
+    'edw_index_check_query_dir',
     '',
     'Optional local directory containing all query files. '
     'Can be absolute or relative to the executable.',
@@ -97,6 +105,9 @@ def Prepare(benchmark_spec):
   query_location = os.path.join(FLAGS.edw_index_deletion_query_dir, 'delete_index_query')
   vm.PushDataFile(query_location)
 
+  query_location = os.path.join(FLAGS.edw_index_check_query_dir, 'check_index_coverage_query')
+  vm.PushDataFile(query_location)
+
 def Run(benchmark_spec):
   """Runs the benchmark and returns a list of samples.
 
@@ -117,8 +128,24 @@ def Run(benchmark_spec):
   results.append(sample.Sample('search_index_deletion_time', execution_time, 'seconds', metadata))
 
   execution_time, metadata = client_interface.ExecuteQuery('create_index_query')
-  # TODO: Wait for Async Index creation
   results.append(sample.Sample('search_index_creation_time', execution_time, 'seconds', metadata))
+
+  # Check Index Coverage until the index has been created
+  start_time = time.time()
+  timeout = 120
+  while True:
+    execution_time, metadata = client_interface.ExecuteQuery('check_index_coverage_query')
+    time_elapsed = time.time() - start_time
+    if metadata and metadata.get('rows_returned', 0) > 0:
+      results.append(sample.Sample('search_index_available_time', time_elapsed, 'seconds', metadata))
+      break
+    if time_elapsed > timeout:
+      print("Timed out waiting for index to be fully created.")
+      break
+    else:
+      time.sleep(1) 
+
+  
   return results
 
 
