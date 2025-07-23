@@ -16,7 +16,7 @@ randrepeat=0
 {%- for pair in disks_list %}
 
 [{{scenario['name']}}-io-depth-{{scenario['iodepth']}}-num-jobs-{{scenario['numjobs']}}{%- if separate_jobs == True %}.{{pair['index']}}{%- endif%}]
-{%- if pair['index'] == 0 %}
+{%- if pair['index'] == 0 or fio_run_parallel_jobs_on_disks == False %}
 stonewall
 {%- endif%}
 {%- if scenario['rwmixread'] is defined %}
