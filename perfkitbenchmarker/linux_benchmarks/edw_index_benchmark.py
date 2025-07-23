@@ -25,7 +25,7 @@ Run command:
 --gcp_service_account=bigquery-testing-pkb@p3rf-bigquery-smallquery-slots.iam.gserviceaccount.com \
 --gcp_service_account_key_file=/Users/saksena/Downloads/p3rf-bigquery-smallquery-slots.json \
 --edw_index_local_query_dir=edw/bigquery/search_index/measure_performance \
---edw_power_queries=test_query \
+--edw_power_queries=search_query \
 --metadata=cloud:GCP \
 --project=saksena-test \
 --zones=us-central1-c 
