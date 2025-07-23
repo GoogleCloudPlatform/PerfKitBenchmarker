@@ -62,6 +62,12 @@ flags.DEFINE_string(
     'Can be absolute or relative to the executable.',
 )
 
+flags.DEFINE_integer(
+  'edw_index_ingestion_search_iterations',
+  1,
+  'How many times to run the search query'
+)
+
 FLAGS = flags.FLAGS
 
 
@@ -92,7 +98,8 @@ def Prepare(benchmark_spec):
   any(vm.PushDataFile(query_loc) for query_loc in query_locations)
 
 
-def _execute_data_load(client_interface, concurrent_ingestion_query, load_time = 7):
+# TODO: Record metrics from these queries too
+def _execute_data_load(client_interface, concurrent_ingestion_query, load_time = 32):
   """Executes the data loading query."""
   logging.info('Starting data loading loop')
   for i in range(load_time):
@@ -107,7 +114,8 @@ def _execute_index_queries(client_interface, search_query, results, num_queries=
     time.sleep(interval)
     logging.info('Running index search query iteration %d', i + 1)
     execution_time, metadata = client_interface.ExecuteQuery(search_query) 
-    logging.info('Index search query iteration %d completed in execution time: ', i + 1, execution_time)
+    logging.info('Index search query iteration %d completed in execution time: %d', i + 1, execution_time)
+    metadata['index_query_iter'] = i
     results.append(sample.Sample('query_execution_Time', execution_time, 'seconds', metadata))
   logging.info('Index search query loop completed')
 
@@ -130,7 +138,7 @@ def Run(benchmark_spec):
 
   data_load_process.start()
 
-  _execute_index_queries(client_interface, 'search_query', results)
+  _execute_index_queries(client_interface, 'search_query', results, num_queries=FLAGS.edw_index_ingestion_search_iterations)
   data_load_process.join()
 
 

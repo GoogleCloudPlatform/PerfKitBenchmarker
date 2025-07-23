@@ -12,3 +12,4 @@
 /*git_ignore*
 *env/
 .*env/
+.vscode/

@@ -1,4 +1,4 @@
-LOAD DATA OVERWRITE search_index_dataset.prototype_simple
+LOAD DATA INTO search_index_dataset.prototype_simple
 (
     event_timestamp TIMESTAMP,
     insert_id STRING,
