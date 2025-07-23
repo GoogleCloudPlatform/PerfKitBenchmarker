@@ -104,8 +104,6 @@ class ElasticKubernetesServiceTest(BaseEksTest):
                 'instanceType': 'm5.large',
                 'desiredCapacity': 1,
                 'amiFamily': 'AmazonLinux2023',
-                'minSize': 1,
-                'maxSize': 1,
                 'labels': {
                     'pkb_nodepool': 'default',
                 },
@@ -180,14 +178,11 @@ class ElasticKubernetesServiceTest(BaseEksTest):
     node_groups = called_json['managedNodeGroups']
     self.assertLen(node_groups, 2)
     self.assertEqual(
-        node_groups[1],
         {
             'name': 'nginx',
             'instanceType': 'm6i.xlarge',
             'desiredCapacity': 3,
             'amiFamily': 'AmazonLinux2023',
-            'minSize': 1,
-            'maxSize': 1,
             'labels': {
                 'pkb_nodepool': 'nginx',
             },
@@ -195,6 +190,7 @@ class ElasticKubernetesServiceTest(BaseEksTest):
             'tags': {},
             'ssh': {'allow': True, 'publicKeyPath': 'perfkit-key-123p'},
         },
+        node_groups[1],
     )
 
 

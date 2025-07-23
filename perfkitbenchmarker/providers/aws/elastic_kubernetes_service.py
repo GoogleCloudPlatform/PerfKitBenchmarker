@@ -156,19 +156,25 @@ class BaseEksCluster(container_service.KubernetesCluster):
   def _RenderNodeGroupJson(
       self, nodepool: container_service.BaseNodePoolConfig
   ) -> dict[str, Any]:
-    """Renders the node group yaml to a string."""
-    return {
+    """Constructs the node group json dictionary."""
+    group_json = {
         'name': nodepool.name,
         'instanceType': nodepool.machine_type,
         'desiredCapacity': nodepool.num_nodes,
         'amiFamily': 'AmazonLinux2023',
-        'minSize': self.min_nodes,
-        'maxSize': self.max_nodes,
         'tags': util.MakeDefaultTags(),
         'labels': {
             'pkb_nodepool': nodepool.name,
         },
     }
+    if (
+        nodepool.name == self.default_nodepool.name
+        and self.min_nodes != self.max_nodes
+    ):
+      # Min / max config only apply to the default nodepool.
+      group_json['minSize'] = self.min_nodes
+      group_json['maxSize'] = self.max_nodes
+    return group_json
 
   def _WriteJsonToFile(self, json_dict: dict[str, Any]) -> str:
     """Renders the given json dict to a file.
@@ -353,7 +359,7 @@ class EksCluster(BaseEksCluster):
   def _RenderNodeGroupJson(
       self, nodepool: container_service.BaseNodePoolConfig
   ) -> dict[str, Any]:
-    """Renders the node group yaml to a string."""
+    """Constructs the node group json dictionary."""
     base_json = super()._RenderNodeGroupJson(nodepool)
     if nodepool.disk_size:
       base_json['volumeSize'] = nodepool.disk_size

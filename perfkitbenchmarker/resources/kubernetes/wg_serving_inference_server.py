@@ -896,6 +896,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       return
 
     self.StopHPAPolling()
-    for resource in self.created_resources:
-      self.cluster.DeleteResource(resource, ignore_not_found=True)
+    for resource in reversed(self.created_resources):
+      self.cluster.DeleteResource(
+          resource, ignore_not_found=True, raise_on_timeout=False
+      )
     self.deployment_metadata = None

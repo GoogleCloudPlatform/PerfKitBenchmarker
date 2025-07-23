@@ -266,8 +266,8 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
 
 
 class TestKubernetesVirtualMachine(
-    pkb_common_test_case.TestOsMixin,
     kubernetes_virtual_machine.KubernetesVirtualMachine,
+    pkb_common_test_case.TestLinuxVirtualMachine,
 ):
   pass
 
@@ -540,6 +540,16 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
       command = issue_command.call_args[0][0]
       command_string = ' '.join(command)
       self.assertIn('gcloud storage', command_string)
+
+  def testIsAarch64(self):
+    spec = self.create_virtual_machine_spec()
+    with patch_critical_objects('aarch64'):
+      kub_vm = TestKubernetesVirtualMachine(spec)
+      self.assertTrue(kub_vm.is_aarch64)
+
+    with patch_critical_objects('x86_64'):
+      kub_vm = TestKubernetesVirtualMachine(spec)
+      self.assertFalse(kub_vm.is_aarch64)
 
 
 class KubernetesVirtualMachineWithGpusTestCase(

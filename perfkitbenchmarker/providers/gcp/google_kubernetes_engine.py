@@ -214,8 +214,11 @@ class BaseGkeCluster(container_service.KubernetesCluster):
     super()._Delete()
     cmd = self._GcloudCommand('container', 'clusters', 'delete', self.name)
     cmd.args.append('--async')
-    _, err, _ = cmd.Issue(raise_on_failure=False)
-    if 'Please wait and try again' in err:
+    _, err, retcode = cmd.Issue(raise_on_failure=False)
+    if retcode:
+      # Some known retryable errors:
+      # Please wait and try again
+      # Cluster is running incompatible operation operation-id.
       raise errors.Resource.RetryableDeletionError(err)
 
   def _Exists(self):

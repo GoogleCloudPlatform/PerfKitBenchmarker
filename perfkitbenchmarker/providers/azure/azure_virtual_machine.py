@@ -783,9 +783,9 @@ class AzureVirtualMachine(
         or self.OS_TYPE in TRUSTED_LAUNCH_UNSUPPORTED_OS_TYPES
     )
     arm_arch = _GetArmArch(self.machine_type)
+    self.is_aarch64 = bool(arm_arch)
     if arm_arch:
       self.host_arch = arm_arch
-      self.is_aarch64 = True
     self.hypervisor_generation = 2
     if vm_spec.image:
       self.image = vm_spec.image
