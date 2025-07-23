@@ -1,3 +1,20 @@
-SELECT COUNT(*)
-FROM prototype_simple
-WHERE SEARCH(raw_log, 'ASIA') = TRUE;
+WITH
+  search_rows AS (
+  SELECT
+    COUNT(*) AS result_rows
+  FROM
+    prototype_simple
+  WHERE
+    SEARCH(raw_log,
+      'ASIA') = TRUE),
+  total_rows AS (
+  SELECT
+    COUNT(*) AS total_row_count
+  FROM
+    prototype_simple)
+SELECT
+  search_rows.result_rows,
+  total_rows.total_row_count
+FROM
+  total_rows,
+  search_rows;
