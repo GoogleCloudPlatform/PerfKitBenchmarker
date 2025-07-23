@@ -618,10 +618,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.preemptible:
       self.preempt_marker = f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/{self.name}'
     arm_arch = GetArmArchitecture(self.machine_type)
+    self.is_aarch64 = bool(arm_arch)
     if arm_arch:
       # Assign host_arch to avoid running detect_host on ARM
       self.host_arch = arm_arch
-      self.is_aarch64 = True
     self.image_family = vm_spec.image_family or self.GetDefaultImageFamily(
         self.is_aarch64
     )

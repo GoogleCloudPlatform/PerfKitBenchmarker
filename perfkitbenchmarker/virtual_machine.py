@@ -564,6 +564,10 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
   _instance_counter_lock = threading.Lock()
   _instance_counter = 0
 
+  # This is implemented in os_mixin.BaseOsMixin, but due to insane diamond
+  # inheritence, we need it here.
+  cpu_arch: str
+
   def __init__(self, vm_spec: BaseVmSpec):
     """Initialize BaseVirtualMachine class.
 
@@ -635,7 +639,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
     self.vm_group = None
     self.id = None
-    self.is_aarch64 = False
+    self._is_aarch64 = None
     self.cpu_version = None
     self.create_operation_name = None
     self.create_return_time = None
@@ -645,6 +649,23 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       raise errors.Setup.InvalidConfigurationError(
           'Startup script are not supported on CoreOS.'
       )
+
+  @property
+  def is_aarch64(self) -> bool:
+    """Whether the VM is known to be an ARM VM.
+
+    Historically each provider sets this explicitly, but for some providers like
+    KuberentesVirtualMachine, it's conveniet to fall back to what is reported by
+    Linux.
+    """
+    if self._is_aarch64 is not None:
+      return self._is_aarch64
+    # Only detect arch if it's not explicitly set.
+    return self.cpu_arch == CPUARCH_AARCH64
+
+  @is_aarch64.setter
+  def is_aarch64(self, value: bool):
+    self._is_aarch64 = value
 
   @property
   @classmethod
