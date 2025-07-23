@@ -102,7 +102,7 @@ def _execute_data_load(
     client_interface: edw_service.EdwClientInterface,
     concurrent_ingestion_query: str,
     complete: SyncEvent,
-    results: ListProxy[sample.Sample],
+    results: ListProxy,
 ):
     """Executes the data loading query."""
     logging.info("Starting data loading loop")
@@ -124,7 +124,7 @@ def _execute_data_load(
 def _execute_index_queries(
     client_interface: edw_service.EdwClientInterface,
     search_query: str,
-    results: ListProxy[sample.Sample],
+    results: ListProxy,
     num_queries=5,
     interval=0,
 ):
@@ -154,12 +154,13 @@ def Run(benchmark_spec):
     results = []
 
     with multiprocessing.Manager() as manager:
-        results_proxy: ListProxy[sample.Sample] = manager.list()
+        #TODO: Python 3.11 doesn't support subscripting for ListProxy, add w/ 3.12
+        results_proxy: ListProxy = manager.list() 
         edw_service_instance: edw_service.EdwService = benchmark_spec.edw_service
         client_interface: edw_service.EdwClientInterface = (
             edw_service_instance.GetClientInterface()
         )
-
+        client_interface.ExecuteQuery("delete_index_query")
         client_interface.ExecuteQuery("load_init_data_query")
         client_interface.ExecuteQuery("create_index_query")
 

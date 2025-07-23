@@ -1,0 +1,1 @@
+DROP SEARCH INDEX IF EXISTS prototype_simple_index ON prototype_simple;

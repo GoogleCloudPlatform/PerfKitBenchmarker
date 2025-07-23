@@ -11,10 +11,19 @@ WITH
   SELECT
     COUNT(*) AS total_row_count
   FROM
-    prototype_simple)
+    prototype_simple),
+  index_coverage AS (
+  SELECT
+    coverage_percentage
+  FROM
+    INFORMATION_SCHEMA.SEARCH_INDEXES
+  WHERE
+    index_name="prototype_simple_index" )
 SELECT
   search_rows.result_rows,
-  total_rows.total_row_count
+  total_rows.total_row_count,
+  index_coverage.coverage_percentage AS index_coverage_percentage
 FROM
   total_rows,
-  search_rows;
+  search_rows,
+  index_coverage;
