@@ -1838,6 +1838,7 @@ class MemtierTestCase(
             'memtier_threads': 4,
             'memtier_version': '2.1.3',
             'memtier_tls': False,
+            'memtier_distinct_client_seed': True,
         },
     )
 
