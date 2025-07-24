@@ -448,6 +448,52 @@ class AksAutomaticCluster(AksCluster):
         timeout=1800,
     )
 
+  def _IsReady(self):
+    """Returns True if the cluster is ready."""
+    # Check provisioning state
+    show_cmd = [
+          azure.AZURE_PATH,
+          'aks',
+          'show',
+          '--name',
+          self.name,
+        ] + self.resource_group.args
+    
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
+    try:
+        cluster = json.loads(stdout)
+        if cluster.get('provisioningState') != 'Succeeded':
+            return False
+    except Exception:
+        return False
+
+    vm_util.IssueCommand(
+        [
+            azure.AZURE_PATH,
+            'aks',
+            'get-credentials',
+            '--name',
+            self.name,
+            '--file',
+            FLAGS.kubeconfig,
+        ]
+        + self.resource_group.args
+    )
+    version_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'version']
+    _, _, retcode = vm_util.IssueCommand(version_cmd, raise_on_failure=False)
+    if retcode:
+      return False
+    # POD creation will fail until the default service account is created.
+    get_cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig',
+        FLAGS.kubeconfig,
+        'get',
+        'serviceAccounts',
+    ]
+    stdout, _, _ = vm_util.IssueCommand(get_cmd)
+    return 'default' in stdout
+
   def _PostCreate(self):
     """Skip the superclass's _PostCreate() method.
 
