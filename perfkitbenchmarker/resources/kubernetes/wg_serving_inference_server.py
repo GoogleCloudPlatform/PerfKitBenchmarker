@@ -480,10 +480,18 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
   def GetResourceMetadata(self) -> dict[str, Any]:
     metadata = super().GetResourceMetadata()
+    storage_type = self.GetStorageType()
     metadata.update({
         'hpa_enabled': self._hpa_enabled,
+        'storage_type': storage_type,
     })
     return metadata
+
+  def GetStorageType(self) -> str:
+    """Returns the storage type of the inference server."""
+    if 'gcsfuse' in self.spec.catalog_components:
+      return 'gcsfuse'
+    return 'huggingface'
 
   def _InjectDefaultHuggingfaceToken(self) -> None:
     """Injects HuggingFace token into the cluster."""
