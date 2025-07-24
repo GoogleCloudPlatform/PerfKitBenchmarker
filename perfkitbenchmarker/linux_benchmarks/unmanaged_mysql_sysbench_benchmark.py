@@ -56,6 +56,12 @@ flags.register_validator(
     ' at the same time.',
 )
 
+_CONFIG_TEMPLATE = flags.DEFINE_string(
+    'config_template',
+    'mysql/ha.cnf.j2',
+    'Path to the MySQL config template file.',
+)
+
 
 BENCHMARK_NAME = 'unmanaged_mysql_sysbench'
 BENCHMARK_CONFIG = """
@@ -252,7 +258,8 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   new_password = FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
   for index, server in enumerate(servers):
     # mysql server ids needs to be positive integers.
-    mysql80.ConfigureAndRestart(server, buffer_pool_size, index + 1)
+    mysql80.ConfigureAndRestart(
+        server, buffer_pool_size, index + 1, _CONFIG_TEMPLATE.value)
     mysql80.UpdatePassword(server, new_password)
     mysql80.CreateDatabase(server, new_password, _DATABASE_NAME)
 

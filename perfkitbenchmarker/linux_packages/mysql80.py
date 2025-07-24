@@ -205,10 +205,12 @@ def GetOSDependentDefaults(os_type: str) -> dict[str, str]:
 
 
 def ConfigureAndRestart(
-    vm: virtual_machine.VirtualMachine, buffer_pool_size: str, server_id: int
+    vm: virtual_machine.VirtualMachine,
+    buffer_pool_size: str,
+    server_id: int,
+    config_template: str,
 ):
   """Configure and restart mysql."""
-  config_template = 'mysql/ha.cnf.j2'
   remote_temp_config = '/tmp/my.cnf'
   remote_final_config = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_CONFIG_PATH]
   config_d_service = 'mysql/mysqld.service'
