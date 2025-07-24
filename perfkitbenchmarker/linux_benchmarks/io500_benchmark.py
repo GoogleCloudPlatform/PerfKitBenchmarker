@@ -47,6 +47,8 @@ GIT_REPO = 'https://github.com/IO500/io500.git'
 SUMMARY_REGEX = (r'\[SCORE \] Bandwidth ([\d\.]*) ([\w\/]*) : '
                  r'IOPS ([\d\.]*) ([\w]*) : TOTAL ([\d\.]*)')
 RESULT_REGEX = r'\[RESULT\]\s+([\w\-]*)\s+([\d\.]+) ([\w\/]+) : time ([\d\.]+)'
+IO500_OUTPUT = 'data'
+BENCHMARK_DIR = '/opt/pkb'
 
 
 def GetConfig(user_config):
@@ -72,14 +74,13 @@ def Prepare(benchmark_spec):
   # where it looks for *.o files. This commit aaba722 fixes the script
   # to look for *.a files.
   headnode.RemoteCommand(
-      f'cd {headnode.scratch_disks[0].mount_point} && '
-      f'git clone {GIT_REPO} -b io500-isc24 && '
+      f'cd {BENCHMARK_DIR} && git clone {GIT_REPO} -b io500-isc24 && '
       'cd io500 && '
       'sed -i "s/778dca8/aaba722/g" prepare.sh && '
       './prepare.sh')
   # TODO(yuyanting) Make this a flag to accept other configs.
   local_path = data.ResourcePath('io500/io500.ini.j2')
-  remote_path = f'{headnode.scratch_disks[0].mount_point}/io500.ini'
+  remote_path = f'{BENCHMARK_DIR}/io500.ini'
   headnode.RenderTemplate(
       template_path=local_path, remote_path=remote_path,
       context={'directory': headnode.scratch_disks[0].mount_point}
@@ -106,7 +107,7 @@ def _Run(headnode, ranks, ppn):
   """
   results = []
   stdout, _ = headnode.RemoteCommand(
-      f'cd {headnode.scratch_disks[0].mount_point} && '
+      f'cd {BENCHMARK_DIR} && '
       'mpirun --hostfile ~/MACHINEFILE -oversubscribe '
       f'-n {ranks} -npernode {ppn} '
       f'io500/io500 io500.ini')
@@ -159,20 +160,24 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   headnode = benchmark_spec.vm_groups['default'][0]
-  num_nodes = len(benchmark_spec.vms)
+  num_nodes = len(benchmark_spec.vm_groups['default'])
   results = []
   num_cpus = headnode.NumCpusForBenchmark()
-  for total_ranks in FLAGS.mpi_ranks_list or num_nodes * num_cpus:
+  for total_ranks in FLAGS.mpi_ranks_list or [num_nodes * num_cpus]:
     ppn = math.ceil(float(total_ranks) / num_nodes)
     results.extend(_Run(headnode, int(total_ranks), ppn))
   return results
 
 
-def Cleanup(unused_benchmark_spec):
+def Cleanup(benchmark_spec):
   """Cleanup the IOR benchmark.
 
   Args:
-    unused_benchmark_spec: The benchmark specification. Contains all data that
-      is required to run the benchmark.
+    benchmark_spec: The benchmark specification. Contains all data that is
+      required to run the benchmark.
   """
+  headnode = benchmark_spec.vm_groups['default'][0]
+  headnode.RemoteCommand(
+      f'cd {headnode.scratch_disks[0].mount_point} && rm -rf {IO500_OUTPUT}'
+  )
   pass

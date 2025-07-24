@@ -26,10 +26,17 @@ from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker.providers.gcp import gce_disk
+from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
+_GCSFUSE_BUCKET = flags.DEFINE_string(
+    'gcsfuse_bucket',
+    '',
+    'The GCS bucket to be mounted. '
+    'If not set, a bucket is created as an ephemeral resource.',
+)
 
 virtual_machine = Any  # pylint: disable=invalid-name
 
@@ -113,7 +120,6 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
   def GetCreationCommand(self) -> dict[str, Any]:
     if not self.DiskCreatedOnVMCreation():
       return {}
-
     create_disks = []
     dic = {}
     for disk_group in self.remote_disk_groups:
@@ -387,26 +393,56 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
 class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
   """Strategies to set up ram disks."""
 
+  # Performance tuning -
+  # https://cloud.google.com/storage/docs/cloud-storage-fuse/performance#compute-engine
   DEFAULT_MOUNT_OPTIONS = [
       'allow_other',
-      'dir_mode=755',
-      'file_mode=755',
-      'implicit_dirs',
+      '--dir-mode=755',
+      '--file-mode=755',
+      '--implicit-dirs',
+      '--write-global-max-blocks=-1',
+      '--metadata-cache-ttl-secs=-1',
+      '--stat-cache-max-size-mb=-1',
+      '--type-cache-max-size-mb=-1',
+      '--cache-dir=/tmp/gcsfuse-cache-path',
+      '--file-cache-max-size-mb=-1',
+      '--file-cache-cache-file-for-range-read=true',
+      '--metadata-cache-negative-ttl-secs=0',
+      '--rename-dir-limit=200000',
+      '--kernel-list-cache-ttl-secs=-1'
   ]
 
   def SetUpDiskOnLinux(self):
     """Performs Linux specific setup of ram disk."""
-    scratch_disk = disk.BaseDisk(self.disk_spec)
     self.vm.Install('gcsfuse')
     self.vm.RemoteCommand(
         f'sudo mkdir -p {self.disk_spec.mount_point} && sudo chmod a+w'
         f' {self.disk_spec.mount_point}'
     )
 
-    opts = ','.join(self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options)
-    bucket = FLAGS.gcsfuse_bucket
+    opts = ' '.join(self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options)
+    bucket = _GCSFUSE_BUCKET.value
+    if not bucket:
+      bucket = f'gcsfuse-{self.vm.name}'
+      gcs_client = gcs.GoogleCloudStorageService()
+      region = util.GetRegionFromZone(self.vm.zone)
+      gcs_client.PrepareService(
+          region, hierarchical_name_space=True, uniform_bucket_level_access=True
+      )
+      # TODO(andytzhu) - Create BaseObjectStorage Resource for programmatic
+      # deletion.
+      gcs_client.MakeBucket(bucket, placement=self.vm.zone)
+
     target = self.disk_spec.mount_point
-    self.vm.RemoteCommand(f'sudo mount -t gcsfuse -o {opts} {bucket} {target}')
+    self.vm.RemoteCommand(f'sudo gcsfuse -o {opts} {bucket} {target}')
+    # Pre-populate the metadata cache
+    self.vm.RemoteCommand(f'ls -R {target} > /dev/null')
+    # Increase kernel read-ahead size
+    self.vm.RemoteCommand(
+        'echo 1024 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'
+        f' {target})/read_ahead_kb'
+    )
+    scratch_disk = disk.BaseDisk(self.disk_spec)
     self.vm.scratch_disks.append(scratch_disk)
 
 

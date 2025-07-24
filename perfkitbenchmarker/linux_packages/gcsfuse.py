@@ -1,38 +1,23 @@
 """Install gcsfuse package."""
 
-from absl import flags
-
-FLAGS = flags.FLAGS
-
-flags.DEFINE_string('gcsfuse_version', '0.37.0', 'The version of the gcsfuse.')
-flags.DEFINE_string(
-    'gcsfuse_bucket',
-    '',
-    'The GCS bucket to be mounted. '
-    'If not set, all buckets are mounted as subdirectories.',
-)
-
-PACKAGE_LOCAL = '/tmp/gcsfuse.deb'
 MNT = '/gcs'
 
 
-def _PackageUrl():
-  return 'https://github.com/GoogleCloudPlatform/gcsfuse/releases/download/v{v}/gcsfuse_{v}_amd64.deb'.format(
-      v=FLAGS.gcsfuse_version
-  )
-
-
+# https://cloud.google.com/storage/docs/cloud-storage-fuse/quickstart-mount-bucket
 def AptInstall(vm):
   """Installs the gcsfuse package and mounts gcsfuse.
 
   Args:
     vm: BaseVirtualMachine. VM to receive the scripts.
   """
-  vm.InstallPackages('wget')
   vm.RemoteCommand(
-      'wget -O {local} {url}'.format(local=PACKAGE_LOCAL, url=_PackageUrl())
+      'export GCSFUSE_REPO=gcsfuse-`lsb_release -c -s` && echo "deb'
+      ' https://packages.cloud.google.com/apt $GCSFUSE_REPO main" | sudo tee'
+      ' /etc/apt/sources.list.d/gcsfuse.list'
   )
-
   vm.RemoteCommand(
-      f'sudo apt-get install -y --allow-downgrades {PACKAGE_LOCAL}'
+      'curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo'
+      ' apt-key add -'
   )
+  vm.RemoteCommand('sudo apt-get update')
+  vm.InstallPackages('fuse gcsfuse')
