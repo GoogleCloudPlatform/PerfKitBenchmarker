@@ -40,7 +40,7 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     self.region = util.GetRegionFromZone(self.zone)
     self.resource_group = azure_network.GetResourceGroup(self.region)
     self.login_server = None
-    self.sku = 'Basic'
+    self.sku = "Basic"
     self._deleted = False
     self.acr_id = None
     self.service_principal = service_principal.ServicePrincipal.GetInstance()
@@ -50,14 +50,14 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     if self._deleted:
       return False
     stdout, _, _ = vm_util.IssueCommand(
-        [azure.AZURE_PATH, 'acr', 'show', '--name', self.name]
+        [azure.AZURE_PATH, "acr", "show", "--name", self.name]
         + self.resource_group.args,
         raise_on_failure=False,
     )
     try:
       registry = json.loads(stdout)
-      self.login_server = registry['loginServer']
-      self.acr_id = registry['id']
+      self.login_server = registry["loginServer"]
+      self.acr_id = registry["id"]
       return True
     except ValueError:
       return False
@@ -69,11 +69,11 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     vm_util.IssueCommand(
         [
             azure.AZURE_PATH,
-            'acr',
-            'create',
-            '--name',
+            "acr",
+            "create",
+            "--name",
             self.name,
-            '--sku',
+            "--sku",
             self.sku,
         ]
         + self.resource_group.args
@@ -91,14 +91,14 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     if not FLAGS.bootstrap_azure_service_principal:
       create_role_assignment_cmd = [
           azure.AZURE_PATH,
-          'role',
-          'assignment',
-          'create',
-          '--assignee',
+          "role",
+          "assignment",
+          "create",
+          "--assignee",
           self.service_principal.app_id,
-          '--role',
-          'Reader',
-          '--scope',
+          "--role",
+          "Reader",
+          "--scope",
           self.acr_id,
       ]
       vm_util.IssueRetryableCommand(create_role_assignment_cmd)
@@ -114,17 +114,19 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
 
   def Login(self):
     """Logs in to the registry."""
-    vm_util.IssueCommand([
-        azure.AZURE_PATH,
-        'acr',
-        'login',
-        '--name',
-        self.name,
-    ])
+    vm_util.IssueCommand(
+        [
+            azure.AZURE_PATH,
+            "acr",
+            "login",
+            "--name",
+            self.name,
+        ]
+    )
 
   def GetFullRegistryTag(self, image):
     """Gets the full tag of the image."""
-    full_tag = '{login_server}/{name}'.format(
+    full_tag = "{login_server}/{name}".format(
         login_server=self.login_server, name=image
     )
     return full_tag
@@ -141,7 +143,7 @@ class AksCluster(container_service.KubernetesCluster):
     self.region = util.GetRegionFromZone(self.zone)
     self.resource_group = azure_network.GetResourceGroup(self.region)
     self.node_resource_group = None
-    self.name = 'pkbcluster%s' % FLAGS.run_uri
+    self.name = "pkbcluster%s" % FLAGS.run_uri
     # TODO(pclay): replace with built in service principal once I figure out how
     # to make it work with ACR
     self.service_principal = service_principal.ServicePrincipal.GetInstance()
@@ -153,8 +155,12 @@ class AksCluster(container_service.KubernetesCluster):
       vm_config: virtual_machine.BaseVirtualMachine,
       nodepool_config: container_service.BaseNodePoolConfig,
   ):
-    nodepool_config.disk_type = vm_config.create_os_disk_strategy.disk.disk_type  # pytype: disable=attribute-error
-    nodepool_config.disk_size = vm_config.create_os_disk_strategy.disk.disk_size  # pytype: disable=attribute-error
+    nodepool_config.disk_type = (
+        vm_config.create_os_disk_strategy.disk.disk_type
+    )  # pytype: disable=attribute-error
+    nodepool_config.disk_size = (
+        vm_config.create_os_disk_strategy.disk.disk_size
+    )  # pytype: disable=attribute-error
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -163,8 +169,8 @@ class AksCluster(container_service.KubernetesCluster):
       dict mapping string property key to value.
     """
     result = super().GetResourceMetadata()
-    result['boot_disk_type'] = self.default_nodepool.disk_type
-    result['boot_disk_size'] = self.default_nodepool.disk_size
+    result["boot_disk_type"] = self.default_nodepool.disk_type
+    result["boot_disk_size"] = self.default_nodepool.disk_size
     return result
 
   def _IsAutoscalerEnabled(self):
@@ -178,29 +184,29 @@ class AksCluster(container_service.KubernetesCluster):
     """Creates the AKS cluster."""
     cmd = [
         azure.AZURE_PATH,
-        'aks',
-        'create',
-        '--name',
+        "aks",
+        "create",
+        "--name",
         self.name,
-        '--location',
+        "--location",
         self.region,
-        '--ssh-key-value',
+        "--ssh-key-value",
         vm_util.GetPublicKeyPath(),
-        '--service-principal',
+        "--service-principal",
         self.service_principal.app_id,
         # TODO(pclay): avoid logging client secret
-        '--client-secret',
+        "--client-secret",
         self.service_principal.password,
-        '--nodepool-name',
+        "--nodepool-name",
         container_service.DEFAULT_NODEPOOL,
-        '--nodepool-labels',
-        f'pkb_nodepool={container_service.DEFAULT_NODEPOOL}',
+        "--nodepool-labels",
+        f"pkb_nodepool={container_service.DEFAULT_NODEPOOL}",
     ] + self._GetNodeFlags(self.default_nodepool)
     if self._IsAutoscalerEnabled():
       cmd += [
-          '--enable-cluster-autoscaler',
-          f'--min-count={self.min_nodes}',
-          f'--max-count={self.max_nodes}',
+          "--enable-cluster-autoscaler",
+          f"--min-count={self.min_nodes}",
+          f"--max-count={self.max_nodes}",
       ]
 
     # TODO(pclay): expose quota and capacity errors
@@ -217,21 +223,19 @@ class AksCluster(container_service.KubernetesCluster):
     for _, nodepool in self.nodepools.items():
       self._CreateNodePool(nodepool)
 
-  def _CreateNodePool(
-      self, nodepool_config: container_service.BaseNodePoolConfig
-  ):
+  def _CreateNodePool(self, nodepool_config: container_service.BaseNodePoolConfig):
     """Creates a node pool."""
     cmd = [
         azure.AZURE_PATH,
-        'aks',
-        'nodepool',
-        'add',
-        '--cluster-name',
+        "aks",
+        "nodepool",
+        "add",
+        "--cluster-name",
         self.name,
-        '--name',
+        "--name",
         _AzureNodePoolName(nodepool_config.name),
-        '--labels',
-        f'pkb_nodepool={nodepool_config.name}',
+        "--labels",
+        f"pkb_nodepool={nodepool_config.name}",
     ] + self._GetNodeFlags(nodepool_config)
     vm_util.IssueCommand(cmd, timeout=600)
 
@@ -240,23 +244,21 @@ class AksCluster(container_service.KubernetesCluster):
   ) -> List[str]:
     """Common flags for create and nodepools add."""
     args = [
-        '--node-vm-size',
+        "--node-vm-size",
         nodepool_config.machine_type,
     ] + self.resource_group.args
     node_count = nodepool_config.num_nodes
     if self._IsAutoscalerEnabled():
       node_count = max(self.min_nodes, node_count)
       node_count = min(self.max_nodes, node_count)
-    args += [f'--node-count={node_count}']
+    args += [f"--node-count={node_count}"]
     if self.default_nodepool.zone and self.default_nodepool.zone != self.region:
-      zones = ' '.join(
-          zone[-1] for zone in self.default_nodepool.zone.split(',')
-      )
-      args += ['--zones', zones]
+      zones = " ".join(zone[-1] for zone in self.default_nodepool.zone.split(","))
+      args += ["--zones", zones]
     if self.default_nodepool.disk_size:
-      args += ['--node-osdisk-size', str(self.default_nodepool.disk_size)]
+      args += ["--node-osdisk-size", str(self.default_nodepool.disk_size)]
     if self.cluster_version:
-      args += ['--kubernetes-version', self.cluster_version]
+      args += ["--kubernetes-version", self.cluster_version]
     return args
 
   def _Exists(self):
@@ -266,9 +268,9 @@ class AksCluster(container_service.KubernetesCluster):
     stdout, _, _ = vm_util.IssueCommand(
         [
             azure.AZURE_PATH,
-            'aks',
-            'show',
-            '--name',
+            "aks",
+            "show",
+            "--name",
             self.name,
         ]
         + self.resource_group.args,
@@ -276,7 +278,7 @@ class AksCluster(container_service.KubernetesCluster):
     )
     try:
       cluster = json.loads(stdout)
-      self.node_resource_group = cluster['nodeResourceGroup']
+      self.node_resource_group = cluster["nodeResourceGroup"]
       return True
     except ValueError:
       return False
@@ -306,61 +308,70 @@ class AksCluster(container_service.KubernetesCluster):
     if self.container_registry:
       attach_registry_cmd = [
           azure.AZURE_PATH,
-          'aks',
-          'update',
-          '--name',
+          "aks",
+          "update",
+          "--name",
           self.name,
-          '--resource-group',
+          "--resource-group",
           self.resource_group.name,
-          '--attach-acr',
+          "--attach-acr",
           self.container_registry.name,
       ]
       vm_util.IssueCommand(attach_registry_cmd)
-  
+
   def _PostCreate(self):
     """Tags the cluster resource group."""
     super()._PostCreate()
     set_tags_cmd = [
         azure.AZURE_PATH,
-        'group',
-        'update',
-        '-g',
+        "group",
+        "update",
+        "-g",
         self.node_resource_group,
-        '--set',
+        "--set",
         util.GetTagsJson(self.resource_group.timeout_minutes),
     ]
     vm_util.IssueCommand(set_tags_cmd)
     self._AttachContainerRegistry()
 
-  def _IsReady(self):
-    """Returns True if the cluster is ready."""
-    vm_util.IssueCommand(
-        [
-            azure.AZURE_PATH,
-            'aks',
-            'get-credentials',
-            '--admin',
-            '--name',
-            self.name,
-            '--file',
-            FLAGS.kubeconfig,
-        ]
-        + self.resource_group.args
-    )
-    version_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'version']
-    _, _, retcode = vm_util.IssueCommand(version_cmd, raise_on_failure=False)
-    if retcode:
-      return False
-    # POD creation will fail until the default service account is created.
-    get_cmd = [
-        FLAGS.kubectl,
-        '--kubeconfig',
+  def _GetCredentials(self, use_admin: bool) -> bool:
+    """Helper method to get credentials and check service account readiness.
+
+    Args:
+        use_admin (bool): Whether to use the `--admin` flag in the `aks get-credentials` command.
+
+    Returns:
+        bool: True if the default service account exists, False otherwise.
+    """
+    # Fetch Kubernetes credentials
+    cmd = [
+        azure.AZURE_PATH,
+        "aks",
+        "get-credentials",
+        "--name",
+        self.name,
+        "--file",
         FLAGS.kubeconfig,
-        'get',
-        'serviceAccounts',
     ]
-    stdout, _, _ = vm_util.IssueCommand(get_cmd)
-    return 'default' in stdout
+    if use_admin:
+      cmd.append("--admin")
+    cmd += self.resource_group.args
+    vm_util.IssueCommand(cmd)
+
+    # Check for default service account. POD creation will fail until the default service account is created.
+    get_service_account_cmd = [
+        FLAGS.kubectl,
+        "--kubeconfig",
+        FLAGS.kubeconfig,
+        "get",
+        "serviceAccounts",
+    ]
+    stdout, _, _ = vm_util.IssueCommand(get_service_account_cmd)
+    return "default" in stdout
+
+  def _IsReady(self) -> bool:
+    """Returns True if the cluster is ready."""
+    return self._GetCredentials(use_admin=True)
 
   def _CreateDependencies(self):
     """Creates the resource group."""
@@ -376,7 +387,7 @@ class AksCluster(container_service.KubernetesCluster):
     """Get the default storage class for the provider."""
     # https://docs.microsoft.com/en-us/azure/aks/csi-storage-drivers
     # Premium_LRS
-    return 'managed-csi-premium'
+    return "managed-csi-premium"
 
   def ResizeNodePool(
       self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
@@ -384,14 +395,14 @@ class AksCluster(container_service.KubernetesCluster):
     """Change the number of nodes in the node pool."""
     cmd = [
         azure.AZURE_PATH,
-        'aks',
-        'nodepool',
-        'scale',
-        '--cluster-name',
+        "aks",
+        "nodepool",
+        "scale",
+        "--cluster-name",
         self.name,
-        '--name',
+        "--name",
         _AzureNodePoolName(node_pool),
-        f'--node-count={new_size}',
+        f"--node-count={new_size}",
     ] + self.resource_group.args
     vm_util.IssueCommand(cmd)
 
@@ -399,15 +410,15 @@ class AksCluster(container_service.KubernetesCluster):
     """Get node pool names for the cluster."""
     cmd = [
         azure.AZURE_PATH,
-        'aks',
-        'nodepool',
-        'list',
-        '--cluster-name',
+        "aks",
+        "nodepool",
+        "list",
+        "--cluster-name",
         self.name,
     ] + self.resource_group.args
     stdout, _, _ = vm_util.IssueCommand(cmd)
     nodepools = json.loads(stdout)
-    return [nodepool['name'] for nodepool in nodepools]
+    return [nodepool["name"] for nodepool in nodepools]
 
 
 class AksAutomaticCluster(AksCluster):
@@ -420,27 +431,27 @@ class AksAutomaticCluster(AksCluster):
   """
 
   CLOUD = provider_info.AZURE
-  CLUSTER_TYPE = 'Auto'
+  CLUSTER_TYPE = "Auto"
 
   def _Create(self):
     """Creates the Automatic AKS cluster with tags."""
     tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
-    tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
+    tags_list = [f"{k}={v}" for k, v in tags_dict.items()]
     cmd = [
         azure.AZURE_PATH,
-        'aks',
-        'create',
-        '--name',
+        "aks",
+        "create",
+        "--name",
         self.name,
-        '--location',
+        "--location",
         self.region,
-        '--ssh-key-value',
+        "--ssh-key-value",
         vm_util.GetPublicKeyPath(),
-        '--resource-group',
+        "--resource-group",
         self.resource_group.name,
-        '--sku',
-        'automatic',
-        '--tags',
+        "--sku",
+        "automatic",
+        "--tags",
     ] + tags_list
     vm_util.IssueCommand(
         cmd,
@@ -448,51 +459,26 @@ class AksAutomaticCluster(AksCluster):
         timeout=1800,
     )
 
-  def _IsReady(self):
+  def _IsReady(self) -> bool:
     """Returns True if the cluster is ready."""
     # Check provisioning state
     show_cmd = [
-          azure.AZURE_PATH,
-          'aks',
-          'show',
-          '--name',
-          self.name,
-        ] + self.resource_group.args
-    
+        azure.AZURE_PATH,
+        "aks",
+        "show",
+        "--name",
+        self.name,
+    ] + self.resource_group.args
+
     stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
     try:
-        cluster = json.loads(stdout)
-        if cluster.get('provisioningState') != 'Succeeded':
-            return False
-    except Exception:
+      cluster = json.loads(stdout)
+      if cluster.get("provisioningState") != "Succeeded":
         return False
-
-    vm_util.IssueCommand(
-        [
-            azure.AZURE_PATH,
-            'aks',
-            'get-credentials',
-            '--name',
-            self.name,
-            '--file',
-            FLAGS.kubeconfig,
-        ]
-        + self.resource_group.args
-    )
-    version_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'version']
-    _, _, retcode = vm_util.IssueCommand(version_cmd, raise_on_failure=False)
-    if retcode:
+    except Exception:
       return False
-    # POD creation will fail until the default service account is created.
-    get_cmd = [
-        FLAGS.kubectl,
-        '--kubeconfig',
-        FLAGS.kubeconfig,
-        'get',
-        'serviceAccounts',
-    ]
-    stdout, _, _ = vm_util.IssueCommand(get_cmd)
-    return 'default' in stdout
+
+    return self._GetCredentials(use_admin=False)
 
   def _PostCreate(self):
     """Skip the superclass's _PostCreate() method.
