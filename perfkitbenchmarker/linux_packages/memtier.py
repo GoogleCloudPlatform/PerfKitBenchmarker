@@ -293,6 +293,11 @@ MEMTIER_SERVER_SELECTION = flags.DEFINE_enum(
     ),
 )
 MEMTIER_TLS = flags.DEFINE_bool('memtier_tls', False, 'Whether to enable TLS.')
+MEMTIER_DISTINCT_CLIENT_SEED = flags.DEFINE_bool(
+    'memtier_distinct_client_seed',
+    True,
+    'If true, each client will use a distinct seed.',
+)
 
 
 class BuildFailureError(Exception):
@@ -1169,7 +1174,7 @@ def _Run(
       key_minimum=1,
       key_maximum=MEMTIER_KEY_MAXIMUM.value,
       random_data=True,
-      distinct_client_seed=True,
+      distinct_client_seed=MEMTIER_DISTINCT_CLIENT_SEED.value,
       test_time=test_time,
       requests=requests,
       password=password,
@@ -1230,6 +1235,7 @@ def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
       'memtier_run_mode': MEMTIER_RUN_MODE.value,
       'memtier_cluster_mode': MEMTIER_CLUSTER_MODE.value,
       'memtier_tls': MEMTIER_TLS.value,
+      'memtier_distinct_client_seed': MEMTIER_DISTINCT_CLIENT_SEED.value,
   }
   if MEMTIER_DATA_SIZE_LIST.value:
     meta['memtier_data_size_list'] = MEMTIER_DATA_SIZE_LIST.value
