@@ -1,6 +1,6 @@
 repos:
   - repo: https://github.com/google/pyink
-    rev: 23.3.0
+    rev: 24.10.1
     hooks:
       - id: pyink
         # It is recommended to specify the latest version of Python
@@ -8,3 +8,4 @@ repos:
         # pre-commit's default_language_version, see
         # https://pre-commit.com/#top_level-default_language_version
         language_version: python3.12
+        args: [--pyink-indentation=2]
