@@ -19,6 +19,7 @@ from typing import List
 
 from absl import flags
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -301,6 +302,23 @@ class AksCluster(container_service.KubernetesCluster):
       self.event_poller.StopPolling()
     self._deleted = True
 
+  def _AttachContainerRegistry(self):
+    """Attaches the container registry if it exists."""
+    if not self.container_registry:
+      return
+    attach_registry_cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'update',
+        '--name',
+        self.name,
+        '--resource-group',
+        self.resource_group.name,
+        '--attach-acr',
+        self.container_registry.name,
+    ]
+    vm_util.IssueCommand(attach_registry_cmd)
+
   def _PostCreate(self):
     """Tags the cluster resource group."""
     super()._PostCreate()
@@ -314,36 +332,48 @@ class AksCluster(container_service.KubernetesCluster):
         util.GetTagsJson(self.resource_group.timeout_minutes),
     ]
     vm_util.IssueCommand(set_tags_cmd)
+    self._AttachContainerRegistry()
 
-  def _IsReady(self):
-    """Returns True if the cluster is ready."""
-    vm_util.IssueCommand(
-        [
-            azure.AZURE_PATH,
-            'aks',
-            'get-credentials',
-            '--admin',
-            '--name',
-            self.name,
-            '--file',
-            FLAGS.kubeconfig,
-        ]
-        + self.resource_group.args
-    )
-    version_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'version']
-    _, _, retcode = vm_util.IssueCommand(version_cmd, raise_on_failure=False)
-    if retcode:
-      return False
-    # POD creation will fail until the default service account is created.
-    get_cmd = [
+  def _GetCredentials(self, use_admin: bool) -> bool:
+    """Helper method to get credentials and check service account readiness.
+
+    Args:
+        use_admin (bool): Whether to use the `--admin` flag in the `aks
+          get-credentials` command.
+
+    Returns:
+        bool: True if the default service account exists, False otherwise.
+    """
+    # Fetch Kubernetes credentials
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'get-credentials',
+        '--name',
+        self.name,
+        '--file',
+        FLAGS.kubeconfig,
+    ]
+    if use_admin:
+      cmd.append('--admin')
+    cmd += self.resource_group.args
+    vm_util.IssueCommand(cmd)
+
+    # Check for default service account. POD creation will fail until the
+    # default service account is created.
+    get_service_account_cmd = [
         FLAGS.kubectl,
         '--kubeconfig',
         FLAGS.kubeconfig,
         'get',
         'serviceAccounts',
     ]
-    stdout, _, _ = vm_util.IssueCommand(get_cmd)
+    stdout, _, _ = vm_util.IssueCommand(get_service_account_cmd)
     return 'default' in stdout
+
+  def _IsReady(self) -> bool:
+    """Returns True if the cluster is ready."""
+    return self._GetCredentials(use_admin=True)
 
   def _CreateDependencies(self):
     """Creates the resource group."""
@@ -431,12 +461,39 @@ class AksAutomaticCluster(AksCluster):
         timeout=1800,
     )
 
+  def _IsReady(self) -> bool:
+    """Returns True if the cluster is ready."""
+    # Check provisioning state
+    show_cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'show',
+        '--name',
+        self.name,
+    ] + self.resource_group.args
+
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
+    try:
+      provisioning_state = json.loads(stdout).get('provisioningState')
+      if provisioning_state == 'Failed':
+        raise errors.Resource.CreationError(
+            'Cluster provisioning failed.'
+        )
+      if provisioning_state != 'Succeeded':
+        return False
+    except json.JSONDecodeError:
+      return False
+
+    return self._GetCredentials(use_admin=False)
+
   def _PostCreate(self):
     """Skip the superclass's _PostCreate() method.
 
-    Needed as the node_resource_group doesn't exist for Automatic clusters.
+    Needed as the node_resource_group is pre-configured and fully managed in
+    Automatic clusters
     """
     super(container_service.KubernetesCluster, self)._PostCreate()
+    self._AttachContainerRegistry()
 
 
 def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
