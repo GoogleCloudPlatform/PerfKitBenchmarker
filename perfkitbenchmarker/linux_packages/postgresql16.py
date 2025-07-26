@@ -43,8 +43,8 @@ SHARED_BUFFERS_CONF = {
     'SIZE_42GB': {
         'shared_buffers': '42GB',
         'effective_cache_size': '89.6GB',
-        'max_memory': '119.5GB',
-        'nr_hugepages': '21504',
+        'max_memory': '108.8G',
+        'nr_hugepages': '23000',
     },
 }
 OS_DEPENDENT_DEFAULTS = {
