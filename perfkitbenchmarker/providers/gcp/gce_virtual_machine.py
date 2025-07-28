@@ -1579,6 +1579,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     )
     cmd.Issue()
 
+  def GetVNUMASplitValue(self) -> int | None:
+    """Returns the vNUMA split value for this VM.
+
+    This will only work for N-series VMs within GCE.
+    """
+    if self.numa_node_count and self.machine_type.lower().startswith('n'):
+      return self.num_cpus // self.numa_node_count
+    return None
+
 
 class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
   """Class supporting Linux GCE virtual machines.
