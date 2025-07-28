@@ -540,7 +540,6 @@ class AwsDisk(disk.BaseDisk):
     try:
       self.create_disk_start_time = time.time()
       stdout, _, _ = vm_util.IssueCommand(create_cmd)
-      self.create_disk_end_time = time.time()
     except errors.VmUtil.IssueCommandError as error:
       error_message = str(error)
       is_quota_error = 'MaxIOPSLimitExceeded' in error_message
@@ -550,6 +549,8 @@ class AwsDisk(disk.BaseDisk):
 
     response = json.loads(stdout)
     self.id = response['VolumeId']
+    self._WaitUntilAvailable()
+    self.create_disk_end_time = time.time()
     util.AddDefaultTags(self.id, self.region)
 
   def _Delete(self):
@@ -570,8 +571,8 @@ class AwsDisk(disk.BaseDisk):
     )
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
-  def _Exists(self):
-    """Returns true if the disk exists."""
+  def _GetStatus(self):
+    """Gets the state of the disk."""
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-volumes',
@@ -585,8 +586,25 @@ class AwsDisk(disk.BaseDisk):
     if not volumes:
       return False
     status = volumes[0]['State']
+    return status
+
+  def _Exists(self):
+    """Returns true if the disk exists."""
+    status = self._GetStatus()
     assert status in VOLUME_KNOWN_STATUSES, status
     return status in VOLUME_EXISTS_STATUSES
+
+  @vm_util.Retry(
+      poll_interval=1,
+      log_errors=True,
+      retryable_exceptions=(AwsStateRetryableError,),
+  )
+  def _WaitUntilAvailable(self):
+    """Returns if the state of the disk is available."""
+    status = self._GetStatus()
+    if status != 'available':
+      raise AwsStateRetryableError()
+    return
 
   @vm_util.Retry(
       poll_interval=0.5,
