@@ -511,12 +511,14 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         secret_file.seek(0)
         secret_file.truncate()
 
-    created_resources = self.cluster.ApplyManifest(
-        'container/kubernetes_ai_inference/huggingface_token_secret.yaml.j2',
-        encode_token=base64.b64encode(
-            self.huggingface_token.encode('utf-8')
-        ).decode('utf-8'),
-        should_log_file=False,
+    created_resources = list(
+        self.cluster.ApplyManifest(
+            'container/kubernetes_ai_inference/huggingface_token_secret.yaml.j2',
+            encode_token=base64.b64encode(
+                self.huggingface_token.encode('utf-8')
+            ).decode('utf-8'),
+            should_log_file=False,
+        )
     )
     self.created_resources.extend(created_resources)
 
@@ -530,12 +532,14 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         'components': self.spec.catalog_components,
         **self.spec.extra_deployment_args,
     }
-    created_resources = self.cluster.ApplyManifest(
-        'container/kubernetes_ai_inference/serving_catalog_cli.yaml.j2',
-        image_repo=FLAG_IMAGE_REPO.value,
-        generate_args=' '.join(
-            [f'--{k} {v}' for k, v in generate_args.items()]
-        ),
+    created_resources = list(
+        self.cluster.ApplyManifest(
+            'container/kubernetes_ai_inference/serving_catalog_cli.yaml.j2',
+            image_repo=FLAG_IMAGE_REPO.value,
+            generate_args=' '.join(
+                [f'--{k} {v}' for k, v in generate_args.items()]
+            ),
+        )
     )
 
     job_resource = next(it for it in created_resources if it.startswith('job'))
@@ -728,8 +732,10 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       )
 
     try:
-      adapter_resources = self.cluster.ApplyManifest(
-          'container/kubernetes_ai_inference/custom-metrics-stackdriver-adapter.yaml'
+      adapter_resources = list(
+          self.cluster.ApplyManifest(
+              'container/kubernetes_ai_inference/custom-metrics-stackdriver-adapter.yaml'
+          )
       )
       self.created_resources.extend(adapter_resources)
       for deployment in filter(
@@ -745,14 +751,17 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
     self.cluster.DeleteResource(self.hpa_name, ignore_not_found=True)
     try:
-      created_resources = self.cluster.ApplyManifest(
-          'container/kubernetes_ai_inference/hpa.custom_metric.yaml.j2',
-          hpa_min_replicas=self.spec.hpa_min_replicas,
-          hpa_max_replicas=self.spec.hpa_max_replicas,
-          custom_metric_name=self.spec.hpa_custom_metric_name,
-          hpa_target_value=self.spec.hpa_target_value,
-          deployment_name=self.deployment_metadata['metadata']['name'],
-          hpa_stabilization_window_seconds=self.spec.deployment_timeout + 120,
+      created_resources = list(
+          self.cluster.ApplyManifest(
+              'container/kubernetes_ai_inference/hpa.custom_metric.yaml.j2',
+              hpa_min_replicas=self.spec.hpa_min_replicas,
+              hpa_max_replicas=self.spec.hpa_max_replicas,
+              custom_metric_name=self.spec.hpa_custom_metric_name,
+              hpa_target_value=self.spec.hpa_target_value,
+              deployment_name=self.deployment_metadata['metadata']['name'],
+              hpa_stabilization_window_seconds=self.spec.deployment_timeout
+              + 120,
+          )
       )
       self.created_resources.extend(created_resources)
       for hpa in filter(
@@ -818,8 +827,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     ) as f:
       f.write(inference_server_manifest)
       f.flush()
-      created_resources = self.cluster.ApplyManifest(
-          f.name, should_log_file=False
+      created_resources = list(
+          self.cluster.ApplyManifest(f.name, should_log_file=False)
       )
       self.created_resources.extend(created_resources)
 
