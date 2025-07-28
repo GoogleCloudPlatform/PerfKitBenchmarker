@@ -244,7 +244,6 @@ class BenchmarkSpec:
     self.BenchmarkPrepare = benchmark_module.Prepare
     self.BenchmarkRun = benchmark_module.Run
     self.BenchmarkCleanup = benchmark_module.Cleanup
-
     # Set the current thread's BenchmarkSpec object to this one.
     context.SetThreadBenchmarkSpec(self)
 
@@ -293,8 +292,9 @@ class BenchmarkSpec:
 
   def ConstructResources(self):
     """Constructs the resources for the benchmark."""
-    self.ConstructContainerCluster()
+    # Put registry first, as it can be needed by cluster.
     self.ConstructContainerRegistry()
+    self.ConstructContainerCluster()
     # dpb service needs to go first, because it adds some vms.
     self.ConstructDpbService()
     self.ConstructCluster()
@@ -325,6 +325,7 @@ class BenchmarkSpec:
     """Create the container cluster."""
     if self.config.container_cluster is None:
       return
+
     cloud = self.config.container_cluster.cloud
     cluster_type = self.config.container_cluster.type
     providers.LoadProvider(cloud)
@@ -334,6 +335,10 @@ class BenchmarkSpec:
     self.container_cluster = container_cluster_class(
         self.config.container_cluster
     )
+
+    if self.container_registry:
+      self.container_cluster.SetContainerRegistry(self.container_registry)
+
     self.resources.append(self.container_cluster)
 
   def ConstructCluster(self):
