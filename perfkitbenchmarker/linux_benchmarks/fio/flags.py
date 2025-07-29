@@ -120,7 +120,7 @@ FIO_RUNTIME = flags.DEFINE_integer(
 )
 FIO_RAMPTIME = flags.DEFINE_integer(
     'fio_ramptime',
-    10,
+    120,
     'The number of seconds to run the specified workload '
     'before logging any performance numbers',
     lower_bound=0,

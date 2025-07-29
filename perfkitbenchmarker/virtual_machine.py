@@ -1294,5 +1294,8 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
   def GetNumTeardownSkippedVms(self) -> int | None:
     """Returns the number of lingering VMs in this VM's zone."""
 
+  def GetVNUMASplitValue(self) -> int | None:
+    """Returns the vNUMA split value (vCPUs/Num of vNUMA nodes) for the VM."""
+    return None
 
 VirtualMachine = typing.TypeVar('VirtualMachine', bound=BaseVirtualMachine)

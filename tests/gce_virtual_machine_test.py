@@ -404,6 +404,25 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(fake_rets):
       self.assertEqual(vm._Exists(), expected)
 
+  @parameterized.named_parameters(
+      ('n2_standard_2', 'n2-standard-2', 2, 2, 1),
+      ('numa_node_count_0', 'n2-standard-4', 4, 0, None),
+      ('c3-standard-4', 'c3-standard-4', 8, 4, None),
+      ('n2_standard_96', 'n2-standard-96', 96, 8, 12),
+  )
+  def testGetVNUMASplitValue(
+      self, machine_type, num_cpus, numa_node_count, expected
+  ):
+    vm = pkb_common_test_case.TestGceVirtualMachine(
+        gce_virtual_machine.GceVmSpec(
+            _COMPONENT,
+            machine_type=machine_type,
+        )
+    )
+    vm.num_cpus = num_cpus
+    vm.numa_node_count = numa_node_count
+    self.assertEqual(vm.GetVNUMASplitValue(), expected)
+
 
 def _CreateFakeDiskMetadata(image, fake_disk):
   fake_disk = copy.copy(fake_disk)
