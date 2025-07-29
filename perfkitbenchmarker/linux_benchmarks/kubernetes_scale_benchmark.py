@@ -157,6 +157,8 @@ def ScaleUpPods(
   if virtual_machine.GPU_COUNT.value:
     # Use nvidia-smi to validate NVIDIA_GPU is available.
     command = ['sh', '-c', 'nvidia-smi && sleep 3600']
+  if CONTAINER_IMAGE.value:
+    command = ['sh', '-c', 'sleep infinity']
 
   # Request X new pods via YAML apply.
   num_new_pods = NUM_PODS.value
