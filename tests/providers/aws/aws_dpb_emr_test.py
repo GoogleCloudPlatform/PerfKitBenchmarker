@@ -173,6 +173,7 @@ class AwsDpbEmrTestCase(pkb_common_test_case.PkbCommonTestCase):
         'dpb_job_properties': '',
         'dpb_cluster_properties': '',
         'dpb_dynamic_allocation': True,
+        'dpb_extra_jars': '',
     }
     self.assertEqual(cluster.GetResourceMetadata(), expected_metadata)
 
