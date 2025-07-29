@@ -8,4 +8,4 @@ repos:
         # pre-commit's default_language_version, see
         # https://pre-commit.com/#top_level-default_language_version
         language_version: python3.12
-        args: [--pyink-indentation=2]
+        args: [--pyink-indentation=2, --pyink-use-majority-quotes, --unstable, --line-length=80]
