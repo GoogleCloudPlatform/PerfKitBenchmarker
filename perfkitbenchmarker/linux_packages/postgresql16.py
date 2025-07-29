@@ -92,33 +92,7 @@ def ConfigureSystemSettings(vm):
   vm.RemoteCommand(
       'echo "session    required pam_limits.so" | sudo tee -a /etc/pam.d/login'
   )
-  thp_append = 'sudo tee -a /usr/lib/systemd/system/disable-thp.service'
-  vm.RemoteCommand('sudo touch /usr/lib/systemd/system/disable-thp.service')
-  disable_huge_pages = f"""[Unit]
-    Description=Disable Transparent Huge Pages (THP)
-    DefaultDependencies=no
-    After=sysinit.target local-fs.target
-    Before={GetOSDependentDefaults(vm.OS_TYPE)["postgres_service_name"]}.service
-
-    [Service]
-    Type=oneshot
-    ExecStart=/bin/sh -c 'echo never | tee /sys/kernel/mm/transparent_hugepage/enabled > /dev/null'
-
-    [Install]
-    WantedBy=basic.target
-    """
-  vm.RemoteCommand(f'echo "{disable_huge_pages}" | {thp_append}')
-  vm.RemoteCommand(
-      'sudo chown root:root /usr/lib/systemd/system/disable-thp.service'
-  )
-  vm.RemoteCommand(
-      'sudo chmod 0600 /usr/lib/systemd/system/disable-thp.service'
-  )
-  vm.RemoteCommand('sudo systemctl daemon-reload')
-  vm.RemoteCommand(
-      'sudo systemctl enable disable-thp.service && sudo systemctl start'
-      ' disable-thp.service'
-  )
+  vm.RemoteCommand('sudo cat /sys/kernel/mm/transparent_hugepage/enabled')
   vm.Reboot()
 
 
