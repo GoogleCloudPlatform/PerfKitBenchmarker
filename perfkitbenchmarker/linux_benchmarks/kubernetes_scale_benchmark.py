@@ -54,6 +54,12 @@ CPUS_PER_POD = flags.DEFINE_string(
 MEMORY_PER_POD = flags.DEFINE_string(
     'kubernetes_scale_pod_memory', '250M', 'Memory limit per pod'
 )
+CONTAINER_IMAGE = flags.DEFINE_string(
+    'kubernetes_scale_container_image',
+    None,
+    'The container image to use for the Kubernetes scale benchmark.'
+    'If not specified, the default image will be used.',
+)
 
 MANIFEST_TEMPLATE = 'container/kubernetes_scale/kubernetes_scale.yaml.j2'
 DEFAULT_IMAGE = 'k8s.gcr.io/pause:3.1'
@@ -64,6 +70,8 @@ def _GetImage() -> str:
   """Get the image for the scale deployment."""
   if virtual_machine.GPU_COUNT.value:
     return NVIDIA_GPU_IMAGE
+  if CONTAINER_IMAGE.value:
+    return CONTAINER_IMAGE.value
   return DEFAULT_IMAGE
 
 
@@ -294,13 +302,16 @@ def _GetResourceStatusConditions(
     A list of status condition, where each condition is a dict with type &
     lastTransitionTime.
   """
-  out, _, _ = container_service.RunRetryableKubectlCommand([
-      'get',
-      resource_type,
-      resource_name,
-      '-o',
-      'jsonpath={.status.conditions[*]}',
-  ], timeout=60 * 2)  # 2 minutes; should be a pretty fast call.
+  out, _, _ = container_service.RunRetryableKubectlCommand(
+      [
+          'get',
+          resource_type,
+          resource_name,
+          '-o',
+          'jsonpath={.status.conditions[*]}',
+      ],
+      timeout=60 * 2,
+  )  # 2 minutes; should be a pretty fast call.
   # Turn space separated individual json objects into a single json array.
   conditions_str = '[' + out.replace('} {', '},{') + ']'
   conditions = json.loads(conditions_str)
