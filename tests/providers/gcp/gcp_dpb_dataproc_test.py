@@ -239,6 +239,7 @@ class GcpDpbDataprocTestCase(pkb_common_test_case.PkbCommonTestCase):
         'dpb_dynamic_allocation': True,
         'dataproc_engine': 'default',
         'dataproc_lightning_engine_runtime': 'default',
+        'dpb_extra_jars': '',
     }
     self.assertEqual(cluster.GetResourceMetadata(), expected_metadata)
 

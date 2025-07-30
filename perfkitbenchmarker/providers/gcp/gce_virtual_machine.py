@@ -822,12 +822,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       metadata.update([self._PreemptibleMetadataKeyValue()])
 
     cmd.flags['metadata'] = util.FormatTags(metadata)
-    # Always explicitly pass local SSD config to validate
-    # gce_disk.FIXED_SSD_MACHINE_TYPES.
-    # If we auto-detect the number of SSDs, only pass this on gens 1 & 2.
-    cmd.flags['local-ssd'] = [
-        'interface={}'.format(self.ssd_interface)
-    ] * self.max_local_disks
+
+    if (
+        self.machine_type is None
+        or self.machine_type not in gce_disk.FIXED_SSD_MACHINE_TYPES
+    ):
+      # Append the `--local-ssd` args only when it's a customized or old-gen VM.
+      cmd.flags['local-ssd'] = [
+          'interface={}'.format(self.ssd_interface)
+      ] * self.max_local_disks
 
     cmd.flags.update(self.create_disk_strategy.GetCreationCommand())
 

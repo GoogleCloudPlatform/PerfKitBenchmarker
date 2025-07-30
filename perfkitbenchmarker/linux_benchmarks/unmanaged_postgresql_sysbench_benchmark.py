@@ -91,6 +91,7 @@ unmanaged_postgresql_sysbench:
     sysbench_run_threads: 1,64,128,256,512,1024,2048
     sysbench_run_seconds: 300
     sysbench_load_threads: 128
+    enable_transparent_hugepages: False
 """
 
 # The database name is used to create a database on the server.

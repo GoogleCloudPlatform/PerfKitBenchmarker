@@ -78,8 +78,10 @@ class BaseWGServingInferenceServer(
   deployment_metadata: Optional[Dict[str, Any]]
   service_name: Optional[str]
   model_id: Optional[str]
+  model_id_from_path: Optional[str]
   tokenizer_id: Optional[str]
   service_port: Optional[int]
+  app_selector: Optional[str]
   spec: wg_serving_inference_server_spec.WGServingInferenceServerConfigSpec
 
   def __init__(
@@ -376,16 +378,15 @@ class BaseWGServingInferenceServer(
         )
     return samples
 
-  def GetInferenceServerLogs(self) -> str:
-    """Returns the logs of the inference server."""
-    deployment_name = self.GetInferenceServerDeploymentName()
-    logs_cmd = [
+  def GetInferenceServerLogsFromPod(self, pod_name: str) -> str:
+    """Returns the inference server logs from the pod."""
+    log_cmd = [
         'logs',
-        f'deployment/{deployment_name}',
+        pod_name,
         '-c',
         'inference-server',
     ]
-    stdout, _, _ = container_service.RunKubectlCommand(logs_cmd)
+    stdout, _, _ = container_service.RunKubectlCommand(log_cmd)
     return stdout
 
   def GetInferenceServerDeploymentName(self) -> str:
@@ -580,6 +581,10 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           for env_var in inference_server_container.get('env', [])
           if env_var.get('name') == 'MODEL_ID'
       ))
+      if self.spec.extra_deployment_args:
+        model_path = self.spec.extra_deployment_args.get('model-path', None)
+        if model_path:
+          self.model_id_from_path = '/data/models/' + model_path
     except (KeyError, IndexError, TypeError, StopIteration) as e:
       logging.exception(
           'Error parsing MODEL_ID from deployment %s, Please ensure the'

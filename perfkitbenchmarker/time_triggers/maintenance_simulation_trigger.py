@@ -70,7 +70,7 @@ SIMULATE_MAINTENANCE_DELAY = flags.DEFINE_integer(
 
 MAINTENANCE_DEGRADATION_WINDOW = flags.DEFINE_float(
     'maintenance_degradation_window',
-    0,
+    2,
     'Multiple of LM duration to consider the degradation after LM starts.',
 )
 

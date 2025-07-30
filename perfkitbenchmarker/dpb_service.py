@@ -147,7 +147,12 @@ _DYNAMIC_ALLOCATION = flags.DEFINE_bool(
     'all cluster executors to an incoming job. Setting this off is only '
     'supported by Dataproc and EMR (non-serverless versions).',
 )
-
+DPB_EXTRA_JARS = flags.DEFINE_list(
+    'dpb_extra_jars',
+    [],
+    'Pass additional object storage paths to jars to be loaded when submitting'
+    ' a job. Only supported on Dataproc as of now.',
+)
 
 FLAGS = flags.FLAGS
 
@@ -538,6 +543,7 @@ class BaseDpbService(resource.BaseResource):
         ),
         'dpb_cluster_properties': ','.join(self.GetClusterProperties()),
         'dpb_dynamic_allocation': _DYNAMIC_ALLOCATION.value,
+        'dpb_extra_jars': ','.join(DPB_EXTRA_JARS.value),
     }
 
   def _CreateDependencies(self):

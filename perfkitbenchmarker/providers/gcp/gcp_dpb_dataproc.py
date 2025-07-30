@@ -277,6 +277,9 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     if FLAGS.gce_network_name:
       cmd.flags['network'] = FLAGS.gce_network_name[0]
 
+    if gcp_flags.GCE_VM_SERVICE_ACCOUNT.value:
+      cmd.flags['service-account'] = gcp_flags.GCE_VM_SERVICE_ACCOUNT.value
+
     metadata = util.GetDefaultTags()
     metadata.update(flag_util.ParseKeyValuePairs(FLAGS.gcp_instance_metadata))
     if gcp_flags.SPARK_BIGQUERY_CONNECTOR_URL.value:
@@ -384,7 +387,7 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
-    job_jars = job_jars or []
+    job_jars = (job_jars or []) + dpb_service.DPB_EXTRA_JARS.value
     if classname:
       if jarfile:
         # Dataproc does not support both a main class and a main jar so just
