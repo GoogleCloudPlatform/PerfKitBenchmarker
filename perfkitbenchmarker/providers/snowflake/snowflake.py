@@ -68,14 +68,20 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     self.client_vm.Install('openjdk')
 
     # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedPackageData(
-        package_name, [self.jdbc_client], ''
-    )
+    if FLAGS.snowflake_jdbc_client_jar:
+      self.client_vm.PushFile(FLAGS.snowflake_jdbc_client_jar)
+    else:
+      self.client_vm.InstallPreprovisionedPackageData(
+          package_name, [self.jdbc_client], ''
+      )
 
-    # Push the credentials to the working directory on client vm
-    self.client_vm.InstallPreprovisionedPackageData(
-        package_name, ['snowflake_keyfile.p8'], ''
-    )
+    # Push the private key to the working directory on client vm
+    if FLAGS.snowflake_jdbc_key_file:
+      self.client_vm.PushFile(FLAGS.snowflake_jdbc_key_file)
+    else:
+      self.client_vm.InstallPreprovisionedPackageData(
+          package_name, ['snowflake_keyfile.p8'], ''
+      )
 
   def ExecuteQuery(
       self, query_name: str, print_results: bool = True
