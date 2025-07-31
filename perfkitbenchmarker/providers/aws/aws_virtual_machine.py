@@ -987,6 +987,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'hpc6a.48xlarge',
         'hpc6id.32xlarge',
         'hpc7a.96xlarge',
+        'hpc7g.16xlarge',
     ):
       query_cmd = util.AWS_PREFIX + [
           'ec2',
