@@ -134,7 +134,7 @@ def _CreateIndex(
 def _MeasureBuildingTime(
     client_interface: edw_service.EdwClientInterface,
     results: list[sample.Sample],
-    timeout: int = 120,
+    timeout: int = 1200,
 ) -> None:
   """Measures the time it takes for the index to be fully built(reaching 100% coverage).
 
