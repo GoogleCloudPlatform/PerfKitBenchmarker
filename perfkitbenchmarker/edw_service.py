@@ -124,6 +124,17 @@ flags.DEFINE_enum(
     ['JDBC'],
     'The Runtime Interface used when interacting with Snowflake.',
 )
+flags.DEFINE_string(
+    'snowflake_jdbc_client_jar',
+    None,
+    'Local location of the snowflake_jdbc_client_jar.',
+)
+flags.DEFINE_string(
+    'snowflake_jdbc_key_file',
+    None,
+    'Local location of the Private key file for Snowflake authentication. '
+    'Must be named snowflake_keyfile.p8',
+)
 flags.DEFINE_boolean(
     'edw_get_service_auxiliary_metrics',
     'False',
