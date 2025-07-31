@@ -24,5 +24,5 @@ RUN git clone https://github.com/GoogleCloudPlatform/PerfKitBenchmarker.git
 RUN python3.11 -m pip install -r $HOME/PerfKitBenchmarker/requirements.txt
 
 # Run PKB directly, example:
-# docker run -v ~/.config:/root/.config -it us-east1-docker.pkg.dev/p3rf-gke/public/pkb-for-gcp --project=my-project --benchmarks=iperf --machine_type=f1-micro
+# docker run -v ~/.config:/root/.config -it us-docker.pkg.dev/p3rf-gke/public/pkb-for-gcp --project=my-project --benchmarks=iperf --machine_type=f1-micro
 ENTRYPOINT ["python3.11", "./PerfKitBenchmarker/pkb.py"]
