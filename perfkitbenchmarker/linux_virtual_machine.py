@@ -2180,13 +2180,12 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
   def _IsSmtEnabled(self):
     """Whether simultaneous multithreading (SMT) is enabled on the vm.
 
-    Looks for the "nosmt" attribute in the booted linux kernel command line
-    parameters.
+    Checks if Thread(s) per Core is greater than 1.
 
     Returns:
       Whether SMT is enabled on the vm.
     """
-    return not bool(re.search(r'\bnosmt\b', self.kernel_command_line))
+    return self.CheckLsCpu().threads_per_core > 1
 
   @property
   def cpu_vulnerabilities(self) -> CpuVulnerabilities:

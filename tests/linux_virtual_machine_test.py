@@ -498,6 +498,13 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       'Thread(s) per core: 1',
       'Socket(s): 1',
   ])
+  lscpu_output_smt_enabled = '\n'.join([
+      'NUMA node(s): 1',
+      'Core(s) per socket: 1',
+      'Thread(s) per core: 2',
+      'Socket(s): 1',
+  ])
+
   normal_boot_responses = {
       'cat /proc/sys/net/ipv4/tcp_congestion_control': 'cubic',
       'grep PRETTY_NAME /etc/os-release': f'PRETTY_NAME="{os_info}"',
@@ -548,19 +555,21 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     return vm
 
   @parameterized.named_parameters(
-      ('hasSMT_want_real', 32, 'regular', 16),
-      ('noSMT_want_real', 32, 'nosmt', 32),
+      ('hasSMT_want_real', 32, True, 16),
+      ('noSMT_want_real', 32, False, 32),
   )
   def testNumCpusForBenchmarkNoSmt(
-      self, vcpus, kernel_command_line, expected_num_cpus
+      self, vcpus, is_smt_enabled, expected_num_cpus
   ):
     FLAGS['use_numcpu_multi_files'].parse(True)
+    if is_smt_enabled:
+      self.lscpu_output = self.lscpu_output_smt_enabled
     responses = {
         'ls /sys/fs/cgroup/cpuset.cpus.effective >> /dev/null 2>&1 || echo file_not_exist': (
             ''
         ),
         'cat /sys/fs/cgroup/cpuset.cpus.effective': f'0-{vcpus-1}',
-        'cat /proc/cmdline': kernel_command_line,
+        'cat /proc/cmdline': 'regular',
     }
     responses.update(self.normal_boot_responses)
     vm = self.CreateVm(responses, metadata=True)
