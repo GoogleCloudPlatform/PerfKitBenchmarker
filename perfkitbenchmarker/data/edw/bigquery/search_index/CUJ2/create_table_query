@@ -1,0 +1,7 @@
+-- TODO: Remove hardcoded table name
+CREATE TABLE prototype_CUJ2_benchmark_100GB_and_growing
+AS
+SELECT *
+FROM
+  prototype_CUJ1_benchmark_100GB
+LIMIT 133782700
