@@ -88,6 +88,12 @@ _FFMPEG_BUF_SIZE_MULTIPLIER = flags.DEFINE_integer(
     'Multiplier of ffmpeg_max_rate to get the rate control buffer which checks'
     ' to make sure the average bitrate is on target. Default value is 2.',
 )
+_FFMPEG_COPIES = flags.DEFINE_integer(
+    'ffmpeg_copies',
+    9,
+    'Number of duplicate copies to create for each source video before'
+    ' transcoding.',
+)
 
 _FFMPEG_DIR = flags.DEFINE_string(
     'ffmpeg_dir', '', 'Directory (ending in "/") where ffmpeg and ffprobe are '
@@ -227,18 +233,31 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       )
 
     for jobs, threads in itertools.product(jobs_list, threads_list):
+      if _FFMPEG_COPIES.value > 0:
+        duplication_cmd = (
+            "for f in $(ls *.mkv | grep -v '_copy'); do "
+            '  filename="${f%.*}";'
+            '  extension="${f##*.}";'
+            f" for i in $(seq 1 {_FFMPEG_COPIES.value}); do"
+            '    cp "$f" "${filename}_copy${i}.${extension}";'
+            '  done;'
+            'done'
+        )
+        vm.RemoteCommand(f'cd {input_videos_dir} && {duplication_cmd}')
+
       jobs_arg = f'-j{jobs}' if jobs else ''
       threads_arg = f'-threads {threads} '
+      # Sort video largest to smallest to mitigate load imbalance.
       parallel_cmd = (
-          f'parallel {jobs_arg} {_FFMPEG_DIR.value}ffmpeg '
+          f'ls -S *.mkv | parallel {jobs_arg} \'{_FFMPEG_DIR.value}ffmpeg '
           f'{threads_arg} -y {cuda_args} -i {{}} {ffmpeg_args} '
-          '{.}.out.mkv </dev/null >&/dev/null ::: *.mkv'
+          '{.}.out.mkv </dev/null >&/dev/null\''
       )
 
       time_file = '~/parallel.time'
       run_cmd = (
           f'cd {input_videos_dir} && PATH="$HOME/bin:$PATH" /usr/bin/time -f'
-          f' "%e" -o {time_file} {parallel_cmd}'
+          f' "%e" -o {time_file} bash -c "{parallel_cmd}"'
       )
       vm.RemoteCommand(run_cmd)
       total_runtime, _ = vm.RemoteCommand(
@@ -259,43 +278,6 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       if num_files == 0:
         raise ValueError('Number of files is zero.')
 
-      # Get the total size of all transcoded files.
-      total_size_bytes_str, _ = vm.RemoteCommand(
-          f"cd {input_videos_dir} && stat -c%s *.out.mkv | awk '{{sum+=$1}}"
-          " END {print sum}'"
-      )
-      total_size_bytes = int(total_size_bytes_str.strip())
-
-      # Compute aggregate bitrate and average PSNR (Peak Signal-to-Noise Ratio).
-      output_files_str, _ = vm.RemoteCommand(list_files_cmd)
-      output_files = output_files_str.strip().split()
-      total_duration_sec = 0.0
-      psnr_values = []
-      for out_file in output_files:
-        input_file = out_file.replace('.out.mkv', '.mkv')
-        remote_input_path = f'{input_videos_dir}/{input_file}'
-        remote_output_path = f'{input_videos_dir}/{out_file}'
-        duration_cmd = (
-            'PATH="$HOME/bin:$PATH" ffprobe -v error -show_entries'
-            ' format=duration -of default=noprint_wrappers=1:nokey=1'
-            f' "{remote_input_path}"'
-        )
-        duration_str, _ = vm.RemoteCommand(duration_cmd)
-        total_duration_sec += float(duration_str.strip())
-
-        psnr_cmd = (
-            f'PATH="$HOME/bin:$PATH" ffmpeg -i "{remote_output_path}" -i'
-            f' "{remote_input_path}" -lavfi psnr -f null - 2>&1 | grep \'PSNR\''
-            " | awk -F'average:' '{print $2}' | awk '{print $1}'"
-        )
-        psnr_str, _ = vm.RemoteCommand(psnr_cmd)
-        psnr_values.append(float(psnr_str.strip()))
-
-      aggregate_bitrate_kbps = (total_size_bytes * 8) / (
-          total_duration_sec * 1000
-      )
-      average_psnr = sum(psnr_values) / len(psnr_values)
-
       vm.RemoteCommand(f'cd {input_videos_dir} && rm -rf *.out.mkv')
 
       metadata = {
@@ -305,25 +287,15 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
           'parallelism': jobs,
           'threads': threads,
           'ffmpeg_compiled_from_source': FLAGS.build_ffmpeg_from_source,
-          'video_copies': 1,
+          'video_copies': _FFMPEG_COPIES.value,
           'ffmpeg_preset': _FFMPEG_PRESET.value,
           'ffmpeg_crf': _FFMPEG_CRF.value,
           'ffmpeg_max_rate': _FFMPEG_MAX_RATE.value,
-          'average_psnr': average_psnr,
-          'psnr_values': psnr_values,
       }
-      samples.extend([
+      samples.append(
           sample.Sample(
               'Total Transcode Time', total_runtime, 'seconds', metadata
-          ),
-          sample.Sample(
-              'Aggregate Bitrate',
-              round(aggregate_bitrate_kbps, 2),
-              'kbps',
-              metadata,
-          ),
-          sample.Sample('Average PSNR', average_psnr, 'score', metadata),
-      ])
+          ))
   return samples
 
 
