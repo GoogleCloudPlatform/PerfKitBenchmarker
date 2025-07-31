@@ -80,7 +80,7 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec):
   vm = spec.vms[0]
   vm.Install('fio')
   FLAGS['fio_target_mode'].value = _GetFioTargetMode()
-  utils.Prefill(vm, constants.FIO_PATH)
+  utils.PrefillIfEnabled(vm, constants.FIO_PATH)
 
 
 def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:

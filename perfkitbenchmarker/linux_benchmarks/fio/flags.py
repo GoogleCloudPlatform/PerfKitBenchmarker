@@ -227,7 +227,22 @@ FIO_LATENCY_RUN = flags.DEFINE_integer(
 )
 
 FIO_SEPARATE_JOBS_FOR_DISKS = flags.DEFINE_bool(
-    'fio_separate_jobs_for_disks', False, ''
+    'fio_separate_jobs_for_disks', False, 'Run separate fio jobs for each disk.'
+)
+
+FIO_RUN_PARALLEL_JOBS_ON_DISKS = flags.DEFINE_bool(
+    'fio_run_parallel_jobs_on_disks',
+    False,
+    'When fio_separate_jobs_for_disks is true, fio_run_parallel_jobs_on_disks'
+    ' will control if we want to run fio scenario on the disks parallelly or'
+    ' sequentially.',
+)
+
+FIO_TEST_DISK_COUNT = flags.DEFINE_integer(
+    'fio_disk_count',
+    None,
+    'How many disks to run the fio on, used only when'
+    ' --fio_separate_jobs_for_disks is true.',
 )
 
 FIO_OPERATION_TYPE = flags.DEFINE_enum(

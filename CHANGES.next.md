@@ -615,3 +615,4 @@
 -   Add fio max IOPS microbenchmark
 -   Add support for MongoDB PSS (Primary-Secondary-Secondary) setup.
 -   Add flags to allow modifying multiple settings in "mongod.conf".
+-   Add new general purpose fio benchmark for device - fio_raw_device_benchmark
