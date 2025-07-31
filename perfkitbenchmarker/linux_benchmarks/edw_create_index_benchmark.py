@@ -52,6 +52,13 @@ flags.DEFINE_string(
     'Can be absolute or relative to the executable.',
 )
 
+flags.DEFINE_integer(
+    'edw_create_index_benchmark_timeout',
+    600,
+    'Timeout for the edw_create_index_benchmark in seconds. Default is 600'
+    ' seconds',
+)
+
 FLAGS = flags.FLAGS
 
 
@@ -134,7 +141,7 @@ def _CreateIndex(
 def _MeasureBuildingTime(
     client_interface: edw_service.EdwClientInterface,
     results: list[sample.Sample],
-    timeout: int = 120,
+    timeout: int = 600,
 ) -> None:
   """Measures the time it takes for the index to be fully built(reaching 100% coverage).
 
@@ -182,7 +189,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   _CreateIndex(client_interface, results)
 
-  _MeasureBuildingTime(client_interface, results)
+  _MeasureBuildingTime(
+      client_interface, results, FLAGS.edw_create_index_benchmark_timeout
+  )
 
   return results
 
