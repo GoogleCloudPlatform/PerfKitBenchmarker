@@ -746,7 +746,12 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       for deployment in filter(
           lambda it: str(it).startswith('deployment'), adapter_resources
       ):
-        self.cluster.WaitForResource(f'{deployment}', 'available', timeout=600)
+        self.cluster.WaitForResource(
+            f'{deployment}',
+            'available',
+            namespace='custom-metrics',
+            timeout=600,
+        )
     except errors.VmUtil.IssueCommandTimeoutError as e:
       logging.exception(
           'Timeout when enabling HPA, it may be caused by IAM permission issue.'

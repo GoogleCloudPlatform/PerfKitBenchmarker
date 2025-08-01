@@ -64,13 +64,16 @@ def GetAllDiskPaths(disks):
 
 
 def SeparateJobsForDisks(disk_paths):
-  return [
+  disks_list = [
       {
           'index': index,
           'disk_filename': disk_path,
       }
       for index, disk_path in enumerate(disk_paths)
   ]
+  if fio_flags.FIO_TEST_DISK_COUNT.value:
+    return disks_list[:fio_flags.FIO_TEST_DISK_COUNT.value]
+  return disks_list
 
 
 def GetFileAsString(file_path):
@@ -125,6 +128,7 @@ def GenerateJobFile(
       ioengine=fio_flags.FIO_IOENGINE.value,
       runtime=benchmark_params.get('runtime') or fio_flags.FIO_RUNTIME.value,
       ramptime=benchmark_params.get('ramptime') or fio_flags.FIO_RAMPTIME.value,
+      fio_run_parallel_jobs_on_disks=fio_flags.FIO_RUN_PARALLEL_JOBS_ON_DISKS.value,
       scenarios=scenarios,
       direct=int(fio_flags.DIRECT_IO.value),
       disks_list=disks_list,
@@ -161,7 +165,7 @@ def FillDevice(vm, disk, fill_size, exec_path):
   vm.RobustRemoteCommand(command)
 
 
-def Prefill(vm, exec_path):
+def PrefillIfEnabled(vm, exec_path):
   """Prefills the target device or file on the given VM."""
   if len(vm.scratch_disks) > 1 and not AgainstDevice():
     raise errors.Setup.InvalidSetupError(
@@ -256,7 +260,6 @@ def RunTest(vm, exec_path, job_file_string):
   samples = result_parser.ParseResults(
       job_file_string,
       json.loads(stdout),
-      require_merge=fio_flags.FIO_SEPARATE_JOBS_FOR_DISKS.value,
   )
 
   samples.append(

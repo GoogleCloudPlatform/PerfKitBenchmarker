@@ -19,8 +19,6 @@ Lmod: https://lmod.readthedocs.io/en/latest/
  Hierarchical problem."
 """
 
-from perfkitbenchmarker import errors
-
 
 def YumInstall(vm) -> None:
   vm.InstallPackages('Lmod')
@@ -28,30 +26,3 @@ def YumInstall(vm) -> None:
 
 def AptInstall(vm) -> None:
   vm.InstallPackages('lmod')
-  _FixLuaInstall(vm)
-
-
-def _FixLuaInstall(vm) -> None:
-  """Fixes Lua 5.2 install if required.
-
-  https://bugs.launchpad.net/ubuntu/+source/lua-posix/+bug/1752082
-
-  lua-posix package broken in version that comes with Ubuntu1804.  Symlinks
-  lua's posix_c.so to posix.so.
-
-  Args:
-    vm: the remote VM to fix lua install.
-
-  Raises:
-    InvalidSetupError: If lua could not be setup correctly.
-  """
-  # will need to change from 5.2 when necessary
-  lua_dir = '/usr/lib/x86_64-linux-gnu/lua/5.2'
-  lua_posix_c = f'{lua_dir}/posix_c.so'
-  missing_dir_error = f'Lua directory {lua_dir} does not exist'
-  missing_file_error = f'Lua posix_c file {lua_posix_c} missing'
-  if not vm.TryRemoteCommand(f'test -d {lua_dir}'):
-    raise errors.Setup.InvalidSetupError(missing_dir_error)
-  if not vm.TryRemoteCommand(f'test -f {lua_posix_c}'):
-    raise errors.Setup.InvalidSetupError(missing_file_error)
-  vm.RemoteCommand(f'sudo ln -s {lua_posix_c} {lua_dir}/posix.so')

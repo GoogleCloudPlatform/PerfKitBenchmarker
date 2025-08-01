@@ -19,6 +19,7 @@ import time
 
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks.fio import constants as fio_constants
+from perfkitbenchmarker.linux_benchmarks.fio import flags as fio_flags
 
 
 _DATA_DIRECTION = {0: 'read', 1: 'write', 2: 'trim'}
@@ -68,7 +69,6 @@ def ParseResults(
     fio_json_result,
     base_metadata=None,
     skip_latency_individual_stats=False,
-    require_merge=False,
 ):
   """Parse fio json output into samples.
 
@@ -78,23 +78,33 @@ def ParseResults(
     base_metadata: Extra metadata to annotate the samples with.
     skip_latency_individual_stats: Bool. If true, skips pulling latency stats
       that are not aggregate.
-    require_merge: whether the result samples require merging from multiple fio
-      jobs.
-
   Returns:
     A list of sample.Sample objects.
   """
   samples = []
   # The samples should all have the same timestamp because they
   # come from the same fio run.
+  # - If we are running multiple jobs in parallel and using group_reporting,
+  # fio will merge all the jobs output. In that case, we drop the index
+  # number from the job name. For example:
+  # rand_4k_read_100%-io-depth-1-num-jobs-1.0 and
+  # rand_4k_read_100%-io-depth-1-num-jobs-1.1 will be merged into
+  # rand_4k_read_100%-io-depth-1-num-jobs-1
+  # - If we are running jobs in parallel and group_reporting is false,
+  # then Fio won't merge results.
   timestamp = time.time()
+  merge_metadata = fio_flags.FIO_RUN_PARALLEL_JOBS_ON_DISKS.value and int(
+      fio_json_result['global options']['group_reporting']
+  ) and fio_flags.FIO_SEPARATE_JOBS_FOR_DISKS.value
   parameter_metadata = (
-      ParseJobFile(job_file, require_merge) if job_file else dict()
+      ParseJobFile(job_file, merge_metadata) if job_file else dict()
   )
   io_modes = list(_DATA_DIRECTION.values())
-
   for job in fio_json_result['jobs']:
-    job_name = job['jobname'].split('.')[0]
+    if not merge_metadata:
+      job_name = job['jobname']
+    else:
+      job_name = job['jobname'].split('.')[0]
     parameters = {'fio_job': job_name}
     if parameter_metadata:
       parameters.update(parameter_metadata[job_name])

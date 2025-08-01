@@ -1,0 +1,2 @@
+-- TODO: b/435032258 Remove hardcoded table name
+DROP SEARCH INDEX IF EXISTS prototype_CUJ1_benchmark_index ON prototype_CUJ1_benchmark_100GB;

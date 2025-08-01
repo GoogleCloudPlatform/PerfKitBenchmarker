@@ -57,7 +57,7 @@ There are a couple of additional flags needed as compared to Cloud Shell:
 
 That full command looks like: `docker run -v ~/.config:/root/.config -v
 "$(pwd)"/pkb-results:/tmp/perfkitbenchmarker -it
-us-east1-docker.pkg.dev/p3rf-gke/public/pkb-for-gcp --project=your-project
+us-docker.pkg.dev/p3rf-gke/public/pkb-for-gcp --project=your-project
 --benchmarks=iperf --machine_type=f1-micro`
 
 ## Run via Cloud Run Jobs
@@ -85,7 +85,7 @@ Jobs. This requires a fair bit more setup though, basically following
     permissions are needed on any services being tested.
 
 1.  Run: `gcloud run jobs deploy pkb-gcp --image
-    us-east1-docker.pkg.dev/p3rf-gke/public/pkb-for-gcp --task-timeout 24h
+    us-docker.pkg.dev/p3rf-gke/public/pkb-for-gcp --task-timeout 24h
     --service-account=cloud-run-pkb@your-project.iam.gserviceaccount.com
     --region=us-east1`
 

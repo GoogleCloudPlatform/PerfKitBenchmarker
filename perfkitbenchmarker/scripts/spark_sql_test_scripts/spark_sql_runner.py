@@ -168,6 +168,9 @@ def main(args, results_logger_getter=get_results_logger):
     # this guarantees all query streams will use more or less the same resources
     builder = builder.config('spark.scheduler.mode', 'FAIR')
   spark = builder.getOrCreate()
+  # Queries supplied to this script by default are not ANSI-compliant, so we are
+  # disabling ANSI SQL explictly, since new Spark versions default to it.
+  spark.conf.set('spark.sql.ansi.enabled', 'false')
   if args.database:
     spark.catalog.setCurrentDatabase(args.database)
   for name, (fmt, options) in get_table_metadata(args).items():

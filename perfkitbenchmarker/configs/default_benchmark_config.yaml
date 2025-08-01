@@ -407,3 +407,35 @@ gpu_jobs_provisioning:
      job_count: 1
      job_gpu_count: 1
      image_directory: 'serverless/echo_job'
+
+hadoop_dfsio:
+  name: dpb_testdfsio_benchmark
+  flags:
+    dfsio_delay_read_sec: 1800
+    dfsio_file_sizes_list: [32768]
+    dfsio_fs: hdfs
+    dfsio_num_files_list: [15]
+    dfsio_readahead_kb: 1024
+    dpb_export_job_stats: True
+    hadoop_hdfs_client_readahead: 0
+    hadoop_hdfs_replication: 1
+    hadoop_map_slots_per_core: 1
+    hadoop_reduce_slots_per_core: 1
+    hadoop_version: 3.4.1
+    num_cpus_override: 16
+    openjdk_version: 11
+    os_type: ubuntu2404
+    yarn_scheduler: org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler
+  dpb_service:
+    service_type: unmanaged_dpb_svc_yarn_cluster
+    worker_count: 1
+    worker_group:
+      vm_spec:
+        GCP:
+          num_local_ssds: 0
+      disk_count: 3
+      disk_spec:
+        GCP:
+          disk_size: 6830
+          disk_type: hyperdisk-throughput
+          provisioned_throughput: 600

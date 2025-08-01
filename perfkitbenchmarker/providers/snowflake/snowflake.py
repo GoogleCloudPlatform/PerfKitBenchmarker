@@ -30,7 +30,7 @@ from perfkitbenchmarker import vm_util
 FLAGS = flags.FLAGS
 
 JdbcClientDict = {
-    provider_info.AWS: 'snowflake-jdbc-client-2.13-enterprise.jar',
+    provider_info.AWS: 'snowflake-jdbc-client-2.14-enterprise.jar',
     provider_info.AZURE: 'snowflake-jdbc-client-azure-external-2.0.jar',
 }
 
@@ -68,9 +68,20 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     self.client_vm.Install('openjdk')
 
     # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedPackageData(
-        package_name, [self.jdbc_client], ''
-    )
+    if FLAGS.snowflake_jdbc_client_jar:
+      self.client_vm.PushFile(FLAGS.snowflake_jdbc_client_jar)
+    else:
+      self.client_vm.InstallPreprovisionedPackageData(
+          package_name, [self.jdbc_client], ''
+      )
+
+    # Push the private key to the working directory on client vm
+    if FLAGS.snowflake_jdbc_key_file:
+      self.client_vm.PushFile(FLAGS.snowflake_jdbc_key_file)
+    else:
+      self.client_vm.InstallPreprovisionedPackageData(
+          package_name, ['snowflake_keyfile.p8'], ''
+      )
 
   def ExecuteQuery(
       self, query_name: str, print_results: bool = True
@@ -94,7 +105,8 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         f'--warehouse {self.warehouse} '
         f'--database {self.database} '
         f'--schema {self.schema} '
-        f'--query_file {query_name}'
+        f'--query_file {query_name} '
+        f'--key_file snowflake_keyfile.p8'
     )
     if print_results:
       query_command += ' --print_results true'
@@ -103,33 +115,6 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     details.update(json.loads(stdout)['details'])
     result = (json.loads(stdout)['query_wall_time_in_secs'], details)
     return result
-
-  def ExecuteSimultaneous(
-      self, submission_interval: int, queries: list[str]
-  ) -> str:
-    """Executes queries simultaneously on client and return performance details.
-
-    Simultaneous app expects queries as white space separated query file names.
-
-    Args:
-      submission_interval: Simultaneous query submission interval in
-        milliseconds.
-      queries: List of strings (names) of queries to execute.
-
-    Returns:
-      A serialized dictionary of execution details.
-    """
-    query_command = (
-        f'java -cp {self.jdbc_client} '
-        'com.google.cloud.performance.edw.Simultaneous '
-        f'--warehouse {self.warehouse} '
-        f'--database {self.database} '
-        f'--schema {self.schema} '
-        f'--submission_interval {submission_interval} '
-        f'--query_files {" ".join(queries)}'
-    )
-    stdout, _ = self.client_vm.RemoteCommand(query_command)
-    return stdout
 
   def ExecuteThroughput(
       self,
@@ -153,6 +138,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         f'--warehouse {self.warehouse} '
         f'--database {self.database} '
         f'--schema {self.schema} '
+        f'--key_file snowflake_keyfile.p8 '
         '--query_streams '
         f'{" ".join([",".join(stream) for stream in concurrency_streams])}'
     )
