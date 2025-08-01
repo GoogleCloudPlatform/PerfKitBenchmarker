@@ -48,11 +48,17 @@ REPORT_LATENCIES = flags.DEFINE_boolean(
     False,
     'Whether to report individual event latencies',
 )
-CPUS_PER_POD = flags.DEFINE_string(
-    'kubernetes_scale_pod_cpus', '250m', 'CPU limit per pod'
+MIN_CPUS_PER_POD = flags.DEFINE_string(
+    'kubernetes_scale_min_pod_cpus', '250m', 'Min CPU limit per pod'
 )
-MEMORY_PER_POD = flags.DEFINE_string(
-    'kubernetes_scale_pod_memory', '250M', 'Memory limit per pod'
+MAX_CPUS_PER_POD = flags.DEFINE_string(
+    'kubernetes_scale_max_pod_cpus', '250m', 'Max CPU limit per pod'
+)
+MIN_MEMORY_PER_POD = flags.DEFINE_string(
+    'kubernetes_scale_min_pod_memory', '250M', 'Min memory limit per pod'
+)
+MAX_MEMORY_PER_POD = flags.DEFINE_string(
+    'kubernetes_scale_max_pod_memory', '250M', 'Max memory limit per pod'
 )
 CONTAINER_IMAGE = flags.DEFINE_string(
     'kubernetes_scale_container_image',
@@ -132,7 +138,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       cluster, 'node', start_time, resources_to_ignore=initial_nodes
   )
   metadata = {
-      'pod_memory': MEMORY_PER_POD.value,
+      'pod_memory': MAX_MEMORY_PER_POD.value,
       'pod_cpu': CPUS_PER_POD.value,
       'goal_replicas': NUM_PODS.value,
       'image': _GetImage(),
@@ -167,8 +173,10 @@ def ScaleUpPods(
       MANIFEST_TEMPLATE,
       Name='kubernetes-scaleup',
       Replicas=num_new_pods,
-      CpuRequest=CPUS_PER_POD.value,
-      MemoryRequest=MEMORY_PER_POD.value,
+      CpuRequest=MIN_CPUS_PER_POD.value,
+      CpuLimit=MAX_CPUS_PER_POD.value,
+      MemoryRequest=MIN_MEMORY_PER_POD.value,
+      MemoryLimit=MAX_MEMORY_PER_POD.value,
       NvidiaGpuRequest=virtual_machine.GPU_COUNT.value,
       Image=_GetImage(),
       Command=command,

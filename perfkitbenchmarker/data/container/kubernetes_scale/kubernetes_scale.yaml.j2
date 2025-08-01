@@ -21,6 +21,9 @@ spec:
         {%- endif %}
         resources:
           limits:
+            cpu: {{ CpuLimit }}
+            memory: {{ MemoryLimit }}
+          requests:
             cpu: {{ CpuRequest }}
             memory: {{ MemoryRequest }}
             ephemeral-storage: {{ EphemeralStorageRequest }}
