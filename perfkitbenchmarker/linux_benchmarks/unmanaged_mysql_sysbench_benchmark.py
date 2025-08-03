@@ -118,6 +118,7 @@ unmanaged_mysql_sysbench:
     sysbench_ssl_mode: required
     sysbench_run_threads: 1,64,128,256,512,1024,2048
     sysbench_run_seconds: 300
+    enable_transparent_hugepages: False
 """
 
 # There are 2 main customer scenarios:

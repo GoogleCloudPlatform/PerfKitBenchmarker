@@ -26,21 +26,6 @@ from perfkitbenchmarker import virtual_machine
 MYSQL_PSWD = 'perfkitbenchmarker'
 PACKAGE_NAME = 'mysql'
 
-DISABLE_HUGE_PAGES = """
-[Unit]
-Description=Disable Transparent Huge Pages (THP)
-DefaultDependencies=no
-After=sysinit.target local-fs.target
-Before=mysqld.service
-
-[Service]
-Type=oneshot
-ExecStart=/bin/sh -c 'echo never | tee /sys/kernel/mm/transparent_hugepage/enabled > /dev/null'
-
-[Install]
-WantedBy=basic.target
-"""
-
 # OS dependent service defaults.
 MYSQL_SERVICE_NAME = 'MYSQL_SERVICE_NAME'
 MYSQL_CONFIG_PATH = 'MYSQL_CONFIG_PATH'
@@ -181,17 +166,6 @@ def ConfigureSystemSettings(vm: virtual_machine.VirtualMachine):
 
   auth_append = 'sudo tee -a /etc/pam.d/login'
   vm.RemoteCommand(f'echo "session required pam_limits.so" | {auth_append}')
-
-  thp_append = 'sudo tee -a /usr/lib/systemd/system/disable-thp.service'
-  vm.RemoteCommand('sudo touch /usr/lib/systemd/system/disable-thp.service')
-  vm.RemoteCommand(f'echo "{DISABLE_HUGE_PAGES}" | {thp_append}')
-  vm.RemoteCommand(
-      'sudo chown root:root /usr/lib/systemd/system/disable-thp.service')
-  vm.RemoteCommand(
-      'sudo chmod 0600 /usr/lib/systemd/system/disable-thp.service')
-  vm.RemoteCommand('sudo systemctl daemon-reload')
-  vm.RemoteCommand('sudo systemctl enable disable-thp.service')
-  vm.RemoteCommand('sudo systemctl start disable-thp.service')
 
   vm.Reboot()
 
