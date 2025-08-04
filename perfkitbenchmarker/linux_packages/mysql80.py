@@ -163,6 +163,8 @@ def ConfigureSystemSettings(vm: virtual_machine.VirtualMachine):
   limits_append = 'sudo tee -a /etc/security/limits.conf'
   vm.RemoteCommand(f'echo "*     soft    nofile  64000" | {limits_append}')
   vm.RemoteCommand(f'echo "*     hard    nofile  64000" | {limits_append}')
+  vm.RemoteCommand(f'echo "*     soft    memlock unlimited" | {limits_append}')
+  vm.RemoteCommand(f'echo "*     hard    memlock unlimited" | {limits_append}')
 
   auth_append = 'sudo tee -a /etc/pam.d/login'
   vm.RemoteCommand(f'echo "session required pam_limits.so" | {auth_append}')
