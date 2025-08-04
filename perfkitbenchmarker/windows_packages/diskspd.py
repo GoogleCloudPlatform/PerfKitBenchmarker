@@ -16,21 +16,39 @@
 """Module containing DiskSpd installation and cleanup functions.
 
 DiskSpd is a tool made for benchmarking Windows disk performance.
-
-More information about DiskSpd may be found here:
-https://gallery.technet.microsoft.com/DiskSpd-a-robust-storage-6cd2f223
 """
 
-
 import collections
+import logging
 import ntpath
+import re
 import xml.etree.ElementTree
+
 from absl import flags
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
+
 FLAGS = flags.FLAGS
+
+LATENCY_PERCENTILES = [50, 90, 95, 99, 99.9, 99.99, 99.999, 99.9999, 99.99999]
+SampleData = collections.namedtuple('SampleData', ['metric', 'value', 'unit'])
+
+flags.DEFINE_boolean(
+    'diskspd_prefill',
+    False,
+    'If we want to prefill the file with random data before running the test.',
+)
+
+flags.DEFINE_integer(
+    'diskspd_prefill_duration',
+    None,
+    'In seconds. Diskspd needs a duration to run. For prefilling, use a'
+    ' duration that is large enough to allow diskspd to write the file to the'
+    ' required size.',
+)
 
 flags.DEFINE_integer(
     'diskspd_duration',
@@ -183,13 +201,11 @@ flags.DEFINE_list(
 )
 
 DISKSPD_RETRIES = 10
-DISKSPD_DIR = 'DiskSpd-2.0.21a'
-DISKSPD_ZIP = DISKSPD_DIR + '.zip'
+DISKSPD_ZIP = 'DiskSpd.zip'
 DISKSPD_URL = (
-    'https://gallery.technet.microsoft.com/DiskSpd-A-Robust-Storage'
-    '-6ef84e62/file/199535/2/'
-    + DISKSPD_ZIP
+    'https://github.com/microsoft/diskspd/releases/download/v2.2/DiskSpd.ZIP'
 )
+
 DISKSPD_TMPFILE = 'testfile.dat'
 DISKSPD_XMLFILE = 'result.xml'
 DISKSPD_TIMEOUT_MULTIPLIER = 3
@@ -320,9 +336,8 @@ def _RunDiskSpd(
   result_xml = _CatXml(running_vm)
   _RemoveTempFile(running_vm)
   _RemoveXml(running_vm)
-  main_metric = 'ReadSpeed' if diskspd_write_read_ratio == 0 else 'WriteSpeed'
 
-  return ParseDiskSpdResults(result_xml, metadata, main_metric)
+  return ParseDiskSpdResults(result_xml, metadata)
 
 
 def _GenerateOption(access_pattern, diskspd_write_read_ratio, block_size):
@@ -411,7 +426,7 @@ def RunDiskSpd(running_vm):
 
   # run diskspd in four different scenario, will generate a metadata list
   for conf in conf_list:
-    sample_list.append(
+    sample_list.extend(
         _RunDiskSpd(
             running_vm,
             conf.access_pattern,
@@ -424,7 +439,30 @@ def RunDiskSpd(running_vm):
   return sample_list
 
 
-def ParseDiskSpdResults(result_xml, metadata, main_metric):
+def Prefill(running_vm):
+  """Prefills the test file with random data using diskspd.
+
+  Args:
+    running_vm: The VM to prefill the file on.
+  """
+  if not FLAGS.diskspd_prefill:
+    return
+  prefill_duration = FLAGS.diskspd_prefill_duration
+  if prefill_duration is None:
+    raise errors.Setup.InvalidConfigurationError(
+        '--diskspd_prefill_duration is None'
+    )
+  logging.info('Prefilling file with random data')
+  diskspd_exe_dir = ntpath.join(running_vm.temp_dir, 'x86')
+  diskspd_options = (
+      f'-c{FLAGS.diskspd_file_size}K -t10 -w100 -b4k -d{prefill_duration} -r'
+      f' C:\\scratch\\{DISKSPD_TMPFILE}'
+  )
+  command = f'cd {diskspd_exe_dir}; .\\diskspd.exe {diskspd_options}'
+  running_vm.RobustRemoteCommand(command)
+
+
+def ParseDiskSpdResults(result_xml, metadata):
   """Parses the xml output from DiskSpd and returns a list of samples.
 
   each list of sample only have one sample with read speed as value
@@ -433,14 +471,13 @@ def ParseDiskSpdResults(result_xml, metadata, main_metric):
   Args:
     result_xml: diskspd output
     metadata: the running info of vm
-    main_metric: the main metric to test, for example 'ReadSpeed'
 
   Returns:
     list of samples from the results of the diskspd tests.
   """
   xml_root = xml.etree.ElementTree.fromstring(result_xml)
   metadata = metadata.copy()
-
+  sample_data = []
   # Get the parameters from the sender XML output. Add all the
   # information of diskspd result to metadata
   for item in list(xml_root):
@@ -449,7 +486,11 @@ def ParseDiskSpdResults(result_xml, metadata, main_metric):
         if subitem.tag == 'Thread':
           target_item = subitem.find('Target')
           for read_write_info in list(target_item):
-            if read_write_info.tag not in ['Path', 'FileSize']:
+            if read_write_info.tag not in [
+                'Path',
+                'FileSize',
+            ] and 'latency' not in read_write_info.tag.lower():
+              # parsing latency metrics from the latency section
               if read_write_info.tag not in metadata:
                 metadata[read_write_info.tag] = 0
               try:
@@ -461,9 +502,17 @@ def ParseDiskSpdResults(result_xml, metadata, main_metric):
           for cpu_info in list(target_item):
             metadata[cpu_info.tag] = cpu_info.text
         elif subitem.tag == 'Latency':
-          # Latency data is added at the top level of the xml data, so no need
-          # to add it again here.
-          pass
+          for latency_info in list(subitem):
+            if latency_info.tag.lower() == 'bucket':
+              sample_data.extend(ParseLatencyBucket(latency_info))
+            else:
+              sample_data.append(
+                  SampleData(
+                      FormatLatencyMetricName(latency_info.tag),
+                      latency_info.text,
+                      'ms' if 'Milliseconds' in latency_info.tag else '',
+                  )
+              )
         else:
           metadata[subitem.tag] = subitem.text
     if item.tag == 'Profile':
@@ -499,13 +548,68 @@ def ParseDiskSpdResults(result_xml, metadata, main_metric):
   read_iops = int(read_count / testtime)
   write_iops = int(write_count / testtime)
   total_iops = int(total_count / testtime)
+  samples = [
+      sample.Sample('total_speed', total_speed, 'MB/s', metadata),
+      sample.Sample('total_iops', total_iops, '', metadata),
+  ]
+  if read_speed != 0:
+    samples.extend([
+        sample.Sample('read_speed', read_speed, 'MB/s', metadata),
+        sample.Sample('read_iops', read_iops, '', metadata),
+    ])
+  if write_speed != 0:
+    samples.extend([
+        sample.Sample('write_speed', write_speed, 'MB/s', metadata),
+        sample.Sample('write_iops', write_iops, '', metadata),
+    ])
+  samples.extend([
+      sample.Sample(item.metric, item.value, item.unit, metadata)
+      for item in sample_data
+  ])
+  return samples
 
-  # store the speed and iops information in metadata
-  metadata['ReadSpeed'] = read_speed
-  metadata['WriteSpeed'] = write_speed
-  metadata['ReadIops'] = read_iops
-  metadata['WriteIops'] = write_iops
-  metadata['TotalSpeed'] = total_speed
-  metadata['TotalIops'] = total_iops
 
-  return sample.Sample(main_metric, metadata[main_metric], 'MB/s', metadata)
+def ParseLatencyBucket(latency_bucket):
+  """Parse latency percentile data from bucket xml tag."""
+  percentile = latency_bucket.find('Percentile')
+  read_milliseconds = latency_bucket.find('ReadMilliseconds')
+  write_milliseconds = latency_bucket.find('WriteMilliseconds')
+  total_milliseconds = latency_bucket.find('TotalMilliseconds')
+  if (
+      percentile is None
+      or total_milliseconds is None
+  ):
+    raise errors.Benchmarks.RunError(
+        'Missing values in latency bucket info in diskspd xml output, please'
+        f' check {xml.etree.ElementTree.tostring(latency_bucket)}'
+    )
+  percentile = float(percentile.text)
+  if percentile not in LATENCY_PERCENTILES:
+    return []
+  sample_data = [
+      SampleData(
+          f'total_latency_p{percentile}', float(total_milliseconds.text), 'ms'
+      )
+  ]
+  if read_milliseconds is not None:
+    sample_data.append(
+        SampleData(
+            f'read_latency_p{percentile}', float(read_milliseconds.text), 'ms'
+        )
+    )
+  if write_milliseconds is not None:
+    sample_data.append(
+        SampleData(
+            f'write_latency_p{percentile}', float(write_milliseconds.text), 'ms'
+        )
+    )
+  return sample_data
+
+
+def FormatLatencyMetricName(text):
+  text = text.replace('Milliseconds', '')
+  # Convert camel case to snake case for latency metric name.
+  text = re.sub(r'(?<!^)(?=[A-Z])', '_', text).lower()
+  if 'latency' not in text:
+    return text + '_latency'
+  return text

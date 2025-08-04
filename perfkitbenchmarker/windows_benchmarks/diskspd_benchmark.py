@@ -39,6 +39,8 @@ def GetConfig(user_config):
 def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]
   vm.Install('diskspd')
+  if FLAGS.diskspd_prefill:
+    diskspd.Prefill(vm)
 
 
 def Run(benchmark_spec):
