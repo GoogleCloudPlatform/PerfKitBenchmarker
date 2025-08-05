@@ -40,7 +40,7 @@ _OUTPUT_PATH = '/output/output.yaml'
 
 FLAG_IMAGE_REPO = flags.DEFINE_string(
     'k8s_inference_server_image_repo',
-    'gcr.io/gke-release-staging',
+    'us-docker.pkg.dev/p3rf-gke/public',
     'The image repo path where the container images are stored (e.g.'
     ' gcr.io/gke-release)',
 )
