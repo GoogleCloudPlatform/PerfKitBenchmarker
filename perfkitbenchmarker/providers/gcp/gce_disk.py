@@ -19,6 +19,7 @@ Use 'gcloud compute disk-types list' to determine valid disk types.
 
 import json
 import logging
+import threading
 import time
 from typing import Any
 
@@ -48,6 +49,7 @@ HYPERDISK_THROUGHPUT = 'hyperdisk-throughput'
 HYPERDISK_EXTREME = 'hyperdisk-extreme'
 HYPERDISK_BALANCED = 'hyperdisk-balanced'
 HYPERDISK_BALANCED_HA = 'hyperdisk-balanced-high-availability'
+HYPERDISK_ML = disk.HYPERDISK_ML
 GCE_REMOTE_DISK_TYPES = [
     PD_STANDARD,
     PD_SSD,
@@ -57,6 +59,7 @@ GCE_REMOTE_DISK_TYPES = [
     HYPERDISK_EXTREME,
     HYPERDISK_BALANCED,
     HYPERDISK_BALANCED_HA,
+    HYPERDISK_ML,
 ]
 # Defaults picked to align with console.
 GCE_DYNAMIC_IOPS_DISK_TYPE_DEFAULTS = {
@@ -70,6 +73,7 @@ GCE_DYNAMIC_THROUGHPUT_DISK_TYPE_DEFAULTS = {
     HYPERDISK_BALANCED: 290,
     HYPERDISK_THROUGHPUT: 180,
     HYPERDISK_BALANCED_HA: 290,
+    HYPERDISK_ML: 160000,
 }
 
 REGIONAL_DISK_SCOPE = 'regional'
@@ -100,6 +104,10 @@ DISK_METADATA = {
         disk.REPLICATION: disk.ZONE,
     },
     HYPERDISK_BALANCED: {
+        disk.MEDIA: disk.SSD,
+        disk.REPLICATION: disk.ZONE,
+    },
+    HYPERDISK_ML: {
         disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.ZONE,
     },
@@ -467,8 +475,8 @@ class GceDisk(disk.BaseDisk):
       cmd.flags['replica-zones'] = ','.join(self.replica_zones)
       del cmd.flags['zone']
 
-    if self.multi_writer_disk:
-      cmd.flags['access-mode'] = 'READ_WRITE_MANY'
+    if self.mode:
+      cmd.flags['access-mode'] = self.mode
     if self.spec.snapshot_name:
       cmd.flags['source-snapshot'] = self.spec.snapshot_name
     self.create_disk_start_time = time.time()
@@ -549,6 +557,9 @@ class GceDisk(disk.BaseDisk):
     if self.replica_zones:
       cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
       cmd.flags['region'] = self.region
+
+    if self.mode == disk.READ_ONLY_MANY:
+      cmd.flags['mode'] = 'ro'
 
     self.attach_start_time = time.time()
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
@@ -802,3 +813,90 @@ class GceStripedDisk(disk.StripedDisk):
     for disk_details in self.disks:
       detach_tasks.append((disk_details.Detach, (), {}))
     background_tasks.RunParallelThreads(detach_tasks, max_concurrency=200)
+
+
+class GceHyperdiskML(disk.MultiAttachDisk):
+  """Object representing a hyperdisk ML disk."""
+
+  CLOUD = provider_info.GCP
+
+  def __init__(
+      self,
+      disk_spec,
+      name,
+      zone,
+      project,
+  ):
+    super().__init__(disk_spec, name, zone, project)
+    self.name = name
+    self.mode = disk.READ_WRITE_SINGLE
+    self.writer_vm = None
+    self.reader_vms = []
+    self.disk = GceDisk(disk_spec, name, zone, project)
+    self.lock = threading.Lock()
+
+  def Create(self):
+    self.disk.Create()
+
+  def GetDevicePath(self):
+    """Returns the path to the device inside the VM."""
+    return f'/dev/disk/by-id/google-{self.name}'
+
+  def AttachWriter(self, vm):
+    """Attaches the disk to a writer VM.
+
+    Args:
+      vm: The GceVirtualMachine instance to which the disk will be attached.
+    """
+    self.lock.acquire()
+    if not self.writer_vm:
+      self.disk.Attach(vm)
+      self.writer_vm = vm
+    self.lock.release()
+    self.reader_vms.append(vm)
+
+  def AddFutureReader(self, vm):
+    """Adds the given VM as a future reader.
+    """
+    self.reader_vms.append(vm)
+
+  def SetReadOnlyMany(self):
+    """Update disk mode to READ_ONLY_MANY mode."""
+    if self.mode == disk.READ_ONLY_MANY:
+      return
+    assert self.mode == disk.READ_WRITE_SINGLE
+    self.mode = disk.READ_ONLY_MANY
+
+    # first detach from all instances.
+    self._Detach()
+
+    # Update mode
+    cmd = util.GcloudCommand(
+        self, 'compute', 'disks', 'update', self.name
+    )
+    cmd.flags['access-mode'] = self.mode
+
+    # then attach in correct mode.
+    for vm in self.reader_vms:
+      self.disk.Attach(vm)
+      vm.MountDisk(
+          self.GetDevicePath(),
+          self.spec.mount_point,
+          self.spec.disk_type,
+          self.mount_options,
+          self.fstab_options,
+      )
+
+  def _Detach(self):
+    """Detaches the disk from all VMs."""
+    for vm in self.reader_vms:
+      cmd = util.GcloudCommand(
+          self, 'compute', 'instances', 'detach-disk', vm.name
+      )
+      cmd.flags['device-name'] = self.name
+      _, _ = cmd.IssueRetryable()
+
+  def _Delete(self):
+    """Deletes the disk."""
+    self._Detach()
+    self.disk.Delete()

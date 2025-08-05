@@ -107,6 +107,10 @@ RAM = 'ram'
 NFS = 'nfs'
 SMB = 'smb'
 
+# Disks that live on a network and attaches to multiple VMs
+HYPERDISK_ML = 'hyperdisk-ml'
+MULTI_ATTACH_DISK_TYPES = [HYPERDISK_ML]
+
 # FUSE mounted object storage bucket
 OBJECT_STORAGE = 'object_storage'
 
@@ -123,6 +127,11 @@ REGION = 'region'
 DEFAULT_MOUNT_OPTIONS = 'discard'
 DEFAULT_FSTAB_OPTIONS = 'defaults'
 
+# Disk access modes
+READ_WRITE_SINGLE = 'READ_WRITE_SINGLE'
+READ_ONLY_MANY = 'READ_ONLY_MANY'
+READ_WRITE_MANY = 'READ_WRITE_MANY'
+
 
 def GetDiskSpecClass(cloud, disk_type):
   """Get the DiskSpec class corresponding to 'cloud'."""
@@ -131,6 +140,11 @@ def GetDiskSpecClass(cloud, disk_type):
   if spec_class is BaseDiskSpec:
     return spec.GetSpecClass(BaseDiskSpec, CLOUD=cloud)
   return spec_class
+
+
+def GetMultiAttachDiskClass(cloud: str):
+  """Get the Disk class corresponding to 'cloud'."""
+  return resource.GetResourceClass(MultiAttachDisk, CLOUD=cloud)
 
 
 def IsRemoteDisk(disk_type):
@@ -429,7 +443,9 @@ class BaseDisk(resource.BaseResource):
     self.num_striped_disks = disk_spec.num_striped_disks
     self.num_partitions = disk_spec.num_partitions
     self.partition_size = disk_spec.partition_size
-    self.multi_writer_disk: bool = disk_spec.multi_writer_mode
+    self.mode = None
+    if disk_spec.multi_writer_mode:
+      self.mode = READ_WRITE_MANY
     self.snapshots = []
     self.metadata.update({
         'type': self.disk_type,
@@ -823,6 +839,17 @@ class SmbDisk(NetworkDisk):
   def Attach(self, vm):
     self.vm = vm
     self.vm.InstallPackages('cifs-utils')
+
+
+class MultiAttachDisk(BaseDisk):
+  """Object representing a disk that can be attached to multiple VMs."""
+
+  REQUIRED_ATTRS = ['CLOUD']
+  RESOURCE_TYPE = 'MultiAttachDisk'
+
+  def __init__(self, disk_spec, name, zone, project):
+    super().__init__(disk_spec)
+    self.vms = []
 
 
 class DiskSnapshot(resource.BaseResource):

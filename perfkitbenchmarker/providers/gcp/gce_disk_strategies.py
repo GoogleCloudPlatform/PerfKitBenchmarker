@@ -21,6 +21,7 @@ import time
 from typing import Any
 from absl import flags
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
@@ -46,7 +47,20 @@ def GetCreateDiskStrategy(
     disk_spec: gce_disk.GceDiskSpec,
     disk_count: int,
 ) -> disk_strategies.CreateDiskStrategy:
+  """Returns the correct disk strategy based on the disk spec.
+
+  Args:
+    vm: The virtual machine.
+    disk_spec: The disk spec.
+    disk_count: The number of disks.
+
+  Returns:
+    The correct disk strategy.
+  """
   if disk_spec and disk_count > 0:
+    if disk_spec.disk_type == gce_disk.HYPERDISK_ML:
+      # HdML behaves more like a non-resource disk.
+      return GCECreateNonResourceDiskStrategy(vm, disk_spec, disk_count)
     if disk_spec.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES:
       return CreatePDDiskStrategy(vm, disk_spec, disk_count)
     elif disk_spec.disk_type == disk.LOCAL:
@@ -176,6 +190,9 @@ class GCECreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
 
     elif self.disk_spec.disk_type == disk.NFS:
       return disk_strategies.SetUpNFSDiskStrategy(self.vm, self.disk_spec)
+
+    elif self.disk_spec.disk_type == disk.HYPERDISK_ML:
+      return SetUpHyperdiskMLDiskStrategy(self.vm, self.disk_spec)
 
     return disk_strategies.EmptySetupDiskStrategy(self.vm, self.disk_spec)
 
@@ -444,6 +461,40 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
     )
     scratch_disk = disk.BaseDisk(self.disk_spec)
     self.vm.scratch_disks.append(scratch_disk)
+
+
+class SetUpHyperdiskMLDiskStrategy(SetUpGCEResourceDiskStrategy):
+  """Strategies to set up Hyperdisk ML disks."""
+
+  _CLASS_LOCK = threading.Lock()
+
+  def SetUpDiskOnLinux(self):
+    """Performs Linux specific setup of HdML disks."""
+    hdml_disk = getattr(context.GetThreadBenchmarkSpec(), 'multi_attach_disk')
+    should_format = False
+    should_mount = False
+
+    self._CLASS_LOCK.acquire()
+    if not hdml_disk.writer_vm:
+      hdml_disk.AttachWriter(self.vm)
+      should_format = True
+      should_mount = True
+    else:
+      hdml_disk.AddFutureReader(self.vm)
+    self._CLASS_LOCK.release()
+
+    if should_format:
+      self.vm.FormatDisk(hdml_disk.GetDevicePath(), self.disk_spec.disk_type)
+    if should_mount:
+      self.vm.MountDisk(
+          hdml_disk.GetDevicePath(),
+          self.disk_spec.mount_point,
+          self.disk_spec.disk_type,
+          hdml_disk.mount_options,
+          hdml_disk.fstab_options,
+      )
+
+    self.vm.scratch_disks.append(hdml_disk)
 
 
 class GCEPrepareScratchDiskStrategy(disk_strategies.PrepareScratchDiskStrategy):
