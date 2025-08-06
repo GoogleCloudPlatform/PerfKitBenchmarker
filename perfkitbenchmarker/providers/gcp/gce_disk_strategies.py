@@ -200,31 +200,6 @@ class GCECreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
 class SetUpGCEResourceDiskStrategy(disk_strategies.SetUpDiskStrategy):
   """Base Strategy class to set up local ssd and pd-ssd."""
 
-  def FindRemoteNVMEDevices(self, nvme_devices):
-    """Find the paths for all remote NVME devices inside the VM."""
-    remote_nvme_devices = [
-        device['DevicePath']
-        for device in nvme_devices
-        if device['ModelNumber'] == 'nvme_card-pd'
-    ]
-
-    return sorted(remote_nvme_devices)
-
-  def UpdateDevicePath(self, scratch_disk, remote_nvme_devices):
-    """Updates the paths for all remote NVME devices inside the VM."""
-    if isinstance(scratch_disk, disk.StripedDisk):
-      disks = scratch_disk.disks
-    else:
-      disks = [scratch_disk]
-
-    # round robin assignment since we cannot tell the disks apart.
-    for d in disks:
-      if (
-          d.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES
-          and d.interface == gce_disk.NVME
-      ):
-        d.name = remote_nvme_devices.pop()
-
   def SetupGCELocalDisks(self):
     """Performs Linux specific setup of local disks."""
     pass
@@ -331,12 +306,7 @@ class SetUpMultiWriterPDDiskStrategy(SetUpGCEResourceDiskStrategy):
         self._MULTIWRITER_DISKS[scratch_disk.name] = True
 
       scratch_disk.Attach(self.vm)
-      # Device path is needed to stripe disks on Linux, but not on Windows.
-      # The path is not updated for Windows machines.
-      if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
-        nvme_devices = self.vm.GetNVMEDeviceInfo()
-        remote_nvme_devices = self.FindRemoteNVMEDevices(nvme_devices)
-        self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
+
     if create_and_setup_disk:
       GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
           self.vm, self.scratch_disks[0], self.disk_specs[0]
@@ -378,12 +348,6 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
     self.scratch_disks = [scratch_disk for scratch_disk, _ in scratch_disks]
     self.AttachDisks()
     for scratch_disk, disk_spec in scratch_disks:
-      # Device path is needed to stripe disks on Linux, but not on Windows.
-      # The path is not updated for Windows machines.
-      if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
-        nvme_devices = self.vm.GetNVMEDeviceInfo()
-        remote_nvme_devices = self.FindRemoteNVMEDevices(nvme_devices)
-        self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
       GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
           self.vm, scratch_disk, disk_spec
       )

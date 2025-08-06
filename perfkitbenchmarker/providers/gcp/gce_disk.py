@@ -484,11 +484,14 @@ class GceDisk(disk.BaseDisk):
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
     self.create_disk_end_time = self._GetEndTime(stdout)
 
-  def _Delete(self):
-    """Deletes the disk, as well as all associated snapshot and restore disks."""
+  def _DeleteDependencies(self):
+    """Deletes potential snapshots of the disk."""
     if self.snapshots:
       for snapshot in self.snapshots:
         snapshot.Delete()
+
+  def _Delete(self):
+    """Deletes the disk, as well as all associated snapshot and restore disks."""
     cmd = util.GcloudCommand(self, 'compute', 'disks', 'delete', self.name)
     if self.replica_zones:
       cmd.flags['region'] = self.region
@@ -620,11 +623,10 @@ class GceDisk(disk.BaseDisk):
     self.attached_vm_name = None
     self.detach_end_time = self._GetEndTime(stdout)
 
+  # Device path is needed to stripe disks on Linux, but not on Windows.
+  # The path is not updated for Windows machines.
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    if self.interface == NVME:
-      return self.name
-    # by default, returns this name id.
     return f'/dev/disk/by-id/google-{self.name}'
 
   def IsNvme(self):
@@ -737,6 +739,9 @@ class GceDiskSnapshot(disk.DiskSnapshot):
     """Creates a disk from the snapshot."""
     self.restore_disk_name = f'{self.name}-restore-{self.num_restore_disks}'
     self.disk_spec.snapshot_name = self.name
+    self.disk_spec.mount_point = (
+        f'/restore{self.num_restore_disks}{self.disk_spec.mount_point}'
+    )
     restore_disk = GceDisk(
         self.disk_spec, self.restore_disk_name, self.zone, self.project
     )

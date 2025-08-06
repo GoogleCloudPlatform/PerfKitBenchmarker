@@ -862,6 +862,8 @@ class DiskSnapshot(resource.BaseResource):
     creation_end_time: The end time of snapshot creation.
     restore_disks: The disks restored from the snapshot.
     num_restore_disks: The number of disks restored from the snapshot.
+    num_detached_restore_disks: The number of detached disks restored from the
+      snapshot.
   """
 
   def __init__(self):
@@ -872,6 +874,7 @@ class DiskSnapshot(resource.BaseResource):
     self.creation_end_time = None
     self.restore_disks = []
     self.num_restore_disks = 0
+    self.num_detached_restore_disks = 0
 
   def _Create(self):
     raise NotImplementedError()

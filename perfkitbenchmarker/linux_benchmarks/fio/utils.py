@@ -43,9 +43,11 @@ def AgainstDevice():
   return fio_flags.FIO_TARGET_MODE.value in constants.AGAINST_DEVICE_MODES
 
 
-def GetFilename(disks):
+def GetFilename(disks, device_path=None):
   if AgainstDevice():
-    filename = ':'.join([disk.GetDevicePath() for disk in disks])
+    filename = device_path or ':'.join(
+        [disk.GetDevicePath() for disk in disks]
+    )
   else:
     # Since we pass --directory to fio, we must use relative file
     # paths or get an error.
@@ -88,6 +90,7 @@ def GenerateJobFile(
     scenarios_list,
     benchmark_params=None,
     job_file='fio-parent.job',
+    device_path=None,
 ):
   """Generates a fio job file based on the provided disks and flags.
 
@@ -96,6 +99,7 @@ def GenerateJobFile(
     scenarios_list: A list of scenario strings.
     benchmark_params: A dict for fio test specific parameters.
     job_file: The name of the job file.
+    device_path: The device path on which to run fio.
 
   Returns:
     A string containing the contents of the fio job file.
@@ -120,7 +124,7 @@ def GenerateJobFile(
   job_file_template = jinja2.Template(
       default_fio_job_file, undefined=jinja2.StrictUndefined
   )
-  filename = GetFilename(disks)
+  filename = GetFilename(disks, device_path=device_path)
   disks_list = [{'index': 0}]
   if fio_flags.FIO_SEPARATE_JOBS_FOR_DISKS.value:
     disks_list = SeparateJobsForDisks(GetAllDiskPaths(disks))

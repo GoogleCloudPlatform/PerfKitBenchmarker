@@ -162,14 +162,18 @@ class AzureDisk(disk.BaseDisk):
 
   _lock = threading.Lock()
 
-  def __init__(self, disk_spec, vm, lun, is_image=False):
+  def __init__(
+      self, disk_spec, vm, lun, is_image=False, num_detached_restore_disks=0
+  ):
     super().__init__(disk_spec)
     self.host_caching = FLAGS.azure_host_caching
     self.vm = vm
     self.vm_name = vm.name
     self.name = self.vm_name + str(lun)
     if self.spec.snapshot_name:
-      self.name += f'-{self.spec.snapshot_name}-restore'
+      self.name = (
+          f'{self.spec.snapshot_name}-{lun+num_detached_restore_disks}-restore'
+      )
     self.zone = vm.zone
     self.availability_zone = vm.availability_zone
     self.region = util.GetRegionFromZone(self.zone)
@@ -321,11 +325,14 @@ class AzureDisk(disk.BaseDisk):
         _, _, _ = vm_util.IssueCommand(args, raise_on_failure=True)
         # create disk end time includes disk update command as well
 
-  def _Delete(self):
-    """Deletes the disk."""
+  def _DeleteDependencies(self):
+    """Deletes potential snapshots of the disk."""
     if self.snapshots:
       for snapshot in self.snapshots:
         snapshot.Delete()
+
+  def _Delete(self):
+    """Deletes the disk."""
     assert not self.is_image
     self._deleted = True
 
@@ -360,7 +367,7 @@ class AzureDisk(disk.BaseDisk):
     Args:
       vm: The AzureVirtualMachine instance to which the disk will be attached.
     """
-    if FLAGS.azure_attach_disk_with_create:
+    if FLAGS.azure_attach_disk_with_create and not self.spec.snapshot_name:
       return
     self.attach_start_time = time.time()
     _, _, retcode = vm_util.IssueCommand(
@@ -422,7 +429,7 @@ class AzureDisk(disk.BaseDisk):
           return '/dev/nvme0n%s' % str(1 + start_index + self.lun)
         if HasTempDrive(self.machine_type):
           start_index += 1
-        return '/dev/sd%s' % REMOTE_DRIVE_PATH_SUFFIXES[start_index + self.lun]
+        return f'/dev/disk/azure/scsi1/lun{self.lun}'
       except IndexError:
         raise TooManyAzureDisksError()
 
@@ -568,16 +575,37 @@ class AzureDiskSnapshot(disk.DiskSnapshot):
 
   def Restore(self):
     """Creates a disk from the snapshot."""
-    self.restore_disk_name = f'{self.name}-restore-{self.num_restore_disks}'
     self.disk_spec.snapshot_name = self.name
+    self.disk_spec.mount_point = (
+        f'/restore{self.num_restore_disks}{self.disk_spec.mount_point}'
+    )
     restore_disk = AzureDisk(
-        self.disk_spec, self.source_disk.vm, self.source_disk.lun
+        self.disk_spec,
+        self.source_disk.vm,
+        self.GetNumAttachedRestoreDisks(),
+        num_detached_restore_disks=self.GetNumDetachedRestoreDisks(),
     )
     restore_disk.Create()
     self.restore_disks.append(restore_disk)
     self.num_restore_disks += 1
 
     return self.restore_disks[-1]
+
+  def GetNumAttachedRestoreDisks(self):
+    num_disks = len(self.source_disk.vm.scratch_disks)
+    for source_disk in self.source_disk.vm.scratch_disks:
+      for snapshot in source_disk.snapshots:
+        num_disks += (
+            snapshot.num_restore_disks - snapshot.num_detached_restore_disks
+        )
+    return num_disks
+
+  def GetNumDetachedRestoreDisks(self):
+    num_detached_restore_disks = 0
+    for source_disk in self.source_disk.vm.scratch_disks:
+      for snapshot in source_disk.snapshots:
+        num_detached_restore_disks += snapshot.num_detached_restore_disks
+    return num_detached_restore_disks
 
   def Delete(self):
     """Deletes the snapshot."""
