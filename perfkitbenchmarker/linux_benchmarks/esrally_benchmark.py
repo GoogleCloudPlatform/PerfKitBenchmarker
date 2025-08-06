@@ -219,15 +219,35 @@ def Run(benchmark_spec):
   for op_metric in metrics['results']['op_metrics']:
     task = op_metric['task']
     mean_throughput = op_metric['throughput']['mean']
-    unit = op_metric['throughput']['unit']
+    throughput_unit = op_metric['throughput']['unit']
     samples.append(
         sample.Sample(
             f'{task}-throughput'.replace('-', '_'),
             mean_throughput,
-            unit,
+            throughput_unit,
             metadata.copy(),
         )
     )
+    mean_latency = op_metric['latency']['mean']
+    latency_unit = op_metric['latency']['unit']
+    samples.append(
+        sample.Sample(
+            f'{task}-latency-mean'.replace('-', '_'),
+            mean_latency,
+            latency_unit,
+            metadata.copy(),
+        )
+    )
+    if op_metric['latency'].get('90_0'):
+      p90_latency = op_metric['latency']['90_0']
+      samples.append(
+          sample.Sample(
+              f'{task}-latency-p90'.replace('-', '_'),
+              p90_latency,
+              latency_unit,
+              metadata.copy(),
+          )
+      )
   client_vm.PullFile(
       vm_util.GetTempDir(), f'{client_vm.GetScratchDir()}/.rally/logs/rally.log'
   )
