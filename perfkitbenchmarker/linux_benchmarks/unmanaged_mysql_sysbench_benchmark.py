@@ -57,7 +57,7 @@ flags.register_validator(
 )
 
 _CONFIG_TEMPLATE = flags.DEFINE_string(
-    'config_template',
+    'mysql_config_template',
     'mysql/ha.cnf.j2',
     'Path to the MySQL config template file.',
 )

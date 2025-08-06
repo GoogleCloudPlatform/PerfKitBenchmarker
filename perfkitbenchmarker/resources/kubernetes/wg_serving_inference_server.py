@@ -40,7 +40,7 @@ _OUTPUT_PATH = '/output/output.yaml'
 
 FLAG_IMAGE_REPO = flags.DEFINE_string(
     'k8s_inference_server_image_repo',
-    'gcr.io/gke-release-staging',
+    'us-docker.pkg.dev/p3rf-gke/public',
     'The image repo path where the container images are stored (e.g.'
     ' gcr.io/gke-release)',
 )
@@ -62,6 +62,7 @@ class PodStartupMetrics:
   pod_scheduled_timestamp: float
   container_started_timestamp: float
   workload_ready_timestamp: float
+  pod_startup_logs: str
 
 
 class BaseWGServingInferenceServer(
@@ -104,6 +105,14 @@ class BaseWGServingInferenceServer(
 
     if spec.static_inference_server is not None:
       self._InitializeUserManagedStateIfSpecified(spec.static_inference_server)
+
+  def GetStartupLogsFromPod(self, pod_name: str) -> str:
+    """Returns the inference server logs from the pod."""
+    if self._monitor_future_map[pod_name]:
+      pod_info = self._monitor_future_map[pod_name].result()
+      if pod_info:
+        return pod_info.pod_startup_logs
+    raise ValueError(f'Pod {pod_name} was not found in monitor future map.')
 
   def GetResourceMetadata(self) -> Dict[str, Any]:
     """Returns the resource metadata."""
@@ -265,11 +274,12 @@ class BaseWGServingInferenceServer(
             "Missing critical timestamp 'container_started_timestamp' for pod"
             f' {pod_name}'
         )
-
+      pod_startup_logs = self.GetInferenceServerLogsFromPod(f'pod/{pod_name}')
       logging.info('Successfully collected metrics for pod %s.', pod_name)
       return PodStartupMetrics(
           pod_name=pod_name,
           metadata={},
+          pod_startup_logs=pod_startup_logs,
           pod_created_timestamp=pod_created_timestamp,
           pod_scheduled_timestamp=pod_scheduled_timestamp,
           container_started_timestamp=container_started_timestamp,

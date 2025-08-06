@@ -192,6 +192,7 @@ class BenchmarkSpec:
     self.edw_service = None
     self.edw_compute_resource = None
     self.example_resource = None
+    self.multi_attach_disk = None
     self.nfs_service = None
     self.smb_service = None
     self.messaging_service = None
@@ -320,6 +321,7 @@ class BenchmarkSpec:
     self.ConstructBaseJob()
     self.ConstructMemoryStore()
     self.ConstructPinecone()
+    self.ConstructMultiAttachDisk()
 
   def ConstructContainerCluster(self):
     """Create the container cluster."""
@@ -523,7 +525,7 @@ class BenchmarkSpec:
     self.resources.append(self.edw_compute_resource)
 
   def ConstructExampleResource(self):
-    """Create an example_resource object. Also call this from pkb.py."""
+    """Create an example_resource object."""
     if self.config.example_resource is None:
       return
     example_resource_type = self.config.example_resource.example_type
@@ -550,7 +552,7 @@ class BenchmarkSpec:
     self.resources.append(self.base_job)
 
   def ConstructManagedAiModel(self):
-    """Create an example_resource object. Also call this from pkb.py."""
+    """Create an example_resource object."""
     if self.config.ai_model is None:
       return
     cloud = self.config.ai_model.cloud
@@ -568,7 +570,7 @@ class BenchmarkSpec:
     self.resources.append(self.ai_model)
 
   def ConstructPinecone(self):
-    """Create an example_resource object. Also call this from pkb.py."""
+    """Create an example_resource object."""
     if self.config.pinecone is None:
       return
     cloud = self.config.pinecone.cloud
@@ -653,6 +655,33 @@ class BenchmarkSpec:
       )  # pytype: disable=not-instantiable
       logging.debug('SMB service %s', self.smb_service)
       break
+
+  def ConstructMultiAttachDisk(self):
+    """Construct the multi attach disk object."""
+    # Hdml is constructed after VM creation. The class is included here
+    # to enable multiple VMs in the same VM group to share the same HdML.
+    # It is deleted during DeleteScratchDisks.
+    if self.multi_attach_disk:
+      return
+    for group_spec in self.vms_to_boot.values():
+      if not group_spec.disk_spec:
+        continue
+      disk_spec = group_spec.disk_spec
+      if disk_spec.disk_type not in disk.MULTI_ATTACH_DISK_TYPES:
+        continue
+      if disk_spec.num_striped_disks > 1:
+        raise errors.Benchmarks.UnsupportedConfigError(
+            'Disk type %s allows only 1 striped disk.' % disk_spec.disk_type
+        )
+      cloud = group_spec.cloud
+      providers.LoadProvider(cloud)
+      disk_class = disk.GetMultiAttachDiskClass(cloud)
+      self.multi_attach_disk = disk_class(
+          disk_spec,
+          name=f'pkb-{FLAGS.run_uri}-data-0-0',
+          zone=group_spec.vm_spec.zone,
+          project=None,
+      )
 
   def ConstructVirtualMachineGroup(
       self, group_name, group_spec
@@ -907,6 +936,8 @@ class BenchmarkSpec:
       self.nfs_service.Create()
     if self.smb_service:
       self.smb_service.Create()
+    if self.multi_attach_disk:
+      self.multi_attach_disk.Create()
 
     for placement_group_object in self.placement_groups.values():
       placement_group_object.Create()
@@ -1050,6 +1081,8 @@ class BenchmarkSpec:
       self.nfs_service.Delete()
     if self.smb_service:
       self.smb_service.Delete()
+    if self.multi_attach_disk:
+      self.multi_attach_disk.Delete()
     if hasattr(self, 'messaging_service') and self.messaging_service:
       self.messaging_service.Delete()
     if hasattr(self, 'memory_store') and self.memory_store:
