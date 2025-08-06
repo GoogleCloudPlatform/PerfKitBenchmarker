@@ -412,7 +412,7 @@ hadoop_dfsio:
   name: dpb_testdfsio_benchmark
   flags:
     dfsio_delay_read_sec: 1800
-    dfsio_file_sizes_list: [32768]
+    dfsio_file_sizes_list: [49152]
     dfsio_fs: hdfs
     dfsio_num_files_list: [15]
     dfsio_readahead_kb: 1024
