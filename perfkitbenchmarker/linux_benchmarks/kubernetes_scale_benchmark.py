@@ -132,8 +132,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       cluster, 'node', start_time, resources_to_ignore=initial_nodes
   )
   metadata = {
-      'pod_memory': LIMIT_MEMORY_PER_POD.value,
-      'pod_cpu': LIMIT_CPUS_PER_POD.value,
+      'pod_memory': MEMORY_PER_POD.value,
+      'pod_cpu': CPUS_PER_POD.value,
       'goal_replicas': NUM_PODS.value,
       'image': _GetImage(),
   }
