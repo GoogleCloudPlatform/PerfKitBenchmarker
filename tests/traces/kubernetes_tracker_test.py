@@ -1,13 +1,20 @@
 import time
 from typing import Optional
 import unittest
-from unittest import mock
+from absl.testing import flagsaver
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import provider_info
+from perfkitbenchmarker.configs import container_spec
 from tests import pkb_common_test_case
 from perfkitbenchmarker.traces import kubernetes_tracker
 
 
 class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.enter_context(flagsaver.flagsaver(kubeconfig="kubeconfig"))
+    self.enter_context(flagsaver.flagsaver(run_uri="123"))
 
   def testTrackUsageCalculatesTotalClusterTime(self):
     fake_time = time.time()
@@ -32,6 +39,7 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = CreateMockCluster(
         name="pkb-cluster", machine_type="e2-standard-8"
     )
+    # pylint: disable=invalid-name
     cluster.GetNodeNames = lambda: [
         "gke-pkb-cluster-default-pool-node-1",
         "gke-pkb-cluster-default-pool-node-2",
@@ -67,6 +75,7 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
         name="pkb-cluster", machine_type="e2-standard-8"
     )
     cluster.GetNodeNames = lambda: ["gke-pkb-cluster-default-pool-node-1"]
+    # pylint: disable=invalid-name
     cluster.GetEvents = lambda: [
         container_service.KubernetesEvent(
             resource=container_service.KubernetesEventResource(
@@ -109,12 +118,8 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
         name="pkb-cluster",
         machine_type="e2-standard-8",
         nodepools={
-            "node-pool-1": CreateMockNodePool(
-                name="node-pool-1", machine_type="n2-standard-4"
-            ),
-            "node-pool-2": CreateMockNodePool(
-                name="node-pool-2", machine_type="n2-highcpu-96"
-            ),
+            "node-pool-1": "n2-standard-4",
+            "node-pool-2": "n2-highcpu-96",
         },
     )
     cluster.GetNodeNames = lambda: [
@@ -179,30 +184,55 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertAlmostEqual(samples[0].value, 60.0)
 
 
+_CLUSTER_CLOUD = provider_info.UNIT_TEST
+
+
+class TestKubernetesCluster(container_service.KubernetesCluster):
+
+  CLOUD = _CLUSTER_CLOUD
+
+  def _Create(self):
+    pass
+
+  def _Delete(self):
+    pass
+
+
 def CreateMockCluster(
     name: str,
     machine_type: str,
-    nodepools: Optional[dict[str, container_service.BaseNodePoolConfig]] = None,
+    nodepools: Optional[dict[str, str]] = None,
 ) -> container_service.KubernetesCluster:
-  cluster = mock.create_autospec(container_service.KubernetesCluster)
-  cluster.name = name
-  cluster.default_nodepool = mock.create_autospec(
-      container_service.BaseNodePoolConfig
+  nodepool_spec = {}
+  if nodepools:
+    for nodepool_name, machine_type in nodepools.items():
+      nodepool_spec[nodepool_name] = {
+          "vm_spec": {
+              _CLUSTER_CLOUD: {
+                  "machine_type": machine_type,
+                  "zone": "us-east2-a",
+              }
+          },
+      }
+  cluster = TestKubernetesCluster(
+      container_spec.ContainerClusterSpec(
+          name,
+          **{
+              "cloud": _CLUSTER_CLOUD,
+              "vm_spec": {
+                  _CLUSTER_CLOUD: {
+                      "machine_type": machine_type,
+                      "zone": "us-east2-a",
+                  },
+              },
+              "nodepools": nodepool_spec,
+          },
+      )
   )
-  cluster.default_nodepool.machine_type = machine_type
-  cluster.nodepools = nodepools
+  cluster.GetEvents = lambda: []
+  cluster.GetNodeNames = lambda: []
   return cluster
-
-
-def CreateMockNodePool(
-    name: str, machine_type: str
-) -> container_service.BaseNodePoolConfig:
-  np = mock.create_autospec(container_service.BaseNodePoolConfig)
-  np.name = name
-  np.machine_type = machine_type
-  return np
 
 
 if __name__ == "__main__":
   unittest.main()
-
