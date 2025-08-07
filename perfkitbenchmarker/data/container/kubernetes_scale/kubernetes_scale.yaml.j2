@@ -20,9 +20,6 @@ spec:
         command: {{ Command }}
         {%- endif %}
         resources:
-          limits:
-            cpu: {{ CpuLimit }}
-            memory: {{ MemoryLimit }}
           requests:
             cpu: {{ CpuRequest }}
             memory: {{ MemoryRequest }}
