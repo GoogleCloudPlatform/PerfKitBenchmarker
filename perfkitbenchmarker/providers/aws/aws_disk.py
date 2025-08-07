@@ -553,11 +553,14 @@ class AwsDisk(disk.BaseDisk):
     self.create_disk_end_time = time.time()
     util.AddDefaultTags(self.id, self.region)
 
-  def _Delete(self):
-    """Deletes the disk, as well as all associated snapshot and restore disks."""
+  def _DeleteDependencies(self):
+    """Deletes potential snapshots of the disk."""
     if self.snapshots:
       for snapshot in self.snapshots:
         snapshot.Delete()
+
+  def _Delete(self):
+    """Deletes the disk, as well as all associated snapshot and restore disks."""
     delete_cmd = util.AWS_PREFIX + [
         'ec2',
         'delete-volume',
@@ -727,9 +730,6 @@ class AwsDisk(disk.BaseDisk):
 
     with self._lock:
       assert self.attached_vm_name in AwsDisk.available_device_letters_by_vm
-      AwsDisk.available_device_letters_by_vm[self.attached_vm_name].add(
-          self.device_letter
-      )
       self.attached_vm_id = None
       self.attached_vm_name = None
       self.device_letter = None
@@ -886,8 +886,10 @@ class AwsDiskSnapshot(disk.DiskSnapshot):
 
   def Restore(self):
     """Creates a disk from the snapshot."""
-    self.restore_disk_name = f'{self.name}-restore-{self.num_restore_disks}'
     self.disk_spec.snapshot_id = self.id
+    self.disk_spec.mount_point = (
+        f'/restore{self.num_restore_disks}{self.disk_spec.mount_point}'
+    )
     restore_disk = AwsDisk(
         self.disk_spec, self.zone, self.source_disk.machine_type
     )

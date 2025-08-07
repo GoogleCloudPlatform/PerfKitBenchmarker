@@ -234,14 +234,6 @@ class GCEPDDiskTest(GCEDiskTest):
     spec.num_striped_disks = 1
     spec.create_with_vm = True
     fake_rets = [
-        ('stdout', 'stderr', 0),
-        ('stdout', 'stderr', 0),
-        (
-            'nvme version 2.8 (git 2.8)\nlibnvme version 1.8 (git 1.8)',
-            'stderr',
-            0,
-        ),
-        ('', 'stderr', 0),
         ('/dev/nvme0n1', 'stderr', 0),
         ('0', 'stderr', 0),
         ('stdout', 'stderr', 0),
@@ -255,13 +247,6 @@ class GCEPDDiskTest(GCEDiskTest):
       )
       self.linux_vm.SetupAllScratchDisks()
       expected_commands = [
-          ['sudo apt-get update'],
-          [
-              "sudo DEBIAN_FRONTEND='noninteractive' /usr/bin/apt-get -y"
-              ' install nvme-cli'
-          ],
-          ['sudo nvme --version'],
-          ['sudo nvme list --output-format json'],
           ['readlink -f /dev/disk/by-id/google-test_vm-data-0-0'],
           ['mount | grep "/dev/nvme0n1 on /scratch" | wc -l'],
           [
@@ -297,14 +282,6 @@ class GCEPDDiskTest(GCEDiskTest):
         (_DISK_JSON, 'stderr', 0),  # Exists command
         (_DISK_JSON, 'stderr', 0),  # Describe command
         ('', '', 0),
-        ('stdout', 'stderr', 0),
-        ('stdout', 'stderr', 0),
-        (
-            'nvme version 2.8 (git 2.8)\nlibnvme version 1.8 (git 1.8)',
-            'stderr',
-            0,
-        ),
-        ('', 'stderr', 0),
         ('/dev/nvme0n1', 'stderr', 0),
         ('0', 'stderr', 0),
         ('', 'stderr', 0),
@@ -378,13 +355,6 @@ class GCEPDDiskTest(GCEDiskTest):
               'test',
               '--quiet',
           ],
-          ['sudo apt-get update'],
-          [
-              "sudo DEBIAN_FRONTEND='noninteractive' /usr/bin/apt-get -y"
-              ' install nvme-cli'
-          ],
-          ['sudo nvme --version'],
-          ['sudo nvme list --output-format json'],
           ['readlink -f /dev/disk/by-id/google-test_vm-data-0-0'],
           ['mount | grep "/dev/nvme0n1 on /scratch" | wc -l'],
           [

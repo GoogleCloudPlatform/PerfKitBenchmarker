@@ -26,16 +26,11 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import unmanaged_mysql_sysbench_benchmark
+from perfkitbenchmarker.linux_benchmarks.fio import utils as fio_utils
 from perfkitbenchmarker.linux_packages import fio
 
 
 FLAGS = flags.FLAGS
-
-REPORT_SNAPSHOT_FULL_RESTORE_TIME = flags.DEFINE_bool(
-    'report_snapshot_full_restore_time',
-    True,
-    'Whether to report the snapshot full restore time. Default value is false.',
-)
 
 BENCHMARK_NAME = 'disk_snapshot'
 BENCHMARK_CONFIG = """
@@ -46,19 +41,19 @@ disk_snapshot:
       vm_spec: *default_dual_core
       disk_spec:
         GCP:
-          disk_size: 500
+          disk_size: 200
           disk_type: hyperdisk-balanced
           provisioned_iops: 16000
           provisioned_throughput: 800
           mount_point: /var/lib/mysql
         AWS:
-          disk_size: 500
+          disk_size: 200
           disk_type: gp3
           provisioned_iops: 16000
           provisioned_throughput: 800
           mount_point: /var/lib/mysql
         Azure:
-          disk_size: 500
+          disk_size: 200
           disk_type: PremiumV2_LRS
           provisioned_iops: 16000
           provisioned_throughput: 800
@@ -74,6 +69,7 @@ disk_snapshot:
     sysbench_ssl_mode: required
     sysbench_run_threads: 1,64,128,256,512,1024,2048
     sysbench_run_seconds: 300
+    fio_target_mode: against_device_without_fill
 """
 
 
@@ -115,23 +111,109 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   return all_samples
 
 
-def RestoreSnapshot(
+def MeasureRestoreSnapshotTime(
     source_disk: disk.BaseDisk,
     vm: linux_virtual_machine.BaseLinuxVirtualMachine,
-):
-  """Restore the snapshot on the given vm."""
+) -> list[sample.Sample]:
+  """Measure snapshot restore time to first byte and full restore time."""
+
   source_disk.snapshots[-1].Restore()
-  if REPORT_SNAPSHOT_FULL_RESTORE_TIME.value:
-    fio_exe = fio.GetFioExec()
-    dev_path = source_disk.GetDevicePath()
-    vm.RemoteCommand(
-        f'{fio_exe} --filename={dev_path} --size=100% --rw=read --bs=1M'
-        ' --iodepth=64 --numjobs=4 --ioengine=libaio --direct=1'
-        ' --name=volume-initialize'
-    )
-  source_disk.snapshots[-1].restore_disks[
-      -1
-  ].create_disk_full_end_time = time.time()
+  latest_restore_disk = source_disk.snapshots[-1].restore_disks[-1]
+  latest_restore_disk.Attach(vm)
+
+  # TODO(andytzhu) - Refactor GetDevicePath disk methods.
+  latest_restore_disk_device_path = latest_restore_disk.GetDevicePath() or ''
+  if vm.CLOUD == 'AWS':
+    nvme_devices = vm.GetNVMEDeviceInfo()
+    for device in nvme_devices:
+      if device['ModelNumber'] == 'Amazon Elastic Block Store':
+        if device['DevicePath'] > latest_restore_disk_device_path:
+          latest_restore_disk_device_path = device['DevicePath']
+
+  vm.RemoteCommand(
+      'sudo dd'
+      f' if={latest_restore_disk_device_path} of=/dev/null'
+      ' bs=4k count=1'
+  )
+  latest_restore_disk.restore_first_byte_end_time = time.time()
+
+  latency_samples = MeasureLatestRestoreDiskLatency(vm)
+
+  # Detach latest restore disk and attach another restore disk.
+  latest_restore_disk.Detach()
+  source_disk.snapshots[-1].num_detached_restore_disks += 1
+  source_disk.snapshots[-1].Restore()
+  latest_restore_disk = source_disk.snapshots[-1].restore_disks[-1]
+  latest_restore_disk.Attach(vm)
+
+  HydrateLatestRestoreDisk(vm)
+  latest_restore_disk.Detach()
+  source_disk.snapshots[-1].num_detached_restore_disks += 1
+
+  return latency_samples
+
+
+def HydrateLatestRestoreDisk(
+    vm: linux_virtual_machine.BaseLinuxVirtualMachine,
+):
+  """Hydrate the latest restore disk by reading all the data.
+
+  Args:
+    vm: The vm to run the fio command.
+  """
+  latest_restore_disk = vm.scratch_disks[-1].snapshots[-1].restore_disks[-1]
+  fio_exe = fio.GetFioExec()
+  latest_restore_disk_device_path = latest_restore_disk.GetDevicePath() or ''
+  if vm.CLOUD == 'AWS':
+    nvme_devices = vm.GetNVMEDeviceInfo()
+    for device in nvme_devices:
+      if device['ModelNumber'] == 'Amazon Elastic Block Store':
+        if device['DevicePath'] > latest_restore_disk_device_path:
+          latest_restore_disk_device_path = device['DevicePath']
+  vm.RemoteCommand(
+      f'{fio_exe} --filename={latest_restore_disk_device_path} --rw=read'
+      ' --bs=1M --iodepth=64 --numjobs=1 --size=100% --ioengine=libaio'
+      ' --direct=1 --name=volume-initialize'
+  )
+  latest_restore_disk.create_disk_full_end_time = time.time()
+
+
+def MeasureLatestRestoreDiskLatency(
+    vm: linux_virtual_machine.BaseLinuxVirtualMachine,
+) -> list[sample.Sample]:
+  """Measure the latency of the latest restore disk.
+
+  Args:
+    vm: The vm to run the fio command.
+
+  Returns:
+    A list of sample.Sample.
+  """
+  latest_restore_disk = vm.scratch_disks[-1].snapshots[-1].restore_disks[-1]
+  latest_restore_disk_device_path = latest_restore_disk.GetDevicePath() or ''
+  if vm.CLOUD == 'AWS':
+    nvme_devices = vm.GetNVMEDeviceInfo()
+    for device in nvme_devices:
+      if device['ModelNumber'] == 'Amazon Elastic Block Store':
+        if device['DevicePath'] > latest_restore_disk_device_path:
+          latest_restore_disk_device_path = device['DevicePath']
+
+  benchmark_params = {
+      'runtime': 30,
+      'ramptime': 0,
+  }
+  job_file_string = fio_utils.GenerateJobFile(
+      [latest_restore_disk],
+      ['rand_4k_read_100%_iodepth-1_numjobs-1'],
+      benchmark_params,
+      device_path=latest_restore_disk_device_path,
+  )
+  samples = fio_utils.RunTest(
+      vm,
+      fio.GetFioExec(),
+      job_file_string,
+  )
+  return samples
 
 
 def CreateSnapshotOnVM(
@@ -147,12 +229,14 @@ def CreateSnapshotOnVM(
       lambda disk: disk.CreateSnapshot(),
       vm.scratch_disks,
   )
-  background_tasks.RunThreaded(
-      lambda disk: RestoreSnapshot(disk, vm), vm.scratch_disks
-  )
-  # TODO(andytzhu) - Measure FIO Latency after restore.
+
   vm_samples = []
   metadata = {'snapshot_number': snapshot_num}
+  latency_samples = MeasureRestoreSnapshotTime(vm.scratch_disks[-1], vm)
+  for latency_sample in latency_samples:
+    latency_sample.metadata.update(metadata)
+    vm_samples.append(latency_sample)
+
   if 'G' not in used_disk_size.strip()[-1]:
     raise ValueError('Used disk size is not in GB.')
   full_snapshot_size_gb = float(used_disk_size.strip().strip('G'))
@@ -197,25 +281,25 @@ def CreateSnapshotOnVM(
             metadata,
         )
     )
+    first_restore_disk = scratch_disk.snapshots[-1].restore_disks[-2]
     vm_samples.append(
         sample.Sample(
             'snapshot_restore_time_to_first_byte',
-            scratch_disk.snapshots[-1].restore_disks[-1].create_disk_end_time
-            - scratch_disk.snapshots[-1]
-            .restore_disks[-1]
+            first_restore_disk
+            .restore_first_byte_end_time
+            - first_restore_disk
             .create_disk_start_time,
             'seconds',
             metadata,
         )
     )
+    latest_restore_disk = scratch_disk.snapshots[-1].restore_disks[-1]
     vm_samples.append(
         sample.Sample(
             'snapshot_full_restore_time',
-            scratch_disk.snapshots[-1]
-            .restore_disks[-1]
+            latest_restore_disk
             .create_disk_full_end_time
-            - scratch_disk.snapshots[-1]
-            .restore_disks[-1]
+            - latest_restore_disk
             .create_disk_start_time,
             'seconds',
             metadata,
