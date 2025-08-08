@@ -151,7 +151,7 @@ class ElasticKubernetesServiceTest(BaseEksTest):
         ('availabilityZones', ['us-west-1a', 'us-west-1b']), called_json.items()
     )
 
-  def testEksClusterNodepoools(self):
+  def testEksClusterNodepools(self):
     self.MockIssueCommand({'create cluster': [('Cluster created', '', 0)]})
     spec2 = EKS_SPEC_DICT.copy()
     spec2['nodepools'] = {
@@ -191,6 +191,29 @@ class ElasticKubernetesServiceTest(BaseEksTest):
             'ssh': {'allow': True, 'publicKeyPath': 'perfkit-key-123p'},
         },
         node_groups[1],
+    )
+
+  def testEksClusterGetNodepoolFromName(self):
+    self.MockIssueCommand({'get node': [('nginx', '', 0)]})
+    spec2 = EKS_SPEC_DICT.copy()
+    spec2['nodepools'] = {
+        'nginx': {
+            'vm_count': 3,
+            'vm_spec': {
+                'AWS': {
+                    'machine_type': 'm6i.xlarge',
+                    'zone': 'us-west-1b',
+                }
+            },
+        }
+    }
+    cluster = elastic_kubernetes_service.EksCluster(
+        container_spec.ContainerClusterSpec('NAME', **spec2)
+    )
+    nodepool = cluster.GetNodePoolFromNodeName('sample-node')
+    self.assertIsNotNone(nodepool)
+    self.assertEqual(
+        nodepool.name, 'nginx'
     )
 
 
