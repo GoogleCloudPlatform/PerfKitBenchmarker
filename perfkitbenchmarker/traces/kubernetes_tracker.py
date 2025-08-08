@@ -15,7 +15,6 @@ import collections
 import contextlib
 import dataclasses
 import logging
-import re
 import time
 from typing import Callable, Iterable, Iterator, Optional
 from perfkitbenchmarker import benchmark_spec as bm_spec
@@ -139,8 +138,6 @@ class KubernetesResourceTracker:
 
   def _StopWatchingForNodeChanges(self):
     """Stop watching the cluster for node add/remove events."""
-    # TODO(user): consider periodically fetching the events (instead of just
-    # at the end).
     polled_events = self._cluster.GetEvents()
 
     for e in polled_events:
@@ -158,12 +155,13 @@ class KubernetesResourceTracker:
         if name in self._nodes:
           continue
 
+        machine_type = _GetMachineTypeFromNodeName(self._cluster, name)
         logging.info(
-            "DEBUG: RegisteredNode: %s, %s", name, self._GetMachineType(name)
+            "DEBUG: RegisteredNode: %s, %s", name, machine_type
         )
         self._nodes[name] = _NodeTracker(
             name=name,
-            machine_type=self._GetMachineType(name),
+            machine_type=machine_type,
             start_time=e.timestamp,
         )
       elif e.reason == "RemovingNode":
@@ -184,9 +182,6 @@ class KubernetesResourceTracker:
         if self._nodes[name].end_time is not None:
           end_time = max(end_time, self._nodes[name].end_time)
         self._nodes[name].end_time = end_time
-
-  def _GetMachineType(self, node_name: str) -> str:
-    return _GetMachineTypeFromNodeName(self._cluster, node_name)
 
 
 @dataclasses.dataclass
@@ -213,34 +208,11 @@ def _GetInitialNodeDetails(
 def _GetMachineTypeFromNodeName(
     cluster: container_service.KubernetesCluster, node_name: str
 ) -> str:
-  """Get the machine type of the given node.
-
-  This method assumes that the nodepool name is embedded in the node name.
-  Better would be a lookup from the cloud provider.
-
-  Args:
-    cluster: The cluster that the given node belongs to.
-    node_name: The name of the node.
-  Returns:
-    The machine type of the node, or 'unknown' if not found.
-  """
-  # Get the nodepool
-  # eg 'gke-pkb-8ee57c86-default-pool-232fa391-34qh' => default-pool
-  # eg 'gke-pkb-8ee57c86-np1-2cd25dd3-1r9l => np1
-  # TODO(user): extend this for clouds other than GCP.
-  m = re.match(f"gke-{cluster.name}-(.*)-[^-]*-[^-]*", node_name)
-  if not m:
+  """Get the machine type of the given node."""
+  nodepool = cluster.GetNodePoolFromNodeName(node_name)
+  if nodepool is None:
     return "unknown"
-  node_pool = m.group(1)
-
-  if node_pool == "default-pool":
-    return cluster.default_nodepool.machine_type
-
-  if node_pool not in cluster.nodepools:
-    return "unknown"
-
-  bnpc: container_service.BaseNodePoolConfig = cluster.nodepools[node_pool]
-  return bnpc.machine_type
+  return nodepool.machine_type
 
 
 def _FinalizeNodeDetails(

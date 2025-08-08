@@ -282,6 +282,71 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
 
   @parameterized.named_parameters(
+      ('aks default', 'aks-default-30566860-vmss000000', 'default'),
+      ('gke default', 'gke-pkb-8ee57c86-default-pool-232fa391-34qh', 'default'),
+      ('gke servers', 'gke-pkb-8ee57c86-servers-2cd25dd3-1r9l', 'servers'),
+      ('check none', 'gke-pkb-8ee57c86-someother-2cd25dd3-1r9l', None),
+  )
+  def testGetNodepoolFromNodeName(
+      self, node_name: str, expected_nodepool_name: str | None
+  ):
+    vm_spec = {
+        _CLUSTER_CLOUD: {
+            'machine_type': 'fake-machine-type',
+            'zone': 'us-east2-a',
+        },
+    }
+    nodepool_cluster = TestKubernetesCluster(
+        container_spec.ContainerClusterSpec(
+            'test-cluster',
+            **{
+                'cloud': _CLUSTER_CLOUD,
+                'vm_spec': vm_spec,
+                'nodepools': {
+                    'servers': {
+                        'vm_spec': vm_spec,
+                    },
+                    'clients': {
+                        'vm_spec': vm_spec,
+                    },
+                },
+            },
+        )
+    )
+    nodepool = nodepool_cluster.GetNodePoolFromNodeName(node_name)
+    if expected_nodepool_name is None:
+      self.assertIsNone(nodepool)
+    else:
+      assert nodepool is not None
+      self.assertEqual(nodepool.name, expected_nodepool_name)
+
+  def testGetNodepoolFromNodeName_raisesIfMultipleNodepoolsFound(self):
+    vm_spec = {
+        _CLUSTER_CLOUD: {
+            'machine_type': 'fake-machine-type',
+            'zone': 'us-east2-a',
+        },
+    }
+    nodepool_cluster = TestKubernetesCluster(
+        container_spec.ContainerClusterSpec(
+            'test-cluster',
+            **{
+                'cloud': _CLUSTER_CLOUD,
+                'vm_spec': vm_spec,
+                'nodepools': {
+                    'default-for-serving': {
+                        'vm_spec': vm_spec,
+                    },
+                },
+            },
+        )
+    )
+    with self.assertRaises(ValueError):
+      nodepool_cluster.GetNodePoolFromNodeName(
+          'gke-pkb-8ee57c86-default-for-serving-232fa391-34qh'
+      )
+
+  @parameterized.named_parameters(
       ('eks_auto', 'hostname', 'k8s-fib-fib-123.elb.us-east-1.amazonaws.com'),
       ('gke', 'ip', '34.16.24.55'),
   )

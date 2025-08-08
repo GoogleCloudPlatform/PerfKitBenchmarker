@@ -235,9 +235,15 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
   def _Delete(self) -> None:
     """Deletes the underlying resource."""
     assert self.endpoint_name
-    self._RunPythonScript(
-        ['--operation=delete', f'--endpoint_name={self.endpoint_name}']
-    )
+    try:
+      self._RunPythonScript(
+          ['--operation=delete', f'--endpoint_name={self.endpoint_name}']
+      )
+    except errors.VirtualMachine.RemoteCommandError as e:
+      raise errors.Resource.RetryableDeletionError(
+          'Failed to delete sagemaker endpoint. Retrying deletion. Error:'
+          f' {e}'
+      )
 
 
 class JumpStartModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):

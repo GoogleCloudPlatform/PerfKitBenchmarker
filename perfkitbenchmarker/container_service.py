@@ -564,6 +564,37 @@ class BaseContainerCluster(resource.BaseResource):
     """Override to initialize cloud specific configs."""
     pass
 
+  def GetNodePoolFromNodeName(
+      self, node_name: str
+  ) -> BaseNodePoolConfig | None:
+    """Get the nodepool from the node name.
+
+    This method assumes that the nodepool name is embedded in the node name.
+    Better would be a lookup from the cloud provider.
+
+    Args:
+      node_name: The name of the node.
+
+    Returns:
+      The associated nodepool, or None if not found.
+    """
+    nodepool_names = self.nodepools.keys()
+    found_pools = []
+    if '-default-' in node_name:
+      found_pools.append(self.default_nodepool)
+    for pool_name in nodepool_names:
+      if f'-{pool_name}-' in node_name:
+        found_pools.append(self.nodepools[pool_name])
+    if len(found_pools) == 1:
+      return found_pools[0]
+    if len(found_pools) > 1:
+      raise ValueError(
+          f'Multiple nodepools found for node with name {node_name}:'
+          f' {found_pools}. Please change the name of the nodepools used to'
+          ' avoid this.'
+      )
+    return None
+
   def DeleteContainers(self):
     """Delete containers belonging to the cluster."""
     for container in itertools.chain(*list(self.containers.values())):

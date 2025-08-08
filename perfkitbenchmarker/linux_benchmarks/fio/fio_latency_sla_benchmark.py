@@ -22,7 +22,7 @@ keeps running for the 'runtime' duration and returns average IOPS for that
 duration that meets the latency SLA.
 
 How this benchmark configures iodepth and numjobs ?
-1. numjobs = twice of vm's cpus.
+1. numjobs = vm's cpus.
 Selects iodepth large enough to create room for queue depth growth, right now
 it's hardcoded at 50.
 
@@ -31,6 +31,7 @@ Finalize your latency target and latency percentile. Latency window is a
 sampling window, fio will the queue depth for that duration. 30 secs is a good
 duration because it gives fio sometime to get stable.
 """
+import copy
 import logging
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
@@ -54,7 +55,7 @@ fio_latency_sla:
       disk_spec: *default_500_gb
       vm_count: 1
 """
-JOB_FILE = 'fio-iops-under-sla.job'
+JOB_FILE = 'fio-parent.job'
 
 
 def GetConfig(user_config):
@@ -99,44 +100,98 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec):
 
 
 def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
-  """Runs FIO benchmark with latency SLA."""
+  """Run the fio latency sla benchmark.
+
+  Args:
+    spec: The benchmark specification.
+
+  Returns:
+    A list of sample.Sample objects.
+  """
   vm = spec.vms[0]
-  iodepth = 100
-  numjobs = 2 * vm.num_cpus
-  ValidateDefaultIODepthAndNumjobs(
-      vm, iodepth, numjobs
-  )
+  max_iodepth = 50
+  numjobs = vm.num_cpus
   benchmark_params = {
       'latency_target': fio_flags.FIO_LATENCY_TARGET.value,
       'latency_percentile': fio_flags.FIO_LATENCY_PERCENTILE.value,
-      'latency_window': fio_flags.FIO_LATENCY_WINDOW.value,
-      'latency_run': fio_flags.FIO_LATENCY_RUN.value,
-      'iodepth': iodepth,
       'numjobs': numjobs,
   }
-  job_file_str = utils.GenerateJobFile(
-      vm.scratch_disks,
-      fio_flags.FIO_GENERATE_SCENARIOS.value,
-      benchmark_params,
-      JOB_FILE,
+  left_iodepth = 1
+  right_iodepth = max_iodepth
+  latency_under_sla_samples = []
+  iodepth_details = {}
+  max_iops_under_sla = 0
+  latency_target = _ParseIntLatencyTargetAsMicroseconds(
+      fio_flags.FIO_LATENCY_TARGET.value
   )
-  return utils.RunTest(vm, constants.FIO_PATH, job_file_str)
+  while left_iodepth <= right_iodepth:
+    iodepth = (left_iodepth + right_iodepth) // 2
+    benchmark_params['iodepth'] = iodepth
+    job_file_str = utils.GenerateJobFile(
+        vm.scratch_disks,
+        fio_flags.FIO_GENERATE_SCENARIOS.value,
+        benchmark_params,
+        JOB_FILE,
+    )
+    samples = utils.RunTest(vm, constants.FIO_PATH, job_file_str)
+    latency_at_percentile_sample = GetLatencyPercentileSample(samples)
+    iops_samples = GetIopsSamples(samples)
+    iodepth_details[iodepth] = ContructLatencyIopsMap(
+        latency_at_percentile_sample, iops_samples
+    )
+    if latency_at_percentile_sample.unit != 'usec':
+      raise errors.Benchmarks.RunError(
+          'Latency unit is not usec. Please check and update latency_target is'
+          ' needed'
+      )
+    if (
+        latency_at_percentile_sample.value > latency_target
+    ):  # latency_at_percentile_sample.value has unit usec
+      right_iodepth = iodepth - 1
+      logging.info(
+          'Latency at iodepth %s is %s usec (more than latency target),'
+          ' reducing right iodepth to %s',
+          iodepth,
+          latency_at_percentile_sample.value,
+          right_iodepth,
+      )
+    else:
+      total_iops = sum(
+          iops_sample.value for iops_sample in iops_samples
+      )  # looking at combined read and write iops for RW workloads
+      if total_iops > max_iops_under_sla:
+        latency_under_sla_samples = samples
+      left_iodepth = iodepth + 1
+      logging.info(
+          'Latency at iodepth %s is %s usec (less than latency target),'
+          ' increasing left iodepth to %s',
+          iodepth,
+          latency_at_percentile_sample.value,
+          left_iodepth,
+      )
+  metadata = copy.deepcopy(latency_under_sla_samples[0].metadata)
+  metadata['iodepth_details'] = iodepth_details
+  latency_under_sla_samples.append(
+      sample.Sample(
+          metric='iodepth_details',
+          value='',
+          unit='',
+          metadata=metadata,
+          timestamp=latency_under_sla_samples[0].timestamp,
+      )
+  )
+  return latency_under_sla_samples
 
 
-def ValidateDefaultIODepthAndNumjobs(vm, iodepth, numjobs):
-  """Run FIO benchmark to make sure iodepth and numjobs are enough for to max IOPS under latency SLA."""
-  benchmark_params = {
-      'iodepth': iodepth,
-      'numjobs': numjobs,
-      'runtime': 10
-  }
-  job_file_str = utils.GenerateJobFile(
-      vm.scratch_disks,
-      fio_flags.FIO_GENERATE_SCENARIOS.value,
-      benchmark_params,
-      'fio-parent.job',
-  )
-  samples = utils.RunTest(vm, constants.FIO_PATH, job_file_str)
+def GetLatencyPercentileSample(samples):
+  """Get latency percentile sample from list of samples.
+
+  Args:
+    samples: list of samples.
+
+  Returns:
+    latency percentile sample.
+  """
   latency_percentile = fio_flags.FIO_LATENCY_PERCENTILE.value
   formatted_percentile = (
       latency_percentile
@@ -149,31 +204,30 @@ def ValidateDefaultIODepthAndNumjobs(vm, iodepth, numjobs):
       for sample in samples
       if sample.metric.endswith(f'latency:p{formatted_percentile}')
   ]
-  for latency_sample in latency_samples:
-    if latency_sample.value < _ParseIntLatencyTarget(
-        fio_flags.FIO_LATENCY_TARGET.value
-    ):
-      raise errors.Benchmarks.RunError(
-          '--latency_percentile latency of %s for the'
-          ' default IODepth and NumJobs is less than latency_target'
-          ' %s, fio_latency_under_sla'
-          " benchmark won't reach the latency SLA. Please increae the default"
-          ' iodepth or numjobs and try again.' % (
-              latency_sample.value,
-              fio_flags.FIO_LATENCY_TARGET.value,
-          )
-      )
+  return latency_samples[0]
+
+
+def GetIopsSamples(samples):
   iops_samples = [
-      sample for sample in samples if sample.metric.endswith(':iops')
+      sample
+      for sample in samples
+      if sample.metric.endswith(':iops')
   ]
+  return iops_samples
+
+
+def ContructLatencyIopsMap(latency_sample, iops_samples):
+  metric_details = {}
+  metric_details['latency'] = latency_sample.value
   for iops_sample in iops_samples:
     if iops_sample.metric.endswith('read:iops'):
-      logging.info('read iops at default configuration: %s', iops_sample.value)
+      metric_details['read_iops'] = iops_sample.value
     if iops_sample.metric.endswith('write:iops'):
-      logging.info('write iops at default configuration: %s', iops_sample.value)
+      metric_details['write_iops'] = iops_sample.value
+  return metric_details
 
 
-def _ParseIntLatencyTarget(latency_target_str):
+def _ParseIntLatencyTargetAsMicroseconds(latency_target_str):
   if latency_target_str.endswith('ms'):
     return int(latency_target_str[:-2])*1000
   elif latency_target_str.endswith('us'):
