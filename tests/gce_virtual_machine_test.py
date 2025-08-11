@@ -423,6 +423,23 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     vm.numa_node_count = numa_node_count
     self.assertEqual(vm.GetVNUMASplitValue(), expected)
 
+  @parameterized.named_parameters(
+      ('no_min_cpu_platform', 'test_machine_type', '', None),
+      ('with_min_cpu_platform', 'test_machine_type', 'skylake', 'skylake'),
+  )
+  def testGetMinCpuPlatform(
+      self, test_machine_type, test_min_cpu_platform, expected
+      ):
+
+    vm = pkb_common_test_case.TestGceVirtualMachine((
+        gce_virtual_machine.GceVmSpec(
+            _COMPONENT,
+            machine_type=test_machine_type,
+            min_cpu_platform=test_min_cpu_platform
+        )
+    ))
+    self.assertEqual(vm.GetMinCpuPlatform(), expected)
+
 
 def _CreateFakeDiskMetadata(image, fake_disk):
   fake_disk = copy.copy(fake_disk)
