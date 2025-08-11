@@ -75,6 +75,9 @@ class MockCommand:
     """Mocks a command, returning the next response for the command."""
     if isinstance(cmd, list):
       try:
+        for i in range(len(cmd)):
+          if cmd[i] is None:
+            cmd[i] = ''
         cmd = ' '.join(cmd)
       except TypeError as ex:
         logging.warning(

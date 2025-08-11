@@ -92,6 +92,9 @@ class BaseEksCluster(container_service.KubernetesCluster):
       self.region = util.GetRegionFromZones(self.control_plane_zones)
     self.cluster_version: str = FLAGS.container_cluster_version
     self.account: str = util.GetAccount()
+    self.node_to_nodepool: dict[
+        str, container_service.BaseNodePoolConfig | None
+    ] = {}
 
   def _ChooseSecondZone(self):
     """Choose a second zone for the control plane if only one is specified."""
@@ -211,6 +214,48 @@ class BaseEksCluster(container_service.KubernetesCluster):
         self.region,
     ]
     vm_util.IssueCommand(cmd, timeout=1800)
+
+  def GetNodePoolFromNodeName(
+      self, node_name: str
+  ) -> container_service.BaseNodePoolConfig | None:
+    """Get the nodepool from the node name.
+
+    This method assumes that the nodepool name is embedded in the node name.
+    Better would be a lookup from the cloud provider.
+
+    Args:
+      node_name: The name of the node.
+
+    Returns:
+      The associated nodepool, or None if not found.
+    """
+    if node_name in self.node_to_nodepool:
+      return self.node_to_nodepool[node_name]
+    nodepool_name, err, code = container_service.RunKubectlCommand(
+        [
+            'get',
+            'node',
+            node_name,
+            '-o',
+            'jsonpath="{.metadata.labels.pkb_nodepool}"',
+        ],
+        raise_on_failure=False,
+    )
+    if code:
+      logging.warning(
+          'Got error when trying to get nodepool name for node %s: %s',
+          err,
+          node_name,
+      )
+      nodepool = None
+    else:
+      nodepool_name = nodepool_name.strip().strip('"')
+      if nodepool_name == 'default':
+        nodepool = self.default_nodepool
+      else:
+        nodepool = self.nodepools[nodepool_name]
+    self.node_to_nodepool[node_name] = nodepool
+    return nodepool
 
   def GetDefaultStorageClass(self) -> str:
     """Get the default storage class for the provider."""

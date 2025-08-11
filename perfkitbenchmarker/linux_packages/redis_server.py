@@ -151,6 +151,28 @@ def _Install(vm) -> None:
       f'cd {GetRedisDir()} && git checkout {_VERSION.value} && make'
   )
 
+  num_processes = _GetNumProcesses(vm)
+  # 10 is an arbituary multiplier that ensures this value is high enough.
+  mux_sessions = 10 * num_processes
+  vm.RemoteCommand(
+      f'echo "\nMaxSessions {mux_sessions}" | sudo tee -a /etc/ssh/sshd_config'
+  )
+  # Redis tuning parameters, see
+  # https://www.techandme.se/performance-tips-for-redis-cache-server/.
+  # This command works on 2nd generation of VMs only.
+  update_sysvtl = vm.TryRemoteCommand(
+      'echo "'
+      'vm.overcommit_memory = 1\n'
+      'net.core.somaxconn = 65535\n'
+      '" | sudo tee -a /etc/sysctl.conf'
+  )
+  # /usr/sbin/sysctl is not applicable on certain distros.
+  commit_sysvtl = vm.TryRemoteCommand(
+      'sudo /usr/sbin/sysctl -p || sudo sysctl -p'
+  )
+  if not (update_sysvtl and commit_sysvtl):
+    logging.info('Fail to optimize overcommit_memory and socket connections.')
+
 
 def YumInstall(vm) -> None:
   """Installs the redis package on the VM."""
@@ -259,27 +281,6 @@ def _BuildStartCommand(vm, port: int) -> str:
 
 def Start(vm) -> None:
   """Start redis server process."""
-  num_processes = _GetNumProcesses(vm)
-  # 10 is an arbituary multiplier that ensures this value is high enough.
-  mux_sessions = 10 * num_processes
-  vm.RemoteCommand(
-      f'echo "\nMaxSessions {mux_sessions}" | sudo tee -a /etc/ssh/sshd_config'
-  )
-  # Redis tuning parameters, see
-  # https://www.techandme.se/performance-tips-for-redis-cache-server/.
-  # This command works on 2nd generation of VMs only.
-  update_sysvtl = vm.TryRemoteCommand(
-      'echo "'
-      'vm.overcommit_memory = 1\n'
-      'net.core.somaxconn = 65535\n'
-      '" | sudo tee -a /etc/sysctl.conf'
-  )
-  # /usr/sbin/sysctl is not applicable on certain distros.
-  commit_sysvtl = vm.TryRemoteCommand(
-      'sudo /usr/sbin/sysctl -p || sudo sysctl -p'
-  )
-  if not (update_sysvtl and commit_sysvtl):
-    logging.info('Fail to optimize overcommit_memory and socket connections.')
   for port in GetRedisPorts(vm):
     vm.RemoteCommand(_BuildStartCommand(vm, port))
 

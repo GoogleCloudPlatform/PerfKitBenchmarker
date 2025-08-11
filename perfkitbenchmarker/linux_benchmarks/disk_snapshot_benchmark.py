@@ -172,8 +172,9 @@ def HydrateLatestRestoreDisk(
           latest_restore_disk_device_path = device['DevicePath']
   vm.RemoteCommand(
       f'{fio_exe} --filename={latest_restore_disk_device_path} --rw=read'
-      ' --bs=1M --iodepth=64 --numjobs=1 --size=100% --ioengine=libaio'
-      ' --direct=1 --name=volume-initialize'
+      ' --bs=1M --iodepth=64 --numjobs=4 --size=25% --offset_increment=25%'
+      ' --ioengine=libaio --direct=1 --name=volume-initialize'
+      ' --group_reporting'
   )
   latest_restore_disk.create_disk_full_end_time = time.time()
 
