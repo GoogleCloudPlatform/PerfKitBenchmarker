@@ -457,7 +457,8 @@ class GCEPrepareScratchDiskStrategy(disk_strategies.PrepareScratchDiskStrategy):
   """Strategies to prepare scratch disk on GCE."""
 
   def GetLocalSSDNames(self):
-    return ['Google EphemeralDisk', 'nvme_card']
+    # C3 and C4 VMs have local SSDs with names nvme_card0'
+    return ['Google EphemeralDisk', 'nvme_card', 'nvme_card?', 'nvme_card??']
 
 
 def _GenerateDiskNamePrefix(
