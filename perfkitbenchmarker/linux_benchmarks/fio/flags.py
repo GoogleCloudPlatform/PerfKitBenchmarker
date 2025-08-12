@@ -203,27 +203,15 @@ FLAGS_IGNORED_FOR_CUSTOM_JOBFILE = frozenset({
 })
 
 FIO_LATENCY_TARGET = flags.DEFINE_string(
-    'latency_target',
+    'fio_latency_target',
     '1ms',
     'Fio latency target, allowed units are ms, us and s. It is taken in'
     ' microseconds if no unit is specified.',
 )
 FIO_LATENCY_PERCENTILE = flags.DEFINE_float(
-    'latency_percentile',
+    'fio_latency_percentile',
     99,
     'Fio latency percentile.',
-)
-
-FIO_LATENCY_WINDOW = flags.DEFINE_string(
-    'latency_window',
-    '30s',
-    'Fio latency window is sample window, fio will run each depth for this'
-    ' duration. In microseconds if unit not specified.',
-)
-FIO_LATENCY_RUN = flags.DEFINE_integer(
-    'latency_run',
-    0,
-    'Fio latency run, 0 to disable and 1 to enable.',
 )
 
 FIO_SEPARATE_JOBS_FOR_DISKS = flags.DEFINE_bool(

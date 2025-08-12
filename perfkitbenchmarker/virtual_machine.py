@@ -1298,4 +1298,8 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     """Returns the vNUMA split value (vCPUs/Num of vNUMA nodes) for the VM."""
     return None
 
+  def GetMinCpuPlatform(self) -> str | None:
+    """Returns the minimum CPU platform for the VM."""
+    return None
+
 VirtualMachine = typing.TypeVar('VirtualMachine', bound=BaseVirtualMachine)
