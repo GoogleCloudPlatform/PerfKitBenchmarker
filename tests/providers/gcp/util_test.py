@@ -15,11 +15,13 @@
 
 
 import collections
+import importlib
 import inspect
 import unittest
 
 from absl.testing import parameterized
 import mock
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
@@ -434,6 +436,69 @@ class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
         util.GcloudCommand._IsIssueRateLimitMessage(error_text),
         is_rate_limit_message,
     )
+
+
+class GetDefaultProjectTest(parameterized.TestCase):
+  """Separate class in order to bypass PkbCommonTestCase's setUp."""
+
+  def setUp(self):
+    super().setUp()
+    # Resets the cache so each test case simulates the first invocation of
+    # GetDefaultProject.
+    importlib.reload(util)
+
+  @parameterized.named_parameters(
+      {
+          'testcase_name': 'MaxRetries',
+          'side_effects': [KeyError('key error')] * 4,
+          'expected_exception': vm_util.RetriesExceededRetryError,
+          'expected_result': None,
+          'expected_call_count': 4,
+      },
+      {
+          'testcase_name': 'RetryableErrorsThenSuccess',
+          'side_effects': [
+              KeyError('key error'),
+              errors.VmUtil.IssueCommandError('issue command error'),
+              ('{"core": {"project": "test-project"}}', '', 0),
+          ],
+          'expected_exception': None,
+          'expected_result': 'test-project',
+          'expected_call_count': 3,
+      },
+      {
+          'testcase_name': 'NonRetryableError',
+          'side_effects': [ValueError('value error')],
+          'expected_exception': ValueError,
+          'expected_result': None,
+          'expected_call_count': 1,
+      },
+      {
+          'testcase_name': 'SuccessOnFirstTry',
+          'side_effects': [('{"core": {"project": "test-project"}}', '', 0)],
+          'expected_exception': None,
+          'expected_result': 'test-project',
+          'expected_call_count': 1,
+      },
+  )
+  @mock.patch.object(vm_util, 'IssueCommand')
+  def testGetDefaultProject(
+      self,
+      mock_issue_command,
+      side_effects,
+      expected_exception,
+      expected_result,
+      expected_call_count,
+  ):
+    mock_issue_command.side_effect = side_effects
+
+    if expected_exception:
+      with self.assertRaises(expected_exception):
+        util.GetDefaultProject()
+    else:
+      self.assertEqual(util.GetDefaultProject(), expected_result)
+
+    self.assertEqual(mock_issue_command.call_count, expected_call_count)
 
 
 class GcpUtilTest(pkb_common_test_case.PkbCommonTestCase):
