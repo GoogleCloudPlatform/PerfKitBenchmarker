@@ -54,6 +54,50 @@ GCS_CLIENT = flags.DEFINE_enum(
 FLAGS = flags.FLAGS
 
 
+class GoogleCloudStorageBucketSpec(object_storage_service.BaseBucketSpec):
+  """Spec for GCS."""
+
+  CLOUD = provider_info.GCP
+
+  def __init__(
+      self,
+      mount_point=None,
+      bucket_name=None,
+      region=None,
+      zone=None,
+      hierarchical_name_space=False,
+      uniform_bucket_level_access=False,
+  ):
+    super().__init__(mount_point, bucket_name, region, zone)
+    self.hierarchical_name_space: bool = hierarchical_name_space
+    self.uniform_bucket_level_access: bool = uniform_bucket_level_access
+
+
+class GoogleCloudStorageBucket(object_storage_service.Bucket):
+  """Google Cloud Storage Object containing GooogleCloudStorageService."""
+
+  def __init__(self, bucket_spec):
+    super().__init__(bucket_spec)
+    self.hierarchical_name_space = bucket_spec.hierarchical_name_space
+    self.uniform_bucket_level_access = (
+        bucket_spec.uniform_bucket_level_access
+    )
+    self.service = GoogleCloudStorageService()
+
+  def _Create(self):
+    self.service.PrepareService(
+        self.region,
+        self.hierarchical_name_space,
+        self.uniform_bucket_level_access,
+    )
+    self.service.MakeBucket(self.bucket_name, placement=self.zone)
+
+  def _Delete(self):
+    self.service.CleanupService()
+    self.service.EmptyBucket(self.bucket_name)
+    self.service.DeleteBucket(self.bucket_name)
+
+
 class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
   """Interface to Google Cloud Storage."""
 
