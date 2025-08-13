@@ -248,6 +248,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Runs the node pools provisioning benchmark."""
   cluster = benchmark_spec.container_cluster
   samples = []
+  cluster_type = getattr(cluster, "CLUSTER_TYPE", None)
+  if cluster_type == "Karpenter":
+    cluster.ApplyManifest(
+        "provision_node_pools/karpenter/nodepool.yaml.j2"
+    )
   start = time.monotonic()
   if INIT_BATCH_SIZE.value > 0:
     samples += _CreateNodePools(cluster, INIT_BATCH_NAME, INIT_BATCH_SIZE.value)

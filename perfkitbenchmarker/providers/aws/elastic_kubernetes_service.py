@@ -323,7 +323,20 @@ class BaseEksCluster(container_service.KubernetesCluster):
         f'jsonpath={container_service.INGRESS_JSONPATH}',
     ])
     return self._GetAddressFromIngress(stdout)
+  
+  def GetNodePoolNames(self) -> list[str]:
+    """Get node pool names for the cluster."""
 
+    stdout, _, _ = container_service.RunKubectlCommand([
+        'get',
+        'nodes',
+        '-o',
+        'json',
+    ])
+
+    data = json.loads(stdout)
+
+    return [item["metadata"]["name"] for item in data["items"]]
 
 class EksCluster(BaseEksCluster):
   """Class representing an Elastic Kubernetes Service cluster."""
