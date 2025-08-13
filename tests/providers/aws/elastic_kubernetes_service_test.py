@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from unittest import mock
 from absl.testing import flagsaver
+from absl.testing import parameterized
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import network
 from perfkitbenchmarker import vm_util
@@ -193,8 +194,12 @@ class ElasticKubernetesServiceTest(BaseEksTest):
         node_groups[1],
     )
 
-  def testEksClusterGetNodepoolFromName(self):
-    self.MockIssueCommand({'get node': [('nginx', '', 0)]})
+  @parameterized.named_parameters(
+      ('default nodepool', 'default', 'default'),
+      ('standard nodepool', 'nginx', 'nginx'),
+  )
+  def testEksClusterGetNodepoolFromName(self, nodepool_name, expected_name):
+    self.MockIssueCommand({'get node': [(nodepool_name, '', 0)]})
     spec2 = EKS_SPEC_DICT.copy()
     spec2['nodepools'] = {
         'nginx': {
@@ -212,9 +217,27 @@ class ElasticKubernetesServiceTest(BaseEksTest):
     )
     nodepool = cluster.GetNodePoolFromNodeName('sample-node')
     self.assertIsNotNone(nodepool)
-    self.assertEqual(
-        nodepool.name, 'nginx'
+    self.assertEqual(nodepool.name, expected_name)
+
+  def testEksClusterNotFound(self):
+    self.MockIssueCommand({'get node': [('', '', 0)]})
+    spec2 = EKS_SPEC_DICT.copy()
+    spec2['nodepools'] = {
+        'nginx': {
+            'vm_count': 3,
+            'vm_spec': {
+                'AWS': {
+                    'machine_type': 'm6i.xlarge',
+                    'zone': 'us-west-1b',
+                }
+            },
+        }
+    }
+    cluster = elastic_kubernetes_service.EksCluster(
+        container_spec.ContainerClusterSpec('NAME', **spec2)
     )
+    nodepool = cluster.GetNodePoolFromNodeName('sample-node')
+    self.assertIsNone(nodepool)
 
 
 class EksAutoClusterTest(BaseEksTest):

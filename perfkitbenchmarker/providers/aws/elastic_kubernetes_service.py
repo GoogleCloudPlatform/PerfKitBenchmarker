@@ -253,7 +253,15 @@ class BaseEksCluster(container_service.KubernetesCluster):
       if nodepool_name == 'default':
         nodepool = self.default_nodepool
       else:
-        nodepool = self.nodepools[nodepool_name]
+        if nodepool_name not in self.nodepools:
+          logging.warning(
+              'Nodepool %s not found in nodepools %s',
+              nodepool_name,
+              self.nodepools,
+          )
+          nodepool = None
+        else:
+          nodepool = self.nodepools[nodepool_name]
     self.node_to_nodepool[node_name] = nodepool
     return nodepool
 
