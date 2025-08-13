@@ -19,10 +19,18 @@ import abc
 import logging
 import os
 import pathlib
+import threading
 
 from absl import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import resource
 
+flags.DEFINE_string(
+    'object_storage_fuse_bucket_name',
+    '',
+    'The bucket to be mounted. If not set, a bucket is created as an ephemeral '
+    'resource.',
+)
 flags.DEFINE_string(
     'object_storage_credential_file', None, 'Directory of credential file.'
 )
@@ -48,6 +56,8 @@ DEFAULT_BOTO_LOCATION_MACHINE = '/etc/boto.cfg'
 BOTO_LIB_VERSION = 'boto_lib_version'
 
 _OBJECT_STORAGE_REGISTRY = {}
+# Required for object storage resource to be part of vm.scratch_disks.
+_OBJECT_STORAGE_DISK_TYPE = 'object_storage'
 
 
 class AutoRegisterObjectStorageMeta(abc.ABCMeta):
@@ -66,6 +76,58 @@ class AutoRegisterObjectStorageMeta(abc.ABCMeta):
           cls.__name__,
       )
     _OBJECT_STORAGE_REGISTRY[cls.STORAGE_NAME] = cls
+
+
+class BaseBucketSpec:
+  """Stores the information needed to create a Base Bucket Class."""
+
+  CLOUD = None
+
+  def __init__(
+      self, mount_point=None, bucket_name=None, region=None, zone=None
+  ):
+    self.mount_point = mount_point
+    self.bucket_name = bucket_name
+    self.region = region
+    self.zone = zone
+
+
+class Bucket(resource.BaseResource):
+  """Object representing an Object Storage."""
+
+  _BUCKET_NAME_LOCK = threading.Lock()
+  _BUCKETS_CREATED = set()
+
+  def __init__(self, bucket_spec):
+    super().__init__()
+    self.disk_type = _OBJECT_STORAGE_DISK_TYPE
+    self.mount_point = bucket_spec.mount_point
+    self.bucket_name = bucket_spec.bucket_name
+    self.region = bucket_spec.region
+    self.zone = bucket_spec.zone
+
+  def Create(self, restore: bool = False):
+    """Creates the bucket, skipping if it already exists in this run."""
+    with self._BUCKET_NAME_LOCK:
+      if self.bucket_name in self._BUCKETS_CREATED:
+        logging.info(
+            'Bucket %s has already been created in this run.', self.bucket_name
+        )
+        self.created = True
+        self.resource_ready = True
+        return
+
+      super().Create(restore)
+
+      if self.created:
+        self._BUCKETS_CREATED.add(self.bucket_name)
+
+  def Delete(self, freeze: bool = False):
+    """Deletes the bucket and removes it from the created set."""
+    super().Delete(freeze)
+    if self.deleted:
+      with self._BUCKET_NAME_LOCK:
+        self._BUCKETS_CREATED.discard(self.bucket_name)
 
 
 class ObjectStorageService(

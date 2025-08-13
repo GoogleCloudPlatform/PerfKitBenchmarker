@@ -474,7 +474,8 @@ class PrepareScratchDiskStrategy:
       logging.info('Temp DB is not supported on this cloud')
       return []
 
-    clause = ' -or '.join([f'($_.FriendlyName -eq "{name}")' for name in names])
+    clause = ' -or '.join([f'($_.FriendlyName -like "{name}")'
+                           for name in names])
     clause = '{' + clause + '}'
 
     # Select the DeviceID from the output

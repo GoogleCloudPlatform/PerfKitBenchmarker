@@ -63,6 +63,10 @@ STOCKOUT_MESSAGE = (
 )
 
 
+@vm_util.Retry(
+    max_retries=3,
+    retryable_exceptions=(errors.VmUtil.IssueCommandError, KeyError)
+)
 @functools.lru_cache()
 def GetDefaultProject():
   """Get the default project."""
