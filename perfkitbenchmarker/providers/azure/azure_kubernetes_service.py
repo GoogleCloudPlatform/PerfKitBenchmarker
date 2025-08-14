@@ -127,8 +127,12 @@ class AksCluster(container_service.KubernetesCluster):
       vm_config: virtual_machine.BaseVirtualMachine,
       nodepool_config: container_service.BaseNodePoolConfig,
   ):
-    nodepool_config.disk_type = vm_config.create_os_disk_strategy.disk.disk_type  # pytype: disable=attribute-error
-    nodepool_config.disk_size = vm_config.create_os_disk_strategy.disk.disk_size  # pytype: disable=attribute-error
+    nodepool_config.disk_type = (
+        vm_config.create_os_disk_strategy.disk.disk_type
+    )  # pytype: disable=attribute-error
+    nodepool_config.disk_size = (
+        vm_config.create_os_disk_strategy.disk.disk_size
+    )  # pytype: disable=attribute-error
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -439,9 +443,7 @@ class AksAutomaticCluster(AksCluster):
     try:
       provisioning_state = json.loads(stdout).get('provisioningState')
       if provisioning_state == 'Failed':
-        raise errors.Resource.CreationError(
-            'Cluster provisioning failed.'
-        )
+        raise errors.Resource.CreationError('Cluster provisioning failed.')
       if provisioning_state != 'Succeeded':
         return False
     except json.JSONDecodeError:

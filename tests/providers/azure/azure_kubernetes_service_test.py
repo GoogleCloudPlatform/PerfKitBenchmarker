@@ -35,13 +35,6 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.enter_context(
         mock.patch.object(
-            azure_kubernetes_service.service_principal,
-            'ServicePrincipal',
-            autospec=True,
-        )
-    )
-    self.enter_context(
-        mock.patch.object(
             vm_util,
             'GetPublicKeyPath',
             return_value='test_key_path',
@@ -66,8 +59,6 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.aks = azure_kubernetes_service.AksCluster(self.spec)
     self.aks.resource_group.args = []
-    self.aks.service_principal.app_id = 'id'
-    self.aks.service_principal.password = 'pass'
 
   def testCreate(self):
     mock_cmd = self.MockIssueCommand(
@@ -88,12 +79,9 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
                 'pkbcluster123',
                 '--location',
                 'westus2',
+                '--enable-managed-identity',
                 '--ssh-key-value',
                 'test_key_path',
-                '--service-principal',
-                'id',
-                '--client-secret',
-                'pass',
                 '--nodepool-name',
                 'default',
                 '--nodepool-labels',
