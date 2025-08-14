@@ -111,6 +111,9 @@ SMB = 'smb'
 HYPERDISK_ML = 'hyperdisk-ml'
 MULTI_ATTACH_DISK_TYPES = [HYPERDISK_ML]
 
+# Lustre disks
+LUSTRE = 'lustre'
+
 # FUSE mounted object storage bucket
 OBJECT_STORAGE = 'object_storage'
 
@@ -287,6 +290,20 @@ class BaseDiskSpec(spec.BaseSpec):
         ),
     })
     return result
+
+
+class BaseLustreDiskSpec(BaseDiskSpec):
+  """Stores the information needed to create a base Lustre disk."""
+
+  SPEC_TYPE = 'BaseLustreDiskSpec'
+  CLOUD = NONE
+  DISK_TYPE = LUSTRE
+  SPEC_ATTRS = ['CLOUD']
+
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.device_path: str = None
+    self.disk_type = LUSTRE
 
 
 class BaseNFSDiskSpec(BaseDiskSpec):
@@ -736,6 +753,23 @@ class NetworkDisk(BaseDisk):
   def _Delete(self):
     # handled by the Network Disk service
     pass
+
+
+class LustreDisk(NetworkDisk):
+  """Provides options for mounting Lustre drives.
+
+  Lustre disk should be ready to mount at the time of creation of this disk.
+
+  Attributes:
+    disk_spec: The disk spec.
+  """
+
+  def Attach(self, vm):
+    self.vm = vm
+
+  def _GetNetworkDiskMountOptionsDict(self):
+    """Default Lustre mount options as a dict."""
+    return {}
 
 
 class NfsDisk(NetworkDisk):

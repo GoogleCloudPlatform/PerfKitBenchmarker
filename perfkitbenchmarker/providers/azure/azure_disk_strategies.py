@@ -155,6 +155,8 @@ class AzureCreateNonResourceDiskStrategy(
 
     elif self.disk_spec.disk_type == disk.SMB:
       return disk_strategies.SetUpSMBDiskStrategy(self.vm, self.disk_spec)
+    elif self.disk_spec.disk_type == disk.LUSTRE:
+      return AzLustreSetupDiskStrategy(self.vm, self.disk_spec)
 
     return disk_strategies.EmptySetupDiskStrategy(self.vm, self.disk_spec)
 
@@ -280,3 +282,12 @@ class AzurePrepareScratchDiskStrategy(
   def PrepareTempDbDisk(self, vm: 'virtual_machine.BaseVirtualMachine'):
     if azure_disk.HasTempDrive(vm.machine_type):
       vm.RemoteCommand('mkdir D:\\TEMPDB')
+
+
+class AzLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
+
+  def SetUpDiskOnLinux(self):
+    """Performs Linux specific setup of Lustre disk."""
+    vm = self.vm
+    super().SetUpDiskOnLinux()
+    vm.RemoteCommand('echo "module load mpi/hpcx" >> .bashrc')

@@ -189,6 +189,9 @@ class CreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
       return disk_strategies.SetUpNFSDiskStrategy(self.vm, self.disk_spec)
     elif self.disk_spec.disk_type == disk.OBJECT_STORAGE:
       return SetUpS3MountPointDiskStrategy(self.vm, self.disk_spec)
+    elif self.disk_spec.disk_type == disk.LUSTRE:
+      return AwsLustreSetupDiskStrategy(self.vm, self.disk_spec)
+
     return disk_strategies.EmptySetupDiskStrategy(self.vm, self.disk_spec)
 
   def GetBlockDeviceMap(
@@ -490,3 +493,53 @@ class AWSPrepareScratchDiskStrategy(disk_strategies.PrepareScratchDiskStrategy):
 
   def GetLocalSSDNames(self) -> list[str]:
     return ['NVMe Amazon EC2 NVMe']
+
+
+class AwsLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
+  """Strategies to prepare Lustre based disks on AWS."""
+
+  def SetUpDiskOnLinux(self):
+    """Performs Linux specific setup of Lustre disk."""
+    vm = self.vm
+    vm.InstallPackages('lustre-client')
+    if FLAGS.aws_efa:
+      stdout, _ = vm.RemoteCommand('ip -br -4 a sh | grep $(hostname -i)')
+      eth = stdout.split()[0]
+      vm.RemoteCommand(
+          'sudo modprobe lnet; '
+          f'sudo /sbin/modprobe kefalnd ipif_name={eth}; '
+          'sudo modprobe ksocklnd; sudo lnetctl lnet configure'
+      )
+      vm.RemoteCommand(
+          f'sudo lnet del --net tcp; sudo lnetctl net add --net tcp --if {eth}'
+      )
+      stdout, _ = vm.RemoteCommand('ls -1 /sys/class/infiniband | wc -l')
+      num_efa = int(stdout)
+      vm.RemoteCommand(
+          'sudo lnetctl net add --net efa --if '
+          '$(ls -1 /sys/class/infiniband | head -n1) --peer-credits 32'
+      )
+      if num_efa > 1:
+        vm.RemoteCommand(
+            'sudo lnetctl net add --net efa --if '
+            '$(ls -1 /sys/class/infiniband | tail -n1) --peer-credits 32'
+        )
+      vm.RemoteCommand('sudo lnetctl set discovery 1')
+      vm.RemoteCommand('sudo lnetctl udsp add --src efa --priority 0')
+      vm.RemoteCommand('sudo lnetctl set discovery 1')
+      vm.RemoteCommand('sudo modprobe lustre;  sudo lnetctl net show')
+    super().SetUpDiskOnLinux()
+    # Apply best practices
+    vm.RemoteCommand('sudo lctl set_param ldlm.namespaces.*.lru_max_age=600000')
+    vm.RemoteCommand('sudo lctl set_param ldlm.namespaces.*.lru_size=18000')
+    vm.RemoteCommand(
+        'sudo touch /etc/modprobe.d/modprobe.conf; '
+        'sudo chmod 766 /etc/modprobe.d/modprobe.conf; '
+        'echo "options ptlrpc ptlrpcd_per_cpt_max=32" >> '
+        '/etc/modprobe.d/modprobe.conf'
+    )
+    vm.RemoteCommand(
+        'echo "options ksocklnd credits=2560" >> /etc/modprobe.d/modprobe.conf'
+    )
+    vm.RemoteCommand('sudo lctl set_param osc.*OST*.max_rpcs_in_flight=32')
+    vm.RemoteCommand('sudo lctl set_param mdc.*.max_rpcs_in_flight=64')

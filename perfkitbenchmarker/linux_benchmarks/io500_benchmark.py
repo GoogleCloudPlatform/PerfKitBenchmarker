@@ -66,6 +66,7 @@ def Prepare(benchmark_spec):
   headnode = benchmark_spec.vm_groups['default'][0]
   # Install mpi across nodes.
   background_tasks.RunThreaded(lambda vm: vm.Install('openmpi'), vms)
+  background_tasks.RunThreaded(lambda vm: vm.Install('build_tools'), vms)
   background_tasks.RunThreaded(lambda vm: vm.AuthenticateVm(), vms)
   hpc_util.CreateMachineFile(vms)
   headnode.InstallPackages('pkg-config')

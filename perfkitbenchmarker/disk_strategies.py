@@ -30,6 +30,7 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import context as pkb_context
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import lustre_service
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
@@ -274,6 +275,37 @@ class SetUpNFSDiskStrategy(SetUpDiskStrategy):
     )
 
     self.vm.scratch_disks.append(nfs_disk)
+
+
+class SetUpLustreDiskStrategy(SetUpDiskStrategy):
+  """Strategies to set up Lustre disks."""
+
+  def __init__(
+      self,
+      vm,
+      disk_spec: disk.BaseDiskSpec,
+      lustre: lustre_service.BaseLustreService | None = None,
+  ):
+    super().__init__(vm, disk_spec)
+    if lustre:
+      self.lustre_service = lustre
+    else:
+      self.lustre_service = getattr(
+          pkb_context.GetThreadBenchmarkSpec(), 'lustre_service'
+      )
+
+  def SetUpDiskOnLinux(self):
+    """Performs Linux specific setup of Lustre disk."""
+    lustre_disk = self.lustre_service.CreateLustreDisk()
+    self.vm.MountDisk(
+        self.lustre_service.GetMountPoint(),
+        self.disk_spec.mount_point,
+        self.disk_spec.disk_type,
+        lustre_disk.mount_options,
+        lustre_disk.fstab_options,
+    )
+
+    self.vm.scratch_disks.append(lustre_disk)
 
 
 class SetUpSMBDiskStrategy(SetUpDiskStrategy):

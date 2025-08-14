@@ -249,6 +249,12 @@ PCLUSTER_PATH = flags.DEFINE_string(
     'The path for the pcluster (parallel-cluster) utility.',
 )
 
+AWS_LUSTRE_COMPRESSION = flags.DEFINE_boolean(
+    'aws_lustre_compression',
+    False,
+    'Whether or not to enable LZ4 compression for AWS lustre.',
+)
+
 
 @flags.multi_flags_validator(
     [
