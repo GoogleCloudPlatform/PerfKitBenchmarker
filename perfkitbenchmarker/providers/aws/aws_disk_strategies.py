@@ -27,6 +27,8 @@ from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import s3
+from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
 virtual_machine = Any  # pylint: disable=invalid-name
@@ -185,7 +187,8 @@ class CreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
       return disk_strategies.SetUpSMBDiskStrategy(self.vm, self.disk_spec)
     elif self.disk_spec.disk_type == disk.NFS:
       return disk_strategies.SetUpNFSDiskStrategy(self.vm, self.disk_spec)
-
+    elif self.disk_spec.disk_type == disk.OBJECT_STORAGE:
+      return SetUpS3MountPointDiskStrategy(self.vm, self.disk_spec)
     return disk_strategies.EmptySetupDiskStrategy(self.vm, self.disk_spec)
 
   def GetBlockDeviceMap(
@@ -445,6 +448,41 @@ class SetUpRemoteDiskStrategy(AWSSetupDiskStrategy):
         attach_tasks, max_concurrency=200
     )
     self.time_to_visible = return_from_threads[0]
+
+
+class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
+  """Strategies to set up S3 buckets."""
+
+  DEFAULT_MOUNT_OPTIONS = [
+      '--cache /opt/pkb'
+  ]
+
+  def SetUpDisk(self):
+    """Performs setup of S3 buckets."""
+    self.vm.Install('mountpoint')
+    target = self.disk_spec.mount_point
+    self.vm.RemoteCommand(f'sudo mkdir -p {target} && sudo chmod a+w {target}')
+
+    opts = ' '.join(self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options)
+    zone_id = util.GetZoneId(self.vm.zone)
+    s3_express_zonal_suffix = f'--{zone_id}--x-s3'
+    bucket_name = (
+        FLAGS.object_storage_fuse_bucket_name
+        or f'mountpoint-{FLAGS.run_uri.lower()}{s3_express_zonal_suffix}'
+    )
+    s3_spec = s3.S3BucketSpec(
+        mount_point=target,
+        bucket_name=bucket_name,
+        region=util.GetRegionFromZone(self.vm.zone),
+        zone=self.vm.zone,
+        is_s3_express=True
+    )
+    s3_client = s3.S3Bucket(s3_spec)
+    if not FLAGS.object_storage_fuse_bucket_name:
+      s3_client.Create()
+
+    self.vm.RemoteCommand(f'sudo mount-s3 {bucket_name} {target} {opts}')
+    self.vm.scratch_disks.append(s3_client)
 
 
 class AWSPrepareScratchDiskStrategy(disk_strategies.PrepareScratchDiskStrategy):
