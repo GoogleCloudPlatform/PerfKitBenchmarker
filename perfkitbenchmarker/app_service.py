@@ -6,11 +6,9 @@ import time
 from typing import Any, Dict, List, Type, TypeVar
 
 from absl import flags
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.linux_packages import http_poller
@@ -190,16 +188,6 @@ class BaseAppService(resource.BaseResource):
   def Update(self):
     """Updates a deployed app instance."""
 
-    @vm_util.Retry(
-        poll_interval=self._POLL_INTERVAL,
-        fuzz=0,
-        timeout=self.READY_TIMEOUT,
-        retryable_exceptions=(errors.Resource.RetryableCreationError,),
-    )
-    def WaitUntilReady():
-      if not self._IsReady():
-        raise errors.Resource.RetryableCreationError('Not yet ready')
-
     if self.user_managed:
       return
     self._UpdateDependencies()
@@ -211,7 +199,7 @@ class BaseAppService(resource.BaseResource):
         'Ending the update timer with %.5fs elapsed. Ready still going.',
         self.update_end_time - self.update_start_time,
     )
-    WaitUntilReady()
+    self._WaitUntilReady()
     self.update_ready_time = time.time()
     self.samples.append(
         sample.Sample(

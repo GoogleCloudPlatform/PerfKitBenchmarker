@@ -19,7 +19,6 @@ and deleted.
 
 import json
 from absl import flags
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import redshift
 from perfkitbenchmarker.providers.aws import util
@@ -132,23 +131,13 @@ class Spectrum(redshift.Redshift):
     tags on the cluster.
     """
 
-    @vm_util.Retry(
-        poll_interval=self.POLL_INTERVAL,
-        fuzz=0,
-        timeout=self.READY_TIMEOUT,
-        retryable_exceptions=(errors.Resource.RetryableCreationError,),
-    )
-    def WaitUntilReady():
-      if not self._IsReady():
-        raise errors.Resource.RetryableCreationError('Adding IAM Role')
-
-    stdout, _, _ = self.__DescribeCluster()
+    self.__DescribeCluster()
     self.adding_iam_role = None
     if self.iam_role is not None:
       self.adding_iam_role = AddingIAMRole(
           self.cluster_identifier, self.iam_role, self.cmd_prefix
       )
-      WaitUntilReady()
+      self._WaitUntilReady()
 
     stdout, _, _ = self.__DescribeCluster()
     self.endpoint = json.loads(stdout)['Clusters'][0]['Endpoint']['Address']
