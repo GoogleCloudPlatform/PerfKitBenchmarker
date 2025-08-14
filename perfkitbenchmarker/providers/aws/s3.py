@@ -38,6 +38,42 @@ _READ = 's3:GetObject'
 _WRITE = 's3:PutObject'
 
 
+class S3BucketSpec(object_storage_service.BaseBucketSpec):
+  """Properties of an S3 Bucket."""
+
+  CLOUD = provider_info.AWS
+
+  def __init__(
+      self,
+      mount_point=None,
+      bucket_name=None,
+      region=None,
+      zone=None,
+      is_s3_express=False,
+  ):
+    super().__init__(mount_point, bucket_name, region, zone)
+    self.is_s3_express = is_s3_express
+
+
+class S3Bucket(object_storage_service.Bucket):
+  """S3 Bucket Resource containing S3Service."""
+
+  def __init__(self, bucket_spec):
+    super().__init__(bucket_spec)
+    self.is_s3_express = bucket_spec.is_s3_express
+    self.service = S3Service()
+
+  def _Create(self):
+    location = self.zone or self.region
+    self.service.PrepareService(location)
+    self.service.MakeBucket(self.bucket_name)
+
+  def _Delete(self):
+    self.service.CleanupService()
+    self.service.EmptyBucket(self.bucket_name)
+    self.service.DeleteBucket(self.bucket_name)
+
+
 class S3Service(object_storage_service.ObjectStorageService):
   """Interface to Amazon S3."""
 

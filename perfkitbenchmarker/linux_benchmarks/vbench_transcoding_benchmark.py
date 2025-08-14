@@ -90,8 +90,8 @@ _FFMPEG_BUF_SIZE_MULTIPLIER = flags.DEFINE_integer(
 )
 _FFMPEG_COPIES = flags.DEFINE_integer(
     'ffmpeg_copies',
-    9,
-    'Number of duplicate copies to create for each source video before'
+    10,
+    'Total number of copies to create for each source video before'
     ' transcoding.',
 )
 
@@ -238,7 +238,7 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
             "for f in $(ls *.mkv | grep -v '_copy'); do "
             '  filename="${f%.*}";'
             '  extension="${f##*.}";'
-            f" for i in $(seq 1 {_FFMPEG_COPIES.value}); do"
+            f" for i in $(seq 1 {_FFMPEG_COPIES.value-1}); do"
             '    cp "$f" "${filename}_copy${i}.${extension}";'
             '  done;'
             'done'
