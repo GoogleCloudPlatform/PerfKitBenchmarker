@@ -242,8 +242,10 @@
 -   Add ability to collect memory size according to lsmem with --collect_lsmem.
 -   Add k8s inference server resource to manage inference server workload in
     cluster
--   Add PV and PVC settings for k8s inference server resources utilizing
-    GCSFuse storage
+-   Add PV and PVC settings for k8s inference server resources utilizing GCSFuse
+    storage
+-   Add new `edw_index_ingestion_benchmark` benchmark evaluating the performance
+    of text search indexes on EDW systems.
 
 ### Enhancements:
 
