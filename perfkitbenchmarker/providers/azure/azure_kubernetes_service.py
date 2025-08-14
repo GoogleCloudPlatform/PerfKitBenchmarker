@@ -25,7 +25,6 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
-from perfkitbenchmarker.providers.azure import service_principal
 from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
@@ -44,7 +43,6 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     self.sku = 'Basic'
     self._deleted = False
     self.acr_id = None
-    self.service_principal = service_principal.ServicePrincipal.GetInstance()
 
   def _Exists(self):
     """Returns True if the registry exists."""
@@ -85,33 +83,9 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     # This will be deleted along with the resource group
     self._deleted = True
 
-  def _PostCreate(self):
-    """Allow the service principle to read from the repository."""
-    # If we bootstrapped our own credentials into the AKS cluster it already,
-    # has read permission, because it created the repo.
-    if not FLAGS.bootstrap_azure_service_principal:
-      create_role_assignment_cmd = [
-          azure.AZURE_PATH,
-          'role',
-          'assignment',
-          'create',
-          '--assignee',
-          self.service_principal.app_id,
-          '--role',
-          'Reader',
-          '--scope',
-          self.acr_id,
-      ]
-      vm_util.IssueRetryableCommand(create_role_assignment_cmd)
-
   def _CreateDependencies(self):
     """Creates the resource group."""
     self.resource_group.Create()
-    self.service_principal.Create()
-
-  def _DeleteDependencies(self):
-    """Deletes the resource group."""
-    self.service_principal.Delete()
 
   def Login(self):
     """Logs in to the registry."""
@@ -145,7 +119,6 @@ class AksCluster(container_service.KubernetesCluster):
     self.name = 'pkbcluster%s' % FLAGS.run_uri
     # TODO(pclay): replace with built in service principal once I figure out how
     # to make it work with ACR
-    self.service_principal = service_principal.ServicePrincipal.GetInstance()
     self.cluster_version = FLAGS.container_cluster_version
     self._deleted = False
 
@@ -154,8 +127,12 @@ class AksCluster(container_service.KubernetesCluster):
       vm_config: virtual_machine.BaseVirtualMachine,
       nodepool_config: container_service.BaseNodePoolConfig,
   ):
-    nodepool_config.disk_type = vm_config.create_os_disk_strategy.disk.disk_type  # pytype: disable=attribute-error
-    nodepool_config.disk_size = vm_config.create_os_disk_strategy.disk.disk_size  # pytype: disable=attribute-error
+    nodepool_config.disk_type = (
+        vm_config.create_os_disk_strategy.disk.disk_type  # pytype: disable=attribute-error
+    )
+    nodepool_config.disk_size = (
+        vm_config.create_os_disk_strategy.disk.disk_size  # pytype: disable=attribute-error
+    )
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -185,13 +162,9 @@ class AksCluster(container_service.KubernetesCluster):
         self.name,
         '--location',
         self.region,
+        '--enable-managed-identity',
         '--ssh-key-value',
         vm_util.GetPublicKeyPath(),
-        '--service-principal',
-        self.service_principal.app_id,
-        # TODO(pclay): avoid logging client secret
-        '--client-secret',
-        self.service_principal.password,
         '--nodepool-name',
         container_service.DEFAULT_NODEPOOL,
         '--nodepool-labels',
@@ -378,12 +351,6 @@ class AksCluster(container_service.KubernetesCluster):
   def _CreateDependencies(self):
     """Creates the resource group."""
     self.resource_group.Create()
-    self.service_principal.Create()
-
-  def _DeleteDependencies(self):
-    """Deletes the resource group."""
-    self.service_principal.Delete()
-    super()._DeleteDependencies()
 
   def GetDefaultStorageClass(self) -> str:
     """Get the default storage class for the provider."""
@@ -476,9 +443,7 @@ class AksAutomaticCluster(AksCluster):
     try:
       provisioning_state = json.loads(stdout).get('provisioningState')
       if provisioning_state == 'Failed':
-        raise errors.Resource.CreationError(
-            'Cluster provisioning failed.'
-        )
+        raise errors.Resource.CreationError('Cluster provisioning failed.')
       if provisioning_state != 'Succeeded':
         return False
     except json.JSONDecodeError:
