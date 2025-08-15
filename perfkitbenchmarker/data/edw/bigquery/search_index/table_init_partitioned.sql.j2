@@ -1,0 +1,14 @@
+CREATE OR REPLACE TABLE {{table_name}}
+(
+    event_timestamp TIMESTAMP,
+    insert_id STRING,
+    hostname STRING,
+    process_id INT64,
+    parent_process_id INT64,
+    user_name STRING,
+    command_line STRING,
+    file_path STRING,
+    ip_address STRING,
+    raw_log STRING
+) PARTITION BY
+  RANGE_BUCKET(process_id, GENERATE_ARRAY(1000, 65535, 1000))

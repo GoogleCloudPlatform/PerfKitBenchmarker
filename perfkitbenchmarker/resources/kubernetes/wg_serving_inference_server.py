@@ -79,6 +79,7 @@ class BaseWGServingInferenceServer(
   deployment_metadata: Optional[Dict[str, Any]]
   service_name: Optional[str]
   model_id: Optional[str]
+  timezone: Optional[str]
   model_id_from_path: Optional[str]
   tokenizer_id: Optional[str]
   service_port: Optional[int]
@@ -102,6 +103,7 @@ class BaseWGServingInferenceServer(
     ] = {}
     self.is_remote: bool = False
     self.user_managed = False
+    self.timezone = None
 
     if spec.static_inference_server is not None:
       self._InitializeUserManagedStateIfSpecified(spec.static_inference_server)
@@ -113,6 +115,20 @@ class BaseWGServingInferenceServer(
       if pod_info:
         return pod_info.pod_startup_logs
     raise ValueError(f'Pod {pod_name} was not found in monitor future map.')
+
+  def GetPodTimeZone(self, pod_name: str) -> str:
+    """Returns the time zone of the pod."""
+    log_cmd = [
+        'exec',
+        '-it',
+        pod_name,
+        '--',
+        'cat',
+        '/etc/timezone',
+    ]
+    stdout, _, _ = container_service.RunKubectlCommand(log_cmd)
+    stdout_split = stdout.splitlines()
+    return stdout_split[0]
 
   def GetResourceMetadata(self) -> Dict[str, Any]:
     """Returns the resource metadata."""
@@ -275,6 +291,8 @@ class BaseWGServingInferenceServer(
             f' {pod_name}'
         )
       pod_startup_logs = self.GetInferenceServerLogsFromPod(f'pod/{pod_name}')
+      if self.timezone is None:
+        self.timezone = self.GetPodTimeZone(pod_name)
       logging.info('Successfully collected metrics for pod %s.', pod_name)
       return PodStartupMetrics(
           pod_name=pod_name,

@@ -584,6 +584,12 @@ GCP_DATAPROC_LIGHTNING_ENGINE_RUNTIME = flags.DEFINE_enum(
     'Dataproc Lightning Engine runtime to use. It defaults to "default"'
     ' regardless of chosen engine.',
 )
+GCP_LUSTRE_VPC = flags.DEFINE_string(
+    'gcp_lustre_vpc',
+    '',
+    'VPC name for GCP Lustre instance: '
+    'https://cloud.google.com/managed-lustre/docs/vpc',
+)
 
 
 def _ValidatePreemptFlags(flags_dict):

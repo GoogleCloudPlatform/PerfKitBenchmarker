@@ -1,0 +1,7 @@
+  SELECT
+    coverage_percentage
+  FROM
+    INFORMATION_SCHEMA.SEARCH_INDEXES
+  WHERE
+    index_name="{{index_name}}"
+    AND table_name="{{table_name}}";

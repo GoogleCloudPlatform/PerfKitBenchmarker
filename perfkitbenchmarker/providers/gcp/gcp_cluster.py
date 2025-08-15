@@ -127,12 +127,12 @@ class GceCluster(cluster.BaseCluster):
     2. Prepare VM environment.
     3. Configure SSH on both headnode and workers.
     """
-
     def _UpdateHeadNode(vm):
       vm.name = f'{self.name}-controller'
 
     self.headnode_vm = self.BackfillVm(self.headnode_spec, _UpdateHeadNode)
-    self._WaitUntilReady()
+    self._WaitForClusterReady()
+
     for i in range(self.num_workers):
 
       def _UpdateWorker(vm):

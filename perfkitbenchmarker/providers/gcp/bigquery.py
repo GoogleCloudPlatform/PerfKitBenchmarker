@@ -764,6 +764,155 @@ class Bigquery(edw_service.EdwService):
     except NotImplementedError:  # No metrics support in client interface.
       return {}
 
+  SEARCH_QUERY_TEMPLATE_LOCATION = 'edw/bigquery/search_index'
+
+  CREATE_INDEX_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/create_index_query.sql.j2'
+  )
+  DELETE_INDEX_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/delete_index_query.sql.j2'
+  )
+  GET_INDEX_STATUS_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/index_status.sql.j2'
+  )
+  INITIALIZE_SEARCH_TABLE_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/table_init.sql.j2'
+  )
+  LOAD_SEARCH_DATA_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/ingestion_query.sql.j2'
+  )
+  INDEX_SEARCH_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/search_query.sql.j2'
+  )
+  GET_ROW_COUNT_QUERY_TEMPLATE = 'edw/bigquery/get_row_count.sql.j2'
+
+  def CreateSearchIndex(
+      self, table_path: str, index_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    query_name = f'create_index_{index_name}'
+    context = {
+        'table_name': table_path,
+        'index_name': index_name,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.CREATE_INDEX_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    return self.client_interface.ExecuteQuery(query_name, print_results=True)
+
+  def DropSearchIndex(
+      self, table_path: str, index_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    query_name = 'delete_index'
+    context = {
+        'table_name': table_path,
+        'index_name': index_name,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.DELETE_INDEX_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    return self.client_interface.ExecuteQuery(query_name, print_results=True)
+
+  def GetSearchIndexCompletionPercentage(
+      self, table_path: str, index_name: str
+  ) -> tuple[int, dict[str, Any]]:
+    query_name = 'get_index_status'
+    context = {
+        'table_name': table_path,
+        'index_name': index_name,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.GET_INDEX_STATUS_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    _, meta = self.client_interface.ExecuteQuery(query_name, print_results=True)
+    qres = meta['query_results']['coverage_percentage'][0]
+    return qres, meta
+
+  def InitializeSearchStarterTable(
+      self, table_path: str, storage_path: str
+  ) -> tuple[float, dict[str, Any]]:
+    query_name = 'initialize_search_table'
+    context = {
+        'table_name': table_path,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.INITIALIZE_SEARCH_TABLE_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    return self.client_interface.ExecuteQuery(query_name, print_results=True)
+
+  def InsertSearchData(
+      self, table_path: str, storage_path: str
+  ) -> tuple[float, dict[str, Any]]:
+    query_name = 'load_search_data'
+    context = {
+        'table_name': table_path,
+        'storage_path': storage_path,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.LOAD_SEARCH_DATA_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    return self.client_interface.ExecuteQuery(query_name, print_results=True)
+
+  def GetTableRowCount(self, table_path: str) -> tuple[int, dict[str, Any]]:
+    query_name = 'get_row_count'
+    context = {
+        'table_name': table_path,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.GET_ROW_COUNT_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    _, meta = self.client_interface.ExecuteQuery(query_name, print_results=True)
+    qres = meta['query_results']['total_row_count'][0]
+    return qres, meta
+
+  def TextSearchQuery(
+      self, table_path: str, search_keyword: str, index_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    query_name = 'text_search_query'
+    context = {
+        'table_name': table_path,
+        'search_text': search_keyword,
+        'index_name': index_name,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.INDEX_SEARCH_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    res, meta = self.client_interface.ExecuteQuery(
+        query_name, print_results=True
+    )
+
+    meta['edw_search_index_coverage_percentage'] = int(
+        meta['query_results']['index_coverage_percentage'][0]
+    )
+    meta['edw_search_result_rows'] = int(
+        meta['query_results']['result_rows'][0]
+    )
+    meta['edw_search_total_row_count'] = int(
+        meta['query_results']['total_row_count'][0]
+    )
+
+    return res, meta
+
 
 class Endor(Bigquery):
   """Class representing BigQuery Endor service."""

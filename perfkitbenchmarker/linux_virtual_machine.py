@@ -1335,6 +1335,9 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     if disk.NFS == disk_type:
       mount_options = '-t nfs %s' % mount_options
       fs_type = 'nfs'
+    elif disk.LUSTRE == disk_type:
+      mount_options = '-t lustre %s' % mount_options
+      fs_type = 'lustre'
     elif disk.SMB == disk_type:
       mount_options = '-t cifs %s' % mount_options
       fs_type = 'smb'

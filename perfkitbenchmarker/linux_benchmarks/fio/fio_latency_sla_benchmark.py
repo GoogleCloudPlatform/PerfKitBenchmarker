@@ -33,6 +33,7 @@ duration because it gives fio sometime to get stable.
 """
 import copy
 import logging
+import math
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
@@ -109,8 +110,8 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
     A list of sample.Sample objects.
   """
   vm = spec.vms[0]
-  max_iodepth = 50
-  numjobs = vm.num_cpus
+  max_iodepth = 100
+  numjobs = math.ceil(vm.num_cpus)/2
   benchmark_params = {
       'latency_target': fio_flags.FIO_LATENCY_TARGET.value,
       'latency_percentile': fio_flags.FIO_LATENCY_PERCENTILE.value,
@@ -169,6 +170,12 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
           latency_at_percentile_sample.value,
           left_iodepth,
       )
+  if not latency_under_sla_samples:
+    # latency target was never met for these numjobs
+    raise errors.Benchmarks.RunError(
+        f'We never reached latency target for {numjobs}, try again by reducing'
+        ' the numjobs'
+    )
   metadata = copy.deepcopy(latency_under_sla_samples[0].metadata)
   metadata['iodepth_details'] = iodepth_details
   latency_under_sla_samples.append(

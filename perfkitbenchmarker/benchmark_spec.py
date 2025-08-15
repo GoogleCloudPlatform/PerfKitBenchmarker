@@ -43,6 +43,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import key as cloud_key
+from perfkitbenchmarker import lustre_service
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import messaging_service
 from perfkitbenchmarker import nfs_service
@@ -194,6 +195,7 @@ class BenchmarkSpec:
     self.example_resource = None
     self.multi_attach_disk = None
     self.nfs_service = None
+    self.lustre_service = None
     self.smb_service = None
     self.messaging_service = None
     self.ai_model = None
@@ -316,6 +318,7 @@ class BenchmarkSpec:
     self.ConstructBaseJob()
     self.ConstructVPNService()
     self.ConstructNfsService()
+    self.ConstructLustreService()
     self.ConstructSmbService()
     self.ConstructDataDiscoveryService()
     self.ConstructBaseJob()
@@ -632,6 +635,29 @@ class BenchmarkSpec:
       logging.debug('NFS service %s', self.nfs_service)
       break
 
+  def ConstructLustreService(self):
+    """Construct the Lustre service object.
+
+    Creates an Lustre Service only if a Lustre disk is found in the disk_specs.
+    """
+    if self.lustre_service:
+      logging.info('Lustre service already created: %s', self.lustre_service)
+      return
+    for group_spec in self.vms_to_boot.values():
+      if not group_spec.disk_spec or not group_spec.vm_count:
+        continue
+      disk_spec = group_spec.disk_spec
+      if disk_spec.disk_type != disk.LUSTRE:
+        continue
+      # Choose which lustre_service to create.
+      cloud = group_spec.cloud
+      providers.LoadProvider(cloud)
+      lustre_class = lustre_service.GetLustreServiceClass(cloud)
+      self.lustre_service = lustre_class(
+          disk_spec, group_spec.vm_spec.zone
+      )  # pytype: disable=not-instantiable
+      break
+
   def ConstructSmbService(self):
     """Construct the SMB service object.
 
@@ -934,6 +960,8 @@ class BenchmarkSpec:
     # do after network setup but before VM created
     if self.nfs_service and self.nfs_service.CLOUD != nfs_service.UNMANAGED:
       self.nfs_service.Create()
+    if self.lustre_service:
+      self.lustre_service.Create()
     if self.smb_service:
       self.smb_service.Create()
     if self.multi_attach_disk:
@@ -1079,6 +1107,8 @@ class BenchmarkSpec:
       self.base_job.Delete()
     if self.nfs_service:
       self.nfs_service.Delete()
+    if self.lustre_service:
+      self.lustre_service.Delete()
     if self.smb_service:
       self.smb_service.Delete()
     if self.multi_attach_disk:

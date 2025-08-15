@@ -364,7 +364,7 @@ class BaseCluster(resource.BaseResource):
       max_retries=5,
       retryable_exceptions=(errors.Resource.RetryableCreationError,),
   )
-  def _WaitUntilReady(self):
+  def _WaitForClusterReady(self):
     if self.unmanaged:
       return
     if not self.headnode_vm.TryRemoteCommand(

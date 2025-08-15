@@ -366,16 +366,6 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
       RestoreError: If there is an error while restoring.
     """
 
-    @vm_util.Retry(
-        poll_interval=self.POLL_INTERVAL,
-        fuzz=0,
-        timeout=self.READY_TIMEOUT,
-        retryable_exceptions=(errors.Resource.RetryableCreationError,),
-    )
-    def WaitUntilReady():
-      if not self._IsReady():
-        raise errors.Resource.RetryableCreationError('Not yet ready')
-
     if self.user_managed:
       self._UserManagedSetup()
       return
@@ -395,10 +385,24 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
 
     self._CreateDependencies()
     self._CreateResource()
-    WaitUntilReady()
+    self._WaitUntilReady()
     if not self.resource_ready_time:
       self.resource_ready_time = time.time()
     self._PostCreate()
+
+  def _WaitUntilReady(self) -> None:
+    """Waits & retries until the resource is ready."""
+    @vm_util.Retry(
+        # Inner function needed to allow for self.POLL_INTERVAL as default.
+        poll_interval=self.POLL_INTERVAL,
+        fuzz=0,
+        timeout=self.READY_TIMEOUT,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
+    def _InnerWaitUntilReady() -> None:
+      if not self._IsReady():
+        raise errors.Resource.RetryableCreationError('Not yet ready')
+    _InnerWaitUntilReady()
 
   def Freeze(self) -> None:
     """Freezes a resource instead of deleting it.
