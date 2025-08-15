@@ -65,6 +65,7 @@ DEFAULT_WORKER_COUNT = 2
 # List of supported applications that can be enabled on the dpb service
 FLINK = 'flink'
 HIVE = 'hive'
+DELTA = 'DELTA'
 
 # Metrics and Status related metadata
 # TODO(pclay): Remove these after migrating all callers to SubmitJob
