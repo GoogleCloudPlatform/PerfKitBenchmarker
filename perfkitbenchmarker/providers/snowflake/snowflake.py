@@ -23,6 +23,7 @@ import json
 import logging
 from typing import Any, Union
 from absl import flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
@@ -106,7 +107,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         f'--database {self.database} '
         f'--schema {self.schema} '
         f'--query_file {query_name} '
-        f'--key_file snowflake_keyfile.p8'
+        '--key_file snowflake_keyfile.p8'
     )
     if print_results:
       query_command += ' --print_results true'
@@ -138,7 +139,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         f'--warehouse {self.warehouse} '
         f'--database {self.database} '
         f'--schema {self.schema} '
-        f'--key_file snowflake_keyfile.p8 '
+        '--key_file snowflake_keyfile.p8 '
         '--query_streams '
         f'{" ".join([",".join(stream) for stream in concurrency_streams])}'
     )
@@ -362,3 +363,150 @@ class Snowflake(edw_service.EdwService):
     basic_data['schema'] = self.schema
     basic_data.update(self.client_interface.GetMetadata())
     return basic_data
+
+  SEARCH_QUERY_TEMPLATE_LOCATION = 'edw/snowflake_aws/search_index'
+
+  CREATE_INDEX_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/create_index_query.sql.j2'
+  )
+  DELETE_INDEX_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/delete_index_query.sql.j2'
+  )
+  GET_INDEX_STATUS_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/index_status.sql.j2'
+  )
+  INITIALIZE_SEARCH_TABLE_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/table_init.sql.j2'
+  )
+  LOAD_SEARCH_DATA_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/ingestion_query.sql.j2'
+  )
+  INDEX_SEARCH_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/search_query.sql.j2'
+  )
+  GET_ROW_COUNT_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/get_row_count.sql.j2'
+  )
+
+  def CreateSearchIndex(
+      self, table_path: str, index_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    query_name = f'create_index_{index_name}'
+    context = {
+        'table_name': table_path,
+        'index_name': index_name,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.CREATE_INDEX_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    return self.client_interface.ExecuteQuery(query_name, print_results=True)
+
+  def DropSearchIndex(
+      self, table_path: str, index_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    query_name = 'delete_index'
+    context = {
+        'table_name': table_path,
+        'index_name': index_name,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.DELETE_INDEX_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    return self.client_interface.ExecuteQuery(query_name, print_results=True)
+
+  def GetSearchIndexStatus(
+      self, table_path: str, index_name: str
+  ) -> tuple[int, dict[str, Any]]:
+    query_name = 'get_index_status'
+    context = {
+        'table_name': table_path,
+        'index_name': index_name,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.GET_INDEX_STATUS_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    _, meta = self.client_interface.ExecuteQuery(query_name, print_results=True)
+    qres = int(meta['output']['COVERAGE_PERCENTAGE'])
+    return qres, meta
+
+  def InitializeSearchStarterTable(
+      self, table_path: str, storage_path: str
+  ) -> tuple[float, dict[str, Any]]:
+    query_name = 'initialize_search_table'
+    context = {
+        'table_name': table_path,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.INITIALIZE_SEARCH_TABLE_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    return self.client_interface.ExecuteQuery(query_name, print_results=True)
+
+  def InsertSearchData(
+      self, table_path: str, storage_path: str
+  ) -> tuple[float, dict[str, Any]]:
+    query_name = 'load_search_data'
+    context = {
+        'table_name': table_path,
+        'storage_path': storage_path,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.LOAD_SEARCH_DATA_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    return self.client_interface.ExecuteQuery(query_name, print_results=True)
+
+  def GetTableRowCount(self, table_path: str) -> tuple[int, dict[str, Any]]:
+    query_name = 'get_row_count'
+    context = {
+        'table_name': table_path,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.GET_ROW_COUNT_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    _, meta = self.client_interface.ExecuteQuery(query_name, print_results=True)
+    qres = int(meta['output']['TOTAL_ROW_COUNT'])
+    return qres, meta
+
+  def TextSearchQuery(
+      self, table_path: str, search_keyword: str, index_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    query_name = 'text_search_query'
+    context = {
+        'table_name': table_path,
+        'search_text': search_keyword,
+        'index_name': index_name,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.INDEX_SEARCH_QUERY_TEMPLATE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    res, meta = self.client_interface.ExecuteQuery(
+        query_name, print_results=True
+    )
+
+    meta['edw_search_index_coverage_percentage'] = int(
+        meta['output']['COVERAGE_PERCENTAGE']
+    )
+    meta['edw_search_result_rows'] = int(meta['output']['RESULT_ROWS'])
+    meta['edw_search_total_row_count'] = int(meta['output']['TOTAL_ROW_COUNT'])
+
+    return res, meta
