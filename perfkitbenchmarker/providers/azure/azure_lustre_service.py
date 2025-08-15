@@ -16,10 +16,6 @@ from perfkitbenchmarker.providers.azure import util
 FLAGS = flags.FLAGS
 
 
-class AzureLustreDiskSpec(disk.BaseLustreDiskSpec):
-  CLOUD = provider_info.AZURE
-
-
 class AzureLustreDisk(disk.LustreDisk):
 
   def _GetNetworkDiskMountOptionsDict(self):

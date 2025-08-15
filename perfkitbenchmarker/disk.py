@@ -296,9 +296,7 @@ class BaseLustreDiskSpec(BaseDiskSpec):
   """Stores the information needed to create a base Lustre disk."""
 
   SPEC_TYPE = 'BaseLustreDiskSpec'
-  CLOUD = NONE
   DISK_TYPE = LUSTRE
-  SPEC_ATTRS = ['CLOUD']
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
