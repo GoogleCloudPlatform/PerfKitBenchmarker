@@ -404,13 +404,13 @@ flags.DEFINE_boolean(
     'them. However, they must be deleted in order to '
     'successfully delete the PKB-created network.',
 )
-flags.DEFINE_enum(
+BQ_CLIENT_INTERFACE = flags.DEFINE_enum(
     'bq_client_interface',
     'CLI',
     [
         'CLI',
         'JAVA',
-        'SIMBA_JDBC_1_6_3_1004',
+        'SIMBA_JDBC',
         'GOOGLE_JDBC',
         'PYTHON',
     ],
