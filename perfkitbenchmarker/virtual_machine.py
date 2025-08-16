@@ -1302,4 +1302,8 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     """Returns the minimum CPU platform for the VM."""
     return None
 
+  def IsSrsoVulnerable(self) -> bool | None:
+    """Returns whether the AMD-based VM is susceptible to an SRSO attack."""
+    return None
+
 VirtualMachine = typing.TypeVar('VirtualMachine', bound=BaseVirtualMachine)
