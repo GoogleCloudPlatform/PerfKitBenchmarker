@@ -440,6 +440,28 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     ))
     self.assertEqual(vm.GetMinCpuPlatform(), expected)
 
+  @parameterized.named_parameters(
+      ('srso_vulnerable', 'spec_rstack_overflow', 'AuthenticAMD_26_2_1', True),
+      ('srso_not_vulnerable', 'other_vuln', 'AuthenticAMD_26_2_1', False),
+      ('not AMD VM', 'spec_rstack_overflow', 'GenuineIntel_6_85_7', None)
+  )
+  def testIsSrsoVulnerable(self, cpu_vuln, cpu_vendor, expected):
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type='test_machine_type',
+    )
+    vm = gce_virtual_machine.Ubuntu2204BasedGceVirtualMachine(spec)
+    vm.cpu_version = cpu_vendor
+    with mock.patch.object(
+        gce_virtual_machine.BaseLinuxGceVirtualMachine,
+        'cpu_vulnerabilities',
+        new_callable=mock.PropertyMock,
+    ) as mock_cpu_vulnerabilities:
+      cpu_vulnerabilities = gce_virtual_machine.linux_vm.CpuVulnerabilities()
+      cpu_vulnerabilities.vulnerabilities[cpu_vuln] = 'Vulnerable'
+      mock_cpu_vulnerabilities.return_value = cpu_vulnerabilities
+      self.assertEqual(vm.IsSrsoVulnerable(), expected)
+
 
 def _CreateFakeDiskMetadata(image, fake_disk):
   fake_disk = copy.copy(fake_disk)

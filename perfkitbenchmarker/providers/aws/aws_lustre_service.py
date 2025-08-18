@@ -16,10 +16,6 @@ from perfkitbenchmarker.providers.aws import util
 FLAGS = flags.FLAGS
 
 
-class AwsLustreDiskSpec(disk.BaseLustreDiskSpec):
-  CLOUD = provider_info.AWS
-
-
 class AwsLustreDisk(disk.LustreDisk):
 
   def _GetNetworkDiskMountOptionsDict(self):

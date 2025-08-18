@@ -27,6 +27,7 @@ from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 
@@ -37,17 +38,14 @@ BQ_PYTHON_CLIENT_FILE = 'bq_python_driver.py'
 BQ_PYTHON_CLIENT_DIR = 'edw/bigquery/clients/python'
 DEFAULT_TABLE_EXPIRATION = 3600 * 24 * 365  # seconds
 
-BQ_JDBC_INTERFACES = ['SIMBA_JDBC_1_6_3_1004', 'GOOGLE_JDBC']
-BQ_JDBC_CLIENT_FILE = {
-    'SIMBA_JDBC_1_6_3_1004': 'bq-jdbc-client-2.4.jar',
-    'GOOGLE_JDBC': 'bq-google-jdbc-client-1.0.jar',
-}
-BQ_JDBC_JAR_FILE = {
-    'SIMBA_JDBC_1_6_3_1004': 'GoogleBigQueryJDBC42_1_6_3.jar',
-    'GOOGLE_JDBC': 'jdbc-jar-with-dependencies-20250129.jar',
+BQ_JDBC_INTERFACES = ['SIMBA_JDBC', 'GOOGLE_JDBC']
+BQ_JDBC_CLIENT_FILE = 'bq-jdbc-client.jar'
+BQ_JDBC_FILE = {
+    'SIMBA_JDBC': 'SimbaJDBCDriverforGoogleBigQuery42.zip',
+    'GOOGLE_JDBC': 'google-cloud-bigquery-jdbc-latest-full.jar',
 }
 BQ_JDBC_JAVA_FLAGS = {
-    'SIMBA_JDBC_1_6_3_1004': '',
+    'SIMBA_JDBC': '',
     'GOOGLE_JDBC': '--add-opens=java.base/java.nio=ALL-UNNAMED',
 }
 
@@ -66,7 +64,7 @@ class GenericClientInterface(edw_service.EdwClientInterface):
 
   def GetMetadata(self) -> dict[str, str]:
     """Gets the Metadata attributes for the Client Interface."""
-    return {'client': FLAGS.bq_client_interface}
+    return {'client': gcp_flags.BQ_CLIENT_INTERFACE.value}
 
   def RunQueryWithResults(self, query_name: str) -> str:
     raise NotImplementedError
@@ -87,13 +85,13 @@ def GetBigQueryClientInterface(
   Raises:
     RuntimeError: if an unsupported bq_client_interface is requested
   """
-  if FLAGS.bq_client_interface == 'CLI':
+  if gcp_flags.BQ_CLIENT_INTERFACE.value == 'CLI':
     return CliClientInterface(project_id, dataset_id)
-  if FLAGS.bq_client_interface == 'JAVA':
+  if gcp_flags.BQ_CLIENT_INTERFACE.value == 'JAVA':
     return JavaClientInterface(project_id, dataset_id)
-  if FLAGS.bq_client_interface in BQ_JDBC_INTERFACES:
+  if gcp_flags.BQ_CLIENT_INTERFACE.value in BQ_JDBC_INTERFACES:
     return JdbcClientInterface(project_id, dataset_id)
-  if FLAGS.bq_client_interface == 'PYTHON':
+  if gcp_flags.BQ_CLIENT_INTERFACE.value == 'PYTHON':
     return PythonClientInterface(project_id, dataset_id)
   raise RuntimeError('Unknown BigQuery Client Interface requested.')
 
@@ -223,11 +221,16 @@ class JdbcClientInterface(GenericClientInterface):
     self.client_vm.InstallPreprovisionedPackageData(
         package_name,
         [
-            BQ_JDBC_CLIENT_FILE[FLAGS.bq_client_interface],
-            BQ_JDBC_JAR_FILE[FLAGS.bq_client_interface],
+            BQ_JDBC_CLIENT_FILE,
+            BQ_JDBC_FILE[gcp_flags.BQ_CLIENT_INTERFACE.value],
         ],
         '',
     )
+    if gcp_flags.BQ_CLIENT_INTERFACE.value == 'SIMBA_JDBC':
+      unzip_cmd = 'unzip jdbc/{} -d jdbc/'.format(
+          BQ_JDBC_FILE[gcp_flags.BQ_CLIENT_INTERFACE.value]
+      )
+      self.client_vm.RemoteCommand(unzip_cmd)
 
   def ExecuteQuery(
       self, query_name: str, print_results: bool = False
@@ -246,12 +249,11 @@ class JdbcClientInterface(GenericClientInterface):
       performance_details: A dictionary of query execution attributes eg. job_id
     """
     query_command = (
-        'java {} -cp {}:{} '
+        'java {} -cp {}:./* '
         'com.google.cloud.performance.edw.App --project {} --service_account '
         '{} --credentials_file {} --dataset {} --query_file {}'.format(
-            BQ_JDBC_JAVA_FLAGS[FLAGS.bq_client_interface],
-            BQ_JDBC_CLIENT_FILE[FLAGS.bq_client_interface],
-            BQ_JDBC_JAR_FILE[FLAGS.bq_client_interface],
+            BQ_JDBC_JAVA_FLAGS[gcp_flags.BQ_CLIENT_INTERFACE.value],
+            BQ_JDBC_CLIENT_FILE,
             self.project_id,
             FLAGS.gcp_service_account,
             FLAGS.gcp_service_account_key_file,

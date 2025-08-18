@@ -503,6 +503,7 @@ class AwsLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
     vm = self.vm
     vm.InstallPackages('lustre-client')
     if FLAGS.aws_efa:
+      # https://docs.aws.amazon.com/fsx/latest/LustreGuide/configure-efa-clients.html
       stdout, _ = vm.RemoteCommand('ip -br -4 a sh | grep $(hostname -i)')
       eth = stdout.split()[0]
       vm.RemoteCommand(
@@ -530,6 +531,7 @@ class AwsLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
       vm.RemoteCommand('sudo modprobe lustre;  sudo lnetctl net show')
     super().SetUpDiskOnLinux()
     # Apply best practices
+    # https://docs.aws.amazon.com/fsx/latest/LustreGuide/performance-tips.html
     vm.RemoteCommand('sudo lctl set_param ldlm.namespaces.*.lru_max_age=600000')
     vm.RemoteCommand('sudo lctl set_param ldlm.namespaces.*.lru_size=18000')
     vm.RemoteCommand(

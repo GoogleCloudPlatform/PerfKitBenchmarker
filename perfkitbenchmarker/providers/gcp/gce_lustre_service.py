@@ -4,17 +4,12 @@ import json
 import logging
 
 from absl import flags
-from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import lustre_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
-
-
-class GceLustreDiskSpec(disk.BaseLustreDiskSpec):
-  CLOUD = provider_info.GCP
 
 
 class GceLustreService(lustre_service.BaseLustreService):

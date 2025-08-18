@@ -113,6 +113,13 @@ _INIT_DATASET_COPIES = flags.DEFINE_integer(
     " for edw search index benchmarks.",
 )
 
+_INDEX_WAIT = flags.DEFINE_boolean(
+    "edw_search_ingestion_index_wait",
+    True,
+    "Whether or not to wait for indexing to complete. Set to false for fast "
+    "debug runs.",
+)
+
 FLAGS = flags.FLAGS
 
 
@@ -151,6 +158,7 @@ def _ExecuteDataLoad(
     synchro: SyncEvent,
     target_row_count: int,
     interval: float,
+    bench_meta: dict[Any, Any] | None = None,
 ):
   """Executes data insertion queries in a loop.
 
@@ -167,6 +175,7 @@ def _ExecuteDataLoad(
     synchro: A multiprocessing.Event to signal when to stop the loading process.
     target_row_count: The target number of rows to ingest.
     interval: The time in seconds to wait between data insertion calls.
+    bench_meta: Optional metadata to add to the collected samples.
   """
   logging.info("Starting data loading loop")
   i = 0
@@ -185,6 +194,7 @@ def _ExecuteDataLoad(
             target_row_count,
             i,
         ),
+        kwargs={"bench_meta": bench_meta},
     )
     load_processes.append(next_run)
     next_run.start()
@@ -204,6 +214,7 @@ def _ExecuteDataLoadQuery(
     current_rows: multiprocessing.Value,
     target_row_count: int,
     load_iter: int,
+    bench_meta: dict[str, Any] | None = None,
 ):
   """Executes a single data load query and records the result.
 
@@ -219,6 +230,7 @@ def _ExecuteDataLoadQuery(
     current_rows: A shared multiprocessing.Value holding the current row count.
     target_row_count: The target number of rows to ingest.
     load_iter: The iteration number of the load operation.
+    bench_meta: Metadata to add to the collected sample.
   """
   if current_rows.value >= target_row_count:
     return
@@ -229,7 +241,10 @@ def _ExecuteDataLoadQuery(
   metadata["load_iter"] = load_iter
   results.append(
       sample.Sample(
-          "load_query_execution_time", execution_time, "seconds", metadata
+          "load_query_execution_time",
+          execution_time,
+          "seconds",
+          metadata | bench_meta,
       )
   )
 
@@ -281,7 +296,7 @@ def _ExecuteIndexQueriesSynchro(
     results: _TResultList,
     synchro: SyncEvent,
     interval: float = 0,
-    bench_meta: Dict[str, Any] | None = None,
+    bench_meta: dict[Any, Any] | None = None,
 ):
   """Executes index search queries in a loop until signaled to stop.
 
@@ -366,7 +381,7 @@ def _WaitForIndexCompletion(
     start_time: float,
     timeout: float,
     stage_label: str,
-    bench_meta: dict[Any, Any],
+    bench_meta: dict[Any, Any] | None = None,
 ) -> None:
   """Waits for a search index to reach 100% coverage.
 
@@ -384,6 +399,8 @@ def _WaitForIndexCompletion(
     stage_label: Label for the current benchmark stage (e.g. 'initialization').
     bench_meta: Metadata to add to the collected samples.
   """
+  if bench_meta is None:
+    bench_meta = {}
   wait_results: dict[int, sample.Sample] = {}
   bench_meta = bench_meta.copy()
   bench_meta["index_completion_timeout"] = timeout
@@ -451,6 +468,20 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
   search_kw: str = _SEARCH_KEYWORD.value
   ingestion_interval: int = _LOAD_INTERVAL_SEC.value
   search_interval: int = _QUERY_INTERVAL_SEC.value
+  index_wait: bool = _INDEX_WAIT.value
+
+  gen_metadata = {
+      "edw_index_search_table": search_table,
+      "edw_index_search_index": index_name,
+      "edw_index_init_data_location": init_data_loc,
+      "edw_index_interactive_data_location": interactive_data_loc,
+      "edw_index_target_row_count": row_target,
+      "edw_index_init_dataset_copies": init_copies,
+      "edw_index_search_keyword": search_kw,
+      "edw_index_ingestion_load_interval_sec": ingestion_interval,
+      "edw_index_ingestion_query_interval_sec": search_interval,
+      "edw_index_ingestion_index_wait": index_wait,
+  }
 
   with multiprocessing.Manager() as manager:
     results_proxy: _TResultList = manager.list()
@@ -469,17 +500,18 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
     logging.info("Creating index")
     indexing_start_time = time.time()
     edw_service_instance.CreateSearchIndex(search_table, index_name)
-    logging.info("Waiting for index to reach 100% coverage on init data")
-    _WaitForIndexCompletion(
-        edw_service_instance,
-        search_table,
-        index_name,
-        results_proxy,
-        indexing_start_time,
-        INDEXING_TIMEOUT_SEC,
-        "initialization",
-        {},
-    )
+    if index_wait:
+      logging.info("Waiting for index to reach 100% coverage on init data")
+      _WaitForIndexCompletion(
+          edw_service_instance,
+          search_table,
+          index_name,
+          results_proxy,
+          indexing_start_time,
+          INDEXING_TIMEOUT_SEC,
+          "initialization",
+          bench_meta=gen_metadata,
+      )
     logging.info("Initial dataset indexing stage complete")
 
     logging.info("Running preload search queries")
@@ -490,7 +522,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
         search_kw,
         results_proxy,
         num_queries=5,
-        bench_meta={"search_query_block": "preload"},
+        bench_meta={"search_query_block": "preload"} | gen_metadata,
     )
 
     run_complete = multiprocessing.Event()
@@ -505,6 +537,9 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
             row_target,  # target_row_count: int,
             ingestion_interval,  # interval: int,
         ),
+        kwargs={
+            "bench_meta": gen_metadata,
+        },
     )
 
     search_query_process = multiprocessing.Process(
@@ -519,7 +554,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
         ),
         kwargs={
             "interval": search_interval,
-            "bench_meta": {"search_query_block": "ingestion"},
+            "bench_meta": {"search_query_block": "ingestion"} | gen_metadata,
         },
     )
 
@@ -539,18 +574,19 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
     data_load_process.join()
     search_query_process.join()
 
-    logging.info("Waiting for index to reach 100% coverage on full dataset")
     after_load_index_start = time.time()
-    _WaitForIndexCompletion(
-        edw_service_instance,
-        search_table,
-        index_name,
-        results_proxy,
-        after_load_index_start,
-        INDEXING_TIMEOUT_SEC,
-        "post_load",
-        {},
-    )
+    if index_wait:
+      logging.info("Waiting for index to reach 100% coverage on full dataset")
+      _WaitForIndexCompletion(
+          edw_service_instance,
+          search_table,
+          index_name,
+          results_proxy,
+          after_load_index_start,
+          INDEXING_TIMEOUT_SEC,
+          "post_load",
+          bench_meta=gen_metadata,
+      )
 
     logging.info("Running post load queries")
     _ExecuteIndexQueries(
@@ -560,7 +596,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
         search_kw,
         results_proxy,
         num_queries=5,
-        bench_meta={"search_query_block": "postload"},
+        bench_meta={"search_query_block": "postload"} | gen_metadata,
     )
 
     results = list(results_proxy)
