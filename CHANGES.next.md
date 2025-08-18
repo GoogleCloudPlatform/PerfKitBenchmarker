@@ -246,6 +246,8 @@
     storage
 -   Add new `edw_index_ingestion_benchmark` benchmark evaluating the performance
     of text search indexes on EDW systems.
+-   Add new `kubernetes_ai_inference_benchmark` benchmark evaluating the
+    performance of inference server (vllm etc.) hosted in k8s cluster.
 
 ### Enhancements:
 

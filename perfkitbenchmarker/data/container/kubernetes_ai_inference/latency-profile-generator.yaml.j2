@@ -1,0 +1,91 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 1000000
+globalDefault: false
+description: "Prevent pod from being preempted"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: latency-profile-generator
+  labels:
+    name: latency-profile-generator
+spec:
+  template:
+    spec:
+      priorityClassName: high-priority
+      initContainers:
+        - name: latency-profile-generator
+          image: {{image_repo}}/inference-benchmark
+          command: ["bash", "-c", "./latency_throughput_curve.sh"]
+          env:
+            - name: MODELS
+              value: "{{models}}"
+            - name: TOKENIZER
+              value: "{{tokenizer}}"
+            - name: IP
+              value: "{{inference_server}}"
+            - name: PORT
+              value: "{{inference_server_port | default('8000')}}"
+            - name: BACKEND
+              value: "{{backend | default('vllm')}}"
+            - name: PROMPT_DATASET
+              value: "{{prompt_dataset | default('sharegpt')}}"
+            - name: INPUT_LENGTH
+              value: "{{input_length | default('1024')}}"
+            - name: OUTPUT_LENGTH
+              value: "{{output_length | default('1024')}}"
+            - name: REQUEST_RATES
+              value: "{{request_rate | default('1,2,4,6,8')}}"
+            - name: BENCHMARK_TIME_SECONDS
+              value: "{{benchmark_time_seconds | default('300')}}"
+            - name: FILE_PREFIX
+              value: "/benchmark_result/benchmark"
+            - name: OUTPUT_BUCKET # adding a GCS bucket will persist the benchmarking report in GCS.
+              value: "{{output_bucket | default('')}}"
+            - name: OUTPUT_BUCKET_FILEPATH
+              value: "{{output_bucket_filepath | default('')}}"
+            - name: SCRAPE_SERVER_METRICS
+              value: "false"
+            - name: SAVE_AGGREGATED_RESULT
+              value: "false"
+            - name: STREAM_REQUEST
+              value: "false"
+            - name: POST_BENCHMARK_SLEEP_TIME
+              value: "0"
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-secret
+                  key: hf_api_token
+            {%- if env_vars is defined %}
+            {%- for key, value in env_vars.items() %}
+            - name: {{ key }}
+              value: "{{ value }}"
+            {%- endfor %}
+            {%- endif %}
+          resources:
+            requests:
+              memory: "16G"
+              cpu: "2"
+          volumeMounts:
+          - name: benchmark-output
+            mountPath: /benchmark_result
+      containers:
+      - name: sleep
+        image: gcr.io/gke-release/debian-base
+        command: ["sleep", "300"]
+        volumeMounts:
+          - name: benchmark-output
+            mountPath: /benchmark_result
+        resources:
+          requests:
+            cpu: "250m"
+      volumes:
+      - name: benchmark-output
+        emptyDir: {}
+      restartPolicy: Never
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 10

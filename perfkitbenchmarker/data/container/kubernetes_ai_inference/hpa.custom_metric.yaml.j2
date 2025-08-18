@@ -1,0 +1,22 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: k8s-ai-inference-benchmark
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{deployment_name}}
+  minReplicas: {{hpa_min_replicas}}
+  maxReplicas: {{hpa_max_replicas}}
+  metrics:
+  - type: External
+    external:
+      metric:
+        name: prometheus.googleapis.com|{{custom_metric_name}}|gauge
+      target:
+        type: Value
+        value: {{hpa_target_value}}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: {{hpa_stabilization_window_seconds}}
