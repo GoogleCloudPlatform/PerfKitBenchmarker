@@ -112,8 +112,6 @@ class GcePlacementGroupTest(pkb_common_test_case.PkbCommonTestCase):
             '--quiet',
             '--region',
             'us-east1',
-            '--vm-count',
-            '2',
         ],
         raise_on_failure=False,
         stack_level=mock.ANY,
