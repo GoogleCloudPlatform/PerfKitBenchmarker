@@ -248,6 +248,8 @@
     of text search indexes on EDW systems.
 -   Add new `kubernetes_ai_inference_benchmark` benchmark evaluating the
     performance of inference server (vllm etc.) hosted in k8s cluster.
+-   Add option for benchmarks to implement three-part prepare flow instead of
+    single Prepare function.
 
 ### Enhancements:
 

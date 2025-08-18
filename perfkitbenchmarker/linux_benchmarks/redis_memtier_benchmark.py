@@ -130,8 +130,26 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   return config
 
 
-def Prepare(bm_spec: _BenchmarkSpec) -> None:
-  """Install Redis on one VM and memtier_benchmark on another."""
+def PrepareSystem(bm_spec: _BenchmarkSpec) -> None:
+  """Set system-wide parameters."""
+  server_vms = bm_spec.vm_groups['servers']  # for cluster mode
+  background_tasks.RunThreaded(redis_server.PrepareSystem, server_vms)
+
+
+def InstallPackages(bm_spec: _BenchmarkSpec) -> None:
+  """Install Redis on the servers and memtier on the clients."""
+  client_vms = bm_spec.vm_groups['clients']
+  server_vms = bm_spec.vm_groups['servers']
+  background_tasks.RunThreaded(
+      lambda client: client.Install('memtier'), client_vms
+  )
+  background_tasks.RunThreaded(
+      lambda server: server.Install('redis_server'), server_vms
+  )
+
+
+def StartServices(bm_spec: _BenchmarkSpec) -> None:
+  """Start Redis servers."""
   server_count = len(bm_spec.vm_groups['servers'])
   if server_count != 1 and not redis_server.CLUSTER_MODE.value:
     raise errors.Benchmarks.PrepareException(
@@ -141,15 +159,6 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   server_vm = bm_spec.vm_groups['servers'][0]
   all_server_vms = bm_spec.vm_groups['servers']  # for cluster mode
 
-  # Install memtier
-  background_tasks.RunThreaded(
-      lambda client: client.Install('memtier'), client_vms
-  )
-
-  # Install and start redis on the server machine(s).
-  background_tasks.RunThreaded(
-      lambda vm: vm.Install('redis_server'), all_server_vms
-    )
   for vm in all_server_vms:
     redis_server.Start(vm)
 
