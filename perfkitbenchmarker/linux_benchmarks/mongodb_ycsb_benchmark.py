@@ -250,7 +250,7 @@ def _PrepareMembers(
 
   # Initiate the replica set with just the primary
   init_config = {
-      '_id': 'rs0',
+      '_id': f'rs-{FLAGS.run_uri}',
       'members': [{
           '_id': 0,
           'host': primary_host,
@@ -360,7 +360,7 @@ def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
         f'"mongodb://{primary.internal_ip}:{DEFAULT_PORT},'
         f'{secondary.internal_ip}:{DEFAULT_PORT},'
         f'{secondary_2.internal_ip}:{DEFAULT_PORT}/ycsb'
-        '?replicaSet=rs0&w=majority&compression=snappy&maxPoolSize=100000"'
+        f'?replicaSet=rs-{FLAGS.run_uri}&w=majority&compression=snappy&maxPoolSize=100000"'
     )
 
   secondary = benchmark_spec.vm_groups['secondary'][0]
@@ -369,7 +369,7 @@ def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
       f'"mongodb://{primary.internal_ip}:{DEFAULT_PORT},'
       f'{secondary.internal_ip}:{DEFAULT_PORT},'
       f'{arbiter.internal_ip}:{DEFAULT_PORT}/ycsb'
-      '?replicaSet=rs0&w=majority&compression=snappy&maxPoolSize=100000"'
+      f'?replicaSet=rs-{FLAGS.run_uri}&w=majority&compression=snappy&maxPoolSize=100000"'
   )
 
 
