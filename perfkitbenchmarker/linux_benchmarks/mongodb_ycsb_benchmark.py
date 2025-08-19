@@ -197,7 +197,9 @@ def _PrepareServer(vm: _LinuxVM) -> None:
   vm.Install('mongosh')
 
   data_dir = _GetDataDir(vm)
+  vm.RemoteCommand('sudo systemctl stop mongod || true')
   vm.RemoteCommand(f'sudo rm -rf {data_dir}')
+  vm.RemoteCommand('sudo rm -rf /var/lib/mongodb')
   vm.RemoteCommand(f'mkdir {data_dir} && chmod a+rwx {data_dir}')
   vm.RemoteCommand(
       f'sudo sed -i "s|dbPath:.*|dbPath: {data_dir}|"'
