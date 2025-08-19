@@ -332,9 +332,22 @@ class BaseCliVertexAiModel(BaseVertexAiModel):
 
   def _GetPromptCommand(self, json_file_name: str):
     """Returns the prompting command once json file is written."""
+    url = self.GetEndpointUrl()
     return (
-        'gcloud ai endpoints predict'
-        f' {self.endpoint.endpoint_name} --json-request={json_file_name}'
+        'curl -X POST -H "Content-Type: application/json" -H "Authorization:'
+        f' Bearer $(gcloud auth print-access-token)" {url} -d @{json_file_name}'
+    )
+
+  def GetEndpointUrl(self) -> str:
+    """Returns the URL of the endpoint."""
+    if gcp_flags.AI_FAST_TRYOUT.value:
+      extension = '-fasttryout'
+    else:
+      extension = f'-{self.project_number}'
+    return (
+        f'https://{self.endpoint.short_endpoint_name}.{self.region}{extension}.'
+        f'prediction.vertexai.goog/v1/projects/{self.project_number}/locations/'
+        f'{self.region}/endpoints/{self.endpoint.short_endpoint_name}:predict'
     )
 
   def _Delete(self) -> None:
@@ -496,21 +509,6 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
   def _PostCreate(self):
     super()._PostCreate()
     self.endpoint.UpdateLabels()
-
-  def _GetPromptCommand(self, json_file_name: str):
-    """Returns the prompting command once json file is written."""
-    if not gcp_flags.AI_FAST_TRYOUT.value:
-      return super()._GetPromptCommand(json_file_name)
-    # Surprisingly, the URL is not in endpoint describe output.
-    url = (
-        f'https://{self.endpoint.short_endpoint_name}.{self.region}-fasttryout.'
-        f'prediction.vertexai.goog/v1/projects/{self.project_number}/locations/'
-        f'{self.region}/endpoints/{self.endpoint.short_endpoint_name}:predict'
-    )
-    return (
-        'curl -X POST -H "Content-Type: application/json" -H "Authorization:'
-        f' Bearer $(gcloud auth print-access-token)" {url} -d @{json_file_name}'
-    )
 
   def _CreateDependencies(self):
     """Does not create any dependencies.
