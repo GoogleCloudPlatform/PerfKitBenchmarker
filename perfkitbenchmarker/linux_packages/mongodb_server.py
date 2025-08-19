@@ -169,7 +169,9 @@ def _Setup(vm):
   # Apply static configurations
   config_data.setdefault('net', {})['bindIp'] = '::,0.0.0.0'
   if not FLAGS.mongodb_primary_only:
-    config_data.setdefault('replication', {})['replSetName'] = 'rs0'
+    config_data.setdefault('replication', {})[
+        'replSetName'
+    ] = f'rs-{FLAGS.run_uri}'
 
   # Apply flag-driven configurations
 

@@ -746,7 +746,32 @@ def DoPreparePhase(
   with timer.Measure('BenchmarkSpec Prepare'):
     spec.Prepare()
   with timer.Measure('Benchmark Prepare'):
-    spec.BenchmarkPrepare(spec)
+    # Benchmarks can either implement a single 'Prepare' method, or
+    # PrepareSystem, InstallPackages and StartServices. In the second option,
+    # those three methods will be called in that order to prepare the benchmark
+    # on a VM.
+
+    # Benchmarks must define at least one prepare function, because defining
+    # none is probably a bug.
+    if (
+        not spec.BenchmarkPrepare
+        and not spec.BenchmarkPrepareSystem
+        and not spec.BenchmarkInstallPackages
+        and not spec.BenchmarkStartServices
+    ):
+      raise errors.Benchmarks.PrepareException(
+          'Benchmark must define at least one prepare function.'
+      )
+
+    if spec.BenchmarkPrepare:
+      spec.BenchmarkPrepare(spec)
+    else:
+      if spec.BenchmarkPrepareSystem:
+        spec.BenchmarkPrepareSystem(spec)
+      if spec.BenchmarkInstallPackages:
+        spec.BenchmarkInstallPackages(spec)
+      if spec.BenchmarkStartServices:
+        spec.BenchmarkStartServices(spec)
   spec.StartBackgroundWorkload()
   if FLAGS.after_prepare_sleep_time:
     logging.info(

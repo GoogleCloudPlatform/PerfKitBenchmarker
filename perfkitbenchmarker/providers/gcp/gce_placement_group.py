@@ -153,10 +153,8 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
 
     if self.style == COLLOCATED:
       placement_policy['collocation'] = self.style
-      placement_policy['vm-count'] = self.num_vms
     elif self.style == CLUSTERED:
       placement_policy['collocation'] = self.style
-      placement_policy['vm-count'] = self.num_vms
     elif self.style == AVAILABILITY_DOMAIN:
       placement_policy['availability-domain-count'] = (
           self.availability_domain_count

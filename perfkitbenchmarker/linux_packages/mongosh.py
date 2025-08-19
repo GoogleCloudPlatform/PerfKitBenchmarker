@@ -33,9 +33,10 @@ def AptInstall(vm):
   vm.InstallPackages('mongodb-org')
 
 
-def RunCommand(vm, command: str) -> tuple[str, str]:
+def RunCommand(vm, command: str, quiet: bool = False) -> tuple[str, str]:
   """Runs a mongosh command on the VM."""
-  return vm.RemoteCommand(f'mongosh --eval "{command}" --verbose')
+  flag = '--quiet' if quiet else '--verbose'
+  return vm.RemoteCommand(f'mongosh --eval "{command}" {flag}')
 
 
 def RunTwoCommands(vm, command1: str, command2: str) -> tuple[str, str]:

@@ -141,12 +141,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     metadata.update({
         'zone': self.spec.db_spec.zone,
     })
-
-    if hasattr(self.spec.db_disk_spec, 'iops'):
-      metadata.update({
-          'disk_iops': self.spec.db_disk_spec.iops,
-      })
-
     return metadata
 
   @staticmethod

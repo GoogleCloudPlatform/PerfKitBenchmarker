@@ -244,7 +244,16 @@ class BenchmarkSpec:
 
     # Modules can't be pickled, but functions can, so we store the functions
     # necessary to run the benchmark.
-    self.BenchmarkPrepare = benchmark_module.Prepare
+    self.BenchmarkPrepare = getattr(benchmark_module, 'Prepare', None)
+    self.BenchmarkPrepareSystem = getattr(
+        benchmark_module, 'PrepareSystem', None
+    )
+    self.BenchmarkInstallPackages = getattr(
+        benchmark_module, 'InstallPackages', None
+    )
+    self.BenchmarkStartServices = getattr(
+        benchmark_module, 'StartServices', None
+    )
     self.BenchmarkRun = benchmark_module.Run
     self.BenchmarkCleanup = benchmark_module.Cleanup
     # Set the current thread's BenchmarkSpec object to this one.

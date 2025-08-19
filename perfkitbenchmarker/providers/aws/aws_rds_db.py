@@ -126,24 +126,6 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
 
     self._SetPrimaryAndSecondaryZones()
 
-  def GetResourceMetadata(self):
-    """Returns the metadata associated with the resource.
-
-    All keys will be prefaced with relational_db before
-    being published (done in publisher.py).
-
-    Returns:
-      metadata: dict of AWS Managed DB metadata.
-    """
-    metadata = super().GetResourceMetadata()
-
-    if hasattr(self.spec.db_disk_spec, 'provisioned_iops'):
-      metadata.update({
-          'disk_iops': self.spec.db_disk_spec.provisioned_iops,
-      })
-
-    return metadata
-
   def _SetEndpoint(self):
     """Assigns the ports and endpoints from the instance_id to self.
 

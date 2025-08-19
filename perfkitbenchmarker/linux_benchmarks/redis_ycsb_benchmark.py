@@ -65,6 +65,7 @@ def PrepareLoadgen(load_vm):
 
 def PrepareServer(redis_vm):
   redis_vm.Install('redis_server')
+  redis_server.PrepareSystem(redis_vm)
   redis_server.Start(redis_vm)
 
 

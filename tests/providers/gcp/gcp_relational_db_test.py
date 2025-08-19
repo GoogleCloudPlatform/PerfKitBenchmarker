@@ -16,6 +16,7 @@
 
 import builtins
 import contextlib
+import inspect
 import json
 import os
 import unittest
@@ -173,6 +174,48 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--backup', command_string)
       self.assertIn('--zone=us-west1-b', command_string)
 
+  def testDiskMetadata(self):
+    FLAGS['db_disk_throughput'].parse(1200)
+    FLAGS['db_disk_iops'].parse(10000)
+    test_spec = inspect.cleandoc("""
+    cluster_boot:
+      relational_db:
+        cloud: GCP
+        engine: mysql
+        engine_version: '5.7'
+        db_spec:
+          GCP:
+            machine_type: db-n1-standard-1
+            zone: us-west1-b
+        db_disk_spec:
+          GCP:
+            disk_size: 50
+        vm_groups:
+          clients:
+            vm_spec:
+              GCP:
+                machine_type: n1-standard-16
+                zone: us-central1-c
+            disk_spec:
+              GCP:
+                disk_size: 500
+                disk_type: pd-ssd
+    """)
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(test_spec)
+    spec.ConstructRelationalDb()
+    with self.subTest('disk_iops'):
+      self.assertEqual(
+          spec.relational_db.spec.db_disk_spec.provisioned_iops, 10000
+      )
+    with self.subTest('disk_throughput'):
+      self.assertEqual(
+          spec.relational_db.spec.db_disk_spec.provisioned_throughput, 1200
+      )
+    with self.subTest('metadata'):
+      metadata = spec.relational_db.GetResourceMetadata()
+      self.assertEqual(metadata['disk_iops'], 10000)
+      self.assertEqual(metadata['disk_throughput_mb'], 1200)
+
   def testCorrectVmGroupsPresent(self):
     with PatchCriticalObjects():
       db = CreateIAASDbFromSpec(self.createMySQLSpecDict())
@@ -278,7 +321,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(db.endpoint, db.server_vm.internal_ip)
 
 
-class GcpPostgresRelationlDbTestCase(pkb_common_test_case.PkbCommonTestCase):
+class GcpPostgresRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
