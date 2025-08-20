@@ -326,17 +326,18 @@ class BaseEksCluster(container_service.KubernetesCluster):
   
   def GetNodePoolNames(self) -> list[str]:
     """Get node pool names for the cluster."""
-
-    stdout, _, _ = container_service.RunKubectlCommand([
-        'get',
-        'nodes',
-        '-o',
-        'json',
-    ])
-
-    data = json.loads(stdout)
-
-    return [item["metadata"]["name"] for item in data["items"]]
+    cmd = [
+        FLAGS.eksctl, "get", "nodegroup",
+        "--cluster", self.name,
+        "--region", self.region,
+        "-o", "json"
+    ]
+    stdout, _, retcode = vm_util.IssueCommand(cmd)
+    if retcode:
+      logging.warning("Failed to get nodegroups: %s", stdout)
+      return []
+    nodegroups = json.loads(stdout)
+    return [ng["Name"] for ng in nodegroups]
 
 class EksCluster(BaseEksCluster):
   """Class representing an Elastic Kubernetes Service cluster."""
