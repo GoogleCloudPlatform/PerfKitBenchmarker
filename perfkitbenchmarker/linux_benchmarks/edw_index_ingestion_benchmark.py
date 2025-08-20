@@ -180,9 +180,12 @@ def _ExecuteDataLoad(
   logging.info("Starting data loading loop")
   i = 0
   load_processes: list[multiprocessing.Process] = []
-  current_rows: multiprocessing.Value = multiprocessing.Value("i", 0)
+  current_rows: multiprocessing.Value = multiprocessing.Value("q", 0)
   current_rows.value, _ = service.GetTableRowCount(table_name)
   while current_rows.value < target_row_count and not synchro.is_set():
+    if current_rows.value < 0:
+      logging.info("current row count negative (overflow?), terminating run")
+      break
     next_run = multiprocessing.Process(
         target=_ExecuteDataLoadQuery,
         args=(
