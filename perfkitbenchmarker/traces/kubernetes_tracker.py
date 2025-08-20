@@ -209,10 +209,10 @@ def _GetMachineTypeFromNodeName(
     cluster: container_service.KubernetesCluster, node_name: str
 ) -> str:
   """Get the machine type of the given node."""
-  nodepool = cluster.GetNodePoolFromNodeName(node_name)
-  if nodepool is None:
+  machine_type = cluster.GetMachineTypeFromNodeName(node_name)
+  if machine_type is None:
     return "unknown"
-  return nodepool.machine_type
+  return machine_type
 
 
 def _FinalizeNodeDetails(

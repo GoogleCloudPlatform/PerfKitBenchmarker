@@ -239,6 +239,15 @@ class ElasticKubernetesServiceTest(BaseEksTest):
     nodepool = cluster.GetNodePoolFromNodeName('sample-node')
     self.assertIsNone(nodepool)
 
+  def testEksClusterGetMachineTypeFromNodeName(self):
+    self.MockIssueCommand({'get node': [("'node1,m6i.xlarge'\n", '', 0)]})
+    cluster = elastic_kubernetes_service.EksCluster(
+        container_spec.ContainerClusterSpec('NAME', **EKS_SPEC_DICT)
+    )
+    machine_type = cluster.GetMachineTypeFromNodeName('node1')
+    self.assertIsNotNone(machine_type)
+    self.assertEqual(machine_type, 'm6i.xlarge')
+
 
 class EksAutoClusterTest(BaseEksTest):
 
