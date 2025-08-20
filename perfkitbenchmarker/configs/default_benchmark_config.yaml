@@ -390,24 +390,6 @@ postgres_sysbench_tpcc:
     sysbench_scale: 100
     sysbench_use_fk: False
 
-mongodb:
-  name: mongodb_ycsb
-  flags:
-    mongodb_readahead_kb: 8
-    iostat: True
-    sar: True
-    sar_interval: 1
-    ycsb_fail_on_incomplete_loading: True
-    ycsb_measurement_type: hdrhistogram
-    ycsb_status: True
-    ycsb_status_interval_sec: 1
-    ycsb_operation_count: 1000000000
-    ycsb_record_command_line: False
-    ycsb_run_parameters: dataintegrity=true,readallfields=true,writeallfields=true
-    timeout_minutes: 360
-    mongodb_primary_only: True
-    mongodb_pss: False
-
 fio_latency:
   name: fio
   flags:
