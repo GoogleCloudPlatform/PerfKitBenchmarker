@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from unittest import mock
@@ -194,10 +195,30 @@ class ElasticKubernetesServiceTest(BaseEksTest):
         node_groups[1],
     )
 
+  def testGetNodePoolNames(self):
+    # Mock the output of the aws cli command
+    self.MockIssueCommand({
+      'get nodegroup': [(
+        json.dumps([
+          {"Name": "default"},
+          {"Name": "nodegroup1"},
+          {"Name": "nodegroup2"}
+        ]),
+        '',
+        0
+      )]
+    })
+    # Check that the method returns the correct node pool names
+    cluster = elastic_kubernetes_service.EksCluster(EKS_SPEC)
+    self.assertEqual(
+      cluster.GetNodePoolNames(),
+      ['default', 'nodegroup1', 'nodegroup2']
+    )
   @parameterized.named_parameters(
       ('default nodepool', 'default', 'default'),
       ('standard nodepool', 'nginx', 'nginx'),
   )
+  
   def testEksClusterGetNodepoolFromName(self, nodepool_name, expected_name):
     self.MockIssueCommand({'get node': [(nodepool_name, '', 0)]})
     spec2 = EKS_SPEC_DICT.copy()
