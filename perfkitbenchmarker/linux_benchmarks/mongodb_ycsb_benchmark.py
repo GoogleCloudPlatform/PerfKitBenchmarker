@@ -286,25 +286,22 @@ def _PrepareMembers(
 
   # Add other members one by one (if any)
   all_members = [primary_host]
-  if not FLAGS.mongodb_primary_only:
-    AddMember(primary_vm, server_vms[1])
-    all_members.append(f'{server_vms[1].internal_ip}:{DEFAULT_PORT}')
-    if FLAGS.mongodb_pss:
-      AddMember(primary_vm, server_vms[2])
-      all_members.append(f'{server_vms[2].internal_ip}:{DEFAULT_PORT}')
-    else:  # PSA setup
-      if arbiter_vm is None:
-        raise ValueError(
-            'Arbiter VM must be provided for PSA replica set setup.'
-        )
-      set_concern_command = (
-          'db.adminCommand({ setDefaultRWConcern: 1, '
-          'defaultWriteConcern: { w: 1 } })'
-      )
-      mongosh.RunCommand(primary_vm, set_concern_command)
-      logging.info('Successfully set default write concern to w:1.')
-      AddMember(primary_vm, arbiter_vm, is_arbiter=True)
-      all_members.append(f'{arbiter_vm.internal_ip}:{DEFAULT_PORT}')
+  AddMember(primary_vm, server_vms[1])
+  all_members.append(f'{server_vms[1].internal_ip}:{DEFAULT_PORT}')
+  if FLAGS.mongodb_pss:
+    AddMember(primary_vm, server_vms[2])
+    all_members.append(f'{server_vms[2].internal_ip}:{DEFAULT_PORT}')
+  else:  # PSA setup
+    if arbiter_vm is None:
+      raise ValueError('Arbiter VM must be provided for PSA replica set setup.')
+    set_concern_command = (
+        'db.adminCommand({ setDefaultRWConcern: 1, '
+        'defaultWriteConcern: { w: 1 } })'
+    )
+    mongosh.RunCommand(primary_vm, set_concern_command)
+    logging.info('Successfully set default write concern to w:1.')
+    AddMember(primary_vm, arbiter_vm, is_arbiter=True)
+    all_members.append(f'{arbiter_vm.internal_ip}:{DEFAULT_PORT}')
 
   @vm_util.Retry(timeout=300)
   def WaitForMemberActive(member_host):
