@@ -315,6 +315,10 @@ sysbench_oltp_base: &sysbench_oltp_base
   sysbench_tables: 8
   sar: True
 
+sysbench_oltp_base_lssd: &sysbench_oltp_base_lssd
+  innodb_buffer_pool_size: 8
+  <<: *sysbench_oltp_base
+
 mysql_sysbench_oltp_read_write:
   name: unmanaged_mysql_sysbench
   flags:
@@ -332,6 +336,24 @@ mysql_sysbench_oltp_write_only:
   flags:
     sysbench_testname: oltp_write_only
     <<: *sysbench_oltp_base
+
+mysql_sysbench_oltp_read_only_lssd:
+  name: unmanaged_mysql_sysbench
+  flags:
+    sysbench_testname: oltp_read_only
+    <<: *sysbench_oltp_base_lssd
+
+mysql_sysbench_oltp_read_write_lssd:
+  name: unmanaged_mysql_sysbench
+  flags:
+    sysbench_testname: oltp_read_write
+    <<: *sysbench_oltp_base_lssd
+
+mysql_sysbench_oltp_write_only_lssd:
+  name: unmanaged_mysql_sysbench
+  flags:
+    sysbench_testname: oltp_write_only
+    <<: *sysbench_oltp_base_lssd
 
 mysql_sysbench_tpcc:
   name: unmanaged_mysql_sysbench
