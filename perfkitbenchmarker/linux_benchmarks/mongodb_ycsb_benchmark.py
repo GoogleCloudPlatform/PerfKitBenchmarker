@@ -443,7 +443,8 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       (lambda f: f()), server_partials + arbiter_partial + client_partials
   )
 
-  _PrepareMembers(server_vms, arbiter)
+  if not FLAGS.mongodb_primary_only:
+    _PrepareMembers(server_vms, arbiter)
 
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
   benchmark_spec.mongodb_url = _GetMongoDbURL(benchmark_spec)
