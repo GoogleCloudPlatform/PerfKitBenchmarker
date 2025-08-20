@@ -225,7 +225,11 @@ def _CreateNodePools(
   _CreateJobsAndWait(cluster, batch_name, node_pools_to_add)
   elapsed = time.monotonic() - start
   _AssertNodes(cluster, nodes_before, node_pools_to_add)
-  _AssertNodePools(cluster, nodes_pools_before, node_pools_to_add)
+  cluster_type = getattr(cluster, "CLUSTER_TYPE", None)
+  if cluster_type == "Karpenter":
+    _AssertNodePools(cluster, nodes_pools_before, 1)
+  else:
+    _AssertNodePools(cluster, nodes_pools_before, node_pools_to_add)
   metadata = {"node_pools_created": node_pools_to_add}
   metric_batch_name = batch_name.replace("-", "_")
   return [
@@ -248,6 +252,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Runs the node pools provisioning benchmark."""
   cluster = benchmark_spec.container_cluster
   samples = []
+  cluster_type = getattr(cluster, "CLUSTER_TYPE", None)
+  if cluster_type == "Karpenter":
+    cluster.ApplyManifest(
+        "provision_node_pools/karpenter/nodepool.yaml.j2"
+    )
   start = time.monotonic()
   if INIT_BATCH_SIZE.value > 0:
     samples += _CreateNodePools(cluster, INIT_BATCH_NAME, INIT_BATCH_SIZE.value)

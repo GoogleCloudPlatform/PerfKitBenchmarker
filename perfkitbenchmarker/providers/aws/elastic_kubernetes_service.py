@@ -294,7 +294,21 @@ class BaseEksCluster(container_service.KubernetesCluster):
         f'jsonpath={container_service.INGRESS_JSONPATH}',
     ])
     return self._GetAddressFromIngress(stdout)
-
+  
+  def GetNodePoolNames(self) -> list[str]:
+    """Get node pool names for the cluster."""
+    cmd = [
+        FLAGS.eksctl, "get", "nodegroup",
+        "--cluster", self.name,
+        "--region", self.region,
+        "-o", "json"
+    ]
+    stdout, _, retcode = vm_util.IssueCommand(cmd)
+    if retcode:
+      logging.warning("Failed to get nodegroups: %s", stdout)
+      return []
+    nodegroups = json.loads(stdout)
+    return [ng["Name"] for ng in nodegroups]
 
 class EksCluster(BaseEksCluster):
   """Class representing an Elastic Kubernetes Service cluster."""
