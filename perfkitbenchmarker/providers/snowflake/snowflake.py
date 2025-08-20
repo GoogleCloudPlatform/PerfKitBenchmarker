@@ -420,7 +420,7 @@ class Snowflake(edw_service.EdwService):
     self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
-  def GetSearchIndexStatus(
+  def GetSearchIndexCompletionPercentage(
       self, table_path: str, index_name: str
   ) -> tuple[int, dict[str, Any]]:
     query_name = 'get_index_status'
