@@ -145,9 +145,10 @@ flags.register_validator(
 )
 _HISTOGRAM_PERCENTILES = flags.DEFINE_multi_float(
     'netperf_histogram_percentiles',
-    [10, 50, 90, 99, 99.9],
+    [10, 50, 90, 99, 99.9, 99.99, 99.999],
     'Percentiles to calculate and report using the histogram. '
-    'Default histogram percentiles are p10, p50, p90, p99 and p99.9.',
+    'Default histogram percentiles are '
+    'p10, p50, p90, p99, p99.9, p99.99, and p99.999.',
 )
 
 FLAGS = flags.FLAGS

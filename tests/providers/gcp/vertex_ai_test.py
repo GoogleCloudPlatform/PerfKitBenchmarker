@@ -148,7 +148,7 @@ class VertexAiCliInterfaceTest(VertexAiTest):
                 ),
                 1,
             )],
-            'gcloud ai endpoints predict': [
+            'curl': [
                 ('', 'No endpoint', 1),
                 (
                     '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
@@ -160,7 +160,7 @@ class VertexAiCliInterfaceTest(VertexAiTest):
         self.pkb_ai.vm,
     )
     self.pkb_ai._Create()
-    self.assertEqual(cli.RunCommand.mock_command.progress_through_calls['gcloud ai endpoints predict'], 2)  # pytype: disable=attribute-error
+    self.assertEqual(cli.RunCommand.mock_command.progress_through_calls['curl'], 2)  # pytype: disable=attribute-error
 
   def test_model_inited(self):
     # Assert on values from setup
@@ -217,7 +217,7 @@ class VertexAiCliInterfaceTest(VertexAiTest):
     )
     self.MockRunCommand(
         {
-            'gcloud ai endpoints predict': [(
+            'curl': [(
                 '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
                 '',
                 0,
@@ -236,7 +236,7 @@ class VertexAiCliInterfaceTest(VertexAiTest):
     )
     self.MockRunCommand(
         {
-            'gcloud ai endpoints predict': [(
+            'curl': [(
                 '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
                 '',
                 0,

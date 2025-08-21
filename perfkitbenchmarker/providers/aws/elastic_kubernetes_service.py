@@ -95,6 +95,7 @@ class BaseEksCluster(container_service.KubernetesCluster):
     self.node_to_nodepool: dict[
         str, container_service.BaseNodePoolConfig | None
     ] = {}
+    self.node_to_machine_type: dict[str, str | None] = {}
 
   def _ChooseSecondZone(self):
     """Choose a second zone for the control plane if only one is specified."""
@@ -218,7 +219,7 @@ class BaseEksCluster(container_service.KubernetesCluster):
   def GetNodePoolFromNodeName(
       self, node_name: str
   ) -> container_service.BaseNodePoolConfig | None:
-    """Get the nodepool from the node name.
+    """Gets the nodepool from the node name.
 
     This method assumes that the nodepool name is embedded in the node name.
     Better would be a lookup from the cloud provider.
@@ -264,6 +265,34 @@ class BaseEksCluster(container_service.KubernetesCluster):
           nodepool = self.nodepools[nodepool_name]
     self.node_to_nodepool[node_name] = nodepool
     return nodepool
+
+  def GetMachineTypeFromNodeName(self, node_name: str) -> str | None:
+    """Gets the machine type from the node name."""
+    if node_name in self.node_to_machine_type:
+      return self.node_to_machine_type[node_name]
+    out, _, _ = container_service.RunKubectlCommand(
+        [
+            'get',
+            'nodes',
+            '-o',
+            (
+                "jsonpath='{range"
+                r' .items[*]}{.metadata.name},{.metadata.labels.beta\.'
+                r'kubernetes\.io/instance-type}{"\n"}{end}\''
+            ),
+        ],
+    )
+    for line in out.splitlines():
+      pieces = line.split(',')
+      if not pieces or len(pieces) != 2:
+        continue
+      node, machine_type = pieces
+      node = node.strip("'")
+      machine_type = machine_type.strip("'")
+      self.node_to_machine_type[node] = machine_type
+    if node_name not in self.node_to_machine_type:
+      self.node_to_machine_type[node_name] = None
+    return self.node_to_machine_type[node_name]
 
   def GetDefaultStorageClass(self) -> str:
     """Get the default storage class for the provider."""

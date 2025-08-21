@@ -230,6 +230,7 @@ class JdbcClientInterface(GenericClientInterface):
       unzip_cmd = 'unzip jdbc/{} -d jdbc/'.format(
           BQ_JDBC_FILE[gcp_flags.BQ_CLIENT_INTERFACE.value]
       )
+      self.client_vm.Install('unzip')
       self.client_vm.RemoteCommand(unzip_cmd)
 
   def ExecuteQuery(

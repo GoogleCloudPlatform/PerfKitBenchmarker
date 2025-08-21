@@ -595,6 +595,15 @@ class BaseContainerCluster(resource.BaseResource):
       )
     return None
 
+  def GetMachineTypeFromNodeName(
+      self, node_name: str
+  ) -> str | None:
+    """Get the machine type from the node name."""
+    nodepool = self.GetNodePoolFromNodeName(node_name)
+    if nodepool is None:
+      return None
+    return nodepool.machine_type
+
   def DeleteContainers(self):
     """Delete containers belonging to the cluster."""
     for container in itertools.chain(*list(self.containers.values())):
