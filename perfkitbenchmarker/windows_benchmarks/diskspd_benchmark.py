@@ -53,7 +53,6 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects with the benchmark results.
   """
-
   vm = benchmark_spec.vms[0]
   results = []
   results.extend(diskspd.RunDiskSpd(vm))
