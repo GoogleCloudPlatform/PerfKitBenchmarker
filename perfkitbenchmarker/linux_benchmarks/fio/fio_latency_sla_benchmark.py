@@ -135,25 +135,40 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
         JOB_FILE,
     )
     samples = utils.RunTest(vm, constants.FIO_PATH, job_file_str)
-    latency_at_percentile_sample = GetLatencyPercentileSample(samples)
+    latency_at_percentile_samples = GetLatencyPercentileSample(samples)
     iops_samples = GetIopsSamples(samples)
-    iodepth_details[iodepth] = ContructLatencyIopsMap(
-        latency_at_percentile_sample, iops_samples
+    iodepth_details[iodepth] = ConstructLatencyIopsMap(
+        latency_at_percentile_samples, iops_samples
     )
-    if latency_at_percentile_sample.unit != 'usec':
+    read_latency = (
+        iodepth_details[iodepth]['read_latency']
+        if 'read_latency' in iodepth_details[iodepth]
+        else None
+    )
+    write_latency = (
+        iodepth_details[iodepth]['write_latency']
+        if 'write_latency' in iodepth_details[iodepth]
+        else None
+    )
+    if not read_latency and not write_latency:
+      raise errors.Benchmarks.RunError(
+          'Latency is not present in the samples. Please check the logs')
+    if latency_at_percentile_samples[0].unit != 'usec':
       raise errors.Benchmarks.RunError(
           'Latency unit is not usec. Please check and update latency_target is'
           ' needed'
       )
-    if (
-        latency_at_percentile_sample.value > latency_target
-    ):  # latency_at_percentile_sample.value has unit usec
+    # Checking if read or write latency are more than latency target
+    if (read_latency is not None and read_latency > latency_target) or (
+        write_latency is not None and write_latency > latency_target
+    ):  # latency has unit usec
       right_iodepth = iodepth - 1
       logging.info(
-          'Latency at iodepth %s is %s usec (more than latency target),'
-          ' reducing right iodepth to %s',
+          'Read Latency at iodepth %s is %s usec and write latency is %s usec'
+          ' (more than latency target), reducing right iodepth to %s',
           iodepth,
-          latency_at_percentile_sample.value,
+          read_latency,
+          write_latency,
           right_iodepth,
       )
     else:
@@ -162,12 +177,14 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       )  # looking at combined read and write iops for RW workloads
       if total_iops > max_iops_under_sla:
         latency_under_sla_samples = samples
+        max_iops_under_sla = total_iops
       left_iodepth = iodepth + 1
       logging.info(
-          'Latency at iodepth %s is %s usec (less than latency target),'
-          ' increasing left iodepth to %s',
+          'Read Latency at iodepth %s is %s usec and write latency is %s usec'
+          ' (less than latency target), increasing left iodepth to %s',
           iodepth,
-          latency_at_percentile_sample.value,
+          read_latency,
+          write_latency,
           left_iodepth,
       )
   if not latency_under_sla_samples:
@@ -211,7 +228,7 @@ def GetLatencyPercentileSample(samples):
       for sample in samples
       if sample.metric.endswith(f'latency:p{formatted_percentile}')
   ]
-  return latency_samples[0]
+  return latency_samples
 
 
 def GetIopsSamples(samples):
@@ -223,14 +240,19 @@ def GetIopsSamples(samples):
   return iops_samples
 
 
-def ContructLatencyIopsMap(latency_sample, iops_samples):
+def ConstructLatencyIopsMap(latency_samples, iops_samples):
+  """Constructs a map of latency and IOPS details."""
   metric_details = {}
-  metric_details['latency'] = latency_sample.value
   for iops_sample in iops_samples:
     if iops_sample.metric.endswith('read:iops'):
       metric_details['read_iops'] = iops_sample.value
     if iops_sample.metric.endswith('write:iops'):
       metric_details['write_iops'] = iops_sample.value
+  for latency_sample in latency_samples:
+    if 'read:latency' in latency_sample.metric:
+      metric_details['read_latency'] = latency_sample.value
+    if 'write:latency' in latency_sample.metric:
+      metric_details['write_latency'] = latency_sample.value
   return metric_details
 
 
