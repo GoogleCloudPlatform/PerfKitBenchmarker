@@ -21,6 +21,8 @@ from typing import Any, Dict, List
 DISK_FLAGS_TO_TRANSLATE = {
     'scratch_disk_type': 'data_disk_type',
     'scratch_disk_size': 'data_disk_size',
+    'gce_boot_disk_size': 'boot_disk_size',
+    'aws_boot_disk_size': 'boot_disk_size',
 }
 
 # Added 10th Nov 2022

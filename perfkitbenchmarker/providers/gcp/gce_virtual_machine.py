@@ -245,8 +245,6 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['ssd_interface'] = flag_values.gce_ssd_interface
     if flag_values['gce_preemptible_vms'].present:
       config_values['preemptible'] = flag_values.gce_preemptible_vms
-    if flag_values['gce_boot_disk_size'].present:
-      config_values['boot_disk_size'] = flag_values.gce_boot_disk_size
     if flag_values['gce_boot_disk_throughput'].present:
       config_values['boot_disk_throughput'] = (
           flag_values.gce_boot_disk_throughput
@@ -312,7 +310,6 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
             {'default': 0, 'min': 0},
         ),
         'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
-        'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
         'boot_disk_type': (
             option_decoders.StringDecoder,
             {'default': None},
