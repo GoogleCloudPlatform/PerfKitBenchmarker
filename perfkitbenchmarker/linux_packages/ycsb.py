@@ -1133,9 +1133,17 @@ class YCSBExecutor:
     Returns:
       List of sample.Sample objects.
     """
+    if _LATENCY_THRESHOLD.value and len(workloads) > 1:
+      logging.warning(
+          'Latency threshold mode is not fully supported with multiple workload'
+          ' files. Only the first workload file (%s) will be run in latency'
+          ' threshold mode.',
+          workloads[0],
+      )
     all_results = []
     parameters = {}
     for workload_index, workload_file in enumerate(workloads):
+      logging.info('Running workload file: %s', workload_file)
       if FLAGS.ycsb_operation_count:
         parameters = {'operationcount': FLAGS.ycsb_operation_count}
       if FLAGS.ycsb_record_count:
