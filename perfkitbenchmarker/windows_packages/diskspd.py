@@ -19,6 +19,7 @@ DiskSpd is a tool made for benchmarking Windows disk performance.
 """
 
 import collections
+import copy
 import logging
 import ntpath
 import re
@@ -27,6 +28,7 @@ import xml.etree.ElementTree
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 
@@ -73,22 +75,18 @@ flags.DEFINE_integer(
     'Defaults: 5s. Unit: seconds',
 )
 
-flags.DEFINE_integer(
-    'diskspd_thread_number_per_file',
-    1,
-    'The thread number created per file toperform read and write. Defaults: 1.',
-)
-
 flags.DEFINE_enum(
     'diskspd_access_pattern',
     's',
-    ['s', 'r'],
+    ['s', 'r', 'si'],
     'the access patten of the read and write'
     'the performance will be downgrade a little bit if use'
     'different hints'
-    'available option: r|s, '
+    'available option: r|s|si, '
     'r: random access'
     's: sequential access. '
+    'si: A single interlocked offset shared between all threads, prevents'
+    'overlapping I/Os. '
     'Defaults: s.',
 )
 
@@ -103,31 +101,27 @@ flags.DEFINE_integer(
     'Defaults: 0. Unit: percent.',
 )
 
-flags.DEFINE_integer(
+DISKSPD_BLOCK_SIZE = flags.DEFINE_string(
     'diskspd_block_size',
-    64,
+    '4K',
     'The block size used when reading and writing data. '
-    'Defaults: 64K. Unit: KB, '
-    'can be set via --diskspd_block_unit',
+    'Defaults: 4K. Please use K|M|G to specify unit.',
 )
 
-flags.DEFINE_enum(
-    'diskspd_block_unit',
-    'K',
-    ['K', 'M', 'G'],
-    'The unit of the block size, available option: K|M|G. '
-    'Will be used as the unit for --diskspd_block_size '
-    'Defaults: K.',
+flags.register_validator(
+    DISKSPD_BLOCK_SIZE.name,
+    lambda x: x[-1] in ['K', 'M', 'G'],
+    'Please specify Unit for --diskspd_block_size',
 )
 
 flags.DEFINE_integer(
     'diskspd_stride_or_alignment',
-    64,
+    None,
     'If the access pattern is sequential, then this value'
     'means the stride for the access'
     'If the access pattern is random, then this value means'
     'the specified number of bytes that random I/O aligns to.'
-    'Defaults: 64K. Unit: KB, can be set',
+    'Defaults: None.',
 )
 
 flags.DEFINE_enum(
@@ -145,8 +139,8 @@ flags.DEFINE_bool(
 
 flags.DEFINE_bool(
     'diskspd_latency_stats',
-    False,
-    'Whether measure the latency statisticsDefaults: False',
+    True,
+    'Whether measure the latency statistics. Defaults: True',
 )
 
 flags.DEFINE_bool(
@@ -170,10 +164,20 @@ flags.DEFINE_bool(
     'Whether to disable software caching. Defaults: True',
 )
 
-flags.DEFINE_integer(
+DISKSPD_OUTSTANDING_IO = flag_util.DEFINE_integerlist(
     'diskspd_outstanding_io',
-    '2',
-    'The number of outstanding I/O per thread per target.Defaults: 2.',
+    flag_util.IntegerList([1]),
+    'The number of outstanding I/O per thread per target.Defaults: 1.',
+    on_nonincreasing=flag_util.IntegerListParser.WARN,
+    module_name=__name__,
+)
+
+DISKSPD_THREAD_NUMBER_PER_FILE = flag_util.DEFINE_integerlist(
+    'diskspd_thread_number_per_file',
+    flag_util.IntegerList([1]),
+    'The number of threads per file. Defaults: 1.',
+    on_nonincreasing=flag_util.IntegerListParser.WARN,
+    module_name=__name__,
 )
 
 flags.DEFINE_integer(
@@ -182,22 +186,17 @@ flags.DEFINE_integer(
     'The throughput per thread per target. Defaults: None. Unit: bytes per ms.',
 )
 
-flags.DEFINE_integer(
+DISKSPD_FILE_SIZE = flags.DEFINE_string(
     'diskspd_file_size',
-    819200,
-    'The file size DiskSpd will create when testing. '
-    'Defaults: 819200. Unit: KB.',
+    '8K',
+    'The file size DiskSpd will create when testing. Defaults: 8K. Please use'
+    ' K|M|G to specify unit.',
 )
 
-flags.DEFINE_list(
-    'diskspd_config_list',
-    None,
-    'comma separated list of configs to run with diskspd. The '
-    'format for a single config is RANDOM_ACCESS:IS_READ:BLOCK_SIZE, '
-    'for example FALSE:TRUE:64. '
-    'Default Behavior: diskspd benchmark test will try to combine'
-    '--diskspd_access_pattern, --diskspd_write_read_ratio, '
-    '--diskspd_block_size together and form a set a config to run.',
+flags.register_validator(
+    DISKSPD_FILE_SIZE.name,
+    lambda x: x[-1] in ['K', 'M', 'G'],
+    'Please specify Unit for --diskspd_file_size',
 )
 
 DISKSPD_RETRIES = 10
@@ -213,70 +212,10 @@ DISKSPD_TIMEOUT_MULTIPLIER = 3
 TRUE_VALS = ['True', 'true', 't', 'TRUE']
 FALSE_VALS = ['False', 'false', 'f', 'FALSE']
 
-# When adding new configs to diskspd_config_list, increase this value
-_NUM_PARAMS_IN_CONFIG = 3
-
 # named tuple used in passing configs around
 DiskspdConf = collections.namedtuple(
     'DiskspdConf', ['access_pattern', 'write_ratio', 'block_size']
 )
-
-
-def DiskspdConfigListValidator(value):
-  """Returns whether or not the config list flag is valid."""
-  if not value:
-    return True
-  for config in value:
-    config_vals = config.split(':')
-    if len(config_vals) < _NUM_PARAMS_IN_CONFIG:
-      return False
-    try:
-      is_random_access = config_vals[0]
-      is_read = config_vals[1]
-      block_size = int(config_vals[2])
-    except ValueError:
-      return False
-
-    if is_random_access not in TRUE_VALS + FALSE_VALS:
-      return False
-
-    if is_read not in TRUE_VALS + FALSE_VALS:
-      return False
-
-    if block_size <= 0:
-      return False
-  return True
-
-
-flags.register_validator(
-    'diskspd_config_list', DiskspdConfigListValidator, 'malformed config list'
-)
-
-
-def ParseConfigList():
-  """Get the list of configs for the test from the flags."""
-  conf_list = []
-
-  if FLAGS.diskspd_config_list is None:
-    return [
-        DiskspdConf(
-            access_pattern=FLAGS.diskspd_access_pattern,
-            write_ratio=FLAGS.diskspd_write_read_ratio,
-            block_size=FLAGS.diskspd_block_size,
-        )
-    ]
-
-  for config in FLAGS.diskspd_config_list:
-    confs = config.split(':')
-
-    conf_list.append(
-        DiskspdConf(
-            access_pattern='r' if (confs[0] in TRUE_VALS) else 's',
-            write_ratio=0 if (confs[1] in TRUE_VALS) else 100,
-            block_size=int(confs[2]),
-        )
-    )
-  return conf_list
 
 
 def Install(vm):
@@ -301,37 +240,28 @@ def _RunDiskSpdWithOptions(vm, options):
 
 def _RemoveXml(vm):
   diskspd_exe_dir = ntpath.join(vm.temp_dir, 'x86')
-  rm_command = 'cd {diskspd_exe_dir}; rm xml.txt'.format(
-      diskspd_exe_dir=diskspd_exe_dir
-  )
+  rm_command = f'cd {diskspd_exe_dir}; rm {DISKSPD_XMLFILE}'
   vm.RemoteCommand(rm_command, ignore_failure=True)
 
 
 def _CatXml(vm):
   diskspd_exe_dir = ntpath.join(vm.temp_dir, 'x86')
-  cat_command = 'cd {diskspd_exe_dir}; cat {result_xml}'.format(
-      diskspd_exe_dir=diskspd_exe_dir, result_xml=DISKSPD_XMLFILE
-  )
+  cat_command = f'cd {diskspd_exe_dir}; cat {DISKSPD_XMLFILE}'
   diskspd_xml, _ = vm.RemoteCommand(cat_command)
   return diskspd_xml
 
 
 def _RemoveTempFile(vm):
-  diskspd_exe_dir = ntpath.join(vm.temp_dir, 'x86')
-  rm_command = 'cd {diskspd_exe_dir}; rm .\\{tmp_file_name}'.format(
-      diskspd_exe_dir=diskspd_exe_dir, tmp_file_name=DISKSPD_TMPFILE
-  )
+  rm_command = f'rm C:\\scratch\\{DISKSPD_TMPFILE}'
   vm.RemoteCommand(rm_command, ignore_failure=True)
 
 
 def _RunDiskSpd(
-    running_vm, access_pattern, diskspd_write_read_ratio, block_size, metadata
+    running_vm, outstanding_io, threads, metadata
 ):
   """Run single iteration of Diskspd test."""
-  sending_options = _GenerateOption(
-      access_pattern, diskspd_write_read_ratio, block_size
-  )
-  process_args = [(_RunDiskSpdWithOptions, (running_vm, sending_options), {})]
+  diskspd_config = _GenerateDiskspdConfig(outstanding_io, threads)
+  process_args = [(_RunDiskSpdWithOptions, (running_vm, diskspd_config), {})]
   background_tasks.RunParallelProcesses(process_args, 200)
   result_xml = _CatXml(running_vm)
   _RemoveTempFile(running_vm)
@@ -340,62 +270,43 @@ def _RunDiskSpd(
   return ParseDiskSpdResults(result_xml, metadata)
 
 
-def _GenerateOption(access_pattern, diskspd_write_read_ratio, block_size):
-  """Generate running options from the given flags.
-
-  Args:
-    access_pattern: the access pattern of diskspd, 's' or 'r'
-    diskspd_write_read_ratio: the ratio of writing compared to reading.
-    block_size: the block size of read/ write.
-
-  Returns:
-    list of samples from the results of the diskspd tests.
-  """
+def _GenerateDiskspdConfig(outstanding_io, threads):
+  """Generate running options from the given flags."""
 
   large_page_string = '-l' if FLAGS.diskspd_large_page else ''
   latency_stats_string = '-L' if FLAGS.diskspd_latency_stats else ''
   disable_affinity_string = '-n' if FLAGS.diskspd_disable_affinity else ''
   software_cache_string = '-Su' if FLAGS.diskspd_software_cache else ''
   write_through_string = '-Sw' if FLAGS.diskspd_write_through else ''
-  block_size_string = str(block_size) + str(FLAGS.diskspd_block_unit)
-  access_pattern_string = (
-      str(access_pattern)
-      + str(FLAGS.diskspd_stride_or_alignment)
-      + str(FLAGS.diskspd_stride_or_alignment_unit)
-  )
+  access_pattern = FLAGS.diskspd_access_pattern
+  diskspd_write_read_ratio = FLAGS.diskspd_write_read_ratio
+  diskspd_block_size = FLAGS.diskspd_block_size
+  access_pattern_string = ''
+  if FLAGS.diskspd_stride_or_alignment:
+    access_pattern_string = (
+        '-'
+        + str(access_pattern)
+        + str(FLAGS.diskspd_stride_or_alignment)
+        + str(FLAGS.diskspd_stride_or_alignment_unit)
+    )
+  os_hint = access_pattern
+  if os_hint == 'si':
+    os_hint = 's'
+
   throughput_per_ms_string = ''
   if FLAGS.diskspd_throughput_per_ms:
     throughput_per_ms_string = '-g' + str(FLAGS.diskspd_throughput_per_ms)
 
-  sending_options = (
-      '-c{filesize}K -d{duration} -t{threadcount} '
-      '-W{warmup} -C{cooldown} -Rxml -w{ratio} '
-      '{large_page} {latency_stats} {disable_affinity} '
-      '{software_cache} {write_through} {throughput}'
-      '-b{block_size} -f{hint_string} -{access_pattern} '
-      '-o{outstanding_io} -L '
-      'C:\\scratch\\{tempfile} > {xmlfile}'
-  ).format(
-      filesize=FLAGS.diskspd_file_size,
-      duration=FLAGS.diskspd_duration,
-      threadcount=FLAGS.diskspd_thread_number_per_file,
-      warmup=FLAGS.diskspd_warmup,
-      cooldown=FLAGS.diskspd_cooldown,
-      ratio=diskspd_write_read_ratio,
-      tempfile=DISKSPD_TMPFILE,
-      xmlfile=DISKSPD_XMLFILE,
-      large_page=large_page_string,
-      latency_stats=latency_stats_string,
-      disable_affinity=disable_affinity_string,
-      software_cache=software_cache_string,
-      write_through=write_through_string,
-      access_pattern=access_pattern_string,
-      block_size=block_size_string,
-      hint_string=access_pattern,
-      throughput=throughput_per_ms_string,
-      outstanding_io=FLAGS.diskspd_outstanding_io,
+  return (
+      f'-c{FLAGS.diskspd_file_size} -d{FLAGS.diskspd_duration}'
+      f' -t{threads} -o{outstanding_io} {latency_stats_string} -W{FLAGS.diskspd_warmup}'
+      f' -C{FLAGS.diskspd_cooldown} -Rxml -w{diskspd_write_read_ratio}'
+      f' {large_page_string} {disable_affinity_string}'
+      f' {software_cache_string} {write_through_string}'
+      f' {throughput_per_ms_string} -b{diskspd_block_size}'
+      f' -{access_pattern} -f{os_hint} {access_pattern_string}'
+      f' F:\\{DISKSPD_TMPFILE} > {DISKSPD_XMLFILE}'
   )
-  return sending_options
 
 
 @vm_util.Retry(max_retries=DISKSPD_RETRIES)
@@ -408,7 +319,6 @@ def RunDiskSpd(running_vm):
 
   # add the flag information to the metadata
   # some of the flags information has been included in the xml file
-  metadata['diskspd_block_size_unit'] = FLAGS.diskspd_block_unit
   metadata['diskspd_stride_or_alignment'] = FLAGS.diskspd_stride_or_alignment
   metadata['diskspd_stride_or_alignment_unit'] = (
       FLAGS.diskspd_stride_or_alignment_unit
@@ -418,23 +328,44 @@ def RunDiskSpd(running_vm):
   metadata['diskspd_disable_affinity'] = FLAGS.diskspd_disable_affinity
   metadata['diskspd_write_through'] = FLAGS.diskspd_write_through
   metadata['diskspd_software_cache'] = FLAGS.diskspd_software_cache
-  metadata['diskspd_outstanding_io'] = FLAGS.diskspd_outstanding_io
   metadata['diskspd_throughput'] = FLAGS.diskspd_throughput_per_ms
+  metadata['diskspd_write_read_ratio'] = FLAGS.diskspd_write_read_ratio
+  metadata['diskspd_access_pattern'] = FLAGS.diskspd_access_pattern
+  metadata['diskspd_block_size'] = FLAGS.diskspd_block_size
 
   sample_list = []
-  conf_list = ParseConfigList()
-
-  # run diskspd in four different scenario, will generate a metadata list
-  for conf in conf_list:
-    sample_list.extend(
-        _RunDiskSpd(
-            running_vm,
-            conf.access_pattern,
-            conf.write_ratio,
-            conf.block_size,
-            metadata,
+  # We can use io array or thread array for calculate max IOPs
+  # or max throughput.
+  outstanding_io_list = sorted(FLAGS.diskspd_outstanding_io)
+  threads_list = sorted(FLAGS.diskspd_thread_number_per_file)
+  for outstanding_io in outstanding_io_list:
+    for threads in threads_list:
+      metadata = copy.deepcopy(metadata)
+      metadata['outstanding_io'] = outstanding_io
+      metadata['threads_per_file'] = threads
+      try:
+        sample_list.extend(
+            _RunDiskSpd(
+                running_vm,
+                outstanding_io,
+                threads,
+                metadata,
+            )
         )
-    )
+      except errors.VirtualMachine.RemoteCommandError as e:
+        if 'Could not allocate a buffer for target' in e:
+          logging.exception(
+              'Diskspd is not able to allocate buffer for this configuration,'
+              ' try using smaller block size or reduce outstanding io or'
+              ' threads: %s',
+              e
+          )
+          if not sample_list:
+            # No successful run till now, higher outstanding io and/or thread
+            # count won't be successful.
+            raise e
+        else:
+          raise e
 
   return sample_list
 
@@ -455,8 +386,8 @@ def Prefill(running_vm):
   logging.info('Prefilling file with random data')
   diskspd_exe_dir = ntpath.join(running_vm.temp_dir, 'x86')
   diskspd_options = (
-      f'-c{FLAGS.diskspd_file_size}K -t10 -w100 -b4k -d{prefill_duration} -Sw'
-      f' -r C:\\scratch\\{DISKSPD_TMPFILE}'
+      f'-c{FLAGS.diskspd_file_size} -t16 -w100 -b4k -d{prefill_duration} -Sw'
+      f' -Su -o16 -r C:\\scratch\\{DISKSPD_TMPFILE}'
   )
   command = f'cd {diskspd_exe_dir}; .\\diskspd.exe {diskspd_options}'
   running_vm.RobustRemoteCommand(command)
@@ -539,26 +470,26 @@ def ParseDiskSpdResults(result_xml, metadata):
   testtime = float(metadata['TestTimeSeconds'])
 
   # calculate the read and write speed (Byte -> MB)
-  read_speed = int(read_bytes / testtime / 1024 / 1024)
-  write_speed = int(write_bytes / testtime / 1024 / 1024)
-  total_speed = int(total_byte / testtime / 1024 / 1024)
+  read_bandwidth = int(read_bytes / testtime / 1024 / 1024)
+  write_bandwidth = int(write_bytes / testtime / 1024 / 1024)
+  total_bandwidth = int(total_byte / testtime / 1024 / 1024)
 
   # calculate the read write times per second
   read_iops = int(read_count / testtime)
   write_iops = int(write_count / testtime)
   total_iops = int(total_count / testtime)
   samples.extend([
-      sample.Sample('total_speed', total_speed, 'MB/s', metadata),
+      sample.Sample('total_bandwidth', total_bandwidth, 'MB/s', metadata),
       sample.Sample('total_iops', total_iops, '', metadata),
   ])
-  if read_speed != 0:
+  if read_bandwidth != 0:
     samples.extend([
-        sample.Sample('read_speed', read_speed, 'MB/s', metadata),
+        sample.Sample('read_bandwidth', read_bandwidth, 'MB/s', metadata),
         sample.Sample('read_iops', read_iops, '', metadata),
     ])
-  if write_speed != 0:
+  if write_bandwidth != 0:
     samples.extend([
-        sample.Sample('write_speed', write_speed, 'MB/s', metadata),
+        sample.Sample('write_bandwidth', write_bandwidth, 'MB/s', metadata),
         sample.Sample('write_iops', write_iops, '', metadata),
     ])
   samples.extend([
@@ -606,15 +537,56 @@ def ParseLatencyBucket(latency_bucket):
 
 
 def ParseCpuUtilizationAsSample(xml_root, metadata):
-  """Parse CPU Utlization from cpu xml tag."""
+  """Parse CPU Utilization from cpu xml tag."""
   per_cpu_usage = {}
   average_cpu_usage = {}
+# Sample CPU tag:
+# <CPU>
+#         <Socket>0</Socket>
+#         <Node>0</Node>
+#         <Group>0</Group>
+#         <Core>0</Core>
+#         <EfficiencyClass>0</EfficiencyClass>
+#         <Id>0</Id>
+#         <UsagePercent>27.89</UsagePercent>
+#         <UserPercent>2.68</UserPercent>
+#         <KernelPercent>25.21</KernelPercent>
+#         <IdlePercent>72.11</IdlePercent>
+# </CPU>
+# <CPU>
+#         <Socket>0</Socket>
+#         <Node>0</Node>
+#         <Group>0</Group>
+#         <Core>0</Core>
+#         <EfficiencyClass>0</EfficiencyClass>
+#         <Id>1</Id>
+#         <UsagePercent>98.38</UsagePercent>
+#         <UserPercent>0.47</UserPercent>
+#         <KernelPercent>97.91</KernelPercent>
+#         <IdlePercent>1.62</IdlePercent>
+# </CPU>
   for item in list(xml_root):
     if item.tag == 'CPU':
       # this tag shows per cpu core usage
+      cpu_socket = item.find('Socket')
+      cpu_node = item.find('Node')
+      cpu_group = item.find('Group')
+      cpu_core = item.find('Core')
       cpu_id = item.find('Id')
+      cpu_key_parts = []
+      if cpu_socket is not None:
+        cpu_key_parts.append(cpu_socket.text)
+      if cpu_node is not None:
+        cpu_key_parts.append(cpu_node.text)
+      if cpu_group is not None:
+        cpu_key_parts.append(cpu_group.text)
+      if cpu_core is not None:
+        cpu_key_parts.append(cpu_core.text)
+      if cpu_id is not None:
+        cpu_key_parts.append(cpu_id.text)
+      cpu_key = '_'.join(cpu_key_parts)
       cpu_usage = ParseCpuUsageTags(item)
-      per_cpu_usage[f'usage_cpu_{cpu_id.text}'] = cpu_usage
+      per_cpu_usage[f'usage_cpu_{cpu_key}'] = cpu_usage
     elif item.tag == 'Average':
       average_cpu_usage = ParseCpuUsageTags(item)
   metadata['per_cpu_usage'] = per_cpu_usage
@@ -628,7 +600,7 @@ def ParseCpuUtilizationAsSample(xml_root, metadata):
 
 
 def ParseCpuUsageTags(cpu_tag):
-  """Parse CPU Utlization from cpu xml tag."""
+  """Parse CPU Utilization from cpu xml tag."""
   usage_percent = cpu_tag.find('UsagePercent')
   user_percent = cpu_tag.find('UserPercent')
   kernel_percent = cpu_tag.find('KernelPercent')
