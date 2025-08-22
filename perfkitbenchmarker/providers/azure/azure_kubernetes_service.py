@@ -383,10 +383,21 @@ class AksCluster(container_service.KubernetesCluster):
           'get',
           'serviceAccounts',
       ]
-      stdout, _, _ = vm_util.IssueCommand(get_service_account_cmd)
+      stdout, err, code = vm_util.IssueCommand(
+          get_service_account_cmd, raise_on_failure=False
+      )
       if 'default' not in stdout:
         raise errors.Resource.RetryableCreationError(
             'Service account not yet ready.'
+        )
+      if code != 0:
+        if 'User does not have access to the resource in Azure' in err:
+          raise errors.Resource.RetryableCreationError(
+              'First kubectl command failed with permission denied, but'
+              ' retrying as this can just be a race condition.'
+          )
+        raise errors.Resource.CreationError(
+            'First kubectl command failed with error: %s' % err
         )
 
     _GetServiceAccount()
