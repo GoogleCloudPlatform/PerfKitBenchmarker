@@ -28,6 +28,7 @@ from perfkitbenchmarker.time_triggers import base_time_trigger
 TIME_SERIES_SAMPLES_FOR_AGGREGATION = [
     sample.TPM_TIME_SERIES,
     sample.OPS_TIME_SERIES,
+    sample.QPS_TIME_SERIES,
 ]
 PERCENTILES = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
 
@@ -254,7 +255,6 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     ) + self._ComputeLossWork(
         median, values_after_lm_starts, interval, metadata
     )
-
     if values_after_lm_ends:
       mean_after_lm_ends = statistics.mean(values_after_lm_ends)
       samples += self._ComputeDegradation(mean, mean_after_lm_ends, metadata)
