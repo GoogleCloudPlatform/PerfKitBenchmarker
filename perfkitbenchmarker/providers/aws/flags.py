@@ -80,9 +80,6 @@ flags.DEFINE_enum(
     'duration for the Spot Instances (also known as Spot blocks),'
     ' in minutes. This value must be a multiple of 60.',
 )
-flags.DEFINE_integer(
-    'aws_boot_disk_size', None, 'The boot disk size in GiB for AWS VMs.'
-)
 flags.DEFINE_string('kops', 'kops', 'The path to the kops binary.')
 flags.DEFINE_string(
     'aws_image_name_filter',

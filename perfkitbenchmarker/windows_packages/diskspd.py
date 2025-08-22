@@ -167,7 +167,7 @@ flags.DEFINE_bool(
 flags.DEFINE_bool(
     'diskspd_software_cache',
     True,
-    'Whether to disable software cachingDefaults: True',
+    'Whether to disable software caching. Defaults: True',
 )
 
 flags.DEFINE_integer(
@@ -455,8 +455,8 @@ def Prefill(running_vm):
   logging.info('Prefilling file with random data')
   diskspd_exe_dir = ntpath.join(running_vm.temp_dir, 'x86')
   diskspd_options = (
-      f'-c{FLAGS.diskspd_file_size}K -t10 -w100 -b4k -d{prefill_duration} -r'
-      f' C:\\scratch\\{DISKSPD_TMPFILE}'
+      f'-c{FLAGS.diskspd_file_size}K -t10 -w100 -b4k -d{prefill_duration} -Sw'
+      f' -r C:\\scratch\\{DISKSPD_TMPFILE}'
   )
   command = f'cd {diskspd_exe_dir}; .\\diskspd.exe {diskspd_options}'
   running_vm.RobustRemoteCommand(command)
@@ -478,6 +478,7 @@ def ParseDiskSpdResults(result_xml, metadata):
   xml_root = xml.etree.ElementTree.fromstring(result_xml)
   metadata = metadata.copy()
   sample_data = []
+  samples = []
   # Get the parameters from the sender XML output. Add all the
   # information of diskspd result to metadata
   for item in list(xml_root):
@@ -498,9 +499,7 @@ def ParseDiskSpdResults(result_xml, metadata):
               except ValueError:
                 metadata[read_write_info.tag] += float(read_write_info.text)
         elif subitem.tag == 'CpuUtilization':
-          target_item = subitem.find('Average')
-          for cpu_info in list(target_item):
-            metadata[cpu_info.tag] = cpu_info.text
+          samples.append(ParseCpuUtilizationAsSample(subitem, metadata.copy()))
         elif subitem.tag == 'Latency':
           for latency_info in list(subitem):
             if latency_info.tag.lower() == 'bucket':
@@ -548,10 +547,10 @@ def ParseDiskSpdResults(result_xml, metadata):
   read_iops = int(read_count / testtime)
   write_iops = int(write_count / testtime)
   total_iops = int(total_count / testtime)
-  samples = [
+  samples.extend([
       sample.Sample('total_speed', total_speed, 'MB/s', metadata),
       sample.Sample('total_iops', total_iops, '', metadata),
-  ]
+  ])
   if read_speed != 0:
     samples.extend([
         sample.Sample('read_speed', read_speed, 'MB/s', metadata),
@@ -604,6 +603,51 @@ def ParseLatencyBucket(latency_bucket):
         )
     )
   return sample_data
+
+
+def ParseCpuUtilizationAsSample(xml_root, metadata):
+  """Parse CPU Utlization from cpu xml tag."""
+  per_cpu_usage = {}
+  average_cpu_usage = {}
+  for item in list(xml_root):
+    if item.tag == 'CPU':
+      # this tag shows per cpu core usage
+      cpu_id = item.find('Id')
+      cpu_usage = ParseCpuUsageTags(item)
+      per_cpu_usage[f'usage_cpu_{cpu_id.text}'] = cpu_usage
+    elif item.tag == 'Average':
+      average_cpu_usage = ParseCpuUsageTags(item)
+  metadata['per_cpu_usage'] = per_cpu_usage
+  metadata['average_cpu_usage'] = average_cpu_usage
+  return sample.Sample(
+      'cpu_total_utilization',
+      average_cpu_usage['cpu_total_utilization'],
+      '',
+      metadata,
+  )
+
+
+def ParseCpuUsageTags(cpu_tag):
+  """Parse CPU Utlization from cpu xml tag."""
+  usage_percent = cpu_tag.find('UsagePercent')
+  user_percent = cpu_tag.find('UserPercent')
+  kernel_percent = cpu_tag.find('KernelPercent')
+  idle_percent = cpu_tag.find('IdlePercent')
+  if (
+      usage_percent is None
+      or user_percent is None
+      or kernel_percent is None
+      or idle_percent is None
+  ):
+    raise errors.Benchmarks.RunError(
+        'Cpu utilization info missing in diskspd xml output'
+    )
+  return {
+      'cpu_total_utilization': float(usage_percent.text),
+      'cpu_user_percent': float(user_percent.text),
+      'cpu_kernel_percent': float(kernel_percent.text),
+      'cpu_idle_percent': float(idle_percent.text),
+  }
 
 
 def FormatLatencyMetricName(text):

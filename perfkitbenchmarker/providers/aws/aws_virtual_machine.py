@@ -380,8 +380,6 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
         provided config values.
     """
     super()._ApplyFlags(config_values, flag_values)
-    if flag_values['aws_boot_disk_size'].present:
-      config_values['boot_disk_size'] = flag_values.aws_boot_disk_size
     if flag_values['aws_spot_instances'].present:
       config_values['use_spot_instance'] = flag_values.aws_spot_instances
     if flag_values['aws_spot_price'].present:
@@ -411,7 +409,6 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
             option_decoders.IntDecoder,
             {'default': None},
         ),
-        'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
     })
 
     return result

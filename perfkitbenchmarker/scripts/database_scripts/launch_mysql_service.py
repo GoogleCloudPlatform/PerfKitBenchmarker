@@ -62,7 +62,7 @@ SYSBENCH_RUN_SECONDS = 'sysbench_run_seconds'
 SYSBENCH_THREAD_COUNT = 'sysbench_thread_count'
 SYSBENCH_REPORT_INTERVAL = 'sysbench_report_interval'
 THREAD_COUNT_LIST = 'thread_count_list'
-GCE_BOOT_DISK_SIZE = 'gce_boot_disk_size'
+BOOT_DISK_SIZE = 'boot_disk_size'
 GCE_BOOT_DISK_TYPE = 'gce_boot_disk_type'
 MACHINE_TYPE = 'machine_type'
 RUN_URI = 'run_uri'
@@ -86,7 +86,7 @@ URI_FLAG = ' --run_uri='
 THREAD_FLAG = ' --sysbench_thread_count='
 RUN_TIME = ' --sysbench_run_seconds='
 WARMUP_FLAG = ' --sysbench_warmup_seconds='
-BOOT_DISK_SIZE_FLAG = ' --gce_boot_disk_size='
+BOOT_DISK_SIZE_FLAG = ' --boot_disk_size='
 BOOT_DISK_TYPE_FLAG = ' --gce_boot_disk_type='
 MACHINE_TYPE_FLAG = ' --machine_type='
 MYSQL_SVC_DB_CORES_FLAG = ' --mysql_svc_db_instance_cores='
@@ -140,7 +140,7 @@ flags.DEFINE_string(
     'prepare, provision, run, cleanup, teardown.',
 )
 flags.DEFINE_string(
-    GCE_BOOT_DISK_SIZE, '1000', 'The boot disk size in GB for GCP VMs..'
+    BOOT_DISK_SIZE, '1000', 'The boot disk size in GB for VMs..'
 )
 flags.DEFINE_string(
     GCE_BOOT_DISK_TYPE, 'pd-ssd', 'The boot disk type for GCP VMs.'
@@ -235,7 +235,7 @@ def _provision_prepare_pkb():
   pkb_cmd = PKB + STAGE_FLAG + PROVISION + ',' + PREPARE
   pkb_cmd += (
       BOOT_DISK_SIZE_FLAG
-      + FLAGS.gce_boot_disk_size
+      + FLAGS.boot_disk_size
       + BOOT_DISK_TYPE_FLAG
       + FLAGS.gce_boot_disk_type
       + MACHINE_TYPE_FLAG

@@ -83,6 +83,9 @@ def ValidateVmMetadataFlag(options_list):
 # vm_metadata flag name
 VM_METADATA = 'vm_metadata'
 
+BOOT_DISK_SIZE = flags.DEFINE_integer(
+    'boot_disk_size', None, 'The boot disk size in GiB for VMs.'
+)
 flags.DEFINE_boolean(
     'dedicated_hosts',
     False,
@@ -343,6 +346,7 @@ class BaseVmSpec(spec.BaseSpec):
   PLATFORM = provider_info.DEFAULT_VM_PLATFORM
 
   def __init__(self, *args, **kwargs):
+    self.boot_disk_size = None
     self.zone = None
     self.cidr = None
     self.machine_type: str
@@ -378,6 +382,8 @@ class BaseVmSpec(spec.BaseSpec):
       values or flag values.
     """
     super()._ApplyFlags(config_values, flag_values)
+    if flag_values['boot_disk_size'].present:
+      config_values['boot_disk_size'] = flag_values.boot_disk_size
     if flag_values['image'].present:
       config_values['image'] = flag_values.image
     if flag_values['install_packages'].present:
@@ -440,6 +446,10 @@ class BaseVmSpec(spec.BaseSpec):
     """
     result = super()._GetOptionDecoderConstructions()
     result.update({
+        'boot_disk_size': (
+            option_decoders.IntDecoder,
+            {'none_ok': True, 'default': None},
+        ),
         'disable_interrupt_moderation': (
             option_decoders.BooleanDecoder,
             {'default': False},
@@ -598,6 +608,8 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       BaseVirtualMachine._instance_counter += 1
     self.disable_interrupt_moderation = vm_spec.disable_interrupt_moderation
     self.disable_rss = vm_spec.disable_rss
+    if vm_spec.boot_disk_size:
+      self.boot_disk_size = vm_spec.boot_disk_size
     self.zone = vm_spec.zone
     self.cidr = vm_spec.cidr
     self.machine_type = vm_spec.machine_type
@@ -1305,5 +1317,6 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
   def IsSrsoVulnerable(self) -> bool | None:
     """Returns whether the AMD-based VM is susceptible to an SRSO attack."""
     return None
+
 
 VirtualMachine = typing.TypeVar('VirtualMachine', bound=BaseVirtualMachine)

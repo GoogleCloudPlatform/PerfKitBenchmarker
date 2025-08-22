@@ -146,9 +146,6 @@ flags.DEFINE_multi_string(
     'about GCP instance metadata, see: --metadata from '
     '`gcloud help compute instances create`.',
 )
-flags.DEFINE_integer(
-    'gce_boot_disk_size', None, 'The boot disk size in GB for GCP VMs.'
-)
 flags.DEFINE_enum(
     'gce_boot_disk_type',
     None,

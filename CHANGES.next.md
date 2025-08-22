@@ -105,6 +105,8 @@
 -   Stop manually installing GPU drivers on GKE and use the API functionality
     via new flag `--gpu-driver-version`. This defaults to no driver installation
     on clusters older than version 1.31.
+-   Consolidated cloud-specific boot-disk-size flags into a cloud-agnostic
+    `--boot-disk-size` flag.
 
 ### New features:
 
