@@ -291,6 +291,11 @@ flags.DEFINE_integer(
     0,
     'Sleep duration in seconds between load and run stage.',
 )
+YCSB_SLEEP_BETWEEN_THREAD_RUNS_SEC = flags.DEFINE_integer(
+    'ycsb_sleep_between_thread_runs_sec',
+    0,
+    'Sleep duration in seconds between runs with different thread counts.',
+)
 _BURST_LOAD_MULTIPLIER = flags.DEFINE_integer(
     'ycsb_burst_load',
     None,
@@ -1179,6 +1184,11 @@ class YCSBExecutor:
       for client_count, target_qps_per_vm in _GetThreadsQpsPerLoaderList(
           len(vms)
       ):
+        logging.info(
+            'Running with thread count: %s and target QPS: %s',
+            client_count,
+            target_qps_per_vm,
+        )
 
         @vm_util.Retry(
             retryable_exceptions=ycsb_stats.CombineHdrLogError,
@@ -1191,24 +1201,28 @@ class YCSBExecutor:
             workload_meta: Mapping[str, Any],
             is_sustained: bool = False,
         ):
-          parameters['threads'] = client_count
+          # Create a copy of the parameters dictionary to avoid leaking state
+          # from one iteration to another. Ex. running with multiple thread
+          # counts
+          iter_params = parameters.copy()
+          iter_params['threads'] = client_count
           if target_qps_per_vm:
             # Threads should be less than the target QPS since YCSB throttles
             # weirdly when threads is much larger than target.
-            parameters['threads'] = min(client_count, target_qps_per_vm)
-            parameters['target'] = int(target_qps_per_vm * len(vms))
+            iter_params['threads'] = min(client_count, target_qps_per_vm)
+            iter_params['target'] = int(target_qps_per_vm * len(vms))
           if is_sustained:
-            parameters['maxexecutiontime'] = (
+            iter_params['maxexecutiontime'] = (
                 FLAGS.ycsb_dynamic_load_sustain_timelimit
             )
           start = time.time()
-          results = self._RunThreaded(vms, **parameters)
+          results = self._RunThreaded(vms, **iter_params)
           events.record_event.send(
               type(self).__name__,
               event='run',
               start_timestamp=start,
               end_timestamp=time.time(),
-              metadata=copy.deepcopy(parameters),
+              metadata=copy.deepcopy(iter_params),
           )
           client_meta = workload_meta.copy()
           client_meta.update(parameters)
@@ -1313,6 +1327,14 @@ class YCSBExecutor:
             )
             time.sleep(_DYNAMIC_LOAD_SLEEP_SEC.value)
 
+        if YCSB_SLEEP_BETWEEN_THREAD_RUNS_SEC.value > 0:
+          logging.info(
+              'Finished run with thread count: %s. Sleeping for %s seconds.',
+              client_count,
+              YCSB_SLEEP_BETWEEN_THREAD_RUNS_SEC.value,
+          )
+          time.sleep(YCSB_SLEEP_BETWEEN_THREAD_RUNS_SEC.value)
+
     return all_results
 
   def Load(self, vms, workloads=None, load_kwargs=None):
@@ -1375,11 +1397,13 @@ class YCSBExecutor:
       samples = self._RunLowestLatencyMode(vms, workloads, run_kwargs, database)
     else:
       samples = list(self.RunStaircaseLoads(vms, workloads, **run_kwargs))
+
     if FLAGS.ycsb_sleep_after_load_in_sec > 0 and not SKIP_LOAD_STAGE.value:
       for s in samples:
         s.metadata['sleep_after_load_in_sec'] = (
             FLAGS.ycsb_sleep_after_load_in_sec
         )
+
     return samples
 
   def _SetRunParameters(self, params: Mapping[str, Any]) -> None:
