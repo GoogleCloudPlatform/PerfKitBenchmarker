@@ -134,6 +134,7 @@ def _CreateIndex(
 def _MeasureBuildingTime(
     client_interface: edw_service.EdwClientInterface,
     results: list[sample.Sample],
+    base_metadata: dict[str, Any],
     timeout: int = 1200,
 ) -> None:
   """Measures the time it takes for the index to be fully built(reaching 100% coverage).
@@ -141,6 +142,7 @@ def _MeasureBuildingTime(
   Args:
     client_interface: The EDW client interface.
     results: The list of samples to append to.
+    base_metadata: The base metadata retrieved from edw service
     timeout: The maximum time(in seconds) to wait for the index to be fully
       built.
   """
@@ -149,9 +151,14 @@ def _MeasureBuildingTime(
     _, metadata = client_interface.ExecuteQuery('check_index_coverage_query')
     time_elapsed = time.time() - start_time
     if metadata and metadata.get('rows_returned', 0) > 0:
+      final_metadata = base_metadata.copy()
+      final_metadata.update(metadata)
       results.append(
           sample.Sample(
-              'search_index_available_time', time_elapsed, 'seconds', metadata
+              'search_index_available_time',
+              time_elapsed,
+              'seconds',
+              final_metadata,
           )
       )
       break
@@ -176,13 +183,15 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   results: list[sample.Sample] = []
 
   edw_service_instance = benchmark_spec.edw_service
+  base_metadata: dict[str, Any] = edw_service_instance.GetMetadata()
+
   client_interface = edw_service_instance.GetClientInterface()
 
   _EnsureNoIndex(client_interface)
 
   _CreateIndex(client_interface, results)
 
-  _MeasureBuildingTime(client_interface, results)
+  _MeasureBuildingTime(client_interface, results, base_metadata)
 
   return results
 
