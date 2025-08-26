@@ -255,7 +255,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   cluster_type = getattr(cluster, "CLUSTER_TYPE", None)
   if cluster_type == "Karpenter":
     cluster.ApplyManifest(
-        "provision_node_pools/karpenter/nodepool.yaml.j2"
+        "provision_node_pools/karpenter/nodepool.yaml.j2",
+        pools_batch=int(INIT_BATCH_SIZE.value),
+        pools_test=int(TEST_BATCH_SIZE.value),
+        CLUSTER_NAME=cluster.name
     )
   start = time.monotonic()
   if INIT_BATCH_SIZE.value > 0:
