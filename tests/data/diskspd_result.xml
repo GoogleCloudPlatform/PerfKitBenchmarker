@@ -71,7 +71,11 @@
       <ProcCount>4</ProcCount>
       <CpuUtilization>
          <CPU>
+            <Socket>0</Socket>
+            <Node>0</Node>
             <Group>0</Group>
+            <Core>0</Core>
+            <EfficiencyClass>0</EfficiencyClass>
             <Id>0</Id>
             <UsagePercent>2.08</UsagePercent>
             <UserPercent>0.21</UserPercent>
@@ -79,7 +83,11 @@
             <IdlePercent>97.92</IdlePercent>
          </CPU>
          <CPU>
+            <Socket>0</Socket>
+            <Node>0</Node>
             <Group>0</Group>
+            <Core>0</Core>
+            <EfficiencyClass>0</EfficiencyClass>
             <Id>1</Id>
             <UsagePercent>2.03</UsagePercent>
             <UserPercent>0.21</UserPercent>
@@ -87,7 +95,11 @@
             <IdlePercent>97.97</IdlePercent>
          </CPU>
          <CPU>
+            <Socket>0</Socket>
+            <Node>0</Node>
             <Group>0</Group>
+            <Core>2</Core>
+            <EfficiencyClass>0</EfficiencyClass>
             <Id>2</Id>
             <UsagePercent>1.67</UsagePercent>
             <UserPercent>0.16</UserPercent>
@@ -95,7 +107,11 @@
             <IdlePercent>98.33</IdlePercent>
          </CPU>
          <CPU>
+            <Socket>0</Socket>
+            <Node>0</Node>
             <Group>0</Group>
+            <Core>3</Core>
+            <EfficiencyClass>0</EfficiencyClass>
             <Id>3</Id>
             <UsagePercent>7.03</UsagePercent>
             <UserPercent>0.42</UserPercent>

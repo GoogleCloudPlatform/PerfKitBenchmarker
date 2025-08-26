@@ -20,6 +20,7 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import provider_info
 
 
 class RedisEvictionPolicy:
@@ -144,6 +145,10 @@ def CheckPrerequisites():
 def PrepareSystem(vm) -> None:
   """Set system-wide parameters on the VM."""
   CheckPrerequisites()
+
+  if vm.PLATFORM == provider_info.KUBERNETES:
+    logging.info('Skipping system preparation for Kubernetes VMs.')
+    return
 
   num_processes = _GetNumProcesses(vm)
   # 10 is an arbituary multiplier that ensures this value is high enough.

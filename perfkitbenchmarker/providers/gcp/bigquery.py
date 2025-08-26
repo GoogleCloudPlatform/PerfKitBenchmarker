@@ -227,7 +227,7 @@ class JdbcClientInterface(GenericClientInterface):
         '',
     )
     if gcp_flags.BQ_CLIENT_INTERFACE.value == 'SIMBA_JDBC':
-      unzip_cmd = 'unzip jdbc/{} -d jdbc/'.format(
+      unzip_cmd = 'unzip {} -d ./'.format(
           BQ_JDBC_FILE[gcp_flags.BQ_CLIENT_INTERFACE.value]
       )
       self.client_vm.Install('unzip')
