@@ -9,8 +9,6 @@ spec:
         pkb_nodepool: default
     spec:
       requirements:
-        - key: group
-          operator: Exists
         - key: kubernetes.io/arch
           operator: In
           values: ["amd64"]
@@ -36,3 +34,120 @@ spec:
   disruption:
     consolidationPolicy: WhenEmptyOrUnderutilized
     consolidateAfter: 1m
+---
+{%- for pool_num in range(1, pools_batch|int + 1) %}
+{%- set pool_id = "%03d"|format(pool_num) %}
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: pool-init-batch-{{ pool_id }}
+spec:
+  template:
+    metadata:
+      labels:
+        pkb_nodepool: default
+    spec:
+      requirements:
+        - key: group
+          operator: In
+          values: ["pool-init-batch-{{ pool_id }}"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["c", "m", "r"]
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["2"]
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: pool-init-batch-{{ pool_id }}
+      expireAfter: 720h # 30 * 24h = 720h
+  limits:
+    cpu: 1000
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 1m
+---
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: pool-init-batch-{{ pool_id }}
+spec:
+  role: "KarpenterNodeRole-{{CLUSTER_NAME}}"
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "{{CLUSTER_NAME}}"
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "{{CLUSTER_NAME}}"
+  amiSelectorTerms:
+    - alias: "al2023@latest"
+---
+{%- endfor %}
+{%- for pool_num_test in range(1, pools_test|int + 1) %}
+{%- set pool_id_test = "%03d"|format(pool_num_test) %}
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: pool-test-batch-{{ pool_id_test }}
+spec:
+  template:
+    metadata:
+      labels:
+        pkb_nodepool: default
+    spec:
+      requirements:
+        - key: group
+          operator: In
+          values: ["pool-test-batch-{{ pool_id_test }}"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["c", "m", "r"]
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["2"]
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: pool-test-batch-{{ pool_id_test }}
+      expireAfter: 720h # 30 * 24h = 720h
+  limits:
+    cpu: 1000
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 1m
+---
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: pool-test-batch-{{ pool_id_test }}
+spec:
+  role: "KarpenterNodeRole-{{CLUSTER_NAME}}"
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "{{CLUSTER_NAME}}"
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "{{CLUSTER_NAME}}"
+  amiSelectorTerms:
+    - alias: "al2023@latest"
+---
+{%- endfor %}

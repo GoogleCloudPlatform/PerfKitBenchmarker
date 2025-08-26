@@ -325,19 +325,39 @@ class BaseEksCluster(container_service.KubernetesCluster):
     return self._GetAddressFromIngress(stdout)
   
   def GetNodePoolNames(self) -> list[str]:
-    """Get node pool names for the cluster."""
-    cmd = [
-        FLAGS.eksctl, "get", "nodegroup",
-        "--cluster", self.name,
-        "--region", self.region,
-        "-o", "json"
-    ]
-    stdout, _, retcode = vm_util.IssueCommand(cmd)
-    if retcode:
-      logging.warning("Failed to get nodegroups: %s", stdout)
-      return []
-    nodegroups = json.loads(stdout)
-    return [ng["Name"] for ng in nodegroups]
+    """Get node pool names for the cluster.
+
+    For Karpenter clusters, returns all CRD NodePool names created by Karpenter.
+    For other clusters, returns managed node group names.
+    """
+    if getattr(self, "CLUSTER_TYPE", None) == "Karpenter":
+      # Get all Karpenter NodePool CRDs
+      cmd = [
+          FLAGS.kubectl,
+          "--kubeconfig", FLAGS.kubeconfig,
+          "get", "nodepool",
+          "-o", "json"
+      ]
+      stdout, _, retcode = vm_util.IssueCommand(cmd)
+      if retcode:
+        logging.warning("Failed to get Karpenter NodePools: %s", stdout)
+        return []
+      nodepools = json.loads(stdout)
+      return [item["metadata"]["name"] for item in nodepools.get("items", [])]
+    else:
+      # Default: return managed node group names
+      cmd = [
+          FLAGS.eksctl, "get", "nodegroup",
+          "--cluster", self.name,
+          "--region", self.region,
+          "-o", "json"
+      ]
+      stdout, _, retcode = vm_util.IssueCommand(cmd)
+      if retcode:
+        logging.warning("Failed to get nodegroups: %s", stdout)
+        return []
+      nodegroups = json.loads(stdout)
+      return [ng["Name"] for ng in nodegroups]
 
 class EksCluster(BaseEksCluster):
   """Class representing an Elastic Kubernetes Service cluster."""
