@@ -222,6 +222,14 @@ def _CreateNodePools(
   nodes_before = len(cluster.GetNodeNames())
   nodes_pools_before = len(cluster.GetNodePoolNames())
   start = time.monotonic()
+  cluster_type = getattr(cluster, "CLUSTER_TYPE", None)
+  if cluster_type == "Karpenter":
+    cluster.ApplyManifest(
+        "provision_node_pools/karpenter/nodepool.yaml.j2",
+        pools_batch=int(INIT_BATCH_SIZE.value),
+        pools_test=int(TEST_BATCH_SIZE.value),
+        CLUSTER_NAME=cluster.name
+    )
   _CreateJobsAndWait(cluster, batch_name, node_pools_to_add)
   elapsed = time.monotonic() - start
   _AssertNodes(cluster, nodes_before, node_pools_to_add)
@@ -248,14 +256,6 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Runs the node pools provisioning benchmark."""
   cluster = benchmark_spec.container_cluster
   samples = []
-  cluster_type = getattr(cluster, "CLUSTER_TYPE", None)
-  if cluster_type == "Karpenter":
-    cluster.ApplyManifest(
-        "provision_node_pools/karpenter/nodepool.yaml.j2",
-        pools_batch=int(INIT_BATCH_SIZE.value),
-        pools_test=int(TEST_BATCH_SIZE.value),
-        CLUSTER_NAME=cluster.name
-    )
   start = time.monotonic()
   if INIT_BATCH_SIZE.value > 0:
     samples += _CreateNodePools(cluster, INIT_BATCH_NAME, INIT_BATCH_SIZE.value)
