@@ -72,7 +72,7 @@ REGION = 'region'
 ZONE = 'zone'
 
 NON_PLACEMENT_GROUP_PREFIXES = frozenset(
-    ['t2', 'm3', 't3', 't3a', 't4g', 'vt1', 'm7i-flex']
+    ['t2', 'm3', 't3', 't3a', 't4g', 'vt1', 'm7i-flex', 'r8i-flex']
 )
 # Reference -
 # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html#network-cards
