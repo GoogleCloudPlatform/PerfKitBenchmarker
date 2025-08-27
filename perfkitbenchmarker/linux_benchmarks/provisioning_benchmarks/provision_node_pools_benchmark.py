@@ -226,9 +226,9 @@ def _CreateNodePools(
   if cluster_type == "Karpenter":
     cluster.ApplyManifest(
         "provision_node_pools/karpenter/nodepool.yaml.j2",
-        pools_batch=int(INIT_BATCH_SIZE.value),
-        pools_test=int(TEST_BATCH_SIZE.value),
-        CLUSTER_NAME=cluster.name
+        batch_name=batch_name,
+        batch_size=node_pools_to_add,
+        cluster_name=cluster.name
     )
   _CreateJobsAndWait(cluster, batch_name, node_pools_to_add)
   elapsed = time.monotonic() - start
