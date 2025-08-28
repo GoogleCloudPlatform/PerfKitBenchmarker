@@ -141,6 +141,19 @@ class BaseWGServingInferenceServer(
 
     return result
 
+  def GetCallableServer(
+      self,
+  ) -> kubernetes_inference_server.InferenceServerEndpoint:
+    """Returns the callable server."""
+    return kubernetes_inference_server.InferenceServerEndpoint(
+        deployment_metadata=self.deployment_metadata,
+        service_name=self.service_name,
+        model_id=self.model_id,
+        backend=self.spec.model_server,
+        tokenizer_id=self.tokenizer_id,
+        service_port=str(self.service_port),
+    )
+
   def _RefreshDeploymentMetadata(self) -> None:
     """Refreshes the deployment metadata."""
     if self.is_remote:
