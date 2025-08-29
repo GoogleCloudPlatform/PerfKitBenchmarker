@@ -1,9 +1,24 @@
 """Base class for Kubernetes Inference Server resource."""
 
 from __future__ import annotations
-from typing import Optional
+
+import dataclasses
+from typing import Any, Optional
+
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource as pkb_resource
+
+
+@dataclasses.dataclass
+class InferenceServerEndpoint:
+  """Dataclass for a callable inference server."""
+
+  deployment_metadata: dict[str, Any] | None = None
+  service_name: str | None = None
+  model_id: str | None = None
+  backend: str | None = None
+  tokenizer_id: str | None = None
+  service_port: str | None = None
 
 
 class BaseKubernetesInferenceServer(pkb_resource.BaseResource):

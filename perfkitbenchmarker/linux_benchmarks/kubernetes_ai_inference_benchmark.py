@@ -15,6 +15,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.resources import kubernetes_inference_server
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server as k8s_server
 
 
@@ -86,7 +87,6 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
   Returns:
       loaded benchmark configuration
   """
-
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if _HF_TOKEN.present:
     config['container_cluster']['inference_server'][
@@ -134,7 +134,7 @@ def Run(
 
     server.EnableHPA()
     output_path = vm_util.GetTempDir() + '/inference_benchmark_result_hpa'
-    _RunInferenceBenchmark(cluster, server, output_path)
+    RunInferenceBenchmark(cluster, server.GetCallableServer(), output_path)
     server.StopHPAPolling()
 
     metrics += _CollectBenchmarkResult(server, output_path)
@@ -142,7 +142,7 @@ def Run(
   else:
     metrics += server.GetPodStartupSamples()
     output_path = vm_util.GetTempDir() + '/inference_benchmark_result'
-    _RunInferenceBenchmark(cluster, server, output_path)
+    RunInferenceBenchmark(cluster, server.GetCallableServer(), output_path)
     metrics += _CollectBenchmarkResult(server, output_path)
 
   if 'vllm' in server.spec.model_server:
@@ -165,10 +165,31 @@ def _CollectBenchmarkResult(
     server: k8s_server.WGServingInferenceServer,
     result_path: str,
 ) -> list[sample.Sample]:
-  """collect the result of the inference benchmark.
+  """Collect the result of the inference benchmark.
 
   Args:
     server: The inference server resource.
+    result_path: The path to the folder containing the result json files.
+
+  Returns:
+    A list of result samples collected from the json files.
+  """
+  results = CollectBenchmarkResult(server.GetResourceMetadata(), result_path)
+  if 'vllm' in server.spec.model_server:
+    model_load_metrics = GetVLLMModelLoadTime(server)
+    results += model_load_metrics
+
+  return results
+
+
+def CollectBenchmarkResult(
+    metadata: dict[str, Any],
+    result_path: str,
+) -> list[sample.Sample]:
+  """Collect the result of the inference benchmark.
+
+  Args:
+    metadata: The metadata for each sample.
     result_path: The path to the folder containing the result json files.
 
   Returns:
@@ -187,16 +208,18 @@ def _CollectBenchmarkResult(
         result = json.load(f)
         metrics = result['metrics']
 
-        metadata = {
+        sample_metadata = {
             'request_rate': metrics['request_rate'],
-            **server.GetResourceMetadata(),
+            **metadata,
         }
         timestamp = datetime.datetime.fromtimestamp(
             result['config']['start_time']['seconds']
         ).timestamp()
 
         results += [
-            sample.Sample(metric, metrics[metric], '', metadata, timestamp)
+            sample.Sample(
+                metric, metrics[metric], '', sample_metadata, timestamp
+            )
             for metric in metrics
             if metrics[metric]
         ]
@@ -206,9 +229,9 @@ def _CollectBenchmarkResult(
   return results
 
 
-def _RunInferenceBenchmark(
+def RunInferenceBenchmark(
     cluster: container_service.KubernetesCluster,
-    server: k8s_server.WGServingInferenceServer,
+    server: kubernetes_inference_server.InferenceServerEndpoint,
     output_path: str,
 ) -> None:
   """Run the inference benchmark.
@@ -231,7 +254,7 @@ def _RunInferenceBenchmark(
       tokenizer=server.tokenizer_id,
       inference_server=server.service_name,
       inference_server_port=server.service_port,
-      backend=server.spec.model_server,
+      backend=server.backend,
       request_rate=_REQUEST_RATE.value,
       image_repo=k8s_server.FLAG_IMAGE_REPO.value,
       env_vars=lpg_extra_args,
@@ -352,10 +375,7 @@ def _ParseModelLoadTimeMetrics(
       startup_event.timestamp,
   )
   for line in log_lines:
-    if (
-        'Starting to load model' in line
-        and model_load_start_timestamp is None
-    ):
+    if 'Starting to load model' in line and model_load_start_timestamp is None:
       model_load_start_timestamp = _ParseInferenceServerTimeStamp(line)
     # Check model load end timestamp
     if 'Model loading took' in line:
@@ -426,8 +446,7 @@ def _ParseInferenceServerTimeStamp(log_line: str) -> Optional[str]:
 
 
 def _FormatUTCTimeStampToLocalTime(
-    server: k8s_server.WGServingInferenceServer,
-    timestamp: Optional[float]
+    server: k8s_server.WGServingInferenceServer, timestamp: Optional[float]
 ) -> Optional[str]:
   """Returns the time zone of the pod."""
   if server.timezone is None:

@@ -431,6 +431,7 @@ _QUOTA_EXCEEDED_REGEX = re.compile(
 _NOT_ENOUGH_RESOURCES_ERROR_SNIPPETS = (
     'does not have enough resources available to fulfill the request.',
     'ZONE_RESOURCE_POOL_EXHAUSTED',
+    'ERROR_STOCKOUT'
 )
 _NOT_ENOUGH_RESOURCES_MESSAGE = 'Creation failed due to not enough resources: '
 
