@@ -1,18 +1,43 @@
-# nodepool-azure.yaml.j2
-# Configures the Azure Node Auto Provisioner (Karpenter) to provision nodes
-# for pods that request a 'group' label matching the 'pool-{{ batch }}-{{ id }}' pattern.
-apiVersion: karpenter.sh/v1beta1
+apiVersion: karpenter.azure.com/v1beta1
+kind: AKSNodeClass
+metadata:
+  name: aks-managed-class
+spec:
+  imageFamily: "Ubuntu2204"
+---
+apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
-  name: {{ name | default('default') }}
+  name: batch-processing
 spec:
+  disruption:
+    budgets:
+    - nodes: 30%
+    consolidateAfter: 0s
+    consolidationPolicy: WhenEmptyOrUnderutilized
   template:
-    metadata:
-      labels:
-        pkb_nodepool: {{ name | default('default') }}
     spec:
-      # Define the rules for provisioning.
+      nodeClassRef:
+        group: karpenter.azure.com
+        kind: AKSNodeClass
+        name: aks-managed-class
       requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values:
+          - amd64
+        - key: kubernetes.io/os
+          operator: In
+          values:
+          - linux
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values:
+          - on-demand
+        - key: karpenter.azure.com/sku-family
+          operator: In
+          values:
+          - D
         - key: "group"
           operator: In
           values:

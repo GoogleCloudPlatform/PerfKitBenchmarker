@@ -84,7 +84,6 @@ TEST_BATCH_NAME = "test-batch"
 JOB_MANIFEST_TEMPLATE = "provision_node_pools/job_manifest.yaml.j2"
 AKS_NODEPOOL_MANIFEST_TEMPLATE = "provision_node_pools/nodepool_azure.yaml.j2"
 
-
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
@@ -107,9 +106,9 @@ def _CreateJobsAndWait(
   if cluster.CLOUD == 'Azure':
     cluster.ApplyManifest(
         AKS_NODEPOOL_MANIFEST_TEMPLATE,
-        name='default',
         batch=batch_name,
         job_count=jobs,
+        cloud=cluster.CLOUD,
     )
 
   apply_start = time.monotonic()
