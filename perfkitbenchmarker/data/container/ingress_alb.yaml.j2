@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ namespace }}
+  name: {{ name }}
+spec:
+  ports:
+    - port: {{ port }}
+      targetPort: {{ port }}
+      protocol: TCP
+  type: ClusterIP
+  selector:
+    app: {{ name }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: {{ namespace }}
+  name: {{ name }}
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing 
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /calculate
+spec:
+  ingressClassName: alb
+  defaultBackend:
+    service:
+      name: {{ name }}
+      port:
+        number: {{ port }}

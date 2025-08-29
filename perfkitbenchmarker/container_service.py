@@ -31,6 +31,7 @@ import json
 import logging
 import multiprocessing
 from multiprocessing import synchronize
+multiprocessing.set_start_method("fork", force=True)
 import os
 import queue as py_queue
 import re
