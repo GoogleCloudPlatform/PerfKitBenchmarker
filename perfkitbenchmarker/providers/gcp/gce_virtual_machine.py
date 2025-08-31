@@ -1729,17 +1729,6 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
       f.write(stdout)
     return True
 
-  def IsSrsoVulnerable(self) -> bool | None:
-    """Returns whether the AMD Linux VM is susceptible to an SRSO attack."""
-
-    if 'AuthenticAMD' not in self.cpu_version:
-      return None
-
-    vm_cpu_vuln = self.cpu_vulnerabilities
-    if 'spec_rstack_overflow' in vm_cpu_vuln.vulnerabilities.keys():
-      return True
-    return False
-
 
 class Debian11BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine,
