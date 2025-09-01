@@ -44,6 +44,7 @@ from perfkitbenchmarker.resources import jobs_setter
 from perfkitbenchmarker.resources import kubernetes  # pylint:disable=unused-import
 from perfkitbenchmarker.resources import managed_ai_model_spec
 from perfkitbenchmarker.resources.pinecone import pinecone_resource_spec
+from perfkitbenchmarker.resources.vertex_vector_search import vvs_resource_spec
 
 
 _NONE_OK = {'default': None, 'none_ok': True}
@@ -1472,6 +1473,10 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'ai_model': (_ManagedAiModelSpecDecoder, {'default': None}),
         'pinecone': (
             pinecone_resource_spec.PineconeResourcesDecoder,
+            {'default': None},
+        ),
+        'vvs': (
+            vvs_resource_spec.VVSResourcesDecoder,
             {'default': None},
         ),
         'data_discovery_service': (

@@ -404,64 +404,6 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(fake_rets):
       self.assertEqual(vm._Exists(), expected)
 
-  @parameterized.named_parameters(
-      ('n2_standard_2', 'n2-standard-2', 2, 2, 1),
-      ('numa_node_count_0', 'n2-standard-4', 4, 0, None),
-      ('c3-standard-4', 'c3-standard-4', 8, 4, None),
-      ('n2_standard_96', 'n2-standard-96', 96, 8, 12),
-  )
-  def testGetVNUMASplitValue(
-      self, machine_type, num_cpus, numa_node_count, expected
-  ):
-    vm = pkb_common_test_case.TestGceVirtualMachine(
-        gce_virtual_machine.GceVmSpec(
-            _COMPONENT,
-            machine_type=machine_type,
-        )
-    )
-    vm.num_cpus = num_cpus
-    vm.numa_node_count = numa_node_count
-    self.assertEqual(vm.GetVNUMASplitValue(), expected)
-
-  @parameterized.named_parameters(
-      ('no_min_cpu_platform', 'test_machine_type', '', None),
-      ('with_min_cpu_platform', 'test_machine_type', 'skylake', 'skylake'),
-  )
-  def testGetMinCpuPlatform(
-      self, test_machine_type, test_min_cpu_platform, expected
-      ):
-
-    vm = pkb_common_test_case.TestGceVirtualMachine((
-        gce_virtual_machine.GceVmSpec(
-            _COMPONENT,
-            machine_type=test_machine_type,
-            min_cpu_platform=test_min_cpu_platform
-        )
-    ))
-    self.assertEqual(vm.GetMinCpuPlatform(), expected)
-
-  @parameterized.named_parameters(
-      ('srso_vulnerable', 'spec_rstack_overflow', 'AuthenticAMD_26_2_1', True),
-      ('srso_not_vulnerable', 'other_vuln', 'AuthenticAMD_26_2_1', False),
-      ('not AMD VM', 'spec_rstack_overflow', 'GenuineIntel_6_85_7', None)
-  )
-  def testIsSrsoVulnerable(self, cpu_vuln, cpu_vendor, expected):
-    spec = gce_virtual_machine.GceVmSpec(
-        _COMPONENT,
-        machine_type='test_machine_type',
-    )
-    vm = gce_virtual_machine.Ubuntu2204BasedGceVirtualMachine(spec)
-    vm.cpu_version = cpu_vendor
-    with mock.patch.object(
-        gce_virtual_machine.BaseLinuxGceVirtualMachine,
-        'cpu_vulnerabilities',
-        new_callable=mock.PropertyMock,
-    ) as mock_cpu_vulnerabilities:
-      cpu_vulnerabilities = gce_virtual_machine.linux_vm.CpuVulnerabilities()
-      cpu_vulnerabilities.vulnerabilities[cpu_vuln] = 'Vulnerable'
-      mock_cpu_vulnerabilities.return_value = cpu_vulnerabilities
-      self.assertEqual(vm.IsSrsoVulnerable(), expected)
-
 
 def _CreateFakeDiskMetadata(image, fake_disk):
   fake_disk = copy.copy(fake_disk)

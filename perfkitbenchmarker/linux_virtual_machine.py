@@ -54,6 +54,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 import yaml
 
+
 FLAGS = flags.FLAGS
 
 

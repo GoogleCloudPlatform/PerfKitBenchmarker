@@ -1579,21 +1579,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     )
     cmd.Issue()
 
-  def GetVNUMASplitValue(self) -> int | None:
-    """Returns the vNUMA split value for this VM.
-
-    This will only work for N-series VMs within GCE.
-    """
-    if self.numa_node_count and self.machine_type.lower().startswith('n'):
-      return self.num_cpus // self.numa_node_count
-    return None
-
-  def GetMinCpuPlatform(self) -> str | None:
-    """Returns the VM's minimum CPU platform if it exists."""
-    if self.min_cpu_platform:
-      return self.min_cpu_platform
-    return None
-
 
 class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
   """Class supporting Linux GCE virtual machines.
@@ -1728,17 +1713,6 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
     with open(local_path, 'w') as f:
       f.write(stdout)
     return True
-
-  def IsSrsoVulnerable(self) -> bool | None:
-    """Returns whether the AMD Linux VM is susceptible to an SRSO attack."""
-
-    if 'AuthenticAMD' not in self.cpu_version:
-      return None
-
-    vm_cpu_vuln = self.cpu_vulnerabilities
-    if 'spec_rstack_overflow' in vm_cpu_vuln.vulnerabilities.keys():
-      return True
-    return False
 
 
 class Debian11BasedGceVirtualMachine(
