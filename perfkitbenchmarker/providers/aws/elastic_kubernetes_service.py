@@ -651,21 +651,21 @@ class EksKarpenterCluster(BaseEksCluster):
     policy_arn = (stdout or '').strip()
     if not policy_arn or policy_arn == 'None':
         # Download the official policy JSON (pinned to a specific controller version).
-        with vm_util.NamedTemporaryFile(dir=vm_util.GetTempDir(), delete=False, mode='w') as tf:
-            policy_path = tf.name
-        vm_util.IssueCommand([
-            'curl', '-sSL', '-o', policy_path,
-            'https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/'
-            'v2.13.4/docs/install/iam_policy.json',
-        ], raise_on_failure=True)
-        create_cmd = util.AWS_PREFIX + [
-            'iam', 'create-policy',
-            '--policy-name', 'AWSLoadBalancerControllerIAMPolicy',
-            '--policy-document', f'file://{policy_path}',
-            '--query', 'Policy.Arn', '--output', 'text',
-        ]
-        stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=True)
-        policy_arn = (stdout or '').strip()
+        with vm_util.NamedTemporaryFile(dir=vm_util.GetTempDir(), mode='w') as tf:
+            vm_util.IssueCommand([
+                'curl', '-sSL', '-o', tf.name,
+                'https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/'
+                'v2.13.4/docs/install/iam_policy.json',
+            ], raise_on_failure=True)
+            create_cmd = util.AWS_PREFIX + [
+                'iam', 'create-policy',
+                '--policy-name', 'AWSLoadBalancerControllerIAMPolicy',
+                '--policy-document', f'file://{tf.name}',
+                '--query', 'Policy.Arn', '--output', 'text',
+            ]
+            stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=True)
+            policy_arn = (stdout or '').strip()
+
 
     # 3) Ensure ServiceAccount with the attached IAM policy (IRSA)
     vm_util.IssueCommand([
@@ -711,7 +711,7 @@ class EksKarpenterCluster(BaseEksCluster):
     """Deploys only Service + Ingress (without IngressClass) for AWS Load Balancer Controller."""
     # Apply the custom manifest template (service + ingress with annotations).
     self.ApplyManifest(
-        'container/ingress_alb.yaml.j2',
+        'container/kubernetes_hpa/ingress_alb.yaml.j2',
         name=name,
         namespace=namespace,
         port=port,
