@@ -759,15 +759,20 @@ class EksKarpenterCluster(BaseEksCluster):
         '--query', f"LoadBalancers[?contains(DNSName, '{normalized}')].SecurityGroups[0]",
         '--output', 'text',
     ]
-    for attempt in range(24):  # ~120s
-        out, _, _ = vm_util.IssueCommand(lb_query, raise_on_failure=False)
+    # Resolve ALB Security Group with retries (up to 120s total).
+    try:
+        out, _, _ = vm_util.IssueRetryableCommand(
+            lb_query,
+            should_retry=lambda retcode, stdout, stderr: (stdout or '').strip() in ('', 'None'),
+            timeout=120,   # total wait time
+            delay=5        # seconds between retries
+        )
         alb_sg = (out or '').strip()
-        if alb_sg and alb_sg != 'None':
-            break
-        logging.info('[PKB][EKS] Waiting for ALB SG (%d/24) for %s', attempt + 1, normalized)
-        time.sleep(5)
+    except Exception:
+        logging.warning('[PKB][EKS] Could not resolve ALB SG for %s; skipping fixups', normalized)
+        return
     if not alb_sg or alb_sg == 'None':
-        logging.warning('[PKB][EKS] Could not resolve ALB SG for %s; skipping fixups for now', normalized)
+        logging.warning('[PKB][EKS] Could not resolve ALB SG for %s; skipping fixups', normalized)
         return
     alb_sg = (out or '').strip()
     if alb_sg and alb_sg != 'None':
