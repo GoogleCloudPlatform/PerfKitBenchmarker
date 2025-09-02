@@ -29,7 +29,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_packages import postgresql16
+from perfkitbenchmarker.linux_packages import postgresql
 from perfkitbenchmarker.linux_packages import sysbench
 
 
@@ -137,7 +137,7 @@ def GetConfig(user_config):
   # Force the scratch disk as database default dir (simpler code).
   disk_spec = config['vm_groups']['server']['disk_spec']
   for cloud in disk_spec:
-    disk_spec[cloud]['mount_point'] = postgresql16.GetOSDependentDefaults(
+    disk_spec[cloud]['mount_point'] = postgresql.GetOSDependentDefaults(
         FLAGS.os_type
     )['disk_mount_point']
   # Update machine type for server/client.
@@ -177,19 +177,19 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   for vm in benchmark_spec.vm_groups:
     if vm.startswith('replica'):
       replica_servers += benchmark_spec.vm_groups[vm]
-  background_tasks.RunThreaded(postgresql16.ConfigureSystemSettings, vms)
-  background_tasks.RunThreaded(lambda vm: vm.Install('postgresql16'), vms)
+  background_tasks.RunThreaded(postgresql.ConfigureSystemSettings, vms)
+  background_tasks.RunThreaded(lambda vm: vm.Install('postgresql'), vms)
 
   primary_server = benchmark_spec.vm_groups['server'][0]
-  postgresql16.InitializeDatabase(primary_server)
-  postgresql16.ConfigureAndRestart(
+  postgresql.InitializeDatabase(primary_server)
+  postgresql.ConfigureAndRestart(
       primary_server,
       FLAGS.run_uri,
       _SHARED_BUFFER_SIZE.value,
       _CONF_TEMPLATE_PATH.value,
   )
   for index, replica in enumerate(replica_servers):
-    postgresql16.SetupReplica(
+    postgresql.SetupReplica(
         primary_server,
         replica,
         index,
@@ -209,7 +209,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   loader_vm = benchmark_spec.vm_groups['client'][0]
   sysbench_parameters = _GetSysbenchParameters(
       primary_server.internal_ip,
-      postgresql16.GetPsqlUserPassword(FLAGS.run_uri),
+      postgresql.GetPsqlUserPassword(FLAGS.run_uri),
   )
   cmd = sysbench.BuildLoadCommand(sysbench_parameters)
   logging.info('%s load command: %s', FLAGS.sysbench_testname, cmd)
@@ -275,7 +275,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   client = benchmark_spec.vm_groups['client'][0]
   sysbench_parameters = _GetSysbenchParameters(
       primary_server.internal_ip,
-      postgresql16.GetPsqlUserPassword(FLAGS.run_uri),
+      postgresql.GetPsqlUserPassword(FLAGS.run_uri),
   )
   results = []
   # a map of transaction metric name (tps/qps) to current sample with max value
