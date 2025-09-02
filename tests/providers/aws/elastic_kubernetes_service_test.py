@@ -235,8 +235,8 @@ class ElasticKubernetesServiceTest(BaseEksTest):
         )
 
   @parameterized.named_parameters(
-    ('default nodepool', 'default', 'default'),
-    ('standard nodepool', 'nginx', 'nginx'),
+      ('default nodepool', 'default', 'default'),
+      ('standard nodepool', 'nginx', 'nginx'),
   )
   def testEksClusterGetNodepoolFromName(self, nodepool_name, expected_name):
     self.MockIssueCommand({'get node': [(nodepool_name, '', 0)]})
