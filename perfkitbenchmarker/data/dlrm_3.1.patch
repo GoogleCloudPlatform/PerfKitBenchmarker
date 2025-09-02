@@ -1,5 +1,5 @@
 diff --git a/closed/Intel/code/dlrm-v2-99/pytorch-cpu-int8/docker/Dockerfile b/closed/Intel/code/dlrm-v2-99/pytorch-cpu-int8/docker/Dockerfile
-index 2f40fa271..8f6f984bf 100644
+index 2f40fa271..ed8c4f213 100644
 --- a/closed/Intel/code/dlrm-v2-99/pytorch-cpu-int8/docker/Dockerfile
 +++ b/closed/Intel/code/dlrm-v2-99/pytorch-cpu-int8/docker/Dockerfile
 @@ -15,7 +15,6 @@ ARG BASE_IMAGE=rockylinux:8.6
@@ -27,6 +27,15 @@ index 2f40fa271..8f6f984bf 100644
      /opt/conda/bin/conda install -c conda-forge -y \
                                      cmake==3.26.4 \
                                      gperftools==2.10 && \
+@@ -50,7 +52,7 @@ RUN curl -fsSL -v -o ~/miniconda.sh -O  https://repo.anaconda.com/miniconda/Mini
+                                     mkl-include \
+                                     numpy==1.25 \
+                                     ninja==1.10.2 \
+-                                    pyyaml==6.0 \
++                                    pyyaml \
+                                     setuptools==68.0.0 \
+                                     cffi==1.15.1 \
+                                     typing_extensions==4.7.1 \
 @@ -67,9 +69,9 @@ RUN pip install -e git+https://github.com/mlperf/logging@3.0.0-rc2#egg=mlperf-lo
                  onnx==1.14.0 \
                  lark-parser==0.12.0 \
