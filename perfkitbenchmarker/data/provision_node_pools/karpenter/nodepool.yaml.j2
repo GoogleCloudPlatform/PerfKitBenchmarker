@@ -33,7 +33,7 @@ spec:
     cpu: 1000
   disruption:
     consolidationPolicy: WhenEmptyOrUnderutilized
-    consolidateAfter: 1m
+    consolidateAfter: 720h
 ---
 {%- for pool_num in range(1, batch_size|int + 1) %}
 {%- set pool_id = "%03d"|format(pool_num) %}

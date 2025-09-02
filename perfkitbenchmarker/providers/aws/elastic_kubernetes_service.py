@@ -338,9 +338,9 @@ class BaseEksCluster(container_service.KubernetesCluster):
           "get", "nodepool",
           "-o", "json"
       ]
-      stdout, _, retcode = vm_util.IssueCommand(cmd)
+      stdout, stderr, retcode = vm_util.IssueCommand(cmd)
       if retcode:
-        logging.warning("Failed to get Karpenter NodePools: %s", stdout)
+        logging.warning("Failed to get Karpenter NodePools: %s, error: %s", stdout, stderr)
         return []
       nodepools = json.loads(stdout)
       return [item["metadata"]["name"] for item in nodepools.get("items", [])]
@@ -352,9 +352,9 @@ class BaseEksCluster(container_service.KubernetesCluster):
           "--region", self.region,
           "-o", "json"
       ]
-      stdout, _, retcode = vm_util.IssueCommand(cmd)
+      stdout, stderr, retcode = vm_util.IssueCommand(cmd)
       if retcode:
-        logging.warning("Failed to get nodegroups: %s", stdout)
+        logging.warning("Failed to get nodegroups: %s, error: %s", stdout, stderr)
         return []
       nodegroups = json.loads(stdout)
       return [ng["Name"] for ng in nodegroups]
