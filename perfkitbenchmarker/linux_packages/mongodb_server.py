@@ -39,7 +39,7 @@ MONGOD_CONF_WIRED_TIGER_CACHE_SIZE_GB = flags.DEFINE_integer(
 
 MONGOD_CONF_WIRED_TIGER_SESSION_MAX = flags.DEFINE_string(
     'mongod_conf_wired_tiger_session_max',
-    None,
+    'session_max=8192',
     'An internal WiredTiger parameter that sets the maximum number of'
     ' concurrent sessions (or connections) the storage engine can handle. This'
     ' is often aligned with the maximum number of client connections. Default'
@@ -48,7 +48,7 @@ MONGOD_CONF_WIRED_TIGER_SESSION_MAX = flags.DEFINE_string(
 
 MONGOD_CONF_NETWORK_MAX_INCOMING_CONNECTIONS = flags.DEFINE_integer(
     'mongod_conf_network_max_incoming_connections',
-    None,
+    8192,
     'The maximum number of simultaneous client connections that the mongod'
     ' process will accept on network layer. Default for Windows is 1,000,000.'
     ' Default for Linux is (RLIMIT_NOFILE) * 0.8, which is OS-dependent.',
