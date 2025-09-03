@@ -45,6 +45,7 @@ https://github.com/GoogleCloudPlatform/spark-bigquery-connector.
 """
 
 from collections.abc import MutableMapping
+import functools
 import json
 import logging
 import os
@@ -53,11 +54,13 @@ import time
 from typing import Any, List
 
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import dpb_service
 from perfkitbenchmarker import dpb_sparksql_benchmark_helper
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import temp_dir
@@ -121,6 +124,10 @@ _FETCH_RESULTS_FROM_LOGS = flags.DEFINE_bool(
     ' instead of writing them to some object storage location. Reduces runner '
     ' latency (and hence its total wall time), but it is not supported by all '
     ' DPB services.',
+)
+
+_READAHEAD_KB = flags.DEFINE_integer(
+    'sparksql_readahead_kb', None, 'Configure block device readahead settings.'
 )
 
 FLAGS = flags.FLAGS
@@ -214,6 +221,14 @@ def CheckPrerequisites(benchmark_config):
     )
 
 
+def _PrepareNode(vm: linux_virtual_machine.BaseLinuxVirtualMachine) -> None:
+  if _READAHEAD_KB.value is not None:
+    vm.SetReadAhead(
+        _READAHEAD_KB.value * 2,
+        [d.GetDevicePath() for d in vm.scratch_disks],
+    )
+
+
 def Prepare(benchmark_spec):
   """Installs and sets up dataset on the Spark clusters.
 
@@ -223,6 +238,12 @@ def Prepare(benchmark_spec):
   Args:
     benchmark_spec: The benchmark specification
   """
+  # Only unmanaged dpb services are VM-aware
+  if benchmark_spec.dpb_service.CLOUD == 'Unmanaged':
+    nodes = benchmark_spec.dpb_service.vms['worker_group']
+    partials = [functools.partial(_PrepareNode, node) for node in nodes]
+    background_tasks.RunThreaded((lambda f: f()), partials)
+
   cluster = benchmark_spec.dpb_service
   storage_service = cluster.storage_service
 
