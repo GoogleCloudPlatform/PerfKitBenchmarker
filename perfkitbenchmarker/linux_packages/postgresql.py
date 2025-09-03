@@ -16,9 +16,20 @@
 
 import os
 
+from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import os_types
 
+
+FLAGS = flags.FLAGS
+
+ALLOWED_VERSIONS = ['postgresql16', 'postgresql17']
+_POSTGRESQL_VERSION = flags.DEFINE_enum(
+    'postgresql_version',
+    'postgresql16',
+    enum_values=ALLOWED_VERSIONS,
+    help='The postgres version used for benchmark test',
+)
 
 SYSBENCH_PASSWORD = 'Syb3enCh#1'
 SHARED_BUFFERS_CONF = {
@@ -47,29 +58,48 @@ SHARED_BUFFERS_CONF = {
         'nr_hugepages': '23000',
     },
 }
-OS_DEPENDENT_DEFAULTS = {
-    'centos': {
-        'postgres_path': '/usr/pgsql-16',
-        'data_dir': '/var/lib/pgsql/16/data',
-        'conf_dir': '/var/lib/pgsql/16/data',
-        'disk_mount_point': '/var/lib/pgsql/16',
-        'postgres_service_name': 'postgresql-16'
-    },
-    'debian': {
-        'postgres_path': '/usr/lib/postgresql/16',
-        'data_dir': '/etc/postgresql/16/data/data',
-        'conf_dir': '/etc/postgresql/16/main',
-        'disk_mount_point': '/etc/postgresql/16/data',
-        'postgres_service_name': 'postgresql',
-        'postgres_template_service_name': 'postgresql@16-main',
-    },
-    'amazonlinux': {
-        'data_dir': '/var/lib/pgsql/data',
-        'conf_dir': '/var/lib/pgsql/data',
-        'disk_mount_point': '/var/lib/pgsql',
-        'postgres_service_name': 'postgresql',
-    }
-}
+
+
+def GetPostgresVersion():
+  """Returns the last two characters of the postgresql_version flag."""
+  return _POSTGRESQL_VERSION.value[-2:]
+
+
+def GetOSDependentDefaultsConfig(os_type: str) -> dict[str, str]:
+  """Returns a dictionary of OS-dependent settings based on flags.
+
+  Args:
+    os_type: The OS type of the VM.
+  """
+  version = GetPostgresVersion()
+
+  configs = {
+      'centos': {
+          'postgres_path': f'/usr/pgsql-{version}',
+          'data_dir': f'/var/lib/pgsql/{version}/data',
+          'conf_dir': f'/var/lib/pgsql/{version}/data',
+          'disk_mount_point': f'/var/lib/pgsql/{version}',
+          'postgres_service_name': f'postgresql-{version}',
+      },
+      'debian': {
+          'postgres_path': f'/usr/lib/postgresql/{version}',
+          'data_dir': f'/etc/postgresql/{version}/data/data',
+          'conf_dir': f'/etc/postgresql/{version}/main',
+          'disk_mount_point': f'/etc/postgresql/{version}/data',
+          'postgres_service_name': 'postgresql',
+          'postgres_template_service_name': f'postgresql@{version}-main',
+      },
+      'amazonlinux': {
+          'data_dir': '/var/lib/pgsql/data',
+          'conf_dir': '/var/lib/pgsql/data',
+          'disk_mount_point': '/var/lib/pgsql',
+          'postgres_service_name': 'postgresql',
+      },
+  }
+  if os_type in configs:
+    return configs[os_type]
+  else:
+    raise ValueError(f'Unsupported OS type: {os_type}')
 
 
 def ConfigureSystemSettings(vm):
@@ -112,15 +142,17 @@ def YumInstall(vm):
     vm.RemoteCommand('sudo dnf -qy module disable postgresql')
   else:
     vm.RemoteCommand('sudo dnf update')
-  postgres_devel = 'postgresql16-devel'
+  postgresql_version = _POSTGRESQL_VERSION.value
+  postgresql_devel = f'{postgresql_version}-devel'
   if vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
-    postgres_devel = 'postgresql-devel'
+    postgresql_devel = 'postgresql-devel'
   vm.RemoteCommand(
-      'sudo yum install -y postgresql16-server postgresql16'
-      f' postgresql16-contrib {postgres_devel}'
+      f'sudo yum install -y {postgresql_version}-server {postgresql_version}'
+      f' {postgresql_version}-contrib {postgresql_devel}'
   )
   vm.RemoteCommand(
-      'echo "export PATH=/usr/pgsql-16/bin:$PATH" | sudo tee -a ~/.bashrc'
+      f'echo "export PATH=/usr/pgsql-{GetPostgresVersion()}/bin:$PATH" |'
+      ' sudo tee -a ~/.bashrc'
   )
   vm.RemoteCommand('pg_config --version')
 
@@ -132,8 +164,11 @@ def AptInstall(vm):
       'sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y'
   )
   vm.RemoteCommand('sudo apt-get update')
-  vm.RemoteCommand('sudo apt-get install -y postgresql-contrib-16')
-  vm.RemoteCommand('sudo apt-get -y install postgresql-16')
+  version_number = GetPostgresVersion()
+  vm.RemoteCommand(
+      f'sudo apt-get install -y postgresql-contrib-{version_number}'
+  )
+  vm.RemoteCommand(f'sudo apt-get -y install postgresql-{version_number}')
 
 
 def InitializeDatabase(vm):
@@ -157,11 +192,11 @@ def InitializeDatabase(vm):
 def GetOSDependentDefaults(os_type: str) -> dict[str, str]:
   """Returns the OS family."""
   if os_type in os_types.CENTOS_TYPES:
-    return OS_DEPENDENT_DEFAULTS['centos']
+    return GetOSDependentDefaultsConfig('centos')
   elif os_type in os_types.AMAZONLINUX_TYPES:
-    return OS_DEPENDENT_DEFAULTS['amazonlinux']
+    return GetOSDependentDefaultsConfig('amazonlinux')
   else:
-    return OS_DEPENDENT_DEFAULTS['debian']
+    return GetOSDependentDefaultsConfig('debian')
 
 
 def IsUbuntu(vm):
