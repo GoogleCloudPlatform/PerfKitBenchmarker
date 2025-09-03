@@ -24,20 +24,16 @@ spec:
       requirements:
         - key: kubernetes.io/arch
           operator: In
-          values:
-          - amd64
+          values: ["amd64"]
         - key: kubernetes.io/os
           operator: In
-          values:
-          - linux
+          values: ["linux"]
         - key: karpenter.sh/capacity-type
           operator: In
-          values:
-          - on-demand
+          values: ["spot", "on-demand"]
         - key: karpenter.azure.com/sku-family
           operator: In
-          values:
-          - D
+          values: ["D", "E", "F"]
         - key: "group"
           operator: In
           values:
