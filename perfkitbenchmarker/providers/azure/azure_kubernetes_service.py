@@ -169,19 +169,19 @@ class AksCluster(container_service.KubernetesCluster):
         container_service.DEFAULT_NODEPOOL,
         '--nodepool-labels',
         f'pkb_nodepool={container_service.DEFAULT_NODEPOOL}',
-    ] 
+    ]
     if FLAGS.benchmarks and 'provision_node_pools' in FLAGS.benchmarks:
-        # For provision_node_pools benchmark, add auto provisioning mode
-        cmd.append('--node-provisioning-mode=auto')
-        cmd += self._GetNodeFlags(self.default_nodepool)
+      # For provision_node_pools benchmark, add auto provisioning mode
+      cmd.append('--node-provisioning-mode=auto')
+      cmd += self._GetNodeFlags(self.default_nodepool)
     else:
-        cmd += self._GetNodeFlags(self.default_nodepool)
-        if self._IsAutoscalerEnabled():
-          cmd += [
-              '--enable-cluster-autoscaler',
-              f'--min-count={self.min_nodes}',
-              f'--max-count={self.max_nodes}',
-          ]
+      cmd += self._GetNodeFlags(self.default_nodepool)
+      if self._IsAutoscalerEnabled():
+        cmd += [
+            '--enable-cluster-autoscaler',
+            f'--min-count={self.min_nodes}',
+            f'--max-count={self.max_nodes}',
+        ]
 
     # TODO(pclay): expose quota and capacity errors
     # Creating an AKS cluster with a fresh service principal usually fails due

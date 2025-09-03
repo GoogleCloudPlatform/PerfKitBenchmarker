@@ -84,6 +84,7 @@ TEST_BATCH_NAME = "test-batch"
 JOB_MANIFEST_TEMPLATE = "provision_node_pools/job_manifest.yaml.j2"
 AKS_NODEPOOL_MANIFEST_TEMPLATE = "provision_node_pools/nodepool_azure.yaml.j2"
 
+
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
@@ -103,7 +104,7 @@ def _CreateJobsAndWait(
       jobs,
   )
 
-  if cluster.CLOUD == 'Azure':
+  if cluster.CLOUD == "Azure":
     cluster.ApplyManifest(
         AKS_NODEPOOL_MANIFEST_TEMPLATE,
         batch=batch_name,
@@ -206,7 +207,7 @@ def _AssertNodePools(
 ) -> None:
   """Asserts expected number of node pools in the cluster."""
   # Skip node pool count check for Azure AKS when using auto-provisioning, as nodes are added without associated node pools
-  if cluster.CLOUD == 'Azure':
+  if cluster.CLOUD == "Azure":
     logging.info("Skipping node pool check for Azure AKS")
     return
   node_pools = len(cluster.GetNodePoolNames())
