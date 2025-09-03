@@ -93,9 +93,9 @@ def SetContainerEnv(vm):
     return (
         'export LD_LIBRARY_PATH='
         # pylint: disable=anomalous-backslash-in-string
-        '/opt/aws-ofi-nccl/lib:/opt/amazon/efa:\$LD_LIBRARY_PATH; '
+        r'/opt/aws-ofi-nccl/lib:/opt/amazon/efa:\$LD_LIBRARY_PATH; '
         # pylint: disable=anomalous-backslash-in-string
-        'export PATH=/opt/amazon/openmpi/bin/:\$PATH; '
+        r'export PATH=/opt/amazon/openmpi/bin/:\$PATH; '
         'export FI_PROVIDER=efa; export FI_EFA_USE_DEVICE_RDMA=1;'
     ) + tuner
   if FLAGS.cloud == 'GCP' and vm.machine_type == 'a3-megagpu-8g':
@@ -112,7 +112,7 @@ def SetContainerEnv(vm):
         'export NCCL_FASTRAK_USE_LLCM=1; '
         'export NCCL_FASTRAK_LLCM_DEVICE_DIRECTORY=/dev/aperture_devices; '
         # pylint: disable=anomalous-backslash-in-string
-        'export LD_LIBRARY_PATH=/var/lib/tcpxo/lib64:\$LD_LIBRARY_PATH; '
+        r'export LD_LIBRARY_PATH=/var/lib/tcpxo/lib64:\$LD_LIBRARY_PATH; '
     )
 
 

@@ -40,11 +40,11 @@ from perfkitbenchmarker.linux_packages import mongosh
 from perfkitbenchmarker.linux_packages import ycsb
 
 flags.DEFINE_integer(
-    'mongodb_readahead_kb', None, 'Configure block device readahead settings.'
+    'mongodb_readahead_kb', 8, 'Configure block device readahead settings.'
 )
 flags.DEFINE_bool(
     'mongodb_primary_only',
-    False,
+    True,
     'Run with a simple primary-only setup. Mutually exclusive with'
     ' --mongodb_pss. If both are False, the default PSA setup will be used.',
 )
@@ -78,7 +78,19 @@ mongodb_ycsb:
   description: Run YCSB against MongoDB.
   vm_groups:
     primary:
-      vm_spec: *default_dual_core
+      vm_spec:
+        GCP:
+          machine_type: n4-standard-2
+          zone: us-central1-b
+          boot_disk_size: 100
+        Azure:
+          machine_type: Standard_D2s_v6
+          zone: eastus-1
+          boot_disk_size: 100
+        AWS:
+          machine_type: m7i.large
+          zone: us-east-1a
+          boot_disk_size: 100
       disk_spec:
         GCP:
           disk_size: 500
@@ -94,7 +106,19 @@ mongodb_ycsb:
           mount_point: /scratch
       vm_count: 1
     secondary:
-      vm_spec: *default_dual_core
+      vm_spec:
+        GCP:
+          machine_type: n4-standard-2
+          zone: us-central1-b
+          boot_disk_size: 100
+        Azure:
+          machine_type: Standard_D2s_v6
+          zone: eastus-1
+          boot_disk_size: 100
+        AWS:
+          machine_type: m7i.large
+          zone: us-east-1a
+          boot_disk_size: 100
       disk_spec:
         GCP:
           disk_size: 500
@@ -110,7 +134,19 @@ mongodb_ycsb:
           mount_point: /scratch
       vm_count: 1
     secondary_2:
-      vm_spec: *default_dual_core
+      vm_spec:
+        GCP:
+          machine_type: n4-standard-2
+          zone: us-central1-b
+          boot_disk_size: 100
+        Azure:
+          machine_type: Standard_D2s_v6
+          zone: eastus-1
+          boot_disk_size: 100
+        AWS:
+          machine_type: m7i.large
+          zone: us-east-1a
+          boot_disk_size: 100
       disk_spec:
         GCP:
           disk_size: 500
@@ -138,6 +174,27 @@ mongodb_ycsb:
     fstab_options: noatime
     enable_transparent_hugepages: false
     create_and_boot_post_task_delay: 5
+    ycsb_fail_on_incomplete_loading: True
+    ycsb_measurement_type: hdrhistogram
+    ycsb_status: True
+    ycsb_status_interval_sec: 1
+    ycsb_operation_count: 1000000000
+    ycsb_record_command_line: False
+    ycsb_run_parameters: dataintegrity=true,readallfields=true,writeallfields=true
+    ycsb_client_vms: 1
+    ycsb_preload_threads: 512
+    ycsb_threads_per_client: 2048
+    ycsb_workload_files: workloadac,workloada,workloadx
+    ycsb_field_count: 10
+    ycsb_field_length: 100
+    ycsb_record_count: 20000000
+    ycsb_sleep_after_load_in_sec: 300
+    ycsb_timelimit: 300
+    ycsb_sleep_between_thread_runs_sec: 120
+    os_type: ubuntu2204
+    timeout_minutes: 360
+    sar: True
+    sar_interval: 1
 """
 
 _LinuxVM = linux_virtual_machine.BaseLinuxVirtualMachine
