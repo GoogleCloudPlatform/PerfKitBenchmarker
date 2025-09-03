@@ -1,6 +1,6 @@
 steps:
-- name: gcr.io/cloud-builders/gsutil
-  args: ['cp', {{ dpb_job_jarfile }}, 'job.jar']
+- name: gcr.io/cloud-builders/gcloud
+  args: ['storage', 'cp', {{ dpb_job_jarfile }}, 'job.jar']
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build',
          '--build-arg',
