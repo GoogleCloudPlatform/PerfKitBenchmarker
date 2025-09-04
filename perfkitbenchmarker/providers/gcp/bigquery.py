@@ -431,7 +431,7 @@ class PythonClientInterface(GenericClientInterface):
     )
     self.client_vm.RemoteCommand('python3 -m venv .venv')
     self.client_vm.RemoteCommand(
-        'source .venv/bin/activate && pip install google-cloud-bigquery'
+        'source .venv/bin/activate && pip install google-cloud-bigquery absl-py'
         ' google-cloud-bigquery-storage pyarrow'
     )
 

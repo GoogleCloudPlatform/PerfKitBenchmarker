@@ -37,7 +37,12 @@ import requests
 
 FLAGS = flags.FLAGS
 
-_VERSION = flags.DEFINE_string('hadoop_version', None, 'Version of Hadoop.')
+_VERSION = flags.DEFINE_string(
+    'hadoop_version',
+    '3.4.1',
+    'Version of Hadoop. Default is 3.4.1 to get around'
+    ' https://issues.apache.org/jira/projects/INFRA/issues/INFRA-27182.',
+)
 _URL_OVERRIDE = flags.DEFINE_string(
     'hadoop_bin_url', None, 'Specify to override url from HADOOP_URL_BASE.'
 )
