@@ -54,7 +54,6 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import resource as resource_type
-from perfkitbenchmarker import resources  # pylint:disable=unused-import  # Load the __init__.py
 from perfkitbenchmarker import smb_service
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm

@@ -48,6 +48,7 @@ class HadoopVersionsTest(pkb_common_test_case.PkbCommonTestCase):
     hadoop.HadoopVersion.cache_clear()
 
   @requests_mock.Mocker()
+  @flagsaver.flagsaver(hadoop_version='')
   def testDefaultHadoopVersion(self, mock_requests):
     mock_requests.get(
         'https://dlcdn.apache.org/hadoop/common/stable',
@@ -60,6 +61,7 @@ class HadoopVersionsTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(1, mock_requests.call_count)
 
   @requests_mock.Mocker()
+  @flagsaver.flagsaver(hadoop_version='')
   def testHadoopVersionConnectionError(self, mock_requests):
     mock_requests.get(
         'https://dlcdn.apache.org/hadoop/common/stable', status_code=404
@@ -71,6 +73,7 @@ class HadoopVersionsTest(pkb_common_test_case.PkbCommonTestCase):
       hadoop.HadoopVersion()
 
   @requests_mock.Mocker()
+  @flagsaver.flagsaver(hadoop_version='')
   def testHadoopVersionParsingError(self, mock_requests):
     mock_requests.get(
         'https://dlcdn.apache.org/hadoop/common/stable',
@@ -91,7 +94,9 @@ class HadoopVersionsTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(version.Version('4.2.0'), observed)
 
   @requests_mock.Mocker()
-  @flagsaver.flagsaver(hadoop_bin_url='http://my/hadooop-4.2.0.tar.gz')
+  @flagsaver.flagsaver(
+      hadoop_version='', hadoop_bin_url='http://my/hadooop-4.2.0.tar.gz'
+  )
   def testHadoopVersionUrlOverride(self, mock_requests):
     observed = hadoop.HadoopVersion()
     self.assertFalse(mock_requests.called)
