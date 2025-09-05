@@ -443,3 +443,74 @@ hadoop_dfsio:
           disk_size: 6830
           disk_type: hyperdisk-throughput
           provisioned_throughput: 600
+
+diskspd_read_only:
+  name: diskspd
+  flags: &diskspd_read_only_flags
+    diskspd_prefill_duration: 2700
+    diskspd_write_read_ratio: 0
+
+diskspd_write_only:
+  name: diskspd
+  flags: &diskspd_write_only_flags
+    diskspd_write_read_ratio: 100
+
+diskspd_single_thread_latency:
+  name: diskspd
+  flags: &diskspd_single_thread_latency_flags
+    diskspd_thread_number_per_file: 1
+    diskspd_outstanding_io: 1
+    diskspd_block_size: 4k
+    diskspd_access_pattern: r
+
+diskspd_max_iops:
+  name: diskspd
+  flags: &diskspd_max_iops_flags
+    diskspd_thread_number_per_file: 1,4,8,16
+    diskspd_outstanding_io: 128
+    diskspd_block_size: 4k
+    diskspd_access_pattern: r
+
+diskspd_max_throughput:
+  name: diskspd
+  flags: &diskspd_max_throughput_flags
+    diskspd_thread_number_per_file: 8,16
+    diskspd_outstanding_io: 64,128
+    diskspd_block_size:  1M
+    diskspd_access_pattern: s
+
+diskspd_single_thread_latency_read_only:
+  name: diskspd
+  flags:
+    <<: *diskspd_read_only_flags
+    <<: *diskspd_single_thread_latency_flags
+
+diskspd_single_thread_latency_write_only:
+  name: diskspd
+  flags:
+    <<: *diskspd_write_only_flags
+    <<: *diskspd_single_thread_latency_flags
+
+diskspd_max_iops_read_only:
+  name: diskspd
+  flags:
+    <<: *diskspd_read_only_flags
+    <<: *diskspd_max_iops_flags
+
+diskspd_max_iops_write_only:
+  name: diskspd
+  flags:
+    <<: *diskspd_write_only_flags
+    <<: *diskspd_max_iops_flags
+
+diskspd_max_throughput_read_only:
+  name: diskspd
+  flags:
+    <<: *diskspd_read_only_flags
+    <<: *diskspd_max_throughput_flags
+
+diskspd_max_throughput_write_only:
+  name: diskspd
+  flags:
+    <<: *diskspd_write_only_flags
+    <<: *diskspd_max_throughput_flags
