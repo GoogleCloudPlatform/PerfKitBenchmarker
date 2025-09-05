@@ -170,7 +170,7 @@ class AksCluster(container_service.KubernetesCluster):
         '--nodepool-labels',
         f'pkb_nodepool={container_service.DEFAULT_NODEPOOL}',
     ]
-    if FLAGS.benchmarks and 'provision_node_pools' in FLAGS.benchmarks:
+    if 'provision_node_pools' in FLAGS.benchmarks:
       # For provision_node_pools benchmark, add auto provisioning mode
       cmd.append('--node-provisioning-mode=auto')
       cmd += self._GetNodeFlags(self.default_nodepool)
