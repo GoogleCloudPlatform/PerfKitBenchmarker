@@ -102,6 +102,7 @@ def _CreateJobsAndWait(
       batch_name,
       jobs,
   )
+
   apply_start = time.monotonic()
   for i in range(jobs):
     cluster.ApplyManifest(
@@ -196,6 +197,10 @@ def _AssertNodePools(
     added_node_pools: int,
 ) -> None:
   """Asserts expected number of node pools in the cluster."""
+  # Skip node pool count check for Azure AKS when using auto-provisioning, as nodes are added without associated node pools
+  if cluster.CLOUD == "Azure":
+    logging.info("Skipping node pool check for Azure AKS")
+    return
   node_pools = len(cluster.GetNodePoolNames())
   if node_pools < added_node_pools:
     raise ValueError(
