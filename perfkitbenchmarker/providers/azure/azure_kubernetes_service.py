@@ -429,20 +429,6 @@ class AksCluster(container_service.KubernetesCluster):
     ] + self.resource_group.args
     vm_util.IssueCommand(cmd)
 
-  def GetNodePoolNames(self) -> list[str]:
-    """Get node pool names for the cluster."""
-    cmd = [
-        azure.AZURE_PATH,
-        'aks',
-        'nodepool',
-        'list',
-        '--cluster-name',
-        self.name,
-    ] + self.resource_group.args
-    stdout, _, _ = vm_util.IssueCommand(cmd)
-    nodepools = json.loads(stdout)
-    return [nodepool['name'] for nodepool in nodepools]
-
 
 class AksAutomaticCluster(AksCluster):
   """Class representing an AKS Automatic cluster, which has managed node pools.
