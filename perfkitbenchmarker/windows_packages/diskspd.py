@@ -26,7 +26,6 @@ import re
 import xml.etree.ElementTree
 
 from absl import flags
-from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import sample
@@ -38,12 +37,6 @@ FLAGS = flags.FLAGS
 LATENCY_PERCENTILES = [50, 90, 95, 99, 99.9, 99.99, 99.999, 99.9999, 99.99999]
 SampleData = collections.namedtuple('SampleData', ['metric', 'value', 'unit'])
 
-flags.DEFINE_boolean(
-    'diskspd_prefill',
-    False,
-    'If we want to prefill the file with random data before running the test.',
-)
-
 flags.DEFINE_integer(
     'diskspd_prefill_duration',
     None,
@@ -54,25 +47,26 @@ flags.DEFINE_integer(
 
 flags.DEFINE_integer(
     'diskspd_duration',
-    20,
-    'The number of seconds to run diskspd test.Defaults to 30s. Unit: seconds.',
+    300,
+    'The number of seconds to run diskspd test.Defaults to 300s. Unit:'
+    ' seconds.',
 )
 
 flags.DEFINE_integer(
     'diskspd_warmup',
-    5,
+    120,
     'The warm up time for diskspd, the time needed to enter'
     'steady state of I/O operation. '
-    'Defaults to 5s. Unit: seconds.',
+    'Defaults to 120s. Unit: seconds.',
 )
 
 flags.DEFINE_integer(
     'diskspd_cooldown',
-    5,
+    30,
     'The cool down time for diskspd, the time to ensure that'
     'each instance of diskspd is active during each'
     'measurement period of each instance. '
-    'Defaults: 5s. Unit: seconds',
+    'Defaults: 30s. Unit: seconds',
 )
 
 flags.DEFINE_enum(
@@ -114,21 +108,23 @@ flags.register_validator(
     'Please specify Unit for --diskspd_block_size',
 )
 
-flags.DEFINE_integer(
-    'diskspd_stride_or_alignment',
+DISKSPD_STRIDE = flags.DEFINE_string(
+    'diskspd_stride',
     None,
-    'If the access pattern is sequential, then this value'
-    'means the stride for the access'
-    'If the access pattern is random, then this value means'
-    'the specified number of bytes that random I/O aligns to.'
-    'Defaults: None.',
+    'Stride is for sequential access, specifies the offset for an IO operation.'
+    ' For example, if a 64KiB stride is chosen for a 4KB block size, the first'
+    ' I/O will be at zero, the second at 64KB and so forth. Please use B|K|M|G'
+    ' to specify unit. Defaults: None.',
 )
 
-flags.DEFINE_enum(
-    'diskspd_stride_or_alignment_unit',
-    'K',
-    ['K', 'M', 'G', 'b'],
-    'The unit of the stride_or_alignment,available option: K|M|G|bDefaults: K.',
+flags.register_validator(
+    DISKSPD_STRIDE,
+    lambda x: x is None or x[-1] in ['B', 'K', 'M', 'G']
+    and FLAGS.diskspd_access_pattern != 'r',
+    message=(
+        'Diskspd_stride is only supported for sequential access pattern. Please'
+        ' specify Unit for --diskspd_stride.'
+    ),
 )
 
 flags.DEFINE_bool(
@@ -226,16 +222,9 @@ def Install(vm):
 
 
 def _RunDiskSpdWithOptions(vm, options):
-  total_runtime = (
-      FLAGS.diskspd_warmup + FLAGS.diskspd_cooldown + FLAGS.diskspd_duration
-  )
-  timeout_duration = total_runtime * DISKSPD_TIMEOUT_MULTIPLIER
-
   diskspd_exe_dir = ntpath.join(vm.temp_dir, 'x86')
-  command = 'cd {diskspd_exe_dir}; .\\diskspd.exe {diskspd_options}'.format(
-      diskspd_exe_dir=diskspd_exe_dir, diskspd_options=options
-  )
-  vm.RobustRemoteCommand(command, timeout=timeout_duration)
+  command = f'cd {diskspd_exe_dir}; .\\diskspd.exe {options}'
+  vm.RobustRemoteCommand(command)
 
 
 def _RemoveXml(vm):
@@ -256,15 +245,21 @@ def _RemoveTempFile(vm):
   vm.RemoteCommand(rm_command, ignore_failure=True)
 
 
-def _RunDiskSpd(
-    running_vm, outstanding_io, threads, metadata
-):
+def EnablePrefill():
+  return (
+      FLAGS.diskspd_prefill_duration is not None
+      and FLAGS.diskspd_prefill_duration != 0
+  )
+
+
+def _RunDiskSpd(running_vm, outstanding_io, threads, metadata):
   """Run single iteration of Diskspd test."""
   diskspd_config = _GenerateDiskspdConfig(outstanding_io, threads)
-  process_args = [(_RunDiskSpdWithOptions, (running_vm, diskspd_config), {})]
-  background_tasks.RunParallelProcesses(process_args, 200)
+  _RunDiskSpdWithOptions(running_vm, diskspd_config)
   result_xml = _CatXml(running_vm)
-  _RemoveTempFile(running_vm)
+  if not EnablePrefill():
+    # Only remove the temp file if we did not prefill the file.
+    _RemoveTempFile(running_vm)
   _RemoveXml(running_vm)
 
   return ParseDiskSpdResults(result_xml, metadata)
@@ -281,17 +276,14 @@ def _GenerateDiskspdConfig(outstanding_io, threads):
   access_pattern = FLAGS.diskspd_access_pattern
   diskspd_write_read_ratio = FLAGS.diskspd_write_read_ratio
   diskspd_block_size = FLAGS.diskspd_block_size
-  access_pattern_string = ''
-  if FLAGS.diskspd_stride_or_alignment:
-    access_pattern_string = (
-        '-'
-        + str(access_pattern)
-        + str(FLAGS.diskspd_stride_or_alignment)
-        + str(FLAGS.diskspd_stride_or_alignment_unit)
-    )
   os_hint = access_pattern
   if os_hint == 'si':
     os_hint = 's'
+  if DISKSPD_STRIDE.value:
+    access_pattern = (
+        str(access_pattern)
+        + DISKSPD_STRIDE.value
+    )
 
   throughput_per_ms_string = ''
   if FLAGS.diskspd_throughput_per_ms:
@@ -304,7 +296,7 @@ def _GenerateDiskspdConfig(outstanding_io, threads):
       f' {large_page_string} {disable_affinity_string}'
       f' {software_cache_string} {write_through_string}'
       f' {throughput_per_ms_string} -b{diskspd_block_size}'
-      f' -{access_pattern} -f{os_hint} {access_pattern_string}'
+      f' -{access_pattern} -f{os_hint}'
       f' F:\\{DISKSPD_TMPFILE} > {DISKSPD_XMLFILE}'
   )
 
@@ -319,10 +311,7 @@ def RunDiskSpd(running_vm):
 
   # add the flag information to the metadata
   # some of the flags information has been included in the xml file
-  metadata['diskspd_stride_or_alignment'] = FLAGS.diskspd_stride_or_alignment
-  metadata['diskspd_stride_or_alignment_unit'] = (
-      FLAGS.diskspd_stride_or_alignment_unit
-  )
+  metadata['diskspd_stride'] = DISKSPD_STRIDE.value
   metadata['diskspd_large_page'] = FLAGS.diskspd_large_page
   metadata['diskspd_latency_stats'] = FLAGS.diskspd_latency_stats
   metadata['diskspd_disable_affinity'] = FLAGS.diskspd_disable_affinity
@@ -353,7 +342,7 @@ def RunDiskSpd(running_vm):
             )
         )
       except errors.VirtualMachine.RemoteCommandError as e:
-        if 'Could not allocate a buffer for target' in e:
+        if 'Could not allocate a buffer for target' in str(e):
           logging.exception(
               'Diskspd is not able to allocate buffer for this configuration,'
               ' try using smaller block size or reduce outstanding io or'
@@ -376,21 +365,52 @@ def Prefill(running_vm):
   Args:
     running_vm: The VM to prefill the file on.
   """
-  if not FLAGS.diskspd_prefill:
+  if not EnablePrefill():
+    logging.info('Prefill duration is not set, skipping prefill.')
     return
-  prefill_duration = FLAGS.diskspd_prefill_duration
-  if prefill_duration is None:
-    raise errors.Setup.InvalidConfigurationError(
-        '--diskspd_prefill_duration is None'
-    )
   logging.info('Prefilling file with random data')
+  prefill_duration = FLAGS.diskspd_prefill_duration
   diskspd_exe_dir = ntpath.join(running_vm.temp_dir, 'x86')
   diskspd_options = (
-      f'-c{FLAGS.diskspd_file_size} -t16 -w100 -b4k -d{prefill_duration} -Sw'
-      f' -Su -o16 -r C:\\scratch\\{DISKSPD_TMPFILE}'
+      f'-c{FLAGS.diskspd_file_size} -t16 -w100 -b4k -d{prefill_duration} -Rxml'
+      f' -Sw -Su -o16 -r C:\\scratch\\{DISKSPD_TMPFILE} >'
+      f' {DISKSPD_XMLFILE}'
   )
   command = f'cd {diskspd_exe_dir}; .\\diskspd.exe {diskspd_options}'
   running_vm.RobustRemoteCommand(command)
+  result_xml = _CatXml(running_vm)
+  _RemoveXml(running_vm)
+
+  prefill_samples = ParseDiskSpdResults(result_xml, {})
+  for prefill_sample in prefill_samples:
+    if prefill_sample.metric != 'write_bandwidth':
+      continue
+    write_bandwidth = prefill_sample.value
+    total_seconds = float(prefill_sample.metadata['TestTimeSeconds'])
+    total_data_written, unit = GetDiskspdFileSizeInPrefillSizeUnit(
+        write_bandwidth, total_seconds
+    )
+    logging.info('Prefill Data written: %s %s', total_data_written, unit)
+    if total_data_written < float(DISKSPD_FILE_SIZE.value[0:-1]):
+      logging.error(
+          'Prefill data written is less than the file size, please check the'
+          ' prefill duration.'
+      )
+
+
+def GetDiskspdFileSizeInPrefillSizeUnit(
+    write_bandwidth: float, test_duration: float
+) -> float:
+  """Returns the diskspd file size in GB."""
+  unit = DISKSPD_FILE_SIZE.value[-1]
+  written_data = 0
+  if unit == 'G':
+    written_data = (write_bandwidth * test_duration) / 1024
+  elif unit == 'M':
+    written_data = write_bandwidth * test_duration
+  elif unit == 'K':
+    written_data = (write_bandwidth * test_duration) * 1024
+  return written_data, unit
 
 
 def ParseDiskSpdResults(result_xml, metadata):
@@ -470,9 +490,9 @@ def ParseDiskSpdResults(result_xml, metadata):
   testtime = float(metadata['TestTimeSeconds'])
 
   # calculate the read and write speed (Byte -> MB)
-  read_bandwidth = int(read_bytes / testtime / 1024 / 1024)
-  write_bandwidth = int(write_bytes / testtime / 1024 / 1024)
-  total_bandwidth = int(total_byte / testtime / 1024 / 1024)
+  read_bandwidth = ConvertTotalBytesToMBPerSecond(read_bytes, testtime)
+  write_bandwidth = ConvertTotalBytesToMBPerSecond(write_bytes, testtime)
+  total_bandwidth = ConvertTotalBytesToMBPerSecond(total_byte, testtime)
 
   # calculate the read write times per second
   read_iops = int(read_count / testtime)
@@ -497,6 +517,13 @@ def ParseDiskSpdResults(result_xml, metadata):
       for item in sample_data
   ])
   return samples
+
+
+def ConvertTotalBytesToMBPerSecond(
+    bytes_value: int, test_duration: float
+) -> float:
+  """Converts total bytes to MB per second."""
+  return bytes_value / test_duration / 1024 / 1024
 
 
 def ParseLatencyBucket(latency_bucket):

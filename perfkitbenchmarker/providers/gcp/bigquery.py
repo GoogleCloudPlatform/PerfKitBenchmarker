@@ -431,13 +431,19 @@ class PythonClientInterface(GenericClientInterface):
     )
     self.client_vm.RemoteCommand('python3 -m venv .venv')
     self.client_vm.RemoteCommand(
-        'source .venv/bin/activate && pip install google-cloud-bigquery'
+        'source .venv/bin/activate && pip install google-cloud-bigquery absl-py'
         ' google-cloud-bigquery-storage pyarrow'
     )
 
     # Push driver script to client vm
     self.client_vm.PushDataFile(
         os.path.join(BQ_PYTHON_CLIENT_DIR, BQ_PYTHON_CLIENT_FILE)
+    )
+    self.client_vm.PushDataFile(
+        os.path.join(
+            edw_service.EDW_PYTHON_DRIVER_LIB_DIR,
+            edw_service.EDW_PYTHON_DRIVER_LIB_FILE,
+        )
     )
 
   def ExecuteQuery(
