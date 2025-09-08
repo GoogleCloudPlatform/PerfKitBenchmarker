@@ -17,6 +17,10 @@ spark.master=spark://{{ leader_ip }}:7077
 # Hadoop configs prefixed with spark.hadoop
 spark.hadoop.fs.defaultFS=hdfs://{{ leader_ip }}/
 
+{% if shuffle_partitions is not none %}
+spark.sql.shuffle.partitions={{ shuffle_partitions }}
+{% endif %}
+
 {% for key, value in spark_conf.items() %}
 {{ key }}={{ value }}
 {% endfor %}

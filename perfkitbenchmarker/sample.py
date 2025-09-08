@@ -35,6 +35,7 @@ _SAMPLE_FIELDS = 'metric', 'value', 'unit', 'metadata', 'timestamp'
 TPM_TIME_SERIES = 'TPM_time_series'
 OPS_TIME_SERIES = 'OPS_time_series'
 LATENCY_TIME_SERIES = 'Latency_time_series'
+QPS_TIME_SERIES = 'QPS_time_series'
 
 # Metadata for time series
 VALUES = 'values'
