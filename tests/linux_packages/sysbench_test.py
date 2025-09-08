@@ -3,12 +3,17 @@
 import os
 import unittest
 
+from absl import flags
 from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_packages import sysbench
 from tests import pkb_common_test_case
+
+
+FLAGS = flags.FLAGS
+FLAGS.mark_as_parsed()
 
 
 class SysbenchTest(pkb_common_test_case.PkbCommonTestCase):
@@ -31,13 +36,7 @@ class MySQLServiceBenchmarkTestCase(
     )
     with open(path) as fp:
       self.contents = fp.read()
-
-  def testParseSysbenchResult(self):
-    metadata = {}
-    results = sysbench.ParseSysbenchTimeSeries(
-        self.contents, metadata
-    )
-    expected_results = [
+    self.expected_results = [
         sample.Sample(
             'tps_array',
             -1,
@@ -111,7 +110,86 @@ class MySQLServiceBenchmarkTestCase(
             },
         ),
     ]
-    self.assertSampleListsEqualUpToTimestamp(results, expected_results)
+
+  @flagsaver.flagsaver(sysbench_qps_time_series=False)
+  def testParseSysbenchResult(self):
+    metadata = {}
+    results = sysbench.ParseSysbenchTimeSeries(
+        self.contents, metadata
+    )
+    self.assertSampleListsEqualUpToTimestamp(results, self.expected_results)
+
+  @mock.patch('time.time', mock.MagicMock(return_value=28.0))
+  @flagsaver.flagsaver(sysbench_qps_time_series=True)
+  def testParseSysbenchResultWithTimeSeries(self):
+    metadata = {}
+    results = sysbench.ParseSysbenchTimeSeries(self.contents, metadata)
+    expected_results_with_time_series = self.expected_results + [
+        sample.Sample(
+            metric='QPS_time_series',
+            value=0.0,
+            unit='qps',
+            metadata={
+                'values': [
+                    20333.18,
+                    20156.38,
+                    20448.49,
+                    20334.15,
+                    20194.07,
+                    20331.31,
+                    20207.00,
+                    20348.96,
+                    20047.11,
+                    19972.86,
+                    19203.97,
+                    18221.83,
+                    18689.14,
+                    18409.68,
+                    19155.63,
+                ],
+                'timestamps': [
+                    0.0,
+                    2000.0,
+                    4000.0,
+                    6000.0,
+                    8000.0,
+                    10000.0,
+                    12000.0,
+                    14000.0,
+                    16000.0,
+                    18000.0,
+                    20000.0,
+                    22000.0,
+                    24000.0,
+                    26000.0,
+                    28000.0,
+                ],
+                'qps': [
+                    20333.18,
+                    20156.38,
+                    20448.49,
+                    20334.15,
+                    20194.07,
+                    20331.31,
+                    20207.00,
+                    20348.96,
+                    20047.11,
+                    19972.86,
+                    19203.97,
+                    18221.83,
+                    18689.14,
+                    18409.68,
+                    19155.63,
+                ],
+                'interval': 1,
+            },
+            timestamp=0,
+        ),
+    ]
+    self.assertSampleListsEqualUpToTimestamp(
+        results, expected_results_with_time_series
+    )
+
 
 if __name__ == '__main__':
   unittest.main()
