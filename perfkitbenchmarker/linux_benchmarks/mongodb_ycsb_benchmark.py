@@ -183,7 +183,7 @@ mongodb_ycsb:
     ycsb_run_parameters: dataintegrity=true,readallfields=true,writeallfields=true
     ycsb_client_vms: 1
     ycsb_preload_threads: 512
-    ycsb_threads_per_client: 2048
+    ycsb_threads_per_client: "2048"
     ycsb_workload_files: workloadac,workloada,workloadx
     ycsb_field_count: 10
     ycsb_field_length: 100
