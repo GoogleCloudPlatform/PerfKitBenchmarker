@@ -180,6 +180,9 @@ EDW_SEARCH_INDEX_NAME = flags.DEFINE_string(
 
 FLAGS = flags.FLAGS
 
+EDW_PYTHON_DRIVER_LIB_FILE = 'edw_python_driver_lib.py'
+EDW_PYTHON_DRIVER_LIB_DIR = 'edw/common/clients/python'
+
 TYPE_2_PROVIDER = dict([
     ('athena', 'aws'),
     ('redshift', 'aws'),

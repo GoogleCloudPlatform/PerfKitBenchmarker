@@ -439,6 +439,12 @@ class PythonClientInterface(GenericClientInterface):
     self.client_vm.PushDataFile(
         os.path.join(BQ_PYTHON_CLIENT_DIR, BQ_PYTHON_CLIENT_FILE)
     )
+    self.client_vm.PushDataFile(
+        os.path.join(
+            edw_service.EDW_PYTHON_DRIVER_LIB_DIR,
+            edw_service.EDW_PYTHON_DRIVER_LIB_FILE,
+        )
+    )
 
   def ExecuteQuery(
       self, query_name: str, print_results: bool = False
