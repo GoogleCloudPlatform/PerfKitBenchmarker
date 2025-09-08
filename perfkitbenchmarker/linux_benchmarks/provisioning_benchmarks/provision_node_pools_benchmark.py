@@ -77,6 +77,11 @@ provision_node_pools:
     gke_max_cpu: 520
     # (100 init_batch + 20 test_batch + 10 buffer) * 16 GB
     gke_max_memory: 2080
+  container_clusters:
+    cloud: Azure
+    type: Kubernetes
+  flags:
+    azure_aks_auto_node_provisioning: True
 """
 
 INIT_BATCH_NAME = "init-batch"
