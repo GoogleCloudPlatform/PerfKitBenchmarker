@@ -118,10 +118,21 @@ flags.DEFINE_string(
     None,
     'The schema of the hosted snowflake database to use during the benchmark.',
 )
+flags.DEFINE_string(
+    'snowflake_account',
+    None,
+    'The Snowflake account to use during the benchmark. Must follow the format'
+    ' "<org_id>-<account_name>".',
+)
+flags.DEFINE_string(
+    'snowflake_user',
+    None,
+    'The Snowflake user to use during the benchmark.',
+)
 flags.DEFINE_enum(
     'snowflake_client_interface',
     'JDBC',
-    ['JDBC'],
+    ['JDBC', 'PYTHON'],
     'The Runtime Interface used when interacting with Snowflake.',
 )
 flags.DEFINE_string(
