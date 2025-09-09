@@ -96,6 +96,7 @@ from perfkitbenchmarker import package_lookup
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import requirements
+from perfkitbenchmarker import resources
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine
@@ -548,6 +549,7 @@ def _CreateBenchmarkSpecs():
   Returns:
     A list of BenchmarkSpecs.
   """
+  resources.LoadModules()
   specs = []
   benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
   benchmark_counts = collections.defaultdict(itertools.count)

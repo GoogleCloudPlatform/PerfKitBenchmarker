@@ -21,6 +21,7 @@ benchmarks.
 import copy
 import json
 import logging
+import os
 from typing import Any, Union
 from absl import flags
 from perfkitbenchmarker import data
@@ -34,15 +35,35 @@ JdbcClientDict = {
     provider_info.AWS: 'snowflake-jdbc-client-2.14-enterprise.jar',
     provider_info.AZURE: 'snowflake-jdbc-client-azure-external-2.0.jar',
 }
+# The python client is developed internally as of now. This requires a client
+# library which should call into the DB. Contact p3rf-team [at] google [dot] com
+# if you would like to run this benchmark to get the file.
+SNOWFLAKE_PYTHON_CLIENT_FILE = 'sf_python_driver.py'
+SNOWFLAKE_PYTHON_CLIENT_DIR = 'edw/snowflake/clients/python'
 
 
-class JdbcClientInterface(edw_service.EdwClientInterface):
+class SnowflakeClientInterface(edw_service.EdwClientInterface):
+  """Base client interface for Snowflake."""
+
+  warehouse: str
+  database: str
+  schema: str
+
+  def __init__(self, warehouse: str, database: str, schema: str):
+    super().__init__()
+    self.warehouse = warehouse
+    self.database = database
+    self.schema = schema
+
+  def GetMetadata(self) -> dict[str, str]:
+    """Gets the Metadata attributes for the Client Interface."""
+    return {'client': FLAGS.snowflake_client_interface}
+
+
+class JdbcClientInterface(SnowflakeClientInterface):
   """Jdbc Client Interface class for Snowflake.
 
   Attributes:
-    warehouse: String name of the virtual warehouse used during benchmark
-    database: String name of the database to benchmark
-    schema: String name of the schema to benchmark
     jdbc_client: String filename of the JDBC client associated with the
       Snowflake backend being tested (AWS/Azure/etc.)
   """
@@ -50,9 +71,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
   def __init__(
       self, warehouse: str, database: str, schema: str, jdbc_client: str
   ):
-    self.warehouse = warehouse
-    self.database = database
-    self.schema = schema
+    super().__init__(warehouse, database, schema)
     self.jdbc_client = jdbc_client
 
   def Prepare(self, package_name: str) -> None:
@@ -146,14 +165,124 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     stdout, _ = self.client_vm.RemoteCommand(query_command)
     return stdout
 
-  def GetMetadata(self) -> dict[str, str]:
-    """Gets the Metadata attributes for the Client Interface."""
-    return {'client': FLAGS.snowflake_client_interface}
+
+class PythonClientInterface(SnowflakeClientInterface):
+  """Python Client Interface class for Snowflake.
+
+  Attributes:
+    user: The user to connect to snowflake with.
+    account: The snowflake account.
+  """
+
+  def __init__(
+      self,
+      warehouse: str,
+      database: str,
+      schema: str,
+      user: str,
+      account: str,
+  ):
+    super().__init__(warehouse, database, schema)
+    self.user = user
+    self.account = account
+
+  def Prepare(self, package_name: str) -> None:
+    """Prepares the client vm to execute query."""
+
+    # Push the private key to the working directory on client vm
+    if FLAGS.snowflake_jdbc_key_file:
+      self.client_vm.PushFile(FLAGS.snowflake_jdbc_key_file)
+    else:
+      self.client_vm.InstallPreprovisionedPackageData(
+          package_name, ['snowflake_keyfile.p8'], ''
+      )
+
+    # Install dependencies for driver
+    self.client_vm.Install('pip')
+    self.client_vm.RemoteCommand(
+        'sudo apt-get -qq update && DEBIAN_FRONTEND=noninteractive sudo apt-get'
+        ' -qq install python3.12-venv'
+    )
+    self.client_vm.RemoteCommand('python3 -m venv .venv')
+    self.client_vm.RemoteCommand(
+        'source .venv/bin/activate && pip install snowflake-connector-python'
+        ' pyarrow absl-py pandas'
+    )
+
+    # Push driver script to client vm
+    self.client_vm.PushDataFile(
+        os.path.join(SNOWFLAKE_PYTHON_CLIENT_DIR, SNOWFLAKE_PYTHON_CLIENT_FILE)
+    )
+    self.client_vm.PushDataFile(
+        os.path.join(
+            edw_service.EDW_PYTHON_DRIVER_LIB_DIR,
+            edw_service.EDW_PYTHON_DRIVER_LIB_FILE,
+        )
+    )
+
+  def _RunPythonClientCommand(
+      self, command: str, additional_args: list[str]
+  ) -> str:
+    """Runs a command on the python client.
+
+    Args:
+      command: The command to run (e.g. 'single', 'throughput').
+      additional_args: A list of additional arguments for the command.
+
+    Returns:
+      The stdout from the command.
+    """
+    cmd_parts = [
+        f'.venv/bin/python {SNOWFLAKE_PYTHON_CLIENT_FILE}',
+        command,
+        f'--warehouse {self.warehouse}',
+        f'--database {self.database}',
+        f'--schema {self.schema}',
+        f'--user {self.user}',
+        f'--account {self.account}',
+        '--credentials_file snowflake_keyfile.p8',
+    ]
+    cmd_parts.extend(additional_args)
+    cmd = ' '.join(cmd_parts)
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    return stdout
+
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
+    """Executes a query and returns performance details."""
+    args = [f'--query_file {query_name}']
+    if print_results:
+      args.append('--print_results')
+    stdout = self._RunPythonClientCommand('single', args)
+    details = copy.copy(self.GetMetadata())
+    details.update(json.loads(stdout)['details'])
+    return json.loads(stdout)['query_wall_time_in_secs'], details
+
+  def ExecuteThroughput(
+      self,
+      concurrency_streams: list[list[str]],
+      labels: dict[str, str] | None = None,
+  ) -> str:
+    """Executes queries simultaneously on client and return performance details."""
+    del labels  # Currently not supported by this implementation.
+    args = [f"--query_streams='{json.dumps(concurrency_streams)}'"]
+    return self._RunPythonClientCommand('throughput', args)
+
+  def RunQueryWithResults(self, query_name: str) -> str:
+    """Executes a query and returns performance details and query output."""
+    args = [f'--query_file {query_name}', '--print_results']
+    return self._RunPythonClientCommand('single', args)
 
 
 def GetSnowflakeClientInterface(
-    warehouse: str, database: str, schema: str, cloud: str
-) -> JdbcClientInterface:
+    warehouse: str,
+    database: str,
+    schema: str,
+    cloud: str,
+    user: str | None,
+    account: str | None,
+) -> SnowflakeClientInterface:
   """Builds and Returns the requested Snowflake client Interface.
 
   Args:
@@ -162,6 +291,8 @@ def GetSnowflakeClientInterface(
     database: String name of the Snowflake database to use during the  benchmark
     schema: String name of the Snowflake schema to use during the  benchmark
     cloud: String ID of the cloud service the client interface is for
+    user: The user to connect to snowflake with.
+    account: The snowflake account.
 
   Returns:
     A concrete Client Interface object (subclass of EdwClientInterface)
@@ -172,6 +303,15 @@ def GetSnowflakeClientInterface(
   if FLAGS.snowflake_client_interface == 'JDBC':
     return JdbcClientInterface(
         warehouse, database, schema, JdbcClientDict[cloud]
+    )
+  elif FLAGS.snowflake_client_interface == 'PYTHON':
+    assert user and account
+    return PythonClientInterface(
+        warehouse,
+        database,
+        schema,
+        user,
+        account,
     )
   raise RuntimeError('Unknown Snowflake Client Interface requested.')
 
@@ -187,8 +327,15 @@ class Snowflake(edw_service.EdwService):
     self.warehouse = FLAGS.snowflake_warehouse
     self.database = FLAGS.snowflake_database
     self.schema = FLAGS.snowflake_schema
+    self.user = FLAGS.snowflake_user
+    self.account = FLAGS.snowflake_account
     self.client_interface = GetSnowflakeClientInterface(
-        self.warehouse, self.database, self.schema, self.CLOUD
+        self.warehouse,
+        self.database,
+        self.schema,
+        self.CLOUD,
+        self.user,
+        self.account,
     )
 
   def IsUserManaged(self, edw_service_spec):
@@ -361,6 +508,10 @@ class Snowflake(edw_service.EdwService):
     basic_data['warehouse'] = self.warehouse
     basic_data['database'] = self.database
     basic_data['schema'] = self.schema
+    if self.user:
+      basic_data['user'] = self.user
+    if self.account:
+      basic_data['account'] = self.account
     basic_data.update(self.client_interface.GetMetadata())
     return basic_data
 

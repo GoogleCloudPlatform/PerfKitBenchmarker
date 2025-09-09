@@ -17,6 +17,3 @@ from perfkitbenchmarker import import_util
 
 def LoadModules():
   list(import_util.LoadModulesForPath(__path__, __name__))
-
-
-LoadModules()
