@@ -281,7 +281,10 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       else:
         cmd.flags['no-enable-data-cache'] = True
 
-    _, stderr, retcode = cmd.Issue(timeout=CREATION_TIMEOUT)
+    _, stderr, retcode = cmd.Issue(
+        timeout=CREATION_TIMEOUT,
+        raise_on_failure=False,
+    )
 
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
 
