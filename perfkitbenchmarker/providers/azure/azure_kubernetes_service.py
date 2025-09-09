@@ -169,13 +169,11 @@ class AksCluster(container_service.KubernetesCluster):
         container_service.DEFAULT_NODEPOOL,
         '--nodepool-labels',
         f'pkb_nodepool={container_service.DEFAULT_NODEPOOL}',
-    ]
+    ] + self._GetNodeFlags(self.default_nodepool)
     if FLAGS.azure_aks_auto_node_provisioning:
       # For provision_node_pools benchmark, add auto provisioning mode
       cmd.append('--node-provisioning-mode=auto')
-      cmd += self._GetNodeFlags(self.default_nodepool)
     else:
-      cmd += self._GetNodeFlags(self.default_nodepool)
       if self._IsAutoscalerEnabled():
         cmd += [
             '--enable-cluster-autoscaler',
