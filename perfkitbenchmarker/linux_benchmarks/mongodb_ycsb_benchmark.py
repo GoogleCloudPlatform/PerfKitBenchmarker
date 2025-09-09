@@ -184,7 +184,7 @@ mongodb_ycsb:
     ycsb_client_vms: 1
     ycsb_preload_threads: 512
     ycsb_threads_per_client: "2048"
-    ycsb_workload_files: workloadac,workloada,workloadx
+    ycsb_workload_files: workloadc,workloada,workloadx
     ycsb_field_count: 10
     ycsb_field_length: 100
     ycsb_record_count: 20000000
