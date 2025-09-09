@@ -105,6 +105,7 @@ NUM_LOCAL_VOLUMES: dict[str, int] = {
     'Standard_D64ds_v6': 4,
     'Standard_D96ds_v6': 6,
     'Standard_D128ds_v6': 4,
+    'Standard_D192ds_v6': 6,
     'Standard_D2ads_v6': 1,
     'Standard_D4ads_v6': 1,
     'Standard_D8ads_v6': 1,
