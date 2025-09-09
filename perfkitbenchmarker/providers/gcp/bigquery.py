@@ -33,6 +33,13 @@ from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 FLAGS = flags.FLAGS
 
+_INITIALIZE_SEARCH_TABLE_PARTITIONED = flags.DEFINE_bool(
+    'bq_initialize_search_table_partitioned',
+    True,
+    'Whether to partition the initial search table for text index'
+    ' benchmarking.',
+)
+
 BQ_CLIENT_FILE = 'bq-jdbc-simba-client-1.8-temp-labels.jar'
 BQ_PYTHON_CLIENT_FILE = 'bq_python_driver.py'
 BQ_PYTHON_CLIENT_DIR = 'edw/bigquery/clients/python'
@@ -784,8 +791,11 @@ class Bigquery(edw_service.EdwService):
   GET_INDEX_STATUS_QUERY_TEMPLATE = (
       f'{SEARCH_QUERY_TEMPLATE_LOCATION}/index_status.sql.j2'
   )
-  INITIALIZE_SEARCH_TABLE_QUERY_TEMPLATE = (
+  INITIALIZE_PART_SEARCH_TABLE_QUERY_TEMPLATE = (
       f'{SEARCH_QUERY_TEMPLATE_LOCATION}/table_init.sql.j2'
+  )
+  INITIALIZE_UNPART_SEARCH_TABLE_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/table_init_partitioned.sql.j2'
   )
   LOAD_SEARCH_DATA_QUERY_TEMPLATE = (
       f'{SEARCH_QUERY_TEMPLATE_LOCATION}/ingestion_query.sql.j2'
@@ -852,8 +862,13 @@ class Bigquery(edw_service.EdwService):
     context = {
         'table_name': table_path,
     }
+    init_table_query = (
+        self.INITIALIZE_PART_SEARCH_TABLE_QUERY_TEMPLATE
+        if _INITIALIZE_SEARCH_TABLE_PARTITIONED.value
+        else self.INITIALIZE_UNPART_SEARCH_TABLE_QUERY_TEMPLATE
+    )
     self.client_interface.client_vm.RenderTemplate(
-        data.ResourcePath(self.INITIALIZE_SEARCH_TABLE_QUERY_TEMPLATE),
+        data.ResourcePath(init_table_query),
         query_name,
         context,
     )
