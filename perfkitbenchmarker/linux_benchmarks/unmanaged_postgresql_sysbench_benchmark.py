@@ -20,6 +20,7 @@ postgreSQL.
 
 import copy
 import logging
+import re
 import time
 
 from absl import flags
@@ -105,10 +106,27 @@ _OLTP_READ_ONLY = 'oltp_read_only'
 _OLTP_WRITE_ONLY = 'oltp_write_only'
 _OLTP = [_OLTP_READ_WRITE, _OLTP_READ_ONLY, _OLTP_WRITE_ONLY]
 
-_SHARED_BUFFER_SIZE = flags.DEFINE_integer(
+_SHARED_BUFFER_SIZE = flags.DEFINE_string(
     'postgresql_shared_buffer_size',
-    10,
-    'Size of the shared buffer in the postgresql cluster (in Gb).',
+    '10G',
+    'Size of the shared buffer in the postgresql cluster.'
+    'Format: <size>[<unit>], where <unit> is one of (B, K, M, G). '
+    'Example: 16G, 512M. If no unit is specified, G is assumed by default.',
+)
+
+
+def _ValidateSharedBufferSizeFlagValue(value: str) -> bool:
+  """Validates the shared buffer size flag's format."""
+  # Checks for one or more digits, optionally followed by B, K, M, or G.
+  return bool(re.fullmatch(r'^\d+[BKMG]?$', value))
+
+flags.register_validator(
+    _SHARED_BUFFER_SIZE,
+    _ValidateSharedBufferSizeFlagValue,
+    message=(
+        '--postgresql_shared_buffer_size must be in the format <size>[<unit>] '
+        'where <unit> is one of (B, K, M, G). Example: 16G, 512M, 1024K, 2048B.'
+    )
 )
 _MEASURE_MAX_QPS = flags.DEFINE_bool(
     'postgresql_measure_max_qps',
@@ -121,6 +139,16 @@ _CONF_TEMPLATE_PATH = flags.DEFINE_string(
     'postgresql/postgresql-custom.conf.j2',
     'Path to the postgresql conf template file.',
 )
+
+
+def GetBufferSize() -> str:
+  """Returns the buffer key for the given buffer size."""
+  buffer_size = _SHARED_BUFFER_SIZE.value
+  if buffer_size.endswith(
+      ('B', 'K', 'M', 'G')
+  ):
+    return buffer_size
+  return f'{buffer_size}G'
 
 
 def GetConfig(user_config):
@@ -185,7 +213,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   postgresql.ConfigureAndRestart(
       primary_server,
       FLAGS.run_uri,
-      _SHARED_BUFFER_SIZE.value,
+      GetBufferSize(),
       _CONF_TEMPLATE_PATH.value,
   )
   for index, replica in enumerate(replica_servers):
@@ -194,7 +222,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
         replica,
         index,
         FLAGS.run_uri,
-        _SHARED_BUFFER_SIZE.value,
+        GetBufferSize(),
         _CONF_TEMPLATE_PATH.value,
     )
   clients = benchmark_spec.vm_groups['client']

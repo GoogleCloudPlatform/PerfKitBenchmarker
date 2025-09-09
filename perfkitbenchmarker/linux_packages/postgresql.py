@@ -33,25 +33,25 @@ _POSTGRESQL_VERSION = flags.DEFINE_enum(
 
 SYSBENCH_PASSWORD = 'Syb3enCh#1'
 SHARED_BUFFERS_CONF = {
-    'SIZE_10GB': {
+    'SIZE_10G': {
         'shared_buffers': '10GB',
         'effective_cache_size': '30GB',
         'max_memory': '40G',
         'nr_hugepages': '5632',
     },
-    'SIZE_100GB': {
+    'SIZE_100G': {
         'shared_buffers': '100GB',
         'effective_cache_size': '112.5GB',
         'max_memory': '150G',
         'nr_hugepages': '52736',
     },
-    'SIZE_80GB': {  # run with 40M table size and 8 tables to write 80GB of data
+    'SIZE_80G': {  # run with 40M table size and 8 tables to write 80GB of data
         'shared_buffers': '80GB',
         'effective_cache_size': '90GB',
         'max_memory': '120G',
         'nr_hugepages': '45000',
     },
-    'SIZE_42GB': {
+    'SIZE_42G': {  # run with 21M table size and 8 tables to write 42GB of data
         'shared_buffers': '42GB',
         'effective_cache_size': '89.6GB',
         'max_memory': '108.8G',
@@ -215,7 +215,7 @@ def ConfigureAndRestart(vm, run_uri, buffer_size, conf_template_path):
   """
   conf_path = GetOSDependentDefaults(vm.OS_TYPE)['conf_dir']
   data_path = GetOSDependentDefaults(vm.OS_TYPE)['data_dir']
-  buffer_size_key = f'SIZE_{buffer_size}GB'
+  buffer_size_key = f'SIZE_{buffer_size}'
   remote_temp_config = '/tmp/my.cnf'
   postgres_conf_path = os.path.join(conf_path, 'postgresql-custom.conf')
   pg_hba_conf_path = os.path.join(conf_path, 'pg_hba.conf')
@@ -315,7 +315,7 @@ def SetupReplica(
     primary_vm, replica_vm, replica_id, run_uri, buffer_size, conf_template_path
 ):
   """Setup postgres replica."""
-  buffer_size_key = f'SIZE_{buffer_size}GB'
+  buffer_size_key = f'SIZE_{buffer_size}'
   data_path = GetOSDependentDefaults(replica_vm.OS_TYPE)['data_dir']
   conf_path = GetOSDependentDefaults(replica_vm.OS_TYPE)['conf_dir']
   replica_vm.RemoteCommand(f'sudo mkdir -p {data_path}')
