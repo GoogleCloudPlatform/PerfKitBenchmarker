@@ -624,50 +624,37 @@ class EksKarpenterCluster(BaseEksCluster):
     self._EksCtlCreate(create_json)
 
   def _InstallAwsLoadBalancerController(self) -> None:
-    """Install AWS Load Balancer Controller for the cluster.
-
-      - Associates the OIDC provider (IRSA).
-      - Reuses a customer-managed IAM policy if present; otherwise creates it
-        from the official policy JSON (pinned version).
-      - Ensures the ServiceAccount with the attached policy exists.
-      - Applies CRDs and installs/updates the Helm chart with a correct IngressClass.
-      - Waits for the controller rollout.
-    """
+    """Install AWS Load Balancer Controller for the cluster."""
     # 1) Ensure OIDC provider (IRSA)
     vm_util.IssueCommand([
         FLAGS.eksctl, 'utils', 'associate-iam-oidc-provider',
         f'--region={self.region}',
         f'--cluster={self.name}',
         '--approve',
-    ], raise_on_failure=False)
-
+    ], suppress_failure=lambda stdout, stderr, retcode: 'already associated' in stderr)
     # 2) Ensure the IAM policy exists (reuse by name or create)
     list_cmd = util.AWS_PREFIX + [
         'iam', 'list-policies', '--scope', 'Local',
         '--query', "Policies[?PolicyName=='AWSLoadBalancerControllerIAMPolicy'].Arn | [0]",
         '--output', 'text',
     ]
-    stdout, _, _ = vm_util.IssueCommand(list_cmd, raise_on_failure=False)
+    stdout, _, _ = vm_util.IssueCommand(list_cmd)
     policy_arn = (stdout or '').strip()
     if not policy_arn or policy_arn == 'None':
-        # Download the official policy JSON (pinned to a specific controller version).
         with vm_util.NamedTemporaryFile(dir=vm_util.GetTempDir(), mode='w') as tf:
             vm_util.IssueCommand([
                 'curl', '-sSL', '-o', tf.name,
                 'https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/'
                 'v2.13.4/docs/install/iam_policy.json',
-            ], raise_on_failure=True)
-            create_cmd = util.AWS_PREFIX + [
+            ])
+            stdout, _, _ = vm_util.IssueCommand(util.AWS_PREFIX + [
                 'iam', 'create-policy',
                 '--policy-name', 'AWSLoadBalancerControllerIAMPolicy',
                 '--policy-document', f'file://{tf.name}',
                 '--query', 'Policy.Arn', '--output', 'text',
-            ]
-            stdout, _, _ = vm_util.IssueCommand(create_cmd, raise_on_failure=True)
+            ])
             policy_arn = (stdout or '').strip()
-
-
-    # 3) Ensure ServiceAccount with the attached IAM policy (IRSA)
+    # 3) Ensure ServiceAccount
     vm_util.IssueCommand([
         FLAGS.eksctl, 'create', 'iamserviceaccount',
         '--cluster', self.name,
@@ -676,18 +663,17 @@ class EksKarpenterCluster(BaseEksCluster):
         '--attach-policy-arn', policy_arn,
         '--approve',
         '--override-existing-serviceaccounts',
-    ], raise_on_failure=False)
-
-    # 4) Ensure CRDs (safe to re-apply)
+    ], suppress_failure=lambda stdout, stderr, retcode: 'already exists' in stderr)
+    # 4) Apply CRDs
     container_service.RunKubectlCommand([
         'apply', '-k',
-        'github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=v2.13.4',
-    ], raise_on_failure=False)
-
-    # 5) Install/upgrade the Helm chart (creates a correct IngressClass 'alb')
-    vm_util.IssueCommand(['helm', 'repo', 'add', 'eks', 'https://aws.github.io/eks-charts'],
-                          raise_on_failure=False)
-    vm_util.IssueCommand(['helm', 'repo', 'update', 'eks'], raise_on_failure=False)
+        'github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master',
+    ], suppress_failure=lambda stdout, stderr, retcode: 'already exists' in stderr)
+    # 5) Install Helm chart
+    vm_util.IssueCommand([
+        'helm', 'repo', 'add', 'eks', 'https://aws.github.io/eks-charts'
+    ], suppress_failure=lambda stdout, stderr, retcode: 'already exists' in stderr)
+    vm_util.IssueCommand(['helm', 'repo', 'update', 'eks'])
     vm_util.IssueCommand([
         'helm', 'upgrade', '--install',
         'aws-load-balancer-controller', 'eks/aws-load-balancer-controller',
@@ -699,13 +685,12 @@ class EksKarpenterCluster(BaseEksCluster):
         '--set', f'region={self.region}',
         '--set', 'createIngressClassResource=true',
         '--set', 'ingressClass=alb',
-    ], raise_on_failure=True)
-
-    # 6) Wait for the controller to be ready (best-effort)
+    ])
+    # 6) Wait for rollout
     container_service.RunKubectlCommand([
         'rollout', 'status', 'deployment/aws-load-balancer-controller',
         '-n', 'kube-system', '--timeout=180s',
-    ], raise_on_failure=False)
+    ])
 
   def DeployIngress(self, name: str, namespace: str, port: int) -> str:
     """Deploys only Service + Ingress (without IngressClass) for AWS Load Balancer Controller."""
@@ -738,99 +723,48 @@ class EksKarpenterCluster(BaseEksCluster):
     return address
 
   def _PostIngressNetworkingFixups(self, namespace: str, name: str, port: int, address: str) -> None:
-    """Best-effort ALB/SG fixups once the Ingress has an address.
+    """Fix ALB -> nodes connectivity to prevent 504 errors from unhealthy targets."""
 
-    Steps (idempotent):
-      - Resolve the ALB security group from the Ingress hostname.
-      - Open port 80 on the ALB SG (public).
-      - Find node security groups for running instances in this cluster.
-      - Ensure the cluster tag on node SGs.
-      - Allow traffic from ALB SG to node SGs on the application port.
-    """
-    # 1) Find the ALB security group by Ingress DNS name.
-    # Ensure 80/tcp is open on the ALB security group
-    raw = (address or '').strip()
-    host = urlparse(raw).hostname if raw.startswith('http') else raw
+    # 1) Get ALB security group from address
+    host = urlparse(address).hostname if address.startswith('http') else address
     normalized = (host or '').replace('dualstack.', '')
     alb_sg = ''
-    lb_query = util.AWS_PREFIX + [
+    if not normalized:
+        raise errors.Config.InvalidValue(f'No valid hostname in address: {address}')
+    out, _ = vm_util.IssueRetryableCommand(util.AWS_PREFIX + [
         'elbv2', 'describe-load-balancers',
         '--region', self.region,
         '--query', f"LoadBalancers[?contains(DNSName, '{normalized}')].SecurityGroups[0]",
         '--output', 'text',
-    ]
-    # Resolve ALB Security Group with retries (up to 120s total).
-    try:
-        out, _, _ = vm_util.IssueRetryableCommand(
-            lb_query,
-            should_retry=lambda retcode, stdout, stderr: (stdout or '').strip() in ('', 'None'),
-            timeout=120,   # total wait time
-            delay=5        # seconds between retries
-        )
-        alb_sg = (out or '').strip()
-    except Exception:
-        logging.warning('[PKB][EKS] Could not resolve ALB SG for %s; skipping fixups', normalized)
-        return
-    if not alb_sg or alb_sg == 'None':
-        logging.warning('[PKB][EKS] Could not resolve ALB SG for %s; skipping fixups', normalized)
-        return
+    ], timeout=120)
     alb_sg = (out or '').strip()
-    if alb_sg and alb_sg != 'None':
-      vm_util.IssueCommand(util.AWS_PREFIX + [
-          'ec2', 'authorize-security-group-ingress',
-          '--region', self.region,
-          '--group-id', alb_sg,
-          '--protocol', 'tcp',
-          '--port', '80',
-          '--cidr', '0.0.0.0/0',
-      ], raise_on_failure=False)  # ok if rule already exists
-      logging.info('[PKB][EKS] Opened 80/tcp on ALB SG %s', alb_sg)
-    else:
-      logging.warning('[PKB][EKS] Could not resolve ALB SG for %s', address)
-
-    # 2) Collect node security groups for the actual running nodes (robust way).
-    #    Read instance IDs from Kubernetes node objects (spec.providerID),
-    #    then get SGs from those exact instances.
-    ids_out, _, _ = container_service.RunKubectlCommand([
-        'get', 'nodes',
-        '-o', 'jsonpath={.items[*].spec.providerID}',
-    ], raise_on_failure=False)
-
-    provider_ids = (ids_out or '').split()
-    instance_ids = []
-    for pid in provider_ids:
-        # Expected format: aws:///us-east-1a/i-0123456789abcdef0  -> take the last token
-        if '/' in pid:
-            instance_ids.append(pid.split('/')[-1])
-
-    instance_ids = sorted(set(i for i in instance_ids if i.startswith('i-')))
+    if not alb_sg or alb_sg == 'None':
+        raise errors.Resource.GetError(f'ALB security group not found for {normalized}')
+    # 2) Get node security groups from actual running instances
+    node_sgs = set()
+    ids_out, _ = vm_util.IssueRetryableCommand([
+        FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+        'get', 'nodes', '-o', 'jsonpath={.items[*].spec.providerID}',
+    ], timeout=120)
+    if not ids_out.strip():
+        raise errors.Resource.GetError('No nodes found in cluster')
+    # 3) Extract instance IDs
+    instance_ids = [pid.split('/')[-1] for pid in ids_out.split()
+                  if '/' in pid and pid.split('/')[-1].startswith('i-')]
     if not instance_ids:
-        return  # No nodes yet; Karpenter may scale later.
-
-    # Describe those instances and collect unique SG IDs.
-    desc_cmd = util.AWS_PREFIX + [
+        raise errors.Resource.GetError('No valid instance IDs found from nodes')
+    out, _, _ = vm_util.IssueCommand(util.AWS_PREFIX + [
         'ec2', 'describe-instances',
         '--region', self.region,
         '--instance-ids', *instance_ids,
         '--query', 'Reservations[].Instances[].SecurityGroups[].GroupId',
         '--output', 'text',
-    ]
-    out, _, _ = vm_util.IssueCommand(desc_cmd, raise_on_failure=False)
-    node_sgs = set((out or '').split())
-    if not node_sgs:
-        return
-
-    # 3) Ensure cluster tag and allow ALB->nodes on the app port.
-    for sg in sorted(node_sgs):
-        # Tag: kubernetes.io/cluster/<name>=owned (safe to repeat).
-        vm_util.IssueCommand(util.AWS_PREFIX + [
-            'ec2', 'create-tags',
-            '--region', self.region,
-            '--resources', sg,
-            '--tags', f'Key=kubernetes.io/cluster/{self.name},Value=owned',
-        ], raise_on_failure=False)
-
-        # Allow traffic from ALB SG to nodes on the application port.
+    ])
+    if not out.strip():
+        raise errors.Resource.GetError(f'No security groups found for instances: {instance_ids}')
+    node_sgs = set(out.split())
+    # 4) CRITICAL: Allow ALB to reach nodes on app port (fixes 504 errors)
+    for sg in node_sgs:
         vm_util.IssueCommand(util.AWS_PREFIX + [
             'ec2', 'authorize-security-group-ingress',
             '--region', self.region,
@@ -838,7 +772,8 @@ class EksKarpenterCluster(BaseEksCluster):
             '--protocol', 'tcp',
             '--port', str(port),
             '--source-group', alb_sg,
-        ], raise_on_failure=False)
+        ], suppress_failure=lambda stdout, stderr, retcode: 'already exists' in stderr)
+    logging.info('[PKB][EKS] Allowed ALB SG %s -> node SGs on port %s', alb_sg, port)
 
   def _PostCreate(self):
     """Performs post-creation steps for the cluster."""
@@ -873,7 +808,8 @@ class EksKarpenterCluster(BaseEksCluster):
         '--wait',
     ])
     # Ensure ALB ingress support: install AWS Load Balancer Controller.
-    self._InstallAwsLoadBalancerController()
+    if FLAGS.eks_install_alb_controller:
+        self._InstallAwsLoadBalancerController()
     # Get the AMI version for current kubernetes version.
     # See e.g. https://karpenter.sh/docs/tasks/managing-amis/ for not using
     # @latest.
@@ -911,7 +847,32 @@ class EksKarpenterCluster(BaseEksCluster):
     )
 
   def _Delete(self):
-    """Deletes the control plane and worker nodes."""
+    """Deletes ALB, the control plane and worker nodes."""
+    # Delete ingress to remove ALB
+    vm_util.IssueCommand([
+        FLAGS.kubectl,
+        '--kubeconfig',
+        FLAGS.kubeconfig,
+        'delete',
+        'ingress',
+        '--all',
+        '--all-namespaces',
+        '--timeout=30s',
+    ], suppress_failure=lambda stdout, stderr, retcode: (
+        'deleted' in stdout and 'timed out waiting for the condition' in stderr
+    ))
+    # Remove Karpenter finalizers (to be updated)
+    # vm_util.IssueCommand([
+    #     FLAGS.kubectl,
+    #     '--kubeconfig',
+    #     FLAGS.kubeconfig,
+    #     'patch',
+    #     'nodeclaim',
+    #     '--all',
+    #     '--type=merge',
+    #     '-p',
+    #     '{"metadata":{"finalizers":[]}}',
+    # ], timeout=30, suppress_failure=lambda stdout, stderr, retcode: True)
     super()._Delete()
     cmd = [
         FLAGS.eksctl,
