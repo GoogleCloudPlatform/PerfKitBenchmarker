@@ -861,18 +861,6 @@ class EksKarpenterCluster(BaseEksCluster):
     ], suppress_failure=lambda stdout, stderr, retcode: (
         'deleted' in stdout and 'timed out waiting for the condition' in stderr
     ))
-    # Remove Karpenter finalizers (to be updated)
-    # vm_util.IssueCommand([
-    #     FLAGS.kubectl,
-    #     '--kubeconfig',
-    #     FLAGS.kubeconfig,
-    #     'patch',
-    #     'nodeclaim',
-    #     '--all',
-    #     '--type=merge',
-    #     '-p',
-    #     '{"metadata":{"finalizers":[]}}',
-    # ], timeout=30, suppress_failure=lambda stdout, stderr, retcode: True)
     super()._Delete()
     cmd = [
         FLAGS.eksctl,
