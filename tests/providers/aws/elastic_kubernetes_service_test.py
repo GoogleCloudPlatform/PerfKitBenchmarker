@@ -202,35 +202,26 @@ class ElasticKubernetesServiceTest(BaseEksTest):
     self.MockIssueCommand({
         'eksctl get nodegroup': [(
             json.dumps([
-                {"Name": "default"},
-                {"Name": "nodegroup1"},
-                {"Name": "nodegroup2"}
+                {'Name': 'default'},
+                {'Name': 'nodegroup1'},
+                {'Name': 'nodegroup2'},
             ]),
             '',
-            0
+            0,
         )],
     })
     self.assertEqual(
-        cluster.GetNodePoolNames(),
-        ['default', 'nodegroup1', 'nodegroup2']
+        cluster.GetNodePoolNames(), ['default', 'nodegroup1', 'nodegroup2']
     )
 
   def testGetNodePoolNamesKarpenter(self):
     cluster = elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
     self.MockIssueCommand({
-        'kubectl get nodepool': [(
-            json.dumps([
-                {"name": "karpenter-ng"},
-                {"name": "default"}
-            ]),
-            '',
-            0
-        )]
+        'kubectl get nodepool': [
+            (json.dumps([{'name': 'karpenter-ng'}, {'name': 'default'}]), '', 0)
+        ]
     })
-    self.assertEqual(
-        cluster.GetNodePoolNames(),
-        ['karpenter-ng', 'default']
-    )
+    self.assertEqual(cluster.GetNodePoolNames(), ['karpenter-ng', 'default'])
 
   @parameterized.named_parameters(
       ('default nodepool', 'default', 'default'),

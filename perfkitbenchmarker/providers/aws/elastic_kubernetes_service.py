@@ -323,25 +323,31 @@ class BaseEksCluster(container_service.KubernetesCluster):
         f'jsonpath={container_service.INGRESS_JSONPATH}',
     ])
     return self._GetAddressFromIngress(stdout)
-  
+
   def GetNodePoolNames(self) -> list[str]:
     """Get node pool names for the cluster."""
 
     cmd = [
-        FLAGS.eksctl, "get", "nodegroup",
-        "--cluster", self.name,
-        "--region", self.region,
-        "-o", "json"
+        FLAGS.eksctl,
+        'get',
+        'nodegroup',
+        '--cluster',
+        self.name,
+        '--region',
+        self.region,
+        '-o',
+        'json',
     ]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd)
     if retcode:
-      logging.warning("Failed to get nodegroups: %s, error: %s", stdout, stderr)
+      logging.warning('Failed to get nodegroups: %s, error: %s', stdout, stderr)
       return []
     nodegroups = json.loads(stdout)
-    return [ng["Name"] for ng in nodegroups]
-  
+    return [ng['Name'] for ng in nodegroups]
+
   def AddNodepool(self, batch_name, pool_id):
     pass
+
 
 class EksCluster(BaseEksCluster):
   """Class representing an Elastic Kubernetes Service cluster."""
@@ -361,8 +367,12 @@ class EksCluster(BaseEksCluster):
       vm_config: virtual_machine.BaseVirtualMachine,
       nodepool_config: container_service.BaseNodePoolConfig,
   ):
-    nodepool_config.disk_type = vm_config.DEFAULT_ROOT_DISK_TYPE  # pytype: disable=attribute-error
-    nodepool_config.disk_size = vm_config.boot_disk_size  # pytype: disable=attribute-error
+    nodepool_config.disk_type = (
+        vm_config.DEFAULT_ROOT_DISK_TYPE
+    )  # pytype: disable=attribute-error
+    nodepool_config.disk_size = (
+        vm_config.boot_disk_size
+    )  # pytype: disable=attribute-error
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -657,9 +667,7 @@ class EksKarpenterCluster(BaseEksCluster):
             }],
         },
         'iamIdentityMappings': [{
-            'arn': (
-                f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}'
-            ),
+            'arn': f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}',
             'username': 'system:node:{{EC2PrivateDNSName}}',
             'groups': ['system:bootstrappers', 'system:nodes'],
         }],
@@ -787,21 +795,26 @@ class EksKarpenterCluster(BaseEksCluster):
     """
     cmd = [
         FLAGS.kubectl,
-        "--kubeconfig", FLAGS.kubeconfig,
-        "get", "nodepool",
-        "-o", "json"
+        '--kubeconfig',
+        FLAGS.kubeconfig,
+        'get',
+        'nodepool',
+        '-o',
+        'json',
     ]
     stdout, stderr, retcode = vm_util.IssueCommand(cmd)
     if retcode:
-      logging.warning("Failed to get Karpenter NodePools: %s, error: %s", stdout, stderr)
+      logging.warning(
+          'Failed to get Karpenter NodePools: %s, error: %s', stdout, stderr
+      )
       return []
     nodepools = json.loads(stdout)
-    return [item["metadata"]["name"] for item in nodepools.get("items", [])]
+    return [item['metadata']['name'] for item in nodepools.get('items', [])]
 
   def AddNodepool(self, batch_name, pool_id):
     self.ApplyManifest(
-        "provision_node_pools/karpenter/nodepool.yaml.j2",
+        'provision_node_pools/karpenter/nodepool.yaml.j2',
         batch_name=batch_name,
         pool_id=pool_id,
-        cluster_name=self.name
+        cluster_name=self.name,
     )
