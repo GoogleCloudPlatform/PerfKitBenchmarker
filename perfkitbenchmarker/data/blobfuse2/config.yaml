@@ -1,0 +1,29 @@
+# Pipeline configuration. Choose components to be engaged. The order below is the priority order that needs to be followed.
+logging:
+  level: log_warning
+
+components:
+  - libfuse
+  - file_cache
+  - attr_cache
+  - azstorage
+
+libfuse:
+  attribute-expiration-sec: 0
+  entry-expiration-sec: 0
+  negative-entry-expiration-sec: 0
+
+file_cache:
+  path: /opt/pkb
+  timeout-sec: 0
+  max-size-mb: -1
+
+attr_cache:
+  timeout-sec: 0
+
+# Azure storage configuration
+azstorage:
+  type: block
+  mode: key
+  account-name: {{ account_name }}
+  account-key: {{ account_key }}

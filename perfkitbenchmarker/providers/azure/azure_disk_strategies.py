@@ -21,10 +21,13 @@ import time
 from typing import Any
 from absl import flags
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
+from perfkitbenchmarker.providers.azure import azure_blob_storage
 from perfkitbenchmarker.providers.azure import azure_disk
+from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
 virtual_machine = Any  # pylint: disable=invalid-name
@@ -157,6 +160,8 @@ class AzureCreateNonResourceDiskStrategy(
       return disk_strategies.SetUpSMBDiskStrategy(self.vm, self.disk_spec)
     elif self.disk_spec.disk_type == disk.LUSTRE:
       return AzLustreSetupDiskStrategy(self.vm, self.disk_spec)
+    elif self.disk_spec.disk_type == disk.OBJECT_STORAGE:
+      return AzureSetUpBlobFuseDiskStrategy(self.vm, self.disk_spec)
 
     return disk_strategies.EmptySetupDiskStrategy(self.vm, self.disk_spec)
 
@@ -291,3 +296,48 @@ class AzLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
     vm = self.vm
     super().SetUpDiskOnLinux()
     vm.RemoteCommand('echo "module load mpi/hpcx" >> .bashrc')
+
+
+class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
+  """Strategies to set up Azure Blob Containers."""
+
+  DEFAULT_MOUNT_OPTIONS = [
+      '--tmp-path /opt/pkb'
+  ]
+
+  def SetUpDiskOnLinux(self):
+    """Performs setup of Blobfuse2 containers on Linux."""
+    self.vm.Install('blobfuse2')
+    target = self.disk_spec.mount_point
+    self.vm.RemoteCommand(f'sudo mkdir -p {target} && sudo chmod a+w {target}')
+
+    opts = ' '.join(self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options)
+    bucket_name = (
+        FLAGS.object_storage_fuse_bucket_name
+        or f'blobfuse2-{FLAGS.run_uri.lower()}'
+    )
+    blob_spec = azure_blob_storage.BlobStorageContainerSpec(
+        mount_point=target,
+        bucket_name=bucket_name,
+        region=util.GetRegionFromZone(self.vm.zone),
+        zone=self.vm.zone,
+    )
+    blob_client = azure_blob_storage.BlobStorageContainer(blob_spec)
+    if not FLAGS.object_storage_fuse_bucket_name:
+      blob_client.Create()
+
+    local_path = data.ResourcePath('blobfuse2/config.yaml')
+    remote_path = 'blobfuse2_config.yaml'
+    context = {
+        'account_name': blob_client.service.storage_account.name,
+        'account_key': blob_client.service.storage_account.key,
+    }
+    self.vm.RenderTemplate(
+        template_path=local_path, remote_path=remote_path,
+        context=context
+    )
+    self.vm.RemoteCommand(
+        f'sudo blobfuse2 mount {target} --config-file={remote_path} '
+        f'--container-name={bucket_name} {opts}'
+    )
+    self.vm.scratch_disks.append(blob_client)

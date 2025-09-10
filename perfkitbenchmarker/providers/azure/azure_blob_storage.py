@@ -32,6 +32,29 @@ FLAGS = flags.FLAGS
 DEFAULT_AZURE_REGION = 'eastus2'
 
 
+class BlobStorageContainerSpec(object_storage_service.BaseBucketSpec):
+  """Properties of a Blob Storage Container."""
+
+  CLOUD = provider_info.AZURE
+
+
+class BlobStorageContainer(object_storage_service.Bucket):
+  """Blob Storage Container Resource containing AzureBlobStorageService."""
+
+  def __init__(self, bucket_spec):
+    super().__init__(bucket_spec)
+    self.service = AzureBlobStorageService()
+
+  def _Create(self):
+    self.service.PrepareService(self.region)
+    self.service.MakeBucket(self.bucket_name)
+
+  def _Delete(self):
+    self.service.CleanupService()
+    self.service.EmptyBucket(self.bucket_name)
+    self.service.DeleteBucket(self.bucket_name)
+
+
 class AzureBlobStorageService(object_storage_service.ObjectStorageService):
   """Interface to Azure Blob Storage.
 
