@@ -227,13 +227,14 @@ def WriteJobFileToTempFile(vm, job_file_string):
   return job_file_path
 
 
-def RunTest(vm, exec_path, job_file_string):
+def RunTest(vm, exec_path, job_file_string, metadata=None):
   """Runs the fio test on the VM using the provided executable path.
 
   Args:
     vm: a linux_virtual_machine.BaseLinuxMixin object.
     exec_path: string path to the fio executable.
     job_file_string: string content of the fio job file.
+    metadata: Extra metadata to annotate the samples with.
 
   Returns:
     A list of sample.Sample objects.
@@ -264,6 +265,7 @@ def RunTest(vm, exec_path, job_file_string):
   samples = result_parser.ParseResults(
       job_file_string,
       json.loads(stdout),
+      base_metadata=metadata,
   )
 
   samples.append(

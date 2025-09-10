@@ -125,6 +125,10 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   latency_target = _ParseIntLatencyTargetAsMicroseconds(
       fio_flags.FIO_LATENCY_TARGET.value
   )
+  base_metadata = {
+      'latency_target': fio_flags.FIO_LATENCY_TARGET.value,
+      'latency_percentile': fio_flags.FIO_LATENCY_PERCENTILE.value,
+  }
   while left_iodepth <= right_iodepth:
     iodepth = (left_iodepth + right_iodepth) // 2
     benchmark_params['iodepth'] = iodepth
@@ -134,7 +138,9 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
         benchmark_params,
         JOB_FILE,
     )
-    samples = utils.RunTest(vm, constants.FIO_PATH, job_file_str)
+    samples = utils.RunTest(
+        vm, constants.FIO_PATH, job_file_str, metadata=base_metadata
+    )
     latency_at_percentile_samples = GetLatencyPercentileSample(samples)
     iops_samples = GetIopsSamples(samples)
     iodepth_details[iodepth] = ConstructLatencyIopsMap(
