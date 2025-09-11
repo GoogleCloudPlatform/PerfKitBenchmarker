@@ -623,7 +623,7 @@ class EksKarpenterCluster(BaseEksCluster):
     self._EksCtlCreate(create_json)
 
   def _InstallAwsLoadBalancerController(self) -> None:
-    """Install AWS Load Balancer Controller for the cluster."""
+    """Installs AWS Load Balancer Controller for the cluster."""
     # 1) Ensure OIDC provider (IRSA)
     vm_util.IssueCommand([
         FLAGS.eksctl, 'utils', 'associate-iam-oidc-provider',
@@ -668,7 +668,7 @@ class EksKarpenterCluster(BaseEksCluster):
         'apply', '-k',
         'github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master',
     ], suppress_failure=lambda stdout, stderr, retcode: 'already exists' in stderr)
-    # 5) Install Helm chart
+    # 5) Installs Helm chart
     vm_util.IssueCommand([
         'helm', 'repo', 'add', 'eks', 'https://aws.github.io/eks-charts'
     ], suppress_failure=lambda stdout, stderr, retcode: 'already exists' in stderr)
@@ -695,7 +695,7 @@ class EksKarpenterCluster(BaseEksCluster):
     """Deploys only Service + Ingress (without IngressClass) for AWS Load Balancer Controller."""
     # Apply the custom manifest template (service + ingress with annotations).
     self.ApplyManifest(
-        'container/kubernetes_hpa/ingress_alb.yaml.j2',
+        'container/karpenter/ingress_alb.yaml.j2',
         name=name,
         namespace=namespace,
         port=port,
@@ -722,7 +722,7 @@ class EksKarpenterCluster(BaseEksCluster):
     return address
 
   def _PostIngressNetworkingFixups(self, namespace: str, name: str, port: int, address: str) -> None:
-    """Fix ALB -> nodes connectivity to prevent 504 errors from unhealthy targets."""
+    """Fixs ALB -> nodes connectivity to prevent 504 errors from unhealthy targets."""
 
     # 1) Get ALB security group from address
     host = urlparse(address).hostname if address.startswith('http') else address
@@ -806,7 +806,7 @@ class EksKarpenterCluster(BaseEksCluster):
         'logLevel=debug',
         '--wait',
     ])
-    # Ensure ALB ingress support: install AWS Load Balancer Controller.
+    # Ensure ALB ingress support: installs AWS Load Balancer Controller.
     if FLAGS.eks_install_alb_controller:
         self._InstallAwsLoadBalancerController()
     # Get the AMI version for current kubernetes version.
@@ -856,7 +856,7 @@ class EksKarpenterCluster(BaseEksCluster):
         'ingress',
         '--all',
         '--all-namespaces',
-        '--timeout=30s',
+        '--timeout=300s',
     ], suppress_failure=lambda stdout, stderr, retcode: (
         'deleted' in stdout and 'timed out waiting for the condition' in stderr
     ))
