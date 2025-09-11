@@ -217,9 +217,16 @@ class ElasticKubernetesServiceTest(BaseEksTest):
   def testGetNodePoolNamesKarpenter(self):
     cluster = elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
     self.MockIssueCommand({
-        'kubectl get nodepool': [
-            (json.dumps([{'name': 'karpenter-ng'}, {'name': 'default'}]), '', 0)
-        ]
+        'kubectl --kubeconfig  get nodepool -o json': [(
+            json.dumps({
+                'items': [
+                    {'metadata': {'name': 'karpenter-ng'}},
+                    {'metadata': {'name': 'default'}},
+                ]
+            }),
+            '',
+            0,
+        )]
     })
     self.assertEqual(cluster.GetNodePoolNames(), ['karpenter-ng', 'default'])
 
