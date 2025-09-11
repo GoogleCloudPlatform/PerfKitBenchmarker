@@ -856,8 +856,8 @@ class EksKarpenterCluster(BaseEksCluster):
         'ingress',
         '--all',
         '--all-namespaces',
-        '--timeout=300s',
-    ], suppress_failure=lambda stdout, stderr, retcode: (
+        '--timeout=600s',
+    ], timeout=660, suppress_failure=lambda stdout, stderr, retcode: (
         'deleted' in stdout and 'timed out waiting for the condition' in stderr
     ))
     super()._Delete()
