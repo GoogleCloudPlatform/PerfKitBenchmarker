@@ -65,6 +65,7 @@ import logging
 import multiprocessing
 from os.path import isfile
 import pickle
+import platform
 import random
 import re
 import sys
@@ -1973,6 +1974,14 @@ def Main(argv):
   assert sys.version_info >= (3, 11), 'PerfKitBenchmarker requires Python 3.11+'
   log_util.ConfigureBasicLogging()
   _InjectBenchmarkInfoIntoDocumentation()
+
+  # Fix multiprocessing on macOS to use 'fork' instead of 'spawn'
+  # to avoid pickle errors with local functions issue #5883
+  if platform.system() == 'Darwin':
+    try:
+      multiprocessing.set_start_method('fork', force=True)
+    except RuntimeError:
+      pass
 
   if FLAGS.helpmatch:
     _PrintHelp(FLAGS.helpmatch)
