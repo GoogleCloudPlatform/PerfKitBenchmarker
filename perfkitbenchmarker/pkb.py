@@ -1509,13 +1509,9 @@ class ZoneRetryManager:
     """Changes zone to be a new zone in the different region."""
     region = self._utils.GetRegionFromZone(self._GetCurrentZoneFlag())
     self._regions_tried.add(region)
-    regions_to_try = (
-        {
-            self._utils.GetRegionFromZone(zone)
-            for zone in self._supported_zones
-        }
-        - self._regions_tried
-    )
+    regions_to_try = {
+        self._utils.GetRegionFromZone(zone) for zone in self._supported_zones
+    } - self._regions_tried
     # Restart from empty if we've exhausted all alternatives.
     if not regions_to_try:
       self._regions_tried.clear()
@@ -1727,8 +1723,7 @@ def _GenerateBenchmarkDocumentation():
   """Generates benchmark documentation to show in --help."""
   benchmark_docs = []
   for benchmark_module in (
-      linux_benchmarks.BENCHMARKS
-      + windows_benchmarks.BENCHMARKS
+      linux_benchmarks.BENCHMARKS + windows_benchmarks.BENCHMARKS
   ):
     benchmark_config = configs.LoadMinimalConfig(
         benchmark_module.BENCHMARK_CONFIG, benchmark_module.BENCHMARK_NAME
@@ -1978,10 +1973,7 @@ def Main(argv):
   # Fix multiprocessing on macOS to use 'fork' instead of 'spawn'
   # to avoid pickle errors with local functions issue #5883
   if platform.system() == 'Darwin':
-    try:
-      multiprocessing.set_start_method('fork', force=True)
-    except RuntimeError:
-      pass
+    multiprocessing.set_start_method('fork', force=True)
 
   if FLAGS.helpmatch:
     _PrintHelp(FLAGS.helpmatch)
