@@ -35,6 +35,7 @@ from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import sysbench
 
 FLAGS = flags.FLAGS
@@ -677,6 +678,14 @@ def _GetSysbenchRunCommand(
   return run_cmd
 
 
+class PostgresConnectionError(Exception):
+  pass
+
+
+@vm_util.Retry(
+    max_retries=5,
+    retryable_exceptions=(PostgresConnectionError,),
+)
 def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
   """Issues a sysbench run command given a vm and a duration.
 
@@ -692,6 +701,11 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
 
   Returns:
     stdout, stderr: the result of the command.
+
+  Raises:
+    PostgresConnectionError: If a temporary failure in name resolution occurs
+      during the command execution.
+    errors.Benchmarks.RunError: If sysbench fails for any other reason.
   """
   stdout = ''
   stderr = ''
@@ -699,7 +713,19 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
     run_cmd = _GetSysbenchRunCommand(
         duration, benchmark_spec.relational_db, sysbench_thread_count
     )
-    stdout, stderr = vm.RobustRemoteCommand(run_cmd, timeout=duration + 60)
+    stdout, stderr = vm.RobustRemoteCommand(
+        run_cmd,
+        timeout=duration + 60,
+        ignore_failure=True,
+    )
+    if stderr:
+      if 'Temporary failure in name resolution' in stderr:
+        raise PostgresConnectionError(
+            'Temporary failure in name resolution, retrying'
+        )
+      raise errors.Benchmarks.RunError(
+          f'Failure when running sysbench:\n{stderr}'
+      )
     logging.info(
         'Sysbench results: \n stdout is:\n%s\nstderr is\n%s', stdout, stderr
     )
