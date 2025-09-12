@@ -565,7 +565,7 @@ class EksAutoCluster(BaseEksCluster):
     # Autopilot does not support nodepools & manual resizes.
     pass
 
-  def GetNodeSelectors(self) -> list[str]:
+  def GetNodeSelectors(self, machine_family: str | None = None) -> list[str]:
     """Get the node selectors section of a yaml for the provider."""
     # Theoretically needed in mixed mode, but deployments fail without it:
     # https://docs.aws.amazon.com/eks/latest/userguide/associate-workload.html#_require_a_workload_is_deployed_to_eks_auto_mode_nodes
@@ -758,6 +758,6 @@ class EksKarpenterCluster(BaseEksCluster):
     """Change the number of nodes in the node group."""
     raise NotImplementedError()
 
-  def GetNodeSelectors(self) -> list[str]:
+  def GetNodeSelectors(self, machine_family: str | None = None) -> list[str]:
     """Get the node selectors section of a yaml for the provider."""
     return []

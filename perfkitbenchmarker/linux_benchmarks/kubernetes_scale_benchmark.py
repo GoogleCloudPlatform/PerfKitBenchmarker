@@ -175,7 +175,9 @@ def ScaleUpPods(
       EphemeralStorageRequest='10Mi',
       RolloutTimeout=max_wait_time,
       PodTimeout=max_wait_time + 60,
-      NodeSelectors=cluster.GetNodeSelectors(),
+      NodeSelectors=cluster.GetNodeSelectors(
+          cluster.default_nodepool.machine_type
+      ),
   )
 
   # Arbitrarily pick the first resource (it should be the only one.)

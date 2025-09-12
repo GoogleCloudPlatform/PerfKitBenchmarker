@@ -562,9 +562,16 @@ class GkeAutopilotCluster(BaseGkeCluster):
     metadata['nodepools'] = self.CLUSTER_TYPE
     return metadata
 
-  def GetNodeSelectors(self) -> list[str]:
+  def GetNodeSelectors(self, machine_family: str | None = None) -> list[str]:
     """Node selectors for instance capabilites in AutoPilot clusters."""
     selectors = []
+    if machine_family:
+      selectors += [
+          f'cloud.google.com/machine-family: {machine_family}',
+          # Mandate one pod per node, which also handles packing small pods into
+          # bigger nodes.
+          'cloud.google.com/compute-class: Performance',
+      ]
     # https://cloud.google.com/kubernetes-engine/docs/how-to/autopilot-gpus#request-gpus
     if virtual_machine.GPU_TYPE.value:
       gpu_count = virtual_machine.GPU_COUNT.value or 1
