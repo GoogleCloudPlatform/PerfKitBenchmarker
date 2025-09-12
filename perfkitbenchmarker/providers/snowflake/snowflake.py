@@ -586,7 +586,7 @@ class Snowflake(edw_service.EdwService):
     )
     self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     _, meta = self.client_interface.ExecuteQuery(query_name, print_results=True)
-    qres = int(meta['output']['COVERAGE_PERCENTAGE'])
+    qres = int(meta['query_results']['COVERAGE_PERCENTAGE'][0])
     return qres, meta
 
   def InitializeSearchStarterTable(
@@ -632,7 +632,7 @@ class Snowflake(edw_service.EdwService):
     )
     self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     _, meta = self.client_interface.ExecuteQuery(query_name, print_results=True)
-    qres = int(meta['output']['TOTAL_ROW_COUNT'])
+    qres = int(meta['query_results']['TOTAL_ROW_COUNT'][0])
     return qres, meta
 
   def TextSearchQuery(
@@ -655,9 +655,13 @@ class Snowflake(edw_service.EdwService):
     )
 
     meta['edw_search_index_coverage_percentage'] = int(
-        meta['output']['COVERAGE_PERCENTAGE']
+        meta['query_results']['COVERAGE_PERCENTAGE'][0]
     )
-    meta['edw_search_result_rows'] = int(meta['output']['RESULT_ROWS'])
-    meta['edw_search_total_row_count'] = int(meta['output']['TOTAL_ROW_COUNT'])
+    meta['edw_search_result_rows'] = int(
+        meta['query_results']['RESULT_ROWS'][0]
+    )
+    meta['edw_search_total_row_count'] = int(
+        meta['query_results']['TOTAL_ROW_COUNT'][0]
+    )
 
     return res, meta
