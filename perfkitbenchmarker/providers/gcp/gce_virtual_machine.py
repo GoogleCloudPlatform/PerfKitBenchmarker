@@ -663,19 +663,17 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.metadata['gce_egress_bandwidth_tier'] = (
           self.gce_egress_bandwidth_tier
       )
-    if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
-      # TODO(pclay): remove when on-host-maintenance gets promoted to GA
-      cmd.use_alpha_gcloud = True
-      if gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value == 'sev':
-        cmd.flags.update({'confidential-compute-type': 'SEV'})
-      cmd.flags.update({'on-host-maintenance': 'TERMINATE'})
 
-    elif self.on_host_maintenance:
-      # TODO(pclay): remove when on-host-maintenance gets promoted to GA
-      maintenance_flag = 'maintenance-policy'
-      if cmd.use_alpha_gcloud:
-        maintenance_flag = 'on-host-maintenance'
+    # TODO(pclay): remove when on-host-maintenance gets promoted to GA
+    maintenance_flag = 'maintenance-policy'
+    if cmd.use_alpha_gcloud:
+      maintenance_flag = 'on-host-maintenance'
+    if self.on_host_maintenance:
       cmd.flags[maintenance_flag] = self.on_host_maintenance
+
+    if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
+      if gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value == 'sev':
+        cmd.flags['confidential-compute-type'] = 'SEV'
 
     if self.network.subnet_resources:
       net_resources = self.network.subnet_resources

@@ -425,6 +425,7 @@
 -   Add support for specifying GCE provisioning model
 -   Add support for NVMe local SSDs in GKE.
 -   Add support for cluster to wait the resource on multiple conditions
+-   Add support for enabling live migration on AMD SEV
 
 ### Bug fixes and maintenance updates:
 

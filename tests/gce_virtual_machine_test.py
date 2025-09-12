@@ -713,6 +713,16 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertEqual(call_count, 1)
 
+  def testMigrateOnMaintenanceFlagTrueWithSev(self):
+    cmd, call_count = self._CreateVmCommand(
+        gce_migrate_on_maintenance=True,
+        gce_confidential_compute=True,
+        gce_confidential_compute_type='sev',
+    )
+    self.assertEqual(call_count, 1)
+    self.assertIn('--maintenance-policy', cmd)
+    self.assertIn('MIGRATE', cmd)
+
   def testAcceleratorTypeOverrideFlag(self):
     cmd, call_count = self._CreateVmCommand(
         gce_accelerator_type_override='fake_type', gpu_count=1, gpu_type='k80'
