@@ -485,6 +485,7 @@ diskspd_read_only:
   flags: &diskspd_read_only_flags
     diskspd_prefill_duration: 2700
     diskspd_write_read_ratio: 0
+    after_prepare_sleep_time: 300 # Wait after the prepare phase for prefill to complete.
 
 diskspd_write_only:
   name: diskspd
