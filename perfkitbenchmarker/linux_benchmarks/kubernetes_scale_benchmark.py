@@ -413,6 +413,10 @@ def _SummarizeTimestamps(timestamps: list[float]) -> dict[str, float]:
 
 def Cleanup(_):
   """Cleanups scale benchmark. Runs before teardown."""
+  container_service.RunKubectlCommand(['get', 'deployments'])
+  container_service.RunRetryableKubectlCommand(
+      ['delete', 'deployment', 'kubernetes-scaleup'], timeout=_GetScaleTimeout()
+  )
   container_service.RunRetryableKubectlCommand(
       ['delete', '--all', 'pods', '-n', 'default'], timeout=_GetScaleTimeout()
   )
