@@ -352,6 +352,51 @@ class _IndexSearchQuerySubmitter:
     )
 
 
+def _FetchQueryPercentageUntilEvent(
+    service: edw_service.EdwService,
+    table_name: str,
+    index_name: str,
+    ingestion_finished: threading.Event,
+    bench_meta: dict[Any, Any] | None = None,
+) -> list[sample.Sample]:
+  # TODO(odiego): Review this fn
+  """Fetches index completion percentage until ingestion finishes.
+
+  Polls the index status and records a sample the first time each coverage
+  percentage is seen. Stops when the event is set.
+
+  Args:
+    service: The EdwService instance to use for checking index status.
+    table_name: The name of the table containing the index.
+    index_name: The name of the index to monitor.
+    ingestion_finished: A threading.Event-like object to signal when to stop.
+    bench_meta: Metadata to add to the collected samples.
+
+  Returns:
+    A list of sample.Sample objects representing the time to reach each
+    index coverage percentage.
+  """
+  if bench_meta is None:
+    bench_meta = {}
+  samples: list[sample.Sample] = []
+  bench_meta = bench_meta.copy()
+  bench_meta["benchmark_stage"] = "ingestion"
+  while not ingestion_finished.is_set():
+    percentage, query_meta = service.GetSearchIndexCompletionPercentage(
+        table_name, index_name
+    )
+    samples.append(
+        sample.Sample(
+            "current_index_percentage",
+            percentage,
+            "percent",
+            bench_meta | query_meta,
+        )
+    )
+    time.sleep(30)
+  return samples
+
+
 def _WaitForIndexCompletion(
     service: edw_service.EdwService,
     table_name: str,
@@ -526,14 +571,27 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
             (ingestion_finished, _QUERY_INTERVAL_SEC.value),
             {"bench_meta": {"search_query_block": "ingestion"} | gen_metadata},
         ),
+        (
+            _FetchQueryPercentageUntilEvent,
+            (
+                edw_service_instance,
+                edw_service.EDW_SEARCH_TABLE_NAME.value,
+                edw_service.EDW_SEARCH_INDEX_NAME.value,
+                ingestion_finished,
+            ),
+            {"bench_meta": gen_metadata},
+        ),
     ]
-    ingestion_samples, search_query_samples = (
-        background_tasks.RunParallelProcesses(
-            tasks, background_tasks.MAX_CONCURRENT_THREADS
-        )
+    (
+        ingestion_samples,
+        search_query_samples,
+        index_percentage_samples,
+    ) = background_tasks.RunParallelProcesses(
+        tasks, background_tasks.MAX_CONCURRENT_THREADS
     )
   samples += ingestion_samples
   samples += search_query_samples
+  samples += index_percentage_samples
 
   if _INDEX_WAIT.value:
     logging.info("Waiting for index to reach 100% coverage on full dataset")
