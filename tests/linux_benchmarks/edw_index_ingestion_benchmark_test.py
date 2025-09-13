@@ -19,6 +19,7 @@ from unittest import mock
 import freezegun
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker.linux_benchmarks import edw_index_ingestion_benchmark
+from perfkitbenchmarker.providers.snowflake import snowflake
 from tests import pkb_common_test_case
 
 
@@ -40,8 +41,10 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         self.mock_service, 'test_table', 'test_index', 'test_query'
     )
 
-  def test_execute_data_load(self):
+  @mock.patch('multiprocessing.current_process')
+  def test_execute_data_load(self, mock_current_process):
     # Configure mocks
+    mock_current_process.return_value.name = 'not_main'
     self.mock_service.GetTableRowCount.side_effect = [
         (0, {}),
         (100, {}),
@@ -57,12 +60,40 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         target_row_count=200,
         interval=0.01,
         ingestion_finished=self.event,
+        ingestion_warehouse=None,
     )
 
     # Assertions
     self.assertTrue(self.mock_service.InsertSearchData.called)
     self.assertLen(samples, 2)
     self.assertTrue(self.event.is_set())
+
+  @mock.patch('multiprocessing.current_process')
+  def test_execute_data_load_with_snowflake_warehouse(
+      self, mock_current_process
+  ):
+    # Configure mocks
+    mock_current_process.return_value.name = 'not_main'
+    mock_snowflake_service = mock.create_autospec(snowflake.Snowflake)
+    mock_snowflake_service.GetTableRowCount.side_effect = [
+        (0, {}),
+        (200, {}),
+    ]
+    mock_snowflake_service.InsertSearchData.return_value = (1.0, {})
+
+    # Call the function
+    edw_index_ingestion_benchmark._ExecuteDataLoad(
+        mock_snowflake_service,
+        'test_table',
+        'test_path',
+        target_row_count=200,
+        interval=0.01,
+        ingestion_finished=self.event,
+        ingestion_warehouse='test_warehouse',
+    )
+    mock_snowflake_service.SetWarehouse.assert_called_once_with(
+        'test_warehouse'
+    )
 
   def test_execute_search_query_n_times(self):
     # Configure mocks

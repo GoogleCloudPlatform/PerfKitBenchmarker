@@ -53,7 +53,10 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import edw_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.configs import benchmark_config_spec as pkb_benchmark_config_spec
+from perfkitbenchmarker.providers.snowflake import snowflake
 
 
 BENCHMARK_NAME = "edw_index_ingestion_benchmark"
@@ -111,6 +114,15 @@ _INDEX_WAIT = flags.DEFINE_boolean(
     "debug runs.",
 )
 
+_SNOWFLAKE_INGESTION_WAREHOUSE = flags.DEFINE_string(
+    "snowflake_ingestion_warehouse",
+    None,
+    "Separate warehouse to send ingestion queries, per their recommendation:"
+    " https://docs.snowflake.com/en/user-guide/data-load-considerations-plan#dedicating-separate-warehouses-to-load-and-query-operations."
+    " If unset, will just use the same warehouse set with"
+    " --snowflake_warehouse.",
+)
+
 FLAGS = flags.FLAGS
 
 
@@ -124,6 +136,19 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
     The benchmark configuration.
   """
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+
+
+def CheckPrerequisites(
+    benchmark_config_spec: pkb_benchmark_config_spec.BenchmarkConfigSpec,
+) -> None:
+  edw_service_type: str = benchmark_config_spec.edw_service.type  # pytype: disable=attribute-error
+  if _SNOWFLAKE_INGESTION_WAREHOUSE.value and not edw_service_type.startswith(
+      "snowflake"
+  ):
+    raise errors.Config.InvalidValue(
+        "--snowflake_ingestion_warehouse is only valid for Snowflake EDW"
+        " services."
+    )
 
 
 def Prepare(spec: benchmark_spec.BenchmarkSpec):
@@ -148,6 +173,7 @@ def _ExecuteDataLoad(
     target_row_count: int,
     interval: float,
     ingestion_finished: threading.Event,
+    ingestion_warehouse: str | None,
 ) -> list[sample.Sample]:
   """Executes data insertion queries in a loop.
 
@@ -164,6 +190,8 @@ def _ExecuteDataLoad(
     interval: The time in seconds to wait between data insertion calls.
     ingestion_finished: A threading.Event-like object to signal when the loading
       process is finished.
+    ingestion_warehouse: The name of the warehouse to use for ingestion queries
+      (Snowflake only).
 
   Returns:
     A list of sample.Sample objects representing the execution time of each
@@ -171,6 +199,16 @@ def _ExecuteDataLoad(
   """
   try:
     logging.info("Starting data loading loop")
+    cur_process = multiprocessing.current_process()
+    assert cur_process.name != "MainProcess", (
+        "Expected to run this function on its own subprocess, since it may try"
+        " to re-configure the EDW service instance (to change Snowflake's"
+        " warehouse), which would otherwise affect other functions of the"
+        " benchmark undesirably."
+    )
+    if ingestion_warehouse:
+      assert isinstance(service, snowflake.Snowflake)
+      service.SetWarehouse(ingestion_warehouse)
     samples = []
     i = 0
     current_rows, _ = service.GetTableRowCount(table_name)
@@ -479,6 +517,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
                 _TARGET_ROW_COUNT.value,
                 _LOAD_INTERVAL_SEC.value,
                 ingestion_finished,
+                _SNOWFLAKE_INGESTION_WAREHOUSE.value,
             ),
             {},
         ),

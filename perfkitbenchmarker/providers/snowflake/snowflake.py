@@ -618,7 +618,9 @@ class Snowflake(edw_service.EdwService):
         context,
     )
     self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
-    return self.client_interface.ExecuteQuery(query_name, print_results=True)
+    # Snowflake returns info for each csv file processed, which pollutes logs
+    # and datapoints needlessly. So print_results=False.
+    return self.client_interface.ExecuteQuery(query_name, print_results=False)
 
   def GetTableRowCount(self, table_path: str) -> tuple[int, dict[str, Any]]:
     query_name = 'get_row_count'
@@ -665,3 +667,11 @@ class Snowflake(edw_service.EdwService):
     )
 
     return res, meta
+
+  def SetWarehouse(self, warehouse: str):
+    """Switches Snowflake Warehouse."""
+    assert isinstance(
+        self.client_interface, (PythonClientInterface, JdbcClientInterface)
+    )
+    self.warehouse = warehouse
+    self.client_interface.warehouse = warehouse
