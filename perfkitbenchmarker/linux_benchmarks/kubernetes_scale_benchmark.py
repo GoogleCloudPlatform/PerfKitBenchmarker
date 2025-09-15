@@ -108,8 +108,10 @@ def _GetRolloutCreationTime(rollout_name: str) -> int:
 
 def _GetScaleTimeout() -> int:
   """Returns the timeout for the scale up & teardown."""
-  base_timeout = 60 * 10
-  per_pod_timeout = NUM_PODS.value * 3
+  base_timeout = 60 * 10  # 10 minutes
+  per_pod_timeout = NUM_PODS.value * 3  # 3 seconds per pod
+  if virtual_machine.GPU_COUNT.value:
+    base_timeout = 60 * 30  # 30 minutes
   proposed_timeout = base_timeout + per_pod_timeout
   max_timeout = 2 * 60 * 60  # 2 hours
   return min(proposed_timeout, max_timeout)
@@ -243,8 +245,14 @@ def _CheckForFailures(
       (s for s in pod_samples if s.metric == 'pod_Ready_count'), None
   )
   if ready_count_sample is None:
+    if NUM_PODS.value < 5:
+      raise errors.Benchmarks.QuotaFailure(
+          f'Attempted to request {NUM_PODS.value} pods, but no pods were'
+          ' created. For a scheduled test, this is likely a quota issue.'
+      )
     raise errors.Benchmarks.RunError(
-        'No pod ready events were found; this should almost never happen.'
+        'No pod ready events were found & we attempted to scale up to'
+        f' {NUM_PODS.value} pods; this is unusual.'
     )
   if ready_count_sample.value >= NUM_PODS.value:
     logging.info(
