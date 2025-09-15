@@ -79,9 +79,13 @@ def AptInstall(vm):
       ' mysql-apt-config_0.8.17-1_all.deb'
   )
 
-  _, stderr = vm.RemoteCommand('sudo apt-get update', ignore_failure=True)
+  _, stderr, code = vm.RemoteCommandWithReturnCode(
+      'sudo apt-get update', ignore_failure=True
+  )
 
-  if stderr:
+  # Sometimes apt prints a warning to stderr but still succeeds. If we try to
+  # fix it, we can break future apt and dpkg commands.
+  if code and stderr:
     if 'public key is not available:' in stderr:
       # This error is due to mysql updated the repository and the public
       # key is not updated.
