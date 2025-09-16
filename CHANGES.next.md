@@ -252,6 +252,7 @@
     performance of inference server (vllm etc.) hosted in k8s cluster.
 -   Add option for benchmarks to implement three-part prepare flow instead of
     single Prepare function.
+-   Add support for the `--addons` flag in GKE Standard.
 
 ### Enhancements:
 

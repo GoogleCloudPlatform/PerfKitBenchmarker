@@ -331,6 +331,8 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append('--enable-shielded-nodes')
     else:
       cmd.args.append('--no-enable-shielded-nodes')
+    if gcp_flags.GKE_ADDONS.value:
+      cmd.args.append(f'--addons={gcp_flags.GKE_ADDONS.value}')
     if not self.release_channel:
       cmd.args.append('--no-enable-autoupgrade')
     self._AddNodeParamsToCmd(
