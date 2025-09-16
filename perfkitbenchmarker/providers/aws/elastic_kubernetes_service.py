@@ -324,6 +324,30 @@ class BaseEksCluster(container_service.KubernetesCluster):
     ])
     return self._GetAddressFromIngress(stdout)
 
+  def GetNodePoolNames(self) -> list[str]:
+    """Get node pool names for the cluster."""
+
+    cmd = [
+        FLAGS.eksctl,
+        'get',
+        'nodegroup',
+        '--cluster',
+        self.name,
+        '--region',
+        self.region,
+        '-o',
+        'json',
+    ]
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+    if retcode:
+      logging.warning('Failed to get nodegroups: %s, error: %s', stdout, stderr)
+      return []
+    nodegroups = json.loads(stdout)
+    return [ng['Name'] for ng in nodegroups]
+
+  def AddNodepool(self, batch_name, pool_id):
+    pass
+
 
 class EksCluster(BaseEksCluster):
   """Class representing an Elastic Kubernetes Service cluster."""
@@ -761,3 +785,35 @@ class EksKarpenterCluster(BaseEksCluster):
   def GetNodeSelectors(self, machine_family: str | None = None) -> list[str]:
     """Get the node selectors section of a yaml for the provider."""
     return []
+
+  def GetNodePoolNames(self) -> list[str]:
+    """Get node pool names for the cluster.
+
+    Returns:
+      All CRD NodePool names created by Karpenter.
+    """
+    cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig',
+        FLAGS.kubeconfig,
+        'get',
+        'nodepool',
+        '-o',
+        'json',
+    ]
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+    if retcode:
+      logging.warning(
+          'Failed to get Karpenter NodePools: %s, error: %s', stdout, stderr
+      )
+      return []
+    nodepools = json.loads(stdout)
+    return [item['metadata']['name'] for item in nodepools.get('items', [])]
+
+  def AddNodepool(self, batch_name, pool_id):
+    self.ApplyManifest(
+        'provision_node_pools/karpenter/nodepool.yaml.j2',
+        batch_name=batch_name,
+        pool_id=pool_id,
+        cluster_name=self.name,
+    )
