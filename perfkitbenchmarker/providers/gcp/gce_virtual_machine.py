@@ -502,6 +502,17 @@ def GetArmArchitecture(machine_type):
   return _MACHINE_TYPE_PREFIX_TO_ARM_ARCH.get(prefix)
 
 
+def IsLiveMigratableConfidentialCompute(machine_type: str):
+  """Returns True if the provided machine type is both confidential computing and can have its maintenance policy set to MIGRATE."""
+  family = machine_type.split('-')[0]
+  match gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value:
+    case 'sev':
+      return family in (
+          'n2d',
+      )
+  return False
+
+
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
@@ -589,27 +600,34 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_shielded_secure_boot = FLAGS.gce_shielded_secure_boot
     # Default to GCE default (Live Migration)
     self.on_host_maintenance = None
-    # https://cloud.google.com/compute/docs/instances/live-migration#gpusmaintenance
-    # https://cloud.google.com/compute/docs/instances/define-instance-placement#restrictions
+    # https://cloud.google.com/compute/docs/instances/live-migration-process#limitations
+    # https://cloud.google.com/compute/docs/instances/placement-policies-overview#restrictions
     # TODO(pclay): Update if this assertion ever changes
     if (
         FLAGS['gce_migrate_on_maintenance'].present
         and FLAGS.gce_migrate_on_maintenance
-        and (self.gpu_count or self.network.placement_group)
+        and (self.gpu_count or self.network.placement_group or self.preemptible)
     ):
       raise errors.Config.InvalidValue(
-          'Cannot set flag gce_migrate_on_maintenance on instances with GPUs '
-          'or network placement groups, as it is not supported by GCP.'
+          'Cannot set flag gce_migrate_on_maintenance on instances with GPUs,'
+          ' network placement groups, or preemption, as it is not supported by'
+          ' GCP.'
       )
     if (
-        not FLAGS.gce_migrate_on_maintenance
-        or self.gpu_count
+        self.gpu_count
         or self.network.placement_group
         or self.preemptible
+        or (
+            gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value
+            and not IsLiveMigratableConfidentialCompute(self.machine_type)
+        )
     ):
       self.on_host_maintenance = 'TERMINATE'
-    else:
-      self.on_host_maintenance = 'MIGRATE'
+    elif FLAGS['gce_migrate_on_maintenance'].present:
+      if FLAGS.gce_migrate_on_maintenance:
+        self.on_host_maintenance = 'MIGRATE'
+      else:
+        self.on_host_maintenance = 'TERMINATE'
 
     self.automatic_restart = FLAGS.gce_automatic_restart
     if self.preemptible:

@@ -694,6 +694,16 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(call_count, 1)
     self.assertIn('--preemptible', cmd)
 
+  def testMigrateOnMaintenanceFlagNotPresent(self):
+    print('GCEVMFlagsTestCase testMigrateOnMaintenanceFlagNotPresent')
+    cmd, call_count = self._CreateVmCommand(
+        # gce_migrate_on_maintenance is None
+    )
+    self.assertEqual(call_count, 1)
+    self.assertNotIn('--maintenance-policy', cmd)
+    self.assertNotIn('TERMINATE', cmd)
+    self.assertNotIn('MIGRATE', cmd)
+
   def testMigrateOnMaintenanceFlagTrueWithGpus(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       self._CreateVmCommand(
@@ -702,22 +712,26 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         str(cm.exception),
         (
-            'Cannot set flag gce_migrate_on_maintenance on instances with GPUs '
-            'or network placement groups, as it is not supported by GCP.'
+            'Cannot set flag gce_migrate_on_maintenance on instances with GPUs,'
+            ' network placement groups, or preemption, as it is not supported'
+            ' by GCP.'
         ),
     )
 
   def testMigrateOnMaintenanceFlagFalseWithGpus(self):
-    _, call_count = self._CreateVmCommand(
+    cmd, call_count = self._CreateVmCommand(
         gce_migrate_on_maintenance=False, gpu_count=1, gpu_type='k80'
     )
     self.assertEqual(call_count, 1)
+    self.assertIn('--maintenance-policy', cmd)
+    self.assertIn('TERMINATE', cmd)
 
   def testMigrateOnMaintenanceFlagTrueWithSev(self):
     cmd, call_count = self._CreateVmCommand(
         gce_migrate_on_maintenance=True,
         gce_confidential_compute=True,
         gce_confidential_compute_type='sev',
+        machine_type='n2d-standard-2',
     )
     self.assertEqual(call_count, 1)
     self.assertIn('--maintenance-policy', cmd)
@@ -789,7 +803,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('total-egress-bandwidth-tier=TIER_1', cmd)
 
   def testAlphaMaintenanceFlag(self):
-    """Tests that egress bandwidth can be set as tier 1."""
+    """Tests that migrate on maintenance sets the correct flag in alpha."""
     gcloud_init = util.GcloudCommand.__init__
 
     def InitAndSetAlpha(self, resource, *args):
@@ -797,9 +811,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.use_alpha_gcloud = True
 
     with mock.patch.object(util.GcloudCommand, '__init__', InitAndSetAlpha):
-      cmd, call_count = self._CreateVmCommand(
-          gce_egress_bandwidth_tier='TIER_1', gpu_count=1, gpu_type='k80'
-      )
+      cmd, call_count = self._CreateVmCommand(gce_migrate_on_maintenance=True)
     self.assertEqual(call_count, 1)
     self.assertIn('--on-host-maintenance', cmd)
 
@@ -1132,8 +1144,6 @@ message: The zone 'projects/artemis-prod/zones/us-central1-b' does not have enou
       self.assertIn(
           'type=nvidia-tesla-k80,count=2', issue_command.call_args[0][0]
       )
-      self.assertIn('--maintenance-policy', issue_command.call_args[0][0])
-      self.assertIn('TERMINATE', issue_command.call_args[0][0])
 
 
 class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):
