@@ -152,6 +152,7 @@ class BaseWGServingInferenceServer(
         backend=self.spec.model_server,
         tokenizer_id=self.tokenizer_id,
         service_port=str(self.service_port),
+        model_id_from_path=self.model_id_from_path,
     )
 
   def _RefreshDeploymentMetadata(self) -> None:
@@ -626,6 +627,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         model_path = self.spec.extra_deployment_args.get('model-path', None)
         if model_path:
           self.model_id_from_path = '/data/models/' + model_path
+      if not hasattr(self, 'model_id_from_path') or not self.model_id_from_path:
+        self.model_id_from_path = None
     except (KeyError, IndexError, TypeError, StopIteration) as e:
       logging.exception(
           'Error parsing MODEL_ID from deployment %s, Please ensure the'

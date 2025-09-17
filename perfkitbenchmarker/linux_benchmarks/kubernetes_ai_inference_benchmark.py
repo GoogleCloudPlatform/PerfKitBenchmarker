@@ -145,9 +145,6 @@ def Run(
     RunInferenceBenchmark(cluster, server.GetCallableServer(), output_path)
     metrics += _CollectBenchmarkResult(server, output_path)
 
-  if 'vllm' in server.spec.model_server:
-    metrics += GetVLLMModelLoadTime(server)
-
   return metrics
 
 
@@ -311,9 +308,14 @@ def GetVLLMModelLoadTime(
     else:
       pod_name = pod
     result_stdout = server.GetStartupLogsFromPod(pod_name)
-    init_time, model_load_time, application_start_time = (
-        _ParseModelLoadTimeMetrics(server, result_stdout, pod_name)
-    )
+    if _IsUsingTPU(server.spec.catalog_components):
+      init_time, model_load_time, application_start_time = (
+          _ParseTPUModelLoadTimeMetrics(server, result_stdout, pod_name)
+      )
+    else:
+      init_time, model_load_time, application_start_time = (
+          _ParseModelLoadTimeMetrics(server, result_stdout, pod_name)
+      )
     init_times.append(init_time)
     model_load_times.append(model_load_time)
     application_start_times.append(application_start_time)
@@ -344,6 +346,68 @@ def GetVLLMModelLoadTime(
           time,
       ),
   ]
+
+
+def _ParseTPUModelLoadTimeMetrics(
+    server: k8s_server.WGServingInferenceServer,
+    result_stdout: str,
+    pod_name: str,
+) -> Tuple[float, float, float]:
+  """Parse the model load time metrics from the logs."""
+  model_load_start_timestamp = None
+  model_load_end_timestamp = None
+  vllm_start_timestamp = None
+  log_lines = result_stdout.splitlines()
+  events = server.cluster.GetEvents()
+  startup_event = None
+  for event in events:
+    if (
+        event.resource.kind == 'Pod'
+        and event.resource.name == pod_name
+        and 'Started container inference-server' in event.message
+    ):
+      startup_event = event
+  if startup_event is None:
+    raise ValueError(
+        f'No events found for pod {pod_name} with message "Started container'
+        ' inference-server".'
+    )
+  container_init_timestamp = _FormatUTCTimeStampToLocalTime(
+      server,
+      startup_event.timestamp,
+  )
+  for line in log_lines:
+    # Check model load start timestamp
+    if (
+        'Downloading weights from HF' in line
+        or 'Found weights from local' in line
+    ) and model_load_start_timestamp is None:
+      model_load_start_timestamp = _ParseInferenceServerTimeStamp(line)
+    # Check model load end timestamp
+    if 'Compilation finished in' in line:
+      model_load_end_timestamp = _ParseInferenceServerTimeStamp(line)
+    # Check when overall container starts
+    if 'Starting vLLM API server' in line:
+      vllm_start_timestamp = _ParseInferenceServerTimeStamp(line)
+      break
+  if container_init_timestamp is None:
+    raise ValueError('Container init timestamp is not found in the logs.')
+  if model_load_start_timestamp is None:
+    raise ValueError('Model load start timestamp is not found in the logs.')
+  if model_load_end_timestamp is None:
+    raise ValueError('Model load end timestamp is not found in the logs.')
+  if vllm_start_timestamp is None:
+    raise ValueError('VLLM start timestamp is not found in the logs.')
+  init_time = GetTimeDifference(
+      container_init_timestamp, model_load_start_timestamp
+  )
+  model_load_time = GetTimeDifference(
+      model_load_start_timestamp, model_load_end_timestamp
+  )
+  application_start_time = GetTimeDifference(
+      model_load_end_timestamp, vllm_start_timestamp
+  )
+  return init_time, model_load_time, application_start_time
 
 
 def _ParseModelLoadTimeMetrics(
@@ -443,6 +507,24 @@ def _ParseInferenceServerTimeStamp(log_line: str) -> Optional[str]:
     logging.warning('Failed to parse timestamp from log: %s', log_line)
     return None
   return match.group(0)
+
+
+def _IsUsingTPU(components: str) -> bool:
+  """Returns whether the components are using TPU.
+
+  TPU component format: v<version>e-<rows>x<cols>
+  Examples of TPU components:
+  v6e-2x4
+  v5e-2x4
+
+  Args:
+    components: The components of the inference server, separated by commas.
+
+  Returns:
+    Whether the components are using TPU.
+  """
+  pattern = re.compile(r'v\d+e-\d+x\d+')
+  return bool(pattern.search(components))
 
 
 def _FormatUTCTimeStampToLocalTime(

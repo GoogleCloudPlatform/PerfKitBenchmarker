@@ -19,6 +19,7 @@ class InferenceServerEndpoint:
   backend: str | None = None
   tokenizer_id: str | None = None
   service_port: str | None = None
+  model_id_from_path: str | None = None
 
 
 class BaseKubernetesInferenceServer(pkb_resource.BaseResource):
@@ -61,3 +62,4 @@ def GetKubernetesInferenceServer(
         'Failed to find inference server resource for type: %s' % spec.type
     )
   return inference_server_class(spec, cluster)
+

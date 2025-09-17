@@ -288,6 +288,83 @@ class KubernetesAiInferenceBenchmarkTest(
     dt_str_format = local_dt.strftime('%H:%M:%S')
     self.assertEqual(local_timestamp, dt_str_format)
 
+  def test_is_using_tpu(self):
+    # TPU component format: v<version>e-<rows>x<cols>
+    # Examples of TPU components:
+    # v6e-2x4
+    # v5e-2x4
+
+    self.assertTrue(
+        kubernetes_ai_inference_benchmark._IsUsingTPU(
+            'v6e-2x4,gcsfuse,spot'
+        )
+    )
+    self.assertFalse(
+        kubernetes_ai_inference_benchmark._IsUsingTPU(
+            '8-H100-80GB,gcsfuse,spot'
+        )
+    )
+
+  def test_tpu_get_model_load_time(self):
+    logs = """22:17:30 Found weights from local: /data/models/vllm_models/llama3-8b-hf
+    22:17:32 Precompile select_hidden_states --> num_tokens=256 | num_reqs=32
+    22:17:52 Compilation finished in 0.17 [secs].
+    22:19:00 Starting vLLM API server 0 on http://0.0.0.0:8000
+    """
+    startup_event = container_service.KubernetesEvent(
+        resource=container_service.KubernetesEventResource(
+            kind='Pod',
+            name='pod1',
+        ),
+        reason='Started',
+        message='Started container inference-server',
+        timestamp=datetime.datetime(
+            2025, 7, 18, 22, 17, 1, tzinfo=tz
+        ).timestamp(),
+    )
+    mock_k8s_server = self._create_mock_k8s_server(hpa_enabled=False)
+    mock_k8s_server.app_selector = 'vllm_inference_server'
+    mock_k8s_server.spec.catalog_components = 'v6e-2x4,gcsfuse,spot'
+    mock_k8s_server.cluster.GetResourceMetadataByName.return_value = [
+        'pod1',
+    ]
+    mock_k8s_server.cluster.GetEvents.return_value = [startup_event]
+    mock_k8s_server.GetStartupLogsFromPod.side_effect = [
+        logs,
+    ]
+    results = kubernetes_ai_inference_benchmark.GetVLLMModelLoadTime(
+        mock_k8s_server
+    )
+    fake_timestamp = mock_k8s_server.model_load_timestamp
+    metadata = {
+        'hpa_enabled': False,
+        'num_pods': 1,
+    }
+    expected_results = [
+        sample.Sample(
+            'ai_inference_container_init_time',
+            29.0,
+            'seconds',
+            metadata,
+            fake_timestamp,
+        ),
+        sample.Sample(
+            'ai_inference_storage_model_load_time',
+            22.0,
+            'seconds',
+            metadata,
+            fake_timestamp,
+        ),
+        sample.Sample(
+            'ai_inference_post_model_load_to_start_time',
+            68.0,
+            'seconds',
+            metadata,
+            fake_timestamp,
+        ),
+    ]
+    self.assertEqual(results, expected_results)
+
   def test_get_model_load_time_single_pod(self):
     first_call_logs = """22:17:30 Starting to load model /data/models/llama3-8b-hf...
     22:17:52 Model loading took 14.9596 GiB and 21.619846 seconds
