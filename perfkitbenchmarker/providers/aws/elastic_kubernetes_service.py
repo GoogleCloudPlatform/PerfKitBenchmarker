@@ -773,7 +773,7 @@ class EksKarpenterCluster(BaseEksCluster):
     return 'Kubernetes control plane' in stdout and 'is running at' in stdout
 
   def GetDefaultStorageClass(self) -> str:
-    """Get the default storage class for the provider."""
+    """Gets the default storage class for the provider."""
     return aws_disk.GP2
 
   def ResizeNodePool(
@@ -783,11 +783,14 @@ class EksKarpenterCluster(BaseEksCluster):
     raise NotImplementedError()
 
   def GetNodeSelectors(self, machine_family: str | None = None) -> list[str]:
-    """Get the node selectors section of a yaml for the provider."""
+    """Gets the node selectors section of a yaml for the provider."""
+    if machine_family:
+      machine_family = util.GetMachineFamily(machine_family)
+      return [f'karpenter.k8s.aws/instance-family: {machine_family}']
     return []
 
   def GetNodePoolNames(self) -> list[str]:
-    """Get node pool names for the cluster.
+    """Gets node pool names for the cluster.
 
     Returns:
       All CRD NodePool names created by Karpenter.
