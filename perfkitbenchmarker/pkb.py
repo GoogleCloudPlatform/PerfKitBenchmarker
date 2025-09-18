@@ -955,6 +955,88 @@ def DoTeardownPhase(
   events.after_phase.send(stages.TEARDOWN, benchmark_spec=spec)
 
 
+def DoPrepareSystemPhase(
+    spec: bm_spec.BenchmarkSpec,
+    timer: timing_util.IntervalTimer,
+):
+  """Performs the prepare system phase of benchmark execution.
+
+  This runs configuration steps that should always happen on the host system,
+  even if the benchmark will run in a VM or container.
+
+  Args:
+    spec: The BenchmarkSpec created for the benchmark.
+    timer: An IntervalTimer that measures the start and stop times of resource
+      teardown.
+  """
+  logging.info('Preparing system for benchmark %s', spec.name)
+  events.before_phase.send(stages.PREPARE_SYSTEM, benchmark_spec=spec)
+
+  if not spec.BenchmarkPrepareSystem:
+    raise errors.Benchmarks.PrepareException(
+        'Benchmark does not define PrepareSystem.'
+    )
+
+  with timer.Measure('Prepare System'):
+    spec.BenchmarkPrepareSystem(spec)
+
+  events.after_phase.send(stages.PREPARE_SYSTEM, benchmark_spec=spec)
+
+
+def DoInstallPackagesPhase(
+    spec: bm_spec.BenchmarkSpec,
+    timer: timing_util.IntervalTimer,
+):
+  """Performs the install packages phase of benchmark execution.
+
+  This installs the packages needed to run the benchmark.
+
+  Args:
+    spec: The BenchmarkSpec created for the benchmark.
+    timer: An IntervalTimer that measures the start and stop times of resource
+      teardown.
+  """
+  logging.info('Installing packages for benchmark %s', spec.name)
+  events.before_phase.send(stages.INSTALL_PACKAGES, benchmark_spec=spec)
+
+  if not spec.BenchmarkInstallPackages:
+    raise errors.Benchmarks.PrepareException(
+        'Benchmark does not define InstallPackages.'
+    )
+
+  with timer.Measure('Install Packages'):
+    spec.BenchmarkInstallPackages(spec)
+
+  events.after_phase.send(stages.INSTALL_PACKAGES, benchmark_spec=spec)
+
+
+def DoStartServicesPhase(
+    spec: bm_spec.BenchmarkSpec,
+    timer: timing_util.IntervalTimer,
+):
+  """Performs the start services phase of benchmark execution.
+
+  This starts the services needed to run the benchmark.
+
+  Args:
+    spec: The BenchmarkSpec created for the benchmark.
+    timer: An IntervalTimer that measures the start and stop times of resource
+      teardown.
+  """
+  logging.info('Starting services for benchmark %s', spec.name)
+  events.before_phase.send(stages.START_SERVICES, benchmark_spec=spec)
+
+  if not spec.BenchmarkStartServices:
+    raise errors.Benchmarks.PrepareException(
+        'Benchmark does not define StartServices.'
+    )
+
+  with timer.Measure('Start Services'):
+    spec.BenchmarkStartServices(spec)
+
+  events.after_phase.send(stages.START_SERVICES, benchmark_spec=spec)
+
+
 def _SkipPendingRunsFile():
   if FLAGS.skip_pending_runs_file and isfile(FLAGS.skip_pending_runs_file):
     logging.warning(
@@ -1113,6 +1195,18 @@ def RunBenchmark(
             DoPreparePhase(spec, detailed_timer)
             interrupt_checker.EndCheckInterruptThreadAndRaiseError()
             interrupt_checker = None
+
+          if stages.PREPARE_SYSTEM in FLAGS.run_stage:
+            current_run_stage = stages.PREPARE_SYSTEM
+            DoPrepareSystemPhase(spec, detailed_timer)
+
+          if stages.INSTALL_PACKAGES in FLAGS.run_stage:
+            current_run_stage = stages.INSTALL_PACKAGES
+            DoInstallPackagesPhase(spec, detailed_timer)
+
+          if stages.START_SERVICES in FLAGS.run_stage:
+            current_run_stage = stages.START_SERVICES
+            DoStartServicesPhase(spec, detailed_timer)
 
           if stages.RUN in FLAGS.run_stage:
             current_run_stage = stages.RUN

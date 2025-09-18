@@ -19,21 +19,50 @@ from absl import flags
 
 
 PROVISION = 'provision'
+PREPARE_SYSTEM = 'prepare_system'
+INSTALL_PACKAGES = 'install_packages'
+START_SERVICES = 'start_services'
 PREPARE = 'prepare'
 RUN = 'run'
 CLEANUP = 'cleanup'
 TEARDOWN = 'teardown'
 
+# The stages run in this order:
+#   provision -> prepare -> run -> cleanup -> teardown
+# However, you can replace the prepare stage with three stages:
+#   install_packages -> prepare_system -> start_services
+# You can skip any of the three, but the ones you run must be in that order.
+# It is not valid to do prepare *and* the above three, these are distinct paths.
+
 STAGES = [PROVISION, PREPARE, RUN, CLEANUP, TEARDOWN]
 
 _NEXT_STAGE = {
-    PROVISION: [PREPARE, TEARDOWN],
+    PROVISION: [
+        PREPARE,
+        INSTALL_PACKAGES,
+        PREPARE_SYSTEM,
+        START_SERVICES,
+        TEARDOWN,
+    ],
     PREPARE: [RUN, CLEANUP],
+    INSTALL_PACKAGES: [PREPARE_SYSTEM, START_SERVICES, RUN, CLEANUP],
+    PREPARE_SYSTEM: [START_SERVICES, RUN, CLEANUP],
+    START_SERVICES: [RUN, CLEANUP],
     RUN: [CLEANUP],
     CLEANUP: [TEARDOWN],
 }
 _ALL = 'all'
-_VALID_FLAG_VALUES = PROVISION, PREPARE, RUN, CLEANUP, TEARDOWN, _ALL
+_VALID_FLAG_VALUES = (
+    PROVISION,
+    PREPARE,
+    RUN,
+    CLEANUP,
+    TEARDOWN,
+    PREPARE_SYSTEM,
+    INSTALL_PACKAGES,
+    START_SERVICES,
+    _ALL,
+)
 
 
 _SYNTACTIC_HELP = (
@@ -109,6 +138,22 @@ class RunStageParser(flags.ListParser):
             )
         )
       previous_stage = stage
+
+    if PREPARE in stage_list and (
+        PREPARE_SYSTEM in stage_list
+        or INSTALL_PACKAGES in stage_list
+        or START_SERVICES in stage_list
+    ):
+      raise ValueError(
+          "Unable to parse {}. '{}' should not be run with '{}' or '{}' or"
+          " '{}'".format(
+              repr(argument),
+              PREPARE,
+              PREPARE_SYSTEM,
+              INSTALL_PACKAGES,
+              START_SERVICES,
+          )
+      )
 
     return stage_list
 

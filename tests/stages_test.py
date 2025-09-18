@@ -56,6 +56,32 @@ class RunStageParserTestCase(unittest.TestCase):
   def testList(self):
     self.assertEqual(self._parser.parse(['prepare', 'run']), ['prepare', 'run'])
 
+  def testThreePartPrepare(self):
+    self.assertEqual(
+        self._parser.parse('install_packages,prepare_system,start_services'),
+        ['install_packages', 'prepare_system', 'start_services'],
+    )
+
+  def testInstallPackagesWithoutStartServices(self):
+    self.assertEqual(
+        self._parser.parse('install_packages,run'),
+        ['install_packages', 'run'],
+    )
+
+  def testProvisionAndInstallPackages(self):
+    self.assertEqual(
+        self._parser.parse('provision,install_packages'),
+        ['provision', 'install_packages'],
+    )
+
+  def testPrepareIsNotAllowedWithThreePartPrepare(self):
+    with self.assertRaises(ValueError):
+      self._parser.parse('prepare,prepare_system')
+    with self.assertRaises(ValueError):
+      self._parser.parse('prepare,install_packges')
+    with self.assertRaises(ValueError):
+      self._parser.parse('prepare,start_services')
+
 
 if __name__ == '__main__':
   unittest.main()
