@@ -677,6 +677,27 @@ def RunThreaded(
   )
 
 
+def RunOnAllVms(target, vms):
+  """Runs the target method in parallel threads on all VMs.
+
+  If there are duplicate vms in the list, only run the method once on each of
+  them.
+
+  Args:
+    target: The method to invoke in the thread.
+    vms: A list of VMs.
+
+  Returns:
+    None
+  """
+
+  unique_vms = []
+  for vm in vms:
+    if vm not in unique_vms:
+      unique_vms.append(vm)
+  RunThreaded(target, unique_vms)
+
+
 def RunParallelProcesses(
     target_arg_tuples, max_concurrency, post_process_delay=0
 ):

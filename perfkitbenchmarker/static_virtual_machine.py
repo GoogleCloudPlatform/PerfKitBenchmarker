@@ -164,6 +164,17 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.from_pool = False
     self.preemptible = False
 
+  def __eq__(self, other):
+    if not isinstance(other, StaticVirtualMachine):
+      return False
+    # If two VMs have the same IP address and SSH port, then they're the same
+    # because any command we run on one will be sent the same place as commands
+    # to the other.
+    return (
+        self.ssh_port == other.ssh_port
+        and self.GetConnectionIp() == other.GetConnectionIp()
+    )
+
   def _Suspend(self):
     """Suspends VM."""
     raise NotImplementedError()

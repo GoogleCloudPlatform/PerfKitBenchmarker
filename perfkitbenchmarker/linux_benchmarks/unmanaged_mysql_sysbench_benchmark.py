@@ -244,7 +244,7 @@ def PrepareSystem(benchmark_spec: bm_spec.BenchmarkSpec):
     benchmark_spec:
   """
   vms = benchmark_spec.vms
-  background_tasks.RunThreaded(mysql80.ConfigureSystemSettings, vms)
+  background_tasks.RunOnAllVms(mysql80.ConfigureSystemSettings, vms)
 
 
 def InstallPackages(benchmark_spec: bm_spec.BenchmarkSpec):
@@ -254,7 +254,7 @@ def InstallPackages(benchmark_spec: bm_spec.BenchmarkSpec):
     benchmark_spec:
   """
   vms = benchmark_spec.vms
-  background_tasks.RunThreaded(lambda vm: vm.Install('mysql80'), vms)
+  background_tasks.RunOnAllVms(lambda vm: vm.Install('mysql80'), vms)
 
   clients = benchmark_spec.vm_groups['client']
   for client in clients:
