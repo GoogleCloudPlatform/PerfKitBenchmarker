@@ -409,6 +409,9 @@ class GkeCluster(BaseGkeCluster):
     if nodepool_config.min_cpu_platform:
       cmd.flags['min-cpu-platform'] = nodepool_config.min_cpu_platform
 
+    if gcp_flags.GCE_PROVISIONING_MODEL.value == 'SPOT':
+      cmd.args.append('--spot')
+
     if nodepool_config.threads_per_core:
       # TODO(user): Remove when threads-per-core is available in GA
       cmd.use_alpha_gcloud = True
