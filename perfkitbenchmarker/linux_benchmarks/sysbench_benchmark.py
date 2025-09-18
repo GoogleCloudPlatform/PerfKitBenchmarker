@@ -317,6 +317,7 @@ def CreateMetadataFromFlags():
       'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
       'sysbench_report_interval': FLAGS.sysbench_report_interval,
+      'sysbench_txn_isolation_level': _TXN_ISOLATION_LEVEL.value,
       'sysbench_rand_type': UNIFORM,
   }
   if FLAGS.sysbench_testname == SPANNER_TPCC:
@@ -671,7 +672,19 @@ def _GetSysbenchRunCommand(
       '--max-requests=0',
       '--time=%d' % duration,
   ]
-  if _GetSysbenchTestParameter() == 'tpcc':
+  # currently only enable Spanner RR on read write test
+  spanner_oltp_read_write = (
+      db.engine_type == sql_engine_utils.SPANNER_POSTGRES
+      and _GetSysbenchTestParameter() == 'oltp_read_write'
+  )
+  if spanner_oltp_read_write and _TXN_ISOLATION_LEVEL.value == 'RC':
+    logging.warning(
+        'Spanner does not support RC isolation level, will ignore'
+        ' sysbench_txn_isolation_level flag and defaulting to SER .'
+    )
+  if _GetSysbenchTestParameter() == 'tpcc' or (
+      spanner_oltp_read_write and _TXN_ISOLATION_LEVEL.value != 'RC'
+  ):
     run_cmd_tokens.append('--trx_level=%s' % _TXN_ISOLATION_LEVEL.value)
   run_cmd = ' '.join(run_cmd_tokens + _GetCommonSysbenchOptions(db) + ['run'])
   run_cmd = 'cd ~/sysbench/ && ' + run_cmd
