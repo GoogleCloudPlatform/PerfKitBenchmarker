@@ -1679,7 +1679,8 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
 
   def __getstate__(self):
     state = self.__dict__.copy()
-    del state['event_poller']
+    if 'event_poller' in state:
+      del state['event_poller']
     return state
 
   def GetResourceMetadata(self):
