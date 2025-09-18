@@ -1,0 +1,14 @@
+# PKB custom 75% read 25% update workload
+
+workload=site.ycsb.workloads.CoreWorkload
+
+readallfields=true
+operationcount=1000000
+recordcount = 1000000
+
+readproportion=0.75
+updateproportion=0.25
+scanproportion=0
+insertproportion=0
+
+requestdistribution=zipfian
