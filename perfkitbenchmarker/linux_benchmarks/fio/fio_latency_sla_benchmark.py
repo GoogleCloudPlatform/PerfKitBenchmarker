@@ -55,6 +55,8 @@ fio_latency_sla:
       vm_spec: *default_dual_core
       disk_spec: *default_500_gb
       vm_count: 1
+  flags:
+    fio_num_jobs: []
 """
 JOB_FILE = 'fio-parent.job'
 
@@ -111,7 +113,11 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   """
   vm = spec.vms[0]
   max_iodepth = 100
-  numjobs = math.ceil(vm.num_cpus)/2
+  numjobs = (
+      math.ceil(vm.num_cpus) / 2
+      if not FLAGS.fio_num_jobs
+      else FLAGS.fio_num_jobs[0]
+  )
   benchmark_params = {
       'latency_target': fio_flags.FIO_LATENCY_TARGET.value,
       'latency_percentile': fio_flags.FIO_LATENCY_PERCENTILE.value,
@@ -195,6 +201,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       )
   if not latency_under_sla_samples:
     # latency target was never met for these numjobs
+    logging.info('iodepth_details: %s', iodepth_details)
     raise errors.Benchmarks.RunError(
         f'We never reached latency target for {numjobs}, try again by reducing'
         ' the numjobs'
