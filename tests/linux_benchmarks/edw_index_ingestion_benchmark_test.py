@@ -16,9 +16,13 @@ import time
 import unittest
 from unittest import mock
 
+from absl.testing import flagsaver
+from absl.testing import parameterized
 import freezegun
+from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker.linux_benchmarks import edw_index_ingestion_benchmark
+from perfkitbenchmarker.providers.gcp import bigquery
 from perfkitbenchmarker.providers.snowflake import snowflake
 from tests import pkb_common_test_case
 
@@ -39,6 +43,38 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.submitter = edw_index_ingestion_benchmark._IndexSearchQuerySubmitter(
         self.mock_service, 'test_table', 'test_index', 'test_query'
+    )
+
+  def _mock_background_tasks(self):
+    self.enter_context(
+        mock.patch.object(
+            edw_index_ingestion_benchmark,
+            'background_tasks',
+            RunParallelProcesses=mock.Mock(return_value=([], [], [])),
+        )
+    )
+
+  def _mock_bigquery_client_interface(self):
+    mock_client_interface = mock.Mock()
+    mock_client_interface.ExecuteQuery.return_value = (0.0, {})
+    self.enter_context(
+        mock.patch.object(
+            bigquery,
+            'GetBigQueryClientInterface',
+            return_value=mock_client_interface,
+        )
+    )
+    return mock_client_interface
+
+  def _mock_index_search_query_submitter(self):
+    self.enter_context(
+        mock.patch.object(
+            edw_index_ingestion_benchmark,
+            '_IndexSearchQuerySubmitter',
+            return_value=mock.Mock(
+                ExecuteSearchQueryNTimes=mock.Mock(return_value=[])
+            ),
+        )
     )
 
   @mock.patch('multiprocessing.current_process')
@@ -200,6 +236,51 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         completion_sample.metric, 'index_build_completed_before_timeout'
     )
     self.assertEqual(completion_sample.value, False)
+
+  @parameterized.named_parameters(
+      ('partitioned', True, 'table_init_partitioned.sql.j2'),
+      ('unpartitioned', False, 'table_init.sql.j2'),
+  )
+  def test_run_initializes_table_with_correct_partitioning(
+      self,
+      partitioned,
+      expected_template,
+  ):
+    # Arrange
+    self.enter_context(mock.patch('multiprocessing.Manager'))
+    self.enter_context(
+        flagsaver.flagsaver(
+            (bigquery.INITIALIZE_SEARCH_TABLE_PARTITIONED, partitioned),
+        )
+    )
+    self._mock_background_tasks()
+    self._mock_index_search_query_submitter()
+    mock_client_interface = self._mock_bigquery_client_interface()
+    mock_edw_spec = mock.Mock(cluster_identifier='project.dataset')
+    bq_service = bigquery.Bigquery(mock_edw_spec)
+    bq_service.DropSearchIndex = mock.Mock(return_value=(0.0, {}))
+    bq_service.InsertSearchData = mock.Mock(return_value=(0.0, {}))
+    bq_service.CreateSearchIndex = mock.Mock(return_value=(0.0, {}))
+    bq_service.GetSearchIndexCompletionPercentage = mock.Mock(
+        return_value=(100.0, {})
+    )
+    mock_spec = mock.create_autospec(
+        benchmark_spec.BenchmarkSpec, edw_service=bq_service
+    )
+
+    # Act
+    samples = edw_index_ingestion_benchmark.Run(mock_spec)
+
+    # Assert
+    self.assertNotEmpty(samples)
+    for sample in samples:
+      self.assertEqual(
+          sample.metadata['edw_index_table_partitioned'], partitioned
+      )
+    mock_client_vm = mock_client_interface.client_vm
+    mock_client_vm.RenderTemplate.assert_called_once()
+    template_path = mock_client_vm.RenderTemplate.call_args[0][0]
+    self.assertIn(expected_template, template_path)
 
 
 if __name__ == '__main__':

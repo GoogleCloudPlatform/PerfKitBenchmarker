@@ -33,7 +33,7 @@ from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 FLAGS = flags.FLAGS
 
-_INITIALIZE_SEARCH_TABLE_PARTITIONED = flags.DEFINE_bool(
+INITIALIZE_SEARCH_TABLE_PARTITIONED = flags.DEFINE_bool(
     'bq_initialize_search_table_partitioned',
     True,
     'Whether to partition the initial search table for text index'
@@ -792,10 +792,10 @@ class Bigquery(edw_service.EdwService):
       f'{SEARCH_QUERY_TEMPLATE_LOCATION}/index_status.sql.j2'
   )
   INITIALIZE_PART_SEARCH_TABLE_QUERY_TEMPLATE = (
-      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/table_init.sql.j2'
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/table_init_partitioned.sql.j2'
   )
   INITIALIZE_UNPART_SEARCH_TABLE_QUERY_TEMPLATE = (
-      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/table_init_partitioned.sql.j2'
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/table_init.sql.j2'
   )
   LOAD_SEARCH_DATA_QUERY_TEMPLATE = (
       f'{SEARCH_QUERY_TEMPLATE_LOCATION}/ingestion_query.sql.j2'
@@ -864,7 +864,7 @@ class Bigquery(edw_service.EdwService):
     }
     init_table_query = (
         self.INITIALIZE_PART_SEARCH_TABLE_QUERY_TEMPLATE
-        if _INITIALIZE_SEARCH_TABLE_PARTITIONED.value
+        if INITIALIZE_SEARCH_TABLE_PARTITIONED.value
         else self.INITIALIZE_UNPART_SEARCH_TABLE_QUERY_TEMPLATE
     )
     self.client_interface.client_vm.RenderTemplate(

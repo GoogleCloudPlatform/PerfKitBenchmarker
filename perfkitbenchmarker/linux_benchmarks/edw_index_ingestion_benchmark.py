@@ -56,6 +56,7 @@ from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.configs import benchmark_config_spec as pkb_benchmark_config_spec
+from perfkitbenchmarker.providers.gcp import bigquery
 from perfkitbenchmarker.providers.snowflake import snowflake
 
 
@@ -482,6 +483,9 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   Returns:
     A list of sample.Sample objects.
   """
+  edw_service_instance: edw_service.EdwService = spec.edw_service
+  samples: list[sample.Sample] = []
+
   gen_metadata = {
       "edw_index_search_table": edw_service.EDW_SEARCH_TABLE_NAME.value,
       "edw_index_search_index": edw_service.EDW_SEARCH_INDEX_NAME.value,
@@ -498,9 +502,10 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       "edw_index_ingestion_query_interval_sec": _QUERY_INTERVAL_SEC.value,
       "edw_index_ingestion_index_wait": _INDEX_WAIT.value,
   }
-
-  edw_service_instance: edw_service.EdwService = spec.edw_service
-  samples: list[sample.Sample] = []
+  if isinstance(edw_service_instance, bigquery.Bigquery):
+    gen_metadata["edw_index_table_partitioned"] = (
+        bigquery.INITIALIZE_SEARCH_TABLE_PARTITIONED.value
+    )
 
   logging.info("Loading initial search data")
   edw_service_instance.DropSearchIndex(
