@@ -1038,12 +1038,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             and self.host_list[-1].fill_fraction + 1.0 / self.num_vms_per_host
             > 1.0
         ):
-          host = GceSoleTenantNodeGroup(self.node_type, self.zone, self.project)
-          self.host_list.append(host)
+          self.host = GceSoleTenantNodeGroup(
+              self.node_type, self.zone, self.project
+          )
+          self.host_list.append(self.host)
           if gcp_flags.GCE_NODE_GROUP.value is None:
             # GCE_NODE_GROUP is used to identify an existing node group.
-            host.Create()
-        self.host = self.host_list[-1]
+            self.host.Create()
+        else:
+          self.host = self.host_list[-1]
         if self.num_vms_per_host:
           self.host.fill_fraction += 1.0 / self.num_vms_per_host
 
