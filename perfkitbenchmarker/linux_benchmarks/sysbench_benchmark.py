@@ -731,11 +731,12 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
         timeout=duration + 60,
         ignore_failure=True,
     )
-    if stderr:
-      if 'Temporary failure in name resolution' in stderr:
+    for output in [stdout, stderr]:
+      if output and 'Temporary failure in name resolution' in output:
         raise PostgresConnectionError(
             'Temporary failure in name resolution, retrying'
         )
+    if stderr:
       raise errors.Benchmarks.RunError(
           f'Failure when running sysbench:\n{stderr}'
       )
