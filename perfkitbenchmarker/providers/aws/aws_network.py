@@ -93,6 +93,7 @@ DUAL_NETWORK_CARD_MACHINES = frozenset([
     'p4de.24xlarge',
     'p5.48xlarge',
     'p5en.48xlarge',
+    'p6-b200.48xlarge',
     'r6idn.32xlarge',
     'r6idn.metal',
     'r6in.32xlarge',
