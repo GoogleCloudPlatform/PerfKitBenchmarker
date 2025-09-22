@@ -30,9 +30,10 @@ Overview of benchmark:
 * Wait for the service to report 100% completion on the index
 * Run 5 text search queries against the provided
 <edw_search_ingestion_search_keyword> search keyword
-* Start two concurrent subprocesses:
+* Start three concurrent subprocesses:
   * One subprocesses continuously ingests new data into the table.
   * Another subprocesses continuously runs search queries against the table.
+  * A third one continuously fetches index completion metrics.
 * Continue benchmarking until the table reaches
 <edw_search_ingestion_target_row_count> total rows
 * Once the target row count is reached, stop data ingestion and querying and
@@ -42,6 +43,7 @@ wait for the index to reach 100% completion
 
 from collections.abc import Iterable
 import dataclasses
+import enum
 import logging
 import multiprocessing
 import threading
@@ -61,6 +63,17 @@ from perfkitbenchmarker.providers.snowflake import snowflake
 
 
 BENCHMARK_NAME = "edw_index_ingestion_benchmark"
+
+
+class _Steps(enum.Enum):
+  INITIAL_LOAD = "INITIAL_LOAD"
+  INITIAL_INDEX_CREATION = "INITIAL_INDEX_CREATION"
+  INITIAL_INDEX_WAIT = "INITIAL_INDEX_WAIT"
+  INITIAL_SEARCH = "INITIAL_SEARCH"
+  MAIN = "MAIN"
+  FINAL_INDEX_WAIT = "FINAL_INDEX_WAIT"
+  FINAL_SEARCH = "FINAL_SEARCH"
+
 
 BENCHMARK_CONFIG = """
 edw_index_ingestion_benchmark:
@@ -108,13 +121,6 @@ _INIT_DATASET_COPIES = flags.DEFINE_integer(
     " for edw search index benchmarks.",
 )
 
-_INDEX_WAIT = flags.DEFINE_boolean(
-    "edw_search_ingestion_index_wait",
-    True,
-    "Whether or not to wait for indexing to complete. Set to false for fast "
-    "debug runs.",
-)
-
 _SNOWFLAKE_INGESTION_WAREHOUSE = flags.DEFINE_string(
     "snowflake_ingestion_warehouse",
     None,
@@ -124,7 +130,48 @@ _SNOWFLAKE_INGESTION_WAREHOUSE = flags.DEFINE_string(
     " --snowflake_warehouse.",
 )
 
+_BENCHMARK_STEPS = flags.DEFINE_list(
+    "edw_search_ingestion_steps",
+    [s.value for s in _Steps],
+    "Comma-separated list of benchmark steps to run. By default it will just "
+    " run all steps. Here's the list of steps in order of execution and what"
+    " they do:\n"
+    "  INITIAL_LOAD: Load n copies of the user-provided init dataset into\n"
+    "    table from cloud storage.\n"
+    "  INITIAL_INDEX_CREATION: Create a text search index on relevant columns\n"
+    "    of the new table. This step is mandatory.\n"
+    "  INITIAL_INDEX_WAIT: Wait for the service to report 100% completion on\n"
+    "    the index.\n"
+    "  INITIAL_SEARCH: Run 5 text search queries against the provided\n"
+    "    <edw_search_ingestion_search_keyword> search keyword.\n"
+    "  MAIN: Start 3 concurrent subprocesses: One subprocesses continuously\n"
+    "    ingests new data into the table. Another subprocess continuously\n"
+    "    runs search queries against the table. A third one continuosly\n"
+    "    fetches index completion metrics. This step is mandatory.\n"
+    "  FINAL_INDEX_WAIT: Once the target row count is reached, stop data\n"
+    "    ingestion and querying and wait for the index to reach 100%\n"
+    "    completion.\n"
+    "  FINAL_SEARCH: Run 5 final search queries against the table after the\n"
+    "    the index completes.",
+)
+
 FLAGS = flags.FLAGS
+
+
+@flags.validator(
+    _BENCHMARK_STEPS,
+    "Invalid step(s) provided to --edw_search_ingestion_steps. Must be one or "
+    "more of: "
+    + ", ".join([s.value for s in _Steps])
+    + " and must include INITIAL_INDEX_CREATION and MAIN.",
+)
+def _CheckEdwSearchIngestionSteps(steps: list[str]) -> bool:
+  """Checks that all provided steps are valid."""
+  return (
+      all(step in [s.value for s in _Steps] for step in steps)
+      and _Steps.INITIAL_INDEX_CREATION.value in steps
+      and _Steps.MAIN.value in steps
+  )
 
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
@@ -175,6 +222,7 @@ def _ExecuteDataLoad(
     interval: float,
     ingestion_finished: threading.Event,
     ingestion_warehouse: str | None,
+    bench_meta: dict[str, Any] | None = None,
 ) -> list[sample.Sample]:
   """Executes data insertion queries in a loop.
 
@@ -193,6 +241,7 @@ def _ExecuteDataLoad(
       process is finished.
     ingestion_warehouse: The name of the warehouse to use for ingestion queries
       (Snowflake only).
+    bench_meta: Metadata to add to the collected samples.
 
   Returns:
     A list of sample.Sample objects representing the execution time of each
@@ -210,6 +259,8 @@ def _ExecuteDataLoad(
     if ingestion_warehouse:
       assert isinstance(service, snowflake.Snowflake)
       service.SetWarehouse(ingestion_warehouse)
+    if bench_meta is None:
+      bench_meta = {}
     samples = []
     i = 0
     current_rows, _ = service.GetTableRowCount(table_name)
@@ -225,7 +276,7 @@ def _ExecuteDataLoad(
               "load_query_execution_time",
               execution_time,
               "seconds",
-              metadata,
+              metadata | bench_meta,
           )
       )
       ingestion_end_time = time.monotonic()
@@ -381,7 +432,6 @@ def _FetchQueryPercentageUntilEvent(
     bench_meta = {}
   samples: list[sample.Sample] = []
   bench_meta = bench_meta.copy()
-  bench_meta["benchmark_stage"] = "ingestion"
   while not ingestion_finished.is_set():
     percentage, query_meta = service.GetSearchIndexCompletionPercentage(
         table_name, index_name
@@ -404,7 +454,6 @@ def _WaitForIndexCompletion(
     index_name: str,
     start_time: float,
     timeout: float,
-    stage_label: str,
     bench_meta: dict[Any, Any] | None = None,
 ) -> list[sample.Sample]:
   """Waits for a search index to reach 100% coverage.
@@ -419,7 +468,6 @@ def _WaitForIndexCompletion(
     index_name: The name of the index to monitor.
     start_time: The time at which index creation was initiated.
     timeout: The maximum time in seconds to wait for completion.
-    stage_label: Label for the current benchmark stage (e.g. 'initialization').
     bench_meta: Metadata to add to the collected samples.
 
   Returns:
@@ -431,7 +479,6 @@ def _WaitForIndexCompletion(
   wait_results: dict[int, sample.Sample] = {}
   bench_meta = bench_meta.copy()
   bench_meta["index_completion_timeout"] = timeout
-  bench_meta["benchmark_stage"] = stage_label
   while True:
     (percentage, query_meta) = service.GetSearchIndexCompletionPercentage(
         table_name, index_name
@@ -463,19 +510,9 @@ def _WaitForIndexCompletion(
 def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Runs the Edw Index Ingestion benchmark.
 
-  Measure the performance of text search queries against an
-  indexed dataset with concurrent data ingestion. Overview of the benchmark:
-
-  1. Load an initial dataset into a table.
-  2. Create a search index on the table and waits for it to build.
-  3. Run a set of queries against the initial data.
-  4. Start two concurrent subprocesses:
-     - One subprocesses continuously ingests new data into the table.
-     - Another subprocesses continuously runs search queries against the table.
-  5. Wait for both subprocesses to complete.
-  6. Wait for the index to cover the newly ingested data.
-  7. Run a final set of queries.
-  8. Collect and returns performance metrics from all stages.
+  Measure the performance of text search queries against an indexed dataset with
+  concurrent data ingestion. See this module's docstring for a benchmark
+  overview.
 
   Args:
     spec: The benchmark specification.
@@ -500,37 +537,43 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       "edw_index_search_keyword": _SEARCH_KEYWORD.value,
       "edw_index_ingestion_load_interval_sec": _LOAD_INTERVAL_SEC.value,
       "edw_index_ingestion_query_interval_sec": _QUERY_INTERVAL_SEC.value,
-      "edw_index_ingestion_index_wait": _INDEX_WAIT.value,
+      "edw_index_steps": ",".join(_BENCHMARK_STEPS.value),
   }
   if isinstance(edw_service_instance, bigquery.Bigquery):
     gen_metadata["edw_index_table_partitioned"] = (
         bigquery.INITIALIZE_SEARCH_TABLE_PARTITIONED.value
     )
 
-  logging.info("Loading initial search data")
-  edw_service_instance.DropSearchIndex(
-      edw_service.EDW_SEARCH_TABLE_NAME.value,
-      edw_service.EDW_SEARCH_INDEX_NAME.value,
-  )
-  edw_service_instance.InitializeSearchStarterTable(
-      edw_service.EDW_SEARCH_TABLE_NAME.value,
-      edw_service.EDW_SEARCH_INIT_DATA_LOCATION.value,
-  )
-  logging.info("Inserting initial search data")
-  for _ in range(_INIT_DATASET_COPIES.value):
-    edw_service_instance.InsertSearchData(
+  if _Steps.INITIAL_LOAD.value in _BENCHMARK_STEPS.value:
+    logging.info("Loading initial search data")
+    edw_service_instance.DropSearchIndex(
+        edw_service.EDW_SEARCH_TABLE_NAME.value,
+        edw_service.EDW_SEARCH_INDEX_NAME.value,
+    )
+    edw_service_instance.InitializeSearchStarterTable(
         edw_service.EDW_SEARCH_TABLE_NAME.value,
         edw_service.EDW_SEARCH_INIT_DATA_LOCATION.value,
     )
-  logging.info("Initial search data load complete")
+    logging.info("Inserting initial search data")
+    for _ in range(_INIT_DATASET_COPIES.value):
+      edw_service_instance.InsertSearchData(
+          edw_service.EDW_SEARCH_TABLE_NAME.value,
+          edw_service.EDW_SEARCH_INIT_DATA_LOCATION.value,
+      )
+    logging.info("Initial search data load complete")
 
-  logging.info("Creating index")
   indexing_start_time = time.time()
-  edw_service_instance.CreateSearchIndex(
-      edw_service.EDW_SEARCH_TABLE_NAME.value,
-      edw_service.EDW_SEARCH_INDEX_NAME.value,
-  )
-  if _INDEX_WAIT.value:
+  if _Steps.INITIAL_INDEX_CREATION.value in _BENCHMARK_STEPS.value:
+    logging.info("Creating index")
+    edw_service_instance.CreateSearchIndex(
+        edw_service.EDW_SEARCH_TABLE_NAME.value,
+        edw_service.EDW_SEARCH_INDEX_NAME.value,
+    )
+
+  if _Steps.INITIAL_INDEX_WAIT.value in _BENCHMARK_STEPS.value:
+    current_step_meta = {
+        "edw_index_current_step": _Steps.INITIAL_INDEX_WAIT.value
+    }
     logging.info("Waiting for index to reach 100% coverage on init data")
     samples += _WaitForIndexCompletion(
         edw_service_instance,
@@ -538,67 +581,75 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
         edw_service.EDW_SEARCH_INDEX_NAME.value,
         indexing_start_time,
         INDEXING_TIMEOUT_SEC,
-        "initialization",
-        bench_meta=gen_metadata,
+        bench_meta=gen_metadata | current_step_meta,
     )
   logging.info("Initial dataset indexing stage complete")
 
-  logging.info("Running preload search queries")
   query_submitter = _IndexSearchQuerySubmitter(
       edw_service_instance,
       edw_service.EDW_SEARCH_TABLE_NAME.value,
       edw_service.EDW_SEARCH_INDEX_NAME.value,
       _SEARCH_KEYWORD.value,
   )
-  samples += query_submitter.ExecuteSearchQueryNTimes(
-      5, bench_meta={"search_query_block": "preload"} | gen_metadata
-  )
 
-  logging.info("Dispatching concurrent ingestion and search queries.")
-  with multiprocessing.Manager() as manager:
-    ingestion_finished = manager.Event()
-    tasks = [
-        (
-            _ExecuteDataLoad,
-            (
-                edw_service_instance,
-                edw_service.EDW_SEARCH_TABLE_NAME.value,
-                edw_service.EDW_SEARCH_DATA_LOCATION.value,
-                _TARGET_ROW_COUNT.value,
-                _LOAD_INTERVAL_SEC.value,
-                ingestion_finished,
-                _SNOWFLAKE_INGESTION_WAREHOUSE.value,
-            ),
-            {},
-        ),
-        (
-            query_submitter.ExecuteSearchQueryUntilEvent,
-            (ingestion_finished, _QUERY_INTERVAL_SEC.value),
-            {"bench_meta": {"search_query_block": "ingestion"} | gen_metadata},
-        ),
-        (
-            _FetchQueryPercentageUntilEvent,
-            (
-                edw_service_instance,
-                edw_service.EDW_SEARCH_TABLE_NAME.value,
-                edw_service.EDW_SEARCH_INDEX_NAME.value,
-                ingestion_finished,
-            ),
-            {"bench_meta": gen_metadata},
-        ),
-    ]
-    (
-        ingestion_samples,
-        search_query_samples,
-        index_percentage_samples,
-    ) = background_tasks.RunParallelProcesses(
-        tasks, background_tasks.MAX_CONCURRENT_THREADS
+  if _Steps.INITIAL_SEARCH.value in _BENCHMARK_STEPS.value:
+    current_step_meta = {"edw_index_current_step": _Steps.INITIAL_SEARCH.value}
+    logging.info("Running preload search queries")
+    samples += query_submitter.ExecuteSearchQueryNTimes(
+        5,
+        bench_meta=gen_metadata | current_step_meta,
     )
-  samples += ingestion_samples
-  samples += search_query_samples
-  samples += index_percentage_samples
 
-  if _INDEX_WAIT.value:
+  if _Steps.MAIN.value in _BENCHMARK_STEPS.value:
+    current_step_meta = {"edw_index_current_step": _Steps.MAIN.value}
+    logging.info("Dispatching concurrent ingestion and search queries.")
+    with multiprocessing.Manager() as manager:
+      ingestion_finished = manager.Event()
+      tasks = [
+          (
+              _ExecuteDataLoad,
+              (
+                  edw_service_instance,
+                  edw_service.EDW_SEARCH_TABLE_NAME.value,
+                  edw_service.EDW_SEARCH_DATA_LOCATION.value,
+                  _TARGET_ROW_COUNT.value,
+                  _LOAD_INTERVAL_SEC.value,
+                  ingestion_finished,
+                  _SNOWFLAKE_INGESTION_WAREHOUSE.value,
+              ),
+              {"bench_meta": gen_metadata | current_step_meta},
+          ),
+          (
+              query_submitter.ExecuteSearchQueryUntilEvent,
+              (ingestion_finished, _QUERY_INTERVAL_SEC.value),
+              {"bench_meta": gen_metadata | current_step_meta},
+          ),
+          (
+              _FetchQueryPercentageUntilEvent,
+              (
+                  edw_service_instance,
+                  edw_service.EDW_SEARCH_TABLE_NAME.value,
+                  edw_service.EDW_SEARCH_INDEX_NAME.value,
+                  ingestion_finished,
+              ),
+              {"bench_meta": gen_metadata | current_step_meta},
+          ),
+      ]
+      (
+          ingestion_samples,
+          search_query_samples,
+          index_percentage_samples,
+      ) = background_tasks.RunParallelProcesses(
+          tasks, background_tasks.MAX_CONCURRENT_THREADS
+      )
+    samples += ingestion_samples
+    samples += search_query_samples
+    samples += index_percentage_samples
+
+  if _Steps.FINAL_INDEX_WAIT.value in _BENCHMARK_STEPS.value:
+    current_step_meta = {
+        "edw_index_current_step": _Steps.FINAL_INDEX_WAIT.value
+    }
     logging.info("Waiting for index to reach 100% coverage on full dataset")
     after_load_index_start = time.time()
     samples += _WaitForIndexCompletion(
@@ -607,14 +658,16 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
         edw_service.EDW_SEARCH_INDEX_NAME.value,
         after_load_index_start,
         INDEXING_TIMEOUT_SEC,
-        "post_load",
-        bench_meta=gen_metadata,
+        bench_meta=gen_metadata | current_step_meta,
     )
 
-  logging.info("Running post load queries")
-  samples += query_submitter.ExecuteSearchQueryNTimes(
-      5, bench_meta={"search_query_block": "postload"} | gen_metadata
-  )
+  if _Steps.FINAL_SEARCH.value in _BENCHMARK_STEPS.value:
+    current_step_meta = {"edw_index_current_step": _Steps.FINAL_SEARCH.value}
+    logging.info("Running post load queries")
+    samples += query_submitter.ExecuteSearchQueryNTimes(
+        5,
+        bench_meta=gen_metadata | current_step_meta,
+    )
 
   return sorted(samples, key=lambda s: s.timestamp)
 

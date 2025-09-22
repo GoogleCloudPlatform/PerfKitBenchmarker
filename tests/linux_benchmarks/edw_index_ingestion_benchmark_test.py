@@ -26,6 +26,21 @@ from perfkitbenchmarker.providers.gcp import bigquery
 from perfkitbenchmarker.providers.snowflake import snowflake
 from tests import pkb_common_test_case
 
+_NO_SEARCHES_STEPS = [
+    'INITIAL_LOAD',
+    'INITIAL_INDEX_CREATION',
+    'INITIAL_INDEX_WAIT',
+    'MAIN',
+    'FINAL_INDEX_WAIT',
+]
+_NO_WAITS_STEPS = [
+    'INITIAL_LOAD',
+    'INITIAL_INDEX_CREATION',
+    'INITIAL_SEARCH',
+    'MAIN',
+    'FINAL_SEARCH',
+]
+
 
 class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
@@ -43,6 +58,13 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.submitter = edw_index_ingestion_benchmark._IndexSearchQuerySubmitter(
         self.mock_service, 'test_table', 'test_index', 'test_query'
+    )
+    self.mock_run_parallel = self.enter_context(
+        mock.patch.object(
+            edw_index_ingestion_benchmark.background_tasks,
+            'RunParallelProcesses',
+            return_value=([], [], []),
+        )
     )
 
   def _mock_background_tasks(self):
@@ -67,14 +89,21 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     return mock_client_interface
 
   def _mock_index_search_query_submitter(self):
+    mock_query_submitter = mock.Mock(
+        ExecuteSearchQueryNTimes=mock.Mock(return_value=[]),
+    )
     self.enter_context(
         mock.patch.object(
             edw_index_ingestion_benchmark,
             '_IndexSearchQuerySubmitter',
-            return_value=mock.Mock(
-                ExecuteSearchQueryNTimes=mock.Mock(return_value=[])
-            ),
+            return_value=mock_query_submitter,
         )
+    )
+    return mock_query_submitter
+
+  def _mock_benchmark_spec(self, mock_edw_service):
+    return mock.create_autospec(
+        benchmark_spec.BenchmarkSpec, edw_service=mock_edw_service
     )
 
   @mock.patch('multiprocessing.current_process')
@@ -180,8 +209,7 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         'test_index',
         start_time=start_time,
         timeout=30,
-        stage_label='test_stage',
-        bench_meta={'meta': 'data'},
+        bench_meta={'meta': 'data', 'edw_index_current_step': 'test_stage'},
     )
     # Assertions
     self.assertEqual(
@@ -208,7 +236,7 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
           {
               'meta': 'data',
               'index_completion_timeout': 30,
-              'benchmark_stage': 'test_stage',
+              'edw_index_current_step': 'test_stage',
           },
           result_sample.metadata,
       )
@@ -225,7 +253,6 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         'test_index',
         start_time=start_time,
         timeout=10,
-        stage_label='test_stage',
         bench_meta={'meta': 'data'},
     )
     # Assertions
@@ -264,9 +291,7 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     bq_service.GetSearchIndexCompletionPercentage = mock.Mock(
         return_value=(100.0, {})
     )
-    mock_spec = mock.create_autospec(
-        benchmark_spec.BenchmarkSpec, edw_service=bq_service
-    )
+    mock_spec = self._mock_benchmark_spec(bq_service)
 
     # Act
     samples = edw_index_ingestion_benchmark.Run(mock_spec)
@@ -281,6 +306,109 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     mock_client_vm.RenderTemplate.assert_called_once()
     template_path = mock_client_vm.RenderTemplate.call_args[0][0]
     self.assertIn(expected_template, template_path)
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='only_mandatory_steps',
+          steps=['INITIAL_INDEX_CREATION', 'MAIN'],
+          drop_search_index_called=False,
+          initialize_search_starter_table_called=False,
+          insert_search_data_called=False,
+          create_search_index_called=True,
+          wait_for_index_completion_called=False,
+          execute_search_query_n_times_called=False,
+          run_parallel_processes_called=True,
+      ),
+      dict(
+          testcase_name='all_steps',
+          steps=[s.value for s in edw_index_ingestion_benchmark._Steps],
+          drop_search_index_called=True,
+          initialize_search_starter_table_called=True,
+          insert_search_data_called=True,
+          create_search_index_called=True,
+          wait_for_index_completion_called=True,
+          execute_search_query_n_times_called=True,
+          run_parallel_processes_called=True,
+      ),
+      dict(
+          testcase_name='no_searches',
+          steps=_NO_SEARCHES_STEPS,
+          drop_search_index_called=True,
+          initialize_search_starter_table_called=True,
+          insert_search_data_called=True,
+          create_search_index_called=True,
+          wait_for_index_completion_called=True,
+          execute_search_query_n_times_called=False,
+          run_parallel_processes_called=True,
+      ),
+      dict(
+          testcase_name='no_waits',
+          steps=_NO_WAITS_STEPS,
+          drop_search_index_called=True,
+          initialize_search_starter_table_called=True,
+          insert_search_data_called=True,
+          create_search_index_called=True,
+          wait_for_index_completion_called=False,
+          execute_search_query_n_times_called=True,
+          run_parallel_processes_called=True,
+      ),
+  )
+  def test_run_with_steps(
+      self,
+      steps,
+      drop_search_index_called,
+      initialize_search_starter_table_called,
+      insert_search_data_called,
+      create_search_index_called,
+      wait_for_index_completion_called,
+      execute_search_query_n_times_called,
+      run_parallel_processes_called,
+  ):
+    # Arrange
+    self.enter_context(mock.patch('multiprocessing.Manager'))
+    self.enter_context(
+        flagsaver.flagsaver(
+            (edw_index_ingestion_benchmark._BENCHMARK_STEPS, steps)
+        )
+    )
+    mock_query_submitter = self._mock_index_search_query_submitter()
+    mock_wait_for_index = self.enter_context(
+        mock.patch.object(
+            edw_index_ingestion_benchmark,
+            '_WaitForIndexCompletion',
+            return_value=[],
+        )
+    )
+    mock_spec = self._mock_benchmark_spec(self.mock_service)
+
+    # Act
+    edw_index_ingestion_benchmark.Run(mock_spec)
+
+    # Assert
+    self.assertEqual(
+        self.mock_service.DropSearchIndex.called, drop_search_index_called
+    )
+    self.assertEqual(
+        self.mock_service.InitializeSearchStarterTable.called,
+        initialize_search_starter_table_called,
+    )
+    self.assertEqual(
+        self.mock_service.InsertSearchData.called, insert_search_data_called
+    )
+    self.assertEqual(
+        self.mock_service.CreateSearchIndex.called,
+        create_search_index_called,
+    )
+    self.assertEqual(
+        mock_wait_for_index.called, wait_for_index_completion_called
+    )
+    self.assertEqual(
+        mock_query_submitter.ExecuteSearchQueryNTimes.called,
+        execute_search_query_n_times_called,
+    )
+    self.assertEqual(
+        self.mock_run_parallel.called, run_parallel_processes_called
+    )
 
 
 if __name__ == '__main__':
