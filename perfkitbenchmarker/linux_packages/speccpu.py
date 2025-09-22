@@ -627,12 +627,16 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
     )
   if peak_score:
     results.append(sample.Sample(peak_name, float(peak_score), '', metadata))
+  elif not scores:
+    raise errors.Benchmarks.RunError('speccpu: no scores found')
 
   return results
 
 
 def _GeometricMean(arr):
   """Calculates the geometric mean of the array."""
+  if not arr:
+    return 0.0
   product = 1
   for val in arr:
     product *= val
