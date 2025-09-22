@@ -257,7 +257,7 @@ def ConfigureAndRestart(
   )
 
   # mysqld silently exits if /var/run/mysqld doesn't exist.
-  vm.RemoteCommand('sudo mkdir /var/run/mysqld')
+  vm.RemoteCommand('sudo mkdir -p /var/run/mysqld')
   vm.RemoteCommand('sudo chown mysql:mysql /var/run/mysqld')
 
   # Start the server.
