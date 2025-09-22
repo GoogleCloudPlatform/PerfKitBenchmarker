@@ -2062,7 +2062,7 @@ def ParseArgs(argv):
 def Main(argv):
   """Entrypoint for PerfKitBenchmarker."""
   del argv  # Unused.
-  assert sys.version_info >= (3, 11), 'PerfKitBenchmarker requires Python 3.11+'
+  assert sys.version_info >= (3, 12), 'PerfKitBenchmarker requires Python 3.12+'
   log_util.ConfigureBasicLogging()
   _InjectBenchmarkInfoIntoDocumentation()
 

@@ -107,6 +107,7 @@
     on clusters older than version 1.31.
 -   Consolidated cloud-specific boot-disk-size flags into a cloud-agnostic
     `--boot-disk-size` flag.
+-   Updated the minimum recommended Python version to 3.12.
 
 ### New features:
 
