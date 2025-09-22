@@ -325,6 +325,7 @@ class AksCluster(container_service.KubernetesCluster):
         self.name,
         '--file',
         FLAGS.kubeconfig,
+        '--overwrite-existing',
     ]
     if use_admin:
       cmd.append('--admin')
@@ -500,10 +501,11 @@ class AksAutomaticCluster(AksCluster):
     full_cluster_id = full_cluster_id.strip()
     current_user, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH,
-        'account',
+        'ad',
+        'signed-in-user',
         'show',
         '--query',
-        'user.name',
+        'id',
         '--output',
         'tsv',
     ])
