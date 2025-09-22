@@ -57,7 +57,7 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(time, 'sleep', side_effect=advance_time)
     )
     self.submitter = edw_index_ingestion_benchmark._IndexSearchQuerySubmitter(
-        self.mock_service, 'test_table', 'test_index', 'test_query'
+        self.mock_service, 'test_table', 'test_index'
     )
     self.mock_run_parallel = self.enter_context(
         mock.patch.object(
@@ -104,6 +104,15 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def _mock_benchmark_spec(self, mock_edw_service):
     return mock.create_autospec(
         benchmark_spec.BenchmarkSpec, edw_service=mock_edw_service
+    )
+
+  def _mock_wait_for_index_completion(self):
+    return self.enter_context(
+        mock.patch.object(
+            edw_index_ingestion_benchmark,
+            '_WaitForIndexCompletion',
+            return_value=[],
+        )
     )
 
   @mock.patch('multiprocessing.current_process')
@@ -163,9 +172,12 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def test_execute_search_query_n_times(self):
     # Configure mocks
     self.mock_service.TextSearchQuery.return_value = (0.5, {'meta': 'data'})
+    search_query = edw_index_ingestion_benchmark._SearchQuery(
+        name='test_name', term='test_term'
+    )
 
     # Call the function
-    samples = self.submitter.ExecuteSearchQueryNTimes(3)
+    samples = self.submitter.ExecuteSearchQueryNTimes(search_query, 3)
 
     # Assertions
     self.assertEqual(self.mock_service.TextSearchQuery.call_count, 3)
@@ -175,6 +187,9 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     # Configure mocks
     self.mock_service.TextSearchQuery.return_value = (0.5, {'meta': 'data'})
     event = threading.Event()
+    search_query = edw_index_ingestion_benchmark._SearchQuery(
+        name='test_name', term='test_term'
+    )
 
     # The mock will be called 3 times and then the event will be set
     def set_event(*args, **kwargs):
@@ -186,7 +201,9 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_service.TextSearchQuery.side_effect = set_event
 
     # Call the function
-    samples = self.submitter.ExecuteSearchQueryUntilEvent(event, 1)
+    samples = self.submitter.ExecuteSearchQueryUntilEvent(
+        [search_query], event, 1
+    )
 
     # Assertions
     self.assertEqual(self.mock_service.TextSearchQuery.call_count, 3)
@@ -368,17 +385,12 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(mock.patch('multiprocessing.Manager'))
     self.enter_context(
         flagsaver.flagsaver(
-            (edw_index_ingestion_benchmark._BENCHMARK_STEPS, steps)
+            (edw_index_ingestion_benchmark._BENCHMARK_STEPS, steps),
+            (edw_index_ingestion_benchmark._SEARCH_QUERIES, ['common:api']),
         )
     )
     mock_query_submitter = self._mock_index_search_query_submitter()
-    mock_wait_for_index = self.enter_context(
-        mock.patch.object(
-            edw_index_ingestion_benchmark,
-            '_WaitForIndexCompletion',
-            return_value=[],
-        )
-    )
+    mock_wait_for_index = self._mock_wait_for_index_completion()
     mock_spec = self._mock_benchmark_spec(self.mock_service)
 
     # Act
@@ -409,6 +421,60 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         self.mock_run_parallel.called, run_parallel_processes_called
     )
+
+  @parameterized.named_parameters(
+      dict(testcase_name='one_query', search_queries=['q1:t1']),
+      dict(testcase_name='two_queries', search_queries=['q1:t1', 'q2:t2']),
+  )
+  def test_run_with_search_queries(self, search_queries):
+    # Arrange
+    self.enter_context(mock.patch('multiprocessing.Manager'))
+    self.enter_context(
+        flagsaver.flagsaver(
+            (edw_index_ingestion_benchmark._SEARCH_QUERIES, search_queries),
+            (
+                edw_index_ingestion_benchmark._BENCHMARK_STEPS,
+                [s.value for s in edw_index_ingestion_benchmark._Steps],
+            ),
+        )
+    )
+    mock_query_submitter = self._mock_index_search_query_submitter()
+    self._mock_wait_for_index_completion()
+    mock_spec = self._mock_benchmark_spec(self.mock_service)
+    parsed_queries = edw_index_ingestion_benchmark._ParseSearchQueries(
+        search_queries
+    )
+
+    # Act
+    edw_index_ingestion_benchmark.Run(mock_spec)
+
+    # Assert
+    self.assertEqual(
+        mock_query_submitter.ExecuteSearchQueryNTimes.call_count,
+        2 * len(search_queries),
+    )
+    initial_queries_called = [
+        c.args[0]
+        for c in mock_query_submitter.ExecuteSearchQueryNTimes.call_args_list
+        if c.kwargs['bench_meta']['edw_index_current_step'] == 'INITIAL_SEARCH'
+    ]
+    final_queries_called = [
+        c.args[0]
+        for c in mock_query_submitter.ExecuteSearchQueryNTimes.call_args_list
+        if c.kwargs['bench_meta']['edw_index_current_step'] == 'FINAL_SEARCH'
+    ]
+    self.assertCountEqual(initial_queries_called, parsed_queries)
+    self.assertCountEqual(final_queries_called, parsed_queries)
+
+    # Check call for MAIN step
+    self.mock_run_parallel.assert_called_once()
+    tasks = self.mock_run_parallel.call_args[0][0]
+    # The second task is ExecuteSearchQueryUntilEvent
+    self.assertEqual(
+        tasks[1][0], mock_query_submitter.ExecuteSearchQueryUntilEvent
+    )
+    search_task_args = tasks[1][1]
+    self.assertEqual(search_task_args[0], parsed_queries)
 
 
 if __name__ == '__main__':
