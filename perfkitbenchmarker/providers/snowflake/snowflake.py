@@ -662,9 +662,6 @@ class Snowflake(edw_service.EdwService):
     meta['edw_search_result_rows'] = int(
         meta['query_results']['RESULT_ROWS'][0]
     )
-    meta['edw_search_total_row_count'] = int(
-        meta['query_results']['TOTAL_ROW_COUNT'][0]
-    )
 
     return res, meta
 

@@ -931,9 +931,6 @@ class Bigquery(edw_service.EdwService):
     meta['edw_search_result_rows'] = int(
         meta['query_results']['result_rows'][0]
     )
-    meta['edw_search_total_row_count'] = int(
-        meta['query_results']['total_row_count'][0]
-    )
 
     return res, meta
 
