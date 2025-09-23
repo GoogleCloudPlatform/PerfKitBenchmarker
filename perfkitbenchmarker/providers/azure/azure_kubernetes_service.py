@@ -499,17 +499,45 @@ class AksAutomaticCluster(AksCluster):
         'tsv',
     ])
     full_cluster_id = full_cluster_id.strip()
-    current_user, _, _ = vm_util.IssueCommand([
+    # Get the user.name (User Principal Name or Service Principal name)
+    user_name, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH,
-        'ad',
-        'signed-in-user',
+        'account',
         'show',
         '--query',
-        'id',
+        'user.name',
         '--output',
         'tsv',
     ])
-    current_user = current_user.strip()
+    try:
+      # Attempt to query as an interactive user
+      current_user_id, _, _ = vm_util.IssueCommand([
+          azure.AZURE_PATH,
+          'ad',
+          'user',
+          'show',
+          '--id',
+          user_name.strip(),
+          '--query',
+          'id',
+          '--output',
+          'tsv',
+      ])
+    except Exception:
+      # If querying as a user fails (e.g., Service Principal), fall back to querying as SP
+      current_user_id, _, _ = vm_util.IssueCommand([
+          azure.AZURE_PATH,
+          'ad',
+          'sp',
+          'show',
+          '--id',
+          user_name.strip(),
+          '--query',
+          'id',
+          '--output',
+          'tsv',
+      ])
+    current_user = current_user_id.strip()
     create_role_assignment_cmd = [
         azure.AZURE_PATH,
         'role',
