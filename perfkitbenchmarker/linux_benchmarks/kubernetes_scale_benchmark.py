@@ -241,34 +241,32 @@ def _CheckForFailures(
     QuotaFailure: If a quota is exceeded.
     RunError: If scale up failed for a non-quota reason.
   """
+  events = cluster.GetEvents()
   ready_count_sample = next(
       (s for s in pod_samples if s.metric == 'pod_Ready_count'), None
   )
-  if ready_count_sample is None:
-    if NUM_PODS.value < 5:
-      raise errors.Benchmarks.QuotaFailure(
-          f'Attempted to request {NUM_PODS.value} pods, but no pods were'
-          ' created. For a scheduled test, this is likely a quota issue.'
-      )
-    raise errors.Benchmarks.RunError(
-        'No pod ready events were found & we attempted to scale up to'
-        f' {NUM_PODS.value} pods; this is unusual.'
-    )
-  if ready_count_sample.value >= NUM_PODS.value:
+  if (
+      ready_count_sample is not None
+      and ready_count_sample.value >= NUM_PODS.value
+  ):
     logging.info(
-        'Benchmark successfully scaled up %d pods, which is more than the goal'
-        ' of %d pods.',
+        'Benchmark successfully scaled up %d pods, which is equal to or more '
+        'than the goal of %d pods.',
         ready_count_sample.value,
         NUM_PODS.value,
     )
     return
-  events = cluster.GetEvents()
   for event in events:
     if event.reason == 'FailedScaleUp' and 'quota exceeded' in event.message:
       raise errors.Benchmarks.QuotaFailure(
           'Failed to scale up to %d pods, at least one pod ran into a quota'
           ' error: %s' % (NUM_PODS.value, event.message)
       )
+  if ready_count_sample is None:
+    raise errors.Benchmarks.RunError(
+        'No pod ready events were found & we attempted to scale up to'
+        f' {NUM_PODS.value} pods; this is unusual.'
+    )
 
   raise errors.Benchmarks.RunError(
       'Benchmark attempted to scale up to  %d pods but only %d pods were'

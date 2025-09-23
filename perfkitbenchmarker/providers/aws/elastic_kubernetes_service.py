@@ -39,6 +39,12 @@ from perfkitbenchmarker.providers.aws import util
 
 
 FLAGS = flags.FLAGS
+# GPU types which practically require spot to get.
+_RARE_GPU_TYPES = [
+    virtual_machine.GPU_H100,
+    virtual_machine.GPU_A100,
+    virtual_machine.GPU_B200,
+]
 
 
 def RecursivelyUpdateDictionary(
@@ -521,9 +527,10 @@ class EksCluster(BaseEksCluster):
 class EksAutoCluster(BaseEksCluster):
   """Class representing an Elastic Kubernetes Service cluster with auto mode.
 
-  Automode supports auto scaling & ignores the concept of nodepools & selecting
-  machine types. It also automatically creates some related resources like a
-  load balancer & networks.
+  Auto mode supports auto scaling & allows users to not specify nodepools nor
+  select machine types if they so wish (but nodepools can still be used to
+  specify these if desired). It also automatically creates some related
+  resources like a load balancer & networks.
   """
 
   CLOUD = provider_info.AWS
@@ -532,6 +539,10 @@ class EksAutoCluster(BaseEksCluster):
   def __init__(self, spec):
     super().__init__(spec)
     self._ChooseSecondZone()
+    is_rare_gpu = (
+        virtual_machine.GPU_TYPE.value in _RARE_GPU_TYPES
+    )
+    self.use_spot: bool = aws_flags.USE_AWS_SPOT_INSTANCES.value or is_rare_gpu
 
   def InitializeNodePoolForCloud(
       self,
@@ -555,7 +566,17 @@ class EksAutoCluster(BaseEksCluster):
         '--public-access=true',
         '--approve',
     ]
-    vm_util.IssueCommand(vpc_cmd, timeout=900)
+    # Retry esp. "cluster currently has an update in progress" errors.
+    vm_util.IssueRetryableCommand(vpc_cmd, timeout=900)
+
+  def _PostCreate(self):
+    """Performs post-creation steps for the cluster."""
+    super()._PostCreate()
+    if self.use_spot:
+      self.ApplyManifest(
+          'container/auto/nodepool.yaml.j2',
+          CLUSTER_NAME=self.name,
+      )
 
   def _Delete(self):
     """Deletes the control plane and worker nodes."""
@@ -593,7 +614,17 @@ class EksAutoCluster(BaseEksCluster):
     """Get the node selectors section of a yaml for the provider."""
     # Theoretically needed in mixed mode, but deployments fail without it:
     # https://docs.aws.amazon.com/eks/latest/userguide/associate-workload.html#_require_a_workload_is_deployed_to_eks_auto_mode_nodes
-    return ['eks.amazonaws.com/compute-type: auto']
+    selectors = ['eks.amazonaws.com/compute-type: auto']
+    if self.use_spot:
+      selectors += ['karpenter.sh/capacity-type: spot']
+    if virtual_machine.GPU_TYPE.value:
+      selectors += [
+          (
+              'eks.amazonaws.com/instance-gpu-name:'
+              f' {virtual_machine.GPU_TYPE.value}'
+          ),
+      ]
+    return selectors
 
 
 _KARPENTER_NAMESPACE = 'kube-system'

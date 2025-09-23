@@ -61,7 +61,7 @@ flags.DEFINE_integer(
     18000,
     'The time to wait for an EMR job to finish, in seconds',
 )
-flags.DEFINE_boolean(
+USE_AWS_SPOT_INSTANCES = flags.DEFINE_boolean(
     'aws_spot_instances',
     False,
     'Whether to use AWS spot instances for any AWS VMs.',
