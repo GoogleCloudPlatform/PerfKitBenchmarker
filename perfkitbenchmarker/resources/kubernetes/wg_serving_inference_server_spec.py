@@ -112,6 +112,7 @@ class WGServingInferenceServerConfigSpec(
     self.hpa_max_replicas: int
     self.hpa_target_value: float
     self.hpa_custom_metric_name: str
+    self.runtime_class_name: str | None
     self.static_inference_server: (
         WGServingStaticInferenceServerConfigSpec | None
     )
@@ -165,6 +166,10 @@ class WGServingInferenceServerConfigSpec(
         'hpa_custom_metric_name': (
             option_decoders.StringDecoder,
             {'default': _DEFAULT_HPA_CUSTOM_METRIC_NAME},
+        ),
+        'runtime_class_name': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
         ),
     })
     return result
