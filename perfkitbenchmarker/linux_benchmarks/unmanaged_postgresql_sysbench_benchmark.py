@@ -323,7 +323,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       raise errors.Benchmarks.RunError(f'Error running sysbench command: {e}')
     metadata = sysbench.GetMetadata(sysbench_parameters)
     metadata.update({
-        'shared_buffer_size': f'{_SHARED_BUFFER_SIZE.value}GB',
+        'shared_buffer_size': f'{GetBufferSize()}',
     })
     results += sysbench.ParseSysbenchTimeSeries(stdout, metadata)
     results += sysbench.ParseSysbenchLatency([stdout], metadata)
