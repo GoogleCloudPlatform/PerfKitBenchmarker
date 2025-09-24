@@ -136,10 +136,24 @@ class BaseWGServingInferenceServer(
     result.update({
         'model': getattr(self, 'model_id', 'unknown'),
         'tokenizer_id': getattr(self, 'tokenizer_id', 'unknown'),
-        'model_server': getattr(self, 'model_server', 'unknown'),
+        'model_server': self.spec.model_server,
     })
 
     return result
+
+  def GetCallableServer(
+      self,
+  ) -> kubernetes_inference_server.InferenceServerEndpoint:
+    """Returns the callable server."""
+    return kubernetes_inference_server.InferenceServerEndpoint(
+        deployment_metadata=self.deployment_metadata,
+        service_name=self.service_name,
+        model_id=self.model_id,
+        backend=self.spec.model_server,
+        tokenizer_id=self.tokenizer_id,
+        service_port=str(self.service_port),
+        model_id_from_path=self.model_id_from_path,
+    )
 
   def _RefreshDeploymentMetadata(self) -> None:
     """Refreshes the deployment metadata."""
@@ -514,6 +528,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         'hpa_enabled': self._hpa_enabled,
         'storage_type': storage_type,
     })
+    if self.spec.runtime_class_name:
+      metadata['runtime_class_name'] = self.spec.runtime_class_name
     return metadata
 
   def GetStorageType(self) -> str:
@@ -581,6 +597,17 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           pod_name, _OUTPUT_PATH
       )
 
+      # Add runtime class name to the deployment spec if specified.
+      if self.spec.runtime_class_name:
+        docs = []
+        for doc in yaml.safe_load_all(inference_server_manifest):
+          if doc.get('kind') == 'Deployment':
+            doc['spec']['template']['spec'][
+                'runtimeClassName'
+            ] = self.spec.runtime_class_name
+          docs.append(doc)
+        inference_server_manifest = yaml.dump_all(docs)
+
       logging.info('Cleaned up manifest generation job %s', job_name)
       return inference_server_manifest
     finally:
@@ -613,6 +640,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         model_path = self.spec.extra_deployment_args.get('model-path', None)
         if model_path:
           self.model_id_from_path = '/data/models/' + model_path
+      if not hasattr(self, 'model_id_from_path') or not self.model_id_from_path:
+        self.model_id_from_path = None
     except (KeyError, IndexError, TypeError, StopIteration) as e:
       logging.exception(
           'Error parsing MODEL_ID from deployment %s, Please ensure the'
@@ -871,11 +900,50 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       self.created_resources.extend(created_resources)
 
     deployment_name = self.deployment_metadata['metadata']['name']
-    self.cluster.WaitForResource(
-        f'deployment/{deployment_name}',
-        'available',
-        timeout=self.spec.deployment_timeout,
-    )
+    try:
+      self.cluster.WaitForResource(
+          f'deployment/{deployment_name}',
+          'available',
+          timeout=self.spec.deployment_timeout,
+      )
+    except errors.VmUtil.IssueCommandError as e:
+      pods = self.cluster.GetResourceMetadataByName(
+          'pods',
+          f'app={self.app_selector}',
+          output_format='name',
+          output_formatter=lambda res: res.splitlines(),
+      )
+      events = self.cluster.GetEvents()
+      quota_failure = False
+      for pod in pods:
+        pod_name = pod.split('/')[1]
+        status_cmd = [
+            'get',
+            'pod',
+            pod.split('/')[1],
+            '-o',
+            'jsonpath={.status.phase}',
+        ]
+        status, _, _ = container_service.RunKubectlCommand(status_cmd)
+        if 'Pending' not in status:
+          continue
+        for event in events:
+          if (
+              event.resource.kind == 'Pod'
+              and event.resource.name == pod_name
+              and 'GCE out of resources' in event.message
+          ):
+            quota_failure = True
+            break
+      if 'timed out waiting for the condition' in str(e) and quota_failure:
+        raise errors.Benchmarks.QuotaFailure(
+            f'TIMED OUT: Deployment {deployment_name} did not become available'
+            f' within {self.spec.deployment_timeout} seconds. This can be due'
+            ' to issues like resource exhaustion, but can also be due to image'
+            f' pull errors, or pod scheduling problems. Original error: {e}'
+        ) from e
+      else:
+        raise e
 
   def _ApplyGCSFusePVC(self):
     """Apply the PV & PVC to the environment."""

@@ -79,6 +79,7 @@ class IbmCloudVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     spec = self._CreateBenchmarkSpecFromConfigDict(config, benchmark_name)
     spec.disable_interrupt_moderation = False
     spec.disable_rss = False
+    spec.boot_disk_size = None
     spec.zone = 'us-south-1'
     spec.cidr = '10.101.0.0/24'
     spec.machine_type = 'Test_machine_type'

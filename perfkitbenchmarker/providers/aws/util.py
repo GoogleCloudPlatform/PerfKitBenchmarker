@@ -168,6 +168,13 @@ def GroupZonesIntoRegions(zones):
   return regions_to_zones_map
 
 
+def GetMachineFamily(machine_type: str | None) -> str | None:
+  """Returns the machine family of a machine type."""
+  if not machine_type:
+    return None
+  return machine_type.split('.')[0]
+
+
 def FormatTags(tags_dict):
   """Format a dict of tags into arguments for 'tag' parameter.
 

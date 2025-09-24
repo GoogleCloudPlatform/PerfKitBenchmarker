@@ -46,6 +46,7 @@ class BaseOpenStackNetworkTest(pkb_common_test_case.PkbCommonTestCase):
     spec = self._CreateBenchmarkSpecFromConfigDict(config, benchmark_name)
     spec.disable_interrupt_moderation = False
     spec.disable_rss = False
+    spec.boot_disk_size = None
     spec.zone = 'test-zone'
     spec.cidr = '192.164.1.0/24'
     spec.machine_type = 'Test_machine_type'

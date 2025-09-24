@@ -62,6 +62,11 @@ _TLS = flags.DEFINE_bool(
     False,
     'Whether to enable TLS for the documentdb cluster.',
 )
+_SNAPSHOT = flags.DEFINE_string(
+    'aws_documentdb_snapshot',
+    None,
+    'If supplied, creates the DocumentDB instance from the snapshot.',
+)
 
 _DEFAULT_ZONES = ['us-east-1a', 'us-east-1b', 'us-east-1c']
 _DEFAULT_STORAGE_TYPE = 'iopt1'
@@ -79,6 +84,7 @@ class DocumentDbSpec(non_relational_db.BaseNonRelationalDbSpec):
   db_instance_class: str
   replica_count: int
   tls: bool
+  snapshot: str
 
   def __init__(self, component_full_name, flag_values, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -98,6 +104,7 @@ class DocumentDbSpec(non_relational_db.BaseNonRelationalDbSpec):
         'db_instance_class': (option_decoders.StringDecoder, none_ok),
         'replica_count': (option_decoders.IntDecoder, none_ok),
         'tls': (option_decoders.BooleanDecoder, none_ok),
+        'snapshot': (option_decoders.StringDecoder, none_ok),
     })
     return result
 
@@ -120,6 +127,7 @@ class DocumentDbSpec(non_relational_db.BaseNonRelationalDbSpec):
         'aws_documentdb_replica_count': 'replica_count',
         'aws_documentdb_zones': 'zones',
         'aws_documentdb_tls': 'tls',
+        'aws_documentdb_snapshot': 'snapshot',
     }
     for flag_name, option_name in option_name_from_flag.items():
       if flag_values[flag_name].present:
@@ -133,6 +141,7 @@ class DocumentDb(non_relational_db.BaseManagedMongoDb):
   """Class for working with DocumentDB."""
 
   SERVICE_TYPE = non_relational_db.DOCUMENTDB
+  READY_TIMEOUT = 30 * 60
 
   def __init__(
       self,
@@ -142,6 +151,7 @@ class DocumentDb(non_relational_db.BaseManagedMongoDb):
       db_instance_class: str | None = None,
       replica_count: int | None = None,
       tls: bool | None = None,
+      snapshot: str | None = None,
       **kwargs,
   ):
     super().__init__(**kwargs)
@@ -157,6 +167,7 @@ class DocumentDb(non_relational_db.BaseManagedMongoDb):
     self.storage_encryption = True
     self.parameter_group = None
     self.tls_enabled = tls or False
+    self.snapshot = snapshot
 
     if name:
       # consider logging warning if spec args were passed
@@ -171,6 +182,7 @@ class DocumentDb(non_relational_db.BaseManagedMongoDb):
         db_instance_class=spec.db_instance_class,
         replica_count=spec.replica_count,
         tls=spec.tls,
+        snapshot=spec.snapshot,
         enable_freeze_restore=spec.enable_freeze_restore,
         create_on_restore_error=spec.create_on_restore_error,
         delete_on_freeze_error=spec.delete_on_freeze_error,
@@ -269,19 +281,28 @@ class DocumentDb(non_relational_db.BaseManagedMongoDb):
     vm_util.IssueCommand(cmd)
 
   def _Create(self) -> None:
-    cmd = util.AWS_PREFIX + [
-        'docdb',
-        'create-db-cluster',
+    common_params = [
         '--db-cluster-identifier', self.name,
         '--db-subnet-group-name', self.subnet_group_name,
         '--engine', 'docdb',
         '--storage-type', self.storage_type,
-        '--master-username', 'test',
-        '--master-user-password', 'testtest',
         '--no-deletion-protection',
-        '--storage-encrypted',
         '--region', self.region,
     ]  # pyformat: disable
+    if self.snapshot:
+      cmd = util.AWS_PREFIX + [
+          'docdb',
+          'restore-db-cluster-from-snapshot',
+          '--snapshot-identifier', self.snapshot,
+      ] + common_params  # pyformat: disable
+    else:
+      cmd = util.AWS_PREFIX + [
+          'docdb',
+          'create-db-cluster',
+          '--master-username', 'test',
+          '--master-user-password', 'testtest',
+          '--storage-encrypted',
+      ] + common_params  # pyformat: disable
     if self.tls_enabled:
       cmd += [
           '--db-cluster-parameter-group-name',
@@ -294,7 +315,6 @@ class DocumentDb(non_relational_db.BaseManagedMongoDb):
     ] + util.MakeFormattedDefaultTags()  # pyformat: disable
     vm_util.IssueCommand(cmd)
 
-    create_instance_cmds = []
     for replica_index in range(self.replica_count + 1):
       cmd = util.AWS_PREFIX + [
           'docdb',
@@ -308,13 +328,12 @@ class DocumentDb(non_relational_db.BaseManagedMongoDb):
           '--engine',
           'docdb',
           '--availability-zone',
-          self.zones[0],
+          self.zones[replica_index % len(self.zones)],
           '--region',
           self.region,
           '--tags',
       ] + util.MakeFormattedDefaultTags()  # pyformat: disable
-      create_instance_cmds.append(cmd)
-    background_tasks.RunThreaded(vm_util.IssueCommand, create_instance_cmds)
+      vm_util.IssueCommand(cmd)
 
   def SetupClientTls(self):
     background_tasks.RunThreaded(SetupClientTls, self._client_vms)
@@ -450,6 +469,6 @@ class DocumentDb(non_relational_db.BaseManagedMongoDb):
 def SetupClientTls(vm: virtual_machine.BaseVirtualMachine):
   """See base class."""
   vm.Install('openjdk')
-  vm.PushDataFile('database_scripts/tls_setup.sh')
+  vm.PushDataFile('tls_setup.sh')
   vm.RemoteCommand('chmod +x ~/tls_setup.sh')
   vm.RemoteCommand('~/tls_setup.sh')

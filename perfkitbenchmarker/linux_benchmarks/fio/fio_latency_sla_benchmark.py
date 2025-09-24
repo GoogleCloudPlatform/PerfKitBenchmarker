@@ -55,6 +55,8 @@ fio_latency_sla:
       vm_spec: *default_dual_core
       disk_spec: *default_500_gb
       vm_count: 1
+  flags:
+    fio_num_jobs: []
 """
 JOB_FILE = 'fio-parent.job'
 
@@ -111,7 +113,11 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   """
   vm = spec.vms[0]
   max_iodepth = 100
-  numjobs = math.ceil(vm.num_cpus)/2
+  numjobs = (
+      math.ceil(vm.num_cpus) / 2
+      if not FLAGS.fio_num_jobs
+      else FLAGS.fio_num_jobs[0]
+  )
   benchmark_params = {
       'latency_target': fio_flags.FIO_LATENCY_TARGET.value,
       'latency_percentile': fio_flags.FIO_LATENCY_PERCENTILE.value,
@@ -125,6 +131,10 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   latency_target = _ParseIntLatencyTargetAsMicroseconds(
       fio_flags.FIO_LATENCY_TARGET.value
   )
+  base_metadata = {
+      'latency_target': fio_flags.FIO_LATENCY_TARGET.value,
+      'latency_percentile': fio_flags.FIO_LATENCY_PERCENTILE.value,
+  }
   while left_iodepth <= right_iodepth:
     iodepth = (left_iodepth + right_iodepth) // 2
     benchmark_params['iodepth'] = iodepth
@@ -134,26 +144,43 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
         benchmark_params,
         JOB_FILE,
     )
-    samples = utils.RunTest(vm, constants.FIO_PATH, job_file_str)
-    latency_at_percentile_sample = GetLatencyPercentileSample(samples)
-    iops_samples = GetIopsSamples(samples)
-    iodepth_details[iodepth] = ContructLatencyIopsMap(
-        latency_at_percentile_sample, iops_samples
+    samples = utils.RunTest(
+        vm, constants.FIO_PATH, job_file_str, metadata=base_metadata
     )
-    if latency_at_percentile_sample.unit != 'usec':
+    latency_at_percentile_samples = GetLatencyPercentileSample(samples)
+    iops_samples = GetIopsSamples(samples)
+    iodepth_details[iodepth] = ConstructLatencyIopsMap(
+        latency_at_percentile_samples, iops_samples
+    )
+    read_latency = (
+        iodepth_details[iodepth]['read_latency']
+        if 'read_latency' in iodepth_details[iodepth]
+        else None
+    )
+    write_latency = (
+        iodepth_details[iodepth]['write_latency']
+        if 'write_latency' in iodepth_details[iodepth]
+        else None
+    )
+    if not read_latency and not write_latency:
+      raise errors.Benchmarks.RunError(
+          'Latency is not present in the samples. Please check the logs')
+    if latency_at_percentile_samples[0].unit != 'usec':
       raise errors.Benchmarks.RunError(
           'Latency unit is not usec. Please check and update latency_target is'
           ' needed'
       )
-    if (
-        latency_at_percentile_sample.value > latency_target
-    ):  # latency_at_percentile_sample.value has unit usec
+    # Checking if read or write latency are more than latency target
+    if (read_latency is not None and read_latency > latency_target) or (
+        write_latency is not None and write_latency > latency_target
+    ):  # latency has unit usec
       right_iodepth = iodepth - 1
       logging.info(
-          'Latency at iodepth %s is %s usec (more than latency target),'
-          ' reducing right iodepth to %s',
+          'Read Latency at iodepth %s is %s usec and write latency is %s usec'
+          ' (more than latency target), reducing right iodepth to %s',
           iodepth,
-          latency_at_percentile_sample.value,
+          read_latency,
+          write_latency,
           right_iodepth,
       )
     else:
@@ -162,16 +189,19 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       )  # looking at combined read and write iops for RW workloads
       if total_iops > max_iops_under_sla:
         latency_under_sla_samples = samples
+        max_iops_under_sla = total_iops
       left_iodepth = iodepth + 1
       logging.info(
-          'Latency at iodepth %s is %s usec (less than latency target),'
-          ' increasing left iodepth to %s',
+          'Read Latency at iodepth %s is %s usec and write latency is %s usec'
+          ' (less than latency target), increasing left iodepth to %s',
           iodepth,
-          latency_at_percentile_sample.value,
+          read_latency,
+          write_latency,
           left_iodepth,
       )
   if not latency_under_sla_samples:
     # latency target was never met for these numjobs
+    logging.info('iodepth_details: %s', iodepth_details)
     raise errors.Benchmarks.RunError(
         f'We never reached latency target for {numjobs}, try again by reducing'
         ' the numjobs'
@@ -211,7 +241,7 @@ def GetLatencyPercentileSample(samples):
       for sample in samples
       if sample.metric.endswith(f'latency:p{formatted_percentile}')
   ]
-  return latency_samples[0]
+  return latency_samples
 
 
 def GetIopsSamples(samples):
@@ -223,14 +253,19 @@ def GetIopsSamples(samples):
   return iops_samples
 
 
-def ContructLatencyIopsMap(latency_sample, iops_samples):
+def ConstructLatencyIopsMap(latency_samples, iops_samples):
+  """Constructs a map of latency and IOPS details."""
   metric_details = {}
-  metric_details['latency'] = latency_sample.value
   for iops_sample in iops_samples:
     if iops_sample.metric.endswith('read:iops'):
       metric_details['read_iops'] = iops_sample.value
     if iops_sample.metric.endswith('write:iops'):
       metric_details['write_iops'] = iops_sample.value
+  for latency_sample in latency_samples:
+    if 'read:latency' in latency_sample.metric:
+      metric_details['read_latency'] = latency_sample.value
+    if 'write:latency' in latency_sample.metric:
+      metric_details['write_latency'] = latency_sample.value
   return metric_details
 
 

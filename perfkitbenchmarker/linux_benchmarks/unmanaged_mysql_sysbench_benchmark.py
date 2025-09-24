@@ -237,16 +237,42 @@ def GetBufferPoolSize():
   return f'{DEFAULT_BUFFER_POOL_SIZE}G'
 
 
-def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
-  """Prepare the servers and clients for the benchmark run.
+def PrepareSystem(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Configure the system for the benchmark run.
 
   Args:
     benchmark_spec:
   """
   vms = benchmark_spec.vms
-  background_tasks.RunThreaded(mysql80.ConfigureSystemSettings, vms)
-  background_tasks.RunThreaded(lambda vm: vm.Install('mysql80'), vms)
+  background_tasks.RunOnAllVms(mysql80.ConfigureSystemSettings, vms)
 
+
+def InstallPackages(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Install packages for the benchmark run.
+
+  Args:
+    benchmark_spec:
+  """
+  vms = benchmark_spec.vms
+  background_tasks.RunOnAllVms(lambda vm: vm.Install('mysql80'), vms)
+
+  clients = benchmark_spec.vm_groups['client']
+  for client in clients:
+    client.InstallPackages('git')
+    client.Install('sysbench')
+    if FLAGS.sysbench_testname == _TPCC:
+      client.RemoteCommand(
+          'cd /opt && sudo rm -fr sysbench-tpcc && '
+          f'sudo git clone {sysbench.SYSBENCH_TPCC_REPRO}'
+      )
+
+
+def StartServices(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Start services for the benchmark run.
+
+  Args:
+    benchmark_spec:
+  """
   buffer_pool_size = GetBufferPoolSize()
 
   primary_server = benchmark_spec.vm_groups['server'][0]
@@ -267,16 +293,6 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   assert primary_server.internal_ip
   for replica in replica_servers:
     mysql80.SetupReplica(replica, new_password, primary_server.internal_ip)
-
-  clients = benchmark_spec.vm_groups['client']
-  for client in clients:
-    client.InstallPackages('git')
-    client.Install('sysbench')
-    if FLAGS.sysbench_testname == _TPCC:
-      client.RemoteCommand(
-          'cd /opt && sudo rm -fr sysbench-tpcc && '
-          f'sudo git clone {sysbench.SYSBENCH_TPCC_REPRO}'
-      )
 
   loader_vm = benchmark_spec.vm_groups['client'][0]
   sysbench_parameters = GetSysbenchParameters(

@@ -595,6 +595,15 @@ class BaseContainerCluster(resource.BaseResource):
       )
     return None
 
+  def GetMachineTypeFromNodeName(
+      self, node_name: str
+  ) -> str | None:
+    """Get the machine type from the node name."""
+    nodepool = self.GetNodePoolFromNodeName(node_name)
+    if nodepool is None:
+      return None
+    return nodepool.machine_type
+
   def DeleteContainers(self):
     """Delete containers belonging to the cluster."""
     for container in itertools.chain(*list(self.containers.values())):
@@ -1670,7 +1679,8 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
 
   def __getstate__(self):
     state = self.__dict__.copy()
-    del state['event_poller']
+    if 'event_poller' in state:
+      del state['event_poller']
     return state
 
   def GetResourceMetadata(self):
@@ -1727,7 +1737,7 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     """Get the default storage class for the provider."""
     raise NotImplementedError
 
-  def GetNodeSelectors(self) -> list[str]:
+  def GetNodeSelectors(self, machine_family: str | None = None) -> list[str]:
     """Get the node selectors section of a yaml for the provider."""
     return []
 

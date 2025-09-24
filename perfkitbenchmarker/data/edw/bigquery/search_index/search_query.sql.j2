@@ -7,11 +7,6 @@ WITH
   WHERE
     SEARCH(raw_log,
       '{{search_text}}') = TRUE),
-  total_rows AS (
-  SELECT
-    COUNT(*) AS total_row_count
-  FROM
-    {{table_name}}),
   index_coverage AS (
   SELECT
     coverage_percentage
@@ -21,9 +16,7 @@ WITH
     index_name="{{index_name}}" )
 SELECT
   search_rows.result_rows,
-  total_rows.total_row_count,
   index_coverage.coverage_percentage AS index_coverage_percentage
 FROM
-  total_rows,
   search_rows,
   index_coverage;

@@ -20,6 +20,7 @@ postgreSQL.
 
 import copy
 import logging
+import re
 import time
 
 from absl import flags
@@ -29,7 +30,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_packages import postgresql16
+from perfkitbenchmarker.linux_packages import postgresql
 from perfkitbenchmarker.linux_packages import sysbench
 
 
@@ -105,10 +106,27 @@ _OLTP_READ_ONLY = 'oltp_read_only'
 _OLTP_WRITE_ONLY = 'oltp_write_only'
 _OLTP = [_OLTP_READ_WRITE, _OLTP_READ_ONLY, _OLTP_WRITE_ONLY]
 
-_SHARED_BUFFER_SIZE = flags.DEFINE_integer(
+_SHARED_BUFFER_SIZE = flags.DEFINE_string(
     'postgresql_shared_buffer_size',
-    10,
-    'Size of the shared buffer in the postgresql cluster (in Gb).',
+    '10G',
+    'Size of the shared buffer in the postgresql cluster.'
+    'Format: <size>[<unit>], where <unit> is one of (B, K, M, G). '
+    'Example: 16G, 512M. If no unit is specified, G is assumed by default.',
+)
+
+
+def _ValidateSharedBufferSizeFlagValue(value: str) -> bool:
+  """Validates the shared buffer size flag's format."""
+  # Checks for one or more digits, optionally followed by B, K, M, or G.
+  return bool(re.fullmatch(r'^\d+[BKMG]?$', value))
+
+flags.register_validator(
+    _SHARED_BUFFER_SIZE,
+    _ValidateSharedBufferSizeFlagValue,
+    message=(
+        '--postgresql_shared_buffer_size must be in the format <size>[<unit>] '
+        'where <unit> is one of (B, K, M, G). Example: 16G, 512M, 1024K, 2048B.'
+    )
 )
 _MEASURE_MAX_QPS = flags.DEFINE_bool(
     'postgresql_measure_max_qps',
@@ -121,6 +139,16 @@ _CONF_TEMPLATE_PATH = flags.DEFINE_string(
     'postgresql/postgresql-custom.conf.j2',
     'Path to the postgresql conf template file.',
 )
+
+
+def GetBufferSize() -> str:
+  """Returns the buffer key for the given buffer size."""
+  buffer_size = _SHARED_BUFFER_SIZE.value
+  if buffer_size.endswith(
+      ('B', 'K', 'M', 'G')
+  ):
+    return buffer_size
+  return f'{buffer_size}G'
 
 
 def GetConfig(user_config):
@@ -137,7 +165,7 @@ def GetConfig(user_config):
   # Force the scratch disk as database default dir (simpler code).
   disk_spec = config['vm_groups']['server']['disk_spec']
   for cloud in disk_spec:
-    disk_spec[cloud]['mount_point'] = postgresql16.GetOSDependentDefaults(
+    disk_spec[cloud]['mount_point'] = postgresql.GetOSDependentDefaults(
         FLAGS.os_type
     )['disk_mount_point']
   # Update machine type for server/client.
@@ -177,24 +205,24 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   for vm in benchmark_spec.vm_groups:
     if vm.startswith('replica'):
       replica_servers += benchmark_spec.vm_groups[vm]
-  background_tasks.RunThreaded(postgresql16.ConfigureSystemSettings, vms)
-  background_tasks.RunThreaded(lambda vm: vm.Install('postgresql16'), vms)
+  background_tasks.RunThreaded(postgresql.ConfigureSystemSettings, vms)
+  background_tasks.RunThreaded(lambda vm: vm.Install('postgresql'), vms)
 
   primary_server = benchmark_spec.vm_groups['server'][0]
-  postgresql16.InitializeDatabase(primary_server)
-  postgresql16.ConfigureAndRestart(
+  postgresql.InitializeDatabase(primary_server)
+  postgresql.ConfigureAndRestart(
       primary_server,
       FLAGS.run_uri,
-      _SHARED_BUFFER_SIZE.value,
+      GetBufferSize(),
       _CONF_TEMPLATE_PATH.value,
   )
   for index, replica in enumerate(replica_servers):
-    postgresql16.SetupReplica(
+    postgresql.SetupReplica(
         primary_server,
         replica,
         index,
         FLAGS.run_uri,
-        _SHARED_BUFFER_SIZE.value,
+        GetBufferSize(),
         _CONF_TEMPLATE_PATH.value,
     )
   clients = benchmark_spec.vm_groups['client']
@@ -209,7 +237,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   loader_vm = benchmark_spec.vm_groups['client'][0]
   sysbench_parameters = _GetSysbenchParameters(
       primary_server.internal_ip,
-      postgresql16.GetPsqlUserPassword(FLAGS.run_uri),
+      postgresql.GetPsqlUserPassword(FLAGS.run_uri),
   )
   cmd = sysbench.BuildLoadCommand(sysbench_parameters)
   logging.info('%s load command: %s', FLAGS.sysbench_testname, cmd)
@@ -275,7 +303,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   client = benchmark_spec.vm_groups['client'][0]
   sysbench_parameters = _GetSysbenchParameters(
       primary_server.internal_ip,
-      postgresql16.GetPsqlUserPassword(FLAGS.run_uri),
+      postgresql.GetPsqlUserPassword(FLAGS.run_uri),
   )
   results = []
   # a map of transaction metric name (tps/qps) to current sample with max value

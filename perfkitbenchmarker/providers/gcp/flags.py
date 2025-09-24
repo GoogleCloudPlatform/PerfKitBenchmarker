@@ -146,9 +146,6 @@ flags.DEFINE_multi_string(
     'about GCP instance metadata, see: --metadata from '
     '`gcloud help compute instances create`.',
 )
-flags.DEFINE_integer(
-    'gce_boot_disk_size', None, 'The boot disk size in GB for GCP VMs.'
-)
 flags.DEFINE_enum(
     'gce_boot_disk_type',
     None,
@@ -314,7 +311,7 @@ GKE_USE_LSSD_AS_EPHEMERAL_STORAGE = flags.DEFINE_boolean(
     'Whether to configure NVMe LSSDs to be available to pods as ephemeral '
     'storage. Without this, using LSSDs require persistent volume claims that '
     'no benchmarks currently use. See '
-    'https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/local-ssd.'
+    'https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/local-ssd.',
 )
 CONTAINER_REMOTE_BUILD_CONFIG = flags.DEFINE_string(
     'container_remote_build_config',
@@ -551,6 +548,11 @@ GKE_ENABLE_SHIELDED_NODES = flags.DEFINE_boolean(
     'gke_enable_shielded_nodes',
     False,
     'Whether to enable shielded nodes.',
+)
+GKE_ADDONS = flags.DEFINE_string(
+    'gke_addons',
+    '',
+    'The addons to enable or disable.',
 )
 GCE_PERFORMANCE_MONITORING_UNIT = flags.DEFINE_enum(
     'gce_performance_monitoring_unit',

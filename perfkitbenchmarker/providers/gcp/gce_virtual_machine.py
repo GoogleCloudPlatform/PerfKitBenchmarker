@@ -245,8 +245,6 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['ssd_interface'] = flag_values.gce_ssd_interface
     if flag_values['gce_preemptible_vms'].present:
       config_values['preemptible'] = flag_values.gce_preemptible_vms
-    if flag_values['gce_boot_disk_size'].present:
-      config_values['boot_disk_size'] = flag_values.gce_boot_disk_size
     if flag_values['gce_boot_disk_throughput'].present:
       config_values['boot_disk_throughput'] = (
           flag_values.gce_boot_disk_throughput
@@ -312,7 +310,6 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
             {'default': 0, 'min': 0},
         ),
         'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
-        'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
         'boot_disk_type': (
             option_decoders.StringDecoder,
             {'default': None},
@@ -505,6 +502,17 @@ def GetArmArchitecture(machine_type):
   return _MACHINE_TYPE_PREFIX_TO_ARM_ARCH.get(prefix)
 
 
+def IsLiveMigratableConfidentialCompute(machine_type: str):
+  """Returns True if the provided machine type is both confidential computing and can have its maintenance policy set to MIGRATE."""
+  family = machine_type.split('-')[0]
+  match gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value:
+    case 'sev':
+      return family in (
+          'n2d',
+      )
+  return False
+
+
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   """Object representing a Google Compute Engine Virtual Machine."""
 
@@ -592,27 +600,34 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_shielded_secure_boot = FLAGS.gce_shielded_secure_boot
     # Default to GCE default (Live Migration)
     self.on_host_maintenance = None
-    # https://cloud.google.com/compute/docs/instances/live-migration#gpusmaintenance
-    # https://cloud.google.com/compute/docs/instances/define-instance-placement#restrictions
+    # https://cloud.google.com/compute/docs/instances/live-migration-process#limitations
+    # https://cloud.google.com/compute/docs/instances/placement-policies-overview#restrictions
     # TODO(pclay): Update if this assertion ever changes
     if (
         FLAGS['gce_migrate_on_maintenance'].present
         and FLAGS.gce_migrate_on_maintenance
-        and (self.gpu_count or self.network.placement_group)
+        and (self.gpu_count or self.network.placement_group or self.preemptible)
     ):
       raise errors.Config.InvalidValue(
-          'Cannot set flag gce_migrate_on_maintenance on instances with GPUs '
-          'or network placement groups, as it is not supported by GCP.'
+          'Cannot set flag gce_migrate_on_maintenance on instances with GPUs,'
+          ' network placement groups, or preemption, as it is not supported by'
+          ' GCP.'
       )
     if (
-        not FLAGS.gce_migrate_on_maintenance
-        or self.gpu_count
+        self.gpu_count
         or self.network.placement_group
         or self.preemptible
+        or (
+            gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value
+            and not IsLiveMigratableConfidentialCompute(self.machine_type)
+        )
     ):
       self.on_host_maintenance = 'TERMINATE'
-    else:
-      self.on_host_maintenance = 'MIGRATE'
+    elif FLAGS['gce_migrate_on_maintenance'].present:
+      if FLAGS.gce_migrate_on_maintenance:
+        self.on_host_maintenance = 'MIGRATE'
+      else:
+        self.on_host_maintenance = 'TERMINATE'
 
     self.automatic_restart = FLAGS.gce_automatic_restart
     if self.preemptible:
@@ -666,19 +681,17 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.metadata['gce_egress_bandwidth_tier'] = (
           self.gce_egress_bandwidth_tier
       )
-    if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
-      # TODO(pclay): remove when on-host-maintenance gets promoted to GA
-      cmd.use_alpha_gcloud = True
-      if gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value == 'sev':
-        cmd.flags.update({'confidential-compute-type': 'SEV'})
-      cmd.flags.update({'on-host-maintenance': 'TERMINATE'})
 
-    elif self.on_host_maintenance:
-      # TODO(pclay): remove when on-host-maintenance gets promoted to GA
-      maintenance_flag = 'maintenance-policy'
-      if cmd.use_alpha_gcloud:
-        maintenance_flag = 'on-host-maintenance'
+    # TODO(pclay): remove when on-host-maintenance gets promoted to GA
+    maintenance_flag = 'maintenance-policy'
+    if cmd.use_alpha_gcloud:
+      maintenance_flag = 'on-host-maintenance'
+    if self.on_host_maintenance:
       cmd.flags[maintenance_flag] = self.on_host_maintenance
+
+    if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
+      if gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value == 'sev':
+        cmd.flags['confidential-compute-type'] = 'SEV'
 
     if self.network.subnet_resources:
       net_resources = self.network.subnet_resources
@@ -1025,12 +1038,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             and self.host_list[-1].fill_fraction + 1.0 / self.num_vms_per_host
             > 1.0
         ):
-          host = GceSoleTenantNodeGroup(self.node_type, self.zone, self.project)
-          self.host_list.append(host)
+          self.host = GceSoleTenantNodeGroup(
+              self.node_type, self.zone, self.project
+          )
+          self.host_list.append(self.host)
           if gcp_flags.GCE_NODE_GROUP.value is None:
             # GCE_NODE_GROUP is used to identify an existing node group.
-            host.Create()
-        self.host = self.host_list[-1]
+            self.host.Create()
+        else:
+          self.host = self.host_list[-1]
         if self.num_vms_per_host:
           self.host.fill_fraction += 1.0 / self.num_vms_per_host
 
@@ -1582,21 +1598,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     )
     cmd.Issue()
 
-  def GetVNUMASplitValue(self) -> int | None:
-    """Returns the vNUMA split value for this VM.
-
-    This will only work for N-series VMs within GCE.
-    """
-    if self.numa_node_count and self.machine_type.lower().startswith('n'):
-      return self.num_cpus // self.numa_node_count
-    return None
-
-  def GetMinCpuPlatform(self) -> str | None:
-    """Returns the VM's minimum CPU platform if it exists."""
-    if self.min_cpu_platform:
-      return self.min_cpu_platform
-    return None
-
 
 class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
   """Class supporting Linux GCE virtual machines.
@@ -1731,17 +1732,6 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
     with open(local_path, 'w') as f:
       f.write(stdout)
     return True
-
-  def IsSrsoVulnerable(self) -> bool | None:
-    """Returns whether the AMD Linux VM is susceptible to an SRSO attack."""
-
-    if 'AuthenticAMD' not in self.cpu_version:
-      return None
-
-    vm_cpu_vuln = self.cpu_vulnerabilities
-    if 'spec_rstack_overflow' in vm_cpu_vuln.vulnerabilities.keys():
-      return True
-    return False
 
 
 class Debian11BasedGceVirtualMachine(

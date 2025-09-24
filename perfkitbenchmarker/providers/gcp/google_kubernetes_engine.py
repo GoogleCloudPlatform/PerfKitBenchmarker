@@ -331,6 +331,8 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append('--enable-shielded-nodes')
     else:
       cmd.args.append('--no-enable-shielded-nodes')
+    if gcp_flags.GKE_ADDONS.value:
+      cmd.args.append(f'--addons={gcp_flags.GKE_ADDONS.value}')
     if not self.release_channel:
       cmd.args.append('--no-enable-autoupgrade')
     self._AddNodeParamsToCmd(
@@ -406,6 +408,9 @@ class GkeCluster(BaseGkeCluster):
       cmd.flags['tags'] = ','.join(gce_tags)
     if nodepool_config.min_cpu_platform:
       cmd.flags['min-cpu-platform'] = nodepool_config.min_cpu_platform
+
+    if gcp_flags.GCE_PROVISIONING_MODEL.value == 'SPOT':
+      cmd.args.append('--spot')
 
     if nodepool_config.threads_per_core:
       # TODO(user): Remove when threads-per-core is available in GA
@@ -509,6 +514,12 @@ class GkeCluster(BaseGkeCluster):
     cmd.Issue()
 
 
+_VM_GPU_TYPE_TO_AUTOPILOT_GPU_TYPE = {
+    'nvidia-a100': 'nvidia-a100-80gb',
+    'nvidia-h100': 'nvidia-h100-80gb',
+}
+
+
 class GkeAutopilotCluster(BaseGkeCluster):
   """Class representing an Autopilot GKE cluster, which has no nodepools."""
 
@@ -562,13 +573,22 @@ class GkeAutopilotCluster(BaseGkeCluster):
     metadata['nodepools'] = self.CLUSTER_TYPE
     return metadata
 
-  def GetNodeSelectors(self) -> list[str]:
+  def GetNodeSelectors(self, machine_family: str | None = None) -> list[str]:
     """Node selectors for instance capabilites in AutoPilot clusters."""
     selectors = []
+    if machine_family:
+      selectors += [
+          f'cloud.google.com/machine-family: {machine_family}',
+          # Mandate one pod per node, which also handles packing small pods into
+          # bigger nodes.
+          'cloud.google.com/compute-class: Performance',
+      ]
     # https://cloud.google.com/kubernetes-engine/docs/how-to/autopilot-gpus#request-gpus
     if virtual_machine.GPU_TYPE.value:
       gpu_count = virtual_machine.GPU_COUNT.value or 1
       gpu_type = f'nvidia-{virtual_machine.GPU_TYPE.value}'
+      if gpu_type in _VM_GPU_TYPE_TO_AUTOPILOT_GPU_TYPE:
+        gpu_type = _VM_GPU_TYPE_TO_AUTOPILOT_GPU_TYPE[gpu_type]
       gpu_driver_version = gcp_flags.GKE_GPU_DRIVER_VERSION.value
       selectors += [
           'cloud.google.com/gke-accelerator: ' + gpu_type,

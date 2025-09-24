@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: serving-catalog-cli
+  labels:
+    app: serving-catalog-cli
+spec:
+  ttlSecondsAfterFinished: 10
+  template:
+    spec:
+      initContainers:
+      - name: generator
+        image: {{image_repo}}/serving-catalog-cli
+        env:
+          - name: GENERATE_ARGS
+            value: {{generate_args}}
+          - name: OUTPUT_FILE
+            value: /output/output.yaml
+        volumeMounts:
+        - name: output
+          mountPath: /output
+        resources:
+          requests:
+            cpu: "250m"
+      containers:
+      - name: sleep
+        image: gcr.io/gke-release/debian-base
+        command: ["sleep", "300"]
+        volumeMounts:
+          - name: output
+            mountPath: /output
+        resources:
+          requests:
+            cpu: "250m"
+      restartPolicy: Never
+      volumes:
+      - name: output
+        emptyDir: {}
+  backoffLimit: 1

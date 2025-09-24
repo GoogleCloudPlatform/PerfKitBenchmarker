@@ -20,6 +20,7 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import provider_info
 
 
 class RedisEvictionPolicy:
@@ -141,15 +142,13 @@ def CheckPrerequisites():
   return True
 
 
-def _Install(vm) -> None:
-  """Installs the redis package on the VM."""
+def PrepareSystem(vm) -> None:
+  """Set system-wide parameters on the VM."""
   CheckPrerequisites()
-  vm.Install('build_tools')
-  vm.Install('wget')
-  vm.RemoteCommand(f'cd {linux_packages.INSTALL_DIR}; git clone {REDIS_GIT}')
-  vm.RemoteCommand(
-      f'cd {GetRedisDir()} && git checkout {_VERSION.value} && make'
-  )
+
+  if vm.PLATFORM == provider_info.KUBERNETES:
+    logging.info('Skipping system preparation for Kubernetes VMs.')
+    return
 
   num_processes = _GetNumProcesses(vm)
   # 10 is an arbituary multiplier that ensures this value is high enough.
@@ -172,6 +171,17 @@ def _Install(vm) -> None:
   )
   if not (update_sysvtl and commit_sysvtl):
     logging.info('Fail to optimize overcommit_memory and socket connections.')
+
+
+def _Install(vm) -> None:
+  """Installs the redis package on the VM."""
+  CheckPrerequisites()
+  vm.Install('build_tools')
+  vm.Install('wget')
+  vm.RemoteCommand(f'cd {linux_packages.INSTALL_DIR}; git clone {REDIS_GIT}')
+  vm.RemoteCommand(
+      f'cd {GetRedisDir()} && git checkout {_VERSION.value} && make'
+  )
 
 
 def YumInstall(vm) -> None:

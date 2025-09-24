@@ -35,6 +35,7 @@ from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import sysbench
 
 FLAGS = flags.FLAGS
@@ -316,6 +317,7 @@ def CreateMetadataFromFlags():
       'sysbench_run_seconds': FLAGS.sysbench_run_seconds,
       'sysbench_latency_percentile': FLAGS.sysbench_latency_percentile,
       'sysbench_report_interval': FLAGS.sysbench_report_interval,
+      'sysbench_txn_isolation_level': _TXN_ISOLATION_LEVEL.value,
       'sysbench_rand_type': UNIFORM,
   }
   if FLAGS.sysbench_testname == SPANNER_TPCC:
@@ -670,13 +672,33 @@ def _GetSysbenchRunCommand(
       '--max-requests=0',
       '--time=%d' % duration,
   ]
-  if _GetSysbenchTestParameter() == 'tpcc':
+  # currently only enable Spanner RR on read write test
+  spanner_oltp_read_write = (
+      db.engine_type == sql_engine_utils.SPANNER_POSTGRES
+      and _GetSysbenchTestParameter() == 'oltp_read_write'
+  )
+  if spanner_oltp_read_write and _TXN_ISOLATION_LEVEL.value == 'RC':
+    logging.warning(
+        'Spanner does not support RC isolation level, will ignore'
+        ' sysbench_txn_isolation_level flag and defaulting to SER .'
+    )
+  if _GetSysbenchTestParameter() == 'tpcc' or (
+      spanner_oltp_read_write and _TXN_ISOLATION_LEVEL.value != 'RC'
+  ):
     run_cmd_tokens.append('--trx_level=%s' % _TXN_ISOLATION_LEVEL.value)
   run_cmd = ' '.join(run_cmd_tokens + _GetCommonSysbenchOptions(db) + ['run'])
   run_cmd = 'cd ~/sysbench/ && ' + run_cmd
   return run_cmd
 
 
+class PostgresConnectionError(Exception):
+  pass
+
+
+@vm_util.Retry(
+    max_retries=5,
+    retryable_exceptions=(PostgresConnectionError,),
+)
 def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
   """Issues a sysbench run command given a vm and a duration.
 
@@ -692,6 +714,11 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
 
   Returns:
     stdout, stderr: the result of the command.
+
+  Raises:
+    PostgresConnectionError: If a temporary failure in name resolution occurs
+      during the command execution.
+    errors.Benchmarks.RunError: If sysbench fails for any other reason.
   """
   stdout = ''
   stderr = ''
@@ -699,7 +726,20 @@ def _IssueSysbenchCommand(vm, duration, benchmark_spec, sysbench_thread_count):
     run_cmd = _GetSysbenchRunCommand(
         duration, benchmark_spec.relational_db, sysbench_thread_count
     )
-    stdout, stderr = vm.RobustRemoteCommand(run_cmd, timeout=duration + 60)
+    stdout, stderr = vm.RobustRemoteCommand(
+        run_cmd,
+        timeout=duration + 60,
+        ignore_failure=True,
+    )
+    for output in [stdout, stderr]:
+      if output and 'Temporary failure in name resolution' in output:
+        raise PostgresConnectionError(
+            'Temporary failure in name resolution, retrying'
+        )
+    if stderr:
+      raise errors.Benchmarks.RunError(
+          f'Failure when running sysbench:\n{stderr}'
+      )
     logging.info(
         'Sysbench results: \n stdout is:\n%s\nstderr is\n%s', stdout, stderr
     )

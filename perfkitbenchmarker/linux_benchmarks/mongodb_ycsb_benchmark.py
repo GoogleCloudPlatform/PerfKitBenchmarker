@@ -28,21 +28,23 @@ import posixpath
 import re
 from typing import Any, Optional
 from absl import flags
+from absl import logging
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import mongosh
 from perfkitbenchmarker.linux_packages import ycsb
 
 flags.DEFINE_integer(
-    'mongodb_readahead_kb', None, 'Configure block device readahead settings.'
+    'mongodb_readahead_kb', 8, 'Configure block device readahead settings.'
 )
 flags.DEFINE_bool(
     'mongodb_primary_only',
-    False,
+    True,
     'Run with a simple primary-only setup. Mutually exclusive with'
     ' --mongodb_pss. If both are False, the default PSA setup will be used.',
 )
@@ -68,6 +70,7 @@ _MONGODB_NVME_QUEUE_DEPTH = flags.DEFINE_integer(
 FLAGS = flags.FLAGS
 
 _VERSION_REGEX = r'\d+\.\d+\.\d+'
+DEFAULT_PORT = 27017
 
 BENCHMARK_NAME = 'mongodb_ycsb'
 BENCHMARK_CONFIG = """
@@ -75,7 +78,19 @@ mongodb_ycsb:
   description: Run YCSB against MongoDB.
   vm_groups:
     primary:
-      vm_spec: *default_dual_core
+      vm_spec:
+        GCP:
+          machine_type: n4-standard-2
+          zone: us-central1-b
+          boot_disk_size: 100
+        Azure:
+          machine_type: Standard_D2s_v6
+          zone: eastus-1
+          boot_disk_size: 100
+        AWS:
+          machine_type: m7i.large
+          zone: us-east-1a
+          boot_disk_size: 100
       disk_spec:
         GCP:
           disk_size: 500
@@ -91,7 +106,19 @@ mongodb_ycsb:
           mount_point: /scratch
       vm_count: 1
     secondary:
-      vm_spec: *default_dual_core
+      vm_spec:
+        GCP:
+          machine_type: n4-standard-2
+          zone: us-central1-b
+          boot_disk_size: 100
+        Azure:
+          machine_type: Standard_D2s_v6
+          zone: eastus-1
+          boot_disk_size: 100
+        AWS:
+          machine_type: m7i.large
+          zone: us-east-1a
+          boot_disk_size: 100
       disk_spec:
         GCP:
           disk_size: 500
@@ -107,7 +134,19 @@ mongodb_ycsb:
           mount_point: /scratch
       vm_count: 1
     secondary_2:
-      vm_spec: *default_dual_core
+      vm_spec:
+        GCP:
+          machine_type: n4-standard-2
+          zone: us-central1-b
+          boot_disk_size: 100
+        Azure:
+          machine_type: Standard_D2s_v6
+          zone: eastus-1
+          boot_disk_size: 100
+        AWS:
+          machine_type: m7i.large
+          zone: us-east-1a
+          boot_disk_size: 100
       disk_spec:
         GCP:
           disk_size: 500
@@ -135,6 +174,28 @@ mongodb_ycsb:
     fstab_options: noatime
     enable_transparent_hugepages: false
     create_and_boot_post_task_delay: 5
+    ycsb_fail_on_incomplete_loading: True
+    ycsb_measurement_type: hdrhistogram
+    ycsb_status: True
+    ycsb_status_interval_sec: 1
+    ycsb_operation_count: 1000000000
+    ycsb_record_command_line: False
+    ycsb_run_parameters: dataintegrity=true,readallfields=true,writeallfields=true
+    ycsb_client_vms: 1
+    ycsb_preload_threads: 512
+    ycsb_threads_per_client: "2048"
+    # 100r:0w, 75r:25w with zipfian distribution
+    ycsb_workload_files: workloadc,75r25w
+    ycsb_field_count: 10
+    ycsb_field_length: 100
+    ycsb_record_count: 20000000
+    ycsb_sleep_after_load_in_sec: 300
+    ycsb_timelimit: 300
+    ycsb_sleep_between_thread_runs_sec: 120
+    os_type: ubuntu2204
+    timeout_minutes: 360
+    sar: True
+    sar_interval: 1
 """
 
 _LinuxVM = linux_virtual_machine.BaseLinuxVirtualMachine
@@ -194,7 +255,9 @@ def _PrepareServer(vm: _LinuxVM) -> None:
   vm.Install('mongosh')
 
   data_dir = _GetDataDir(vm)
+  vm.RemoteCommand('sudo systemctl stop mongod || true')
   vm.RemoteCommand(f'sudo rm -rf {data_dir}')
+  vm.RemoteCommand('sudo rm -rf /var/lib/mongodb')
   vm.RemoteCommand(f'mkdir {data_dir} && chmod a+rwx {data_dir}')
   vm.RemoteCommand(
       f'sudo sed -i "s|dbPath:.*|dbPath: {data_dir}|"'
@@ -226,75 +289,102 @@ def _PrepareArbiter(vm: _LinuxVM) -> None:
   vm.RemoteCommand('ulimit -n 64000 && sudo systemctl start mongod')
 
 
-def _PrepareReplicaSet(
+def _PrepareMembers(
     server_vms: Sequence[_LinuxVM], arbiter_vm: Optional[_LinuxVM]
 ) -> None:
-  """Prepares the replica set for the benchmark.
+  """Prepares the replica set members for the benchmark.
 
-  This benchmark currently uses a primary-secondary-arbiter replica set
-  configuration. The secondary keeps a full replica of the data while the
-  arbiter does not. The arbiter is still able to vote. See
-  https://www.mongodb.com/docs/manual/core/replica-set-architecture-three-members
-  for more information.
+  This benchmark currently supports three replica set configurations:
+  1. Primary only
+  2. Primary + two secondaries (PSS)
+  3. Primary + secondary + arbiter (PSA)
 
   Args:
     server_vms: The primary (index 0) and secondary (index 1) server VMs to use.
     arbiter_vm: The arbiter VM to use.
   """
-  if FLAGS.mongodb_pss and len(server_vms) == 3 and arbiter_vm is None:
-    args = {
-        '_id': '"rs0"',
-        'members': [
-            {
-                '_id': 0,
-                'host': f'"{server_vms[0].internal_ip}:27017"',
-                'priority': 1,
-            },
-            {
-                '_id': 1,
-                'host': f'"{server_vms[1].internal_ip}:27017"',
-                'priority': 1,
-            },
-            {
-                '_id': 2,
-                'host': f'"{server_vms[2].internal_ip}:27017"',
-                'priority': 1,
-            },
-        ],
-    }
-  elif (
-      not FLAGS.mongodb_pss
-      and not FLAGS.mongodb_primary_only
-      and len(server_vms) == 2
-      and arbiter_vm is not None
-  ):
-    args = {
-        '_id': '"rs0"',
-        'members': [
-            {
-                '_id': 0,
-                'host': f'"{server_vms[0].internal_ip}:27017"',
-                'priority': 1,
-            },
-            {
-                '_id': 1,
-                'host': f'"{server_vms[1].internal_ip}:27017"',
-                'priority': 0.5,
-            },
-            {
-                '_id': 2,
-                'host': f'"{arbiter_vm.internal_ip}:27017"',
-                'arbiterOnly': True,
-            },
-        ],
-    }
-  else:
-    raise errors.Config.InvalidValue(
-        'Invalid number of server VMs and arbiter VM for replica set.'
+  primary_vm = server_vms[0]
+  primary_host = f'{primary_vm.internal_ip}:{DEFAULT_PORT}'
+
+  # Initiate the replica set with just the primary
+  init_config = {
+      '_id': f'rs-{FLAGS.run_uri}',
+      'members': [{
+          '_id': 0,
+          'host': primary_host,
+      }],
+  }
+  # Convert dict to string, mongosh prefers single quotes for strings
+  init_config_str = json.dumps(init_config).replace('"', "'")
+  init_command = f'rs.initiate({init_config_str})'
+  mongosh.RunCommand(primary_vm, init_command)
+
+  @vm_util.Retry(timeout=300)
+  def AddMember(primary_vm, vm: _LinuxVM, is_arbiter: bool = False) -> None:
+    if is_arbiter:
+      command = f"rs.addArb('{vm.internal_ip}:{DEFAULT_PORT}')"
+    else:
+      command = f"rs.add('{vm.internal_ip}:{DEFAULT_PORT}')"
+
+    stdout, stderr = mongosh.RunCommand(primary_vm, command)
+
+    if not stderr:
+      logging.info('Member %s is added successfully:\n%s', vm.name, stdout)
+      return
+
+    if 'Found two member configurations with same host field' in stderr:
+      logging.info(
+          'Member %s is already a member:\n%s. Considering this as success.',
+          vm.name,
+          stderr,
+      )
+      return
+
+    raise ValueError(f'Member addition failed: {stderr}')
+
+  # Add other members one by one (if any)
+  all_members = [primary_host]
+  AddMember(primary_vm, server_vms[1])
+  all_members.append(f'{server_vms[1].internal_ip}:{DEFAULT_PORT}')
+  if FLAGS.mongodb_pss:
+    AddMember(primary_vm, server_vms[2])
+    all_members.append(f'{server_vms[2].internal_ip}:{DEFAULT_PORT}')
+  else:  # PSA setup
+    if arbiter_vm is None:
+      raise ValueError('Arbiter VM must be provided for PSA replica set setup.')
+    set_concern_command = (
+        'db.adminCommand({ setDefaultRWConcern: 1, '
+        'defaultWriteConcern: { w: 1 } })'
     )
-  mongosh.RunCommand(server_vms[0], f'rs.initiate({json.dumps(args)})')
-  mongosh.RunCommand(server_vms[0], 'rs.conf()')
-  mongosh.RunCommand(server_vms[0], 'rs.status()')
+    mongosh.RunCommand(primary_vm, set_concern_command)
+    logging.info('Successfully set default write concern to w:1.')
+    AddMember(primary_vm, arbiter_vm, is_arbiter=True)
+    all_members.append(f'{arbiter_vm.internal_ip}:{DEFAULT_PORT}')
+
+  @vm_util.Retry(timeout=300)
+  def WaitForMemberActive(member_host):
+    """Waits for a member to become active."""
+    try:
+      stdout, stderr = _GetReplicaSetMemberState(primary_vm, member_host)
+      logging.info(
+          '_GetReplicaSetMemberState stdout: %s, stderr: %s', stdout, stderr
+      )
+    except errors.VirtualMachine.RemoteCommandError as e:
+      logging.exception('Failed to get replica set member state: %s', e)
+      raise
+    state = stdout.strip()
+
+    if state in ['PRIMARY', 'SECONDARY', 'ARBITER']:
+      logging.info('Member %s is now %s.', member_host, state)
+      return
+
+    raise ValueError(f'Member {member_host} is still {state}')
+
+  for member_host in all_members:
+    WaitForMemberActive(member_host)
+
+  mongosh.RunCommand(primary_vm, 'rs.conf()')
+  mongosh.RunCommand(primary_vm, 'rs.status()')
 
 
 def _PrepareClient(vm: _LinuxVM) -> None:
@@ -320,7 +410,7 @@ def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
 
   if FLAGS.mongodb_primary_only:
     return (
-        f'"mongodb://{primary.internal_ip}:27017/ycsb'
+        f'"mongodb://{primary.internal_ip}:{DEFAULT_PORT}/ycsb'
         '?w=1&j=true&compression=snappy&maxPoolSize=100000"'
     )
 
@@ -328,19 +418,19 @@ def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
     secondary = benchmark_spec.vm_groups['secondary'][0]
     secondary_2 = benchmark_spec.vm_groups['secondary_2'][0]
     return (
-        f'"mongodb://{primary.internal_ip}:27017,'
-        f'{secondary.internal_ip}:27017,'
-        f'{secondary_2.internal_ip}:27017/ycsb'
-        '?replicaSet=rs0&w=majority&compression=snappy&maxPoolSize=100000"'
+        f'"mongodb://{primary.internal_ip}:{DEFAULT_PORT},'
+        f'{secondary.internal_ip}:{DEFAULT_PORT},'
+        f'{secondary_2.internal_ip}:{DEFAULT_PORT}/ycsb'
+        f'?replicaSet=rs-{FLAGS.run_uri}&w=majority&compression=snappy&maxPoolSize=100000"'
     )
 
   secondary = benchmark_spec.vm_groups['secondary'][0]
   arbiter = benchmark_spec.vm_groups['arbiter'][0]
   return (
-      f'"mongodb://{primary.internal_ip}:27017,'
-      f'{secondary.internal_ip}:27017,'
-      f'{arbiter.internal_ip}:27017/ycsb'
-      '?replicaSet=rs0&w=majority&compression=snappy&maxPoolSize=100000"'
+      f'"mongodb://{primary.internal_ip}:{DEFAULT_PORT},'
+      f'{secondary.internal_ip}:{DEFAULT_PORT},'
+      f'{arbiter.internal_ip}:{DEFAULT_PORT}/ycsb'
+      f'?replicaSet=rs-{FLAGS.run_uri}&w=majority&compression=snappy&maxPoolSize=100000"'
   )
 
 
@@ -415,7 +505,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   )
 
   if not FLAGS.mongodb_primary_only:
-    _PrepareReplicaSet(server_vms, arbiter)
+    _PrepareMembers(server_vms, arbiter)
 
   benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
   benchmark_spec.mongodb_url = _GetMongoDbURL(benchmark_spec)
@@ -511,4 +601,30 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     )
     server.RemoteCommand('rm -rf %s' % _GetDataDir(server))
 
-  CleanupServer(benchmark_spec.vm_groups['workers'][0])
+  server_vms = benchmark_spec.vm_groups['primary']
+  if not FLAGS.mongodb_primary_only:
+    server_vms += benchmark_spec.vm_groups['secondary']
+    if FLAGS.mongodb_pss:
+      server_vms += benchmark_spec.vm_groups['secondary_2']
+    else:
+      server_vms += benchmark_spec.vm_groups['arbiter']
+
+  for vm in server_vms:
+    CleanupServer(vm)
+
+
+def _GetReplicaSetMemberState(vm, host_port: str) -> tuple[str, str]:
+  """Gets the state of a specific member in the replica set.
+
+  Args:
+    vm: The VM to run the command on.
+    host_port: The host:port of the member to get the state for.
+
+  Returns:
+    A tuple of (stdout, stderr) from the remote command.
+  """
+  return mongosh.RunCommand(
+      vm,
+      f"rs.status().members.find(m => m.name === '{host_port}').stateStr",
+      quiet=True,
+  )

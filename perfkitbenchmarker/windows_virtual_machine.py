@@ -18,7 +18,7 @@ import logging
 import ntpath
 import os
 import time
-from typing import Tuple, cast
+from typing import cast, Tuple
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -27,9 +27,11 @@ from perfkitbenchmarker import os_mixin
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_packages
+import requests
 import six
 import timeout_decorator
 import winrm
+
 
 FLAGS = flags.FLAGS
 
@@ -114,16 +116,28 @@ def winrm_retry(func):
     A function that wraps functions in retry logic. It can be used as a
     decorator.
   """
+
   def wrapper(self, *args, **kwargs):
 
     retried_func = vm_util.Retry(
         log_errors=False,
         max_retries=FLAGS.winrm_retries,
         poll_interval=FLAGS.winrm_retry_interval,
-        retryable_exceptions=WaitTimeoutError,
+        retryable_exceptions=(
+            WaitTimeoutError,
+            requests.exceptions.ConnectionError,
+        ),
     )(func)
 
-    return retried_func(self, *args, **kwargs)
+    try:
+      return retried_func(self, *args, **kwargs)
+    except requests.exceptions.ConnectionError:
+      logging.warning(
+          'ConnectionError detected. The WinRM service on the VM'
+          ' may be down or restarting. Please check Windows Event Logs'
+          ' on the VM for details.'
+      )
+      raise
 
   return wrapper
 
@@ -633,7 +647,8 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
       script_path = ntpath.join(self.temp_dir, os.path.basename(tf.name))
       self.RemoteCopy(tf.name, script_path)
       self.RemoteCommand(
-          'diskpart /s {script_path}'.format(script_path=script_path)
+          'diskpart /s {script_path}'.format(script_path=script_path),
+          timeout=60,
       )
 
   def DiskDriveIsLocal(self, device, model):

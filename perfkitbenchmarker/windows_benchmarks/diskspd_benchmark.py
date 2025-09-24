@@ -39,7 +39,7 @@ def GetConfig(user_config):
 def Prepare(benchmark_spec):
   vm = benchmark_spec.vms[0]
   vm.Install('diskspd')
-  if FLAGS.diskspd_prefill:
+  if FLAGS.diskspd_prefill_duration is not None:
     diskspd.Prefill(vm)
 
 
@@ -53,7 +53,6 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects with the benchmark results.
   """
-
   vm = benchmark_spec.vms[0]
   results = []
   results.extend(diskspd.RunDiskSpd(vm))

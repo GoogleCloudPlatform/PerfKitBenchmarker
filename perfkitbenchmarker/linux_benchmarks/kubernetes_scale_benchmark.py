@@ -108,8 +108,10 @@ def _GetRolloutCreationTime(rollout_name: str) -> int:
 
 def _GetScaleTimeout() -> int:
   """Returns the timeout for the scale up & teardown."""
-  base_timeout = 60 * 10
-  per_pod_timeout = NUM_PODS.value * 3
+  base_timeout = 60 * 10  # 10 minutes
+  per_pod_timeout = NUM_PODS.value * 3  # 3 seconds per pod
+  if virtual_machine.GPU_COUNT.value:
+    base_timeout = 60 * 30  # 30 minutes
   proposed_timeout = base_timeout + per_pod_timeout
   max_timeout = 2 * 60 * 60  # 2 hours
   return min(proposed_timeout, max_timeout)
@@ -175,7 +177,9 @@ def ScaleUpPods(
       EphemeralStorageRequest='10Mi',
       RolloutTimeout=max_wait_time,
       PodTimeout=max_wait_time + 60,
-      NodeSelectors=cluster.GetNodeSelectors(),
+      NodeSelectors=cluster.GetNodeSelectors(
+          cluster.default_nodepool.machine_type
+      ),
   )
 
   # Arbitrarily pick the first resource (it should be the only one.)
@@ -237,28 +241,32 @@ def _CheckForFailures(
     QuotaFailure: If a quota is exceeded.
     RunError: If scale up failed for a non-quota reason.
   """
+  events = cluster.GetEvents()
   ready_count_sample = next(
       (s for s in pod_samples if s.metric == 'pod_Ready_count'), None
   )
-  if ready_count_sample is None:
-    raise errors.Benchmarks.RunError(
-        'No pod ready events were found; this should almost never happen.'
-    )
-  if ready_count_sample.value >= NUM_PODS.value:
+  if (
+      ready_count_sample is not None
+      and ready_count_sample.value >= NUM_PODS.value
+  ):
     logging.info(
-        'Benchmark successfully scaled up %d pods, which is more than the goal'
-        ' of %d pods.',
+        'Benchmark successfully scaled up %d pods, which is equal to or more '
+        'than the goal of %d pods.',
         ready_count_sample.value,
         NUM_PODS.value,
     )
     return
-  events = cluster.GetEvents()
   for event in events:
     if event.reason == 'FailedScaleUp' and 'quota exceeded' in event.message:
       raise errors.Benchmarks.QuotaFailure(
           'Failed to scale up to %d pods, at least one pod ran into a quota'
           ' error: %s' % (NUM_PODS.value, event.message)
       )
+  if ready_count_sample is None:
+    raise errors.Benchmarks.RunError(
+        'No pod ready events were found & we attempted to scale up to'
+        f' {NUM_PODS.value} pods; this is unusual.'
+    )
 
   raise errors.Benchmarks.RunError(
       'Benchmark attempted to scale up to  %d pods but only %d pods were'
@@ -413,6 +421,12 @@ def _SummarizeTimestamps(timestamps: list[float]) -> dict[str, float]:
 
 def Cleanup(_):
   """Cleanups scale benchmark. Runs before teardown."""
+  container_service.RunKubectlCommand(['get', 'deployments'])
+  container_service.RunRetryableKubectlCommand(
+      ['delete', 'deployment', 'kubernetes-scaleup'],
+      timeout=_GetScaleTimeout(),
+      raise_on_failure=False,
+  )
   container_service.RunRetryableKubectlCommand(
       ['delete', '--all', 'pods', '-n', 'default'], timeout=_GetScaleTimeout()
   )

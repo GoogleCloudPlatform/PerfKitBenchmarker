@@ -310,10 +310,51 @@ sparksql_tpcds_1t:
           provisioned_iops: 5000
           provisioned_throughput: 480
 
+sparksql_tpcds_1t_tuned:
+  name: dpb_sparksql_benchmark
+  flags:
+    create_and_boot_post_task_delay: 2
+    dpb_export_job_stats: True
+    dpb_sparksql_copy_to_hdfs: True
+    dpb_sparksql_create_hive_tables: False
+    dpb_sparksql_data_compression: snappy
+    dpb_sparksql_data_format: parquet
+    dpb_sparksql_order: 1,2,3,4,5,6,7,8,9,10,11,12,13,14a,14b,15,16,17,18,19,20,21,22,23a,23b,24a,24b,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39a,39b,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99
+    dpb_sparksql_query: tpcds_2_4
+    hadoop_hdfs_client_readahead: 0
+    hadoop_hdfs_replication: 1
+    hadoop_version: 3.4.1
+    openjdk_version: 11
+    spark_version: 3.5.6
+    sparksql_readahead_kb: 1024
+  dpb_service:
+    service_type: unmanaged_spark_cluster
+    worker_count: 8
+    worker_group:
+      vm_spec:
+        GCP:
+          num_local_ssds: 0
+      disk_count: 4
+      disk_spec:
+        GCP:
+          disk_size: 320
+          disk_type: hyperdisk-balanced
+          provisioned_iops: 160000
+          provisioned_throughput: 2400
+        AWS:
+          disk_size: 500
+          disk_type: gp3
+          provisioned_iops: 5000
+          provisioned_throughput: 480
+
 sysbench_oltp_base: &sysbench_oltp_base
   sysbench_table_size: 50000000
   sysbench_tables: 8
   sar: True
+
+sysbench_oltp_base_lssd: &sysbench_oltp_base_lssd
+  innodb_buffer_pool_size: 8
+  <<: *sysbench_oltp_base
 
 mysql_sysbench_oltp_read_write:
   name: unmanaged_mysql_sysbench
@@ -332,6 +373,24 @@ mysql_sysbench_oltp_write_only:
   flags:
     sysbench_testname: oltp_write_only
     <<: *sysbench_oltp_base
+
+mysql_sysbench_oltp_read_only_lssd:
+  name: unmanaged_mysql_sysbench
+  flags:
+    sysbench_testname: oltp_read_only
+    <<: *sysbench_oltp_base_lssd
+
+mysql_sysbench_oltp_read_write_lssd:
+  name: unmanaged_mysql_sysbench
+  flags:
+    sysbench_testname: oltp_read_write
+    <<: *sysbench_oltp_base_lssd
+
+mysql_sysbench_oltp_write_only_lssd:
+  name: unmanaged_mysql_sysbench
+  flags:
+    sysbench_testname: oltp_write_only
+    <<: *sysbench_oltp_base_lssd
 
 mysql_sysbench_tpcc:
   name: unmanaged_mysql_sysbench
@@ -367,24 +426,6 @@ postgres_sysbench_tpcc:
     sysbench_tables: 10
     sysbench_scale: 100
     sysbench_use_fk: False
-
-mongodb:
-  name: mongodb_ycsb
-  flags:
-    mongodb_readahead_kb: 8
-    iostat: True
-    sar: True
-    sar_interval: 1
-    ycsb_fail_on_incomplete_loading: True
-    ycsb_measurement_type: hdrhistogram
-    ycsb_status: True
-    ycsb_status_interval_sec: 1
-    ycsb_operation_count: 1000000000
-    ycsb_record_command_line: False
-    ycsb_run_parameters: dataintegrity=true,readallfields=true,writeallfields=true
-    timeout_minutes: 360
-    mongodb_primary_only: True
-    mongodb_pss: False
 
 fio_latency:
   name: fio
@@ -424,7 +465,6 @@ hadoop_dfsio:
     hadoop_version: 3.4.1
     num_cpus_override: 16
     openjdk_version: 11
-    os_type: ubuntu2404
     yarn_scheduler: org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler
   dpb_service:
     service_type: unmanaged_dpb_svc_yarn_cluster
@@ -439,3 +479,75 @@ hadoop_dfsio:
           disk_size: 6830
           disk_type: hyperdisk-throughput
           provisioned_throughput: 600
+
+diskspd_read_only:
+  name: diskspd
+  flags: &diskspd_read_only_flags
+    diskspd_prefill_duration: 2700
+    diskspd_write_read_ratio: 0
+    after_prepare_sleep_time: 300 # Wait after the prepare phase for prefill to complete.
+
+diskspd_write_only:
+  name: diskspd
+  flags: &diskspd_write_only_flags
+    diskspd_write_read_ratio: 100
+
+diskspd_single_thread_latency:
+  name: diskspd
+  flags: &diskspd_single_thread_latency_flags
+    diskspd_thread_number_per_file: 1
+    diskspd_outstanding_io: 1
+    diskspd_block_size: 4k
+    diskspd_access_pattern: r
+
+diskspd_max_iops:
+  name: diskspd
+  flags: &diskspd_max_iops_flags
+    diskspd_thread_number_per_file: 4,8,16,32,64,96,128
+    diskspd_outstanding_io: 64
+    diskspd_block_size: 4k
+    diskspd_access_pattern: r
+
+diskspd_max_throughput:
+  name: diskspd
+  flags: &diskspd_max_throughput_flags
+    diskspd_thread_number_per_file: 8,16
+    diskspd_outstanding_io: 64,128
+    diskspd_block_size:  1M
+    diskspd_access_pattern: s
+
+diskspd_single_thread_latency_read_only:
+  name: diskspd
+  flags:
+    <<: *diskspd_read_only_flags
+    <<: *diskspd_single_thread_latency_flags
+
+diskspd_single_thread_latency_write_only:
+  name: diskspd
+  flags:
+    <<: *diskspd_write_only_flags
+    <<: *diskspd_single_thread_latency_flags
+
+diskspd_max_iops_read_only:
+  name: diskspd
+  flags:
+    <<: *diskspd_read_only_flags
+    <<: *diskspd_max_iops_flags
+
+diskspd_max_iops_write_only:
+  name: diskspd
+  flags:
+    <<: *diskspd_write_only_flags
+    <<: *diskspd_max_iops_flags
+
+diskspd_max_throughput_read_only:
+  name: diskspd
+  flags:
+    <<: *diskspd_read_only_flags
+    <<: *diskspd_max_throughput_flags
+
+diskspd_max_throughput_write_only:
+  name: diskspd
+  flags:
+    <<: *diskspd_write_only_flags
+    <<: *diskspd_max_throughput_flags

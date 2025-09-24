@@ -295,6 +295,8 @@ class AksCluster(container_service.KubernetesCluster):
   def _PostCreate(self):
     """Tags the cluster resource group."""
     super()._PostCreate()
+    self._GetCredentials(use_admin=True)
+    self._WaitForDefaultServiceAccount()
     set_tags_cmd = [
         azure.AZURE_PATH,
         'group',
@@ -307,15 +309,12 @@ class AksCluster(container_service.KubernetesCluster):
     vm_util.IssueCommand(set_tags_cmd)
     self._AttachContainerRegistry()
 
-  def _GetCredentials(self, use_admin: bool) -> bool:
+  def _GetCredentials(self, use_admin: bool) -> None:
     """Helper method to get credentials and check service account readiness.
 
     Args:
         use_admin (bool): Whether to use the `--admin` flag in the `aks
           get-credentials` command.
-
-    Returns:
-        bool: True if the default service account exists, False otherwise.
     """
     # Fetch Kubernetes credentials
     cmd = [
@@ -332,21 +331,76 @@ class AksCluster(container_service.KubernetesCluster):
     cmd += self.resource_group.args
     vm_util.IssueCommand(cmd)
 
-    # Check for default service account. POD creation will fail until the
-    # default service account is created.
-    get_service_account_cmd = [
-        FLAGS.kubectl,
-        '--kubeconfig',
-        FLAGS.kubeconfig,
-        'get',
-        'serviceAccounts',
-    ]
-    stdout, _, _ = vm_util.IssueCommand(get_service_account_cmd)
-    return 'default' in stdout
-
   def _IsReady(self) -> bool:
     """Returns True if the cluster is ready."""
-    return self._GetCredentials(use_admin=True)
+    show_cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'show',
+        '--name',
+        self.name,
+    ] + self.resource_group.args
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
+
+    try:
+      provisioning_state = json.loads(stdout).get('provisioningState')
+      if provisioning_state == 'Failed':
+        raise errors.Resource.CreationError('Cluster provisioning failed.')
+      if provisioning_state != 'Succeeded':
+        return False
+    except json.JSONDecodeError:
+      return False
+    return True
+
+  def _WaitForDefaultServiceAccount(self):
+    """Waits for the default service account to be created, or throws an error.
+
+    POD creation will fail until the default service account is created.
+    """
+
+    @vm_util.Retry(
+        poll_interval=self.POLL_INTERVAL,
+        fuzz=0,
+        timeout=self.READY_TIMEOUT,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
+    def _GetServiceAccount():
+      """Inner function to retry but passing self.POLL_INTERVAL as default.
+
+      Raises:
+        errors.Resource.CreationError: If the user does not have sufficient
+          permissions to list service accounts.
+        errors.VmUtil.IssueCommandError: If the command to get service accounts
+          fails for any other reason.
+        errors.Resource.RetryableCreationError: If the default service account
+          has not yet been created. This is automatically retried by the
+          outer decorator.
+      """
+      get_service_account_cmd = [
+          FLAGS.kubectl,
+          '--kubeconfig',
+          FLAGS.kubeconfig,
+          'get',
+          'serviceAccounts',
+      ]
+      stdout, err, code = vm_util.IssueCommand(
+          get_service_account_cmd, raise_on_failure=False
+      )
+      if 'default' not in stdout:
+        raise errors.Resource.RetryableCreationError(
+            'Service account not yet ready.'
+        )
+      if code != 0:
+        if 'User does not have access to the resource in Azure' in err:
+          raise errors.Resource.RetryableCreationError(
+              'First kubectl command failed with permission denied, but'
+              ' retrying as this can just be a race condition.'
+          )
+        raise errors.Resource.CreationError(
+            'First kubectl command failed with error: %s' % err
+        )
+
+    _GetServiceAccount()
 
   def _CreateDependencies(self):
     """Creates the resource group."""
@@ -428,36 +482,56 @@ class AksAutomaticCluster(AksCluster):
         timeout=1800,
     )
 
-  def _IsReady(self) -> bool:
-    """Returns True if the cluster is ready."""
-    # Check provisioning state
-    show_cmd = [
+  def _CreateRoleAssignment(self):
+    """Creates a role assignment for the current user."""
+    full_cluster_id, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH,
         'aks',
         'show',
         '--name',
         self.name,
-    ] + self.resource_group.args
-
-    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
-    try:
-      provisioning_state = json.loads(stdout).get('provisioningState')
-      if provisioning_state == 'Failed':
-        raise errors.Resource.CreationError('Cluster provisioning failed.')
-      if provisioning_state != 'Succeeded':
-        return False
-    except json.JSONDecodeError:
-      return False
-
-    return self._GetCredentials(use_admin=False)
+        '--resource-group',
+        self.resource_group.name,
+        '--query',
+        'id',
+        '--output',
+        'tsv',
+    ])
+    full_cluster_id = full_cluster_id.strip()
+    current_user, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'account',
+        'show',
+        '--query',
+        'user.name',
+        '--output',
+        'tsv',
+    ])
+    current_user = current_user.strip()
+    create_role_assignment_cmd = [
+        azure.AZURE_PATH,
+        'role',
+        'assignment',
+        'create',
+        '--assignee',
+        current_user,
+        '--role',
+        'Azure Kubernetes Service RBAC Admin',
+        '--scope',
+        full_cluster_id,
+    ]
+    vm_util.IssueCommand(create_role_assignment_cmd)
 
   def _PostCreate(self):
     """Skip the superclass's _PostCreate() method.
 
-    Needed as the node_resource_group is pre-configured and fully managed in
-    Automatic clusters
+    Needed as node_resource_group is pre-configured and fully managed in
+    Automatic clusters & role assignment must be created before authenticating.
     """
     super(container_service.KubernetesCluster, self)._PostCreate()
+    self._CreateRoleAssignment()
+    self._GetCredentials(use_admin=False)
+    self._WaitForDefaultServiceAccount()
     self._AttachContainerRegistry()
 
 

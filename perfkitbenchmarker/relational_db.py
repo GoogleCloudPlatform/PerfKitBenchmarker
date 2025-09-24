@@ -413,12 +413,12 @@ class BaseRelationalDb(resource.BaseResource):
         'client_vm_zone': self.spec.vm_groups['clients'].vm_spec.zone,
         'use_managed_db': self.is_managed_db,
         'instance_id': self.instance_id,
-        'client_vm_disk_type': self.spec.vm_groups[
-            'clients'
-        ].disk_spec.disk_type,
-        'client_vm_disk_size': self.spec.vm_groups[
-            'clients'
-        ].disk_spec.disk_size,
+        'client_vm_disk_type': (
+            self.spec.vm_groups['clients'].disk_spec.disk_type
+        ),
+        'client_vm_disk_size': (
+            self.spec.vm_groups['clients'].disk_spec.disk_size
+        ),
     }
 
     if (
@@ -456,9 +456,9 @@ class BaseRelationalDb(resource.BaseResource):
         and self.spec.vm_groups['clients'].vm_spec.machine_type
     ):
       metadata.update({
-          'client_vm_machine_type': self.spec.vm_groups[
-              'clients'
-          ].vm_spec.machine_type,
+          'client_vm_machine_type': (
+              self.spec.vm_groups['clients'].vm_spec.machine_type
+          ),
       })
     elif hasattr(self.spec.vm_groups['clients'].vm_spec, 'cpus') and (
         hasattr(self.spec.vm_groups['clients'].vm_spec, 'memory')
@@ -483,6 +483,13 @@ class BaseRelationalDb(resource.BaseResource):
       metadata.update({
           'db_tier': self.spec.db_tier,
       })
+
+    if hasattr(self.spec.db_disk_spec, 'provisioned_iops'):
+      metadata.update({'disk_iops': self.spec.db_disk_spec.provisioned_iops})
+    if hasattr(self.spec.db_disk_spec, 'provisioned_throughput'):
+      metadata.update(
+          {'disk_throughput_mb': self.spec.db_disk_spec.provisioned_throughput}
+      )
 
     return metadata
 

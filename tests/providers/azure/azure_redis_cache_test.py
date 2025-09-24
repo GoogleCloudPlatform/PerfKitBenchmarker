@@ -65,7 +65,7 @@ class AzureRedisCacheTestCase(pkb_common_test_case.PkbCommonTestCase):
         '6.0',
     ]
     self.redis._Create()
-    self.mock_command.assert_called_once_with(expected_output, timeout=900)
+    self.mock_command.assert_called_once_with(expected_output, timeout=1800)
 
   def testDelete(self):
     self.mock_command.return_value = (None, '', None)
@@ -80,7 +80,7 @@ class AzureRedisCacheTestCase(pkb_common_test_case.PkbCommonTestCase):
         '--yes',
     ]
     self.redis._Delete()
-    self.mock_command.assert_called_once_with(expected_output, timeout=900)
+    self.mock_command.assert_called_once_with(expected_output, timeout=1800)
 
   def testExistTrue(self):
     self.mock_command.return_value = (None, '', 0)

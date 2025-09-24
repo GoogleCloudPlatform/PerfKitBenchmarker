@@ -147,17 +147,35 @@ running with PKB.
 ## Python 3
 
 The recommended way to install and run PKB is in a virtualenv with the latest
-version of Python 3 (at least Python 3.11). Most Linux distributions and recent
+version of Python 3 (at least Python 3.12). Most Linux distributions and recent
 Mac OS X versions already have Python 3 installed at `/usr/bin/python3`.
 
 If Python is not installed, you can likely install it using your distribution's
 package manager, or see the
 [Python Download page](https://www.python.org/downloads/).
 
-```bash
-python3 -m venv $HOME/my_virtualenv
-source $HOME/my_virtualenv/bin/activate
+<!-- copybara:strip_begin(internal) -->
+<!--* pragma: { seclinter_this_is_fine: true } *-->
+<!-- copybara:strip_end -->
 ```
+# install pyenv to install python on persistent home directory
+curl https://pyenv.run | bash
+
+# add to path
+echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> ~/.bashrc
+echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+echo 'eval "$(pyenv virtualenv-init -)"' >> ~/.bashrc
+
+# update bashrc
+source ~/.bashrc
+
+# install python 3.12 and make default
+pyenv install 3.12
+pyenv global 3.12
+```
+<!-- copybara:strip_begin(internal) -->
+<!--* pragma: { seclinter_this_is_fine: false } *-->
+<!-- copybara:strip_end -->
 
 ## Install PerfKit Benchmarker
 

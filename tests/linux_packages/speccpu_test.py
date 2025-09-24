@@ -205,6 +205,25 @@ TEST_OUTPUT_BAD1 = """
  Est. SPECint_rate2006                                              Not Run
 """
 
+# All NR, no aggregate score.
+TEST_OUTPUT_ALL_NR = """
+==============================================================================
+400.perlbench                               NR
+401.bzip2                                   NR
+403.gcc                                     NR
+429.mcf                                     NR
+445.gobmk                                   NR
+456.hmmer                                   NR
+458.sjeng                                   NR
+462.libquantum                              NR
+464.h264ref                                 NR
+471.omnetpp                                 NR
+473.astar                                   NR
+483.xalancbmk                               NR
+ Est. SPECint(R)_rate_base2006           --
+ Est. SPECint_rate2006                                              Not Run
+"""
+
 EXPECTED_BAD1_METADATA = GOOD_METADATA.copy()
 EXPECTED_BAD1_METADATA.update({
     'partial': 'true',
@@ -673,6 +692,19 @@ class Speccpu2006BenchmarkTestCase(
     self.assertSampleListsEqualUpToTimestamp(
         samples, EXPECTED_PARTIAL_PEAK_RESULT_SPECINT
     )
+
+  @flagsaver.flagsaver(spec_runmode='base', runspec_estimate_spec=True)
+  def testGeometricMeanWithNoScores(self):
+    vm = mock.Mock(vm=linux_virtual_machine.Ubuntu2004Mixin)
+    spec_test_config = speccpu.SpecInstallConfigurations()
+    spec_test_config.benchmark_name = 'speccpu2006'
+    spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
+    spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
+    vm.speccpu_vm_state = spec_test_config
+    with self.assertRaisesRegex(
+        errors.Benchmarks.RunError, 'speccpu: no scores found'
+    ):
+      speccpu._ExtractScore(TEST_OUTPUT_ALL_NR, vm, True, 'rate')
 
 
 if __name__ == '__main__':

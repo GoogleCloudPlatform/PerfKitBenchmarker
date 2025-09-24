@@ -105,6 +105,9 @@
 -   Stop manually installing GPU drivers on GKE and use the API functionality
     via new flag `--gpu-driver-version`. This defaults to no driver installation
     on clusters older than version 1.31.
+-   Consolidated cloud-specific boot-disk-size flags into a cloud-agnostic
+    `--boot-disk-size` flag.
+-   Updated the minimum recommended Python version to 3.12.
 
 ### New features:
 
@@ -246,6 +249,12 @@
     storage
 -   Add new `edw_index_ingestion_benchmark` benchmark evaluating the performance
     of text search indexes on EDW systems.
+-   Add new `kubernetes_ai_inference_benchmark` benchmark evaluating the
+    performance of inference server (vllm etc.) hosted in k8s cluster.
+-   Add option for benchmarks to implement three-part prepare flow instead of
+    single Prepare function.
+-   Also let users run only some of those three parts if they want to.
+-   Add support for the `--addons` flag in GKE Standard.
 
 ### Enhancements:
 
@@ -419,6 +428,7 @@
 -   Add support for specifying GCE provisioning model
 -   Add support for NVMe local SSDs in GKE.
 -   Add support for cluster to wait the resource on multiple conditions
+-   Add support for enabling live migration on AMD SEV
 
 ### Bug fixes and maintenance updates:
 
