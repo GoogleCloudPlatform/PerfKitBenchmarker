@@ -136,7 +136,7 @@ class BaseWGServingInferenceServer(
     result.update({
         'model': getattr(self, 'model_id', 'unknown'),
         'tokenizer_id': getattr(self, 'tokenizer_id', 'unknown'),
-        'model_server': getattr(self, 'model_server', 'unknown'),
+        'model_server': self.spec.model_server,
     })
 
     return result
