@@ -22,6 +22,7 @@ instructions.
 
 from collections import abc
 import json
+import sys
 import logging
 import re
 from typing import Any
@@ -684,6 +685,7 @@ class EksKarpenterCluster(BaseEksCluster):
         '--set', f'region={self.region}',
         '--set', 'createIngressClassResource=true',
         '--set', 'ingressClass=alb',
+        '--set', 'replicaCount=1',
     ])
     # 6) Wait for rollout
     container_service.RunKubectlCommand([
@@ -807,7 +809,8 @@ class EksKarpenterCluster(BaseEksCluster):
         '--wait',
     ])
     # Ensure ALB ingress support: installs AWS Load Balancer Controller.
-    if FLAGS.eks_install_alb_controller:
+    command_line = ' '.join(sys.argv)
+    if '--benchmarks=kubernetes_hpa' in command_line:
         self._InstallAwsLoadBalancerController()
     # Get the AMI version for current kubernetes version.
     # See e.g. https://karpenter.sh/docs/tasks/managing-amis/ for not using
