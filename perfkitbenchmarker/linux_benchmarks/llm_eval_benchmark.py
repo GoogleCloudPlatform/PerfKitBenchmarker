@@ -53,6 +53,21 @@ llm_eval:
       vm_count: 1
 """
 
+# This benchmark uses preprovisioned data. Before running this benchmark on a
+# given cloud, you must add a '.env' file to that cloud by following the
+# cloud-specific instructions. For more information, see the "Pre-provisioned
+# Data" section in the README.
+#
+# The '.env' file should contain the API key for the LLM provider being tested.
+# For example, to create the file for Google, run the following command:
+#   echo "API_KEY=<your_google_api_key>" > .env
+#
+# The value in this dict is the sha256sum hash for the file. This is used to
+# verify the integrity of the preprovisioned data.
+#
+# The benchmark defines the constant BENCHMARK_DATA to contain the name of the
+# file mapped to the sha256sum hash. This ensures that when we change versions
+# of the benchmark data or binaries, we update the code.
 BENCHMARK_DATA = {
     '.env': '6102705161035710e3866e44451531aad83174f71999c7b2a94313747375d0a0'
 }
