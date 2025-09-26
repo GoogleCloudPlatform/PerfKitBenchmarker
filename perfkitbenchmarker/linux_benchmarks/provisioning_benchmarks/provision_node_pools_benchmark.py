@@ -77,6 +77,8 @@ provision_node_pools:
     gke_max_cpu: 520
     # (100 init_batch + 20 test_batch + 10 buffer) * 16 GB
     gke_max_memory: 2080
+    # Azure flag for AKS cluster with  node auto provisioning feature
+    azure_aks_auto_node_provisioning: True
 """
 
 INIT_BATCH_NAME = "init-batch"
@@ -102,6 +104,7 @@ def _CreateJobsAndWait(
       batch_name,
       jobs,
   )
+
   apply_start = time.monotonic()
   for i in range(jobs):
     cluster.AddNodepool(batch_name, pool_id="{:03d}".format(i + 1))
@@ -197,6 +200,10 @@ def _AssertNodePools(
     added_node_pools: int,
 ) -> None:
   """Asserts expected number of node pools in the cluster."""
+  # Skip node pool count check for Azure AKS when using auto-provisioning, as nodes are added without associated node pools
+  if cluster.CLOUD == "Azure":
+    logging.info("Skipping node pool check for Azure AKS")
+    return
   node_pools = len(cluster.GetNodePoolNames())
   if node_pools < added_node_pools:
     raise ValueError(
