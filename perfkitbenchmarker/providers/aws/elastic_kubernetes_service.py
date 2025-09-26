@@ -893,8 +893,7 @@ class EksKarpenterCluster(BaseEksCluster):
         '--wait',
     ])
     # Ensure ALB ingress support: installs AWS Load Balancer Controller.
-    command_line = ' '.join(sys.argv)
-    if '--benchmarks=kubernetes_hpa' in command_line:
+    if FLAGS.eks_install_alb_controller:
         self._InstallAwsLoadBalancerController()
     # Get the AMI version for current kubernetes version.
     # See e.g. https://karpenter.sh/docs/tasks/managing-amis/ for not using

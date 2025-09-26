@@ -61,7 +61,7 @@ flags.DEFINE_integer(
     18000,
     'The time to wait for an EMR job to finish, in seconds',
 )
-USE_AWS_SPOT_INSTANCES = flags.DEFINE_boolean(
+flags.DEFINE_boolean(
     'aws_spot_instances',
     False,
     'Whether to use AWS spot instances for any AWS VMs.',
@@ -79,6 +79,9 @@ flags.DEFINE_enum(
     'The required '
     'duration for the Spot Instances (also known as Spot blocks),'
     ' in minutes. This value must be a multiple of 60.',
+)
+flags.DEFINE_integer(
+    'aws_boot_disk_size', None, 'The boot disk size in GiB for AWS VMs.'
 )
 flags.DEFINE_string('kops', 'kops', 'The path to the kops binary.')
 flags.DEFINE_string(
@@ -211,6 +214,12 @@ flags.DEFINE_integer(
     'unset, all the files will be crawled. May range from 1 to 249.',
     1,
     249,
+)
+flags.DEFINE_boolean(
+    'eks_install_alb_controller',
+    False,
+    'Whether to install AWS Load Balancer Controller in EKS Karpenter clusters'
+    'Default value - don not install unless explicitly requested'
 )
 AWS_CAPACITY_BLOCK_RESERVATION_ID = flags.DEFINE_string(
     'aws_capacity_block_reservation_id',
