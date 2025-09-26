@@ -1,0 +1,37 @@
+Please summarize the following text:
+Letter 1
+
+_To Mrs. Saville, England._
+
+
+St. Petersburgh, Dec. 11th, 17—. You will rejoice to hear that no disaster has accompanied the
+commencement of an enterprise which you have regarded with such evil
+forebodings. I arrived here yesterday, and my first task is to assure
+my dear sister of my welfare and increasing confidence in the success
+of my undertaking. I am already far north of London, and as I walk in the streets of
+Petersburgh, I feel a cold northern breeze play upon my cheeks, which
+braces my nerves and fills me with delight. Do you understand this
+feeling? This breeze, which has travelled from the regions towards
+which I am advancing, gives me a foretaste of those icy climes. Inspirited by this wind of promise, my daydreams become more fervent
+and vivid. I try in vain to be persuaded that the pole is the seat of
+frost and desolation; it ever presents itself to my imagination as the
+region of beauty and delight.
+---
+Please summarize the following text:
+CHAPTER 1. Loomings. Call me Ishmael. Some years ago—never mind how long precisely—having
+little or no money in my purse, and nothing particular to interest me
+on shore, I thought I would sail about a little and see the watery part
+of the world. It is a way I have of driving off the spleen and
+regulating the circulation. Whenever I find myself growing grim about
+the mouth; whenever it is a damp, drizzly November in my soul; whenever
+I find myself involuntarily pausing before coffin warehouses, and
+bringing up the rear of every funeral I meet; and especially whenever
+my hypos get such an upper hand of me, that it requires a strong moral
+principle to prevent me from deliberately stepping into the street, and
+methodically knocking people’s hats off—then, I account it high time to
+get to sea as soon as I can. This is my substitute for pistol and ball. With a philosophical flourish Cato throws himself upon his sword; I
+quietly take to the ship.
+---
+Explain the concept of gravity in simple terms.
+---
+Write a 'Hello, World!' program in Python.
