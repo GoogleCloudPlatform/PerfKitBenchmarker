@@ -610,8 +610,9 @@ class EksAutoCluster(BaseEksCluster):
     # Autopilot does not support nodepools & manual resizes.
     pass
 
-  def GetNodeSelectors(self, machine_family: str | None = None) -> list[str]:
+  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
     """Get the node selectors section of a yaml for the provider."""
+    del machine_type  # Unused.
     # Theoretically needed in mixed mode, but deployments fail without it:
     # https://docs.aws.amazon.com/eks/latest/userguide/associate-workload.html#_require_a_workload_is_deployed_to_eks_auto_mode_nodes
     selectors = ['eks.amazonaws.com/compute-type: auto']
@@ -813,10 +814,10 @@ class EksKarpenterCluster(BaseEksCluster):
     """Change the number of nodes in the node group."""
     raise NotImplementedError()
 
-  def GetNodeSelectors(self, machine_family: str | None = None) -> list[str]:
+  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
     """Gets the node selectors section of a yaml for the provider."""
+    machine_family = util.GetMachineFamily(self.default_nodepool.machine_type)
     if machine_family:
-      machine_family = util.GetMachineFamily(machine_family)
       return [f'karpenter.k8s.aws/instance-family: {machine_family}']
     return []
 

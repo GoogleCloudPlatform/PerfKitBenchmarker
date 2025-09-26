@@ -568,15 +568,19 @@ class GkeAutopilotCluster(BaseGkeCluster):
     metadata['zone'] = self.zone
     metadata['region'] = self.region
     # Override node specific metadata set in parent.
-    metadata['machine_type'] = self.CLUSTER_TYPE
+    metadata['machine_type'] = util.GetMachineFamily(
+        self.default_nodepool.machine_type
+    ) or self.CLUSTER_TYPE
     metadata['size'] = self.CLUSTER_TYPE
     metadata['nodepools'] = self.CLUSTER_TYPE
     return metadata
 
-  def GetNodeSelectors(self, machine_family: str | None = None) -> list[str]:
+  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
     """Node selectors for instance capabilites in AutoPilot clusters."""
     selectors = []
+    machine_family = util.GetMachineFamily(self.default_nodepool.machine_type)
     if machine_family:
+      # Machine type should not be set or should be set to machine family.
       selectors += [
           f'cloud.google.com/machine-family: {machine_family}',
           # Mandate one pod per node, which also handles packing small pods into
