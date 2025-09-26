@@ -22,7 +22,6 @@ instructions.
 
 from collections import abc
 import json
-import sys
 import logging
 import re
 from typing import Any
