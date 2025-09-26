@@ -154,6 +154,8 @@ class AksCluster(container_service.KubernetesCluster):
 
   def _Create(self):
     """Creates the AKS cluster."""
+    if self._Exists():
+      return
     cmd = [
         azure.AZURE_PATH,
         'aks',
@@ -325,6 +327,7 @@ class AksCluster(container_service.KubernetesCluster):
         self.name,
         '--file',
         FLAGS.kubeconfig,
+        '--overwrite-existing',
     ]
     if use_admin:
       cmd.append('--admin')
@@ -339,11 +342,15 @@ class AksCluster(container_service.KubernetesCluster):
         'show',
         '--name',
         self.name,
+        '--query',
+        'provisioningState',
+        '--output',
+        'tsv',
     ] + self.resource_group.args
     stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
 
     try:
-      provisioning_state = json.loads(stdout).get('provisioningState')
+      provisioning_state = stdout.strip()
       if provisioning_state == 'Failed':
         raise errors.Resource.CreationError('Cluster provisioning failed.')
       if provisioning_state != 'Succeeded':
@@ -458,6 +465,8 @@ class AksAutomaticCluster(AksCluster):
 
   def _Create(self):
     """Creates the Automatic AKS cluster with tags."""
+    if self._Exists():
+      return
     tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
     tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
     cmd = [
@@ -529,7 +538,18 @@ class AksAutomaticCluster(AksCluster):
     Automatic clusters & role assignment must be created before authenticating.
     """
     super(container_service.KubernetesCluster, self)._PostCreate()
-    self._CreateRoleAssignment()
+    user_type, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'account',
+        'show',
+        '--query',
+        'user.type',
+        '--output',
+        'tsv',
+    ])
+    user_type = user_type.strip()
+    if user_type == 'servicePrincipal':
+      self._CreateRoleAssignment()
     self._GetCredentials(use_admin=False)
     self._WaitForDefaultServiceAccount()
     self._AttachContainerRegistry()
