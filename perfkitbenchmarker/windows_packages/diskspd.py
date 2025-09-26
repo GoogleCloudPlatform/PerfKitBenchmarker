@@ -355,8 +355,46 @@ def RunDiskSpd(running_vm):
             raise e
         else:
           raise e
-
+  sample_list.extend(_CalculateMaxMetric(sample_list))
   return sample_list
+
+
+def _CalculateMaxMetric(sample_list):
+  """Calculate the max metric from the sample list."""
+  iops_metric = 'total_iops'
+  throughput_metric = 'total_bandwidth'
+  max_iops_sample = None
+  max_throughput_sample = None
+  max_samples = []
+  for sample_item in sample_list:
+    if sample_item.metric == iops_metric and (
+        max_iops_sample is None or sample_item.value > max_iops_sample.value
+    ):
+      max_iops_sample = sample_item
+    if sample_item.metric == throughput_metric and (
+        max_throughput_sample is None
+        or sample_item.value > max_throughput_sample.value
+    ):
+      max_throughput_sample = sample_item
+  if max_iops_sample is not None:
+    max_samples.append(
+        sample.Sample(
+            'max_' + iops_metric,
+            max_iops_sample.value,
+            max_iops_sample.unit,
+            max_iops_sample.metadata,
+        )
+    )
+  if max_throughput_sample is not None:
+    max_samples.append(
+        sample.Sample(
+            'max_' + throughput_metric,
+            max_throughput_sample.value,
+            max_throughput_sample.unit,
+            max_throughput_sample.metadata,
+        )
+    )
+  return max_samples
 
 
 def Prefill(running_vm):
@@ -383,12 +421,12 @@ def Prefill(running_vm):
 
   prefill_samples = ParseDiskSpdResults(result_xml, {})
   for prefill_sample in prefill_samples:
-    if prefill_sample.metric != 'write_bandwidth':
+    if prefill_sample.metric != 'write_throughput':
       continue
-    write_bandwidth = prefill_sample.value
+    write_throughput = prefill_sample.value
     total_seconds = float(prefill_sample.metadata['TestTimeSeconds'])
     total_data_written, unit = GetDiskspdFileSizeInPrefillSizeUnit(
-        write_bandwidth, total_seconds
+        write_throughput, total_seconds
     )
     logging.info('Prefill Data written: %s %s', total_data_written, unit)
     if total_data_written < float(DISKSPD_FILE_SIZE.value[0:-1]):
@@ -399,17 +437,17 @@ def Prefill(running_vm):
 
 
 def GetDiskspdFileSizeInPrefillSizeUnit(
-    write_bandwidth: float, test_duration: float
+    write_throughput: float, test_duration: float
 ) -> float:
   """Returns the diskspd file size in GB."""
   unit = DISKSPD_FILE_SIZE.value[-1]
   written_data = 0
   if unit == 'G':
-    written_data = (write_bandwidth * test_duration) / 1024
+    written_data = (write_throughput * test_duration) / 1024
   elif unit == 'M':
-    written_data = write_bandwidth * test_duration
+    written_data = write_throughput * test_duration
   elif unit == 'K':
-    written_data = (write_bandwidth * test_duration) * 1024
+    written_data = (write_throughput * test_duration) * 1024
   return written_data, unit
 
 
