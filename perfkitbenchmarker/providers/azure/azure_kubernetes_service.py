@@ -154,6 +154,8 @@ class AksCluster(container_service.KubernetesCluster):
 
   def _Create(self):
     """Creates the AKS cluster."""
+    if self._Exists():
+      return
     cmd = [
         azure.AZURE_PATH,
         'aks',
@@ -340,11 +342,15 @@ class AksCluster(container_service.KubernetesCluster):
         'show',
         '--name',
         self.name,
+        '--query',
+        'provisioningState',
+        '--output',
+        'tsv',
     ] + self.resource_group.args
     stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
 
     try:
-      provisioning_state = json.loads(stdout).get('provisioningState')
+      provisioning_state = stdout.strip()
       if provisioning_state == 'Failed':
         raise errors.Resource.CreationError('Cluster provisioning failed.')
       if provisioning_state != 'Succeeded':
@@ -459,6 +465,8 @@ class AksAutomaticCluster(AksCluster):
 
   def _Create(self):
     """Creates the Automatic AKS cluster with tags."""
+    if self._Exists():
+      return
     tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
     tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
     cmd = [
@@ -499,8 +507,7 @@ class AksAutomaticCluster(AksCluster):
         'tsv',
     ])
     full_cluster_id = full_cluster_id.strip()
-    # Get the user.name (User Principal Name or Service Principal name)
-    user_name, _, _ = vm_util.IssueCommand([
+    current_user, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH,
         'account',
         'show',
@@ -509,35 +516,7 @@ class AksAutomaticCluster(AksCluster):
         '--output',
         'tsv',
     ])
-    try:
-      # Attempt to query as an interactive user
-      current_user_id, _, _ = vm_util.IssueCommand([
-          azure.AZURE_PATH,
-          'ad',
-          'user',
-          'show',
-          '--id',
-          user_name.strip(),
-          '--query',
-          'id',
-          '--output',
-          'tsv',
-      ])
-    except Exception:
-      # If querying as a user fails (e.g., Service Principal), fall back to querying as SP
-      current_user_id, _, _ = vm_util.IssueCommand([
-          azure.AZURE_PATH,
-          'ad',
-          'sp',
-          'show',
-          '--id',
-          user_name.strip(),
-          '--query',
-          'id',
-          '--output',
-          'tsv',
-      ])
-    current_user = current_user_id.strip()
+    current_user = current_user.strip()
     create_role_assignment_cmd = [
         azure.AZURE_PATH,
         'role',
@@ -559,7 +538,18 @@ class AksAutomaticCluster(AksCluster):
     Automatic clusters & role assignment must be created before authenticating.
     """
     super(container_service.KubernetesCluster, self)._PostCreate()
-    self._CreateRoleAssignment()
+    user_type, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'account',
+        'show',
+        '--query',
+        'user.type',
+        '--output',
+        'tsv',
+    ])
+    user_type = user_type.strip()
+    if user_type == 'servicePrincipal':
+      self._CreateRoleAssignment()
     self._GetCredentials(use_admin=False)
     self._WaitForDefaultServiceAccount()
     self._AttachContainerRegistry()

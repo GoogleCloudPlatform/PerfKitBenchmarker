@@ -29,16 +29,16 @@ spec:
             {%- endif %}
         # Added livenessProbe
         livenessProbe:
-          httpGet:
-            path: /
-            port: 80
+          exec:
+            command:
+            - /bin/true
           initialDelaySeconds: 5
           periodSeconds: 10
         # Added readinessProbe
         readinessProbe:
-          httpGet:
-            path: /
-            port: 80
+          exec:
+            command:
+            - /bin/true
           initialDelaySeconds: 5
           periodSeconds: 10
       nodeSelector:
