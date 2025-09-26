@@ -266,13 +266,6 @@ def InstallPackages(benchmark_spec: bm_spec.BenchmarkSpec):
           f'sudo git clone {sysbench.SYSBENCH_TPCC_REPRO}'
       )
 
-
-def StartServices(benchmark_spec: bm_spec.BenchmarkSpec):
-  """Start services for the benchmark run.
-
-  Args:
-    benchmark_spec:
-  """
   buffer_pool_size = GetBufferPoolSize()
 
   primary_server = benchmark_spec.vm_groups['server'][0]
@@ -282,11 +275,30 @@ def StartServices(benchmark_spec: bm_spec.BenchmarkSpec):
       replica_servers += benchmark_spec.vm_groups[vm]
 
   servers = [primary_server] + replica_servers
-  new_password = FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
   for index, server in enumerate(servers):
     # mysql server ids needs to be positive integers.
-    mysql80.ConfigureAndRestart(
-        server, buffer_pool_size, index + 1, _CONFIG_TEMPLATE.value)
+    mysql80.WriteMysqlConfiguration(
+        server, buffer_pool_size, index + 1, _CONFIG_TEMPLATE.value
+    )
+
+
+def StartServices(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Start services for the benchmark run.
+
+  Args:
+    benchmark_spec:
+  """
+  primary_server = benchmark_spec.vm_groups['server'][0]
+  replica_servers = []
+  for vm in benchmark_spec.vm_groups:
+    if vm.startswith('replica'):
+      replica_servers += benchmark_spec.vm_groups[vm]
+
+  servers = [primary_server] + replica_servers
+  new_password = FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
+  for _, server in enumerate(servers):
+    # mysql server ids needs to be positive integers.
+    mysql80.RestartServer(server)
     mysql80.UpdatePassword(server, new_password)
     mysql80.CreateDatabase(server, new_password, _DATABASE_NAME)
 
