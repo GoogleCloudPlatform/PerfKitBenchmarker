@@ -102,7 +102,6 @@ class GoogleProvider(base_provider.BaseProvider):
       client: genai.Client,
       model_name: str,
       prompt: str,
-      safety_settings: List[Dict[str, Any]],
       max_output_tokens: int,
   ) -> Dict[str, Any]:
     """Benchmarks a single model in non-streaming mode.
@@ -111,7 +110,6 @@ class GoogleProvider(base_provider.BaseProvider):
       client: The Google GenAI client.
       model_name: The name of the model to benchmark.
       prompt: The prompt to send to the model.
-      safety_settings: The safety settings to use for the request.
       max_output_tokens: The maximum number of tokens to generate.
 
     Returns:
@@ -125,7 +123,7 @@ class GoogleProvider(base_provider.BaseProvider):
       )
       if max_output_tokens:
         config.max_output_tokens = max_output_tokens
-      config.safety_settings = safety_settings
+      config.safety_settings = SAFETY_SETTINGS
       response = client.models.generate_content(
           model=model_name,
           contents=prompt,
@@ -176,7 +174,6 @@ class GoogleProvider(base_provider.BaseProvider):
       client: genai.Client,
       model_name: str,
       prompt: str,
-      safety_settings: List[Dict[str, Any]],
       max_output_tokens: int,
   ) -> Dict[str, Any]:
     """Benchmarks a single model in streaming mode.
@@ -185,7 +182,6 @@ class GoogleProvider(base_provider.BaseProvider):
       client: The Google GenAI client.
       model_name: The name of the model to benchmark.
       prompt: The prompt to send to the model.
-      safety_settings: The safety settings to use for the request.
       max_output_tokens: The maximum number of tokens to generate.
 
     Returns:
@@ -197,7 +193,7 @@ class GoogleProvider(base_provider.BaseProvider):
     config = types.GenerateContentConfig(temperature=base_provider.TEMPERATURE)
     if max_output_tokens:
       config.max_output_tokens = max_output_tokens
-    config.safety_settings = safety_settings
+    config.safety_settings = SAFETY_SETTINGS
     stream = client.models.generate_content_stream(
         model=model_name,
         contents=prompt,
@@ -255,12 +251,12 @@ class GoogleProvider(base_provider.BaseProvider):
     }
 
     non_streaming_results = self._benchmark_non_streaming(
-        client, model_name, prompt, SAFETY_SETTINGS, max_output_tokens
+        client, model_name, prompt, max_output_tokens
     )
     results.update(non_streaming_results)
 
     streaming_results = self._benchmark_streaming(
-        client, model_name, prompt, SAFETY_SETTINGS, max_output_tokens
+        client, model_name, prompt, max_output_tokens
     )
     results.update(streaming_results)
 

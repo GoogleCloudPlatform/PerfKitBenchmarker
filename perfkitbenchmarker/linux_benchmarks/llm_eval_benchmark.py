@@ -135,8 +135,7 @@ def CheckPrerequisites(
       raise errors.Config.InvalidValue(
           'Cannot use --llm_eval_specific_models with --llm_eval_max_models.'
       )
-  if _DISCOVER_MODELS_ONLY.value:
-    if _SPECIFIC_MODELS.value:
+    if _DISCOVER_MODELS_ONLY.value:
       raise errors.Config.InvalidValue(
           'Cannot use --llm_eval_specific_models with'
           ' --llm_eval_discover_models_only.'
@@ -194,33 +193,39 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   stdout, _ = vm.RemoteCommand(full_cmd)
 
   if _DISCOVER_MODELS_ONLY.value:
-    metadata = {'discovered_models': json.loads(stdout)}
-    return [sample.Sample('discovered_models', 0, '', metadata)]
-  else:
-    results = json.loads(stdout)
-    samples = []
-    prompts_tested = results.get('prompts_tested', {})
-    for model, model_results in results['results'].items():
-      for prompt, prompt_results in model_results.items():
-        metadata = {
-            'model': model,
-            'prompt': prompt,
-            'provider': _PROVIDER.value,
-            'prompt_text': prompts_tested.get(prompt, {}).get('text'),
-        }
-        if 'error' in prompt_results:
-          metadata['error_message'] = prompt_results['error']
-          samples.append(sample.Sample('error_count', 1, 'count', metadata))
-        else:
-          for metric, value in prompt_results.items():
-            unit = ''
-            if 'tokens' in metric:
-              unit = 'tokens'
-            elif 'seconds' in metric:
-              unit = 'seconds'
-            samples.append(sample.Sample(metric, value, unit, metadata))
+    discovered_models = json.loads(stdout)
+    model_count = len(discovered_models)
+    metadata = {'discovered_models': discovered_models}
+    return [
+        sample.Sample(
+            'discovered_models_count', model_count, 'count', metadata
+        )
+    ]
 
-    return samples
+  results = json.loads(stdout)
+  samples = []
+  prompts_tested = results.get('prompts_tested', {})
+  for model, model_results in results['results'].items():
+    for prompt, prompt_results in model_results.items():
+      metadata = {
+          'model': model,
+          'prompt': prompt,
+          'provider': _PROVIDER.value,
+          'prompt_text': prompts_tested.get(prompt, {}).get('text'),
+      }
+      if 'error' in prompt_results:
+        metadata['error_message'] = prompt_results['error']
+        samples.append(sample.Sample('error_count', 1, 'count', metadata))
+      else:
+        for metric, value in prompt_results.items():
+          unit = ''
+          if 'tokens' in metric:
+            unit = 'tokens'
+          elif 'seconds' in metric:
+            unit = 'seconds'
+          samples.append(sample.Sample(metric, value, unit, metadata))
+
+  return samples
 
 
 def Cleanup(spec: benchmark_spec.BenchmarkSpec) -> None:
