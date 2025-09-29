@@ -68,7 +68,6 @@ BENCHMARK_NAME = "edw_index_ingestion_benchmark"
 
 class _Steps(enum.Enum):
   INITIAL_LOAD = "INITIAL_LOAD"
-  INITIAL_INDEX_CREATION = "INITIAL_INDEX_CREATION"
   INITIAL_INDEX_WAIT = "INITIAL_INDEX_WAIT"
   INITIAL_SEARCH = "INITIAL_SEARCH"
   MAIN = "MAIN"
@@ -131,10 +130,9 @@ _BENCHMARK_STEPS = flags.DEFINE_list(
     "Comma-separated list of benchmark steps to run. By default it will just "
     " run all steps. Here's the list of steps in order of execution and what"
     " they do:\n"
-    "  INITIAL_LOAD: Load n copies of the user-provided init dataset into\n"
-    "    table from cloud storage.\n"
-    "  INITIAL_INDEX_CREATION: Create a text search index on relevant columns\n"
-    "    of the new table. This step is mandatory.\n"
+    "  INITIAL_LOAD: Create a table, load n copies of the user-provided init\n"
+    "    dataset from cloud storage into the table and create a text search\n"
+    "    index on it. This step is mandatory.\n"
     "  INITIAL_INDEX_WAIT: Wait for the service to report 100% completion on\n"
     "    the index.\n"
     "  INITIAL_SEARCH: Run each defined search query 5 times against the\n"
@@ -190,13 +188,13 @@ def _ParseSearchQueries(search_queries: list[str]) -> list[_SearchQuery]:
     "Invalid step(s) provided to --edw_search_ingestion_steps. Must be one or "
     "more of: "
     + ", ".join([s.value for s in _Steps])
-    + " and must include INITIAL_INDEX_CREATION and MAIN.",
+    + " and must include INITIAL_LOAD and MAIN.",
 )
 def _CheckEdwSearchIngestionSteps(steps: list[str]) -> bool:
   """Checks that all provided steps are valid."""
   return (
       all(step in [s.value for s in _Steps] for step in steps)
-      and _Steps.INITIAL_INDEX_CREATION.value in steps
+      and _Steps.INITIAL_LOAD.value in steps
       and _Steps.MAIN.value in steps
   )
 
@@ -602,6 +600,9 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
         bigquery.INITIALIZE_SEARCH_TABLE_PARTITIONED.value
     )
 
+  # always overwritten, because INITIAL_LOAD is mandatory, but we are appeasing
+  # the linter
+  indexing_start_time = time.time()
   if _Steps.INITIAL_LOAD.value in _BENCHMARK_STEPS.value:
     logging.info("Loading initial search data")
     edw_service_instance.DropSearchIndex(
@@ -620,8 +621,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       )
     logging.info("Initial search data load complete")
 
-  indexing_start_time = time.time()
-  if _Steps.INITIAL_INDEX_CREATION.value in _BENCHMARK_STEPS.value:
+    indexing_start_time = time.time()
     logging.info("Creating index")
     edw_service_instance.CreateSearchIndex(
         edw_service.EDW_SEARCH_TABLE_NAME.value,

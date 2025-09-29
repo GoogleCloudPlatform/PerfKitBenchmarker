@@ -28,14 +28,12 @@ from tests import pkb_common_test_case
 
 _NO_SEARCHES_STEPS = [
     'INITIAL_LOAD',
-    'INITIAL_INDEX_CREATION',
     'INITIAL_INDEX_WAIT',
     'MAIN',
     'FINAL_INDEX_WAIT',
 ]
 _NO_WAITS_STEPS = [
     'INITIAL_LOAD',
-    'INITIAL_INDEX_CREATION',
     'INITIAL_SEARCH',
     'MAIN',
     'FINAL_SEARCH',
@@ -327,10 +325,10 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   @parameterized.named_parameters(
       dict(
           testcase_name='only_mandatory_steps',
-          steps=['INITIAL_INDEX_CREATION', 'MAIN'],
-          drop_search_index_called=False,
-          initialize_search_starter_table_called=False,
-          insert_search_data_called=False,
+          steps=['INITIAL_LOAD', 'MAIN'],
+          drop_search_index_called=True,
+          initialize_search_starter_table_called=True,
+          insert_search_data_called=True,
           create_search_index_called=True,
           wait_for_index_completion_called=False,
           execute_search_query_n_times_called=False,
