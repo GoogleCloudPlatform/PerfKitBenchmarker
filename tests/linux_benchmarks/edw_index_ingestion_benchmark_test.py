@@ -26,19 +26,6 @@ from perfkitbenchmarker.providers.gcp import bigquery
 from perfkitbenchmarker.providers.snowflake import snowflake
 from tests import pkb_common_test_case
 
-_NO_SEARCHES_STEPS = [
-    'INITIAL_LOAD',
-    'INITIAL_INDEX_WAIT',
-    'MAIN',
-    'FINAL_INDEX_WAIT',
-]
-_NO_WAITS_STEPS = [
-    'INITIAL_LOAD',
-    'INITIAL_SEARCH',
-    'MAIN',
-    'FINAL_SEARCH',
-]
-
 
 class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
@@ -325,7 +312,9 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   @parameterized.named_parameters(
       dict(
           testcase_name='only_mandatory_steps',
-          steps=['INITIAL_LOAD', 'MAIN'],
+          index_wait=False,
+          initial_search_count=0,
+          final_search_count=0,
           drop_search_index_called=True,
           initialize_search_starter_table_called=True,
           insert_search_data_called=True,
@@ -336,7 +325,9 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
       ),
       dict(
           testcase_name='all_steps',
-          steps=[s.value for s in edw_index_ingestion_benchmark._Steps],
+          index_wait=True,
+          initial_search_count=1,
+          final_search_count=1,
           drop_search_index_called=True,
           initialize_search_starter_table_called=True,
           insert_search_data_called=True,
@@ -347,7 +338,9 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
       ),
       dict(
           testcase_name='no_searches',
-          steps=_NO_SEARCHES_STEPS,
+          index_wait=True,
+          initial_search_count=0,
+          final_search_count=0,
           drop_search_index_called=True,
           initialize_search_starter_table_called=True,
           insert_search_data_called=True,
@@ -358,7 +351,9 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
       ),
       dict(
           testcase_name='no_waits',
-          steps=_NO_WAITS_STEPS,
+          index_wait=False,
+          initial_search_count=1,
+          final_search_count=1,
           drop_search_index_called=True,
           initialize_search_starter_table_called=True,
           insert_search_data_called=True,
@@ -368,9 +363,11 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
           run_parallel_processes_called=True,
       ),
   )
-  def test_run_with_steps(
+  def test_run_workflow(
       self,
-      steps,
+      index_wait,
+      initial_search_count,
+      final_search_count,
       drop_search_index_called,
       initialize_search_starter_table_called,
       insert_search_data_called,
@@ -384,7 +381,15 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(mock.patch('multiprocessing.Manager'))
     self.enter_context(
         flagsaver.flagsaver(
-            (edw_index_ingestion_benchmark._BENCHMARK_STEPS, steps),
+            (edw_index_ingestion_benchmark._INDEX_WAIT, index_wait),
+            (
+                edw_index_ingestion_benchmark._INITIAL_SEARCH_COUNT,
+                initial_search_count,
+            ),
+            (
+                edw_index_ingestion_benchmark._FINAL_SEARCH_COUNT,
+                final_search_count,
+            ),
             (edw_index_ingestion_benchmark._SEARCH_QUERIES, ['common:api']),
         )
     )
@@ -407,8 +412,7 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         self.mock_service.InsertSearchData.called, insert_search_data_called
     )
     self.assertEqual(
-        self.mock_service.CreateSearchIndex.called,
-        create_search_index_called,
+        self.mock_service.CreateSearchIndex.called, create_search_index_called
     )
     self.assertEqual(
         mock_wait_for_index.called, wait_for_index_completion_called
@@ -431,11 +435,7 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(mock.patch('multiprocessing.Manager'))
     self.enter_context(
         flagsaver.flagsaver(
-            (edw_index_ingestion_benchmark._SEARCH_QUERIES, search_queries),
-            (
-                edw_index_ingestion_benchmark._BENCHMARK_STEPS,
-                [s.value for s in edw_index_ingestion_benchmark._Steps],
-            ),
+            (edw_index_ingestion_benchmark._SEARCH_QUERIES, search_queries)
         )
     )
     mock_query_submitter = self._mock_index_search_query_submitter()
