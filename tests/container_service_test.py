@@ -118,6 +118,9 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     self.enter_context(flagsaver.flagsaver(kubeconfig='kubeconfig'))
     self.enter_context(flagsaver.flagsaver(run_uri='123'))
+    self.enter_context(
+        mock.patch('perfkitbenchmarker.providers.LoadProvider', autospec=True)
+    )
     self.kubernetes_cluster = TestKubernetesCluster(
         container_spec.ContainerClusterSpec(
             'test-cluster',
