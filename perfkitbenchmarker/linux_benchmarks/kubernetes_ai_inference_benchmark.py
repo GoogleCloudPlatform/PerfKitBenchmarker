@@ -213,13 +213,15 @@ def CollectBenchmarkResult(
             result['config']['start_time']['seconds']
         ).timestamp()
 
-        results += [
-            sample.Sample(
-                metric, metrics[metric], '', sample_metadata, timestamp
-            )
-            for metric in metrics
-            if metrics[metric]
-        ]
+        for metric in metrics:
+          if not metrics[metric]:
+            continue
+          unit = 'ms' if 'ms' in metric else ''
+          results.append(
+              sample.Sample(
+                  metric, metrics[metric], unit, sample_metadata, timestamp
+              )
+          )
     except (json.JSONDecodeError, FileNotFoundError, KeyError) as e:
       logging.exception('Failed to read %s: %s', filename, e)
       raise e
