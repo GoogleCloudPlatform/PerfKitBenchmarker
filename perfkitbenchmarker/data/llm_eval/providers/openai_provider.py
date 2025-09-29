@@ -5,13 +5,15 @@ import itertools
 import os
 import re
 import time
-from typing import Any, Dict, List
+from typing import Any, List
 
 from logger import get_logger
 import openai
 from openai import OpenAI
 
 from . import base_provider
+from .base_provider import NonStreamingResult
+from .base_provider import StreamingResult
 
 MAX_OUTPUT_TOKENS = 1024
 logger = get_logger(__name__)
@@ -29,7 +31,7 @@ class OpenAIProvider(base_provider.BaseProvider):
     Returns:
       A list of model names.
     """
-    client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
+    client = self._create_client()
     models = [
         model.id
         for model in client.models.list()
@@ -109,37 +111,33 @@ class OpenAIProvider(base_provider.BaseProvider):
 
     return sorted(list(set(final_models)))
 
-  def benchmark_model(
+  def _create_client(self) -> OpenAI:
+    """Creates and returns an OpenAI client."""
+    return OpenAI(api_key=os.environ['OPENAI_API_KEY'])
+
+  def _count_input_tokens(
+      self, client: OpenAI, prompt: str, model_name: str
+  ) -> int:
+    """Counts the number of tokens in the input prompt."""
+    # For OpenAI, we can only get the input token count from the response of a
+    # non-streaming call. We will retrieve it there and pass it back.
+    return 0
+
+  def _execute_non_streaming(
       self,
+      client: OpenAI,
       model_name: str,
       prompt: str,
-      prompt_id: str,
       max_output_tokens: int,
-  ) -> Dict[str, Any]:
-    """Benchmarks a single OpenAI model.
-
-    Args:
-      model_name: The name of the model to benchmark.
-      prompt: The prompt to send to the model.
-      prompt_id: The ID of the prompt.
-      max_output_tokens: The maximum number of tokens to generate.
-
-    Returns:
-      A dictionary of benchmark results.
-    """
-    super().benchmark_model(model_name, prompt, prompt_id, max_output_tokens)
-    client = OpenAI(api_key=os.environ['OPENAI_API_KEY'])
-    results = {}
-
+  ) -> NonStreamingResult:
+    """Executes the non-streaming benchmark."""
+    logger.debug('Starting non-streaming benchmark...')
+    start_time = time.time()
     tokens_to_use = (
         max_output_tokens
         if max_output_tokens is not None
         else MAX_OUTPUT_TOKENS
     )
-
-    # Non-streaming
-    logger.debug('Starting non-streaming benchmark...')
-    start_time = time.time()
     params = {
         'model': model_name,
         'messages': [{'role': 'user', 'content': prompt}],
@@ -156,22 +154,40 @@ class OpenAIProvider(base_provider.BaseProvider):
       response = client.chat.completions.create(**params)
       end_time = time.time()
       logger.debug(f'Non-streaming response: {response}')
-      results['non_streaming_full_response_time_in_seconds'] = round(
-          end_time - start_time, 2
-      )
-      results['input_request_tokens'] = response.usage.prompt_tokens
-      results['non_streaming_full_response_output_tokens'] = (
-          response.usage.completion_tokens
+      return NonStreamingResult(
+          total_time_seconds=round(end_time - start_time, 2),
+          output_tokens=response.usage.completion_tokens,
       )
     except openai.OpenAIError as e:
       logger.debug(f'Non-streaming benchmark failed: {e}')
-      results['error'] = str(e)
-      return results
+      return NonStreamingResult(error=str(e))
 
-    # Streaming
+  def _execute_streaming(
+      self,
+      client: OpenAI,
+      model_name: str,
+      prompt: str,
+      max_output_tokens: int,
+  ) -> StreamingResult:
+    """Executes the streaming benchmark."""
     logger.debug('Starting streaming benchmark...')
     start_time = time.time()
     first_token_time = None
+    tokens_to_use = (
+        max_output_tokens
+        if max_output_tokens is not None
+        else MAX_OUTPUT_TOKENS
+    )
+    params = {
+        'model': model_name,
+        'messages': [{'role': 'user', 'content': prompt}],
+        'temperature': base_provider.TEMPERATURE,
+    }
+
+    if 'nano' in model_name or 'gpt-5' in model_name:
+      params['max_completion_tokens'] = tokens_to_use
+    else:
+      params['max_tokens'] = tokens_to_use
 
     logger.debug(f'Streaming request params: {params}')
     try:
@@ -184,13 +200,6 @@ class OpenAIProvider(base_provider.BaseProvider):
           output_text += chunk.choices[0].delta.content
       end_time = time.time()
       logger.debug('Finished streaming benchmark.')
-
-      results['streaming_time_to_first_token_in_seconds'] = round(
-          first_token_time - start_time, 2
-      )
-      results['streaming_full_response_time_in_seconds'] = round(
-          end_time - start_time, 2
-      )
 
       # Re-encode to count tokens for streaming
       re_encode_params = {
@@ -206,12 +215,13 @@ class OpenAIProvider(base_provider.BaseProvider):
       logger.debug(f'Re-encoding request params: {re_encode_params}')
       response = client.chat.completions.create(**re_encode_params)
       logger.debug(f'Re-encoding response: {response}')
-      results['streaming_full_response_output_tokens'] = (
-          response.usage.prompt_tokens
+      output_tokens = response.usage.prompt_tokens
+
+      return StreamingResult(
+          time_to_first_token_seconds=round(first_token_time - start_time, 2),
+          total_time_seconds=round(end_time - start_time, 2),
+          output_tokens=output_tokens,
       )
     except openai.OpenAIError as e:
       logger.debug(f'Streaming benchmark failed: {e}')
-      results['streaming_error'] = str(e)
-
-    logger.debug(f"  Finished benchmarking prompt: '{prompt_id}'")
-    return results
+      return StreamingResult(error=str(e))

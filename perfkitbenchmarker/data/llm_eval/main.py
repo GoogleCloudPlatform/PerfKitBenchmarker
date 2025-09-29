@@ -161,7 +161,7 @@ def _run_benchmarks(
             prompt_data['text'],
             prompt_id,
             prompt_data['max_tokens'],
-        )
+        ).as_dict()
       except Exception as e:  # pylint: disable=broad-exception-caught
         # Catching broad exception to ensure one failed prompt doesn't stop
         # the entire benchmark run.
@@ -174,7 +174,7 @@ def _run_benchmarks(
             prompt_data['text'],
             prompt_id,
             prompt_data['max_tokens'],
-        )
+        ).as_dict()
       except Exception as e:  # pylint: disable=broad-exception-caught
         # Catching broad exception to ensure one failed prompt doesn't stop
         # the entire benchmark run.
