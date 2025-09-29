@@ -76,7 +76,10 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   def _mock_bigquery_client_interface(self):
     mock_client_interface = mock.Mock()
-    mock_client_interface.ExecuteQuery.return_value = (0.0, {})
+    mock_client_interface.ExecuteQuery.return_value = (
+        0.0,
+        {'query_results': {'total_row_count': [0]}},
+    )
     self.enter_context(
         mock.patch.object(
             bigquery,
@@ -117,11 +120,6 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def test_execute_data_load(self, mock_current_process):
     # Configure mocks
     mock_current_process.return_value.name = 'not_main'
-    self.mock_service.GetTableRowCount.side_effect = [
-        (0, {}),
-        (100, {}),
-        (200, {}),
-    ]
     self.mock_service.InsertSearchData.return_value = (1.0, {})
 
     # Call the function
@@ -129,10 +127,12 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         self.mock_service,
         'test_table',
         'test_path',
-        target_row_count=200,
+        dataset_copies_to_ingest=2,
         interval=0.01,
         ingestion_finished=self.event,
         ingestion_warehouse=None,
+        already_loaded_rows=0,
+        dataset_rows=100,
     )
 
     # Assertions
@@ -147,10 +147,6 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     # Configure mocks
     mock_current_process.return_value.name = 'not_main'
     mock_snowflake_service = mock.create_autospec(snowflake.Snowflake)
-    mock_snowflake_service.GetTableRowCount.side_effect = [
-        (0, {}),
-        (200, {}),
-    ]
     mock_snowflake_service.InsertSearchData.return_value = (1.0, {})
 
     # Call the function
@@ -158,10 +154,12 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         mock_snowflake_service,
         'test_table',
         'test_path',
-        target_row_count=200,
+        dataset_copies_to_ingest=1,
         interval=0.01,
         ingestion_finished=self.event,
         ingestion_warehouse='test_warehouse',
+        already_loaded_rows=0,
+        dataset_rows=200,
     )
     mock_snowflake_service.SetWarehouse.assert_called_once_with(
         'test_warehouse'
@@ -318,9 +316,11 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
           sample.metadata['edw_index_table_partitioned'], partitioned
       )
     mock_client_vm = mock_client_interface.client_vm
-    mock_client_vm.RenderTemplate.assert_called_once()
-    template_path = mock_client_vm.RenderTemplate.call_args[0][0]
-    self.assertIn(expected_template, template_path)
+    # Assert that the correct template for table initialization was used.
+    render_template_calls = mock_client_vm.RenderTemplate.call_args_list
+    self.assertTrue(
+        any(expected_template in call[0][0] for call in render_template_calls)
+    )
 
   @parameterized.named_parameters(
       dict(
@@ -380,6 +380,7 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
       run_parallel_processes_called,
   ):
     # Arrange
+    self.mock_service.GetTableRowCount.return_value = (200, {})
     self.enter_context(mock.patch('multiprocessing.Manager'))
     self.enter_context(
         flagsaver.flagsaver(
@@ -426,6 +427,7 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   )
   def test_run_with_search_queries(self, search_queries):
     # Arrange
+    self.mock_service.GetTableRowCount.return_value = (200, {})
     self.enter_context(mock.patch('multiprocessing.Manager'))
     self.enter_context(
         flagsaver.flagsaver(

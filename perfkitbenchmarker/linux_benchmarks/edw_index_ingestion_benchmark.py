@@ -88,12 +88,6 @@ edw_index_ingestion_benchmark:
 
 INDEXING_TIMEOUT_SEC = 21600
 
-_TARGET_ROW_COUNT = flags.DEFINE_integer(
-    "edw_search_ingestion_target_row_count",
-    1,
-    "Target number of rows ingested for index ingestion benchmark",
-)
-
 _LOAD_INTERVAL_SEC = flags.DEFINE_integer(
     "edw_search_ingestion_load_interval_sec",
     60,
@@ -111,8 +105,15 @@ _QUERY_INTERVAL_SEC = flags.DEFINE_integer(
 _INIT_DATASET_COPIES = flags.DEFINE_integer(
     "edw_search_ingestion_init_dataset_copies",
     2,
-    "The number of copies of the init dataset to insert into the starter table"
-    " for edw search index benchmarks.",
+    "The number of copies of the dataset to insert into the table on"
+    " INITIAL_LOAD step (before MAIN step).",
+    lower_bound=1,
+)
+
+_DATASET_COPIES_TO_INGEST = flags.DEFINE_integer(
+    "edw_search_ingestion_dataset_copies_to_ingest",
+    2,
+    "The number of copies of the to insert into the table during MAIN step.",
 )
 
 _SNOWFLAKE_INGESTION_WAREHOUSE = flags.DEFINE_string(
@@ -260,10 +261,12 @@ def _ExecuteDataLoad(
     service: edw_service.EdwService,
     table_name: str,
     data_path: str,
-    target_row_count: int,
+    dataset_copies_to_ingest: int,
     interval: float,
     ingestion_finished: threading.Event,
     ingestion_warehouse: str | None,
+    already_loaded_rows: int,
+    dataset_rows: int,
     bench_meta: dict[str, Any] | None = None,
 ) -> list[sample.Sample]:
   """Executes data insertion queries in a loop.
@@ -277,12 +280,14 @@ def _ExecuteDataLoad(
     service: The EdwService instance to use for executing queries.
     table_name: The name of the table to insert data into.
     data_path: The path to the data to be loaded.
-    target_row_count: The target number of rows to ingest.
+    dataset_copies_to_ingest: The number of copies of the dataset to ingest.
     interval: The time in seconds to wait between data insertion calls.
     ingestion_finished: A threading.Event-like object to signal when the loading
       process is finished.
     ingestion_warehouse: The name of the warehouse to use for ingestion queries
       (Snowflake only).
+    already_loaded_rows: The number of rows already loaded into the table.
+    dataset_rows: The number of rows in the dataset.
     bench_meta: Metadata to add to the collected samples.
 
   Returns:
@@ -304,14 +309,11 @@ def _ExecuteDataLoad(
     if bench_meta is None:
       bench_meta = {}
     samples = []
-    i = 0
-    current_rows, _ = service.GetTableRowCount(table_name)
-    while current_rows < target_row_count:
+    for i in range(dataset_copies_to_ingest):
       ingestion_start_time = time.monotonic()
       execution_time, metadata = service.InsertSearchData(table_name, data_path)
-      reported_rows, _ = service.GetTableRowCount(table_name)
-      current_rows = reported_rows
-      metadata["current_rows"] = reported_rows
+      current_rows = already_loaded_rows + (i + 1) * dataset_rows
+      metadata["current_rows"] = current_rows
       metadata["load_iter"] = i
       samples.append(
           sample.Sample(
@@ -583,13 +585,8 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   gen_metadata = {
       "edw_index_search_table": edw_service.EDW_SEARCH_TABLE_NAME.value,
       "edw_index_search_index": edw_service.EDW_SEARCH_INDEX_NAME.value,
-      "edw_index_init_data_location": (
-          edw_service.EDW_SEARCH_INIT_DATA_LOCATION.value
-      ),
-      "edw_index_interactive_data_location": (
-          edw_service.EDW_SEARCH_DATA_LOCATION.value
-      ),
-      "edw_index_target_row_count": _TARGET_ROW_COUNT.value,
+      "edw_index_data_location": edw_service.EDW_SEARCH_DATA_LOCATION.value,
+      "edw_index_dataset_copies_to_ingest": _DATASET_COPIES_TO_INGEST.value,
       "edw_index_init_dataset_copies": _INIT_DATASET_COPIES.value,
       "edw_index_ingestion_load_interval_sec": _LOAD_INTERVAL_SEC.value,
       "edw_index_ingestion_query_interval_sec": _QUERY_INTERVAL_SEC.value,
@@ -603,6 +600,8 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   # always overwritten, because INITIAL_LOAD is mandatory, but we are appeasing
   # the linter
   indexing_start_time = time.time()
+  dataset_rows = 0
+  already_loaded_rows = 0
   if _Steps.INITIAL_LOAD.value in _BENCHMARK_STEPS.value:
     logging.info("Loading initial search data")
     edw_service_instance.DropSearchIndex(
@@ -611,13 +610,13 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
     )
     edw_service_instance.InitializeSearchStarterTable(
         edw_service.EDW_SEARCH_TABLE_NAME.value,
-        edw_service.EDW_SEARCH_INIT_DATA_LOCATION.value,
+        edw_service.EDW_SEARCH_DATA_LOCATION.value,
     )
     logging.info("Inserting initial search data")
     for _ in range(_INIT_DATASET_COPIES.value):
       edw_service_instance.InsertSearchData(
           edw_service.EDW_SEARCH_TABLE_NAME.value,
-          edw_service.EDW_SEARCH_INIT_DATA_LOCATION.value,
+          edw_service.EDW_SEARCH_DATA_LOCATION.value,
       )
     logging.info("Initial search data load complete")
 
@@ -627,6 +626,10 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
         edw_service.EDW_SEARCH_TABLE_NAME.value,
         edw_service.EDW_SEARCH_INDEX_NAME.value,
     )
+    already_loaded_rows, _ = edw_service_instance.GetTableRowCount(
+        edw_service.EDW_SEARCH_TABLE_NAME.value
+    )
+    dataset_rows = already_loaded_rows / _INIT_DATASET_COPIES.value
 
   if _Steps.INITIAL_INDEX_WAIT.value in _BENCHMARK_STEPS.value:
     current_step_meta = {
@@ -671,10 +674,12 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
                   edw_service_instance,
                   edw_service.EDW_SEARCH_TABLE_NAME.value,
                   edw_service.EDW_SEARCH_DATA_LOCATION.value,
-                  _TARGET_ROW_COUNT.value,
+                  _DATASET_COPIES_TO_INGEST.value,
                   _LOAD_INTERVAL_SEC.value,
                   ingestion_finished,
                   _SNOWFLAKE_INGESTION_WAREHOUSE.value,
+                  already_loaded_rows,
+                  dataset_rows,
               ),
               {"bench_meta": gen_metadata | current_step_meta},
           ),
