@@ -13,8 +13,7 @@ from google.genai import types
 from logger import get_logger
 
 from . import base_provider
-from .base_provider import NonStreamingResult
-from .base_provider import StreamingResult
+
 
 MAX_OUTPUT_TOKENS = 1024
 logger = get_logger(__name__)
@@ -88,7 +87,7 @@ class GoogleProvider(base_provider.BaseProvider):
           The date from the model name, or the minimum datetime if no date is
           found.
         """
-        match = re.search(r'(\d{2}-\d{2})$', model_name)
+        match = re.search(r'(\d{2}-\d{2})', model_name)
         if match:
           return datetime.datetime.strptime(match.group(1), '%m-%d')
         return datetime.datetime.min
@@ -117,7 +116,7 @@ class GoogleProvider(base_provider.BaseProvider):
       model_name: str,
       prompt: str,
       max_output_tokens: int,
-  ) -> NonStreamingResult:
+  ) -> base_provider.NonStreamingResult:
     """Executes the non-streaming benchmark."""
     logger.debug('Starting non-streaming benchmark...')
     start_time = time.time()
@@ -153,13 +152,13 @@ class GoogleProvider(base_provider.BaseProvider):
               'No response text found. Finish reason:'
               f' {block_reason}'
           )
-        return NonStreamingResult(error=error_msg)
+        return base_provider.NonStreamingResult(error=error_msg)
     except exceptions.GoogleAPIError as e:
       logger.debug('Non-streaming benchmark failed.')
-      return NonStreamingResult(error=str(e))
+      return base_provider.NonStreamingResult(error=str(e))
     logger.debug('Finished non-streaming benchmark.')
 
-    return NonStreamingResult(
+    return base_provider.NonStreamingResult(
         total_time_seconds=round(end_time - start_time, 2),
         output_tokens=client.models.count_tokens(
             model=model_name, contents=response.text
@@ -172,7 +171,7 @@ class GoogleProvider(base_provider.BaseProvider):
       model_name: str,
       prompt: str,
       max_output_tokens: int,
-  ) -> StreamingResult:
+  ) -> base_provider.StreamingResult:
     """Executes the streaming benchmark."""
     logger.debug('Starting streaming benchmark...')
     start_time = time.time()
@@ -195,11 +194,11 @@ class GoogleProvider(base_provider.BaseProvider):
           output_text += chunk.text
     except exceptions.GoogleAPIError as e:
       logger.debug('Streaming benchmark failed.')
-      return StreamingResult(error=str(e))
+      return base_provider.StreamingResult(error=str(e))
     end_time = time.time()
     logger.debug('Finished streaming benchmark.')
 
-    return StreamingResult(
+    return base_provider.StreamingResult(
         time_to_first_token_seconds=round(first_token_time - start_time, 2),
         total_time_seconds=round(end_time - start_time, 2),
         output_tokens=client.models.count_tokens(

@@ -151,23 +151,11 @@ def _run_benchmarks(
     A dictionary of benchmark results.
   """
   results = {}
+  all_prompts = {**SUMMARIZATION_PROMPTS, **OPEN_ENDED_PROMPTS}
   for model_name in models_to_test:
     logger.debug(f'Benchmarking model: {model_name}')
     results[model_name] = {}
-    for prompt_id, prompt_data in SUMMARIZATION_PROMPTS.items():
-      try:
-        results[model_name][prompt_id] = provider.benchmark_model(
-            model_name,
-            prompt_data['text'],
-            prompt_id,
-            prompt_data['max_tokens'],
-        ).as_dict()
-      except Exception as e:  # pylint: disable=broad-exception-caught
-        # Catching broad exception to ensure one failed prompt doesn't stop
-        # the entire benchmark run.
-        logger.debug(f"  Error benchmarking prompt '{prompt_id}': {e}")
-        results[model_name][prompt_id] = {'error': str(e)}
-    for prompt_id, prompt_data in OPEN_ENDED_PROMPTS.items():
+    for prompt_id, prompt_data in all_prompts.items():
       try:
         results[model_name][prompt_id] = provider.benchmark_model(
             model_name,

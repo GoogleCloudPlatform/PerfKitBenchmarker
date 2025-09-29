@@ -12,8 +12,7 @@ import openai
 from openai import OpenAI
 
 from . import base_provider
-from .base_provider import NonStreamingResult
-from .base_provider import StreamingResult
+
 
 MAX_OUTPUT_TOKENS = 1024
 logger = get_logger(__name__)
@@ -129,7 +128,7 @@ class OpenAIProvider(base_provider.BaseProvider):
       model_name: str,
       prompt: str,
       max_output_tokens: int,
-  ) -> NonStreamingResult:
+  ) -> base_provider.NonStreamingResult:
     """Executes the non-streaming benchmark."""
     logger.debug('Starting non-streaming benchmark...')
     start_time = time.time()
@@ -154,13 +153,13 @@ class OpenAIProvider(base_provider.BaseProvider):
       response = client.chat.completions.create(**params)
       end_time = time.time()
       logger.debug(f'Non-streaming response: {response}')
-      return NonStreamingResult(
+      return base_provider.NonStreamingResult(
           total_time_seconds=round(end_time - start_time, 2),
           output_tokens=response.usage.completion_tokens,
       )
     except openai.OpenAIError as e:
       logger.debug(f'Non-streaming benchmark failed: {e}')
-      return NonStreamingResult(error=str(e))
+      return base_provider.NonStreamingResult(error=str(e))
 
   def _execute_streaming(
       self,
@@ -168,7 +167,7 @@ class OpenAIProvider(base_provider.BaseProvider):
       model_name: str,
       prompt: str,
       max_output_tokens: int,
-  ) -> StreamingResult:
+  ) -> base_provider.StreamingResult:
     """Executes the streaming benchmark."""
     logger.debug('Starting streaming benchmark...')
     start_time = time.time()
@@ -217,11 +216,11 @@ class OpenAIProvider(base_provider.BaseProvider):
       logger.debug(f'Re-encoding response: {response}')
       output_tokens = response.usage.prompt_tokens
 
-      return StreamingResult(
+      return base_provider.StreamingResult(
           time_to_first_token_seconds=round(first_token_time - start_time, 2),
           total_time_seconds=round(end_time - start_time, 2),
           output_tokens=output_tokens,
       )
     except openai.OpenAIError as e:
       logger.debug(f'Streaming benchmark failed: {e}')
-      return StreamingResult(error=str(e))
+      return base_provider.StreamingResult(error=str(e))
