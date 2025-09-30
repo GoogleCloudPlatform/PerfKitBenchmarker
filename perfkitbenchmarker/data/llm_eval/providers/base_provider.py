@@ -1,7 +1,7 @@
 """Abstract base class for LLM providers."""
 
 import abc
-from dataclasses import asdict, dataclass
+import dataclasses
 from typing import Any, Dict, List, Optional
 
 from logger import get_logger
@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 TEMPERATURE = 0.0
 
 
-@dataclass
+@dataclasses.dataclass
 class NonStreamingResult:
   """Structured result for a non-streaming benchmark."""
 
@@ -21,7 +21,7 @@ class NonStreamingResult:
   error: Optional[str] = None
 
 
-@dataclass
+@dataclasses.dataclass
 class StreamingResult:
   """Structured result for a streaming benchmark."""
 
@@ -31,7 +31,7 @@ class StreamingResult:
   error: Optional[str] = None
 
 
-@dataclass
+@dataclasses.dataclass
 class LlmBenchmarkResult:
   """A structured object for LLM benchmark results."""
 
@@ -50,7 +50,9 @@ class LlmBenchmarkResult:
 
   def as_dict(self) -> Dict[str, Any]:
     """Return the dataclass as a dictionary, filtering out None values."""
-    return {k: v for k, v in asdict(self).items() if v is not None}
+    return {
+        k: v for k, v in dataclasses.asdict(self).items() if v is not None
+    }
 
   @classmethod
   def from_results(

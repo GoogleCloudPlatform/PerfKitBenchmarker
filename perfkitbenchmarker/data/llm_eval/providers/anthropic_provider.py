@@ -2,7 +2,7 @@
 
 import os
 import time
-from typing import Any, List
+from typing import List
 
 from anthropic import Anthropic
 from anthropic import AnthropicError

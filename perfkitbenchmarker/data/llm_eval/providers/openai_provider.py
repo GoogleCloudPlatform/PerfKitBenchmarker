@@ -5,7 +5,7 @@ import itertools
 import os
 import re
 import time
-from typing import Any, List
+from typing import List
 
 from logger import get_logger
 import openai
