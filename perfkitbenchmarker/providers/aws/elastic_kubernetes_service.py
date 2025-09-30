@@ -816,7 +816,7 @@ class EksKarpenterCluster(BaseEksCluster):
 
   def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
     """Gets the node selectors section of a yaml for the provider."""
-    machine_family = util.GetMachineFamily(self.default_nodepool.machine_type)
+    machine_family = util.GetMachineFamily(machine_type)
     if machine_family:
       return [f'karpenter.k8s.aws/instance-family: {machine_family}']
     return []
