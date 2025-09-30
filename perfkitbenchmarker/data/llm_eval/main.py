@@ -42,7 +42,7 @@ flags.DEFINE_enum(
 flags.mark_flag_as_required('provider')
 flags.DEFINE_integer(
     'max_models',
-    -1,
+    20,
     (
         'The maximum number of models to test in a single invocation. This '
         'flag has no effect if the --models flag is specified.'
@@ -98,6 +98,8 @@ def _get_models_to_test(provider: BaseProvider) -> Tuple[List[str], List[str]]:
     skipped_models = all_models[FLAGS.max_models :]
 
   logger.debug(f'Models to be benchmarked: {models_to_test}')
+  if skipped_models:
+    logger.debug(f'Models skipped due to --max_models: {skipped_models}')
 
   return models_to_test, skipped_models
 

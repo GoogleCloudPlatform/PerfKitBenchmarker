@@ -95,7 +95,7 @@ _DISCOVER_MODELS_ONLY = flags.DEFINE_boolean(
 _INCLUDE_PREVIEW = flags.DEFINE_boolean(
     'llm_eval_include_preview',
     False,
-    'Include preview models from the benchmark.',
+    'Include preview models in the benchmark.',
 )
 
 FLAGS = flags.FLAGS
