@@ -334,7 +334,7 @@ sparksql_tpcds_1t_tuned:
       vm_spec:
         GCP:
           num_local_ssds: 0
-      disk_count: 4
+      disk_count: 3
       disk_spec:
         GCP:
           disk_size: 320
