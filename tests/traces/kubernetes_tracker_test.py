@@ -1,6 +1,7 @@
 import time
 from typing import Optional
 import unittest
+from unittest import mock
 from absl.testing import flagsaver
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import provider_info
@@ -15,6 +16,9 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     self.enter_context(flagsaver.flagsaver(kubeconfig="kubeconfig"))
     self.enter_context(flagsaver.flagsaver(run_uri="123"))
+    self.enter_context(
+        mock.patch("perfkitbenchmarker.providers.LoadProvider", autospec=True)
+    )
 
   def testTrackUsageCalculatesTotalClusterTime(self):
     fake_time = time.time()

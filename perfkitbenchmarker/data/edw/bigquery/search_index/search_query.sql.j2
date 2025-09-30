@@ -1,22 +1,3 @@
-WITH
-  search_rows AS (
-  SELECT
-    COUNT(*) AS result_rows
-  FROM
-    {{table_name}}
-  WHERE
-    SEARCH(raw_log,
-      '{{search_text}}') = TRUE),
-  index_coverage AS (
-  SELECT
-    coverage_percentage
-  FROM
-    INFORMATION_SCHEMA.SEARCH_INDEXES
-  WHERE
-    index_name="{{index_name}}" )
-SELECT
-  search_rows.result_rows,
-  index_coverage.coverage_percentage AS index_coverage_percentage
-FROM
-  search_rows,
-  index_coverage;
+SELECT COUNT(*) AS result_rows
+FROM {{table_name}}
+WHERE SEARCH(raw_log, '{{search_text}}');

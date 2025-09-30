@@ -559,7 +559,12 @@ class GceDisk(disk.BaseDisk):
 
     if self.replica_zones:
       cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
-      cmd.flags['region'] = self.region
+      # The gcloud CLI for attaching Hyperdisk Balanced high availability
+      # disks does not accept the --region flag, but it is still needed for
+      # api_http_util.
+      if (self.spec.DISK_TYPE != HYPERDISK_BALANCED_HA
+          or FLAGS.gcp_gcloud_use_http):
+        cmd.flags['region'] = self.region
 
     if self.mode == disk.READ_ONLY_MANY:
       cmd.flags['mode'] = 'ro'

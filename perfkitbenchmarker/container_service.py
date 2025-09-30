@@ -1737,7 +1737,7 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     """Get the default storage class for the provider."""
     raise NotImplementedError
 
-  def GetNodeSelectors(self, machine_family: str | None = None) -> list[str]:
+  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
     """Get the node selectors section of a yaml for the provider."""
     return []
 

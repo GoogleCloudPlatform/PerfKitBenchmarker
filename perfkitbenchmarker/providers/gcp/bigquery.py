@@ -924,14 +924,9 @@ class Bigquery(edw_service.EdwService):
     res, meta = self.client_interface.ExecuteQuery(
         query_name, print_results=True
     )
-
-    meta['edw_search_index_coverage_percentage'] = int(
-        meta['query_results']['index_coverage_percentage'][0]
-    )
     meta['edw_search_result_rows'] = int(
         meta['query_results']['result_rows'][0]
     )
-
     return res, meta
 
 

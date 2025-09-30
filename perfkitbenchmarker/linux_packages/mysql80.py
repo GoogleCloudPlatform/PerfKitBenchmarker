@@ -218,13 +218,13 @@ def GetOSDependentDefaults(os_type: str) -> dict[str, str]:
     return OS_DEPENDENT_DEFAULTS['debian']
 
 
-def ConfigureAndRestart(
+def WriteMysqlConfiguration(
     vm: virtual_machine.VirtualMachine,
     buffer_pool_size: str,
     server_id: int,
     config_template: str,
 ):
-  """Configure and restart mysql."""
+  """Write mysql configuration files."""
   remote_temp_config = '/tmp/my.cnf'
   remote_final_config = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_CONFIG_PATH]
   logrotation = 'mysql/logrotation'
@@ -247,6 +247,16 @@ def ConfigureAndRestart(
       f'sudo cp {remote_temp_logrotation} {remote_final_logrotation}'
   )
   vm.RemoteCommand(f'sudo chmod 0644 {remote_final_logrotation}')
+
+  # mysqld silently exits if /var/run/mysqld doesn't exist.
+  vm.RemoteCommand('sudo mkdir -p /var/run/mysqld')
+  vm.RemoteCommand('sudo chown mysql:mysql /var/run/mysqld')
+
+
+def RestartServer(
+    vm: virtual_machine.VirtualMachine,
+):
+  """Configure and restart mysql."""
   # The default MySQL systemd unit file sets the open file limit to 100000.
   # Do the same here.
   vm.RemoteCommand(
@@ -255,10 +265,6 @@ def ConfigureAndRestart(
   vm.RemoteCommand(
       'echo "mysql hard nofile 100000" | sudo tee -a /etc/security/limits.conf'
   )
-
-  # mysqld silently exits if /var/run/mysqld doesn't exist.
-  vm.RemoteCommand('sudo mkdir -p /var/run/mysqld')
-  vm.RemoteCommand('sudo chown mysql:mysql /var/run/mysqld')
 
   # Start the server.
   vm.RemoteCommand('sudo -g mysql -u mysql nohup mysqld &> /dev/null &')
