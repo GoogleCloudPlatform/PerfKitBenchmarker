@@ -320,7 +320,7 @@ CONTAINER_REMOTE_BUILD_CONFIG = flags.DEFINE_string(
 )
 GKE_GPU_DRIVER_VERSION = flags.DEFINE_enum(
     'gke_gpu_driver_version',
-    'disabled',
+    'default',
     ['disabled', 'latest', 'default'],
     'The GPU driver version to use for all node pools in the container cluster.'
     'Default behavior depends on GKE version. See '
