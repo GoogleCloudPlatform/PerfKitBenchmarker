@@ -270,7 +270,7 @@ def GetBlockDeviceMap(vm):
 def GetArmArchitecture(machine_type: str):
   """Returns the specific ARM processor architecture of the VM."""
   # c6g.medium -> c6g, m6gd.large -> m6g, c5n.18xlarge -> c5
-  prefix = re.split(r'[dn]?\.', machine_type)[0]
+  prefix = re.split(r'[bdn]?\.', machine_type)[0]
   return _MACHINE_TYPE_PREFIX_TO_ARM_ARCH.get(prefix)
 
 
