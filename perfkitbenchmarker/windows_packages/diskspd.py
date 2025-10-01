@@ -458,7 +458,7 @@ def Prefill(running_vm):
 
 def GetDiskspdFileSizeInPrefillSizeUnit(
     write_throughput: float, test_duration: float
-) -> float:
+) -> tuple[float, str]:
   """Returns the diskspd file size in GB."""
   unit = DISKSPD_FILE_SIZE.value[-1]
   written_data = 0
