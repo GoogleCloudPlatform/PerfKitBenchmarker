@@ -59,7 +59,6 @@ GOOD_METADATA = {
     'spec17_threads': None,
     'spec17_subset': ['intrate'],
     'gcc_version': '7',
-    'CPU2017_version': '',
 }
 
 EXPECTED_RESULT_SPECINT = [
