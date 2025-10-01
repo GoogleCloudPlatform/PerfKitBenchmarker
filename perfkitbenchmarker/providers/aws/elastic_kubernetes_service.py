@@ -771,6 +771,8 @@ class EksKarpenterCluster(BaseEksCluster):
             'iamserviceaccount',
             '--cluster',
             self.name,
+            '--region',
+            self.region,
             '--namespace',
             'kube-system',
             '--name',
