@@ -207,6 +207,7 @@ NVME_MACHINE_FAMILIES = [
     'Standard_Eibds_v5',
     'Standard_Ebds_v5',
     'Standard_Es_v6',
+    'Standard_Eis_v6',
     'Standard_Fas_v6',
     'Standard_Fals_v6',
     'Standard_Fams_v6',
