@@ -389,20 +389,33 @@ class EksKarpenterTest(BaseEksTest):
   def testIngressAddressParsing(self):
     """Test parsing AWS ALB address with dualstack prefix removal."""
     test_cases = [
-        ('http://dualstack.k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
-         'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com'),
-        ('https://dualstack.k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
-         'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com'),
-        ('dualstack.k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
-         'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com'),
-        ('k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
-         'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com'),
+        (
+            'http://dualstack.k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+        ),
+        (
+            'https://dualstack.k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+        ),
+        (
+            'dualstack.k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+        ),
+        (
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+        ),
     ]
     for address, expected in test_cases:
-        with self.subTest(address=address):
-            host = urlparse(address).hostname if address.startswith('http') else address
-            normalized = (host or '').replace('dualstack.', '')
-            self.assertEqual(normalized, expected)
+      with self.subTest(address=address):
+        host = (
+            urlparse(address).hostname
+            if address.startswith('http')
+            else address
+        )
+        normalized = (host or '').replace('dualstack.', '')
+        self.assertEqual(normalized, expected)
+
 
 if __name__ == '__main__':
   unittest.main()

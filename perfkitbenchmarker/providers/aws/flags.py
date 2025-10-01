@@ -216,11 +216,13 @@ flags.DEFINE_boolean(
     'eks_install_alb_controller',
     False,
     'Whether to install AWS Load Balancer Controller in EKS Karpenter clusters'
-    'Default value - don not install unless explicitly requested'
+    'Default value - don not install unless explicitly requested',
 )
 AWS_CAPACITY_BLOCK_RESERVATION_ID = flags.DEFINE_string(
     'aws_capacity_block_reservation_id',
-    None, 'Reservation id for capacity block.')
+    None,
+    'Reservation id for capacity block.',
+)
 AWS_CREATE_DISKS_WITH_VM = flags.DEFINE_boolean(
     'aws_create_disks_with_vm',
     True,
@@ -277,6 +279,7 @@ def _ValidatePreprovisionedDataAccess(flag_values: dict[str, Any]) -> bool:
       or flag_values[AWS_EC2_INSTANCE_PROFILE.name]
       or flag_values[AWS_EKS_POD_IDENTITY_ROLE.name]
   )
+
 
 # MemoryDB Flags
 MEMORYDB_NODE_TYPE = flags.DEFINE_string(
