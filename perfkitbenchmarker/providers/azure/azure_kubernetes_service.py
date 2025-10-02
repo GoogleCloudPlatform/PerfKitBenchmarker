@@ -549,43 +549,6 @@ class AksAutomaticCluster(AksCluster):
     self._WaitForDefaultServiceAccount()
     self._AttachContainerRegistry()
 
-  def ModifyDeploySpec(self):
-    """Get the deploy spec for Kubernetes scale benchmark to be compliant
-    with Azure requirements.
-    
-    Returns:
-      A dictionary containing pod spec configurations including container image,
-      probes, and topology constraints.
-    """
-    container_image = 'busybox:1.37'
-    probe_command = ['/bin/true']
-    initial_delay = 5
-    period = 10
-
-    deploy_spec = {
-      'container_image': container_image,
-      'liveness_probe': {
-          'exec': {'command': probe_command},
-          'initialDelaySeconds': initial_delay,
-          'periodSeconds': period,
-      },
-      'readiness_probe': {
-          'exec': {'command': probe_command},
-          'initialDelaySeconds': initial_delay,
-          'periodSeconds': period,
-      },
-      'topology_constraints': [{
-          'maxSkew': 1,
-          'topologyKey': 'kubernetes.io/hostname',
-          'whenUnsatisfiable': 'ScheduleAnyway',
-          'labelSelector': {
-              'matchLabels': {
-                  'name': '{{ Name }}'
-              }
-          }
-      }]
-    }
-    return deploy_spec
 
 def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
   """Truncate nodepool name for AKS."""

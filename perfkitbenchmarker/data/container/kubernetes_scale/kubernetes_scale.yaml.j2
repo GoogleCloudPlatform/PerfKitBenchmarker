@@ -27,14 +27,20 @@ spec:
             {%- if NvidiaGpuRequest %}
             nvidia.com/gpu: {{ NvidiaGpuRequest }}
             {%- endif %}
-      {% if liveness_probe is defined %}
+        # Added livenessProbe
         livenessProbe:
-      {{ liveness_probe }}
-      {% endif %}
-      {% if readiness_probe is defined %}
+          exec:
+            command:
+            - /bin/true
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        # Added readinessProbe
         readinessProbe:
-      {{ readiness_probe }}
-      {% endif %}
+          exec:
+            command:
+            - /bin/true
+          initialDelaySeconds: 5
+          periodSeconds: 10
       nodeSelector:
         {%- for NodeSelector in NodeSelectors %}
         {{ NodeSelector }}
@@ -53,7 +59,12 @@ spec:
         tolerationSeconds: {{ PodTimeout }}
       # Add topology spread constraints to fix an issue with Azure AKS where
       # admission webhook "validation.gatekeeper.sh" denied the request
-      {% if topology_constraints is defined %}
+      {%- if cloud == 'Azure' %}
       topologySpreadConstraints:
-      {{ topology_constraints }}
-      {% endif %}
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            name: {{ Name }}
+      {%- endif %}
