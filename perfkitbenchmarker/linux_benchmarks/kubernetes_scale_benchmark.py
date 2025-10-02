@@ -6,7 +6,6 @@ import dataclasses
 import json
 import time
 from typing import Any
-from yaml import safe_dump
 
 from absl import flags
 from absl import logging
