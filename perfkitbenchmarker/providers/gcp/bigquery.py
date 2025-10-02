@@ -467,7 +467,7 @@ class PythonClientInterface(GenericClientInterface):
       cmd += ' --print_results'
     if self.destination:
       cmd += f' --destination {self.destination}'
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
     details = copy.copy(self.GetMetadata())
     details.update(json.loads(stdout)['details'])
     return json.loads(stdout)['query_wall_time_in_secs'], details
@@ -485,7 +485,7 @@ class PythonClientInterface(GenericClientInterface):
         f' --feature_config {FLAGS.edw_bq_feature_config} --labels'
         f" '{json.dumps(labels)}'"
     )
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
     return stdout
 
   def RunQueryWithResults(self, query_name: str) -> str:
@@ -495,7 +495,7 @@ class PythonClientInterface(GenericClientInterface):
         f' {self.project_id} --credentials_file {self.key_file_name} --dataset'
         f' {self.dataset_id} --query_file {query_name} --print_results'
     )
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
     return stdout
 
 
