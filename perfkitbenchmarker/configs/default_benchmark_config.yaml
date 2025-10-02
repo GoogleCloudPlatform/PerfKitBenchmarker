@@ -482,9 +482,9 @@ hadoop_dfsio:
       disk_count: 3
       disk_spec:
         GCP:
-          disk_size: 6830
+          disk_size: 9200
           disk_type: hyperdisk-throughput
-          provisioned_throughput: 600
+          provisioned_throughput: 800
 
 diskspd_read_only:
   name: diskspd
