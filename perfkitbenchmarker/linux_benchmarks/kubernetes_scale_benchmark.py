@@ -242,6 +242,28 @@ def _CheckForFailures(
     RunError: If scale up failed for a non-quota reason.
   """
   events = cluster.GetEvents()
+  failure_events_list: list[container_service.KubernetesEvent] = [
+      event for event in events if event.type != 'Normal'
+  ]
+  logging.info(
+      'There were %d possible failure events. Some of these are benign & the'
+      ' benchmark may still have passed. Printing these by event reason.',
+      len(failure_events_list),
+  )
+  failure_events_by_reason: dict[
+      str | None, list[container_service.KubernetesEvent]
+  ] = {}
+  for event in failure_events_list:
+    failure_events_by_reason.setdefault(event.reason, []).append(event)
+  for reason, failure_events in failure_events_by_reason.items():
+    logging.info(
+        'There were %d failure events for reason %s. Printing the last 20.',
+        len(failure_events),
+        reason,
+    )
+    for event in failure_events[-20:]:
+      logging.info('Printing failure event: %s', event)
+
   ready_count_sample = next(
       (s for s in pod_samples if s.metric == 'pod_Ready_count'), None
   )
@@ -256,16 +278,17 @@ def _CheckForFailures(
         NUM_PODS.value,
     )
     return
-  for event in events:
-    if event.reason == 'FailedScaleUp' and 'quota exceeded' in event.message:
-      raise errors.Benchmarks.QuotaFailure(
-          'Failed to scale up to %d pods, at least one pod ran into a quota'
-          ' error: %s' % (NUM_PODS.value, event.message)
-      )
+  if 'FailedScaleUp' in failure_events_by_reason:
+    for event in failure_events_by_reason['FailedScaleUp']:
+      if 'quota exceeded' in event.message:
+        raise errors.Benchmarks.QuotaFailure(
+            'Failed to scale up to %d pods, at least one pod ran into a quota'
+            ' error: %s' % (NUM_PODS.value, event.message)
+        )
   if ready_count_sample is None:
     raise errors.Benchmarks.RunError(
         'No pod ready events were found & we attempted to scale up to'
-        f' {NUM_PODS.value} pods; this is unusual.'
+        f' {NUM_PODS.value} pods.'
     )
 
   raise errors.Benchmarks.RunError(
