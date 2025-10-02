@@ -127,11 +127,11 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   samples, rollout_name = ScaleUpPods(cluster)
   start_time = _GetRolloutCreationTime(rollout_name)
-  pod_samples = ParseStatusChanges(cluster, 'pod', start_time)
+  pod_samples = ParseStatusChanges('pod', start_time)
   samples += pod_samples
   _CheckForFailures(cluster, pod_samples)
   samples += ParseStatusChanges(
-      cluster, 'node', start_time, resources_to_ignore=initial_nodes
+      'node', start_time, resources_to_ignore=initial_nodes
   )
   metadata = {
       'pod_memory': MEMORY_PER_POD.value,
@@ -321,39 +321,56 @@ class KubernetesResourceStatusCondition:
     )
 
 
-def _GetResourceStatusConditions(
-    resource_type: str, resource_name: str
+def _GetStatusConditionsForResourceType(
+    resource_type: str, resources_to_ignore: abc.Set[str]
 ) -> list[KubernetesResourceStatusCondition]:
-  """Returns the status conditions for a resource.
+  """Returns the status conditions for a resource type.
 
   Args:
     resource_type: The type of the resource to get the status conditions for.
-    resource_name: The name of the resource to get the status conditions for.
-      Should not have a prefix (eg pods/).
+    resources_to_ignore: A set of resource names to ignore.
 
   Returns:
     A list of status condition, where each condition is a dict with type &
     lastTransitionTime.
   """
-  out, _, _ = container_service.RunRetryableKubectlCommand(
+
+  jsonpath = (
+      r'{range .items[*]}'
+      # e.g. '"pod-name-1234": [<condition1>, ...],\n'
+      r'{"\""}{.metadata.name}{"\": "}{.status.conditions}{",\n"}'
+      r'{end}'
+  )
+  stdout, _, _ = container_service.RunKubectlCommand(
       [
           'get',
           resource_type,
-          resource_name,
           '-o',
-          'jsonpath={.status.conditions[*]}',
+          'jsonpath=' + jsonpath,
       ],
-      timeout=60 * 2,
-  )  # 2 minutes; should be a pretty fast call.
-  # Turn space separated individual json objects into a single json array.
-  conditions_str = '[' + out.replace('} {', '},{') + ']'
-  conditions = json.loads(conditions_str)
-  return [
-      KubernetesResourceStatusCondition.FromJsonPathResult(
-          resource_type, resource_name, condition
+      timeout=60 * 2,  # 2 minutes; should be a pretty fast call.
+      # Output can be quite large, so we'll conditionally suppress it.
+      suppress_logging=NUM_PODS.value > 20,
+  )
+
+  # Convert output to valid json and parse it
+  stdout = stdout.rstrip('\t\n\r ,')
+  stdout = '{' + stdout + '}'
+  name_to_conditions = json.loads(stdout)
+
+  for key in resources_to_ignore:
+    name_to_conditions.pop(key, None)
+
+  results = []
+  for name in name_to_conditions.keys():
+    for conditions in name_to_conditions[name]:
+      results.append(
+          KubernetesResourceStatusCondition.FromJsonPathResult(
+              resource_type, name, conditions
+          )
       )
-      for condition in conditions
-  ]
+
+  return results
 
 
 def ConvertToEpochTime(timestamp: str) -> int:
@@ -363,7 +380,6 @@ def ConvertToEpochTime(timestamp: str) -> int:
 
 
 def ParseStatusChanges(
-    cluster: container_service.KubernetesCluster,
     resource_type: str,
     start_time: float,
     resources_to_ignore: abc.Set[str] = frozenset(),
@@ -374,7 +390,6 @@ def ParseStatusChanges(
   transitions to PodScheduled or Ready. See tests for more example input/output.
 
   Args:
-    cluster: The cluster to parse the status changes for.
     resource_type: The type of the resource to parse the status changes for
       (node or pod).
     start_time: The start time of the scale up operation, subtracted from
@@ -384,11 +399,10 @@ def ParseStatusChanges(
   Returns:
     A list of samples, with various percentiles for each status condition.
   """
-  all_resources = set(cluster.GetAllNamesForResourceType(resource_type + 's'))
-  all_resources -= resources_to_ignore
-  conditions = []
-  for resource in sorted(all_resources):
-    conditions += _GetResourceStatusConditions(resource_type, resource)
+
+  conditions = _GetStatusConditionsForResourceType(
+      resource_type, resources_to_ignore
+  )
 
   samples = []
   overall_times = collections.defaultdict(list)
