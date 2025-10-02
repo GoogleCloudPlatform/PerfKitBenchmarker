@@ -54,7 +54,6 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import resource as resource_type
-from perfkitbenchmarker import resources  # pylint:disable=unused-import  # Load the __init__.py
 from perfkitbenchmarker import smb_service
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine as static_vm
@@ -67,6 +66,7 @@ from perfkitbenchmarker.resources import base_job
 from perfkitbenchmarker.resources import example_resource
 from perfkitbenchmarker.resources import managed_ai_model
 from perfkitbenchmarker.resources.pinecone import pinecone as pinecone_resource
+from perfkitbenchmarker.resources.vertex_vector_search import vvs as vvs_resource  # pylint: disable=line-too-long
 import six
 import six.moves._thread
 import six.moves.copyreg
@@ -200,6 +200,7 @@ class BenchmarkSpec:
     self.messaging_service = None
     self.ai_model = None
     self.pinecone = None
+    self.vvs = None
     self.memory_store = None
     self.data_discovery_service = None
     self.app_groups = {}
@@ -333,6 +334,7 @@ class BenchmarkSpec:
     self.ConstructBaseJob()
     self.ConstructMemoryStore()
     self.ConstructPinecone()
+    self.ConstructVertexVectorSearch()
     self.ConstructMultiAttachDisk()
 
   def ConstructContainerCluster(self):
@@ -593,6 +595,19 @@ class BenchmarkSpec:
     )  # pytype: disable=not-instantiable
     self.pinecone.SetVms(self.vm_groups)
     self.resources.append(self.pinecone)
+
+  def ConstructVertexVectorSearch(self):
+    """Construct the Vertex Vector Search instance."""
+    if self.config.vvs is None:
+      return
+    cloud = self.config.vvs.cloud
+    providers.LoadProvider(cloud)
+    model_class = vvs_resource.GetVVSResourceClass(cloud)
+    self.vvs = model_class(
+        self.config.vvs
+    )  # pytype: disable=not-instanti
+    self.vvs.SetVms(self.vm_groups)
+    self.resources.append(self.vvs)
 
   def ConstructMemoryStore(self):
     """Create the memory store instance."""
@@ -1057,6 +1072,8 @@ class BenchmarkSpec:
       self.ai_model.Create()
     if self.pinecone:
       self.pinecone.Create()
+    if self.vvs:
+      self.vvs.Create()
     if self.edw_service:
       if (
           not self.edw_service.user_managed
@@ -1132,6 +1149,8 @@ class BenchmarkSpec:
       self.data_discovery_service.Delete()
     if hasattr(self, 'pinecone') and self.pinecone:
       self.pinecone.Delete()
+    if hasattr(self, 'vvs') and self.vvs:
+      self.vvs.Delete()
 
     # Note: It is ok to delete capacity reservations before deleting the VMs,
     # and will actually save money (mere seconds of usage).

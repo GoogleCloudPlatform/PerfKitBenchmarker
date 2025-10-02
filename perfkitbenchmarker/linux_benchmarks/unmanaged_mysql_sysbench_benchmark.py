@@ -237,36 +237,24 @@ def GetBufferPoolSize():
   return f'{DEFAULT_BUFFER_POOL_SIZE}G'
 
 
-def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
-  """Prepare the servers and clients for the benchmark run.
+def PrepareSystem(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Configure the system for the benchmark run.
 
   Args:
     benchmark_spec:
   """
   vms = benchmark_spec.vms
-  background_tasks.RunThreaded(mysql80.ConfigureSystemSettings, vms)
-  background_tasks.RunThreaded(lambda vm: vm.Install('mysql80'), vms)
+  background_tasks.RunOnAllVms(mysql80.ConfigureSystemSettings, vms)
 
-  buffer_pool_size = GetBufferPoolSize()
 
-  primary_server = benchmark_spec.vm_groups['server'][0]
-  replica_servers = []
-  for vm in benchmark_spec.vm_groups:
-    if vm.startswith('replica'):
-      replica_servers += benchmark_spec.vm_groups[vm]
+def InstallPackages(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Install packages for the benchmark run.
 
-  servers = [primary_server] + replica_servers
-  new_password = FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
-  for index, server in enumerate(servers):
-    # mysql server ids needs to be positive integers.
-    mysql80.ConfigureAndRestart(
-        server, buffer_pool_size, index + 1, _CONFIG_TEMPLATE.value)
-    mysql80.UpdatePassword(server, new_password)
-    mysql80.CreateDatabase(server, new_password, _DATABASE_NAME)
-
-  assert primary_server.internal_ip
-  for replica in replica_servers:
-    mysql80.SetupReplica(replica, new_password, primary_server.internal_ip)
+  Args:
+    benchmark_spec:
+  """
+  vms = benchmark_spec.vms
+  background_tasks.RunOnAllVms(lambda vm: vm.Install('mysql80'), vms)
 
   clients = benchmark_spec.vm_groups['client']
   for client in clients:
@@ -277,6 +265,46 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
           'cd /opt && sudo rm -fr sysbench-tpcc && '
           f'sudo git clone {sysbench.SYSBENCH_TPCC_REPRO}'
       )
+
+  buffer_pool_size = GetBufferPoolSize()
+
+  primary_server = benchmark_spec.vm_groups['server'][0]
+  replica_servers = []
+  for vm in benchmark_spec.vm_groups:
+    if vm.startswith('replica'):
+      replica_servers += benchmark_spec.vm_groups[vm]
+
+  servers = [primary_server] + replica_servers
+  for index, server in enumerate(servers):
+    # mysql server ids needs to be positive integers.
+    mysql80.WriteMysqlConfiguration(
+        server, buffer_pool_size, index + 1, _CONFIG_TEMPLATE.value
+    )
+
+
+def StartServices(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Start services for the benchmark run.
+
+  Args:
+    benchmark_spec:
+  """
+  primary_server = benchmark_spec.vm_groups['server'][0]
+  replica_servers = []
+  for vm in benchmark_spec.vm_groups:
+    if vm.startswith('replica'):
+      replica_servers += benchmark_spec.vm_groups[vm]
+
+  servers = [primary_server] + replica_servers
+  new_password = FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
+  for _, server in enumerate(servers):
+    # mysql server ids needs to be positive integers.
+    mysql80.RestartServer(server)
+    mysql80.UpdatePassword(server, new_password)
+    mysql80.CreateDatabase(server, new_password, _DATABASE_NAME)
+
+  assert primary_server.internal_ip
+  for replica in replica_servers:
+    mysql80.SetupReplica(replica, new_password, primary_server.internal_ip)
 
   loader_vm = benchmark_spec.vm_groups['client'][0]
   sysbench_parameters = GetSysbenchParameters(

@@ -84,7 +84,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     benchmark_spec: The benchmarks specification.
   """
   benchmark_spec.vm_groups['client'] = benchmark_spec.vm_groups['server']
-  unmanaged_mysql_sysbench_benchmark.Prepare(benchmark_spec)
+  unmanaged_mysql_sysbench_benchmark.PrepareSystem(benchmark_spec)
+  unmanaged_mysql_sysbench_benchmark.InstallPackages(benchmark_spec)
+  unmanaged_mysql_sysbench_benchmark.StartServices(benchmark_spec)
   background_tasks.RunThreaded(
       lambda vm: vm.Install('fio'), benchmark_spec.vm_groups['client']
   )

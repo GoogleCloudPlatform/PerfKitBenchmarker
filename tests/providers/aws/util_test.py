@@ -65,6 +65,10 @@ class AwsUtilTest(pkb_common_test_case.PkbCommonTestCase):
     expected_regions = {'us-west-2'}
     self.assertEqual(expected_regions, actual_regions)
 
+  def testGetMachineFamily(self):
+    self.assertEqual(util.GetMachineFamily('r6gd.xlarge'), 'r6gd')
+    self.assertEqual(util.GetMachineFamily('m7i.2xlarge'), 'm7i')
+    self.assertIsNone(util.GetMachineFamily(None))
 
 if __name__ == '__main__':
   unittest.main()

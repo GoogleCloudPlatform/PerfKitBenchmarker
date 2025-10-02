@@ -19,11 +19,9 @@ table in an
 EDW service(BigQuery or Snowflake), then measures the time it takes for the
 index to fully cover the table.
 
-TODO: b/435033142 Set up SF tables and queries and test if they work.
 """
 
 import logging
-import os
 import time
 from typing import Any
 from absl import flags
@@ -44,13 +42,6 @@ edw_create_index_benchmark:
     client:
       vm_spec: *default_dual_core
 """
-
-flags.DEFINE_string(
-    'edw_index_creation_query_dir',
-    '',
-    'Optional local directory containing all query files. '
-    'Can be absolute or relative to the executable.',
-)
 
 FLAGS = flags.FLAGS
 
@@ -75,66 +66,19 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """
   benchmark_spec.always_call_cleanup = True
   edw_service_instance = benchmark_spec.edw_service
-  vm = benchmark_spec.vms[0]
 
   edw_service_instance.GetClientInterface().SetProvisionedAttributes(
       benchmark_spec
   )
   edw_service_instance.GetClientInterface().Prepare('edw_common')
 
-  query_locations: list[str] = [
-      os.path.join(FLAGS.edw_index_creation_query_dir, query)
-      for query in FLAGS.edw_power_queries.split(',')
-  ]
-  any(vm.PushDataFile(query_loc) for query_loc in query_locations)
-
-
-def _EnsureNoIndex(
-    client_interface: edw_service.EdwClientInterface, timeout: int = 30
-) -> None:
-  """Checks if an index already exists and deletes it if it does.
-
-  Args:
-    client_interface: The EDW client interface.
-    timeout: The maximum time(in seconds) to wait for the index to be deleted.
-  """
-  start_time = time.time()
-  while True:
-    time_elapsed = time.time() - start_time
-    if time_elapsed > timeout:
-      logging.error('Timed out waiting for index to be deleted.')
-      # TODO: b/435032278 - find a way to stop the benchmark in case of timeout
-      break
-    _, metadata = client_interface.ExecuteQuery('verify_no_index_query')
-    if metadata and metadata.get('rows_returned', 0) > 0:
-      client_interface.ExecuteQuery('delete_index_query')
-    else:
-      break
-    time.sleep(1)
-
-
-def _CreateIndex(
-    client_interface: edw_service.EdwClientInterface,
-    results: list[sample.Sample],
-) -> None:
-  """Creates an index and records the execution time.
-
-  Args:
-    client_interface: The EDW client interface.
-    results: The list of samples to append to.
-  """
-  execution_time, metadata = client_interface.ExecuteQuery('create_index_query')
-  results.append(
-      sample.Sample(
-          'search_index_creation_time', execution_time, 'seconds', metadata
-      )
-  )
-
 
 def _MeasureBuildingTime(
-    client_interface: edw_service.EdwClientInterface,
+    client_interface: edw_service.EdwService,
     results: list[sample.Sample],
     base_metadata: dict[str, Any],
+    search_table: str,
+    index_name: str,
     timeout: int = 1200,
 ) -> None:
   """Measures the time it takes for the index to be fully built(reaching 100% coverage).
@@ -142,15 +86,21 @@ def _MeasureBuildingTime(
   Args:
     client_interface: The EDW client interface.
     results: The list of samples to append to.
-    base_metadata: The base metadata retrieved from edw service
+    base_metadata: The base metadata retrieved from edw service.
+    search_table: The name of the table containing the index.
+    index_name: The name of the index to monitor.
     timeout: The maximum time(in seconds) to wait for the index to be fully
       built.
   """
   start_time = time.time()
   while True:
-    _, metadata = client_interface.ExecuteQuery('check_index_coverage_query')
+    (percentage, metadata) = (
+        client_interface.GetSearchIndexCompletionPercentage(
+            search_table, index_name
+        )
+    )
     time_elapsed = time.time() - start_time
-    if metadata and metadata.get('rows_returned', 0) > 0:
+    if percentage == 100:
       final_metadata = base_metadata.copy()
       final_metadata.update(metadata)
       results.append(
@@ -184,14 +134,17 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   edw_service_instance = benchmark_spec.edw_service
   base_metadata: dict[str, Any] = edw_service_instance.GetMetadata()
+  search_table: str = edw_service.EDW_SEARCH_TABLE_NAME.value
+  index_name: str = edw_service.EDW_SEARCH_INDEX_NAME.value
 
-  client_interface = edw_service_instance.GetClientInterface()
+  # Ensure the index does not exist before starting the measurement.
+  edw_service_instance.DropSearchIndex(search_table, index_name)
 
-  _EnsureNoIndex(client_interface)
+  edw_service_instance.CreateSearchIndex(search_table, index_name)
 
-  _CreateIndex(client_interface, results)
-
-  _MeasureBuildingTime(client_interface, results, base_metadata)
+  _MeasureBuildingTime(
+      edw_service_instance, results, base_metadata, search_table, index_name
+  )
 
   return results
 
@@ -205,5 +158,6 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   benchmark_spec.edw_service.Cleanup()
 
   edw_service_instance = benchmark_spec.edw_service
-  client_interface = edw_service_instance.GetClientInterface()
-  client_interface.ExecuteQuery('delete_index_query')
+  search_table: str = edw_service.EDW_SEARCH_TABLE_NAME.value
+  index_name: str = edw_service.EDW_SEARCH_INDEX_NAME.value
+  edw_service_instance.DropSearchIndex(search_table, index_name)

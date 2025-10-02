@@ -378,6 +378,16 @@ class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
     expected_zones = {'us-west1-a', 'us-west1-b'}
     self.assertEqual(found_zones, expected_zones)
 
+  @parameterized.parameters(
+      ('n1-standard-1', 'n1'),
+      ('c3-highcpu-4', 'c3'),
+      ('auto', None),
+      ('', None),
+      (None, None),
+  )
+  def testGetMachineFamily(self, machine_type, expected_family):
+    self.assertEqual(util.GetMachineFamily(machine_type), expected_family)
+
   def testProjectNumber(self):
     test_output = inspect.cleandoc("""
 [

@@ -1679,7 +1679,8 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
 
   def __getstate__(self):
     state = self.__dict__.copy()
-    del state['event_poller']
+    if 'event_poller' in state:
+      del state['event_poller']
     return state
 
   def GetResourceMetadata(self):
@@ -1736,7 +1737,7 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     """Get the default storage class for the provider."""
     raise NotImplementedError
 
-  def GetNodeSelectors(self) -> list[str]:
+  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
     """Get the node selectors section of a yaml for the provider."""
     return []
 
@@ -1808,6 +1809,8 @@ class KubernetesEvent:
   message: str
   # Reason is actually more of a machine readable message.
   reason: str | None
+  # Examples: Normal, Warning, Error
+  type: str
   timestamp: float
 
   @classmethod
@@ -1832,6 +1835,7 @@ class KubernetesEvent:
           resource=KubernetesEventResource.FromDict(
               yaml_data['involvedObject']
           ),
+          type=yaml_data['type'],
           timestamp=timestamp,
       )
     except (AssertionError, KeyError) as e:

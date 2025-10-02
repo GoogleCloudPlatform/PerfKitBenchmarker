@@ -15,6 +15,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.resources import kubernetes_inference_server
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server as k8s_server
 
 
@@ -86,7 +87,6 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
   Returns:
       loaded benchmark configuration
   """
-
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   if _HF_TOKEN.present:
     config['container_cluster']['inference_server'][
@@ -134,7 +134,7 @@ def Run(
 
     server.EnableHPA()
     output_path = vm_util.GetTempDir() + '/inference_benchmark_result_hpa'
-    _RunInferenceBenchmark(cluster, server, output_path)
+    RunInferenceBenchmark(cluster, server.GetCallableServer(), output_path)
     server.StopHPAPolling()
 
     metrics += _CollectBenchmarkResult(server, output_path)
@@ -142,11 +142,8 @@ def Run(
   else:
     metrics += server.GetPodStartupSamples()
     output_path = vm_util.GetTempDir() + '/inference_benchmark_result'
-    _RunInferenceBenchmark(cluster, server, output_path)
+    RunInferenceBenchmark(cluster, server.GetCallableServer(), output_path)
     metrics += _CollectBenchmarkResult(server, output_path)
-
-  if 'vllm' in server.spec.model_server:
-    metrics += GetVLLMModelLoadTime(server)
 
   return metrics
 
@@ -165,10 +162,31 @@ def _CollectBenchmarkResult(
     server: k8s_server.WGServingInferenceServer,
     result_path: str,
 ) -> list[sample.Sample]:
-  """collect the result of the inference benchmark.
+  """Collect the result of the inference benchmark.
 
   Args:
     server: The inference server resource.
+    result_path: The path to the folder containing the result json files.
+
+  Returns:
+    A list of result samples collected from the json files.
+  """
+  results = CollectBenchmarkResult(server.GetResourceMetadata(), result_path)
+  if 'vllm' in server.spec.model_server:
+    model_load_metrics = GetVLLMModelLoadTime(server)
+    results += model_load_metrics
+
+  return results
+
+
+def CollectBenchmarkResult(
+    metadata: dict[str, Any],
+    result_path: str,
+) -> list[sample.Sample]:
+  """Collect the result of the inference benchmark.
+
+  Args:
+    metadata: The metadata for each sample.
     result_path: The path to the folder containing the result json files.
 
   Returns:
@@ -187,28 +205,32 @@ def _CollectBenchmarkResult(
         result = json.load(f)
         metrics = result['metrics']
 
-        metadata = {
+        sample_metadata = {
             'request_rate': metrics['request_rate'],
-            **server.GetResourceMetadata(),
+            **metadata,
         }
         timestamp = datetime.datetime.fromtimestamp(
             result['config']['start_time']['seconds']
         ).timestamp()
 
-        results += [
-            sample.Sample(metric, metrics[metric], '', metadata, timestamp)
-            for metric in metrics
-            if metrics[metric]
-        ]
+        for metric in metrics:
+          if not metrics[metric]:
+            continue
+          unit = 'ms' if 'ms' in metric else ''
+          results.append(
+              sample.Sample(
+                  metric, metrics[metric], unit, sample_metadata, timestamp
+              )
+          )
     except (json.JSONDecodeError, FileNotFoundError, KeyError) as e:
       logging.exception('Failed to read %s: %s', filename, e)
       raise e
   return results
 
 
-def _RunInferenceBenchmark(
+def RunInferenceBenchmark(
     cluster: container_service.KubernetesCluster,
-    server: k8s_server.WGServingInferenceServer,
+    server: kubernetes_inference_server.InferenceServerEndpoint,
     output_path: str,
 ) -> None:
   """Run the inference benchmark.
@@ -231,7 +253,7 @@ def _RunInferenceBenchmark(
       tokenizer=server.tokenizer_id,
       inference_server=server.service_name,
       inference_server_port=server.service_port,
-      backend=server.spec.model_server,
+      backend=server.backend,
       request_rate=_REQUEST_RATE.value,
       image_repo=k8s_server.FLAG_IMAGE_REPO.value,
       env_vars=lpg_extra_args,
@@ -288,9 +310,14 @@ def GetVLLMModelLoadTime(
     else:
       pod_name = pod
     result_stdout = server.GetStartupLogsFromPod(pod_name)
-    init_time, model_load_time, application_start_time = (
-        _ParseModelLoadTimeMetrics(server, result_stdout, pod_name)
-    )
+    if _IsUsingTPU(server.spec.catalog_components):
+      init_time, model_load_time, application_start_time = (
+          _ParseTPUModelLoadTimeMetrics(server, result_stdout, pod_name)
+      )
+    else:
+      init_time, model_load_time, application_start_time = (
+          _ParseModelLoadTimeMetrics(server, result_stdout, pod_name)
+      )
     init_times.append(init_time)
     model_load_times.append(model_load_time)
     application_start_times.append(application_start_time)
@@ -323,6 +350,68 @@ def GetVLLMModelLoadTime(
   ]
 
 
+def _ParseTPUModelLoadTimeMetrics(
+    server: k8s_server.WGServingInferenceServer,
+    result_stdout: str,
+    pod_name: str,
+) -> Tuple[float, float, float]:
+  """Parse the model load time metrics from the logs."""
+  model_load_start_timestamp = None
+  model_load_end_timestamp = None
+  vllm_start_timestamp = None
+  log_lines = result_stdout.splitlines()
+  events = server.cluster.GetEvents()
+  startup_event = None
+  for event in events:
+    if (
+        event.resource.kind == 'Pod'
+        and event.resource.name == pod_name
+        and 'Started container inference-server' in event.message
+    ):
+      startup_event = event
+  if startup_event is None:
+    raise ValueError(
+        f'No events found for pod {pod_name} with message "Started container'
+        ' inference-server".'
+    )
+  container_init_timestamp = _FormatUTCTimeStampToLocalTime(
+      server,
+      startup_event.timestamp,
+  )
+  for line in log_lines:
+    # Check model load start timestamp
+    if (
+        'Downloading weights from HF' in line
+        or 'Found weights from local' in line
+    ) and model_load_start_timestamp is None:
+      model_load_start_timestamp = _ParseInferenceServerTimeStamp(line)
+    # Check model load end timestamp
+    if 'Compilation finished in' in line:
+      model_load_end_timestamp = _ParseInferenceServerTimeStamp(line)
+    # Check when overall container starts
+    if 'Starting vLLM API server' in line:
+      vllm_start_timestamp = _ParseInferenceServerTimeStamp(line)
+      break
+  if container_init_timestamp is None:
+    raise ValueError('Container init timestamp is not found in the logs.')
+  if model_load_start_timestamp is None:
+    raise ValueError('Model load start timestamp is not found in the logs.')
+  if model_load_end_timestamp is None:
+    raise ValueError('Model load end timestamp is not found in the logs.')
+  if vllm_start_timestamp is None:
+    raise ValueError('VLLM start timestamp is not found in the logs.')
+  init_time = GetTimeDifference(
+      container_init_timestamp, model_load_start_timestamp
+  )
+  model_load_time = GetTimeDifference(
+      model_load_start_timestamp, model_load_end_timestamp
+  )
+  application_start_time = GetTimeDifference(
+      model_load_end_timestamp, vllm_start_timestamp
+  )
+  return init_time, model_load_time, application_start_time
+
+
 def _ParseModelLoadTimeMetrics(
     server: k8s_server.WGServingInferenceServer,
     result_stdout: str,
@@ -352,10 +441,7 @@ def _ParseModelLoadTimeMetrics(
       startup_event.timestamp,
   )
   for line in log_lines:
-    if (
-        'Starting to load model' in line
-        and model_load_start_timestamp is None
-    ):
+    if 'Starting to load model' in line and model_load_start_timestamp is None:
       model_load_start_timestamp = _ParseInferenceServerTimeStamp(line)
     # Check model load end timestamp
     if 'Model loading took' in line:
@@ -425,9 +511,26 @@ def _ParseInferenceServerTimeStamp(log_line: str) -> Optional[str]:
   return match.group(0)
 
 
+def _IsUsingTPU(components: str) -> bool:
+  """Returns whether the components are using TPU.
+
+  TPU component format: v<version>e-<rows>x<cols>
+  Examples of TPU components:
+  v6e-2x4
+  v5e-2x4
+
+  Args:
+    components: The components of the inference server, separated by commas.
+
+  Returns:
+    Whether the components are using TPU.
+  """
+  pattern = re.compile(r'v\d+e-\d+x\d+')
+  return bool(pattern.search(components))
+
+
 def _FormatUTCTimeStampToLocalTime(
-    server: k8s_server.WGServingInferenceServer,
-    timestamp: Optional[float]
+    server: k8s_server.WGServingInferenceServer, timestamp: Optional[float]
 ) -> Optional[str]:
   """Returns the time zone of the pod."""
   if server.timezone is None:

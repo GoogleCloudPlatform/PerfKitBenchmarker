@@ -404,64 +404,6 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(fake_rets):
       self.assertEqual(vm._Exists(), expected)
 
-  @parameterized.named_parameters(
-      ('n2_standard_2', 'n2-standard-2', 2, 2, 1),
-      ('numa_node_count_0', 'n2-standard-4', 4, 0, None),
-      ('c3-standard-4', 'c3-standard-4', 8, 4, None),
-      ('n2_standard_96', 'n2-standard-96', 96, 8, 12),
-  )
-  def testGetVNUMASplitValue(
-      self, machine_type, num_cpus, numa_node_count, expected
-  ):
-    vm = pkb_common_test_case.TestGceVirtualMachine(
-        gce_virtual_machine.GceVmSpec(
-            _COMPONENT,
-            machine_type=machine_type,
-        )
-    )
-    vm.num_cpus = num_cpus
-    vm.numa_node_count = numa_node_count
-    self.assertEqual(vm.GetVNUMASplitValue(), expected)
-
-  @parameterized.named_parameters(
-      ('no_min_cpu_platform', 'test_machine_type', '', None),
-      ('with_min_cpu_platform', 'test_machine_type', 'skylake', 'skylake'),
-  )
-  def testGetMinCpuPlatform(
-      self, test_machine_type, test_min_cpu_platform, expected
-      ):
-
-    vm = pkb_common_test_case.TestGceVirtualMachine((
-        gce_virtual_machine.GceVmSpec(
-            _COMPONENT,
-            machine_type=test_machine_type,
-            min_cpu_platform=test_min_cpu_platform
-        )
-    ))
-    self.assertEqual(vm.GetMinCpuPlatform(), expected)
-
-  @parameterized.named_parameters(
-      ('srso_vulnerable', 'spec_rstack_overflow', 'AuthenticAMD_26_2_1', True),
-      ('srso_not_vulnerable', 'other_vuln', 'AuthenticAMD_26_2_1', False),
-      ('not AMD VM', 'spec_rstack_overflow', 'GenuineIntel_6_85_7', None)
-  )
-  def testIsSrsoVulnerable(self, cpu_vuln, cpu_vendor, expected):
-    spec = gce_virtual_machine.GceVmSpec(
-        _COMPONENT,
-        machine_type='test_machine_type',
-    )
-    vm = gce_virtual_machine.Ubuntu2204BasedGceVirtualMachine(spec)
-    vm.cpu_version = cpu_vendor
-    with mock.patch.object(
-        gce_virtual_machine.BaseLinuxGceVirtualMachine,
-        'cpu_vulnerabilities',
-        new_callable=mock.PropertyMock,
-    ) as mock_cpu_vulnerabilities:
-      cpu_vulnerabilities = gce_virtual_machine.linux_vm.CpuVulnerabilities()
-      cpu_vulnerabilities.vulnerabilities[cpu_vuln] = 'Vulnerable'
-      mock_cpu_vulnerabilities.return_value = cpu_vulnerabilities
-      self.assertEqual(vm.IsSrsoVulnerable(), expected)
-
 
 def _CreateFakeDiskMetadata(image, fake_disk):
   fake_disk = copy.copy(fake_disk)
@@ -752,6 +694,16 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(call_count, 1)
     self.assertIn('--preemptible', cmd)
 
+  def testMigrateOnMaintenanceFlagNotPresent(self):
+    print('GCEVMFlagsTestCase testMigrateOnMaintenanceFlagNotPresent')
+    cmd, call_count = self._CreateVmCommand(
+        # gce_migrate_on_maintenance is None
+    )
+    self.assertEqual(call_count, 1)
+    self.assertNotIn('--maintenance-policy', cmd)
+    self.assertNotIn('TERMINATE', cmd)
+    self.assertNotIn('MIGRATE', cmd)
+
   def testMigrateOnMaintenanceFlagTrueWithGpus(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
       self._CreateVmCommand(
@@ -760,16 +712,30 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         str(cm.exception),
         (
-            'Cannot set flag gce_migrate_on_maintenance on instances with GPUs '
-            'or network placement groups, as it is not supported by GCP.'
+            'Cannot set flag gce_migrate_on_maintenance on instances with GPUs,'
+            ' network placement groups, or preemption, as it is not supported'
+            ' by GCP.'
         ),
     )
 
   def testMigrateOnMaintenanceFlagFalseWithGpus(self):
-    _, call_count = self._CreateVmCommand(
+    cmd, call_count = self._CreateVmCommand(
         gce_migrate_on_maintenance=False, gpu_count=1, gpu_type='k80'
     )
     self.assertEqual(call_count, 1)
+    self.assertIn('--maintenance-policy', cmd)
+    self.assertIn('TERMINATE', cmd)
+
+  def testMigrateOnMaintenanceFlagTrueWithSev(self):
+    cmd, call_count = self._CreateVmCommand(
+        gce_migrate_on_maintenance=True,
+        gce_confidential_compute=True,
+        gce_confidential_compute_type='sev',
+        machine_type='n2d-standard-2',
+    )
+    self.assertEqual(call_count, 1)
+    self.assertIn('--maintenance-policy', cmd)
+    self.assertIn('MIGRATE', cmd)
 
   def testAcceleratorTypeOverrideFlag(self):
     cmd, call_count = self._CreateVmCommand(
@@ -837,7 +803,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('total-egress-bandwidth-tier=TIER_1', cmd)
 
   def testAlphaMaintenanceFlag(self):
-    """Tests that egress bandwidth can be set as tier 1."""
+    """Tests that migrate on maintenance sets the correct flag in alpha."""
     gcloud_init = util.GcloudCommand.__init__
 
     def InitAndSetAlpha(self, resource, *args):
@@ -845,9 +811,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.use_alpha_gcloud = True
 
     with mock.patch.object(util.GcloudCommand, '__init__', InitAndSetAlpha):
-      cmd, call_count = self._CreateVmCommand(
-          gce_egress_bandwidth_tier='TIER_1', gpu_count=1, gpu_type='k80'
-      )
+      cmd, call_count = self._CreateVmCommand(gce_migrate_on_maintenance=True)
     self.assertEqual(call_count, 1)
     self.assertIn('--on-host-maintenance', cmd)
 
@@ -1180,8 +1144,6 @@ message: The zone 'projects/artemis-prod/zones/us-central1-b' does not have enou
       self.assertIn(
           'type=nvidia-tesla-k80,count=2', issue_command.call_args[0][0]
       )
-      self.assertIn('--maintenance-policy', issue_command.call_args[0][0])
-      self.assertIn('TERMINATE', issue_command.call_args[0][0])
 
 
 class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):

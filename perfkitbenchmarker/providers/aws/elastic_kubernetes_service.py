@@ -39,6 +39,12 @@ from perfkitbenchmarker.providers.aws import util
 
 
 FLAGS = flags.FLAGS
+# GPU types which practically require spot to get.
+_RARE_GPU_TYPES = [
+    virtual_machine.GPU_H100,
+    virtual_machine.GPU_A100,
+    virtual_machine.GPU_B200,
+]
 
 
 def RecursivelyUpdateDictionary(
@@ -324,6 +330,30 @@ class BaseEksCluster(container_service.KubernetesCluster):
     ])
     return self._GetAddressFromIngress(stdout)
 
+  def GetNodePoolNames(self) -> list[str]:
+    """Get node pool names for the cluster."""
+
+    cmd = [
+        FLAGS.eksctl,
+        'get',
+        'nodegroup',
+        '--cluster',
+        self.name,
+        '--region',
+        self.region,
+        '-o',
+        'json',
+    ]
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+    if retcode:
+      logging.warning('Failed to get nodegroups: %s, error: %s', stdout, stderr)
+      return []
+    nodegroups = json.loads(stdout)
+    return [ng['Name'] for ng in nodegroups]
+
+  def AddNodepool(self, batch_name, pool_id):
+    pass
+
 
 class EksCluster(BaseEksCluster):
   """Class representing an Elastic Kubernetes Service cluster."""
@@ -497,9 +527,10 @@ class EksCluster(BaseEksCluster):
 class EksAutoCluster(BaseEksCluster):
   """Class representing an Elastic Kubernetes Service cluster with auto mode.
 
-  Automode supports auto scaling & ignores the concept of nodepools & selecting
-  machine types. It also automatically creates some related resources like a
-  load balancer & networks.
+  Auto mode supports auto scaling & allows users to not specify nodepools nor
+  select machine types if they so wish (but nodepools can still be used to
+  specify these if desired). It also automatically creates some related
+  resources like a load balancer & networks.
   """
 
   CLOUD = provider_info.AWS
@@ -508,6 +539,10 @@ class EksAutoCluster(BaseEksCluster):
   def __init__(self, spec):
     super().__init__(spec)
     self._ChooseSecondZone()
+    is_rare_gpu = (
+        virtual_machine.GPU_TYPE.value in _RARE_GPU_TYPES
+    )
+    self.use_spot: bool = aws_flags.USE_AWS_SPOT_INSTANCES.value or is_rare_gpu
 
   def InitializeNodePoolForCloud(
       self,
@@ -531,7 +566,17 @@ class EksAutoCluster(BaseEksCluster):
         '--public-access=true',
         '--approve',
     ]
-    vm_util.IssueCommand(vpc_cmd, timeout=900)
+    # Retry esp. "cluster currently has an update in progress" errors.
+    vm_util.IssueRetryableCommand(vpc_cmd, timeout=900)
+
+  def _PostCreate(self):
+    """Performs post-creation steps for the cluster."""
+    super()._PostCreate()
+    if self.use_spot:
+      self.ApplyManifest(
+          'container/auto/nodepool.yaml.j2',
+          CLUSTER_NAME=self.name,
+      )
 
   def _Delete(self):
     """Deletes the control plane and worker nodes."""
@@ -565,11 +610,22 @@ class EksAutoCluster(BaseEksCluster):
     # Autopilot does not support nodepools & manual resizes.
     pass
 
-  def GetNodeSelectors(self) -> list[str]:
+  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
     """Get the node selectors section of a yaml for the provider."""
+    del machine_type  # Unused.
     # Theoretically needed in mixed mode, but deployments fail without it:
     # https://docs.aws.amazon.com/eks/latest/userguide/associate-workload.html#_require_a_workload_is_deployed_to_eks_auto_mode_nodes
-    return ['eks.amazonaws.com/compute-type: auto']
+    selectors = ['eks.amazonaws.com/compute-type: auto']
+    if self.use_spot:
+      selectors += ['karpenter.sh/capacity-type: spot']
+    if virtual_machine.GPU_TYPE.value:
+      selectors += [
+          (
+              'eks.amazonaws.com/instance-gpu-name:'
+              f' {virtual_machine.GPU_TYPE.value}'
+          ),
+      ]
+    return selectors
 
 
 _KARPENTER_NAMESPACE = 'kube-system'
@@ -749,7 +805,7 @@ class EksKarpenterCluster(BaseEksCluster):
     return 'Kubernetes control plane' in stdout and 'is running at' in stdout
 
   def GetDefaultStorageClass(self) -> str:
-    """Get the default storage class for the provider."""
+    """Gets the default storage class for the provider."""
     return aws_disk.GP2
 
   def ResizeNodePool(
@@ -758,6 +814,41 @@ class EksKarpenterCluster(BaseEksCluster):
     """Change the number of nodes in the node group."""
     raise NotImplementedError()
 
-  def GetNodeSelectors(self) -> list[str]:
-    """Get the node selectors section of a yaml for the provider."""
+  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
+    """Gets the node selectors section of a yaml for the provider."""
+    machine_family = util.GetMachineFamily(machine_type)
+    if machine_family:
+      return [f'karpenter.k8s.aws/instance-family: {machine_family}']
     return []
+
+  def GetNodePoolNames(self) -> list[str]:
+    """Gets node pool names for the cluster.
+
+    Returns:
+      All CRD NodePool names created by Karpenter.
+    """
+    cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig',
+        FLAGS.kubeconfig,
+        'get',
+        'nodepool',
+        '-o',
+        'json',
+    ]
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+    if retcode:
+      logging.warning(
+          'Failed to get Karpenter NodePools: %s, error: %s', stdout, stderr
+      )
+      return []
+    nodepools = json.loads(stdout)
+    return [item['metadata']['name'] for item in nodepools.get('items', [])]
+
+  def AddNodepool(self, batch_name, pool_id):
+    self.ApplyManifest(
+        'provision_node_pools/karpenter/nodepool.yaml.j2',
+        batch_name=batch_name,
+        pool_id=pool_id,
+        cluster_name=self.name,
+    )

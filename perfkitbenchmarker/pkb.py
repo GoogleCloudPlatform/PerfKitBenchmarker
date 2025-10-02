@@ -65,6 +65,7 @@ import logging
 import multiprocessing
 from os.path import isfile
 import pickle
+import platform
 import random
 import re
 import sys
@@ -96,6 +97,7 @@ from perfkitbenchmarker import package_lookup
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import requirements
+from perfkitbenchmarker import resources
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine
@@ -548,6 +550,7 @@ def _CreateBenchmarkSpecs():
   Returns:
     A list of BenchmarkSpecs.
   """
+  resources.LoadModules()
   specs = []
   benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
   benchmark_counts = collections.defaultdict(itertools.count)
@@ -952,6 +955,88 @@ def DoTeardownPhase(
   events.after_phase.send(stages.TEARDOWN, benchmark_spec=spec)
 
 
+def DoPrepareSystemPhase(
+    spec: bm_spec.BenchmarkSpec,
+    timer: timing_util.IntervalTimer,
+):
+  """Performs the prepare system phase of benchmark execution.
+
+  This runs configuration steps that should always happen on the host system,
+  even if the benchmark will run in a VM or container.
+
+  Args:
+    spec: The BenchmarkSpec created for the benchmark.
+    timer: An IntervalTimer that measures the start and stop times of resource
+      teardown.
+  """
+  logging.info('Preparing system for benchmark %s', spec.name)
+  events.before_phase.send(stages.PREPARE_SYSTEM, benchmark_spec=spec)
+
+  if not spec.BenchmarkPrepareSystem:
+    raise errors.Benchmarks.PrepareException(
+        'Benchmark does not define PrepareSystem.'
+    )
+
+  with timer.Measure('Prepare System'):
+    spec.BenchmarkPrepareSystem(spec)
+
+  events.after_phase.send(stages.PREPARE_SYSTEM, benchmark_spec=spec)
+
+
+def DoInstallPackagesPhase(
+    spec: bm_spec.BenchmarkSpec,
+    timer: timing_util.IntervalTimer,
+):
+  """Performs the install packages phase of benchmark execution.
+
+  This installs the packages needed to run the benchmark.
+
+  Args:
+    spec: The BenchmarkSpec created for the benchmark.
+    timer: An IntervalTimer that measures the start and stop times of resource
+      teardown.
+  """
+  logging.info('Installing packages for benchmark %s', spec.name)
+  events.before_phase.send(stages.INSTALL_PACKAGES, benchmark_spec=spec)
+
+  if not spec.BenchmarkInstallPackages:
+    raise errors.Benchmarks.PrepareException(
+        'Benchmark does not define InstallPackages.'
+    )
+
+  with timer.Measure('Install Packages'):
+    spec.BenchmarkInstallPackages(spec)
+
+  events.after_phase.send(stages.INSTALL_PACKAGES, benchmark_spec=spec)
+
+
+def DoStartServicesPhase(
+    spec: bm_spec.BenchmarkSpec,
+    timer: timing_util.IntervalTimer,
+):
+  """Performs the start services phase of benchmark execution.
+
+  This starts the services needed to run the benchmark.
+
+  Args:
+    spec: The BenchmarkSpec created for the benchmark.
+    timer: An IntervalTimer that measures the start and stop times of resource
+      teardown.
+  """
+  logging.info('Starting services for benchmark %s', spec.name)
+  events.before_phase.send(stages.START_SERVICES, benchmark_spec=spec)
+
+  if not spec.BenchmarkStartServices:
+    raise errors.Benchmarks.PrepareException(
+        'Benchmark does not define StartServices.'
+    )
+
+  with timer.Measure('Start Services'):
+    spec.BenchmarkStartServices(spec)
+
+  events.after_phase.send(stages.START_SERVICES, benchmark_spec=spec)
+
+
 def _SkipPendingRunsFile():
   if FLAGS.skip_pending_runs_file and isfile(FLAGS.skip_pending_runs_file):
     logging.warning(
@@ -1110,6 +1195,18 @@ def RunBenchmark(
             DoPreparePhase(spec, detailed_timer)
             interrupt_checker.EndCheckInterruptThreadAndRaiseError()
             interrupt_checker = None
+
+          if stages.PREPARE_SYSTEM in FLAGS.run_stage:
+            current_run_stage = stages.PREPARE_SYSTEM
+            DoPrepareSystemPhase(spec, detailed_timer)
+
+          if stages.INSTALL_PACKAGES in FLAGS.run_stage:
+            current_run_stage = stages.INSTALL_PACKAGES
+            DoInstallPackagesPhase(spec, detailed_timer)
+
+          if stages.START_SERVICES in FLAGS.run_stage:
+            current_run_stage = stages.START_SERVICES
+            DoStartServicesPhase(spec, detailed_timer)
 
           if stages.RUN in FLAGS.run_stage:
             current_run_stage = stages.RUN
@@ -1508,13 +1605,9 @@ class ZoneRetryManager:
     """Changes zone to be a new zone in the different region."""
     region = self._utils.GetRegionFromZone(self._GetCurrentZoneFlag())
     self._regions_tried.add(region)
-    regions_to_try = (
-        {
-            self._utils.GetRegionFromZone(zone)
-            for zone in self._supported_zones
-        }
-        - self._regions_tried
-    )
+    regions_to_try = {
+        self._utils.GetRegionFromZone(zone) for zone in self._supported_zones
+    } - self._regions_tried
     # Restart from empty if we've exhausted all alternatives.
     if not regions_to_try:
       self._regions_tried.clear()
@@ -1726,8 +1819,7 @@ def _GenerateBenchmarkDocumentation():
   """Generates benchmark documentation to show in --help."""
   benchmark_docs = []
   for benchmark_module in (
-      linux_benchmarks.BENCHMARKS
-      + windows_benchmarks.BENCHMARKS
+      linux_benchmarks.BENCHMARKS + windows_benchmarks.BENCHMARKS
   ):
     benchmark_config = configs.LoadMinimalConfig(
         benchmark_module.BENCHMARK_CONFIG, benchmark_module.BENCHMARK_NAME
@@ -1970,9 +2062,14 @@ def ParseArgs(argv):
 def Main(argv):
   """Entrypoint for PerfKitBenchmarker."""
   del argv  # Unused.
-  assert sys.version_info >= (3, 11), 'PerfKitBenchmarker requires Python 3.11+'
+  assert sys.version_info >= (3, 12), 'PerfKitBenchmarker requires Python 3.12+'
   log_util.ConfigureBasicLogging()
   _InjectBenchmarkInfoIntoDocumentation()
+
+  # Fix multiprocessing on macOS to use 'fork' instead of 'spawn'
+  # to avoid pickle errors with local functions issue #5883
+  if platform.system() == 'Darwin':
+    multiprocessing.set_start_method('fork', force=True)
 
   if FLAGS.helpmatch:
     _PrintHelp(FLAGS.helpmatch)

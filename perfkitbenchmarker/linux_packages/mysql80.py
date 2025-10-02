@@ -21,6 +21,7 @@ import re
 from perfkitbenchmarker import data
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
 
 
 MYSQL_PSWD = 'perfkitbenchmarker'
@@ -44,6 +45,18 @@ OS_DEPENDENT_DEFAULTS = {
 }
 
 
+class MysqldFailedToStartError(Exception):
+  """Raised when mysqld fails to start."""
+
+  pass
+
+
+class MysqldFailedToStopError(Exception):
+  """Raised when mysqld fails to stop."""
+
+  pass
+
+
 def YumInstall(vm):
   """Installs the mysql package on the VM."""
   if vm.OS_TYPE not in os_types.AMAZONLINUX_TYPES:
@@ -59,6 +72,7 @@ def YumInstall(vm):
       'sudo yum install -y mysql-community-server mysql-community-client luajit'
       ' libaio screen mysql-community-libs'
   )
+  _StopServiceIfRunning(vm)
 
 
 def AptInstall(vm):
@@ -79,9 +93,13 @@ def AptInstall(vm):
       ' mysql-apt-config_0.8.17-1_all.deb'
   )
 
-  _, stderr = vm.RemoteCommand('sudo apt-get update', ignore_failure=True)
+  _, stderr, code = vm.RemoteCommandWithReturnCode(
+      'sudo apt-get update', ignore_failure=True
+  )
 
-  if stderr:
+  # Sometimes apt prints a warning to stderr but still succeeds. If we try to
+  # fix it, we can break future apt and dpkg commands.
+  if code and stderr:
     if 'public key is not available:' in stderr:
       # This error is due to mysql updated the repository and the public
       # key is not updated.
@@ -107,6 +125,26 @@ def AptInstall(vm):
       f'password {MYSQL_PSWD}" | sudo debconf-set-selections'
   )
   vm.InstallPackages('mysql-server')
+  _StopServiceIfRunning(vm)
+
+
+def _StopServiceIfRunning(vm):
+  """Stop the MySQL systemd service, if one is running."""
+
+  service_name = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_SERVICE_NAME]
+
+  # If mysql is already running as a systemd service then stop it. But it's okay
+  # if this fails, because mysql might not be running.
+  vm.RemoteCommand(f'sudo systemctl stop {service_name}', ignore_failure=True)
+  vm.RemoteCommand(
+      f'sudo systemctl disable {service_name}', ignore_failure=True
+  )
+  # Make sure mysql is stopped, which is what we really wanted.
+  _, _, code = vm.RemoteCommandWithReturnCode(
+      'pgrep mysqld', ignore_failure=True
+  )
+  if not code:
+    raise MysqldFailedToStopError()
 
 
 def YumGetPathToConfig(vm):
@@ -180,43 +218,65 @@ def GetOSDependentDefaults(os_type: str) -> dict[str, str]:
     return OS_DEPENDENT_DEFAULTS['debian']
 
 
-def ConfigureAndRestart(
+def WriteMysqlConfiguration(
     vm: virtual_machine.VirtualMachine,
     buffer_pool_size: str,
     server_id: int,
     config_template: str,
 ):
-  """Configure and restart mysql."""
+  """Write mysql configuration files."""
   remote_temp_config = '/tmp/my.cnf'
   remote_final_config = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_CONFIG_PATH]
-  config_d_service = 'mysql/mysqld.service'
-  remote_temp_d_service = '/tmp/mysqld'
-  remote_final_d_service = '/lib/systemd/system/mysqld.service'
   logrotation = 'mysql/logrotation'
   remote_temp_logrotation = '/tmp/logrotation'
   remote_final_logrotation = '/etc/logrotate.d/mysqld'
   remote_final_log_dir = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_LOG_PATH]
-  service_name = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_SERVICE_NAME]
   context = {
       'scratch_dir': vm.GetScratchDir(),
       'server_id': str(server_id),
       'buffer_pool_size': buffer_pool_size,
       'log_dir': remote_final_log_dir,
   }
+
   vm.RenderTemplate(
       data.ResourcePath(config_template), remote_temp_config, context
   )
   vm.RemoteCommand(f'sudo cp {remote_temp_config} {remote_final_config}')
-  vm.PushDataFile(config_d_service, remote_temp_d_service)
-  vm.RemoteCommand(f'sudo cp {remote_temp_d_service} {remote_final_d_service}')
   vm.PushDataFile(logrotation, remote_temp_logrotation)
   vm.RemoteCommand(
       f'sudo cp {remote_temp_logrotation} {remote_final_logrotation}'
   )
   vm.RemoteCommand(f'sudo chmod 0644 {remote_final_logrotation}')
-  vm.RemoteCommand('sudo systemctl daemon-reload')
-  vm.RemoteCommand(f'sudo systemctl stop {service_name}')
-  vm.RemoteCommand(f'sudo systemctl start {service_name}')
+
+  # mysqld silently exits if /var/run/mysqld doesn't exist.
+  vm.RemoteCommand('sudo mkdir -p /var/run/mysqld')
+  vm.RemoteCommand('sudo chown mysql:mysql /var/run/mysqld')
+
+
+def RestartServer(
+    vm: virtual_machine.VirtualMachine,
+):
+  """Configure and restart mysql."""
+  # The default MySQL systemd unit file sets the open file limit to 100000.
+  # Do the same here.
+  vm.RemoteCommand(
+      'echo "mysql soft nofile 100000" | sudo tee -a /etc/security/limits.conf'
+  )
+  vm.RemoteCommand(
+      'echo "mysql hard nofile 100000" | sudo tee -a /etc/security/limits.conf'
+  )
+
+  # Start the server.
+  vm.RemoteCommand('sudo -g mysql -u mysql nohup mysqld &> /dev/null &')
+
+  # mysqld isn't ready until it's written a socket file.
+  @vm_util.Retry(retryable_exceptions=(MysqldFailedToStartError,))
+  def EnsureMysqldStarted():
+    stdout, _ = vm.RemoteCommand('sudo file /var/lib/mysql/mysql.sock')
+    if 'cannot open' in stdout:
+      raise MysqldFailedToStartError()
+
+  EnsureMysqldStarted()
 
 
 def UpdatePassword(vm: virtual_machine.VirtualMachine, new_password: str):

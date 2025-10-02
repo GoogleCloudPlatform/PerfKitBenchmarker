@@ -32,9 +32,9 @@ import copy
 import json
 import logging
 import os
-import pipes
 import posixpath
 import re
+import shlex
 import threading
 import time
 from typing import Any, Dict, Set, Tuple, Union
@@ -53,6 +53,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 import yaml
+
 
 FLAGS = flags.FLAGS
 
@@ -648,7 +649,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
                      '--stderr', stderr_file,
                      '--status', status_file,
                      '--exclusive', exclusive_file,
-                     '--command', pipes.quote(command)]  # pyformat: disable
+                     '--command', shlex.quote(command)]  # pyformat: disable
     if timeout:
       start_command.extend(['--timeout', str(timeout)])
 
@@ -1558,7 +1559,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       ignore_failure: Ignore any failure if set to true.
       login_shell: Run command in a login shell.
       disable_tty_lock: Disables TTY lock. Multiple commands will try to take
-      control of the terminal.
+        control of the terminal.
       timeout: The timeout for IssueCommand.
       ip_address: The ip address to use to connect to host.  If None, uses
         self.GetConnectionIp()
@@ -2261,7 +2262,6 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
 
     Returns:
       A list of paths where the logs are stored on the caller's machine.
-
     """
     log_files = []
     # syslog
@@ -2312,9 +2312,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     sosreport_path = '/tmp/sosreport-*.tar.xz'
     # The report is owned by root and is not readable by other users, so we
     # need to change the permissions to copy it.
-    self.RemoteCommand(
-        f'sudo chmod o+r {sosreport_path}'
-    )
+    self.RemoteCommand(f'sudo chmod o+r {sosreport_path}')
     self.RemoteCopy(local_path, sosreport_path, copy_to=False)
     return True
 
@@ -2361,6 +2359,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     Args:
       log_path: The directory or file path on the VM to copy the logs from.
     """
+
     def GetTargeFilePath(remote_file: str) -> str:
       """Build the target file path for a given remote file."""
       # Join absolute path of the log file to preserve the directory
@@ -3454,7 +3453,7 @@ def CreateUlimitSamples(
   return samples
 
 
-class UlimitResults():
+class UlimitResults:
   """Holds the contents of the command ulimit."""
 
   def __init__(self, ulimit: str):

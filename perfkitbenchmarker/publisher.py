@@ -298,6 +298,11 @@ class DefaultMetadataProvider(MetadataProvider):
       for k, v in pinecone.GetResourceMetadata().items():
         new_metadata['pinecone_' + k] = v
 
+    if benchmark_spec.vvs:
+      vvs = benchmark_spec.vvs
+      for k, v in vvs.GetResourceMetadata().items():
+        metadata['vvs_' + k] = v
+
     if benchmark_spec.memory_store:
       memory_store = benchmark_spec.memory_store
       for k, v in memory_store.GetResourceMetadata().items():

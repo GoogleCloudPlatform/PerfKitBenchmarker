@@ -179,7 +179,7 @@ diff --git a/src/lua/oltp_common.lua b/src/lua/oltp_common.lua
 index 90f93e2..4b9fb58 100644
 --- a/src/lua/oltp_common.lua
 +++ b/src/lua/oltp_common.lua
-@@ -33,8 +33,14 @@ end
+@@ -33,8 +33,16 @@ end
  sysbench.cmdline.options = {
     table_size =
        {"Number of rows per table", 10000},
@@ -191,10 +191,12 @@ index 90f93e2..4b9fb58 100644
        {"Range size for range SELECT queries", 100},
 +   create_tables =
 +     {"Whether to create table", true},
++   trx_level =
++      {"Transaction isolation level (RC, RR or SER)", "SER"},
     tables =
        {"Number of tables", 1},
     point_selects =
-@@ -81,6 +87,7 @@ sysbench.cmdline.options = {
+@@ -81,6 +89,7 @@ sysbench.cmdline.options = {
  function cmd_prepare()
     local drv = sysbench.sql.driver()
     local con = drv:connect()
@@ -202,7 +204,7 @@ index 90f93e2..4b9fb58 100644
 
     for i = sysbench.tid % sysbench.opt.threads + 1, sysbench.opt.tables,
     sysbench.opt.threads do
-@@ -185,17 +192,17 @@ function create_table(drv, con, table_num)
+@@ -185,17 +194,17 @@ function create_table(drv, con, table_num)
     print(string.format("Creating table 'sbtest%d'...", table_num))
 
     query = string.format([[
@@ -226,7 +228,7 @@ index 90f93e2..4b9fb58 100644
     if (sysbench.opt.table_size > 0) then
        print(string.format("Inserting %d records into 'sbtest%d'",
                            sysbench.opt.table_size, table_num))
-@@ -207,12 +214,19 @@ CREATE TABLE sbtest%d(
+@@ -207,12 +216,19 @@ CREATE TABLE sbtest%d(
        query = "INSERT INTO sbtest" .. table_num .. "(id, k, c, pad) VALUES"
     end
 
@@ -250,7 +252,7 @@ index 90f93e2..4b9fb58 100644
 
        c_val = get_c_value()
        pad_val = get_pad_value()
-@@ -222,15 +236,15 @@ CREATE TABLE sbtest%d(
+@@ -222,15 +238,15 @@ CREATE TABLE sbtest%d(
                                 sb_rand(1, sysbench.opt.table_size), c_val,
                                 pad_val)
        else
@@ -269,7 +271,7 @@ index 90f93e2..4b9fb58 100644
 
     if sysbench.opt.create_secondary then
        print(string.format("Creating a secondary index on 'sbtest%d'...",
-@@ -262,13 +276,13 @@ local stmt_defs = {
+@@ -262,13 +278,13 @@ local stmt_defs = {
        t.INT},
     non_index_updates = {
        "UPDATE sbtest%u SET c=? WHERE id=?",
