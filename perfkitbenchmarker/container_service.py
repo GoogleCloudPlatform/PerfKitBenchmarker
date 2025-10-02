@@ -1787,10 +1787,6 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
       )
     return 'http://' + ip.strip()
 
-  def ModifyDeploySpec(self):
-    """Modify the deployment spec before deploying it"""
-    return {}
-
 
 @dataclasses.dataclass(eq=True, frozen=True)
 class KubernetesEventResource:
