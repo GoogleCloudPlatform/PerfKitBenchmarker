@@ -1809,6 +1809,8 @@ class KubernetesEvent:
   message: str
   # Reason is actually more of a machine readable message.
   reason: str | None
+  # Examples: Normal, Warning, Error
+  type: str
   timestamp: float
 
   @classmethod
@@ -1833,6 +1835,7 @@ class KubernetesEvent:
           resource=KubernetesEventResource.FromDict(
               yaml_data['involvedObject']
           ),
+          type=yaml_data['type'],
           timestamp=timestamp,
       )
     except (AssertionError, KeyError) as e:

@@ -205,6 +205,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
                 name='pod',
                 kind='Pod',
             ),
+            type='Normal',
             timestamp=100,
         )
     ]
@@ -230,6 +231,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
                 name='pod',
                 kind='Pod',
             ),
+            type='Warning',
             timestamp=100,
         )
     ]

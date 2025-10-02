@@ -88,6 +88,7 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
             message="ignored",
             reason="RegisteredNode",
             timestamp=fake_time + 20.0,
+            type="Normal",
         ),
         container_service.KubernetesEvent(
             resource=container_service.KubernetesEventResource(
@@ -96,6 +97,7 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
             message="ignored",
             reason="RemovingNode",
             timestamp=fake_time + 40.0,
+            type="Normal",
         ),
     ]
     tracker = kubernetes_tracker.KubernetesResourceTracker(
@@ -170,6 +172,7 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
             message="ignored",
             reason="RegisteredNode",
             timestamp=fake_time - 20.0,
+            type="Normal",
         ),
     ]
     tracker = kubernetes_tracker.KubernetesResourceTracker(

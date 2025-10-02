@@ -432,6 +432,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
             ),
             message='gke-49fe-vm became leader',
             reason='LeaderElection',
+            type='Normal',
             timestamp=1739209338,
         ),
     )
