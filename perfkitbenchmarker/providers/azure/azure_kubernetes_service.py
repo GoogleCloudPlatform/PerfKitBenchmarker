@@ -435,17 +435,39 @@ class AksCluster(container_service.KubernetesCluster):
 
   def GetNodePoolNames(self) -> list[str]:
     """Get node pool names for the cluster."""
-    cmd = [
-        azure.AZURE_PATH,
-        'aks',
-        'nodepool',
-        'list',
-        '--cluster-name',
-        self.name,
-    ] + self.resource_group.args
-    stdout, _, _ = vm_util.IssueCommand(cmd)
-    nodepools = json.loads(stdout)
-    return [nodepool['name'] for nodepool in nodepools]
+    if FLAGS.azure_aks_auto_node_provisioning:
+      cmd = [
+          FLAGS.kubectl,
+          '--kubeconfig',
+          FLAGS.kubeconfig,
+          'get',
+          'nodepools',
+          '-o',
+          'json',
+      ]
+      stdout, _, _ = vm_util.IssueCommand(cmd)
+      nodepools = json.loads(stdout).get('items', [])
+      return [nodepool['metadata']['name'] for nodepool in nodepools]
+    else:
+      cmd = [
+          azure.AZURE_PATH,
+          'aks',
+          'nodepool',
+          'list',
+          '--cluster-name',
+          self.name,
+      ] + self.resource_group.args
+      stdout, _, _ = vm_util.IssueCommand(cmd)
+      nodepools = json.loads(stdout)
+      return [nodepool['name'] for nodepool in nodepools]
+
+  def AddNodepool(self, batch_name, id):
+    self.ApplyManifest(
+        'provision_node_pools/aks/nodepool.yaml.j2',
+        batch=batch_name,
+        id=id,
+        cluster_name=self.name,
+    )
 
 
 class AksAutomaticCluster(AksCluster):
