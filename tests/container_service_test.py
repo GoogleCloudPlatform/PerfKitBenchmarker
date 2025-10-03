@@ -437,6 +437,37 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         ),
     )
 
+  def test_KubernetesEventParsing(self):
+    event = container_service.KubernetesEvent.FromDict({
+        'eventTime': '2025-10-03T18:05:56.272315Z',
+        'involvedObject': {
+            'apiVersion': 'v1',
+            'kind': 'Pod',
+            'name': 'kubernetes-scaleup-5d6c5f45cf-wtbmv',
+            'namespace': 'default',
+            'uid': '8c0f9844-cb1f-4563-a3bc-fc75e3a2fc3f',
+        },
+        'kind': 'Event',
+        'lastTimestamp': None,
+        'message': (
+            'Successfully assigned default/deploy-pod to gke-node'
+        ),
+        'metadata': {
+            'creationTimestamp': '2025-10-03T18:05:56Z',
+        },
+        'reason': 'Scheduled',
+        'reportingComponent': 'default-scheduler',
+        'type': 'Normal',
+    })
+    self.assertIsNotNone(event)
+    self.assertEqual(
+        event.message,
+        'Successfully assigned default/deploy-pod to gke-node'
+    )
+    self.assertEqual(event.reason, 'Scheduled')
+    self.assertEqual(event.type, 'Normal')
+    self.assertEqual(event.timestamp, 1759514756)
+
 
 def _ClearTimestamps(samples: Iterable[Sample]) -> Iterable[Sample]:
   for s in samples:
