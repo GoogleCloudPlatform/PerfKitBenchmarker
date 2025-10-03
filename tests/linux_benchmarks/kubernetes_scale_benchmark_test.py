@@ -269,6 +269,50 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('node_Ready_count', samples_by_metric.keys())
     self.assertEqual(samples_by_metric['node_Ready_count'].value, 1)
 
+  @flagsaver.flagsaver(kubernetes_scale_report_latency_percentiles=False)
+  @flagsaver.flagsaver(kubernetes_scale_report_individual_latencies=True)
+  def testReportLatenciesMultipleStatsOnePod(self):
+    self.enter_context(
+        mock.patch.object(
+            container_service,
+            'RunKubectlCommand',
+            side_effect=[
+                (
+                    """
+                    "pod1": [
+                      {
+                        "lastProbeTime":null,
+                        "lastTransitionTime":"1970-01-01T00:01:00Z",
+                        "status":"True",
+                        "type":"Ready"
+                      }, {
+                        "lastProbeTime":null,
+                        "lastTransitionTime":"1970-01-01T00:01:00Z",
+                        "status":"True",
+                        "type":"ContainersReady"
+                      }
+                    ],
+                    """,
+                    '',
+                    0,
+                ),
+            ],
+        )
+    )
+    samples = kubernetes_scale_benchmark.ParseStatusChanges('pod', 40)
+    self.assertLen(samples, 4)
+    # self.assertEqual(samples, [])
+    samples_by_metric = _SamplesByMetric(samples)
+    self.assertEqual(
+        samples_by_metric.keys(),
+        {
+            'pod_Ready_count',
+            'pod_ContainersReady_count',
+            'pod_Ready',
+            'pod_ContainersReady',
+        },
+    )
+
   @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresPassesWithCorrectNumberOfPods(self):
     self.cluster.GetEvents.return_value = []

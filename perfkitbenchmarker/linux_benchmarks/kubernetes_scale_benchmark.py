@@ -409,17 +409,7 @@ def ParseStatusChanges(
   for condition in conditions:
     overall_times[condition.event].append(condition.epoch_time)
   for event, timestamps in overall_times.items():
-    summaries = _SummarizeTimestamps(timestamps)
     prefix = f'{resource_type}_{event}_'
-    if REPORT_PERCENTILES.value:
-      for percentile, value in summaries.items():
-        samples.append(
-            sample.Sample(
-                prefix + percentile,
-                value - start_time,
-                'seconds',
-            )
-        )
     # Always report counts, because it is used in failure handling
     samples.append(
         sample.Sample(
@@ -428,20 +418,33 @@ def ParseStatusChanges(
             'count',
         )
     )
+    if not REPORT_PERCENTILES.value:
+      continue
+    summaries = _SummarizeTimestamps(timestamps)
+    for percentile, value in summaries.items():
+      samples.append(
+          sample.Sample(
+              prefix + percentile,
+              value - start_time,
+              'seconds',
+          )
+      )
 
-    if REPORT_LATENCIES.value:
-      for condition in conditions:
-        metadata = {
-            'k8s_resource_name': condition.resource_name,
-        }
-        samples.append(
-            sample.Sample(
-                f'{resource_type}_{condition.event}',
-                condition.epoch_time - start_time,
-                'seconds',
-                metadata,
-            )
+  if not REPORT_LATENCIES.value:
+    return samples
+
+  for condition in conditions:
+    metadata = {
+        'k8s_resource_name': condition.resource_name,
+    }
+    samples.append(
+        sample.Sample(
+            f'{resource_type}_{condition.event}',
+            condition.epoch_time - start_time,
+            'seconds',
+            metadata,
         )
+    )
   return samples
 
 
