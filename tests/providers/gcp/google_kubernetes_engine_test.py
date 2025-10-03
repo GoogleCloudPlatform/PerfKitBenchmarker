@@ -162,6 +162,7 @@ class GoogleKubernetesEngineCustomMachineTypeTestCase(
                     'zone': 'us-west1-a',
                 },
             },
+            'poll_for_events': False,
         },
     )
     return kubernetes_engine_spec
@@ -507,7 +508,7 @@ class GoogleKubernetesEngineWithGpusTestCase(
 ):
 
   @staticmethod
-  def create_kubernetes_engine_spec():
+  def create_kubernetes_engine_spec(gpu_type):
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME',
         **{
@@ -515,19 +516,20 @@ class GoogleKubernetesEngineWithGpusTestCase(
             'vm_spec': {
                 'GCP': {
                     'machine_type': 'fake-machine-type',
-                    'gpu_type': 'k80',
+                    'gpu_type': gpu_type,
                     'gpu_count': 2,
                     'zone': 'us-west1-a',
                 },
             },
             'vm_count': 2,
+            'poll_for_events': False,
         },
     )
     return kubernetes_engine_spec
 
   @flagsaver.flagsaver(gke_gpu_driver_version='latest')
   def testCreate(self):
-    spec = self.create_kubernetes_engine_spec()
+    spec = self.create_kubernetes_engine_spec('k80')
     with patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
@@ -543,9 +545,21 @@ class GoogleKubernetesEngineWithGpusTestCase(
           command_string,
       )
 
+  def testCreateGpuH100(self):
+    spec = self.create_kubernetes_engine_spec('h100')
+    with patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      command_string = ' '.join(issue_command.call_args[0][0])
+      self.assertIn(
+          '--accelerator '
+          'type=nvidia-h100-80gb,count=2,gpu-driver-version=default',
+          command_string,
+      )
+
   @mock.patch('perfkitbenchmarker.kubernetes_helper.CreateFromFile')
   def testPostCreate(self, create_from_file_patch):
-    spec = self.create_kubernetes_engine_spec()
+    spec = self.create_kubernetes_engine_spec('k80')
     with patch_critical_objects() as issue_command, mock.patch.object(
         container_service, 'RunKubectlCommand'
     ) as mock_kubectl_command:
@@ -808,6 +822,21 @@ class GoogleKubernetesEngineAutopilotTestCase(
               'release_channel': 'rapid',
           },
           metadata,
+      )
+
+  @flagsaver.flagsaver(gpu_type='h100', gpu_count=1)
+  def testGetNodeSelectorGpusH100(self):
+    spec = self.create_kubernetes_engine_spec()
+    with patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
+      self.assertEqual(
+          cluster.GetNodeSelectors(),
+          [
+              'cloud.google.com/gke-accelerator: nvidia-h100-80gb',
+              "cloud.google.com/gke-accelerator-count: '1'",
+              "cloud.google.com/gke-gpu-driver-version: 'default'",
+              'cloud.google.com/compute-class: Accelerator',
+          ],
       )
 
 

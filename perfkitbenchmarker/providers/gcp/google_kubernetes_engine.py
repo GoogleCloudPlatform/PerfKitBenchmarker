@@ -514,12 +514,6 @@ class GkeCluster(BaseGkeCluster):
     cmd.Issue()
 
 
-_VM_GPU_TYPE_TO_AUTOPILOT_GPU_TYPE = {
-    'nvidia-a100': 'nvidia-a100-80gb',
-    'nvidia-h100': 'nvidia-h100-80gb',
-}
-
-
 class GkeAutopilotCluster(BaseGkeCluster):
   """Class representing an Autopilot GKE cluster, which has no nodepools."""
 
@@ -591,9 +585,11 @@ class GkeAutopilotCluster(BaseGkeCluster):
     # https://cloud.google.com/kubernetes-engine/docs/how-to/autopilot-gpus#request-gpus
     if virtual_machine.GPU_TYPE.value:
       gpu_count = virtual_machine.GPU_COUNT.value or 1
-      gpu_type = f'nvidia-{virtual_machine.GPU_TYPE.value}'
-      if gpu_type in _VM_GPU_TYPE_TO_AUTOPILOT_GPU_TYPE:
-        gpu_type = _VM_GPU_TYPE_TO_AUTOPILOT_GPU_TYPE[gpu_type]
+      gpu_type = virtual_machine.GPU_TYPE.value
+      suffix = ''
+      if gpu_type in gce_virtual_machine.GPU_TYPE_TO_SUFFIX:
+        suffix = gce_virtual_machine.GPU_TYPE_TO_SUFFIX[gpu_type]
+      gpu_type = f'nvidia-{gpu_type}{suffix}'
       gpu_driver_version = gcp_flags.GKE_GPU_DRIVER_VERSION.value
       selectors += [
           'cloud.google.com/gke-accelerator: ' + gpu_type,
