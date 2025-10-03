@@ -18,6 +18,7 @@ import datetime
 import json
 import logging
 import os
+import random
 import re
 from typing import Any
 
@@ -879,9 +880,11 @@ class Bigquery(edw_service.EdwService):
       self, table_path: str, storage_path: str
   ) -> tuple[float, dict[str, Any]]:
     query_name = 'load_search_data'
+    random_8_char_long_hex = f'{random.randrange(2**32):08x}'
     context = {
         'table_name': table_path,
         'storage_path': storage_path,
+        'random_id': random_8_char_long_hex,
     }
     self.client_interface.client_vm.RenderTemplate(
         data.ResourcePath(self.LOAD_SEARCH_DATA_QUERY_TEMPLATE),
