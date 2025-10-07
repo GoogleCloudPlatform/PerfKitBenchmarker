@@ -18,9 +18,9 @@ metadata:
   namespace: {{ namespace }}
   name: {{ name }}
   annotations:
-    alb.ingress.kubernetes.io/scheme: internet-facing 
+    alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/healthcheck-path: /calculate
+    alb.ingress.kubernetes.io/healthcheck-path: {{ health_path }}
 spec:
   ingressClassName: alb
   defaultBackend:

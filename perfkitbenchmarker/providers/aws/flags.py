@@ -216,7 +216,7 @@ flags.DEFINE_boolean(
     'eks_install_alb_controller',
     False,
     'Whether to install AWS Load Balancer Controller in EKS Karpenter clusters'
-    'Default value - don not install unless explicitly requested',
+    'Default value - do not install unless explicitly requested',
 )
 AWS_CAPACITY_BLOCK_RESERVATION_ID = flags.DEFINE_string(
     'aws_capacity_block_reservation_id',

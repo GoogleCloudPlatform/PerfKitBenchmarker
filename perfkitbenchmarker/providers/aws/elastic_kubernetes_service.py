@@ -837,7 +837,7 @@ class EksKarpenterCluster(BaseEksCluster):
         '--timeout=180s',
     ])
 
-  def DeployIngress(self, name: str, namespace: str, port: int) -> str:
+  def DeployIngress(self, name: str, namespace: str, port: int, health_path: str) -> str:
     """Deploys only Service + Ingress (without IngressClass) for AWS Load Balancer Controller."""
     # Apply the custom manifest template (service + ingress with annotations).
     self.ApplyManifest(
@@ -845,6 +845,7 @@ class EksKarpenterCluster(BaseEksCluster):
         name=name,
         namespace=namespace,
         port=port,
+        health_path=health_path,
     )
     # Wait until the ingress resource gets an address (hostname or IP).
     self.WaitForResource(

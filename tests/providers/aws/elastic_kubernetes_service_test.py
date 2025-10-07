@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from unittest import mock
+from urllib.parse import urlparse
 from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import container_service
@@ -12,7 +13,6 @@ from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import elastic_kubernetes_service
 from perfkitbenchmarker.providers.aws import util
 from tests import pkb_common_test_case
-from urllib.parse import urlparse
 
 
 EKS_SPEC_DICT = {
