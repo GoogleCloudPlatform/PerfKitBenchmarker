@@ -294,7 +294,8 @@ def _BuildStartCommand(vm, port: int) -> str:
 def _WaitForRedisUp(vm, port):
   """Wait until redis server is up on a given port."""
   vm.RemoteCommand(
-      f'sudo {GetRedisDir()}/src/redis-cli -p {port} ping | grep PONG'
+      f'sudo {GetRedisDir()}/src/redis-cli -h localhost -p {port} ping | grep'
+      ' PONG'
   )
 
 
@@ -314,11 +315,14 @@ def Stop(vm) -> None:
   ports = GetRedisPorts(vm)
 
   for port in ports:
-    vm.TryRemoteCommand(f'sudo {redis_dir}/src/redis-cli -p {port} flushall')
+    vm.TryRemoteCommand(
+        f'sudo {redis_dir}/src/redis-cli -h localhost -p {port} flushall'
+    )
 
   for port in ports:
     vm.TryRemoteCommand(
-        f'sudo {redis_dir}/src/redis-cli -p {port} cluster reset hard'
+        f'sudo {redis_dir}/src/redis-cli -h localhost -p {port} cluster reset '
+        'hard'
     )
 
   vm.TryRemoteCommand(
