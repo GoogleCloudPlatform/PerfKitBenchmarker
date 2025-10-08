@@ -457,8 +457,15 @@ class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
   """Strategies to set up S3 buckets."""
 
   DEFAULT_MOUNT_OPTIONS = [
-      '--cache /opt/pkb'
-  ]
+      '--allow-other',
+      '--dir-mode=755',
+      '--file-mode=755',
+      # Sets part size to 64MiB. Max upload 64000MiB.
+      '--write-part-size=67108864',
+      '--incremental-upload',
+      '--allow-overwrite',
+      '--allow-delete'
+      ]
 
   def SetUpDisk(self):
     """Performs setup of S3 buckets."""
@@ -466,7 +473,11 @@ class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
     target = self.disk_spec.mount_point
     self.vm.RemoteCommand(f'sudo mkdir -p {target} && sudo chmod a+w {target}')
 
-    opts = ' '.join(self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options)
+    all_mount_options = self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options
+    if not FLAGS.aws_s3_mount_enable_metadata_cache:
+      all_mount_options += ['--metadata-ttl=0']
+
+    opts = ' '.join(all_mount_options)
     zone_id = util.GetZoneId(self.vm.zone)
     s3_express_zonal_suffix = f'--{zone_id}--x-s3'
     bucket_name = (

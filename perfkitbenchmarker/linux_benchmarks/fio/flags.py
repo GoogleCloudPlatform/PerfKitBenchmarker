@@ -78,6 +78,11 @@ FIO_FILL_BLOCK_SIZE = flags.DEFINE_string(
     '--fio_target_mode is against_device_with_fill or '
     'against_file_with_fill.',
 )
+FIO_NR_FILES = flags.DEFINE_integer(
+    'fio_nr_files',
+    1,
+    'The number of files to use for FIO.',
+)
 FIO_IO_DEPTHS = flag_util.DEFINE_integerlist(
     'fio_io_depths',
     flag_util.IntegerList([1]),
@@ -116,7 +121,7 @@ FIO_RUNTIME = flags.DEFINE_integer(
     'fio_runtime',
     600,
     'The number of seconds to run each fio job for.',
-    lower_bound=1,
+    lower_bound=0,
 )
 FIO_RAMPTIME = flags.DEFINE_integer(
     'fio_ramptime',
@@ -172,7 +177,7 @@ FIO_RNG = flags.DEFINE_enum(
 FIO_IOENGINE = flags.DEFINE_enum(
     'fio_ioengine',
     'libaio',
-    ['libaio', 'windowsaio'],
+    ['libaio', 'windowsaio', 'sync'],
     'Defines how the job issues I/O to the file',
 )
 FIO_RATE_BANDWIDTH_LIMIT = flags.DEFINE_string(

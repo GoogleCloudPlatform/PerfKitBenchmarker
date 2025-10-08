@@ -592,6 +592,16 @@ GCP_LUSTRE_VPC = flags.DEFINE_string(
     'VPC name for GCP Lustre instance: '
     'https://cloud.google.com/managed-lustre/docs/vpc',
 )
+GCS_FUSE_ENABLE_FILE_CACHE = flags.DEFINE_boolean(
+    'gcs_fuse_enable_file_cache',
+    False,
+    'Whether to enable file cache for gcs fuse.',
+)
+GCS_FUSE_ENABLE_METADATA_CACHE = flags.DEFINE_boolean(
+    'gcs_fuse_enable_metadata_cache',
+    False,
+    'Whether to enable metadata cache for gcs fuse.',
+)
 
 
 def _ValidatePreemptFlags(flags_dict):

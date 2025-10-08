@@ -251,6 +251,11 @@ AWS_LUSTRE_COMPRESSION = flags.DEFINE_boolean(
     False,
     'Whether or not to enable LZ4 compression for AWS lustre.',
 )
+AWS_S3_MOUNT_ENABLE_METADATA_CACHE = flags.DEFINE_boolean(
+    'aws_s3_mount_enable_metadata_cache',
+    False,
+    'Whether to enable metadata cache for s3 mountpoint.',
+)
 
 
 @flags.multi_flags_validator(

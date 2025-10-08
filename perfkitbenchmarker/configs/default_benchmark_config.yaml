@@ -445,6 +445,16 @@ fio_latency:
     fio_runtime: 300
     fio_target_mode: against_device_with_fill
 
+fio_object_storage_latency_8kb:
+  name: fio_object_storage
+  flags:
+    fio_generate_scenarios: rand_8k_read_800KB_iodepth-1_numjobs-1
+    fio_fill_size: 800K
+    fio_fill_block_size: 8k
+    fio_nr_files: 100
+    fio_ramptime: 0
+    fio_runtime: 0
+
 gpu_jobs_provisioning:
   name: jobs_benchmark
   base_job:

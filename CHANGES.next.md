@@ -629,3 +629,4 @@
 -   Add flags to allow modifying multiple settings in "mongod.conf".
 -   Add new general purpose fio benchmark for device - fio_raw_device_benchmark
 -   Add support for GCP HdML disks.
+-   Add fio benchmark for object storage via FUSE.

@@ -69,6 +69,7 @@ def ParseResults(
     fio_json_result,
     base_metadata=None,
     skip_latency_individual_stats=False,
+    latency_measure='clat',
 ):
   """Parse fio json output into samples.
 
@@ -78,6 +79,9 @@ def ParseResults(
     base_metadata: Extra metadata to annotate the samples with.
     skip_latency_individual_stats: Bool. If true, skips pulling latency stats
       that are not aggregate.
+    latency_measure: The latency measurement to use (e.g., 'clat', 'slat',
+      'lat').
+
   Returns:
     A list of sample.Sample objects.
   """
@@ -105,7 +109,7 @@ def ParseResults(
       job_name = job['jobname']
     else:
       job_name = job['jobname'].split('.')[0]
-    parameters = {'fio_job': job_name}
+    parameters = {'fio_job': job_name, 'latency_measure': latency_measure}
     if parameter_metadata:
       parameters.update(parameter_metadata[job_name])
     if base_metadata:
@@ -129,27 +133,31 @@ def ParseResults(
                 bw_metadata,
             )
         )
-        clat_key = 'clat' if 'clat' in job[mode] else 'clat_ns'
-        clat_section = job[mode][clat_key]
+        lat_key = (
+            latency_measure
+            if latency_measure in job[mode]
+            else f'{latency_measure}_ns'
+        )
+        lat_section = job[mode][lat_key]
 
-        def _ConvertClat(value):
-          if clat_key == 'clat_ns':  # pylint: disable=cell-var-from-loop
+        def _ConvertLat(value):
+          if lat_key == f'{latency_measure}_ns':  # pylint: disable=cell-var-from-loop
             # convert from nsec to usec
             return value / 1000
           else:
             return value
 
         lat_statistics = [
-            ('min', _ConvertClat(clat_section['min'])),
-            ('max', _ConvertClat(clat_section['max'])),
-            ('mean', _ConvertClat(clat_section['mean'])),
-            ('stddev', _ConvertClat(clat_section['stddev'])),
+            ('min', _ConvertLat(lat_section['min'])),
+            ('max', _ConvertLat(lat_section['max'])),
+            ('mean', _ConvertLat(lat_section['mean'])),
+            ('stddev', _ConvertLat(lat_section['stddev'])),
         ]
-        if 'percentile' in clat_section and not skip_latency_individual_stats:
-          percentiles = clat_section['percentile']
+        if 'percentile' in lat_section and not skip_latency_individual_stats:
+          percentiles = lat_section['percentile']
           percentile_map = FormatPercentileMap(percentiles)
           for key, value in percentile_map.items():
-            lat_statistics.append((f'p{key}', _ConvertClat(value)))
+            lat_statistics.append((f'p{key}', _ConvertLat(value)))
 
         lat_metadata = parameters.copy()
         for name, val in lat_statistics:
@@ -157,7 +165,7 @@ def ParseResults(
         samples.append(
             sample.Sample(
                 '%s:latency' % metric_name,
-                _ConvertClat(job[mode][clat_key]['mean']),
+                _ConvertLat(job[mode][lat_key]['mean']),
                 'usec',
                 lat_metadata,
                 timestamp,
