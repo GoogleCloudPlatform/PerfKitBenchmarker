@@ -21,6 +21,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import vm_util
 
 
 class RedisEvictionPolicy:
@@ -289,10 +290,22 @@ def _BuildStartCommand(vm, port: int) -> str:
   return cmd.format(redis_dir=redis_dir, args=' '.join(cmd_args))
 
 
+@vm_util.Retry(poll_interval=5, timeout=60)
+def _WaitForRedisUp(vm, port):
+  """Wait until redis server is up on a given port."""
+  vm.RemoteCommand(
+      f'sudo {GetRedisDir()}/src/redis-cli -p {port} ping | grep PONG'
+  )
+
+
 def Start(vm) -> None:
   """Start redis server process."""
-  for port in GetRedisPorts(vm):
+  ports = GetRedisPorts(vm)
+  for port in ports:
     vm.RemoteCommand(_BuildStartCommand(vm, port))
+    # The redis-server command starts in the background, so we need to wait for
+    # it to be up before issuing commands to it.
+    _WaitForRedisUp(vm, port)
 
 
 def Stop(vm) -> None:
