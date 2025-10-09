@@ -62,7 +62,7 @@ CONTAINER_IMAGE = flags.DEFINE_string(
 )
 
 MANIFEST_TEMPLATE = 'container/kubernetes_scale/kubernetes_scale.yaml.j2'
-DEFAULT_IMAGE = 'k8s.gcr.io/pause:3.1'
+DEFAULT_IMAGE = 'busybox:1.37'
 NVIDIA_GPU_IMAGE = 'nvidia/cuda:11.0.3-runtime-ubuntu20.04'
 
 
@@ -155,11 +155,10 @@ def ScaleUpPods(
   initial_pods = set(cluster.GetPodNames())
   logging.info('Initial pods: %s', initial_pods)
 
-  command = None
   if virtual_machine.GPU_COUNT.value:
     # Use nvidia-smi to validate NVIDIA_GPU is available.
     command = ['sh', '-c', 'nvidia-smi && sleep 3600']
-  if CONTAINER_IMAGE.value:
+  else:
     command = ['sh', '-c', 'sleep infinity']
 
   # Request X new pods via YAML apply.
@@ -180,6 +179,7 @@ def ScaleUpPods(
       NodeSelectors=cluster.GetNodeSelectors(
           cluster.default_nodepool.machine_type
       ),
+      cloud='Azure' if FLAGS.cloud == 'Azure' else None,
   )
 
   # Arbitrarily pick the first resource (it should be the only one.)
