@@ -73,14 +73,17 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
         {
             'az aks create': [('', '', 0)],
             'az aks nodepool': [('', '', 0)],
-            'az aks show': [(
+            'az aks show': [
                 (
-                    '{"provisioningState": "Succeeded", "nodeResourceGroup":'
-                    ' "node-resource-group"}'
+                    (
+                        '{"provisioningState": "Succeeded",'
+                        ' "nodeResourceGroup": "node-resource-group"}'
+                    ),
+                    '',
+                    0,
                 ),
-                '',
-                0,
-            )],
+                ('Succeeded', '', 0),
+            ],
             'get serviceAccounts': [('default, foo', '', 0)],
         },
     )
@@ -186,16 +189,22 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
             'az aks create': [('', '', 0)],
             'az aks nodepool': [('', '', 0)],
             '--query id': [('cluster-id', '', 0)],
-            'az aks show': [(
+            'az aks show': [
                 (
-                    '{"provisioningState": "Succeeded", "nodeResourceGroup":'
-                    ' "node-resource-group"}'
+                    (
+                        '{"provisioningState": "Succeeded",'
+                        ' "nodeResourceGroup": "node-resource-group"}'
+                    ),
+                    '',
+                    0,
                 ),
-                '',
-                0,
-            )],
+                ('Succeeded', '', 0),
+            ],
             'get serviceAccounts': [('default, foo', '', 0)],
-            'az account show': [('user-name', '', 0)],
+            'az account show': [
+                ('servicePrincipal', '', 0),
+                ('user-name', '', 0),
+            ],
             'az role assignment': [('', '', 0)],
         },
     )
@@ -214,7 +223,8 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
                 '--scope',
                 'cluster-id',
             ],
-        ),])
+        ),
+    ])
 
   def testGetNodePoolNames(self):
     self.MockIssueCommand(
