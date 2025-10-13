@@ -136,7 +136,7 @@ class BaseWGServingInferenceServer(
     result.update({
         'model': getattr(self, 'model_id', 'unknown'),
         'tokenizer_id': getattr(self, 'tokenizer_id', 'unknown'),
-        'model_server': getattr(self, 'model_server', 'unknown'),
+        'model_server': self.spec.model_server,
     })
 
     return result
@@ -528,6 +528,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         'hpa_enabled': self._hpa_enabled,
         'storage_type': storage_type,
     })
+    if self.spec.runtime_class_name:
+      metadata['runtime_class_name'] = self.spec.runtime_class_name
     return metadata
 
   def GetStorageType(self) -> str:
@@ -594,6 +596,17 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       inference_server_manifest = self.cluster.GetFileContentFromPod(
           pod_name, _OUTPUT_PATH
       )
+
+      # Add runtime class name to the deployment spec if specified.
+      if self.spec.runtime_class_name:
+        docs = []
+        for doc in yaml.safe_load_all(inference_server_manifest):
+          if doc.get('kind') == 'Deployment':
+            doc['spec']['template']['spec'][
+                'runtimeClassName'
+            ] = self.spec.runtime_class_name
+          docs.append(doc)
+        inference_server_manifest = yaml.dump_all(docs)
 
       logging.info('Cleaned up manifest generation job %s', job_name)
       return inference_server_manifest

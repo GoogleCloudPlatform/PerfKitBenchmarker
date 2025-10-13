@@ -54,6 +54,7 @@ disk_to_hdfs_map = {
     'pd-standard': 'HDD',
     'pd-balanced': 'SSD (Balanced)',
     'pd-ssd': 'SSD',
+    'hyperdisk-balanced': 'Hyperdisk (Balanced)',
 }
 serverless_disk_to_hdfs_map = {
     'standard': 'HDD',

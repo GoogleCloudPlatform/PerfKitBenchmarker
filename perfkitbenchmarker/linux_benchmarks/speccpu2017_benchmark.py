@@ -97,14 +97,16 @@ flags.DEFINE_boolean(
     False,
     'Best effort run of spec. Allow missing results without failing.',
 )
-flags.DEFINE_string(
+AUTO_NUMA_BIND_CONFIG = 'auto'
+PACKED_NUMA_BIND_CONFIG = 'packed'
+SPEC17_NUMA_BIND_CONFIG = flags.DEFINE_string(
     'spec17_numa_bind_config',
     None,
     'Name of the config file to use for specifying NUMA binding. '
     'None by default. To enable numa binding, ensure the runspec_config file, '
     'contains "include: numactl.inc". In addition, setting to "auto", will '
-    'attempt to pin to local numa node and pin each SIR copy to a '
-    'exclusive hyperthread.',
+    'attempt to pin virtual cpus in order. Setting to "packed" will attempt to '
+    'pack the CPUs into the same sockets and cores.',
 )
 
 BENCHMARK_NAME = 'speccpu2017'
@@ -211,15 +213,38 @@ def _GenNumactlIncFile(vm):
   if FLAGS.spec17_numa_bind_config:
     remote_numactl_path = os.path.join(config.spec_dir, 'config', 'numactl.inc')
     vm.Install('numactl')
-    if FLAGS.spec17_numa_bind_config == 'auto':
+
+    if SPEC17_NUMA_BIND_CONFIG.value in [
+        AUTO_NUMA_BIND_CONFIG,
+        PACKED_NUMA_BIND_CONFIG,
+    ]:
+      bind_cpu_order = []
+      num_copies = _GetNumCopies(vm)
+      if SPEC17_NUMA_BIND_CONFIG.value == AUTO_NUMA_BIND_CONFIG:
+        bind_cpu_order = range(num_copies)
+      elif SPEC17_NUMA_BIND_CONFIG.value == PACKED_NUMA_BIND_CONFIG:
+        # Sort by physical id, core id, then cpu id.
+        # On a machine with SMT and n vCPUs, usually cpu k and k + n/2 are on
+        # the physical core. This produces the bind order:
+        # 0, n/2, 1, n/2 + 1, ...
+        packed_cpus = sorted(
+            vm.CheckProcCpu().mappings.items(),
+            key=lambda p: (
+                int(p[1]['physical id']),
+                int(p[1]['core id']),
+                p[0],
+            ),
+        )
+        bind_cpu_order = [cpu_id for cpu_id, _ in packed_cpus][:num_copies]
+
       # Upload config and rename
       numa_bind_cfg = [
           'intrate,fprate:',
           'submit = echo "${command}" > run.sh ; $BIND bash run.sh',
       ]
-      for idx in range(vm.NumCpusForBenchmark()):
+      for idx, cpu_id in enumerate(bind_cpu_order):
         numa_bind_cfg.append(
-            f'bind{idx} = /usr/bin/numactl --physcpubind=+{idx} --localalloc'
+            f'bind{idx} = /usr/bin/numactl --physcpubind=+{cpu_id} --localalloc'
         )
       vm_util.CreateRemoteFile(
           vm, '\n'.join(numa_bind_cfg), remote_numactl_path
@@ -321,7 +346,7 @@ def _Run(vm):
     cmd += '--rebuild '
 
   version_specific_parameters = []
-  copies = FLAGS.spec17_copies or vm.NumCpusForBenchmark()
+  copies = _GetNumCopies(vm)
   version_specific_parameters.append(f' --copies={copies} ')
   version_specific_parameters.append(
       ' --threads=%s ' % (FLAGS.spec17_threads or vm.NumCpusForBenchmark())
@@ -401,3 +426,10 @@ def Cleanup(benchmark_spec):
   """
   vms = benchmark_spec.vms
   background_tasks.RunThreaded(speccpu.Uninstall, vms)
+
+
+def _GetNumCopies(vm) -> int:
+  """Returns the number of copies to run."""
+  if FLAGS.spec17_copies:
+    return FLAGS.spec17_copies
+  return vm.NumCpusForBenchmark()

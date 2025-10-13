@@ -603,9 +603,7 @@ class BenchmarkSpec:
     cloud = self.config.vvs.cloud
     providers.LoadProvider(cloud)
     model_class = vvs_resource.GetVVSResourceClass(cloud)
-    self.vvs = model_class(
-        self.config.vvs
-    )  # pytype: disable=not-instanti
+    self.vvs = model_class(self.config.vvs)  # pytype: disable=not-instantiable
     self.vvs.SetVms(self.vm_groups)
     self.resources.append(self.vvs)
 

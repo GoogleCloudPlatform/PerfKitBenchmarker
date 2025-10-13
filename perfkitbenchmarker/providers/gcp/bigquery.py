@@ -18,6 +18,7 @@ import datetime
 import json
 import logging
 import os
+import random
 import re
 from typing import Any
 
@@ -467,7 +468,7 @@ class PythonClientInterface(GenericClientInterface):
       cmd += ' --print_results'
     if self.destination:
       cmd += f' --destination {self.destination}'
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
     details = copy.copy(self.GetMetadata())
     details.update(json.loads(stdout)['details'])
     return json.loads(stdout)['query_wall_time_in_secs'], details
@@ -485,7 +486,7 @@ class PythonClientInterface(GenericClientInterface):
         f' --feature_config {FLAGS.edw_bq_feature_config} --labels'
         f" '{json.dumps(labels)}'"
     )
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
     return stdout
 
   def RunQueryWithResults(self, query_name: str) -> str:
@@ -495,7 +496,7 @@ class PythonClientInterface(GenericClientInterface):
         f' {self.project_id} --credentials_file {self.key_file_name} --dataset'
         f' {self.dataset_id} --query_file {query_name} --print_results'
     )
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
     return stdout
 
 
@@ -879,9 +880,11 @@ class Bigquery(edw_service.EdwService):
       self, table_path: str, storage_path: str
   ) -> tuple[float, dict[str, Any]]:
     query_name = 'load_search_data'
+    random_8_char_long_hex = f'{random.randrange(2**32):08x}'
     context = {
         'table_name': table_path,
         'storage_path': storage_path,
+        'random_id': random_8_char_long_hex,
     }
     self.client_interface.client_vm.RenderTemplate(
         data.ResourcePath(self.LOAD_SEARCH_DATA_QUERY_TEMPLATE),
@@ -924,17 +927,9 @@ class Bigquery(edw_service.EdwService):
     res, meta = self.client_interface.ExecuteQuery(
         query_name, print_results=True
     )
-
-    meta['edw_search_index_coverage_percentage'] = int(
-        meta['query_results']['index_coverage_percentage'][0]
-    )
     meta['edw_search_result_rows'] = int(
         meta['query_results']['result_rows'][0]
     )
-    meta['edw_search_total_row_count'] = int(
-        meta['query_results']['total_row_count'][0]
-    )
-
     return res, meta
 
 

@@ -73,7 +73,6 @@ AGAINST_DEVICE_MODES = frozenset({
 FILL_TARGET_MODES = frozenset(
     {AGAINST_DEVICE_WITH_FILL_MODE, AGAINST_FILE_WITH_FILL_MODE}
 )
-DEFAULT_TEMP_FILE_NAME = 'fio-temp-file'
 FIO_DIR = '/opt/pkb/fio'
 GIT_REPO = 'https://github.com/axboe/fio.git'
 GIT_TAG = 'fio-3.39'

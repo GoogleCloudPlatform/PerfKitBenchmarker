@@ -27,7 +27,7 @@ _SAMPLE_RESULT_DATA_BASE = {
 }
 
 _SAMPLE_RESULT_DATA_ANOTHER = {
-    'metrics': {'metric2': 20.0, 'request_rate': 2.0},
+    'metrics': {'avg_latency_ms': 20.0, 'request_rate': 2.0},
     'dimensions': {
         'model_id': 'model_b',
         'tokenizer_id': 'tokenizer_b',
@@ -135,9 +135,9 @@ class KubernetesAiInferenceBenchmarkTest(
             timestamp=1000000000.0,
         ),
         sample.Sample(
-            metric='metric2',
+            metric='avg_latency_ms',
             value=20.0,
-            unit='',
+            unit='ms',
             metadata={
                 'request_rate': 2.0,
                 'model': 'mock_model',
@@ -318,6 +318,7 @@ class KubernetesAiInferenceBenchmarkTest(
         ),
         reason='Started',
         message='Started container inference-server',
+        type='Normal',
         timestamp=datetime.datetime(
             2025, 7, 18, 22, 17, 1, tzinfo=tz
         ).timestamp(),
@@ -377,6 +378,7 @@ class KubernetesAiInferenceBenchmarkTest(
         ),
         reason='Started',
         message='Started container inference-server',
+        type='Normal',
         timestamp=datetime.datetime(
             2025, 7, 18, 22, 17, 1, tzinfo=tz
         ).timestamp(),
@@ -447,6 +449,7 @@ class KubernetesAiInferenceBenchmarkTest(
             ),
             reason='Started',
             message='Started container inference-server',
+            type='Normal',
             timestamp=datetime.datetime(
                 2025, 7, 18, 22, 17, 1, tzinfo=tz
             ).timestamp(),
@@ -458,6 +461,7 @@ class KubernetesAiInferenceBenchmarkTest(
             ),
             reason='Started',
             message='Started container inference-server',
+            type='Normal',
             timestamp=datetime.datetime(
                 2025, 7, 18, 22, 17, 5, tzinfo=tz
             ).timestamp(),
@@ -469,6 +473,7 @@ class KubernetesAiInferenceBenchmarkTest(
             ),
             reason='Started',
             message='Started container inference-server',
+            type='Normal',
             timestamp=datetime.datetime(
                 2025, 7, 18, 22, 17, 10, tzinfo=tz
             ).timestamp(),

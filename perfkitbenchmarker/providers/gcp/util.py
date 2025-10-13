@@ -195,6 +195,16 @@ def GetMultiRegionFromRegion(region: str):
     raise Exception('Unknown region "%s".' % region)
 
 
+def GetMachineFamily(machine_type: str | None) -> str | None:
+  """Returns the machine family of a machine type."""
+  if not machine_type:
+    return None
+  pieces = machine_type.split('-')
+  if len(pieces) != 3:
+    return None
+  return pieces[0]
+
+
 def IssueCommandFunction(cmd: 'GcloudCommand', **kwargs):
   """Use vm_util to issue the given command.
 

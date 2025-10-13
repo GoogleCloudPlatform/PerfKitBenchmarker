@@ -28,7 +28,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from typing import Any, Callable, Dict, Iterable, Tuple
+from typing import Any, Callable, Dict, Iterable, Literal, Tuple
 
 from absl import flags
 import jinja2
@@ -965,9 +965,11 @@ def RenderTemplate(
     return tf.name
 
 
-def CreateRemoteFile(vm, file_contents, file_path):
+def CreateRemoteFile(
+    vm, file_contents, file_path, write_mode: Literal['w', 'wb'] = 'w'
+):
   """Creates a file on the remote server."""
-  with NamedTemporaryFile(mode='w') as tf:
+  with NamedTemporaryFile(mode=write_mode) as tf:
     tf.write(file_contents)
     tf.close()
     parent_dir = posixpath.dirname(file_path)

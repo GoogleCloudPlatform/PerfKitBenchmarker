@@ -377,16 +377,12 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
       '--dir-mode=755',
       '--file-mode=755',
       '--implicit-dirs',
-      '--write-global-max-blocks=-1',
-      '--metadata-cache-ttl-secs=-1',
-      '--stat-cache-max-size-mb=-1',
-      '--type-cache-max-size-mb=-1',
+      '--rename-dir-limit=200000',
+  ]
+  FILE_CACHE_OPTIONS = [
       '--cache-dir=/tmp/gcsfuse-cache-path',
       '--file-cache-max-size-mb=-1',
       '--file-cache-cache-file-for-range-read=true',
-      '--metadata-cache-negative-ttl-secs=0',
-      '--rename-dir-limit=200000',
-      '--kernel-list-cache-ttl-secs=-1',
   ]
 
   def SetUpDiskOnLinux(self):
@@ -395,7 +391,25 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
     target = self.disk_spec.mount_point
     self.vm.RemoteCommand(f'sudo mkdir -p {target} && sudo chmod a+w {target}')
 
-    opts = ' '.join(self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options)
+    metadata_cache_option_val = '0'
+    if FLAGS.gcs_fuse_enable_metadata_cache:
+      metadata_cache_option_val = '-1'
+    metadata_cache_options = [
+        f'--metadata-cache-ttl-secs={metadata_cache_option_val}',
+        f'--stat-cache-max-size-mb={metadata_cache_option_val}',
+        f'--type-cache-max-size-mb={metadata_cache_option_val}',
+        f'--metadata-cache-negative-ttl-secs={metadata_cache_option_val}',
+        f'--kernel-list-cache-ttl-secs={metadata_cache_option_val}',
+    ]
+    all_mount_options = (
+        self.DEFAULT_MOUNT_OPTIONS
+        + FLAGS.mount_options
+        + metadata_cache_options
+    )
+    if FLAGS.gcs_fuse_enable_file_cache:
+      all_mount_options += self.FILE_CACHE_OPTIONS
+
+    opts = ' '.join(all_mount_options)
     bucket_name = (
         FLAGS.object_storage_fuse_bucket_name or f'gcsfuse-{FLAGS.run_uri}'
     )

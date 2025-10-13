@@ -129,6 +129,10 @@ class Bucket(resource.BaseResource):
       with self._BUCKET_NAME_LOCK:
         self._BUCKETS_CREATED.discard(self.bucket_name)
 
+  def GetDevicePath(self) -> str:
+    """Returns the device path of the bucket."""
+    return self.mount_point
+
 
 class ObjectStorageService(
     metaclass=AutoRegisterObjectStorageMeta

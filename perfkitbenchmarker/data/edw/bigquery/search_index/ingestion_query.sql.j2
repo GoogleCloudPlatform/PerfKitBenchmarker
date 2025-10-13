@@ -1,18 +1,12 @@
-LOAD DATA INTO {{table_name}}
-(
-    event_timestamp TIMESTAMP,
-    insert_id STRING,
-    hostname STRING,
-    process_id INT64,
-    parent_process_id INT64,
-    user_name STRING,
-    command_line STRING,
-    file_path STRING,
-    ip_address STRING,
-    raw_log STRING
-)
-FROM FILES (
-  format = 'CSV',
-  uris = ['{{ storage_path }}/*.csv'],
-  skip_leading_rows = 1
-  );
+{# INSERT INTO statements are not subject to any quota (unlike LOAD DATA). But
+they require declaring an external table (which is cheap because BQ doesn't try
+to cache anything unless it's explicitly instructed to do so). #}
+
+CREATE EXTERNAL TABLE tmpload_{{table_name}}_{{random_id}}
+OPTIONS (
+  format ="CSV",
+  uris = ['{{ storage_path }}/*.csv']
+);
+INSERT INTO {{table_name}}
+SELECT * FROM tmpload_{{table_name}}_{{random_id}};
+DROP TABLE tmpload_{{table_name}}_{{random_id}};

@@ -17,6 +17,7 @@ This class is responsible to provide helper methods for IAAS relational
 database.
 """
 
+import logging
 import ntpath
 import os
 
@@ -118,7 +119,9 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
       self.replica_vms = vm_groups["servers_replicas"]
       self.controller_vm = vm_groups["controller"][0]
 
-  def MoveSQLServerTempDb(self):
+  def MoveSQLServerTempDb(
+      self, tempdb_disk=TEMPDB_DISK_LETTER, restart_sql=True
+  ):
     """Moves the SQL Server temporary database to LocalSSD."""
     vms = [self.server_vm]
     if self.spec.high_availability_type == "AOAG" and self.replica_vms:
@@ -145,6 +148,9 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
             "FROM sys.master_files "
             "f WHERE f.database_id"
             " = DB_ID('tempdb');\""
+            " -U {} -P {}".format(
+                self.spec.database_username, self.spec.database_password
+            )
         )
         tmp_db_files_list = [
             str(tmp_file.strip().replace("\r", ""))
@@ -157,12 +163,91 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
           vm.RemoteCommand(
               'sqlcmd -Q "ALTER DATABASE tempdb '
               "MODIFY FILE (NAME = [{}], "
-              "FILENAME = '{}:\\TEMPDB\\{}');\"".format(
-                  tmp_db_name, self.TEMPDB_DISK_LETTER, tmp_db_file
+              "FILENAME = '{}:\\TEMPDB\\{}');\" -U {} -P {}".format(
+                  tmp_db_name, tempdb_disk, tmp_db_file,
+                  self.spec.database_username, self.spec.database_password,
               )
           )
 
-        vm.RemoteCommand("Restart-Service MSSQLSERVER -Force")
+        if restart_sql:
+          vm.RemoteCommand("Restart-Service MSSQLSERVER -Force")
+
+  def MoveLogAndTempDbFiles(self):
+    """Moves the SQL Server log and tempdb to other available cluster disks."""
+    if (
+        self.spec.high_availability_type != "FCIMW"
+        or FLAGS.db_num_striped_disks == 1
+    ):
+      return
+
+    stdout, _ = self.server_vm.RemoteCommand(
+        """
+        Get-ClusterResource | ? { $_.ResourceType.Name -eq "Physical Disk" } | Where-Object {$_.OwnerGroup -eq "Available Storage"} | % {
+        $resourceName = $_.Name
+        $resource  = gwmi MSCluster_Resource -Namespace root/mscluster |
+              ? { $_.Name -eq $resourceName }
+        $disk = gwmi -Namespace root/mscluster -Query `
+              "ASSOCIATORS OF {$resource} WHERE ResultClass=MSCluster_Disk"
+        $partition = gwmi -Namespace root/mscluster -Query `
+              "ASSOCIATORS OF {$disk} WHERE ResultClass=MSCluster_DiskPartition"
+        $partition | select Path}
+        """
+    )
+
+    drive_list = [
+        str(drive.strip().replace("\r", ""))
+        for drive in stdout.split("\n")
+        if drive and drive.strip().endswith(":")
+    ]
+
+    if not drive_list:
+      logging.warning(
+          "No available cluster disks found. Skipping log and tempdb moves."
+      )
+      return
+    elif len(drive_list) == 1:
+      tempdb_disk = drive_list[0][:-1]
+      logdb_disk = tempdb_disk
+    else:
+      tempdb_disk = drive_list[0][:-1]
+      logdb_disk = drive_list[1][:-1]
+
+    # Adds all available cluster disks to the SQL Server role
+    # and adds dependency for SQL on the newly added disks
+    self.PushAndRunPowershellScript(
+        self.server_vm, "add_available_cluster_disks2_sql.ps1",
+    )
+
+    # Creates the LOGDB directory on the new logdb disk
+    self.server_vm.RemoteCommand(
+        f"$Path = '{logdb_disk}:\\MSSQL\\LOGDB'; "
+        'if (-not (Test-Path -Path $Path)) '
+        '{ New-Item -Path $Path -ItemType Directory }'
+    )
+
+    # Sets the default log database to the new log disk
+    self.server_vm.RemoteCommand(
+        f"sqlcmd -U {self.spec.database_username} "
+        f'-P {self.spec.database_password} -Q "EXEC xp_instance_regwrite'
+        " N'HKEY_LOCAL_MACHINE',"
+        " N'Software\\Microsoft\\MSSQLServer\\MSSQLServer', N'DefaultLog',"
+        f" REG_SZ, N'{logdb_disk}:\\MSSQL\\LOGDB'\""
+    )
+
+    # Creates the TEMPDB directory on the new tempdb disk
+    self.server_vm.RemoteCommand(
+        f"$Path = '{tempdb_disk}:\\TEMPDB'; "
+        'if (-not (Test-Path -Path $Path)) '
+        '{ New-Item -Path $Path -ItemType Directory }'
+    )
+
+    # Moves the SQL Server temporary database to the new cluster disk
+    self.MoveSQLServerTempDb(tempdb_disk, restart_sql=False)
+    # SQL Server service restart on clustered SQL server will automatically
+    # failover to the replica. Restarting cluster resource to ensure
+    # SQL Server service is restarted correctly on the primary.
+    self.server_vm.RemoteCommand("Stop-ClusterResource -Name 'SQL Server'")
+    self.server_vm.RemoteCommand("Get-ClusterGroup | Start-ClusterGroup")
 
   def _SetupWindowsUnamangedDatabase(self):
     self.spec.database_username = "sa"
@@ -172,6 +257,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
       if (self.spec.high_availability_type == "FCIMW"
           or self.spec.high_availability_type == "FCIS2D"):
         self.ConfigureSQLServerHaFci()
+        self.MoveLogAndTempDbFiles()
       elif self.spec.high_availability_type == "AOAG":
         self.ConfigureSQLServerHaAoag()
         ConfigureSQLServer(

@@ -118,6 +118,9 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     self.enter_context(flagsaver.flagsaver(kubeconfig='kubeconfig'))
     self.enter_context(flagsaver.flagsaver(run_uri='123'))
+    self.enter_context(
+        mock.patch('perfkitbenchmarker.providers.LoadProvider', autospec=True)
+    )
     self.kubernetes_cluster = TestKubernetesCluster(
         container_spec.ContainerClusterSpec(
             'test-cluster',
@@ -429,9 +432,41 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
             ),
             message='gke-49fe-vm became leader',
             reason='LeaderElection',
+            type='Normal',
             timestamp=1739209338,
         ),
     )
+
+  def test_KubernetesEventParsing(self):
+    event = container_service.KubernetesEvent.FromDict({
+        'eventTime': '2025-10-03T18:05:56.272315Z',
+        'involvedObject': {
+            'apiVersion': 'v1',
+            'kind': 'Pod',
+            'name': 'kubernetes-scaleup-5d6c5f45cf-wtbmv',
+            'namespace': 'default',
+            'uid': '8c0f9844-cb1f-4563-a3bc-fc75e3a2fc3f',
+        },
+        'kind': 'Event',
+        'lastTimestamp': None,
+        'message': (
+            'Successfully assigned default/deploy-pod to gke-node'
+        ),
+        'metadata': {
+            'creationTimestamp': '2025-10-03T18:05:56Z',
+        },
+        'reason': 'Scheduled',
+        'reportingComponent': 'default-scheduler',
+        'type': 'Normal',
+    })
+    self.assertIsNotNone(event)
+    self.assertEqual(
+        event.message,
+        'Successfully assigned default/deploy-pod to gke-node'
+    )
+    self.assertEqual(event.reason, 'Scheduled')
+    self.assertEqual(event.type, 'Normal')
+    self.assertEqual(event.timestamp, 1759514756)
 
 
 def _ClearTimestamps(samples: Iterable[Sample]) -> Iterable[Sample]:

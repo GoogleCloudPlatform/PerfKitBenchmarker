@@ -334,7 +334,7 @@ sparksql_tpcds_1t_tuned:
       vm_spec:
         GCP:
           num_local_ssds: 0
-      disk_count: 4
+      disk_count: 3
       disk_spec:
         GCP:
           disk_size: 320
@@ -401,23 +401,29 @@ mysql_sysbench_tpcc:
     sysbench_use_fk: False
     sysbench_txn_isolation_level: RC
 
+postgresql_sysbench_oltp_base: &postgresql_sysbench_oltp_base
+  sysbench_table_size: 21000000
+  sysbench_tables: 8
+  postgresql_shared_buffer_size: 42G
+  sar: True
+
 postgres_sysbench_oltp_read_write:
   name: unmanaged_postgresql_sysbench
   flags:
     sysbench_testname: oltp_read_write
-    <<: *sysbench_oltp_base
+    <<: *postgresql_sysbench_oltp_base
 
 postgres_sysbench_oltp_read_only:
   name: unmanaged_postgresql_sysbench
   flags:
     sysbench_testname: oltp_read_only
-    <<: *sysbench_oltp_base
+    <<: *postgresql_sysbench_oltp_base
 
 postgres_sysbench_oltp_write_only:
   name: unmanaged_postgresql_sysbench
   flags:
     sysbench_testname: oltp_write_only
-    <<: *sysbench_oltp_base
+    <<: *postgresql_sysbench_oltp_base
 
 postgres_sysbench_tpcc:
   name: unmanaged_postgresql_sysbench
@@ -438,6 +444,16 @@ fio_latency:
     fio_num_jobs: 1
     fio_runtime: 300
     fio_target_mode: against_device_with_fill
+
+fio_object_storage_latency_8kb:
+  name: fio_object_storage
+  flags:
+    fio_generate_scenarios: rand_8k_read_800KB_iodepth-1_numjobs-1
+    fio_fill_size: 800K
+    fio_fill_block_size: 8k
+    fio_nr_files: 100
+    fio_ramptime: 0
+    fio_runtime: 0
 
 gpu_jobs_provisioning:
   name: jobs_benchmark
@@ -476,9 +492,9 @@ hadoop_dfsio:
       disk_count: 3
       disk_spec:
         GCP:
-          disk_size: 6830
+          disk_size: 9200
           disk_type: hyperdisk-throughput
-          provisioned_throughput: 600
+          provisioned_throughput: 800
 
 diskspd_read_only:
   name: diskspd

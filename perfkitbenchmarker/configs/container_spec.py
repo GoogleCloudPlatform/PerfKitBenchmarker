@@ -23,6 +23,7 @@ from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -395,6 +396,13 @@ class ContainerClusterSpec(spec.BaseSpec):
           '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
           'configuration for "{1}".'.format(component_full_name, self.cloud)
       )
+    # LoadProvider to load the relevant VmSpec subclasses before fetching one.
+    ignore_package_requirements = (
+        getattr(flag_values, 'ignore_package_requirements', True)
+        if flag_values
+        else True
+    )
+    providers.LoadProvider(self.cloud, ignore_package_requirements)
     vm_spec_class = virtual_machine.GetVmSpecClass(
         self.cloud, provider_info.DEFAULT_VM_PLATFORM
     )

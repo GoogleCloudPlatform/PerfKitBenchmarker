@@ -1146,6 +1146,24 @@ message: The zone 'projects/artemis-prod/zones/us-central1-b' does not have enou
       )
 
 
+class UtilsTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  @parameterized.parameters(
+      ('h100', 8, 'type=nvidia-h100-80gb,count=8'),
+      ('l4', 1, 'type=nvidia-l4,count=1'),
+      ('k80', 1, 'type=nvidia-tesla-k80,count=1'),
+  )
+  def testGenerateAcceleratorSpecString(
+      self, accelerator_type, accelerator_count, expected
+  ):
+    self.assertEqual(
+        expected,
+        gce_virtual_machine.GenerateAcceleratorSpecString(
+            accelerator_type, accelerator_count
+        ),
+    )
+
+
 class GceFirewallRuleTest(pkb_common_test_case.PkbCommonTestCase):
 
   @mock.patch('time.sleep', side_effect=lambda _: None)

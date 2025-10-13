@@ -244,7 +244,7 @@ class PythonClientInterface(SnowflakeClientInterface):
     ]
     cmd_parts.extend(additional_args)
     cmd = ' '.join(cmd_parts)
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
     return stdout
 
   def ExecuteQuery(
@@ -655,17 +655,9 @@ class Snowflake(edw_service.EdwService):
     res, meta = self.client_interface.ExecuteQuery(
         query_name, print_results=True
     )
-
-    meta['edw_search_index_coverage_percentage'] = int(
-        meta['query_results']['COVERAGE_PERCENTAGE'][0]
-    )
     meta['edw_search_result_rows'] = int(
         meta['query_results']['RESULT_ROWS'][0]
     )
-    meta['edw_search_total_row_count'] = int(
-        meta['query_results']['TOTAL_ROW_COUNT'][0]
-    )
-
     return res, meta
 
   def SetWarehouse(self, warehouse: str):

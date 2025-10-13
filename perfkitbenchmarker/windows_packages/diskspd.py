@@ -23,6 +23,7 @@ import copy
 import logging
 import ntpath
 import re
+import time
 import xml.etree.ElementTree
 
 from absl import flags
@@ -255,14 +256,25 @@ def EnablePrefill():
 def _RunDiskSpd(running_vm, outstanding_io, threads, metadata):
   """Run single iteration of Diskspd test."""
   diskspd_config = _GenerateDiskspdConfig(outstanding_io, threads)
-  _RunDiskSpdWithOptions(running_vm, diskspd_config)
-  result_xml = _CatXml(running_vm)
-  if not EnablePrefill():
-    # Only remove the temp file if we did not prefill the file.
-    _RemoveTempFile(running_vm)
-  _RemoveXml(running_vm)
-
-  return ParseDiskSpdResults(result_xml, metadata)
+  try:
+    _RunDiskSpdWithOptions(running_vm, diskspd_config)
+    result_xml = _CatXml(running_vm)
+    if not EnablePrefill():
+      # Only remove the temp file if we did not prefill the file.
+      _RemoveTempFile(running_vm)
+    _RemoveXml(running_vm)
+    return ParseDiskSpdResults(result_xml, metadata)
+  except errors.VirtualMachine.RemoteCommandError as e:
+    # Diskspd gets unstable for higher pending requests and doesn't return
+    # results.
+    if 'Got non-zero return code (1) executing' in str(e):
+      logging.exception(
+          'Diskspd failed to run for %s threads and %s outstanding IOs',
+          threads,
+          outstanding_io,
+      )
+      return []
+    raise e
 
 
 def _GenerateDiskspdConfig(outstanding_io, threads):
@@ -341,13 +353,16 @@ def RunDiskSpd(running_vm):
                 metadata,
             )
         )
+        time.sleep(
+            60
+        )  # Sleep for 60 seconds after each test run for disk cooldown.
       except errors.VirtualMachine.RemoteCommandError as e:
         if 'Could not allocate a buffer for target' in str(e):
           logging.exception(
               'Diskspd is not able to allocate buffer for this configuration,'
               ' try using smaller block size or reduce outstanding io or'
               ' threads: %s',
-              e
+              e,
           )
           if not sample_list:
             # No successful run till now, higher outstanding io and/or thread
@@ -355,8 +370,51 @@ def RunDiskSpd(running_vm):
             raise e
         else:
           raise e
-
+  if not sample_list:
+    raise errors.Benchmarks.RunError(
+        'Diskspd failed to run for all thread/IO configurations. Review the'
+        ' logs and try smaller requests.'
+    )
+  sample_list.extend(_CalculateMaxMetric(sample_list))
   return sample_list
+
+
+def _CalculateMaxMetric(sample_list):
+  """Calculate the max metric from the sample list."""
+  iops_metric = 'total_iops'
+  throughput_metric = 'total_bandwidth'
+  max_iops_sample = None
+  max_throughput_sample = None
+  max_samples = []
+  for sample_item in sample_list:
+    if sample_item.metric == iops_metric and (
+        max_iops_sample is None or sample_item.value > max_iops_sample.value
+    ):
+      max_iops_sample = sample_item
+    if sample_item.metric == throughput_metric and (
+        max_throughput_sample is None
+        or sample_item.value > max_throughput_sample.value
+    ):
+      max_throughput_sample = sample_item
+  if max_iops_sample is not None:
+    max_samples.append(
+        sample.Sample(
+            'max_' + iops_metric,
+            max_iops_sample.value,
+            max_iops_sample.unit,
+            max_iops_sample.metadata,
+        )
+    )
+  if max_throughput_sample is not None:
+    max_samples.append(
+        sample.Sample(
+            'max_' + throughput_metric,
+            max_throughput_sample.value,
+            max_throughput_sample.unit,
+            max_throughput_sample.metadata,
+        )
+    )
+  return max_samples
 
 
 def Prefill(running_vm):
@@ -383,12 +441,12 @@ def Prefill(running_vm):
 
   prefill_samples = ParseDiskSpdResults(result_xml, {})
   for prefill_sample in prefill_samples:
-    if prefill_sample.metric != 'write_bandwidth':
+    if prefill_sample.metric != 'write_throughput':
       continue
-    write_bandwidth = prefill_sample.value
+    write_throughput = prefill_sample.value
     total_seconds = float(prefill_sample.metadata['TestTimeSeconds'])
     total_data_written, unit = GetDiskspdFileSizeInPrefillSizeUnit(
-        write_bandwidth, total_seconds
+        write_throughput, total_seconds
     )
     logging.info('Prefill Data written: %s %s', total_data_written, unit)
     if total_data_written < float(DISKSPD_FILE_SIZE.value[0:-1]):
@@ -399,17 +457,17 @@ def Prefill(running_vm):
 
 
 def GetDiskspdFileSizeInPrefillSizeUnit(
-    write_bandwidth: float, test_duration: float
-) -> float:
+    write_throughput: float, test_duration: float
+) -> tuple[float, str]:
   """Returns the diskspd file size in GB."""
   unit = DISKSPD_FILE_SIZE.value[-1]
   written_data = 0
   if unit == 'G':
-    written_data = (write_bandwidth * test_duration) / 1024
+    written_data = (write_throughput * test_duration) / 1024
   elif unit == 'M':
-    written_data = write_bandwidth * test_duration
+    written_data = write_throughput * test_duration
   elif unit == 'K':
-    written_data = (write_bandwidth * test_duration) * 1024
+    written_data = (write_throughput * test_duration) * 1024
   return written_data, unit
 
 
