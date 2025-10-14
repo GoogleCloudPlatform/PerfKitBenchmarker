@@ -373,8 +373,12 @@ class EksCluster(BaseEksCluster):
       vm_config: virtual_machine.BaseVirtualMachine,
       nodepool_config: container_service.BaseNodePoolConfig,
   ):
-    nodepool_config.disk_type = vm_config.DEFAULT_ROOT_DISK_TYPE  # pytype: disable=attribute-error
-    nodepool_config.disk_size = vm_config.boot_disk_size  # pytype: disable=attribute-error
+    nodepool_config.disk_type = (
+        vm_config.DEFAULT_ROOT_DISK_TYPE
+    )  # pytype: disable=attribute-error
+    nodepool_config.disk_size = (
+        vm_config.boot_disk_size
+    )  # pytype: disable=attribute-error
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -539,9 +543,7 @@ class EksAutoCluster(BaseEksCluster):
   def __init__(self, spec):
     super().__init__(spec)
     self._ChooseSecondZone()
-    is_rare_gpu = (
-        virtual_machine.GPU_TYPE.value in _RARE_GPU_TYPES
-    )
+    is_rare_gpu = virtual_machine.GPU_TYPE.value in _RARE_GPU_TYPES
     self.use_spot: bool = aws_flags.USE_AWS_SPOT_INSTANCES.value or is_rare_gpu
 
   def InitializeNodePoolForCloud(
@@ -647,6 +649,9 @@ class EksKarpenterCluster(BaseEksCluster):
     self._ChooseSecondZone()
     self.stack_name = f'Karpenter-{self.name}'
     self.cluster_version: str = self.cluster_version or _DEAULT_K8S_VERSION
+    # Add spot instance support similar to EksAutoCluster
+    is_rare_gpu = virtual_machine.GPU_TYPE.value in _RARE_GPU_TYPES
+    self.use_spot: bool = aws_flags.USE_AWS_SPOT_INSTANCES.value or is_rare_gpu
 
   def InitializeNodePoolForCloud(
       self,
@@ -695,9 +700,7 @@ class EksKarpenterCluster(BaseEksCluster):
             }],
         },
         'iamIdentityMappings': [{
-            'arn': (
-                f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}'
-            ),
+            'arn': f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}',
             'username': 'system:node:{{EC2PrivateDNSName}}',
             'groups': ['system:bootstrappers', 'system:nodes'],
         }],
@@ -738,6 +741,27 @@ class EksKarpenterCluster(BaseEksCluster):
         'logLevel=debug',
         '--wait',
     ])
+    # Create AWSServiceRoleForEC2Spot
+    if self.use_spot:
+      stdout, stderr, retcode = vm_util.IssueCommand(
+          [
+              'aws',
+              'iam',
+              'create-service-linked-role',
+              '--aws-service-name',
+              'spot.amazonaws.com',
+          ],
+          raise_on_failure=False,
+      )
+
+      if retcode:
+        logging.warning(
+            'Failed to create service linked role spot.amazonaws.com: %s,'
+            ' error: %s',
+            stdout,
+            stderr,
+        )
+
     # Get the AMI version for current kubernetes version.
     # See e.g. https://karpenter.sh/docs/tasks/managing-amis/ for not using
     # @latest.
@@ -772,11 +796,14 @@ class EksKarpenterCluster(BaseEksCluster):
         'container/karpenter/nodepool.yaml.j2',
         CLUSTER_NAME=self.name,
         ALIAS_VERSION=alias_version,
+        USE_SPOT=self.use_spot,
+        GPU_TYPE=virtual_machine.GPU_TYPE.value
+        if virtual_machine.GPU_TYPE.value
+        else None,
     )
 
   def _Delete(self):
     """Deletes the control plane and worker nodes."""
-    super()._Delete()
     cmd = [
         FLAGS.eksctl,
         'delete',
@@ -816,10 +843,27 @@ class EksKarpenterCluster(BaseEksCluster):
 
   def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
     """Gets the node selectors section of a yaml for the provider."""
-    machine_family = util.GetMachineFamily(machine_type)
+    selectors = []
+
+    # Machine family selector
+    machine_family = util.GetMachineFamily(self.default_nodepool.machine_type)
     if machine_family:
-      return [f'karpenter.k8s.aws/instance-family: {machine_family}']
-    return []
+      selectors.append(f'karpenter.k8s.aws/instance-family: {machine_family}')
+
+    # Spot instance selector
+    if self.use_spot:
+      selectors.append('karpenter.sh/capacity-type: spot')
+    else:
+      selectors.append('karpenter.sh/capacity-type: on-demand')
+
+    # GPU selector for Karpenter
+    if virtual_machine.GPU_TYPE.value:
+      selectors.append(
+          'karpenter.k8s.aws/instance-gpu-name:'
+          f' {virtual_machine.GPU_TYPE.value}'
+      )
+
+    return selectors
 
   def GetNodePoolNames(self) -> list[str]:
     """Gets node pool names for the cluster.
