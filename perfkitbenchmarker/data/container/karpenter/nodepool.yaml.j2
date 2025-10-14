@@ -14,7 +14,12 @@ spec:
           values: ["linux"]
         - key: karpenter.sh/capacity-type
           operator: In
-          values: ["on-demand"]
+          values: {% if USE_SPOT %}["spot"]{% else %}["on-demand"]{% endif %}
+        {% if GPU_TYPE -%}
+        - key: karpenter.k8s.aws/instance-gpu-name
+          operator: In
+          values: ["{{ GPU_TYPE }}"]
+        {% endif -%}
         - key: karpenter.k8s.aws/instance-category
           operator: In
           values: ["c", "m", "r"]
@@ -39,7 +44,7 @@ metadata:
 spec:
   role: "KarpenterNodeRole-{{CLUSTER_NAME}}"
   amiSelectorTerms:
-    - alias: "al2023@{{ALIAS_VERSION}}"
+    - alias: {% if GPU_TYPE %}"al2023@{{ALIAS_VERSION}}"{% else %}"al2023@{{ALIAS_VERSION}}"{% endif %}
   subnetSelectorTerms:
     - tags:
         karpenter.sh/discovery: "{{CLUSTER_NAME}}"
