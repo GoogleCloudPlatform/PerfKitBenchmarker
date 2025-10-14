@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from unittest import mock
+from urllib import parse
 from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import container_service
@@ -384,6 +385,36 @@ class EksKarpenterTest(BaseEksTest):
         expected,
         elastic_kubernetes_service.RecursivelyUpdateDictionary(base, update),
     )
+
+  def testIngressAddressParsing(self):
+    """Test parsing AWS ALB address with dualstack prefix removal."""
+    test_cases = [
+        (
+            'http://dualstack.k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+        ),
+        (
+            'https://dualstack.k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+        ),
+        (
+            'dualstack.k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+        ),
+        (
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+        ),
+    ]
+    for address, expected in test_cases:
+      with self.subTest(address=address):
+        host = (
+            parse.urlparse(address).hostname
+            if address.startswith('http')
+            else address
+        )
+        normalized = (host or '').replace('dualstack.', '')
+        self.assertEqual(normalized, expected)
 
 
 if __name__ == '__main__':

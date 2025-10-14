@@ -68,6 +68,7 @@ kubernetes_hpa:
 """
 
 _PORT = 5000
+_HEALTH_PATH = '/calculate'
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -132,7 +133,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
   cluster: container_service.KubernetesCluster = typing.cast(
       container_service.KubernetesCluster, benchmark_spec.container_cluster
   )
-  addr = cluster.DeployIngress('fib', 'fib', _PORT)
+  addr = cluster.DeployIngress('fib', 'fib', _PORT, _HEALTH_PATH)
 
   # Confirm the server can be pinged.
   _PollServer(vm, addr)

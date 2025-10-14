@@ -1739,17 +1739,21 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     """Get the node selectors section of a yaml for the provider."""
     return []
 
-  def DeployIngress(self, name: str, namespace: str, port: int) -> str:
+  def DeployIngress(
+      self, name: str, namespace: str, port: int, health_path: str = ''
+  ) -> str:
     """Deploys an Ingress/load balancer resource to the cluster.
 
     Args:
       name: The name of the Ingress resource.
       namespace: The namespace of the resource.
       port: The port to expose to the internet.
+      health_path: The path to use for health checks.
 
     Returns:
       The address of the Ingress.
     """
+    del health_path
     self.ApplyManifest(
         'container/loadbalancer.yaml.j2',
         name=name,
