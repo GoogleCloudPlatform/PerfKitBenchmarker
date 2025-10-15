@@ -461,11 +461,11 @@ class AksCluster(container_service.KubernetesCluster):
       nodepools = json.loads(stdout)
       return [nodepool['name'] for nodepool in nodepools]
 
-  def AddNodepool(self, batch_name, id):
+  def AddNodepool(self, batch_name, pool_id):
     self.ApplyManifest(
         'provision_node_pools/aks/nodepool.yaml.j2',
         batch=batch_name,
-        id=id,
+        id=pool_id,
         cluster_name=self.name,
     )
 

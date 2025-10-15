@@ -107,7 +107,7 @@ def _CreateJobsAndWait(
 
   apply_start = time.monotonic()
   for i in range(jobs):
-    cluster.AddNodepool(batch_name, id="{:03d}".format(i + 1))
+    cluster.AddNodepool(batch_name, pool_id="{:03d}".format(i + 1))
     cluster.ApplyManifest(
         JOB_MANIFEST_TEMPLATE,
         batch=batch_name,
