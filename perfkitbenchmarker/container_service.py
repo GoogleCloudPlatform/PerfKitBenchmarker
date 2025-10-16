@@ -636,6 +636,9 @@ class BaseContainerCluster(resource.BaseResource):
         'nodepools': nodepools_metadata,
     }
 
+    if virtual_machine.GPU_TYPE.value:
+      metadata['gpu_type'] = virtual_machine.GPU_TYPE.value
+
     if (
         self.min_nodes != self.default_nodepool.num_nodes
         or self.max_nodes != self.default_nodepool.num_nodes
