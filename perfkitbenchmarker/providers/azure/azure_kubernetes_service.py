@@ -462,6 +462,7 @@ class AksCluster(container_service.KubernetesCluster):
       return [nodepool['name'] for nodepool in nodepools]
 
   def AddNodepool(self, batch_name, pool_id):
+    """Add a Karpenter NodePool and AKSNodeClass to the AKS cluster."""
     self.ApplyManifest(
         'provision_node_pools/aks/nodepool.yaml.j2',
         batch=batch_name,
