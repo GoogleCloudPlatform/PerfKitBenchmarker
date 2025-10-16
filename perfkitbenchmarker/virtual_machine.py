@@ -725,6 +725,10 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       return [self.internal_ip]
     return []
 
+  def GetLocalhostAddr(self):
+    """Returns ::1 if use_ipv6 is set, and localhost otherwise."""
+    return '::1' if pkb_flags.FLAGS.use_ipv6 else 'localhost'
+
   def SetDiskSpec(self, disk_spec, disk_count):
     """Set Disk Specs of the current VM."""
     # This method will be depreciate soon.
