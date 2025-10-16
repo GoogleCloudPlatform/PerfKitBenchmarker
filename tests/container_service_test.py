@@ -136,9 +136,10 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         )
     )
 
-  def test_apply_manifest_gets_deployment_name(self):
+  @parameterized.parameters(('created'), ('configured'))
+  def test_apply_manifest_gets_deployment_name(self, suffix):
     self.MockIssueCommand(
-        {'apply -f': [('deployment.apps/test-deployment created', '', 0)]}
+        {'apply -f': [(f'deployment.apps/test-deployment {suffix}', '', 0)]}
     )
     self.enter_context(
         mock.patch.object(

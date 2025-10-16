@@ -123,13 +123,27 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   cluster = bm_spec.container_cluster
   assert isinstance(cluster, container_service.KubernetesCluster)
 
-  initial_nodes = set(cluster.GetNodeNames())
+  # Warm up the cluster by creating a single pod. This compensates for
+  # differences between Standard & Autopilot, where Standard already has 1 node
+  # due to its starting nodepool but Autopilot does not.
+  scale_one_samples, _ = ScaleUpPods(cluster, 1)
+  if not scale_one_samples:
+    logging.exception(
+        'Failed to scale up to 1 pod; now investigating failure reasons.'
+    )
+    unused = 0
+    pod_samples = ParseStatusChanges('pod', unused)
+    # Log & check for quota failure.
+    _CheckForFailures(cluster, pod_samples, 1)
 
-  samples, rollout_name = ScaleUpPods(cluster)
+  initial_nodes = set(cluster.GetNodeNames())
+  initial_pods = set(cluster.GetPodNames())
+
+  samples, rollout_name = ScaleUpPods(cluster, NUM_PODS.value)
   start_time = _GetRolloutCreationTime(rollout_name)
-  pod_samples = ParseStatusChanges('pod', start_time)
+  pod_samples = ParseStatusChanges('pod', start_time, initial_pods)
   samples += pod_samples
-  _CheckForFailures(cluster, pod_samples)
+  _CheckForFailures(cluster, pod_samples, NUM_PODS.value - 1)
   samples += ParseStatusChanges(
       'node', start_time, resources_to_ignore=initial_nodes
   )
@@ -149,6 +163,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
 
 def ScaleUpPods(
     cluster: container_service.KubernetesCluster,
+    num_new_pods: int,
 ) -> tuple[list[sample.Sample], str]:
   """Scales up pods on a kubernetes cluster. Returns samples & rollout name."""
   samples = []
@@ -162,7 +177,6 @@ def ScaleUpPods(
     command = ['sh', '-c', 'sleep infinity']
 
   # Request X new pods via YAML apply.
-  num_new_pods = NUM_PODS.value
   max_wait_time = _GetScaleTimeout()
   resource_names = cluster.ApplyManifest(
       MANIFEST_TEMPLATE,
@@ -182,7 +196,6 @@ def ScaleUpPods(
       cloud='Azure' if FLAGS.cloud == 'Azure' else None,
   )
 
-  # Arbitrarily pick the first resource (it should be the only one.)
   assert resource_names
   rollout_name = next(resource_names)
 
@@ -217,10 +230,12 @@ def ScaleUpPods(
       errors.VmUtil.IssueCommandTimeoutError,
       vm_util.TimeoutExceededRetryError,
   ) as e:
-    logging.warning(
-        'Kubernetes failed to wait for all the rollout and/or all pods to be'
-        ' ready, even with retries. Full error: %s. Continuing for now. Failure'
-        ' will be checked later by number of pods with ready events.',
+    logging.exception(
+        'Kubernetes waited %s seconds for the rollout to complete and/or all'
+        ' pods to be ready, but they were not, even with retries. Full error:'
+        ' %s. Continuing for now. Failure will be checked later by number of'
+        ' pods with ready events.',
+        max_wait_time,
         e,
     )
     return [], rollout_name
@@ -229,6 +244,7 @@ def ScaleUpPods(
 def _CheckForFailures(
     cluster: container_service.KubernetesCluster,
     pod_samples: list[sample.Sample],
+    num_pods: int,
 ):
   """Fails the benchmark if not enough pods were created.
 
@@ -236,6 +252,7 @@ def _CheckForFailures(
     cluster: The cluster to check for failures on.
     pod_samples: The samples from pod transition times which includes pod Ready
       count.
+    num_pods: The number of pods we attempted to scale up to.
 
   Raises:
     QuotaFailure: If a quota is exceeded.
@@ -269,13 +286,13 @@ def _CheckForFailures(
   )
   if (
       ready_count_sample is not None
-      and ready_count_sample.value >= NUM_PODS.value
+      and ready_count_sample.value >= num_pods
   ):
     logging.info(
         'Benchmark successfully scaled up %d pods, which is equal to or more '
         'than the goal of %d pods.',
         ready_count_sample.value,
-        NUM_PODS.value,
+        num_pods,
     )
     return
   if 'FailedScaleUp' in failure_events_by_reason:
@@ -283,18 +300,18 @@ def _CheckForFailures(
       if 'quota exceeded' in event.message:
         raise errors.Benchmarks.QuotaFailure(
             'Failed to scale up to %d pods, at least one pod ran into a quota'
-            ' error: %s' % (NUM_PODS.value, event.message)
+            ' error: %s' % (num_pods, event.message)
         )
   if ready_count_sample is None:
     raise errors.Benchmarks.RunError(
         'No pod ready events were found & we attempted to scale up to'
-        f' {NUM_PODS.value} pods.'
+        f' {num_pods} pods.'
     )
 
   raise errors.Benchmarks.RunError(
       'Benchmark attempted to scale up to  %d pods but only %d pods were'
       ' created & ready. Check above "Kubernetes failed to wait for" logs for'
-      ' exact failure location.' % (NUM_PODS.value, ready_count_sample.value)
+      ' exact failure location.' % (num_pods, ready_count_sample.value)
   )
 
 

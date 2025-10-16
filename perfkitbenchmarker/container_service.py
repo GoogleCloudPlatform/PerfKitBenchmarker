@@ -1005,7 +1005,7 @@ class KubernetesClusterCommands:
       """Parses the output of kubectl apply to get the name of the resource."""
       # Example input: deployment.apps/pkb123 created
       for line in stdout.splitlines():
-        match = re.search(r'([^\s/]+/[^\s/]+) created', line)
+        match = re.search(r'([^\s/]+/[^\s/]+) (created|configured)', line)
         if match:
           yield match.group(1)
 
