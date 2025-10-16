@@ -17,6 +17,7 @@ import unittest
 from unittest import mock
 
 from absl import flags
+from absl.testing import flagsaver
 from perfkitbenchmarker import mysql_iaas_relational_db
 from perfkitbenchmarker import postgres_iaas_relational_db
 from perfkitbenchmarker import relational_db_spec
@@ -395,6 +396,62 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
     ]
 
     self.assertCountEqual(remote_command.call_args_list, command)
+
+  @flagsaver.flagsaver(db_num_striped_disks=2)
+  def testMoveLogAndTempDbFiles(self):
+    FLAGS['use_managed_db'].parse(False)
+    db = FakeSQLServerRelationalDb(self.sqlserver_spec)
+    db.spec.high_availability_type = 'FCIMW'
+    db.spec.database_username = 'sa'
+    db.spec.database_password = 'password'
+    server_vm = mock.MagicMock()
+    db.SetVms({'default': [CreateTestLinuxVm()], 'servers': [server_vm]})
+    db.server_vm.RemoteCommand.return_value = ('X:\r\nY:\r\n', '')
+
+    with mock.patch.object(
+        db, 'PushAndRunPowershellScript'
+    ) as run_script, mock.patch.object(
+        db, 'MoveSQLServerTempDb'
+    ) as move_temp_db:
+      db.MoveLogAndTempDbFiles()
+
+      run_script.assert_called_once_with(
+          db.server_vm, 'add_available_cluster_disks2_sql.ps1'
+      )
+      move_temp_db.assert_called_once_with('X', restart_sql=False)
+
+      command = [
+          mock.call("""
+        Get-ClusterResource | ? { $_.ResourceType.Name -eq "Physical Disk" } | Where-Object {$_.OwnerGroup -eq "Available Storage"} | % {
+        $resourceName = $_.Name
+        $resource  = gwmi MSCluster_Resource -Namespace root/mscluster |
+              ? { $_.Name -eq $resourceName }
+        $disk = gwmi -Namespace root/mscluster -Query `
+              "ASSOCIATORS OF {$resource} WHERE ResultClass=MSCluster_Disk"
+        $partition = gwmi -Namespace root/mscluster -Query `
+              "ASSOCIATORS OF {$disk} WHERE ResultClass=MSCluster_DiskPartition"
+        $partition | select Path}
+        """),
+          mock.call(
+              "$Path = 'Y:\\MSSQL\\LOGDB'; "
+              'if (-not (Test-Path -Path $Path)) '
+              '{ New-Item -Path $Path -ItemType Directory }'
+          ),
+          mock.call(
+              "sqlcmd -U sa -P password -Q \"EXEC xp_instance_regwrite"
+              " N'HKEY_LOCAL_MACHINE', "
+              "N'Software\\Microsoft\\MSSQLServer\\MSSQLServer', N'DefaultLog',"
+              " REG_SZ, N'Y:\\MSSQL\\LOGDB'\""
+          ),
+          mock.call(
+              "$Path = 'X:\\TEMPDB'; "
+              'if (-not (Test-Path -Path $Path)) '
+              '{ New-Item -Path $Path -ItemType Directory }'
+          ),
+          mock.call("Stop-ClusterResource -Name 'SQL Server'"),
+          mock.call('Get-ClusterGroup | Start-ClusterGroup'),
+      ]
+      self.assertCountEqual(db.server_vm.RemoteCommand.call_args_list, command)
 
 
 if __name__ == '__main__':

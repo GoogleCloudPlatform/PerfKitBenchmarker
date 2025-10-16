@@ -118,8 +118,7 @@ _TXN_ISOLATION_LEVEL = flags.DEFINE_enum(
     'sysbench_txn_isolation_level',
     'SER',
     ['SER', 'RR', 'RC'],
-    'If true, uses postgres-compatible benchmark script. Only used if'
-    ' --sysbench_testname=spanner_tpcc.',
+    'Set transaction isolation level. For Spanner, RC is not supported.',
 )
 _SKIP_LOAD_STAGE = flags.DEFINE_boolean(
     'sysbench_skip_load_stage',
@@ -672,19 +671,19 @@ def _GetSysbenchRunCommand(
       '--max-requests=0',
       '--time=%d' % duration,
   ]
-  # currently only enable Spanner RR on read write test
-  spanner_oltp_read_write = (
+  spanner_read_committed = (
       db.engine_type == sql_engine_utils.SPANNER_POSTGRES
-      and _GetSysbenchTestParameter() == 'oltp_read_write'
+      and _TXN_ISOLATION_LEVEL.value == 'RC'
   )
-  if spanner_oltp_read_write and _TXN_ISOLATION_LEVEL.value == 'RC':
+  if spanner_read_committed:
     logging.warning(
         'Spanner does not support RC isolation level, will ignore'
         ' sysbench_txn_isolation_level flag and defaulting to SER .'
     )
-  if _GetSysbenchTestParameter() == 'tpcc' or (
-      spanner_oltp_read_write and _TXN_ISOLATION_LEVEL.value != 'RC'
-  ):
+  if (
+      _GetSysbenchTestParameter() == 'tpcc'
+      or db.engine_type == sql_engine_utils.SPANNER_POSTGRES
+  ) and not spanner_read_committed:
     run_cmd_tokens.append('--trx_level=%s' % _TXN_ISOLATION_LEVEL.value)
   run_cmd = ' '.join(run_cmd_tokens + _GetCommonSysbenchOptions(db) + ['run'])
   run_cmd = 'cd ~/sysbench/ && ' + run_cmd

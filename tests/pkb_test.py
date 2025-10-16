@@ -78,7 +78,9 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     error_msg = 'error'
     self.provision_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
+    self.assertRaises(
+        Exception, pkb.RunBenchmark, self.spec, self.collector, False
+    )
     self.publish_failed_run_sample_mock.assert_called_once_with(
         self.spec, error_msg, stages.PROVISION, self.collector
     )
@@ -88,7 +90,9 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     error_msg = 'error'
     self.prepare_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
+    self.assertRaises(
+        Exception, pkb.RunBenchmark, self.spec, self.collector, False
+    )
     self.publish_failed_run_sample_mock.assert_called_once_with(
         self.spec, error_msg, stages.PREPARE, self.collector
     )
@@ -98,7 +102,9 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     error_msg = 'error'
     self.run_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
+    self.assertRaises(
+        Exception, pkb.RunBenchmark, self.spec, self.collector, False
+    )
     self.publish_failed_run_sample_mock.assert_called_once_with(
         self.spec, error_msg, stages.RUN, self.collector
     )
@@ -108,7 +114,9 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     error_msg = 'error'
     self.cleanup_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
+    self.assertRaises(
+        Exception, pkb.RunBenchmark, self.spec, self.collector, False
+    )
     self.publish_failed_run_sample_mock.assert_called_once_with(
         self.spec, error_msg, stages.CLEANUP, self.collector
     )
@@ -118,7 +126,9 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     error_msg = 'error'
     self.teardown_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
+    self.assertRaises(
+        Exception, pkb.RunBenchmark, self.spec, self.collector, False
+    )
     self.publish_failed_run_sample_mock.assert_called_once_with(
         self.spec, error_msg, stages.TEARDOWN, self.collector
     )
@@ -127,7 +137,9 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     self.flags_mock.create_failed_run_samples = False
     self.run_mock.side_effect = Exception('error')
 
-    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
+    self.assertRaises(
+        Exception, pkb.RunBenchmark, self.spec, self.collector, False
+    )
     self.publish_failed_run_sample_mock.assert_not_called()
 
 
@@ -780,7 +792,7 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
 
     # Run the benchmark loop.
     with self.assertRaises(Exception):
-      pkb.RunBenchmark(test_benchmark_spec, collector)
+      pkb.RunBenchmark(test_benchmark_spec, collector, False)
 
     # PKB should still attempt to freeze benchmark spec.
     mock_freeze.assert_called_once()

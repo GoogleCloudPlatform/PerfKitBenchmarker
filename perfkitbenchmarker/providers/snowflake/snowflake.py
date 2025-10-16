@@ -244,7 +244,7 @@ class PythonClientInterface(SnowflakeClientInterface):
     ]
     cmd_parts.extend(additional_args)
     cmd = ' '.join(cmd_parts)
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
     return stdout
 
   def ExecuteQuery(

@@ -80,7 +80,6 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
       errors.Config.InvalidValue upon invalid input value.
     """
     dpb_service_config = super().Decode(value, component_full_name, flag_values)
-
     if (
         dpb_service_config['service_type'] == dpb_constants.EMR
         and component_full_name == 'dpb_wordcount_benchmark'
@@ -92,6 +91,21 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
         flag_values,
         **dpb_service_config,
     )
+    # pytype: disable=attribute-error
+    non_default_legacy_runtime_engine = (
+        result.dataproc_serverless_runtime_engine != 'default'
+    )
+    non_default_engine = (
+        result.dataproc_serverless_engine
+        != dpb_constants.DATAPROC_DEFAULT_ENGINE
+    )
+    if non_default_legacy_runtime_engine and non_default_engine:
+      raise errors.Config.InvalidValue(
+          'Non-default legacy "dataproc_serverless_runtime_engine" config is'
+          ' not compatible with newer "dataproc_serverless_engine" config (for'
+          ' Lightning Engine).'
+      )
+    # pytype: enable=attribute-error
     return result
 
 
@@ -213,11 +227,34 @@ class _DpbServiceSpec(spec.BaseSpec):
             option_decoders.IntDecoder,
             {'default': None, 'none_ok': True},
         ),
-        'dataproc_serverless_runtime_engine': (
+        'dataproc_serverless_runtime_engine': (  # legacy "runtime engine"
             option_decoders.EnumDecoder,
             {
                 'valid_values': ('default', 'native'),
                 'default': 'default',
+            },
+        ),
+        # new "engine" config (to enable Lightning Engine)
+        'dataproc_serverless_engine': (
+            option_decoders.EnumDecoder,
+            {
+                'valid_values': (
+                    dpb_constants.DATAPROC_DEFAULT_ENGINE,
+                    dpb_constants.DATAPROC_LIGHTNING_ENGINE,
+                ),
+                'default': dpb_constants.DATAPROC_DEFAULT_ENGINE,
+            },
+        ),
+        'dataproc_serverless_lightning_engine_runtime': (
+            option_decoders.EnumDecoder,
+            {
+                'valid_values': (
+                    dpb_constants.DATAPROC_LIGHTNING_ENGINE_DEFAULT_RUNTIME,
+                    dpb_constants.DATAPROC_LIGHTNING_ENGINE_NATIVE_RUNTIME,
+                ),
+                'default': (
+                    dpb_constants.DATAPROC_LIGHTNING_ENGINE_DEFAULT_RUNTIME
+                ),
             },
         ),
         'dataproc_serverless_memory_overhead': (
@@ -826,9 +863,7 @@ class _NonRelationalDbDecoder(option_decoders.TypeVerifier):
           'Required attribute `service_type` missing from non_relational_db '
           'config.'
       )
-    db_spec_class = non_relational_db.GetNonRelationalDbSpecClass(
-        service_type
-    )
+    db_spec_class = non_relational_db.GetNonRelationalDbSpecClass(service_type)
     return db_spec_class(
         self._GetOptionFullName(component_full_name),
         flag_values,

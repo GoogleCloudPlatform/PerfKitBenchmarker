@@ -302,7 +302,6 @@ class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
   """Strategies to set up Azure Blob Containers."""
 
   DEFAULT_MOUNT_OPTIONS = [
-      '--tmp-path /opt/pkb'
   ]
 
   def SetUpDiskOnLinux(self):

@@ -514,12 +514,6 @@ class GkeCluster(BaseGkeCluster):
     cmd.Issue()
 
 
-_VM_GPU_TYPE_TO_AUTOPILOT_GPU_TYPE = {
-    'nvidia-a100': 'nvidia-a100-80gb',
-    'nvidia-h100': 'nvidia-h100-80gb',
-}
-
-
 class GkeAutopilotCluster(BaseGkeCluster):
   """Class representing an Autopilot GKE cluster, which has no nodepools."""
 
@@ -568,9 +562,10 @@ class GkeAutopilotCluster(BaseGkeCluster):
     metadata['zone'] = self.zone
     metadata['region'] = self.region
     # Override node specific metadata set in parent.
-    metadata['machine_type'] = util.GetMachineFamily(
-        self.default_nodepool.machine_type
-    ) or self.CLUSTER_TYPE
+    metadata['machine_type'] = (
+        util.GetMachineFamily(self.default_nodepool.machine_type)
+        or self.CLUSTER_TYPE
+    )
     metadata['size'] = self.CLUSTER_TYPE
     metadata['nodepools'] = self.CLUSTER_TYPE
     return metadata
@@ -578,21 +573,23 @@ class GkeAutopilotCluster(BaseGkeCluster):
   def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
     """Node selectors for instance capabilites in AutoPilot clusters."""
     selectors = []
-    machine_family = util.GetMachineFamily(self.default_nodepool.machine_type)
+    compute_class = None
+    machine_family: str | None = util.GetMachineFamily(machine_type)
     if machine_family:
-      # Machine type should not be set or should be set to machine family.
       selectors += [
           f'cloud.google.com/machine-family: {machine_family}',
-          # Mandate one pod per node, which also handles packing small pods into
-          # bigger nodes.
-          'cloud.google.com/compute-class: Performance',
       ]
+      # Mandate one pod per node, which also handles packing small pods into
+      # bigger nodes.
+      compute_class = 'Performance'
     # https://cloud.google.com/kubernetes-engine/docs/how-to/autopilot-gpus#request-gpus
     if virtual_machine.GPU_TYPE.value:
       gpu_count = virtual_machine.GPU_COUNT.value or 1
-      gpu_type = f'nvidia-{virtual_machine.GPU_TYPE.value}'
-      if gpu_type in _VM_GPU_TYPE_TO_AUTOPILOT_GPU_TYPE:
-        gpu_type = _VM_GPU_TYPE_TO_AUTOPILOT_GPU_TYPE[gpu_type]
+      gpu_type = virtual_machine.GPU_TYPE.value
+      suffix = ''
+      if gpu_type in gce_virtual_machine.GPU_TYPE_TO_SUFFIX:
+        suffix = gce_virtual_machine.GPU_TYPE_TO_SUFFIX[gpu_type]
+      gpu_type = f'nvidia-{gpu_type}{suffix}'
       gpu_driver_version = gcp_flags.GKE_GPU_DRIVER_VERSION.value
       selectors += [
           'cloud.google.com/gke-accelerator: ' + gpu_type,
@@ -603,6 +600,11 @@ class GkeAutopilotCluster(BaseGkeCluster):
               f" '{gpu_driver_version}'"
           ),
       ]
+      # Override earlier compute class, as only one can be set & Accelerator
+      # (or nothing) is required for GPUs.
+      compute_class = 'Accelerator'
+    if compute_class:
+      selectors += [f'cloud.google.com/compute-class: {compute_class}']
     return selectors
 
   def ResizeNodePool(

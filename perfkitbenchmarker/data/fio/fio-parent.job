@@ -2,10 +2,19 @@
 ioengine={{ioengine}}
 invalidate=1
 direct={{direct}}
+{%- if runtime > 0 %}
 runtime={{runtime}}
+{%- endif %}
+{%- if ramptime > 0 %}
 ramp_time={{ramptime}}
+{%- endif %}
+{%- if runtime > 0 or ramptime > 0 %}
 time_based
+{%- endif %}
+{%- if filename is not none %}
 filename={{filename}}
+{%- endif %}
+nr_files={{nr_files}}
 do_verify=0
 verify_fatal=0
 group_reporting=1

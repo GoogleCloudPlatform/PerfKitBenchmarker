@@ -23,6 +23,7 @@ import copy
 import logging
 import ntpath
 import re
+import time
 import xml.etree.ElementTree
 
 from absl import flags
@@ -255,14 +256,25 @@ def EnablePrefill():
 def _RunDiskSpd(running_vm, outstanding_io, threads, metadata):
   """Run single iteration of Diskspd test."""
   diskspd_config = _GenerateDiskspdConfig(outstanding_io, threads)
-  _RunDiskSpdWithOptions(running_vm, diskspd_config)
-  result_xml = _CatXml(running_vm)
-  if not EnablePrefill():
-    # Only remove the temp file if we did not prefill the file.
-    _RemoveTempFile(running_vm)
-  _RemoveXml(running_vm)
-
-  return ParseDiskSpdResults(result_xml, metadata)
+  try:
+    _RunDiskSpdWithOptions(running_vm, diskspd_config)
+    result_xml = _CatXml(running_vm)
+    if not EnablePrefill():
+      # Only remove the temp file if we did not prefill the file.
+      _RemoveTempFile(running_vm)
+    _RemoveXml(running_vm)
+    return ParseDiskSpdResults(result_xml, metadata)
+  except errors.VirtualMachine.RemoteCommandError as e:
+    # Diskspd gets unstable for higher pending requests and doesn't return
+    # results.
+    if 'Got non-zero return code (1) executing' in str(e):
+      logging.exception(
+          'Diskspd failed to run for %s threads and %s outstanding IOs',
+          threads,
+          outstanding_io,
+      )
+      return []
+    raise e
 
 
 def _GenerateDiskspdConfig(outstanding_io, threads):
@@ -341,13 +353,16 @@ def RunDiskSpd(running_vm):
                 metadata,
             )
         )
+        time.sleep(
+            60
+        )  # Sleep for 60 seconds after each test run for disk cooldown.
       except errors.VirtualMachine.RemoteCommandError as e:
         if 'Could not allocate a buffer for target' in str(e):
           logging.exception(
               'Diskspd is not able to allocate buffer for this configuration,'
               ' try using smaller block size or reduce outstanding io or'
               ' threads: %s',
-              e
+              e,
           )
           if not sample_list:
             # No successful run till now, higher outstanding io and/or thread
@@ -355,6 +370,11 @@ def RunDiskSpd(running_vm):
             raise e
         else:
           raise e
+  if not sample_list:
+    raise errors.Benchmarks.RunError(
+        'Diskspd failed to run for all thread/IO configurations. Review the'
+        ' logs and try smaller requests.'
+    )
   sample_list.extend(_CalculateMaxMetric(sample_list))
   return sample_list
 
@@ -438,7 +458,7 @@ def Prefill(running_vm):
 
 def GetDiskspdFileSizeInPrefillSizeUnit(
     write_throughput: float, test_duration: float
-) -> float:
+) -> tuple[float, str]:
   """Returns the diskspd file size in GB."""
   unit = DISKSPD_FILE_SIZE.value[-1]
   written_data = 0

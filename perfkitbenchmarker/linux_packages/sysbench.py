@@ -130,17 +130,9 @@ def _Install(vm, spanner_oltp=False, args=immutabledict.immutabledict()):
         'sysbench/spanner_oltp_write_only.diff',
         f'{SYSBENCH_DIR}/spanner_oltp_write_only.diff',
     )
-    vm.PushDataFile(
-        'sysbench/spanner_oltp_read_write.diff',
-        f'{SYSBENCH_DIR}/spanner_oltp_read_write.diff',
-    )
     vm.RemoteCommand(
         'cd ~/sysbench/ && git apply --reject --ignore-whitespace'
         ' spanner_oltp_git.diff'
-    )
-    vm.RemoteCommand(
-        'cd ~/sysbench/ && git apply --reject --ignore-whitespace'
-        ' spanner_oltp_read_write.diff'
     )
 
     if _SYSBENCH_SPANNER_OLTP_COMMIT_DELAY.value:

@@ -33,6 +33,8 @@ from perfkitbenchmarker.linux_benchmarks.fio import result_parser
 
 FLAGS = flags.FLAGS
 
+_FILENAME_PREFIX = 'fill-device'
+
 
 def AgainstDevice():
   """Check whether we're running against a device or a file.
@@ -44,14 +46,30 @@ def AgainstDevice():
 
 
 def GetFilename(disks, device_path=None):
+  """Gets the filename(s) to be used by fio.
+
+  Args:
+    disks: A list of disk objects.
+    device_path: Optional; A specific device path to use.
+
+  Returns:
+    A string containing the filename or colon-separated filenames for fio.
+  """
   if AgainstDevice():
     filename = device_path or ':'.join(
         [disk.GetDevicePath() for disk in disks]
     )
+  elif not FillTarget():
+    filename = None
   else:
     # Since we pass --directory to fio, we must use relative file
     # paths or get an error.
-    filename = constants.DEFAULT_TEMP_FILE_NAME
+    filename_base = f'{_FILENAME_PREFIX}.'
+    filenames = []
+    for filenum in range(fio_flags.FIO_NR_FILES.value):
+      filenames.append(f'{filename_base}{filenum}')
+    filename = ':'.join(filenames)
+
   return filename
 
 
@@ -136,6 +154,7 @@ def GenerateJobFile(
       scenarios=scenarios,
       direct=int(fio_flags.DIRECT_IO.value),
       disks_list=disks_list,
+      nr_files=fio_flags.FIO_NR_FILES.value,
       filename=filename,
       separate_jobs=fio_flags.FIO_SEPARATE_JOBS_FOR_DISKS.value,
       extra_params=benchmark_params,
@@ -151,25 +170,35 @@ def FillTarget():
   return fio_flags.FIO_TARGET_MODE.value in constants.FILL_TARGET_MODES
 
 
-def FillDevice(vm, disk, fill_size, exec_path):
+def FillDevice(vm, disk, fill_size, exec_path, use_directory=False):
   """Fill the given disk on the given vm up to fill_size.
 
   Args:
     vm: a linux_virtual_machine.BaseLinuxMixin object.
     disk: a disk.BaseDisk attached to the given vm.
     fill_size: amount of device to fill, in fio format.
-    exec_path: string path to the fio executable
+    exec_path: string path to the fio executable.
+    use_directory: bool. If true, use --directory with the disk's mount point.
+      Otherwise, use --filename with the disk's mountpoint.
   """
+  if use_directory:
+    dir_or_filename_arg = 'directory'
+  else:
+    dir_or_filename_arg = 'filename'
+
   command = (
-      f'sudo {exec_path} --filename={disk.GetDevicePath()} '
-      f'--ioengine={fio_flags.FIO_IOENGINE.value} --name=fill-device '
-      f'--blocksize={fio_flags.FIO_FILL_BLOCK_SIZE.value} --iodepth=64 --rw=write --direct=1 --size={fill_size}'
+      f'{exec_path} --{dir_or_filename_arg}={disk.GetDevicePath()} '
+      f'--ioengine={fio_flags.FIO_IOENGINE.value} --name={_FILENAME_PREFIX} '
+      f'--blocksize={fio_flags.FIO_FILL_BLOCK_SIZE.value} --iodepth=64 '
+      f'--rw=write --direct=1 --size={fill_size} '
+      f'--nrfiles={fio_flags.FIO_NR_FILES.value} --fallocate=none '
+      '--create_on_open=1'
   )
 
   vm.RobustRemoteCommand(command)
 
 
-def PrefillIfEnabled(vm, exec_path):
+def PrefillIfEnabled(vm, exec_path, use_directory=False):
   """Prefills the target device or file on the given VM."""
   if len(vm.scratch_disks) > 1 and not AgainstDevice():
     raise errors.Setup.InvalidSetupError(
@@ -184,7 +213,11 @@ def PrefillIfEnabled(vm, exec_path):
     )
     background_tasks.RunThreaded(
         lambda disk: FillDevice(
-            vm, disk, fio_flags.FIO_FILL_SIZE.value, exec_path
+            vm,
+            disk,
+            fio_flags.FIO_FILL_SIZE.value,
+            exec_path,
+            use_directory=use_directory,
         ),
         vm.scratch_disks,
     )
@@ -227,7 +260,9 @@ def WriteJobFileToTempFile(vm, job_file_string):
   return job_file_path
 
 
-def RunTest(vm, exec_path, job_file_string, metadata=None):
+def RunTest(
+    vm, exec_path, job_file_string, metadata=None, latency_measure='clat'
+):
   """Runs the fio test on the VM using the provided executable path.
 
   Args:
@@ -235,6 +270,7 @@ def RunTest(vm, exec_path, job_file_string, metadata=None):
     exec_path: string path to the fio executable.
     job_file_string: string content of the fio job file.
     metadata: Extra metadata to annotate the samples with.
+    latency_measure: The key to use for latency metrics in the results.
 
   Returns:
     A list of sample.Sample objects.
@@ -252,9 +288,9 @@ def RunTest(vm, exec_path, job_file_string, metadata=None):
   else:
     assert(len(disks) == 1)
     fio_command = (
-        f'sudo {exec_path} --output-format=json '
-        f'--random_generator={fio_flags.FIO_RNG.value} '
-        f'--directory={disks[0].mount_point} {remote_fio_job_file_path}'
+        f'sudo {exec_path} --output-format=json'
+        f' --random_generator={fio_flags.FIO_RNG.value} --{latency_measure}_percentiles=1'
+        f' --directory={disks[0].mount_point} {remote_fio_job_file_path}'
     )
   logging.info('FIO Results:')
   start_time = time.time()
@@ -266,6 +302,7 @@ def RunTest(vm, exec_path, job_file_string, metadata=None):
       job_file_string,
       json.loads(stdout),
       base_metadata=metadata,
+      latency_measure=latency_measure,
   )
 
   samples.append(

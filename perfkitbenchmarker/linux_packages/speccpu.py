@@ -510,13 +510,13 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
   in_result_section = False
   at_peak_results_line, peak_name, peak_score = False, None, None
 
-  # Extract the CPU version
-  cpu2017_version = ''
+  # Extract the benchmark versions
+  cpu_version = None
   for line in stdout.splitlines():
-    if re.search(r'Tested with SPEC CPU.*', line):
-      version_groups = re.search(r'2017 v(.*?) on', line)
-      if version_groups:
-        cpu2017_version = version_groups.group(1)
+    if version_match := re.search(
+        r'Tested with SPEC CPU\(R\)(\w+) v(\S+)', line
+    ):
+      cpu_version = version_match.groups()
       break
     continue
 
@@ -564,8 +564,10 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       'spec17_fdo': FLAGS.spec17_fdo,
       'spec17_subset': FLAGS.spec17_subset,
       'gcc_version': build_tools.GetVersion(vm, 'gcc'),
-      'CPU2017_version': cpu2017_version,
   }
+  if cpu_version:
+    major, minor = cpu_version
+    metadata[f'CPU{major}_version'] = minor
 
   missing_results = []
   scores = []

@@ -54,6 +54,7 @@ disk_to_hdfs_map = {
     'pd-standard': 'HDD',
     'pd-balanced': 'SSD (Balanced)',
     'pd-ssd': 'SSD',
+    'hyperdisk-balanced': 'Hyperdisk (Balanced)',
 }
 serverless_disk_to_hdfs_map = {
     'standard': 'HDD',
@@ -731,6 +732,15 @@ class GcpDpbDataprocServerless(
       )
     if self.spec.dataproc_serverless_runtime_engine == 'native':
       result['spark.dataproc.runtimeEngine'] = 'native'
+    if (
+        self.spec.dataproc_serverless_engine
+        == dpb_constants.DATAPROC_LIGHTNING_ENGINE
+    ):
+      result['dataproc.tier'] = 'premium'
+      result['spark.dataproc.engine'] = dpb_constants.DATAPROC_LIGHTNING_ENGINE
+      result['spark.dataproc.lightningEngine.runtime'] = (
+          self.spec.dataproc_serverless_lightning_engine_runtime
+      )
     if gcp_flags.SPARK_BIGQUERY_CONNECTOR_URL.value:
       result['dataproc.sparkBqConnector.uri'] = (
           gcp_flags.SPARK_BIGQUERY_CONNECTOR_URL.value
@@ -793,6 +803,15 @@ class GcpDpbDataprocServerless(
         'dpb_job_properties': self.metadata['dpb_job_properties'],
         'dpb_runtime_engine': self.spec.dataproc_serverless_runtime_engine,
     }
+
+    if (
+        self.spec.dataproc_serverless_engine
+        == dpb_constants.DATAPROC_LIGHTNING_ENGINE
+    ):
+      self.metadata['dpb_runtime_engine'] = self.spec.dataproc_serverless_engine
+      self.metadata['dataproc_lightning_engine_runtime'] = (
+          self.spec.dataproc_serverless_lightning_engine_runtime
+      )
 
   def CalculateLastJobCosts(self) -> dpb_service.JobCosts:
     fetch_batch_cmd = self.DataprocGcloudCommand(

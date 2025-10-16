@@ -41,7 +41,7 @@ class FioUtitTest(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(fio_target_mode='against_file_with_fill')
   def testGetFilenameForDiskWorFile(self):
-    self.assertEqual(utils.GetFilename(self.disks), 'fio-temp-file')
+    self.assertEqual(utils.GetFilename(self.disks), 'fill-device.0')
 
   def testGetAllDiskPaths(self):
     test_disk = self.disks[0]
@@ -58,7 +58,7 @@ class FioUtitTest(pkb_common_test_case.PkbCommonTestCase):
         {},
         'fio-parent.job',
     )
-    expected_job_file = '[global]\nioengine=libaio\ninvalidate=1\ndirect=1\nruntime=30\nramp_time=120\ntime_based\nfilename=fio-temp-file\ndo_verify=0\nverify_fatal=0\ngroup_reporting=1\nrandrepeat=0\n\n[rand_4k_read_100%-io-depth-1-num-jobs-1]\nstonewall\nrw=randread\nblocksize=4k\niodepth=1\nsize=100%\nnumjobs=1'
+    expected_job_file = '[global]\nioengine=libaio\ninvalidate=1\ndirect=1\nruntime=30\nramp_time=120\ntime_based\nnr_files=1\ndo_verify=0\nverify_fatal=0\ngroup_reporting=1\nrandrepeat=0\n\n[rand_4k_read_100%-io-depth-1-num-jobs-1]\nstonewall\nrw=randread\nblocksize=4k\niodepth=1\nsize=100%\nnumjobs=1'
     self.assertMultiLineEqual(expected_job_file, generated_job_file)
 
   @flagsaver.flagsaver(fio_runtime=30)
@@ -73,7 +73,7 @@ class FioUtitTest(pkb_common_test_case.PkbCommonTestCase):
         {},
         'fio-parent.job',
     )
-    expected_job_file = '[global]\nioengine=libaio\ninvalidate=1\ndirect=1\nruntime=30\nramp_time=120\ntime_based\nfilename=fio-temp-file\ndo_verify=0\nverify_fatal=0\ngroup_reporting=1\nrandrepeat=0\n\n[rand_4k_read_100%-io-depth-1-num-jobs-1.0]\nstonewall\nrw=randread\nblocksize=4k\niodepth=1\nsize=100%\nnumjobs=1\nfilename=/tmp/disk/path\n\n[rand_4k_read_100%-io-depth-1-num-jobs-1.1]\nstonewall\nrw=randread\nblocksize=4k\niodepth=1\nsize=100%\nnumjobs=1\nfilename=/tmp/disk/path'
+    expected_job_file = '[global]\nioengine=libaio\ninvalidate=1\ndirect=1\nruntime=30\nramp_time=120\ntime_based\nnr_files=1\ndo_verify=0\nverify_fatal=0\ngroup_reporting=1\nrandrepeat=0\n\n[rand_4k_read_100%-io-depth-1-num-jobs-1.0]\nstonewall\nrw=randread\nblocksize=4k\niodepth=1\nsize=100%\nnumjobs=1\nfilename=/tmp/disk/path\n\n[rand_4k_read_100%-io-depth-1-num-jobs-1.1]\nstonewall\nrw=randread\nblocksize=4k\niodepth=1\nsize=100%\nnumjobs=1\nfilename=/tmp/disk/path'
     self.assertMultiLineEqual(expected_job_file, generated_job_file)
 
 

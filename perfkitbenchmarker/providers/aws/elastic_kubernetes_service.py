@@ -305,7 +305,9 @@ class BaseEksCluster(container_service.KubernetesCluster):
     """Get the default storage class for the provider."""
     return aws_disk.GP2
 
-  def DeployIngress(self, name: str, namespace: str, port: int) -> str:
+  def DeployIngress(
+      self, name: str, namespace: str, port: int, health_path: str = ''
+  ) -> str:
     """Deploys an Ingress resource to the cluster."""
     self.ApplyManifest(
         'container/ingress.yaml.j2',
@@ -375,11 +377,11 @@ class EksCluster(BaseEksCluster):
       nodepool_config: container_service.BaseNodePoolConfig,
   ):
     nodepool_config.disk_type = (
-        vm_config.DEFAULT_ROOT_DISK_TYPE
-    )  # pytype: disable=attribute-error
+        vm_config.DEFAULT_ROOT_DISK_TYPE  # pytype: disable=attribute-error
+    )
     nodepool_config.disk_size = (
-        vm_config.boot_disk_size
-    )  # pytype: disable=attribute-error
+        vm_config.boot_disk_size  # pytype: disable=attribute-error
+    )
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -698,7 +700,9 @@ class EksKarpenterCluster(BaseEksCluster):
             }],
         },
         'iamIdentityMappings': [{
-            'arn': f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}',
+            'arn': (
+                f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}'
+            ),
             'username': 'system:node:{{EC2PrivateDNSName}}',
             'groups': ['system:bootstrappers', 'system:nodes'],
         }],
@@ -838,7 +842,7 @@ class EksKarpenterCluster(BaseEksCluster):
     ])
 
   def DeployIngress(
-      self, name: str, namespace: str, port: int, health_path: str
+      self, name: str, namespace: str, port: int, health_path: str = ''
   ) -> str:
     """Deploys only Service + Ingress (without IngressClass) for AWS Load Balancer Controller."""
     # Apply the custom manifest template (service + ingress with annotations).
@@ -882,9 +886,12 @@ class EksKarpenterCluster(BaseEksCluster):
     """Fixs ALB -> nodes connectivity to prevent 504 errors from unhealthy targets."""
 
     # 1) Get ALB security group from address
-    host = parse.urlparse(address).hostname if address.startswith('http') else address
+    host = (
+        parse.urlparse(address).hostname
+        if address.startswith('http')
+        else address
+    )
     normalized = (host or '').replace('dualstack.', '')
-    alb_sg = ''
     if not normalized:
       raise errors.Config.InvalidValue(
           f'No valid hostname in address: {address}'
@@ -912,7 +919,6 @@ class EksKarpenterCluster(BaseEksCluster):
           f'ALB security group not found for {normalized}'
       )
     # 2) Get node security groups from actual running instances
-    node_sgs = set()
     ids_out, _ = vm_util.IssueRetryableCommand(
         [
             FLAGS.kubectl,
@@ -1111,7 +1117,7 @@ class EksKarpenterCluster(BaseEksCluster):
 
   def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
     """Gets the node selectors section of a yaml for the provider."""
-    machine_family = util.GetMachineFamily(self.default_nodepool.machine_type)
+    machine_family = util.GetMachineFamily(machine_type)
     if machine_family:
       return [f'karpenter.k8s.aws/instance-family: {machine_family}']
     return []

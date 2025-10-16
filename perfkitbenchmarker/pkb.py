@@ -665,8 +665,6 @@ def DoProvisionPhase(
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.Pickle()
-
-  events.register_tracers.send(parsed_flags=FLAGS)
   events.benchmark_start.send(benchmark_spec=spec)
   try:
     with timer.Measure('Resource Provisioning'):
@@ -1146,13 +1144,16 @@ def _IsException(e: Exception, exception_class: Type[Exception]) -> bool:
 
 
 def RunBenchmark(
-    spec: bm_spec.BenchmarkSpec, collector: publisher.SampleCollector
+    spec: bm_spec.BenchmarkSpec,
+    collector: publisher.SampleCollector,
+    register_tracers: bool = True,
 ):
   """Runs a single benchmark and adds the results to the collector.
 
   Args:
     spec: The BenchmarkSpec object with run information.
     collector: The SampleCollector object to add samples to.
+    register_tracers: Whether to register tracers for the benchmark.
   """
 
   # Since there are issues with the handling SIGINT/KeyboardInterrupt (see
@@ -1175,6 +1176,9 @@ def RunBenchmark(
       spec.name, spec.sequence_number, spec.total_benchmarks
   )
   context.SetThreadBenchmarkSpec(spec)
+  if register_tracers:
+    events.register_tracers.send(parsed_flags=FLAGS)
+
   log_context = log_util.GetThreadLogContext()
   with log_context.ExtendLabel(label_extension):
     with spec.RedirectGlobalFlags():

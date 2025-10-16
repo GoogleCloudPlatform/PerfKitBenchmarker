@@ -320,7 +320,7 @@ CONTAINER_REMOTE_BUILD_CONFIG = flags.DEFINE_string(
 )
 GKE_GPU_DRIVER_VERSION = flags.DEFINE_enum(
     'gke_gpu_driver_version',
-    'disabled',
+    'default',
     ['disabled', 'latest', 'default'],
     'The GPU driver version to use for all node pools in the container cluster.'
     'Default behavior depends on GKE version. See '
@@ -591,6 +591,16 @@ GCP_LUSTRE_VPC = flags.DEFINE_string(
     '',
     'VPC name for GCP Lustre instance: '
     'https://cloud.google.com/managed-lustre/docs/vpc',
+)
+GCS_FUSE_ENABLE_FILE_CACHE = flags.DEFINE_boolean(
+    'gcs_fuse_enable_file_cache',
+    False,
+    'Whether to enable file cache for gcs fuse.',
+)
+GCS_FUSE_ENABLE_METADATA_CACHE = flags.DEFINE_boolean(
+    'gcs_fuse_enable_metadata_cache',
+    False,
+    'Whether to enable metadata cache for gcs fuse.',
 )
 
 

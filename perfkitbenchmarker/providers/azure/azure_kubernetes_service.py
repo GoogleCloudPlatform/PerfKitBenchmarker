@@ -339,11 +339,15 @@ class AksCluster(container_service.KubernetesCluster):
         'show',
         '--name',
         self.name,
+        '--query',
+        'provisioningState',
+        '--output',
+        'tsv',
     ] + self.resource_group.args
     stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
 
     try:
-      provisioning_state = json.loads(stdout).get('provisioningState')
+      provisioning_state = stdout.strip()
       if provisioning_state == 'Failed':
         raise errors.Resource.CreationError('Cluster provisioning failed.')
       if provisioning_state != 'Succeeded':
@@ -529,7 +533,18 @@ class AksAutomaticCluster(AksCluster):
     Automatic clusters & role assignment must be created before authenticating.
     """
     super(container_service.KubernetesCluster, self)._PostCreate()
-    self._CreateRoleAssignment()
+    user_type, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'account',
+        'show',
+        '--query',
+        'user.type',
+        '--output',
+        'tsv',
+    ])
+    user_type = user_type.strip()
+    if user_type == 'servicePrincipal':
+      self._CreateRoleAssignment()
     self._GetCredentials(use_admin=False)
     self._WaitForDefaultServiceAccount()
     self._AttachContainerRegistry()

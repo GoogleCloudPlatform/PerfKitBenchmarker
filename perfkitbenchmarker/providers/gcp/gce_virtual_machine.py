@@ -111,6 +111,14 @@ _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     'c3a': 'ampere1',
     'c4a': 'neoverse-v2',
 }
+# When requesting a specific GPU type independently of the machine type, choose
+# the most common version. When using a machine type from the
+# _FIXED_GPU_MACHINE_TYPES list below  will bypass this code.
+GPU_TYPE_TO_SUFFIX = {
+    'a100': '-80gb',
+    'h100': '-80gb',
+    'h200': '-141gb',
+}
 # The A2 and A3 machine families, unlike some other GCP offerings, have a
 # preset type and number of GPUs, so we set those attributes directly from the
 # machine_type.
@@ -490,6 +498,8 @@ def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
       )
       + accelerator_type
   )
+  if accelerator_type in GPU_TYPE_TO_SUFFIX:
+    gce_accelerator_type += GPU_TYPE_TO_SUFFIX[accelerator_type]
   return 'type={},count={}'.format(gce_accelerator_type, accelerator_count)
 
 
@@ -1721,7 +1731,11 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
       False otherwise.
     """
     cmd = util.GcloudCommand(
-        self, 'compute', 'instances', 'get-serial-port-output', self.name,
+        self,
+        'compute',
+        'instances',
+        'get-serial-port-output',
+        self.name,
     )
     cmd.flags['zone'] = self.zone
     cmd.flags['port'] = 1
@@ -1769,9 +1783,7 @@ class Rhel9BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
-class Ol8BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.Ol8Mixin
-):
+class Ol8BasedGceVirtualMachine(BaseLinuxGceVirtualMachine, linux_vm.Ol8Mixin):
   DEFAULT_X86_IMAGE_FAMILY = 'oracle-linux-8'
   DEFAULT_IMAGE_PROJECT = 'oracle-linux-cloud'
 
@@ -1783,9 +1795,7 @@ class Ol8BasedGceVirtualMachine(
     )
 
 
-class Ol9BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine, linux_vm.Ol9Mixin
-):
+class Ol9BasedGceVirtualMachine(BaseLinuxGceVirtualMachine, linux_vm.Ol9Mixin):
   DEFAULT_X86_IMAGE_FAMILY = 'oracle-linux-9'
   DEFAULT_IMAGE_PROJECT = 'oracle-linux-cloud'
 

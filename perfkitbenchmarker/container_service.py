@@ -595,9 +595,7 @@ class BaseContainerCluster(resource.BaseResource):
       )
     return None
 
-  def GetMachineTypeFromNodeName(
-      self, node_name: str
-  ) -> str | None:
+  def GetMachineTypeFromNodeName(self, node_name: str) -> str | None:
     """Get the machine type from the node name."""
     nodepool = self.GetNodePoolFromNodeName(node_name)
     if nodepool is None:
@@ -1741,17 +1739,21 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     """Get the node selectors section of a yaml for the provider."""
     return []
 
-  def DeployIngress(self, name: str, namespace: str, port: int) -> str:
+  def DeployIngress(
+      self, name: str, namespace: str, port: int, health_path: str = ''
+  ) -> str:
     """Deploys an Ingress/load balancer resource to the cluster.
 
     Args:
       name: The name of the Ingress resource.
       namespace: The namespace of the resource.
       port: The port to expose to the internet.
+      health_path: The path to use for health checks.
 
     Returns:
       The address of the Ingress.
     """
+    del health_path
     self.ApplyManifest(
         'container/loadbalancer.yaml.j2',
         name=name,
@@ -1809,6 +1811,8 @@ class KubernetesEvent:
   message: str
   # Reason is actually more of a machine readable message.
   reason: str | None
+  # Examples: Normal, Warning, Error
+  type: str
   timestamp: float
 
   @classmethod
@@ -1818,7 +1822,9 @@ class KubernetesEvent:
       return None
     try:
       # There are multiple timestamps. They should be equivalent.
-      raw_timestamp = yaml_data['lastTimestamp']
+      raw_timestamp = yaml_data.get('lastTimestamp') or yaml_data.get(
+          'eventTime'
+      )
       assert raw_timestamp
       # Python 3.10 cannot handle Z as utc in ISO 8601 timestamps
       python_3_10_compatible_timestamp = re.sub('Z$', '+00:00', raw_timestamp)
@@ -1833,10 +1839,11 @@ class KubernetesEvent:
           resource=KubernetesEventResource.FromDict(
               yaml_data['involvedObject']
           ),
+          type=yaml_data['type'],
           timestamp=timestamp,
       )
     except (AssertionError, KeyError) as e:
-      logging.warning(
+      logging.exception(
           'Tried parsing event: %s but ran into error: %s', yaml_data, e
       )
       return None

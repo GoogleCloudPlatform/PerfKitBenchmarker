@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Relational database provisioning and teardown for Azure RDS."""
+"""Azure Flexible server provisioning and teardown."""
 
 import datetime
 import logging
@@ -52,8 +52,6 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
   Instructions from:
   https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/
 
-  On teardown, all resources are deleted.
-
   Note that the client VM's region and the region requested for the database
   must be the same.
   """
@@ -66,18 +64,8 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
   ]
 
   @staticmethod
-  def GetDefaultEngineVersion(engine: str):
-    """Returns the default version of a given database engine.
-
-    Args:
-      engine: type of database (my_sql or postgres).
-
-    Returns:
-      (string): Default engine version.
-    Raises:
-      RelationalDbEngineNotFoundError: if an unknown engine is
-                                                  requested.
-    """
+  def GetDefaultEngineVersion(engine: str) -> str:
+    """Returns the default version of a given database engine."""
     if engine == sql_engine_utils.POSTGRES:
       return DEFAULT_POSTGRES_VERSION
     elif engine == sql_engine_utils.MYSQL:
@@ -87,8 +75,8 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
           'Unsupported engine {}'.format(engine)
       )
 
-  def _Create(self):
-    """Creates the Azure RDS instance."""
+  def _Create(self) -> None:
+    """Creates the Azure database instance."""
     ha_flag = ENABLE_HA if self.spec.high_availability else DISABLE_HA
     cmd = [
         azure.AZURE_PATH,
@@ -120,7 +108,7 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
 
     vm_util.IssueCommand(cmd, timeout=CREATE_AZURE_DB_TIMEOUT)
 
-  def GetAzCommandForEngine(self):
+  def GetAzCommandForEngine(self) -> str:
     engine = self.spec.engine
     if engine == sql_engine_utils.FLEXIBLE_SERVER_POSTGRES:
       return 'postgres'
@@ -128,9 +116,8 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
       return 'mysql'
     else:
       raise NotImplementedError('Unsupported engine {}'.format(engine))
-    return engine
 
-  def _PostCreate(self):
+  def _PostCreate(self) -> None:
     """Perform general post create operations on the cluster."""
     # Calling the grand parent class.
     super(azure_relational_db.AzureRelationalDb, self)._PostCreate()
@@ -180,21 +167,10 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         '--server',
         self.instance_id,
     ]
-    return vm_util.IssueCommand(cmd)
+    return vm_util.IssueCommand(cmd, raise_on_failure=False)
 
-  def _IsInstanceReady(self, timeout=IS_READY_TIMEOUT):
-    """Return true if the instance is ready.
-
-    This method will query the instance every 5 seconds until
-    its instance state is 'Ready', or until a timeout occurs.
-
-    Args:
-      timeout: timeout in seconds
-
-    Returns:
-      True if the resource was ready in time, False if the wait timed out
-        or an Exception occurred.
-    """
+  def _IsInstanceReady(self, timeout: int = IS_READY_TIMEOUT) -> bool:
+    """See base class."""
     start_time = datetime.datetime.now()
 
     while True:
@@ -203,15 +179,15 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         return False
 
       server_show_json = self._AzServerShow()
-      state = server_show_json['state']
       if server_show_json is not None:
+        state = server_show_json['state']
         if state == 'Ready':
           break
       time.sleep(5)
     return True
 
-  def _ApplyDbFlags(self):
-    """Applies the MySqlFlags to a managed instance."""
+  def _ApplyDbFlags(self) -> None:
+    """Apply database flags to the instance."""
     for flag in FLAGS.db_flags:
       name_and_value = flag.split('=')
       cmd = [

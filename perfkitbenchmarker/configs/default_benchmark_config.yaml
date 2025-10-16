@@ -334,7 +334,7 @@ sparksql_tpcds_1t_tuned:
       vm_spec:
         GCP:
           num_local_ssds: 0
-      disk_count: 4
+      disk_count: 3
       disk_spec:
         GCP:
           disk_size: 320
@@ -445,6 +445,16 @@ fio_latency:
     fio_runtime: 300
     fio_target_mode: against_device_with_fill
 
+fio_object_storage_latency_8kb:
+  name: fio_object_storage
+  flags:
+    fio_generate_scenarios: rand_8k_read_800KB_iodepth-1_numjobs-1
+    fio_fill_size: 800K
+    fio_fill_block_size: 8k
+    fio_nr_files: 100
+    fio_ramptime: 0
+    fio_runtime: 0
+
 gpu_jobs_provisioning:
   name: jobs_benchmark
   base_job:
@@ -482,9 +492,9 @@ hadoop_dfsio:
       disk_count: 3
       disk_spec:
         GCP:
-          disk_size: 6830
+          disk_size: 9200
           disk_type: hyperdisk-throughput
-          provisioned_throughput: 600
+          provisioned_throughput: 800
 
 diskspd_read_only:
   name: diskspd

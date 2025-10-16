@@ -318,6 +318,7 @@ class KubernetesAiInferenceBenchmarkTest(
         ),
         reason='Started',
         message='Started container inference-server',
+        type='Normal',
         timestamp=datetime.datetime(
             2025, 7, 18, 22, 17, 1, tzinfo=tz
         ).timestamp(),
@@ -377,6 +378,7 @@ class KubernetesAiInferenceBenchmarkTest(
         ),
         reason='Started',
         message='Started container inference-server',
+        type='Normal',
         timestamp=datetime.datetime(
             2025, 7, 18, 22, 17, 1, tzinfo=tz
         ).timestamp(),
@@ -447,6 +449,7 @@ class KubernetesAiInferenceBenchmarkTest(
             ),
             reason='Started',
             message='Started container inference-server',
+            type='Normal',
             timestamp=datetime.datetime(
                 2025, 7, 18, 22, 17, 1, tzinfo=tz
             ).timestamp(),
@@ -458,6 +461,7 @@ class KubernetesAiInferenceBenchmarkTest(
             ),
             reason='Started',
             message='Started container inference-server',
+            type='Normal',
             timestamp=datetime.datetime(
                 2025, 7, 18, 22, 17, 5, tzinfo=tz
             ).timestamp(),
@@ -469,6 +473,7 @@ class KubernetesAiInferenceBenchmarkTest(
             ),
             reason='Started',
             message='Started container inference-server',
+            type='Normal',
             timestamp=datetime.datetime(
                 2025, 7, 18, 22, 17, 10, tzinfo=tz
             ).timestamp(),
