@@ -2,7 +2,7 @@ import json
 import tempfile
 import unittest
 from unittest import mock
-from urllib.parse import urlparse
+from urllib import parse
 from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import container_service
@@ -409,7 +409,7 @@ class EksKarpenterTest(BaseEksTest):
     for address, expected in test_cases:
       with self.subTest(address=address):
         host = (
-            urlparse(address).hostname
+            parse.urlparse(address).hostname
             if address.startswith('http')
             else address
         )

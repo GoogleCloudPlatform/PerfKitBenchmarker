@@ -70,6 +70,7 @@ kubernetes_hpa:
 _PORT = 5000
 _HEALTH_PATH = '/calculate'
 
+
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   """Load and return benchmark config.
 

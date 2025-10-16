@@ -25,7 +25,7 @@ import json
 import logging
 import re
 from typing import Any
-from urllib.parse import urlparse
+from urllib import parse
 
 from absl import flags
 from perfkitbenchmarker import container_service
@@ -882,7 +882,7 @@ class EksKarpenterCluster(BaseEksCluster):
     """Fixs ALB -> nodes connectivity to prevent 504 errors from unhealthy targets."""
 
     # 1) Get ALB security group from address
-    host = urlparse(address).hostname if address.startswith('http') else address
+    host = parse.urlparse(address).hostname if address.startswith('http') else address
     normalized = (host or '').replace('dualstack.', '')
     alb_sg = ''
     if not normalized:
