@@ -14,12 +14,14 @@
 """Tests for perfkitbenchmarker.time_triggers.maintenance_simulation_trigger."""
 
 import datetime
+import time
 import unittest
 from unittest import mock
 from absl import flags
 from absl.testing import flagsaver
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.sample import Sample
 from tests import pkb_common_test_case
 from perfkitbenchmarker.time_triggers import maintenance_simulation_trigger
@@ -41,13 +43,13 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(trigger.delay, 10)
 
   def testTrigger(self):
-    vm = mock.Mock()
+    vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
     trigger.TriggerMethod(vm)
     vm.SimulateMaintenanceEvent.assert_called_once()
 
   def testSetup(self):
-    vm = mock.Mock()
+    vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
     trigger.vms = [vm]
     trigger.SetUp()
@@ -57,13 +59,30 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     trigger.SetUp()
     vm.SetupLMNotification.assert_called_once()
 
-  @mock.patch('time.time', mock.MagicMock(return_value=0))
-  def testAppendSamples(self):
-    vm = mock.Mock()
+  @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
+  def testWaitForDisruption(self):
+    vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     time_dic = {'LM_total_time': 10, 'Host_maintenance_end': 0}
     s = []
-    vm.CollectLMNotificationsTime = mock.MagicMock(return_value=time_dic)
+    trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
+    self.enter_context(
+        mock.patch.object(trigger, 'WaitForDisruption', return_value=[time_dic])
+    )
+    trigger.capture_live_migration_timestamps = True
+    trigger.vms = [vm]
+    trigger.AppendSamples(None, vm_spec, s)
+    self.assertEqual(
+        s, [Sample('LM Total Time', 10, 'seconds', time_dic, timestamp=0)]
+    )
+
+  @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
+  def testAppendSamples(self):
+    vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
+    vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
+    time_dic = {'LM_total_time': 10, 'Host_maintenance_end': 0}
+    s = []
+    vm.CollectLMNotificationsTime.return_value = time_dic
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
     trigger.capture_live_migration_timestamps = True
     trigger.vms = [vm]
@@ -72,7 +91,7 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
         s, [Sample('LM Total Time', 10, 'seconds', time_dic, timestamp=0)]
     )
 
-  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
   def testAppendLossFunctionWithDegradationPercent(self):
     FLAGS.maintenance_degradation_percent = 90
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
@@ -198,7 +217,7 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
         ],
     )
 
-  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
   def testAppendLossFunctionWithMissingTimeStampsWithRegression(self):
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
@@ -323,7 +342,7 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
         ],
     )
 
-  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
   def testAppendLossFunctionWithMissingTimeStampsNoRegression(self):
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
@@ -448,7 +467,7 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
         ],
     )
 
-  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
   def testAppendLossFunctionSamples(self):
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
@@ -580,7 +599,7 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
         ],
     )
 
-  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
   def testAppendLossFunctionSamplesWithNotification(self):
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
@@ -594,10 +613,11 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    vm = mock.MagicMock()
-    vm.CollectLMNotificationsTime = mock.MagicMock(
-        return_value={'LM_total_time': 100, 'Host_maintenance_end': 8}
-    )
+    vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
+    vm.CollectLMNotificationsTime.return_value = {
+        'LM_total_time': 100,
+        'Host_maintenance_end': 8,
+    }
     trigger.vms = [vm]
     trigger.AppendSamples(None, vm_spec, samples)
     self.assertEqual(
@@ -780,7 +800,7 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
         ],
     )
 
-  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
   def testAppendLossFunctionSamplesContainsMetadata(self):
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
@@ -795,10 +815,11 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    vm = mock.MagicMock()
-    vm.CollectLMNotificationsTime = mock.MagicMock(
-        return_value={'LM_total_time': 100, 'Host_maintenance_end': 8}
-    )
+    vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
+    vm.CollectLMNotificationsTime.return_value = {
+        'LM_total_time': 100,
+        'Host_maintenance_end': 8,
+    }
     trigger.vms = [vm]
     trigger.AppendSamples(None, vm_spec, samples)
     self.assertEqual(
@@ -983,7 +1004,7 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
         ],
     )
 
-  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
   def testAppendLossFunctionSamplesHandleTimeDrift(self):
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
@@ -1001,10 +1022,11 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    vm = mock.MagicMock()
-    vm.CollectLMNotificationsTime = mock.MagicMock(
-        return_value={'LM_total_time': 100, 'Host_maintenance_end': 11}
-    )
+    vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
+    vm.CollectLMNotificationsTime.return_value = {
+        'LM_total_time': 100,
+        'Host_maintenance_end': 11,
+    }
     trigger.vms = [vm]
     trigger.AppendSamples(None, vm_spec, samples)
     self.assertEqual(
@@ -1137,7 +1159,7 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
         ],
     )
 
-  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
   @flagsaver.flagsaver(
       (maintenance_simulation_trigger.MAINTENANCE_DEGRADATION_WINDOW, 1.0)
   )
@@ -1160,10 +1182,11 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    vm = mock.MagicMock()
-    vm.CollectLMNotificationsTime = mock.MagicMock(
-        return_value={'LM_total_time': 100, 'Host_maintenance_end': 11}
-    )
+    vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
+    vm.CollectLMNotificationsTime.return_value = {
+        'LM_total_time': 100,
+        'Host_maintenance_end': 11,
+    }
     trigger.vms = [vm]
     trigger.AppendSamples(None, vm_spec, samples)
     # Assertions
@@ -1297,7 +1320,7 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
         ],
     )
 
-  @mock.patch('time.time', mock.MagicMock(return_value=0))
+  @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
   @flagsaver.flagsaver(
       (maintenance_simulation_trigger.MAINTENANCE_DEGRADATION_WINDOW, 1.0)
   )
@@ -1320,10 +1343,11 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    vm = mock.MagicMock()
-    vm.CollectLMNotificationsTime = mock.MagicMock(
-        return_value={'LM_total_time': 100, 'Host_maintenance_end': 8}
-    )
+    vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
+    vm.CollectLMNotificationsTime.return_value = {
+        'LM_total_time': 100,
+        'Host_maintenance_end': 8,
+    }
     trigger.vms = [vm]
     trigger.AppendSamples(None, vm_spec, samples)
     # Assertions

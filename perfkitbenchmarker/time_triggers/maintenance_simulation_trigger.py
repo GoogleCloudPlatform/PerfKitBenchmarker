@@ -14,10 +14,11 @@
 """Module containning methods for triggering maintenance simulation."""
 
 import collections
+from collections.abc import Mapping, MutableSequence
 import copy
 import logging
 import statistics
-from typing import Any, Dict, List
+from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
@@ -85,51 +86,41 @@ CAPTURE_LIVE_MIGRATION_TIMESTAMPS = flags.DEFINE_boolean(
 )
 
 
-class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
+class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
   """Class contains logic for triggering maintenance events."""
 
-  def __init__(self):
-    super().__init__(SIMULATE_MAINTENANCE_DELAY.value)
-    self.capture_live_migration_timestamps = (
-        CAPTURE_LIVE_MIGRATION_TIMESTAMPS.value
-    )
-    self.lm_ends = None
+  def __init__(self, delay: int):
+    super().__init__(delay)
+    self.disruption_ends = None
 
   def TriggerMethod(self, vm: virtual_machine.VirtualMachine):
-    if self.capture_live_migration_timestamps:
-      vm.StartLMNotification()
-    if SIMULATE_MAINTENANCE_WITH_LOG.value:
-      vm.SimulateMaintenanceWithLog()  # pytype: disable=attribute-error
-    else:
-      vm.SimulateMaintenanceEvent()
+    """Trigger the disruption."""
+    raise NotImplementedError()
 
   def SetUp(self):
-    """Base class."""
-    if self.capture_live_migration_timestamps:
-      for vm in self.vms:
-        vm.SetupLMNotification()
+    """See base class."""
+    raise NotImplementedError()
+
+  def WaitForDisruption(self) -> MutableSequence[Mapping[str, Any]]:
+    """Wait for disruption to end and return the end time."""
+    return []
 
   def AppendSamples(
       self,
       unused_sender,
       benchmark_spec: bm_spec.BenchmarkSpec,
-      samples: List[sample.Sample],
+      samples: MutableSequence[sample.Sample],
   ):
-    """Append samples related to Live Migration."""
+    """Append samples related to disruption."""
 
-    def generate_lm_total_time_samples() -> List[sample.Sample]:
-      lm_event_dicts = []
-      if self.capture_live_migration_timestamps:
-        # Block test exit until LM ended.
-        for vm in self.vms:
-          vm.WaitLMNotificationRelease()
-          lm_event_dicts.append(vm.CollectLMNotificationsTime())
-      else:
-        return []
+    def generate_disruption_total_time_samples() -> (
+        MutableSequence[sample.Sample]
+    ):
+      events = self.WaitForDisruption()
 
       # Host maintenance is in s
-      self.lm_ends = max(
-          [float(d['Host_maintenance_end']) * 1000 for d in lm_event_dicts],
+      self.disruption_ends = max(
+          [float(d['Host_maintenance_end']) * 1000 for d in events],
           default=0,
       )
 
@@ -148,22 +139,24 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
               'seconds',
               sample_metadata | d,
           )
-          for d in lm_event_dicts
+          for d in events
       ]
 
-    samples.extend(generate_lm_total_time_samples())
+    samples += generate_disruption_total_time_samples()
     self._AppendAggregatedMetrics(samples)
 
-  def _AppendAggregatedMetrics(self, samples: List[sample.Sample]):
+  def _AppendAggregatedMetrics(self, samples: MutableSequence[sample.Sample]):
     """Finds the time series samples and add generate the aggregated metrics."""
     additional_samples = []
     for s in samples:
       if s.metric in TIME_SERIES_SAMPLES_FOR_AGGREGATION:
         additional_samples += self._AggregateThroughputSample(s)
-    samples.extend(additional_samples)
+    samples += additional_samples
 
-  def _AggregateThroughputSample(self, s: sample.Sample) -> List[sample.Sample]:
-    """Aggregate a time series sample into Live migration metrics.
+  def _AggregateThroughputSample(
+      self, s: sample.Sample
+  ) -> MutableSequence[sample.Sample]:
+    """Aggregate a time series sample into disruption metrics.
 
     Split the samples and compute mean and median and calls relevant
     methods to generate an aggregated sample based on the time series sample.
@@ -183,23 +176,21 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     # provide it in the metadata.
     ramp_up_ends = time_series[0]
     ramp_down_starts = time_series[-1]
-    lm_ends = time_series[-1]
+    disruption_ends = self.GetDisruptionEnds()
+    if disruption_ends is None:
+      disruption_ends = time_series[-1]
     if sample.RAMP_DOWN_STARTS in metadata:
       ramp_down_starts = metadata[sample.RAMP_DOWN_STARTS]
     if sample.RAMP_UP_ENDS in metadata:
       ramp_up_ends = metadata[sample.RAMP_UP_ENDS]
 
-    if self.capture_live_migration_timestamps:
-      # lm ends is computed from LM notification
-      lm_ends = self.lm_ends
+    disruption_start = sample.ConvertDateTimeToUnixMs(self.trigger_time)
 
-    lm_start = sample.ConvertDateTimeToUnixMs(self.trigger_time)
-
-    lm_duration = lm_ends - lm_start
+    disruption_duration = disruption_ends - disruption_start
 
     base_line_values = []
-    values_after_lm_starts = []
-    values_after_lm_ends = []
+    values_after_disruption_starts = []
+    values_after_disruption_ends = []
     total_missing_seconds = 0
     for i in range(len(values)):
       time = time_series[i]
@@ -219,7 +210,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
 
           else:
             interval_values.append(values[i])
-        if time <= lm_start:
+        if time <= disruption_start:
           base_line_values.extend(interval_values)
         else:
           if (
@@ -231,19 +222,19 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
                 'maintenance_degradation_window must be between 1 and 10'
                 f' inclusive, or None. Got: {window}'
             )
-            if time <= lm_start + lm_duration * window:
-              values_after_lm_starts.extend(interval_values)
+            if time <= disruption_start + disruption_duration * window:
+              values_after_disruption_starts.extend(interval_values)
           else:
-            values_after_lm_starts.extend(interval_values)
+            values_after_disruption_starts.extend(interval_values)
 
-        if time > lm_ends:
-          values_after_lm_ends.extend(interval_values)
+        if time > disruption_ends:
+          values_after_disruption_ends.extend(interval_values)
 
     median = statistics.median(base_line_values)
     mean = statistics.mean(base_line_values)
 
-    logging.info('LM Baseline median: %s', median)
-    logging.info('LM Baseline mean: %s', mean)
+    logging.info('Disruption Baseline median: %s', median)
+    logging.info('Disruption Baseline mean: %s', mean)
 
     # Keep the metadata from the original sample except time series metadata
     for field in sample.TIME_SERIES_METADATA:
@@ -251,16 +242,19 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
         del metadata[field]
 
     samples = self._ComputeLossPercentile(
-        mean, values_after_lm_starts, metadata
+        mean, values_after_disruption_starts, metadata
     ) + self._ComputeLossWork(
-        median, values_after_lm_starts, interval, metadata
+        median, values_after_disruption_starts, interval, metadata
     )
-    if values_after_lm_ends:
-      mean_after_lm_ends = statistics.mean(values_after_lm_ends)
-      samples += self._ComputeDegradation(mean, mean_after_lm_ends, metadata)
-      logging.info('Mean after LM ends: %s', mean_after_lm_ends)
+    if values_after_disruption_ends:
+      mean_after_disruption_ends = statistics.mean(values_after_disruption_ends)
+      samples += self._ComputeDegradation(
+          mean, mean_after_disruption_ends, metadata
+      )
+      logging.info('Mean after disruption ends: %s', mean_after_disruption_ends)
       logging.info(
-          'Number of samples after LM ends: %s', len(values_after_lm_ends)
+          'Number of samples after disruption ends: %s',
+          len(values_after_disruption_ends),
       )
 
     # Seconds that are missing i.e without throughput.
@@ -274,9 +268,16 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     )
     return samples
 
+  def GetDisruptionEnds(self) -> float | None:
+    """Get the disruption ends."""
+    return self.disruption_ends
+
   def _ComputeLossPercentile(
-      self, mean: float, values_after_lm: List[float], metadata: Dict[str, Any]
-  ) -> List[sample.Sample]:
+      self,
+      mean: float,
+      values_after_disruption: MutableSequence[float],
+      metadata: Mapping[str, Any],
+  ) -> MutableSequence[sample.Sample]:
     """Compute loss percentile metrics.
 
     This method samples of seconds_dropped_below_x_percent from 0% to 90%
@@ -285,38 +286,36 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
 
     Args:
       mean: Mean of the baseline
-      values_after_lm: List of samples after Live migration.
+      values_after_disruption: List of samples after disruption.
       metadata: Metadata for samples
 
     Returns:
       Samples of loss percentile metrics.
     """
-    number_of_seconds_dropped_below_percentile = collections.defaultdict(int)
-    for value in values_after_lm:
+    seconds_dropped_below_percentile = collections.defaultdict(int)
+    for value in values_after_disruption:
       for p in PERCENTILES:
         if value <= mean * p:
-          number_of_seconds_dropped_below_percentile[p] += 1
+          seconds_dropped_below_percentile[p] += 1
 
-    samples = []
-    for p in PERCENTILES:
-      samples.append(
-          sample.Sample(
-              f'seconds_dropped_below_{int(p * 100)}_percent',
-              number_of_seconds_dropped_below_percentile[p],
-              's',
-              metadata=metadata,
-          )
-      )
-    return samples
+    return [
+        sample.Sample(
+            f'seconds_dropped_below_{int(p * 100)}_percent',
+            seconds_dropped_below_percentile[p],
+            's',
+            metadata=metadata,
+        )
+        for p in PERCENTILES
+    ]
 
   def _ComputeLossWork(
       self,
       median: float,
-      values_after_lm: List[float],
+      values_after_disruption: MutableSequence[float],
       interval: float,
-      metadata: Dict[str, Any],
+      metadata: Mapping[str, Any],
   ):
-    """Compute the loss work metrics for Live Migration.
+    """Compute the loss work metrics for disruption.
 
     This method returns two metrics.
     1. The totl loss seconds. This is defined as the loss time across the LM.
@@ -327,7 +326,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
 
     Args:
       median: median of the baseline
-      values_after_lm: List of samples after LM
+      values_after_disruption: List of samples after disruption
       interval: Interval of the metrics.
       metadata: Metadata for samples
 
@@ -336,7 +335,7 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     """
     total_loss_seconds = 0
     unresponsive_metric = 0
-    for value in values_after_lm:
+    for value in values_after_disruption:
       if value < median * DEGRADATION_PERCENT.value / 100.0:
         total_loss_seconds += (median - value) / median * interval
         unresponsive_metric += (((median - value) / median) ** (3.0)) * interval
@@ -361,8 +360,8 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     return samples
 
   def _ComputeDegradation(
-      self, baseline_mean: float, mean: float, metadata: Dict[str, Any]
-  ) -> List[sample.Sample]:
+      self, baseline_mean: float, mean: float, metadata: Mapping[str, Any]
+  ) -> MutableSequence[sample.Sample]:
     """Compute the degradation after LM ends to baseline."""
     return [
         sample.Sample(
@@ -372,6 +371,53 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
             metadata=metadata,
         )
     ]
+
+  @property
+  def trigger_name(self) -> str:
+    raise NotImplementedError()
+
+
+class MaintenanceEventTrigger(BaseDisruptionTrigger):
+  """Class contains logic for triggering maintenance events."""
+
+  def __init__(self):
+    super().__init__(SIMULATE_MAINTENANCE_DELAY.value)
+    self.capture_live_migration_timestamps = (
+        CAPTURE_LIVE_MIGRATION_TIMESTAMPS.value
+    )
+
+  def TriggerMethod(self, vm: virtual_machine.VirtualMachine):
+    if self.capture_live_migration_timestamps:
+      vm.StartLMNotification()
+    if SIMULATE_MAINTENANCE_WITH_LOG.value:
+      vm.SimulateMaintenanceWithLog()  # pytype: disable=attribute-error
+    else:
+      vm.SimulateMaintenanceEvent()
+
+  def SetUp(self):
+    """Sets up notification if live migration timestamps are captured."""
+    if self.capture_live_migration_timestamps:
+      for vm in self.vms:
+        vm.SetupLMNotification()
+
+  def WaitForDisruption(self) -> MutableSequence[Mapping[str, Any]]:
+    """Wait for the disruption to end and return the end time."""
+    if self.capture_live_migration_timestamps:
+      # Block test exit until LM ended.
+      lm_events = []
+      for vm in self.vms:
+        vm.WaitLMNotificationRelease()
+        lm_events.append(vm.CollectLMNotificationsTime())
+      return lm_events
+    else:
+      return []
+
+  def GetDisruptionEnds(self) -> float | None:
+    """Get the disruption ends."""
+    if self.capture_live_migration_timestamps:
+      # lm ends is computed from LM notification
+      return self.disruption_ends
+    return None
 
   @property
   def trigger_name(self) -> str:
