@@ -31,3 +31,4 @@ seaborn
 setuptools>=40.3.0
 six>=1.13.0
 timeout-decorator
+tornado
