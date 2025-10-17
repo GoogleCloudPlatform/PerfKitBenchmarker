@@ -181,3 +181,9 @@ AZURE_SECURE_BOOT = flags.DEFINE_bool(
     'Enable/Disable secure boot of the VM to allow unsigned operating systems'
     ' and drivers. Defaults to None to fallback to Azure default behavior',
 )
+flags.DEFINE_boolean(
+    'azure_aks_auto_node_provisioning',
+    False,
+    'Enable automatic node provisioning for Azure AKS clusters. '
+    'This is automatically set to True for the provision_node_pools benchmark.',
+)
