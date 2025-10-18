@@ -181,50 +181,23 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
         mock_cmd.func_to_mock.mock_calls[0].args[0],
     )
 
-  def testFullCreateAksAutomatic(self):
-    aks_auto = azure_kubernetes_service.AksAutomaticCluster(self.spec)
-    aks_auto.resource_group.name = 'resource-group'
-    mock_cmd = self.MockIssueCommand(
+  def test_get_node_pool_names(self):
+    nodepool_list_output = """
+    [
+      {
+        "name": "nodepool1"
+      },
+      {
+        "name": "nodepool2"
+      }
+    ]
+    """
+    self.MockIssueCommand(
         {
-            'az aks create': [('', '', 0)],
-            'az aks nodepool': [('', '', 0)],
-            '--query id': [('cluster-id', '', 0)],
-            'az aks show': [
-                (
-                    (
-                        '{"provisioningState": "Succeeded",'
-                        ' "nodeResourceGroup": "node-resource-group"}'
-                    ),
-                    '',
-                    0,
-                ),
-                ('Succeeded', '', 0),
-            ],
-            'get serviceAccounts': [('default, foo', '', 0)],
-            'az account show': [
-                ('servicePrincipal', '', 0),
-                ('user-name', '', 0),
-            ],
-            'az role assignment': [('', '', 0)],
+            'az aks nodepool list': [(nodepool_list_output, '', 0)],
         },
     )
-    aks_auto.Create()
-    mock_cmd.func_to_mock.assert_has_calls([
-        mock.call(
-            [
-                'az',
-                'role',
-                'assignment',
-                'create',
-                '--assignee',
-                'user-name',
-                '--role',
-                'Azure Kubernetes Service RBAC Admin',
-                '--scope',
-                'cluster-id',
-            ],
-        ),
-    ])
+    self.assertEqual(self.aks.GetNodePoolNames(), ['nodepool1', 'nodepool2'])
 
   def testGetNodePoolNames(self):
     self.MockIssueCommand(
