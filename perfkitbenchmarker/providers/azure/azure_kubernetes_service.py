@@ -437,144 +437,19 @@ class AksCluster(container_service.KubernetesCluster):
     ] + self.resource_group.args
     vm_util.IssueCommand(cmd)
 
-  def GetNodePoolNames(self) -> list[str]:
-    """Get node pool names for the cluster."""
-    if FLAGS.azure_aks_auto_node_provisioning:
-      cmd = [
-          FLAGS.kubectl,
-          '--kubeconfig',
-          FLAGS.kubeconfig,
-          'get',
-          'nodepools',
-          '-o',
-          'json',
-      ]
-      stdout, _, _ = vm_util.IssueCommand(cmd)
-      nodepools = json.loads(stdout).get('items', [])
-      return [nodepool['metadata']['name'] for nodepool in nodepools]
-    else:
-      cmd = [
-          azure.AZURE_PATH,
-          'aks',
-          'nodepool',
-          'list',
-          '--cluster-name',
-          self.name,
-      ] + self.resource_group.args
-      stdout, _, _ = vm_util.IssueCommand(cmd)
-      nodepools = json.loads(stdout)
-      return [nodepool['name'] for nodepool in nodepools]
-
-  def AddNodepool(self, batch_name, pool_id):
-    """Add a Karpenter NodePool and AKSNodeClass to the AKS cluster."""
-    self.ApplyManifest(
-        'provision_node_pools/aks/nodepool.yaml.j2',
-        batch=batch_name,
-        id=pool_id,
-        cluster_name=self.name,
-    )
-
-
-class AksAutomaticCluster(AksCluster):
-  """Class representing an AKS Automatic cluster, which has managed node pools.
-
-  This feature is currently in preview. To provision an AKS Automatic cluster,
-  you'll need to install the Azure CLI 'aks-preview' extension.
-  For more details, see the official documentation:
-  https://learn.microsoft.com/en-us/azure/aks/automatic/quick-automatic-managed-network
-  """
-
-  CLOUD = provider_info.AZURE
-  CLUSTER_TYPE = 'Auto'
-
-  def _Create(self):
-    """Creates the Automatic AKS cluster with tags."""
-    tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
-    tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
-    cmd = [
+  def GetNodePoolNames(self) -> List[str]:
+    """Gets the names of all node pools in the cluster."""
+    nodepool_list_cmd = [
         azure.AZURE_PATH,
         'aks',
-        'create',
-        '--name',
+        'nodepool',
+        'list',
+        '--cluster-name',
         self.name,
-        '--location',
-        self.region,
-        '--ssh-key-value',
-        vm_util.GetPublicKeyPath(),
-        '--resource-group',
-        self.resource_group.name,
-        '--sku',
-        'automatic',
-        '--tags',
-    ] + tags_list
-    vm_util.IssueCommand(
-        cmd,
-        # Half hour timeout on creating the cluster.
-        timeout=1800,
-    )
-
-  def _CreateRoleAssignment(self):
-    """Creates a role assignment for the current user."""
-    full_cluster_id, _, _ = vm_util.IssueCommand([
-        azure.AZURE_PATH,
-        'aks',
-        'show',
-        '--name',
-        self.name,
-        '--resource-group',
-        self.resource_group.name,
-        '--query',
-        'id',
-        '--output',
-        'tsv',
-    ])
-    full_cluster_id = full_cluster_id.strip()
-    current_user, _, _ = vm_util.IssueCommand([
-        azure.AZURE_PATH,
-        'account',
-        'show',
-        '--query',
-        'user.name',
-        '--output',
-        'tsv',
-    ])
-    current_user = current_user.strip()
-    create_role_assignment_cmd = [
-        azure.AZURE_PATH,
-        'role',
-        'assignment',
-        'create',
-        '--assignee',
-        current_user,
-        '--role',
-        'Azure Kubernetes Service RBAC Admin',
-        '--scope',
-        full_cluster_id,
-    ]
-    vm_util.IssueCommand(create_role_assignment_cmd)
-
-  def _PostCreate(self):
-    """Skip the superclass's _PostCreate() method.
-
-    Needed as node_resource_group is pre-configured and fully managed in
-    Automatic clusters & role assignment must be created before authenticating.
-    """
-    super(container_service.KubernetesCluster, self)._PostCreate()
-    user_type, _, _ = vm_util.IssueCommand([
-        azure.AZURE_PATH,
-        'account',
-        'show',
-        '--query',
-        'user.type',
-        '--output',
-        'tsv',
-    ])
-    user_type = user_type.strip()
-    if user_type == 'servicePrincipal':
-      self._CreateRoleAssignment()
-    self._GetCredentials(use_admin=False)
-    self._WaitForDefaultServiceAccount()
-    self._AttachContainerRegistry()
+    ] + self.resource_group.args
+    stdout, _, _ = vm_util.IssueCommand(nodepool_list_cmd)
+    nodepools = json.loads(stdout)
+    return [nodepool['name'] for nodepool in nodepools]
 
 
 def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
