@@ -472,7 +472,7 @@ class AksCluster(container_service.KubernetesCluster):
         batch=batch_name,
         id=pool_id,
         cluster_name=self.name,
-        spot=FLAGS.azure_aks_spot_nodepools,
+        spot=FLAGS.azure_low_priority_vms,
     )
 
 

@@ -150,7 +150,9 @@ REDIS_SIZE = flags.DEFINE_enum(
 flags.DEFINE_boolean(
     'azure_low_priority_vms',
     False,
-    'Whether to set the priority to low for Azure VMs',
+    'Whether to set the priority to low for Azure VMs. '
+    'Also applies to Karpenter NodePools in AKS, using spot capacity-type '
+    'when True, otherwise on-demand.',
 )
 
 flags.DEFINE_boolean(
@@ -186,10 +188,4 @@ flags.DEFINE_boolean(
     False,
     'Enable automatic node provisioning for Azure AKS clusters. '
     'This is automatically set to True for the provision_node_pools benchmark.',
-)
-flags.DEFINE_boolean(
-    'azure_aks_spot_nodepools',
-    False,
-    'Whether to use spot instances for Karpenter NodePools in AKS. '
-    'If True, NodePools will use spot capacity-type, otherwise on-demand.',
 )
