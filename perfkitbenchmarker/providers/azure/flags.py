@@ -187,3 +187,9 @@ flags.DEFINE_boolean(
     'Enable automatic node provisioning for Azure AKS clusters. '
     'This is automatically set to True for the provision_node_pools benchmark.',
 )
+flags.DEFINE_boolean(
+    'azure_aks_spot_nodepools',
+    False,
+    'Whether to use spot instances for Karpenter NodePools in AKS. '
+    'If True, NodePools will use spot capacity-type, otherwise on-demand.',
+)
