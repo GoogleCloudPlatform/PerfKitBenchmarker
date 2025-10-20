@@ -44,7 +44,7 @@ metadata:
 spec:
   role: "KarpenterNodeRole-{{CLUSTER_NAME}}"
   amiSelectorTerms:
-    - alias: {% if GPU_TYPE %}"al2023@{{ALIAS_VERSION}}"{% else %}"al2023@{{ALIAS_VERSION}}"{% endif %}
+    - alias: "al2023@{{ALIAS_VERSION}}"
   subnetSelectorTerms:
     - tags:
         karpenter.sh/discovery: "{{CLUSTER_NAME}}"

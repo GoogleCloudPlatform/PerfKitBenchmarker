@@ -1160,8 +1160,7 @@ class EksKarpenterCluster(BaseEksCluster):
     # GPU selector for Karpenter
     if virtual_machine.GPU_TYPE.value:
       selectors.append(
-          'karpenter.k8s.aws/instance-gpu-name:'
-          f' {virtual_machine.GPU_TYPE.value}'
+        f'karpenter.k8s.aws/instance-gpu-name: {virtual_machine.GPU_TYPE.value}'
       )
 
     return selectors
