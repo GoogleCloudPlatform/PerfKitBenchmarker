@@ -1,0 +1,172 @@
+# BEGIN GOOGLE-INTERNAL
+# This is based on http://google3/devtools/gpylint/config/base/rc
+# END GOOGLE-INTERNAL
+
+# Default configuration for pylint, which should pass for all (incremental) changes.
+# See CONTRIBUTING.md for more.
+
+[MESSAGES CONTROL]
+# List of checkers and warnings to enable.
+enable=indexing-exception,old-raise-syntax
+
+disable=abstract-method,
+        attribute-defined-outside-init,
+        bad-option-value,
+        c-extension-no-member,
+        design,
+        file-ignored,
+        fixme,
+        global-statement,
+        invalid-metaclass,
+        locally-disabled,
+        locally-enabled,
+        misplaced-comparison-constant,
+        no-else-break,
+        no-else-continue,
+        no-else-raise,
+        no-else-return,
+        no-self-use,
+        pointless-except,
+        redundant-u-string-prefix,
+        similarities,
+        star-args,
+        suppressed-message,
+        trailing-newlines,
+        ungrouped-imports,
+        unnecessary-pass,
+        unspecified-encoding,
+        unsubscriptable-object,
+        useless-else-on-loop,
+        useless-object-inheritance,
+        useless-suppression,
+
+[BASIC]
+
+# Regular expression which should only match the name
+# of functions or classes which do not require a docstring.
+no-docstring-rgx=(__.*__|main)
+
+# Min length in lines of a function that requires a docstring.
+docstring-min-length=12
+
+# Regular expression which should only match correct module names. The
+# leading underscore is sanctioned for private modules by Google's style
+# guide.
+#
+# There are exceptions to the basic rule (_?[a-z][a-z0-9_]*) to cover
+# requirements of Python's module system and of the presubmit framework.
+module-rgx=^(_?[a-z][a-z0-9_]*)|__init__|PRESUBMIT|PRESUBMIT_unittest$
+
+# Regular expression which should only match correct module level names
+const-rgx=^(_?[A-Z][A-Z0-9_]*|__[a-z0-9_]+__|_?[a-z][a-z0-9_]*)$
+
+# Regular expression which should only match correct class attribute
+class-attribute-rgx=^(_?[A-Z][A-Z0-9_]*|__[a-z0-9_]+__|_?[a-z][a-z0-9_]*)$
+
+# Regular expression which should only match correct class names
+class-rgx=^_?[A-Z][a-zA-Z0-9]*$
+
+# Regular expression which should only match correct function names.
+# 'PascalCase' and 'snake_case' group names are used for consistency of naming
+# styles across functions and methods.
+function-rgx=^(?:(?P<PascalCase>_?[A-Z][a-zA-Z0-9]*)|(?P<snake_case>_?[a-z][a-z0-9_]*))$
+
+# Regular expression which should only match correct method names.
+# 'PascalCase' and 'snake_case' group names are used for consistency of naming
+# styles across functions and methods. 'exempt' indicates a name which is
+# consistent with all naming styles.
+method-rgx=(?x)^(?:(?P<exempt>_[a-z0-9_]+__|next)|(?P<PascalCase>_{0,2}[A-Z][a-zA-Z0-9_]*)|(?P<snake_case>_{0,2}[a-z][a-z0-9_]*))$
+
+# Regular expression which should only match correct instance attribute names
+attr-rgx=^_{0,2}[a-z][a-z0-9_]*$
+
+# Regular expression which should only match correct argument names
+argument-rgx=^[a-z][a-z0-9_]*$
+
+# Regular expression which should only match correct variable names
+variable-rgx=^[a-z][a-z0-9_]*$
+
+# Regular expression which should only match correct list comprehension /
+# generator expression variable names
+inlinevar-rgx=^[a-z][a-z0-9_]*$
+
+# Regular expression which should only match correct TypeVar names
+typevar-rgx=^_{0,2}(?:[^\W\da-z_]+|(?:[^\W\da-z_]+[^\WA-Z_]+)+T?)(?:_co(?:ntra)?)?$
+
+# Good variable names which should always be accepted, separated by a comma
+good-names=main,_
+
+# List of decorators that define properties, such as abc.abstractproperty.
+property-classes=abc.abstractproperty,functools.cached_property,google3.pyglib.function_utils.cached.property,cached_property.cached_property,cached_property.threaded_cached_property,cached_property.cached_property_with_ttl,cached_property.threaded_cached_property_with_ttl,werkzeug.utils.cached_property
+
+[VARIABLES]
+
+# Tells whether we should check for unused import in __init__ files.
+init-import=no
+
+# A regular expression matching names used for dummy variables (i.e. not used).
+dummy-variables-rgx=^\*{0,2}(_$|unused_|dummy_)
+
+# List of additional names supposed to be defined in builtins. Remember that
+# you should avoid to define new builtins when possible.
+additional-builtins=
+
+# List of modules that are allowed to redefine builtins.
+redefining-builtins-modules=six,six.moves,past.builtins,future.builtins,functools
+
+
+[STRING]
+
+# This flag controls whether the implicit-str-concat should
+# generate a warning on implicit string concatenation in sequences defined over
+# several lines.
+check-str-concat-over-line-jumps=yes
+
+[CLASSES]
+
+# List of method names used to declare (i.e. assign) instance attributes.
+defining-attr-methods=__init__,__new__,setUp
+
+# "class_" is also a valid for the first argument to a class method.
+valid-classmethod-first-arg=cls,class_
+
+
+[IMPORTS]
+
+# Deprecated modules which should not be used, separated by a comma
+deprecated-modules=
+
+
+[FORMAT]
+
+# Maximum number of characters on a single line.
+max-line-length=80
+
+# Regexp for a line that is allowed to be longer than the limit.
+# This "ignore" regex is today composed of:
+# (1) p4 expansion $Id$ lines
+# (2) Depot paths for go/ifthisthenthatlint directives.
+# (3) Long string constants not containing whitespaces. This is needed now we
+#     have switched Pyformat to use Pyink, and it would wrap strings constants
+#     with a narrow range of lengths (less than 80 - indentation) in parens.
+#     This causes GPylint to complain otherwise allowed per
+#     go/pystyle#line-length. See b/262137806 for more information.
+# Other lines might be allowed to be long by gpylint.pyformat_filter: see that
+# module for more information.
+ignore-long-lines=(?x)(\$Id:\s\/\/depot\/.+\#\d+\s\$|^\s*\#\ LINT\.ThenChange|^\s*\w+\ =\ (?P<quote>['"])\S+(?P=quote)$)
+
+# Maximum number of lines in a module
+max-module-lines=99999
+
+# String used as indentation unit. We differ from PEP8's normal 4 spaces.
+indent-string='  '
+
+# Do not warn about multiple statements on a single line for constructs like
+#   if test: stmt
+single-line-if-stmt=y
+
+[MISCELLANEOUS]
+
+# List of note tags to take in consideration, separated by a comma.
+notes=
+
