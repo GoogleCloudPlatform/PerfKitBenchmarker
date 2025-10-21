@@ -517,11 +517,22 @@ def _RunPostBootLatencyTest(
   """
   try:
     before_test_time = time.time()
-    _, stderr, retcode = test_vm.RemoteCommandWithReturnCode(test_cmd)
+    _, stderr, retcode = test_vm.RemoteCommandWithReturnCode(
+        test_cmd, ignore_failure=True
+    )
     after_test_time = time.time()
     if retcode != 0:
       logging.warning(
           'The test command returned a non-zero exit code: %s', stderr
+      )
+      return sample.Sample(
+          'Post Boot Command Failed',
+          1,
+          'count',
+          {
+              'test_command': test_cmd,
+              'test_command_stderr': stderr[:1000],
+          },
       )
     else:
       return sample.Sample(

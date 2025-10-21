@@ -263,7 +263,7 @@ class PostBootLatencyTest(ClusterBootBenchmarkTest):
       self.assertEqual(result.unit, 'seconds')
       self.assertEqual(result.metadata['test_command'], 'test_command')
       self.test_vm.RemoteCommandWithReturnCode.assert_called_once_with(
-          self.test_cmd
+          self.test_cmd, ignore_failure=True
       )
 
   @mock.patch.object(logging, 'warning')
@@ -279,12 +279,16 @@ class PostBootLatencyTest(ClusterBootBenchmarkTest):
         self.test_cmd, self.test_vm
     )
 
-    self.assertIsNone(result)
+    self.assertIsNotNone(result)
+    self.assertEqual(result.metric, 'Post Boot Command Failed')
+    self.assertEqual(result.value, 1)
+    self.assertEqual(result.unit, 'count')
+    self.assertEqual(result.metadata['test_command'], 'test_command')
     mock_warning.assert_called_once_with(
         'The test command returned a non-zero exit code: %s', 'error message'
     )
     self.test_vm.RemoteCommandWithReturnCode.assert_called_once_with(
-        self.test_cmd
+        self.test_cmd, ignore_failure=True
     )
 
   @mock.patch.object(logging, 'warning')
@@ -305,7 +309,7 @@ class PostBootLatencyTest(ClusterBootBenchmarkTest):
         mock.ANY,
     )
     self.test_vm.RemoteCommandWithReturnCode.assert_called_once_with(
-        self.test_cmd
+        self.test_cmd, ignore_failure=True
     )
 
 if __name__ == '__main__':
