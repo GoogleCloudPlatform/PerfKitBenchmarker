@@ -409,6 +409,12 @@ class Rhel9BasedStaticVirtualMachine(
   pass
 
 
+class Rhel10BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Rhel10Mixin
+):
+  pass
+
+
 class Fedora36BasedStaticVirtualMachine(
     StaticVirtualMachine, linux_virtual_machine.Fedora36Mixin
 ):
@@ -429,6 +435,12 @@ class Debian11BasedStaticVirtualMachine(
 
 class Debian12BasedStaticVirtualMachine(
     StaticVirtualMachine, linux_virtual_machine.Debian12Mixin
+):
+  pass
+
+
+class Debian13BasedStaticVirtualMachine(
+    StaticVirtualMachine, linux_virtual_machine.Debian13Mixin
 ):
   pass
 

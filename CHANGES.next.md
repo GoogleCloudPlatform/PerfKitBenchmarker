@@ -255,6 +255,8 @@
     single Prepare function.
 -   Also let users run only some of those three parts if they want to.
 -   Add support for the `--addons` flag in GKE Standard.
+-   Add support for RHEL and Rocky Linux 10.
+-   Add support for Debian 13.
 
 ### Enhancements:
 

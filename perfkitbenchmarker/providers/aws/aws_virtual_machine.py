@@ -1676,6 +1676,16 @@ class Debian12BasedAwsVirtualMachine(
   DEFAULT_USER_NAME = 'admin'
 
 
+class Debian13BasedAwsVirtualMachine(
+    BaseLinuxAwsVirtualMachine, linux_virtual_machine.Debian13Mixin
+):
+  # From https://wiki.debian.org/Cloud/AmazonEC2Image/Trixie
+  IMAGE_NAME_FILTER_PATTERN = 'debian-13-{alternate_architecture}-*'
+  IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
+  DEFAULT_USER_NAME = 'admin'
+
+
 class UbuntuBasedAwsVirtualMachine(BaseLinuxAwsVirtualMachine):
   IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'ubuntu'
@@ -1851,6 +1861,19 @@ class Rhel9BasedAwsVirtualMachine(
   IMAGE_OWNER = RHEL_IMAGE_PROJECT
 
 
+class Rhel10BasedAwsVirtualMachine(
+    BaseLinuxAwsVirtualMachine, linux_virtual_machine.Rhel10Mixin
+):
+  """Class with configuration for AWS RHEL 10 virtual machines."""
+
+  # Documentation on finding RHEL images:
+  # https://access.redhat.com/articles/3692431
+  # All RHEL AMIs are HVM. HVM- blocks HVM_BETA.
+  IMAGE_NAME_FILTER_PATTERN = 'RHEL-10*_HVM-*'
+  IMAGE_OWNER = RHEL_IMAGE_PROJECT
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
+
+
 class RockyLinux8BasedAwsVirtualMachine(
     BaseLinuxAwsVirtualMachine, linux_virtual_machine.RockyLinux8Mixin
 ):
@@ -1868,6 +1891,16 @@ class RockyLinux9BasedAwsVirtualMachine(
 
   IMAGE_OWNER = ROCKY_LINUX_IMAGE_PROJECT
   IMAGE_NAME_FILTER_PATTERN = 'Rocky-9-*'
+  DEFAULT_USER_NAME = 'rocky'
+
+
+class RockyLinux10BasedAwsVirtualMachine(
+    BaseLinuxAwsVirtualMachine, linux_virtual_machine.RockyLinux10Mixin
+):
+  """Class with configuration for AWS Rocky Linux 10 virtual machines."""
+
+  IMAGE_OWNER = ROCKY_LINUX_IMAGE_PROJECT
+  IMAGE_NAME_FILTER_PATTERN = 'Rocky-10-*'
   DEFAULT_USER_NAME = 'rocky'
 
 

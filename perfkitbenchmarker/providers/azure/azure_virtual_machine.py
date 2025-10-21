@@ -1325,6 +1325,15 @@ class Debian12BasedAzureVirtualMachine(
   ARM_IMAGE_URN = 'Debian:debian-12:12-arm64:latest'
 
 
+class Debian13BasedAzureVirtualMachine(
+    AzureVirtualMachine, linux_virtual_machine.Debian13Mixin
+):
+  # From https://wiki.debian.org/Cloud/MicrosoftAzure
+  GEN2_IMAGE_URN = 'Debian:debian-13:13-gen2:latest'
+  GEN1_IMAGE_URN = 'Debian:debian-13:13:latest'
+  ARM_IMAGE_URN = 'Debian:debian-13:13-arm64:latest'
+
+
 class Ubuntu2004BasedAzureVirtualMachine(
     AzureVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin
 ):
@@ -1376,6 +1385,13 @@ class Rhel9BasedAzureVirtualMachine(
 ):
   GEN2_IMAGE_URN = 'RedHat:RHEL:9-lvm-gen2:latest'
   GEN1_IMAGE_URN = 'RedHat:RHEL:9-lvm:latest'
+
+
+class Rhel10BasedAzureVirtualMachine(
+    AzureVirtualMachine, linux_virtual_machine.Rhel10Mixin
+):
+  GEN2_IMAGE_URN = 'RedHat:RHEL:10-lvm-gen2:latest'
+  GEN1_IMAGE_URN = 'RedHat:RHEL:10-lvm:latest'
 
 
 class AlmaLinuxBasedAzureVirtualMachine(

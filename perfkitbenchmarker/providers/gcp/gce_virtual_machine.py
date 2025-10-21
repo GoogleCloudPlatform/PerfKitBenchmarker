@@ -1769,6 +1769,13 @@ class Debian12BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
 
+class Debian13BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Debian13Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'debian-13'
+  DEFAULT_IMAGE_PROJECT = 'debian-cloud'
+
+
 class Rhel8BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Rhel8Mixin
 ):
@@ -1780,6 +1787,13 @@ class Rhel9BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Rhel9Mixin
 ):
   DEFAULT_X86_IMAGE_FAMILY = 'rhel-9'
+  DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
+
+
+class Rhel10BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Rhel10Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'rhel-10'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
@@ -1834,6 +1848,20 @@ class RockyLinux9OptimizedBasedGceVirtualMachine(
 ):
   OS_TYPE = os_types.ROCKY_LINUX9_OPTIMIZED
   DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-9-optimized-gcp'
+
+
+class RockyLinux10BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.RockyLinux10Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-10'
+  DEFAULT_IMAGE_PROJECT = 'rocky-linux-cloud'
+
+
+class RockyLinux10OptimizedBasedGceVirtualMachine(
+    RockyLinux10BasedGceVirtualMachine
+):
+  OS_TYPE = os_types.ROCKY_LINUX10_OPTIMIZED
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-10-optimized-gcp'
 
 
 class CentOsStream9BasedGceVirtualMachine(

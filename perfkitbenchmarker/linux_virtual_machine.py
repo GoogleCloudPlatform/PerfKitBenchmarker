@@ -2841,6 +2841,17 @@ class Rhel9Mixin(BaseRhelMixin):
     self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(9)}')
 
 
+class Rhel10Mixin(BaseRhelMixin):
+  """Class holding RHEL 10 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.RHEL10
+
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/#_rhel_10
+    self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(10)}')
+
+
 class Ol8Mixin(BaseRhelMixin):
   """Class holding Oracle Linux 8 specific VM methods and attributes."""
 
@@ -2913,6 +2924,20 @@ class RockyLinux9Mixin(BaseRhelMixin):
   def SetupPackageManager(self):
     """Install EPEL."""
     # https://docs.fedoraproject.org/en-US/epel/#_almalinux_9_rocky_linux_98
+    self.RemoteCommand(
+        'sudo dnf config-manager --set-enabled crb &&'
+        'sudo dnf install -y epel-release'
+    )
+
+
+class RockyLinux10Mixin(BaseRhelMixin):
+  """Class holding Rocky Linux 10 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.ROCKY_LINUX10
+
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/#_rocky_linux_10
     self.RemoteCommand(
         'sudo dnf config-manager --set-enabled crb &&'
         'sudo dnf install -y epel-release'
@@ -3135,6 +3160,18 @@ class Debian12Mixin(BaseDebianMixin):
   """Class holding Debian 12 specific VM methods and attributes."""
 
   OS_TYPE = os_types.DEBIAN12
+
+  def PrepareVMEnvironment(self):
+    # Missing in some images. Required by PrepareVMEnvironment to determine
+    # partitioning.
+    self.InstallPackages('fdisk')
+    super().PrepareVMEnvironment()
+
+
+class Debian13Mixin(BaseDebianMixin):
+  """Class holding Debian 13 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.DEBIAN13
 
   def PrepareVMEnvironment(self):
     # Missing in some images. Required by PrepareVMEnvironment to determine
