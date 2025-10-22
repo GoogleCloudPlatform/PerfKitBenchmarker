@@ -39,7 +39,13 @@ AWS_NIC_QUEUE_COUNTS = flags.DEFINE_list(
     'The queue count of each NIC. Specify a list of key=value pairs, where key'
     ' is the network device name and value is the queue count.',
 )
-
+AWS_INSTANCE_BANDWIDTH_WEIGHTING = flags.DEFINE_enum(
+    'aws_instance_bandwidth_weighting',
+    None,
+    ['vpc-1', 'ebs-1'],
+    'The bandwidth weighting of each instance, increasing one of vpc and ebs'
+    ' bandwidth at the expense of the other. Valid options are vpc-1, ebs-1.',
+)
 flags.DEFINE_string(
     'aws_dax_node_type',
     'dax.r4.large',

@@ -962,6 +962,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '{CapacityReservationId=%s}' % reservation_id]
     else:
       reservation_args = []
+
+    bandwidth_weighting_args = []
+    if aws_flags.AWS_INSTANCE_BANDWIDTH_WEIGHTING.value:
+      bandwidth_weighting_args = [
+          '--network-performance-options',
+          f'BandwidthWeighting={aws_flags.AWS_INSTANCE_BANDWIDTH_WEIGHTING.value}'
+      ]
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'run-instances',
@@ -972,7 +979,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--key-name=%s' % AwsKeyFileManager.GetKeyNameForRun(),
         '--tag-specifications=%s'
         % util.FormatTagSpecifications('instance', self.aws_tags),
-    ] + reservation_args
+    ] + reservation_args + bandwidth_weighting_args
 
     if FLAGS.aws_vm_hibernate:
       create_cmd.extend([
@@ -1607,6 +1614,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['efa_count'] = FLAGS.aws_efa_count
       result['nic_count'] = FLAGS.aws_efa_count
     result['preemptible'] = self.use_spot_instance
+    result['instance_bandwidth_weighting'] = (
+        aws_flags.AWS_INSTANCE_BANDWIDTH_WEIGHTING.value or 'default'
+    )
     return result
 
   def DiskTypeCreatedOnVMCreation(self, disk_type):
