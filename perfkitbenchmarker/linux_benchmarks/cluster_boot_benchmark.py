@@ -505,7 +505,7 @@ def _GetVmOperationDataSamples(
 
 def _RunPostBootLatencyTest(
     test_cmd: str, test_vm: virtual_machine.BaseVirtualMachine
-) -> sample.Sample | None:
+) -> list[sample.Sample] | None:
   """Runs a test command on a VM and returns a sample of its latency.
 
   Args:
@@ -525,7 +525,7 @@ def _RunPostBootLatencyTest(
       logging.warning(
           'The test command returned a non-zero exit code: %s', stderr
       )
-      return sample.Sample(
+      return [sample.Sample(
           'Post Boot Command Failed',
           1,
           'count',
@@ -533,14 +533,22 @@ def _RunPostBootLatencyTest(
               'test_command': test_cmd,
               'test_command_stderr': stderr[:1000],
           },
-      )
+      )]
     else:
-      return sample.Sample(
-          'Post Boot Command Latency',
-          after_test_time - before_test_time,
-          'seconds',
-          {'test_command': test_cmd},
-      )
+      return [
+          sample.Sample(
+              'Post Boot Command Latency',
+              after_test_time - before_test_time,
+              'seconds',
+              {'test_command': test_cmd},
+          ),
+          sample.Sample(
+              'Create to Post Boot Command',
+              after_test_time - test_vm.create_start_time,
+              'seconds',
+              {'test_command': test_cmd},
+          ),
+      ]
   except errors.VirtualMachine.RemoteCommandError as e:
     logging.warning(
         'Unable to establish connection with VM; the test command was not'
@@ -559,6 +567,12 @@ def Run(benchmark_spec):
     An empty list (all boot samples will be added later).
   """
   samples = []
+  if _POST_BOOT_LATENCY_TEST_COMMAND.value and benchmark_spec.vms:
+    test_vm = benchmark_spec.vms[0]
+    post_boot_samples = _RunPostBootLatencyTest(
+        _POST_BOOT_LATENCY_TEST_COMMAND.value, test_vm)
+    if post_boot_samples:
+      samples += post_boot_samples
   if _LINUX_BOOT_METRICS.value or CollectNetworkSamples():
     for vm in benchmark_spec.vms:
       samples.extend(
@@ -574,12 +588,6 @@ def Run(benchmark_spec):
       )
   if _BOOT_TIME_REBOOT.value:
     samples.extend(_MeasureReboot(benchmark_spec.vms))
-  if _POST_BOOT_LATENCY_TEST_COMMAND.value and benchmark_spec.vms:
-    test_vm = benchmark_spec.vms[0]
-    post_boot_sample = _RunPostBootLatencyTest(
-        _POST_BOOT_LATENCY_TEST_COMMAND.value, test_vm)
-    if post_boot_sample:
-      samples.append(post_boot_sample)
 
   return samples
 
