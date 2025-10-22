@@ -111,6 +111,21 @@ Start from the master branch of the repository. This is the default.
       pyink --pyink-indentation 2 --pyink-use-majority-quotes --unstable --line-length=80 {file_path}
     ```
 
+1.  Run lint-diffs on your changes.
+
+    ```
+    git diff -U0 origin | lint-diffs
+    ```
+
+    This will likely give some errors like:
+
+    ```
+    elastic_kubernetes_service.py:1032:0: C0301: Line too long (120/80) (line-too-long)
+    ```
+
+    Address all these errors before sending out the PR (& after making changes
+    to the PR).
+
 1.  Update the appropriate sections in CHANGES.next.md with a summary of your
     changes. For example, under "Bug fixes and maintenance updates" you might
     put something like: `- Fix crazy bug X (GH-<insert PR number here> from

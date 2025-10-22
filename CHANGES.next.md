@@ -632,3 +632,5 @@
 -   Add new general purpose fio benchmark for device - fio_raw_device_benchmark
 -   Add support for GCP HdML disks.
 -   Add fio benchmark for object storage via FUSE.
+-   Updated the CONTRIBUTING.md guide with steps to minimize merging & review
+    friction for new PRs.
