@@ -204,13 +204,6 @@ def ScaleUpPods(
     cluster.WaitForRollout(rollout_name, timeout=max_wait_time)
 
     all_new_pods = set(cluster.GetPodNames()) - initial_pods
-    cluster.WaitForResource(
-        'pod',
-        condition_name='Ready',
-        timeout=max_wait_time,
-        wait_for_all=True,
-        namespace='default',
-    )
     end_polling_time = time.monotonic()
     logging.info(
         'In %d seconds, found all %s new pods',
