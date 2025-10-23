@@ -75,7 +75,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import log_util
+from perfkitbenchmarker import log_collector
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -607,7 +607,7 @@ def Cleanup(benchmark_spec):
       logging.warning('tcpdump process %s ended prematurely.', pid)
     try:
       tcpdump_path = benchmark_spec.config.temporary['tcpdump_output_path']
-      log_util.CollectVMLogs(FLAGS.run_uri, tcpdump_path)
+      log_collector.CollectVMLogs(FLAGS.run_uri, tcpdump_path)
       os.remove(tcpdump_path)
     except FileNotFoundError:
       logging.warning(

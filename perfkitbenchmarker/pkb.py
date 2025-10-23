@@ -91,6 +91,7 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import log_collector
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import package_lookup
@@ -1079,13 +1080,13 @@ def _PublishRunStartedSample(spec):
   """
   metadata = {'flags': str(flag_util.GetProvidedCommandLineFlags())}
   # Publish the path to this spec's PKB logs at the start of the runs.
-  if log_util.PKB_LOG_BUCKET.value and FLAGS.run_uri:
-    metadata['pkb_log_path'] = log_util.GetLogCloudPath(
-        log_util.PKB_LOG_BUCKET.value, f'{FLAGS.run_uri}-pkb.log'
+  if log_collector.PKB_LOG_BUCKET.value and FLAGS.run_uri:
+    metadata['pkb_log_path'] = log_collector.GetLogCloudPath(
+        log_collector.PKB_LOG_BUCKET.value, f'{FLAGS.run_uri}-pkb.log'
     )
-  if log_util.VM_LOG_BUCKET.value and FLAGS.run_uri:
-    metadata['vm_log_path'] = log_util.GetLogCloudPath(
-        log_util.VM_LOG_BUCKET.value, FLAGS.run_uri
+  if log_collector.VM_LOG_BUCKET.value and FLAGS.run_uri:
+    metadata['vm_log_path'] = log_collector.GetLogCloudPath(
+        log_collector.VM_LOG_BUCKET.value, FLAGS.run_uri
     )
 
   _PublishEventSample(spec, 'Run Started', metadata)
@@ -1810,7 +1811,9 @@ def RunBenchmarks():
     _WriteCompletionStatusFile(benchmark_specs, status_file)
 
   # Upload PKB logs to GCS after all benchmark runs are complete.
-  log_util.CollectPKBLogs(run_uri=FLAGS.run_uri)
+  log_collector.CollectPKBLogs(
+      run_uri=FLAGS.run_uri, log_local_path=log_util.log_local_path
+  )
   all_benchmarks_succeeded = all(
       spec.status == benchmark_status.SUCCEEDED for spec in benchmark_specs
   )
@@ -2054,7 +2057,7 @@ def CaptureVMLogs(
           'Captured the following logs for VM %s: %s', vm.name, vm_log_files
       )
       for log_path in vm_log_files:
-        log_util.CollectVMLogs(FLAGS.run_uri, log_path)
+        log_collector.CollectVMLogs(FLAGS.run_uri, log_path)
 
 
 def ParseArgs(argv):
