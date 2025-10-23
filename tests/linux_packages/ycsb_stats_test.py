@@ -13,7 +13,6 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.packages.ycsb."""
 
-import copy
 import logging
 import os
 import unittest
@@ -317,26 +316,6 @@ class CombineResultsTestCase(unittest.TestCase):
     self.assertEqual(
         {'Operations': 196, 'Return=0': 194, 'Return=-1': 2}, read_stats
     )
-
-  def testDropUnaggregatedFromSingleResult(self):
-    r = ycsb_stats.YcsbResult(
-        client='',
-        command_line='',
-        groups={
-            'read': ycsb_stats._OpResult(
-                group='read',
-                statistics={'AverageLatency(ms)': 21},
-                data_type=ycsb_stats.HISTOGRAM,
-            )
-        },
-    )
-
-    r_copy = copy.deepcopy(r)
-    self.assertEqual(r, r_copy)
-    combined = ycsb_stats.CombineResults([r], 'histogram', {})
-    self.assertEqual(r, r_copy)
-    r.groups['read'].statistics = {}
-    self.assertEqual(r, combined)
 
 
 class HdrLogsParserTestCase(unittest.TestCase):

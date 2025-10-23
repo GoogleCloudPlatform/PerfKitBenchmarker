@@ -65,6 +65,7 @@ import logging
 import multiprocessing
 from os.path import isfile
 import pickle
+import platform
 import random
 import re
 import sys
@@ -90,12 +91,14 @@ from perfkitbenchmarker import flag_util
 from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_benchmarks
 from perfkitbenchmarker import linux_virtual_machine
+from perfkitbenchmarker import log_collector
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import package_lookup
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import requirements
+from perfkitbenchmarker import resources
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import static_virtual_machine
@@ -400,9 +403,14 @@ def _InjectBenchmarkInfoIntoDocumentation():
 
 
 def _ParseFlags(argv):
-  """Parses the command-line flags."""
+  """Parses the command-line flags and returns the positional arguments."""
   try:
     argv = FLAGS(argv)
+    if len(argv) > 1:
+      raise flags.ValidationError(
+          f'Unexpected positional arguments: {argv[1:]}'
+      )
+    return argv
   except flags.Error as e:
     logging.error(e)
     logging.info('For usage instructions, use --helpmatch={module_name}')
@@ -543,6 +551,7 @@ def _CreateBenchmarkSpecs():
   Returns:
     A list of BenchmarkSpecs.
   """
+  resources.LoadModules()
   specs = []
   benchmark_tuple_list = benchmark_sets.GetBenchmarksFromFlags()
   benchmark_counts = collections.defaultdict(itertools.count)
@@ -657,8 +666,6 @@ def DoProvisionPhase(
   # Pickle the spec before we try to create anything so we can clean
   # everything up on a second run if something goes wrong.
   spec.Pickle()
-
-  events.register_tracers.send(parsed_flags=FLAGS)
   events.benchmark_start.send(benchmark_spec=spec)
   try:
     with timer.Measure('Resource Provisioning'):
@@ -741,7 +748,32 @@ def DoPreparePhase(
   with timer.Measure('BenchmarkSpec Prepare'):
     spec.Prepare()
   with timer.Measure('Benchmark Prepare'):
-    spec.BenchmarkPrepare(spec)
+    # Benchmarks can either implement a single 'Prepare' method, or
+    # PrepareSystem, InstallPackages and StartServices. In the second option,
+    # those three methods will be called in that order to prepare the benchmark
+    # on a VM.
+
+    # Benchmarks must define at least one prepare function, because defining
+    # none is probably a bug.
+    if (
+        not spec.BenchmarkPrepare
+        and not spec.BenchmarkPrepareSystem
+        and not spec.BenchmarkInstallPackages
+        and not spec.BenchmarkStartServices
+    ):
+      raise errors.Benchmarks.PrepareException(
+          'Benchmark must define at least one prepare function.'
+      )
+
+    if spec.BenchmarkPrepare:
+      spec.BenchmarkPrepare(spec)
+    else:
+      if spec.BenchmarkPrepareSystem:
+        spec.BenchmarkPrepareSystem(spec)
+      if spec.BenchmarkInstallPackages:
+        spec.BenchmarkInstallPackages(spec)
+      if spec.BenchmarkStartServices:
+        spec.BenchmarkStartServices(spec)
   spec.StartBackgroundWorkload()
   if FLAGS.after_prepare_sleep_time:
     logging.info(
@@ -922,6 +954,88 @@ def DoTeardownPhase(
   events.after_phase.send(stages.TEARDOWN, benchmark_spec=spec)
 
 
+def DoPrepareSystemPhase(
+    spec: bm_spec.BenchmarkSpec,
+    timer: timing_util.IntervalTimer,
+):
+  """Performs the prepare system phase of benchmark execution.
+
+  This runs configuration steps that should always happen on the host system,
+  even if the benchmark will run in a VM or container.
+
+  Args:
+    spec: The BenchmarkSpec created for the benchmark.
+    timer: An IntervalTimer that measures the start and stop times of resource
+      teardown.
+  """
+  logging.info('Preparing system for benchmark %s', spec.name)
+  events.before_phase.send(stages.PREPARE_SYSTEM, benchmark_spec=spec)
+
+  if not spec.BenchmarkPrepareSystem:
+    raise errors.Benchmarks.PrepareException(
+        'Benchmark does not define PrepareSystem.'
+    )
+
+  with timer.Measure('Prepare System'):
+    spec.BenchmarkPrepareSystem(spec)
+
+  events.after_phase.send(stages.PREPARE_SYSTEM, benchmark_spec=spec)
+
+
+def DoInstallPackagesPhase(
+    spec: bm_spec.BenchmarkSpec,
+    timer: timing_util.IntervalTimer,
+):
+  """Performs the install packages phase of benchmark execution.
+
+  This installs the packages needed to run the benchmark.
+
+  Args:
+    spec: The BenchmarkSpec created for the benchmark.
+    timer: An IntervalTimer that measures the start and stop times of resource
+      teardown.
+  """
+  logging.info('Installing packages for benchmark %s', spec.name)
+  events.before_phase.send(stages.INSTALL_PACKAGES, benchmark_spec=spec)
+
+  if not spec.BenchmarkInstallPackages:
+    raise errors.Benchmarks.PrepareException(
+        'Benchmark does not define InstallPackages.'
+    )
+
+  with timer.Measure('Install Packages'):
+    spec.BenchmarkInstallPackages(spec)
+
+  events.after_phase.send(stages.INSTALL_PACKAGES, benchmark_spec=spec)
+
+
+def DoStartServicesPhase(
+    spec: bm_spec.BenchmarkSpec,
+    timer: timing_util.IntervalTimer,
+):
+  """Performs the start services phase of benchmark execution.
+
+  This starts the services needed to run the benchmark.
+
+  Args:
+    spec: The BenchmarkSpec created for the benchmark.
+    timer: An IntervalTimer that measures the start and stop times of resource
+      teardown.
+  """
+  logging.info('Starting services for benchmark %s', spec.name)
+  events.before_phase.send(stages.START_SERVICES, benchmark_spec=spec)
+
+  if not spec.BenchmarkStartServices:
+    raise errors.Benchmarks.PrepareException(
+        'Benchmark does not define StartServices.'
+    )
+
+  with timer.Measure('Start Services'):
+    spec.BenchmarkStartServices(spec)
+
+  events.after_phase.send(stages.START_SERVICES, benchmark_spec=spec)
+
+
 def _SkipPendingRunsFile():
   if FLAGS.skip_pending_runs_file and isfile(FLAGS.skip_pending_runs_file):
     logging.warning(
@@ -966,13 +1080,13 @@ def _PublishRunStartedSample(spec):
   """
   metadata = {'flags': str(flag_util.GetProvidedCommandLineFlags())}
   # Publish the path to this spec's PKB logs at the start of the runs.
-  if log_util.PKB_LOG_BUCKET.value and FLAGS.run_uri:
-    metadata['pkb_log_path'] = log_util.GetLogCloudPath(
-        log_util.PKB_LOG_BUCKET.value, f'{FLAGS.run_uri}-pkb.log'
+  if log_collector.PKB_LOG_BUCKET.value and FLAGS.run_uri:
+    metadata['pkb_log_path'] = log_collector.GetLogCloudPath(
+        log_collector.PKB_LOG_BUCKET.value, f'{FLAGS.run_uri}-pkb.log'
     )
-  if log_util.VM_LOG_BUCKET.value and FLAGS.run_uri:
-    metadata['vm_log_path'] = log_util.GetLogCloudPath(
-        log_util.VM_LOG_BUCKET.value, FLAGS.run_uri
+  if log_collector.VM_LOG_BUCKET.value and FLAGS.run_uri:
+    metadata['vm_log_path'] = log_collector.GetLogCloudPath(
+        log_collector.VM_LOG_BUCKET.value, FLAGS.run_uri
     )
 
   _PublishEventSample(spec, 'Run Started', metadata)
@@ -1031,13 +1145,16 @@ def _IsException(e: Exception, exception_class: Type[Exception]) -> bool:
 
 
 def RunBenchmark(
-    spec: bm_spec.BenchmarkSpec, collector: publisher.SampleCollector
+    spec: bm_spec.BenchmarkSpec,
+    collector: publisher.SampleCollector,
+    register_tracers: bool = True,
 ):
   """Runs a single benchmark and adds the results to the collector.
 
   Args:
     spec: The BenchmarkSpec object with run information.
     collector: The SampleCollector object to add samples to.
+    register_tracers: Whether to register tracers for the benchmark.
   """
 
   # Since there are issues with the handling SIGINT/KeyboardInterrupt (see
@@ -1060,6 +1177,9 @@ def RunBenchmark(
       spec.name, spec.sequence_number, spec.total_benchmarks
   )
   context.SetThreadBenchmarkSpec(spec)
+  if register_tracers:
+    events.register_tracers.send(parsed_flags=FLAGS)
+
   log_context = log_util.GetThreadLogContext()
   with log_context.ExtendLabel(label_extension):
     with spec.RedirectGlobalFlags():
@@ -1081,6 +1201,18 @@ def RunBenchmark(
             interrupt_checker.EndCheckInterruptThreadAndRaiseError()
             interrupt_checker = None
 
+          if stages.PREPARE_SYSTEM in FLAGS.run_stage:
+            current_run_stage = stages.PREPARE_SYSTEM
+            DoPrepareSystemPhase(spec, detailed_timer)
+
+          if stages.INSTALL_PACKAGES in FLAGS.run_stage:
+            current_run_stage = stages.INSTALL_PACKAGES
+            DoInstallPackagesPhase(spec, detailed_timer)
+
+          if stages.START_SERVICES in FLAGS.run_stage:
+            current_run_stage = stages.START_SERVICES
+            DoStartServicesPhase(spec, detailed_timer)
+
           if stages.RUN in FLAGS.run_stage:
             current_run_stage = stages.RUN
             interrupt_checker = InterruptChecker(spec.vms)
@@ -1096,6 +1228,7 @@ def RunBenchmark(
             interrupt_checker = None
 
           if stages.TEARDOWN in FLAGS.run_stage:
+            # This function will only do anything if --capture_vm_logs is passed
             CaptureVMLogs(spec.vms)
             skip_teardown_conditions = ParseSkipTeardownConditions(
                 pkb_flags.SKIP_TEARDOWN_CONDITIONS.value
@@ -1194,6 +1327,10 @@ def RunBenchmark(
         ):
           # Note that if TEARDOWN is specified, it will happen below.
           DoTeardownPhase(spec, collector, detailed_timer)
+
+        # Ensures log capture is attempted even if the run fails
+        # This function will only do anything if --capture_vm_logs is passed
+        CaptureVMLogs(spec.vms)
         raise
       # finally block will only clean up generic resources if teardown is
       # included in FLAGS.run_stage.
@@ -1473,13 +1610,9 @@ class ZoneRetryManager:
     """Changes zone to be a new zone in the different region."""
     region = self._utils.GetRegionFromZone(self._GetCurrentZoneFlag())
     self._regions_tried.add(region)
-    regions_to_try = (
-        {
-            self._utils.GetRegionFromZone(zone)
-            for zone in self._supported_zones
-        }
-        - self._regions_tried
-    )
+    regions_to_try = {
+        self._utils.GetRegionFromZone(zone) for zone in self._supported_zones
+    } - self._regions_tried
     # Restart from empty if we've exhausted all alternatives.
     if not regions_to_try:
       self._regions_tried.clear()
@@ -1678,7 +1811,9 @@ def RunBenchmarks():
     _WriteCompletionStatusFile(benchmark_specs, status_file)
 
   # Upload PKB logs to GCS after all benchmark runs are complete.
-  log_util.CollectPKBLogs(run_uri=FLAGS.run_uri)
+  log_collector.CollectPKBLogs(
+      run_uri=FLAGS.run_uri, log_local_path=log_util.log_local_path
+  )
   all_benchmarks_succeeded = all(
       spec.status == benchmark_status.SUCCEEDED for spec in benchmark_specs
   )
@@ -1848,6 +1983,69 @@ def _CollectMeminfoHandler(
   samples.extend(background_tasks.RunThreaded(CollectMeminfo, linux_vms))
 
 
+@events.benchmark_samples_created.connect
+def _CollectLsmemHandler(
+    unused_sender,
+    benchmark_spec: bm_spec.BenchmarkSpec,
+    samples: List[sample.Sample],
+) -> None:
+  """Optionally creates lsmem sample of VM total memory.
+
+  If the flag --collect_lsmem is set, this function appends a sample.Sample of
+  total memory
+  size.
+
+  Parameter names cannot be changed as the method is called by events.send with
+  keyword arguments.
+
+  Args:
+    benchmark_spec: The benchmark spec.
+    samples: Generated samples that can be appended to.
+  """
+  if not pkb_flags.COLLECT_LSMEM.value:
+    return
+
+  def CollectLsmem(vm):
+    txt, _ = vm.RemoteCommand('lsmem -b -J -o SIZE')
+    try:
+      lsmem_json = json.loads(txt)
+    except json.JSONDecodeError:
+      logging.error('Failed to parse lsmem output: %s', txt)
+      return sample.Sample(
+          'lsmem_memory_size',
+          0,
+          'bytes',
+          {'lsmem_vmname': vm.name, 'lsmem_malformed': txt},
+      )
+    memory_bytes = 0
+    for memory_chunk in lsmem_json.get('memory', []):
+      memory_bytes += memory_chunk.get('size')
+    if not memory_bytes:
+      logging.error('Failed to parse memory size from lsmem')
+      return sample.Sample(
+          'lsmem_memory_size',
+          0,
+          'bytes',
+          {'lsmem_vmname': vm.name, 'lsmem_malformed': lsmem_json},
+      )
+    return sample.Sample(
+        'lsmem_memory_size',
+        memory_bytes,
+        'bytes',
+        {
+            'lsmem_vmname': vm.name,
+            'lsmem_machine_type': vm.machine_type,
+            'lsmem_os_type': vm.OS_TYPE,
+        },
+    )
+
+  linux_vms = [
+      vm for vm in benchmark_spec.vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES
+  ]
+
+  samples.extend(background_tasks.RunThreaded(CollectLsmem, linux_vms))
+
+
 def CaptureVMLogs(
     vms: List[virtual_machine.BaseVirtualMachine],
 ) -> None:
@@ -1859,13 +2057,27 @@ def CaptureVMLogs(
           'Captured the following logs for VM %s: %s', vm.name, vm_log_files
       )
       for log_path in vm_log_files:
-        log_util.CollectVMLogs(FLAGS.run_uri, log_path)
+        log_collector.CollectVMLogs(FLAGS.run_uri, log_path)
 
 
-def ParseArgs():
-  """Parse command line arguments ."""
-  argv = flag_alias.AliasFlagsFromArgs(sys.argv)
-  _ParseFlags(argv)
+def ParseArgs(argv):
+  """Parse command line flags and returns positional arguments."""
+  canonical_argv = flag_alias.AliasFlagsFromArgs(argv)
+  return _ParseFlags(canonical_argv)
+
+
+def Main(argv):
+  """Entrypoint for PerfKitBenchmarker."""
+  del argv  # Unused.
+  assert sys.version_info >= (3, 12), 'PerfKitBenchmarker requires Python 3.12+'
+  log_util.ConfigureBasicLogging()
+  _InjectBenchmarkInfoIntoDocumentation()
+
+  # Fix multiprocessing on macOS to use 'fork' instead of 'spawn'
+  # to avoid pickle errors with local functions issue #5883
+  if platform.system() == 'Darwin':
+    multiprocessing.set_start_method('fork', force=True)
+
   if FLAGS.helpmatch:
     _PrintHelp(FLAGS.helpmatch)
     return 0
@@ -1881,12 +2093,4 @@ def ParseArgs():
 
   CheckVersionFlag()
   SetUpPKB()
-
-
-def Main():
-  """Entrypoint for PerfKitBenchmarker."""
-  assert sys.version_info >= (3, 11), 'PerfKitBenchmarker requires Python 3.11+'
-  log_util.ConfigureBasicLogging()
-  _InjectBenchmarkInfoIntoDocumentation()
-  ParseArgs()
   return RunBenchmarks()

@@ -72,7 +72,7 @@ REGION = 'region'
 ZONE = 'zone'
 
 NON_PLACEMENT_GROUP_PREFIXES = frozenset(
-    ['t2', 'm3', 't3', 't3a', 't4g', 'vt1', 'm7i-flex']
+    ['t2', 'm3', 't3', 't3a', 't4g', 'vt1', 'm7i-flex', 'm8i-flex', 'r8i-flex']
 )
 # Reference -
 # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html#network-cards
@@ -93,10 +93,12 @@ DUAL_NETWORK_CARD_MACHINES = frozenset([
     'p4de.24xlarge',
     'p5.48xlarge',
     'p5en.48xlarge',
+    'p6-b200.48xlarge',
     'r6idn.32xlarge',
     'r6idn.metal',
     'r6in.32xlarge',
     'r6in.metal',
+    'r8gn.48xlarge',
     'trn1.32xlarge',
     'trn1n.32xlarge',
 ])

@@ -19,6 +19,7 @@ This benchmark measures performance of Sysbench Databases on unmanaged MySQL.
 
 import copy
 import logging
+import re
 import time
 
 from absl import flags
@@ -32,6 +33,34 @@ from perfkitbenchmarker.linux_packages import sysbench
 
 
 FLAGS = flags.FLAGS
+
+
+_MYSQL_BUFFER_POOL_SIZE = flags.DEFINE_string(
+    'mysql_buffer_pool_size',
+    None,
+    'Buffer pool size with units. Example: 8G, 16M, 32K or 64B.',
+)
+flags.register_validator(
+    _MYSQL_BUFFER_POOL_SIZE,
+    lambda value: (value is None) or re.fullmatch(r'^\d+[BKMG]?$', value),
+    'mysql_buffer_pool_size must be in the format of <size>[<unit>] where'
+    ' <unit> is one of (B, K, M, G) or None. If no unit is specified, B is'
+    ' assumed.',
+)
+flags.register_validator(
+    _MYSQL_BUFFER_POOL_SIZE,
+    lambda value: not (
+        value is not None and FLAGS.innodb_buffer_pool_size is not None
+    ),
+    'Both "mysql_buffer_pool_size" and "innodb_buffer_pool_size" cannot be set'
+    ' at the same time.',
+)
+
+_CONFIG_TEMPLATE = flags.DEFINE_string(
+    'mysql_config_template',
+    'mysql/ha.cnf.j2',
+    'Path to the MySQL config template file.',
+)
 
 
 BENCHMARK_NAME = 'unmanaged_mysql_sysbench'
@@ -89,6 +118,7 @@ unmanaged_mysql_sysbench:
     sysbench_ssl_mode: required
     sysbench_run_threads: 1,64,128,256,512,1024,2048
     sysbench_run_seconds: 300
+    enable_transparent_hugepages: False
 """
 
 # There are 2 main customer scenarios:
@@ -193,40 +223,38 @@ def GetSysbenchParameters(primary_server_ip: str | None, password: str):
 
 def GetBufferPoolSize():
   """Get buffer pool size from flags."""
+  if _MYSQL_BUFFER_POOL_SIZE.value:
+    logging.info(
+        'Buffer pool size was set with mysql_buffer_pool_sizeflag: %s',
+        _MYSQL_BUFFER_POOL_SIZE.value,
+    )
+    if _MYSQL_BUFFER_POOL_SIZE.value.endswith('B'):
+      # MySQL expects the buffer pool size to have no unit if it is in bytes.
+      return _MYSQL_BUFFER_POOL_SIZE.value[:-1]
+    return f'{_MYSQL_BUFFER_POOL_SIZE.value}'
   if FLAGS.innodb_buffer_pool_size:
     return f'{FLAGS.innodb_buffer_pool_size}G'
   return f'{DEFAULT_BUFFER_POOL_SIZE}G'
 
 
-def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
-  """Prepare the servers and clients for the benchmark run.
+def PrepareSystem(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Configure the system for the benchmark run.
 
   Args:
     benchmark_spec:
   """
   vms = benchmark_spec.vms
-  background_tasks.RunThreaded(mysql80.ConfigureSystemSettings, vms)
-  background_tasks.RunThreaded(lambda vm: vm.Install('mysql80'), vms)
+  background_tasks.RunOnAllVms(mysql80.ConfigureSystemSettings, vms)
 
-  buffer_pool_size = GetBufferPoolSize()
 
-  primary_server = benchmark_spec.vm_groups['server'][0]
-  replica_servers = []
-  for vm in benchmark_spec.vm_groups:
-    if vm.startswith('replica'):
-      replica_servers += benchmark_spec.vm_groups[vm]
+def InstallPackages(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Install packages for the benchmark run.
 
-  servers = [primary_server] + replica_servers
-  new_password = FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
-  for index, server in enumerate(servers):
-    # mysql server ids needs to be positive integers.
-    mysql80.ConfigureAndRestart(server, buffer_pool_size, index + 1)
-    mysql80.UpdatePassword(server, new_password)
-    mysql80.CreateDatabase(server, new_password, _DATABASE_NAME)
-
-  assert primary_server.internal_ip
-  for replica in replica_servers:
-    mysql80.SetupReplica(replica, new_password, primary_server.internal_ip)
+  Args:
+    benchmark_spec:
+  """
+  vms = benchmark_spec.vms
+  background_tasks.RunOnAllVms(lambda vm: vm.Install('mysql80'), vms)
 
   clients = benchmark_spec.vm_groups['client']
   for client in clients:
@@ -238,9 +266,50 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
           f'sudo git clone {sysbench.SYSBENCH_TPCC_REPRO}'
       )
 
+  buffer_pool_size = GetBufferPoolSize()
+
+  primary_server = benchmark_spec.vm_groups['server'][0]
+  replica_servers = []
+  for vm in benchmark_spec.vm_groups:
+    if vm.startswith('replica'):
+      replica_servers += benchmark_spec.vm_groups[vm]
+
+  servers = [primary_server] + replica_servers
+  for index, server in enumerate(servers):
+    # mysql server ids needs to be positive integers.
+    mysql80.WriteMysqlConfiguration(
+        server, buffer_pool_size, index + 1, _CONFIG_TEMPLATE.value
+    )
+
+
+def StartServices(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Start services for the benchmark run.
+
+  Args:
+    benchmark_spec:
+  """
+  primary_server = benchmark_spec.vm_groups['server'][0]
+  replica_servers = []
+  for vm in benchmark_spec.vm_groups:
+    if vm.startswith('replica'):
+      replica_servers += benchmark_spec.vm_groups[vm]
+
+  servers = [primary_server] + replica_servers
+  new_password = FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
+  for _, server in enumerate(servers):
+    # mysql server ids needs to be positive integers.
+    mysql80.RestartServer(server)
+    mysql80.UpdatePassword(server, new_password)
+    mysql80.CreateDatabase(server, new_password, _DATABASE_NAME)
+
+  assert primary_server.internal_ip
+  for replica in replica_servers:
+    mysql80.SetupReplica(replica, new_password, primary_server.internal_ip)
+
   loader_vm = benchmark_spec.vm_groups['client'][0]
   sysbench_parameters = GetSysbenchParameters(
-      primary_server.internal_ip, new_password)
+      primary_server.internal_ip, new_password
+  )
   cmd = sysbench.BuildLoadCommand(sysbench_parameters)
   logging.info('%s load command: %s', FLAGS.sysbench_testname, cmd)
   loader_vm.RemoteCommand(cmd)
@@ -259,9 +328,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   primary_server = benchmark_spec.vm_groups['server'][0]
   client = benchmark_spec.vm_groups['client'][0]
   sysbench_parameters = GetSysbenchParameters(
-      primary_server.internal_ip, _GetPassword())
+      primary_server.internal_ip, _GetPassword()
+  )
   results = []
-  # a map of trasactions metric name to current sample with max value
+  # a map of transactions metric name to current sample with max value
   max_transactions = {}
   for i, thread_count in enumerate(FLAGS.sysbench_run_threads):
     sysbench_parameters.threads = thread_count
@@ -269,10 +339,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     logging.info('%s run command: %s', FLAGS.sysbench_testname, cmd)
     try:
       stdout, _ = client.RemoteCommand(
-          cmd, timeout=2*FLAGS.sysbench_run_seconds,)
+          cmd,
+          timeout=2 * FLAGS.sysbench_run_seconds,
+      )
     except errors.VirtualMachine.RemoteCommandError as e:
-      logging.exception('Failed to run sysbench command: %s', e)
-      continue
+      raise errors.Benchmarks.RunError(f'Error running sysbench command: {e}')
     metadata = sysbench.GetMetadata(sysbench_parameters)
     metadata.update({
         'buffer_pool_size': GetBufferPoolSize(),
@@ -306,6 +377,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
             'max_' + item.metric, item.value, item.unit, metadata=metadata
         )
     )
+  # Copy client and server logs to the scratch directory.
+  for _, vms in benchmark_spec.vm_groups.items():
+    for vm in vms:
+      vm.CopyLogs('/var/log')
   return results
 
 

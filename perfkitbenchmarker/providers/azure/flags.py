@@ -115,7 +115,12 @@ flags.DEFINE_boolean(
     'create-vm-accelerated-networking-cli'
     'for more information.',
 )
-
+AZURE_NIC_COUNT = flags.DEFINE_integer(
+    'azure_nic_count',
+    1,
+    'Number of NICs to attach to the VM. Defaults to 1. Flag azure_subnet_id'
+    ' must be None if greater than 1.',
+)
 AZURE_SUBNET_ID = flags.DEFINE_string(
     'azure_subnet_id',
     None,
@@ -175,4 +180,10 @@ AZURE_SECURE_BOOT = flags.DEFINE_bool(
     None,
     'Enable/Disable secure boot of the VM to allow unsigned operating systems'
     ' and drivers. Defaults to None to fallback to Azure default behavior',
+)
+flags.DEFINE_boolean(
+    'azure_aks_auto_node_provisioning',
+    False,
+    'Enable automatic node provisioning for Azure AKS clusters. '
+    'This is automatically set to True for the provision_node_pools benchmark.',
 )

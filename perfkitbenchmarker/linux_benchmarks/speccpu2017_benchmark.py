@@ -86,24 +86,27 @@ flags.DEFINE_boolean(
     'Rebuild spec binaries, defaults to True. Set to False '
     'when using run_stage_iterations > 1 to avoid recompiling',
 )
-flags.DEFINE_string(
+SPEC17_GCC_FLAGS= flags.DEFINE_string(
     'spec17_gcc_flags',
-    '-O3',
-    'Flags to be used to override the default GCC -O3 used to compile SPEC.',
+    None,
+    'Flags to be used to override the default OPTIMIZE used to compile SPEC for'
+    ' GCC.',
 )
 flags.DEFINE_boolean(
     'spec17_best_effort',
     False,
     'Best effort run of spec. Allow missing results without failing.',
 )
-flags.DEFINE_string(
+AUTO_NUMA_BIND_CONFIG = 'auto'
+PACKED_NUMA_BIND_CONFIG = 'packed'
+SPEC17_NUMA_BIND_CONFIG = flags.DEFINE_string(
     'spec17_numa_bind_config',
     None,
     'Name of the config file to use for specifying NUMA binding. '
     'None by default. To enable numa binding, ensure the runspec_config file, '
     'contains "include: numactl.inc". In addition, setting to "auto", will '
-    'attempt to pin to local numa node and pin each SIR copy to a '
-    'exclusive hyperthread.',
+    'attempt to pin virtual cpus in order. Setting to "packed" will attempt to '
+    'pack the CPUs into the same sockets and cores.',
 )
 
 BENCHMARK_NAME = 'speccpu2017'
@@ -114,6 +117,11 @@ speccpu2017:
     default:
       vm_spec: *default_dual_core
       disk_spec: *default_500_gb
+  flags:
+    build_fortran: True
+    gcc_version: "11"
+    enable_transparent_hugepages: True
+    runspec_tar: cpu2017-1.1.8.tar.gz
 """
 
 KB_TO_GB_MULTIPLIER = 1000000
@@ -205,15 +213,38 @@ def _GenNumactlIncFile(vm):
   if FLAGS.spec17_numa_bind_config:
     remote_numactl_path = os.path.join(config.spec_dir, 'config', 'numactl.inc')
     vm.Install('numactl')
-    if FLAGS.spec17_numa_bind_config == 'auto':
+
+    if SPEC17_NUMA_BIND_CONFIG.value in [
+        AUTO_NUMA_BIND_CONFIG,
+        PACKED_NUMA_BIND_CONFIG,
+    ]:
+      bind_cpu_order = []
+      num_copies = _GetNumCopies(vm)
+      if SPEC17_NUMA_BIND_CONFIG.value == AUTO_NUMA_BIND_CONFIG:
+        bind_cpu_order = range(num_copies)
+      elif SPEC17_NUMA_BIND_CONFIG.value == PACKED_NUMA_BIND_CONFIG:
+        # Sort by physical id, core id, then cpu id.
+        # On a machine with SMT and n vCPUs, usually cpu k and k + n/2 are on
+        # the physical core. This produces the bind order:
+        # 0, n/2, 1, n/2 + 1, ...
+        packed_cpus = sorted(
+            vm.CheckProcCpu().mappings.items(),
+            key=lambda p: (
+                int(p[1]['physical id']),
+                int(p[1]['core id']),
+                p[0],
+            ),
+        )
+        bind_cpu_order = [cpu_id for cpu_id, _ in packed_cpus][:num_copies]
+
       # Upload config and rename
       numa_bind_cfg = [
           'intrate,fprate:',
           'submit = echo "${command}" > run.sh ; $BIND bash run.sh',
       ]
-      for idx in range(vm.NumCpusForBenchmark()):
+      for idx, cpu_id in enumerate(bind_cpu_order):
         numa_bind_cfg.append(
-            f'bind{idx} = /usr/bin/numactl --physcpubind=+{idx} --localalloc'
+            f'bind{idx} = /usr/bin/numactl --physcpubind=+{cpu_id} --localalloc'
         )
       vm_util.CreateRemoteFile(
           vm, '\n'.join(numa_bind_cfg), remote_numactl_path
@@ -270,10 +301,14 @@ def Run(benchmark_spec):
   return samples
 
 
-def _OverwriteGccO3(vm):
+def _OverwriteGccOptimize(vm):
+  """Update OPTIMIZE flag if compiler is gcc."""
+  if SPEC17_GCC_FLAGS.value is None:
+    return
   config = speccpu2017.GetSpecInstallConfig(vm.GetScratchDir())
   config_filepath = getattr(vm, speccpu.VM_STATE_ATTR, config).cfg_file_path
-  cmd = f"sed -i 's/-g -O3/{FLAGS.spec17_gcc_flags}/g' {config_filepath}"
+  cmd = f"sed -Ei 's/i(\\s+OPTIMIZE\\s+=).*/\\1 {SPEC17_GCC_FLAGS.value}/' "
+  cmd += config_filepath
   vm.RemoteCommand(cmd)
   return
 
@@ -290,7 +325,9 @@ def _Run(vm):
 
   # Make changes e.g. compiler flags to spec config file.
   if 'gcc' in FLAGS.runspec_config:
-    _OverwriteGccO3(vm)
+    # OPTIMIZE applies to all compilers, but our flag is only for gcc for
+    # legacy reasons.
+    _OverwriteGccOptimize(vm)
 
   # swap only if necessary; free local node memory and avoid remote memory;
   # reset caches; set stack size to unlimited
@@ -309,7 +346,7 @@ def _Run(vm):
     cmd += '--rebuild '
 
   version_specific_parameters = []
-  copies = FLAGS.spec17_copies or vm.NumCpusForBenchmark()
+  copies = _GetNumCopies(vm)
   version_specific_parameters.append(f' --copies={copies} ')
   version_specific_parameters.append(
       ' --threads=%s ' % (FLAGS.spec17_threads or vm.NumCpusForBenchmark())
@@ -373,7 +410,7 @@ def _Run(vm):
   samples = speccpu.ParseOutput(vm, log_files, partial_results, None)
   for item in samples:
     item.metadata['vm_name'] = vm.name
-    item.metadata['spec17_gcc_flags'] = FLAGS.spec17_gcc_flags
+    item.metadata['spec17_gcc_flags'] = SPEC17_GCC_FLAGS.value or 'default'
     item.metadata['spec17_numa_bind_config'] = FLAGS.spec17_numa_bind_config
     item.metadata['spec17_copies'] = copies
 
@@ -389,3 +426,10 @@ def Cleanup(benchmark_spec):
   """
   vms = benchmark_spec.vms
   background_tasks.RunThreaded(speccpu.Uninstall, vms)
+
+
+def _GetNumCopies(vm) -> int:
+  """Returns the number of copies to run."""
+  if FLAGS.spec17_copies:
+    return FLAGS.spec17_copies
+  return vm.NumCpusForBenchmark()

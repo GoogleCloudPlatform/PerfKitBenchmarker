@@ -101,9 +101,20 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     if self.spec.engine in _SQL_SERVER_ENGINES:
       cmd = cmd + ['--license-model=license-included']
 
+    # RDS does not support IOPS/throughput for GP3 disks under 400GB for
+    # certain engines.
     if (
         self.spec.db_disk_spec.disk_type == aws_disk.IO1
         or self.spec.db_disk_spec.disk_type == aws_disk.GP3
+    ) and not (
+        self.spec.engine
+        in [
+            sql_engine_utils.MARIADB,
+            sql_engine_utils.MYSQL,
+            sql_engine_utils.POSTGRES,
+        ]
+        and self.spec.db_disk_spec.disk_size < 400
+        and self.spec.db_disk_spec.disk_type == aws_disk.GP3
     ):
       if self.spec.db_disk_spec.provisioned_iops:
         cmd.append('--iops=%s' % self.spec.db_disk_spec.provisioned_iops)
@@ -125,24 +136,6 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     super()._PostCreate()
 
     self._SetPrimaryAndSecondaryZones()
-
-  def GetResourceMetadata(self):
-    """Returns the metadata associated with the resource.
-
-    All keys will be prefaced with relational_db before
-    being published (done in publisher.py).
-
-    Returns:
-      metadata: dict of AWS Managed DB metadata.
-    """
-    metadata = super().GetResourceMetadata()
-
-    if hasattr(self.spec.db_disk_spec, 'provisioned_iops'):
-      metadata.update({
-          'disk_iops': self.spec.db_disk_spec.provisioned_iops,
-      })
-
-    return metadata
 
   def _SetEndpoint(self):
     """Assigns the ports and endpoints from the instance_id to self.

@@ -14,10 +14,20 @@
 
 """Module containing dpdk-pktgen installation."""
 
+from absl import flags
 
 DPDK_PKTGEN_GIT_REPO = 'https://github.com/pktgen/Pktgen-DPDK'
 DPDK_PKTGEN_GIT_REPO_DIR = 'Pktgen-DPDK'
 DPDK_PKTGEN_GIT_REPO_TAG = '0e3a9c50daedccc7a83597f187d96288264edac0'
+
+DPDK_PKTGEN_MBUF_CACHE_SIZE = flags.DEFINE_integer(
+    'dpdk_pktgen_mbuf_cache_size', 512, 'The size of the mbuf cache per lcore.'
+)
+DPDK_PKTGEN_MBUFS_PER_PORT_MULTIPLIER = flags.DEFINE_integer(
+    'dpdk_pktgen_mbufs_per_port_multiplier',
+    32,
+    'The multiplier for the number of mbufs per port.',
+)
 
 
 def _Install(vm):
@@ -36,6 +46,17 @@ def _Install(vm):
   )
   vm.RemoteCommand(
       f'cd {DPDK_PKTGEN_GIT_REPO_DIR} && patch -l -p1 < pktgen.patch'
+  )
+  vm.RemoteCommand(
+      'sudo sed -i "s/MBUF_CACHE_SIZE                   = 128/MBUF_CACHE_SIZE '
+      f'                  = {DPDK_PKTGEN_MBUF_CACHE_SIZE.value}/g"'
+      f' {DPDK_PKTGEN_GIT_REPO_DIR}/app/pktgen-constants.h'
+  )
+  vm.RemoteCommand(
+      'sudo sed -i "s/DEFAULT_MBUFS_PER_PORT_MULTIPLIER ='
+      ' 8/DEFAULT_MBUFS_PER_PORT_MULTIPLIER ='
+      f' {DPDK_PKTGEN_MBUFS_PER_PORT_MULTIPLIER.value}/g"'
+      f' {DPDK_PKTGEN_GIT_REPO_DIR}/app/pktgen-constants.h'
   )
   vm.RemoteCommand(f'cd {DPDK_PKTGEN_GIT_REPO_DIR} && make')
 

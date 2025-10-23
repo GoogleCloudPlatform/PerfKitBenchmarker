@@ -1,0 +1,3 @@
+SELECT COUNT(*) AS result_rows
+FROM {{table_name}}
+WHERE SEARCH(raw_log, '{{search_text}}');

@@ -23,9 +23,7 @@ from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import container_service
-from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
@@ -36,11 +34,6 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
-
-NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT = 'https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/nvidia-driver-installer/cos/daemonset-preloaded.yaml'
-NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET = (
-    'nvidia_unrestricted_permissions_daemonset.yml'
-)
 SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
 ONE_HOUR = 60 * 60
 
@@ -221,8 +214,11 @@ class BaseGkeCluster(container_service.KubernetesCluster):
     super()._Delete()
     cmd = self._GcloudCommand('container', 'clusters', 'delete', self.name)
     cmd.args.append('--async')
-    _, err, _ = cmd.Issue(raise_on_failure=False)
-    if 'Please wait and try again' in err:
+    _, err, retcode = cmd.Issue(raise_on_failure=False)
+    if retcode:
+      # Some known retryable errors:
+      # Please wait and try again
+      # Cluster is running incompatible operation operation-id.
       raise errors.Resource.RetryableDeletionError(err)
 
   def _Exists(self):
@@ -236,6 +232,16 @@ class BaseGkeCluster(container_service.KubernetesCluster):
     # https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/gce-pd-csi-driver
     # PD-SSD
     return 'premium-rwo'
+
+  def GetNodePoolNames(self) -> list[str]:
+    """Get node pool names for the cluster."""
+    # Command `gcloud container node-pools list` does not work for Autopilot
+    # clusters - node pools are hidden and command results in 4xx.
+    cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
+    cmd.flags['flatten'] = 'nodePools'
+    cmd.flags['format'] = 'value(nodePools.name)'
+    stdout, _, _ = cmd.Issue()
+    return stdout.split()
 
 
 class GkeCluster(BaseGkeCluster):
@@ -270,6 +276,7 @@ class GkeCluster(BaseGkeCluster):
     nodepool_config.disk_type = vm_config.boot_disk.boot_disk_type
     nodepool_config.disk_size = vm_config.boot_disk.boot_disk_size
     nodepool_config.max_local_disks = vm_config.max_local_disks
+    nodepool_config.ssd_interface = vm_config.ssd_interface
     nodepool_config.gpu_type = vm_config.gpu_type
     nodepool_config.gpu_count = vm_config.gpu_count
     nodepool_config.threads_per_core = vm_config.threads_per_core
@@ -298,15 +305,20 @@ class GkeCluster(BaseGkeCluster):
     result['boot_disk_size'] = self.default_nodepool.disk_size
     if self.default_nodepool.max_local_disks:
       result['gce_local_ssd_count'] = self.default_nodepool.max_local_disks
-      # TODO(pclay): support NVME when it leaves alpha
-      # Also consider moving FLAGS.gce_ssd_interface into the vm_spec.
-      result['gce_local_ssd_interface'] = gce_virtual_machine.SCSI
+      result['gce_local_ssd_interface'] = self.default_nodepool.ssd_interface
     result['gke_nccl_fast_socket'] = self.enable_nccl_fast_socket
     if 'nccl' in self.nodepools:
       result['gpu_type'] = self.nodepools['nccl'].gpu_type
       result['gpu_count'] = self.nodepools['nccl'].gpu_count
     if self.image_type:
       result['image_type'] = self.image_type
+    if gcp_flags.MAX_CPU.value:
+      result['max-cpu'] = gcp_flags.MAX_CPU.value
+    if gcp_flags.MAX_MEMORY.value:
+      result['max-memory'] = gcp_flags.MAX_MEMORY.value
+    if gcp_flags.MAX_ACCELERATOR.value:
+      result['max-accelerator'] = gcp_flags.MAX_ACCELERATOR.value
+
     return result
 
   def _Create(self):
@@ -319,12 +331,27 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append('--enable-shielded-nodes')
     else:
       cmd.args.append('--no-enable-shielded-nodes')
+    if gcp_flags.GKE_ADDONS.value:
+      cmd.args.append(f'--addons={gcp_flags.GKE_ADDONS.value}')
     if not self.release_channel:
       cmd.args.append('--no-enable-autoupgrade')
     self._AddNodeParamsToCmd(
         self.default_nodepool,
         cmd,
     )
+    enable_autoprovisioning = False
+    if gcp_flags.MAX_CPU.value:
+      cmd.flags['max-cpu'] = gcp_flags.MAX_CPU.value
+      enable_autoprovisioning = True
+    if gcp_flags.MAX_MEMORY.value:
+      cmd.flags['max-memory'] = gcp_flags.MAX_MEMORY.value
+      enable_autoprovisioning = True
+    if gcp_flags.MAX_ACCELERATOR.value:
+      cmd.flags['max-accelerator'] = gcp_flags.MAX_ACCELERATOR.value
+      enable_autoprovisioning = True
+    if enable_autoprovisioning:
+      cmd.args.append('--enable-autoprovisioning')
+
     if (
         self.min_nodes != self.default_nodepool.num_nodes
         or self.max_nodes != self.default_nodepool.num_nodes
@@ -365,11 +392,14 @@ class GkeCluster(BaseGkeCluster):
 
     if nodepool_config.gpu_count:
       if 'a2-' not in nodepool_config.machine_type:
-        cmd.flags['accelerator'] = (
-            gce_virtual_machine.GenerateAcceleratorSpecString(
-                nodepool_config.gpu_type, nodepool_config.gpu_count
-            )
+        accelerator_spec = gce_virtual_machine.GenerateAcceleratorSpecString(
+            nodepool_config.gpu_type, nodepool_config.gpu_count
         )
+        if gcp_flags.GKE_GPU_DRIVER_VERSION.value:
+          accelerator_spec += (
+              ',gpu-driver-version=' + gcp_flags.GKE_GPU_DRIVER_VERSION.value
+          )
+        cmd.flags['accelerator'] = accelerator_spec
 
     gce_tags = FLAGS.gce_tags
     if nodepool_config.gce_tags:
@@ -378,6 +408,9 @@ class GkeCluster(BaseGkeCluster):
       cmd.flags['tags'] = ','.join(gce_tags)
     if nodepool_config.min_cpu_platform:
       cmd.flags['min-cpu-platform'] = nodepool_config.min_cpu_platform
+
+    if gcp_flags.GCE_PROVISIONING_MODEL.value == 'SPOT':
+      cmd.args.append('--spot')
 
     if nodepool_config.threads_per_core:
       # TODO(user): Remove when threads-per-core is available in GA
@@ -389,10 +422,18 @@ class GkeCluster(BaseGkeCluster):
     if nodepool_config.disk_type:
       cmd.flags['disk-type'] = nodepool_config.disk_type
     if nodepool_config.max_local_disks:
-      # TODO(pclay): Switch to local-ssd-volumes which support NVME when it
-      # leaves alpha. See
-      # https://cloud.google.com/sdk/gcloud/reference/alpha/container/clusters/create
-      cmd.flags['local-ssd-count'] = nodepool_config.max_local_disks
+      # https://cloud.google.com/kubernetes-engine/docs/concepts/local-ssd
+      if nodepool_config.ssd_interface == gce_virtual_machine.NVME:
+        if gcp_flags.GKE_USE_LSSD_AS_EPHEMERAL_STORAGE.value:
+          ssd_flag = 'ephemeral-storage-local-ssd'
+        else:
+          ssd_flag = 'local-nvme-ssd-block'
+        # Technically the count paramter is optional for gen 3+ VMs.
+        # However gce_virtual_machine always passes it explitly, so be
+        # consistent here.
+        cmd.flags[ssd_flag] = f'count={nodepool_config.max_local_disks}'
+      else:
+        cmd.flags['local-ssd-count'] = nodepool_config.max_local_disks
 
     cmd.flags['num-nodes'] = nodepool_config.num_nodes
     # zone may be split a comma separated list
@@ -428,7 +469,7 @@ class GkeCluster(BaseGkeCluster):
     cmd.flags['node-labels'] = f'pkb_nodepool={nodepool_config.name}'
 
   def _PostCreate(self):
-    """Installs nvidia drivers if needed."""
+    """Waits for kube-dns to be available."""
     super()._PostCreate()
 
     # GKE does not wait for kube-dns by default
@@ -438,15 +479,6 @@ class GkeCluster(BaseGkeCluster):
         condition_name='Available',
         namespace='kube-system',
     )
-
-    should_install_nvidia_drivers = self.default_nodepool.gpu_count or any(
-        pool.gpu_count for pool in self.nodepools.values()
-    )
-    if should_install_nvidia_drivers:
-      kubernetes_helper.CreateFromFile(NVIDIA_DRIVER_SETUP_DAEMON_SET_SCRIPT)
-      kubernetes_helper.CreateFromFile(
-          data.ResourcePath(NVIDIA_UNRESTRICTED_PERMISSIONS_DAEMON_SET)
-      )
 
   def _GetInstanceGroups(self):
     cmd = self._GcloudCommand('container', 'node-pools', 'list')
@@ -530,18 +562,34 @@ class GkeAutopilotCluster(BaseGkeCluster):
     metadata['zone'] = self.zone
     metadata['region'] = self.region
     # Override node specific metadata set in parent.
-    metadata['machine_type'] = self.CLUSTER_TYPE
+    metadata['machine_type'] = (
+        util.GetMachineFamily(self.default_nodepool.machine_type)
+        or self.CLUSTER_TYPE
+    )
     metadata['size'] = self.CLUSTER_TYPE
     metadata['nodepools'] = self.CLUSTER_TYPE
     return metadata
 
-  def GetNodeSelectors(self) -> list[str]:
+  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
     """Node selectors for instance capabilites in AutoPilot clusters."""
     selectors = []
+    compute_class = None
+    machine_family: str | None = util.GetMachineFamily(machine_type)
+    if machine_family:
+      selectors += [
+          f'cloud.google.com/machine-family: {machine_family}',
+      ]
+      # Mandate one pod per node, which also handles packing small pods into
+      # bigger nodes.
+      compute_class = 'Performance'
     # https://cloud.google.com/kubernetes-engine/docs/how-to/autopilot-gpus#request-gpus
     if virtual_machine.GPU_TYPE.value:
       gpu_count = virtual_machine.GPU_COUNT.value or 1
-      gpu_type = f'nvidia-{virtual_machine.GPU_TYPE.value}'
+      gpu_type = virtual_machine.GPU_TYPE.value
+      suffix = ''
+      if gpu_type in gce_virtual_machine.GPU_TYPE_TO_SUFFIX:
+        suffix = gce_virtual_machine.GPU_TYPE_TO_SUFFIX[gpu_type]
+      gpu_type = f'nvidia-{gpu_type}{suffix}'
       gpu_driver_version = gcp_flags.GKE_GPU_DRIVER_VERSION.value
       selectors += [
           'cloud.google.com/gke-accelerator: ' + gpu_type,
@@ -552,6 +600,11 @@ class GkeAutopilotCluster(BaseGkeCluster):
               f" '{gpu_driver_version}'"
           ),
       ]
+      # Override earlier compute class, as only one can be set & Accelerator
+      # (or nothing) is required for GPUs.
+      compute_class = 'Accelerator'
+    if compute_class:
+      selectors += [f'cloud.google.com/compute-class: {compute_class}']
     return selectors
 
   def ResizeNodePool(

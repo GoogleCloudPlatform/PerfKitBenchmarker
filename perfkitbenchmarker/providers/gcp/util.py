@@ -63,6 +63,10 @@ STOCKOUT_MESSAGE = (
 )
 
 
+@vm_util.Retry(
+    max_retries=3,
+    retryable_exceptions=(errors.VmUtil.IssueCommandError, KeyError)
+)
 @functools.lru_cache()
 def GetDefaultProject():
   """Get the default project."""
@@ -189,6 +193,16 @@ def GetMultiRegionFromRegion(region: str):
     return 'asia'
   else:
     raise Exception('Unknown region "%s".' % region)
+
+
+def GetMachineFamily(machine_type: str | None) -> str | None:
+  """Returns the machine family of a machine type."""
+  if not machine_type:
+    return None
+  pieces = machine_type.split('-')
+  if len(pieces) != 3:
+    return None
+  return pieces[0]
 
 
 def IssueCommandFunction(cmd: 'GcloudCommand', **kwargs):
@@ -427,6 +441,7 @@ _QUOTA_EXCEEDED_REGEX = re.compile(
 _NOT_ENOUGH_RESOURCES_ERROR_SNIPPETS = (
     'does not have enough resources available to fulfill the request.',
     'ZONE_RESOURCE_POOL_EXHAUSTED',
+    'ERROR_STOCKOUT'
 )
 _NOT_ENOUGH_RESOURCES_MESSAGE = 'Creation failed due to not enough resources: '
 

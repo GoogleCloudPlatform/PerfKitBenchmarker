@@ -13,10 +13,24 @@
 # limitations under the License.
 
 
-"""Module containing MS SQL Server 2022 installation and cleanup functions."""
+"""Module containing MS SQL Server 2022 installation and cleanup functions.
 
+Debian instructions:
+https://learn.microsoft.com/en-us/sql/linux/quickstart-install-connect-ubuntu?view=sql-server-ver16
+
+"""
+from perfkitbenchmarker import os_types
 
 # version: evaluation, developer, express, web, standard, enterprise
+
+_DEB_REPO_KEY = 'https://packages.microsoft.com/keys/microsoft.asc'
+_DEB_REPO_FILE = 'https://packages.microsoft.com/config/ubuntu/{os}/mssql-server-2022.list'
+_DEB_FILE_LOCATION = '/etc/apt/sources.list.d/mssql-server-2022.list'
+
+OS_TYPE_MAPPING = {
+    os_types.UBUNTU2004: '20.04',
+    os_types.UBUNTU2204: '22.04',
+}
 
 
 def YumInstall(vm):
@@ -48,15 +62,30 @@ def YumInstall(vm):
 
 
 def AptInstall(vm):
+  """Installs the mssql-server package on the Debian VM."""
   vm.RemoteCommand(
-      'wget -qO- https://packages.microsoft.com/keys/microsoft.asc'
-      ' | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc'
+      'curl {key} | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc'.format(
+          key=_DEB_REPO_KEY
+      )
   )
-  vm.RemoteCommand(
-      'sudo add-apt-repository "$(wget -qO- '
-      'https://packages.microsoft.com/config/ubuntu/20.04/'
-      'mssql-server-2022.list)"'
-  )
+  deb_repro_file = _DEB_REPO_FILE.format(os=OS_TYPE_MAPPING[vm.OS_TYPE])
+  if vm.OS_TYPE == os_types.UBUNTU2004:
+    vm.RemoteCommand(
+        'sudo add-apt-repository "$(wget -qO- {file})"'.format(
+            file=deb_repro_file
+        )
+    )
+  elif vm.OS_TYPE == os_types.UBUNTU2204:
+    vm.RemoteCommand(
+        'curl -fsSL {file} | sudo tee {location}'.format(
+            file=deb_repro_file, location=_DEB_FILE_LOCATION
+        )
+    )
+  else:
+    raise NotImplementedError(
+        'Invalid OS version: {}. SQL Server 2022 only supports Ubuntu 20.04'
+        ' and 22.04'.format(vm.OS_TYPE)
+    )
 
   vm.RemoteCommand('sudo apt-get update')
   vm.InstallPackages('mssql-server')

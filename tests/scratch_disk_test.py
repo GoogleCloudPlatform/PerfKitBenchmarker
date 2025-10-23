@@ -119,7 +119,7 @@ class ScratchDiskTestMixin:
     vm = self._CreateVm()
     disk_spec = self.GetDiskSpec(mount_point='/mountpoint')
     vm.SetDiskSpec(disk_spec, 2)
-    vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+    vm.create_disk_strategy.GetSetupDiskStrategy().WaitForRemoteDisksToVisibleFromVm = mock.MagicMock(
         return_value=12
     )
     vm.RemoteHostCommand = mock.MagicMock(return_value=('0', ''))
@@ -300,7 +300,7 @@ class GceMultiWriterDiskTest(GceScratchDiskTest, unittest.TestCase):
 
     # Create scratch disks
     vm.SetDiskSpec(disk_spec, 1)
-    vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+    vm.create_disk_strategy.GetSetupDiskStrategy().WaitForRemoteDisksToVisibleFromVm = mock.MagicMock(
         return_value=12
     )
     vm.SetupAllScratchDisks()

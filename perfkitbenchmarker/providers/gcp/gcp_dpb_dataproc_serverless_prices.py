@@ -64,7 +64,7 @@ DATAPROC_SERVERLESS_PRICES = {
             'usd_per_shuffle_storage_gb_sec': 0.044 / 744 / 3600,
         },
         'europe-west6': {
-            'usd_per_milli_dcu_sec': 0.083955 / 1000 / 3600,
+            'usd_per_milli_dcu_sec': 0.0786 / 1000 / 3600,
             'usd_per_shuffle_storage_gb_sec': 0.052 / 744 / 3600,
         },
         'europe-west8': {
@@ -76,7 +76,7 @@ DATAPROC_SERVERLESS_PRICES = {
             'usd_per_shuffle_storage_gb_sec': 0.0464 / 744 / 3600,
         },
         'europe-central2': {
-            'usd_per_milli_dcu_sec': 0.077307 / 1000 / 3600,
+            'usd_per_milli_dcu_sec': 0.0726 / 1000 / 3600,
             'usd_per_shuffle_storage_gb_sec': 0.048 / 744 / 3600,
         },
         'europe-southwest1': {
@@ -202,7 +202,7 @@ DATAPROC_SERVERLESS_PRICES = {
             'usd_per_shuffle_storage_gb_sec': 0.11 / 744 / 3600,
         },
         'europe-west6': {
-            'usd_per_milli_dcu_sec': 0.124533 / 1000 / 3600,
+            'usd_per_milli_dcu_sec': 0.11659 / 1000 / 3600,
             'usd_per_shuffle_storage_gb_sec': 0.13 / 744 / 3600,
         },
         'europe-west8': {
@@ -214,7 +214,7 @@ DATAPROC_SERVERLESS_PRICES = {
             'usd_per_shuffle_storage_gb_sec': 0.116 / 744 / 3600,
         },
         'europe-central2': {
-            'usd_per_milli_dcu_sec': 0.114672 / 1000 / 3600,
+            'usd_per_milli_dcu_sec': 0.10769 / 1000 / 3600,
             'usd_per_shuffle_storage_gb_sec': 0.12 / 744 / 3600,
         },
         'europe-southwest1': {

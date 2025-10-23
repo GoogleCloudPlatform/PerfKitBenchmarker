@@ -144,13 +144,19 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     cmd = self._GetAlloyDbCommand(cmd_string)
     _, _, _ = cmd.Issue(timeout=CREATION_TIMEOUT)
 
+    if self.spec.db_spec.machine_type is not None:
+      machine_shape_param = f'--machine-type={self.spec.db_spec.machine_type}'
+    else:
+      # Default machine family is n2 if only CPU count is specified.
+      machine_shape_param = f'--cpu-count={self.spec.db_spec.cpus}'
+
     # Create a primary instance
     cmd_string = [
         'instances',
         'create',
         self.instance_id,
         '--cluster=%s' % self.cluster_id,
-        '--cpu-count=%s' % self.spec.db_spec.cpus,
+        machine_shape_param,
         '--instance-type=PRIMARY',
     ]
     if self.spec.high_availability:
@@ -182,7 +188,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
           'create',
           self.replica_instance_id,
           f'--cluster={self.cluster_id}',
-          f'--cpu-count={self.spec.db_spec.cpus}',
+          machine_shape_param,
           f'--read-pool-node-count={_READ_POOL_NODE_COUNT.value}',
           '--instance-type=READ_POOL',
       ]

@@ -13,8 +13,13 @@
 # limitations under the License.
 
 
-"""Module containing MS SQL Server 2022 installation and cleanup functions."""
+"""Module containing MS SQL Server 2019 installation and cleanup functions.
 
+Debian instructions:
+https://learn.microsoft.com/en-us/sql/linux/quickstart-install-connect-ubuntu?view=sql-server-ver15
+
+"""
+from perfkitbenchmarker import os_types
 
 # version: evaluation, developer, express, web, standard, enterprise
 
@@ -42,6 +47,30 @@ def YumInstall(vm):
       r'echo export PATH="$PATH:/opt/mssql-tools/bin" >> ~/.bashrc'
   )
   vm.RemoteCommand('source ~/.bashrc')
+
+
+def AptInstall(vm):
+  """Installs the mssql-server package on the Debian VM."""
+  if vm.OS_TYPE != os_types.UBUNTU2004:
+    raise NotImplementedError(
+        'Invalid OS version: {}. SQL Server 2019 only supports Ubuntu 18.04'
+        ' and20.04'.format(vm.OS_TYPE)
+    )
+
+  vm.RemoteCommand(
+      'wget -qO- https://packages.microsoft.com/keys/microsoft.asc'
+      ' | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc'
+  )
+  vm.RemoteCommand(
+      'sudo add-apt-repository "$(wget -qO- '
+      'https://packages.microsoft.com/config/ubuntu/20.04/'
+      'mssql-server-2022.list)"'
+  )
+
+  vm.RemoteCommand('sudo apt-get update')
+  vm.InstallPackages('mssql-server')
+
+  vm.RemoteCommand('sudo ufw allow in 1433')
 
 
 def ZypperInstall(vm):

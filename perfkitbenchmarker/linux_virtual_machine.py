@@ -32,9 +32,9 @@ import copy
 import json
 import logging
 import os
-import pipes
 import posixpath
 import re
+import shlex
 import threading
 import time
 from typing import Any, Dict, Set, Tuple, Union
@@ -53,6 +53,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 import yaml
+
 
 FLAGS = flags.FLAGS
 
@@ -648,7 +649,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
                      '--stderr', stderr_file,
                      '--status', status_file,
                      '--exclusive', exclusive_file,
-                     '--command', pipes.quote(command)]  # pyformat: disable
+                     '--command', shlex.quote(command)]  # pyformat: disable
     if timeout:
       start_command.extend(['--timeout', str(timeout)])
 
@@ -1335,6 +1336,9 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     if disk.NFS == disk_type:
       mount_options = '-t nfs %s' % mount_options
       fs_type = 'nfs'
+    elif disk.LUSTRE == disk_type:
+      mount_options = '-t lustre %s' % mount_options
+      fs_type = 'lustre'
     elif disk.SMB == disk_type:
       mount_options = '-t cifs %s' % mount_options
       fs_type = 'smb'
@@ -1507,7 +1511,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
-    kwargs = _IncrementStackLevel(**kwargs)
+    kwargs = vm_util.IncrementStackLevel(**kwargs)
     return self.RemoteCommandWithReturnCode(*args, **kwargs)[:2]
 
   def RemoteCommandWithReturnCode(
@@ -1526,7 +1530,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
-    kwargs = _IncrementStackLevel(**kwargs)
+    kwargs = vm_util.IncrementStackLevel(**kwargs)
     return self.RemoteHostCommandWithReturnCode(*args, **kwargs)
 
   def RemoteHostCommandWithReturnCode(
@@ -1540,6 +1544,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       ip_address: str | None = None,
       should_pre_log: bool = True,
       stack_level: int = 1,
+      suppress_logging: bool = False,
   ) -> Tuple[str, str, int]:
     """Runs a command on the VM.
 
@@ -1554,13 +1559,15 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       ignore_failure: Ignore any failure if set to true.
       login_shell: Run command in a login shell.
       disable_tty_lock: Disables TTY lock. Multiple commands will try to take
-      control of the terminal.
+        control of the terminal.
       timeout: The timeout for IssueCommand.
       ip_address: The ip address to use to connect to host.  If None, uses
         self.GetConnectionIp()
       should_pre_log: Whether to output a "Running command" log statement.
       stack_level: Number of stack frames to skip & get an "interesting" caller,
         for logging. 1 skips this function, 2 skips this & its caller, etc..
+      suppress_logging: A boolean indicated whether STDOUT and STDERR should be
+        suppressed. Used for sensitive information.
 
     Returns:
       A tuple of stdout, stderr, return_code from running the command.
@@ -1618,6 +1625,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
             timeout=timeout,
             should_pre_log=False,
             raise_on_failure=False,
+            suppress_logging=suppress_logging,
             stack_level=stack_level,
         )
         # Retry on 255 because this indicates an SSH failure
@@ -1656,7 +1664,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     Raises:
       RemoteCommandError: If there was a problem establishing the connection.
     """
-    kwargs = _IncrementStackLevel(**kwargs)
+    kwargs = vm_util.IncrementStackLevel(**kwargs)
     return self.RemoteHostCommandWithReturnCode(*args, **kwargs)[:2]
 
   def _CheckRebootability(self):
@@ -2176,13 +2184,12 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
   def _IsSmtEnabled(self):
     """Whether simultaneous multithreading (SMT) is enabled on the vm.
 
-    Looks for the "nosmt" attribute in the booted linux kernel command line
-    parameters.
+    Checks if Thread(s) per Core is greater than 1.
 
     Returns:
       Whether SMT is enabled on the vm.
     """
-    return not bool(re.search(r'\bnosmt\b', self.kernel_command_line))
+    return self.CheckLsCpu().threads_per_core > 1
 
   @property
   def cpu_vulnerabilities(self) -> CpuVulnerabilities:
@@ -2255,7 +2262,6 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
 
     Returns:
       A list of paths where the logs are stored on the caller's machine.
-
     """
     log_files = []
     # syslog
@@ -2306,9 +2312,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     sosreport_path = '/tmp/sosreport-*.tar.xz'
     # The report is owned by root and is not readable by other users, so we
     # need to change the permissions to copy it.
-    self.RemoteCommand(
-        f'sudo chmod o+r {sosreport_path}'
-    )
+    self.RemoteCommand(f'sudo chmod o+r {sosreport_path}')
     self.RemoteCopy(local_path, sosreport_path, copy_to=False)
     return True
 
@@ -2330,16 +2334,128 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     )
     return False
 
+  def CopyLogs(self, log_path: str):
+    """Copies logs from the given path on the VM to the scratch directory.
 
-def _IncrementStackLevel(**kwargs: Any) -> Any:
-  """Increments the stack_level variable stored in kwargs."""
-  if 'stack_level' in kwargs:
-    kwargs['stack_level'] += 1
-  else:
-    # Default to 2 - one for helper function this is called from, & one for
-    # RemoteHostCommandWithReturnCode.
-    kwargs['stack_level'] = 2
-  return kwargs
+    If the provided path is a directory, all files within that directory are
+    copied. If the path is a file, only that file is copied.
+
+    Log paths are converted to snake_case and .log extension is added if it is
+    missing. And VM name is prepended to the file name to distinguish between
+    multiple VMs.
+
+    Example (Directory):
+    VM: pkb-123456-0
+    Log path: /var/log/syslog
+
+    Copied file: /tmp/perkitbenchmarker/123456/pkb-123456-0__var_log_syslog.log
+
+    Example (File):
+    VM: pkb-123456-0
+    Log path: /etc/mongod.conf
+
+    Copied file: /tmp/perkitbenchmarker/123456/pkb-123456-0__etc_mongod.conf.log
+
+    Args:
+      log_path: The directory or file path on the VM to copy the logs from.
+    """
+
+    def GetTargeFilePath(remote_file: str) -> str:
+      """Build the target file path for a given remote file."""
+      # Join absolute path of the log file to preserve the directory
+      # structure.
+      target_file_name = f'{self.name}_{remote_file.replace("/", "_")}'
+      target_file_path = os.path.join(vm_util.GetTempDir(), target_file_name)
+      # Add .log extension if it is missing since Artemis only copied logs
+      # with this extension.
+      if not target_file_path.endswith('.log'):
+        target_file_path += '.log'
+      return target_file_path
+
+    files_to_copy = []
+    # First, check if the path is a directory.
+    _, _, is_dir_code = self.RemoteCommandWithReturnCode(
+        f'[[ -d "{log_path}" ]]', ignore_failure=True
+    )
+    if is_dir_code == 0:
+      # Path is a directory, find all files within it.
+      try:
+        stdout, stderr = self.RemoteCommand(f'sudo find {log_path} -type f')
+        if not stdout:
+          logging.warning(
+              'No files found in directory %s: %s', log_path, stderr
+          )
+          return
+        files_to_copy = [rf.strip() for rf in stdout.splitlines()]
+      except errors.VirtualMachine.RemoteCommandError as e:
+        logging.warning('Failed to find logs in directory %s: %s', log_path, e)
+        return
+    else:
+      # Path is not a directory, check if it is a file.
+      _, _, is_file_code = self.RemoteCommandWithReturnCode(
+          f'[[ -f "{log_path}" ]]', ignore_failure=True
+      )
+      if is_file_code == 0:
+        # Path is a single file.
+        files_to_copy = [log_path]
+      else:
+        # Path does not exist or is not a regular file or directory.
+        logging.warning(
+            'Log path %s does not exist or is not a regular file or '
+            'directory on VM %s. Skipping log copying for this path.',
+            log_path,
+            self.name,
+        )
+        return
+
+    for remote_file in files_to_copy:
+      try:
+        # Build the target file path for a given remote file.
+        target_file_path = GetTargeFilePath(remote_file)
+        # Pull the file from the VM to target_file_path. Note that vm.PullFile
+        # does not use sudo.
+        self.PullFile(target_file_path, remote_file)
+      except errors.VirtualMachine.RemoteCommandError as scp_error:
+        logging.warning(
+            'Error copying log file %s from vm %s: %s',
+            remote_file,
+            self.name,
+            scp_error,
+        )
+
+        # Define a sudo cat remote command to read the file with elevated
+        # privileges.
+        sudo_cat_command = f'sudo cat {remote_file}'
+        try:
+          # Execute the command and capture the stdout, which is the content of
+          # the remote log file.
+          log_contents, _ = self.RemoteCommand(
+              sudo_cat_command, suppress_logging=True
+          )
+          # Build the target file path for a given remote file.
+          target_file_path = GetTargeFilePath(remote_file)
+          # Write the captured stdout to target_file_path.
+          with open(target_file_path, 'w') as target_file:
+            target_file.write(log_contents)
+          logging.info(
+              'Successfully copied remote file %s from vm %s with sudo cat'
+              ' to %s',
+              remote_file,
+              self.name,
+              target_file_path,
+          )
+        except errors.VirtualMachine.RemoteCommandError as ssh_sudo_cat_error:
+          logging.warning(
+              'Error copying log file %s from vm %s with sudo cat: %s',
+              remote_file,
+              self.name,
+              ssh_sudo_cat_error,
+          )
+
+        # We attempt to copy all given log files. However, it's possible that
+        # copying some files might fail. Failures in copying such log files
+        # should not block further log files from being copied.
+        pass
 
 
 class ClearMixin(BaseLinuxMixin):
@@ -2725,6 +2841,35 @@ class Rhel9Mixin(BaseRhelMixin):
     self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(9)}')
 
 
+class Rhel10Mixin(BaseRhelMixin):
+  """Class holding RHEL 10 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.RHEL10
+
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/#_rhel_10
+    self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(10)}')
+
+
+class Ol8Mixin(BaseRhelMixin):
+  """Class holding Oracle Linux 8 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.OL8
+
+  def SetupPackageManager(self):
+    """Oracle Linux images come with EPEL pre-installed."""
+
+
+class Ol9Mixin(BaseRhelMixin):
+  """Class holding Oracle Linux 9 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.OL9
+
+  def SetupPackageManager(self):
+    """Oracle Linux images come with EPEL pre-installed."""
+
+
 class Fedora36Mixin(BaseRhelMixin):
   """Class holding Fedora36 specific methods and attributes."""
 
@@ -2779,6 +2924,20 @@ class RockyLinux9Mixin(BaseRhelMixin):
   def SetupPackageManager(self):
     """Install EPEL."""
     # https://docs.fedoraproject.org/en-US/epel/#_almalinux_9_rocky_linux_98
+    self.RemoteCommand(
+        'sudo dnf config-manager --set-enabled crb &&'
+        'sudo dnf install -y epel-release'
+    )
+
+
+class RockyLinux10Mixin(BaseRhelMixin):
+  """Class holding Rocky Linux 10 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.ROCKY_LINUX10
+
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/#_rocky_linux_10
     self.RemoteCommand(
         'sudo dnf config-manager --set-enabled crb &&'
         'sudo dnf install -y epel-release'
@@ -3009,6 +3168,18 @@ class Debian12Mixin(BaseDebianMixin):
     super().PrepareVMEnvironment()
 
 
+class Debian13Mixin(BaseDebianMixin):
+  """Class holding Debian 13 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.DEBIAN13
+
+  def PrepareVMEnvironment(self):
+    # Missing in some images. Required by PrepareVMEnvironment to determine
+    # partitioning.
+    self.InstallPackages('fdisk')
+    super().PrepareVMEnvironment()
+
+
 class Debian11BackportsMixin(Debian11Mixin):
   """Debian 11 with backported kernel."""
 
@@ -3030,10 +3201,12 @@ class BaseUbuntuMixin(BaseDebianMixin):
       self.Reboot()
 
 
-class Ubuntu2004Mixin(BaseUbuntuMixin):
+class Ubuntu2004Mixin(BaseUbuntuMixin, os_mixin.DeprecatedOsMixin):
   """Class holding Ubuntu2004 specific VM methods and attributes."""
 
   OS_TYPE = os_types.UBUNTU2004
+  ALTERNATIVE_OS = os_types.UBUNTU2204
+  END_OF_LIFE = '2025-04-01'
 
   def UpdateEnvironmentPath(self):
     """Add /snap/bin to default search path for Ubuntu2004.
@@ -3317,7 +3490,7 @@ def CreateUlimitSamples(
   return samples
 
 
-class UlimitResults():
+class UlimitResults:
   """Holds the contents of the command ulimit."""
 
   def __init__(self, ulimit: str):

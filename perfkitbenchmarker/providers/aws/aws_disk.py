@@ -369,6 +369,27 @@ NUM_LOCAL_VOLUMES = {
     'i8g.16xlarge': 4,
     'i8g.24xlarge': 6,
     'i8g.metal-24xl': 6,
+    'i7i.large': 1,
+    'i7i.xlarge': 1,
+    'i7i.2xlarge': 1,
+    'i7i.4xlarge': 1,
+    'i7i.8xlarge': 2,
+    'i7i.12xlarge': 3,
+    'i7i.16xlarge': 4,
+    'i7i.24xlarge': 6,
+    'i7i.48xlarge': 12,
+    'm8gd.medium': 1,
+    'm8gd.large': 1,
+    'm8gd.xlarge': 1,
+    'm8gd.2xlarge': 1,
+    'm8gd.4xlarge': 1,
+    'm8gd.8xlarge': 1,
+    'm8gd.12xlarge': 3,
+    'm8gd.16xlarge': 2,
+    'm8gd.24xlarge': 3,
+    'm8gd.48xlarge': 6,
+    'm8gd.metal-24xl': 3,
+    'm8gd.metal-48xl': 6,
 }
 
 
@@ -514,11 +535,11 @@ class AwsDisk(disk.BaseDisk):
       create_cmd.append('--iops=%s' % self.iops)
     if self.disk_type == GP3 and self.throughput:
       create_cmd.append('--throughput=%s' % self.throughput)
-
+    if self.spec.snapshot_id:
+      create_cmd.append('--snapshot-id=%s' % self.spec.snapshot_id)
     try:
       self.create_disk_start_time = time.time()
       stdout, _, _ = vm_util.IssueCommand(create_cmd)
-      self.create_disk_end_time = time.time()
     except errors.VmUtil.IssueCommandError as error:
       error_message = str(error)
       is_quota_error = 'MaxIOPSLimitExceeded' in error_message
@@ -528,10 +549,18 @@ class AwsDisk(disk.BaseDisk):
 
     response = json.loads(stdout)
     self.id = response['VolumeId']
+    self._WaitUntilAvailable()
+    self.create_disk_end_time = time.time()
     util.AddDefaultTags(self.id, self.region)
 
+  def _DeleteDependencies(self):
+    """Deletes potential snapshots of the disk."""
+    if self.snapshots:
+      for snapshot in self.snapshots:
+        snapshot.Delete()
+
   def _Delete(self):
-    """Deletes the disk."""
+    """Deletes the disk, as well as all associated snapshot and restore disks."""
     delete_cmd = util.AWS_PREFIX + [
         'ec2',
         'delete-volume',
@@ -545,8 +574,8 @@ class AwsDisk(disk.BaseDisk):
     )
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
-  def _Exists(self):
-    """Returns true if the disk exists."""
+  def _GetStatus(self):
+    """Gets the state of the disk."""
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-volumes',
@@ -560,8 +589,25 @@ class AwsDisk(disk.BaseDisk):
     if not volumes:
       return False
     status = volumes[0]['State']
+    return status
+
+  def _Exists(self):
+    """Returns true if the disk exists."""
+    status = self._GetStatus()
     assert status in VOLUME_KNOWN_STATUSES, status
     return status in VOLUME_EXISTS_STATUSES
+
+  @vm_util.Retry(
+      poll_interval=1,
+      log_errors=True,
+      retryable_exceptions=(AwsStateRetryableError,),
+  )
+  def _WaitUntilAvailable(self):
+    """Returns if the state of the disk is available."""
+    status = self._GetStatus()
+    if status != 'available':
+      raise AwsStateRetryableError()
+    return
 
   @vm_util.Retry(
       poll_interval=0.5,
@@ -684,12 +730,192 @@ class AwsDisk(disk.BaseDisk):
 
     with self._lock:
       assert self.attached_vm_name in AwsDisk.available_device_letters_by_vm
-      AwsDisk.available_device_letters_by_vm[self.attached_vm_name].add(
-          self.device_letter
-      )
       self.attached_vm_id = None
       self.attached_vm_name = None
       self.device_letter = None
+
+  def CreateSnapshot(self):
+    """Creates a snapshot of the disk."""
+    snapshot = AwsDiskSnapshot(self, len(self.snapshots) + 1)
+    snapshot.Create()
+    self.snapshots.append(snapshot)
+
+  def GetLastIncrementalSnapshotSize(self):
+    """Gets last incremental snapshot size."""
+    num_changed_blocks = 0
+    list_changed_cmd = util.AWS_PREFIX + [
+        'ebs',
+        'list-changed-blocks',
+        '--first-snapshot-id=%s' % self.snapshots[-2].id,
+        '--second-snapshot-id=%s' % self.snapshots[-1].id,
+        '--region=%s' % self.region,
+    ]
+    stdout, _ = util.IssueRetryableCommand(list_changed_cmd)
+    response = json.loads(stdout)
+    for changed_block in response['ChangedBlocks']:
+      # Only added and modified blocks count towards incremental snapshot size.
+      if 'SecondBlockToken' in changed_block:
+        num_changed_blocks += 1
+
+    while 'NextToken' in response:
+      list_changed_cmd_next_token = list_changed_cmd + [
+          '--next-token=%s' % response['NextToken'],
+      ]
+      stdout, _ = util.IssueRetryableCommand(list_changed_cmd_next_token)
+      response = json.loads(stdout)
+      for changed_block in response['ChangedBlocks']:
+        if 'SecondBlockToken' in changed_block:
+          num_changed_blocks += 1
+
+    incremental_snapshot_size_bytes = num_changed_blocks * int(
+        response['BlockSize']
+    )
+    incremental_snapshot_size_gb = incremental_snapshot_size_bytes / (1000**3)
+
+    return incremental_snapshot_size_gb
+
+
+class AwsDiskSnapshot(disk.DiskSnapshot):
+  """Object representing a AWS Disk Snapshot.
+
+  Attributes:
+    source_disk: The AwsDisk object that the snapshot is created from.
+    disk_spec: The disk spec of the source disk.
+    source_disk_id: The id of the source disk.
+    source_disk_size: The size of the source disk.
+    source_disk_type: The type of the source disk.
+    name: The name of the snapshot.
+    zone: The zone of the source disk.
+    region: The region of the source disk.
+    storage_gb: The storage used by the snapshot in GB.
+    restore_disks: A list of GceDisk objects created from the snapshot.
+    num_restore_disks: The number of disks restored from this snapshot.
+  """
+
+  def __init__(self, source_disk, snapshot_num):
+    super().__init__()
+    self.source_disk = source_disk
+    self.disk_spec = source_disk.spec
+    self.source_disk_id = source_disk.id
+    self.source_disk_size = source_disk.disk_size
+    self.source_disk_type = source_disk.disk_type
+    self.snapshot_num = snapshot_num
+    self.name = f'disk-snapshot-{self.source_disk_id}-{self.snapshot_num}'
+    self.id = None
+    self.zone = source_disk.zone
+    self.region = source_disk.region
+
+  def _Create(self):
+    """Creates a snapshot of the disk.
+
+    Raises:
+      errors.VmUtil.CalledProcessException: When the command returns a non-zero
+      exit code.
+    """
+    formatted_tags = util.FormatTagSpecifications(
+        'snapshot', util.MakeDefaultTags()
+    )
+    snapshot_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'create-snapshot',
+        '--volume-id=%s' % self.source_disk_id,
+        '--region=%s' % self.region,
+        '--tag-specifications=%s' % formatted_tags,
+    ]
+    logging.info(
+        'Creating snapshot for AWS volume %s.',
+        self.source_disk_id,
+    )
+    self.creation_start_time = time.time()
+    stdout, stderr, retcode = vm_util.IssueCommand(
+        snapshot_cmd, raise_on_failure=False
+    )
+    result = json.loads(stdout)
+    # self.id used in _Describe()
+    self.id = result['SnapshotId']
+    self.creation_end_time = self._Describe()
+
+    if retcode:
+      debug_text = 'Ran: {%s}\nReturnCode:%s\nSTDOUT: %s\nSTDERR: %s' % (
+          ' '.join(snapshot_cmd),
+          retcode,
+          stdout,
+          stderr,
+      )
+      raise errors.VmUtil.CalledProcessException(
+          'Command returned a non-zero exit code:\n{}'.format(debug_text)
+      )
+
+  # AWS Snapshots take ~15 minutes to complete.
+  @vm_util.Retry(
+      poll_interval=5,
+      max_retries=-1,
+      log_errors=True,
+      retryable_exceptions=(errors.Resource.RetryableCreationError,),
+  )
+  def _Describe(self):
+    """Describe the snapshot, storing the storage size in GB.
+
+    Returns:
+        float: The time when the snapshot was created.
+
+    Raises:
+        errors.Resource.RetryableCreationError: If the snapshot is not created
+        and ready.
+    """
+    if not self.id:
+      raise errors.Resource.CreationError()
+    describe_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'describe-snapshots',
+        '--snapshot-ids=%s' % self.id,
+        '--region=%s' % self.region,
+    ]
+    stdout, _, _ = vm_util.IssueCommand(describe_cmd, raise_on_failure=False)
+    result = json.loads(stdout)
+    snapshot_result = result['Snapshots'][0]
+    snapshot_status = snapshot_result['State']
+    if snapshot_status == 'completed':
+      self.storage_gb = int(
+          snapshot_result['FullSnapshotSizeInBytes'] / (1000**3)
+      )
+      return time.time()
+    logging.info(
+        'Disk %s snapshot %s has status %s.',
+        self.source_disk_id,
+        self.id,
+        snapshot_status,
+    )
+    raise errors.Resource.RetryableCreationError()
+
+  def Restore(self):
+    """Creates a disk from the snapshot."""
+    self.disk_spec.snapshot_id = self.id
+    self.disk_spec.mount_point = (
+        f'/restore{self.num_restore_disks}{self.disk_spec.mount_point}'
+    )
+    restore_disk = AwsDisk(
+        self.disk_spec, self.zone, self.source_disk.machine_type
+    )
+    restore_disk.Create()
+    self.restore_disks.append(restore_disk)
+    self.num_restore_disks += 1
+
+    return self.restore_disks[-1]
+
+  def Delete(self):
+    """Deletes the snapshot."""
+    if self.restore_disks:
+      for restore_disk in self.restore_disks:
+        restore_disk.Delete()
+        self.num_restore_disks -= 1
+
+    delete_cmd = util.AWS_PREFIX + [
+        'ec2',
+        'delete-snapshot',
+        '--snapshot-id=%s' % self.id,
+    ]
+    vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
 
 class AwsStripedDisk(disk.StripedDisk):

@@ -31,6 +31,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hadoop
 import requests
 
@@ -39,6 +40,14 @@ FLAGS = flags.FLAGS
 
 _SPARK_VERSION_FLAG = flags.DEFINE_string(
     'spark_version', None, 'Version of spark. Defaults to latest.'
+)
+
+_SHUFFLE_PARTITIONS = flags.DEFINE_integer(
+    'spark_shuffle_partitions',
+    None,
+    'Configure Spark shuffle partitions. See '
+    'https://spark.apache.org/docs/latest/sql-performance-tuning.html#tuning-partitions '
+    'for more details.',
 )
 
 DATA_FILES = [
@@ -101,6 +110,7 @@ def SparkExamplesJarPath() -> str:
   )
 
 
+@vm_util.Retry(poll_interval=10)
 def Install(vm):
   """Install spark on a vm."""
   vm.Install('openjdk')
@@ -116,7 +126,7 @@ def Install(vm):
   )
   vm.RemoteCommand(
       (
-          'mkdir {0} && curl -L {1} | tar -C {0} --strip-components=1 -xzf -'
+          'mkdir -p {0} && curl -L {1} | tar -C {0} --strip-components=1 -xzf -'
       ).format(SPARK_DIR, spark_url)
   )
 
@@ -171,6 +181,11 @@ def _RenderConfig(
   worker_cores = worker.NumCpusForBenchmark()
   worker_memory_mb = int((worker.total_memory_kb / 1024) * memory_fraction)
   driver_memory_mb = int((leader.total_memory_kb / 1024) * memory_fraction)
+  # Default to the recommended value from
+  # https://cloud.google.com/dataproc/docs/support/spark-job-tuning#configuring_partitions
+  shuffle_partitions = (
+      _SHUFFLE_PARTITIONS.value or worker_cores * len(workers) * 3
+  )
 
   spark_conf = GetConfiguration(
       driver_memory_mb=driver_memory_mb,
@@ -202,6 +217,7 @@ def _RenderConfig(
       'hadoop_cmd': hadoop.HADOOP_CMD,
       'python_cmd': 'python3',
       'optional_tools': optional_tools,
+      'shuffle_partitions': shuffle_partitions,
   }
 
   for file_name in DATA_FILES:

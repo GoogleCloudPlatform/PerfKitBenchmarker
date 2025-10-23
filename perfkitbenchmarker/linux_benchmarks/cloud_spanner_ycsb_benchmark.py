@@ -38,11 +38,6 @@ BENCHMARK_DESCRIPTION = 'YCSB'
 BENCHMARK_TABLE = 'usertable'
 BENCHMARK_ZERO_PADDING = 12
 
-REQUIRED_SCOPES = (
-    'https://www.googleapis.com/auth/spanner.admin',
-    'https://www.googleapis.com/auth/spanner.data',
-)
-
 BENCHMARK_CONFIG = f"""
 cloud_spanner_ycsb:
   description: >
@@ -61,8 +56,8 @@ cloud_spanner_ycsb:
         vm_count: 1
   flags:
     openjdk_version: 8
-    gcloud_scopes: >
-      {' '.join(REQUIRED_SCOPES)}"""
+    gcloud_scopes: cloud-platform
+"""
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer(
@@ -100,9 +95,6 @@ def GetConfig(user_config):
 
 def CheckPrerequisites(_):
   """Validates correct flag usages before running this benchmark."""
-  for scope in REQUIRED_SCOPES:
-    if scope not in FLAGS.gcloud_scopes:
-      raise ValueError('Scope {} required.'.format(scope))
   if ycsb.CPU_OPTIMIZATION.value and (
       ycsb.CPU_OPTIMIZATION_MEASUREMENT_MINS.value
       <= gcp_spanner.CPU_API_DELAY_MINUTES

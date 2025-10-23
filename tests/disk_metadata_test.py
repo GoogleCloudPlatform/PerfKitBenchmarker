@@ -101,7 +101,7 @@ class AwsDiskMetadataTest(_DiskMetadataTestCase):
     vm.LogDeviceByDiskSpecId('0_0', 'foobar_1')
     vm.LogDeviceByName('foobar_1', 'vol67890', None)
     vm.SetDiskSpec(disk_spec, 1)
-    vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+    vm.create_disk_strategy.GetSetupDiskStrategy().WaitForRemoteDisksToVisibleFromVm = mock.MagicMock(
         return_value=12
     )
     vm.create_disk_strategy.GetSetupDiskStrategy().SetUpDisk()
@@ -152,7 +152,7 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
     vm.hasStripedDiskDevice = mock.MagicMock(return_value=False)
     vm.StripeDisks = mock.Mock()
     vm.SetDiskSpec(disk_spec, 1)
-    vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+    vm.create_disk_strategy.GetSetupDiskStrategy().WaitForRemoteDisksToVisibleFromVm = mock.MagicMock(
         return_value=12
     )
     vm.SetupAllScratchDisks()

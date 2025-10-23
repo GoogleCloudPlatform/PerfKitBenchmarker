@@ -19,6 +19,7 @@ import dataclasses
 import logging
 import re
 import statistics
+import time
 
 from absl import flags
 import immutabledict
@@ -41,6 +42,12 @@ _SYSBENCH_SPANNER_OLTP_COMMIT_DELAY = flags.DEFINE_integer(
     'sysbench_max_commit_delay', None, 'Max commit delay for spanner oltp in ms'
 )
 
+_SYSBENCH_QPS_TIME_SERIES = flags.DEFINE_bool(
+    'sysbench_qps_time_series',
+    False,
+    'If true, collect qps time series.',
+)
+
 # release 1.0.20; committed Apr 24, 2020. When updating this, also update the
 # correct line for CONCURRENT_MODS, as it may have changed in between releases.
 DEFAULT_RELEASE_TAG = '1.0.20'
@@ -59,6 +66,11 @@ SYSBENCH_SLEEP_BETWEEN_RUNS_SEC = flags.DEFINE_integer(
     'sysbench_sleep_between_runs_sec',
     0,
     'The time in seconds to sleep between runs with different thread counts.',
+)
+SYSBENCH_THREAD_INIT_TIMEOUT = flags.DEFINE_integer(
+    'sysbench_thread_init_timeout',
+    60,
+    'The timeout in seconds for sysbench to initialize run threads.',
 )
 SYSBENCH_VERBOSE_MODE = flags.DEFINE_integer(
     'sysbench_verbose_mode',
@@ -194,6 +206,7 @@ def ParseSysbenchTimeSeries(sysbench_output, metadata) -> list[sample.Sample]:
   tps_numbers = []
   latency_numbers = []
   qps_numbers = []
+  time_ms = []
   for line in sysbench_output.split('\n'):
     # parse a line like (it's one line - broken up in the comment to fit):
     # [ 6s ] thds: 16 tps: 650.51 qps: 12938.26 (r/w/o: 9046.18/2592.05/1300.03)
@@ -213,6 +226,11 @@ def ParseSysbenchTimeSeries(sysbench_output, metadata) -> list[sample.Sample]:
       qps_numbers.append(float(match.group(1)))
       if line.startswith('SQL statistics:'):
         break
+      if _SYSBENCH_QPS_TIME_SERIES.value:
+        match = re.search(r'\[ ([0-9]+)s \]', line)
+        if not match:
+          raise ValueError(f'no time in: {line}')
+        time_ms.append(float(match.group(1)) * 1000)
 
   tps_metadata = metadata.copy()
   tps_metadata.update({'tps': tps_numbers})
@@ -226,7 +244,28 @@ def ParseSysbenchTimeSeries(sysbench_output, metadata) -> list[sample.Sample]:
   qps_metadata.update({'qps': qps_numbers})
   qps_sample = sample.Sample('qps_array', -1, 'qps', qps_metadata)
 
-  return [tps_sample, latency_sample, qps_sample]
+  samples = [tps_sample, latency_sample, qps_sample]
+  if _SYSBENCH_QPS_TIME_SERIES.value:
+    if len(time_ms) != len(qps_numbers):
+      raise ValueError(
+          f'time_ms and qps_numbers have different lengths: {time_ms},'
+          f' {qps_numbers}'
+      )
+    # There might be small inaccuracy here owing to the time gap between the
+    # instant last metric was recorded and the instant time.time() was invoked.
+    start_time = (time.time() * 1000) - time_ms[-1]
+    timestamps = [start_time + time_ms[i] for i in range(len(time_ms))]
+    qps_time_series = sample.CreateTimeSeriesSample(
+        qps_numbers,
+        timestamps,
+        sample.QPS_TIME_SERIES,
+        'qps',
+        1,
+        additional_metadata=qps_metadata,
+    )
+    samples.append(qps_time_series)
+
+  return samples
 
 
 def ParseSysbenchLatency(
@@ -395,6 +434,7 @@ def BuildRunCommand(sysbench_parameters: SysbenchInputParameters) -> str:
   cmd = _BuildGenericCommand(sysbench_parameters)
   cmd += [f'--time={FLAGS.sysbench_run_seconds}']
   cmd += ['run']
+  cmd += [f'--thread-init-timeout={SYSBENCH_THREAD_INIT_TIMEOUT.value}']
   return  f'cd {SYSBENCH_DIR} && ' + ' '.join(cmd)
 
 

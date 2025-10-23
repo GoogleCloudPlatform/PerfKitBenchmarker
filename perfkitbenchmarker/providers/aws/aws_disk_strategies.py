@@ -27,6 +27,8 @@ from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import s3
+from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
 virtual_machine = Any  # pylint: disable=invalid-name
@@ -185,6 +187,10 @@ class CreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
       return disk_strategies.SetUpSMBDiskStrategy(self.vm, self.disk_spec)
     elif self.disk_spec.disk_type == disk.NFS:
       return disk_strategies.SetUpNFSDiskStrategy(self.vm, self.disk_spec)
+    elif self.disk_spec.disk_type == disk.OBJECT_STORAGE:
+      return SetUpS3MountPointDiskStrategy(self.vm, self.disk_spec)
+    elif self.disk_spec.disk_type == disk.LUSTRE:
+      return AwsLustreSetupDiskStrategy(self.vm, self.disk_spec)
 
     return disk_strategies.EmptySetupDiskStrategy(self.vm, self.disk_spec)
 
@@ -340,9 +346,11 @@ class SetUpLocalDiskStrategy(AWSSetupDiskStrategy):
   def _CreateLocalDisk(self, disk_spec, spec_id, i):
     disk_spec_id = self.vm.create_disk_strategy.BuildDiskSpecId(spec_id, i)
     data_disk = aws_disk.AwsDisk(
-        disk_spec, self.vm.zone, self.vm.machine_type, disk_spec_id)
+        disk_spec, self.vm.zone, self.vm.machine_type, disk_spec_id
+    )
     device_letter = chr(
-        ord(self.LOCAL_DRIVE_START_LETTER) + self.vm.local_disk_counter)
+        ord(self.LOCAL_DRIVE_START_LETTER) + self.vm.local_disk_counter
+    )
     nvme_boot_drive_index = self._GetNvmeBootIndex()
     data_disk.AssignDeviceLetter(device_letter, nvme_boot_drive_index)  # pytype: disable=wrong-arg-types
     data_disk.disk_number = self.vm.local_disk_counter + 1
@@ -416,6 +424,15 @@ class SetUpRemoteDiskStrategy(AWSSetupDiskStrategy):
       AWSPrepareScratchDiskStrategy().PrepareScratchDisk(
           self.vm, scratch_disk, disk_spec
       )
+    for scratch_disk in self.scratch_disks:
+      if hasattr(scratch_disk, 'disk_spec_id'):
+        scratch_disk.disk_name = self.vm.device_by_disk_spec_id.get(
+            scratch_disk.disk_spec_id, None
+        )
+        if scratch_disk.disk_name in self.vm.disk_identifiers_by_device:
+          scratch_disk.id = self.vm.disk_identifiers_by_device[
+              scratch_disk.disk_name
+          ].volume_id
 
   def AttachDisks(self):
     attach_tasks = []
@@ -425,7 +442,9 @@ class SetUpRemoteDiskStrategy(AWSSetupDiskStrategy):
         or not self.scratch_disks
     ):
       return
-    attach_tasks.append((self.WaitForDisksToVisibleFromVm, [start_time], {}))
+    attach_tasks.append(
+        (self.WaitForRemoteDisksToVisibleFromVm, [start_time], {})
+    )
     for scratch_disk in self.scratch_disks:
       attach_tasks.append((scratch_disk.Attach, [self.vm], {}))
     return_from_threads = background_tasks.RunParallelThreads(
@@ -434,8 +453,106 @@ class SetUpRemoteDiskStrategy(AWSSetupDiskStrategy):
     self.time_to_visible = return_from_threads[0]
 
 
+class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
+  """Strategies to set up S3 buckets."""
+
+  DEFAULT_MOUNT_OPTIONS = [
+      '--allow-other',
+      '--dir-mode=755',
+      '--file-mode=755',
+      # Sets part size to 64MiB. Max upload 64000MiB.
+      '--write-part-size=67108864',
+      '--incremental-upload',
+      '--allow-overwrite',
+      '--allow-delete'
+      ]
+
+  def SetUpDisk(self):
+    """Performs setup of S3 buckets."""
+    self.vm.Install('mountpoint')
+    target = self.disk_spec.mount_point
+    self.vm.RemoteCommand(f'sudo mkdir -p {target} && sudo chmod a+w {target}')
+
+    all_mount_options = self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options
+    if not FLAGS.aws_s3_mount_enable_metadata_cache:
+      all_mount_options += ['--metadata-ttl=0']
+
+    opts = ' '.join(all_mount_options)
+    zone_id = util.GetZoneId(self.vm.zone)
+    s3_express_zonal_suffix = f'--{zone_id}--x-s3'
+    bucket_name = (
+        FLAGS.object_storage_fuse_bucket_name
+        or f'mountpoint-{FLAGS.run_uri.lower()}{s3_express_zonal_suffix}'
+    )
+    s3_spec = s3.S3BucketSpec(
+        mount_point=target,
+        bucket_name=bucket_name,
+        region=util.GetRegionFromZone(self.vm.zone),
+        zone=self.vm.zone,
+        is_s3_express=True
+    )
+    s3_client = s3.S3Bucket(s3_spec)
+    if not FLAGS.object_storage_fuse_bucket_name:
+      s3_client.Create()
+
+    self.vm.RemoteCommand(f'sudo mount-s3 {bucket_name} {target} {opts}')
+    self.vm.scratch_disks.append(s3_client)
+
+
 class AWSPrepareScratchDiskStrategy(disk_strategies.PrepareScratchDiskStrategy):
   """Strategies to prepare scratch disk on AWS."""
 
   def GetLocalSSDNames(self) -> list[str]:
     return ['NVMe Amazon EC2 NVMe']
+
+
+class AwsLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
+  """Strategies to prepare Lustre based disks on AWS."""
+
+  def SetUpDiskOnLinux(self):
+    """Performs Linux specific setup of Lustre disk."""
+    vm = self.vm
+    vm.InstallPackages('lustre-client')
+    if FLAGS.aws_efa:
+      # https://docs.aws.amazon.com/fsx/latest/LustreGuide/configure-efa-clients.html
+      stdout, _ = vm.RemoteCommand('ip -br -4 a sh | grep $(hostname -i)')
+      eth = stdout.split()[0]
+      vm.RemoteCommand(
+          'sudo modprobe lnet; '
+          f'sudo /sbin/modprobe kefalnd ipif_name={eth}; '
+          'sudo modprobe ksocklnd; sudo lnetctl lnet configure'
+      )
+      vm.RemoteCommand(
+          f'sudo lnet del --net tcp; sudo lnetctl net add --net tcp --if {eth}'
+      )
+      stdout, _ = vm.RemoteCommand('ls -1 /sys/class/infiniband | wc -l')
+      num_efa = int(stdout)
+      vm.RemoteCommand(
+          'sudo lnetctl net add --net efa --if '
+          '$(ls -1 /sys/class/infiniband | head -n1) --peer-credits 32'
+      )
+      if num_efa > 1:
+        vm.RemoteCommand(
+            'sudo lnetctl net add --net efa --if '
+            '$(ls -1 /sys/class/infiniband | tail -n1) --peer-credits 32'
+        )
+      vm.RemoteCommand('sudo lnetctl set discovery 1')
+      vm.RemoteCommand('sudo lnetctl udsp add --src efa --priority 0')
+      vm.RemoteCommand('sudo lnetctl set discovery 1')
+      vm.RemoteCommand('sudo modprobe lustre;  sudo lnetctl net show')
+    super().SetUpDiskOnLinux()
+    # Apply best practices
+    # https://docs.aws.amazon.com/fsx/latest/LustreGuide/performance-tips.html
+    vm.RemoteCommand('sudo lctl set_param ldlm.namespaces.*.lru_max_age=600000')
+    vm.RemoteCommand('sudo lctl set_param ldlm.namespaces.*.lru_size=18000')
+    vm.RemoteCommand(
+        'sudo touch /etc/modprobe.d/modprobe.conf; '
+        'sudo chmod 766 /etc/modprobe.d/modprobe.conf; '
+        'echo "options ptlrpc ptlrpcd_per_cpt_max=32" >> '
+        '/etc/modprobe.d/modprobe.conf'
+    )
+    vm.RemoteCommand(
+        'echo "options ksocklnd credits=2560" >> /etc/modprobe.d/modprobe.conf'
+    )
+    vm.RemoteCommand('sudo lctl set_param osc.*OST*.max_rpcs_in_flight=32')
+    vm.RemoteCommand('sudo lctl set_param mdc.*.max_rpcs_in_flight=64')

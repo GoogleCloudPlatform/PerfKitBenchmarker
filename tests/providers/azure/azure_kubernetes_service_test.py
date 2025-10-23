@@ -5,6 +5,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.providers.azure import azure_kubernetes_service
 from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import util
 from tests import pkb_common_test_case
 
 
@@ -35,9 +36,9 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.enter_context(
         mock.patch.object(
-            azure_kubernetes_service.service_principal,
-            'ServicePrincipal',
-            autospec=True,
+            util,
+            'GetResourceTags',
+            return_value={},
         )
     )
     self.enter_context(
@@ -66,17 +67,27 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.aks = azure_kubernetes_service.AksCluster(self.spec)
     self.aks.resource_group.args = []
-    self.aks.service_principal.app_id = 'id'
-    self.aks.service_principal.password = 'pass'
 
   def testCreate(self):
     mock_cmd = self.MockIssueCommand(
         {
             'az aks create': [('', '', 0)],
             'az aks nodepool': [('', '', 0)],
+            'az aks show': [
+                (
+                    (
+                        '{"provisioningState": "Succeeded",'
+                        ' "nodeResourceGroup": "node-resource-group"}'
+                    ),
+                    '',
+                    0,
+                ),
+                ('Succeeded', '', 0),
+            ],
+            'get serviceAccounts': [('default, foo', '', 0)],
         },
     )
-    self.aks._Create()
+    self.aks.Create()
     self.assertEqual(
         mock_cmd.func_to_mock.mock_calls[0],
         mock.call(
@@ -88,12 +99,9 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
                 'pkbcluster123',
                 '--location',
                 'westus2',
+                '--enable-managed-identity',
                 '--ssh-key-value',
                 'test_key_path',
-                '--service-principal',
-                'id',
-                '--client-secret',
-                'pass',
                 '--nodepool-name',
                 'default',
                 '--nodepool-labels',
@@ -172,6 +180,73 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
         ],
         mock_cmd.func_to_mock.mock_calls[0].args[0],
     )
+
+  def testFullCreateAksAutomatic(self):
+    aks_auto = azure_kubernetes_service.AksAutomaticCluster(self.spec)
+    aks_auto.resource_group.name = 'resource-group'
+    mock_cmd = self.MockIssueCommand(
+        {
+            'az aks create': [('', '', 0)],
+            'az aks nodepool': [('', '', 0)],
+            '--query id': [('cluster-id', '', 0)],
+            'az aks show': [
+                (
+                    (
+                        '{"provisioningState": "Succeeded",'
+                        ' "nodeResourceGroup": "node-resource-group"}'
+                    ),
+                    '',
+                    0,
+                ),
+                ('Succeeded', '', 0),
+            ],
+            'get serviceAccounts': [('default, foo', '', 0)],
+            'az account show': [
+                ('servicePrincipal', '', 0),
+                ('user-name', '', 0),
+            ],
+            'az role assignment': [('', '', 0)],
+        },
+    )
+    aks_auto.Create()
+    mock_cmd.func_to_mock.assert_has_calls([
+        mock.call(
+            [
+                'az',
+                'role',
+                'assignment',
+                'create',
+                '--assignee',
+                'user-name',
+                '--role',
+                'Azure Kubernetes Service RBAC Admin',
+                '--scope',
+                'cluster-id',
+            ],
+        ),
+    ])
+
+  def testGetNodePoolNames(self):
+    self.MockIssueCommand(
+        {
+            'az aks nodepool list': [(
+                """[
+  {
+      "count": 4,
+      "name": "default"
+  },
+  {
+      "count": 1,
+      "name": "nodepool1"
+  }
+]
+""",
+                '',
+                0,
+            )],
+        },
+    )
+    self.assertEqual(self.aks.GetNodePoolNames(), ['default', 'nodepool1'])
 
 
 if __name__ == '__main__':

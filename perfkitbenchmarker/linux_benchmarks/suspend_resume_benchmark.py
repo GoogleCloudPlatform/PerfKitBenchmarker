@@ -45,7 +45,7 @@ suspend_resume:
     aws_vm_hibernate: True
     # AWS boot disk size must be specified for an encrypted disk mapping to be
     # created.
-    aws_boot_disk_size: 150
+    boot_disk_size: 150
 """
 
 

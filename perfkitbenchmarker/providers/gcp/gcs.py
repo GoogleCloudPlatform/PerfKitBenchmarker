@@ -54,6 +54,50 @@ GCS_CLIENT = flags.DEFINE_enum(
 FLAGS = flags.FLAGS
 
 
+class GoogleCloudStorageBucketSpec(object_storage_service.BaseBucketSpec):
+  """Spec for GCS."""
+
+  CLOUD = provider_info.GCP
+
+  def __init__(
+      self,
+      mount_point=None,
+      bucket_name=None,
+      region=None,
+      zone=None,
+      hierarchical_name_space=False,
+      uniform_bucket_level_access=False,
+  ):
+    super().__init__(mount_point, bucket_name, region, zone)
+    self.hierarchical_name_space: bool = hierarchical_name_space
+    self.uniform_bucket_level_access: bool = uniform_bucket_level_access
+
+
+class GoogleCloudStorageBucket(object_storage_service.Bucket):
+  """Google Cloud Storage Object containing GooogleCloudStorageService."""
+
+  def __init__(self, bucket_spec):
+    super().__init__(bucket_spec)
+    self.hierarchical_name_space = bucket_spec.hierarchical_name_space
+    self.uniform_bucket_level_access = (
+        bucket_spec.uniform_bucket_level_access
+    )
+    self.service = GoogleCloudStorageService()
+
+  def _Create(self):
+    self.service.PrepareService(
+        self.region,
+        self.hierarchical_name_space,
+        self.uniform_bucket_level_access,
+    )
+    self.service.MakeBucket(self.bucket_name, placement=self.zone)
+
+  def _Delete(self):
+    self.service.CleanupService()
+    self.service.EmptyBucket(self.bucket_name)
+    self.service.DeleteBucket(self.bucket_name)
+
+
 class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
   """Interface to Google Cloud Storage."""
 
@@ -61,27 +105,52 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
   location: str
 
-  def PrepareService(self, location):
-    self.location = location or DEFAULT_GCP_REGION
+  def __init__(self):
+    super().__init__()
+    self.location = None
+    self.hierarchical_name_space = False
+    self.uniform_bucket_level_access = False
 
-  def MakeBucket(self, bucket_name, raise_on_failure=True, tag_bucket=True):
+  def PrepareService(
+      self,
+      location,
+      hierarchical_name_space=False,
+      uniform_bucket_level_access=False,
+  ):
+    self.location = location or DEFAULT_GCP_REGION
+    self.hierarchical_name_space = hierarchical_name_space
+    self.uniform_bucket_level_access = uniform_bucket_level_access
+
+  def MakeBucket(
+      self, bucket_name, placement=None, raise_on_failure=True, tag_bucket=True
+  ):
     """Creates a GCS bucket.
 
     Args:
       bucket_name: The name of the bucket to create, without gs:// prefix.
+      placement: The placement of the bucket.
       raise_on_failure: If False, exceptions are swallowed.
       tag_bucket: If True, tag the bucket with default tags.
     """
-    command = ['gsutil', 'mb']
+    command = ['gcloud', 'storage', 'buckets', 'create']
     if self.location:
-      command.extend(['-l', self.location])
-    if self.location and '-' in self.location:
+      command.extend(['--location', self.location])
+    if object_storage_service.STORAGE_CLASS.value:
+      command.extend([
+          '--default-storage-class',
+          object_storage_service.STORAGE_CLASS.value,
+      ])
+    elif self.location and '-' in self.location:
       # regional buckets
-      command.extend(['-c', 'regional'])
-    elif object_storage_service.STORAGE_CLASS.value:
-      command.extend(['-c', object_storage_service.STORAGE_CLASS.value])
+      command.extend(['--default-storage-class', 'regional'])
+    if placement:
+      command.extend(['--placement', placement])
+    if self.hierarchical_name_space:
+      command.extend(['--enable-hierarchical-namespace'])
+    if self.uniform_bucket_level_access:
+      command.extend(['--uniform-bucket-level-access'])
     if FLAGS.project:
-      command.extend(['-p', FLAGS.project])
+      command.extend(['--project', FLAGS.project])
     if object_storage_service.OBJECT_TTL_DAYS.value:
       command.extend(
           ['--retention', f'{object_storage_service.OBJECT_TTL_DAYS.value}d']

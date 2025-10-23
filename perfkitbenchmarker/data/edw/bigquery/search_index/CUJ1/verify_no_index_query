@@ -1,0 +1,7 @@
+-- TODO: b/435032258 Remove hardcoded table name
+SELECT
+  *
+FROM
+  `p3rf-bq-search`.`search_index_dataset`.INFORMATION_SCHEMA.SEARCH_INDEXES
+WHERE
+  table_name = 'prototype_CUJ1_benchmark_100GB'

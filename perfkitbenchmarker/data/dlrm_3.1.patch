@@ -1,5 +1,5 @@
 diff --git a/closed/Intel/code/dlrm-v2-99/pytorch-cpu-int8/docker/Dockerfile b/closed/Intel/code/dlrm-v2-99/pytorch-cpu-int8/docker/Dockerfile
-index 2f40fa271..75200679f 100644
+index 2f40fa271..ed8c4f213 100644
 --- a/closed/Intel/code/dlrm-v2-99/pytorch-cpu-int8/docker/Dockerfile
 +++ b/closed/Intel/code/dlrm-v2-99/pytorch-cpu-int8/docker/Dockerfile
 @@ -15,7 +15,6 @@ ARG BASE_IMAGE=rockylinux:8.6
@@ -10,7 +10,7 @@ index 2f40fa271..75200679f 100644
  
  FROM ${BASE_IMAGE} AS dev-base
  ARG GCC_MAJOR_VERSION
-@@ -37,7 +36,6 @@ ENV PATH /opt/conda/bin:$PATH
+@@ -37,12 +36,15 @@ ENV PATH /opt/conda/bin:$PATH
  
  FROM dev-base as conda
  ARG PYTHON_VERSION
@@ -18,7 +18,25 @@ index 2f40fa271..75200679f 100644
  RUN curl -fsSL -v -o ~/miniconda.sh -O  https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
      chmod +x ~/miniconda.sh && \
      ~/miniconda.sh -b -p /opt/conda && \
-@@ -67,9 +65,9 @@ RUN pip install -e git+https://github.com/mlperf/logging@3.0.0-rc2#egg=mlperf-lo
+     rm ~/miniconda.sh && \
++    /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
++    /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
+     /opt/conda/bin/conda install -y python=${PYTHON_VERSION} && \
++    /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
++    /opt/conda/bin/conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r && \
+     /opt/conda/bin/conda install -c conda-forge -y \
+                                     cmake==3.26.4 \
+                                     gperftools==2.10 && \
+@@ -50,7 +52,7 @@ RUN curl -fsSL -v -o ~/miniconda.sh -O  https://repo.anaconda.com/miniconda/Mini
+                                     mkl-include \
+                                     numpy==1.25 \
+                                     ninja==1.10.2 \
+-                                    pyyaml==6.0 \
++                                    pyyaml \
+                                     setuptools==68.0.0 \
+                                     cffi==1.15.1 \
+                                     typing_extensions==4.7.1 \
+@@ -67,9 +69,9 @@ RUN pip install -e git+https://github.com/mlperf/logging@3.0.0-rc2#egg=mlperf-lo
                  onnx==1.14.0 \
                  lark-parser==0.12.0 \
                  hypothesis==6.82.0 \
@@ -30,7 +48,7 @@ index 2f40fa271..75200679f 100644
  
  FROM dev-base AS build
  ARG GCC_MAJOR_VERSION
-@@ -83,7 +81,7 @@ RUN --mount=type=cache,target=/opt/ccache \
+@@ -83,7 +85,7 @@ RUN --mount=type=cache,target=/opt/ccache \
      source /opt/rh/gcc-toolset-${GCC_MAJOR_VERSION}/enable && \
      export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"} && \
      git clone -b ${IPEX_BRANCH} https://github.com/intel/intel-extension-for-pytorch.git intel-extension-for-pytorch && \

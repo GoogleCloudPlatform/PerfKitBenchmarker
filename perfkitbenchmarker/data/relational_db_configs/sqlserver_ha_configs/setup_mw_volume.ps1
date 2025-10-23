@@ -36,13 +36,21 @@ try {
     $diskCount = $diskCount + 1
   }
 
-  Write-Host 'Test Cluster'
-  Invoke-Command -ComputerName  $ad_dc.HostName -Credential $domainCredential -ArgumentList $node1,$node2 -ScriptBlock {
-        Test-Cluster -Node $args[0],$args[1] -Include 'Inventory', 'Network', 'System Configuration' -Confirm:0;
+  Invoke-Command -ComputerName $ad_dc.HostName -Credential $domainCredential -ArgumentList $ad_dc.HostName -ScriptBlock {
+      $fileShareWitness = "\\$($args[0])\QWitness"
+      Set-ClusterQuorum -FileShareWitness $fileShareWitness -Cluster sql-fci
   }
+
+  Start-Sleep -Seconds 5
+  Write-Host 'Test Cluster'
+
+  Invoke-Command -ComputerName  $ad_dc.HostName -Credential $domainCredential -ArgumentList $node1,$node2 -ScriptBlock {
+      Test-Cluster -Node $args[0],$args[1] -Include 'Inventory', 'Network', 'System Configuration' -Confirm:0;
+  }
+
   Write-Host 'Add SQL service account'
   Invoke-Command -ComputerName  $ad_dc.HostName -Credential $domainCredential -ArgumentList $passwordSecureString -ScriptBlock {
-        New-ADUser -Name 'sql_server' -Description 'SQL Agent and SQL Admin account.' -AccountPassword $args[0] -Enabled $true -PasswordNeverExpires $true
+      New-ADUser -Name 'sql_server' -Description 'SQL Agent and SQL Admin account.' -AccountPassword $args[0] -Enabled $true -PasswordNeverExpires $true
   }
 
   $clDiskList = Get-ClusterAvailableDisk

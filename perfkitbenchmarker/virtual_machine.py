@@ -50,6 +50,12 @@ QUOTA_EXCEEDED_MESSAGE = 'Creation failed due to quota exceeded: '
 PREPROVISIONED_DATA_TIMEOUT = 600
 
 
+class CpuVersionMismatch(errors.Resource.RetryableCreationError):
+  """When a VM does not match an expected CPU version."""
+
+  pass
+
+
 def ValidateVmMetadataFlag(options_list):
   """Verifies correct usage of the vm metadata flag.
 
@@ -77,6 +83,9 @@ def ValidateVmMetadataFlag(options_list):
 # vm_metadata flag name
 VM_METADATA = 'vm_metadata'
 
+BOOT_DISK_SIZE = flags.DEFINE_integer(
+    'boot_disk_size', None, 'The boot disk size in GiB for VMs.'
+)
 flags.DEFINE_boolean(
     'dedicated_hosts',
     False,
@@ -235,11 +244,13 @@ GPU_P100 = 'p100'
 GPU_V100 = 'v100'
 GPU_A100 = 'a100'
 GPU_H100 = 'h100'
+GPU_B200 = 'b200'
 GPU_P4 = 'p4'
 GPU_P4_VWS = 'p4-vws'
 GPU_T4 = 't4'
 GPU_L4 = 'l4'
 GPU_A10 = 'a10'
+GPU_RTX_PRO_6000 = 'rtx-pro-6000'
 TESLA_GPU_TYPES = [
     GPU_K80,
     GPU_P100,
@@ -250,7 +261,12 @@ TESLA_GPU_TYPES = [
     GPU_T4,
     GPU_A10,
 ]
-VALID_GPU_TYPES = TESLA_GPU_TYPES + [GPU_L4, GPU_H100]
+VALID_GPU_TYPES = TESLA_GPU_TYPES + [
+    GPU_L4,
+    GPU_H100,
+    GPU_B200,
+    GPU_RTX_PRO_6000,
+]
 CPUARCH_X86_64 = 'x86_64'
 CPUARCH_AARCH64 = 'aarch64'
 
@@ -336,6 +352,7 @@ class BaseVmSpec(spec.BaseSpec):
   PLATFORM = provider_info.DEFAULT_VM_PLATFORM
 
   def __init__(self, *args, **kwargs):
+    self.boot_disk_size = None
     self.zone = None
     self.cidr = None
     self.machine_type: str
@@ -371,6 +388,8 @@ class BaseVmSpec(spec.BaseSpec):
       values or flag values.
     """
     super()._ApplyFlags(config_values, flag_values)
+    if flag_values['boot_disk_size'].present:
+      config_values['boot_disk_size'] = flag_values.boot_disk_size
     if flag_values['image'].present:
       config_values['image'] = flag_values.image
     if flag_values['install_packages'].present:
@@ -433,6 +452,10 @@ class BaseVmSpec(spec.BaseSpec):
     """
     result = super()._GetOptionDecoderConstructions()
     result.update({
+        'boot_disk_size': (
+            option_decoders.IntDecoder,
+            {'none_ok': True, 'default': None},
+        ),
         'disable_interrupt_moderation': (
             option_decoders.BooleanDecoder,
             {'default': False},
@@ -557,6 +580,10 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
   _instance_counter_lock = threading.Lock()
   _instance_counter = 0
 
+  # This is implemented in os_mixin.BaseOsMixin, but due to insane diamond
+  # inheritence, we need it here.
+  cpu_arch: str
+
   def __init__(self, vm_spec: BaseVmSpec):
     """Initialize BaseVirtualMachine class.
 
@@ -587,6 +614,8 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       BaseVirtualMachine._instance_counter += 1
     self.disable_interrupt_moderation = vm_spec.disable_interrupt_moderation
     self.disable_rss = vm_spec.disable_rss
+    if vm_spec.boot_disk_size:
+      self.boot_disk_size = vm_spec.boot_disk_size
     self.zone = vm_spec.zone
     self.cidr = vm_spec.cidr
     self.machine_type = vm_spec.machine_type
@@ -628,7 +657,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
     self.vm_group = None
     self.id = None
-    self.is_aarch64 = False
+    self._is_aarch64 = None
     self.cpu_version = None
     self.create_operation_name = None
     self.create_return_time = None
@@ -638,6 +667,23 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       raise errors.Setup.InvalidConfigurationError(
           'Startup script are not supported on CoreOS.'
       )
+
+  @property
+  def is_aarch64(self) -> bool:
+    """Whether the VM is known to be an ARM VM.
+
+    Historically each provider sets this explicitly, but for some providers like
+    KuberentesVirtualMachine, it's conveniet to fall back to what is reported by
+    Linux.
+    """
+    if self._is_aarch64 is not None:
+      return self._is_aarch64
+    # Only detect arch if it's not explicitly set.
+    return self.cpu_arch == CPUARCH_AARCH64
+
+  @is_aarch64.setter
+  def is_aarch64(self, value: bool):
+    self._is_aarch64 = value
 
   @property
   @classmethod
@@ -678,6 +724,10 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     elif self.internal_ip:
       return [self.internal_ip]
     return []
+
+  def GetLocalhostAddr(self):
+    """Returns ::1 if use_ipv6 is set, and localhost otherwise."""
+    return '::1' if pkb_flags.FLAGS.use_ipv6 else 'localhost'
 
   def SetDiskSpec(self, disk_spec, disk_count):
     """Set Disk Specs of the current VM."""
@@ -767,23 +817,27 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
           _REQUIRED_CPU_VERSION.value
           and _REQUIRED_CPU_VERSION.value != self.cpu_version
       ):
-        self.Delete()
-        raise errors.Resource.RetryableCreationError(
+        error_msg = (
             f'Guest arch {self.cpu_version} is not enforced guest arch'
             f' {_REQUIRED_CPU_VERSION.value}. Deleting VM and scratch disk and'
-            ' recreating.',
+            ' recreating.'
         )
+        logging.error(error_msg)
+        self.Delete()
+        raise CpuVersionMismatch(error_msg)
 
     try:
       vm_util.Retry(
           max_retries=_REQUIRED_CPU_VERSION_RETRIES.value,
-          retryable_exceptions=errors.Resource.RetryableCreationError,
+          retryable_exceptions=CpuVersionMismatch,
       )(CreateAndBootOnce)()
     except vm_util.RetriesExceededRetryError as exc:
-      raise errors.Benchmarks.InsufficientCapacityCloudFailure(
-          f'{_REQUIRED_CPU_VERSION.value} was not obtained after'
-          f' {_REQUIRED_CPU_VERSION_RETRIES.value} retries.'
-      ) from exc
+      if isinstance(exc.__cause__, CpuVersionMismatch):
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+            f'{_REQUIRED_CPU_VERSION.value} was not obtained after'
+            f' {_REQUIRED_CPU_VERSION_RETRIES.value} retries.'
+        ) from exc
+      raise exc
 
   def PrepareAfterBoot(self):
     """Prepares a VM after it has booted.
@@ -848,10 +902,12 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     result = self.metadata.copy()
     result.update({
         'image': self.image,
-        'zone': self.zone,
         'cloud': self.CLOUD,
         'os_type': type(self).OS_TYPE,
+        'vm_platform': self.PLATFORM,
     })
+    if self.zone is not None:
+      result['zone'] = self.zone
     if self.cidr is not None:
       result['cidr'] = self.cidr
     if self.machine_type is not None:
@@ -1259,6 +1315,5 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
 
   def GetNumTeardownSkippedVms(self) -> int | None:
     """Returns the number of lingering VMs in this VM's zone."""
-
 
 VirtualMachine = typing.TypeVar('VirtualMachine', bound=BaseVirtualMachine)

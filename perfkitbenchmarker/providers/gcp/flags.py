@@ -14,6 +14,7 @@
 """Module containing flags applicable across benchmark run on GCP."""
 
 from absl import flags
+from perfkitbenchmarker import dpb_constants
 
 # Sentinel value for unspecified platform.
 GCP_MIN_CPU_PLATFORM_NONE = 'none'
@@ -122,9 +123,8 @@ GCE_PLACEMENT_GROUP_MAX_DISTANCE = flags.DEFINE_integer(
 flags.DEFINE_string(
     'gce_remote_access_firewall_rule',
     None,
-    'The name of an '
-    'already created firewall rule which allows remote access '
-    'instead of creating a new one.',
+    'Obsolete. This was never used, but used to serve as a boolean similar to '
+    '--skip_firewall_rules, but specific to SSH, WinRM, and SMB.',
 )
 flags.DEFINE_multi_string(
     'gcp_instance_metadata_from_file',
@@ -145,9 +145,6 @@ flags.DEFINE_multi_string(
     'by commas. This option can be repeated multiple times. For information '
     'about GCP instance metadata, see: --metadata from '
     '`gcloud help compute instances create`.',
-)
-flags.DEFINE_integer(
-    'gce_boot_disk_size', None, 'The boot disk size in GB for GCP VMs.'
 )
 flags.DEFINE_enum(
     'gce_boot_disk_type',
@@ -308,6 +305,14 @@ GKE_IMAGE_TYPE = flags.DEFINE_string(
     ' https://cloud.google.com/kubernetes-engine/docs/concepts/node-images#available_node_images. '
     'See https://cloud.google.com/kubernetes-engine/docs/how-to/node-images#specifying_a_node_image.',
 )
+GKE_USE_LSSD_AS_EPHEMERAL_STORAGE = flags.DEFINE_boolean(
+    'gke_use_lssd_as_ephemeral_storage',
+    True,
+    'Whether to configure NVMe LSSDs to be available to pods as ephemeral '
+    'storage. Without this, using LSSDs require persistent volume claims that '
+    'no benchmarks currently use. See '
+    'https://cloud.google.com/kubernetes-engine/docs/how-to/persistent-volumes/local-ssd.',
+)
 CONTAINER_REMOTE_BUILD_CONFIG = flags.DEFINE_string(
     'container_remote_build_config',
     None,
@@ -315,7 +320,7 @@ CONTAINER_REMOTE_BUILD_CONFIG = flags.DEFINE_string(
 )
 GKE_GPU_DRIVER_VERSION = flags.DEFINE_enum(
     'gke_gpu_driver_version',
-    'disabled',
+    'default',
     ['disabled', 'latest', 'default'],
     'The GPU driver version to use for all node pools in the container cluster.'
     'Default behavior depends on GKE version. See '
@@ -328,6 +333,23 @@ CONTAINER_RELEASE_CHANNEL = flags.DEFINE_enum(
     'The release channel to use for the container cluster. Different release'
     ' channels support different Kubernetes versions and have different'
     ' defaults.',
+)
+MAX_CPU = flags.DEFINE_integer(
+    'gke_max_cpu',
+    None,
+    'Maximum number of cores to which the cluster can scale. Required to enable'
+    ' autoprovisioning feature.',
+)
+MAX_MEMORY = flags.DEFINE_integer(
+    'gke_max_memory',
+    None,
+    'Maximum number of GB of memory to which the cluster can scale. Required to'
+    ' enable autoprovisioning feature.',
+)
+MAX_ACCELERATOR = flags.DEFINE_string(
+    'gke_max_accelerator',
+    None,
+    'Sets maximum limit for a single type of GPU in the cluster.',
 )
 flags.DEFINE_string(
     'gcp_dataproc_subnet',
@@ -379,13 +401,13 @@ flags.DEFINE_boolean(
     'them. However, they must be deleted in order to '
     'successfully delete the PKB-created network.',
 )
-flags.DEFINE_enum(
+BQ_CLIENT_INTERFACE = flags.DEFINE_enum(
     'bq_client_interface',
     'CLI',
     [
         'CLI',
         'JAVA',
-        'SIMBA_JDBC_1_6_3_1004',
+        'SIMBA_JDBC',
         'GOOGLE_JDBC',
         'PYTHON',
     ],
@@ -420,6 +442,18 @@ RETRY_GCE_SUBNETWORK_NOT_READY = flags.DEFINE_boolean(
     'retry_gce_subnetwork_not_ready',
     True,
     'Retry Subnetwork not ready when provisioning resources.',
+)
+GCE_RESERVATION_ID = flags.DEFINE_string(
+    'gce_reservation_id',
+    None,
+    'ID of a capacity reservation to use when creating an instance',
+)
+
+GCE_PROVISIONING_MODEL = flags.DEFINE_enum(
+    'gce_provisioning_model',
+    None,
+    ['STANDARD', 'SPOT', 'RESERVATION_BOUND'],
+    'Provisioning model for GCE VM instances.',
 )
 
 # Flags required by dataflow_template provider
@@ -478,10 +512,16 @@ flags.DEFINE_list(
     'multiple zones.',
 )
 
-SPARK_BIGQUERY_CONNECTOR = flags.DEFINE_string(
-    'spark_bigquery_connector',
+SPARK_BIGQUERY_CONNECTOR_VERSION = flags.DEFINE_string(
+    'spark_bigquery_connector_version',
     None,
-    'The Spark BigQuery Connector jar to pass to the Spark Job',
+    'The Spark BigQuery Connector jar version to pass to the Spark Job.',
+)
+
+SPARK_BIGQUERY_CONNECTOR_URL = flags.DEFINE_string(
+    'spark_bigquery_connector_url',
+    None,
+    'The Spark BigQuery Connector url to pass to the Spark Job.',
 )
 
 AI_BUCKET_URI = flags.DEFINE_string(
@@ -490,6 +530,12 @@ AI_BUCKET_URI = flags.DEFINE_string(
     'If set, use this pre-existing bucket for model upload. Otherwise will'
     ' create a bucket & copy needed information to it at runtime. Should not'
     ' have a gs:// prefix.',
+)
+
+AI_FAST_TRYOUT = flags.DEFINE_boolean(
+    'ai_fast_tryout',
+    False,
+    'If set, passes --enable-fast-tryout to model garden deploy command.',
 )
 
 GCLUSTER_PATH = flags.DEFINE_string(
@@ -503,11 +549,58 @@ GKE_ENABLE_SHIELDED_NODES = flags.DEFINE_boolean(
     False,
     'Whether to enable shielded nodes.',
 )
+GKE_ADDONS = flags.DEFINE_string(
+    'gke_addons',
+    '',
+    'The addons to enable or disable.',
+)
 GCE_PERFORMANCE_MONITORING_UNIT = flags.DEFINE_enum(
     'gce_performance_monitoring_unit',
     None,
     ['standard', 'architectural', 'enhanced'],
-    'Whether to enable PMU when creating a VM.'
+    'Whether to enable PMU when creating a VM.',
+)
+GCP_DATAPROC_TIER = flags.DEFINE_enum(
+    'gcp_dataproc_tier',
+    dpb_constants.DATAPROC_STANDARD_TIER,
+    [dpb_constants.DATAPROC_STANDARD_TIER, dpb_constants.DATAPROC_PREMIUM_TIER],
+    'Dataproc tier to use for Dataproc GCE clusters.',
+)
+GCP_DATAPROC_ENGINE = flags.DEFINE_enum(
+    'gcp_dataproc_engine',
+    dpb_constants.DATAPROC_DEFAULT_ENGINE,
+    [
+        dpb_constants.DATAPROC_DEFAULT_ENGINE,
+        dpb_constants.DATAPROC_LIGHTNING_ENGINE,
+    ],
+    'Dataproc engine to use for Dataproc GCE clusters. Unlike gcloud it'
+    ' defaults to "default" regardless of chosen tier.',
+)
+GCP_DATAPROC_LIGHTNING_ENGINE_RUNTIME = flags.DEFINE_enum(
+    'gcp_dataproc_lightning_engine_runtime',
+    dpb_constants.DATAPROC_LIGHTNING_ENGINE_DEFAULT_RUNTIME,
+    [
+        dpb_constants.DATAPROC_LIGHTNING_ENGINE_DEFAULT_RUNTIME,
+        dpb_constants.DATAPROC_LIGHTNING_ENGINE_NATIVE_RUNTIME,
+    ],
+    'Dataproc Lightning Engine runtime to use. It defaults to "default"'
+    ' regardless of chosen engine.',
+)
+GCP_LUSTRE_VPC = flags.DEFINE_string(
+    'gcp_lustre_vpc',
+    '',
+    'VPC name for GCP Lustre instance: '
+    'https://cloud.google.com/managed-lustre/docs/vpc',
+)
+GCS_FUSE_ENABLE_FILE_CACHE = flags.DEFINE_boolean(
+    'gcs_fuse_enable_file_cache',
+    False,
+    'Whether to enable file cache for gcs fuse.',
+)
+GCS_FUSE_ENABLE_METADATA_CACHE = flags.DEFINE_boolean(
+    'gcs_fuse_enable_metadata_cache',
+    False,
+    'Whether to enable metadata cache for gcs fuse.',
 )
 
 

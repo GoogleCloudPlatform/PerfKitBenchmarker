@@ -23,9 +23,11 @@ from absl import flags
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.resources import kubernetes_inference_server_spec
 
 
 _DEFAULT_VM_COUNT = 1
@@ -304,9 +306,7 @@ class _NodepoolsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    nodepools_configs = super().Decode(
-        value, component_full_name, flag_values
-    )
+    nodepools_configs = super().Decode(value, component_full_name, flag_values)
     result = {}
     for nodepool_name, nodepool_config in nodepools_configs.items():
       result[nodepool_name] = NodepoolSpec(
@@ -384,6 +384,9 @@ class ContainerClusterSpec(spec.BaseSpec):
   cloud: str
   vm_spec: spec.PerCloudConfigSpec
   nodepools: dict[str, NodepoolSpec]
+  inference_server: (
+      kubernetes_inference_server_spec.BaseInferenceServerConfigSpec | None
+  )
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -393,6 +396,13 @@ class ContainerClusterSpec(spec.BaseSpec):
           '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
           'configuration for "{1}".'.format(component_full_name, self.cloud)
       )
+    # LoadProvider to load the relevant VmSpec subclasses before fetching one.
+    ignore_package_requirements = (
+        getattr(flag_values, 'ignore_package_requirements', True)
+        if flag_values
+        else True
+    )
+    providers.LoadProvider(self.cloud, ignore_package_requirements)
     vm_spec_class = virtual_machine.GetVmSpecClass(
         self.cloud, provider_info.DEFAULT_VM_PLATFORM
     )
@@ -462,13 +472,17 @@ class ContainerClusterSpec(spec.BaseSpec):
         ),
         'poll_for_events': (
             option_decoders.BooleanDecoder,
-            {'default': False, 'none_ok': True},
+            {'default': True, 'none_ok': True},
         ),
         # vm_spec is used to define the machine type for the default nodepool
         'vm_spec': (spec.PerCloudConfigDecoder, {}),
         # nodepools specifies a list of additional nodepools to create alongside
         # the default nodepool (nodepool created on cluster creation).
         'nodepools': (_NodepoolsDecoder, {'default': {}, 'none_ok': True}),
+        'inference_server': (
+            kubernetes_inference_server_spec.InferenceServerConfigDecoder,
+            {'default': None, 'none_ok': True},
+        ),
     })
     return result
 

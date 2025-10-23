@@ -270,7 +270,7 @@ def GetBlockDeviceMap(vm):
 def GetArmArchitecture(machine_type: str):
   """Returns the specific ARM processor architecture of the VM."""
   # c6g.medium -> c6g, m6gd.large -> m6g, c5n.18xlarge -> c5
-  prefix = re.split(r'[dn]?\.', machine_type)[0]
+  prefix = re.split(r'[bdn]?\.', machine_type)[0]
   return _MACHINE_TYPE_PREFIX_TO_ARM_ARCH.get(prefix)
 
 
@@ -380,8 +380,6 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
         provided config values.
     """
     super()._ApplyFlags(config_values, flag_values)
-    if flag_values['aws_boot_disk_size'].present:
-      config_values['boot_disk_size'] = flag_values.aws_boot_disk_size
     if flag_values['aws_spot_instances'].present:
       config_values['use_spot_instance'] = flag_values.aws_spot_instances
     if flag_values['aws_spot_price'].present:
@@ -411,7 +409,6 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
             option_decoders.IntDecoder,
             {'default': None},
         ),
-        'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
     })
 
     return result
@@ -634,9 +631,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.create_cmd = None
 
     arm_arch = GetArmArchitecture(self.machine_type)
+    self.is_aarch64 = bool(arm_arch)
     if arm_arch:
       self.host_arch = arm_arch
-      self.is_aarch64 = True
 
     if self.use_dedicated_host and util.IsRegion(self.zone):
       raise ValueError(
@@ -965,6 +962,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '{CapacityReservationId=%s}' % reservation_id]
     else:
       reservation_args = []
+
+    bandwidth_weighting_args = []
+    if aws_flags.AWS_INSTANCE_BANDWIDTH_WEIGHTING.value:
+      bandwidth_weighting_args = [
+          '--network-performance-options',
+          f'BandwidthWeighting={aws_flags.AWS_INSTANCE_BANDWIDTH_WEIGHTING.value}'
+      ]
     create_cmd = util.AWS_PREFIX + [
         'ec2',
         'run-instances',
@@ -975,7 +979,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--key-name=%s' % AwsKeyFileManager.GetKeyNameForRun(),
         '--tag-specifications=%s'
         % util.FormatTagSpecifications('instance', self.aws_tags),
-    ] + reservation_args
+    ] + reservation_args + bandwidth_weighting_args
 
     if FLAGS.aws_vm_hibernate:
       create_cmd.extend([
@@ -987,6 +991,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         'hpc6a.48xlarge',
         'hpc6id.32xlarge',
         'hpc7a.96xlarge',
+        'hpc7g.16xlarge',
     ):
       query_cmd = util.AWS_PREFIX + [
           'ec2',
@@ -1609,6 +1614,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['efa_count'] = FLAGS.aws_efa_count
       result['nic_count'] = FLAGS.aws_efa_count
     result['preemptible'] = self.use_spot_instance
+    result['instance_bandwidth_weighting'] = (
+        aws_flags.AWS_INSTANCE_BANDWIDTH_WEIGHTING.value or 'default'
+    )
     return result
 
   def DiskTypeCreatedOnVMCreation(self, disk_type):
@@ -1674,6 +1682,17 @@ class Debian12BasedAwsVirtualMachine(
   # From https://wiki.debian.org/Cloud/AmazonEC2Image/Bookworm
   IMAGE_NAME_FILTER_PATTERN = 'debian-12-{alternate_architecture}-*'
   IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
+  DEFAULT_USER_NAME = 'admin'
+
+
+class Debian13BasedAwsVirtualMachine(
+    BaseLinuxAwsVirtualMachine, linux_virtual_machine.Debian13Mixin
+):
+  # From https://wiki.debian.org/Cloud/AmazonEC2Image/Trixie
+  IMAGE_NAME_FILTER_PATTERN = 'debian-13-{alternate_architecture}-*'
+  IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
   DEFAULT_USER_NAME = 'admin'
 
 
@@ -1852,6 +1871,19 @@ class Rhel9BasedAwsVirtualMachine(
   IMAGE_OWNER = RHEL_IMAGE_PROJECT
 
 
+class Rhel10BasedAwsVirtualMachine(
+    BaseLinuxAwsVirtualMachine, linux_virtual_machine.Rhel10Mixin
+):
+  """Class with configuration for AWS RHEL 10 virtual machines."""
+
+  # Documentation on finding RHEL images:
+  # https://access.redhat.com/articles/3692431
+  # All RHEL AMIs are HVM. HVM- blocks HVM_BETA.
+  IMAGE_NAME_FILTER_PATTERN = 'RHEL-10*_HVM-*'
+  IMAGE_OWNER = RHEL_IMAGE_PROJECT
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
+
+
 class RockyLinux8BasedAwsVirtualMachine(
     BaseLinuxAwsVirtualMachine, linux_virtual_machine.RockyLinux8Mixin
 ):
@@ -1869,6 +1901,16 @@ class RockyLinux9BasedAwsVirtualMachine(
 
   IMAGE_OWNER = ROCKY_LINUX_IMAGE_PROJECT
   IMAGE_NAME_FILTER_PATTERN = 'Rocky-9-*'
+  DEFAULT_USER_NAME = 'rocky'
+
+
+class RockyLinux10BasedAwsVirtualMachine(
+    BaseLinuxAwsVirtualMachine, linux_virtual_machine.RockyLinux10Mixin
+):
+  """Class with configuration for AWS Rocky Linux 10 virtual machines."""
+
+  IMAGE_OWNER = ROCKY_LINUX_IMAGE_PROJECT
+  IMAGE_NAME_FILTER_PATTERN = 'Rocky-10-*'
   DEFAULT_USER_NAME = 'rocky'
 
 

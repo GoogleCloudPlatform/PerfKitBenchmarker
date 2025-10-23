@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Contains code related Kubernetes pod spec decoding."""
+"""Contains code related to Kubernetes pod spec decoding."""
 
 from typing import Optional, Union
 
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.resources.kubernetes import kubernetes_resources_spec
 
 
@@ -25,6 +26,7 @@ class KubernetesPodSpec(virtual_machine.BaseVmSpec):
   """Object containing the information needed to create a Kubernetes Pod.
 
   Attributes:
+    host_network: Whether to directly use the pod's host for networking.
     resource_limits: The max resource limits (cpu & memory).
     resource_requests: The requested resources (cpu & memory).
   """
@@ -37,6 +39,7 @@ class KubernetesPodSpec(virtual_machine.BaseVmSpec):
   PLATFORM: str = provider_info.KUBERNETES
 
   def __init__(self, *args, **kwargs):
+    self.host_network: bool = False
     self.resource_limits: Optional[
         kubernetes_resources_spec.KubernetesResourcesSpec
     ] = None
@@ -56,6 +59,10 @@ class KubernetesPodSpec(virtual_machine.BaseVmSpec):
     """
     result = super()._GetOptionDecoderConstructions()
     result.update({
+        'host_network': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
+        ),
         'resource_limits': (
             kubernetes_resources_spec.KubernetesResourcesDecoder,
             {'default': None},

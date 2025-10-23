@@ -18,14 +18,6 @@ import re
 import time
 from typing import Any
 from absl import flags
-# pylint: disable=g-import-not-at-top, g-statement-before-imports
-# External needs from google.cloud.
-# pytype: disable=module-attr
-try:
-  from google.cloud.aiplatform import aiplatform
-except ImportError:
-  from google.cloud import aiplatform
-from google.api_core import exceptions as google_exceptions
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
@@ -42,7 +34,6 @@ FLAGS = flags.FLAGS
 
 CLI = 'CLI'
 MODEL_GARDEN_CLI = 'MODEL-GARDEN-CLI'
-SDK = 'SDK'
 SERVICE_ACCOUNT_BASE = '{}-compute@developer.gserviceaccount.com'
 _MODEL_DEPLOY_TIMEOUT = 60 * 60  # 1 hour
 
@@ -56,7 +47,8 @@ class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
     model_resource_name: The full resource name of the created model, e.g.
       projects/123/locations/us-east1/models/1234.
     region: The region, derived from the zone.
-    project: The project.
+    project: The project (eg "my-project").
+    project_number: The GCP project number (eg "12345").
     endpoint: The PKB resource endpoint the model is deployed to.
     service_account: Name of the service account used by the model.
     model_deploy_time: Time it took to deploy the model.
@@ -81,6 +73,7 @@ class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
   name: str
   region: str
   project: str
+  project_number: str
   service_account: str
   model_resource_name: str | None
   model_deploy_time: float | None
@@ -116,6 +109,7 @@ class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
     else:
       self.name = 'pkb' + FLAGS.run_uri
     self.project = FLAGS.project
+    self.project_number = util.GetProjectNumber(self.project)
     self.endpoint = self._CreateEndpoint()
     if not self.project:
       raise errors.Setup.InvalidConfigurationError(
@@ -128,6 +122,7 @@ class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
         'machine_type': self.model_spec.machine_type,
         'accelerator_type': self.model_spec.accelerator_type,
         'accelerator_count': self.model_spec.accelerator_count,
+        'project': self.project,
     })
     project_number = util.GetProjectNumber(self.project)
     self.service_account = SERVICE_ACCOUNT_BASE.format(project_number)
@@ -277,15 +272,16 @@ class BaseVertexAiModel(managed_ai_model.BaseManagedAiModel):
       self.gcs_bucket_copy_time = time.time() - gcs_bucket_copy_start_time
     self.endpoint.Create()
 
-  def Delete(self, freeze: bool = False) -> None:
-    """Deletes the underlying resource & its dependencies."""
+  def _PreDelete(self) -> None:
+    """Deletes dependencies before deleting the underlying resource."""
     # Normally _DeleteDependencies is called by parent after _Delete, but we
     # need to call it before.
     self._DeleteDependencies()
-    super().Delete(freeze)
 
   def _DeleteDependencies(self):
     super()._DeleteDependencies()
+    if self.deleted:
+      return
     self.endpoint.Delete()
     if self.gcs_client:
       self.gcs_client.DeleteBucket(
@@ -332,9 +328,26 @@ class BaseCliVertexAiModel(BaseVertexAiModel):
     end_write_time = time.time()
     write_time = end_write_time - start_write_time
     self.json_write_times.append(write_time)
+    return self._GetPromptCommand(name)
+
+  def _GetPromptCommand(self, json_file_name: str):
+    """Returns the prompting command once json file is written."""
+    url = self.GetEndpointUrl()
     return (
-        'gcloud ai endpoints predict'
-        f' {self.endpoint.endpoint_name} --json-request={name}'
+        'curl -X POST -H "Content-Type: application/json" -H "Authorization:'
+        f' Bearer $(gcloud auth print-access-token)" {url} -d @{json_file_name}'
+    )
+
+  def GetEndpointUrl(self) -> str:
+    """Returns the URL of the endpoint."""
+    if gcp_flags.AI_FAST_TRYOUT.value:
+      extension = '-fasttryout'
+    else:
+      extension = f'-{self.project_number}'
+    return (
+        f'https://{self.endpoint.short_endpoint_name}.{self.region}{extension}.'
+        f'prediction.vertexai.goog/v1/projects/{self.project_number}/locations/'
+        f'{self.region}/endpoints/{self.endpoint.short_endpoint_name}:predict'
     )
 
   def _Delete(self) -> None:
@@ -440,6 +453,8 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
     super().__init__(vm, model_spec, name, bucket_uri, **kwargs)
     # GCS client is not needed by Model Garden CLI.
     self.gcs_client = None
+    if gcp_flags.AI_FAST_TRYOUT.value:
+      self.metadata.update({'fast_tryout': True})
 
   def _Create(self) -> None:
     """Creates the underlying resource."""
@@ -451,6 +466,8 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
         f' --project={self.project} --region={self.region}'
         f' --machine-type={self.model_spec.machine_type}'
     )
+    if gcp_flags.AI_FAST_TRYOUT.value:
+      deploy_cmd += ' --enable-fast-tryout'
     _, err_out, _ = self.vm.RunCommand(
         deploy_cmd, timeout=_MODEL_DEPLOY_TIMEOUT
     )
@@ -473,11 +490,14 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
         exception_type=errors.Resource.CreationError,
         group_index=2,
     )
+    # Above command created the endpoint & the model, so setup the endpoint as
+    # if it was created by the CLI.
     self.endpoint.endpoint_name = _FindRegexInOutput(
         out,
         r'endpoint: (.*)\n',
         exception_type=errors.Resource.CreationError,
     )
+    self.endpoint.created = True
     logging.info(
         'Model resource with name %s deployed & found with model id %s &'
         ' endpoint id %s',
@@ -497,125 +517,7 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
     calls the grandparent managed_ai_model._CreateDependencies to add metadata.
     """
     super(BaseVertexAiModel, self)._CreateDependencies()
-
-
-class VertexAiPythonSdkModel(BaseVertexAiModel):
-  """Vertex AI model managed via python SDK.
-
-  Attributes:
-    gcloud_model: Representation of the model in gcloud python library.
-  """
-
-  INTERFACE: str = SDK
-
-  endpoint: 'VertexAiSdkEndpoint'
-  gcloud_model: aiplatform.Model
-
-  def _CreateEndpoint(self) -> 'VertexAiSdkEndpoint':
-    return VertexAiSdkEndpoint(
-        name=self.name,
-        region=self.region,
-        project=self.project,
-        vm=self.vm,
-    )
-
-  def _SendPrompt(
-      self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
-  ) -> list[str]:
-    """Sends a prompt to the model and returns the response."""
-    instances = self.model_spec.ConvertToInstances(
-        prompt, max_tokens, temperature, **kwargs
-    )
-    assert self.endpoint.ai_endpoint
-    response = self.endpoint.ai_endpoint.predict(instances=instances)  # pytype: disable=attribute-error
-    str_responses = [str(response) for response in response.predictions]
-    return str_responses
-
-  def _UploadModel(self):
-    env_vars = self.model_spec.GetEnvironmentVariables(
-        model_bucket_path=self.model_bucket_path
-    )
-    logging.info(
-        'Uploading ai model %s with env vars %s', self.model_name, env_vars
-    )
-    self.gcloud_model = aiplatform.Model.upload(
-        display_name=self.name,
-        serving_container_image_uri=self.model_spec.container_image_uri,
-        serving_container_command=self.model_spec.serving_container_command,
-        serving_container_args=self.model_spec.serving_container_args,
-        serving_container_ports=self.model_spec.serving_container_ports,
-        serving_container_predict_route=self.model_spec.serving_container_predict_route,
-        serving_container_health_route=self.model_spec.serving_container_health_route,
-        serving_container_environment_variables=env_vars,
-        artifact_uri=self.model_bucket_path,
-        labels=util.GetDefaultTags(),
-    )
-    self.model_resource_name = self.gcloud_model.resource_name
-
-  def _DeployModel(self):
-    try:
-      assert self.gcloud_model
-      self.gcloud_model.deploy(
-          endpoint=self.endpoint.ai_endpoint,
-          machine_type=self.model_spec.machine_type,
-          accelerator_type=self.model_spec.accelerator_type,
-          accelerator_count=self.model_spec.accelerator_count,
-          deploy_request_timeout=1800,
-          max_replica_count=self.max_scaling,
-      )
-    except google_exceptions.ServiceUnavailable as ex:
-      logging.info('Tried to deploy model but got unavailable error %s', ex)
-      raise errors.Benchmarks.QuotaFailure(ex)
-
-  def _CreateDependencies(self):
-    """Creates the endpoint & copies the model to a bucket."""
-    aiplatform.init(
-        project=self.project,
-        location=self.region,
-        staging_bucket=self.staging_bucket,
-        service_account=self.service_account,
-    )
-    super()._CreateDependencies()
-
-  def Delete(self, freeze: bool = False) -> None:
-    """Deletes the underlying resource & its dependencies."""
-    # Normally _DeleteDependencies is called by parent after _Delete, but we
-    # need to call it before.
-    self._DeleteDependencies()
-    super().Delete(freeze)
-
-  def _Delete(self) -> None:
-    """Deletes the underlying resource."""
-    logging.info('Deleting the resource: %s.', self.model_name)
-    assert self.gcloud_model
-    self.gcloud_model.delete()
-
-  def __getstate__(self):
-    """Override pickling as the AI platform objects are not picklable."""
-    to_pickle_dict = {
-        'name': self.name,
-        'model_name': self.model_name,
-        'model_bucket_path': self.model_bucket_path,
-        'region': self.region,
-        'project': self.project,
-        'service_account': self.service_account,
-        'model_upload_time': self.model_upload_time,
-        'model_deploy_time': self.model_deploy_time,
-        'model_spec': self.model_spec,
-    }
-    return to_pickle_dict
-
-  def __setstate__(self, pickled_dict):
-    """Override pickling as the AI platform objects are not picklable."""
-    self.name = pickled_dict['name']
-    self.model_name = pickled_dict['model_name']
-    self.model_bucket_path = pickled_dict['model_bucket_path']
-    self.region = pickled_dict['region']
-    self.project = pickled_dict['project']
-    self.service_account = pickled_dict['service_account']
-    self.model_upload_time = pickled_dict['model_upload_time']
-    self.model_deploy_time = pickled_dict['model_deploy_time']
-    self.model_spec = pickled_dict['model_spec']
+    self.vm.InstallPackages('curl')
 
 
 class BaseVertexAiEndpoint(resource.BaseResource):
@@ -642,7 +544,18 @@ class BaseVertexAiEndpoint(resource.BaseResource):
     self.project = project
     self.region = region
     self.vm = vm
-    self.endpoint_name = None
+    self.endpoint_name = str | None
+
+  @property
+  def short_endpoint_name(self) -> str | None:
+    """Returns the short name of the endpoint.
+
+    Returns: The short name.
+    ie 1234 rather than projects/123/locations/us-east1/endpoints/1234.
+    """
+    if self.endpoint_name is None:
+      return None
+    return self.endpoint_name.split('/')[-1]
 
   def UpdateLabels(self) -> None:
     """Updates the labels of the endpoint."""
@@ -706,32 +619,6 @@ class VertexAiCliEndpoint(BaseVertexAiEndpoint):
     )
 
 
-class VertexAiSdkEndpoint(BaseVertexAiEndpoint):
-  """Represents a Vertex AI endpoint managed by the SDK.
-
-  Attributes:
-    ai_endpoint: The AIPlatform object representing the endpoint.
-  """
-
-  INTERFACE = SDK
-
-  ai_endpoint: aiplatform.Endpoint | None
-
-  def _Create(self) -> None:
-    """Creates the underlying resource."""
-    logging.info('Creating the endpoint: %s.', self.name)
-    self.ai_endpoint = aiplatform.Endpoint.create(
-        display_name=f'{self.name}-endpoint'
-    )
-
-  def _Delete(self) -> None:
-    """Deletes the underlying resource."""
-    logging.info('Deleting the endpoint: %s.', self.name)
-    assert self.ai_endpoint
-    self.ai_endpoint.delete(force=True)
-    self.ai_endpoint = None  # Object is not picklable - none it out
-
-
 def _FindRegexInOutput(
     output: str,
     regex: str,
@@ -747,6 +634,7 @@ def _FindRegexInOutput(
     group_index: If there are multiple groups in the regex, which one to return.
   """
   matches = re.search(regex, output)
+
   if not matches:
     if exception_type:
       raise exception_type(
@@ -804,14 +692,6 @@ class VertexAiModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
         f' --container-env-vars={env_vars_str}'
     )
 
-  def GetModelDeployKwargs(self) -> dict[str, Any]:
-    """Returns the kwargs needed to deploy the model."""
-    return {
-        'machine_type': self.machine_type,
-        'accelerator_type': self.accelerator_type,
-        'accelerator_count': self.accelerator_count,
-    }
-
   def GetEnvironmentVariables(self, **kwargs) -> dict[str, str]:
     """Returns container's environment variables needed by Llama2."""
     return {
@@ -855,7 +735,7 @@ class VertexAiLlama2Spec(VertexAiModelSpec):
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
     # The pre-built serving docker images.
-    self.container_image_uri = 'us-docker.pkg.dev/vertex-ai/vertex-vision-model-garden-dockers/pytorch-vllm-serve:20240222_0916_RC00'
+    self.container_image_uri = 'us-docker.pkg.dev/vertex-ai/vertex-vision-model-garden-dockers/pytorch-vllm-serve:20240715_0916_RC00'
     self.serving_container_command = [
         'python',
         '-m',
@@ -893,7 +773,7 @@ class VertexAiLlama3Spec(VertexAiModelSpec):
   """Spec for running the Llama3 8b & 70b model."""
 
   MODEL_NAME: str = 'llama3'
-  MODEL_SIZE: list[str] = ['8b', '70b']
+  MODEL_SIZE: list[str] = ['8b', '8b-instruct', '70b']
   VLLM_ARGS = [
       '--host=0.0.0.0',
       '--port=8080',
@@ -929,9 +809,13 @@ class VertexAiLlama3Spec(VertexAiModelSpec):
     if self.model_size == '8b':
       self.machine_type = 'g2-standard-12'
       self.accelerator_count = 1
-    else:
+    elif self.model_size == '70b':
       self.machine_type = 'g2-standard-96'
       self.accelerator_count = 8
+    else:
+      # This machine type selected for instruct to use the quick deploy config.
+      self.machine_type = 'a2-ultragpu-1g'
+      self.accelerator_count = 1
     self.accelerator_type = 'NVIDIA_L4'
     self.serving_container_args = self.VLLM_ARGS.copy()
     self.serving_container_args.append(
@@ -950,3 +834,30 @@ class VertexAiLlama3Spec(VertexAiModelSpec):
   def GetModelGardenName(self) -> str:
     """Returns the name of the model in Model Garden."""
     return f'meta/llama3@meta-llama-3-{self.model_size}'
+
+
+class VertexAiLlama4Spec(VertexAiModelSpec):
+  """Spec for running the Llama4 scout & maverick models.
+
+  Only currently works for Model Garden CLI.
+  """
+
+  MODEL_NAME: str = 'llama4'
+  MODEL_SIZE: list[str] = ['scout-17b', 'maverick-17b']
+  VLLM_ARGS = []
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+    self.machine_type = 'a3-highgpu-8g'
+    self.accelerator_count = 8
+    self.accelerator_type = 'NVIDIA_H100_80GB'
+    self.model_bucket_suffix = ''
+
+  def GetModelGardenName(self) -> str:
+    """Returns the name of the model in Model Garden."""
+    suffix = self.model_size
+    if self.model_size == 'scout-17b':
+      suffix += '-16e'
+    else:
+      suffix += '-128e'
+    return f'meta/llama4@llama-4-{suffix}'

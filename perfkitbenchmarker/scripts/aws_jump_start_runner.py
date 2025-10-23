@@ -7,6 +7,7 @@ python aws_jump_start_runner.py --model_id=meta-textgeneration-llama-2-7b-f --mo
 ```
 """
 
+import json
 from absl import app
 from absl import flags
 from sagemaker import predictor as predictor_lib
@@ -24,7 +25,7 @@ _MODEL_ID = flags.DEFINE_string(
     'model_id', '', help='Id of the model. Required.'
 )
 _MODEL_VERSION = flags.DEFINE_string(
-    'model_version', '', help='Version of the model. Required.'
+    'model_version', '', help='Version of the model. Optional.'
 )
 _REGION = flags.DEFINE_string(
     'region', '', help='Name of the region model/endpoint are in. Required.'
@@ -35,29 +36,27 @@ _OPERATION = flags.DEFINE_enum(
     enum_values=['create', 'delete', 'prompt'],
     help='Required. Operation that will be done against the endpoint.',
 )
+_PAYLOAD_JSON = flags.DEFINE_string(
+    'payload',
+    '',
+    help='The payload prompt sent to the model, as a json string.',
+)
 _PROMPT = flags.DEFINE_string(
     'prompt', '', help='Prompt sent to model, used in prompt mode'
-)
-_MAX_TOKENS = flags.DEFINE_integer(
-    'max_tokens',
-    512,
-    help='Max tokens returned in response, used in prompt mode',
-)
-_TEMPERATURE = flags.DEFINE_float(
-    'temperature',
-    1.0,
-    help='Temperature / randomness of responses, used in prompt mode',
 )
 
 
 def Create():
+  """Creates a new model and endpoint."""
   assert _ROLE.value
-  model = JumpStartModel(
-      model_id=_MODEL_ID.value,
-      model_version=_MODEL_VERSION.value,
-      region=_REGION.value,
-      role=_ROLE.value,
-  )
+  kwargs = {
+      'model_id': _MODEL_ID.value,
+      'region': _REGION.value,
+      'role': _ROLE.value,
+  }
+  if _MODEL_VERSION.value:
+    kwargs['model_version'] = _MODEL_VERSION.value
+  model = JumpStartModel(**kwargs)
   print('Model name: <' + model.name + '>')
   predictor = model.deploy(accept_eula=True)
   print('Endpoint name: <' + predictor.endpoint_name + '>')
@@ -65,46 +64,51 @@ def Create():
 
 
 def GetModel():
+  """Gets an existing model as a python object."""
   assert _ENDPOINT_NAME.value
+  kwargs = {
+      'region': _REGION.value,
+      'model_id': _MODEL_ID.value,
+  }
+  if _MODEL_VERSION.value:
+    kwargs['model_version'] = _MODEL_VERSION.value
   return predictor_lib.retrieve_default(
       _ENDPOINT_NAME.value,
-      region=_REGION.value,
-      model_id=_MODEL_ID.value,
-      model_version=_MODEL_VERSION.value,
+      **kwargs,
   )
 
 
 def SendPrompt(predictor: predictor_lib.Predictor):
   """Sends prompt given flags to the predictor."""
-  assert _PROMPT.value
+  assert _PAYLOAD_JSON.value
 
   def PrintDialog(response):
-    assumed_role = response[0]['generation']['role'].capitalize()
-    content = response[0]['generation']['content']
-    print(f'Response>>>> {assumed_role}: {content}')
+    print('got back response:')
+    print(response)
+    if 'generated_text' in response:
+      output = response['generated_text']
+    else:
+      if 'choices' in response:
+        message = response['choices'][0]['message']
+      else:
+        message = response[0]['generation']
+      output = f'{message['role'].capitalize()}: {message['content']}'
+    print(f'Response>>>> {output}')
     print('\n====\n')
 
-  payload = {
-      'inputs': [[
-          {'role': 'user', 'content': _PROMPT.value},
-      ]],
-      'parameters': {
-          'max_new_tokens': _MAX_TOKENS.value,
-          'temperature': _TEMPERATURE.value,
-      },
-  }
+  payload = json.loads(_PAYLOAD_JSON.value)
   response = predictor.predict(payload, custom_attributes='accept_eula=true')
   PrintDialog(response)
 
 
 def Delete(predictor: predictor_lib.Predictor):
+  """Deletes the model and endpoint."""
   predictor.delete_model()
   predictor.delete_endpoint()
 
 
 def main(argv):
   del argv
-  assert _MODEL_VERSION.value
   assert _MODEL_ID.value
   assert _REGION.value
   if _OPERATION.value == 'create':

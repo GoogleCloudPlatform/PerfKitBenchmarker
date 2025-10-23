@@ -16,6 +16,7 @@
 
 import unittest
 from absl import flags
+from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
@@ -49,16 +50,15 @@ GOOD_METADATA = {
     'runspec_config': 'linux64-x64-gcc47.cfg',
     'runspec_config_md5sum': 'abcd',
     'runspec_define': '',
-    'runspec_iterations': '3',
+    'runspec_iterations': '1',
     'runspec_enable_32bit': 'False',
     'runspec_metric': 'rate',
     'spec_runmode': 'base',
     'spec17_fdo': False,
     'spec17_copies': None,
     'spec17_threads': None,
-    'spec17_subset': ['intspeed', 'fpspeed', 'intrate', 'fprate'],
+    'spec17_subset': ['intrate'],
     'gcc_version': '7',
-    'CPU2017_version': '',
 }
 
 EXPECTED_RESULT_SPECINT = [
@@ -199,6 +199,25 @@ TEST_OUTPUT_BAD1 = """
 464.h264ref         1  778             28.4 *
 471.omnetpp         1  536             11.7 *
 473.astar           1  657             10.7 *
+483.xalancbmk                               NR
+ Est. SPECint(R)_rate_base2006           --
+ Est. SPECint_rate2006                                              Not Run
+"""
+
+# All NR, no aggregate score.
+TEST_OUTPUT_ALL_NR = """
+==============================================================================
+400.perlbench                               NR
+401.bzip2                                   NR
+403.gcc                                     NR
+429.mcf                                     NR
+445.gobmk                                   NR
+456.hmmer                                   NR
+458.sjeng                                   NR
+462.libquantum                              NR
+464.h264ref                                 NR
+471.omnetpp                                 NR
+473.astar                                   NR
 483.xalancbmk                               NR
  Est. SPECint(R)_rate_base2006           --
  Est. SPECint_rate2006                                              Not Run
@@ -587,13 +606,13 @@ class Speccpu2006BenchmarkTestCase(
     mock.patch.object(speccpu, '_GenerateMd5sum').start().return_value = 'abcd'
     self.addCleanup(mock.patch.stopall)
 
+  @flagsaver.flagsaver(spec_runmode='base', runspec_estimate_spec=False)
   def testParseResultsC(self):
     vm = mock.Mock(vm=linux_virtual_machine.Ubuntu2004Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2006'
     spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
     spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
-    speccpu.FLAGS.spec_runmode = 'base'
     vm.speccpu_vm_state = spec_test_config
 
     samples = speccpu._ExtractScore(TEST_OUTPUT_SPECINT, vm, False, 'rate')
@@ -621,8 +640,8 @@ class Speccpu2006BenchmarkTestCase(
     samples = speccpu._ExtractScore(TEST_OUTPUT_EST, vm, True, 'rate')
     self.assertSampleListsEqualUpToTimestamp(samples, EXPECTED_RESULT_EST)
 
+  @flagsaver.flagsaver(spec_runmode='base')
   def testParseSpeedResults(self):
-    speccpu.FLAGS.spec_runmode = 'base'
     vm = mock.Mock(vm=linux_virtual_machine.Ubuntu2004Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2006'
@@ -634,8 +653,8 @@ class Speccpu2006BenchmarkTestCase(
         samples, EXPECTED_SPEED_RESULT_SPECINT
     )
 
+  @flagsaver.flagsaver(spec_runmode='all')
   def testParseAllResults(self):
-    speccpu.FLAGS.spec_runmode = 'all'
     vm = mock.Mock(vm=linux_virtual_machine.Ubuntu2004Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2017'
@@ -647,8 +666,8 @@ class Speccpu2006BenchmarkTestCase(
         samples, EXPECTED_ALL_RESULT_SPECINT
     )
 
+  @flagsaver.flagsaver(spec_runmode='peak', runspec_estimate_spec=False)
   def testParsePeakResults(self):
-    speccpu.FLAGS.spec_runmode = 'peak'
     vm = mock.Mock(vm=linux_virtual_machine.Ubuntu2004Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2017'
@@ -660,8 +679,8 @@ class Speccpu2006BenchmarkTestCase(
         samples, EXPECTED_PEAK_RESULT_SPECINT
     )
 
+  @flagsaver.flagsaver(spec_runmode='peak', runspec_estimate_spec=False)
   def testParsePartialPeakResults(self):
-    speccpu.FLAGS.spec_runmode = 'peak'
     vm = mock.Mock(vm=linux_virtual_machine.Ubuntu2004Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
     spec_test_config.benchmark_name = 'speccpu2017'
@@ -672,6 +691,19 @@ class Speccpu2006BenchmarkTestCase(
     self.assertSampleListsEqualUpToTimestamp(
         samples, EXPECTED_PARTIAL_PEAK_RESULT_SPECINT
     )
+
+  @flagsaver.flagsaver(spec_runmode='base', runspec_estimate_spec=True)
+  def testGeometricMeanWithNoScores(self):
+    vm = mock.Mock(vm=linux_virtual_machine.Ubuntu2004Mixin)
+    spec_test_config = speccpu.SpecInstallConfigurations()
+    spec_test_config.benchmark_name = 'speccpu2006'
+    spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
+    spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
+    vm.speccpu_vm_state = spec_test_config
+    with self.assertRaisesRegex(
+        errors.Benchmarks.RunError, 'speccpu: no scores found'
+    ):
+      speccpu._ExtractScore(TEST_OUTPUT_ALL_NR, vm, True, 'rate')
 
 
 if __name__ == '__main__':

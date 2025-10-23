@@ -1,11 +1,11 @@
 diff --git a/src/drivers/pgsql/drv_pgsql.c b/src/drivers/pgsql/drv_pgsql.c
-index 7c2ffe2..f7af3db 100644
+index 245c12b..b537535 100644
 --- a/src/drivers/pgsql/drv_pgsql.c
 +++ b/src/drivers/pgsql/drv_pgsql.c
 @@ -68,6 +68,12 @@ typedef struct
    int              pg_type;
  } db_pgsql_bind_map_t;
-
+ 
 +typedef struct
 +{
 +  PGconn *con;
@@ -16,14 +16,14 @@ index 7c2ffe2..f7af3db 100644
  db_pgsql_bind_map_t db_pgsql_bind_map[] =
  {
 @@ -156,7 +162,7 @@ static db_driver_t pgsql_driver =
-
-
+ 
+ 
  /* Local functions */
 -
 +static PGconn *pgconn_from_wrapped(void *wrapped);
  static int get_pgsql_bind_type(db_bind_type_t);
  static int get_unique_stmt_name(char *, int);
-
+ 
 @@ -234,7 +240,7 @@ static void empty_notice_processor(void *arg, const char *msg)
  int pgsql_drv_connect(db_conn_t *sb_conn)
  {
@@ -34,7 +34,7 @@ index 7c2ffe2..f7af3db 100644
                       args.port,
                       NULL,
 @@ -252,16 +258,29 @@ int pgsql_drv_connect(db_conn_t *sb_conn)
-
+ 
    /* Silence the default notice receiver spitting NOTICE message to stderr */
    PQsetNoticeProcessor(con, empty_notice_processor, NULL);
 -  sb_conn->ptr = con;
@@ -48,34 +48,34 @@ index 7c2ffe2..f7af3db 100644
 +  wrapped->con = con;
 +  wrapped->copy_mode = 0;
 +  sb_conn->ptr = wrapped;
-  
+   
    return 0;
  }
-
+ 
 +PGconn *pgconn_from_wrapped(void *wrapped)
 +{
 +  return ((wrapped_conn_t *) wrapped)->con;
 +}
  /* Disconnect from database */
-
+ 
  int pgsql_drv_disconnect(db_conn_t *sb_conn)
  {
 -  PGconn *con = (PGconn *)sb_conn->ptr;
 +  PGconn *con = pgconn_from_wrapped(sb_conn->ptr);
-
+ 
    /* These might be allocated in pgsql_check_status() */
    xfree(sb_conn->sql_state);
 @@ -269,7 +288,7 @@ int pgsql_drv_disconnect(db_conn_t *sb_conn)
-
+ 
    if (con != NULL)
      PQfinish(con);
 -
 +  xfree(sb_conn->ptr);
    return 0;
  }
-
+ 
 @@ -279,7 +298,7 @@ int pgsql_drv_disconnect(db_conn_t *sb_conn)
-
+ 
  int pgsql_drv_prepare(db_stmt_t *stmt, const char *query, size_t len)
  {
 -  PGconn       *con = (PGconn *)stmt->connection->ptr;
@@ -84,7 +84,7 @@ index 7c2ffe2..f7af3db 100644
    pg_stmt_t    *pgstmt;
    char         *buf = NULL;
 @@ -391,7 +410,7 @@ int pgsql_drv_prepare(db_stmt_t *stmt, const char *query, size_t len)
-
+ 
  int pgsql_drv_bind_param(db_stmt_t *stmt, db_bind_t *params, size_t len)
  {
 -  PGconn       *con = (PGconn *)stmt->connection->ptr;
@@ -98,12 +98,12 @@ index 7c2ffe2..f7af3db 100644
    db_error_t     rc;
 -  PGconn * const pgcon = con->ptr;
 +  PGconn * const pgcon = pgconn_from_wrapped(con->ptr);
-
+ 
    status = PQresultStatus(pgres);
    switch(status) {
 @@ -501,7 +520,7 @@ static db_error_t pgsql_check_status(db_conn_t *con, PGresult *pgres,
      rc = DB_ERROR_NONE;
-
+ 
      break;
 -
 +  case PGRES_COPY_IN:
@@ -129,7 +129,7 @@ index 7c2ffe2..f7af3db 100644
 +  int            copy_result;
    PGresult       *pgres;
    db_error_t     rc;
-
+ 
 @@ -685,11 +706,44 @@ db_error_t pgsql_drv_query(db_conn_t *sb_conn, const char *query, size_t len,
    sb_conn->sql_errno = 0;
    xfree(sb_conn->sql_state);
@@ -144,7 +144,7 @@ index 7c2ffe2..f7af3db 100644
 +      if (PQresultStatus(tmp) != PGRES_COMMAND_OK) {
 +         log_text(LOG_FATAL, "Failed to copy %s", PQerrorMessage(pgcon));
 +      }
-
+ 
 +      if (copy_result == 1) {
 +        wrapped->copy_mode = 0;
 +      }
@@ -164,22 +164,22 @@ index 7c2ffe2..f7af3db 100644
 +      rc = DB_ERROR_FATAL;
 +    }
 +  } else {
-     pgres = PQexec(pgcon, query);
+   pgres = PQexec(pgcon, query);
 +    if (PQresultStatus(pgres) == PGRES_COPY_IN) {
 +      wrapped->copy_mode = 1;
 +    }
-     rc = pgsql_check_status(sb_conn, pgres, "PQexec", query, rs);
-
-     rs->ptr = (rs->counter == SB_CNT_READ) ? (void *) pgres : NULL;
+   rc = pgsql_check_status(sb_conn, pgres, "PQexec", query, rs);
+ 
+   rs->ptr = (rs->counter == SB_CNT_READ) ? (void *) pgres : NULL;
 +  }
-
+ 
    return rc;
  }
 diff --git a/src/lua/oltp_common.lua b/src/lua/oltp_common.lua
-index 90f93e2..4b9fb58 100644
+index c488490..98cf5a5 100644
 --- a/src/lua/oltp_common.lua
 +++ b/src/lua/oltp_common.lua
-@@ -33,8 +33,14 @@ end
+@@ -33,8 +33,16 @@ end
  sysbench.cmdline.options = {
     table_size =
        {"Number of rows per table", 10000},
@@ -191,20 +191,22 @@ index 90f93e2..4b9fb58 100644
        {"Range size for range SELECT queries", 100},
 +   create_tables =
 +     {"Whether to create table", true},
++   trx_level =
++      {"Transaction isolation level (RC, RR or SER)", "SER"},
     tables =
        {"Number of tables", 1},
     point_selects =
-@@ -81,6 +87,7 @@ sysbench.cmdline.options = {
+@@ -81,6 +89,7 @@ sysbench.cmdline.options = {
  function cmd_prepare()
     local drv = sysbench.sql.driver()
     local con = drv:connect()
 +   con:query("SET STATEMENT_TIMEOUT TO '12000s'")
-
+ 
     for i = sysbench.tid % sysbench.opt.threads + 1, sysbench.opt.tables,
     sysbench.opt.threads do
-@@ -185,17 +192,17 @@ function create_table(drv, con, table_num)
+@@ -185,17 +194,17 @@ function create_table(drv, con, table_num)
     print(string.format("Creating table 'sbtest%d'...", table_num))
-
+ 
     query = string.format([[
 -CREATE TABLE sbtest%d(
 +CREATE TABLE IF NOT EXISTS  sbtest%d(
@@ -220,16 +222,16 @@ index 90f93e2..4b9fb58 100644
        table_num, id_def, id_index_def, engine_def, extra_table_options)
 -
 +   if sysbench.opt.create_tables then
-     con:query(query)
+    con:query(query)
 -
 +   end
     if (sysbench.opt.table_size > 0) then
        print(string.format("Inserting %d records into 'sbtest%d'",
                            sysbench.opt.table_size, table_num))
-@@ -207,12 +214,19 @@ CREATE TABLE sbtest%d(
+@@ -207,12 +216,19 @@ CREATE TABLE sbtest%d(
        query = "INSERT INTO sbtest" .. table_num .. "(id, k, c, pad) VALUES"
     end
-
+ 
 -   con:bulk_insert_init(query)
 -
     local c_val
@@ -247,29 +249,29 @@ index 90f93e2..4b9fb58 100644
 +   con:query("SET SPANNER.COPY_COMMIT_TIMEOUT=30000")
 +   con:query("COPY sbtest".. table_num .." FROM STDIN")
 +   for i = start_index, end_index do
-
+ 
        c_val = get_c_value()
        pad_val = get_pad_value()
-@@ -222,15 +236,15 @@ CREATE TABLE sbtest%d(
+@@ -222,15 +238,15 @@ CREATE TABLE sbtest%d(
                                 sb_rand(1, sysbench.opt.table_size), c_val,
                                 pad_val)
        else
 -         query = string.format("(%d, %d, '%s', '%s')",
 +        query = string.format("%d\t%d\t%s\t%s\n",
-                                         i, sb_rand(1, sysbench.opt.table_size), c_val,
-                                         pad_val)
+                                i, sb_rand(1, sysbench.opt.table_size), c_val,
+                                pad_val)
        end
-
+ 
 -      con:bulk_insert_next(query)
 +      con:query(query)
     end
 +   con:query("COPYEND")
-
+ 
 -   con:bulk_insert_done()
-
+ 
     if sysbench.opt.create_secondary then
        print(string.format("Creating a secondary index on 'sbtest%d'...",
-@@ -262,13 +276,13 @@ local stmt_defs = {
+@@ -262,13 +278,13 @@ local stmt_defs = {
        t.INT},
     non_index_updates = {
        "UPDATE sbtest%u SET c=? WHERE id=?",
@@ -283,10 +285,51 @@ index 90f93e2..4b9fb58 100644
 -      t.INT, t.INT, {t.CHAR, 120}, {t.CHAR, 60}},
 +      t.INT, t.INT, {t.VARCHAR, 120}, {t.VARCHAR, 60}},
  }
-
+ 
  function prepare_begin()
+@@ -344,10 +360,28 @@ function prepare_delete_inserts()
+    prepare_for_each_table("inserts")
+ end
+ 
++
++function set_isolation_level(drv,con)
++   if drv:name() == "pgsql"
++   then
++        if sysbench.opt.trx_level == "RR" then
++            isolation_level="REPEATABLE READ"
++        elseif sysbench.opt.trx_level == "RC" then
++            isolation_level="READ COMMITTED"
++        elseif sysbench.opt.trx_level == "SER" then
++            isolation_level="SERIALIZABLE"
++        end
++
++        con:query("SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL " .. isolation_level )
++   end
++
++end
++
++
++-- Replace the original thread_init function to set isolation level.
+ function thread_init()
+    drv = sysbench.sql.driver()
+    con = drv:connect()
+-
+    -- Create global nested tables for prepared statements and their
+    -- parameters. We need a statement and a parameter set for each combination
+    -- of connection/table/query
+@@ -361,8 +395,10 @@ function thread_init()
+ 
+    -- This function is a 'callback' defined by individual benchmark scripts
+    prepare_statements()
++   set_isolation_level(drv, con)
+ end
+ 
++
+ -- Close prepared statements
+ function close_statements()
+    for t = 1, sysbench.opt.tables do
 diff --git a/src/lua/oltp_read_only.lua b/src/lua/oltp_read_only.lua
-index 86c0fc8..725c890 100755
+index a5215b6..4ac6038 100644
 --- a/src/lua/oltp_read_only.lua
 +++ b/src/lua/oltp_read_only.lua
 @@ -38,6 +38,7 @@ function prepare_statements()

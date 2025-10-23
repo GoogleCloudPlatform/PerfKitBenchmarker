@@ -19,12 +19,12 @@ from typing import List
 
 from absl import flags
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
-from perfkitbenchmarker.providers.azure import service_principal
 from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
@@ -43,7 +43,6 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     self.sku = 'Basic'
     self._deleted = False
     self.acr_id = None
-    self.service_principal = service_principal.ServicePrincipal.GetInstance()
 
   def _Exists(self):
     """Returns True if the registry exists."""
@@ -84,33 +83,9 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     # This will be deleted along with the resource group
     self._deleted = True
 
-  def _PostCreate(self):
-    """Allow the service principle to read from the repository."""
-    # If we bootstrapped our own credentials into the AKS cluster it already,
-    # has read permission, because it created the repo.
-    if not FLAGS.bootstrap_azure_service_principal:
-      create_role_assignment_cmd = [
-          azure.AZURE_PATH,
-          'role',
-          'assignment',
-          'create',
-          '--assignee',
-          self.service_principal.app_id,
-          '--role',
-          'Reader',
-          '--scope',
-          self.acr_id,
-      ]
-      vm_util.IssueRetryableCommand(create_role_assignment_cmd)
-
   def _CreateDependencies(self):
     """Creates the resource group."""
     self.resource_group.Create()
-    self.service_principal.Create()
-
-  def _DeleteDependencies(self):
-    """Deletes the resource group."""
-    self.service_principal.Delete()
 
   def Login(self):
     """Logs in to the registry."""
@@ -144,7 +119,6 @@ class AksCluster(container_service.KubernetesCluster):
     self.name = 'pkbcluster%s' % FLAGS.run_uri
     # TODO(pclay): replace with built in service principal once I figure out how
     # to make it work with ACR
-    self.service_principal = service_principal.ServicePrincipal.GetInstance()
     self.cluster_version = FLAGS.container_cluster_version
     self._deleted = False
 
@@ -153,8 +127,12 @@ class AksCluster(container_service.KubernetesCluster):
       vm_config: virtual_machine.BaseVirtualMachine,
       nodepool_config: container_service.BaseNodePoolConfig,
   ):
-    nodepool_config.disk_type = vm_config.create_os_disk_strategy.disk.disk_type  # pytype: disable=attribute-error
-    nodepool_config.disk_size = vm_config.create_os_disk_strategy.disk.disk_size  # pytype: disable=attribute-error
+    nodepool_config.disk_type = (
+        vm_config.create_os_disk_strategy.disk.disk_type  # pytype: disable=attribute-error
+    )
+    nodepool_config.disk_size = (
+        vm_config.create_os_disk_strategy.disk.disk_size  # pytype: disable=attribute-error
+    )
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -184,24 +162,24 @@ class AksCluster(container_service.KubernetesCluster):
         self.name,
         '--location',
         self.region,
+        '--enable-managed-identity',
         '--ssh-key-value',
         vm_util.GetPublicKeyPath(),
-        '--service-principal',
-        self.service_principal.app_id,
-        # TODO(pclay): avoid logging client secret
-        '--client-secret',
-        self.service_principal.password,
         '--nodepool-name',
         container_service.DEFAULT_NODEPOOL,
         '--nodepool-labels',
         f'pkb_nodepool={container_service.DEFAULT_NODEPOOL}',
     ] + self._GetNodeFlags(self.default_nodepool)
-    if self._IsAutoscalerEnabled():
-      cmd += [
-          '--enable-cluster-autoscaler',
-          f'--min-count={self.min_nodes}',
-          f'--max-count={self.max_nodes}',
-      ]
+    if FLAGS.azure_aks_auto_node_provisioning:
+      # For provision_node_pools benchmark, add auto provisioning mode
+      cmd.append('--node-provisioning-mode=auto')
+    else:
+      if self._IsAutoscalerEnabled():
+        cmd += [
+            '--enable-cluster-autoscaler',
+            f'--min-count={self.min_nodes}',
+            f'--max-count={self.max_nodes}',
+        ]
 
     # TODO(pclay): expose quota and capacity errors
     # Creating an AKS cluster with a fresh service principal usually fails due
@@ -229,7 +207,7 @@ class AksCluster(container_service.KubernetesCluster):
         '--cluster-name',
         self.name,
         '--name',
-        nodepool_config.name,
+        _AzureNodePoolName(nodepool_config.name),
         '--labels',
         f'pkb_nodepool={nodepool_config.name}',
     ] + self._GetNodeFlags(nodepool_config)
@@ -301,9 +279,28 @@ class AksCluster(container_service.KubernetesCluster):
       self.event_poller.StopPolling()
     self._deleted = True
 
+  def _AttachContainerRegistry(self):
+    """Attaches the container registry if it exists."""
+    if not self.container_registry:
+      return
+    attach_registry_cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'update',
+        '--name',
+        self.name,
+        '--resource-group',
+        self.resource_group.name,
+        '--attach-acr',
+        self.container_registry.name,
+    ]
+    vm_util.IssueCommand(attach_registry_cmd)
+
   def _PostCreate(self):
     """Tags the cluster resource group."""
     super()._PostCreate()
+    self._GetCredentials(use_admin=True)
+    self._WaitForDefaultServiceAccount()
     set_tags_cmd = [
         azure.AZURE_PATH,
         'group',
@@ -314,46 +311,108 @@ class AksCluster(container_service.KubernetesCluster):
         util.GetTagsJson(self.resource_group.timeout_minutes),
     ]
     vm_util.IssueCommand(set_tags_cmd)
+    self._AttachContainerRegistry()
 
-  def _IsReady(self):
-    """Returns True if the cluster is ready."""
-    vm_util.IssueCommand(
-        [
-            azure.AZURE_PATH,
-            'aks',
-            'get-credentials',
-            '--admin',
-            '--name',
-            self.name,
-            '--file',
-            FLAGS.kubeconfig,
-        ]
-        + self.resource_group.args
-    )
-    version_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig, 'version']
-    _, _, retcode = vm_util.IssueCommand(version_cmd, raise_on_failure=False)
-    if retcode:
-      return False
-    # POD creation will fail until the default service account is created.
-    get_cmd = [
-        FLAGS.kubectl,
-        '--kubeconfig',
+  def _GetCredentials(self, use_admin: bool) -> None:
+    """Helper method to get credentials and check service account readiness.
+
+    Args:
+        use_admin (bool): Whether to use the `--admin` flag in the `aks
+          get-credentials` command.
+    """
+    # Fetch Kubernetes credentials
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'get-credentials',
+        '--name',
+        self.name,
+        '--file',
         FLAGS.kubeconfig,
-        'get',
-        'serviceAccounts',
     ]
-    stdout, _, _ = vm_util.IssueCommand(get_cmd)
-    return 'default' in stdout
+    if use_admin:
+      cmd.append('--admin')
+    cmd += self.resource_group.args
+    vm_util.IssueCommand(cmd)
+
+  def _IsReady(self) -> bool:
+    """Returns True if the cluster is ready."""
+    show_cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'show',
+        '--name',
+        self.name,
+        '--query',
+        'provisioningState',
+        '--output',
+        'tsv',
+    ] + self.resource_group.args
+    stdout, _, _ = vm_util.IssueCommand(show_cmd, raise_on_failure=False)
+
+    try:
+      provisioning_state = stdout.strip()
+      if provisioning_state == 'Failed':
+        raise errors.Resource.CreationError('Cluster provisioning failed.')
+      if provisioning_state != 'Succeeded':
+        return False
+    except json.JSONDecodeError:
+      return False
+    return True
+
+  def _WaitForDefaultServiceAccount(self):
+    """Waits for the default service account to be created, or throws an error.
+
+    POD creation will fail until the default service account is created.
+    """
+
+    @vm_util.Retry(
+        poll_interval=self.POLL_INTERVAL,
+        fuzz=0,
+        timeout=self.READY_TIMEOUT,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
+    def _GetServiceAccount():
+      """Inner function to retry but passing self.POLL_INTERVAL as default.
+
+      Raises:
+        errors.Resource.CreationError: If the user does not have sufficient
+          permissions to list service accounts.
+        errors.VmUtil.IssueCommandError: If the command to get service accounts
+          fails for any other reason.
+        errors.Resource.RetryableCreationError: If the default service account
+          has not yet been created. This is automatically retried by the
+          outer decorator.
+      """
+      get_service_account_cmd = [
+          FLAGS.kubectl,
+          '--kubeconfig',
+          FLAGS.kubeconfig,
+          'get',
+          'serviceAccounts',
+      ]
+      stdout, err, code = vm_util.IssueCommand(
+          get_service_account_cmd, raise_on_failure=False
+      )
+      if 'default' not in stdout:
+        raise errors.Resource.RetryableCreationError(
+            'Service account not yet ready.'
+        )
+      if code != 0:
+        if 'User does not have access to the resource in Azure' in err:
+          raise errors.Resource.RetryableCreationError(
+              'First kubectl command failed with permission denied, but'
+              ' retrying as this can just be a race condition.'
+          )
+        raise errors.Resource.CreationError(
+            'First kubectl command failed with error: %s' % err
+        )
+
+    _GetServiceAccount()
 
   def _CreateDependencies(self):
     """Creates the resource group."""
     self.resource_group.Create()
-    self.service_principal.Create()
-
-  def _DeleteDependencies(self):
-    """Deletes the resource group."""
-    self.service_principal.Delete()
-    super()._DeleteDependencies()
 
   def GetDefaultStorageClass(self) -> str:
     """Get the default storage class for the provider."""
@@ -373,7 +432,152 @@ class AksCluster(container_service.KubernetesCluster):
         '--cluster-name',
         self.name,
         '--name',
-        node_pool,
+        _AzureNodePoolName(node_pool),
         f'--node-count={new_size}',
     ] + self.resource_group.args
     vm_util.IssueCommand(cmd)
+
+  def GetNodePoolNames(self) -> list[str]:
+    """Get node pool names for the cluster."""
+    if FLAGS.azure_aks_auto_node_provisioning:
+      cmd = [
+          FLAGS.kubectl,
+          '--kubeconfig',
+          FLAGS.kubeconfig,
+          'get',
+          'nodepools',
+          '-o',
+          'json',
+      ]
+      stdout, _, _ = vm_util.IssueCommand(cmd)
+      nodepools = json.loads(stdout).get('items', [])
+      return [nodepool['metadata']['name'] for nodepool in nodepools]
+    else:
+      cmd = [
+          azure.AZURE_PATH,
+          'aks',
+          'nodepool',
+          'list',
+          '--cluster-name',
+          self.name,
+      ] + self.resource_group.args
+      stdout, _, _ = vm_util.IssueCommand(cmd)
+      nodepools = json.loads(stdout)
+      return [nodepool['name'] for nodepool in nodepools]
+
+  def AddNodepool(self, batch_name, pool_id):
+    """Add a Karpenter NodePool and AKSNodeClass to the AKS cluster."""
+    self.ApplyManifest(
+        'provision_node_pools/aks/nodepool.yaml.j2',
+        batch=batch_name,
+        id=pool_id,
+        cluster_name=self.name,
+    )
+
+
+class AksAutomaticCluster(AksCluster):
+  """Class representing an AKS Automatic cluster, which has managed node pools.
+
+  This feature is currently in preview. To provision an AKS Automatic cluster,
+  you'll need to install the Azure CLI 'aks-preview' extension.
+  For more details, see the official documentation:
+  https://learn.microsoft.com/en-us/azure/aks/automatic/quick-automatic-managed-network
+  """
+
+  CLOUD = provider_info.AZURE
+  CLUSTER_TYPE = 'Auto'
+
+  def _Create(self):
+    """Creates the Automatic AKS cluster with tags."""
+    tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
+    tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'create',
+        '--name',
+        self.name,
+        '--location',
+        self.region,
+        '--ssh-key-value',
+        vm_util.GetPublicKeyPath(),
+        '--resource-group',
+        self.resource_group.name,
+        '--sku',
+        'automatic',
+        '--tags',
+    ] + tags_list
+    vm_util.IssueCommand(
+        cmd,
+        # Half hour timeout on creating the cluster.
+        timeout=1800,
+    )
+
+  def _CreateRoleAssignment(self):
+    """Creates a role assignment for the current user."""
+    full_cluster_id, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'aks',
+        'show',
+        '--name',
+        self.name,
+        '--resource-group',
+        self.resource_group.name,
+        '--query',
+        'id',
+        '--output',
+        'tsv',
+    ])
+    full_cluster_id = full_cluster_id.strip()
+    current_user, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'account',
+        'show',
+        '--query',
+        'user.name',
+        '--output',
+        'tsv',
+    ])
+    current_user = current_user.strip()
+    create_role_assignment_cmd = [
+        azure.AZURE_PATH,
+        'role',
+        'assignment',
+        'create',
+        '--assignee',
+        current_user,
+        '--role',
+        'Azure Kubernetes Service RBAC Admin',
+        '--scope',
+        full_cluster_id,
+    ]
+    vm_util.IssueCommand(create_role_assignment_cmd)
+
+  def _PostCreate(self):
+    """Skip the superclass's _PostCreate() method.
+
+    Needed as node_resource_group is pre-configured and fully managed in
+    Automatic clusters & role assignment must be created before authenticating.
+    """
+    super(container_service.KubernetesCluster, self)._PostCreate()
+    user_type, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'account',
+        'show',
+        '--query',
+        'user.type',
+        '--output',
+        'tsv',
+    ])
+    user_type = user_type.strip()
+    if user_type == 'servicePrincipal':
+      self._CreateRoleAssignment()
+    self._GetCredentials(use_admin=False)
+    self._WaitForDefaultServiceAccount()
+    self._AttachContainerRegistry()
+
+
+def _AzureNodePoolName(pkb_nodepool_name: str) -> str:
+  """Truncate nodepool name for AKS."""
+  # https://learn.microsoft.com/en-us/azure/aks/create-node-pools#limitations
+  return pkb_nodepool_name[:12]

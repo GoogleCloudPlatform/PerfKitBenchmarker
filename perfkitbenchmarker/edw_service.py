@@ -118,11 +118,33 @@ flags.DEFINE_string(
     None,
     'The schema of the hosted snowflake database to use during the benchmark.',
 )
+flags.DEFINE_string(
+    'snowflake_account',
+    None,
+    'The Snowflake account to use during the benchmark. Must follow the format'
+    ' "<org_id>-<account_name>".',
+)
+flags.DEFINE_string(
+    'snowflake_user',
+    None,
+    'The Snowflake user to use during the benchmark.',
+)
 flags.DEFINE_enum(
     'snowflake_client_interface',
     'JDBC',
-    ['JDBC'],
+    ['JDBC', 'PYTHON'],
     'The Runtime Interface used when interacting with Snowflake.',
+)
+flags.DEFINE_string(
+    'snowflake_jdbc_client_jar',
+    None,
+    'Local location of the snowflake_jdbc_client_jar.',
+)
+flags.DEFINE_string(
+    'snowflake_jdbc_key_file',
+    None,
+    'Local location of the Private key file for Snowflake authentication. '
+    'Must be named snowflake_keyfile.p8',
 )
 flags.DEFINE_boolean(
     'edw_get_service_auxiliary_metrics',
@@ -141,8 +163,36 @@ flags.DEFINE_enum(
     'Only supported for Python client.',
 )
 
+# MARK: index flags
+# Flags for EDW search index benchmarks.
+EDW_SEARCH_TABLE_NAME = flags.DEFINE_string(
+    'edw_search_table_name',
+    None,
+    'Table name to use for edw search index benchmarks.',
+)
+EDW_SEARCH_INIT_DATA_LOCATION = flags.DEFINE_string(
+    'edw_search_init_data_location',
+    None,
+    'Cloud directory of bucket to source initialization data '
+    'for EDW search benchmarks.',
+)
+EDW_SEARCH_DATA_LOCATION = flags.DEFINE_string(
+    'edw_search_data_location',
+    None,
+    'Cloud directory of bucket to source ongoing load data '
+    'for EDW search benchmarks.',
+)
+EDW_SEARCH_INDEX_NAME = flags.DEFINE_string(
+    'edw_search_index_name',
+    None,
+    'Name of index for edw search index benchmarks',
+)
+
 
 FLAGS = flags.FLAGS
+
+EDW_PYTHON_DRIVER_LIB_FILE = 'edw_python_driver_lib.py'
+EDW_PYTHON_DRIVER_LIB_DIR = 'edw/common/clients/python'
 
 TYPE_2_PROVIDER = dict([
     ('athena', 'aws'),
@@ -346,6 +396,7 @@ class EdwService(resource.BaseResource):
   """Object representing a EDW Service."""
 
   SERVICE_TYPE = 'abstract'
+  QUERY_SET = 'abstract'
 
   def __init__(self, edw_service_spec):
     """Initialize the edw service object.
@@ -426,6 +477,7 @@ class EdwService(resource.BaseResource):
         'edw_cluster_identifier': self.cluster_identifier,
         'edw_cluster_node_type': self.node_type,
         'edw_cluster_node_count': self.node_count,
+        'edw_query_set': self.QUERY_SET,
     }
     return basic_data
 
@@ -549,5 +601,160 @@ class EdwService(resource.BaseResource):
         { 'metric_1': { 'value': 1, 'unit': 'imperial femtoseconds' },
           'metric_2': { 'value': 2, 'unit': 'metric dollars' }
         ...}
+    """
+    raise NotImplementedError
+
+  def CreateSearchIndex(
+      self, table_path: str, index_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    """Create a search index on a table.
+
+    Create a text search index across all supported columns in a table.
+    Search indexes generally build asynchronously. Expect this to return
+    immediately, and then use GetSearchIndexStatus to monitor indexing
+    progression.
+
+    The `index_name` parameter should be provided, but some services may
+    discard it if they do not support named indexes. In this case, an unnamed
+    index will be created on the given table.
+
+    Metadata returned by this method is arbitrary, and is for the purpose of
+    inclusion in benchmark result metadata. The presence or absence of specific
+    values should not be relied on. Example returned metadata:
+    {'query_results_loaded':True,'results_load_time':0.873234,'rows_returned':1}
+
+    Args:
+      table_path: The name of the table to create the index on.
+      index_name: The name for the new search index.
+
+    Returns:
+      A tuple of execution time in seconds and a dictionary of metadata.
+    """
+    raise NotImplementedError
+
+  def DropSearchIndex(
+      self, table_path: str, index_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    """Deletes a search index from a table.
+
+    The `index_name` parameter should be provided, but some services may
+    discard it if they do not support named indexes. In this case, all indexes
+    will be deleted from the given table.
+
+    Metadata returned by this method is arbitrary, and is for the purpose of
+    inclusion in benchmark result metadata. The presence or absence of specific
+    values should not be relied on. Example returned metadata:
+    {'query_results_loaded':True,'results_load_time':0.072512,'rows_returned':1}
+
+    Args:
+      table_path: The name of the table to delete the index from.
+      index_name: The name of the search index to delete.
+
+    Returns:
+      A tuple of execution time in seconds and a dictionary of metadata.
+    """
+    raise NotImplementedError
+
+  def GetSearchIndexCompletionPercentage(
+      self, table_path: str, index_name: str
+  ) -> tuple[int, dict[str, Any]]:
+    """Gets the status of a search index.
+
+    Returns the completion status of a search index on a table, expressed as an
+    integer percentage.
+
+    Metadata returned by this method is arbitrary, and is for the purpose of
+    inclusion in benchmark result metadata. The presence or absence of specific
+    values should not be relied on.
+
+    Args:
+      table_path: The name of the table to get index status from.
+      index_name: The name of the search index.
+
+    Returns:
+      A tuple containing the index coverage percentage (int) and a dictionary
+      of metadata.
+    """
+    raise NotImplementedError
+
+  def InitializeSearchStarterTable(
+      self, table_path: str, storage_path: str
+  ) -> tuple[float, dict[str, Any]]:
+    """Initializes a table for search index benchmarks.
+
+    Creates a table using the standard search index benchmark init template
+    for a given service.
+
+    Metadata returned by this method is arbitrary, and is for the purpose of
+    inclusion in benchmark result metadata. The presence or absence of specific
+    values should not be relied on.
+
+    Args:
+      table_path: The full path or name of the table to initialize.
+      storage_path: The path to the data source for initialization.
+
+    Returns:
+      A tuple of execution time in seconds and a dictionary of metadata.
+    """
+    raise NotImplementedError
+
+  def InsertSearchData(
+      self, table_path: str, storage_path: str
+  ) -> tuple[float, dict[str, Any]]:
+    """Inserts data into a table for search index benchmarks.
+
+    Metadata returned by this method is arbitrary, and is for the purpose of
+    inclusion in benchmark result metadata. The presence or absence of specific
+    values should not be relied on.
+
+    Args:
+      table_path: The full path or name of the table to insert data into.
+      storage_path: The path to the data source to load.
+
+    Returns:
+      A tuple of execution time in seconds and a dictionary of metadata.
+    """
+    raise NotImplementedError
+
+  def GetTableRowCount(self, table_path: str) -> tuple[int, dict[str, Any]]:
+    """Gets the total number of rows in a table.
+
+    Metadata returned by this method is arbitrary, and is for the purpose of
+    inclusion in benchmark result metadata. The presence or absence of specific
+    values should not be relied on.
+
+    Args:
+      table_path: The full path or name of the table.
+
+    Returns:
+      A tuple containing the total row count (int) and a dictionary of metadata.
+    """
+    raise NotImplementedError
+
+  def TextSearchQuery(
+      self, table_path: str, search_keyword: str, index_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    """Executes a text search query against a table.
+
+    Typically used on tables with a search index.
+
+    The metadata returned by implementations of this method should include the
+    following k-v pairs:
+
+    {edw_search_index_coverage_percentage: int|None,
+     edw_search_result_rows: int|None,
+     edw_search_total_row_count: int|None}
+
+    Other arbitrary values may also be returned by the service, and callers
+    should not rely on the presence or absence of specific values beyond
+    those specified above.
+
+    Args:
+      table_path: The full path or name of the table to query.
+      search_keyword: The text to search for within the indexed columns.
+      index_name: The name of the search index to use for the query.
+
+    Returns:
+      A tuple of execution time in seconds and a dictionary of metadata.
     """
     raise NotImplementedError

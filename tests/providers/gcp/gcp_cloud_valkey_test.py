@@ -98,6 +98,42 @@ class ConstructCloudValkeyTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.subTest('zone_distribution'):
       self.assertEqual(instance.zone_distribution, 'multi-zone')
 
+  def testStandaloneFlagOverrides(self):
+    test_spec = inspect.cleandoc(f"""
+    cloud_redis_memtier:
+      memory_store:
+        service_type: elasticache
+        memory_store_type: {managed_memory_store.REDIS}
+        version: redis_3_2
+    """)
+    FLAGS['managed_memory_store_type'].parse('VALKEY')
+    FLAGS['managed_memory_store_service_type'].parse('memorystore')
+    FLAGS['managed_memory_store_version'].parse('VALKEY_7_2')
+    FLAGS['cloud_redis_region'].parse('us-central1')
+    FLAGS['gcp_redis_zone_distribution'].parse('multi-zone')
+    FLAGS['managed_memory_store_cluster'].parse('false')
+    self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_string=test_spec, benchmark_name='cloud_redis_memtier'
+    )
+    self.test_bm_spec.vm_groups = {'clients': [mock.MagicMock()]}
+
+    self.test_bm_spec.ConstructMemoryStore()
+
+    instance = self.test_bm_spec.memory_store
+    with self.subTest('service_type'):
+      self.assertEqual(instance.SERVICE_TYPE, 'memorystore')
+    with self.subTest('memory_store_type'):
+      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.VALKEY)
+    with self.subTest('version'):
+      self.assertEqual(instance.version, 'VALKEY_7_2')
+    with self.subTest('redis_region'):
+      self.assertEqual(instance.location, 'us-central1')
+    with self.subTest('zone_distribution'):
+      self.assertEqual(instance.zone_distribution, 'multi-zone')
+    with self.subTest('clustered'):
+      self.assertFalse(instance.clustered)
+    with self.subTest('shard_count'):
+      self.assertEqual(instance.shard_count, 1)
 
 if __name__ == '__main__':
   unittest.main()

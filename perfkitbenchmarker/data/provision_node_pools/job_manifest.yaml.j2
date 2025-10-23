@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ batch }}-{{ id }}
+spec:
+  template:
+    metadata:
+      labels:
+        batch: {{ batch }}
+        pod: {{ batch }}-{{ id }}
+    spec:
+      restartPolicy: OnFailure
+      tolerations:
+      - key: group
+        operator: Equal
+        value: pool-{{ batch }}-{{ id }}
+        effect: NoSchedule
+      nodeSelector:
+        group: pool-{{ batch }}-{{ id }}
+        {% if gpu and cloud == 'GCP' -%}
+        cloud.google.com/gke-accelerator: nvidia-tesla-t4
+        {%- endif %}
+      containers:
+      - name: pause
+        image: busybox
+        resources:
+          requests:
+            memory: 50Mi
+            cpu: 10m
+          {% if gpu and cloud == 'GCP' -%}
+          limits:
+            nvidia.com/gpu: 1
+          {%- endif %}
+        command:
+        - sleep
+        args:
+        - 10d

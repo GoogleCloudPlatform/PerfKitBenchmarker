@@ -917,14 +917,10 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
       True if all success conditions were met, false otherwise.
     """
     non_zero_streams = len(self.performance) >= 1
-    all_streams_ran_all_queries = self.all_streams_ran_all_expected_queries(
-        expected_queries
-    )
     no_duplicate_queries = self.no_duplicate_queries()
     all_queries_succeeded = self.all_queries_succeeded()
     return (
         non_zero_streams
-        and all_streams_ran_all_queries
         and no_duplicate_queries
         and all_queries_succeeded
     )

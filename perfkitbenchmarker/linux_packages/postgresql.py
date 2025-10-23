@@ -16,54 +16,90 @@
 
 import os
 
+from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import os_types
 
 
+FLAGS = flags.FLAGS
+
+ALLOWED_VERSIONS = ['postgresql16', 'postgresql17']
+_POSTGRESQL_VERSION = flags.DEFINE_enum(
+    'postgresql_version',
+    'postgresql16',
+    enum_values=ALLOWED_VERSIONS,
+    help='The postgres version used for benchmark test',
+)
+
 SYSBENCH_PASSWORD = 'Syb3enCh#1'
 SHARED_BUFFERS_CONF = {
-    'SIZE_10GB': {
+    'SIZE_10G': {
         'shared_buffers': '10GB',
         'effective_cache_size': '30GB',
         'max_memory': '40G',
         'nr_hugepages': '5632',
     },
-    'SIZE_100GB': {
+    'SIZE_100G': {
         'shared_buffers': '100GB',
         'effective_cache_size': '112.5GB',
         'max_memory': '150G',
         'nr_hugepages': '52736',
     },
-    'SIZE_80GB': {  # run with 40M table size and 8 tables to write 80GB of data
+    'SIZE_80G': {  # run with 40M table size and 8 tables to write 80GB of data
         'shared_buffers': '80GB',
         'effective_cache_size': '90GB',
         'max_memory': '120G',
         'nr_hugepages': '45000',
     },
-}
-OS_DEPENDENT_DEFAULTS = {
-    'centos': {
-        'postgres_path': '/usr/pgsql-16',
-        'data_dir': '/var/lib/pgsql/16/data',
-        'conf_dir': '/var/lib/pgsql/16/data',
-        'disk_mount_point': '/var/lib/pgsql/16',
-        'postgres_service_name': 'postgresql-16'
+    'SIZE_42G': {  # run with 21M table size and 8 tables to write 42GB of data
+        'shared_buffers': '42GB',
+        'effective_cache_size': '89.6GB',
+        'max_memory': '108.8G',
+        'nr_hugepages': '23000',
     },
-    'debian': {
-        'postgres_path': '/usr/lib/postgresql/16',
-        'data_dir': '/etc/postgresql/16/data/data',
-        'conf_dir': '/etc/postgresql/16/main',
-        'disk_mount_point': '/etc/postgresql/16/data',
-        'postgres_service_name': 'postgresql',
-        'postgres_template_service_name': 'postgresql@16-main',
-    },
-    'amazonlinux': {
-        'data_dir': '/var/lib/pgsql/data',
-        'conf_dir': '/var/lib/pgsql/data',
-        'disk_mount_point': '/var/lib/pgsql',
-        'postgres_service_name': 'postgresql',
-    }
 }
+
+
+def GetPostgresVersion():
+  """Returns the last two characters of the postgresql_version flag."""
+  return _POSTGRESQL_VERSION.value[-2:]
+
+
+def GetOSDependentDefaultsConfig(os_type: str) -> dict[str, str]:
+  """Returns a dictionary of OS-dependent settings based on flags.
+
+  Args:
+    os_type: The OS type of the VM.
+  """
+  version = GetPostgresVersion()
+
+  configs = {
+      'centos': {
+          'postgres_path': f'/usr/pgsql-{version}',
+          'data_dir': f'/var/lib/pgsql/{version}/data',
+          'conf_dir': f'/var/lib/pgsql/{version}/data',
+          'disk_mount_point': f'/var/lib/pgsql/{version}',
+          'postgres_service_name': f'postgresql-{version}',
+      },
+      'debian': {
+          'postgres_path': f'/usr/lib/postgresql/{version}',
+          'data_dir': f'/etc/postgresql/{version}/data/data',
+          'conf_dir': f'/etc/postgresql/{version}/main',
+          'disk_mount_point': f'/etc/postgresql/{version}/data',
+          'postgres_service_name': 'postgresql',
+          'postgres_template_service_name': f'postgresql@{version}-main',
+      },
+      'amazonlinux': {
+          'data_dir': '/var/lib/pgsql/data',
+          'conf_dir': '/var/lib/pgsql/data',
+          'disk_mount_point': '/var/lib/pgsql',
+          'postgres_service_name': 'postgresql',
+      },
+  }
+  if os_type in configs:
+    return configs[os_type]
+  else:
+    raise ValueError(f'Unsupported OS type: {os_type}')
 
 
 def ConfigureSystemSettings(vm):
@@ -86,33 +122,7 @@ def ConfigureSystemSettings(vm):
   vm.RemoteCommand(
       'echo "session    required pam_limits.so" | sudo tee -a /etc/pam.d/login'
   )
-  thp_append = 'sudo tee -a /usr/lib/systemd/system/disable-thp.service'
-  vm.RemoteCommand('sudo touch /usr/lib/systemd/system/disable-thp.service')
-  disable_huge_pages = f"""[Unit]
-    Description=Disable Transparent Huge Pages (THP)
-    DefaultDependencies=no
-    After=sysinit.target local-fs.target
-    Before={GetOSDependentDefaults(vm.OS_TYPE)["postgres_service_name"]}.service
-
-    [Service]
-    Type=oneshot
-    ExecStart=/bin/sh -c 'echo never | tee /sys/kernel/mm/transparent_hugepage/enabled > /dev/null'
-
-    [Install]
-    WantedBy=basic.target
-    """
-  vm.RemoteCommand(f'echo "{disable_huge_pages}" | {thp_append}')
-  vm.RemoteCommand(
-      'sudo chown root:root /usr/lib/systemd/system/disable-thp.service'
-  )
-  vm.RemoteCommand(
-      'sudo chmod 0600 /usr/lib/systemd/system/disable-thp.service'
-  )
-  vm.RemoteCommand('sudo systemctl daemon-reload')
-  vm.RemoteCommand(
-      'sudo systemctl enable disable-thp.service && sudo systemctl start'
-      ' disable-thp.service'
-  )
+  vm.RemoteCommand('sudo cat /sys/kernel/mm/transparent_hugepage/enabled')
   vm.Reboot()
 
 
@@ -132,15 +142,17 @@ def YumInstall(vm):
     vm.RemoteCommand('sudo dnf -qy module disable postgresql')
   else:
     vm.RemoteCommand('sudo dnf update')
-  postgres_devel = 'postgresql16-devel'
+  postgresql_version = _POSTGRESQL_VERSION.value
+  postgresql_devel = f'{postgresql_version}-devel'
   if vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
-    postgres_devel = 'postgresql-devel'
+    postgresql_devel = 'postgresql-devel'
   vm.RemoteCommand(
-      'sudo yum install -y postgresql16-server postgresql16'
-      f' postgresql16-contrib {postgres_devel}'
+      f'sudo yum install -y {postgresql_version}-server {postgresql_version}'
+      f' {postgresql_version}-contrib {postgresql_devel}'
   )
   vm.RemoteCommand(
-      'echo "export PATH=/usr/pgsql-16/bin:$PATH" | sudo tee -a ~/.bashrc'
+      f'echo "export PATH=/usr/pgsql-{GetPostgresVersion()}/bin:$PATH" |'
+      ' sudo tee -a ~/.bashrc'
   )
   vm.RemoteCommand('pg_config --version')
 
@@ -152,8 +164,11 @@ def AptInstall(vm):
       'sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y'
   )
   vm.RemoteCommand('sudo apt-get update')
-  vm.RemoteCommand('sudo apt-get install -y postgresql-contrib-16')
-  vm.RemoteCommand('sudo apt-get -y install postgresql-16')
+  version_number = GetPostgresVersion()
+  vm.RemoteCommand(
+      f'sudo apt-get install -y postgresql-contrib-{version_number}'
+  )
+  vm.RemoteCommand(f'sudo apt-get -y install postgresql-{version_number}')
 
 
 def InitializeDatabase(vm):
@@ -177,11 +192,11 @@ def InitializeDatabase(vm):
 def GetOSDependentDefaults(os_type: str) -> dict[str, str]:
   """Returns the OS family."""
   if os_type in os_types.CENTOS_TYPES:
-    return OS_DEPENDENT_DEFAULTS['centos']
+    return GetOSDependentDefaultsConfig('centos')
   elif os_type in os_types.AMAZONLINUX_TYPES:
-    return OS_DEPENDENT_DEFAULTS['amazonlinux']
+    return GetOSDependentDefaultsConfig('amazonlinux')
   else:
-    return OS_DEPENDENT_DEFAULTS['debian']
+    return GetOSDependentDefaultsConfig('debian')
 
 
 def IsUbuntu(vm):
@@ -189,18 +204,18 @@ def IsUbuntu(vm):
   return vm.OS_TYPE in os_types.UBUNTU_OS_TYPES
 
 
-def ConfigureAndRestart(vm, run_uri, buffer_size):
+def ConfigureAndRestart(vm, run_uri, buffer_size, conf_template_path):
   """Configure and restart postgres.
 
   Args:
     vm: virtual machine to configure postgres on.
     run_uri: run uri to use for password generation.
     buffer_size: buffer size to use for postgres.
+    conf_template_path: path to the postgres conf template file.
   """
   conf_path = GetOSDependentDefaults(vm.OS_TYPE)['conf_dir']
   data_path = GetOSDependentDefaults(vm.OS_TYPE)['data_dir']
-  buffer_size_key = f'SIZE_{buffer_size}GB'
-  conf_template_config = 'postgresql/postgresql-custom.conf.j2'
+  buffer_size_key = f'SIZE_{buffer_size}'
   remote_temp_config = '/tmp/my.cnf'
   postgres_conf_path = os.path.join(conf_path, 'postgresql-custom.conf')
   pg_hba_conf_path = os.path.join(conf_path, 'pg_hba.conf')
@@ -217,7 +232,7 @@ def ConfigureAndRestart(vm, run_uri, buffer_size):
       'password': GetPsqlUserPassword(run_uri),
   }
   vm.RenderTemplate(
-      data.ResourcePath(conf_template_config),
+      data.ResourcePath(conf_template_path),
       remote_temp_config,
       context,
   )
@@ -296,9 +311,11 @@ def UpdateMaxMemory(vm, buffer_size_key, postgres_service_name):
   )
 
 
-def SetupReplica(primary_vm, replica_vm, replica_id, run_uri, buffer_size):
+def SetupReplica(
+    primary_vm, replica_vm, replica_id, run_uri, buffer_size, conf_template_path
+):
   """Setup postgres replica."""
-  buffer_size_key = f'SIZE_{buffer_size}GB'
+  buffer_size_key = f'SIZE_{buffer_size}'
   data_path = GetOSDependentDefaults(replica_vm.OS_TYPE)['data_dir']
   conf_path = GetOSDependentDefaults(replica_vm.OS_TYPE)['conf_dir']
   replica_vm.RemoteCommand(f'sudo mkdir -p {data_path}')
@@ -317,11 +334,10 @@ def SetupReplica(primary_vm, replica_vm, replica_id, run_uri, buffer_size):
       ],
       'data_directory': data_path,
   }
-  conf_template_config = 'postgresql/postgresql-custom.conf.j2'
   remote_temp_config = '/tmp/my.cnf'
   postgres_conf_path = os.path.join(conf_path, 'postgresql-custom.conf')
   replica_vm.RenderTemplate(
-      data.ResourcePath(conf_template_config),
+      data.ResourcePath(conf_template_path),
       remote_temp_config,
       context,
   )

@@ -28,6 +28,7 @@ import logging
 
 from absl import flags
 import numpy
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 
@@ -177,6 +178,7 @@ VALID_STRESSORS = frozenset({
     'membarrier',
     'memcpy',
     'memfd',
+    'memrate',
     'mergesort',
     'mincore',
     'mknod',
@@ -315,6 +317,7 @@ MEMORY_SUITE = frozenset({
     'membarrier',
     'memcpy',
     'memfd',
+    'memrate',
     'mergesort',
     'mincore',
     'null',
@@ -355,6 +358,28 @@ flags.DEFINE_list(
     [],
     'List of cpu methods to run with. By default none are ran.',
 )
+flags.DEFINE_integer(
+    'stress_ng_cpu_load',
+    100,
+    'Percentage of cpu to load. By default 100% of cpu is loaded.',
+)
+flags.DEFINE_integer(
+    'stress_ng_cpu_load_slice',
+    0,
+    'Specify --cpu-load-slice to configure time slice during busy load.'
+    'A positive value means # of ms to run before idling the CPU.',
+)
+
+flags.DEFINE_integer(
+    'stress_ng_memrate_rd',
+    0,
+    'memrate worker read rate in MiB/s. Only applies to "memrate" stressor.'
+)
+flags.DEFINE_integer(
+    'stress_ng_memrate_wr',
+    0,
+    'memrate worker write rate in MiB/s. Only applies to "memrate" stressor.'
+)
 
 ALL_WORKLOADS = ['small', 'medium', 'large']
 flags.DEFINE_list(
@@ -368,6 +393,16 @@ flags.register_validator(
     'stress_ng_thread_workloads',
     lambda workloads: workloads and set(workloads).issubset(ALL_WORKLOADS),
 )
+flags.register_validator(
+    'stress_ng_cpu_load',
+    lambda value: 0 < value <= 100,
+    message='stress_ng_cpu_load must be between 1 and 100.',
+)
+flags.register_validator(
+    'stress_ng_cpu_load_slice',
+    lambda value: -50 <= value <= 50,
+    message='stress_ng_cpu_load_slice must be between -50 and 50.',
+)
 
 
 def _GeoMeanOverflow(iterable):
@@ -380,6 +415,8 @@ def _GeoMeanOverflow(iterable):
 
   Returns: The geometric mean of the list.
   """
+  if not iterable:
+    return 0.0
   a = numpy.log(iterable)
   return numpy.exp(a.sum() / len(a))
 
@@ -413,8 +450,10 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  vm = benchmark_spec.vms[0]
-  vm.InstallPackages('stress-ng')
+  vms = benchmark_spec.vms
+  def _Install(vm):
+    vm.InstallPackages('stress-ng')
+  background_tasks.RunThreaded(_Install, vms)
 
 
 def _ParseStressngResult(
@@ -441,7 +480,7 @@ def _ParseStressngResult(
   if len(output_matrix) < 5:
     logging.error('output is missing')
     return None
-  while output_matrix[-1][-1] == 'stressor)':
+  while len(output_matrix) > 3 and 'stressor' not in output_matrix[-3]:
     output_matrix.pop()
   assert output_matrix[-3][-4] == 'bogo' and output_matrix[-3][-3] == 'ops/s'
   assert output_matrix[-2][-4] == '(real' and output_matrix[-2][-3] == 'time)'
@@ -475,26 +514,47 @@ def _RunWorkload(vm, num_threads):
     A list of sample.Sample objects.
   """
 
+  stressors = FLAGS.stress_ng_custom_stressors
+  logging.info('Running stressors: %s', stressors)
+
   metadata = {
       'duration_sec': FLAGS.stress_ng_duration,
       'threads': num_threads,
+      'stressor': [],
   }
 
   samples = []
   values_to_geomean_list = []
 
-  stressors = FLAGS.stress_ng_custom_stressors
-  for stressor in stressors:
-    cmd = (
-        'stress-ng --{stressor} {numthreads} --metrics-brief '
-        '-t {duration}'.format(
-            stressor=stressor,
-            numthreads=num_threads,
-            duration=FLAGS.stress_ng_duration,
-        )
-    )
-    stdout, stderr = vm.RemoteCommand(cmd)
-    stdout = stderr
+  for stressor_name in stressors:
+    cmd_parts = [
+        'stress-ng',
+        f'--{stressor_name}',
+        str(num_threads),
+        '--metrics-brief',
+        '-t',
+        str(FLAGS.stress_ng_duration)
+    ]
+    metadata['stressor'].append(stressor_name)
+
+    if stressor_name == 'memrate':
+      memrate_rd = FLAGS.stress_ng_memrate_rd
+      memrate_wr = FLAGS.stress_ng_memrate_wr
+      if memrate_rd > 0:
+        cmd_parts.extend([
+            '--memrate-rd',
+            str(memrate_rd),
+        ])
+        metadata['memrate_rd_mib_per_s'] = memrate_rd
+      if memrate_wr > 0:
+        cmd_parts.extend([
+            '--memrate-wr',
+            str(memrate_wr),
+        ])
+        metadata['memrate_wr_mib_per_s'] = memrate_wr
+
+    cmd = ' '.join(cmd_parts)
+    stdout, _ = vm.RemoteCommand(cmd)
     stressng_sample = _ParseStressngResult(metadata, stdout)
     if stressng_sample:
       samples.append(stressng_sample)
@@ -505,15 +565,30 @@ def _RunWorkload(vm, num_threads):
       if 'all_cpu_methods' in FLAGS.stress_ng_cpu_methods
       else FLAGS.stress_ng_cpu_methods
   )
+  if cpu_methods:
+    metadata['cpu_methods'] = cpu_methods
   for cpu_method in cpu_methods:
-    cmd = (
-        'stress-ng --cpu {numthreads} --metrics-brief '
-        '-t {duration} --cpu-method {cpu_method}'.format(
-            numthreads=num_threads,
-            duration=FLAGS.stress_ng_duration,
-            cpu_method=cpu_method,
-        )
-    )
+    cmd_parts = [
+        'stress-ng',
+        '--cpu',
+        str(num_threads),
+        '--metrics-brief',
+        '-t',
+        str(FLAGS.stress_ng_duration),
+        '--cpu-method',
+        cpu_method,
+    ]
+    cpu_load = FLAGS.stress_ng_cpu_load
+    if cpu_load < 100:
+      cmd_parts.extend(['--cpu-load', str(cpu_load)])
+      metadata['cpu_load'] = cpu_load
+    cpu_load_slice = FLAGS.stress_ng_cpu_load_slice
+    if cpu_load_slice != 0:
+      cmd_parts.extend(
+          ['--cpu-load-slice', str(cpu_load_slice)]
+      )
+      metadata['cpu_load_slice'] = cpu_load_slice
+    cmd = ' '.join(cmd_parts)
     stdout, _ = vm.RemoteCommand(cmd)
     stressng_sample = _ParseStressngResult(metadata, stdout, cpu_method)
     if stressng_sample:
@@ -522,7 +597,6 @@ def _RunWorkload(vm, num_threads):
 
   if FLAGS.stress_ng_calc_geomean:
     geomean_metadata = metadata.copy()
-    geomean_metadata['stressors'] = stressors
     # True only if each stressor provided a value
     geomean_metadata['valid_run'] = len(values_to_geomean_list) == len(
         stressors
@@ -538,6 +612,40 @@ def _RunWorkload(vm, num_threads):
   return samples
 
 
+def _RunStressNgOnVm(vm):
+  """Runs stress-ng on a single VM for all workloads and adds machine_instance metadata.
+
+  Args:
+    vm: The target vm to run on.
+
+  Returns:
+    A list of sample.Sample objects from this VM.
+  """
+  vm_samples = []
+  num_cpus = vm.NumCpusForBenchmark()
+
+  for workload_type in FLAGS.stress_ng_thread_workloads:
+    if workload_type == 'small':
+      threads_for_workload = 1
+    elif workload_type == 'medium':
+      threads_for_workload = max(1, int(num_cpus / 2))
+    elif workload_type == 'large':
+      threads_for_workload = num_cpus
+    else:
+      logging.warning(
+          'Unknown workload type: %s for VM %s',
+          workload_type,
+          vm.name,
+      )
+      continue
+
+    current_samples = _RunWorkload(vm, threads_for_workload)
+    for s in current_samples:
+      s.metadata['machine_instance'] = vm.name
+    vm_samples.extend(current_samples)
+  return vm_samples
+
+
 def Run(benchmark_spec):
   """Runs stress-ng on the target vm.
 
@@ -548,19 +656,14 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
+  vms = benchmark_spec.vms
+  results = background_tasks.RunThreaded(_RunStressNgOnVm, vms)
 
-  vm = benchmark_spec.vms[0]
+  all_samples = []
+  for vm_result in results:
+    all_samples.extend(vm_result)
 
-  samples = []
-  for workload in FLAGS.stress_ng_thread_workloads:
-    if workload == 'small':
-      samples.extend(_RunWorkload(vm, 1))
-    elif workload == 'medium':
-      samples.extend(_RunWorkload(vm, vm.NumCpusForBenchmark() / 2))
-    elif workload == 'large':
-      samples.extend(_RunWorkload(vm, vm.NumCpusForBenchmark()))
-
-  return samples
+  return all_samples
 
 
 def Cleanup(benchmark_spec):
@@ -570,5 +673,7 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  vm = benchmark_spec.vms[0]
-  vm.Uninstall('stress-ng')
+  vms = benchmark_spec.vms
+  def _Uninstall(vm):
+    vm.Uninstall('stress-ng')
+  background_tasks.RunThreaded(_Uninstall, vms)

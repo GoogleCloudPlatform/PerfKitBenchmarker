@@ -14,13 +14,11 @@
 """Utilities related to loggers and logging."""
 
 from contextlib import contextmanager
-import datetime
 import logging
 from logging import handlers
 import sys
 import threading
 from absl import flags
-from perfkitbenchmarker import vm_util
 
 try:
   import colorlog
@@ -43,43 +41,11 @@ LOG_LEVELS = {
 log_local_path = None
 LOG_FILE_NAME = 'pkb.log'
 
-GSUTIL_MV = 'mv'
-GSUTIL_CP = 'cp'
-GSUTIL_OPERATIONS = [GSUTIL_MV, GSUTIL_CP]
-
 DEFAULT_LOG_ROTATING_INTERVAL = 1
 DEFAULT_LOG_ROTATING_UNIT = 'D'
 DEFAULT_LOG_ROTATING_BACKUP_COUNT = 5
 
 
-PKB_LOG_BUCKET = flags.DEFINE_string(
-    'pkb_log_bucket',
-    None,
-    'Name of the GCS bucket that PKB logs should route to. If this is not '
-    'specified, then PKB logs will remain on the VM. This bucket must exist '
-    'and the caller must have write permissions on the bucket for a successful '
-    'export.',
-)
-VM_LOG_BUCKET = flags.DEFINE_string(
-    'vm_log_bucket',
-    None,
-    'The GCS bucket to store VM logs in. If not provided, VM logs will go to '
-    'the calling machine only. This only applies if --capture_vm_logs is '
-    'set.',
-)
-_SAVE_LOG_TO_BUCKET_OPERATION = flags.DEFINE_enum(
-    'save_log_to_bucket_operation',
-    GSUTIL_MV,
-    GSUTIL_OPERATIONS,
-    'How to save the log to the bucket, available options are mv, cp',
-)
-_RELATIVE_GCS_LOG_PATH = flags.DEFINE_string(
-    'relative_gcs_log_path',
-    None,
-    'The relative path inside the GCS bucket where to save the log, e.g. '
-    '"root_dir/sub_dir", and the full file path would be '
-    'gs://<bucket>/<relative_gcs_log_path>',
-)
 flags.DEFINE_enum(
     'log_level',
     INFO,
@@ -255,81 +221,3 @@ def ConfigureLogging(
   logger.addHandler(handler)
   logging.getLogger('requests').setLevel(logging.ERROR)
 
-
-def CollectPKBLogs(run_uri: str) -> None:
-  """Move PKB log files over to a GCS bucket (`pkb_log_bucket` flag).
-
-  Args:
-    run_uri: The run URI of the benchmark run.
-  """
-  if PKB_LOG_BUCKET.value:
-    # Generate the log path to the cloud bucket based on the invocation date of
-    # this function.
-    gcs_log_path = GetLogCloudPath(PKB_LOG_BUCKET.value, f'{run_uri}-pkb.log')
-    vm_util.IssueRetryableCommand([
-        'gsutil',
-        '-h',
-        'Content-Type:text/plain',
-        _SAVE_LOG_TO_BUCKET_OPERATION.value,
-        '-Z',
-        log_local_path,
-        gcs_log_path,
-    ])
-
-
-def CollectVMLogs(run_uri: str, source_path: str) -> None:
-  """Move VM log files over to a GCS bucket (`vm_log_bucket` flag).
-
-  Args:
-    run_uri: The run URI of the benchmark run.
-    source_path: The path to the log file.
-  """
-  if VM_LOG_BUCKET.value:
-    source_filename = source_path.split('/')[-1]
-    gcs_directory_path = GetLogCloudPath(VM_LOG_BUCKET.value, run_uri)
-    gcs_path = f'{gcs_directory_path}/{source_filename}'
-    vm_util.IssueRetryableCommand([
-        'gsutil',
-        '-h',
-        'Content-Type:text/plain',
-        'mv',
-        '-Z',
-        source_path,
-        gcs_path,
-    ])
-
-
-def GetLogCloudPath(log_bucket: str, path_suffix: str) -> str:
-  """Returns the GCS path, to where the logs should be saved.
-
-  Args:
-    log_bucket: The GCS bucket to save the logs to.
-    path_suffix: The suffix to append to the GCS path.
-
-  Returns:
-    The GCS path to where the logs should be saved.
-  """
-  run_date = datetime.date.today()
-  gcs_path_prefix = _GetGcsPathPrefix(log_bucket)
-  return (
-      f'{gcs_path_prefix}/'
-      + f'{run_date.year:04d}/{run_date.month:02d}/'
-      + f'{run_date.day:02d}/'
-      + path_suffix
-  )
-
-
-def _GetGcsPathPrefix(bucket: str) -> str:
-  """Returns the GCS path prefix, to where the logs should be saved.
-
-  Args:
-    bucket: The GCS bucket to save the logs to.
-
-  Returns:
-    The GCS path prefix, to where the logs should be saved. If
-    `relative_gcs_log_path` is specified, the prefix will be
-    gs://<bucket>/<relative_gcs_log_path>. Otherwise, it will be gs://<bucket>.
-  """
-  if _RELATIVE_GCS_LOG_PATH.value:
-    return f'gs://{bucket}/{_RELATIVE_GCS_LOG_PATH.value}'
-  return f'gs://{bucket}'

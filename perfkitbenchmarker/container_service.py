@@ -32,9 +32,10 @@ import logging
 import multiprocessing
 from multiprocessing import synchronize
 import os
+import queue as py_queue
 import re
 import time
-from typing import Any, Callable, Iterator, Optional, Sequence
+from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Sequence
 
 from absl import flags
 import jinja2
@@ -51,6 +52,7 @@ from perfkitbenchmarker import units
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
+from perfkitbenchmarker.resources import kubernetes_inference_server
 from perfkitbenchmarker.sample import Sample
 import requests
 import yaml
@@ -125,7 +127,7 @@ spec:
     servicePort: 8080
 """
 RESOURCE_DELETE_SLEEP_SECONDS = 5
-_RETRYABLE_KUBECTL_ERRORS = [
+RETRYABLE_KUBECTL_ERRORS = [
     (
         '"unable to decode an event from the watch stream: http2: client'
         ' connection lost"'
@@ -133,7 +135,13 @@ _RETRYABLE_KUBECTL_ERRORS = [
     'read: connection reset by peer',
     'Unable to connect to the server: dial tcp',
     'Unable to connect to the server: net/http: TLS handshake timeout',
+    # These come up in kubectl exec
+    'error dialing backend:',
+    'connect: connection timed out',
+    'error sending request:',
+    '(abnormal closure): unexpected EOF',
 ]
+INGRESS_JSONPATH = '{.status.loadBalancer.ingress[0]}'
 
 
 class ContainerException(errors.Error):
@@ -158,11 +166,7 @@ class RetriableContainerException(
 
 def RunKubectlCommand(command: list[str], **kwargs) -> tuple[str, str, int]:
   """Run a kubectl command."""
-  if 'stack_level' in kwargs:
-    kwargs['stack_level'] += 1
-  else:
-    # IssueCommand defaults stack_level to 1, so 2 skips this function.
-    kwargs['stack_level'] = 2
+  kwargs = vm_util.IncrementStackLevel(**kwargs)
   cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig] + command
 
   orig_suppress_failure = None
@@ -173,7 +177,7 @@ def RunKubectlCommand(command: list[str], **kwargs) -> tuple[str, str, int]:
     # Check for kubectl timeout. If found, treat it the same as a regular
     # timeout.
     if retcode != 0:
-      for error_substring in _RETRYABLE_KUBECTL_ERRORS:
+      for error_substring in RETRYABLE_KUBECTL_ERRORS:
         if error_substring in stderr:
           # Raise timeout error regardless of raise_on_failure - as the intended
           # semantics is to ignore expected errors caused by invoking the
@@ -185,11 +189,11 @@ def RunKubectlCommand(command: list[str], **kwargs) -> tuple[str, str, int]:
           )
           if raise_on_timeout:
             raise errors.VmUtil.IssueCommandTimeoutError(stderr)
-    # Else, if the user supplied a suppress_failure function, try that.
+    # Else, revert to user supplied kwargs values.
     if orig_suppress_failure is not None:
       return orig_suppress_failure(stdout, stderr, retcode)
-
-    # Else, no suppression.
+    if 'raise_on_failure' in kwargs:
+      return not kwargs['raise_on_failure']
     return False
 
   kwargs['suppress_failure'] = _DetectTimeoutViaSuppressFailure
@@ -207,17 +211,13 @@ def RunRetryableKubectlCommand(
         ' (since timeouts are retryable).'
     )
 
-  if 'stack_level' in kwargs:
-    kwargs['stack_level'] += 1
-  else:
-    # IssueCommand defaults stack_level to 1, so 2 skips this function.
-    kwargs['stack_level'] = 2
+  kwargs = vm_util.IncrementStackLevel(**kwargs)
 
   @vm_util.Retry(
       timeout=timeout,
       retryable_exceptions=(errors.VmUtil.IssueCommandTimeoutError,),
   )
-  def _RunRetryablePart(run_cmd: list[str], **kwargs):
+  def _RunRetryablePart(run_cmd: list[str], **kwargs) -> tuple[str, str, int]:
     """Inner function retries command so timeout can be passed to decorator."""
     kwargs['stack_level'] += 1
     return RunKubectlCommand(run_cmd, raise_on_timeout=True, **kwargs)
@@ -373,7 +373,7 @@ class BaseContainerRegistry(resource.BaseResource):
     if _CONTAINER_CLUSTER_ARCHITECTURE.value:
       cmd += ['--platform', ','.join(_CONTAINER_CLUSTER_ARCHITECTURE.value)]
     cmd += ['--no-cache', '--push', '-t', full_tag, image.directory]
-    vm_util.IssueCommand(cmd, timeout=None)
+    vm_util.IssueRetryableCommand(cmd, timeout=None)
     vm_util.IssueCommand(['docker', 'buildx', 'stop'])
 
   def GetOrBuild(self, image: str):
@@ -457,8 +457,9 @@ class BaseNodePoolConfig:
     self.num_nodes: int
     self.disk_type: str
     self.disk_size: int
-    # Defined by google_kubernetes_engine
+    # Defined by gce_virtual_machine. Used by google_kubernetes_engine
     self.max_local_disks: int | None
+    self.ssd_interface: str | None
     self.gpu_type: str | None
     self.gpu_count: int | None
     self.threads_per_core: int
@@ -506,6 +507,8 @@ class BaseContainerCluster(resource.BaseResource):
         collections.defaultdict(list)
     )
     self.services: dict[str, KubernetesContainerService] = {}
+    self._extra_samples: list[sample.Sample] = []
+    self.container_registry: BaseContainerRegistry | None = None
 
   @property
   def num_nodes(self) -> int:
@@ -514,6 +517,10 @@ class BaseContainerCluster(resource.BaseResource):
   @property
   def zone(self) -> str:
     return self.default_nodepool.zone
+
+  def SetContainerRegistry(self, container_registry):
+    """Sets the container registry for the cluster."""
+    self.container_registry = container_registry
 
   def _InitializeDefaultNodePool(
       self,
@@ -556,6 +563,44 @@ class BaseContainerCluster(resource.BaseResource):
   ):
     """Override to initialize cloud specific configs."""
     pass
+
+  def GetNodePoolFromNodeName(
+      self, node_name: str
+  ) -> BaseNodePoolConfig | None:
+    """Get the nodepool from the node name.
+
+    This method assumes that the nodepool name is embedded in the node name.
+    Better would be a lookup from the cloud provider.
+
+    Args:
+      node_name: The name of the node.
+
+    Returns:
+      The associated nodepool, or None if not found.
+    """
+    nodepool_names = self.nodepools.keys()
+    found_pools = []
+    if '-default-' in node_name:
+      found_pools.append(self.default_nodepool)
+    for pool_name in nodepool_names:
+      if f'-{pool_name}-' in node_name:
+        found_pools.append(self.nodepools[pool_name])
+    if len(found_pools) == 1:
+      return found_pools[0]
+    if len(found_pools) > 1:
+      raise ValueError(
+          f'Multiple nodepools found for node with name {node_name}:'
+          f' {found_pools}. Please change the name of the nodepools used to'
+          ' avoid this.'
+      )
+    return None
+
+  def GetMachineTypeFromNodeName(self, node_name: str) -> str | None:
+    """Get the machine type from the node name."""
+    nodepool = self.GetNodePoolFromNodeName(node_name)
+    if nodepool is None:
+      return None
+    return nodepool.machine_type
 
   def DeleteContainers(self):
     """Delete containers belonging to the cluster."""
@@ -610,6 +655,9 @@ class BaseContainerCluster(resource.BaseResource):
     """Deploys a ContainerSerivice according to the ContainerSpec."""
     raise NotImplementedError()
 
+  def AddSamples(self, samples: Iterable[sample.Sample]):
+    self._extra_samples += samples
+
   def GetSamples(self):
     """Return samples with information about deployment times."""
     samples = super().GetSamples()
@@ -654,10 +702,16 @@ class BaseContainerCluster(resource.BaseResource):
             )
         )
 
+    samples += self._extra_samples
+
     return samples
 
   def ResizeNodePool(self, new_size: int, node_pool: str = DEFAULT_NODEPOOL):
     """Change the number of nodes in the node pool."""
+    raise NotImplementedError
+
+  def GetNodePoolNames(self) -> list[str]:
+    """Get node pool names for the cluster."""
     raise NotImplementedError
 
 
@@ -894,9 +948,12 @@ class KubernetesClusterCommands:
     cluster has been deleted.
     """
     try:
-      # Delete deployments first as otherwise autorepair will redeploy deleted
-      # pods.
+      # Delete deployments and jobs first as otherwise autorepair will redeploy
+      # deleted pods.
       run_cmd = ['delete', 'deployment', '--all', '-n', 'default']
+      RunRetryableKubectlCommand(run_cmd)
+
+      run_cmd = ['delete', 'job', '--all', '-n', 'default']
       RunRetryableKubectlCommand(run_cmd)
 
       timeout = 60 * 20
@@ -948,7 +1005,7 @@ class KubernetesClusterCommands:
       """Parses the output of kubectl apply to get the name of the resource."""
       # Example input: deployment.apps/pkb123 created
       for line in stdout.splitlines():
-        match = re.search(r'([^\s/]+/[^\s/]+) created', line)
+        match = re.search(r'([^\s/]+/[^\s/]+) (created|configured)', line)
         if match:
           yield match.group(1)
 
@@ -982,6 +1039,8 @@ class KubernetesClusterCommands:
       timeout: int = vm_util.DEFAULT_TIMEOUT,
       wait_for_all: bool = False,
       condition_type='condition=',
+      extra_args: list[str] | None = None,
+      **kwargs,
   ):
     """Waits for a condition on a Kubernetes resource (eg: deployment, pod)."""
     run_cmd = [
@@ -994,7 +1053,71 @@ class KubernetesClusterCommands:
       run_cmd.append(f'--namespace={namespace}')
     if wait_for_all:
       run_cmd.append('--all')
-    RunKubectlCommand(run_cmd, timeout=timeout + 10)
+    if extra_args:
+      run_cmd.extend(extra_args)
+    RunKubectlCommand(run_cmd, timeout=timeout + 10, **kwargs)
+
+  @staticmethod
+  def WaitForResourceForMultiConditions(
+      resource_name: str,
+      conditions: Iterable[str],
+      namespace: str | None = None,
+      timeout: int = vm_util.DEFAULT_TIMEOUT,
+      wait_for_all: bool = False,
+      extra_args: list[str] | None = None,
+  ) -> str:
+    """Waits for multiple conditions on a Kubernetes resource (eg: deployment, pod)."""
+
+    def _WrappedWait(condition: str, queue: multiprocessing.Queue):
+      try:
+        KubernetesClusterCommands.WaitForResource(
+            resource_name,
+            condition,
+            namespace,
+            timeout,
+            wait_for_all,
+            '',
+            extra_args,
+            suppress_logging=True,
+        )
+        queue.put((condition, None))
+      except Exception as e:  # pylint: disable=broad-except
+        # Handle all exceptions and will raise it in main thread.
+        queue.put((condition, e))
+
+    queue = multiprocessing.Queue()
+    processes = []
+
+    for condition in conditions:
+      proc = multiprocessing.Process(
+          target=_WrappedWait, args=(condition, queue)
+      )
+      proc.daemon = True
+      proc.start()
+      processes.append(proc)
+
+    try:
+      # Wait for any one of the conditions to be met or timeout.
+      condition, exc = queue.get(timeout=timeout + 1)
+      logging.info('%s condition met: %s', resource_name, condition)
+    except py_queue.Empty:
+      condition = ''
+      exc = TimeoutError(
+          f'Timed out waiting for conditions on resource {resource_name}:'
+          f' {conditions} '
+      )
+
+    # Terminate any remaining waiting processes.
+    for proc in processes:
+      if proc.is_alive():
+        proc.terminate()
+      proc.join()
+
+    # TODO: cl/783410635 - Consider to raise the exception in child thread as
+    # well for easier debugging.
+    if exc is not None:
+      raise exc
+    return condition
 
   @staticmethod
   def WaitForSucceeded(
@@ -1310,13 +1433,114 @@ class KubernetesClusterCommands:
   @staticmethod
   def _GetEvents(**kwargs) -> set['KubernetesEvent']:
     """Get the events for the cluster."""
-    stdout, _, _ = RunKubectlCommand(['get', 'events', '-o', 'yaml'], **kwargs)
+    stdout, _, _ = RunRetryableKubectlCommand(
+        ['get', 'events', '-o', 'yaml'], **kwargs
+    )
     k8s_events = set()
     for item in yaml.safe_load(stdout)['items']:
       k8s_event = KubernetesEvent.FromDict(item)
       if k8s_event:
         k8s_events.add(k8s_event)
     return k8s_events
+
+  @staticmethod
+  def GetResourceMetadataByName(
+      resource_name: str,
+      resource_label: Optional[str] = None,
+      output_format: str = 'yaml',
+      output_formatter=yaml.safe_load,
+      **kwargs,
+  ) -> Dict[str, Any]:
+    """Gets the resource metadata from a Kubernetes resource."""
+    get_cmd = [
+        'get',
+        resource_name,
+    ]
+    if resource_label:
+      get_cmd.extend(['-l', resource_label])
+    get_cmd.extend(['-o', output_format])
+
+    stdout, _, _ = RunRetryableKubectlCommand(get_cmd, **kwargs)
+
+    return output_formatter(stdout)
+
+  @staticmethod
+  def RetryableGetPodNameFromJob(
+      job_name: str, timeout: int | None = None
+  ) -> str:
+    """Get the name of the pod from a job, retry until the pod is created.
+
+    Args:
+      job_name: The name of the job.
+      timeout: The timeout in seconds.
+
+    Returns:
+      The name of the pod.
+    """
+
+    class EmptyPodNameError(Exception):
+      pass
+
+    @vm_util.Retry(timeout=timeout, retryable_exceptions=EmptyPodNameError)
+    def _RetryFunction():
+      pod_name = KubernetesClusterCommands.GetResourceMetadataByName(
+          'pods', f'job-name={job_name}', 'jsonpath={.items[*].metadata.name}'
+      )
+      if not pod_name:
+        raise EmptyPodNameError(
+            f'No pod found for job {job_name}, the pod may not be created yet.'
+        )
+      return pod_name
+
+    return _RetryFunction()
+
+  @staticmethod
+  def DeleteResource(
+      resource_identifier: str, ignore_not_found: bool = True, **kwargs
+  ) -> None:
+    """Deletes a kubernetes resource."""
+    delete_cmd = [
+        'delete',
+        resource_identifier,
+    ]
+    if ignore_not_found:
+      delete_cmd.append('--ignore-not-found=true')
+    RunKubectlCommand(delete_cmd, raise_on_failure=False, **kwargs)
+
+  @staticmethod
+  def GetFileContentFromPod(pod_name: str, file_path: str) -> str:
+    """Get the content of a file from a pod.
+
+    Args:
+      pod_name: The name of the pod.
+      file_path: The path of the file to get.
+
+    Returns:
+      The content of the file.
+    """
+    get_cmd = [
+        'exec',
+        pod_name,
+        '--',
+        'cat',
+        file_path,
+    ]
+
+    stdout, _, _ = RunRetryableKubectlCommand(get_cmd)
+    return stdout
+
+  @staticmethod
+  def CopyFilesFromPod(
+      pod_name: str, src_path: str, target_path: str, **kwargs
+  ) -> None:
+    """Copy files from a pod source path to the target path on current VM."""
+    get_cmd = [
+        'cp',
+        f'{pod_name}:{src_path}',
+        target_path,
+    ]
+
+    RunRetryableKubectlCommand(get_cmd, **kwargs)
 
 
 class KubernetesEventPoller:
@@ -1386,7 +1610,8 @@ class KubernetesEventPoller:
     self.stop_polling.set()
     while not self.event_queue.empty():
       self.polled_events.add(self.event_queue.get())
-    self.event_poller.join(timeout=30)
+    if self.event_poller.is_alive():
+      self.event_poller.join(timeout=30)
     if self.event_poller.is_alive():
       logging.warning(
           'Event poller process did not join in 30 seconds; killing it.'
@@ -1418,10 +1643,26 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
 
       self.event_poller = KubernetesEventPoller(_GetEventsNoLogging)
 
+    self.inference_server = (
+        kubernetes_inference_server.GetKubernetesInferenceServer(
+            cluster_spec.inference_server, self
+        )
+    )
+
+  def Create(self, restore: bool = False) -> None:
+    super().Create(restore)
+    if self.inference_server:
+      self.inference_server.Create()
+
   def _PostCreate(self):
     super()._PostCreate()
     if self.event_poller:
       self.event_poller.StartPolling()
+
+  def Delete(self, freeze: bool = False) -> None:
+    if self.inference_server:
+      self.inference_server.Delete()
+    super().Delete(freeze)
 
   def _Delete(self):
     if self.event_poller:
@@ -1436,7 +1677,8 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
 
   def __getstate__(self):
     state = self.__dict__.copy()
-    del state['event_poller']
+    if 'event_poller' in state:
+      del state['event_poller']
     return state
 
   def GetResourceMetadata(self):
@@ -1493,9 +1735,59 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     """Get the default storage class for the provider."""
     raise NotImplementedError
 
-  def GetNodeSelectors(self) -> list[str]:
+  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
     """Get the node selectors section of a yaml for the provider."""
     return []
+
+  def DeployIngress(
+      self, name: str, namespace: str, port: int, health_path: str = ''
+  ) -> str:
+    """Deploys an Ingress/load balancer resource to the cluster.
+
+    Args:
+      name: The name of the Ingress resource.
+      namespace: The namespace of the resource.
+      port: The port to expose to the internet.
+      health_path: The path to use for health checks.
+
+    Returns:
+      The address of the Ingress.
+    """
+    del health_path
+    self.ApplyManifest(
+        'container/loadbalancer.yaml.j2',
+        name=name,
+        namespace=namespace,
+        port=port,
+    )
+    self.WaitForResource(
+        f'service/{name}',
+        INGRESS_JSONPATH,
+        namespace=namespace,
+        condition_type='jsonpath=',
+    )
+    stdout, _, _ = RunKubectlCommand([
+        'get',
+        '-n',
+        name,
+        f'svc/{name}',
+        '-o',
+        f'jsonpath={INGRESS_JSONPATH}',
+    ])
+    return f'{self._GetAddressFromIngress(stdout)}:{port}'
+
+  def _GetAddressFromIngress(self, ingress_out: str):
+    """Gets the endpoint address from the Ingress resource."""
+    ingress = json.loads(ingress_out.strip("'"))
+    if 'ip' in ingress:
+      ip = ingress['ip']
+    elif 'hostname' in ingress:
+      ip = ingress['hostname']
+    else:
+      raise errors.Benchmarks.RunError(
+          'No IP or hostname found in ingress from stdout ' + ingress_out
+      )
+    return 'http://' + ip.strip()
 
 
 @dataclasses.dataclass(eq=True, frozen=True)
@@ -1519,6 +1811,8 @@ class KubernetesEvent:
   message: str
   # Reason is actually more of a machine readable message.
   reason: str | None
+  # Examples: Normal, Warning, Error
+  type: str
   timestamp: float
 
   @classmethod
@@ -1528,7 +1822,9 @@ class KubernetesEvent:
       return None
     try:
       # There are multiple timestamps. They should be equivalent.
-      raw_timestamp = yaml_data['lastTimestamp']
+      raw_timestamp = yaml_data.get('lastTimestamp') or yaml_data.get(
+          'eventTime'
+      )
       assert raw_timestamp
       # Python 3.10 cannot handle Z as utc in ISO 8601 timestamps
       python_3_10_compatible_timestamp = re.sub('Z$', '+00:00', raw_timestamp)
@@ -1543,10 +1839,11 @@ class KubernetesEvent:
           resource=KubernetesEventResource.FromDict(
               yaml_data['involvedObject']
           ),
+          type=yaml_data['type'],
           timestamp=timestamp,
       )
     except (AssertionError, KeyError) as e:
-      logging.warning(
+      logging.exception(
           'Tried parsing event: %s but ran into error: %s', yaml_data, e
       )
       return None

@@ -19,6 +19,7 @@ Use 'gcloud compute disk-types list' to determine valid disk types.
 
 import json
 import logging
+import threading
 import time
 from typing import Any
 
@@ -48,6 +49,7 @@ HYPERDISK_THROUGHPUT = 'hyperdisk-throughput'
 HYPERDISK_EXTREME = 'hyperdisk-extreme'
 HYPERDISK_BALANCED = 'hyperdisk-balanced'
 HYPERDISK_BALANCED_HA = 'hyperdisk-balanced-high-availability'
+HYPERDISK_ML = disk.HYPERDISK_ML
 GCE_REMOTE_DISK_TYPES = [
     PD_STANDARD,
     PD_SSD,
@@ -57,6 +59,7 @@ GCE_REMOTE_DISK_TYPES = [
     HYPERDISK_EXTREME,
     HYPERDISK_BALANCED,
     HYPERDISK_BALANCED_HA,
+    HYPERDISK_ML,
 ]
 # Defaults picked to align with console.
 GCE_DYNAMIC_IOPS_DISK_TYPE_DEFAULTS = {
@@ -70,6 +73,7 @@ GCE_DYNAMIC_THROUGHPUT_DISK_TYPE_DEFAULTS = {
     HYPERDISK_BALANCED: 290,
     HYPERDISK_THROUGHPUT: 180,
     HYPERDISK_BALANCED_HA: 290,
+    HYPERDISK_ML: 160000,
 }
 
 REGIONAL_DISK_SCOPE = 'regional'
@@ -103,6 +107,10 @@ DISK_METADATA = {
         disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.ZONE,
     },
+    HYPERDISK_ML: {
+        disk.MEDIA: disk.SSD,
+        disk.REPLICATION: disk.ZONE,
+    },
     HYPERDISK_BALANCED_HA: {
         disk.MEDIA: disk.SSD,
         disk.REPLICATION: disk.REGION,
@@ -121,6 +129,17 @@ NVME = 'NVME'
 FIXED_SSD_MACHINE_TYPES = {
     'z3-highmem-176': 12,
     'z3-highmem-88': 12,
+    'z3-highmem-14-standardlssd': 1,
+    'z3-highmem-22-standardlssd': 2,
+    'z3-highmem-44-standardlssd': 3,
+    'z3-highmem-88-standardlssd': 6,
+    'z3-highmem-176-standardlssd': 12,
+    'z3-highmem-8-highlssd': 1,
+    'z3-highmem-16-highlssd': 2,
+    'z3-highmem-22-highlssd': 3,
+    'z3-highmem-32-highlssd': 4,
+    'z3-highmem-44-highlssd': 6,
+    'z3-highmem-88-highlssd': 12,
     'c3-standard-4-lssd': 1,
     'c3-standard-8-lssd': 2,
     'c3-standard-22-lssd': 4,
@@ -140,6 +159,58 @@ FIXED_SSD_MACHINE_TYPES = {
     'c3d-highmem-90-lssd': 8,
     'c3d-highmem-180-lssd': 16,
     'c3d-highmem-360-lssd': 32,
+    'c4-standard-4-lssd': 1,
+    'c4-standard-8-lssd': 1,
+    'c4-standard-16-lssd': 2,
+    'c4-standard-24-lssd': 4,
+    'c4-standard-32-lssd': 5,
+    'c4-standard-48-lssd': 8,
+    'c4-standard-64-lssd': 10,
+    'c4-standard-96-lssd': 16,
+    'c4-standard-144-lssd': 24,
+    'c4-standard-192-lssd': 32,
+    'c4-standard-288-lssd': 48,
+    'c4-highmem-4-lssd': 1,
+    'c4-highmem-8-lssd': 1,
+    'c4-highmem-16-lssd': 2,
+    'c4-highmem-24-lssd': 4,
+    'c4-highmem-32-lssd': 5,
+    'c4-highmem-48-lssd': 8,
+    'c4-highmem-64-lssd': 10,
+    'c4-highmem-96-lssd': 16,
+    'c4-highmem-144-lssd': 24,
+    'c4-highmem-192-lssd': 32,
+    'c4-highmem-288-lssd': 48,
+    'c4a-standard-4-lssd': 1,
+    'c4a-standard-8-lssd': 2,
+    'c4a-standard-16-lssd': 4,
+    'c4a-standard-32-lssd': 6,
+    'c4a-standard-48-lssd': 10,
+    'c4a-standard-64-lssd': 14,
+    'c4a-standard-72-lssd': 16,
+    'c4a-highmem-4-lssd': 1,
+    'c4a-highmem-8-lssd': 2,
+    'c4a-highmem-16-lssd': 4,
+    'c4a-highmem-32-lssd': 6,
+    'c4a-highmem-48-lssd': 10,
+    'c4a-highmem-64-lssd': 14,
+    'c4a-highmem-72-lssd': 16,
+    'c4d-standard-8-lssd': 1,
+    'c4d-standard-16-lssd': 1,
+    'c4d-standard-32-lssd': 2,
+    'c4d-standard-48-lssd': 4,
+    'c4d-standard-64-lssd': 6,
+    'c4d-standard-96-lssd': 8,
+    'c4d-standard-192-lssd': 16,
+    'c4d-standard-384-lssd': 32,
+    'c4d-highmem-8-lssd': 1,
+    'c4d-highmem-16-lssd': 1,
+    'c4d-highmem-32-lssd': 2,
+    'c4d-highmem-48-lssd': 4,
+    'c4d-highmem-64-lssd': 6,
+    'c4d-highmem-96-lssd': 8,
+    'c4d-highmem-192-lssd': 16,
+    'c4d-highmem-384-lssd': 32,
 }
 
 NVME_PD_MACHINE_FAMILIES = ['m3']
@@ -222,6 +293,17 @@ class GceDiskSpec(disk.BaseDiskSpec):
       config_values['create_with_vm'] = flag_values.gcp_create_disks_with_vm
     if flag_values['data_disk_zones'].present:
       config_values['replica_zones'] = flag_values.data_disk_zones
+    # Striping all the local ssd disks by default if --num_striped_disks is
+    # not set. num_striped_disks is set in config_values if --num_striped_disks
+    # is set.
+    if 'num_striped_disks' not in config_values and (
+        config_values.get('disk_type', '') == 'local'
+        and flag_values['machine_type'].present
+        and flag_values.machine_type in FIXED_SSD_MACHINE_TYPES
+    ):
+      config_values['num_striped_disks'] = FIXED_SSD_MACHINE_TYPES.get(
+          flag_values.machine_type, 1
+      )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -341,7 +423,6 @@ class GceDisk(disk.BaseDisk):
       replica_zones=None,
   ):
     super().__init__(disk_spec)
-    self.spec = disk_spec
     self.interface = disk_spec.interface
     self.attached_vm_name = None
     self.image = image
@@ -394,8 +475,8 @@ class GceDisk(disk.BaseDisk):
       cmd.flags['replica-zones'] = ','.join(self.replica_zones)
       del cmd.flags['zone']
 
-    if self.multi_writer_disk:
-      cmd.flags['access-mode'] = 'READ_WRITE_MANY'
+    if self.mode:
+      cmd.flags['access-mode'] = self.mode
     if self.spec.snapshot_name:
       cmd.flags['source-snapshot'] = self.spec.snapshot_name
     self.create_disk_start_time = time.time()
@@ -403,11 +484,14 @@ class GceDisk(disk.BaseDisk):
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
     self.create_disk_end_time = self._GetEndTime(stdout)
 
-  def _Delete(self):
-    """Deletes the disk, as well as all associated snapshot and restore disks."""
+  def _DeleteDependencies(self):
+    """Deletes potential snapshots of the disk."""
     if self.snapshots:
       for snapshot in self.snapshots:
         snapshot.Delete()
+
+  def _Delete(self):
+    """Deletes the disk, as well as all associated snapshot and restore disks."""
     cmd = util.GcloudCommand(self, 'compute', 'disks', 'delete', self.name)
     if self.replica_zones:
       cmd.flags['region'] = self.region
@@ -475,7 +559,15 @@ class GceDisk(disk.BaseDisk):
 
     if self.replica_zones:
       cmd.flags['disk-scope'] = REGIONAL_DISK_SCOPE
-      cmd.flags['region'] = self.region
+      # The gcloud CLI for attaching Hyperdisk Balanced high availability
+      # disks does not accept the --region flag, but it is still needed for
+      # api_http_util.
+      if (self.spec.DISK_TYPE != HYPERDISK_BALANCED_HA
+          or FLAGS.gcp_gcloud_use_http):
+        cmd.flags['region'] = self.region
+
+    if self.mode == disk.READ_ONLY_MANY:
+      cmd.flags['mode'] = 'ro'
 
     self.attach_start_time = time.time()
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
@@ -536,11 +628,10 @@ class GceDisk(disk.BaseDisk):
     self.attached_vm_name = None
     self.detach_end_time = self._GetEndTime(stdout)
 
+  # Device path is needed to stripe disks on Linux, but not on Windows.
+  # The path is not updated for Windows machines.
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
-    if self.interface == NVME:
-      return self.name
-    # by default, returns this name id.
     return f'/dev/disk/by-id/google-{self.name}'
 
   def IsNvme(self):
@@ -551,6 +642,9 @@ class GceDisk(disk.BaseDisk):
     snapshot = GceDiskSnapshot(self, len(self.snapshots) + 1)
     snapshot.Create()
     self.snapshots.append(snapshot)
+
+  def GetLastIncrementalSnapshotSize(self):
+    return self.snapshots[-1].storage_gb
 
 
 class GceDiskSnapshot(disk.DiskSnapshot):
@@ -650,6 +744,9 @@ class GceDiskSnapshot(disk.DiskSnapshot):
     """Creates a disk from the snapshot."""
     self.restore_disk_name = f'{self.name}-restore-{self.num_restore_disks}'
     self.disk_spec.snapshot_name = self.name
+    self.disk_spec.mount_point = (
+        f'/restore{self.num_restore_disks}{self.disk_spec.mount_point}'
+    )
     restore_disk = GceDisk(
         self.disk_spec, self.restore_disk_name, self.zone, self.project
     )
@@ -726,3 +823,90 @@ class GceStripedDisk(disk.StripedDisk):
     for disk_details in self.disks:
       detach_tasks.append((disk_details.Detach, (), {}))
     background_tasks.RunParallelThreads(detach_tasks, max_concurrency=200)
+
+
+class GceHyperdiskML(disk.MultiAttachDisk):
+  """Object representing a hyperdisk ML disk."""
+
+  CLOUD = provider_info.GCP
+
+  def __init__(
+      self,
+      disk_spec,
+      name,
+      zone,
+      project,
+  ):
+    super().__init__(disk_spec, name, zone, project)
+    self.name = name
+    self.mode = disk.READ_WRITE_SINGLE
+    self.writer_vm = None
+    self.reader_vms = []
+    self.disk = GceDisk(disk_spec, name, zone, project)
+    self.lock = threading.Lock()
+
+  def Create(self):
+    self.disk.Create()
+
+  def GetDevicePath(self):
+    """Returns the path to the device inside the VM."""
+    return f'/dev/disk/by-id/google-{self.name}'
+
+  def AttachWriter(self, vm):
+    """Attaches the disk to a writer VM.
+
+    Args:
+      vm: The GceVirtualMachine instance to which the disk will be attached.
+    """
+    self.lock.acquire()
+    if not self.writer_vm:
+      self.disk.Attach(vm)
+      self.writer_vm = vm
+    self.lock.release()
+    self.reader_vms.append(vm)
+
+  def AddFutureReader(self, vm):
+    """Adds the given VM as a future reader.
+    """
+    self.reader_vms.append(vm)
+
+  def SetReadOnlyMany(self):
+    """Update disk mode to READ_ONLY_MANY mode."""
+    if self.mode == disk.READ_ONLY_MANY:
+      return
+    assert self.mode == disk.READ_WRITE_SINGLE
+    self.mode = disk.READ_ONLY_MANY
+
+    # first detach from all instances.
+    self._Detach()
+
+    # Update mode
+    cmd = util.GcloudCommand(
+        self, 'compute', 'disks', 'update', self.name
+    )
+    cmd.flags['access-mode'] = self.mode
+
+    # then attach in correct mode.
+    for vm in self.reader_vms:
+      self.disk.Attach(vm)
+      vm.MountDisk(
+          self.GetDevicePath(),
+          self.spec.mount_point,
+          self.spec.disk_type,
+          self.mount_options,
+          self.fstab_options,
+      )
+
+  def _Detach(self):
+    """Detaches the disk from all VMs."""
+    for vm in self.reader_vms:
+      cmd = util.GcloudCommand(
+          self, 'compute', 'instances', 'detach-disk', vm.name
+      )
+      cmd.flags['device-name'] = self.name
+      _, _ = cmd.IssueRetryable()
+
+  def _Delete(self):
+    """Deletes the disk."""
+    self._Detach()
+    self.disk.Delete()

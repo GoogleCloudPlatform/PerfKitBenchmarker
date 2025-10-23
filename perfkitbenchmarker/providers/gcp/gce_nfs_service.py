@@ -31,7 +31,6 @@ class GceNfsService(nfs_service.BaseNfsService):
 
   CLOUD = provider_info.GCP
   NFS_TIERS = (STANDARD, PREMIUM, ZONAL, REGIONAL, HIGH_SCALE_SSD, ENTERPRISE)
-  DEFAULT_NFS_VERSION = '3.0'
   DEFAULT_TIER = 'STANDARD'
   user_managed = False
 

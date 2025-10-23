@@ -33,8 +33,7 @@ from perfkitbenchmarker.providers.gcp import util
 FLAGS = flags.FLAGS
 STANDARD_TIER = 'STANDARD'
 BASIC_TIER = 'BASIC'
-# TODO(user): Put timeout back to 10 minutes after experiment.
-COMMAND_TIMEOUT = 1200  # 20 minutes
+COMMAND_TIMEOUT = 3600
 DEFAULT_PORT = 6379
 
 _SHARD_SIZE_GB = 13

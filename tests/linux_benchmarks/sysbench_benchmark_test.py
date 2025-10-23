@@ -21,6 +21,7 @@ from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import sysbench_benchmark
 from tests import pkb_common_test_case
@@ -317,6 +318,110 @@ class SpannerBenchmarkTestCase(
       mock_update_instance.assert_has_calls(
           [mock.call('db.r7g.16xlarge'), mock.call('db.m4.4xlarge')]
       )
+
+  class SysbenchRunCommandTransactionLevelsTest(
+      pkb_common_test_case.PkbCommonTestCase, parameterized.TestCase
+  ):
+
+    def setUp(self):
+      super().setUp()
+      self.mock_db = mock.MagicMock()
+      self.mock_db.engine_type = sql_engine_utils.SPANNER_POSTGRES
+      self.enter_context(
+          mock.patch.object(
+              sysbench_benchmark,
+              '_GetCommonSysbenchOptions',
+              return_value=['--mocked_db_options'],
+          )
+      )
+
+    @parameterized.named_parameters(
+        dict(
+            testcase_name='_SER', level='SER', expected_flag='--trx_level=SER'
+        ),
+        dict(testcase_name='_RR', level='RR', expected_flag='--trx_level=RR'),
+    )
+    @flagsaver.flagsaver(sysbench_testname=sysbench_benchmark.SPANNER_TPCC)
+    def test_spanner_tpcc_transaction_levels(self, level, expected_flag):
+      FLAGS.sysbench_txn_isolation_level = level
+      command = sysbench_benchmark._GetSysbenchRunCommand(
+          duration=300, db=self.mock_db, sysbench_thread_count=64
+      )
+      self.assertIn(expected_flag, command)
+
+    @parameterized.named_parameters(
+        dict(
+            testcase_name='_SER', level='SER', expected_flag='--trx_level=SER'
+        ),
+        dict(testcase_name='_RR', level='RR', expected_flag='--trx_level=RR'),
+    )
+    @flagsaver.flagsaver(sysbench_testname='oltp_read_write')
+    def test_spanner_oltp_read_write_transaction_levels(
+        self, level, expected_flag
+    ):
+      FLAGS.sysbench_txn_isolation_level = level
+      command = sysbench_benchmark._GetSysbenchRunCommand(
+          duration=60, db=self.mock_db, sysbench_thread_count=16
+      )
+      self.assertIn(expected_flag, command)
+
+    @parameterized.named_parameters(
+        dict(
+            testcase_name='_SER', level='SER', expected_flag='--trx_level=SER'
+        ),
+        dict(testcase_name='_RR', level='RR', expected_flag='--trx_level=RR'),
+    )
+    @flagsaver.flagsaver(sysbench_testname='oltp_write_only')
+    def test_spanner_oltp_write_only_transaction_levels(
+        self, level, expected_flag
+    ):
+      FLAGS.sysbench_txn_isolation_level = level
+      command = sysbench_benchmark._GetSysbenchRunCommand(
+          duration=60, db=self.mock_db, sysbench_thread_count=16
+      )
+      self.assertIn(expected_flag, command)
+
+    @parameterized.named_parameters(
+        dict(
+            testcase_name='_SER', level='SER', expected_flag='--trx_level=SER'
+        ),
+        dict(testcase_name='_RR', level='RR', expected_flag='--trx_level=RR'),
+    )
+    @flagsaver.flagsaver(sysbench_testname='oltp_read_only')
+    def test_spanner_oltp_read_only_transaction_levels(
+        self, level, expected_flag
+    ):
+      FLAGS.sysbench_txn_isolation_level = level
+      command = sysbench_benchmark._GetSysbenchRunCommand(
+          duration=60, db=self.mock_db, sysbench_thread_count=16
+      )
+      self.assertIn(expected_flag, command)
+
+    @parameterized.named_parameters(
+        dict(
+            testcase_name='_oltp_read_write',
+            sysbench_testname='oltp_read_write',
+        ),
+        dict(
+            testcase_name='_oltp_write_only',
+            sysbench_testname='oltp_write_only',
+        ),
+        dict(
+            testcase_name='_oltp_read_only', sysbench_testname='oltp_read_only'
+        ),
+        dict(
+            testcase_name='_tpcc',
+            sysbench_testname=sysbench_benchmark.SPANNER_TPCC,
+        ),
+    )
+    @flagsaver.flagsaver(sysbench_txn_isolation_level='RC')
+    def test_spanner_transaction_level_rc_unsupported(self, sysbench_testname):
+      FLAGS.sysbench_testname = sysbench_testname
+      command = sysbench_benchmark._GetSysbenchRunCommand(
+          duration=60, db=self.mock_db, sysbench_thread_count=16
+      )
+      # RC is not supported for Spanner, so no trx_level flag should be added.
+      self.assertNotIn('--trx_level=', command)
 
 
 if __name__ == '__main__':

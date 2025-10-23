@@ -22,22 +22,28 @@ CENTOS_STREAM9 = 'centos_stream9'
 CLEAR = 'clear'
 COS = 'cos'  # stable
 COS_DEV = 'cos_dev'
+COS121 = 'cos121'
 COS117 = 'cos117'
 COS113 = 'cos113'
 COS109 = 'cos109'
-COS105 = 'cos105'
 CORE_OS = 'core_os'
 DEBIAN11 = 'debian11'
 DEBIAN11_BACKPORTS = 'debian11_backports'
 DEBIAN12 = 'debian12'
+DEBIAN13 = 'debian13'
 FEDORA36 = 'fedora36'
 FEDORA37 = 'fedora37'
+OL8 = 'ol8'
+OL9 = 'ol9'
 RHEL8 = 'rhel8'
 RHEL9 = 'rhel9'
+RHEL10 = 'rhel10'
 ROCKY_LINUX8 = 'rocky_linux8'
 ROCKY_LINUX8_OPTIMIZED = 'rocky_linux8_optimized'
 ROCKY_LINUX9 = 'rocky_linux9'
 ROCKY_LINUX9_OPTIMIZED = 'rocky_linux9_optimized'
+ROCKY_LINUX10 = 'rocky_linux10'
+ROCKY_LINUX10_OPTIMIZED = 'rocky_linux10_optimized'
 UBUNTU2004 = 'ubuntu2004'
 UBUNTU2004_EFA = 'ubuntu2004_efa'
 UBUNTU2004_DL = 'ubuntu2004_dl'
@@ -102,10 +108,10 @@ WINDOWS = 'windows'
 CONTAINER_OS_TYPES = [
     CORE_OS,
     COS,
+    COS121,
     COS117,
     COS113,
     COS109,
-    COS105,
     COS_DEV,
 ]
 
@@ -120,14 +126,20 @@ LINUX_OS_TYPES = CONTAINER_OS_TYPES + [
     DEBIAN11_BACKPORTS,
     DEBIAN12,
     DEBIAN12_DL,
+    DEBIAN13,
     FEDORA36,
     FEDORA37,
+    OL8,
+    OL9,
     RHEL8,
     RHEL9,
+    RHEL10,
     ROCKY_LINUX8,
     ROCKY_LINUX8_OPTIMIZED,
     ROCKY_LINUX9,
     ROCKY_LINUX9_OPTIMIZED,
+    ROCKY_LINUX10,
+    ROCKY_LINUX10_OPTIMIZED,
     UBUNTU2004,
     UBUNTU2004_EFA,
     UBUNTU2004_DL,
@@ -185,12 +197,17 @@ AMAZONLINUX_TYPES = [
 
 EL_OS_TYPES = [
     CENTOS_TYPES,
+    OL8,
+    OL9,
     RHEL8,
     RHEL9,
+    RHEL10,
     ROCKY_LINUX8,
     ROCKY_LINUX8_OPTIMIZED,
     ROCKY_LINUX9,
     ROCKY_LINUX9_OPTIMIZED,
+    ROCKY_LINUX10,
+    ROCKY_LINUX10_OPTIMIZED,
 ]
 
 ALL = LINUX_OS_TYPES + WINDOWS_OS_TYPES

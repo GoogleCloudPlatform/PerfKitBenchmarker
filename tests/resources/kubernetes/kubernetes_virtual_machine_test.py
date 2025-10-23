@@ -13,14 +13,12 @@
 # limitations under the License.
 """Tests for providers.kubernetes.kubernetes_virtual_machine."""
 
-# pylint: disable=not-context-manager
-
 import builtins
+import contextlib
 import json
 import unittest
 from absl import flags as flgs
 from absl.testing import flagsaver
-import contextlib2
 import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
@@ -184,6 +182,40 @@ _EXPECTED_CALL_BODY_WITH_VM_GROUP = """
 }
 """
 
+_EXPECTED_CALL_BODY_WITH_HOST_NETWORK = """
+{
+    "spec": {
+        "hostNetwork": true,
+        "dnsPolicy":
+            "ClusterFirstWithHostNet",
+        "volumes": [],
+        "containers": [{
+            "name": "fake_name",
+            "workingDir": "/root",
+            "volumeMounts": [],
+            "image": "test_image",
+            "securityContext": {
+                "privileged": true
+            },
+            "command": ["tail", "-f", "/dev/null"]
+        }],
+        "tolerations": [{
+            "key": "kubernetes.io/arch",
+            "operator": "Exists",
+            "effect": "NoSchedule"
+        }]
+    },
+    "kind": "Pod",
+    "metadata": {
+        "name": "fake_name",
+        "labels": {
+            "pkb": "fake_name"
+        }
+    },
+    "apiVersion": "v1"
+}
+"""
+
 
 def get_write_mock_from_temp_file_mock(temp_file_mock):
   """Returns the write method mock from the NamedTemporaryFile mock.
@@ -201,9 +233,9 @@ def get_write_mock_from_temp_file_mock(temp_file_mock):
   return temp_file_mock().__enter__().write
 
 
-@contextlib2.contextmanager
+@contextlib.contextmanager
 def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
-  with contextlib2.ExitStack() as stack:
+  with contextlib.ExitStack() as stack:
     retval = (stdout, stderr, return_code)
 
     flags.gcloud_path = 'gcloud'
@@ -234,8 +266,8 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
 
 
 class TestKubernetesVirtualMachine(
-    pkb_common_test_case.TestOsMixin,
     kubernetes_virtual_machine.KubernetesVirtualMachine,
+    pkb_common_test_case.TestLinuxVirtualMachine,
 ):
   pass
 
@@ -450,6 +482,24 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
           write_mock.call_args[0][0], _EXPECTED_CALL_BODY_WITHOUT_GPUS
       )
 
+  def testCreatePodBodyWithHostNetwork(self):
+    spec = self.create_virtual_machine_spec()
+    spec.host_network = True
+    with patch_critical_objects() as (_, temp_file):
+      kub_vm = TestKubernetesVirtualMachine(spec)
+      # Need to set the name explicitly on the instance because the test
+      # running is currently using a single PKB instance, so the BaseVm
+      # instance counter is at an unpredictable number at this stage, and it is
+      # used to set the name.
+      kub_vm.name = _NAME
+      kub_vm._WaitForPodBootCompletion = lambda: None
+      kub_vm._Create()
+
+      write_mock = get_write_mock_from_temp_file_mock(temp_file)
+      self.assertJsonEqual(
+          write_mock.call_args[0][0], _EXPECTED_CALL_BODY_WITH_HOST_NETWORK
+      )
+
   def testDownloadPreprovisionedDataAws(self):
     spec = self.create_virtual_machine_spec()
     vm_class = virtual_machine.GetVmClass(
@@ -490,6 +540,16 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
       command = issue_command.call_args[0][0]
       command_string = ' '.join(command)
       self.assertIn('gcloud storage', command_string)
+
+  def testIsAarch64(self):
+    spec = self.create_virtual_machine_spec()
+    with patch_critical_objects('aarch64'):
+      kub_vm = TestKubernetesVirtualMachine(spec)
+      self.assertTrue(kub_vm.is_aarch64)
+
+    with patch_critical_objects('x86_64'):
+      kub_vm = TestKubernetesVirtualMachine(spec)
+      self.assertFalse(kub_vm.is_aarch64)
 
 
 class KubernetesVirtualMachineWithGpusTestCase(

@@ -53,7 +53,7 @@ flags.DEFINE_string(
 )
 flags.DEFINE_integer(
     'runspec_iterations',
-    3,
+    1,
     'Used by the PKB speccpu benchmarks. The number of benchmark iterations '
     'to execute, provided to the runspec binary via its --iterations flag.',
 )
@@ -75,7 +75,7 @@ flags.DEFINE_boolean(
 )
 flags.DEFINE_boolean(
     'runspec_keep_partial_results',
-    False,
+    True,
     'Used by the PKB speccpu benchmarks. If set, the benchmark will report '
     'an aggregate score even if some of the SPEC CPU component tests '
     'failed with status "NR". Available results will be saved, and PKB samples '
@@ -84,7 +84,7 @@ flags.DEFINE_boolean(
 )
 flags.DEFINE_boolean(
     'runspec_estimate_spec',
-    False,
+    True,
     'Used by the PKB speccpu benchmarks. If set, the benchmark will report '
     'an estimated aggregate score even if SPEC CPU did not compute one. '
     'This usually occurs when --runspec_iterations is less than 3.  '
@@ -138,19 +138,12 @@ def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
     errors.Config.InvalidValue: If the tar file is found, and runspec_config is
         not a valid file name.
   """
-  if posixpath.basename(runspec_config) != runspec_config:
-    raise errors.Config.InvalidValue(
-        'Invalid runspec_config value: {}{}When running speccpu with a '
-        'tar file, runspec_config cannot specify a file in a sub-directory. '
-        'See README.md for information about running speccpu with a tar '
-        'file.'.format(runspec_config, os.linesep)
-    )
-  if not examine_members:
-    return
-
   # Copy the cfg to the VM.
   local_cfg_file_path = data.ResourcePath(speccpu_vm_state.runspec_config)
   vm.PushFile(local_cfg_file_path, speccpu_vm_state.cfg_file_path)
+
+  if not examine_members:
+    return
 
   scratch_dir = vm.GetScratchDir()
   cfg_member = '{}/config/{}'.format(
@@ -343,6 +336,9 @@ def InstallSPECCPU(vm, speccpu_vm_state):
         speccpu_vm_state,
     )
   except errors.Setup.BadPreprovisionedDataError:
+    if not speccpu_vm_state.base_iso_file_path:
+      raise
+    logging.exception('Failed to set up tar. Trying ISO file.')
     _CheckIsoAndCfgFile(
         speccpu_vm_state.runspec_config,
         speccpu_vm_state.base_iso_file_path,
@@ -385,7 +381,7 @@ def _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state):
       scratch_dir,
   )
   vm.RemoteCommand(
-      'cd {dir} && tar xfz {tar}'.format(
+      'cd {dir} && tar xf {tar}'.format(
           dir=scratch_dir, tar=speccpu_vm_state.base_tar_file_path
       )
   )
@@ -514,13 +510,13 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
   in_result_section = False
   at_peak_results_line, peak_name, peak_score = False, None, None
 
-  # Extract the CPU version
-  cpu2017_version = ''
+  # Extract the benchmark versions
+  cpu_version = None
   for line in stdout.splitlines():
-    if re.search(r'Tested with SPEC CPU.*', line):
-      version_groups = re.search(r'2017 v(.*?) on', line)
-      if version_groups:
-        cpu2017_version = version_groups.group(1)
+    if version_match := re.search(
+        r'Tested with SPEC CPU\(R\)(\w+) v(\S+)', line
+    ):
+      cpu_version = version_match.groups()
       break
     continue
 
@@ -568,8 +564,10 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       'spec17_fdo': FLAGS.spec17_fdo,
       'spec17_subset': FLAGS.spec17_subset,
       'gcc_version': build_tools.GetVersion(vm, 'gcc'),
-      'CPU2017_version': cpu2017_version,
   }
+  if cpu_version:
+    major, minor = cpu_version
+    metadata[f'CPU{major}_version'] = minor
 
   missing_results = []
   scores = []
@@ -631,12 +629,16 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
     )
   if peak_score:
     results.append(sample.Sample(peak_name, float(peak_score), '', metadata))
+  elif not scores:
+    raise errors.Benchmarks.RunError('speccpu: no scores found')
 
   return results
 
 
 def _GeometricMean(arr):
   """Calculates the geometric mean of the array."""
+  if not arr:
+    return 0.0
   product = 1
   for val in arr:
     product *= val

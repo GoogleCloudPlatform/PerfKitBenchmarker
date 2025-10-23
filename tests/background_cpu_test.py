@@ -15,11 +15,11 @@
 """Tests for background cpu workload."""
 
 
+import contextlib
 import itertools
 import unittest
 
 from absl import flags
-import contextlib2
 import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
@@ -117,7 +117,7 @@ class TestBackgroundWorkload(pkb_common_test_case.PkbCommonTestCase):
         )
 
   def _CheckVMFromSpec(self, spec, working_groups=(), non_working_groups=()):
-    with contextlib2.ExitStack() as stack:
+    with contextlib.ExitStack() as stack:
       for vm in spec.vms:
         for function_name in _MOCKED_VM_FUNCTIONS:
           stack.enter_context(mock.patch.object(vm, function_name))

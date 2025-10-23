@@ -21,15 +21,16 @@ import time
 from typing import Any
 from absl import flags
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker.providers.gcp import gce_disk
+from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
-
 
 virtual_machine = Any  # pylint: disable=invalid-name
 
@@ -39,7 +40,20 @@ def GetCreateDiskStrategy(
     disk_spec: gce_disk.GceDiskSpec,
     disk_count: int,
 ) -> disk_strategies.CreateDiskStrategy:
+  """Returns the correct disk strategy based on the disk spec.
+
+  Args:
+    vm: The virtual machine.
+    disk_spec: The disk spec.
+    disk_count: The number of disks.
+
+  Returns:
+    The correct disk strategy.
+  """
   if disk_spec and disk_count > 0:
+    if disk_spec.disk_type == gce_disk.HYPERDISK_ML:
+      # HdML behaves more like a non-resource disk.
+      return GCECreateNonResourceDiskStrategy(vm, disk_spec, disk_count)
     if disk_spec.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES:
       return CreatePDDiskStrategy(vm, disk_spec, disk_count)
     elif disk_spec.disk_type == disk.LOCAL:
@@ -113,7 +127,6 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
   def GetCreationCommand(self) -> dict[str, Any]:
     if not self.DiskCreatedOnVMCreation():
       return {}
-
     create_disks = []
     dic = {}
     for disk_group in self.remote_disk_groups:
@@ -171,36 +184,17 @@ class GCECreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
     elif self.disk_spec.disk_type == disk.NFS:
       return disk_strategies.SetUpNFSDiskStrategy(self.vm, self.disk_spec)
 
+    elif self.disk_spec.disk_type == disk.HYPERDISK_ML:
+      return SetUpHyperdiskMLDiskStrategy(self.vm, self.disk_spec)
+
+    elif self.disk_spec.disk_type == disk.LUSTRE:
+      return GcpLustreSetupDiskStrategy(self.vm, self.disk_spec)
+
     return disk_strategies.EmptySetupDiskStrategy(self.vm, self.disk_spec)
 
 
 class SetUpGCEResourceDiskStrategy(disk_strategies.SetUpDiskStrategy):
   """Base Strategy class to set up local ssd and pd-ssd."""
-
-  def FindRemoteNVMEDevices(self, nvme_devices):
-    """Find the paths for all remote NVME devices inside the VM."""
-    remote_nvme_devices = [
-        device['DevicePath']
-        for device in nvme_devices
-        if device['ModelNumber'] == 'nvme_card-pd'
-    ]
-
-    return sorted(remote_nvme_devices)
-
-  def UpdateDevicePath(self, scratch_disk, remote_nvme_devices):
-    """Updates the paths for all remote NVME devices inside the VM."""
-    if isinstance(scratch_disk, disk.StripedDisk):
-      disks = scratch_disk.disks
-    else:
-      disks = [scratch_disk]
-
-    # round robin assignment since we cannot tell the disks apart.
-    for d in disks:
-      if (
-          d.disk_type in gce_disk.GCE_REMOTE_DISK_TYPES
-          and d.interface == gce_disk.NVME
-      ):
-        d.name = remote_nvme_devices.pop()
 
   def SetupGCELocalDisks(self):
     """Performs Linux specific setup of local disks."""
@@ -308,12 +302,7 @@ class SetUpMultiWriterPDDiskStrategy(SetUpGCEResourceDiskStrategy):
         self._MULTIWRITER_DISKS[scratch_disk.name] = True
 
       scratch_disk.Attach(self.vm)
-      # Device path is needed to stripe disks on Linux, but not on Windows.
-      # The path is not updated for Windows machines.
-      if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
-        nvme_devices = self.vm.GetNVMEDeviceInfo()
-        remote_nvme_devices = self.FindRemoteNVMEDevices(nvme_devices)
-        self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
+
     if create_and_setup_disk:
       GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
           self.vm, self.scratch_disks[0], self.disk_specs[0]
@@ -355,12 +344,6 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
     self.scratch_disks = [scratch_disk for scratch_disk, _ in scratch_disks]
     self.AttachDisks()
     for scratch_disk, disk_spec in scratch_disks:
-      # Device path is needed to stripe disks on Linux, but not on Windows.
-      # The path is not updated for Windows machines.
-      if self.vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES:
-        nvme_devices = self.vm.GetNVMEDeviceInfo()
-        remote_nvme_devices = self.FindRemoteNVMEDevices(nvme_devices)
-        self.UpdateDevicePath(scratch_disk, remote_nvme_devices)
       GCEPrepareScratchDiskStrategy().PrepareScratchDisk(
           self.vm, scratch_disk, disk_spec
       )
@@ -373,7 +356,9 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
         or not self.scratch_disks
     ):
       return
-    attach_tasks.append((self.WaitForDisksToVisibleFromVm, [start_time], {}))
+    attach_tasks.append(
+        (self.WaitForRemoteDisksToVisibleFromVm, [start_time], {})
+    )
     for scratch_disk in self.scratch_disks:
       attach_tasks.append((scratch_disk.Attach, [self.vm], {}))
     return_from_threads = background_tasks.RunParallelThreads(
@@ -385,34 +370,112 @@ class SetUpPDDiskStrategy(SetUpGCEResourceDiskStrategy):
 class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
   """Strategies to set up ram disks."""
 
+  # Performance tuning -
+  # https://cloud.google.com/storage/docs/cloud-storage-fuse/performance#compute-engine
   DEFAULT_MOUNT_OPTIONS = [
       'allow_other',
-      'dir_mode=755',
-      'file_mode=755',
-      'implicit_dirs',
+      '--dir-mode=755',
+      '--file-mode=755',
+      '--implicit-dirs',
+      '--rename-dir-limit=200000',
+  ]
+  FILE_CACHE_OPTIONS = [
+      '--cache-dir=/tmp/gcsfuse-cache-path',
+      '--file-cache-max-size-mb=-1',
+      '--file-cache-cache-file-for-range-read=true',
   ]
 
   def SetUpDiskOnLinux(self):
-    """Performs Linux specific setup of ram disk."""
-    scratch_disk = disk.BaseDisk(self.disk_spec)
+    """Performs Linux specific setup of GCSFuse."""
     self.vm.Install('gcsfuse')
-    self.vm.RemoteCommand(
-        f'sudo mkdir -p {self.disk_spec.mount_point} && sudo chmod a+w'
-        f' {self.disk_spec.mount_point}'
-    )
-
-    opts = ','.join(self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options)
-    bucket = FLAGS.gcsfuse_bucket
     target = self.disk_spec.mount_point
-    self.vm.RemoteCommand(f'sudo mount -t gcsfuse -o {opts} {bucket} {target}')
-    self.vm.scratch_disks.append(scratch_disk)
+    self.vm.RemoteCommand(f'sudo mkdir -p {target} && sudo chmod a+w {target}')
+
+    metadata_cache_option_val = '0'
+    if FLAGS.gcs_fuse_enable_metadata_cache:
+      metadata_cache_option_val = '-1'
+    metadata_cache_options = [
+        f'--metadata-cache-ttl-secs={metadata_cache_option_val}',
+        f'--stat-cache-max-size-mb={metadata_cache_option_val}',
+        f'--type-cache-max-size-mb={metadata_cache_option_val}',
+        f'--metadata-cache-negative-ttl-secs={metadata_cache_option_val}',
+        f'--kernel-list-cache-ttl-secs={metadata_cache_option_val}',
+    ]
+    all_mount_options = (
+        self.DEFAULT_MOUNT_OPTIONS
+        + FLAGS.mount_options
+        + metadata_cache_options
+    )
+    if FLAGS.gcs_fuse_enable_file_cache:
+      all_mount_options += self.FILE_CACHE_OPTIONS
+
+    opts = ' '.join(all_mount_options)
+    bucket_name = (
+        FLAGS.object_storage_fuse_bucket_name or f'gcsfuse-{FLAGS.run_uri}'
+    )
+    gcs_spec = gcs.GoogleCloudStorageBucketSpec(
+        mount_point=target,
+        bucket_name=bucket_name,
+        region=util.GetRegionFromZone(self.vm.zone),
+        zone=self.vm.zone,
+        hierarchical_name_space=True,
+        uniform_bucket_level_access=True,
+    )
+    gcs_client = gcs.GoogleCloudStorageBucket(gcs_spec)
+    if not FLAGS.object_storage_fuse_bucket_name:
+      gcs_client.Create()
+
+    self.vm.RemoteCommand(f'sudo gcsfuse -o {opts} {bucket_name} {target}')
+    # Pre-populate the metadata cache
+    self.vm.RemoteCommand(f'ls -R {target} > /dev/null')
+    # Increase kernel read-ahead size
+    self.vm.RemoteCommand(
+        'echo 1024 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'
+        f' {target})/read_ahead_kb'
+    )
+    self.vm.scratch_disks.append(gcs_client)
+
+
+class SetUpHyperdiskMLDiskStrategy(SetUpGCEResourceDiskStrategy):
+  """Strategies to set up Hyperdisk ML disks."""
+
+  _CLASS_LOCK = threading.Lock()
+
+  def SetUpDiskOnLinux(self):
+    """Performs Linux specific setup of HdML disks."""
+    hdml_disk = getattr(context.GetThreadBenchmarkSpec(), 'multi_attach_disk')
+    should_format = False
+    should_mount = False
+
+    self._CLASS_LOCK.acquire()
+    if not hdml_disk.writer_vm:
+      hdml_disk.AttachWriter(self.vm)
+      should_format = True
+      should_mount = True
+    else:
+      hdml_disk.AddFutureReader(self.vm)
+    self._CLASS_LOCK.release()
+
+    if should_format:
+      self.vm.FormatDisk(hdml_disk.GetDevicePath(), self.disk_spec.disk_type)
+    if should_mount:
+      self.vm.MountDisk(
+          hdml_disk.GetDevicePath(),
+          self.disk_spec.mount_point,
+          self.disk_spec.disk_type,
+          hdml_disk.mount_options,
+          hdml_disk.fstab_options,
+      )
+
+    self.vm.scratch_disks.append(hdml_disk)
 
 
 class GCEPrepareScratchDiskStrategy(disk_strategies.PrepareScratchDiskStrategy):
   """Strategies to prepare scratch disk on GCE."""
 
   def GetLocalSSDNames(self):
-    return ['Google EphemeralDisk', 'nvme_card']
+    # C3 and C4 VMs have local SSDs with names nvme_card0'
+    return ['Google EphemeralDisk', 'nvme_card', 'nvme_card?', 'nvme_card??']
 
 
 def _GenerateDiskNamePrefix(
@@ -429,3 +492,11 @@ def _GenerateDiskNamePrefix(
       group_name = vm.vm_group
     return f'pkb-{FLAGS.run_uri}-multiwriter-{group_name}-{index}'
   return f'{vm.name}-data-{disk_spec_id}-{index}'
+
+
+class GcpLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
+
+  def SetUpDiskOnLinux(self):
+    """Performs Linux specific setup of Lustre disk."""
+    self.vm.Install('lustre_client')
+    super().SetUpDiskOnLinux()

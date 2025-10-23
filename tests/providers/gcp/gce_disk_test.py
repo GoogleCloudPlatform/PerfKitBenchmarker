@@ -185,7 +185,7 @@ class GCEDiskTest(pkb_common_test_case.PkbCommonTestCase):
     self.linux_vm.GetConnectionIp = mock.MagicMock(return_value='1.1.1.1')
     disk_spec = self.GetDiskSpec(mount_point='/mountpoint')
     self.linux_vm.SetDiskSpec(disk_spec, 2)
-    self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+    self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForRemoteDisksToVisibleFromVm = mock.MagicMock(
         return_value=12
     )
     self.mock_cmd = mock.Mock()
@@ -234,14 +234,6 @@ class GCEPDDiskTest(GCEDiskTest):
     spec.num_striped_disks = 1
     spec.create_with_vm = True
     fake_rets = [
-        ('stdout', 'stderr', 0),
-        ('stdout', 'stderr', 0),
-        (
-            'nvme version 2.8 (git 2.8)\nlibnvme version 1.8 (git 1.8)',
-            'stderr',
-            0,
-        ),
-        ('', 'stderr', 0),
         ('/dev/nvme0n1', 'stderr', 0),
         ('0', 'stderr', 0),
         ('stdout', 'stderr', 0),
@@ -255,13 +247,6 @@ class GCEPDDiskTest(GCEDiskTest):
       )
       self.linux_vm.SetupAllScratchDisks()
       expected_commands = [
-          ['sudo apt-get update'],
-          [
-              "sudo DEBIAN_FRONTEND='noninteractive' /usr/bin/apt-get -y"
-              ' install nvme-cli'
-          ],
-          ['sudo nvme --version'],
-          ['sudo nvme list --output-format json'],
           ['readlink -f /dev/disk/by-id/google-test_vm-data-0-0'],
           ['mount | grep "/dev/nvme0n1 on /scratch" | wc -l'],
           [
@@ -297,14 +282,6 @@ class GCEPDDiskTest(GCEDiskTest):
         (_DISK_JSON, 'stderr', 0),  # Exists command
         (_DISK_JSON, 'stderr', 0),  # Describe command
         ('', '', 0),
-        ('stdout', 'stderr', 0),
-        ('stdout', 'stderr', 0),
-        (
-            'nvme version 2.8 (git 2.8)\nlibnvme version 1.8 (git 1.8)',
-            'stderr',
-            0,
-        ),
-        ('', 'stderr', 0),
         ('/dev/nvme0n1', 'stderr', 0),
         ('0', 'stderr', 0),
         ('', 'stderr', 0),
@@ -315,7 +292,7 @@ class GCEPDDiskTest(GCEDiskTest):
     ]
     with PatchCriticalObjects(fake_rets) as issue_command:
       self.linux_vm.SetDiskSpec(spec, 1)
-      self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+      self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForRemoteDisksToVisibleFromVm = mock.MagicMock(
           return_value=12
       )
       self.linux_vm.SetupAllScratchDisks()
@@ -378,13 +355,6 @@ class GCEPDDiskTest(GCEDiskTest):
               'test',
               '--quiet',
           ],
-          ['sudo apt-get update'],
-          [
-              "sudo DEBIAN_FRONTEND='noninteractive' /usr/bin/apt-get -y"
-              ' install nvme-cli'
-          ],
-          ['sudo nvme --version'],
-          ['sudo nvme list --output-format json'],
           ['readlink -f /dev/disk/by-id/google-test_vm-data-0-0'],
           ['mount | grep "/dev/nvme0n1 on /scratch" | wc -l'],
           [
@@ -465,7 +435,7 @@ class GCENFSDiskTest(GCEDiskTest):
     ]
 
     with PatchCriticalObjects(fake_rets) as issue_command:
-      self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForDisksToVisibleFromVm = mock.MagicMock(
+      self.linux_vm.create_disk_strategy.GetSetupDiskStrategy().WaitForRemoteDisksToVisibleFromVm = mock.MagicMock(
           return_value=12
       )
       self.linux_vm.SetupAllScratchDisks()

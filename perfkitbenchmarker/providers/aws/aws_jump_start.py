@@ -47,7 +47,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
   model_spec: 'JumpStartModelSpec'
   model_name: str
   model_id: str
-  model_version: str
+  model_version: str | None
   name: str
   account_id: str
   endpoint_name: str | None
@@ -120,30 +120,38 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
         timeout=60 * 30,
         stack_level=2,
     )
+    if 'Traceback' in out:
+      raise errors.VirtualMachine.RemoteCommandError(
+          'Ran into stack trace exception while running'
+          f' {self.python_script}.\nFull output:\n{out}\nErr:\n{err}'
+      )
     return out, err
 
   def _GetPythonScriptCommand(self, args: list[str]) -> str:
     """Returns the command to run the python script with the given args."""
     # When run without the region variable, get the error:
     # "ARN should be scoped to correct region: us-west-2"
-    return (
+    cmd = (
         f'export AWS_DEFAULT_REGION={self.region} && '
         # These arguments are needed for all operations.
         'python3'
         f' {self.python_script} --region={self.region} --model_id={self.model_id} '
-        f'--model_version={self.model_version} ' + ' '.join(args)
+        + ' '.join(args)
     )
+    if self.model_version:
+      cmd += f' --model_version={self.model_version}'
+    return cmd
 
   def _SendPrompt(
       self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
   ) -> list[str]:
     """Sends a prompt to the model and returns the response."""
+    payload = self.model_spec.GetPayload(prompt, max_tokens, temperature)
+    payload_json = json.dumps(payload)
     out, err = self._RunPythonScript([
         '--operation=prompt',
         f'--endpoint_name={self.endpoint_name}',
-        f'--prompt={prompt}',
-        f'--max_tokens={max_tokens}',
-        f'--temperature={temperature}',
+        f"--payload='{payload_json}'",
     ])
     matches = re.search('Response>>>>(.*)====', out, flags=re.DOTALL)
     if not matches:
@@ -156,13 +164,8 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
   def GetPromptCommand(
       self, prompt: str, max_tokens: int, temperature: float, **kwargs: Any
   ) -> str:
-    return self._GetPythonScriptCommand([
-        '--operation=prompt',
-        f'--endpoint_name={self.endpoint_name}',
-        f'--prompt={prompt}',
-        f'--max_tokens={max_tokens}',
-        f'--temperature={temperature}',
-    ])
+    """Doesn't need to be implemented as _SendPrompt is overridden."""
+    raise NotImplementedError('Not implemented')
 
   def _Create(self) -> None:
     """Creates the underlying resource."""
@@ -232,9 +235,15 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
   def _Delete(self) -> None:
     """Deletes the underlying resource."""
     assert self.endpoint_name
-    self._RunPythonScript(
-        ['--operation=delete', f'--endpoint_name={self.endpoint_name}']
-    )
+    try:
+      self._RunPythonScript(
+          ['--operation=delete', f'--endpoint_name={self.endpoint_name}']
+      )
+    except errors.VirtualMachine.RemoteCommandError as e:
+      raise errors.Resource.RetryableDeletionError(
+          'Failed to delete sagemaker endpoint. Retrying deletion. Error:'
+          f' {e}'
+      )
 
 
 class JumpStartModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
@@ -250,7 +259,21 @@ class JumpStartModelSpec(managed_ai_model_spec.BaseManagedAiModelSpec):
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
     self.model_id: str
-    self.model_version: str
+    self.model_version: str | None
+
+  def GetPayload(
+      self, prompt: str, max_tokens: int, temperature: float
+  ) -> dict[str, Any]:
+    """Returns the payload to send to the model."""
+    return {
+        'inputs': [[
+            {'role': 'user', 'content': prompt},
+        ]],
+        'parameters': {
+            'max_new_tokens': max_tokens,
+            'temperature': temperature,
+        },
+    }
 
 
 class JumpStartLlama2Spec(JumpStartModelSpec):
@@ -283,3 +306,45 @@ class JumpStartLlama3Spec(JumpStartModelSpec):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
     self.model_id = f'meta-textgeneration-llama-3-{self.model_size}'
     self.model_version = '2.*'
+
+  def GetPayload(
+      self, prompt: str, max_tokens: int, temperature: float
+  ) -> dict[str, Any]:
+    """Returns the payload to send to the model."""
+    return {
+        'inputs': prompt,
+        'parameters': {
+            'max_new_tokens': max_tokens,
+            'temperature': temperature,
+        },
+    }
+
+
+class JumpStartLlama4Spec(JumpStartModelSpec):
+  """Spec for running the Llama4 model."""
+
+  MODEL_NAME = 'llama4'
+  MODEL_SIZE = ['scout-17b', 'maverick-17b']
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+    self.model_id = f'meta-vlm-llama-4-{self.model_size}'
+    if self.model_size == 'scout-17b':
+      self.model_id += '-16e-instruct'
+    else:
+      self.model_id += '-128e-instruct'
+    self.model_version = None
+
+  def GetPayload(
+      self, prompt: str, max_tokens: int, temperature: float
+  ) -> dict[str, Any]:
+    """Returns the payload to send to the model."""
+    return {
+        'messages': [
+            {'role': 'user', 'content': prompt},
+        ],
+        'parameters': {
+            'max_new_tokens': max_tokens,
+            'temperature': temperature,
+        },
+    }

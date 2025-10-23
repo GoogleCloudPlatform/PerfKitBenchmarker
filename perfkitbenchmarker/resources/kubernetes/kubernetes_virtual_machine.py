@@ -49,9 +49,8 @@ SELECTOR_PREFIX = 'pkb'
 
 def _IsKubectlErrorEphemeral(retcode: int, stderr: str) -> bool:
   """Determine if kubectl error is retriable."""
-  return retcode == 1 and (
-      'error dialing backend:' in stderr
-      or 'connect: connection timed out' in stderr
+  return retcode == 1 and any(
+      error in stderr for error in container_service.RETRYABLE_KUBECTL_ERRORS
   )
 
 
@@ -88,6 +87,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.name: str = self.name.replace('_', '-')
     self.user_name: str = FLAGS.username
     self.image: str = self.image or self.DEFAULT_IMAGE
+    self.host_network: bool = vm_spec.host_network
     self.resource_limits: Optional[
         kubernetes_resources_spec.KubernetesResourcesSpec
     ] = vm_spec.resource_limits
@@ -103,6 +103,10 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def GetResourceMetadata(self):
     metadata = super().GetResourceMetadata()
+    if self.host_network:
+      metadata.update({
+          'host_network': 'true',
+      })
     if self.resource_limits:
       metadata.update({
           'pod_cpu_limit': self.resource_limits.cpus,
@@ -305,7 +309,6 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         'spec': {
             'volumes': volumes,
             'containers': [container],
-            'dnsPolicy': 'ClusterFirst',
             'tolerations': [{
                 'key': 'kubernetes.io/arch',
                 'operator': 'Exists',
@@ -313,6 +316,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
             }],
         },
     }
+
+    if self.host_network:
+      template['spec']['hostNetwork'] = True
+      # https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy
+      template['spec']['dnsPolicy'] = 'ClusterFirstWithHostNet'
+    else:
+      template['spec']['dnsPolicy'] = 'ClusterFirst'
 
     if k8s_flags.USE_NODE_SELECTORS.value and self.vm_group:
       if self.vm_group == 'default':

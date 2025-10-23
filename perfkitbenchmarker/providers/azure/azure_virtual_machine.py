@@ -78,6 +78,50 @@ NUM_LOCAL_VOLUMES: dict[str, int] = {
     'Standard_L48as_v3': 6,
     'Standard_L64as_v3': 8,
     'Standard_L80as_v3': 10,
+    'Standard_L2s_v4': 1,
+    'Standard_L4s_v4': 2,
+    'Standard_L8s_v4': 4,
+    'Standard_L16s_v4': 4,
+    'Standard_L32s_v4': 8,
+    'Standard_L48s_v4': 6,
+    'Standard_L64s_v4': 8,
+    'Standard_L80s_v4': 10,
+    'Standard_L96s_v4': 12,
+    'Standard_L2as_v4': 1,
+    'Standard_L4as_v4': 2,
+    'Standard_L8as_v4': 4,
+    'Standard_L16as_v4': 4,
+    'Standard_L32as_v4': 8,
+    'Standard_L48as_v4': 6,
+    'Standard_L64as_v4': 8,
+    'Standard_L80as_v4': 10,
+    'Standard_L96as_v4': 12,
+    'Standard_D2ds_v6': 1,
+    'Standard_D4ds_v6': 1,
+    'Standard_D8ds_v6': 1,
+    'Standard_D16ds_v6': 2,
+    'Standard_D32ds_v6': 4,
+    'Standard_D48ds_v6': 6,
+    'Standard_D64ds_v6': 4,
+    'Standard_D96ds_v6': 6,
+    'Standard_D128ds_v6': 4,
+    'Standard_D192ds_v6': 6,
+    'Standard_D2ads_v6': 1,
+    'Standard_D4ads_v6': 1,
+    'Standard_D8ads_v6': 1,
+    'Standard_D16ads_v6': 2,
+    'Standard_D32ads_v6': 4,
+    'Standard_D48ads_v6': 6,
+    'Standard_D64ads_v6': 4,
+    'Standard_D96ads_v6': 6,
+    'Standard_D2pds_v6': 1,
+    'Standard_D4pds_v6': 1,
+    'Standard_D8pds_v6': 1,
+    'Standard_D16pds_v6': 2,
+    'Standard_D32pds_v6': 4,
+    'Standard_D48pds_v6': 6,
+    'Standard_D64pds_v6': 4,
+    'Standard_D96pds_v6': 6,
 }
 
 _MACHINE_TYPES_ONLY_SUPPORT_GEN1_IMAGES = (
@@ -163,9 +207,12 @@ NVME_MACHINE_FAMILIES = [
     'Standard_Eibds_v5',
     'Standard_Ebds_v5',
     'Standard_Es_v6',
+    'Standard_Eis_v6',
     'Standard_Fas_v6',
     'Standard_Fals_v6',
     'Standard_Fams_v6',
+    'Standard_Ls_v4',
+    'Standard_Las_v4',
     'Standard_Ms_v3',
     'Standard_Mds_v3',
 ]
@@ -342,6 +389,7 @@ class AzureNIC(resource.BaseResource):
   def __init__(
       self,
       network: azure_network.AzureNetwork,
+      subnet: azure_network.AzureSubnet,
       name: str,
       public_ip: str | None,
       accelerated_networking: bool,
@@ -349,13 +397,13 @@ class AzureNIC(resource.BaseResource):
   ):
     super().__init__()
     self.network = network
+    self.subnet = subnet
     self.name = name
     self.public_ip = public_ip
     self.private_ip = private_ip
     self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
     self.region = self.network.region
-    self.args = ['--nics', self.name]
     self.accelerated_networking = accelerated_networking
 
   def _Create(self):
@@ -365,16 +413,16 @@ class AzureNIC(resource.BaseResource):
         '--name', self.name
     ]  # pyformat: disable
     cmd += self.resource_group.args
-    if self.network.subnet.id:
+    if self.subnet.id:
       # pre-existing subnet from --azure_subnet_id
-      cmd += ['--subnet', self.network.subnet.id]
+      cmd += ['--subnet', self.subnet.id]
     else:
       # auto created subnet
       cmd += [
           '--vnet-name',
-          self.network.subnet.vnet.name,
+          self.subnet.vnet.name,
           '--subnet',
-          self.network.subnet.name,
+          self.subnet.name,
       ]
     if self.public_ip:
       cmd += ['--public-ip-address', self.public_ip]
@@ -382,8 +430,9 @@ class AzureNIC(resource.BaseResource):
       cmd += ['--private-ip-address', self.private_ip]
     if self.accelerated_networking:
       cmd += ['--accelerated-networking', 'true']
-    if self.network.nsg:
-      cmd += ['--network-security-group', self.network.nsg.name]
+    for nsg in self.network.nsgs:
+      if nsg.subnet.name == self.subnet.name:
+        cmd += ['--network-security-group', nsg.name]
     vm_util.IssueCommand(cmd)
 
   def _Exists(self):
@@ -673,8 +722,8 @@ class AzureVirtualMachine(
   host_map = collections.defaultdict(list)
 
   create_os_disk_strategy: azure_disk_strategies.AzureCreateOSDiskStrategy
-  nic: AzureNIC
-  public_ip: AzurePublicIPAddress | None = None
+  nics: list[AzureNIC] = []
+  public_ips: list[AzurePublicIPAddress] = []
   resource_group: azure_network.AzureResourceGroup
   low_priority: bool
   low_priority_status_code: int | None
@@ -709,20 +758,29 @@ class AzureVirtualMachine(
     self.resource_group = azure_network.GetResourceGroup()
 
     # Configure NIC
-    if self.assign_external_ip:
-      public_ip_name = self.name + '-public-ip'
-      self.public_ip = AzurePublicIPAddress(
-          self.region, self.availability_zone, public_ip_name
+    self.nics: list[AzureNIC] = []
+    self.public_ips: list[AzurePublicIPAddress] = []
+
+    public_ip_name = None
+    for nic_num, subnet in enumerate(self.network.subnets):
+      if self.assign_external_ip:
+        public_ip_name = self.name + '-public-ip' + str(nic_num)
+        public_ip = AzurePublicIPAddress(
+            self.region, self.availability_zone, public_ip_name
+        )
+        self.public_ips.append(public_ip)
+
+      subnet_name = self.name + '-nic'
+      if not azure_flags.AZURE_SUBNET_ID.value:
+        subnet_name = f'{self.name}-nic{nic_num}'
+      nic = AzureNIC(
+          self.network,
+          subnet,
+          subnet_name,
+          public_ip_name,
+          vm_spec.accelerated_networking,
       )
-    else:
-      public_ip_name = None
-      self.public_ip = None
-    self.nic: AzureNIC = AzureNIC(
-        self.network,
-        self.name + '-nic',
-        public_ip_name,
-        vm_spec.accelerated_networking,
-    )
+      self.nics.append(nic)
 
     self.storage_account = self.network.storage_account
     self.machine_type_is_confidential = any(
@@ -737,9 +795,9 @@ class AzureVirtualMachine(
         or self.OS_TYPE in TRUSTED_LAUNCH_UNSUPPORTED_OS_TYPES
     )
     arm_arch = _GetArmArch(self.machine_type)
+    self.is_aarch64 = bool(arm_arch)
     if arm_arch:
       self.host_arch = arm_arch
-      self.is_aarch64 = True
     self.hypervisor_generation = 2
     if vm_spec.image:
       self.image = vm_spec.image
@@ -798,9 +856,10 @@ class AzureVirtualMachine(
 
   def _CreateDependencies(self):
     """Create VM dependencies."""
-    if self.public_ip:
-      self.public_ip.Create()
-    self.nic.Create()
+    for public_ip in self.public_ips:
+      public_ip.Create()
+    for nic in self.nics:
+      nic.Create()
 
     if self.use_dedicated_host:
       with self._lock:
@@ -897,7 +956,8 @@ class AzureVirtualMachine(
         + security_args
         + secure_boot_args
         + self.resource_group.args
-        + self.nic.args
+        + ['--nics']
+        + [nic.name for nic in self.nics]
         + tag_args
     )
     if self.hypervisor_generation > 1:
@@ -1052,8 +1112,11 @@ class AzureVirtualMachine(
         self.name,
     ] + self.resource_group.args
     vm_util.IssueCommand(start_cmd)
-    if self.public_ip:
-      self.ip_address = self.public_ip.GetIPAddress()
+    if self.public_ips:
+      self.ip_address = self.public_ips[0].GetIPAddress()
+      self.ip_addresses = [
+          public_ip.GetIPAddress() for public_ip in self.public_ips
+      ]
 
   def _Stop(self):
     """Stops the VM."""
@@ -1115,9 +1178,13 @@ class AzureVirtualMachine(
         ]
         + self.resource_group.args
     )
-    self.internal_ip = self.nic.GetInternalIP()
-    if self.public_ip:
-      self.ip_address = self.public_ip.GetIPAddress()
+    self.internal_ip = self.nics[0].GetInternalIP()
+    self.internal_ips = [nic.GetInternalIP() for nic in self.nics]
+    if self.public_ips:
+      self.ip_address = self.public_ips[0].GetIPAddress()
+      self.ip_addresses = [
+          public_ip.GetIPAddress() for public_ip in self.public_ips
+      ]
 
   def SetupAllScratchDisks(self):
     """Set up all scratch disks of the current VM."""
@@ -1183,7 +1250,7 @@ class AzureVirtualMachine(
   def GetResourceMetadata(self):
     assert self.network is not None
     result = super().GetResourceMetadata()
-    result['accelerated_networking'] = self.nic.accelerated_networking
+    result['accelerated_networking'] = self.nics[0].accelerated_networking
     result['boot_disk_type'] = self.create_os_disk_strategy.disk.disk_type
     result['boot_disk_size'] = self.create_os_disk_strategy.disk.disk_size
     if self.network.placement_group:
@@ -1258,6 +1325,15 @@ class Debian12BasedAzureVirtualMachine(
   ARM_IMAGE_URN = 'Debian:debian-12:12-arm64:latest'
 
 
+class Debian13BasedAzureVirtualMachine(
+    AzureVirtualMachine, linux_virtual_machine.Debian13Mixin
+):
+  # From https://wiki.debian.org/Cloud/MicrosoftAzure
+  GEN2_IMAGE_URN = 'Debian:debian-13:13-gen2:latest'
+  GEN1_IMAGE_URN = 'Debian:debian-13:13:latest'
+  ARM_IMAGE_URN = 'Debian:debian-13:13-arm64:latest'
+
+
 class Ubuntu2004BasedAzureVirtualMachine(
     AzureVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin
 ):
@@ -1309,6 +1385,13 @@ class Rhel9BasedAzureVirtualMachine(
 ):
   GEN2_IMAGE_URN = 'RedHat:RHEL:9-lvm-gen2:latest'
   GEN1_IMAGE_URN = 'RedHat:RHEL:9-lvm:latest'
+
+
+class Rhel10BasedAzureVirtualMachine(
+    AzureVirtualMachine, linux_virtual_machine.Rhel10Mixin
+):
+  GEN2_IMAGE_URN = 'RedHat:RHEL:10-lvm-gen2:latest'
+  GEN1_IMAGE_URN = 'RedHat:RHEL:10-lvm:latest'
 
 
 class AlmaLinuxBasedAzureVirtualMachine(

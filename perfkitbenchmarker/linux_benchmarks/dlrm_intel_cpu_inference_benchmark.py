@@ -99,6 +99,13 @@ def _BuildDocker(vm):
     vm.DownloadPreprovisionedData(
         dlrm.MODEL_PATH, 'dlrm', 'dlrm_int8.pt', dlrm.DLRM_DOWNLOAD_TIMEOUT
     )
+    conda_licensing = (
+        r'\/opt\/conda\/bin\/conda tos accept --override-channels --channel '
+        r'https\:\/\/repo.anaconda.com\/pkgs\/main \&\& '
+        r'\/opt\/conda\/bin\/conda tos accept --override-channels --channel '
+        r'https\:\/\/repo.anaconda.com\/pkgs\/r'
+    )
+    # TODO(yuyanting) Consider checkin Dockerfile directly.
     vm.RemoteCommand(
         'cd mlcommons/inference_results_v4.0/closed/Intel/code/'
         f'dlrm-v2-{dlrm.TARGET.value}/pytorch-cpu-int8/docker && '
@@ -111,6 +118,12 @@ def _BuildDocker(vm):
         'conda config --add channels '
         r'https\:\/\/software.repos.intel.com\/python\/conda\/|g" '
         'Dockerfile && '
+        r'sed -i "s|\/opt\/conda\/bin\/conda install -y'
+        r' python=\${PYTHON_VERSION}|'
+        rf'{conda_licensing} \&\& '
+        r'\/opt\/conda\/bin\/conda install -y python=\${PYTHON_VERSION} \&\& '
+        # switch python version wipe out tos files
+        rf'{conda_licensing}|g" Dockerfile && '
         'bash build_dlrm-v2-99_int8_container.sh'
     )
     vm.RemoteCommand(

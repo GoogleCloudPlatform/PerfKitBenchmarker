@@ -31,6 +31,7 @@ class Snowflake(snowflake.Snowflake):
 
   CLOUD = provider_info.AZURE
   SERVICE_TYPE = 'snowflake_azure'
+  QUERY_SET = 'snowflake_azure'
 
 
 class Snowflakeexternal(snowflake.Snowflake):
@@ -38,3 +39,4 @@ class Snowflakeexternal(snowflake.Snowflake):
 
   CLOUD = provider_info.AZURE
   SERVICE_TYPE = 'snowflakeexternal_azure'
+  QUERY_SET = 'snowflake_azure'

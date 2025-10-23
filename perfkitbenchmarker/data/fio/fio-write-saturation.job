@@ -1,0 +1,34 @@
+[global]
+ioengine={{ioengine}}
+invalidate=1
+direct={{direct}}
+runtime={{runtime}}
+ramp_time={{ramptime}}
+time_based
+filename={{filename}}
+do_verify=0
+verify_fatal=0
+group_reporting=1
+randrepeat=0
+disable_lat=1
+disable_slat=1
+disable_clat=1
+
+{%- for scenario in scenarios %}
+
+{%- for pair in disks_list %}
+
+[{{scenario['name']}}-io-depth-{{scenario['iodepth']}}-num-jobs-{{scenario['numjobs']}}{%- if separate_jobs == True %}.{{pair['index']}}{%- endif%}]
+{%- if pair['index'] == 0 %}
+stonewall
+{%- endif%}
+rw={{scenario['rwkind']}}
+blocksize={{scenario['blocksize']}}
+iodepth={{scenario['iodepth']}}
+size={{scenario['size']}}
+numjobs={{scenario['numjobs']}}
+{%- if pair['disk_filename'] is defined %}
+filename={{pair['disk_filename']}}
+{%- endif%}
+{%- endfor %}
+{%- endfor %}

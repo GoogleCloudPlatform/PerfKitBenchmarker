@@ -23,7 +23,7 @@ runner:
     ssh_connect_timeout: 30
     ssh_reuse_connections: false
     gce_network_name: default
-    gce_remote_access_firewall_rule: default-allow-internal
+
     connect_via_internal_ip: true
 
     #################################

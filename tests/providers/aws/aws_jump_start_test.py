@@ -4,9 +4,12 @@ import unittest
 from unittest import mock
 
 from absl.testing import flagsaver
+from absl.testing import parameterized
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.providers.aws import aws_jump_start
 from perfkitbenchmarker.providers.aws import util
+from tests import matchers
 from tests import pkb_common_test_case
 
 CRAWLER_ROLE = 'arn:aws:iam::123456789012:role/service-role/AWSGlueServiceRole-CrawlerTutorial'
@@ -69,6 +72,28 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
         self.ai_model.endpoint_name,
         'meta-textgeneration-llama-2-7b-f-2025-08-16-06',
     )
+
+  def testTracebackRaises(self):
+    self.MockRunCommand(
+        {
+            'python3': [(
+                (
+                    'Traceback  (most recent call'
+                    ' last)\n/tmp/aws_jump_start_runner.py:125 in <module>an'
+                    ' errorModel name:'
+                    ' <meta-textgeneration-llama-2-7b-f-2025-08-16-05>sagemaker.config'
+                    ' INFO - Not applying SDK defaults from location:'
+                    ' /etc/xdg/sagemaker/config.yaml\n--!Endpoint name:'
+                    ' <meta-textgeneration-llama-2-7b-f-2025-08-16-06>'
+                ),
+                'std error fine - warning only',
+                0,
+            )],
+        },
+        self.mock_vm,
+    )
+    with self.assertRaises(errors.VirtualMachine.RemoteCommandError):
+      self.ai_model._Create()
 
   def testPostCreate(self):
     self.enter_context(
@@ -209,8 +234,26 @@ class AwsJumpStartTest(pkb_common_test_case.PkbCommonTestCase):
         command=['aws', 'sagemaker', 'list-endpoints', '--region=us-east-1'],
     )
 
-  def testPromptResponseParsed(self):
-    expected_response = """ Assistant: Here's how you can travel from Beijing to New York:
+  @parameterized.named_parameters(
+      (
+          'Llama2',
+          aws_jump_start.JumpStartLlama2Spec('f_name'),
+          'inputs',
+      ),
+      (
+          'Llama4',
+          aws_jump_start.JumpStartLlama4Spec('f_name'),
+          'messages',
+      ),
+  )
+  def testPrompt(self, ai_model_spec, expected_payload):
+    ai_model_spec.model_id = 'test-model-id'
+    ai_model_spec.model_version = '2.*'
+    self.ai_model = aws_jump_start.JumpStartModelInRegistry(
+        self.mock_vm,
+        ai_model_spec,
+    )
+    response = """ Assistant: Here's how you can travel from Beijing to New York:
 
 Fly from Beijing Capital International Airport to John F. Kennedy International Airport or Newark Liberty International Airport.
 
@@ -219,7 +262,7 @@ Fly from Beijing Capital International Airport to John F. Kennedy International 
         {
             'python3': [(
                 f"""
-Response>>>>{expected_response}====
+Response>>>>{response}====
 """,
                 '',
                 0,
@@ -232,7 +275,13 @@ Response>>>>{expected_response}====
     )
     self.assertEqual(
         responses[0],
-        expected_response,
+        response,
+    )
+    self.mock_vm.RunCommand.assert_called_once_with(
+        matchers.REGEXP(rf'.*{expected_payload}'),
+        raise_on_failure=False,
+        timeout=mock.ANY,
+        stack_level=2,
     )
 
 

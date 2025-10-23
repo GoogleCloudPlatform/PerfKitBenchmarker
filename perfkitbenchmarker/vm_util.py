@@ -28,7 +28,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from typing import Callable, Dict, Iterable, Tuple
+from typing import Any, Callable, Dict, Iterable, Literal, Tuple
 
 from absl import flags
 import jinja2
@@ -281,6 +281,26 @@ def GetPublicKeyPath():
   if UseProvidedSSHKeys():
     return _SSH_PUBLIC_KEY.value
   return PrependTempDir(PUBLIC_KEYFILE)
+
+
+def IncrementStackLevel(**kwargs: Any) -> Any:
+  """Increments the stack_level variable stored in kwargs.
+
+  This method should be called from "helper" functions whose usage is not
+  particularly interesting, but whose callers are.
+  A default of 1 (before being incremented) represents the caller of the
+  "helper" function.
+  Args:
+    **kwargs: The dictionary of arguments to modify, which may or may not
+      contain stack_level.
+
+  Returns:
+    The modified dictionary of arguments.
+  """
+  if 'stack_level' not in kwargs:
+    kwargs['stack_level'] = 1
+  kwargs['stack_level'] += 1
+  return kwargs
 
 
 def GetSshOptions(ssh_key_filename, connect_timeout=None):
@@ -896,9 +916,60 @@ def DictionaryToEnvString(dictionary, joiner=' '):
   )
 
 
-def CreateRemoteFile(vm, file_contents, file_path):
+def RenderTemplate(
+    template_path,
+    context,
+    should_log_file: bool = False,
+    trim_spaces: bool = False,
+) -> str:
+  """Renders a local Jinja2 template and returns its file name.
+
+  The template will be provided variables defined in 'context'.
+
+  Args:
+    template_path: string. Local path to jinja2 template.
+    context: dict. Variables to pass to the Jinja2 template during rendering.
+    should_log_file: bool. Whether to log the file after rendering.
+    trim_spaces: bool. Value for both trim_blocks and lstrip_blocks.
+
+  Raises:
+    jinja2.UndefinedError: if template contains variables not present in
+      'context'.
+
+  Returns:
+    The name of the temporary file containing the rendered template.
+  """
+  with open(template_path) as fp:
+    template_contents = fp.read()
+  environment = jinja2.Environment(
+      undefined=jinja2.StrictUndefined,
+      trim_blocks=trim_spaces,
+      lstrip_blocks=trim_spaces,
+  )
+  template = environment.from_string(template_contents)
+  prefix = 'pkb-' + os.path.basename(template_path)
+  with NamedTemporaryFile(
+      prefix=prefix, dir=GetTempDir(), delete=False, mode='w'
+  ) as tf:
+    rendered_template = template.render(**context)
+    if should_log_file:
+      logging.info(
+          'Rendered template from %s to %s with full text:\n%s',
+          template_path,
+          tf.name,
+          rendered_template,
+          stacklevel=2,
+      )
+    tf.write(rendered_template)
+    tf.close()
+    return tf.name
+
+
+def CreateRemoteFile(
+    vm, file_contents, file_path, write_mode: Literal['w', 'wb'] = 'w'
+):
   """Creates a file on the remote server."""
-  with NamedTemporaryFile(mode='w') as tf:
+  with NamedTemporaryFile(mode=write_mode) as tf:
     tf.write(file_contents)
     tf.close()
     parent_dir = posixpath.dirname(file_path)

@@ -15,8 +15,6 @@ absl-py
 beautifulsoup4
 blinker>=1.3
 colorlog[windows]==2.6.0
-contextlib2>=0.5.1
-google-cloud-aiplatform
 google-cloud-core
 google-cloud-monitoring>=2.0.0
 immutabledict

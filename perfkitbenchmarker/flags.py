@@ -143,6 +143,9 @@ RESTORE_PATH = flags.DEFINE_string(
 FREEZE_PATH = flags.DEFINE_string(
     'freeze', None, 'Path to freeze resources to.'
 )
+COLLECT_LSMEM = flags.DEFINE_bool(
+    'collect_lsmem', False, 'Whether to collect lsmem size.'
+)
 COLLECT_MEMINFO = flags.DEFINE_bool(
     'collect_meminfo', False, 'Whether to collect /proc/meminfo stats.'
 )

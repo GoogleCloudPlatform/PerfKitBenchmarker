@@ -1,3 +1,5 @@
+<!-- linter off -->
+
 Want to contribute? Great! First, read this page (including the small print at
 the end).
 
@@ -65,9 +67,14 @@ publish your changes. GitHub has
     pip install -r requirements-testing.txt
     ```
 
-### Create a branch
+### Create a branch and make changes
 
 Start from the master branch of the repository. This is the default.
+
+> **NOTE:** If you plan on making many contributions to PKB, ask in your first
+> PR for an invite to the collaborators list. After accepting the invite, you
+> will be able to invoke the Cloud Build integration tests by adding "/gcbrun"
+> as a comment to your PR.
 
 1.  Create a branch to contain your changes.
 
@@ -75,21 +82,62 @@ Start from the master branch of the repository. This is the default.
     git checkout -b <your-branch-name>
     ```
 
-2.  Make your modifications to the code in one or more commits
+1.  Make your modifications to the code in one or more commits
     [(guidelines for useful git commit messages)](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html).
 
-3.  Update the appropriate sections in CHANGES.next.md with a summary of your
+1.  Run unit tests and make sure they succeed:
+
+    ```
+      set -Eeuo pipefail; for test in $(find tests/ | grep "test.py"); do echo ; echo "Running $test ...";  python -m unittest $test -v ; done
+    ```
+
+1.  For a single test, run
+
+    ```
+      python -m unittest '{test_file_path}' -v
+    ```
+
+1.  Run the pyink formatter on the file(s) that were changed.
+
+    Check the changed file for formatting without changing the file:
+
+    ```
+      pyink --pyink-indentation 2 --pyink-use-majority-quotes --unstable --line-length=80 --check --diff {file_path}
+    ```
+
+    Format the file:
+
+    ```
+      pyink --pyink-indentation 2 --pyink-use-majority-quotes --unstable --line-length=80 {file_path}
+    ```
+
+1.  Run lint-diffs on your changes.
+
+    ```
+    git diff -U0 origin | lint-diffs
+    ```
+
+    This will likely give some errors like:
+
+    ```
+    elastic_kubernetes_service.py:1032:0: C0301: Line too long (120/80) (line-too-long)
+    ```
+
+    Address all these errors before sending out the PR (& after making changes
+    to the PR).
+
+1.  Update the appropriate sections in CHANGES.next.md with a summary of your
     changes. For example, under "Bug fixes and maintenance updates" you might
     put something like: `- Fix crazy bug X (GH-<insert PR number here> from
     @<insert your username here>)`
 
-4.  Push your changes to GitHub
+1.  Push your changes to GitHub
 
     ```
     git push origin <your-branch-name>
     ```
 
-5.  Create a pull request to integrate your change into the `master` branch.
+1.  Create a pull request to integrate your change into the `master` branch.
     This can be done on github.com, or through CLIs. See GitHub's documentation
     [here](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request)
     for more details. When making a pull request on GitHub, the base branch of

@@ -1,0 +1,123 @@
+[global]
+datadir = {{ directory }}/data
+timestamp-datadir = FALSE
+resultdir = /opt/pkb/results
+timestamp-resultdir = TRUE
+api = POSIX
+drop-caches = TRUE
+drop-caches-cmd = sudo -n bash -c "echo 3 > /proc/sys/vm/drop_caches"
+io-buffers-on-gpu = FALSE
+verbosity = 1
+scc = TRUE
+dataPacketType = timestamp
+
+[debug]
+stonewall-time = 60
+
+[ior-easy]
+API =
+transferSize = 4194304
+blockSize = 54975581388800
+filePerProc = TRUE
+uniqueDir = FALSE
+run = TRUE
+verbosity =
+
+[ior-easy-write]
+API =
+run = TRUE
+
+[ior-easy-read]
+API =
+run = TRUE
+
+[mdtest-easy]
+API =
+n = 1000000
+run = TRUE
+
+[mdtest-easy-write]
+API =
+run = TRUE
+
+[mdtest-hard-stat]
+API =
+run = TRUE
+
+[mdtest-hard-read]
+API =
+run = TRUE
+
+[timestamp]
+
+[find-easy]
+external-script =
+external-mpi-args =
+external-extra-args =
+nproc =
+run = FALSE
+pfind-queue-length = 10000
+pfind-steal-next = FALSE
+pfind-parallelize-single-dir-access-using-hashing = FALSE
+
+[ior-hard]
+API =
+segmentCount = 10000000
+collective =
+run = TRUE
+verbosity =
+
+[ior-hard-write]
+API =
+collective =
+run = TRUE
+
+[mdtest-hard]
+API =
+n = 1000000
+files-per-dir =
+run = TRUE
+
+[mdtest-hard-write]
+API =
+run = TRUE
+
+[find]
+external-script =
+external-mpi-args =
+external-extra-args =
+nproc =
+run = TRUE
+pfind-queue-length = 10000
+pfind-steal-next = FALSE
+pfind-parallelize-single-dir-access-using-hashing = FALSE
+
+[find-hard]
+external-script =
+external-mpi-args =
+external-extra-args =
+nproc =
+run = FALSE
+pfind-queue-length = 10000
+pfind-steal-next = FALSE
+pfind-parallelize-single-dir-access-using-hashing = FALSE
+
+[mdworkbench-bench]
+run = FALSE
+
+[mdtest-easy-stat]
+API =
+run = TRUE
+
+[ior-hard-read]
+API =
+collective =
+run = TRUE
+
+[mdtest-easy-delete]
+API =
+run = TRUE
+
+[mdtest-hard-delete]
+API =
+run = TRUE

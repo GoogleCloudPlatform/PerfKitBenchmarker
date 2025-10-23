@@ -18,10 +18,8 @@ database for TimescaleDB.
 """
 
 from absl import flags
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import postgres_iaas_relational_db
 from perfkitbenchmarker import sql_engine_utils
-from perfkitbenchmarker import vm_util
 
 KB_TO_GB = 1.0 / 1000000
 
@@ -82,17 +80,7 @@ class TimescaleDbIAASRelationalDb(
         f' -c shared_buffers={self.postgres_shared_buffer_size}GB'
     )
 
-    @vm_util.Retry(
-        poll_interval=5,
-        fuzz=0,
-        timeout=self.READY_TIMEOUT,
-        retryable_exceptions=(errors.Resource.RetryableCreationError,),
-    )
-    def WaitUntilReady():
-      if not self._IsReady():
-        raise errors.Resource.RetryableCreationError('Not yet ready')
-
-    WaitUntilReady()
+    self._WaitUntilReady()
 
     self.server_vm.RemoteCommand(
         f'PGPASSWORD={self.spec.database_password} psql -h localhost -U'

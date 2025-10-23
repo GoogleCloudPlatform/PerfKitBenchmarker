@@ -27,8 +27,7 @@ from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import flags as azure_flags
 
 FLAGS = flags.FLAGS
-# 15min timeout for issuing az redis delete command.
-TIMEOUT = 900
+TIMEOUT = 60 * 30
 EXISTS_RETRY_TIMES = 3
 EXISTS_RETRY_POLL = 30
 

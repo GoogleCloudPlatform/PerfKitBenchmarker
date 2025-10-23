@@ -187,14 +187,20 @@ In Cloud Shell, disable OS Login for the project.
 gcloud compute project-info add-metadata --metadata enable-oslogin=FALSE
 ```
 
-### Set up python 3.11 virtual environment
+### Set up python 3.12 virtual environment
 
-Perfkitbenchmarker requires python 3.11 to run. Default GCP cloud console comes with
-python 3.10. In this section, we will be installing python 3.11.
+For Cloud Shell, skip to verifying that python 3.12 is installed.
+
+Perfkitbenchmarker requires python 3.12 to run, which is currently the default
+for Cloud Shell. Follow these instructions to install python 3.12 if your system
+doesn't have it.
 
 1.  In Cloud Shell, run the following commands.
 
-    ```
+<!-- copybara:strip_begin(internal) -->
+<!--* pragma: { seclinter_this_is_fine: true } *-->
+<!-- copybara:strip_end -->
+    ```bash
     # install pyenv to install python on persistent home directory
     curl https://pyenv.run | bash
 
@@ -206,12 +212,15 @@ python 3.10. In this section, we will be installing python 3.11.
     # updating bashrc
     source ~/.bashrc
 
-    # install python 3.11 and make default
-    pyenv install 3.11
-    pyenv global 3.11
+    # install python 3.12 and make default
+    pyenv install 3.12
+    pyenv global 3.12
     ```
+<!-- copybara:strip_begin(internal) -->
+<!--* pragma: { seclinter_this_is_fine: false } *-->
+<!-- copybara:strip_end -->
 
-1.  Verify that python 3.11 is installed:
+1.  Verify that python 3.12 is installed:
 
     ```
     python -V

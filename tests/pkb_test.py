@@ -78,7 +78,9 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     error_msg = 'error'
     self.provision_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
+    self.assertRaises(
+        Exception, pkb.RunBenchmark, self.spec, self.collector, False
+    )
     self.publish_failed_run_sample_mock.assert_called_once_with(
         self.spec, error_msg, stages.PROVISION, self.collector
     )
@@ -88,7 +90,9 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     error_msg = 'error'
     self.prepare_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
+    self.assertRaises(
+        Exception, pkb.RunBenchmark, self.spec, self.collector, False
+    )
     self.publish_failed_run_sample_mock.assert_called_once_with(
         self.spec, error_msg, stages.PREPARE, self.collector
     )
@@ -98,7 +102,9 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     error_msg = 'error'
     self.run_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
+    self.assertRaises(
+        Exception, pkb.RunBenchmark, self.spec, self.collector, False
+    )
     self.publish_failed_run_sample_mock.assert_called_once_with(
         self.spec, error_msg, stages.RUN, self.collector
     )
@@ -108,7 +114,9 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     error_msg = 'error'
     self.cleanup_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
+    self.assertRaises(
+        Exception, pkb.RunBenchmark, self.spec, self.collector, False
+    )
     self.publish_failed_run_sample_mock.assert_called_once_with(
         self.spec, error_msg, stages.CLEANUP, self.collector
     )
@@ -118,7 +126,9 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     error_msg = 'error'
     self.teardown_mock.side_effect = Exception(error_msg)
 
-    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
+    self.assertRaises(
+        Exception, pkb.RunBenchmark, self.spec, self.collector, False
+    )
     self.publish_failed_run_sample_mock.assert_called_once_with(
         self.spec, error_msg, stages.TEARDOWN, self.collector
     )
@@ -127,7 +137,9 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     self.flags_mock.create_failed_run_samples = False
     self.run_mock.side_effect = Exception('error')
 
-    self.assertRaises(Exception, pkb.RunBenchmark, self.spec, self.collector)
+    self.assertRaises(
+        Exception, pkb.RunBenchmark, self.spec, self.collector, False
+    )
     self.publish_failed_run_sample_mock.assert_not_called()
 
 
@@ -355,6 +367,67 @@ class TestMiscFunctions(
     expected_sample = sample.Sample('meminfo', 0, '', expected_metadata)
     self.assertSampleListsEqualUpToTimestamp([expected_sample], samples)
     vm.RemoteCommand.assert_called_with('cat /proc/meminfo')
+
+  def testCollectLsmemHandlerDefault(self):
+    # must set --collect_lsmem to collect samples
+    vm = mock.Mock()
+    benchmark_spec = mock.Mock(vms=[vm])
+    samples = []
+
+    pkb._CollectLsmemHandler(None, benchmark_spec, samples)
+
+    self.assertEmpty(samples)
+    vm.RemoteCommand.assert_not_called()
+
+  @flagsaver.flagsaver(collect_lsmem=True)
+  def testCollectLsmemHandlerIgnoreWindows(self):
+    vm = mock.Mock()
+    vm.OS_TYPE = 'windows2019_desktop'
+    benchmark_spec = mock.Mock(vms=[vm])
+    samples = []
+
+    pkb._CollectLsmemHandler(None, benchmark_spec, samples)
+
+    self.assertEmpty(samples)
+    vm.RemoteCommand.assert_not_called()
+
+  @flagsaver.flagsaver(collect_lsmem=True)
+  def testCollectLsmemHandler(self):
+    vm = mock.Mock()
+    vm.RemoteCommand.return_value = (
+        """{
+           "memory": [
+              {
+                 "size": 3221225472
+              },{
+                 "size": 134217728000
+              }
+           ]
+        }
+        """,
+        '',
+    )
+    vm.name = 'pkb-1234-0'
+    vm.OS_TYPE = 'ubuntu2004'
+    vm.machine_type = 'n1-standard-2'
+    benchmark_spec = mock.Mock(vms=[vm])
+    samples = []
+
+    pkb._CollectLsmemHandler(None, benchmark_spec, samples)
+
+    expected_metadata = {
+        'lsmem_machine_type': 'n1-standard-2',
+        'lsmem_os_type': 'ubuntu2004',
+        'lsmem_vmname': 'pkb-1234-0',
+    }
+    expected_sample = sample.Sample(
+        'lsmem_memory_size',
+        3221225472 + 134217728000,
+        'bytes',
+        expected_metadata,
+    )
+    self.assertSampleListsEqualUpToTimestamp([expected_sample], samples)
+    vm.RemoteCommand.assert_called_with('lsmem -b -J -o SIZE')
 
   def test_IsException_subclass(self):
     e = errors.Resource.CreationInternalError('internal error')
@@ -719,7 +792,7 @@ class FreezeRestoreTest(pkb_common_test_case.PkbCommonTestCase):
 
     # Run the benchmark loop.
     with self.assertRaises(Exception):
-      pkb.RunBenchmark(test_benchmark_spec, collector)
+      pkb.RunBenchmark(test_benchmark_spec, collector, False)
 
     # PKB should still attempt to freeze benchmark spec.
     mock_freeze.assert_called_once()

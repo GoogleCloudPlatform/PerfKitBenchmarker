@@ -24,14 +24,12 @@ confusingly coupled with BaseVirtualMachine.
 import abc
 import contextlib
 import logging
-import os.path
 import socket
 import time
 from typing import Any, Dict, List, Tuple, Union
 import uuid
 
 from absl import flags
-import jinja2
 from perfkitbenchmarker import background_workload
 from perfkitbenchmarker import command_interface
 from perfkitbenchmarker import data
@@ -238,6 +236,7 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
 
   def TryRemoteCommand(self, command: str, **kwargs):
     """Runs a remote command and returns True iff it succeeded."""
+    kwargs = vm_util.IncrementStackLevel(**kwargs)
     try:
       self.RemoteCommand(command, **kwargs)
       return True
@@ -570,7 +569,9 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
     else:
       self.PushFile(file_path, remote_path)
 
-  def RenderTemplate(self, template_path, remote_path, context):
+  def RenderTemplate(
+      self, template_path, remote_path, context, should_log_file: bool = False
+  ):
     """Renders a local Jinja2 template and copies it to the remote host.
 
     The template will be provided variables defined in 'context', as well as a
@@ -580,25 +581,18 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
       template_path: string. Local path to jinja2 template.
       remote_path: string. Remote path for rendered file on the remote vm.
       context: dict. Variables to pass to the Jinja2 template during rendering.
+      should_log_file: bool. Whether to log the file after rendering.
 
     Raises:
       jinja2.UndefinedError: if template contains variables not present in
         'context'.
       RemoteCommandError: If there was a problem copying the file.
     """
-    with open(template_path) as fp:
-      template_contents = fp.read()
-
-    environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
-    template = environment.from_string(template_contents)
-    prefix = 'pkb-' + os.path.basename(template_path)
-
-    with vm_util.NamedTemporaryFile(
-        prefix=prefix, dir=vm_util.GetTempDir(), delete=False, mode='w'
-    ) as tf:
-      tf.write(template.render(vm=self, **context))
-      tf.close()
-      self.RemoteCopy(tf.name, remote_path)
+    context = {'vm': self} | context
+    rendered_template = vm_util.RenderTemplate(
+        template_path, context, should_log_file
+    )
+    self.RemoteCopy(rendered_template, remote_path)
 
   def DiskCreatedOnVMCreation(self, data_disk):
     """Returns whether the disk has been created during VM creation."""

@@ -39,7 +39,13 @@ AWS_NIC_QUEUE_COUNTS = flags.DEFINE_list(
     'The queue count of each NIC. Specify a list of key=value pairs, where key'
     ' is the network device name and value is the queue count.',
 )
-
+AWS_INSTANCE_BANDWIDTH_WEIGHTING = flags.DEFINE_enum(
+    'aws_instance_bandwidth_weighting',
+    None,
+    ['vpc-1', 'ebs-1'],
+    'The bandwidth weighting of each instance, increasing one of vpc and ebs'
+    ' bandwidth at the expense of the other. Valid options are vpc-1, ebs-1.',
+)
 flags.DEFINE_string(
     'aws_dax_node_type',
     'dax.r4.large',
@@ -61,7 +67,7 @@ flags.DEFINE_integer(
     18000,
     'The time to wait for an EMR job to finish, in seconds',
 )
-flags.DEFINE_boolean(
+USE_AWS_SPOT_INSTANCES = flags.DEFINE_boolean(
     'aws_spot_instances',
     False,
     'Whether to use AWS spot instances for any AWS VMs.',
@@ -79,9 +85,6 @@ flags.DEFINE_enum(
     'The required '
     'duration for the Spot Instances (also known as Spot blocks),'
     ' in minutes. This value must be a multiple of 60.',
-)
-flags.DEFINE_integer(
-    'aws_boot_disk_size', None, 'The boot disk size in GiB for AWS VMs.'
 )
 flags.DEFINE_string('kops', 'kops', 'The path to the kops binary.')
 flags.DEFINE_string(
@@ -215,9 +218,17 @@ flags.DEFINE_integer(
     1,
     249,
 )
+flags.DEFINE_boolean(
+    'eks_install_alb_controller',
+    False,
+    'Whether to install AWS Load Balancer Controller in EKS Karpenter clusters'
+    'Default value - do not install unless explicitly requested',
+)
 AWS_CAPACITY_BLOCK_RESERVATION_ID = flags.DEFINE_string(
     'aws_capacity_block_reservation_id',
-    None, 'Reservation id for capacity block.')
+    None,
+    'Reservation id for capacity block.',
+)
 AWS_CREATE_DISKS_WITH_VM = flags.DEFINE_boolean(
     'aws_create_disks_with_vm',
     True,
@@ -249,6 +260,17 @@ PCLUSTER_PATH = flags.DEFINE_string(
     'The path for the pcluster (parallel-cluster) utility.',
 )
 
+AWS_LUSTRE_COMPRESSION = flags.DEFINE_boolean(
+    'aws_lustre_compression',
+    False,
+    'Whether or not to enable LZ4 compression for AWS lustre.',
+)
+AWS_S3_MOUNT_ENABLE_METADATA_CACHE = flags.DEFINE_boolean(
+    'aws_s3_mount_enable_metadata_cache',
+    False,
+    'Whether to enable metadata cache for s3 mountpoint.',
+)
+
 
 @flags.multi_flags_validator(
     [
@@ -268,6 +290,7 @@ def _ValidatePreprovisionedDataAccess(flag_values: dict[str, Any]) -> bool:
       or flag_values[AWS_EC2_INSTANCE_PROFILE.name]
       or flag_values[AWS_EKS_POD_IDENTITY_ROLE.name]
   )
+
 
 # MemoryDB Flags
 MEMORYDB_NODE_TYPE = flags.DEFINE_string(

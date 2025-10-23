@@ -293,6 +293,11 @@ MEMTIER_SERVER_SELECTION = flags.DEFINE_enum(
     ),
 )
 MEMTIER_TLS = flags.DEFINE_bool('memtier_tls', False, 'Whether to enable TLS.')
+MEMTIER_DISTINCT_CLIENT_SEED = flags.DEFINE_bool(
+    'memtier_distinct_client_seed',
+    True,
+    'If true, each client will use a distinct seed.',
+)
 
 
 class BuildFailureError(Exception):
@@ -1090,9 +1095,8 @@ def _GetSingleThreadedLatency(
 
 
 @vm_util.Retry(
-    poll_interval=0,
-    timeout=0,
-    max_retries=5,
+    poll_interval=1,
+    timeout=60,
     retryable_exceptions=(RetryableRunError),
 )
 def _IssueRetryableCommand(vm, cmd: str) -> None:
@@ -1102,6 +1106,15 @@ def _IssueRetryableCommand(vm, cmd: str) -> None:
     raise RetryableRunError('Redis client connection failed, retrying')
   if 'handle error response' in stderr:
     raise RunFailureError(stderr)
+
+
+@vm_util.Retry(poll_interval=1, timeout=60)
+def _CheckRedisReachable(vm, server_ip: str, server_port: int) -> None:
+  """Checks if redis server is reachable."""
+  logging.info('Checking reachability of %s:%s', server_ip, server_port)
+  # Output: Connection to xxxx:yyy:zzzz:wwww:: 6379 port [tcp/redis] succeeded!
+  cmd = f'nc -zv {server_ip} {server_port} 2>&1 | grep succeeded'
+  vm.RemoteCommand(cmd)
 
 
 def _Run(
@@ -1127,6 +1140,8 @@ def _Run(
       threads,
       pipeline,
   )
+
+  _CheckRedisReachable(vm, server_ip, server_port)
 
   file_name_suffix = '_'.join(filter(None, [str(server_port), unique_id]))
   memtier_results_file_name = (
@@ -1169,7 +1184,7 @@ def _Run(
       key_minimum=1,
       key_maximum=MEMTIER_KEY_MAXIMUM.value,
       random_data=True,
-      distinct_client_seed=True,
+      distinct_client_seed=MEMTIER_DISTINCT_CLIENT_SEED.value,
       test_time=test_time,
       requests=requests,
       password=password,
@@ -1230,6 +1245,7 @@ def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
       'memtier_run_mode': MEMTIER_RUN_MODE.value,
       'memtier_cluster_mode': MEMTIER_CLUSTER_MODE.value,
       'memtier_tls': MEMTIER_TLS.value,
+      'memtier_distinct_client_seed': MEMTIER_DISTINCT_CLIENT_SEED.value,
   }
   if MEMTIER_DATA_SIZE_LIST.value:
     meta['memtier_data_size_list'] = MEMTIER_DATA_SIZE_LIST.value

@@ -59,6 +59,8 @@ class VmGroupSpec(spec.BaseSpec):
   vm_as_nfs_disk_spec: disk.BaseNFSDiskSpec | None
   placement_group_name: str
   cidr: str
+  provision_order: int
+  provision_delay_seconds: int
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(
@@ -155,6 +157,14 @@ class VmGroupSpec(spec.BaseSpec):
         'placement_group_name': (
             option_decoders.StringDecoder,
             {'default': None, 'none_ok': True},
+        ),
+        'provision_order': (
+            option_decoders.IntDecoder,
+            {'default': 0, 'min': 0},
+        ),
+        'provision_delay_seconds': (
+            option_decoders.IntDecoder,
+            {'default': 0, 'min': 0, 'none_ok': True},
         ),
     })
     return result

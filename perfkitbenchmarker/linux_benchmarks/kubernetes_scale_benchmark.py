@@ -54,9 +54,15 @@ CPUS_PER_POD = flags.DEFINE_string(
 MEMORY_PER_POD = flags.DEFINE_string(
     'kubernetes_scale_pod_memory', '250M', 'Memory limit per pod'
 )
+CONTAINER_IMAGE = flags.DEFINE_string(
+    'kubernetes_scale_container_image',
+    None,
+    'The container image to use for the Kubernetes scale benchmark.'
+    'If not specified, the default image will be used.',
+)
 
 MANIFEST_TEMPLATE = 'container/kubernetes_scale/kubernetes_scale.yaml.j2'
-DEFAULT_IMAGE = 'k8s.gcr.io/pause:3.1'
+DEFAULT_IMAGE = 'busybox:1.37'
 NVIDIA_GPU_IMAGE = 'nvidia/cuda:11.0.3-runtime-ubuntu20.04'
 
 
@@ -64,6 +70,8 @@ def _GetImage() -> str:
   """Get the image for the scale deployment."""
   if virtual_machine.GPU_COUNT.value:
     return NVIDIA_GPU_IMAGE
+  if CONTAINER_IMAGE.value:
+    return CONTAINER_IMAGE.value
   return DEFAULT_IMAGE
 
 
@@ -88,7 +96,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
 
 def _GetRolloutCreationTime(rollout_name: str) -> int:
   """Returns the time when the rollout was created."""
-  out, _, _ = container_service.RunKubectlCommand([
+  out, _, _ = container_service.RunRetryableKubectlCommand([
       'rollout',
       'history',
       rollout_name,
@@ -100,8 +108,10 @@ def _GetRolloutCreationTime(rollout_name: str) -> int:
 
 def _GetScaleTimeout() -> int:
   """Returns the timeout for the scale up & teardown."""
-  base_timeout = 60 * 10
-  per_pod_timeout = NUM_PODS.value * 3
+  base_timeout = 60 * 10  # 10 minutes
+  per_pod_timeout = NUM_PODS.value * 3  # 3 seconds per pod
+  if virtual_machine.GPU_COUNT.value:
+    base_timeout = 60 * 30  # 30 minutes
   proposed_timeout = base_timeout + per_pod_timeout
   max_timeout = 2 * 60 * 60  # 2 hours
   return min(proposed_timeout, max_timeout)
@@ -113,15 +123,29 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   cluster = bm_spec.container_cluster
   assert isinstance(cluster, container_service.KubernetesCluster)
 
-  initial_nodes = set(cluster.GetNodeNames())
+  # Warm up the cluster by creating a single pod. This compensates for
+  # differences between Standard & Autopilot, where Standard already has 1 node
+  # due to its starting nodepool but Autopilot does not.
+  scale_one_samples, _ = ScaleUpPods(cluster, 1)
+  if not scale_one_samples:
+    logging.exception(
+        'Failed to scale up to 1 pod; now investigating failure reasons.'
+    )
+    unused = 0
+    pod_samples = ParseStatusChanges('pod', unused)
+    # Log & check for quota failure.
+    _CheckForFailures(cluster, pod_samples, 1)
 
-  samples, rollout_name = ScaleUpPods(cluster)
+  initial_nodes = set(cluster.GetNodeNames())
+  initial_pods = set(cluster.GetPodNames())
+
+  samples, rollout_name = ScaleUpPods(cluster, NUM_PODS.value)
   start_time = _GetRolloutCreationTime(rollout_name)
-  pod_samples = ParseStatusChanges(cluster, 'pod', start_time)
+  pod_samples = ParseStatusChanges('pod', start_time, initial_pods)
   samples += pod_samples
-  _CheckForFailures(cluster, pod_samples)
+  _CheckForFailures(cluster, pod_samples, NUM_PODS.value - 1)
   samples += ParseStatusChanges(
-      cluster, 'node', start_time, resources_to_ignore=initial_nodes
+      'node', start_time, resources_to_ignore=initial_nodes
   )
   metadata = {
       'pod_memory': MEMORY_PER_POD.value,
@@ -139,19 +163,20 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
 
 def ScaleUpPods(
     cluster: container_service.KubernetesCluster,
+    num_new_pods: int,
 ) -> tuple[list[sample.Sample], str]:
   """Scales up pods on a kubernetes cluster. Returns samples & rollout name."""
   samples = []
   initial_pods = set(cluster.GetPodNames())
   logging.info('Initial pods: %s', initial_pods)
 
-  command = None
   if virtual_machine.GPU_COUNT.value:
     # Use nvidia-smi to validate NVIDIA_GPU is available.
     command = ['sh', '-c', 'nvidia-smi && sleep 3600']
+  else:
+    command = ['sh', '-c', 'sleep infinity']
 
   # Request X new pods via YAML apply.
-  num_new_pods = NUM_PODS.value
   max_wait_time = _GetScaleTimeout()
   resource_names = cluster.ApplyManifest(
       MANIFEST_TEMPLATE,
@@ -165,10 +190,12 @@ def ScaleUpPods(
       EphemeralStorageRequest='10Mi',
       RolloutTimeout=max_wait_time,
       PodTimeout=max_wait_time + 60,
-      NodeSelectors=cluster.GetNodeSelectors(),
+      NodeSelectors=cluster.GetNodeSelectors(
+          cluster.default_nodepool.machine_type
+      ),
+      cloud='Azure' if FLAGS.cloud == 'Azure' else None,
   )
 
-  # Arbitrarily pick the first resource (it should be the only one.)
   assert resource_names
   rollout_name = next(resource_names)
 
@@ -177,13 +204,6 @@ def ScaleUpPods(
     cluster.WaitForRollout(rollout_name, timeout=max_wait_time)
 
     all_new_pods = set(cluster.GetPodNames()) - initial_pods
-    cluster.WaitForResource(
-        'pod',
-        condition_name='Ready',
-        timeout=max_wait_time,
-        wait_for_all=True,
-        namespace='default',
-    )
     end_polling_time = time.monotonic()
     logging.info(
         'In %d seconds, found all %s new pods',
@@ -203,10 +223,12 @@ def ScaleUpPods(
       errors.VmUtil.IssueCommandTimeoutError,
       vm_util.TimeoutExceededRetryError,
   ) as e:
-    logging.warning(
-        'Kubernetes failed to wait for all the rollout and/or all pods to be'
-        ' ready, even with retries. Full error: %s. Continuing for now. Failure'
-        ' will be checked later by number of pods with ready events.',
+    logging.exception(
+        'Kubernetes waited %s seconds for the rollout to complete and/or all'
+        ' pods to be ready, but they were not, even with retries. Full error:'
+        ' %s. Continuing for now. Failure will be checked later by number of'
+        ' pods with ready events.',
+        max_wait_time,
         e,
     )
     return [], rollout_name
@@ -215,6 +237,7 @@ def ScaleUpPods(
 def _CheckForFailures(
     cluster: container_service.KubernetesCluster,
     pod_samples: list[sample.Sample],
+    num_pods: int,
 ):
   """Fails the benchmark if not enough pods were created.
 
@@ -222,38 +245,66 @@ def _CheckForFailures(
     cluster: The cluster to check for failures on.
     pod_samples: The samples from pod transition times which includes pod Ready
       count.
+    num_pods: The number of pods we attempted to scale up to.
 
   Raises:
     QuotaFailure: If a quota is exceeded.
     RunError: If scale up failed for a non-quota reason.
   """
+  events = cluster.GetEvents()
+  failure_events_list: list[container_service.KubernetesEvent] = [
+      event for event in events if event.type != 'Normal'
+  ]
+  logging.info(
+      'There were %d possible failure events. Some of these are benign & the'
+      ' benchmark may still have passed. Printing these by event reason.',
+      len(failure_events_list),
+  )
+  failure_events_by_reason: dict[
+      str | None, list[container_service.KubernetesEvent]
+  ] = {}
+  for event in failure_events_list:
+    failure_events_by_reason.setdefault(event.reason, []).append(event)
+  for reason, failure_events in failure_events_by_reason.items():
+    logging.info(
+        'There were %d failure events for reason %s. Printing the last 20.',
+        len(failure_events),
+        reason,
+    )
+    for event in failure_events[-20:]:
+      logging.info('Printing failure event: %s', event)
+
   ready_count_sample = next(
       (s for s in pod_samples if s.metric == 'pod_Ready_count'), None
   )
-  if ready_count_sample is None:
-    raise errors.Benchmarks.RunError(
-        'No pod ready events were found; this should almost never happen.'
-    )
-  if ready_count_sample.value >= NUM_PODS.value:
+  if (
+      ready_count_sample is not None
+      and ready_count_sample.value >= num_pods
+  ):
     logging.info(
-        'Benchmark successfully scaled up %d pods, which is more than the goal'
-        ' of %d pods.',
+        'Benchmark successfully scaled up %d pods, which is equal to or more '
+        'than the goal of %d pods.',
         ready_count_sample.value,
-        NUM_PODS.value,
+        num_pods,
     )
     return
-  events = cluster.GetEvents()
-  for event in events:
-    if event.reason == 'FailedScaleUp' and 'quota exceeded' in event.message:
-      raise errors.Benchmarks.QuotaFailure(
-          'Failed to scale up to %d pods, at least one pod ran into a quota'
-          ' error: %s' % (NUM_PODS.value, event.message)
-      )
+  if 'FailedScaleUp' in failure_events_by_reason:
+    for event in failure_events_by_reason['FailedScaleUp']:
+      if 'quota exceeded' in event.message:
+        raise errors.Benchmarks.QuotaFailure(
+            'Failed to scale up to %d pods, at least one pod ran into a quota'
+            ' error: %s' % (num_pods, event.message)
+        )
+  if ready_count_sample is None:
+    raise errors.Benchmarks.RunError(
+        'No pod ready events were found & we attempted to scale up to'
+        f' {num_pods} pods.'
+    )
 
   raise errors.Benchmarks.RunError(
       'Benchmark attempted to scale up to  %d pods but only %d pods were'
       ' created & ready. Check above "Kubernetes failed to wait for" logs for'
-      ' exact failure location.' % (NUM_PODS.value, ready_count_sample.value)
+      ' exact failure location.' % (num_pods, ready_count_sample.value)
   )
 
 
@@ -280,36 +331,56 @@ class KubernetesResourceStatusCondition:
     )
 
 
-def _GetResourceStatusConditions(
-    resource_type: str, resource_name: str
+def _GetStatusConditionsForResourceType(
+    resource_type: str, resources_to_ignore: abc.Set[str]
 ) -> list[KubernetesResourceStatusCondition]:
-  """Returns the status conditions for a resource.
+  """Returns the status conditions for a resource type.
 
   Args:
     resource_type: The type of the resource to get the status conditions for.
-    resource_name: The name of the resource to get the status conditions for.
-      Should not have a prefix (eg pods/).
+    resources_to_ignore: A set of resource names to ignore.
 
   Returns:
     A list of status condition, where each condition is a dict with type &
     lastTransitionTime.
   """
-  out, _, _ = container_service.RunKubectlCommand([
-      'get',
-      resource_type,
-      resource_name,
-      '-o',
-      'jsonpath={.status.conditions[*]}',
-  ])
-  # Turn space separated individual json objects into a single json array.
-  conditions_str = '[' + out.replace('} {', '},{') + ']'
-  conditions = json.loads(conditions_str)
-  return [
-      KubernetesResourceStatusCondition.FromJsonPathResult(
-          resource_type, resource_name, condition
+
+  jsonpath = (
+      r'{range .items[*]}'
+      # e.g. '"pod-name-1234": [<condition1>, ...],\n'
+      r'{"\""}{.metadata.name}{"\": "}{.status.conditions}{",\n"}'
+      r'{end}'
+  )
+  stdout, _, _ = container_service.RunKubectlCommand(
+      [
+          'get',
+          resource_type,
+          '-o',
+          'jsonpath=' + jsonpath,
+      ],
+      timeout=60 * 2,  # 2 minutes; should be a pretty fast call.
+      # Output can be quite large, so we'll conditionally suppress it.
+      suppress_logging=NUM_PODS.value > 20,
+  )
+
+  # Convert output to valid json and parse it
+  stdout = stdout.rstrip('\t\n\r ,')
+  stdout = '{' + stdout + '}'
+  name_to_conditions = json.loads(stdout)
+
+  for key in resources_to_ignore:
+    name_to_conditions.pop(key, None)
+
+  results = []
+  for name in name_to_conditions.keys():
+    for conditions in name_to_conditions[name]:
+      results.append(
+          KubernetesResourceStatusCondition.FromJsonPathResult(
+              resource_type, name, conditions
+          )
       )
-      for condition in conditions
-  ]
+
+  return results
 
 
 def ConvertToEpochTime(timestamp: str) -> int:
@@ -319,7 +390,6 @@ def ConvertToEpochTime(timestamp: str) -> int:
 
 
 def ParseStatusChanges(
-    cluster: container_service.KubernetesCluster,
     resource_type: str,
     start_time: float,
     resources_to_ignore: abc.Set[str] = frozenset(),
@@ -330,7 +400,6 @@ def ParseStatusChanges(
   transitions to PodScheduled or Ready. See tests for more example input/output.
 
   Args:
-    cluster: The cluster to parse the status changes for.
     resource_type: The type of the resource to parse the status changes for
       (node or pod).
     start_time: The start time of the scale up operation, subtracted from
@@ -340,28 +409,17 @@ def ParseStatusChanges(
   Returns:
     A list of samples, with various percentiles for each status condition.
   """
-  all_resources = set(cluster.GetAllNamesForResourceType(resource_type + 's'))
-  all_resources -= resources_to_ignore
-  conditions = []
-  for resource in sorted(all_resources):
-    conditions += _GetResourceStatusConditions(resource_type, resource)
+
+  conditions = _GetStatusConditionsForResourceType(
+      resource_type, resources_to_ignore
+  )
 
   samples = []
   overall_times = collections.defaultdict(list)
   for condition in conditions:
     overall_times[condition.event].append(condition.epoch_time)
   for event, timestamps in overall_times.items():
-    summaries = _SummarizeTimestamps(timestamps)
     prefix = f'{resource_type}_{event}_'
-    if REPORT_PERCENTILES.value:
-      for percentile, value in summaries.items():
-        samples.append(
-            sample.Sample(
-                prefix + percentile,
-                value - start_time,
-                'seconds',
-            )
-        )
     # Always report counts, because it is used in failure handling
     samples.append(
         sample.Sample(
@@ -370,20 +428,33 @@ def ParseStatusChanges(
             'count',
         )
     )
+    if not REPORT_PERCENTILES.value:
+      continue
+    summaries = _SummarizeTimestamps(timestamps)
+    for percentile, value in summaries.items():
+      samples.append(
+          sample.Sample(
+              prefix + percentile,
+              value - start_time,
+              'seconds',
+          )
+      )
 
-    if REPORT_LATENCIES.value:
-      for condition in conditions:
-        metadata = {
-            'k8s_resource_name': condition.resource_name,
-        }
-        samples.append(
-            sample.Sample(
-                f'{resource_type}_{condition.event}',
-                condition.epoch_time - start_time,
-                'seconds',
-                metadata,
-            )
+  if not REPORT_LATENCIES.value:
+    return samples
+
+  for condition in conditions:
+    metadata = {
+        'k8s_resource_name': condition.resource_name,
+    }
+    samples.append(
+        sample.Sample(
+            f'{resource_type}_{condition.event}',
+            condition.epoch_time - start_time,
+            'seconds',
+            metadata,
         )
+    )
   return samples
 
 
@@ -400,6 +471,12 @@ def _SummarizeTimestamps(timestamps: list[float]) -> dict[str, float]:
 
 def Cleanup(_):
   """Cleanups scale benchmark. Runs before teardown."""
+  container_service.RunKubectlCommand(['get', 'deployments'])
+  container_service.RunRetryableKubectlCommand(
+      ['delete', 'deployment', 'kubernetes-scaleup'],
+      timeout=_GetScaleTimeout(),
+      raise_on_failure=False,
+  )
   container_service.RunRetryableKubectlCommand(
       ['delete', '--all', 'pods', '-n', 'default'], timeout=_GetScaleTimeout()
   )

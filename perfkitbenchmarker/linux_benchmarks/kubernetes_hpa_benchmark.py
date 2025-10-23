@@ -15,7 +15,6 @@
 
 from collections.abc import Callable
 import functools
-import json
 import logging
 import threading
 import typing
@@ -27,6 +26,9 @@ from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import http_poller
 from perfkitbenchmarker.linux_packages import locust
 from perfkitbenchmarker.sample import Sample
 
@@ -55,12 +57,18 @@ kubernetes_hpa:
     type: Kubernetes
     min_vm_count: 3
     max_vm_count: 50
-    vm_spec: *default_dual_core
+    vm_spec:
+      <<: *default_dual_core
+      GCP:
+        machine_type: n4-standard-2
+        zone: us-central1-a,us-central1-b,us-central1-c
+        image: null
   flags:
     locust_path: locust/rampup.py
 """
 
-_INGRESS_JSONPATH = '{.status.loadBalancer.ingress[0]}'
+_PORT = 5000
+_HEALTH_PATH = '/calculate'
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -89,20 +97,16 @@ def _PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec):
       fib_image=fib_image,
       runtime_class_name=FLAGS.kubernetes_hpa_runtime_class_name,
       node_selectors=cluster.GetNodeSelectors(),
+      port=_PORT,
   )
 
   cluster.WaitForResource('deploy/fib', 'available', namespace='fib')
-  cluster.WaitForResource(
-      'service/fib',
-      _INGRESS_JSONPATH,
-      namespace='fib',
-      condition_type='jsonpath=',
-  )
 
 
 def _PrepareLocust(benchmark_spec: bm_spec.BenchmarkSpec):
   """Prepares a vm to run locust."""
   vm = benchmark_spec.vms[0]
+  vm.Install('http_poller')
   locust.Install(vm)
   locust.Prep(vm)
 
@@ -123,36 +127,16 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
 
-def _GetLoadBalancerURI() -> str:
-  """Returns the SUT Load Balancer URI."""
-  stdout, _, _ = container_service.RunKubectlCommand([
-      'get',
-      '-n',
-      'fib',
-      'svc/fib',
-      '-o',
-      f"jsonpath='{_INGRESS_JSONPATH}'",
-  ])
-  ingress = json.loads(stdout.strip("'"))
-  if 'ip' in ingress:
-    ip = ingress['ip']
-  elif 'hostname' in ingress:
-    ip = ingress['hostname']
-  else:
-    raise errors.Benchmarks.RunError(
-        'No IP or hostname found in ingress from stdout ' + stdout
-    )
-  return 'http://' + ip.strip() + ':5000'
-
-
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
   """Run a benchmark against the Nginx server."""
-  addr = _GetLoadBalancerURI()
-
   vm = benchmark_spec.vms[0]
   cluster: container_service.KubernetesCluster = typing.cast(
       container_service.KubernetesCluster, benchmark_spec.container_cluster
   )
+  addr = cluster.DeployIngress('fib', 'fib', _PORT, _HEALTH_PATH)
+
+  # Confirm the server can be pinged.
+  _PollServer(vm, addr)
 
   samples = []
   stop = threading.Event()
@@ -174,7 +158,32 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
       max_concurrent_threads=3,
   )
 
+  failure_count = 0
+  total_requests = 0
+  for s in samples:
+    if s.metric == 'locust/Total_Failure_Count':
+      failure_count = s.value
+    elif s.metric == 'locust/Total_Request_Count':
+      total_requests = s.value
+  assert total_requests - failure_count >= 0.90 * total_requests, (
+      f'More than 10% of requests failed, with: {failure_count} failures out of'
+      f' {total_requests} total requestts'
+  )
+
   return samples
+
+
+@vm_util.Retry(
+    retryable_exceptions=(errors.Resource.RetryableGetError,),
+)
+def _PollServer(vm: virtual_machine.BaseVirtualMachine, addr: str) -> None:
+  """Polls the server to confirm it is responding."""
+  poller = http_poller.HttpPoller()
+  response = poller.Run(vm, addr + '/calculate')
+  if not response.success:
+    raise errors.Resource.RetryableGetError(
+        'Failed to contact server; got failing response: %s' % response
+    )
 
 
 class KubernetesMetricsCollector:
@@ -255,7 +264,8 @@ class KubernetesMetricsCollector:
         # Ignore errors, timeouts - there'll be a gap in the data, but that's
         # ok.
         logging.warning(
-            'Ignoring exception that occurred while observing cluster: %s', e)
+            'Ignoring exception that occurred while observing cluster: %s', e
+        )
         failure_count += 1
 
       if self._stop.wait(timeout=1.0):

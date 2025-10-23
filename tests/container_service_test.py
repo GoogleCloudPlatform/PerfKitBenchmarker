@@ -3,6 +3,7 @@ from typing import Callable, Iterable, Protocol, Tuple
 import unittest
 from unittest import mock
 from absl.testing import flagsaver
+from absl.testing import parameterized
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
@@ -117,6 +118,9 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     self.enter_context(flagsaver.flagsaver(kubeconfig='kubeconfig'))
     self.enter_context(flagsaver.flagsaver(run_uri='123'))
+    self.enter_context(
+        mock.patch('perfkitbenchmarker.providers.LoadProvider', autospec=True)
+    )
     self.kubernetes_cluster = TestKubernetesCluster(
         container_spec.ContainerClusterSpec(
             'test-cluster',
@@ -132,9 +136,10 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         )
     )
 
-  def test_apply_manifest_gets_deployment_name(self):
+  @parameterized.parameters(('created'), ('configured'))
+  def test_apply_manifest_gets_deployment_name(self, suffix):
     self.MockIssueCommand(
-        {'apply -f': [('deployment.apps/test-deployment created', '', 0)]}
+        {'apply -f': [(f'deployment.apps/test-deployment {suffix}', '', 0)]}
     )
     self.enter_context(
         mock.patch.object(
@@ -280,6 +285,83 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         ],
     )
 
+  @parameterized.named_parameters(
+      ('aks default', 'aks-default-30566860-vmss000000', 'default'),
+      ('gke default', 'gke-pkb-8ee57c86-default-pool-232fa391-34qh', 'default'),
+      ('gke servers', 'gke-pkb-8ee57c86-servers-2cd25dd3-1r9l', 'servers'),
+      ('check none', 'gke-pkb-8ee57c86-someother-2cd25dd3-1r9l', None),
+  )
+  def testGetNodepoolFromNodeName(
+      self, node_name: str, expected_nodepool_name: str | None
+  ):
+    vm_spec = {
+        _CLUSTER_CLOUD: {
+            'machine_type': 'fake-machine-type',
+            'zone': 'us-east2-a',
+        },
+    }
+    nodepool_cluster = TestKubernetesCluster(
+        container_spec.ContainerClusterSpec(
+            'test-cluster',
+            **{
+                'cloud': _CLUSTER_CLOUD,
+                'vm_spec': vm_spec,
+                'nodepools': {
+                    'servers': {
+                        'vm_spec': vm_spec,
+                    },
+                    'clients': {
+                        'vm_spec': vm_spec,
+                    },
+                },
+            },
+        )
+    )
+    nodepool = nodepool_cluster.GetNodePoolFromNodeName(node_name)
+    if expected_nodepool_name is None:
+      self.assertIsNone(nodepool)
+    else:
+      assert nodepool is not None
+      self.assertEqual(nodepool.name, expected_nodepool_name)
+
+  def testGetNodepoolFromNodeName_raisesIfMultipleNodepoolsFound(self):
+    vm_spec = {
+        _CLUSTER_CLOUD: {
+            'machine_type': 'fake-machine-type',
+            'zone': 'us-east2-a',
+        },
+    }
+    nodepool_cluster = TestKubernetesCluster(
+        container_spec.ContainerClusterSpec(
+            'test-cluster',
+            **{
+                'cloud': _CLUSTER_CLOUD,
+                'vm_spec': vm_spec,
+                'nodepools': {
+                    'default-for-serving': {
+                        'vm_spec': vm_spec,
+                    },
+                },
+            },
+        )
+    )
+    with self.assertRaises(ValueError):
+      nodepool_cluster.GetNodePoolFromNodeName(
+          'gke-pkb-8ee57c86-default-for-serving-232fa391-34qh'
+      )
+
+  @parameterized.named_parameters(
+      ('eks_auto', 'hostname', 'k8s-fib-fib-123.elb.us-east-1.amazonaws.com'),
+      ('gke', 'ip', '34.16.24.55'),
+  )
+  def testGetIpFromIngress(self, field_name, address):
+    # ex after f-string resolution: {"ip":"34.16.24.55"}
+    ingress_out = f'{{"{field_name}":"{address}"}}'
+    self.assertEqual(
+        self.kubernetes_cluster._GetAddressFromIngress(ingress_out),
+        f'http://{address}',
+    )
+
   @mock.patch.object(
       vm_util,
       'IssueCommand',
@@ -305,7 +387,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
       container_service.RunKubectlCommand(['get', 'pods'])
 
   def test_RunKubectlCommand_KubectlTimeoutRaisesCommandTimeout(self):
-    for err in container_service._RETRYABLE_KUBECTL_ERRORS:
+    for err in container_service.RETRYABLE_KUBECTL_ERRORS:
       with mock.patch.object(
           vm_util, 'IssueCommand', _MockedIssueCommandSuppressing(stderr=err)
       ):
@@ -318,7 +400,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
   def test_RunKubectlCommand_KubectlTimeoutWithSuppressFailureRaisesCommandTimeout(
       self,
   ):
-    for err in container_service._RETRYABLE_KUBECTL_ERRORS:
+    for err in container_service.RETRYABLE_KUBECTL_ERRORS:
       with mock.patch.object(
           vm_util, 'IssueCommand', _MockedIssueCommandSuppressing(stderr=err)
       ):
@@ -351,9 +433,41 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
             ),
             message='gke-49fe-vm became leader',
             reason='LeaderElection',
+            type='Normal',
             timestamp=1739209338,
         ),
     )
+
+  def test_KubernetesEventParsing(self):
+    event = container_service.KubernetesEvent.FromDict({
+        'eventTime': '2025-10-03T18:05:56.272315Z',
+        'involvedObject': {
+            'apiVersion': 'v1',
+            'kind': 'Pod',
+            'name': 'kubernetes-scaleup-5d6c5f45cf-wtbmv',
+            'namespace': 'default',
+            'uid': '8c0f9844-cb1f-4563-a3bc-fc75e3a2fc3f',
+        },
+        'kind': 'Event',
+        'lastTimestamp': None,
+        'message': (
+            'Successfully assigned default/deploy-pod to gke-node'
+        ),
+        'metadata': {
+            'creationTimestamp': '2025-10-03T18:05:56Z',
+        },
+        'reason': 'Scheduled',
+        'reportingComponent': 'default-scheduler',
+        'type': 'Normal',
+    })
+    self.assertIsNotNone(event)
+    self.assertEqual(
+        event.message,
+        'Successfully assigned default/deploy-pod to gke-node'
+    )
+    self.assertEqual(event.reason, 'Scheduled')
+    self.assertEqual(event.type, 'Normal')
+    self.assertEqual(event.timestamp, 1759514756)
 
 
 def _ClearTimestamps(samples: Iterable[Sample]) -> Iterable[Sample]:

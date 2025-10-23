@@ -21,10 +21,13 @@ import time
 from typing import Any
 from absl import flags
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
+from perfkitbenchmarker.providers.azure import azure_blob_storage
 from perfkitbenchmarker.providers.azure import azure_disk
+from perfkitbenchmarker.providers.azure import util
 
 FLAGS = flags.FLAGS
 virtual_machine = Any  # pylint: disable=invalid-name
@@ -155,6 +158,10 @@ class AzureCreateNonResourceDiskStrategy(
 
     elif self.disk_spec.disk_type == disk.SMB:
       return disk_strategies.SetUpSMBDiskStrategy(self.vm, self.disk_spec)
+    elif self.disk_spec.disk_type == disk.LUSTRE:
+      return AzLustreSetupDiskStrategy(self.vm, self.disk_spec)
+    elif self.disk_spec.disk_type == disk.OBJECT_STORAGE:
+      return AzureSetUpBlobFuseDiskStrategy(self.vm, self.disk_spec)
 
     return disk_strategies.EmptySetupDiskStrategy(self.vm, self.disk_spec)
 
@@ -173,6 +180,12 @@ class AzureSetUpLocalSSDDiskStrategy(disk_strategies.SetUpDiskStrategy):
 
   def SetUpDisk(self):
     disks = []
+
+    if self.vm.SupportsNVMe():
+      nvme_devices = self.vm.GetNVMEDeviceInfo()
+      if len(nvme_devices) == self.vm.max_local_disks + 1:
+        # boot disk is nvme, and boot disk takes position 0
+        next(self.vm.lun_counter)
 
     for _ in range(self.disk_spec.num_striped_disks):
       data_disk = self._CreateLocalDisk()
@@ -245,7 +258,9 @@ class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
     start_time = time.time()
     if not self.scratch_disks or FLAGS.azure_attach_disk_with_create:
       return
-    attach_tasks.append((self.WaitForDisksToVisibleFromVm, [start_time], {}))
+    attach_tasks.append(
+        (self.WaitForRemoteDisksToVisibleFromVm, [start_time], {})
+    )
     attach_tasks.append((self.AttachAzureDisks, (), {}))
     return_from_threads = background_tasks.RunParallelThreads(
         attach_tasks, max_concurrency=200
@@ -272,3 +287,56 @@ class AzurePrepareScratchDiskStrategy(
   def PrepareTempDbDisk(self, vm: 'virtual_machine.BaseVirtualMachine'):
     if azure_disk.HasTempDrive(vm.machine_type):
       vm.RemoteCommand('mkdir D:\\TEMPDB')
+
+
+class AzLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
+
+  def SetUpDiskOnLinux(self):
+    """Performs Linux specific setup of Lustre disk."""
+    vm = self.vm
+    super().SetUpDiskOnLinux()
+    vm.RemoteCommand('echo "module load mpi/hpcx" >> .bashrc')
+
+
+class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
+  """Strategies to set up Azure Blob Containers."""
+
+  DEFAULT_MOUNT_OPTIONS = [
+  ]
+
+  def SetUpDiskOnLinux(self):
+    """Performs setup of Blobfuse2 containers on Linux."""
+    self.vm.Install('blobfuse2')
+    target = self.disk_spec.mount_point
+    self.vm.RemoteCommand(f'sudo mkdir -p {target} && sudo chmod a+w {target}')
+
+    opts = ' '.join(self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options)
+    bucket_name = (
+        FLAGS.object_storage_fuse_bucket_name
+        or f'blobfuse2-{FLAGS.run_uri.lower()}'
+    )
+    blob_spec = azure_blob_storage.BlobStorageContainerSpec(
+        mount_point=target,
+        bucket_name=bucket_name,
+        region=util.GetRegionFromZone(self.vm.zone),
+        zone=self.vm.zone,
+    )
+    blob_client = azure_blob_storage.BlobStorageContainer(blob_spec)
+    if not FLAGS.object_storage_fuse_bucket_name:
+      blob_client.Create()
+
+    local_path = data.ResourcePath('blobfuse2/config.yaml')
+    remote_path = 'blobfuse2_config.yaml'
+    context = {
+        'account_name': blob_client.service.storage_account.name,
+        'account_key': blob_client.service.storage_account.key,
+    }
+    self.vm.RenderTemplate(
+        template_path=local_path, remote_path=remote_path,
+        context=context
+    )
+    self.vm.RemoteCommand(
+        f'sudo blobfuse2 mount {target} --config-file={remote_path} '
+        f'--container-name={bucket_name} {opts}'
+    )
+    self.vm.scratch_disks.append(blob_client)

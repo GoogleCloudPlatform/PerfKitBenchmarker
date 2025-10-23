@@ -53,7 +53,7 @@ runner:
     # The following settings only work for runner and worker VMs in the same VPC network: "default".
     # If runner and worker VMs don't share the same network, you can simply remove the settings.
     gce_network_name: default
-    gce_remote_access_firewall_rule: default-allow-internal
+
     connect_via_internal_ip: true
 
     #################################

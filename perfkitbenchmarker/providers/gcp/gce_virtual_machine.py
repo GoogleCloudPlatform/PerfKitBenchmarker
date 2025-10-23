@@ -111,6 +111,14 @@ _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     'c3a': 'ampere1',
     'c4a': 'neoverse-v2',
 }
+# When requesting a specific GPU type independently of the machine type, choose
+# the most common version. When using a machine type from the
+# _FIXED_GPU_MACHINE_TYPES list below  will bypass this code.
+GPU_TYPE_TO_SUFFIX = {
+    'a100': '-80gb',
+    'h100': '-80gb',
+    'h200': '-141gb',
+}
 # The A2 and A3 machine families, unlike some other GCP offerings, have a
 # preset type and number of GPUs, so we set those attributes directly from the
 # machine_type.
@@ -132,6 +140,9 @@ _FIXED_GPU_MACHINE_TYPES = {
     'a3-highgpu-4g': (virtual_machine.GPU_H100, 4),
     'a3-highgpu-8g': (virtual_machine.GPU_H100, 8),
     'a3-megagpu-8g': (virtual_machine.GPU_H100, 8),
+    # B200 GPUs
+    # https://cloud.google.com/compute/docs/gpus#b200-gpus
+    'a4-highgpu-8g': (virtual_machine.GPU_B200, 8),
     # L4 GPUs
     # https://cloud.google.com/compute/docs/accelerator-optimized-machines#g2-vms
     'g2-standard-4': (virtual_machine.GPU_L4, 1),
@@ -242,8 +253,6 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
       config_values['ssd_interface'] = flag_values.gce_ssd_interface
     if flag_values['gce_preemptible_vms'].present:
       config_values['preemptible'] = flag_values.gce_preemptible_vms
-    if flag_values['gce_boot_disk_size'].present:
-      config_values['boot_disk_size'] = flag_values.gce_boot_disk_size
     if flag_values['gce_boot_disk_throughput'].present:
       config_values['boot_disk_throughput'] = (
           flag_values.gce_boot_disk_throughput
@@ -309,7 +318,6 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
             {'default': 0, 'min': 0},
         ),
         'preemptible': (option_decoders.BooleanDecoder, {'default': False}),
-        'boot_disk_size': (option_decoders.IntDecoder, {'default': None}),
         'boot_disk_type': (
             option_decoders.StringDecoder,
             {'default': None},
@@ -490,6 +498,8 @@ def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
       )
       + accelerator_type
   )
+  if accelerator_type in GPU_TYPE_TO_SUFFIX:
+    gce_accelerator_type += GPU_TYPE_TO_SUFFIX[accelerator_type]
   return 'type={},count={}'.format(gce_accelerator_type, accelerator_count)
 
 
@@ -500,6 +510,17 @@ def GetArmArchitecture(machine_type):
     return None
   prefix = re.split(r'[dn]?\-', machine_type)[0]
   return _MACHINE_TYPE_PREFIX_TO_ARM_ARCH.get(prefix)
+
+
+def IsLiveMigratableConfidentialCompute(machine_type: str):
+  """Returns True if the provided machine type is both confidential computing and can have its maintenance policy set to MIGRATE."""
+  family = machine_type.split('-')[0]
+  match gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value:
+    case 'sev':
+      return family in (
+          'n2d',
+      )
+  return False
 
 
 class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
@@ -566,7 +587,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.min_cpu_platform = vm_spec.min_cpu_platform
     self.threads_per_core = vm_spec.threads_per_core
     self.visible_core_count = vm_spec.visible_core_count
-    self.gce_remote_access_firewall_rule = FLAGS.gce_remote_access_firewall_rule
     self.gce_accelerator_type_override = FLAGS.gce_accelerator_type_override
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
@@ -590,36 +610,43 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_shielded_secure_boot = FLAGS.gce_shielded_secure_boot
     # Default to GCE default (Live Migration)
     self.on_host_maintenance = None
-    # https://cloud.google.com/compute/docs/instances/live-migration#gpusmaintenance
-    # https://cloud.google.com/compute/docs/instances/define-instance-placement#restrictions
+    # https://cloud.google.com/compute/docs/instances/live-migration-process#limitations
+    # https://cloud.google.com/compute/docs/instances/placement-policies-overview#restrictions
     # TODO(pclay): Update if this assertion ever changes
     if (
         FLAGS['gce_migrate_on_maintenance'].present
         and FLAGS.gce_migrate_on_maintenance
-        and (self.gpu_count or self.network.placement_group)
+        and (self.gpu_count or self.network.placement_group or self.preemptible)
     ):
       raise errors.Config.InvalidValue(
-          'Cannot set flag gce_migrate_on_maintenance on instances with GPUs '
-          'or network placement groups, as it is not supported by GCP.'
+          'Cannot set flag gce_migrate_on_maintenance on instances with GPUs,'
+          ' network placement groups, or preemption, as it is not supported by'
+          ' GCP.'
       )
     if (
-        not FLAGS.gce_migrate_on_maintenance
-        or self.gpu_count
+        self.gpu_count
         or self.network.placement_group
         or self.preemptible
+        or (
+            gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value
+            and not IsLiveMigratableConfidentialCompute(self.machine_type)
+        )
     ):
       self.on_host_maintenance = 'TERMINATE'
-    else:
-      self.on_host_maintenance = 'MIGRATE'
+    elif FLAGS['gce_migrate_on_maintenance'].present:
+      if FLAGS.gce_migrate_on_maintenance:
+        self.on_host_maintenance = 'MIGRATE'
+      else:
+        self.on_host_maintenance = 'TERMINATE'
 
     self.automatic_restart = FLAGS.gce_automatic_restart
     if self.preemptible:
       self.preempt_marker = f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/{self.name}'
     arm_arch = GetArmArchitecture(self.machine_type)
+    self.is_aarch64 = bool(arm_arch)
     if arm_arch:
       # Assign host_arch to avoid running detect_host on ARM
       self.host_arch = arm_arch
-      self.is_aarch64 = True
     self.image_family = vm_spec.image_family or self.GetDefaultImageFamily(
         self.is_aarch64
     )
@@ -664,19 +691,17 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.metadata['gce_egress_bandwidth_tier'] = (
           self.gce_egress_bandwidth_tier
       )
-    if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
-      # TODO(pclay): remove when on-host-maintenance gets promoted to GA
-      cmd.use_alpha_gcloud = True
-      if gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value == 'sev':
-        cmd.flags.update({'confidential-compute-type': 'SEV'})
-      cmd.flags.update({'on-host-maintenance': 'TERMINATE'})
 
-    elif self.on_host_maintenance:
-      # TODO(pclay): remove when on-host-maintenance gets promoted to GA
-      maintenance_flag = 'maintenance-policy'
-      if cmd.use_alpha_gcloud:
-        maintenance_flag = 'on-host-maintenance'
+    # TODO(pclay): remove when on-host-maintenance gets promoted to GA
+    maintenance_flag = 'maintenance-policy'
+    if cmd.use_alpha_gcloud:
+      maintenance_flag = 'on-host-maintenance'
+    if self.on_host_maintenance:
       cmd.flags[maintenance_flag] = self.on_host_maintenance
+
+    if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
+      if gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value == 'sev':
+        cmd.flags['confidential-compute-type'] = 'SEV'
 
     if self.network.subnet_resources:
       net_resources = self.network.subnet_resources
@@ -842,6 +867,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       cmd.flags['performance-monitoring-unit'] = (
           gcp_flags.GCE_PERFORMANCE_MONITORING_UNIT.value
       )
+
+    if gcp_flags.GCE_RESERVATION_ID.value:
+      cmd.flags['reservation'] = gcp_flags.GCE_RESERVATION_ID.value
+      cmd.flags['reservation-affinity'] = 'specific'
+
+    if gcp_flags.GCE_PROVISIONING_MODEL.value:
+      cmd.flags['provisioning-model'] = gcp_flags.GCE_PROVISIONING_MODEL.value
 
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
@@ -1016,12 +1048,15 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             and self.host_list[-1].fill_fraction + 1.0 / self.num_vms_per_host
             > 1.0
         ):
-          host = GceSoleTenantNodeGroup(self.node_type, self.zone, self.project)
-          self.host_list.append(host)
+          self.host = GceSoleTenantNodeGroup(
+              self.node_type, self.zone, self.project
+          )
+          self.host_list.append(self.host)
           if gcp_flags.GCE_NODE_GROUP.value is None:
             # GCE_NODE_GROUP is used to identify an existing node group.
-            host.Create()
-        self.host = self.host_list[-1]
+            self.host.Create()
+        else:
+          self.host = self.host_list[-1]
         if self.num_vms_per_host:
           self.host.fill_fraction += 1.0 / self.num_vms_per_host
 
@@ -1127,11 +1162,20 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self, 'compute', 'instances', 'describe', self.name
     )
     stdout, stderr, retcode = getinstance_cmd.Issue(raise_on_failure=False)
-    if 'The service is currently unavailable' in stderr:
+    transient_error_msgs = (
+        'The service is currently unavailable',
+        'Max retries exceeded with url',
+    )
+    if any(msg in stderr for msg in transient_error_msgs):
       logging.info('instances describe command failed, retrying.')
-      raise GceServiceUnavailableError()
+      raise GceServiceUnavailableError(stderr)
     elif retcode and re.search(r"The resource \'.*'\ was not found", stderr):
       return False
+    elif retcode:
+      raise errors.VmUtil.IssueCommandError(
+          f'Failed to check existence of VM {self.name}:\n{stderr}\n'
+          f'return code: {retcode}'
+      )
     response = json.loads(stdout)
     status = response['status']
     return status in INSTANCE_EXISTS_STATUSES
@@ -1206,16 +1250,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     gce_disk.AddLabels(self, self.name)
     self.create_disk_strategy.AddMetadataToDiskResource()
 
-  def AllowRemoteAccessPorts(self):
-    """Creates firewall rules for remote access if required."""
-
-    # If gce_remote_access_firewall_rule is specified, access is already
-    # granted by that rule.
-    # If not, GCE firewall rules are created for all instances in a
-    # network.
-    if not self.gce_remote_access_firewall_rule:
-      super().AllowRemoteAccessPorts()
-
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the VM.
 
@@ -1266,6 +1300,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     for disk_ in self.disks:
       result.update(disk_.GetResourceMetadata())
+
+    if gcp_flags.GCE_RESERVATION_ID.value:
+      result['reservation_id'] = gcp_flags.GCE_RESERVATION_ID.value
+
+    if gcp_flags.GCE_PROVISIONING_MODEL.value:
+      result['provisioning_model'] = gcp_flags.GCE_PROVISIONING_MODEL.value
+
     return result
 
   def SimulateMaintenanceWithLog(self):
@@ -1690,7 +1731,11 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
       False otherwise.
     """
     cmd = util.GcloudCommand(
-        self, 'compute', 'instances', 'get-serial-port-output', self.name,
+        self,
+        'compute',
+        'instances',
+        'get-serial-port-output',
+        self.name,
     )
     cmd.flags['zone'] = self.zone
     cmd.flags['port'] = 1
@@ -1724,6 +1769,13 @@ class Debian12BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
 
+class Debian13BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Debian13Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'debian-13'
+  DEFAULT_IMAGE_PROJECT = 'debian-cloud'
+
+
 class Rhel8BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Rhel8Mixin
 ):
@@ -1736,6 +1788,37 @@ class Rhel9BasedGceVirtualMachine(
 ):
   DEFAULT_X86_IMAGE_FAMILY = 'rhel-9'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
+
+
+class Rhel10BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Rhel10Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'rhel-10'
+  DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
+
+
+class Ol8BasedGceVirtualMachine(BaseLinuxGceVirtualMachine, linux_vm.Ol8Mixin):
+  DEFAULT_X86_IMAGE_FAMILY = 'oracle-linux-8'
+  DEFAULT_IMAGE_PROJECT = 'oracle-linux-cloud'
+
+  def PrepareVMEnvironment(self):
+    super().PrepareVMEnvironment()
+    # https://cloud.google.com/compute/docs/images/os-details#oracle_linux
+    self.RemoteCommand(
+        'sudo dnf install -y google-cloud-cli --enablerepo google-cloud-sdk'
+    )
+
+
+class Ol9BasedGceVirtualMachine(BaseLinuxGceVirtualMachine, linux_vm.Ol9Mixin):
+  DEFAULT_X86_IMAGE_FAMILY = 'oracle-linux-9'
+  DEFAULT_IMAGE_PROJECT = 'oracle-linux-cloud'
+
+  def PrepareVMEnvironment(self):
+    super().PrepareVMEnvironment()
+    # https://cloud.google.com/compute/docs/images/os-details#oracle_linux
+    self.RemoteCommand(
+        'sudo dnf install -y google-cloud-cli --enablerepo google-cloud-sdk'
+    )
 
 
 class RockyLinux8BasedGceVirtualMachine(
@@ -1765,6 +1848,20 @@ class RockyLinux9OptimizedBasedGceVirtualMachine(
 ):
   OS_TYPE = os_types.ROCKY_LINUX9_OPTIMIZED
   DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-9-optimized-gcp'
+
+
+class RockyLinux10BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.RockyLinux10Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-10'
+  DEFAULT_IMAGE_PROJECT = 'rocky-linux-cloud'
+
+
+class RockyLinux10OptimizedBasedGceVirtualMachine(
+    RockyLinux10BasedGceVirtualMachine
+):
+  OS_TYPE = os_types.ROCKY_LINUX10_OPTIMIZED
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-10-optimized-gcp'
 
 
 class CentOsStream9BasedGceVirtualMachine(
@@ -1803,6 +1900,12 @@ class CosDevBasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-dev'
 
 
+class Cos121BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+  OS_TYPE = os_types.COS121
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-121-lts'
+  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-121-lts'
+
+
 class Cos117BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS117
   DEFAULT_X86_IMAGE_FAMILY = 'cos-117-lts'
@@ -1819,12 +1922,6 @@ class Cos109BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS109
   DEFAULT_X86_IMAGE_FAMILY = 'cos-109-lts'
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-109-lts'
-
-
-class Cos105BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
-  OS_TYPE = os_types.COS105
-  DEFAULT_X86_IMAGE_FAMILY = 'cos-105-lts'
-  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-105-lts'
 
 
 class CoreOsBasedGceVirtualMachine(

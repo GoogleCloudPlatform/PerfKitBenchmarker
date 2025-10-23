@@ -82,6 +82,8 @@
 -   Remove EOL CentOS 8 and CentOS Stream 8.
 -   Add a python dependency on google-cloud-aiplatform & google-cloud-core,
     needed for benchmarking Vertex AI.
+-   Removed the above AI python dependencies & support for deploying Vertex AI
+    via SDK, instead only supporting deployment via CLI.
 -   Remove EOL CentOS 7 and RHEL 7.
 -   Remove EOL Debian 9 and 10.
 -   Remove EOL Ubuntu 16, 18, and 23.10.
@@ -91,8 +93,21 @@
 -   Merged redundant `--runspec_build_tool_version` with `--gcc_version`.
 -   Create new flag `--azure_blob_storage_type` that defaults to `Standard_ZRS`
     instead of former default `--azure_storage_type=Standard_LRS`.
--   Keep existing metadata rather than overwriting with metadata auto added by resources.
--   In default_config_constants.yaml, replace default_single_core with default_dual_core.
+-   Keep existing metadata rather than overwriting with metadata auto added by
+    resources.
+-   In default_config_constants.yaml, replace default_single_core with
+    default_dual_core.
+-   Stop modifying existing GCE firewall rules if the user passes
+    `--gce_(subnet|network)_name`. This requires ensuring that you have SSH
+    access from where you are running PerfKitBenchmarker for most Linux
+    benchmarks.
+-   Mark Ubuntu 20 EOL.
+-   Stop manually installing GPU drivers on GKE and use the API functionality
+    via new flag `--gpu-driver-version`. This defaults to no driver installation
+    on clusters older than version 1.31.
+-   Consolidated cloud-specific boot-disk-size flags into a cloud-agnostic
+    `--boot-disk-size` flag.
+-   Updated the minimum recommended Python version to 3.12.
 
 ### New features:
 
@@ -178,7 +193,7 @@
 -   Add support for multi-network creation/attachment. PKB currently does not
     handle subnet creation on an existing network.
 -   Add support for GCE Confidential VM's.
--   Add cos-dev, cos117, cos113, cos109, and cos105 OS support for GCP.
+-   Add cos-dev, cos121, cos117, cos113, and cos109 OS support for GCP.
 -   Add --object_ttl_days flag for lifecycle management of created buckets.
 -   Add support for multi-NIC netperf throughput on AWS.
 -   Added AWS/GCP support for Data Plane Development Kit (DPDK) on Linux VM's to
@@ -218,11 +233,30 @@
 -   Add new vmstat trace.
 -   Add support for customizing Hadoop jobs scheduling
 -   Add support for GKE Autopilot & EKS Auto, which don't require nodepools.
+-   Add support for EKS with Karpenter for autoscaling.
 -   Add tutorial walking through an example GKE benchmark.
--   Add dpdk_pktgen_benchmark, a more feature-rich DPDK benchmark than dpdk_testpmd_benchmark.
+-   Add dpdk_pktgen_benchmark, a more feature-rich DPDK benchmark than
+    dpdk_testpmd_benchmark.
 -   Add support for configuring readahead buffer size in DFSIO test
 -   Add disk_snapshot_benchmark, measuring compression, snapshot creation time,
     and snapshot restore time.
+-   Add support for Managed MongoDB services and a YCSB benchmark.
+-   Add ESRally (Elasticsearch Rally) benchmark.
+-   Add ability to collect memory size according to lsmem with --collect_lsmem.
+-   Add k8s inference server resource to manage inference server workload in
+    cluster
+-   Add PV and PVC settings for k8s inference server resources utilizing GCSFuse
+    storage
+-   Add new `edw_index_ingestion_benchmark` benchmark evaluating the performance
+    of text search indexes on EDW systems.
+-   Add new `kubernetes_ai_inference_benchmark` benchmark evaluating the
+    performance of inference server (vllm etc.) hosted in k8s cluster.
+-   Add option for benchmarks to implement three-part prepare flow instead of
+    single Prepare function.
+-   Also let users run only some of those three parts if they want to.
+-   Add support for the `--addons` flag in GKE Standard.
+-   Add support for RHEL and Rocky Linux 10.
+-   Add support for Debian 13.
 
 ### Enhancements:
 
@@ -391,6 +425,12 @@
 -   Explicitly pass --maintenance-policy=MIGRATE to gcloud when
     --gce_migrate_on_maintenance is true (the default).
 -   Add support for configuring client readahead in Hadoop
+-   Add support for multiple NICs on Azure VMs.
+-   Add support for specifying a Reservation ID for GCE
+-   Add support for specifying GCE provisioning model
+-   Add support for NVMe local SSDs in GKE.
+-   Add support for cluster to wait the resource on multiple conditions
+-   Add support for enabling live migration on AMD SEV
 
 ### Bug fixes and maintenance updates:
 
@@ -568,3 +608,29 @@
 -   `--google_bigtable_channel_count` now applies to the googlebigtable2 binding
     as well.
 -   Upgrade Fio Version to 3.39
+-   Update GCE VM creation command logic to allow creating
+    z3-highmem-88-standardlssd
+-   Slightly more robust Exists check for GCE VMs.
+-   \_\_main\_\_.py calls absl.app.run(Main) as the entrypoint
+-   Positional arguments passed to PKB are no longer silently ignored, they will
+    cause PKB to exit immediately with an error
+-   Added `sysbench_thread_init_timeout` flag to allow higher timeout limit when
+    initializing a high thread count (eg. 2048)
+-   Add Fio benchmark to measure IOPS under latency SLA
+-   Update MongoDB version to 8.0 which is the latest stable version with
+    performance improvement over 7.0.
+-   Increase connection pool size to 60000 to avoid maxWaitQueueSize (number of
+    threads waiting for a connection, default 500) being exceeded during MongoDB
+    YCSB benchmarks. This will also align the number between single node and PSA
+    setups.
+-   Add flag nvme_queue_depth to allow changing the value for server VMs' data
+    disks. One example use case is to match SCSI queue depth for comparison.
+-   Add fio Write saturation IOPS benchmark.
+-   Add fio max IOPS microbenchmark
+-   Add support for MongoDB PSS (Primary-Secondary-Secondary) setup.
+-   Add flags to allow modifying multiple settings in "mongod.conf".
+-   Add new general purpose fio benchmark for device - fio_raw_device_benchmark
+-   Add support for GCP HdML disks.
+-   Add fio benchmark for object storage via FUSE.
+-   Updated the CONTRIBUTING.md guide with steps to minimize merging & review
+    friction for new PRs.

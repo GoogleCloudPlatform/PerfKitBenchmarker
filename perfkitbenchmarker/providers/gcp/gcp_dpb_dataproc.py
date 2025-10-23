@@ -54,6 +54,7 @@ disk_to_hdfs_map = {
     'pd-standard': 'HDD',
     'pd-balanced': 'SSD (Balanced)',
     'pd-ssd': 'SSD',
+    'hyperdisk-balanced': 'Hyperdisk (Balanced)',
 }
 serverless_disk_to_hdfs_map = {
     'standard': 'HDD',
@@ -172,6 +173,14 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     if self.user_managed and not FLAGS.dpb_service_bucket:
       self.bucket = self._GetCluster()['config']['tempBucket']
 
+  def _InitializeMetadata(self) -> None:
+    super()._InitializeMetadata()
+    self.metadata['dataproc_tier'] = gcp_flags.GCP_DATAPROC_TIER.value
+    self.metadata['dataproc_engine'] = gcp_flags.GCP_DATAPROC_ENGINE.value
+    self.metadata['dataproc_lightning_engine_runtime'] = (
+        gcp_flags.GCP_DATAPROC_LIGHTNING_ENGINE_RUNTIME.value
+    )
+
   def GetClusterCreateTime(self) -> float | None:
     """Returns the cluster creation time.
 
@@ -260,6 +269,8 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     if FLAGS.dpb_initialization_actions:
       cmd.flags['initialization-actions'] = FLAGS.dpb_initialization_actions
 
+    cmd.flags['tier'] = gcp_flags.GCP_DATAPROC_TIER.value
+
     # Ideally DpbServiceSpec would have a network spec, which we would create to
     # Resolve the name, but because EMR provisions its own VPC and we are
     # generally happy using pre-existing networks for Dataproc. Just use the
@@ -267,11 +278,18 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     if FLAGS.gce_network_name:
       cmd.flags['network'] = FLAGS.gce_network_name[0]
 
+    if gcp_flags.GCE_VM_SERVICE_ACCOUNT.value:
+      cmd.flags['service-account'] = gcp_flags.GCE_VM_SERVICE_ACCOUNT.value
+
     metadata = util.GetDefaultTags()
     metadata.update(flag_util.ParseKeyValuePairs(FLAGS.gcp_instance_metadata))
-    if gcp_flags.SPARK_BIGQUERY_CONNECTOR.value:
+    if gcp_flags.SPARK_BIGQUERY_CONNECTOR_URL.value:
       metadata['SPARK_BQ_CONNECTOR_URL'] = (
-          gcp_flags.SPARK_BIGQUERY_CONNECTOR.value
+          gcp_flags.SPARK_BIGQUERY_CONNECTOR_URL.value
+      )
+    if gcp_flags.SPARK_BIGQUERY_CONNECTOR_VERSION.value:
+      metadata['SPARK_BQ_CONNECTOR_VERSION'] = (
+          gcp_flags.SPARK_BIGQUERY_CONNECTOR_VERSION.value
       )
     cmd.flags['metadata'] = util.FormatTags(metadata)
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
@@ -370,7 +388,7 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     cmd.flags['cluster'] = self.cluster_id
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
-    job_jars = job_jars or []
+    job_jars = (job_jars or []) + dpb_service.DPB_EXTRA_JARS.value
     if classname:
       if jarfile:
         # Dataproc does not support both a main class and a main jar so just
@@ -430,6 +448,15 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
         run_time=(done_time - start_time).total_seconds(),
         pending_time=(start_time - pending_time).total_seconds(),
     )
+
+  def GetJobProperties(self) -> Dict[str, str]:
+    """Returns a dict of job properties."""
+    properties = super().GetJobProperties()
+    properties['spark.dataproc.engine'] = gcp_flags.GCP_DATAPROC_ENGINE.value
+    properties['spark.dataproc.lightningEngine.runtime'] = (
+        gcp_flags.GCP_DATAPROC_LIGHTNING_ENGINE_RUNTIME.value
+    )
+    return properties
 
   def _AddToCmd(self, cmd, cmd_property, cmd_value):
     flag_name = cmd_property
@@ -599,6 +626,8 @@ class GcpDpbDataprocServerless(
     if FLAGS.gcp_dataproc_image:
       cmd.flags['container-image'] = FLAGS.gcp_dataproc_image
 
+    cmd.flags['ttl'] = f't{FLAGS.timeout_minutes}m'
+
     all_properties = self.GetJobProperties()
     all_properties.update(properties or {})
     if all_properties:
@@ -703,6 +732,23 @@ class GcpDpbDataprocServerless(
       )
     if self.spec.dataproc_serverless_runtime_engine == 'native':
       result['spark.dataproc.runtimeEngine'] = 'native'
+    if (
+        self.spec.dataproc_serverless_engine
+        == dpb_constants.DATAPROC_LIGHTNING_ENGINE
+    ):
+      result['dataproc.tier'] = 'premium'
+      result['spark.dataproc.engine'] = dpb_constants.DATAPROC_LIGHTNING_ENGINE
+      result['spark.dataproc.lightningEngine.runtime'] = (
+          self.spec.dataproc_serverless_lightning_engine_runtime
+      )
+    if gcp_flags.SPARK_BIGQUERY_CONNECTOR_URL.value:
+      result['dataproc.sparkBqConnector.uri'] = (
+          gcp_flags.SPARK_BIGQUERY_CONNECTOR_URL.value
+      )
+    if gcp_flags.SPARK_BIGQUERY_CONNECTOR_VERSION.value:
+      result['dataproc.sparkBqConnector.version'] = (
+          gcp_flags.SPARK_BIGQUERY_CONNECTOR_VERSION.value
+      )
     result.update(super().GetJobProperties())
     return result
 
@@ -757,6 +803,15 @@ class GcpDpbDataprocServerless(
         'dpb_job_properties': self.metadata['dpb_job_properties'],
         'dpb_runtime_engine': self.spec.dataproc_serverless_runtime_engine,
     }
+
+    if (
+        self.spec.dataproc_serverless_engine
+        == dpb_constants.DATAPROC_LIGHTNING_ENGINE
+    ):
+      self.metadata['dpb_runtime_engine'] = self.spec.dataproc_serverless_engine
+      self.metadata['dataproc_lightning_engine_runtime'] = (
+          self.spec.dataproc_serverless_lightning_engine_runtime
+      )
 
   def CalculateLastJobCosts(self) -> dpb_service.JobCosts:
     fetch_batch_cmd = self.DataprocGcloudCommand(

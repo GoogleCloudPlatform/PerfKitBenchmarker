@@ -101,7 +101,7 @@ MIN_CUSTOM_MACHINE_MEM_MB = 3840
 
 IS_READY_TIMEOUT = 600  # 10 minutes
 DELETE_INSTANCE_TIMEOUT = 600  # 10 minutes
-CREATION_TIMEOUT = 1200  # 20 minutes
+CREATION_TIMEOUT = 1800  # 30 minutes
 
 
 class UnsupportedDatabaseEngineError(Exception):
@@ -232,6 +232,16 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
           '--root-password={}'.format(self.spec.database_password)
       )
 
+    if self.spec.db_disk_spec.provisioned_iops:
+      cmd_string.append(
+          '--storage-provisioned-iops=%s'
+          % self.spec.db_disk_spec.provisioned_iops
+      )
+    if self.spec.db_disk_spec.provisioned_throughput:
+      cmd_string.append(
+          '--storage-provisioned-throughput=%s'
+          % self.spec.db_disk_spec.provisioned_throughput
+      )
     if self.spec.db_spec.cpus and self.spec.db_spec.memory:
       self._ValidateSpec()
       memory = self.spec.db_spec.memory
@@ -271,7 +281,10 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       else:
         cmd.flags['no-enable-data-cache'] = True
 
-    _, stderr, retcode = cmd.Issue(timeout=CREATION_TIMEOUT)
+    _, stderr, retcode = cmd.Issue(
+        timeout=CREATION_TIMEOUT,
+        raise_on_failure=False,
+    )
 
     util.CheckGcloudResponseKnownFailures(stderr, retcode)
 

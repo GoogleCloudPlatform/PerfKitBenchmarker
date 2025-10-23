@@ -1,0 +1,25 @@
+# Example nodepool & configuration from: https://docs.aws.amazon.com/eks/latest/userguide/create-node-pool.html
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: spot-nodepool
+spec:
+  template:
+    spec:
+      requirements:
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot"]
+      nodeClassRef:
+        group: eks.amazonaws.com
+        kind: NodeClass
+        name: default
+      expireAfter: 240h # 10 * 24h = 240h
+  limits:
+    cpu: 1000
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 1m

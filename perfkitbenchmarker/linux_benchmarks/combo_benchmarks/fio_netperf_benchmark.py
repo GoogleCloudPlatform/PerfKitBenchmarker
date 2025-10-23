@@ -28,8 +28,8 @@ from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_benchmarks import fio_benchmark
 from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
+from perfkitbenchmarker.linux_benchmarks.fio import fio_benchmark
 from perfkitbenchmarker.linux_packages import fio
 
 

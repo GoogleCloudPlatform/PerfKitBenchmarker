@@ -47,12 +47,25 @@ UNMANAGED_SERVICES = [
     UNMANAGED_SPARK_CLUSTER,
 ]
 
+# Supported Dataproc GCE Cluster tiers
+DATAPROC_STANDARD_TIER = 'standard'
+DATAPROC_PREMIUM_TIER = 'premium'
+
+# Supported Dataproc GCE Cluster Engine
+DATAPROC_DEFAULT_ENGINE = 'default'
+DATAPROC_LIGHTNING_ENGINE = 'lightningEngine'
+
+# Supported Dataproc Lightning Engine Runtime
+DATAPROC_LIGHTNING_ENGINE_DEFAULT_RUNTIME = 'default'
+DATAPROC_LIGHTNING_ENGINE_NATIVE_RUNTIME = 'native'
+
 # Default number of workers to be used in the dpb service implementation
 DEFAULT_WORKER_COUNT = 2
 
 # List of supported applications that can be enabled on the dpb service
 FLINK = 'flink'
 HIVE = 'hive'
+DELTA = 'DELTA'
 
 # Metrics and Status related metadata
 # TODO(pclay): Remove these after migrating all callers to SubmitJob

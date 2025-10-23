@@ -56,7 +56,7 @@ class GoogleCloudRunJob(base_job.BaseJob):
     cmd = ['gcloud']
     # TODO(user): Remove alpha once the feature is GA.
     if self.job_gpu_type or self.job_gpu_count:
-      cmd.append('alpha')
+      cmd.append('beta')
 
     cmd.extend([
         'run',
@@ -74,6 +74,8 @@ class GoogleCloudRunJob(base_job.BaseJob):
       cmd.append('--gpu-type=%s' % self.job_gpu_type)
     if self.job_gpu_count:
       cmd.append('--gpu=%s' % self.job_gpu_count)
+    if self.job_gpu_type or self.job_gpu_count:
+      cmd.append('--no-gpu-zonal-redundancy')
 
     self.metadata.update({
         'container_image': self.container_image,
