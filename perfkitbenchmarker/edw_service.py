@@ -20,6 +20,7 @@ import os
 from typing import Any, Dict, List
 
 from absl import flags
+from absl import logging
 from perfkitbenchmarker import resource
 
 flags.DEFINE_integer(
@@ -598,11 +599,39 @@ class EdwService(resource.BaseResource):
 
     Returns:
       A dictionary of the following format:
-        { 'metric_1': { 'value': 1, 'unit': 'imperial femtoseconds' },
-          'metric_2': { 'value': 2, 'unit': 'metric dollars' }
+        { 'metric_1': { 'value': 1, 'unit': 'imperial femtoseconds'},
+          'metric_2': { 'value': 2, 'unit': 'metric dollars'}
         ...}
     """
-    raise NotImplementedError
+    logging.info(
+        'Per-iteration auxiliary metrics are not supported for this service.'
+    )
+    del iter_run_key
+    return {}
+
+  def GetTimeBoundAuxiliaryMetrics(
+      self, start_timestamp: float, end_timestamp: float
+  ) -> List[Dict[str, Any]]:
+    """Returns service-specific metrics from a set time range.
+
+    Whenever possible, the service should return metrics only from the compute
+    cluster used for the current benchmark run.
+
+    Args:
+      start_timestamp: Start of the time range to retrieve metrics for.
+      end_timestamp: End of the time range to retrieve metrics for.
+
+    Returns:
+      A list of the following format:
+        [{'metric_1': 'value': 1, 'unit': 'imperial nanoseconds', metadata: {}},
+         {'metric_2': 'value': 2, 'unit': 'metric dollars', metadata: {}}
+        ...]
+    """
+    logging.info(
+        'Time-bound auxiliary metrics are not supported for this service.'
+    )
+    del start_timestamp, end_timestamp
+    return []
 
   def CreateSearchIndex(
       self, table_path: str, index_name: str
@@ -758,3 +787,18 @@ class EdwService(resource.BaseResource):
       A tuple of execution time in seconds and a dictionary of metadata.
     """
     raise NotImplementedError
+
+  @staticmethod
+  def ColsToRows(col_res: dict[str, list[Any]]) -> list[dict[str, Any]]:
+    """Converts a dictionary of columns to a list of rows.
+
+    Args:
+      col_res: A dictionary of columns to convert to a list of rows.
+
+    Returns:
+      A list of dictionaries, where each dictionary represents a row.
+
+      e.g. {'col1': [1, 2, 3], 'col2': [4, 5, 6]} -> [{'col1': 1, 'col2': 4},
+        {'col1': 2, 'col2': 5}, {'col1': 3, 'col2': 6}].
+    """
+    return [dict(zip(col_res.keys(), row)) for row in zip(*col_res.values())]
