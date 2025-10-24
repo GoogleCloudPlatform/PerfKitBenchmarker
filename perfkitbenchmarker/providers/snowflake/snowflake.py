@@ -560,8 +560,8 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.CREATE_INDEX_QUERY_TEMPLATE),
         query_name,
         context,
+        should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
   def DropSearchIndex(
@@ -576,8 +576,8 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.DELETE_INDEX_QUERY_TEMPLATE),
         query_name,
         context,
+                should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
   def GetSearchIndexCompletionPercentage(
@@ -592,8 +592,8 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.GET_INDEX_STATUS_QUERY_TEMPLATE),
         query_name,
         context,
+        should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     _, meta = self.client_interface.ExecuteQuery(query_name, print_results=True)
     qres = int(meta['query_results']['COVERAGE_PERCENTAGE'][0])
     return qres, meta
@@ -609,8 +609,8 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.INITIALIZE_SEARCH_TABLE_QUERY_TEMPLATE),
         query_name,
         context,
+        should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
   def InsertSearchData(
@@ -625,8 +625,8 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.LOAD_SEARCH_DATA_QUERY_TEMPLATE),
         query_name,
         context,
+        should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     # Snowflake returns info for each csv file processed, which pollutes logs
     # and datapoints needlessly. So print_results=False.
     return self.client_interface.ExecuteQuery(query_name, print_results=False)
@@ -640,8 +640,8 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.GET_ROW_COUNT_QUERY_TEMPLATE),
         query_name,
         context,
+        should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     _, meta = self.client_interface.ExecuteQuery(query_name, print_results=True)
     qres = int(meta['query_results']['TOTAL_ROW_COUNT'][0])
     return qres, meta
@@ -659,8 +659,8 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.INDEX_SEARCH_QUERY_TEMPLATE),
         query_name,
         context,
+        should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     res, meta = self.client_interface.ExecuteQuery(
         query_name, print_results=True
     )
@@ -684,9 +684,8 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(query_template),
         query_name,
         context,
+        should_log_file=True,
     )
-    # log the query text
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     _, output = self.client_interface.ExecuteQuery(
         query_name, print_results=True
     )
