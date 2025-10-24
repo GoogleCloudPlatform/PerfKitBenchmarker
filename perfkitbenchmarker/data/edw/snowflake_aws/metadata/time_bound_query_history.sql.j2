@@ -1,0 +1,13 @@
+SELECT
+    *
+FROM
+    TABLE(
+        INFORMATION_SCHEMA.QUERY_HISTORY_BY_WAREHOUSE(
+            END_TIME_RANGE_START => TO_TIMESTAMP_LTZ({{start_timestamp}}),
+            END_TIME_RANGE_END => TO_TIMESTAMP_LTZ({{end_timestamp}}),
+            RESULT_LIMIT => 10000,
+            WAREHOUSE_NAME => '{{warehouse}}'
+        )
+    )
+ORDER BY
+    start_time;
