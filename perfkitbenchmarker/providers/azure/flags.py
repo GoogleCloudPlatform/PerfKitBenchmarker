@@ -150,7 +150,9 @@ REDIS_SIZE = flags.DEFINE_enum(
 flags.DEFINE_boolean(
     'azure_low_priority_vms',
     False,
-    'Whether to set the priority to low for Azure VMs',
+    'Whether to set the priority to low for Azure VMs. '
+    'Also applies to Karpenter NodePools in AKS, using spot capacity-type '
+    'when True, otherwise on-demand.',
 )
 
 flags.DEFINE_boolean(
