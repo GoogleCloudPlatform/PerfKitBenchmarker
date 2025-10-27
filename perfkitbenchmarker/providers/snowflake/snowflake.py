@@ -726,6 +726,7 @@ class Snowflake(edw_service.EdwService):
             'value': 1,
             'unit': 'metadata',
             'metadata': {
+                'sf_query_id': query_id,
                 'sf_query_stats': json.dumps(query_stats_rows, default=str)
             },
         },
