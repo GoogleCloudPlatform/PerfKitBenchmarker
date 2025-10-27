@@ -1380,6 +1380,11 @@ def PublishFailedRunSample(
       'run_stage': run_stage_that_failed,
       'flags': str(flag_util.GetProvidedCommandLineFlags()),
   }
+  vm_create_operation_names = ','.join([
+      vm.create_operation_name for vm in spec.vms if vm.create_operation_name
+  ])
+  if vm_create_operation_names:
+    metadata['vm_create_operation_names'] = vm_create_operation_names
   background_tasks.RunThreaded(
       lambda vm: vm.UpdateInterruptibleVmStatus(use_api=True), spec.vms
   )
