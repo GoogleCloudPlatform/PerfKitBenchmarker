@@ -126,7 +126,7 @@ def _CopyTar(vm):
 
 def YumInstall(vm):
   """Installs the netperf package on the VM."""
-  vm.InstallPackages('libsctp-devel')
+  vm.InstallPackages('lksctp-tools-devel')
   _Install(vm)
 
 

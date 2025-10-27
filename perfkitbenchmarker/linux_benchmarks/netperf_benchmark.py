@@ -522,8 +522,8 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
         f'-H {server_ip} -L {client_ip} '
         f'-l {FLAGS.netperf_test_length} {confidence}'
         ' -- '
-        f'-T {protocol}'
-        f'-d {direction}'
+        f'-T {protocol} '
+        f'-d {direction} '
         '-P ,{data_port} '
         f'-o {OUTPUT_SELECTOR}'
     )
