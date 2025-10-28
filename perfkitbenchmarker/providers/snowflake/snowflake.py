@@ -576,7 +576,7 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.DELETE_INDEX_QUERY_TEMPLATE),
         query_name,
         context,
-                should_log_file=True,
+        should_log_file=True,
     )
     return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
@@ -718,7 +718,8 @@ class Snowflake(edw_service.EdwService):
             'value': 1,
             'unit': 'metadata',
             'metadata': {
-                f'sf_{key}': value for key, value in query_plan_rows[0].items()
+                f'sf_{key.lower()}': value
+                for key, value in query_plan_rows[0].items()
             },
         },
         {
@@ -727,7 +728,7 @@ class Snowflake(edw_service.EdwService):
             'unit': 'metadata',
             'metadata': {
                 'sf_query_id': query_id,
-                'sf_query_stats': json.dumps(query_stats_rows, default=str)
+                'sf_query_stats': json.dumps(query_stats_rows, default=str),
             },
         },
     ]
@@ -756,7 +757,9 @@ class Snowflake(edw_service.EdwService):
           'metric': 'sf_query_metadata',
           'value': 1,
           'unit': 'metadata',
-          'metadata': {f'sf_{key}': value for key, value in row.items()},
+          'metadata': {
+              f'sf_{key.lower()}': value for key, value in row.items()
+          },
       })
     for qid in col_res['QUERY_ID']:
       history_results.extend(self._GetIndividualQueryMetadata(qid))
