@@ -8,8 +8,8 @@ from awsglue import context
 from awsglue import utils
 
 
-def get_results_logger(spark_context):
-  glue_context = context.GlueContext(spark_context)
+def get_results_logger(spark_session):
+  glue_context = context.GlueContext(spark_session.sparkContext)
   logger = glue_context.get_logger()
   return logger
 

@@ -139,23 +139,18 @@ def parse_args(args=None):
   return parser.parse_args(args)
 
 
-def _load_file(spark, object_path):
-  """Load an HCFS file into a string."""
-  return '\n'.join(spark.sparkContext.textFile(object_path).collect())
-
-
-def get_results_logger(spark_context):
+def get_results_logger(spark_session):
   """Gets results logger.
 
   Injected into main fn to be replaceable by wrappers.
 
   Args:
-    spark_context: Spark API context.
+    spark_session: Spark Session object.
 
   Returns:
     A python logger object.
   """
-  del spark_context
+  del spark_session
   return _results_logger
 
 
@@ -189,8 +184,7 @@ def main(args, results_logger_getter=get_results_logger):
         'Dumping the spark conf properties to %s', args.dump_spark_conf
     )
     props = [
-        sql.Row(key=key, val=val)
-        for key, val in spark.sparkContext.getConf().getAll()
+        sql.Row(key=key, val=val) for key, val in spark.conf.getAll().items()
     ]
     spark.createDataFrame(props).coalesce(1).write.mode('append').json(
         args.dump_spark_conf
@@ -215,7 +209,7 @@ def main(args, results_logger_getter=get_results_logger):
         json.dumps(results),
         '----@spark_sql_runner:results_end@----',
     ])
-    results_logger = results_logger_getter(spark.sparkContext)
+    results_logger = results_logger_getter(spark)
     results_logger.info(dumped_results)
   else:
     logging.info('Writing results to %s', args.report_dir)
