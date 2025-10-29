@@ -20,6 +20,7 @@ from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import pkb_common_test_case
 from perfkitbenchmarker.time_triggers import maintenance_simulation_trigger
 
@@ -40,21 +41,28 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(trigger.delay, 10)
 
   def testTrigger(self):
-    vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
-    trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
-    trigger.TriggerMethod(vm)
-    vm.SimulateMaintenanceEvent.assert_called_once()
-
-  def testSetup(self):
-    vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
+    vm = mock.create_autospec(gce_virtual_machine.GceVirtualMachine)
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
     trigger.vms = [vm]
     trigger.SetUp()
-    vm.SetupLMNotification.assert_not_called()
+    self.assertIn(vm, trigger.gce_simulate_maintenance_helpers)
 
+  @mock.patch(
+      'perfkitbenchmarker.time_triggers.maintenance_simulation_trigger.GCESimulateMaintenanceFactory'
+  )
+  def testSetup(self, mock_factory):
+    mock_helper = mock.create_autospec(
+        maintenance_simulation_trigger.GCESimulateMaintenanceTool
+    )
+    mock_factory.return_value = mock_helper
+    vm = mock.create_autospec(gce_virtual_machine.GceVirtualMachine)
+    trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
+    trigger.vms = [vm]
     trigger.capture_live_migration_timestamps = True
     trigger.SetUp()
-    vm.SetupLMNotification.assert_called_once()
+    mock_helper.SetupLMNotification.assert_called_once()
+    trigger.TriggerMethod(vm)
+    mock_helper.StartLMNotification.assert_called_once()
 
   @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
   def testWaitForDisruption(self):
@@ -75,12 +83,17 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     )
 
   def testWaitForDisruptionReturnsCorrectValue(self):
-    vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
-    vm.CollectLMNotificationsTime.return_value = {
+    vm = mock.create_autospec(gce_virtual_machine.GceVirtualMachine)
+    trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
+    trigger.gce_simulate_maintenance_helpers[vm] = mock.create_autospec(
+        maintenance_simulation_trigger.GCESimulateMaintenanceTool
+    )
+    trigger.gce_simulate_maintenance_helpers[
+        vm
+    ].CollectLMNotificationsTime.return_value = {
         'LM_total_time': 10,
         'Host_maintenance_end': 0,
     }
-    trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
     trigger.capture_live_migration_timestamps = True
     trigger.vms = [vm]
     self.assertEqual(
