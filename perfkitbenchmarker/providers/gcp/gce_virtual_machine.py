@@ -473,7 +473,37 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
     cmd.Issue(raise_on_failure=False)
 
 
-def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
+def GetGceAcceleratorType(accelerator_type: str) -> str:
+  """Generates a GCE speicifc accelerator type string.
+
+  This function takes a cloud-agnostic accelerator type (k80, p100, etc.) and
+  returns a gce-specific accelerator name (nvidia-tesla-k80, etc).
+
+  If FLAGS.gce_accelerator_type_override is specified, the value of said flag
+  will be used as the name of the accelerator.
+
+  Args:
+    accelerator_type: cloud-agnostic accelerator type (p100, k80, etc.)
+
+  Returns:
+    GCE specific accelerator type.
+  """
+  gce_accelerator_type = FLAGS.gce_accelerator_type_override or (
+      (
+          _GCE_NVIDIA_TESLA_GPU_PREFIX
+          if accelerator_type in virtual_machine.TESLA_GPU_TYPES
+          else _GCE_NVIDIA_GPU_PREFIX
+      )
+      + accelerator_type
+  )
+  if accelerator_type in GPU_TYPE_TO_SUFFIX:
+    gce_accelerator_type += GPU_TYPE_TO_SUFFIX[accelerator_type]
+  return gce_accelerator_type
+
+
+def GenerateAcceleratorSpecString(
+    accelerator_type: str, accelerator_count: int
+) -> str:
   """Generates a string to be used to attach accelerators to a VM using gcloud.
 
   This function takes a cloud-agnostic accelerator type (k80, p100, etc.) and
@@ -490,16 +520,7 @@ def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
     String to be used by gcloud to attach accelerators to a VM.
     Must be prepended by the flag '--accelerator'.
   """
-  gce_accelerator_type = FLAGS.gce_accelerator_type_override or (
-      (
-          _GCE_NVIDIA_TESLA_GPU_PREFIX
-          if accelerator_type in virtual_machine.TESLA_GPU_TYPES
-          else _GCE_NVIDIA_GPU_PREFIX
-      )
-      + accelerator_type
-  )
-  if accelerator_type in GPU_TYPE_TO_SUFFIX:
-    gce_accelerator_type += GPU_TYPE_TO_SUFFIX[accelerator_type]
+  gce_accelerator_type = GetGceAcceleratorType(accelerator_type)
   return 'type={},count={}'.format(gce_accelerator_type, accelerator_count)
 
 
