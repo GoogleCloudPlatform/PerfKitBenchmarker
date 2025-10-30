@@ -264,7 +264,7 @@ def SetPostgresOptimizedServerConfiguration(
       support MINIMUM_RECOVERY and RESTORABLE
     server_vm: Server VM to host the database.
     relational_db: Relational database class.
-    custom_server_config: str = '' The custom server configuration file name
+    custom_server_config: The custom server configuration file name.
   """
 
   shared_buffer_size = relational_db.postgres_shared_buffer_size
