@@ -244,11 +244,23 @@ class BaseAppService(resource.BaseResource):
       An object containing success, response string, & latency. Latency is
       also negative in the case of a failure.
     """
-    return self.poller.Run(
-        self.vm,
-        self.endpoint,
-        retries=retries,
-        expected_response=self.builder.GetExpectedResponse(),
+    cmd = self.builder.InvokeCommand(self.endpoint)
+    if not cmd:
+      return self.poller.Run(
+          self.vm,
+          self.endpoint,
+          retries=retries,
+          expected_response=self.builder.GetExpectedResponse(),
+      )
+    start_time = time.time()
+    out, err = self.vm.RemoteCommand(cmd, ignore_failure=True)
+    # Assert error is empty & out is not.
+    success = (not bool(err)) and bool(out) and ('timeout' not in out)
+    end_time = time.time()
+    return http_poller.PollingResponse(
+        success=success,
+        response=out,
+        latency=end_time - start_time,
     )
 
   def _IsReady(self) -> bool:
@@ -267,7 +279,7 @@ class BaseAppService(resource.BaseResource):
         response.success,
         response.latency,
     )
-    return response.latency > 0
+    return response.latency > 0 and response.success
 
   def _CreateDependencies(self):
     """Creates dependencies needed before _CreateResource() is called."""
