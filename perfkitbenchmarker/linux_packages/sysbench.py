@@ -69,7 +69,7 @@ SYSBENCH_SLEEP_BETWEEN_RUNS_SEC = flags.DEFINE_integer(
 )
 SYSBENCH_THREAD_INIT_TIMEOUT = flags.DEFINE_integer(
     'sysbench_thread_init_timeout',
-    60,
+    120,
     'The timeout in seconds for sysbench to initialize run threads.',
 )
 SYSBENCH_VERBOSE_MODE = flags.DEFINE_integer(
