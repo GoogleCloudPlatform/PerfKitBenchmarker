@@ -43,6 +43,7 @@ OS_DEPENDENT_DEFAULTS = {
         MYSQL_LOG_PATH: '/var/log/mysqld.log',
     },
 }
+MYSQL_DEFAULT_PATH = '/var/lib/mysql'
 
 
 class MysqldFailedToStartError(Exception):
@@ -253,10 +254,10 @@ def WriteMysqlConfiguration(
   vm.RemoteCommand('sudo chown mysql:mysql /var/run/mysqld')
 
 
-def RestartServer(
+def ConfigureAndStartServer(
     vm: virtual_machine.VirtualMachine,
 ):
-  """Configure and restart mysql."""
+  """Configure and start mysql."""
   # The default MySQL systemd unit file sets the open file limit to 100000.
   # Do the same here.
   vm.RemoteCommand(
@@ -266,13 +267,34 @@ def RestartServer(
       'echo "mysql hard nofile 100000" | sudo tee -a /etc/security/limits.conf'
   )
 
+  # MySQL uses the mysql/ha.cnf.j2 template to set up the MySQL server.
+  # The template uses the scratch directory to store the MySQL data and binary
+  # log files.
+  scratch_dir = vm.GetScratchDir()
+
+  # We do not need to initialize the database if the scratch directory is the
+  # default MySQL installation directory.
+  if scratch_dir != MYSQL_DEFAULT_PATH:
+    vm.RemoteCommand(f'sudo chown mysql:mysql {scratch_dir}')
+    vm.RemoteCommand(
+        f'sudo -u mysql -g mysql mysqld --initialize --datadir={scratch_dir}'
+    )
+
   # Start the server.
-  vm.RemoteCommand('sudo -g mysql -u mysql nohup mysqld &> /dev/null &')
+  vm.RemoteCommand(
+      'sudo -g mysql -u mysql nohup mysqld &> /dev/null &'
+  )
+
+  log_file_path = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_LOG_PATH]
+
+  socket_file = f'{scratch_dir}/mysql.sock'
 
   # mysqld isn't ready until it's written a socket file.
   @vm_util.Retry(retryable_exceptions=(MysqldFailedToStartError,))
   def EnsureMysqldStarted():
-    stdout, _ = vm.RemoteCommand('sudo file /var/lib/mysql/mysql.sock')
+    stdout, _ = vm.RemoteCommand(f'sudo file {socket_file}')
+    # Get the log file to see for last server messages.
+    vm.RemoteCommand(f'tail -n 5 {log_file_path}')
     if 'cannot open' in stdout:
       raise MysqldFailedToStartError()
 

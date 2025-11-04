@@ -298,7 +298,7 @@ def StartServices(benchmark_spec: bm_spec.BenchmarkSpec):
   new_password = FLAGS.run_uri + '_P3rfk1tbenchm4rker#'
   for _, server in enumerate(servers):
     # mysql server ids needs to be positive integers.
-    mysql80.RestartServer(server)
+    mysql80.ConfigureAndStartServer(server)
     mysql80.UpdatePassword(server, new_password)
     mysql80.CreateDatabase(server, new_password, _DATABASE_NAME)
 
