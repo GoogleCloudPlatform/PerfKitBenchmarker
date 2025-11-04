@@ -19,6 +19,7 @@ benchmarks.
 """
 
 import copy
+import datetime
 import json
 import logging
 import os
@@ -647,13 +648,18 @@ class Snowflake(edw_service.EdwService):
     return qres, meta
 
   def TextSearchQuery(
-      self, table_path: str, search_keyword: str, index_name: str
+      self,
+      table_path: str,
+      search_keyword: str,
+      order_by: str | None = None,
+      limit: int | None = None,
+      date_between: tuple[datetime.date, datetime.date] | None = None,
   ) -> tuple[float, dict[str, Any]]:
+    # TODO(user): Add support for order_by, limit and date_between args.
     query_name = 'text_search_query'
     context = {
         'table_name': table_path,
         'search_text': search_keyword,
-        'index_name': index_name,
     }
     self.client_interface.client_vm.RenderTemplate(
         data.ResourcePath(self.INDEX_SEARCH_QUERY_TEMPLATE),
