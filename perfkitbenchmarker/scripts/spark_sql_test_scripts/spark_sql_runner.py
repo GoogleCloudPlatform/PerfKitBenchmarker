@@ -134,6 +134,10 @@ def parse_args(args=None):
           'purposes.'
       ),
   )
+  parser.add_argument(
+      '--catalog',
+      help='Spark catalog to look for data in.',
+  )
   if args is None:
     return parser.parse_args()
   return parser.parse_args(args)
@@ -166,6 +170,8 @@ def main(args, results_logger_getter=get_results_logger):
   # Queries supplied to this script by default are not ANSI-compliant, so we are
   # disabling ANSI SQL explictly, since new Spark versions default to it.
   spark.conf.set('spark.sql.ansi.enabled', 'false')
+  if args.catalog:
+    spark.catalog.setCurrentCatalog(args.catalog)
   if args.database:
     spark.catalog.setCurrentDatabase(args.database)
   for name, (fmt, options) in get_table_metadata(args).items():
