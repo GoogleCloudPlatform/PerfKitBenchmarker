@@ -725,6 +725,10 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       return [self.internal_ip]
     return []
 
+  def GetLocalhostAddr(self):
+    """Returns ::1 if use_ipv6 is set, and localhost otherwise."""
+    return '::1' if pkb_flags.FLAGS.use_ipv6 else 'localhost'
+
   def SetDiskSpec(self, disk_spec, disk_count):
     """Set Disk Specs of the current VM."""
     # This method will be depreciate soon.
@@ -940,30 +944,6 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     if self.create_start_time:
       result['create_start_time'] = self.create_start_time
     return result
-
-  def SimulateMaintenanceEvent(self):
-    """Simulates a maintenance event on the VM."""
-    raise NotImplementedError()
-
-  def SetupLMNotification(self):
-    """Prepare environment for /scripts/gce_maintenance_notify.py script."""
-    raise NotImplementedError()
-
-  def _GetLMNotifificationCommand(self):
-    """Return Remote python execution command for LM notify script."""
-    raise NotImplementedError()
-
-  def StartLMNotification(self):
-    """Start meta-data server notification subscription."""
-    raise NotImplementedError()
-
-  def WaitLMNotificationRelease(self):
-    """Block main thread until LM ended."""
-    raise NotImplementedError()
-
-  def CollectLMNotificationsTime(self):
-    """Extract LM notifications from log file."""
-    raise NotImplementedError()
 
   def _InstallData(
       self,

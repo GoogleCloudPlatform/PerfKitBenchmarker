@@ -81,12 +81,6 @@ INSTANCE_KNOWN_STATUSES = INSTANCE_EXISTS_STATUSES | INSTANCE_DELETED_STATUSES
 # Gcloud operations are complete when their 'status' is 'DONE'.
 OPERATION_DONE = 'DONE'
 
-# 2h timeout for LM notification
-LM_NOTIFICATION_TIMEOUT_SECONDS = 60 * 60 * 2
-
-# 10m wait time prior to checking log for LM status
-LM_UNAVAILABLE_STATUS_WAIT_TIME_MIN = 10
-
 NVME = 'NVME'
 SCSI = 'SCSI'
 _INSUFFICIENT_HOST_CAPACITY = (
@@ -473,7 +467,37 @@ class GceSoleTenantNodeGroup(resource.BaseResource):
     cmd.Issue(raise_on_failure=False)
 
 
-def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
+def GetGceAcceleratorType(accelerator_type: str) -> str:
+  """Generates a GCE speicifc accelerator type string.
+
+  This function takes a cloud-agnostic accelerator type (k80, p100, etc.) and
+  returns a gce-specific accelerator name (nvidia-tesla-k80, etc).
+
+  If FLAGS.gce_accelerator_type_override is specified, the value of said flag
+  will be used as the name of the accelerator.
+
+  Args:
+    accelerator_type: cloud-agnostic accelerator type (p100, k80, etc.)
+
+  Returns:
+    GCE specific accelerator type.
+  """
+  gce_accelerator_type = FLAGS.gce_accelerator_type_override or (
+      (
+          _GCE_NVIDIA_TESLA_GPU_PREFIX
+          if accelerator_type in virtual_machine.TESLA_GPU_TYPES
+          else _GCE_NVIDIA_GPU_PREFIX
+      )
+      + accelerator_type
+  )
+  if accelerator_type in GPU_TYPE_TO_SUFFIX:
+    gce_accelerator_type += GPU_TYPE_TO_SUFFIX[accelerator_type]
+  return gce_accelerator_type
+
+
+def GenerateAcceleratorSpecString(
+    accelerator_type: str, accelerator_count: int
+) -> str:
   """Generates a string to be used to attach accelerators to a VM using gcloud.
 
   This function takes a cloud-agnostic accelerator type (k80, p100, etc.) and
@@ -490,16 +514,7 @@ def GenerateAcceleratorSpecString(accelerator_type, accelerator_count):
     String to be used by gcloud to attach accelerators to a VM.
     Must be prepended by the flag '--accelerator'.
   """
-  gce_accelerator_type = FLAGS.gce_accelerator_type_override or (
-      (
-          _GCE_NVIDIA_TESLA_GPU_PREFIX
-          if accelerator_type in virtual_machine.TESLA_GPU_TYPES
-          else _GCE_NVIDIA_GPU_PREFIX
-      )
-      + accelerator_type
-  )
-  if accelerator_type in GPU_TYPE_TO_SUFFIX:
-    gce_accelerator_type += GPU_TYPE_TO_SUFFIX[accelerator_type]
+  gce_accelerator_type = GetGceAcceleratorType(accelerator_type)
   return 'type={},count={}'.format(gce_accelerator_type, accelerator_count)
 
 
@@ -535,11 +550,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   _host_lock = threading.Lock()
   deleted_hosts = set()
   host_map = collections.defaultdict(list)
-
-  _LM_TIMES_SEMAPHORE = threading.Semaphore(0)
-  _LM_NOTICE_SCRIPT = 'gce_maintenance_notice.py'
-  _LM_SIGNAL_LOG = 'lm_signal.log'
-  _LM_NOTICE_LOG = 'gce_maintenance_notice.log'
 
   def __init__(self, vm_spec):
     """Initialize a GCE virtual machine.
@@ -1309,135 +1319,6 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     return result
 
-  def SimulateMaintenanceWithLog(self):
-    """Create a json file with information related to the vm."""
-    simulate_maintenance_json = {
-        'current_time': datetime.datetime.now().timestamp() * 1000,
-        'instance_id': self.id,
-        'project': self.project,
-        'instance_name': self.name,
-        'zone': self.zone,
-    }
-    vm_path = posixpath.join(vm_util.GetTempDir(), self._LM_SIGNAL_LOG)
-    with open(vm_path, 'w+') as f:
-      json.dump(simulate_maintenance_json, f, indent=2, sort_keys=True)
-
-  def SimulateMaintenanceEvent(self):
-    """Simulates a maintenance event on the VM."""
-    cmd = util.GcloudCommand(
-        self,
-        'compute',
-        'instances',
-        'simulate-maintenance-event',
-        self.name,
-        '--async',
-    )
-    logcmd = util.GcloudCommand(
-        None,
-        'logging',
-        'read',
-        '"protoPayload.methodName=v1.compute.instances.simulateMaintenanceEvent'
-        f' resource.labels.instance_id={self.id}"',
-    )
-    logcmd.flags['freshness'] = f'{LM_UNAVAILABLE_STATUS_WAIT_TIME_MIN}M'
-
-    stdout, _, retcode = cmd.Issue(raise_on_failure=False)
-    if retcode or 'error' in stdout:
-      raise errors.VirtualMachine.VirtualMachineError(
-          'Unable to simulate maintenance event.'
-      )
-
-    time.sleep(LM_UNAVAILABLE_STATUS_WAIT_TIME_MIN * 60)
-    stdout, _, retcode = logcmd.Issue(raise_on_failure=False)
-    # if the migration is temporarily unavailable, retry the migration command
-    if not retcode and 'MIGRATION_TEMPORARILY_UNAVAILABLE' in stdout:
-      stdout, _, retcode = cmd.Issue(raise_on_failure=False)
-      if retcode or 'error' in stdout:
-        raise errors.VirtualMachine.VirtualMachineError(
-            'Unable to simulate maintenance event.'
-        )
-
-  def SetupLMNotification(self):
-    """Prepare environment for /scripts/gce_maintenance_notify.py script."""
-    self.Install('pip')
-    self.RemoteCommand('sudo pip3 install requests')
-    self.PushDataFile(self._LM_NOTICE_SCRIPT, vm_util.VM_TMP_DIR)
-
-  def _GetLMNotificationCommand(self):
-    """Return Remote python execution command for LM notify script."""
-    vm_path = posixpath.join(vm_util.VM_TMP_DIR, self._LM_NOTICE_SCRIPT)
-    server_log = self._LM_NOTICE_LOG
-    return (
-        f'python3 {vm_path} {gcp_flags.LM_NOTIFICATION_METADATA_NAME.value} >'
-        f' {server_log} 2>&1'
-    )
-
-  def _PullLMNoticeLog(self):
-    """Pull the LM Notice Log onto the local VM."""
-    self.PullFile(vm_util.GetTempDir(), self._LM_NOTICE_LOG)
-
-  def StartLMNotification(self):
-    """Start meta-data server notification subscription."""
-
-    def _Subscribe():
-      self.RemoteCommand(
-          self._GetLMNotificationCommand(),
-          timeout=LM_NOTIFICATION_TIMEOUT_SECONDS,
-          ignore_failure=True,
-      )
-      self._PullLMNoticeLog()
-      logging.info('[LM Notify] Release live migration lock.')
-      self._LM_TIMES_SEMAPHORE.release()
-
-    logging.info('[LM Notify] Create live migration timestamp thread.')
-    t = threading.Thread(target=_Subscribe)
-    t.daemon = True
-    t.start()
-
-  def WaitLMNotificationRelease(self):
-    """Block main thread until LM ended."""
-    logging.info('[LM Notify] Wait for live migration to finish.')
-    self._LM_TIMES_SEMAPHORE.acquire()
-    logging.info('[LM Notify] Live migration is done.')
-
-  def _ReadLMNoticeContents(self):
-    """Read the contents of the LM Notice Log into a string."""
-    return self.RemoteCommand(f'cat {self._LM_NOTICE_LOG}')[0]
-
-  def CollectLMNotificationsTime(self):
-    """Extract LM notifications from log file.
-
-    Sample Log file to parse:
-      Host_maintenance_start _at_ 1656555520.78123
-      Host_maintenance_end _at_ 1656557227.63631
-
-    Returns:
-      Live migration events timing info dictionary
-    """
-    lm_total_time_key = 'LM_total_time'
-    lm_start_time_key = 'Host_maintenance_start'
-    lm_end_time_key = 'Host_maintenance_end'
-    events_dict = {
-        'machine_instance': self.instance_number,
-        lm_start_time_key: 0,
-        lm_end_time_key: 0,
-        lm_total_time_key: 0,
-    }
-    lm_times = self._ReadLMNoticeContents()
-    if not lm_times:
-      raise ValueError('Cannot collect lm times. Live Migration might failed.')
-
-    # Result may contain errors captured, so we need to skip them
-    for event_info in lm_times.splitlines():
-      event_info_parts = event_info.split(' _at_ ')
-      if len(event_info_parts) == 2:
-        events_dict[event_info_parts[0]] = event_info_parts[1]
-
-    events_dict[lm_total_time_key] = float(
-        events_dict[lm_end_time_key]
-    ) - float(events_dict[lm_start_time_key])
-    return events_dict
-
   def DownloadPreprovisionedData(
       self,
       install_path,
@@ -1769,6 +1650,13 @@ class Debian12BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
 
+class Debian13BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Debian13Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'debian-13'
+  DEFAULT_IMAGE_PROJECT = 'debian-cloud'
+
+
 class Rhel8BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Rhel8Mixin
 ):
@@ -1780,6 +1668,13 @@ class Rhel9BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Rhel9Mixin
 ):
   DEFAULT_X86_IMAGE_FAMILY = 'rhel-9'
+  DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
+
+
+class Rhel10BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Rhel10Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'rhel-10'
   DEFAULT_IMAGE_PROJECT = 'rhel-cloud'
 
 
@@ -1834,6 +1729,20 @@ class RockyLinux9OptimizedBasedGceVirtualMachine(
 ):
   OS_TYPE = os_types.ROCKY_LINUX9_OPTIMIZED
   DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-9-optimized-gcp'
+
+
+class RockyLinux10BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.RockyLinux10Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-10'
+  DEFAULT_IMAGE_PROJECT = 'rocky-linux-cloud'
+
+
+class RockyLinux10OptimizedBasedGceVirtualMachine(
+    RockyLinux10BasedGceVirtualMachine
+):
+  OS_TYPE = os_types.ROCKY_LINUX10_OPTIMIZED
+  DEFAULT_X86_IMAGE_FAMILY = 'rocky-linux-10-optimized-gcp'
 
 
 class CentOsStream9BasedGceVirtualMachine(

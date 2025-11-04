@@ -240,6 +240,7 @@ class PostBootLatencyTest(ClusterBootBenchmarkTest):
   def setUp(self):
     super().setUp()
     self.test_vm = mock.Mock()
+    self.test_vm.create_start_time = 0
     self.test_cmd = 'test_command'
 
   def testSuccessfulCommand(self):
@@ -250,20 +251,24 @@ class PostBootLatencyTest(ClusterBootBenchmarkTest):
         0,
     )
 
-    # We need a third time.time() mock to cover the invocation in the
-    # sample.Sample constructor
-    with mock.patch('time.time', side_effect=[10, 12, 0]):
+    # We need dummy third & fourth time.time() mocks to cover the invocation in
+    # the sample.Sample constructor
+    with mock.patch('time.time', side_effect=[10, 12, 0, 0]):
       result = cluster_boot_benchmark._RunPostBootLatencyTest(
           self.test_cmd, self.test_vm
       )
 
-      self.assertIsNotNone(result)
-      self.assertEqual(result.metric, 'Post Boot Command Latency')
-      self.assertEqual(result.value, 2)
-      self.assertEqual(result.unit, 'seconds')
-      self.assertEqual(result.metadata['test_command'], 'test_command')
+      self.assertLen(result, 2)
+      self.assertEqual(result[0].metric, 'Post Boot Command Latency')
+      self.assertEqual(result[0].value, 2)
+      self.assertEqual(result[0].unit, 'seconds')
+      self.assertEqual(result[0].metadata['test_command'], 'test_command')
+      self.assertEqual(result[1].metric, 'Create to Post Boot Command')
+      self.assertEqual(result[1].value, 12)
+      self.assertEqual(result[1].unit, 'seconds')
+      self.assertEqual(result[1].metadata['test_command'], 'test_command')
       self.test_vm.RemoteCommandWithReturnCode.assert_called_once_with(
-          self.test_cmd
+          self.test_cmd, ignore_failure=True
       )
 
   @mock.patch.object(logging, 'warning')
@@ -279,12 +284,16 @@ class PostBootLatencyTest(ClusterBootBenchmarkTest):
         self.test_cmd, self.test_vm
     )
 
-    self.assertIsNone(result)
+    self.assertLen(result, 1)
+    self.assertEqual(result[0].metric, 'Post Boot Command Failed')
+    self.assertEqual(result[0].value, 1)
+    self.assertEqual(result[0].unit, 'count')
+    self.assertEqual(result[0].metadata['test_command'], 'test_command')
     mock_warning.assert_called_once_with(
         'The test command returned a non-zero exit code: %s', 'error message'
     )
     self.test_vm.RemoteCommandWithReturnCode.assert_called_once_with(
-        self.test_cmd
+        self.test_cmd, ignore_failure=True
     )
 
   @mock.patch.object(logging, 'warning')
@@ -305,7 +314,7 @@ class PostBootLatencyTest(ClusterBootBenchmarkTest):
         mock.ANY,
     )
     self.test_vm.RemoteCommandWithReturnCode.assert_called_once_with(
-        self.test_cmd
+        self.test_cmd, ignore_failure=True
     )
 
 if __name__ == '__main__':

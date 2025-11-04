@@ -16,6 +16,7 @@
 import copy
 import unittest
 from absl import flags
+from absl.testing import parameterized
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker.configs import benchmark_config_spec
 from tests import pkb_common_test_case
@@ -109,6 +110,44 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
         'pkb-' + FLAGS.run_uri, edw_local.GetClusterIdentifier(spec)
     )
     self.assertEqual('pkb-' + FLAGS.run_uri, edw_local.cluster_identifier)
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='_empty_dict',
+          cols={},
+          expected=[],
+      ),
+      dict(
+          testcase_name='_single_column',
+          cols={'col1': ['val1', 'val2']},
+          expected=[{'col1': 'val1'}, {'col1': 'val2'}],
+      ),
+      dict(
+          testcase_name='_multiple_columns',
+          cols={'col1': ['val1', 'val2'], 'col2': ['val3', 'val4']},
+          expected=[
+              {'col1': 'val1', 'col2': 'val3'},
+              {'col1': 'val2', 'col2': 'val4'},
+          ],
+      ),
+      dict(
+          testcase_name='_uneven_columns',
+          cols={'col1': ['val1', 'val2'], 'col2': ['val3', 'val4', 'val5']},
+          expected=[
+              {'col1': 'val1', 'col2': 'val3'},
+              {'col1': 'val2', 'col2': 'val4'},
+          ],
+      ),
+  )
+  def testColsToRows(self, cols=None, expected=None):
+    self.assertEqual(
+        expected,
+        edw_service.EdwService.ColsToRows(cols),
+        msg=(
+            f'Expected {expected} but got'
+            f' {edw_service.EdwService.ColsToRows(cols)}'
+        ),
+    )
 
 
 if __name__ == '__main__':

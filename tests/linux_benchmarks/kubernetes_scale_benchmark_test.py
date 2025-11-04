@@ -322,6 +322,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             sample.Sample('pod_Ready_p90', 95.0, 'seconds'),
             sample.Sample('pod_Ready_count', 10, 'count'),
         ],
+        9,
     )
 
   @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
@@ -344,6 +345,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
           [
               sample.Sample('pod_Ready_count', 5, 'count'),
           ],
+          9,
       )
 
   @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
@@ -370,6 +372,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
           [
               sample.Sample('pod_Ready_count', 5, 'count'),
           ],
+          9,
       )
 
 

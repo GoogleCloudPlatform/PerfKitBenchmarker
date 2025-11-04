@@ -20,7 +20,7 @@ import logging
 import os
 import random
 import re
-from typing import Any
+from typing import Any, override
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -769,6 +769,7 @@ class Bigquery(edw_service.EdwService):
     run_cost = output['details']['query_results']['billed_slot_seconds'][0]
     return run_cost
 
+  @override
   def GetIterationAuxiliaryMetrics(self, iter_run_key: str) -> dict[str, Any]:
     service_auxiliary_metrics = {}
     try:

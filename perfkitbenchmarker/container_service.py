@@ -1005,7 +1005,7 @@ class KubernetesClusterCommands:
       """Parses the output of kubectl apply to get the name of the resource."""
       # Example input: deployment.apps/pkb123 created
       for line in stdout.splitlines():
-        match = re.search(r'([^\s/]+/[^\s/]+) created', line)
+        match = re.search(r'([^\s/]+/[^\s/]+) (created|configured)', line)
         if match:
           yield match.group(1)
 
@@ -1739,17 +1739,21 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     """Get the node selectors section of a yaml for the provider."""
     return []
 
-  def DeployIngress(self, name: str, namespace: str, port: int) -> str:
+  def DeployIngress(
+      self, name: str, namespace: str, port: int, health_path: str = ''
+  ) -> str:
     """Deploys an Ingress/load balancer resource to the cluster.
 
     Args:
       name: The name of the Ingress resource.
       namespace: The namespace of the resource.
       port: The port to expose to the internet.
+      health_path: The path to use for health checks.
 
     Returns:
       The address of the Ingress.
     """
+    del health_path
     self.ApplyManifest(
         'container/loadbalancer.yaml.j2',
         name=name,
@@ -1784,6 +1788,10 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
           'No IP or hostname found in ingress from stdout ' + ingress_out
       )
     return 'http://' + ip.strip()
+
+  def AddNodepool(self, batch_name: str, pool_id: str):
+    """Adds an additional nodepool with the given name to the cluster."""
+    pass
 
 
 @dataclasses.dataclass(eq=True, frozen=True)

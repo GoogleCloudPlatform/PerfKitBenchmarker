@@ -293,8 +293,9 @@ def _BuildStartCommand(vm, port: int) -> str:
 @vm_util.Retry(poll_interval=5, timeout=60)
 def _WaitForRedisUp(vm, port):
   """Wait until redis server is up on a given port."""
+  localhost = vm.GetLocalhostAddr()
   vm.RemoteCommand(
-      f'sudo {GetRedisDir()}/src/redis-cli -h localhost -p {port} ping | grep'
+      f'sudo {GetRedisDir()}/src/redis-cli -h {localhost} -p {port} ping | grep'
       ' PONG'
   )
 
@@ -313,21 +314,33 @@ def Stop(vm) -> None:
   """Stops redis server processes, flushes all keys, and resets the cluster."""
   redis_dir = GetRedisDir()
   ports = GetRedisPorts(vm)
+  localhost = vm.GetLocalhostAddr()
 
   for port in ports:
     vm.TryRemoteCommand(
-        f'sudo {redis_dir}/src/redis-cli -h localhost -p {port} flushall'
+        f'sudo {redis_dir}/src/redis-cli -h {localhost} -p {port} flushall'
     )
 
   for port in ports:
     vm.TryRemoteCommand(
-        f'sudo {redis_dir}/src/redis-cli -h localhost -p {port} cluster reset '
-        'hard'
+        f'sudo {redis_dir}/src/redis-cli -h {localhost} -p {port} cluster reset'
+        ' hard'
     )
 
-  vm.TryRemoteCommand(
-      'sudo pkill -f redis-server || echo "No Redis server processes found"'
-  )
+  for port in ports:
+    # Gracefully send SHUTDOWN command to redis server.
+    vm.TryRemoteCommand(
+        f'sudo {redis_dir}/src/redis-cli -h {localhost} -p {port} shutdown'
+    )
+
+  for port in ports:
+    # Check that redis server is not running anymore.
+    _, stderr, return_code = vm.RemoteCommandWithReturnCode(
+        f'sudo {redis_dir}/src/redis-cli -h {localhost} -p {port} ping',
+        ignore_failure=True,
+    )
+    if return_code == 0 or 'Could not connect to Redis' not in stderr:
+      raise errors.Error(f'Redis on port {port} failed to shut down.')
 
 
 def StartCluster(server_vms) -> None:

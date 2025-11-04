@@ -1095,9 +1095,8 @@ def _GetSingleThreadedLatency(
 
 
 @vm_util.Retry(
-    poll_interval=0,
-    timeout=0,
-    max_retries=5,
+    poll_interval=1,
+    timeout=60,
     retryable_exceptions=(RetryableRunError),
 )
 def _IssueRetryableCommand(vm, cmd: str) -> None:
@@ -1107,6 +1106,15 @@ def _IssueRetryableCommand(vm, cmd: str) -> None:
     raise RetryableRunError('Redis client connection failed, retrying')
   if 'handle error response' in stderr:
     raise RunFailureError(stderr)
+
+
+@vm_util.Retry(poll_interval=1, timeout=60)
+def _CheckRedisReachable(vm, server_ip: str, server_port: int) -> None:
+  """Checks if redis server is reachable."""
+  logging.info('Checking reachability of %s:%s', server_ip, server_port)
+  # Output: Connection to xxxx:yyy:zzzz:wwww:: 6379 port [tcp/redis] succeeded!
+  cmd = f'nc -zv {server_ip} {server_port} 2>&1 | grep succeeded'
+  vm.RemoteCommand(cmd)
 
 
 def _Run(
@@ -1132,6 +1140,8 @@ def _Run(
       threads,
       pipeline,
   )
+
+  _CheckRedisReachable(vm, server_ip, server_port)
 
   file_name_suffix = '_'.join(filter(None, [str(server_port), unique_id]))
   memtier_results_file_name = (

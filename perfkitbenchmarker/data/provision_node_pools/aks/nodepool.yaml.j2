@@ -1,0 +1,43 @@
+{% if id == '001' -%}
+---
+apiVersion: karpenter.azure.com/v1beta1
+kind: AKSNodeClass
+metadata:
+  name: aks-managed-class
+spec:
+  imageFamily: "Ubuntu2204"
+{%- endif %}
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: {{ batch }}-nodepool-{{ id }}
+spec:
+  disruption:
+    budgets:
+    - nodes: 30%
+    consolidateAfter: 0s
+    consolidationPolicy: WhenEmptyOrUnderutilized
+  template:
+    spec:
+      nodeClassRef:
+        group: karpenter.azure.com
+        kind: AKSNodeClass
+        name: aks-managed-class
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["{{ 'spot' if spot else 'on-demand' }}"]
+        - key: karpenter.azure.com/sku-family
+          operator: In
+          values: ["D"]
+        - key: "group"
+          operator: In
+          values:
+          - pool-{{ batch }}-{{ id }}

@@ -13,34 +13,28 @@
 # limitations under the License.
 """Module containning methods for triggering maintenance simulation."""
 
-import collections
-import copy
+from collections.abc import Mapping, MutableSequence
+import datetime
+import json
 import logging
-import statistics
-from typing import Any, Dict, List
+import ntpath
+import posixpath
+import threading
+import time
+import typing
+from typing import Any, Dict
 
 from absl import flags
-from perfkitbenchmarker import benchmark_spec as bm_spec
-from perfkitbenchmarker import sample
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker.time_triggers import base_time_trigger
+from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
+from perfkitbenchmarker.providers.gcp import gce_virtual_machine
+from perfkitbenchmarker.providers.gcp import gce_windows_virtual_machine
+from perfkitbenchmarker.providers.gcp import util
+from perfkitbenchmarker.time_triggers import base_disruption_trigger
 
-TIME_SERIES_SAMPLES_FOR_AGGREGATION = [
-    sample.TPM_TIME_SERIES,
-    sample.OPS_TIME_SERIES,
-    sample.QPS_TIME_SERIES,
-]
-PERCENTILES = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
-
-DEGRADATION_PERCENT = flags.DEFINE_float(
-    'maintenance_degradation_percent',
-    95.0,
-    (
-        'Percentage to consider a given second is a degradation. This should'
-        ' set to (1 - max variance) of the benchmark. I.e if the benchmark have'
-        ' max variance of 5%, this should be set to 95.'
-    ),
-)
+WindowsGceVirtualMachine = gce_windows_virtual_machine.WindowsGceVirtualMachine
 
 SIMULATE_MAINTENANCE = flags.DEFINE_boolean(
     'simulate_maintenance',
@@ -69,12 +63,6 @@ SIMULATE_MAINTENANCE_DELAY = flags.DEFINE_integer(
     ),
 )
 
-MAINTENANCE_DEGRADATION_WINDOW = flags.DEFINE_float(
-    'maintenance_degradation_window',
-    2,
-    'Multiple of LM duration to consider the degradation after LM starts.',
-)
-
 CAPTURE_LIVE_MIGRATION_TIMESTAMPS = flags.DEFINE_boolean(
     'capture_live_migration_timestamps',
     False,
@@ -84,8 +72,253 @@ CAPTURE_LIVE_MIGRATION_TIMESTAMPS = flags.DEFINE_boolean(
     ),
 )
 
+# 2h timeout for LM notification
+LM_NOTIFICATION_TIMEOUT_SECONDS = 60 * 60 * 2
 
-class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
+# 10m wait time prior to checking log for LM status
+LM_UNAVAILABLE_STATUS_WAIT_TIME_MIN = 10
+
+
+class GCESimulateMaintenanceTool:
+  """Helper class for simulating maintenance on a GCE VM."""
+
+  def __init__(self, vm: gce_virtual_machine.GceVirtualMachine):
+    self.vm = vm
+    self._lm_times_semaphore = threading.Semaphore(0)
+    self._lm_notice_script = 'gce_maintenance_notice.py'
+    self._lm_signal_log = 'lm_signal.log'
+    self._lm_notice_log = 'gce_maintenance_notice.log'
+
+  def SimulateMaintenanceWithLog(self):
+    """Create a json file with information related to the vm."""
+    simulate_maintenance_json = {
+        'current_time': datetime.datetime.now().timestamp() * 1000,
+        'instance_id': self.vm.id,
+        'project': self.vm.project,
+        'instance_name': self.vm.name,
+        'zone': self.vm.zone,
+    }
+    vm_path = posixpath.join(vm_util.GetTempDir(), self._lm_signal_log)
+    with open(vm_path, 'w+') as f:
+      json.dump(simulate_maintenance_json, f, indent=2, sort_keys=True)
+
+  def SimulateMaintenanceEvent(self):
+    """Simulates a maintenance event on the VM."""
+    cmd = util.GcloudCommand(
+        self.vm,
+        'compute',
+        'instances',
+        'simulate-maintenance-event',
+        self.vm.name,
+        '--async',
+    )
+    logcmd = util.GcloudCommand(
+        None,
+        'logging',
+        'read',
+        '"protoPayload.methodName=v1.compute.instances.simulateMaintenanceEvent'
+        f' resource.labels.instance_id={self.vm.id}"',
+    )
+    logcmd.flags['freshness'] = f'{LM_UNAVAILABLE_STATUS_WAIT_TIME_MIN}M'
+
+    stdout, _, retcode = cmd.Issue(raise_on_failure=False)
+    if retcode or 'error' in stdout:
+      raise errors.VirtualMachine.VirtualMachineError(
+          'Unable to simulate maintenance event.'
+      )
+
+    time.sleep(LM_UNAVAILABLE_STATUS_WAIT_TIME_MIN * 60)
+    stdout, _, retcode = logcmd.Issue(raise_on_failure=False)
+    # if the migration is temporarily unavailable, retry the migration command
+    if not retcode and 'MIGRATION_TEMPORARILY_UNAVAILABLE' in stdout:
+      stdout, _, retcode = cmd.Issue(raise_on_failure=False)
+      if retcode or 'error' in stdout:
+        raise errors.VirtualMachine.VirtualMachineError(
+            'Unable to simulate maintenance event.'
+        )
+
+  def SetupLMNotification(self):
+    """Prepare environment for /scripts/gce_maintenance_notify.py script."""
+    self.vm.Install('pip')
+    self.vm.RemoteCommand('sudo pip3 install requests')
+    self.vm.PushDataFile(self._lm_notice_script, vm_util.VM_TMP_DIR)
+
+  def _GetLMNotificationCommand(self):
+    """Return Remote python execution command for LM notify script."""
+    vm_path = posixpath.join(vm_util.VM_TMP_DIR, self._lm_notice_script)
+    server_log = self._lm_notice_log
+    return (
+        f'python3 {vm_path} {gcp_flags.LM_NOTIFICATION_METADATA_NAME.value} >'
+        f' {server_log} 2>&1'
+    )
+
+  def _PullLMNoticeLog(self):
+    """Pull the LM Notice Log onto the local VM."""
+    self.vm.PullFile(vm_util.GetTempDir(), self._lm_notice_log)
+
+  def StartLMNotification(self):
+    """Start meta-data server notification subscription."""
+
+    def _Subscribe():
+      self.vm.RemoteCommand(
+          self._GetLMNotificationCommand(),
+          timeout=LM_NOTIFICATION_TIMEOUT_SECONDS,
+          ignore_failure=True,
+      )
+      self._PullLMNoticeLog()
+      logging.info('[LM Notify] Release live migration lock.')
+      self._lm_times_semaphore.release()
+
+    logging.info('[LM Notify] Create live migration timestamp thread.')
+    t = threading.Thread(target=_Subscribe)
+    t.daemon = True
+    t.start()
+
+  def WaitLMNotificationRelease(self):
+    """Block main thread until LM ended."""
+    logging.info('[LM Notify] Wait for live migration to finish.')
+    self._lm_times_semaphore.acquire()
+    logging.info('[LM Notify] Live migration is done.')
+
+  def _ReadLMNoticeContents(self):
+    """Read the contents of the LM Notice Log into a string."""
+    return self.vm.RemoteCommand(f'cat {self._lm_notice_log}')[0]
+
+  def CollectLMNotificationsTime(self):
+    """Extract LM notifications from log file.
+
+    Sample Log file to parse:
+      Host_maintenance_start _at_ 1656555520.78123
+      Host_maintenance_end _at_ 1656557227.63631
+
+    Returns:
+      Live migration events timing info dictionary
+    """
+    lm_total_time_key = 'LM_total_time'
+    lm_start_time_key = 'Host_maintenance_start'
+    lm_end_time_key = 'Host_maintenance_end'
+    events_dict = {
+        'machine_instance': self.vm.instance_number,
+        lm_start_time_key: 0,
+        lm_end_time_key: 0,
+        lm_total_time_key: 0,
+    }
+    lm_times = self._ReadLMNoticeContents()
+    if not lm_times:
+      raise ValueError('Cannot collect lm times. Live Migration might failed.')
+
+    # Result may contain errors captured, so we need to skip them
+    for event_info in lm_times.splitlines():
+      event_info_parts = event_info.split(' _at_ ')
+      if len(event_info_parts) == 2:
+        events_dict[event_info_parts[0]] = event_info_parts[1]
+
+    events_dict[lm_total_time_key] = float(
+        events_dict[lm_end_time_key]
+    ) - float(events_dict[lm_start_time_key])
+    return events_dict
+
+
+class GCESimulateMaintenanceToolForWindows(GCESimulateMaintenanceTool):
+  """Helper class for simulating maintenance on a GCE VM."""
+
+  def __init__(self, vm: gce_virtual_machine.GceVirtualMachine):
+    super().__init__(vm)
+    if vm is not WindowsGceVirtualMachine:
+      raise ValueError('WindowsGceVirtualMachine is required.')
+
+    self.vm_temp_dir = typing.cast(WindowsGceVirtualMachine, vm).temp_dir
+
+  def SetupLMNotification(self):
+    """Prepare environment for /scripts/gce_maintenance_notify.py script."""
+    self.vm.Install('python')
+    self.vm.RemoteCommand('pip install requests')
+    self.vm.PushDataFile(
+        self._lm_notice_script, f'{self.vm_temp_dir}\\{self._lm_notice_script}'
+    )
+
+  def _GetLMNotificationCommand(self):
+    """Return Remote python execution command for LM notify script."""
+    vm_path = ntpath.join(self.vm_temp_dir, self._lm_notice_script)
+    return (
+        f'python {vm_path} {gcp_flags.LM_NOTIFICATION_METADATA_NAME.value}'
+        f' {gcp_flags.LM_NOTIFICATION_TIMEOUT.value} >'
+        f' {self.vm_temp_dir}\\{self._lm_notice_log} 2>&1'
+    )
+
+  def _PullLMNoticeLog(self):
+    """Pull the LM Notice Log onto the local VM."""
+    self.vm.PullFile(
+        f'{vm_util.GetTempDir()}/{self._lm_notice_log}',
+        f'{self.vm_temp_dir}\\{self._lm_notice_log}',
+    )
+
+  def StartLMNotification(self):
+    """Start meta-data server notification subscription."""
+
+    def _Subscribe():
+      self.vm.RemoteCommand(
+          self._GetLMNotificationCommand(),
+          timeout=LM_NOTIFICATION_TIMEOUT_SECONDS,
+          ignore_failure=True,
+      )
+      self._PullLMNoticeLog()
+      logging.info('[LM Notify] Release live migration lock.')
+      self._lm_times_semaphore.release()
+
+    logging.info('[LM Notify] Create live migration timestamp thread.')
+    t = threading.Thread(target=_Subscribe)
+    t.daemon = True
+    t.start()
+
+  def WaitLMNotificationRelease(self):
+    """Block main thread until LM ended."""
+    logging.info('[LM Notify] Wait for live migration to finish.')
+    self._lm_times_semaphore.acquire()
+    logging.info('[LM Notify] Live migration is done.')
+
+  def _ReadLMNoticeContents(self):
+    """Read the contents of the LM Notice Log into a string."""
+    return self.vm.RemoteCommand(
+        f'type {self.vm_temp_dir}\\{self._lm_notice_log}'
+    )[0]
+
+  def CollectLMNotificationsTime(self):
+    """Extract LM notifications from log file.
+
+    Sample Log file to parse:
+      Host_maintenance_start _at_ 1656555520.78123
+      Host_maintenance_end _at_ 1656557227.63631
+
+    Returns:
+      Live migration events timing info dictionary
+    """
+    lm_total_time_key = 'LM_total_time'
+    lm_start_time_key = 'Host_maintenance_start'
+    lm_end_time_key = 'Host_maintenance_end'
+    events_dict = {
+        'machine_instance': self.vm.instance_number,
+        lm_start_time_key: 0,
+        lm_end_time_key: 0,
+        lm_total_time_key: 0,
+    }
+    lm_times = self._ReadLMNoticeContents()
+    if not lm_times:
+      raise ValueError('Cannot collect lm times. Live Migration might failed.')
+
+    # Result may contain errors captured, so we need to skip them
+    for event_info in lm_times.splitlines():
+      event_info_parts = event_info.split(' _at_ ')
+      if len(event_info_parts) == 2:
+        events_dict[event_info_parts[0]] = event_info_parts[1]
+
+    events_dict[lm_total_time_key] = float(
+        events_dict[lm_end_time_key]
+    ) - float(events_dict[lm_start_time_key])
+    return events_dict
+
+
+class MaintenanceEventTrigger(base_disruption_trigger.BaseDisruptionTrigger):
   """Class contains logic for triggering maintenance events."""
 
   def __init__(self):
@@ -93,289 +326,59 @@ class MaintenanceEventTrigger(base_time_trigger.BaseTimeTrigger):
     self.capture_live_migration_timestamps = (
         CAPTURE_LIVE_MIGRATION_TIMESTAMPS.value
     )
-    self.lm_ends = None
+    self.gce_simulate_maintenance_helpers: Dict[
+        gce_virtual_machine.GceVirtualMachine, GCESimulateMaintenanceTool
+    ] = {}
 
   def TriggerMethod(self, vm: virtual_machine.VirtualMachine):
     if self.capture_live_migration_timestamps:
-      vm.StartLMNotification()
+      self.gce_simulate_maintenance_helpers[vm].StartLMNotification()
     if SIMULATE_MAINTENANCE_WITH_LOG.value:
-      vm.SimulateMaintenanceWithLog()  # pytype: disable=attribute-error
+      self.gce_simulate_maintenance_helpers[vm].SimulateMaintenanceWithLog()
     else:
-      vm.SimulateMaintenanceEvent()
+      self.gce_simulate_maintenance_helpers[vm].SimulateMaintenanceEvent()
 
   def SetUp(self):
-    """Base class."""
+    """Sets up notification if live migration timestamps are captured."""
+    for vm in self.vms:
+      self.gce_simulate_maintenance_helpers[vm] = GCESimulateMaintenanceFactory(
+          vm
+      )
     if self.capture_live_migration_timestamps:
-      for vm in self.vms:
-        vm.SetupLMNotification()
+      for helper in self.gce_simulate_maintenance_helpers.values():
+        helper.SetupLMNotification()
 
-  def AppendSamples(
-      self,
-      unused_sender,
-      benchmark_spec: bm_spec.BenchmarkSpec,
-      samples: List[sample.Sample],
-  ):
-    """Append samples related to Live Migration."""
+  def WaitForDisruption(self) -> MutableSequence[Mapping[str, Any]]:
+    """Wait for the disruption to end and return the end time."""
+    if self.capture_live_migration_timestamps:
+      # Block test exit until LM ended.
+      lm_events = []
+      for helper in self.gce_simulate_maintenance_helpers.values():
+        helper.WaitLMNotificationRelease()
+        lm_events.append(helper.CollectLMNotificationsTime())
+      return lm_events
+    else:
+      return []
 
-    def generate_lm_total_time_samples() -> List[sample.Sample]:
-      lm_event_dicts = []
-      if self.capture_live_migration_timestamps:
-        # Block test exit until LM ended.
-        for vm in self.vms:
-          vm.WaitLMNotificationRelease()
-          lm_event_dicts.append(vm.CollectLMNotificationsTime())
-      else:
-        return []
-
-      # Host maintenance is in s
-      self.lm_ends = max(
-          [float(d['Host_maintenance_end']) * 1000 for d in lm_event_dicts],
-          default=0,
-      )
-
-      # Populate the run_number "LM Total Time" by copying the metadata from
-      # (one of) the existing samples. Ideally pkb.DoRunPhase() would have sole
-      # responsibility for populating run_number for all samples, but making
-      # that change might be risky.
-      sample_metadata = (
-          copy.deepcopy(samples[0].metadata) if len(samples) > 0 else {}
-      )
-
-      return [
-          sample.Sample(
-              'LM Total Time',
-              d['LM_total_time'],
-              'seconds',
-              sample_metadata | d,
-          )
-          for d in lm_event_dicts
-      ]
-
-    samples.extend(generate_lm_total_time_samples())
-    self._AppendAggregatedMetrics(samples)
-
-  def _AppendAggregatedMetrics(self, samples: List[sample.Sample]):
-    """Finds the time series samples and add generate the aggregated metrics."""
-    additional_samples = []
-    for s in samples:
-      if s.metric in TIME_SERIES_SAMPLES_FOR_AGGREGATION:
-        additional_samples += self._AggregateThroughputSample(s)
-    samples.extend(additional_samples)
-
-  def _AggregateThroughputSample(self, s: sample.Sample) -> List[sample.Sample]:
-    """Aggregate a time series sample into Live migration metrics.
-
-    Split the samples and compute mean and median and calls relevant
-    methods to generate an aggregated sample based on the time series sample.
-
-    Args:
-      s: A time series sample create using CreateTimeSeriesSample in samples.py
-
-    Returns:
-      A list of samples.
-    """
-    metadata = copy.deepcopy(s.metadata)
-    time_series = metadata['timestamps']
-    values = metadata['values']
-    interval = metadata['interval']
-
-    # Default ramp up starts and ramp down starts if the benchmark does not
-    # provide it in the metadata.
-    ramp_up_ends = time_series[0]
-    ramp_down_starts = time_series[-1]
-    lm_ends = time_series[-1]
-    if sample.RAMP_DOWN_STARTS in metadata:
-      ramp_down_starts = metadata[sample.RAMP_DOWN_STARTS]
-    if sample.RAMP_UP_ENDS in metadata:
-      ramp_up_ends = metadata[sample.RAMP_UP_ENDS]
-
+  def GetDisruptionEnds(self) -> float | None:
+    """Get the disruption ends."""
     if self.capture_live_migration_timestamps:
       # lm ends is computed from LM notification
-      lm_ends = self.lm_ends
-
-    lm_start = sample.ConvertDateTimeToUnixMs(self.trigger_time)
-
-    lm_duration = lm_ends - lm_start
-
-    base_line_values = []
-    values_after_lm_starts = []
-    values_after_lm_ends = []
-    total_missing_seconds = 0
-    for i in range(len(values)):
-      time = time_series[i]
-      if time >= ramp_up_ends and time <= ramp_down_starts:
-        interval_values = []
-        # If more than 1 sequential value is missing from the time series.
-        # Distrubute the ops throughout the time series
-        if i > 0:
-          time_gap_in_seconds = (time - time_series[i - 1]) / 1000
-          missing_entry_count = int((time_gap_in_seconds / interval) - 1)
-          if missing_entry_count > 1:
-            total_missing_seconds += missing_entry_count * interval
-            interval_values.extend(
-                [int(values[i] / float(missing_entry_count + 1))]
-                * (missing_entry_count + 1)
-            )
-
-          else:
-            interval_values.append(values[i])
-        if time <= lm_start:
-          base_line_values.extend(interval_values)
-        else:
-          if (
-              MAINTENANCE_DEGRADATION_WINDOW.value is not None
-              and MAINTENANCE_DEGRADATION_WINDOW.value > 0
-          ):
-            window = MAINTENANCE_DEGRADATION_WINDOW.value
-            assert 1 <= window <= 10, (
-                'maintenance_degradation_window must be between 1 and 10'
-                f' inclusive, or None. Got: {window}'
-            )
-            if time <= lm_start + lm_duration * window:
-              values_after_lm_starts.extend(interval_values)
-          else:
-            values_after_lm_starts.extend(interval_values)
-
-        if time > lm_ends:
-          values_after_lm_ends.extend(interval_values)
-
-    median = statistics.median(base_line_values)
-    mean = statistics.mean(base_line_values)
-
-    logging.info('LM Baseline median: %s', median)
-    logging.info('LM Baseline mean: %s', mean)
-
-    # Keep the metadata from the original sample except time series metadata
-    for field in sample.TIME_SERIES_METADATA:
-      if field in metadata:
-        del metadata[field]
-
-    samples = self._ComputeLossPercentile(
-        mean, values_after_lm_starts, metadata
-    ) + self._ComputeLossWork(
-        median, values_after_lm_starts, interval, metadata
-    )
-    if values_after_lm_ends:
-      mean_after_lm_ends = statistics.mean(values_after_lm_ends)
-      samples += self._ComputeDegradation(mean, mean_after_lm_ends, metadata)
-      logging.info('Mean after LM ends: %s', mean_after_lm_ends)
-      logging.info(
-          'Number of samples after LM ends: %s', len(values_after_lm_ends)
-      )
-
-    # Seconds that are missing i.e without throughput.
-    samples.append(
-        sample.Sample(
-            'total_missing_seconds',
-            total_missing_seconds,
-            's',
-            metadata=metadata,
-        )
-    )
-    return samples
-
-  def _ComputeLossPercentile(
-      self, mean: float, values_after_lm: List[float], metadata: Dict[str, Any]
-  ) -> List[sample.Sample]:
-    """Compute loss percentile metrics.
-
-    This method samples of seconds_dropped_below_x_percent from 0% to 90%
-    in 10 percent increment. This is computed by a nested for loop and
-    comparing if value dropped below a given percentile.
-
-    Args:
-      mean: Mean of the baseline
-      values_after_lm: List of samples after Live migration.
-      metadata: Metadata for samples
-
-    Returns:
-      Samples of loss percentile metrics.
-    """
-    number_of_seconds_dropped_below_percentile = collections.defaultdict(int)
-    for value in values_after_lm:
-      for p in PERCENTILES:
-        if value <= mean * p:
-          number_of_seconds_dropped_below_percentile[p] += 1
-
-    samples = []
-    for p in PERCENTILES:
-      samples.append(
-          sample.Sample(
-              f'seconds_dropped_below_{int(p * 100)}_percent',
-              number_of_seconds_dropped_below_percentile[p],
-              's',
-              metadata=metadata,
-          )
-      )
-    return samples
-
-  def _ComputeLossWork(
-      self,
-      median: float,
-      values_after_lm: List[float],
-      interval: float,
-      metadata: Dict[str, Any],
-  ):
-    """Compute the loss work metrics for Live Migration.
-
-    This method returns two metrics.
-    1. The totl loss seconds. This is defined as the loss time across the LM.
-    It is the sum of (Median - value) / median * interval
-    2. Unresponsive metrics. This is the cube of the lost time to degrade
-    the impact of LM in the higher percentile.
-    It is the sum of  ((Median - value) / median) ** 3 * interval
-
-    Args:
-      median: median of the baseline
-      values_after_lm: List of samples after LM
-      interval: Interval of the metrics.
-      metadata: Metadata for samples
-
-    Returns:
-      List of samples.
-    """
-    total_loss_seconds = 0
-    unresponsive_metric = 0
-    for value in values_after_lm:
-      if value < median * DEGRADATION_PERCENT.value / 100.0:
-        total_loss_seconds += (median - value) / median * interval
-        unresponsive_metric += (((median - value) / median) ** (3.0)) * interval
-
-    samples = []
-    samples.append(
-        sample.Sample(
-            'unresponsive_metric',
-            round(unresponsive_metric, 4),
-            'metric',
-            metadata=metadata,
-        )
-    )
-    samples.append(
-        sample.Sample(
-            'total_loss_seconds',
-            round(total_loss_seconds, 4),
-            'seconds',
-            metadata=metadata,
-        )
-    )
-    return samples
-
-  def _ComputeDegradation(
-      self, baseline_mean: float, mean: float, metadata: Dict[str, Any]
-  ) -> List[sample.Sample]:
-    """Compute the degradation after LM ends to baseline."""
-    return [
-        sample.Sample(
-            'degradation_percent',
-            round((baseline_mean - mean) / baseline_mean * 100, 4),
-            '%',
-            metadata=metadata,
-        )
-    ]
+      return self.disruption_ends
+    return None
 
   @property
   def trigger_name(self) -> str:
     return 'simulate_maintenance'
+
+
+def GCESimulateMaintenanceFactory(
+    vm: virtual_machine.VirtualMachine,
+) -> GCESimulateMaintenanceTool:
+  """Factory method for GCESimulateMaintenanceTool  ."""
+  if isinstance(vm, WindowsGceVirtualMachine):
+    return GCESimulateMaintenanceToolForWindows(vm)
+  return GCESimulateMaintenanceTool(vm)  # pytype: disable=wrong-arg-types
 
 
 def Register(parsed_flags):

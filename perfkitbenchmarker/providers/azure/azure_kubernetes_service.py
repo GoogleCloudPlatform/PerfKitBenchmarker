@@ -170,12 +170,16 @@ class AksCluster(container_service.KubernetesCluster):
         '--nodepool-labels',
         f'pkb_nodepool={container_service.DEFAULT_NODEPOOL}',
     ] + self._GetNodeFlags(self.default_nodepool)
-    if self._IsAutoscalerEnabled():
-      cmd += [
-          '--enable-cluster-autoscaler',
-          f'--min-count={self.min_nodes}',
-          f'--max-count={self.max_nodes}',
-      ]
+    if FLAGS.azure_aks_auto_node_provisioning:
+      # For provision_node_pools benchmark, add auto provisioning mode
+      cmd.append('--node-provisioning-mode=auto')
+    else:
+      if self._IsAutoscalerEnabled():
+        cmd += [
+            '--enable-cluster-autoscaler',
+            f'--min-count={self.min_nodes}',
+            f'--max-count={self.max_nodes}',
+        ]
 
     # TODO(pclay): expose quota and capacity errors
     # Creating an AKS cluster with a fresh service principal usually fails due
@@ -435,17 +439,41 @@ class AksCluster(container_service.KubernetesCluster):
 
   def GetNodePoolNames(self) -> list[str]:
     """Get node pool names for the cluster."""
-    cmd = [
-        azure.AZURE_PATH,
-        'aks',
-        'nodepool',
-        'list',
-        '--cluster-name',
-        self.name,
-    ] + self.resource_group.args
-    stdout, _, _ = vm_util.IssueCommand(cmd)
-    nodepools = json.loads(stdout)
-    return [nodepool['name'] for nodepool in nodepools]
+    if FLAGS.azure_aks_auto_node_provisioning:
+      cmd = [
+          FLAGS.kubectl,
+          '--kubeconfig',
+          FLAGS.kubeconfig,
+          'get',
+          'nodepools',
+          '-o',
+          'json',
+      ]
+      stdout, _, _ = vm_util.IssueCommand(cmd)
+      nodepools = json.loads(stdout).get('items', [])
+      return [nodepool['metadata']['name'] for nodepool in nodepools]
+    else:
+      cmd = [
+          azure.AZURE_PATH,
+          'aks',
+          'nodepool',
+          'list',
+          '--cluster-name',
+          self.name,
+      ] + self.resource_group.args
+      stdout, _, _ = vm_util.IssueCommand(cmd)
+      nodepools = json.loads(stdout)
+      return [nodepool['name'] for nodepool in nodepools]
+
+  def AddNodepool(self, batch_name, pool_id):
+    """Add a Karpenter NodePool and AKSNodeClass to the AKS cluster."""
+    self.ApplyManifest(
+        'provision_node_pools/aks/nodepool.yaml.j2',
+        batch=batch_name,
+        id=pool_id,
+        cluster_name=self.name,
+        spot=FLAGS.azure_low_priority_vms,
+    )
 
 
 class AksAutomaticCluster(AksCluster):

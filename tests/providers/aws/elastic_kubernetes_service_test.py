@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from unittest import mock
+from urllib import parse
 from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import container_service
@@ -11,6 +12,7 @@ from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import elastic_kubernetes_service
 from perfkitbenchmarker.providers.aws import util
+from tests import matchers
 from tests import pkb_common_test_case
 
 
@@ -339,9 +341,13 @@ class EksKarpenterTest(BaseEksTest):
     )
     cluster = elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
     self.MockJsonRead(cluster)
-    self.MockIssueCommand(
-        {'create cluster': [('Cluster created', '', 0)], 'curl': [('', '', 0)]}
-    )
+    mock_cmd = self.MockIssueCommand({
+        'cloudformation deploy': [
+            ('Deployed cloud-formation-template.yaml', '', 0)
+        ],
+        'create cluster': [('Cluster created', '', 0)],
+        'curl': [('', '', 0)],
+    })
     cluster._Create()
     assert self.patched_read_json is not None
     called_json = self.patched_read_json.call_args_list[0][0][0]
@@ -375,6 +381,16 @@ class EksKarpenterTest(BaseEksTest):
     self.assertEqual(
         called_json['addons'], [{'name': 'eks-pod-identity-agent'}]
     )
+    mock_cmd.func_to_mock.assert_has_calls([
+        mock.call(
+            matchers.HASALLOF(
+                'cloudformation',
+                'deploy',
+                'benchmark=kubernetes_scale',
+                'cloud=aws',
+            )
+        ),
+    ])
 
   def testRecursiveDictionaryUpdate(self):
     base = {'a': 1, 'deep': {'c': 2}}
@@ -384,6 +400,36 @@ class EksKarpenterTest(BaseEksTest):
         expected,
         elastic_kubernetes_service.RecursivelyUpdateDictionary(base, update),
     )
+
+  def testIngressAddressParsing(self):
+    """Test parsing AWS ALB address with dualstack prefix removal."""
+    test_cases = [
+        (
+            'http://dualstack.k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+        ),
+        (
+            'https://dualstack.k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+        ),
+        (
+            'dualstack.k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+        ),
+        (
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+            'k8s-test-ingress-abc12345ef-123456789.us-east-1.elb.amazonaws.com',
+        ),
+    ]
+    for address, expected in test_cases:
+      with self.subTest(address=address):
+        host = (
+            parse.urlparse(address).hostname
+            if address.startswith('http')
+            else address
+        )
+        normalized = (host or '').replace('dualstack.', '')
+        self.assertEqual(normalized, expected)
 
 
 if __name__ == '__main__':

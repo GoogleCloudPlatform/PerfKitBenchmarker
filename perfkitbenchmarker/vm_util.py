@@ -622,7 +622,9 @@ def IssueCommand(
       # since some callers assume either is a failure e.g.
       # perfkitbenchmarker.providers.aws.util.IssueRetryableCommand()
       return stdout, '', 0
-    raise errors.VmUtil.IssueCommandError(debug_text)
+    # raise only when raise_on_failure=True, even if suppress_failure was passed
+    if raise_on_failure:
+      raise errors.VmUtil.IssueCommandError(debug_text)
 
   return stdout, stderr, process.returncode
 

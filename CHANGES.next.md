@@ -255,6 +255,8 @@
     single Prepare function.
 -   Also let users run only some of those three parts if they want to.
 -   Add support for the `--addons` flag in GKE Standard.
+-   Add support for RHEL and Rocky Linux 10.
+-   Add support for Debian 13.
 
 ### Enhancements:
 
@@ -630,3 +632,5 @@
 -   Add new general purpose fio benchmark for device - fio_raw_device_benchmark
 -   Add support for GCP HdML disks.
 -   Add fio benchmark for object storage via FUSE.
+-   Updated the CONTRIBUTING.md guide with steps to minimize merging & review
+    friction for new PRs.

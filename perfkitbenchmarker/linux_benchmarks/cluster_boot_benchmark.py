@@ -75,7 +75,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import log_util
+from perfkitbenchmarker import log_collector
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -505,7 +505,7 @@ def _GetVmOperationDataSamples(
 
 def _RunPostBootLatencyTest(
     test_cmd: str, test_vm: virtual_machine.BaseVirtualMachine
-) -> sample.Sample | None:
+) -> list[sample.Sample] | None:
   """Runs a test command on a VM and returns a sample of its latency.
 
   Args:
@@ -517,19 +517,38 @@ def _RunPostBootLatencyTest(
   """
   try:
     before_test_time = time.time()
-    _, stderr, retcode = test_vm.RemoteCommandWithReturnCode(test_cmd)
+    _, stderr, retcode = test_vm.RemoteCommandWithReturnCode(
+        test_cmd, ignore_failure=True
+    )
     after_test_time = time.time()
     if retcode != 0:
       logging.warning(
           'The test command returned a non-zero exit code: %s', stderr
       )
+      return [sample.Sample(
+          'Post Boot Command Failed',
+          1,
+          'count',
+          {
+              'test_command': test_cmd,
+              'test_command_stderr': stderr[:1000],
+          },
+      )]
     else:
-      return sample.Sample(
-          'Post Boot Command Latency',
-          after_test_time - before_test_time,
-          'seconds',
-          {'test_command': test_cmd},
-      )
+      return [
+          sample.Sample(
+              'Post Boot Command Latency',
+              after_test_time - before_test_time,
+              'seconds',
+              {'test_command': test_cmd},
+          ),
+          sample.Sample(
+              'Create to Post Boot Command',
+              after_test_time - test_vm.create_start_time,
+              'seconds',
+              {'test_command': test_cmd},
+          ),
+      ]
   except errors.VirtualMachine.RemoteCommandError as e:
     logging.warning(
         'Unable to establish connection with VM; the test command was not'
@@ -548,6 +567,12 @@ def Run(benchmark_spec):
     An empty list (all boot samples will be added later).
   """
   samples = []
+  if _POST_BOOT_LATENCY_TEST_COMMAND.value and benchmark_spec.vms:
+    test_vm = benchmark_spec.vms[0]
+    post_boot_samples = _RunPostBootLatencyTest(
+        _POST_BOOT_LATENCY_TEST_COMMAND.value, test_vm)
+    if post_boot_samples:
+      samples += post_boot_samples
   if _LINUX_BOOT_METRICS.value or CollectNetworkSamples():
     for vm in benchmark_spec.vms:
       samples.extend(
@@ -563,12 +588,6 @@ def Run(benchmark_spec):
       )
   if _BOOT_TIME_REBOOT.value:
     samples.extend(_MeasureReboot(benchmark_spec.vms))
-  if _POST_BOOT_LATENCY_TEST_COMMAND.value and benchmark_spec.vms:
-    test_vm = benchmark_spec.vms[0]
-    post_boot_sample = _RunPostBootLatencyTest(
-        _POST_BOOT_LATENCY_TEST_COMMAND.value, test_vm)
-    if post_boot_sample:
-      samples.append(post_boot_sample)
 
   return samples
 
@@ -588,7 +607,7 @@ def Cleanup(benchmark_spec):
       logging.warning('tcpdump process %s ended prematurely.', pid)
     try:
       tcpdump_path = benchmark_spec.config.temporary['tcpdump_output_path']
-      log_util.CollectVMLogs(FLAGS.run_uri, tcpdump_path)
+      log_collector.CollectVMLogs(FLAGS.run_uri, tcpdump_path)
       os.remove(tcpdump_path)
     except FileNotFoundError:
       logging.warning(

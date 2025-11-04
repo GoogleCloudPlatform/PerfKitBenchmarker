@@ -20,7 +20,10 @@ flags.DEFINE_string(
     'appservice_region', None, 'Region of deployed app service.'
 )
 flags.DEFINE_string(
-    'appservice_backend', None, 'Backend instance type of app service uses.'
+    'appservice_backend', None, 'Backend memory of app service uses.'
+)
+flags.DEFINE_string(
+    'appservice_cpu', None, 'Backend cpu of app service uses.'
 )
 flags.DEFINE_string(
     'app_runtime',
@@ -60,6 +63,8 @@ class BaseAppServiceSpec(spec.BaseSpec):
     SPEC_ATTRS: Required field(s) for subclasses.
     appservice_region: The region to run in.
     appservice_backend: Amount of memory to use.
+    appservice_cpu: Amount of CPU to use. Optional / backend memory takes
+      precedence.
     appservice: Name of the service (e.g. googlecloudfunction).
   """
 
@@ -67,6 +72,7 @@ class BaseAppServiceSpec(spec.BaseSpec):
   SPEC_ATTRS: List[str] = ['SERVICE']
   appservice_region: str
   appservice_backend: str
+  appservice_cpu: str | None
   appservice: str
 
   @classmethod
@@ -80,6 +86,8 @@ class BaseAppServiceSpec(spec.BaseSpec):
       config_values['appservice_region'] = flag_values.appservice_region
     if flag_values['appservice_backend'].present:
       config_values['appservice_backend'] = flag_values.appservice_backend
+    if flag_values['appservice_cpu'].present:
+      config_values['appservice_cpu'] = flag_values.appservice_cpu
     if flag_values['appservice'].present:
       config_values['appservice'] = flag_values.appservice
 
@@ -92,6 +100,10 @@ class BaseAppServiceSpec(spec.BaseSpec):
             {'default': None, 'none_ok': True},
         ),
         'appservice_backend': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'appservice_cpu': (
             option_decoders.StringDecoder,
             {'default': None, 'none_ok': True},
         ),
@@ -147,6 +159,7 @@ class BaseAppService(resource.BaseResource):
     self.name: str = self._GenerateName()
     self.region: str = base_app_service_spec.appservice_region
     self.backend: str = base_app_service_spec.appservice_backend
+    self.cpu: str | None = base_app_service_spec.appservice_cpu
     self.builder: Any = None
     self.endpoint: str | None = None
     self.poller: http_poller.HttpPoller = http_poller.HttpPoller()
