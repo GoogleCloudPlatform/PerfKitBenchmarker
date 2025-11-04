@@ -272,7 +272,7 @@ GCE_VM_SERVICE_ACCOUNT = flags.DEFINE_string(
 flags.DEFINE_string(
     'gcp_service_account', None, 'Service account to use for authorization.'
 )
-flags.DEFINE_string(
+GCP_SERVICE_ACCOUNT_KEY_FILE = flags.DEFINE_string(
     'gcp_service_account_key_file',
     None,
     'Local path to file that contains a private authorization '
