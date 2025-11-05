@@ -16,6 +16,10 @@ spec:
             value: {{generate_args}}
           - name: OUTPUT_FILE
             value: /output/output.yaml
+          - name: WG_SERVING_REPO_URL
+            value: "https://github.com/vofish/wg-serving.git" # need to be changed after merge of the https://github.com/kubernetes-sigs/wg-serving/pull/64/files
+          - name: WG_SERVING_REPO_BRANCH
+            value: "feature/add-aws-support-to-ai-inference" # need to be changed after merge of the https://github.com/kubernetes-sigs/wg-serving/pull/64/files 
         volumeMounts:
         - name: output
           mountPath: /output

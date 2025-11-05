@@ -569,6 +569,18 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
   def _GetInferenceServerManifest(self) -> str:
     """Generates and retrieves the inference server manifest content."""
+        # Ensure GPU capacity exists before scheduling GPU workloads
+    list(self.cluster.ApplyManifest(
+        'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
+        gpu_nodepool_name='gpu',
+        gpu_consolidate_after='1h',
+        gpu_consolidation_policy='WhenEmpty',
+        karpenter_nodeclass_name='default',   # must exist already
+        gpu_capacity_types=['on-demand'],
+        gpu_arch=['amd64'],
+        gpu_instance_families=['g6','g6e'],
+        gpu_taint_key='nvidia.com/gpu',
+    ))
     generate_args = {
         'kind': 'core/deployment',
         'model-server': self.spec.model_server,
