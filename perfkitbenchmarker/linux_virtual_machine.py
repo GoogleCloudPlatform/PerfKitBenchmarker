@@ -46,6 +46,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_mixin
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
@@ -1413,14 +1414,18 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       simplified_cmd.extend([remote_location, file_path])
       scp_cmd.extend([remote_location, file_path])
 
-    logging.info(
+    log_util.LogToShortLogAndRoot(
         'Copying file with simplified command: %s', ' '.join(simplified_cmd)
     )
 
     stdout, stderr, retcode = '', '', 1  # placate uninitialized variable checks
     for _ in range(FLAGS.ssh_retries):
       stdout, stderr, retcode = vm_util.IssueCommand(
-          scp_cmd, timeout=None, should_pre_log=False, raise_on_failure=False
+          scp_cmd,
+          timeout=None,
+          should_pre_log=False,
+          raise_on_failure=False,
+          log_to_short_log=False,
       )
 
       # Retry on 255 because this indicates an SSH failure
@@ -1604,12 +1609,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       ]
 
     if should_pre_log:
-      logger.info(
-          'Running on %s via ssh: %s',
-          self.name,
-          command,
-          stacklevel=stack_level,
-      )
+      log_message = f'Running on {self.name} via ssh: {command}'
+      log_util.LogToShortLogAndRoot(log_message, stacklevel=stack_level)
     stdout, stderr, retcode = '', '', 1  # placate uninitialized variable checks
     try:
       if login_shell:
@@ -1627,6 +1628,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
             raise_on_failure=False,
             suppress_logging=suppress_logging,
             stack_level=stack_level,
+            log_to_short_log=False,
         )
         # Retry on 255 because this indicates an SSH failure
         if retcode != RETRYABLE_SSH_RETCODE:

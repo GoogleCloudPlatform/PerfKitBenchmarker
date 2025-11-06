@@ -34,6 +34,7 @@ from absl import flags
 import jinja2
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import log_util
 from perfkitbenchmarker import temp_dir
 
 FLAGS = flags.FLAGS
@@ -448,6 +449,7 @@ def IssueCommand(
     suppress_logging: bool = False,
     raise_on_timeout: bool = True,
     stack_level: int = 1,
+    log_to_short_log: bool = True,
 ) -> Tuple[str, str, int]:
   """Tries running the provided command once.
 
@@ -476,6 +478,8 @@ def IssueCommand(
       timeout being hit should raise a IssueCommandTimeoutError
     stack_level: Number of stack frames to skip & get an "interesting" caller,
       for logging. 1 skips this function, 2 skips this & its caller, etc..
+    log_to_short_log: A boolean indicating if the command should be logged to
+      the short log.
 
   Returns:
     A tuple of stdout, stderr, and retcode from running the provided command.
@@ -598,6 +602,8 @@ def IssueCommand(
       and process.returncode
   ):
     logger.info(debug_text, stacklevel=stack_level)
+    if log_to_short_log:
+      log_util.LogToShortLog(full_cmd, stacklevel=stack_level)
 
   # Raise timeout error regardless of raise_on_failure - as the intended
   # semantics is to ignore expected errors caused by invoking the command

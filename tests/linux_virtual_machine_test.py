@@ -332,7 +332,10 @@ class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
       self.vm.RemoteCommand('foo')
     self.assertEqual(
         logs.output,
-        ['INFO:root:Running on %s via ssh: %s' % ('pkb-test', 'foo')],
+        [
+            'INFO:root:Running on pkb-test via ssh: foo',
+            'INFO:short:Running on pkb-test via ssh: foo',
+        ],
     )
     self.issue_cmd_mock.assert_called_once_with(
         matchers.HASALLOF('ssh', 'PasswordAuthentication=no', 'foo'),
@@ -341,6 +344,7 @@ class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
         raise_on_failure=False,
         suppress_logging=False,
         stack_level=mock.ANY,
+        log_to_short_log=False,
     )
 
   def testIssueCommanndCalledWithStackLevel(self):
@@ -352,6 +356,7 @@ class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
         raise_on_failure=False,
         suppress_logging=False,
         stack_level=4,
+        log_to_short_log=False,
     )
 
   @parameterized.parameters(
@@ -364,7 +369,7 @@ class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
     method = getattr(self.vm, method_name)
     with self.assertLogs() as logs:
       method('foo')
-    self.assertLen(logs.output, 1)
+    self.assertLen(logs.output, 2)
     self.assertIn('linux_virtual_machine_test', logs.records[0].pathname)
 
   def testLoginShellAppendsBash(self):
@@ -376,6 +381,7 @@ class TestRemoteCommand(pkb_common_test_case.PkbCommonTestCase):
         raise_on_failure=False,
         suppress_logging=False,
         stack_level=mock.ANY,
+        log_to_short_log=False,
     )
 
   def testNonZeroReturnCodeRaises(self):

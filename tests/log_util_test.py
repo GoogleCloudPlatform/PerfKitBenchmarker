@@ -14,6 +14,7 @@
 
 import inspect
 import logging
+import os
 import threading
 import unittest
 
@@ -145,6 +146,36 @@ class LogUtilTestCase(pkb_common_test_case.PkbCommonTestCase):
     child.join()
     self.assertTrue(self.completed)
     self.assertEqual(self.log_record.pkb_label, '')
+
+  def testLogToShortLog(self):
+    log_dir = self.create_tempdir().full_path
+    short_log_path = os.path.join(log_dir, log_util.SHORT_LOG_FILE_NAME)
+
+    log_util.ConfigureShortLogging(log_dir)
+    log_util.LogToShortLog('test message')
+
+    self.assertTrue(os.path.exists(short_log_path))
+    with open(short_log_path) as f:
+      self.assertIn('test message', f.read())
+
+  def testLogToShortLogAndRoot(self):
+    log_dir = self.create_tempdir().full_path
+    short_log_path = os.path.join(log_dir, log_util.SHORT_LOG_FILE_NAME)
+    pkb_log_path = os.path.join(log_dir, log_util.LOG_FILE_NAME)
+
+    log_util.ConfigureLogging(
+        stderr_log_level=logging.INFO,
+        logs_dir=log_dir,
+        run_uri='test_uri',
+        file_log_level=logging.INFO,
+    )
+    log_util.ConfigureShortLogging(log_dir)
+    log_util.LogToShortLogAndRoot('test message')
+
+    for log_path in [short_log_path, pkb_log_path]:
+      self.assertTrue(os.path.exists(log_path))
+      with open(log_path) as f:
+        self.assertIn('test message', f.read())
 
 
 if __name__ == '__main__':
