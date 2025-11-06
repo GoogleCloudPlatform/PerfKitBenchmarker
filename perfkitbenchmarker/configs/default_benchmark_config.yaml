@@ -528,7 +528,7 @@ diskspd_max_throughput:
   name: diskspd
   flags: &diskspd_max_throughput_flags
     diskspd_thread_number_per_file: 8,16
-    diskspd_outstanding_io: 64,128
+    diskspd_outstanding_io: 8,16,64
     diskspd_block_size:  1M
     diskspd_access_pattern: s
 
