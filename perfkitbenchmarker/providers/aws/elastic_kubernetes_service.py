@@ -1063,6 +1063,7 @@ class EksKarpenterCluster(BaseEksCluster):
 
   def _Delete(self):
     """Deletes the control plane and worker nodes."""
+    self._DeleteIngresses()
     self._CleanupKarpenter()
     super()._Delete()
     vm_util.IssueCommand([
@@ -1124,6 +1125,26 @@ class EksKarpenterCluster(BaseEksCluster):
       ])
     # Finish deleting the stack after deleting the role.
     vm_util.IssueCommand(delete_stack_cmd)
+
+  def _DeleteIngresses(self):
+    """Deletes all ingresses in all namespaces (to trigger ALB deletion)."""
+    vm_util.IssueCommand(
+        [
+            FLAGS.kubectl,
+            '--kubeconfig',
+            FLAGS.kubeconfig,
+            'delete',
+            'ingress',
+            '--all',
+            '--all-namespaces',
+            '--timeout=600s',
+        ],
+        timeout=660,
+        suppress_failure=lambda stdout, stderr, retcode: (
+            'deleted' in stdout
+            and 'timed out waiting for the condition' in stderr
+        ),
+    )
 
   def _CleanupKarpenter(self):
     """Cleanup Karpenter managed nodes before cluster deletion."""
