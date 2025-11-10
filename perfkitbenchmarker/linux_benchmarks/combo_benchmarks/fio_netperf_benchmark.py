@@ -29,8 +29,9 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
+from perfkitbenchmarker.linux_benchmarks.fio import constants
 from perfkitbenchmarker.linux_benchmarks.fio import fio_benchmark
-from perfkitbenchmarker.linux_packages import fio
+from perfkitbenchmarker.linux_benchmarks.fio import utils
 
 
 BENCHMARK_NAME = 'fio_netperf'
@@ -50,7 +51,7 @@ fio_netperf:
     netperf_benchmarks: TCP_STREAM
     netperf_num_streams: 200
     fio_runtime: 300
-    fio_generate_scenarios: seq_1M_read_100%
+    fio_generate_scenarios: seq_1M_readwrite_100%_rwmixread-50
     fio_num_jobs: 8
     fio_io_depths: 64
     fio_target_mode: against_device_without_fill
@@ -73,11 +74,11 @@ def GetConfig(user_config: Dict[Any, Any]) -> Dict[Any, Any]:
     merged configs
   """
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  if FLAGS.fio_target_mode != fio_benchmark.AGAINST_FILE_WITHOUT_FILL_MODE:
-    for vm_group in config['vm_groups'].keys():
-      disk_spec = config['vm_groups'][vm_group]['disk_spec']
-      for cloud in disk_spec:
-        disk_spec[cloud]['mount_point'] = None
+  # Running against raw device
+  for vm_group in config['vm_groups'].keys():
+    disk_spec = config['vm_groups'][vm_group]['disk_spec']
+    for cloud in disk_spec:
+      disk_spec[cloud]['mount_point'] = None
   return config
 
 
@@ -125,11 +126,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       2,
   )
 
-  # Prepare FIO benchmark on receiving VM.
-  exec_path = fio.GetFioExec()
-  background_tasks.RunThreaded(
-      lambda vm: fio_benchmark.PrepareWithExec(vm, exec_path), [vms[1]]
-  )
+  # Prepare FIO benchmark on receiving VM (from fio_raw_device_benchmark).
+  vms[1].Install('fio')
+  utils.PrefillIfEnabled(vms[1], constants.FIO_PATH)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -220,5 +219,4 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     benchmark_spec: The benchmark specification.
   """
   vms = benchmark_spec.vms[:2]
-  background_tasks.RunThreaded(fio_benchmark.CleanupVM, [vms[1]])
   netperf_benchmark.CleanupClientServerVMs(vms[0], vms[1])
