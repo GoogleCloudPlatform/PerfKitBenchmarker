@@ -21,7 +21,8 @@ from perfkitbenchmarker.linux_packages import azure_cli
 class AzureCliTest(unittest.TestCase):
 
   def setUp(self):
-    self.vm = mock.Mock()
+    self.vm = mock.MagicMock(autospec=True)
+    self.maxDiff = None
 
   def assertCallArgsEqual(self, call_args_singles, mock_method):
     """Compare the list of single arguments to all mocked calls in mock_method.
@@ -40,7 +41,7 @@ class AzureCliTest(unittest.TestCase):
     """
     # convert from ['a', 'b'] into [(('a',),), (('b',),)]
     expected = [((arg,),) for arg in call_args_singles]
-    self.assertEqual(expected, mock_method.call_args_list)
+    self.assertSequenceEqual(expected, mock_method.call_args_list)
 
   def assertInstallPackageCommandsEqual(self, expected_packages):
     # tests the calls to vm.InstallPackages(str)
@@ -88,30 +89,15 @@ class AzureCliTest(unittest.TestCase):
     self.assertOnlyKnownMethodsCalled('RemoteCommand', 'InstallPackages')
 
   def testAptInstall(self):
-    self.vm.RemoteCommand.return_value = ('wheezy', '')
+    self.vm.OS_TYPE = 'ubuntu2404'
     azure_cli.AptInstall(self.vm)
-    if self.vm.is_aarch64:
-      self.assertRemoteCommandsEqual(
-          ['sudo pip3 install --upgrade azure-cli pyOpenSSL>=23.2.0']
-      )
-      return
     self.assertRemoteCommandsEqual([
-        'lsb_release -cs',
-        (
-            'echo "deb [arch=amd64]'
-            ' https://packages.microsoft.com/repos/azure-cli/ wheezy main"'
-            ' | sudo tee /etc/apt/sources.list.d/azure-cli.list'
-        ),
-        (
-            'curl -L https://packages.microsoft.com/keys/microsoft.asc |'
-            ' sudo apt-key add -'
-        ),
+        'curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash',
         'sudo apt-get update',
     ])
-    self.assertInstallPackageCommandsEqual(['apt-transport-https', 'azure-cli'])
-    self.assertVmInstallCommandsEqual(['python', 'lsb_release', 'curl'])
+    self.assertInstallPackageCommandsEqual(['curl'])
     self.assertOnlyKnownMethodsCalled(
-        'RemoteCommand', 'Install', 'InstallPackages'
+        'RemoteCommand', 'InstallPackages'
     )
 
 
