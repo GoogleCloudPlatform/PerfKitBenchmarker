@@ -355,7 +355,9 @@ def Install(vm):
   # Install gcc, g++, fortran according to --gcc_version
   vm.Install('build_tools')
 
-  if vm.OS_TYPE in os_types.EL_OS_TYPES:
+  # Install libxcrypt-compat is needed on RHEL 9 based OSes, but not available
+  # on RHEL 8 based OSes.
+  if vm.OS_TYPE in os_types.EL_OS_TYPES and vm.HasPackage('libxcrypt-compat'):
     vm.InstallPackages('libxcrypt-compat')
 
   if FLAGS.runspec_tuned_profile:
