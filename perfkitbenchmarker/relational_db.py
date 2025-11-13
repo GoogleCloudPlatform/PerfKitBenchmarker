@@ -18,11 +18,13 @@ This is the base implementation of all relational db.
 """
 
 import abc
+import datetime
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 
 # TODO(chunla): Move IAAS flag to file
@@ -577,3 +579,22 @@ class BaseRelationalDb(resource.BaseResource):
     Returns: none
     """
     raise NotImplementedError('Restart database is not implemented.')
+
+  def CollectMetrics(
+      self, start_time: datetime.datetime, end_time: datetime.datetime
+  ) -> list[sample.Sample]:
+    """Collects and returns performance metrics after the run phase.
+
+    This method is optional for subclasses to implement. Subclasses should
+    query cloud-specific monitoring APIs for metrics within the provided time
+    range and return them as a list of sample.Sample objects.
+
+    Args:
+      start_time: The start time of the run phase.
+      end_time: The end time of the run phase.
+
+    Returns:
+      A list of sample.Sample instances containing the collected metrics.
+    """
+    del start_time, end_time
+    return []

@@ -1,5 +1,6 @@
 """Runs the HammerDB relational database benchmark."""
 
+import datetime
 import posixpath
 from typing import Any
 
@@ -381,7 +382,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   samples = []
   for i in range(1, 1 + hammerdb.NUM_RUN.value):
     metadata['run_iteration'] = i
+    start_time = datetime.datetime.now()
     stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)
+    end_time = datetime.datetime.now()
     current_samples = hammerdb.ParseResults(
         script=script, stdout=stdout, vm=client_vm
     )
@@ -394,6 +397,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       current_samples = _CheckAlloyDbColumnarEngine(
           db, client_vm, script, timeout, database_name
       )
+    current_samples.extend(db.CollectMetrics(start_time, end_time))
 
     for s in current_samples:
       s.metadata.update(metadata)
