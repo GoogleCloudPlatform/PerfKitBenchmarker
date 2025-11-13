@@ -1128,11 +1128,8 @@ class EksKarpenterCluster(BaseEksCluster):
 
   def _DeleteIngresses(self):
     """Deletes all ingresses in all namespaces (to trigger ALB deletion)."""
-    vm_util.IssueCommand(
+    container_service.RunKubectlCommand(
         [
-            FLAGS.kubectl,
-            '--kubeconfig',
-            FLAGS.kubeconfig,
             'delete',
             'ingress',
             '--all',
@@ -1150,11 +1147,8 @@ class EksKarpenterCluster(BaseEksCluster):
     """Cleanup Karpenter managed nodes before cluster deletion."""
     logging.info('Cleaning up Karpenter nodes...')
     # Delete NodePool resources - this will trigger node termination
-    vm_util.IssueCommand(
+    container_service.RunKubectlCommand(
         [
-            FLAGS.kubectl,
-            '--kubeconfig',
-            FLAGS.kubeconfig,
             'delete',
             'nodepool,ec2nodeclass',
             '--all',
@@ -1167,11 +1161,8 @@ class EksKarpenterCluster(BaseEksCluster):
         ),
     )
     # Wait for all Karpenter nodes to be deleted
-    vm_util.IssueCommand(
+    container_service.RunKubectlCommand(
         [
-            FLAGS.kubectl,
-            '--kubeconfig',
-            FLAGS.kubeconfig,
             'wait',
             '--for=delete',
             'node',
@@ -1185,7 +1176,7 @@ class EksKarpenterCluster(BaseEksCluster):
         ),
     )
     # Force terminate remaining EC2 instances
-    result = vm_util.IssueCommand(
+    stdout, _, _ = vm_util.IssueCommand(
         [
             'aws',
             'ec2',
@@ -1202,9 +1193,7 @@ class EksKarpenterCluster(BaseEksCluster):
             'text',
         ],
     )
-    instance_ids = (
-        result[0].strip().split() if result[0] and result[0].strip() else []
-    )
+    instance_ids = stdout.strip().split() if stdout and stdout.strip() else []
     if instance_ids:
       logging.info(f'Terminating {len(instance_ids)} remaining instances')
       vm_util.IssueCommand(
@@ -1233,7 +1222,7 @@ class EksKarpenterCluster(BaseEksCluster):
       )
     # Cleanup orphaned network interfaces
     logging.info('Cleaning up orphaned network interfaces...')
-    result = vm_util.IssueCommand(
+    stdout, _, _ = vm_util.IssueCommand(
         [
             'aws',
             'ec2',
@@ -1252,9 +1241,7 @@ class EksKarpenterCluster(BaseEksCluster):
             'not found' in stderr.lower()
         ),
     )
-    eni_ids = (
-        result[0].strip().split() if result[0] and result[0].strip() else []
-    )
+    eni_ids = stdout.strip().split() if stdout and stdout.strip() else []
     if eni_ids:
       logging.info(f'Deleting {len(eni_ids)} orphaned network interfaces')
       for eni_id in eni_ids:
