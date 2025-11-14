@@ -30,6 +30,7 @@ import time
 
 from absl import flags
 from google.cloud import monitoring_v3
+from google.cloud.monitoring_v3 import types
 from perfkitbenchmarker import data
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import mysql_iaas_relational_db
@@ -650,6 +651,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     metric_basename = _GetMetricBasename(metric_type)
     unit = _GetMetricUnit(metric_type)
     samples = []
+    client = monitoring_v3.MetricServiceClient()
     is_delta = metric_type.endswith('_ops_count') or metric_type.endswith(
         '_bytes_count'
     )
@@ -658,29 +660,29 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         if is_delta
         else monitoring_v3.Aggregation.Aligner.ALIGN_MEAN
     )
-
-    client = monitoring_v3.MetricServiceClient()
     results = client.list_time_series(
-        request={
-            'name': f'projects/{self.project}',
-            'filter': (
+        types.ListTimeSeriesRequest(
+            name=f'projects/{self.project}',
+            filter=(
                 'resource.type="cloudsql_database" AND'
                 f' resource.labels.database_id="{self.project}:{self.instance_id}"'
                 f' AND metric.type="{metric_type}"'
             ),
-            'interval': {
-                'start_time': start_time.isoformat() + 'Z',
-                'end_time': end_time.isoformat() + 'Z',
-            },
-            'aggregation': {
-                'alignment_period': {'seconds': 60},
-                'per_series_aligner': aligner,
-            },
-        }
+            interval=types.TimeInterval(
+                start_time=start_time.astimezone(datetime.timezone.utc),
+                end_time=end_time.astimezone(datetime.timezone.utc),
+            ),
+            aggregation=monitoring_v3.Aggregation(
+                alignment_period={'seconds': 60},
+                per_series_aligner=aligner,
+            ),
+        )
     )
     time_series = list(results)
     if not time_series or not time_series[0].points:
-      logging.warning('No points in time series for %s.', metric_type)
+      logging.warning(
+          'No points in time series for %s. Results: %s', metric_type, results
+      )
       return []
 
     points = time_series[0].points
