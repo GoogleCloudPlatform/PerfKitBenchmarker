@@ -1781,6 +1781,12 @@ class CosDevBasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-dev'
 
 
+class Cos125BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+  OS_TYPE = os_types.COS125
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-125-lts'
+  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-125-lts'
+
+
 class Cos121BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS121
   DEFAULT_X86_IMAGE_FAMILY = 'cos-121-lts'
@@ -1797,12 +1803,6 @@ class Cos113BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS113
   DEFAULT_X86_IMAGE_FAMILY = 'cos-113-lts'
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-113-lts'
-
-
-class Cos109BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
-  OS_TYPE = os_types.COS109
-  DEFAULT_X86_IMAGE_FAMILY = 'cos-109-lts'
-  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-109-lts'
 
 
 class CoreOsBasedGceVirtualMachine(
