@@ -64,10 +64,11 @@ def GetFilename(disks, device_path=None):
   else:
     # Since we pass --directory to fio, we must use relative file
     # paths or get an error.
-    filename_base = f'{_FILENAME_PREFIX}.'
+    # TODO(andytzhu): Support multiple numjobs.
+    filename_base = f'{_FILENAME_PREFIX}.0'
     filenames = []
     for filenum in range(fio_flags.FIO_NR_FILES.value):
-      filenames.append(f'{filename_base}{filenum}')
+      filenames.append(f'{filename_base}.{filenum}')
     filename = ':'.join(filenames)
 
   return filename
@@ -194,6 +195,8 @@ def FillDevice(vm, disk, fill_size, exec_path, use_directory=False):
       '--create_on_open=1'
   )
   vm.RobustRemoteCommand(command)
+  # Clear the OS page cache
+  vm.RobustRemoteCommand('sudo sh -c "echo 3 > /proc/sys/vm/drop_caches"')
 
 
 def PrefillIfEnabled(vm, exec_path, use_directory=False):
