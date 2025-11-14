@@ -46,7 +46,7 @@ fio_netperf:
       vm_spec: *default_dual_core
       disk_spec: *default_500_gb
   flags:
-    placement_group_style: closest_supported
+    placement_group_style: none
     netperf_test_length: 300
     netperf_benchmarks: TCP_STREAM
     netperf_num_streams: 200
