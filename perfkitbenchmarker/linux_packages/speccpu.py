@@ -357,7 +357,9 @@ def Install(vm):
 
   # Install libxcrypt-compat is needed on RHEL 9 based OSes, but not available
   # on RHEL 8 based OSes.
-  if vm.OS_TYPE in os_types.EL_OS_TYPES and vm.HasPackage('libxcrypt-compat'):
+  if vm.OS_TYPE in os_types.RED_HAT_OS_TYPES and vm.HasPackage(
+      'libxcrypt-compat'
+  ):
     vm.InstallPackages('libxcrypt-compat')
 
   if FLAGS.runspec_tuned_profile:

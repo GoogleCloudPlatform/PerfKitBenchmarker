@@ -19,6 +19,7 @@ import logging
 import re
 
 from perfkitbenchmarker import data
+from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -32,12 +33,12 @@ MYSQL_SERVICE_NAME = 'MYSQL_SERVICE_NAME'
 MYSQL_CONFIG_PATH = 'MYSQL_CONFIG_PATH'
 MYSQL_LOG_PATH = 'MYSQL_LOG_PATH'
 OS_DEPENDENT_DEFAULTS = {
-    'debian': {
+    os_types.DEBIAN: {
         MYSQL_SERVICE_NAME: 'mysql',
         MYSQL_CONFIG_PATH: '/etc/mysql/mysql.conf.d/mysqld.cnf',
         MYSQL_LOG_PATH: '/var/log/mysql/error.log',
     },
-    'centos': {
+    os_types.RED_HAT: {
         MYSQL_SERVICE_NAME: 'mysqld',
         MYSQL_CONFIG_PATH: '/etc/my.cnf',
         MYSQL_LOG_PATH: '/var/log/mysqld.log',
@@ -60,18 +61,11 @@ class MysqldFailedToStopError(Exception):
 
 def YumInstall(vm):
   """Installs the mysql package on the VM."""
-  if vm.OS_TYPE not in os_types.AMAZONLINUX_TYPES:
-    vm.RemoteCommand('sudo dnf config-manager --set-enabled crb')
-    vm.RemoteCommand('sudo dnf install -y epel-release epel-next-release')
-  vm.RemoteCommand(
-      'sudo yum -y install '
-      'https://dev.mysql.com/get/mysql80-community-release-el9-5.noarch.rpm'
-  )
   vm.RemoteCommand('sudo dnf config-manager --enable mysql80-community')
   vm.RemoteCommand('sudo dnf config-manager --enable mysql-tools-community')
-  vm.RemoteCommand(
-      'sudo yum install -y mysql-community-server mysql-community-client luajit'
-      ' libaio screen mysql-community-libs'
+  vm.InstallPackages(
+      'mysql-community-server mysql-community-client luajit  libaio screen '
+      'mysql-community-libs'
   )
   _StopServiceIfRunning(vm)
 
@@ -181,8 +175,10 @@ def ConfigureSystemSettings(vm: virtual_machine.VirtualMachine):
     vm: The VM to configure.
   """
   if vm.OS_TYPE not in os_types.LINUX_OS_TYPES:
+    assert isinstance(vm, linux_virtual_machine.BaseLinuxMixin)
     logging.error(
-        'System settings not configured for unsupported OS: %s', vm.os_info)  # pytype: disable=attribute-error
+        'System settings not configured for unsupported OS: %s', vm.os_info
+    )
     return
   sysctl_append = 'sudo tee -a /etc/sysctl.conf'
   vm.RemoteCommand(f'echo "vm.swappiness=1" | {sysctl_append}')
@@ -190,11 +186,14 @@ def ConfigureSystemSettings(vm: virtual_machine.VirtualMachine):
   vm.RemoteCommand(f'echo "vm.dirty_background_ratio=5" | {sysctl_append}')
   vm.RemoteCommand(f'echo "net.core.somaxconn=65535" | {sysctl_append}')
   vm.RemoteCommand(
-      f'echo "net.core.netdev_max_backlog=65535" | {sysctl_append}')
+      f'echo "net.core.netdev_max_backlog=65535" | {sysctl_append}'
+  )
   vm.RemoteCommand(
-      f'echo "net.ipv4.tcp_max_syn_backlog=65535" | {sysctl_append}')
+      f'echo "net.ipv4.tcp_max_syn_backlog=65535" | {sysctl_append}'
+  )
   vm.RemoteCommand(
-      f'echo "net.ipv4.ip_local_port_range=4000 65000" | {sysctl_append}')
+      f'echo "net.ipv4.ip_local_port_range=4000 65000" | {sysctl_append}'
+  )
   vm.RemoteCommand(f'echo "net.ipv4.tcp_tw_reuse=1" | {sysctl_append}')
   vm.RemoteCommand(f'echo "net.ipv4.tcp_fin_timeout=5" | {sysctl_append}')
   vm.RemoteCommand('sudo sysctl -p')
@@ -213,10 +212,12 @@ def ConfigureSystemSettings(vm: virtual_machine.VirtualMachine):
 
 def GetOSDependentDefaults(os_type: str) -> dict[str, str]:
   """Returns the OS family."""
-  if os_type in os_types.CENTOS_TYPES or os_type in os_types.AMAZONLINUX_TYPES:
-    return OS_DEPENDENT_DEFAULTS['centos']
+  if os_type in os_types.RED_HAT_OS_TYPES:
+    return OS_DEPENDENT_DEFAULTS[os_types.RED_HAT]
+  elif os_type in os_types.DEBIAN_OS_TYPES:
+    return OS_DEPENDENT_DEFAULTS[os_types.DEBIAN]
   else:
-    return OS_DEPENDENT_DEFAULTS['debian']
+    raise ValueError(f'Unsupported OS type: {os_type}')
 
 
 def WriteMysqlConfiguration(
@@ -281,9 +282,7 @@ def ConfigureAndStartServer(
     )
 
   # Start the server.
-  vm.RemoteCommand(
-      'sudo -g mysql -u mysql nohup mysqld &> /dev/null &'
-  )
+  vm.RemoteCommand('sudo -g mysql -u mysql nohup mysqld &> /dev/null &')
 
   log_file_path = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_LOG_PATH]
 
@@ -343,7 +342,8 @@ def CreateDatabase(
 
 
 def SetupReplica(
-    vm: virtual_machine.VirtualMachine, password: str, master_ip: str):
+    vm: virtual_machine.VirtualMachine, password: str, master_ip: str
+):
   """Setup replica mysql server."""
   tmp_path = '/tmp/setup_repl.sql'
   vm.RenderTemplate(

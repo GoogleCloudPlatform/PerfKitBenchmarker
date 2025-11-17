@@ -416,7 +416,7 @@ class Ubuntu2004BasedIbmCloudVirtualMachine(
 
 
 class RhelBasedIbmCloudVirtualMachine(
-    IbmCloudVirtualMachine, linux_virtual_machine.BaseRhelMixin
+    IbmCloudVirtualMachine, linux_virtual_machine.BaseRedHatMixin
 ):
 
   def PrepareVMEnvironment(self):
