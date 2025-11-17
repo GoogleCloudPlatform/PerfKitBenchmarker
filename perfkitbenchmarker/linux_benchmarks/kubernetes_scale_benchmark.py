@@ -333,8 +333,11 @@ class KubernetesResourceStatusCondition:
     )
 
 
-def _GetStatusConditionsForResourceType(
-    resource_type: str, resources_to_ignore: abc.Set[str]
+# TODO: b/458122803 - refactor by moving to a common location (e.g.
+# container_service.py)
+def GetStatusConditionsForResourceType(
+    resource_type: str,
+    resources_to_ignore: abc.Set[str] = frozenset(),
 ) -> list[KubernetesResourceStatusCondition]:
   """Returns the status conditions for a resource type.
 
@@ -412,7 +415,7 @@ def ParseStatusChanges(
     A list of samples, with various percentiles for each status condition.
   """
 
-  conditions = _GetStatusConditionsForResourceType(
+  conditions = GetStatusConditionsForResourceType(
       resource_type, resources_to_ignore
   )
 
