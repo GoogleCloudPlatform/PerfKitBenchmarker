@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<parameters>
+    <type>{{ db_type }}</type>
+    <driver>{{ driver_class }}</driver>
+    <url>{{ jdbc_url }}</url>
+    {{ username_element }}
+    {{ password_element }}
+    <reconnectOnConnectionFailure>true</reconnectOnConnectionFailure>
+    <isolation>{{ isolation }}</isolation>
+    <scalefactor>{{ scalefactor }}</scalefactor>
+    <terminals>{{ terminals }}</terminals>
+    <batchsize>128</batchsize>
+
+    <!-- Benchmark Type -->
+    <type>TPCC</type>
+
+    <!-- Workload for TPC-C -->
+    <works>
+        <work>
+            <time>{{ workload_duration_seconds }}</time>
+            {{ rate_element }}
+            <weights>{{ weights }}</weights>
+        </work>
+    </works>
+
+    <!-- TPC-C Specific -->
+    <transactiontypes>
+        <transactiontype>
+            <name>NewOrder</name>
+        </transactiontype>
+        <transactiontype>
+            <name>Payment</name>
+        </transactiontype>
+        <transactiontype>
+            <name>OrderStatus</name>
+        </transactiontype>
+        <transactiontype>
+            <name>Delivery</name>
+        </transactiontype>
+        <transactiontype>
+            <name>StockLevel</name>
+        </transactiontype>
+    </transactiontypes>
+</parameters>

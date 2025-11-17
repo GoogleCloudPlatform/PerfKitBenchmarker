@@ -634,8 +634,8 @@ class EksAutoCluster(BaseEksCluster):
 
 
 _KARPENTER_NAMESPACE = 'kube-system'
-_KARPENTER_VERSION = '1.5.0'
-_DEAULT_K8S_VERSION = '1.32'
+_KARPENTER_VERSION = '1.8.1'
+_DEAULT_K8S_VERSION = '1.34'
 
 
 class EksKarpenterCluster(BaseEksCluster):
@@ -670,21 +670,27 @@ class EksKarpenterCluster(BaseEksCluster):
         '-o',
         template_filename,
     ])
-    vm_util.IssueCommand([
-        'aws',
-        'cloudformation',
-        'deploy',
-        '--stack-name',
-        self.stack_name,
-        '--template-file',
-        template_filename,
-        '--capabilities',
-        'CAPABILITY_NAMED_IAM',
-        '--parameter-overrides',
-        f'ClusterName={self.name}',
-        '--region',
-        f'{self.region}',
-    ])
+    # key=value format differs from other service's Key=key,Value=value format
+    formation_tags = [f'{k}={v}' for k, v in util.MakeDefaultTags().items()]
+    vm_util.IssueCommand(
+        [
+            'aws',
+            'cloudformation',
+            'deploy',
+            '--stack-name',
+            self.stack_name,
+            '--template-file',
+            template_filename,
+            '--capabilities',
+            'CAPABILITY_NAMED_IAM',
+            '--parameter-overrides',
+            f'ClusterName={self.name}',
+            '--region',
+            f'{self.region}',
+            '--tags',
+        ]
+        + formation_tags,
+    )
     create_json: dict[str, Any] = {
         'metadata': {
             'tags': {'karpenter.sh/discovery': self.name},
@@ -1088,7 +1094,11 @@ class EksKarpenterCluster(BaseEksCluster):
         self.region,
     ]
     vm_util.IssueCommand(cmd, timeout=1800)
-    vm_util.IssueCommand([
+
+  def _DeleteDependencies(self):
+    """Deletes the CloudFormation stack."""
+    super()._DeleteDependencies()
+    delete_stack_cmd = [
         'aws',
         'cloudformation',
         'delete-stack',
@@ -1096,7 +1106,44 @@ class EksKarpenterCluster(BaseEksCluster):
         self.stack_name,
         '--region',
         f'{self.region}',
+    ]
+    # Start deleting the stack but likely to fail to delete this role.
+    vm_util.IssueCommand(delete_stack_cmd)
+    node_role = f'KarpenterNodeRole-{self.name}'
+    out, _, _ = vm_util.IssueCommand([
+        'aws',
+        'iam',
+        'list-instance-profiles-for-role',
+        '--role-name',
+        node_role,
+        '--region',
+        f'{self.region}',
     ])
+    profiles_json = json.loads(out)
+    for profile in profiles_json.get('InstanceProfiles', []):
+      profile_name = profile['InstanceProfileName']
+      vm_util.IssueCommand([
+          'aws',
+          'iam',
+          'remove-role-from-instance-profile',
+          '--instance-profile-name',
+          profile_name,
+          '--role-name',
+          node_role,
+          '--region',
+          f'{self.region}',
+      ])
+      vm_util.IssueCommand([
+          'aws',
+          'iam',
+          'delete-instance-profile',
+          '--instance-profile-name',
+          profile_name,
+          '--region',
+          f'{self.region}',
+      ])
+    # Finish deleting the stack after deleting the role.
+    vm_util.IssueCommand(delete_stack_cmd)
 
   def _IsReady(self):
     """Returns True if cluster is running. Autopilot defaults to 0 nodes."""

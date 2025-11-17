@@ -19,7 +19,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks.fio import constants
 from perfkitbenchmarker.linux_benchmarks.fio import flags as fio_flags
 from perfkitbenchmarker.linux_benchmarks.fio import utils
-from perfkitbenchmarker.linux_packages import fio
 
 
 FLAGS = flags.FLAGS
@@ -57,7 +56,7 @@ def GetConfig(user_config):
 def Prepare(spec: benchmark_spec.BenchmarkSpec):
   vm = spec.vms[0]
   vm.Install('fio')
-  utils.PrefillIfEnabled(vm, fio.GetFioExec(), use_directory=True)
+  utils.PrefillIfEnabled(vm, constants.FIO_PATH, use_directory=True)
 
 
 def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:

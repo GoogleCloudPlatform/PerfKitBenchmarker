@@ -861,6 +861,106 @@ def SearchAndReplaceTclScript(
   )
 
 
+def _InstallHammerDbArm(vm: virtual_machine.BaseVirtualMachine):
+  """Install hammerdb on ARM."""
+  # Install build dependencies and PostgreSQL client dev library for pgtcl
+  vm.InstallPackages(
+      'wget build-essential libreadline-dev zlib1g-dev libpq-dev'
+  )
+
+  # Define aarch64 specific flags
+  cflags = (
+      '"-O3 -mcpu=neoverse-n1 -march=armv8.2-a+lse+crc+crypto+dotprod'
+      ' -moutline-atomics -Wl,--build-id"'
+  )
+  cxxflags = cflags  # Same flags for CXX in the script
+  gcc_bin_dir = '/usr/bin'
+  hammerdb_dir = HAMMERDB_RUN_LOCATION
+
+  download_commands = [
+      f'cd {hammerdb_dir}',
+      'wget https://prdownloads.sourceforge.net/tcl/tcl8.6.11-src.tar.gz',
+      (
+          'wget https://sourceforge.net/projects/expect/files/Expect/5.45.4/expect5.45.4.tar.gz'
+      ),
+      (
+          'wget https://sourceforge.net/projects/pgtclng/files/pgtclng/2.1.1/pgtcl2.1.1.tar.gz'
+      ),
+  ]
+  vm.RemoteCommand(' && '.join(download_commands))
+
+  # Build Tcl
+  build_tcl_commands = [
+      f'cd {hammerdb_dir}',
+      'tar xf tcl8.6.11-src.tar.gz',
+      'rm -f bin/tclsh8.6',  # Remove existing tclsh
+      'cd tcl8.6.11/unix',
+      (
+          f'CC="{gcc_bin_dir}/gcc" CXX="{gcc_bin_dir}/g++"'
+          f' LD="{gcc_bin_dir}/gcc"'
+          f' CFLAGS={cflags} CXXFLAGS={cxxflags} ./configure'
+          f' --prefix="{hammerdb_dir}" --enable-64bit'
+      ),
+      'make -j $(nproc)',
+      'make install',
+  ]
+  vm.RemoteCommand(' && '.join(build_tcl_commands))
+
+  # Build Expect
+  build_expect_commands = [
+      f'cd {hammerdb_dir}',
+      'tar xf expect5.45.4.tar.gz',
+      'cd expect5.45.4',
+      'arch=$(uname -m)',
+      (
+          f'CC="{gcc_bin_dir}/gcc" CXX="{gcc_bin_dir}/g++"'
+          f' LD="{gcc_bin_dir}/gcc"'
+          f' CFLAGS={cflags} CXXFLAGS={cxxflags} ./configure'
+          f' --prefix="{hammerdb_dir}" --build=${{arch}}-unknown-linux-gnu'
+          ' --enable-64bit --with-tclinclude=../include'
+      ),
+      'make -j $(nproc)',
+      'make install',
+  ]
+  vm.RemoteCommand(' && '.join(build_expect_commands))
+
+  # Build pgtcl
+  build_pgtcl_commands = [
+      f'cd {hammerdb_dir}',
+      'tar xf pgtcl2.1.1.tar.gz',
+      'cd pgtcl2.1.1',
+      # Assuming standard paths for libpq-dev headers/libs
+      (
+          'pg_include_path=$(dpkg -L libpq-dev | grep "/libpq-fe\\.h$" | head'
+          ' -n 1 | xargs dirname)'
+      ),
+      (
+          'pg_lib_path=$(dpkg -L libpq-dev | grep "/libpq\\.so$" | head -n 1'
+          ' | xargs dirname)'
+      ),
+      (
+          f'CC="{gcc_bin_dir}/gcc" CXX="{gcc_bin_dir}/g++"'
+          f' LD="{gcc_bin_dir}/gcc"'
+          f' CFLAGS={cflags} CXXFLAGS={cxxflags} ./configure'
+          f' --prefix="{hammerdb_dir}" --enable-64bit'
+          ' --with-postgres-include=${pg_include_path}'
+          ' --with-postgres-lib=${pg_lib_path}'
+      ),
+      'make -j $(nproc)',
+      'make install',
+  ]
+  vm.RemoteCommand(' && '.join(build_pgtcl_commands))
+
+  # clean up build directories and tarballs
+  clean_up_commands = [
+      f'cd {hammerdb_dir}',
+      'rm -rf expect*',
+      'rm -rf pgtcl*',
+      'rm -rf tcl*',
+  ]
+  vm.RemoteCommand(' && '.join(clean_up_commands))
+
+
 def Install(vm: virtual_machine.BaseVirtualMachine):
   """Installs hammerdbcli and dependencies on the VM."""
   vm.InstallPackages('curl')
@@ -891,99 +991,7 @@ def Install(vm: virtual_machine.BaseVirtualMachine):
       and db_engine == sql_engine_utils.POSTGRES
       and vm.cpu_arch == virtual_machine.CPUARCH_AARCH64
   ):
-    # Install build dependencies and PostgreSQL client dev library for pgtcl
-    vm.InstallPackages(
-        'wget build-essential libreadline-dev zlib1g-dev libpq-dev'
-    )
-
-    # Define aarch64 specific flags
-    cflags = (
-        '"-O3 -mcpu=neoverse-n1 -march=armv8.2-a+lse+crc+crypto+dotprod'
-        ' -moutline-atomics -Wl,--build-id"'
-    )
-    cxxflags = cflags  # Same flags for CXX in the script
-    gcc_bin_dir = '/usr/bin'
-    hammerdb_dir = HAMMERDB_RUN_LOCATION
-
-    download_commands = [
-        f'cd {hammerdb_dir}',
-        'wget https://prdownloads.sourceforge.net/tcl/tcl8.6.11-src.tar.gz',
-        (
-            'wget https://sourceforge.net/projects/expect/files/Expect/5.45.4/expect5.45.4.tar.gz'
-        ),
-        (
-            'wget https://sourceforge.net/projects/pgtclng/files/pgtclng/2.1.1/pgtcl2.1.1.tar.gz'
-        ),
-    ]
-    vm.RemoteCommand(' && '.join(download_commands))
-
-    # Build Tcl
-    build_tcl_commands = [
-        f'cd {hammerdb_dir}',
-        'tar xf tcl8.6.11-src.tar.gz',
-        'rm -f bin/tclsh8.6',  # Remove existing tclsh
-        'cd tcl8.6.11/unix',
-        (
-            f'CC="{gcc_bin_dir}/gcc" CXX="{gcc_bin_dir}/g++"'
-            f' LD="{gcc_bin_dir}/gcc"'
-            f' CFLAGS={cflags} CXXFLAGS={cxxflags} ./configure'
-            f' --prefix="{hammerdb_dir}" --enable-64bit'
-        ),
-        'make -j $(nproc)',
-        'make install',
-    ]
-    vm.RemoteCommand(' && '.join(build_tcl_commands))
-
-    # Build Expect
-    build_expect_commands = [
-        f'cd {hammerdb_dir}',
-        'tar xf expect5.45.4.tar.gz',
-        'cd expect5.45.4',
-        'arch=$(uname -m)',
-        (
-            f'CC="{gcc_bin_dir}/gcc" CXX="{gcc_bin_dir}/g++"'
-            f' LD="{gcc_bin_dir}/gcc"'
-            f' CFLAGS={cflags} CXXFLAGS={cxxflags} ./configure'
-            f' --prefix="{hammerdb_dir}" --build=${{arch}}-unknown-linux-gnu'
-            ' --enable-64bit --with-tclinclude=../include'
-        ),
-        'make -j $(nproc)',
-        'make install',
-    ]
-    vm.RemoteCommand(' && '.join(build_expect_commands))
-
-    # Build pgtcl
-    build_pgtcl_commands = [
-        f'cd {hammerdb_dir}',
-        'tar xf pgtcl2.1.1.tar.gz',
-        'cd pgtcl2.1.1',
-        # Assuming standard paths for libpq-dev headers/libs
-        (
-            'pg_include_path=$(dpkg -L libpq-dev | grep "/libpq-fe\\.h$" | head'
-            ' -n 1 | xargs dirname)'
-        ),
-        (
-            'pg_lib_path=$(dpkg -L libpq-dev | grep "/libpq\\.so$" | head -n 1'
-            ' | xargs dirname)'
-        ),
-        f'CC="{gcc_bin_dir}/gcc" CXX="{gcc_bin_dir}/g++" LD="{gcc_bin_dir}/gcc"'
-        f' CFLAGS={cflags} CXXFLAGS={cxxflags} ./configure'
-        f' --prefix="{hammerdb_dir}" --enable-64bit '
-        '--with-postgres-include=${pg_include_path} '
-        '--with-postgres-lib=${pg_lib_path}',
-        'make -j $(nproc)',
-        'make install',
-    ]
-    vm.RemoteCommand(' && '.join(build_pgtcl_commands))
-
-    # clean up build directories and tarballs
-    clean_up_commands = [
-        f'cd {hammerdb_dir}',
-        'rm -rf expect*',
-        'rm -rf pgtcl*',
-        'rm -rf tcl*',
-    ]
-    vm.RemoteCommand(' && '.join(clean_up_commands))
+    _InstallHammerDbArm(vm)
   else:
     # normal install
     # Push Hammerdb install files

@@ -19,10 +19,11 @@ benchmarks.
 """
 
 import copy
+import datetime
 import json
 import logging
 import os
-from typing import Any, Union
+from typing import Any, Union, override
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
@@ -319,6 +320,42 @@ def GetSnowflakeClientInterface(
 class Snowflake(edw_service.EdwService):
   """Object representing a Snowflake Data Warehouse Instance."""
 
+  SEARCH_QUERY_TEMPLATE_LOCATION = 'edw/snowflake_aws/search_index'
+
+  CREATE_INDEX_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/create_index_query.sql.j2'
+  )
+  DELETE_INDEX_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/delete_index_query.sql.j2'
+  )
+  GET_INDEX_STATUS_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/index_status.sql.j2'
+  )
+  INITIALIZE_SEARCH_TABLE_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/table_init.sql.j2'
+  )
+  LOAD_SEARCH_DATA_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/ingestion_query.sql.j2'
+  )
+  INDEX_SEARCH_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/search_query.sql.j2'
+  )
+  GET_ROW_COUNT_QUERY_TEMPLATE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/get_row_count.sql.j2'
+  )
+  TIME_BOUND_QUERY_HISTORY_TEMPLATE = (
+      'edw/snowflake_aws/metadata/time_bound_query_history.sql.j2'
+  )
+  INDIVIDUAL_QUERY_PLAN_TEMPLATE = (
+      'edw/snowflake_aws/metadata/individual_query_plan.sql.j2'
+  )
+  INDIVIDUAL_QUERY_STATS_TEMPLATE = (
+      'edw/snowflake_aws/metadata/individual_query_stats.sql.j2'
+  )
+  INJECT_TOKEN_INTO_TABLE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/inject_token_into_table.sql.j2'
+  )
+
   CLOUD: str = None
   SERVICE_TYPE = None
 
@@ -515,30 +552,6 @@ class Snowflake(edw_service.EdwService):
     basic_data.update(self.client_interface.GetMetadata())
     return basic_data
 
-  SEARCH_QUERY_TEMPLATE_LOCATION = 'edw/snowflake_aws/search_index'
-
-  CREATE_INDEX_QUERY_TEMPLATE = (
-      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/create_index_query.sql.j2'
-  )
-  DELETE_INDEX_QUERY_TEMPLATE = (
-      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/delete_index_query.sql.j2'
-  )
-  GET_INDEX_STATUS_QUERY_TEMPLATE = (
-      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/index_status.sql.j2'
-  )
-  INITIALIZE_SEARCH_TABLE_QUERY_TEMPLATE = (
-      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/table_init.sql.j2'
-  )
-  LOAD_SEARCH_DATA_QUERY_TEMPLATE = (
-      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/ingestion_query.sql.j2'
-  )
-  INDEX_SEARCH_QUERY_TEMPLATE = (
-      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/search_query.sql.j2'
-  )
-  GET_ROW_COUNT_QUERY_TEMPLATE = (
-      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/get_row_count.sql.j2'
-  )
-
   def CreateSearchIndex(
       self, table_path: str, index_name: str
   ) -> tuple[float, dict[str, Any]]:
@@ -551,8 +564,8 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.CREATE_INDEX_QUERY_TEMPLATE),
         query_name,
         context,
+        should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
   def DropSearchIndex(
@@ -567,8 +580,8 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.DELETE_INDEX_QUERY_TEMPLATE),
         query_name,
         context,
+        should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
   def GetSearchIndexCompletionPercentage(
@@ -583,8 +596,8 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.GET_INDEX_STATUS_QUERY_TEMPLATE),
         query_name,
         context,
+        should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     _, meta = self.client_interface.ExecuteQuery(query_name, print_results=True)
     qres = int(meta['query_results']['COVERAGE_PERCENTAGE'][0])
     return qres, meta
@@ -600,8 +613,8 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.INITIALIZE_SEARCH_TABLE_QUERY_TEMPLATE),
         query_name,
         context,
+        should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
   def InsertSearchData(
@@ -616,8 +629,8 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.LOAD_SEARCH_DATA_QUERY_TEMPLATE),
         query_name,
         context,
+        should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     # Snowflake returns info for each csv file processed, which pollutes logs
     # and datapoints needlessly. So print_results=False.
     return self.client_interface.ExecuteQuery(query_name, print_results=False)
@@ -631,34 +644,58 @@ class Snowflake(edw_service.EdwService):
         data.ResourcePath(self.GET_ROW_COUNT_QUERY_TEMPLATE),
         query_name,
         context,
+        should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     _, meta = self.client_interface.ExecuteQuery(query_name, print_results=True)
     qres = int(meta['query_results']['TOTAL_ROW_COUNT'][0])
     return qres, meta
 
   def TextSearchQuery(
-      self, table_path: str, search_keyword: str, index_name: str
+      self,
+      table_path: str,
+      search_keyword: str,
+      order_by: str | None = None,
+      limit: int | None = None,
+      date_between: tuple[datetime.date, datetime.date] | None = None,
   ) -> tuple[float, dict[str, Any]]:
     query_name = 'text_search_query'
     context = {
         'table_name': table_path,
         'search_text': search_keyword,
-        'index_name': index_name,
+        'order_by': order_by,
+        'limit': limit,
+        'date_between': date_between,
     }
     self.client_interface.client_vm.RenderTemplate(
         data.ResourcePath(self.INDEX_SEARCH_QUERY_TEMPLATE),
         query_name,
         context,
+        should_log_file=True,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
     res, meta = self.client_interface.ExecuteQuery(
         query_name, print_results=True
     )
-    meta['edw_search_result_rows'] = int(
-        meta['query_results']['RESULT_ROWS'][0]
+    meta['edw_search_result_rows'] = len(
+        meta['query_results'].get('EVENT_TIMESTAMP', [])
     )
     return res, meta
+
+  def InjectTokenIntoTable(
+      self, table_path: str, token: str, token_count: int
+  ) -> tuple[float, dict[str, Any]]:
+    query_name = 'inject_token_into_table'
+    context = {
+        'table_name': table_path,
+        'token': token,
+        'token_count': token_count,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.INJECT_TOKEN_INTO_TABLE),
+        query_name,
+        context,
+        should_log_file=True,
+    )
+    return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
   def SetWarehouse(self, warehouse: str):
     """Switches Snowflake Warehouse."""
@@ -667,3 +704,91 @@ class Snowflake(edw_service.EdwService):
     )
     self.warehouse = warehouse
     self.client_interface.warehouse = warehouse
+
+  def _RunMetadataQuery(
+      self, query_template: str, query_name: str, context: dict[str, Any]
+  ) -> dict[str, Any]:
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(query_template),
+        query_name,
+        context,
+        should_log_file=True,
+    )
+    _, output = self.client_interface.ExecuteQuery(
+        query_name, print_results=True
+    )
+    col_res = output['query_results']
+    return col_res
+
+  def _GetIndividualQueryMetadata(self, query_id: str) -> list[dict[str, Any]]:
+    query_plan_file_name = f'individual_query_plan_{query_id}.sql'
+    query_stats_file_name = f'individual_query_stats_{query_id}.sql'
+    context = {
+        'query_id': query_id,
+    }
+    query_plan_rows = self.ColsToRows(
+        self._RunMetadataQuery(
+            self.INDIVIDUAL_QUERY_PLAN_TEMPLATE,
+            query_plan_file_name,
+            context,
+        )
+    )
+    query_stats_rows = self.ColsToRows(
+        self._RunMetadataQuery(
+            self.INDIVIDUAL_QUERY_STATS_TEMPLATE,
+            query_stats_file_name,
+            context,
+        )
+    )
+    results = [
+        {
+            'metric': 'edw_sf_query_plan',
+            'value': 1,
+            'unit': 'metadata',
+            'metadata': {
+                f'sf_{key.lower()}': value
+                for key, value in query_plan_rows[0].items()
+            },
+        },
+        {
+            'metric': 'edw_sf_query_stats',
+            'value': 1,
+            'unit': 'metadata',
+            'metadata': {
+                'sf_query_id': query_id,
+                'sf_query_stats': json.dumps(query_stats_rows, default=str),
+            },
+        },
+    ]
+    return results
+
+  @override
+  def GetTimeBoundAuxiliaryMetrics(
+      self, start_timestamp: float, end_timestamp: float
+  ) -> list[dict[str, Any]]:
+    """Returns the auxiliary metrics for the given run."""
+    query_file_name = f'metadata_query_{start_timestamp}.sql'
+    context = {
+        'start_timestamp': start_timestamp,
+        'end_timestamp': end_timestamp,
+        'warehouse': self.warehouse,
+    }
+    col_res = self._RunMetadataQuery(
+        self.TIME_BOUND_QUERY_HISTORY_TEMPLATE,
+        query_file_name,
+        context,
+    )
+    row_res = self.ColsToRows(col_res)
+    history_results = []
+    for row in row_res:
+      history_results.append({
+          'metric': 'sf_query_metadata',
+          'value': 1,
+          'unit': 'metadata',
+          'metadata': {
+              f'sf_{key.lower()}': value for key, value in row.items()
+          },
+      })
+    for qid in col_res['QUERY_ID']:
+      history_results.extend(self._GetIndividualQueryMetadata(qid))
+    return history_results

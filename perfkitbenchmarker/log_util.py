@@ -16,9 +16,11 @@
 from contextlib import contextmanager
 import logging
 from logging import handlers
+import os
 import sys
 import threading
 from absl import flags
+from absl import logging as absl_logging
 
 try:
   import colorlog
@@ -37,9 +39,12 @@ LOG_LEVELS = {
     ERROR: logging.ERROR,
 }
 
+SHORT_LOGGER_NAME = 'short'
+
 # Paths for log writing and exporting.
 log_local_path = None
 LOG_FILE_NAME = 'pkb.log'
+SHORT_LOG_FILE_NAME = 'pkb_short.log'
 
 DEFAULT_LOG_ROTATING_INTERVAL = 1
 DEFAULT_LOG_ROTATING_UNIT = 'D'
@@ -150,7 +155,7 @@ def ConfigureBasicLogging():
 
 
 def ConfigureLogging(
-    stderr_log_level, log_path, run_uri, file_log_level=logging.DEBUG
+    stderr_log_level, logs_dir, run_uri, file_log_level=logging.DEBUG
 ):
   """Configure logging.
 
@@ -160,7 +165,7 @@ def ConfigureLogging(
 
   Args:
     stderr_log_level: Messages at this level and above are emitted to stderr.
-    log_path: Path to the log file.
+    logs_dir: Path to the directory where logs should be written.
     run_uri: A string containing the run_uri to be appended to the log prefix
       labels.
     file_log_level: Messages at this level and above are written to the log
@@ -168,7 +173,7 @@ def ConfigureLogging(
   """
   # Set local log file path global variable so it can be used by PKB.
   global log_local_path
-  log_local_path = log_path
+  log_local_path = os.path.join(logs_dir, LOG_FILE_NAME)
 
   # Build the format strings for the stderr and log file message formatters.
   stderr_format = (
@@ -221,3 +226,39 @@ def ConfigureLogging(
   logger.addHandler(handler)
   logging.getLogger('requests').setLevel(logging.ERROR)
 
+
+def ConfigureShortLogging(logs_dir, file_log_level=logging.DEBUG):
+  """Initializes short logging."""
+  short_logger = logging.getLogger(SHORT_LOGGER_NAME)
+  short_logger.setLevel(file_log_level)
+  # Don't propagate logs to parent loggers. Callsites will determine when to log
+  # to root (pkb.log / stdout / stderr) and when to log to the short log.
+  short_logger.propagate = False
+  handler = handlers.TimedRotatingFileHandler(
+      filename=os.path.join(logs_dir, SHORT_LOG_FILE_NAME),
+      when=DEFAULT_LOG_ROTATING_UNIT,
+      interval=DEFAULT_LOG_ROTATING_INTERVAL,
+      backupCount=DEFAULT_LOG_ROTATING_BACKUP_COUNT,
+  )
+  handler.setLevel(file_log_level)
+  handler.setFormatter(absl_logging.PythonFormatter())
+  short_logger.addHandler(handler)
+
+
+def LogToShortLog(message: str, *args, **kwargs):
+  """Logs the message to the short log."""
+  if 'stacklevel' in kwargs:
+    kwargs['stacklevel'] += 1
+  else:
+    kwargs['stacklevel'] = 2
+  logging.getLogger(SHORT_LOGGER_NAME).info(message, *args, **kwargs)
+
+
+def LogToShortLogAndRoot(message: str, *args, **kwargs):
+  """Logs the message to both the short log and root (PKB/stdout)."""
+  if 'stacklevel' in kwargs:
+    kwargs['stacklevel'] += 1
+  else:
+    kwargs['stacklevel'] = 2
+  logging.info(message, *args, **kwargs)
+  LogToShortLog(message, *args, **kwargs)

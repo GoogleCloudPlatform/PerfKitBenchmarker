@@ -70,6 +70,7 @@ def _Install(vm):
       f'CFLAGS=-DHIST_NUM_OF_BUCKET={FLAGS.netperf_histogram_buckets} '
       './configure --enable-burst '
       '--enable-demo --enable-histogram '
+      '--enable-sctp'
       '&& make && sudo make install'
   )
 
@@ -125,11 +126,13 @@ def _CopyTar(vm):
 
 def YumInstall(vm):
   """Installs the netperf package on the VM."""
+  vm.InstallPackages('lksctp-tools-devel')
   _Install(vm)
 
 
 def AptInstall(vm):
   """Installs the netperf package on the VM."""
+  vm.InstallPackages('libsctp-dev')
   _Install(vm)
 
 

@@ -259,6 +259,16 @@ def GetTestDir() -> pathlib.Path:
   return pathlib.Path(__file__).parent
 
 
+def ReadFile(file_name: str, base_path: pathlib.Path | None = None) -> str:
+  """Returns the contents of the given file in the test data directory."""
+  if base_path is None:
+    base_path = GetTestDir() / 'data'
+  path = base_path / file_name
+  with open(path) as f:
+    contents = f.read()
+  return contents
+
+
 class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):
   """Test case class for PKB.
 

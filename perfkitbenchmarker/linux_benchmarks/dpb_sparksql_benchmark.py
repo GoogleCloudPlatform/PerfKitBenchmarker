@@ -125,6 +125,11 @@ _FETCH_RESULTS_FROM_LOGS = flags.DEFINE_bool(
     ' latency (and hence its total wall time), but it is not supported by all '
     ' DPB services.',
 )
+_CATALOG = flags.DEFINE_string(
+    'dpb_sparksql_catalog',
+    None,
+    'Spark catalog to look for data in.',
+)
 
 _READAHEAD_KB = flags.DEFINE_integer(
     'sparksql_readahead_kb', None, 'Configure block device readahead settings.'
@@ -138,7 +143,7 @@ LOG_RESULTS_PATTERN = (
     r'----@spark_sql_runner:results_end@----'
 )
 POLL_LOGS_INTERVAL = 60
-POLL_LOGS_TIMEOUT = 6 * 60
+POLL_LOGS_TIMEOUT = 15 * 60
 RESULTS_FROM_LOGS_SUPPORTED_DPB_SERVICES = (
     dpb_constants.DATAPROC_SERVERLESS,
     dpb_constants.EMR_SERVERLESS,
@@ -380,6 +385,8 @@ def _RunQueries(benchmark_spec) -> tuple[str, dpb_service.JobResult]:
     args += ['--log-results', 'True']
   else:
     args += ['--report-dir', report_dir]
+  if _CATALOG.value:
+    args += ['--catalog', _CATALOG.value]
   if FLAGS.dpb_sparksql_database:
     args += ['--database', FLAGS.dpb_sparksql_database]
   if FLAGS.dpb_sparksql_create_hive_tables:

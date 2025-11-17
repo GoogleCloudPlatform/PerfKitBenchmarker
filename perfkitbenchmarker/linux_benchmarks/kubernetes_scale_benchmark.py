@@ -113,7 +113,7 @@ def _GetScaleTimeout() -> int:
   if virtual_machine.GPU_COUNT.value:
     base_timeout = 60 * 30  # 30 minutes
   proposed_timeout = base_timeout + per_pod_timeout
-  max_timeout = 2 * 60 * 60  # 2 hours
+  max_timeout = 60 * 60  # 1 hour
   return min(proposed_timeout, max_timeout)
 
 
@@ -178,6 +178,8 @@ def ScaleUpPods(
 
   # Request X new pods via YAML apply.
   max_wait_time = _GetScaleTimeout()
+  resource_timeout = max_wait_time + 60 * 5  # 5 minutes after waiting to avoid
+  # pod delete events from polluting data collection.
   resource_names = cluster.ApplyManifest(
       MANIFEST_TEMPLATE,
       Name='kubernetes-scaleup',
@@ -189,7 +191,7 @@ def ScaleUpPods(
       Command=command,
       EphemeralStorageRequest='10Mi',
       RolloutTimeout=max_wait_time,
-      PodTimeout=max_wait_time + 60,
+      PodTimeout=resource_timeout,
       NodeSelectors=cluster.GetNodeSelectors(
           cluster.default_nodepool.machine_type
       ),

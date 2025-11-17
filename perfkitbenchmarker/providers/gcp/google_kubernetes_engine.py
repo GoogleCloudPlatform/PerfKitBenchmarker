@@ -74,6 +74,7 @@ class GoogleArtifactRegistry(container_service.BaseContainerRegistry):
     util.GcloudCommand(self, 'auth', 'configure-docker', self.endpoint).Issue()
 
   def _Create(self):
+    self.Login()
     util.GcloudCommand(
         self,
         'artifacts',

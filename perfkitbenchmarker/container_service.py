@@ -1789,6 +1789,10 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
       )
     return 'http://' + ip.strip()
 
+  def AddNodepool(self, batch_name: str, pool_id: str):
+    """Adds an additional nodepool with the given name to the cluster."""
+    pass
+
 
 @dataclasses.dataclass(eq=True, frozen=True)
 class KubernetesEventResource:

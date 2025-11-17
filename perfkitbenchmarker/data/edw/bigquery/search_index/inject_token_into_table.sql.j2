@@ -1,0 +1,5 @@
+INSERT INTO {{table_name}}
+SELECT * EXCEPT(raw_log), raw_log || " " || "{{token}}" AS raw_log
+FROM {{table_name}}
+ORDER BY RAND()
+LIMIT {{token_count}};

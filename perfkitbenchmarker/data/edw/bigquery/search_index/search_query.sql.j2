@@ -1,3 +1,15 @@
-SELECT COUNT(*) AS result_rows
+SELECT event_timestamp, insert_id
 FROM {{table_name}}
-WHERE SEARCH(raw_log, '{{search_text}}');
+WHERE SEARCH(raw_log, '{{search_text}}')
+{%- if date_between %}
+  AND event_timestamp BETWEEN
+    TIMESTAMP('{{ date_between[0].strftime('%Y-%m-%d')}}')
+    AND TIMESTAMP('{{ date_between[1].strftime('%Y-%m-%d')}}')
+{%- endif %}
+{%- if order_by %}
+ORDER BY {{order_by}}
+{%- endif -%}
+{%- if limit %}
+LIMIT {{limit}}
+{%- endif -%}
+;

@@ -1,2 +1,3 @@
 CREATE SEARCH INDEX IF NOT EXISTS {{index_name}}
-ON `{{table_name}}`(ALL COLUMNS);
+ON `{{table_name}}`(ALL COLUMNS)
+OPTIONS (partition_index_expiration_days=35);

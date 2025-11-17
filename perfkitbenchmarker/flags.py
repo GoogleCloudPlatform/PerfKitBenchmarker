@@ -166,7 +166,13 @@ flags.DEFINE_string(
     'static_virtual_machine.py for a description of this file.',
 )
 flags.DEFINE_boolean(
-    'version', False, 'Display the version and exit.', allow_override_cpp=True
+    'version',
+    False,
+    'Display the version and exit.',
+    allow_override_cpp=True,
+    # Race condition with absl.flags.
+    # absl defends against it, but in rare cases it can still happen.
+    allow_override=True,
 )
 flags.DEFINE_boolean('time_commands', False, 'Times each command issued.')
 flags.DEFINE_string(
@@ -489,7 +495,7 @@ flags.DEFINE_bool(
 ALWAYS_CALL_CLEANUP = flags.DEFINE_boolean(
     'always_call_cleanup',
     False,
-    'Indicates that this benchmark run should always run the Cleanup phase.'
+    'Indicates that this benchmark run should always run the Cleanup phase.',
 )
 SKIP_TEARDOWN_CONDITIONS = flags.DEFINE_list(
     'skip_teardown_conditions',

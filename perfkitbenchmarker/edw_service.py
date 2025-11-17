@@ -16,10 +16,12 @@
 Classes to wrap specific backend services are in the corresponding provider
 directory as a subclass of BaseEdwService.
 """
+import datetime
 import os
 from typing import Any, Dict, List
 
 from absl import flags
+from absl import logging
 from perfkitbenchmarker import resource
 
 flags.DEFINE_integer(
@@ -180,7 +182,7 @@ EDW_SEARCH_DATA_LOCATION = flags.DEFINE_string(
     'edw_search_data_location',
     None,
     'Cloud directory of bucket to source ongoing load data '
-    'for EDW search benchmarks.',
+    'for EDW search benchmarks (without rare token).',
 )
 EDW_SEARCH_INDEX_NAME = flags.DEFINE_string(
     'edw_search_index_name',
@@ -598,11 +600,39 @@ class EdwService(resource.BaseResource):
 
     Returns:
       A dictionary of the following format:
-        { 'metric_1': { 'value': 1, 'unit': 'imperial femtoseconds' },
-          'metric_2': { 'value': 2, 'unit': 'metric dollars' }
+        { 'metric_1': { 'value': 1, 'unit': 'imperial femtoseconds'},
+          'metric_2': { 'value': 2, 'unit': 'metric dollars'}
         ...}
     """
-    raise NotImplementedError
+    logging.info(
+        'Per-iteration auxiliary metrics are not supported for this service.'
+    )
+    del iter_run_key
+    return {}
+
+  def GetTimeBoundAuxiliaryMetrics(
+      self, start_timestamp: float, end_timestamp: float
+  ) -> List[Dict[str, Any]]:
+    """Returns service-specific metrics from a set time range.
+
+    Whenever possible, the service should return metrics only from the compute
+    cluster used for the current benchmark run.
+
+    Args:
+      start_timestamp: Start of the time range to retrieve metrics for.
+      end_timestamp: End of the time range to retrieve metrics for.
+
+    Returns:
+      A list of the following format:
+        [{'metric_1': 'value': 1, 'unit': 'imperial nanoseconds', metadata: {}},
+         {'metric_2': 'value': 2, 'unit': 'metric dollars', metadata: {}}
+        ...]
+    """
+    logging.info(
+        'Time-bound auxiliary metrics are not supported for this service.'
+    )
+    del start_timestamp, end_timestamp
+    return []
 
   def CreateSearchIndex(
       self, table_path: str, index_name: str
@@ -732,7 +762,12 @@ class EdwService(resource.BaseResource):
     raise NotImplementedError
 
   def TextSearchQuery(
-      self, table_path: str, search_keyword: str, index_name: str
+      self,
+      table_path: str,
+      search_keyword: str,
+      order_by: str | None = None,
+      limit: int | None = None,
+      date_between: tuple[datetime.date, datetime.date] | None = None,
   ) -> tuple[float, dict[str, Any]]:
     """Executes a text search query against a table.
 
@@ -752,9 +787,45 @@ class EdwService(resource.BaseResource):
     Args:
       table_path: The full path or name of the table to query.
       search_keyword: The text to search for within the indexed columns.
-      index_name: The name of the search index to use for the query.
+      order_by: The column to order the results by.
+      limit: The maximum number of rows to return.
+      date_between: A tuple of two dates to filter the results by.
 
     Returns:
       A tuple of execution time in seconds and a dictionary of metadata.
     """
     raise NotImplementedError
+
+  def InjectTokenIntoTable(
+      self, table_path: str, token: str, token_count: int
+  ) -> tuple[float, dict[str, Any]]:
+    """Updates N rows to append a token to a well-known string column.
+
+    Metadata returned by this method is arbitrary, and is for the purpose of
+    inclusion in benchmark result metadata. The presence or absence of specific
+    values should not be relied on.
+
+    Args:
+      table_path: The full path or name of the table to insert data into.
+      token: The token to append to the column.
+      token_count: The number of rows to update.
+
+    Returns:
+      A tuple of execution time in seconds and a dictionary of metadata.
+    """
+    raise NotImplementedError
+
+  @staticmethod
+  def ColsToRows(col_res: dict[str, list[Any]]) -> list[dict[str, Any]]:
+    """Converts a dictionary of columns to a list of rows.
+
+    Args:
+      col_res: A dictionary of columns to convert to a list of rows.
+
+    Returns:
+      A list of dictionaries, where each dictionary represents a row.
+
+      e.g. {'col1': [1, 2, 3], 'col2': [4, 5, 6]} -> [{'col1': 1, 'col2': 4},
+        {'col1': 2, 'col2': 5}, {'col1': 3, 'col2': 6}].
+    """
+    return [dict(zip(col_res.keys(), row)) for row in zip(*col_res.values())]

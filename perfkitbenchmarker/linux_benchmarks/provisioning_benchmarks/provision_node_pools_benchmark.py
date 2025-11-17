@@ -38,6 +38,7 @@ import logging
 import time
 from typing import List
 from absl import flags
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
@@ -94,9 +95,25 @@ def Prepare(_: bm_spec.BenchmarkSpec) -> None:
   pass
 
 
+def _AddNodePool(
+    cluster: container_service.KubernetesCluster,
+    batch_name: str,
+    pool_id: str,
+) -> None:
+  """Adds a node pool to the cluster."""
+  cluster.AddNodepool(batch_name, pool_id=pool_id)
+  cluster.ApplyManifest(
+      JOB_MANIFEST_TEMPLATE,
+      batch=batch_name,
+      gpu=USE_GPU.value,
+      cloud=cluster.CLOUD,
+      id=pool_id,
+  )
+
+
 def _CreateJobsAndWait(
     cluster: container_service.KubernetesCluster, batch_name: str, jobs: int
-) -> None:
+) -> list[sample.Sample]:
   """Creates jobs and waits for all pods to be running."""
   logging.info(
       "Creating batch '%s' of %d jobs, each job running in a separate node in a"
@@ -105,22 +122,33 @@ def _CreateJobsAndWait(
       jobs,
   )
 
+  samples = []
   apply_start = time.monotonic()
-  for i in range(jobs):
-    cluster.AddNodepool(batch_name, pool_id="{:03d}".format(i + 1))
-    cluster.ApplyManifest(
-        JOB_MANIFEST_TEMPLATE,
-        batch=batch_name,
-        gpu=USE_GPU.value,
-        cloud=cluster.CLOUD,
-        id="{:03d}".format(i + 1),
-    )
+  tasks = []
+  for i in range(2, jobs + 1):
+    tasks.append((
+        _AddNodePool,
+        [cluster, batch_name, "{:03d}".format(i)],
+        {},
+    ))
+  # Add the first node pool + batch prior to the rest.
+  logging.info("Creating the first node pool 001")
+  _AddNodePool(cluster, batch_name, "001")
+  background_tasks.RunParallelThreads(tasks, len(tasks))
+  apply_time = time.monotonic() - apply_start
   logging.info(
       "Created %d jobs in batch '%s' in %d seconds. Waiting for all pods to be"
       " running",
       jobs,
       batch_name,
-      time.monotonic() - apply_start,
+      apply_time,
+  )
+  samples.append(
+      sample.Sample(
+          "apply_time",
+          apply_time,
+          "seconds",
+      )
   )
   start = time.monotonic()
   # wait up to 2 min per node pool + 45 min for master resizes
@@ -144,7 +172,7 @@ def _CreateJobsAndWait(
       if running >= jobs:
         break
       logging.info(
-          "Running jobs in batch '%s': %d/%d. Time: %d seconds.",
+          "Waiting for jobs in batch '%s': %d/%d. Time: %d seconds.",
           batch_name,
           running,
           jobs,
@@ -165,12 +193,21 @@ def _CreateJobsAndWait(
           % batch_name
       )
     time.sleep(60)
+  ready_time = time.monotonic() - start
   logging.info(
       "All %d jobs in batch '%s' are running. Wait time: %d seconds.",
       jobs,
       batch_name,
-      time.monotonic() - start,
+      ready_time,
   )
+  samples.append(
+      sample.Sample(
+          "ready_time",
+          ready_time,
+          "seconds",
+      )
+  )
+  return samples
 
 
 def _AssertNodes(
@@ -226,26 +263,39 @@ def _CreateNodePools(
   nodes_before = len(cluster.GetNodeNames())
   nodes_pools_before = len(cluster.GetNodePoolNames())
   start = time.monotonic()
-  _CreateJobsAndWait(cluster, batch_name, node_pools_to_add)
+  samples = _CreateJobsAndWait(cluster, batch_name, node_pools_to_add)
   elapsed = time.monotonic() - start
   _AssertNodes(cluster, nodes_before, node_pools_to_add)
   _AssertNodePools(cluster, nodes_pools_before, node_pools_to_add)
-  metadata = {"node_pools_created": node_pools_to_add}
-  metric_batch_name = batch_name.replace("-", "_")
-  return [
+  samples.append(
       sample.Sample(
-          "%s_provisioning_time" % metric_batch_name,
+          "provisioning_time",
           elapsed,
           "seconds",
-          metadata,
-      ),
-      sample.Sample(
-          "%s_provisioning_time_per_node_pool" % metric_batch_name,
-          elapsed / node_pools_to_add,
-          "seconds",
-          metadata,
-      ),
-  ]
+      )
+  )
+  metadata = {"node_pools_created": node_pools_to_add}
+  metric_batch_name = batch_name.replace("-", "_")
+  final_samples = []
+  for s in samples:
+    metric_name = f"{metric_batch_name}_{s.metric}"
+    final_samples.append(
+        sample.Sample(
+            metric_name,
+            s.value,
+            s.unit,
+            metadata,
+        )
+    )
+    final_samples.append(
+        sample.Sample(
+            f"{metric_name}_per_node_pool",
+            s.value / node_pools_to_add,
+            s.unit,
+            s.metadata,
+        )
+    )
+  return final_samples
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:

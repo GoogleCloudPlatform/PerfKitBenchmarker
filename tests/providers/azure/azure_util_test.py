@@ -8,9 +8,7 @@ from tests import pkb_common_test_case
 
 
 def _MockIssueCommand(file_name_text_response):
-  path = pkb_common_test_case.GetTestDir() / 'data' / file_name_text_response
-  with open(path) as f:
-    output = f.read()
+  output = pkb_common_test_case.ReadFile(file_name_text_response)
   return mock.patch.object(
       vm_util, 'IssueCommand', autospec=True, return_value=[output, None, None]
   )

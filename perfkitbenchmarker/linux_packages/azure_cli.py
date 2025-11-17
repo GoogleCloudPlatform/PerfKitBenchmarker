@@ -73,9 +73,7 @@ def _PipInstall(vm):
     vm: Virtual Machine to install on.
   """
   vm.Install('pip')
-  # azure-cli updated requirements.txt dependency, but not setupu.py:
-  # https://github.com/Azure/azure-cli/pull/26671
-  vm.RemoteCommand('sudo pip3 install --upgrade azure-cli pyOpenSSL>=23.2.0')
+  vm.RemoteCommand('sudo pip3 install --upgrade azure-cli')
 
 
 # https://packages.microsoft.com/repos/azure-cli/dists/
@@ -94,7 +92,7 @@ def AptInstall(vm):
   Args:
     vm: Virtual Machine to install on.
   """
-  if vm.is_aarch64 or vm.OS_TYPE not in SUPPORTED_APT_DISTROS:
+  if vm.OS_TYPE not in SUPPORTED_APT_DISTROS:
     _PipInstall(vm)
     return
 

@@ -1,19 +1,23 @@
 """Runs the HammerDB relational database benchmark."""
 
+import datetime
 import posixpath
-from typing import Any, Dict, List
+from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
-from perfkitbenchmarker import relational_db as r_db
+from perfkitbenchmarker import iaas_relational_db
+from perfkitbenchmarker import mysql_iaas_relational_db
+from perfkitbenchmarker import postgres_iaas_relational_db
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine
-
 from perfkitbenchmarker.linux_packages import hammerdb
 from perfkitbenchmarker.providers.gcp import gcp_alloy_db  # pylint: disable=unused-import
+
 
 # Update this version when changing a config
 # TODO(chunla) Consider adding checks to make sure this version gets updated.
@@ -109,7 +113,7 @@ hammerdbcli:
 """
 
 
-def GetConfig(user_config: Dict[Any, Any]) -> Dict[Any, Any]:
+def GetConfig(user_config: dict[Any, Any]) -> dict[Any, Any]:
   """Load and return benchmark config.
 
   Args:
@@ -121,7 +125,49 @@ def GetConfig(user_config: Dict[Any, Any]) -> Dict[Any, Any]:
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
+def _PrepareServer(db: iaas_relational_db.IAASRelationalDb):
+  """Applies server configurations if necessary."""
+  optimized_server_config = (
+      hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value
+  )
+  if (
+      optimized_server_config != hammerdb.NON_OPTIMIZED
+      and not FLAGS.use_managed_db
+  ):
+    SetOptimizedServerConfiguration(optimized_server_config, db.server_vm, db)
+  elif db.engine == sql_engine_utils.POSTGRES:
+    custom_server_config = hammerdb.HAMMERDB_SERVER_CONFIGURATION.value
+    if custom_server_config:
+      SetPostgresOptimizedServerConfiguration(
+          optimized_server_config,
+          db.server_vm,
+          db,
+          custom_server_config,
+      )
+
+
+def _PrepareAlloyDb(db: gcp_alloy_db.GCPAlloyRelationalDb) -> None:
+  """Prepares AlloyDB if necessary."""
+  db_name = hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[hammerdb.HAMMERDB_SCRIPT.value]
+  if not db.enable_columnar_engine:
+    return
+  db.CreateColumnarEngineExtension(db_name)
+  if (
+      hammerdb.HAMMERDB_SCRIPT.value == hammerdb.HAMMERDB_SCRIPT_TPC_H
+      and hammerdb.LOAD_TPCH_TABLES_TO_COLUMNAR_ENGINE.value
+  ):
+    for table in hammerdb.TPCH_TABLES:
+      db.AddTableToColumnarEngine(table, database_name=db_name)
+
+
+def _GetNumCpus(db: relational_db.BaseRelationalDb) -> int | None:
+  """Returns the number of CPUs for the database."""
+  if hasattr(db, 'server_vm'):
+    return db.server_vm.NumCpusForBenchmark()
+  return None
+
+
+def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """Prepare Hammerdbcli by installing dependencies and uploading binaries.
 
   Args:
@@ -131,106 +177,65 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   client_vms = benchmark_spec.vm_groups['clients']
   assert len(client_vms) == 1
   client_vm = client_vms[0]
-  relational_db = benchmark_spec.relational_db
-  db_engine = relational_db.engine
-  num_cpus = None
-  if hasattr(relational_db, 'server_vm'):
-    server_vm = relational_db.server_vm
-    num_cpus = server_vm.NumCpusForBenchmark()
-  hammerdb.SetDefaultConfig(num_cpus)
-  db_name = hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[hammerdb.HAMMERDB_SCRIPT.value]
+  db = benchmark_spec.relational_db
 
-  if FLAGS.cloud == 'Azure' and db_engine == 'mysql' and FLAGS.use_managed_db:
-    # Default configuration of wait_timeout is only 120 seconds
-    # Use 28800, the default mysql timeout
-    relational_db.SetDbConfiguration('wait_timeout', '28800')
+  hammerdb.SetDefaultConfig(_GetNumCpus(db))
 
   client_vm.Install('hammerdb')
-  optimized_server_config = (
-      hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value
-  )
-  if (
-      optimized_server_config != hammerdb.NON_OPTIMIZED
-      and not FLAGS.use_managed_db
-  ):
-    server_vm = relational_db.server_vm
-    SetOptimizedServerConfiguration(
-        optimized_server_config, server_vm, relational_db, db_engine
-    )
-  elif db_engine == 'postgres':
-    custom_server_config = hammerdb.HAMMERDB_SERVER_CONFIGURATION.value
-    if custom_server_config:
-      server_vm = relational_db.server_vm
-      SetPostgresOptimizedServerConfiguration(
-          optimized_server_config,
-          server_vm,
-          relational_db,
-          custom_server_config,
-      )
+
+  if not FLAGS.use_managed_db:
+    _PrepareServer(db)
+
   hammerdb.SetupConfig(
       vm=client_vm,
-      db_engine=db_engine,
+      db_engine=db.engine,
       hammerdb_script=hammerdb.HAMMERDB_SCRIPT.value,
-      ip=relational_db.endpoint,
-      port=relational_db.port,
-      password=relational_db.spec.database_password,
-      user=relational_db.spec.database_username,
+      ip=db.endpoint,
+      port=db.port,
+      password=db.spec.database_password,
+      user=db.spec.database_username,
       is_managed_azure=(FLAGS.cloud == 'Azure' and FLAGS.use_managed_db),
   )
 
-  if (
-      db_engine == sql_engine_utils.ALLOYDB
-      and relational_db.enable_columnar_engine
-  ):
-    relational_db.CreateColumnarEngineExtension(db_name)
-    if (
-        hammerdb.HAMMERDB_SCRIPT.value == hammerdb.HAMMERDB_SCRIPT_TPC_H
-        and hammerdb.LOAD_TPCH_TABLES_TO_COLUMNAR_ENGINE.value
-    ):
-      for table in hammerdb.TPCH_TABLES:
-        relational_db.AddTableToColumnarEngine(table, database_name=db_name)
+  if db.engine == sql_engine_utils.ALLOYDB:
+    _PrepareAlloyDb(db)
 
 
 def SetOptimizedServerConfiguration(
     optimized_server_config: str,
     server_vm: virtual_machine.BaseVirtualMachine,
-    relational_db: r_db.BaseRelationalDb,
-    db_engine: str,
-):
+    db: relational_db.BaseRelationalDb,
+) -> None:
   """Set the optimized configuration for hammerdb.
 
   Args:
     optimized_server_config: The optimized server configuration type. Currently
       support MINIMUM_RECOVERY and RESTORABLE
     server_vm: Server VM to host the database.
-    relational_db: Relational database class.
-    db_engine: Database engine type.
+    db: Relational database class.
   """
-  if db_engine == 'mysql':
-    SetMysqlOptimizedServerConfiguration(
-        optimized_server_config, server_vm, relational_db
-    )
-  elif db_engine == 'postgres':
+  if db.engine == sql_engine_utils.MYSQL:
+    SetMysqlOptimizedServerConfiguration(optimized_server_config, server_vm, db)
+  elif db.engine == sql_engine_utils.POSTGRES:
     SetPostgresOptimizedServerConfiguration(
-        optimized_server_config, server_vm, relational_db
+        optimized_server_config, server_vm, db
     )
 
 
 def SetMysqlOptimizedServerConfiguration(
     optimized_server_config: str,
     server_vm: virtual_machine.BaseVirtualMachine,
-    relational_db: r_db.BaseRelationalDb,
-):
+    db: mysql_iaas_relational_db.MysqlIAASRelationalDb,
+) -> None:
   """Set the optimized configuration for hammerdb for Mysql.
 
   Args:
     optimized_server_config: The optimized server configuration type. Currently
       support MINIMUM_RECOVERY and RESTORABLE
     server_vm: Server VM to host the database.
-    relational_db: Relational database class.
+    db: Relational database class.
   """
-  file_name_prefix = f'hammerdb_optimized_{optimized_server_config}_'
-  config = file_name_prefix + 'mysqld.cnf'
+  config = f'hammerdb_optimized_{optimized_server_config}_mysqld.cnf'
   server_vm.PushFile(
       data.ResourcePath(posixpath.join('relational_db_configs', config)),
       '',
@@ -240,7 +245,7 @@ def SetMysqlOptimizedServerConfiguration(
       '~/',
       config,
       INNODB_BUFFER_POOL_SIZE,
-      relational_db.innodb_buffer_pool_size,
+      db.innodb_buffer_pool_size,
   )
   server_vm.RemoteCommand(f'sudo mv {config} {MYSQL_CONFIG_PATH}')
   server_vm.RemoteCommand(f'sudo chown mysql:mysql {MYSQL_CONFIG_PATH}')
@@ -248,26 +253,26 @@ def SetMysqlOptimizedServerConfiguration(
   server_vm.RemoteCommand('sudo sudo service mysql restart')
 
   # Flush table might be refreshed after changing the cnf file.
-  relational_db.SetMYSQLClientPrivileges()
+  db.SetMYSQLClientPrivileges()
 
 
 def SetPostgresOptimizedServerConfiguration(
     optimized_server_config: str,
     server_vm: virtual_machine.BaseVirtualMachine,
-    relational_db: r_db.BaseRelationalDb,
+    db: postgres_iaas_relational_db.PostgresIAASRelationalDb,
     custom_server_config: str = '',
-):
+) -> None:
   """Set the optimized configuration for hammerdb for postgres.
 
   Args:
     optimized_server_config: The optimized server configuration type. Currently
       support MINIMUM_RECOVERY and RESTORABLE
     server_vm: Server VM to host the database.
-    relational_db: Relational database class.
-    custom_server_config: str = '' The custom server configuration file name
+    db: Relational database class.
+    custom_server_config: The custom server configuration file name.
   """
 
-  shared_buffer_size = relational_db.postgres_shared_buffer_size
+  shared_buffer_size = db.postgres_shared_buffer_size
   server_vm.RemoteCommand('sudo systemctl stop postgresql')
 
   # Set the hugepages size for hammerdb
@@ -306,7 +311,7 @@ def SetPostgresOptimizedServerConfiguration(
   hammerdb.SearchAndReplaceGuestFile(
       server_vm, '~/', config, SHARED_BUFFER_SIZE, str(shared_buffer_size)
   )
-  db_version = relational_db.spec.engine_version
+  db_version = db.spec.engine_version
   hammerdb.SearchAndReplaceGuestFile(
       server_vm, '~/', config, PG_VERSION, db_version
   )
@@ -324,14 +329,30 @@ def SetPostgresOptimizedServerConfiguration(
   server_vm.RemoteCommand('sudo systemctl restart postgresql')
 
 
-def AddMetadata(metadata: Dict[str, Any], updates: Any) -> Dict[str, Any]:
+def AddMetadata(metadata: dict[str, Any], updates: Any) -> dict[str, Any]:
   """Returns a copy of the metadata with dictionary update applied."""
   result = metadata.copy()
   result.update(updates)
   return result
 
 
-def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
+def _CheckAlloyDbColumnarEngine(
+    db: gcp_alloy_db.GCPAlloyRelationalDb,
+    client_vm: virtual_machine.BaseVirtualMachine,
+    script: str,
+    timeout: int | None,
+    database_name: str,
+) -> list[sample.Sample]:
+  """Checks AlloyDB columnar engine recommendation and reruns if needed."""
+  columnar_size, relation = db.GetColumnarEngineRecommendation('tpch')
+  db.UpdateAlloyDBFlags(columnar_size, True, 'off', relation=relation)
+  db.WaitColumnarEnginePopulates(database_name)
+  # Another prewarm
+  stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)
+  return hammerdb.ParseResults(script=script, stdout=stdout, vm=client_vm)
+
+
+def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Run the Hammerdbcli benchmark.
 
   Args:
@@ -344,46 +365,39 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   Raises:
     Exception: if the script is unknown
   """
-  client_vms = benchmark_spec.vm_groups['clients']
-  assert len(client_vms) == 1
-  client_vm = client_vms[0]
-  relational_db = benchmark_spec.relational_db
-  num_cpus = None
-  if hasattr(relational_db, 'server_vm'):
-    server_vm = relational_db.server_vm
-    num_cpus = server_vm.NumCpusForBenchmark()
-  hammerdb.SetDefaultConfig(num_cpus)
-  db_engine = relational_db.engine
-  metadata = hammerdb.GetMetadata(db_engine)
-  # TODO(chunla) Consider if we should have separate versioning for each config.
-  metadata['hammerdbcli_config_version'] = CONFIG_VERSION
+  client_vm = benchmark_spec.vm_groups['clients'][0]
+  db = benchmark_spec.relational_db
+  num_cpus = (
+      db.server_vm.NumCpusForBenchmark() if hasattr(db, 'server_vm') else None
+  )
   script = hammerdb.HAMMERDB_SCRIPT.value
   timeout = hammerdb.HAMMERDB_RUN_TIMEOUT.value
-  database_name = hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[script]
+
+  hammerdb.SetDefaultConfig(num_cpus)
+
+  metadata = hammerdb.GetMetadata(db.engine)
+  # Consider if we should have separate versioning for each config.
+  metadata['hammerdbcli_config_version'] = CONFIG_VERSION
+
   samples = []
   for i in range(1, 1 + hammerdb.NUM_RUN.value):
     metadata['run_iteration'] = i
-    stdout = hammerdb.Run(client_vm, db_engine, script, timeout=timeout)
+    start_time = datetime.datetime.now()
+    stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)
+    end_time = datetime.datetime.now()
     current_samples = hammerdb.ParseResults(
         script=script, stdout=stdout, vm=client_vm
     )
     if (
-        db_engine == sql_engine_utils.ALLOYDB
-        and relational_db.enable_columnar_engine_recommendation
+        db.engine == sql_engine_utils.ALLOYDB
+        and db.enable_columnar_engine_recommendation
         and i == 1
     ):
-      columnar_size, relation = relational_db.GetColumnarEngineRecommendation(
-          'tpch'
+      database_name = hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[script]
+      current_samples = _CheckAlloyDbColumnarEngine(
+          db, client_vm, script, timeout, database_name
       )
-      relational_db.UpdateAlloyDBFlags(
-          columnar_size, True, 'off', relation=relation
-      )
-      relational_db.WaitColumnarEnginePopulates(database_name)
-      # Another prewarm
-      stdout = hammerdb.Run(client_vm, db_engine, script, timeout=timeout)
-      current_samples = hammerdb.ParseResults(
-          script=script, stdout=stdout, vm=client_vm
-      )
+    current_samples.extend(db.CollectMetrics(start_time, end_time))
 
     for s in current_samples:
       s.metadata.update(metadata)
@@ -391,7 +405,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   return samples
 
 
-def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec):
+def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """Cleanup the VM to its original state.
 
   Args:

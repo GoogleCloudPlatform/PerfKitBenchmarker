@@ -29,8 +29,9 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import netperf_benchmark
+from perfkitbenchmarker.linux_benchmarks.fio import constants
 from perfkitbenchmarker.linux_benchmarks.fio import fio_benchmark
-from perfkitbenchmarker.linux_packages import fio
+from perfkitbenchmarker.linux_benchmarks.fio import utils
 
 
 BENCHMARK_NAME = 'fio_netperf'
@@ -45,9 +46,15 @@ fio_netperf:
       vm_spec: *default_dual_core
       disk_spec: *default_500_gb
   flags:
+    placement_group_style: none
     netperf_test_length: 300
+    netperf_benchmarks: TCP_STREAM
+    netperf_num_streams: 200
     fio_runtime: 300
-    placement_group_style: closest_supported
+    fio_generate_scenarios: seq_1M_readwrite_100%_rwmixread-50
+    fio_num_jobs: 8
+    fio_io_depths: 64
+    fio_target_mode: against_device_without_fill
 """
 
 FLAGS = flags.FLAGS
@@ -67,11 +74,11 @@ def GetConfig(user_config: Dict[Any, Any]) -> Dict[Any, Any]:
     merged configs
   """
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  if FLAGS.fio_target_mode != fio_benchmark.AGAINST_FILE_WITHOUT_FILL_MODE:
-    for vm_group in config['vm_groups'].keys():
-      disk_spec = config['vm_groups'][vm_group]['disk_spec']
-      for cloud in disk_spec:
-        disk_spec[cloud]['mount_point'] = None
+  # Running against raw device
+  for vm_group in config['vm_groups'].keys():
+    disk_spec = config['vm_groups'][vm_group]['disk_spec']
+    for cloud in disk_spec:
+      disk_spec[cloud]['mount_point'] = None
   return config
 
 
@@ -119,11 +126,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       2,
   )
 
-  # Prepare FIO benchmark
-  exec_path = fio.GetFioExec()
-  background_tasks.RunThreaded(
-      lambda vm: fio_benchmark.PrepareWithExec(vm, exec_path), vms
-  )
+  # Prepare FIO benchmark on receiving VM (from fio_raw_device_benchmark).
+  vms[1].Install('fio')
+  utils.PrefillIfEnabled(vms[1], constants.FIO_PATH)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -138,10 +143,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   Raises:
     RunError: A run-stage error raised by an individual benchmark.
   """
+  # Only the receiving vm is used for FIO.
   vms = benchmark_spec.vms[:2]
   output_samples_list = background_tasks.RunParallelThreads(
       [
-          (fio_benchmark.RunFioOnVMs, [vms], {}),
+          (fio_benchmark.RunFioOnVMs, [[vms[1]]], {}),
           (netperf_benchmark.RunClientServerVMs, vms, {}),
       ],
       2,
@@ -153,13 +159,13 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   sample_times = {}
   for fio_sample in output_samples_list[0]:
     if fio_sample.metric == 'start_time':
-      key = 'fio_start_time' + str(fio_sample.metadata['machine_instance'])
+      key = 'fio_start_time'
       sample_times[key] = min(
           sample_times.get(key, float('inf')), fio_sample.value
       )
 
     elif fio_sample.metric == 'end_time':
-      key = 'fio_end_time' + str(fio_sample.metadata['machine_instance'])
+      key = 'fio_end_time'
       sample_times[key] = max(
           sample_times.get(key, float('-inf')), fio_sample.value
       )
@@ -180,15 +186,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   min_test_length = min(FLAGS.netperf_test_length, FLAGS.fio_runtime)
   if (
       float(
-          max(
-              abs(
-                  sample_times['fio_start_time0']
-                  - sample_times['netperf_start_time']
-              ),
-              abs(
-                  sample_times['fio_start_time1']
-                  - sample_times['netperf_start_time']
-              ),
+          abs(
+              sample_times['fio_start_time']
+              - sample_times['netperf_start_time']
           )
       )
       / min_test_length
@@ -201,16 +201,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
 
   if (
       float(
-          max(
-              abs(
-                  sample_times['fio_end_time0']
-                  - sample_times['netperf_end_time']
-              ),
-              abs(
-                  sample_times['fio_end_time1']
-                  - sample_times['netperf_end_time']
-              ),
-          )
+          abs(sample_times['fio_end_time'] - sample_times['netperf_end_time'])
       )
       / min_test_length
       - 1
@@ -228,5 +219,4 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     benchmark_spec: The benchmark specification.
   """
   vms = benchmark_spec.vms[:2]
-  background_tasks.RunThreaded(fio_benchmark.CleanupVM, vms)
   netperf_benchmark.CleanupClientServerVMs(vms[0], vms[1])
