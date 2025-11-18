@@ -352,6 +352,18 @@ def _CheckAlloyDbColumnarEngine(
   return hammerdb.ParseResults(script=script, stdout=stdout, vm=client_vm)
 
 
+def _PreRun(db: relational_db.BaseRelationalDb) -> None:
+  """Prepares the database for the benchmark run."""
+  db.ClearWaitStats()
+  db.QueryIOStats()
+
+
+def _PostRun(db: relational_db.BaseRelationalDb) -> None:
+  """Records the database metrics after the benchmark run."""
+  db.QueryWaitStats()
+  db.QueryIOStats()
+
+
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Run the Hammerdbcli benchmark.
 
@@ -382,12 +394,14 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   samples = []
   for i in range(1, 1 + hammerdb.NUM_RUN.value):
     metadata['run_iteration'] = i
+    _PreRun(db)
     start_time = datetime.datetime.now()
     stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)
     end_time = datetime.datetime.now()
     current_samples = hammerdb.ParseResults(
         script=script, stdout=stdout, vm=client_vm
     )
+    _PostRun(db)
     if (
         db.engine == sql_engine_utils.ALLOYDB
         and db.enable_columnar_engine_recommendation

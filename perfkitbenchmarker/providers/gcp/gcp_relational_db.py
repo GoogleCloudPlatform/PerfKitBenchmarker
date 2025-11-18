@@ -31,6 +31,7 @@ import time
 from absl import flags
 from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3 import types
+import numpy as np
 from perfkitbenchmarker import data
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import mysql_iaas_relational_db
@@ -109,6 +110,26 @@ DELETE_INSTANCE_TIMEOUT = 600  # 10 minutes
 CREATION_TIMEOUT = 1800  # 30 minutes
 
 _METRICS_COLLECTION_DELAY_SECONDS = 165
+
+_DEFAULT_METRICS = [
+    'cloudsql.googleapis.com/database/cpu/utilization',
+    'cloudsql.googleapis.com/database/memory/total_usage',
+    'cloudsql.googleapis.com/database/disk/read_ops_count',
+    'cloudsql.googleapis.com/database/disk/write_ops_count',
+    'cloudsql.googleapis.com/database/disk/write_bytes_count',
+    'cloudsql.googleapis.com/database/disk/read_bytes_count',
+    'cloudsql.googleapis.com/database/disk/utilization',
+    'cloudsql.googleapis.com/database/disk/provisioning/iops',
+    'cloudsql.googleapis.com/database/disk/provisioning/throughput',
+]
+
+_SQLSERVER_METRICS = [
+    'cloudsql.googleapis.com/database/sqlserver/memory/page_life_expectancy',
+    'cloudsql.googleapis.com/database/sqlserver/memory/lazy_write_count',
+    'cloudsql.googleapis.com/database/sqlserver/memory/buffer_cache_hit_ratio',
+    'cloudsql.googleapis.com/database/sqlserver/memory/memory_grants_pending',
+    'cloudsql.googleapis.com/database/sqlserver/memory/free_list_stall_count',
+]
 
 
 class UnsupportedDatabaseEngineError(Exception):
@@ -637,6 +658,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       metric_type: str,
       start_time: datetime.datetime,
       end_time: datetime.datetime,
+      collect_percentiles: bool = False,
   ) -> list[sample.Sample]:
     """Collects time series metrics from Google Cloud Monitoring.
 
@@ -644,6 +666,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       metric_type: The full metric type name.
       start_time: The start time of query interval.
       end_time: The end time of query interval.
+      collect_percentiles: Whether to collect percentiles for the metric.
 
     Returns:
       A list of sample.Sample objects.
@@ -712,6 +735,19 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         f'{metric_basename}: average={avg_val:.2f}, min={min(values):.2f},'
         f' max={max(values):.2f}, count={len(values)}'
     )
+    if collect_percentiles:
+      percentiles_to_collect = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+      percentile_values = np.percentile(values, percentiles_to_collect)
+      for percentile, value in zip(percentiles_to_collect, percentile_values):
+        if percentile == 0:
+          name = 'min'
+        elif percentile == 100:
+          name = 'max'
+        else:
+          name = f'p{percentile}'
+        samples.append(
+            sample.Sample(f'{metric_basename}_{name}', value, unit, metadata={})
+        )
     human_readable_ts = [
         f'{_FormatTime(t)}: {v:.2f} {unit}'
         for t, v in reversed(list(zip(timestamps, values)))
@@ -756,20 +792,16 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       )
       time.sleep(time_to_wait.total_seconds())
 
-    metrics_to_collect = [
-        'cloudsql.googleapis.com/database/cpu/utilization',
-        'cloudsql.googleapis.com/database/memory/total_usage',
-        'cloudsql.googleapis.com/database/disk/read_ops_count',
-        'cloudsql.googleapis.com/database/disk/write_ops_count',
-        'cloudsql.googleapis.com/database/disk/write_bytes_count',
-        'cloudsql.googleapis.com/database/disk/read_bytes_count',
-        'cloudsql.googleapis.com/database/disk/utilization',
-        'cloudsql.googleapis.com/database/disk/provisioning/iops',
-        'cloudsql.googleapis.com/database/disk/provisioning/throughput',
-    ]
     all_samples = []
-    for metric in metrics_to_collect:
+    for metric in _DEFAULT_METRICS:
       all_samples.extend(self._CollectTimeSeries(metric, start_time, end_time))
+    if self.engine_type == sql_engine_utils.SQLSERVER:
+      for metric in _SQLSERVER_METRICS:
+        all_samples.extend(
+            self._CollectTimeSeries(
+                metric, start_time, end_time, collect_percentiles=True
+            )
+        )
     return all_samples
 
 

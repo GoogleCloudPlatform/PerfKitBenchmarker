@@ -19,8 +19,10 @@ This is the base implementation of all relational db.
 
 import abc
 import datetime
+import logging
 from absl import flags
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
@@ -235,6 +237,12 @@ DEFAULT_PORTS = {
     sql_engine_utils.SQLSERVER: DEFAULT_SQLSERVER_PORT,
 }
 
+CLEAR_WAIT_STATS_SQL = "DBCC SQLPERF ('sys.dm_os_wait_stats', CLEAR);"
+CAPTURE_IO_STATS_SQL = (
+    'select DB_NAME(database_id) as DBName,* from '
+    'sys.dm_io_virtual_file_stats(NULL,NULL)'
+)
+
 
 class RelationalDbPropertyNotSetError(Exception):
   pass
@@ -384,6 +392,24 @@ class BaseRelationalDb(resource.BaseResource):
     ]
     # TODO(user): Remove this after moving to multiple client VMs.
     self.client_vm = self.client_vms[0]
+
+  def ClearWaitStats(self) -> None:
+    if self.engine_type == sql_engine_utils.SQLSERVER:
+      logging.info('Clearing wait stats')
+      self.client_vm_query_tools.IssueSqlCommand(CLEAR_WAIT_STATS_SQL)
+
+  def QueryIOStats(self) -> tuple[str, str]:
+    if self.engine_type == sql_engine_utils.SQLSERVER:
+      logging.info('Querying IO stats')
+      return self.client_vm_query_tools.IssueSqlCommand(CAPTURE_IO_STATS_SQL)
+    return ('', '')
+
+  def QueryWaitStats(self) -> tuple[str, str]:
+    if self.engine_type == sql_engine_utils.SQLSERVER:
+      logging.info('Querying wait stats')
+      with open(data.ResourcePath('capture_wait_stats.sql'), 'r') as f:
+        return self.client_vm_query_tools.IssueSqlCommand(f.read())
+    return ('', '')
 
   @property
   def port(self):
