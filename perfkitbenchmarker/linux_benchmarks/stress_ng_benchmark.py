@@ -380,6 +380,16 @@ flags.DEFINE_integer(
     0,
     'memrate worker write rate in MiB/s. Only applies to "memrate" stressor.'
 )
+flags.DEFINE_integer(
+    'stress_ng_vm_count',
+    4,
+    'Number of VMs to run the "vm" stressor on.'
+)
+flags.DEFINE_string(
+    'stress_ng_vm_bytes',
+    '1G',
+    'Size of the VM to run the "vm" stressor on.'
+)
 
 ALL_WORKLOADS = ['small', 'medium', 'large']
 flags.DEFINE_list(
@@ -552,6 +562,19 @@ def _RunWorkload(vm, num_threads):
             str(memrate_wr),
         ])
         metadata['memrate_wr_mib_per_s'] = memrate_wr
+
+    if stressor_name == 'vm':
+      cmd_parts.extend([
+          '--vm',
+          str(FLAGS.stress_ng_vm_count),
+          '--vm-bytes',
+          str(FLAGS.stress_ng_vm_bytes),
+          '--vm-keep',
+          '--vm-hang',
+          '0',
+      ])
+      metadata['vm_count'] = FLAGS.stress_ng_vm_count
+      metadata['vm_bytes'] = FLAGS.stress_ng_vm_bytes
 
     cmd = ' '.join(cmd_parts)
     stdout, _ = vm.RemoteCommand(cmd)
