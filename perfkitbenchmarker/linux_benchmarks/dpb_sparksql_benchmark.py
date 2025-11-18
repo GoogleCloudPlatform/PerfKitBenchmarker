@@ -143,7 +143,7 @@ LOG_RESULTS_PATTERN = (
     r'----@spark_sql_runner:results_end@----'
 )
 POLL_LOGS_INTERVAL = 60
-POLL_LOGS_TIMEOUT = 6 * 60
+POLL_LOGS_TIMEOUT = 15 * 60
 RESULTS_FROM_LOGS_SUPPORTED_DPB_SERVICES = (
     dpb_constants.DATAPROC_SERVERLESS,
     dpb_constants.EMR_SERVERLESS,

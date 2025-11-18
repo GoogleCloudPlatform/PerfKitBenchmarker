@@ -20,6 +20,7 @@ from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import nfs_service
+from perfkitbenchmarker import os_types
 from tests import pkb_common_test_case
 
 
@@ -130,7 +131,7 @@ class UnmanagedNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(self.nfs_service.GetRemoteAddress(), '1.1.1.1')
 
   def testNfsExportDirectoryFirstTime(self):
-    vm = mock.Mock(BASE_OS_TYPE='debian')
+    vm = mock.Mock(BASE_OS_TYPE=os_types.DEBIAN)
     vm.TryRemoteCommand.return_value = False
     nfs_service.NfsExport(vm, '/foo/bar')
     # /etc/exports updated
@@ -144,7 +145,7 @@ class UnmanagedNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testNfsExportDirectoryAlreadyExported(self):
     # Testing when NfsExport called twice with the same path.
-    vm = mock.Mock(BASE_OS_TYPE='rhel')
+    vm = mock.Mock(BASE_OS_TYPE=os_types.RED_HAT)
     vm.TryRemoteCommand.return_value = True
     nfs_service.NfsExport(vm, '/foo/bar')
     # RemoteCommand not called with the mkdir ... echo calls

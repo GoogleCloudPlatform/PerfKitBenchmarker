@@ -74,14 +74,14 @@ def GetOSDependentDefaultsConfig(os_type: str) -> dict[str, str]:
   version = GetPostgresVersion()
 
   configs = {
-      'centos': {
+      os_types.CENTOS_STREAM9: {
           'postgres_path': f'/usr/pgsql-{version}',
           'data_dir': f'/var/lib/pgsql/{version}/data',
           'conf_dir': f'/var/lib/pgsql/{version}/data',
           'disk_mount_point': f'/var/lib/pgsql/{version}',
           'postgres_service_name': f'postgresql-{version}',
       },
-      'debian': {
+      os_types.DEBIAN: {
           'postgres_path': f'/usr/lib/postgresql/{version}',
           'data_dir': f'/etc/postgresql/{version}/data/data',
           'conf_dir': f'/etc/postgresql/{version}/main',
@@ -89,7 +89,7 @@ def GetOSDependentDefaultsConfig(os_type: str) -> dict[str, str]:
           'postgres_service_name': 'postgresql',
           'postgres_template_service_name': f'postgresql@{version}-main',
       },
-      'amazonlinux': {
+      os_types.AMAZONLINUX2023: {
           'data_dir': '/var/lib/pgsql/data',
           'conf_dir': '/var/lib/pgsql/data',
           'disk_mount_point': '/var/lib/pgsql',
@@ -128,9 +128,12 @@ def ConfigureSystemSettings(vm):
 
 def YumInstall(vm):
   """Installs the postgres package on the VM."""
-  if vm.OS_TYPE not in os_types.AMAZONLINUX_TYPES:
-    vm.RemoteCommand('sudo dnf config-manager --set-enabled crb')
-    vm.RemoteCommand('sudo dnf install -y epel-release epel-next-release')
+  # TODO(user): support more os types
+  # These instructions would probably work for RHEL9 and ROcky Linux 9, but for
+  # some reason this file assumed CENTOS_STREAM9 historically and they have not
+  # been tested.
+  assert vm.OS_TYPE in [os_types.AMAZONLINUX2023, os_types.CENTOS_STREAM9]
+  if vm.OS_TYPE == os_types.CENTOS_STREAM9:
     if vm.is_aarch64:
       repo = 'EL-9-aarch64'
     else:
@@ -140,11 +143,9 @@ def YumInstall(vm):
         f'reporpms/{repo}/pgdg-redhat-repo-latest.noarch.rpm --skip-broken'
     )
     vm.RemoteCommand('sudo dnf -qy module disable postgresql')
-  else:
-    vm.RemoteCommand('sudo dnf update')
   postgresql_version = _POSTGRESQL_VERSION.value
   postgresql_devel = f'{postgresql_version}-devel'
-  if vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
+  if vm.OS_TYPE == os_types.AMAZONLINUX2023:
     postgresql_devel = 'postgresql-devel'
   vm.RemoteCommand(
       f'sudo yum install -y {postgresql_version}-server {postgresql_version}'
@@ -173,7 +174,7 @@ def AptInstall(vm):
 
 def InitializeDatabase(vm):
   """Initialize the database."""
-  if vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
+  if vm.OS_TYPE == os_types.AMAZONLINUX2023:
     vm.RemoteCommand('sudo postgresql-setup --initdb')
     return
   postgres_path = GetOSDependentDefaults(vm.OS_TYPE)['postgres_path']
@@ -191,17 +192,19 @@ def InitializeDatabase(vm):
 
 def GetOSDependentDefaults(os_type: str) -> dict[str, str]:
   """Returns the OS family."""
-  if os_type in os_types.CENTOS_TYPES:
-    return GetOSDependentDefaultsConfig('centos')
-  elif os_type in os_types.AMAZONLINUX_TYPES:
-    return GetOSDependentDefaultsConfig('amazonlinux')
+  if os_type == os_types.CENTOS_STREAM9:
+    return GetOSDependentDefaultsConfig(os_types.CENTOS_STREAM9)
+  elif os_type == os_types.AMAZONLINUX2023:
+    return GetOSDependentDefaultsConfig(os_types.AMAZONLINUX2023)
+  elif os_type in os_types.DEBIAN_OS_TYPES:
+    return GetOSDependentDefaultsConfig(os_types.DEBIAN)
   else:
-    return GetOSDependentDefaultsConfig('debian')
+    raise ValueError(f'Unsupported OS type: {os_type}')
 
 
 def IsUbuntu(vm):
   """Returns whether the VM is Debian."""
-  return vm.OS_TYPE in os_types.UBUNTU_OS_TYPES
+  return vm.BASE_OS_TYPE == os_types.DEBIAN
 
 
 def ConfigureAndRestart(vm, run_uri, buffer_size, conf_template_path):

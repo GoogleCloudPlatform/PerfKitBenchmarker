@@ -819,7 +819,7 @@ class GcpDpbDataprocServerless(
     )
 
     @vm_util.Retry(
-        timeout=180,
+        timeout=15 * 60,
         poll_interval=15,
         fuzz=0,
         retryable_exceptions=(MetricNotReadyError,),

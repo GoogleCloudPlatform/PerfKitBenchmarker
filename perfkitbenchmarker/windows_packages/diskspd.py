@@ -38,7 +38,7 @@ FLAGS = flags.FLAGS
 LATENCY_PERCENTILES = [50, 90, 95, 99, 99.9, 99.99, 99.999, 99.9999, 99.99999]
 SampleData = collections.namedtuple('SampleData', ['metric', 'value', 'unit'])
 
-flags.DEFINE_integer(
+DISKSPD_PREFILL_DURATION = flags.DEFINE_integer(
     'diskspd_prefill_duration',
     None,
     'In seconds. Diskspd needs a duration to run. For prefilling, use a'
@@ -283,32 +283,39 @@ def _GenerateDiskspdConfig(outstanding_io, threads):
   large_page_string = '-l' if FLAGS.diskspd_large_page else ''
   latency_stats_string = '-L' if FLAGS.diskspd_latency_stats else ''
   disable_affinity_string = '-n' if FLAGS.diskspd_disable_affinity else ''
-  software_cache_string = '-Su' if FLAGS.diskspd_software_cache else ''
-  write_through_string = '-Sw' if FLAGS.diskspd_write_through else ''
   access_pattern = FLAGS.diskspd_access_pattern
   diskspd_write_read_ratio = FLAGS.diskspd_write_read_ratio
   diskspd_block_size = FLAGS.diskspd_block_size
-  os_hint = access_pattern
-  if os_hint == 'si':
-    os_hint = 's'
   if DISKSPD_STRIDE.value:
     access_pattern = (
         str(access_pattern)
         + DISKSPD_STRIDE.value
     )
-
+  cache_string = ''
+  if FLAGS.diskspd_software_cache and FLAGS.diskspd_write_through:
+    cache_string = '-Sh'
+  elif FLAGS.diskspd_write_through:
+    cache_string = '-Sw'
+  elif FLAGS.diskspd_software_cache:
+    cache_string = '-Su'
   throughput_per_ms_string = ''
   if FLAGS.diskspd_throughput_per_ms:
     throughput_per_ms_string = '-g' + str(FLAGS.diskspd_throughput_per_ms)
 
+  diskspd_file_size = ''
+  if DISKSPD_PREFILL_DURATION.value is None:
+    # -c in diskspd creates file. If prefill duration is set, we need to use the
+    # already created file from the prefill stage.
+    diskspd_file_size = f'-c{FLAGS.diskspd_file_size}'
+
   return (
-      f'-c{FLAGS.diskspd_file_size} -d{FLAGS.diskspd_duration}'
+      f'{diskspd_file_size} -d{FLAGS.diskspd_duration}'
       f' -t{threads} -o{outstanding_io} {latency_stats_string} -W{FLAGS.diskspd_warmup}'
       f' -C{FLAGS.diskspd_cooldown} -Rxml -w{diskspd_write_read_ratio}'
       f' {large_page_string} {disable_affinity_string}'
-      f' {software_cache_string} {write_through_string}'
+      f' {cache_string}'
       f' {throughput_per_ms_string} -b{diskspd_block_size}'
-      f' -{access_pattern} -f{os_hint}'
+      f' -{access_pattern} '
       f' F:\\{DISKSPD_TMPFILE} > {DISKSPD_XMLFILE}'
   )
 
@@ -430,8 +437,8 @@ def Prefill(running_vm):
   prefill_duration = FLAGS.diskspd_prefill_duration
   diskspd_exe_dir = ntpath.join(running_vm.temp_dir, 'x86')
   diskspd_options = (
-      f'-c{FLAGS.diskspd_file_size} -t16 -w100 -b4k -d{prefill_duration} -Rxml'
-      f' -Sw -Su -o16 -r C:\\scratch\\{DISKSPD_TMPFILE} >'
+      f'-c{FLAGS.diskspd_file_size} -t16 -w100 -b64k -d{prefill_duration} -Rxml'
+      f' -Sh -o16 -Zr C:\\scratch\\{DISKSPD_TMPFILE} >'
       f' {DISKSPD_XMLFILE}'
   )
   command = f'cd {diskspd_exe_dir}; .\\diskspd.exe {diskspd_options}'
@@ -441,7 +448,7 @@ def Prefill(running_vm):
 
   prefill_samples = ParseDiskSpdResults(result_xml, {})
   for prefill_sample in prefill_samples:
-    if prefill_sample.metric != 'write_throughput':
+    if prefill_sample.metric != 'write_bandwidth':
       continue
     write_throughput = prefill_sample.value
     total_seconds = float(prefill_sample.metadata['TestTimeSeconds'])

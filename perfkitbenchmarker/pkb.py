@@ -1661,7 +1661,7 @@ def _LogCommandLineFlags():
     flag = FLAGS[name]
     if flag.present:
       result.append(flag.serialize())
-  logging.info('Flag values:\n%s', '\n'.join(result))
+  log_util.LogToShortLogAndRoot('Flag values:\n%s', '\n'.join(result))
 
 
 def SetUpPKB():
@@ -1684,10 +1684,15 @@ def SetUpPKB():
   if FLAGS.use_pkb_logging:
     log_util.ConfigureLogging(
         stderr_log_level=log_util.LOG_LEVELS[FLAGS.log_level],
-        log_path=vm_util.PrependTempDir(log_util.LOG_FILE_NAME),
+        logs_dir=vm_util.GetTempDir(),
         run_uri=FLAGS.run_uri,
         file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level],
     )
+  # Always output a short log.
+  log_util.ConfigureShortLogging(
+      logs_dir=vm_util.GetTempDir(),
+      file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level],
+  )
   logging.info('PerfKitBenchmarker version: %s', version.VERSION)
 
   # Log all provided flag values.

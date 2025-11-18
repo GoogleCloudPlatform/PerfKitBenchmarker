@@ -46,6 +46,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_mixin
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
@@ -1413,14 +1414,18 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       simplified_cmd.extend([remote_location, file_path])
       scp_cmd.extend([remote_location, file_path])
 
-    logging.info(
+    log_util.LogToShortLogAndRoot(
         'Copying file with simplified command: %s', ' '.join(simplified_cmd)
     )
 
     stdout, stderr, retcode = '', '', 1  # placate uninitialized variable checks
     for _ in range(FLAGS.ssh_retries):
       stdout, stderr, retcode = vm_util.IssueCommand(
-          scp_cmd, timeout=None, should_pre_log=False, raise_on_failure=False
+          scp_cmd,
+          timeout=None,
+          should_pre_log=False,
+          raise_on_failure=False,
+          log_to_short_log=False,
       )
 
       # Retry on 255 because this indicates an SSH failure
@@ -1604,12 +1609,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       ]
 
     if should_pre_log:
-      logger.info(
-          'Running on %s via ssh: %s',
-          self.name,
-          command,
-          stacklevel=stack_level,
-      )
+      log_message = f'Running on {self.name} via ssh: {command}'
+      log_util.LogToShortLogAndRoot(log_message, stacklevel=stack_level)
     stdout, stderr, retcode = '', '', 1  # placate uninitialized variable checks
     try:
       if login_shell:
@@ -1627,6 +1628,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
             raise_on_failure=False,
             suppress_logging=suppress_logging,
             stack_level=stack_level,
+            log_to_short_log=False,
         )
         # Retry on 255 because this indicates an SSH failure
         if retcode != RETRYABLE_SSH_RETCODE:
@@ -2636,8 +2638,8 @@ class BaseContainerLinuxMixin(BaseLinuxMixin):
     pass
 
 
-class BaseRhelMixin(BaseLinuxMixin):
-  """Class holding RHEL/CentOS specific VM methods and attributes."""
+class BaseRedHatMixin(BaseLinuxMixin):
+  """Class representing OSes derived from Red Hat Linux that use yum or dnf."""
 
   # In all RHEL 8+ based distros yum is an alias to dnf.
   # dnf is backwards compatible with yum, but has some additional capabilities
@@ -2646,8 +2648,7 @@ class BaseRhelMixin(BaseLinuxMixin):
   # This can be removed when Amazon Linux 2 is no longer supported by PKB.
   PACKAGE_MANAGER = DNF
 
-  # OS_TYPE = os_types.RHEL
-  BASE_OS_TYPE = os_types.RHEL
+  BASE_OS_TYPE = os_types.RED_HAT
 
   # RHEL's command to create a initramfs image.
   INIT_RAM_FS_CMD = 'sudo dracut --regenerate-all -f'
@@ -2793,7 +2794,7 @@ class BaseRhelMixin(BaseLinuxMixin):
       self.Reboot()
 
 
-class AmazonLinux2Mixin(BaseRhelMixin):
+class AmazonLinux2Mixin(BaseRedHatMixin):
   """Class holding Amazon Linux 2 VM methods and attributes."""
 
   OS_TYPE = os_types.AMAZONLINUX2
@@ -2811,7 +2812,7 @@ class AmazonNeuronMixin(AmazonLinux2Mixin):
   OS_TYPE = os_types.AMAZON_NEURON
 
 
-class AmazonLinux2023Mixin(BaseRhelMixin):
+class AmazonLinux2023Mixin(BaseRedHatMixin):
   """Class holding Amazon Linux 2023 VM methods and attributes."""
 
   OS_TYPE = os_types.AMAZONLINUX2023
@@ -2819,7 +2820,7 @@ class AmazonLinux2023Mixin(BaseRhelMixin):
   # https://docs.aws.amazon.com/linux/al2023/ug/compare-with-al2.html#epel
 
 
-class Rhel8Mixin(BaseRhelMixin):
+class Rhel8Mixin(BaseRedHatMixin):
   """Class holding RHEL 8 specific VM methods and attributes."""
 
   OS_TYPE = os_types.RHEL8
@@ -2830,7 +2831,7 @@ class Rhel8Mixin(BaseRhelMixin):
     self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(8)}')
 
 
-class Rhel9Mixin(BaseRhelMixin):
+class Rhel9Mixin(BaseRedHatMixin):
   """Class holding RHEL 9 specific VM methods and attributes."""
 
   OS_TYPE = os_types.RHEL9
@@ -2841,7 +2842,7 @@ class Rhel9Mixin(BaseRhelMixin):
     self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(9)}')
 
 
-class Rhel10Mixin(BaseRhelMixin):
+class Rhel10Mixin(BaseRedHatMixin):
   """Class holding RHEL 10 specific VM methods and attributes."""
 
   OS_TYPE = os_types.RHEL10
@@ -2852,7 +2853,7 @@ class Rhel10Mixin(BaseRhelMixin):
     self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(10)}')
 
 
-class Ol8Mixin(BaseRhelMixin):
+class Ol8Mixin(BaseRedHatMixin):
   """Class holding Oracle Linux 8 specific VM methods and attributes."""
 
   OS_TYPE = os_types.OL8
@@ -2861,7 +2862,7 @@ class Ol8Mixin(BaseRhelMixin):
     """Oracle Linux images come with EPEL pre-installed."""
 
 
-class Ol9Mixin(BaseRhelMixin):
+class Ol9Mixin(BaseRedHatMixin):
   """Class holding Oracle Linux 9 specific VM methods and attributes."""
 
   OS_TYPE = os_types.OL9
@@ -2870,7 +2871,7 @@ class Ol9Mixin(BaseRhelMixin):
     """Oracle Linux images come with EPEL pre-installed."""
 
 
-class Fedora36Mixin(BaseRhelMixin):
+class Fedora36Mixin(BaseRedHatMixin):
   """Class holding Fedora36 specific methods and attributes."""
 
   OS_TYPE = os_types.FEDORA36
@@ -2879,7 +2880,7 @@ class Fedora36Mixin(BaseRhelMixin):
     """Fedora does not need epel."""
 
 
-class Fedora37Mixin(BaseRhelMixin):
+class Fedora37Mixin(BaseRedHatMixin):
   """Class holding Fedora37 specific methods and attributes."""
 
   OS_TYPE = os_types.FEDORA37
@@ -2888,7 +2889,7 @@ class Fedora37Mixin(BaseRhelMixin):
     """Fedora does not need epel."""
 
 
-class CentOsStream9Mixin(BaseRhelMixin):
+class CentOsStream9Mixin(BaseRedHatMixin):
   """Class holding CentOS Stream 9 specific VM methods and attributes."""
 
   OS_TYPE = os_types.CENTOS_STREAM9
@@ -2902,7 +2903,7 @@ class CentOsStream9Mixin(BaseRhelMixin):
     )
 
 
-class RockyLinux8Mixin(BaseRhelMixin):
+class RockyLinux8Mixin(BaseRedHatMixin):
   """Class holding Rocky Linux 8 specific VM methods and attributes."""
 
   OS_TYPE = os_types.ROCKY_LINUX8
@@ -2916,7 +2917,7 @@ class RockyLinux8Mixin(BaseRhelMixin):
     )
 
 
-class RockyLinux9Mixin(BaseRhelMixin):
+class RockyLinux9Mixin(BaseRedHatMixin):
   """Class holding Rocky Linux 8 specific VM methods and attributes."""
 
   OS_TYPE = os_types.ROCKY_LINUX9
@@ -2930,7 +2931,7 @@ class RockyLinux9Mixin(BaseRhelMixin):
     )
 
 
-class RockyLinux10Mixin(BaseRhelMixin):
+class RockyLinux10Mixin(BaseRedHatMixin):
   """Class holding Rocky Linux 10 specific VM methods and attributes."""
 
   OS_TYPE = os_types.ROCKY_LINUX10

@@ -16,7 +16,7 @@ from tests import pkb_common_test_case
 
 def MockVm():
   return mock.Mock(
-      internal_ip='1.2.3.4', NumCpusForBenchmark=8, BASE_OS_TYPE=os_types.RHEL
+      internal_ip='1.2.3.4', NumCpusForBenchmark=8, BASE_OS_TYPE=os_types.RHEL10
   )
 
 

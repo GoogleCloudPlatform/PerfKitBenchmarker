@@ -103,6 +103,7 @@ DB_DRIVER_KEY = 'db_driver'
 def _Install(vm, spanner_oltp=False, args=immutabledict.immutabledict()):
   """Installs the sysbench package on the VM."""
   vm.RemoteCommand(f'sudo rm -rf {SYSBENCH_DIR}')
+  vm.InstallPackages('git')
   if SYSBENCH_VERSION.value in RELEASE_TAGS:
     vm.RemoteCommand(
         f'git clone {GIT_REPO} {SYSBENCH_DIR} --branch {SYSBENCH_VERSION.value}'
@@ -166,9 +167,9 @@ def YumInstall(vm, args=immutabledict.immutabledict()):
       DB_DRIVER_KEY in args
       and args.get(DB_DRIVER_KEY) == 'pgsql'
   ):
-    if vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
+    if vm.OS_TYPE == os_types.AMAZONLINUX2023:
       mariadb_pkg_name = ''
-  elif vm.OS_TYPE in os_types.AMAZONLINUX_TYPES:
+  elif vm.OS_TYPE == os_types.AMAZONLINUX2023:
     # Use mysql-devel according to sysbench documentation.
     mariadb_pkg_name = 'mysql-devel'
   vm.InstallPackages(

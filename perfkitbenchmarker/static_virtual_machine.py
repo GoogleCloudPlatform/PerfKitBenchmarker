@@ -253,19 +253,12 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
           'Invalid static VM file. Expected array, got: %s.' % type(vm_arr)
       )
 
-    required_keys = frozenset(['ip_address', 'user_name'])
-
-    linux_required_keys = required_keys | frozenset(['keyfile_path'])
-
-    required_keys_by_os = {
-        os_types.WINDOWS: required_keys | frozenset(['password']),
-        os_types.DEBIAN: linux_required_keys,
-        os_types.RHEL: linux_required_keys,
-        os_types.CLEAR: linux_required_keys,
-    }
-
+    required_keys = set(['ip_address', 'user_name'])
     # assume linux_required_keys for unknown os_type
-    required_keys = required_keys_by_os.get(FLAGS.os_type, linux_required_keys)
+    if FLAGS.os_type in os_types.WINDOWS_OS_TYPES:
+      required_keys.add('password')
+    else:
+      required_keys.add('keyfile_path')
 
     optional_keys = frozenset([
         'internal_ip',
@@ -277,7 +270,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
         'ssh_port',
         'install_packages',
     ])
-    allowed_keys = required_keys | optional_keys
+    allowed_keys = frozenset(required_keys) | optional_keys
 
     def VerifyItemFormat(item):
       """Verify that the decoded JSON object matches the required schema."""

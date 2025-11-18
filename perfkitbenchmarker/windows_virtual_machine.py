@@ -18,11 +18,11 @@ import logging
 import ntpath
 import os
 import time
-from typing import cast, Tuple
-
+from typing import Tuple, cast
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_mixin
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
@@ -206,7 +206,9 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
       RemoteCommandError: If there was a problem issuing the command or the
           command timed out.
     """
-    logging.info('Running command on %s: %s', self, command, stacklevel=2)
+    log_util.LogToShortLogAndRoot(
+        f'Running command on {self}: {command}', stacklevel=2
+    )
     if timeout is None:
       s = winrm.Session(
           'https://%s:%s' % (self.GetConnectionIp(), self.winrm_port),

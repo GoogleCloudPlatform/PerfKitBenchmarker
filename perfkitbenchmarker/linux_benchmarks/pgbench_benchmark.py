@@ -33,6 +33,7 @@ This benchmark is written for pgbench 9.5, which is the default
 (as of 10/2017) version installed on Ubuntu 16.04.
 """
 
+import datetime
 import re
 from absl import flags
 from perfkitbenchmarker import configs
@@ -364,6 +365,7 @@ def Run(benchmark_spec):
   db_size = GetDbSize(relational_db, TEST_DB_NAME)
   common_metadata = GetMetaData(db_size, benchmark_spec)
 
+  start_time = datetime.datetime.now()
   pgbench.RunPgBench(
       benchmark_spec,
       relational_db,
@@ -376,7 +378,8 @@ def Run(benchmark_spec):
       benchmark_spec.pgbench_protocol,
       common_metadata,
   )
-  return []
+  end_time = datetime.datetime.now()
+  return relational_db.CollectMetrics(start_time, end_time)
 
 
 def GetMetaData(db_size, benchmark_spec):
