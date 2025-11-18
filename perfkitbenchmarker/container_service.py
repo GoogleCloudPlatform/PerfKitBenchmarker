@@ -1664,10 +1664,12 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
       self.inference_server.Delete()
     super().Delete(freeze)
 
+  def _PreDelete(self):
+    self._DeleteAllFromDefaultNamespace()
+
   def _Delete(self):
     if self.event_poller:
       self.event_poller.StopPolling()
-    self._DeleteAllFromDefaultNamespace()
 
   def GetEvents(self) -> set['KubernetesEvent']:
     """Gets the events for the cluster, including previously polled events."""

@@ -1221,7 +1221,6 @@ class EksKarpenterCluster(BaseEksCluster):
           timeout=180,
       )
     # Cleanup orphaned network interfaces
-    logging.info('Cleaning up orphaned network interfaces...')
     stdout, _, _ = vm_util.IssueCommand(
         [
             'aws',
