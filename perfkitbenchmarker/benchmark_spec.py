@@ -1416,11 +1416,19 @@ class BenchmarkSpec:
     if not self.networks:
       return False
     
-    # Check for corrupted pickle data: keys should be network names, not JSON fragments
+    # Check for corrupted pickle data
     for key, net in self.networks.items():
+      # Handle tuple keys (which indicate corruption)
+      if isinstance(key, tuple):
+        logging.warning(f'Network dict has tuple keys (corrupted): {key}')
+        return False
+      
+      # Convert key to string for checking
+      key_str = str(key)
+      
       # Keys that look like JSON fragments indicate corruption
-      if key.strip() in ['{', '}', '[', ']', ','] or key.strip().startswith('"'):
-        logging.warning(f'Network dict has corrupted keys (JSON fragments): {key[:50]}')
+      if key_str.strip() in ['{', '}', '[', ']', ','] or key_str.strip().startswith('"'):
+        logging.warning(f'Network dict has corrupted keys (JSON fragments): {key_str[:50]}')
         return False
       
       if not hasattr(net, 'Delete') or not callable(net.Delete):
