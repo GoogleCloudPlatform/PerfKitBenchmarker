@@ -854,6 +854,40 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       vm._DisableCstates()
     self.assertNotIn('disabled_cstates', vm.os_metadata)
 
+  @mock.patch.object(
+      pkb_common_test_case.TestLinuxVirtualMachine, 'RemoteCommand'
+  )
+  def test_get_nvme_device_info_with_devices(self, mock_remote_command):
+    vm = CreateTestLinuxVm()
+    nvme_list_output = """Node                  Generic               SN                   Model                                    Namespace  Usage                      Format           FW Rev
+--------------------- --------------------- -------------------- ---------------------------------------- ---------- -------------------------- ---------------- --------
+/dev/nvme0n1          /dev/ng0n1            vol06948076c9c135a44 Amazon Elastic Block Store               0x1          8.59  GB /   8.59  GB    512   B +  0 B   1.0
+/dev/nvme1n1          /dev/ng1n1            vol06d22d4fd149a2e68 Amazon Elastic Block Store               0x1         10.74  GB /  10.74  GB    512   B +  0 B   1.0
+"""
+    mock_remote_command.side_effect = [
+        ('nvme version 2.13', ''),  # nvme --version
+        (nvme_list_output, ''),  # nvme list
+    ]
+
+    expected_result = [
+        {
+            'DevicePath': '/dev/nvme0n1',
+            'SerialNumber': 'vol06948076c9c135a44',
+            'ModelNumber': 'Amazon Elastic Block Store',
+        },
+        {
+            'DevicePath': '/dev/nvme1n1',
+            'SerialNumber': 'vol06d22d4fd149a2e68',
+            'ModelNumber': 'Amazon Elastic Block Store',
+        },
+    ]
+
+    result = vm.GetNVMEDeviceInfo()
+
+    self.assertEqual(result, expected_result)
+    mock_remote_command.assert_any_call('sudo nvme --version')
+    mock_remote_command.assert_any_call('sudo nvme list')
+
 
 class RangeListUtilTest(parameterized.TestCase):
 
