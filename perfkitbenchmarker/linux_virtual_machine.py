@@ -285,6 +285,14 @@ _ENABLE_NVME_INTERRUPT_COALEASING = flags.DEFINE_bool(
     'modify the interrupt coaleasing behavior.',
 )
 
+_ENABLE_RT_KERNEL = flags.DEFINE_bool(
+    'enable_rt_kernel',
+    False,
+    'Attempt to install and enable the real time kernel on '
+    'the VM.'
+    'Currently only implemented for RockyLinux.',
+)
+
 
 # RHEL package managers
 YUM = 'yum'
@@ -751,6 +759,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       self.SetupPackageManager()
     self.SetFiles()
     self.DoSysctls()
+    if _ENABLE_RT_KERNEL.value:
+      self._EnableRealTimeKernel()
     self._DoAppendKernelCommandLine()
     self.ModifyKernelModules()
     self.DoConfigureNetworkForBBR()
@@ -776,6 +786,12 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
   def _Stop(self):
     """Stops the VM."""
     raise NotImplementedError()
+
+  def _EnableRealTimeKernel(self):
+    """Enables real-time kernel features on the VM."""
+    raise NotImplementedError(
+        f'Real-time kernel not supported for {self.OS_TYPE}'
+    )
 
   def SetFiles(self):
     """Apply --set_files to the VM."""
@@ -2896,46 +2912,50 @@ class CentOsStream9Mixin(BaseRedHatMixin):
     )
 
 
-class RockyLinux8Mixin(BaseRedHatMixin):
+class BaseRockyLinuxMixin(BaseRedHatMixin):
+  """Class holding Rocky Linux specific VM methods and attributes."""
+
+  def _EnableRealTimeKernel(self):
+    self.RemoteCommand(
+        'sudo dnf config-manager --set-enabled rt && '
+        'sudo dnf install -y kernel-rt && '
+        'sudo grubby --set-default /boot/vmlinuz*+rt'
+    )
+    self._needs_reboot = True
+
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/getting-started/
+    self.RemoteCommand(
+        'sudo dnf config-manager --set-enabled crb &&'
+        'sudo dnf install -y epel-release'
+    )
+
+
+class RockyLinux8Mixin(BaseRockyLinuxMixin):
   """Class holding Rocky Linux 8 specific VM methods and attributes."""
 
   OS_TYPE = os_types.ROCKY_LINUX8
 
   def SetupPackageManager(self):
     """Install EPEL."""
-    # https://docs.fedoraproject.org/en-US/epel/#_almalinux_8_rocky_linux_8
+    # https://docs.fedoraproject.org/en-US/epel/getting-started/
     self.RemoteCommand(
         'sudo dnf config-manager --set-enabled powertools && '
         'sudo dnf install -y epel-release'
     )
 
 
-class RockyLinux9Mixin(BaseRedHatMixin):
+class RockyLinux9Mixin(BaseRockyLinuxMixin):
   """Class holding Rocky Linux 8 specific VM methods and attributes."""
 
   OS_TYPE = os_types.ROCKY_LINUX9
 
-  def SetupPackageManager(self):
-    """Install EPEL."""
-    # https://docs.fedoraproject.org/en-US/epel/#_almalinux_9_rocky_linux_98
-    self.RemoteCommand(
-        'sudo dnf config-manager --set-enabled crb &&'
-        'sudo dnf install -y epel-release'
-    )
 
-
-class RockyLinux10Mixin(BaseRedHatMixin):
+class RockyLinux10Mixin(BaseRockyLinuxMixin):
   """Class holding Rocky Linux 10 specific VM methods and attributes."""
 
   OS_TYPE = os_types.ROCKY_LINUX10
-
-  def SetupPackageManager(self):
-    """Install EPEL."""
-    # https://docs.fedoraproject.org/en-US/epel/#_rocky_linux_10
-    self.RemoteCommand(
-        'sudo dnf config-manager --set-enabled crb &&'
-        'sudo dnf install -y epel-release'
-    )
 
 
 class CoreOsMixin(BaseContainerLinuxMixin):
