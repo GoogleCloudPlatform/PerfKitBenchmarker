@@ -27,6 +27,12 @@ CONFIG_VERSION = 'v1.0'
 MYSQL_CONFIG_PATH = '/etc/mysql/mysql.conf.d/mysqld.cnf'
 FLAGS = flags.FLAGS
 
+_ENABLE_HAMMERDBCLI_VALIDATION = flags.DEFINE_bool(
+    'enable_hammerdbcli_validation',
+    True,
+    'Enables data validation of HammerDB after the benchmark run.',
+)
+
 DATABASE_FILE_SIZE = '{{DATABASE_FILE_SIZE}}'
 INNODB_BUFFER_POOL_SIZE = '{{INNODB_BUFFER_POOL_SIZE}}'
 SHARED_BUFFER_SIZE = '{{SHARED_BUFFER_SIZE}}'
@@ -392,30 +398,35 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   metadata['hammerdbcli_config_version'] = CONFIG_VERSION
 
   samples = []
-  for i in range(1, 1 + hammerdb.NUM_RUN.value):
-    metadata['run_iteration'] = i
-    _PreRun(db)
-    start_time = datetime.datetime.now()
-    stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)
-    end_time = datetime.datetime.now()
-    current_samples = hammerdb.ParseResults(
-        script=script, stdout=stdout, vm=client_vm
-    )
-    _PostRun(db)
-    if (
-        db.engine == sql_engine_utils.ALLOYDB
-        and db.enable_columnar_engine_recommendation
-        and i == 1
-    ):
-      database_name = hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[script]
-      current_samples = _CheckAlloyDbColumnarEngine(
-          db, client_vm, script, timeout, database_name
+  try:
+    for i in range(1, 1 + hammerdb.NUM_RUN.value):
+      metadata['run_iteration'] = i
+      _PreRun(db)
+      start_time = datetime.datetime.now()
+      stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)
+      end_time = datetime.datetime.now()
+      current_samples = hammerdb.ParseResults(
+          script=script, stdout=stdout, vm=client_vm
       )
-    current_samples.extend(db.CollectMetrics(start_time, end_time))
+      _PostRun(db)
+      if (
+          db.engine == sql_engine_utils.ALLOYDB
+          and db.enable_columnar_engine_recommendation
+          and i == 1
+      ):
+        database_name = hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[script]
+        current_samples = _CheckAlloyDbColumnarEngine(
+            db, client_vm, script, timeout, database_name
+        )
+      current_samples.extend(db.CollectMetrics(start_time, end_time))
 
-    for s in current_samples:
-      s.metadata.update(metadata)
-    samples += current_samples
+      for s in current_samples:
+        s.metadata.update(metadata)
+      samples += current_samples
+  finally:
+    if _ENABLE_HAMMERDBCLI_VALIDATION.value:
+      hammerdb.RunValidation(client_vm, db.engine, script, timeout=timeout)
+
   return samples
 
 

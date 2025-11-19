@@ -85,8 +85,9 @@ MAP_SCRIPT_TO_DATABASE_NAME = {
     HAMMERDB_SCRIPT_TPC_H: 'tpch',
 }
 
-RUN_SCRIPT_TYPE = 'RUN'
 BUILD_SCRIPT_TYPE = 'BUILD'
+RUN_SCRIPT_TYPE = 'RUN'
+VALIDATE_SCRIPT_TYPE = 'VALIDATE'
 
 # number of queries that are expected from the TPC H Test
 TPC_H_QUERY_COUNT = 22
@@ -291,10 +292,16 @@ class HammerDbTclScript:
       )
 
   @classmethod
-  def CheckErrorFromHammerdb(cls, stdout: str):
+  def CheckErrorFromHammerdb(
+      cls, stdout: str, script_type: str = '', return_code: int = 0
+  ):
     """Check errors from the stdout of Hammerdb.
 
-    Some sample errors
+    For Validation script, if the return code is not 0, it is considered as a
+    failure.
+
+    For Build / Run script, if certain errors are found in the stdout, it is
+    considered as a failure. Some sample errors:
       Error in Virtual User 1:
       [Microsoft][ODBC Driver 17 for SQL Server][SQL Server]
       User does not have permission to perform this action.
@@ -305,11 +312,20 @@ class HammerDbTclScript:
       Virtual Users remain running (Runs terminated before finished)
 
     Args:
-       stdout: Stdout from Hammerdb script.
+      stdout: Stdout from Hammerdb script.
+      script_type: The type of script being run (e.g., BUILD, RUN, VALIDATE).
+      return_code: The return code of the Hammerdb command.
 
     Raises:
      Exception: exception when hammerdb failed
     """
+    if script_type == VALIDATE_SCRIPT_TYPE and return_code != 0:
+      raise HammerdbBenchmarkError(
+          'Validation failed with return code {} and stdout {}'.format(
+              return_code, stdout
+          )
+      )
+
     if (
         'Error' in stdout
         or 'FAILED' in stdout
@@ -340,7 +356,7 @@ class HammerDbTclScript:
     # Increase the Open file limit to a large number.
     if _HAMMERDB_SET_LINUX_OPEN_FILE_LIMIT.value:
       cmd = f'ulimit -n {_HAMMERDB_SET_LINUX_OPEN_FILE_LIMIT.value} &&'
-    stdout, _ = vm.RemoteCommand(
+    stdout, _, return_code = vm.RemoteCommandWithReturnCode(
         InDir(
             HAMMERDB_RUN_LOCATION,
             'PATH="$PATH:/opt/mssql-tools/bin" &&'
@@ -350,7 +366,7 @@ class HammerDbTclScript:
         timeout=timeout,
     )
 
-    self.CheckErrorFromHammerdb(stdout)
+    self.CheckErrorFromHammerdb(stdout, self.script_type, return_code)
     return stdout
 
 
@@ -525,6 +541,13 @@ TPC_C_MYSQL_RUN_SCRIPT = HammerDbTclScript(
     RUN_SCRIPT_TYPE,
 )
 
+TPC_C_MYSQL_VALIDATE_SCRIPT = HammerDbTclScript(
+    'hammerdb_mysql_tpc_c_validate.tcl',
+    TPCC_PARAMS,
+    P3RF_CLOUD_SQL_TEST_DIR,
+    VALIDATE_SCRIPT_TYPE,
+)
+
 TPC_H_MYSQL_BUILD_SCRIPT = HammerDbTclScript(
     'hammerdb_mysql_tpc_h_build.tcl',
     TPCH_PARAMS,
@@ -537,6 +560,13 @@ TPC_H_MYSQL_RUN_SCRIPT = HammerDbTclScript(
     TPCH_PARAMS,
     P3RF_CLOUD_SQL_TEST_DIR,
     RUN_SCRIPT_TYPE,
+)
+
+TPC_H_MYSQL_VALIDATE_SCRIPT = HammerDbTclScript(
+    'hammerdb_mysql_tpc_h_validate.tcl',
+    TPCH_PARAMS,
+    P3RF_CLOUD_SQL_TEST_DIR,
+    VALIDATE_SCRIPT_TYPE,
 )
 
 TPC_C_POSTGRES_BUILD_SCRIPT = HammerDbTclScript(
@@ -597,6 +627,25 @@ SCRIPT_MAPPING = {
             TPC_C_POSTGRES_BUILD_SCRIPT,
             TPC_C_POSTGRES_RUN_SCRIPT,
         ],
+    },
+}
+
+VALIDATE_SCRIPT_MAPPING = {
+    sql_engine_utils.MYSQL: {
+        HAMMERDB_SCRIPT_TPC_H: [
+            TPC_H_MYSQL_VALIDATE_SCRIPT,
+        ],
+        HAMMERDB_SCRIPT_TPC_C: [
+            TPC_C_MYSQL_VALIDATE_SCRIPT,
+        ],
+    },
+    sql_engine_utils.SQLSERVER: {
+        HAMMERDB_SCRIPT_TPC_H: [],
+        HAMMERDB_SCRIPT_TPC_C: [],
+    },
+    sql_engine_utils.POSTGRES: {
+        HAMMERDB_SCRIPT_TPC_H: [],
+        HAMMERDB_SCRIPT_TPC_C: [],
     },
 }
 
@@ -1098,6 +1147,20 @@ def Run(
   # Run the build scripts which contains build schema (inserts into dbs)
   # And the benchmark scripts. The last stdout is the result from the run script
   return scripts[-1].Run(vm, timeout=timeout)
+
+
+def RunValidation(
+    vm: virtual_machine.BaseVirtualMachine,
+    db_engine: str,
+    hammerdb_script: str,
+    timeout: int | None = 60 * 60 * 8,
+) -> str:
+  """Run the HammerDBCli Validation Script."""
+  db_engine = sql_engine_utils.GetDbEngineType(db_engine)
+
+  scripts = VALIDATE_SCRIPT_MAPPING[db_engine][hammerdb_script]
+
+  return scripts[-1].Run(vm, timeout=timeout) if scripts else ''
 
 
 def GetMetadata(db_engine: str):
