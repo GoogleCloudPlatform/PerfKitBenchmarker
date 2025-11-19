@@ -2775,8 +2775,14 @@ class BaseRedHatMixin(BaseLinuxMixin):
         r'echo GRUB_CMDLINE_LINUX_DEFAULT=\"\${GRUB_CMDLINE_LINUX_DEFAULT} %s\"'
         ' | sudo tee -a /etc/default/grub' % command_line
     )
-    self.RemoteCommand('sudo grub2-mkconfig -o /boot/grub2/grub.cfg')
-    self.RemoteCommand('sudo grub2-mkconfig -o /etc/grub2.cfg')
+    # RHEL 9.3+ requires a flag to update the kernel command line.
+    # It does not exist in older versions.
+    # https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/9.3_release_notes/new-features#new-features-boot-loader
+    update_grub = 'sudo grub2-mkconfig'
+    if self.TryRemoteCommand(f'{update_grub} --update-bls-cmdline'):
+      update_grub += ' --update-bls-cmdline'
+    self.RemoteCommand(f'{update_grub} -o /boot/grub2/grub.cfg')
+    self.RemoteCommand(f'{update_grub} -o /etc/grub2.cfg')
     if reboot:
       self.Reboot()
 
