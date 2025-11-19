@@ -569,18 +569,19 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
   def _GetInferenceServerManifest(self) -> str:
     """Generates and retrieves the inference server manifest content."""
-        # Ensure GPU capacity exists before scheduling GPU workloads
-    list(self.cluster.ApplyManifest(
-        'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
-        gpu_nodepool_name='gpu',
-        gpu_consolidate_after='1h',
-        gpu_consolidation_policy='WhenEmpty',
-        karpenter_nodeclass_name='default',   # must exist already
-        gpu_capacity_types=['on-demand'],
-        gpu_arch=['amd64'],
-        gpu_instance_families=['g6','g6e'],
-        gpu_taint_key='nvidia.com/gpu',
-    ))
+    # Ensure GPU capacity exists before scheduling GPU workloads
+    if FLAGS.cloud == 'AWS':
+        self.cluster.ApplyManifest(
+            'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
+            gpu_nodepool_name='gpu',
+            gpu_consolidate_after='1h',
+            gpu_consolidation_policy='WhenEmpty',
+            karpenter_nodeclass_name='default',   # must exist already
+            gpu_capacity_types=['on-demand'],
+            gpu_arch=['amd64'],
+            gpu_instance_families=['g6','g6e'],
+            gpu_taint_key='nvidia.com/gpu',
+        )
     generate_args = {
         'kind': 'core/deployment',
         'model-server': self.spec.model_server,
@@ -593,6 +594,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         self.cluster.ApplyManifest(
             'container/kubernetes_ai_inference/serving_catalog_cli.yaml.j2',
             image_repo=FLAG_IMAGE_REPO.value,
+            wg_serving_repo_url=FLAGS.wg_serving_repo_url,
+            wg_serving_repo_branch=FLAGS.wg_serving_repo_branch,
             generate_args=' '.join(
                 [f'--{k} {v}' for k, v in generate_args.items()]
             ),
