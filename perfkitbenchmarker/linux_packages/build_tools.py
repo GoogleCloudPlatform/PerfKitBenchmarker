@@ -49,11 +49,14 @@ PACKAGE_DATA_URL = {
 
 def YumInstall(vm):
   """Installs build tools on the VM."""
-  vm.InstallPackageGroup('Development Tools')
   # Recent RPM-based Linux distros split libnsl out of libc. This breaks many
   # compilations so install it explicitly.
   if vm.HasPackage('libnsl'):
     vm.InstallPackages('libnsl')
+  # Install development tools AFTER libnsl.
+  # Because we --allowerasing when installing libnsl can erase many development
+  # tools (e.g. gcc-c++) by upgrading their dependencies.
+  vm.InstallPackageGroup('Development Tools')
   if FLAGS.gcc_version:
     Reinstall(vm, version=FLAGS.gcc_version)
 
