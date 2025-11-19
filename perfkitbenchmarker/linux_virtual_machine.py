@@ -798,10 +798,9 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
 
     if self.num_disable_cpus <= 0 or self.num_disable_cpus >= self.num_cpus:
       raise ValueError(
-          'num_disable_cpus must be between 1 and '
-          '(num_cpus - 1) inclusive.  '
-          'num_disable_cpus: %i, num_cpus: %i'
-          % (self.num_disable_cpus, self.num_cpus)
+          'num_disable_cpus must be between 1 and (num_cpus - 1) inclusive.  '
+          f'num_disable_cpus: {self.num_disable_cpus}, '
+          f'num_cpus: {self.num_cpus}'
       )
 
     # We can't disable cpu 0, starting from the last cpu in /proc/cpuinfo.
@@ -1690,6 +1689,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     self._kernel_release = None
     self._kernel_command_line = None
     self._lscpu_cache = None
+    # recalculated in RecordAdditionalMetadata
+    self.num_cpus = None
     self.RecordAdditionalMetadata()
     if self.install_packages:
       self._CreateInstallDir()
