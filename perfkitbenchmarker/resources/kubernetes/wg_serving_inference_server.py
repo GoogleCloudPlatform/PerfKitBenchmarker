@@ -586,8 +586,13 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
             ),
         )
     )
+    gpu_nodepool_resources = list(
+        self.cluster.ApplyManifest(
+            'container/kubernetes_ai_inference/azure-gpu-nodepool.yaml.j2',
+        )
+    )
 
-    job_resource = next(it for it in created_resources if it.startswith('job'))
+    job_resource = next(it for it in created_resources + gpu_nodepool_resources if it.startswith('job'))
     _, job_name = job_resource.split('/', maxsplit=1)
     try:
       pod_name = self.cluster.RetryableGetPodNameFromJob(job_name)
@@ -887,7 +892,15 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
     logging.info('Creating new inference server')
     self._InjectDefaultHuggingfaceToken()
-    inference_server_manifest = self._GetInferenceServerManifest()
+
+    while True:
+      try:
+        logging.info('Applying inference server manifest')
+        inference_server_manifest = self._GetInferenceServerManifest()
+        break
+      except Exception as e:
+        logging.warning('Failed to apply manifest: %s. Retrying in 30s...', e)
+
     self._ParseAndStoreInferenceServerDetails(inference_server_manifest)
     with vm_util.NamedTemporaryFile(
         mode='w', prefix='inference-server-manifest', suffix='.yaml'

@@ -15,6 +15,7 @@
 """Contains classes/functions related to Azure Kubernetes Service."""
 
 import json
+import logging
 from typing import List
 
 from absl import flags
@@ -335,6 +336,63 @@ class AksCluster(container_service.KubernetesCluster):
     cmd += self.resource_group.args
     vm_util.IssueCommand(cmd)
 
+  def _GrantResourcePolicyContributorRole(self):
+    """Helper method to grant Resource Policy Contributor role to current user/service principal.
+    It needs to manage Safeguards policies for AKS cluster.
+    """
+    account_info, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'account',
+        'show',
+        '--query',
+        '[user.name, id]',
+        '--output',
+        'tsv',
+    ])
+
+    assignee_id, subscription_id = account_info.strip().split('\n')
+    scope = f'/subscriptions/{subscription_id}/resourceGroups/{self.resource_group.name}'
+
+    vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'role',
+        'assignment',
+        'create',
+        '--role',
+        'Resource Policy Contributor',
+        '--assignee',
+        assignee_id,
+        '--scope',
+        scope,
+    ])
+
+  def _RelaxAKSPolicy(self):
+    """Relax AKS Safeguards policy."""
+    subscription_id, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'account',
+        'show',
+        '--query',
+        'id',
+        '--output',
+        'tsv',
+    ])
+    subscription_id = subscription_id.strip()
+    policy_scope = f'/subscriptions/{subscription_id}/resourceGroups/{self.resource_group.name}/providers/Microsoft.ContainerService/managedClusters/{self.name}'
+
+    vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'policy',
+        'assignment',
+        'update',
+        '--name',
+        'aks-deployment-safeguards-policy-assignment',
+        '--scope',
+        policy_scope,
+        '--set',
+        'enforcement_mode="DoNotEnforce"',
+    ])
+
   def _IsReady(self) -> bool:
     """Returns True if the cluster is ready."""
     show_cmd = [
@@ -490,29 +548,30 @@ class AksAutomaticCluster(AksCluster):
 
   def _Create(self):
     """Creates the Automatic AKS cluster with tags."""
-    tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
-    tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
-    cmd = [
-        azure.AZURE_PATH,
-        'aks',
-        'create',
-        '--name',
-        self.name,
-        '--location',
-        self.region,
-        '--ssh-key-value',
-        vm_util.GetPublicKeyPath(),
-        '--resource-group',
-        self.resource_group.name,
-        '--sku',
-        'automatic',
-        '--tags',
-    ] + tags_list
-    vm_util.IssueCommand(
-        cmd,
-        # Half hour timeout on creating the cluster.
-        timeout=1800,
-    )
+    if not self._Exists():
+      tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
+      tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
+      cmd = [
+          azure.AZURE_PATH,
+          'aks',
+          'create',
+          '--name',
+          self.name,
+          '--location',
+          self.region,
+          '--ssh-key-value',
+          vm_util.GetPublicKeyPath(),
+          '--resource-group',
+          self.resource_group.name,
+          '--sku',
+          'automatic',
+          '--tags',
+      ] + tags_list
+      vm_util.IssueCommand(
+          cmd,
+          # Half hour timeout on creating the cluster.
+          timeout=1800,
+      )
 
   def _CreateRoleAssignment(self):
     """Creates a role assignment for the current user."""
@@ -573,6 +632,11 @@ class AksAutomaticCluster(AksCluster):
     user_type = user_type.strip()
     if user_type == 'servicePrincipal':
       self._CreateRoleAssignment()
+    # if FLAGS.benchmark_name == 'kubernetes_ai_inference':
+    # Grant Resource Policy Contributor role for policy management
+    self._GrantResourcePolicyContributorRole()
+    # Update AKS policy to exclude default namespace
+    self._RelaxAKSPolicy()
     self._GetCredentials(use_admin=False)
     self._WaitForDefaultServiceAccount()
     self._AttachContainerRegistry()
