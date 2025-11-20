@@ -567,3 +567,21 @@ diskspd_max_throughput_write_only:
   flags:
     <<: *diskspd_write_only_flags
     <<: *diskspd_max_throughput_flags
+
+kvrocks_memtier:
+  name: kvrocks_memtier
+  flags:
+    fio_fill_block_size: 64k
+    data_disk_type: local
+    num_striped_disks: 8
+    memtier_protocol: 'redis'
+    memtier_cluster_mode: True
+    memtier_clients: 1
+    memtier_threads: 4
+    memtier_pipeline: 1
+    memtier_data_size: 400
+    memtier_key_maximum: 18000000
+    memtier_key_prefix: 'key'
+    memtier_run_duration: 40
+    memtier_random_data: True
+    memtier_command: 'hmset __key__ field1 __data__ field2 __data__ field3 __data__ field4 __data__ field5 __data__ field6 __data__ field7 __data__ field8 __data__ field9 __data__ field10 __data__ field11 __data__ field12 __data__ field13 __data__ field14 __data__ field15 __data__ field16 __data__ field17 __data__ field18 __data__ field19 __data__'

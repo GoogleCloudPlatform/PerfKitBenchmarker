@@ -1,0 +1,48 @@
+daemonize yes
+timeout 0
+slowlog-max-len 128
+cluster-enabled yes
+rocksdb.max_write_buffer_number 16
+rocksdb.write_buffer_size 64
+rocksdb.max_background_jobs 4
+rocksdb.max_bytes_for_level_base 2147483647
+rocksdb.compression no
+workers 16
+max-replication-mb 500
+migrate-batch-rate-limit-mb 64
+cluster-enabled yes
+persist-cluster-nodes-enabled yes
+bind 0.0.0.0
+maxclients 60000
+rocksdb.block_size 4096
+migrate-speed 0
+migrate-pipeline-size 64
+migrate-batch-size-kb 64
+tcp-backlog 4096
+log-level warning
+slowlog-log-slower-than 20000
+rocksdb.level0_file_num_compaction_trigger 8
+# rocksdb.min_write_buffer_number_to_merge 4
+# rocksdb.max_sub_compactions 1
+rocksdb.compaction_readahead_size 1048576     #128k, max_sector_kb
+rocksdb.level0_slowdown_writes_trigger 30
+rocksdb.level0_stop_writes_trigger 60
+rocksdb.level0_file_num_compaction_trigger 8
+rocksdb.stats_dump_period_sec 60
+rocksdb.stats_dump_period_sec 60
+rocksdb.enable_pipelined_write yes
+# rocksdb.use_direct_reads no
+migrate-type raw-key-value
+rocksdb.wal_ttl_seconds 3600
+rocksdb.wal_size_limit_mb 32768
+requirepass {{password}}
+masterauth {{password}}
+max-db-size 256
+rocksdb.block_cache_size 16000
+log-retention-days 7
+
+
+port {{port}}
+dir /data/kv-{{instance_num}}
+log-dir /data/kv-{{instance_num}}/log
+backup-dir /data/kv-{{instance_num}}/backup

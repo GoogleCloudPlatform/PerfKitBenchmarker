@@ -47,7 +47,8 @@ APT_PACKAGES = (
     'libevent-dev pkg-config zlib1g-dev libssl-dev'
 )
 YUM_PACKAGES = (
-    'zlib-devel pcre-devel libmemcached-devel libevent-devel openssl-devel'
+    'zlib-devel pcre-devel libmemcached-devel libevent-devel openssl-devel '
+    'gcc-c++ libtool autoconf automake'
 )
 MEMTIER_RESULTS = 'memtier_results'
 TMP_FOLDER = '/tmp'
@@ -298,6 +299,18 @@ MEMTIER_DISTINCT_CLIENT_SEED = flags.DEFINE_bool(
     True,
     'If true, each client will use a distinct seed.',
 )
+MEMTIER_COMMAND = flags.DEFINE_string(
+    'memtier_command',
+    None,
+    'Custom memtier command to execute. Use __key__ and __data__ as'
+    ' placeholders.',
+)
+MEMTIER_KEY_PREFIX = flags.DEFINE_string(
+    'memtier_key_prefix', '', 'Prefix for keys used in memtier.'
+)
+MEMTIER_RANDOM_DATA = flags.DEFINE_bool(
+    'memtier_random_data', True, 'Use random data for memtier.'
+)
 
 
 class BuildFailureError(Exception):
@@ -312,8 +325,9 @@ class RetryableRunError(Exception):
   pass
 
 
-def YumInstall(vm):
-  """Installs the memtier package on the VM."""
+def YumInstall(vm: virtual_machine.VirtualMachine) -> None:
+  """Installs the memtier_benchmark package on the VM."""
+  vm.RemoteCommand('sudo dnf update -y')
   vm.Install('build_tools')
   vm.InstallPackages(YUM_PACKAGES)
   _Install(vm)
@@ -377,6 +391,8 @@ def BuildMemtierCommand(
     tls: bool | None = None,
     expiry_range: str | None = None,
     json_out_file: pathlib.PosixPath | None = None,
+    command: str | None = None,
+    key_prefix: str | None = None,
 ) -> str:
   """Returns command arguments used to run memtier."""
   # Arguments passed with a parameter
@@ -387,11 +403,9 @@ def BuildMemtierCommand(
       'protocol': protocol,
       'clients': clients,
       'threads': threads,
-      'ratio': ratio,
       'pipeline': pipeline,
       'key-minimum': key_minimum,
       'key-maximum': key_maximum,
-      'key-pattern': key_pattern,
       'requests': requests,
       'run-count': run_count,
       'test-time': test_time,
@@ -399,7 +413,14 @@ def BuildMemtierCommand(
       'json-out-file': json_out_file,
       'print-percentile': '50,90,95,99,99.5,99.9,99.95,99.99',
       'shard-addresses': shard_addresses,
+      'key-prefix': key_prefix,
   }
+  # The `--ratio` and `--key-pattern' flags are exclusive with `--command`.
+  if command:
+    args['command'] = command
+  else:
+    args['key-pattern'] = key_pattern
+    args['ratio'] = ratio
   if data_size_list:
     args['data-size-list'] = data_size_list
   else:
@@ -423,7 +444,10 @@ def BuildMemtierCommand(
   cmd += ['memtier_benchmark']
   for arg, value in args.items():
     if value is not None:
-      cmd.extend([f'--{arg}', str(value)])
+      if arg == 'command':
+        cmd.append(f'--{arg} "{value}"')
+      else:
+        cmd.extend([f'--{arg}', str(value)])
   for no_param_arg, value in no_param_args.items():
     if value:
       cmd.append(f'--{no_param_arg}')
@@ -1099,9 +1123,9 @@ def _GetSingleThreadedLatency(
     timeout=60,
     retryable_exceptions=(RetryableRunError),
 )
-def _IssueRetryableCommand(vm, cmd: str) -> None:
+def _IssueRetryableCommand(vm, cmd: str, timeout: int | None = None) -> None:
   """Issue redis command, retry connection failure."""
-  _, stderr = vm.RobustRemoteCommand(cmd)
+  _, stderr = vm.RobustRemoteCommand(cmd, timeout=timeout)
   if 'Connection error' in stderr:
     raise RetryableRunError('Redis client connection failed, retrying')
   if 'handle error response' in stderr:
@@ -1183,7 +1207,7 @@ def _Run(
       pipeline=pipeline,
       key_minimum=1,
       key_maximum=MEMTIER_KEY_MAXIMUM.value,
-      random_data=True,
+      random_data=MEMTIER_RANDOM_DATA.value,
       distinct_client_seed=MEMTIER_DISTINCT_CLIENT_SEED.value,
       test_time=test_time,
       requests=requests,
@@ -1193,8 +1217,13 @@ def _Run(
       shard_addresses=shard_addresses,
       json_out_file=json_results_file,
       tls=MEMTIER_TLS.value,
+      command=MEMTIER_COMMAND.value,
+      key_prefix=MEMTIER_KEY_PREFIX.value,
   )
-  _IssueRetryableCommand(vm, cmd)
+  logging.info('Memtier command: %s', cmd)
+  # Add a buffer to the timeout to account for command overhead.
+  timeout = test_time + 100 if test_time else None
+  _IssueRetryableCommand(vm, cmd, timeout=timeout)
 
   output_path = os.path.join(vm_util.GetTempDir(), memtier_results_file_name)
   vm_util.IssueCommand(['rm', '-f', output_path])
@@ -1216,9 +1245,11 @@ def _Run(
         # "Average Latency": -nan
         # "Min Latency": 9223372036854776.000
         # 9223372036854776 is likely caused by rounding long long in c++
-        time_series_json = time_series_json.replace('-nan', '0.000')
-        time_series_json = time_series_json.replace(
-            '9223372036854776.000', '0.000'
+        # The new version of memtier_benchmark may output 'inf'.
+        time_series_json = (
+            time_series_json.replace('-nan', '0.000')
+            .replace('inf', '0.000')
+            .replace('9223372036854776.000', '0.000')
         )
         time_series_json = json.loads(time_series_json)
 
@@ -1246,6 +1277,9 @@ def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
       'memtier_cluster_mode': MEMTIER_CLUSTER_MODE.value,
       'memtier_tls': MEMTIER_TLS.value,
       'memtier_distinct_client_seed': MEMTIER_DISTINCT_CLIENT_SEED.value,
+      'memtier_command': MEMTIER_COMMAND.value,
+      'memtier_key_prefix': MEMTIER_KEY_PREFIX.value,
+      'memtier_random_data': MEMTIER_RANDOM_DATA.value,
   }
   if MEMTIER_DATA_SIZE_LIST.value:
     meta['memtier_data_size_list'] = MEMTIER_DATA_SIZE_LIST.value
