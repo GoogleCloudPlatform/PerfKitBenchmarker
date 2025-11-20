@@ -150,6 +150,9 @@ _SSH_PRIVATE_KEY = flags.DEFINE_string(
     None,
     'File path to the SSH private key. If None, use the newly generated one.',
 )
+_SSH_KEY_TYPE = flags.DEFINE_string(
+    'ssh_key_type', 'rsa',
+    'SSH key type.')
 
 
 class RetryError(Exception):
@@ -260,7 +263,7 @@ def SSHKeyGen():
     create_cmd = [
         'ssh-keygen',
         '-t',
-        'rsa',
+        _SSH_KEY_TYPE.value,
         '-N',
         '',
         '-m',

@@ -180,6 +180,10 @@ HeadNode:
   Ssh:
     KeyName: perfkit-key-run12345
   SharedStorageType: Ebs
+  Iam:
+    S3Access:
+      - BucketName: *
+        EnableWriteAccess: false
 Scheduling:
   Scheduler: slurm
   SlurmQueues:

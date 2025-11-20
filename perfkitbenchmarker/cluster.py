@@ -134,7 +134,7 @@ def GetClusterSpecClass(cloud: str):
 
 def GetClusterClass(cloud: str):
   """Returns the cluster spec class corresponding to the given service."""
-  if UNMANAGED.value:
+  if UNMANAGED.value and TYPE.value == 'default':
     return BaseCluster
   return resource.GetResourceClass(BaseCluster, CLOUD=cloud, TYPE=TYPE.value)
 
@@ -220,6 +220,7 @@ class BaseCluster(resource.BaseResource):
       command: str,
       ignore_failure: bool = False,
       timeout: float | None = None,
+      env: str = '',
       **kwargs,
   ) -> Tuple[str, str]:
     """Runs a command on the VM.
@@ -232,6 +233,7 @@ class BaseCluster(resource.BaseResource):
       ignore_failure: Ignore any failure if set to true.
       timeout: The time to wait in seconds for the command before exiting. None
         means no timeout.
+      env: Environment variables to set before running the command.
       **kwargs: Additional command arguments.
 
     Returns:
@@ -241,7 +243,7 @@ class BaseCluster(resource.BaseResource):
       RemoteCommandError: If there was a problem issuing the command.
     """
     return self.headnode_vm.RemoteCommand(
-        f'srun -N {self.num_workers} {command}',
+        f'{env} srun -N {self.num_workers} {command}',
         ignore_failure=ignore_failure,
         timeout=timeout,
         **kwargs,

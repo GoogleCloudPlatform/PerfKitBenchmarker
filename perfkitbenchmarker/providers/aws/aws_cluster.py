@@ -2,6 +2,7 @@
 
 import json
 import os
+from typing import Tuple
 
 from absl import flags as absl_flags
 import jinja2
@@ -179,6 +180,7 @@ class AWSCluster(cluster.BaseCluster):
           enable_spot_vm=FLAGS.aws_spot_instances,
           # Expose enable_smt flag for consistency across clouds.
           enable_smt=not FLAGS.disable_smt,
+          preprovisioned_bucket=FLAGS.aws_preprovisioned_data_bucket or '*'
       )
 
   def _Create(self):
@@ -196,6 +198,7 @@ class AWSCluster(cluster.BaseCluster):
 
   @vm_util.Retry(
       poll_interval=1,
+      timeout=3600,
       log_errors=False,
       retryable_exceptions=(aws_virtual_machine.AwsUnknownStatusError,),
   )
@@ -255,6 +258,7 @@ class AWSCluster(cluster.BaseCluster):
       _PopulateVM(vm, instance)
       vm.ip_address = vm.internal_ips[0]
       vm.proxy_jump = self.headnode_vm.name
+      vm.has_private_key = True
     self.vms = [self.headnode_vm] + self.worker_vms
     self.headnode_vm.network.regional_network._reference_count += 1
 
@@ -288,3 +292,62 @@ class AWSCluster(cluster.BaseCluster):
     """Authenticate a remote machine to access all vms."""
     # Already taken care of by pcluster
     pass
+
+
+class AWSP6Cluster(AWSCluster):
+  """Class representing a P6-B200 cluster."""
+
+  DEFAULT_TEMPLATE = 'cluster/p6.yaml.j2'
+  TYPE = 'p6'
+
+  def _PostCreate(self):
+    super()._PostCreate()
+    # https://docs.aws.amazon.com/parallelcluster/latest/ug/tutorials_11_running-containerized-jobs-with-pyxis.html
+
+    def _PrepPyxis(vm):
+      for f in ('/var/enroot', '/run/enroot', '/etc/enroot', '/run/pyxis'):
+        vm.RemoteCommand(f'sudo mkdir -p {f};')
+        vm.RemoteCommand(f'sudo chmod a=rwx,+t {f}')
+      vm.RemoteCommand(
+          'sudo mv /opt/parallelcluster/examples/enroot/enroot.conf '
+          '/etc/enroot/enroot.conf'
+      )
+      vm.RemoteCommand('sudo chmod 0644 /etc/enroot/enroot.conf')
+      vm.RemoteCommand(
+          'echo "ENROOT_TEMP_PATH          /opt/apps/enroot" | '
+          'sudo tee -a /etc/enroot/enroot.conf')
+
+    background_tasks.RunThreaded(_PrepPyxis, self.vms)
+
+    def _PrepWorker(vm):
+      vm.Install('nvidia_container_toolkit')
+      vm.RemoteCommand(
+          'echo "kernel.apparmor_restrict_unprivileged_userns = 0" | sudo tee '
+          '/etc/sysctl.d/99-pcluster-disable-apparmor-restrict-unprivileged-userns.conf'
+      )
+      vm.RemoteCommand('sudo sysctl --system')
+
+    background_tasks.RunThreaded(_PrepWorker, self.worker_vms)
+    self.headnode_vm.PushFile(data.ResourcePath('docker_daemon.json'))
+    self.headnode_vm.RemoteCommand(
+        'echo "root = \\"/opt/apps/containerd\\"" | sudo tee -a '
+        '/etc/containerd/config.toml'
+    )
+    self.headnode_vm.RemoteCommand(
+        'sudo mv docker_daemon.json /etc/docker/daemon.json')
+    self.headnode_vm.RemoteCommand(
+        'sudo systemctl restart containerd')
+    self.headnode_vm.RemoteCommand(
+        'sudo systemctl restart docker')
+
+  def RemoteCommand(
+      self,
+      command: str,
+      ignore_failure: bool = False,
+      timeout: float | None = None,
+      env: str = '',
+      **kwargs,
+  ) -> Tuple[str, str]:
+    return super().RemoteCommand(
+        command, ignore_failure, timeout,
+        env + 'export FI_PROVIDER=efa; ', **kwargs)

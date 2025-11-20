@@ -31,6 +31,7 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = absl_flags.FLAGS
 _CONFIG_FILE_NAME = 'cluster.yaml'
+_DEPLOY_TIMEOUT = 1800
 
 
 class GceClusterSpec(cluster.BaseClusterSpec):
@@ -117,7 +118,7 @@ class GceCluster(cluster.BaseCluster):
         f'--out={vm_util.GetTempDir()}',
         '-l',
         'IGNORE'
-    ])
+    ], timeout=_DEPLOY_TIMEOUT)
 
   def _PostCreate(self):
     """Post create actions after GCP cluster is created.
@@ -179,8 +180,8 @@ class GceCluster(cluster.BaseCluster):
         flags.GCLUSTER_PATH.value,
         'destroy',
         f'{vm_util.GetTempDir()}/{self.name}',
-        '--auto-approve',
-    ])
+        '--auto-approve'
+    ], timeout=600)
 
   def AuthenticateVM(self):
     """Authenticate all VMs in the cluster to access each other."""
@@ -203,3 +204,18 @@ class H4dCluster(GceCluster):
 
   DEFAULT_TEMPLATE = 'cluster/h4d.yaml.j2'
   TYPE = 'h4d'
+
+
+class A4Cluster(GceCluster):
+  """Class representing a A4 cluster."""
+
+  DEFAULT_TEMPLATE = 'cluster/a4.yaml.j2'
+  TYPE = 'a4'
+
+  def _PostCreate(self):
+    super()._PostCreate()
+
+    def _InstallNVContainerToolkit(vm):
+      vm.Install('nvidia_container_toolkit')
+
+    background_tasks.RunThreaded(_InstallNVContainerToolkit, self.worker_vms)

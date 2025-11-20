@@ -27,6 +27,13 @@ HeadNode:
     S3Access:
       - BucketName: {{ preprovisioned_bucket }}
         EnableWriteAccess: false
+  CustomActions:
+    OnNodeConfigured:
+      Script: https://raw.githubusercontent.com/aws-samples/aws-parallelcluster-post-install-scripts/authentication-credentials/multi-runner/postinstall.sh
+      Args:
+        - https://raw.githubusercontent.com/aws-samples/aws-parallelcluster-post-install-scripts/authentication-credentials/pyxis/postinstall.sh
+        - -/opt/apps
+        - https://raw.githubusercontent.com/aws-samples/aws-parallelcluster-post-install-scripts/main/docker/postinstall.sh
 Scheduling:
   Scheduler: slurm
   SlurmQueues:
@@ -35,7 +42,7 @@ Scheduling:
     ComputeResources:
     - Name: {{ name }}
       Instances:
-      - InstanceType: {{ worker_machine_type }}
+      - InstanceType: p6-b200.48xlarge
       MinCount: {{ num_workers }}
       MaxCount: {{ num_workers }}
       DisableSimultaneousMultithreading: {{ not enable_smt }}
@@ -46,6 +53,12 @@ Scheduling:
         Enabled: true
       SubnetIds:
       - {{ worker_subnet_id }}
+    CustomActions:
+      OnNodeConfigured:
+        Script: https://raw.githubusercontent.com/aws-samples/aws-parallelcluster-post-install-scripts/authentication-credentials/multi-runner/postinstall.sh
+        Args:
+          - https://raw.githubusercontent.com/aws-samples/aws-parallelcluster-post-install-scripts/authentication-credentials/pyxis/postinstall.sh
+          - -/opt/apps
 Monitoring:
   Logs:
     CloudWatch:

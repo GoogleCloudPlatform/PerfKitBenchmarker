@@ -1,0 +1,446 @@
+# Based on https://github.com/GoogleCloudPlatform/cluster-toolkit/blob/main/examples/machine-learning/a4-highgpu-8g/a4high-slurm-blueprint.yaml
+blueprint_name: {{ name }}
+
+vars:
+  project_id: {{ project }}
+  deployment_name: {{ name }}
+  region: {{ region }}
+  zone: {{ zone }}
+  base_image:
+    project: ubuntu-os-accelerator-images
+    image: ubuntu-accelerator-2204-amd64-with-nvidia-570-v20250722
+  image_build_machine_type: n2-standard-16
+  build_slurm_from_git_ref: 6.10.6
+  # Cluster env settings
+  # net0 and filestore ranges must not overlap
+  net0_range: 192.168.0.0/19
+  filestore_ip_range: 192.168.32.0/24
+  net1_range: 192.168.64.0/18
+  rdma_net_range: 192.168.128.0/18
+  # Cluster Settings
+  local_ssd_mountpoint: /mnt/localssd
+  instance_image:
+    project: $(vars.project_id)
+    family: $(vars.deployment_name)-u22
+  disk_size_gb: 100
+  nccl_plugin_version: v1.1.0
+  base_network_name: $(vars.deployment_name)
+
+  #Provisioning models (set to true or fill in reservation name, pick only one)
+  a4h_reservation_name: "" # supply reservation name
+  a4h_dws_flex_enabled: false
+  a4h_enable_spot_vm: true
+
+deployment_groups:
+
+- group: cluster-env
+  modules:
+  - id: a4high-slurm-net-0
+    source: modules/network/vpc
+    settings:
+      network_name: $(vars.base_network_name)-net-0
+      mtu: 8896
+      enable_cloud_router: false
+      enable_cloud_nat: false
+      enable_internal_traffic: false # Setting firewall below instead
+      subnetworks:
+      - subnet_name: $(vars.base_network_name)-sub-0
+        subnet_region: $(vars.region)
+        subnet_ip: $(vars.net0_range)
+      firewall_rules:
+      - name: $(vars.base_network_name)-internal-0
+        ranges: [$(vars.net0_range)]
+        allow:
+        - protocol: tcp
+        - protocol: udp
+        - protocol: icmp
+      - name: $(vars.base_network_name)-fw
+        direction: INGRESS
+        ranges: [0.0.0.0/0]
+        allow:
+        - protocol: tcp
+          ports: [22]
+        - protocol: udp
+        - protocol: icmp
+
+  - id: a4high-slurm-net-1
+    source: modules/network/vpc
+    settings:
+      network_name: $(vars.base_network_name)-net-1
+      mtu: 8896
+      enable_internal_traffic: false # Setting firewall below instead
+      subnetworks:
+      - subnet_name: $(vars.base_network_name)-sub-1
+        subnet_region: $(vars.region)
+        subnet_ip: $(vars.net1_range)
+      firewall_rules:
+      - name: $(vars.base_network_name)-internal-1
+        ranges: [$(vars.net1_range)]
+        allow:
+        - protocol: tcp
+        - protocol: udp
+        - protocol: icmp
+
+  - id: a4high-slurm-rdma-net
+    source: modules/network/gpu-rdma-vpc
+    settings:
+      network_name: $(vars.base_network_name)-rdma-net
+      network_profile: https://www.googleapis.com/compute/beta/projects/$(vars.project_id)/global/networkProfiles/$(vars.zone)-vpc-roce
+      network_routing_mode: REGIONAL
+      subnetworks_template:
+        name_prefix: $(vars.base_network_name)-mrdma-sub
+        count: 8
+        ip_range: $(vars.rdma_net_range)
+        region: $(vars.region)
+
+  - id: homefs
+    source: modules/file-system/filestore
+    use:
+    - a4high-slurm-net-0
+    settings:
+      filestore_tier: HIGH_SCALE_SSD
+      size_gb: 10240
+      local_mount: /home
+      reserved_ip_range: $(vars.filestore_ip_range)
+      deletion_protection:
+        enabled: false
+    outputs:
+    - network_storage
+
+  # - id: private_service_access
+  #   source: community/modules/network/private-service-access
+  #   use: [a4high-slurm-net-0]
+
+  # To use Managed Lustre as for the shared /home directory:
+  # 1. Comment out the filestore block above and the`filestore_ip_range` line in the vars block.
+  # 2. Uncomment the managed-lustre and private-service-access blocks
+  # 3. Change the value for "install_managed_lustre" in /var/tmp/slurm_vars.json above to true
+  # - id: homefs
+  #   source: modules/file-system/managed-lustre
+  #   use:
+  #   - a4high-slurm-net-0
+  #   - private_service_access
+  #   settings:
+  #     size_gib: 18000
+  #     name: lustre-instance1
+  #     local_mount: /home
+  #     remote_mount: lustrefs
+  #   outputs:
+  #   - network_storage
+
+  # The following four modules create and mount a Cloud Storage Bucket with
+  # gcsfuse.  They are optional but recommended for many use cases.
+  # (Optional) The following creates a GCS bucket that will be mounted
+  # using gcsfuse. If you prefer to use a pre-existing bucket, use the
+  # modules/file-system/pre-existing-network-storage module.
+  - id: gcs_bucket
+    source: community/modules/file-system/cloud-storage-bucket
+    settings:
+      enable_hierarchical_namespace: true
+      local_mount: /gcs
+      random_suffix: true
+      mount_options: "implicit-dirs,\
+                      metadata-cache-negative-ttl-secs=0,\
+                      metadata-cache-ttl-secs=-1,\
+                      stat-cache-max-size-mb=-1,\
+                      type-cache-max-size-mb=-1,\
+                      enable-streaming-writes=true,\
+                      dir-mode=777,\
+                      file-mode=777,\
+                      allow_other"
+
+  # (Optional) Create a mount-point optimized for checkpoint writing/reading Uses
+  # local-ssd for and enables parallel downloads.  For more information on
+  # these flags, see
+  # https://github.com/GoogleCloudPlatform/gcsfuse/tree/master/samples/gcsfuse_config
+  - id: gcs_checkpoints
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(gcs_bucket.gcs_bucket_name)
+      local_mount: /gcs-checkpoints
+      fs_type: gcsfuse
+      mount_options: "implicit-dirs,\
+                      metadata-cache-negative-ttl-secs=0,\
+                      metadata-cache-ttl-secs=-1,\
+                      stat-cache-max-size-mb=-1,\
+                      type-cache-max-size-mb=-1,\
+                      file-cache-max-size-mb=-1,\
+                      file-cache-cache-file-for-range-read=true,\
+                      file-cache-enable-parallel-downloads=true,\
+                      cache-dir=/mnt/localssd,\
+                      enable-streaming-writes=true,\
+                      dir-mode=777,\
+                      file-mode=777,\
+                      allow_other"
+
+  # (Optional) Create a mount-point optimized for reading training data.
+  # For more information on these flags, see
+  # https://github.com/GoogleCloudPlatform/gcsfuse/tree/master/samples/gcsfuse_config
+  # If your training dataset fits on localssd, then you may want to enable file
+  # cache as well, which is done by adding
+  # cache-dir=/mnt/localssd,\
+  # file-cache-max-size-mb=<DATASET_SIZE>,\
+  # file-cache-cache-file-for-range-read=true,\
+  # to the mount_options.
+  - id: gcs_training_data
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(gcs_bucket.gcs_bucket_name)
+      local_mount: /gcs-training-data
+      fs_type: gcsfuse
+      mount_options: "implicit-dirs,\
+                      metadata-cache-negative-ttl-secs=0,\
+                      metadata-cache-ttl-secs=-1,\
+                      stat-cache-max-size-mb=-1,\
+                      type-cache-max-size-mb=-1,\
+                      enable-streaming-writes=true,\
+                      dir-mode=777,\
+                      file-mode=777,\
+                      allow_other"
+
+  # (Optional) Create a mount-point optimized for model serving.
+  # For more information on these flags, see
+  # https://github.com/GoogleCloudPlatform/gcsfuse/tree/master/samples/gcsfuse_config
+  - id: gcs_model_serving
+    source: modules/file-system/pre-existing-network-storage
+    settings:
+      remote_mount: $(gcs_bucket.gcs_bucket_name)
+      local_mount: /gcs-model-serving
+      fs_type: gcsfuse
+      mount_options: "implicit-dirs,\
+                      cache-dir=/mnt/localssd,\
+                      metadata-cache-negative-ttl-secs=0,\
+                      metadata-cache-ttl-secs=-1,\
+                      stat-cache-max-size-mb=-1,\
+                      type-cache-max-size-mb=-1,\
+                      file-cache-max-size-mb=-1,\
+                      file-cache-cache-file-for-range-read=true,\
+                      file-cache-enable-parallel-downloads=true,\
+                      dir-mode=777,\
+                      file-mode=777,\
+                      allow_other"
+
+- group: primary
+  modules:
+  - id: a4high_startup
+    source: modules/scripts/startup-script
+    settings:
+      local_ssd_filesystem:
+        mountpoint: $(vars.local_ssd_mountpoint)
+        permissions: "1777" # must quote numeric filesystem permissions!
+      docker:
+        enabled: true
+        world_writable: true
+        daemon_config: |
+          {
+            "data-root": "$(vars.local_ssd_mountpoint)/docker"
+          }
+      runners:
+      - $(gcs_checkpoints.client_install_runner)
+      - $(gcs_checkpoints.mount_runner)
+      - $(gcs_training_data.client_install_runner)
+      - $(gcs_training_data.mount_runner)
+      - $(gcs_model_serving.client_install_runner)
+      - $(gcs_model_serving.mount_runner)
+      - type: data
+        destination: /etc/enroot/enroot.conf
+        content: |
+          ENROOT_CONFIG_PATH     ${HOME}/.enroot
+          ENROOT_RUNTIME_PATH    $(vars.local_ssd_mountpoint)/${UID}/enroot/runtime
+          ENROOT_CACHE_PATH      $(vars.local_ssd_mountpoint)/${UID}/enroot/cache
+          ENROOT_DATA_PATH       $(vars.local_ssd_mountpoint)/${UID}/enroot/data
+          ENROOT_TEMP_PATH       $(vars.local_ssd_mountpoint)/${UID}/enroot
+      - type: ansible-local
+        destination: nccl_plugin.yml
+        content: |
+          ---
+          - name: Install NCCL plugin for A4 High series
+            hosts: all
+            become: true
+            tasks:
+            - name: Add SystemD unit for NCCL plugin installation
+              ansible.builtin.copy:
+                dest: /etc/systemd/system/nccl-plugin@.service
+                mode: 0o0644
+                content: |
+                  [Unit]
+                  After=network-online.target docker.service
+                  Before=slurmd.service
+                  Requires=docker.service
+
+                  [Service]
+                  Type=oneshot
+                  ExecStartPre=/usr/bin/rm -rf /usr/local/gib
+                  ExecStartPre=/usr/bin/mkdir -p /usr/local/gib
+                  ExecStartPre=/snap/bin/gcloud auth configure-docker --quiet us-docker.pkg.dev
+                  ExecStart=/usr/bin/docker run --rm --name nccl-gib-installer --volume /usr/local/gib:/var/lib/gib \
+                      us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib:%i install --install-nccl
+                  ExecStartPost=/usr/bin/chmod -R a+r /usr/local/gib
+
+                  [Install]
+                  WantedBy=slurmd.service
+              notify:
+              - Reload SystemD
+            handlers:
+            - name: Reload SystemD
+              ansible.builtin.systemd:
+                daemon_reload: true
+            post_tasks:
+            - name: Enable NCCL plugin SystemD unit
+              ansible.builtin.service:
+                name: nccl-plugin@$(vars.nccl_plugin_version).service
+                state: started
+                enabled: true
+      - type: ansible-local
+        destination: enable_dcgm.yml
+        content: |
+          ---
+          - name: Enable NVIDIA DCGM on GPU nodes
+            hosts: all
+            become: true
+            tasks:
+            - name: Update Ops Agent configuration
+              ansible.builtin.blockinfile:
+                path: /etc/google-cloud-ops-agent/config.yaml
+                insertafter: EOF
+                block: |
+                  metrics:
+                    receivers:
+                      dcgm:
+                        type: dcgm
+                    service:
+                      pipelines:
+                        dcgm:
+                          receivers:
+                            - dcgm
+              notify:
+              - Restart Google Cloud Ops Agent
+            handlers:
+            - name: Restart Google Cloud Ops Agent
+              ansible.builtin.service:
+                name: google-cloud-ops-agent.service
+                state: 'restarted'
+                enabled: true
+            post_tasks:
+            - name: Enable Google Cloud Ops Agent
+              ansible.builtin.service:
+                name: google-cloud-ops-agent.service
+                state: 'started'
+                enabled: true
+            - name: Enable NVIDIA DCGM
+              ansible.builtin.service:
+                name: nvidia-dcgm.service
+                state: 'started'
+                enabled: true
+            - name: Enable NVIDIA Persistence Daemon
+              ansible.builtin.service:
+                name: nvidia-persistenced.service
+                state: 'started'
+                enabled: true
+
+  - id: compute_nodeset
+    source: community/modules/compute/schedmd-slurm-gcp-v6-nodeset
+    use: [a4high-slurm-net-0, a4high_startup]
+    settings:
+      bandwidth_tier: gvnic_enabled
+      machine_type: a4-highgpu-8g
+      enable_public_ips: true
+      node_count_dynamic_max: 0
+      enable_placement: false
+      disk_type: hyperdisk-balanced
+      on_host_maintenance: TERMINATE
+      enable_oslogin: false
+      node_count_static: {{ num_workers }}
+      instance_image_custom: true
+
+      #Provisioning models
+      reservation_name: $(vars.a4h_reservation_name)
+      enable_spot_vm: $(vars.a4h_enable_spot_vm)
+      dws_flex:
+        enabled: $(vars.a4h_dws_flex_enabled)
+      node_conf:
+        CoresPerSocket: 56
+        SocketsPerBoard: 2
+        ThreadsPerCore: 2
+
+      instance_image:
+        family: {{ image_family }}
+        project: {{ image_project }}
+
+      additional_networks:
+        $(concat(
+          [{
+            network=null,
+            subnetwork=a4high-slurm-net-1.subnetwork_self_link,
+            subnetwork_project=vars.project_id,
+            nic_type="GVNIC",
+            queue_count=null,
+            network_ip="",
+            stack_type=null,
+            access_config=[],
+            ipv6_access_config=[],
+            alias_ip_range=[]
+          }],
+          a4high-slurm-rdma-net.subnetwork_interfaces
+        ))
+      advanced_machine_features:
+        threads_per_core: {{ threads_per_core }}
+      metadata:
+        {{ compute_tags }}
+
+  - id: a4high_partition
+    source: community/modules/compute/schedmd-slurm-gcp-v6-partition
+    use:
+    - compute_nodeset
+    settings:
+      partition_name: pkbworkers
+      exclusive: false
+      is_default: true
+      partition_conf:
+        OverSubscribe: EXCLUSIVE
+        ResumeTimeout: 1200
+        SuspendTimeout: 1200
+
+  - id: controller_startup
+    source: modules/scripts/startup-script
+    settings:
+      runners:
+      - type: shell
+        destination: stage_scripts.sh
+        content: |
+          #!/bin/bash
+          SLURM_ROOT=/opt/apps/adm/slurm
+          PARTITION_NAME=$(a4high_partition.partitions[0].partition_name)
+          mkdir -m 0755 -p "${SLURM_ROOT}/scripts"
+          # enable a GPU health check that runs at the completion of all jobs on A4 nodes
+          mkdir -p "${SLURM_ROOT}/partition-${PARTITION_NAME}-epilog_slurmd.d"
+          ln -s "/slurm/scripts/tools/gpu-test" "${SLURM_ROOT}/partition-${PARTITION_NAME}-epilog_slurmd.d/gpu-test.epilog_slurmd"
+          # enable the use of password-free sudo within Slurm jobs on all compute nodes
+          # feature is restricted to users with OS Admin Login IAM role
+          # https://cloud.google.com/iam/docs/understanding-roles#compute.osAdminLogin
+          mkdir -p "${SLURM_ROOT}/prolog_slurmd.d"
+          mkdir -p "${SLURM_ROOT}/epilog_slurmd.d"
+          curl -s -o "${SLURM_ROOT}/scripts/sudo-oslogin" \
+              https://raw.githubusercontent.com/GoogleCloudPlatform/slurm-gcp/master/tools/prologs-epilogs/sudo-oslogin
+          chmod 0755 "${SLURM_ROOT}/scripts/sudo-oslogin"
+          ln -s "${SLURM_ROOT}/scripts/sudo-oslogin" "${SLURM_ROOT}/prolog_slurmd.d/sudo-oslogin.prolog_slurmd"
+          ln -s "${SLURM_ROOT}/scripts/sudo-oslogin" "${SLURM_ROOT}/epilog_slurmd.d/sudo-oslogin.epilog_slurmd"
+
+  - id: slurm_controller
+    source: community/modules/scheduler/schedmd-slurm-gcp-v6-controller
+    use:
+    - a4high-slurm-net-0
+    - a4high_partition
+    # - homefs
+    - gcs_bucket
+    settings:
+      disk_size_gb: 500
+      instance_image_custom: true
+      instance_image:
+        family: {{ image_family }}
+        project: {{ image_project }}
+      machine_type: {{ headnode_machine_type }}
+      enable_oslogin: false
+      metadata:
+        {{ controller_tags }}
+      enable_controller_public_ips: true
