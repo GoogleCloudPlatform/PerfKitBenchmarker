@@ -98,6 +98,23 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   background_tasks.RunThreaded(lambda vm: vm.Install('kvrocks_server'), vms)
   background_tasks.RunThreaded(lambda vm: vm.Install('memtier'), client_vms)
 
+  # The nc provided by nmap-ncat on Rocky9 does not output "succeeded"
+  # which is expected by memtier._CheckRedisReachable.
+  # This wrapper script mimics the expected behavior.
+  def _InstallNcWrapper(vm):
+    vm.InstallPackages('nmap-ncat')
+    nc_wrapper = """
+#!/bin/bash
+/usr/bin/nc "$@"
+if [[ $? -eq 0 ]]; then
+  echo "succeeded"
+fi
+"""
+    vm.RemoteCommand(f"echo '{nc_wrapper}' | sudo tee /usr/local/bin/nc")
+    vm.RemoteCommand('sudo chmod +x /usr/local/bin/nc')
+
+  background_tasks.RunThreaded(_InstallNcWrapper, client_vms)
+
   def _InstallAndStartPrometheus(vm):
     vm.Install('prometheus')
     prometheus.ConfigureAndStart(vm, server_vms)
