@@ -34,24 +34,36 @@ benchbase:
   relational_db:
     cloud: GCP
     engine: spanner-postgres
-    spanner_nodes: 3
     db_spec:
       GCP:
+        machine_type: db-n1-standard-16
         zone: us-central1-f
+      AWS:
+        machine_type: db.m4.4xlarge
+        zone: us-east-1a
     db_disk_spec:
       GCP:
         disk_size: 2048
         disk_type: pd-ssd
+      AWS: # not actually used by it's a required spec so fill random values
+        disk_size: 6144
+        disk_type: gp2
     vm_groups:
       clients:
         vm_spec:
           GCP:
             machine_type: n2-standard-21
             zone: us-central1-c
+          AWS:
+            machine_type: m5.8xlarge
+            zone: us-east-1
         disk_spec:
           GCP:
             disk_size: 500
             disk_type: pd-ssd
+          AWS:
+            disk_size: 500
+            disk_type: gp3
 """
 
 FLAGS = flags.FLAGS
