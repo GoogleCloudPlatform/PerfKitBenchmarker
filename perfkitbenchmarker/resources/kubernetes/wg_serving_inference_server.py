@@ -586,21 +586,14 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
             ),
         )
     )
-    gpu_nodepool_resources = (
-        list(
-            self.cluster.ApplyManifest(
-                'container/kubernetes_ai_inference/azure-gpu-nodepool.yaml.j2',
-            )
-        )
-        if FLAGS.cloud == 'Azure'
-        else []
-    )
+    if FLAGS.cloud == 'Azure':
+      created_resources += list(
+          self.cluster.ApplyManifest(
+              'container/kubernetes_ai_inference/azure-gpu-nodepool.yaml.j2',
+          )
+      )
 
-    job_resource = next(
-        it
-        for it in created_resources + gpu_nodepool_resources
-        if it.startswith('job')
-    )
+    job_resource = next(it for it in created_resources if it.startswith('job'))
     _, job_name = job_resource.split('/', maxsplit=1)
     try:
       pod_name = self.cluster.RetryableGetPodNameFromJob(job_name)
