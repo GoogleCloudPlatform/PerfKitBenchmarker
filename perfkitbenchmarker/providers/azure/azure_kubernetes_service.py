@@ -15,7 +15,6 @@
 """Contains classes/functions related to Azure Kubernetes Service."""
 
 import json
-import logging
 from typing import List
 
 from absl import flags
