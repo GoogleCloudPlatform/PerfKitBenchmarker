@@ -1,41 +1,41 @@
 apiVersion: karpenter.azure.com/v1beta1
 kind: AKSNodeClass
 metadata:
-  name: gpu-class
+  name: {{ gpu_nodeclass_name | default('gpu-nodeclass') }}
 spec:
   imageFamily: Ubuntu2204
 ---
 apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
-  name: gpu-nodepool
+  name: {{ gpu_nodepool_name | default('gpu-nodepool') }}
 spec:
   disruption:
     budgets:
     - nodes: 30%
-    consolidateAfter: 0s
-    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: {{ gpu_consolidate_after | default('0s') }}
+    consolidationPolicy: {{ gpu_consolidation_policy | default('WhenEmptyOrUnderutilized') }}
   template:
     spec:
       nodeClassRef:
         group: karpenter.azure.com
         kind: AKSNodeClass
-        name: gpu-class
+        name: {{ gpu_nodeclass_name | default('gpu-nodeclass') }}
       requirements:
         - key: kubernetes.io/arch
           operator: In
-          values: ["amd64"]
+          values: {{ gpu_arch | default(['amd64']) }}
         - key: kubernetes.io/os
           operator: In
-          values: ["linux"]
+          values: ['linux']
         - key: karpenter.sh/capacity-type
           operator: In
-          values: ["on-demand"]
-        - key: karpenter.azure.com/sku-name
+          values: {{ gpu_capacity_types | default(['on-demand']) }}
+        - key: karpenter.azure.com/sku-gpu-name
           operator: In
-          values: ["Standard_NC40ads_H100_v5"]
+          values: {{ gpu_sku_name | default(['H100']) }}
       taints:
-        - key: 'nvidia.com/gpu'
+        - key: {{ gpu_taint_key | default('nvidia.com/gpu') }}
           effect: NoSchedule
 ---
 # According to the official Microsoft documentation, the NVIDIA device plugin
@@ -58,20 +58,20 @@ spec:
         name: nvidia-device-plugin-ds
     spec:
       tolerations:
-      - key: "nvidia.com/gpu"
+      - key: 'nvidia.com/gpu'
         operator: Exists
         effect: NoSchedule
-      priorityClassName: "system-node-critical"
+      priorityClassName: 'system-node-critical'
       containers:
       - image: nvcr.io/nvidia/k8s-device-plugin:v0.18.0
         name: nvidia-device-plugin-ctr
         env:
           - name: FAIL_ON_INIT_ERROR
-            value: "false"
+            value: 'false'
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
-            drop: ["ALL"]
+            drop: ['ALL']
         volumeMounts:
         - name: device-plugin
           mountPath: /var/lib/kubelet/device-plugins

@@ -223,7 +223,8 @@ class AzureStorageAccount(resource.BaseResource):
             self.kind,
             '--name',
             self.name,
-            "--allow-blob-public-access",
+            # Disable public blob access for security best practices
+            '--allow-blob-public-access',
             'false',
             '--tags',
         ]
@@ -477,7 +478,7 @@ class AzureSubnet(resource.BaseResource):
         self.vnet.address_spaces.append(self.address_space)
 
   def _Create(self):
-    vm_util.IssueCommand(
+    stdout, _, _ = vm_util.IssueCommand(
         [
             azure.AZURE_PATH,
             'network',
@@ -493,6 +494,7 @@ class AzureSubnet(resource.BaseResource):
         ]
         + self.resource_group.args
     )
+    self.id = json.loads(stdout)['id']
 
   @vm_util.Retry()
   def _Exists(self):
