@@ -48,7 +48,6 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   CLOUD = 'AWS'
   IS_MANAGED = True
   ENGINE = _AURORA_ENGINES
-  REQUIRED_ATTRS = ['CLOUD', 'IS_MANAGED', 'ENGINE']
 
   def __init__(self, relational_db_spec):
     super().__init__(relational_db_spec)

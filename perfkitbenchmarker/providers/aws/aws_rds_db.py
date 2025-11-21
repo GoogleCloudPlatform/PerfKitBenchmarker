@@ -56,7 +56,6 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   CLOUD = 'AWS'
   IS_MANAGED = True
   ENGINE = _RDS_ENGINES
-  REQUIRED_ATTRS = ['CLOUD', 'IS_MANAGED', 'ENGINE']
 
   def _Create(self):
     """Creates the AWS RDS instance.
