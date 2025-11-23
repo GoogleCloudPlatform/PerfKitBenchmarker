@@ -16,6 +16,10 @@ spec:
             value: {{generate_args}}
           - name: OUTPUT_FILE
             value: /output/output.yaml
+          - name: WG_SERVING_REPO_URL
+            value: "https://github.com/vofish/wg-serving.git"
+          - name: WG_SERVING_REPO_BRANCH
+            value: "feature/add-azure-support-to-ai-inference"
         volumeMounts:
         - name: output
           mountPath: /output
