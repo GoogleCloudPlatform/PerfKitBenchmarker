@@ -75,6 +75,18 @@ _EXTRA_LPG_ARGS = flags.DEFINE_multi_string(
     ' --k8s_ai_inference_extra_lpg_args=KEY_OF_ARG=VALUE_OF_ARG',
 )
 
+flags.DEFINE_string(
+    'wg_serving_repo_url',
+    'https://github.com/kubernetes-sigs/wg-serving',
+    'Repository URL for WG-Serving used by serving_catalog_cli.',
+)
+
+flags.DEFINE_string(
+    'wg_serving_repo_branch',
+    'main',
+    'Git branch of the WG-Serving repository.',
+)
+
 lpg_extra_args = {}
 
 
