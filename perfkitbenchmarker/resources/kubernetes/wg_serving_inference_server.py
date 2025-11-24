@@ -26,6 +26,7 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources import kubernetes_inference_server
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server_spec
@@ -518,15 +519,21 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     self._hpa_enabled = False
     self._hpa_scale_up_time_series = []
     self._hpa_scale_up_time_series_lock = threading.Lock()
-
+    self.accelerator_component = self._GetAcceleratorComponent()
+    self.accelerator_type = self._GetAcceleratorType()
+    self.accelerator_count = self._GetAcceleratorCount()
     self.created_resources = []
 
   def GetResourceMetadata(self) -> dict[str, Any]:
     metadata = super().GetResourceMetadata()
     storage_type = self.GetStorageType()
     metadata.update({
+        'catalog_components': self.spec.catalog_components,
         'hpa_enabled': self._hpa_enabled,
         'storage_type': storage_type,
+        'accelerator_component': self.accelerator_component,
+        'accelerator_type': self.accelerator_type,
+        'accelerator_count': self.accelerator_count,
     })
     if self.spec.runtime_class_name:
       metadata['runtime_class_name'] = self.spec.runtime_class_name
@@ -537,6 +544,37 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     if 'gcsfuse' in self.spec.catalog_components:
       return 'gcsfuse'
     return 'huggingface'
+
+  def _GetAcceleratorComponent(self) -> str:
+    """Returns the accelerator component of the inference server."""
+    components = self.spec.catalog_components.split(',')
+    for component in components:
+      lowered = component.lower()
+      for gpu in virtual_machine.VALID_GPU_TYPES:
+        if gpu in lowered:
+          return component
+    return 'unknown'
+
+  def _GetAcceleratorType(self) -> str:
+    """Returns the accelerator type of the inference server."""
+    if self.accelerator_component == 'unknown':
+      return 'unknown'
+    if 'v6e' in self.accelerator_component:
+      return 'v6e'
+    return self.accelerator_component.split('-')[1]
+
+  def _GetAcceleratorCount(self) -> int:
+    """Returns the accelerator count of the inference server."""
+    if self.accelerator_component == 'unknown':
+      return 0
+    if 'v6e' in self.accelerator_component:
+      xpart = self.accelerator_component.split('-')[1]
+      xnumbers = xpart.split('x')
+      total = 1
+      for xnumber in xnumbers:
+        total *= int(xnumber)
+      return total
+    return int(self.accelerator_component.split('-')[0])
 
   def _InjectDefaultHuggingfaceToken(self) -> None:
     """Injects HuggingFace token into the cluster."""

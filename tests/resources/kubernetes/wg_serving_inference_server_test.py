@@ -1,9 +1,10 @@
 import unittest
+
+from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server
 from tests import pkb_common_test_case
-
 
 _BENCHMARK_SPEC_YAML = """
 cluster_boot:
@@ -59,12 +60,53 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(container_service, 'RunKubectlCommand', autospec=True)
     )
     self.config_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        _BENCHMARK_SPEC_YAML
+        _BENCHMARK_SPEC_YAML)
+    self.server = wg_serving_inference_server.WGServingInferenceServer(
+        spec=self.config_spec.config.container_cluster.inference_server,
+        cluster=self.mock_cluster,
+    )
+
+  @parameterized.parameters(
+      dict(
+          catalog_components='v6e-2x2',
+          expected_accelerator_type='v6e',
+          expected_accelerator_count=4,
+      ),
+      dict(
+          catalog_components='1-L4',
+          expected_accelerator_type='L4',
+          expected_accelerator_count=1,
+      ),
+      dict(
+          catalog_components='gcsfuse,8-H100',
+          expected_accelerator_type='H100',
+          expected_accelerator_count=8,
+      ),
+      dict(
+          catalog_components='gcsfuse',
+          expected_accelerator_type='unknown',
+          expected_accelerator_count=0,
+      ),
+  )
+  def testMetadataAcceleratorType(
+      self,
+      catalog_components,
+      expected_accelerator_type,
+      expected_accelerator_count,
+  ):
+    modified_spec = _BENCHMARK_SPEC_YAML.replace(
+        'catalog_components: 1-L4', f'catalog_components: {catalog_components}'
+    )
+    self.config_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        modified_spec
     )
     self.server = wg_serving_inference_server.WGServingInferenceServer(
         spec=self.config_spec.config.container_cluster.inference_server,
         cluster=self.mock_cluster,
     )
+    metadata = self.server.GetResourceMetadata()
+    self.assertEqual(metadata['accelerator_type'], expected_accelerator_type)
+    self.assertEqual(metadata['accelerator_count'], expected_accelerator_count)
 
   def testDelete(self):
     self.mock_run_kubectl.return_value = ('', '', 0)
