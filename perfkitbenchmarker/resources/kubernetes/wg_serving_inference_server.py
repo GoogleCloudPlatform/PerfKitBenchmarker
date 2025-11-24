@@ -51,6 +51,18 @@ FLAG_GCS_BUCKET = flags.DEFINE_string(
     'The GCS bucket that has model data for inference server to use.',
 )
 
+WG_SERVING_REPO_URL = flags.DEFINE_string(
+    'wg_serving_repo_url',
+    'https://github.com/kubernetes-sigs/wg-serving',
+    'URL of the WG Serving repository.',
+)
+
+WG_SERVING_REPO_BRANCH = flags.DEFINE_string(
+    'wg_serving_repo_branch',
+    'main',
+    'Branch of the WG Serving repository.',
+)
+
 
 @dataclasses.dataclass
 class PodStartupMetrics:
@@ -594,8 +606,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         self.cluster.ApplyManifest(
             'container/kubernetes_ai_inference/serving_catalog_cli.yaml.j2',
             image_repo=FLAG_IMAGE_REPO.value,
-            wg_serving_repo_url=FLAGS.wg_serving_repo_url,
-            wg_serving_repo_branch=FLAGS.wg_serving_repo_branch,
+            wg_serving_repo_url=WG_SERVING_REPO_URL.value,
+            wg_serving_repo_branch=WG_SERVING_REPO_BRANCH.value,
             generate_args=' '.join(
                 [f'--{k} {v}' for k, v in generate_args.items()]
             ),
