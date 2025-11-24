@@ -586,6 +586,12 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
             ),
         )
     )
+    if FLAGS.cloud == 'Azure':
+      created_resources += list(
+          self.cluster.ApplyManifest(
+              'container/kubernetes_ai_inference/azure-gpu-nodepool.yaml.j2',
+          )
+      )
 
     job_resource = next(it for it in created_resources if it.startswith('job'))
     _, job_name = job_resource.split('/', maxsplit=1)
@@ -887,7 +893,16 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
     logging.info('Creating new inference server')
     self._InjectDefaultHuggingfaceToken()
-    inference_server_manifest = self._GetInferenceServerManifest()
+
+    # Apply the manifest with retry logic, waiting for the Safeguard policy relaxation to take effect.
+    @vm_util.Retry(poll_interval=30, retryable_exceptions=Exception)
+    def _apply_manifest_with_retry():
+      """Apply inference server manifest with retry logic."""
+      logging.info('Applying inference server manifest')
+      return self._GetInferenceServerManifest()
+
+    inference_server_manifest = _apply_manifest_with_retry()
+
     self._ParseAndStoreInferenceServerDetails(inference_server_manifest)
     with vm_util.NamedTemporaryFile(
         mode='w', prefix='inference-server-manifest', suffix='.yaml'
