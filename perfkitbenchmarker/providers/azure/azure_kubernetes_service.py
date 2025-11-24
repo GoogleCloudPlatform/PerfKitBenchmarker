@@ -547,30 +547,31 @@ class AksAutomaticCluster(AksCluster):
 
   def _Create(self):
     """Creates the Automatic AKS cluster with tags."""
-    if not self._Exists():
-      tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
-      tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
-      cmd = [
-          azure.AZURE_PATH,
-          'aks',
-          'create',
-          '--name',
-          self.name,
-          '--location',
-          self.region,
-          '--ssh-key-value',
-          vm_util.GetPublicKeyPath(),
-          '--resource-group',
-          self.resource_group.name,
-          '--sku',
-          'automatic',
-          '--tags',
-      ] + tags_list
-      vm_util.IssueCommand(
-          cmd,
-          # Half hour timeout on creating the cluster.
-          timeout=1800,
-      )
+    if self._Exists():
+      return
+    tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)
+    tags_list = [f'{k}={v}' for k, v in tags_dict.items()]
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'create',
+        '--name',
+        self.name,
+        '--location',
+        self.region,
+        '--ssh-key-value',
+        vm_util.GetPublicKeyPath(),
+        '--resource-group',
+        self.resource_group.name,
+        '--sku',
+        'automatic',
+        '--tags',
+    ] + tags_list
+    vm_util.IssueCommand(
+        cmd,
+        # Half hour timeout on creating the cluster.
+        timeout=1800,
+    )
 
   def _CreateRoleAssignment(self):
     """Creates a role assignment for the current user."""
@@ -631,7 +632,6 @@ class AksAutomaticCluster(AksCluster):
     user_type = user_type.strip()
     if user_type == 'servicePrincipal':
       self._CreateRoleAssignment()
-    # if FLAGS.benchmark_name == 'kubernetes_ai_inference':
     # Grant Resource Policy Contributor role for policy management
     self._GrantResourcePolicyContributorRole()
     # Update AKS policy to exclude default namespace

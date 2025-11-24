@@ -1,30 +1,30 @@
 apiVersion: karpenter.azure.com/v1beta1
 kind: AKSNodeClass
 metadata:
-  name: {{ gpu_nodeclass_name | default('gpu-nodeclass') }}
+  name: gpu-nodeclass
 spec:
   imageFamily: Ubuntu2204
 ---
 apiVersion: karpenter.sh/v1
 kind: NodePool
 metadata:
-  name: {{ gpu_nodepool_name | default('gpu-nodepool') }}
+  name: gpu-nodepool
 spec:
   disruption:
     budgets:
     - nodes: 30%
-    consolidateAfter: {{ gpu_consolidate_after | default('0s') }}
-    consolidationPolicy: {{ gpu_consolidation_policy | default('WhenEmptyOrUnderutilized') }}
+    consolidateAfter: 0s
+    consolidationPolicy: WhenEmptyOrUnderutilized
   template:
     spec:
       nodeClassRef:
         group: karpenter.azure.com
         kind: AKSNodeClass
-        name: {{ gpu_nodeclass_name | default('gpu-nodeclass') }}
+        name: gpu-nodeclass
       requirements:
         - key: kubernetes.io/arch
           operator: In
-          values: {{ gpu_arch | default(['amd64']) }}
+          values: ['amd64']
         - key: kubernetes.io/os
           operator: In
           values: ['linux']
@@ -35,7 +35,7 @@ spec:
           operator: In
           values: {{ gpu_sku_name | default(['H100']) }}
       taints:
-        - key: {{ gpu_taint_key | default('nvidia.com/gpu') }}
+        - key: 'nvidia.com/gpu'
           effect: NoSchedule
 ---
 # According to the official Microsoft documentation, the NVIDIA device plugin
