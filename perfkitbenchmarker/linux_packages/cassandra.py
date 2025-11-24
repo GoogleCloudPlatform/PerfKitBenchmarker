@@ -25,7 +25,6 @@ import os
 import posixpath
 import re
 import time
-from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -37,14 +36,13 @@ JNA_JAR_URL = (
     'net/java/dev/jna/jna/4.1.0/jna-4.1.0.jar'
 )
 CASSANDRA_GIT_REPRO = 'https://github.com/apache/cassandra.git'
-CASSANDRA_VERSION = 'cassandra-2.1'
 CASSANDRA_YAML_TEMPLATE = 'cassandra/cassandra.yaml.j2'
 CASSANDRA_RACKDC_TEMPLATE = 'cassandra/cassandra-rackdc.properties.j2'
 CASSANDRA_KEYSPACE_TEMPLATE = (
     'cassandra/create-keyspace-cassandra-stress.cql.j2'
 )
 CASSANDRA_ROW_CACHE_TEMPLATE = 'cassandra/enable-row-caching.cql.j2'
-CASSANDRA_VERSION = 'apache-cassandra-4.1.5'
+CASSANDRA_VERSION = 'apache-cassandra-5.0.0'
 CASSANDRA_DIR = posixpath.join(linux_packages.INSTALL_DIR, CASSANDRA_VERSION)
 CASSANDRA_PID = posixpath.join(CASSANDRA_DIR, 'cassandra.pid')
 CASSANDRA_OUT = posixpath.join(CASSANDRA_DIR, 'cassandra.out')
@@ -56,32 +54,6 @@ CLUSTER_START_TRIES = 10
 CLUSTER_START_SLEEP = 30
 # Time, in seconds, to sleep between node starts.
 NODE_START_SLEEP = 30
-# for setting a maven repo with --cassandra_maven_repo_url
-_MAVEN_REPO_PARAMS = """
-artifact.remoteRepository.central: {0}
-artifact.remoteRepository.apache: {0}
-"""
-
-FLAGS = flags.FLAGS
-flags.DEFINE_integer('cassandra_replication_factor', 3, 'Num of replicas.')
-CASSANDRA_CONCURRENT_READS = flags.DEFINE_integer(
-    'cassandra_concurrent_reads',
-    32,
-    'Concurrent read requests each server accepts.',
-)
-CASSANDRA_CONCURRENT_WRITES = flags.DEFINE_integer(
-    'cassandra_concurrent_writes',
-    None,
-    'Concurrent write requests each server accepts. Suggested number is'
-    ' Number of CPUs in the VM * 8',
-)
-# Partial list of known mirrors:
-# https://repo.maven.apache.org/maven2/.meta/repository-metadata.xml
-# See instructions for setting up own mirror:
-# https://maven.apache.org/guides/mini/guide-mirror-settings.html
-flags.DEFINE_boolean(
-    'cassandra_maven_repo_url', None, 'Optional maven repo mirror to use.'
-)
 
 
 def CheckPrerequisites():
@@ -104,7 +76,7 @@ def _Install(vm):
   vm.Install('curl')
   vm.RemoteCommand(
       'curl -o /opt/pkb/cassandra.tar.gz'
-      ' https://archive.apache.org/dist/cassandra/4.1.5/apache-cassandra-4.1.5-bin.tar.gz'
+      f' https://archive.apache.org/dist/cassandra/{CASSANDRA_VERSION.split("-")[-1]}/{CASSANDRA_VERSION}-bin.tar.gz'
   )
   vm.RemoteCommand('tar xzvf /opt/pkb/cassandra.tar.gz --directory /opt/pkb')
 
@@ -161,31 +133,26 @@ def JujuInstall(vm, vm_group_name):
     unit.RemoteCommand('mkdir -p %s' % remote_path)
 
 
-def Configure(vm, seed_vms):
+def Configure(vm, seed_vms, custom_cassandra_conf=None):
   """Configure Cassandra on 'vm'.
 
   Args:
     vm: VirtualMachine. The VM to configure.
     seed_vms: List of VirtualMachine. The seed virtual machine(s).
+    custom_cassandra_conf: Dict. Custom configurations for Cassandra.
   """
+  if not custom_cassandra_conf:
+    custom_cassandra_conf = {}
   context = {
       'ip_address': vm.internal_ip,
       'data_path': posixpath.join(vm.GetScratchDir(), 'cassandra'),
       'seeds': ','.join(f'{vm.internal_ip}:7000' for vm in seed_vms),
       'num_cpus': vm.NumCpusForBenchmark(),
       'cluster_name': 'Test cluster',
-      'concurrent_reads': CASSANDRA_CONCURRENT_READS.value,
-      'concurrent_writes': (
-          CASSANDRA_CONCURRENT_WRITES.value
-          if CASSANDRA_CONCURRENT_WRITES.value
-          else 8 * vm.NumCpusForBenchmark()
-      ),
       'datacenter': 'datacenter',
       'rack': vm.zone,
-      'row_cache_size': (
-          f'{FLAGS.row_cache_size}MiB' if FLAGS.is_row_cache_enabled else '0MiB'
-      ),
   }
+  context.update(custom_cassandra_conf)
   logging.info('cassandra yaml context: %s', context)
   for template in [CASSANDRA_YAML_TEMPLATE, CASSANDRA_RACKDC_TEMPLATE]:
     local_path = data.ResourcePath(template)
@@ -197,6 +164,27 @@ def Configure(vm, seed_vms):
     vm.RemoteCommand(f'sudo cp {remote_path} {cassandra_conf_path}')
   vm.RemoteCommand(f'mkdir {vm.GetScratchDir()}/cassandra')
   vm.RemoteCommand(f'sudo chmod -R 755 {vm.GetScratchDir()}/cassandra')
+  _SetupPy311(vm)
+
+
+def _SetupPy311(vm):
+  """Setup Python 3.11 on a VM.
+
+  CQL has known issues with Python 3.12. Using Python 3.11 for cassandra
+  benchmark. CQL fails with error :
+  "unsupported version of Python, required 3.6-3.11 but found 3.12"
+
+  Args:
+    vm: The target vm.
+  """
+  vm.RemoteCommand('sudo apt update')
+  vm.RemoteCommand('sudo apt install software-properties-common -y')
+  vm.RemoteCommand('sudo add-apt-repository ppa:deadsnakes/ppa -y')
+  vm.RemoteCommand(
+      'sudo apt install python3.11 python3.11-dev python3.11-venv -y'
+  )
+  vm.RemoteCommand('python3.11 -m venv ~/cqlsh_venv')
+  vm.RemoteCommand('~/cqlsh_venv/bin/pip install cassandra-driver')
 
 
 def Start(vm):
@@ -208,10 +196,10 @@ def Start(vm):
   vm.RemoteCommand(f'{GetCassandraPath()}')
 
 
-def CreateKeyspace(vm, replication_factor):
+def CreateKeyspace(vm, replication_factor, is_row_cache_enabled):
   """Create a keyspace on a VM."""
   RunCql(vm, CASSANDRA_KEYSPACE_TEMPLATE, replication_factor)
-  if FLAGS.is_row_cache_enabled:
+  if is_row_cache_enabled:
     RunCql(vm, CASSANDRA_ROW_CACHE_TEMPLATE, replication_factor)
 
 
@@ -234,7 +222,8 @@ def RunCql(vm, template, replication_factor):
   )
   vm.RemoteCommand(f'sudo cp {remote_path} {cassandra_conf_path}')
   vm.RemoteCommand(
-      f'cd {CASSANDRA_DIR}/bin && sudo ./cqlsh -f'
+      'PYTHONPATH=~/cqlsh_venv/lib/python3.11/site-packages sudo -E'
+      f' ~/cqlsh_venv/bin/python {CASSANDRA_DIR}/bin/cqlsh.py -f'
       f' {cassandra_conf_path}/{file_name}'
   )
 
@@ -289,9 +278,9 @@ def GetPendingTaskCountFromCompactionStats(cassandra_vms):
   )
   pending_tasks = []
   for stats in compaction_stats:
-    line = re.search(r'pending tasks: *(\d*)', stats)
+    line = re.search(r'pending tasks:? *(\d*)', stats)
     if line:
-      value = re.sub(r'pending tasks: *(\d*)', r'\1', line.group())
+      value = line.group(1)
       pending_tasks.append(int(value))
   return pending_tasks
 

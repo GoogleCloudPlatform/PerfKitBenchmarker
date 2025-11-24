@@ -31,7 +31,6 @@ max op rate.
 
 import collections
 import copy
-import functools
 import logging
 import math
 import posixpath
@@ -171,6 +170,21 @@ CASSANDRA_STRESS_MAX_RUNS = flags.DEFINE_integer(
     6,
     'Max Number of times to run cassandra-stress to optimize performance.',
 )
+
+CASSANDRA_REPLICATION_FACTOR = flags.DEFINE_integer(
+    'cassandra_replication_factor', 3, 'Num of replicas.'
+)
+CASSANDRA_CONCURRENT_READS = flags.DEFINE_integer(
+    'cassandra_concurrent_reads',
+    32,
+    'Concurrent read requests each server accepts.',
+)
+CASSANDRA_CONCURRENT_WRITES = flags.DEFINE_integer(
+    'cassandra_concurrent_writes',
+    None,
+    'Concurrent write requests each server accepts. Suggested number is'
+    ' Number of CPUs in the VM * 8',
+)
 # Use "./cassandra-stress help -pop" to get more details.
 # [dist=DIST(?)]: Seeds are selected from this distribution
 #  EXP(min..max):
@@ -285,6 +299,19 @@ cassandra_stress:
         AWS:
           machine_type: m6i.xlarge
           zone: us-east-1
+  flags:
+    cassandra_stress_run_duration: 1m
+    is_row_cache_enabled: false
+    cassandra_replication_factor: 3
+    cassandra_stress_consistency_level: LOCAL_QUORUM
+    cassandra_client_zones: us-central1-a
+    cassandra_server_zones: us-central1-a,us-central1-b,us-central1-c
+    cassandra_stress_population_distribution: GAUSSIAN
+    client_vm_machine_type: c3-standard-4
+    db_machine_type: c3-standard-4
+    db_disk_type: hypderdisk-balanced
+    db_disk_size: 350
+    openjdk_version: 17
 """
 
 CASSANDRA_GROUP = 'workers'
@@ -341,50 +368,44 @@ def GetConfig(user_config):
   """Customize the config for the benchmark based on flags."""
   cloud = FLAGS.cloud
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  if FLAGS.client_vm_machine_type:
-    vm_spec = config['vm_groups'][CLIENT_GROUP]['vm_spec']
-    for cloud_value in vm_spec:
-      config['vm_groups'][CLIENT_GROUP]['vm_spec'][cloud_value][
-          'machine_type'
-      ] = FLAGS.client_vm_machine_type
-  if FLAGS.db_machine_type:
-    vm_spec = config['vm_groups'][CASSANDRA_GROUP]['vm_spec']
-    for cloud_value in vm_spec:
-      config['vm_groups'][CASSANDRA_GROUP]['vm_spec'][cloud_value][
-          'machine_type'
-      ] = FLAGS.db_machine_type
-  if FLAGS.db_disk_type:
-    disk_spec = config['vm_groups'][CASSANDRA_GROUP]['disk_spec']
-    for cloud_value in disk_spec:
-      config['vm_groups'][CASSANDRA_GROUP]['disk_spec'][cloud_value][
-          'disk_type'
-      ] = FLAGS.db_disk_type
-  if FLAGS.db_disk_size:
-    disk_spec = config['vm_groups'][CASSANDRA_GROUP]['disk_spec']
-    for cloud_value in disk_spec:
-      config['vm_groups'][CASSANDRA_GROUP]['disk_spec'][cloud_value][
-          'disk_size'
-      ] = FLAGS.db_disk_size
-  if FLAGS.db_disk_iops:
-    disk_spec = config['vm_groups'][CASSANDRA_GROUP]['disk_spec']
-    for cloud_value in disk_spec:
-      config['vm_groups'][CASSANDRA_GROUP]['disk_spec'][cloud_value][
-          'provisioned_iops'
-      ] = FLAGS.db_disk_iops
-  if FLAGS.db_disk_throughput:
-    disk_spec = config['vm_groups'][CASSANDRA_GROUP]['disk_spec']
-    for cloud_value in disk_spec:
-      config['vm_groups'][CASSANDRA_GROUP]['disk_spec'][cloud_value][
-          'provisioned_throughput'
-      ] = FLAGS.db_disk_throughput
-  ConfigureVmGroups(
-      config, CASSANDRA_SERVER_ZONES.value, CASSANDRA_GROUP, cloud
+  ConfigureVmSpec(
+      config,
+      CLIENT_GROUP,
+      'vm_spec',
+      'machine_type',
+      FLAGS.client_vm_machine_type,
   )
-  ConfigureVmGroups(config, CASSANDRA_CLIENT_ZONES.value, CLIENT_GROUP, cloud)
+  ConfigureVmSpec(
+      config,
+      CASSANDRA_GROUP,
+      'vm_spec',
+      'machine_type',
+      FLAGS.db_machine_type,
+  )
+  server_zones = (
+      FLAGS.cassandra_server_zones
+      or config['flags']['cassandra_server_zones'].split(',')
+  )
+  client_zones = (
+      FLAGS.cassandra_client_zones
+      or config['flags']['cassandra_client_zones'].split(',')
+  )
+  ConfigureVmZones(config, server_zones, CASSANDRA_GROUP, cloud)
+  ConfigureVmZones(config, client_zones, CLIENT_GROUP, cloud)
   return config
 
 
-def ConfigureVmGroups(config, flag, group_name, cloud):
+def ConfigureVmSpec(config, group_name, spec_type, property_name, value):
+  if value is None:
+    return
+  spec = config['vm_groups'][group_name][spec_type]
+  for cloud_value in spec:
+    config['vm_groups'][group_name][spec_type][cloud_value][
+        property_name
+    ] = value
+
+
+def ConfigureVmZones(config, flag, group_name, cloud):
   for index, zone in enumerate(flag):
     if index == 0:
       config['vm_groups'][group_name]['vm_spec'][cloud]['zone'] = zone
@@ -565,8 +586,7 @@ def Prepare(benchmark_spec):
       lambda vm: vm.InstallPackages('sysstat'), cassandra_vms + client_vms
   )
   seed_vm = cassandra_vms[0]
-  configure = functools.partial(cassandra.Configure, seed_vms=[seed_vm])
-  background_tasks.RunThreaded(configure, cassandra_vms)
+  ConfigureCassandra(seed_vm, cassandra_vms)
   cassandra.StartCluster(seed_vm, cassandra_vms[1:])
   if FLAGS.cassandra_stress_command == USER_COMMAND:
     for vm in client_vms:
@@ -577,7 +597,9 @@ def Prepare(benchmark_spec):
   if metadata['num_preload_keys']:
     CheckMetadata(metadata)
   cassandra.CreateKeyspace(
-      seed_vm, replication_factor=FLAGS.cassandra_replication_factor
+      seed_vm,
+      replication_factor=FLAGS.cassandra_replication_factor,
+      is_row_cache_enabled=IS_ROW_CACHE_ENABLED.value,
   )
   PreloadCassandraServer(cassandra_vms, client_vms, metadata)
   WaitForCompactionTasks(cassandra_vms)
@@ -585,6 +607,33 @@ def Prepare(benchmark_spec):
 
 def _ResultFilePath(vm):
   return posixpath.join(vm_util.VM_TMP_DIR, vm.hostname + '.stress_results.txt')
+
+
+def ConfigureCassandra(seed_vm, cassandra_vms):
+  """Configure cassandra configuration files."""
+  configure_tasks = []
+
+  for vm in cassandra_vms:
+    # Cassandra concurrent reads and writes are explained here:
+    # https://cassandra.apache.org/doc/3.11/cassandra/configuration/cass_yaml_file.html#concurrent_reads
+    custom_cassandra_conf = {
+        'concurrent_reads': FLAGS.cassandra_concurrent_reads,
+        'concurrent_writes': (
+            FLAGS.cassandra_concurrent_writes
+            or 8 * vm.NumCpusForBenchmark()
+        ),
+        'row_cache_size': (
+            f'{ROW_CACHE_SIZE.value}MiB'
+            if IS_ROW_CACHE_ENABLED.value
+            else '0MiB'
+        ),
+    }
+    configure_tasks.append((
+        cassandra.Configure,
+        [vm, [seed_vm], custom_cassandra_conf],
+        {},
+    ))
+  background_tasks.RunParallelThreads(configure_tasks, max_concurrency=10)
 
 
 def RunTestOnLoader(
@@ -1069,14 +1118,14 @@ def GetOperationRate(samples):
   for s in samples:
     if s.metric == 'op rate':
       return s.value
-  return 0
+  return -1
 
 
 def GetMedianLatency(samples):
   for s in samples:
     if s.metric == 'latency median':
       return s.value
-  return 0
+  return -1
 
 
 def Cleanup(benchmark_spec):
