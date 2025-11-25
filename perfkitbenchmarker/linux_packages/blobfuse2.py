@@ -13,19 +13,20 @@
 # limitations under the License.
 """Module for installing the Blobfuse2 package."""
 
-from perfkitbenchmarker import os_types
 
-
-_UBUNTU24_PACKAGE_REPO = 'https://packages.microsoft.com/config/ubuntu/24.04/packages-microsoft-prod.deb'
+_BLOBFUSE2_REPO_URL = 'https://github.com/Azure/azure-storage-fuse.git'
+_BLOBFUSE2_REPO_NAME = 'azure-storage-fuse'
+_BLOBFUSE2_VERSION = 'blobfuse2-2.5.0'
 
 
 def AptInstall(vm):
   """Installs Blobfuse2 on the VM."""
-  if vm.OS_TYPE != os_types.UBUNTU2404:
-    raise NotImplementedError(
-        'Only installation of Blobfuse2 on Ubuntu 24.04 is supported.'
-    )
-  vm.InstallPackages('wget')
-  vm.RemoteCommand(f'sudo wget {_UBUNTU24_PACKAGE_REPO}')
-  vm.RemoteCommand('sudo dpkg -i packages-microsoft-prod.deb')
-  vm.InstallPackages('libfuse3-dev fuse3 blobfuse2')
+  vm.InstallPackages('golang-go libfuse3-dev fuse3')
+  vm.RemoteCommand(f'git clone {_BLOBFUSE2_REPO_URL}')
+  vm.RemoteCommand(
+      f'cd {_BLOBFUSE2_REPO_NAME} && git checkout {_BLOBFUSE2_VERSION} &&'
+      ' ./build.sh'
+  )
+  vm.RemoteCommand(
+      f'sudo cp {_BLOBFUSE2_REPO_NAME}/blobfuse2 /usr/local/bin/'
+  )

@@ -25,15 +25,21 @@ for more information.
 import datetime
 import json
 import logging
+import statistics
 import time
 
 from absl import flags
+from google.cloud import monitoring_v3
+from google.cloud.monitoring_v3 import types
+import numpy as np
 from perfkitbenchmarker import data
+from perfkitbenchmarker import log_util
 from perfkitbenchmarker import mysql_iaas_relational_db
 from perfkitbenchmarker import omni_postgres_iaas_relational_db
 from perfkitbenchmarker import postgres_iaas_relational_db
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import sqlserver_iaas_relational_db
 from perfkitbenchmarker import timescaledb_iaas_relational_db
@@ -102,6 +108,28 @@ MIN_CUSTOM_MACHINE_MEM_MB = 3840
 IS_READY_TIMEOUT = 600  # 10 minutes
 DELETE_INSTANCE_TIMEOUT = 600  # 10 minutes
 CREATION_TIMEOUT = 1800  # 30 minutes
+
+_METRICS_COLLECTION_DELAY_SECONDS = 165
+
+_DEFAULT_METRICS = [
+    'cloudsql.googleapis.com/database/cpu/utilization',
+    'cloudsql.googleapis.com/database/memory/total_usage',
+    'cloudsql.googleapis.com/database/disk/read_ops_count',
+    'cloudsql.googleapis.com/database/disk/write_ops_count',
+    'cloudsql.googleapis.com/database/disk/write_bytes_count',
+    'cloudsql.googleapis.com/database/disk/read_bytes_count',
+    'cloudsql.googleapis.com/database/disk/utilization',
+    'cloudsql.googleapis.com/database/disk/provisioning/iops',
+    'cloudsql.googleapis.com/database/disk/provisioning/throughput',
+]
+
+_SQLSERVER_METRICS = [
+    'cloudsql.googleapis.com/database/sqlserver/memory/page_life_expectancy',
+    'cloudsql.googleapis.com/database/sqlserver/memory/lazy_write_count',
+    'cloudsql.googleapis.com/database/sqlserver/memory/buffer_cache_hit_ratio',
+    'cloudsql.googleapis.com/database/sqlserver/memory/memory_grants_pending',
+    'cloudsql.googleapis.com/database/sqlserver/memory/free_list_stall_count',
+]
 
 
 class UnsupportedDatabaseEngineError(Exception):
@@ -624,3 +652,181 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     # this command doesnt support the specifier: 'format'
     del cmd.flags['format']
     cmd.IssueRetryable()
+
+  def _CollectTimeSeries(
+      self,
+      metric_type: str,
+      start_time: datetime.datetime,
+      end_time: datetime.datetime,
+      collect_percentiles: bool = False,
+  ) -> list[sample.Sample]:
+    """Collects time series metrics from Google Cloud Monitoring.
+
+    Args:
+      metric_type: The full metric type name.
+      start_time: The start time of query interval.
+      end_time: The end time of query interval.
+      collect_percentiles: Whether to collect percentiles for the metric.
+
+    Returns:
+      A list of sample.Sample objects.
+    """
+    metric_basename = _GetMetricBasename(metric_type)
+    unit = _GetMetricUnit(metric_type)
+    samples = []
+    client = monitoring_v3.MetricServiceClient()
+    is_delta = metric_type.endswith('_ops_count') or metric_type.endswith(
+        '_bytes_count'
+    )
+    aligner = (
+        monitoring_v3.Aggregation.Aligner.ALIGN_RATE
+        if is_delta
+        else monitoring_v3.Aggregation.Aligner.ALIGN_MEAN
+    )
+    results = client.list_time_series(
+        types.ListTimeSeriesRequest(
+            name=f'projects/{self.project}',
+            filter=(
+                'resource.type="cloudsql_database" AND'
+                f' resource.labels.database_id="{self.project}:{self.instance_id}"'
+                f' AND metric.type="{metric_type}"'
+            ),
+            interval=types.TimeInterval(
+                start_time=start_time.astimezone(datetime.timezone.utc),
+                end_time=end_time.astimezone(datetime.timezone.utc),
+            ),
+            aggregation=monitoring_v3.Aggregation(
+                alignment_period={'seconds': 60},
+                per_series_aligner=aligner,
+            ),
+        )
+    )
+    time_series = list(results)
+    if not time_series or not time_series[0].points:
+      logging.warning(
+          'No points in time series for %s. Results: %s', metric_type, results
+      )
+      return []
+
+    points = time_series[0].points
+    values = []
+    timestamps = []
+    for point in points:
+      value = point.value
+      if value.int64_value:
+        value = float(value.int64_value)
+      else:
+        value = float(value.double_value)
+      if 'bytes_count' in metric_type:
+        value /= 1024 * 1024
+      elif unit == 'GB':
+        value /= 1024 * 1024 * 1024
+      elif unit == '%':
+        value *= 100
+      values.append(value)
+      timestamps.append(point.interval.start_time)
+
+    if not values:
+      logging.warning('No values found for metric %s', metric_type)
+      return []
+
+    avg_val = statistics.mean(values)
+    log_util.LogToShortLogAndRoot(
+        f'{metric_basename}: average={avg_val:.2f}, min={min(values):.2f},'
+        f' max={max(values):.2f}, count={len(values)}'
+    )
+    if collect_percentiles:
+      percentiles_to_collect = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+      percentile_values = np.percentile(values, percentiles_to_collect)
+      for percentile, value in zip(percentiles_to_collect, percentile_values):
+        if percentile == 0:
+          name = 'min'
+        elif percentile == 100:
+          name = 'max'
+        else:
+          name = f'p{percentile}'
+        samples.append(
+            sample.Sample(f'{metric_basename}_{name}', value, unit, metadata={})
+        )
+    human_readable_ts = [
+        f'{_FormatTime(t)}: {v:.2f} {unit}'
+        for t, v in reversed(list(zip(timestamps, values)))
+    ]
+    log_util.LogToShortLogAndRoot(
+        f'{metric_basename}_time_series:\n{'\n'.join(human_readable_ts)}'
+    )
+
+    samples.append(
+        sample.Sample(f'{metric_basename}_average', avg_val, unit, metadata={})
+    )
+    samples.append(
+        sample.CreateTimeSeriesSample(
+            values,
+            [t.timestamp() for t in timestamps],
+            f'{metric_basename}_time_series',
+            unit,
+            60,
+        )
+    )
+    return samples
+
+  def CollectMetrics(
+      self, start_time: datetime.datetime, end_time: datetime.datetime
+  ) -> list[sample.Sample]:
+    """Collects metrics during the run phase."""
+    logging.info(
+        'Collecting metrics for time range: %s to %s',
+        _FormatTime(start_time),
+        _FormatTime(end_time),
+    )
+
+    time_to_wait = (
+        end_time
+        + datetime.timedelta(seconds=_METRICS_COLLECTION_DELAY_SECONDS)
+        - datetime.datetime.now()
+    )
+    if time_to_wait.total_seconds() > 0:
+      logging.info(
+          'Waiting %s seconds for metrics to be available.',
+          int(time_to_wait.total_seconds()),
+      )
+      time.sleep(time_to_wait.total_seconds())
+
+    all_samples = []
+    for metric in _DEFAULT_METRICS:
+      all_samples.extend(self._CollectTimeSeries(metric, start_time, end_time))
+    if self.engine_type == sql_engine_utils.SQLSERVER:
+      for metric in _SQLSERVER_METRICS:
+        all_samples.extend(
+            self._CollectTimeSeries(
+                metric, start_time, end_time, collect_percentiles=True
+            )
+        )
+    return all_samples
+
+
+def _FormatTime(dt: datetime.datetime) -> str:
+  return dt.strftime('%Y-%m-%d %H:%M:%S')
+
+
+def _GetMetricBasename(metric_type) -> str:
+  return '_'.join(metric_type.split('/')[1:])
+
+
+def _GetMetricUnit(metric_type) -> str:
+  """Returns the unit for a given metric type."""
+  if 'cpu/utilization' in metric_type:
+    return '%'
+  if 'memory/total_usage' in metric_type:
+    return 'GB'
+  if 'read_ops_count' in metric_type or 'write_ops_count' in metric_type:
+    return 'iops'
+  if 'read_bytes_count' in metric_type or 'write_bytes_count' in metric_type:
+    return 'MB/s'
+  if 'disk/utilization' in metric_type:
+    return '%'
+  if 'disk/provisioning/iops' in metric_type:
+    return 'iops'
+  if 'disk/provisioning/throughput' in metric_type:
+    return 'MB/s'
+  return ''

@@ -36,6 +36,7 @@ MYSQL = 'mysql'
 MARIADB = 'mariadb'
 POSTGRES = 'postgres'
 AURORA_POSTGRES = 'aurora-postgresql'
+AURORA_DSQL_POSTGRES = 'aurora-dsql-postgres'
 AURORA_MYSQL = 'aurora-mysql'
 SQLSERVER = 'sqlserver'
 SQLSERVER_EXPRESS = 'sqlserver-ex'
@@ -51,6 +52,7 @@ ALL_ENGINES = [
     MARIADB,
     MYSQL,
     POSTGRES,
+    AURORA_DSQL_POSTGRES,
     AURORA_POSTGRES,
     AURORA_MYSQL,
     SQLSERVER,
@@ -378,8 +380,15 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
       sessions_arg = (
           f'-r "minSessions={sessions};'
           f'maxSessions={_PGADAPTER_MAX_SESSIONS};'
-          f'numChannels={int(_PGADAPTER_MAX_SESSIONS/100)}"'
+          f'numChannels={int(_PGADAPTER_MAX_SESSIONS/100)}'
       )
+      if FLAGS.cloud_spanner_max_commit_delay is not None:
+        sessions_arg = (
+            sessions_arg
+            + f';maxCommitDelay={FLAGS.cloud_spanner_max_commit_delay}'
+        )
+      sessions_arg = sessions_arg + '"'
+
     properties = self.connection_properties
     database_name = database_name or properties.database_name
     command = (
@@ -562,6 +571,7 @@ def GetDbEngineType(db_engine: str) -> str:
     return SQLSERVER
   elif (
       db_engine == AWS_AURORA_POSTGRES_ENGINE
+      or db_engine == AURORA_DSQL_POSTGRES
       or db_engine == FLEXIBLE_SERVER_POSTGRES
   ):
     return POSTGRES

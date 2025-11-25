@@ -22,7 +22,6 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
-from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
@@ -419,18 +418,7 @@ class CliVertexAiModel(BaseCliVertexAiModel):
           'The operations may still be underway remotely and may still succeed'
           in err
       ):
-
-        @vm_util.Retry(
-            poll_interval=self.POLL_INTERVAL,
-            fuzz=0,
-            timeout=self.READY_TIMEOUT,
-            retryable_exceptions=(errors.Resource.RetryableCreationError,),
-        )
-        def WaitUntilReady():
-          if not self._IsReady():
-            raise errors.Resource.RetryableCreationError('Not yet ready')
-
-        WaitUntilReady()
+        self._WaitUntilReady()
       elif 'Machine type temporarily unavailable' in err:
         raise errors.Benchmarks.QuotaFailure(err)
       else:

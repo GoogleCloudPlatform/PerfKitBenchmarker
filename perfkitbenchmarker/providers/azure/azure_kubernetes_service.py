@@ -488,6 +488,10 @@ class AksAutomaticCluster(AksCluster):
   CLOUD = provider_info.AZURE
   CLUSTER_TYPE = 'Auto'
 
+  # Control how long to WaitUntilReady
+  READY_TIMEOUT = 40 * 60  # 40 minutes
+  POLL_INTERVAL = 40
+
   def _Create(self):
     """Creates the Automatic AKS cluster with tags."""
     tags_dict = util.GetResourceTags(self.resource_group.timeout_minutes)

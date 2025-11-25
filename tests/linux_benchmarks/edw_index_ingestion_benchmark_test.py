@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import datetime
 import threading
 import time
 import unittest
@@ -25,6 +26,19 @@ from perfkitbenchmarker.linux_benchmarks import edw_index_ingestion_benchmark
 from perfkitbenchmarker.providers.gcp import bigquery
 from perfkitbenchmarker.providers.snowflake import snowflake
 from tests import pkb_common_test_case
+
+
+class _Matching:
+  """'Equal' to another obj iff that obj satisfies the given predicate."""
+
+  def __init__(self, predicate_func):
+    self.predicate_func = predicate_func
+
+  def __eq__(self, other):
+    return self.predicate_func(other)
+
+  def __repr__(self):
+    return f'<_Matching: {self.predicate_func.__name__}>'
 
 
 class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
@@ -42,7 +56,7 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(time, 'sleep', side_effect=advance_time)
     )
     self.submitter = edw_index_ingestion_benchmark._IndexSearchQuerySubmitter(
-        self.mock_service, 'test_table', 'test_index'
+        self.mock_service, 'test_table'
     )
     self.mock_run_parallel = self.enter_context(
         mock.patch.object(
@@ -114,12 +128,15 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         self.mock_service,
         'test_table',
         'test_path',
+        'rare_token_test_path',
         dataset_copies_to_ingest=2,
+        rare_token_dataset_copies_to_ingest=0,
         interval=0.01,
         ingestion_finished=self.event,
         ingestion_warehouse=None,
         already_loaded_rows=0,
         dataset_rows=100,
+        bench_meta={},
     )
 
     # Assertions
@@ -141,12 +158,15 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         mock_snowflake_service,
         'test_table',
         'test_path',
+        'rare_token_test_path',
         dataset_copies_to_ingest=1,
+        rare_token_dataset_copies_to_ingest=0,
         interval=0.01,
         ingestion_finished=self.event,
         ingestion_warehouse='test_warehouse',
         already_loaded_rows=0,
         dataset_rows=200,
+        bench_meta={},
     )
     mock_snowflake_service.SetWarehouse.assert_called_once_with(
         'test_warehouse'
@@ -160,11 +180,37 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     )
 
     # Call the function
-    samples = self.submitter.ExecuteSearchQueryNTimes(search_query, 3)
+    samples = self.submitter.ExecuteSearchQueryNTimes(
+        search_query,
+        (datetime.date(2025, 1, 2), datetime.date(2025, 1, 4)),
+        3,
+        1,
+        {},
+    )
 
     # Assertions
-    self.assertEqual(self.mock_service.TextSearchQuery.call_count, 3)
-    self.assertLen(samples, 3)
+    def one_day_in_range_fn(date_tuple):
+      if (
+          not isinstance(date_tuple, tuple)
+          or len(date_tuple) != 2
+          or date_tuple[0] != date_tuple[1]
+      ):
+        return False
+      day = date_tuple[0]
+      return datetime.date(2025, 1, 2) <= day <= datetime.date(2025, 1, 4)
+
+    some_day_in_range = _Matching(one_day_in_range_fn)
+    last_30_days = (datetime.date(2024, 12, 6), datetime.date(2025, 1, 4))
+
+    self.assertLen(samples, 6)
+    self.mock_service.TextSearchQuery.assert_has_calls([
+        mock.call('test_table', 'test_term', None, None, some_day_in_range),
+        mock.call('test_table', 'test_term', None, None, last_30_days),
+        mock.call('test_table', 'test_term', None, None, some_day_in_range),
+        mock.call('test_table', 'test_term', None, None, last_30_days),
+        mock.call('test_table', 'test_term', None, None, some_day_in_range),
+        mock.call('test_table', 'test_term', None, None, last_30_days),
+    ])
 
   def test_execute_search_query_until_event(self):
     # Configure mocks
@@ -185,7 +231,11 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
     # Call the function
     samples = self.submitter.ExecuteSearchQueryUntilEvent(
-        [search_query], event, 1
+        [search_query],
+        (datetime.date(2025, 1, 1), datetime.date(2025, 1, 1)),
+        event,
+        1,
+        {},
     )
 
     # Assertions
@@ -278,6 +328,10 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(
         flagsaver.flagsaver(
             (bigquery.INITIALIZE_SEARCH_TABLE_PARTITIONED, partitioned),
+            (
+                edw_index_ingestion_benchmark._DATA_DATE_RANGES,
+                ['2025-01-02', '2025-01-03', '2025-01-04'],
+            ),
         )
     )
     self._mock_background_tasks()
@@ -390,7 +444,12 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
                 edw_index_ingestion_benchmark._FINAL_SEARCH_COUNT,
                 final_search_count,
             ),
-            (edw_index_ingestion_benchmark._SEARCH_QUERIES, ['common:api']),
+            (edw_index_ingestion_benchmark._COMMON_TOKEN, 'common'),
+            (edw_index_ingestion_benchmark._RARE_TOKEN, 'rare'),
+            (
+                edw_index_ingestion_benchmark._DATA_DATE_RANGES,
+                ['2025-01-02', '2025-01-03', '2025-01-04'],
+            ),
         )
     )
     mock_query_submitter = self._mock_index_search_query_submitter()
@@ -424,57 +483,6 @@ class EdwIndexIngestionBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         self.mock_run_parallel.called, run_parallel_processes_called
     )
-
-  @parameterized.named_parameters(
-      dict(testcase_name='one_query', search_queries=['q1:t1']),
-      dict(testcase_name='two_queries', search_queries=['q1:t1', 'q2:t2']),
-  )
-  def test_run_with_search_queries(self, search_queries):
-    # Arrange
-    self.mock_service.GetTableRowCount.return_value = (200, {})
-    self.enter_context(mock.patch('multiprocessing.Manager'))
-    self.enter_context(
-        flagsaver.flagsaver(
-            (edw_index_ingestion_benchmark._SEARCH_QUERIES, search_queries)
-        )
-    )
-    mock_query_submitter = self._mock_index_search_query_submitter()
-    self._mock_wait_for_index_completion()
-    mock_spec = self._mock_benchmark_spec(self.mock_service)
-    parsed_queries = edw_index_ingestion_benchmark._ParseSearchQueries(
-        search_queries
-    )
-
-    # Act
-    edw_index_ingestion_benchmark.Run(mock_spec)
-
-    # Assert
-    self.assertEqual(
-        mock_query_submitter.ExecuteSearchQueryNTimes.call_count,
-        2 * len(search_queries),
-    )
-    initial_queries_called = [
-        c.args[0]
-        for c in mock_query_submitter.ExecuteSearchQueryNTimes.call_args_list
-        if c.kwargs['bench_meta']['edw_index_current_step'] == 'INITIAL_SEARCH'
-    ]
-    final_queries_called = [
-        c.args[0]
-        for c in mock_query_submitter.ExecuteSearchQueryNTimes.call_args_list
-        if c.kwargs['bench_meta']['edw_index_current_step'] == 'FINAL_SEARCH'
-    ]
-    self.assertCountEqual(initial_queries_called, parsed_queries)
-    self.assertCountEqual(final_queries_called, parsed_queries)
-
-    # Check call for MAIN step
-    self.mock_run_parallel.assert_called_once()
-    tasks = self.mock_run_parallel.call_args[0][0]
-    # The second task is ExecuteSearchQueryUntilEvent
-    self.assertEqual(
-        tasks[1][0], mock_query_submitter.ExecuteSearchQueryUntilEvent
-    )
-    search_task_args = tasks[1][1]
-    self.assertEqual(search_task_args[0], parsed_queries)
 
 
 if __name__ == '__main__':

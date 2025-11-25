@@ -79,7 +79,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             ),
         )
     )
-    conditions = kubernetes_scale_benchmark._GetStatusConditionsForResourceType(
+    conditions = kubernetes_scale_benchmark.GetStatusConditionsForResourceType(
         'pod',
         frozenset(),
     )
@@ -119,7 +119,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             ),
         )
     )
-    conditions = kubernetes_scale_benchmark._GetStatusConditionsForResourceType(
+    conditions = kubernetes_scale_benchmark.GetStatusConditionsForResourceType(
         'pod',
         resources_to_ignore=frozenset(['pod456']),
     )

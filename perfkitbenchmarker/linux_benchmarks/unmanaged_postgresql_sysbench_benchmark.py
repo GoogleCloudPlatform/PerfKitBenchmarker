@@ -246,7 +246,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
 
 def InstallSysbench(vm):
   args = {'db_driver': _DATABASE_TYPE}
-  if vm.OS_TYPE in os_types.AMAZONLINUX_TYPES + os_types.CENTOS_TYPES:
+  if vm.BASE_OS_TYPE == os_types.RED_HAT:
     sysbench.YumInstall(vm, args=args)
   else:
     sysbench.AptInstall(vm, args=args)

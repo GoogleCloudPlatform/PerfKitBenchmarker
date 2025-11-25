@@ -23,6 +23,10 @@ HeadNode:
   Ssh:
     KeyName: {{ ssh_key }}
   SharedStorageType: Ebs
+  Iam:
+    S3Access:
+      - BucketName: {{ preprovisioned_bucket }}
+        EnableWriteAccess: false
 Scheduling:
   Scheduler: slurm
   SlurmQueues:

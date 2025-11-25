@@ -576,6 +576,8 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
       })
     else:
       metadata['gcp_spanner_node_count'] = self.nodes
+    if _MAX_COMMIT_DELAY.value:
+      metadata['gcp_spanner_max_commit_delay'] = _MAX_COMMIT_DELAY.value
     return metadata
 
   def GetAverageCpuUsage(

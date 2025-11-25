@@ -806,6 +806,9 @@ class Bigquery(edw_service.EdwService):
       f'{SEARCH_QUERY_TEMPLATE_LOCATION}/search_query.sql.j2'
   )
   GET_ROW_COUNT_QUERY_TEMPLATE = 'edw/bigquery/get_row_count.sql.j2'
+  INJECT_TOKEN_INTO_TABLE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/inject_token_into_table.sql.j2'
+  )
 
   def CreateSearchIndex(
       self, table_path: str, index_name: str
@@ -911,13 +914,20 @@ class Bigquery(edw_service.EdwService):
     return qres, meta
 
   def TextSearchQuery(
-      self, table_path: str, search_keyword: str, index_name: str
+      self,
+      table_path: str,
+      search_keyword: str,
+      order_by: str | None = None,
+      limit: int | None = None,
+      date_between: tuple[datetime.date, datetime.date] | None = None,
   ) -> tuple[float, dict[str, Any]]:
     query_name = 'text_search_query'
     context = {
         'table_name': table_path,
         'search_text': search_keyword,
-        'index_name': index_name,
+        'order_by': order_by,
+        'limit': limit,
+        'date_between': date_between,
     }
     self.client_interface.client_vm.RenderTemplate(
         data.ResourcePath(self.INDEX_SEARCH_QUERY_TEMPLATE),
@@ -928,10 +938,27 @@ class Bigquery(edw_service.EdwService):
     res, meta = self.client_interface.ExecuteQuery(
         query_name, print_results=True
     )
-    meta['edw_search_result_rows'] = int(
-        meta['query_results']['result_rows'][0]
+    meta['edw_search_result_rows'] = len(
+        meta['query_results'].get('event_timestamp', [])
     )
     return res, meta
+
+  def InjectTokenIntoTable(
+      self, table_path: str, token: str, token_count: int
+    ) -> tuple[float, dict[str, Any]]:
+    query_name = 'inject_token_into_table'
+    context = {
+        'table_name': table_path,
+        'token': token,
+        'token_count': token_count,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.INJECT_TOKEN_INTO_TABLE),
+        query_name,
+        context,
+    )
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
 
 class Endor(Bigquery):

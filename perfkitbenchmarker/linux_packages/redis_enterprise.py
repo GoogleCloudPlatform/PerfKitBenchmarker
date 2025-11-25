@@ -168,17 +168,20 @@ PREPROVISIONED_DATA = {
 _THREAD_OPTIMIZATION_RATIO = 0.75
 
 
-def _GetTarName() -> str | None:
+def _GetTarName(vm) -> str | None:
   """Returns the Redis Enterprise package to use depending on the os.
 
   For information about available packages, see
   https://redislabs.com/redis-enterprise/software/downloads/.
+
+  Args:
+    vm: The VM to install the package on.
   """
-  if FLAGS.os_type in [os_types.RHEL, os_types.AMAZONLINUX2, os_types.CENTOS7]:
+  if vm.BASE_OS_TYPE == os_types.RED_HAT:
     return _RHEL_TAR
-  if FLAGS.os_type in [os_types.UBUNTU1604, os_types.DEBIAN, os_types.DEBIAN9]:
+  if vm.OS_TYPE in [os_types.UBUNTU1604, os_types.DEBIAN9]:
     return _XENIAL_TAR
-  if FLAGS.os_type == os_types.UBUNTU1804:
+  if vm.OS_TYPE == os_types.UBUNTU1804:
     return _BIONIC_TAR
 
 
@@ -195,11 +198,11 @@ def Install(vm: _VM) -> None:
 
   # Check for the tarfile in the data directory first.
   vm.InstallPreprovisionedPackageData(
-      _PACKAGE_NAME, [_GetTarName()], _WORKING_DIR
+      _PACKAGE_NAME, [_GetTarName(vm)], _WORKING_DIR
   )
   vm.RemoteCommand(
       'cd {dir} && sudo tar xvf {tar}'.format(
-          dir=_WORKING_DIR, tar=_GetTarName()
+          dir=_WORKING_DIR, tar=_GetTarName(vm)
       )
   )
 

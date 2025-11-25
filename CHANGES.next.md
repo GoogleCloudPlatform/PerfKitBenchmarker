@@ -193,7 +193,7 @@
 -   Add support for multi-network creation/attachment. PKB currently does not
     handle subnet creation on an existing network.
 -   Add support for GCE Confidential VM's.
--   Add cos-dev, cos121, cos117, cos113, and cos109 OS support for GCP.
+-   Add cos-dev, cos125, cos121, cos117, and cos113 OS support for GCP.
 -   Add --object_ttl_days flag for lifecycle management of created buckets.
 -   Add support for multi-NIC netperf throughput on AWS.
 -   Added AWS/GCP support for Data Plane Development Kit (DPDK) on Linux VM's to
@@ -257,6 +257,7 @@
 -   Add support for the `--addons` flag in GKE Standard.
 -   Add support for RHEL and Rocky Linux 10.
 -   Add support for Debian 13.
+-   Add KVRocks memtier benchmark with LSSD support.
 
 ### Enhancements:
 

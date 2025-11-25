@@ -168,7 +168,7 @@ class UnmanagedNfsService(BaseNfsService):
   ])
 
   _NFS_NAME = {
-      os_types.RHEL: 'nfs-server',
+      os_types.RED_HAT: 'nfs-server',
       os_types.DEBIAN: 'nfs-kernel-server',
   }
   _NFS_RESTART_CMD = 'sudo systemctl restart {nfs_name}'

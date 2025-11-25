@@ -7,58 +7,54 @@ Source:
 https://catalog.ngc.nvidia.com/orgs/nvidia/containers/hpc-benchmarks
 """
 
+import posixpath
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import data
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cuda_toolkit
 from perfkitbenchmarker.linux_packages import nvidia_driver
-from perfkitbenchmarker.linux_packages import optimize_gpu
-from perfkitbenchmarker.linux_packages import slurm
 
 
 BENCHMARK_NAME = 'nvidia_hpl'
 BENCHMARK_CONFIG = """
 nvidia_hpl:
   description: Runs nvidia hpl benchmark.
-  vm_groups:
-    default:
+  cluster:
+    headnode:
       vm_spec:
         GCP:
-          machine_type: a3-megagpu-8g
-          gpu_count: 8
-          gpu_type: h100
-          zone: us-east1-d
-          boot_disk_size: 1000
+          machine_type: c3-standard-88
+          zone: us-central1-a
+          boot_disk_size: 2000
         AWS:
-          machine_type: p5.48xlarge
-          zone: us-east-1
-          boot_disk_size: 1000
-      disk_spec: *default_500_gb
+          machine_type: m7i.16xlarge
+          zone: us-east-2a
+          boot_disk_size: 2000
+      vm_count: 1
+    workers:
       vm_count: null
+      os_type: ubuntu2004
+      vm_spec:
+        GCP:
+          machine_type: a4-highgpu-8g
+          zone: us-central1-a
+        AWS:
+          machine_type: p6.48xlarge
+          zone: us-east-2a
   flags:
     placement_group_style: closest_supported
-    scratch_dir: /mnt/localssd
-    data_disk_type: local
     preprovision_ignore_checksum: True
-    gce_num_local_ssds: 16
-    gce_ssd_interface: NVME
-    gcloud_scopes: https://www.googleapis.com/auth/devstorage.read_write,cloud-platform
 """
 
+BENCHMARK_DATA = {
+    'a4.sqsh':
+        'f1697f356da43c6c3c1ff2888349158c175a3393bfa107c659ba90610b326b21',
+    'p6.sqsh':
+        '02dc6376608348de27f78c8ed4d65cfc1b78731dc42681384d4f968a25864cb1'
+}
+
 FLAGS = flags.FLAGS
-
-
-def CheckPrerequisites(_):
-  """Perform flag checks."""
-  if FLAGS.cloud == 'GCP' and not FLAGS.image_project:
-    raise errors.Benchmarks.UnsupportedConfigError(
-        '--image_project is required. Please follow'
-        ' https://cloud.google.com/cluster-toolkit/docs/deploy/deploy-a3-mega-cluster'
-        ' to build your own image.'
-    )
 
 
 def GetConfig(user_config):
@@ -75,24 +71,8 @@ def GetConfig(user_config):
 
 def _PrepareNvidiaHPL(vm):
   """Install packages and configure VM."""
-  vm.Install('nvidia_hpc')
   nvidia_driver.EnablePersistenceMode(vm)
   vm.RemoteCommand('sudo mount -o remount,size=75% /run')
-  vm.RemoteCommand(
-      'echo "FROM nvcr.io/nvidia/hpc-benchmarks:24.09" >> Dockerfile')
-  vm.RemoteCommand(
-      'echo "WORKDIR /workspace" >> Dockerfile')
-  vm.UpdateDockerfile('Dockerfile')
-  # TODO(yuyanting): Figure out proper math for other node counts
-  # 128 GPUs dat from Sam Skillman
-  vm.RemoteCopy(
-      data.ResourcePath('HPL-H200-128GPUs.dat')
-  )
-  vm.RemoteCommand(
-      'echo "COPY HPL-H200-128GPUs.dat '
-      '/workspace/hpl-linux-x86_64/sample-dat/HPL-H200-128GPUs.dat"'
-      ' >> Dockerfile')
-  vm.RemoteCommand('docker build --network=host -t pkb-hpc-image .')
 
 
 def Prepare(benchmark_spec):
@@ -103,9 +83,13 @@ def Prepare(benchmark_spec):
   """
   vms = benchmark_spec.vms
   background_tasks.RunThreaded(_PrepareNvidiaHPL, vms)
-  slurm.ConfigureSlurm(vms)
-  background_tasks.RunThreaded(optimize_gpu.Install, vms)
-  optimize_gpu.BuildHostFile(vms[0], len(benchmark_spec.vms))
+  benchmark_spec.cluster.InstallSquashImage(
+      BENCHMARK_NAME,
+      f'{benchmark_spec.cluster.TYPE}.sqsh',
+      benchmark_spec.cluster.nfs_path,
+      posixpath.join(BENCHMARK_NAME,
+                     f'{benchmark_spec.cluster.TYPE}.dockerfile')
+  )
 
 
 def _CreateMetadata(vms, result_line_parts):
@@ -144,56 +128,38 @@ def Run(benchmark_spec):
     A list of sample.Sample objects.
   """
   samples = []
-  controller = benchmark_spec.vms[0]
-  gpus_per_node = FLAGS.hpcg_gpus_per_node or nvidia_driver.QueryNumberOfGpus(
-      benchmark_spec.vms[0])
-  provider_env = optimize_gpu.SetContainerEnv(controller)
+  vms = benchmark_spec.cluster.worker_vms
+  ngpus = nvidia_driver.QueryNumberOfGpus(vms[0])
+  cpus_per_task = vms[0].NumCpusForBenchmark() // ngpus
+  image = posixpath.join(
+      benchmark_spec.cluster.nfs_path, f'{benchmark_spec.cluster.TYPE}.sqsh')
   hpl_command = ''
-  if nvidia_driver.GetGpuType(controller) == nvidia_driver.NVIDIA_H100:
-    hpl_dat = f'HPL-dgx-{len(benchmark_spec.vms)}N.dat'
-  elif nvidia_driver.GetGpuType(controller) == nvidia_driver.NVIDIA_H200:
-    hpl_dat = f'HPL-H200-{len(benchmark_spec.vms) * 8}GPUs.dat'
-    if len(benchmark_spec.vms) > 4 and len(benchmark_spec.vms) != 16:
+  if nvidia_driver.GetGpuType(vms[0]) == nvidia_driver.NVIDIA_H100:
+    hpl_dat = f'HPL-dgx-{len(vms)}N.dat'
+  elif nvidia_driver.GetGpuType(vms[0]) == nvidia_driver.NVIDIA_H200:
+    hpl_dat = f'HPL-H200-{len(vms) * 8}GPUs.dat'
+    if len(vms) > 4 and len(vms) != 16:
       raise ValueError(
           f'Unsupported number of nodes: {len(benchmark_spec.vms)}'
       )
+  elif nvidia_driver.GetGpuType(vms[0]) == nvidia_driver.NVIDIA_B200:
+    hpl_dat = f'HPL-B200-{len(vms) * 8}GPUs.dat'
   else:
     raise ValueError(
-        f'Unsupported GPU type: {nvidia_driver.GetGpuType(controller)}'
+        f'Unsupported GPU type: {nvidia_driver.GetGpuType(vms[0])}'
     )
   hpl_command += (
       f'./hpl.sh --dat /workspace/hpl-linux-x86_64/sample-dat/{hpl_dat}'
   )
-  # pylint: disable=protected-access
-  hostfile = controller._RemoteFileExists('/var/tmp/hostfile')
-  if hostfile:
-    hostfile_arg = 'export SLURM_HOSTFILE=/var/tmp/hostfile; '
-    slurm_args = ''
-  else:
-    hostfile_arg = ''
-    slurm_args = f'-N {len(benchmark_spec.vms)} '
-  mount_args = ','.join(optimize_gpu.GetContainerMounts(controller))
-  if mount_args:
-    slurm_args += f'--container-mounts="{mount_args}" '
-  stdout, _ = controller.RemoteCommand(
-      f'{hostfile_arg}'
-      'export TMPDIR=/tmp; '
-      'export NCCL_DEBUG=INFO; '
-      'export HPL_FCT_COMM_POLICY=1; '
-      'export HPL_P2P_AS_BCAST=0; '
-      'export HPL_USE_NVSHMEM=0; '
-      'export NVSHMEM_DISABLE_CUDA_VMM=1; '
-      'export OMPI_MCA_pml="ucx"; '
-      'export UCX_MAX_RNDV_RAILS=8; '
-      # environment variables to use
-      f'srun '
-      f'--ntasks-per-node {gpus_per_node} '
-      '--cpus-per-task '
-      f'{int(controller.NumCpusForBenchmark() / gpus_per_node)} '
-      '--cpu-bind=none --mpi=pmi2 '
-      '--container-image="dockerd://pkb-hpc-image" '
-      f'{slurm_args} bash -c "{provider_env} {hpl_command}"'
-  )
+  stdout, _ = benchmark_spec.cluster.RemoteCommand(
+      '--mpi=pmix --cpu-bind=none '
+      f'--gpus-per-node={ngpus} --ntasks-per-node={ngpus} '
+      f'--cpus-per-task={cpus_per_task} '
+      f'--container-image {image} '
+      '--container-writable '
+      f'--wait=60 --kill-on-bad-exit=1 {hpl_command}',
+      env=('export HPL_CUSOLVER_MP_TESTS=0; export HPL_USE_NVSHMEM=0; '),
+      login_shell=True)
   lines = stdout.splitlines()
   result_line_idx = None
   for line_idx, line in enumerate(lines):
@@ -212,7 +178,7 @@ def Run(benchmark_spec):
             'HPL Throughput',
             float(result_line_parts[6]),
             'Gflops',
-            _CreateMetadata(benchmark_spec.vms, result_line_parts),
+            _CreateMetadata(vms, result_line_parts),
         )
     )
   return samples

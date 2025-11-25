@@ -185,6 +185,9 @@ class BaseEksCluster(container_service.KubernetesCluster):
       # Min / max config only apply to the default nodepool.
       group_json['minSize'] = self.min_nodes
       group_json['maxSize'] = self.max_nodes
+      group_json['desiredCapacity'] = min(
+          max(self.min_nodes, nodepool.num_nodes), self.max_nodes
+      )
     return group_json
 
   def _WriteJsonToFile(self, json_dict: dict[str, Any]) -> str:

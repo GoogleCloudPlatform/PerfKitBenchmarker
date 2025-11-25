@@ -94,6 +94,9 @@ def SparkVersion() -> version.Version:
 
 
 def _ScalaVersion() -> version.Version:
+  if SparkVersion().major >= 4:
+    # https://spark.apache.org/docs/4.0.0/#downloading
+    return version.Version('2.13')
   if SparkVersion().major >= 3:
     # https://spark.apache.org/docs/3.0.0/#downloading
     return version.Version('2.12')

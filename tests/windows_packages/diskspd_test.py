@@ -154,7 +154,7 @@ class DiskspdBenchmarkTestCase(
   def testGenerateDiskspdConfig(self):
     config = diskspd._GenerateDiskspdConfig(outstanding_io=8, threads=4)
     expected_config = (
-        '-c10G -d60 -t4 -o8 -L -W10 -C5 -Rxml -w70   -Su -Sw  -b16K -r -fr'
+        '-c10G -d60 -t4 -o8 -L -W10 -C5 -Rxml -w70   -Sh  -b16K -r '
         f' F:\\{diskspd.DISKSPD_TMPFILE} > {diskspd.DISKSPD_XMLFILE}'
     )
     self.assertMultiLineEqual(config, expected_config)
@@ -169,7 +169,6 @@ class DiskspdBenchmarkTestCase(
   def testGenerateDiskspdConfigWithStride(self):
     config = diskspd._GenerateDiskspdConfig(outstanding_io=1, threads=1)
     self.assertIn('-s64K', config)
-    self.assertIn('-fs', config)
 
   @flagsaver.flagsaver(
       diskspd_latency_stats=False,

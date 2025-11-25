@@ -13,11 +13,15 @@
 # limitations under the License.
 
 """Class to represent a Cluster object."""
+
+import os
 import typing
 from typing import Callable, List, Tuple
+import uuid
 
 from absl import flags
 from absl import logging
+from perfkitbenchmarker import data
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
@@ -134,7 +138,7 @@ def GetClusterSpecClass(cloud: str):
 
 def GetClusterClass(cloud: str):
   """Returns the cluster spec class corresponding to the given service."""
-  if UNMANAGED.value:
+  if UNMANAGED.value and TYPE.value == 'default':
     return BaseCluster
   return resource.GetResourceClass(BaseCluster, CLOUD=cloud, TYPE=TYPE.value)
 
@@ -220,6 +224,7 @@ class BaseCluster(resource.BaseResource):
       command: str,
       ignore_failure: bool = False,
       timeout: float | None = None,
+      env: str = '',
       **kwargs,
   ) -> Tuple[str, str]:
     """Runs a command on the VM.
@@ -232,6 +237,7 @@ class BaseCluster(resource.BaseResource):
       ignore_failure: Ignore any failure if set to true.
       timeout: The time to wait in seconds for the command before exiting. None
         means no timeout.
+      env: Environment variables to set before running the command.
       **kwargs: Additional command arguments.
 
     Returns:
@@ -241,7 +247,7 @@ class BaseCluster(resource.BaseResource):
       RemoteCommandError: If there was a problem issuing the command.
     """
     return self.headnode_vm.RemoteCommand(
-        f'srun -N {self.num_workers} {command}',
+        f'{env} srun -N {self.num_workers} {command}',
         ignore_failure=ignore_failure,
         timeout=timeout,
         **kwargs,
@@ -371,6 +377,40 @@ class BaseCluster(resource.BaseResource):
         f'srun -N {self.num_workers} hostname'
     ):
       raise errors.Resource.RetryableCreationError('Cluster not ready.')
+
+  def InstallSquashImage(
+      self,
+      benchmark_name,
+      image,
+      install_path,
+      dockerfile
+  ):
+    """Download squash image from preprovisoned bucket or built from scratch.
+
+    Args:
+      benchmark_name: The name of the benchmark defining the preprovisioned
+        data. The benchmark's module must define the dict BENCHMARK_DATA mapping
+        filenames to sha256sum hashes.
+      image: String. Name of image stored in preprovisioned-bucket.
+      install_path: The path to download the data file.
+      dockerfile: String. Name of Dockerfile to built from scratch.
+    """
+    headnode = self.headnode_vm
+    try:
+      headnode.InstallPreprovisionedBenchmarkData(
+          benchmark_name, [image], install_path
+      )
+    except errors.Setup.BadPreprovisionedDataError:
+      logging.warning(
+          'Cannot find preprovisioned squash image %s in preprovisioned bucket.'
+          ' Attempting to build from dockerfile.')
+      headnode.PushFile(data.ResourcePath(dockerfile), 'Dockerfile')
+      tmp_image = str(uuid.uuid4()).split('-')[0]
+      image_path = os.path.join(install_path, image)
+      headnode.RemoteCommand(
+          f'docker build --network=host -t {tmp_image} .; '
+          f'enroot import -o {image_path} dockerd://{tmp_image}; '
+          f'docker rmi {tmp_image}')
 
 
 Cluster = typing.TypeVar('Cluster', bound=BaseCluster)

@@ -45,6 +45,7 @@ Overview of benchmark:
 
 from collections.abc import Iterable
 import dataclasses
+import datetime
 import enum
 import logging
 import multiprocessing
@@ -99,7 +100,7 @@ _LOAD_INTERVAL_SEC = flags.DEFINE_integer(
 
 _QUERY_INTERVAL_SEC = flags.DEFINE_integer(
     "edw_search_ingestion_query_interval_sec",
-    29,
+    0,
     "The time in seconds to wait between search queries during live data"
     " ingestion.",
 )
@@ -112,14 +113,20 @@ _INIT_DATASET_COPIES = flags.DEFINE_integer(
     " text searches).",
     lower_bound=1,
 )
-
 _DATASET_COPIES_TO_INGEST = flags.DEFINE_integer(
     "edw_search_ingestion_dataset_copies_to_ingest",
     2,
-    "The number of copies of the to insert into the table during Main step"
-    " (where we concurrently ingest new records and perform text searches).",
+    "The number of copies of the dataset specified via"
+    " --edw_search_data_location (which shouldn't have the rare token) to"
+    " ingest during the Main step (where we concurrently ingest new records and"
+    " perform text searches).",
 )
-
+_RARE_TOKEN_DATASET_COPIES_TO_INGEST = flags.DEFINE_integer(
+    "edw_search_ingestion_rare_token_copies_to_ingest",
+    2,
+    "The number of copies of the rare token dataset to ingest into the table"
+    " during the Main step.",
+)
 _INDEX_WAIT = flags.DEFINE_boolean(
     "edw_search_ingestion_index_wait",
     True,
@@ -136,16 +143,6 @@ _SNOWFLAKE_INGESTION_WAREHOUSE = flags.DEFINE_string(
     " --snowflake_warehouse.",
 )
 
-_SEARCH_QUERIES = flags.DEFINE_list(
-    "edw_search_ingestion_queries",
-    [],
-    "Comma separated list of search queries to run. Each query passed has to be"
-    " in the format 'name:term', where name is a human-friendly name to be"
-    " added to the exported samples' metadata and term is the actual search"
-    " query that will be passed down to the corresponding EDW text search"
-    " function.",
-)
-
 _INITIAL_SEARCH_COUNT = flags.DEFINE_integer(
     "edw_search_ingestion_initial_search_count",
     5,
@@ -160,26 +157,110 @@ _FINAL_SEARCH_COUNT = flags.DEFINE_integer(
     " --edw_search_ingestion_queries at the end of the benchmark.",
 )
 
+_COMMON_TOKEN = flags.DEFINE_string(
+    "edw_search_ingestion_common_token", None, "The common token to search for."
+)
+
+_RARE_TOKEN = flags.DEFINE_string(
+    "edw_search_ingestion_rare_token",
+    None,
+    "The rare token to search for. This token will be injected into"
+    " --edw_search_ingestion_initial_data_rare_token_count rows on the initial"
+    " dataset.",
+)
+
+_INITIAL_DATA_RARE_TOKEN_COUNT = flags.DEFINE_integer(
+    "edw_search_ingestion_initial_data_rare_token_count",
+    None,
+    "The number of rows to inject the rare token into on the initial dataset.",
+)
+
+_DATA_DATE_RANGES = flags.DEFINE_list(
+    "edw_search_ingestion_data_date_range",
+    [],
+    "A list 3 of ISO-formatted dates in ISO date format (e.g. '2025-01-01'):"
+    " initial_date; the first date in table. initial_data_last_date; the last"
+    " date in initial data (inclusive). last_date; the last date after for all"
+    " the data (inclusive).",
+)
+
+_RARE_TOKEN_DATA_LOCATION = flags.DEFINE_string(
+    "edw_search_ingestion_rare_token_data_location",
+    None,
+    "Cloud directory of bucket to source ongoing load data with the rare"
+    " token for EDW search benchmarks.",
+)
+
+
 FLAGS = flags.FLAGS
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class _SearchQuery:
+  """Represents a search query to be issued.
+
+  Attributes:
+    name: The name of the query (for returned sample metadata).
+    term: The term to search for.
+    order_by: The column to order the results by.
+    limit: The maximum number of results to return.
+    date_between: A tuple of two dates to search between.
+  """
+
   name: str
   term: str
+  order_by: str | None = None
+  limit: str | None = None
+  date_between: tuple[datetime.date, datetime.date] | None = None
+
+  def ExecuteIndexSearchQuery(
+      self,
+      edw_service_instance: edw_service.EdwService,
+      table_path: str,
+      bench_meta: dict[Any, Any],
+  ) -> sample.Sample:
+    """Executes a single text search query and returns the sample.
+
+    Args:
+      edw_service_instance: The EdwService instance to use for executing
+        queries.
+      table_path: The name of the table to query.
+      bench_meta: Metadata to add to the collected sample.
+
+    Returns:
+      A sample.Sample object representing the execution time of the query.
+    """
+    execution_time, metadata = edw_service_instance.TextSearchQuery(
+        table_path,
+        self.term,
+        self.order_by,
+        self.limit,
+        self.date_between,
+    )
+    return sample.Sample(
+        "query_execution_time",
+        execution_time,
+        "seconds",
+        metadata | bench_meta | {"search_query_name": self.name},
+    )
 
 
-def _ParseSearchQueries(search_queries: list[str]) -> list[_SearchQuery]:
-  """Parses a list of search queries from the format 'name:term'."""
-  parsed_queries = []
-  for query in search_queries:
-    parts = query.split(":", 1)
-    if len(parts) != 2:
-      raise ValueError(
-          f"Invalid search query format: {query}. Expected 'name:term'."
-      )
-    parsed_queries.append(_SearchQuery(name=parts[0], term=parts[1]))
-  return parsed_queries
+_ONE_DAY = datetime.timedelta(days=1)
+
+
+def _ParseDateRanges(date_ranges: list[str]) -> list[datetime.date]:
+  """Parses a list of ISO-formatted dates.
+
+  Args:
+    date_ranges: A list of strings, expected to be in ISO date format.
+
+  Returns:
+    A list of datetime.date objects.
+
+  Raises:
+    ValueError: If any date is not in the correct format.
+  """
+  return [datetime.date.fromisoformat(date_str) for date_str in date_ranges]
 
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
@@ -210,18 +291,35 @@ def CheckPrerequisites(
         "--snowflake_ingestion_warehouse is only valid for Snowflake EDW"
         " services."
     )
-  if not _SEARCH_QUERIES.value:
-    raise errors.Config.InvalidValue(
-        "edw_index_ingestion_benchmark requires --edw_search_ingestion_queries"
-        " flag to be set."
-    )
-  try:
-    _ParseSearchQueries(_SEARCH_QUERIES.value)
-  except ValueError:
-    raise errors.Config.InvalidValue(
-        "--edw_search_ingestion_queries does not follow the required format:"
-        " 'label1:term1,...,labeln:termn'."
-    ) from None
+  required_flags = [
+      _COMMON_TOKEN,
+      _RARE_TOKEN,
+      _INITIAL_DATA_RARE_TOKEN_COUNT,
+      _RARE_TOKEN_DATA_LOCATION,
+      edw_service.EDW_SEARCH_TABLE_NAME,
+      edw_service.EDW_SEARCH_INIT_DATA_LOCATION,
+      edw_service.EDW_SEARCH_DATA_LOCATION,
+      edw_service.EDW_SEARCH_INDEX_NAME,
+  ]
+  for flag in required_flags:
+    if flag.value is None:
+      raise errors.Config.InvalidValue(
+          f"edw_index_ingestion_benchmark requires --{flag.name} flag to be"
+          " set."
+      )
+  if _DATA_DATE_RANGES.value:
+    if len(_DATA_DATE_RANGES.value) != 3:
+      raise errors.Config.InvalidValue(
+          "Expected exactly 3 dates for --edw_search_ingestion_data_date_range,"
+          f" but got {len(_DATA_DATE_RANGES.value)}."
+      )
+    try:
+      _ParseDateRanges(_DATA_DATE_RANGES.value)
+    except ValueError as e:
+      raise errors.Config.InvalidValue(
+          "Invalid date format found in --edw_search_ingestion_data_date_range."
+          " Expected ISO format (YYYY-MM-DD)."
+      ) from e
 
 
 def Prepare(spec: benchmark_spec.BenchmarkSpec):
@@ -243,7 +341,9 @@ def _ExecuteDataLoad(
     service: edw_service.EdwService,
     table_name: str,
     data_path: str,
+    rare_token_data_path: str,
     dataset_copies_to_ingest: int,
+    rare_token_dataset_copies_to_ingest: int,
     interval: float,
     ingestion_finished: threading.Event,
     ingestion_warehouse: str | None,
@@ -261,8 +361,12 @@ def _ExecuteDataLoad(
   Args:
     service: The EdwService instance to use for executing queries.
     table_name: The name of the table to insert data into.
-    data_path: The path to the data to be loaded.
-    dataset_copies_to_ingest: The number of copies of the dataset to ingest.
+    data_path: The path to the data to be loaded (without rare token).
+    rare_token_data_path: The path to the data with the rare token to be loaded.
+    dataset_copies_to_ingest: The number of copies of the dataset to ingest
+      (without rare token).
+    rare_token_dataset_copies_to_ingest: The number of copies of the rare token
+      dataset to ingest.
     interval: The time in seconds to wait between data insertion calls.
     ingestion_finished: A threading.Event-like object to signal when the loading
       process is finished.
@@ -291,9 +395,17 @@ def _ExecuteDataLoad(
     if bench_meta is None:
       bench_meta = {}
     samples = []
-    for i in range(dataset_copies_to_ingest):
+    data_path_seq = random.sample(
+        [data_path, rare_token_data_path],
+        counts=[
+            dataset_copies_to_ingest,
+            rare_token_dataset_copies_to_ingest,
+        ],
+        k=dataset_copies_to_ingest + rare_token_dataset_copies_to_ingest,
+    )
+    for i, path in enumerate(data_path_seq):
       ingestion_start_time = time.monotonic()
-      execution_time, metadata = service.InsertSearchData(table_name, data_path)
+      execution_time, metadata = service.InsertSearchData(table_name, path)
       current_rows = already_loaded_rows + (i + 1) * dataset_rows
       metadata["current_rows"] = current_rows
       metadata["load_iter"] = i
@@ -323,16 +435,35 @@ class _IndexSearchQuerySubmitter:
   Attributes:
     edw_service_instance: The EdwService instance to use for executing queries.
     table_name: The name of the table to query.
-    index_name: The name of the search index to use.
   """
 
   edw_service_instance: edw_service.EdwService
   table_name: str
-  index_name: str
+
+  def _CreateOneRandomDaySearch(
+      self, query: _SearchQuery, date_range: tuple[datetime.date, datetime.date]
+  ) -> _SearchQuery:
+    random_days_passed = random.randint(0, (date_range[1] - date_range[0]).days)
+    random_date = date_range[0] + random_days_passed * _ONE_DAY
+    return dataclasses.replace(
+        query,
+        name=f"{query.name}_1day",
+        date_between=(random_date, random_date),
+    )
+
+  def _CreateLast30DaysSearch(
+      self, query: _SearchQuery, end_date: datetime.date
+  ) -> _SearchQuery:
+    return dataclasses.replace(
+        query,
+        name=f"{query.name}_last30days",
+        date_between=(end_date - 29 * _ONE_DAY, end_date),
+    )
 
   def ExecuteSearchQueryNTimes(
       self,
       search_query: _SearchQuery,
+      date_range: tuple[datetime.date, datetime.date],
       n: int,
       cooldown_sec: float = 0,
       bench_meta: dict[str, Any] | None = None,
@@ -341,6 +472,7 @@ class _IndexSearchQuerySubmitter:
 
     Args:
       search_query: The search query to execute.
+      date_range: The date range to search within.
       n: The number of times to execute the query.
       cooldown_sec: The time in seconds to wait between queries.
       bench_meta: Metadata to add to the collected samples.
@@ -352,7 +484,10 @@ class _IndexSearchQuerySubmitter:
 
     def _Generator():
       for _ in range(n):
-        yield search_query
+        # search one random day
+        yield self._CreateOneRandomDaySearch(search_query, date_range)
+        # search last 30 days
+        yield self._CreateLast30DaysSearch(search_query, date_range[1])
         time.sleep(cooldown_sec)
 
     return self._ExecuteIndexSearchQueriesFor(_Generator(), bench_meta)
@@ -360,6 +495,7 @@ class _IndexSearchQuerySubmitter:
   def ExecuteSearchQueryUntilEvent(
       self,
       search_queries: list[_SearchQuery],
+      date_range: tuple[datetime.date, datetime.date],
       event: threading.Event,
       cooldown_sec: float,
       bench_meta: dict[str, Any] | None = None,
@@ -368,6 +504,7 @@ class _IndexSearchQuerySubmitter:
 
     Args:
       search_queries: A list of _SearchQuery objects to randomly choose from.
+      date_range: The date range to search within.
       event: A threading.Event-like object to signal when to stop executing
         queries.
       cooldown_sec: The time in seconds to wait between queries.
@@ -379,8 +516,14 @@ class _IndexSearchQuerySubmitter:
     """
 
     def _Generator():
+      search_queries_with_dates = []
+      for q in search_queries:
+        search_queries_with_dates += [
+            self._CreateOneRandomDaySearch(q, date_range),
+            self._CreateLast30DaysSearch(q, date_range[1]),
+        ]
       while not event.is_set():
-        search_query = random.choice(search_queries)
+        search_query = random.choice(search_queries_with_dates)
         yield search_query
         time.sleep(cooldown_sec)
 
@@ -405,43 +548,18 @@ class _IndexSearchQuerySubmitter:
     samples = []
     if bench_meta is None:
       bench_meta = {}
-    i = 0
-    for search_query in iterable:
+    for i, search_query in enumerate(iterable):
       query_meta = {
           "search_query_iter": i,
-          "search_query_name": search_query.name,
       }
       samples.append(
-          self._ExecuteIndexSearchQuery(
-              search_query.term, bench_meta | query_meta
+          search_query.ExecuteIndexSearchQuery(
+              self.edw_service_instance,
+              self.table_name,
+              bench_meta=bench_meta | query_meta,
           )
       )
-      i += 1
     return samples
-
-  def _ExecuteIndexSearchQuery(
-      self,
-      query_text: str,
-      bench_meta: dict[Any, Any],
-  ) -> sample.Sample:
-    """Executes a single text search query and returns the sample.
-
-    Args:
-      query_text: The text of the search query to execute.
-      bench_meta: Metadata to add to the collected sample.
-
-    Returns:
-      A sample.Sample object representing the execution time of the query.
-    """
-    execution_time, metadata = self.edw_service_instance.TextSearchQuery(
-        self.table_name, query_text, self.index_name
-    )
-    return sample.Sample(
-        "query_execution_time",
-        execution_time,
-        "seconds",
-        metadata | bench_meta,
-    )
 
 
 def _FetchQueryPercentageUntilEvent(
@@ -451,7 +569,6 @@ def _FetchQueryPercentageUntilEvent(
     ingestion_finished: threading.Event,
     bench_meta: dict[Any, Any] | None = None,
 ) -> list[sample.Sample]:
-  # TODO(odiego): Review this fn
   """Fetches index completion percentage until ingestion finishes.
 
   Polls the index status and records a sample the first time each coverage
@@ -562,11 +679,25 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   """
   edw_service_instance: edw_service.EdwService = spec.edw_service
   samples: list[sample.Sample] = []
-  search_queries = _ParseSearchQueries(_SEARCH_QUERIES.value)
+  search_queries = [
+      _SearchQuery(
+          "common",
+          _COMMON_TOKEN.value,
+          order_by="event_timestamp DESC",
+          limit=100,
+      ),
+      _SearchQuery("rare", _RARE_TOKEN.value, order_by="event_timestamp DESC"),
+  ]
+  first_date, initial_data_last_date, last_date = _ParseDateRanges(
+      _DATA_DATE_RANGES.value
+  )
 
   gen_metadata = {
       "edw_index_search_table": edw_service.EDW_SEARCH_TABLE_NAME.value,
       "edw_index_search_index": edw_service.EDW_SEARCH_INDEX_NAME.value,
+      "edw_index_init_data_location": (
+          edw_service.EDW_SEARCH_INIT_DATA_LOCATION.value
+      ),
       "edw_index_data_location": edw_service.EDW_SEARCH_DATA_LOCATION.value,
       "edw_index_dataset_copies_to_ingest": _DATASET_COPIES_TO_INGEST.value,
       "edw_index_init_dataset_copies": _INIT_DATASET_COPIES.value,
@@ -575,6 +706,15 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       "edw_index_ingestion_index_wait": _INDEX_WAIT.value,
       "edw_index_ingestion_initial_search_count": _INITIAL_SEARCH_COUNT.value,
       "edw_index_ingestion_final_search_count": _FINAL_SEARCH_COUNT.value,
+      "edw_index_ingestion_initial_data_rare_token_count": (
+          _INITIAL_DATA_RARE_TOKEN_COUNT.value
+      ),
+      "edw_index_ingestion_rare_token_data_location": (
+          _RARE_TOKEN_DATA_LOCATION.value
+      ),
+      "edw_index_ingestion_rare_token_copies_to_ingest": (
+          _RARE_TOKEN_DATASET_COPIES_TO_INGEST.value
+      ),
   }
   if isinstance(edw_service_instance, bigquery.Bigquery):
     gen_metadata["edw_index_table_partitioned"] = (
@@ -588,15 +728,22 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   )
   edw_service_instance.InitializeSearchStarterTable(
       edw_service.EDW_SEARCH_TABLE_NAME.value,
-      edw_service.EDW_SEARCH_DATA_LOCATION.value,
+      edw_service.EDW_SEARCH_INIT_DATA_LOCATION.value,
   )
   logging.info("Inserting initial search data")
   for _ in range(_INIT_DATASET_COPIES.value):
     edw_service_instance.InsertSearchData(
         edw_service.EDW_SEARCH_TABLE_NAME.value,
-        edw_service.EDW_SEARCH_DATA_LOCATION.value,
+        edw_service.EDW_SEARCH_INIT_DATA_LOCATION.value,
     )
   logging.info("Initial search data load complete")
+
+  logging.info("Inserting rare token rows.")
+  edw_service_instance.InjectTokenIntoTable(
+      edw_service.EDW_SEARCH_TABLE_NAME.value,
+      _RARE_TOKEN.value,
+      _INITIAL_DATA_RARE_TOKEN_COUNT.value,
+  )
 
   indexing_start_time = time.time()
   logging.info("Creating index")
@@ -627,7 +774,6 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   query_submitter = _IndexSearchQuerySubmitter(
       edw_service_instance,
       edw_service.EDW_SEARCH_TABLE_NAME.value,
-      edw_service.EDW_SEARCH_INDEX_NAME.value,
   )
 
   if _INITIAL_SEARCH_COUNT.value > 0:
@@ -636,6 +782,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
     for search_query in search_queries:
       samples += query_submitter.ExecuteSearchQueryNTimes(
           search_query,
+          (first_date, initial_data_last_date),
           _INITIAL_SEARCH_COUNT.value,
           bench_meta=gen_metadata | current_step_meta,
       )
@@ -651,7 +798,9 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
                 edw_service_instance,
                 edw_service.EDW_SEARCH_TABLE_NAME.value,
                 edw_service.EDW_SEARCH_DATA_LOCATION.value,
+                _RARE_TOKEN_DATA_LOCATION.value,
                 _DATASET_COPIES_TO_INGEST.value,
+                _RARE_TOKEN_DATASET_COPIES_TO_INGEST.value,
                 _LOAD_INTERVAL_SEC.value,
                 ingestion_finished,
                 _SNOWFLAKE_INGESTION_WAREHOUSE.value,
@@ -662,7 +811,12 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
         ),
         (
             query_submitter.ExecuteSearchQueryUntilEvent,
-            (search_queries, ingestion_finished, _QUERY_INTERVAL_SEC.value),
+            (
+                search_queries,
+                (first_date, last_date),
+                ingestion_finished,
+                _QUERY_INTERVAL_SEC.value,
+            ),
             {"bench_meta": gen_metadata | current_step_meta},
         ),
         (
@@ -708,6 +862,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
     for search_query in search_queries:
       samples += query_submitter.ExecuteSearchQueryNTimes(
           search_query,
+          (first_date, last_date),
           _FINAL_SEARCH_COUNT.value,
           bench_meta=gen_metadata | current_step_meta,
       )

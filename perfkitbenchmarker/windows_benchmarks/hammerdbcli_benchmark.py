@@ -17,11 +17,13 @@
 This benchmark uses Windows as the OS for both the database server and the
 HammerDB client(s).
 """
+import datetime
 import logging
 import time
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.linux_packages import hammerdb as linux_hammerdb
 from perfkitbenchmarker.windows_packages import hammerdb
@@ -222,11 +224,11 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  relational_db = benchmark_spec.relational_db
-  vm = relational_db.client_vm
+  db = benchmark_spec.relational_db
+  vm = db.client_vm
   num_cpus = None
-  if hasattr(relational_db, 'server_vm'):
-    server_vm = relational_db.server_vm
+  if hasattr(db, 'server_vm'):
+    server_vm = db.server_vm
     num_cpus = server_vm.NumCpusForBenchmark()
   hammerdb.SetDefaultConfig(num_cpus)
   vm.Install('hammerdb')
@@ -242,7 +244,7 @@ def Prepare(benchmark_spec):
               ALTER DATABASE tpcc SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
               DROP DATABASE tpcc;
           END;"""
-      relational_db.client_vm_query_tools.IssueSqlCommand(
+      db.client_vm_query_tools.IssueSqlCommand(
           drop_sql, timeout=60 * 20
       )
 
@@ -254,7 +256,7 @@ def Prepare(benchmark_spec):
         db_name = linux_hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[
             linux_hammerdb.HAMMERDB_SCRIPT.value
         ]
-        relational_db.client_vm_query_tools.IssueSqlCommand(
+        db.client_vm_query_tools.IssueSqlCommand(
             """CREATE DATABASE [{0}];
             BACKUP DATABASE [{0}] TO DISK = 'F:\\Backup\\{0}.bak';
             ALTER AVAILABILITY GROUP [{1}] ADD DATABASE [{0}];
@@ -262,7 +264,7 @@ def Prepare(benchmark_spec):
         )
       elif is_azure and hammerdb.HAMMERDB_SCRIPT.value == 'tpc_c':
         # Create the database first only Azure requires creating the database.
-        relational_db.client_vm_query_tools.IssueSqlCommand(
+        db.client_vm_query_tools.IssueSqlCommand(
             'CREATE DATABASE tpcc;'
         )
 
@@ -270,16 +272,16 @@ def Prepare(benchmark_spec):
           vm,
           sql_engine_utils.SQLSERVER,
           hammerdb.HAMMERDB_SCRIPT.value,
-          relational_db.endpoint,
-          relational_db.port,
-          relational_db.spec.database_password,
-          relational_db.spec.database_username,
+          db.endpoint,
+          db.port,
+          db.spec.database_password,
+          db.spec.database_username,
           is_azure,
       )
 
       # SQL Server exhibits better performance when restarted after prepare step
       if FLAGS.hammerdbcli_restart_before_run:
-        relational_db.RestartDatabase()
+        db.RestartDatabase()
       return
     except retryable_exceptions as e:
       if tries >= max_retries - 1:
@@ -289,42 +291,54 @@ def Prepare(benchmark_spec):
         time.sleep(60)
 
 
-def SetMinimumRecover(relational_db):
+def SetMinimumRecover(db):
   """Change sql server settings to make TPM nubmers stable."""
   # https://www.mssqltips.com/sqlservertip/4541/adjust-targetrecoverytime-to-reduce-sql-server-io-spikes/
-  relational_db.client_vm_query_tools.IssueSqlCommand(
+  db.client_vm_query_tools.IssueSqlCommand(
       'ALTER DATABASE tpcc SET TARGET_RECOVERY_TIME = 12000 SECONDS;'
   )
-  relational_db.client_vm_query_tools.IssueSqlCommand(
+  db.client_vm_query_tools.IssueSqlCommand(
       'ALTER DATABASE tpcc SET AUTO_UPDATE_STATISTICS OFF;'
   )
 
-  relational_db.client_vm_query_tools.IssueSqlCommand(
+  db.client_vm_query_tools.IssueSqlCommand(
       'ALTER DATABASE SCOPED CONFIGURATION SET MAXDOP = 1;'
   )
 
-  relational_db.client_vm_query_tools.IssueSqlCommand(
+  db.client_vm_query_tools.IssueSqlCommand(
       'ALTER DATABASE [tpcc] SET DELAYED_DURABILITY = DISABLED WITH NO_WAIT;'
   )
 
-  relational_db.client_vm_query_tools.IssueSqlCommand(
+  db.client_vm_query_tools.IssueSqlCommand(
       "ALTER DATABASE [tpcc] MODIFY FILE ( NAME = N'tpcc', SIZE = 500 GB,"
       ' FILEGROWTH = 10%);'
   )
 
-  relational_db.client_vm_query_tools.IssueSqlCommand(
+  db.client_vm_query_tools.IssueSqlCommand(
       "dbcc shrinkfile('tpcc_log',truncateonly)"
   )
 
-  relational_db.client_vm_query_tools.IssueSqlCommand(
+  db.client_vm_query_tools.IssueSqlCommand(
       "alter database tpcc modify file (name='tpcc_log', size=64000)"
   )
 
   # Verify the setting changed
-  relational_db.client_vm_query_tools.IssueSqlCommand("dbcc loginfo('tpcc')")
-  relational_db.client_vm_query_tools.IssueSqlCommand(
+  db.client_vm_query_tools.IssueSqlCommand("dbcc loginfo('tpcc')")
+  db.client_vm_query_tools.IssueSqlCommand(
       'SELECT name,target_recovery_time_in_seconds FROM sys.databases;'
   )
+
+
+def _PreRun(db: relational_db.BaseRelationalDb):
+  """Prepares the database for the benchmark run."""
+  db.ClearWaitStats()
+  db.QueryIOStats()
+
+
+def _PostRun(db: relational_db.BaseRelationalDb):
+  """Records the database metrics after the benchmark run."""
+  db.QueryWaitStats()
+  db.QueryIOStats()
 
 
 def Run(benchmark_spec):
@@ -338,20 +352,25 @@ def Run(benchmark_spec):
     A list of sample.Sample instances.
   """
   client_vms = benchmark_spec.vm_groups['clients']
-  relational_db = benchmark_spec.relational_db
+  db = benchmark_spec.relational_db
 
   if (
       hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value
       == hammerdb.MINIMUM_RECOVERY
   ):
-    SetMinimumRecover(relational_db)
+    SetMinimumRecover(db)
 
+  _PreRun(db)
+  start_time = datetime.datetime.now()
   samples = hammerdb.Run(
       client_vms[0],
       sql_engine_utils.SQLSERVER,
       hammerdb.HAMMERDB_SCRIPT.value,
       timeout=linux_hammerdb.HAMMERDB_RUN_TIMEOUT.value,
   )
+  end_time = datetime.datetime.now()
+  _PostRun(db)
+  samples.extend(db.CollectMetrics(start_time, end_time))
 
   metadata = GetMetadata()
   for sample in samples:

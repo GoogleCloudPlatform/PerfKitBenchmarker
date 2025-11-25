@@ -19,6 +19,7 @@ benchmarks.
 """
 
 import copy
+import datetime
 import json
 import logging
 import os
@@ -351,6 +352,9 @@ class Snowflake(edw_service.EdwService):
   INDIVIDUAL_QUERY_STATS_TEMPLATE = (
       'edw/snowflake_aws/metadata/individual_query_stats.sql.j2'
   )
+  INJECT_TOKEN_INTO_TABLE = (
+      f'{SEARCH_QUERY_TEMPLATE_LOCATION}/inject_token_into_table.sql.j2'
+  )
 
   CLOUD: str = None
   SERVICE_TYPE = None
@@ -647,13 +651,20 @@ class Snowflake(edw_service.EdwService):
     return qres, meta
 
   def TextSearchQuery(
-      self, table_path: str, search_keyword: str, index_name: str
+      self,
+      table_path: str,
+      search_keyword: str,
+      order_by: str | None = None,
+      limit: int | None = None,
+      date_between: tuple[datetime.date, datetime.date] | None = None,
   ) -> tuple[float, dict[str, Any]]:
     query_name = 'text_search_query'
     context = {
         'table_name': table_path,
         'search_text': search_keyword,
-        'index_name': index_name,
+        'order_by': order_by,
+        'limit': limit,
+        'date_between': date_between,
     }
     self.client_interface.client_vm.RenderTemplate(
         data.ResourcePath(self.INDEX_SEARCH_QUERY_TEMPLATE),
@@ -664,10 +675,27 @@ class Snowflake(edw_service.EdwService):
     res, meta = self.client_interface.ExecuteQuery(
         query_name, print_results=True
     )
-    meta['edw_search_result_rows'] = int(
-        meta['query_results']['RESULT_ROWS'][0]
+    meta['edw_search_result_rows'] = len(
+        meta['query_results'].get('EVENT_TIMESTAMP', [])
     )
     return res, meta
+
+  def InjectTokenIntoTable(
+      self, table_path: str, token: str, token_count: int
+  ) -> tuple[float, dict[str, Any]]:
+    query_name = 'inject_token_into_table'
+    context = {
+        'table_name': table_path,
+        'token': token,
+        'token_count': token_count,
+    }
+    self.client_interface.client_vm.RenderTemplate(
+        data.ResourcePath(self.INJECT_TOKEN_INTO_TABLE),
+        query_name,
+        context,
+        should_log_file=True,
+    )
+    return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
   def SetWarehouse(self, warehouse: str):
     """Switches Snowflake Warehouse."""

@@ -38,12 +38,22 @@ FLAGS = flags.FLAGS
 LATENCY_PERCENTILES = [50, 90, 95, 99, 99.9, 99.99, 99.999, 99.9999, 99.99999]
 SampleData = collections.namedtuple('SampleData', ['metric', 'value', 'unit'])
 
-flags.DEFINE_integer(
+DISKSPD_PREFILL_DURATION = flags.DEFINE_integer(
     'diskspd_prefill_duration',
     None,
     'In seconds. Diskspd needs a duration to run. For prefilling, use a'
     ' duration that is large enough to allow diskspd to write the file to the'
     ' required size.',
+)
+
+DISKSPD_FILL_MODE = flags.DEFINE_enum(
+    'diskspd_fill_mode',
+    'without_fill',
+    [
+        'without_fill',
+        'with_fill',
+    ],
+    'The target mode of the diskspd test. Defaults to bandwidth.',
 )
 
 flags.DEFINE_integer(
@@ -190,6 +200,13 @@ DISKSPD_FILE_SIZE = flags.DEFINE_string(
     ' K|M|G to specify unit.',
 )
 
+DISKSPD_PREFILL_BLOCK_SIZE = flags.DEFINE_string(
+    'diskspd_prefill_block_size',
+    '64K',
+    'The block size used when prefill the file. Defaults: 4K. Please use'
+    ' K|M|G to specify unit.',
+)
+
 flags.register_validator(
     DISKSPD_FILE_SIZE.name,
     lambda x: x[-1] in ['K', 'M', 'G'],
@@ -248,8 +265,7 @@ def _RemoveTempFile(vm):
 
 def EnablePrefill():
   return (
-      FLAGS.diskspd_prefill_duration is not None
-      and FLAGS.diskspd_prefill_duration != 0
+      DISKSPD_FILL_MODE.value == 'with_fill'
   )
 
 
@@ -283,32 +299,39 @@ def _GenerateDiskspdConfig(outstanding_io, threads):
   large_page_string = '-l' if FLAGS.diskspd_large_page else ''
   latency_stats_string = '-L' if FLAGS.diskspd_latency_stats else ''
   disable_affinity_string = '-n' if FLAGS.diskspd_disable_affinity else ''
-  software_cache_string = '-Su' if FLAGS.diskspd_software_cache else ''
-  write_through_string = '-Sw' if FLAGS.diskspd_write_through else ''
   access_pattern = FLAGS.diskspd_access_pattern
   diskspd_write_read_ratio = FLAGS.diskspd_write_read_ratio
   diskspd_block_size = FLAGS.diskspd_block_size
-  os_hint = access_pattern
-  if os_hint == 'si':
-    os_hint = 's'
   if DISKSPD_STRIDE.value:
     access_pattern = (
         str(access_pattern)
         + DISKSPD_STRIDE.value
     )
-
+  cache_string = ''
+  if FLAGS.diskspd_software_cache and FLAGS.diskspd_write_through:
+    cache_string = '-Sh'
+  elif FLAGS.diskspd_write_through:
+    cache_string = '-Sw'
+  elif FLAGS.diskspd_software_cache:
+    cache_string = '-Su'
   throughput_per_ms_string = ''
   if FLAGS.diskspd_throughput_per_ms:
     throughput_per_ms_string = '-g' + str(FLAGS.diskspd_throughput_per_ms)
 
+  diskspd_file_size = ''
+  if DISKSPD_PREFILL_DURATION.value is None:
+    # -c in diskspd creates file. If prefill duration is set, we need to use the
+    # already created file from the prefill stage.
+    diskspd_file_size = f'-c{FLAGS.diskspd_file_size}'
+
   return (
-      f'-c{FLAGS.diskspd_file_size} -d{FLAGS.diskspd_duration}'
+      f'{diskspd_file_size} -d{FLAGS.diskspd_duration}'
       f' -t{threads} -o{outstanding_io} {latency_stats_string} -W{FLAGS.diskspd_warmup}'
       f' -C{FLAGS.diskspd_cooldown} -Rxml -w{diskspd_write_read_ratio}'
       f' {large_page_string} {disable_affinity_string}'
-      f' {software_cache_string} {write_through_string}'
+      f' {cache_string}'
       f' {throughput_per_ms_string} -b{diskspd_block_size}'
-      f' -{access_pattern} -f{os_hint}'
+      f' -{access_pattern} '
       f' F:\\{DISKSPD_TMPFILE} > {DISKSPD_XMLFILE}'
   )
 
@@ -333,6 +356,8 @@ def RunDiskSpd(running_vm):
   metadata['diskspd_write_read_ratio'] = FLAGS.diskspd_write_read_ratio
   metadata['diskspd_access_pattern'] = FLAGS.diskspd_access_pattern
   metadata['diskspd_block_size'] = FLAGS.diskspd_block_size
+  metadata['diskspd_prefill_duration'] = DISKSPD_PREFILL_DURATION.value
+  metadata['diskspd_prefill_block_size'] = DISKSPD_PREFILL_BLOCK_SIZE.value
 
   sample_list = []
   # We can use io array or thread array for calculate max IOPs
@@ -424,24 +449,27 @@ def Prefill(running_vm):
     running_vm: The VM to prefill the file on.
   """
   if not EnablePrefill():
-    logging.info('Prefill duration is not set, skipping prefill.')
+    logging.info(
+        '--diskspd_fill_mode is %s, skipping prefill.', DISKSPD_FILL_MODE.value
+    )
     return
   logging.info('Prefilling file with random data')
-  prefill_duration = FLAGS.diskspd_prefill_duration
   diskspd_exe_dir = ntpath.join(running_vm.temp_dir, 'x86')
-  diskspd_options = (
-      f'-c{FLAGS.diskspd_file_size} -t16 -w100 -b4k -d{prefill_duration} -Rxml'
-      f' -Sw -Su -o16 -r C:\\scratch\\{DISKSPD_TMPFILE} >'
-      f' {DISKSPD_XMLFILE}'
+  # Run for 10s initially to get the approximate throughput. We will use this
+  # to calculate the duration for prefilling the entire file. prefill duration =
+  # file_size/throughput.
+  prefill_duration = DISKSPD_PREFILL_DURATION.value or CalculatePrefillDuration(
+      running_vm, diskspd_exe_dir
   )
-  command = f'cd {diskspd_exe_dir}; .\\diskspd.exe {diskspd_options}'
-  running_vm.RobustRemoteCommand(command)
-  result_xml = _CatXml(running_vm)
-  _RemoveXml(running_vm)
+  # Add 30 seconds to the prefill duration to ensure that the file is fully
+  # written.
+  prefill_result_xml = RunDiskspdPrefillCommandForDuration(
+      running_vm, diskspd_exe_dir, prefill_duration+30
+  )
 
-  prefill_samples = ParseDiskSpdResults(result_xml, {})
+  prefill_samples = ParseDiskSpdResults(prefill_result_xml, {})
   for prefill_sample in prefill_samples:
-    if prefill_sample.metric != 'write_throughput':
+    if prefill_sample.metric != 'write_bandwidth':
       continue
     write_throughput = prefill_sample.value
     total_seconds = float(prefill_sample.metadata['TestTimeSeconds'])
@@ -450,10 +478,57 @@ def Prefill(running_vm):
     )
     logging.info('Prefill Data written: %s %s', total_data_written, unit)
     if total_data_written < float(DISKSPD_FILE_SIZE.value[0:-1]):
-      logging.error(
+      raise errors.Benchmarks.RunError(
           'Prefill data written is less than the file size, please check the'
           ' prefill duration.'
       )
+
+
+def RunDiskspdPrefillCommandForDuration(vm, diskspd_exe_dir, prefill_duration):
+  diskspd_options = (
+      f'-c{FLAGS.diskspd_file_size} -t16 -w100'
+      f' -b{DISKSPD_PREFILL_BLOCK_SIZE.value} -d{prefill_duration} -Rxml -Sh'
+      f' -o16 -Zr C:\\scratch\\{DISKSPD_TMPFILE} > {DISKSPD_XMLFILE}'
+  )
+  command = f'cd {diskspd_exe_dir}; .\\diskspd.exe {diskspd_options}'
+  vm.RobustRemoteCommand(command)
+  result_xml = _CatXml(vm)
+  _RemoveXml(vm)
+  return result_xml
+
+
+def CalculatePrefillDuration(vm, diskspd_exe_dir):
+  """Calculates the prefill duration for the test file."""
+  # Run for 10s initially to get the approximate throughput. We will use this
+  # to calculate the duration for prefilling the entire file. prefill duration =
+  # file_size/throughput.
+  througput_check_result = RunDiskspdPrefillCommandForDuration(
+      vm, diskspd_exe_dir, 10
+  )
+  prefill_samples = ParseDiskSpdResults(througput_check_result, {})
+  for prefill_sample in prefill_samples:
+    if prefill_sample.metric != 'write_bandwidth':
+      continue
+    write_throughput = prefill_sample.value
+    prefill_duration = int(GetDiskspdFileSizeInMB() / write_throughput)
+    logging.info('Prefill duration calculated: %s', prefill_duration)
+    return prefill_duration
+
+
+def GetDiskspdFileSizeInMB() -> float:
+  """Returns the diskspd file size in MB."""
+  unit = DISKSPD_FILE_SIZE.value[-1]
+  size = float(DISKSPD_FILE_SIZE.value[0:-1])
+  if unit == 'G':
+    return size * 1024
+  elif unit == 'M':
+    return size
+  elif unit == 'K':
+    return size * 1024 * 1024
+  else:
+    raise errors.Benchmarks.RunError(
+        f'Unsupported file size unit: {unit}. Only G, M, and K are supported.'
+    )
 
 
 def GetDiskspdFileSizeInPrefillSizeUnit(

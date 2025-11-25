@@ -29,7 +29,7 @@ for you.
 import abc
 import collections
 import copy
-import json
+import io
 import logging
 import os
 import posixpath
@@ -41,11 +41,12 @@ from typing import Any, Dict, Set, Tuple, Union
 import uuid
 
 from absl import flags
-from packaging import version as packaging_version
+import pandas as pd
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_mixin
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import regex_util
@@ -282,6 +283,14 @@ _ENABLE_NVME_INTERRUPT_COALEASING = flags.DEFINE_bool(
     'Currently only implemented for local disks. '
     'Depending on the Guest, this command may or may not actually '
     'modify the interrupt coaleasing behavior.',
+)
+
+_ENABLE_RT_KERNEL = flags.DEFINE_bool(
+    'enable_rt_kernel',
+    False,
+    'Attempt to install and enable the real time kernel on '
+    'the VM.'
+    'Currently only implemented for RockyLinux.',
 )
 
 
@@ -750,6 +759,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       self.SetupPackageManager()
     self.SetFiles()
     self.DoSysctls()
+    if _ENABLE_RT_KERNEL.value:
+      self._EnableRealTimeKernel()
     self._DoAppendKernelCommandLine()
     self.ModifyKernelModules()
     self.DoConfigureNetworkForBBR()
@@ -776,6 +787,12 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     """Stops the VM."""
     raise NotImplementedError()
 
+  def _EnableRealTimeKernel(self):
+    """Enables real-time kernel features on the VM."""
+    raise NotImplementedError(
+        f'Real-time kernel not supported for {self.OS_TYPE}'
+    )
+
   def SetFiles(self):
     """Apply --set_files to the VM."""
 
@@ -797,10 +814,9 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
 
     if self.num_disable_cpus <= 0 or self.num_disable_cpus >= self.num_cpus:
       raise ValueError(
-          'num_disable_cpus must be between 1 and '
-          '(num_cpus - 1) inclusive.  '
-          'num_disable_cpus: %i, num_cpus: %i'
-          % (self.num_disable_cpus, self.num_cpus)
+          'num_disable_cpus must be between 1 and (num_cpus - 1) inclusive.  '
+          f'num_disable_cpus: {self.num_disable_cpus}, '
+          f'num_cpus: {self.num_cpus}'
       )
 
     # We can't disable cpu 0, starting from the last cpu in /proc/cpuinfo.
@@ -1413,14 +1429,18 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       simplified_cmd.extend([remote_location, file_path])
       scp_cmd.extend([remote_location, file_path])
 
-    logging.info(
+    log_util.LogToShortLogAndRoot(
         'Copying file with simplified command: %s', ' '.join(simplified_cmd)
     )
 
     stdout, stderr, retcode = '', '', 1  # placate uninitialized variable checks
     for _ in range(FLAGS.ssh_retries):
       stdout, stderr, retcode = vm_util.IssueCommand(
-          scp_cmd, timeout=None, should_pre_log=False, raise_on_failure=False
+          scp_cmd,
+          timeout=None,
+          should_pre_log=False,
+          raise_on_failure=False,
+          log_to_short_log=False,
       )
 
       # Retry on 255 because this indicates an SSH failure
@@ -1604,12 +1624,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       ]
 
     if should_pre_log:
-      logger.info(
-          'Running on %s via ssh: %s',
-          self.name,
-          command,
-          stacklevel=stack_level,
-      )
+      log_message = f'Running on {self.name} via ssh: {command}'
+      log_util.LogToShortLogAndRoot(log_message, stacklevel=stack_level)
     stdout, stderr, retcode = '', '', 1  # placate uninitialized variable checks
     try:
       if login_shell:
@@ -1627,6 +1643,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
             raise_on_failure=False,
             suppress_logging=suppress_logging,
             stack_level=stack_level,
+            log_to_short_log=False,
         )
         # Retry on 255 because this indicates an SSH failure
         if retcode != RETRYABLE_SSH_RETCODE:
@@ -1688,6 +1705,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     self._kernel_release = None
     self._kernel_command_line = None
     self._lscpu_cache = None
+    # recalculated in RecordAdditionalMetadata
+    self.num_cpus = None
     self.RecordAdditionalMetadata()
     if self.install_packages:
       self._CreateInstallDir()
@@ -2218,41 +2237,27 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     """Get the NVME disk device info, by querying the VM."""
     self.InstallPackages('nvme-cli')
     version_str, _ = self.RemoteCommand('sudo nvme --version')
-    version_num = version_str.split()[2]
-    # TODO(arushigaur): Version check can be removed and we can just parse
-    # the raw output.
-    if packaging_version.parse(version_num) >= packaging_version.parse(
-        '1.5'
-    ) and packaging_version.parse(version_num) < packaging_version.parse(
-        '2.11'
-    ):
-      stdout, _ = self.RemoteCommand('sudo nvme list --output-format json')
-      if not stdout:
-        return []
-      response = json.loads(stdout)
-      return response.get('Devices', [])
-    else:
-      # custom parsing for older OSes that do not ship nvme-cli ver 1.5+.
-      response = []
-      stdout, _ = self.RemoteCommand('sudo nvme list')
-      if 'No NVMe devices detected' in stdout:
-        return []
-      rows = stdout.splitlines()
-      delimiter_row = rows[1]  # row 0 is the column headers
-      delimiter_index = [0] + [
-          i for i in range(len(delimiter_row)) if delimiter_row[i] == ' '
-      ]
-      for row in rows[2:]:
-        device = {}
-        device_info = [
-            row[i:j]
-            for i, j in zip(delimiter_index, delimiter_index[1:] + [None])
-        ]
-        device['DevicePath'] = device_info[0].strip()
-        device['SerialNumber'] = device_info[1].strip()
-        device['ModelNumber'] = device_info[2].strip()
-        response.append(device)
-      return response
+    logging.info('nvme-cli version: %s', version_str.split()[2])
+    response = []
+    stdout, _ = self.RemoteCommand('sudo nvme list')
+    if 'No NVMe devices detected' in stdout:
+      return []
+    rows = stdout.splitlines()
+    header_row = rows[0]
+    delimiter_row = rows[1]
+    col_spans = [
+        (m.start(), m.end()) for m in re.finditer(r'-+', delimiter_row)
+    ]
+    data = '\n'.join([header_row] + rows[2:])
+    df_colspecs = pd.read_fwf(io.StringIO(data), colspecs=col_spans)
+    df_rows = df_colspecs.to_dict(orient='records')
+    for row in df_rows:
+      response.append({
+          'DevicePath': row.get('Node'),
+          'SerialNumber': row.get('SN'),
+          'ModelNumber': row.get('Model'),
+      })
+    return response
 
   def GenerateAndCaptureLogs(self) -> list[str]:
     """Generates and/or captures logs for this VM and returns the paths.
@@ -2636,8 +2641,8 @@ class BaseContainerLinuxMixin(BaseLinuxMixin):
     pass
 
 
-class BaseRhelMixin(BaseLinuxMixin):
-  """Class holding RHEL/CentOS specific VM methods and attributes."""
+class BaseRedHatMixin(BaseLinuxMixin):
+  """Class representing OSes derived from Red Hat Linux that use yum or dnf."""
 
   # In all RHEL 8+ based distros yum is an alias to dnf.
   # dnf is backwards compatible with yum, but has some additional capabilities
@@ -2646,8 +2651,7 @@ class BaseRhelMixin(BaseLinuxMixin):
   # This can be removed when Amazon Linux 2 is no longer supported by PKB.
   PACKAGE_MANAGER = DNF
 
-  # OS_TYPE = os_types.RHEL
-  BASE_OS_TYPE = os_types.RHEL
+  BASE_OS_TYPE = os_types.RED_HAT
 
   # RHEL's command to create a initramfs image.
   INIT_RAM_FS_CMD = 'sudo dracut --regenerate-all -f'
@@ -2787,13 +2791,19 @@ class BaseRhelMixin(BaseLinuxMixin):
         r'echo GRUB_CMDLINE_LINUX_DEFAULT=\"\${GRUB_CMDLINE_LINUX_DEFAULT} %s\"'
         ' | sudo tee -a /etc/default/grub' % command_line
     )
-    self.RemoteCommand('sudo grub2-mkconfig -o /boot/grub2/grub.cfg')
-    self.RemoteCommand('sudo grub2-mkconfig -o /etc/grub2.cfg')
+    # RHEL 9.3+ requires a flag to update the kernel command line.
+    # It does not exist in older versions.
+    # https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/9.3_release_notes/new-features#new-features-boot-loader
+    update_grub = 'sudo grub2-mkconfig'
+    if self.TryRemoteCommand(f'{update_grub} --update-bls-cmdline'):
+      update_grub += ' --update-bls-cmdline'
+    self.RemoteCommand(f'{update_grub} -o /boot/grub2/grub.cfg')
+    self.RemoteCommand(f'{update_grub} -o /etc/grub2.cfg')
     if reboot:
       self.Reboot()
 
 
-class AmazonLinux2Mixin(BaseRhelMixin):
+class AmazonLinux2Mixin(BaseRedHatMixin):
   """Class holding Amazon Linux 2 VM methods and attributes."""
 
   OS_TYPE = os_types.AMAZONLINUX2
@@ -2811,7 +2821,7 @@ class AmazonNeuronMixin(AmazonLinux2Mixin):
   OS_TYPE = os_types.AMAZON_NEURON
 
 
-class AmazonLinux2023Mixin(BaseRhelMixin):
+class AmazonLinux2023Mixin(BaseRedHatMixin):
   """Class holding Amazon Linux 2023 VM methods and attributes."""
 
   OS_TYPE = os_types.AMAZONLINUX2023
@@ -2819,7 +2829,7 @@ class AmazonLinux2023Mixin(BaseRhelMixin):
   # https://docs.aws.amazon.com/linux/al2023/ug/compare-with-al2.html#epel
 
 
-class Rhel8Mixin(BaseRhelMixin):
+class Rhel8Mixin(BaseRedHatMixin):
   """Class holding RHEL 8 specific VM methods and attributes."""
 
   OS_TYPE = os_types.RHEL8
@@ -2830,7 +2840,7 @@ class Rhel8Mixin(BaseRhelMixin):
     self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(8)}')
 
 
-class Rhel9Mixin(BaseRhelMixin):
+class Rhel9Mixin(BaseRedHatMixin):
   """Class holding RHEL 9 specific VM methods and attributes."""
 
   OS_TYPE = os_types.RHEL9
@@ -2841,7 +2851,7 @@ class Rhel9Mixin(BaseRhelMixin):
     self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(9)}')
 
 
-class Rhel10Mixin(BaseRhelMixin):
+class Rhel10Mixin(BaseRedHatMixin):
   """Class holding RHEL 10 specific VM methods and attributes."""
 
   OS_TYPE = os_types.RHEL10
@@ -2852,7 +2862,7 @@ class Rhel10Mixin(BaseRhelMixin):
     self.RemoteCommand(f'sudo dnf install -y {_EPEL_URL.format(10)}')
 
 
-class Ol8Mixin(BaseRhelMixin):
+class Ol8Mixin(BaseRedHatMixin):
   """Class holding Oracle Linux 8 specific VM methods and attributes."""
 
   OS_TYPE = os_types.OL8
@@ -2861,7 +2871,7 @@ class Ol8Mixin(BaseRhelMixin):
     """Oracle Linux images come with EPEL pre-installed."""
 
 
-class Ol9Mixin(BaseRhelMixin):
+class Ol9Mixin(BaseRedHatMixin):
   """Class holding Oracle Linux 9 specific VM methods and attributes."""
 
   OS_TYPE = os_types.OL9
@@ -2870,7 +2880,7 @@ class Ol9Mixin(BaseRhelMixin):
     """Oracle Linux images come with EPEL pre-installed."""
 
 
-class Fedora36Mixin(BaseRhelMixin):
+class Fedora36Mixin(BaseRedHatMixin):
   """Class holding Fedora36 specific methods and attributes."""
 
   OS_TYPE = os_types.FEDORA36
@@ -2879,7 +2889,7 @@ class Fedora36Mixin(BaseRhelMixin):
     """Fedora does not need epel."""
 
 
-class Fedora37Mixin(BaseRhelMixin):
+class Fedora37Mixin(BaseRedHatMixin):
   """Class holding Fedora37 specific methods and attributes."""
 
   OS_TYPE = os_types.FEDORA37
@@ -2888,7 +2898,7 @@ class Fedora37Mixin(BaseRhelMixin):
     """Fedora does not need epel."""
 
 
-class CentOsStream9Mixin(BaseRhelMixin):
+class CentOsStream9Mixin(BaseRedHatMixin):
   """Class holding CentOS Stream 9 specific VM methods and attributes."""
 
   OS_TYPE = os_types.CENTOS_STREAM9
@@ -2902,46 +2912,50 @@ class CentOsStream9Mixin(BaseRhelMixin):
     )
 
 
-class RockyLinux8Mixin(BaseRhelMixin):
+class BaseRockyLinuxMixin(BaseRedHatMixin):
+  """Class holding Rocky Linux specific VM methods and attributes."""
+
+  def _EnableRealTimeKernel(self):
+    self.RemoteCommand(
+        'sudo dnf config-manager --set-enabled rt && '
+        'sudo dnf install -y kernel-rt && '
+        'sudo grubby --set-default /boot/vmlinuz*+rt'
+    )
+    self._needs_reboot = True
+
+  def SetupPackageManager(self):
+    """Install EPEL."""
+    # https://docs.fedoraproject.org/en-US/epel/getting-started/
+    self.RemoteCommand(
+        'sudo dnf config-manager --set-enabled crb &&'
+        'sudo dnf install -y epel-release'
+    )
+
+
+class RockyLinux8Mixin(BaseRockyLinuxMixin):
   """Class holding Rocky Linux 8 specific VM methods and attributes."""
 
   OS_TYPE = os_types.ROCKY_LINUX8
 
   def SetupPackageManager(self):
     """Install EPEL."""
-    # https://docs.fedoraproject.org/en-US/epel/#_almalinux_8_rocky_linux_8
+    # https://docs.fedoraproject.org/en-US/epel/getting-started/
     self.RemoteCommand(
         'sudo dnf config-manager --set-enabled powertools && '
         'sudo dnf install -y epel-release'
     )
 
 
-class RockyLinux9Mixin(BaseRhelMixin):
+class RockyLinux9Mixin(BaseRockyLinuxMixin):
   """Class holding Rocky Linux 8 specific VM methods and attributes."""
 
   OS_TYPE = os_types.ROCKY_LINUX9
 
-  def SetupPackageManager(self):
-    """Install EPEL."""
-    # https://docs.fedoraproject.org/en-US/epel/#_almalinux_9_rocky_linux_98
-    self.RemoteCommand(
-        'sudo dnf config-manager --set-enabled crb &&'
-        'sudo dnf install -y epel-release'
-    )
 
-
-class RockyLinux10Mixin(BaseRhelMixin):
+class RockyLinux10Mixin(BaseRockyLinuxMixin):
   """Class holding Rocky Linux 10 specific VM methods and attributes."""
 
   OS_TYPE = os_types.ROCKY_LINUX10
-
-  def SetupPackageManager(self):
-    """Install EPEL."""
-    # https://docs.fedoraproject.org/en-US/epel/#_rocky_linux_10
-    self.RemoteCommand(
-        'sudo dnf config-manager --set-enabled crb &&'
-        'sudo dnf install -y epel-release'
-    )
 
 
 class CoreOsMixin(BaseContainerLinuxMixin):

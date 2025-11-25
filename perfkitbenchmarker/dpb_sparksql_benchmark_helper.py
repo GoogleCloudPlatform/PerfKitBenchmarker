@@ -326,7 +326,7 @@ def _RenderRunnerScriptWithQueries(queries: dict[str, str]) -> str:
       the actual query SQL.
 
   Returns:
-    The python file rendered as a str.
+    A local filepath for the rendered python file.
   """
   lines = ['QUERIES = {']
   for query_id, sql_str in queries.items():

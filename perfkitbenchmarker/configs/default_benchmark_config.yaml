@@ -323,9 +323,10 @@ sparksql_tpcds_1t_tuned:
     dpb_sparksql_query: tpcds_2_4
     hadoop_hdfs_client_readahead: 0
     hadoop_hdfs_replication: 1
-    hadoop_version: 3.4.1
-    openjdk_version: 11
-    spark_version: 3.5.6
+    hadoop_version: 3.4.2
+    openjdk_version: 17
+    # TODO(pclay): Update to 4.0.1 and Java 21
+    spark_version: 3.5.7
     sparksql_readahead_kb: 1024
   dpb_service:
     service_type: unmanaged_spark_cluster
@@ -499,22 +500,28 @@ hadoop_dfsio:
 diskspd_read_only:
   name: diskspd
   flags: &diskspd_read_only_flags
-    diskspd_prefill_duration: 2700
     diskspd_write_read_ratio: 0
     after_prepare_sleep_time: 300 # Wait after the prepare phase for prefill to complete.
+    diskspd_file_size: 1000G
+    diskspd_prefill_block_size: 512K
 
 diskspd_write_only:
   name: diskspd
   flags: &diskspd_write_only_flags
     diskspd_write_read_ratio: 100
+    diskspd_file_size: 1000G
 
 diskspd_single_thread_latency:
   name: diskspd
   flags: &diskspd_single_thread_latency_flags
+    num_striped_disks: 1
+    data_disk_size: 500
+    diskspd_file_size: 400G
     diskspd_thread_number_per_file: 1
     diskspd_outstanding_io: 1
-    diskspd_block_size: 4k
+    diskspd_block_size: 8k
     diskspd_access_pattern: r
+    diskspd_prefill_block_size: 512K
 
 diskspd_max_iops:
   name: diskspd
@@ -528,21 +535,23 @@ diskspd_max_throughput:
   name: diskspd
   flags: &diskspd_max_throughput_flags
     diskspd_thread_number_per_file: 8,16
-    diskspd_outstanding_io: 64,128
+    diskspd_outstanding_io: 8,16,64
     diskspd_block_size:  1M
     diskspd_access_pattern: s
 
 diskspd_single_thread_latency_read_only:
   name: diskspd
   flags:
-    <<: *diskspd_read_only_flags
     <<: *diskspd_single_thread_latency_flags
+    diskspd_write_read_ratio: 0
+    after_prepare_sleep_time: 300
 
 diskspd_single_thread_latency_write_only:
   name: diskspd
   flags:
-    <<: *diskspd_write_only_flags
     <<: *diskspd_single_thread_latency_flags
+    diskspd_write_read_ratio: 100
+    after_prepare_sleep_time: 300
 
 diskspd_max_iops_read_only:
   name: diskspd
@@ -567,3 +576,21 @@ diskspd_max_throughput_write_only:
   flags:
     <<: *diskspd_write_only_flags
     <<: *diskspd_max_throughput_flags
+
+kvrocks_memtier:
+  name: kvrocks_memtier
+  flags:
+    fio_fill_block_size: 64k
+    data_disk_type: local
+    num_striped_disks: 8
+    memtier_protocol: 'redis'
+    memtier_cluster_mode: True
+    memtier_clients: 1
+    memtier_threads: 4
+    memtier_pipeline: 1
+    memtier_data_size: 400
+    memtier_key_maximum: 18000000
+    memtier_key_prefix: 'key'
+    memtier_run_duration: 40
+    memtier_random_data: True
+    memtier_command: 'hmset __key__ field1 __data__ field2 __data__ field3 __data__ field4 __data__ field5 __data__ field6 __data__ field7 __data__ field8 __data__ field9 __data__ field10 __data__ field11 __data__ field12 __data__ field13 __data__ field14 __data__ field15 __data__ field16 __data__ field17 __data__ field18 __data__ field19 __data__'

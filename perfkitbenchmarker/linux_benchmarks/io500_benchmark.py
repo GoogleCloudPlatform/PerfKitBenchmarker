@@ -69,23 +69,24 @@ def Prepare(benchmark_spec):
   background_tasks.RunThreaded(lambda vm: vm.Install('build_tools'), vms)
   background_tasks.RunThreaded(lambda vm: vm.AuthenticateVm(), vms)
   hpc_util.CreateMachineFile(vms)
-  headnode.InstallPackages('pkg-config')
+  background_tasks.RunThreaded(lambda vm: vm.InstallPackages('pkg-config'), vms)
   # io500 needs to build a group of binaries.
-  # Among them, the pined commit for pfind is currently broken,
+  # Among them, the pinned commit for pfind is currently broken,
   # where it looks for *.o files. This commit aaba722 fixes the script
   # to look for *.a files.
-  headnode.RemoteCommand(
+  # Install binary on all vms.
+  background_tasks.RunThreaded(lambda vm: vm.RemoteCommand(
       f'cd {BENCHMARK_DIR} && git clone {GIT_REPO} -b io500-isc24 && '
       'cd io500 && '
       'sed -i "s/778dca8/aaba722/g" prepare.sh && '
-      './prepare.sh')
+      './prepare.sh'), vms)
   # TODO(yuyanting) Make this a flag to accept other configs.
   local_path = data.ResourcePath('io500/io500.ini.j2')
   remote_path = f'{BENCHMARK_DIR}/io500.ini'
-  headnode.RenderTemplate(
+  background_tasks.RunThreaded(lambda vm: vm.RenderTemplate(
       template_path=local_path, remote_path=remote_path,
       context={'directory': headnode.scratch_disks[0].mount_point}
-  )
+      ), vms)
 
 
 def _Run(headnode, ranks, ppn):

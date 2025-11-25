@@ -16,6 +16,7 @@
 Classes to wrap specific backend services are in the corresponding provider
 directory as a subclass of BaseEdwService.
 """
+import datetime
 import os
 from typing import Any, Dict, List
 
@@ -181,7 +182,7 @@ EDW_SEARCH_DATA_LOCATION = flags.DEFINE_string(
     'edw_search_data_location',
     None,
     'Cloud directory of bucket to source ongoing load data '
-    'for EDW search benchmarks.',
+    'for EDW search benchmarks (without rare token).',
 )
 EDW_SEARCH_INDEX_NAME = flags.DEFINE_string(
     'edw_search_index_name',
@@ -761,7 +762,12 @@ class EdwService(resource.BaseResource):
     raise NotImplementedError
 
   def TextSearchQuery(
-      self, table_path: str, search_keyword: str, index_name: str
+      self,
+      table_path: str,
+      search_keyword: str,
+      order_by: str | None = None,
+      limit: int | None = None,
+      date_between: tuple[datetime.date, datetime.date] | None = None,
   ) -> tuple[float, dict[str, Any]]:
     """Executes a text search query against a table.
 
@@ -781,7 +787,28 @@ class EdwService(resource.BaseResource):
     Args:
       table_path: The full path or name of the table to query.
       search_keyword: The text to search for within the indexed columns.
-      index_name: The name of the search index to use for the query.
+      order_by: The column to order the results by.
+      limit: The maximum number of rows to return.
+      date_between: A tuple of two dates to filter the results by.
+
+    Returns:
+      A tuple of execution time in seconds and a dictionary of metadata.
+    """
+    raise NotImplementedError
+
+  def InjectTokenIntoTable(
+      self, table_path: str, token: str, token_count: int
+  ) -> tuple[float, dict[str, Any]]:
+    """Updates N rows to append a token to a well-known string column.
+
+    Metadata returned by this method is arbitrary, and is for the purpose of
+    inclusion in benchmark result metadata. The presence or absence of specific
+    values should not be relied on.
+
+    Args:
+      table_path: The full path or name of the table to insert data into.
+      token: The token to append to the column.
+      token_count: The number of rows to update.
 
     Returns:
       A tuple of execution time in seconds and a dictionary of metadata.

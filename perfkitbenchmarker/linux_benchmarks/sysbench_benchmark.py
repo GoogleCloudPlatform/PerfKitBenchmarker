@@ -877,7 +877,13 @@ def Run(benchmark_spec):
     metadata['sysbench_thread_count'] = thread_count
     # The run phase is common across providers. The VMs[0] object contains all
     # information and states necessary to carry out the run.
-    results += _RunSysbench(client_vms, metadata, benchmark_spec, thread_count)
+    start_time = datetime.datetime.now()
+    current_results = _RunSysbench(
+        client_vms, metadata, benchmark_spec, thread_count
+    )
+    end_time = datetime.datetime.now()
+    current_results.extend(db.CollectMetrics(start_time, end_time))
+    results.extend(current_results)
   return results
 
 

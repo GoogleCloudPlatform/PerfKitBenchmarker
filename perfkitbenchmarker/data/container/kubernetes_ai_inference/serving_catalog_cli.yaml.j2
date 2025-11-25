@@ -16,6 +16,10 @@ spec:
             value: {{generate_args}}
           - name: OUTPUT_FILE
             value: /output/output.yaml
+          - name: WG_SERVING_REPO_URL
+            value: "{{ wg_serving_repo_url }}"
+          - name: WG_SERVING_REPO_BRANCH
+            value: "{{ wg_serving_repo_branch }}"
         volumeMounts:
         - name: output
           mountPath: /output

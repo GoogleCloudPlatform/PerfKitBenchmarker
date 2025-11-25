@@ -1,0 +1,73 @@
+Region: {{ region }}
+Image:
+  Os: {{ os_type }}
+Tags:
+{% for key,value in tags.items() %}
+  - Key: {{ key }}
+    Value: {{ value }}
+{% endfor %}
+SharedStorage:
+  - MountDir: /opt/apps
+    Name: nfs
+    StorageType: Ebs
+    EbsSettings:
+      VolumeType: gp3
+      Iops: 5000
+      Size: {{ nfs_size }}
+      Encrypted: True
+HeadNode:
+  InstanceType: {{ headnode_machine_type }}
+  Networking:
+    ElasticIp: true
+    SubnetId: {{ headnode_subnet_id }}
+  Ssh:
+    KeyName: {{ ssh_key }}
+  SharedStorageType: Ebs
+  Iam:
+    S3Access:
+      - BucketName: {{ preprovisioned_bucket }}
+        EnableWriteAccess: false
+  CustomActions:
+    OnNodeConfigured:
+      Script: https://raw.githubusercontent.com/aws-samples/aws-parallelcluster-post-install-scripts/authentication-credentials/multi-runner/postinstall.sh
+      Args:
+        - https://raw.githubusercontent.com/aws-samples/aws-parallelcluster-post-install-scripts/authentication-credentials/pyxis/postinstall.sh
+        - -/opt/apps
+        - https://raw.githubusercontent.com/aws-samples/aws-parallelcluster-post-install-scripts/main/docker/postinstall.sh
+Scheduling:
+  Scheduler: slurm
+  SlurmQueues:
+  - Name: queue1
+    CapacityType: {{ "SPOT" if enable_spot_vm else "ONDEMAND" }}
+    ComputeResources:
+    - Name: {{ name }}
+      Instances:
+      - InstanceType: p6-b200.48xlarge
+      MinCount: {{ num_workers }}
+      MaxCount: {{ num_workers }}
+      DisableSimultaneousMultithreading: {{ not enable_smt }}
+      Efa:
+        Enabled: {{ efa_enabled }}
+    Networking:
+      PlacementGroup:
+        Enabled: true
+      SubnetIds:
+      - {{ worker_subnet_id }}
+    CustomActions:
+      OnNodeConfigured:
+        Script: https://raw.githubusercontent.com/aws-samples/aws-parallelcluster-post-install-scripts/authentication-credentials/multi-runner/postinstall.sh
+        Args:
+          - https://raw.githubusercontent.com/aws-samples/aws-parallelcluster-post-install-scripts/authentication-credentials/pyxis/postinstall.sh
+          - -/opt/apps
+Monitoring:
+  Logs:
+    CloudWatch:
+      Enabled: false
+    Rotation:
+      Enabled: false
+  Dashboards:
+    CloudWatch:
+      Enabled: false
+  DetailedMonitoring: false
+  Alarms:
+    Enabled: false

@@ -92,6 +92,8 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
   the common methods across both offerings.
   """
 
+  REQUIRED_ATTRS = ['CLOUD', 'IS_MANAGED', 'ENGINE']
+
   def __init__(self, relational_db_spec):
     super().__init__(relational_db_spec)
     self.all_instance_ids = []

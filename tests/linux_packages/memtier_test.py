@@ -1839,6 +1839,10 @@ class MemtierTestCase(
             'memtier_version': '2.1.3',
             'memtier_tls': False,
             'memtier_distinct_client_seed': True,
+            'memtier_command': None,
+            'memtier_key_prefix': '',
+            'memtier_random_data': True,
+
         },
     )
 

@@ -41,7 +41,7 @@ class FioUtitTest(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(fio_target_mode='against_file_with_fill')
   def testGetFilenameForDiskWorFile(self):
-    self.assertEqual(utils.GetFilename(self.disks), 'fill-device.0')
+    self.assertEqual(utils.GetFilename(self.disks), 'fill-device.0.0')
 
   def testGetAllDiskPaths(self):
     test_disk = self.disks[0]
