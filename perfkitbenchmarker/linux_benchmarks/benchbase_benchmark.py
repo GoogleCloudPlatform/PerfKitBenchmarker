@@ -26,28 +26,22 @@ from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import benchbase
+# Needed in order to register spec:
+from perfkitbenchmarker.providers.aws import aws_aurora_dsql_db  # pylint: disable=unused-import
 
 BENCHMARK_NAME: str = 'benchbase'
 BENCHMARK_CONFIG: str = """
 benchbase:
   description: Runs Benchbase benchmark.
   relational_db:
-    cloud: GCP
-    engine: spanner-postgres
+    cloud: AWS
+    engine: aurora-dsql-postgres
     db_spec:
       GCP:
         machine_type: db-n1-standard-16
         zone: us-central1-f
       AWS:
-        machine_type: db.m4.4xlarge
         zone: us-east-1a
-    db_disk_spec:
-      GCP:
-        disk_size: 2048
-        disk_type: pd-ssd
-      AWS: # not actually used by it's a required spec so fill random values
-        disk_size: 6144
-        disk_type: gp2
     vm_groups:
       clients:
         vm_spec:

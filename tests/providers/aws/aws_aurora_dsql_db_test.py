@@ -67,7 +67,6 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',
         'db_spec': mock.MagicMock(),
-        'db_disk_spec': mock.MagicMock(disk_type='gp2'),
         'enable_freeze_restore': False,
         'create_on_restore_error': False,
         'delete_on_freeze_error': False,
