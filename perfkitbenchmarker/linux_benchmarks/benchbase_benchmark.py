@@ -25,10 +25,13 @@ from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.linux_packages import benchbase
 # Needed in order to register spec:
 from perfkitbenchmarker.providers.aws import aws_aurora_dsql_db  # pylint: disable=unused-import
 
+
+SPANNER_POSTGRES = sql_engine_utils.SPANNER_POSTGRES
 BENCHMARK_NAME: str = 'benchbase'
 BENCHMARK_CONFIG: str = """
 benchbase:
@@ -93,7 +96,18 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   # Create the configuration file on the client VM
   benchbase.CreateConfigFile(client_vm)
-  # TODO(shuninglin): Implement benchbase data loading
+  profile: str = (
+      'postgres'
+      if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
+      else 'auroradsql'
+  )
+  load_command: str = (
+      f'source /etc/profile.d/maven.sh && cd {benchbase.BENCHBASE_DIR} && mvn'
+      f' clean compile exec:java -P {profile} -Dexec.args="-b tpcc -c'
+      f' {benchbase.CONFIG_FILE_NAME} --create=true --load=true'
+      ' --execute=false"'
+  )
+  client_vm.RemoteCommand(load_command)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -105,13 +119,22 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   Returns:
     A list of sample.Sample objects.
   """
-  del benchmark_spec  # Unused for now.
-  # TODO(shuninglin): Implement the run phase
-  # 1. Construct the run command:
-  # 2.1 Send the first run command as warmup
-  # 2.2 Sleep for warmup duration
-  # 2.3 Send the second run command as the main workload
-  # 3. Parse results from the output files
+  client_vm = benchmark_spec.vms[0]
+  profile: str = (
+      'postgres'
+      if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
+      else 'auroradsql'
+  )
+  # TODO(shuninglin): implement the three-phase warmup run - cool down - formal
+  # run, right now it's just one run
+  run_command: str = (
+      f'source /etc/profile.d/maven.sh && cd {benchbase.BENCHBASE_DIR} && mvn'
+      f' clean compile exec:java -P {profile} -Dexec.args="-b tpcc -c'
+      f' {benchbase.CONFIG_FILE_NAME} --create=false --load=false'
+      ' --execute=true"'
+  )
+  client_vm.RemoteCommand(run_command)
+  # TODO(shuninglin): Parse results from the output files
 
   samples: List[sample.Sample] = []
   return samples

@@ -22,6 +22,7 @@ from absl import flags
 import jinja2
 from perfkitbenchmarker import data as pkb_data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine
 
 
@@ -30,9 +31,9 @@ _OPENJDK_23_URL: str = (
 )
 _OPENJDK_23_TAR_FILE: str = 'jdk-23.0.2_linux-x64_bin.tar.gz'
 _JDK_BIN_PATH: str = '/opt/jdk-23.0.2/bin'
-_BENCHBASE_DIR: str = '~/benchbase'
-_CONFIG_FILE_NAME: str = 'pkb_benchbase_config.xml'
-_CONFIG_FILE_PATH: str = os.path.join(_BENCHBASE_DIR, _CONFIG_FILE_NAME)
+BENCHBASE_DIR: str = '~/benchbase'
+CONFIG_FILE_NAME: str = 'pkb_benchbase_config.xml'
+CONFIG_FILE_PATH: str = os.path.join(BENCHBASE_DIR, CONFIG_FILE_NAME)
 
 _SECONDS_IN_MINUTE: int = 60
 _CONFIG_TEMPLATE_FILE_NAME: str = 'benchbase_conf.j2'
@@ -47,22 +48,14 @@ _BENCHBASE_REPO_URL = flags.DEFINE_string(
     help='The URL of the Benchbase repository.',
 )
 
-_BENCHBASE_DB_ENGINE = flags.DEFINE_enum(
-    'benchbase_db_engine',
-    default='spanner',
-    enum_values=['spanner', 'aurora_dsql'],
-    help='The database engine to benchmark with Benchbase. ',
-)
-
-
 _BENCHBASE_THREAD_COUNT = flags.DEFINE_integer(
     'benchbase_thread_count',
     default=200,
     help='Number of threads for Benchbase. Tune to hit ~65% CPU on Spanner.',
 )
 _BENCHBASE_RATE = flags.DEFINE_string(
-    'unlimited',
-    default='420',
+    'benchbase_rate',
+    default='1000',
     help=(
         'Target QPS for BenchBase. Use "unlimited" for no rate limit, or an'
         ' integer value for a specific QPS cap.'
@@ -108,6 +101,11 @@ _BENCHBASE_ISOLATION = flags.DEFINE_enum(
     ],
     help='Transaction isolation level.',
 )
+_BENCHBASE_USE_FOREIGN_KEY = flags.DEFINE_bool(
+    'benchbase_use_foreign_key',
+    default=False,
+    help='Use foreign key for Spanner.',
+)
 
 
 def Install(vm: virtual_machine.BaseVirtualMachine) -> None:
@@ -116,16 +114,30 @@ def Install(vm: virtual_machine.BaseVirtualMachine) -> None:
   Args:
     vm: The virtual machine to install Benchbase on.
 
-  Raises:
-    errors.Setup.InvalidFlagConfigurationError: If db_engine is not provided
-      or is an unsupported value.
   """
+  vm.Install('maven')
   _InstallJDK23(vm)
-  vm.RemoteCommand(f'sudo rm -rf {_BENCHBASE_DIR}')
+  vm.RemoteCommand(f'sudo rm -rf {BENCHBASE_DIR}')
   git_repo = _BENCHBASE_REPO_URL.value
-  vm.RemoteCommand(f'git clone {git_repo} {_BENCHBASE_DIR}')
-  # TODO(shuninglin): Applying diff to be compatible with spanner/dsql
-  print(f'BenchBase installation complete in {_BENCHBASE_DIR}')
+  vm.RemoteCommand(f'git clone {git_repo} {BENCHBASE_DIR}')
+
+  if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES:
+    logging.info(
+        'benchbase_use_foreign_key: %s', _BENCHBASE_USE_FOREIGN_KEY.value
+    )
+    if _BENCHBASE_USE_FOREIGN_KEY.value:
+      diff_file = 'spanner_pg_tpcc_with_fk.diff'
+      data_file = 'benchbase/spanner_pg_tpcc_with_fk.diff'
+    else:
+      diff_file = 'spanner_pg_tpcc_no_fk.diff'
+      data_file = 'benchbase/spanner_pg_tpcc_no_fk.diff'
+    vm.PushDataFile(data_file, os.path.join(BENCHBASE_DIR, diff_file))
+    logging.info('Applying benchbase diff file: %s', diff_file)
+    vm.RemoteCommand(
+        f'cd {BENCHBASE_DIR} && git apply'
+        f' {diff_file}'
+    )
+    print(f'BenchBase installation complete in {BENCHBASE_DIR}')
 
 
 def _GetJdbcUrl() -> str:
@@ -137,10 +149,10 @@ def _GetJdbcUrl() -> str:
   Raises:
     errors.Config.InvalidValue: If the db_engine is not supported.
   """
-  db_engine: str = _BENCHBASE_DB_ENGINE.value
-  if db_engine == 'spanner':
+  db_engine: str = FLAGS.db_engine
+  if db_engine == sql_engine_utils.SPANNER_POSTGRES:
     return 'jdbc:postgresql://localhost:5432/benchbase?sslmode=disable&amp;ApplicationName=tpcc&amp;reWriteBatchedInserts=true&amp;options=-c%20spanner.support_drop_cascade=true'
-  elif db_engine == 'aurora_dsql':
+  elif db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
     return 'jdbc:postgresql://localhost:5432/postgres?sslmode=require&amp;ApplicationName=tpcc&amp;reWriteBatchedInserts=true'
   raise errors.Config.InvalidValue(f'Unsupported db_engine: {db_engine}')
 
@@ -151,7 +163,7 @@ def CreateConfigFile(vm: virtual_machine.BaseVirtualMachine) -> None:
   Args:
     vm: The client virtual machine to create the file on.
   """
-  db_engine: str = _BENCHBASE_DB_ENGINE.value
+  db_engine: str = FLAGS.db_engine
 
   context: dict[str, int | str] = {
       'driver_class': 'org.postgresql.Driver',
@@ -165,7 +177,7 @@ def CreateConfigFile(vm: virtual_machine.BaseVirtualMachine) -> None:
       'weights': ','.join(_BENCHBASE_TXN_WEIGHTS.value),
   }
 
-  if db_engine == 'aurora_dsql':
+  if db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
     context['db_type'] = 'AURORADSQL'
     # For DSQL we use automatic username and password generation so comment out
     # the username and password elements.
@@ -187,7 +199,7 @@ def CreateConfigFile(vm: virtual_machine.BaseVirtualMachine) -> None:
     vm.RenderTemplate(
         template_path=template_file_path,
         context=context,
-        remote_path=_CONFIG_FILE_PATH,
+        remote_path=CONFIG_FILE_PATH,
     )
   except jinja2.TemplateNotFound:
     logging.error('Template file not found: %s', _CONFIG_TEMPLATE_FILE_NAME)
@@ -203,7 +215,7 @@ def Uninstall(vm: virtual_machine.BaseVirtualMachine) -> None:
   Args:
     vm: The virtual machine to uninstall BenchBase from.
   """
-  vm.RemoteCommand(f'sudo rm -rf {_BENCHBASE_DIR}')
+  vm.RemoteCommand(f'sudo rm -rf {BENCHBASE_DIR}')
 
 
 # JDK 23 is not available when installing via package manager so we need to
@@ -250,3 +262,11 @@ def _InstallJDK23(vm: virtual_machine.BaseVirtualMachine) -> None:
         f'Java version is not 23.0.2: {stderr}, jdk 23 is required for'
         ' Benchbase.'
     )
+  # Override the JAVA_HOME in maven shell to use JDK 23.
+  vm.RemoteCommand(
+      'sudo sed -i "/^export JAVA_HOME=/d" /etc/profile.d/maven.sh'
+  )
+  vm.RemoteCommand(
+      'echo "export JAVA_HOME=/opt/jdk-23.0.2" | sudo tee -a'
+      ' /etc/profile.d/maven.sh'
+  )
