@@ -358,6 +358,8 @@ def RunDiskSpd(running_vm):
   metadata['diskspd_block_size'] = FLAGS.diskspd_block_size
   metadata['diskspd_prefill_duration'] = DISKSPD_PREFILL_DURATION.value
   metadata['diskspd_prefill_block_size'] = DISKSPD_PREFILL_BLOCK_SIZE.value
+  metadata['diskspd_fill_mode'] = DISKSPD_FILL_MODE.value
+  metadata['diskspd_file_size'] = DISKSPD_FILE_SIZE.value
 
   sample_list = []
   # We can use io array or thread array for calculate max IOPs
