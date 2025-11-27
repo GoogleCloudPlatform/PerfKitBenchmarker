@@ -1,0 +1,81 @@
+apiVersion: karpenter.azure.com/v1beta1
+kind: AKSNodeClass
+metadata:
+  name: gpu-nodeclass
+spec:
+  imageFamily: Ubuntu2204
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: gpu-nodepool
+spec:
+  disruption:
+    budgets:
+    - nodes: 30%
+    consolidateAfter: 0s
+    consolidationPolicy: WhenEmptyOrUnderutilized
+  template:
+    spec:
+      nodeClassRef:
+        group: karpenter.azure.com
+        kind: AKSNodeClass
+        name: gpu-nodeclass
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ['amd64']
+        - key: kubernetes.io/os
+          operator: In
+          values: ['linux']
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: {{ gpu_capacity_types | default(['on-demand']) }}
+        - key: karpenter.azure.com/sku-gpu-name
+          operator: In
+          values: {{ gpu_sku_name | default(['H100']) }}
+      taints:
+        - key: 'nvidia.com/gpu'
+          effect: NoSchedule
+---
+# According to the official Microsoft documentation, the NVIDIA device plugin
+# must be deployed as a DaemonSet to enable GPU support in the Kubernetes cluster.
+# Reference: https://learn.microsoft.com/en-us/azure/aks/use-nvidia-gpu?tabs=add-ubuntu-gpu-node-pool#nvidia-device-plugin-installation
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-daemonset
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-device-plugin-ds
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: nvidia-device-plugin-ds
+    spec:
+      tolerations:
+      - key: 'nvidia.com/gpu'
+        operator: Exists
+        effect: NoSchedule
+      priorityClassName: 'system-node-critical'
+      containers:
+      - image: nvcr.io/nvidia/k8s-device-plugin:v0.18.0
+        name: nvidia-device-plugin-ctr
+        env:
+          - name: FAIL_ON_INIT_ERROR
+            value: 'false'
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ['ALL']
+        volumeMounts:
+        - name: device-plugin
+          mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+      - name: device-plugin
+        hostPath:
+          path: /var/lib/kubelet/device-plugins
