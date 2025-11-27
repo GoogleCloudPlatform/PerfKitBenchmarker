@@ -620,19 +620,6 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
   def _GetInferenceServerManifest(self) -> str:
     """Generates and retrieves the inference server manifest content."""
-    # Ensure GPU capacity exists before scheduling GPU workloads
-    if FLAGS.cloud == 'AWS':
-      self.cluster.ApplyManifest(
-          'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
-          gpu_nodepool_name='gpu',
-          gpu_consolidate_after='1h',
-          gpu_consolidation_policy='WhenEmpty',
-          karpenter_nodeclass_name='default',  # must exist already
-          gpu_capacity_types=['on-demand'],
-          gpu_arch=['amd64'],
-          gpu_instance_families=['g6', 'g6e'],
-          gpu_taint_key='nvidia.com/gpu',
-      )
     provider = self.spec.cloud.lower()
     if provider == 'gcp':
       provider = 'gke'
@@ -682,6 +669,27 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     finally:
       self.cluster.DeleteResource(f'job/{job_name}', ignore_not_found=True)
 
+  def _ProvisionGPUNodePool(self):
+    """Provisions cloud-specific GPU node pool for inference workloads."""
+    if FLAGS.cloud == 'AWS':
+      self.cluster.ApplyManifest(
+          'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
+          gpu_nodepool_name='gpu',
+          gpu_consolidate_after='1h',
+          gpu_consolidation_policy='WhenEmpty',
+          karpenter_nodeclass_name='default',  # must exist already
+          gpu_capacity_types=['on-demand'],
+          gpu_arch=['amd64'],
+          gpu_instance_families=['g6', 'g6e'],
+          gpu_taint_key='nvidia.com/gpu',
+      )
+    elif FLAGS.cloud == 'Azure':
+      self.cluster.ApplyManifest(
+          'container/kubernetes_ai_inference/azure-gpu-nodepool.yaml.j2',
+          gpu_capacity_types=['on-demand'],
+          gpu_sku_name=[self.accelerator_type],
+      )
+  
   def _ParseInferenceServerDeploymentMetadata(self) -> None:
     """Parses deployment metadata to get server details and stores them."""
     try:
@@ -956,7 +964,16 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
     logging.info('Creating new inference server')
     self._InjectDefaultHuggingfaceToken()
-    inference_server_manifest = self._GetInferenceServerManifest()
+
+    # Apply the manifest with retry logic, waiting for the Safeguard policy relaxation to take effect.
+    @vm_util.Retry(poll_interval=30, retryable_exceptions=Exception)
+    def _apply_manifest_with_retry():
+      """Apply inference server manifest with retry logic."""
+      logging.info('Applying inference server manifest')
+      return self._GetInferenceServerManifest()
+
+    inference_server_manifest = _apply_manifest_with_retry()
+
     self._ParseAndStoreInferenceServerDetails(inference_server_manifest)
     with vm_util.NamedTemporaryFile(
         mode='w', prefix='inference-server-manifest', suffix='.yaml'
