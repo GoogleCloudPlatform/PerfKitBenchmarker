@@ -52,6 +52,18 @@ FLAG_GCS_BUCKET = flags.DEFINE_string(
     'The GCS bucket that has model data for inference server to use.',
 )
 
+WG_SERVING_REPO_URL = flags.DEFINE_string(
+    'wg_serving_repo_url',
+    'https://github.com/kubernetes-sigs/wg-serving',
+    'URL of the WG Serving repository.',
+)
+
+WG_SERVING_REPO_BRANCH = flags.DEFINE_string(
+    'wg_serving_repo_branch',
+    'main',
+    'Branch of the WG Serving repository.',
+)
+
 
 @dataclasses.dataclass
 class PodStartupMetrics:
@@ -620,6 +632,12 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           gpu_instance_families=['g6', 'g6e'],
           gpu_taint_key='nvidia.com/gpu',
       )
+    elif FLAGS.cloud == 'Azure':
+      self.cluster.ApplyManifest(
+          'container/kubernetes_ai_inference/azure-gpu-nodepool.yaml.j2',
+          gpu_capacity_types=['on-demand'],
+          gpu_sku_name=['H100'],
+      )
     generate_args = {
         'kind': 'core/deployment',
         'model-server': self.spec.model_server,
@@ -632,8 +650,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         self.cluster.ApplyManifest(
             'container/kubernetes_ai_inference/serving_catalog_cli.yaml.j2',
             image_repo=FLAG_IMAGE_REPO.value,
-            wg_serving_repo_url=FLAGS.wg_serving_repo_url,
-            wg_serving_repo_branch=FLAGS.wg_serving_repo_branch,
+            wg_serving_repo_url=WG_SERVING_REPO_URL.value,
+            wg_serving_repo_branch=WG_SERVING_REPO_BRANCH.value,
             generate_args=' '.join(
                 [f'--{k} {v}' for k, v in generate_args.items()]
             ),
@@ -940,7 +958,16 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
     logging.info('Creating new inference server')
     self._InjectDefaultHuggingfaceToken()
-    inference_server_manifest = self._GetInferenceServerManifest()
+
+    # Apply the manifest with retry logic, waiting for the Safeguard policy relaxation to take effect.
+    @vm_util.Retry(poll_interval=30, retryable_exceptions=Exception)
+    def _apply_manifest_with_retry():
+      """Apply inference server manifest with retry logic."""
+      logging.info('Applying inference server manifest')
+      return self._GetInferenceServerManifest()
+
+    inference_server_manifest = _apply_manifest_with_retry()
+
     self._ParseAndStoreInferenceServerDetails(inference_server_manifest)
     with vm_util.NamedTemporaryFile(
         mode='w', prefix='inference-server-manifest', suffix='.yaml'

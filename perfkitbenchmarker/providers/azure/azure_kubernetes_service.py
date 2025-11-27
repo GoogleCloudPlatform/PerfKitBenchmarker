@@ -335,6 +335,68 @@ class AksCluster(container_service.KubernetesCluster):
     cmd += self.resource_group.args
     vm_util.IssueCommand(cmd)
 
+  def _GrantResourcePolicyContributorRole(self):
+    """Helper method to grant Resource Policy Contributor role to current user/service principal.
+    It needs to manage Safeguards policies for AKS cluster.
+    """
+    account_info, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'account',
+        'show',
+        '--query',
+        '[user.name, id]',
+        '--output',
+        'tsv',
+    ])
+
+    assignee_id, subscription_id = account_info.strip().split('\n')
+    scope = f'/subscriptions/{subscription_id}/resourceGroups/{self.resource_group.name}'
+
+    vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'role',
+        'assignment',
+        'create',
+        '--role',
+        'Resource Policy Contributor',
+        '--assignee',
+        assignee_id,
+        '--scope',
+        scope,
+    ])
+
+  def _RelaxAKSPolicy(self):
+    """Switch AKS Deployment Safeguards policy to audit-only mode for testing.
+
+    AKS Safeguards enforces strict policies unnecessary in testing environments.
+    This update allows violations to be logged but not blocked, enabling non-compliant
+    workload deployment.
+    """
+    subscription_id, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'account',
+        'show',
+        '--query',
+        'id',
+        '--output',
+        'tsv',
+    ])
+    subscription_id = subscription_id.strip()
+    policy_scope = f'/subscriptions/{subscription_id}/resourceGroups/{self.resource_group.name}/providers/Microsoft.ContainerService/managedClusters/{self.name}'
+
+    vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'policy',
+        'assignment',
+        'update',
+        '--name',
+        'aks-deployment-safeguards-policy-assignment',
+        '--scope',
+        policy_scope,
+        '--set',
+        'enforcement_mode="DoNotEnforce"',
+    ])
+
   def _IsReady(self) -> bool:
     """Returns True if the cluster is ready."""
     show_cmd = [
@@ -577,6 +639,10 @@ class AksAutomaticCluster(AksCluster):
     user_type = user_type.strip()
     if user_type == 'servicePrincipal':
       self._CreateRoleAssignment()
+    # Grant Resource Policy Contributor role for policy management
+    self._GrantResourcePolicyContributorRole()
+    # Update AKS policy to exclude default namespace
+    self._RelaxAKSPolicy()
     self._GetCredentials(use_admin=False)
     self._WaitForDefaultServiceAccount()
     self._AttachContainerRegistry()
