@@ -80,17 +80,16 @@ class WGServingInferenceServerConfigSpec(
     deployment_timeout: Timeout for waiting for the deployment to be available.
     hf_token: Access Token of HuggingFace Hub, it could be either token or uri
       to the secret in object storage (e.g. gs://bucket/path/to/token).
-    model_name: Name of the model to use for the benchmark. options are
+    model_name: Name of the model to use for the benchmark. Options are
       available at
       https://github.com/kubernetes-sigs/wg-serving/blob/main/serving-catalog/README.md
-    model_server: Name of the inference server to use for the benchmark. options
+    model_server: Name of the inference server to use for the benchmark. Options
       are available at
       https://github.com/kubernetes-sigs/wg
-    catalog_provider: Name of the catalog provider to use for the benchmark.
-      options are available at
+    cloud: Cloud provider to use for the benchmark. Options are available at
       https://github.com/kubernetes-sigs/wg
     catalog_components: Name of components of inference server to use for the
-      benchmark. options are available at
+      benchmark. Options are available at
       https://github.com/kubernetes-sigs/wg
     extra_deployment_args: Extra arguments to pass to the catalog CLI.
     hpa_min_replicas: Minimum replicas for HPA.
@@ -105,7 +104,7 @@ class WGServingInferenceServerConfigSpec(
     self.hf_token: str
     self.model_name: str
     self.model_server: str
-    self.catalog_provider: str
+    self.cloud: str
     self.catalog_components: str
     self.extra_deployment_args: dict[str, str] | None
     self.hpa_min_replicas: int
@@ -139,7 +138,7 @@ class WGServingInferenceServerConfigSpec(
             option_decoders.StringDecoder,
             {'default': 'vllm'},
         ),
-        'catalog_provider': (
+        'cloud': (
             option_decoders.StringDecoder,
             {'default': 'gke'},
         ),
@@ -173,3 +172,9 @@ class WGServingInferenceServerConfigSpec(
         ),
     })
     return result
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    super()._ApplyFlags(config_values, flag_values)
+    if flag_values['cloud'].present or 'cloud' not in config_values:
+      config_values['cloud'] = flag_values.cloud

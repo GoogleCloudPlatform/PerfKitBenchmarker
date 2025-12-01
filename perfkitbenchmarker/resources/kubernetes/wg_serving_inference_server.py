@@ -620,11 +620,14 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           gpu_instance_families=['g6', 'g6e'],
           gpu_taint_key='nvidia.com/gpu',
       )
+    provider = self.spec.cloud.lower()
+    if provider == 'gcp':
+      provider = 'gke'
     generate_args = {
         'kind': 'core/deployment',
         'model-server': self.spec.model_server,
         'model': self.spec.model_name,
-        'provider': self.spec.catalog_provider,
+        'provider': provider,
         'components': self.spec.catalog_components,
         **self.spec.extra_deployment_args,
     }

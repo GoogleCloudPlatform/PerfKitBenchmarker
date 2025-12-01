@@ -17,7 +17,6 @@ cluster_boot:
       model_server: vllm
       hf_token: gs://bucket/path/to/token
       model_name: llama3-8b
-      catalog_provider: gke
       catalog_components: 1-L4
       hpa_max_replicas: 10
       extra_deployment_args:
@@ -125,7 +124,7 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
   def testGetInferenceServerManifest(self):
     self.server.spec.model_server = 'vllm'
     self.server.spec.model_name = 'model1'
-    self.server.spec.catalog_provider = 'gcp'
+    self.server.spec.cloud = 'gcp'
     self.server.spec.catalog_components = 'gcsfuse'
     self.server.spec.extra_deployment_args = {}
     self.server.spec.runtime_class_name = 'test-runtime'
