@@ -1198,7 +1198,7 @@ class EksKarpenterCluster(BaseEksCluster):
     )
     instance_ids = stdout.strip().split() if stdout and stdout.strip() else []
     if instance_ids:
-      logging.info(f'Terminating {len(instance_ids)} remaining instances')
+      logging.info('Terminating %d remaining instances', len(instance_ids))
       vm_util.IssueCommand(
           [
               'aws',
@@ -1245,7 +1245,7 @@ class EksKarpenterCluster(BaseEksCluster):
     )
     eni_ids = stdout.strip().split() if stdout and stdout.strip() else []
     if eni_ids:
-      logging.info(f'Deleting {len(eni_ids)} orphaned network interfaces')
+      logging.info('Terminating %d remaining instances', len(instance_ids))
       for eni_id in eni_ids:
         vm_util.IssueCommand(
             [
