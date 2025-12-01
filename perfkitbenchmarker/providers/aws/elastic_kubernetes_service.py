@@ -1245,7 +1245,7 @@ class EksKarpenterCluster(BaseEksCluster):
     )
     eni_ids = stdout.strip().split() if stdout and stdout.strip() else []
     if eni_ids:
-      logging.info('Terminating %d remaining instances', len(instance_ids))
+      logging.info('Deleting %d orphaned network interfaces', len(eni_ids))
       for eni_id in eni_ids:
         vm_util.IssueCommand(
             [
