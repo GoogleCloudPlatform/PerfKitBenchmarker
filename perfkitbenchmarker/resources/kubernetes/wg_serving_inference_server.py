@@ -64,6 +64,7 @@ WG_SERVING_REPO_BRANCH = flags.DEFINE_string(
     'Branch of the WG Serving repository.',
 )
 
+
 @dataclasses.dataclass
 class PodStartupMetrics:
   """Dataclass for pod startup metrics."""
