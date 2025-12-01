@@ -449,11 +449,13 @@ class GcpRelationalDbTest(pkb_common_test_case.PkbCommonTestCase):
         start_time,
         end_time,
     )
-    self.assertLen(samples, 2)
-    self.assertEqual(samples[0].metric, 'database_cpu_utilization_average')
-    self.assertEqual(samples[0].value, 20)  # Multiplied by 100 for %
-    self.assertEqual(samples[0].unit, '%')
-    self.assertEqual(samples[1].metric, 'database_cpu_utilization_time_series')
+    self.assertLen(samples, 4)
+    metrics = {s.metric: s for s in samples}
+    self.assertEqual(metrics['database_cpu_utilization_average'].value, 20)
+    self.assertEqual(metrics['database_cpu_utilization_average'].unit, '%')
+    self.assertEqual(metrics['database_cpu_utilization_min'].value, 10)
+    self.assertEqual(metrics['database_cpu_utilization_max'].value, 30)
+    self.assertIn('database_cpu_utilization_time_series', metrics)
 
   def testCollectTimeSeriesDelta(self):
     self.mock_monitoring_client.list_time_series.return_value = (

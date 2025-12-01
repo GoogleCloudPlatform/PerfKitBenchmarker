@@ -760,6 +760,12 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         sample.Sample(f'{metric_basename}_average', avg_val, unit, metadata={})
     )
     samples.append(
+        sample.Sample(f'{metric_basename}_min', min(values), unit, metadata={})
+    )
+    samples.append(
+        sample.Sample(f'{metric_basename}_max', max(values), unit, metadata={})
+    )
+    samples.append(
         sample.CreateTimeSeriesSample(
             values,
             [t.timestamp() for t in timestamps],

@@ -16,14 +16,17 @@
 import datetime
 import json
 import logging
+import statistics
 import time
 
 from absl import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import log_util
 from perfkitbenchmarker import mysql_iaas_relational_db
 from perfkitbenchmarker import postgres_iaas_relational_db
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import sqlserver_iaas_relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_network
@@ -49,6 +52,13 @@ POSTGRES_SUPPORTED_MAJOR_VERSIONS = [
 ]
 
 
+def _ConvertDateTimeToUtc(dt):
+  """Converts a datetime to UTC. If naive, assumes local time."""
+  if dt.tzinfo:
+    return dt.astimezone(datetime.timezone.utc)
+  return dt.replace(tzinfo=datetime.timezone.utc)
+
+
 class AWSSQLServerIAASRelationalDb(
     sqlserver_iaas_relational_db.SQLServerIAASRelationalDb
 ):
@@ -58,7 +68,8 @@ class AWSSQLServerIAASRelationalDb(
 
   def CreateIpReservation(self) -> str:
     cluster_ip_address = '.'.join(
-        self.server_vm.internal_ip.split('.')[:-1]+['128'])
+        self.server_vm.internal_ip.split('.')[:-1] + ['128']
+    )
     return cluster_ip_address
 
   def ReleaseIpReservation(self) -> bool:
@@ -480,6 +491,147 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
     if not json_output:
       return False
     return True
+
+  # Consider decoupling from BaseAwsRelationalDb (more generic version would
+  # take namespace, metric, region, etc).
+  def _CollectCloudWatchMetrics(
+      self,
+      metric_name: str,
+      metric_sample_name: str,
+      unit: str,
+      start_time: datetime.datetime,
+      end_time: datetime.datetime,
+  ) -> list[sample.Sample]:
+    """Collects metrics from AWS CloudWatch."""
+    logging.info(
+        'Collecting metric %s for instance %s', metric_name, self.instance_id
+    )
+    start_time_str = start_time.astimezone(datetime.timezone.utc).strftime(
+        relational_db.METRICS_TIME_FORMAT
+    )
+    end_time_str = end_time.astimezone(datetime.timezone.utc).strftime(
+        relational_db.METRICS_TIME_FORMAT
+    )
+    cmd = util.AWS_PREFIX + [
+        'cloudwatch',
+        'get-metric-statistics',
+        '--namespace',
+        'AWS/RDS',
+        '--metric-name',
+        metric_name,
+        '--start-time',
+        start_time_str,
+        '--end-time',
+        end_time_str,
+        '--period',
+        '60',
+        '--statistics',
+        'Average',  # RDS metrics are at 1 minute granularity
+        '--dimensions',
+        f'Name=DBInstanceIdentifier,Value={self.instance_id}',
+        '--region',
+        self.region,
+    ]
+    try:
+      stdout, _ = util.IssueRetryableCommand(cmd)
+    except errors.VmUtil.IssueCommandError as e:
+      logging.warning(
+          'Could not collect metric %s for instance %s: %s',
+          metric_name,
+          self.instance_id,
+          e,
+      )
+      return []
+    response = json.loads(stdout)
+    datapoints = response['Datapoints']
+    if not datapoints:
+      logging.warning('No datapoints for metric %s', metric_name)
+      return []
+
+    points = []
+    for dp in datapoints:
+      value = dp['Average']
+      if unit == 'MB/s':
+        value /= 1024 * 1024
+      points.append((datetime.datetime.fromisoformat(dp['Timestamp']), value))
+    if not points:
+      logging.warning('No values found for metric %s', metric_name)
+      return []
+    points.sort(key=lambda x: x[0])
+    timestamps = [p[0] for p in points]
+    values = [p[1] for p in points]
+    avg_val = statistics.mean(values)
+    min_val = min(values)
+    max_val = max(values)
+    samples = []
+    samples.append(
+        sample.Sample(
+            f'{metric_sample_name}_average', avg_val, unit, metadata={}
+        )
+    )
+    samples.append(
+        sample.Sample(f'{metric_sample_name}_min', min_val, unit, metadata={})
+    )
+    samples.append(
+        sample.Sample(f'{metric_sample_name}_max', max_val, unit, metadata={})
+    )
+    samples.append(
+        sample.CreateTimeSeriesSample(
+            values,
+            [t.timestamp() for t in timestamps],
+            f'{metric_sample_name}_time_series',
+            unit,
+            60,
+        )
+    )
+    log_util.LogToShortLogAndRoot(
+        f'{metric_sample_name}: average={avg_val:.2f}, min={min(values):.2f},'
+        f' max={max(values):.2f}, count={len(values)}'
+    )
+    human_readable_ts = [f'{t}: {v:.2f} {unit}' for t, v in reversed(points)]
+    log_util.LogToShortLogAndRoot(
+        f'{metric_sample_name}_time_series:\n{'\n'.join(human_readable_ts)}'
+    )
+    return samples
+
+  def CollectMetrics(
+      self, start_time: datetime.datetime, end_time: datetime.datetime
+  ) -> list[sample.Sample]:
+    """Collects metrics during the run phase."""
+    logging.info(
+        'Collecting metrics for time range: %s to %s',
+        start_time.strftime(relational_db.METRICS_TIME_FORMAT),
+        end_time.strftime(relational_db.METRICS_TIME_FORMAT),
+    )
+
+    time_to_wait = (
+        end_time
+        + datetime.timedelta(
+            seconds=relational_db.METRICS_COLLECTION_DELAY_SECONDS
+        )
+        - datetime.datetime.now()
+    )
+    if time_to_wait.total_seconds() > 0:
+      logging.info(
+          'Waiting %s seconds for metrics to be available.',
+          int(time_to_wait.total_seconds()),
+      )
+      time.sleep(time_to_wait.total_seconds())
+    metrics_to_collect = [
+        ('CPUUtilization', 'cpu_utilization', '%'),
+        ('ReadIOPS', 'disk_read_iops', 'iops'),
+        ('WriteIOPS', 'disk_write_iops', 'iops'),
+        ('ReadThroughput', 'disk_read_throughput', 'MB/s'),
+        ('WriteThroughput', 'disk_write_throughput', 'MB/s'),
+    ]
+    all_samples = []
+    for metric_name, metric_sample_name, unit in metrics_to_collect:
+      all_samples.extend(
+          self._CollectCloudWatchMetrics(
+              metric_name, metric_sample_name, unit, start_time, end_time
+          )
+      )
+    return all_samples
 
   def _Exists(self):
     """Returns true if the underlying resource exists.
