@@ -319,7 +319,7 @@ def _GenerateDiskspdConfig(outstanding_io, threads):
     throughput_per_ms_string = '-g' + str(FLAGS.diskspd_throughput_per_ms)
 
   diskspd_file_size = ''
-  if DISKSPD_PREFILL_DURATION.value is None:
+  if not EnablePrefill():
     # -c in diskspd creates file. If prefill duration is set, we need to use the
     # already created file from the prefill stage.
     diskspd_file_size = f'-c{FLAGS.diskspd_file_size}'
