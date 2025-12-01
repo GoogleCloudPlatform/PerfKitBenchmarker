@@ -49,7 +49,6 @@ class AwsAuroraDsqlSpec(relational_db_spec.RelationalDbSpec):
   """Configurable options for AWS Aurora DSQL."""
 
   SERVICE_TYPE = 'aurora-dsql'
-  db_disk_spec = None
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
