@@ -19,8 +19,10 @@ from typing import Any
 from absl import flags
 from absl import logging
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import relational_db_spec
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.aws import aws_relational_db
 from perfkitbenchmarker.providers.aws import util
 
@@ -40,6 +42,23 @@ _AURORA_DSQL_ENGINES = [
     sql_engine_utils.AURORA_DSQL_POSTGRES,
 ]
 
+_NONE_OK = {'default': None, 'none_ok': True}
+
+
+class AwsAuroraDsqlSpec(relational_db_spec.RelationalDbSpec):
+  """Configurable options for AWS Aurora DSQL."""
+
+  SERVICE_TYPE = 'aurora-dsql'
+  db_disk_spec = None
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    result = super()._GetOptionDecoderConstructions()
+    result.update({
+        'db_disk_spec': (spec.PerCloudConfigDecoder, _NONE_OK),
+    })
+    return result
+
 
 class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   """Implements the aurora DSQL database for AWS."""
@@ -48,8 +67,8 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   IS_MANAGED = True
   ENGINE = _AURORA_DSQL_ENGINES
 
-  def __init__(self, relational_db_spec):
-    super().__init__(relational_db_spec)
+  def __init__(self, dsql_spec: AwsAuroraDsqlSpec):
+    super().__init__(dsql_spec)
     self.cluster_id = None
 
   # DSQL has different format for tags:
@@ -162,6 +181,8 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     return _MAP_ENGINE_TO_DEFAULT_VERSION[engine]
 
   def GetResourceMetadata(self) -> dict[str, Any]:
-    metadata = super().GetResourceMetadata()
-    metadata['dsql_cluster_id'] = self.cluster_id
+    """Returns useful metadata about the instance."""
+    metadata = {
+        'dsql_cluster_id': self.cluster_id,
+    }
     return metadata

@@ -222,6 +222,8 @@ SERVER_GCE_SSD_INTERFACE = flags.DEFINE_enum(
 ENABLE_DATA_CACHE = flags.DEFINE_bool(
     'gcp_db_enable_data_cache', False, 'Whether to enable data cache.'
 )
+METRICS_TIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+METRICS_COLLECTION_DELAY_SECONDS = 165
 
 
 FLAGS = flags.FLAGS

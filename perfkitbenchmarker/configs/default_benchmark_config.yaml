@@ -504,6 +504,7 @@ diskspd_read_only:
     after_prepare_sleep_time: 300 # Wait after the prepare phase for prefill to complete.
     diskspd_file_size: 1000G
     diskspd_prefill_block_size: 512K
+    diskspd_fill_mode: with_fill
 
 diskspd_write_only:
   name: diskspd
@@ -522,6 +523,7 @@ diskspd_single_thread_latency:
     diskspd_block_size: 8k
     diskspd_access_pattern: r
     diskspd_prefill_block_size: 512K
+    diskspd_fill_mode: with_fill
 
 diskspd_max_iops:
   name: diskspd

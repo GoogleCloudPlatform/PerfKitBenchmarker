@@ -15,6 +15,7 @@
 
 import builtins
 import contextlib
+import datetime
 import json
 import os
 import textwrap
@@ -458,6 +459,58 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     db._UpdateClusterClass('db.t3.small')
 
     mock_issue_command.assert_not_called()
+
+  def testCollectMetrics(self):
+    db = self.CreateDbFromSpec()
+    db.instance_id = 'pkb-db-instance-123'
+    db.region = 'us-west-2'
+
+    # Mock the response from AWS CloudWatch
+    mock_response = {
+        'Datapoints': [
+            {
+                'Timestamp': '2025-11-26T10:00:00Z',
+                'Average': 10.0,
+            },
+            {
+                'Timestamp': '2025-11-26T10:01:00Z',
+                'Average': 20.0,
+            },
+        ]
+    }
+    self.enter_context(
+        mock.patch.object(
+            aws_relational_db.util,
+            'IssueRetryableCommand',
+            return_value=(json.dumps(mock_response), ''),
+        )
+    )
+
+    start_time = datetime.datetime(2025, 11, 26, 10, 0, 0)
+    end_time = datetime.datetime(2025, 11, 26, 10, 1, 0)
+    samples = db.CollectMetrics(start_time, end_time)
+
+    # Check the number of samples returned (4 per metric * 5 metrics)
+    self.assertLen(samples, 20)
+
+    # Spot check a few sample values
+    sample_names = [s.metric for s in samples]
+    self.assertIn('cpu_utilization_average', sample_names)
+    self.assertIn('cpu_utilization_min', sample_names)
+    self.assertIn('cpu_utilization_max', sample_names)
+    self.assertIn('disk_read_iops_average', sample_names)
+
+    cpu_avg = next(s for s in samples if s.metric == 'cpu_utilization_average')
+    self.assertEqual(cpu_avg.value, 15.0)
+    self.assertEqual(cpu_avg.unit, '%')
+
+    cpu_min = next(s for s in samples if s.metric == 'cpu_utilization_min')
+    self.assertEqual(cpu_min.value, 10.0)
+    self.assertEqual(cpu_min.unit, '%')
+
+    cpu_max = next(s for s in samples if s.metric == 'cpu_utilization_max')
+    self.assertEqual(cpu_max.value, 20.0)
+    self.assertEqual(cpu_max.unit, '%')
 
 
 if __name__ == '__main__':

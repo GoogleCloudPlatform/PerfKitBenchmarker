@@ -39,6 +39,8 @@ def GetRelationalDbSpecClass(engine):
       sql_engine_utils.SPANNER_POSTGRES,
   ]:
     return spec.GetSpecClass(RelationalDbSpec, SERVICE_TYPE='spanner')
+  if engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
+    return spec.GetSpecClass(RelationalDbSpec, SERVICE_TYPE='aurora-dsql')
   return RelationalDbSpec
 
 
