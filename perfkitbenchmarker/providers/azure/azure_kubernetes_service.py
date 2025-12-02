@@ -336,8 +336,9 @@ class AksCluster(container_service.KubernetesCluster):
     vm_util.IssueCommand(cmd)
 
   def _GrantResourcePolicyContributorRole(self):
-    """Helper method to grant Resource Policy Contributor role to current user/service principal.
-    It needs to manage Safeguards policies for AKS cluster.
+    """Grants Resource Policy Contributor role to current user/service principal.
+
+    This role is required to manage Safeguards policies for the AKS cluster.
     """
     account_info, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH,
@@ -366,11 +367,15 @@ class AksCluster(container_service.KubernetesCluster):
     ])
 
   def _RelaxAKSPolicy(self):
-    """Switch AKS Deployment Safeguards policy to audit-only mode for testing.
+    """Switches AKS Deployment Safeguards policy to audit-only mode for benchmark testing.
 
-    AKS Safeguards enforces strict policies unnecessary in testing environments.
-    This update allows violations to be logged but not blocked, enabling non-compliant
-    workload deployment.
+    AKS Safeguards enforces policies that are unnecessary for benchmark testing:
+    - Memory limits must be <= 5Gi (AI benchmark workloads requires more)
+    - Liveness/readiness probes must be defined (not needed for test pods)
+    - Container images must use specific tags (test images may use 'latest')
+
+    Audit-only mode logs policy violations without blocking deployment, allowing
+    non-compliant workloads to run for performance testing.
     """
     subscription_id, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH,
@@ -639,9 +644,7 @@ class AksAutomaticCluster(AksCluster):
     user_type = user_type.strip()
     if user_type == 'servicePrincipal':
       self._CreateRoleAssignment()
-    # Grant Resource Policy Contributor role for policy management
     self._GrantResourcePolicyContributorRole()
-    # Update AKS policy to exclude default namespace
     self._RelaxAKSPolicy()
     self._GetCredentials(use_admin=False)
     self._WaitForDefaultServiceAccount()
