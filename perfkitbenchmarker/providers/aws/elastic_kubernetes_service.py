@@ -380,10 +380,10 @@ class EksCluster(BaseEksCluster):
       nodepool_config: container_service.BaseNodePoolConfig,
   ):
     nodepool_config.disk_type = (
-        vm_config.DEFAULT_ROOT_DISK_TYPE # pytype: disable=attribute-error
+        vm_config.DEFAULT_ROOT_DISK_TYPE  # pytype: disable=attribute-error
     )
     nodepool_config.disk_size = (
-        vm_config.boot_disk_size # pytype: disable=attribute-error
+        vm_config.boot_disk_size  # pytype: disable=attribute-error
     )
 
   def GetResourceMetadata(self):
