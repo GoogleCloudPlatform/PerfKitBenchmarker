@@ -22,6 +22,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import pkb_common_test_case
+from perfkitbenchmarker.time_triggers import base_disruption_trigger
 from perfkitbenchmarker.time_triggers import maintenance_simulation_trigger
 
 FLAGS = flags.FLAGS
@@ -68,37 +69,48 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
   def testWaitForDisruption(self):
     vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
-    time_dic = {'LM_total_time': 10, 'Host_maintenance_end': 0}
+    event = base_disruption_trigger.DisruptionEvent(
+        start_time=0.0, end_time=0.0, total_time=10.0
+    )
     s = []
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
     self.enter_context(
-        mock.patch.object(trigger, 'WaitForDisruption', return_value=[time_dic])
+        mock.patch.object(trigger, 'WaitForDisruption', return_value=[event])
     )
     trigger.capture_live_migration_timestamps = True
     trigger.vms = [vm]
     trigger.AppendSamples(None, vm_spec, s)
     self.assertEqual(
         s,
-        [sample.Sample('LM Total Time', 10, 'seconds', time_dic, timestamp=0)],
+        [
+            sample.Sample(
+                'LM Total Time',
+                10,
+                'seconds',
+                {'LM_total_time': 10.0, 'Host_maintenance_end': 0.0},
+                timestamp=0,
+            )
+        ],
     )
 
   def testWaitForDisruptionReturnsCorrectValue(self):
     vm = mock.create_autospec(gce_virtual_machine.GceVirtualMachine)
+    vm.instance_number = 0
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
     trigger.gce_simulate_maintenance_helpers[vm] = mock.create_autospec(
         maintenance_simulation_trigger.GCESimulateMaintenanceTool
     )
+    event = base_disruption_trigger.DisruptionEvent(
+        start_time=0.0, end_time=0.0, total_time=10.0
+    )
     trigger.gce_simulate_maintenance_helpers[
         vm
-    ].CollectLMNotificationsTime.return_value = {
-        'LM_total_time': 10,
-        'Host_maintenance_end': 0,
-    }
+    ].CollectLMNotificationsTime.return_value = event
     trigger.capture_live_migration_timestamps = True
     trigger.vms = [vm]
     self.assertEqual(
         trigger.WaitForDisruption(),
-        [{'LM_total_time': 10, 'Host_maintenance_end': 0}],
+        [event],
     )
 
 

@@ -13,7 +13,7 @@
 # limitations under the License.
 """Module containning methods for triggering maintenance simulation."""
 
-from collections.abc import Mapping, MutableSequence
+from collections.abc import MutableSequence
 import datetime
 import json
 import logging
@@ -184,7 +184,9 @@ class GCESimulateMaintenanceTool:
     """Read the contents of the LM Notice Log into a string."""
     return self.vm.RemoteCommand(f'cat {self._lm_notice_log}')[0]
 
-  def CollectLMNotificationsTime(self):
+  def CollectLMNotificationsTime(
+      self,
+  ) -> base_disruption_trigger.DisruptionEvent:
     """Extract LM notifications from log file.
 
     Sample Log file to parse:
@@ -197,7 +199,8 @@ class GCESimulateMaintenanceTool:
     lm_total_time_key = 'LM_total_time'
     lm_start_time_key = 'Host_maintenance_start'
     lm_end_time_key = 'Host_maintenance_end'
-    events_dict = {
+
+    self.metadata = {
         'machine_instance': self.vm.instance_number,
         lm_start_time_key: 0,
         lm_end_time_key: 0,
@@ -211,12 +214,17 @@ class GCESimulateMaintenanceTool:
     for event_info in lm_times.splitlines():
       event_info_parts = event_info.split(' _at_ ')
       if len(event_info_parts) == 2:
-        events_dict[event_info_parts[0]] = event_info_parts[1]
+        self.metadata[event_info_parts[0]] = event_info_parts[1]
 
-    events_dict[lm_total_time_key] = float(
-        events_dict[lm_end_time_key]
-    ) - float(events_dict[lm_start_time_key])
-    return events_dict
+    self.metadata[lm_total_time_key] = float(
+        self.metadata[lm_end_time_key]
+    ) - float(self.metadata[lm_start_time_key])
+    migration_event = base_disruption_trigger.DisruptionEvent(
+        start_time=float(self.metadata[lm_start_time_key]),
+        end_time=float(self.metadata[lm_end_time_key]),
+        total_time=float(self.metadata[lm_total_time_key]),
+    )
+    return migration_event
 
 
 class GCESimulateMaintenanceToolForWindows(GCESimulateMaintenanceTool):
@@ -283,7 +291,9 @@ class GCESimulateMaintenanceToolForWindows(GCESimulateMaintenanceTool):
         f'type {self.vm_temp_dir}\\{self._lm_notice_log}'
     )[0]
 
-  def CollectLMNotificationsTime(self):
+  def CollectLMNotificationsTime(
+      self,
+  ) -> base_disruption_trigger.DisruptionEvent:
     """Extract LM notifications from log file.
 
     Sample Log file to parse:
@@ -315,7 +325,13 @@ class GCESimulateMaintenanceToolForWindows(GCESimulateMaintenanceTool):
     events_dict[lm_total_time_key] = float(
         events_dict[lm_end_time_key]
     ) - float(events_dict[lm_start_time_key])
-    return events_dict
+
+    migration_event = base_disruption_trigger.DisruptionEvent(
+        start_time=float(events_dict[lm_start_time_key]),
+        end_time=float(events_dict[lm_end_time_key]),
+        total_time=float(events_dict[lm_total_time_key]),
+    )
+    return migration_event
 
 
 class MaintenanceEventTrigger(base_disruption_trigger.BaseDisruptionTrigger):
@@ -348,7 +364,9 @@ class MaintenanceEventTrigger(base_disruption_trigger.BaseDisruptionTrigger):
       for helper in self.gce_simulate_maintenance_helpers.values():
         helper.SetupLMNotification()
 
-  def WaitForDisruption(self) -> MutableSequence[Mapping[str, Any]]:
+  def WaitForDisruption(
+      self,
+  ) -> MutableSequence[base_disruption_trigger.DisruptionEvent]:
     """Wait for the disruption to end and return the end time."""
     if self.capture_live_migration_timestamps:
       # Block test exit until LM ended.
