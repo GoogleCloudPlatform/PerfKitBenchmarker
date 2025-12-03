@@ -87,7 +87,11 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
                 'LM Total Time',
                 10,
                 'seconds',
-                {'LM_total_time': 10.0, 'Host_maintenance_end': 0.0},
+                {
+                    'LM_total_time': 10.0,
+                    'Host_maintenance_end': 0.0,
+                    'Host_maintenance_start': 0.0,
+                },
                 timestamp=0,
             )
         ],

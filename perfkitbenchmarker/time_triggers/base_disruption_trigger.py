@@ -82,6 +82,7 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
     """Get the metadata for the trigger and append it to the samples."""
     return self.metadata | {
         'LM_total_time': event.total_time,
+        'Host_maintenance_start': event.start_time,
         'Host_maintenance_end': event.end_time,
     }
 
