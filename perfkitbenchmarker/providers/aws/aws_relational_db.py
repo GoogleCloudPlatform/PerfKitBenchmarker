@@ -35,7 +35,7 @@ from perfkitbenchmarker.providers.aws import util
 FLAGS = flags.FLAGS
 
 DEFAULT_MYSQL_VERSION = '8'
-DEFAULT_POSTGRES_VERSION = '13'
+DEFAULT_POSTGRES_VERSION = '17'
 DEFAULT_SQLSERVER_VERSION = '14'
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (RDS HA takes a long time to prepare)
 
@@ -49,6 +49,7 @@ POSTGRES_SUPPORTED_MAJOR_VERSIONS = [
     '14',
     '15',
     '16',
+    '17',
 ]
 
 

@@ -50,9 +50,14 @@ _READ_POOL_NODE_COUNT = flags.DEFINE_integer(
     upper_bound=20,
 )
 
-SUPPORTED_ALLOYDB_ENGINE_VERSIONS = ['13']
+ALLOYDB_DATABASE_VERSION_MAPPING = {
+    '14': 'POSTGRES_14',
+    '15': 'POSTGRES_15',
+    '16': 'POSTGRES_16',
+    '17': 'POSTGRES_17',
+}
 
-DEFAULT_ENGINE_VERSION = '13'
+DEFAULT_ENGINE_VERSION = '17'
 CREATION_TIMEOUT = 30 * 60
 IS_READY_TIMEOUT = 600  # 10 minutes
 
@@ -91,7 +96,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     Returns:
       (string): Default version for the given database engine.
     """
-    if engine not in SUPPORTED_ALLOYDB_ENGINE_VERSIONS:
+    if engine not in ALLOYDB_DATABASE_VERSION_MAPPING:
       raise NotImplementedError(
           'Default engine not specified for engine {}'.format(engine)
       )
@@ -125,13 +130,17 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
       Exception: if an invalid MySQL flag was used.
     """
     # Create a database cluster
+    database_version_string = self._GetEngineVersionString(
+        self.spec.engine_version
+    )
     cmd_string = [
         'clusters',
         'create',
         self.cluster_id,
-        '--password=%s' % self.spec.database_password,
-        '--network=%s' % self.client_vm.network.network_resource.name,
+        f'--password={self.spec.database_password}',
+        f'--network={self.client_vm.network.network_resource.name}',
         '--allocated-ip-range-name=google-service-range',
+        f'--database-version={database_version_string}',
     ]
 
     # Continuous backup is not enabled by default when using gcloud
@@ -372,3 +381,24 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     cmd_string = ['clusters', 'delete', self.cluster_id, '--force', '--async']
     cmd = self._GetAlloyDbCommand(cmd_string)
     cmd.Issue()
+
+  def _GetEngineVersionString(self, version: str) -> str:
+    """Returns AlloyDB-specific version string for a given database engine.
+
+    Args:
+      version: engine version
+
+    Returns:
+      (string): AlloyDB-specific name for the requested engine and version.
+
+    Raises:
+      NotImplementedError on invalid engine / version combination.
+    """
+    if version not in ALLOYDB_DATABASE_VERSION_MAPPING:
+      valid_versions = ', '.join(ALLOYDB_DATABASE_VERSION_MAPPING.keys())
+      raise NotImplementedError(
+          f'Version {version} is not supported, supported versions include'
+          f' {valid_versions}'
+      )
+
+    return ALLOYDB_DATABASE_VERSION_MAPPING[version]
