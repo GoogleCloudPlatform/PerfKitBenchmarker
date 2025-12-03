@@ -69,6 +69,7 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   def __init__(self, dsql_spec: AwsAuroraDsqlSpec):
     super().__init__(dsql_spec)
     self.cluster_id = None
+    self.assigned_name = f'pkb-{FLAGS.run_uri}'
 
   # DSQL has different format for tags:
   # https://docs.aws.amazon.com/cli/v1/reference/rds/create-db-cluster.html
@@ -77,7 +78,7 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     tags: dict[str, Any] = util.MakeDefaultTags()
     formatted_tags_list: list[str] = [
         '%s=%s' % (k, v) for k, v in sorted(tags.items())
-    ]
+    ] + ['Name=%s' % self.assigned_name]
     formatted_tags_str = ','.join(formatted_tags_list)
     return [formatted_tags_str]
 

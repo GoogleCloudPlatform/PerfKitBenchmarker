@@ -100,10 +100,10 @@ class BenchbaseTest(pkb_common_test_case.PkbCommonTestCase):
     context = kwargs['context']
     self.assertEqual(context['db_type'], 'AURORADSQL')
     self.assertEqual(
-        context['username_element'], '<!--<username>admin</username>-->'
+        context['username_element'], '<username>admin</username>'
     )
     self.assertEqual(
-        context['password_element'], '<!--<password>password</password>-->'
+        context['password_element'], '<password></password>'
     )
     self.assertEqual(context['rate_element'], '<rate>unlimited</rate>')
     self.assertIn(

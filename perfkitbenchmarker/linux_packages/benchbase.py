@@ -179,10 +179,10 @@ def CreateConfigFile(vm: virtual_machine.BaseVirtualMachine) -> None:
 
   if db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
     context['db_type'] = 'AURORADSQL'
-    # For DSQL we use automatic username and password generation so comment out
-    # the username and password elements.
-    context['username_element'] = '<!--<username>admin</username>-->'
-    context['password_element'] = '<!--<password>password</password>-->'
+    # Following guide here to use automatic username and password generation:
+    # https://github.com/amazon-contributing/aurora-dsql-benchbase-benchmarking/wiki#loading-data-and-running-tpc-c-against-an-aurora-dsql-cluster
+    context['username_element'] = '<username>admin</username>'
+    context['password_element'] = '<password></password>'
   else:  # spanner by default
     context['db_type'] = 'POSTGRES'
     context['username_element'] = '<username>admin</username>'
@@ -207,6 +207,18 @@ def CreateConfigFile(vm: virtual_machine.BaseVirtualMachine) -> None:
   except jinja2.TemplateError as e:
     logging.exception('Error rendering template: %s', e)
     return
+
+
+def OverrideEndpoint(
+    vm: virtual_machine.BaseVirtualMachine, endpoint: str
+) -> None:
+  """Overrides the endpoint in the Benchbase XML configuration file on the client VM.
+
+  Args:
+    vm: The client virtual machine to create the file on.
+    endpoint: The endpoint of the database.
+  """
+  vm.RemoteCommand(f"sed -i 's/localhost/{endpoint}/g' {CONFIG_FILE_PATH}")
 
 
 def Uninstall(vm: virtual_machine.BaseVirtualMachine) -> None:

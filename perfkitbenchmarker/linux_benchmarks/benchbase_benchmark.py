@@ -24,6 +24,7 @@ from typing import Any, Dict, List
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.linux_packages import benchbase
@@ -75,7 +76,8 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   Returns:
     loaded benchmark configuration
   """
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  return config
 
 
 # TODO(shuninglin): need to implement auth logic(automatic password gen)
@@ -96,6 +98,16 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   # Create the configuration file on the client VM
   benchbase.CreateConfigFile(client_vm)
+  if FLAGS.db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
+    dsql: aws_aurora_dsql_db.AwsAuroraDsqlRelationalDb = (
+        benchmark_spec.relational_db
+    )
+    # Ideally we want to use endpoint from get-cluster command but it's not
+    # returning endpoint as documented. That said this hard-coded endpoint
+    # construction is also documented so should be reliable.
+    # https://docs.aws.amazon.com/aurora-dsql/latest/userguide/SECTION_authentication-token.html#authentication-token-cli
+    endpoint: str = f'{dsql.cluster_id}.dsql.{dsql.region}.on.aws'
+    benchbase.OverrideEndpoint(client_vm, endpoint)
   profile: str = (
       'postgres'
       if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
@@ -107,6 +119,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       f' {benchbase.CONFIG_FILE_NAME} --create=true --load=true'
       ' --execute=false"'
   )
+
   client_vm.RemoteCommand(load_command)
 
 

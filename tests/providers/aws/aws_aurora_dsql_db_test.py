@@ -113,7 +113,7 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     ):
       db = self.CreateDbFromSpec()
       tags = db._MakeDsqlTags()
-      self.assertEqual(tags, ['tag1=value1,tag2=value2'])
+      self.assertEqual(tags, ['tag1=value1,tag2=value2,Name=pkb-123'])
 
   def testDescribeCluster(self):
     """Tests that the describe cluster command is correct."""
