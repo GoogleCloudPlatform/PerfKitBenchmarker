@@ -208,7 +208,7 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
                     'test-user@example.com\n12345678-1234-1234-1234-123456789abc',
                     '',
                     0,
-                ),  # Moved this up
+                ),
                 ('cluster-id', '', 0),
             ],
             'az role assignment': [('', '', 0)],
