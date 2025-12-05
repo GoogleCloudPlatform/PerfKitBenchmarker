@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fib
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fib
+  namespace: fib
+spec:
+  replicas: 10
+  selector:
+    matchLabels:
+      app: "fib"
+  template:
+    metadata:
+      labels:
+        app: "fib"
+    spec:
+      containers:
+        - name: "fib"
+          image: {{ fib_image }}
+          imagePullPolicy: "Always"
+          resources:
+            requests:
+              cpu: "5m"
+              memory: "256Mi"
+            limits:
+              cpu: "10m"
+              memory: "256Mi"
+          ports:
+            - containerPort: {{ port }}
+              name: "web"
+              protocol: "TCP"
+      nodeSelector:
+        {%- for node_selector in node_selectors %}
+        {{node_selector}}
+        {%- endfor %}
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: fib
+  namespace: fib
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: "Deployment"
+    name: "fib"
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: '*'
+        maxAllowed:
+          cpu: "500m"
+          memory: "256Mi"
+        minAllowed:
+          memory: "256Mi"
+

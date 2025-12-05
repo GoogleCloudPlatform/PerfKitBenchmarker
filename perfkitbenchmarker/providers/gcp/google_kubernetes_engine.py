@@ -183,6 +183,9 @@ class BaseGkeCluster(container_service.KubernetesCluster):
       logging.info('Using default GCE service account for GKE cluster')
       cmd.flags['scopes'] = 'cloud-platform'
 
+    if self.enable_vpa:
+      cmd.flags['enable-vertical-pod-autoscaling'] = True
+
     self._IssueResourceCreationCommand(cmd)
 
   def _IssueResourceCreationCommand(self, cmd: util.GcloudCommand):

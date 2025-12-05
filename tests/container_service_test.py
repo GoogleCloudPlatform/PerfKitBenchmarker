@@ -469,6 +469,141 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(event.type, 'Normal')
     self.assertEqual(event.timestamp, 1759514756)
 
+  def test_GetPodNamesForResource_success(self):
+    resource_name = 'deployment/my-app'
+    namespace = 'default'
+    selector = '{"app":"my-app"}'
+    pod_names = 'pod-1 pod-2'
+    self.MockIssueCommand({
+        f"get {resource_name} -n {namespace} -o=jsonpath='{{.spec.selector.matchLabels}}'": [
+            (f"'{selector}'", '', 0)
+        ],
+        f'get pods -l app=my-app -n {namespace} -o=jsonpath={{.items[*].metadata.name}}': [
+            (pod_names, '', 0)
+        ],
+    })
+    names = container_service.KubernetesClusterCommands._GetPodNamesForResource(
+        resource_name, namespace
+    )
+    self.assertEqual(names, ['pod-1', 'pod-2'])
+
+  def test_GetPodNamesForResource_no_selector(self):
+    resource_name = 'deployment/my-app'
+    namespace = 'default'
+    self.MockIssueCommand({
+        f"get {resource_name} -n {namespace} -o=jsonpath='{{.spec.selector.matchLabels}}'": [
+            ("''", '', 0)
+        ],
+    })
+    with self.assertRaises(ValueError):
+      container_service.KubernetesClusterCommands._GetPodNamesForResource(
+          resource_name, namespace
+      )
+
+  def test_GetPodNamesForResource_resource_not_found(self):
+    resource_name = 'deployment/my-app'
+    namespace = 'default'
+    self.MockIssueCommand({
+        f"get {resource_name} -n {namespace} -o=jsonpath='{{.spec.selector.matchLabels}}'": [(
+            '',
+            'Error from server (NotFound): deployments.apps "my-app" not found',
+            1,
+        )],
+    })
+    names = container_service.KubernetesClusterCommands._GetPodNamesForResource(
+        resource_name, namespace
+    )
+    self.assertEqual(names, [])
+
+  def test_GetCPURequestSamples_success(self):
+    resource_name = 'deployment/my-app'
+    namespace = 'default'
+    pod_names = ['pod-1', 'pod-2']
+    with mock.patch.object(
+        container_service.KubernetesClusterCommands,
+        '_GetPodNamesForResource',
+        return_value=pod_names,
+    ):
+      self.MockIssueCommand({
+          f'get pod pod-1 -n {namespace} -o=jsonpath={{.spec.containers[*].resources.requests.cpu}}': [
+              ('500m', '', 0)
+          ],
+          f'get pod pod-2 -n {namespace} -o=jsonpath={{.spec.containers[*].resources.requests.cpu}}': [
+              ('1', '', 0)
+          ],
+      })
+      samples = (
+          container_service.KubernetesClusterCommands.GetCPURequestSamples(
+              resource_name, namespace
+          )
+      )
+      self.assertLen(samples, 2)
+      self.assertEqual(samples[0].metric, 'kubernetes_cpu_request')
+      self.assertEqual(samples[0].value, 0.5)
+      self.assertEqual(samples[0].metadata['pod'], 'pod-1')
+      self.assertEqual(samples[1].metric, 'kubernetes_cpu_request')
+      self.assertEqual(samples[1].value, 1.0)
+      self.assertEqual(samples[1].metadata['pod'], 'pod-2')
+
+  def test_GetCPURequestSamples_no_pods(self):
+    with mock.patch.object(
+        container_service.KubernetesClusterCommands,
+        '_GetPodNamesForResource',
+        return_value=[],
+    ):
+      samples = (
+          container_service.KubernetesClusterCommands.GetCPURequestSamples(
+              'deployment/my-app', 'default'
+          )
+      )
+      self.assertEmpty(samples)
+
+  def test_GetCPUUsageSamples_success(self):
+    resource_name = 'deployment/my-app'
+    namespace = 'default'
+    pod_names = ['pod-1']
+    top_output = """
+POD_NAME   NAME      CPU(cores)   MEMORY(bytes)
+pod-1      my-app    123m         456Mi
+"""
+    with mock.patch.object(
+        container_service.KubernetesClusterCommands,
+        '_GetPodNamesForResource',
+        return_value=pod_names,
+    ):
+      self.MockIssueCommand({
+          f'top pod pod-1 --namespace {namespace} --containers': [
+              (top_output, '', 0)
+          ],
+      })
+      samples = container_service.KubernetesClusterCommands.GetCPUUsageSamples(
+          resource_name, namespace
+      )
+      self.assertLen(samples, 1)
+      self.assertEqual(samples[0].metric, 'kubernetes_cpu_usage')
+      self.assertEqual(samples[0].value, 0.123)
+      self.assertEqual(samples[0].metadata['pod'], 'pod-1')
+      self.assertEqual(samples[0].metadata['container'], 'my-app')
+
+  def test_GetCPUUsageSamples_top_fails(self):
+    resource_name = 'deployment/my-app'
+    namespace = 'default'
+    pod_names = ['pod-1']
+    with mock.patch.object(
+        container_service.KubernetesClusterCommands,
+        '_GetPodNamesForResource',
+        return_value=pod_names,
+    ):
+      self.MockIssueCommand({
+          f'top pod pod-1 --namespace {namespace} --containers': [
+              ('', 'error: metrics not available yet', 1)
+          ],
+      })
+      samples = container_service.KubernetesClusterCommands.GetCPUUsageSamples(
+          resource_name, namespace
+      )
+      self.assertEmpty(samples)
+
 
 def _ClearTimestamps(samples: Iterable[Sample]) -> Iterable[Sample]:
   for s in samples:

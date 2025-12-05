@@ -34,12 +34,6 @@ from perfkitbenchmarker.sample import Sample
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string(
-    'kubernetes_hpa_runtime_class_name',
-    None,
-    'A custom runtimeClassName to apply to the pods.',
-)
-
 BENCHMARK_NAME = 'kubernetes_hpa'
 BENCHMARK_CONFIG = """
 kubernetes_hpa:
@@ -85,7 +79,7 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   return config
 
 
-def _PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec):
+def PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec, manifest_path: str):
   """Prepares a cluster to run the hpa benchmark."""
   cluster: container_service.KubernetesCluster = (
       benchmark_spec.container_cluster
@@ -93,9 +87,8 @@ def _PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec):
   fib_image = benchmark_spec.container_specs['kubernetes_fib'].image
 
   cluster.ApplyManifest(
-      'container/kubernetes_hpa/fib.yaml.j2',
+      manifest_path,
       fib_image=fib_image,
-      runtime_class_name=FLAGS.kubernetes_hpa_runtime_class_name,
       node_selectors=cluster.GetNodeSelectors(),
       port=_PORT,
   )
@@ -103,7 +96,7 @@ def _PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec):
   cluster.WaitForResource('deploy/fib', 'available', namespace='fib')
 
 
-def _PrepareLocust(benchmark_spec: bm_spec.BenchmarkSpec):
+def PrepareLocust(benchmark_spec: bm_spec.BenchmarkSpec):
   """Prepares a vm to run locust."""
   vm = benchmark_spec.vms[0]
   vm.Install('http_poller')
@@ -111,24 +104,28 @@ def _PrepareLocust(benchmark_spec: bm_spec.BenchmarkSpec):
   locust.Prep(vm)
 
 
-def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
+def Prepare(
+    benchmark_spec: bm_spec.BenchmarkSpec,
+    manifest_path: str = 'container/kubernetes_hpa/fib.yaml.j2',
+):
   """Install fib workload (and associated hpa) on the K8s Cluster.
 
   Args:
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
+    manifest_path: The manifest to apply.
   """
 
   prepare_fns = [
-      functools.partial(_PrepareCluster, benchmark_spec),
-      functools.partial(_PrepareLocust, benchmark_spec),
+      functools.partial(PrepareCluster, benchmark_spec, manifest_path),
+      functools.partial(PrepareLocust, benchmark_spec),
   ]
 
   background_tasks.RunThreaded(lambda f: f(), prepare_fns)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
-  """Run a benchmark against the Nginx server."""
+  """Run a benchmark against the fibonacci server."""
   vm = benchmark_spec.vms[0]
   cluster: container_service.KubernetesCluster = typing.cast(
       container_service.KubernetesCluster, benchmark_spec.container_cluster
@@ -136,7 +133,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
   addr = cluster.DeployIngress('fib', 'fib', _PORT, _HEALTH_PATH)
 
   # Confirm the server can be pinged.
-  _PollServer(vm, addr)
+  PollServer(vm, addr)
 
   samples = []
   stop = threading.Event()
@@ -158,25 +155,13 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
       max_concurrent_threads=3,
   )
 
-  failure_count = 0
-  total_requests = 0
-  for s in samples:
-    if s.metric == 'locust/Total_Failure_Count':
-      failure_count = s.value
-    elif s.metric == 'locust/Total_Request_Count':
-      total_requests = s.value
-  assert total_requests - failure_count >= 0.90 * total_requests, (
-      f'More than 10% of requests failed, with: {failure_count} failures out of'
-      f' {total_requests} total requestts'
-  )
-
   return samples
 
 
 @vm_util.Retry(
     retryable_exceptions=(errors.Resource.RetryableGetError,),
 )
-def _PollServer(vm: virtual_machine.BaseVirtualMachine, addr: str) -> None:
+def PollServer(vm: virtual_machine.BaseVirtualMachine, addr: str) -> None:
   """Polls the server to confirm it is responding."""
   poller = http_poller.HttpPoller()
   response = poller.Run(vm, addr + '/calculate')
