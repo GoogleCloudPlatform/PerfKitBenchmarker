@@ -257,7 +257,6 @@
 -   Add support for the `--addons` flag in GKE Standard.
 -   Add support for RHEL and Rocky Linux 10.
 -   Add support for Debian 13.
--   Add KVRocks memtier benchmark with LSSD support.
 
 ### Enhancements:
 
