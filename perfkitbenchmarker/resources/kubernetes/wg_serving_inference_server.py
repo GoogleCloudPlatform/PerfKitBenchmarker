@@ -689,7 +689,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           gpu_capacity_types=['on-demand'],
           gpu_sku_name=[self.accelerator_type],
       )
-  
+
   def _ParseInferenceServerDeploymentMetadata(self) -> None:
     """Parses deployment metadata to get server details and stores them."""
     try:
@@ -962,6 +962,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     if 'gcsfuse' in self.spec.catalog_components:
       self._ApplyGCSFusePVC()
 
+    self._ProvisionGPUNodePool()
+
     logging.info('Creating new inference server')
     self._InjectDefaultHuggingfaceToken()
 
@@ -970,18 +972,21 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         'admission webhook "validation.gatekeeper.sh" denied',
         'azurepolicy-k8sazurev',
     ]
+
     # Apply the manifest with retry logic, waiting for the Safeguard policy relaxation to take effect.
-    @vm_util.Retry(poll_interval=30, retryable_exceptions=errors.Resource.CreationError)
+    @vm_util.Retry(
+        poll_interval=30, retryable_exceptions=errors.Resource.CreationError
+    )
     def _apply_manifest_with_retry():
       """Apply inference server manifest with retry logic."""
       logging.info('Applying inference server manifest')
       try:
         return self._GetInferenceServerManifest()
       except Exception as e:
-          # Only retry Safeguard policy errors, fail fast on others
-          if any(pattern in str(e) for pattern in SAFEGUARD_POLICY_ERRORS):
-              raise errors.Resource.CreationError(str(e))
-          raise
+        # Only retry Safeguard policy errors, fail fast on others
+        if any(pattern in str(e) for pattern in SAFEGUARD_POLICY_ERRORS):
+          raise errors.Resource.CreationError(str(e))
+        raise
 
     inference_server_manifest = _apply_manifest_with_retry()
 
