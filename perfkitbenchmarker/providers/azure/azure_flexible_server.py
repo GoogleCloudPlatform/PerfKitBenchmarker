@@ -23,7 +23,6 @@ import datetime
 import json
 import logging
 import re
-import time
 from typing import Any, Tuple
 
 from absl import flags
@@ -330,23 +329,6 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         self.instance_id,
     ]
     return vm_util.IssueCommand(cmd, raise_on_failure=False)
-
-  def _IsInstanceReady(self, timeout: int = IS_READY_TIMEOUT) -> bool:
-    """See base class."""
-    start_time = datetime.datetime.now()
-
-    while True:
-      if (datetime.datetime.now() - start_time).seconds >= timeout:
-        logging.warning('Timeout waiting for sql instance to be ready')
-        return False
-
-      server_show_json = self._AzServerShow()
-      if server_show_json is not None:
-        state = server_show_json['state']
-        if state == 'Ready':
-          break
-      time.sleep(5)
-    return True
 
   def _ApplyDbFlags(self) -> None:
     """Apply database flags to the instance."""
