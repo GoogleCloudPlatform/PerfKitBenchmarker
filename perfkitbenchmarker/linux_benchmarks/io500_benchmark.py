@@ -29,6 +29,21 @@ from perfkitbenchmarker import sample
 
 FLAGS = flags.FLAGS
 
+_IO500_TESTS = flags.DEFINE_list(
+    'io500_tests', ['all'], 'List of io500 sub-benchmarks to run. '
+    'Defaults to all tests. Possible values are: ior_easy_write, '
+    'ior_easy_read, ior_hard_write, ior_hard_read, mdtest_easy_write, '
+    'mdtest_easy_stat, mdtest_easy_delete, mdtest_hard_write, '
+    'mdtest_hard_stat, mdtest_hard_read, mdtest_hard_delete, find')
+
+# Section names in io500.ini.j2 that can be run
+RUNNABLE_SECTIONS = [
+    'ior_easy_write', 'ior_easy_read',
+    'ior_hard_write', 'ior_hard_read',
+    'mdtest_easy_write', 'mdtest_easy_stat', 'mdtest_easy_delete',
+    'mdtest_hard_write', 'mdtest_hard_stat', 'mdtest_hard_read',
+    'mdtest_hard_delete', 'find'
+]
 
 BENCHMARK_NAME = 'io500'
 BENCHMARK_CONFIG = """
@@ -83,9 +98,19 @@ def Prepare(benchmark_spec):
   # TODO(yuyanting) Make this a flag to accept other configs.
   local_path = data.ResourcePath('io500/io500.ini.j2')
   remote_path = f'{BENCHMARK_DIR}/io500.ini'
+
+  tests_to_run = _IO500_TESTS.value
+  run_all = 'all' in tests_to_run
+
+  context = {'directory': headnode.scratch_disks[0].mount_point}
+  for section in RUNNABLE_SECTIONS:
+    should_run = run_all or section in tests_to_run
+    context[f'run_{section}'] = 'TRUE' if should_run else 'FALSE'
+  logging.info('io500 context: %s', context)
+
   background_tasks.RunThreaded(lambda vm: vm.RenderTemplate(
       template_path=local_path, remote_path=remote_path,
-      context={'directory': headnode.scratch_disks[0].mount_point}
+      context=context
       ), vms)
 
 
