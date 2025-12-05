@@ -76,6 +76,12 @@ flags.DEFINE_string(
     'database created if unset. cloud_spanner_instance flag is '
     'mandatory to use this flag.',
 )
+_MAX_COMMIT_DELAY = flags.DEFINE_integer(
+    'cloud_spanner_max_commit_delay',
+    None,
+    'A delay to batch writes to increase throughput but also increase latency.'
+    ' See https://cloud.google.com/spanner/docs/throughput-optimized-writes',
+)
 
 # Flags related to managed autoscaler
 # https://cloud.google.com/spanner/docs/create-manage-instances#gcloud
