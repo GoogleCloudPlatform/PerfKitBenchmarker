@@ -72,8 +72,8 @@ CAPTURE_LIVE_MIGRATION_TIMESTAMPS = flags.DEFINE_boolean(
     ),
 )
 
-# 2h timeout for LM notification
-LM_NOTIFICATION_TIMEOUT_SECONDS = 60 * 60 * 2
+# 4h timeout for LM notification
+LM_NOTIFICATION_TIMEOUT_SECONDS = 60 * 60 * 4
 
 # 10m wait time prior to checking log for LM status
 LM_UNAVAILABLE_STATUS_WAIT_TIME_MIN = 10
