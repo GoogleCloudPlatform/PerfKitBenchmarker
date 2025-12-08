@@ -1,5 +1,6 @@
 """Tests for benchbase package."""
 
+import json
 import unittest
 from unittest import mock
 
@@ -109,6 +110,47 @@ class BenchbaseTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn(
         'jdbc:postgresql://localhost:5432/postgres', context['jdbc_url']
     )
+
+  def test_parse_results(self):
+    self.vm.RemoteCommand.side_effect = [
+        ('tpcc_2025-12-03_19-45-37.summary.json', ''),
+        (
+            json.dumps({
+                'Latency Distribution': {
+                    '95th Percentile Latency (microseconds)': 1555074,
+                    'Maximum Latency (microseconds)': 5588384,
+                    'Median Latency (microseconds)': 656210,
+                    'Minimum Latency (microseconds)': 7632,
+                    '25th Percentile Latency (microseconds)': 270068,
+                    '90th Percentile Latency (microseconds)': 1442239,
+                    '99th Percentile Latency (microseconds)': 2621825,
+                    '75th Percentile Latency (microseconds)': 1121111,
+                    'Average Latency (microseconds)': 732735,
+                },
+                'Throughput (requests/second)': 404.000,
+            }),
+            '',
+        ),
+    ]
+    results = benchbase.ParseResults(self.vm, {})
+    self.assertLen(results, 11)
+    actual_metrics = {s.metric: s.value for s in results}
+    expected_metrics = {
+        '95th_percentile_latency': 1555.074,
+        'maximum_latency': 5588.384,
+        'median_latency': 656.210,
+        'minimum_latency': 7.632,
+        '25th_percentile_latency': 270.068,
+        '90th_percentile_latency': 1442.239,
+        '99th_percentile_latency': 2621.825,
+        '75th_percentile_latency': 1121.111,
+        'average_latency': 732.735,
+        'tps': 404.000,
+        'tpmc': 10908.0,
+    }
+    for metric, value in expected_metrics.items():
+      self.assertIn(metric, actual_metrics)
+      self.assertAlmostEqual(actual_metrics[metric], value, places=3)
 
 
 if __name__ == '__main__':

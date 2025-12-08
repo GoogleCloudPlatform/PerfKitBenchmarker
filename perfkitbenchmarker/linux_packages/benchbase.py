@@ -13,15 +13,17 @@
 # limitations under the License.
 
 """Module containing Benchbase installation and cleanup functions."""
-# TODO(shuninglin): Add result parsing functions
 
+import json
 import logging
 import os
+from typing import Any
 
 from absl import flags
 import jinja2
 from perfkitbenchmarker import data as pkb_data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine
 
@@ -207,6 +209,66 @@ def CreateConfigFile(vm: virtual_machine.BaseVirtualMachine) -> None:
   except jinja2.TemplateError as e:
     logging.exception('Error rendering template: %s', e)
     return
+
+
+def ParseResults(
+    vm: virtual_machine.BaseVirtualMachine, metadata: dict[str, Any]
+) -> list[sample.Sample]:
+  """Parses the latest benchbase result file and returns metrics.
+
+  Args:
+    vm: The virtual machine to parse results from.
+    metadata: The metadata to attach to the samples.
+
+  Returns:
+    A list of sample.Sample objects.
+
+  Raises:
+    errors.Benchmarks.RunError: If the result file is not found or cannot be
+      parsed.
+  """
+  stdout, _ = vm.RemoteCommand(
+      f'ls -t {BENCHBASE_DIR}/results/tpcc*summary.json | head -n 1'
+  )
+  result_file = stdout.strip()
+  if not result_file:
+    raise errors.Benchmarks.RunError('Benchbase result file not found.')
+  stdout, _ = vm.RemoteCommand(f'cat {result_file}')
+  try:
+    results = json.loads(stdout)
+  except json.JSONDecodeError as e:
+    raise errors.Benchmarks.RunError(
+        f'Error parsing benchbase result file {result_file}: {e}'
+    ) from e
+  samples: list[sample.Sample] = []
+  latency_metrics = results.get('Latency Distribution', {})
+  if not latency_metrics:
+    raise errors.Benchmarks.RunError(
+        'Latency Distribution not found in benchbase result file.'
+    )
+  for key, value in latency_metrics.items():
+    metric_name = (
+        key.replace('(microseconds)', '').strip().replace(' ', '_').lower()
+    )
+    samples.append(sample.Sample(metric_name, value / 1000, 'ms', metadata))
+
+  if 'Throughput (requests/second)' in results:
+    throughput = results['Throughput (requests/second)']
+    samples.append(
+        sample.Sample(
+            'tps',
+            throughput,
+            'tps',
+            metadata,
+        )
+    )
+    tpmc = throughput * int(_BENCHBASE_TXN_WEIGHTS.value[0]) / 100.0 * 60.0
+    samples.append(sample.Sample('tpmc', tpmc, 'tpm', metadata))
+  else:
+    raise errors.Benchmarks.RunError(
+        'Throughput (requests/second) not found in benchbase result file.'
+    )
+  return samples
 
 
 def OverrideEndpoint(

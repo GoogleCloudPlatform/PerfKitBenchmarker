@@ -37,6 +37,8 @@ class BenchbaseBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         benchmark_spec.BenchmarkSpec, instance=True
     )
     self.mock_benchmark_spec.vms = [self.mock_vm]
+    self.mock_benchmark_spec.relational_db = mock.Mock()
+    self.mock_benchmark_spec.relational_db.GetResourceMetadata.return_value = {}
     self.mock_load_config = self.enter_context(
         mock.patch.object(configs, 'LoadConfig', autospec=True)
     )
@@ -58,10 +60,13 @@ class BenchbaseBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_vm.Install.assert_called_once_with('benchbase')
     mock_create_config.assert_called_once_with(self.mock_vm)
 
-  def test_run(self):
-    # TODO(shuninglin): Update test when Run is implemented
+  @mock.patch.object(benchbase, 'ParseResults', autospec=True)
+  def test_run(self, mock_parse_results):
+    mock_parse_results.return_value = []
     results = benchbase_benchmark.Run(self.mock_benchmark_spec)
     self.assertEqual(results, [])
+    self.mock_benchmark_spec.relational_db.GetResourceMetadata.assert_called_once()
+    mock_parse_results.assert_called_once_with(self.mock_vm, {})
 
 
 if __name__ == '__main__':

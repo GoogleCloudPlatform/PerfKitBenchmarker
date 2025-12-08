@@ -80,8 +80,6 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   return config
 
 
-# TODO(shuninglin): need to implement auth logic(automatic password gen)
-# for DSQL
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """Prepares the benchmark by installing BenchBase and loading data.
 
@@ -147,10 +145,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
       ' --execute=true"'
   )
   client_vm.RemoteCommand(run_command)
-  # TODO(shuninglin): Parse results from the output files
-
-  samples: List[sample.Sample] = []
-  return samples
+  metadata = benchmark_spec.relational_db.GetResourceMetadata()
+  return benchbase.ParseResults(client_vm, metadata)
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
