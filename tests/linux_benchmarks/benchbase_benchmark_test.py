@@ -50,7 +50,7 @@ class BenchbaseBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         benchbase_benchmark.BENCHMARK_NAME,
     )
 
-  @flagsaver.flagsaver(benchbase_db_engine='spanner')
+  @flagsaver.flagsaver(db_engine='spanner-postgres')
   @mock.patch.object(benchbase, 'CreateConfigFile', autospec=True)
   def test_prepare(self, mock_create_config):
     benchbase_benchmark.Prepare(self.mock_benchmark_spec)

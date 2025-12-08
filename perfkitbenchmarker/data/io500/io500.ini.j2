@@ -25,11 +25,11 @@ verbosity =
 
 [ior-easy-write]
 API =
-run = TRUE
+run = {{ run_ior_easy_write }}
 
 [ior-easy-read]
 API =
-run = TRUE
+run = {{ run_ior_easy_read }}
 
 [mdtest-easy]
 API =
@@ -38,15 +38,15 @@ run = TRUE
 
 [mdtest-easy-write]
 API =
-run = TRUE
+run = {{ run_mdtest_easy_write }}
 
 [mdtest-hard-stat]
 API =
-run = TRUE
+run = {{ run_mdtest_hard_stat }}
 
 [mdtest-hard-read]
 API =
-run = TRUE
+run = {{ run_mdtest_hard_read }}
 
 [timestamp]
 
@@ -70,7 +70,7 @@ verbosity =
 [ior-hard-write]
 API =
 collective =
-run = TRUE
+run = {{ run_ior_hard_write }}
 
 [mdtest-hard]
 API =
@@ -80,14 +80,14 @@ run = TRUE
 
 [mdtest-hard-write]
 API =
-run = TRUE
+run = {{ run_mdtest_hard_write }}
 
 [find]
 external-script =
 external-mpi-args =
 external-extra-args =
 nproc =
-run = TRUE
+run = {{ run_find }}
 pfind-queue-length = 10000
 pfind-steal-next = FALSE
 pfind-parallelize-single-dir-access-using-hashing = FALSE
@@ -107,17 +107,17 @@ run = FALSE
 
 [mdtest-easy-stat]
 API =
-run = TRUE
+run = {{ run_mdtest_easy_stat }}
 
 [ior-hard-read]
 API =
 collective =
-run = TRUE
+run = {{ run_ior_hard_read }}
 
 [mdtest-easy-delete]
 API =
-run = TRUE
+run = {{ run_mdtest_easy_delete }}
 
 [mdtest-hard-delete]
 API =
-run = TRUE
+run = {{ run_mdtest_hard_delete }}

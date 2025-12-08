@@ -82,8 +82,8 @@ GCP_DATABASE_VERSION_MAPPING = {
 }
 
 
-DEFAULT_MYSQL_VERSION = '5.7'
-DEFAULT_POSTGRES_VERSION = '9.6'
+DEFAULT_MYSQL_VERSION = '8.0'
+DEFAULT_POSTGRES_VERSION = '17'
 DEFAULT_SQL_SERVER_VERSION = '2017_Standard'
 
 DEFAULT_ENGINE_VERSIONS = {
@@ -212,8 +212,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
 
   This class contains logic required to provision and teardown the database.
   Currently, the database will be open to the world (0.0.0.0/0) which is not
-  ideal; however, a password is still required to connect. Currently only
-  MySQL 5.7 and Postgres 9.6 are supported.
+  ideal; however, a password is still required to connect.
   """
 
   CLOUD = provider_info.GCP
@@ -298,12 +297,11 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       cmd_string.append('--no-backup')
     cmd = util.GcloudCommand(*cmd_string)
     cmd.flags['project'] = self.project
+    # Needed for labels and allocated-ip-range-name
     cmd.use_beta_gcloud = True
 
     if self.spec.db_tier:
       cmd.flags['edition'] = self.spec.db_tier
-      cmd.use_alpha_gcloud = True
-      cmd.use_beta_gcloud = False
       if relational_db.ENABLE_DATA_CACHE.value:
         cmd.flags['enable-data-cache'] = True
       else:
@@ -758,6 +756,12 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
 
     samples.append(
         sample.Sample(f'{metric_basename}_average', avg_val, unit, metadata={})
+    )
+    samples.append(
+        sample.Sample(f'{metric_basename}_min', min(values), unit, metadata={})
+    )
+    samples.append(
+        sample.Sample(f'{metric_basename}_max', max(values), unit, metadata={})
     )
     samples.append(
         sample.CreateTimeSeriesSample(

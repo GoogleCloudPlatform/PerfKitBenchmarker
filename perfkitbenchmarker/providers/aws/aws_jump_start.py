@@ -227,7 +227,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
   def _CreateDependencies(self) -> None:
     self.vm.Install('pip')
     self.vm.Install('awscli')
-    self.vm.RunCommand('pip install sagemaker')
+    self.vm.RunCommand('pip install "sagemaker<3.0.0"')
     self.vm.RunCommand('pip install absl-py')
     self.python_script = self.vm.PrepareResourcePath(AWS_RUNNER_SCRIPT)
     super()._CreateDependencies()

@@ -23,45 +23,42 @@ class BenchbaseTest(pkb_common_test_case.PkbCommonTestCase):
   def test_uninstall(self):
     benchbase.Uninstall(self.vm)
     self.vm.RemoteCommand.assert_called_once_with(
-        f'sudo rm -rf {benchbase._BENCHBASE_DIR}'
+        f'sudo rm -rf {benchbase.BENCHBASE_DIR}'
     )
 
-  @flagsaver.flagsaver((benchbase._BENCHBASE_DB_ENGINE, 'spanner'))
+  @flagsaver.flagsaver(db_engine='spanner-postgres')
   @mock.patch.object(benchbase, '_InstallJDK23', autospec=True)
   def test_install_spanner(self, mock_install_jdk):
     benchbase.Install(self.vm)
     mock_install_jdk.assert_called_once_with(self.vm)
     self.vm.RemoteCommand.assert_has_calls([
-        mock.call(f'sudo rm -rf {benchbase._BENCHBASE_DIR}'),
+        mock.call(f'sudo rm -rf {benchbase.BENCHBASE_DIR}'),
         mock.call(
             'git clone https://github.com/cmu-db/benchbase.git'
-            f' {benchbase._BENCHBASE_DIR}'
+            f' {benchbase.BENCHBASE_DIR}'
         ),
     ])
 
   @flagsaver.flagsaver(
-      (benchbase._BENCHBASE_DB_ENGINE, 'aurora_dsql'),
-      (
-          benchbase._BENCHBASE_REPO_URL,
-          'https://github.com/amazon-contributing/aurora-dsql-benchbase-benchmarking.git',
-      ),
+      db_engine='aurora-dsql-postgres',
+      benchbase_repo_url='https://github.com/amazon-contributing/aurora-dsql-benchbase-benchmarking.git',
   )
   @mock.patch.object(benchbase, '_InstallJDK23', autospec=True)
   def test_install_aurora_dsql(self, mock_install_jdk):
     benchbase.Install(self.vm)
     mock_install_jdk.assert_called_once_with(self.vm)
     self.vm.RemoteCommand.assert_has_calls([
-        mock.call(f'sudo rm -rf {benchbase._BENCHBASE_DIR}'),
+        mock.call(f'sudo rm -rf {benchbase.BENCHBASE_DIR}'),
         mock.call(
             'git clone'
             ' https://github.com/amazon-contributing/aurora-dsql-benchbase-benchmarking.git'
-            f' {benchbase._BENCHBASE_DIR}'
+            f' {benchbase.BENCHBASE_DIR}'
         ),
     ])
 
   @flagsaver.flagsaver(
-      (benchbase._BENCHBASE_DB_ENGINE, 'spanner'),
-      (benchbase._BENCHBASE_RATE, '500'),
+      db_engine='spanner-postgres',
+      benchbase_rate='500',
   )
   @mock.patch.object(pkb_data, 'ResourcePath', return_value='dummy_template.j2')
   def test_create_config_file_spanner(self, _):
@@ -70,7 +67,7 @@ class BenchbaseTest(pkb_common_test_case.PkbCommonTestCase):
     _, kwargs = self.vm.RenderTemplate.call_args
 
     self.assertEqual(kwargs['template_path'], 'dummy_template.j2')
-    self.assertEqual(kwargs['remote_path'], benchbase._CONFIG_FILE_PATH)
+    self.assertEqual(kwargs['remote_path'], benchbase.CONFIG_FILE_PATH)
 
     context = kwargs['context']
     self.assertEqual(context['db_type'], 'POSTGRES')
@@ -88,8 +85,8 @@ class BenchbaseTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(context['terminals'], 200)
 
   @flagsaver.flagsaver(
-      (benchbase._BENCHBASE_DB_ENGINE, 'aurora_dsql'),
-      (benchbase._BENCHBASE_RATE, 'unlimited'),
+      db_engine='aurora-dsql-postgres',
+      benchbase_rate='unlimited',
   )
   @mock.patch.object(pkb_data, 'ResourcePath', return_value='dummy_template.j2')
   def test_create_config_file_aurora_dsql(self, _):
@@ -98,15 +95,15 @@ class BenchbaseTest(pkb_common_test_case.PkbCommonTestCase):
     _, kwargs = self.vm.RenderTemplate.call_args
 
     self.assertEqual(kwargs['template_path'], 'dummy_template.j2')
-    self.assertEqual(kwargs['remote_path'], benchbase._CONFIG_FILE_PATH)
+    self.assertEqual(kwargs['remote_path'], benchbase.CONFIG_FILE_PATH)
 
     context = kwargs['context']
     self.assertEqual(context['db_type'], 'AURORADSQL')
     self.assertEqual(
-        context['username_element'], '<!--<username>admin</username>-->'
+        context['username_element'], '<username>admin</username>'
     )
     self.assertEqual(
-        context['password_element'], '<!--<password>password</password>-->'
+        context['password_element'], '<password></password>'
     )
     self.assertEqual(context['rate_element'], '<rate>unlimited</rate>')
     self.assertIn(

@@ -599,6 +599,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       storage_service = object_storage_service.GetObjectStorageClass(
           FLAGS.cloud
       )()
+      storage_service.PrepareService(self.cluster.region)
       storage_service.Copy(self.huggingface_token, secret_file_path)
 
       with open(secret_file_path, mode='r+') as secret_file:
@@ -619,11 +620,14 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
   def _GetInferenceServerManifest(self) -> str:
     """Generates and retrieves the inference server manifest content."""
+    provider = self.spec.cloud.lower()
+    if provider == 'gcp':
+      provider = 'gke'
     generate_args = {
         'kind': 'core/deployment',
         'model-server': self.spec.model_server,
         'model': self.spec.model_name,
-        'provider': self.spec.catalog_provider,
+        'provider': provider,
         'components': self.spec.catalog_components,
         **self.spec.extra_deployment_args,
     }

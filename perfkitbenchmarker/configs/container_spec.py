@@ -483,6 +483,10 @@ class ContainerClusterSpec(spec.BaseSpec):
             kubernetes_inference_server_spec.InferenceServerConfigDecoder,
             {'default': None, 'none_ok': True},
         ),
+        'enable_vpa': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
+        ),
     })
     return result
 

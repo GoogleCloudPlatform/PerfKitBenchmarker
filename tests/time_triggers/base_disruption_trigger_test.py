@@ -56,10 +56,18 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
 
   @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
   def testAppendSamples(self):
-    time_dic = {'LM_total_time': 10, 'Host_maintenance_end': 0}
+    time_dic = {
+        'LM_total_time': 10,
+        'Host_maintenance_end': 10,
+        'Host_maintenance_start': 4,
+    }
     s = []
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
-    self.trigger.WaitForDisruption.return_value = [time_dic]
+    self.trigger.WaitForDisruption.return_value = [
+        base_disruption_trigger.DisruptionEvent(
+            total_time=10, end_time=10, start_time=4
+        )
+    ]
     self.trigger.AppendSamples(None, vm_spec, s)
     self.assertEqual(
         s,
@@ -603,10 +611,11 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     self.trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    self.trigger.WaitForDisruption.return_value = [{
-        'LM_total_time': 100,
-        'Host_maintenance_end': 8,
-    }]
+    self.trigger.WaitForDisruption.return_value = [
+        base_disruption_trigger.DisruptionEvent(
+            total_time=100, end_time=8, start_time=4
+        )
+    ]
     self.trigger.AppendSamples(None, vm_spec, samples)
     self.assertEqual(
         samples,
@@ -684,6 +693,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
                     'interval': 1,
                     'LM_total_time': 100,
                     'Host_maintenance_end': 8,
+                    'Host_maintenance_start': 4,
                 },
                 timestamp=0,
             ),
@@ -801,10 +811,11 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     self.trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    self.trigger.WaitForDisruption.return_value = [{
-        'LM_total_time': 100,
-        'Host_maintenance_end': 8,
-    }]
+    self.trigger.WaitForDisruption.return_value = [
+        base_disruption_trigger.DisruptionEvent(
+            total_time=100, end_time=8, start_time=4
+        )
+    ]
     self.trigger.AppendSamples(None, vm_spec, samples)
     self.assertEqual(
         samples,
@@ -884,6 +895,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
                     'random': 'random',
                     'LM_total_time': 100,
                     'Host_maintenance_end': 8,
+                    'Host_maintenance_start': 4,
                 },
                 timestamp=0,
             ),
@@ -1004,10 +1016,11 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     self.trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    self.trigger.WaitForDisruption.return_value = [{
-        'LM_total_time': 100,
-        'Host_maintenance_end': 11,
-    }]
+    self.trigger.WaitForDisruption.return_value = [
+        base_disruption_trigger.DisruptionEvent(
+            total_time=100, end_time=11, start_time=4
+        )
+    ]
     self.trigger.AppendSamples(None, vm_spec, samples)
 
     self.assertEqual(
@@ -1036,6 +1049,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
                     'random': 'random',
                     'LM_total_time': 100,
                     'Host_maintenance_end': 11,
+                    'Host_maintenance_start': 4,
                 },
                 timestamp=0,
             ),
@@ -1161,10 +1175,11 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     self.trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    self.trigger.WaitForDisruption.return_value = [{
-        'LM_total_time': 100,
-        'Host_maintenance_end': 11,
-    }]
+    self.trigger.WaitForDisruption.return_value = [
+        base_disruption_trigger.DisruptionEvent(
+            total_time=100, end_time=11, start_time=4
+        )
+    ]
     self.trigger.AppendSamples(None, vm_spec, samples)
     # Assertions
     self.assertEqual(
@@ -1193,6 +1208,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
                     'random': 'random',
                     'LM_total_time': 100,
                     'Host_maintenance_end': 11,
+                    'Host_maintenance_start': 4,
                 },
                 timestamp=0,
             ),
@@ -1318,10 +1334,11 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     self.trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    self.trigger.WaitForDisruption.return_value = [{
-        'LM_total_time': 100,
-        'Host_maintenance_end': 8,
-    }]
+    self.trigger.WaitForDisruption.return_value = [
+        base_disruption_trigger.DisruptionEvent(
+            total_time=100, end_time=8, start_time=4
+        )
+    ]
     self.trigger.AppendSamples(None, vm_spec, samples)
     # Assertions
     self.assertEqual(
@@ -1350,6 +1367,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
                     'random': 'random',
                     'LM_total_time': 100,
                     'Host_maintenance_end': 8,
+                    'Host_maintenance_start': 4,
                 },
                 timestamp=0,
             ),

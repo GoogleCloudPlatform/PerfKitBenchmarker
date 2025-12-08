@@ -509,6 +509,7 @@ class BaseContainerCluster(resource.BaseResource):
     self.services: dict[str, KubernetesContainerService] = {}
     self._extra_samples: list[sample.Sample] = []
     self.container_registry: BaseContainerRegistry | None = None
+    self.enable_vpa: bool = cluster_spec.enable_vpa
 
   @property
   def num_nodes(self) -> int:
@@ -1321,6 +1322,214 @@ class KubernetesClusterCommands:
     ]
 
   @staticmethod
+  def _GetPodNamesForResource(
+      resource_name: str, namespace: str = ''
+  ) -> list[str]:
+    """Gets the names of pods managed by a resource (e.g., deployment).
+
+    The resource must have a .spec.selector.matchLabels defined, and non-empty.
+
+    Args:
+      resource_name: the resource type and name, e.g. 'deployment/my_deploy'.
+      namespace: The namespace of the resource.
+
+    Raises:
+      ValueError: if the resource does not have a (non-empty)
+        `.spec.selector.matchLabels` field or if the field cannot be parsed.
+    """
+    # NB: If this approach is insufficient, then we could convert this to use
+    # ownerReferences instead. This would mean going over several hops (i.e.
+    # deployment->replicaset->pods) so probably is not worth it unless the
+    # current approach prooves inadequate.
+
+    # 1. Get the selector from the resource.
+    get_selector_cmd = [
+        'get',
+        resource_name,
+        '-n',
+        namespace,
+        "-o=jsonpath='{.spec.selector.matchLabels}'",
+    ]
+    selector_stdout, stderr, retcode = RunKubectlCommand(
+        get_selector_cmd, raise_on_failure=False
+    )
+    if retcode != 0:
+      if 'NotFound' in stderr:
+        return []
+      raise errors.VmUtil.IssueCommandError(
+          f'Failed to get selector for resource {resource_name}: {stderr}'
+      )
+
+    try:
+      # The output can be empty if there are no labels (which violates the
+      # pre-condition).
+      selector_str = selector_stdout.strip("'")
+      if not selector_str:
+        raise ValueError(
+            'A resource without a .spec.selector.matchLabels was passed to'
+            ' _GetPodNamesForResource.'
+        )
+      selector_dict = json.loads(selector_str)
+    except json.JSONDecodeError as e:
+      raise ValueError(
+          f'Could not decode selector for resource {resource_name}:'
+          f' {selector_stdout}'
+      ) from e
+
+    if not selector_dict:
+      raise ValueError(
+          'A resource without a (non-empty) .spec.selector.matchLabels was'
+          ' passed to _GetPodNamesForResource.'
+      )
+
+    # 2. Construct the label selector string.
+    selector_parts = [f'{key}={value}' for key, value in selector_dict.items()]
+    label_selector = ','.join(selector_parts)
+
+    # 3. Get pods using the selector.
+    get_pods_cmd = [
+        'get',
+        'pods',
+        '-l',
+        label_selector,
+        '-n',
+        namespace,
+        '-o=jsonpath={.items[*].metadata.name}',
+    ]
+    pods_stdout, _, _ = RunKubectlCommand(get_pods_cmd)
+
+    return pods_stdout.strip().split()
+
+  @staticmethod
+  def GetCPURequestSamples(
+      resource_name: str, namespace: str = ''
+  ) -> list[Sample]:
+    """Returns the CPU requests for all pods within the specified resource.
+
+    Args:
+      resource_name: The deployment/statefulset/etc's name, e.g.
+        'deployment/my_deployment'.
+      namespace: The namespace of the resource. If omitted, the 'default'
+        namespace will be used.
+
+    Returns:
+      A list of Samples, each representing the CPU request of a pod.
+    """
+    now = int(time.time())
+
+    pod_names = KubernetesClusterCommands._GetPodNamesForResource(
+        resource_name, namespace
+    )
+    samples = []
+
+    for pod_name in pod_names:
+      # Get CPU requests for each pod
+      cpu_request_stdout, _, _ = RunKubectlCommand(
+          [
+              'get',
+              'pod',
+              pod_name,
+              '-n',
+              namespace,
+              '-o=jsonpath={.spec.containers[*].resources.requests.cpu}',
+          ],
+      )
+
+      # Convert CPU string (e.g., "100m", "1") to float (cores)
+      cpu_request_str = cpu_request_stdout.strip()
+      if not cpu_request_str:
+        continue
+      if cpu_request_str.endswith('m'):
+        cpu_request = float(cpu_request_str[:-1]) / 1000
+      else:
+        cpu_request = float(cpu_request_str)
+
+      samples.append(
+          Sample(
+              metric='kubernetes_cpu_request',
+              value=cpu_request,
+              unit='cores',
+              metadata={
+                  'namespace': namespace,
+                  'resource_name': resource_name,
+                  'pod': pod_name,
+              },
+              timestamp=now,
+          )
+      )
+    return samples
+
+  @staticmethod
+  def GetCPUUsageSamples(
+      resource_name: str, namespace: str = ''
+  ) -> list[Sample]:
+    """Returns the CPU usage for all pods within the specified resource.
+
+    Args:
+      resource_name: The deployment/statefulset/etc's name, e.g.
+        'deployment/my_deployment'.
+      namespace: The namespace of the resource. If omitted, the 'default'
+        namespace will be used.
+
+    Returns:
+      A list of Samples, each representing the CPU usage of a pod.
+    """
+    now = int(time.time())
+
+    pod_names = KubernetesClusterCommands._GetPodNamesForResource(
+        resource_name, namespace
+    )
+    samples = []
+
+    for pod_name in pod_names:
+      # Get CPU usage for each pod using kubectl top
+      # kubectl top pod <pod-name> --namespace <namespace> --containers
+      # This returns output like:
+      # POD       NAME   CPU(cores)   MEMORY(bytes)
+      # fib-xyz   fib    10m          20Mi
+      top_output, stderr, retcode = RunKubectlCommand(
+          ['top', 'pod', pod_name, '--namespace', namespace, '--containers'],
+          raise_on_failure=False,
+      )
+      if retcode != 0:
+        logging.warning(
+            'Could not get CPU usage for pod %s: %s', pod_name, stderr
+        )
+        continue
+
+      # Parse the output to get CPU usage
+      # Skip header and split lines
+      lines = top_output.strip().split('\n')[1:]
+      for line in lines:
+        parts = line.split()
+        if len(parts) < 4:
+          raise errors.VmUtil.IssueCommandError(
+              f'Unexpected output line from kubectl top: {line}'
+          )
+
+        cpu_usage_str = parts[2]
+        if cpu_usage_str.endswith('m'):
+          cpu_usage = float(cpu_usage_str[:-1]) / 1000
+        else:
+          cpu_usage = float(cpu_usage_str)
+
+        samples.append(
+            Sample(
+                metric='kubernetes_cpu_usage',
+                value=cpu_usage,
+                unit='cores',
+                metadata={
+                    'namespace': namespace,
+                    'resource_name': resource_name,
+                    'pod': pod_name,
+                    'container': parts[1],  # Container name
+                },
+                timestamp=now,
+            )
+        )
+    return samples
+
+  @staticmethod
   def CreateConfigMap(name: str, from_file_dir: str):
     """Creates a Kubernetes ConfigMap.
 
@@ -1663,6 +1872,9 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     if self.inference_server:
       self.inference_server.Delete()
     super().Delete(freeze)
+
+  def _PreDelete(self):
+    self._DeleteAllFromDefaultNamespace()
 
   def _Delete(self):
     if self.event_poller:

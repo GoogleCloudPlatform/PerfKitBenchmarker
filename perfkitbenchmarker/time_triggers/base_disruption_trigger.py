@@ -16,9 +16,10 @@
 import collections
 from collections.abc import Mapping, MutableSequence
 import copy
+import dataclasses
 import logging
 import statistics
-from typing import Any
+from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
@@ -50,11 +51,19 @@ MAINTENANCE_DEGRADATION_WINDOW = flags.DEFINE_float(
 )
 
 
+@dataclasses.dataclass
+class DisruptionEvent:
+  start_time: float = 0.0
+  end_time: float = 0.0
+  total_time: float = 0.0
+
+
 class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
   """Class contains logic for triggering maintenance events."""
 
   def __init__(self, delay: int):
     super().__init__(delay)
+    self.metadata = {}
     self.disruption_ends = None
 
   def TriggerMethod(self, vm: virtual_machine.VirtualMachine):
@@ -65,9 +74,17 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
     """See base class."""
     raise NotImplementedError()
 
-  def WaitForDisruption(self) -> MutableSequence[Mapping[str, Any]]:
+  def WaitForDisruption(self) -> MutableSequence[DisruptionEvent]:
     """Wait for disruption to end and return the end time."""
     return []
+
+  def GetMetadataForTrigger(self, event: DisruptionEvent) -> Dict[str, Any]:
+    """Get the metadata for the trigger and append it to the samples."""
+    return self.metadata | {
+        'LM_total_time': event.total_time,
+        'Host_maintenance_start': event.start_time,
+        'Host_maintenance_end': event.end_time,
+    }
 
   def AppendSamples(
       self,
@@ -84,7 +101,7 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
 
       # Host maintenance is in s
       self.disruption_ends = max(
-          [float(d['Host_maintenance_end']) * 1000 for d in events],
+          [float(d.end_time) * 1000 for d in events],
           default=0,
       )
 
@@ -99,9 +116,9 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
       return [
           sample.Sample(
               'LM Total Time',
-              d['LM_total_time'],
+              d.total_time,
               'seconds',
-              sample_metadata | d,
+              sample_metadata | self.GetMetadataForTrigger(d),
           )
           for d in events
       ]

@@ -1067,36 +1067,19 @@ class EksKarpenterCluster(BaseEksCluster):
     )
 
   def _Delete(self):
-    """Deletes ALB, the control plane and worker nodes."""
-    # Delete ingress to remove ALB
-    vm_util.IssueCommand(
-        [
-            FLAGS.kubectl,
-            '--kubeconfig',
-            FLAGS.kubeconfig,
-            'delete',
-            'ingress',
-            '--all',
-            '--all-namespaces',
-            '--timeout=600s',
-        ],
-        timeout=660,
-        suppress_failure=lambda stdout, stderr, retcode: (
-            'deleted' in stdout
-            and 'timed out waiting for the condition' in stderr
-        ),
-    )
+    """Deletes the control plane and worker nodes."""
+    self._DeleteIngresses()
+    self._CleanupKarpenter()
     super()._Delete()
-    cmd = [
-        FLAGS.eksctl,
-        'delete',
-        'cluster',
-        '--name',
-        self.name,
+    vm_util.IssueCommand([
+        'aws',
+        'cloudformation',
+        'delete-stack',
+        '--stack-name',
+        self.stack_name,
         '--region',
-        self.region,
-    ]
-    vm_util.IssueCommand(cmd, timeout=1800)
+        f'{self.region}',
+    ])
 
   def _DeleteDependencies(self):
     """Deletes the CloudFormation stack."""
@@ -1147,6 +1130,140 @@ class EksKarpenterCluster(BaseEksCluster):
       ])
     # Finish deleting the stack after deleting the role.
     vm_util.IssueCommand(delete_stack_cmd)
+
+  def _DeleteIngresses(self):
+    """Deletes all ingresses in all namespaces (to trigger ALB deletion)."""
+    container_service.RunKubectlCommand(
+        [
+            'delete',
+            'ingress',
+            '--all',
+            '--all-namespaces',
+            '--timeout=600s',
+        ],
+        timeout=660,
+        suppress_failure=lambda stdout, stderr, retcode: (
+            'deleted' in stdout
+            and 'timed out waiting for the condition' in stderr
+        ),
+    )
+
+  def _CleanupKarpenter(self):
+    """Cleanup Karpenter managed nodes before cluster deletion."""
+    logging.info('Cleaning up Karpenter nodes...')
+    # Delete NodePool resources - this will trigger node termination
+    container_service.RunKubectlCommand(
+        [
+            'delete',
+            'nodepool,ec2nodeclass',
+            '--all',
+            '--timeout=120s',
+        ],
+        suppress_failure=lambda stdout, stderr, retcode: (
+            'no resources found' in stderr.lower()
+            or 'not found' in stderr.lower()
+            or 'timed out waiting for the condition' in stderr.lower()
+        ),
+    )
+    # Wait for all Karpenter nodes to be deleted
+    container_service.RunKubectlCommand(
+        [
+            'wait',
+            '--for=delete',
+            'node',
+            '-l',
+            'karpenter.sh/nodepool',
+            '--timeout=120s',
+        ],
+        suppress_failure=lambda stdout, stderr, retcode: (
+            'no matching resources found' in stderr.lower()
+            or 'timed out' in stderr.lower()
+        ),
+    )
+    # Force terminate remaining EC2 instances
+    stdout, _, _ = vm_util.IssueCommand(
+        [
+            'aws',
+            'ec2',
+            'describe-instances',
+            '--region',
+            self.region,
+            '--filters',
+            'Name=tag:karpenter.sh/nodepool,Values=*',
+            f'Name=tag:kubernetes.io/cluster/{self.name},Values=owned',
+            'Name=instance-state-name,Values=running,pending',
+            '--query',
+            'Reservations[].Instances[].InstanceId',
+            '--output',
+            'text',
+        ],
+    )
+    instance_ids = stdout.strip().split() if stdout and stdout.strip() else []
+    if instance_ids:
+      logging.info('Terminating %d remaining instances', len(instance_ids))
+      vm_util.IssueCommand(
+          [
+              'aws',
+              'ec2',
+              'terminate-instances',
+              '--region',
+              self.region,
+              '--instance-ids',
+              *instance_ids,
+          ],
+      )
+      vm_util.IssueCommand(
+          [
+              'aws',
+              'ec2',
+              'wait',
+              'instance-terminated',
+              '--region',
+              self.region,
+              '--instance-ids',
+              *instance_ids,
+          ],
+          timeout=180,
+      )
+    # Cleanup orphaned network interfaces
+    stdout, _, _ = vm_util.IssueCommand(
+        [
+            'aws',
+            'ec2',
+            'describe-network-interfaces',
+            '--region',
+            self.region,
+            '--filters',
+            f'Name=tag:cluster.k8s.amazonaws.com/name,Values={self.name}',
+            'Name=status,Values=available',
+            '--query',
+            'NetworkInterfaces[].NetworkInterfaceId',
+            '--output',
+            'text',
+        ],
+        suppress_failure=lambda stdout, stderr, retcode: (
+            'not found' in stderr.lower()
+        ),
+    )
+    eni_ids = stdout.strip().split() if stdout and stdout.strip() else []
+    if eni_ids:
+      logging.info('Deleting %d orphaned network interfaces', len(eni_ids))
+      for eni_id in eni_ids:
+        vm_util.IssueCommand(
+            [
+                'aws',
+                'ec2',
+                'delete-network-interface',
+                '--region',
+                self.region,
+                '--network-interface-id',
+                eni_id,
+            ],
+            suppress_failure=lambda stdout, stderr, retcode: (
+                'not found' in stderr.lower()
+                or 'does not exist' in stderr.lower()
+            ),
+        )
 
   def _IsReady(self):
     """Returns True if cluster is running. Autopilot defaults to 0 nodes."""

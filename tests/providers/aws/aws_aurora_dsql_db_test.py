@@ -14,6 +14,7 @@
 """Tests for Aurora DSQL resource."""
 
 import contextlib
+import inspect
 import json
 import unittest
 
@@ -67,7 +68,6 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',
         'db_spec': mock.MagicMock(),
-        'db_disk_spec': mock.MagicMock(disk_type='gp2'),
         'enable_freeze_restore': False,
         'create_on_restore_error': False,
         'delete_on_freeze_error': False,
@@ -113,7 +113,7 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     ):
       db = self.CreateDbFromSpec()
       tags = db._MakeDsqlTags()
-      self.assertEqual(tags, ['tag1=value1,tag2=value2'])
+      self.assertEqual(tags, ['tag1=value1,tag2=value2,Name=pkb-123'])
 
   def testDescribeCluster(self):
     """Tests that the describe cluster command is correct."""
@@ -190,6 +190,36 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.cluster_id = 'fake_cluster_id'
     metadata = db.GetResourceMetadata()
     self.assertEqual(metadata['dsql_cluster_id'], 'fake_cluster_id')
+
+
+class AwsAuroraDsqlSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    FLAGS['run_uri'].value = '123'
+    FLAGS.ignore_package_requirements = True
+    FLAGS.cloud = 'AWS'
+
+  def testDsqlSpecWithoutDiskSpecFromYaml(self):
+    """Tests that DSQL spec can be created without disk spec."""
+    yaml_string = inspect.cleandoc("""
+    benchbase:
+      description: Runs Benchbase benchmark.
+      relational_db:
+        cloud: AWS
+        engine: aurora-dsql-postgres
+        db_spec:
+          AWS:
+            zone: us-east-1a
+    """)
+    test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_string=yaml_string, benchmark_name='benchbase'
+    )
+    test_bm_spec.ConstructRelationalDb()
+    self.assertIsInstance(
+        test_bm_spec.relational_db,
+        aws_aurora_dsql_db.AwsAuroraDsqlRelationalDb,
+    )
 
 
 if __name__ == '__main__':

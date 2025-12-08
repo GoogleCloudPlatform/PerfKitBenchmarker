@@ -141,7 +141,7 @@ class DocumentDb(non_relational_db.BaseManagedMongoDb):
   """Class for working with DocumentDB."""
 
   SERVICE_TYPE = non_relational_db.DOCUMENTDB
-  READY_TIMEOUT = 30 * 60
+  READY_TIMEOUT = 60 * 60
 
   def __init__(
       self,

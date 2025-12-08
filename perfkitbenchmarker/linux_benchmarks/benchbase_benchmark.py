@@ -24,30 +24,28 @@ from typing import Any, Dict, List
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.linux_packages import benchbase
+# Needed in order to register spec:
+from perfkitbenchmarker.providers.aws import aws_aurora_dsql_db  # pylint: disable=unused-import
 
+
+SPANNER_POSTGRES = sql_engine_utils.SPANNER_POSTGRES
 BENCHMARK_NAME: str = 'benchbase'
 BENCHMARK_CONFIG: str = """
 benchbase:
   description: Runs Benchbase benchmark.
   relational_db:
-    cloud: GCP
-    engine: spanner-postgres
+    cloud: AWS
+    engine: aurora-dsql-postgres
     db_spec:
       GCP:
         machine_type: db-n1-standard-16
         zone: us-central1-f
       AWS:
-        machine_type: db.m4.4xlarge
         zone: us-east-1a
-    db_disk_spec:
-      GCP:
-        disk_size: 2048
-        disk_type: pd-ssd
-      AWS: # not actually used by it's a required spec so fill random values
-        disk_size: 6144
-        disk_type: gp2
     vm_groups:
       clients:
         vm_spec:
@@ -78,7 +76,8 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   Returns:
     loaded benchmark configuration
   """
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  return config
 
 
 # TODO(shuninglin): need to implement auth logic(automatic password gen)
@@ -99,7 +98,29 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   # Create the configuration file on the client VM
   benchbase.CreateConfigFile(client_vm)
-  # TODO(shuninglin): Implement benchbase data loading
+  if FLAGS.db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
+    dsql: aws_aurora_dsql_db.AwsAuroraDsqlRelationalDb = (
+        benchmark_spec.relational_db
+    )
+    # Ideally we want to use endpoint from get-cluster command but it's not
+    # returning endpoint as documented. That said this hard-coded endpoint
+    # construction is also documented so should be reliable.
+    # https://docs.aws.amazon.com/aurora-dsql/latest/userguide/SECTION_authentication-token.html#authentication-token-cli
+    endpoint: str = f'{dsql.cluster_id}.dsql.{dsql.region}.on.aws'
+    benchbase.OverrideEndpoint(client_vm, endpoint)
+  profile: str = (
+      'postgres'
+      if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
+      else 'auroradsql'
+  )
+  load_command: str = (
+      f'source /etc/profile.d/maven.sh && cd {benchbase.BENCHBASE_DIR} && mvn'
+      f' clean compile exec:java -P {profile} -Dexec.args="-b tpcc -c'
+      f' {benchbase.CONFIG_FILE_NAME} --create=true --load=true'
+      ' --execute=false"'
+  )
+
+  client_vm.RemoteCommand(load_command)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -111,13 +132,22 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   Returns:
     A list of sample.Sample objects.
   """
-  del benchmark_spec  # Unused for now.
-  # TODO(shuninglin): Implement the run phase
-  # 1. Construct the run command:
-  # 2.1 Send the first run command as warmup
-  # 2.2 Sleep for warmup duration
-  # 2.3 Send the second run command as the main workload
-  # 3. Parse results from the output files
+  client_vm = benchmark_spec.vms[0]
+  profile: str = (
+      'postgres'
+      if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
+      else 'auroradsql'
+  )
+  # TODO(shuninglin): implement the three-phase warmup run - cool down - formal
+  # run, right now it's just one run
+  run_command: str = (
+      f'source /etc/profile.d/maven.sh && cd {benchbase.BENCHBASE_DIR} && mvn'
+      f' clean compile exec:java -P {profile} -Dexec.args="-b tpcc -c'
+      f' {benchbase.CONFIG_FILE_NAME} --create=false --load=false'
+      ' --execute=true"'
+  )
+  client_vm.RemoteCommand(run_command)
+  # TODO(shuninglin): Parse results from the output files
 
   samples: List[sample.Sample] = []
   return samples

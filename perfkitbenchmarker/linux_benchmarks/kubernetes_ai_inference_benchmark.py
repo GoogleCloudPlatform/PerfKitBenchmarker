@@ -32,7 +32,6 @@ kubernetes_ai_inference:
     inference_server:
       model_server: vllm
       model_name: llama3-8b
-      catalog_provider: gke
       catalog_components: 1-L4
       hpa_max_replicas: 10
       extra_deployment_args:

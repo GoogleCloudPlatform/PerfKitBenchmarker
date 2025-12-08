@@ -16,6 +16,7 @@
 
 import os
 import unittest
+from unittest import mock
 import xml.etree.ElementTree as ET
 
 from absl import flags
@@ -183,6 +184,26 @@ class DiskspdBenchmarkTestCase(
     self.assertNotIn('-Sw', config)
     self.assertIn('-l', config)
     self.assertIn('-n', config)
+
+  @flagsaver.flagsaver(diskspd_file_size='1G', diskspd_prefill_block_size='1M')
+  def testRunDiskspdPrefillCommandForDuration(self):
+    vm = mock.Mock()
+    with mock.patch.object(
+        diskspd, '_CatXml', return_value='<xml>result</xml>'
+    ) as cat_xml_mock:
+      with mock.patch.object(diskspd, '_RemoveXml') as remove_xml_mock:
+        result = diskspd.RunDiskspdPrefillCommandForDuration(
+            vm, '/tmp/x86', 100
+        )
+        self.assertEqual(result, '<xml>result</xml>')
+        command = (
+            'cd /tmp/x86; .\\diskspd.exe -c1G -t16 -w100 -si -b1M -d100 -Rxml'
+            f' -Sh -o16 -Zr C:\\scratch\\{diskspd.DISKSPD_TMPFILE} >'
+            f' {diskspd.DISKSPD_XMLFILE}'
+        )
+        vm.RobustRemoteCommand.assert_called_with(command)
+        cat_xml_mock.assert_called_with(vm)
+        remove_xml_mock.assert_called_with(vm)
 
 
 if __name__ == '__main__':
