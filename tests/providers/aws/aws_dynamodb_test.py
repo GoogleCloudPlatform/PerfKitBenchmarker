@@ -81,7 +81,13 @@ def GetTestDynamoDBInstance(minimal=False):
       yaml_string=spec, benchmark_name='aws_dynamodb_ycsb'
   )
   test_benchmark_spec.ConstructNonRelationalDb()
-  return test_benchmark_spec.non_relational_db
+  instance = test_benchmark_spec.non_relational_db
+  if instance is None:
+    raise ValueError(
+        'BenchmarkSpec.ConstructNonRelationalDb() failed to create a '
+        'non_relational_db instance for testing, tests cannot proceed.'
+    )
+  return instance
 
 
 class AwsDynamodbTest(pkb_common_test_case.PkbCommonTestCase):

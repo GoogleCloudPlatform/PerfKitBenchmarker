@@ -62,7 +62,7 @@ class BaseSubprocessTest(pkb_common_test_case.PkbCommonTestCase):
 
   @classmethod
   def Main(cls, *args, **kwargs):
-    cls.main_function(*args, **kwargs)  # pylint: disable=not-callable
+    cls.main_function(*args, **kwargs)  # pylint: disable=not-callable # pytype: disable=not-callable
 
   def setUp(self):
     super().setUp()

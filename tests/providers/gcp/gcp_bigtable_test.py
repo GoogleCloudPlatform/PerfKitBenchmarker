@@ -107,10 +107,17 @@ def GetTestBigtableInstance(spec=_TEST_BENCHMARK_SPEC):
       yaml_string=spec, benchmark_name='cloud_bigtable_ycsb'
   )
   test_benchmark_spec.ConstructNonRelationalDb()
-  return test_benchmark_spec.non_relational_db
+  instance = test_benchmark_spec.non_relational_db
+  if instance is None:
+    raise ValueError(
+        'BenchmarkSpec.ConstructNonRelationalDb() failed to create a '
+        'non_relational_db instance for testing, tests cannot proceed.'
+    )
+  return instance
 
 
 class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
+  bigtable: gcp_bigtable.GcpBigtableInstance
 
   def setUp(self):
     super().setUp()
