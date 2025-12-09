@@ -64,6 +64,7 @@ netperf_tcp_rr:
   name: netperf
   flags:
     netperf_benchmarks: TCP_RR
+    netperf_num_streams: 1
     sar: True
 
 netperf_tcp_stream:
