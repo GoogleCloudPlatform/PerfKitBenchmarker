@@ -111,6 +111,13 @@ class BenchbaseTest(pkb_common_test_case.PkbCommonTestCase):
         'jdbc:postgresql://localhost:5432/postgres', context['jdbc_url']
     )
 
+  def test_update_time(self):
+    benchbase.UpdateTime(self.vm, 10)
+    self.vm.RemoteCommand.assert_called_once_with(
+        "sed -i 's|<time>.*</time>|<time>600</time>|' "
+        f'{benchbase.CONFIG_FILE_PATH}'
+    )
+
   def test_parse_results(self):
     self.vm.RemoteCommand.side_effect = [
         ('tpcc_2025-12-03_19-45-37.summary.json', ''),

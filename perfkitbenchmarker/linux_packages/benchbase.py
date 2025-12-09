@@ -71,7 +71,7 @@ _BENCHBASE_TXN_WEIGHTS = flags.DEFINE_list(
         ' Delivery, StockLevel).'
     ),
 )
-_BENCHBASE_WAREHOUSES = flags.DEFINE_integer(
+BENCHBASE_WAREHOUSES = flags.DEFINE_integer(
     'benchbase_warehouses',
     default=10000,
     help=(
@@ -79,20 +79,20 @@ _BENCHBASE_WAREHOUSES = flags.DEFINE_integer(
         ' 1TB).'
     ),
 )
-_BENCHBASE_WARMUP_DURATION = flags.DEFINE_integer(
+BENCHBASE_WARMUP_DURATION = flags.DEFINE_integer(
     'benchbase_warmup_duration',
     default=30,
-    help='Warmup duration for the run phase, in minutes.',
+    help='Warmup phase duration, in minutes.',
 )
-_BENCHBASE_WORKLOAD_DURATION = flags.DEFINE_integer(
+BENCHBASE_WORKLOAD_DURATION = flags.DEFINE_integer(
     'benchbase_workload_duration',
     default=30,
     help='Main workload execution duration, in minutes.',
 )
-_BENCHBASE_COOLDOWN_DURATION = flags.DEFINE_integer(
+BENCHBASE_COOLDOWN_DURATION = flags.DEFINE_integer(
     'benchbase_cooldown_duration',
     default=60,
-    help='Cooldown duration after the run phase, in minutes.',
+    help='Cooldown duration after the warmup phase, in minutes.',
 )
 _BENCHBASE_ISOLATION = flags.DEFINE_enum(
     'benchbase_isolation',
@@ -171,10 +171,10 @@ def CreateConfigFile(vm: virtual_machine.BaseVirtualMachine) -> None:
       'driver_class': 'org.postgresql.Driver',
       'jdbc_url': _GetJdbcUrl(),
       'isolation': _BENCHBASE_ISOLATION.value,
-      'scalefactor': _BENCHBASE_WAREHOUSES.value,
+      'scalefactor': BENCHBASE_WAREHOUSES.value,
       'terminals': _BENCHBASE_THREAD_COUNT.value,
       'workload_duration_seconds': (
-          _BENCHBASE_WORKLOAD_DURATION.value * _SECONDS_IN_MINUTE
+          BENCHBASE_WORKLOAD_DURATION.value * _SECONDS_IN_MINUTE
       ),
       'weights': ','.join(_BENCHBASE_TXN_WEIGHTS.value),
   }
@@ -269,6 +269,22 @@ def ParseResults(
         'Throughput (requests/second) not found in benchbase result file.'
     )
   return samples
+
+
+def UpdateTime(
+    vm: virtual_machine.BaseVirtualMachine, time_in_minutes: int
+) -> None:
+  """Updates the time in configuration.
+
+  Args:
+    vm: The client virtual machine to create the file on.
+    time_in_minutes: The time in minutes to set in the config file.
+  """
+  time_in_seconds = time_in_minutes * _SECONDS_IN_MINUTE
+  vm.RemoteCommand(
+      f"sed -i 's|<time>.*</time>|<time>{time_in_seconds}</time>|'"
+      f' {CONFIG_FILE_PATH}'
+  )
 
 
 def OverrideEndpoint(

@@ -19,6 +19,8 @@ postgres databases using the Benchbase(https://github.com/cmu-db/benchbase)
 framework.
 """
 
+import logging
+import time
 from typing import Any, Dict, List
 
 from absl import flags
@@ -65,6 +67,11 @@ benchbase:
 """
 
 FLAGS = flags.FLAGS
+_SECONDS_IN_MINUTE = 60
+_COOLDOWN_DURATION = benchbase.BENCHBASE_COOLDOWN_DURATION
+_WARMUP_DURATION = benchbase.BENCHBASE_WARMUP_DURATION
+_WORKLOAD_DURATION = benchbase.BENCHBASE_WORKLOAD_DURATION
+_WAREHOUSES = benchbase.BENCHBASE_WAREHOUSES
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -77,6 +84,10 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
     loaded benchmark configuration
   """
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if _COOLDOWN_DURATION.value > 0 and _WARMUP_DURATION.value <= 0:
+    raise errors.Config.InvalidValue(
+        'benchbase_warmup_duration must be positive if'
+        ' benchbase_cooldown_duration is positive.')
   return config
 
 
@@ -136,13 +147,30 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
       if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
       else 'auroradsql'
   )
-  # TODO(shuninglin): implement the three-phase warmup run - cool down - formal
-  # run, right now it's just one run
   run_command: str = (
       f'source /etc/profile.d/maven.sh && cd {benchbase.BENCHBASE_DIR} && mvn'
       f' clean compile exec:java -P {profile} -Dexec.args="-b tpcc -c'
       f' {benchbase.CONFIG_FILE_NAME} --create=false --load=false'
       ' --execute=true"'
+  )
+  if _WARMUP_DURATION.value > 0:
+    benchbase.UpdateTime(client_vm, _WARMUP_DURATION.value)
+    logging.info(
+        'Running benchbase warmup for %d minutes',
+        _WARMUP_DURATION.value,
+    )
+    client_vm.RemoteCommand(run_command)
+    if _COOLDOWN_DURATION.value > 0:
+      logging.info(
+          'Running benchbase cooldown for %d minutes',
+          _COOLDOWN_DURATION.value,
+      )
+      time.sleep(_COOLDOWN_DURATION.value * _SECONDS_IN_MINUTE)
+    benchbase.UpdateTime(client_vm, _WORKLOAD_DURATION.value)
+
+  logging.info(
+      'Running benchbase workload for %d minutes',
+      _WORKLOAD_DURATION.value,
   )
   client_vm.RemoteCommand(run_command)
   metadata = benchmark_spec.relational_db.GetResourceMetadata()
