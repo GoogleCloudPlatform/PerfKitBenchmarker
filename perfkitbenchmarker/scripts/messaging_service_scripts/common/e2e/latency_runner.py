@@ -143,6 +143,9 @@ class EndToEndLatencyRunner(runners.BaseRunner):
     return asyncio.run(self._async_run_phase(number_of_messages))
 
   async def _wait_until_received(self, seq: int) -> protocol.ReceptionReport:
+    assert self._receiver is not None, (
+        f'Receiver is not initialized. Message sequence: {seq}.'
+    )
     while True:
       report = await self._receiver.receive()
       self._record_message_reception(report)

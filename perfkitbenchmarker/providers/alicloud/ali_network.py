@@ -346,16 +346,22 @@ class AliNetwork(network.BaseNetwork):
         self.security_group = AliSecurityGroup(
             self.name, self.region, use_vpc=True, vpc_id=self.vpc.id
         )
-      self.security_group.Create()
+      if self.security_group is not None:
+        self.security_group.Create()
     else:
-      self.security_group.Create()
+      if self.security_group is not None:
+        self.security_group.Create()
 
   def Delete(self):
     """Deletes the network."""
     if self.use_vpc:
-      self.security_group.Delete()
-      self.vswitch.Delete()
-      self.security_group.Delete()
+      if self.security_group is not None:
+        self.security_group.Delete()
+      if self.vswitch is not None:
+        self.vswitch.Delete()
+      if self.security_group is not None:
+        self.security_group.Delete()
       self.vpc.Delete()
     else:
-      self.security_group.Delete()
+      if self.security_group is not None:
+        self.security_group.Delete()

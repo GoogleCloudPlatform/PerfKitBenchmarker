@@ -549,6 +549,10 @@ class BaseDpbService(resource.BaseResource):
   def _CreateDependencies(self):
     """Creates a bucket to use with the cluster."""
     if self.manage_bucket:
+      if self.storage_service is None:
+        raise ValueError(
+            'storage_service is None. Initialize before use.'
+        )
       self.storage_service.MakeBucket(self.bucket)
 
   def _Create(self):
@@ -558,6 +562,10 @@ class BaseDpbService(resource.BaseResource):
   def _DeleteDependencies(self):
     """Deletes the bucket used with the cluster."""
     if self.manage_bucket:
+      if self.storage_service is None:
+        raise ValueError(
+            'storage_service is None. Initialize before use.'
+        )
       self.storage_service.DeleteBucket(self.bucket)
 
   def _Delete(self):
@@ -932,6 +940,10 @@ class UnmanagedDpbServiceYarnCluster(UnmanagedDpbService):
       cmd_list += job_arguments
     cmd_string = ' '.join(cmd_list)
 
+    if self.leader is None:
+      raise JobSubmissionError(
+          'Cannot submit job as leader VM is not initialized.'
+      )
     start_time = datetime.datetime.now()
     try:
       stdout, stderr = self.leader.RobustRemoteCommand(cmd_string)
@@ -1027,6 +1039,10 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
         job_type=job_type,
         properties=properties,
     )
+    if self.leader is None:
+      raise JobSubmissionError(
+          'Cannot submit job as leader VM is not initialized.'
+      )
     start_time = datetime.datetime.now()
     try:
       stdout, _ = self.leader.RobustRemoteCommand(' '.join(cmd))

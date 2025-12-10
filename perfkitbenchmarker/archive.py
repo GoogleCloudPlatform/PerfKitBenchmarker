@@ -69,9 +69,10 @@ def ArchiveRun(
   )
   p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
-  with p.stdin:
-    with tarfile.open(mode='w:gz', fileobj=p.stdin) as tar:
-      tar.add(run_temp_directory, os.path.basename(run_temp_directory))
+  if p.stdin is not None:
+    with p.stdin:
+      with tarfile.open(mode='w:gz', fileobj=p.stdin) as tar:
+        tar.add(run_temp_directory, os.path.basename(run_temp_directory))
 
   status = p.wait()
   if status:
