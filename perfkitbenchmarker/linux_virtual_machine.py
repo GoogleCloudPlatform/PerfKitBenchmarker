@@ -2803,11 +2803,13 @@ class BaseRedHatMixin(BaseLinuxMixin):
       self.Reboot()
 
 
-class AmazonLinux2Mixin(BaseRedHatMixin):
+class AmazonLinux2Mixin(BaseRedHatMixin, os_mixin.DeprecatedOsMixin):
   """Class holding Amazon Linux 2 VM methods and attributes."""
 
   OS_TYPE = os_types.AMAZONLINUX2
   PACKAGE_MANAGER = YUM
+  ALTERNATIVE_OS = os_types.AMAZONLINUX2023
+  END_OF_LIFE = '2026-07-01'
 
   def SetupPackageManager(self):
     """Install EPEL."""
