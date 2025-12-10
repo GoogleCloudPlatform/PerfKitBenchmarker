@@ -54,9 +54,12 @@ class _DpbApplicationListDecoder(option_decoders.ListDecoder):
   def __init__(self, **kwargs):
     super().__init__(
         default=None,
-        item_decoder=option_decoders.EnumDecoder(
-            [dpb_constants.FLINK, dpb_constants.HIVE, dpb_constants.DELTA]
-        ),
+        item_decoder=option_decoders.EnumDecoder([
+            dpb_constants.FLINK,
+            dpb_constants.HIVE,
+            dpb_constants.DELTA,
+            dpb_constants.ICEBERG,
+        ]),
         **kwargs,
     )
 

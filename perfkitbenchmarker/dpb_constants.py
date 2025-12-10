@@ -66,6 +66,7 @@ DEFAULT_WORKER_COUNT = 2
 FLINK = 'flink'
 HIVE = 'hive'
 DELTA = 'DELTA'
+ICEBERG = 'ICEBERG'
 
 # Metrics and Status related metadata
 # TODO(pclay): Remove these after migrating all callers to SubmitJob
