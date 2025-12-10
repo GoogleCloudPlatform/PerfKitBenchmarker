@@ -64,19 +64,30 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
   def __init__(self, delay: int):
     super().__init__(delay)
     self.metadata = {}
-    self.disruption_ends = None
+    self.disruption_events: MutableSequence[DisruptionEvent] = []
 
   def TriggerMethod(self, vm: virtual_machine.VirtualMachine):
-    """Trigger the disruption."""
+    """Trigger the disruption.
+
+    Implementation of this needs to modify the disruption_events list if the
+    operation sync.
+
+    Args:
+      vm: The VirtualMachine to trigger the disruption on.
+    """
     raise NotImplementedError()
 
   def SetUp(self):
     """See base class."""
     raise NotImplementedError()
 
-  def WaitForDisruption(self) -> MutableSequence[DisruptionEvent]:
-    """Wait for disruption to end and return the end time."""
-    return []
+  def WaitForDisruption(self) -> None:
+    """Wait for disruption to end and return the end time.
+
+    Only need to implement this if the operation is async. If the operation is
+    async append the events to the disruption_events list.
+    """
+    pass
 
   def GetMetadataForTrigger(self, event: DisruptionEvent) -> Dict[str, Any]:
     """Get the metadata for the trigger and append it to the samples."""
@@ -97,11 +108,11 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
     def generate_disruption_total_time_samples() -> (
         MutableSequence[sample.Sample]
     ):
-      events = self.WaitForDisruption()
+      self.WaitForDisruption()
 
       # Host maintenance is in s
       self.disruption_ends = max(
-          [float(d.end_time) * 1000 for d in events],
+          [float(d.end_time) * 1000 for d in self.disruption_events],
           default=0,
       )
 
@@ -120,7 +131,7 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
               'seconds',
               sample_metadata | self.GetMetadataForTrigger(d),
           )
-          for d in events
+          for d in self.disruption_events
       ]
 
     samples += generate_disruption_total_time_samples()
@@ -251,7 +262,12 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
 
   def GetDisruptionEnds(self) -> float | None:
     """Get the disruption ends."""
-    return self.disruption_ends
+    if self.disruption_events:
+      return max(
+          [float(d.end_time) * 1000 for d in self.disruption_events],
+          default=None,
+      )
+    return None
 
   def _ComputeLossPercentile(
       self,

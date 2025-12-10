@@ -49,6 +49,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super().setUp()
     self.trigger = TestBaseDisruptionTrigger()
+    self.maxDiff = 100000
     self.enter_context(
         mock.patch.object(self.trigger, 'WaitForDisruption', autospec=True)
     )
@@ -63,7 +64,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
     }
     s = []
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
-    self.trigger.WaitForDisruption.return_value = [
+    self.trigger.disruption_events = [
         base_disruption_trigger.DisruptionEvent(
             total_time=10, end_time=10, start_time=4
         )
@@ -79,7 +80,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.maintenance_degradation_percent = 90
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     self.trigger.trigger_time = datetime.datetime.fromtimestamp(2)
-    self.trigger.WaitForDisruption.return_value = []
+    self.trigger.disruption_events = []
     self.enter_context(
         mock.patch.object(
             self.trigger, 'GetDisruptionEnds', return_value=None, autospec=True
@@ -208,7 +209,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
   def testAppendLossFunctionWithMissingTimeStampsWithRegression(self):
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     self.trigger.trigger_time = datetime.datetime.fromtimestamp(2)
-    self.trigger.WaitForDisruption.return_value = []
+    self.trigger.disruption_events = []
     self.enter_context(
         mock.patch.object(
             self.trigger, 'GetDisruptionEnds', return_value=None, autospec=True
@@ -336,7 +337,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
   @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
   def testAppendLossFunctionWithMissingTimeStampsNoRegression(self):
     self.trigger.trigger_time = datetime.datetime.fromtimestamp(2)
-    self.trigger.WaitForDisruption.return_value = []
+    self.trigger.disruption_events = []
     self.enter_context(
         mock.patch.object(
             self.trigger, 'GetDisruptionEnds', return_value=None, autospec=True
@@ -465,7 +466,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
   @mock.patch.object(time, 'time', mock.MagicMock(return_value=0))
   def testAppendLossFunctionSamples(self):
     vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
-    self.trigger.WaitForDisruption.return_value = []
+    self.trigger.disruption_events = []
     self.enter_context(
         mock.patch.object(
             self.trigger, 'GetDisruptionEnds', return_value=None, autospec=True
@@ -611,7 +612,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     self.trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    self.trigger.WaitForDisruption.return_value = [
+    self.trigger.disruption_events = [
         base_disruption_trigger.DisruptionEvent(
             total_time=100, end_time=8, start_time=4
         )
@@ -811,7 +812,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     self.trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    self.trigger.WaitForDisruption.return_value = [
+    self.trigger.disruption_events = [
         base_disruption_trigger.DisruptionEvent(
             total_time=100, end_time=8, start_time=4
         )
@@ -1016,7 +1017,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     self.trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    self.trigger.WaitForDisruption.return_value = [
+    self.trigger.disruption_events = [
         base_disruption_trigger.DisruptionEvent(
             total_time=100, end_time=11, start_time=4
         )
@@ -1175,7 +1176,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     self.trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    self.trigger.WaitForDisruption.return_value = [
+    self.trigger.disruption_events = [
         base_disruption_trigger.DisruptionEvent(
             total_time=100, end_time=11, start_time=4
         )
@@ -1334,7 +1335,7 @@ class BaseDisruptionTriggerTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = [s]
     self.trigger.trigger_time = datetime.datetime.fromtimestamp(4)
-    self.trigger.WaitForDisruption.return_value = [
+    self.trigger.disruption_events = [
         base_disruption_trigger.DisruptionEvent(
             total_time=100, end_time=8, start_time=4
         )

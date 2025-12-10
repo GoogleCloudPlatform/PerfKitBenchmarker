@@ -75,8 +75,9 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     s = []
     trigger = maintenance_simulation_trigger.MaintenanceEventTrigger()
     self.enter_context(
-        mock.patch.object(trigger, 'WaitForDisruption', return_value=[event])
+        mock.patch.object(trigger, 'WaitForDisruption', return_value=None)
     )
+    trigger.disruption_events = [event]
     trigger.capture_live_migration_timestamps = True
     trigger.vms = [vm]
     trigger.AppendSamples(None, vm_spec, s)
@@ -112,8 +113,9 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     ].CollectLMNotificationsTime.return_value = event
     trigger.capture_live_migration_timestamps = True
     trigger.vms = [vm]
+    trigger.WaitForDisruption()
     self.assertEqual(
-        trigger.WaitForDisruption(),
+        trigger.disruption_events,
         [event],
     )
 

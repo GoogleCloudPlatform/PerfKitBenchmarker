@@ -13,7 +13,6 @@
 # limitations under the License.
 """Module containning methods for triggering maintenance simulation."""
 
-from collections.abc import MutableSequence
 import datetime
 import json
 import logging
@@ -364,26 +363,13 @@ class MaintenanceEventTrigger(base_disruption_trigger.BaseDisruptionTrigger):
       for helper in self.gce_simulate_maintenance_helpers.values():
         helper.SetupLMNotification()
 
-  def WaitForDisruption(
-      self,
-  ) -> MutableSequence[base_disruption_trigger.DisruptionEvent]:
+  def WaitForDisruption(self) -> None:
     """Wait for the disruption to end and return the end time."""
     if self.capture_live_migration_timestamps:
       # Block test exit until LM ended.
-      lm_events = []
       for helper in self.gce_simulate_maintenance_helpers.values():
         helper.WaitLMNotificationRelease()
-        lm_events.append(helper.CollectLMNotificationsTime())
-      return lm_events
-    else:
-      return []
-
-  def GetDisruptionEnds(self) -> float | None:
-    """Get the disruption ends."""
-    if self.capture_live_migration_timestamps:
-      # lm ends is computed from LM notification
-      return self.disruption_ends
-    return None
+        self.disruption_events.append(helper.CollectLMNotificationsTime())
 
   @property
   def trigger_name(self) -> str:
