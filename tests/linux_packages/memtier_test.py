@@ -1840,7 +1840,7 @@ class MemtierTestCase(
             'memtier_tls': False,
             'memtier_distinct_client_seed': True,
             'memtier_command': None,
-            'memtier_key_prefix': '',
+            'memtier_key_prefix': None,
             'memtier_random_data': True,
 
         },
