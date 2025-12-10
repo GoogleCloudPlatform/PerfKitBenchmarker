@@ -63,6 +63,10 @@ def Prepare(benchmark_spec):  # pylint: disable=unused-argument
     vms = benchmark_spec.vms
     for vm in vms:
       vm.AllowIcmp()
+  vms = benchmark_spec.vms
+  for vm in vms:
+    if vm_util.ShouldRunOnExternalIpv6Address(vm):
+      vm.AllowIcmpIpv6()
 
 
 def Run(benchmark_spec):
@@ -88,10 +92,15 @@ def Run(benchmark_spec):
       results = results + _RunPing(
           sending_vm, receiving_vm, receiving_vm.internal_ip, ip_type
       )
+    if vm_util.ShouldRunOnExternalIpv6Address(receiving_vm):
+      ip_type = vm_util.IpAddressMetadata.EXTERNAL
+      results = results + _RunPing(
+        sending_vm, receiving_vm, receiving_vm.ipv6_address, ip_type, using_ipv6=True
+      )
   return results
 
 
-def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
+def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type, using_ipv6 = False):
   """Run ping using 'sending_vm' to connect to 'receiving_ip'.
 
   Args:
@@ -100,6 +109,7 @@ def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
     receiving_ip: The IP address to be pinged.
     ip_type: The type of 'receiving_ip', (either
       'vm_util.IpAddressSubset.INTERNAL or vm_util.IpAddressSubset.EXTERNAL')
+    using_ipv6: True if receiving_ip is IPv6, False if not
 
   Returns:
     A list of samples, with one sample for each metric.
@@ -120,6 +130,7 @@ def _RunPing(sending_vm, receiving_vm, receiving_ip, ip_type):
 
   metadata = {
       'ip_type': ip_type,
+      'using_ipv6': using_ipv6,
       'receiving_zone': receiving_vm.zone,
       'sending_zone': sending_vm.zone,
   }
