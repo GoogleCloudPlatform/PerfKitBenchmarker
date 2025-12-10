@@ -150,9 +150,7 @@ _SSH_PRIVATE_KEY = flags.DEFINE_string(
     None,
     'File path to the SSH private key. If None, use the newly generated one.',
 )
-_SSH_KEY_TYPE = flags.DEFINE_string(
-    'ssh_key_type', 'rsa',
-    'SSH key type.')
+_SSH_KEY_TYPE = flags.DEFINE_string('ssh_key_type', 'rsa', 'SSH key type.')
 
 
 class RetryError(Exception):
@@ -950,19 +948,13 @@ def RenderTemplate(
   Returns:
     The name of the temporary file containing the rendered template.
   """
-  with open(template_path) as fp:
-    template_contents = fp.read()
-  environment = jinja2.Environment(
-      undefined=jinja2.StrictUndefined,
-      trim_blocks=trim_spaces,
-      lstrip_blocks=trim_spaces,
+  rendered_template = ReadAndRenderJinja2Template(
+      template_path, trim_spaces, **context
   )
-  template = environment.from_string(template_contents)
   prefix = 'pkb-' + os.path.basename(template_path)
   with NamedTemporaryFile(
       prefix=prefix, dir=GetTempDir(), delete=False, mode='w'
   ) as tf:
-    rendered_template = template.render(**context)
     if should_log_file:
       logging.info(
           'Rendered template from %s to %s with full text:\n%s',
@@ -974,6 +966,24 @@ def RenderTemplate(
     tf.write(rendered_template)
     tf.close()
     return tf.name
+
+
+@staticmethod
+def ReadAndRenderJinja2Template(
+    file_path: str, trim_spaces: bool = False, **kwargs
+) -> str:
+  """Reads & renders a .j2 file, returning the whole thing as a string."""
+  filename = data.ResourcePath(file_path)
+  with open(filename) as template_file:
+    contents = template_file.read()
+  if file_path.endswith('.j2'):
+    environment = jinja2.Environment(
+        undefined=jinja2.StrictUndefined,
+        trim_blocks=trim_spaces,
+        lstrip_blocks=trim_spaces,
+    )
+    contents = environment.from_string(contents).render(kwargs)
+  return contents
 
 
 def CreateRemoteFile(

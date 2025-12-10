@@ -1,3 +1,4 @@
+import os
 import time
 from typing import Callable, Iterable, Protocol, Tuple
 import unittest
@@ -136,7 +137,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         )
     )
 
-  @parameterized.parameters(('created'), ('configured'))
+  @parameterized.parameters('created', 'configured')
   def test_apply_manifest_gets_deployment_name(self, suffix):
     self.MockIssueCommand(
         {'apply -f': [(f'deployment.apps/test-deployment {suffix}', '', 0)]}
@@ -152,6 +153,68 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         'test-deployment.yaml',
     )
     self.assertEqual(next(deploy_ids), 'deployment.apps/test-deployment')
+
+  def test_apply_manifest_logs_jinja(self):
+    self.MockIssueCommand(
+        {'apply -f': [('deployment.apps/test-deployment hello', '', 0)]}
+    )
+    self.enter_context(
+        mock.patch.object(
+            container_service.data,
+            'ResourcePath',
+            return_value=os.path.join(
+                os.path.dirname(__file__), 'data', 'kube_apply.yaml.j2'
+            ),
+        )
+    )
+    with self.assertLogs(level='INFO') as logs:
+      self.kubernetes_cluster.ApplyManifest(
+          'tests/data/kube_apply.yaml.j2',
+          should_log_file=True,
+          name='hello-world',
+          command=['echo', 'hello', 'world'],
+      )
+    # Asserting on logging isn't very important, but is easier than reading the
+    # written file.
+    full_logs = ';'.join(logs.output)
+    self.assertIn('name: hello-world', full_logs)
+    self.assertIn('echo', full_logs)
+
+  def test_apply_manifest_yaml_logs(self):
+    self.MockIssueCommand(
+        {'apply -f': [('deployment.apps/test-deployment hello', '', 0)]}
+    )
+    self.enter_context(
+        mock.patch.object(
+            container_service.data,
+            'ResourcePath',
+            return_value=os.path.join(
+                os.path.dirname(__file__), 'data', 'kube_apply.yaml.j2'
+            ),
+        )
+    )
+    with self.assertLogs(level='INFO') as logs:
+      yamls = self.kubernetes_cluster.ConvertManifestToYamlDicts(
+          'tests/data/kube_apply.yaml.j2',
+          name='hello-world',
+          command=[],
+      )
+      self.assertEqual(yamls[0]['kind'], 'Namespace')
+      yamls[1]['spec']['selector']['app'] = 'hi-world'
+      yamls[1]['spec']['template']['spec']['containers'].append(
+          {'name': 'second-container'}
+      )
+      self.kubernetes_cluster.ApplyYaml(
+          yamls,
+          should_log_file=True,
+      )
+    full_logs = ';'.join(logs.output)
+    self.assertIn('app: hi-world', full_logs)
+    self.assertIn('name: hello-world', full_logs)
+    self.assertIn('name: second-container', full_logs)
+    # Check for no python artifacts.
+    self.assertNotIn('dict', full_logs)
+    self.assertNotIn('null', full_logs)
 
   @mock.patch.object(
       vm_util,
@@ -450,9 +513,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         },
         'kind': 'Event',
         'lastTimestamp': None,
-        'message': (
-            'Successfully assigned default/deploy-pod to gke-node'
-        ),
+        'message': 'Successfully assigned default/deploy-pod to gke-node',
         'metadata': {
             'creationTimestamp': '2025-10-03T18:05:56Z',
         },
@@ -462,8 +523,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     })
     self.assertIsNotNone(event)
     self.assertEqual(
-        event.message,
-        'Successfully assigned default/deploy-pod to gke-node'
+        event.message, 'Successfully assigned default/deploy-pod to gke-node'
     )
     self.assertEqual(event.reason, 'Scheduled')
     self.assertEqual(event.type, 'Normal')

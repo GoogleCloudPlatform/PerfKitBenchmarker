@@ -180,7 +180,7 @@ def ScaleUpPods(
   max_wait_time = _GetScaleTimeout()
   resource_timeout = max_wait_time + 60 * 5  # 5 minutes after waiting to avoid
   # pod delete events from polluting data collection.
-  resource_names = cluster.ApplyManifest(
+  scaleup_yaml = cluster.ConvertManifestToYamlDicts(
       MANIFEST_TEMPLATE,
       Name='kubernetes-scaleup',
       Replicas=num_new_pods,
@@ -197,6 +197,7 @@ def ScaleUpPods(
       ),
       cloud='Azure' if FLAGS.cloud == 'Azure' else None,
   )
+  resource_names = cluster.ApplyYaml(scaleup_yaml)
 
   assert resource_names
   rollout_name = next(resource_names)
