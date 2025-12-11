@@ -3,30 +3,14 @@ import time
 from typing import Callable, Iterable, Protocol, Tuple
 import unittest
 from unittest import mock
-from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.sample import Sample
+from tests import container_service_mock
 from tests import pkb_common_test_case
-
-
-# Use Mesos as a valid cloud we can override the implementation for.
-_CLUSTER_CLOUD = provider_info.UNIT_TEST
-
-
-class TestKubernetesCluster(container_service.KubernetesCluster):
-
-  CLOUD = _CLUSTER_CLOUD
-
-  def _Create(self):
-    pass
-
-  def _Delete(self):
-    pass
 
 
 kubectl_timeout_tuple = (
@@ -117,24 +101,9 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
-    self.enter_context(flagsaver.flagsaver(kubeconfig='kubeconfig'))
-    self.enter_context(flagsaver.flagsaver(run_uri='123'))
-    self.enter_context(
-        mock.patch('perfkitbenchmarker.providers.LoadProvider', autospec=True)
-    )
-    self.kubernetes_cluster = TestKubernetesCluster(
-        container_spec.ContainerClusterSpec(
-            'test-cluster',
-            **{
-                'cloud': _CLUSTER_CLOUD,
-                'vm_spec': {
-                    _CLUSTER_CLOUD: {
-                        'machine_type': 'fake-machine-type',
-                        'zone': 'us-east2-a',
-                    },
-                },
-            },
-        )
+    container_service_mock.MockContainerInit(self)
+    self.kubernetes_cluster = (
+        container_service_mock.CreateTestKubernetesCluster()
     )
 
   @parameterized.parameters('created', 'configured')
@@ -358,16 +327,16 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
       self, node_name: str, expected_nodepool_name: str | None
   ):
     vm_spec = {
-        _CLUSTER_CLOUD: {
+        container_service_mock.TEST_CLOUD: {
             'machine_type': 'fake-machine-type',
             'zone': 'us-east2-a',
         },
     }
-    nodepool_cluster = TestKubernetesCluster(
+    nodepool_cluster = container_service_mock.TestKubernetesCluster(
         container_spec.ContainerClusterSpec(
             'test-cluster',
             **{
-                'cloud': _CLUSTER_CLOUD,
+                'cloud': container_service_mock.TEST_CLOUD,
                 'vm_spec': vm_spec,
                 'nodepools': {
                     'servers': {
@@ -389,16 +358,16 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testGetNodepoolFromNodeName_raisesIfMultipleNodepoolsFound(self):
     vm_spec = {
-        _CLUSTER_CLOUD: {
+        container_service_mock.TEST_CLOUD: {
             'machine_type': 'fake-machine-type',
             'zone': 'us-east2-a',
         },
     }
-    nodepool_cluster = TestKubernetesCluster(
+    nodepool_cluster = container_service_mock.TestKubernetesCluster(
         container_spec.ContainerClusterSpec(
             'test-cluster',
             **{
-                'cloud': _CLUSTER_CLOUD,
+                'cloud': container_service_mock.TEST_CLOUD,
                 'vm_spec': vm_spec,
                 'nodepools': {
                     'default-for-serving': {

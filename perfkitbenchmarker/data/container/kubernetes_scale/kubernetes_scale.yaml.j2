@@ -41,10 +41,6 @@ spec:
             - /bin/true
           initialDelaySeconds: 5
           periodSeconds: 10
-      nodeSelector:
-        {%- for NodeSelector in NodeSelectors %}
-        {{ NodeSelector }}
-        {%- endfor %}
       terminationGracePeriodSeconds: 1
       # Add not-ready/unreachable tolerations for X seconds so that node
       # failure doesn't trigger pod deletion.
@@ -57,14 +53,3 @@ spec:
         operator: "Exists"
         effect: "NoExecute"
         tolerationSeconds: {{ PodTimeout }}
-      # Add topology spread constraints to fix an issue with Azure AKS where
-      # admission webhook "validation.gatekeeper.sh" denied the request
-      {%- if cloud == 'Azure' %}
-      topologySpreadConstraints:
-      - maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: DoNotSchedule
-        labelSelector:
-          matchLabels:
-            name: {{ Name }}
-      {%- endif %}

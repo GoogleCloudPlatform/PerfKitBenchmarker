@@ -1119,22 +1119,33 @@ class KubernetesClusterCommands:
     if not isinstance(yaml_doc, dict) and not isinstance(yaml_doc, list):
       return yaml_doc
 
+    def _ConvertPossiblyEmptyValue(value: Any) -> Any | None:
+      """Converts a given value to the dictionary type, or None if empty."""
+      if not bool(value) and value != 0:
+        return None
+      converted_value = KubernetesClusterCommands._ConvertToDictType(
+          value, dict_lambda
+      )
+      if not bool(converted_value) and converted_value != 0:
+        return None
+      return converted_value
+
     yaml_list = []
     if isinstance(yaml_doc, list):
       for item in yaml_doc:
-        if not bool(item) and item != 0:
+        converted_value = _ConvertPossiblyEmptyValue(item)
+        if converted_value is None:
           continue
         yaml_list.append(
-            KubernetesClusterCommands._ConvertToDictType(item, dict_lambda)
+            converted_value
         )
       return yaml_list
     yaml_dict = dict_lambda()
     for key, value in yaml_doc.items():
-      if not bool(value) and value != 0:
+      converted_value = _ConvertPossiblyEmptyValue(value)
+      if converted_value is None:
         continue
-      yaml_dict[key] = KubernetesClusterCommands._ConvertToDictType(
-          value, dict_lambda
-      )
+      yaml_dict[key] = converted_value
     return yaml_dict
 
   @staticmethod
@@ -2077,9 +2088,62 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     """Get the default storage class for the provider."""
     raise NotImplementedError
 
-  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
+  def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Get the node selectors section of a yaml for the provider."""
-    return []
+    return {}
+
+  def ModifyPodSpecPlacementYaml(
+      self,
+      yaml_dicts: list[dict[str, Any]],
+      name: str,
+      machine_type: str | None = None,
+  ) -> None:
+    """Modifies the pod spec yaml in-place with additional needed attributes.
+
+    The placement of pods (with eg node selectors or topology constraints) is
+    the most likely to change from cloud to cloud.
+
+    Args:
+      yaml_dicts: The list of yaml dicts to search through & modify. See
+        https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#podspec-v1-core
+          for documentation on the pod spec fields. This is modified in place.
+      name: The name of the app.
+      machine_type: A specified machine type to request.
+    """
+    modified = False
+    for yaml_dict in yaml_dicts:
+      if yaml_dict['spec']['template']['spec']:
+        self._ModifyPodSpecPlacementYaml(
+            yaml_dict['spec']['template']['spec'], name, machine_type
+        )
+        modified = True
+    if not modified:
+      raise ValueError(
+          'No pod spec yaml found to modify. Was the wrong jinja passed in?'
+      )
+
+  def _ModifyPodSpecPlacementYaml(
+      self,
+      pod_spec_yaml: dict[str, Any],
+      name: str,
+      machine_type: str | None = None,
+  ) -> None:
+    """Modifies the pod spec yaml in-place with additional needed attributes.
+
+    The placement of pods (with eg node selectors or topology constraints) is
+    the most likely to change from cloud to cloud.
+
+    Args:
+      pod_spec_yaml: The pod spec yaml to modify. See
+        https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#podspec-v1-core
+          for documentation on the pod spec fields. This is modified in place.
+      name: The name of the app.
+      machine_type: A specified machine type to request.
+    """
+    del name
+    node_selectors = self.GetNodeSelectors(machine_type)
+    if node_selectors:
+      pod_spec_yaml['nodeSelector'].update(node_selectors)
 
   def DeployIngress(
       self, name: str, namespace: str, port: int, health_path: str = ''
