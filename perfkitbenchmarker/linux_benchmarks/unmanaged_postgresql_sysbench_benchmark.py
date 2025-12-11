@@ -389,7 +389,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   # report the max tps/qps as a new metric.
   for item in max_transactions.values():
     metadata = copy.deepcopy(item.metadata)
-    metadata['searched_thread_counts'] = FLAGS.sysbench_run_threads
+    metadata['searched_thread_counts'] = list(FLAGS.sysbench_run_threads)
     results.append(
         sample.Sample(
             'max_' + item.metric, item.value, item.unit, metadata=metadata
