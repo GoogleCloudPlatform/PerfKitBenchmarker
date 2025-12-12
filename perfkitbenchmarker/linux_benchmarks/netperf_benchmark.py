@@ -765,6 +765,8 @@ def RunClientServerVMs(client_vm, server_vm):
             netperf_benchmark,
             [server_vm.ip_address],
             num_streams,
+            # NAT translates internal to external IP when remote server IP is
+            # external.
             [client_vm.GetInternalIPs()[0]],
         )
         for external_ip_result in external_ip_results:
