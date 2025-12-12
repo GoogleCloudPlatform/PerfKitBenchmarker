@@ -968,12 +968,13 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     self._InjectDefaultHuggingfaceToken()
 
     # Define Safeguard policy error patterns
-    SAFEGUARD_POLICY_ERRORS = [
+    _SAFEGUARD_POLICY_ERRORS = [
         'admission webhook "validation.gatekeeper.sh" denied',
         'azurepolicy-k8sazurev',
     ]
 
-    # Apply the manifest with retry logic, waiting for the Safeguard policy relaxation to take effect.
+    # Apply the manifest with retry logic,
+    # waiting for the Safeguard policy relaxation to take effect.
     @vm_util.Retry(
         poll_interval=30, retryable_exceptions=errors.Resource.CreationError
     )
@@ -984,7 +985,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         return self._GetInferenceServerManifest()
       except Exception as e:
         # Only retry Safeguard policy errors, fail fast on others
-        if any(pattern in str(e) for pattern in SAFEGUARD_POLICY_ERRORS):
+        if any(pattern in str(e) for pattern in _SAFEGUARD_POLICY_ERRORS):
           raise errors.Resource.CreationError(str(e))
         raise
 
