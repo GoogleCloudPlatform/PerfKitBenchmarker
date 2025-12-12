@@ -204,27 +204,67 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
             'az account show': [
                 ('servicePrincipal', '', 0),
                 ('user-name', '', 0),
+                (
+                    'test-user@example.com\n12345678-1234-1234-1234-123456789abc',
+                    '',
+                    0,
+                ),
+                ('cluster-id', '', 0),
             ],
             'az role assignment': [('', '', 0)],
+            'az policy assignment': [('', '', 0)],
         },
     )
     aks_auto.Create()
-    mock_cmd.func_to_mock.assert_has_calls([
-        mock.call(
-            [
-                'az',
-                'role',
-                'assignment',
-                'create',
-                '--assignee',
-                'user-name',
-                '--role',
-                'Azure Kubernetes Service RBAC Admin',
-                '--scope',
-                'cluster-id',
-            ],
-        ),
-    ])
+    mock_cmd.func_to_mock.assert_has_calls(
+        [
+            mock.call(
+                [
+                    'az',
+                    'role',
+                    'assignment',
+                    'create',
+                    '--assignee',
+                    'user-name',
+                    '--role',
+                    'Azure Kubernetes Service RBAC Admin',
+                    '--scope',
+                    'cluster-id',
+                ],
+            ),
+            # Resource Policy Contributor role for Safeguards management
+            mock.call(
+                [
+                    'az',
+                    'role',
+                    'assignment',
+                    'create',
+                    '--role',
+                    'Resource Policy Contributor',
+                    '--assignee',
+                    'test-user@example.com',
+                    '--scope',
+                    '/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/resource-group',
+                ],
+            ),
+            # Safeguard policy relaxation
+            mock.call(
+                [
+                    'az',
+                    'policy',
+                    'assignment',
+                    'update',
+                    '--name',
+                    'aks-deployment-safeguards-policy-assignment',
+                    '--scope',
+                    '/subscriptions/cluster-id/resourceGroups/resource-group/providers/Microsoft.ContainerService/managedClusters/pkbcluster123',
+                    '--set',
+                    'enforcement_mode="DoNotEnforce"',
+                ],
+            ),
+        ],
+        any_order=True,
+    )
 
   def testGetNodePoolNames(self):
     self.MockIssueCommand(
