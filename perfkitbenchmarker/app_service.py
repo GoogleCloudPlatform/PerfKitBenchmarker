@@ -307,6 +307,12 @@ class BaseAppService(resource.BaseResource):
       s.metadata.update(self.metadata)
     return self.samples
 
+  def IsAppLongRunning(self) -> bool:
+    """Returns true if the app is long running."""
+    if not self.builder:
+      return False
+    return self.builder.IsAppLongRunning()
+
   def _PostCreate(self):
     """Method called after _CreateResource."""
     if self.builder:

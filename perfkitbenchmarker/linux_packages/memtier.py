@@ -306,7 +306,7 @@ MEMTIER_COMMAND = flags.DEFINE_string(
     ' placeholders.',
 )
 MEMTIER_KEY_PREFIX = flags.DEFINE_string(
-    'memtier_key_prefix', '', 'Prefix for keys used in memtier.'
+    'memtier_key_prefix', None, 'Prefix for keys used in memtier.'
 )
 MEMTIER_RANDOM_DATA = flags.DEFINE_bool(
     'memtier_random_data', True, 'Use random data for memtier.'

@@ -38,7 +38,6 @@ import time
 from typing import Any, Callable, Dict, Iterable, Iterator, Optional, Sequence
 
 from absl import flags
-import jinja2
 from perfkitbenchmarker import context
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -1001,6 +1000,33 @@ class KubernetesClusterCommands:
     Returns:
       Names of the resources, e.g. [deployment.apps/mydeploy, pod/foo]
     """
+    filename = data.ResourcePath(manifest_file)
+    if not filename.endswith('.j2'):
+      if kwargs:
+        raise AssertionError(
+            'kwargs should be empty for non-jinja templates. '
+            f'Found when reading {manifest_file}'
+        )
+      return KubernetesClusterCommands._ApplyRenderedManifest(filename)
+
+    manifest = vm_util.ReadAndRenderJinja2Template(
+        manifest_file, trim_spaces=False, **kwargs
+    )
+    return KubernetesClusterCommands._WriteAndApplyManifest(
+        manifest, should_log_file
+    )
+
+  @staticmethod
+  def _ApplyRenderedManifest(manifest_file: str) -> Iterator[str]:
+    """Applies a rendered Kubernetes manifest & returns resources created.
+
+    Args:
+      manifest_file: The full path of the YAML file.
+
+    Returns:
+      Names of the resources, e.g. [deployment.apps/mydeploy, pod/foo]
+    """
+    out, _, _ = RunKubectlCommand(['apply', '-f', manifest_file])
 
     def _ParseApplyOutput(stdout: str) -> Iterator[str]:
       """Parses the output of kubectl apply to get the name of the resource."""
@@ -1010,17 +1036,17 @@ class KubernetesClusterCommands:
         if match:
           yield match.group(1)
 
-    filename = data.ResourcePath(manifest_file)
-    if not filename.endswith('.j2'):
-      assert not kwargs
-      out, _, _ = RunKubectlCommand(['apply', '-f', filename])
-      return _ParseApplyOutput(out)
+    # Inner function needed to run kubectl command even if output is unused.
+    return _ParseApplyOutput(out)
 
-    environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
-    with open(filename) as template_file, vm_util.NamedTemporaryFile(
+  @staticmethod
+  def _WriteAndApplyManifest(
+      manifest: str, should_log_file: bool = True
+  ) -> Iterator[str]:
+    """Writes the string to file and applies it."""
+    with vm_util.NamedTemporaryFile(
         mode='w', suffix='.yaml'
     ) as rendered_template:
-      manifest = environment.from_string(template_file.read()).render(kwargs)
       rendered_template.write(manifest)
       rendered_template.close()
       if should_log_file:
@@ -1028,9 +1054,124 @@ class KubernetesClusterCommands:
             'Rendered manifest file %s with contents:\n%s',
             rendered_template.name,
             manifest,
+            stacklevel=2,
         )
-      out, _, _ = RunKubectlCommand(['apply', '-f', rendered_template.name])
-      return _ParseApplyOutput(out)
+      resource_names = KubernetesClusterCommands._ApplyRenderedManifest(
+          rendered_template.name
+      )
+      return resource_names
+
+  @staticmethod
+  def _RecursiveDict() -> dict[str, Any]:
+    """Creates a new dictionary with auto nesting keys.
+
+    See https://stackoverflow.com/a/10218517/2528472.
+
+    Returns:
+      A new dictionary that automatically sets the value for any nested missing
+      keys.
+    """
+    return collections.defaultdict(KubernetesClusterCommands._RecursiveDict)
+
+  @staticmethod
+  def ConvertManifestToYamlDicts(
+      manifest_file: str, **kwargs
+  ) -> list[dict[str, Any]]:
+    """Reads a Kubernetes manifest from a file and converts it to YAML.
+
+    Args:
+      manifest_file: The name of the YAML file or YAML template.
+      **kwargs: Arguments to the jinja template.
+
+    Returns:
+      The various YAML documents as a list of dictionaries.
+    """
+    manifest = vm_util.ReadAndRenderJinja2Template(
+        manifest_file, trim_spaces=False, **kwargs
+    )
+    yaml_docs = yaml.safe_load_all(manifest)
+    return_yamls = []
+    for yaml_doc in yaml_docs:
+      return_yamls.append(
+          KubernetesClusterCommands._ConvertToDictType(
+              yaml_doc, KubernetesClusterCommands._RecursiveDict
+          )
+      )
+    return return_yamls
+
+  @staticmethod
+  def _ConvertToDictType(
+      yaml_doc: Any, dict_lambda: Any
+  ) -> dict[str, Any] | Any:
+    """Converts a YAML document to the given dictionary type.
+
+    In particular a recursive defaultdict can be more easily accessed with e.g.
+    my_dict['a']['b'] = value rather than my_dict.setdefault('a', {})['b'] =
+    value.
+
+    Args:
+      yaml_doc: The YAML document to convert.
+      dict_lambda: A constructor for the dictionary type to convert to.
+
+    Returns:
+      The remade dictionary.
+    """
+    if not isinstance(yaml_doc, dict) and not isinstance(yaml_doc, list):
+      return yaml_doc
+
+    def _ConvertPossiblyEmptyValue(value: Any) -> Any | None:
+      """Converts a given value to the dictionary type, or None if empty."""
+      if not bool(value) and value != 0:
+        return None
+      converted_value = KubernetesClusterCommands._ConvertToDictType(
+          value, dict_lambda
+      )
+      if not bool(converted_value) and converted_value != 0:
+        return None
+      return converted_value
+
+    yaml_list = []
+    if isinstance(yaml_doc, list):
+      for item in yaml_doc:
+        converted_value = _ConvertPossiblyEmptyValue(item)
+        if converted_value is None:
+          continue
+        yaml_list.append(
+            converted_value
+        )
+      return yaml_list
+    yaml_dict = dict_lambda()
+    for key, value in yaml_doc.items():
+      converted_value = _ConvertPossiblyEmptyValue(value)
+      if converted_value is None:
+        continue
+      yaml_dict[key] = converted_value
+    return yaml_dict
+
+  @staticmethod
+  def ApplyYaml(
+      yaml_dicts: list[dict[str, Any]], should_log_file: bool = True
+  ) -> Iterator[str]:
+    """Writes yaml to a file and applies it.
+
+    Args:
+      yaml_dicts: A list of YAML documents.
+      should_log_file: Whether to log the rendered manifest to stdout or not.
+
+    Returns:
+      Names of the resources, e.g. [deployment.apps/mydeploy, pod/foo]
+    """
+    normal_dicts = []
+    # Convert back to a normal dict because yaml.dump otherwise adds random
+    # "dictitems:" keys & other python artifacts.
+    for yaml_dict in yaml_dicts:
+      normal_dicts.append(
+          KubernetesClusterCommands._ConvertToDictType(yaml_dict, dict)
+      )
+    manifest = yaml.dump_all(normal_dicts)
+    return KubernetesClusterCommands._WriteAndApplyManifest(
+        manifest, should_log_file
+    )
 
   @staticmethod
   def WaitForResource(
@@ -1947,9 +2088,62 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     """Get the default storage class for the provider."""
     raise NotImplementedError
 
-  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
+  def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Get the node selectors section of a yaml for the provider."""
-    return []
+    return {}
+
+  def ModifyPodSpecPlacementYaml(
+      self,
+      yaml_dicts: list[dict[str, Any]],
+      name: str,
+      machine_type: str | None = None,
+  ) -> None:
+    """Modifies the pod spec yaml in-place with additional needed attributes.
+
+    The placement of pods (with eg node selectors or topology constraints) is
+    the most likely to change from cloud to cloud.
+
+    Args:
+      yaml_dicts: The list of yaml dicts to search through & modify. See
+        https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#podspec-v1-core
+          for documentation on the pod spec fields. This is modified in place.
+      name: The name of the app.
+      machine_type: A specified machine type to request.
+    """
+    modified = False
+    for yaml_dict in yaml_dicts:
+      if yaml_dict['spec']['template']['spec']:
+        self._ModifyPodSpecPlacementYaml(
+            yaml_dict['spec']['template']['spec'], name, machine_type
+        )
+        modified = True
+    if not modified:
+      raise ValueError(
+          'No pod spec yaml found to modify. Was the wrong jinja passed in?'
+      )
+
+  def _ModifyPodSpecPlacementYaml(
+      self,
+      pod_spec_yaml: dict[str, Any],
+      name: str,
+      machine_type: str | None = None,
+  ) -> None:
+    """Modifies the pod spec yaml in-place with additional needed attributes.
+
+    The placement of pods (with eg node selectors or topology constraints) is
+    the most likely to change from cloud to cloud.
+
+    Args:
+      pod_spec_yaml: The pod spec yaml to modify. See
+        https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#podspec-v1-core
+          for documentation on the pod spec fields. This is modified in place.
+      name: The name of the app.
+      machine_type: A specified machine type to request.
+    """
+    del name
+    node_selectors = self.GetNodeSelectors(machine_type)
+    if node_selectors:
+      pod_spec_yaml['nodeSelector'].update(node_selectors)
 
   def DeployIngress(
       self, name: str, namespace: str, port: int, health_path: str = ''

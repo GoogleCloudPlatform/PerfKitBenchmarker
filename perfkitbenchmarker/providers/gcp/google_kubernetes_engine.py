@@ -574,15 +574,13 @@ class GkeAutopilotCluster(BaseGkeCluster):
     metadata['nodepools'] = self.CLUSTER_TYPE
     return metadata
 
-  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
+  def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Node selectors for instance capabilites in AutoPilot clusters."""
-    selectors = []
+    selectors = {}
     compute_class = None
     machine_family: str | None = util.GetMachineFamily(machine_type)
     if machine_family:
-      selectors += [
-          f'cloud.google.com/machine-family: {machine_family}',
-      ]
+      selectors['cloud.google.com/machine-family'] = machine_family
       # Mandate one pod per node, which also handles packing small pods into
       # bigger nodes.
       compute_class = 'Performance'
@@ -595,20 +593,17 @@ class GkeAutopilotCluster(BaseGkeCluster):
         suffix = gce_virtual_machine.GPU_TYPE_TO_SUFFIX[gpu_type]
       gpu_type = f'nvidia-{gpu_type}{suffix}'
       gpu_driver_version = gcp_flags.GKE_GPU_DRIVER_VERSION.value
-      selectors += [
-          'cloud.google.com/gke-accelerator: ' + gpu_type,
+      selectors.update({
+          'cloud.google.com/gke-accelerator': gpu_type,
           # Quote to avoid YAML parsing as int.
-          f"cloud.google.com/gke-accelerator-count: '{gpu_count}'",
-          (
-              'cloud.google.com/gke-gpu-driver-version:'
-              f" '{gpu_driver_version}'"
-          ),
-      ]
+          'cloud.google.com/gke-accelerator-count': str(gpu_count),
+          'cloud.google.com/gke-gpu-driver-version': str(gpu_driver_version),
+      })
       # Override earlier compute class, as only one can be set & Accelerator
       # (or nothing) is required for GPUs.
       compute_class = 'Accelerator'
     if compute_class:
-      selectors += [f'cloud.google.com/compute-class: {compute_class}']
+      selectors['cloud.google.com/compute-class'] = compute_class
     return selectors
 
   def ResizeNodePool(

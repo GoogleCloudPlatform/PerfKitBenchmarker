@@ -824,20 +824,61 @@ class GoogleKubernetesEngineAutopilotTestCase(
           metadata,
       )
 
-  @flagsaver.flagsaver(gpu_type='h100', gpu_count=1)
-  def testGetNodeSelectorGpusH100(self):
+  @flagsaver.flagsaver(gpu_type='h100', gpu_count=1, run_uri='123')
+  def testApplyYamlGpusH100(self):
+    self.enter_context(
+        mock.patch(
+            gce_network.__name__ + '.GceFirewall.GetFirewall',
+            return_value='fakefirewall',
+        )
+    )
+    self.enter_context(
+        mock.patch(
+            gce_network.__name__ + '.GceNetwork.GetNetwork',
+            return_value=gce_network.GceNetwork(
+                gce_network.GceNetworkSpec('fakeproject', zone='us-central1-a')
+            ),
+        )
+    )
+    self.MockIssueCommand(
+        {'apply -f': [('deployment.apps/test-deployment hello', '', 0)]}
+    )
+    self.enter_context(
+        mock.patch.object(
+            container_service.data,
+            'ResourcePath',
+            return_value=os.path.join(
+                os.path.dirname(__file__),
+                '..',
+                '..',
+                'data',
+                'kube_apply.yaml.j2',
+            ),
+        )
+    )
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects():
+    with self.assertLogs(level='INFO') as logs:
       cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
-      self.assertEqual(
-          cluster.GetNodeSelectors(),
-          [
-              'cloud.google.com/gke-accelerator: nvidia-h100-80gb',
-              "cloud.google.com/gke-accelerator-count: '1'",
-              "cloud.google.com/gke-gpu-driver-version: 'default'",
-              'cloud.google.com/compute-class: Accelerator',
-          ],
+      yamls = cluster.ConvertManifestToYamlDicts(
+          'tests/data/kube_apply.yaml.j2',
+          name='hello-world',
+          command=[],
       )
+      cluster.ModifyPodSpecPlacementYaml(
+          yamls,
+          'hello-world',
+      )
+      cluster.ApplyYaml(
+          yamls,
+          should_log_file=True,
+      )
+    full_logs = ';'.join(logs.output)
+    self.assertIn("cloud.google.com/gke-accelerator-count: '1'", full_logs)
+    self.assertIn(
+        'cloud.google.com/gke-accelerator: nvidia-h100-80gb', full_logs
+    )
+    self.assertIn('cloud.google.com/gke-gpu-driver-version: default', full_logs)
+    self.assertIn('cloud.google.com/compute-class: Accelerator', full_logs)
 
 
 if __name__ == '__main__':

@@ -1,31 +1,16 @@
+import os
 import time
 from typing import Callable, Iterable, Protocol, Tuple
 import unittest
 from unittest import mock
-from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.sample import Sample
+from tests import container_service_mock
 from tests import pkb_common_test_case
-
-
-# Use Mesos as a valid cloud we can override the implementation for.
-_CLUSTER_CLOUD = provider_info.UNIT_TEST
-
-
-class TestKubernetesCluster(container_service.KubernetesCluster):
-
-  CLOUD = _CLUSTER_CLOUD
-
-  def _Create(self):
-    pass
-
-  def _Delete(self):
-    pass
 
 
 kubectl_timeout_tuple = (
@@ -116,27 +101,12 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
-    self.enter_context(flagsaver.flagsaver(kubeconfig='kubeconfig'))
-    self.enter_context(flagsaver.flagsaver(run_uri='123'))
-    self.enter_context(
-        mock.patch('perfkitbenchmarker.providers.LoadProvider', autospec=True)
-    )
-    self.kubernetes_cluster = TestKubernetesCluster(
-        container_spec.ContainerClusterSpec(
-            'test-cluster',
-            **{
-                'cloud': _CLUSTER_CLOUD,
-                'vm_spec': {
-                    _CLUSTER_CLOUD: {
-                        'machine_type': 'fake-machine-type',
-                        'zone': 'us-east2-a',
-                    },
-                },
-            },
-        )
+    container_service_mock.MockContainerInit(self)
+    self.kubernetes_cluster = (
+        container_service_mock.CreateTestKubernetesCluster()
     )
 
-  @parameterized.parameters(('created'), ('configured'))
+  @parameterized.parameters('created', 'configured')
   def test_apply_manifest_gets_deployment_name(self, suffix):
     self.MockIssueCommand(
         {'apply -f': [(f'deployment.apps/test-deployment {suffix}', '', 0)]}
@@ -152,6 +122,68 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         'test-deployment.yaml',
     )
     self.assertEqual(next(deploy_ids), 'deployment.apps/test-deployment')
+
+  def test_apply_manifest_logs_jinja(self):
+    self.MockIssueCommand(
+        {'apply -f': [('deployment.apps/test-deployment hello', '', 0)]}
+    )
+    self.enter_context(
+        mock.patch.object(
+            container_service.data,
+            'ResourcePath',
+            return_value=os.path.join(
+                os.path.dirname(__file__), 'data', 'kube_apply.yaml.j2'
+            ),
+        )
+    )
+    with self.assertLogs(level='INFO') as logs:
+      self.kubernetes_cluster.ApplyManifest(
+          'tests/data/kube_apply.yaml.j2',
+          should_log_file=True,
+          name='hello-world',
+          command=['echo', 'hello', 'world'],
+      )
+    # Asserting on logging isn't very important, but is easier than reading the
+    # written file.
+    full_logs = ';'.join(logs.output)
+    self.assertIn('name: hello-world', full_logs)
+    self.assertIn('echo', full_logs)
+
+  def test_apply_manifest_yaml_logs(self):
+    self.MockIssueCommand(
+        {'apply -f': [('deployment.apps/test-deployment hello', '', 0)]}
+    )
+    self.enter_context(
+        mock.patch.object(
+            container_service.data,
+            'ResourcePath',
+            return_value=os.path.join(
+                os.path.dirname(__file__), 'data', 'kube_apply.yaml.j2'
+            ),
+        )
+    )
+    with self.assertLogs(level='INFO') as logs:
+      yamls = self.kubernetes_cluster.ConvertManifestToYamlDicts(
+          'tests/data/kube_apply.yaml.j2',
+          name='hello-world',
+          command=[],
+      )
+      self.assertEqual(yamls[0]['kind'], 'Namespace')
+      yamls[1]['spec']['selector']['app'] = 'hi-world'
+      yamls[1]['spec']['template']['spec']['containers'].append(
+          {'name': 'second-container'}
+      )
+      self.kubernetes_cluster.ApplyYaml(
+          yamls,
+          should_log_file=True,
+      )
+    full_logs = ';'.join(logs.output)
+    self.assertIn('app: hi-world', full_logs)
+    self.assertIn('name: hello-world', full_logs)
+    self.assertIn('name: second-container', full_logs)
+    # Check for no python artifacts.
+    self.assertNotIn('dict', full_logs)
+    self.assertNotIn('null', full_logs)
 
   @mock.patch.object(
       vm_util,
@@ -295,16 +327,16 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
       self, node_name: str, expected_nodepool_name: str | None
   ):
     vm_spec = {
-        _CLUSTER_CLOUD: {
+        container_service_mock.TEST_CLOUD: {
             'machine_type': 'fake-machine-type',
             'zone': 'us-east2-a',
         },
     }
-    nodepool_cluster = TestKubernetesCluster(
+    nodepool_cluster = container_service_mock.TestKubernetesCluster(
         container_spec.ContainerClusterSpec(
             'test-cluster',
             **{
-                'cloud': _CLUSTER_CLOUD,
+                'cloud': container_service_mock.TEST_CLOUD,
                 'vm_spec': vm_spec,
                 'nodepools': {
                     'servers': {
@@ -326,16 +358,16 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testGetNodepoolFromNodeName_raisesIfMultipleNodepoolsFound(self):
     vm_spec = {
-        _CLUSTER_CLOUD: {
+        container_service_mock.TEST_CLOUD: {
             'machine_type': 'fake-machine-type',
             'zone': 'us-east2-a',
         },
     }
-    nodepool_cluster = TestKubernetesCluster(
+    nodepool_cluster = container_service_mock.TestKubernetesCluster(
         container_spec.ContainerClusterSpec(
             'test-cluster',
             **{
-                'cloud': _CLUSTER_CLOUD,
+                'cloud': container_service_mock.TEST_CLOUD,
                 'vm_spec': vm_spec,
                 'nodepools': {
                     'default-for-serving': {
@@ -450,9 +482,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         },
         'kind': 'Event',
         'lastTimestamp': None,
-        'message': (
-            'Successfully assigned default/deploy-pod to gke-node'
-        ),
+        'message': 'Successfully assigned default/deploy-pod to gke-node',
         'metadata': {
             'creationTimestamp': '2025-10-03T18:05:56Z',
         },
@@ -462,8 +492,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     })
     self.assertIsNotNone(event)
     self.assertEqual(
-        event.message,
-        'Successfully assigned default/deploy-pod to gke-node'
+        event.message, 'Successfully assigned default/deploy-pod to gke-node'
     )
     self.assertEqual(event.reason, 'Scheduled')
     self.assertEqual(event.type, 'Normal')

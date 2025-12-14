@@ -2,9 +2,12 @@ import threading
 import time
 import unittest
 from unittest import mock
+from perfkitbenchmarker import benchmark_spec as bm_spec_lib
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.linux_benchmarks import kubernetes_hpa_benchmark
+from tests import container_service_mock
 from tests import pkb_common_test_case
 
 
@@ -72,6 +75,37 @@ def _sample() -> sample.Sample:
       metadata={},
       timestamp=time.time(),
   )
+
+
+class HpaBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    container_service_mock.MockContainerInit(self)
+    self.kubernetes_cluster = (
+        container_service_mock.CreateTestKubernetesCluster()
+    )
+    self.bm_spec = mock.create_autospec(
+        bm_spec_lib.BenchmarkSpec, instance=True
+    )
+    self.bm_spec.container_cluster = self.kubernetes_cluster
+    self.bm_spec.container_specs = {
+        'kubernetes_fib': container_spec.ContainerSpec(
+            'kubernetes_fib',
+            **{
+                'image': 'ubuntu:latest',
+            },
+        )
+    }
+
+  def testPrepareClusterManifestApplied(self):
+    manifest_path = 'container/kubernetes_hpa/fib.yaml.j2'
+    self.MockIssueCommand({'apply -f': [('deployment.apps/fib fib', '', 0)]})
+    with self.assertLogs(level='INFO') as logs:
+      kubernetes_hpa_benchmark.PrepareCluster(self.bm_spec, manifest_path)
+    full_logs = ';'.join(logs.output)
+    self.assertIn('image: ubuntu:latest', full_logs)
+    self.assertNotIn('template: {}', full_logs)
 
 
 if __name__ == '__main__':

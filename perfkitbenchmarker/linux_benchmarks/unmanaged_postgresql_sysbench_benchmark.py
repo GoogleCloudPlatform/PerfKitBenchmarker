@@ -194,20 +194,47 @@ def GetConfig(user_config):
   return config
 
 
-def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
-  """Prepare the servers and clients for the benchmark run.
+def PrepareSystem(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Configure the system for the benchmark run.
 
   Args:
     benchmark_spec:
   """
   vms = benchmark_spec.vms
+  background_tasks.RunThreaded(postgresql.ConfigureSystemSettings, vms)
+
+
+def InstallPackages(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Install packages for the benchmark run.
+
+  Args:
+    benchmark_spec:
+  """
+  for group, vms in benchmark_spec.vm_groups.items():
+    if group == 'server' or group.startswith('replica'):
+      for vm in vms:
+        vm.Install('postgresql')
+  clients = benchmark_spec.vm_groups['client']
+  for client in clients:
+    client.InstallPackages('git')
+    InstallSysbench(client)
+    if FLAGS.sysbench_testname == _TPCC:
+      client.RemoteCommand(
+          'cd /opt && sudo rm -fr sysbench-tpcc && '
+          f'sudo git clone {sysbench.SYSBENCH_TPCC_REPRO}'
+      )
+
+
+def StartServices(benchmark_spec: bm_spec.BenchmarkSpec):
+  """Start services for the benchmark run.
+
+  Args:
+    benchmark_spec:
+  """
   replica_servers = []
   for vm in benchmark_spec.vm_groups:
     if vm.startswith('replica'):
       replica_servers += benchmark_spec.vm_groups[vm]
-  background_tasks.RunThreaded(postgresql.ConfigureSystemSettings, vms)
-  background_tasks.RunThreaded(lambda vm: vm.Install('postgresql'), vms)
-
   primary_server = benchmark_spec.vm_groups['server'][0]
   postgresql.InitializeDatabase(primary_server)
   postgresql.ConfigureAndRestart(
@@ -225,15 +252,6 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
         GetBufferSize(),
         _CONF_TEMPLATE_PATH.value,
     )
-  clients = benchmark_spec.vm_groups['client']
-  for client in clients:
-    client.InstallPackages('git')
-    InstallSysbench(client)
-    if FLAGS.sysbench_testname == _TPCC:
-      client.RemoteCommand(
-          'cd /opt && sudo rm -fr sysbench-tpcc && '
-          f'sudo git clone {sysbench.SYSBENCH_TPCC_REPRO}'
-      )
   loader_vm = benchmark_spec.vm_groups['client'][0]
   sysbench_parameters = _GetSysbenchParameters(
       primary_server.internal_ip,
@@ -371,7 +389,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   # report the max tps/qps as a new metric.
   for item in max_transactions.values():
     metadata = copy.deepcopy(item.metadata)
-    metadata['searched_thread_counts'] = FLAGS.sysbench_run_threads
+    metadata['searched_thread_counts'] = list(FLAGS.sysbench_run_threads)
     results.append(
         sample.Sample(
             'max_' + item.metric, item.value, item.unit, metadata=metadata

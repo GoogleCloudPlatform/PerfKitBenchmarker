@@ -180,7 +180,7 @@ def ScaleUpPods(
   max_wait_time = _GetScaleTimeout()
   resource_timeout = max_wait_time + 60 * 5  # 5 minutes after waiting to avoid
   # pod delete events from polluting data collection.
-  resource_names = cluster.ApplyManifest(
+  yaml_docs = cluster.ConvertManifestToYamlDicts(
       MANIFEST_TEMPLATE,
       Name='kubernetes-scaleup',
       Replicas=num_new_pods,
@@ -192,11 +192,13 @@ def ScaleUpPods(
       EphemeralStorageRequest='10Mi',
       RolloutTimeout=max_wait_time,
       PodTimeout=resource_timeout,
-      NodeSelectors=cluster.GetNodeSelectors(
-          cluster.default_nodepool.machine_type
-      ),
-      cloud='Azure' if FLAGS.cloud == 'Azure' else None,
   )
+  cluster.ModifyPodSpecPlacementYaml(
+      yaml_docs,
+      'kubernetes-scaleup',
+      cluster.default_nodepool.machine_type,
+  )
+  resource_names = cluster.ApplyYaml(yaml_docs)
 
   assert resource_names
   rollout_name = next(resource_names)
@@ -279,10 +281,7 @@ def _CheckForFailures(
   ready_count_sample = next(
       (s for s in pod_samples if s.metric == 'pod_Ready_count'), None
   )
-  if (
-      ready_count_sample is not None
-      and ready_count_sample.value >= num_pods
-  ):
+  if ready_count_sample is not None and ready_count_sample.value >= num_pods:
     logging.info(
         'Benchmark successfully scaled up %d pods, which is equal to or more '
         'than the goal of %d pods.',

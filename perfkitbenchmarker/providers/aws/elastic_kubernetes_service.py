@@ -618,21 +618,20 @@ class EksAutoCluster(BaseEksCluster):
     # Autopilot does not support nodepools & manual resizes.
     pass
 
-  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
+  def GetNodeSelectors(
+      self, machine_type: str | None = None
+  ) -> dict[str, str]:
     """Get the node selectors section of a yaml for the provider."""
     del machine_type  # Unused.
     # Theoretically needed in mixed mode, but deployments fail without it:
     # https://docs.aws.amazon.com/eks/latest/userguide/associate-workload.html#_require_a_workload_is_deployed_to_eks_auto_mode_nodes
-    selectors = ['eks.amazonaws.com/compute-type: auto']
+    selectors = {'eks.amazonaws.com/compute-type': 'auto'}
     if self.use_spot:
-      selectors += ['karpenter.sh/capacity-type: spot']
+      selectors['karpenter.sh/capacity-type'] = 'spot'
     if virtual_machine.GPU_TYPE.value:
-      selectors += [
-          (
-              'eks.amazonaws.com/instance-gpu-name:'
-              f' {virtual_machine.GPU_TYPE.value}'
-          ),
-      ]
+      selectors['eks.amazonaws.com/instance-gpu-name'] = (
+          virtual_machine.GPU_TYPE.value
+      )
     return selectors
 
 
@@ -1282,12 +1281,12 @@ class EksKarpenterCluster(BaseEksCluster):
     """Change the number of nodes in the node group."""
     raise NotImplementedError()
 
-  def GetNodeSelectors(self, machine_type: str | None = None) -> list[str]:
+  def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Gets the node selectors section of a yaml for the provider."""
     machine_family = util.GetMachineFamily(machine_type)
     if machine_family:
-      return [f'karpenter.k8s.aws/instance-family: {machine_family}']
-    return []
+      return {'karpenter.k8s.aws/instance-family': machine_family}
+    return {}
 
   def GetNodePoolNames(self) -> list[str]:
     """Gets node pool names for the cluster.

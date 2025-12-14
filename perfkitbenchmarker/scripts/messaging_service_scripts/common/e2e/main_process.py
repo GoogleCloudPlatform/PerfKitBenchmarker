@@ -62,6 +62,7 @@ class BaseWorker:
     Args:
       timeout: Timeout in seconds. Defaults to BaseWorker.DEFAULT_TIMEOUT.
     """
+    assert self.subprocess is not None, 'stop() called before start()'
     try:
       self.subprocess.terminate()
       await self._join_subprocess(timeout)
@@ -89,7 +90,7 @@ class BaseWorker:
   async def _join_subprocess(self, timeout=None):
     timeout = self.DEFAULT_TIMEOUT if timeout is None else timeout
     deadline = time.time() + timeout
-    while self.subprocess.exitcode is None:
+    while self.subprocess and self.subprocess.exitcode is None:
       await asyncio.sleep(self.SLEEP_TIME)
       if time.time() > deadline:
         raise errors.EndToEnd.SubprocessTimeoutError

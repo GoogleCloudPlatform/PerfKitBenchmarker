@@ -15,7 +15,7 @@
 """Contains classes/functions related to Azure Kubernetes Service."""
 
 import json
-from typing import List
+from typing import Any, List
 
 from absl import flags
 from perfkitbenchmarker import container_service
@@ -580,6 +580,23 @@ class AksAutomaticCluster(AksCluster):
     self._GetCredentials(use_admin=False)
     self._WaitForDefaultServiceAccount()
     self._AttachContainerRegistry()
+
+  def _ModifyPodSpecPlacementYaml(
+      self,
+      pod_spec_yaml: dict[str, Any],
+      name: str,
+      machine_type: str | None = None,
+  ) -> None:
+    """Modifies the pod spec yaml with additional needed attributes."""
+    # Topology spread constraints needed to fix an issue with Azure AKS where
+    # admission webhook "validation.gatekeeper.sh" denied the request.
+    super()._ModifyPodSpecPlacementYaml(pod_spec_yaml, machine_type)
+    pod_spec_yaml['topologySpreadConstraints'] = [{
+        'maxSkew': 1,
+        'topologyKey': 'kubernetes.io/hostname',
+        'whenUnsatisfiable': 'DoNotSchedule',
+        'labelSelector': {'matchLabels': {'name': name}},
+    }]
 
 
 def _AzureNodePoolName(pkb_nodepool_name: str) -> str:

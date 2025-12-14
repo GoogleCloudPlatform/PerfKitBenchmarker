@@ -86,12 +86,16 @@ def PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec, manifest_path: str):
   )
   fib_image = benchmark_spec.container_specs['kubernetes_fib'].image
 
-  cluster.ApplyManifest(
+  yaml_docs = cluster.ConvertManifestToYamlDicts(
       manifest_path,
       fib_image=fib_image,
-      node_selectors=cluster.GetNodeSelectors(),
       port=_PORT,
   )
+  cluster.ModifyPodSpecPlacementYaml(
+      yaml_docs,
+      'fib',
+  )
+  cluster.ApplyYaml(yaml_docs)
 
   cluster.WaitForResource('deploy/fib', 'available', namespace='fib')
 
