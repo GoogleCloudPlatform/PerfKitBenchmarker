@@ -27,6 +27,7 @@ from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources import managed_ai_model
 from perfkitbenchmarker.resources import managed_ai_model_spec
+import yaml
 
 FLAGS = flags.FLAGS
 
@@ -343,9 +344,15 @@ class BaseCliVertexAiModel(BaseVertexAiModel):
       extension = '-fasttryout'
     else:
       extension = f'-{self.project_number}'
+    if self.endpoint.endpoint_dns:
+      dns = self.endpoint.endpoint_dns
+    else:
+      dns = (
+          f'{self.endpoint.short_endpoint_name}.{self.region}{extension}.'
+          f'prediction.vertexai.goog'
+      )
     return (
-        f'https://{self.endpoint.short_endpoint_name}.{self.region}{extension}.'
-        f'prediction.vertexai.goog/v1/projects/{self.project_number}/locations/'
+        f'https://{dns}/v1/projects/{self.project_number}/locations/'
         f'{self.region}/endpoints/{self.endpoint.short_endpoint_name}:predict'
     )
 
@@ -448,7 +455,7 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
     """Creates the underlying resource."""
     deploy_start_time = time.time()
     deploy_cmd = (
-        'gcloud beta ai model-garden models deploy'
+        'gcloud ai model-garden models deploy'
         f' --model={self.model_spec.GetModelGardenName()}'
         f' --endpoint-display-name={self.name}'
         f' --project={self.project} --region={self.region}'
@@ -486,6 +493,7 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
         exception_type=errors.Resource.CreationError,
     )
     self.endpoint.created = True
+    self.endpoint.Describe()
     logging.info(
         'Model resource with name %s deployed & found with model id %s &'
         ' endpoint id %s',
@@ -517,6 +525,8 @@ class BaseVertexAiEndpoint(resource.BaseResource):
     region: The region, derived from the zone.
     endpoint_name: The full resource name of the created endpoint, e.g.
       projects/123/locations/us-east1/endpoints/1234.
+    endpoint_dns: The DNS name of the endpoint, e.g.
+      1234.us-east1.prediction.vertexai.goog
   """
 
   def __init__(
@@ -533,6 +543,7 @@ class BaseVertexAiEndpoint(resource.BaseResource):
     self.region = region
     self.vm = vm
     self.endpoint_name = str | None
+    self.endpoint_dns: str | None = None
 
   @property
   def short_endpoint_name(self) -> str | None:
@@ -547,6 +558,10 @@ class BaseVertexAiEndpoint(resource.BaseResource):
 
   def UpdateLabels(self) -> None:
     """Updates the labels of the endpoint."""
+    pass
+
+  def Describe(self) -> None:
+    """Describes the endpoint & gets any needed info."""
     pass
 
 
@@ -597,6 +612,15 @@ class VertexAiCliEndpoint(BaseVertexAiEndpoint):
     self.vm.RunCommand(
         f'gcloud ai endpoints delete {self.endpoint_name} --quiet'
     )
+
+  def Describe(self) -> None:
+    """Describes the endpoint & stores any needed info."""
+    out, _, _ = self.vm.RunCommand(
+        'gcloud ai endpoints describe'
+        f' {self.endpoint_name} --project={self.project} --region={self.region}'
+    )
+    loaded_yaml = yaml.safe_load(out)
+    self.endpoint_dns = loaded_yaml['dedicatedEndpointDns']
 
   def UpdateLabels(self) -> None:
     """Updates the labels of the endpoint."""
