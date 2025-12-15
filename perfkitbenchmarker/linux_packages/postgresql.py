@@ -14,12 +14,12 @@
 
 """Module containing postgres installation functions."""
 
+import logging
 import os
 
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import os_types
-
 
 FLAGS = flags.FLAGS
 
@@ -29,6 +29,11 @@ _POSTGRESQL_VERSION = flags.DEFINE_enum(
     'postgresql16',
     enum_values=ALLOWED_VERSIONS,
     help='The postgres version used for benchmark test',
+)
+_SKIP_SYSTEM_CONFIG = flags.DEFINE_bool(
+    'skip_system_config',
+    False,
+    'Skips system configuration for benchmarks.',
 )
 
 SYSBENCH_PASSWORD = 'Syb3enCh#1'
@@ -59,6 +64,8 @@ SHARED_BUFFERS_CONF = {
     },
 }
 
+POSTGRES_CLUSTER_NAME = 'main'
+
 
 def GetPostgresVersion():
   """Returns the last two characters of the postgresql_version flag."""
@@ -84,10 +91,12 @@ def GetOSDependentDefaultsConfig(os_type: str) -> dict[str, str]:
       os_types.DEBIAN: {
           'postgres_path': f'/usr/lib/postgresql/{version}',
           'data_dir': f'/etc/postgresql/{version}/data/data',
-          'conf_dir': f'/etc/postgresql/{version}/main',
+          'conf_dir': f'/etc/postgresql/{version}/{POSTGRES_CLUSTER_NAME}',
           'disk_mount_point': f'/etc/postgresql/{version}/data',
           'postgres_service_name': 'postgresql',
-          'postgres_template_service_name': f'postgresql@{version}-main',
+          'postgres_template_service_name': (
+              f'postgresql@{version}-{POSTGRES_CLUSTER_NAME}'
+          ),
       },
       os_types.AMAZONLINUX2023: {
           'data_dir': '/var/lib/pgsql/data',
@@ -180,13 +189,10 @@ def InitializeDatabase(vm):
   postgres_path = GetOSDependentDefaults(vm.OS_TYPE)['postgres_path']
   data_path = GetOSDependentDefaults(vm.OS_TYPE)['data_dir']
   vm.RemoteCommand(
-      f'sudo mkdir -p {data_path} && sudo chown postgres:root'
-      f' {data_path}'
+      f'sudo mkdir -p {data_path} && sudo chown postgres:root {data_path}'
   )
   vm.RemoteCommand(
-      'sudo -u postgres'
-      f' {postgres_path}/bin/initdb -D'
-      f' {data_path}'
+      f'sudo -u postgres {postgres_path}/bin/initdb -D {data_path}'
   )
 
 
@@ -220,7 +226,6 @@ def ConfigureAndRestart(vm, run_uri, buffer_size, conf_template_path):
   data_path = GetOSDependentDefaults(vm.OS_TYPE)['data_dir']
   buffer_size_key = f'SIZE_{buffer_size}'
   remote_temp_config = '/tmp/my.cnf'
-  postgres_conf_path = os.path.join(conf_path, 'postgresql-custom.conf')
   pg_hba_conf_path = os.path.join(conf_path, 'pg_hba.conf')
   database_queries_path = os.path.join(conf_path, 'queries.sql')
   database_setup_queries = 'postgresql/database_setup_queries.sql.j2'
@@ -239,9 +244,8 @@ def ConfigureAndRestart(vm, run_uri, buffer_size, conf_template_path):
       remote_temp_config,
       context,
   )
-  vm.RemoteCommand(f'sudo cp {remote_temp_config} {postgres_conf_path}')
   vm.RemoteCommand(
-      'sudo echo -e "\ninclude = postgresql-custom.conf" | sudo tee -a'
+      f'cat {remote_temp_config} | sudo tee -a'
       f' {os.path.join(conf_path, "postgresql.conf")}'
   )
   vm.RenderTemplate(
@@ -269,9 +273,9 @@ def ConfigureAndRestart(vm, run_uri, buffer_size, conf_template_path):
   UpdateHugePages(vm, buffer_size_key)
 
   if IsUbuntu(vm):
-    postgres_service_name = GetOSDependentDefaults(
-        vm.OS_TYPE
-    )['postgres_template_service_name']
+    postgres_service_name = GetOSDependentDefaults(vm.OS_TYPE)[
+        'postgres_template_service_name'
+    ]
   UpdateMaxMemory(vm, buffer_size_key, postgres_service_name)
 
   vm.RemoteCommand(
@@ -279,12 +283,13 @@ def ConfigureAndRestart(vm, run_uri, buffer_size, conf_template_path):
       f' -out {data_path}/server.crt -keyout'
       f' {data_path}/server.key -subj "/CN=`hostname`""'
   )
-  vm.RemoteCommand(f'sudo chmod 755 {postgres_conf_path}')
+  postgres_version = GetPostgresVersion()
   vm.RemoteCommand(
-      'sudo systemctl restart'
-      f' {GetOSDependentDefaults(vm.OS_TYPE)["postgres_service_name"]}'
+      f'sudo pg_ctlcluster {postgres_version} {POSTGRES_CLUSTER_NAME} restart'
   )
-  vm.RemoteCommand(f'sudo systemctl status {postgres_service_name}')
+  vm.RemoteCommand(
+      f'sudo pg_ctlcluster {postgres_version} {POSTGRES_CLUSTER_NAME} status'
+  )
   vm.RemoteCommand(
       f'sudo su - postgres -c "psql -a -f {database_queries_path}"'
   )
@@ -304,6 +309,9 @@ def UpdateHugePages(vm, buffer_size_key):
 
 
 def UpdateMaxMemory(vm, buffer_size_key, postgres_service_name):
+  if _SKIP_SYSTEM_CONFIG.value:
+    logging.info('Skipping UpdateMaxMemory() configuration for postgresql.')
+    return
   vm.RemoteCommand(
       'sudo systemctl set-property'
       f' {postgres_service_name}.service'
@@ -358,19 +366,17 @@ def SetupReplica(
       'sudo sync; echo 3 | sudo tee -a /proc/sys/vm/drop_caches'
   )
   if IsUbuntu(replica_vm):
-    postgres_service_name = GetOSDependentDefaults(
-        replica_vm.OS_TYPE
-    )['postgres_template_service_name']
+    postgres_service_name = GetOSDependentDefaults(replica_vm.OS_TYPE)[
+        'postgres_template_service_name'
+    ]
     UpdateMaxMemory(replica_vm, buffer_size_key, postgres_service_name)
 
   replica_vm.RemoteCommand(f'sudo chown -R postgres:root {data_path}')
   replica_vm.RemoteCommand(f'sudo chown -R postgres:root {conf_path}')
+  replica_vm.RemoteCommand(f'sudo chmod 700 {data_path}')
   replica_vm.RemoteCommand(
-      f'sudo chmod 700 {data_path}'
-  )
-  replica_vm.RemoteCommand(
-      'sudo systemctl restart'
-      f' {GetOSDependentDefaults(replica_vm.OS_TYPE)["postgres_service_name"]}'
+      'sudo pg_ctlcluster'
+      f' {GetPostgresVersion()} {POSTGRES_CLUSTER_NAME} restart'
   )
 
 
