@@ -687,7 +687,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       self.cluster.ApplyManifest(
           'container/kubernetes_ai_inference/azure-gpu-nodepool.yaml.j2',
           gpu_capacity_types=['on-demand'],
-          gpu_sku_name=['H100'],
+          gpu_sku_name=[self.accelerator_type],
       )
 
   def _ParseInferenceServerDeploymentMetadata(self) -> None:
