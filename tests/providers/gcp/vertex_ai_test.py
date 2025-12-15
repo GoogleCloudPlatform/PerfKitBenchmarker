@@ -305,7 +305,12 @@ response:
                 '',
                 0,
             )],
-            'ai endpoints describe update': [('', '', 0)],
+            'ai endpoints describe': [(
+                """dedicatedEndpointDns: mg-endpoint-123.us-east1-456.prediction.vertexai.goog
+dedicatedEndpointEnabled: true""",
+                '',
+                0,
+            )],
             'curl': [(
                 '[Prompt:What is crab?\nOutput:Crabs are tasty.\n]',
                 '',
