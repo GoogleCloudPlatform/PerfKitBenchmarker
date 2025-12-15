@@ -14,14 +14,18 @@
 """Runs a locust based vpa benchmark on a k8s cluster."""
 
 import collections
+import threading
+import typing
 from typing import Any, Dict, List
 
 from absl import flags
 import numpy as np
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker.linux_benchmarks import kubernetes_hpa_benchmark as hpa
+from perfkitbenchmarker.linux_packages import locust
 from perfkitbenchmarker.sample import Sample
 from scipy import integrate
 
@@ -83,8 +87,35 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
   """Run a benchmark against the fibonacci server."""
+  vm = benchmark_spec.vms[0]
+  cluster: container_service.KubernetesCluster = typing.cast(
+      container_service.KubernetesCluster, benchmark_spec.container_cluster
+  )
+  addr = cluster.DeployIngress('fib', 'fib', _PORT, _HEALTH_PATH)
 
-  samples = hpa.Run(benchmark_spec)
+  # Confirm the server can be pinged.
+  hpa.PollServer(vm, addr)
+
+  samples = []
+  stop = threading.Event()
+
+  kmc = KubernetesMetricsCollector(samples, stop)
+
+  def RunLocust():
+    for s in locust.Run(vm, addr):
+      samples.append(s)
+    stop.set()
+
+  background_tasks.RunThreaded(
+      lambda f: f(),
+      [
+          lambda: kmc.ObserveCPUUsage(cluster, 'deploy/fib', 'fib'),
+          lambda: kmc.ObserveCPURequests(cluster, 'deploy/fib', 'fib'),
+          RunLocust,
+      ],
+      max_concurrent_threads=3,
+  )
+
   samples.append(_ComputeOverUnderProvisioning(samples))
 
   return samples
