@@ -72,6 +72,7 @@ _COOLDOWN_DURATION = benchbase.BENCHBASE_COOLDOWN_DURATION
 _WARMUP_DURATION = benchbase.BENCHBASE_WARMUP_DURATION
 _WORKLOAD_DURATION = benchbase.BENCHBASE_WORKLOAD_DURATION
 _WAREHOUSES = benchbase.BENCHBASE_WAREHOUSES
+_RECOVERY_POINT_ARN = aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -87,7 +88,8 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   if _COOLDOWN_DURATION.value > 0 and _WARMUP_DURATION.value <= 0:
     raise errors.Config.InvalidValue(
         'benchbase_warmup_duration must be positive if'
-        ' benchbase_cooldown_duration is positive.')
+        ' benchbase_cooldown_duration is positive.'
+    )
   return config
 
 
@@ -107,6 +109,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   # Create the configuration file on the client VM
   benchbase.CreateConfigFile(client_vm)
+
   if FLAGS.db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
     dsql: aws_aurora_dsql_db.AwsAuroraDsqlRelationalDb = (
         benchmark_spec.relational_db
@@ -117,19 +120,27 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     # https://docs.aws.amazon.com/aurora-dsql/latest/userguide/SECTION_authentication-token.html#authentication-token-cli
     endpoint: str = f'{dsql.cluster_id}.dsql.{dsql.region}.on.aws'
     benchbase.OverrideEndpoint(client_vm, endpoint)
-  profile: str = (
-      'postgres'
-      if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
-      else 'auroradsql'
-  )
-  load_command: str = (
-      f'source /etc/profile.d/maven.sh && cd {benchbase.BENCHBASE_DIR} && mvn'
-      f' clean compile exec:java -P {profile} -Dexec.args="-b tpcc -c'
-      f' {benchbase.CONFIG_FILE_NAME} --create=true --load=true'
-      ' --execute=false"'
-  )
 
-  client_vm.RemoteCommand(load_command)
+  dsql_create_from_raw: bool = (
+      FLAGS.db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES
+      and _RECOVERY_POINT_ARN.value is None
+  )
+  if (
+      dsql_create_from_raw
+      or FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
+  ):
+    profile: str = (
+        'postgres'
+        if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
+        else 'auroradsql'
+    )
+    load_command: str = (
+        f'source /etc/profile.d/maven.sh && cd {benchbase.BENCHBASE_DIR} && mvn'
+        f' clean compile exec:java -P {profile} -Dexec.args="-b tpcc -c'
+        f' {benchbase.CONFIG_FILE_NAME} --create=true --load=true'
+        ' --execute=false"'
+    )
+    client_vm.RemoteCommand(load_command)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
