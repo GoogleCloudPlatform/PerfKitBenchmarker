@@ -45,6 +45,24 @@ _TRIGGER_PRIMARY_SERVER = flags.DEFINE_bool(
     ),
 )
 
+_TRIGGER_INFINITE = flags.DEFINE_bool(
+    'trigger_infinite',
+    False,
+    'If true, runs trigger for given interval until benchmark completion.',
+)
+
+_TRIGGER_INTERVAL_S = flags.DEFINE_integer(
+    'trigger_interval_s',
+    60,
+    'Interval in seconds between triggers if trigger_infinite is true.',
+)
+
+flags.register_validator(
+    'trigger_interval_s',
+    lambda value: value >= 0,
+    message='--trigger_interval_s must be non-negative.',
+)
+
 
 class BaseTimeTrigger(metaclass=abc.ABCMeta):
   """Object representing a Base Time Trigger.
@@ -59,6 +77,7 @@ class BaseTimeTrigger(metaclass=abc.ABCMeta):
     self.delay = delay
     self.vms = []
     self.trigger_time = None
+    self.trigger_count = 0
     self.metadata = {
         self.trigger_name: True,
         self.trigger_name + '_delay': delay,
@@ -76,11 +95,15 @@ class BaseTimeTrigger(metaclass=abc.ABCMeta):
 
     def TriggerEvent():
       time.sleep(self.delay)
-      logging.info('Triggering %s on %s', self.trigger_name, vm.name)
-      self.TriggerMethod(vm)
+      while True:
+        logging.info('Triggering %s on %s', self.trigger_name, vm.name)
+        self.TriggerMethod(vm)
+        self.trigger_count += 1
+        if not _TRIGGER_INFINITE.value:
+          break
+        time.sleep(_TRIGGER_INTERVAL_S.value)
 
-    t = threading.Thread(target=TriggerEvent)
-    t.daemon = True
+    t = threading.Thread(target=TriggerEvent, daemon=True)
     t.start()
 
   def SetUpTrigger(self, unused_sender, benchmark_spec):
@@ -111,6 +134,7 @@ class BaseTimeTrigger(metaclass=abc.ABCMeta):
   # pylint: disable=unused-argument
   def UpdateMetadata(self, unused_sender, benchmark_spec, samples):
     """Update global metadata."""
+    self.metadata['trigger_count'] = self.trigger_count
     for s in samples:
       s.metadata.update(self.metadata)
 

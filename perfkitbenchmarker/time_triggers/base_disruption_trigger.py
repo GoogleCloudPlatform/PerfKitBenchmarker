@@ -108,8 +108,6 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
     def generate_disruption_total_time_samples() -> (
         MutableSequence[sample.Sample]
     ):
-      self.WaitForDisruption()
-
       # Host maintenance is in s
       self.disruption_ends = max(
           [float(d.end_time) * 1000 for d in self.disruption_events],

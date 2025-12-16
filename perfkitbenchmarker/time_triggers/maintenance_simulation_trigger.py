@@ -352,6 +352,7 @@ class MaintenanceEventTrigger(base_disruption_trigger.BaseDisruptionTrigger):
       self.gce_simulate_maintenance_helpers[vm].SimulateMaintenanceWithLog()
     else:
       self.gce_simulate_maintenance_helpers[vm].SimulateMaintenanceEvent()
+    self.WaitForDisruption()
 
   def SetUp(self):
     """Sets up notification if live migration timestamps are captured."""
