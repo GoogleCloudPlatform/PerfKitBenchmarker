@@ -183,7 +183,6 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
     """
     return self.RemoteCommand(command, ignore_failure, timeout)
 
-  @winrm_retry
   def RemoteCommand(
       self,
       command: str,
@@ -201,6 +200,33 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
 
     Returns:
       A tuple of stdout and stderr from running the command.
+
+    Raises:
+      RemoteCommandError: If there was a problem issuing the command or the
+          command timed out.
+    """
+    return self.RemoteCommandWithReturnCode(
+        command, ignore_failure, timeout
+    )[:2]
+
+  @winrm_retry
+  def RemoteCommandWithReturnCode(
+      self,
+      command: str,
+      ignore_failure: bool = False,
+      timeout: float | None = None,
+  ) -> Tuple[str, str, int]:
+    """Runs a powershell command on the VM.
+
+    Args:
+      command: A valid powershell command.
+      ignore_failure: Ignore any failure if set to true.
+      timeout: Float. A timeout in seconds for the command. If None is passed,
+        no timeout is applied. Timeout kills the winrm session which then kills
+        the process being executed.
+
+    Returns:
+      A tuple of stdout, stderr, and return code from running the command.
 
     Raises:
       RemoteCommandError: If there was a problem issuing the command or the
@@ -259,7 +285,7 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
       )
       raise errors.VirtualMachine.RemoteCommandError(error_text)
 
-    return stdout, stderr
+    return stdout, stderr, retcode
 
   def PartitionDisk(self, dev_name, dev_path, num_partitions, partition_size):
     raise NotImplementedError()
