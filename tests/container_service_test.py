@@ -5,6 +5,7 @@ import unittest
 from unittest import mock
 from absl.testing import parameterized
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
@@ -113,7 +114,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.enter_context(
         mock.patch.object(
-            container_service.data,
+            data,
             'ResourcePath',
             return_value='path/to/test-deployment.yaml',
         )
@@ -129,7 +130,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.enter_context(
         mock.patch.object(
-            container_service.data,
+            data,
             'ResourcePath',
             return_value=os.path.join(
                 os.path.dirname(__file__), 'data', 'kube_apply.yaml.j2'
@@ -155,7 +156,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.enter_context(
         mock.patch.object(
-            container_service.data,
+            data,
             'ResourcePath',
             return_value=os.path.join(
                 os.path.dirname(__file__), 'data', 'kube_apply.yaml.j2'

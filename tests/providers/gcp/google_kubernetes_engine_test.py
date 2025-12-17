@@ -24,6 +24,7 @@ from unittest import mock
 from absl import flags as flgs
 from absl.testing import flagsaver
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
@@ -107,7 +108,7 @@ class GoogleContainerRegistryTestCase(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     self.enter_context(
         mock.patch.object(
-            google_kubernetes_engine.container_service,
+            google_kubernetes_engine.container_service.base,
             'ContainerImage',
             self.FakeContainerImage,
         )
@@ -845,7 +846,7 @@ class GoogleKubernetesEngineAutopilotTestCase(
     )
     self.enter_context(
         mock.patch.object(
-            container_service.data,
+            data,
             'ResourcePath',
             return_value=os.path.join(
                 os.path.dirname(__file__),
