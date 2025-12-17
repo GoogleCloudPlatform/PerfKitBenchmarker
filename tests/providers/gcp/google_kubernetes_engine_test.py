@@ -257,7 +257,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testPostCreate(self):
     spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command, mock.patch.object(
-        container_service, 'RunKubectlCommand'
+        container_service.kubernetes, 'RunKubectlCommand'
     ) as mock_kubectl_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._PostCreate()
@@ -561,7 +561,7 @@ class GoogleKubernetesEngineWithGpusTestCase(
   def testPostCreate(self, create_from_file_patch):
     spec = self.create_kubernetes_engine_spec('k80')
     with patch_critical_objects() as issue_command, mock.patch.object(
-        container_service, 'RunKubectlCommand'
+        container_service.kubernetes, 'RunKubectlCommand'
     ) as mock_kubectl_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._PostCreate()
