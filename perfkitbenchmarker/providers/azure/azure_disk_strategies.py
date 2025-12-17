@@ -325,7 +325,7 @@ class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
     if not FLAGS.object_storage_fuse_bucket_name:
       blob_client.Create()
 
-    local_path = data.ResourcePath('blobfuse2/config.yaml')
+    local_path = data.ResourcePath('blobfuse2/config.yaml.j2')
     remote_path = 'blobfuse2_config.yaml'
     context = {
         'account_name': blob_client.service.storage_account.name,
