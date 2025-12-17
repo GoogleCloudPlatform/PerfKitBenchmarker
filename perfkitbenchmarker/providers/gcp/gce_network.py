@@ -692,6 +692,8 @@ class GceFirewall(network.BaseFirewall):
             start_port,
             end_port,
         )
+        if source_range is not None:
+          firewall_name += f'-{source_range.replace(':','c').replace('/','s')}'
         key = (vm.project, vm.cidr, start_port, end_port, source_range)
       else:
         firewall_name = 'perfkit-firewall-%s-%d-%d' % (
@@ -699,6 +701,8 @@ class GceFirewall(network.BaseFirewall):
             start_port,
             end_port,
         )
+        if source_range is not None:
+          firewall_name += f'-{source_range.replace(':','c').replace('/','s')}'
         key = (vm.project, start_port, end_port, source_range)
       if key in self.firewall_rules:
         return
