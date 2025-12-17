@@ -1315,10 +1315,10 @@ class KubernetesClusterCommands:
     try:
       # Ensure the load balancer is ready by parsing the output IP
       ip_address = ipaddress.ip_address(stdout)
-    except ValueError:
+    except ValueError as e:
       raise errors.Resource.RetryableCreationError(
           "Load Balancer IP for service '%s' is not ready." % service_name
-      )
+      ) from e
 
     return format(ip_address)
 
