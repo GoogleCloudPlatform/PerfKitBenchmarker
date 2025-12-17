@@ -872,4 +872,4 @@ class VertexAiLlama4Spec(VertexAiModelSpec):
       suffix += '-16e'
     else:
       suffix += '-128e'
-    return f'meta/llama4@llama-4-{suffix}'
+    return f'meta/llama4@llama-4-{suffix}-instruct'
