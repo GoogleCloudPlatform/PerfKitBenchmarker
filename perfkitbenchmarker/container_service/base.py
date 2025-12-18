@@ -17,7 +17,7 @@ import collections
 import itertools
 import os
 import time
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from absl import flags
 from perfkitbenchmarker import context
@@ -583,7 +583,7 @@ class BaseContainerCluster(resource.BaseResource):
 
 def GetContainerClusterClass(
     cloud: str, cluster_type: str
-) -> type[BaseContainerCluster]:
+) -> Callable[[container_spec_lib.ContainerClusterSpec], BaseContainerCluster]:
   return resource.GetResourceClass(
       BaseContainerCluster, CLOUD=cloud, CLUSTER_TYPE=cluster_type
   )
