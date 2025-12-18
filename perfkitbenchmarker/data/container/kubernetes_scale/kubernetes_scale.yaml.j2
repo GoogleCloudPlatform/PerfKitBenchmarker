@@ -13,6 +13,10 @@ spec:
       labels:
         name: {{ Name }}
     spec:
+      {%- if NvidiaGpuRequest and Cloud == 'aws' %}
+      nodeSelector:
+        karpenter.sh/nodepool: {{ GpuNodepoolName | default('gpu') }}
+      {%- endif %}
       containers:
       - name: {{ Name }}
         image: {{ Image }}
@@ -20,6 +24,13 @@ spec:
         command: {{ Command }}
         {%- endif %}
         resources:
+          requests:
+            cpu: {{ CpuRequest }}
+            memory: {{ MemoryRequest }}
+            ephemeral-storage: {{ EphemeralStorageRequest }}
+            {%- if NvidiaGpuRequest %}
+            nvidia.com/gpu: {{ NvidiaGpuRequest }}
+            {%- endif %}
           limits:
             cpu: {{ CpuRequest }}
             memory: {{ MemoryRequest }}
@@ -53,3 +64,8 @@ spec:
         operator: "Exists"
         effect: "NoExecute"
         tolerationSeconds: {{ PodTimeout }}
+      {%- if NvidiaGpuRequest and Cloud == 'aws' %}
+      - key: {{ GpuTaintKey | default('nvidia.com/gpu') }}
+        operator: Exists
+        effect: NoSchedule
+      {%- endif %}

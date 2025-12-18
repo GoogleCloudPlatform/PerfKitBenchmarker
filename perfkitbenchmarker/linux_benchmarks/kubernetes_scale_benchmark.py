@@ -97,8 +97,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
 def _GetRolloutCreationTime(rollout_name: str) -> int:
   """Returns the time when the rollout was created."""
   out, _, _ = container_service.RunRetryableKubectlCommand([
-      'rollout',
-      'history',
+      'get',
       rollout_name,
       '-o',
       'jsonpath={.metadata.creationTimestamp}',
@@ -180,8 +179,32 @@ def ScaleUpPods(
   max_wait_time = _GetScaleTimeout()
   resource_timeout = max_wait_time + 60 * 5  # 5 minutes after waiting to avoid
   # pod delete events from polluting data collection.
-  yaml_docs = cluster.ConvertManifestToYamlDicts(
-      MANIFEST_TEMPLATE,
+
+  # Ensure a GPU NodePool exists for EKS Karpenter before applying the workload.
+  is_eks_karpenter_aws_gpu = (
+      virtual_machine.GPU_COUNT.value
+      and FLAGS.cloud.lower() == 'aws'
+      and getattr(cluster, 'CLUSTER_TYPE', None) == 'Karpenter'
+  )
+
+  if is_eks_karpenter_aws_gpu:
+    cluster.ApplyManifest(
+        'container/kubernetes_scale/aws-gpu-nodepool.yaml.j2',
+        gpu_nodepool_name='gpu',
+        gpu_nodepool_label='gpu',
+        karpenter_ec2nodeclass_name='default',
+        gpu_instance_categories=['g'],
+        gpu_instance_families=['g6', 'g6e'],
+        gpu_capacity_types=['on-demand'],
+        gpu_arch=['amd64'],
+        gpu_os=['linux'],
+        gpu_taint_key='nvidia.com/gpu',
+        gpu_consolidate_after='1m',
+        gpu_consolidation_policy='WhenEmptyOrUnderutilized',
+        gpu_nodepool_cpu_limit=1000,
+    )
+
+  manifest_kwargs = dict(
       Name='kubernetes-scaleup',
       Replicas=num_new_pods,
       CpuRequest=CPUS_PER_POD.value,
@@ -192,12 +215,28 @@ def ScaleUpPods(
       EphemeralStorageRequest='10Mi',
       RolloutTimeout=max_wait_time,
       PodTimeout=resource_timeout,
+      Cloud=FLAGS.cloud.lower(),
   )
-  cluster.ModifyPodSpecPlacementYaml(
-      yaml_docs,
-      'kubernetes-scaleup',
-      cluster.default_nodepool.machine_type,
+
+  if is_eks_karpenter_aws_gpu:
+    manifest_kwargs.update({
+        'GpuNodepoolName': 'gpu',
+        'GpuTaintKey': 'nvidia.com/gpu',
+    })
+
+  yaml_docs = cluster.ConvertManifestToYamlDicts(
+      MANIFEST_TEMPLATE,
+      **manifest_kwargs,
   )
+
+  # Non-GPU path: keep existing placement behavior.
+  if not is_eks_karpenter_aws_gpu:
+    cluster.ModifyPodSpecPlacementYaml(
+        yaml_docs,
+        'kubernetes-scaleup',
+        cluster.default_nodepool.machine_type,
+    )
+
   resource_names = cluster.ApplyYaml(yaml_docs)
 
   assert resource_names
