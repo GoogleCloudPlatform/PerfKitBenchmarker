@@ -14,7 +14,6 @@
 """Contains classes related to managed kubernetes container services."""
 
 import calendar
-import collections
 import dataclasses
 import datetime
 import functools
@@ -488,18 +487,6 @@ class KubernetesClusterCommands:
       return resource_names
 
   @staticmethod
-  def _RecursiveDict() -> dict[str, Any]:
-    """Creates a new dictionary with auto nesting keys.
-
-    See https://stackoverflow.com/a/10218517/2528472.
-
-    Returns:
-      A new dictionary that automatically sets the value for any nested missing
-      keys.
-    """
-    return collections.defaultdict(KubernetesClusterCommands._RecursiveDict)
-
-  @staticmethod
   def ConvertManifestToYamlDicts(
       manifest_file: str, **kwargs
   ) -> list[dict[str, Any]]:
@@ -515,87 +502,24 @@ class KubernetesClusterCommands:
     manifest = vm_util.ReadAndRenderJinja2Template(
         manifest_file, trim_spaces=False, **kwargs
     )
-    yaml_docs = yaml.safe_load_all(manifest)
-    return_yamls = []
-    for yaml_doc in yaml_docs:
-      return_yamls.append(
-          KubernetesClusterCommands._ConvertToDictType(
-              yaml_doc, KubernetesClusterCommands._RecursiveDict
-          )
-      )
-    return return_yamls
-
-  @staticmethod
-  def _ConvertToDictType(
-      yaml_doc: Any, dict_lambda: Any
-  ) -> dict[str, Any] | Any:
-    """Converts a YAML document to the given dictionary type.
-
-    In particular a recursive defaultdict can be more easily accessed with e.g.
-    my_dict['a']['b'] = value rather than my_dict.setdefault('a', {})['b'] =
-    value.
-
-    Args:
-      yaml_doc: The YAML document to convert.
-      dict_lambda: A constructor for the dictionary type to convert to.
-
-    Returns:
-      The remade dictionary.
-    """
-    if not isinstance(yaml_doc, dict) and not isinstance(yaml_doc, list):
-      return yaml_doc
-
-    def _ConvertPossiblyEmptyValue(value: Any) -> Any | None:
-      """Converts a given value to the dictionary type, or None if empty."""
-      if not bool(value) and value != 0:
-        return None
-      converted_value = KubernetesClusterCommands._ConvertToDictType(
-          value, dict_lambda
-      )
-      if not bool(converted_value) and converted_value != 0:
-        return None
-      return converted_value
-
-    yaml_list = []
-    if isinstance(yaml_doc, list):
-      for item in yaml_doc:
-        converted_value = _ConvertPossiblyEmptyValue(item)
-        if converted_value is None:
-          continue
-        yaml_list.append(converted_value)
-      return yaml_list
-    yaml_dict = dict_lambda()
-    for key, value in yaml_doc.items():
-      converted_value = _ConvertPossiblyEmptyValue(value)
-      if converted_value is None:
-        continue
-      yaml_dict[key] = converted_value
-    return yaml_dict
+    return vm_util.ReadYamlAsDicts(manifest)
 
   @staticmethod
   def ApplyYaml(
-      yaml_dicts: list[dict[str, Any]], should_log_file: bool = True
+      yaml_dicts: list[dict[str, Any]], **logging_kwargs
   ) -> Iterator[str]:
     """Writes yaml to a file and applies it.
 
     Args:
       yaml_dicts: A list of YAML documents.
-      should_log_file: Whether to log the rendered manifest to stdout or not.
+      **logging_kwargs: Keyword arguments passed to file writing.
 
     Returns:
       Names of the resources, e.g. [deployment.apps/mydeploy, pod/foo]
     """
-    normal_dicts = []
-    # Convert back to a normal dict because yaml.dump otherwise adds random
-    # "dictitems:" keys & other python artifacts.
-    for yaml_dict in yaml_dicts:
-      normal_dicts.append(
-          KubernetesClusterCommands._ConvertToDictType(yaml_dict, dict)
-      )
-    manifest = yaml.dump_all(normal_dicts)
-    return KubernetesClusterCommands._WriteAndApplyManifest(
-        manifest, should_log_file
-    )
+    vm_util.IncrementStackLevel(**logging_kwargs)
+    yaml_file = vm_util.WriteYaml(yaml_dicts, **logging_kwargs)
+    return KubernetesClusterCommands._ApplyRenderedManifest(yaml_file)
 
   @staticmethod
   def WaitForResource(

@@ -1,3 +1,4 @@
+import tempfile
 import threading
 import time
 import unittest
@@ -5,6 +6,7 @@ from unittest import mock
 from perfkitbenchmarker import benchmark_spec as bm_spec_lib
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.linux_benchmarks import kubernetes_hpa_benchmark
 from tests import container_service_mock
@@ -99,6 +101,13 @@ class HpaBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     }
 
   def testPrepareClusterManifestApplied(self):
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'GetTempDir',
+            return_value=tempfile.gettempdir(),
+        )
+    )
     manifest_path = 'container/kubernetes_hpa/fib.yaml.j2'
     self.MockIssueCommand({'apply -f': [('deployment.apps/fib fib', '', 0)]})
     with self.assertLogs(level='INFO') as logs:
