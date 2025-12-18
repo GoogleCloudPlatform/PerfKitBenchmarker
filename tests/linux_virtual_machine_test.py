@@ -521,6 +521,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
           pkb_common_test_case.IP_LINK_TEXT
       ),
       'cat /proc/cpuinfo | grep processor | wc -l': '16',
+      'cat /proc/cmdline': 'test kernel flags'
   }
 
   def CreateVm(
@@ -687,6 +688,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'os_info': self.os_info,
         'cpu_arch': self.cpu_arch,
         'threads_per_core': 1,
+        'kernel_command_line': 'test kernel flags',
     }
     self.assertEqual(expected_os_metadata, vm.os_metadata)
 
