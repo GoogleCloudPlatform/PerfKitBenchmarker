@@ -20,6 +20,7 @@ case it is created with auto-scale IOPS.
 """
 
 import datetime
+import json
 import logging
 import time
 from typing import Any, Tuple
@@ -28,11 +29,13 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_relational_db
+from perfkitbenchmarker.providers.azure import util
 
 DEFAULT_DATABASE_NAME = 'database'
 
@@ -70,6 +73,9 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
       sql_engine_utils.FLEXIBLE_SERVER_POSTGRES,
       sql_engine_utils.FLEXIBLE_SERVER_MYSQL,
   ]
+  # Metrics are processed in 5 minute batches according to
+  # https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-monitoring.
+  METRICS_COLLECTION_DELAY_SECONDS = 300
 
   def __init__(self, relational_db_spec: Any):
     super().__init__(relational_db_spec)
@@ -277,3 +283,122 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         )
 
     self._Reboot()
+
+  def _GetResourceProvider(self) -> str:
+    if self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_MYSQL:
+      return 'Microsoft.DBforMySQL'
+    elif self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_POSTGRES:
+      return 'Microsoft.DBforPostgreSQL'
+    else:
+      raise NotImplementedError(f'Unsupported engine {self.spec.engine}')
+
+  def _GetResourceId(self) -> str:
+    return (
+        f'/subscriptions/{util.GetSubscriptionId()}/resourceGroups/'
+        f'{self.resource_group.name}/providers/'
+        f'{self._GetResourceProvider()}/flexibleServers/{self.instance_id}'
+    )
+
+  def _GetMetricsToCollect(self) -> list[relational_db.MetricSpec]:
+    """Returns a list of metrics to collect."""
+    # pyformat: disable
+    if self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_MYSQL:
+      return [
+          relational_db.MetricSpec('cpu_percent', 'cpu_utilization', '%', None),
+          relational_db.MetricSpec('io_consumption_percent', 'io_consumption_percent', '%', None),
+          relational_db.MetricSpec('storage_io_count', 'storage_io_count', 'iops', None),
+          relational_db.MetricSpec('storage_used', 'disk_bytes_used', 'GB', lambda x: x / (1024 * 1024 * 1024)),
+      ]
+    else:
+      return [
+          relational_db.MetricSpec('cpu_percent', 'cpu_utilization', '%', None),
+          relational_db.MetricSpec('read_iops', 'disk_read_iops', 'iops', None),
+          relational_db.MetricSpec('write_iops', 'disk_write_iops', 'iops', None),
+          relational_db.MetricSpec('read_throughput', 'disk_read_throughput', 'MB/s', lambda x: x / (1024 * 1024)),
+          relational_db.MetricSpec('write_throughput', 'disk_write_throughput', 'MB/s', lambda x: x / (1024 * 1024)),
+          relational_db.MetricSpec('storage_used', 'disk_bytes_used', 'GB', lambda x: x / (1024 * 1024 * 1024)),
+      ]
+    # pyformat: enable
+
+  @vm_util.Retry(poll_interval=60, max_retries=5, retryable_exceptions=KeyError)
+  def _CollectProviderMetric(
+      self,
+      metric: relational_db.MetricSpec,
+      start_time: datetime.datetime,
+      end_time: datetime.datetime,
+      collect_percentiles: bool = False,
+  ) -> list[sample.Sample]:
+    """Collects metrics from Azure Monitor."""
+    if end_time - start_time < datetime.timedelta(minutes=1):
+      logging.warning(
+          'Not collecting metrics since end time %s is within 1 minute of start'
+          ' time %s.',
+          end_time,
+          start_time,
+      )
+      return []
+    metric_name = metric.provider_name
+    logging.info(
+        'Collecting metric %s for instance %s', metric_name, self.instance_id
+    )
+    cmd = [
+        azure.AZURE_PATH,
+        'monitor',
+        'metrics',
+        'list',
+        '--resource',
+        self._GetResourceId(),
+        '--metric',
+        metric_name,
+        '--start-time',
+        start_time.astimezone(datetime.timezone.utc).strftime(
+            relational_db.METRICS_TIME_FORMAT
+        ),
+        '--end-time',
+        end_time.astimezone(datetime.timezone.utc).strftime(
+            relational_db.METRICS_TIME_FORMAT
+        ),
+        '--interval',
+        'pt1m',
+        '--aggregation',
+        'Average',
+    ]
+    try:
+      stdout, _ = vm_util.IssueRetryableCommand(cmd)
+    except errors.VmUtil.IssueCommandError as e:
+      logging.warning(
+          'Could not collect metric %s for instance %s: %s',
+          metric.provider_name,
+          self.instance_id,
+          e,
+      )
+      return []
+    response = json.loads(stdout)
+    if (
+        not response
+        or not response['value']
+        or not response['value'][0]['timeseries']
+    ):
+      logging.warning('No timeseries for metric %s', metric_name)
+      return []
+
+    datapoints = response['value'][0]['timeseries'][0]['data']
+    if not datapoints:
+      logging.warning('No datapoints for metric %s', metric_name)
+      return []
+
+    points = []
+    for dp in datapoints:
+      if dp['average'] is None:
+        continue
+      value = dp['average']
+      if metric.conversion_func:
+        value = metric.conversion_func(value)
+      points.append((
+          datetime.datetime.fromisoformat(dp['timeStamp']),
+          value,
+      ))
+
+    return self._CreateSamples(
+        points, metric.sample_name, metric.unit, collect_percentiles
+    )

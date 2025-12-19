@@ -1,4 +1,6 @@
+import datetime
 import inspect
+import json
 import unittest
 
 from absl import flags
@@ -8,9 +10,107 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.azure import azure_network
+from perfkitbenchmarker.providers.azure import util
 from tests import pkb_common_test_case
 
+
 FLAGS = flags.FLAGS
+
+
+class AzureFlexibleServerMetricsTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand', return_value=('', '', ''))
+    )
+    FLAGS.run_uri = '123'
+    FLAGS.cloud = provider_info.AZURE
+    FLAGS['db_engine'].parse(sql_engine_utils.FLEXIBLE_SERVER_POSTGRES)
+    test_spec = inspect.cleandoc("""
+    sysbench:
+      relational_db:
+        engine: postgres
+        engine_version: '13'
+        database_username: user
+        database_password: password
+        high_availability: False
+        db_spec:
+          Azure:
+            machine_type: Standard_D2s_v3
+            zone: westus2
+        db_disk_spec:
+          Azure:
+            disk_size: 128
+        vm_groups:
+          clients:
+            vm_spec:
+              Azure:
+                machine_type: Standard_B4ms
+                zone: westus2
+    """)
+    self.spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_string=test_spec, benchmark_name='sysbench'
+    )
+    self.spec.ConstructRelationalDb()
+    self.server = self.spec.relational_db
+    self.server.resource_group = mock.Mock()
+    self.server.resource_group.name = 'test-group'
+    self.enter_context(
+        mock.patch.object(util, 'GetSubscriptionId', return_value='test-sub')
+    )
+
+  def testCollectMetrics(self):
+    # Mock the response from Azure Monitor
+    mock_response = {
+        'value': [{
+            'timeseries': [{
+                'data': [
+                    {
+                        'timeStamp': '2025-11-26T10:00:00Z',
+                        'average': 10.0,
+                    },
+                    {
+                        'timeStamp': '2025-11-26T10:01:00Z',
+                        'average': 20.0,
+                    },
+                ]
+            }]
+        }]
+    }
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueRetryableCommand',
+            return_value=(json.dumps(mock_response), ''),
+        )
+    )
+
+    start_time = datetime.datetime(2025, 11, 26, 10, 0, 0)
+    end_time = datetime.datetime(2025, 11, 26, 10, 1, 0)
+    samples = self.server.CollectMetrics(start_time, end_time)
+
+    # Check the number of samples returned (4 per metric * 6 metrics)
+    self.assertLen(samples, 24)
+
+    # Spot check a few sample values
+    sample_names = [s.metric for s in samples]
+    self.assertIn('cpu_utilization_average', sample_names)
+    self.assertIn('cpu_utilization_min', sample_names)
+    self.assertIn('cpu_utilization_max', sample_names)
+    self.assertIn('disk_read_iops_average', sample_names)
+
+    cpu_avg = next(s for s in samples if s.metric == 'cpu_utilization_average')
+    self.assertEqual(cpu_avg.value, 15.0)
+    self.assertEqual(cpu_avg.unit, '%')
+
+    cpu_min = next(s for s in samples if s.metric == 'cpu_utilization_min')
+    self.assertEqual(cpu_min.value, 10.0)
+    self.assertEqual(cpu_min.unit, '%')
+
+    cpu_max = next(s for s in samples if s.metric == 'cpu_utilization_max')
+    self.assertEqual(cpu_max.value, 20.0)
+    self.assertEqual(cpu_max.unit, '%')
 
 
 class AzureFlexibleServerCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
