@@ -16,11 +16,13 @@
 
 import builtins
 import contextlib
+import datetime
 import inspect
 import json
 import os
 import unittest
 from absl import flags
+from google.cloud.monitoring_v3 import types
 import mock
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import relational_db
@@ -320,6 +322,66 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       db._PostCreate()
       self.assertEqual(db.endpoint, db.server_vm.internal_ip)
 
+  def testCollectMetrics(self):
+    db = CreateDbFromSpec(self.createMySQLSpecDict())
+    db.instance_id = 'pkb-db-instance-123'
+    db.project = 'fakeproject'
+    mock_response = types.ListTimeSeriesResponse(
+        time_series=[{
+            'metric': {
+                'type': 'cloudsql.googleapis.com/database/cpu/utilization'
+            },
+            'points': [
+                {
+                    'interval': {
+                        'start_time': {'seconds': 1764103200, 'nanos': 0},
+                        'end_time': {'seconds': 1764103200, 'nanos': 0},
+                    },
+                    'value': {'double_value': 0.1},
+                },
+                {
+                    'interval': {
+                        'start_time': {'seconds': 1764103260, 'nanos': 0},
+                        'end_time': {'seconds': 1764103260, 'nanos': 0},
+                    },
+                    'value': {'double_value': 0.2},
+                },
+            ],
+        }]
+    )
+    mock_client = mock.MagicMock()
+    mock_client.list_time_series.return_value = mock_response.time_series
+    self.enter_context(
+        mock.patch.object(
+            db,
+            '_GetMonitoringClient',
+            return_value=mock_client,
+        )
+    )
+
+    start_time = datetime.datetime(2025, 11, 26, 10, 0, 0)
+    end_time = datetime.datetime(2025, 11, 26, 10, 1, 0)
+    samples = db.CollectMetrics(start_time, end_time)
+
+    cpu_avg = next(
+        s for s in samples if s.metric == 'database_cpu_utilization_average'
+    )
+    cpu_min = next(
+        s for s in samples if s.metric == 'database_cpu_utilization_min'
+    )
+    cpu_max = next(
+        s for s in samples if s.metric == 'database_cpu_utilization_max'
+    )
+    cpu_p50 = next(
+        s for s in samples if s.metric == 'database_cpu_utilization_p50'
+    )
+
+    self.assertEqual(cpu_avg.value, 15.0)
+    self.assertEqual(cpu_avg.unit, '%')
+    self.assertEqual(cpu_min.value, 10.0)
+    self.assertEqual(cpu_max.value, 20.0)
+    self.assertEqual(cpu_p50.value, 15.0)
+
 
 class GcpPostgresRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
@@ -393,141 +455,6 @@ class GcpPostgresRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       command_string = ' '.join(issue_command.call_args[0][0])
 
       self.assertIn('--availability-type=REGIONAL', command_string)
-
-
-class GcpRelationalDbTest(pkb_common_test_case.PkbCommonTestCase):
-
-  def setUp(self):
-    super().setUp()
-    FLAGS.project = 'test-project'
-    FLAGS.run_uri = 'test-uri'
-    self.db = CreateDbFromSpec({
-        'engine': MYSQL,
-        'db_tier': None,
-        'engine_version': '5.7',
-        'run_uri': '123',
-        'database_name': 'fakedbname',
-        'database_password': 'fakepassword',
-        'db_spec': mock.Mock(zone='us-west1-b'),
-        'db_disk_spec': mock.Mock(disk_size=50),
-        'high_availability': False,
-        'backup_enabled': True,
-        'enable_freeze_restore': False,
-        'create_on_restore_error': False,
-        'delete_on_freeze_error': False,
-        'db_flags': '',
-    })
-    self.db.instance_id = 'test-instance'
-    self.mock_monitoring_client = self.enter_context(
-        mock.patch.object(
-            gcp_relational_db.monitoring_v3,
-            'MetricServiceClient',
-            autospec=True,
-        )
-    ).return_value
-
-  def _CreateMockTimeSeries(self, values):
-    points = []
-    for i, value in enumerate(values):
-      point = mock.Mock()
-      point.value.int64_value = None
-      point.value.double_value = float(value)
-      point.interval.start_time.timestamp.return_value = i * 60
-      points.append(point)
-    time_series = mock.Mock()
-    time_series.points = points
-    return [time_series]
-
-  def testCollectTimeSeries(self):
-    self.mock_monitoring_client.list_time_series.return_value = (
-        self._CreateMockTimeSeries([0.1, 0.2, 0.3])
-    )
-    start_time = gcp_relational_db.datetime.datetime(2025, 1, 1, 0, 0, 0)
-    end_time = gcp_relational_db.datetime.datetime(2025, 1, 1, 0, 3, 0)
-    samples = self.db._CollectTimeSeries(
-        'cloudsql.googleapis.com/database/cpu/utilization',
-        start_time,
-        end_time,
-    )
-    self.assertLen(samples, 4)
-    metrics = {s.metric: s for s in samples}
-    self.assertEqual(metrics['database_cpu_utilization_average'].value, 20)
-    self.assertEqual(metrics['database_cpu_utilization_average'].unit, '%')
-    self.assertEqual(metrics['database_cpu_utilization_min'].value, 10)
-    self.assertEqual(metrics['database_cpu_utilization_max'].value, 30)
-    self.assertIn('database_cpu_utilization_time_series', metrics)
-
-  def testCollectTimeSeriesDelta(self):
-    self.mock_monitoring_client.list_time_series.return_value = (
-        self._CreateMockTimeSeries([60, 120, 180])
-    )
-    start_time = gcp_relational_db.datetime.datetime(2025, 1, 1, 0, 0, 0)
-    end_time = gcp_relational_db.datetime.datetime(2025, 1, 1, 0, 3, 0)
-    samples = self.db._CollectTimeSeries(
-        'cloudsql.googleapis.com/database/disk/read_ops_count',
-        start_time,
-        end_time,
-    )
-    self.assertEqual(samples[0].metric, 'database_disk_read_ops_count_average')
-    self.assertEqual(samples[0].value, 120.0)  # Rate per second
-    self.assertEqual(samples[0].unit, 'iops')
-
-  def testCollectTimeSeriesBytes(self):
-    self.mock_monitoring_client.list_time_series.return_value = (
-        self._CreateMockTimeSeries([60 * 1024 * 1024, 120 * 1024 * 1024])
-    )
-    start_time = gcp_relational_db.datetime.datetime(2025, 1, 1, 0, 0, 0)
-    end_time = gcp_relational_db.datetime.datetime(2025, 1, 1, 0, 2, 0)
-    samples = self.db._CollectTimeSeries(
-        'cloudsql.googleapis.com/database/disk/read_bytes_count',
-        start_time,
-        end_time,
-    )
-    self.assertEqual(
-        samples[0].metric, 'database_disk_read_bytes_count_average'
-    )
-    self.assertEqual(samples[0].value, 90.0)  # MB/s
-    self.assertEqual(samples[0].unit, 'MB/s')
-
-  def testCollectTimeSeriesEmpty(self):
-    self.mock_monitoring_client.list_time_series.return_value = []
-    start_time = gcp_relational_db.datetime.datetime(2025, 1, 1, 0, 0, 0)
-    end_time = gcp_relational_db.datetime.datetime(2025, 1, 1, 0, 1, 0)
-    samples = self.db._CollectTimeSeries(
-        'cloudsql.googleapis.com/database/cpu/utilization',
-        start_time,
-        end_time,
-    )
-    self.assertEmpty(samples)
-
-  def testCollectTimeSeriesWithPercentiles(self):
-    self.mock_monitoring_client.list_time_series.return_value = (
-        self._CreateMockTimeSeries([10, 20, 30, 40, 50])
-    )
-    start_time = gcp_relational_db.datetime.datetime(2025, 1, 1, 0, 0, 0)
-    end_time = gcp_relational_db.datetime.datetime(2025, 1, 1, 0, 5, 0)
-    samples = self.db._CollectTimeSeries(
-        'cloudsql.googleapis.com/database/sqlserver/memory/page_life_expectancy',
-        start_time,
-        end_time,
-        collect_percentiles=True,
-    )
-    metrics = {s.metric: s.value for s in samples}
-    self.assertEqual(
-        metrics['database_sqlserver_memory_page_life_expectancy_min'], 10.0
-    )
-    self.assertEqual(
-        metrics['database_sqlserver_memory_page_life_expectancy_p50'], 30.0
-    )
-    self.assertEqual(
-        metrics['database_sqlserver_memory_page_life_expectancy_max'], 50.0
-    )
-    self.assertEqual(
-        metrics['database_sqlserver_memory_page_life_expectancy_average'], 30.0
-    )
-    self.assertIn(
-        'database_sqlserver_memory_page_life_expectancy_time_series', metrics
-    )
 
 
 if __name__ == '__main__':

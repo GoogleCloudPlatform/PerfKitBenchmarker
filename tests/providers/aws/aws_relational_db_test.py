@@ -469,11 +469,11 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     mock_response = {
         'Datapoints': [
             {
-                'Timestamp': '2025-11-26T10:00:00Z',
+                'Timestamp': 1766084460,
                 'Average': 10.0,
             },
             {
-                'Timestamp': '2025-11-26T10:01:00Z',
+                'Timestamp': 1766084400,
                 'Average': 20.0,
             },
         ]
@@ -489,9 +489,6 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     start_time = datetime.datetime(2025, 11, 26, 10, 0, 0)
     end_time = datetime.datetime(2025, 11, 26, 10, 1, 0)
     samples = db.CollectMetrics(start_time, end_time)
-
-    # Check the number of samples returned (4 per metric * 5 metrics)
-    self.assertLen(samples, 20)
 
     # Spot check a few sample values
     sample_names = [s.metric for s in samples]

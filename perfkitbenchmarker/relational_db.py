@@ -20,10 +20,16 @@ This is the base implementation of all relational db.
 import abc
 import datetime
 import logging
+import statistics
+import time
+from typing import Any, NamedTuple
+
 from absl import flags
+import numpy as np
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
@@ -223,7 +229,6 @@ ENABLE_DATA_CACHE = flags.DEFINE_bool(
     'gcp_db_enable_data_cache', False, 'Whether to enable data cache.'
 )
 METRICS_TIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
-METRICS_COLLECTION_DELAY_SECONDS = 165
 
 
 FLAGS = flags.FLAGS
@@ -294,12 +299,20 @@ def VmsToBoot(vm_groups):
   }
 
 
+class MetricSpec(NamedTuple):
+  provider_name: str
+  sample_name: str
+  unit: str
+  conversion_func: Any
+
+
 class BaseRelationalDb(resource.BaseResource):
   """Object representing a relational database Service."""
 
   IS_MANAGED = True
   RESOURCE_TYPE = 'BaseRelationalDb'
   REQUIRED_ATTRS = ['CLOUD', 'IS_MANAGED']
+  METRICS_COLLECTION_DELAY_SECONDS = 0
 
   def __init__(self, relational_db_spec):
     """Initialize the managed relational database object.
@@ -608,14 +621,101 @@ class BaseRelationalDb(resource.BaseResource):
     """
     raise NotImplementedError('Restart database is not implemented.')
 
+  def _GetMetricsToCollect(self) -> list[MetricSpec]:
+    """Returns a list of metrics to collect.
+
+    Each element in the list is a tuple containing:
+      - metric_name: The name of the metric in the provider's monitoring system.
+      - metric_sample_name: The name to use for the metric in the samples.
+      - unit: The unit of the metric.
+      - conversion_func: A function to apply to the metric value (or None).
+    """
+    return []
+
+  def _CollectProviderMetric(
+      self,
+      metric: MetricSpec,
+      start_time: datetime.datetime,
+      end_time: datetime.datetime,
+      collect_percentiles: bool = False,
+  ) -> list[sample.Sample]:
+    """Collects a single metric from the provider's monitoring system.
+
+    Args:
+      metric: The metric to collect.
+      start_time: The start time of the query interval.
+      end_time: The end time of the query interval.
+      collect_percentiles: Whether to collect percentiles for the metric.
+
+    Returns:
+      A list of sample.Sample objects.
+    """
+    del self, metric, start_time, end_time, collect_percentiles
+    return []
+
+  def _CreateSamples(
+      self,
+      points: list[tuple[datetime.datetime, float]],
+      metric_sample_name: str,
+      unit: str,
+      collect_percentiles: bool = False,
+  ) -> list[sample.Sample]:
+    """Creates a list of samples from a list of (timestamp, value) points."""
+    if not points:
+      logging.warning('No values found for metric %s', metric_sample_name)
+      return []
+    points.sort(key=lambda x: x[0])
+    timestamps = [p[0] for p in points]
+    values = [p[1] for p in points]
+    avg_val = statistics.mean(values)
+    min_val = min(values)
+    max_val = max(values)
+    samples = []
+    samples.append(
+        sample.Sample(f'{metric_sample_name}_min', min_val, unit, metadata={})
+    )
+    samples.append(
+        sample.Sample(f'{metric_sample_name}_max', max_val, unit, metadata={})
+    )
+    samples.append(
+        sample.Sample(
+            f'{metric_sample_name}_average', avg_val, unit, metadata={}
+        )
+    )
+    if collect_percentiles:
+      percentiles_to_collect = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+      # Note that this uses linear interpolation to calculate the percentiles.
+      percentile_values = np.percentile(values, percentiles_to_collect)
+      for percentile, value in zip(percentiles_to_collect, percentile_values):
+        name = f'p{percentile}'
+        samples.append(
+            sample.Sample(
+                f'{metric_sample_name}_{name}', value, unit, metadata={}
+            )
+        )
+    samples.append(
+        sample.CreateTimeSeriesSample(
+            values,
+            [t.timestamp() for t in timestamps],
+            f'{metric_sample_name}_time_series',
+            unit,
+            60,
+        )
+    )
+    log_util.LogToShortLogAndRoot(
+        f'{metric_sample_name}: average={avg_val:.2f}, min={min_val:.2f}, '
+        f'max={max_val:.2f}, count={len(values)}'
+    )
+    human_readable_ts = [f'{t}: {v:.2f} {unit}' for t, v in reversed(points)]
+    log_util.LogToShortLogAndRoot(
+        f'{metric_sample_name}_time_series:\n' + '\n'.join(human_readable_ts)
+    )
+    return samples
+
   def CollectMetrics(
       self, start_time: datetime.datetime, end_time: datetime.datetime
   ) -> list[sample.Sample]:
     """Collects and returns performance metrics after the run phase.
-
-    This method is optional for subclasses to implement. Subclasses should
-    query cloud-specific monitoring APIs for metrics within the provided time
-    range and return them as a list of sample.Sample objects.
 
     Args:
       start_time: The start time of the run phase.
@@ -624,5 +724,28 @@ class BaseRelationalDb(resource.BaseResource):
     Returns:
       A list of sample.Sample instances containing the collected metrics.
     """
-    del start_time, end_time
-    return []
+    logging.info(
+        'Collecting metrics for time range: %s to %s',
+        start_time.strftime(METRICS_TIME_FORMAT),
+        end_time.strftime(METRICS_TIME_FORMAT),
+    )
+
+    time_to_wait = (
+        end_time
+        - datetime.datetime.now()
+        + datetime.timedelta(seconds=self.METRICS_COLLECTION_DELAY_SECONDS)
+    )
+    if time_to_wait.total_seconds() > 0:
+      logging.info(
+          'Waiting %s seconds for metrics to be available.',
+          int(time_to_wait.total_seconds()),
+      )
+      time.sleep(time_to_wait.total_seconds())
+
+    metrics_to_collect = self._GetMetricsToCollect()
+    all_samples = []
+    for metric in metrics_to_collect:
+      all_samples.extend(
+          self._CollectProviderMetric(metric, start_time, end_time)
+      )
+    return all_samples
