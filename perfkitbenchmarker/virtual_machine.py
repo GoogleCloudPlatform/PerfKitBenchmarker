@@ -138,6 +138,12 @@ _ASSIGN_EXTERNAL_IP = flags.DEFINE_boolean(
     'If True, an external (public) IP will be created for VMs. '
     'If False, --connect_via_internal_ip may also be needed.',
 )
+_ASSIGN_EXTERNAL_IPV6 = flags.DEFINE_boolean(
+    'assign_external_ipv6',
+    False,
+    'If True, an external (public) IPv6 address will be created for VMs. '
+    '(initial support only for GCP VMs)'
+)
 flags.DEFINE_string(
     'boot_startup_script',
     None,
@@ -334,6 +340,7 @@ class BaseVmSpec(spec.BaseSpec):
     gpu_type: None or string. Type of gpus to attach to the VM.
     image: The disk image to boot from.
     assign_external_ip: Bool.  If true, create an external (public) IP.
+    assign_external_ipv6: Bool. If true, create an external (public) IPv6 address.
     install_packages: If false, no packages will be installed. This is useful if
       benchmark dependencies have already been installed.
     background_cpu_threads: The number of threads of background CPU usage while
@@ -362,6 +369,7 @@ class BaseVmSpec(spec.BaseSpec):
     self.gpu_type = None
     self.image = None
     self.assign_external_ip = None
+    self.assign_external_ipv6 = None
     self.install_packages = None
     self.background_cpu_threads = None
     self.background_network_mbits_per_sec = None
@@ -420,6 +428,8 @@ class BaseVmSpec(spec.BaseSpec):
       config_values['gpu_count'] = flag_values.gpu_count
     if flag_values['assign_external_ip'].present:
       config_values['assign_external_ip'] = flag_values.assign_external_ip
+    if flag_values['assign_external_ipv6'].present:
+      config_values['assign_external_ipv6'] = flag_values.assign_external_ipv6
     if flag_values['disable_interrupt_moderation'].present:
       config_values['disable_interrupt_moderation'] = (
           flag_values.disable_interrupt_moderation
@@ -478,6 +488,10 @@ class BaseVmSpec(spec.BaseSpec):
         'assign_external_ip': (
             option_decoders.BooleanDecoder,
             {'default': True},
+        ),
+        'assign_external_ipv6': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
         ),
         'gpu_type': (
             option_decoders.EnumDecoder,
@@ -545,6 +559,8 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     internal_ip: Internal IP address.
     assign_external_ip: If True, create an external (public) IP.
     ip_address: Public (external) IP address.
+    assign_external_ipv6: If True, create an external (public) IPv6 Address.
+    ipv6_address: Public (external) IPv6 address.
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
     project: The provider-specific project associated with the VM (e.g.
       artisanal-lightbulb-883).
@@ -630,7 +646,9 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     )
     self.boot_completion_ip_subset = _BOOT_COMPLETION_IP_SUBSET.value
     self.assign_external_ip = vm_spec.assign_external_ip
+    self.assign_external_ipv6 = vm_spec.assign_external_ipv6
     self.ip_address = None
+    self.ipv6_address = None
     self.internal_ip = None
     self.internal_ips = []
     self.user_name = _VM_USER_NAME.value
@@ -860,6 +878,11 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     if self.firewall and not FLAGS.skip_firewall_rules:
       self.firewall.AllowIcmp(self)
 
+  def AllowIcmpIpv6(self):
+    """Opens ICMP for IPv6 protocol on the firewall corresponding to the VM if exists"""
+    if self.firewall and not FLAGS.skip_firewall_rules and self.ipv6_address is not None:
+      self.firewall.AllowIcmpIpv6(self)
+
   def AllowPort(self, start_port, end_port=None, source_range=None):
     """Opens the port on the firewall corresponding to the VM if one exists.
 
@@ -939,6 +962,8 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       result['name'] = self.name
     if self.ip_address is not None:
       result['ip_address'] = self.ip_address
+    if self.ipv6_address is not None:
+      result['ipv6_address'] = self.ipv6_address
     if pkb_flags.RECORD_PROCCPU.value and self.cpu_version:
       result['cpu_version'] = self.cpu_version
     if self.create_operation_name is not None:

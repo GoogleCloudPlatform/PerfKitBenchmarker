@@ -734,6 +734,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       no_address_arg = []
       if not self.assign_external_ip or idx > 0:
         no_address_arg = ['no-address']
+      ipv6_args = []
+      if self.assign_external_ipv6:
+        ipv6_args = ['stack-type=IPV4_IPV6', 'ipv6-network-tier=PREMIUM']
       cmd.additional_flags += [
           '--network-interface',
           ','.join(
@@ -744,6 +747,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
               ]
               + gce_nic_queue_count_arg
               + no_address_arg
+              + ipv6_args
           ),
       ]
 
@@ -1106,6 +1110,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     for network_interface in describe_response['networkInterfaces']:
       self.internal_ips.append(network_interface['networkIP'])
+    
+    if 'ipv6AccessConfigs' in network_interface:
+      self.ipv6_address = network_interface['ipv6AccessConfigs'][0]['externalIpv6']
 
   @property
   def HasIpAddress(self):
@@ -1118,6 +1125,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         not self.id
         or not self.GetInternalIPs()
         or (self.assign_external_ip and not self.ip_address)
+        or (self.assign_external_ipv6 and not self.ipv6_address)
     )
 
   @vm_util.Retry()

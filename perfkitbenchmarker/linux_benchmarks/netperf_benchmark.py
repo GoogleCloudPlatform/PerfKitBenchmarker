@@ -265,6 +265,9 @@ def PrepareServerVM(server_vm, client_vm_internal_ips, client_vm_ip_address):
   if vm_util.ShouldRunOnExternalIpAddress():
     # Open all of the command and data ports
     server_vm.AllowPort(PORT_START, PORT_START + num_streams * 2 - 1)
+  
+  if vm_util.ShouldRunOnExternalIpv6Address(server_vm):
+    server_vm.AllowPort(PORT_START, PORT_START + num_streams * 2 - 1, ['::/0'])
 
   port_end = PORT_START + num_streams * 2 - 1
   netserver_cmd = (
@@ -773,6 +776,7 @@ def RunClientServerVMs(client_vm, server_vm):
           external_ip_result.metadata['ip_type'] = (
               vm_util.IpAddressMetadata.EXTERNAL
           )
+          external_ip_result.metadata['using_ipv6'] = (False)
           external_ip_result.metadata.update(metadata)
         results.extend(external_ip_results)
 
@@ -789,7 +793,25 @@ def RunClientServerVMs(client_vm, server_vm):
           internal_ip_result.metadata['ip_type'] = (
               vm_util.IpAddressMetadata.INTERNAL
           )
+          internal_ip_result.metadata['using_ipv6'] = (False)
         results.extend(internal_ip_results)
+
+      if vm_util.ShouldRunOnExternalIpv6Address(server_vm) and vm_util.ShouldRunOnExternalIpv6Address(client_vm):
+        external_ipv6_results = RunNetperf(
+            client_vm,
+            netperf_benchmark,
+            [server_vm.ipv6_address],
+            num_streams,
+            # NAT translates internal to external IP when remote IP is external
+            [client_vm.ipv6_address],
+        )
+        for external_ipv6_result in external_ipv6_results:
+          external_ipv6_result.metadata['ip_type'] = (
+              vm_util.IpAddressMetadata.EXTERNAL
+          )
+          external_ipv6_result.metadata['using_ipv6'] = (True)
+          external_ipv6_result.metadata.update(metadata)
+        results.extend(external_ipv6_results)
 
   return results
 
