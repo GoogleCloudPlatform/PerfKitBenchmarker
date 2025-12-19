@@ -11,19 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Azure Flexible server provisioning and teardown."""
+"""Azure Flexible server provisioning and teardown.
+
+Postgres Flexible Server is created with PremiumV2_LRS storage type.
+
+MySQL Flexible Server is created with provisioned IOPS unless omitted, in which
+case it is created with auto-scale IOPS.
+"""
 
 import datetime
 import logging
 import time
-from typing import Tuple
+from typing import Any, Tuple
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
+from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_relational_db
 
 DEFAULT_DATABASE_NAME = 'database'
@@ -63,6 +71,25 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
       sql_engine_utils.FLEXIBLE_SERVER_MYSQL,
   ]
 
+  def __init__(self, relational_db_spec: Any):
+    super().__init__(relational_db_spec)
+    if (
+        self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_MYSQL
+        and self.spec.db_disk_spec.provisioned_throughput
+    ):
+      raise errors.Config.InvalidValue(
+          'Provisioned throughput is not supported for MySQL Flexible Server.'
+      )
+    self.storage_type = None
+    if self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_POSTGRES:
+      self.storage_type = (
+          self.spec.db_disk_spec.disk_type or azure_disk.PREMIUM_STORAGE
+      )
+      if self.storage_type == azure_disk.PREMIUM_STORAGE_V2:
+        raise errors.Config.InvalidValue(
+            'Premium Storage v2 is not supported for Postgres Flexible Server.'
+        )
+
   @staticmethod
   def GetDefaultEngineVersion(engine: str) -> str:
     """Returns the default version of a given database engine."""
@@ -75,9 +102,22 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
           'Unsupported engine {}'.format(engine)
       )
 
+  def GetResourceMetadata(self) -> dict[str, Any]:
+    metadata = super().GetResourceMetadata()
+    if self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_MYSQL:
+      metadata['autoscale_iops'] = (
+          'Enabled'
+          if self.spec.db_disk_spec.provisioned_iops is None
+          else 'Disabled'
+      )
+    if self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_POSTGRES:
+      metadata['disk_type'] = self.storage_type
+    return metadata
+
   def _Create(self) -> None:
     """Creates the Azure database instance."""
     ha_flag = ENABLE_HA if self.spec.high_availability else DISABLE_HA
+    # Consider adding --zone and maybe --standby-zone for parity with GCP.
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
@@ -105,6 +145,29 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         self.spec.engine_version,
         '--yes',
     ]
+    if self.storage_type:
+      cmd.extend([
+          '--storage-type',
+          self.storage_type,
+      ])
+    if (
+        self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_MYSQL
+        and self.spec.db_disk_spec.provisioned_iops is not None
+    ):
+      cmd.extend([
+          '--auto-scale-iops',
+          'Disabled',
+      ])
+    if self.spec.db_disk_spec.provisioned_iops:
+      cmd.extend([
+          '--iops',
+          str(self.spec.db_disk_spec.provisioned_iops),
+      ])
+    if self.spec.db_disk_spec.provisioned_throughput:
+      cmd.extend([
+          '--throughput',
+          str(self.spec.db_disk_spec.provisioned_throughput),
+      ])
 
     vm_util.IssueCommand(cmd, timeout=CREATE_AZURE_DB_TIMEOUT)
 
