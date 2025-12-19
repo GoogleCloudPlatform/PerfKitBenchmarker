@@ -3,6 +3,7 @@ import unittest
 from absl import flags
 from absl.testing import flagsaver
 import mock
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import trino
 from tests import pkb_common_test_case
 
@@ -35,6 +36,13 @@ class TrinoTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(db.name, 'pkb-123')
 
   def testCreate(self):
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'WriteTemporaryFile',
+            return_value='trino.yaml',
+        )
+    )
     db = trino.Trino(EDW_SERVICE_SPEC)
     mock_cmd = self.MockIssueCommand({'': [('', '', 0)]})
     db._Create()
@@ -49,6 +57,8 @@ class TrinoTest(pkb_common_test_case.PkbCommonTestCase):
         mock.call([
             'helm',
             'install',
+            '-f',
+            'trino.yaml',
             'pkb-123',
             'trino/trino',
             '--kubeconfig',

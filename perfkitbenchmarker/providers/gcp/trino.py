@@ -46,10 +46,18 @@ class Trino(edw_service.EdwService):
         'trino',
         'https://trinodb.github.io/charts',
     ]
+    yaml_config = {
+        'server': {
+            'workers': self.node_count,
+        }
+    }
+    filename = vm_util.WriteYaml([yaml_config])
     vm_util.IssueCommand(cmd)
     cmd = [
         'helm',
         'install',
+        '-f',
+        filename,
         self.name,
         'trino/trino',
         '--kubeconfig',
