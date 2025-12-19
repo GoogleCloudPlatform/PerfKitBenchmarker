@@ -1,4 +1,5 @@
 import os
+import tempfile
 import time
 from typing import Callable, Iterable, Protocol, Tuple
 import unittest
@@ -161,6 +162,13 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
             return_value=os.path.join(
                 os.path.dirname(__file__), 'data', 'kube_apply.yaml.j2'
             ),
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'GetTempDir',
+            return_value=tempfile.gettempdir(),
         )
     )
     with self.assertLogs(level='INFO') as logs:

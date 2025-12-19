@@ -1200,11 +1200,13 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     self.os_metadata['kernel_release'] = str(self.kernel_release)
     self.os_metadata['cpu_arch'] = self.cpu_arch
     self.os_metadata.update(self.partition_table)
+    self.os_metadata['kernel_command_line'] = self.kernel_command_line
     if FLAGS.append_kernel_command_line:
-      self.os_metadata['kernel_command_line'] = self.kernel_command_line
       self.os_metadata['append_kernel_command_line'] = (
           FLAGS.append_kernel_command_line
       )
+    if _ENABLE_RT_KERNEL.value:
+      self.os_metadata['enable_rt_kernel'] = True
     # TODO(pclay): consider publishing full lsmod as a sample. It's probably too
     # spammy for metadata
     if _KERNEL_MODULES_TO_ADD.value:

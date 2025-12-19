@@ -18,6 +18,7 @@
 import builtins
 import contextlib
 import os
+import tempfile
 import unittest
 from unittest import mock
 
@@ -831,6 +832,13 @@ class GoogleKubernetesEngineAutopilotTestCase(
         mock.patch(
             gce_network.__name__ + '.GceFirewall.GetFirewall',
             return_value='fakefirewall',
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'GetTempDir',
+            return_value=tempfile.gettempdir(),
         )
     )
     self.enter_context(

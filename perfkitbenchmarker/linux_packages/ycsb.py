@@ -691,6 +691,27 @@ def CheckPrerequisites():
     )
 
 
+def _DownloadAndInstallTarball(vm, install_dir, url):
+  """Downloads and installs a tarball to the VM."""
+  if url.startswith('gs://'):
+    download_cmd = 'gsutil cat'
+  else:
+    download_cmd = 'curl -L'
+  install_cmd = (
+      f'mkdir -p {install_dir} && {download_cmd} {url} | '
+      f'tar -C {install_dir} --strip-components=1 -xzf - '
+      # Log4j 2 < 2.16 is vulnerable to
+      # https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-44228.
+      # YCSB currently ships with a number of vulnerable jars. None are used by
+      # PKB, so simply exclude them.
+      # After https://github.com/brianfrankcooper/YCSB/pull/1583 is merged and
+      # released, this will not be necessary.
+      # TODO(user): Update minimum YCSB version and remove.
+      "--exclude='**/log4j-core-2*.jar' "
+  )
+  vm.RemoteCommand(install_cmd)
+
+
 @vm_util.Retry(poll_interval=1)
 def Install(vm):
   """Installs the YCSB and, if needed, hdrhistogram package on the VM."""
@@ -702,18 +723,7 @@ def Install(vm):
   # ycsb.py uses /usr/bin/env python
   vm.RemoteCommand('sudo ln -sf /usr/bin/python2.7 /usr/local/bin/python')
   vm.Install('maven')
-  install_cmd = (
-      'mkdir -p {0} && curl -L {1} | '
-      'tar -C {0} --strip-components=1 -xzf - '
-      # Log4j 2 < 2.16 is vulnerable to
-      # https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-44228.
-      # YCSB currently ships with a number of vulnerable jars. None are used by
-      # PKB, so simply exclude them.
-      # After https://github.com/brianfrankcooper/YCSB/pull/1583 is merged and
-      # released, this will not be necessary.
-      # TODO(user): Update minimum YCSB version and remove.
-      "--exclude='**/log4j-core-2*.jar' "
-  )
+
   if _YCSB_COMMIT.value:
     vm.RemoteCommand(
         f'mkdir -p {YCSB_DIR} && cd {YCSB_DIR} && git init && (git config'
@@ -735,8 +745,8 @@ def Install(vm):
         or FLAGS.ycsb_tar_url
         or YCSB_URL_TEMPLATE.format(_YCSB_VERSION.value)
     )
-    vm.RemoteCommand(install_cmd.format(YCSB_DIR, ycsb_url))
-  vm.RemoteCommand(install_cmd.format(HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL))
+    _DownloadAndInstallTarball(vm, YCSB_DIR, ycsb_url)
+  _DownloadAndInstallTarball(vm, HDRHISTOGRAM_DIR, HDRHISTOGRAM_TAR_URL)
   # _JAVA_OPTIONS needed to work around this issue:
   # https://stackoverflow.com/questions/53010200/maven-surefire-could-not-find-forkedbooter-class
   # https://stackoverflow.com/questions/34170811/maven-connection-reset-error
