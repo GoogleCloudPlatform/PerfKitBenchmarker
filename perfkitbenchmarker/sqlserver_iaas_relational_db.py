@@ -141,7 +141,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
 
       if self.TEMPDB_DISK_LETTER in drive_list:
         stdout, _ = vm.RemoteCommand(
-            'sqlcmd -h -1 -Q "SET NOCOUNT '
+            'sqlcmd -C -h -1 -Q "SET NOCOUNT '
             " ON; select f.name + CASE WHEN "
             "f.type = 1 THEN '.ldf' "
             "ELSE '.mdf' END "
@@ -161,7 +161,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         for tmp_db_file in tmp_db_files_list:
           tmp_db_name = tmp_db_file.split(".")[0]
           vm.RemoteCommand(
-              'sqlcmd -Q "ALTER DATABASE tempdb '
+              'sqlcmd -C -Q "ALTER DATABASE tempdb '
               "MODIFY FILE (NAME = [{}], "
               "FILENAME = '{}:\\TEMPDB\\{}');\" -U {} -P {}".format(
                   tmp_db_name, tempdb_disk, tmp_db_file,
@@ -227,7 +227,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
 
     # Sets the default log database to the new log disk
     self.server_vm.RemoteCommand(
-        f"sqlcmd -U {self.spec.database_username} "
+        f"sqlcmd -C -U {self.spec.database_username} "
         f'-P {self.spec.database_password} -Q "EXEC xp_instance_regwrite'
         " N'HKEY_LOCAL_MACHINE',"
         " N'Software\\Microsoft\\MSSQLServer\\MSSQLServer', N'DefaultLog',"
@@ -545,7 +545,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     """Move server_vm as primary node in AOAG."""
     # Set first server vm as primary if necessary
     out, _ = self.server_vm.RemoteCommand(
-        """sqlcmd -Q \"
+        """sqlcmd -C -Q \"
         SELECT
           role_desc
         FROM
@@ -557,7 +557,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         """.format(sql_engine_utils.SQLSERVER_AOAG_NAME))
     if "PRIMARY" not in out:
       self.server_vm.RemoteCommand(
-          'sqlcmd -Q "ALTER AVAILABILITY GROUP [{}] FAILOVER"'.format(
+          'sqlcmd -C -Q "ALTER AVAILABILITY GROUP [{}] FAILOVER"'.format(
               sql_engine_utils.SQLSERVER_AOAG_NAME))
 
   def ConfigureSQLServerHaAoag(self):
@@ -644,7 +644,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         r"mkdir F:\DATA; mkdir F:\Logs; mkdir F:\Backup")
     self.PushAndRunPowershellScript(
         server_vm, "check_sql_server_status.ps1")
-    server_vm.RemoteCommand("""sqlcmd -Q \"
+    server_vm.RemoteCommand("""sqlcmd -C -Q \"
         USE [master]
         GO
         ALTER LOGIN [sa] ENABLE
@@ -690,7 +690,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     # failed to for user 'NT AUTHORITY\ANONYMOUS LOGON double
     self.PushAndRunPowershellScript(server_vm, "check_sql_server_status.ps1")
     server_vm.RemoteCommand(
-        """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
+        """sqlcmd -C -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
         USE [master]
         GO
 
@@ -727,7 +727,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     self.PushAndRunPowershellScript(
         replica_vms[0], "check_sql_server_status.ps1")
     replica_vms[0].RemoteCommand(
-        """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
+        """sqlcmd -C -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
         USE [master]
         GO
 
@@ -766,7 +766,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         )
     self.PushAndRunPowershellScript(server_vm, "check_sql_server_status.ps1")
     server_vm.RemoteCommand(
-        """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
+        """sqlcmd -C -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
         USE [master]
         GO
 
@@ -788,7 +788,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     self.PushAndRunPowershellScript(
         replica_vms[0], "check_sql_server_status.ps1")
     replica_vms[0].RemoteCommand(
-        """sqlcmd -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
+        """sqlcmd -C -Q \"--- YOU MUST EXECUTE THE FOLLOWING SCRIPT IN SQLCMD MODE.
         ALTER AVAILABILITY GROUP [{0}] JOIN;
         GO
 
@@ -809,7 +809,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
 
     self.PushAndRunPowershellScript(server_vm, "check_sql_server_status.ps1")
     server_vm.RemoteCommand(
-        """sqlcmd -Q \"
+        """sqlcmd -C -Q \"
         ALTER AVAILABILITY GROUP [{1}] REMOVE DATABASE [{0}];
         DROP DATABASE [{0}];\"
         """.format(sql_engine_utils.SQLSERVER_AOAG_DB_NAME,
@@ -892,28 +892,28 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
 
 def ConfigureSQLServer(vm, username: str, password: str):
   """Update the username and password on a SQL Server."""
-  vm.RemoteCommand(f'sqlcmd -Q "ALTER LOGIN {username} ENABLE;"')
+  vm.RemoteCommand(f'sqlcmd -C -Q "ALTER LOGIN {username} ENABLE;"')
   vm.RemoteCommand(
-      f"sqlcmd -Q \"ALTER LOGIN sa WITH PASSWORD = '{password}' ;\""
+      f"sqlcmd -C -Q \"ALTER LOGIN sa WITH PASSWORD = '{password}' ;\""
   )
   vm.RemoteCommand(
-      "sqlcmd -Q \"EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE', "
+      "sqlcmd -C -Q \"EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE', "
       "N'Software\\Microsoft\\MSSQLServer\\MSSQLServer', "
       "N'LoginMode', REG_DWORD, 2\""
   )
   vm.RemoteCommand(
-      "sqlcmd -Q \"EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE', "
+      "sqlcmd -C -Q \"EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE', "
       "N'Software\\Microsoft\\MSSQLServer\\MSSQLServer', "
       "N'BackupDirectory', REG_SZ, N'C:\\scratch'\""
   )
 
   vm.RemoteCommand(
-      "sqlcmd -Q \"EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE', "
+      "sqlcmd -C -Q \"EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE', "
       "N'Software\\Microsoft\\MSSQLServer\\MSSQLServer', "
       f"N'DefaultData', REG_SZ, N'{vm.assigned_disk_letter}:\\'\""
   )
   vm.RemoteCommand(
-      "sqlcmd -Q \"EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE', "
+      "sqlcmd -C -Q \"EXEC xp_instance_regwrite N'HKEY_LOCAL_MACHINE', "
       "N'Software\\Microsoft\\MSSQLServer\\MSSQLServer', "
       f"N'DefaultLog', REG_SZ, N'{vm.assigned_disk_letter}:\\'\""
   )

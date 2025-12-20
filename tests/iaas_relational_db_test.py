@@ -438,7 +438,7 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
               '{ New-Item -Path $Path -ItemType Directory }'
           ),
           mock.call(
-              "sqlcmd -U sa -P password -Q \"EXEC xp_instance_regwrite"
+              "sqlcmd -C -U sa -P password -Q \"EXEC xp_instance_regwrite"
               " N'HKEY_LOCAL_MACHINE', "
               "N'Software\\Microsoft\\MSSQLServer\\MSSQLServer', N'DefaultLog',"
               " REG_SZ, N'Y:\\MSSQL\\LOGDB'\""
