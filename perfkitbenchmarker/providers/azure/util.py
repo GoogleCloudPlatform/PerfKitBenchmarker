@@ -280,3 +280,11 @@ def GetMachineSeriesNumber(machine_type: str) -> int:
     return int(match.group(1))
   # Azure only adds a v after the first series,
   return 1
+
+
+def GetSubscriptionId():
+  """Gets the current Azure subscription ID."""
+  stdout, _ = vm_util.IssueRetryableCommand(
+      [AZURE_PATH, 'account', 'show', '--query', 'id', '-o', 'tsv']
+  )
+  return stdout.strip()

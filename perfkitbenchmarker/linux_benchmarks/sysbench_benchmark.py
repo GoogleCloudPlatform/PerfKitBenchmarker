@@ -598,6 +598,7 @@ def Prepare(benchmark_spec) -> List[sample.Sample]:
         'Sleeping for %d seconds now that loading has finished.',
         _SLEEP_SEC.value,
     )
+    time.sleep(_SLEEP_SEC.value)
   return load_samples
 
 

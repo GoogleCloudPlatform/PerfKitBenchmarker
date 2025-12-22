@@ -792,6 +792,18 @@ class Windows2019SQLServer2019Enterprise(BaseWindowsMixin):
   OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2019_ENTERPRISE
 
 
+class Windows2019SQLServer2025Standard(BaseWindowsMixin):
+  """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+
+  OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2025_STANDARD
+
+
+class Windows2019SQLServer2025Enterprise(BaseWindowsMixin):
+  """Class holding Windows Server 2019 with Desktop Experience VM specifics."""
+
+  OS_TYPE = os_types.WINDOWS2019_SQLSERVER_2025_ENTERPRISE
+
+
 class Windows2022SQLServer2019Standard(BaseWindowsMixin):
   """Class holding Windows Server 2022 with Desktop Experience VM specifics."""
 
@@ -816,13 +828,37 @@ class Windows2022SQLServer2022Enterprise(BaseWindowsMixin):
   OS_TYPE = os_types.WINDOWS2022_SQLSERVER_2022_ENTERPRISE
 
 
-class Windows2025SQLServer2022Standard(BaseWindowsMixin):
+class Windows2022SQLServer2025Standard(BaseWindowsMixin):
   """Class holding Windows Server 2022 with Desktop Experience VM specifics."""
+
+  OS_TYPE = os_types.WINDOWS2022_SQLSERVER_2025_STANDARD
+
+
+class Windows2022SQLServer2025Enterprise(BaseWindowsMixin):
+  """Class holding Windows Server 2022 with Desktop Experience VM specifics."""
+
+  OS_TYPE = os_types.WINDOWS2022_SQLSERVER_2025_ENTERPRISE
+
+
+class Windows2025SQLServer2022Standard(BaseWindowsMixin):
+  """Class holding Windows Server 2025 with Desktop Experience VM specifics."""
 
   OS_TYPE = os_types.WINDOWS2025_SQLSERVER_2022_STANDARD
 
 
 class Windows2025SQLServer2022Enterprise(BaseWindowsMixin):
-  """Class holding Windows Server 2022 with Desktop Experience VM specifics."""
+  """Class holding Windows Server 2025 with Desktop Experience VM specifics."""
 
   OS_TYPE = os_types.WINDOWS2025_SQLSERVER_2022_ENTERPRISE
+
+
+class Windows2025SQLServer2025Standard(BaseWindowsMixin):
+  """Class holding Windows Server 2025 with Desktop Experience VM specifics."""
+
+  OS_TYPE = os_types.WINDOWS2025_SQLSERVER_2025_STANDARD
+
+
+class Windows2025SQLServer2025Enterprise(BaseWindowsMixin):
+  """Class holding Windows Server 2025 with Desktop Experience VM specifics."""
+
+  OS_TYPE = os_types.WINDOWS2025_SQLSERVER_2025_ENTERPRISE
