@@ -291,6 +291,8 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
       mssql_name = "mssql2022"
     elif self.spec.engine_version == "2019":
       mssql_name = "mssql2019"
+    elif self.spec.engine_version == "2025":
+      mssql_name = "mssql2025"
     else:
       raise NotImplementedError(
           "Invalid database engine version: {}. "
@@ -339,7 +341,6 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         "/scratch/mssqllog"
     )
     # Enabling FUA I/O subsystem capability per MSFT
-    # https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-performance-best-practices?view=sql-server-ver16
     self.server_vm.RemoteCommand(
         "sudo /opt/mssql/bin/mssql-conf set "
         "control.alternatewritethrough 0"
@@ -349,8 +350,10 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
         "control.writethrough 1"
     )
     self.server_vm.RemoteCommand(
-        "sudo /opt/mssql/bin/mssql-conf set "
-        "traceflag.traceflag 3979"
+        "sudo /opt/mssql/bin/mssql-conf traceflag 3979 on"
+    )
+    self.server_vm.RemoteCommand(
+        "sudo /opt/mssql/bin/mssql-conf traceflag 9944 on"
     )
 
     self.server_vm.Install("mssql_tools")
@@ -358,20 +361,24 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     self.MoveSQLServerTempDBLinux()
     self.server_vm.RemoteCommand("sudo systemctl restart mssql-server")
 
-    if self.server_vm.OS_TYPE == os_types.RHEL8:
+    if (
+        self.server_vm.OS_TYPE == os_types.RHEL8
+        or self.server_vm.OS_TYPE == os_types.RHEL9
+    ):
       _TuneForSQL(self.server_vm)
 
   def MoveSQLServerTempDBLinux(self):
     vm = self.server_vm
     stdout, _ = vm.RemoteCommand(
         "/opt/mssql-tools/bin/sqlcmd -C "
-        "-S localhost -U sa -P \'{}\' -h -1 -Q  \"SET NOCOUNT ON; "
+        "-S localhost -U sa -P '{}' -h -1 -Q  \"SET NOCOUNT ON; "
         "SELECT f.name + SUBSTRING(f.physical_name, "
         "CHARINDEX('.', f.physical_name), LEN(f.physical_name) -1) "
         "FROM sys.master_files f "
-        "WHERE f.database_id = DB_ID('tempdb');\""
-        .format(self.spec.database_password)
+        "WHERE f.database_id = DB_ID('tempdb');\"".format(
+            self.spec.database_password
         )
+    )
 
     tmp_db_files_list = [
         str(tmp_file.strip().replace("\r", ""))
