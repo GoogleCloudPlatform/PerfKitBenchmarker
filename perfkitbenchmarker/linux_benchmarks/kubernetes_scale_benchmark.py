@@ -192,7 +192,6 @@ def ScaleUpPods(
       EphemeralStorageRequest='10Mi',
       RolloutTimeout=max_wait_time,
       PodTimeout=resource_timeout,
-      cloud=FLAGS.cloud,
   )
   cluster.ModifyPodSpecPlacementYaml(
       yaml_docs,
