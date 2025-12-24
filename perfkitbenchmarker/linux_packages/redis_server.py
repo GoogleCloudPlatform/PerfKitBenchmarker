@@ -88,6 +88,12 @@ REDIS_AOF = flags.DEFINE_bool(
     False,
     'If true, use disks on the server for aof backups.',
 )
+REDIS_AOF_VERIFY = flags.DEFINE_bool(
+    'redis_aof_verify',
+    False,
+    'If true, execute redis-check-aof to verify the AOF backups. This depends'
+    ' on enabling --redis_aof. Default is set to False.',
+)
 
 
 # Default port for Redis
@@ -187,12 +193,16 @@ def _Install(vm) -> None:
 def YumInstall(vm) -> None:
   """Installs the redis package on the VM."""
   vm.InstallPackages('tcl-devel')
+  if REDIS_AOF_VERIFY.value:
+    vm.InstallPackages('redis')
   _Install(vm)
 
 
 def AptInstall(vm) -> None:
   """Installs the redis package on the VM."""
   vm.InstallPackages('tcl-dev')
+  if REDIS_AOF_VERIFY.value:
+    vm.InstallPackages('redis-tools')
   _Install(vm)
 
 
@@ -206,6 +216,19 @@ def _GetIOThreads(vm) -> int:
     return max(num_cpus - 1, 1)
   else:
     return num_cpus // 2
+
+
+def _GetRedisAofFilename(port) -> str:
+  return f'backup_{port}'
+
+
+def _GetRedisConfigDir(vm, localhost, port) -> str:
+  """Returns the directory where redis files are stored."""
+  stdout, _ = vm.RemoteCommand(
+      f'sudo {GetRedisDir()}/src/redis-cli -h {localhost} -p {port} CONFIG'
+      ' GET dir'
+  )
+  return stdout.strip().split('\n')[-1]
 
 
 def _BuildStartCommand(vm, port: int) -> str:
@@ -234,7 +257,7 @@ def _BuildStartCommand(vm, port: int) -> str:
   if REDIS_AOF.value:
     cmd_args += [
         '--appendonly yes',
-        f'--appendfilename backup_{port}',
+        f'--appendfilename {_GetRedisAofFilename(port)}',
         f'--dir /{REDIS_BACKUP}',
     ]
   # Add check for the MADV_FREE/fork arm64 Linux kernel bug
@@ -353,3 +376,24 @@ def GetRedisPorts(vm=None) -> List[int]:
   """Returns a list of redis port(s)."""
   num_processes = _GetNumProcesses(vm)
   return [DEFAULT_PORT + i for i in range(num_processes)]
+
+
+def VerifyRedisAof(vm) -> None:
+  """Apply data validation to the AOF backups."""
+  localhost = vm.GetLocalhostAddr()
+  ports = GetRedisPorts(vm)
+  for port in ports:
+    redis_config_dir = _GetRedisConfigDir(vm, localhost, port)
+    _, stderr, return_code = vm.RemoteCommandWithReturnCode(
+        f'sudo redis-check-aof {redis_config_dir}/{_GetRedisAofFilename(port)}'
+    )
+    if return_code == 0:
+      logging.info(
+          'Validation succeeded for the AOF backup file %s',
+          f'{redis_config_dir}/{_GetRedisAofFilename(port)}',
+      )
+    else:
+      raise errors.Error(
+          'Validation failed with the AOF backup file'
+          f' {redis_config_dir}/{_GetRedisAofFilename(port)}, stderr: {stderr}'
+      )
