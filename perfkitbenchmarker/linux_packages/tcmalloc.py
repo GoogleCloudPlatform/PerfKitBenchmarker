@@ -86,7 +86,7 @@ def AptInstall(vm):
     vm.Install('google_cloud_sdk')
     local_path = '/tmp/libtcmalloc.so'
     vm.RemoteCommand(
-        'gsutil cp {url} {path} '
+        'gcloud storage cp {url} {path} '
         '&& echo "export LD_PRELOAD={path}" | sudo tee -a {tmp}'.format(
             url=FLAGS.tcmalloc_experimental_url,
             path=local_path,

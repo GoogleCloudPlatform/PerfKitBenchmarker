@@ -67,13 +67,24 @@ def CollectPKBLogs(run_uri: str, log_local_path: str) -> None:
     gcs_log_path = GetLogCloudPath(PKB_LOG_BUCKET.value, f'{run_uri}-pkb.log')
     vm_util.IssueCommand(
         [
-            'gsutil',
-            '-h',
-            'Content-Type:text/plain',
+            'gcloud',
+            'storage',
             _SAVE_LOG_TO_BUCKET_OPERATION.value,
-            '-Z',
+            '--gzip-local-all',
             log_local_path,
             gcs_log_path,
+        ],
+        raise_on_failure=False,
+        raise_on_timeout=False,
+    )
+    vm_util.IssueCommand(
+        [
+            'gcloud',
+            'storage',
+            'objects',
+            'update',
+            gcs_log_path,
+            '--content-type=text/plain',
         ],
         raise_on_failure=False,
         raise_on_timeout=False,
@@ -96,13 +107,24 @@ def CollectVMLogs(run_uri: str, source_path: str) -> None:
     gcs_path = f'{gcs_directory_path}/{source_filename}'
     vm_util.IssueCommand(
         [
-            'gsutil',
-            '-h',
-            'Content-Type:text/plain',
+            'gcloud',
+            'storage',
             'mv',
-            '-Z',
+            '--gzip-local-all',
             source_path,
             gcs_path,
+        ],
+        raise_on_failure=False,
+        raise_on_timeout=False,
+    )
+    vm_util.IssueCommand(
+        [
+            'gcloud',
+            'storage',
+            'objects',
+            'update',
+            gcs_path,
+            '--content-type=text/plain',
         ],
         raise_on_failure=False,
         raise_on_timeout=False,

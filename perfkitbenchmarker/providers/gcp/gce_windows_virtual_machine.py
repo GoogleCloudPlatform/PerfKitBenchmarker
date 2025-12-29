@@ -27,7 +27,7 @@ from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util
 
-_WINDOWS_SHUTDOWN_SCRIPT_PS1 = 'Write-Host | gsutil cp - {preempt_marker}'
+_WINDOWS_SHUTDOWN_SCRIPT_PS1 = 'Write-Host | gcloud storage cp - {preempt_marker}'
 
 _METADATA_PREEMPT_CMD_WIN = (
     'Invoke-RestMethod -Uri'
