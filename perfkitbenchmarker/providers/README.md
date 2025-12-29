@@ -427,6 +427,7 @@ To create a new `~/.boto` file, issue the following command and follow the
 instructions given by this command:
 
 ```bash
+# gsutil config has no direct gcloud equivalent; its functionality is split between 'gcloud config' and 'gcloud auth'.
 $ gsutil config
 ```
 
