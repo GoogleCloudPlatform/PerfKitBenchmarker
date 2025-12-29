@@ -303,13 +303,13 @@ def _PrepareBucket(benchmark_spec):
   bucket_uri = f'gs://{bucket}'
   service.MakeBucket(bucket)
   # set default permissions to allow cloudharmony test file access
-  perm_cmd = ['gsutil', 'defacl', 'set', 'public-read', bucket_uri]
+  perm_cmd = ['gcloud', 'storage', 'buckets', 'update', bucket_uri, '--predefined-default-object-acl=public-read']
   vm_util.IssueCommand(perm_cmd)
   # set bucket lifecyle to ensure bucket deletion after 30 days
   lifecyle_config_file = data.ResourcePath(
       'cloudharmony_network_gcp_lifecycle.json'
   )
-  lc_cmd = ['gsutil', 'lifecycle', 'set', lifecyle_config_file, bucket_uri]
+  lc_cmd = ['gcloud', 'storage', 'buckets', 'update', bucket_uri, '--lifecycle-file', lifecyle_config_file]
   vm_util.IssueCommand(lc_cmd)
   # prepare preprovisioned test data
   tmp_dir = vm_util.GetTempDir()
@@ -332,7 +332,7 @@ def _PrepareBucket(benchmark_spec):
   # copy preprovisioned test data to test bucket
   src_path = posixpath.join(remote_probe_dir, '*')
   dst_url = f'{bucket_uri}/probe'
-  cp_cmd = ['gsutil', 'cp', '-r', src_path, dst_url]
+  cp_cmd = ['gcloud', 'storage', 'cp', '--recursive', src_path, dst_url]
   vm_util.IssueCommand(cp_cmd, raise_on_timeout=False)
   # save the service and the bucket name
   benchmark_spec.service = service

@@ -680,8 +680,7 @@ Warning: Permanently added '' (ECDSA) to the list of known hosts.
 2017-07-07 11:35:32,601 41b2ddaa MainThread mysql_service(1/0) INFO     percentile_response_time is 17.730000
 2017-07-07 11:35:32,623 41b2ddaa MainThread INFO     Publishing 16 samples to /tmp/perfkitbenchmarker/runs/.json
 2017-07-07 11:35:32,624 41b2ddaa MainThread INFO     Publishing 16 samples to gs://perfkit
-2017-07-07 11:35:32,624 41b2ddaa MainThread INFO     Running: gsutil cp /tmp/perfkitbenchmarker/runs/
-2017-07-07 11:35:34,238 41b2ddaa MainThread INFO     
+2017-07-07 11:35:32,624 41b2ddaa MainThread INFO     Running: gcloud storage cp /tmp/perfkitbenchmarker/runs/2017-07-07 11:35:34,238 41b2ddaa MainThread INFO     
 -------------------------PerfKitBenchmarker Complete Results-------------------------
 {'metadata': {'cloud': 'GCP',
               'dedicated_host': False,

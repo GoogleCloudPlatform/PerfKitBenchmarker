@@ -611,7 +611,7 @@ class Bigquery(edw_service.EdwService):
 
     # Make sure the bucket is empty.
     vm_util.IssueCommand(
-        ['gsutil', '-m', 'rm', gcs_uri + '/**'], raise_on_failure=False
+        ['gcloud', 'storage', 'rm', gcs_uri + '/**'], raise_on_failure=False
     )
 
     project_dataset = self.FormatProjectAndDatasetForCommand(dataset)
@@ -701,7 +701,7 @@ class Bigquery(edw_service.EdwService):
     for table in tables:
       schema_path = schema_dir + table + '.json'
       local_schema = './%s.json' % table
-      vm_util.IssueCommand(['gsutil', 'cp', schema_path, local_schema])
+      vm_util.IssueCommand(['gcloud', 'storage', 'cp', schema_path, local_schema])
       cmd = [
           'bq',
           'load',

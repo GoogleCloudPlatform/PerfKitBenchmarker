@@ -694,7 +694,7 @@ def CheckPrerequisites():
 def _DownloadAndInstallTarball(vm, install_dir, url):
   """Downloads and installs a tarball to the VM."""
   if url.startswith('gs://'):
-    download_cmd = 'gsutil cat'
+    download_cmd = 'gcloud storage cat'
   else:
     download_cmd = 'curl -L'
   install_cmd = (
