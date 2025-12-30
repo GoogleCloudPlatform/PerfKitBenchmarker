@@ -678,9 +678,9 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           gpu_consolidate_after='1h',
           gpu_consolidation_policy='WhenEmpty',
           karpenter_nodeclass_name='default',  # must exist already
-          gpu_capacity_types=['on-demand'],
+          gpu_capacity_types=['spot','on-demand'],
           gpu_arch=['amd64'],
-          gpu_instance_families=['g6', 'g6e'],
+          gpu_instance_families=['g6','p5'],
           gpu_taint_key='nvidia.com/gpu',
       )
     elif FLAGS.cloud == 'Azure':

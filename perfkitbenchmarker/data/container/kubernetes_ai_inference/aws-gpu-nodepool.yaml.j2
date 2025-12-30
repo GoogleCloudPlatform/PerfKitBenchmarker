@@ -15,13 +15,13 @@ spec:
       requirements:
         - key: karpenter.sh/capacity-type
           operator: In
-          values: {{ gpu_capacity_types | default(['on-demand']) }}
+          values: {{ gpu_capacity_types | default(['spot','on-demand']) }}
         - key: kubernetes.io/arch
           operator: In
           values: {{ gpu_arch | default(['amd64']) }}
         - key: eks.amazonaws.com/instance-family
           operator: In
-          values: {{ gpu_instance_families | default(['g6','g6e']) }}
+          values: {{ gpu_instance_families | default(['g6','p5']) }}
       taints:
         - key: {{ gpu_taint_key | default('nvidia.com/gpu') }}
           effect: NoSchedule
