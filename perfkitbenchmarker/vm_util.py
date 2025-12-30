@@ -723,6 +723,10 @@ def ShouldRunOnExternalIpAddress(ip_type=None):
       IpAddressSubset.REACHABLE,
   )
 
+def ShouldRunOnExternalIpv6Address(receiving_vm):
+  """Returns whether a test should be run on an instance's external IPv6 address.
+  """
+  return ShouldRunOnExternalIpAddress() and receiving_vm.ipv6_address is not None
 
 def ShouldRunOnInternalIpAddress(sending_vm, receiving_vm, ip_type=None):
   """Returns whether a test should be run on an instance's internal IP.

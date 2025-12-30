@@ -692,6 +692,8 @@ class GceFirewall(network.BaseFirewall):
             start_port,
             end_port,
         )
+        if source_range is not None:
+          firewall_name += f'-{source_range.replace(':','c').replace('/','s')}'
         key = (vm.project, vm.cidr, start_port, end_port, source_range)
       else:
         firewall_name = 'perfkit-firewall-%s-%d-%d' % (
@@ -699,6 +701,8 @@ class GceFirewall(network.BaseFirewall):
             start_port,
             end_port,
         )
+        if source_range is not None:
+          firewall_name += f'-{source_range.replace(':','c').replace('/','s')}'
         key = (vm.project, start_port, end_port, source_range)
       if key in self.firewall_rules:
         return
@@ -753,6 +757,37 @@ class GceFirewall(network.BaseFirewall):
       self.firewall_icmp_rules[key] = firewall_rule
       firewall_rule.Create()
 
+  def AllowIcmpIpv6(self, vm):
+    """Open the ICMP for IPv6 protocl on the firewall.
+      Note: Protocol Number for ICMP for IPv6 is 58.
+      (https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml)
+
+    Args:
+      vm: The BaseVirtualMachine object to open the ICMP for IPv6 protocol for.
+    """
+    if vm.is_static:
+      return
+    with self._lock:
+      if vm.cidr:
+        cidr_string = network.BaseNetwork.FormatCidrString(vm.cidr)
+        firewall_name = 'perfkit-firewall-icmp-ipv6-%s-%s' % (
+            cidr_string,
+            FLAGS.run_uri,
+        )
+        key = (vm.project, vm.cidr, 'ipv6')
+      else:
+        firewall_name = 'perfkit-firewall-icmp-ipv6-%s' % FLAGS.run_uri
+        key = (vm.project, 'ipv6')
+      
+      if key in self.firewall_icmp_rules:
+        return
+      
+      allow = '58' # ICMP for IPv6 Protocol Number
+      firewall_rule = GceFirewallRule(
+          firewall_name, vm.project, allow, vm.network.network_resource.name, "::/0"
+      )
+      self.firewall_icmp_rules[key] = firewall_rule
+      firewall_rule.Create()
 
 class GceNetworkSpec(network.BaseNetworkSpec):
   """Object representing a GCE Network specification."""
@@ -873,6 +908,9 @@ class GceSubnetResource(resource.BaseResource):
     cmd.flags['network'] = self.network_name
     cmd.flags['region'] = self.region
     cmd.flags['range'] = self.addr_range
+    if FLAGS.assign_external_ipv6:
+        cmd.flags['stack-type'] = 'IPV4_IPV6'
+        cmd.flags['ipv6-access-type'] = 'EXTERNAL'
     cmd.Issue()
 
   def _Exists(self) -> bool:

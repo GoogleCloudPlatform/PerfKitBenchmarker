@@ -118,6 +118,9 @@ IPERF_PORT = 20000
 IPERF_UDP_PORT = 25000
 IPERF_RETRIES = 5
 
+IPERF_PORT_IPV6 = IPERF_PORT + 1
+IPERF_UDP_PORT_IPV6 = IPERF_UDP_PORT + 1
+
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -145,6 +148,12 @@ def Prepare(benchmark_spec):
       if UDP in FLAGS.iperf_benchmarks:
         vm.AllowPort(IPERF_UDP_PORT)
 
+    if vm_util.ShouldRunOnExternalIpv6Address(vm):
+      if TCP in FLAGS.iperf_benchmarks:
+        vm.AllowPort(IPERF_PORT_IPV6, source_range = ['::/0'])
+      if UDP in FLAGS.iperf_benchmarks:
+        vm.AllowPort(IPERF_UDP_PORT_IPV6, source_range = ['::/0'])
+
     if TCP in FLAGS.iperf_benchmarks:
       stdout, _ = vm.RemoteCommand(
           f'nohup iperf --server --port {IPERF_PORT} &> /dev/null & echo $!'
@@ -154,6 +163,17 @@ def Prepare(benchmark_spec):
       vm.iperf_tcp_server_pid = stdout.strip()
       # Check that the server is actually running
       vm.RemoteCommand(f'ps -p {vm.iperf_tcp_server_pid}')
+
+      if vm_util.ShouldRunOnExternalIpv6Address(vm):
+        stdout, _ = vm.RemoteCommand(
+            f'nohup iperf -V --server --port {IPERF_PORT_IPV6} &> /dev/null & echo $!'
+        )
+
+        # TODO(user): store this in a better place
+        vm.iperf_tcp_server_pid_ipv6 = stdout.strip()
+        # Check that the server is actually running
+        vm.RemoteCommand(f'ps -p {vm.iperf_tcp_server_pid_ipv6}')
+
     if UDP in FLAGS.iperf_benchmarks:
       stdout, _ = vm.RemoteCommand(
           f'nohup iperf --server --bind {vm.internal_ip} --udp '
@@ -163,6 +183,16 @@ def Prepare(benchmark_spec):
       vm.iperf_udp_server_pid = stdout.strip()
       # Check that the server is actually running
       vm.RemoteCommand(f'ps -p {vm.iperf_udp_server_pid}')
+
+      if vm_util.ShouldRunOnExternalIpv6Address(vm):
+        stdout, _ = vm.RemoteCommand(
+            f'nohup iperf -V --server --bind {vm.ipv6_address} --udp '
+            f'--port {IPERF_UDP_PORT_IPV6} &> /dev/null & echo $!'
+        )
+        # TODO(user): store this in a better place
+        vm.iperf_udp_server_pid_ipv6 = stdout.strip()
+        # Check that the server is actually running
+        vm.RemoteCommand(f'ps -p {vm.iperf_udp_server_pid_ipv6}')
 
 
 @vm_util.Retry(max_retries=IPERF_RETRIES)
@@ -174,6 +204,7 @@ def _RunIperf(
     ip_type,
     protocol,
     interval_size=None,
+    using_ipv6 = False,
 ):
   """Run iperf using sending 'vm' to connect to 'ip_address'.
 
@@ -185,6 +216,7 @@ def _RunIperf(
     ip_type: The IP type of 'ip_address' (e.g. 'internal', 'external')
     protocol: The protocol for Iperf to use. Either 'TCP' or 'UDP'
     interval_size: Time interval at which to output stats.
+    using_ipv6: Whether receiving_ip_address is IPv6 or not
 
   Returns:
     A Sample.
@@ -199,6 +231,7 @@ def _RunIperf(
       'sending_zone': sending_vm.zone,
       'runtime_in_seconds': FLAGS.iperf_runtime_in_seconds,
       'ip_type': ip_type,
+      'using_ipv6': using_ipv6,
   }
 
   if protocol == TCP:
@@ -207,6 +240,13 @@ def _RunIperf(
         f'{IPERF_PORT} --format m --time {FLAGS.iperf_runtime_in_seconds} '
         f'--parallel {thread_count}'
     )
+
+    if using_ipv6:
+      iperf_cmd = (
+          f'iperf -V --enhancedreports --client {receiving_ip_address} --port '
+          f'{IPERF_PORT_IPV6} --format m --time {FLAGS.iperf_runtime_in_seconds} '
+          f'--parallel {thread_count}'
+      )
 
     if FLAGS.iperf_interval:
       iperf_cmd += f' --interval {FLAGS.iperf_interval}'
@@ -437,6 +477,13 @@ def _RunIperf(
         f' {IPERF_UDP_PORT} --format m --time {FLAGS.iperf_runtime_in_seconds}'
         f' --parallel {thread_count} '
     )
+    
+    if using_ipv6:
+      iperf_cmd = (
+          f'iperf -V --enhancedreports --udp --client {receiving_ip_address} --port'
+          f' {IPERF_UDP_PORT_IPV6} --format m --time {FLAGS.iperf_runtime_in_seconds}'
+          f' --parallel {thread_count} '
+      )
 
     if FLAGS.iperf_udp_per_stream_bandwidth:
       iperf_cmd += f' --bandwidth {FLAGS.iperf_udp_per_stream_bandwidth}M'
@@ -603,6 +650,22 @@ def Run(benchmark_spec):
 
           time.sleep(FLAGS.iperf_sleep_time)
 
+        # Send using external IPv6 addresses
+        if vm_util.ShouldRunOnExternalIpv6Address(receiving_vm):
+          results.append(
+            _RunIperf(
+                  sending_vm,
+                  receiving_vm,
+                  receiving_vm.ipv6_address,
+                  thread_count,
+                  vm_util.IpAddressMetadata.EXTERNAL,
+                  protocol,
+                  interval_size=FLAGS.iperf_interval,
+                  using_ipv6 = True,
+            )
+          )
+          time.sleep(FLAGS.iperf_sleep_time)
+
   return results
 
 
@@ -619,7 +682,18 @@ def Cleanup(benchmark_spec):
       vm.RemoteCommand(
           f'kill -9 {vm.iperf_tcp_server_pid}', ignore_failure=True
       )
+
+      if vm_util.ShouldRunOnExternalIpv6Address(vm):
+        vm.RemoteCommand(
+          f'kill -9 {vm.iperf_tcp_server_pid_ipv6}', ignore_failure=True
+        )
+    
     if UDP in FLAGS.iperf_benchmarks:
       vm.RemoteCommand(
           f'kill -9 {vm.iperf_udp_server_pid}', ignore_failure=True
       )
+
+      if vm_util.ShouldRunOnExternalIpv6Address(vm):
+        vm.RemoteCommand(
+            f'kill -9 {vm.iperf_udp_server_pid_ipv6}', ignore_failure=True
+        )
