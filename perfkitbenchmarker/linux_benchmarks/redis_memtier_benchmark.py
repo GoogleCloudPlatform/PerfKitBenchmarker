@@ -214,42 +214,48 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   maximum_total_ops_throughput = 0.0
   result_with_maximum_total_ops_throughput = None
   all_results = []
-
-  for io_threads in io_threads_to_sweep:
-    # Override the io_threads and restart the server if io_threads is not None
-    if io_threads is not None:
-      _UpdateIOThreadsForRedisServer(bm_spec.vm_groups['servers'], io_threads)
-
-    raw_results = memtier.RunOverAllThreadsPipelinesAndClients(
-        client_vms,
-        bm_spec.redis_endpoint_ip,
-        redis_server.GetRedisPorts(server_vm),
-    )
-    redis_metadata = redis_server.GetMetadata(server_vm)
-
-    total_ops_throughput = 0.0
-    for server_result in raw_results:
-      if server_result.metric == 'Total Ops Throughput':
-        total_ops_throughput = server_result.value
-      server_result.metadata.update(redis_metadata)
-      server_result.metadata.update(benchmark_metadata)
-
-    if total_ops_throughput > maximum_total_ops_throughput:
-      maximum_total_ops_throughput = total_ops_throughput
-      result_with_maximum_total_ops_throughput = raw_results
-
-    # Add the results with the current io_threads value
-    if io_threads is not None:
-      for server_result in raw_results:
-        # Cannot assign to metric directly because it is an immutable namedtuple
-        server_result = server_result._replace(
-            metric=f'{server_result.metric} (io_threads={io_threads})'
-        )
-        all_results.append(server_result)
-
   top_results = []
-  if measure_cpu_on_server_vm:
-    top_results = _GetTopResults(server_vm)
+
+  try:
+    for io_threads in io_threads_to_sweep:
+      # Override the io_threads and restart the server if io_threads is not None
+      if io_threads is not None:
+        _UpdateIOThreadsForRedisServer(bm_spec.vm_groups['servers'], io_threads)
+
+      raw_results = memtier.RunOverAllThreadsPipelinesAndClients(
+          client_vms,
+          bm_spec.redis_endpoint_ip,
+          redis_server.GetRedisPorts(server_vm),
+      )
+      redis_metadata = redis_server.GetMetadata(server_vm)
+
+      total_ops_throughput = 0.0
+      for server_result in raw_results:
+        if server_result.metric == 'Total Ops Throughput':
+          total_ops_throughput = server_result.value
+        server_result.metadata.update(redis_metadata)
+        server_result.metadata.update(benchmark_metadata)
+
+      if total_ops_throughput > maximum_total_ops_throughput:
+        maximum_total_ops_throughput = total_ops_throughput
+        result_with_maximum_total_ops_throughput = raw_results
+
+      # Add the results with the current io_threads value
+      if io_threads is not None:
+        for server_result in raw_results:
+          # Cannot assign to metric directly because it is an immutable
+          # named tuple
+          server_result = server_result._replace(
+              metric=f'{server_result.metric} (io_threads={io_threads})'
+          )
+          all_results.append(server_result)
+
+    if measure_cpu_on_server_vm:
+      top_results = _GetTopResults(server_vm)
+  finally:
+    if redis_server.REDIS_AOF.value and redis_server.REDIS_AOF_VERIFY.value:
+      for server_vm in bm_spec.vm_groups['servers']:
+        redis_server.VerifyRedisAof(server_vm)
 
   return result_with_maximum_total_ops_throughput + all_results + top_results
 
