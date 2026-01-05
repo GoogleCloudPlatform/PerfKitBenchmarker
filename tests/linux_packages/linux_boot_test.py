@@ -229,7 +229,7 @@ class LinuxBootTest(
 
   def testCollectVmToVmSamples(self):
     """Test vm to vm networking result parsing."""
-    # Load startup script data, which ingress timestamps.
+    # Load startup script data, which contains ingress timestamps.
     with open(os.path.join(self.data_dir, 'boot.output')) as f:
       boot_output = f.read()
     # Load tcpdump output, which contains egress timestamps.
@@ -266,6 +266,20 @@ class LinuxBootTest(
             ),
         ],
     )
+
+  def testCollectBootSamplesTimeout(self):
+    """Test CollectBootSamples raises StartupScriptTimeoutError."""
+    self.enter_context(
+        mock.patch.object(
+            linux_boot,
+            'GetStartupScriptOutput',
+            side_effect=vm_util.TimeoutExceededRetryError,
+        )
+    )
+    with self.assertRaises(linux_boot.StartupScriptRetrievalError):
+      linux_boot.CollectBootSamples(
+          self.mock_vm, 0, ('', ''), datetime.datetime.now()
+      )
 
 
 if __name__ == '__main__':

@@ -26,6 +26,10 @@ _MICROSECONDS_PER_SECOND = 1000000
 FLAGS = flags.FLAGS
 
 
+class StartupScriptRetrievalError(vm_util.TimeoutExceededRetryError):
+  """Raised when GetStartupScriptOutput times out."""
+
+
 def PrepareBootScriptVM(aux_vm_ips: str, aux_vm_port: int) -> str:
   script_path = data.ResourcePath(
       os.path.join(DATA_DIR, BOOT_STARTUP_SCRIPT_TEMPLATE)
@@ -83,7 +87,12 @@ def CollectBootSamples(
   Returns:
     A list of sample.Sample objects.
   """
-  boot_output = GetStartupScriptOutput(vm, BOOT_SCRIPT_OUTPUT).split('\n')
+  try:
+    boot_output = GetStartupScriptOutput(vm, BOOT_SCRIPT_OUTPUT).split('\n')
+  except vm_util.TimeoutExceededRetryError as e:
+    raise StartupScriptRetrievalError(
+        'Timeout getting startup script output.'
+    ) from e
   boot_samples = ScrapeConsoleLogLines(
       boot_output, create_time, CONSOLE_FIRST_START_MATCHERS
   )
@@ -621,7 +630,12 @@ def CollectVmToVmSamples(
 ) -> List[sample.Sample]:
   """Collect samples related to vm-to-vm networking."""
   samples = []
-  vm_output = GetStartupScriptOutput(vm, BOOT_SCRIPT_OUTPUT)
+  try:
+    vm_output = GetStartupScriptOutput(vm, BOOT_SCRIPT_OUTPUT)
+  except vm_util.TimeoutExceededRetryError as e:
+    raise StartupScriptRetrievalError(
+        'Timeout getting startup script output.'
+    ) from e
   vm_internal_ip = vm.internal_ip
   vm_external_ip = vm.ip_address
 
