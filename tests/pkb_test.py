@@ -32,6 +32,7 @@ from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import test_util
+from perfkitbenchmarker.linux_packages import linux_boot
 from perfkitbenchmarker.providers.gcp import util as gcp_utils
 from tests import pkb_common_test_case
 
@@ -83,6 +84,21 @@ class TestCreateFailedRunSampleFlag(unittest.TestCase):
     )
     self.publish_failed_run_sample_mock.assert_called_once_with(
         self.spec, error_msg, stages.PROVISION, self.collector
+    )
+
+  def testCreateScriptRetrievalFailedSample(self):
+    self.flags_mock.create_failed_run_samples = True
+    error_msg = 'error'
+    self.run_mock.side_effect = linux_boot.StartupScriptRetrievalError(
+        error_msg
+    )
+
+    self.assertRaises(
+        Exception, pkb.RunBenchmark, self.spec, self.collector, False
+    )
+    self.assertEqual(
+        self.spec.failed_substatus,
+        benchmark_status.FailedSubstatus.VM_NOT_READY,
     )
 
   def testCreatePrepareFailedSample(self):
