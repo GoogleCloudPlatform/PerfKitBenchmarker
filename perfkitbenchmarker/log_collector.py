@@ -65,13 +65,13 @@ def CollectPKBLogs(run_uri: str, log_local_path: str) -> None:
     # Generate the log path to the cloud bucket based on the invocation date of
     # this function.
     gcs_log_path = GetLogCloudPath(PKB_LOG_BUCKET.value, f'{run_uri}-pkb.log')
+    # The gsutil top-level flag '-h' is not supported by 'gcloud storage cp' or 'gcloud storage mv'.
     vm_util.IssueCommand(
         [
-            'gsutil',
-            '-h',
-            'Content-Type:text/plain',
+            'gcloud',
+            'storage',
             _SAVE_LOG_TO_BUCKET_OPERATION.value,
-            '-Z',
+            '--gzip-local-all',
             log_local_path,
             gcs_log_path,
         ],
@@ -94,13 +94,13 @@ def CollectVMLogs(run_uri: str, source_path: str) -> None:
     source_filename = source_path.split('/')[-1]
     gcs_directory_path = GetLogCloudPath(VM_LOG_BUCKET.value, run_uri)
     gcs_path = f'{gcs_directory_path}/{source_filename}'
+    # The gsutil top-level flag '-h' is not supported by 'gcloud storage mv'.
     vm_util.IssueCommand(
         [
-            'gsutil',
-            '-h',
-            'Content-Type:text/plain',
+            'gcloud',
+            'storage',
             'mv',
-            '-Z',
+            '--gzip-local-all',
             source_path,
             gcs_path,
         ],
