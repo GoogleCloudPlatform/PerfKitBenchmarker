@@ -1294,6 +1294,12 @@ def RunBenchmark(
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.PROCESS_KILLED
           )
+        elif isinstance(
+            e, cluster_boot_benchmark.linux_boot.StartupScriptRetrievalError
+        ):
+          spec.failed_substatus = (
+              benchmark_status.FailedSubstatus.VM_NOT_READY
+          )
         elif _IsException(e, vm_util.TimeoutExceededRetryError):
           spec.failed_substatus = (
               benchmark_status.FailedSubstatus.COMMAND_TIMEOUT

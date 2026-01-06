@@ -73,6 +73,9 @@ class FailedSubstatus:
   # Failure when config values are invalid.
   INVALID_VALUE = 'INVALID_VALUE'
 
+  # VM under test is not ready, causing the benchmark to fail
+  VM_NOT_READY = 'VM_NOT_READY'
+
   # List of valid substatuses for use with --retries.
   # UNCATEGORIZED failures are not retryable. To make a specific UNCATEGORIZED
   # failure retryable, please raise an errors.Benchmarks.KnownIntermittentError.
@@ -87,6 +90,7 @@ class FailedSubstatus:
       UNSUPPORTED,
       COMMAND_TIMEOUT,
       RETRIES_EXCEEDED,
+      VM_NOT_READY,
   ]
 
 
