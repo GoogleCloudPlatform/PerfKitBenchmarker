@@ -263,6 +263,22 @@ def GetCompactionStats(vm):
   return stdout
 
 
+def UpdateCassandraConcurrentCompactorCount(vm, concurrent_compactors_count):
+  """Updates the cassandra concurrent compactor count."""
+  vm.RemoteCommand(
+      f'{GetNodetoolPath()} setconcurrentcompactors'
+      f' {concurrent_compactors_count}'
+  )
+
+
+def UpdateCassandraCompactionThroughput(vm, compaction_throughput_mb_per_sec):
+  """Updates the cassandra compaction throughput."""
+  vm.RemoteCommand(
+      f'{GetNodetoolPath()} setcompactionthroughput'
+      f' {compaction_throughput_mb_per_sec}'
+  )
+
+
 def GetPendingTaskCountFromCompactionStats(cassandra_vms):
   """Parses the compaction stats for the given VMs and returns the pending task count.
 
@@ -331,6 +347,11 @@ def GetNumberOfNodesUp(vm):
       0
   ].strip()
   return int(vms_up)
+
+
+def GetNodetoolStatus(vms):
+  for vm in vms:
+    vm.RemoteCommand(f'{GetNodetoolPath()} status')
 
 
 def StartCluster(seed_vm, vms):
