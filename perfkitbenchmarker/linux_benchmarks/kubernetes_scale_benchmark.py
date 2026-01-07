@@ -88,10 +88,38 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   return config
 
+def _IsEksKarpenterAwsGpu(cluster: container_service.KubernetesCluster) -> bool:
+  return (
+      virtual_machine.GPU_COUNT.value
+      and FLAGS.cloud.lower() == 'aws'
+      and getattr(cluster, 'CLUSTER_TYPE', None) == 'Karpenter'
+  )
+
+def _EnsureEksKarpenterGpuNodepool(cluster: container_service.KubernetesCluster) -> None:
+  """Ensures a GPU NodePool exists for EKS Karpenter before applying workloads."""
+  if not _IsEksKarpenterAwsGpu(cluster):
+    return
+  cluster.ApplyManifest(
+      'container/kubernetes_scale/aws-gpu-nodepool.yaml.j2',
+      gpu_nodepool_name='gpu',
+      gpu_nodepool_label='gpu',
+      karpenter_ec2nodeclass_name='default',
+      gpu_instance_categories=['g'],
+      gpu_instance_families=['g6', 'g6e'],
+      gpu_capacity_types=['on-demand'],
+      gpu_arch=['amd64'],
+      gpu_os=['linux'],
+      gpu_taint_key='nvidia.com/gpu',
+      gpu_consolidate_after='1m',
+      gpu_consolidation_policy='WhenEmptyOrUnderutilized',
+      gpu_nodepool_cpu_limit=1000,
+  )
 
 def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   """Sets additional spec attributes."""
   bm_spec.always_call_cleanup = True
+  assert bm_spec.container_cluster
+  _EnsureEksKarpenterGpuNodepool(bm_spec.container_cluster)
 
 
 def _GetRolloutCreationTime(rollout_name: str) -> int:
@@ -180,29 +208,7 @@ def ScaleUpPods(
   resource_timeout = max_wait_time + 60 * 5  # 5 minutes after waiting to avoid
   # pod delete events from polluting data collection.
 
-  # Ensure a GPU NodePool exists for EKS Karpenter before applying the workload.
-  is_eks_karpenter_aws_gpu = (
-      virtual_machine.GPU_COUNT.value
-      and FLAGS.cloud.lower() == 'aws'
-      and getattr(cluster, 'CLUSTER_TYPE', None) == 'Karpenter'
-  )
-
-  if is_eks_karpenter_aws_gpu:
-    cluster.ApplyManifest(
-        'container/kubernetes_scale/aws-gpu-nodepool.yaml.j2',
-        gpu_nodepool_name='gpu',
-        gpu_nodepool_label='gpu',
-        karpenter_ec2nodeclass_name='default',
-        gpu_instance_categories=['g'],
-        gpu_instance_families=['g6', 'g6e'],
-        gpu_capacity_types=['on-demand'],
-        gpu_arch=['amd64'],
-        gpu_os=['linux'],
-        gpu_taint_key='nvidia.com/gpu',
-        gpu_consolidate_after='1m',
-        gpu_consolidation_policy='WhenEmptyOrUnderutilized',
-        gpu_nodepool_cpu_limit=1000,
-    )
+  is_eks_karpenter_aws_gpu = _IsEksKarpenterAwsGpu(cluster)
 
   manifest_kwargs = dict(
       Name='kubernetes-scaleup',
