@@ -8,6 +8,7 @@ from absl import flags
 import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.azure import azure_network
@@ -112,6 +113,37 @@ class AzureFlexibleServerMetricsTest(pkb_common_test_case.PkbCommonTestCase):
     cpu_max = next(s for s in samples if s.metric == 'cpu_utilization_max')
     self.assertEqual(cpu_max.value, 20.0)
     self.assertEqual(cpu_max.unit, '%')
+
+  def testCollectMetricsAggregation(self):
+    mock_issue_cmd = self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueRetryableCommand',
+            return_value=(json.dumps({'value': []}), ''),
+        )
+    )
+    start_time = datetime.datetime(2025, 11, 26, 10, 0, 0)
+    end_time = datetime.datetime(2025, 11, 26, 10, 1, 0)
+
+    # Test 'Total' aggregation
+    count_metric = relational_db.MetricSpec(
+        'some_count', 'some_count', 'count', None
+    )
+    self.server._CollectProviderMetric(count_metric, start_time, end_time)
+
+    call_args = mock_issue_cmd.call_args[0][0]
+    self.assertIn('--aggregation', call_args)
+    self.assertIn('Total', call_args)
+
+    # Test 'Average' aggregation
+    avg_metric = relational_db.MetricSpec(
+        'some_metric', 'some_metric', 'percent', None
+    )
+    self.server._CollectProviderMetric(avg_metric, start_time, end_time)
+
+    call_args = mock_issue_cmd.call_args[0][0]
+    self.assertIn('--aggregation', call_args)
+    self.assertIn('Average', call_args)
 
 
 class AzureFlexibleServerCreateTestCase(pkb_common_test_case.PkbCommonTestCase):

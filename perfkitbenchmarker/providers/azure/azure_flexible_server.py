@@ -434,6 +434,9 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
     logging.info(
         'Collecting metric %s for instance %s', metric_name, self.instance_id
     )
+    aggregation = 'Average'
+    if 'count' in metric_name:
+      aggregation = 'Total'
     cmd = [
         azure.AZURE_PATH,
         'monitor',
@@ -454,7 +457,7 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         '--interval',
         'pt1m',
         '--aggregation',
-        'Average',
+        aggregation,
     ]
     try:
       stdout, _ = vm_util.IssueRetryableCommand(cmd)
@@ -481,10 +484,11 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
       return []
 
     points = []
+    key = aggregation.lower()
     for dp in datapoints:
-      if dp['average'] is None:
+      if dp[key] is None:
         continue
-      value = dp['average']
+      value = dp[key]
       if metric.conversion_func:
         value = metric.conversion_func(value)
       points.append((
