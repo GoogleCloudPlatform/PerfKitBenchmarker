@@ -1,3 +1,6 @@
+param (
+    [string]$skip_cluster_check = 'False'
+ )
 
 function Get-SqlServiceStatus {
   $sqlServerService = Get-Service -Name 'MSSQLSERVER' -ErrorAction SilentlyContinue
@@ -54,7 +57,12 @@ try {
   for (($i = 0); $i -lt 24; $i++) {
 
     $serviceRunning = Get-SqlServiceStatus
-    $isClustered = Get-ClusterStatus
+    if ($skip_cluster_check -eq 'True') {
+      $isClustered = $true
+    }
+    else {
+      $isClustered = Get-ClusterStatus
+    }
     $canConnect = Get-SqlServerConnectionState -HostName $localServerName
 
     if ($serviceRunning -and $isClustered -and $canConnect) {
@@ -80,5 +88,3 @@ catch {
   Write-Host $_.Exception.Message
   throw $_.Exception.Message
 }
-
-
