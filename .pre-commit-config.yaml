@@ -3,7 +3,7 @@ repos:
     rev: 24.10.1
     hooks:
       - id: pyink
-        # It is recommended to specify the latest version of Python
+        # It is highly recommended to specify the latest version of Python
         # supported by your project here, or alternatively use
         # pre-commit's default_language_version, see
         # https://pre-commit.com/#top_level-default_language_version
