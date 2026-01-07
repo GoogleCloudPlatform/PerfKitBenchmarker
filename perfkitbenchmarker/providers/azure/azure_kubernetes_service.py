@@ -313,7 +313,7 @@ class AksCluster(container_service.KubernetesCluster):
     vm_util.IssueCommand(set_tags_cmd)
     self._AttachContainerRegistry()
     # Install NVIDIA device plugin as a DaemonSet to enable GPU support in the Kubernetes cluster.
-    if virtual_machine.GPU_COUNT.value > 0:
+    if virtual_machine.GPU_COUNT.value is not None and virtual_machine.GPU_COUNT.value > 0:
       self.ApplyManifest(
           'container/azure/nvidia-device-plugin.yaml',
       )
