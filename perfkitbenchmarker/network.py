@@ -77,6 +77,14 @@ class BaseFirewall:
     """
     pass
 
+  def AllowIcmpIpv6(self, vm):
+    """Opens the ICMP for IPv6 protocol on the firewall
+    
+    Args:
+      vm: The BaseVirtualMachine object to open the ICMP for IPv6 protocol for.
+    """
+    pass
+
   def AllowPort(
       self,
       vm,
