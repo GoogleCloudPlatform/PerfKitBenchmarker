@@ -170,6 +170,8 @@ class AksCluster(container_service.KubernetesCluster):
         '--nodepool-labels',
         f'pkb_nodepool={container_service.DEFAULT_NODEPOOL}',
     ] + self._GetNodeFlags(self.default_nodepool)
+    if self.enable_vpa:
+      cmd.append('--enable-vpa')
     if FLAGS.azure_aks_auto_node_provisioning:
       # For provision_node_pools benchmark, add auto provisioning mode
       cmd.append('--node-provisioning-mode=auto')

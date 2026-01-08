@@ -1,12 +1,14 @@
 import datetime
 import inspect
 import json
+import time
 import unittest
 
 from absl import flags
 import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.azure import azure_network
@@ -111,6 +113,37 @@ class AzureFlexibleServerMetricsTest(pkb_common_test_case.PkbCommonTestCase):
     cpu_max = next(s for s in samples if s.metric == 'cpu_utilization_max')
     self.assertEqual(cpu_max.value, 20.0)
     self.assertEqual(cpu_max.unit, '%')
+
+  def testCollectMetricsAggregation(self):
+    mock_issue_cmd = self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'IssueRetryableCommand',
+            return_value=(json.dumps({'value': []}), ''),
+        )
+    )
+    start_time = datetime.datetime(2025, 11, 26, 10, 0, 0)
+    end_time = datetime.datetime(2025, 11, 26, 10, 1, 0)
+
+    # Test 'Total' aggregation
+    count_metric = relational_db.MetricSpec(
+        'some_count', 'some_count', 'count', None
+    )
+    self.server._CollectProviderMetric(count_metric, start_time, end_time)
+
+    call_args = mock_issue_cmd.call_args[0][0]
+    self.assertIn('--aggregation', call_args)
+    self.assertIn('Total', call_args)
+
+    # Test 'Average' aggregation
+    avg_metric = relational_db.MetricSpec(
+        'some_metric', 'some_metric', 'percent', None
+    )
+    self.server._CollectProviderMetric(avg_metric, start_time, end_time)
+
+    call_args = mock_issue_cmd.call_args[0][0]
+    self.assertIn('--aggregation', call_args)
+    self.assertIn('Average', call_args)
 
 
 class AzureFlexibleServerCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -229,6 +262,158 @@ class AzureFlexibleServerCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     with self.assertRaises(errors.Config.InvalidValue):
       bm_spec.ConstructRelationalDb()
+
+
+class AzureFlexibleServerPremiumV2CreateTestCase(
+    pkb_common_test_case.PkbCommonTestCase
+):
+
+  def setUp(self):
+    super().setUp()
+    FLAGS.cloud = provider_info.AZURE
+    FLAGS.run_uri = 'test_run_uri'
+    self.resource_group_patch = self.enter_context(
+        mock.patch.object(
+            azure_network, 'GetResourceGroup', return_value=mock.Mock()
+        )
+    )
+    self.enter_context(
+        mock.patch.object(util, 'GetSubscriptionId', return_value='test-sub')
+    )
+    self.enter_context(mock.patch.object(time, 'sleep'))
+
+  def testCreatePostgresPremiumV2(self):
+    mock_cmd = self.MockIssueCommand({
+        'rest --method PUT': [(
+            '',
+            "'Azure-AsyncOperation': 'https://management.azure.com/async_op'",
+            0,
+        )],
+        'rest --method GET': [
+            ('{"status": "InProgress"}', '', 0),
+            ('{"status": "Succeeded"}', '', 0),
+        ],
+    })
+    yaml_spec = inspect.cleandoc(f"""
+        sysbench:
+          relational_db:
+            cloud: {provider_info.AZURE}
+            engine: {sql_engine_utils.FLEXIBLE_SERVER_POSTGRES}
+            engine_version: '13'
+            db_tier: GeneralPurpose
+            db_spec:
+              {provider_info.AZURE}:
+                machine_type: Standard_D2ds_v4
+                zone: eastus
+            db_disk_spec:
+              {provider_info.AZURE}:
+                disk_size: 128
+                disk_type: PremiumV2_LRS
+                provisioned_iops: 1000
+                provisioned_throughput: 200
+            vm_groups:
+              clients:
+                vm_spec: *default_dual_core
+                disk_spec: *default_500_gb
+    """)
+    bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_spec, 'sysbench'
+    )
+    bm_spec.ConstructRelationalDb()
+
+    bm_spec.relational_db._Create()
+
+    self.assertEqual(mock_cmd.func_to_mock.call_count, 3)
+    put_call, get_call1, get_call2 = mock_cmd.func_to_mock.call_args_list
+
+    # Check az rest PUT call
+    put_cmd = ' '.join(put_call[0][0])
+    with self.subTest(name='RestApi'):
+      self.assertIn('rest --method PUT', put_cmd)
+      self.assertIn('PremiumV2_LRS', put_cmd)
+      self.assertIn('"iops": 1000', put_cmd)
+      self.assertIn('"throughput": 200', put_cmd)
+
+    # Check az rest GET calls
+    get_cmd1 = ' '.join(get_call1[0][0])
+    self.assertIn('rest --method GET', get_cmd1)
+    get_cmd2 = ' '.join(get_call2[0][0])
+    self.assertIn('rest --method GET', get_cmd2)
+
+  def testCreatePostgresPremiumV2Fails(self):
+    self.MockIssueCommand({
+        'rest --method PUT': [(
+            '',
+            "'Azure-AsyncOperation': 'https://management.azure.com/async_op'",
+            0,
+        )],
+        'rest --method GET': [('{"status": "Failed"}', '', 0)],
+    })
+    yaml_spec = inspect.cleandoc(f"""
+        sysbench:
+          relational_db:
+            cloud: {provider_info.AZURE}
+            engine: {sql_engine_utils.FLEXIBLE_SERVER_POSTGRES}
+            engine_version: '13'
+            db_tier: GeneralPurpose
+            db_spec:
+              {provider_info.AZURE}:
+                machine_type: Standard_D2ds_v4
+                zone: eastus
+            db_disk_spec:
+              {provider_info.AZURE}:
+                disk_size: 128
+                disk_type: PremiumV2_LRS
+            vm_groups:
+              clients:
+                vm_spec: *default_dual_core
+                disk_spec: *default_500_gb
+    """)
+    bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_spec, 'sysbench'
+    )
+    bm_spec.ConstructRelationalDb()
+
+    with self.assertRaises(errors.Resource.CreationError):
+      bm_spec.relational_db._Create()
+
+  def testCreatePostgresPremiumV2NoAsyncHeader(self):
+    self.MockIssueCommand(
+        {
+            'rest --method PUT': [(
+                '',
+                'some other stderr',
+                0,
+            )]
+        }
+    )
+    yaml_spec = inspect.cleandoc(f"""
+        sysbench:
+          relational_db:
+            cloud: {provider_info.AZURE}
+            engine: {sql_engine_utils.FLEXIBLE_SERVER_POSTGRES}
+            engine_version: '13'
+            db_tier: GeneralPurpose
+            db_spec:
+              {provider_info.AZURE}:
+                machine_type: Standard_D2ds_v4
+                zone: eastus
+            db_disk_spec:
+              {provider_info.AZURE}:
+                disk_size: 128
+                disk_type: PremiumV2_LRS
+            vm_groups:
+              clients:
+                vm_spec: *default_dual_core
+                disk_spec: *default_500_gb
+    """)
+    bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        yaml_spec, 'sysbench'
+    )
+    bm_spec.ConstructRelationalDb()
+
+    with self.assertRaises(errors.Resource.CreationError):
+      bm_spec.relational_db._Create()
 
 
 if __name__ == '__main__':
