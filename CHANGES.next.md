@@ -636,3 +636,4 @@
 -   Updated the CONTRIBUTING.md guide with steps to minimize merging & review
     friction for new PRs.
 -   Support gs:// URLs in --ycsb_tar_url.
+-   Add `--gce_extra_network_interface_options` flag.

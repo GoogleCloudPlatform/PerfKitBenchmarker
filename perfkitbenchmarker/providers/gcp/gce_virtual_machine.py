@@ -744,6 +744,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
               ]
               + gce_nic_queue_count_arg
               + no_address_arg
+              + gcp_flags.GCE_EXTRA_NETWORK_INTERFACE_OPTIONS.value
           ),
       ]
 
