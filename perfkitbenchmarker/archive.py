@@ -28,7 +28,7 @@ def ArchiveRun(
     run_temp_directory,
     target_bucket,
     prefix='',
-    gsutil_path='gsutil',
+    gsutil_path='gcloud',
     aws_path=AWS_PATH,
 ):
   """Archive a run directory to GCS or S3.
@@ -52,7 +52,7 @@ def ArchiveRun(
   )
 
   prefix_len = 5
-  prefixes = {'s3://': [aws_path, 's3', 'cp'], 'gs://': [gsutil_path, 'cp']}
+  prefixes = {'s3://': [aws_path, 's3', 'cp'], 'gs://': [gsutil_path, 'storage', 'cp']}
 
   assert all(len(key) == prefix_len for key in prefixes), prefixes
 

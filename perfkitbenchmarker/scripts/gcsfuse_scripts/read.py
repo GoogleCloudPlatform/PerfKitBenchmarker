@@ -3,11 +3,11 @@
 Example usages:
 
 (1) Specify `--mountpoint` to read from gcsfuse.
-> gsutil ls gs://gcsfuse-benchmark/10M/ | python read.py --mountpoint=/gcs/
+> gcloud storage ls gs://gcsfuse-benchmark/10M/ | python read.py --mountpoint=/gcs/
 
 (2) Omit `--mountpoint` to read from GCS using tf.io.gfile; specify
 `--iterations` to run it multiple times.
-> gsutil ls gs://gcsfuse-benchmark/10M/ | python read.py --iterations=3
+> gcloud storage ls gs://gcsfuse-benchmark/10M/ | python read.py --iterations=3
 """
 
 import concurrent.futures
