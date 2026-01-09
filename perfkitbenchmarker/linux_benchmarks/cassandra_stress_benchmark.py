@@ -315,7 +315,7 @@ cassandra_stress:
           machine_type: m6i.xlarge
           zone: us-east-1
   flags:
-    cassandra_stress_run_duration: 1m
+    cassandra_stress_run_duration: 10m
     is_row_cache_enabled: false
     cassandra_replication_factor: 3
     cassandra_stress_consistency_level: LOCAL_QUORUM
@@ -1088,7 +1088,16 @@ def RunTestNTimes(client_vms, cassandra_vms, metadata):
     )
     # TODO(arushigaur) Add a stopping condition that if op rate in the last x
     # tests hasn't changed much then exit the while loop.
-    if max_op_rate < thread_data[current_thread_count]['operation_rate']:
+    # If op rate at the current_thread_count meets latency and cpu utilization
+    # criteria, then record it as the max_op_rate.
+    if (
+        max_op_rate < thread_data[current_thread_count]['operation_rate']
+        and int(thread_data[current_thread_count]['median_latency'])
+        < MAX_MEDIAN_LATENCY_MS
+        and sum(thread_data[current_thread_count]['cpu_utilization'])
+        / len(thread_data[current_thread_count]['cpu_utilization'])
+        < CASSANDRA_CPU_UTILIZATION_LIMIT.value * 1.01
+    ):
       max_op_rate = thread_data[current_thread_count]['operation_rate']
       max_op_rate_metadata = thread_data[current_thread_count]['metadata']
   samples.append(
