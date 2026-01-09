@@ -520,6 +520,11 @@ class BenchmarkSpec:
     self.edw_service = edw_service_class(
         self.config.edw_service
     )  # pytype: disable=not-instantiable
+    if self.container_cluster:
+      assert isinstance(
+          self.container_cluster, container_service.KubernetesCluster
+      )
+      self.edw_service.SetContainerCluster(self.container_cluster)
 
   def ConstructEdwComputeResource(self):
     """Create an edw_compute_resource object."""
