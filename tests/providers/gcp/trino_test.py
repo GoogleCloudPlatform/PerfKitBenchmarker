@@ -3,6 +3,7 @@ import unittest
 from absl import flags
 from absl.testing import flagsaver
 import mock
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import trino
 from tests import pkb_common_test_case
@@ -36,6 +37,7 @@ class TrinoTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(db.name, 'pkb-123')
 
   def testCreate(self):
+    # Arrange.
     self.enter_context(
         mock.patch.object(
             vm_util,
@@ -44,8 +46,17 @@ class TrinoTest(pkb_common_test_case.PkbCommonTestCase):
         )
     )
     db = trino.Trino(EDW_SERVICE_SPEC)
-    mock_cmd = self.MockIssueCommand({'': [('', '', 0)]})
+    mock_kubernetes = mock.create_autospec(
+        container_service.KubernetesCluster, instance=True
+    )
+    mock_kubernetes.DeployIngress.return_value = '1.0.0.0:12345'
+    db.SetContainerCluster(mock_kubernetes)
+    mock_cmd = self.MockIssueCommand(
+        {'get service pkb-123-trino': [('12345', '', 0)]}
+    )
+    # Act.
     db._Create()
+    # Assert.
     mock_cmd.func_to_mock.assert_has_calls([
         mock.call([
             'helm',
@@ -65,6 +76,7 @@ class TrinoTest(pkb_common_test_case.PkbCommonTestCase):
             'kube1',
         ]),
     ])
+    self.assertEqual(db.address, '1.0.0.0:12345')
 
 
 if __name__ == '__main__':
