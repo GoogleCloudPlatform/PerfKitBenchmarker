@@ -799,8 +799,8 @@ class EksKarpenterCluster(BaseEksCluster):
     container_service.RunKubectlCommand(
         [
             'apply',
-            '-k',
-            'github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master',
+            '-f',
+            'https://raw.githubusercontent.com/aws/eks-charts/master/stable/aws-load-balancer-controller/crds/crds.yaml',
         ],
         suppress_failure=lambda stdout, stderr, retcode: 'already exists'
         in stderr,
