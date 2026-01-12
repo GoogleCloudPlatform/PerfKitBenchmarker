@@ -1495,8 +1495,18 @@ class KubernetesCluster(
     if node_selectors:
       pod_spec_yaml['nodeSelector'].update(node_selectors)
 
+  @property
+  def _ingress_manifest_path(self) -> str:
+    """The path to the ingress manifest template file."""
+    return 'container/loadbalancer.yaml.j2'
+
   def DeployIngress(
-      self, name: str, namespace: str, port: int, health_path: str = ''
+      self,
+      name: str,
+      namespace: str,
+      port: int,
+      health_path: str = '',
+      node_selectors: dict[str, str] | None = None,
   ) -> str:
     """Deploys an Ingress/load balancer resource to the cluster.
 
@@ -1505,28 +1515,39 @@ class KubernetesCluster(
       namespace: The namespace of the resource.
       port: The port to expose to the internet.
       health_path: The path to use for health checks.
+      node_selectors: The node selectors to use for the Service.
 
     Returns:
-      The address of the Ingress.
+      The address of the Ingress, with or without the port.
     """
-    del health_path
-    self.ApplyManifest(
-        'container/loadbalancer.yaml.j2',
+    yaml_docs = self.ConvertManifestToYamlDicts(
+        self._ingress_manifest_path,
         name=name,
         namespace=namespace,
         port=port,
+        health_path=health_path,
     )
+    if node_selectors:
+      for yaml_doc in yaml_docs:
+        if yaml_doc['kind'] == 'Service':
+          yaml_doc['spec']['selector'] = node_selectors
+    self.ApplyYaml(yaml_docs)
+    return self._WaitForIngress(name, namespace, port)
+
+  def _WaitForIngress(self, name: str, namespace: str, port: int) -> str:
+    """Waits for a deployed Ingress/load balancer resource."""
+    name = f'service/{name}'
     self.WaitForResource(
-        f'service/{name}',
+        name,
         INGRESS_JSONPATH,
         namespace=namespace,
         condition_type='jsonpath=',
     )
     stdout, _, _ = RunKubectlCommand([
         'get',
-        '-n',
         name,
-        f'svc/{name}',
+        '-n',
+        namespace,
         '-o',
         f'jsonpath={INGRESS_JSONPATH}',
     ])

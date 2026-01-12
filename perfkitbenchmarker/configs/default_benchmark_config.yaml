@@ -599,3 +599,10 @@ kvrocks_memtier:
     memtier_run_duration: 40
     memtier_random_data: True
     memtier_command: 'hmset __key__ field1 __data__ field2 __data__ field3 __data__ field4 __data__ field5 __data__ field6 __data__ field7 __data__ field8 __data__ field9 __data__ field10 __data__ field11 __data__ field12 __data__ field13 __data__ field14 __data__ field15 __data__ field16 __data__ field17 __data__ field18 __data__ field19 __data__'
+
+cassandra_stress_mixed_workload:
+  name: cassandra_stress
+  flags:
+    cassandra_stress_run_duration: 10m
+    cassandra_stress_mixed_ratio: 'write=3,read=1'
+    cassandra_stress_command: 'mixed'
