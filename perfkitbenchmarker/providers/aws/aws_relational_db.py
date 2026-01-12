@@ -293,18 +293,21 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
         key_value_pair = flag.split('=')
         if len(key_value_pair) != 2:
           raise AwsRelationalDbParameterError('Malformed parameter %s' % flag)
-        cmd = util.AWS_PREFIX + [
-            'rds',
-            'modify-db-parameter-group',
-            '--db-parameter-group-name=%s' % self.parameter_group,
-            '--parameters=ParameterName=%s,ParameterValue=%s,ApplyMethod=pending-reboot'
-            % (key_value_pair[0], key_value_pair[1]),
-            '--region=%s' % self.region,
-        ]
-
-        vm_util.IssueCommand(cmd)
+        self._ModifyDbParameterGroup(key_value_pair[0], key_value_pair[1])
 
       self._Reboot()
+
+  @vm_util.Retry()
+  def _ModifyDbParameterGroup(self, key: str, value: str) -> None:
+    cmd = util.AWS_PREFIX + [
+        'rds',
+        'modify-db-parameter-group',
+        '--db-parameter-group-name=%s' % self.parameter_group,
+        '--parameters=ParameterName=%s,ParameterValue=%s,ApplyMethod=pending-reboot'
+        % (key, value),
+        '--region=%s' % self.region,
+    ]
+    vm_util.IssueCommand(cmd)
 
   def _GetParameterGroupFamily(self):
     """Get the parameter group family string.
