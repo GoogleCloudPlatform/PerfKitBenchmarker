@@ -15,7 +15,7 @@ spec:
       requirements:
         - key: karpenter.sh/capacity-type
           operator: In
-          values: {{ gpu_capacity_types | default(['spot','on-demand']) }}
+          values: {{ gpu_capacity_types | default(['on-demand']) }}
         - key: kubernetes.io/arch
           operator: In
           values: {{ gpu_arch | default(['amd64']) }}

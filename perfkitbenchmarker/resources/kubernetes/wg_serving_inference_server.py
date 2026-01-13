@@ -320,10 +320,45 @@ class BaseWGServingInferenceServer(
       pod_startup_logs = self.GetInferenceServerLogsFromPod(f'pod/{pod_name}')
       if self.timezone is None:
         self.timezone = self.GetPodTimeZone(pod_name)
+
+      # Collect node / instance metadata (best-effort)
+      startup_metadata = {}
+      node_name = pod_metadata.get('spec', {}).get('nodeName')
+      if node_name:
+        startup_metadata['node_name'] = node_name
+        try:
+          node_metadata = self.cluster.GetResourceMetadataByName(
+              f'node/{node_name}', should_pre_log=False, suppress_logging=True
+          )
+          node_labels = node_metadata.get('metadata', {}).get('labels', {}) or {}
+          instance_type = (
+              node_labels.get('node.kubernetes.io/instance-type')
+              or node_labels.get('beta.kubernetes.io/instance-type')
+          )
+          if instance_type:
+            startup_metadata['node_instance_type'] = instance_type
+          instance_family = (
+              node_labels.get('karpenter.k8s.aws/instance-family')
+              or node_labels.get('eks.amazonaws.com/instance-family')
+          )
+          if not instance_family and instance_type:
+            instance_family = instance_type.split('.', 1)[0]
+          if instance_family:
+            startup_metadata['node_instance_family'] = instance_family
+          instance_size = node_labels.get('karpenter.k8s.aws/instance-size')
+          if instance_size:
+            startup_metadata['node_instance_size'] = instance_size
+          gpu_product = node_labels.get('nvidia.com/gpu.product')
+          if gpu_product:
+            startup_metadata['gpu_product'] = gpu_product
+        except Exception as e:  # best-effort only
+          logging.info(
+              'Failed to fetch node metadata for %s: %s', node_name, e
+          )
       logging.info('Successfully collected metrics for pod %s.', pod_name)
       return PodStartupMetrics(
           pod_name=pod_name,
-          metadata={},
+          metadata=startup_metadata,
           pod_startup_logs=pod_startup_logs,
           pod_created_timestamp=pod_created_timestamp,
           pod_scheduled_timestamp=pod_scheduled_timestamp,
@@ -549,6 +584,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     })
     if self.spec.runtime_class_name:
       metadata['runtime_class_name'] = self.spec.runtime_class_name
+    if FLAGS.cloud == 'AWS':
+      metadata['aws_spot_instances'] = bool(FLAGS.aws_spot_instances)
     return metadata
 
   def GetStorageType(self) -> str:
@@ -672,13 +709,14 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
   def _ProvisionGPUNodePool(self):
     """Provisions cloud-specific GPU node pool for inference workloads."""
     if FLAGS.cloud == 'AWS':
+      use_spot = bool(FLAGS.aws_spot_instances)
       self.cluster.ApplyManifest(
           'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
           gpu_nodepool_name='gpu',
           gpu_consolidate_after='1h',
           gpu_consolidation_policy='WhenEmpty',
           karpenter_nodeclass_name='default',  # must exist already
-          gpu_capacity_types=['spot','on-demand'],
+          gpu_capacity_types=['spot'] if use_spot else ['on-demand'],
           gpu_arch=['amd64'],
           gpu_instance_families=['g6','p5'],
           gpu_taint_key='nvidia.com/gpu',
