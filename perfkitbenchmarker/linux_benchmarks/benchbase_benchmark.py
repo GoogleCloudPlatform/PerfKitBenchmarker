@@ -49,6 +49,10 @@ benchbase:
       AWS:
         zone: us-east-1a
     vm_groups:
+      default:
+        os_type: ubuntu2404
+        vm_spec: *default_dual_core
+        vm_count: 1
       clients:
         vm_spec:
           GCP:
@@ -64,6 +68,8 @@ benchbase:
           AWS:
             disk_size: 500
             disk_type: gp3
+  flags:
+    gcloud_scopes: cloud-platform
 """
 
 FLAGS = flags.FLAGS
