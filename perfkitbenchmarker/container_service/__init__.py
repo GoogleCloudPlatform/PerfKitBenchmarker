@@ -24,18 +24,19 @@ expanded to support first-class container benchmarks.
 from perfkitbenchmarker.container_service.container_cluster import BaseContainerCluster
 from perfkitbenchmarker.container_service.container_cluster import DEFAULT_NODEPOOL
 from perfkitbenchmarker.container_service.container_cluster import GetContainerClusterClass
+# Temporarily hoist container_registry related classes into this namespace
+from perfkitbenchmarker.container_service.container_registry import BaseContainerRegistry
+from perfkitbenchmarker.container_service.container_registry import GetContainerRegistryClass
 # Temporarily hoist error related classes into this namespace
 from perfkitbenchmarker.container_service.errors import ContainerException
 from perfkitbenchmarker.container_service.errors import FatalContainerException
 from perfkitbenchmarker.container_service.errors import RetriableContainerException
 # Temporarily hoist base related classes into this namespace
 from .base import BaseContainer
-from .base import BaseContainerRegistry
 from .base import BaseContainerService
 from .base import BaseNodePoolConfig
 from .base import ContainerImage
 from .base import FLAGS
-from .base import GetContainerRegistryClass
 from .base import KUBERNETES
 from .base import NodePoolName
 # Temporarily hoist kubernetes related classes into this namespace
