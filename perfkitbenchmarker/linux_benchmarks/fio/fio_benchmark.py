@@ -144,8 +144,6 @@ fio:
       vm_spec: *default_dual_core
       disk_spec: *default_500_gb
       vm_count: null
-  flags:
-    sar: True
 """
 
 
