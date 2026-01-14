@@ -413,6 +413,39 @@ class AksCluster(container_service.KubernetesCluster):
         'enforcement_mode="DoNotEnforce"',
     ])
 
+  def _WaitForPolicyRelaxation(self):
+    """Waits for AKS Safeguards policy to switch to dryrun enforcement mode."""
+
+    @vm_util.Retry(
+        poll_interval=self.POLL_INTERVAL,
+        fuzz=0,
+        timeout=self.READY_TIMEOUT,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
+    def _CheckConstraintEnforcementAction():
+      stdout, stderr, retcode = vm_util.IssueCommand(
+          [
+              FLAGS.kubectl,
+              '--kubeconfig',
+              FLAGS.kubeconfig,
+              'get',
+              'constraints',
+              '-o',
+              'jsonpath={.items[?(@.kind=="K8sAzureV1ContainerRequests")].spec.enforcementAction}',
+          ],
+          raise_on_failure=False,
+      )
+      if retcode != 0:
+        raise errors.Resource.RetryableCreationError(
+            f'Failed to check constraint: {stderr}'
+        )
+      if stdout.strip() != 'dryrun':
+        raise errors.Resource.RetryableCreationError(
+            f'Enforcement action is "{stdout.strip()}", waiting for "dryrun"'
+        )
+
+    _CheckConstraintEnforcementAction()
+
   def _IsReady(self) -> bool:
     """Returns True if the cluster is ready."""
     show_cmd = [
@@ -659,6 +692,7 @@ class AksAutomaticCluster(AksCluster):
     self._RelaxAKSPolicy()
     self._GetCredentials(use_admin=False)
     self._WaitForDefaultServiceAccount()
+    self._WaitForPolicyRelaxation()
     self._AttachContainerRegistry()
 
   def _ModifyPodSpecPlacementYaml(
