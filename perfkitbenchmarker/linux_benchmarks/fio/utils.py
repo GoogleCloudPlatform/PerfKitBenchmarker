@@ -171,7 +171,14 @@ def FillTarget():
   return fio_flags.FIO_TARGET_MODE.value in constants.FILL_TARGET_MODES
 
 
-def FillDevice(vm, disk, fill_size, exec_path, use_directory=False):
+def FillDevice(
+    vm,
+    disk,
+    fill_size,
+    exec_path,
+    use_directory=False,
+    fill_access_pattern='write',
+):
   """Fill the given disk on the given vm up to fill_size.
 
   Args:
@@ -181,7 +188,14 @@ def FillDevice(vm, disk, fill_size, exec_path, use_directory=False):
     exec_path: string path to the fio executable.
     use_directory: bool. If true, use --directory with the disk's mount point.
       Otherwise, use --filename with the disk's mountpoint.
+    fill_access_pattern: string. The access pattern to use for filling the disk.
+      Can be 'write' or 'randwrite'.
   """
+  if fill_access_pattern not in ('write', 'randwrite'):
+    raise ValueError(
+        f'fill_access_pattern must be "write" or "randwrite", got '
+        f'{fill_access_pattern}'
+    )
   if use_directory:
     dir_or_filename_arg = 'directory'
   else:
@@ -190,7 +204,7 @@ def FillDevice(vm, disk, fill_size, exec_path, use_directory=False):
       f'sudo {exec_path} --{dir_or_filename_arg}={disk.GetDevicePath()} '
       f'--ioengine={fio_flags.FIO_IOENGINE.value} --name={_FILENAME_PREFIX} '
       f'--blocksize={fio_flags.FIO_FILL_BLOCK_SIZE.value} --iodepth=64 '
-      f'--rw=write --direct=1 --size={fill_size} '
+      f'--rw={fill_access_pattern} --direct=1 --size={fill_size} '
       f'--nrfiles={fio_flags.FIO_NR_FILES.value} --fallocate=none '
       '--create_on_open=1'
   )
@@ -207,6 +221,9 @@ def PrefillIfEnabled(vm, exec_path, use_directory=False):
         'but multiple scratch disks are configured.'
     )
   if FillTarget():
+    if fio_flags.FIO_PREFILL_TYPE.value == 'sequential_and_random':
+      TwoStepPrefillIfEnabled(vm, exec_path, use_directory)
+      return
     logging.info(
         'Fill devices %s on %s',
         [disk.GetDevicePath() for disk in vm.scratch_disks],
@@ -219,6 +236,42 @@ def PrefillIfEnabled(vm, exec_path, use_directory=False):
             fio_flags.FIO_FILL_SIZE.value,
             exec_path,
             use_directory=use_directory,
+        ),
+        vm.scratch_disks,
+    )
+
+
+def TwoStepPrefillIfEnabled(vm, exec_path, use_directory=False):
+  """Prefills the target device or file on the given VM."""
+  if len(vm.scratch_disks) > 1 and not AgainstDevice():
+    raise errors.Setup.InvalidSetupError(
+        f'Target mode {fio_flags.FIO_TARGET_MODE.value} tests against 1 file, '
+        'but multiple scratch disks are configured.'
+    )
+  if FillTarget():
+    logging.info(
+        'Fill devices %s on %s',
+        [disk.GetDevicePath() for disk in vm.scratch_disks],
+        vm,
+    )
+    background_tasks.RunThreaded(
+        lambda disk: FillDevice(
+            vm,
+            disk,
+            '100%',  # Fill the entire disk.
+            exec_path,
+            use_directory=use_directory,
+        ),
+        vm.scratch_disks,
+    )
+    background_tasks.RunThreaded(
+        lambda disk: FillDevice(
+            vm,
+            disk,
+            '125%',  # Fill the entire disk.
+            exec_path,
+            use_directory=use_directory,
+            fill_access_pattern='randwrite',
         ),
         vm.scratch_disks,
     )
@@ -283,15 +336,17 @@ def RunTest(
   disks = vm.scratch_disks
   if AgainstDevice():
     fio_command = (
-        f'sudo {exec_path} --output-format=json '
-        f'--random_generator={fio_flags.FIO_RNG.value} {remote_fio_job_file_path}'
+        f'sudo {exec_path} --output-format=json'
+        f' --random_generator={fio_flags.FIO_RNG.value}'
+        f' {remote_fio_job_file_path}'
     )
   else:
-    assert(len(disks) == 1)
+    assert len(disks) == 1
     fio_command = (
         f'sudo {exec_path} --output-format=json'
-        f' --random_generator={fio_flags.FIO_RNG.value} --{latency_measure}_percentiles=1'
-        f' --directory={disks[0].mount_point} {remote_fio_job_file_path}'
+        f' --random_generator={fio_flags.FIO_RNG.value}'
+        f' --{latency_measure}_percentiles=1 --directory={disks[0].mount_point}'
+        f' {remote_fio_job_file_path}'
     )
   logging.info('FIO Results:')
   start_time = time.time()

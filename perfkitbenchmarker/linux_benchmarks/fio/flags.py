@@ -260,3 +260,10 @@ FIO_TEST_COUNT = flags.DEFINE_integer(
     1,
     'Number of fio tests to run.',
 )
+
+FIO_PREFILL_TYPE = flags.DEFINE_enum(
+    'fio_prefill_type',
+    'only_sequential',
+    ['only_sequential', 'sequential_and_random'],
+    'Type of prefill to use.',
+)
