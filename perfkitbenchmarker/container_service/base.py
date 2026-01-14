@@ -22,7 +22,6 @@ from typing import Any, Callable, Iterable
 from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import data
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
@@ -79,26 +78,6 @@ _CONTAINER_CLUSTER_ARCHITECTURE = flags.DEFINE_list(
     'The architecture(s) that the container cluster uses. '
     'Defaults to linux/amd64',
 )
-
-
-class ContainerException(errors.Error):
-  """Exception during the creation or execution of a container."""
-
-
-class FatalContainerException(
-    errors.Resource.CreationError, ContainerException
-):
-  """Fatal Exception during the creation or execution of a container."""
-
-  pass
-
-
-class RetriableContainerException(
-    errors.Resource.RetryableCreationError, ContainerException
-):
-  """Retriable Exception during the creation or execution of a container."""
-
-  pass
 
 
 class BaseContainer(resource.BaseResource):

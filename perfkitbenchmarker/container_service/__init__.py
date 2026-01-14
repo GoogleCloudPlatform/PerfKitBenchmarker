@@ -20,22 +20,23 @@ without pre-provisioning container clusters. In the future, this may be
 expanded to support first-class container benchmarks.
 """
 
+# Temporarily hoist error related classes into this namespace
+from perfkitbenchmarker.container_service.errors import ContainerException
+from perfkitbenchmarker.container_service.errors import FatalContainerException
+from perfkitbenchmarker.container_service.errors import RetriableContainerException
 # Temporarily hoist base related classes into this namespace
 from .base import BaseContainer
 from .base import BaseContainerCluster
 from .base import BaseContainerRegistry
 from .base import BaseContainerService
 from .base import BaseNodePoolConfig
-from .base import ContainerException
 from .base import ContainerImage
 from .base import DEFAULT_NODEPOOL
-from .base import FatalContainerException
 from .base import FLAGS
 from .base import GetContainerClusterClass
 from .base import GetContainerRegistryClass
 from .base import KUBERNETES
 from .base import NodePoolName
-from .base import RetriableContainerException
 # Temporarily hoist kubernetes related classes into this namespace
 from .kubernetes import INGRESS_JSONPATH
 from .kubernetes import KubernetesCluster
