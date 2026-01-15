@@ -184,6 +184,9 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
   def testFullCreateAksAutomatic(self):
     aks_auto = azure_kubernetes_service.AksAutomaticCluster(self.spec)
     aks_auto.resource_group.name = 'resource-group'
+    self.enter_context(
+        flagsaver.flagsaver(kubectl='kubectl', kubeconfig='dummy')
+    )
     mock_cmd = self.MockIssueCommand(
         {
             'az aks create': [('', '', 0)],
@@ -213,6 +216,7 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
             ],
             'az role assignment': [('', '', 0)],
             'az policy assignment': [('', '', 0)],
+            'kubectl --kubeconfig dummy get constraints': [('dryrun', '', 0)],
         },
     )
     aks_auto.Create()
