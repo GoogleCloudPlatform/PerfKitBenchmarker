@@ -692,8 +692,8 @@ class AksAutomaticCluster(AksCluster):
     self._RelaxAKSPolicy()
     self._GetCredentials(use_admin=False)
     self._WaitForDefaultServiceAccount()
-    self._WaitForPolicyRelaxation()
     self._AttachContainerRegistry()
+    self._WaitForPolicyRelaxation()
 
   def _ModifyPodSpecPlacementYaml(
       self,
