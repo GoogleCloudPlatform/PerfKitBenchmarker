@@ -13,10 +13,6 @@ spec:
       labels:
         name: {{ Name }}
     spec:
-      {%- if NvidiaGpuRequest and Cloud == 'aws' %}
-      nodeSelector:
-        karpenter.sh/nodepool: {{ GpuNodepoolName | default('gpu') }}
-      {%- endif %}
       containers:
       - name: {{ Name }}
         image: {{ Image }}

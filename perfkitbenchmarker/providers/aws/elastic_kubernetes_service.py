@@ -1283,10 +1283,16 @@ class EksKarpenterCluster(BaseEksCluster):
 
   def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Gets the node selectors section of a yaml for the provider."""
-    machine_family = util.GetMachineFamily(machine_type)
-    if machine_family:
-      return {'karpenter.k8s.aws/instance-family': machine_family}
-    return {}
+    selectors = {}
+    # If GPU is requested, use the GPU nodepool
+    if virtual_machine.GPU_TYPE.value:
+      selectors['karpenter.sh/nodepool'] = 'gpu'
+    else:
+      # Otherwise, use instance-family selector if machine_type is specified
+      machine_family = util.GetMachineFamily(machine_type)
+      if machine_family:
+        selectors['karpenter.k8s.aws/instance-family'] = machine_family
+    return selectors
 
   def GetNodePoolNames(self) -> list[str]:
     """Gets node pool names for the cluster.

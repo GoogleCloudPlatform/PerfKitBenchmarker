@@ -2143,7 +2143,7 @@ class KubernetesCluster(BaseContainerCluster, KubernetesClusterCommands):
     del name
     node_selectors = self.GetNodeSelectors(machine_type)
     if node_selectors:
-      pod_spec_yaml['nodeSelector'].update(node_selectors)
+      pod_spec_yaml.setdefault('nodeSelector', {}).update(node_selectors)
 
   def DeployIngress(
       self, name: str, namespace: str, port: int, health_path: str = ''

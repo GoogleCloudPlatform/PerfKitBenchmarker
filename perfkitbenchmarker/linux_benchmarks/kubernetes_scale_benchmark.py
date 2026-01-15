@@ -224,24 +224,21 @@ def ScaleUpPods(
       Cloud=FLAGS.cloud.lower(),
   )
 
+  # GpuTaintKey is still needed for tolerations in the yaml template
   if is_eks_karpenter_aws_gpu:
-    manifest_kwargs.update({
-        'GpuNodepoolName': 'gpu',
-        'GpuTaintKey': 'nvidia.com/gpu',
-    })
+    manifest_kwargs['GpuTaintKey'] = 'nvidia.com/gpu'
 
   yaml_docs = cluster.ConvertManifestToYamlDicts(
       MANIFEST_TEMPLATE,
       **manifest_kwargs,
   )
 
-  # Non-GPU path: keep existing placement behavior.
-  if not is_eks_karpenter_aws_gpu:
-    cluster.ModifyPodSpecPlacementYaml(
-        yaml_docs,
-        'kubernetes-scaleup',
-        cluster.default_nodepool.machine_type,
-    )
+  # Always use ModifyPodSpecPlacementYaml to add nodeSelectors via GetNodeSelectors()
+  cluster.ModifyPodSpecPlacementYaml(
+      yaml_docs,
+      'kubernetes-scaleup',
+      cluster.default_nodepool.machine_type,
+  )
 
   resource_names = cluster.ApplyYaml(yaml_docs)
 
