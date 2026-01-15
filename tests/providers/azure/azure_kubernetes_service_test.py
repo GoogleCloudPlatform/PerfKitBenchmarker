@@ -181,12 +181,10 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
         mock_cmd.func_to_mock.mock_calls[0].args[0],
     )
 
+  @flagsaver.flagsaver(kubectl='kubectl', kubeconfig='dummy')
   def testFullCreateAksAutomatic(self):
     aks_auto = azure_kubernetes_service.AksAutomaticCluster(self.spec)
     aks_auto.resource_group.name = 'resource-group'
-    self.enter_context(
-        flagsaver.flagsaver(kubectl='kubectl', kubeconfig='dummy')
-    )
     mock_cmd = self.MockIssueCommand(
         {
             'az aks create': [('', '', 0)],
