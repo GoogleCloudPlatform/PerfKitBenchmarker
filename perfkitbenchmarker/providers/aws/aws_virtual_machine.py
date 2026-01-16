@@ -18,7 +18,6 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
-
 import base64
 import collections
 import json
@@ -31,7 +30,6 @@ import time
 import uuid
 from absl import flags
 from perfkitbenchmarker import disk
-from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_virtual_machine
@@ -227,7 +225,7 @@ def GetRootBlockDeviceSpecForImage(image_id, region):
   return root_block_device_dict
 
 
-def GetBlockDeviceMap(vm):
+def GetBlockDeviceMap(vm: 'AwsVirtualMachine'):
   """Returns the block device map to expose all devices for a given machine.
 
   Args:
@@ -539,8 +537,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   deleted_hosts = set()
   host_map = collections.defaultdict(list)
   client_token: str
-  create_cmd: list[str] | None
-  create_disk_strategy: disk_strategies.CreateDiskStrategy
+  create_cmd: list[str]
+  create_disk_strategy: aws_disk_strategies.AWSCreateDiskStrategy
   device_by_disk_spec_id: dict[int, str]
   disk_identifiers_by_device: dict[str, aws_disk.AWSDiskIdentifiers]
   host: AwsDedicatedHost | None
@@ -628,7 +626,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # See:
     # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/enhanced-networking-os.html
     self._smp_affinity_script = 'smp_affinity.sh'
-    self.create_cmd = None
+    self.create_cmd = []
 
     arm_arch = GetArmArchitecture(self.machine_type)
     self.is_aarch64 = bool(arm_arch)
@@ -828,8 +826,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         ] + self.internal_ips
       else:
         # EFAv3 only has internal IPs for every 4th NIC?
-        if (self.machine_type not in _EFA_V3_MACHINE_TYPES
-            or network_interface['Attachment']['NetworkCardIndex'] % 4 == 0):
+        if (
+            self.machine_type not in _EFA_V3_MACHINE_TYPES
+            or network_interface['Attachment']['NetworkCardIndex'] % 4 == 0
+        ):
           self.internal_ips.append(network_interface['PrivateIpAddress'])
     if util.IsRegion(self.zone):
       self.zone = str(instance['Placement']['AvailabilityZone'])
@@ -939,6 +939,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if not util.IsRegion(self.zone):
       placement.append('AvailabilityZone=%s' % self.zone)
     if self.use_dedicated_host:
+      assert self.host
       placement.append('Tenancy=host,HostId=%s' % self.host.id)
       self.num_hosts = len(self.host_list)
     elif self.placement_group:
@@ -959,7 +960,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--count=1',
           '--instance-market-options=MarketType="capacity-block"',
           '--capacity-reservation-specification=CapacityReservationTarget='
-          '{CapacityReservationId=%s}' % reservation_id]
+          '{CapacityReservationId=%s}' % reservation_id,
+      ]
     else:
       reservation_args = []
 
@@ -967,19 +969,24 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     if aws_flags.AWS_INSTANCE_BANDWIDTH_WEIGHTING.value:
       bandwidth_weighting_args = [
           '--network-performance-options',
-          f'BandwidthWeighting={aws_flags.AWS_INSTANCE_BANDWIDTH_WEIGHTING.value}'
+          f'BandwidthWeighting={aws_flags.AWS_INSTANCE_BANDWIDTH_WEIGHTING.value}',
       ]
-    create_cmd = util.AWS_PREFIX + [
-        'ec2',
-        'run-instances',
-        '--region=%s' % self.region,
-        '--client-token=%s' % self.client_token,
-        '--image-id=%s' % self.image,
-        '--instance-type=%s' % self.machine_type,
-        '--key-name=%s' % AwsKeyFileManager.GetKeyNameForRun(),
-        '--tag-specifications=%s'
-        % util.FormatTagSpecifications('instance', self.aws_tags),
-    ] + reservation_args + bandwidth_weighting_args
+    create_cmd = (
+        util.AWS_PREFIX
+        + [
+            'ec2',
+            'run-instances',
+            '--region=%s' % self.region,
+            '--client-token=%s' % self.client_token,
+            '--image-id=%s' % self.image,
+            '--instance-type=%s' % self.machine_type,
+            '--key-name=%s' % AwsKeyFileManager.GetKeyNameForRun(),
+            '--tag-specifications=%s'
+            % util.FormatTagSpecifications('instance', self.aws_tags),
+        ]
+        + reservation_args
+        + bandwidth_weighting_args
+    )
 
     if FLAGS.aws_vm_hibernate:
       create_cmd.extend([

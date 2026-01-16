@@ -236,6 +236,9 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
+    self.boot_disk_size: int | None = None
+    self.boot_disk_type: str | None = None
+    self.low_priority: bool
     if isinstance(
         self.machine_type,
         custom_virtual_machine_spec.AzurePerformanceTierDecoder,
@@ -826,7 +829,7 @@ class AzureVirtualMachine(
     self.host = None
     if self.use_dedicated_host:
       self.host_series_sku = _GetSkuType(self.machine_type)
-      self.host_list = None
+      self.host_list = []
     self.low_priority = vm_spec.low_priority
     self.low_priority_status_code = None
     self.spot_early_termination = False
@@ -985,7 +988,9 @@ class AzureVirtualMachine(
 
     # Resources in Availability Set are not allowed to be
     # deployed to particular hosts.
+    num_hosts = 0
     if self.use_dedicated_host:
+      assert self.host is not None
       create_cmd.extend(
           ['--host-group', self.host.host_group, '--host', self.host.name]
       )
