@@ -636,6 +636,22 @@ class AksAutomaticCluster(AksCluster):
     ]
     vm_util.IssueCommand(create_role_assignment_cmd)
 
+  def _ConvertCredentialsToAzCli(self):
+    """Converts the kubeconfig file to the Azure CLI format."""
+    kubelogin_path, _, _ = vm_util.IssueCommand(
+        ['which', 'kubelogin']
+    )
+    kubelogin_path = kubelogin_path.strip()
+    vm_util.IssueCommand(
+        [
+            kubelogin_path,
+            'convert-kubeconfig',
+            '-l',
+            'azurecli',
+        ],
+        env={'KUBECONFIG': FLAGS.kubeconfig},
+    )
+
   def _PostCreate(self):
     """Skip the superclass's _PostCreate() method.
 
@@ -658,6 +674,8 @@ class AksAutomaticCluster(AksCluster):
     self._GrantResourcePolicyContributorRole()
     self._RelaxAKSPolicy()
     self._GetCredentials(use_admin=False)
+    if user_type != 'servicePrincipal':
+      self._ConvertCredentialsToAzCli()
     self._WaitForDefaultServiceAccount()
     self._AttachContainerRegistry()
 
