@@ -571,9 +571,7 @@ class AksAutomaticCluster(AksCluster):
 
   def _ConvertCredentialsToAzCli(self):
     """Converts the kubeconfig file to the Azure CLI format."""
-    kubelogin_path, _, _ = vm_util.IssueCommand(
-        ['which', 'kubelogin']
-    )
+    kubelogin_path, _, _ = vm_util.IssueCommand(['which', 'kubelogin'])
     kubelogin_path = kubelogin_path.strip()
     vm_util.IssueCommand(
         [
@@ -584,6 +582,73 @@ class AksAutomaticCluster(AksCluster):
         ],
         env={'KUBECONFIG': FLAGS.kubeconfig},
     )
+
+  def _GrantResourcePolicyContributorRole(self):
+    """Grants Resource Policy Contributor role to current user/service principal.
+
+    This role is required to manage Safeguards policies for the AKS cluster.
+    """
+    account_info, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'account',
+        'show',
+        '--query',
+        '[user.name, id]',
+        '--output',
+        'tsv',
+    ])
+
+    assignee_id, subscription_id = account_info.strip().split('\n')
+    scope = f'/subscriptions/{subscription_id}/resourceGroups/{self.resource_group.name}'
+
+    vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'role',
+        'assignment',
+        'create',
+        '--role',
+        'Resource Policy Contributor',
+        '--assignee',
+        assignee_id,
+        '--scope',
+        scope,
+    ])
+
+  def _RelaxAKSPolicy(self):
+    """Switches AKS Deployment Safeguards policy to audit-only mode for benchmark testing.
+
+    AKS Safeguards enforces policies that are unnecessary for benchmark testing:
+    - Memory limits must be <= 5Gi (AI benchmark workloads requires more)
+    - Liveness/readiness probes must be defined (not needed for test pods)
+    - Container images must use specific tags (test images may use 'latest')
+
+    Audit-only mode logs policy violations without blocking deployment, allowing
+    non-compliant workloads to run for performance testing.
+    """
+    subscription_id, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'account',
+        'show',
+        '--query',
+        'id',
+        '--output',
+        'tsv',
+    ])
+    subscription_id = subscription_id.strip()
+    policy_scope = f'/subscriptions/{subscription_id}/resourceGroups/{self.resource_group.name}/providers/Microsoft.ContainerService/managedClusters/{self.name}'
+
+    vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'policy',
+        'assignment',
+        'update',
+        '--name',
+        'aks-deployment-safeguards-policy-assignment',
+        '--scope',
+        policy_scope,
+        '--set',
+        'enforcement_mode="DoNotEnforce"',
+    ])
 
   def _PostCreate(self):
     """Skip the superclass's _PostCreate() method.
