@@ -345,9 +345,6 @@ class BaseWGServingInferenceServer(
             machine_family = machine_type.split('.', 1)[0]
           if machine_family:
             startup_metadata['node_machine_family'] = machine_family
-          instance_size = node_labels.get('karpenter.k8s.aws/instance-size')
-          if instance_size:
-            startup_metadata['node_instance_size'] = instance_size
           gpu_product = node_labels.get('nvidia.com/gpu.product')
           if gpu_product:
             startup_metadata['gpu_product'] = gpu_product
