@@ -331,20 +331,20 @@ class BaseWGServingInferenceServer(
               f'node/{node_name}', should_pre_log=False, suppress_logging=True
           )
           node_labels = node_metadata.get('metadata', {}).get('labels', {}) or {}
-          instance_type = (
+          machine_type = (
               node_labels.get('node.kubernetes.io/instance-type')
               or node_labels.get('beta.kubernetes.io/instance-type')
           )
-          if instance_type:
-            startup_metadata['node_instance_type'] = instance_type
-          instance_family = (
+          if machine_type:
+            startup_metadata['node_machine_type'] = machine_type
+          machine_family = (
               node_labels.get('karpenter.k8s.aws/instance-family')
               or node_labels.get('eks.amazonaws.com/instance-family')
           )
-          if not instance_family and instance_type:
-            instance_family = instance_type.split('.', 1)[0]
-          if instance_family:
-            startup_metadata['node_instance_family'] = instance_family
+          if not machine_family and machine_type:
+            machine_family = machine_type.split('.', 1)[0]
+          if machine_family:
+            startup_metadata['node_machine_family'] = machine_family
           instance_size = node_labels.get('karpenter.k8s.aws/instance-size')
           if instance_size:
             startup_metadata['node_instance_size'] = instance_size
