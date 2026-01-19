@@ -63,6 +63,13 @@ _AEROSPIKE_ENTERPRISE_VERSION = flags.DEFINE_string(
     'aerospike_enterprise_version', DEFAULT_VERSION, 'Aerospike version to use'
 )
 
+_CAPTURE_LM_TIMESTAMPS = flags.DEFINE_boolean(
+    'capture_live_migration_timestamps',
+    'False',
+    'Whether to capture LM event timestamps.',
+    allow_override=True,
+)
+
 _AEROSPIKE_EDITION = flags.DEFINE_enum_class(
     'aerospike_edition',
     AerospikeEdition.COMNUNITY,
@@ -107,10 +114,15 @@ flags.DEFINE_integer(
 MIN_FREE_KBYTES = 1160000
 
 
-_AEROSPIKE_CONFIGS = {
-    AerospikeEdition.COMNUNITY: 'aerospike_community.conf.j2',
-    AerospikeEdition.ENTERPRISE: 'aerospike_enterprise.conf.j2',
-}
+def _GetAerospikeTemplatePath():
+  """Returns the Aerospike config template path."""
+  if _AEROSPIKE_EDITION.value == AerospikeEdition.COMNUNITY:
+    return 'aerospike_community.conf.j2'
+  elif _AEROSPIKE_EDITION.value == AerospikeEdition.ENTERPRISE:
+    if _CAPTURE_LM_TIMESTAMPS.value:
+      return 'aerospike_enterprise_lm.conf.j2'
+    else:
+      return 'aerospike_enterprise.conf.j2'
 
 
 def _GetAerospikeDir(idx=None):
@@ -372,7 +384,7 @@ def ConfigureAndStart(server, seed_node_ips=None):
           idx * num_device_per_instance : (idx + 1) * num_device_per_instance
       ]
     server.RenderTemplate(
-        data.ResourcePath(_AEROSPIKE_CONFIGS[_AEROSPIKE_EDITION.value]),
+        data.ResourcePath(_GetAerospikeTemplatePath()),
         _GetAerospikeConfig(idx),
         {
             'devices': current_devices,
