@@ -352,6 +352,10 @@ class BaseWGServingInferenceServer(
           logging.info(
               'Failed to fetch node metadata for %s: %s', node_name, e
           )
+      else:
+        logging.info(
+            'Node name not found in pod metadata for pod %s', pod_name
+        )
       logging.info('Successfully collected metrics for pod %s.', pod_name)
       return PodStartupMetrics(
           pod_name=pod_name,
