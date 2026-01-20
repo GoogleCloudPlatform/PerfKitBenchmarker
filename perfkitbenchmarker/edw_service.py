@@ -16,12 +16,14 @@
 Classes to wrap specific backend services are in the corresponding provider
 directory as a subclass of BaseEdwService.
 """
+
 import datetime
 import os
 from typing import Any, Dict, List
 
 from absl import flags
 from absl import logging
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker import resource
 
 flags.DEFINE_integer(
@@ -443,6 +445,7 @@ class EdwService(resource.BaseResource):
     # resource workflow management
     self.supports_wait_on_delete = True
     self.client_interface: EdwClientInterface
+    self.container_cluster: container_service.KubernetesCluster | None = None
 
   def GetClientInterface(self) -> EdwClientInterface:
     """Gets the active Client Interface."""
@@ -508,6 +511,12 @@ class EdwService(resource.BaseResource):
 
   def SetDestinationTable(self, dataset: str):
     pass
+
+  def SetContainerCluster(
+      self, container_cluster: container_service.KubernetesCluster
+  ):
+    """Sets the container cluster if one is applicable."""
+    self.container_cluster = container_cluster
 
   def ExtractDataset(
       self, dest_bucket, dataset=None, tables=None, dest_format='CSV'

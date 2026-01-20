@@ -14,7 +14,7 @@
 
 """Set of utility functions for working with virtual machines."""
 
-
+import collections
 import contextlib
 import enum
 import logging
@@ -36,6 +36,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import temp_dir
+import yaml
 
 FLAGS = flags.FLAGS
 # Using logger rather than logging.info to avoid stack_level problems.
@@ -925,11 +926,48 @@ def DictionaryToEnvString(dictionary, joiner=' '):
   )
 
 
+def WriteTemporaryFile(
+    file_contents: str,
+    origin: str = '',
+    should_log_file: bool = True,
+    stack_level: int = 1,
+) -> str:
+  """Writes the string file_contents to a temporary file.
+
+  Args:
+    file_contents: string. The contents of the file to write.
+    origin: str. The origin of the file, used for logging.
+    should_log_file: bool. Whether to log the file before writing.
+    stack_level: int. The stack level to use for logging.
+
+  Returns:
+    The name of the temporary file.
+  """
+  stack_level += 1
+  prefix = 'pkb-'
+  with NamedTemporaryFile(
+      prefix=prefix, dir=GetTempDir(), delete=False, mode='w'
+  ) as tf:
+    if origin:
+      origin = f'from {origin}'
+    if should_log_file:
+      logging.info(
+          'Writing temporary file %s to name %s with contents:\n%s',
+          origin,
+          tf.name,
+          file_contents,
+          stacklevel=stack_level,
+      )
+    tf.write(file_contents)
+    tf.close()
+    return tf.name
+
+
 def RenderTemplate(
     template_path,
     context,
-    should_log_file: bool = False,
     trim_spaces: bool = False,
+    **logging_kwargs: dict[str, Any],
 ) -> str:
   """Renders a local Jinja2 template and returns its file name.
 
@@ -938,8 +976,8 @@ def RenderTemplate(
   Args:
     template_path: string. Local path to jinja2 template.
     context: dict. Variables to pass to the Jinja2 template during rendering.
-    should_log_file: bool. Whether to log the file after rendering.
     trim_spaces: bool. Value for both trim_blocks and lstrip_blocks.
+    **logging_kwargs: dict. Keyword arguments passed to WriteTemporaryFile.
 
   Raises:
     jinja2.UndefinedError: if template contains variables not present in
@@ -951,24 +989,14 @@ def RenderTemplate(
   rendered_template = ReadAndRenderJinja2Template(
       template_path, trim_spaces, **context
   )
-  prefix = 'pkb-' + os.path.basename(template_path)
-  with NamedTemporaryFile(
-      prefix=prefix, dir=GetTempDir(), delete=False, mode='w'
-  ) as tf:
-    if should_log_file:
-      logging.info(
-          'Rendered template from %s to %s with full text:\n%s',
-          template_path,
-          tf.name,
-          rendered_template,
-          stacklevel=2,
-      )
-    tf.write(rendered_template)
-    tf.close()
-    return tf.name
+  IncrementStackLevel(**logging_kwargs)
+  return WriteTemporaryFile(
+      rendered_template,
+      origin=f'jinja2 template {template_path}',
+      **logging_kwargs,
+  )
 
 
-@staticmethod
 def ReadAndRenderJinja2Template(
     file_path: str, trim_spaces: bool = False, **kwargs
 ) -> str:
@@ -976,7 +1004,13 @@ def ReadAndRenderJinja2Template(
   filename = data.ResourcePath(file_path)
   with open(filename) as template_file:
     contents = template_file.read()
-  if file_path.endswith('.j2'):
+  if kwargs:
+    if not file_path.endswith('.j2'):
+      logging.warning(
+          'kwargs were provided when reading %s, but it is not a jinja2'
+          ' template. Rename file to end with .j2.',
+          file_path,
+      )
     environment = jinja2.Environment(
         undefined=jinja2.StrictUndefined,
         trim_blocks=trim_spaces,
@@ -1003,3 +1037,94 @@ def ReadLocalFile(filename: str) -> str:
   file_path = posixpath.join(GetTempDir(), filename)
   stdout, _, _ = IssueCommand(['cat', file_path])
   return stdout
+
+
+def RecursiveDict() -> dict[str, Any]:
+  """Creates a new dictionary with auto nesting keys.
+
+  See https://stackoverflow.com/a/10218517/2528472.
+
+  Returns:
+    A new dictionary that automatically sets the value for any nested missing
+    keys.
+  """
+  return collections.defaultdict(RecursiveDict)
+
+
+def ReadYamlAsDicts(file_contents: str) -> list[dict[str, Any]]:
+  """Reads file contents & converts it to a list of recursive YAML doc dicts.
+
+  Args:
+    file_contents: The yaml string.
+
+  Returns:
+    The various YAML documents as a list of recursive dictionaries.
+  """
+  yaml_docs = yaml.safe_load_all(file_contents)
+  return_yamls = []
+  for yaml_doc in yaml_docs:
+    return_yamls.append(ConvertToDictType(yaml_doc, RecursiveDict))
+  return return_yamls
+
+
+def ConvertToDictType(yaml_doc: Any, dict_lambda: Any) -> dict[str, Any] | Any:
+  """Converts a YAML document to the given dictionary type.
+
+  In particular a recursive defaultdict can be more easily accessed with e.g.
+  my_dict['a']['b'] = value rather than my_dict.setdefault('a', {})['b'] =
+  value.
+
+  Args:
+    yaml_doc: The YAML document to convert.
+    dict_lambda: A constructor for the dictionary type to convert to.
+
+  Returns:
+    The remade dictionary.
+  """
+  if not isinstance(yaml_doc, dict) and not isinstance(yaml_doc, list):
+    return yaml_doc
+
+  def _ConvertPossiblyEmptyValue(value: Any) -> Any | None:
+    """Converts a given value to the dictionary type, or None if empty."""
+    if not bool(value) and value != 0:
+      return None
+    converted_value = ConvertToDictType(value, dict_lambda)
+    if not bool(converted_value) and converted_value != 0:
+      return None
+    return converted_value
+
+  yaml_list = []
+  if isinstance(yaml_doc, list):
+    for item in yaml_doc:
+      converted_value = _ConvertPossiblyEmptyValue(item)
+      if converted_value is None:
+        continue
+      yaml_list.append(converted_value)
+    return yaml_list
+  yaml_dict = dict_lambda()
+  for key, value in yaml_doc.items():
+    converted_value = _ConvertPossiblyEmptyValue(value)
+    if converted_value is None:
+      continue
+    yaml_dict[key] = converted_value
+  return yaml_dict
+
+
+def WriteYaml(yaml_dicts: list[dict[str, Any]], **kwargs) -> str:
+  """Writes yaml to a file & returns the name of that file.
+
+  Args:
+    yaml_dicts: A list of YAML documents.
+    **kwargs: Keyword arguments passed to file writing.
+
+  Returns:
+    Names of the written file.
+  """
+  normal_dicts = []
+  # Convert back to a normal dict because yaml.dump otherwise adds random
+  # "dictitems:" keys & other python artifacts.
+  for yaml_dict in yaml_dicts:
+    normal_dicts.append(ConvertToDictType(yaml_dict, dict))
+  manifest = yaml.dump_all(normal_dicts)
+  IncrementStackLevel(**kwargs)
+  return WriteTemporaryFile(manifest, origin='yaml', **kwargs)

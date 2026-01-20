@@ -35,7 +35,7 @@ virtual_machine = Any  # pylint: disable=invalid-name
 
 def GetCreateDiskStrategy(
     vm: 'virtual_machine.BaseVirtualMachine',
-    disk_spec: disk.BaseDiskSpec,
+    disk_spec: disk.BaseDiskSpec | None,
     disk_count: int,
 ) -> disk_strategies.CreateDiskStrategy:
   """Returns the strategies to create disks for the disk type."""
@@ -93,7 +93,7 @@ class AzureCreateRemoteDiskStrategy(AzureCreateDiskStrategy):
   def __init__(
       self,
       vm: 'virtual_machine.BaseVirtualMachine',
-      disk_spec: disk.BaseDiskSpec,
+      disk_spec: disk.BaseDiskSpec | None,
       disk_count: int,
   ):
     super().__init__(vm, disk_spec, disk_count)
@@ -325,7 +325,7 @@ class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
     if not FLAGS.object_storage_fuse_bucket_name:
       blob_client.Create()
 
-    local_path = data.ResourcePath('blobfuse2/config.yaml')
+    local_path = data.ResourcePath('blobfuse2/config.yaml.j2')
     remote_path = 'blobfuse2_config.yaml'
     context = {
         'account_name': blob_client.service.storage_account.name,

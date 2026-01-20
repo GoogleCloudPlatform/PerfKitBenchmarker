@@ -21,6 +21,7 @@ from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.linux_benchmarks import benchbase_benchmark
 from perfkitbenchmarker.linux_packages import benchbase
 from tests import pkb_common_test_case
@@ -39,8 +40,16 @@ class BenchbaseBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_benchmark_spec.vms = [self.mock_vm]
     self.mock_benchmark_spec.relational_db = mock.Mock()
     self.mock_benchmark_spec.relational_db.GetResourceMetadata.return_value = {}
+    self.mock_benchmark_spec.relational_db.cluster_id = 'cluster'
+    self.mock_benchmark_spec.relational_db.region = 'region'
     self.mock_load_config = self.enter_context(
         mock.patch.object(configs, 'LoadConfig', autospec=True)
+    )
+    self.mock_create_config = self.enter_context(
+        mock.patch.object(benchbase, 'CreateConfigFile', autospec=True)
+    )
+    self.mock_override_endpoint = self.enter_context(
+        mock.patch.object(benchbase, 'OverrideEndpoint', autospec=True)
     )
 
   def test_get_config(self):
@@ -52,13 +61,44 @@ class BenchbaseBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         benchbase_benchmark.BENCHMARK_NAME,
     )
 
-  @flagsaver.flagsaver(db_engine='spanner-postgres')
-  @mock.patch.object(benchbase, 'CreateConfigFile', autospec=True)
-  def test_prepare(self, mock_create_config):
+  @flagsaver.flagsaver(db_engine=sql_engine_utils.SPANNER_POSTGRES)
+  def test_prepare_spanner_postgres_loads(self):
     benchbase_benchmark.Prepare(self.mock_benchmark_spec)
 
     self.mock_vm.Install.assert_called_once_with('benchbase')
-    mock_create_config.assert_called_once_with(self.mock_vm)
+    self.mock_create_config.assert_called_once_with(self.mock_vm)
+    self.mock_override_endpoint.assert_not_called()
+    self.mock_vm.RemoteCommand.assert_called_once()
+    self.assertIn(
+        '--create=true --load=true', self.mock_vm.RemoteCommand.call_args[0][0]
+    )
+    self.assertIn('-P postgres', self.mock_vm.RemoteCommand.call_args[0][0])
+
+  @flagsaver.flagsaver(
+      db_engine=sql_engine_utils.AURORA_DSQL_POSTGRES,
+      aws_aurora_dsql_recovery_point_arn=None,
+  )
+  def test_prepare_dsql_raw_loads(self):
+    benchbase_benchmark.Prepare(self.mock_benchmark_spec)
+    self.mock_vm.Install.assert_called_once_with('benchbase')
+    self.mock_create_config.assert_called_once_with(self.mock_vm)
+    self.mock_override_endpoint.assert_called_once()
+    self.mock_vm.RemoteCommand.assert_called_once()
+    self.assertIn(
+        '--create=true --load=true', self.mock_vm.RemoteCommand.call_args[0][0]
+    )
+    self.assertIn('-P auroradsql', self.mock_vm.RemoteCommand.call_args[0][0])
+
+  @flagsaver.flagsaver(
+      db_engine=sql_engine_utils.AURORA_DSQL_POSTGRES,
+      aws_aurora_dsql_recovery_point_arn='arn',
+  )
+  def test_prepare_dsql_restore_skips_loading(self):
+    benchbase_benchmark.Prepare(self.mock_benchmark_spec)
+    self.mock_vm.Install.assert_called_once_with('benchbase')
+    self.mock_create_config.assert_called_once_with(self.mock_vm)
+    self.mock_override_endpoint.assert_called_once()
+    self.mock_vm.RemoteCommand.assert_not_called()
 
   @mock.patch('time.sleep')
   @mock.patch.object(benchbase, 'ParseResults', autospec=True)

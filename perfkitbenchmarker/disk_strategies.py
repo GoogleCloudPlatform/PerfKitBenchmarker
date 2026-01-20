@@ -20,6 +20,7 @@ There are two types of diks strategies.
                           virtual machine should create the disk resource.
 2. SetUpDiskStrategy - This strategy controls how a disk are set up.
 """
+
 import copy
 import json
 import logging
@@ -105,7 +106,9 @@ class EmptyCreateDiskStrategy(CreateDiskStrategy):
   """Strategies to create nothing. Useful when there is no resource disk."""
 
   # pylint: disable=super-init-not-called
-  def __init__(self, vm: Any, disk_spec: disk.BaseDiskSpec, disk_count: int):
+  def __init__(
+      self, vm: Any, disk_spec: disk.BaseDiskSpec | None, disk_count: int
+  ):
     self.disk_spec = disk_spec
     self.disk_count = disk_count
     self.vm = vm
@@ -506,8 +509,9 @@ class PrepareScratchDiskStrategy:
       logging.info('Temp DB is not supported on this cloud')
       return []
 
-    clause = ' -or '.join([f'($_.FriendlyName -like "{name}")'
-                           for name in names])
+    clause = ' -or '.join(
+        [f'($_.FriendlyName -like "{name}")' for name in names]
+    )
     clause = '{' + clause + '}'
 
     # Select the DeviceID from the output

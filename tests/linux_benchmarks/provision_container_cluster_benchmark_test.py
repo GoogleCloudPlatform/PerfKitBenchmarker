@@ -3,6 +3,7 @@ import unittest
 from unittest import mock
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
+from perfkitbenchmarker.container_service import kubectl
 from perfkitbenchmarker.linux_benchmarks.provisioning_benchmarks import provision_container_cluster_benchmark
 from tests import pkb_common_test_case
 
@@ -101,7 +102,7 @@ _POD_NAME = 'daemon-set-jntzg'
 
 class ProvisionKubernetesClusterTest(pkb_common_test_case.PkbCommonTestCase):
 
-  @mock.patch.object(container_service, 'RunKubectlCommand')
+  @mock.patch.object(kubectl, 'RunKubectlCommand')
   def test_GetKeyScalingEventTimes(self, mock_run_kubectl):
     test_path = os.path.join(
         os.path.dirname(__file__), '../data/kubectl_get_events.yaml'
@@ -130,7 +131,7 @@ class ProvisionKubernetesClusterTest(pkb_common_test_case.PkbCommonTestCase):
         ['get', 'events', '-o', 'yaml'],
         raise_on_timeout=True, timeout=None, stack_level=3)
 
-  @mock.patch.object(container_service, 'RunKubectlCommand')
+  @mock.patch.object(kubectl, 'RunKubectlCommand')
   def test_GetMinimumKeyScalingEventTimes(self, mock_run_kubectl):
     events_yaml = (
         _YAML_START + _NODE_READY_YAML + _CONTAINER_START_YAML + _YAML_EMD
@@ -152,7 +153,7 @@ class ProvisionKubernetesClusterTest(pkb_common_test_case.PkbCommonTestCase):
         ['get', 'events', '-o', 'yaml'],
         raise_on_timeout=True, timeout=None, stack_level=3)
 
-  @mock.patch.object(container_service, 'RunKubectlCommand')
+  @mock.patch.object(kubectl, 'RunKubectlCommand')
   def test_NoMinimumEventsThrows(self, mock_run_kubectl):
     events_yaml = _YAML_START + _CONTAINER_START_YAML + _YAML_EMD
     mock_run_kubectl.return_value = (events_yaml, None, None)

@@ -11,20 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Azure Flexible server provisioning and teardown."""
+"""Azure Flexible server provisioning and teardown.
+
+Postgres Flexible Server is created with PremiumV2_LRS storage type.
+
+MySQL Flexible Server is created with provisioned IOPS unless omitted, in which
+case it is created with auto-scale IOPS.
+"""
 
 import datetime
+import json
 import logging
+import re
 import time
-from typing import Tuple
+from typing import Any, Tuple
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
+from perfkitbenchmarker.providers.azure import azure_disk
 from perfkitbenchmarker.providers.azure import azure_relational_db
+from perfkitbenchmarker.providers.azure import util
 
 DEFAULT_DATABASE_NAME = 'database'
 
@@ -46,6 +58,10 @@ IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (might take some time to prepare)
 CREATE_AZURE_DB_TIMEOUT = 60 * 120
 
 
+class AzureAsyncOperationInProgressError(Exception):
+  """Exception raised when an Azure async operation is still in progress."""
+
+
 class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
   """An object representing an Azure Flexible server.
 
@@ -62,6 +78,24 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
       sql_engine_utils.FLEXIBLE_SERVER_POSTGRES,
       sql_engine_utils.FLEXIBLE_SERVER_MYSQL,
   ]
+  # Metrics are processed in 5 minute batches according to
+  # https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/concepts-monitoring.
+  METRICS_COLLECTION_DELAY_SECONDS = 300
+
+  def __init__(self, relational_db_spec: Any):
+    super().__init__(relational_db_spec)
+    if (
+        self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_MYSQL
+        and self.spec.db_disk_spec.provisioned_throughput
+    ):
+      raise errors.Config.InvalidValue(
+          'Provisioned throughput is not supported for MySQL Flexible Server.'
+      )
+    self.storage_type = None
+    if self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_POSTGRES:
+      self.storage_type = (
+          self.spec.db_disk_spec.disk_type or azure_disk.PREMIUM_STORAGE
+      )
 
   @staticmethod
   def GetDefaultEngineVersion(engine: str) -> str:
@@ -75,9 +109,22 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
           'Unsupported engine {}'.format(engine)
       )
 
+  def GetResourceMetadata(self) -> dict[str, Any]:
+    metadata = super().GetResourceMetadata()
+    if self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_MYSQL:
+      metadata['autoscale_iops'] = (
+          'Enabled'
+          if self.spec.db_disk_spec.provisioned_iops is None
+          else 'Disabled'
+      )
+    if self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_POSTGRES:
+      metadata['disk_type'] = self.storage_type
+    return metadata
+
   def _Create(self) -> None:
     """Creates the Azure database instance."""
     ha_flag = ENABLE_HA if self.spec.high_availability else DISABLE_HA
+    # Consider adding --zone and maybe --standby-zone for parity with GCP.
     cmd = [
         azure.AZURE_PATH,
         self.GetAzCommandForEngine(),
@@ -105,8 +152,123 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         self.spec.engine_version,
         '--yes',
     ]
+    if (
+        self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_POSTGRES
+        and self.storage_type == azure_disk.PREMIUM_STORAGE_V2
+    ):
+      # Postgres PremiumV2_LRS requires creation through REST API.
+      self._CreatePremiumSsdV2()
+      return
+    if self.storage_type:
+      cmd.extend([
+          '--storage-type',
+          self.storage_type,
+      ])
+    if (
+        self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_MYSQL
+        and self.spec.db_disk_spec.provisioned_iops is not None
+    ):
+      cmd.extend([
+          '--auto-scale-iops',
+          'Disabled',
+      ])
+    if self.spec.db_disk_spec.provisioned_iops:
+      cmd.extend([
+          '--iops',
+          str(self.spec.db_disk_spec.provisioned_iops),
+      ])
+    if self.spec.db_disk_spec.provisioned_throughput:
+      cmd.extend([
+          '--throughput',
+          str(self.spec.db_disk_spec.provisioned_throughput),
+      ])
 
     vm_util.IssueCommand(cmd, timeout=CREATE_AZURE_DB_TIMEOUT)
+
+  @vm_util.Retry(
+      timeout=CREATE_AZURE_DB_TIMEOUT,
+      retryable_exceptions=(AzureAsyncOperationInProgressError,),
+  )
+  def _WaitForAzureAsyncOperation(self, async_url: str) -> None:
+    """Polls Azure async operation URL until completion."""
+    cmd = [azure.AZURE_PATH, 'rest', '--method', 'GET', '--uri', async_url]
+    stdout, _, _ = vm_util.IssueCommand(cmd, raise_on_failure=True)
+    status_info = json.loads(stdout)
+    status = status_info.get('status')
+    if not status and 'properties' in status_info:
+      status = status_info['properties'].get('status')
+
+    if status == 'Succeeded':
+      return
+    if status == 'Failed':
+      raise errors.Resource.CreationError(
+          f'Azure async operation failed: {stdout}'
+      )
+    raise AzureAsyncOperationInProgressError(
+        f'Azure async operation status unknown: {status_info}'
+    )
+
+  def _CreatePremiumSsdV2(self) -> None:
+    """Creates a Postgres PremiumV2_LRS instance."""
+    subscription_id = util.GetSubscriptionId()
+    uri = (
+        f'https://management.azure.com/subscriptions/{subscription_id}'
+        f'/resourceGroups/{self.resource_group.name}'
+        '/providers/Microsoft.DBforPostgreSQL/flexibleServers/'
+        f'{self.instance_id}?api-version=2024-08-01'
+    )
+    body = {
+        'location': self.region,
+        'sku': {
+            'name': self.spec.db_spec.machine_type,
+            'tier': self.spec.db_tier,
+        },
+        'properties': {
+            'administratorLogin': self.spec.database_username,
+            'administratorLoginPassword': self.spec.database_password,
+            'version': self.spec.engine_version,
+            'storage': {
+                'storageSizeGB': self.spec.db_disk_spec.disk_size,
+                'type': azure_disk.PREMIUM_STORAGE_V2,
+            },
+            'backup': {
+                'backupRetentionDays': 7,
+                'geoRedundantBackup': 'Disabled',
+            },
+            'network': {'publicNetworkAccess': 'Enabled'},
+            'highAvailability': {'mode': 'ZoneRedundant'},
+        },
+    }
+    if self.spec.db_disk_spec.provisioned_iops:
+      body['properties']['storage'][
+          'iops'
+      ] = self.spec.db_disk_spec.provisioned_iops
+    if self.spec.db_disk_spec.provisioned_throughput:
+      body['properties']['storage'][
+          'throughput'
+      ] = self.spec.db_disk_spec.provisioned_throughput
+    cmd = [
+        azure.AZURE_PATH,
+        'rest',
+        '--method',
+        'PUT',
+        '--uri',
+        uri,
+        '--body',
+        json.dumps(body),
+        '--verbose',
+    ]
+    _, stderr, _ = vm_util.IssueCommand(
+        cmd, timeout=CREATE_AZURE_DB_TIMEOUT, raise_on_failure=False
+    )
+    match = re.search(r"'Azure-AsyncOperation': '([^']*)'", stderr)
+    if not match:
+      raise errors.Resource.CreationError(
+          'Could not find Azure-AsyncOperation header in az rest verbose'
+          ' output.'
+      )
+    async_operation_url = match.group(1)
+    self._WaitForAzureAsyncOperation(async_operation_url)
 
   def GetAzCommandForEngine(self) -> str:
     engine = self.spec.engine
@@ -214,3 +376,126 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         )
 
     self._Reboot()
+
+  def _GetResourceProvider(self) -> str:
+    if self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_MYSQL:
+      return 'Microsoft.DBforMySQL'
+    elif self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_POSTGRES:
+      return 'Microsoft.DBforPostgreSQL'
+    else:
+      raise NotImplementedError(f'Unsupported engine {self.spec.engine}')
+
+  def _GetResourceId(self) -> str:
+    return (
+        f'/subscriptions/{util.GetSubscriptionId()}/resourceGroups/'
+        f'{self.resource_group.name}/providers/'
+        f'{self._GetResourceProvider()}/flexibleServers/{self.instance_id}'
+    )
+
+  def _GetMetricsToCollect(self) -> list[relational_db.MetricSpec]:
+    """Returns a list of metrics to collect."""
+    # pyformat: disable
+    if self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_MYSQL:
+      return [
+          relational_db.MetricSpec('cpu_percent', 'cpu_utilization', '%', None),
+          relational_db.MetricSpec('io_consumption_percent', 'io_consumption_percent', '%', None),
+          relational_db.MetricSpec('storage_io_count', 'storage_io_count', 'iops', None),
+          relational_db.MetricSpec('storage_used', 'disk_bytes_used', 'GB', lambda x: x / (1024 * 1024 * 1024)),
+      ]
+    else:
+      return [
+          relational_db.MetricSpec('cpu_percent', 'cpu_utilization', '%', None),
+          relational_db.MetricSpec('read_iops', 'disk_read_iops', 'iops', None),
+          relational_db.MetricSpec('write_iops', 'disk_write_iops', 'iops', None),
+          relational_db.MetricSpec('read_throughput', 'disk_read_throughput', 'MB/s', lambda x: x / (1024 * 1024)),
+          relational_db.MetricSpec('write_throughput', 'disk_write_throughput', 'MB/s', lambda x: x / (1024 * 1024)),
+          relational_db.MetricSpec('storage_used', 'disk_bytes_used', 'GB', lambda x: x / (1024 * 1024 * 1024)),
+      ]
+    # pyformat: enable
+
+  @vm_util.Retry(poll_interval=60, max_retries=5, retryable_exceptions=KeyError)
+  def _CollectProviderMetric(
+      self,
+      metric: relational_db.MetricSpec,
+      start_time: datetime.datetime,
+      end_time: datetime.datetime,
+      collect_percentiles: bool = False,
+  ) -> list[sample.Sample]:
+    """Collects metrics from Azure Monitor."""
+    if end_time - start_time < datetime.timedelta(minutes=1):
+      logging.warning(
+          'Not collecting metrics since end time %s is within 1 minute of start'
+          ' time %s.',
+          end_time,
+          start_time,
+      )
+      return []
+    metric_name = metric.provider_name
+    logging.info(
+        'Collecting metric %s for instance %s', metric_name, self.instance_id
+    )
+    aggregation = 'Average'
+    if 'count' in metric_name:
+      aggregation = 'Total'
+    cmd = [
+        azure.AZURE_PATH,
+        'monitor',
+        'metrics',
+        'list',
+        '--resource',
+        self._GetResourceId(),
+        '--metric',
+        metric_name,
+        '--start-time',
+        start_time.astimezone(datetime.timezone.utc).strftime(
+            relational_db.METRICS_TIME_FORMAT
+        ),
+        '--end-time',
+        end_time.astimezone(datetime.timezone.utc).strftime(
+            relational_db.METRICS_TIME_FORMAT
+        ),
+        '--interval',
+        'pt1m',
+        '--aggregation',
+        aggregation,
+    ]
+    try:
+      stdout, _ = vm_util.IssueRetryableCommand(cmd)
+    except errors.VmUtil.IssueCommandError as e:
+      logging.warning(
+          'Could not collect metric %s for instance %s: %s',
+          metric.provider_name,
+          self.instance_id,
+          e,
+      )
+      return []
+    response = json.loads(stdout)
+    if (
+        not response
+        or not response['value']
+        or not response['value'][0]['timeseries']
+    ):
+      logging.warning('No timeseries for metric %s', metric_name)
+      return []
+
+    datapoints = response['value'][0]['timeseries'][0]['data']
+    if not datapoints:
+      logging.warning('No datapoints for metric %s', metric_name)
+      return []
+
+    points = []
+    key = aggregation.lower()
+    for dp in datapoints:
+      if dp[key] is None:
+        continue
+      value = dp[key]
+      if metric.conversion_func:
+        value = metric.conversion_func(value)
+      points.append((
+          datetime.datetime.fromisoformat(dp['timeStamp']),
+          value,
+      ))
+
+    return self._CreateSamples(
+        points, metric.sample_name, metric.unit, collect_percentiles
+    )

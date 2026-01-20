@@ -118,7 +118,9 @@ def Run(
   cluster: container_service.KubernetesCluster = (
       benchmark_spec.container_cluster
   )
-  server: k8s_server.WGServingInferenceServer = cluster.inference_server
+  server: kubernetes_inference_server.BaseKubernetesInferenceServer | None = (
+      cluster.inference_server
+  )
   if not server or not isinstance(server, k8s_server.WGServingInferenceServer):
     raise ValueError('Inference server is not initialized in the cluster.')
 

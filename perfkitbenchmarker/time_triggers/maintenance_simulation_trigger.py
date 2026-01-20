@@ -64,7 +64,7 @@ SIMULATE_MAINTENANCE_DELAY = flags.DEFINE_integer(
 
 CAPTURE_LIVE_MIGRATION_TIMESTAMPS = flags.DEFINE_boolean(
     'capture_live_migration_timestamps',
-    False,
+    True,
     (
         'Whether to capture maintenance times during migration. '
         'This requires external python script for notification.'
@@ -338,6 +338,11 @@ class MaintenanceEventTrigger(base_disruption_trigger.BaseDisruptionTrigger):
 
   def __init__(self):
     super().__init__(SIMULATE_MAINTENANCE_DELAY.value)
+    if not CAPTURE_LIVE_MIGRATION_TIMESTAMPS.value:
+      logging.warning(
+          'capture_live_migration_timestamps is set to False. This will not'
+          ' be supported in the future and might break the test.'
+      )
     self.capture_live_migration_timestamps = (
         CAPTURE_LIVE_MIGRATION_TIMESTAMPS.value
     )
@@ -352,6 +357,7 @@ class MaintenanceEventTrigger(base_disruption_trigger.BaseDisruptionTrigger):
       self.gce_simulate_maintenance_helpers[vm].SimulateMaintenanceWithLog()
     else:
       self.gce_simulate_maintenance_helpers[vm].SimulateMaintenanceEvent()
+    self.WaitForDisruption()
 
   def SetUp(self):
     """Sets up notification if live migration timestamps are captured."""

@@ -13,6 +13,7 @@
 # limitations under the License.
 """Managed relational database provisioning and teardown for AWS Aurora DSQL."""
 
+import functools
 import json
 from typing import Any
 
@@ -27,11 +28,16 @@ from perfkitbenchmarker.providers.aws import aws_relational_db
 from perfkitbenchmarker.providers.aws import util
 
 
-# TODO(shuninglin): Add cluster creation from a backup.
 # TODO(shuninglin): Add reaper for this new resource.
 
 FLAGS = flags.FLAGS
 
+AWS_AURORA_DSQL_RECOVERY_POINT_ARN = flags.DEFINE_string(
+    'aws_aurora_dsql_recovery_point_arn',
+    None,
+    'The ARN of the recovery point to restore AWS Aurora DSQL cluster from. If '
+    'not provided, a new cluster is created from scratch.',
+)
 DEFAULT_AURORA_DSQL_POSTGRES_VERSION = '16.2'
 
 _MAP_ENGINE_TO_DEFAULT_VERSION = {
@@ -65,11 +71,20 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   CLOUD = 'AWS'
   IS_MANAGED = True
   ENGINE = _AURORA_DSQL_ENGINES
+  READY_TIMEOUT = 60 * 60
 
   def __init__(self, dsql_spec: AwsAuroraDsqlSpec):
     super().__init__(dsql_spec)
     self.cluster_id = None
+    self.cluster_arn = None
     self.assigned_name = f'pkb-{FLAGS.run_uri}'
+    self.use_backup = bool(AWS_AURORA_DSQL_RECOVERY_POINT_ARN.value)
+    self.restore_job_id = None
+
+  @functools.cached_property
+  def account_id(self) -> str:
+    """Returns the AWS account ID."""
+    return util.GetAccount()
 
   # DSQL has different format for tags:
   # https://docs.aws.amazon.com/cli/v1/reference/rds/create-db-cluster.html
@@ -83,6 +98,70 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     return [formatted_tags_str]
 
   def _Create(self) -> None:
+    """Creates AWS Aurora DSQL cluster, from backup if recovery point ARN is provided."""
+    if not self.use_backup:
+      self._CreateRawCluster()
+      return
+    if self.restore_job_id:
+      logging.info(
+          'Restore job %s already exists. Skipping creation.',
+          self.restore_job_id,
+      )
+      return
+    cmd = util.AWS_PREFIX + [
+        'backup',
+        'start-restore-job',
+        '--recovery-point-arn',
+        AWS_AURORA_DSQL_RECOVERY_POINT_ARN.value,
+        '--region',
+        self.region,
+        '--iam-role-arn',
+        (
+            f'arn:aws:iam::{self.account_id}:role/service-role/'
+            'AWSBackupDefaultServiceRole'
+        ),
+        '--metadata',
+        '{"regionalConfig": "[{\\"region\\": \\"%s\\",'
+        ' \\"isDeletionProtectionEnabled\\": false}]"}'
+        % self.region,
+    ]
+    stdout, _, _ = vm_util.IssueCommand(cmd)
+    response = json.loads(stdout)
+    self.restore_job_id = response['RestoreJobId']
+    if self.restore_job_id:
+      # Mark created so we don't try to create it again on a retry.
+      self.created = True
+
+  def _DescribeRestoreJob(self, job_id: str) -> dict[str, Any]:
+    """Describes the restore job."""
+    cmd = util.AWS_PREFIX + [
+        'backup',
+        'describe-restore-job',
+        '--region',
+        self.region,
+        '--restore-job-id',
+        job_id,
+    ]
+    stdout, _, _ = vm_util.IssueCommand(cmd)
+    return json.loads(stdout)
+
+  def _AddTagsToCluster(self, cluster_arn: str) -> None:
+    """Adds tags to the DSQL cluster."""
+    cmd = (
+        util.AWS_PREFIX
+        + [
+            'dsql',
+            'tag-resource',
+            '--region',
+            self.region,
+            '--resource-arn=%s' % cluster_arn,
+            '--tags',
+        ]
+        + self._MakeDsqlTags()
+    )
+    vm_util.IssueCommand(cmd)
+
+  def _CreateRawCluster(self) -> None:
     """Creates the AWS Aurora DSQL instance.
 
     Raises:
@@ -93,7 +172,8 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
         + [
             'dsql',
             'create-cluster',
-            '--region=%s' % self.region,
+            '--region',
+            self.region,
             # Make it easier for deletion/reaping
             '--no-deletion-protection-enabled',
             '--tags',
@@ -108,11 +188,15 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     self.cluster_id = response['identifier']
 
   def _DescribeCluster(self) -> dict[str, Any] | None:
+    if not self.cluster_id:
+      logging.info('Cluster id is not set.')
+      return None
     cmd = util.AWS_PREFIX + [
         'dsql',
         'get-cluster',
         '--identifier=%s' % self.cluster_id,
-        '--region=%s' % self.region,
+        '--region',
+        self.region,
     ]
     stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
@@ -122,8 +206,29 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
 
   def _IsReady(self, timeout=aws_relational_db.IS_READY_TIMEOUT) -> bool:
     """Returns true if the cluster is ready."""
-    json_output = self._DescribeCluster()
-    return bool(json_output and json_output['status'] == 'ACTIVE')
+    if self.use_backup:
+      if not self.restore_job_id:
+        return False
+      job_description = self._DescribeRestoreJob(self.restore_job_id)
+      status = job_description['Status']
+      if status == 'COMPLETED':
+        self.cluster_id = job_description['CreatedResourceArn'].split('/')[-1]
+        self.cluster_arn = job_description['CreatedResourceArn']
+        return True
+      if status in ['ABORTED', 'FAILED']:
+        raise errors.Resource.CreationError(
+            f'Restore job {self.restore_job_id} failed with status {status}'
+        )
+      return False
+    else:
+      json_output = self._DescribeCluster()
+      return bool(json_output and json_output['status'] == 'ACTIVE')
+
+  def _PostCreate(self) -> None:
+    """Add tags if we are restoring from backup."""
+    super()._PostCreate()
+    if self.use_backup:
+      self._AddTagsToCluster(self.cluster_arn)
 
   def _Exists(self) -> bool:
     """Returns true if the underlying cluster exists."""

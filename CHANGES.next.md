@@ -431,7 +431,8 @@
 -   Add support for NVMe local SSDs in GKE.
 -   Add support for cluster to wait the resource on multiple conditions
 -   Add support for enabling live migration on AMD SEV
--   Increased maintenance simulation notification timeout to 4 hours in maintenance_simulation_trigger.py.
+-   Increased maintenance simulation notification timeout to 4 hours in
+    maintenance_simulation_trigger.py.
 
 ### Bug fixes and maintenance updates:
 
@@ -635,3 +636,7 @@
 -   Add fio benchmark for object storage via FUSE.
 -   Updated the CONTRIBUTING.md guide with steps to minimize merging & review
     friction for new PRs.
+-   Support gs:// URLs in --ycsb_tar_url.
+-   Add `--gce_extra_network_interface_options` flag.
+-   Add pyink as a precommit hook for GitHub PRs. This was already recommended
+    practice but is now done automatically.

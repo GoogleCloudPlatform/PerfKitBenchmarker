@@ -14,7 +14,7 @@
 """Module containing base class for disruption triggers."""
 
 import collections
-from collections.abc import Mapping, MutableSequence
+from collections.abc import Mapping, MutableSequence, Sequence
 import copy
 import dataclasses
 import logging
@@ -33,6 +33,7 @@ TIME_SERIES_SAMPLES_FOR_AGGREGATION = [
     sample.QPS_TIME_SERIES,
 ]
 PERCENTILES = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+MS_MULTIPLIER = 1000
 
 DEGRADATION_PERCENT = flags.DEFINE_float(
     'maintenance_degradation_percent',
@@ -51,11 +52,66 @@ MAINTENANCE_DEGRADATION_WINDOW = flags.DEFINE_float(
 )
 
 
+@flags.validator(
+    'maintenance_degradation_window',
+    'maintenance_degradation_window must be between 1 and 10 inclusive, or'
+    ' None.',
+)
+def _ValidateMaintenanceDegradationWindow(value):
+  return value is None or (1 <= value <= 10)
+
+
 @dataclasses.dataclass
 class DisruptionEvent:
   start_time: float = 0.0
   end_time: float = 0.0
   total_time: float = 0.0
+
+
+@dataclasses.dataclass
+class DisruptionEventTimestamps:
+  disruption_start: float = 0.0
+  disruption_end: float = 0.0
+  baseline_start: float = 0.0
+  baseline_end: float = 0.0
+  degradation_start: float = 0.0
+  degradation_end: float = 0.0
+
+
+def _ComputeLossPercentile(
+    mean: float,
+    values_after_disruption: MutableSequence[float],
+    metadata: Mapping[str, Any],
+) -> MutableSequence[sample.Sample]:
+  """Compute loss percentile metrics.
+
+  This method samples of seconds_dropped_below_x_percent from 0% to 90%
+  in 10 percent increment. This is computed by a nested for loop and
+  comparing if value dropped below a given percentile.
+
+  Args:
+    mean: Mean of the baseline
+    values_after_disruption: List of samples after disruption.
+    metadata: Metadata for samples
+
+  Returns:
+    Samples of loss percentile metrics.
+  """
+  seconds_dropped_below_percentile = collections.defaultdict(int)
+  for value in values_after_disruption:
+    for p in PERCENTILES:
+      if value <= mean * p:
+        seconds_dropped_below_percentile[p] += 1
+
+  return [
+      sample.Sample(
+          f'seconds_dropped_below_{int(p * 100)}_percent',
+          seconds_dropped_below_percentile[p],
+          's',
+          metadata=metadata,
+      )
+      for p in PERCENTILES
+  ]
 
 
 class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
@@ -97,6 +153,28 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
         'Host_maintenance_end': event.end_time,
     }
 
+  def _GenerateDisruptionTotalTimeSamples(
+      self, samples: MutableSequence[sample.Sample]
+  ) -> MutableSequence[sample.Sample]:
+    """Generate samples for total disruption time."""
+    # Populate the run_number "LM Total Time" by copying the metadata from
+    # (one of) the existing samples. Ideally pkb.DoRunPhase() would have sole
+    # responsibility for populating run_number for all samples, but making
+    # that change might be risky.
+    sample_metadata = (
+        copy.deepcopy(samples[0].metadata) if len(samples) > 0 else {}
+    )
+
+    return [
+        sample.Sample(
+            'LM Total Time',
+            d.total_time,
+            'seconds',
+            sample_metadata | self.GetMetadataForTrigger(d),
+        )
+        for d in self.disruption_events
+    ]
+
   def AppendSamples(
       self,
       unused_sender,
@@ -104,49 +182,91 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
       samples: MutableSequence[sample.Sample],
   ):
     """Append samples related to disruption."""
+    samples += self._GenerateDisruptionTotalTimeSamples(samples)
+    samples += self._AppendAggregatedMetrics(samples)
 
-    def generate_disruption_total_time_samples() -> (
-        MutableSequence[sample.Sample]
-    ):
-      self.WaitForDisruption()
-
-      # Host maintenance is in s
-      self.disruption_ends = max(
-          [float(d.end_time) * 1000 for d in self.disruption_events],
-          default=0,
-      )
-
-      # Populate the run_number "LM Total Time" by copying the metadata from
-      # (one of) the existing samples. Ideally pkb.DoRunPhase() would have sole
-      # responsibility for populating run_number for all samples, but making
-      # that change might be risky.
-      sample_metadata = (
-          copy.deepcopy(samples[0].metadata) if len(samples) > 0 else {}
-      )
-
-      return [
-          sample.Sample(
-              'LM Total Time',
-              d.total_time,
-              'seconds',
-              sample_metadata | self.GetMetadataForTrigger(d),
-          )
-          for d in self.disruption_events
-      ]
-
-    samples += generate_disruption_total_time_samples()
-    self._AppendAggregatedMetrics(samples)
-
-  def _AppendAggregatedMetrics(self, samples: MutableSequence[sample.Sample]):
+  def _AppendAggregatedMetrics(
+      self, samples: Sequence[sample.Sample]
+  ) -> MutableSequence[sample.Sample]:
     """Finds the time series samples and add generate the aggregated metrics."""
     additional_samples = []
-    for s in samples:
-      if s.metric in TIME_SERIES_SAMPLES_FOR_AGGREGATION:
-        additional_samples += self._AggregateThroughputSample(s)
-    samples += additional_samples
+    time_series_samples = (
+        s for s in samples if s.metric in TIME_SERIES_SAMPLES_FOR_AGGREGATION
+    )
+
+    for s in time_series_samples:
+      time_series = s.metadata['timestamps']
+      # Default ramp up starts and ramp down starts if the benchmark does not
+      # provide it in the metadata.
+      ramp_up_ends = s.metadata.get(sample.RAMP_UP_ENDS, time_series[0])
+      ramp_down_starts = s.metadata.get(
+          sample.RAMP_DOWN_STARTS, time_series[-1]
+      )
+
+      for index, disruption_event in enumerate(self.disruption_events):
+        disruption_event_timestamps = self._GetDisruptionEventTimestamps(
+            index,
+            disruption_event,
+            ramp_up_ends=ramp_up_ends,
+            ramp_down_starts=ramp_down_starts,
+        )
+        if disruption_event_timestamps is None:
+          continue
+        additional_samples += self._AggregateThroughputSample(
+            s, disruption_event_timestamps
+        )
+    return additional_samples
+
+  def _GetDisruptionEventTimestamps(
+      self,
+      index: int,
+      disruption_event: DisruptionEvent,
+      *,
+      ramp_up_ends: float,
+      ramp_down_starts: float,
+  ) -> None | DisruptionEventTimestamps:
+    """Get the disruption event timestamps for a given disruption event."""
+    disruption_start = disruption_event.start_time * 1000
+    baseline_start = ramp_up_ends
+    baseline_end = disruption_start
+    degradation_start = disruption_event.end_time * 1000
+    if disruption_event.end_time > ramp_down_starts:
+      return None
+
+    if index != len(self.disruption_events) - 1:
+      # This is not the last disruption event.
+      # The disruption end time is the start time of the next disruption.
+      disruption_end = self.disruption_events[index + 1].start_time * 1000
+      degradation_end = disruption_end
+    else:
+      # This is the last disruption event.
+      degradation_end = ramp_down_starts
+      disruption_duration = ramp_down_starts - disruption_start
+      if (
+          MAINTENANCE_DEGRADATION_WINDOW.value is not None
+          and MAINTENANCE_DEGRADATION_WINDOW.value > 0
+      ):
+        window = MAINTENANCE_DEGRADATION_WINDOW.value
+        disruption_end = min(
+            disruption_start + disruption_duration * window,
+            ramp_down_starts,
+        )
+      else:
+        disruption_end = ramp_down_starts
+
+    return DisruptionEventTimestamps(
+        disruption_start=disruption_start,
+        disruption_end=disruption_end,
+        baseline_start=baseline_start,
+        baseline_end=baseline_end,
+        degradation_start=degradation_start,
+        degradation_end=degradation_end,
+    )
 
   def _AggregateThroughputSample(
-      self, s: sample.Sample
+      self,
+      s: sample.Sample,
+      disruption_event_timestamps: DisruptionEventTimestamps,
   ) -> MutableSequence[sample.Sample]:
     """Aggregate a time series sample into disruption metrics.
 
@@ -155,72 +275,58 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
 
     Args:
       s: A time series sample create using CreateTimeSeriesSample in samples.py
+      disruption_event_timestamps: The DisruptionEventTimestamps being
+        aggregated.
 
     Returns:
       A list of samples.
     """
     metadata = copy.deepcopy(s.metadata)
-    time_series = metadata['timestamps']
-    values = metadata['values']
-    interval = metadata['interval']
-
-    # Default ramp up starts and ramp down starts if the benchmark does not
-    # provide it in the metadata.
-    ramp_up_ends = time_series[0]
-    ramp_down_starts = time_series[-1]
-    disruption_ends = self.GetDisruptionEnds()
-    if disruption_ends is None:
-      disruption_ends = time_series[-1]
-    if sample.RAMP_DOWN_STARTS in metadata:
-      ramp_down_starts = metadata[sample.RAMP_DOWN_STARTS]
-    if sample.RAMP_UP_ENDS in metadata:
-      ramp_up_ends = metadata[sample.RAMP_UP_ENDS]
-
-    disruption_start = sample.ConvertDateTimeToUnixMs(self.trigger_time)
-
-    disruption_duration = disruption_ends - disruption_start
-
+    time_series = s.metadata['timestamps']
+    values = s.metadata['values']
+    interval = s.metadata['interval']
     base_line_values = []
     values_after_disruption_starts = []
     values_after_disruption_ends = []
     total_missing_seconds = 0
-    for i in range(len(values)):
+    for i, value in enumerate(values):
       time = time_series[i]
-      if time >= ramp_up_ends and time <= ramp_down_starts:
-        interval_values = []
-        # If more than 1 sequential value is missing from the time series.
-        # Distrubute the ops throughout the time series
-        if i > 0:
-          time_gap_in_seconds = (time - time_series[i - 1]) / 1000
-          missing_entry_count = int((time_gap_in_seconds / interval) - 1)
-          if missing_entry_count > 1:
-            total_missing_seconds += missing_entry_count * interval
-            interval_values.extend(
-                [int(values[i] / float(missing_entry_count + 1))]
-                * (missing_entry_count + 1)
-            )
+      if time < disruption_event_timestamps.baseline_start:
+        continue
 
-          else:
-            interval_values.append(values[i])
-        if time <= disruption_start:
-          base_line_values.extend(interval_values)
+      interval_values = []
+      # If more than 1 sequential value is missing from the time series.
+      # Distrubute the ops throughout the time series
+      if i > 0:
+        time_gap_in_seconds = (time - time_series[i - 1]) / 1000
+        missing_entry_count = int((time_gap_in_seconds / interval) - 1)
+        if missing_entry_count > 1:
+          total_missing_seconds += missing_entry_count * interval
+          interval_values.extend(
+              [int(values[i] / float(missing_entry_count + 1))]
+              * (missing_entry_count + 1)
+          )
+
         else:
-          if (
-              MAINTENANCE_DEGRADATION_WINDOW.value is not None
-              and MAINTENANCE_DEGRADATION_WINDOW.value > 0
-          ):
-            window = MAINTENANCE_DEGRADATION_WINDOW.value
-            assert 1 <= window <= 10, (
-                'maintenance_degradation_window must be between 1 and 10'
-                f' inclusive, or None. Got: {window}'
-            )
-            if time <= disruption_start + disruption_duration * window:
-              values_after_disruption_starts.extend(interval_values)
-          else:
-            values_after_disruption_starts.extend(interval_values)
+          interval_values.append(value)
+      else:
+        interval_values.append(value)
 
-        if time > disruption_ends:
-          values_after_disruption_ends.extend(interval_values)
+      if time < disruption_event_timestamps.baseline_end:
+        base_line_values.extend(interval_values)
+      if (
+          disruption_event_timestamps.disruption_start
+          <= time
+          <= disruption_event_timestamps.disruption_end
+      ):
+        values_after_disruption_starts.extend(interval_values)
+
+      if (
+          disruption_event_timestamps.degradation_start
+          < time
+          <= disruption_event_timestamps.degradation_end
+      ):
+        values_after_disruption_ends.extend(interval_values)
 
     median = statistics.median(base_line_values)
     mean = statistics.mean(base_line_values)
@@ -233,7 +339,9 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
       if field in metadata:
         del metadata[field]
 
-    samples = self._ComputeLossPercentile(
+    metadata = metadata | dataclasses.asdict(disruption_event_timestamps)
+
+    samples = _ComputeLossPercentile(
         mean, values_after_disruption_starts, metadata
     ) + self._ComputeLossWork(
         median, values_after_disruption_starts, interval, metadata
@@ -259,51 +367,6 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
         )
     )
     return samples
-
-  def GetDisruptionEnds(self) -> float | None:
-    """Get the disruption ends."""
-    if self.disruption_events:
-      return max(
-          [float(d.end_time) * 1000 for d in self.disruption_events],
-          default=None,
-      )
-    return None
-
-  def _ComputeLossPercentile(
-      self,
-      mean: float,
-      values_after_disruption: MutableSequence[float],
-      metadata: Mapping[str, Any],
-  ) -> MutableSequence[sample.Sample]:
-    """Compute loss percentile metrics.
-
-    This method samples of seconds_dropped_below_x_percent from 0% to 90%
-    in 10 percent increment. This is computed by a nested for loop and
-    comparing if value dropped below a given percentile.
-
-    Args:
-      mean: Mean of the baseline
-      values_after_disruption: List of samples after disruption.
-      metadata: Metadata for samples
-
-    Returns:
-      Samples of loss percentile metrics.
-    """
-    seconds_dropped_below_percentile = collections.defaultdict(int)
-    for value in values_after_disruption:
-      for p in PERCENTILES:
-        if value <= mean * p:
-          seconds_dropped_below_percentile[p] += 1
-
-    return [
-        sample.Sample(
-            f'seconds_dropped_below_{int(p * 100)}_percent',
-            seconds_dropped_below_percentile[p],
-            's',
-            metadata=metadata,
-        )
-        for p in PERCENTILES
-    ]
 
   def _ComputeLossWork(
       self,

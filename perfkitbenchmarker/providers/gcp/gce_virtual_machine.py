@@ -650,6 +650,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.on_host_maintenance = 'TERMINATE'
 
     self.automatic_restart = FLAGS.gce_automatic_restart
+    self.preempt_marker: str | None = None
     if self.preemptible:
       self.preempt_marker = f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/{self.name}'
     arm_arch = GetArmArchitecture(self.machine_type)
@@ -744,6 +745,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
               ]
               + gce_nic_queue_count_arg
               + no_address_arg
+              + gcp_flags.GCE_EXTRA_NETWORK_INTERFACE_OPTIONS.value
           ),
       ]
 

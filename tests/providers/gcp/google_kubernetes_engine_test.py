@@ -18,12 +18,14 @@
 import builtins
 import contextlib
 import os
+import tempfile
 import unittest
 from unittest import mock
 
 from absl import flags as flgs
 from absl.testing import flagsaver
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
@@ -107,7 +109,7 @@ class GoogleContainerRegistryTestCase(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     self.enter_context(
         mock.patch.object(
-            google_kubernetes_engine.container_service,
+            google_kubernetes_engine.container_service.base,
             'ContainerImage',
             self.FakeContainerImage,
         )
@@ -257,7 +259,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testPostCreate(self):
     spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command, mock.patch.object(
-        container_service, 'RunKubectlCommand'
+        container_service.kubernetes, 'RunKubectlCommand'
     ) as mock_kubectl_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._PostCreate()
@@ -561,7 +563,7 @@ class GoogleKubernetesEngineWithGpusTestCase(
   def testPostCreate(self, create_from_file_patch):
     spec = self.create_kubernetes_engine_spec('k80')
     with patch_critical_objects() as issue_command, mock.patch.object(
-        container_service, 'RunKubectlCommand'
+        container_service.kubernetes, 'RunKubectlCommand'
     ) as mock_kubectl_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._PostCreate()
@@ -833,6 +835,13 @@ class GoogleKubernetesEngineAutopilotTestCase(
         )
     )
     self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'GetTempDir',
+            return_value=tempfile.gettempdir(),
+        )
+    )
+    self.enter_context(
         mock.patch(
             gce_network.__name__ + '.GceNetwork.GetNetwork',
             return_value=gce_network.GceNetwork(
@@ -845,7 +854,7 @@ class GoogleKubernetesEngineAutopilotTestCase(
     )
     self.enter_context(
         mock.patch.object(
-            container_service.data,
+            data,
             'ResourcePath',
             return_value=os.path.join(
                 os.path.dirname(__file__),
