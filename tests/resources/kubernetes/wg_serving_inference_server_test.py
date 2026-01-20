@@ -59,7 +59,8 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(container_service, 'RunKubectlCommand', autospec=True)
     )
     self.config_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        _BENCHMARK_SPEC_YAML)
+        _BENCHMARK_SPEC_YAML
+    )
     self.server = wg_serving_inference_server.WGServingInferenceServer(
         spec=self.config_spec.config.container_cluster.inference_server,
         cluster=self.mock_cluster,

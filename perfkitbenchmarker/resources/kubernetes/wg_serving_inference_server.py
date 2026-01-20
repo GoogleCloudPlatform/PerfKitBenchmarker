@@ -330,17 +330,17 @@ class BaseWGServingInferenceServer(
           node_metadata = self.cluster.GetResourceMetadataByName(
               f'node/{node_name}', should_pre_log=False, suppress_logging=True
           )
-          node_labels = node_metadata.get('metadata', {}).get('labels', {}) or {}
-          machine_type = (
-              node_labels.get('node.kubernetes.io/instance-type')
-              or node_labels.get('beta.kubernetes.io/instance-type')
+          node_labels = (
+              node_metadata.get('metadata', {}).get('labels', {}) or {}
           )
+          machine_type = node_labels.get(
+              'node.kubernetes.io/instance-type'
+          ) or node_labels.get('beta.kubernetes.io/instance-type')
           if machine_type:
             startup_metadata['node_machine_type'] = machine_type
-          machine_family = (
-              node_labels.get('karpenter.k8s.aws/instance-family')
-              or node_labels.get('eks.amazonaws.com/instance-family')
-          )
+          machine_family = node_labels.get(
+              'karpenter.k8s.aws/instance-family'
+          ) or node_labels.get('eks.amazonaws.com/instance-family')
           if not machine_family and machine_type:
             # Try different separators: '.' (AWS), '-' (GCP), '_' (Azure)
             for separator in ['.', '-', '_']:
@@ -357,13 +357,9 @@ class BaseWGServingInferenceServer(
           if gpu:
             startup_metadata['gpu'] = gpu
         except Exception as e:  # best-effort only
-          logging.info(
-              'Failed to fetch node metadata for %s: %s', node_name, e
-          )
+          logging.info('Failed to fetch node metadata for %s: %s', node_name, e)
       else:
-        logging.info(
-            'Node name not found in pod metadata for pod %s', pod_name
-        )
+        logging.info('Node name not found in pod metadata for pod %s', pod_name)
       logging.info('Successfully collected metrics for pod %s.', pod_name)
       return PodStartupMetrics(
           pod_name=pod_name,
@@ -727,7 +723,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           karpenter_nodeclass_name='default',  # must exist already
           gpu_capacity_types=['spot'] if use_spot else ['on-demand'],
           gpu_arch=['amd64'],
-          gpu_instance_families=['g6','p5'],
+          gpu_instance_families=['g6', 'p5'],
           gpu_taint_key='nvidia.com/gpu',
       )
     elif FLAGS.cloud == 'Azure':
