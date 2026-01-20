@@ -222,6 +222,7 @@ def ScaleUpPods(
       RolloutTimeout=max_wait_time,
       PodTimeout=resource_timeout,
       Cloud=FLAGS.cloud.lower(),
+      GpuTaintKey=None,  # Only set to 'nvidia.com/gpu' for EKS Karpenter
   )
 
   # GpuTaintKey is still needed for tolerations in the yaml template

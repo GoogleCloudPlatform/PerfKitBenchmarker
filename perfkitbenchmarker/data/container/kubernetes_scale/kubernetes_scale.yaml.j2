@@ -60,8 +60,8 @@ spec:
         operator: "Exists"
         effect: "NoExecute"
         tolerationSeconds: {{ PodTimeout }}
-      {%- if NvidiaGpuRequest and Cloud == 'aws' %}
-      - key: {{ GpuTaintKey | default('nvidia.com/gpu') }}
+      {%- if GpuTaintKey %}
+      - key: {{ GpuTaintKey }}
         operator: Exists
         effect: NoSchedule
       {%- endif %}
