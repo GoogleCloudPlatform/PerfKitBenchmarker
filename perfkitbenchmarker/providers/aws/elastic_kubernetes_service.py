@@ -313,9 +313,7 @@ class BaseEksCluster(container_service.KubernetesCluster):
     """The path to the ingress manifest template file."""
     return 'container/ingress.yaml.j2'
 
-  def _WaitForIngress(
-      self, name: str, namespace: str, port: int
-  ) -> str:
+  def _WaitForIngress(self, name: str, namespace: str, port: int) -> str:
     """Waits for an Ingress resource to be deployed to the cluster."""
     del port
     self.WaitForResource(
@@ -706,9 +704,7 @@ class EksKarpenterCluster(BaseEksCluster):
             }],
         },
         'iamIdentityMappings': [{
-            'arn': (
-                f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}'
-            ),
+            'arn': f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}',
             'username': 'system:node:{{EC2PrivateDNSName}}',
             'groups': ['system:bootstrappers', 'system:nodes'],
         }],

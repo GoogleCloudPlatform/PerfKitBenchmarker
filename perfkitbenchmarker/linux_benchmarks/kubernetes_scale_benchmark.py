@@ -88,6 +88,7 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   return config
 
+
 def _IsEksKarpenterAwsGpu(cluster: container_service.KubernetesCluster) -> bool:
   return (
       virtual_machine.GPU_COUNT.value
@@ -95,7 +96,10 @@ def _IsEksKarpenterAwsGpu(cluster: container_service.KubernetesCluster) -> bool:
       and getattr(cluster, 'CLUSTER_TYPE', None) == 'Karpenter'
   )
 
-def _EnsureEksKarpenterGpuNodepool(cluster: container_service.KubernetesCluster) -> None:
+
+def _EnsureEksKarpenterGpuNodepool(
+    cluster: container_service.KubernetesCluster,
+) -> None:
   """Ensures a GPU NodePool exists for EKS Karpenter before applying workloads."""
   if not _IsEksKarpenterAwsGpu(cluster):
     return
@@ -114,6 +118,7 @@ def _EnsureEksKarpenterGpuNodepool(cluster: container_service.KubernetesCluster)
       gpu_consolidation_policy='WhenEmptyOrUnderutilized',
       gpu_nodepool_cpu_limit=1000,
   )
+
 
 def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   """Sets additional spec attributes."""
