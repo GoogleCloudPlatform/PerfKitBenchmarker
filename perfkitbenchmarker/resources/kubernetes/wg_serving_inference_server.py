@@ -342,12 +342,20 @@ class BaseWGServingInferenceServer(
               or node_labels.get('eks.amazonaws.com/instance-family')
           )
           if not machine_family and machine_type:
-            machine_family = machine_type.split('.', 1)[0]
+            # Try different separators: '.' (AWS), '-' (GCP), '_' (Azure)
+            for separator in ['.', '-', '_']:
+              if separator in machine_type:
+                machine_family = machine_type.split(separator, 1)[0]
+                break
+            else:
+              # No separator found, use the whole machine_type
+              machine_family = machine_type
           if machine_family:
             startup_metadata['node_machine_family'] = machine_family
-          gpu_product = node_labels.get('nvidia.com/gpu.product')
-          if gpu_product:
-            startup_metadata['gpu_product'] = gpu_product
+          # Example values: "A100", "H100", "L4", "T4"
+          gpu = node_labels.get('nvidia.com/gpu.product')
+          if gpu:
+            startup_metadata['gpu'] = gpu
         except Exception as e:  # best-effort only
           logging.info(
               'Failed to fetch node metadata for %s: %s', node_name, e
