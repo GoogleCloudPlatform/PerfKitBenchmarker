@@ -227,7 +227,7 @@ def ScaleUpPods(
       RolloutTimeout=max_wait_time,
       PodTimeout=resource_timeout,
       Cloud=FLAGS.cloud.lower(),
-      GpuTaintKey=None,  # Only set to 'nvidia.com/gpu' for EKS Karpenter
+      GpuTaintKey=None,
   )
 
   # GpuTaintKey is still needed for tolerations in the yaml template
@@ -239,7 +239,7 @@ def ScaleUpPods(
       **manifest_kwargs,
   )
 
-  # Always use ModifyPodSpecPlacementYaml to add nodeSelectors via GetNodeSelectors()
+  # Use ModifyPodSpecPlacementYaml to add nodeSelectors via GetNodeSelectors()
   cluster.ModifyPodSpecPlacementYaml(
       yaml_docs,
       'kubernetes-scaleup',
