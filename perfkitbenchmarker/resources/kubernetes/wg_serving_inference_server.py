@@ -639,9 +639,9 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       )
       secret_file_path = vm_util.PrependTempDir('hf_token.secret')
       storage_service = object_storage_service.GetObjectStorageClass(
-          FLAGS.cloud
+          'GCP'
       )()
-      storage_service.PrepareService(self.cluster.region)
+      storage_service.PrepareService(None)
       storage_service.Copy(self.huggingface_token, secret_file_path)
 
       with open(secret_file_path, mode='r+') as secret_file:

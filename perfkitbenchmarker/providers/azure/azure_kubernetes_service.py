@@ -170,6 +170,8 @@ class AksCluster(container_service.KubernetesCluster):
         '--nodepool-labels',
         f'pkb_nodepool={container_service.DEFAULT_NODEPOOL}',
     ] + self._GetNodeFlags(self.default_nodepool)
+    if self.enable_vpa:
+      cmd.append('--enable-vpa')
     if FLAGS.azure_aks_auto_node_provisioning:
       # For provision_node_pools benchmark, add auto provisioning mode
       cmd.append('--node-provisioning-mode=auto')
@@ -312,6 +314,15 @@ class AksCluster(container_service.KubernetesCluster):
     ]
     vm_util.IssueCommand(set_tags_cmd)
     self._AttachContainerRegistry()
+    # Install NVIDIA device plugin as a DaemonSet to enable GPU support
+    # in the Kubernetes cluster.
+    if (
+        virtual_machine.GPU_COUNT.value is not None
+        and virtual_machine.GPU_COUNT.value > 0
+    ):
+      self.ApplyManifest(
+          'container/azure/nvidia-device-plugin.yaml',
+      )
 
   def _GetCredentials(self, use_admin: bool) -> None:
     """Helper method to get credentials and check service account readiness.
@@ -625,6 +636,22 @@ class AksAutomaticCluster(AksCluster):
     ]
     vm_util.IssueCommand(create_role_assignment_cmd)
 
+  def _ConvertCredentialsToAzCli(self):
+    """Converts the kubeconfig file to the Azure CLI format."""
+    kubelogin_path, _, _ = vm_util.IssueCommand(
+        ['which', 'kubelogin']
+    )
+    kubelogin_path = kubelogin_path.strip()
+    vm_util.IssueCommand(
+        [
+            kubelogin_path,
+            'convert-kubeconfig',
+            '-l',
+            'azurecli',
+        ],
+        env={'KUBECONFIG': FLAGS.kubeconfig},
+    )
+
   def _PostCreate(self):
     """Skip the superclass's _PostCreate() method.
 
@@ -647,6 +674,8 @@ class AksAutomaticCluster(AksCluster):
     self._GrantResourcePolicyContributorRole()
     self._RelaxAKSPolicy()
     self._GetCredentials(use_admin=False)
+    if user_type != 'servicePrincipal':
+      self._ConvertCredentialsToAzCli()
     self._WaitForDefaultServiceAccount()
     self._AttachContainerRegistry()
 

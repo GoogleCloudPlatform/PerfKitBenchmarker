@@ -71,6 +71,7 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   CLOUD = 'AWS'
   IS_MANAGED = True
   ENGINE = _AURORA_DSQL_ENGINES
+  READY_TIMEOUT = 60 * 60
 
   def __init__(self, dsql_spec: AwsAuroraDsqlSpec):
     super().__init__(dsql_spec)
@@ -112,6 +113,8 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
         'start-restore-job',
         '--recovery-point-arn',
         AWS_AURORA_DSQL_RECOVERY_POINT_ARN.value,
+        '--region',
+        self.region,
         '--iam-role-arn',
         (
             f'arn:aws:iam::{self.account_id}:role/service-role/'
@@ -134,6 +137,8 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     cmd = util.AWS_PREFIX + [
         'backup',
         'describe-restore-job',
+        '--region',
+        self.region,
         '--restore-job-id',
         job_id,
     ]
@@ -147,6 +152,8 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
         + [
             'dsql',
             'tag-resource',
+            '--region',
+            self.region,
             '--resource-arn=%s' % cluster_arn,
             '--tags',
         ]
@@ -165,7 +172,8 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
         + [
             'dsql',
             'create-cluster',
-            '--region=%s' % self.region,
+            '--region',
+            self.region,
             # Make it easier for deletion/reaping
             '--no-deletion-protection-enabled',
             '--tags',
@@ -187,7 +195,8 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
         'dsql',
         'get-cluster',
         '--identifier=%s' % self.cluster_id,
-        '--region=%s' % self.region,
+        '--region',
+        self.region,
     ]
     stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:

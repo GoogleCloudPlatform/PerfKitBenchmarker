@@ -43,7 +43,7 @@ _HIDE_LOGGING = flags.DEFINE_boolean(
 
 flags.DEFINE_string(
     'otel_config_file',
-    './otel/config.yaml',
+    './otel/config.yaml.j2',
     'Path of the Linux configuration file for Open-Telemetry.',
 )
 
@@ -133,6 +133,7 @@ class _OTELCollector(base_collector.BaseCollector):
             'INTERVAL': str(self.interval),
             'OUTPUT_FILE': str(collector_file),
         },
+        should_log_file=True,
     )
 
     # Create collector file to avoid running into permission issue. Otherwise,

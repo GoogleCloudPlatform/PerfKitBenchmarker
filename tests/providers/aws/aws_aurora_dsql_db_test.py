@@ -94,6 +94,8 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('backup', start_restore_call[0][0])
       self.assertIn('--recovery-point-arn', start_restore_call[0][0])
       self.assertIn('arn:foo', start_restore_call[0][0])
+      self.assertIn('--region', start_restore_call[0][0])
+      self.assertIn('us-east-1', start_restore_call[0][0])
       self.assertIn('--iam-role-arn', start_restore_call[0][0])
       self.assertIn(
           'arn:aws:iam::123456789012:role/service-role/AWSBackupDefaultServiceRole',
@@ -123,6 +125,8 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       create_cluster_call = issue_command.call_args_list[0]
       self.assertIn('create-cluster', create_cluster_call[0][0])
       self.assertIn('dsql', create_cluster_call[0][0])
+      self.assertIn('--region', create_cluster_call[0][0])
+      self.assertIn('us-east-1', create_cluster_call[0][0])
       self.assertIn(
           '--no-deletion-protection-enabled', create_cluster_call[0][0]
       )
@@ -155,6 +159,8 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       command_args = issue_command.call_args[0][0]
       self.assertEqual(command_args[4], 'get-cluster')
       self.assertIn('--identifier=fake_cluster_id', command_args)
+      self.assertIn('--region', command_args)
+      self.assertIn('us-east-1', command_args)
 
   @flagsaver.flagsaver(aws_aurora_dsql_recovery_point_arn=None)
   def testIsReadyFromRawActive(self):
@@ -195,13 +201,18 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         vm_util,
         'IssueCommand',
         return_value=(describe_restore_response, '', 0),
-    ):
+    ) as issue_command:
       self.assertTrue(db._IsReady())
       self.assertEqual(db.cluster_id, 'restored-cluster-id')
       self.assertEqual(
           db.cluster_arn,
           'arn:aws:dsql:us-east-1:123456789012:cluster/restored-cluster-id',
       )
+      issue_command.assert_called_once()
+      restore_call = issue_command.call_args[0][0]
+      self.assertIn('describe-restore-job', restore_call)
+      self.assertIn('--region', restore_call)
+      self.assertIn('us-east-1', restore_call)
 
   @flagsaver.flagsaver(aws_aurora_dsql_recovery_point_arn='arn:foo')
   def testIsReadyFromBackupPending(self):
@@ -247,6 +258,8 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       tag_call = issue_command.call_args_list[0]
       self.assertIn('tag-resource', tag_call[0][0])
       self.assertIn('dsql', tag_call[0][0])
+      self.assertIn('--region', tag_call[0][0])
+      self.assertIn('us-east-1', tag_call[0][0])
       self.assertIn(
           '--resource-arn=arn:aws:dsql:us-east-1:123456789012:cluster/restored-cluster-id',
           tag_call[0][0],
@@ -296,6 +309,8 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       command_args = issue_command.call_args[0][0]
       self.assertEqual(command_args[4], 'delete-cluster')
       self.assertIn('--identifier=fake_cluster_id', command_args)
+      self.assertIn('--region', command_args)
+      self.assertIn('us-east-1', command_args)
 
   def testGetDefaultEngineVersion(self):
     """Tests that correct default engine version is returned."""

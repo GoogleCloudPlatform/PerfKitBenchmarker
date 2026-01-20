@@ -22,6 +22,7 @@ case it is created with auto-scale IOPS.
 import datetime
 import json
 import logging
+import re
 import time
 from typing import Any, Tuple
 
@@ -55,6 +56,10 @@ IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (might take some time to prepare)
 # The operation timed out and automatically rolled back.
 # Please retry the operation.
 CREATE_AZURE_DB_TIMEOUT = 60 * 120
+
+
+class AzureAsyncOperationInProgressError(Exception):
+  """Exception raised when an Azure async operation is still in progress."""
 
 
 class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
@@ -91,10 +96,6 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
       self.storage_type = (
           self.spec.db_disk_spec.disk_type or azure_disk.PREMIUM_STORAGE
       )
-      if self.storage_type == azure_disk.PREMIUM_STORAGE_V2:
-        raise errors.Config.InvalidValue(
-            'Premium Storage v2 is not supported for Postgres Flexible Server.'
-        )
 
   @staticmethod
   def GetDefaultEngineVersion(engine: str) -> str:
@@ -151,6 +152,13 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         self.spec.engine_version,
         '--yes',
     ]
+    if (
+        self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_POSTGRES
+        and self.storage_type == azure_disk.PREMIUM_STORAGE_V2
+    ):
+      # Postgres PremiumV2_LRS requires creation through REST API.
+      self._CreatePremiumSsdV2()
+      return
     if self.storage_type:
       cmd.extend([
           '--storage-type',
@@ -176,6 +184,91 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
       ])
 
     vm_util.IssueCommand(cmd, timeout=CREATE_AZURE_DB_TIMEOUT)
+
+  @vm_util.Retry(
+      timeout=CREATE_AZURE_DB_TIMEOUT,
+      retryable_exceptions=(AzureAsyncOperationInProgressError,),
+  )
+  def _WaitForAzureAsyncOperation(self, async_url: str) -> None:
+    """Polls Azure async operation URL until completion."""
+    cmd = [azure.AZURE_PATH, 'rest', '--method', 'GET', '--uri', async_url]
+    stdout, _, _ = vm_util.IssueCommand(cmd, raise_on_failure=True)
+    status_info = json.loads(stdout)
+    status = status_info.get('status')
+    if not status and 'properties' in status_info:
+      status = status_info['properties'].get('status')
+
+    if status == 'Succeeded':
+      return
+    if status == 'Failed':
+      raise errors.Resource.CreationError(
+          f'Azure async operation failed: {stdout}'
+      )
+    raise AzureAsyncOperationInProgressError(
+        f'Azure async operation status unknown: {status_info}'
+    )
+
+  def _CreatePremiumSsdV2(self) -> None:
+    """Creates a Postgres PremiumV2_LRS instance."""
+    subscription_id = util.GetSubscriptionId()
+    uri = (
+        f'https://management.azure.com/subscriptions/{subscription_id}'
+        f'/resourceGroups/{self.resource_group.name}'
+        '/providers/Microsoft.DBforPostgreSQL/flexibleServers/'
+        f'{self.instance_id}?api-version=2024-08-01'
+    )
+    body = {
+        'location': self.region,
+        'sku': {
+            'name': self.spec.db_spec.machine_type,
+            'tier': self.spec.db_tier,
+        },
+        'properties': {
+            'administratorLogin': self.spec.database_username,
+            'administratorLoginPassword': self.spec.database_password,
+            'version': self.spec.engine_version,
+            'storage': {
+                'storageSizeGB': self.spec.db_disk_spec.disk_size,
+                'type': azure_disk.PREMIUM_STORAGE_V2,
+            },
+            'backup': {
+                'backupRetentionDays': 7,
+                'geoRedundantBackup': 'Disabled',
+            },
+            'network': {'publicNetworkAccess': 'Enabled'},
+            'highAvailability': {'mode': 'ZoneRedundant'},
+        },
+    }
+    if self.spec.db_disk_spec.provisioned_iops:
+      body['properties']['storage'][
+          'iops'
+      ] = self.spec.db_disk_spec.provisioned_iops
+    if self.spec.db_disk_spec.provisioned_throughput:
+      body['properties']['storage'][
+          'throughput'
+      ] = self.spec.db_disk_spec.provisioned_throughput
+    cmd = [
+        azure.AZURE_PATH,
+        'rest',
+        '--method',
+        'PUT',
+        '--uri',
+        uri,
+        '--body',
+        json.dumps(body),
+        '--verbose',
+    ]
+    _, stderr, _ = vm_util.IssueCommand(
+        cmd, timeout=CREATE_AZURE_DB_TIMEOUT, raise_on_failure=False
+    )
+    match = re.search(r"'Azure-AsyncOperation': '([^']*)'", stderr)
+    if not match:
+      raise errors.Resource.CreationError(
+          'Could not find Azure-AsyncOperation header in az rest verbose'
+          ' output.'
+      )
+    async_operation_url = match.group(1)
+    self._WaitForAzureAsyncOperation(async_operation_url)
 
   def GetAzCommandForEngine(self) -> str:
     engine = self.spec.engine
@@ -341,6 +434,9 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
     logging.info(
         'Collecting metric %s for instance %s', metric_name, self.instance_id
     )
+    aggregation = 'Average'
+    if 'count' in metric_name:
+      aggregation = 'Total'
     cmd = [
         azure.AZURE_PATH,
         'monitor',
@@ -361,7 +457,7 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         '--interval',
         'pt1m',
         '--aggregation',
-        'Average',
+        aggregation,
     ]
     try:
       stdout, _ = vm_util.IssueRetryableCommand(cmd)
@@ -388,10 +484,11 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
       return []
 
     points = []
+    key = aggregation.lower()
     for dp in datapoints:
-      if dp['average'] is None:
+      if dp[key] is None:
         continue
-      value = dp['average']
+      value = dp[key]
       if metric.conversion_func:
         value = metric.conversion_func(value)
       points.append((

@@ -14,7 +14,6 @@
 
 """Set of utility functions for working with virtual machines."""
 
-
 import collections
 import contextlib
 import enum
@@ -1005,7 +1004,13 @@ def ReadAndRenderJinja2Template(
   filename = data.ResourcePath(file_path)
   with open(filename) as template_file:
     contents = template_file.read()
-  if file_path.endswith('.j2'):
+  if kwargs:
+    if not file_path.endswith('.j2'):
+      logging.warning(
+          'kwargs were provided when reading %s, but it is not a jinja2'
+          ' template. Rename file to end with .j2.',
+          file_path,
+      )
     environment = jinja2.Environment(
         undefined=jinja2.StrictUndefined,
         trim_blocks=trim_spaces,
@@ -1046,9 +1051,7 @@ def RecursiveDict() -> dict[str, Any]:
   return collections.defaultdict(RecursiveDict)
 
 
-def ReadYamlAsDicts(
-    file_contents: str
-) -> list[dict[str, Any]]:
+def ReadYamlAsDicts(file_contents: str) -> list[dict[str, Any]]:
   """Reads file contents & converts it to a list of recursive YAML doc dicts.
 
   Args:
@@ -1107,9 +1110,7 @@ def ConvertToDictType(yaml_doc: Any, dict_lambda: Any) -> dict[str, Any] | Any:
   return yaml_dict
 
 
-def WriteYaml(
-    yaml_dicts: list[dict[str, Any]], **kwargs
-) -> str:
+def WriteYaml(yaml_dicts: list[dict[str, Any]], **kwargs) -> str:
   """Writes yaml to a file & returns the name of that file.
 
   Args:
@@ -1126,6 +1127,4 @@ def WriteYaml(
     normal_dicts.append(ConvertToDictType(yaml_dict, dict))
   manifest = yaml.dump_all(normal_dicts)
   IncrementStackLevel(**kwargs)
-  return WriteTemporaryFile(
-      manifest, origin='yaml', **kwargs
-  )
+  return WriteTemporaryFile(manifest, origin='yaml', **kwargs)

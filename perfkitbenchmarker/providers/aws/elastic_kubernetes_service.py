@@ -308,16 +308,16 @@ class BaseEksCluster(container_service.KubernetesCluster):
     """Get the default storage class for the provider."""
     return aws_disk.GP2
 
-  def DeployIngress(
-      self, name: str, namespace: str, port: int, health_path: str = ''
+  @property
+  def _ingress_manifest_path(self) -> str:
+    """The path to the ingress manifest template file."""
+    return 'container/ingress.yaml.j2'
+
+  def _WaitForIngress(
+      self, name: str, namespace: str, port: int
   ) -> str:
-    """Deploys an Ingress resource to the cluster."""
-    self.ApplyManifest(
-        'container/ingress.yaml.j2',
-        name=name,
-        namespace=namespace,
-        port=port,
-    )
+    """Waits for an Ingress resource to be deployed to the cluster."""
+    del port
     self.WaitForResource(
         'ingress',
         container_service.INGRESS_JSONPATH,
@@ -618,9 +618,7 @@ class EksAutoCluster(BaseEksCluster):
     # Autopilot does not support nodepools & manual resizes.
     pass
 
-  def GetNodeSelectors(
-      self, machine_type: str | None = None
-  ) -> dict[str, str]:
+  def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Get the node selectors section of a yaml for the provider."""
     del machine_type  # Unused.
     # Theoretically needed in mixed mode, but deployments fail without it:
@@ -801,8 +799,8 @@ class EksKarpenterCluster(BaseEksCluster):
     container_service.RunKubectlCommand(
         [
             'apply',
-            '-k',
-            'github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master',
+            '-f',
+            'https://raw.githubusercontent.com/aws/eks-charts/master/stable/aws-load-balancer-controller/crds/crds.yaml',
         ],
         suppress_failure=lambda stdout, stderr, retcode: 'already exists'
         in stderr,
@@ -849,18 +847,20 @@ class EksKarpenterCluster(BaseEksCluster):
         '--timeout=180s',
     ])
 
-  def DeployIngress(
-      self, name: str, namespace: str, port: int, health_path: str = ''
-  ) -> str:
-    """Deploys only Service + Ingress (without IngressClass) for AWS Load Balancer Controller."""
-    # Apply the custom manifest template (service + ingress with annotations).
-    self.ApplyManifest(
-        'container/karpenter/ingress_alb.yaml.j2',
-        name=name,
-        namespace=namespace,
-        port=port,
-        health_path=health_path,
-    )
+  @property
+  def _ingress_manifest_path(self) -> str:
+    """The path to the ingress manifest template file.
+
+    Has service + ingress with annotations for AWS Load Balancer Controller
+    (without IngressClass).
+
+    Returns:
+      The path to the ingress manifest template file.
+    """
+    return 'container/karpenter/ingress_alb.yaml.j2'
+
+  def _WaitForIngress(self, name: str, namespace: str, port: int) -> str:
+    """Wait for the ingress & apply some additional networking fixes."""
     # Wait until the ingress resource gets an address (hostname or IP).
     self.WaitForResource(
         'ingress',

@@ -106,6 +106,12 @@ flags.DEFINE_string(
     'subnet, given in CDR notation. Not used unless '
     '--gce_subnet_region is given.',
 )
+GCE_EXTRA_NETWORK_INTERFACE_OPTIONS = flags.DEFINE_list(
+    'gce_extra_network_interface_options',
+    [],
+    'Additional options to pass to --network-interface when creating a VM. '
+    'This flag can be specified multiple times.',
+)
 GCE_AVAILABILITY_DOMAIN_COUNT = flags.DEFINE_integer(
     'gce_availability_domain_count',
     0,

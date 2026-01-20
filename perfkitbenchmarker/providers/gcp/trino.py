@@ -3,7 +3,10 @@
 Requies: A container_cluster also initialized by PKB.
 """
 
+import logging
+
 from absl import flags
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
@@ -22,6 +25,7 @@ class Trino(edw_service.EdwService):
     """Initialize the Trino object."""
     super().__init__(edw_service_spec)
     self.name = f'pkb-{FLAGS.run_uri}'
+    self.address: str = ''
 
   def IsUserManaged(self, edw_service_spec):
     """Indicates if the edw service instance is user managed.
@@ -64,6 +68,32 @@ class Trino(edw_service.EdwService):
         FLAGS.kubeconfig,
     ]
     vm_util.IssueCommand(cmd)
+    self.address = self._DeployIngress()
+
+  def _DeployIngress(self) -> str:
+    """Deploy the ingress for the Trino service & returns the address."""
+    port, _, _ = container_service.RunKubectlCommand(
+        [
+            'get',
+            'service',
+            f'{self.name}-trino',
+            '--output',
+            'jsonpath={.spec.ports[0].port}',
+        ],
+    )
+    port = port.strip()
+    assert self.container_cluster is not None
+    address = self.container_cluster.DeployIngress(
+        name='trino-ingress',
+        namespace='default',
+        port=int(port),
+        node_selectors={
+            'app.kubernetes.io/name': 'trino',
+            'app.kubernetes.io/component': 'coordinator',
+        },
+    )
+    logging.info('Trino port exposed at: %s', address)
+    return address
 
   def _Delete(self):
     """Deleting the cluster."""

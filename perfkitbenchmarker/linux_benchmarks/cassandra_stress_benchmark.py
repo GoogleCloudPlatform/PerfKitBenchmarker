@@ -56,7 +56,7 @@ NUM_KEYS_PER_CORE = 2000000
 # Adding wait between prefill and the test workload to give some time
 # for the data to propagate and for the cluster to stabilize.
 PROPAGATION_WAIT_TIME = 720
-WAIT_BETWEEN_COMPACTION_TASKS_CHECK = 720
+WAIT_BETWEEN_COMPACTION_TASKS_CHECK = 300
 
 # cassandra-stress command
 WRITE_COMMAND = 'write'
@@ -158,7 +158,7 @@ CASSANDRA_CLIENT_ZONES = flags.DEFINE_list(
 )
 CASSANDRA_CPU_UTILIZATION_LIMIT = flags.DEFINE_integer(
     'cassandra_cpu_utilization_limit',
-    70,
+    80,
     'Maximum cpu utilization percentage for the benchmark. ',
 )
 CASSANDRA_STRESS_MAX_RUNS = flags.DEFINE_integer(
@@ -265,6 +265,25 @@ flags.DEFINE_string(
     'Only valid if --cassandra_stress_command=user.',
 )
 
+CASSANDRA_COMPACTION_STRATEGY = flags.DEFINE_enum(
+    'cassandra_compaction_strategy',
+    'SizeTieredCompactionStrategy',  # Cassandra default.
+    ['SizeTieredCompactionStrategy', 'LeveledCompactionStrategy'],
+    'Compaction strategy to use for the cassandra server.',
+)
+
+CASSANDRA_CONCURRENT_COMPACTORS = flags.DEFINE_integer(
+    'cassandra_concurrent_compactors',
+    None,
+    'Number of concurrent compactors to use for the cassandra server.',
+)
+
+CASSANDRA_COMPACTION_THROUGHPUT_MB = flags.DEFINE_integer(
+    'cassandra_compaction_throughput_mb',
+    None,
+    'Compaction throughput in MB/sec to use for the cassandra server.',
+)
+
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'cassandra_stress'
@@ -296,7 +315,7 @@ cassandra_stress:
           machine_type: m6i.xlarge
           zone: us-east-1
   flags:
-    cassandra_stress_run_duration: 1m
+    cassandra_stress_run_duration: 10m
     is_row_cache_enabled: false
     cassandra_replication_factor: 3
     cassandra_stress_consistency_level: LOCAL_QUORUM
@@ -352,7 +371,7 @@ MAXIMUM_METRICS = {'latency max'}
 THREAD_INCREMENT_COUNT = 50
 MAX_MEDIAN_LATENCY_MS = 20
 MAX_ACCEPTED_COMPACTION_TIME = 30
-STARTING_THREAD_COUNT = 25
+STARTING_THREAD_COUNT = 1
 SAR_CPU_UTILIZATION_INTERVAL = 10
 
 
@@ -595,6 +614,15 @@ def Prepare(benchmark_spec):
       replication_factor=FLAGS.cassandra_replication_factor,
       is_row_cache_enabled=IS_ROW_CACHE_ENABLED.value,
   )
+  for vm in cassandra_vms:
+    if CASSANDRA_CONCURRENT_COMPACTORS.value:
+      cassandra.UpdateCassandraConcurrentCompactorCount(
+          vm, CASSANDRA_CONCURRENT_COMPACTORS.value
+      )
+    if CASSANDRA_COMPACTION_THROUGHPUT_MB.value:
+      cassandra.UpdateCassandraCompactionThroughput(
+          vm, CASSANDRA_COMPACTION_THROUGHPUT_MB.value
+      )
   PreloadCassandraServer(cassandra_vms, client_vms, metadata)
   WaitForCompactionTasks(cassandra_vms)
 
@@ -644,6 +672,7 @@ class CassandraStressCommandSpec:
   retries: int
   mixed_ratio: Optional[str]
   replication_factor: int
+  compaction_strategy: str
   is_preload: bool = False
 
 
@@ -674,10 +703,12 @@ def GenerateCassandraStressCommand(
     schema_option = ''
   else:
     if command == MIXED_COMMAND:
-      command += f' ratio\({spec.mixed_ratio}\)'
+      command += fr' ratio\({spec.mixed_ratio}\)'
     schema_option = (
-        r'-schema replication\(factor={replication_factor}\)'.format(
-            replication_factor=spec.replication_factor
+        r'-schema replication\(factor={replication_factor}\)'
+        r' compaction\(strategy={compaction_strategy}\)'.format(
+            replication_factor=spec.replication_factor,
+            compaction_strategy=spec.compaction_strategy,
         )
     )
   operations_per_vm = int(math.ceil(float(num_keys) / spec.total_clients))
@@ -784,6 +815,7 @@ def RunCassandraStressOnClient(
       mixed_ratio=FLAGS.cassandra_stress_mixed_ratio,
       replication_factor=FLAGS.cassandra_replication_factor,
       is_preload=is_preload,
+      compaction_strategy=CASSANDRA_COMPACTION_STRATEGY.value,
   )
   client_vm.RobustRemoteCommand(
       GenerateCassandraStressCommand(spec)
@@ -812,7 +844,8 @@ def ParseAverageCpuUtilization(output) -> float:
   per_process_cpu_utilization = re.sub(
       ' +', ' ', average_cpu_utilization[0]
   ).split(' ')
-  return float(per_process_cpu_utilization[2].strip())
+  # 7th element idle percentage, return 100 - idle percentage for utilization.
+  return 100.0 - float(per_process_cpu_utilization[7].strip())
 
 
 def CalculateNumberOfSarRequestsFromDuration(duration, freq):
@@ -996,12 +1029,14 @@ def RunTestNTimes(client_vms, cassandra_vms, metadata):
   max_op_rate_metadata = None
   thread_data = {}
   while (
-      left_thread_count <= right_thread_count
+      left_thread_count < right_thread_count - 1
   ):
     current_thread_count = int((left_thread_count + right_thread_count) / 2)
     # running with both left_left_thread_count and current_thread_count to
     # understand where is the current_thread_count on the curve.
     for threads in [left_thread_count, current_thread_count]:
+      # adding nodetool status to check the ownership of each node.
+      cassandra.GetNodetoolStatus(cassandra_vms)
       if threads in thread_data:
         logging.info('thread count %s already tested', threads)
         continue
@@ -1015,7 +1050,6 @@ def RunTestNTimes(client_vms, cassandra_vms, metadata):
           immutabledict.immutabledict(current_metadata),
           is_preload=False,
       )
-      WaitForCompactionTasks(cassandra_vms)
       current_samples = CollectResults(
           client_vms, current_metadata
       )
@@ -1041,6 +1075,7 @@ def RunTestNTimes(client_vms, cassandra_vms, metadata):
       PerformanceReporting(
           cassandra_vms, thread_data[threads], current_metadata
       )
+      WaitForCompactionTasks(cassandra_vms)
     left_thread_count, right_thread_count = (
         GetNextThreadCount(
             left_thread_count,
@@ -1053,7 +1088,16 @@ def RunTestNTimes(client_vms, cassandra_vms, metadata):
     )
     # TODO(arushigaur) Add a stopping condition that if op rate in the last x
     # tests hasn't changed much then exit the while loop.
-    if max_op_rate < thread_data[current_thread_count]['operation_rate']:
+    # If op rate at the current_thread_count meets latency and cpu utilization
+    # criteria, then record it as the max_op_rate.
+    if (
+        max_op_rate < thread_data[current_thread_count]['operation_rate']
+        and int(thread_data[current_thread_count]['median_latency'])
+        < MAX_MEDIAN_LATENCY_MS
+        and sum(thread_data[current_thread_count]['cpu_utilization'])
+        / len(thread_data[current_thread_count]['cpu_utilization'])
+        < CASSANDRA_CPU_UTILIZATION_LIMIT.value * 1.01
+    ):
       max_op_rate = thread_data[current_thread_count]['operation_rate']
       max_op_rate_metadata = thread_data[current_thread_count]['metadata']
   samples.append(
@@ -1094,7 +1138,7 @@ def GetNextThreadCount(
     right_thread_count: The upper bound of the thread count for the binary
       search.
     thread_data: A dict of thread data containing operation_rate,
-      median_latency and max_cpu_usage.
+      median_latency and average_cpu_usage.
     max_median_latency: The maximum acceptable median latency.
     max_cpu_utilization: The maximum acceptable cpu utilization.
 
@@ -1107,38 +1151,54 @@ def GetNextThreadCount(
   till op rate reaches a max and after that op rate drops while latency and cpu
   keeps increasing.
   """
-  max_cpu_usage = max(thread_data[current_thread_count]['cpu_utilization'])
+  # taking average cpu utilization to consider uneven load across nodes.
+  average_cpu_usage = sum(
+      thread_data[current_thread_count]['cpu_utilization']
+  ) / len(thread_data[current_thread_count]['cpu_utilization'])
   median_latency = int(thread_data[current_thread_count]['median_latency'])
   if (
       median_latency
       >= max_median_latency
-      or max_cpu_usage
-      >= max_cpu_utilization
+      or average_cpu_usage
+      >= max_cpu_utilization*1.01  # cpu utilization within 1% of the limit.
   ):
     # decrease thread count
     logging.info(
         'latency is %s and cpu utilization is %s for %s threads, decreasing'
         ' threads',
         median_latency,
-        max_cpu_usage,
+        average_cpu_usage,
         current_thread_count,
     )
     right_thread_count = current_thread_count
+  elif (
+      thread_data[current_thread_count]['operation_rate']
+      < thread_data[left_thread_count]['operation_rate']
+  ):
+    # move left on the curve because op rate dropped from left to right.
+    right_thread_count = current_thread_count
+    logging.info(
+        'op rate %s is %s and %s is %s, decreasing threads',
+        left_thread_count,
+        thread_data[left_thread_count]['operation_rate'],
+        current_thread_count,
+        thread_data[current_thread_count]['operation_rate'],
+    )
   else:
-    if (
-        thread_data[current_thread_count]['operation_rate']
-        < thread_data[left_thread_count]['operation_rate']
-    ):
-      # move left on the curve because op rate dropped from left to right.
-      right_thread_count = current_thread_count
-    else:
-      # move right on the curve because op rate increased from left to right.
-      left_thread_count = current_thread_count
+    # move right on the curve because op rate increased from left to right.
+    left_thread_count = current_thread_count
+    logging.info(
+        'op rate %s is %s and %s is %s, increasing threads',
+        left_thread_count,
+        thread_data[left_thread_count]['operation_rate'],
+        current_thread_count,
+        thread_data[current_thread_count]['operation_rate'],
+    )
   return int(left_thread_count), int(right_thread_count)
 
 
 @vm_util.Retry(
-    max_retries=10,
+    max_retries=20,
     retryable_exceptions=(
         CassandraCompactionNotCompletedError,
     ),

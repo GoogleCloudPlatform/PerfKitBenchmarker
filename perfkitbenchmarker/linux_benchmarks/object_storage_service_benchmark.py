@@ -713,7 +713,7 @@ def ProcessMultiStreamResults(
   results.append(
       sample.Sample(
           'Multi-stream ' + operation + ' net throughput',
-          np.sum((
+          sum((
               size / active_time * 8
               for size, active_time in zip(
                   total_active_sizes, total_active_times
@@ -726,7 +726,7 @@ def ProcessMultiStreamResults(
   results.append(
       sample.Sample(
           'Multi-stream ' + operation + ' net throughput (with gap)',
-          np.sum((
+          sum((
               size / duration * 8
               for size, duration in zip(total_active_sizes, active_durations)
           )),

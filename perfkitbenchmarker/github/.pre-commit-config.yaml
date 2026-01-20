@@ -1,0 +1,7 @@
+repos:
+  - repo: https://github.com/google/pyink
+    rev: 24.10.1
+    hooks:
+      - id: pyink
+        language_version: python3.12
+        args: [--pyink-indentation=2, --pyink-use-majority-quotes, --unstable, --line-length=80]
