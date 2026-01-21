@@ -320,10 +320,53 @@ class BaseWGServingInferenceServer(
       pod_startup_logs = self.GetInferenceServerLogsFromPod(f'pod/{pod_name}')
       if self.timezone is None:
         self.timezone = self.GetPodTimeZone(pod_name)
+
+      # Collect node / instance metadata (best-effort)
+      startup_metadata = {}
+      node_name = pod_metadata.get('spec', {}).get('nodeName')
+      if node_name:
+        startup_metadata['node_name'] = node_name
+        try:
+          node_metadata = self.cluster.GetResourceMetadataByName(
+              f'node/{node_name}', should_pre_log=False, suppress_logging=True
+          )
+          node_labels = (
+              node_metadata.get('metadata', {}).get('labels', {}) or {}
+          )
+          machine_type = node_labels.get(
+              'node.kubernetes.io/instance-type'
+          ) or node_labels.get('beta.kubernetes.io/instance-type')
+          if machine_type:
+            startup_metadata['node_machine_type'] = machine_type
+          machine_family = node_labels.get(
+              'karpenter.k8s.aws/instance-family'
+          ) or node_labels.get('eks.amazonaws.com/instance-family')
+          if not machine_family and machine_type:
+            # Try different separators: '.' (AWS), '-' (GCP), '_' (Azure)
+            for separator in ['.', '-', '_']:
+              if separator in machine_type:
+                machine_family = machine_type.split(separator, 1)[0]
+                break
+            else:
+              # No separator found, use the whole machine_type
+              machine_family = machine_type
+          if machine_family:
+            startup_metadata['node_machine_family'] = machine_family
+          # Example values: "A100", "H100", "L4", "T4"
+          gpu = node_labels.get('nvidia.com/gpu.product')
+          if gpu:
+            startup_metadata['gpu'] = str(gpu)
+        except (
+            errors.VmUtil.IssueCommandError,
+            yaml.YAMLError,
+        ) as e:  # best-effort only
+          logging.info('Failed to fetch node metadata for %s: %s', node_name, e)
+      else:
+        logging.info('Node name not found in pod metadata for pod %s', pod_name)
       logging.info('Successfully collected metrics for pod %s.', pod_name)
       return PodStartupMetrics(
           pod_name=pod_name,
-          metadata={},
+          metadata=startup_metadata,
           pod_startup_logs=pod_startup_logs,
           pod_created_timestamp=pod_created_timestamp,
           pod_scheduled_timestamp=pod_scheduled_timestamp,
@@ -549,6 +592,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     })
     if self.spec.runtime_class_name:
       metadata['runtime_class_name'] = self.spec.runtime_class_name
+    if FLAGS.cloud == 'AWS':
+      metadata['aws_spot_instances'] = bool(FLAGS.aws_spot_instances)
     return metadata
 
   def GetStorageType(self) -> str:
@@ -596,9 +641,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           self.huggingface_token,
       )
       secret_file_path = vm_util.PrependTempDir('hf_token.secret')
-      storage_service = object_storage_service.GetObjectStorageClass(
-          'GCP'
-      )()
+      storage_service = object_storage_service.GetObjectStorageClass('GCP')()
       storage_service.PrepareService(None)
       storage_service.Copy(self.huggingface_token, secret_file_path)
 
@@ -672,15 +715,16 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
   def _ProvisionGPUNodePool(self):
     """Provisions cloud-specific GPU node pool for inference workloads."""
     if FLAGS.cloud == 'AWS':
+      use_spot = bool(FLAGS.aws_spot_instances)
       self.cluster.ApplyManifest(
           'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
           gpu_nodepool_name='gpu',
           gpu_consolidate_after='1h',
           gpu_consolidation_policy='WhenEmpty',
           karpenter_nodeclass_name='default',  # must exist already
-          gpu_capacity_types=['on-demand'],
+          gpu_capacity_types=['spot'] if use_spot else ['on-demand'],
           gpu_arch=['amd64'],
-          gpu_instance_families=['g6', 'g6e'],
+          gpu_instance_families=['g6', 'p5'],
           gpu_taint_key='nvidia.com/gpu',
       )
     elif FLAGS.cloud == 'Azure':
