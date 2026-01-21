@@ -355,8 +355,11 @@ class BaseWGServingInferenceServer(
           # Example values: "A100", "H100", "L4", "T4"
           gpu = node_labels.get('nvidia.com/gpu.product')
           if gpu:
-            startup_metadata['gpu'] = gpu
-        except Exception as e:  # best-effort only
+            startup_metadata['gpu'] = str(gpu)
+        except (
+            errors.VmUtil.IssueCommandError,
+            yaml.YAMLError,
+        ) as e:  # best-effort only
           logging.info('Failed to fetch node metadata for %s: %s', node_name, e)
       else:
         logging.info('Node name not found in pod metadata for pod %s', pod_name)
@@ -638,9 +641,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           self.huggingface_token,
       )
       secret_file_path = vm_util.PrependTempDir('hf_token.secret')
-      storage_service = object_storage_service.GetObjectStorageClass(
-          'GCP'
-      )()
+      storage_service = object_storage_service.GetObjectStorageClass('GCP')()
       storage_service.PrepareService(None)
       storage_service.Copy(self.huggingface_token, secret_file_path)
 
