@@ -20,7 +20,7 @@ spec:
         command: {{ Command }}
         {%- endif %}
         resources:
-          limits:
+          requests:
             cpu: {{ CpuRequest }}
             memory: {{ MemoryRequest }}
             ephemeral-storage: {{ EphemeralStorageRequest }}
