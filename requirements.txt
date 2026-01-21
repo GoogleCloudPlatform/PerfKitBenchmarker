@@ -23,6 +23,7 @@ numpy>=1.16.5
 packaging
 pandas>=1.1.5
 pint
+pytz
 PyYAML>=5.4.1
 pywinrm
 requests
