@@ -304,6 +304,7 @@ class MetricSpec(NamedTuple):
   sample_name: str
   unit: str
   conversion_func: Any
+  dimension_name: str = None
 
 
 class BaseRelationalDb(resource.BaseResource):

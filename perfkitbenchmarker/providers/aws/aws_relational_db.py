@@ -50,6 +50,32 @@ POSTGRES_SUPPORTED_MAJOR_VERSIONS = [
     '17',
 ]
 
+RDS_COMMON_METRICS = [
+    relational_db.MetricSpec('CPUUtilization', 'cpu_utilization', '%', None),
+    relational_db.MetricSpec('ReadIOPS', 'disk_read_iops', 'iops', None),
+    relational_db.MetricSpec('WriteIOPS', 'disk_write_iops', 'iops', None),
+    relational_db.MetricSpec(
+        'ReadThroughput',
+        'disk_read_throughput',
+        'MB/s',
+        lambda x: x / (1024 * 1024),
+    ),
+    relational_db.MetricSpec(
+        'WriteThroughput',
+        'disk_write_throughput',
+        'MB/s',
+        lambda x: x / (1024 * 1024),
+    ),
+]
+_RDS_ONLY_METRICS = [
+    relational_db.MetricSpec(
+        'FreeStorageSpace',
+        'free_storage_space',
+        'GB',
+        lambda x: x / (1024 * 1024 * 1024),
+    ),
+]
+
 
 def _ConvertDateTimeToUtc(dt):
   """Converts a datetime to UTC. If naive, assumes local time."""
@@ -497,16 +523,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
 
   def _GetMetricsToCollect(self) -> list[relational_db.MetricSpec]:
     """Returns a list of metrics to collect."""
-    # pyformat: disable
-    return [
-        relational_db.MetricSpec('CPUUtilization', 'cpu_utilization', '%', None),
-        relational_db.MetricSpec('ReadIOPS', 'disk_read_iops', 'iops', None),
-        relational_db.MetricSpec('WriteIOPS', 'disk_write_iops', 'iops', None),
-        relational_db.MetricSpec('ReadThroughput', 'disk_read_throughput', 'MB/s', lambda x: x / (1024 * 1024)),
-        relational_db.MetricSpec('WriteThroughput', 'disk_write_throughput', 'MB/s', lambda x: x / (1024 * 1024)),
-        relational_db.MetricSpec('FreeStorageSpace', 'disk_bytes_used', 'GB', lambda x: x / (1024 * 1024 * 1024)),
-    ]
-    # pyformat: enable
+    return RDS_COMMON_METRICS + _RDS_ONLY_METRICS
 
   def _CollectProviderMetric(
       self,

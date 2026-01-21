@@ -13,6 +13,7 @@
 # limitations under the License.
 """Managed relational database provisioning and teardown for AWS Aurora."""
 
+import datetime
 import json
 import time
 from typing import Any
@@ -20,6 +21,8 @@ from typing import Any
 from absl import flags
 from absl import logging
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import relational_db
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_relational_db
@@ -39,6 +42,18 @@ _MAP_ENGINE_TO_DEFAULT_VERSION = {
 _AURORA_ENGINES = [
     sql_engine_utils.AURORA_MYSQL,
     sql_engine_utils.AURORA_POSTGRES,
+]
+
+# Before adding other DBClusterIdentifier metrics, check _CollectProviderMetric
+# to make sure it is supported.
+_AURORA_ONLY_METRICS = [
+    relational_db.MetricSpec(
+        'VolumeBytesUsed',
+        'disk_bytes_used',
+        'GB',
+        lambda x: x / (1024 * 1024 * 1024),
+        'DBClusterIdentifier',
+    ),
 ]
 
 
@@ -71,9 +86,7 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
           'db_high_availability is false, one zone '
           'should be specified.   '
           'db_high_availability: {}  '
-          'zone count: {} '.format(
-              self.spec.high_availability, len(self.zones)
-          )
+          'zone count: {} '.format(self.spec.high_availability, len(self.zones))
       )
 
     # Create the cluster.
@@ -264,3 +277,84 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     metadata = super().GetResourceMetadata()
     metadata['aurora_storage_type'] = self.storage_type
     return metadata
+
+  def _GetMetricsToCollect(self) -> list[relational_db.MetricSpec]:
+    """Returns a list of metrics to collect."""
+    return aws_relational_db.RDS_COMMON_METRICS + _AURORA_ONLY_METRICS
+
+  def _CollectProviderMetric(
+      self,
+      metric: relational_db.MetricSpec,
+      start_time: datetime.datetime,
+      end_time: datetime.datetime,
+      collect_percentiles: bool = False,
+  ) -> list[sample.Sample]:
+    """Collects metrics from AWS CloudWatch."""
+    if metric.dimension_name != 'DBClusterIdentifier':
+      return super()._CollectProviderMetric(
+          metric, start_time, end_time, collect_percentiles
+      )
+
+    logging.info(
+        'Collecting metric %s for cluster %s',
+        metric.provider_name,
+        self.cluster_id,
+    )
+    # Storage metrics are collected with a 12 hour padding to ensure we capture
+    # enough data points.
+    start_time_str = (
+        (start_time - datetime.timedelta(hours=12))
+        .astimezone(datetime.timezone.utc)
+        .strftime(relational_db.METRICS_TIME_FORMAT)
+    )
+    end_time_str = (
+        (end_time + datetime.timedelta(hours=12))
+        .astimezone(datetime.timezone.utc)
+        .strftime(relational_db.METRICS_TIME_FORMAT)
+    )
+    cmd = util.AWS_PREFIX + [
+        'cloudwatch',
+        'get-metric-statistics',
+        '--namespace',
+        'AWS/RDS',
+        '--metric-name',
+        metric.provider_name,
+        '--start-time',
+        start_time_str,
+        '--end-time',
+        end_time_str,
+        '--period',
+        '3600',
+        '--statistics',
+        'Average',
+        '--dimensions',
+        f'Name=DBClusterIdentifier,Value={self.cluster_id}',
+        '--region',
+        self.region,
+    ]
+    try:
+      stdout, _ = util.IssueRetryableCommand(cmd)
+    except errors.VmUtil.IssueCommandError as e:
+      logging.warning(
+          'Could not collect metric %s for cluster %s: %s',
+          metric.provider_name,
+          self.cluster_id,
+          e,
+      )
+      return []
+    response = json.loads(stdout)
+    datapoints = response['Datapoints']
+    if not datapoints:
+      logging.warning('No datapoints for metric %s', metric.provider_name)
+      return []
+
+    points = []
+    for dp in datapoints:
+      value = dp['Average']
+      if metric.conversion_func:
+        value = metric.conversion_func(value)
+      points.append((datetime.datetime.fromtimestamp(dp['Timestamp']), value))
+
+    return self._CreateSamples(
+        points, metric.sample_name, metric.unit, collect_percentiles
+    )
