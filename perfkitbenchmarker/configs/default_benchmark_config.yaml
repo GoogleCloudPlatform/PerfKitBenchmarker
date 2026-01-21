@@ -327,7 +327,7 @@ sparksql_tpcds_1t_tuned:
     hadoop_version: 3.4.2
     openjdk_version: 17
     # TODO(pclay): Update to 4.0.1 and Java 21
-    spark_version: 3.5.7
+    spark_version: 3.5.8
     sparksql_readahead_kb: 1024
   dpb_service:
     service_type: unmanaged_spark_cluster
