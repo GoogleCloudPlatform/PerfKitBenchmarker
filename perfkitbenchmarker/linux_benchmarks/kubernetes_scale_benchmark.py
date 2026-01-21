@@ -90,7 +90,7 @@ def GetConfig(user_config):
 
 
 def _IsEksKarpenterAwsGpu(cluster: container_service.KubernetesCluster) -> bool:
-  return (
+  return bool(
       virtual_machine.GPU_COUNT.value
       and FLAGS.cloud.lower() == 'aws'
       and getattr(cluster, 'CLUSTER_TYPE', None) == 'Karpenter'
@@ -154,6 +154,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   assert bm_spec.container_cluster
   cluster = bm_spec.container_cluster
   assert isinstance(cluster, container_service.KubernetesCluster)
+  cluster: container_service.KubernetesCluster = cluster
 
   # Warm up the cluster by creating a single pod. This compensates for
   # differences between Standard & Autopilot, where Standard already has 1 node
@@ -438,7 +439,7 @@ def GetStatusConditionsForResourceType(
 def ConvertToEpochTime(timestamp: str) -> int:
   """Converts a timestamp to epoch time."""
   # Example: 2024-11-08T23:44:36Z
-  return parser.parse(timestamp).timestamp()
+  return int(parser.parse(timestamp).timestamp())
 
 
 def ParseStatusChanges(
