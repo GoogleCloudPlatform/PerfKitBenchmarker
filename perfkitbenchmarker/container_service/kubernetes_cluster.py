@@ -189,7 +189,7 @@ class KubernetesCluster(
     del name
     node_selectors = self.GetNodeSelectors(machine_type)
     if node_selectors:
-      pod_spec_yaml['nodeSelector'].update(node_selectors)
+      pod_spec_yaml.setdefault('nodeSelector', {}).update(node_selectors)
 
   @property
   def _ingress_manifest_path(self) -> str:

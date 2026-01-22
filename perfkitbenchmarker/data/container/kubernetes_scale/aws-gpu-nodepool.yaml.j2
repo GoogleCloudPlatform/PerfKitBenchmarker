@@ -1,0 +1,38 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: {{ gpu_nodepool_name | default('gpu') }}
+spec:
+  disruption:
+    consolidateAfter: {{ gpu_consolidate_after | default('1m') }}
+    consolidationPolicy: {{ gpu_consolidation_policy | default('WhenEmptyOrUnderutilized') }}
+  limits:
+    cpu: {{ gpu_nodepool_cpu_limit | default(1000) }}
+  template:
+    metadata:
+      labels:
+        pkb_nodepool: {{ gpu_nodepool_label | default('gpu') }}
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: {{ karpenter_ec2nodeclass_name | default('default') }}
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: {{ gpu_arch | default(['amd64']) }}
+        - key: kubernetes.io/os
+          operator: In
+          values: {{ gpu_os | default(['linux']) }}
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: {{ gpu_capacity_types | default(['on-demand']) }}
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: {{ gpu_instance_categories | default(['g']) }}
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values: {{ gpu_instance_families | default(['g6','g6e']) }}
+      taints:
+        - key: {{ gpu_taint_key | default('nvidia.com/gpu') }}
+          effect: NoSchedule

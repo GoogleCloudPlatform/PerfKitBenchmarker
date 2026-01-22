@@ -89,16 +89,48 @@ def GetConfig(user_config):
   return config
 
 
+def _IsEksKarpenterAwsGpu(cluster: container_service.KubernetesCluster) -> bool:
+  return bool(
+      virtual_machine.GPU_COUNT.value
+      and FLAGS.cloud.lower() == 'aws'
+      and getattr(cluster, 'CLUSTER_TYPE', None) == 'Karpenter'
+  )
+
+
+def _EnsureEksKarpenterGpuNodepool(
+    cluster: container_service.KubernetesCluster,
+) -> None:
+  """Ensures a GPU NodePool exists for EKS Karpenter before applying workloads."""
+  if not _IsEksKarpenterAwsGpu(cluster):
+    return
+  cluster.ApplyManifest(
+      'container/kubernetes_scale/aws-gpu-nodepool.yaml.j2',
+      gpu_nodepool_name='gpu',
+      gpu_nodepool_label='gpu',
+      karpenter_ec2nodeclass_name='default',
+      gpu_instance_categories=['g'],
+      gpu_instance_families=['g6', 'g6e'],
+      gpu_capacity_types=['on-demand'],
+      gpu_arch=['amd64'],
+      gpu_os=['linux'],
+      gpu_taint_key='nvidia.com/gpu',
+      gpu_consolidate_after='1m',
+      gpu_consolidation_policy='WhenEmptyOrUnderutilized',
+      gpu_nodepool_cpu_limit=1000,
+  )
+
+
 def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   """Sets additional spec attributes."""
   bm_spec.always_call_cleanup = True
+  assert bm_spec.container_cluster
+  _EnsureEksKarpenterGpuNodepool(bm_spec.container_cluster)
 
 
 def _GetRolloutCreationTime(rollout_name: str) -> int:
   """Returns the time when the rollout was created."""
   out, _, _ = container_service.RunRetryableKubectlCommand([
-      'rollout',
-      'history',
+      'get',
       rollout_name,
       '-o',
       'jsonpath={.metadata.creationTimestamp}',
@@ -122,6 +154,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   assert bm_spec.container_cluster
   cluster = bm_spec.container_cluster
   assert isinstance(cluster, container_service.KubernetesCluster)
+  cluster: container_service.KubernetesCluster = cluster
 
   # Warm up the cluster by creating a single pod. This compensates for
   # differences between Standard & Autopilot, where Standard already has 1 node
@@ -180,8 +213,10 @@ def ScaleUpPods(
   max_wait_time = _GetScaleTimeout()
   resource_timeout = max_wait_time + 60 * 5  # 5 minutes after waiting to avoid
   # pod delete events from polluting data collection.
-  yaml_docs = cluster.ConvertManifestToYamlDicts(
-      MANIFEST_TEMPLATE,
+
+  is_eks_karpenter_aws_gpu = _IsEksKarpenterAwsGpu(cluster)
+
+  manifest_kwargs = dict(
       Name='kubernetes-scaleup',
       Replicas=num_new_pods,
       CpuRequest=CPUS_PER_POD.value,
@@ -192,12 +227,26 @@ def ScaleUpPods(
       EphemeralStorageRequest='10Mi',
       RolloutTimeout=max_wait_time,
       PodTimeout=resource_timeout,
+      Cloud=FLAGS.cloud.lower(),
+      GpuTaintKey=None,
   )
+
+  # GpuTaintKey is still needed for tolerations in the yaml template
+  if is_eks_karpenter_aws_gpu:
+    manifest_kwargs['GpuTaintKey'] = 'nvidia.com/gpu'
+
+  yaml_docs = cluster.ConvertManifestToYamlDicts(
+      MANIFEST_TEMPLATE,
+      **manifest_kwargs,
+  )
+
+  # Use ModifyPodSpecPlacementYaml to add nodeSelectors via GetNodeSelectors()
   cluster.ModifyPodSpecPlacementYaml(
       yaml_docs,
       'kubernetes-scaleup',
       cluster.default_nodepool.machine_type,
   )
+
   resource_names = cluster.ApplyYaml(yaml_docs)
 
   assert resource_names
@@ -366,7 +415,7 @@ def GetStatusConditionsForResourceType(
 def ConvertToEpochTime(timestamp: str) -> int:
   """Converts a timestamp to epoch time."""
   # Example: 2024-11-08T23:44:36Z
-  return parser.parse(timestamp).timestamp()
+  return int(parser.parse(timestamp).timestamp())
 
 
 def ParseStatusChanges(
