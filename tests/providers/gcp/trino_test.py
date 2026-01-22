@@ -51,9 +51,10 @@ class TrinoTest(pkb_common_test_case.PkbCommonTestCase):
     )
     mock_kubernetes.DeployIngress.return_value = '1.0.0.0:12345'
     db.SetContainerCluster(mock_kubernetes)
-    mock_cmd = self.MockIssueCommand(
-        {'get service pkb-123-trino': [('12345', '', 0)]}
-    )
+    mock_cmd = self.MockIssueCommand({
+        'projects list': [('[{"projectNumber": 123}]', '', 0)],
+        'get service pkb-123-trino': [('12345', '', 0)],
+    })
     # Act.
     db._Create()
     # Assert.

@@ -103,6 +103,12 @@ def GetProjectNumber(project_id: str | None = None) -> str:
   return result[0]['projectNumber']
 
 
+def GetDefaultComputeServiceAccount(project_id: str | None = None) -> str:
+  """Gets the default compute service account."""
+  project_number = GetProjectNumber(project_id)
+  return f'{project_number}-compute@developer.gserviceaccount.com'
+
+
 def GetRegionFromZone(zone) -> str:
   """Returns the region name from a fully-qualified zone name.
 

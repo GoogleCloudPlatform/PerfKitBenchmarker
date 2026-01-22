@@ -21,7 +21,7 @@ spec:
           values: {{ gpu_arch | default(['amd64']) }}
         - key: eks.amazonaws.com/instance-family
           operator: In
-          values: {{ gpu_instance_families | default(['g6','g6e']) }}
+          values: {{ gpu_instance_families | default(['g6','p5']) }}
       taints:
         - key: {{ gpu_taint_key | default('nvidia.com/gpu') }}
           effect: NoSchedule

@@ -59,7 +59,8 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(container_service, 'RunKubectlCommand', autospec=True)
     )
     self.config_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        _BENCHMARK_SPEC_YAML)
+        _BENCHMARK_SPEC_YAML
+    )
     self.server = wg_serving_inference_server.WGServingInferenceServer(
         spec=self.config_spec.config.container_cluster.inference_server,
         cluster=self.mock_cluster,
@@ -139,6 +140,85 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_cluster.DeleteResource.assert_called_with(
         'job/test-job', ignore_not_found=True
     )
+
+  @parameterized.parameters(
+      dict(
+          node_labels={
+              'node.kubernetes.io/instance-type': 'g2-standard-8',
+              'nvidia.com/gpu.product': 'L4',
+          },
+          expected_metadata={
+              'node_name': 'test-node',
+              'node_machine_type': 'g2-standard-8',
+              'node_machine_family': 'g2',
+              'gpu': 'L4',
+          },
+          description='GCP',
+      ),
+      dict(
+          node_labels={
+              'node.kubernetes.io/instance-type': 'g6.xlarge',
+              'karpenter.k8s.aws/instance-family': 'g6',
+              'nvidia.com/gpu.product': 'L4',
+          },
+          expected_metadata={
+              'node_name': 'test-node',
+              'node_machine_type': 'g6.xlarge',
+              'node_machine_family': 'g6',
+              'gpu': 'L4',
+          },
+          description='AWS',
+      ),
+      dict(
+          node_labels={
+              'beta.kubernetes.io/instance-type': 'Standard_NC6s_v3',
+              'nvidia.com/gpu.product': 'T4',
+          },
+          expected_metadata={
+              'node_name': 'test-node',
+              'node_machine_type': 'Standard_NC6s_v3',
+              'node_machine_family': 'Standard',
+              'gpu': 'T4',
+          },
+          description='Azure',
+      ),
+  )
+  def testMonitorPodStartupNodeMetadata(
+      self, node_labels, expected_metadata, description
+  ):
+    """Tests node metadata collection in _MonitorPodStartup across clouds."""
+    pod_name = 'test-pod'
+    timestamp = '2024-01-01T00:00:00Z'
+
+    pod_metadata = {
+        'metadata': {'creationTimestamp': timestamp},
+        'spec': {'nodeName': 'test-node'},
+        'status': {
+            'conditions': [
+                {'type': 'PodScheduled', 'lastTransitionTime': timestamp},
+                {'type': 'Ready', 'lastTransitionTime': timestamp},
+            ],
+            'containerStatuses': [{
+                'name': 'inference-server',
+                'state': {'running': {'startedAt': timestamp}},
+            }],
+        },
+    }
+
+    node_metadata = {'metadata': {'labels': node_labels}}
+
+    self.mock_cluster.GetResourceMetadataByName.return_value = node_metadata
+    self.server.GetInferenceServerLogsFromPod = mock.Mock(return_value='logs')
+    self.server.GetPodTimeZone = mock.Mock(return_value='UTC')
+    self.server.timezone = None
+
+    result = self.server._MonitorPodStartup(pod_name, pod_metadata)
+
+    self.assertIsNotNone(result)
+    for key, value in expected_metadata.items():
+      self.assertEqual(
+          result.metadata.get(key), value, f'{description}: {key} mismatch'
+      )
 
 
 if __name__ == '__main__':

@@ -55,7 +55,6 @@ DEFAULT_INSTALL_URL = (
     'https://enterprise.aerospike.com/enterprise/download/server/{}/artifact/{}_{}'
 )
 
-
 # Link could be found here
 # https://aerospike.com/download/#servers
 
@@ -125,6 +124,34 @@ def _GetAerospikeTemplatePath():
       return 'aerospike_enterprise.conf.j2'
 
 
+def _GetInstallUrl(vm):
+  """Returns the default install url for the Aerospike server."""
+  if _CAPTURE_LM_TIMESTAMPS.value:
+    # https://download.aerospike.com/artifacts/aerospike-server-enterprise/8.1.0.2/aerospike-server-enterprise_8.1.0.2_tools-12.0.2_ubuntu24.04_aarch64.tgz
+    # https://download.aerospike.com/artifacts/aerospike-server-enterprise/8.1.0.2/aerospike-server-enterprise_8.1.0.2_tools-12.0.2_ubuntu24.04_x86_64.tgz
+    server_version = '8.1.0.2'
+    tools_version = '12.0.2'
+    distro = 'ubuntu24.04'
+    install_url = (
+        'https://dl.aerospike.com/artifacts/aerospike-server-enterprise/'
+        '{}/'
+        'aerospike-server-enterprise_{}_tools-{}_{}_{}.tgz'
+    )
+    return install_url.format(
+        server_version,
+        server_version,
+        tools_version,
+        distro,
+        'aarch64' if vm.is_aarch64 else 'x86_64',
+    )
+  else:
+    return DEFAULT_INSTALL_URL.format(
+        _AEROSPIKE_ENTERPRISE_VERSION.value,
+        AEROSPIKE_VERSION_NAME_FOR_OS[FLAGS.os_type],
+        'arm64' if vm.is_aarch64 else 'amd64',
+    )
+
+
 def _GetAerospikeDir(idx=None):
   if _AEROSPIKE_EDITION.value == AerospikeEdition.COMNUNITY:
     if idx is None:
@@ -173,16 +200,13 @@ def _InstallFromPackage(vm):
   # https://docs.aerospike.com/server/operations/install/linux/ubuntu
   vm.RemoteCommand(
       'wget -O aerospike.tgz '
-      + DEFAULT_INSTALL_URL.format(
-          _AEROSPIKE_ENTERPRISE_VERSION.value,
-          AEROSPIKE_VERSION_NAME_FOR_OS[FLAGS.os_type],
-          'arm64' if vm.is_aarch64 else 'amd64',
-      )
+      + _GetInstallUrl(vm)
   )
   # Create log directory
   vm.Install('python')
   vm.InstallPackages('dpkg')
-  vm.InstallPackages('netcat')
+  if not _CAPTURE_LM_TIMESTAMPS.value:
+    vm.InstallPackages('netcat')
   vm.RemoteCommand('sudo mkdir -p /var/log/aerospike')
 
   vm.RemoteCommand('mkdir -p aerospike')

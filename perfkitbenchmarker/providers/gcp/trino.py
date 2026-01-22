@@ -4,15 +4,19 @@ Requies: A container_cluster also initialized by PKB.
 """
 
 import logging
+from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.container_service import kubectl
+from perfkitbenchmarker.providers.gcp import util
 
 
 FLAGS = flags.FLAGS
+_TRINO_CHART = 'container/trino.yaml.j2'
 
 
 class Trino(edw_service.EdwService):
@@ -26,6 +30,7 @@ class Trino(edw_service.EdwService):
     super().__init__(edw_service_spec)
     self.name = f'pkb-{FLAGS.run_uri}'
     self.address: str = ''
+    self.project: str = FLAGS.project
 
   def IsUserManaged(self, edw_service_spec):
     """Indicates if the edw service instance is user managed.
@@ -41,8 +46,33 @@ class Trino(edw_service.EdwService):
     # cluster_identifier value to None with config_overrides.
     return False
 
+  def _WriteConfigYaml(self) -> str:
+    """Writes the config yaml for the Trino cluster."""
+    contents = vm_util.ReadAndRenderJinja2Template(
+        _TRINO_CHART,
+        **{
+            'num_workers': self.node_count,
+            'hive_uri': self.endpoint,
+            'project': self.project,
+        },
+    )
+    yaml_dicts = vm_util.ReadYamlAsDicts(contents)
+    yaml_dict: dict[str, Any] = yaml_dicts[0]
+    # TODO(howellz): Add support for memory.
+    return vm_util.WriteYaml([yaml_dict], should_log_file=True)
+
   def _Create(self):
     """Resuming the cluster."""
+    service_account = util.GetDefaultComputeServiceAccount(self.project)
+    cmd = [
+        'annotate',
+        'serviceaccount',
+        'default',
+        '--namespace',
+        'default',
+        f'iam.gke.io/gcp-service-account={service_account}',
+    ]
+    kubectl.RunKubectlCommand(cmd)
     cmd = [
         'helm',
         'repo',
@@ -50,13 +80,8 @@ class Trino(edw_service.EdwService):
         'trino',
         'https://trinodb.github.io/charts',
     ]
-    yaml_config = {
-        'server': {
-            'workers': self.node_count,
-        }
-    }
-    filename = vm_util.WriteYaml([yaml_config])
     vm_util.IssueCommand(cmd)
+    filename = self._WriteConfigYaml()
     cmd = [
         'helm',
         'install',
@@ -94,6 +119,15 @@ class Trino(edw_service.EdwService):
     )
     logging.info('Trino port exposed at: %s', address)
     return address
+
+  def _Exists(self):
+    """Checks if Trino exists (or at least if its pods do)."""
+    assert self.container_cluster
+    self.container_cluster.WaitForRollout(
+        f'deployment.apps/{self.name}-trino-worker',
+        timeout=60 * 5,
+    )
+    return True
 
   def _Delete(self):
     """Deleting the cluster."""
