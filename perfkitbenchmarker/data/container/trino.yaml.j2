@@ -1,0 +1,90 @@
+image:
+  tag: "479"
+server:
+  config:
+    query:
+      maxMemory: "8000GB"
+  workers: {{ num_workers }}
+coordinator:
+  jvm:
+    maxHeapSize: "104G"
+    additionalJVMConfig: |
+      -Xms104G
+  readinessProbe:
+    initialDelaySeconds: 120
+  livenessProbe:
+    initialDelaySeconds: 120
+worker:
+  nodeSelector:
+      cloud.google.com/compute-class: Performance
+  config:
+    query:
+      maxMemoryPerNode: "60GB"
+  jvm:
+    maxHeapSize: "95G"
+  resources:
+    requests:
+      memory: 110Gi
+      ephemeral-storage: 100Gi
+    limits:
+      ephemeral-storage: 100Gi
+
+additionalConfigProperties:
+  - query.max-writer-task-count=600
+  - retry-policy=QUERY
+  - fault-tolerant-execution.exchange-encryption-enabled=false
+  - exchange.deduplication-buffer-size=512MB
+
+resourceGroups:
+  type: configmap
+  resourceGroupsConfig: |-
+    {
+      "rootGroups": [
+        {
+          "name": "global",
+          "softMemoryLimit": "100%",
+          "hardConcurrencyLimit": 100,
+          "maxQueued": 1000,
+          "schedulingPolicy": "weighted",
+          "jmxExport": true,
+          "subGroups": [
+            {
+              "name": "admin",
+              "softMemoryLimit": "100%",
+              "hardConcurrencyLimit": 100,
+              "maxQueued": 100,
+              "schedulingWeight": 10
+            },
+            {
+              "name": "users",
+              "softMemoryLimit": "100%",
+              "hardConcurrencyLimit": 100,
+              "maxQueued": 100,
+              "schedulingWeight": 10
+            }
+          ]
+        }
+      ],
+      "selectors": [
+        {
+          "user": ".*",
+          "group": "global.users"
+        }
+      ],
+      "cpuQuotaPeriod": "1h"
+    }
+
+catalogs:
+  dpms: |-
+    connector.name=iceberg
+    hive.metastore.uri={{ hive_uri }}
+    fs.native-gcs.enabled=true
+    gcs.project-id={{ project }}
+    gcs.auth-type=APPLICATION_DEFAULT
+    iceberg.register-table-procedure.enabled=true
+    iceberg.add-files-procedure.enabled=true
+    iceberg.max-partitions-per-writer=1000
+    fs.memory-cache.max-size=1GB
+    fs.cache.enabled=true
+    fs.cache.directories=/tmp/trino-cache
+    fs.cache.max-sizes=50GB
