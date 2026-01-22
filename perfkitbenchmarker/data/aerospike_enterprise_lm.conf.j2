@@ -82,7 +82,9 @@ namespace test {
   # running with disable-odirect true could lead to more extensive data loss
   # since it disabled odirect for all IO.
   {% else %}
-  storage-engine memory
+  storage-engine memory {
+    data-size 450G
+  }
   {% endif %}
 }
 

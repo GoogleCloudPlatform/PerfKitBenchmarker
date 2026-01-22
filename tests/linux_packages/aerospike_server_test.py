@@ -73,6 +73,53 @@ class AerospikeServerTest(unittest.TestCase):
         ),
     ])
 
+  @flagsaver.flagsaver(
+      aerospike_instances=1,
+      os_type='ubuntu2004',
+      capture_live_migration_timestamps=True,
+  )
+  def testInstallFromPackageWithLmTimestamps(self):
+    aerospike_server._InstallFromPackage(self.vm)
+    self.vm.DownloadPreprovisionedData.assert_called_once()
+    self.vm.RemoteCommand.assert_has_calls([
+        mock.call(
+            'wget -O aerospike.tgz '
+            'https://dl.aerospike.com/artifacts/aerospike-server-enterprise/8.1.0.2/'
+            'aerospike-server-enterprise_8.1.0.2_tools-12.0.2_ubuntu24.04_x86_64.tgz'
+        ),
+        mock.call('sudo mkdir -p /var/log/aerospike'),
+        mock.call('mkdir -p aerospike'),
+        mock.call('tar -xvf aerospike.tgz -C aerospike --strip-components=1'),
+        mock.call('cd ./aerospike && sudo ./asinstall'),
+        mock.call(
+            'sudo mv ./aerospike/features.conf /etc/aerospike/features.conf'
+        ),
+    ])
+
+  @flagsaver.flagsaver(
+      aerospike_instances=1,
+      os_type='ubuntu2004',
+      capture_live_migration_timestamps=True,
+  )
+  def testInstallFromPackageWithLmTimestampsArm64(self):
+    self.vm.is_aarch64 = True
+    aerospike_server._InstallFromPackage(self.vm)
+    self.vm.DownloadPreprovisionedData.assert_called_once()
+    self.vm.RemoteCommand.assert_has_calls([
+        mock.call(
+            'wget -O aerospike.tgz https://dl.aerospike.com/artifacts/'
+            'aerospike-server-enterprise/8.1.0.2/'
+            'aerospike-server-enterprise_8.1.0.2_tools-12.0.2_ubuntu24.04_aarch64.tgz'
+        ),
+        mock.call('sudo mkdir -p /var/log/aerospike'),
+        mock.call('mkdir -p aerospike'),
+        mock.call('tar -xvf aerospike.tgz -C aerospike --strip-components=1'),
+        mock.call('cd ./aerospike && sudo ./asinstall'),
+        mock.call(
+            'sudo mv ./aerospike/features.conf /etc/aerospike/features.conf'
+        ),
+    ])
+
 
 if __name__ == '__main__':
   unittest.main()
