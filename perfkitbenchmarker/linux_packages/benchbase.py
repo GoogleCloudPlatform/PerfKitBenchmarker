@@ -227,6 +227,7 @@ def ParseResults(
     errors.Benchmarks.RunError: If the result file is not found or cannot be
       parsed.
   """
+  metadata['benchbase_use_foreign_key'] = _BENCHBASE_USE_FOREIGN_KEY.value
   stdout, _ = vm.RemoteCommand(
       f'ls -t {BENCHBASE_DIR}/results/tpcc*summary.json | head -n 1'
   )
