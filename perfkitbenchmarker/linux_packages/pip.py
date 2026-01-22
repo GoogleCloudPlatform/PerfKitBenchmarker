@@ -77,6 +77,7 @@ def _DownloadAndInstallPip(vm):
   def GetPipWithRetries():
     vm.RemoteCommand(
         f'curl {get_pip_url} -o get_pip.py && sudo python3 get_pip.py'
+        ' --ignore-installed'
     )
 
   GetPipWithRetries()

@@ -13,7 +13,7 @@ NEED_PIP_37 = [
     'sudo rm -f /usr/lib/python3*/EXTERNALLY-MANAGED',
     (
         'curl https://bootstrap.pypa.io/pip/3.7/get-pip.py -o get_pip.py && '
-        'sudo python3 get_pip.py'
+        'sudo python3 get_pip.py --ignore-installed'
     ),
     'sudo pip --version',
     'sudo pip3 --version',
@@ -22,7 +22,7 @@ NEED_PIP_38 = [
     'sudo rm -f /usr/lib/python3*/EXTERNALLY-MANAGED',
     (
         'curl https://bootstrap.pypa.io/pip/get-pip.py -o get_pip.py && '
-        'sudo python3 get_pip.py'
+        'sudo python3 get_pip.py --ignore-installed'
     ),
     'sudo pip --version',
     'sudo pip3 --version',
