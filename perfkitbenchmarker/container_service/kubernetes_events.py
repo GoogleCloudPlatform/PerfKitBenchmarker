@@ -98,6 +98,45 @@ class KubernetesEventPoller:
       self.polled_events.add(self.event_queue.get())
     return self.polled_events
 
+  def GetAndLogFailureEvents(self) -> dict[str | None, list['KubernetesEvent']]:
+    """Returns failure events by reason."""
+    k8s_events = self.GetEvents()
+    failure_events_list: list[KubernetesEvent] = [
+        event for event in k8s_events if event.type != 'Normal'
+    ]
+    logging.info(
+        'There were %d possible failure events. Some of these are benign & the'
+        ' benchmark may still have passed. Printing these by event reason.',
+        len(failure_events_list),
+    )
+    failure_events_by_reason: dict[str | None, list[KubernetesEvent]] = {}
+    for event in failure_events_list:
+      failure_events_by_reason.setdefault(event.reason, []).append(event)
+    for reason, failure_events in failure_events_by_reason.items():
+      logging.info(
+          'There were %d failure events for reason %s. Printing the last 20.',
+          len(failure_events),
+          reason,
+      )
+      for event in failure_events[-20:]:
+        logging.info('Printing failure event: %s', event)
+    return failure_events_by_reason
+
+  def CheckForQuotaFailure(
+      self, failure_events_by_reason: dict[str | None, list['KubernetesEvent']]
+  ) -> None:
+    """Raises a quota failure if one is detected."""
+    if 'FailedScaleUp' in failure_events_by_reason:
+      for event in failure_events_by_reason['FailedScaleUp']:
+        if (
+            'quota exceeded' in event.message
+            or 'out of resources' in event.message
+        ):
+          raise errors.Benchmarks.QuotaFailure(
+              'At least one resource %s/%s ran into a quota error: %s'
+              % (event.resource.kind, event.resource.name, event.message)
+          )
+
 
 @dataclasses.dataclass(eq=True, frozen=True)
 class KubernetesEventResource:

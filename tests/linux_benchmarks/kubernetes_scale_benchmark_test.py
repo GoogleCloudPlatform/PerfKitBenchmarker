@@ -315,7 +315,9 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresPassesWithCorrectNumberOfPods(self):
-    self.cluster.GetEvents.return_value = []
+    self.cluster.event_poller = container_service.KubernetesEventPoller(
+        set
+    )
     kubernetes_scale_benchmark._CheckForFailures(
         self.cluster,
         [
@@ -327,18 +329,20 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresThrowsRegularError(self):
-    self.cluster.GetEvents.return_value = [
-        container_service.KubernetesEvent(
-            reason='PodReady',
-            message='Pod is ready',
-            resource=container_service.KubernetesEventResource(
-                name='pod',
-                kind='Pod',
-            ),
-            type='Normal',
-            timestamp=100,
-        )
-    ]
+    self.cluster.event_poller = container_service.KubernetesEventPoller(
+        lambda: {
+            container_service.KubernetesEvent(
+                reason='PodReady',
+                message='Pod is ready',
+                resource=container_service.KubernetesEventResource(
+                    name='pod',
+                    kind='Pod',
+                ),
+                type='Normal',
+                timestamp=100,
+            )
+        }
+    )
     with self.assertRaises(errors.Benchmarks.RunError):
       kubernetes_scale_benchmark._CheckForFailures(
           self.cluster,
@@ -350,22 +354,24 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresThrowsQuotaExceeded(self):
-    self.cluster.GetEvents.return_value = [
-        container_service.KubernetesEvent(
-            reason='FailedScaleUp',
-            message=(
-                'Node scale up in zones us-west1-b associated with this pod'
-                ' failed: GCE quota exceeded. Pod is at risk of not being'
-                ' scheduled.'
-            ),
-            resource=container_service.KubernetesEventResource(
-                name='pod',
-                kind='Pod',
-            ),
-            type='Warning',
-            timestamp=100,
-        )
-    ]
+    self.cluster.event_poller = container_service.KubernetesEventPoller(
+        lambda: {
+            container_service.KubernetesEvent(
+                reason='FailedScaleUp',
+                message=(
+                    'Node scale up in zones us-west1-b associated with this pod'
+                    ' failed: GCE quota exceeded. Pod is at risk of not being'
+                    ' scheduled.'
+                ),
+                resource=container_service.KubernetesEventResource(
+                    name='pod',
+                    kind='Pod',
+                ),
+                type='Warning',
+                timestamp=100,
+            )
+        }
+    )
     with self.assertRaises(errors.Benchmarks.QuotaFailure):
       kubernetes_scale_benchmark._CheckForFailures(
           self.cluster,

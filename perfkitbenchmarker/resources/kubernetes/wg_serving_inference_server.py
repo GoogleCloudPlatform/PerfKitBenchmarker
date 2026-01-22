@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Module for Kubernetes wg-serving Inference Server resource."""
+
 from __future__ import annotations
 import base64
 import collections
@@ -1054,43 +1055,9 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           timeout=self.spec.deployment_timeout,
       )
     except errors.VmUtil.IssueCommandError as e:
-      pods = self.cluster.GetResourceMetadataByName(
-          'pods',
-          f'app={self.app_selector}',
-          output_format='name',
-          output_formatter=lambda res: res.splitlines(),
-      )
-      events = self.cluster.GetEvents()
-      quota_failure = False
-      for pod in pods:
-        pod_name = pod.split('/')[1]
-        status_cmd = [
-            'get',
-            'pod',
-            pod.split('/')[1],
-            '-o',
-            'jsonpath={.status.phase}',
-        ]
-        status, _, _ = container_service.RunKubectlCommand(status_cmd)
-        if 'Pending' not in status:
-          continue
-        for event in events:
-          if (
-              event.resource.kind == 'Pod'
-              and event.resource.name == pod_name
-              and 'GCE out of resources' in event.message
-          ):
-            quota_failure = True
-            break
-      if 'timed out waiting for the condition' in str(e) and quota_failure:
-        raise errors.Benchmarks.QuotaFailure(
-            f'TIMED OUT: Deployment {deployment_name} did not become available'
-            f' within {self.spec.deployment_timeout} seconds. This can be due'
-            ' to issues like resource exhaustion, but can also be due to image'
-            f' pull errors, or pod scheduling problems. Original error: {e}'
-        ) from e
-      else:
-        raise e
+      failure_events = self.cluster.event_poller.GetAndLogFailureEvents()
+      self.cluster.event_poller.CheckForQuotaFailure(failure_events)
+      raise e
 
   def _ApplyGCSFusePVC(self):
     """Apply the PV & PVC to the environment."""
