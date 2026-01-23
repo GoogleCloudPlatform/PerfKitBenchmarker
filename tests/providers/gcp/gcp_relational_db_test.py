@@ -22,6 +22,7 @@ import json
 import os
 import unittest
 from absl import flags
+from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3 import types
 import mock
 from perfkitbenchmarker import disk
@@ -353,8 +354,8 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     mock_client.list_time_series.return_value = mock_response.time_series
     self.enter_context(
         mock.patch.object(
-            db,
-            '_GetMonitoringClient',
+            monitoring_v3,
+            'MetricServiceClient',
             return_value=mock_client,
         )
     )

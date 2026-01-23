@@ -21,7 +21,6 @@ See https://cloud.google.com/sdk/gcloud/reference/beta/sql/instances/create
 for more information.
 """
 
-
 import datetime
 import json
 import logging
@@ -29,7 +28,6 @@ import time
 
 from absl import flags
 from google.cloud import monitoring_v3
-from google.cloud.monitoring_v3 import types
 from perfkitbenchmarker import data
 from perfkitbenchmarker import mysql_iaas_relational_db
 from perfkitbenchmarker import omni_postgres_iaas_relational_db
@@ -656,20 +654,34 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
     metrics = _DEFAULT_METRICS
     if self.engine_type == sql_engine_utils.SQLSERVER:
       metrics += _SQLSERVER_METRICS
-    final_metrics = [
-        relational_db.MetricSpec(
-            f'{_METRIC_PREFIX}/{metric_name}',
-            _GetMetricSampleName(f'{_METRIC_PREFIX}/{metric_name}'),
-            unit,
-            conversion_func,
-        )
-        for metric_name, unit, conversion_func in metrics
-    ]
+    resource_filter = (
+        'resource.type="cloudsql_database" AND'
+        f' resource.labels.database_id="{self.project}:{self.instance_id}"'
+    )
+    final_metrics = []
+    for metric_name, unit, conversion_func in metrics:
+      is_delta = str(metric_name).endswith('_ops_count') or str(
+          metric_name
+      ).endswith('_bytes_count')
+      aligner = (
+          monitoring_v3.Aggregation.Aligner.ALIGN_RATE
+          if is_delta
+          else monitoring_v3.Aggregation.Aligner.ALIGN_MEAN
+      )
+      final_metrics.append(
+          util.GcpMetricSpec(
+              provider_name=f'{_METRIC_PREFIX}/{metric_name}',
+              sample_name=_GetMetricSampleName(
+                  f'{_METRIC_PREFIX}/{metric_name}'
+              ),
+              unit=unit,
+              conversion_func=conversion_func,
+              resource_filter=resource_filter,
+              project=self.project,
+              aligner=aligner,
+          )
+      )
     return final_metrics
-
-  def _GetMonitoringClient(self):
-    """Returns a MetricServiceClient."""
-    return monitoring_v3.MetricServiceClient()
 
   def _CollectProviderMetric(
       self,
@@ -679,50 +691,12 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       collect_percentiles: bool = False,
   ) -> list[sample.Sample]:
     """Collects time series metrics from Google Cloud Monitoring."""
-    client = self._GetMonitoringClient()
-    metric_name = metric.provider_name
-    is_delta = metric_name.endswith('_ops_count') or metric_name.endswith(
-        '_bytes_count'
+    assert isinstance(metric, util.GcpMetricSpec)
+    points = util.GetTimeSeries(
+        metric,
+        start_time,
+        end_time,
     )
-    aligner = (
-        monitoring_v3.Aggregation.Aligner.ALIGN_RATE
-        if is_delta
-        else monitoring_v3.Aggregation.Aligner.ALIGN_MEAN
-    )
-    results = client.list_time_series(
-        types.ListTimeSeriesRequest(
-            name=f'projects/{self.project}',
-            filter=(
-                'resource.type="cloudsql_database" AND'
-                f' resource.labels.database_id="{self.project}:{self.instance_id}"'
-                f' AND metric.type="{metric_name}"'
-            ),
-            interval=types.TimeInterval(
-                start_time=start_time.astimezone(datetime.timezone.utc),
-                end_time=end_time.astimezone(datetime.timezone.utc),
-            ),
-            aggregation=monitoring_v3.Aggregation(
-                alignment_period={'seconds': 60},
-                per_series_aligner=aligner,
-            ),
-        )
-    )
-    time_series = list(results)
-    if not time_series or not time_series[0].points:
-      logging.warning(
-          'No points in time series for %s. Results: %s', metric_name, results
-      )
-      return []
-    points = []
-    for point in time_series[0].points:
-      value = point.value
-      if value.int64_value:
-        value = float(value.int64_value)
-      else:
-        value = float(value.double_value)
-      if metric.conversion_func:
-        value = metric.conversion_func(value)
-      points.append((point.interval.start_time, value))
     return self._CreateSamples(
         points, metric.sample_name, metric.unit, collect_percentiles=True
     )

@@ -14,14 +14,20 @@
 """Utilities for working with Google Cloud Platform resources."""
 
 import collections
+import dataclasses
+import datetime
 import functools
 import json
 import logging
 import re
 from typing import Any, Set
+
 from absl import flags
+from google.cloud import monitoring_v3
+from google.cloud.monitoring_v3 import types
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
@@ -65,7 +71,7 @@ STOCKOUT_MESSAGE = (
 
 @vm_util.Retry(
     max_retries=3,
-    retryable_exceptions=(errors.VmUtil.IssueCommandError, KeyError)
+    retryable_exceptions=(errors.VmUtil.IssueCommandError, KeyError),
 )
 @functools.lru_cache()
 def GetDefaultProject():
@@ -447,7 +453,7 @@ _QUOTA_EXCEEDED_REGEX = re.compile(
 _NOT_ENOUGH_RESOURCES_ERROR_SNIPPETS = (
     'does not have enough resources available to fulfill the request.',
     'ZONE_RESOURCE_POOL_EXHAUSTED',
-    'ERROR_STOCKOUT'
+    'ERROR_STOCKOUT',
 )
 _NOT_ENOUGH_RESOURCES_MESSAGE = 'Creation failed due to not enough resources: '
 
@@ -623,6 +629,76 @@ def GetAccessToken(application_default: bool = True) -> str:
   cmd.append('print-access-token')
   stdout, _, _ = vm_util.IssueCommand(cmd)
   return stdout.strip()
+
+
+@dataclasses.dataclass
+class GcpMetricSpec(relational_db.MetricSpec):
+  """Metric spec for GCP Cloud Monitoring.
+
+  Attributes:
+    resource_filter: The filter for the resource to query.
+    project: The project to query.
+    aligner: The aligner to use for the metric.
+  """
+  resource_filter: str
+  project: str
+  aligner: Any = monitoring_v3.Aggregation.Aligner.ALIGN_MEAN
+
+
+def GetTimeSeries(
+    metric: GcpMetricSpec,
+    start_time: datetime.datetime,
+    end_time: datetime.datetime,
+) -> list[tuple[datetime.datetime, float]]:
+  """Collects time series metrics from Google Cloud Monitoring.
+
+  Args:
+    metric: The metric to query.
+    start_time: The start time of the query.
+    end_time: The end time of the query.
+
+  Returns:
+    A list of (timestamp, value) tuples.
+  """
+  client = monitoring_v3.MetricServiceClient()
+  query_filter = (
+      f'{metric.resource_filter} AND metric.type="{metric.provider_name}"'
+  )
+  results = client.list_time_series(
+      types.ListTimeSeriesRequest(
+          name=f'projects/{metric.project}',
+          filter=query_filter,
+          interval=types.TimeInterval(
+              start_time=start_time.astimezone(datetime.timezone.utc),
+              end_time=end_time.astimezone(datetime.timezone.utc),
+          ),
+          aggregation=monitoring_v3.Aggregation(
+              alignment_period={'seconds': 60},
+              per_series_aligner=metric.aligner,
+          ),
+      )
+  )
+  logging.info('Monitoring API results: %s', results)
+  time_series = list(results)
+  if not time_series or not time_series[0].points:
+    logging.warning(
+        'No points in time series for %s. Results: %s',
+        metric.provider_name,
+        results,
+    )
+    return []
+
+  points = []
+  for point in time_series[0].points:
+    value = point.value
+    if value.int64_value:
+      value = float(value.int64_value)
+    else:
+      value = float(value.double_value)
+    if metric.conversion_func:
+      value = metric.conversion_func(value)
+    points.append((point.interval.start_time, value))
+  return points
 
 
 def SetupPrivateServicesAccess(network: str, project: str) -> None:

@@ -4,6 +4,7 @@ AlloyDb is currently a postgres engine GCP supporting to achieve better
 performance with postgres.
 """
 
+import datetime
 import json
 import logging
 from typing import Any, Dict, List, Tuple
@@ -13,6 +14,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.providers.gcp import util
 import requests
 
@@ -101,6 +103,40 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
           'Default engine not specified for engine {}'.format(engine)
       )
     return DEFAULT_ENGINE_VERSION
+
+  def _GetMetricsToCollect(self) -> list[relational_db.MetricSpec]:
+    return [
+        util.GcpMetricSpec(
+            provider_name='alloydb.googleapis.com/cluster/storage/usage',
+            sample_name='disk_bytes_used',
+            unit='GB',
+            conversion_func=lambda x: x / (1024 * 1024 * 1024),
+            project=self.project,
+            resource_filter=(
+                'resource.type="alloydb.googleapis.com/Cluster" AND'
+                f' resource.labels.cluster_id="{self.cluster_id}"'
+                f' AND resource.labels.resource_container="{self.project}"'
+                f' AND resource.labels.location="{self.region}"'
+            ),
+        )
+    ]
+
+  def _CollectProviderMetric(
+      self,
+      metric: relational_db.MetricSpec,
+      start_time: datetime.datetime,
+      end_time: datetime.datetime,
+      collect_percentiles: bool = False,
+  ) -> list[sample.Sample]:
+    assert isinstance(metric, util.GcpMetricSpec)
+    points = util.GetTimeSeries(
+        metric,
+        start_time,
+        end_time,
+    )
+    return self._CreateSamples(
+        points, metric.sample_name, metric.unit, collect_percentiles
+    )
 
   def GetResourceMetadata(self) -> Dict[str, Any]:
     metadata = super().GetResourceMetadata()

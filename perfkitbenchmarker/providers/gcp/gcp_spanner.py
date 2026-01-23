@@ -33,6 +33,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -281,6 +282,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
   CLOUD = 'GCP'
   IS_MANAGED = True
   REQUIRED_ATTRS = ['CLOUD', 'IS_MANAGED', 'ENGINE']
+  METRICS_COLLECTION_DELAY_SECONDS = CPU_API_DELAY_SECONDS
 
   def __init__(self, db_spec: SpannerSpec, **kwargs):
     super().__init__(db_spec, **kwargs)
@@ -585,6 +587,40 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     if _MAX_COMMIT_DELAY.value:
       metadata['gcp_spanner_max_commit_delay'] = _MAX_COMMIT_DELAY.value
     return metadata
+
+  def _GetMetricsToCollect(self) -> list[relational_db.MetricSpec]:
+    return [
+        util.GcpMetricSpec(
+            provider_name='spanner.googleapis.com/instance/storage/used_bytes',
+            sample_name='disk_bytes_used',
+            unit='GB',
+            conversion_func=lambda x: x / (1024 * 1024 * 1024),
+            project=self.project,
+            resource_filter=(
+                'resource.type="spanner_instance" AND'
+                f' resource.labels.instance_id="{self.instance_id}" AND'
+                f' resource.labels.project_id="{self.project}" AND'
+                ' metric.labels.storage_class="ssd"'
+            ),
+        )
+    ]
+
+  def _CollectProviderMetric(
+      self,
+      metric: relational_db.MetricSpec,
+      start_time: datetime.datetime,
+      end_time: datetime.datetime,
+      collect_percentiles: bool = False,
+  ) -> list[sample.Sample]:
+    assert isinstance(metric, util.GcpMetricSpec)
+    points = util.GetTimeSeries(
+        metric,
+        start_time,
+        end_time,
+    )
+    return self._CreateSamples(
+        points, metric.sample_name, metric.unit, collect_percentiles
+    )
 
   def GetAverageCpuUsage(
       self, duration_minutes: int, end_time: datetime.datetime

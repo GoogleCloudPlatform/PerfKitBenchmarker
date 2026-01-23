@@ -1,11 +1,14 @@
 """Tests for google3.third_party.py.perfkitbenchmarker.providers.gcp.gcp_spanner."""
 
+import datetime
 import inspect
 import unittest
 
 from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
+from google.cloud import monitoring_v3
+from google.cloud.monitoring_v3 import types
 import mock
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import vm_util
@@ -240,6 +243,58 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
 
     # Assert
     self.assertEqual(expected_qps, actual_qps)
+
+  def testCollectMetrics(self):
+    test_instance = GetTestSpannerInstance()
+    test_instance.project = 'test_project'
+    test_instance.instance_id = 'pkb-instance-test_uri'
+
+    mock_response = types.ListTimeSeriesResponse(
+        time_series=[{
+            'metric': {
+                'type': 'spanner.googleapis.com/instance/storage/used_bytes'
+            },
+            'points': [
+                {
+                    'interval': {
+                        'start_time': {'seconds': 1764103200, 'nanos': 0},
+                        'end_time': {'seconds': 1764103200, 'nanos': 0},
+                    },
+                    'value': {'int64_value': 2 * 1024**3},
+                },
+                {
+                    'interval': {
+                        'start_time': {'seconds': 1764103260, 'nanos': 0},
+                        'end_time': {'seconds': 1764103260, 'nanos': 0},
+                    },
+                    'value': {'int64_value': 4 * 1024**3},
+                },
+            ],
+        }]
+    )
+    mock_client = mock.MagicMock()
+    mock_client.list_time_series.return_value = mock_response.time_series
+
+    self.enter_context(
+        mock.patch.object(
+            monitoring_v3,
+            'MetricServiceClient',
+            return_value=mock_client,
+        )
+    )
+
+    start_time = datetime.datetime(2025, 11, 26, 10, 0, 0)
+    end_time = datetime.datetime(2025, 11, 26, 10, 1, 0)
+    samples = test_instance.CollectMetrics(start_time, end_time)
+
+    size_avg = next(s for s in samples if s.metric == 'disk_bytes_used_average')
+    size_min = next(s for s in samples if s.metric == 'disk_bytes_used_min')
+    size_max = next(s for s in samples if s.metric == 'disk_bytes_used_max')
+
+    self.assertEqual(size_avg.value, 3)
+    self.assertEqual(size_avg.unit, 'GB')
+    self.assertEqual(size_min.value, 2)
+    self.assertEqual(size_max.value, 4)
 
 
 class CreateTest(pkb_common_test_case.PkbCommonTestCase):
