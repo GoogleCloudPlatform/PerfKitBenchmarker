@@ -14,6 +14,11 @@ time_based
 {%- if filename is not none %}
 filename={{filename}}
 {%- endif %}
+{%- if filename_format is not none %}
+filename_format={{filename_format}}
+allow_file_create=0
+openfiles=1000
+{%- endif %}
 nr_files={{nr_files}}
 do_verify=0
 verify_fatal=0

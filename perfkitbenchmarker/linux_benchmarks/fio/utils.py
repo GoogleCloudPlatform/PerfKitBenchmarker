@@ -34,6 +34,7 @@ from perfkitbenchmarker.linux_benchmarks.fio import result_parser
 FLAGS = flags.FLAGS
 
 _FILENAME_PREFIX = 'fill-device'
+_MAX_OPEN_FILES = 1000
 
 
 def AgainstDevice():
@@ -56,20 +57,9 @@ def GetFilename(disks, device_path=None):
     A string containing the filename or colon-separated filenames for fio.
   """
   if AgainstDevice():
-    filename = device_path or ':'.join(
-        [disk.GetDevicePath() for disk in disks]
-    )
-  elif not FillTarget():
-    filename = None
+    filename = device_path or ':'.join([disk.GetDevicePath() for disk in disks])
   else:
-    # Since we pass --directory to fio, we must use relative file
-    # paths or get an error.
-    # TODO(andytzhu): Support multiple numjobs.
-    filename_base = f'{_FILENAME_PREFIX}.0'
-    filenames = []
-    for filenum in range(fio_flags.FIO_NR_FILES.value):
-      filenames.append(f'{filename_base}.{filenum}')
-    filename = ':'.join(filenames)
+    filename = None
 
   return filename
 
@@ -144,6 +134,10 @@ def GenerateJobFile(
       default_fio_job_file, undefined=jinja2.StrictUndefined
   )
   filename = GetFilename(disks, device_path=device_path)
+  filename_format = None
+  # Reads many existing files.
+  if FillTarget() or not AgainstDevice():
+    filename_format = f'{_FILENAME_PREFIX}.$jobnum.$filenum'
   disks_list = [{'index': 0}]
   if fio_flags.FIO_SEPARATE_JOBS_FOR_DISKS.value:
     disks_list = SeparateJobsForDisks(GetAllDiskPaths(disks))
@@ -157,6 +151,7 @@ def GenerateJobFile(
       disks_list=disks_list,
       nr_files=fio_flags.FIO_NR_FILES.value,
       filename=filename,
+      filename_format=filename_format,
       separate_jobs=fio_flags.FIO_SEPARATE_JOBS_FOR_DISKS.value,
       extra_params=benchmark_params,
   )
@@ -208,6 +203,9 @@ def FillDevice(
       f'--nrfiles={fio_flags.FIO_NR_FILES.value} --fallocate=none '
       '--create_on_open=1'
   )
+  if fio_flags.FIO_NR_FILES.value > _MAX_OPEN_FILES:
+    command += ' --openfiles=1000'
+
   vm.RobustRemoteCommand(command)
   # Clear the OS page cache
   vm.RobustRemoteCommand('sudo sh -c "echo 3 > /proc/sys/vm/drop_caches"')
