@@ -393,6 +393,22 @@ class AzureVirtualNetwork(network.BaseNetwork):
       self.address_index += 1
       return next_address_space
 
+  def UpdateAddressSpace(self) -> None:
+    """Adds an address space to the virtual network."""
+    vm_util.IssueRetryableCommand(
+        [
+            azure.AZURE_PATH,
+            'network',
+            'vnet',
+            'update',
+            '--name',
+            self.name,
+            '--address-prefixes',
+        ]
+        + self.address_spaces
+        + self.resource_group.args
+    )
+
   def Create(self):
     """Creates the virtual network."""
     with self.vnet_lock:
@@ -450,7 +466,15 @@ class AzureVirtualNetwork(network.BaseNetwork):
 class AzureSubnet(resource.BaseResource):
   """Object representing an Azure Subnet."""
 
-  def __init__(self, vnet, name):
+  def __init__(self, vnet, name, delegations=None):
+    """Initializes AzureSubnet.
+
+    Args:
+      vnet: The AzureVirtualNetwork object.
+      name: The name of the subnet.
+      delegations: String of space-separated list of services to whom subnet is
+        delegated.
+    """
     super().__init__()
     if azure_flags.AZURE_SUBNET_ID.value:
       # use pre-existing subnet
@@ -466,6 +490,7 @@ class AzureSubnet(resource.BaseResource):
       self.resource_group = GetResourceGroup()
       self.vnet = vnet
       self.name = name
+      self.delegations = delegations
       self.args = ['--subnet', self.name]
 
       self.address_space = ''
@@ -475,6 +500,9 @@ class AzureSubnet(resource.BaseResource):
         self.vnet.address_spaces.append(self.address_space)
 
   def _Create(self):
+    delegations = []
+    if self.delegations:
+      delegations = ['--delegations', self.delegations]
     stdout, _, _ = vm_util.IssueCommand(
         [
             azure.AZURE_PATH,
@@ -490,6 +518,7 @@ class AzureSubnet(resource.BaseResource):
             self.name,
         ]
         + self.resource_group.args
+        + delegations
     )
     self.id = json.loads(stdout)['id']
 
