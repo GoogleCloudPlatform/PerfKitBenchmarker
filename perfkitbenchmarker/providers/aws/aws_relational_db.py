@@ -13,6 +13,7 @@
 # limitations under the License.
 """Managed relational database provisioning and teardown for AWS RDS."""
 
+import dataclasses
 import datetime
 import json
 import logging
@@ -50,17 +51,39 @@ POSTGRES_SUPPORTED_MAJOR_VERSIONS = [
     '17',
 ]
 
+
+@dataclasses.dataclass
+class AwsMetricSpec(relational_db.MetricSpec):
+  """Metric specification for AWS RDS.
+
+  Attributes:
+    time_period: The granularity, in seconds, of metrics to retrieve from
+      CloudWatch.
+    time_period_padding: The padding to add to the start and end times when
+      collecting metrics from CloudWatch. This is to adjust the query window to
+      account for potential delays in metric reporting or aggregation, ensuring
+      that data points around the boundaries are included.
+    dimensions: A dictionary of CloudWatch dimensions used to filter metrics for
+      a specific resource, such as DBInstanceIdentifier.
+  """
+  time_period: int = 60
+  time_period_padding: datetime.timedelta = datetime.timedelta(seconds=0)
+  dimensions: dict[str, str] = dataclasses.field(
+      default_factory=lambda: {'DBInstanceIdentifier': ''}
+  )
+
+
 RDS_COMMON_METRICS = [
-    relational_db.MetricSpec('CPUUtilization', 'cpu_utilization', '%', None),
-    relational_db.MetricSpec('ReadIOPS', 'disk_read_iops', 'iops', None),
-    relational_db.MetricSpec('WriteIOPS', 'disk_write_iops', 'iops', None),
-    relational_db.MetricSpec(
+    AwsMetricSpec('CPUUtilization', 'cpu_utilization', '%', None),
+    AwsMetricSpec('ReadIOPS', 'disk_read_iops', 'iops', None),
+    AwsMetricSpec('WriteIOPS', 'disk_write_iops', 'iops', None),
+    AwsMetricSpec(
         'ReadThroughput',
         'disk_read_throughput',
         'MB/s',
         lambda x: x / (1024 * 1024),
     ),
-    relational_db.MetricSpec(
+    AwsMetricSpec(
         'WriteThroughput',
         'disk_write_throughput',
         'MB/s',
@@ -68,7 +91,7 @@ RDS_COMMON_METRICS = [
     ),
 ]
 _RDS_ONLY_METRICS = [
-    relational_db.MetricSpec(
+    AwsMetricSpec(
         'FreeStorageSpace',
         'free_storage_space',
         'GB',
@@ -523,7 +546,10 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
 
   def _GetMetricsToCollect(self) -> list[relational_db.MetricSpec]:
     """Returns a list of metrics to collect."""
-    return RDS_COMMON_METRICS + _RDS_ONLY_METRICS
+    metrics = RDS_COMMON_METRICS + _RDS_ONLY_METRICS
+    for metric in metrics:
+      metric.dimensions['DBInstanceIdentifier'] = self.instance_id
+    return metrics
 
   def _CollectProviderMetric(
       self,
@@ -533,17 +559,23 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
       collect_percentiles: bool = False,
   ) -> list[sample.Sample]:
     """Collects metrics from AWS CloudWatch."""
+    assert isinstance(metric, AwsMetricSpec)
     logging.info(
         'Collecting metric %s for instance %s',
         metric.provider_name,
         self.instance_id,
     )
-    start_time_str = start_time.astimezone(datetime.timezone.utc).strftime(
-        relational_db.METRICS_TIME_FORMAT
+    start_time_str = (
+        (start_time - metric.time_period_padding)
+        .astimezone(datetime.timezone.utc)
+        .strftime(relational_db.METRICS_TIME_FORMAT)
     )
-    end_time_str = end_time.astimezone(datetime.timezone.utc).strftime(
-        relational_db.METRICS_TIME_FORMAT
+    end_time_str = (
+        (end_time + metric.time_period_padding)
+        .astimezone(datetime.timezone.utc)
+        .strftime(relational_db.METRICS_TIME_FORMAT)
     )
+    dimensions = [f'Name={n},Value={v}' for n, v in metric.dimensions.items()]
     cmd = util.AWS_PREFIX + [
         'cloudwatch',
         'get-metric-statistics',
@@ -556,11 +588,11 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
         '--end-time',
         end_time_str,
         '--period',
-        '60',
+        str(metric.time_period),
         '--statistics',
         'Average',  # RDS metrics are at 1 minute granularity
         '--dimensions',
-        f'Name=DBInstanceIdentifier,Value={self.instance_id}',
+        ' '.join(dimensions),
         '--region',
         self.region,
     ]

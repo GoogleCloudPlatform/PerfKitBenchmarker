@@ -18,11 +18,12 @@ This is the base implementation of all relational db.
 """
 
 import abc
+import dataclasses
 import datetime
 import logging
 import statistics
 import time
-from typing import Any, NamedTuple
+from typing import Any
 
 from absl import flags
 import numpy as np
@@ -299,12 +300,12 @@ def VmsToBoot(vm_groups):
   }
 
 
-class MetricSpec(NamedTuple):
+@dataclasses.dataclass
+class MetricSpec:
   provider_name: str
   sample_name: str
   unit: str
   conversion_func: Any
-  dimension_name: str = None
 
 
 class BaseRelationalDb(resource.BaseResource):

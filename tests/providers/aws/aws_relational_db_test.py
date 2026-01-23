@@ -478,7 +478,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
             },
         ]
     }
-    self.enter_context(
+    mock_issue_retryable_command = self.enter_context(
         mock.patch.object(
             aws_relational_db.util,
             'IssueRetryableCommand',
@@ -489,6 +489,14 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     start_time = datetime.datetime(2025, 11, 26, 10, 0, 0)
     end_time = datetime.datetime(2025, 11, 26, 10, 1, 0)
     samples = db.CollectMetrics(start_time, end_time)
+
+    for call in mock_issue_retryable_command.call_args_list:
+      cmd = call[0][0]
+      dimensions_flag_index = cmd.index('--dimensions')
+      self.assertIn(
+          'Name=DBInstanceIdentifier,Value=pkb-db-instance-123',
+          cmd[dimensions_flag_index + 1],
+      )
 
     # Spot check a few sample values
     sample_names = [s.metric for s in samples]
@@ -508,6 +516,22 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     cpu_max = next(s for s in samples if s.metric == 'cpu_utilization_max')
     self.assertEqual(cpu_max.value, 20.0)
     self.assertEqual(cpu_max.unit, '%')
+
+  def testAuroraMetricsHaveCorrectDimensions(self):
+    db = self.CreateAuroraDbFromSpec()
+    db.instance_id = 'pkb-db-instance-123'
+    db.cluster_id = 'pkb-db-cluster-123'
+    metrics = db._GetMetricsToCollect()
+    self.assertNotEmpty(metrics)
+    for metric in metrics:
+      if 'DBClusterIdentifier' in metric.dimensions:
+        self.assertEqual(
+            'pkb-db-cluster-123', metric.dimensions['DBClusterIdentifier']
+        )
+      elif 'DBInstanceIdentifier' in metric.dimensions:
+        self.assertEqual(
+            'pkb-db-instance-123', metric.dimensions['DBInstanceIdentifier']
+        )
 
 
 if __name__ == '__main__':
