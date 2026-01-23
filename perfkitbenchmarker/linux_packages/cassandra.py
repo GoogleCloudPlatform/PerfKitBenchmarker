@@ -150,7 +150,7 @@ def Configure(vm, seed_vms, custom_cassandra_conf=None):
       'num_cpus': vm.NumCpusForBenchmark(),
       'cluster_name': 'Test cluster',
       'datacenter': 'datacenter',
-      'rack': vm.zone,
+      'rack': vm.name,
   }
   context.update(custom_cassandra_conf)
   logging.info('cassandra yaml context: %s', context)
