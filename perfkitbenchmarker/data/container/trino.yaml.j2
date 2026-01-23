@@ -3,7 +3,7 @@ image:
 server:
   config:
     query:
-      maxMemory: "8000GB"
+      maxMemory: "20000GB"
   workers: {{ num_workers }}
 coordinator:
   jvm:
@@ -15,19 +15,17 @@ coordinator:
   livenessProbe:
     initialDelaySeconds: 120
 worker:
-  nodeSelector:
-      cloud.google.com/compute-class: Performance
   config:
     query:
-      maxMemoryPerNode: "60GB"
+      maxMemoryPerNode: "120GB"
   jvm:
-    maxHeapSize: "95G"
+    maxHeapSize: "195G"
   resources:
     requests:
-      memory: 110Gi
-      ephemeral-storage: 100Gi
+      memory: 210Gi
+      ephemeral-storage: 200Gi
     limits:
-      ephemeral-storage: 100Gi
+      ephemeral-storage: 200Gi
 
 additionalConfigProperties:
   - query.max-writer-task-count=600
@@ -87,4 +85,4 @@ catalogs:
     fs.memory-cache.max-size=1GB
     fs.cache.enabled=true
     fs.cache.directories=/tmp/trino-cache
-    fs.cache.max-sizes=50GB
+    fs.cache.max-sizes=100GB
