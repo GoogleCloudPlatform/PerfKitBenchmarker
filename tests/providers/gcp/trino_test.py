@@ -36,7 +36,7 @@ class TrinoTest(pkb_common_test_case.PkbCommonTestCase):
     db = trino.Trino(EDW_SERVICE_SPEC)
     self.assertEqual(db.name, 'pkb-123')
 
-  def testCreate(self):
+  def testCreateSetsAddress(self):
     # Arrange.
     self.enter_context(
         mock.patch.object(
@@ -49,7 +49,7 @@ class TrinoTest(pkb_common_test_case.PkbCommonTestCase):
     mock_kubernetes = mock.create_autospec(
         container_service.KubernetesCluster, instance=True
     )
-    mock_kubernetes.DeployIngress.return_value = '1.0.0.0:12345'
+    mock_kubernetes.DeployIngress.return_value = 'http://1.0.0.0:12345'
     db.SetContainerCluster(mock_kubernetes)
     mock_cmd = self.MockIssueCommand({
         'projects list': [('[{"projectNumber": 123}]', '', 0)],
@@ -77,7 +77,10 @@ class TrinoTest(pkb_common_test_case.PkbCommonTestCase):
             'kube1',
         ]),
     ])
-    self.assertEqual(db.address, '1.0.0.0:12345')
+    self.assertEqual(db.address, 'http://1.0.0.0:12345')
+    self.assertEqual(db.client_interface.hostname, '1.0.0.0')
+    self.assertEqual(db.client_interface.port, 12345)
+    self.assertEqual(db.client_interface.http_scheme, trino.HttpScheme.HTTP)
 
 
 if __name__ == '__main__':

@@ -3,8 +3,13 @@
 Requies: A container_cluster also initialized by PKB.
 """
 
+import copy
+import enum
+import json
 import logging
+import os
 from typing import Any
+import urllib.parse
 
 from absl import flags
 from perfkitbenchmarker import container_service
@@ -16,14 +21,118 @@ from perfkitbenchmarker.providers.gcp import util
 
 
 FLAGS = flags.FLAGS
+
+
+class HttpScheme(enum.Enum):
+  HTTP = 'http'
+  HTTPS = 'https'
+
+
+_TRINO_CATALOG = flags.DEFINE_string(
+    'trino_catalog', 'dpms', 'Catalog for Trino.'
+)
+_TRINO_SCHEMA = flags.DEFINE_string(
+    'trino_schema', 'imt_tpcds_10t', 'Trino schema to use.'
+)
+
+_TRINO_PYTHON_CLIENT_FILE = 'trino_python_driver.py'
+_TRINO_PYTHON_CLIENT_DIR = 'edw/trino/clients/python'
 _TRINO_CHART = 'container/trino.yaml.j2'
 
 
+class TrinoClientInterface(edw_service.EdwClientInterface):
+  """Python Client Interface class for Trino."""
+
+  def __init__(
+      self,
+      catalog: str,
+      schema: str,
+  ):
+    super().__init__()
+    self.catalog: str = catalog
+    self.schema: str = schema
+    self.hostname: str | None = None
+    self.port: int | None = None
+    self.http_scheme: HttpScheme = HttpScheme.HTTP
+
+  def Prepare(self, package_name: str) -> None:
+    """Prepares the client vm to execute query."""
+    # Install dependencies for driver
+    self.client_vm.Install('pip')
+    self.client_vm.RemoteCommand(
+        'sudo apt-get -qq update && DEBIAN_FRONTEND=noninteractive sudo apt-get'
+        ' -qq install python3.12-venv'
+    )
+    self.client_vm.RemoteCommand('python3 -m venv .venv')
+    self.client_vm.RemoteCommand(
+        'source .venv/bin/activate && pip install trino absl-py'
+    )
+
+    # Push driver script to client vm
+    self.client_vm.PushDataFile(
+        os.path.join(_TRINO_PYTHON_CLIENT_DIR, _TRINO_PYTHON_CLIENT_FILE)
+    )
+    self.client_vm.PushDataFile(
+        os.path.join(
+            edw_service.EDW_PYTHON_DRIVER_LIB_DIR,
+            edw_service.EDW_PYTHON_DRIVER_LIB_FILE,
+        )
+    )
+
+  def _RunClientCommand(self, command: str, additional_args: list[str]) -> str:
+    """Runs a command on the python client."""
+    cmd_parts = [
+        f'.venv/bin/python {_TRINO_PYTHON_CLIENT_FILE}',
+        command,
+        f'--hostname {self.hostname}',
+        f'--port {self.port}',
+        f'--catalog {self.catalog}',
+        f'--schema {self.schema}',
+        f'--http_scheme {self.http_scheme.value}',
+    ]
+    cmd_parts.extend(additional_args)
+    cmd = ' '.join(cmd_parts)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
+    return stdout
+
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
+    """Executes a query and returns performance details."""
+    args = [f'--query_file {query_name}']
+    if print_results:
+      args.append('--print_results')
+    stdout = self._RunClientCommand('single', args)
+    results = json.loads(stdout)
+    details = copy.copy(self.GetMetadata())
+    details.update(results['details'])
+    return results['query_wall_time_in_secs'], details
+
+  def ExecuteThroughput(
+      self,
+      concurrency_streams: list[list[str]],
+      labels: dict[str, str] | None = None,
+  ) -> str:
+    """Executes queries simultaneously on client and return performance details."""
+    del labels  # Currently not supported by trino python api
+    args = [f"--query_streams='{json.dumps(concurrency_streams)}'"]
+    return self._RunClientCommand('throughput', args)
+
+  def GetMetadata(self) -> dict[str, str]:
+    return {
+        'client': 'python',
+        'trino_catalog': self.catalog,
+        'trino_schema': self.schema,
+    }
+
+
+# TODO(howellz): Move this from GCP -> resources/ as it is not GCP specific.
 class Trino(edw_service.EdwService):
   """Object representing a Trino cluster."""
 
   CLOUD = provider_info.GCP
   SERVICE_TYPE = 'trino'
+  QUERY_SET = 'trino'
 
   def __init__(self, edw_service_spec):
     """Initialize the Trino object."""
@@ -31,6 +140,11 @@ class Trino(edw_service.EdwService):
     self.name = f'pkb-{FLAGS.run_uri}'
     self.address: str = ''
     self.project: str = FLAGS.project
+
+    self.client_interface: TrinoClientInterface = TrinoClientInterface(
+        catalog=_TRINO_CATALOG.value,
+        schema=_TRINO_SCHEMA.value,
+    )
 
   def IsUserManaged(self, edw_service_spec):
     """Indicates if the edw service instance is user managed.
@@ -62,7 +176,11 @@ class Trino(edw_service.EdwService):
     return vm_util.WriteYaml([yaml_dict], should_log_file=True)
 
   def _Create(self):
-    """Resuming the cluster."""
+    """Creates the Trino cluster on GKE.
+
+    Side effects:
+      Sets the client interface hostname and port to the deployed ingress.
+    """
     service_account = util.GetDefaultComputeServiceAccount(self.project)
     cmd = [
         'annotate',
@@ -93,10 +211,14 @@ class Trino(edw_service.EdwService):
         FLAGS.kubeconfig,
     ]
     vm_util.IssueCommand(cmd)
-    self.address = self._DeployIngress()
+    self._DeployIngress()
 
-  def _DeployIngress(self) -> str:
-    """Deploy the ingress for the Trino service & returns the address."""
+  def _DeployIngress(self):
+    """Deploy the ingress for the Trino service & saves the address.
+
+    Side effects:
+      Sets the client interface hostname and port to the deployed ingress.
+    """
     port, _, _ = container_service.RunKubectlCommand(
         [
             'get',
@@ -118,7 +240,13 @@ class Trino(edw_service.EdwService):
         },
     )
     logging.info('Trino port exposed at: %s', address)
-    return address
+    # Parse full address (eg http://12.0.0.0:8080) into pieces.
+    self.address = address
+    parsed_address = urllib.parse.urlparse(address)
+    assert parsed_address.scheme, f'Invalid address had no scheme: {address}'
+    self.client_interface.http_scheme = HttpScheme(parsed_address.scheme)
+    self.client_interface.hostname = parsed_address.hostname
+    self.client_interface.port = parsed_address.port
 
   def _Exists(self):
     """Checks if Trino exists (or at least if its pods do)."""
@@ -139,6 +267,12 @@ class Trino(edw_service.EdwService):
         FLAGS.kubeconfig,
     ]
     vm_util.IssueCommand(cmd)
+
+  def GetMetadata(self):
+    """Returns the metadata for the Trino service."""
+    metadata = super().GetMetadata()
+    metadata.update(self.client_interface.GetMetadata())
+    return metadata
 
   def ExtractDataset(
       self, dest_bucket, dataset=None, tables=None, dest_format='CSV'
@@ -183,7 +317,7 @@ class Trino(edw_service.EdwService):
       source_bucket: Name of the bucket to load the data from. Should already
         exist. Each table must have its own subfolder in the bucket named after
         the table, containing one or more csv files that make up the table data.
-      tables: List of table names to load.
+      tables: list of table names to load.
       dataset: Optional name of the dataset. If none, will be determined by the
         service.
     """
