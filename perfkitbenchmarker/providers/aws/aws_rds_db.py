@@ -102,10 +102,7 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
 
     # RDS does not support IOPS/throughput for GP3 disks under 400GB for
     # certain engines.
-    if (
-        self.spec.db_disk_spec.disk_type == aws_disk.IO1
-        or self.spec.db_disk_spec.disk_type == aws_disk.GP3
-    ) and not (
+    if not (
         self.spec.engine
         in [
             sql_engine_utils.MARIADB,
