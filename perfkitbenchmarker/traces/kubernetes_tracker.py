@@ -22,6 +22,7 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import events
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
+from perfkitbenchmarker.container_service import kubernetes_commands
 
 
 CLUSTER_TIME_METRIC = "cluster/usage/cluster_time"
@@ -196,7 +197,7 @@ def _GetInitialNodeDetails(
     cluster: container_service.KubernetesCluster, start_time: float
 ) -> dict[str, _NodeTracker]:
   result: dict[str, _NodeTracker] = {}
-  for name in cluster.GetNodeNames():
+  for name in kubernetes_commands.GetNodeNames():
     result[name] = _NodeTracker(
         name=name,
         machine_type=_GetMachineTypeFromNodeName(cluster, name),

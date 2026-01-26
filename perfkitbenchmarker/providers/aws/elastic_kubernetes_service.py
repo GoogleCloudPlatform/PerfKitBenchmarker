@@ -33,6 +33,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import flags as aws_flags
@@ -316,7 +317,7 @@ class BaseEksCluster(container_service.KubernetesCluster):
   def _WaitForIngress(self, name: str, namespace: str, port: int) -> str:
     """Waits for an Ingress resource to be deployed to the cluster."""
     del port
-    self.WaitForResource(
+    kubernetes_commands.WaitForResource(
         'ingress',
         container_service.INGRESS_JSONPATH,
         namespace=namespace,
@@ -579,7 +580,7 @@ class EksAutoCluster(BaseEksCluster):
     """Performs post-creation steps for the cluster."""
     super()._PostCreate()
     if self.use_spot:
-      self.ApplyManifest(
+      kubernetes_commands.ApplyManifest(
           'container/auto/nodepool.yaml.j2',
           CLUSTER_NAME=self.name,
       )
@@ -860,7 +861,7 @@ class EksKarpenterCluster(BaseEksCluster):
   def _WaitForIngress(self, name: str, namespace: str, port: int) -> str:
     """Wait for the ingress & apply some additional networking fixes."""
     # Wait until the ingress resource gets an address (hostname or IP).
-    self.WaitForResource(
+    kubernetes_commands.WaitForResource(
         'ingress',
         container_service.INGRESS_JSONPATH,
         namespace=namespace,
@@ -1057,7 +1058,7 @@ class EksKarpenterCluster(BaseEksCluster):
         'v'
         + full_version.strip().strip('"').split(f'{self.cluster_version}-v')[1]
     )
-    self.ApplyManifest(
+    kubernetes_commands.ApplyManifest(
         'container/karpenter/nodepool.yaml.j2',
         CLUSTER_NAME=self.name,
         ALIAS_VERSION=alias_version,
@@ -1317,7 +1318,7 @@ class EksKarpenterCluster(BaseEksCluster):
     return [item['metadata']['name'] for item in nodepools.get('items', [])]
 
   def AddNodepool(self, batch_name, pool_id):
-    self.ApplyManifest(
+    kubernetes_commands.ApplyManifest(
         'provision_node_pools/karpenter/nodepool.yaml.j2',
         batch_name=batch_name,
         pool_id=pool_id,

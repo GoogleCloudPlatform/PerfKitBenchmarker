@@ -29,6 +29,7 @@ from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.resources import kubernetes_inference_server
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server_spec
 import yaml
@@ -177,7 +178,7 @@ class BaseWGServingInferenceServer(
       raise ValueError('app_selector is not set.')
     self.deployment_metadata = next((
         deployment
-        for deployment in self.cluster.GetResourceMetadataByName(
+        for deployment in kubernetes_commands.GetResourceMetadataByName(
             'deployments',
             f'app={self.app_selector}',
             should_pre_log=False,
@@ -204,7 +205,7 @@ class BaseWGServingInferenceServer(
     )
 
     try:
-      service_metadata = self.cluster.GetResourceMetadataByName(
+      service_metadata = kubernetes_commands.GetResourceMetadataByName(
           f'service/{self.service_name}'
       )
       if not service_metadata:
@@ -262,10 +263,10 @@ class BaseWGServingInferenceServer(
           for condition in pod_metadata.get('status', {}).get('conditions', [])
       ):
         logging.info('Waiting for pod %s to be Ready.', pod_name)
-        self.cluster.WaitForResource(
+        kubernetes_commands.WaitForResource(
             f'pod/{pod_name}', 'Ready', timeout=self.spec.deployment_timeout
         )
-        pod_metadata = self.cluster.GetResourceMetadataByName(
+        pod_metadata = kubernetes_commands.GetResourceMetadataByName(
             f'pod/{pod_name}', should_pre_log=False, suppress_logging=True
         )
 
@@ -328,7 +329,7 @@ class BaseWGServingInferenceServer(
       if node_name:
         startup_metadata['node_name'] = node_name
         try:
-          node_metadata = self.cluster.GetResourceMetadataByName(
+          node_metadata = kubernetes_commands.GetResourceMetadataByName(
               f'node/{node_name}', should_pre_log=False, suppress_logging=True
           )
           node_labels = (
@@ -391,7 +392,7 @@ class BaseWGServingInferenceServer(
           'Pod monitoring is not supported for this inference server. Make sure'
           ' that the inference server is not remote or user-managed.'
       )
-    pod_list_metadata = self.cluster.GetResourceMetadataByName(
+    pod_list_metadata = kubernetes_commands.GetResourceMetadataByName(
         'pods',
         f'app={self.app_selector}',
         should_pre_log=False,
@@ -652,7 +653,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         secret_file.truncate()
 
     created_resources = list(
-        self.cluster.ApplyManifest(
+        kubernetes_commands.ApplyManifest(
             'container/kubernetes_ai_inference/huggingface_token_secret.yaml.j2',
             encode_token=base64.b64encode(
                 self.huggingface_token.encode('utf-8')
@@ -676,7 +677,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         **self.spec.extra_deployment_args,
     }
     created_resources = list(
-        self.cluster.ApplyManifest(
+        kubernetes_commands.ApplyManifest(
             'container/kubernetes_ai_inference/serving_catalog_cli.yaml.j2',
             image_repo=FLAG_IMAGE_REPO.value,
             wg_serving_repo_url=WG_SERVING_REPO_URL.value,
@@ -690,10 +691,12 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     job_resource = next(it for it in created_resources if it.startswith('job'))
     _, job_name = job_resource.split('/', maxsplit=1)
     try:
-      pod_name = self.cluster.RetryableGetPodNameFromJob(job_name)
+      pod_name = kubernetes_commands.RetryableGetPodNameFromJob(job_name)
 
-      self.cluster.WaitForResource(f'pod/{pod_name}', 'Ready', timeout=600)
-      inference_server_manifest = self.cluster.GetFileContentFromPod(
+      kubernetes_commands.WaitForResource(
+          f'pod/{pod_name}', 'Ready', timeout=600
+      )
+      inference_server_manifest = kubernetes_commands.GetFileContentFromPod(
           pod_name, _OUTPUT_PATH
       )
 
@@ -711,7 +714,9 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       logging.info('Cleaned up manifest generation job %s', job_name)
       return inference_server_manifest
     finally:
-      self.cluster.DeleteResource(f'job/{job_name}', ignore_not_found=True)
+      kubernetes_commands.DeleteResource(
+          f'job/{job_name}', ignore_not_found=True
+      )
 
   def _ProvisionGPUNodePool(self):
     """Provisions cloud-specific GPU node pool for inference workloads."""
@@ -861,7 +866,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     last_transition = None
     while not stop_event.is_set():
       try:
-        hpa = self.cluster.GetResourceMetadataByName(
+        hpa = kubernetes_commands.GetResourceMetadataByName(
             self.hpa_name, should_pre_log=False, suppress_logging=True
         )
 
@@ -917,7 +922,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
     try:
       adapter_resources = list(
-          self.cluster.ApplyManifest(
+          kubernetes_commands.ApplyManifest(
               'container/kubernetes_ai_inference/custom-metrics-stackdriver-adapter.yaml'
           )
       )
@@ -925,7 +930,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       for deployment in filter(
           lambda it: str(it).startswith('deployment'), adapter_resources
       ):
-        self.cluster.WaitForResource(
+        kubernetes_commands.WaitForResource(
             f'{deployment}',
             'available',
             namespace='custom-metrics',
@@ -938,10 +943,10 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       )
       raise e
 
-    self.cluster.DeleteResource(self.hpa_name, ignore_not_found=True)
+    kubernetes_commands.DeleteResource(self.hpa_name, ignore_not_found=True)
     try:
       created_resources = list(
-          self.cluster.ApplyManifest(
+          kubernetes_commands.ApplyManifest(
               'container/kubernetes_ai_inference/hpa.custom_metric.yaml.j2',
               hpa_min_replicas=self.spec.hpa_min_replicas,
               hpa_max_replicas=self.spec.hpa_max_replicas,
@@ -957,7 +962,9 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           lambda it: str(it).startswith('horizontalpodautoscaler.autoscaling'),
           created_resources,
       ):
-        self.cluster.WaitForResource(f'{hpa}', 'ScalingActive', timeout=60)
+        kubernetes_commands.WaitForResource(
+            f'{hpa}', 'ScalingActive', timeout=60
+        )
 
       if not self._hpa_poller_executor:
         self._hpa_poller_executor = concurrent.futures.ThreadPoolExecutor(
@@ -1043,13 +1050,13 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       f.write(inference_server_manifest)
       f.flush()
       created_resources = list(
-          self.cluster.ApplyManifest(f.name, should_log_file=False)
+          kubernetes_commands.ApplyManifest(f.name, should_log_file=False)
       )
       self.created_resources.extend(created_resources)
 
     deployment_name = self.deployment_metadata['metadata']['name']
     try:
-      self.cluster.WaitForResource(
+      kubernetes_commands.WaitForResource(
           f'deployment/{deployment_name}',
           'available',
           timeout=self.spec.deployment_timeout,
@@ -1065,7 +1072,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       raise errors.Resource.CreationError(
           'GCS bucket is required to apply GCSFuse PVC.'
       )
-    self.cluster.ApplyManifest(
+    kubernetes_commands.ApplyManifest(
         'container/kubernetes_ai_inference/gcsfuse_pv_pvc.yaml.j2',
         gcs_bucket=FLAG_GCS_BUCKET.value,
     )
@@ -1134,7 +1141,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
     self.StopHPAPolling()
     for resource in reversed(self.created_resources):
-      self.cluster.DeleteResource(
+      kubernetes_commands.DeleteResource(
           resource, ignore_not_found=True, raise_on_timeout=False
       )
     self.deployment_metadata = None

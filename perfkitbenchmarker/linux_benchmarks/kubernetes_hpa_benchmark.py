@@ -28,6 +28,7 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_packages import http_poller
 from perfkitbenchmarker.linux_packages import locust
 from perfkitbenchmarker.sample import Sample
@@ -86,7 +87,7 @@ def PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec, manifest_path: str):
   )
   fib_image = benchmark_spec.container_specs['kubernetes_fib'].image
 
-  yaml_docs = cluster.ConvertManifestToYamlDicts(
+  yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
       manifest_path,
       fib_image=fib_image,
       port=_PORT,
@@ -95,9 +96,11 @@ def PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec, manifest_path: str):
       yaml_docs,
       'fib',
   )
-  cluster.ApplyYaml(yaml_docs)
+  kubernetes_commands.ApplyYaml(yaml_docs)
 
-  cluster.WaitForResource('deploy/fib', 'available', namespace='fib')
+  kubernetes_commands.WaitForResource(
+      'deploy/fib', 'available', namespace='fib'
+  )
 
 
 def PrepareLocust(benchmark_spec: bm_spec.BenchmarkSpec):
@@ -152,8 +155,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
   background_tasks.RunThreaded(
       lambda f: f(),
       [
-          lambda: kmc.ObserveNumReplicas(cluster, 'deploy/fib', 'fib'),
-          lambda: kmc.ObserveNumNodes(cluster),
+          lambda: kmc.ObserveNumReplicas('deploy/fib', 'fib'),
+          kmc.ObserveNumNodes,
           RunLocust,
       ],
       max_concurrent_threads=3,
@@ -191,7 +194,6 @@ class KubernetesMetricsCollector:
 
   def ObserveNumReplicas(
       self,
-      cluster: container_service.KubernetesCluster,
       resource_name: str,
       namespace: str = '',
   ) -> None:
@@ -203,19 +205,19 @@ class KubernetesMetricsCollector:
     is signaled.
 
     Args:
-      cluster: The cluster in question.
       resource_name: The deployment/statefulset/etc's name, e.g.
         'deployment/my_deployment'.
       namespace: The namespace of the resource. If omitted, the 'default'
         namespace will be used.
     """
     self._Observe(
-        lambda: cluster.GetNumReplicasSamples(resource_name, namespace)
+        lambda: kubernetes_commands.GetNumReplicasSamples(
+            resource_name, namespace
+        )
     )
 
   def ObserveNumNodes(
       self,
-      cluster: container_service.KubernetesCluster,
   ) -> None:
     """Periodically samples the number of nodes.
 
@@ -224,10 +226,8 @@ class KubernetesMetricsCollector:
     Expected to be run in a background thread. Never completes until self._stop
     is signaled.
 
-    Args:
-      cluster: The cluster in question.
     """
-    self._Observe(cluster.GetNumNodesSamples)
+    self._Observe(kubernetes_commands.GetNumNodesSamples)
 
   def _Observe(
       self,

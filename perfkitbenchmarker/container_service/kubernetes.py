@@ -32,8 +32,6 @@ from .kubectl import RunRetryableKubectlCommand
 # Temporarily hoist cluster related classes into this namespace
 from .kubernetes_cluster import INGRESS_JSONPATH
 from .kubernetes_cluster import KubernetesCluster
-# Temporarily hoist k8s cluster commands into this namespace
-from .kubernetes_commands import KubernetesClusterCommands
 # Temporarily hoist event related classes into this namespace
 from .kubernetes_events import KubernetesEvent
 from .kubernetes_events import KubernetesEventPoller

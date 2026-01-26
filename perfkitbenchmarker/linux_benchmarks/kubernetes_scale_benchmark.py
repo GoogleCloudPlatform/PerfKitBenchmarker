@@ -18,6 +18,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.container_service import kubernetes_commands
 
 
 FLAGS = flags.FLAGS
@@ -169,8 +170,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
     # Log & check for quota failure.
     _CheckForFailures(cluster, pod_samples, 1)
 
-  initial_nodes = set(cluster.GetNodeNames())
-  initial_pods = set(cluster.GetPodNames())
+  initial_nodes = set(kubernetes_commands.GetNodeNames())
+  initial_pods = set(kubernetes_commands.GetPodNames())
 
   samples, rollout_name = ScaleUpPods(cluster, NUM_PODS.value)
   start_time = _GetRolloutCreationTime(rollout_name)
@@ -200,7 +201,7 @@ def ScaleUpPods(
 ) -> tuple[list[sample.Sample], str]:
   """Scales up pods on a kubernetes cluster. Returns samples & rollout name."""
   samples = []
-  initial_pods = set(cluster.GetPodNames())
+  initial_pods = set(kubernetes_commands.GetPodNames())
   logging.info('Initial pods: %s', initial_pods)
 
   if virtual_machine.GPU_COUNT.value:
@@ -246,17 +247,16 @@ def ScaleUpPods(
       'kubernetes-scaleup',
       cluster.default_nodepool.machine_type,
   )
-
-  resource_names = cluster.ApplyYaml(yaml_docs)
+  resource_names = kubernetes_commands.ApplyYaml(yaml_docs)
 
   assert resource_names
   rollout_name = next(resource_names)
 
   try:
     start_polling_time = time.monotonic()
-    cluster.WaitForRollout(rollout_name, timeout=max_wait_time)
+    kubernetes_commands.WaitForRollout(rollout_name, timeout=max_wait_time)
 
-    all_new_pods = set(cluster.GetPodNames()) - initial_pods
+    all_new_pods = set(kubernetes_commands.GetPodNames()) - initial_pods
     end_polling_time = time.monotonic()
     logging.info(
         'In %d seconds, found all %s new pods',

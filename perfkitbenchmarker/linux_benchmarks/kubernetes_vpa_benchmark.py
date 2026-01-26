@@ -24,6 +24,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_benchmarks import kubernetes_hpa_benchmark as hpa
 from perfkitbenchmarker.linux_packages import locust
 from perfkitbenchmarker.sample import Sample
@@ -109,8 +110,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
   background_tasks.RunThreaded(
       lambda f: f(),
       [
-          lambda: kmc.ObserveCPUUsage(cluster, 'deploy/fib', 'fib'),
-          lambda: kmc.ObserveCPURequests(cluster, 'deploy/fib', 'fib'),
+          lambda: kmc.ObserveCPUUsage('deploy/fib', 'fib'),
+          lambda: kmc.ObserveCPURequests('deploy/fib', 'fib'),
           RunLocust,
       ],
       max_concurrent_threads=3,
@@ -188,7 +189,6 @@ class KubernetesMetricsCollector(hpa.KubernetesMetricsCollector):
 
   def ObserveCPURequests(
       self,
-      cluster: container_service.KubernetesCluster,
       resource_name: str,
       namespace: str = '',
   ) -> None:
@@ -200,19 +200,19 @@ class KubernetesMetricsCollector(hpa.KubernetesMetricsCollector):
     is signaled.
 
     Args:
-      cluster: The cluster in question.
       resource_name: The deployment/statefulset/etc's name, e.g.
         'deployment/my_deployment'.
       namespace: The namespace of the resource. If omitted, the 'default'
         namespace will be used.
     """
     self._Observe(
-        lambda: cluster.GetCPURequestSamples(resource_name, namespace)
+        lambda: kubernetes_commands.GetCPURequestSamples(
+            resource_name, namespace
+        )
     )
 
   def ObserveCPUUsage(
       self,
-      cluster: container_service.KubernetesCluster,
       resource_name: str,
       namespace: str = '',
   ) -> None:
@@ -226,13 +226,14 @@ class KubernetesMetricsCollector(hpa.KubernetesMetricsCollector):
     is signaled.
 
     Args:
-      cluster: The cluster in question.
       resource_name: The deployment/statefulset/etc's name, e.g.
         'deployment/my_deployment'.
       namespace: The namespace of the resource. If omitted, the 'default'
         namespace will be used.
     """
-    self._Observe(lambda: cluster.GetCPUUsageSamples(resource_name, namespace))
+    self._Observe(
+        lambda: kubernetes_commands.GetCPUUsageSamples(resource_name, namespace)
+    )
 
 
 def Cleanup(benchmark_spec):

@@ -41,6 +41,7 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_packages import hadoop
 from perfkitbenchmarker.linux_packages import spark
 from perfkitbenchmarker.providers.aws import flags as aws_flags
@@ -1231,7 +1232,7 @@ class KubernetesSparkCluster(BaseDpbService):
         self.GetJobProperties()[spark.SPARK_DRIVER_MEMORY].strip('m')
     )
     start_time = datetime.datetime.now()
-    self.k8s_cluster.ApplyManifest(
+    kubernetes_commands.ApplyManifest(
         'container/spark/spark-driver.yaml.j2',
         name=driver_name,
         command=command,
@@ -1411,7 +1412,7 @@ class KubernetesFlinkCluster(BaseDpbService):
     job_manager_name = self._GetJobManagerName()
     job_properties = self.GetJobProperties()
     start_time = datetime.datetime.now()
-    self.k8s_cluster.ApplyManifest(
+    kubernetes_commands.ApplyManifest(
         'container/flink/flink-job-and-deployment.yaml.j2',
         job_manager_name=job_manager_name,
         job_manager_service=self.FLINK_JOB_MANAGER_SERVICE,

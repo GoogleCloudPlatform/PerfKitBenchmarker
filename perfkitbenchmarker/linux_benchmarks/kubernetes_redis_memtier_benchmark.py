@@ -30,6 +30,7 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_benchmarks import redis_memtier_benchmark
 from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.linux_packages import redis_server
@@ -103,7 +104,7 @@ def _PrepareCluster(bm_spec: _BenchmarkSpec):
           ),
       },
   ) as rendered_manifest:
-    bm_spec.container_cluster.ApplyManifest(rendered_manifest.name)
+    kubernetes_commands.ApplyManifest(rendered_manifest.name)
 
   bm_spec.container_cluster.WaitForRollout('statefulset/redis')
 

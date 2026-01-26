@@ -23,6 +23,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import util
@@ -320,7 +321,7 @@ class AksCluster(container_service.KubernetesCluster):
         virtual_machine.GPU_COUNT.value is not None
         and virtual_machine.GPU_COUNT.value > 0
     ):
-      self.ApplyManifest(
+      kubernetes_commands.ApplyManifest(
           'container/azure/nvidia-device-plugin.yaml',
       )
 
@@ -478,7 +479,7 @@ class AksCluster(container_service.KubernetesCluster):
 
   def AddNodepool(self, batch_name, pool_id):
     """Add a Karpenter NodePool and AKSNodeClass to the AKS cluster."""
-    self.ApplyManifest(
+    kubernetes_commands.ApplyManifest(
         'provision_node_pools/aks/nodepool.yaml.j2',
         batch=batch_name,
         id=pool_id,

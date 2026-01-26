@@ -29,6 +29,8 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
+from perfkitbenchmarker.container_service import kubectl
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import google_kubernetes_engine
 from perfkitbenchmarker.providers.gcp import util
@@ -259,7 +261,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testPostCreate(self):
     spec = self.create_kubernetes_engine_spec()
     with patch_critical_objects() as issue_command, mock.patch.object(
-        container_service.kubernetes, 'RunKubectlCommand'
+        kubectl, 'RunKubectlCommand'
     ) as mock_kubectl_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._PostCreate()
@@ -563,7 +565,7 @@ class GoogleKubernetesEngineWithGpusTestCase(
   def testPostCreate(self, create_from_file_patch):
     spec = self.create_kubernetes_engine_spec('k80')
     with patch_critical_objects() as issue_command, mock.patch.object(
-        container_service.kubernetes, 'RunKubectlCommand'
+        kubectl, 'RunKubectlCommand'
     ) as mock_kubectl_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._PostCreate()
@@ -868,7 +870,7 @@ class GoogleKubernetesEngineAutopilotTestCase(
     spec = self.create_kubernetes_engine_spec()
     with self.assertLogs(level='INFO') as logs:
       cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
-      yamls = cluster.ConvertManifestToYamlDicts(
+      yamls = kubernetes_commands.ConvertManifestToYamlDicts(
           'tests/data/kube_apply.yaml.j2',
           name='hello-world',
           command=[],
@@ -877,7 +879,7 @@ class GoogleKubernetesEngineAutopilotTestCase(
           yamls,
           'hello-world',
       )
-      cluster.ApplyYaml(
+      kubernetes_commands.ApplyYaml(
           yamls,
           should_log_file=True,
       )

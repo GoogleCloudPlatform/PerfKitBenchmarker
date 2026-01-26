@@ -8,6 +8,7 @@ import zoneinfo
 
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_benchmarks import kubernetes_ai_inference_benchmark
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server_spec as k8s_spec
@@ -305,7 +306,12 @@ class KubernetesAiInferenceBenchmarkTest(
         )
     )
 
-  def test_tpu_get_model_load_time(self):
+  @mock.patch.object(
+      kubernetes_commands,
+      'GetResourceMetadataByName',
+      return_value=['pod1'],
+  )
+  def test_tpu_get_model_load_time(self, get_resource_metadata_by_name_mock):
     logs = """22:17:30 Found weights from local: /data/models/vllm_models/llama3-8b-hf
     22:17:32 Precompile select_hidden_states --> num_tokens=256 | num_reqs=32
     22:17:52 Compilation finished in 0.17 [secs].
@@ -326,9 +332,6 @@ class KubernetesAiInferenceBenchmarkTest(
     mock_k8s_server = self._create_mock_k8s_server(hpa_enabled=False)
     mock_k8s_server.app_selector = 'vllm_inference_server'
     mock_k8s_server.spec.catalog_components = 'v6e-2x4,gcsfuse,spot'
-    mock_k8s_server.cluster.GetResourceMetadataByName.return_value = [
-        'pod1',
-    ]
     mock_k8s_server.cluster.GetEvents.return_value = [startup_event]
     mock_k8s_server.GetStartupLogsFromPod.side_effect = [
         logs,
@@ -366,7 +369,14 @@ class KubernetesAiInferenceBenchmarkTest(
     ]
     self.assertEqual(results, expected_results)
 
-  def test_get_model_load_time_single_pod(self):
+  @mock.patch.object(
+      kubernetes_commands,
+      'GetResourceMetadataByName',
+      return_value=['pod1'],
+  )
+  def test_get_model_load_time_single_pod(
+      self, get_resource_metadata_by_name_mock
+  ):
     first_call_logs = """22:17:30 Starting to load model /data/models/llama3-8b-hf...
     22:17:52 Model loading took 14.9596 GiB and 21.619846 seconds
     22:19:00 Starting vLLM API server on http://0.0.0.0:8000
@@ -385,9 +395,6 @@ class KubernetesAiInferenceBenchmarkTest(
     )
     mock_k8s_server = self._create_mock_k8s_server(hpa_enabled=False)
     mock_k8s_server.app_selector = 'vllm_inference_server'
-    mock_k8s_server.cluster.GetResourceMetadataByName.return_value = [
-        'pod1',
-    ]
     mock_k8s_server.cluster.GetEvents.return_value = [startup_event]
     mock_k8s_server.GetStartupLogsFromPod.side_effect = [
         first_call_logs,
@@ -425,7 +432,14 @@ class KubernetesAiInferenceBenchmarkTest(
     ]
     self.assertEqual(results, expected_results)
 
-  def test_get_model_load_time_multiple_pods(self):
+  @mock.patch.object(
+      kubernetes_commands,
+      'GetResourceMetadataByName',
+      return_value=['pod1', 'pod2', 'pod3'],
+  )
+  def test_get_model_load_time_multiple_pods(
+      self, get_resource_metadata_by_name_mock
+  ):
     first_call_logs = """22:17:01 Automatically detected platform cuda
     22:17:30 Starting to load model /data/models/llama3-8b-hf...
     22:17:52 Model loading took 14.9596 GiB and 21.619846 seconds
@@ -482,11 +496,6 @@ class KubernetesAiInferenceBenchmarkTest(
 
     mock_k8s_server = self._create_mock_k8s_server(hpa_enabled=True)
     mock_k8s_server.app_selector = 'vllm_inference_server'
-    mock_k8s_server.cluster.GetResourceMetadataByName.return_value = [
-        'pod1',
-        'pod2',
-        'pod3',
-    ]
     mock_k8s_server.cluster.GetEvents.return_value = [
         startup_events[0],
         startup_events[1],

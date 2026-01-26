@@ -31,6 +31,7 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.container_service import kubernetes_commands
 
 _TIME_RESIZE = flags.DEFINE_bool(
     'provision_container_cluster_time_resize',
@@ -118,10 +119,12 @@ def _BenchmarkClusterResize(
   """
   samples = []
 
-  cluster.ApplyManifest('container/provision_container_cluster/daemonset.yaml')
-  cluster.WaitForRollout('daemonset/daemon-set')
+  kubernetes_commands.ApplyManifest(
+      'container/provision_container_cluster/daemonset.yaml'
+  )
+  kubernetes_commands.WaitForRollout('daemonset/daemon-set')
 
-  initial_nodes = set(cluster.GetNodeNames())
+  initial_nodes = set(kubernetes_commands.GetNodeNames())
   new_node_count = len(initial_nodes) + 1
 
   resize_start_time = time.time()
@@ -149,7 +152,7 @@ def _BenchmarkClusterResize(
     raise errors.Benchmarks.RunError(failure_message)
 
   def GetNode() -> str:
-    new_nodes = set(cluster.GetNodeNames()) - initial_nodes
+    new_nodes = set(kubernetes_commands.GetNodeNames()) - initial_nodes
     if new_nodes:
       return new_nodes.pop()
     return ''
@@ -160,7 +163,7 @@ def _BenchmarkClusterResize(
       failure_message='Cluster failed to add new node.',
   )
 
-  cluster.WaitForRollout('daemonset/daemon-set')
+  kubernetes_commands.WaitForRollout('daemonset/daemon-set')
 
   def GetPodOnNode() -> str:
     pods_json, _, _ = container_service.RunKubectlCommand([
@@ -185,7 +188,7 @@ def _BenchmarkClusterResize(
       failure_message='Daemonset failed to schedule new pod.',
   )
 
-  cluster.WaitForResource(f'pod/{new_pod}', 'ready')
+  kubernetes_commands.WaitForResource(f'pod/{new_pod}', 'ready')
 
   key_event_timestamps = _GetKeyScalingEventTimes(cluster, new_node, new_pod)
   for metric, timestamp in key_event_timestamps.items():

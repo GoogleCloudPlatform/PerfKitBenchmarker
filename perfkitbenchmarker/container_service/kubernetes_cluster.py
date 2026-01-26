@@ -2,11 +2,13 @@
 
 import functools
 import json
+import logging
+import time
 from typing import Any
-
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import units
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
 from perfkitbenchmarker.container_service import kubectl
 from perfkitbenchmarker.container_service import kubernetes
@@ -15,12 +17,10 @@ from perfkitbenchmarker.container_service import kubernetes_events
 from perfkitbenchmarker.resources import kubernetes_inference_server
 
 INGRESS_JSONPATH = '{.status.loadBalancer.ingress[0]}'
+RESOURCE_DELETE_SLEEP_SECONDS = 5
 
 
-class KubernetesCluster(
-    container_service.BaseContainerCluster,
-    kubernetes_commands.KubernetesClusterCommands,
-):
+class KubernetesCluster(container_service.BaseContainerCluster):
   """A Kubernetes flavor of Container Cluster."""
 
   CLUSTER_TYPE = container_service.KUBERNETES
@@ -31,7 +31,7 @@ class KubernetesCluster(
     if cluster_spec.poll_for_events:
 
       def _GetEventsNoLogging():
-        return self._GetEvents(suppress_logging=True)
+        return kubernetes_commands.GetEvents(suppress_logging=True)
 
       self.event_poller = kubernetes_events.KubernetesEventPoller(
           _GetEventsNoLogging
@@ -59,18 +59,18 @@ class KubernetesCluster(
     super().Delete(freeze)
 
   def _PreDelete(self):
-    self._DeleteAllFromDefaultNamespace()
+    _DeleteAllFromDefaultNamespace()
 
   def _Delete(self):
     if self.event_poller:
       self.event_poller.StopPolling()
-    self._DeleteAllFromDefaultNamespace()
+    _DeleteAllFromDefaultNamespace()
 
   def GetEvents(self) -> set['kubernetes_events.KubernetesEvent']:
     """Gets the events for the cluster, including previously polled events."""
     if self.event_poller:
       return self.event_poller.GetEvents()
-    return self._GetEvents()
+    return kubernetes_commands.GetEvents()
 
   def __getstate__(self):
     state = self.__dict__.copy()
@@ -82,7 +82,7 @@ class KubernetesCluster(
     """Returns a dict containing metadata about the cluster."""
     result = super().GetResourceMetadata()
     if self.created:
-      result['version'] = self.k8s_version
+      result['version'] = kubernetes_commands.GetK8sVersion()
     return result
 
   def DeployContainer(
@@ -216,7 +216,7 @@ class KubernetesCluster(
     Returns:
       The address of the Ingress, with or without the port.
     """
-    yaml_docs = self.ConvertManifestToYamlDicts(
+    yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
         self._ingress_manifest_path,
         name=name,
         namespace=namespace,
@@ -227,13 +227,13 @@ class KubernetesCluster(
       for yaml_doc in yaml_docs:
         if yaml_doc['kind'] == 'Service':
           yaml_doc['spec']['selector'] = node_selectors
-    self.ApplyYaml(yaml_docs)
+    kubernetes_commands.ApplyYaml(yaml_docs)
     return self._WaitForIngress(name, namespace, port)
 
   def _WaitForIngress(self, name: str, namespace: str, port: int) -> str:
     """Waits for a deployed Ingress/load balancer resource."""
     name = f'service/{name}'
-    self.WaitForResource(
+    kubernetes_commands.WaitForResource(
         name,
         INGRESS_JSONPATH,
         namespace=namespace,
@@ -265,3 +265,50 @@ class KubernetesCluster(
   def AddNodepool(self, batch_name: str, pool_id: str):
     """Adds an additional nodepool with the given name to the cluster."""
     pass
+
+
+def _DeleteAllFromDefaultNamespace():
+  """Deletes all resources from a namespace.
+
+  Since StatefulSets do not reclaim PVCs upon deletion, they are explicitly
+  deleted here to prevent dynamically provisioned PDs from leaking once the
+  cluster has been deleted.
+  """
+  try:
+    # Delete deployments and jobs first as otherwise autorepair will redeploy
+    # deleted pods.
+    run_cmd = ['delete', 'deployment', '--all', '-n', 'default']
+    kubectl.RunRetryableKubectlCommand(run_cmd)
+
+    run_cmd = ['delete', 'job', '--all', '-n', 'default']
+    kubectl.RunRetryableKubectlCommand(run_cmd)
+
+    timeout = 60 * 20
+    run_cmd = [
+        'delete',
+        'all',
+        '--all',
+        '-n',
+        'default',
+        f'--timeout={timeout}s',
+    ]
+    kubectl.RunRetryableKubectlCommand(run_cmd, timeout=timeout)
+
+    run_cmd = ['delete', 'pvc', '--all', '-n', 'default']
+    kubectl.RunKubectlCommand(run_cmd)
+    # There maybe a slight race if resources are cleaned up in the background
+    # where deleting the cluster immediately prevents the PVCs from being
+    # deleted.
+    logging.info(
+        'Sleeping for %s seconds to give resources time to delete.',
+        RESOURCE_DELETE_SLEEP_SECONDS,
+    )
+    time.sleep(RESOURCE_DELETE_SLEEP_SECONDS)
+  except (
+      errors.VmUtil.IssueCommandTimeoutError,
+      vm_util.TimeoutExceededRetryError,
+  ) as e:
+    raise errors.Resource.RetryableDeletionError(
+        'Timed out while deleting all resources from default namespace. We'
+        ' should still continue trying to delete everything.'
+    ) from e

@@ -20,6 +20,7 @@ from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark as ksb
 
 BENCHMARK_NAME = 'kubernetes_deployment_startup'
@@ -87,7 +88,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """
   cluster = benchmark_spec.container_cluster
   image = benchmark_spec.container_specs['kubernetes_deployment_startup'].image
-  cluster.ApplyManifest(
+  kubernetes_commands.ApplyManifest(
       DEPLOYMENT_YAML.value,
       name='startup',
       image=image,

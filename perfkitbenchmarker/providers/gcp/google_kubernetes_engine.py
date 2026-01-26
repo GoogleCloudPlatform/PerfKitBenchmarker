@@ -27,6 +27,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
@@ -478,7 +479,7 @@ class GkeCluster(BaseGkeCluster):
 
     # GKE does not wait for kube-dns by default
     logging.info('Waiting for kube-dns')
-    self.WaitForResource(
+    kubernetes_commands.WaitForResource(
         'deployment/kube-dns',
         condition_name='Available',
         namespace='kube-system',
@@ -502,7 +503,7 @@ class GkeCluster(BaseGkeCluster):
     cluster is deleted within that hour.
     https://cloud.google.com/kubernetes-engine/docs/how-to/creating-managing-labels#label_propagation
     """
-    pvcs = self._GetPvcs()
+    pvcs = kubernetes_commands.GetPvcs()
     for pvc in pvcs:
       gce_disk.AddLabels(self, pvc['spec']['volumeName'])
 

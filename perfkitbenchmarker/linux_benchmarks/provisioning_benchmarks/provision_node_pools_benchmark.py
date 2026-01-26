@@ -44,6 +44,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.container_service import kubernetes_commands
 
 INIT_BATCH_SIZE = flags.DEFINE_integer(
     "provision_node_pools_init_batch",
@@ -102,7 +103,7 @@ def _AddNodePool(
 ) -> None:
   """Adds a node pool to the cluster."""
   cluster.AddNodepool(batch_name, pool_id=pool_id)
-  cluster.ApplyManifest(
+  kubernetes_commands.ApplyManifest(
       JOB_MANIFEST_TEMPLATE,
       batch=batch_name,
       gpu=USE_GPU.value,
@@ -211,12 +212,11 @@ def _CreateJobsAndWait(
 
 
 def _AssertNodes(
-    cluster: container_service.KubernetesCluster,
     initial_nodes: int,
     added_nodes: int,
 ) -> None:
   """Asserts expected number of nodes in the cluster."""
-  nodes = len(cluster.GetNodeNames())
+  nodes = len(kubernetes_commands.GetNodeNames())
   if nodes < added_nodes:
     raise ValueError(
         "Cluster has %d nodes, but expected >=%d)" % (nodes, added_nodes)
@@ -260,12 +260,12 @@ def _CreateNodePools(
     node_pools_to_add: int,
 ) -> List[sample.Sample]:
   """Creates node pools and measures the time it takes to provision them."""
-  nodes_before = len(cluster.GetNodeNames())
+  nodes_before = len(kubernetes_commands.GetNodeNames())
   nodes_pools_before = len(cluster.GetNodePoolNames())
   start = time.monotonic()
   samples = _CreateJobsAndWait(cluster, batch_name, node_pools_to_add)
   elapsed = time.monotonic() - start
-  _AssertNodes(cluster, nodes_before, node_pools_to_add)
+  _AssertNodes(nodes_before, node_pools_to_add)
   _AssertNodePools(cluster, nodes_pools_before, node_pools_to_add)
   samples.append(
       sample.Sample(

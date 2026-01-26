@@ -17,6 +17,7 @@ from unittest import mock
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_benchmarks import kubernetes_deployment_startup_benchmark as kdsb
 from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark as ksb
 from tests import pkb_common_test_case
@@ -36,7 +37,8 @@ class KubernetesDeploymentStartupBenchmarkTest(
     }
 
   @mock.patch.object(ksb, 'GetStatusConditionsForResourceType')
-  def testRun(self, mock_get_conditions):
+  @mock.patch.object(kubernetes_commands, 'ApplyManifest')
+  def testRun(self, mock_apply_manifest, mock_get_conditions):
     """Tests the Run method with mock pod data."""
     mock_get_conditions.return_value = [
         mock.Mock(
@@ -55,7 +57,7 @@ class KubernetesDeploymentStartupBenchmarkTest(
 
     result = kdsb.Run(self.spec)
 
-    self.spec.container_cluster.ApplyManifest.assert_called_with(
+    mock_apply_manifest.assert_called_with(
         kdsb.DEPLOYMENT_YAML.value, name='startup', image='test_image'
     )
     self.spec.container_cluster.WaitForRollout.assert_called_with(
@@ -70,7 +72,8 @@ class KubernetesDeploymentStartupBenchmarkTest(
     )
 
   @mock.patch.object(ksb, 'GetStatusConditionsForResourceType')
-  def testRunNoPods(self, mock_get_conditions):
+  @mock.patch.object(kubernetes_commands, 'ApplyManifest')
+  def testRunNoPods(self, mock_apply_manifest, mock_get_conditions):
     """Tests the Run method when no pods are found."""
     mock_get_conditions.return_value = []
     with self.assertRaises(RuntimeError):

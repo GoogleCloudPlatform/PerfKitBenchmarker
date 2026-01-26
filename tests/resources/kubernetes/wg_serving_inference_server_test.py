@@ -3,6 +3,8 @@ import unittest
 from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import container_service
+from perfkitbenchmarker.container_service import kubectl
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server
 from tests import pkb_common_test_case
 
@@ -56,7 +58,7 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(container_service, 'KubernetesCluster', autospec=True)
     )
     self.mock_run_kubectl = self.enter_context(
-        mock.patch.object(container_service, 'RunKubectlCommand', autospec=True)
+        mock.patch.object(kubectl, 'RunKubectlCommand', autospec=True)
     )
     self.config_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
         _BENCHMARK_SPEC_YAML
@@ -122,22 +124,39 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(self.server.model_id, 'test-model')
     self.assertIsNotNone(self.server.deployment_metadata)
 
-  def testGetInferenceServerManifest(self):
+  @mock.patch.object(
+      kubernetes_commands,
+      'ApplyManifest',
+      return_value=['job/test-job'],
+  )
+  @mock.patch.object(
+      kubernetes_commands,
+      'RetryableGetPodNameFromJob',
+      return_value='test-pod',
+  )
+  @mock.patch.object(
+      kubernetes_commands,
+      'GetFileContentFromPod',
+      return_value=(_INFERENCE_SERVER_MANIFEST),
+  )
+  @mock.patch.object(kubernetes_commands, 'DeleteResource')
+  def testGetInferenceServerManifest(
+      self,
+      delete_resource_mock,
+      get_file_content_from_pod_mock,
+      retryable_get_pod_name_from_job_mock,
+      apply_manifest_mock,
+  ):
     self.server.spec.model_server = 'vllm'
     self.server.spec.model_name = 'model1'
     self.server.spec.cloud = 'gcp'
     self.server.spec.catalog_components = 'gcsfuse'
     self.server.spec.extra_deployment_args = {}
     self.server.spec.runtime_class_name = 'test-runtime'
-    self.mock_cluster.ApplyManifest.return_value = ['job/test-job']
-    self.mock_cluster.RetryableGetPodNameFromJob.return_value = 'test-pod'
-    self.mock_cluster.GetFileContentFromPod.return_value = (
-        _INFERENCE_SERVER_MANIFEST
-    )
     manifest = self.server._GetInferenceServerManifest()
     self.assertIn('runtimeClassName: test-runtime', manifest)
     self.assertIn('kind: Deployment', manifest)
-    self.mock_cluster.DeleteResource.assert_called_with(
+    delete_resource_mock.assert_called_with(
         'job/test-job', ignore_not_found=True
     )
 
@@ -183,8 +202,9 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
           description='Azure',
       ),
   )
+  @mock.patch.object(kubernetes_commands, 'GetResourceMetadataByName')
   def testMonitorPodStartupNodeMetadata(
-      self, node_labels, expected_metadata, description
+      self, mock_grmbn, node_labels, expected_metadata, description
   ):
     """Tests node metadata collection in _MonitorPodStartup across clouds."""
     pod_name = 'test-pod'
@@ -207,7 +227,7 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
 
     node_metadata = {'metadata': {'labels': node_labels}}
 
-    self.mock_cluster.GetResourceMetadataByName.return_value = node_metadata
+    mock_grmbn.return_value = node_metadata
     self.server.GetInferenceServerLogsFromPod = mock.Mock(return_value='logs')
     self.server.GetPodTimeZone = mock.Mock(return_value='UTC')
     self.server.timezone = None

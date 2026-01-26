@@ -15,6 +15,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.resources import kubernetes_inference_server
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server as k8s_server
 
@@ -135,7 +136,7 @@ def Run(
 
     server.EnableHPA()
     output_path = vm_util.GetTempDir() + '/inference_benchmark_result_hpa'
-    RunInferenceBenchmark(cluster, server.GetCallableServer(), output_path)
+    _RunInferenceBenchmark(server.GetCallableServer(), output_path)
     server.StopHPAPolling()
 
     metrics += _CollectBenchmarkResult(server, output_path)
@@ -143,7 +144,7 @@ def Run(
   else:
     metrics += server.GetPodStartupSamples()
     output_path = vm_util.GetTempDir() + '/inference_benchmark_result'
-    RunInferenceBenchmark(cluster, server.GetCallableServer(), output_path)
+    _RunInferenceBenchmark(server.GetCallableServer(), output_path)
     metrics += _CollectBenchmarkResult(server, output_path)
 
   return metrics
@@ -229,15 +230,13 @@ def CollectBenchmarkResult(
   return results
 
 
-def RunInferenceBenchmark(
-    cluster: container_service.KubernetesCluster,
+def _RunInferenceBenchmark(
     server: kubernetes_inference_server.InferenceServerEndpoint,
     output_path: str,
 ) -> None:
   """Run the inference benchmark.
 
   Args:
-    cluster: The Kubernetes cluster resource.
     server: The inference server resource.
     output_path: The path to the folder containing the result json files.
 
@@ -248,7 +247,7 @@ def RunInferenceBenchmark(
     model_id = server.model_id_from_path
   else:
     model_id = server.model_id
-  created_resources = cluster.ApplyManifest(
+  created_resources = kubernetes_commands.ApplyManifest(
       'container/kubernetes_ai_inference/latency-profile-generator.yaml.j2',
       models=model_id,
       tokenizer=server.tokenizer_id,
@@ -262,7 +261,7 @@ def RunInferenceBenchmark(
   job_resource = next(it for it in created_resources if it.startswith('job'))
   _, job_name = job_resource.split('/', maxsplit=1)
 
-  condition = cluster.WaitForResourceForMultiConditions(
+  condition = kubernetes_commands.WaitForResourceForMultiConditions(
       f'job/{job_name}',
       ['jsonpath={.status.ready}=1', 'condition=Failed'],
       timeout=7200,
@@ -271,11 +270,13 @@ def RunInferenceBenchmark(
   if 'Failed' in condition:
     raise RuntimeError('Latency profile generator job failed.')
 
-  pod_name = cluster.RetryableGetPodNameFromJob(job_name)
+  pod_name = kubernetes_commands.RetryableGetPodNameFromJob(job_name)
   os.makedirs(output_path, exist_ok=True)
-  cluster.CopyFilesFromPod(pod_name, '/benchmark_result', output_path)
+  kubernetes_commands.CopyFilesFromPod(
+      pod_name, '/benchmark_result', output_path
+  )
 
-  cluster.DeleteResource(f'job/{job_name}')
+  kubernetes_commands.DeleteResource(f'job/{job_name}')
 
 
 def GetVLLMModelLoadTime(
@@ -290,7 +291,7 @@ def GetVLLMModelLoadTime(
   else:
     now = datetime.datetime.now()
     time = now.timestamp()
-  pods = server.cluster.GetResourceMetadataByName(
+  pods = kubernetes_commands.GetResourceMetadataByName(
       'pods',
       f'app={server.app_selector}',
       output_format='name',

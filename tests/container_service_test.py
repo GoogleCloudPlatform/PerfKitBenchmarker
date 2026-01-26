@@ -10,6 +10,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.sample import Sample
 from tests import container_service_mock
 from tests import pkb_common_test_case
@@ -120,7 +121,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
             return_value='path/to/test-deployment.yaml',
         )
     )
-    deploy_ids = self.kubernetes_cluster.ApplyManifest(
+    deploy_ids = kubernetes_commands.ApplyManifest(
         'test-deployment.yaml',
     )
     self.assertEqual(next(deploy_ids), 'deployment.apps/test-deployment')
@@ -139,7 +140,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         )
     )
     with self.assertLogs(level='INFO') as logs:
-      self.kubernetes_cluster.ApplyManifest(
+      kubernetes_commands.ApplyManifest(
           'tests/data/kube_apply.yaml.j2',
           should_log_file=True,
           name='hello-world',
@@ -172,7 +173,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         )
     )
     with self.assertLogs(level='INFO') as logs:
-      yamls = self.kubernetes_cluster.ConvertManifestToYamlDicts(
+      yamls = kubernetes_commands.ConvertManifestToYamlDicts(
           'tests/data/kube_apply.yaml.j2',
           name='hello-world',
           command=[],
@@ -182,7 +183,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
       yamls[1]['spec']['template']['spec']['containers'].append(
           {'name': 'second-container'}
       )
-      self.kubernetes_cluster.ApplyYaml(
+      kubernetes_commands.ApplyYaml(
           yamls,
           should_log_file=True,
       )
@@ -270,9 +271,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
       )
 
     samples = _ClearTimestamps(
-        container_service.KubernetesClusterCommands.GetNumReplicasSamples(
-            resource_name, namespace
-        )
+        kubernetes_commands.GetNumReplicasSamples(resource_name, namespace)
     )
     self.assertCountEqual(
         samples,
@@ -292,7 +291,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         ]
     })
 
-    samples = container_service.KubernetesClusterCommands.GetNumReplicasSamples(
+    samples = kubernetes_commands.GetNumReplicasSamples(
         resource_name, namespace
     )
     self.assertEmpty(samples)
@@ -313,9 +312,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
           timestamp=0,
       )
 
-    samples = _ClearTimestamps(
-        container_service.KubernetesClusterCommands.GetNumNodesSamples()
-    )
+    samples = _ClearTimestamps(kubernetes_commands.GetNumNodesSamples())
     self.assertCountEqual(
         samples,
         [
@@ -464,7 +461,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
       vm_util, 'IssueCommand', return_value=(_ELECTION_EVENT_NO_NAME, '', 0)
   )
   def test_GetKubectlEvents_Success(self, unused_mock):
-    events = container_service.KubernetesClusterCommands._GetEvents()
+    events = kubernetes_commands.GetEvents()
     self.assertLen(events, 1)
     self.assertEqual(
         events.pop(),
@@ -520,7 +517,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
             (pod_names, '', 0)
         ],
     })
-    names = container_service.KubernetesClusterCommands._GetPodNamesForResource(
+    names = kubernetes_commands._GetPodNamesForResource(
         resource_name, namespace
     )
     self.assertEqual(names, ['pod-1', 'pod-2'])
@@ -534,9 +531,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         ],
     })
     with self.assertRaises(ValueError):
-      container_service.KubernetesClusterCommands._GetPodNamesForResource(
-          resource_name, namespace
-      )
+      kubernetes_commands._GetPodNamesForResource(resource_name, namespace)
 
   def test_GetPodNamesForResource_resource_not_found(self):
     resource_name = 'deployment/my-app'
@@ -548,7 +543,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
             1,
         )],
     })
-    names = container_service.KubernetesClusterCommands._GetPodNamesForResource(
+    names = kubernetes_commands._GetPodNamesForResource(
         resource_name, namespace
     )
     self.assertEqual(names, [])
@@ -558,7 +553,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     namespace = 'default'
     pod_names = ['pod-1', 'pod-2']
     with mock.patch.object(
-        container_service.KubernetesClusterCommands,
+        kubernetes_commands,
         '_GetPodNamesForResource',
         return_value=pod_names,
     ):
@@ -570,10 +565,8 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
               ('1', '', 0)
           ],
       })
-      samples = (
-          container_service.KubernetesClusterCommands.GetCPURequestSamples(
-              resource_name, namespace
-          )
+      samples = kubernetes_commands.GetCPURequestSamples(
+          resource_name, namespace
       )
       self.assertLen(samples, 2)
       self.assertEqual(samples[0].metric, 'kubernetes_cpu_request')
@@ -585,14 +578,12 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def test_GetCPURequestSamples_no_pods(self):
     with mock.patch.object(
-        container_service.KubernetesClusterCommands,
+        kubernetes_commands,
         '_GetPodNamesForResource',
         return_value=[],
     ):
-      samples = (
-          container_service.KubernetesClusterCommands.GetCPURequestSamples(
-              'deployment/my-app', 'default'
-          )
+      samples = kubernetes_commands.GetCPURequestSamples(
+          'deployment/my-app', 'default'
       )
       self.assertEmpty(samples)
 
@@ -605,7 +596,7 @@ POD_NAME   NAME      CPU(cores)   MEMORY(bytes)
 pod-1      my-app    123m         456Mi
 """
     with mock.patch.object(
-        container_service.KubernetesClusterCommands,
+        kubernetes_commands,
         '_GetPodNamesForResource',
         return_value=pod_names,
     ):
@@ -614,9 +605,7 @@ pod-1      my-app    123m         456Mi
               (top_output, '', 0)
           ],
       })
-      samples = container_service.KubernetesClusterCommands.GetCPUUsageSamples(
-          resource_name, namespace
-      )
+      samples = kubernetes_commands.GetCPUUsageSamples(resource_name, namespace)
       self.assertLen(samples, 1)
       self.assertEqual(samples[0].metric, 'kubernetes_cpu_usage')
       self.assertEqual(samples[0].value, 0.123)
@@ -628,7 +617,7 @@ pod-1      my-app    123m         456Mi
     namespace = 'default'
     pod_names = ['pod-1']
     with mock.patch.object(
-        container_service.KubernetesClusterCommands,
+        kubernetes_commands,
         '_GetPodNamesForResource',
         return_value=pod_names,
     ):
@@ -637,9 +626,7 @@ pod-1      my-app    123m         456Mi
               ('', 'error: metrics not available yet', 1)
           ],
       })
-      samples = container_service.KubernetesClusterCommands.GetCPUUsageSamples(
-          resource_name, namespace
-      )
+      samples = kubernetes_commands.GetCPUUsageSamples(resource_name, namespace)
       self.assertEmpty(samples)
 
 

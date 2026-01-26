@@ -6,6 +6,7 @@ from absl.testing import flagsaver
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.configs import container_spec
+from perfkitbenchmarker.container_service import kubernetes_commands
 from tests import pkb_common_test_case
 from perfkitbenchmarker.traces import kubernetes_tracker
 
@@ -43,8 +44,7 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = CreateMockCluster(
         name="pkb-cluster", machine_type="e2-standard-8"
     )
-    # pylint: disable=invalid-name
-    cluster.GetNodeNames = lambda: [
+    kubernetes_commands.GetNodeNames = lambda: [
         "gke-pkb-cluster-default-pool-node-1",
         "gke-pkb-cluster-default-pool-node-2",
         "gke-pkb-cluster-default-pool-node-3",
@@ -78,7 +78,9 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = CreateMockCluster(
         name="pkb-cluster", machine_type="e2-standard-8"
     )
-    cluster.GetNodeNames = lambda: ["gke-pkb-cluster-default-pool-node-1"]
+    kubernetes_commands.GetNodeNames = lambda: [
+        "gke-pkb-cluster-default-pool-node-1"
+    ]
     # pylint: disable=invalid-name
     cluster.GetEvents = lambda: [
         container_service.KubernetesEvent(
@@ -128,7 +130,7 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
             "node-pool-2": "n2-highcpu-96",
         },
     )
-    cluster.GetNodeNames = lambda: [
+    kubernetes_commands.GetNodeNames = lambda: [
         "gke-pkb-cluster-node-pool-1-node-1",
         "gke-pkb-cluster-node-pool-2-node-2",
     ]
@@ -163,7 +165,9 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = CreateMockCluster(
         name="pkb-cluster", machine_type="e2-standard-8"
     )
-    cluster.GetNodeNames = lambda: ["gke-pkb-cluster-default-pool-node-1"]
+    kubernetes_commands.GetNodeNames = lambda: [
+        "gke-pkb-cluster-default-pool-node-1"
+    ]
     cluster.GetEvents = lambda: [
         container_service.KubernetesEvent(
             resource=container_service.KubernetesEventResource(
@@ -237,7 +241,7 @@ def CreateMockCluster(
       )
   )
   cluster.GetEvents = lambda: []
-  cluster.GetNodeNames = lambda: []
+  kubernetes_commands.GetNodeNames = lambda: []
   return cluster
 
 

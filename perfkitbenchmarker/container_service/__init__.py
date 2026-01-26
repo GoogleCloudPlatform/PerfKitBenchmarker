@@ -42,7 +42,6 @@ from .base import NodePoolName
 # Temporarily hoist kubernetes related classes into this namespace
 from .kubernetes import INGRESS_JSONPATH
 from .kubernetes import KubernetesCluster
-from .kubernetes import KubernetesClusterCommands
 from .kubernetes import KubernetesContainer
 from .kubernetes import KubernetesContainerService
 from .kubernetes import KubernetesEvent
