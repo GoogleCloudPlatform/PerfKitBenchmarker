@@ -13,7 +13,6 @@
 # limitations under the License.
 """Classes relating to decoding a custom machine type."""
 
-
 import re
 
 from perfkitbenchmarker import errors
@@ -47,9 +46,9 @@ class MemoryDecoder(option_decoders.StringDecoder):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    string = super().Decode(
-        value, component_full_name, flag_values
-    )
+    string = super().Decode(value, component_full_name, flag_values)
+    if string is None:
+      return None
     match = self._CONFIG_MEMORY_PATTERN.match(string)
     if not match:
       raise errors.Config.InvalidValue(
@@ -91,6 +90,9 @@ class CustomMachineTypeSpec(spec.BaseSpec):
       GiB. Must be an integer number of MiB (e.g. "1280MiB", "7.5GiB").
   """
 
+  cpus: int
+  memory: int
+
   @classmethod
   def _GetOptionDecoderConstructions(cls):
     """Gets decoder classes and constructor args for each configurable option.
@@ -103,7 +105,7 @@ class CustomMachineTypeSpec(spec.BaseSpec):
     result = super()._GetOptionDecoderConstructions()
     result.update({
         'cpus': (option_decoders.IntDecoder, {'min': 1}),
-        'memory': (MemoryDecoder, {}),
+        'memory': (MemoryDecoder, {'none_ok': True, 'default': None}),
     })
     return result
 
@@ -112,9 +114,7 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
   """Decodes the machine_type option of a VM config."""
 
   def __init__(self, **kwargs):
-    super().__init__(
-        ((str,) + (dict,)), **kwargs
-    )
+    super().__init__(((str,) + (dict,)), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Decodes the machine_type option of a VM config.
@@ -134,9 +134,7 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    super().Decode(
-        value, component_full_name, flag_values
-    )
+    super().Decode(value, component_full_name, flag_values)
     if isinstance(value, str):
       return value
     return CustomMachineTypeSpec(
@@ -150,9 +148,7 @@ class AzureMachineTypeDecoder(option_decoders.TypeVerifier):
   """Decodes the machine_type option of a VM config."""
 
   def __init__(self, **kwargs):
-    super().__init__(
-        (str,) + (dict,), **kwargs
-    )
+    super().__init__((str,) + (dict,), **kwargs)
 
   def Decode(self, value, component_full_name, flag_values):
     """Decodes the machine_type option of a VM config.
@@ -172,25 +168,31 @@ class AzureMachineTypeDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    super().Decode(
-        value, component_full_name, flag_values
-    )
+    super().Decode(value, component_full_name, flag_values)
     if isinstance(value, str):
       return value
-    return AzurePerformanceTierDecoder(
+    elif isinstance(value, dict) and 'cpus' in value or 'memory' in value:
+      return CustomMachineTypeSpec(
+          self._GetOptionFullName(component_full_name),
+          flag_values=flag_values,
+          **value
+      )
+    return AzurePerformanceTierSpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
         **value
     )
 
 
-class AzurePerformanceTierDecoder(spec.BaseSpec):
+class AzurePerformanceTierSpec(spec.BaseSpec):
   """Properties of a An Azure custom machine type.
 
   Attributes:
     compute_units: int. Number of compute units.
     tier: Basic, Standard or Premium
   """
+  compute_units: int
+  tier: str
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):

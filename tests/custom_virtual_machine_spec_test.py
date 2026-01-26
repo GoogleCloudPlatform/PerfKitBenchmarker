@@ -89,12 +89,9 @@ class CustomMachineTypeSpecTestCase(unittest.TestCase):
         'Required options were missing from test_component: cpus.',
     )
 
-  def testMissingMemory(self):
-    with self.assertRaises(errors.Config.MissingOption) as cm:
-      custom_virtual_machine_spec.CustomMachineTypeSpec(_COMPONENT, cpus=1)
-    self.assertEqual(
-        str(cm.exception),
-        'Required options were missing from test_component: memory.',
+  def testMissingMemoryAllowed(self):
+    custom_virtual_machine_spec.CustomMachineTypeSpec(
+        _COMPONENT, cpus=1, memory=None
     )
 
   def testExtraOptions(self):
@@ -104,7 +101,7 @@ class CustomMachineTypeSpecTestCase(unittest.TestCase):
       )
     self.assertEqual(
         str(cm.exception),
-        'Unrecognized options were found in test_component: extra1, extra2.'
+        'Unrecognized options were found in test_component: extra1, extra2.',
     )
 
   def testInvalidCpus(self):
@@ -115,19 +112,6 @@ class CustomMachineTypeSpecTestCase(unittest.TestCase):
     self.assertEqual(
         str(cm.exception),
         'Invalid test_component.cpus value: "0". Value must be at least 1.',
-    )
-
-  def testInvalidMemory(self):
-    with self.assertRaises(errors.Config.InvalidValue) as cm:
-      custom_virtual_machine_spec.CustomMachineTypeSpec(
-          _COMPONENT, cpus=1, memory=None
-      )
-    self.assertEqual(
-        str(cm.exception),
-        (
-            'Invalid test_component.memory value: "None" (of type "NoneType"). '
-            'Value must be one of the following types: %s.' % _STRING_TYPE_NAME
-        ),
     )
 
 

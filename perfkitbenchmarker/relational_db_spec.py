@@ -14,6 +14,7 @@
 """Module containing the spec for relational database services."""
 
 import copy
+import json
 
 from absl import logging
 from perfkitbenchmarker import db_util
@@ -77,9 +78,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
   load_machine_type: str
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
-    super().__init__(
-        component_full_name, flag_values=flag_values, **kwargs
-    )
+    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
     # TODO(user): This is a lot of boilerplate, and is repeated
     # below in VmGroupSpec. See if some can be consolidated. Maybe we can
     # specify a VmGroupSpec instead of both vm_spec and disk_spec.
@@ -202,7 +201,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     has_db_machine_type = flag_values['db_machine_type'].present
     has_db_cpus = flag_values['db_cpus'].present
     has_db_memory = flag_values['db_memory'].present
-    has_custom_machine_type = has_db_cpus and has_db_memory
+    has_custom_machine_type = has_db_cpus or has_db_memory
     has_client_machine_type = flag_values['client_vm_machine_type'].present
     has_client_vm_cpus = flag_values['client_vm_cpus'].present
     has_client_vm_memory = flag_values['client_vm_memory'].present
@@ -213,12 +212,6 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
           'db_cpus/db_memory can not be specified with '
           'db_machine_type.   Either specify a custom machine '
           'with cpus and memory or specify a predefined machine type.'
-      )
-
-    if not has_custom_machine_type and (has_db_cpus or has_db_memory):
-      raise errors.Config.MissingOption(
-          'To specify a custom database machine instance, both db_cpus '
-          'and db_memory must be specified.'
       )
 
     if has_client_custom_machine_type and has_client_machine_type:
@@ -465,4 +458,6 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       if flag_values['zone'].present:
         flag_values.zone.clear()
 
-    logging.warning('Relational db config values: %s', config_values)
+    logging.warning(
+        'Relational db config values: %s', json.dumps(config_values, indent=2)
+    )

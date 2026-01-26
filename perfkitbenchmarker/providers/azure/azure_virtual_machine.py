@@ -241,11 +241,17 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
     self.low_priority: bool
     if isinstance(
         self.machine_type,
-        custom_virtual_machine_spec.AzurePerformanceTierDecoder,
+        custom_virtual_machine_spec.AzurePerformanceTierSpec,
     ):
       self.tier = self.machine_type.tier
       self.compute_units = self.machine_type.compute_units
       self.machine_type = None
+    elif isinstance(
+        self.machine_type,
+        custom_virtual_machine_spec.CustomMachineTypeSpec,
+    ):
+      self.cpus = self.machine_type.cpus
+      self.memory = self.machine_type.memory
     else:
       self.tier = None
       self.compute_units = None
