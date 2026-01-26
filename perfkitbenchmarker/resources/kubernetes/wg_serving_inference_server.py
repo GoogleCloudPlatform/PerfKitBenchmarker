@@ -722,7 +722,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     """Provisions cloud-specific GPU node pool for inference workloads."""
     if FLAGS.cloud == 'AWS':
       use_spot = bool(FLAGS.aws_spot_instances)
-      self.cluster.ApplyManifest(
+      kubernetes_commands.ApplyManifest(
           'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
           gpu_nodepool_name='gpu',
           gpu_consolidate_after='1h',
@@ -734,7 +734,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           gpu_taint_key='nvidia.com/gpu',
       )
     elif FLAGS.cloud == 'Azure':
-      self.cluster.ApplyManifest(
+      kubernetes_commands.ApplyManifest(
           'container/kubernetes_ai_inference/azure-gpu-nodepool.yaml.j2',
           gpu_capacity_types=['on-demand'],
           gpu_sku_name=[self.accelerator_type],

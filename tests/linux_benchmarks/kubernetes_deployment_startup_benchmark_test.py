@@ -36,9 +36,12 @@ class KubernetesDeploymentStartupBenchmarkTest(
         'kubernetes_deployment_startup': mock.Mock(image='test_image')
     }
 
-  @mock.patch.object(ksb, 'GetStatusConditionsForResourceType')
+  @mock.patch.object(kubernetes_commands, 'WaitForRollout')
   @mock.patch.object(kubernetes_commands, 'ApplyManifest')
-  def testRun(self, mock_apply_manifest, mock_get_conditions):
+  @mock.patch.object(ksb, 'GetStatusConditionsForResourceType')
+  def testRun(
+      self, mock_get_conditions, mock_apply_manifest, mock_wait_for_rollout
+  ):
     """Tests the Run method with mock pod data."""
     mock_get_conditions.return_value = [
         mock.Mock(
@@ -54,16 +57,13 @@ class KubernetesDeploymentStartupBenchmarkTest(
         ),
         mock.Mock(event='Ready', resource_name='pod2', epoch_time=25),
     ]
-
     result = kdsb.Run(self.spec)
 
     mock_apply_manifest.assert_called_with(
         kdsb.DEPLOYMENT_YAML.value, name='startup', image='test_image'
     )
-    self.spec.container_cluster.WaitForRollout.assert_called_with(
-        'deployment/startup', timeout=600
-    )
-    self.assertEqual(len(result), 1)
+    mock_wait_for_rollout.assert_called_with('deployment/startup', timeout=600)
+    self.assertLen(result, 1)
     self.assertEqual(
         result[0],
         sample.Sample(
@@ -71,9 +71,12 @@ class KubernetesDeploymentStartupBenchmarkTest(
         ),
     )
 
-  @mock.patch.object(ksb, 'GetStatusConditionsForResourceType')
+  @mock.patch.object(kubernetes_commands, 'WaitForRollout')
   @mock.patch.object(kubernetes_commands, 'ApplyManifest')
-  def testRunNoPods(self, mock_apply_manifest, mock_get_conditions):
+  @mock.patch.object(ksb, 'GetStatusConditionsForResourceType')
+  def testRunNoPods(
+      self, mock_get_conditions, mock_apply_manifest, mock_wait_for_rollout
+  ):
     """Tests the Run method when no pods are found."""
     mock_get_conditions.return_value = []
     with self.assertRaises(RuntimeError):

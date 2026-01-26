@@ -17,6 +17,7 @@ from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.container_service import kubectl
+from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.providers.gcp import util
 
 
@@ -250,8 +251,7 @@ class Trino(edw_service.EdwService):
 
   def _Exists(self):
     """Checks if Trino exists (or at least if its pods do)."""
-    assert self.container_cluster
-    self.container_cluster.WaitForRollout(
+    kubernetes_commands.WaitForRollout(
         f'deployment.apps/{self.name}-trino-worker',
         timeout=60 * 5,
     )

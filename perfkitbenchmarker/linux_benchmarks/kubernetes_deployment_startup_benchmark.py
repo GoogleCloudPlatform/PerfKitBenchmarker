@@ -86,14 +86,13 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   Returns:
     A list of sample.Sample objects.
   """
-  cluster = benchmark_spec.container_cluster
   image = benchmark_spec.container_specs['kubernetes_deployment_startup'].image
   kubernetes_commands.ApplyManifest(
       DEPLOYMENT_YAML.value,
       name='startup',
       image=image,
   )
-  cluster.WaitForRollout('deployment/startup', timeout=600)
+  kubernetes_commands.WaitForRollout('deployment/startup', timeout=600)
 
   pod_name_to_start_end_times: dict[str, tuple[int, int]] = (
       collections.defaultdict(lambda: (0, 0))
