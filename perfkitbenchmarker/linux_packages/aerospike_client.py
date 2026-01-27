@@ -45,6 +45,12 @@ _AEROSPIKE_TOOLS_VERSION = flags.DEFINE_string(
     'Aerospike tools version to use'
 )
 
+_AEROSPIKE_OPS_TIME_SERIES = flags.DEFINE_bool(
+    'aerospike_ops_time_series',
+    False,
+    'If true, collect ops time series.',
+)
+
 PATH_FORMATTER = 'aerospike-tools_%s_%s_%s'
 TAR_FILE_FORMATTER = '%s.tgz'
 
@@ -207,6 +213,10 @@ def _ParseHdrLines(
           rf'{op}\(.*?\) (?:total|read|write)', lines[line_idx]
       )
   )
+  if _AEROSPIKE_OPS_TIME_SERIES.value:
+    match = re.search(r'total\(tps=([0-9]+)', lines[line_idx])
+    if match:
+      aggregation_metrics['total_tps'] = float(match.group(1))
   metadata.update(aggregation_metrics)
   find_op_hdr = False
   for hdr_idx in range(2):
@@ -501,6 +511,7 @@ class AsbenchResult:
   read_max: float
   write_min: float
   write_max: float
+  total_tps: float = 0.0
 
   def __init__(self, s: sample.Sample):
     super().__init__()
@@ -512,6 +523,7 @@ class AsbenchResult:
     self.read_max = s.metadata.get('read_max', None)
     self.write_min = s.metadata.get('write_min', None)
     self.write_max = s.metadata.get('write_max', None)
+    self.total_tps = s.metadata.get('total_tps', 0.0)
 
 
 def CreateTimeSeriesSample(samples: List[sample.Sample]) -> List[sample.Sample]:
@@ -526,9 +538,13 @@ def CreateTimeSeriesSample(samples: List[sample.Sample]) -> List[sample.Sample]:
       for the entire run.
   """
   sample_results = {}
+  ops_by_timestamp = collections.defaultdict(float)
   for s in samples:
     ns_op = s.metric
-    sample_results.setdefault(ns_op, []).append(AsbenchResult(s))
+    result = AsbenchResult(s)
+    sample_results.setdefault(ns_op, []).append(result)
+    if _AEROSPIKE_OPS_TIME_SERIES.value:
+      ops_by_timestamp[result.timestamp] = result.total_tps
 
   ts_samples = []
   total_ops = []
@@ -595,6 +611,21 @@ def CreateTimeSeriesSample(samples: List[sample.Sample]) -> List[sample.Sample]:
               additional_metadata={},
           ),
       ])
+  if ops_by_timestamp:
+    sorted_timestamps = sorted(ops_by_timestamp.keys())
+    ops_ts_values = [ops_by_timestamp[t] for t in sorted_timestamps]
+    rampup_end_time = min(sorted_timestamps) + RAMPUP_TIME_IN_MS
+    ts_samples.append(
+        sample.CreateTimeSeriesSample(
+            ops_ts_values,
+            sorted_timestamps,
+            'OPS_time_series',
+            'ops',
+            1,
+            ramp_up_ends=rampup_end_time,
+            additional_metadata={},
+        )
+    )
   total_ops.append(sample.Sample(
       'total_ops', total_ops_value, 'ops', {}
   ))

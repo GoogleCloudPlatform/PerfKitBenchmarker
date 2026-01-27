@@ -19,6 +19,7 @@ import unittest
 from unittest import mock
 
 from absl import flags
+from absl.testing import flagsaver
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import aerospike_client
 from tests import pkb_common_test_case
@@ -210,6 +211,144 @@ class AerospikeClientTestCase(pkb_common_test_case.PkbCommonTestCase):
                     'tps': 15780.0,
                     'timeouts': 0.0,
                     'errors': 0.0,
+                    'start_timestamp': 1658945956.0,
+                    'window': 1,
+                    'write_min': 70.0,
+                    'write_max': 16735.0,
+                    'write_p50': 755.0,
+                    'write_p90': 1280.0,
+                    'write_p99': 2063.0,
+                    'write_p99.9': 3013.0,
+                    'write_p99.99': 8511.0,
+                },
+                timestamp=actual_samples[5].timestamp,
+            ),
+        ],
+    )
+
+  @flagsaver.flagsaver(aerospike_ops_time_series=True)
+  def testParseAsbenchStdoutWithOpsTimeSeries(self):
+    actual_samples = aerospike_client.ParseAsbenchStdout(
+        ASBENCH_OUTPUT_HEADER + ASBENCH_OUTPUT_RESULT_1
+    )
+
+    self.assertEqual(
+        actual_samples,
+        [
+            sample.Sample(
+                metric='test_read',
+                value=141748.0,
+                unit='transaction_per_second',
+                metadata={
+                    'tps': 141748.0,
+                    'timeouts': 0.0,
+                    'errors': 0.0,
+                    'total_tps': 157442.0,
+                    'start_timestamp': 1658945954.0,
+                    'window': 1,
+                    'read_min': 61.0,
+                    'read_max': 68863.0,
+                    'read_p50': 685.0,
+                    'read_p90': 1201.0,
+                    'read_p99': 2008.0,
+                    'read_p99.9': 3315.0,
+                    'read_p99.99': 45471.0,
+                },
+                timestamp=actual_samples[0].timestamp,
+            ),
+            sample.Sample(
+                metric='test_write',
+                value=15694.0,
+                unit='transaction_per_second',
+                metadata={
+                    'tps': 15694.0,
+                    'timeouts': 0.0,
+                    'errors': 0.0,
+                    'total_tps': 157442.0,
+                    'start_timestamp': 1658945954.0,
+                    'window': 1,
+                    'write_min': 70.0,
+                    'write_max': 16735.0,
+                    'write_p50': 726.0,
+                    'write_p90': 1248.0,
+                    'write_p99': 2008.0,
+                    'write_p99.9': 3577.0,
+                    'write_p99.99': 13183.0,
+                },
+                timestamp=actual_samples[1].timestamp,
+            ),
+            sample.Sample(
+                metric='test_read',
+                value=140415.0,
+                unit='transaction_per_second',
+                metadata={
+                    'tps': 140415.0,
+                    'timeouts': 0.0,
+                    'errors': 0.0,
+                    'total_tps': 155885.0,
+                    'start_timestamp': 1658945955.0,
+                    'window': 1,
+                    'read_min': 61.0,
+                    'read_max': 68863.0,
+                    'read_p50': 712.0,
+                    'read_p90': 1230.0,
+                    'read_p99': 2026.0,
+                    'read_p99.9': 3095.0,
+                    'read_p99.99': 18607.0,
+                },
+                timestamp=actual_samples[2].timestamp,
+            ),
+            sample.Sample(
+                metric='test_write',
+                value=15470.0,
+                unit='transaction_per_second',
+                metadata={
+                    'tps': 15470.0,
+                    'timeouts': 0.0,
+                    'errors': 0.0,
+                    'total_tps': 155885.0,
+                    'start_timestamp': 1658945955.0,
+                    'window': 1,
+                    'write_min': 70.0,
+                    'write_max': 16735.0,
+                    'write_p50': 750.0,
+                    'write_p90': 1278.0,
+                    'write_p99': 2071.0,
+                    'write_p99.9': 3137.0,
+                    'write_p99.99': 8575.0,
+                },
+                timestamp=actual_samples[3].timestamp,
+            ),
+            sample.Sample(
+                metric='test_read',
+                value=141700.0,
+                unit='transaction_per_second',
+                metadata={
+                    'tps': 141700.0,
+                    'timeouts': 0.0,
+                    'errors': 0.0,
+                    'total_tps': 157480.0,
+                    'start_timestamp': 1658945956.0,
+                    'window': 1,
+                    'read_min': 61.0,
+                    'read_max': 68863.0,
+                    'read_p50': 718.0,
+                    'read_p90': 1236.0,
+                    'read_p99': 2031.0,
+                    'read_p99.9': 2981.0,
+                    'read_p99.99': 10303.0,
+                },
+                timestamp=actual_samples[4].timestamp,
+            ),
+            sample.Sample(
+                metric='test_write',
+                value=15780.0,
+                unit='transaction_per_second',
+                metadata={
+                    'tps': 15780.0,
+                    'timeouts': 0.0,
+                    'errors': 0.0,
+                    'total_tps': 157480.0,
                     'start_timestamp': 1658945956.0,
                     'window': 1,
                     'write_min': 70.0,
@@ -704,6 +843,137 @@ class AerospikeClientTestCase(pkb_common_test_case.PkbCommonTestCase):
                 unit='ops',
                 metadata={},
                 timestamp=ts_samples[6].timestamp,
+            ),
+        ],
+    )
+
+  @flagsaver.flagsaver(aerospike_ops_time_series=True)
+  def testCreateTimeSeriesSampleWithOpsTimeSeries(self):
+    raw_samples = aerospike_client.ParseAsbenchStdout(
+        ASBENCH_OUTPUT_HEADER + ASBENCH_OUTPUT_RESULT_1
+    )
+    ts_samples = aerospike_client.CreateTimeSeriesSample(raw_samples)
+    self.assertEqual(
+        ts_samples,
+        [
+            sample.Sample(
+                metric='test_read_client_tps',
+                value=0.0,
+                unit='ops',
+                metadata={
+                    'values': [141748.0, 140415.0, 141700.0],
+                    'timestamps': [
+                        1658945954000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                    'ramp_up_ends': 1658946014000.0,
+                },
+                timestamp=ts_samples[0].timestamp,
+            ),
+            sample.Sample(
+                metric='Read_Min_Latency_time_series',
+                value=0.0,
+                unit='us',
+                metadata={
+                    'values': [61.0, 61.0, 61.0],
+                    'timestamps': [
+                        1658945954000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                    'ramp_up_ends': 1658946014000.0,
+                },
+                timestamp=ts_samples[1].timestamp,
+            ),
+            sample.Sample(
+                metric='Read_Max_Latency_time_series',
+                value=0.0,
+                unit='us',
+                metadata={
+                    'values': [68863.0, 68863.0, 68863.0],
+                    'timestamps': [
+                        1658945954000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                    'ramp_up_ends': 1658946014000.0,
+                },
+                timestamp=ts_samples[2].timestamp,
+            ),
+            sample.Sample(
+                metric='test_write_client_tps',
+                value=0.0,
+                unit='ops',
+                metadata={
+                    'values': [15694.0, 15470.0, 15780.0],
+                    'timestamps': [
+                        1658945954000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                    'ramp_up_ends': 1658946014000.0,
+                },
+                timestamp=ts_samples[3].timestamp,
+            ),
+            sample.Sample(
+                metric='Write_Min_Latency_time_series',
+                value=0.0,
+                unit='us',
+                metadata={
+                    'values': [70.0, 70.0, 70.0],
+                    'timestamps': [
+                        1658945954000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                    'ramp_up_ends': 1658946014000.0,
+                },
+                timestamp=ts_samples[4].timestamp,
+            ),
+            sample.Sample(
+                metric='Write_Max_Latency_time_series',
+                value=0.0,
+                unit='us',
+                metadata={
+                    'values': [16735.0, 16735.0, 16735.0],
+                    'timestamps': [
+                        1658945954000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                    'ramp_up_ends': 1658946014000.0,
+                },
+                timestamp=ts_samples[5].timestamp,
+            ),
+            sample.Sample(
+                metric='OPS_time_series',
+                value=0.0,
+                unit='ops',
+                metadata={
+                    'values': [157442.0, 155885.0, 157480.0],
+                    'timestamps': [
+                        1658945954000.0,
+                        1658945955000.0,
+                        1658945956000.0,
+                    ],
+                    'interval': 1,
+                    'ramp_up_ends': 1658946014000.0,
+                },
+                timestamp=ts_samples[6].timestamp,
+            ),
+            sample.Sample(
+                metric='total_ops',
+                value=156935.66666666666,
+                unit='ops',
+                metadata={},
+                timestamp=ts_samples[7].timestamp,
             ),
         ],
     )
