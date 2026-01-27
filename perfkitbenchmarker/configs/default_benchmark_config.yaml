@@ -457,6 +457,49 @@ fio_object_storage_latency_8kb:
     fio_ramptime: 0
     fio_runtime: 0
 
+fio_remote_ssd_max_iops:
+  name: fio
+  flags:
+    fio_generate_scenarios: rand_8k_read_100%,rand_8k_write_100%
+    fio_io_depths: 256
+    fio_num_jobs: 16
+    fio_runtime: 300
+    fio_target_mode: against_device_without_fill
+  vm_groups:
+    default:
+      disk_spec:
+        GCP:
+          disk_size: 1000
+          disk_type: hyperdisk-extreme
+        AWS:
+          disk_size: 640
+          disk_type: io2
+        Azure:
+          disk_size: 1024
+          disk_type: UltraSSD_LRS
+
+fio_remote_ssd_max_throughput:
+  name: fio
+  flags:
+    provisioned_iops: 100000
+    fio_generate_scenarios: seq_1M_read_100%,seq_1M_write_100%
+    fio_io_depths: 64
+    fio_num_jobs: 8
+    fio_runtime: 300
+    fio_target_mode: against_device_without_fill
+  vm_groups:
+    default:
+      disk_spec:
+        GCP:
+          disk_size: 1000
+          disk_type: hyperdisk-extreme
+        AWS:
+          disk_size: 640
+          disk_type: io2
+        Azure:
+          disk_size: 1024
+          disk_type: UltraSSD_LRS
+
 gpu_jobs_provisioning:
   name: jobs_benchmark
   base_job:
