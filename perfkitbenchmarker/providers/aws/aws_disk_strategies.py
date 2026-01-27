@@ -28,6 +28,7 @@ from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 
@@ -155,6 +156,8 @@ class CreateRemoteDiskStrategy(AWSCreateDiskStrategy):
         ebs_block = collections.OrderedDict()
         ebs_block['VolumeType'] = disk_spec.disk_type
         ebs_block['VolumeSize'] = disk_spec.disk_size
+        if aws_flags.AWS_EBS_CARD_COUNT.value > 1:
+          ebs_block['EbsCardIndex'] = i % aws_flags.AWS_EBS_CARD_COUNT.value
         ebs_block['DeleteOnTermination'] = True
         if disk_spec.provisioned_iops and disk_spec.disk_type in [
             aws_disk.IO1,

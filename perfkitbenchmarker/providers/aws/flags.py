@@ -33,6 +33,9 @@ flags.DEFINE_integer(
     None,
     'Provisioned throughput (MB/s) for (SSD) volumes in AWS.',
 )
+AWS_EBS_CARD_COUNT = flags.DEFINE_integer(
+    'aws_ebs_card_count', 1, 'The number of EBS cards per instance.'
+)
 AWS_NIC_QUEUE_COUNTS = flags.DEFINE_list(
     'aws_nic_queue_counts',
     None,
