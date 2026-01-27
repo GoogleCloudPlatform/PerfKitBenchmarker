@@ -272,7 +272,7 @@ class PostBootLatencyTest(ClusterBootBenchmarkTest):
       )
 
   @mock.patch.object(logging, 'warning')
-  def testFailedCommand(self, mock_warning):
+  def testFailedCommandNonZeroExitCode(self, mock_warning):
     """Tests for the correct error/warning behavior for non-zero exit codes."""
     self.test_vm.RemoteCommandWithReturnCode.return_value = (
         '',
@@ -290,7 +290,33 @@ class PostBootLatencyTest(ClusterBootBenchmarkTest):
     self.assertEqual(result[0].unit, 'count')
     self.assertEqual(result[0].metadata['test_command'], 'test_command')
     mock_warning.assert_called_once_with(
-        'The test command returned a non-zero exit code: %s', 'error message'
+        'The test command failed: %s', 'error message'
+    )
+    self.test_vm.RemoteCommandWithReturnCode.assert_called_once_with(
+        self.test_cmd, ignore_failure=True
+    )
+
+  @mock.patch.object(logging, 'warning')
+  def testFailedCommandNotFound(self, mock_warning):
+    """Tests for the correct error/warning behavior for command not found."""
+    error_message = 'bash: line 1: aws: command not found'
+    self.test_vm.RemoteCommandWithReturnCode.return_value = (
+        '',
+        error_message,
+        0,
+    )
+
+    result = cluster_boot_benchmark._RunPostBootLatencyTest(
+        self.test_cmd, self.test_vm
+    )
+
+    self.assertLen(result, 1)
+    self.assertEqual(result[0].metric, 'Post Boot Command Failed')
+    self.assertEqual(result[0].value, 1)
+    self.assertEqual(result[0].unit, 'count')
+    self.assertEqual(result[0].metadata['test_command'], 'test_command')
+    mock_warning.assert_called_once_with(
+        'The test command failed: %s', error_message
     )
     self.test_vm.RemoteCommandWithReturnCode.assert_called_once_with(
         self.test_cmd, ignore_failure=True

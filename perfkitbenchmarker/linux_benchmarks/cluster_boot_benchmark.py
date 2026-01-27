@@ -521,9 +521,9 @@ def _RunPostBootLatencyTest(
         test_cmd, ignore_failure=True
     )
     after_test_time = time.time()
-    if retcode != 0:
+    if retcode != 0 or 'command not found' in stderr:
       logging.warning(
-          'The test command returned a non-zero exit code: %s', stderr
+          'The test command failed: %s', stderr
       )
       return [sample.Sample(
           'Post Boot Command Failed',
