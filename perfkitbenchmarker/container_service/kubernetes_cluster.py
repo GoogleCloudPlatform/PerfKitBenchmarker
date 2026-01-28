@@ -78,11 +78,16 @@ class KubernetesCluster(container_service.BaseContainerCluster):
       del state['event_poller']
     return state
 
+  @functools.cached_property
+  def k8s_version(self) -> str:
+    """Actual Kubernetes version reported by server."""
+    return kubernetes_commands.GetK8sVersion()
+
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster."""
     result = super().GetResourceMetadata()
     if self.created:
-      result['version'] = kubernetes_commands.GetK8sVersion()
+      result['version'] = self.k8s_version
     return result
 
   def DeployContainer(
@@ -105,9 +110,7 @@ class KubernetesCluster(container_service.BaseContainerCluster):
     self.services[name] = service
     service.Create()
 
-  # TODO(pclay): Move to cached property in Python 3.9
-  @property
-  @functools.lru_cache(maxsize=1)
+  @functools.cached_property
   def node_memory_allocatable(self) -> units.Quantity:
     """Usable memory of each node in cluster in KiB."""
     stdout, _, _ = kubectl.RunKubectlCommand(
@@ -116,8 +119,7 @@ class KubernetesCluster(container_service.BaseContainerCluster):
     )
     return units.ParseExpression(stdout)
 
-  @property
-  @functools.lru_cache(maxsize=1)
+  @functools.cached_property
   def node_num_cpu(self) -> int:
     """vCPU of each node in cluster."""
     stdout, _, _ = kubectl.RunKubectlCommand(

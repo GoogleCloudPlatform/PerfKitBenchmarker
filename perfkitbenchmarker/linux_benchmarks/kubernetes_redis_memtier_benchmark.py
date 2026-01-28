@@ -106,9 +106,9 @@ def _PrepareCluster(bm_spec: _BenchmarkSpec):
   ) as rendered_manifest:
     kubernetes_commands.ApplyManifest(rendered_manifest.name)
 
-  bm_spec.container_cluster.WaitForRollout('statefulset/redis')
+  kubernetes_commands.WaitForRollout('statefulset/redis')
 
-  pod_ips = bm_spec.container_cluster.GetPodIps('statefulset/redis')
+  pod_ips = kubernetes_commands.GetPodIps('statefulset/redis')
   ip_and_port_list = list(map(lambda ip: '%s:%s' % (ip, redis_port), pod_ips))
   cmd = [
       'redis-cli',
@@ -118,7 +118,7 @@ def _PrepareCluster(bm_spec: _BenchmarkSpec):
       '1',
       '--cluster-yes',
   ] + ip_and_port_list
-  bm_spec.container_cluster.RunKubectlExec('redis-0', cmd)
+  kubernetes_commands.RunKubectlExec('redis-0', cmd)
 
   bm_spec.redis_endpoint_ip = pod_ips[0]
 
