@@ -1,31 +1,12 @@
 image:
   tag: "479"
 server:
-  config:
-    query:
-      maxMemory: "20000GB"
   workers: {{ num_workers }}
 coordinator:
-  jvm:
-    maxHeapSize: "104G"
-    additionalJVMConfig: |
-      -Xms104G
   readinessProbe:
     initialDelaySeconds: 120
   livenessProbe:
     initialDelaySeconds: 120
-worker:
-  config:
-    query:
-      maxMemoryPerNode: "120GB"
-  jvm:
-    maxHeapSize: "195G"
-  resources:
-    requests:
-      memory: 210Gi
-      ephemeral-storage: 200Gi
-    limits:
-      ephemeral-storage: 200Gi
 
 additionalConfigProperties:
   - query.max-writer-task-count=600
@@ -85,4 +66,4 @@ catalogs:
     fs.memory-cache.max-size=1GB
     fs.cache.enabled=true
     fs.cache.directories=/tmp/trino-cache
-    fs.cache.max-sizes=100GB
+    fs.cache.max-disk-usage-percentages=80

@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 
 from absl import flags
@@ -81,6 +82,31 @@ class TrinoTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(db.client_interface.hostname, '1.0.0.0')
     self.assertEqual(db.client_interface.port, 12345)
     self.assertEqual(db.client_interface.http_scheme, trino.HttpScheme.HTTP)
+
+  def testYamlWritten(self):
+    # Arrange.
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'GetTempDir',
+            return_value=tempfile.gettempdir(),
+        )
+    )
+    self.enter_context(flagsaver.flagsaver(trino_worker_memory=100))
+    EDW_SERVICE_SPEC.node_count = 5
+    db = trino.Trino(EDW_SERVICE_SPEC)
+    mock_kubernetes = mock.create_autospec(
+        container_service.KubernetesCluster, instance=True
+    )
+    db.SetContainerCluster(mock_kubernetes)
+    # Act.
+    with self.assertLogs(level='DEBUG') as logs:
+      db._WriteConfigYaml()
+    # Assert.
+    full_logs = ';'.join(logs.output)
+    self.assertIn('maxHeapSize: 75G', full_logs)
+    self.assertIn('maxMemory: 112GB', full_logs)
+    self.assertIn('maxMemoryPerNode: 22GB', full_logs)
 
 
 if __name__ == '__main__':

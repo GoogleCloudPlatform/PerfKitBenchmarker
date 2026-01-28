@@ -76,6 +76,17 @@ flags.DEFINE_string(
     'Named Snowflake connection defined in SnowSQL config file.'
     'https://docs.snowflake.net/manuals/user-guide/snowsql-start.html#using-named-connections',
 )  # pylint: disable=line-too-long
+TRINO_CATALOG = flags.DEFINE_string(
+    'trino_catalog', 'dpms', 'Catalog for Trino.'
+)
+TRINO_SCHEMA = flags.DEFINE_string(
+    'trino_schema', 'imt_tpcds_10t', 'Trino schema to use.'
+)
+TRINO_MEMORY = flags.DEFINE_integer(
+    'trino_worker_memory',
+    200,
+    'Amount of memory in GiB used by each Trino worker.',
+)
 flags.DEFINE_integer(
     'edw_suite_iterations', 1, 'Number of suite iterations to perform.'
 )

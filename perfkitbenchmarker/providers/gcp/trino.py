@@ -14,6 +14,7 @@ import urllib.parse
 from absl import flags
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import edw_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.container_service import kubectl
@@ -29,16 +30,14 @@ class HttpScheme(enum.Enum):
   HTTPS = 'https'
 
 
-_TRINO_CATALOG = flags.DEFINE_string(
-    'trino_catalog', 'dpms', 'Catalog for Trino.'
-)
-_TRINO_SCHEMA = flags.DEFINE_string(
-    'trino_schema', 'imt_tpcds_10t', 'Trino schema to use.'
-)
-
 _TRINO_PYTHON_CLIENT_FILE = 'trino_python_driver.py'
 _TRINO_PYTHON_CLIENT_DIR = 'edw/trino/clients/python'
 _TRINO_CHART = 'container/trino.yaml.j2'
+
+
+def _MemoryToString(memory: float) -> str:
+  """Returns the memory number as a string."""
+  return f'{round(memory)}G'
 
 
 class TrinoClientInterface(edw_service.EdwClientInterface):
@@ -141,10 +140,11 @@ class Trino(edw_service.EdwService):
     self.name = f'pkb-{FLAGS.run_uri}'
     self.address: str = ''
     self.project: str = FLAGS.project
+    self.memory: int = edw_service.TRINO_MEMORY.value
 
     self.client_interface: TrinoClientInterface = TrinoClientInterface(
-        catalog=_TRINO_CATALOG.value,
-        schema=_TRINO_SCHEMA.value,
+        catalog=edw_service.TRINO_CATALOG.value,
+        schema=edw_service.TRINO_SCHEMA.value,
     )
 
   def IsUserManaged(self, edw_service_spec):
@@ -167,13 +167,47 @@ class Trino(edw_service.EdwService):
         _TRINO_CHART,
         **{
             'num_workers': self.node_count,
+            'memory': self.memory,
             'hive_uri': self.endpoint,
             'project': self.project,
         },
     )
     yaml_dicts = vm_util.ReadYamlAsDicts(contents)
     yaml_dict: dict[str, Any] = yaml_dicts[0]
-    # TODO(howellz): Add support for memory.
+    # From Trino sizing guidelines:
+    # https://vjain143.github.io/Trino_Memory_Sizing_Guidelines.html
+    jvm_heap_size_num: float = self.memory * 0.75
+    query_size_per_node_num: float = 0.3 * jvm_heap_size_num
+    jvm_heap_size_str: str = _MemoryToString(jvm_heap_size_num)
+    yaml_dict['server']['config'] = {
+        'query': {
+            'maxMemory': (
+                f'{_MemoryToString(query_size_per_node_num * self.node_count)}B'
+            ),
+        }
+    }
+    yaml_dict['coordinator']['jvm'] = {
+        'maxHeapSize': jvm_heap_size_str,
+        'additionalJVMConfigs': f'-Xms{jvm_heap_size_str}',
+    }
+    yaml_dict['worker'] = {
+        'config': {
+            'query': {
+                'maxMemoryPerNode': (
+                    f'{_MemoryToString(query_size_per_node_num)}B'
+                ),
+            }
+        },
+        'jvm': {
+            'maxHeapSize': jvm_heap_size_str,
+        },
+        'resources': {
+            'requests': {
+                'memory': f'{_MemoryToString(self.memory)}i',
+                'ephemeral-storage': f'{_MemoryToString(self.memory)}i',
+            },
+        },
+    }
     return vm_util.WriteYaml([yaml_dict], should_log_file=True)
 
   def _Create(self):
@@ -251,11 +285,16 @@ class Trino(edw_service.EdwService):
 
   def _Exists(self):
     """Checks if Trino exists (or at least if its pods do)."""
-    kubernetes_commands.WaitForRollout(
-        f'deployment.apps/{self.name}-trino-worker',
-        timeout=60 * 5,
-    )
-    return True
+    try:
+      kubernetes_commands.WaitForRollout(
+          f'deployment.apps/{self.name}-trino-worker',
+          timeout=60 * 5,
+      )
+      return True
+    except errors.VmUtil.IssueCommandError as e:
+      if 'not found' in str(e):
+        return False
+      raise
 
   def _Delete(self):
     """Deleting the cluster."""
