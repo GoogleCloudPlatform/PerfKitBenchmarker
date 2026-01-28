@@ -640,3 +640,6 @@
 -   Add `--gce_extra_network_interface_options` flag.
 -   Add pyink as a precommit hook for GitHub PRs. This was already recommended
     practice but is now done automatically.
+-   Added --ycsb_load_max_error_rates and --ycsb_run_max_error_rates as a more
+    general solution that can be used with or instead of --ycsb_max_error_rate
+    and --ycsb_fail_on_incomplete_loading.

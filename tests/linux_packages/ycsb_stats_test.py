@@ -199,22 +199,48 @@ class BadResultParserTestCase(unittest.TestCase):
 
   def testBadTestRun(self):
     contents = open_data_file('ycsb-test-run-3.dat')
-    self.assertRaises(
-        errors.Benchmarks.KnownIntermittentError,
-        ycsb_stats.ParseResults,
-        contents,
-        'histogram',
-    )
+    with self.assertRaises(errors.Benchmarks.KnownIntermittentError):
+      ycsb_stats.ParseResults(contents, 'histogram')
 
-  def testErrorRate(self):
+  def testBlanketErrorRate(self):
     contents = open_data_file('ycsb-test-run-4.dat')
-    self.assertRaises(
-        errors.Benchmarks.RunError,
-        ycsb_stats.ParseResults,
+    with self.assertRaises(errors.Benchmarks.RunError):
+      ycsb_stats.ParseResults(
+          contents,
+          'hdrhistogram',
+          0.95,
+      )
+
+  def testPerOpErrorRateUnset(self):
+    contents = open_data_file('ycsb-test-run-5.dat')
+    with self.assertRaises(errors.Benchmarks.RunError):
+      # Default of 95% should fail because `read` has a 96% error rate.
+      ycsb_stats.ParseResults(
+          contents,
+          'hdrhistogram',
+          0.95,
+      )
+
+  def testPerOpErrorRatePartiallySet(self):
+    contents = open_data_file('ycsb-test-run-5.dat')
+    # Should not fail because we override the threshold for `read` to 99%.
+    ycsb_stats.ParseResults(
         contents,
         'hdrhistogram',
         0.95,
+        {'read': 0.99},
     )
+
+  def testPerOpErrorRateFullySet(self):
+    contents = open_data_file('ycsb-test-run-5.dat')
+    with self.assertRaises(errors.Benchmarks.RunError):
+      # Should fail again because we want 10% or less errors for `insert`.
+      ycsb_stats.ParseResults(
+          contents,
+          'hdrhistogram',
+          0.95,
+          {'read': 0.99, 'insert': 0.1, 'update': 0.99},
+      )
 
 
 class WeightedQuantileTestCase(unittest.TestCase):

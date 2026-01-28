@@ -333,7 +333,11 @@ def _ParseStatusLine(line: str) -> Iterator[_OpResult]:
   return (_OpResult.FromStatusLine(match) for match in matches)
 
 
-def _ValidateErrorRate(result: YcsbResult, threshold: float) -> None:
+def _ValidateErrorRate(
+    result: YcsbResult,
+    default_threshold: float,
+    per_op_thresholds: dict[str, float] | None = None,
+) -> None:
   """Raises an error if results contains entries with too high error rate.
 
   Computes the error rate for each operation, example output looks like:
@@ -351,13 +355,18 @@ def _ValidateErrorRate(result: YcsbResult, threshold: float) -> None:
 
   Args:
     result: The result of running ParseResults()
-    threshold: The error rate before throwing an exception. 1.0 means no
-      exception will be thrown, 0.0 means an exception is always thrown.
+    default_threshold: The error rate before throwing an exception. 1.0 means no
+      exception will be thrown, 0.0 means an exception is thrown for any error.
+    per_op_thresholds: A dict of operation name to error rate threshold. If
+      set, these thresholds will take precedence over the default_threshold.
 
   Raises:
     errors.Benchmarks.RunError: If the computed error rate is higher than the
       threshold.
   """
+  if per_op_thresholds is None:
+    per_op_thresholds = {}
+
   for operation in result.groups.values():
     name, stats = operation.group, operation.statistics
     # The operation count can be 0 or keys may be missing from the output
@@ -371,6 +380,7 @@ def _ValidateErrorRate(result: YcsbResult, threshold: float) -> None:
     if count == 0:
       continue
     error_rate = failed_count / count
+    threshold = per_op_thresholds.get(name, default_threshold)
     if error_rate > threshold:
       raise errors.Benchmarks.RunError(
           f'YCSB had a {error_rate} error rate for {name}, higher than '
@@ -381,7 +391,8 @@ def _ValidateErrorRate(result: YcsbResult, threshold: float) -> None:
 def ParseResults(
     ycsb_result_string: str,
     data_type: str = 'histogram',
-    error_rate_threshold: float = 1.0,
+    default_error_rate_threshold: float = 1.0,
+    per_op_error_rate_thresholds: dict[str, float] | None = None,
     timestamp_offset_sec: int = 0,
     epoch_start_time: int = 0,
 ) -> 'YcsbResult':
@@ -464,8 +475,11 @@ def ParseResults(
       and 'hdrhistogram' datasets are in the same format, with the difference
       being lacking the (millisec, count) histogram component. Hence are parsed
       similarly.
-    error_rate_threshold: Error statistics in the output should not exceed this
-      ratio.
+    default_error_rate_threshold: Error statistics in the output should not
+      exceed this ratio.
+    per_op_error_rate_thresholds: A dict of operation name to error rate
+      threshold. If set, these thresholds will take precedence over the
+      default_error_rate_threshold.
     timestamp_offset_sec: The number of seconds to offset the timestamp by for
       runs measuring the status time series. Useful for if there are multiple
       runs back-to-back.
@@ -477,6 +491,7 @@ def ParseResults(
   Raises:
     IOError: If the results contained unexpected lines.
   """
+
   if (
       'redis.clients.jedis.exceptions.JedisConnectionException'
       in ycsb_result_string
@@ -550,7 +565,9 @@ def ParseResults(
     result.groups[operation] = _OpResult.FromSummaryLines(
         lines, operation, data_type
     )
-  _ValidateErrorRate(result, error_rate_threshold)
+  _ValidateErrorRate(
+      result, default_error_rate_threshold, per_op_error_rate_thresholds
+  )
   return result
 
 

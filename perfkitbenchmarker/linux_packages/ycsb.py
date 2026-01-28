@@ -323,22 +323,38 @@ _SHOULD_FAIL_ON_INCOMPLETE_LOADING = flags.DEFINE_boolean(
     'ycsb_fail_on_incomplete_loading',
     False,
     'Whether to fail the benchmarking if loading is not complete, '
-    'e.g., there are insert failures.',
+    'e.g., there are insert failures. Takes precedence over any "insert" value'
+    ' set in --ycsb_load_error_rate_thresholds.',
 )
 _INCOMPLETE_LOADING_METRIC = flags.DEFINE_string(
     'ycsb_insert_error_metric',
     'insert Return=ERROR',
-    'Used with --ycsb_fail_on_incomplete_loading. Will fail the benchmark if '
-    "this metric's value is non-zero. This metric should be an indicator of "
-    'incomplete table loading. If insertion retries are enabled via '
-    'core_workload_insertion_retry_limit, then the default metric may be '
-    'non-zero even though the retried insertion eventually succeeded.',
+    'DEPRECATED: Use --ycsb_load_error_rate_thresholds instead.',
+)
+_LOAD_MAX_ERROR_RATES = flags.DEFINE_list(
+    'ycsb_load_max_error_rates',
+    [],
+    'Comma-separated list of "key=value" pairs, where the key is the operation'
+    ' name and the value is the error rate threshold during the load stage.'
+    ' A value of 1.0 will ignore all errors.'
+    ' insert=0.0 will be set if --ycsb_fail_on_incomplete_loading is true.'
+    ' Operations not specified will default to using --ycsb_max_error_rate.',
+)
+_RUN_MAX_ERROR_RATES = flags.DEFINE_list(
+    'ycsb_run_max_error_rates',
+    [],
+    'Comma-separated list of "key=value" pairs, where the key is the operation'
+    ' name and the value is the error rate threshold during the run stage.'
+    ' A value of 1.0 will ignore all errors.'
+    ' Operations not specified will default to using --ycsb_max_error_rate.',
 )
 _ERROR_RATE_THRESHOLD = flags.DEFINE_float(
     'ycsb_max_error_rate',
     1.00,
-    'The maximum error rate allowed for the run. '
-    'By default, this allows any number of errors.',
+    'The maximum error rate allowed for the run for any operation not'
+    ' specified in --ycsb_run_max_error_rates or '
+    '--ycsb_load_max_error_rates. '
+    'The default flag values allows any number of errors.',
 )
 
 # CPU optimization mode flags
@@ -597,6 +613,27 @@ def _GetRunParameters() -> dict[str, str]:
   for kv in FLAGS.ycsb_run_parameters:
     param, value = kv.split('=', 1)
     result[param] = value
+  return result
+
+
+def _GetLoadPerOpErrorRateThresholds() -> dict[str, float]:
+  """Returns a dict of params from the --ycsb_load_max_error_rates flag."""
+  result = {}
+  for kv in _LOAD_MAX_ERROR_RATES.value:
+    operation, value = kv.split('=', 1)
+    result[operation.lower()] = float(value)
+
+  if _SHOULD_FAIL_ON_INCOMPLETE_LOADING.value:
+    result['insert'] = 0.0
+  return result
+
+
+def _GetRunPerOpErrorRateThresholds() -> dict[str, float]:
+  """Returns a dict of params from the --ycsb_run_max_error_rates flag."""
+  result = {}
+  for kv in _RUN_MAX_ERROR_RATES.value:
+    operation, value = kv.split('=', 1)
+    result[operation.lower()] = float(value)
   return result
 
 
@@ -915,10 +952,11 @@ class YCSBExecutor:
     stdout, stderr = vm.RobustRemoteCommand(command)
     try:
       return ycsb_stats.ParseResults(
-          str(stderr + stdout),
-          self.measurement_type,
-          _ERROR_RATE_THRESHOLD.value,
-          start,
+          ycsb_result_string=str(stderr + stdout),
+          data_type=self.measurement_type,
+          default_error_rate_threshold=_ERROR_RATE_THRESHOLD.value,
+          per_op_error_rate_thresholds=_GetLoadPerOpErrorRateThresholds(),
+          timestamp_offset_sec=start,
       )
     except errors.Benchmarks.RunError:
       logging.error(
@@ -1053,11 +1091,11 @@ class YCSBExecutor:
     stdout, stderr = vm.RobustRemoteCommand(command)
     try:
       return ycsb_stats.ParseResults(
-          str(stderr + stdout),
-          self.measurement_type,
-          _ERROR_RATE_THRESHOLD.value,
-          self.burst_time_offset_sec,
-          start,
+          ycsb_result_string=str(stderr + stdout),
+          data_type=self.measurement_type,
+          default_error_rate_threshold=_ERROR_RATE_THRESHOLD.value,
+          per_op_error_rate_thresholds=_GetRunPerOpErrorRateThresholds(),
+          timestamp_offset_sec=start,
       )
     except errors.Benchmarks.RunError:
       logging.error(
@@ -1386,22 +1424,10 @@ class YCSBExecutor:
     load_samples = []
     assert workloads, 'no workloads'
 
-    def _HasInsertFailures(result_samples):
-      for s in result_samples:
-        if s.metric == _INCOMPLETE_LOADING_METRIC.value and s.value > 0:
-          return True
-      return False
-
     if FLAGS.ycsb_reload_database or not self.loaded:
       load_samples += list(
           self._LoadThreaded(vms, workloads[0], **(load_kwargs or {}))
       )
-      if _SHOULD_FAIL_ON_INCOMPLETE_LOADING.value and _HasInsertFailures(
-          load_samples
-      ):
-        raise errors.Benchmarks.RunError(
-            'There are insert failures, so the table loading is incomplete'
-        )
 
       self.loaded = True
     if FLAGS.ycsb_sleep_after_load_in_sec > 0:
