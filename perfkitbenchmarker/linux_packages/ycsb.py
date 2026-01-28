@@ -326,11 +326,6 @@ _SHOULD_FAIL_ON_INCOMPLETE_LOADING = flags.DEFINE_boolean(
     'e.g., there are insert failures. Takes precedence over any "insert" value'
     ' set in --ycsb_load_error_rate_thresholds.',
 )
-_INCOMPLETE_LOADING_METRIC = flags.DEFINE_string(
-    'ycsb_insert_error_metric',
-    'insert Return=ERROR',
-    'DEPRECATED: Use --ycsb_load_error_rate_thresholds instead.',
-)
 _LOAD_MAX_ERROR_RATES = flags.DEFINE_list(
     'ycsb_load_max_error_rates',
     [],

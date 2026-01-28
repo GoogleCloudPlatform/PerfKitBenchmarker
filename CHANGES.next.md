@@ -490,9 +490,7 @@
 -   Make RunBenchmark handle KeyboardInterrupt so that benchmark specific
     resources can be cleaned up on cancellation. Expose these errors via status.
 -   Added --ycsb_fail_on_incomplete_loading flag to allow the test to fail fast
-    in the case of table loading failures. --ycsb_insert_error_metric can be
-    used to determine which metric indicates that loading failed (defaults to
-    'insert Return=ERROR').
+    in the case of table loading failures.
 -   Enable the aggregation for "Return=NOT_FOUND" errors.
 -   Added no_proxy flag for proxy settings
 -   Stop attempting to delete PKB resources that failed to create.
