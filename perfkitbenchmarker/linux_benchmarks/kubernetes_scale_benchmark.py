@@ -236,7 +236,7 @@ def ScaleUpPods(
   if is_eks_karpenter_aws_gpu:
     manifest_kwargs['GpuTaintKey'] = 'nvidia.com/gpu'
 
-  yaml_docs = cluster.ConvertManifestToYamlDicts(
+  yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
       MANIFEST_TEMPLATE,
       **manifest_kwargs,
   )
