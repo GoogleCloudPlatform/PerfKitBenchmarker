@@ -125,6 +125,7 @@ flags.DEFINE_integer(
 flags.DEFINE_string(
     'managed_db_tier', None, 'Tier in azure. (Basic, Standard, Premium).'
 )
+flags.DEFINE_string('db_family', None, 'The database family to use.')
 flags.DEFINE_string('server_vm_os_type', None, 'OS type of the client vm.')
 flags.DEFINE_string('client_vm_os_type', None, 'OS type of the client vm.')
 flags.DEFINE_string(

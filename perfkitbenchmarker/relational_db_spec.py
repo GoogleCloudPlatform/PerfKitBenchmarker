@@ -76,6 +76,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
   db_disk_spec: disk.BaseDiskSpec
   db_spec: virtual_machine.BaseVmSpec
   load_machine_type: str
+  family: str
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -167,6 +168,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
         ),
         'backup_enabled': (option_decoders.BooleanDecoder, {'default': True}),
         'is_managed_db': (option_decoders.BooleanDecoder, {'default': True}),
+        'family': (option_decoders.StringDecoder, {'default': None}),
         'db_tier': (option_decoders.StringDecoder, {'default': None}),
         'db_spec': (spec.PerCloudConfigDecoder, {}),
         'db_disk_spec': (spec.PerCloudConfigDecoder, {}),
@@ -338,6 +340,8 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       ] = flag_values.managed_db_azure_compute_units
     if flag_values['managed_db_tier'].present:
       config_values['db_tier'] = flag_values.managed_db_tier
+    if flag_values['db_family'].present:
+      config_values['family'] = flag_values.db_family
     if has_client_machine_type:
       config_values['vm_groups']['clients']['vm_spec'][cloud][
           'machine_type'
