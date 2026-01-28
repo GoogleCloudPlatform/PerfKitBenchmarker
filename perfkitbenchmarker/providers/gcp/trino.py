@@ -288,7 +288,7 @@ class Trino(edw_service.EdwService):
     try:
       kubernetes_commands.WaitForRollout(
           f'deployment.apps/{self.name}-trino-worker',
-          timeout=60 * 5,
+          timeout=60 * 4 + 20 * self.node_count,
       )
       return True
     except errors.VmUtil.IssueCommandError as e:
