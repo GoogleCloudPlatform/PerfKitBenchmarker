@@ -67,13 +67,15 @@ _DPDK_PKTGEN_NUM_FLOWS = flags.DEFINE_integer(
     'Number of flows to use by taking a range of source ports.',
     lower_bound=0,
 )
+# Pktgen-dpdk perform incorrectly with multiple threads, causing both incorrect
+# count on the receiver and severe performance limitations. Hence restrict the
+# test to single thread. This limits the sending rate to approximately 50-55Mpps
+# but the TX path on the NIC is throttled at 48Mpps anyways.
+# https://github.com/pktgen/Pktgen-DPDK/issues/369#issue-3777028887
 _DPDK_PKTGEN_TX_RX_LCORES_LIST = flags.DEFINE_list(
     'dpdk_pktgen_tx_rx_lcores_list',
     [
-        '[8:1];[1:8]',
-        '[8:1-2];[1-2:8]',
-        '[8:1-4];[1-4:8]',
-        '[8:1-7];[1-7:8]',
+        '[2:1];[1:2]',
     ],
     'A list of strings designating logical cores assigned to TX and RX. Each'
     ' string is in the form'
@@ -84,11 +86,15 @@ _DPDK_PKTGEN_NUM_MEMORY_CHANNELS_PER_NUMA = flags.DEFINE_integer(
     1,
     'Number of memory channels per NUMA node.',
 )
+# Use txburst=8, large enough to send sufficiently fast, small enough to avoid
+# too much burstiness (only matters on the sender).
 _DPDK_PKTGEN_TX_BURST = flags.DEFINE_integer(
-    'dpdk_pktgen_tx_burst', 1, 'The TX burst size.'
+    'dpdk_pktgen_tx_burst', 8, 'The TX burst size.'
 )
+# Use rxburst=64 to be fast enough in draining data, larger values have
+# negligible benefits (only matters on the receiver).
 _DPDK_PKTGEN_RX_BURST = flags.DEFINE_integer(
-    'dpdk_pktgen_rx_burst', 1, 'The RX burst size.'
+    'dpdk_pktgen_rx_burst', 64, 'The RX burst size.'
 )
 _DPDK_PKTGEN_TXD = flags.DEFINE_integer(
     'dpdk_pktgen_txd', 8192, 'The size of the TX descriptor ring size.'
@@ -98,7 +104,10 @@ _DPDK_PKTGEN_RXD = flags.DEFINE_integer(
 )
 
 # DPDK Pktgen maximum logical cores
-_MAX_LCORES = 128
+# _MAX_LCORES is not really useful, pktgen-dpdk is buggy with multiple tx/rx
+# queues so we only need 1 core for 1 tx queue, 1 core for 1 rx queue, and 1 to
+# run the User interface.
+_MAX_LCORES = 16
 _START_RATE = 100000000
 # Percent difference in PPS between consecutive iterations to terminate binary
 # search.
@@ -145,10 +154,23 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       'sudo sed -i "s/start all//g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
-  # Ensure receiver runs longer than sender. Receiver starts 1 second before
-  # sender, so make receiver duration 2 seconds longer.
+  # Remove sender config from receiver pktgen.pkt file.
   receiver_vm.RemoteCommand(
-      f'sudo sed -i "s/<DURATION>/{_DPDK_PKTGEN_DURATION.value+2}/g"'
+      f'sudo sed -i "/# BEGIN_SENDER_CONFIG/,/# END_SENDER_CONFIG/d" '
+      f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+  )
+
+  sender_vm.RemoteCommand(
+      f'sudo sed -i '
+      f'-e "/# .*_SENDER_CONFIG/d" '
+      f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+  )
+
+  # Ensure receiver runs longer than sender. Receiver starts 1 second before
+  # sender, and sender has a 2 seconds small packet tranimission of 500 for
+  # warmup. So make receiver duration 5 seconds longer.
+  receiver_vm.RemoteCommand(
+      f'sudo sed -i "s/<DURATION>/{_DPDK_PKTGEN_DURATION.value+5}/g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
   sender_vm.RemoteCommand(
