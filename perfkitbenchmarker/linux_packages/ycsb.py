@@ -913,12 +913,23 @@ class YCSBExecutor:
     command = self._BuildCommand('load', **kwargs)
     start = round(time.time())
     stdout, stderr = vm.RobustRemoteCommand(command)
-    return ycsb_stats.ParseResults(
-        str(stderr + stdout),
-        self.measurement_type,
-        _ERROR_RATE_THRESHOLD.value,
-        start,
-    )
+    try:
+      return ycsb_stats.ParseResults(
+          str(stderr + stdout),
+          self.measurement_type,
+          _ERROR_RATE_THRESHOLD.value,
+          start,
+      )
+    except errors.Benchmarks.RunError:
+      logging.error(
+          'YCSB error rate too high for VM %s\n'
+          'COMMAND: %s\nSTDOUT: %s\nSTDERR: %s',
+          vm.name,
+          command,
+          stdout,
+          stderr,
+      )
+      raise
 
   def _LoadThreaded(self, vms, workload_file, **kwargs):
     """Runs "Load" in parallel for each VM in VMs.
@@ -1040,13 +1051,24 @@ class YCSBExecutor:
       vm.RemoteCommand('mkdir -p {}'.format(hdr_files_dir))
     start = round(time.time())
     stdout, stderr = vm.RobustRemoteCommand(command)
-    return ycsb_stats.ParseResults(
-        str(stderr + stdout),
-        self.measurement_type,
-        _ERROR_RATE_THRESHOLD.value,
-        self.burst_time_offset_sec,
-        start,
-    )
+    try:
+      return ycsb_stats.ParseResults(
+          str(stderr + stdout),
+          self.measurement_type,
+          _ERROR_RATE_THRESHOLD.value,
+          self.burst_time_offset_sec,
+          start,
+      )
+    except errors.Benchmarks.RunError:
+      logging.error(
+          'YCSB error rate too high for VM %s\n'
+          'COMMAND: %s\nSTDOUT: %s\nSTDERR: %s',
+          vm.name,
+          command,
+          stdout,
+          stderr,
+      )
+      raise
 
   def _RunThreaded(self, vms, **kwargs):
     """Run a single workload using `vms`."""
