@@ -1040,11 +1040,10 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.extend(efas)
     elif self.network_eni_count > 1:
       enis = ['--network-interfaces']
-      enis_per_network_card = self.network_eni_count // self.network_card_count
       for device_index in range(self.network_eni_count):
         eni_params = _ENI_PARAMS.copy()
         eni_params.update({
-            'NetworkCardIndex': device_index // enis_per_network_card,
+            'NetworkCardIndex': device_index % self.network_card_count,
             'DeviceIndex': device_index,
             'Groups': self.group_id,
             'SubnetId': self.network.subnet.id,
