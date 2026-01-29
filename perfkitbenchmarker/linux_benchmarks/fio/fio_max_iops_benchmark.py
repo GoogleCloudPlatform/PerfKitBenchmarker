@@ -38,7 +38,7 @@ fio_max_iops:
     fio_fill_block_size: 128k
     fio_runtime: 120
 """
-IODEPTH = 128
+IODEPTH = 256
 NUMJOBS = [4, 8, 16, 32, 64, 128, 256]
 
 
