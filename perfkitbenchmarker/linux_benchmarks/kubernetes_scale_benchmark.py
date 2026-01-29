@@ -168,7 +168,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
     unused = 0
     pod_samples = ParseStatusChanges('pod', unused)
     # Log & check for quota failure.
-    _CheckForFailures(cluster, pod_samples, 1)
+    CheckForFailures(cluster, pod_samples, 1)
 
   initial_nodes = set(kubernetes_commands.GetNodeNames())
   initial_pods = set(kubernetes_commands.GetPodNames())
@@ -177,7 +177,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   start_time = _GetRolloutCreationTime(rollout_name)
   pod_samples = ParseStatusChanges('pod', start_time, initial_pods)
   samples += pod_samples
-  _CheckForFailures(cluster, pod_samples, NUM_PODS.value - 1)
+  CheckForFailures(cluster, pod_samples, NUM_PODS.value - 1)
   samples += ParseStatusChanges(
       'node', start_time, resources_to_ignore=initial_nodes
   )
@@ -287,7 +287,7 @@ def ScaleUpPods(
     return [], rollout_name
 
 
-def _CheckForFailures(
+def CheckForFailures(
     cluster: container_service.KubernetesCluster,
     pod_samples: list[sample.Sample],
     num_pods: int,

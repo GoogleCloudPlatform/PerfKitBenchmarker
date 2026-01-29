@@ -318,7 +318,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.cluster.event_poller = container_service.KubernetesEventPoller(
         set
     )
-    kubernetes_scale_benchmark._CheckForFailures(
+    kubernetes_scale_benchmark.CheckForFailures(
         self.cluster,
         [
             sample.Sample('pod_Ready_p90', 95.0, 'seconds'),
@@ -344,7 +344,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         }
     )
     with self.assertRaises(errors.Benchmarks.RunError):
-      kubernetes_scale_benchmark._CheckForFailures(
+      kubernetes_scale_benchmark.CheckForFailures(
           self.cluster,
           [
               sample.Sample('pod_Ready_count', 5, 'count'),
@@ -373,7 +373,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         }
     )
     with self.assertRaises(errors.Benchmarks.QuotaFailure):
-      kubernetes_scale_benchmark._CheckForFailures(
+      kubernetes_scale_benchmark.CheckForFailures(
           self.cluster,
           [
               sample.Sample('pod_Ready_count', 5, 'count'),
