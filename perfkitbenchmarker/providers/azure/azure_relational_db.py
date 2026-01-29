@@ -102,6 +102,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       )
     self.region = util.GetRegionFromZone(self.spec.db_spec.zone)
     self.resource_group = azure_network.GetResourceGroup(self.region)
+    self.database_name = DEFAULT_DATABASE_NAME
 
   def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns the metadata associated with the resource.
