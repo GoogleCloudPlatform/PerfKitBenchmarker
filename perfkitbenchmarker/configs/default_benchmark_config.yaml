@@ -65,7 +65,6 @@ netperf_tcp_rr:
   flags:
     netperf_benchmarks: TCP_RR
     netperf_num_streams: 1
-    gce_prefer_rack_placement: True
     sar: True
 
 netperf_tcp_stream:

@@ -27,6 +27,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 
 FLAGS = flags.FLAGS
@@ -71,7 +72,6 @@ class GcePlacementGroupSpec(placement_group.BasePlacementGroupSpec):
                 'default': placement_group.PLACEMENT_GROUP_NONE,
             },
         ),
-        'max_distance': (option_decoders.IntDecoder, {'default': None}),
     })
     return result
 
@@ -102,12 +102,13 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
       self.availability_domain_count = FLAGS.gce_availability_domain_count
     else:
       self.availability_domain_count = self.num_vms
-    self.max_distance = gce_placement_group_spec.max_distance
 
     self.metadata.update({
         'placement_group_name': self.name,
         'placement_group_style': self.style,
-        'placement_group_max_distance': self.max_distance,
+        'placement_group_max_distance': (
+            gcp_flags.GCE_PLACEMENT_GROUP_MAX_DISTANCE.value
+        ),
     })
 
   def _Create(self):
@@ -125,7 +126,7 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
     # beta API for max-distance
     # https://cloud.google.com/sdk/gcloud/reference/alpha/compute/resource-policies/create/group-placement
     # https://cloud.google.com/sdk/gcloud/reference/beta/compute/resource-policies/create/group-placement
-    if self.max_distance:
+    if gcp_flags.GCE_PLACEMENT_GROUP_MAX_DISTANCE.value:
       cmd = gcp_util.GcloudCommand(
           self,
           'beta',
@@ -162,8 +163,10 @@ class GcePlacementGroup(placement_group.BasePlacementGroup):
           {'availability_domain_count': self.availability_domain_count}
       )
 
-    if self.max_distance:
-      placement_policy['max-distance'] = self.max_distance
+    if gcp_flags.GCE_PLACEMENT_GROUP_MAX_DISTANCE.value:
+      placement_policy['max-distance'] = (
+          gcp_flags.GCE_PLACEMENT_GROUP_MAX_DISTANCE.value
+      )
     cmd.flags.update(placement_policy)
 
     _, stderr, retcode = cmd.Issue(raise_on_failure=False)
