@@ -29,7 +29,6 @@ from perfkitbenchmarker import mysql_iaas_relational_db
 from perfkitbenchmarker import postgres_iaas_relational_db
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import relational_db
-from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import sqlserver_iaas_relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
@@ -40,17 +39,7 @@ DEFAULT_DATABASE_NAME = 'database'
 
 FLAGS = flags.FLAGS
 
-DEFAULT_SQLSERVER_VERSION = 'DEFAULT'
-
 IS_READY_TIMEOUT = 60 * 60  # 1 hour (might take some time to prepare)
-
-# Longest time recorded is 20 minutes when
-# creating STANDARD_D64_V3 - 12/02/2020
-# The Azure command timeout with the following error message:
-#
-# Deployment failed. Correlation ID: fcdc3c76-33cc-4eb1-986c-fbc30ce7d820.
-# The operation timed out and automatically rolled back.
-# Please retry the operation.
 CREATE_AZURE_DB_TIMEOUT = 60 * 30
 
 
@@ -100,8 +89,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
   """
 
   CLOUD = provider_info.AZURE
-  ENGINE = [sql_engine_utils.SQLSERVER]
-  SERVER_TYPE = 'server'
+  SERVER_TYPE = ''
   REQUIRED_ATTRS = ['CLOUD', 'IS_MANAGED', 'ENGINE']
 
   database_name: str
@@ -143,52 +131,11 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
       RelationalDbEngineNotFoundError: if an unknown engine is
                                                   requested.
     """
-    if engine == sql_engine_utils.SQLSERVER:
-      return DEFAULT_SQLSERVER_VERSION
-    else:
-      raise relational_db.RelationalDbEngineNotFoundError(
-          'Unsupported engine {}'.format(engine)
-      )
+    raise NotImplementedError()
 
   def GetAzCommandForEngine(self) -> str:
-    engine = self.spec.engine
-    if engine == sql_engine_utils.SQLSERVER:
-      return 'sql'
-    raise relational_db.RelationalDbEngineNotFoundError(
-        'Unsupported engine {}'.format(engine)
-    )
-
-  def GetConfigFromMachineType(self, machine_type: str) -> tuple[str, str, str]:
-    """Returns a tuple of (edition, family, vcore) from Azure machine type.
-
-    Args:
-     machine_type (string): Azure machine type i.e GP_Gen5_4
-
-    Returns:
-      (string, string, string): edition, family, vcore
-    Raises:
-      UnsupportedError: if the machine type is not supported.
-    """
-    machine_type = machine_type.split('_')
-    if len(machine_type) != 3:
-      raise relational_db.UnsupportedError(
-          'Unsupported machine type {}, sample machine type GP_Gen5_2'.format(
-              machine_type
-          )
-      )
-    edition = machine_type[0]
-    if edition == 'BC':
-      edition = 'BusinessCritical'
-    elif edition == 'GP':
-      edition = 'GeneralPurpose'
-    else:
-      raise relational_db.UnsupportedError(
-          'Unsupported edition {}. Only supports BC or GP'.format(machine_type)
-      )
-
-    family = machine_type[1]
-    vcore = machine_type[2]
-    return (edition, family, vcore)
+    """Returns the Azure CLI command group name for the database engine."""
+    raise NotImplementedError()
 
   def SetDbConfiguration(self, name: str, value: str) -> tuple[str, str, int]:
     """Set configuration for the database instance.
@@ -200,47 +147,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     Returns:
       Tuple of standand output and standard error
     """
-    cmd = [
-        azure.AZURE_PATH,
-        self.GetAzCommandForEngine(),
-        self.SERVER_TYPE,
-        'configuration',
-        'set',
-        '--name',
-        name,
-        '--value',
-        value,
-        '--resource-group',
-        self.resource_group.name,
-        '--server',
-        self.instance_id,
-    ]
-    return vm_util.IssueCommand(cmd, raise_on_failure=False)
-
-  def RenameDatabase(self, new_name: str) -> None:
-    """Renames an the database instace."""
-    engine = self.spec.engine
-    if engine == sql_engine_utils.SQLSERVER:
-      cmd = [
-          azure.AZURE_PATH,
-          self.GetAzCommandForEngine(),
-          'db',
-          'rename',
-          '--resource-group',
-          self.resource_group.name,
-          '--server',
-          self.instance_id,
-          '--name',
-          self.database_name,
-          '--new-name',
-          new_name,
-      ]
-      vm_util.IssueCommand(cmd)
-      self.database_name = new_name
-    else:
-      raise relational_db.RelationalDbEngineNotFoundError(
-          'Unsupported engine {}'.format(engine)
-      )
+    raise NotImplementedError()
 
   def _ApplyDbFlags(self) -> None:
     """Apply database flags to the instance."""
@@ -255,94 +162,6 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
         )
 
     self._Reboot()
-
-  def _CreateSqlServerInstance(self) -> None:
-    """Creates a managed sql server instance."""
-    cmd = [
-        azure.AZURE_PATH,
-        self.GetAzCommandForEngine(),
-        'server',
-        'create',
-        '--resource-group',
-        self.resource_group.name,
-        '--name',
-        self.instance_id,
-        '--location',
-        self.region,
-        '--admin-user',
-        self.spec.database_username,
-        '--admin-password',
-        self.spec.database_password,
-    ]
-    vm_util.IssueCommand(cmd)
-
-    # Azure support two ways of specifying machine type DTU or with vcores
-    # if compute units is specified we will use the DTU model
-    if self.spec.db_spec.compute_units is not None:
-      # Supported families & capacities for 'Standard' are:
-      # [(None, 10), (None, 20), (None, 50), (None, 100), (None, 200),
-      # (None, 400), (None, 800), (None, 1600), (None, 3000)]
-
-      # Supported families & capacities for 'Premium' are:
-      # [(None, 125), (None, 250), (None, 500), (None, 1000), (None, 1750),
-      #  (None, 4000)].
-
-      cmd = [
-          azure.AZURE_PATH,
-          self.GetAzCommandForEngine(),
-          'db',
-          'create',
-          '--resource-group',
-          self.resource_group.name,
-          '--server',
-          self.instance_id,
-          '--name',
-          DEFAULT_DATABASE_NAME,
-          '--edition',
-          self.spec.db_tier,
-          '--capacity',
-          str(self.spec.db_spec.compute_units),
-          '--zone-redundant',
-          'true' if self.spec.high_availability else 'false',
-      ]
-    else:
-      # Sample machine_type: GP_Gen5_2
-      edition, family, vcore = self.GetConfigFromMachineType(
-          self.spec.db_spec.machine_type
-      )
-      cmd = [
-          azure.AZURE_PATH,
-          self.GetAzCommandForEngine(),
-          'db',
-          'create',
-          '--resource-group',
-          self.resource_group.name,
-          '--server',
-          self.instance_id,
-          '--name',
-          DEFAULT_DATABASE_NAME,
-          '--edition',
-          edition,
-          '--family',
-          family,
-          '--capacity',
-          vcore,
-          '--zone-redundant',
-          'true' if self.spec.high_availability else 'false',
-      ]
-    vm_util.IssueCommand(cmd, timeout=CREATE_AZURE_DB_TIMEOUT)
-    self.database_name = DEFAULT_DATABASE_NAME
-
-  def _Create(self) -> None:
-    """See base class."""
-    if self.engine_type == sql_engine_utils.SQLSERVER:
-      self._CreateSqlServerInstance()
-    else:
-      raise NotImplementedError(
-          'Unknown how to create Azure data base engine {}'.format(
-              self.engine_type
-          )
-      )
 
   def _Delete(self) -> None:
     """See base class."""
@@ -432,14 +251,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
 
       server_show_json = self._AzServerShow()
       if server_show_json is not None:
-        engine = self.engine_type
-        if engine == sql_engine_utils.SQLSERVER:
-          state = server_show_json['state']
-        else:
-          raise relational_db.RelationalDbEngineNotFoundError(
-              'The db engine does not contain a valid state'
-          )
-
+        state = server_show_json['state']
         if state == 'Ready':
           break
       time.sleep(5)
