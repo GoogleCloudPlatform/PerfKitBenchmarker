@@ -122,6 +122,16 @@ NUM_LOCAL_VOLUMES: dict[str, int] = {
     'Standard_D48pds_v6': 6,
     'Standard_D64pds_v6': 4,
     'Standard_D96pds_v6': 6,
+    'Standard_D2ads_v7': 1,
+    'Standard_D4ads_v7': 1,
+    'Standard_D8ads_v7': 1,
+    'Standard_D16ads_v7': 2,
+    'Standard_D32ads_v7': 4,
+    'Standard_D48ads_v7': 6,
+    'Standard_D64ads_v7': 4,
+    'Standard_D96ads_v7': 6,
+    'Standard_D128ads_v7': 4,
+    'Standard_D160ads_v7': 4,
 }
 
 _MACHINE_TYPES_ONLY_SUPPORT_GEN1_IMAGES = (
@@ -193,28 +203,11 @@ TRUSTED_LAUNCH_UNSUPPORTED_OS_TYPES = [
     os_types.ROCKY_LINUX9,
 ]
 
-NVME_MACHINE_FAMILIES = [
-    'Standard_Das_v6',
-    'Standard_Dads_v6',
-    'Standard_Dals_v6',
-    'Standard_Dalds_v6',
-    'Standard_Ds_v6',
-    'Standard_Dds_v6',
-    'Standard_Eas_v6',
-    'Standard_Eads_v6',
-    'Standard_Eibs_v5',
-    'Standard_Ebs_v5',
-    'Standard_Eibds_v5',
-    'Standard_Ebds_v5',
-    'Standard_Es_v6',
-    'Standard_Eis_v6',
-    'Standard_Fas_v6',
-    'Standard_Fals_v6',
-    'Standard_Fams_v6',
-    'Standard_Ls_v4',
-    'Standard_Las_v4',
-    'Standard_Ms_v3',
-    'Standard_Mds_v3',
+
+EARLY_NVME_MACHINE_FAMILIES = [
+    r'Standard_Ei?bd?s_v5',
+    r'Standard_La?s_v4',
+    r'Standard_Md?s_v3',
 ]
 
 _SKU_NOT_AVAILABLE = 'SkuNotAvailable'
@@ -905,10 +898,7 @@ class AzureVirtualMachine(
         'create-disk'
     ]
     enable_secure_boot = azure_flags.AZURE_SECURE_BOOT.value
-    if (
-        self.trusted_launch_unsupported_type
-        and enable_secure_boot is not None
-    ):
+    if self.trusted_launch_unsupported_type and enable_secure_boot is not None:
       raise errors.Benchmarks.UnsupportedConfigError(
           "Please don't set --azure_secure_boot for"
           f' {self.machine_type} machine_type. Attemping to update secure boot'
@@ -1310,12 +1300,12 @@ class AzureVirtualMachine(
     return self.low_priority_status_code
 
   def SupportsNVMe(self):
-    """Returns whether this vm supports NVMe.
-
-    Returns:
-      True if this vm supports NVMe.
-    """
-    return util.GetMachineFamily(self.machine_type) in NVME_MACHINE_FAMILIES
+    """Returns whether this vm supports NVMe."""
+    generation = util.GetMachineSeriesNumber(self.machine_type)
+    family = util.GetMachineFamily(self.machine_type)
+    return generation >= 6 or any(
+        re.match(pattern, family) for pattern in EARLY_NVME_MACHINE_FAMILIES
+    )
 
 
 class Debian11BasedAzureVirtualMachine(
