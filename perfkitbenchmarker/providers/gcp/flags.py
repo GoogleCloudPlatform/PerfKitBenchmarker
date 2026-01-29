@@ -126,6 +126,12 @@ GCE_PLACEMENT_GROUP_MAX_DISTANCE = flags.DEFINE_integer(
     'Number of max logical switches between VMs.',
     lower_bound=0,
 )
+GCE_PREFER_RACK_PLACEMENT = flags.DEFINE_boolean(
+    'gce_prefer_rack_placement',
+    False,
+    'Whether to use same rack (max_distance=1) if supported. If'
+    ' gce_placement_group_max_distance is set, this flag is ignored.',
+)
 flags.DEFINE_string(
     'gce_remote_access_firewall_rule',
     None,

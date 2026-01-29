@@ -23,6 +23,7 @@ more information about GCE VM networking.
 
 import json
 import logging
+import re
 import threading
 from typing import Any, Dict, List, Set, Tuple, Union
 
@@ -58,6 +59,11 @@ _PLACEMENT_GROUP_PREFIXES = frozenset([
     'c4',
     'c4d',
 ])
+# Machine families that support compact placement, but do not support same-rack
+# placement (max_distance=1). Refer to
+# https://cloud.google.com/compute/docs/instances/placement-policies-overview#about-compact-policies
+# for more details.
+_SAME_RACK_DENYLIST_REGEX = r'^(n\d|m[1-3])'
 
 
 class GceVpnGateway(network.BaseVpnGateway):
@@ -1049,12 +1055,21 @@ class GceNetwork(network.BaseNetwork):
           'Use placement group style closest_supported.'
       )
     else:
+      max_distance = gcp_flags.GCE_PLACEMENT_GROUP_MAX_DISTANCE.value
+      if (
+          not max_distance
+          and gcp_flags.GCE_PREFER_RACK_PLACEMENT.value
+          and not re.match(_SAME_RACK_DENYLIST_REGEX, network_spec.machine_type)
+      ):
+        max_distance = 1
+
       placement_group_spec = gce_placement_group.GcePlacementGroupSpec(
           'GcePlacementGroupSpec',
           flag_values=FLAGS,
           zone=network_spec.zone,
           project=self.project,
           num_vms=self._GetNumberVms(),
+          max_distance=max_distance,
       )
       self.placement_group = gce_placement_group.GcePlacementGroup(
           placement_group_spec
