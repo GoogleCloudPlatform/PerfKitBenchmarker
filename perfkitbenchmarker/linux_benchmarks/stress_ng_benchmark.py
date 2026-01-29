@@ -390,6 +390,16 @@ flags.DEFINE_string(
     '1G',
     'Size of the VM to run the "vm" stressor on.'
 )
+flags.DEFINE_integer(
+    'stress_ng_futex_ops',
+    '1',
+    'Stop futex workers after N bogo successful futex wait operations.'
+)
+flags.DEFINE_integer(
+    'stress_ng_futex_thread_multiplier',
+    '1',
+    'Multiplier for the number of futex workers to use.'
+)
 
 ALL_WORKLOADS = ['small', 'medium', 'large']
 flags.DEFINE_list(
@@ -562,6 +572,26 @@ def _RunWorkload(vm, num_threads):
             str(memrate_wr),
         ])
         metadata['memrate_wr_mib_per_s'] = memrate_wr
+
+    if stressor_name == 'futex':
+      futex_ops = FLAGS.stress_ng_futex_ops
+      futex_thread_multiplier = FLAGS.stress_ng_futex_thread_multiplier
+      if futex_ops > 1:
+        cmd_parts.extend([
+            '--futex-ops',
+            str(FLAGS.stress_ng_futex_ops),
+        ])
+      if futex_thread_multiplier > 1:
+        cmd_parts[2] = str(num_threads * futex_thread_multiplier)
+
+      cmd_parts.extend([
+          '--aggressive',
+      ])
+
+      metadata['futex_ops'] = futex_ops
+      metadata['futex_threads'] = int(
+          num_threads * futex_thread_multiplier
+      )
 
     if stressor_name == 'vm':
       cmd_parts.extend([
