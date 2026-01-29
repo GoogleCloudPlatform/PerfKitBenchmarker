@@ -18,7 +18,9 @@ import re
 from perfkitbenchmarker import errors
 
 DPDK_GIT_REPO = 'https://github.com/DPDK/dpdk.git'
+# LINT.IfChange(dpdk_tag)
 DPDK_GIT_REPO_TAG = 'v24.11'
+# LINT.ThenChange(:dpdk_patch)
 DPDK_GCP_DRIVER_GIT_REPO = (
     'https://github.com/google/compute-virtual-ethernet-dpdk'
 )
@@ -34,6 +36,14 @@ def _Install(vm):
   vm.Install('pip')
   vm.RobustRemoteCommand(f'git clone {DPDK_GIT_REPO}')
   vm.RobustRemoteCommand(f'cd dpdk && git checkout {DPDK_GIT_REPO_TAG}')
+  # LINT.IfChange(dpdk_patch)
+  # This patch has the list of bugs fixed in DPDK 24.11.
+  # Bug List : [https://bugs.dpdk.org/show_bug.cgi?id=1869]
+  vm.PushDataFile('dpdk/dpdk.patch', '/tmp/dpdk.patch')
+  vm.RobustRemoteCommand(
+      'cd dpdk && git apply /tmp/dpdk.patch && rm /tmp/dpdk.patch'
+  )
+  # LINT.ThenChange()
   if vm.CLOUD == 'GCP':
     # Get out of tree driver
     vm.RobustRemoteCommand(f'git clone {DPDK_GCP_DRIVER_GIT_REPO}')

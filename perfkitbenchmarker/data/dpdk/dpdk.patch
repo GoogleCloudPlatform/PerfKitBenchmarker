@@ -1,0 +1,13 @@
+diff --git a/lib/eal/x86/rte_cycles.c b/lib/eal/x86/rte_cycles.c
+index f147a5231d..e8e805e710 100644
+--- a/lib/eal/x86/rte_cycles.c
++++ b/lib/eal/x86/rte_cycles.c
+@@ -145,7 +145,7 @@ get_tsc_freq_arch(void)
+
+ 		/* EBX : TSC/Crystal ratio, ECX : Crystal Hz */
+ 		if (b && c)
+-			return c * (b / a);
++			return (uint64_t)c * b / a;
+ 	}
+
+ #ifdef RTE_TOOLCHAIN_MSVC
