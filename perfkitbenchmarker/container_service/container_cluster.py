@@ -11,7 +11,7 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
-from perfkitbenchmarker.container_service.base import BaseNodePoolConfig
+from perfkitbenchmarker.resources.container_service.container import BaseNodePoolConfig
 
 
 DEFAULT_NODEPOOL = container_spec_lib.DEFAULT_NODEPOOL

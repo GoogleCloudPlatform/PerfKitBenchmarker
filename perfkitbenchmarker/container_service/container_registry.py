@@ -10,7 +10,7 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
-from perfkitbenchmarker.container_service import base
+from perfkitbenchmarker.resources.container_service import container
 
 BenchmarkSpec = Any  # benchmark_spec lib imports this module.
 
@@ -81,11 +81,11 @@ class BaseContainerRegistry(resource.BaseResource):
     """
     raise NotImplementedError()
 
-  def PrePush(self, image: base.ContainerImage):
+  def PrePush(self, image: container.ContainerImage):
     """Prepares registry to push a given image."""
     pass
 
-  def RemoteBuild(self, image: base.ContainerImage):
+  def RemoteBuild(self, image: container.ContainerImage):
     """Build the image remotely.
 
     Args:
@@ -97,7 +97,7 @@ class BaseContainerRegistry(resource.BaseResource):
     """Log in to the registry (in order to push to it)."""
     raise NotImplementedError()
 
-  def LocalBuildAndPush(self, image: base.ContainerImage):
+  def LocalBuildAndPush(self, image: container.ContainerImage):
     """Build the image locally and push to registry.
 
     Assumes we are already authenticated with the registry from self.Login.
@@ -140,7 +140,7 @@ class BaseContainerRegistry(resource.BaseResource):
     Args:
       image: The PKB name for the image (string).
     """
-    image = base.ContainerImage(image)
+    image = container.ContainerImage(image)
     if not container_service.FLAGS.local_container_build:
       try:
         build_start = time.time()

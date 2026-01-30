@@ -32,13 +32,13 @@ from perfkitbenchmarker.container_service.errors import ContainerException
 from perfkitbenchmarker.container_service.errors import FatalContainerException
 from perfkitbenchmarker.container_service.errors import RetriableContainerException
 # Temporarily hoist base related classes into this namespace
-from .base import BaseContainer
-from .base import BaseContainerService
-from .base import BaseNodePoolConfig
-from .base import ContainerImage
-from .base import FLAGS
-from .base import KUBERNETES
-from .base import NodePoolName
+from perfkitbenchmarker.resources.container_service.container import BaseContainer
+from perfkitbenchmarker.resources.container_service.container import BaseContainerService
+from perfkitbenchmarker.resources.container_service.container import BaseNodePoolConfig
+from perfkitbenchmarker.resources.container_service.container import ContainerImage
+from perfkitbenchmarker.resources.container_service.container import FLAGS
+from perfkitbenchmarker.resources.container_service.container import KUBERNETES
+from perfkitbenchmarker.resources.container_service.container import NodePoolName
 # Temporarily hoist kubernetes related classes into this namespace
 from .kubernetes import INGRESS_JSONPATH
 from .kubernetes import KubernetesCluster

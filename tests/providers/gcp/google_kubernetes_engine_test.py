@@ -34,6 +34,7 @@ from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import google_kubernetes_engine
 from perfkitbenchmarker.providers.gcp import util
+from perfkitbenchmarker.resources.container_service import container
 from tests import pkb_common_test_case
 
 FLAGS = flgs.FLAGS
@@ -111,7 +112,7 @@ class GoogleContainerRegistryTestCase(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     self.enter_context(
         mock.patch.object(
-            google_kubernetes_engine.container_service.base,
+            container,
             'ContainerImage',
             self.FakeContainerImage,
         )
