@@ -1,17 +1,24 @@
-"""Benchmark which scales up to a number of nodes, then down, then back up.
+"""Benchmark for Kubernetes node auto-scaling: scale up, down, then up again.
 
-Similar to kubernetes_scale, but only cares about node scaling & has additional
-scaling up/down steps.
+Deploys a Deployment with pod anti-affinity to force one pod per node, then
+measures node provisioning and de-provisioning times across three phases:
+
+  1. Scale up to NUM_NODES replicas.
+  2. Scale down to 0 replicas and wait for nodes to be removed.
+  3. Scale up to NUM_NODES replicas again.
+
+Reuses ParseStatusChanges and CheckForFailures from kubernetes_scale_benchmark
+for consistent metric collection.
 """
-
 
 from absl import flags
 from absl import logging
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import container_service
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark
-from perfkitbenchmarker.resources.container_service import kubernetes_cluster
+from perfkitbenchmarker.container_service import kubernetes_commands
 
 FLAGS = flags.FLAGS
 
@@ -32,49 +39,76 @@ NUM_NODES = flags.DEFINE_integer(
     'kubernetes_scale_num_nodes', 5, 'Number of new nodes to create'
 )
 
+MANIFEST_TEMPLATE = 'container/kubernetes_scale/kubernetes_node_scale.yaml.j2'
+
 
 def CheckPrerequisites(_):
-  """Validate flags and config."""
-  pass
+  """Validates flags and config."""
 
 
 def GetConfig(user_config):
   """Loads and returns benchmark config."""
-  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-  return config
+  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
-  """Sets additional spec attributes."""
+  """Applies the app deployment manifest with 0 replicas."""
   bm_spec.always_call_cleanup = True
   assert bm_spec.container_cluster
+  cluster = bm_spec.container_cluster
+  manifest_kwargs = dict(
+      cloud=FLAGS.cloud,
+  )
+
+  yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
+      MANIFEST_TEMPLATE,
+      **manifest_kwargs,
+  )
+  cluster.ModifyPodSpecPlacementYaml(
+      yaml_docs,
+      'app',
+      cluster.default_nodepool.machine_type,
+  )
+  list(kubernetes_commands.ApplyYaml(yaml_docs))
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
-  """Scales a large number of pods on kubernetes."""
+  """Runs the scale-up, scale-down, scale-up benchmark sequence.
+
+  Args:
+    bm_spec: The benchmark specification.
+
+  Returns:
+    Combined samples from all three phases, each tagged with phase metadata.
+  """
   assert bm_spec.container_cluster
   cluster = bm_spec.container_cluster
-  assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
-  cluster: kubernetes_cluster.KubernetesCluster = cluster
-
-  # Warm up the cluster by creating a single pod. This compensates for
-  # differences between Standard & Autopilot, where Standard already has 1 node
-  # due to its starting nodepool but Autopilot does not.
-  scale_one_samples, _ = kubernetes_scale_benchmark.ScaleUpPods(cluster, 1)
-  if not scale_one_samples:
-    logging.exception(
-        'Failed to scale up to 1 pod; now investigating failure reasons.'
-    )
-    unused = 0
-    pod_samples = kubernetes_scale_benchmark.ParseStatusChanges('pod', unused)
-    # Log & check for quota failure.
-    kubernetes_scale_benchmark.CheckForFailures(cluster, pod_samples, 1)
+  assert isinstance(cluster, container_service.KubernetesCluster)
+  cluster: container_service.KubernetesCluster = cluster
 
   # Do one scale up, scale down, then scale up again.
+  _ScaleDeploymentReplicas(NUM_NODES.value)
+  _ScaleDeploymentReplicas(0)
+  _ScaleDeploymentReplicas(NUM_NODES.value)
   return []
+
+
+def _ScaleDeploymentReplicas(replicas: int) -> None:
+  container_service.RunKubectlCommand([
+      'scale',
+      f'--replicas={replicas}',
+      'deployment/app',
+  ])
+  kubernetes_commands.WaitForRollout(
+      'deployment/app',
+      timeout=kubernetes_scale_benchmark._GetScaleTimeout(),
+  )
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec):
   """Cleanups scale benchmark. Runs before teardown."""
-  # Might need to change if kubernetes-scaleup deployment not used.
-  kubernetes_scale_benchmark.Cleanup(bm_spec)
+  container_service.RunRetryableKubectlCommand(
+      ['delete', 'deployment', 'app'],
+      timeout=kubernetes_scale_benchmark._GetScaleTimeout(),
+      raise_on_failure=False,
+  )
