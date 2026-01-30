@@ -109,6 +109,18 @@ def _ScaleDeploymentReplicas(replicas: int) -> None:
   )
 
 
+def _ScaleDeploymentReplicas(replicas: int) -> None:
+  container_service.RunKubectlCommand([
+      'scale',
+      f'--replicas={replicas}',
+      'deployment/app',
+  ])
+  kubernetes_commands.WaitForRollout(
+      'deployment/app',
+      timeout=kubernetes_scale_benchmark._GetScaleTimeout(),
+  )
+
+
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec):
   """Cleanups scale benchmark. Runs before teardown."""
   container_service.RunRetryableKubectlCommand(
