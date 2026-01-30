@@ -200,7 +200,7 @@ def _ConfigureNginxServer(server, upstream_servers):
   )
   idx = 1
   for upstream_server in upstream_servers:
-    for internal_ip in upstream_server.internal_ips:
+    for internal_ip in upstream_server.GetInternalIPs():
       server.RemoteCommand(
           r"sudo sed -i 's|# server <fileserver_%s_ip_or_dns>|server %s|g'"
           ' /etc/nginx/conf.d/loadbalance.conf'
@@ -456,7 +456,7 @@ def Run(benchmark_spec):
   results = []
   scheme = 'https' if FLAGS.nginx_use_ssl else 'http'
   targets = []
-  for hostip in server.internal_ips:
+  for hostip in server.GetInternalIPs():
     hoststr = (
         f'[{hostip}]'
         if isinstance(ipaddress.ip_address(hostip), ipaddress.IPv6Address)

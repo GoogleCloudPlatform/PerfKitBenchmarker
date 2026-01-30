@@ -249,6 +249,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       raise Exception('Internal POD IP address not found. Retrying.')
 
     self.internal_ip = pod_ip
+    self.internal_ips = [pod_ip]
     self.ip_address = pod_ip
     if self.sriov_network:
       annotations = json.loads(
@@ -262,6 +263,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         raise Exception('SRIOV interface ip address not found. Retrying.')
 
       self.internal_ip = sriov_ip
+      self.internal_ips = [sriov_ip]
       self.ip_address = sriov_ip
 
   def _ConfigureProxy(self):
