@@ -1,0 +1,54 @@
+{% if cloud == 'GCP' %}
+apiVersion: cloud.google.com/v1
+kind: ComputeClass
+metadata:
+  name: app-ccc
+spec:
+  nodePoolAutoCreation:
+    enabled: true
+  priorities:
+  - machineType: e2-medium  # smallest machine-type supported by NAP
+    spot: false
+    storage:
+      bootDiskSize: 20
+      bootDiskType: pd-standard
+  whenUnsatisfiable: DoNotScaleUp
+{% endif %}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app: app
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - app
+            topologyKey: "kubernetes.io/hostname"
+      {% if cloud == 'GCP' %}
+      nodeSelector:
+        cloud.google.com/compute-class: app-ccc
+      {% endif %}
+      containers:
+      - name: pause
+        image: registry.k8s.io/pause:3.10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
