@@ -27,10 +27,6 @@ from perfkitbenchmarker.container_service.container_cluster import GetContainerC
 # Temporarily hoist container_registry related classes into this namespace
 from perfkitbenchmarker.container_service.container_registry import BaseContainerRegistry
 from perfkitbenchmarker.container_service.container_registry import GetContainerRegistryClass
-# Temporarily hoist error related classes into this namespace
-from perfkitbenchmarker.container_service.errors import ContainerException
-from perfkitbenchmarker.container_service.errors import FatalContainerException
-from perfkitbenchmarker.container_service.errors import RetriableContainerException
 # Temporarily hoist base related classes into this namespace
 from perfkitbenchmarker.resources.container_service.container import BaseContainer
 from perfkitbenchmarker.resources.container_service.container import BaseContainerService
@@ -39,6 +35,10 @@ from perfkitbenchmarker.resources.container_service.container import ContainerIm
 from perfkitbenchmarker.resources.container_service.container import FLAGS
 from perfkitbenchmarker.resources.container_service.container import KUBERNETES
 from perfkitbenchmarker.resources.container_service.container import NodePoolName
+# Temporarily hoist error related classes into this namespace
+from perfkitbenchmarker.resources.container_service.errors import ContainerException
+from perfkitbenchmarker.resources.container_service.errors import FatalContainerException
+from perfkitbenchmarker.resources.container_service.errors import RetriableContainerException
 # Temporarily hoist kubernetes related classes into this namespace
 from .kubernetes import INGRESS_JSONPATH
 from .kubernetes import KubernetesCluster
