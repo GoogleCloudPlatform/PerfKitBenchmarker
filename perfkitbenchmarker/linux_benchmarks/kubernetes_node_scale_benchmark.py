@@ -22,7 +22,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark
-from perfkitbenchmarker.resources.container_service import kubernetes_cluster
+from perfkitbenchmarker.container_service import kubernetes_commands
 
 FLAGS = flags.FLAGS
 
@@ -431,6 +431,18 @@ def _AddPhaseMetadata(
   """Adds phase metadata to all samples."""
   for s in samples:
     s.metadata['phase'] = phase
+
+
+def _ScaleDeploymentReplicas(replicas: int) -> None:
+  container_service.RunKubectlCommand([
+      'scale',
+      f'--replicas={replicas}',
+      'deployment/app',
+  ])
+  kubernetes_commands.WaitForRollout(
+      'deployment/app',
+      timeout=kubernetes_scale_benchmark._GetScaleTimeout(),
+  )
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec):
