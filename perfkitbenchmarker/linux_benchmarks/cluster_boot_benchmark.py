@@ -283,15 +283,12 @@ def GetTimeToBoot(vms):
     # TIME TO CREATE ASYNC RETURN
     if vm.create_return_time:
       time_to_create_sec = vm.create_return_time - min_create_start_time
-      create_sample_metadata = metadata.copy()
-      if vm.create_cmd_info_log:
-        create_sample_metadata['create_cmd_info_log'] = vm.create_cmd_info_log
       samples.append(
           sample.Sample(
               'Time to Create Async Return',
               time_to_create_sec,
               'seconds',
-              create_sample_metadata,
+              metadata,
           )
       )
 

@@ -614,11 +614,6 @@ GCS_FUSE_ENABLE_METADATA_CACHE = flags.DEFINE_boolean(
     False,
     'Whether to enable metadata cache for gcs fuse.',
 )
-GCE_GENERATE_CREATE_CMD_INFO_LOG = flags.DEFINE_boolean(
-    'gce_generate_create_cmd_info_log',
-    False,
-    'Whether to generate an info log for the compute instances create command.',
-)
 
 
 def _ValidatePreemptFlags(flags_dict):
