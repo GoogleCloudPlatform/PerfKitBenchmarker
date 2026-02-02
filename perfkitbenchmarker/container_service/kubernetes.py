@@ -27,6 +27,10 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service.kubectl import RETRYABLE_KUBECTL_ERRORS
 from perfkitbenchmarker.resources.container_service.kubectl import RunKubectlCommand
 from perfkitbenchmarker.resources.container_service.kubectl import RunRetryableKubectlCommand
+# Temporarily hoist event related classes into this namespace
+from perfkitbenchmarker.resources.container_service.kubernetes_events import KubernetesEvent
+from perfkitbenchmarker.resources.container_service.kubernetes_events import KubernetesEventPoller
+from perfkitbenchmarker.resources.container_service.kubernetes_events import KubernetesEventResource
 
 import requests
 import yaml
@@ -34,10 +38,6 @@ import yaml
 # Temporarily hoist cluster related classes into this namespace
 from .kubernetes_cluster import INGRESS_JSONPATH
 from .kubernetes_cluster import KubernetesCluster
-# Temporarily hoist event related classes into this namespace
-from .kubernetes_events import KubernetesEvent
-from .kubernetes_events import KubernetesEventPoller
-from .kubernetes_events import KubernetesEventResource
 # pylint: enable=unused-import
 
 
