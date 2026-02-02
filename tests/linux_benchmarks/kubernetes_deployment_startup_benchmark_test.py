@@ -17,9 +17,9 @@ from unittest import mock
 
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_benchmarks import kubernetes_deployment_startup_benchmark as kdsb
 from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark as ksb
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from tests import pkb_common_test_case
 
 

@@ -6,7 +6,7 @@ from absl.testing import flagsaver
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.configs import container_spec
-from perfkitbenchmarker.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from tests import pkb_common_test_case
 from perfkitbenchmarker.traces import kubernetes_tracker
 

@@ -44,7 +44,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 INIT_BATCH_SIZE = flags.DEFINE_integer(
     "provision_node_pools_init_batch",

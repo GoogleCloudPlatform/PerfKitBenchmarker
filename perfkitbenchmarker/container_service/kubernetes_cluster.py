@@ -11,9 +11,9 @@ from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
 from perfkitbenchmarker.container_service import kubernetes
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.resources import kubernetes_inference_server
 from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.container_service import kubernetes_events
 
 INGRESS_JSONPATH = '{.status.loadBalancer.ingress[0]}'

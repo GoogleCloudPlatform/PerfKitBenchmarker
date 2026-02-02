@@ -24,9 +24,9 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import container_service
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_benchmarks import kubernetes_hpa_benchmark as hpa
 from perfkitbenchmarker.linux_packages import locust
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.sample import Sample
 from scipy import integrate
 

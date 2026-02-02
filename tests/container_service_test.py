@@ -10,7 +10,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
-from perfkitbenchmarker.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.sample import Sample
 from tests import container_service_mock
 from tests import pkb_common_test_case

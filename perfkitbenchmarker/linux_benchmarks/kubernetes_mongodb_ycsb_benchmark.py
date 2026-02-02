@@ -25,9 +25,9 @@ import time
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_benchmarks import mongodb_ycsb_benchmark
 from perfkitbenchmarker.linux_packages import ycsb
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 FLAGS = flags.FLAGS
 

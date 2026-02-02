@@ -28,9 +28,9 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_packages import http_poller
 from perfkitbenchmarker.linux_packages import locust
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.sample import Sample
 
 FLAGS = flags.FLAGS
@@ -225,7 +225,6 @@ class KubernetesMetricsCollector:
 
     Expected to be run in a background thread. Never completes until self._stop
     is signaled.
-
     """
     self._Observe(kubernetes_commands.GetNumNodesSamples)
 

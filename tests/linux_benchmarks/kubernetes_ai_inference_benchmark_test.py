@@ -8,8 +8,8 @@ import zoneinfo
 
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_benchmarks import kubernetes_ai_inference_benchmark
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server_spec as k8s_spec
 from tests import pkb_common_test_case

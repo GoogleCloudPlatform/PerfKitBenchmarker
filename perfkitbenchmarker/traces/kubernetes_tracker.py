@@ -22,7 +22,7 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import events
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
-from perfkitbenchmarker.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 
 CLUSTER_TIME_METRIC = "cluster/usage/cluster_time"

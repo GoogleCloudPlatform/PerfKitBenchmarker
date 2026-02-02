@@ -15,8 +15,8 @@ from typing import Any, Dict, Iterable, Iterator, Optional, Sequence
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.container_service import kubernetes
 from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_events
 from perfkitbenchmarker.sample import Sample
 import yaml
 
@@ -726,14 +726,14 @@ def GetPvcs() -> Sequence[Any]:
   return yaml.safe_load(stdout)['items']
 
 
-def GetEvents(**kwargs) -> set['kubernetes.KubernetesEvent']:
+def GetEvents(**kwargs) -> set['kubernetes_events.KubernetesEvent']:
   """Get the events for the cluster."""
   stdout, _, _ = kubectl.RunRetryableKubectlCommand(
       ['get', 'events', '-o', 'yaml'], **kwargs
   )
   k8s_events = set()
   for item in yaml.safe_load(stdout)['items']:
-    k8s_event = kubernetes.KubernetesEvent.FromDict(item)
+    k8s_event = kubernetes_events.KubernetesEvent.FromDict(item)
     if k8s_event:
       k8s_events.add(k8s_event)
   return k8s_events
