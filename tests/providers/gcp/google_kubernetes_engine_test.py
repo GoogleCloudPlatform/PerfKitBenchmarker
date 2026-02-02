@@ -29,12 +29,12 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
-from perfkitbenchmarker.container_service import kubectl
 from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import google_kubernetes_engine
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources.container_service import container
+from perfkitbenchmarker.resources.container_service import kubectl
 from tests import pkb_common_test_case
 
 FLAGS = flgs.FLAGS

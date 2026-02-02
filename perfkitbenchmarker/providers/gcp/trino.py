@@ -17,9 +17,9 @@ from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.container_service import kubectl
 from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.providers.gcp import util
+from perfkitbenchmarker.resources.container_service import kubectl
 
 
 FLAGS = flags.FLAGS

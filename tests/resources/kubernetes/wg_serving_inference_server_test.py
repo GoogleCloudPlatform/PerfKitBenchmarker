@@ -3,8 +3,8 @@ import unittest
 from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import container_service
-from perfkitbenchmarker.container_service import kubectl
 from perfkitbenchmarker.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server
 from tests import pkb_common_test_case
 

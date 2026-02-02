@@ -21,14 +21,16 @@ from perfkitbenchmarker import container_service
 from perfkitbenchmarker import events
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import vm_util
-import requests
-import yaml
 
 # pylint: disable=unused-import
 # Temporarily hoist kubectl related methods into this namespace
-from .kubectl import RETRYABLE_KUBECTL_ERRORS
-from .kubectl import RunKubectlCommand
-from .kubectl import RunRetryableKubectlCommand
+from perfkitbenchmarker.resources.container_service.kubectl import RETRYABLE_KUBECTL_ERRORS
+from perfkitbenchmarker.resources.container_service.kubectl import RunKubectlCommand
+from perfkitbenchmarker.resources.container_service.kubectl import RunRetryableKubectlCommand
+
+import requests
+import yaml
+
 # Temporarily hoist cluster related classes into this namespace
 from .kubernetes_cluster import INGRESS_JSONPATH
 from .kubernetes_cluster import KubernetesCluster

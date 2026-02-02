@@ -3,8 +3,8 @@ import unittest
 from unittest import mock
 from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker.container_service import kubectl
 from perfkitbenchmarker.linux_benchmarks.provisioning_benchmarks import provision_container_cluster_benchmark
+from perfkitbenchmarker.resources.container_service import kubectl
 from tests import pkb_common_test_case
 
 KubernetesEvent = container_service.KubernetesEvent

@@ -15,8 +15,8 @@ from typing import Any, Dict, Iterable, Iterator, Optional, Sequence
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.container_service import kubectl
 from perfkitbenchmarker.container_service import kubernetes
+from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.sample import Sample
 import yaml
 
