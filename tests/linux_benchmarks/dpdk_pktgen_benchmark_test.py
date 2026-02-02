@@ -97,6 +97,8 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     self.bm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
     self.bm_spec.vms = [mock.MagicMock(), mock.MagicMock()]
     self.bm_spec.vms[0].NumCpusForBenchmark.return_value = 22
+    self.bm_spec.vms[0].tertiary_nic_bus_info = None
+    self.bm_spec.vms[1].tertiary_nic_bus_info = None
 
   @flagsaver.flagsaver(
       dpdk_pktgen_packet_loss_threshold_rates=[1],

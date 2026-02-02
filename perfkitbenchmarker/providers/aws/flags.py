@@ -49,6 +49,13 @@ AWS_INSTANCE_BANDWIDTH_WEIGHTING = flags.DEFINE_enum(
     'The bandwidth weighting of each instance, increasing one of vpc and ebs'
     ' bandwidth at the expense of the other. Valid options are vpc-1, ebs-1.',
 )
+AWS_DISABLE_NON_PRIMARY_NIC_SOURCE_DEST_CHECK = flags.DEFINE_boolean(
+    'aws_disable_non_primary_nic_source_dest_check',
+    False,
+    'Whether to disable the source-dest-check for non-primary NICs. This'
+    ' prevents the AWS VPC fabric from dropping suspicious packets where ARP or'
+    ' handshakes are not used.',
+)
 flags.DEFINE_string(
     'aws_dax_node_type',
     'dax.r4.large',

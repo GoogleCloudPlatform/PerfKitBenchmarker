@@ -825,6 +825,17 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             network_interface['PrivateIpAddress']
         ] + self.internal_ips
       else:
+        if aws_flags.AWS_DISABLE_NON_PRIMARY_NIC_SOURCE_DEST_CHECK.value:
+          cmd = util.AWS_PREFIX + [
+              'ec2',
+              'modify-network-interface-attribute',
+              '--network-interface-id',
+              network_interface['NetworkInterfaceId'],
+              '--region',
+              self.region,
+              '--no-source-dest-check',
+          ]
+          vm_util.IssueCommand(cmd, raise_on_failure=False)
         # EFAv3 only has internal IPs for every 4th NIC?
         if (
             self.machine_type not in _EFA_V3_MACHINE_TYPES

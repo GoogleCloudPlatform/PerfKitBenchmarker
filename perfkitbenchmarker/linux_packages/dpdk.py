@@ -14,6 +14,7 @@
 
 """Module containing hugepage allocation, dpdk installation, and nic binding to dpdk driver."""
 
+import logging
 import re
 from perfkitbenchmarker import errors
 
@@ -168,11 +169,23 @@ def _BindNICToDPDKDriver(vm):
     )
   secondary_nic = nic_match.group(1)
 
-  # Get non-primary MAC Address
-  mac_match = re.findall(r'link/ether ([a-z0-9:]*)', stdout)[1]
-  if not mac_match:
-    raise errors.VirtualMachine.VmStateError('No secondary MAC address.')
-  vm.secondary_mac_addr = mac_match
+  # Get second non-primary NIC if it exists
+  tertiary_nic = None
+  nic_match_2 = re.search('4: ([a-zA-Z0-9]+):', stdout)
+  if nic_match_2:
+    logging.info('Found tertiary NIC.')
+    tertiary_nic = nic_match_2.group(1)
+
+  # Get non-primary MAC Addresses
+  mac_matches = re.findall(r'link/ether ([a-z0-9:]*)', stdout)
+  if len(mac_matches) < 2:
+    raise errors.VirtualMachine.VmStateError('Not enough MAC addresses.')
+
+  vm.secondary_mac_addr = mac_matches[1]
+  vm.tertiary_mac_addr = None
+  if len(mac_matches) > 2:
+    logging.info('Found tertiary MAC address.')
+    vm.tertiary_mac_addr = mac_matches[2]
 
   # Find bus info for secondary nic
   stdout, _ = vm.RemoteCommand(f'sudo ethtool -i {secondary_nic}')
@@ -180,21 +193,36 @@ def _BindNICToDPDKDriver(vm):
   if not bus_match:
     raise errors.VirtualMachine.VmStateError('No bus info for secondary NIC.')
   vm.secondary_nic_bus_info = bus_match.group(1)
-
-  # Set secondary interface down
   vm.RemoteCommand(f'sudo ip link set {secondary_nic} down')
+  nic_bus_infos = vm.secondary_nic_bus_info
 
-  # Bind secondary device to VFIO kernel module
+  # Find bus info for tertiary nic
+  vm.tertiary_nic_bus_info = None
+  if tertiary_nic:
+    stdout, _ = vm.RemoteCommand(f'sudo ethtool -i {tertiary_nic}')
+    bus_match = re.search('bus-info: (0000:[0-9]+:[0-9]+.0)', stdout)
+    if not bus_match:
+      raise errors.VirtualMachine.VmStateError('No bus info for tertiary NIC.')
+    vm.tertiary_nic_bus_info = bus_match.group(1)
+    vm.RemoteCommand(f'sudo ip link set {tertiary_nic} down')
+    nic_bus_infos += f' {vm.tertiary_nic_bus_info}'
+
+  # Bind devices to VFIO kernel module
   vm.RobustRemoteCommand(
       'sudo dpdk/usertools/dpdk-devbind.py -b vfio-pci --noiommu-mode'
-      f' {vm.secondary_nic_bus_info}'
+      f' {nic_bus_infos}'
   )
 
   # Show bind status of NICs
-  # Should see 1 NIC using kernel driver and 1 NIC using DPDK-compatible driver
+  # Should see 1 NIC using kernel driver and 1-2 NICs using DPDK-compatible
+  # driver
   stdout, _ = vm.RemoteCommand('sudo dpdk/usertools/dpdk-devbind.py --status')
-  match = re.search(f'{vm.secondary_nic_bus_info}.*drv=vfio-pci', stdout)
-  if not match:
+  if not re.search(f'{vm.secondary_nic_bus_info}.*drv=vfio-pci', stdout):
     raise errors.VirtualMachine.VmStateError(
-        'No network device is using a DPDK-compatible driver.'
+        'Secondary NIC is not using a DPDK-compatible driver.'
     )
+  if vm.tertiary_nic_bus_info:
+    if not re.search(f'{vm.tertiary_nic_bus_info}.*drv=vfio-pci', stdout):
+      raise errors.VirtualMachine.VmStateError(
+          'Tertiary NIC is not using a DPDK-compatible driver.'
+      )
