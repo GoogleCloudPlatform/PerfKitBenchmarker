@@ -951,6 +951,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._ParseCreateErrors(self.create_cmd.rate_limited, stderr, retcode)
     if not self.create_return_time:
       self.create_return_time = time.time()
+    if gcp_flags.GCE_GENERATE_CREATE_CMD_INFO_LOG.value:
+      self.create_cmd_info_log, _, _ = vm_util.IssueCommand(
+          [FLAGS.gcloud_path, 'info', '--show-log'], raise_on_failure=False
+      )
 
   def _ParseCreateErrors(
       self, cmd_rate_limited: bool, stderr: str, retcode: int
