@@ -4,7 +4,6 @@ import time
 from typing import Any
 
 from absl import flags
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
@@ -36,9 +35,7 @@ class BaseContainerRegistry(resource.BaseResource):
     project = getattr(container_cluster, 'project', None)
     self.zone: str = registry_spec.zone or zone
     self.project: str = registry_spec.project or project
-    self.name: str = (
-        registry_spec.name or 'pkb%s' % container_service.FLAGS.run_uri
-    )
+    self.name: str = registry_spec.name or 'pkb%s' % container.FLAGS.run_uri
     self.local_build_times: dict[str, float] = {}
     self.remote_build_times: dict[str, float] = {}
     self.metadata.update({'cloud': self.CLOUD})
@@ -141,7 +138,7 @@ class BaseContainerRegistry(resource.BaseResource):
       image: The PKB name for the image (string).
     """
     image = container.ContainerImage(image)
-    if not container_service.FLAGS.local_container_build:
+    if not container.FLAGS.local_container_build:
       try:
         build_start = time.time()
         # Build the image remotely using an image building service.

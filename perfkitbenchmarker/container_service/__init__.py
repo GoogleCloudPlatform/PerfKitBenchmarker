@@ -24,9 +24,6 @@ expanded to support first-class container benchmarks.
 from perfkitbenchmarker.container_service.container_cluster import BaseContainerCluster
 from perfkitbenchmarker.container_service.container_cluster import DEFAULT_NODEPOOL
 from perfkitbenchmarker.container_service.container_cluster import GetContainerClusterClass
-# Temporarily hoist container_registry related classes into this namespace
-from perfkitbenchmarker.container_service.container_registry import BaseContainerRegistry
-from perfkitbenchmarker.container_service.container_registry import GetContainerRegistryClass
 # Temporarily hoist base related classes into this namespace
 from perfkitbenchmarker.resources.container_service.container import BaseContainer
 from perfkitbenchmarker.resources.container_service.container import BaseContainerService
@@ -35,6 +32,9 @@ from perfkitbenchmarker.resources.container_service.container import ContainerIm
 from perfkitbenchmarker.resources.container_service.container import FLAGS
 from perfkitbenchmarker.resources.container_service.container import KUBERNETES
 from perfkitbenchmarker.resources.container_service.container import NodePoolName
+# Temporarily hoist container_registry related classes into this namespace
+from perfkitbenchmarker.resources.container_service.container_registry import BaseContainerRegistry
+from perfkitbenchmarker.resources.container_service.container_registry import GetContainerRegistryClass
 # Temporarily hoist error related classes into this namespace
 from perfkitbenchmarker.resources.container_service.errors import ContainerException
 from perfkitbenchmarker.resources.container_service.errors import FatalContainerException
