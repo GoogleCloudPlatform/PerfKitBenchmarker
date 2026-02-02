@@ -4,6 +4,8 @@ Similar to kubernetes_scale, but only cares about node scaling & has additional
 scaling up/down steps.
 """
 
+import time
+
 from absl import flags
 from absl import logging
 from perfkitbenchmarker import benchmark_spec
@@ -74,11 +76,24 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   assert isinstance(cluster, container_service.KubernetesCluster)
   cluster: container_service.KubernetesCluster = cluster
 
+  initial_node_count = len(kubernetes_commands.GetNodeNames())
+  start_time = time.time()
+
   # Do one scale up, scale down, then scale up again.
   _ScaleDeploymentReplicas(NUM_NODES.value)
+  samples = kubernetes_scale_benchmark.ParseStatusChanges(
+      'node',
+      start_time,
+      resources_to_ignore=set(),
+  )
   _ScaleDeploymentReplicas(0)
-  _ScaleDeploymentReplicas(NUM_NODES.value)
-  return []
+  if _WaitForScaledNodesDeletion(initial_node_count):
+    _ScaleDeploymentReplicas(NUM_NODES.value)
+  else:
+    logging.warning(
+        'Skipping final scale up; scaled nodes not deleted within timeout.'
+    )
+  return samples
 
 
 def _ScaleDeploymentReplicas(replicas: int) -> None:
@@ -91,6 +106,28 @@ def _ScaleDeploymentReplicas(replicas: int) -> None:
       'deployment/app',
       timeout=kubernetes_scale_benchmark._GetScaleTimeout(),
   )
+
+
+def _WaitForScaledNodesDeletion(initial_node_count: int) -> bool:
+  timeout = 20 * 60 + kubernetes_scale_benchmark._GetScaleTimeout()
+  start_time = time.monotonic()
+  while True:
+    current_node_count = len(kubernetes_commands.GetNodeNames())
+    if current_node_count <= initial_node_count:
+      logging.info('Node count returned to initial level.')
+      return True
+    elapsed = time.monotonic() - start_time
+    if elapsed >= timeout:
+      logging.warning(
+          'Timed out waiting for scaled nodes to delete. Remaining nodes: %d',
+          max(current_node_count - initial_node_count, 0),
+      )
+      return False
+    logging.info(
+        'Remaining scaled nodes: %d',
+        max(current_node_count - initial_node_count, 0),
+    )
+    time.sleep(60)
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec):
