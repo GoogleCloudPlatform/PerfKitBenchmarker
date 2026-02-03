@@ -319,6 +319,52 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         min_cpu_platform_in_command, gcloud_cmd.flags.get('min-cpu-platform')
     )
 
+  def testLocalSsdsSet(
+      self,
+  ):
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type='n2-standard-16',
+        num_local_ssds=8,
+        project='fakeproject',
+    )
+    vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+    self.assertEqual(8, vm.max_local_disks)
+    gcloud_cmd = vm._GenerateCreateCommand('x')
+    self.assertEqual(['interface=NVME'] * 8, gcloud_cmd.flags.get('local-ssd'))
+    metadata = vm.GetResourceMetadata()
+    self.assertEqual(8, metadata['gce_local_ssd_count'])
+
+  def testLocalSsdFixedMachineTypeC4Standard8FlagOverride(
+      self,
+  ):
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type='c4-standard-8-lssd',
+        num_local_ssds=200,
+        project='fakeproject',
+    )
+    # Assert lssd count is overriden to 1.
+    vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+    self.assertEqual(1, vm.max_local_disks)
+    gcloud_cmd = vm._GenerateCreateCommand('x')
+    self.assertNotIn('local-ssd', gcloud_cmd.flags)
+    metadata = vm.GetResourceMetadata()
+    self.assertEqual(1, metadata['gce_local_ssd_count'])
+
+  def testLocalSsdFixedMachineTypeC4Standard16FlagNotSpecified(
+      self,
+  ):
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type='c4-standard-16-lssd',
+        project='fakeproject',
+    )
+    vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+    self.assertEqual(2, vm.max_local_disks)
+    metadata = vm.GetResourceMetadata()
+    self.assertEqual(2, metadata['gce_local_ssd_count'])
+
   def testUpdateInterruptibleVmStatus(self):
     spec = gce_virtual_machine.GceVmSpec(
         _COMPONENT,
@@ -1064,15 +1110,18 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
   @parameterized.named_parameters(
       {
           'testcase_name': 'old_message',
-          'fake_stderr': """\
+          'fake_stderr': (
+              """\
 "The zone 'projects/fake-project/zones/fake-zone' does not have enough \
 resources available to fulfill the request. Try a different zone, or try again \
 later."
-""",
+"""
+          ),
       },
       {
           'testcase_name': 'new_message',
-          'fake_stderr': """\
+          'fake_stderr': (
+              """\
 code: ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS
 errorDetails:
 - help:
@@ -1096,7 +1145,8 @@ errorDetails:
       zonesAvailable: us-central1-f,us-central1-a,us-central1-c
     reason: stockout
 message: The zone 'projects/artemis-prod/zones/us-central1-b' does not have enough
-  resources available to fulfill the request.  '(resource type:compute)'.""",
+  resources available to fulfill the request.  '(resource type:compute)'."""
+          ),
       },
   )
   def testInsufficientCapacityCloudFailure(self, fake_stderr):
