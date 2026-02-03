@@ -17,28 +17,14 @@ import json
 from typing import Any
 
 from absl import flags
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import events
 from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import vm_util
-
-# pylint: disable=unused-import
-# Temporarily hoist kubectl related methods into this namespace
-from perfkitbenchmarker.resources.container_service.kubectl import RETRYABLE_KUBECTL_ERRORS
-from perfkitbenchmarker.resources.container_service.kubectl import RunKubectlCommand
-from perfkitbenchmarker.resources.container_service.kubectl import RunRetryableKubectlCommand
-# Temporarily hoist event related classes into this namespace
-from perfkitbenchmarker.resources.container_service.kubernetes_events import KubernetesEvent
-from perfkitbenchmarker.resources.container_service.kubernetes_events import KubernetesEventPoller
-from perfkitbenchmarker.resources.container_service.kubernetes_events import KubernetesEventResource
-
+from perfkitbenchmarker.resources.container_service import container
+from perfkitbenchmarker.resources.container_service import errors
+from perfkitbenchmarker.resources.container_service import kubectl
 import requests
 import yaml
-
-# Temporarily hoist cluster related classes into this namespace
-from .kubernetes_cluster import INGRESS_JSONPATH
-from .kubernetes_cluster import KubernetesCluster
-# pylint: enable=unused-import
 
 
 BenchmarkSpec = Any  # benchmark_spec lib imports this module.
@@ -80,7 +66,9 @@ class KubernetesPod:
 
   def _GetPod(self) -> dict[str, Any]:
     """Gets a representation of the POD and returns it."""
-    stdout, _, _ = RunKubectlCommand(['get', 'pod', self.name, '-o', 'yaml'])
+    stdout, _, _ = kubectl.RunKubectlCommand(
+        ['get', 'pod', self.name, '-o', 'yaml']
+    )
     pod = yaml.safe_load(stdout)
     self.ip_address = pod.get('status', {}).get('podIP')
     return pod
@@ -94,7 +82,7 @@ class KubernetesPod:
     if phase == 'Succeeded':
       return
     elif phase == 'Failed':
-      raise container_service.FatalContainerException(
+      raise errors.FatalContainerException(
           f'Pod {self.name} failed:\n{yaml.dump(status)}'
       )
     else:
@@ -105,7 +93,7 @@ class KubernetesPod:
             and condition['reason'] == 'Unschedulable'
         ):
           # TODO(pclay): Revisit this when we scale clusters.
-          raise container_service.FatalContainerException(
+          raise errors.FatalContainerException(
               f"Pod {self.name} failed to schedule:\n{condition['message']}"
           )
       for container_status in status.get('containerStatuses', []):
@@ -114,7 +102,7 @@ class KubernetesPod:
             'ErrImagePull',
             'ImagePullBackOff',
         ]:
-          raise container_service.FatalContainerException(
+          raise errors.FatalContainerException(
               f'Failed to find container image for {self.name}:\n'
               + yaml.dump(waiting_status.get('message'))
           )
@@ -124,7 +112,7 @@ class KubernetesPod:
 
     @vm_util.Retry(
         timeout=timeout,
-        retryable_exceptions=(container_service.RetriableContainerException,),
+        retryable_exceptions=(errors.RetriableContainerException,),
     )
     def _WaitForExit():
       pod = self._GetPod()
@@ -134,7 +122,7 @@ class KubernetesPod:
       if phase == 'Succeeded':
         return pod
       else:
-        raise container_service.RetriableContainerException(
+        raise errors.RetriableContainerException(
             f'Pod phase ({phase}) not in finished phases.'
         )
 
@@ -142,12 +130,12 @@ class KubernetesPod:
 
   def GetLogs(self):
     """Returns the logs from the container."""
-    stdout, _, _ = RunKubectlCommand(['logs', self.name])
+    stdout, _, _ = kubectl.RunKubectlCommand(['logs', self.name])
     return stdout
 
 
 # Order KubernetesPod first so that it's constructor is called first.
-class KubernetesContainer(KubernetesPod, container_service.BaseContainer):
+class KubernetesContainer(KubernetesPod, container.BaseContainer):
   """A KubernetesPod based flavor of Container."""
 
   def _Create(self):
@@ -181,7 +169,7 @@ class KubernetesContainer(KubernetesPod, container_service.BaseContainer):
     if self.command:
       run_cmd.extend(['--command', '--'])
       run_cmd.extend(self.command)
-    RunKubectlCommand(run_cmd)
+    kubectl.RunKubectlCommand(run_cmd)
 
   def _Delete(self):
     """Deletes the container."""
@@ -194,7 +182,7 @@ class KubernetesContainer(KubernetesPod, container_service.BaseContainer):
     return status['phase'] != 'Pending'
 
 
-class KubernetesContainerService(container_service.BaseContainerService):
+class KubernetesContainerService(container.BaseContainerService):
   """A Kubernetes flavor of Container Service."""
 
   def __init__(self, container_spec, name):
@@ -222,7 +210,7 @@ class KubernetesContainerService(container_service.BaseContainerService):
     if self.command:
       run_cmd.extend(['--command', '--'])
       run_cmd.extend(self.command)
-    RunKubectlCommand(run_cmd)
+    kubectl.RunKubectlCommand(run_cmd)
 
     expose_cmd = [
         'expose',
@@ -233,7 +221,7 @@ class KubernetesContainerService(container_service.BaseContainerService):
         '--target-port',
         str(self.port),
     ]
-    RunKubectlCommand(expose_cmd)
+    kubectl.RunKubectlCommand(expose_cmd)
     with vm_util.NamedTemporaryFile() as tf:
       tf.write(_K8S_INGRESS.format(service_name=self.name))
       tf.close()
@@ -249,7 +237,7 @@ class KubernetesContainerService(container_service.BaseContainerService):
         '-o',
         'jsonpath={.status.loadBalancer.ingress[*].ip}',
     ]
-    stdout, _, _ = RunKubectlCommand(get_cmd)
+    stdout, _, _ = kubectl.RunKubectlCommand(get_cmd)
     ip_address = stdout
     if ip_address:
       self.ip_address = ip_address
@@ -273,7 +261,7 @@ class KubernetesContainerService(container_service.BaseContainerService):
       kubernetes_helper.DeleteFromFile(tf.name)
 
     delete_cmd = ['delete', 'deployment', self.name]
-    RunKubectlCommand(delete_cmd, raise_on_failure=False)
+    kubectl.RunKubectlCommand(delete_cmd, raise_on_failure=False)
 
 
 @events.benchmark_start.connect

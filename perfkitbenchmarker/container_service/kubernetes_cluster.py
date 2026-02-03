@@ -5,14 +5,15 @@ import json
 import logging
 import time
 from typing import Any
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
-from perfkitbenchmarker.container_service import kubernetes
 from perfkitbenchmarker.resources import kubernetes_inference_server
+from perfkitbenchmarker.resources.container_service import container as container_lib
+from perfkitbenchmarker.resources.container_service import container_cluster
 from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.container_service import kubernetes_events
 
@@ -20,10 +21,10 @@ INGRESS_JSONPATH = '{.status.loadBalancer.ingress[0]}'
 RESOURCE_DELETE_SLEEP_SECONDS = 5
 
 
-class KubernetesCluster(container_service.BaseContainerCluster):
+class KubernetesCluster(container_cluster.BaseContainerCluster):
   """A Kubernetes flavor of Container Cluster."""
 
-  CLUSTER_TYPE = container_service.KUBERNETES
+  CLUSTER_TYPE = container_lib.KUBERNETES
 
   def __init__(self, cluster_spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(cluster_spec)

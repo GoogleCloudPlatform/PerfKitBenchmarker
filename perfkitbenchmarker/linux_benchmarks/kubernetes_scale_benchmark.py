@@ -104,7 +104,7 @@ def _EnsureEksKarpenterGpuNodepool(
   """Ensures a GPU NodePool exists for EKS Karpenter before applying workloads."""
   if not _IsEksKarpenterAwsGpu(cluster):
     return
-  cluster.ApplyManifest(
+  kubernetes_commands.ApplyManifest(
       'container/kubernetes_scale/aws-gpu-nodepool.yaml.j2',
       gpu_nodepool_name='gpu',
       gpu_nodepool_label='gpu',
@@ -236,7 +236,7 @@ def ScaleUpPods(
   if is_eks_karpenter_aws_gpu:
     manifest_kwargs['GpuTaintKey'] = 'nvidia.com/gpu'
 
-  yaml_docs = cluster.ConvertManifestToYamlDicts(
+  yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
       MANIFEST_TEMPLATE,
       **manifest_kwargs,
   )
