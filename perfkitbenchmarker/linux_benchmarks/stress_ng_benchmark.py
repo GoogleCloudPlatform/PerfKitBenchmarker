@@ -373,22 +373,30 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     'stress_ng_memrate_rd',
     0,
-    'memrate worker read rate in MiB/s. Only applies to "memrate" stressor.'
+    'memrate worker read rate in MiB/s. Only applies to "memrate" stressor.',
 )
 flags.DEFINE_integer(
     'stress_ng_memrate_wr',
     0,
-    'memrate worker write rate in MiB/s. Only applies to "memrate" stressor.'
+    'memrate worker write rate in MiB/s. Only applies to "memrate" stressor.',
 )
 flags.DEFINE_integer(
-    'stress_ng_vm_count',
-    4,
-    'Number of VMs to run the "vm" stressor on.'
+    'stress_ng_vm_count', 4, 'Number of VMs to run the "vm" stressor on.'
 )
 flags.DEFINE_string(
-    'stress_ng_vm_bytes',
-    '1G',
-    'Size of the VM to run the "vm" stressor on.'
+    'stress_ng_vm_madvise',
+    'random',
+    'Specify  the  option used on the memory mapped regions used in the vm'
+    ' stressor. The options are: [dontneed, hugepage, mergeable, nohugepage,'
+    ' normal, random, sequential, unmergeable, willneed]',
+)
+flags.DEFINE_boolean(
+    'stress_ng_use_vm_populate',
+    'false',
+    'Populate page tables for the memory mappings; this can stress swapping.',
+)
+flags.DEFINE_string(
+    'stress_ng_vm_bytes', '1G', 'Size of the VM to run the "vm" stressor on.'
 )
 flags.DEFINE_integer(
     'stress_ng_futex_ops',
@@ -602,7 +610,13 @@ def _RunWorkload(vm, num_threads):
           '--vm-keep',
           '--vm-hang',
           '0',
+          '--vm-madvise',
+          str(FLAGS.stress_ng_vm_madvise),
       ])
+      if FLAGS.stress_ng_use_vm_populate == 'true':
+        cmd_parts.extend([
+            '--vm-populate',
+        ])
       metadata['vm_count'] = FLAGS.stress_ng_vm_count
       metadata['vm_bytes'] = FLAGS.stress_ng_vm_bytes
 
