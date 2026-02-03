@@ -1302,8 +1302,7 @@ class AzureVirtualMachine(
     """Returns whether this vm supports NVMe."""
     generation = util.GetMachineSeriesNumber(self.machine_type)
     family = util.GetMachineFamily(self.machine_type)
-    # 'p' for Azure ARM VMs, which are not supported.
-    if 'pds' in family or 'ps' in family:
+    if _MachineTypeIsArm(self.machine_type):
       return False
     return generation >= 6 or any(
         re.match(pattern, family) for pattern in EARLY_NVME_MACHINE_FAMILIES
