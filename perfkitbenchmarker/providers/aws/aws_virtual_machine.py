@@ -530,7 +530,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   # Whether to include deprecated images in the list.
   ALLOW_DEPRECATED_IMAGE = False
 
-  DEFAULT_ROOT_DISK_TYPE = 'gp2'
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
   DEFAULT_USER_NAME = 'ec2-user'
 
   _lock = threading.Lock()
