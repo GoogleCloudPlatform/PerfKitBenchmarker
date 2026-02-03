@@ -35,7 +35,7 @@ virtual_machine = Any  # pylint: disable=invalid-name
 
 def GetCreateDiskStrategy(
     vm: 'virtual_machine.BaseVirtualMachine',
-    disk_spec: disk.BaseDiskSpec,
+    disk_spec: disk.BaseDiskSpec | None,
     disk_count: int,
 ) -> disk_strategies.CreateDiskStrategy:
   """Returns the strategies to create disks for the disk type."""
@@ -93,7 +93,7 @@ class AzureCreateRemoteDiskStrategy(AzureCreateDiskStrategy):
   def __init__(
       self,
       vm: 'virtual_machine.BaseVirtualMachine',
-      disk_spec: disk.BaseDiskSpec,
+      disk_spec: disk.BaseDiskSpec | None,
       disk_count: int,
   ):
     super().__init__(vm, disk_spec, disk_count)

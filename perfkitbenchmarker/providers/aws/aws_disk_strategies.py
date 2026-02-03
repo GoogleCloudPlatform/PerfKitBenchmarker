@@ -16,6 +16,7 @@
 This module abstract out the disk algorithm for formatting and creating
 scratch disks.
 """
+
 import collections
 import logging
 import time
@@ -39,7 +40,7 @@ def GetCreateDiskStrategy(
     vm: 'virtual_machine.BaseVirtualMachine',
     disk_spec: aws_disk.AwsDiskSpec,
     disk_count: int,
-) -> disk_strategies.CreateDiskStrategy:
+) -> 'AWSCreateDiskStrategy':
   """Returns the strategies to create disks for the disk type."""
   if disk_spec and disk_count > 0:
     if disk_spec.disk_type == disk.LOCAL:
@@ -57,6 +58,10 @@ class AWSCreateDiskStrategy(disk_strategies.CreateDiskStrategy):
   def BuildDiskSpecId(self, spec_index, strip_index):
     """Generates an unique string to represent a disk_spec position."""
     return f'{spec_index}_{strip_index}'
+
+  def GetBlockDeviceMap(self) -> list[dict[str, str]]:
+    # Implemented by subclasses.
+    raise NotImplementedError()
 
 
 class CreateLocalDiskStrategy(AWSCreateDiskStrategy):
@@ -171,7 +176,9 @@ class CreateRemoteDiskStrategy(AWSCreateDiskStrategy):
     return mappings
 
 
-class CreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
+class CreateNonResourceDiskStrategy(
+    disk_strategies.EmptyCreateDiskStrategy, AWSCreateDiskStrategy
+):
   """Strategies to create non remote and non local disks like RAM, SMB."""
 
   def DiskCreatedOnVMCreation(self) -> bool:
@@ -467,8 +474,8 @@ class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
       '--write-part-size=67108864',
       '--incremental-upload',
       '--allow-overwrite',
-      '--allow-delete'
-      ]
+      '--allow-delete',
+  ]
 
   def SetUpDisk(self):
     """Performs setup of S3 buckets."""
@@ -492,7 +499,7 @@ class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
         bucket_name=bucket_name,
         region=util.GetRegionFromZone(self.vm.zone),
         zone=self.vm.zone,
-        is_s3_express=True
+        is_s3_express=True,
     )
     s3_client = s3.S3Bucket(s3_spec)
     if not FLAGS.object_storage_fuse_bucket_name:
