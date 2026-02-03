@@ -18,7 +18,6 @@ import os
 import uuid
 
 from absl import flags
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
@@ -29,6 +28,11 @@ from perfkitbenchmarker.providers.aws import aws_logs
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
+from perfkitbenchmarker.resources.container_service import container as container_lib
+from perfkitbenchmarker.resources.container_service import container_cluster
+from perfkitbenchmarker.resources.container_service import container_registry
+from perfkitbenchmarker.resources.container_service import errors as container_errors
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 import requests
 import yaml
 
@@ -100,7 +104,7 @@ class EcrRepository(resource.BaseResource):
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
 
-class ElasticContainerRegistry(container_service.BaseContainerRegistry):
+class ElasticContainerRegistry(container_registry.BaseContainerRegistry):
   """Class for building and storing container images on AWS."""
 
   CLOUD = provider_info.AWS
@@ -239,7 +243,7 @@ class TaskDefinition(resource.BaseResource):
     return json.dumps(definitions)
 
 
-class EcsTask(container_service.BaseContainer):
+class EcsTask(container_lib.BaseContainer):
   """Class representing an ECS/Fargate task."""
 
   def __init__(self, name, container_spec, cluster):
@@ -354,12 +358,12 @@ class EcsTask(container_service.BaseContainer):
 
     @vm_util.Retry(
         timeout=timeout,
-        retryable_exceptions=(container_service.RetriableContainerException,),
+        retryable_exceptions=(container_errors.RetriableContainerException,),
     )
     def _WaitForExit():
       task = self._GetTask()
       if task['lastStatus'] != 'STOPPED':
-        raise container_service.RetriableContainerException(
+        raise container_errors.RetriableContainerException(
             'Task is not STOPPED.'
         )
       return task
@@ -376,7 +380,7 @@ class EcsTask(container_service.BaseContainer):
     )
 
 
-class EcsService(container_service.BaseContainerService):
+class EcsService(container_lib.BaseContainerService):
   """Class representing an ECS/Fargate service."""
 
   def __init__(self, name, container_spec, cluster):
@@ -500,7 +504,7 @@ class EcsService(container_service.BaseContainerService):
     return False
 
 
-class FargateCluster(container_service.BaseContainerCluster):
+class FargateCluster(container_cluster.BaseContainerCluster):
   """Class representing an AWS Fargate cluster."""
 
   CLOUD = provider_info.AWS
@@ -584,7 +588,7 @@ class FargateCluster(container_service.BaseContainerCluster):
     service.Create()
 
 
-class AwsKopsCluster(container_service.KubernetesCluster):
+class AwsKopsCluster(kubernetes_cluster.KubernetesCluster):
   """Class representing a kops based Kubernetes cluster."""
 
   CLOUD = provider_info.AWS

@@ -32,7 +32,6 @@ from typing import Dict, List, Type, TypeAlias
 from absl import flags
 import jinja2
 from perfkitbenchmarker import background_tasks
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import data
 from perfkitbenchmarker import dpb_constants
@@ -48,6 +47,10 @@ from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util as aws_util
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util as gcp_util
+from perfkitbenchmarker.resources.container_service import container as container_lib
+from perfkitbenchmarker.resources.container_service import errors as container_errors
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 import yaml
 
@@ -1067,7 +1070,7 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
 class KubernetesSparkCluster(BaseDpbService):
   """Object representing a Kubernetes dpb service spark cluster."""
 
-  CLOUD = container_service.KUBERNETES
+  CLOUD = container_lib.KUBERNETES
   SERVICE_TYPE = dpb_constants.KUBERNETES_SPARK_CLUSTER
 
   # Constants to sychronize between YAML and Spark configuration
@@ -1090,7 +1093,7 @@ class KubernetesSparkCluster(BaseDpbService):
     benchmark_spec = context.GetThreadBenchmarkSpec()
     self.k8s_cluster = benchmark_spec.container_cluster
     assert self.k8s_cluster
-    assert self.k8s_cluster.CLUSTER_TYPE == container_service.KUBERNETES
+    assert self.k8s_cluster.CLUSTER_TYPE == container_lib.KUBERNETES
     self.cloud = self.k8s_cluster.CLOUD
     self.container_registry = benchmark_spec.container_registry
     assert self.container_registry
@@ -1242,18 +1245,18 @@ class KubernetesSparkCluster(BaseDpbService):
         image=self.image,
         service_account=self.SPARK_K8S_SERVICE_ACCOUNT,
     )
-    container = container_service.KubernetesPod(driver_name)
+    pod = kubernetes.KubernetesPod(driver_name)
     # increments driver_name for next job
-    self.spark_drivers.append(container)
+    self.spark_drivers.append(pod)
     try:
-      container.WaitForExit()
-    except container_service.ContainerException as e:
+      pod.WaitForExit()
+    except container_errors.ContainerException as e:
       raise JobSubmissionError() from e
     end_time = datetime.datetime.now()
 
     if job_stdout_file:
       with open(job_stdout_file, 'w') as f:
-        f.write(container.GetLogs())
+        f.write(pod.GetLogs())
 
     # TODO(pclay): use k8s output for timing?
     return JobResult(run_time=(end_time - start_time).total_seconds())
@@ -1262,14 +1265,14 @@ class KubernetesSparkCluster(BaseDpbService):
     pass
 
   def _GetCompletedJob(self, job_id: str) -> JobResult | None:
-    """container.WaitForExit is blocking so this is not meaningful."""
-    raise NotImplementedError('container.WaitForExit is a blocking command.')
+    """pod.WaitForExit is blocking so this is not meaningful."""
+    raise NotImplementedError('pod.WaitForExit is a blocking command.')
 
 
 class KubernetesFlinkCluster(BaseDpbService):
   """Object representing a Kubernetes dpb service flink cluster."""
 
-  CLOUD = container_service.KUBERNETES
+  CLOUD = container_lib.KUBERNETES
   SERVICE_TYPE = dpb_constants.KUBERNETES_FLINK_CLUSTER
 
   FLINK_JOB_MANAGER_SERVICE = 'flink-jobmanager'
@@ -1281,7 +1284,7 @@ class KubernetesFlinkCluster(BaseDpbService):
     benchmark_spec = context.GetThreadBenchmarkSpec()
     self.k8s_cluster = benchmark_spec.container_cluster
     assert self.k8s_cluster
-    assert self.k8s_cluster.CLUSTER_TYPE == container_service.KUBERNETES
+    assert self.k8s_cluster.CLUSTER_TYPE == container_lib.KUBERNETES
     self.cloud = self.k8s_cluster.CLOUD
     self.container_registry = benchmark_spec.container_registry
     assert self.container_registry
@@ -1427,23 +1430,23 @@ class KubernetesFlinkCluster(BaseDpbService):
             'queryable-state.proxy.ports'
         ),
     )
-    stdout, _, _ = container_service.RunKubectlCommand(
+    stdout, _, _ = kubectl.RunKubectlCommand(
         ['get', 'pod', f'--selector=job-name={job_manager_name}', '-o', 'yaml']
     )
     pods = yaml.safe_load(stdout)['items']
     if len(pods) <= 0:
       raise JobSubmissionError('No pod was created for the job.')
-    container = container_service.KubernetesPod(pods[0]['metadata']['name'])
-    self.flink_jobmanagers.append(container)
+    pod = kubernetes.KubernetesPod(pods[0]['metadata']['name'])
+    self.flink_jobmanagers.append(pod)
     try:
-      container.WaitForExit()
-    except container_service.ContainerException as e:
+      pod.WaitForExit()
+    except container_errors.ContainerException as e:
       raise JobSubmissionError() from e
     end_time = datetime.datetime.now()
 
     if job_stdout_file:
       with open(job_stdout_file, 'w') as f:
-        f.write(container.GetLogs())
+        f.write(pod.GetLogs())
 
     return JobResult(run_time=(end_time - start_time).total_seconds())
 
@@ -1454,8 +1457,8 @@ class KubernetesFlinkCluster(BaseDpbService):
     assert not FLAGS.dpb_cluster_properties
 
   def _GetCompletedJob(self, job_id: str) -> JobResult | None:
-    """container.WaitForExit is blocking so this is not meaningful."""
-    raise NotImplementedError('container.WaitForExit is a blocking command.')
+    """pod.WaitForExit is blocking so this is not meaningful."""
+    raise NotImplementedError('pod.WaitForExit is a blocking command.')
 
   def _Delete(self):
     pass
@@ -1482,7 +1485,7 @@ def GetDpbServiceClass(
       dpb_constants.KUBERNETES_SPARK_CLUSTER,
       dpb_constants.KUBERNETES_FLINK_CLUSTER,
   ]:
-    cloud = container_service.KUBERNETES
+    cloud = container_lib.KUBERNETES
   return resource.GetResourceClass(
       BaseDpbService, CLOUD=cloud, SERVICE_TYPE=dpb_service_type
   )

@@ -5,12 +5,13 @@ from typing import Callable, Iterable, Protocol, Tuple
 import unittest
 from unittest import mock
 from absl.testing import parameterized
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
+from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_events
 from perfkitbenchmarker.sample import Sample
 from tests import container_service_mock
 from tests import pkb_common_test_case
@@ -203,7 +204,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
   )
   def test_retriable_kubectl_command_fails_on_random_error(self, _):
     with self.assertRaises(errors.VmUtil.IssueCommandError):
-      container_service.RunRetryableKubectlCommand(['get', 'podpatchwork'])
+      kubectl.RunRetryableKubectlCommand(['get', 'podpatchwork'])
 
   @mock.patch.object(
       vm_util,
@@ -218,9 +219,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
   def test_retriable_kubectl_command_retries_on_retriable_error(
       self, sleep_mock, issue_command_mock
   ):
-    out, err, ret = container_service.RunRetryableKubectlCommand(
-        ['get', 'pods']
-    )
+    out, err, ret = kubectl.RunRetryableKubectlCommand(['get', 'pods'])
     self.assertEqual(out, 'pod1, pod2')
     self.assertEqual(err, '')
     self.assertEqual(ret, 0)
@@ -241,13 +240,11 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
       return 'ok', '', 0
 
     with mock.patch.object(vm_util, 'IssueCommand', _VerifyTimeout):
-      container_service.RunRetryableKubectlCommand(['get', 'pods'], timeout=1)
+      kubectl.RunRetryableKubectlCommand(['get', 'pods'], timeout=1)
 
   def test_retriable_kubectl_command_fails_with_raise_on_timeout(self):
     with self.assertRaises(ValueError):
-      container_service.RunRetryableKubectlCommand(
-          ['get', 'pods'], raise_on_timeout=True
-      )
+      kubectl.RunRetryableKubectlCommand(['get', 'pods'], raise_on_timeout=True)
 
   def test_GetNumReplicasSamples_found(self):
     resource_name = 'deployment/my_deployment'
@@ -407,9 +404,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
       autospec=True,
   )
   def test_RunKubectlCommand(self, issue_command_mock):
-    stdout, stderr, status = container_service.RunKubectlCommand(
-        ['get', 'pods']
-    )
+    stdout, stderr, status = kubectl.RunKubectlCommand(['get', 'pods'])
     self.assertEqual(stdout, 'stdout')
     self.assertEqual(stderr, 'stderr')
     self.assertEqual(status, 0)
@@ -422,10 +417,10 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
   )
   def test_RunKubectlCommand_CommandTimeoutPropagated(self, issue_command_mock):
     with self.assertRaises(errors.VmUtil.IssueCommandTimeoutError):
-      container_service.RunKubectlCommand(['get', 'pods'])
+      kubectl.RunKubectlCommand(['get', 'pods'])
 
   def test_RunKubectlCommand_KubectlTimeoutRaisesCommandTimeout(self):
-    for err in container_service.RETRYABLE_KUBECTL_ERRORS:
+    for err in kubectl.RETRYABLE_KUBECTL_ERRORS:
       with mock.patch.object(
           vm_util, 'IssueCommand', _MockedIssueCommandSuppressing(stderr=err)
       ):
@@ -433,12 +428,12 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
             errors.VmUtil.IssueCommandTimeoutError,
             msg=f'Failed to raise timeout for error: {err}',
         ):
-          container_service.RunKubectlCommand(['get', 'pods'])
+          kubectl.RunKubectlCommand(['get', 'pods'])
 
   def test_RunKubectlCommand_KubectlTimeoutWithSuppressFailureRaisesCommandTimeout(
       self,
   ):
-    for err in container_service.RETRYABLE_KUBECTL_ERRORS:
+    for err in kubectl.RETRYABLE_KUBECTL_ERRORS:
       with mock.patch.object(
           vm_util, 'IssueCommand', _MockedIssueCommandSuppressing(stderr=err)
       ):
@@ -446,13 +441,13 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
             errors.VmUtil.IssueCommandTimeoutError,
             msg=f'Failed to raise timeout for error: {err}',
         ):
-          container_service.RunKubectlCommand(
+          kubectl.RunKubectlCommand(
               ['get', 'pods'], suppress_failure=lambda x, y, z: True
           )
 
   @mock.patch.object(vm_util, 'IssueCommand', _MockedIssueCommandFailure)
   def test_RunKubectlCommand_KubectlFailWithSuppressFailure(self):
-    _, _, status = container_service.RunKubectlCommand(
+    _, _, status = kubectl.RunKubectlCommand(
         ['get', 'pods'], suppress_failure=lambda x, y, z: True
     )
     self.assertEqual(status, 0)
@@ -465,8 +460,8 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertLen(events, 1)
     self.assertEqual(
         events.pop(),
-        container_service.KubernetesEvent(
-            container_service.KubernetesEventResource(
+        kubernetes_events.KubernetesEvent(
+            kubernetes_events.KubernetesEventResource(
                 kind='ConfigMap', name=None
             ),
             message='gke-49fe-vm became leader',
@@ -477,7 +472,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
 
   def test_KubernetesEventParsing(self):
-    event = container_service.KubernetesEvent.FromDict({
+    event = kubernetes_events.KubernetesEvent.FromDict({
         'eventTime': '2025-10-03T18:05:56.272315Z',
         'involvedObject': {
             'apiVersion': 'v1',

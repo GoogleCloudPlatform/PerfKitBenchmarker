@@ -12,7 +12,6 @@ from typing import Any
 import urllib.parse
 
 from absl import flags
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
@@ -254,7 +253,7 @@ class Trino(edw_service.EdwService):
     Side effects:
       Sets the client interface hostname and port to the deployed ingress.
     """
-    port, _, _ = container_service.RunKubectlCommand(
+    port, _, _ = kubectl.RunKubectlCommand(
         [
             'get',
             'service',

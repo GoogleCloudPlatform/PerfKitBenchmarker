@@ -4,9 +4,9 @@ import unittest
 from absl import flags
 from absl.testing import flagsaver
 import mock
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import trino
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from tests import pkb_common_test_case
 
 
@@ -48,7 +48,7 @@ class TrinoTest(pkb_common_test_case.PkbCommonTestCase):
     )
     db = trino.Trino(EDW_SERVICE_SPEC)
     mock_kubernetes = mock.create_autospec(
-        container_service.KubernetesCluster, instance=True
+        kubernetes_cluster.KubernetesCluster, instance=True
     )
     mock_kubernetes.DeployIngress.return_value = 'http://1.0.0.0:12345'
     db.SetContainerCluster(mock_kubernetes)
@@ -96,7 +96,7 @@ class TrinoTest(pkb_common_test_case.PkbCommonTestCase):
     EDW_SERVICE_SPEC.node_count = 5
     db = trino.Trino(EDW_SERVICE_SPEC)
     mock_kubernetes = mock.create_autospec(
-        container_service.KubernetesCluster, instance=True
+        kubernetes_cluster.KubernetesCluster, instance=True
     )
     db.SetContainerCluster(mock_kubernetes)
     # Act.

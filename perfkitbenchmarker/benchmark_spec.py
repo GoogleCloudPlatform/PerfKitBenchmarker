@@ -31,7 +31,6 @@ from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import capacity_reservation
 from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import cluster
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import data_discovery_service
 from perfkitbenchmarker import disk
@@ -65,6 +64,9 @@ from perfkitbenchmarker.configs import freeze_restore_spec
 from perfkitbenchmarker.resources import base_job
 from perfkitbenchmarker.resources import example_resource
 from perfkitbenchmarker.resources import managed_ai_model
+from perfkitbenchmarker.resources.container_service import container_cluster
+from perfkitbenchmarker.resources.container_service import container_registry
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.pinecone import pinecone as pinecone_resource
 from perfkitbenchmarker.resources.vertex_vector_search import vvs as vvs_resource  # pylint: disable=line-too-long
 import six
@@ -182,7 +184,7 @@ class BenchmarkSpec:
     self.uuid = '%s-%s' % (FLAGS.run_uri, uuid.uuid4())
     self.always_call_cleanup = pkb_flags.ALWAYS_CALL_CLEANUP.value
     self.dpb_service: dpb_service.BaseDpbService = None
-    self.container_cluster: container_service.BaseContainerCluster = None
+    self.container_cluster: container_cluster.BaseContainerCluster = None
     self.cluster: cluster.BaseCluster = None
     self.key = None
     self.relational_db = None
@@ -345,7 +347,7 @@ class BenchmarkSpec:
     cloud = self.config.container_cluster.cloud
     cluster_type = self.config.container_cluster.type
     providers.LoadProvider(cloud)
-    container_cluster_class = container_service.GetContainerClusterClass(
+    container_cluster_class = container_cluster.GetContainerClusterClass(
         cloud, cluster_type
     )
     self.container_cluster = container_cluster_class(
@@ -374,7 +376,7 @@ class BenchmarkSpec:
       return
     cloud = self.config.container_registry.cloud
     providers.LoadProvider(cloud)
-    container_registry_class = container_service.GetContainerRegistryClass(
+    container_registry_class = container_registry.GetContainerRegistryClass(
         cloud
     )
     self.container_registry = container_registry_class(
@@ -522,7 +524,7 @@ class BenchmarkSpec:
     )  # pytype: disable=not-instantiable
     if self.container_cluster:
       assert isinstance(
-          self.container_cluster, container_service.KubernetesCluster
+          self.container_cluster, kubernetes_cluster.KubernetesCluster
       )
       self.edw_service.SetContainerCluster(self.container_cluster)
 

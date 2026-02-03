@@ -3,8 +3,9 @@ from unittest import mock
 
 from absl.testing import flagsaver
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker.linux_benchmarks.provisioning_benchmarks import provision_node_pools_benchmark
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from tests import pkb_common_test_case
 
@@ -14,7 +15,7 @@ class ProvisionNodePoolsBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super().setUp()
     self.cluster = mock.create_autospec(
-        container_service.KubernetesCluster, instance=True
+        kubernetes_cluster.KubernetesCluster, instance=True
     )
     self.cluster.CLOUD = 'GCP'
 
@@ -22,7 +23,7 @@ class ProvisionNodePoolsBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     many_nodes = ['foo'] * num_nodes
     self.enter_context(
         mock.patch.object(
-            container_service,
+            kubectl,
             'RunKubectlCommand',
             return_value=(' '.join(many_nodes), None, None),
         )

@@ -41,9 +41,10 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 INIT_BATCH_SIZE = flags.DEFINE_integer(
@@ -97,7 +98,7 @@ def Prepare(_: bm_spec.BenchmarkSpec) -> None:
 
 
 def _AddNodePool(
-    cluster: container_service.KubernetesCluster,
+    cluster: kubernetes_cluster.KubernetesCluster,
     batch_name: str,
     pool_id: str,
 ) -> None:
@@ -113,7 +114,7 @@ def _AddNodePool(
 
 
 def _CreateJobsAndWait(
-    cluster: container_service.KubernetesCluster, batch_name: str, jobs: int
+    cluster: kubernetes_cluster.KubernetesCluster, batch_name: str, jobs: int
 ) -> list[sample.Sample]:
   """Creates jobs and waits for all pods to be running."""
   logging.info(
@@ -159,7 +160,7 @@ def _CreateJobsAndWait(
   # the RunKubectlCommand fails before timeout.
   while True:
     try:
-      stdout, _, _ = container_service.RunKubectlCommand([
+      stdout, _, _ = kubectl.RunKubectlCommand([
           "get",
           "pods",
           "-l",
@@ -232,7 +233,7 @@ def _AssertNodes(
 
 
 def _AssertNodePools(
-    cluster: container_service.KubernetesCluster,
+    cluster: kubernetes_cluster.KubernetesCluster,
     intital_node_pools: int,
     added_node_pools: int,
 ) -> None:
@@ -255,7 +256,7 @@ def _AssertNodePools(
 
 
 def _CreateNodePools(
-    cluster: container_service.KubernetesCluster,
+    cluster: kubernetes_cluster.KubernetesCluster,
     batch_name: str,
     node_pools_to_add: int,
 ) -> List[sample.Sample]:

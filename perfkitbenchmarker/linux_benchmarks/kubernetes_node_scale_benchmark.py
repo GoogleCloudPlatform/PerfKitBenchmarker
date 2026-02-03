@@ -9,9 +9,9 @@ from absl import flags
 from absl import logging
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 
 FLAGS = flags.FLAGS
 
@@ -54,8 +54,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Scales a large number of pods on kubernetes."""
   assert bm_spec.container_cluster
   cluster = bm_spec.container_cluster
-  assert isinstance(cluster, container_service.KubernetesCluster)
-  cluster: container_service.KubernetesCluster = cluster
+  assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
+  cluster: kubernetes_cluster.KubernetesCluster = cluster
 
   # Warm up the cluster by creating a single pod. This compensates for
   # differences between Standard & Autopilot, where Standard already has 1 node

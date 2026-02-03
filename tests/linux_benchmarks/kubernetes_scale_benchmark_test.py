@@ -5,10 +5,12 @@ import unittest
 from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
+from perfkitbenchmarker.resources.container_service import kubernetes_events
 from tests import pkb_common_test_case
 
 
@@ -21,7 +23,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super().setUp()
     self.bm_spec = mock.create_autospec(benchmark_spec.BenchmarkSpec)
-    self.cluster = mock.create_autospec(container_service.KubernetesCluster)
+    self.cluster = mock.create_autospec(kubernetes_cluster.KubernetesCluster)
     self.bm_spec.container_cluster = self.cluster
     self.expected_num_samples_per_reason = 9
 
@@ -38,7 +40,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def testPodStatusConditions(self):
     self.enter_context(
         mock.patch.object(
-            container_service,
+            kubectl,
             'RunKubectlCommand',
             return_value=(
                 """
@@ -88,7 +90,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def testPodStatusConditionsWithIgnoredResources(self):
     self.enter_context(
         mock.patch.object(
-            container_service,
+            kubectl,
             'RunKubectlCommand',
             return_value=(
                 """
@@ -128,7 +130,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def testOneStatForOnePod(self):
     self.enter_context(
         mock.patch.object(
-            container_service,
+            kubectl,
             'RunKubectlCommand',
             side_effect=[
                 (
@@ -159,7 +161,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def testOneStatForMultiplePods(self):
     self.enter_context(
         mock.patch.object(
-            container_service,
+            kubectl,
             'RunKubectlCommand',
             side_effect=[
                 (
@@ -205,7 +207,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def testMultipleStatForOnePod(self):
     self.enter_context(
         mock.patch.object(
-            container_service,
+            kubectl,
             'RunKubectlCommand',
             side_effect=[
                 (
@@ -241,7 +243,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def testOneStatForOneNode(self):
     self.enter_context(
         mock.patch.object(
-            container_service,
+            kubectl,
             'RunKubectlCommand',
             side_effect=[
                 (
@@ -274,7 +276,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def testReportLatenciesMultipleStatsOnePod(self):
     self.enter_context(
         mock.patch.object(
-            container_service,
+            kubectl,
             'RunKubectlCommand',
             side_effect=[
                 (
@@ -315,9 +317,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresPassesWithCorrectNumberOfPods(self):
-    self.cluster.event_poller = container_service.KubernetesEventPoller(
-        set
-    )
+    self.cluster.event_poller = kubernetes_events.KubernetesEventPoller(set)
     kubernetes_scale_benchmark.CheckForFailures(
         self.cluster,
         [
@@ -329,12 +329,12 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresThrowsRegularError(self):
-    self.cluster.event_poller = container_service.KubernetesEventPoller(
+    self.cluster.event_poller = kubernetes_events.KubernetesEventPoller(
         lambda: {
-            container_service.KubernetesEvent(
+            kubernetes_events.KubernetesEvent(
                 reason='PodReady',
                 message='Pod is ready',
-                resource=container_service.KubernetesEventResource(
+                resource=kubernetes_events.KubernetesEventResource(
                     name='pod',
                     kind='Pod',
                 ),
@@ -354,16 +354,16 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresThrowsQuotaExceeded(self):
-    self.cluster.event_poller = container_service.KubernetesEventPoller(
+    self.cluster.event_poller = kubernetes_events.KubernetesEventPoller(
         lambda: {
-            container_service.KubernetesEvent(
+            kubernetes_events.KubernetesEvent(
                 reason='FailedScaleUp',
                 message=(
                     'Node scale up in zones us-west1-b associated with this pod'
                     ' failed: GCE quota exceeded. Pod is at risk of not being'
                     ' scheduled.'
                 ),
-                resource=container_service.KubernetesEventResource(
+                resource=kubernetes_events.KubernetesEventResource(
                     name='pod',
                     kind='Pod',
                 ),

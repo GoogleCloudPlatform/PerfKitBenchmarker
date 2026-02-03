@@ -13,12 +13,14 @@ from dateutil import parser
 import numpy as np
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_events
 
 
 FLAGS = flags.FLAGS
@@ -90,7 +92,9 @@ def GetConfig(user_config):
   return config
 
 
-def _IsEksKarpenterAwsGpu(cluster: container_service.KubernetesCluster) -> bool:
+def _IsEksKarpenterAwsGpu(
+    cluster: kubernetes_cluster.KubernetesCluster,
+) -> bool:
   return bool(
       virtual_machine.GPU_COUNT.value
       and FLAGS.cloud.lower() == 'aws'
@@ -99,7 +103,7 @@ def _IsEksKarpenterAwsGpu(cluster: container_service.KubernetesCluster) -> bool:
 
 
 def _EnsureEksKarpenterGpuNodepool(
-    cluster: container_service.KubernetesCluster,
+    cluster: kubernetes_cluster.KubernetesCluster,
 ) -> None:
   """Ensures a GPU NodePool exists for EKS Karpenter before applying workloads."""
   if not _IsEksKarpenterAwsGpu(cluster):
@@ -130,7 +134,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
 
 def _GetRolloutCreationTime(rollout_name: str) -> int:
   """Returns the time when the rollout was created."""
-  out, _, _ = container_service.RunRetryableKubectlCommand([
+  out, _, _ = kubectl.RunRetryableKubectlCommand([
       'get',
       rollout_name,
       '-o',
@@ -154,8 +158,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Scales a large number of pods on kubernetes."""
   assert bm_spec.container_cluster
   cluster = bm_spec.container_cluster
-  assert isinstance(cluster, container_service.KubernetesCluster)
-  cluster: container_service.KubernetesCluster = cluster
+  assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
+  cluster: kubernetes_cluster.KubernetesCluster = cluster
 
   # Warm up the cluster by creating a single pod. This compensates for
   # differences between Standard & Autopilot, where Standard already has 1 node
@@ -196,7 +200,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
 
 
 def ScaleUpPods(
-    cluster: container_service.KubernetesCluster,
+    cluster: kubernetes_cluster.KubernetesCluster,
     num_new_pods: int,
 ) -> tuple[list[sample.Sample], str]:
   """Scales up pods on a kubernetes cluster. Returns samples & rollout name."""
@@ -288,7 +292,7 @@ def ScaleUpPods(
 
 
 def CheckForFailures(
-    cluster: container_service.KubernetesCluster,
+    cluster: kubernetes_cluster.KubernetesCluster,
     pod_samples: list[sample.Sample],
     num_pods: int,
 ):
@@ -306,7 +310,7 @@ def CheckForFailures(
   """
   assert cluster.event_poller
   failure_events_by_reason: dict[
-      str | None, list[container_service.KubernetesEvent]
+      str | None, list[kubernetes_events.KubernetesEvent]
   ] = cluster.event_poller.GetAndLogFailureEvents()
 
   ready_count_sample = next(
@@ -358,7 +362,7 @@ class KubernetesResourceStatusCondition:
 
 
 # TODO: b/458122803 - refactor by moving to a common location (e.g.
-# container_service.py)
+# resources/container_service modules)
 def GetStatusConditionsForResourceType(
     resource_type: str,
     resources_to_ignore: abc.Set[str] = frozenset(),
@@ -380,7 +384,7 @@ def GetStatusConditionsForResourceType(
       r'{"\""}{.metadata.name}{"\": "}{.status.conditions}{",\n"}'
       r'{end}'
   )
-  stdout, _, _ = container_service.RunKubectlCommand(
+  stdout, _, _ = kubectl.RunKubectlCommand(
       [
           'get',
           resource_type,
@@ -500,12 +504,12 @@ def _SummarizeTimestamps(timestamps: list[float]) -> dict[str, float]:
 
 def Cleanup(_):
   """Cleanups scale benchmark. Runs before teardown."""
-  container_service.RunKubectlCommand(['get', 'deployments'])
-  container_service.RunRetryableKubectlCommand(
+  kubectl.RunKubectlCommand(['get', 'deployments'])
+  kubectl.RunRetryableKubectlCommand(
       ['delete', 'deployment', 'kubernetes-scaleup'],
       timeout=_GetScaleTimeout(),
       raise_on_failure=False,
   )
-  container_service.RunRetryableKubectlCommand(
+  kubectl.RunRetryableKubectlCommand(
       ['delete', '--all', 'pods', '-n', 'default'], timeout=_GetScaleTimeout()
   )

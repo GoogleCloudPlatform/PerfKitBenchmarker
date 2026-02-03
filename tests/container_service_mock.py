@@ -6,9 +6,9 @@ your test case.
 
 from unittest import mock
 from absl.testing import flagsaver
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.configs import container_spec
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from tests import pkb_common_test_case
 
 
@@ -16,7 +16,7 @@ from tests import pkb_common_test_case
 TEST_CLOUD = provider_info.UNIT_TEST
 
 
-class TestKubernetesCluster(container_service.KubernetesCluster):
+class TestKubernetesCluster(kubernetes_cluster.KubernetesCluster):
 
   CLOUD = TEST_CLOUD
 

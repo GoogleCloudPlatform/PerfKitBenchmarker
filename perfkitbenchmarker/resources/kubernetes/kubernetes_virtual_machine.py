@@ -21,7 +21,6 @@ import stat
 from typing import Any, Optional, Union
 
 from absl import flags
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -34,6 +33,8 @@ from perfkitbenchmarker.linux_packages import google_cloud_sdk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
+from perfkitbenchmarker.resources.container_service import container as container_service_lib
+from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.kubernetes import flags as k8s_flags
 from perfkitbenchmarker.resources.kubernetes import kubernetes_disk
 from perfkitbenchmarker.resources.kubernetes import kubernetes_pod_spec
@@ -50,7 +51,7 @@ SELECTOR_PREFIX = 'pkb'
 def _IsKubectlErrorEphemeral(retcode: int, stderr: str) -> bool:
   """Determine if kubectl error is retriable."""
   return retcode == 1 and any(
-      error in stderr for error in container_service.RETRYABLE_KUBECTL_ERRORS
+      error in stderr for error in kubectl.RETRYABLE_KUBECTL_ERRORS
   )
 
 
@@ -332,7 +333,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
       else:
         nodepool = self.vm_group
       template['spec']['nodeSelector'] = {
-          'pkb_nodepool': container_service.NodePoolName(nodepool)
+          'pkb_nodepool': container_service_lib.NodePoolName(nodepool)
       }
 
     if FLAGS.kubernetes_anti_affinity:

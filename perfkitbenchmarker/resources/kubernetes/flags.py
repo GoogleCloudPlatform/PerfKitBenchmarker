@@ -87,7 +87,7 @@ SETUP_SSH = flags.DEFINE_boolean(
     'Set up SSH on Kubernetes VMs. Probably not needed any more?',
 )
 DEFAULT_VM_GROUP_NODEPOOL = flags.DEFINE_string(
-    # default is container_service.DEFAULT_NODEPOOL, but don't import because it
+    # default is container_cluster.DEFAULT_NODEPOOL, but don't import because it
     # causes a runtime circular dependency.
     'kubernetes_vm_default_nodepool',
     'default',

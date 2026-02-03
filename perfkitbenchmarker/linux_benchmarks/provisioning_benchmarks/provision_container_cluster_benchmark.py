@@ -27,11 +27,14 @@ from typing import Callable, List
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.configs import benchmark_config_spec
+from perfkitbenchmarker.resources.container_service import container as container_lib
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_events
 
 _TIME_RESIZE = flags.DEFINE_bool(
     'provision_container_cluster_time_resize',
@@ -67,7 +70,7 @@ def GetConfig(user_config):
 def CheckPrerequisites(
     benchmark_config: benchmark_config_spec.BenchmarkConfigSpec,
 ):
-  if benchmark_config.container_cluster.type != container_service.KUBERNETES:
+  if benchmark_config.container_cluster.type != container_lib.KUBERNETES:
     raise errors.Config.InvalidValue(
         'provision_container_cluster only supports Kubernetes clusters.'
     )
@@ -77,16 +80,16 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   """Provision container, because it's not handled by provision stage."""
   cluster = bm_spec.container_cluster
   assert cluster
-  container = bm_spec.container_specs[SPEC_NAME]
-  logging.info('Deploying container with image %s', container.image)
-  cluster.DeployContainer(CONTAINER_NAME, container)
+  container_spec = bm_spec.container_specs[SPEC_NAME]
+  logging.info('Deploying container_spec with image %s', container_spec.image)
+  cluster.DeployContainer(CONTAINER_NAME, container_spec)
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Get samples from resource provisioning."""
   cluster = bm_spec.container_cluster
   assert cluster
-  assert isinstance(cluster, container_service.KubernetesCluster)
+  assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
   container = cluster.containers[CONTAINER_NAME][0]
   samples = container.GetSamples()
   if not cluster.user_managed:
@@ -103,7 +106,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
 
 
 def _BenchmarkClusterResize(
-    cluster: container_service.KubernetesCluster,
+    cluster: kubernetes_cluster.KubernetesCluster,
 ) -> List[sample.Sample]:
   """Time resizing the cluster.
 
@@ -166,7 +169,7 @@ def _BenchmarkClusterResize(
   kubernetes_commands.WaitForRollout('daemonset/daemon-set')
 
   def GetPodOnNode() -> str:
-    pods_json, _, _ = container_service.RunKubectlCommand([
+    pods_json, _, _ = kubectl.RunKubectlCommand([
         'get',
         'pod',
         '-o',
@@ -201,7 +204,7 @@ def _BenchmarkClusterResize(
 
 
 def _GetKeyScalingEventTimes(
-    cluster: container_service.KubernetesCluster, new_node: str, new_pod: str
+    cluster: kubernetes_cluster.KubernetesCluster, new_node: str, new_pod: str
 ) -> dict[str, float]:
   """Extract the time of each known milestone."""
   events = cluster.GetEvents()
@@ -217,10 +220,10 @@ def _GetKeyScalingEventTimes(
   )
 
   def First(
-      items: list[container_service.KubernetesEvent],
-      predicate: Callable[[container_service.KubernetesEvent], bool],
+      items: list[kubernetes_events.KubernetesEvent],
+      predicate: Callable[[kubernetes_events.KubernetesEvent], bool],
       event_name: str,
-  ) -> dict[str, container_service.KubernetesEvent]:
+  ) -> dict[str, kubernetes_events.KubernetesEvent]:
     filtered_item = next(filter(predicate, items), None)
     if not filtered_item:
       return {}

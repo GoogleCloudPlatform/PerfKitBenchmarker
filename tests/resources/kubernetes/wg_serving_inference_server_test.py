@@ -2,8 +2,8 @@ import unittest
 
 from absl.testing import parameterized
 import mock
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server
 from tests import pkb_common_test_case
@@ -55,7 +55,9 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super().setUp()
     self.mock_cluster = self.enter_context(
-        mock.patch.object(container_service, 'KubernetesCluster', autospec=True)
+        mock.patch.object(
+            kubernetes_cluster, 'KubernetesCluster', autospec=True
+        )
     )
     self.mock_run_kubectl = self.enter_context(
         mock.patch.object(kubectl, 'RunKubectlCommand', autospec=True)

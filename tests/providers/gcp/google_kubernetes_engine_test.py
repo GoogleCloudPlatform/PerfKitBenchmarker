@@ -24,7 +24,6 @@ from unittest import mock
 
 from absl import flags as flgs
 from absl.testing import flagsaver
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -102,7 +101,7 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
 
 class GoogleContainerRegistryTestCase(pkb_common_test_case.PkbCommonTestCase):
 
-  class FakeContainerImage(container_service.ContainerImage):
+  class FakeContainerImage(container.ContainerImage):
 
     def __init__(self, name):
       self.name = name

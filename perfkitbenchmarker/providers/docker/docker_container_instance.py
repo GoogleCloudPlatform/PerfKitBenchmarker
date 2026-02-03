@@ -22,7 +22,6 @@ import logging
 import os
 import threading
 from absl import flags
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import data
 from perfkitbenchmarker import disk

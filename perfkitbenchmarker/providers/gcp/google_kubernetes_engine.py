@@ -22,7 +22,6 @@ import typing
 from typing import Any
 
 from absl import flags
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
@@ -31,6 +30,10 @@ from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
+from perfkitbenchmarker.resources.container_service import container
+from perfkitbenchmarker.resources.container_service import container_cluster
+from perfkitbenchmarker.resources.container_service import container_registry
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 FLAGS = flags.FLAGS
@@ -51,7 +54,7 @@ def _CalculateCidrSize(nodes: int) -> int:
   return min(cidr_size, 19)
 
 
-class GoogleArtifactRegistry(container_service.BaseContainerRegistry):
+class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
   """Class for building/storing container images on GCP w/ Artifact Registry."""
 
   CLOUD = provider_info.GCP
@@ -96,7 +99,7 @@ class GoogleArtifactRegistry(container_service.BaseContainerRegistry):
         f'--location={self.region}',
     ).Issue()
 
-  def RemoteBuild(self, image: container_service.ContainerImage):
+  def RemoteBuild(self, image: container.ContainerImage):
     """Builds the image remotely."""
     if not gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value:
       full_tag = self.GetFullRegistryTag(image.name)
@@ -108,7 +111,7 @@ class GoogleArtifactRegistry(container_service.BaseContainerRegistry):
     build_cmd.Issue(timeout=None)
 
 
-class BaseGkeCluster(container_service.KubernetesCluster):
+class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
   """Base class for regular & Autopilot GKE clusters."""
 
   def __init__(self, spec: container_spec_lib.ContainerClusterSpec):
@@ -275,7 +278,7 @@ class GkeCluster(BaseGkeCluster):
   def InitializeNodePoolForCloud(
       self,
       vm_config: virtual_machine.BaseVirtualMachine,
-      nodepool_config: container_service.BaseNodePoolConfig,
+      nodepool_config: container.BaseNodePoolConfig,
   ):
     vm_config = typing.cast(gce_virtual_machine.GceVirtualMachine, vm_config)
     nodepool_config.disk_type = vm_config.boot_disk.boot_disk_type
@@ -384,7 +387,7 @@ class GkeCluster(BaseGkeCluster):
 
   def _AddNodeParamsToCmd(
       self,
-      nodepool_config: container_service.BaseNodePoolConfig,
+      nodepool_config: container.BaseNodePoolConfig,
       cmd: util.GcloudCommand,
   ):
     """Modifies cmd to include node specific command arguments."""
@@ -458,7 +461,7 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append('--no-enable-gvnic')
     if (
         self.enable_nccl_fast_socket
-        and nodepool_config.name != container_service.DEFAULT_NODEPOOL
+        and nodepool_config.name != container_cluster.DEFAULT_NODEPOOL
     ):
       cmd.args.append('--enable-fast-socket')
 
@@ -508,13 +511,13 @@ class GkeCluster(BaseGkeCluster):
       gce_disk.AddLabels(self, pvc['spec']['volumeName'])
 
   def ResizeNodePool(
-      self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
+      self, new_size: int, node_pool: str = container_cluster.DEFAULT_NODEPOOL
   ):
     """Changes the number of nodes in the node pool."""
     cmd = self._GcloudCommand('container', 'clusters', 'resize', self.name)
     cmd.flags['num-nodes'] = new_size
     # updates default node pool by default
-    if node_pool != container_service.DEFAULT_NODEPOOL:
+    if node_pool != container_cluster.DEFAULT_NODEPOOL:
       cmd.flags['node-pool'] = node_pool
     cmd.Issue()
 
@@ -534,7 +537,7 @@ class GkeAutopilotCluster(BaseGkeCluster):
   def InitializeNodePoolForCloud(
       self,
       vm_config: virtual_machine.BaseVirtualMachine,
-      nodepool_config: container_service.BaseNodePoolConfig,
+      nodepool_config: container.BaseNodePoolConfig,
   ):
     nodepool_config.network = vm_config.network
     return nodepool_config
@@ -608,6 +611,6 @@ class GkeAutopilotCluster(BaseGkeCluster):
     return selectors
 
   def ResizeNodePool(
-      self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
+      self, new_size: int, node_pool: str = container_cluster.DEFAULT_NODEPOOL
   ):
     raise NotImplementedError('Autopilot clusters do not support resizing.')

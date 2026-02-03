@@ -23,9 +23,9 @@ import numpy as np
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker.linux_benchmarks import kubernetes_hpa_benchmark as hpa
 from perfkitbenchmarker.linux_packages import locust
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.sample import Sample
 from scipy import integrate
@@ -89,8 +89,8 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
   """Run a benchmark against the fibonacci server."""
   vm = benchmark_spec.vms[0]
-  cluster: container_service.KubernetesCluster = typing.cast(
-      container_service.KubernetesCluster, benchmark_spec.container_cluster
+  cluster: kubernetes_cluster.KubernetesCluster = typing.cast(
+      kubernetes_cluster.KubernetesCluster, benchmark_spec.container_cluster
   )
   addr = cluster.DeployIngress('fib', 'fib', _PORT, _HEALTH_PATH)
 
