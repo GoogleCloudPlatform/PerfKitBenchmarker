@@ -97,11 +97,11 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     """Deploys Containers according to the ContainerSpec."""
     base_name = name
     name = base_name + str(len(self.containers[base_name]))
-    container = kubernetes.KubernetesContainer(
+    k8s_container = kubernetes.KubernetesContainer(
         container_spec=container_spec, name=name
     )
-    self.containers[base_name].append(container)
-    container.Create()
+    self.containers[base_name].append(k8s_container)
+    k8s_container.Create()
 
   def DeployContainerService(
       self, name: str, container_spec: container_spec_lib.ContainerSpec

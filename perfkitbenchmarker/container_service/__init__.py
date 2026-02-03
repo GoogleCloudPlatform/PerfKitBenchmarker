@@ -22,8 +22,6 @@ expanded to support first-class container benchmarks.
 
 # Temporarily hoist base related classes into this namespace
 # Temporarily hoist kubernetes related classes into this namespace
-from perfkitbenchmarker.container_service.kubernetes_cluster import INGRESS_JSONPATH
-from perfkitbenchmarker.container_service.kubernetes_cluster import KubernetesCluster
 from perfkitbenchmarker.resources.container_service.container import BaseContainer
 from perfkitbenchmarker.resources.container_service.container import BaseContainerService
 from perfkitbenchmarker.resources.container_service.container import BaseNodePoolConfig
@@ -48,6 +46,8 @@ from perfkitbenchmarker.resources.container_service.kubectl import RunRetryableK
 from perfkitbenchmarker.resources.container_service.kubernetes import KubernetesContainer
 from perfkitbenchmarker.resources.container_service.kubernetes import KubernetesContainerService
 from perfkitbenchmarker.resources.container_service.kubernetes import KubernetesPod
+from perfkitbenchmarker.resources.container_service.kubernetes_cluster import INGRESS_JSONPATH
+from perfkitbenchmarker.resources.container_service.kubernetes_cluster import KubernetesCluster
 from perfkitbenchmarker.resources.container_service.kubernetes_events import KubernetesEvent
 from perfkitbenchmarker.resources.container_service.kubernetes_events import KubernetesEventPoller
 from perfkitbenchmarker.resources.container_service.kubernetes_events import KubernetesEventResource
