@@ -15,9 +15,10 @@
 """Contains classes/functions related to S3."""
 
 import json
+import logging
 import os
 import posixpath
-from typing import List, TYPE_CHECKING
+from typing import List
 
 from absl import flags
 from absl import logging
@@ -26,9 +27,8 @@ from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import util
-if TYPE_CHECKING:
-  from perfkitbenchmarker.providers.aws import aws_virtual_machine  # pylint: disable=g-import-not-at-top
 
 FLAGS = flags.FLAGS
 
@@ -306,7 +306,8 @@ class S3Service(object_storage_service.ObjectStorageService):
 
   UPLOAD_HTTP_METHOD = 'PUT'
 
-  def PrepareVM(self, vm: 'aws_virtual_machine.AwsVirtualMachine'):
+  def PrepareVM(self, vm):
+    assert isinstance(vm, aws_virtual_machine.AwsVirtualMachine)
     if not vm.instance_profile:
       raise ValueError('--aws_ec2_instance_profile is required to access s3.')
 

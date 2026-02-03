@@ -18,6 +18,7 @@ All VM specifics are self-contained and the class provides methods to
 operate on the VM: boot, shutdown, etc.
 """
 
+
 import abc
 import copy
 import enum
@@ -300,9 +301,7 @@ def GetVmSpecClass(cloud: str, platform: str | None = None):
   return spec.GetSpecClass(BaseVmSpec, CLOUD=cloud, PLATFORM=platform)
 
 
-def GetVmClass(
-    cloud: str, os_type: str, platform: str | None = None
-) -> type['BaseVirtualMachine']:
+def GetVmClass(cloud: str, os_type: str, platform: str | None = None):
   """Returns the VM class with corresponding attributes.
 
   Args:
@@ -1295,6 +1294,5 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
 
   def GetNumTeardownSkippedVms(self) -> int | None:
     """Returns the number of lingering VMs in this VM's zone."""
-
 
 VirtualMachine = typing.TypeVar('VirtualMachine', bound=BaseVirtualMachine)
