@@ -37,20 +37,16 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
   def CreateTpuSpecDict(self):
     return {
         'tpu_name': 'pkb-tpu-123',
-        'tpu_cidr_range': '192.168.0.0/29',
-        'tpu_accelerator_type': 'tpu-v2',
-        'tpu_description': 'MyTFNode',
-        'tpu_network': 'default',
+        'tpu_type': 'v4-8',
+        'tpu_topology': '2x2',
         'tpu_tf_version': 'nightly',
         'tpu_zone': 'us-central1-a',
-        'tpu_preemptible': True,
     }
 
   def setUp(self):
     super().setUp()
     FLAGS.run_uri = '123'
     FLAGS.project = ''
-    FLAGS.tpu_cores_per_donut = 8
     FLAGS.gcloud_path = 'gcloud'
 
     mock_tpu_spec_attrs = self.CreateTpuSpecDict()
@@ -77,17 +73,16 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertTrue(
-          command_string.startswith('gcloud compute tpus create pkb-tpu-123'),
+          command_string.startswith(
+              'gcloud compute tpus tpu-vm create pkb-tpu-123'
+          ),
           command_string,
       )
       self.assertIn('--project fakeproject', command_string)
-      self.assertIn('--range 192.168.0.0/29', command_string)
-      self.assertIn('--accelerator-type tpu-v2', command_string)
-      self.assertIn('--description MyTFNode', command_string)
-      self.assertIn('--network default', command_string)
+      self.assertIn('--type v4-8', command_string)
+      self.assertIn('--topology 2x2', command_string)
       self.assertIn('--version nightly', command_string)
       self.assertIn('--zone us-central1-a', command_string)
-      self.assertIn('--preemptible', command_string)
 
   def testStockout(self):
     stderr = """Create request issued for: [pkb-tpu-train-9baf32202]
@@ -110,7 +105,9 @@ ERROR: (gcloud.compute.tpus.create) {
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertTrue(
-          command_string.startswith('gcloud compute tpus delete pkb-tpu-123')
+          command_string.startswith(
+              'gcloud compute tpus tpu-vm delete pkb-tpu-123'
+          )
       )
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--zone us-central1-a', command_string)
@@ -122,7 +119,9 @@ ERROR: (gcloud.compute.tpus.create) {
       self.assertEqual(issue_command.call_count, 1)
       command_string = ' '.join(issue_command.call_args[0][0])
       self.assertTrue(
-          command_string.startswith('gcloud compute tpus describe pkb-tpu-123')
+          command_string.startswith(
+              'gcloud compute tpus tpu-vm describe pkb-tpu-123'
+          )
       )
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--zone us-central1-a', command_string)
@@ -130,30 +129,8 @@ ERROR: (gcloud.compute.tpus.create) {
   def testGetName(self):
     with self._PatchCriticalObjects():
       tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
-      name = tpu.GetName()
+      name = tpu.spec.tpu_name
       self.assertEqual(name, 'pkb-tpu-123')
-
-  def testGetNumShards(self):
-    with self._PatchCriticalObjects(
-        stdout=(
-            '{"networkEndpoints": [{"ipAddress": "10.199.12.2", "port": 8470}]}'
-        )
-    ):
-      tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
-      num_shards = tpu.GetNumShards()
-      self.assertEqual(num_shards, 8)
-
-  def testGetMasterGrpcAddress(self):
-    with self._PatchCriticalObjects(stdout="""{
-  "networkEndpoints": [{
-    "ipAddress": "10.199.12.2",
-    "port": 8470
-  }]
-}
-    """):
-      tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
-      ip_address = tpu.GetMasterGrpcAddress()
-      self.assertEqual(ip_address, 'grpc://10.199.12.2:8470')
 
 
 if __name__ == '__main__':
