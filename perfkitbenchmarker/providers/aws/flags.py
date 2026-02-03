@@ -39,8 +39,7 @@ AWS_EBS_CARD_COUNT = flags.DEFINE_integer(
 AWS_NIC_QUEUE_COUNTS = flags.DEFINE_list(
     'aws_nic_queue_counts',
     None,
-    'The queue count of each NIC. Specify a list of key=value pairs, where key'
-    ' is the network device name and value is the queue count.',
+    'The queue count of each NIC, ordered by NIC device index.',
 )
 AWS_INSTANCE_BANDWIDTH_WEIGHTING = flags.DEFINE_enum(
     'aws_instance_bandwidth_weighting',

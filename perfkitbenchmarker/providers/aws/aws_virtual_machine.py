@@ -581,18 +581,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.network = aws_network.AwsNetwork.GetNetwork(self)
     self.network_eni_count = aws_network.AWS_ENI_COUNT.value
     self.network_card_count = aws_network.AWS_NETWORK_CARD_COUNT.value
-    if (
-        (self.network_eni_count > 1)
-        and (self.network_card_count > 1)
-        and (self.machine_type not in aws_network.DUAL_NETWORK_CARD_MACHINES)
-    ):
-      logging.warning(
-          '%s does not support %s network cards. Using 1 instead.',
-          self.machine_type,
-          self.network_card_count,
-      )
-      self.network_eni_count = 1
-      self.network_card_count = 1
     self.placement_group = self.network.placement_group
     self.firewall = aws_network.AwsFirewall.GetFirewall()
     self.use_dedicated_host = vm_spec.use_dedicated_host
@@ -1042,7 +1030,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             )
         )
       create_cmd.extend(efas)
-    elif self.network_eni_count > 1:
+    else:
       enis = ['--network-interfaces']
       for device_index in range(self.network_eni_count):
         eni_params = _ENI_PARAMS.copy()
@@ -1052,16 +1040,21 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             'Groups': self.group_id,
             'SubnetId': self.network.subnet.id,
         })
+        if (
+            self.assign_external_ip
+            and self.network_eni_count == 1
+        ):
+          eni_params['AssociatePublicIpAddress'] = True
+        if aws_flags.AWS_NIC_QUEUE_COUNTS.value:
+          eni_params['EnaQueueCount'] = aws_flags.AWS_NIC_QUEUE_COUNTS.value[
+              device_index
+          ]
         enis.append(
             ','.join(
                 f'{key}={value}' for key, value in sorted(eni_params.items())
             )
         )
       create_cmd.extend(enis)
-    else:
-      if self.assign_external_ip:
-        create_cmd.append('--associate-public-ip-address')
-      create_cmd.append(f'--subnet-id={self.network.subnet.id}')
     if block_device_map:
       create_cmd.append('--block-device-mappings=%s' % block_device_map)
     if placement:
@@ -1638,31 +1631,15 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     return self.DiskTypeCreatedOnVMCreation(data_disk.disk_type)
 
 
-class BaseLinuxAwsVirtualMachine(
-    AwsVirtualMachine, linux_virtual_machine.BaseLinuxMixin
-):
-  """Class supporting Linux AWS virtual machines."""
-
-  def _PostCreate(self):
-    super()._PostCreate()
-    nic_queue_counts = aws_flags.AWS_NIC_QUEUE_COUNTS.value
-    if nic_queue_counts:
-      for network_device in nic_queue_counts:
-        device_name, queue_count = network_device.split('=')
-        self.RemoteCommand(
-            f'sudo ethtool -L {device_name} combined {queue_count}'
-        )
-
-
 class ClearBasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.ClearMixin
+    AwsVirtualMachine, linux_virtual_machine.ClearMixin
 ):
   IMAGE_NAME_FILTER_PATTERN = 'clear/images/*/clear-*'
   DEFAULT_USER_NAME = 'clear'
 
 
 class CoreOsBasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.CoreOsMixin
+    AwsVirtualMachine, linux_virtual_machine.CoreOsMixin
 ):
   IMAGE_NAME_FILTER_PATTERN = 'fedora-coreos-*'
   # CoreOS only distinguishes between stable and testing in the description
@@ -1672,7 +1649,7 @@ class CoreOsBasedAwsVirtualMachine(
 
 
 class Debian11BasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.Debian11Mixin
+    AwsVirtualMachine, linux_virtual_machine.Debian11Mixin
 ):
   # From https://wiki.debian.org/Cloud/AmazonEC2Image/Bullseye
   IMAGE_NAME_FILTER_PATTERN = 'debian-11-{alternate_architecture}-*'
@@ -1687,7 +1664,7 @@ class Debian11BackportsBasedAwsVirtualMachine(
 
 
 class Debian12BasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.Debian12Mixin
+    AwsVirtualMachine, linux_virtual_machine.Debian12Mixin
 ):
   # From https://wiki.debian.org/Cloud/AmazonEC2Image/Bookworm
   IMAGE_NAME_FILTER_PATTERN = 'debian-12-{alternate_architecture}-*'
@@ -1697,7 +1674,7 @@ class Debian12BasedAwsVirtualMachine(
 
 
 class Debian13BasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.Debian13Mixin
+    AwsVirtualMachine, linux_virtual_machine.Debian13Mixin
 ):
   # From https://wiki.debian.org/Cloud/AmazonEC2Image/Trixie
   IMAGE_NAME_FILTER_PATTERN = 'debian-13-{alternate_architecture}-*'
@@ -1706,7 +1683,7 @@ class Debian13BasedAwsVirtualMachine(
   DEFAULT_USER_NAME = 'admin'
 
 
-class UbuntuBasedAwsVirtualMachine(BaseLinuxAwsVirtualMachine):
+class UbuntuBasedAwsVirtualMachine(AwsVirtualMachine):
   IMAGE_OWNER = UBUNTU_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'ubuntu'
 
@@ -1792,7 +1769,7 @@ ENV LD_LIBRARY_PATH=/opt/aws-ofi-nccl/lib:/opt/amazon/efa:\$LD_LIBRARY_PATH
 
 
 class AmazonLinux2EfaBasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.AmazonLinux2DLMixin
+    AwsVirtualMachine, linux_virtual_machine.AmazonLinux2DLMixin
 ):
   """AmazonLinux2 Base DLAMI virtual machine."""
 
@@ -1834,7 +1811,7 @@ class Ubuntu2404BasedAwsVirtualMachine(
 
 
 class AmazonLinux2BasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.AmazonLinux2Mixin
+    AwsVirtualMachine, linux_virtual_machine.AmazonLinux2Mixin
 ):
   """Class with configuration for AWS Amazon Linux 2 virtual machines."""
 
@@ -1850,7 +1827,7 @@ class AmazonNeuronBasedAwsVirtualMachine(
 
 
 class AmazonLinux2023BasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.AmazonLinux2023Mixin
+    AwsVirtualMachine, linux_virtual_machine.AmazonLinux2023Mixin
 ):
   """Class with configuration for AWS Amazon Linux 2023 virtual machines."""
 
@@ -1858,7 +1835,7 @@ class AmazonLinux2023BasedAwsVirtualMachine(
 
 
 class Rhel8BasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.Rhel8Mixin
+    AwsVirtualMachine, linux_virtual_machine.Rhel8Mixin
 ):
   """Class with configuration for AWS RHEL 8 virtual machines."""
 
@@ -1870,7 +1847,7 @@ class Rhel8BasedAwsVirtualMachine(
 
 
 class Rhel9BasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.Rhel9Mixin
+    AwsVirtualMachine, linux_virtual_machine.Rhel9Mixin
 ):
   """Class with configuration for AWS RHEL 9 virtual machines."""
 
@@ -1882,7 +1859,7 @@ class Rhel9BasedAwsVirtualMachine(
 
 
 class Rhel10BasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.Rhel10Mixin
+    AwsVirtualMachine, linux_virtual_machine.Rhel10Mixin
 ):
   """Class with configuration for AWS RHEL 10 virtual machines."""
 
@@ -1895,7 +1872,7 @@ class Rhel10BasedAwsVirtualMachine(
 
 
 class RockyLinux8BasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.RockyLinux8Mixin
+    AwsVirtualMachine, linux_virtual_machine.RockyLinux8Mixin
 ):
   """Class with configuration for AWS Rocky Linux 8 virtual machines."""
 
@@ -1905,7 +1882,7 @@ class RockyLinux8BasedAwsVirtualMachine(
 
 
 class RockyLinux9BasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.RockyLinux9Mixin
+    AwsVirtualMachine, linux_virtual_machine.RockyLinux9Mixin
 ):
   """Class with configuration for AWS Rocky Linux 9 virtual machines."""
 
@@ -1915,7 +1892,7 @@ class RockyLinux9BasedAwsVirtualMachine(
 
 
 class RockyLinux10BasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.RockyLinux10Mixin
+    AwsVirtualMachine, linux_virtual_machine.RockyLinux10Mixin
 ):
   """Class with configuration for AWS Rocky Linux 10 virtual machines."""
 
@@ -1925,7 +1902,7 @@ class RockyLinux10BasedAwsVirtualMachine(
 
 
 class CentOsStream9BasedAwsVirtualMachine(
-    BaseLinuxAwsVirtualMachine, linux_virtual_machine.CentOsStream9Mixin
+    AwsVirtualMachine, linux_virtual_machine.CentOsStream9Mixin
 ):
   """Class with configuration for AWS CentOS Stream 9 virtual machines."""
 

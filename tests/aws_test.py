@@ -321,8 +321,8 @@ def CreateTestAwsVm():
   disk_spec.provisioned_iops = 1000
   disk_spec.provisioned_throughput = 256
   disk_spec.create_with_vm = False
-  vm.create_disk_strategy = (
-      aws_disk_strategies.GetCreateDiskStrategy(vm, disk_spec, 1)
+  vm.create_disk_strategy = aws_disk_strategies.GetCreateDiskStrategy(
+      vm, disk_spec, 1
   )
   return vm
 
@@ -568,11 +568,10 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
             '--instance-type=c3.large',
             '--key-name=perfkit-key-aaaaaa',
             '--tag-specifications=foobar',
-            '--associate-public-ip-address',
-            '--subnet-id=subnet-id',
+            '--network-interfaces',
+            'AssociatePublicIpAddress=True,DeviceIndex=0,Groups=sg-1234,InterfaceType=interface,NetworkCardIndex=0,SubnetId=subnet-id',
             (
-                '--placement=AvailabilityZone=us-east-1a,'
-                'GroupName=placement_group_name'
+                '--placement=AvailabilityZone=us-east-1a,GroupName=placement_group_name'
             ),
             (
                 '--instance-market-options={"MarketType": "spot",'
@@ -654,16 +653,16 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.vm.network.is_static = False
 
   @parameterized.named_parameters(
-      ('use_efa', True, 'network-interfaces', 'associate-public-ip-address'),
-      ('no_efa', False, 'associate-public-ip-address', 'network-interfaces'),
+      ('use_efa', True),
+      ('no_efa', False),
   )
-  def testElasticNetwork(self, use_efa, should_find, should_not_find):
-    # with EFA the "--associate-public-ip-address" flag is not used, instead
-    # putting that attribute into --network-interfaces
+  def testElasticNetwork(self, use_efa):
     FLAGS.aws_efa = use_efa
     aws_cmd = CreateVm()
-    self.assertRegex(aws_cmd, 'run-instances .*--' + should_find)
-    self.assertNotRegex(aws_cmd, 'run-instances .*--' + should_not_find)
+    self.assertRegex(
+        aws_cmd,
+        'run-instances .*--network-interfaces .*AssociatePublicIpAddress=True',
+    )
 
   def testSkipEfaInstall(self):
     # when aws_efa_version is blanked out do not install EFA

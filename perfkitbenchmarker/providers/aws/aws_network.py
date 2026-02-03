@@ -74,34 +74,6 @@ ZONE = 'zone'
 NON_PLACEMENT_GROUP_PREFIXES = frozenset(
     ['t2', 'm3', 't3', 't3a', 't4g', 'vt1', 'm7i-flex', 'm8i-flex', 'r8i-flex']
 )
-# Reference -
-# https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html#network-cards
-DUAL_NETWORK_CARD_MACHINES = frozenset([
-    'c6in.32xlarge',
-    'c6in.metal',
-    'dl1.24xlarge',
-    'hpc6id.32xlarge',
-    'hpc7a.12xlarge',
-    'hpc7a.24xlarge',
-    'hpc7a.48xlarge',
-    'hpc7a.96xlarge',
-    'm6idn.32xlarge',
-    'm6idn.metal',
-    'm6in.32xlarge',
-    'm6in.metal',
-    'p4d.24xlarge',
-    'p4de.24xlarge',
-    'p5.48xlarge',
-    'p5en.48xlarge',
-    'p6-b200.48xlarge',
-    'r6idn.32xlarge',
-    'r6idn.metal',
-    'r6in.32xlarge',
-    'r6in.metal',
-    'r8gn.48xlarge',
-    'trn1.32xlarge',
-    'trn1n.32xlarge',
-])
 
 
 class AwsFirewall(network.BaseFirewall):
