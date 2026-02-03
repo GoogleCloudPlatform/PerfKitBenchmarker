@@ -641,3 +641,4 @@
 -   Added --ycsb_load_max_error_rates and --ycsb_run_max_error_rates as a more
     general solution that can be used with or instead of --ycsb_max_error_rate
     and --ycsb_fail_on_incomplete_loading.
+-   Support basic TPU vm provisioning.
