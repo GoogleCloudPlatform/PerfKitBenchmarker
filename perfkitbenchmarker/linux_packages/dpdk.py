@@ -28,7 +28,7 @@ DPDK_GCP_DRIVER_GIT_REPO = (
 # Head as of 2025-03-15.
 DPDK_GCP_DRIVER_GIT_REPO_COMMIT = '0342498eaa38e8db1cd663a99d470989fb60f803'
 DPDK_AWS_DRIVER_GIT_REPO = 'https://github.com/amzn/amzn-drivers'
-DPDK_AWS_DRIVER_GIT_REPO_TAG = 'ena_linux_2.13.3'
+DPDK_AWS_DRIVER_GIT_REPO_TAG = 'ena_linux_2.16.1'
 DPDK_AWS_VFIO_DRIVER_DIR = 'amzn-drivers/userspace/dpdk/enav2-vfio-patch'
 
 
