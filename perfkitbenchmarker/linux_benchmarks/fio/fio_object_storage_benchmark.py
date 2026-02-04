@@ -67,6 +67,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       vm.scratch_disks,
       fio_flags.FIO_GENERATE_SCENARIOS.value,
       benchmark_params,
+      job_file='fio-object-storage.job',
   )
   vm.RobustRemoteCommand('sudo sh -c "sync; echo 3 > /proc/sys/vm/drop_caches"')
   return utils.RunTest(
