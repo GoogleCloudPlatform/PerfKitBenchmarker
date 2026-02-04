@@ -82,7 +82,8 @@ class BaseFirewall:
       vm,
       start_port: int,
       end_port: int | None = None,
-      source_range: list[str] | None = None):
+      source_range: list[str] | None = None,
+  ):
     """Opens a port on the firewall.
 
     Args:
@@ -131,7 +132,8 @@ class ExistingNetworkFirewall(BaseFirewall):
       vm,
       start_port: int,
       end_port: int | None = None,
-      source_range: list[str] | None = None):
+      source_range: list[str] | None = None,
+  ):
     """Logs a warning rather than opening ports."""
     logging.warning(
         'Benchmark tried to modify the firewalls of existing network %s to '
@@ -232,10 +234,12 @@ class BaseNetwork:
     self.cidr = spec.cidr
 
   @staticmethod
-  def _GetNetworkSpecFromVm(vm):
+  def _GetNetworkSpecFromVmSpec(vm_spec):
     """Returns a BaseNetworkSpec created from VM attributes."""
     return BaseNetworkSpec(
-        zone=vm.zone, cidr=vm.cidr, machine_type=vm.machine_type
+        zone=vm_spec.zone,
+        cidr=vm_spec.cidr,
+        machine_type=vm_spec.machine_type,
     )
 
   @classmethod
@@ -246,7 +250,7 @@ class BaseNetwork:
     return (cls.CLOUD, spec.zone)
 
   @classmethod
-  def GetNetwork(cls, vm):
+  def GetNetwork(cls, vm_spec):
     """Returns a BaseNetwork.
 
     This method is used instead of directly calling the class's constructor.
@@ -256,9 +260,9 @@ class BaseNetwork:
     VMs to call this method and all share the same BaseNetwork object.
 
     Args:
-      vm: The VM for which the Network is being created.
+      vm_spec: The VmSpec for which the Network is being created.
     """
-    return cls.GetNetworkFromNetworkSpec(cls._GetNetworkSpecFromVm(vm))
+    return cls.GetNetworkFromNetworkSpec(cls._GetNetworkSpecFromVmSpec(vm_spec))
 
   @staticmethod
   def FormatCidrString(cidr_raw):

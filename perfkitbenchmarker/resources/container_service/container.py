@@ -136,18 +136,17 @@ class BaseNodePoolConfig:
   See also: https://cloud.google.com/kubernetes-engine/docs/concepts/node-pools
   """
 
-  def __init__(self, vm_config: virtual_machine.BaseVirtualMachine, name: str):
-    # Use Virtual Machine class to resolve VM Spec. Note there is no actual VM;
-    # we just use it as a data holder to let VM subclass __init__'s handle
-    # parsing specific information like disks out of the spec.
-    self.machine_type = vm_config.machine_type
+  def __init__(
+      self, vm_spec: virtual_machine.BaseVmSpec, name: str
+  ):
+    self.machine_type = vm_spec.machine_type
+    self.zone: str = vm_spec.zone
     self.name = NodePoolName(name)
-    self.zone: str = vm_config.zone
     self.sandbox_config: container_spec_lib.SandboxSpec | None = None
     self.num_nodes: int
-    self.disk_type: str
-    self.disk_size: int
-    # Defined by gce_virtual_machine. Used by google_kubernetes_engine
+    self.disk_type: str | None = vm_spec.boot_disk_type
+    self.disk_size: int = vm_spec.boot_disk_size
+    # Defined by GceVirtualMachineConfig. Used by google_kubernetes_engine
     self.max_local_disks: int | None
     self.ssd_interface: str | None
     self.gpu_type: str | None

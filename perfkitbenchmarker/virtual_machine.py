@@ -355,7 +355,8 @@ class BaseVmSpec(spec.BaseSpec):
   PLATFORM = provider_info.DEFAULT_VM_PLATFORM
 
   def __init__(self, *args, **kwargs):
-    self.boot_disk_size: int | None = None
+    self.boot_disk_size = None
+    self.boot_disk_type: str | None = None  # Set by child classes.
     self.zone = None
     self.cidr = None
     self.machine_type: str
@@ -615,13 +616,13 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       else:
         self.name = '%s-%d' % (name_prefix, self.instance_number)
       BaseVirtualMachine._instance_counter += 1
+    self.vm_spec = vm_spec
+    self.machine_type = vm_spec.machine_type
+    self.zone = vm_spec.zone
     self.disable_interrupt_moderation = vm_spec.disable_interrupt_moderation
     self.disable_rss = vm_spec.disable_rss
-    if vm_spec.boot_disk_size:
-      self.boot_disk_size = vm_spec.boot_disk_size
-    self.zone = vm_spec.zone
+    self.boot_disk_size = vm_spec.boot_disk_size
     self.cidr = vm_spec.cidr
-    self.machine_type = vm_spec.machine_type
     self.gpu_count = vm_spec.gpu_count
     self.gpu_type = vm_spec.gpu_type
     self.image = vm_spec.image

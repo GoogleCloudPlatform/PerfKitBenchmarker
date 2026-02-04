@@ -28,6 +28,7 @@ from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
+from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources.container_service import container
@@ -116,7 +117,7 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
 
   def __init__(self, spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(spec)
-    self.project: str = spec.vm_spec.project or FLAGS.project
+    self.project: str = spec.vm_spec.GetProject()
     self.cluster_version: str = FLAGS.container_cluster_version
     self.release_channel: str | None = gcp_flags.CONTAINER_RELEASE_CHANNEL.value
     self.use_application_default_credentials: bool = True
@@ -277,12 +278,14 @@ class GkeCluster(BaseGkeCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVirtualMachine,
+      vm_config: virtual_machine.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
-    vm_config = typing.cast(gce_virtual_machine.GceVirtualMachine, vm_config)
-    nodepool_config.disk_type = vm_config.boot_disk.boot_disk_type
-    nodepool_config.disk_size = vm_config.boot_disk.boot_disk_size
+    vm_config = typing.cast(
+        gce_virtual_machine.GceVmSpec, vm_config
+    )
+    nodepool_config.disk_type = vm_config.boot_disk_type
+    nodepool_config.disk_size = vm_config.boot_disk_size
     nodepool_config.max_local_disks = vm_config.max_local_disks
     nodepool_config.ssd_interface = vm_config.ssd_interface
     nodepool_config.gpu_type = vm_config.gpu_type
@@ -290,9 +293,9 @@ class GkeCluster(BaseGkeCluster):
     nodepool_config.threads_per_core = vm_config.threads_per_core
     nodepool_config.gce_tags = vm_config.gce_tags
     nodepool_config.min_cpu_platform = vm_config.min_cpu_platform
-    nodepool_config.network = vm_config.network
+    nodepool_config.network = gce_network.GceNetwork.GetNetwork(vm_config)
     nodepool_config.cpus: int = vm_config.cpus
-    nodepool_config.memory_mib: int = vm_config.memory_mib
+    nodepool_config.memory_mib: int = vm_config.memory
 
   def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
     """Fix zone and region."""
@@ -536,10 +539,10 @@ class GkeAutopilotCluster(BaseGkeCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVirtualMachine,
+      vm_config: virtual_machine.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
-    nodepool_config.network = vm_config.network
+    nodepool_config.network = gce_network.GceNetwork.GetNetwork(vm_config)
     return nodepool_config
 
   def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:

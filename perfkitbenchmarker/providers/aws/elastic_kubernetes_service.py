@@ -376,14 +376,11 @@ class EksCluster(BaseEksCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVirtualMachine,
+      vm_config: virtual_machine.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
     nodepool_config.disk_type = (
-        vm_config.DEFAULT_ROOT_DISK_TYPE  # pytype: disable=attribute-error
-    )
-    nodepool_config.disk_size = (
-        vm_config.boot_disk_size  # pytype: disable=attribute-error
+        aws_virtual_machine.AwsVirtualMachine.DEFAULT_ROOT_DISK_TYPE
     )
 
   def GetResourceMetadata(self):
@@ -554,7 +551,7 @@ class EksAutoCluster(BaseEksCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVirtualMachine,
+      vm_config: virtual_machine.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
     pass
@@ -655,7 +652,7 @@ class EksKarpenterCluster(BaseEksCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVirtualMachine,
+      vm_config: virtual_machine.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
     pass

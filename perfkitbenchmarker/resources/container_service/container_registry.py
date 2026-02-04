@@ -158,3 +158,4 @@ class BaseContainerRegistry(resource.BaseResource):
 
 def GetContainerRegistryClass(cloud: str) -> type[BaseContainerRegistry]:
   return resource.GetResourceClass(BaseContainerRegistry, CLOUD=cloud)
+

@@ -1283,8 +1283,10 @@ class GceNetworkTest(pkb_common_test_case.PkbCommonTestCase):
   def testGetNetwork(self):
     project = 'myproject'
     zone = 'us-east1-a'
-    vm = mock.Mock(zone=zone, project=project, cidr=None, subnet_names=None)
-    net = gce_network.GceNetwork.GetNetwork(vm)
+    vm_spec = gce_virtual_machine.GceVmSpec(
+        'test_component', project=project, zone=zone
+    )
+    net = gce_network.GceNetwork.GetNetwork(vm_spec)
     self.assertEqual(project, net.project)
     self.assertEqual(zone, net.zone)
 

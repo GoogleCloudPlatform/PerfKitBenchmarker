@@ -748,7 +748,7 @@ class AzureVirtualMachine(
     self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
     self.use_dedicated_host = vm_spec.use_dedicated_host
     self.num_vms_per_host = vm_spec.num_vms_per_host
-    self.network = azure_network.AzureNetwork.GetNetwork(self)
+    self.network = azure_network.AzureNetwork.GetNetwork(vm_spec)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     if azure_disk.HasTempDrive(self.machine_type):
       self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type, 1)

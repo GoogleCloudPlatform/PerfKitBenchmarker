@@ -128,15 +128,11 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVirtualMachine,
+      vm_config: virtual_machine.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
-    nodepool_config.disk_type = (
-        vm_config.create_os_disk_strategy.disk.disk_type  # pytype: disable=attribute-error
-    )
-    nodepool_config.disk_size = (
-        vm_config.create_os_disk_strategy.disk.disk_size  # pytype: disable=attribute-error
-    )
+    nodepool_config.disk_type = vm_config.boot_disk_type
+    nodepool_config.disk_size = vm_config.boot_disk_size
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.

@@ -966,7 +966,7 @@ class AwsNetwork(network.BaseNetwork):
       )
 
   @staticmethod
-  def _GetNetworkSpecFromVm(vm):
+  def _GetNetworkSpecFromVmSpec(vm):
     """Returns an AwsNetworkSpec created from VM attributes and flags."""
     if _AWS_SUBNET.value == 'default':
       vpc_id = _get_default_vpc_id(vm.region)

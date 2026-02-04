@@ -576,7 +576,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.user_data = f'file://{self.boot_startup_script}'
     else:
       self.user_data = None
-    self.network = aws_network.AwsNetwork.GetNetwork(self)
+    self.network = aws_network.AwsNetwork.GetNetwork(self.vm_spec)
     self.network_eni_count = aws_network.AWS_ENI_COUNT.value
     self.network_card_count = aws_network.AWS_NETWORK_CARD_COUNT.value
     self.placement_group = self.network.placement_group
