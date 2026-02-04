@@ -301,8 +301,7 @@ class AzLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
 class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
   """Strategies to set up Azure Blob Containers."""
 
-  DEFAULT_MOUNT_OPTIONS = [
-  ]
+  DEFAULT_MOUNT_OPTIONS = []
 
   def SetUpDiskOnLinux(self):
     """Performs setup of Blobfuse2 containers on Linux."""
@@ -327,13 +326,18 @@ class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
 
     local_path = data.ResourcePath('blobfuse2/config.yaml.j2')
     remote_path = 'blobfuse2_config.yaml'
+    # Refer to azure_blob_storage.py for the storage account name.
+    account_name = f'pkb{FLAGS.run_uri}absstorage'
+    account_key = util.GetAzureStorageAccountKey(
+        account_name,
+        ['--resource-group', f'pkb{FLAGS.run_uri}abs-resource-group'],
+    )
     context = {
-        'account_name': blob_client.service.storage_account.name,
-        'account_key': blob_client.service.storage_account.key,
+        'account_name': account_name,
+        'account_key': account_key,
     }
     self.vm.RenderTemplate(
-        template_path=local_path, remote_path=remote_path,
-        context=context
+        template_path=local_path, remote_path=remote_path, context=context
     )
     self.vm.RemoteCommand(
         f'sudo blobfuse2 mount {target} --config-file={remote_path} '

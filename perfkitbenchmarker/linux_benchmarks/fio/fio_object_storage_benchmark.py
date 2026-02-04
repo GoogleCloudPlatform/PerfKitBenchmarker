@@ -31,6 +31,7 @@ fio_object_storage:
     default:
       vm_spec: *default_dual_core
       disk_spec: *default_500_gb
+      vm_count: 2
   flags:
     boot_disk_size: 300
     data_disk_type: object_storage
@@ -54,14 +55,16 @@ def GetConfig(user_config):
 
 
 def Prepare(spec: benchmark_spec.BenchmarkSpec):
-  vm = spec.vms[0]
-  vm.Install('fio')
-  utils.PrefillIfEnabled(vm, constants.FIO_PATH, use_directory=True)
+  writer_vm = spec.vm_groups['default'][1]
+  writer_vm.Install('fio')
+  utils.PrefillIfEnabled(writer_vm, constants.FIO_PATH, use_directory=True)
+  test_vm = spec.vm_groups['default'][0]
+  test_vm.Install('fio')
 
 
 def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Runs FIO benchmark on raw devices."""
-  vm = spec.vms[0]
+  vm = spec.vm_groups['default'][0]
   benchmark_params = {}
   job_file_str = utils.GenerateJobFile(
       vm.scratch_disks,
@@ -69,7 +72,6 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       benchmark_params,
       job_file='fio-object-storage.job',
   )
-  vm.RobustRemoteCommand('sudo sh -c "sync; echo 3 > /proc/sys/vm/drop_caches"')
   return utils.RunTest(
       vm, constants.FIO_PATH, job_file_str, latency_measure='lat'
   )
