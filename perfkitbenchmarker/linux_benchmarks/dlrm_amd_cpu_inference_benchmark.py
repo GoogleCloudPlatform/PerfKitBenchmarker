@@ -144,7 +144,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       'chmod 755 run_*.sh; '
       f'export DATA_DIR=/home/{vm.user_name}/mlcommons/data-terabyte; '
       f'export MODEL_DIR=/home/{vm.user_name}/mlcommons; '
-      f'export NUM_SOCKETS={vm.numa_node_count}; '
+      f'export NUM_SOCKETS={vm.CheckLsCpu().socket_count}; '
       f'export CPUS_PER_SOCKET={cpus_per_socket}; '
       f'export CPUS_PER_PROCESS={cpus_per_socket}; '
       'export CPUS_PER_INSTANCE=2; '
