@@ -1651,6 +1651,7 @@ class CoreOsBasedAwsVirtualMachine(
   IMAGE_NAME_FILTER_PATTERN = 'fedora-coreos-*'
   # CoreOS only distinguishes between stable and testing in the description
   IMAGE_DESCRIPTION_FILTER = 'Fedora CoreOS stable *'
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
   IMAGE_OWNER = CENTOS_IMAGE_PROJECT
   DEFAULT_USER_NAME = 'core'
 
@@ -1850,6 +1851,7 @@ class Rhel8BasedAwsVirtualMachine(
   # https://access.redhat.com/articles/3692431
   # All RHEL AMIs are HVM. HVM- blocks HVM_BETA.
   IMAGE_NAME_FILTER_PATTERN = 'RHEL-8*_HVM-*'
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
   IMAGE_OWNER = RHEL_IMAGE_PROJECT
 
 
