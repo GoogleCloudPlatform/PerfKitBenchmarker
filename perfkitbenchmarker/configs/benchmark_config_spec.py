@@ -471,29 +471,20 @@ class _TpuGroupSpec(spec.BaseSpec):
             option_decoders.EnumDecoder,
             {'valid_values': provider_info.VALID_CLOUDS},
         ),
-        'tpu_cidr_range': (
+        'tpu_name': (option_decoders.StringDecoder, {'default': None}),
+        'tpu_type': (
             option_decoders.StringDecoder,
             {'default': None},
         ),
-        'tpu_accelerator_type': (
+        'tpu_topology': (
             option_decoders.StringDecoder,
             {'default': None},
         ),
-        'tpu_description': (
-            option_decoders.StringDecoder,
-            {'default': None},
-        ),
-        'tpu_network': (option_decoders.StringDecoder, {'default': None}),
         'tpu_tf_version': (
             option_decoders.StringDecoder,
             {'default': None},
         ),
         'tpu_zone': (option_decoders.StringDecoder, {'default': None}),
-        'tpu_name': (option_decoders.StringDecoder, {'default': None}),
-        'tpu_preemptible': (
-            option_decoders.BooleanDecoder,
-            {'default': False},
-        ),
     })
     return result
 
@@ -512,22 +503,16 @@ class _TpuGroupSpec(spec.BaseSpec):
     super()._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present:
       config_values['cloud'] = flag_values.cloud
-    if flag_values['tpu_cidr_range'].present:
-      config_values['tpu_cidr_range'] = flag_values.tpu_cidr_range
-    if flag_values['tpu_accelerator_type'].present:
-      config_values['tpu_accelerator_type'] = flag_values.tpu_accelerator_type
-    if flag_values['tpu_description'].present:
-      config_values['tpu_description'] = flag_values.tpu_description
-    if flag_values['tpu_network'].present:
-      config_values['tpu_network'] = flag_values.tpu_network
+    if flag_values['tpu_name'].present:
+      config_values['tpu_name'] = flag_values.tpu_name
+    if flag_values['tpu_type'].present:
+      config_values['tpu_type'] = flag_values.tpu_type
+    if flag_values['tpu_topology'].present:
+      config_values['tpu_topology'] = flag_values.tpu_topology
     if flag_values['tpu_tf_version'].present:
       config_values['tpu_tf_version'] = flag_values.tpu_tf_version
     if flag_values['tpu_zone'].present:
       config_values['tpu_zone'] = flag_values.tpu_zone
-    if flag_values['tpu_name'].present:
-      config_values['tpu_name'] = flag_values.tpu_name
-    if flag_values['tpu_preemptible'].present:
-      config_values['tpu_preemptible'] = flag_values.tpu_preemptible
 
 
 class _EdwServiceDecoder(option_decoders.TypeVerifier):
