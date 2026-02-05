@@ -28,8 +28,6 @@ from perfkitbenchmarker.linux_packages import docker
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
 from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.linux_packages import tensorflow
-from perfkitbenchmarker.providers.gcp import gcs
-from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
@@ -277,189 +275,7 @@ def PrepareRunner(benchmark_spec, vm=None):
   """
   vm = vm or benchmark_spec.vms[0]
   if benchmark_spec.tpus:
-    if vm == benchmark_spec.vms[0]:
-      storage_service = gcs.GoogleCloudStorageService()
-      benchmark_spec.storage_service = storage_service
-      if FLAGS.mlperf_bucket:
-        bucket = FLAGS.mlperf_bucket
-        benchmark_spec.model_dir = f'gs://{bucket}/pkb-{FLAGS.run_uri}'
-      else:
-        bucket = f'pkb-{FLAGS.run_uri}'.format(uri=FLAGS.run_uri)
-        benchmark_spec.model_dir = f'gs://{bucket}'
-
-      benchmark_spec.bucket = bucket
-      location = benchmark_spec.tpu_groups['train'].GetZone()
-      storage_service.PrepareService(util.GetRegionFromZone(location))
-      storage_service.MakeBucket(bucket)
-      storage_service.AclBucket(
-          benchmark_spec.gcp_service_account, gcs.WRITER, bucket
-      )
-
-    # For MLPerf 1.0, the benchmake code of different hardware are different.
-    if (
-        benchmark_spec.tpu_groups['train'].GetAcceleratorType() == 'v3-32'
-        or benchmark_spec.tpu_groups['train'].GetAcceleratorType() == 'v3-128'
-        or benchmark_spec.tpu_groups['train'].GetAcceleratorType() == 'v3-256'
-        or benchmark_spec.tpu_groups['train'].GetAcceleratorType() == 'v3-512'
-        or benchmark_spec.tpu_groups['train'].GetAcceleratorType() == 'v3-1024'
-        or benchmark_spec.tpu_groups['train'].GetAcceleratorType() == 'v3-2048'
-    ):
-      run_path = '$HOME/training_results_{version}/Google/benchmarks/{model}/tpu-{tpus}'.format(
-          version=VERSION.value,
-          model=benchmark_spec.benchmark,
-          tpus=benchmark_spec.tpu_groups['train'].GetAcceleratorType(),
-      )
-    else:
-      raise ValueError(
-          'MLPerf configurations do not support the hardware in PKB. PKB may '
-          'need to be updated if this is a new TPU type.'
-      )
-
-    if MASK in benchmark_spec.benchmark:
-      model = 'mask_rcnn'
-    elif GNMT in benchmark_spec.benchmark:
-      model = 'nmt'
-    else:
-      model = benchmark_spec.benchmark
-
-    code_path = '$HOME/training_results_{version}/Google/benchmarks/{model}/implementations/tpu-{tpus}-{model}'.format(
-        version=VERSION.value,
-        model=benchmark_spec.benchmark,
-        tpus=benchmark_spec.tpu_groups['train'].GetAcceleratorType(),
-    )
-
-    vm.RemoteCommand('pip3 install --upgrade pyyaml==3.13 ')
-    vm.RemoteCommand('pip3 install cloud-tpu-profiler==1.12')
-    if MASK in benchmark_spec.benchmark or SSD in benchmark_spec.benchmark:
-      # Install the coco package, to load the coco dataset for Mask-RCNN
-      # and SSD benchmarks.
-      # TODO(user): coco whl package for python 3.5
-      vm.RemoteCommand(
-          'cd /tmp && wget https://storage.cloud.google.com/'
-          'mlperf_artifcats/v0.6_training/'
-          'coco-1.1-cp36-cp36m-linux_x86_64.whl'  # NOTYPO
-      )
-
-    setup_script = posixpath.join(run_path, 'setup.sh')
-    vm_util.ReplaceText(vm, '--progress-bar off', ' ', setup_script)
-    vm_util.ReplaceText(vm, 'pip ', 'pip3 ', setup_script)
-    vm.RemoteCommand(
-        'chmod 755 {script} && {script}'.format(script=setup_script)
-    )
-
-    if MASK not in benchmark_spec.benchmark:
-      vm.RemoteCommand(
-          'pip3 uninstall -y tf-estimator-nightly && '
-          'pip3 install tf-estimator-nightly==1.14.0.dev2019051801'
-      )
-
-    if RESNET in benchmark_spec.benchmark:
-      data_dir = benchmark_spec.imagenet_data_dir
-    elif TRANSFORMER in benchmark_spec.benchmark:
-      data_dir = benchmark_spec.wmt_data_dir
-    elif MASK in benchmark_spec.benchmark:
-      data_dir = benchmark_spec.coco_data_dir
-    elif GNMT in benchmark_spec.benchmark:
-      data_dir = benchmark_spec.gnmt_data_dir
-    elif SSD in benchmark_spec.benchmark:
-      data_dir = benchmark_spec.coco_data_dir
-    elif BERT in benchmark_spec.benchmark:
-      data_dir = benchmark_spec.bert_data_dir
-    else:
-      raise ValueError(
-          'Unknown operation, cannot find {} in benchmark'.format(
-              benchmark_spec.benchmark
-          )
-      )
-
-    run_script = posixpath.join(run_path, 'run_and_time.sh')
-    data_dir = data_dir.replace('/', r'\/')
-    checkpoint = FLAGS.mlperf_gcs_resnet_checkpoint.replace('/', r'\/')
-    decode_dir = FLAGS.mlperf_transformer_decode_dir.replace('/', r'\/')
-    tpu = benchmark_spec.tpu_groups['train'].GetName()
-    vm_util.ReplaceText(
-        vm,
-        '--model_dir=.*',
-        r'--model_dir=gs:\/\/{} \\\\'.format(bucket),
-        run_script,
-    )
-    vm_util.ReplaceText(
-        vm, '--data_dir=.*', r'--data_dir={} \\\\'.format(data_dir), run_script
-    )
-    vm_util.ReplaceText(
-        vm,
-        '--training_file_pattern=.*',
-        r'--training_file_pattern={}\/train-* \\\\'.format(data_dir),
-        run_script,
-    )
-    vm_util.ReplaceText(
-        vm,
-        '--validation_file_pattern=.*',
-        r'--validation_file_pattern={}\/val-* \\\\'.format(data_dir),
-        run_script,
-    )
-    vm_util.ReplaceText(
-        vm,
-        '--val_json_file=.*',
-        r'--val_json_file={}\/instances_val2017.json \\\\'.format(data_dir),
-        run_script,
-    )
-    vm_util.ReplaceText(
-        vm,
-        '--resnet_checkpoint=.*',
-        r'--resnet_checkpoint={} \\\\'.format(checkpoint),
-        run_script,
-    )
-    vm_util.ReplaceText(
-        vm,
-        '--decode_from_file=.*',
-        r'--decode_from_file={}\/wmt14-en-de.src \\\\'.format(decode_dir),
-        run_script,
-    )
-    vm_util.ReplaceText(
-        vm,
-        '--decode_reference=.*',
-        r'--decode_reference={}\/wmt14-en-de.ref \\\\'.format(decode_dir),
-        run_script,
-    )
-    vm_util.ReplaceText(
-        vm,
-        '--decode_to_file=.*',
-        r'--decode_to_file={}\/decode.transformer_mlperf_tpu.'
-        r'translate_ende_wmt32k_packed.2x2_log_1018_2 \\\\'.format(bucket),
-        run_script,
-    )
-    vm_util.ReplaceText(
-        vm, '--tpu=.*', r'--tpu={} \\\\'.format(tpu), run_script
-    )
-    vm_util.ReplaceText(
-        vm,
-        '--output_dir=.*',
-        r'--output_dir=gs:\/\/{} \\\\'.format(bucket),
-        run_script,
-    )
-    vm_util.ReplaceText(
-        vm,
-        '--cloud_tpu_name=.*',
-        r'--cloud_tpu_name={} \\\\'.format(tpu),
-        run_script,
-    )
-    vm_util.ReplaceText(
-        vm,
-        '--out_dir=.*',
-        r'--out_dir=gs:\/\/{} \\\\'.format(bucket),
-        run_script,
-    )
-    vm_util.ReplaceText(
-        vm, '--tpu_name=.*', r'--tpu_name={} \\\\'.format(tpu), run_script
-    )
-    vm.RemoteCommand('chmod 755 {}'.format(run_script))
-
-    if GNMT in benchmark_spec.benchmark:
-      metric_script = posixpath.join(code_path, model, 'metric.py')
-      vm_util.ReplaceText(
-          vm, ' sacrebleu -t', ' python3 -m sacrebleu -t', metric_script
-      )
+    raise errors.Config.InvalidValue('MLPerf benchmark does not support TPUs.')
   else:
     benchmark_spec.model_dir = '/tmp'
 
@@ -757,7 +573,6 @@ def _CreateMetadataDict(benchmark_spec):
     metadata dict
   """
   metadata = {
-      'use_tpu': bool(benchmark_spec.tpus),
       'model_dir': benchmark_spec.model_dir,
       'model': benchmark_spec.benchmark,
       'version': VERSION.value,
@@ -769,15 +584,6 @@ def _CreateMetadataDict(benchmark_spec):
   total_gpus = gpus_per_node * num_vms
   metadata.update(cuda_toolkit.GetMetadata(vm))
   metadata['total_gpus'] = total_gpus
-  if benchmark_spec.tpus:
-    metadata.update({
-        'train_tpu_num_shards': benchmark_spec.tpu_groups[
-            'train'
-        ].GetNumShards(),
-        'train_tpu_accelerator_type': benchmark_spec.tpu_groups[
-            'train'
-        ].GetAcceleratorType(),
-    })
   return metadata
 
 
@@ -891,55 +697,7 @@ def Run(benchmark_spec):
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
   if benchmark_spec.tpus:
-    # For MLPerf 1.0, the benchmake code of different hardware are different.
-    if (
-        benchmark_spec.tpu_groups['train'].GetAcceleratorType() == 'v3-32'
-        or benchmark_spec.tpu_groups['train'].GetAcceleratorType() == 'v3-128'
-        or benchmark_spec.tpu_groups['train'].GetAcceleratorType() == 'v3-256'
-        or benchmark_spec.tpu_groups['train'].GetAcceleratorType() == 'v3-512'
-        or benchmark_spec.tpu_groups['train'].GetAcceleratorType() == 'v3-1024'
-        or benchmark_spec.tpu_groups['train'].GetAcceleratorType() == 'v3-2048'
-    ):
-      run_path = '$HOME/training_results_{version}/Google/benchmarks/{model}/tpu-{tpus}'.format(
-          version=VERSION.value,
-          model=benchmark_spec.benchmark,
-          tpus=benchmark_spec.tpu_groups['train'].GetAcceleratorType(),
-      )
-      code_path = '$HOME/training_results_{version}/Google/benchmarks/{model}/implementations/tpu-{tpus}-{model}'.format(
-          version=VERSION.value,
-          model=benchmark_spec.benchmark,
-          tpus=benchmark_spec.tpu_groups['train'].GetAcceleratorType(),
-      )
-
-      if MASK in benchmark_spec.benchmark:
-        model = 'mask_rcnn'
-      elif GNMT in benchmark_spec.benchmark:
-        model = 'nmt'
-      else:
-        model = benchmark_spec.benchmark
-
-      mlperf_benchmark_cmd = (
-          'cd {code_path} && '
-          'export PYTHONPATH=$(pwd):$(pwd)/{model} && '
-          'cd {model} && '
-          '{run_path}/run_and_time.sh'.format(
-              code_path=code_path, model=model, run_path=run_path
-          )
-      )
-
-      if SSD in benchmark_spec.benchmark:
-        mlperf_benchmark_cmd = (
-            'export MLP_GCS_RESNET_CHECKPOINT={checkpoint} && {cmd}'.format(
-                checkpoint=FLAGS.mlperf_gcs_resnet_checkpoint,
-                cmd=mlperf_benchmark_cmd,
-            )
-        )
-    else:
-      raise ValueError(
-          'MLPerf configurations do not support the hardware in PKB. PKB may '
-          'need to be updated if this is a new TPU type.'
-      )
-
+    raise errors.Config.InvalidValue('MLPerf benchmark does not support TPUs.')
   else:
     run_sub_paths = {
         RESNET: 'resnet/implementations/mxnet',
@@ -1002,12 +760,7 @@ def Run(benchmark_spec):
   return samples
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(_):
   """Cleanup MLPerf on the cluster.
-
-  Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-      required to run the benchmark.
   """
-  if benchmark_spec.tpus and FLAGS.mlperf_bucket is None:
-    benchmark_spec.storage_service.DeleteBucket(benchmark_spec.bucket)
+  pass

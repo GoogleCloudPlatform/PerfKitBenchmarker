@@ -23,8 +23,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import cloud_tpu_models
 from perfkitbenchmarker.linux_packages import nvidia_driver
 from perfkitbenchmarker.linux_packages import tensorflow
-from perfkitbenchmarker.providers.gcp import gcs
-from perfkitbenchmarker.providers.gcp import util
 
 
 FLAGS = flags.FLAGS
@@ -146,24 +144,10 @@ def Prepare(benchmark_spec):
   benchmark_spec.always_call_cleanup = True
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
-  if not benchmark_spec.tpus:
-    vm.Install('tensorflow')
+  vm.Install('tensorflow')
   vm.Install('cloud_tpu_models')
   vm.Install('tensorflow_models')
-  if benchmark_spec.tpus:
-    storage_service = gcs.GoogleCloudStorageService()
-    benchmark_spec.storage_service = storage_service
-    bucket = 'pkb{}'.format(FLAGS.run_uri)
-    benchmark_spec.bucket = bucket
-    benchmark_spec.model_dir = 'gs://{}'.format(bucket)
-    location = benchmark_spec.tpu_groups['train'].GetZone()
-    storage_service.PrepareService(util.GetRegionFromZone(location))
-    storage_service.MakeBucket(bucket)
-    storage_service.AclBucket(
-        benchmark_spec.gcp_service_account, gcs.WRITER, bucket
-    )
-  else:
-    benchmark_spec.model_dir = '/tmp'
+  benchmark_spec.model_dir = '/tmp'
 
 
 def CreateMetadataDict(benchmark_spec):
@@ -177,7 +161,6 @@ def CreateMetadataDict(benchmark_spec):
     metadata dict
   """
   metadata = {
-      'use_tpu': bool(benchmark_spec.tpus),
       'data_dir': benchmark_spec.data_dir,
       'model_dir': benchmark_spec.model_dir,
       'train_steps': benchmark_spec.train_steps,
@@ -192,15 +175,6 @@ def CreateMetadataDict(benchmark_spec):
       'train_batch_size': benchmark_spec.batch_size,
       'eval_batch_size': benchmark_spec.batch_size,
   }
-  if benchmark_spec.tpus:
-    metadata.update({
-        'train_tpu_num_shards': benchmark_spec.tpu_groups[
-            'train'
-        ].GetNumShards(),
-        'train_tpu_accelerator_type': benchmark_spec.tpu_groups[
-            'train'
-        ].GetAcceleratorType(),
-    })
   return metadata
 
 
@@ -327,40 +301,21 @@ def Run(benchmark_spec):
   _UpdateBenchmarkSpecWithFlags(benchmark_spec)
   vm = benchmark_spec.vms[0]
 
-  if benchmark_spec.tpus:
-    mnist_benchmark_script = 'mnist_tpu.py'
-    mnist_benchmark_cmd = (
-        'cd tpu/models && '
-        'export PYTHONPATH=$(pwd) && '
-        'cd official/mnist && '
-        'python {script} '
-        '--data_dir={data_dir} '
-        '--iterations={iterations} '
-        '--model_dir={model_dir} '
-        '--batch_size={batch_size}'.format(
-            script=mnist_benchmark_script,
-            data_dir=benchmark_spec.data_dir,
-            iterations=benchmark_spec.iterations,
-            model_dir=benchmark_spec.model_dir,
-            batch_size=benchmark_spec.batch_size,
-        )
-    )
-  else:
-    mnist_benchmark_script = 'mnist.py'
-    mnist_benchmark_cmd = (
-        'cd models && '
-        'export PYTHONPATH=$(pwd) && '
-        'cd official/mnist && '
-        'python {script} '
-        '--data_dir={data_dir} '
-        '--model_dir={model_dir} '
-        '--batch_size={batch_size} '.format(
-            script=mnist_benchmark_script,
-            data_dir=benchmark_spec.data_dir,
-            model_dir=benchmark_spec.model_dir,
-            batch_size=benchmark_spec.batch_size,
-        )
-    )
+  mnist_benchmark_script = 'mnist.py'
+  mnist_benchmark_cmd = (
+      'cd models && '
+      'export PYTHONPATH=$(pwd) && '
+      'cd official/mnist && '
+      'python {script} '
+      '--data_dir={data_dir} '
+      '--model_dir={model_dir} '
+      '--batch_size={batch_size} '.format(
+          script=mnist_benchmark_script,
+          data_dir=benchmark_spec.data_dir,
+          model_dir=benchmark_spec.model_dir,
+          batch_size=benchmark_spec.batch_size,
+      )
+  )
 
   if nvidia_driver.CheckNvidiaGpuExists(vm):
     mnist_benchmark_cmd = '{env} {cmd}'.format(
@@ -370,29 +325,9 @@ def Run(benchmark_spec):
   metadata = CreateMetadataDict(benchmark_spec)
 
   if benchmark_spec.train_steps > 0:
-    if benchmark_spec.tpus:
-      tpu = benchmark_spec.tpu_groups['train'].GetName()
-      num_shards = '--num_shards={}'.format(
-          benchmark_spec.tpu_groups['train'].GetNumShards()
-      )
-    else:
-      tpu = num_shards = ''
-
-    if benchmark_spec.tpus:
-      mnist_benchmark_train_cmd = (
-          '{cmd} --tpu={tpu} --use_tpu={use_tpu} --train_steps={train_steps} '
-          '{num_shards} --noenable_predict'.format(
-              cmd=mnist_benchmark_cmd,
-              tpu=tpu,
-              use_tpu=bool(benchmark_spec.tpus),
-              train_steps=benchmark_spec.train_steps,
-              num_shards=num_shards,
-          )
-      )
-    else:
-      mnist_benchmark_train_cmd = '{cmd} --train_epochs={train_epochs} '.format(
-          cmd=mnist_benchmark_cmd, train_epochs=benchmark_spec.train_epochs
-      )
+    mnist_benchmark_train_cmd = '{cmd} --train_epochs={train_epochs} '.format(
+        cmd=mnist_benchmark_cmd, train_epochs=benchmark_spec.train_epochs
+    )
 
     start = time.time()
     stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_train_cmd)
@@ -407,20 +342,9 @@ def Run(benchmark_spec):
     )
 
   if benchmark_spec.eval_steps > 0:
-    if benchmark_spec.tpus:
-      mnist_benchmark_eval_cmd = (
-          '{cmd} --tpu={tpu} --use_tpu={use_tpu} --eval_steps={eval_steps}'
-          .format(
-              cmd=mnist_benchmark_cmd,
-              use_tpu=bool(benchmark_spec.tpus),
-              tpu=benchmark_spec.tpu_groups['eval'].GetName(),
-              eval_steps=benchmark_spec.eval_steps,
-          )
-      )
-    else:
-      mnist_benchmark_eval_cmd = '{cmd} --eval_steps={eval_steps}'.format(
-          cmd=mnist_benchmark_cmd, eval_steps=benchmark_spec.eval_steps
-      )
+    mnist_benchmark_eval_cmd = '{cmd} --eval_steps={eval_steps}'.format(
+        cmd=mnist_benchmark_cmd, eval_steps=benchmark_spec.eval_steps
+    )
 
     stdout, stderr = vm.RobustRemoteCommand(mnist_benchmark_eval_cmd)
     samples.extend(
@@ -429,12 +353,7 @@ def Run(benchmark_spec):
   return samples
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(_):
   """Cleanup MNIST on the cluster.
-
-  Args:
-    benchmark_spec: The benchmark specification. Contains all data that is
-      required to run the benchmark.
   """
-  if benchmark_spec.tpus:
-    benchmark_spec.storage_service.DeleteBucket(benchmark_spec.bucket)
+  pass
