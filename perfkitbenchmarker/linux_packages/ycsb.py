@@ -324,7 +324,7 @@ _SHOULD_FAIL_ON_INCOMPLETE_LOADING = flags.DEFINE_boolean(
     False,
     'Whether to fail the benchmarking if loading is not complete, '
     'e.g., there are insert failures. Takes precedence over any "insert" value'
-    ' set in --ycsb_load_error_rate_thresholds.',
+    ' set in --ycsb_load_max_error_rates.',
 )
 _LOAD_MAX_ERROR_RATES = flags.DEFINE_list(
     'ycsb_load_max_error_rates',
