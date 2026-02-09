@@ -29,7 +29,7 @@ pywinrm
 requests
 rsa>=4.7.2
 seaborn
-setuptools>=40.3.0
+setuptools>=40.3.0,<81
 six>=1.13.0
 timeout-decorator
 scipy
