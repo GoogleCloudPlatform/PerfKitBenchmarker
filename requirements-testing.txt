@@ -35,7 +35,7 @@ freezegun
 boto3
 google-cloud-pubsub
 requests-mock
-pyfakefs<=6.0.0
+pyfakefs
 pyink
 pylint
 lint-diffs
