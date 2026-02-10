@@ -12,3 +12,5 @@
 /.idea
 /*git_ignore*
 .DS_Store
+venv*/
+/pkb_temp/

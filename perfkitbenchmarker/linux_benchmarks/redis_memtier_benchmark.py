@@ -22,6 +22,7 @@ memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 """
 
 from typing import Any, Dict, List
+import logging
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -158,6 +159,14 @@ def StartServices(bm_spec: _BenchmarkSpec) -> None:
   client_vms = bm_spec.vm_groups['clients']
   server_vm = bm_spec.vm_groups['servers'][0]
   all_server_vms = bm_spec.vm_groups['servers']  # for cluster mode
+
+  # Set io_threads from command-line flag if specified
+  if redis_server.IO_THREADS.value:
+    # Use the first value if it's a sweep
+    io_threads_list = [int(io) for io in redis_server.IO_THREADS.value]
+    if io_threads_list:
+      redis_server.CURRENT_IO_THREADS = io_threads_list[0]
+      logging.info(f'Setting io_threads to {redis_server.CURRENT_IO_THREADS} from flag')
 
   for vm in all_server_vms:
     redis_server.Start(vm)

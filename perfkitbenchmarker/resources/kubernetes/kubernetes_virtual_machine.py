@@ -50,8 +50,9 @@ SELECTOR_PREFIX = 'pkb'
 
 def _IsKubectlErrorEphemeral(retcode: int, stderr: str) -> bool:
   """Determine if kubectl error is retriable."""
-  return retcode == 1 and any(
-      error in stderr for error in kubectl.RETRYABLE_KUBECTL_ERRORS
+  return retcode == 1 and (
+      any(error in stderr for error in container_service.RETRYABLE_KUBECTL_ERRORS)
+      or 'deadline exceeded' in stderr
   )
 
 
@@ -588,6 +589,8 @@ class DebianBasedKubernetesVirtualMachine(
       if not _IsKubectlErrorEphemeral(retcode, stderr):
         break
       logging.info('Retrying ephemeral connection issue\n:%s', stderr)
+      import time
+      time.sleep(3)
     if retcode:
       error_text = (
           'Got non-zero return code (%s) executing %s\nSTDOUT: %sSTDERR: %s'
