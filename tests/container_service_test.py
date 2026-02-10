@@ -1,4 +1,5 @@
 import os
+import pickle
 import tempfile
 import time
 from typing import Callable, Iterable, Protocol, Tuple
@@ -451,6 +452,13 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         ['get', 'pods'], suppress_failure=lambda x, y, z: True
     )
     self.assertEqual(status, 0)
+
+  def test_PickleKubernetesCluster(self):
+    cluster = container_service_mock.CreateTestKubernetesCluster()
+    self.assertIsNotNone(cluster.event_poller)
+    dumped = pickle.dumps(cluster)
+    new_cluster = pickle.loads(dumped)
+    self.assertIsNotNone(new_cluster.event_poller)
 
   @mock.patch.object(
       vm_util, 'IssueCommand', return_value=(_ELECTION_EVENT_NO_NAME, '', 0)

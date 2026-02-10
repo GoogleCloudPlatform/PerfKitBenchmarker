@@ -29,19 +29,23 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
   def __init__(self, cluster_spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(cluster_spec)
     self.event_poller: kubernetes_events.KubernetesEventPoller | None = None
-    if cluster_spec.poll_for_events:
-
-      def _GetEventsNoLogging():
-        return kubernetes_commands.GetEvents(suppress_logging=True)
-
-      self.event_poller = kubernetes_events.KubernetesEventPoller(
-          _GetEventsNoLogging
-      )
-
+    self.cluster_spec = cluster_spec
+    self._InitializeEventPoller()
     self.inference_server = (
         kubernetes_inference_server.GetKubernetesInferenceServer(
             cluster_spec.inference_server, self
         )
+    )
+
+  def _InitializeEventPoller(self):
+    if not self.cluster_spec.poll_for_events:
+      return
+
+    def _GetEventsNoLogging():
+      return kubernetes_commands.GetEvents(suppress_logging=True)
+
+    self.event_poller = kubernetes_events.KubernetesEventPoller(
+        _GetEventsNoLogging
     )
 
   def Create(self, restore: bool = False) -> None:
@@ -78,6 +82,10 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     if 'event_poller' in state:
       del state['event_poller']
     return state
+
+  def __setstate__(self, state):
+    self.__dict__ = state
+    self._InitializeEventPoller()
 
   @functools.cached_property
   def k8s_version(self) -> str:
