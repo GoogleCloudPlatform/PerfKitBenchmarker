@@ -24,7 +24,7 @@ def Install(vm):
   """Installs HAProxy on the VM."""
   vm.RemoteCommand('sudo apt-get update', ignore_failure=True)
   vm.RemoteCommand('sudo apt-get install -y haproxy')
-  
+
   # Verify installation
   vm.RemoteCommand('haproxy -v')
 
@@ -70,7 +70,7 @@ backend redis_replica
     mode tcp
     server replica {replica_ip}:6379 check
 """
-  
+
   # Write config to file
   vm.RemoteCommand(f'echo "{config_content}" | sudo tee {HAPROXY_CONFIG}')
 
@@ -78,23 +78,30 @@ backend redis_replica
 def Start(vm):
   """Starts HAProxy as a background process."""
   # Start HAProxy directly (not via systemctl - doesn't exist in containers)
-  vm.RemoteCommand(
-      'sudo haproxy -f /etc/haproxy/haproxy.cfg -D'
-  )
-  
+  vm.RemoteCommand('sudo haproxy -f /etc/haproxy/haproxy.cfg -D')
+
   # Wait for HAProxy to start
   vm.RemoteCommand('sleep 3')
-  
+
   # Verify HAProxy is running
   haproxy_check = vm.RemoteCommand('pgrep -f haproxy', ignore_failure=True)[0]
   if not haproxy_check:
     vm.RemoteCommand('echo "HAProxy failed to start"')
     raise Exception('HAProxy failed to start')
-  
+
   # Check if HAProxy is listening on ports 6379 and 6380
   vm.RemoteCommand('echo "=== Checking HAProxy ports ==="')
-  vm.RemoteCommand('sudo netstat -tlnp | grep haproxy || ss -tlnp | grep haproxy', ignore_failure=True)
-  
+  vm.RemoteCommand(
+      'sudo netstat -tlnp | grep haproxy || ss -tlnp | grep haproxy',
+      ignore_failure=True,
+  )
+
   # Verify ports are open
-  vm.RemoteCommand('nc -zv localhost 6379 || echo "Port 6379 not reachable"', ignore_failure=True)
-  vm.RemoteCommand('nc -zv localhost 6380 || echo "Port 6380 not reachable"', ignore_failure=True)
+  vm.RemoteCommand(
+      'nc -zv localhost 6379 || echo "Port 6379 not reachable"',
+      ignore_failure=True,
+  )
+  vm.RemoteCommand(
+      'nc -zv localhost 6380 || echo "Port 6380 not reachable"',
+      ignore_failure=True,
+  )

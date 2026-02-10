@@ -166,7 +166,9 @@ def StartServices(bm_spec: _BenchmarkSpec) -> None:
     io_threads_list = [int(io) for io in redis_server.IO_THREADS.value]
     if io_threads_list:
       redis_server.CURRENT_IO_THREADS = io_threads_list[0]
-      logging.info(f'Setting io_threads to {redis_server.CURRENT_IO_THREADS} from flag')
+      logging.info(
+          f'Setting io_threads to {redis_server.CURRENT_IO_THREADS} from flag'
+      )
 
   for vm in all_server_vms:
     redis_server.Start(vm)

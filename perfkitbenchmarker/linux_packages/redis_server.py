@@ -41,13 +41,13 @@ _GIT_REPO = flags.DEFINE_string(
     'redis_git_repo',
     'https://github.com/redis/redis.git',
     'Git repository URL for Redis or Valkey. '
-    'Use https://github.com/valkey-io/valkey.git for Valkey.'
+    'Use https://github.com/valkey-io/valkey.git for Valkey.',
 )
 _REDIS_TYPE = flags.DEFINE_enum(
     'redis_type',
     'redis',
     ['redis', 'valkey'],
-    'Type of server to install: redis or valkey.'
+    'Type of server to install: redis or valkey.',
 )
 CLUSTER_MODE = flags.DEFINE_bool(
     'redis_server_cluster_mode', False, 'Whether to use cluster mode.'
@@ -206,10 +206,10 @@ def _Install(vm) -> None:
   vm.Install('wget')
   git_repo = _GIT_REPO.value
   repo_dir = GetRedisDir()
-  vm.RemoteCommand(f'cd {linux_packages.INSTALL_DIR}; git clone {git_repo} redis')
   vm.RemoteCommand(
-      f'cd {repo_dir} && git checkout {_VERSION.value} && make'
+      f'cd {linux_packages.INSTALL_DIR}; git clone {git_repo} redis'
   )
+  vm.RemoteCommand(f'cd {repo_dir} && git checkout {_VERSION.value} && make')
 
 
 def YumInstall(vm) -> None:
@@ -314,7 +314,9 @@ def _BuildStartCommand(vm, port: int) -> str:
   else:
     max_memory_per_instance = int(vm.total_memory_kb * 0.7 / num_processes)
   cmd_args.append(f'--maxmemory {max_memory_per_instance}kb')
-  return cmd.format(redis_dir=redis_dir, server_binary=server_binary, args=' '.join(cmd_args))
+  return cmd.format(
+      redis_dir=redis_dir, server_binary=server_binary, args=' '.join(cmd_args)
+  )
 
 
 @vm_util.Retry(poll_interval=5, timeout=60)
@@ -323,8 +325,8 @@ def _WaitForRedisUp(vm, port):
   localhost = vm.GetLocalhostAddr()
   cli_binary = GetRedisCliBinary()
   vm.RemoteCommand(
-      f'sudo {GetRedisDir()}/src/{cli_binary} -h {localhost} -p {port} ping | grep'
-      ' PONG'
+      f'sudo {GetRedisDir()}/src/{cli_binary} -h {localhost} -p {port} ping |'
+      ' grep PONG'
   )
 
 
@@ -353,8 +355,8 @@ def Stop(vm) -> None:
 
   for port in ports:
     vm.TryRemoteCommand(
-        f'sudo {redis_dir}/src/{cli_binary} -h {localhost} -p {port} cluster reset'
-        ' hard'
+        f'sudo {redis_dir}/src/{cli_binary} -h {localhost} -p {port} cluster'
+        ' reset hard'
     )
 
   for port in ports:
@@ -374,18 +376,26 @@ def Stop(vm) -> None:
       # If return code is non-zero and we see the connection error, it's down.
       if return_code != 0 and 'Could not connect to' in stderr:
         break
-      logging.info(f'Waiting for Redis on port {port} to shut down... (RC={return_code}, stderr="{stderr}")')
+      logging.info(
+          f'Waiting for Redis on port {port} to shut down... (RC={return_code},'
+          f' stderr="{stderr}")'
+      )
       import time
+
       time.sleep(1)
     else:
       # If we exhausted retries
-      raise errors.Error(f'Redis on port {port} failed to shut down. Last stderr: {stderr}')
+      raise errors.Error(
+          f'Redis on port {port} failed to shut down. Last stderr: {stderr}'
+      )
 
 
 def StartCluster(server_vms) -> None:
   """Start redis cluster; assumes redis shards started with cluster mode."""
   cli_binary = GetRedisCliBinary()
-  cluster_create_cmd = f'sudo {GetRedisDir()}/src/{cli_binary} --cluster create '
+  cluster_create_cmd = (
+      f'sudo {GetRedisDir()}/src/{cli_binary} --cluster create '
+  )
   for server_vm in server_vms:
     cluster_create_cmd += f' {server_vm.internal_ip}:{DEFAULT_PORT}'
   stdout, _ = server_vms[0].RemoteCommand(f'echo "yes" | {cluster_create_cmd}')
@@ -409,11 +419,9 @@ def GetMetadata(vm) -> Dict[str, Any]:
   }
 
 
-
-
 def ConfigureReplication(replica_vm, primary_ip, primary_port=DEFAULT_PORT):
   """Configure replica to replicate from primary.
-  
+
   Args:
     replica_vm: The replica VM instance.
     primary_ip: IP address of the primary Redis server.
@@ -422,11 +430,17 @@ def ConfigureReplication(replica_vm, primary_ip, primary_port=DEFAULT_PORT):
   cli_binary = GetRedisCliBinary()
   localhost = replica_vm.GetLocalhostAddr()
   replica_port = GetRedisPorts(replica_vm)[0]
-  
+
   # Configure replica to follow primary
-  cmd = f'{GetRedisDir()}/src/{cli_binary} -h {localhost} -p {replica_port} REPLICAOF {primary_ip} {primary_port}'
+  cmd = (
+      f'{GetRedisDir()}/src/{cli_binary} -h {localhost} -p {replica_port}'
+      f' REPLICAOF {primary_ip} {primary_port}'
+  )
   replica_vm.RemoteCommand(cmd)
-  logging.info(f'Configured replica on {replica_vm.name} to replicate from {primary_ip}:{primary_port}')
+  logging.info(
+      f'Configured replica on {replica_vm.name} to replicate from'
+      f' {primary_ip}:{primary_port}'
+  )
 
 
 def GetRedisPorts(vm=None) -> List[int]:
