@@ -12,12 +12,18 @@ for consistent metric collection.
 """
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 import json
 import time
 from typing import Any
 =======
 import time
 >>>>>>> 9a938ee8 (Add scaling down logic and gathering metrics)
+=======
+import json
+import time
+from typing import Any
+>>>>>>> 9fbbc449 (Add scaling down logic, phases and gathering metrics)
 
 from absl import flags
 from absl import logging
@@ -95,6 +101,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   cluster = bm_spec.container_cluster
   assert isinstance(cluster, container_service.KubernetesCluster)
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   initial_nodes = set(kubernetes_commands.GetNodeNames())
   initial_node_count = len(initial_nodes)
@@ -439,57 +446,319 @@ def _AddPhaseMetadata(
 =======
   initial_node_count = len(kubernetes_commands.GetNodeNames())
   start_time = time.time()
+=======
+  initial_nodes = set(kubernetes_commands.GetNodeNames())
+  initial_node_count = len(initial_nodes)
+>>>>>>> 9fbbc449 (Add scaling down logic, phases and gathering metrics)
 
   # Do one scale up, scale down, then scale up again.
-  _ScaleDeploymentReplicas(NUM_NODES.value)
-  samples = kubernetes_scale_benchmark.ParseStatusChanges(
-      'node',
-      start_time,
-      resources_to_ignore=set(),
+  scaleup1_samples = _ScaleUpAndCollectSamples(
+      phase='scaleup1',
+      replicas=NUM_NODES.value,
+      cluster=cluster,
+      initial_nodes=initial_nodes,
+      initial_pods=set(kubernetes_commands.GetPodNames()),
+      pod_phase_timeout=3 * 60 * 60,
   )
-  _ScaleDeploymentReplicas(0)
-  if _WaitForScaledNodesDeletion(initial_node_count):
-    _ScaleDeploymentReplicas(NUM_NODES.value)
+
+  scaledown_samples, scaledown_complete = _ScaleDownAndCollectSamples(
+      phase='scaledown',
+      initial_nodes=initial_nodes,
+      initial_node_count=initial_node_count,
+      node_timeout=2 * 60 * 60,
+  )
+
+  scaleup2_samples: list[sample.Sample] = []
+  if scaledown_complete:
+    scaleup2_samples = _ScaleUpAndCollectSamples(
+        phase='scaleup2',
+        replicas=NUM_NODES.value,
+        cluster=cluster,
+        initial_nodes=initial_nodes,
+        initial_pods=set(kubernetes_commands.GetPodNames()),
+        pod_phase_timeout=3 * 60 * 60,
+    )
   else:
     logging.warning(
         'Skipping final scale up; scaled nodes not deleted within timeout.'
     )
+<<<<<<< HEAD
   return samples
 >>>>>>> 9a938ee8 (Add scaling down logic and gathering metrics)
+=======
+
+  return scaleup1_samples + scaledown_samples + scaleup2_samples
+>>>>>>> 9fbbc449 (Add scaling down logic, phases and gathering metrics)
 
 
-def _ScaleDeploymentReplicas(replicas: int) -> None:
+def _ScaleDeploymentReplicas(replicas: int, wait_for_rollout: bool = True) -> None:
   container_service.RunKubectlCommand([
       'scale',
       f'--replicas={replicas}',
       'deployment/app',
   ])
-  kubernetes_commands.WaitForRollout(
-      'deployment/app',
-      timeout=kubernetes_scale_benchmark._GetScaleTimeout(),
+  if wait_for_rollout:
+    kubernetes_commands.WaitForRollout(
+        'deployment/app',
+        timeout=GetScaleTimeout(replicas),
+    )
+
+
+def _ScaleUpAndCollectSamples(
+    phase: str,
+    replicas: int,
+    cluster: container_service.KubernetesCluster,
+    initial_nodes: set[str],
+    initial_pods: set[str],
+    pod_phase_timeout: int,
+) -> list[sample.Sample]:
+  start_time = time.time()
+  _ScaleDeploymentReplicas(replicas, wait_for_rollout=False)
+
+  phase_samples: list[sample.Sample] = []
+  phase_samples += _LogPodPhaseCountsUntilReady(
+      phase=phase,
+      timeout=pod_phase_timeout,
+      desired_replicas=replicas,
+  )
+
+  ready_samples = kubernetes_scale_benchmark.ParseStatusChanges(
+      'pod',
+      start_time,
+      resources_to_ignore=initial_pods,
+  )
+  kubernetes_scale_benchmark.CheckForFailures(cluster, ready_samples, replicas)
+  _AddPhaseMetadata(ready_samples, phase)
+  phase_samples += ready_samples
+  node_samples = kubernetes_scale_benchmark.ParseStatusChanges(
+      'node',
+      start_time,
+      resources_to_ignore=initial_nodes,
+  )
+  _AddPhaseMetadata(node_samples, phase)
+  phase_samples += node_samples
+  return phase_samples
+
+
+def _ScaleDownAndCollectSamples(
+    phase: str,
+    initial_nodes: set[str],
+    initial_node_count: int,
+    node_timeout: int,
+) -> tuple[list[sample.Sample], bool]:
+  start_time = time.time()
+  _ScaleDeploymentReplicas(0, wait_for_rollout=False)
+  return _LogNodeDeletionUntilGone(
+      phase=phase,
+      initial_nodes=initial_nodes,
+      initial_node_count=initial_node_count,
+      start_time=start_time,
+      timeout=node_timeout,
   )
 
 
-def _WaitForScaledNodesDeletion(initial_node_count: int) -> bool:
-  timeout = 20 * 60 + kubernetes_scale_benchmark._GetScaleTimeout()
-  start_time = time.monotonic()
+def _LogPodPhaseCountsUntilReady(
+    phase: str,
+    timeout: int,
+    desired_replicas: int,
+) -> list[sample.Sample]:
+  samples: list[sample.Sample] = []
+  start_monotonic = time.monotonic()
   while True:
-    current_node_count = len(kubernetes_commands.GetNodeNames())
-    if current_node_count <= initial_node_count:
-      logging.info('Node count returned to initial level.')
+    phase_counts, ready_count = _GetPodPhaseCounts()
+    elapsed = time.monotonic() - start_monotonic
+    logging.info(
+        'Pod phases (%s) after %ds: %s (Ready: %d/%d)',
+        phase,
+        int(elapsed),
+        phase_counts,
+        ready_count,
+        desired_replicas,
+    )
+    for pod_phase, count in phase_counts.items():
+      samples.append(
+          sample.Sample(
+              'pod_phase_count',
+              count,
+              'count',
+              metadata={
+                  'phase': phase,
+                  'pod_phase': pod_phase,
+                  'elapsed_seconds': elapsed,
+              },
+          )
+      )
+    samples.append(
+        sample.Sample(
+            'pod_phase_count',
+            ready_count,
+            'count',
+            metadata={
+                'phase': phase,
+                'pod_phase': 'Ready',
+                'elapsed_seconds': elapsed,
+            },
+        )
+    )
+
+    if ready_count >= desired_replicas:
+      return samples
+    if elapsed >= timeout:
+      logging.warning(
+          'Timed out waiting for pods to be Ready (%s). Ready: %d/%d',
+          phase,
+          ready_count,
+          desired_replicas,
+      )
+      return samples
+    time.sleep(60)
+
+
+def _GetPodPhaseCounts() -> tuple[dict[str, int], int]:
+  stdout, _, _ = container_service.RunKubectlCommand(
+      [
+          'get',
+          'pods',
+          '-o',
+          'jsonpath={.items[*].metadata.name}',
+      ],
+      suppress_logging=True,
+  )
+  pod_names = stdout.split()
+  pod_list: list[dict[str, Any]] = []
+  for pod_name in pod_names:
+    pod_stdout, _, _ = container_service.RunKubectlCommand(
+        [
+            'get',
+            'pod',
+            pod_name,
+            '-o',
+            'json',
+        ],
+        suppress_logging=True,
+    )
+    pod_list.append(json.loads(pod_stdout))
+  phase_counts: dict[str, int] = {}
+  ready_count = 0
+  for pod in pod_list:
+    labels = pod.get('metadata', {}).get('labels', {})
+    if labels.get('app') != 'app':
+      continue
+    phase = pod.get('status', {}).get('phase', 'Unknown')
+    phase_counts[phase] = phase_counts.get(phase, 0) + 1
+    if _IsPodReady(pod):
+      ready_count += 1
+  return phase_counts, ready_count
+
+
+def _IsPodReady(pod: dict[str, Any]) -> bool:
+  for condition in pod.get('status', {}).get('conditions', []):
+    if condition.get('type') == 'Ready' and condition.get('status') == 'True':
       return True
-    elapsed = time.monotonic() - start_time
+  return False
+
+
+def _LogNodeDeletionUntilGone(
+    phase: str,
+    initial_nodes: set[str],
+    initial_node_count: int,
+    start_time: float,
+    timeout: int,
+) -> tuple[list[sample.Sample], bool]:
+  samples: list[sample.Sample] = []
+  deletion_times: dict[str, float] = {}
+  scaled_nodes = set(kubernetes_commands.GetNodeNames()) - initial_nodes
+  start_monotonic = time.monotonic()
+
+  while True:
+    current_nodes = set(kubernetes_commands.GetNodeNames())
+    remaining_nodes = current_nodes - initial_nodes
+    elapsed = time.monotonic() - start_monotonic
+
+    for node in list(scaled_nodes):
+      if node not in current_nodes and node not in deletion_times:
+        deletion_times[node] = elapsed
+        scaled_nodes.discard(node)
+
+    samples.append(
+        sample.Sample(
+            'node_remaining_count',
+            max(len(remaining_nodes), 0),
+            'count',
+            metadata={
+                'phase': phase,
+                'elapsed_seconds': elapsed,
+            },
+        )
+    )
+
+    if len(current_nodes) <= initial_node_count:
+      logging.info('Node count returned to initial level.')
+      break
     if elapsed >= timeout:
       logging.warning(
           'Timed out waiting for scaled nodes to delete. Remaining nodes: %d',
-          max(current_node_count - initial_node_count, 0),
+          max(len(remaining_nodes), 0),
       )
-      return False
+      break
+
     logging.info(
         'Remaining scaled nodes: %d',
-        max(current_node_count - initial_node_count, 0),
+        max(len(remaining_nodes), 0),
     )
     time.sleep(60)
+
+  delete_samples = _BuildNodeDeletionSamples(
+      deletion_times,
+      phase,
+      start_time,
+  )
+  samples += delete_samples
+  return samples, len(current_nodes) <= initial_node_count
+
+
+def _BuildNodeDeletionSamples(
+    deletion_times: dict[str, float],
+    phase: str,
+    start_time: float,
+) -> list[sample.Sample]:
+  if not deletion_times:
+    return []
+  summaries = kubernetes_scale_benchmark._SummarizeTimestamps(  # pylint: disable=protected-access
+      list(deletion_times.values())
+  )
+  percentiles = {'p50', 'p90', 'p99', 'p99.9', 'p100'}
+  samples: list[sample.Sample] = []
+  for percentile, value in summaries.items():
+    if percentile not in percentiles:
+      continue
+    samples.append(
+        sample.Sample(
+            f'node_delete_{percentile}',
+            value,
+            'seconds',
+            metadata={
+                'phase': phase,
+                'start_time_epoch': start_time,
+            },
+        )
+    )
+  return samples
+
+
+def GetScaleTimeout(num_nodes: int | None = None) -> int:
+  """Returns the timeout for scale operations in this benchmark."""
+  nodes = num_nodes if num_nodes is not None else NUM_NODES.value
+  base_timeout = 60 * 10  # 10 minutes
+  per_node_timeout = nodes * 3  # 3 seconds per node
+  proposed_timeout = base_timeout + per_node_timeout
+  max_timeout = 60 * 60  # 1 hour
+  return min(proposed_timeout, max_timeout)
+
+
+def _AddPhaseMetadata(samples: list[sample.Sample], phase: str) -> None:
+  for s in samples:
+    s.metadata['phase'] = phase
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec):
@@ -497,6 +766,10 @@ def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec):
   del bm_spec  # Unused.
   container_service.RunRetryableKubectlCommand(
       ['delete', 'deployment', 'app'],
+<<<<<<< HEAD
       timeout=_GetScaleTimeout(),
+=======
+      timeout=GetScaleTimeout(),
+>>>>>>> 9fbbc449 (Add scaling down logic, phases and gathering metrics)
       raise_on_failure=False,
   )
