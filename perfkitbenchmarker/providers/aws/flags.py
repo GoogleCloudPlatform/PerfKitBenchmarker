@@ -251,6 +251,12 @@ AURORA_STORAGE_TYPE = flags.DEFINE_enum(
     'Aurora storage type to use, corresponds to different modes of billing. See'
     ' https://aws.amazon.com/rds/aurora/pricing/.',
 )
+AURORA_METRICS_COLLECTION_SLEEP_SECONDS = flags.DEFINE_integer(
+    'aws_aurora_metrics_collection_sleep_seconds',
+    2 * 60 * 60,
+    'The time to sleep before collecting Aurora metrics. By default this is a'
+    ' long time in order to collect accurate VolumeBytesUsed metrics.',
+)
 AWS_EC2_INSTANCE_PROFILE = flags.DEFINE_string(
     'aws_ec2_instance_profile',
     None,

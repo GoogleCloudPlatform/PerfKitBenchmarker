@@ -19,6 +19,7 @@ import datetime
 import json
 import os
 import textwrap
+import time
 import unittest
 
 from absl import flags
@@ -532,6 +533,77 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         self.assertEqual(
             'pkb-db-instance-123', metric.dimensions['DBInstanceIdentifier']
         )
+
+  def testAuroraStart(self):
+    db = self.CreateAuroraDbFromSpec()
+    db.cluster_id = 'pkb-db-cluster-123'
+    db.region = 'us-east-1'
+    mock_issue_command = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand')
+    )
+    self.enter_context(mock.patch.object(db, '_WaitForStatus'))
+
+    db.Start()
+
+    mock_issue_command.assert_called_once_with(
+        matchers.HAS('start-db-cluster'), raise_on_failure=False
+    )
+    db._WaitForStatus.assert_called_once_with('available')
+
+  def testAuroraStop(self):
+    db = self.CreateAuroraDbFromSpec()
+    db.cluster_id = 'pkb-db-cluster-123'
+    db.region = 'us-east-1'
+    mock_issue_command = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand')
+    )
+    self.enter_context(mock.patch.object(db, '_WaitForStatus'))
+
+    db.Stop()
+
+    mock_issue_command.assert_called_once_with(
+        matchers.HAS('stop-db-cluster'), raise_on_failure=False
+    )
+    db._WaitForStatus.assert_called_once_with('stopped')
+
+  def testAuroraWaitForStatus(self):
+    db = self.CreateAuroraDbFromSpec()
+    db.cluster_id = 'pkb-db-cluster-123'
+    mock_describe = self.enter_context(
+        mock.patch.object(db, '_DescribeCluster')
+    )
+    mock_describe.side_effect = [
+        {'DBClusters': [{'Status': 'modifying'}]},
+        {'DBClusters': [{'Status': 'available'}]},
+    ]
+    self.enter_context(mock.patch.object(time, 'sleep'))
+
+    db._WaitForStatus('available')
+
+    self.assertEqual(mock_describe.call_count, 2)
+
+  def testAuroraCollectMetrics(self):
+    db = self.CreateAuroraDbFromSpec()
+    db.cluster_id = 'pkb-db-cluster-123'
+    db.client_vms = [mock.Mock()]
+    mock_stop = self.enter_context(mock.patch.object(db, 'Stop'))
+    mock_start = self.enter_context(mock.patch.object(db, 'Start'))
+    self.enter_context(mock.patch.object(time, 'sleep'))
+    mock_super_collect = self.enter_context(
+        mock.patch.object(
+            aws_relational_db.BaseAwsRelationalDb,
+            'CollectMetrics',
+            return_value=['sample'],
+        )
+    )
+
+    results = db.CollectMetrics(mock.Mock(), mock.Mock())
+
+    self.assertEqual(results, ['sample'])
+    mock_stop.assert_called_once()
+    mock_start.assert_called_once()
+    mock_super_collect.assert_called_once()
+    db.client_vms[0].DowngradeToCheapInstance.assert_called_once()
 
 
 if __name__ == '__main__':

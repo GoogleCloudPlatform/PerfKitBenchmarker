@@ -1637,6 +1637,23 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Returns whether the disk type has been created during VM creation."""
     return self.DiskTypeCreatedOnVMCreation(data_disk.disk_type)
 
+  def DowngradeToCheapInstance(self):
+    """Downgrades the VM to a cheap instance type (e.g., t3.micro)."""
+    logging.info('Downgrading instance %s to t3.micro', self.id)
+    self.Stop()
+    cmd = util.AWS_PREFIX + [
+        'ec2',
+        'modify-instance-attribute',
+        '--region',
+        self.region,
+        '--instance-id',
+        self.id,
+        '--instance-type',
+        'Value=t3.micro',
+    ]
+    vm_util.IssueCommand(cmd)
+    self.Start()
+
 
 class ClearBasedAwsVirtualMachine(
     AwsVirtualMachine, linux_virtual_machine.ClearMixin
