@@ -183,21 +183,8 @@ cat ./pkb_temp/runs/<run_uri>/perfkitbenchmarker_results.json | jq
 ## 1. Optimized Redis 7 - N2 Standard
 Runs the optimized benchmark for Redis 7 on N2 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-optimized-v5-with-versions.sh \
-  --machine_type n2-standard-4 \
-  --client_type  n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type redis \
-  --redis_version 7.2.6 > r7_opt_n2_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_optimized_redis_memtier_v2 \
@@ -244,21 +231,8 @@ python3 pkb.py \
 ## 2. Optimized Redis 7 - C4 Standard
 Runs the optimized benchmark for Redis 7 on C4 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-optimized-v5-with-versions.sh \
-    --machine_type c4-standard-4 \
-    --client_type c4-standard-32 \
-    --zone us-east1-b \
-    --project $PROJECT_ID \
-    --duration 300 \
-    --iterations 1 \
-    --log_level error \
-    --redis_type redis \
-    --redis_version 7.2.6 > r7_opt_c4_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_optimized_redis_memtier_v2 \
@@ -305,21 +279,8 @@ python3 pkb.py \
 ## 3. Optimized Redis 8 - N2 Standard
 Runs the optimized benchmark for Redis 8 on N2 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-optimized-v5-with-versions.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type redis \
-  --redis_version 8.0.5 > r8_opt_n2_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_optimized_redis_memtier_v2 \
@@ -366,21 +327,8 @@ python3 pkb.py \
 ## 4. Optimized Redis 8 - C4 Standard
 Runs the optimized benchmark for Redis 8 on C4 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-optimized-v5-with-versions.sh \
-  --machine_type c4-standard-4 \
-  --client_type c4-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type redis \
-  --redis_version 8.0.5 > r8_opt_c4_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_optimized_redis_memtier_v2 \
@@ -427,21 +375,8 @@ python3 pkb.py \
 ## 5. Valkey 8 Baseline - N2 Standard
 Runs the baseline benchmark for Valkey 8 on N2 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-baseline-v3-with-versions.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type valkey \
-  --redis_version 8.0.0 > v8_baseline_n2_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=redis_memtier_caching_single_node \
@@ -483,21 +418,7 @@ python3 pkb.py \
 ## 6. Valkey 8 Baseline - C4 Standard
 Runs the baseline benchmark for Valkey 8 on C4 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-baseline-v3-with-versions.sh \
-  --machine_type c4-standard-4 \
-  --client_type c4-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type valkey \
-  --redis_version 8.0.0 > v8_baseline_c4_10it.log 2>&1 &
-```
-
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=redis_memtier_caching_single_node \
@@ -539,21 +460,7 @@ python3 pkb.py \
 ## 7. Valkey 8 Optimized - N2 Standard
 Runs the optimized benchmark for Valkey 8 on N2 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-optimized-v5-with-versions.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type valkey \
-  --redis_version 8.0.0 > v8_opt_n2_10it.log 2>&1 &
-```
-
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_optimized_redis_memtier_v2 \
@@ -600,21 +507,8 @@ python3 pkb.py \
 ## 8. Valkey 8 Optimized - C4 Standard
 Runs the optimized benchmark for Valkey 8 on C4 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-optimized-v5-with-versions.sh \
-  --machine_type c4-standard-4 \
-  --client_type c4-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type valkey \
-  --redis_version 8.0.0 > v8_opt_c4_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_optimized_redis_memtier_v2 \
@@ -661,21 +555,8 @@ python3 pkb.py \
 ## 9. Redis 7 Baseline (N2 Standard) - 1:1 with AOF
 Runs the baseline benchmark with AOF enabled and 1:1 read/write ratio on N2 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-AOF-baseline-v1-with-versions.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type redis \
-  --redis_version 7.2.6 > r7_aof_base_n2_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=redis_memtier_caching_single_node \
@@ -717,21 +598,8 @@ python3 pkb.py \
 ## 10. Redis 7 Baseline (C4 Standard) - 1:1 with AOF
 Runs the baseline benchmark with AOF enabled and 1:1 read/write ratio on C4 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-AOF-baseline-v1-with-versions.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type redis \
-  --redis_version 7.2.6 > r7_aof_base_c4_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=redis_memtier_caching_single_node \
@@ -773,21 +641,8 @@ python3 pkb.py \
 ## 11. Redis 7 Optimized (C4 Standard) - 1:1 with AOF
 Runs the optimized benchmark with AOF enabled and 1:1 read/write ratio on C4 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-AOF-optimized-v1-with-versions.sh \
-  --machine_type c4-standard-4 \
-  --client_type c4-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type redis \
-  --redis_version 7.2.6 > r7_aof_opt_c4_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_optimized_redis_memtier_v2 \
@@ -834,21 +689,7 @@ python3 pkb.py \
 ## 12. Redis 7 Optimized (N2 Standard) - 1:1 with AOF
 Runs the optimized benchmark with AOF enabled and 1:1 read/write ratio on N2 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-AOF-optimized-v1-with-versions.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type redis \
-  --redis_version 7.2.6 > r7_aof_opt_n2_10it.log 2>&1 &
-```
-
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_optimized_redis_memtier_v2 \
@@ -895,21 +736,8 @@ python3 pkb.py \
 ## 13. Redis 6 Baseline - C4 Standard
 Runs the baseline benchmark for Redis 6 on C4 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-baseline-v3-with-versions.sh \
-  --machine_type c4-standard-4 \
-  --client_type c4-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type redis \
-  --redis_version 6.2.14 > r6_baseline_c4_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=redis_memtier_caching_single_node \
@@ -951,21 +779,7 @@ python3 pkb.py \
 ## 14. Redis 6 Baseline - N2 Standard
 Runs the baseline benchmark for Redis 6 on N2 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-baseline-v3-with-versions.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type redis \
-  --redis_version 6.2.14 > r6_baseline_n2_10it.log 2>&1 &
-```
-
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=redis_memtier_caching_single_node \
@@ -1007,21 +821,8 @@ python3 pkb.py \
 ## 15. Redis 6 Optimized - N2 Standard
 Runs the optimized benchmark for Redis 6 on N2 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-optimized-v5-with-versions.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type redis \
-  --redis_version 6.2.14 > r6_opt_n2_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_optimized_redis_memtier_v2 \
@@ -1068,21 +869,8 @@ python3 pkb.py \
 ## 16. Redis 6 Optimized - C4 Standard
 Runs the optimized benchmark for Redis 6 on C4 nodes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-optimized-v5-with-versions.sh \
-  --machine_type c4-standard-4 \
-  --client_type c4-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level error \
-  --redis_type redis \
-  --redis_version 6.2.14 > r6_opt_c4_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command (Single Iteration):**
+** PKB Command (Single Iteration):**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_optimized_redis_memtier_v2 \
@@ -1131,21 +919,8 @@ python3 pkb.py \
 ## 17. Redis 7 HA Optimized - C4 Standard (0:1 - 100% Reads)
 Runs optimized regional HA benchmark (Primary+Replica+HAProxy) on C4 Standard nodes with 100% reads.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-ha-haproxy-regional-AOF-optimized.sh \
-  --machine_type c4-standard-4 \
-  --client_type c4-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level info \
-  --ratio 0:1 \
-  --redis_version 7.2.6 > r7_ha_opt_c4_0-1_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command:**
+** PKB Command:**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_redis_ha_haproxy \
@@ -1196,21 +971,8 @@ python3 pkb.py \
 ## 18. Redis 7 HA Optimized - C4 Standard (1:0 - 100% Writes)
 Runs optimized regional HA benchmark (Primary+Replica+HAProxy) on C4 Standard nodes with 100% writes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-ha-haproxy-regional-AOF-optimized.sh \
-  --machine_type c4-standard-4 \
-  --client_type c4-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level info \
-  --ratio 1:0 \
-  --redis_version 7.2.6 > r7_ha_opt_c4_1-0_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command:**
+** PKB Command:**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_redis_ha_haproxy \
@@ -1261,21 +1023,9 @@ python3 pkb.py \
 ## 19. Redis 7 HA Optimized - C4 Standard (1:1 - Mixed)
 Runs optimized regional HA benchmark (Primary+Replica+HAProxy) on C4 Standard nodes with 1:1 read/write ratio.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-ha-haproxy-regional-AOF-optimized.sh \
-  --machine_type c4-standard-4 \
-  --client_type c4-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level info \
-  --ratio 1:1 \
-  --redis_version 7.2.6 > r7_ha_opt_c4_1-1_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command:**
+
+** PKB Command:**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_redis_ha_haproxy \
@@ -1326,21 +1076,9 @@ python3 pkb.py \
 ## 20. Redis 7 HA Optimized - N2 Standard (0:1 - 100% Reads)
 Runs optimized regional HA benchmark (Primary+Replica+HAProxy) on N2 Standard nodes with 100% reads.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-ha-haproxy-regional-AOF-optimized.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level info \
-  --ratio 0:1 \
-  --redis_version 7.2.6 > r7_ha_opt_n2_0-1_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command:**
+
+** PKB Command:**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_redis_ha_haproxy \
@@ -1391,21 +1129,9 @@ python3 pkb.py \
 ## 21. Redis 7 HA Optimized - N2 Standard (1:0 - 100% Writes)
 Runs optimized regional HA benchmark (Primary+Replica+HAProxy) on N2 Standard nodes with 100% writes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-ha-haproxy-regional-AOF-optimized.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level info \
-  --ratio 1:0 \
-  --redis_version 7.2.6 > r7_ha_opt_n2_1-0_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command:**
+
+** PKB Command:**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_redis_ha_haproxy \
@@ -1456,21 +1182,9 @@ python3 pkb.py \
 ## 22. Redis 7 HA Optimized - N2 Standard (1:1 - Mixed)
 Runs optimized regional HA benchmark (Primary+Replica+HAProxy) on N2 Standard nodes with 1:1 read/write ratio.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-ha-haproxy-regional-AOF-optimized.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level info \
-  --ratio 1:1 \
-  --redis_version 7.2.6 > r7_ha_opt_n2_1-1_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command:**
+
+** PKB Command:**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_redis_ha_haproxy \
@@ -1521,21 +1235,8 @@ python3 pkb.py \
 ## 23. Redis 7 HA Baseline - C4 Standard (0:1 - 100% Reads)
 Runs baseline regional HA benchmark (Primary+Replica+HAProxy) on C4 Standard nodes with 100% reads.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-ha-haproxy-regional-AOF-baseline.sh \
-  --machine_type c4-standard-4 \
-  --client_type c4-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level info \
-  --ratio 0:1 \
-  --redis_version 7.2.6 > r7_ha_base_c4_0-1_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command:**
+** PKB Command:**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_redis_ha_haproxy \
@@ -1584,21 +1285,8 @@ python3 pkb.py \
 ## 24. Redis 7 HA Baseline - C4 Standard (1:0 - 100% Writes)
 Runs baseline regional HA benchmark (Primary+Replica+HAProxy) on C4 Standard nodes with 100% writes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-ha-haproxy-regional-AOF-baseline.sh \
-  --machine_type c4-standard-4 \
-  --client_type c4-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level info \
-  --ratio 1:0 \
-  --redis_version 7.2.6 > r7_ha_base_c4_1-0_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command:**
+** PKB Command:**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_redis_ha_haproxy \
@@ -1647,21 +1335,9 @@ python3 pkb.py \
 ## 25. Redis 7 HA Baseline - C4 Standard (1:1 - Mixed)
 Runs baseline regional HA benchmark (Primary+Replica+HAProxy) on C4 Standard nodes with 1:1 read/write ratio.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-ha-haproxy-regional-AOF-baseline.sh \
-  --machine_type c4-standard-4 \
-  --client_type c4-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level info \
-  --ratio 1:1 \
-  --redis_version 7.2.6 > r7_ha_base_c4_1-1_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command:**
+
+** PKB Command:**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_redis_ha_haproxy \
@@ -1710,21 +1386,9 @@ python3 pkb.py \
 ## 26. Redis 7 HA Baseline - N2 Standard (0:1 - 100% Reads)
 Runs baseline regional HA benchmark (Primary+Replica+HAProxy) on N2 Standard nodes with 100% reads.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-ha-haproxy-regional-AOF-baseline.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level info \
-  --ratio 0:1 \
-  --redis_version 7.2.6 > r7_ha_base_n2_0-1_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command:**
+
+** PKB Command:**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_redis_ha_haproxy \
@@ -1773,21 +1437,8 @@ python3 pkb.py \
 ## 27. Redis 7 HA Baseline - N2 Standard (1:0 - 100% Writes)
 Runs baseline regional HA benchmark (Primary+Replica+HAProxy) on N2 Standard nodes with 100% writes.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-ha-haproxy-regional-AOF-baseline.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level info \
-  --ratio 1:0 \
-  --redis_version 7.2.6 > r7_ha_base_n2_1-0_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command:**
+** PKB Command:**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_redis_ha_haproxy \
@@ -1836,21 +1487,8 @@ python3 pkb.py \
 ## 28. Redis 7 HA Baseline - N2 Standard (1:1 - Mixed)
 Runs baseline regional HA benchmark (Primary+Replica+HAProxy) on N2 Standard nodes with 1:1 read/write ratio.
 
-**Wrapper Command:**
-```bash
-nohup ./scripts/redis-ha-haproxy-regional-AOF-baseline.sh \
-  --machine_type n2-standard-4 \
-  --client_type n2-standard-32 \
-  --zone us-east1-b \
-  --project $PROJECT_ID \
-  --duration 300 \
-  --iterations 10 \
-  --log_level info \
-  --ratio 1:1 \
-  --redis_version 7.2.6 > r7_ha_base_n2_1-1_10it.log 2>&1 &
-```
 
-**Equivalent PKB Command:**
+** PKB Command:**
 ```bash
 python3 pkb.py \
   --benchmarks=gke_redis_ha_haproxy \
