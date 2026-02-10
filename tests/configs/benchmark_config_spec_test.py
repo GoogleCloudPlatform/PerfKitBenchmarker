@@ -39,7 +39,7 @@ _OPTION = 'test_option'
 _GCP_ONLY_VM_CONFIG = {'GCP': {'machine_type': 'n1-standard-1'}}
 _GCP_AWS_VM_CONFIG = {
     'GCP': {'machine_type': 'n1-standard-1'},
-    'AWS': {'machine_type': 'm4.large'},
+    'AWS': {'machine_type': 'm4.large', 'zone': 'us-fake-1a'},
 }
 _GCP_AWS_DISK_CONFIG = {'GCP': {}, 'AWS': {}}
 

@@ -365,6 +365,11 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
 
   CLOUD = provider_info.AWS
 
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    assert isinstance(self.zone, str)
+    self.region = util.GetRegionFromZone(self.zone)
+
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
     """Modifies config options based on runtime flag values.
@@ -567,8 +572,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       ValueError: If an incompatible vm_spec is passed.
     """
     super().__init__(vm_spec)
-    assert isinstance(self.zone, str)
-    self.region = util.GetRegionFromZone(self.zone)
+    self.region = vm_spec.region
     self.user_name = FLAGS.aws_user_name or self.DEFAULT_USER_NAME
     if self.machine_type in aws_disk.NUM_LOCAL_VOLUMES:
       self.max_local_disks = aws_disk.NUM_LOCAL_VOLUMES[self.machine_type]

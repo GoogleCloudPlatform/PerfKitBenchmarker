@@ -39,7 +39,7 @@ class AwsClusterTest(pkb_common_test_case.PkbCommonTestCase):
     vm_config = {
         'cloud': 'AWS',
         'os_type': 'ubuntu2004',
-        'vm_spec': {'AWS': {}}
+        'vm_spec': {'AWS': {'zone': 'us-fake-1a'}}
     }
     FLAGS.run_uri = 'run12345'
     self.cluster_spec = TestAwsClusterSpec(
