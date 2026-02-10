@@ -540,3 +540,11 @@ CAPTURE_VM_LOGS = flags.DEFINE_bool(
     'Enables capture of VM logs. Currently limited to Linux syslogs, '
     'journalctl, and sos report.',
 )
+GENERATE_VM_CREATE_CMD_INFO_LOG = flags.DEFINE_boolean(
+    'generate_vm_create_cmd_info_log',
+    False,
+    'Whether to generate an info log for the VM create command. This will log '
+    'the full output to the PKB log, but will not save it anywhere else. Add '
+    'the --capture_vm_logs and --vm_log_bucket flags to save the log to a '
+    'bucket.',
+)

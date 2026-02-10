@@ -964,7 +964,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._ParseCreateErrors(self.create_cmd.rate_limited, stderr, retcode)
     if not self.create_return_time:
       self.create_return_time = time.time()
-    if gcp_flags.GCE_GENERATE_CREATE_CMD_INFO_LOG.value:
+    if pkb_flags.GENERATE_VM_CREATE_CMD_INFO_LOG.value:
       self.create_cmd_info_log, _, _ = vm_util.IssueCommand(
           [FLAGS.gcloud_path, 'info', '--show-log'], raise_on_failure=False
       )
@@ -1646,6 +1646,15 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
     with open(local_path, 'w') as f:
       f.write(stdout)
     return True
+
+  def GetCreateCmdInfoLogPath(self) -> str:
+    """Writes the create cmd info log to a temp file and returns the path."""
+    if not self.create_cmd_info_log:
+      return ''
+    path = vm_util.PrependTempDir('create_cmd_info_log')
+    with open(path, 'w') as f:
+      f.write(self.create_cmd_info_log)
+    return path
 
 
 class Debian11BasedGceVirtualMachine(
