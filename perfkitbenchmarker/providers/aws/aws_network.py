@@ -966,15 +966,15 @@ class AwsNetwork(network.BaseNetwork):
       )
 
   @staticmethod
-  def _GetNetworkSpecFromVmSpec(vm):
+  def _GetNetworkSpecFromVmSpec(vm_spec):
     """Returns an AwsNetworkSpec created from VM attributes and flags."""
     if _AWS_SUBNET.value == 'default':
-      vpc_id = _get_default_vpc_id(vm.region)
-      subnet_id = _get_default_subnet_id(vm.zone)
+      vpc_id = _get_default_vpc_id(vm_spec.GetRegion())
+      subnet_id = _get_default_subnet_id(vm_spec.zone)
     else:
       vpc_id = _AWS_VPC.value
       subnet_id = _AWS_SUBNET.value
-    return AwsNetworkSpec(vm.zone, vpc_id, subnet_id, vm.machine_type)
+    return AwsNetworkSpec(vm_spec.zone, vpc_id, subnet_id, vm_spec.machine_type)
 
   def Create(self):
     """Creates the network."""

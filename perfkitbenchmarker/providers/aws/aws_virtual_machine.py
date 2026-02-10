@@ -365,10 +365,9 @@ class AwsVmSpec(virtual_machine.BaseVmSpec):
 
   CLOUD = provider_info.AWS
 
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
+  def GetRegion(self) -> str:
     assert isinstance(self.zone, str)
-    self.region = util.GetRegionFromZone(self.zone)
+    return util.GetRegionFromZone(self.zone)
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -572,7 +571,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       ValueError: If an incompatible vm_spec is passed.
     """
     super().__init__(vm_spec)
-    self.region = vm_spec.region
+    self.region = vm_spec.GetRegion()
     self.user_name = FLAGS.aws_user_name or self.DEFAULT_USER_NAME
     if self.machine_type in aws_disk.NUM_LOCAL_VOLUMES:
       self.max_local_disks = aws_disk.NUM_LOCAL_VOLUMES[self.machine_type]
