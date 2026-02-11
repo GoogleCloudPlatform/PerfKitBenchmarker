@@ -31,6 +31,7 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
@@ -46,9 +47,9 @@ from perfkitbenchmarker.resources.container_service import kubernetes_commands
 FLAGS = flags.FLAGS
 # GPU types which practically require spot to get.
 _RARE_GPU_TYPES = [
-    virtual_machine.GPU_H100,
-    virtual_machine.GPU_A100,
-    virtual_machine.GPU_B200,
+    virtual_machine_spec.GPU_H100,
+    virtual_machine_spec.GPU_A100,
+    virtual_machine_spec.GPU_B200,
 ]
 
 
@@ -376,7 +377,7 @@ class EksCluster(BaseEksCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVmSpec,
+      vm_config: virtual_machine_spec.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
     nodepool_config.disk_type = (
@@ -551,7 +552,7 @@ class EksAutoCluster(BaseEksCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVmSpec,
+      vm_config: virtual_machine_spec.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
     pass
@@ -652,7 +653,7 @@ class EksKarpenterCluster(BaseEksCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVmSpec,
+      vm_config: virtual_machine_spec.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
     pass

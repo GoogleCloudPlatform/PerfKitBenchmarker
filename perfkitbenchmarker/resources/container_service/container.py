@@ -19,7 +19,7 @@ from typing import Any
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import resource
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
 
 
@@ -136,9 +136,7 @@ class BaseNodePoolConfig:
   See also: https://cloud.google.com/kubernetes-engine/docs/concepts/node-pools
   """
 
-  def __init__(
-      self, vm_spec: virtual_machine.BaseVmSpec, name: str
-  ):
+  def __init__(self, vm_spec: virtual_machine_spec.BaseVmSpec, name: str):
     self.machine_type = vm_spec.machine_type
     self.zone: str = vm_spec.zone
     self.name = NodePoolName(name)

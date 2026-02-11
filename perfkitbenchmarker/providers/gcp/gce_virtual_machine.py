@@ -50,6 +50,7 @@ from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
@@ -121,34 +122,34 @@ GPU_TYPE_TO_SUFFIX = {
 _FIXED_GPU_MACHINE_TYPES = {
     # A100 GPUs
     # https://cloud.google.com/blog/products/compute/announcing-google-cloud-a2-vm-family-based-on-nvidia-a100-gpu
-    'a2-highgpu-1g': (virtual_machine.GPU_A100, 1),
-    'a2-highgpu-2g': (virtual_machine.GPU_A100, 2),
-    'a2-highgpu-4g': (virtual_machine.GPU_A100, 4),
-    'a2-highgpu-8g': (virtual_machine.GPU_A100, 8),
-    'a2-megagpu-16g': (virtual_machine.GPU_A100, 16),
-    'a2-ultragpu-1g': (virtual_machine.GPU_A100, 1),
-    'a2-ultragpu-2g': (virtual_machine.GPU_A100, 2),
-    'a2-ultragpu-4g': (virtual_machine.GPU_A100, 4),
-    'a2-ultragpu-8g': (virtual_machine.GPU_A100, 8),
+    'a2-highgpu-1g': (virtual_machine_spec.GPU_A100, 1),
+    'a2-highgpu-2g': (virtual_machine_spec.GPU_A100, 2),
+    'a2-highgpu-4g': (virtual_machine_spec.GPU_A100, 4),
+    'a2-highgpu-8g': (virtual_machine_spec.GPU_A100, 8),
+    'a2-megagpu-16g': (virtual_machine_spec.GPU_A100, 16),
+    'a2-ultragpu-1g': (virtual_machine_spec.GPU_A100, 1),
+    'a2-ultragpu-2g': (virtual_machine_spec.GPU_A100, 2),
+    'a2-ultragpu-4g': (virtual_machine_spec.GPU_A100, 4),
+    'a2-ultragpu-8g': (virtual_machine_spec.GPU_A100, 8),
     # H100 GPUs
-    'a3-highgpu-1g': (virtual_machine.GPU_H100, 1),
-    'a3-highgpu-2g': (virtual_machine.GPU_H100, 2),
-    'a3-highgpu-4g': (virtual_machine.GPU_H100, 4),
-    'a3-highgpu-8g': (virtual_machine.GPU_H100, 8),
-    'a3-megagpu-8g': (virtual_machine.GPU_H100, 8),
+    'a3-highgpu-1g': (virtual_machine_spec.GPU_H100, 1),
+    'a3-highgpu-2g': (virtual_machine_spec.GPU_H100, 2),
+    'a3-highgpu-4g': (virtual_machine_spec.GPU_H100, 4),
+    'a3-highgpu-8g': (virtual_machine_spec.GPU_H100, 8),
+    'a3-megagpu-8g': (virtual_machine_spec.GPU_H100, 8),
     # B200 GPUs
     # https://cloud.google.com/compute/docs/gpus#b200-gpus
-    'a4-highgpu-8g': (virtual_machine.GPU_B200, 8),
+    'a4-highgpu-8g': (virtual_machine_spec.GPU_B200, 8),
     # L4 GPUs
     # https://cloud.google.com/compute/docs/accelerator-optimized-machines#g2-vms
-    'g2-standard-4': (virtual_machine.GPU_L4, 1),
-    'g2-standard-8': (virtual_machine.GPU_L4, 1),
-    'g2-standard-12': (virtual_machine.GPU_L4, 1),
-    'g2-standard-16': (virtual_machine.GPU_L4, 1),
-    'g2-standard-24': (virtual_machine.GPU_L4, 2),
-    'g2-standard-32': (virtual_machine.GPU_L4, 1),
-    'g2-standard-48': (virtual_machine.GPU_L4, 4),
-    'g2-standard-96': (virtual_machine.GPU_L4, 8),
+    'g2-standard-4': (virtual_machine_spec.GPU_L4, 1),
+    'g2-standard-8': (virtual_machine_spec.GPU_L4, 1),
+    'g2-standard-12': (virtual_machine_spec.GPU_L4, 1),
+    'g2-standard-16': (virtual_machine_spec.GPU_L4, 1),
+    'g2-standard-24': (virtual_machine_spec.GPU_L4, 2),
+    'g2-standard-32': (virtual_machine_spec.GPU_L4, 1),
+    'g2-standard-48': (virtual_machine_spec.GPU_L4, 4),
+    'g2-standard-96': (virtual_machine_spec.GPU_L4, 8),
 }
 
 PKB_SKIPPED_TEARDOWN_METADATA_KEY = 'pkb_skipped_teardown'
@@ -166,7 +167,7 @@ class GceServiceUnavailableError(Exception):
   """Error for retrying _Exists when the describe output indicates that 'The service is currently unavailable'."""
 
 
-class GceVmSpec(virtual_machine.BaseVmSpec):
+class GceVmSpec(virtual_machine_spec.BaseVmSpec):
   """Object containing the information needed to create a GceVirtualMachine.
 
   Attributes:
@@ -511,7 +512,7 @@ def GetGceAcceleratorType(accelerator_type: str) -> str:
   gce_accelerator_type = FLAGS.gce_accelerator_type_override or (
       (
           _GCE_NVIDIA_TESLA_GPU_PREFIX
-          if accelerator_type in virtual_machine.TESLA_GPU_TYPES
+          if accelerator_type in virtual_machine_spec.TESLA_GPU_TYPES
           else _GCE_NVIDIA_GPU_PREFIX
       )
       + accelerator_type
@@ -581,7 +582,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Initialize a GCE virtual machine.
 
     Args:
-      vm_spec: virtual_machine.BaseVmSpec object of the vm.
+      vm_spec: virtual_machine_spec.BaseVmSpec object of the vm.
 
     Raises:
       errors.Config.MissingOption: If the spec does not include a "machine_type"

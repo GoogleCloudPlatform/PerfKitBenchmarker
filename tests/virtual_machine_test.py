@@ -17,7 +17,7 @@ import unittest
 from absl import flags
 import mock
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 from tests import pkb_common_test_case
 
@@ -25,7 +25,7 @@ FLAGS = flags.FLAGS
 _COMPONENT = 'test_component'
 
 
-class TestVmSpec(virtual_machine.BaseVmSpec):
+class TestVmSpec(virtual_machine_spec.BaseVmSpec):
   CLOUD = 'test_cloud'
 
   @classmethod
@@ -39,14 +39,14 @@ class TestVmSpec(virtual_machine.BaseVmSpec):
 class BaseVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testDefaults(self):
-    spec = virtual_machine.BaseVmSpec(_COMPONENT)
+    spec = virtual_machine_spec.BaseVmSpec(_COMPONENT)
     self.assertEqual(spec.image, None)
     self.assertEqual(spec.install_packages, True)
     self.assertEqual(spec.machine_type, None)
     self.assertEqual(spec.zone, None)
 
   def testProvidedValid(self):
-    spec = virtual_machine.BaseVmSpec(
+    spec = virtual_machine_spec.BaseVmSpec(
         _COMPONENT,
         image='test_image',
         install_packages=False,
@@ -60,7 +60,7 @@ class BaseVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testUnrecognizedOptions(self):
     with self.assertRaises(errors.Config.UnrecognizedOption) as cm:
-      virtual_machine.BaseVmSpec(
+      virtual_machine_spec.BaseVmSpec(
           _COMPONENT, color='red', flavor='cherry', texture=None
       )
     self.assertEqual(
@@ -84,24 +84,24 @@ class BaseVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testInvalidImage(self):
     with self.assertRaises(errors.Config.InvalidValue):
-      virtual_machine.BaseVmSpec(_COMPONENT, image=0)
+      virtual_machine_spec.BaseVmSpec(_COMPONENT, image=0)
 
   def testInvalidInstallPackages(self):
     with self.assertRaises(errors.Config.InvalidValue):
-      virtual_machine.BaseVmSpec(_COMPONENT, install_packages='yes')
+      virtual_machine_spec.BaseVmSpec(_COMPONENT, install_packages='yes')
 
   def testInvalidMachineType(self):
     with self.assertRaises(errors.Config.InvalidValue):
-      virtual_machine.BaseVmSpec(_COMPONENT, machine_type=True)
+      virtual_machine_spec.BaseVmSpec(_COMPONENT, machine_type=True)
 
   def testInvalidZone(self):
     with self.assertRaises(errors.Config.InvalidValue):
-      virtual_machine.BaseVmSpec(_COMPONENT, zone=0)
+      virtual_machine_spec.BaseVmSpec(_COMPONENT, zone=0)
 
   def testGpus(self):
     gpu_count = 2
     gpu_type = 'k80'
-    result = virtual_machine.BaseVmSpec(
+    result = virtual_machine_spec.BaseVmSpec(
         _COMPONENT, gpu_count=gpu_count, gpu_type=gpu_type
     )
     self.assertEqual(result.gpu_type, 'k80')
@@ -109,14 +109,18 @@ class BaseVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testMissingGpuCount(self):
     with self.assertRaises(errors.Config.MissingOption) as cm:
-      virtual_machine.BaseVmSpec(_COMPONENT, flag_values=FLAGS, gpu_type='k80')
+      virtual_machine_spec.BaseVmSpec(
+          _COMPONENT, flag_values=FLAGS, gpu_type='k80'
+      )
     self.assertEqual(
         str(cm.exception), 'gpu_count must be specified if gpu_type is set'
     )
 
   def testMissingGpuType(self):
     with self.assertRaises(errors.Config.MissingOption) as cm:
-      virtual_machine.BaseVmSpec(_COMPONENT, flag_values=FLAGS, gpu_count=1)
+      virtual_machine_spec.BaseVmSpec(
+          _COMPONENT, flag_values=FLAGS, gpu_count=1
+      )
 
     self.assertEqual(
         str(cm.exception), 'gpu_type must be specified if gpu_count is set'
@@ -124,7 +128,7 @@ class BaseVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testInvalidGpuType(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
-      virtual_machine.BaseVmSpec(
+      virtual_machine_spec.BaseVmSpec(
           _COMPONENT, flag_values=FLAGS, gpu_count=1, gpu_type='bad_type'
       )
 
@@ -141,7 +145,7 @@ class BaseVmSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testInvalidGpuCount(self):
     with self.assertRaises(errors.Config.InvalidValue) as cm:
-      virtual_machine.BaseVmSpec(
+      virtual_machine_spec.BaseVmSpec(
           _COMPONENT, flag_values=FLAGS, gpu_count=0, gpu_type='k80'
       )
 

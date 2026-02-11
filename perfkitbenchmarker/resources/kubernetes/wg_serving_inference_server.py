@@ -26,7 +26,7 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources import kubernetes_inference_server
 from perfkitbenchmarker.resources.container_service import kubectl
@@ -610,7 +610,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     components = self.spec.catalog_components.split(',')
     for component in components:
       lowered = component.lower()
-      for gpu in virtual_machine.VALID_GPU_TYPES:
+      for gpu in virtual_machine_spec.VALID_GPU_TYPES:
         if gpu in lowered:
           return component
     return 'unknown'

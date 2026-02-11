@@ -26,7 +26,7 @@ from absl import flags
 import mock
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_aurora_db  # pylint: disable=unused-import
 from perfkitbenchmarker.providers.aws import aws_disk
@@ -110,7 +110,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         _COMPONENT, disk_size=5, disk_type=aws_disk.IO1, provisioned_iops=1000
     )
 
-    default_server_db_spec = virtual_machine.BaseVmSpec(
+    default_server_db_spec = virtual_machine_spec.BaseVmSpec(
         'NAME', **{'machine_type': 'db.t1.micro', 'zone': 'us-west-2b'}
     )
     spec_dict = {
@@ -199,7 +199,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertNotIn('servers', vms)
 
   def CreateAuroraMockSpec(self, additional_spec_items=None):
-    default_server_db_spec = virtual_machine.BaseVmSpec(
+    default_server_db_spec = virtual_machine_spec.BaseVmSpec(
         'NAME', **{'machine_type': 'db.t1.micro', 'zone': 'us-west-2b'}
     )
 

@@ -28,7 +28,7 @@ import mock
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import gcp_relational_db
@@ -110,7 +110,7 @@ def VmGroupSpec():
 class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def createMySQLSpecDict(self):
-    db_spec = virtual_machine.BaseVmSpec(
+    db_spec = virtual_machine_spec.BaseVmSpec(
         'NAME',
         **{
             'machine_type': 'db-n1-standard-1',

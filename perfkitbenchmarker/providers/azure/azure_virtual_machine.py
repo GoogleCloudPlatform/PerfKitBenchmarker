@@ -44,6 +44,7 @@ from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
@@ -213,7 +214,7 @@ EARLY_NVME_MACHINE_FAMILIES = [
 _SKU_NOT_AVAILABLE = 'SkuNotAvailable'
 
 
-class AzureVmSpec(virtual_machine.BaseVmSpec):
+class AzureVmSpec(virtual_machine_spec.BaseVmSpec):
   """Object containing the information needed to create a AzureVirtualMachine.
 
   Attributes:
@@ -734,7 +735,7 @@ class AzureVirtualMachine(
     """Initialize an Azure virtual machine.
 
     Args:
-      vm_spec: virtual_machine.BaseVmSpec object of the vm.
+      vm_spec: virtual_machine_spec.BaseVmSpec object of the vm.
     """
     super().__init__(vm_spec)
 

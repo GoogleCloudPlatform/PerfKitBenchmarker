@@ -21,6 +21,7 @@ from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
@@ -128,7 +129,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVmSpec,
+      vm_config: virtual_machine_spec.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
     nodepool_config.disk_type = vm_config.boot_disk_type

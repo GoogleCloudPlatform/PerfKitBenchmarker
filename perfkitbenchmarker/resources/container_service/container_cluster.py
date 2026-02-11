@@ -7,7 +7,7 @@ from typing import Callable, Iterable
 from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
 from perfkitbenchmarker.resources.container_service import container
 from perfkitbenchmarker.resources.container_service import container_registry
@@ -71,7 +71,7 @@ class BaseContainerCluster(resource.BaseResource):
   def _InitializeDefaultNodePool(
       self,
       cluster_spec: container_spec_lib.ContainerClusterSpec,
-      vm_config: virtual_machine.BaseVmSpec,
+      vm_config: virtual_machine_spec.BaseVmSpec,
   ) -> container.BaseNodePoolConfig:
     nodepool_config = container.BaseNodePoolConfig(
         vm_config,
@@ -85,7 +85,7 @@ class BaseContainerCluster(resource.BaseResource):
       self,
       name: str,
       nodepool_spec: container_spec_lib.NodepoolSpec,
-      vm_config: virtual_machine.BaseVmSpec,
+      vm_config: virtual_machine_spec.BaseVmSpec,
   ) -> container.BaseNodePoolConfig:
     zone = (
         nodepool_spec.vm_spec.zone
@@ -104,7 +104,7 @@ class BaseContainerCluster(resource.BaseResource):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVmSpec,
+      vm_config: virtual_machine_spec.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
     """Override to initialize cloud specific configs."""

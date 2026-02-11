@@ -23,7 +23,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import sql_engine_utils
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import freeze_restore_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -59,7 +59,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
       opposed to unmanaged (installed on infrastructure).
     db_tier: Specifies what tier the database is in.
     db_disk_spec: disk.BaseDiskSpec: Configurable disk options.
-    db_spec: virtual_machine.BaseVmSpec: Configurable VM options.
+    db_spec: virtual_machine_spec.BaseVmSpec: Configurable VM options.
   """
 
   SPEC_TYPE = 'RelationalDbSpec'
@@ -74,7 +74,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
   is_managed_db: bool
   db_tier: str
   db_disk_spec: disk.BaseDiskSpec
-  db_spec: virtual_machine.BaseVmSpec
+  db_spec: virtual_machine_spec.BaseVmSpec
   load_machine_type: str
   family: str
 
@@ -113,7 +113,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
             '{0}.cloud is "{1}", but {0}.db_spec does not contain a '
             'configuration for "{1}".'.format(component_full_name, self.cloud)
         )
-      db_vm_spec_class = virtual_machine.GetVmSpecClass(self.cloud)
+      db_vm_spec_class = virtual_machine_spec.GetVmSpecClass(self.cloud)
       self.db_spec = db_vm_spec_class(
           '{}.db_spec.{}'.format(component_full_name, self.cloud),
           flag_values=flag_values,

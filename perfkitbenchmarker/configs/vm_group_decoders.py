@@ -19,7 +19,7 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import static_vm_decoders
@@ -54,7 +54,7 @@ class VmGroupSpec(spec.BaseSpec):
   os_type: str
   static_vms: list[static_virtual_machine.StaticVmSpec]
   vm_count: int
-  vm_spec: virtual_machine.BaseVmSpec
+  vm_spec: virtual_machine_spec.BaseVmSpec
   vm_as_nfs: bool
   vm_as_nfs_disk_spec: disk.BaseNFSDiskSpec | None
   placement_group_name: str
@@ -109,7 +109,7 @@ class VmGroupSpec(spec.BaseSpec):
           '{0}.cloud is "{1}", but {0}.vm_spec does not contain a '
           'configuration for "{1}".'.format(component_full_name, self.cloud)
       )
-    vm_spec_class = virtual_machine.GetVmSpecClass(cloud=self.cloud)
+    vm_spec_class = virtual_machine_spec.GetVmSpecClass(cloud=self.cloud)
     self.vm_spec = vm_spec_class(
         '{}.vm_spec.{}'.format(component_full_name, self.cloud),
         flag_values=flag_values,

@@ -37,6 +37,7 @@ from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
@@ -356,7 +357,7 @@ class AwsDedicatedHost(resource.BaseResource):
     return state in HOST_EXISTS_STATES
 
 
-class AwsVmSpec(virtual_machine.BaseVmSpec):
+class AwsVmSpec(virtual_machine_spec.BaseVmSpec):
   """Object containing the information needed to create an AwsVirtualMachine.
 
   Attributes:

@@ -28,6 +28,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.providers.ibmcloud import ibm_api as ibm
@@ -53,7 +54,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
   validated_resources_set = set()
   validated_subnets = 0
 
-  def __init__(self, vm_spec: virtual_machine.BaseVmSpec):
+  def __init__(self, vm_spec: virtual_machine_spec.BaseVmSpec):
     """Initialize a IBM Cloud virtual machine.
 
     Args:

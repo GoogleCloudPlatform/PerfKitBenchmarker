@@ -87,7 +87,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     super().__init__(vm_spec)
     self.name: str = self.name.replace('_', '-')
     self.user_name: str = FLAGS.username
-    self.image: str = self.image or self.DEFAULT_IMAGE
+    self.image: str | None = self.image or self.DEFAULT_IMAGE
     self.host_network: bool = vm_spec.host_network
     self.resource_limits: Optional[
         kubernetes_resources_spec.KubernetesResourcesSpec

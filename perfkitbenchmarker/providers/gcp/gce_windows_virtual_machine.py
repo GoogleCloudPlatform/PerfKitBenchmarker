@@ -86,7 +86,7 @@ class WindowsGceVirtualMachine(
     """Initialize a Windows GCE virtual machine.
 
     Args:
-      vm_spec: virtual_machine.BaseVmSpec object of the vm.
+      vm_spec: virtual_machine_spec.BaseVmSpec object of the vm.
     """
     super().__init__(vm_spec)
     self.boot_metadata['windows-startup-script-ps1'] = (

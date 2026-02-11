@@ -1305,7 +1305,7 @@ class BenchmarkSpec:
     """Create a vm in zone.
 
     Args:
-      vm_spec: A virtual_machine.BaseVmSpec object.
+      vm_spec: A virtual_machine_spec.BaseVmSpec object.
       os_type: The type of operating system for the VM. See the flag of the same
         name for more information.
       cloud: The cloud for the VM. See the flag of the same name for more
