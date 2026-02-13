@@ -1,0 +1,19 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: force-host-network-postgres
+spec:
+  rules:
+  - name: add-host-network
+    match:
+      resources:
+        kinds:
+        - Pod
+        selector:
+            matchLabels:
+                cnpg.io/cluster: gke-pg-cluster
+    mutate:
+      patchStrategicMerge:
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet

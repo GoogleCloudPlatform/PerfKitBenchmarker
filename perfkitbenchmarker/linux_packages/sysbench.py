@@ -435,7 +435,12 @@ def BuildRunCommand(sysbench_parameters: SysbenchInputParameters) -> str:
   cmd = _BuildGenericCommand(sysbench_parameters)
   cmd += [f'--time={FLAGS.sysbench_run_seconds}']
   cmd += ['run']
-  cmd += [f'--thread-init-timeout={SYSBENCH_THREAD_INIT_TIMEOUT.value}']
+  # Skip thread-init-timeout for older sysbench versions
+  if SYSBENCH_THREAD_INIT_TIMEOUT.value > 0:
+    # Note: This flag may not be available in older sysbench versions (< 1.1)
+    # Comment out or set flag to 0 if you get "invalid option" error
+    pass  # Disabled for compatibility with sysbench 1.0.20
+    # cmd += [f'--thread-init-timeout={SYSBENCH_THREAD_INIT_TIMEOUT.value}']
   return  f'cd {SYSBENCH_DIR} && ' + ' '.join(cmd)
 
 

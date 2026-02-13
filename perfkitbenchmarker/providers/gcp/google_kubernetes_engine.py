@@ -260,6 +260,9 @@ class GkeCluster(BaseGkeCluster):
 
   def __init__(self, spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(spec)
+    # Initialize event_poller to None to avoid AttributeError
+    if not hasattr(self, 'event_poller'):
+      self.event_poller = None
     # Update the environment for gcloud commands:
     if gcp_flags.GKE_API_OVERRIDE.value:
       os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER'] = (
@@ -468,7 +471,11 @@ class GkeCluster(BaseGkeCluster):
     ):
       cmd.args.append('--enable-fast-socket')
 
-    if FLAGS.gke_node_system_config is not None:
+    if (
+        FLAGS.gke_node_system_config is not None
+        and nodepool_config.name != container_service.DEFAULT_NODEPOOL
+        and nodepool_config.name != 'clients'
+    ):
       cmd.flags['system-config-from-file'] = FLAGS.gke_node_system_config
 
     if nodepool_config.sandbox_config is not None:
