@@ -109,16 +109,16 @@
     `--boot-disk-size` flag.
 -   Updated the minimum recommended Python version to 3.12.
 -   PKB runs over user-managed Dataproc non-GKE clusters with
-    --dpb_service_bucket unset won't upload PKB files (like queries and
-    scripts) to the cluster's staging bucket.
+    --dpb_service_bucket unset won't upload PKB files (like queries and scripts)
+    to the cluster's staging bucket.
 -   PKB-managed Dataproc GKE clusters' staging bucket won't be set to
     --dpb_service_bucket anymore.
--   --dpb_service_bucket has been replaced with --dpb_storage_uri. This flag
-      now allows specifying a more general object storage URI (e.g., a folder
-      within a bucket) where DPB service files (scripts, queries) will be
-      staged. When --dpb_storage_uri is provided, files are staged in a
-      subfolder named after the PKB run_uri within the given URI. If not
-      provided, a new bucket is still created and managed by PKB.
+-   --dpb_service_bucket has been replaced with --dpb_storage_uri. This flag now
+    allows specifying a more general object storage URI (e.g., a folder within a
+    bucket) where DPB service files (scripts, queries) will be staged. When
+    --dpb_storage_uri is provided, files are staged in a subfolder named after
+    the PKB run_uri within the given URI. If not provided, a new bucket is still
+    created and managed by PKB.
 
 ### New features:
 
@@ -268,6 +268,8 @@
 -   Add support for the `--addons` flag in GKE Standard.
 -   Add support for RHEL and Rocky Linux 10.
 -   Add support for Debian 13.
+-   Add `--dpb_spark_event_logs` flag to export Spark event logs in dpb service
+    benchmarks.
 
 ### Enhancements:
 

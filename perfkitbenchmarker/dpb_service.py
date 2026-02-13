@@ -27,7 +27,8 @@ import logging
 import os
 import shutil
 import tempfile
-from typing import Dict, List, Type, TypeAlias
+from typing import Any, Dict, List, Type, TypeAlias
+from urllib import parse
 
 from absl import flags
 import jinja2
@@ -157,6 +158,13 @@ DPB_EXTRA_JARS = flags.DEFINE_list(
     [],
     'Pass additional object storage paths to jars to be loaded when submitting'
     ' a job. Only supported on Dataproc as of now.',
+)
+SPARK_EVENT_LOG_DIR = flags.DEFINE_string(
+    'dpb_spark_event_logs',
+    None,
+    'Path where Spark event logs will be exported to if set. Can be either a'
+    " full Hadoop URI or a relative path to cluster's base_dir (which can be"
+    ' set with --dpb_storage_uri).',
 )
 
 FLAGS = flags.FLAGS
@@ -559,6 +567,10 @@ class BaseDpbService(resource.BaseResource):
     }
     if FLAGS.dpb_storage_uri:  # Else this is a tmp location not worth exporting
       self.metadata['dpb_base_dir'] = self.base_dir
+    if SPARK_EVENT_LOG_DIR.value:
+      self.metadata['dpb_spark_event_log_dir'] = parse.urljoin(
+          self.base_dir, SPARK_EVENT_LOG_DIR.value
+      )
 
   def _CreateDependencies(self):
     """Creates a bucket to use with the cluster."""
@@ -625,7 +637,14 @@ class BaseDpbService(resource.BaseResource):
 
   def GetJobProperties(self) -> Dict[str, str]:
     """Parse the dpb_job_properties_flag."""
-    return dict(pair.split('=') for pair in FLAGS.dpb_job_properties)
+    job_props = {}
+    if SPARK_EVENT_LOG_DIR.value:
+      job_props['spark.eventLog.enabled'] = 'true'
+      job_props['spark.eventLog.dir'] = parse.urljoin(
+          self.base_dir, SPARK_EVENT_LOG_DIR.value
+      )
+    job_props.update(dict(pair.split('=') for pair in FLAGS.dpb_job_properties))
+    return job_props
 
   def GetExecutionJar(self, job_category: str, job_type: str) -> str:
     """Retrieve execution jar corresponding to the job_category and job_type.
@@ -775,6 +794,8 @@ class BaseDpbService(resource.BaseResource):
 class DpbServiceServerlessMixin:
   """Mixin with default methods dpb services without managed infrastructure."""
 
+  metadata: dict[str, Any]
+
   def _Create(self) -> None:
     pass
 
@@ -795,6 +816,17 @@ class DpbServiceServerlessMixin:
 
   def GetClusterPremiumCost(self) -> float | None:
     return None
+
+  def _GetRunStorageLocationMetadata(self) -> dict[str, Any]:
+    """Gets storage location-related metadata for further debugging the run."""
+    metadata = {}
+    if self.metadata.get('dpb_base_dir'):
+      metadata['dpb_base_dir'] = self.metadata['dpb_base_dir']
+    if self.metadata.get('dpb_spark_event_log_dir'):
+      metadata['dpb_spark_event_log_dir'] = self.metadata[
+          'dpb_spark_event_log_dir'
+      ]
+    return metadata
 
 
 class UnmanagedDpbService(BaseDpbService):

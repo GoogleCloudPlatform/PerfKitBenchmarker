@@ -800,7 +800,7 @@ class GcpDpbDataprocServerless(
         'dpb_service_zone': basic_data['dpb_service_zone'],
         'dpb_job_properties': basic_data['dpb_job_properties'],
         'dpb_runtime_engine': self.spec.dataproc_serverless_runtime_engine,
-    }
+    } | self._GetRunStorageLocationMetadata()
 
     if (
         self.spec.dataproc_serverless_engine
@@ -810,9 +810,6 @@ class GcpDpbDataprocServerless(
       self.metadata['dataproc_lightning_engine_runtime'] = (
           self.spec.dataproc_serverless_lightning_engine_runtime
       )
-
-    if basic_data.get('dpb_base_dir'):
-      self.metadata['dpb_base_dir'] = basic_data['dpb_base_dir']
 
   def CalculateLastJobCosts(self) -> dpb_service.JobCosts:
     fetch_batch_cmd = self.DataprocGcloudCommand(
