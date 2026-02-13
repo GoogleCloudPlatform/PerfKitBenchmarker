@@ -196,7 +196,6 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     )
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(self.region)
-    self.persistent_fs_prefix = 's3://'
     self.bucket_to_delete = None
     self._cluster_create_time: float | None = None
     self._cluster_ready_time: float | None = None
@@ -205,6 +204,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       raise errors.Setup.InvalidSetupError(
           'dpb_service.version must be provided.'
       )
+
+  @property
+  def persistent_fs_prefix(self) -> str | None:
+    return 's3://'
 
   def GetDpbVersion(self) -> str | None:
     return FLAGS.dpb_emr_release_label or super().GetDpbVersion()
@@ -612,7 +615,6 @@ class AwsDpbEmrServerless(
     self.cmd_prefix += ['--region', self.region]
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(self.region)
-    self.persistent_fs_prefix = 's3://'
     self._cluster_create_time = None
     if not self.GetDpbVersion():
       raise errors.Setup.InvalidSetupError(
@@ -626,6 +628,10 @@ class AwsDpbEmrServerless(
     # Last job usage info
     self._job_run = _AwsDpbEmrServerlessJobRun()
     self._FillMetadata()
+
+  @property
+  def persistent_fs_prefix(self) -> str | None:
+    return 's3://'
 
   def SubmitJob(
       self,

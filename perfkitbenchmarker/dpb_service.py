@@ -373,8 +373,14 @@ class BaseDpbService(resource.BaseResource):
     return None
 
   @property
+  @abc.abstractmethod
+  def persistent_fs_prefix(self) -> str | None:
+    """The prefix for the persistent filesystem."""
+    raise NotImplementedError()
+
+  @property
   def base_dir(self):
-    return self.persistent_fs_prefix + self.bucket  # pytype: disable=attribute-error  # bind-properties
+    return self.persistent_fs_prefix + self.bucket
 
   @abc.abstractmethod
   def SubmitJob(
@@ -806,15 +812,12 @@ class UnmanagedDpbService(BaseDpbService):
     if self.cloud == 'GCP':
       self.region = gcp_util.GetRegionFromZone(FLAGS.dpb_service_zone)
       self.storage_service = gcs.GoogleCloudStorageService()
-      self.persistent_fs_prefix = 'gs://'
     elif self.cloud == 'AWS':
       self.region = aws_util.GetRegionFromZone(FLAGS.dpb_service_zone)
       self.storage_service = s3.S3Service()
-      self.persistent_fs_prefix = 's3://'
     else:
       self.region = None
       self.storage_service = None
-      self.persistent_fs_prefix = None
       self.manage_bucket = False
       logging.warning(
           'Cloud provider %s does not support object storage. '
@@ -827,6 +830,14 @@ class UnmanagedDpbService(BaseDpbService):
 
     # set in _Create of derived classes
     self.leader = None
+
+  @property
+  def persistent_fs_prefix(self) -> str | None:
+    if self.cloud == 'GCP':
+      return 'gs://'
+    if self.cloud == 'AWS':
+      return 's3://'
+    return None
 
   def CheckPrerequisites(self):
     if self.cloud == 'AWS' and not aws_flags.AWS_EC2_INSTANCE_PROFILE.value:
@@ -1107,11 +1118,9 @@ class KubernetesSparkCluster(BaseDpbService):
     if self.cloud == 'GCP':
       self.region = gcp_util.GetRegionFromZone(self.k8s_cluster.zone)
       self.storage_service = gcs.GoogleCloudStorageService()
-      self.persistent_fs_prefix = 'gs://'
     elif self.cloud == 'AWS':
       self.region = self.k8s_cluster.region
       self.storage_service = s3.S3Service()
-      self.persistent_fs_prefix = 's3://'
     else:
       raise errors.Config.InvalidValue(
           f'Unsupported Cloud provider {self.cloud}'
@@ -1127,6 +1136,14 @@ class KubernetesSparkCluster(BaseDpbService):
           f'Cluster type {dpb_constants.KUBERNETES_SPARK_CLUSTER} requires at'
           f' least 2 nodes.Found {self.k8s_cluster.num_nodes}.'
       )
+
+  @property
+  def persistent_fs_prefix(self) -> str | None:
+    if self.cloud == 'GCP':
+      return 'gs://'
+    if self.cloud == 'AWS':
+      return 's3://'
+    return None
 
   def GetDpbVersion(self) -> str | None:
     return 'spark_' + FLAGS.spark_version
@@ -1295,7 +1312,6 @@ class KubernetesFlinkCluster(BaseDpbService):
     if self.cloud == 'GCP':
       self.region = gcp_util.GetRegionFromZone(self.k8s_cluster.zone)
       self.storage_service = gcs.GoogleCloudStorageService()
-      self.persistent_fs_prefix = 'gs://'
     else:
       raise errors.Config.InvalidValue(
           f'Unsupported Cloud provider {self.cloud}'
@@ -1308,6 +1324,12 @@ class KubernetesFlinkCluster(BaseDpbService):
           f'Cluster type {dpb_constants.KUBERNETES_FLINK_CLUSTER} requires at'
           f' least 2 nodes.Found {self.k8s_cluster.num_nodes}.'
       )
+
+  @property
+  def persistent_fs_prefix(self) -> str | None:
+    if self.cloud == 'GCP':
+      return 'gs://'
+    return None
 
   def GetDpbVersion(self) -> str | None:
     return self.spec.version or self.DEFAULT_FLINK_IMAGE

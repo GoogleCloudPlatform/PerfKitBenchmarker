@@ -88,10 +88,13 @@ class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
     self.region = self.dpb_service_zone.rsplit('-', 1)[0]
     self.storage_service = gcs.GoogleCloudStorageService()
     self.storage_service.PrepareService(location=self.region)
-    self.persistent_fs_prefix = 'gs://'
     self._cluster_create_time: float | None = None
     self._cluster_ready_time: float | None = None
     self._cluster_delete_time: float | None = None
+
+  @property
+  def persistent_fs_prefix(self) -> str | None:
+    return 'gs://'
 
   def GetDpbVersion(self) -> str | None:
     return FLAGS.dpb_dataproc_image_version or super().GetDpbVersion()

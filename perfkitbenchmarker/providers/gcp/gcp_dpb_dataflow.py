@@ -143,8 +143,11 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     self.region = util.GetRegionFromZone(self.dpb_service_zone)
     self.storage_service = gcs.GoogleCloudStorageService()
     self.storage_service.PrepareService(location=self.region)
-    self.persistent_fs_prefix = 'gs://'
     self._FillMetadata()
+
+  @property
+  def persistent_fs_prefix(self) -> str | None:
+    return 'gs://'
 
   def _GetTempLocation(self) -> str:
     if FLAGS.dpb_dataflow_temp_location is None:
