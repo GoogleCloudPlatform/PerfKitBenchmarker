@@ -14,6 +14,7 @@
 
 """Module containing Benchbase installation and cleanup functions."""
 
+import io
 import json
 import logging
 import os
@@ -21,6 +22,7 @@ from typing import Any
 
 from absl import flags
 import jinja2
+import pandas as pd
 from perfkitbenchmarker import data as pkb_data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
@@ -211,23 +213,10 @@ def CreateConfigFile(vm: virtual_machine.BaseVirtualMachine) -> None:
     return
 
 
-def ParseResults(
+def _ParseSummaryMetrics(
     vm: virtual_machine.BaseVirtualMachine, metadata: dict[str, Any]
 ) -> list[sample.Sample]:
-  """Parses the latest benchbase result file and returns metrics.
-
-  Args:
-    vm: The virtual machine to parse results from.
-    metadata: The metadata to attach to the samples.
-
-  Returns:
-    A list of sample.Sample objects.
-
-  Raises:
-    errors.Benchmarks.RunError: If the result file is not found or cannot be
-      parsed.
-  """
-  metadata['benchbase_use_foreign_key'] = _BENCHBASE_USE_FOREIGN_KEY.value
+  """Parses Benchbase summary JSON file for throughput and latency metrics."""
   stdout, _ = vm.RemoteCommand(
       f'ls -t {BENCHBASE_DIR}/results/tpcc*summary.json | head -n 1'
   )
@@ -269,6 +258,95 @@ def ParseResults(
     raise errors.Benchmarks.RunError(
         'Throughput (requests/second) not found in benchbase result file.'
     )
+  return samples
+
+
+def _ParsePerTransactionTypeMetrics(
+    vm: virtual_machine.BaseVirtualMachine, metadata: dict[str, Any]
+) -> list[sample.Sample]:
+  """Parses Benchbase raw CSV file for detailed latency metrics."""
+  stdout, _ = vm.RemoteCommand(
+      f'ls -t {BENCHBASE_DIR}/results/*.raw.csv | head -n 1'
+  )
+  csv_file: str = stdout.strip()
+  if not csv_file:
+    raise errors.Benchmarks.RunError('No raw result file found.')
+  stdout, _ = vm.RemoteCommand(f'cat {csv_file}')
+  df: pd.DataFrame = pd.read_csv(io.StringIO(stdout))
+
+  latency_col = 'Latency (microseconds)'
+  txn_name_col = 'Transaction Name'
+
+  if latency_col not in df.columns or txn_name_col not in df.columns:
+    raise errors.Benchmarks.RunError(
+        'Raw result file does not contain expected columns.'
+    )
+
+  df[latency_col] /= 1000.0  # convert to milliseconds
+  samples: list[sample.Sample] = []
+  for txn_name, group in df.groupby(txn_name_col):
+    latency_breakdown_metadata = metadata.copy()
+    latency_breakdown_metadata['txn_type'] = txn_name
+
+    samples.append(
+        sample.Sample(
+            'average_latency',
+            group[latency_col].mean(),
+            'ms',
+            latency_breakdown_metadata,
+        )
+    )
+    samples.append(
+        sample.Sample(
+            'minimum_latency',
+            group[latency_col].min(),
+            'ms',
+            latency_breakdown_metadata,
+        )
+    )
+    samples.append(
+        sample.Sample(
+            'maximum_latency',
+            group[latency_col].max(),
+            'ms',
+            latency_breakdown_metadata,
+        )
+    )
+    percentiles = [25, 50, 75, 90, 95, 99]
+    for p in percentiles:
+      metric_name = f'{p}th_percentile_latency'
+      if p == 50:
+        metric_name = 'median_latency'
+      samples.append(
+          sample.Sample(
+              metric_name,
+              group[latency_col].quantile(p / 100.0),
+              'ms',
+              latency_breakdown_metadata,
+          )
+      )
+  return samples
+
+
+def ParseResults(
+    vm: virtual_machine.BaseVirtualMachine, metadata: dict[str, Any]
+) -> list[sample.Sample]:
+  """Parses the latest benchbase result file and returns metrics.
+
+  Args:
+    vm: The virtual machine to parse results from.
+    metadata: The metadata to attach to the samples.
+
+  Returns:
+    A list of sample.Sample objects.
+
+  Raises:
+    errors.Benchmarks.RunError: If the result file is not found or cannot be
+      parsed.
+  """
+  metadata['benchbase_use_foreign_key'] = _BENCHBASE_USE_FOREIGN_KEY.value
+  samples = _ParseSummaryMetrics(vm, metadata)
+  samples.extend(_ParsePerTransactionTypeMetrics(vm, metadata))
   return samples
 
 
