@@ -72,12 +72,13 @@ flags.DEFINE_string(
     'Classname of the job implementation in the jar file',
 )
 flags.DEFINE_string(
-    'dpb_service_bucket',
+    'dpb_storage_uri',
     None,
-    'A bucket to use with the DPB '
-    'service. If none is provided one will be created by the '
-    'benchmark and cleaned up afterwards unless you are using '
-    'a static instance.',
+    'An object storage location where the DPB service will upload files'
+    ' required for running the benchmark, such as scripts and queries. If set,'
+    " then files will be staged in a folder named after PKB's run_uri at the"
+    ' given location. If none is provided, a bucket will be created by the'
+    ' benchmark and cleaned up afterwards.',
 )
 flags.DEFINE_string(
     'dpb_service_zone',
@@ -348,8 +349,7 @@ class BaseDpbService(resource.BaseResource):
       self.cluster_id = dpb_service_spec.static_dpb_service_instance
     else:
       self.cluster_id = 'pkb-' + FLAGS.run_uri
-    if FLAGS.dpb_service_bucket:
-      self._bucket = FLAGS.dpb_service_bucket
+    if FLAGS.dpb_storage_uri:
       self.manage_bucket = False
     else:
       self._bucket = 'pkb-' + FLAGS.run_uri
@@ -380,6 +380,8 @@ class BaseDpbService(resource.BaseResource):
 
   @property
   def base_dir(self):
+    if FLAGS.dpb_storage_uri:
+      return os.path.join(FLAGS.dpb_storage_uri, 'pkb-' + FLAGS.run_uri)
     return self.persistent_fs_prefix + self._bucket
 
   @abc.abstractmethod
@@ -555,14 +557,14 @@ class BaseDpbService(resource.BaseResource):
         'dpb_dynamic_allocation': _DYNAMIC_ALLOCATION.value,
         'dpb_extra_jars': ','.join(DPB_EXTRA_JARS.value),
     }
+    if FLAGS.dpb_storage_uri:  # Else this is a tmp location not worth exporting
+      self.metadata['dpb_base_dir'] = self.base_dir
 
   def _CreateDependencies(self):
     """Creates a bucket to use with the cluster."""
     if self.manage_bucket:
       if self.storage_service is None:
-        raise ValueError(
-            'storage_service is None. Initialize before use.'
-        )
+        raise ValueError('storage_service is None. Initialize before use.')
       self.storage_service.MakeBucket(self._bucket)
 
   def _Create(self):
@@ -573,9 +575,7 @@ class BaseDpbService(resource.BaseResource):
     """Deletes the bucket used with the cluster."""
     if self.manage_bucket:
       if self.storage_service is None:
-        raise ValueError(
-            'storage_service is None. Initialize before use.'
-        )
+        raise ValueError('storage_service is None. Initialize before use.')
       self.storage_service.DeleteBucket(self._bucket)
 
   def _Delete(self):

@@ -773,11 +773,13 @@ class GcpDpbDataprocServerless(
         or 'default'
     )
 
+    basic_data = self.metadata
+
     self.metadata = {
-        'dpb_service': self.metadata['dpb_service'],
-        'dpb_version': self.metadata['dpb_version'],
-        'dpb_service_version': self.metadata['dpb_service_version'],
-        'dpb_batch_id': self.metadata['dpb_cluster_id'],
+        'dpb_service': basic_data['dpb_service'],
+        'dpb_version': basic_data['dpb_version'],
+        'dpb_service_version': basic_data['dpb_service_version'],
+        'dpb_batch_id': basic_data['dpb_cluster_id'],
         'dpb_cluster_shape': cluster_shape,
         'dpb_cluster_size': cluster_size,
         'dpb_cluster_min_executors': min_executors,
@@ -793,10 +795,10 @@ class GcpDpbDataprocServerless(
         'dpb_off_heap_memory_per_node': (
             self.spec.dataproc_serverless_off_heap_memory or 'default'
         ),
-        'dpb_hdfs_type': self.metadata['dpb_hdfs_type'],
-        'dpb_disk_size': self.metadata['dpb_disk_size'],
-        'dpb_service_zone': self.metadata['dpb_service_zone'],
-        'dpb_job_properties': self.metadata['dpb_job_properties'],
+        'dpb_hdfs_type': basic_data['dpb_hdfs_type'],
+        'dpb_disk_size': basic_data['dpb_disk_size'],
+        'dpb_service_zone': basic_data['dpb_service_zone'],
+        'dpb_job_properties': basic_data['dpb_job_properties'],
         'dpb_runtime_engine': self.spec.dataproc_serverless_runtime_engine,
     }
 
@@ -808,6 +810,9 @@ class GcpDpbDataprocServerless(
       self.metadata['dataproc_lightning_engine_runtime'] = (
           self.spec.dataproc_serverless_lightning_engine_runtime
       )
+
+    if basic_data.get('dpb_base_dir'):
+      self.metadata['dpb_base_dir'] = basic_data['dpb_base_dir']
 
   def CalculateLastJobCosts(self) -> dpb_service.JobCosts:
     fetch_batch_cmd = self.DataprocGcloudCommand(

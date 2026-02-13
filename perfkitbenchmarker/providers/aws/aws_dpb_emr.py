@@ -910,6 +910,9 @@ class AwsDpbEmrServerless(
         'dpb_job_properties': basic_data['dpb_job_properties'],
     }
 
+    if basic_data.get('dpb_base_dir'):
+      self.metadata['dpb_base_dir'] = basic_data['dpb_base_dir']
+
   def GetHdfsType(self) -> str | None:
     """Gets human friendly disk type for metric metadata."""
     return 'default-disk'

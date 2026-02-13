@@ -113,6 +113,12 @@
     scripts) to the cluster's staging bucket.
 -   PKB-managed Dataproc GKE clusters' staging bucket won't be set to
     --dpb_service_bucket anymore.
+-   --dpb_service_bucket has been replaced with --dpb_storage_uri. This flag
+      now allows specifying a more general object storage URI (e.g., a folder
+      within a bucket) where DPB service files (scripts, queries) will be
+      staged. When --dpb_storage_uri is provided, files are staged in a
+      subfolder named after the PKB run_uri within the given URI. If not
+      provided, a new bucket is still created and managed by PKB.
 
 ### New features:
 
