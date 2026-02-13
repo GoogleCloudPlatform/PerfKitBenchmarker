@@ -349,10 +349,10 @@ class BaseDpbService(resource.BaseResource):
     else:
       self.cluster_id = 'pkb-' + FLAGS.run_uri
     if FLAGS.dpb_service_bucket:
-      self.bucket = FLAGS.dpb_service_bucket
+      self._bucket = FLAGS.dpb_service_bucket
       self.manage_bucket = False
     else:
-      self.bucket = 'pkb-' + FLAGS.run_uri
+      self._bucket = 'pkb-' + FLAGS.run_uri
       self.manage_bucket = True
     self.dpb_service_zone = FLAGS.dpb_service_zone
     self.dpb_service_type = self.SERVICE_TYPE
@@ -380,7 +380,7 @@ class BaseDpbService(resource.BaseResource):
 
   @property
   def base_dir(self):
-    return self.persistent_fs_prefix + self.bucket
+    return self.persistent_fs_prefix + self._bucket
 
   @abc.abstractmethod
   def SubmitJob(
@@ -563,7 +563,7 @@ class BaseDpbService(resource.BaseResource):
         raise ValueError(
             'storage_service is None. Initialize before use.'
         )
-      self.storage_service.MakeBucket(self.bucket)
+      self.storage_service.MakeBucket(self._bucket)
 
   def _Create(self):
     """Creates the underlying resource."""
@@ -576,7 +576,7 @@ class BaseDpbService(resource.BaseResource):
         raise ValueError(
             'storage_service is None. Initialize before use.'
         )
-      self.storage_service.DeleteBucket(self.bucket)
+      self.storage_service.DeleteBucket(self._bucket)
 
   def _Delete(self):
     """Deletes the underlying resource.

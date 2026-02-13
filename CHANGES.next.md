@@ -108,6 +108,11 @@
 -   Consolidated cloud-specific boot-disk-size flags into a cloud-agnostic
     `--boot-disk-size` flag.
 -   Updated the minimum recommended Python version to 3.12.
+-   PKB runs over user-managed Dataproc non-GKE clusters with
+    --dpb_service_bucket unset won't upload PKB files (like queries and
+    scripts) to the cluster's staging bucket.
+-   PKB-managed Dataproc GKE clusters' staging bucket won't be set to
+    --dpb_service_bucket anymore.
 
 ### New features:
 

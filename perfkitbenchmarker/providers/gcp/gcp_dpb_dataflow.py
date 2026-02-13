@@ -151,12 +151,12 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
   def _GetTempLocation(self) -> str:
     if FLAGS.dpb_dataflow_temp_location is None:
-      return f'gs://{self.bucket}/temp/'
+      return os.path.join(self.base_dir, 'temp/')
     return FLAGS.dpb_dataflow_temp_location
 
   def GetStagingLocation(self) -> str:
     if FLAGS.dpb_dataflow_staging_location is None:
-      return f'gs://{self.bucket}/staging/'
+      return os.path.join(self.base_dir, 'staging/')
     return FLAGS.dpb_dataflow_staging_location
 
   def CheckPrerequisites(self):

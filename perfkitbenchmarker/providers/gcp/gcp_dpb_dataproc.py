@@ -171,11 +171,6 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
   SERVICE_TYPE = 'dataproc'
   SUPPORTS_NO_DYNALLOC = True
 
-  def __init__(self, dpb_service_spec):
-    super().__init__(dpb_service_spec)
-    if self.user_managed and not FLAGS.dpb_service_bucket:
-      self.bucket = self._GetCluster()['config']['tempBucket']
-
   def _InitializeMetadata(self) -> None:
     super()._InitializeMetadata()
     self.metadata['dataproc_tier'] = gcp_flags.GCP_DATAPROC_TIER.value
@@ -520,8 +515,6 @@ class GcpDpbDpgke(GcpDpbDataproc):
     # spec parameters containing '='
     cmd.flags['pools'] = self.spec.gke_cluster_nodepools.replace(':', '=')
     cmd.flags['gke-cluster-location'] = self.spec.gke_cluster_location
-    if FLAGS.dpb_service_bucket:
-      cmd.flags['staging-bucket'] = FLAGS.dpb_service_bucket
     if self.project is not None:
       cmd.flags['project'] = self.project
     cmd.flags['image-version'] = self.spec.version
