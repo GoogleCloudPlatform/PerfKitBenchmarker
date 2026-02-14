@@ -12,3 +12,7 @@
 /.idea
 /*git_ignore*
 .DS_Store
+pkb_temp/
+venv_postgres/
+*.log
+*.csv

@@ -1,0 +1,62 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: gke-pg-cluster
+  namespace: {{ namespace }}
+spec:
+  description: "HA GKE PostgreSQL cluster (Primary + 2 Replicas)"
+  imageName: ghcr.io/cloudnative-pg/postgresql:{{ postgres_version }}
+  enableSuperuserAccess: true
+  instances: {{ instances }}
+  
+  # Update Strategy
+  primaryUpdateStrategy: unsupervised
+  
+  # Postgres Configuration
+  postgresql:
+    pg_hba:
+      - host all all 0.0.0.0/0 trust
+{% if postgres_parameters %}
+    parameters:
+{% for key, value in postgres_parameters.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
+
+  # Bootstrap Method
+  bootstrap:
+    initdb:
+      database: {{ postgres_database }}
+      owner: {{ postgres_user }}
+      # We rely on the operator to handle the password via secret generation
+      # or we can force one if needed, but best practice is to let CNPG manage it
+      # and read the secret. For benchmark simplicity, we will use a fixed user/pass
+      # via postInitTemplateSQL if needed, or just use the generated superuser/app user.
+      postInitTemplateSQL:
+        - "ALTER USER {{ postgres_user }} WITH PASSWORD 'md5172a9ce58b31afc76c0ebb0c6a73d32e';"
+        - "GRANT pg_monitor TO {{ postgres_user }};"
+
+  # Storage Configuration
+  storage:
+    storageClass: {{ storage_class }}
+    size: {{ disk_size }}
+
+  # Resource Usage
+  resources:
+    requests:
+      memory: "{{ memory_request }}"
+      cpu: "{{ cpu_request }}"
+{% if hugepages_2mi_request %}
+      hugepages-2Mi: "{{ hugepages_2mi_request }}"
+{% endif %}
+    limits:
+      memory: "{{ memory_limit }}"
+      cpu: "{{ cpu_limit }}"
+{% if hugepages_2mi_request %}
+      hugepages-2Mi: "{{ hugepages_2mi_request }}"
+{% endif %}
+
+  # High Availability / Affinity
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: {{ topology_key }}
