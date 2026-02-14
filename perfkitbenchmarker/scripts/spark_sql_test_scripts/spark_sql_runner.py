@@ -39,6 +39,7 @@ def parse_args(args=None):
   """Parse argv."""
 
   parser = argparse.ArgumentParser(description=__doc__)
+  parser.add_argument('--run-uri', help='Run ID to name the application after.')
   parser.add_argument(
       '--sql-queries',
       action='append',
@@ -203,7 +204,12 @@ def set_tag(spark, tag):
 
 
 def main(args, results_logger_getter=get_results_logger):
-  builder = sql.SparkSession.builder.appName('Spark SQL Query')
+  app_name = (
+      f'spark_sql_runner_{args.run_uri}'
+      if args.run_uri
+      else 'spark_sql_runner'
+  )
+  builder = sql.SparkSession.builder.appName(app_name)
   if args.enable_hive:
     builder = builder.enableHiveSupport()
   query_streams = args.sql_queries
@@ -305,7 +311,7 @@ def run_sql_query(
 
     try:
       logging.info('Running query %s', query_id)
-      annotate_query(spark_session, query_id)
+      annotate_query(spark_session, f'q{query_id}')
       start = time.time()
       df = spark_session.sql(query)
       df.collect()

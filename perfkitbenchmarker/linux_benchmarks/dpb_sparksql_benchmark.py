@@ -416,6 +416,7 @@ def _RunQueries(benchmark_spec) -> tuple[str, dpb_service.JobResult]:
     args += ['--table-cache', FLAGS.dpb_sparksql_table_cache]
   if dpb_sparksql_benchmark_helper.DUMP_SPARK_CONF.value:
     args += ['--dump-spark-conf', os.path.join(cluster.base_dir, 'spark-conf')]
+  args += ['--run-uri', FLAGS.run_uri]
   jars = []
   job_result = cluster.SubmitJob(
       pyspark_file='/'.join([
