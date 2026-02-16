@@ -1,0 +1,33 @@
+set all txburst <TX_BURST>
+set all rxburst <RX_BURST>
+enable all range
+range 0 proto udp
+range 0 src ip <SRC_IP> <SRC_IP> <SRC_IP> 0.0.0.1
+range 0 src mac <SRC_MAC> <SRC_MAC> <SRC_MAC> 00:00:00:00:00:01
+range 0 src port 1234 1234 1234 0
+range 0 dst ip <DST_IP> <DST_IP> <DST_IP> 0.0.0.1
+range 0 dst mac <DST_MAC> <DST_MAC> <DST_MAC> 00:00:00:00:00:01
+range 0 dst port 5678 5678 5678 0
+range 1 proto udp
+range 1 src ip <SRC_IP2> <SRC_IP2> <SRC_IP2> 0.0.0.1
+range 1 src mac <SRC_MAC2> <SRC_MAC2> <SRC_MAC2> 00:00:00:00:00:01
+range 1 src port 1234 1234 1234 0
+range 1 dst ip <DST_IP2> <DST_IP2> <DST_IP2> 0.0.0.1
+range 1 dst mac <DST_MAC2> <DST_MAC2> <DST_MAC2> 00:00:00:00:00:01
+range 1 dst port 5678 5678 5678 0
+clr
+# BEGIN_SENDER_CONFIG
+# Send an initial burst (one or a few packets suffice) to trigger the
+# installation of HW flow entries so the next traffic is entirely processed in
+# hw. Don't wait too long because entries expire in 5 seconds.
+set all count 500
+start all
+sleep 2
+stop all
+set all count 0
+start all
+# END_SENDER_CONFIG
+sleep <DURATION>
+stop all
+sleep 5
+exit

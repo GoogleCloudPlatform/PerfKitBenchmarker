@@ -258,7 +258,7 @@ class RackspaceNetwork(network.BaseNetwork):
     self.default_firewall_rules = []
 
   @staticmethod
-  def _GetNetworkSpecFromVm(vm):
+  def _GetNetworkSpecFromVmSpec(vm):
     return RackspaceNetworkSpec(tenant_id=vm.tenant_id, region=vm.zone)
 
   @classmethod

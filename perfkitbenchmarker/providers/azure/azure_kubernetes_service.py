@@ -18,20 +18,24 @@ import json
 from typing import Any, List
 
 from absl import flags
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import util
+from perfkitbenchmarker.resources.container_service import container
+from perfkitbenchmarker.resources.container_service import container_cluster
+from perfkitbenchmarker.resources.container_service import container_registry
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 FLAGS = flags.FLAGS
 
 
-class AzureContainerRegistry(container_service.BaseContainerRegistry):
+class AzureContainerRegistry(container_registry.BaseContainerRegistry):
   """Class for building and storing container images on Azure."""
 
   CLOUD = provider_info.AZURE
@@ -106,7 +110,7 @@ class AzureContainerRegistry(container_service.BaseContainerRegistry):
     return full_tag
 
 
-class AksCluster(container_service.KubernetesCluster):
+class AksCluster(kubernetes_cluster.KubernetesCluster):
   """Class representing an Azure Kubernetes Service cluster."""
 
   CLOUD = provider_info.AZURE
@@ -125,15 +129,11 @@ class AksCluster(container_service.KubernetesCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVirtualMachine,
-      nodepool_config: container_service.BaseNodePoolConfig,
+      vm_config: virtual_machine_spec.BaseVmSpec,
+      nodepool_config: container.BaseNodePoolConfig,
   ):
-    nodepool_config.disk_type = (
-        vm_config.create_os_disk_strategy.disk.disk_type  # pytype: disable=attribute-error
-    )
-    nodepool_config.disk_size = (
-        vm_config.create_os_disk_strategy.disk.disk_size  # pytype: disable=attribute-error
-    )
+    nodepool_config.disk_type = vm_config.boot_disk_type
+    nodepool_config.disk_size = vm_config.boot_disk_size
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -167,9 +167,9 @@ class AksCluster(container_service.KubernetesCluster):
         '--ssh-key-value',
         vm_util.GetPublicKeyPath(),
         '--nodepool-name',
-        container_service.DEFAULT_NODEPOOL,
+        container_cluster.DEFAULT_NODEPOOL,
         '--nodepool-labels',
-        f'pkb_nodepool={container_service.DEFAULT_NODEPOOL}',
+        f'pkb_nodepool={container_cluster.DEFAULT_NODEPOOL}',
     ] + self._GetNodeFlags(self.default_nodepool)
     if self.enable_vpa:
       cmd.append('--enable-vpa')
@@ -198,9 +198,7 @@ class AksCluster(container_service.KubernetesCluster):
     for _, nodepool in self.nodepools.items():
       self._CreateNodePool(nodepool)
 
-  def _CreateNodePool(
-      self, nodepool_config: container_service.BaseNodePoolConfig
-  ):
+  def _CreateNodePool(self, nodepool_config: container.BaseNodePoolConfig):
     """Creates a node pool."""
     cmd = [
         azure.AZURE_PATH,
@@ -217,7 +215,7 @@ class AksCluster(container_service.KubernetesCluster):
     vm_util.IssueCommand(cmd, timeout=600)
 
   def _GetNodeFlags(
-      self, nodepool_config: container_service.BaseNodePoolConfig
+      self, nodepool_config: container.BaseNodePoolConfig
   ) -> List[str]:
     """Common flags for create and nodepools add."""
     args = [
@@ -433,7 +431,7 @@ class AksCluster(container_service.KubernetesCluster):
     return 'managed-csi-premium'
 
   def ResizeNodePool(
-      self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
+      self, new_size: int, node_pool: str = container_cluster.DEFAULT_NODEPOOL
   ):
     """Change the number of nodes in the node pool."""
     cmd = [
@@ -690,7 +688,7 @@ class AksAutomaticCluster(AksCluster):
     Needed as node_resource_group is pre-configured and fully managed in
     Automatic clusters & role assignment must be created before authenticating.
     """
-    super(container_service.KubernetesCluster, self)._PostCreate()
+    super(kubernetes_cluster.KubernetesCluster, self)._PostCreate()
     user_type, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH,
         'account',

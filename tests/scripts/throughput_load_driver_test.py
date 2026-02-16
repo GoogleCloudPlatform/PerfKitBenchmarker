@@ -45,12 +45,12 @@ class ThroughputLoadDriverTest(
             side_effect=_run_command_mock,
         )
     )
-    fs = fake_filesystem.FakeFilesystem()
-    fake_open = fake_filesystem.FakeFileOpen(fs)
+    self.fs = fake_filesystem.FakeFilesystem()
+    self.fake_open = fake_filesystem.FakeFileOpen(self.fs)
     self.enter_context(
-        mock.patch.object(throughput_load_driver, 'open', fake_open)
+        mock.patch.object(throughput_load_driver, 'open', self.fake_open)
     )
-    fs.create_dir('/tmp')
+    self.fs.create_dir('/tmp')
 
   @parameterized.named_parameters(
       ('tiny test', 1, 2),

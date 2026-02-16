@@ -4,17 +4,18 @@ import collections
 import itertools
 from typing import Callable, Iterable
 
-from perfkitbenchmarker import container_service
-from perfkitbenchmarker import os_types
-from perfkitbenchmarker import provider_info
+from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
-from perfkitbenchmarker.container_service.base import BaseNodePoolConfig
+from perfkitbenchmarker.resources.container_service import container
+from perfkitbenchmarker.resources.container_service import container_registry
 
 
 DEFAULT_NODEPOOL = container_spec_lib.DEFAULT_NODEPOOL
+
+FLAGS = flags.FLAGS
 
 
 class BaseContainerCluster(resource.BaseResource):
@@ -28,24 +29,16 @@ class BaseContainerCluster(resource.BaseResource):
   def __init__(self, cluster_spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(user_managed=bool(cluster_spec.static_cluster))
     self.name: str = (
-        cluster_spec.static_cluster or 'pkb-' + container_service.FLAGS.run_uri
+        cluster_spec.static_cluster or 'pkb-' + FLAGS.run_uri
     )
-    # Go get a BaseVM, to use strictly for config values.
-    default_vm_class = virtual_machine.GetVmClass(
-        self.CLOUD, os_types.DEFAULT, provider_info.DEFAULT_VM_PLATFORM
-    )
-    default_vm_config: virtual_machine.BaseVirtualMachine = default_vm_class(
-        cluster_spec.vm_spec
-    )  # pytype: disable=not-instantiable
     self.default_nodepool = self._InitializeDefaultNodePool(
-        cluster_spec, default_vm_config
+        cluster_spec, cluster_spec.vm_spec
     )
-    self.nodepools: dict[str, BaseNodePoolConfig] = {}
+    self.nodepools: dict[str, container.BaseNodePoolConfig] = {}
     for name, nodepool_spec in cluster_spec.nodepools.copy().items():
-      vm_config: virtual_machine.BaseVirtualMachine = default_vm_class(
-          nodepool_spec.vm_spec
-      )  # pytype: disable=not-instantiable
-      nodepool = self._InitializeNodePool(name, nodepool_spec, vm_config)
+      nodepool = self._InitializeNodePool(
+          name, nodepool_spec, nodepool_spec.vm_spec
+      )
       self.nodepools[nodepool.name] = nodepool
     self.min_nodes: int = (
         cluster_spec.min_vm_count or self.default_nodepool.num_nodes
@@ -53,12 +46,12 @@ class BaseContainerCluster(resource.BaseResource):
     self.max_nodes: int = (
         cluster_spec.max_vm_count or self.default_nodepool.num_nodes
     )
-    self.containers: dict[str, list[container_service.BaseContainer]] = (
+    self.containers: dict[str, list[container.BaseContainer]] = (
         collections.defaultdict(list)
     )
-    self.services: dict[str, container_service.BaseContainerService] = {}
+    self.services: dict[str, container.BaseContainerService] = {}
     self._extra_samples: list[sample.Sample] = []
-    self.container_registry: container_service.BaseContainerRegistry | None = (
+    self.container_registry: container_registry.BaseContainerRegistry | None = (
         None
     )
     self.enable_vpa: bool = cluster_spec.enable_vpa
@@ -71,16 +64,16 @@ class BaseContainerCluster(resource.BaseResource):
   def zone(self) -> str:
     return self.default_nodepool.zone
 
-  def SetContainerRegistry(self, container_registry):
+  def SetContainerRegistry(self, registry):
     """Sets the container registry for the cluster."""
-    self.container_registry = container_registry
+    self.container_registry = registry
 
   def _InitializeDefaultNodePool(
       self,
       cluster_spec: container_spec_lib.ContainerClusterSpec,
-      vm_config: virtual_machine.BaseVirtualMachine,
-  ) -> BaseNodePoolConfig:
-    nodepool_config = BaseNodePoolConfig(
+      vm_config: virtual_machine_spec.BaseVmSpec,
+  ) -> container.BaseNodePoolConfig:
+    nodepool_config = container.BaseNodePoolConfig(
         vm_config,
         DEFAULT_NODEPOOL,
     )
@@ -92,14 +85,14 @@ class BaseContainerCluster(resource.BaseResource):
       self,
       name: str,
       nodepool_spec: container_spec_lib.NodepoolSpec,
-      vm_config: virtual_machine.BaseVirtualMachine,
-  ) -> BaseNodePoolConfig:
+      vm_config: virtual_machine_spec.BaseVmSpec,
+  ) -> container.BaseNodePoolConfig:
     zone = (
         nodepool_spec.vm_spec.zone
         if nodepool_spec.vm_spec
         else self.default_nodepool.zone
     )
-    nodepool_config = BaseNodePoolConfig(
+    nodepool_config = container.BaseNodePoolConfig(
         vm_config,
         name,
     )
@@ -111,15 +104,15 @@ class BaseContainerCluster(resource.BaseResource):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVirtualMachine,
-      nodepool_config: BaseNodePoolConfig,
+      vm_config: virtual_machine_spec.BaseVmSpec,
+      nodepool_config: container.BaseNodePoolConfig,
   ):
     """Override to initialize cloud specific configs."""
     pass
 
   def GetNodePoolFromNodeName(
       self, node_name: str
-  ) -> BaseNodePoolConfig | None:
+  ) -> container.BaseNodePoolConfig | None:
     """Get the nodepool from the node name.
 
     This method assumes that the nodepool name is embedded in the node name.
@@ -157,8 +150,8 @@ class BaseContainerCluster(resource.BaseResource):
 
   def DeleteContainers(self):
     """Delete containers belonging to the cluster."""
-    for container in itertools.chain(*list(self.containers.values())):
-      container.Delete()
+    for c in itertools.chain(*list(self.containers.values())):
+      c.Delete()
 
   def DeleteServices(self):
     """Delete services belonging to the cluster."""
@@ -214,22 +207,22 @@ class BaseContainerCluster(resource.BaseResource):
   def GetSamples(self):
     """Return samples with information about deployment times."""
     samples = super().GetSamples()
-    for container in itertools.chain(*list(self.containers.values())):
-      metadata = {'image': container.image.split('/')[-1]}
-      if container.resource_ready_time and container.create_start_time:
+    for c in itertools.chain(*list(self.containers.values())):
+      metadata = {'image': c.image.split('/')[-1]}
+      if c.resource_ready_time and c.create_start_time:
         samples.append(
             sample.Sample(
                 'Container Deployment Time',
-                container.resource_ready_time - container.create_start_time,
+                c.resource_ready_time - c.create_start_time,
                 'seconds',
                 metadata,
             )
         )
-      if container.delete_end_time and container.delete_start_time:
+      if c.delete_end_time and c.delete_start_time:
         samples.append(
             sample.Sample(
                 'Container Delete Time',
-                container.delete_end_time - container.delete_start_time,
+                c.delete_end_time - c.delete_start_time,
                 'seconds',
                 metadata,
             )

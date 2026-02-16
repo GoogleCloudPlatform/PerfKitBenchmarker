@@ -63,6 +63,8 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             'gs://datasetbucket',
             '--table-names',
             *_TPCH_TABLES,
+            '--run-uri',
+            'fakeru',
         ],
     )
 
@@ -93,6 +95,8 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             'gs://datasetbucket',
             '--table-names',
             *_TPCH_TABLES,
+            '--run-uri',
+            'fakeru',
         ],
     )
 
@@ -121,6 +125,8 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             'gs://datasetbucket',
             '--table-names',
             *_TPCH_TABLES,
+            '--run-uri',
+            'fakeru',
         ],
     )
 
@@ -145,6 +151,8 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             'gs://test2/report-1680048000000',
             '--database',
             'tpcds_1t_delta',
+            '--run-uri',
+            'fakeru',
         ],
     )
 
@@ -374,12 +382,12 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     with open(rendered_script_path) as f:
       rendered_script = f.read()
     expected_substr = (
-        "\nQUERIES = {\n"
+        '\nQUERIES = {\n'
         "  '1': 'SELECT * FROM hello;',\n"
-        "  '10': \"SELECT \'\\\\n\' AS newline_repr;\",\n"
+        "  '10': \"SELECT '\\\\n' AS newline_repr;\",\n"
         "  '42': 'WITH t AS (\\n  SELECT timestamp, value\\n  FROM pkb_data)"
         " SELECT * FROM T LIMIT 1;',\n"
-        "}\n"
+        '}\n'
     )
     self.assertIn(expected_substr, rendered_script)
 

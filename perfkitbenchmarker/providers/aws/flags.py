@@ -39,8 +39,7 @@ AWS_EBS_CARD_COUNT = flags.DEFINE_integer(
 AWS_NIC_QUEUE_COUNTS = flags.DEFINE_list(
     'aws_nic_queue_counts',
     None,
-    'The queue count of each NIC. Specify a list of key=value pairs, where key'
-    ' is the network device name and value is the queue count.',
+    'The queue count of each NIC, ordered by NIC device index.',
 )
 AWS_INSTANCE_BANDWIDTH_WEIGHTING = flags.DEFINE_enum(
     'aws_instance_bandwidth_weighting',
@@ -48,6 +47,13 @@ AWS_INSTANCE_BANDWIDTH_WEIGHTING = flags.DEFINE_enum(
     ['vpc-1', 'ebs-1'],
     'The bandwidth weighting of each instance, increasing one of vpc and ebs'
     ' bandwidth at the expense of the other. Valid options are vpc-1, ebs-1.',
+)
+AWS_DISABLE_NON_PRIMARY_NIC_SOURCE_DEST_CHECK = flags.DEFINE_boolean(
+    'aws_disable_non_primary_nic_source_dest_check',
+    False,
+    'Whether to disable the source-dest-check for non-primary NICs. This'
+    ' prevents the AWS VPC fabric from dropping suspicious packets where ARP or'
+    ' handshakes are not used.',
 )
 flags.DEFINE_string(
     'aws_dax_node_type',
@@ -244,6 +250,12 @@ AURORA_STORAGE_TYPE = flags.DEFINE_enum(
     ['aurora', 'aurora-iopt1'],
     'Aurora storage type to use, corresponds to different modes of billing. See'
     ' https://aws.amazon.com/rds/aurora/pricing/.',
+)
+AURORA_METRICS_COLLECTION_SLEEP_SECONDS = flags.DEFINE_integer(
+    'aws_aurora_metrics_collection_sleep_seconds',
+    2 * 60 * 60,
+    'The time to sleep before collecting Aurora metrics. By default this is a'
+    ' long time in order to collect accurate VolumeBytesUsed metrics.',
 )
 AWS_EC2_INSTANCE_PROFILE = flags.DEFINE_string(
     'aws_ec2_instance_profile',

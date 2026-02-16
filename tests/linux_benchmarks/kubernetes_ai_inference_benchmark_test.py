@@ -6,10 +6,11 @@ import unittest
 from unittest import mock
 import zoneinfo
 
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_benchmarks import kubernetes_ai_inference_benchmark
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_events
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server_spec as k8s_spec
 from tests import pkb_common_test_case
@@ -82,7 +83,7 @@ class KubernetesAiInferenceBenchmarkTest(
     mock_k8s_server.tokenizer_id = 'mock_tokenizer'
     mock_k8s_server.pod_names = []
     mock_k8s_server.cluster = mock.create_autospec(
-        container_service.KubernetesCluster, instance=True
+        kubernetes_cluster.KubernetesCluster, instance=True
     )
     fixed_datetime = datetime.datetime(2025, 7, 18, 10, 0, 0)
     fixed_timestamp = fixed_datetime.timestamp()
@@ -317,8 +318,8 @@ class KubernetesAiInferenceBenchmarkTest(
     22:17:52 Compilation finished in 0.17 [secs].
     22:19:00 Starting vLLM API server 0 on http://0.0.0.0:8000
     """
-    startup_event = container_service.KubernetesEvent(
-        resource=container_service.KubernetesEventResource(
+    startup_event = kubernetes_events.KubernetesEvent(
+        resource=kubernetes_events.KubernetesEventResource(
             kind='Pod',
             name='pod1',
         ),
@@ -381,8 +382,8 @@ class KubernetesAiInferenceBenchmarkTest(
     22:17:52 Model loading took 14.9596 GiB and 21.619846 seconds
     22:19:00 Starting vLLM API server on http://0.0.0.0:8000
     """
-    startup_event = container_service.KubernetesEvent(
-        resource=container_service.KubernetesEventResource(
+    startup_event = kubernetes_events.KubernetesEvent(
+        resource=kubernetes_events.KubernetesEventResource(
             kind='Pod',
             name='pod1',
         ),
@@ -456,8 +457,8 @@ class KubernetesAiInferenceBenchmarkTest(
     22:22:25 Starting vLLM API server on http://0.0.0.0:8000
     """
     startup_events = [
-        container_service.KubernetesEvent(
-            resource=container_service.KubernetesEventResource(
+        kubernetes_events.KubernetesEvent(
+            resource=kubernetes_events.KubernetesEventResource(
                 kind='Pod',
                 name='pod1',
             ),
@@ -468,8 +469,8 @@ class KubernetesAiInferenceBenchmarkTest(
                 2025, 7, 18, 22, 17, 1, tzinfo=tz
             ).timestamp(),
         ),
-        container_service.KubernetesEvent(
-            resource=container_service.KubernetesEventResource(
+        kubernetes_events.KubernetesEvent(
+            resource=kubernetes_events.KubernetesEventResource(
                 kind='Pod',
                 name='pod2',
             ),
@@ -480,8 +481,8 @@ class KubernetesAiInferenceBenchmarkTest(
                 2025, 7, 18, 22, 17, 5, tzinfo=tz
             ).timestamp(),
         ),
-        container_service.KubernetesEvent(
-            resource=container_service.KubernetesEventResource(
+        kubernetes_events.KubernetesEvent(
+            resource=kubernetes_events.KubernetesEventResource(
                 kind='Pod',
                 name='pod3',
             ),

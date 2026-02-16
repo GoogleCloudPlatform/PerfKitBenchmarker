@@ -19,10 +19,10 @@ from absl import flags
 from absl import logging
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 
 FLAGS = flags.FLAGS
 

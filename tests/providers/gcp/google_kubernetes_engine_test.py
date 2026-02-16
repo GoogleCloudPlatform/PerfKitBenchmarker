@@ -24,16 +24,16 @@ from unittest import mock
 
 from absl import flags as flgs
 from absl.testing import flagsaver
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
-from perfkitbenchmarker.container_service import kubectl
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import google_kubernetes_engine
 from perfkitbenchmarker.providers.gcp import util
+from perfkitbenchmarker.resources.container_service import container
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from tests import pkb_common_test_case
 
 FLAGS = flgs.FLAGS
@@ -101,7 +101,7 @@ def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
 
 class GoogleContainerRegistryTestCase(pkb_common_test_case.PkbCommonTestCase):
 
-  class FakeContainerImage(container_service.ContainerImage):
+  class FakeContainerImage(container.ContainerImage):
 
     def __init__(self, name):
       self.name = name
@@ -111,7 +111,7 @@ class GoogleContainerRegistryTestCase(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     self.enter_context(
         mock.patch.object(
-            google_kubernetes_engine.container_service.base,
+            container,
             'ContainerImage',
             self.FakeContainerImage,
         )

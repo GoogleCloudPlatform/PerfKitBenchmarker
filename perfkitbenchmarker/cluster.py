@@ -28,6 +28,7 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -175,11 +176,13 @@ class BaseCluster(resource.BaseResource):
     self.spec: BaseClusterSpec = cluster_spec
     self.worker_machine_type: str = self.machine_type
     self.headnode_machine_type: str = cluster_spec.headnode.vm_spec.machine_type
-    self.headnode_spec: virtual_machine.BaseVmSpec = (
+    self.headnode_spec: virtual_machine_spec.BaseVmSpec = (
         cluster_spec.headnode.vm_spec
     )
     self.image: str = cluster_spec.workers.vm_spec.image
-    self.workers_spec: virtual_machine.BaseVmSpec = cluster_spec.workers.vm_spec
+    self.workers_spec: virtual_machine_spec.BaseVmSpec = (
+        cluster_spec.workers.vm_spec
+    )
     self.workers_static_disk_spec: disk.BaseDiskSpec = (
         cluster_spec.workers.disk_spec
     )
@@ -295,7 +298,7 @@ class BaseCluster(resource.BaseResource):
 
   def BackfillVm(
       self,
-      vm_spec: virtual_machine.BaseVmSpec,
+      vm_spec: virtual_machine_spec.BaseVmSpec,
       fn: Callable[[virtual_machine.BaseVirtualMachine], None],
   ):
     """Create and backfill a VM object created using cluster resource.

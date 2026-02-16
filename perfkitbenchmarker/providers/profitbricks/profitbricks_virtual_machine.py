@@ -21,6 +21,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
@@ -95,7 +96,7 @@ class MachineTypeDecoder(option_decoders.TypeVerifier):
     )
 
 
-class ProfitBricksVmSpec(virtual_machine.BaseVmSpec):
+class ProfitBricksVmSpec(virtual_machine_spec.BaseVmSpec):
   """Object containing the information needed to create a
 
   ProfitBricksVirtualMachine.

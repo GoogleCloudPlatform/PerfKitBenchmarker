@@ -1,4 +1,4 @@
-# Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2026 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,10 +18,12 @@ cloud TPU can be created and deleted.
 
 import json
 import logging
+import time
 from absl import flags
 from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -47,29 +49,27 @@ class GcpTpu(cloud_tpu.BaseTpu):
 
   def __init__(self, tpu_spec):
     super().__init__(tpu_spec)
-    self.spec = tpu_spec
     self.project = FLAGS.project or util.GetDefaultProject()
 
   def _Create(self):
     """Create Cloud TPU."""
-    cmd = util.GcloudCommand(
-        self, 'compute', 'tpus', 'create', self.spec.tpu_name
-    )
-    cmd.flags['range'] = self.spec.tpu_cidr_range
-    if self.spec.tpu_accelerator_type:
-      cmd.flags['accelerator-type'] = self.spec.tpu_accelerator_type
-    if self.spec.tpu_description:
-      cmd.flags['description'] = self.spec.tpu_description
-    if self.spec.tpu_network:
-      cmd.flags['network'] = self.spec.tpu_network
+    is_v6e = self.spec.tpu_type and self.spec.tpu_type.startswith('v6e')
+    components = ['compute', 'tpus', 'tpu-vm', 'create', self.spec.tpu_name]
+    if is_v6e:
+      components = ['alpha'] + components
+    cmd = util.GcloudCommand(self, *components)
+    if self.spec.tpu_type:
+      cmd.flags['type'] = self.spec.tpu_type
+    if self.spec.tpu_topology:
+      cmd.flags['topology'] = self.spec.tpu_topology
     if self.spec.tpu_tf_version:
       cmd.flags['version'] = self.spec.tpu_tf_version
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
-    if self.spec.tpu_preemptible:
-      cmd.flags['preemptible'] = self.spec.tpu_preemptible
     cmd.flags['project'] = self.project
+    self.create_start_time = time.time()
     _, stderr, retcode = cmd.Issue(raise_on_failure=False)
+    self.create_time = time.time() - self.create_start_time
 
     if _INSUFFICIENT_CAPACITY in stderr:
       logging.error(util.STOCKOUT_MESSAGE)
@@ -82,9 +82,10 @@ class GcpTpu(cloud_tpu.BaseTpu):
 
   def _Delete(self):
     """Deletes the cloud TPU."""
-    cmd = util.GcloudCommand(
-        self, 'compute', 'tpus', 'delete', self.spec.tpu_name
-    )
+    components = ['compute', 'tpus', 'tpu-vm', 'delete', self.spec.tpu_name]
+    if self.spec.tpu_type and self.spec.tpu_type.startswith('v6e'):
+      components = ['alpha'] + components
+    cmd = util.GcloudCommand(self, *components)
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
     cmd.flags['project'] = self.project
@@ -96,12 +97,14 @@ class GcpTpu(cloud_tpu.BaseTpu):
 
   def _GetTpuDescription(self):
     """Gets the cloud TPU description."""
-    cmd = util.GcloudCommand(
-        self, 'compute', 'tpus', 'describe', self.spec.tpu_name
-    )
+    components = ['compute', 'tpus', 'tpu-vm', 'describe', self.spec.tpu_name]
+    if self.spec.tpu_type and self.spec.tpu_type.startswith('v6e'):
+      components = ['alpha'] + components
+    cmd = util.GcloudCommand(self, *components)
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
     cmd.flags['project'] = self.project
+    cmd.flags['format'] = 'json'
     stdout, _, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
       logging.info('Could not found GCP cloud TPU %s.', self.spec.tpu_name)
@@ -112,25 +115,19 @@ class GcpTpu(cloud_tpu.BaseTpu):
     _, retcode = self._GetTpuDescription()
     return retcode == 0
 
-  def GetName(self):
-    """Gets the name of the cloud TPU."""
-    return self.spec.tpu_name
+  def SshCommand(self, command):
+    cmd = [FLAGS.gcloud_path]
+    if self.spec.tpu_type and self.spec.tpu_type.startswith('v6e'):
+      cmd.append('alpha')
+    cmd.extend(['compute', 'tpus', 'tpu-vm', 'ssh', self.spec.tpu_name])
+    cmd.extend(['--zone', self.spec.tpu_zone])
+    cmd.extend(['--project', self.project])
+    cmd.extend(['--', command])
+    return vm_util.IssueCommand(cmd, timeout=60)
 
-  def GetMasterGrpcAddress(self):
-    """Gets the grpc address of the 0th NetworkEndpoint."""
-    master_network_endpoint = self._GetTpuDescription()[0]['networkEndpoints'][
-        0
-    ]
-
-    return 'grpc://{ip_address}:{port}'.format(
-        ip_address=master_network_endpoint['ipAddress'],
-        port=master_network_endpoint['port'],
-    )
-
-  def GetNumShards(self):
-    """Gets the number of TPU shards."""
-    num_tpus = len(self._GetTpuDescription()[0]['networkEndpoints'])
-    return num_tpus * FLAGS.tpu_cores_per_donut
+  @vm_util.Retry(poll_interval=1, timeout=600, log_errors=False)
+  def WaitForSshBecameReady(self):
+    self.SshCommand('hostname')
 
   def GetZone(self):
     """Gets the TPU zone."""
@@ -138,7 +135,7 @@ class GcpTpu(cloud_tpu.BaseTpu):
 
   def GetAcceleratorType(self):
     """Gets the TPU accelerator type."""
-    return self.spec.tpu_accelerator_type
+    return self.spec.tpu_type
 
   def GetResourceMetadata(self):
     """Returns the metadata associated with the resource.

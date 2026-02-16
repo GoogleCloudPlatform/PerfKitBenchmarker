@@ -33,6 +33,10 @@ JOB_STDERR = 'stderr'
 
 class MockDpbService(dpb_service.BaseDpbService):
 
+  @property
+  def persistent_fs_prefix(self) -> str | None:
+    return 'gs://'
+
   def __init__(
       self,
       dpb_service_spec: Any,

@@ -3,7 +3,7 @@
 Currently, only tracks vm usage within k8s clusters.
 
 Example usage:
-  cluster: container_service.KubernetesCluster = SetupK8sBenchmark()
+  cluster: kubernetes_cluster.KubernetesCluster = SetupK8sBenchmark()
   tracker = kubernetes_tracker.KubernetesCluster(cluster)
   with tracker.TrackUsage()
     RunK8sBenchmark()
@@ -18,11 +18,11 @@ import logging
 import time
 from typing import Callable, Iterable, Iterator, Optional
 from perfkitbenchmarker import benchmark_spec as bm_spec
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import events
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
-from perfkitbenchmarker.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 
 CLUSTER_TIME_METRIC = "cluster/usage/cluster_time"
@@ -48,9 +48,9 @@ class KubernetesResourceTracker:
   Usage:
       if isinstance(
           spec.container_cluster,
-          container_service.KubernetesCluster
+          kubernetes_cluster.KubernetesCluster
       ):
-        k8s_cluster: container_service.KubernetesCluster =
+        k8s_cluster: kubernetes_cluster.KubernetesCluster =
         spec.container_cluster
         tracker = kubernetes_tracker.KubernetesResourceTracker(k8s_cluster)
         with tracker.TrackUsage():
@@ -60,7 +60,7 @@ class KubernetesResourceTracker:
 
   def __init__(
       self,
-      cluster: container_service.KubernetesCluster,
+      cluster: kubernetes_cluster.KubernetesCluster,
       time_fn: Optional[Callable[[], float]] = None,
   ):
     """Create a context manager that will watch a k8s cluster usage.
@@ -194,7 +194,7 @@ class _NodeTracker:
 
 
 def _GetInitialNodeDetails(
-    cluster: container_service.KubernetesCluster, start_time: float
+    cluster: kubernetes_cluster.KubernetesCluster, start_time: float
 ) -> dict[str, _NodeTracker]:
   result: dict[str, _NodeTracker] = {}
   for name in kubernetes_commands.GetNodeNames():
@@ -207,7 +207,7 @@ def _GetInitialNodeDetails(
 
 
 def _GetMachineTypeFromNodeName(
-    cluster: container_service.KubernetesCluster, node_name: str
+    cluster: kubernetes_cluster.KubernetesCluster, node_name: str
 ) -> str:
   """Get the machine type of the given node."""
   machine_type = cluster.GetMachineTypeFromNodeName(node_name)
@@ -242,7 +242,7 @@ def _StartTrackingVMUsage(stage: str, benchmark_spec: bm_spec.BenchmarkSpec):
   if stage != stages.RUN:
     return
 
-  k8s_cluster: container_service.KubernetesCluster = (
+  k8s_cluster: kubernetes_cluster.KubernetesCluster = (
       benchmark_spec.container_cluster
   )
   if k8s_cluster is None:
@@ -264,7 +264,7 @@ def _StopTrackingVMUsage(stage: str, benchmark_spec: bm_spec.BenchmarkSpec):
   if stage != stages.RUN:
     return
 
-  k8s_cluster: container_service.KubernetesCluster = (
+  k8s_cluster: kubernetes_cluster.KubernetesCluster = (
       benchmark_spec.container_cluster
   )
   if k8s_cluster is None:

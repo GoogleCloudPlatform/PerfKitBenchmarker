@@ -24,13 +24,13 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_packages import http_poller
 from perfkitbenchmarker.linux_packages import locust
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.sample import Sample
 
 FLAGS = flags.FLAGS
@@ -82,7 +82,7 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
 
 def PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec, manifest_path: str):
   """Prepares a cluster to run the hpa benchmark."""
-  cluster: container_service.KubernetesCluster = (
+  cluster: kubernetes_cluster.KubernetesCluster = (
       benchmark_spec.container_cluster
   )
   fib_image = benchmark_spec.container_specs['kubernetes_fib'].image
@@ -134,8 +134,8 @@ def Prepare(
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
   """Run a benchmark against the fibonacci server."""
   vm = benchmark_spec.vms[0]
-  cluster: container_service.KubernetesCluster = typing.cast(
-      container_service.KubernetesCluster, benchmark_spec.container_cluster
+  cluster: kubernetes_cluster.KubernetesCluster = typing.cast(
+      kubernetes_cluster.KubernetesCluster, benchmark_spec.container_cluster
   )
   addr = cluster.DeployIngress('fib', 'fib', _PORT, _HEALTH_PATH)
 
@@ -225,7 +225,6 @@ class KubernetesMetricsCollector:
 
     Expected to be run in a background thread. Never completes until self._stop
     is signaled.
-
     """
     self._Observe(kubernetes_commands.GetNumNodesSamples)
 

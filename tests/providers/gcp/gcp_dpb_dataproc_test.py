@@ -30,7 +30,6 @@ GCP_ZONE_US_CENTRAL1_A = 'us-central1-a'
 GCP_REGION = 'us-central1'
 BUCKET_NAME = 'foo'
 PROJECT = 'fake-project'
-STAGING_BUCKET = 'fake-bucket'
 SERVERLESS_MOCK_BATCH = """
 {
     "state": "SUCCEEDED",
@@ -259,7 +258,6 @@ class GcpDpbDPGKETestCase(pkb_common_test_case.PkbCommonTestCase):
     super().setUp()
     FLAGS.run_uri = TEST_RUN_URI
     FLAGS.dpb_service_zone = GCP_ZONE_US_CENTRAL1_A
-    FLAGS.dpb_service_bucket = STAGING_BUCKET
 
   @mock.patch.object(
       vm_util, 'IssueCommand', return_value=('fake_stdout', 'fake_stderr', 0)
@@ -279,7 +277,6 @@ class GcpDpbDPGKETestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('--project fake-project ', command_string)
     self.assertIn('--region us-central1 ', command_string)
     self.assertIn('--image-version preview-0.3 ', command_string)
-    self.assertIn('--staging-bucket fake-bucket', command_string)
 
   def testMissingAttrs(self):
     cluster_spec = mock.Mock(

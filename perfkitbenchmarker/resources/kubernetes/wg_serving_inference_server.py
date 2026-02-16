@@ -23,14 +23,15 @@ import logging
 import threading
 from typing import Any, Callable, Dict, Optional
 from absl import flags
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.resources import kubernetes_inference_server
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server_spec
 import yaml
 
@@ -104,7 +105,7 @@ class BaseWGServingInferenceServer(
   def __init__(
       self,
       spec: wg_serving_inference_server_spec.WGServingInferenceServerConfigSpec,
-      cluster: container_service.KubernetesCluster,
+      cluster: kubernetes_cluster.KubernetesCluster,
   ):
     super().__init__(spec, cluster)
     self.model_load_timestamp = None
@@ -141,7 +142,7 @@ class BaseWGServingInferenceServer(
         'cat',
         '/etc/timezone',
     ]
-    stdout, _, _ = container_service.RunKubectlCommand(log_cmd)
+    stdout, _, _ = kubectl.RunKubectlCommand(log_cmd)
     stdout_split = stdout.splitlines()
     return stdout_split[0]
 
@@ -486,7 +487,7 @@ class BaseWGServingInferenceServer(
         '-c',
         'inference-server',
     ]
-    stdout, _, _ = container_service.RunKubectlCommand(log_cmd)
+    stdout, _, _ = kubectl.RunKubectlCommand(log_cmd)
     return stdout
 
   def GetInferenceServerDeploymentName(self) -> str:
@@ -559,7 +560,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
   def __init__(
       self,
       spec: wg_serving_inference_server_spec.WGServingInferenceServerConfigSpec,
-      cluster: container_service.KubernetesCluster,
+      cluster: kubernetes_cluster.KubernetesCluster,
   ):
     super().__init__(spec, cluster)
 
@@ -609,7 +610,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     components = self.spec.catalog_components.split(',')
     for component in components:
       lowered = component.lower()
-      for gpu in virtual_machine.VALID_GPU_TYPES:
+      for gpu in virtual_machine_spec.VALID_GPU_TYPES:
         if gpu in lowered:
           return component
     return 'unknown'

@@ -28,24 +28,28 @@ from typing import Any
 from urllib import parse
 
 from absl import flags
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import util
+from perfkitbenchmarker.resources.container_service import container
+from perfkitbenchmarker.resources.container_service import container_cluster
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 
 FLAGS = flags.FLAGS
 # GPU types which practically require spot to get.
 _RARE_GPU_TYPES = [
-    virtual_machine.GPU_H100,
-    virtual_machine.GPU_A100,
-    virtual_machine.GPU_B200,
+    virtual_machine_spec.GPU_H100,
+    virtual_machine_spec.GPU_A100,
+    virtual_machine_spec.GPU_B200,
 ]
 
 
@@ -73,7 +77,7 @@ def RecursivelyUpdateDictionary(
   return original
 
 
-class BaseEksCluster(container_service.KubernetesCluster):
+class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
   """Shared base class for Elastic Kubernetes Service cluster auto mode & not."""
 
   def __init__(self, spec):
@@ -100,9 +104,7 @@ class BaseEksCluster(container_service.KubernetesCluster):
       self.region = util.GetRegionFromZones(self.control_plane_zones)
     self.cluster_version: str = FLAGS.container_cluster_version
     self.account: str = util.GetAccount()
-    self.node_to_nodepool: dict[
-        str, container_service.BaseNodePoolConfig | None
-    ] = {}
+    self.node_to_nodepool: dict[str, container.BaseNodePoolConfig | None] = {}
     self.node_to_machine_type: dict[str, str | None] = {}
 
   def _ChooseSecondZone(self):
@@ -166,7 +168,7 @@ class BaseEksCluster(container_service.KubernetesCluster):
         raise errors.Resource.CreationError(stdout)
 
   def _RenderNodeGroupJson(
-      self, nodepool: container_service.BaseNodePoolConfig
+      self, nodepool: container.BaseNodePoolConfig
   ) -> dict[str, Any]:
     """Constructs the node group json dictionary."""
     group_json = {
@@ -229,7 +231,7 @@ class BaseEksCluster(container_service.KubernetesCluster):
 
   def GetNodePoolFromNodeName(
       self, node_name: str
-  ) -> container_service.BaseNodePoolConfig | None:
+  ) -> container.BaseNodePoolConfig | None:
     """Gets the nodepool from the node name.
 
     This method assumes that the nodepool name is embedded in the node name.
@@ -243,7 +245,7 @@ class BaseEksCluster(container_service.KubernetesCluster):
     """
     if node_name in self.node_to_nodepool:
       return self.node_to_nodepool[node_name]
-    nodepool_name, err, code = container_service.RunKubectlCommand(
+    nodepool_name, err, code = kubectl.RunKubectlCommand(
         [
             'get',
             'node',
@@ -281,7 +283,7 @@ class BaseEksCluster(container_service.KubernetesCluster):
     """Gets the machine type from the node name."""
     if node_name in self.node_to_machine_type:
       return self.node_to_machine_type[node_name]
-    out, _, _ = container_service.RunKubectlCommand(
+    out, _, _ = kubectl.RunKubectlCommand(
         [
             'get',
             'nodes',
@@ -319,19 +321,19 @@ class BaseEksCluster(container_service.KubernetesCluster):
     del port
     kubernetes_commands.WaitForResource(
         'ingress',
-        container_service.INGRESS_JSONPATH,
+        kubernetes_cluster.INGRESS_JSONPATH,
         namespace=namespace,
         condition_type='jsonpath=',
         extra_args=[name],
     )
-    stdout, _, _ = container_service.RunKubectlCommand([
+    stdout, _, _ = kubectl.RunKubectlCommand([
         'get',
         'ingress',
         name,
         '-n',
         namespace,
         '-o',
-        f'jsonpath={container_service.INGRESS_JSONPATH}',
+        f'jsonpath={kubernetes_cluster.INGRESS_JSONPATH}',
     ])
     return self._GetAddressFromIngress(stdout)
 
@@ -375,14 +377,11 @@ class EksCluster(BaseEksCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVirtualMachine,
-      nodepool_config: container_service.BaseNodePoolConfig,
+      vm_config: virtual_machine_spec.BaseVmSpec,
+      nodepool_config: container.BaseNodePoolConfig,
   ):
     nodepool_config.disk_type = (
-        vm_config.DEFAULT_ROOT_DISK_TYPE  # pytype: disable=attribute-error
-    )
-    nodepool_config.disk_size = (
-        vm_config.boot_disk_size  # pytype: disable=attribute-error
+        aws_virtual_machine.AwsVirtualMachine.DEFAULT_ROOT_DISK_TYPE
     )
 
   def GetResourceMetadata(self):
@@ -478,7 +477,7 @@ class EksCluster(BaseEksCluster):
       vm_util.IssueCommand(cmd)
 
   def _RenderNodeGroupJson(
-      self, nodepool: container_service.BaseNodePoolConfig
+      self, nodepool: container.BaseNodePoolConfig
   ) -> dict[str, Any]:
     """Constructs the node group json dictionary."""
     base_json = super()._RenderNodeGroupJson(nodepool)
@@ -515,7 +514,7 @@ class EksCluster(BaseEksCluster):
     return ready_nodes >= self.min_nodes
 
   def ResizeNodePool(
-      self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
+      self, new_size: int, node_pool: str = container_cluster.DEFAULT_NODEPOOL
   ):
     """Change the number of nodes in the node group."""
     cmd = [
@@ -553,8 +552,8 @@ class EksAutoCluster(BaseEksCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVirtualMachine,
-      nodepool_config: container_service.BaseNodePoolConfig,
+      vm_config: virtual_machine_spec.BaseVmSpec,
+      nodepool_config: container.BaseNodePoolConfig,
   ):
     pass
 
@@ -601,7 +600,7 @@ class EksAutoCluster(BaseEksCluster):
 
   def _IsReady(self):
     """Returns True if cluster is running. Autopilot defaults to 0 nodes."""
-    stdout, _, _ = container_service.RunKubectlCommand(['cluster-info'])
+    stdout, _, _ = kubectl.RunKubectlCommand(['cluster-info'])
     # These two strings are printed in sequence, but with ansi color code
     # escape characters in between.
     return 'Kubernetes control plane' in stdout and 'is running at' in stdout
@@ -611,7 +610,7 @@ class EksAutoCluster(BaseEksCluster):
     return aws_disk.GP2
 
   def ResizeNodePool(
-      self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
+      self, new_size: int, node_pool: str = container_cluster.DEFAULT_NODEPOOL
   ):
     """Change the number of nodes in the node group."""
     # Autopilot does not support nodepools & manual resizes.
@@ -654,8 +653,8 @@ class EksKarpenterCluster(BaseEksCluster):
 
   def InitializeNodePoolForCloud(
       self,
-      vm_config: virtual_machine.BaseVirtualMachine,
-      nodepool_config: container_service.BaseNodePoolConfig,
+      vm_config: virtual_machine_spec.BaseVmSpec,
+      nodepool_config: container.BaseNodePoolConfig,
   ):
     pass
 
@@ -795,7 +794,7 @@ class EksKarpenterCluster(BaseEksCluster):
         in stderr,
     )
     # 4) Apply CRDs
-    container_service.RunKubectlCommand(
+    kubectl.RunKubectlCommand(
         [
             'apply',
             '-f',
@@ -837,7 +836,7 @@ class EksKarpenterCluster(BaseEksCluster):
         'replicaCount=1',
     ])
     # 6) Wait for rollout
-    container_service.RunKubectlCommand([
+    kubectl.RunKubectlCommand([
         'rollout',
         'status',
         'deployment/aws-load-balancer-controller',
@@ -863,20 +862,20 @@ class EksKarpenterCluster(BaseEksCluster):
     # Wait until the ingress resource gets an address (hostname or IP).
     kubernetes_commands.WaitForResource(
         'ingress',
-        container_service.INGRESS_JSONPATH,
+        kubernetes_cluster.INGRESS_JSONPATH,
         namespace=namespace,
         condition_type='jsonpath=',
         extra_args=[name],
     )
     # Retrieve the ingress address to return it back.
-    stdout, _, _ = container_service.RunKubectlCommand([
+    stdout, _, _ = kubectl.RunKubectlCommand([
         'get',
         'ingress',
         name,
         '-n',
         namespace,
         '-o',
-        f'jsonpath={container_service.INGRESS_JSONPATH}',
+        f'jsonpath={kubernetes_cluster.INGRESS_JSONPATH}',
     ])
     address = self._GetAddressFromIngress(stdout)
 
@@ -1131,7 +1130,7 @@ class EksKarpenterCluster(BaseEksCluster):
 
   def _DeleteIngresses(self):
     """Deletes all ingresses in all namespaces (to trigger ALB deletion)."""
-    container_service.RunKubectlCommand(
+    kubectl.RunKubectlCommand(
         [
             'delete',
             'ingress',
@@ -1150,7 +1149,7 @@ class EksKarpenterCluster(BaseEksCluster):
     """Cleanup Karpenter managed nodes before cluster deletion."""
     logging.info('Cleaning up Karpenter nodes...')
     # Delete NodePool resources - this will trigger node termination
-    container_service.RunKubectlCommand(
+    kubectl.RunKubectlCommand(
         [
             'delete',
             'nodepool,ec2nodeclass',
@@ -1164,7 +1163,7 @@ class EksKarpenterCluster(BaseEksCluster):
         ),
     )
     # Wait for all Karpenter nodes to be deleted
-    container_service.RunKubectlCommand(
+    kubectl.RunKubectlCommand(
         [
             'wait',
             '--for=delete',
@@ -1265,7 +1264,7 @@ class EksKarpenterCluster(BaseEksCluster):
 
   def _IsReady(self):
     """Returns True if cluster is running. Autopilot defaults to 0 nodes."""
-    stdout, _, _ = container_service.RunKubectlCommand(['cluster-info'])
+    stdout, _, _ = kubectl.RunKubectlCommand(['cluster-info'])
     # These two strings are printed in sequence, but with ansi color code
     # escape characters in between.
     return 'Kubernetes control plane' in stdout and 'is running at' in stdout
@@ -1275,7 +1274,7 @@ class EksKarpenterCluster(BaseEksCluster):
     return aws_disk.GP2
 
   def ResizeNodePool(
-      self, new_size: int, node_pool: str = container_service.DEFAULT_NODEPOOL
+      self, new_size: int, node_pool: str = container_cluster.DEFAULT_NODEPOOL
   ):
     """Change the number of nodes in the node group."""
     raise NotImplementedError()

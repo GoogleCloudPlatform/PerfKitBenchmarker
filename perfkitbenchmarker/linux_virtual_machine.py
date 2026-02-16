@@ -45,6 +45,7 @@ import pandas as pd
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import log_util
 from perfkitbenchmarker import os_mixin
@@ -2294,6 +2295,8 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     serial_port_1_path = vm_util.PrependTempDir('serial_port_1')
     if self.GenerateAndCaptureSerialPortOutput(serial_port_1_path):
       log_files.append(serial_port_1_path)
+    if pkb_flags.GENERATE_VM_CREATE_CMD_INFO_LOG.value:
+      log_files.append(self.GetCreateCmdInfoLogPath())
     return log_files
 
   def GenerateAndCaptureSosReport(self, local_path: str) -> bool:
@@ -2340,6 +2343,13 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
         'Capturing serial port output is not implemented for this VM.'
     )
     return False
+
+  def GetCreateCmdInfoLogPath(self) -> str:
+    """Writes the create cmd info log to a temp file and returns the path."""
+    logging.warning(
+        'Create command info log capture is not implemented for this VM.'
+    )
+    return ''
 
   def CopyLogs(self, log_path: str):
     """Copies logs from the given path on the VM to the scratch directory.

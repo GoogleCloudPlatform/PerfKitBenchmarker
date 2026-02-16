@@ -48,6 +48,7 @@ dpdk_pktgen:
     gce_nic_queue_counts: default,default
     gce_network_type: custom
     ip_addresses: INTERNAL
+    aws_disable_non_primary_nic_source_dest_check: true
 """
 
 FLAGS = flags.FLAGS
@@ -79,7 +80,9 @@ _DPDK_PKTGEN_TX_RX_LCORES_LIST = flags.DEFINE_list(
     ],
     'A list of strings designating logical cores assigned to TX and RX. Each'
     ' string is in the form'
-    '"[<sender_rx>:<sender_tx>],[<receiver_rx>:<receiver_tx>]".',
+    '"[<sender_rx>:<sender_tx>](#[<sender_rx>:<sender_tx>]);"'
+    '"[<receiver_rx>:<receiver_tx>](#[<receiver_rx>:<receiver_tx>])". For TX'
+    ' and RX, each hash-separated core-list is assigned to a port.',
 )
 _DPDK_PKTGEN_NUM_MEMORY_CHANNELS_PER_NUMA = flags.DEFINE_integer(
     'dpdk_pktgen_num_memory_channels_per_numa',
@@ -113,6 +116,8 @@ _START_RATE = 100000000
 # search.
 _PPS_BINARY_SEARCH_THRESHOLD = 0.01
 _STDOUT_LOG_FILE = 'pktgen_stdout.log'
+_PKTGEN_FILE = 'pktgen.pkt'
+_PKTGEN_2NIC_FILE = 'pktgen_2nics.pkt'
 
 
 def GetConfig(user_config: Mapping[Any, Any]) -> Mapping[Any, Any]:
@@ -140,29 +145,48 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       lambda vm: vm.Install('dpdk_pktgen'),
       [sender_vm, receiver_vm],
   )
-  background_tasks.RunThreaded(
-      lambda vm: PrepareVM(
-          vm,
-          sender_vm.internal_ips[1],
-          sender_vm.secondary_mac_addr,
-          receiver_vm.internal_ips[1],
-          receiver_vm.secondary_mac_addr,
-      ),
-      [sender_vm, receiver_vm],
-  )
+  # If tertiary NIC is present, run DPDK Pktgen on 2 compatible NICs.
+  if (
+      sender_vm.tertiary_mac_addr
+      and receiver_vm.tertiary_mac_addr
+      and min(len(sender_vm.internal_ips), len(receiver_vm.internal_ips)) > 2
+  ):
+    background_tasks.RunThreaded(
+        lambda vm: PrepareVM(
+            vm,
+            sender_vm.internal_ips[1:3],
+            [sender_vm.secondary_mac_addr, sender_vm.tertiary_mac_addr],
+            receiver_vm.internal_ips[1:3],
+            [receiver_vm.secondary_mac_addr, receiver_vm.tertiary_mac_addr],
+            _PKTGEN_2NIC_FILE,
+        ),
+        [sender_vm, receiver_vm],
+    )
+  else:
+    background_tasks.RunThreaded(
+        lambda vm: PrepareVM(
+            vm,
+            [sender_vm.internal_ips[1]],
+            [sender_vm.secondary_mac_addr],
+            [receiver_vm.internal_ips[1]],
+            [receiver_vm.secondary_mac_addr],
+            _PKTGEN_FILE,
+        ),
+        [sender_vm, receiver_vm],
+    )
   receiver_vm.RemoteCommand(
       'sudo sed -i "s/start all//g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
   # Remove sender config from receiver pktgen.pkt file.
   receiver_vm.RemoteCommand(
-      f'sudo sed -i "/# BEGIN_SENDER_CONFIG/,/# END_SENDER_CONFIG/d" '
+      'sudo sed -i "/# BEGIN_SENDER_CONFIG/,/# END_SENDER_CONFIG/d" '
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
 
   sender_vm.RemoteCommand(
-      f'sudo sed -i '
-      f'-e "/# .*_SENDER_CONFIG/d" '
+      'sudo sed -i '
+      '-e "/# .*_SENDER_CONFIG/d" '
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
 
@@ -181,22 +205,23 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
 def PrepareVM(
     vm: linux_virtual_machine.BaseLinuxVirtualMachine,
-    sender_vm_ip: str,
-    sender_vm_mac: str,
-    receiver_vm_ip: str,
-    receiver_vm_mac: str,
+    sender_vm_ips: list[str],
+    sender_vm_macs: list[str],
+    receiver_vm_ips: list[str],
+    receiver_vm_macs: list[str],
+    pktgen_file: str,
 ) -> None:
   """Prepares a VM to run DPDK Pktgen."""
   vm.PushDataFile(
-      'dpdk_pktgen/pktgen.pkt',
+      f'dpdk_pktgen/{pktgen_file}',
       f'{dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt',
   )
   vm.RemoteCommand(
-      f'sudo sed -i "s/<SRC_IP>/{sender_vm_ip}/g"'
+      f'sudo sed -i "s/<SRC_IP>/{sender_vm_ips[0]}/g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
   vm.RemoteCommand(
-      f'sudo sed -i "s/<SRC_MAC>/{sender_vm_mac}/g"'
+      f'sudo sed -i "s/<SRC_MAC>/{sender_vm_macs[0]}/g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
   # Updating src port numbers for multiple flows.
@@ -206,13 +231,31 @@ def PrepareVM(
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
   vm.RemoteCommand(
-      f'sudo sed -i "s/<DST_IP>/{receiver_vm_ip}/g"'
+      f'sudo sed -i "s/<DST_IP>/{receiver_vm_ips[0]}/g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
   vm.RemoteCommand(
-      f'sudo sed -i "s/<DST_MAC>/{receiver_vm_mac}/g"'
+      f'sudo sed -i "s/<DST_MAC>/{receiver_vm_macs[0]}/g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
+  if pktgen_file == _PKTGEN_2NIC_FILE:
+    vm.RemoteCommand(
+        f'sudo sed -i "s/<SRC_IP2>/{sender_vm_ips[1]}/g"'
+        f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+    )
+    vm.RemoteCommand(
+        f'sudo sed -i "s/<SRC_MAC2>/{sender_vm_macs[1]}/g"'
+        f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+    )
+    vm.RemoteCommand(
+        f'sudo sed -i "s/<DST_IP2>/{receiver_vm_ips[1]}/g"'
+        f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+    )
+    vm.RemoteCommand(
+        f'sudo sed -i "s/<DST_MAC2>/{receiver_vm_macs[1]}/g"'
+        f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+    )
+
   # Updating dst port numbers for multiple flows.
   vm.RemoteCommand(
       'sudo sed -i "s/5678 5678 5678 0/5678 5678'
@@ -287,6 +330,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   if sender_vm.CLOUD == 'AWS':
     pktgen_env_var = ' LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib64'
     aws_eal_arg = f' -a "{receiver_vm.secondary_nic_bus_info},llq_policy=1"'
+    if receiver_vm.tertiary_nic_bus_info:
+      aws_eal_arg += f' -a "{receiver_vm.tertiary_nic_bus_info},llq_policy=1"'
 
   def _FindMaxRateFromConfig(
       tx_cmd: str, rx_cmd: str, packet_loss_threshold: float, start_rate: float
@@ -337,6 +382,23 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       total_sender_rx_pkts, _ = sender_vm.RemoteCommand(stdout_rx_parser)
       total_receiver_rx_pkts, _ = receiver_vm.RemoteCommand(stdout_rx_parser)
 
+      if receiver_vm.tertiary_nic_bus_info:
+        stdout_rx_parser_2 = stdout_rx_parser.replace('7;22H', '7;46H')
+        stdout_tx_parser_2 = stdout_tx_parser.replace('8;22H', '8;46H')
+        total_sender_rx_pkts_2, _ = sender_vm.RemoteCommand(stdout_rx_parser_2)
+        total_sender_tx_pkts_2, _ = sender_vm.RemoteCommand(stdout_tx_parser_2)
+        total_receiver_rx_pkts_2, _ = receiver_vm.RemoteCommand(
+            stdout_rx_parser_2
+        )
+        total_sender_rx_pkts = int(total_sender_rx_pkts) + int(
+            total_sender_rx_pkts_2
+        )
+        total_sender_tx_pkts = int(total_sender_tx_pkts) + int(
+            total_sender_tx_pkts_2
+        )
+        total_receiver_rx_pkts = int(total_receiver_rx_pkts) + int(
+            total_receiver_rx_pkts_2
+        )
       if not all([
           total_sender_tx_pkts,
           total_sender_rx_pkts,
@@ -392,7 +454,14 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
     # Iterate over all combinations of Tx and Rx lcore configurations
     for tx_rx_lcores in _DPDK_PKTGEN_TX_RX_LCORES_LIST.value:
+      tx_cores_arg, rx_cores_arg = '', ''
       tx_cores, rx_cores = tx_rx_lcores.split(';')
+      tx_core_lists = tx_cores.split('#')
+      for port_num, tx_core_list in enumerate(tx_core_lists):
+        tx_cores_arg += f' -m "{tx_core_list}.{port_num}"'
+      rx_cores_list = rx_cores.split('#')
+      for port_num, rx_core_list in enumerate(rx_cores_list):
+        rx_cores_arg += f' -m "{rx_core_list}.{port_num}"'
 
       # Build pktgen commands for the current core configuration
       tx_cmd = (
@@ -400,7 +469,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
           f' sudo{pktgen_env_var} ./usr/local/bin/pktgen -l 0-{num_lcores-1}'
           f' -n {num_memory_channels}{aws_eal_arg} --'
           f' --txd={_DPDK_PKTGEN_TXD.value}'
-          f' --rxd={_DPDK_PKTGEN_RXD.value} -m "{tx_cores}.0"'
+          f' --rxd={_DPDK_PKTGEN_RXD.value}{tx_cores_arg}'
           ' -f pktgen.pkt'
           f' > {_STDOUT_LOG_FILE}'
       )
@@ -409,7 +478,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
           f' sudo{pktgen_env_var} ./usr/local/bin/pktgen -l 0-{num_lcores-1}'
           f' -n {num_memory_channels}{aws_eal_arg} --'
           f' --txd={_DPDK_PKTGEN_TXD.value}'
-          f' --rxd={_DPDK_PKTGEN_RXD.value} -m "{rx_cores}.0"'
+          f' --rxd={_DPDK_PKTGEN_RXD.value}{rx_cores_arg}'
           ' -f pktgen.pkt'
           f' > {_STDOUT_LOG_FILE}'
       )

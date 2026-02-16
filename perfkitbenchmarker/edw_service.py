@@ -23,8 +23,8 @@ from typing import Any, Dict, List
 
 from absl import flags
 from absl import logging
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import resource
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 
 flags.DEFINE_integer(
     'edw_service_cluster_concurrency',
@@ -456,7 +456,7 @@ class EdwService(resource.BaseResource):
     # resource workflow management
     self.supports_wait_on_delete = True
     self.client_interface: EdwClientInterface
-    self.container_cluster: container_service.KubernetesCluster | None = None
+    self.container_cluster: kubernetes_cluster.KubernetesCluster | None = None
 
   def GetClientInterface(self) -> EdwClientInterface:
     """Gets the active Client Interface."""
@@ -524,7 +524,7 @@ class EdwService(resource.BaseResource):
     pass
 
   def SetContainerCluster(
-      self, container_cluster: container_service.KubernetesCluster
+      self, container_cluster: kubernetes_cluster.KubernetesCluster
   ):
     """Sets the container cluster if one is applicable."""
     self.container_cluster = container_cluster

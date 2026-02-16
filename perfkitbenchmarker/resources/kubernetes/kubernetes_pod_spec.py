@@ -17,12 +17,12 @@
 from typing import Optional, Union
 
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.resources.kubernetes import kubernetes_resources_spec
 
 
-class KubernetesPodSpec(virtual_machine.BaseVmSpec):
+class KubernetesPodSpec(virtual_machine_spec.BaseVmSpec):
   """Object containing the information needed to create a Kubernetes Pod.
 
   Attributes:

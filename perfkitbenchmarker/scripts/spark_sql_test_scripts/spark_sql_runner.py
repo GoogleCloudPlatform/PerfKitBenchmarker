@@ -39,6 +39,7 @@ def parse_args(args=None):
   """Parse argv."""
 
   parser = argparse.ArgumentParser(description=__doc__)
+  parser.add_argument('--run-uri', help='Run ID to name the application after.')
   parser.add_argument(
       '--sql-queries',
       action='append',
@@ -158,8 +159,57 @@ def get_results_logger(spark_session):
   return _results_logger
 
 
+def _has_spark_context(spark):
+  """Detects if spark session has sparkContext.
+
+  Newer Spark environments might use Spark Connect, which errors out when trying
+  to access sparkContext.
+
+  Args:
+    spark: The spark session.
+
+  Returns:
+    Whether sparkContext can be accessed from spark version.
+  """
+  try:
+    spark.sparkContext
+  except AttributeError:
+    return False
+  return True
+
+
+def get_query_annotator_fn(spark):
+  """Gets query annotator function appropriate for the env for debugging."""
+  if _has_spark_context(spark):
+    return set_job_description
+  return set_tag
+
+
+def set_job_description(spark, description):
+  """Sets spark context job description for debugging in Spark UI."""
+  spark.sparkContext.setJobDescription(description)
+
+
+def set_tag(spark, tag):
+  """Set operation tag for debugging in Spark UI.
+
+  Requires spark connect or Spark version >=4.0.0.
+
+  Args:
+    spark: The spark session.
+    tag: str. The tag to set.
+  """
+  spark.clearTags()
+  spark.addTag(tag)
+
+
 def main(args, results_logger_getter=get_results_logger):
-  builder = sql.SparkSession.builder.appName('Spark SQL Query')
+  app_name = (
+      f'spark_sql_runner_{args.run_uri}'
+      if args.run_uri
+      else 'spark_sql_runner'
+  )
+  builder = sql.SparkSession.builder.appName(app_name)
   if args.enable_hive:
     builder = builder.enableHiveSupport()
   query_streams = args.sql_queries
@@ -254,12 +304,14 @@ def run_sql_query(
 ):
   """Runs a SQL query stream, returns list[dict] with durations."""
 
+  annotate_query = get_query_annotator_fn(spark_session)
   results = []
   for query_id in query_stream:
     query = QUERIES[query_id]
 
     try:
       logging.info('Running query %s', query_id)
+      annotate_query(spark_session, f'q{query_id}')
       start = time.time()
       df = spark_session.sql(query)
       df.collect()

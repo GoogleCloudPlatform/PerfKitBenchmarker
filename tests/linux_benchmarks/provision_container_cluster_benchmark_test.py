@@ -1,18 +1,19 @@
 import os
 import unittest
 from unittest import mock
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
-from perfkitbenchmarker.container_service import kubectl
 from perfkitbenchmarker.linux_benchmarks.provisioning_benchmarks import provision_container_cluster_benchmark
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
+from perfkitbenchmarker.resources.container_service import kubernetes_events
 from tests import pkb_common_test_case
 
-KubernetesEvent = container_service.KubernetesEvent
-KubernetesEventResource = container_service.KubernetesEventResource
+KubernetesEvent = kubernetes_events.KubernetesEvent
+KubernetesEventResource = kubernetes_events.KubernetesEventResource
 
 
 class TestKubernetesCluster(
-    pkb_common_test_case.TestResource, container_service.KubernetesCluster
+    pkb_common_test_case.TestResource, kubernetes_cluster.KubernetesCluster
 ):
   """Test KubernetesCluster.
 

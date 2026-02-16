@@ -18,6 +18,7 @@ from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.mesos.mesos_disk import LocalDisk
@@ -31,7 +32,7 @@ MARATHON_API_PREFIX = '/v2/apps/'
 USERNAME = 'root'
 
 
-class MesosDockerSpec(virtual_machine.BaseVmSpec):
+class MesosDockerSpec(virtual_machine_spec.BaseVmSpec):
   """Object containing the information needed to create a MesosDockerInstance.
 
   Attributes:

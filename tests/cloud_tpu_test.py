@@ -42,21 +42,6 @@ class FakeTpu(cloud_tpu.BaseTpu):
   def _Delete(self):
     pass
 
-  def GetName(self):
-    pass
-
-  def GetMasterGrpcAddress(self):
-    pass
-
-  def GetNumShards(self):
-    pass
-
-  def GetZone(self):
-    pass
-
-  def GetAcceleratorType(self):
-    pass
-
 
 class TpuSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
 
@@ -93,57 +78,31 @@ class TpuSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertEqual(result.tpu_name, 'pkb-tpu')
 
-  def testDefaultTpuCidrRange(self):
+  def testDefaultTpuType(self):
     result = benchmark_config_spec._TpuGroupSpec(
         _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **self.minimal_spec
     )
-    self.assertEqual(result.tpu_cidr_range, None)
+    self.assertIsNone(result.tpu_type)
 
-  def testCustomTpuCidrRange(self):
-    spec = MergeDicts(self.minimal_spec, {'tpu_cidr_range': '192.168.0.0/29'})
+  def testCustomTpuType(self):
+    spec = MergeDicts(self.minimal_spec, {'tpu_type': 'v6e'})
     result = benchmark_config_spec._TpuGroupSpec(
         _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **spec
     )
-    self.assertEqual(result.tpu_cidr_range, '192.168.0.0/29')
+    self.assertEqual(result.tpu_type, 'v6e')
 
-  def testDefaultTpuAcceleratorType(self):
+  def testDefaultTpuTopology(self):
     result = benchmark_config_spec._TpuGroupSpec(
         _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **self.minimal_spec
     )
-    self.assertEqual(result.tpu_accelerator_type, None)
+    self.assertIsNone(result.tpu_topology)
 
-  def testCustomTpuAcceleratorType(self):
-    spec = MergeDicts(self.minimal_spec, {'tpu_accelerator_type': 'tpu-v2'})
+  def testCustomTpuTopology(self):
+    spec = MergeDicts(self.minimal_spec, {'tpu_topology': '1x1'})
     result = benchmark_config_spec._TpuGroupSpec(
         _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **spec
     )
-    self.assertEqual(result.tpu_accelerator_type, 'tpu-v2')
-
-  def testDefaultTpuDescription(self):
-    result = benchmark_config_spec._TpuGroupSpec(
-        _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **self.minimal_spec
-    )
-    self.assertEqual(result.tpu_description, None)
-
-  def testCustomTpuDescription(self):
-    spec = MergeDicts(self.minimal_spec, {'tpu_description': 'My TF Node'})
-    result = benchmark_config_spec._TpuGroupSpec(
-        _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **spec
-    )
-    self.assertEqual(result.tpu_description, 'My TF Node')
-
-  def testDefaultTpuNetwork(self):
-    result = benchmark_config_spec._TpuGroupSpec(
-        _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **self.minimal_spec
-    )
-    self.assertEqual(result.tpu_network, None)
-
-  def testCustomTpuNetwork(self):
-    spec = MergeDicts(self.minimal_spec, {'tpu_network': 'default'})
-    result = benchmark_config_spec._TpuGroupSpec(
-        _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **spec
-    )
-    self.assertEqual(result.tpu_network, 'default')
+    self.assertEqual(result.tpu_topology, '1x1')
 
   def testDefaultTpuZone(self):
     result = benchmark_config_spec._TpuGroupSpec(
@@ -181,10 +140,8 @@ class TpuSpecFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.full_spec = {
         'cloud': 'GCP',
         'tpu_name': 'pkb-tpu-123',
-        'tpu_cidr_range': '192.168.0.0/29',
-        'tpu_accelerator_type': 'tpu-v2',
-        'tpu_description': 'My TF Node',
-        'tpu_network': 'default',
+        'tpu_type': 'v5',
+        'tpu_topology': '2x2',
         'tpu_tf_version': 'nightly',
         'tpu_zone': 'us-central1-a',
     }
@@ -205,33 +162,19 @@ class TpuSpecFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertEqual(result.tpu_name, 'pkb-tpu')
 
-  def testTpuCidrRangeFlag(self):
-    FLAGS['tpu_cidr_range'].parse('10.240.0.0/29')
+  def testTpuTypeFlag(self):
+    FLAGS['tpu_type'].parse('v6e')
     result = benchmark_config_spec._TpuGroupSpec(
         _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **self.full_spec
     )
-    self.assertEqual(result.tpu_cidr_range, '10.240.0.0/29')
+    self.assertEqual(result.tpu_type, 'v6e')
 
-  def testTpuAcceleratorTypeFlag(self):
-    FLAGS['tpu_accelerator_type'].parse('tpu-v1')
+  def testTpuTopologyFlag(self):
+    FLAGS['tpu_topology'].parse('1x1')
     result = benchmark_config_spec._TpuGroupSpec(
         _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **self.full_spec
     )
-    self.assertEqual(result.tpu_accelerator_type, 'tpu-v1')
-
-  def testTpuDescriptionFlag(self):
-    FLAGS['tpu_description'].parse('MyTfNode')
-    result = benchmark_config_spec._TpuGroupSpec(
-        _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **self.full_spec
-    )
-    self.assertEqual(result.tpu_description, 'MyTfNode')
-
-  def testTpuNetworkFlag(self):
-    FLAGS['tpu_network'].parse('my-tf-network')
-    result = benchmark_config_spec._TpuGroupSpec(
-        _COMPONENT, _GROUP_NAME, flag_values=FLAGS, **self.full_spec
-    )
-    self.assertEqual(result.tpu_network, 'my-tf-network')
+    self.assertEqual(result.tpu_topology, '1x1')
 
   def testTpuTfVersion(self):
     FLAGS['tpu_tf_version'].parse('1.2')

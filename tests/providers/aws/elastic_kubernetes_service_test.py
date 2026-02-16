@@ -5,13 +5,13 @@ from unittest import mock
 from urllib import parse
 from absl.testing import flagsaver
 from absl.testing import parameterized
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import network
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import elastic_kubernetes_service
 from perfkitbenchmarker.providers.aws import util
+from perfkitbenchmarker.resources.container_service import kubectl
 from tests import matchers
 from tests import pkb_common_test_case
 
@@ -304,7 +304,7 @@ class EksAutoClusterTest(BaseEksTest):
   def testEksClusterIsReady(self):
     self.enter_context(
         mock.patch.object(
-            container_service,
+            kubectl,
             'RunKubectlCommand',
             return_value=(
                 (

@@ -20,18 +20,20 @@ private ip since they can't be connected to vnets.
 import json
 
 from absl import flags
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers import azure
 from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import util
+from perfkitbenchmarker.resources.container_service import container as container_lib
+from perfkitbenchmarker.resources.container_service import container_cluster
+from perfkitbenchmarker.resources.container_service import errors as container_errors
 
 FLAGS = flags.FLAGS
 
 
-class AciContainer(container_service.BaseContainer):
+class AciContainer(container_lib.BaseContainer):
   """Class representing an ACI container."""
 
   def __init__(self, container_spec, name, resource_group):
@@ -118,13 +120,13 @@ class AciContainer(container_service.BaseContainer):
 
     @vm_util.Retry(
         timeout=timeout,
-        retryable_exceptions=(container_service.RetriableContainerException,),
+        retryable_exceptions=(container_errors.RetriableContainerException,),
     )
     def _WaitForExit():
       container = self._GetContainerInstance()['containers'][0]
       state = container['instanceView']['currentState']['state']
       if state != 'Terminated':
-        raise container_service.RetriableContainerException(
+        raise container_errors.RetriableContainerException(
             f'Container in ({state}). Not yet in expected state Terminated.'
         )
       return container
@@ -144,7 +146,7 @@ class AciContainer(container_service.BaseContainer):
     return stdout
 
 
-class AciCluster(container_service.BaseContainerCluster):
+class AciCluster(container_cluster.BaseContainerCluster):
   """Class that can deploy ACI containers."""
 
   CLOUD = provider_info.AZURE

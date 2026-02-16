@@ -23,7 +23,7 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import static_virtual_machine
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import static_vm_decoders
@@ -39,7 +39,7 @@ _OPTION = 'test_option'
 _GCP_ONLY_VM_CONFIG = {'GCP': {'machine_type': 'n1-standard-1'}}
 _GCP_AWS_VM_CONFIG = {
     'GCP': {'machine_type': 'n1-standard-1'},
-    'AWS': {'machine_type': 'm4.large'},
+    'AWS': {'machine_type': 'm4.large', 'zone': 'us-fake-1a'},
 }
 _GCP_AWS_DISK_CONFIG = {'GCP': {}, 'AWS': {}}
 
@@ -321,7 +321,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
         result.static_vms[0], static_virtual_machine.StaticVmSpec
     )
     self.assertEqual(result.vm_count, 0)
-    self.assertIsInstance(result.vm_spec, virtual_machine.BaseVmSpec)
+    self.assertIsInstance(result.vm_spec, virtual_machine_spec.BaseVmSpec)
 
   def testMissingCloudDiskConfig(self):
     with self.assertRaises(errors.Config.MissingOption) as cm:
@@ -615,7 +615,7 @@ class BenchmarkConfigSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(result.vm_groups['default'].cloud, 'AWS')
     self.assertEqual(result.vm_groups['default'].os_type, 'ubuntu2404')
     self.assertIsInstance(
-        result.vm_groups['default'].vm_spec, virtual_machine.BaseVmSpec
+        result.vm_groups['default'].vm_spec, virtual_machine_spec.BaseVmSpec
     )
 
 

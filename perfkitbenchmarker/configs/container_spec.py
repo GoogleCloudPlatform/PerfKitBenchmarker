@@ -24,7 +24,7 @@ from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.resources import kubernetes_inference_server_spec
@@ -403,7 +403,7 @@ class ContainerClusterSpec(spec.BaseSpec):
         else True
     )
     providers.LoadProvider(self.cloud, ignore_package_requirements)
-    vm_spec_class = virtual_machine.GetVmSpecClass(
+    vm_spec_class = virtual_machine_spec.GetVmSpecClass(
         self.cloud, provider_info.DEFAULT_VM_PLATFORM
     )
     self.vm_spec = vm_spec_class(

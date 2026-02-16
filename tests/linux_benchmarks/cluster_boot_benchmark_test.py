@@ -3,13 +3,17 @@
 import logging
 import unittest
 
+from absl.testing import parameterized
 import freezegun
 import mock
 from perfkitbenchmarker import context
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import cluster_boot_benchmark
+from perfkitbenchmarker.providers.aws import aws_virtual_machine
+from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import pkb_common_test_case
 
@@ -176,16 +180,46 @@ class ClusterBootBenchmarkTest(
     # assert actual and expected samples are equal
     self.assertSampleListsEqualUpToTimestamp(actual_samples, expected_samples)
 
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='GCP',
+          vm_spec_class=gce_virtual_machine.GceVmSpec,
+          vm_class=gce_virtual_machine.Ubuntu2204BasedGceVirtualMachine,
+          zone='us-central1-a',
+          machine_type='n1-standard-2',
+      ),
+      dict(
+          testcase_name='AWS',
+          vm_spec_class=aws_virtual_machine.AwsVmSpec,
+          vm_class=aws_virtual_machine.Ubuntu2204BasedAwsVirtualMachine,
+          zone='us-east-1a',
+          machine_type='m5.large',
+      ),
+      dict(
+          testcase_name='Azure',
+          vm_spec_class=azure_virtual_machine.AzureVmSpec,
+          vm_class=azure_virtual_machine.Ubuntu2204BasedAzureVirtualMachine,
+          zone='eastus',
+          machine_type='Standard_D2s_v3',
+      ),
+  )
   @freezegun.freeze_time('2023-03-07')
-  def testGetTimeToBoot(self):
+  def testGetTimeToBoot(
+      self, vm_spec_class, vm_class, zone, machine_type
+  ):
     context.SetThreadBenchmarkSpec(
         pkb_common_test_case.CreateBenchmarkSpecFromYaml()
     )
-
-    vm_spec = gce_virtual_machine.GceVmSpec(
-        'cluster_boot_benchmark_test', zone='us-central1-a'
+    # Covers az --version (part of VM init) that is irrelevant to this test
+    self.enter_context(
+        mock.patch.object(
+            vm_util, 'IssueCommand', return_value=('{}', '', 0), autospec=True
+        )
     )
-    vm = gce_virtual_machine.Ubuntu2204BasedGceVirtualMachine(vm_spec)
+    vm_spec = vm_spec_class(
+        'cluster_boot_benchmark_test', zone=zone, machine_type=machine_type
+    )
+    vm = vm_class(vm_spec)
     vm.create_start_time = 1
     vm.create_return_time = 2
     vm.is_running_time = 3

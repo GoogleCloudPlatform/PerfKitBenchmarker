@@ -12,11 +12,11 @@ import zoneinfo
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.resources import kubernetes_inference_server
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server as k8s_server
 
 
@@ -116,7 +116,7 @@ def Run(
   Returns:
     A list of result samples collected from the json files.
   """
-  cluster: container_service.KubernetesCluster = (
+  cluster: kubernetes_cluster.KubernetesCluster = (
       benchmark_spec.container_cluster
   )
   server: kubernetes_inference_server.BaseKubernetesInferenceServer | None = (

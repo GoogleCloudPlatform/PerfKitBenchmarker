@@ -19,13 +19,14 @@ import datetime
 import json
 import os
 import textwrap
+import time
 import unittest
 
 from absl import flags
 import mock
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_aurora_db  # pylint: disable=unused-import
 from perfkitbenchmarker.providers.aws import aws_disk
@@ -109,7 +110,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         _COMPONENT, disk_size=5, disk_type=aws_disk.IO1, provisioned_iops=1000
     )
 
-    default_server_db_spec = virtual_machine.BaseVmSpec(
+    default_server_db_spec = virtual_machine_spec.BaseVmSpec(
         'NAME', **{'machine_type': 'db.t1.micro', 'zone': 'us-west-2b'}
     )
     spec_dict = {
@@ -198,7 +199,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertNotIn('servers', vms)
 
   def CreateAuroraMockSpec(self, additional_spec_items=None):
-    default_server_db_spec = virtual_machine.BaseVmSpec(
+    default_server_db_spec = virtual_machine_spec.BaseVmSpec(
         'NAME', **{'machine_type': 'db.t1.micro', 'zone': 'us-west-2b'}
     )
 
@@ -532,6 +533,77 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         self.assertEqual(
             'pkb-db-instance-123', metric.dimensions['DBInstanceIdentifier']
         )
+
+  def testAuroraStart(self):
+    db = self.CreateAuroraDbFromSpec()
+    db.cluster_id = 'pkb-db-cluster-123'
+    db.region = 'us-east-1'
+    mock_issue_command = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand')
+    )
+    self.enter_context(mock.patch.object(db, '_WaitForStatus'))
+
+    db.Start()
+
+    mock_issue_command.assert_called_once_with(
+        matchers.HAS('start-db-cluster'), raise_on_failure=False
+    )
+    db._WaitForStatus.assert_called_once_with('available')
+
+  def testAuroraStop(self):
+    db = self.CreateAuroraDbFromSpec()
+    db.cluster_id = 'pkb-db-cluster-123'
+    db.region = 'us-east-1'
+    mock_issue_command = self.enter_context(
+        mock.patch.object(vm_util, 'IssueCommand')
+    )
+    self.enter_context(mock.patch.object(db, '_WaitForStatus'))
+
+    db.Stop()
+
+    mock_issue_command.assert_called_once_with(
+        matchers.HAS('stop-db-cluster'), raise_on_failure=False
+    )
+    db._WaitForStatus.assert_called_once_with('stopped')
+
+  def testAuroraWaitForStatus(self):
+    db = self.CreateAuroraDbFromSpec()
+    db.cluster_id = 'pkb-db-cluster-123'
+    mock_describe = self.enter_context(
+        mock.patch.object(db, '_DescribeCluster')
+    )
+    mock_describe.side_effect = [
+        {'DBClusters': [{'Status': 'modifying'}]},
+        {'DBClusters': [{'Status': 'available'}]},
+    ]
+    self.enter_context(mock.patch.object(time, 'sleep'))
+
+    db._WaitForStatus('available')
+
+    self.assertEqual(mock_describe.call_count, 2)
+
+  def testAuroraCollectMetrics(self):
+    db = self.CreateAuroraDbFromSpec()
+    db.cluster_id = 'pkb-db-cluster-123'
+    db.client_vms = [mock.Mock()]
+    mock_stop = self.enter_context(mock.patch.object(db, 'Stop'))
+    mock_start = self.enter_context(mock.patch.object(db, 'Start'))
+    self.enter_context(mock.patch.object(time, 'sleep'))
+    mock_super_collect = self.enter_context(
+        mock.patch.object(
+            aws_relational_db.BaseAwsRelationalDb,
+            'CollectMetrics',
+            return_value=['sample'],
+        )
+    )
+
+    results = db.CollectMetrics(mock.Mock(), mock.Mock())
+
+    self.assertEqual(results, ['sample'])
+    mock_stop.assert_called_once()
+    mock_start.assert_called_once()
+    mock_super_collect.assert_called_once()
+    db.client_vms[0].DowngradeToCheapInstance.assert_called_once()
 
 
 if __name__ == '__main__':

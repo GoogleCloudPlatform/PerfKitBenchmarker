@@ -104,8 +104,8 @@ be found
 
 To actually spin up clusters and VMs, PKB maintains a python representation of
 Cloud resources which runs gcloud/kubectl commands & parses the output to create
-and delete resources. For GKE,
-[container_service.py](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master//perfkitbenchmarker/container_service.py)
+and delete resources. For Kubernetes,
+[resources/container_service/](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/resources/container_service/)
 contains the base classes for a Kubernetes cluster & a container registry. The
 specific GCP implementation is found in
 [google_kubernetes_engine.py](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/providers/gcp/google_kubernetes_engine.py).
@@ -119,8 +119,8 @@ A resource has several important functions:
     resource, which get added to the samples eventually returned in the run
     phase. For example, the kubernetes version.
 
-Also in container_service.py is
-[KubernetesClusterCommands](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/container_service.py),
+Also in resources/container_service/ is
+[kubernetes_commands.py](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/perfkitbenchmarker/resources/container_service/kubernetes_commands.py),
 kind of a grab-bag of kubectl commands.
 
 ## Creating a benchmark
@@ -151,7 +151,8 @@ Steps:
       # Run the benchmark, returning a list of p3rf samples.
       # Run your load test tool to generate raw output eg. locust
       # You should be able to add all the commands that you compile in a notebook
-      stdout, _, _ = container_service.RunKubectlCommand([ 'get', '-n', 'fib', 'svc/fib', '-o', "jsonpath='{.status.loadBalancer.ingress[0].ip}'", ])
+      from perfkitbenchmarker.resources.container_service import kubectl
+      stdout, _, _ = kubectl.RunKubectlCommand([ 'get', '-n', 'fib', 'svc/fib', '-o', "jsonpath='{.status.loadBalancer.ingress[0].ip}'", ])
       # Parse the output to extract the observed performance
       # Create list of samples return samples
     ```

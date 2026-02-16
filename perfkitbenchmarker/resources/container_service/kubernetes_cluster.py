@@ -5,42 +5,47 @@ import json
 import logging
 import time
 from typing import Any
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
-from perfkitbenchmarker.container_service import kubectl
-from perfkitbenchmarker.container_service import kubernetes
-from perfkitbenchmarker.container_service import kubernetes_commands
-from perfkitbenchmarker.container_service import kubernetes_events
 from perfkitbenchmarker.resources import kubernetes_inference_server
+from perfkitbenchmarker.resources.container_service import container as container_lib
+from perfkitbenchmarker.resources.container_service import container_cluster
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_events
 
 INGRESS_JSONPATH = '{.status.loadBalancer.ingress[0]}'
 RESOURCE_DELETE_SLEEP_SECONDS = 5
 
 
-class KubernetesCluster(container_service.BaseContainerCluster):
+class KubernetesCluster(container_cluster.BaseContainerCluster):
   """A Kubernetes flavor of Container Cluster."""
 
-  CLUSTER_TYPE = container_service.KUBERNETES
+  CLUSTER_TYPE = container_lib.KUBERNETES
 
   def __init__(self, cluster_spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(cluster_spec)
     self.event_poller: kubernetes_events.KubernetesEventPoller | None = None
-    if cluster_spec.poll_for_events:
-
-      def _GetEventsNoLogging():
-        return kubernetes_commands.GetEvents(suppress_logging=True)
-
-      self.event_poller = kubernetes_events.KubernetesEventPoller(
-          _GetEventsNoLogging
-      )
-
+    self.cluster_spec = cluster_spec
+    self._InitializeEventPoller()
     self.inference_server = (
         kubernetes_inference_server.GetKubernetesInferenceServer(
             cluster_spec.inference_server, self
         )
+    )
+
+  def _InitializeEventPoller(self):
+    if not self.cluster_spec.poll_for_events:
+      return
+
+    def _GetEventsNoLogging():
+      return kubernetes_commands.GetEvents(suppress_logging=True)
+
+    self.event_poller = kubernetes_events.KubernetesEventPoller(
+        _GetEventsNoLogging
     )
 
   def Create(self, restore: bool = False) -> None:
@@ -78,6 +83,10 @@ class KubernetesCluster(container_service.BaseContainerCluster):
       del state['event_poller']
     return state
 
+  def __setstate__(self, state):
+    self.__dict__ = state
+    self._InitializeEventPoller()
+
   @functools.cached_property
   def k8s_version(self) -> str:
     """Actual Kubernetes version reported by server."""
@@ -96,11 +105,11 @@ class KubernetesCluster(container_service.BaseContainerCluster):
     """Deploys Containers according to the ContainerSpec."""
     base_name = name
     name = base_name + str(len(self.containers[base_name]))
-    container = kubernetes.KubernetesContainer(
+    k8s_container = kubernetes.KubernetesContainer(
         container_spec=container_spec, name=name
     )
-    self.containers[base_name].append(container)
-    container.Create()
+    self.containers[base_name].append(k8s_container)
+    k8s_container.Create()
 
   def DeployContainerService(
       self, name: str, container_spec: container_spec_lib.ContainerSpec

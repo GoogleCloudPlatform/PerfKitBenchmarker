@@ -200,7 +200,9 @@ def Prepare(benchmark_spec):
   for script in service_scripts:
     scripts_to_upload[data.ResourcePath(script)] = script
   for local_path, bucket_dest in scripts_to_upload.items():
-    storage_service.CopyToBucket(local_path, cluster.bucket, bucket_dest)
+    storage_service.Copy(
+        local_path, os.path.join(cluster.base_dir, bucket_dest)
+    )
 
   benchmark_spec.table_subdirs = []
   benchmark_spec.data_dir = None

@@ -44,6 +44,7 @@ from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import windows_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
@@ -213,7 +214,7 @@ EARLY_NVME_MACHINE_FAMILIES = [
 _SKU_NOT_AVAILABLE = 'SkuNotAvailable'
 
 
-class AzureVmSpec(virtual_machine.BaseVmSpec):
+class AzureVmSpec(virtual_machine_spec.BaseVmSpec):
   """Object containing the information needed to create a AzureVirtualMachine.
 
   Attributes:
@@ -228,9 +229,8 @@ class AzureVmSpec(virtual_machine.BaseVmSpec):
   CLOUD = provider_info.AZURE
 
   def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self.boot_disk_size: int | None = None
     self.boot_disk_type: str | None = None
+    super().__init__(*args, **kwargs)
     self.low_priority: bool
     if isinstance(
         self.machine_type,
@@ -735,7 +735,7 @@ class AzureVirtualMachine(
     """Initialize an Azure virtual machine.
 
     Args:
-      vm_spec: virtual_machine.BaseVmSpec object of the vm.
+      vm_spec: virtual_machine_spec.BaseVmSpec object of the vm.
     """
     super().__init__(vm_spec)
 
@@ -749,7 +749,7 @@ class AzureVirtualMachine(
     self.availability_zone = util.GetAvailabilityZoneFromZone(self.zone)
     self.use_dedicated_host = vm_spec.use_dedicated_host
     self.num_vms_per_host = vm_spec.num_vms_per_host
-    self.network = azure_network.AzureNetwork.GetNetwork(self)
+    self.network = azure_network.AzureNetwork.GetNetwork(vm_spec)
     self.firewall = azure_network.AzureFirewall.GetFirewall()
     if azure_disk.HasTempDrive(self.machine_type):
       self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type, 1)
@@ -1303,6 +1303,8 @@ class AzureVirtualMachine(
     """Returns whether this vm supports NVMe."""
     generation = util.GetMachineSeriesNumber(self.machine_type)
     family = util.GetMachineFamily(self.machine_type)
+    if _MachineTypeIsArm(self.machine_type):
+      return False
     return generation >= 6 or any(
         re.match(pattern, family) for pattern in EARLY_NVME_MACHINE_FAMILIES
     )

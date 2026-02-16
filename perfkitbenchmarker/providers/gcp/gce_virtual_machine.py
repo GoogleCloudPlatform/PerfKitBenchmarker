@@ -27,6 +27,7 @@ operate on the VM: boot, shutdown, etc.
 import collections
 import copy
 import datetime
+import functools
 import itertools
 import json
 import logging
@@ -34,6 +35,7 @@ import posixpath
 import re
 import threading
 import time
+import typing
 from typing import Dict, List, Tuple
 
 from absl import flags
@@ -48,6 +50,7 @@ from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
@@ -119,34 +122,34 @@ GPU_TYPE_TO_SUFFIX = {
 _FIXED_GPU_MACHINE_TYPES = {
     # A100 GPUs
     # https://cloud.google.com/blog/products/compute/announcing-google-cloud-a2-vm-family-based-on-nvidia-a100-gpu
-    'a2-highgpu-1g': (virtual_machine.GPU_A100, 1),
-    'a2-highgpu-2g': (virtual_machine.GPU_A100, 2),
-    'a2-highgpu-4g': (virtual_machine.GPU_A100, 4),
-    'a2-highgpu-8g': (virtual_machine.GPU_A100, 8),
-    'a2-megagpu-16g': (virtual_machine.GPU_A100, 16),
-    'a2-ultragpu-1g': (virtual_machine.GPU_A100, 1),
-    'a2-ultragpu-2g': (virtual_machine.GPU_A100, 2),
-    'a2-ultragpu-4g': (virtual_machine.GPU_A100, 4),
-    'a2-ultragpu-8g': (virtual_machine.GPU_A100, 8),
+    'a2-highgpu-1g': (virtual_machine_spec.GPU_A100, 1),
+    'a2-highgpu-2g': (virtual_machine_spec.GPU_A100, 2),
+    'a2-highgpu-4g': (virtual_machine_spec.GPU_A100, 4),
+    'a2-highgpu-8g': (virtual_machine_spec.GPU_A100, 8),
+    'a2-megagpu-16g': (virtual_machine_spec.GPU_A100, 16),
+    'a2-ultragpu-1g': (virtual_machine_spec.GPU_A100, 1),
+    'a2-ultragpu-2g': (virtual_machine_spec.GPU_A100, 2),
+    'a2-ultragpu-4g': (virtual_machine_spec.GPU_A100, 4),
+    'a2-ultragpu-8g': (virtual_machine_spec.GPU_A100, 8),
     # H100 GPUs
-    'a3-highgpu-1g': (virtual_machine.GPU_H100, 1),
-    'a3-highgpu-2g': (virtual_machine.GPU_H100, 2),
-    'a3-highgpu-4g': (virtual_machine.GPU_H100, 4),
-    'a3-highgpu-8g': (virtual_machine.GPU_H100, 8),
-    'a3-megagpu-8g': (virtual_machine.GPU_H100, 8),
+    'a3-highgpu-1g': (virtual_machine_spec.GPU_H100, 1),
+    'a3-highgpu-2g': (virtual_machine_spec.GPU_H100, 2),
+    'a3-highgpu-4g': (virtual_machine_spec.GPU_H100, 4),
+    'a3-highgpu-8g': (virtual_machine_spec.GPU_H100, 8),
+    'a3-megagpu-8g': (virtual_machine_spec.GPU_H100, 8),
     # B200 GPUs
     # https://cloud.google.com/compute/docs/gpus#b200-gpus
-    'a4-highgpu-8g': (virtual_machine.GPU_B200, 8),
+    'a4-highgpu-8g': (virtual_machine_spec.GPU_B200, 8),
     # L4 GPUs
     # https://cloud.google.com/compute/docs/accelerator-optimized-machines#g2-vms
-    'g2-standard-4': (virtual_machine.GPU_L4, 1),
-    'g2-standard-8': (virtual_machine.GPU_L4, 1),
-    'g2-standard-12': (virtual_machine.GPU_L4, 1),
-    'g2-standard-16': (virtual_machine.GPU_L4, 1),
-    'g2-standard-24': (virtual_machine.GPU_L4, 2),
-    'g2-standard-32': (virtual_machine.GPU_L4, 1),
-    'g2-standard-48': (virtual_machine.GPU_L4, 4),
-    'g2-standard-96': (virtual_machine.GPU_L4, 8),
+    'g2-standard-4': (virtual_machine_spec.GPU_L4, 1),
+    'g2-standard-8': (virtual_machine_spec.GPU_L4, 1),
+    'g2-standard-12': (virtual_machine_spec.GPU_L4, 1),
+    'g2-standard-16': (virtual_machine_spec.GPU_L4, 1),
+    'g2-standard-24': (virtual_machine_spec.GPU_L4, 2),
+    'g2-standard-32': (virtual_machine_spec.GPU_L4, 1),
+    'g2-standard-48': (virtual_machine_spec.GPU_L4, 4),
+    'g2-standard-96': (virtual_machine_spec.GPU_L4, 8),
 }
 
 PKB_SKIPPED_TEARDOWN_METADATA_KEY = 'pkb_skipped_teardown'
@@ -164,7 +167,7 @@ class GceServiceUnavailableError(Exception):
   """Error for retrying _Exists when the describe output indicates that 'The service is currently unavailable'."""
 
 
-class GceVmSpec(virtual_machine.BaseVmSpec):
+class GceVmSpec(virtual_machine_spec.BaseVmSpec):
   """Object containing the information needed to create a GceVirtualMachine.
 
   Attributes:
@@ -193,6 +196,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     self.boot_disk_type: str = None
     self.boot_disk_iops: int = None
     self.boot_disk_throughput: int = None
+    # But prefer GetProject()
     self.project: str = None
     self.image_family: str = None
     self.image_project: str = None
@@ -203,7 +207,11 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     self.gce_tags: List[str] = None
     self.min_node_cpus: int = None
     self.subnet_names: List[str] = None
+    self.ssd_interface: str
+    self.mtu: int | None
     super().__init__(*args, **kwargs)
+    # Copy num_local_ssds from flag values to max_local_disks.
+    self.max_local_disks: int | None = self.num_local_ssds
     self.boot_disk_spec = boot_disk.BootDiskSpec(
         self.boot_disk_size,
         self.boot_disk_type,
@@ -227,6 +235,22 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
     else:
       self.cpus = None
       self.memory = None
+    if (
+        self.machine_type
+        and self.machine_type in gce_disk.FIXED_SSD_MACHINE_TYPES
+    ):
+      self.max_local_disks = gce_disk.FIXED_SSD_MACHINE_TYPES[self.machine_type]
+      self.ssd_interface = 'NVME'
+    # For certain machine families, we need to explicitly set the GPU type
+    # and counts. See the _FIXED_GPU_MACHINE_TYPES dictionary for more details.
+    if self.machine_type and self.machine_type in _FIXED_GPU_MACHINE_TYPES:
+      self.gpu_type = _FIXED_GPU_MACHINE_TYPES[self.machine_type][0]
+      self.gpu_count = _FIXED_GPU_MACHINE_TYPES[self.machine_type][1]
+
+  @functools.lru_cache(maxsize=1)
+  def GetProject(self) -> str:
+    """Returns the current project or default."""
+    return self.project or util.GetDefaultProject()
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -241,6 +265,8 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
         provided config values.
     """
     super()._ApplyFlags(config_values, flag_values)
+    if flag_values['mtu'].present:
+      config_values['mtu'] = flag_values.mtu
     if flag_values['gce_num_local_ssds'].present:
       config_values['num_local_ssds'] = flag_values.gce_num_local_ssds
     if flag_values['gce_ssd_interface'].present:
@@ -321,6 +347,7 @@ class GceVmSpec(virtual_machine.BaseVmSpec):
             option_decoders.IntDecoder,
             {'default': None},
         ),
+        'mtu': (option_decoders.IntDecoder, {'default': None}),
         'project': (option_decoders.StringDecoder, {'default': None}),
         'image_family': (option_decoders.StringDecoder, {'default': None}),
         'image_project': (option_decoders.StringDecoder, {'default': None}),
@@ -485,7 +512,7 @@ def GetGceAcceleratorType(accelerator_type: str) -> str:
   gce_accelerator_type = FLAGS.gce_accelerator_type_override or (
       (
           _GCE_NVIDIA_TESLA_GPU_PREFIX
-          if accelerator_type in virtual_machine.TESLA_GPU_TYPES
+          if accelerator_type in virtual_machine_spec.TESLA_GPU_TYPES
           else _GCE_NVIDIA_GPU_PREFIX
       )
       + accelerator_type
@@ -555,7 +582,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Initialize a GCE virtual machine.
 
     Args:
-      vm_spec: virtual_machine.BaseVmSpec object of the vm.
+      vm_spec: virtual_machine_spec.BaseVmSpec object of the vm.
 
     Raises:
       errors.Config.MissingOption: If the spec does not include a "machine_type"
@@ -564,26 +591,22 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
           at least one of "cpus" or "memory".
     """
     super().__init__(vm_spec)
+    self.vm_spec = typing.cast(GceVmSpec, vm_spec)
     self.create_cmd: util.GcloudCommand = None
     self.boot_metadata = {}
     self.boot_metadata_from_file = {}
     if self.boot_startup_script:
       self.boot_metadata_from_file['startup-script'] = self.boot_startup_script
     self.ssd_interface = vm_spec.ssd_interface
-    if (
-        self.machine_type
-        and self.machine_type in gce_disk.FIXED_SSD_MACHINE_TYPES
-    ):
-      self.ssd_interface = 'NVME'
     self.cpus = vm_spec.cpus
     self.image = self.image or self.DEFAULT_IMAGE
     self.memory_mib = vm_spec.memory
     self.preemptible = vm_spec.preemptible
     self.spot_early_termination = False
     self.preemptible_status_code = None
-    self.project = vm_spec.project or util.GetDefaultProject()
+    self.project = vm_spec.GetProject()
     self.image_project = vm_spec.image_project or self.GetDefaultImageProject()
-    self.mtu: int | None = FLAGS.mtu
+    self.mtu: int | None = vm_spec.mtu
     self.subnet_names = vm_spec.subnet_names
     self.network = self._GetNetwork()
     self.firewall = gce_network.GceFirewall.GetFirewall()
@@ -601,17 +624,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.gce_tags = vm_spec.gce_tags
     self.gce_network_tier = FLAGS.gce_network_tier
     self.gce_nic_types = FLAGS.gce_nic_types
-    self.max_local_disks = vm_spec.num_local_ssds
-    if (
-        self.machine_type
-        and self.machine_type in gce_disk.FIXED_SSD_MACHINE_TYPES
-    ):
-      self.max_local_disks = gce_disk.FIXED_SSD_MACHINE_TYPES[self.machine_type]
-    # For certain machine families, we need to explicitly set the GPU type
-    # and counts. See the _FIXED_GPU_MACHINE_TYPES dictionary for more details.
-    if self.machine_type and self.machine_type in _FIXED_GPU_MACHINE_TYPES:
-      self.gpu_type = _FIXED_GPU_MACHINE_TYPES[self.machine_type][0]
-      self.gpu_count = _FIXED_GPU_MACHINE_TYPES[self.machine_type][1]
+    self.max_local_disks = vm_spec.max_local_disks
+    self.create_cmd_info_log = None
     for idx, gce_nic_type in enumerate(self.gce_nic_types):
       if gce_nic_type == 'GVNIC' and not self.SupportGVNIC():
         logging.warning('Changing gce_nic_type to VIRTIO_NET')
@@ -650,7 +664,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.on_host_maintenance = 'TERMINATE'
 
     self.automatic_restart = FLAGS.gce_automatic_restart
-    self.preempt_marker: str | None = None
+    self.preempt_marker = None
     if self.preemptible:
       self.preempt_marker = f'gs://{FLAGS.gcp_preemptible_status_bucket}/{FLAGS.run_uri}/{self.name}'
     arm_arch = GetArmArchitecture(self.machine_type)
@@ -667,7 +681,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _GetNetwork(self):
     """Returns the GceNetwork to use."""
-    return gce_network.GceNetwork.GetNetwork(self)
+    return gce_network.GceNetwork.GetNetwork(self.vm_spec)
 
   @property
   def host_list(self):
@@ -951,6 +965,10 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._ParseCreateErrors(self.create_cmd.rate_limited, stderr, retcode)
     if not self.create_return_time:
       self.create_return_time = time.time()
+    if pkb_flags.GENERATE_VM_CREATE_CMD_INFO_LOG.value:
+      self.create_cmd_info_log, _, _ = vm_util.IssueCommand(
+          [FLAGS.gcloud_path, 'info', '--show-log'], raise_on_failure=False
+      )
 
   def _ParseCreateErrors(
       self, cmd_rate_limited: bool, stderr: str, retcode: int
@@ -1629,6 +1647,15 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
     with open(local_path, 'w') as f:
       f.write(stdout)
     return True
+
+  def GetCreateCmdInfoLogPath(self) -> str:
+    """Writes the create cmd info log to a temp file and returns the path."""
+    if not self.create_cmd_info_log:
+      return ''
+    path = vm_util.PrependTempDir('create_cmd_info_log')
+    with open(path, 'w') as f:
+      f.write(self.create_cmd_info_log)
+    return path
 
 
 class Debian11BasedGceVirtualMachine(

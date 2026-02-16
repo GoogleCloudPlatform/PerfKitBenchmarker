@@ -53,7 +53,6 @@ class AwsDpbGlue(
     self.cmd_prefix += ['--region', self.region]
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(location=self.region)
-    self.persistent_fs_prefix = 's3://'
     self.role = FLAGS.aws_glue_job_role
     self._cluster_create_time = None
     self._job_counter = 0
@@ -61,6 +60,10 @@ class AwsDpbGlue(
     # Last job run cost
     self._run_cost = dpb_service.JobCosts()
     self._FillMetadata()
+
+  @property
+  def persistent_fs_prefix(self) -> str | None:
+    return 's3://'
 
   @property
   def _glue_script_wrapper_url(self):

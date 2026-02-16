@@ -54,7 +54,7 @@ Valid VM group keys:
       any Cloud VMs are created. The total number of VMs will still add up to
       the number specified by the 'vm_count' key.
 
-For valid VM spec keys, see virtual_machine.BaseVmSpec and derived classes.
+For valid VM spec keys, see virtual_machine_spec.BaseVmSpec and derived classes.
 For valid disk spec keys, see disk.BaseDiskSpec and derived classes.
 
 See configs.spec.BaseSpec for more information about adding additional keys to

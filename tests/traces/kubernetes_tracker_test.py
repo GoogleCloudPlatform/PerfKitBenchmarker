@@ -3,10 +3,11 @@ from typing import Optional
 import unittest
 from unittest import mock
 from absl.testing import flagsaver
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker.configs import container_spec
-from perfkitbenchmarker.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_cluster
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_events
 from tests import pkb_common_test_case
 from perfkitbenchmarker.traces import kubernetes_tracker
 
@@ -83,8 +84,8 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
     ]
     # pylint: disable=invalid-name
     cluster.GetEvents = lambda: [
-        container_service.KubernetesEvent(
-            resource=container_service.KubernetesEventResource(
+        kubernetes_events.KubernetesEvent(
+            resource=kubernetes_events.KubernetesEventResource(
                 kind="Node", name="gke-pkb-cluster-default-pool-node-2"
             ),
             message="ignored",
@@ -92,8 +93,8 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
             timestamp=fake_time + 20.0,
             type="Normal",
         ),
-        container_service.KubernetesEvent(
-            resource=container_service.KubernetesEventResource(
+        kubernetes_events.KubernetesEvent(
+            resource=kubernetes_events.KubernetesEventResource(
                 kind="Node", name="gke-pkb-cluster-default-pool-node-1"
             ),
             message="ignored",
@@ -169,8 +170,8 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
         "gke-pkb-cluster-default-pool-node-1"
     ]
     cluster.GetEvents = lambda: [
-        container_service.KubernetesEvent(
-            resource=container_service.KubernetesEventResource(
+        kubernetes_events.KubernetesEvent(
+            resource=kubernetes_events.KubernetesEventResource(
                 kind="Node", name="gke-pkb-cluster-default-pool-node-1"
             ),
             message="ignored",
@@ -198,7 +199,7 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
 _CLUSTER_CLOUD = provider_info.UNIT_TEST
 
 
-class TestKubernetesCluster(container_service.KubernetesCluster):
+class TestKubernetesCluster(kubernetes_cluster.KubernetesCluster):
 
   CLOUD = _CLUSTER_CLOUD
 
@@ -213,7 +214,7 @@ def CreateMockCluster(
     name: str,
     machine_type: str,
     nodepools: Optional[dict[str, str]] = None,
-) -> container_service.KubernetesCluster:
+) -> kubernetes_cluster.KubernetesCluster:
   nodepool_spec = {}
   if nodepools:
     for nodepool_name, machine_type in nodepools.items():

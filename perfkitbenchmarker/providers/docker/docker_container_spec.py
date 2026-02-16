@@ -17,12 +17,12 @@
 import logging
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 import yaml
 
 
-class DockerContainerSpec(virtual_machine.BaseVmSpec):
+class DockerContainerSpec(virtual_machine_spec.BaseVmSpec):
   """Object containing the information needed to create a Docker Instance.
 
   Attributes:

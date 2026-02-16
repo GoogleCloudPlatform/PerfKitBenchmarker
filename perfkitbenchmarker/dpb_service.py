@@ -27,12 +27,12 @@ import logging
 import os
 import shutil
 import tempfile
-from typing import Dict, List, Type, TypeAlias
+from typing import Any, Dict, List, Type, TypeAlias
+from urllib import parse
 
 from absl import flags
 import jinja2
 from perfkitbenchmarker import background_tasks
-from perfkitbenchmarker import container_service
 from perfkitbenchmarker import context
 from perfkitbenchmarker import data
 from perfkitbenchmarker import dpb_constants
@@ -41,7 +41,6 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.container_service import kubernetes_commands
 from perfkitbenchmarker.linux_packages import hadoop
 from perfkitbenchmarker.linux_packages import spark
 from perfkitbenchmarker.providers.aws import flags as aws_flags
@@ -49,6 +48,11 @@ from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util as aws_util
 from perfkitbenchmarker.providers.gcp import gcs
 from perfkitbenchmarker.providers.gcp import util as gcp_util
+from perfkitbenchmarker.resources.container_service import container as container_lib
+from perfkitbenchmarker.resources.container_service import errors as container_errors
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 import yaml
 
 flags.DEFINE_string(
@@ -69,12 +73,13 @@ flags.DEFINE_string(
     'Classname of the job implementation in the jar file',
 )
 flags.DEFINE_string(
-    'dpb_service_bucket',
+    'dpb_storage_uri',
     None,
-    'A bucket to use with the DPB '
-    'service. If none is provided one will be created by the '
-    'benchmark and cleaned up afterwards unless you are using '
-    'a static instance.',
+    'An object storage location where the DPB service will upload files'
+    ' required for running the benchmark, such as scripts and queries. If set,'
+    " then files will be staged in a folder named after PKB's run_uri at the"
+    ' given location. If none is provided, a bucket will be created by the'
+    ' benchmark and cleaned up afterwards.',
 )
 flags.DEFINE_string(
     'dpb_service_zone',
@@ -153,6 +158,13 @@ DPB_EXTRA_JARS = flags.DEFINE_list(
     [],
     'Pass additional object storage paths to jars to be loaded when submitting'
     ' a job. Only supported on Dataproc as of now.',
+)
+SPARK_EVENT_LOG_DIR = flags.DEFINE_string(
+    'dpb_spark_event_logs',
+    None,
+    'Path where Spark event logs will be exported to if set. Can be either a'
+    " full Hadoop URI or a relative path to cluster's base_dir (which can be"
+    ' set with --dpb_storage_uri).',
 )
 
 FLAGS = flags.FLAGS
@@ -345,11 +357,10 @@ class BaseDpbService(resource.BaseResource):
       self.cluster_id = dpb_service_spec.static_dpb_service_instance
     else:
       self.cluster_id = 'pkb-' + FLAGS.run_uri
-    if FLAGS.dpb_service_bucket:
-      self.bucket = FLAGS.dpb_service_bucket
+    if FLAGS.dpb_storage_uri:
       self.manage_bucket = False
     else:
-      self.bucket = 'pkb-' + FLAGS.run_uri
+      self._bucket = 'pkb-' + FLAGS.run_uri
       self.manage_bucket = True
     self.dpb_service_zone = FLAGS.dpb_service_zone
     self.dpb_service_type = self.SERVICE_TYPE
@@ -370,8 +381,16 @@ class BaseDpbService(resource.BaseResource):
     return None
 
   @property
+  @abc.abstractmethod
+  def persistent_fs_prefix(self) -> str | None:
+    """The prefix for the persistent filesystem."""
+    raise NotImplementedError()
+
+  @property
   def base_dir(self):
-    return self.persistent_fs_prefix + self.bucket  # pytype: disable=attribute-error  # bind-properties
+    if FLAGS.dpb_storage_uri:
+      return os.path.join(FLAGS.dpb_storage_uri, 'pkb-' + FLAGS.run_uri)
+    return self.persistent_fs_prefix + self._bucket
 
   @abc.abstractmethod
   def SubmitJob(
@@ -546,15 +565,19 @@ class BaseDpbService(resource.BaseResource):
         'dpb_dynamic_allocation': _DYNAMIC_ALLOCATION.value,
         'dpb_extra_jars': ','.join(DPB_EXTRA_JARS.value),
     }
+    if FLAGS.dpb_storage_uri:  # Else this is a tmp location not worth exporting
+      self.metadata['dpb_base_dir'] = self.base_dir
+    if SPARK_EVENT_LOG_DIR.value:
+      self.metadata['dpb_spark_event_log_dir'] = parse.urljoin(
+          self.base_dir, SPARK_EVENT_LOG_DIR.value
+      )
 
   def _CreateDependencies(self):
     """Creates a bucket to use with the cluster."""
     if self.manage_bucket:
       if self.storage_service is None:
-        raise ValueError(
-            'storage_service is None. Initialize before use.'
-        )
-      self.storage_service.MakeBucket(self.bucket)
+        raise ValueError('storage_service is None. Initialize before use.')
+      self.storage_service.MakeBucket(self._bucket)
 
   def _Create(self):
     """Creates the underlying resource."""
@@ -564,10 +587,8 @@ class BaseDpbService(resource.BaseResource):
     """Deletes the bucket used with the cluster."""
     if self.manage_bucket:
       if self.storage_service is None:
-        raise ValueError(
-            'storage_service is None. Initialize before use.'
-        )
-      self.storage_service.DeleteBucket(self.bucket)
+        raise ValueError('storage_service is None. Initialize before use.')
+      self.storage_service.DeleteBucket(self._bucket)
 
   def _Delete(self):
     """Deletes the underlying resource.
@@ -616,7 +637,14 @@ class BaseDpbService(resource.BaseResource):
 
   def GetJobProperties(self) -> Dict[str, str]:
     """Parse the dpb_job_properties_flag."""
-    return dict(pair.split('=') for pair in FLAGS.dpb_job_properties)
+    job_props = {}
+    if SPARK_EVENT_LOG_DIR.value:
+      job_props['spark.eventLog.enabled'] = 'true'
+      job_props['spark.eventLog.dir'] = parse.urljoin(
+          self.base_dir, SPARK_EVENT_LOG_DIR.value
+      )
+    job_props.update(dict(pair.split('=') for pair in FLAGS.dpb_job_properties))
+    return job_props
 
   def GetExecutionJar(self, job_category: str, job_type: str) -> str:
     """Retrieve execution jar corresponding to the job_category and job_type.
@@ -766,6 +794,8 @@ class BaseDpbService(resource.BaseResource):
 class DpbServiceServerlessMixin:
   """Mixin with default methods dpb services without managed infrastructure."""
 
+  metadata: dict[str, Any]
+
   def _Create(self) -> None:
     pass
 
@@ -787,6 +817,17 @@ class DpbServiceServerlessMixin:
   def GetClusterPremiumCost(self) -> float | None:
     return None
 
+  def _GetRunStorageLocationMetadata(self) -> dict[str, Any]:
+    """Gets storage location-related metadata for further debugging the run."""
+    metadata = {}
+    if self.metadata.get('dpb_base_dir'):
+      metadata['dpb_base_dir'] = self.metadata['dpb_base_dir']
+    if self.metadata.get('dpb_spark_event_log_dir'):
+      metadata['dpb_spark_event_log_dir'] = self.metadata[
+          'dpb_spark_event_log_dir'
+      ]
+    return metadata
+
 
 class UnmanagedDpbService(BaseDpbService):
   """Object representing an un-managed dpb service."""
@@ -803,15 +844,12 @@ class UnmanagedDpbService(BaseDpbService):
     if self.cloud == 'GCP':
       self.region = gcp_util.GetRegionFromZone(FLAGS.dpb_service_zone)
       self.storage_service = gcs.GoogleCloudStorageService()
-      self.persistent_fs_prefix = 'gs://'
     elif self.cloud == 'AWS':
       self.region = aws_util.GetRegionFromZone(FLAGS.dpb_service_zone)
       self.storage_service = s3.S3Service()
-      self.persistent_fs_prefix = 's3://'
     else:
       self.region = None
       self.storage_service = None
-      self.persistent_fs_prefix = None
       self.manage_bucket = False
       logging.warning(
           'Cloud provider %s does not support object storage. '
@@ -824,6 +862,14 @@ class UnmanagedDpbService(BaseDpbService):
 
     # set in _Create of derived classes
     self.leader = None
+
+  @property
+  def persistent_fs_prefix(self) -> str | None:
+    if self.cloud == 'GCP':
+      return 'gs://'
+    if self.cloud == 'AWS':
+      return 's3://'
+    return None
 
   def CheckPrerequisites(self):
     if self.cloud == 'AWS' and not aws_flags.AWS_EC2_INSTANCE_PROFILE.value:
@@ -1067,7 +1113,7 @@ class UnmanagedDpbSparkCluster(UnmanagedDpbService):
 class KubernetesSparkCluster(BaseDpbService):
   """Object representing a Kubernetes dpb service spark cluster."""
 
-  CLOUD = container_service.KUBERNETES
+  CLOUD = container_lib.KUBERNETES
   SERVICE_TYPE = dpb_constants.KUBERNETES_SPARK_CLUSTER
 
   # Constants to sychronize between YAML and Spark configuration
@@ -1090,7 +1136,7 @@ class KubernetesSparkCluster(BaseDpbService):
     benchmark_spec = context.GetThreadBenchmarkSpec()
     self.k8s_cluster = benchmark_spec.container_cluster
     assert self.k8s_cluster
-    assert self.k8s_cluster.CLUSTER_TYPE == container_service.KUBERNETES
+    assert self.k8s_cluster.CLUSTER_TYPE == container_lib.KUBERNETES
     self.cloud = self.k8s_cluster.CLOUD
     self.container_registry = benchmark_spec.container_registry
     assert self.container_registry
@@ -1104,11 +1150,9 @@ class KubernetesSparkCluster(BaseDpbService):
     if self.cloud == 'GCP':
       self.region = gcp_util.GetRegionFromZone(self.k8s_cluster.zone)
       self.storage_service = gcs.GoogleCloudStorageService()
-      self.persistent_fs_prefix = 'gs://'
     elif self.cloud == 'AWS':
       self.region = self.k8s_cluster.region
       self.storage_service = s3.S3Service()
-      self.persistent_fs_prefix = 's3://'
     else:
       raise errors.Config.InvalidValue(
           f'Unsupported Cloud provider {self.cloud}'
@@ -1124,6 +1168,14 @@ class KubernetesSparkCluster(BaseDpbService):
           f'Cluster type {dpb_constants.KUBERNETES_SPARK_CLUSTER} requires at'
           f' least 2 nodes.Found {self.k8s_cluster.num_nodes}.'
       )
+
+  @property
+  def persistent_fs_prefix(self) -> str | None:
+    if self.cloud == 'GCP':
+      return 'gs://'
+    if self.cloud == 'AWS':
+      return 's3://'
+    return None
 
   def GetDpbVersion(self) -> str | None:
     return 'spark_' + FLAGS.spark_version
@@ -1242,18 +1294,18 @@ class KubernetesSparkCluster(BaseDpbService):
         image=self.image,
         service_account=self.SPARK_K8S_SERVICE_ACCOUNT,
     )
-    container = container_service.KubernetesPod(driver_name)
+    pod = kubernetes.KubernetesPod(driver_name)
     # increments driver_name for next job
-    self.spark_drivers.append(container)
+    self.spark_drivers.append(pod)
     try:
-      container.WaitForExit()
-    except container_service.ContainerException as e:
+      pod.WaitForExit()
+    except container_errors.ContainerException as e:
       raise JobSubmissionError() from e
     end_time = datetime.datetime.now()
 
     if job_stdout_file:
       with open(job_stdout_file, 'w') as f:
-        f.write(container.GetLogs())
+        f.write(pod.GetLogs())
 
     # TODO(pclay): use k8s output for timing?
     return JobResult(run_time=(end_time - start_time).total_seconds())
@@ -1262,14 +1314,14 @@ class KubernetesSparkCluster(BaseDpbService):
     pass
 
   def _GetCompletedJob(self, job_id: str) -> JobResult | None:
-    """container.WaitForExit is blocking so this is not meaningful."""
-    raise NotImplementedError('container.WaitForExit is a blocking command.')
+    """pod.WaitForExit is blocking so this is not meaningful."""
+    raise NotImplementedError('pod.WaitForExit is a blocking command.')
 
 
 class KubernetesFlinkCluster(BaseDpbService):
   """Object representing a Kubernetes dpb service flink cluster."""
 
-  CLOUD = container_service.KUBERNETES
+  CLOUD = container_lib.KUBERNETES
   SERVICE_TYPE = dpb_constants.KUBERNETES_FLINK_CLUSTER
 
   FLINK_JOB_MANAGER_SERVICE = 'flink-jobmanager'
@@ -1281,7 +1333,7 @@ class KubernetesFlinkCluster(BaseDpbService):
     benchmark_spec = context.GetThreadBenchmarkSpec()
     self.k8s_cluster = benchmark_spec.container_cluster
     assert self.k8s_cluster
-    assert self.k8s_cluster.CLUSTER_TYPE == container_service.KUBERNETES
+    assert self.k8s_cluster.CLUSTER_TYPE == container_lib.KUBERNETES
     self.cloud = self.k8s_cluster.CLOUD
     self.container_registry = benchmark_spec.container_registry
     assert self.container_registry
@@ -1292,7 +1344,6 @@ class KubernetesFlinkCluster(BaseDpbService):
     if self.cloud == 'GCP':
       self.region = gcp_util.GetRegionFromZone(self.k8s_cluster.zone)
       self.storage_service = gcs.GoogleCloudStorageService()
-      self.persistent_fs_prefix = 'gs://'
     else:
       raise errors.Config.InvalidValue(
           f'Unsupported Cloud provider {self.cloud}'
@@ -1305,6 +1356,12 @@ class KubernetesFlinkCluster(BaseDpbService):
           f'Cluster type {dpb_constants.KUBERNETES_FLINK_CLUSTER} requires at'
           f' least 2 nodes.Found {self.k8s_cluster.num_nodes}.'
       )
+
+  @property
+  def persistent_fs_prefix(self) -> str | None:
+    if self.cloud == 'GCP':
+      return 'gs://'
+    return None
 
   def GetDpbVersion(self) -> str | None:
     return self.spec.version or self.DEFAULT_FLINK_IMAGE
@@ -1427,23 +1484,23 @@ class KubernetesFlinkCluster(BaseDpbService):
             'queryable-state.proxy.ports'
         ),
     )
-    stdout, _, _ = container_service.RunKubectlCommand(
+    stdout, _, _ = kubectl.RunKubectlCommand(
         ['get', 'pod', f'--selector=job-name={job_manager_name}', '-o', 'yaml']
     )
     pods = yaml.safe_load(stdout)['items']
     if len(pods) <= 0:
       raise JobSubmissionError('No pod was created for the job.')
-    container = container_service.KubernetesPod(pods[0]['metadata']['name'])
-    self.flink_jobmanagers.append(container)
+    pod = kubernetes.KubernetesPod(pods[0]['metadata']['name'])
+    self.flink_jobmanagers.append(pod)
     try:
-      container.WaitForExit()
-    except container_service.ContainerException as e:
+      pod.WaitForExit()
+    except container_errors.ContainerException as e:
       raise JobSubmissionError() from e
     end_time = datetime.datetime.now()
 
     if job_stdout_file:
       with open(job_stdout_file, 'w') as f:
-        f.write(container.GetLogs())
+        f.write(pod.GetLogs())
 
     return JobResult(run_time=(end_time - start_time).total_seconds())
 
@@ -1454,8 +1511,8 @@ class KubernetesFlinkCluster(BaseDpbService):
     assert not FLAGS.dpb_cluster_properties
 
   def _GetCompletedJob(self, job_id: str) -> JobResult | None:
-    """container.WaitForExit is blocking so this is not meaningful."""
-    raise NotImplementedError('container.WaitForExit is a blocking command.')
+    """pod.WaitForExit is blocking so this is not meaningful."""
+    raise NotImplementedError('pod.WaitForExit is a blocking command.')
 
   def _Delete(self):
     pass
@@ -1482,7 +1539,7 @@ def GetDpbServiceClass(
       dpb_constants.KUBERNETES_SPARK_CLUSTER,
       dpb_constants.KUBERNETES_FLINK_CLUSTER,
   ]:
-    cloud = container_service.KUBERNETES
+    cloud = container_lib.KUBERNETES
   return resource.GetResourceClass(
       BaseDpbService, CLOUD=cloud, SERVICE_TYPE=dpb_service_type
   )

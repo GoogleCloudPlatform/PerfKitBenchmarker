@@ -181,6 +181,12 @@ CASSANDRA_CONCURRENT_WRITES = flags.DEFINE_integer(
     'Concurrent write requests each server accepts. Suggested number is'
     ' Number of CPUs in the VM * 8',
 )
+
+CASSANDRA_STRESS_THREADS = flags.DEFINE_list(
+    'cassandra_stress_threads',
+    [],
+    'The list of threads to use for cassandra-stress. ',
+)
 # Use "./cassandra-stress help -pop" to get more details.
 # [dist=DIST(?)]: Seeds are selected from this distribution
 #  EXP(min..max):
@@ -1000,6 +1006,13 @@ def Run(benchmark_spec):
   metadata['cassandra_version'] = cassandra.GetCassandraVersion(
       benchmark_spec.vm_groups[CASSANDRA_GROUP][0]
   )
+  if CASSANDRA_STRESS_THREADS.value:
+    return RunCassandraStressOnFixedThreads(
+        client_vms,
+        cassandra_vms,
+        metadata,
+        CASSANDRA_STRESS_THREADS.value,
+    )
   return RunTestNTimes(client_vms, cassandra_vms, metadata)
 
 
@@ -1109,6 +1122,76 @@ def RunTestNTimes(client_vms, cassandra_vms, metadata):
       )
   )
   thread_run_data_metadata = copy.deepcopy(max_op_rate_metadata or {})
+  thread_run_data_metadata['thread_data'] = thread_data
+  samples.append(
+      sample.Sample(
+          'thread_run_data',
+          -1,
+          '',
+          thread_run_data_metadata,
+      )
+  )
+  return samples
+
+
+def RunCassandraStressOnFixedThreads(
+    client_vms, cassandra_vms, metadata, client_threads_array
+):
+  """Run the cassandra stress test max_allowed_runs times.
+
+  Args:
+    client_vms: client vms.
+    cassandra_vms: cassandra server vms.
+    metadata: dict. Contains metadata for this benchmark.
+    client_threads_array: array of client threads to run the test with.
+
+  Returns:
+    A list of sample.Sample objects.
+  """
+  samples = []
+  thread_data = {}
+  for threads in client_threads_array:
+    cassandra.GetNodetoolStatus(cassandra_vms)
+    if threads in thread_data:
+      logging.info('thread count %s already tested', threads)
+      continue
+    current_metadata = copy.deepcopy(metadata)
+    current_metadata['num_cassandra_stress_threads'] = threads
+    logging.info('running thread count: %s', threads)
+    RunCassandraStressTestOnClients(
+        cassandra_vms,
+        client_vms,
+        FLAGS.cassandra_stress_command,
+        immutabledict.immutabledict(current_metadata),
+        is_preload=False,
+    )
+    current_samples = CollectResults(
+        client_vms, current_metadata
+    )
+    samples.extend(current_samples)
+    thread_data[threads] = {
+        'operation_rate': GetOperationRate(
+            current_samples
+        ),
+        'median_latency': GetMedianLatency(
+            current_samples
+        ),
+        'cpu_loads': GetCpuAverageLoad(cassandra_vms),
+        'cpu_utilization': GetCpuUtilization(
+            cassandra_vms
+        ),
+        'metadata': current_metadata,
+    }
+    logging.info(
+        'details for thread count %s are %s',
+        threads,
+        thread_data[threads],
+    )
+    PerformanceReporting(
+        cassandra_vms, thread_data[threads], current_metadata
+    )
+    WaitForCompactionTasks(cassandra_vms)
+  thread_run_data_metadata = copy.deepcopy(metadata or {})
   thread_run_data_metadata['thread_data'] = thread_data
   samples.append(
       sample.Sample(

@@ -32,7 +32,7 @@ from perfkitbenchmarker.linux_benchmarks.fio import result_parser
 
 
 FLAGS = flags.FLAGS
-
+# Used in some fio job files.
 _FILENAME_PREFIX = 'fill-device'
 _MAX_OPEN_FILES = 1000
 
@@ -134,10 +134,6 @@ def GenerateJobFile(
       default_fio_job_file, undefined=jinja2.StrictUndefined
   )
   filename = GetFilename(disks, device_path=device_path)
-  filename_format = None
-  # Reads many existing files.
-  if FillTarget() or not AgainstDevice():
-    filename_format = f'{_FILENAME_PREFIX}.$jobnum.$filenum'
   disks_list = [{'index': 0}]
   if fio_flags.FIO_SEPARATE_JOBS_FOR_DISKS.value:
     disks_list = SeparateJobsForDisks(GetAllDiskPaths(disks))
@@ -151,7 +147,6 @@ def GenerateJobFile(
       disks_list=disks_list,
       nr_files=fio_flags.FIO_NR_FILES.value,
       filename=filename,
-      filename_format=filename_format,
       separate_jobs=fio_flags.FIO_SEPARATE_JOBS_FOR_DISKS.value,
       extra_params=benchmark_params,
   )

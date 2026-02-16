@@ -35,6 +35,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import windows_virtual_machine
 
 FLAGS = flags.FLAGS
@@ -55,7 +56,7 @@ flags.DEFINE_bool(
 )
 
 
-class StaticVmSpec(virtual_machine.BaseVmSpec):
+class StaticVmSpec(virtual_machine_spec.BaseVmSpec):
   """Object containing all info needed to create a Static VM."""
 
   CLOUD = 'Static'

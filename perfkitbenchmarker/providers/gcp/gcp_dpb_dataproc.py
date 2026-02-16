@@ -88,10 +88,13 @@ class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
     self.region = self.dpb_service_zone.rsplit('-', 1)[0]
     self.storage_service = gcs.GoogleCloudStorageService()
     self.storage_service.PrepareService(location=self.region)
-    self.persistent_fs_prefix = 'gs://'
     self._cluster_create_time: float | None = None
     self._cluster_ready_time: float | None = None
     self._cluster_delete_time: float | None = None
+
+  @property
+  def persistent_fs_prefix(self) -> str | None:
+    return 'gs://'
 
   def GetDpbVersion(self) -> str | None:
     return FLAGS.dpb_dataproc_image_version or super().GetDpbVersion()
@@ -167,11 +170,6 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
   CLOUD = provider_info.GCP
   SERVICE_TYPE = 'dataproc'
   SUPPORTS_NO_DYNALLOC = True
-
-  def __init__(self, dpb_service_spec):
-    super().__init__(dpb_service_spec)
-    if self.user_managed and not FLAGS.dpb_service_bucket:
-      self.bucket = self._GetCluster()['config']['tempBucket']
 
   def _InitializeMetadata(self) -> None:
     super()._InitializeMetadata()
@@ -517,8 +515,6 @@ class GcpDpbDpgke(GcpDpbDataproc):
     # spec parameters containing '='
     cmd.flags['pools'] = self.spec.gke_cluster_nodepools.replace(':', '=')
     cmd.flags['gke-cluster-location'] = self.spec.gke_cluster_location
-    if FLAGS.dpb_service_bucket:
-      cmd.flags['staging-bucket'] = FLAGS.dpb_service_bucket
     if self.project is not None:
       cmd.flags['project'] = self.project
     cmd.flags['image-version'] = self.spec.version
@@ -777,11 +773,13 @@ class GcpDpbDataprocServerless(
         or 'default'
     )
 
+    basic_data = self.metadata
+
     self.metadata = {
-        'dpb_service': self.metadata['dpb_service'],
-        'dpb_version': self.metadata['dpb_version'],
-        'dpb_service_version': self.metadata['dpb_service_version'],
-        'dpb_batch_id': self.metadata['dpb_cluster_id'],
+        'dpb_service': basic_data['dpb_service'],
+        'dpb_version': basic_data['dpb_version'],
+        'dpb_service_version': basic_data['dpb_service_version'],
+        'dpb_batch_id': basic_data['dpb_cluster_id'],
         'dpb_cluster_shape': cluster_shape,
         'dpb_cluster_size': cluster_size,
         'dpb_cluster_min_executors': min_executors,
@@ -797,12 +795,12 @@ class GcpDpbDataprocServerless(
         'dpb_off_heap_memory_per_node': (
             self.spec.dataproc_serverless_off_heap_memory or 'default'
         ),
-        'dpb_hdfs_type': self.metadata['dpb_hdfs_type'],
-        'dpb_disk_size': self.metadata['dpb_disk_size'],
-        'dpb_service_zone': self.metadata['dpb_service_zone'],
-        'dpb_job_properties': self.metadata['dpb_job_properties'],
+        'dpb_hdfs_type': basic_data['dpb_hdfs_type'],
+        'dpb_disk_size': basic_data['dpb_disk_size'],
+        'dpb_service_zone': basic_data['dpb_service_zone'],
+        'dpb_job_properties': basic_data['dpb_job_properties'],
         'dpb_runtime_engine': self.spec.dataproc_serverless_runtime_engine,
-    }
+    } | self._GetRunStorageLocationMetadata()
 
     if (
         self.spec.dataproc_serverless_engine

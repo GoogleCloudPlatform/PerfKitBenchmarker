@@ -20,11 +20,11 @@ same project. See https://developers.google.com/compute/docs/networking for
 more information about GCE VM networking.
 """
 
-
 import json
 import logging
 import re
 import threading
+import typing
 from typing import Any, Dict, List, Set, Tuple, Union
 
 from absl import flags
@@ -1186,22 +1186,25 @@ class GceNetwork(network.BaseNetwork):
     return firewall_name
 
   @staticmethod
-  def _GetNetworkSpecFromVm(vm) -> GceNetworkSpec:
+  def _GetNetworkSpecFromVmSpec(vm_spec) -> GceNetworkSpec:
     """Returns a BaseNetworkSpec created from VM attributes."""
     return GceNetworkSpec(
-        project=vm.project,
-        zone=vm.zone,
-        cidr=vm.cidr,
-        mtu=vm.mtu,
-        machine_type=vm.machine_type,
-        subnet_names=vm.subnet_names,
+        project=vm_spec.GetProject(),
+        zone=vm_spec.zone,
+        cidr=vm_spec.cidr,
+        mtu=vm_spec.mtu,
+        machine_type=vm_spec.machine_type,
+        subnet_names=vm_spec.subnet_names,
     )
 
   @classmethod
-  def _GetKeyFromNetworkSpec(
-      cls, spec
-  ) -> Union[Tuple[str, str], Tuple[str, str, str], Tuple[str, str, str, str]]:
+  def _GetKeyFromNetworkSpec(cls, spec) -> Union[
+      Tuple[str, str | None],
+      Tuple[str, str | None, str],
+      Tuple[str, str | None, str, str],
+  ]:
     """Returns a key used to register Network instances."""
+    spec = typing.cast(GceNetworkSpec, spec)
     network_key = (cls.CLOUD, spec.project)
     if spec.cidr:
       network_key += (spec.cidr,)

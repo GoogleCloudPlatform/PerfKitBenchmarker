@@ -14,6 +14,11 @@ time_based
 {%- if filename is not none %}
 filename={{filename}}
 {%- endif %}
+filename_format=fill-device.$jobnum.$filenum
+allow_file_create=0
+file_service_type=random
+openfiles=1
+nr_files={{nr_files}}
 do_verify=0
 verify_fatal=0
 group_reporting=1

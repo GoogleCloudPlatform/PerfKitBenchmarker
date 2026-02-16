@@ -39,6 +39,7 @@ from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.rackspace import rackspace_disk
@@ -98,7 +99,7 @@ def RenderBlockDeviceTemplate(image, volume_size):
   return blk_params
 
 
-class RackspaceVmSpec(virtual_machine.BaseVmSpec):
+class RackspaceVmSpec(virtual_machine_spec.BaseVmSpec):
   """Object containing the information needed to create a
 
   RackspaceVirtualMachine.
