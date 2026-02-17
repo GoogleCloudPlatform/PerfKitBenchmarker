@@ -138,9 +138,6 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   # any iodepth and numjobs combination.
   BaseCheck(vm, benchmark_params)
 
-  # We have seen that numjobs = vm's cpus/2 and iodepth = 1 might not meet the
-  # latency target. In that case, we will reduce the numjobs by half and do
-  # binary search over iodepth to find a configuration that meets the target.
   while numjobs > 0:
     left_iodepth = 1
     right_iodepth = max_iodepth
@@ -212,9 +209,12 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
     if numjobs == 1:
       break
     if not latency_under_sla_samples:
-      # latency target was never met for these numjobs
       numjobs_reduced = math.ceil(numjobs / 2)
-      logging.error(
+      # Initial Numjobs = vm's cpus/2 and iodepth = 1 might not meet the latency
+      # target. Reducing the numjobs by half and performing binary search over
+      # iodepth again to find a numjobs and iodepth configuration that meets the
+      # target.
+      logging.info(
           'We never reached latency target for %s, reducing numjobs to %s',
           numjobs,
           numjobs_reduced,
