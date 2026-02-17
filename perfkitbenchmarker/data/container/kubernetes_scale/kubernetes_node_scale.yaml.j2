@@ -1,20 +1,3 @@
-{% if cloud == 'GCP' %}
-apiVersion: cloud.google.com/v1
-kind: ComputeClass
-metadata:
-  name: app-ccc
-spec:
-  nodePoolAutoCreation:
-    enabled: true
-  priorities:
-  - machineType: e2-medium  # smallest machine-type supported by NAP
-    spot: false
-    storage:
-      bootDiskSize: 20
-      bootDiskType: pd-standard
-  whenUnsatisfiable: DoNotScaleUp
-{% endif %}
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -41,10 +24,6 @@ spec:
                 values:
                 - app
             topologyKey: "kubernetes.io/hostname"
-      {% if cloud == 'GCP' %}
-      nodeSelector:
-        cloud.google.com/compute-class: app-ccc
-      {% endif %}
       containers:
       - name: pause
         image: registry.k8s.io/pause:3.10
