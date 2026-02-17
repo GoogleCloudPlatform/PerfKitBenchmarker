@@ -51,6 +51,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import linux_packages
+from perfkitbenchmarker import log_util
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
@@ -1208,7 +1209,7 @@ class YCSBExecutor:
     all_results = []
     parameters = {}
     for workload_index, workload_file in enumerate(workloads):
-      logging.info('Running workload file: %s', workload_file)
+      log_util.LogToShortLogAndRoot('Running workload file: %s', workload_file)
       if FLAGS.ycsb_operation_count:
         parameters = {'operationcount': FLAGS.ycsb_operation_count}
       if FLAGS.ycsb_record_count:
@@ -1257,7 +1258,7 @@ class YCSBExecutor:
       for client_count, target_qps_per_vm in _GetThreadsQpsPerLoaderList(
           len(vms)
       ):
-        logging.info(
+        log_util.LogToShortLogAndRoot(
             'Running with thread count: %s and target QPS: %s',
             client_count,
             target_qps_per_vm,
@@ -1394,14 +1395,14 @@ class YCSBExecutor:
           if target_throughput is None:
             break
           if _DYNAMIC_LOAD_SLEEP_SEC.value > 0:
-            logging.info(
+            log_util.LogToShortLogAndRoot(
                 'Sleeping %s seconds after dynamic load.',
                 _DYNAMIC_LOAD_SLEEP_SEC.value,
             )
             time.sleep(_DYNAMIC_LOAD_SLEEP_SEC.value)
 
         if YCSB_SLEEP_BETWEEN_THREAD_RUNS_SEC.value > 0:
-          logging.info(
+          log_util.LogToShortLogAndRoot(
               'Finished run with thread count: %s. Sleeping for %s seconds.',
               client_count,
               YCSB_SLEEP_BETWEEN_THREAD_RUNS_SEC.value,
@@ -1426,7 +1427,7 @@ class YCSBExecutor:
 
       self.loaded = True
     if FLAGS.ycsb_sleep_after_load_in_sec > 0:
-      logging.info(
+      log_util.LogToShortLogAndRoot(
           'Sleeping %s seconds after load stage.',
           FLAGS.ycsb_sleep_after_load_in_sec,
       )
@@ -1541,7 +1542,9 @@ class YCSBExecutor:
     ending_length = FLAGS.ycsb_timelimit
     ending_threadcount = int(FLAGS.ycsb_threads_per_client[0])
     incremental_targets = self.GetIncrementalQpsTargets(ending_qps)
-    logging.info('Incremental targets: %s', incremental_targets)
+    log_util.LogToShortLogAndRoot(
+        'Incremental targets: %s', incremental_targets
+    )
 
     # Warm-up phase is shorter and doesn't need results parsing
     FLAGS['ycsb_timelimit'].parse(INCREMENTAL_TIMELIMIT_SEC)
@@ -1637,12 +1640,12 @@ class YCSBExecutor:
     while True:
       samples = _RunWorkload(target)
       result = ycsb_stats.ExtractStats(samples, _LOWEST_LATENCY_PERCENTILE)
-      logging.info('Run stats: %s', result)
+      log_util.LogToShortLogAndRoot('Run stats: %s', result)
       if (
           result.read_latency > min_read_latency + _LOWEST_LATENCY_BUFFER
           or result.update_latency > min_update_latency + _LOWEST_LATENCY_BUFFER
       ):
-        logging.info(
+        log_util.LogToShortLogAndRoot(
             'Found lowest latency at %s ops/s. Run had higher read and/or'
             ' update latency than threshold %s read %s ms, update %s ms.',
             prev_result.throughput,
@@ -1734,7 +1737,7 @@ class YCSBExecutor:
                 copy.copy(run_samples[0].metadata),
             )
         )
-        logging.info(
+        log_util.LogToShortLogAndRoot(
             'Run had throughput target %s and measured stats \n %s \n %s, '
             'with CPU utilization %s.',
             target_qps,
@@ -1747,7 +1750,7 @@ class YCSBExecutor:
         elif cpu_utilization > CPU_OPTIMIZATION_TARGET.value:
           upper_bound = measured_qps
         else:
-          logging.info(
+          log_util.LogToShortLogAndRoot(
               'Found CPU utilization percentage between target %s and %s',
               CPU_OPTIMIZATION_TARGET_MIN.value,
               CPU_OPTIMIZATION_TARGET.value,
@@ -1766,7 +1769,7 @@ class YCSBExecutor:
 
         # Sleep between steps for some workloads.
         if _CPU_OPTIMIZATION_SLEEP_MINS.value:
-          logging.info(
+          log_util.LogToShortLogAndRoot(
               'Run phase finished, sleeping for %s minutes before starting the '
               'next run.',
               _CPU_OPTIMIZATION_SLEEP_MINS.value,
@@ -1857,7 +1860,7 @@ class YCSBExecutor:
         stats = ycsb_stats.ExtractStats(
             run_samples, percentile=_LATENCY_THRESHOLD_PERCENTILE.value
         )
-        logging.info(
+        log_util.LogToShortLogAndRoot(
             'Run had throughput target %s and measured stats %s',
             target_qps,
             stats,
@@ -1892,7 +1895,7 @@ class YCSBExecutor:
           upper_bound = target_qps
 
         if _LATENCY_THRESHOLD_SLEEP_MINS.value:
-          logging.info(
+          log_util.LogToShortLogAndRoot(
               'Run phase finished, sleeping for %s minutes before starting the '
               'next run.',
               _LATENCY_THRESHOLD_SLEEP_MINS.value,
