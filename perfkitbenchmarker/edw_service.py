@@ -116,6 +116,12 @@ flags.DEFINE_multi_string(
     'stream should be passed in separately and the queries should be comma '
     'separated, e.g. --concurrency_streams=1,2,3 --concurrency_streams=3,2,1',
 )
+flags.DEFINE_boolean(
+    'edw_warmup_tolerate_failure',
+    False,
+    'If set, the benchmark will tolerate query failures during the warmup '
+    'phase. Mostly useful for testing.',
+)
 flags.DEFINE_string(
     'snowflake_warehouse',
     None,
