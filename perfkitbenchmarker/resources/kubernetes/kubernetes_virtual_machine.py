@@ -594,9 +594,7 @@ class DebianBasedKubernetesVirtualMachine(
       if not _IsKubectlErrorEphemeral(retcode, stderr):
         break
       logging.info('Retrying ephemeral connection issue\n:%s', stderr)
-      import time
 
-      time.sleep(3)
     if retcode:
       error_text = (
           'Got non-zero return code (%s) executing %s\nSTDOUT: %sSTDERR: %s'
