@@ -1,0 +1,5 @@
+-- TODO: Remove hardcoded table name
+INSERT INTO prototype_CUJ2_benchmark_100GB_and_growing
+SELECT *
+FROM
+  prototype_CUJ2_benchmark_100GB_and_growing
