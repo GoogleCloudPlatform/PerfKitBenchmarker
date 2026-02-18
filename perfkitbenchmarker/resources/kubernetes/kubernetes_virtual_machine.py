@@ -50,12 +50,8 @@ SELECTOR_PREFIX = 'pkb'
 
 def _IsKubectlErrorEphemeral(retcode: int, stderr: str) -> bool:
   """Determine if kubectl error is retriable."""
-  return retcode == 1 and (
-      any(
-          error in stderr
-          for error in kubectl.RETRYABLE_KUBECTL_ERRORS
-      )
-      or 'deadline exceeded' in stderr
+  return retcode == 1 and any(
+      error in stderr for error in kubectl.RETRYABLE_KUBECTL_ERRORS
   )
 
 
@@ -540,9 +536,7 @@ class DebianBasedKubernetesVirtualMachine(
     """
     file_name = vm_util.PrependTempDir(posixpath.basename(source_path))
     self.RemoteHostCopy(file_name, source_path, copy_to=False)
-    target.RemoteHostCopy(
-        file_name, remote_path
-    )  # pytype: disable=attribute-error
+    target.RemoteHostCopy(file_name, remote_path)  # pytype: disable=attribute-error
 
   def RemoteHostCopy(
       self,
@@ -594,7 +588,6 @@ class DebianBasedKubernetesVirtualMachine(
       if not _IsKubectlErrorEphemeral(retcode, stderr):
         break
       logging.info('Retrying ephemeral connection issue\n:%s', stderr)
-
     if retcode:
       error_text = (
           'Got non-zero return code (%s) executing %s\nSTDOUT: %sSTDERR: %s'
@@ -706,9 +699,7 @@ class DebianBasedKubernetesVirtualMachine(
     """Returns whether or not preprovisioned data is available."""
     if self.cloud == 'GCP' and FLAGS.gcp_preprovisioned_data_bucket:
       stat_function = gce_virtual_machine.GenerateStatPreprovisionedDataCommand
-      gce_virtual_machine.GceVirtualMachine.InstallCli(
-          self
-      )  # pytype: disable=wrong-arg-types
+      gce_virtual_machine.GceVirtualMachine.InstallCli(self)  # pytype: disable=wrong-arg-types
       # We assume that gsutil is installed to /usr/bin/gsutil on GCE VMs
       # ln -f is idempotent and can be called multiple times
       self.RemoteCommand(
@@ -717,16 +708,12 @@ class DebianBasedKubernetesVirtualMachine(
       )
     elif self.cloud == 'AWS' and FLAGS.aws_preprovisioned_data_bucket:
       stat_function = aws_virtual_machine.GenerateStatPreprovisionedDataCommand
-      aws_virtual_machine.AwsVirtualMachine.InstallCli(
-          self
-      )  # pytype: disable=wrong-arg-types
+      aws_virtual_machine.AwsVirtualMachine.InstallCli(self)  # pytype: disable=wrong-arg-types
     elif self.cloud == 'Azure' and FLAGS.azure_preprovisioned_data_account:
       stat_function = (
           azure_virtual_machine.GenerateStatPreprovisionedDataCommand
       )
-      azure_virtual_machine.AzureVirtualMachine.InstallCli(
-          self
-      )  # pytype: disable=wrong-arg-types
+      azure_virtual_machine.AzureVirtualMachine.InstallCli(self)  # pytype: disable=wrong-arg-types
     else:
       return False
     return self.TryRemoteCommand(stat_function(module_name, filename))
