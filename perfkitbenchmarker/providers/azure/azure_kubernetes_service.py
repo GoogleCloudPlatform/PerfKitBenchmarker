@@ -126,6 +126,8 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     # to make it work with ACR
     self.cluster_version = FLAGS.container_cluster_version
     self._deleted = False
+    # Instantiation required to delete the resource group.
+    self.network = azure_network.AzureNetwork.GetNetwork(spec.vm_spec)
 
   def InitializeNodePoolForCloud(
       self,
