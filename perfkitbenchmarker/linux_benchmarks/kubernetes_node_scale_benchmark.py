@@ -273,10 +273,13 @@ def _GetPodPhaseCounts() -> tuple[dict[str, int], int]:
   Returns:
     A tuple of (phase_name -> count, ready_count).
   """
-  stdout, _, _ = kubectl.RunKubectlCommand(
+  stdout, _, retcode = kubectl.RunKubectlCommand(
       ['get', 'pods', '-l', 'app=app', '-o', 'json'],
       suppress_logging=True,
+      raise_on_failure=False,
   )
+  if retcode:
+    return {}, 0
   pods = json.loads(stdout).get('items', [])
   phase_counts: dict[str, int] = {}
   ready_count = 0
