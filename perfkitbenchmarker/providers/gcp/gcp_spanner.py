@@ -423,18 +423,6 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     stdout, stderr, _ = cmd.Issue(raise_on_failure=False)
     return stdout, stderr
 
-  def RunDDLQuery(self, sql_query: str) -> tuple[str, str]:
-    """Runs a DDL query on the database."""
-    cmd = util.GcloudCommand(
-        self, 'spanner', 'databases', 'ddl', 'update', self.database
-    )
-    cmd.flags['instance'] = self.instance_id
-    cmd.flags['ddl'] = sql_query
-    stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
-    if retcode != 0:
-      logging.error('Failed to run DDL query: %s', sql_query)
-    return stdout, stderr
-
   def _Exists(self, instance_only: bool = False) -> bool:
     """Returns true if the instance and the database exists."""
     _, retcode = self._DescribeInstance(raise_on_failure=False)

@@ -73,9 +73,6 @@ class BenchbaseBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         '--create=true --load=true', self.mock_vm.RemoteCommand.call_args[0][0]
     )
     self.assertIn('-P postgres', self.mock_vm.RemoteCommand.call_args[0][0])
-    self.mock_benchmark_spec.relational_db.RunDDLQuery.assert_called_once_with(
-        'ANALYZE;'
-    )
 
   @flagsaver.flagsaver(
       db_engine=sql_engine_utils.AURORA_DSQL_POSTGRES,
@@ -91,9 +88,6 @@ class BenchbaseBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         '--create=true --load=true', self.mock_vm.RemoteCommand.call_args[0][0]
     )
     self.assertIn('-P auroradsql', self.mock_vm.RemoteCommand.call_args[0][0])
-    self.assertEqual(
-        self.mock_benchmark_spec.relational_db.RunSqlQuery.call_count, 9
-    )
 
   @flagsaver.flagsaver(
       db_engine=sql_engine_utils.AURORA_DSQL_POSTGRES,
@@ -105,9 +99,6 @@ class BenchbaseBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_create_config.assert_called_once_with(self.mock_vm)
     self.mock_override_endpoint.assert_called_once()
     self.mock_vm.RemoteCommand.assert_not_called()
-    self.assertEqual(
-        self.mock_benchmark_spec.relational_db.RunSqlQuery.call_count, 9
-    )
 
   @mock.patch('time.sleep')
   @mock.patch.object(benchbase, 'ParseResults', autospec=True)

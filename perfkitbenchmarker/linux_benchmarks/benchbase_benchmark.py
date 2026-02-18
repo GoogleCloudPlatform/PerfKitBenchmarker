@@ -148,23 +148,6 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     )
     client_vm.RemoteCommand(load_command)
 
-  if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES:
-    benchmark_spec.relational_db.RunDDLQuery('ANALYZE;')
-  elif FLAGS.db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
-    queries = [
-        'ANALYZE public.customer;',
-        'ANALYZE public.district;',
-        'ANALYZE public.history;',
-        'ANALYZE public.item;',
-        'ANALYZE public.new_order;',
-        'ANALYZE public.oorder;',
-        'ANALYZE public.order_line;',
-        'ANALYZE public.stock;',
-        'ANALYZE public.warehouse;',
-    ]
-    for query in queries:
-      benchmark_spec.relational_db.RunSqlQuery(query)
-
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Runs the BenchBase benchmark.

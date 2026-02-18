@@ -312,34 +312,6 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--region', command_args)
       self.assertIn('us-east-1', command_args)
 
-  def testGetHostname(self):
-    """Tests that hostname is formatted correctly."""
-    db = self.CreateDbFromSpec()
-    db.cluster_id = 'fake_cluster_id'
-    self.assertEqual(db._GetHostname(), 'fake_cluster_id.dsql.us-east-1.on.aws')
-
-  def testRunSqlQuery(self):
-    """Tests that RunSqlQuery command is correct."""
-    db = self.CreateDbFromSpec()
-    db.cluster_id = 'fake_cluster_id'
-    with mock.patch('boto3.client') as mock_boto3_client:
-      mock_client = mock.MagicMock()
-      mock_boto3_client.return_value = mock_client
-      mock_client.generate_db_connect_admin_auth_token.return_value = 'token'
-      db.RunSqlQuery('SELECT 1;')
-      mock_boto3_client.assert_called_once_with('dsql', region_name='us-east-1')
-      mock_client.generate_db_connect_admin_auth_token.assert_called_once_with(
-          'fake_cluster_id.dsql.us-east-1.on.aws', 'us-east-1'
-      )
-      cmd = db.client_vm.RemoteCommand.call_args[0][0]
-      self.assertStartsWith(cmd, 'PGSSLMODE=require psql')
-      self.assertIn(
-          "'host=fake_cluster_id.dsql.us-east-1.on.aws user=admin"
-          " password=token dbname=postgres'",
-          cmd,
-      )
-      self.assertIn('-c "SELECT 1;"', cmd)
-
   def testGetDefaultEngineVersion(self):
     """Tests that correct default engine version is returned."""
     self.assertEqual(

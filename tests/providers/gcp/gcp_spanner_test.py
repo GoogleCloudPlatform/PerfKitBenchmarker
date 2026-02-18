@@ -296,19 +296,6 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(size_min.value, 2)
     self.assertEqual(size_max.value, 4)
 
-  def testRunDDLQuery(self):
-    test_instance = GetTestSpannerInstance()
-    test_instance.instance_id = 'pkb-instance-test_uri'
-    test_instance.database = 'pkb-database-test_uri'
-    ddl = 'ALTER TABLE t ADD COLUMN c INT64'
-    with mock.patch.object(
-        util.GcloudCommand, 'Issue', return_value=('', '', 0), autospec=True
-    ) as issue:
-      test_instance.RunDDLQuery(ddl)
-      gcloud_cmd = issue.call_args[0][0]
-      self.assertEqual(gcloud_cmd.flags['instance'], test_instance.instance_id)
-      self.assertEqual(gcloud_cmd.flags['ddl'], ddl)
-
 
 class CreateTest(pkb_common_test_case.PkbCommonTestCase):
 
