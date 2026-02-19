@@ -283,6 +283,33 @@ redis_memtier_session_storage_cluster:
       vm_count: 3
       <<: *redis_memtier_session_storage_disk_spec
 
+# GKE-optimized Redis 7 caching - uses PKB VMs with GKE optimization labels
+gke_optimized_redis_memtier:
+  name: gke_optimized_redis_memtier
+  flags:
+    # Standard Redis settings (using existing flags)
+    redis_server_version: '7.2.6'
+    redis_server_enable_snapshots: False
+    redis_server_io_threads_do_reads: True
+    redis_eviction_policy: allkeys-lru
+    enable_transparent_hugepages: False
+
+    # Memtier settings (using existing flags)
+    memtier_ratio: '1:4'
+    memtier_clients: 12
+    memtier_threads: 32
+    memtier_run_duration: 300
+    memtier_run_count: 10
+    memtier_data_size: 1024
+    memtier_key_maximum: 6400000
+    memtier_pipeline: 1
+
+    # GKE optimization
+    gke_redis_enable_optimization: True
+
+    # Monitoring
+    iostat: True
+    sar: True
 
 sparksql_tpcds_1t:
   name: dpb_sparksql_benchmark
