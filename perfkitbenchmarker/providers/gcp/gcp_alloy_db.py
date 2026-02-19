@@ -15,6 +15,7 @@ from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 import requests
 
@@ -158,13 +159,8 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     )
 
   def _Create(self) -> None:
-    """Creates the Cloud SQL instance and authorizes traffic from anywhere.
+    """See base class."""
 
-    Raises:
-      UnsupportedDatabaseEngineError:
-        if the database is unmanaged and the engine isn't MYSQL.
-      Exception: if an invalid MySQL flag was used.
-    """
     # Create a database cluster
     database_version_string = self._GetEngineVersionString(
         self.spec.engine_version
@@ -186,8 +182,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     else:
       cmd_string.append('--no-enable-continuous-backup')
 
-    cmd = self._GetAlloyDbCommand(cmd_string)
-    _, _, _ = cmd.Issue(timeout=CREATION_TIMEOUT)
+    self._IssueAlloyDbCreateCommand(cmd_string)
 
     if self.spec.db_spec.machine_type is not None:
       machine_shape_param = f'--machine-type={self.spec.db_spec.machine_type}'
@@ -208,9 +203,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
       cmd_string.append('--availability-type=REGIONAL')
     else:
       cmd_string.append('--availability-type=ZONAL')
-
-    cmd = self._GetAlloyDbCommand(cmd_string)
-    cmd.Issue(timeout=CREATION_TIMEOUT)
+    self._IssueAlloyDbCreateCommand(cmd_string)
 
     cmd_string = [
         'instances',
@@ -237,8 +230,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
           f'--read-pool-node-count={_READ_POOL_NODE_COUNT.value}',
           '--instance-type=READ_POOL',
       ]
-      cmd = self._GetAlloyDbCommand(cmd_string)
-      cmd.Issue(timeout=CREATION_TIMEOUT)
+      self._IssueAlloyDbCreateCommand(cmd_string)
 
       # Assign the endpoint for the read replica
       cmd_string = [
@@ -332,6 +324,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
         'SELECT google_columnar_engine_jobs_wait(14400000)', database_name
     )
 
+  @vm_util.Retry()
   def UpdateAlloyDBFlags(
       self,
       columnar_engine_size: int | None,
@@ -397,6 +390,37 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     cmd.flags['zone'] = []
     cmd.flags['region'] = self.region
     return cmd
+
+  def _IssueAlloyDbCreateCommand(
+      self, cmd_string: List[str]
+  ) -> Tuple[str, str, int]:
+    """Issues an AlloyDB command, handling errors and retries.
+
+    Args:
+       cmd_string: The command string to issue.
+
+    Returns:
+       A tuple of stdout, stderr, and retcode.
+    """
+    cmd = self._GetAlloyDbCommand(cmd_string)
+    stdout, stderr, retcode = cmd.Issue(
+        timeout=CREATION_TIMEOUT, raise_on_failure=False
+    )
+
+    if retcode:
+      # If the cluster/instance already exists, we can proceed.
+      if 'already exists' in stderr:
+        return stdout, stderr, retcode
+      if 'an internal error has occurred' in stderr:
+        raise errors.Resource.RetryableCreationError(
+            f'Creation failed due to internal error: {stderr}'
+        )
+      util.CheckGcloudResponseKnownFailures(stderr, retcode)
+      raise errors.VmUtil.IssueCommandError(
+          f'Command failed: {cmd_string}\n{stderr}'
+      )
+
+    return stdout, stderr, retcode
 
   def _IsReady(self) -> bool:
     """Return true if the underlying resource is ready."""
