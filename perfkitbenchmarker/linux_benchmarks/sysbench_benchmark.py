@@ -490,10 +490,10 @@ def _LoadDatabaseInParallel(
     # This command update the secondary index
     # Run all index update in parallel.
     client_vms[0].RobustRemoteCommand(
-        'cd ~/sysbench/ && nice -15 sysbench oltp_read_only'
+        f'cd ~/sysbench/ && nice -15 sysbench {FLAGS.sysbench_testname}'
         f' --tables={FLAGS.sysbench_tables} --table_size=0 '
-        f' --threads={FLAGS.sysbench_tables} --auto-inc=off '
-        '--create_secondary=true --db-driver=pgsql'
+        f' --threads={FLAGS.sysbench_tables}/2 --auto-inc=off'
+        ' --create_tables=false --create_secondary=true --db-driver=pgsql'
         ' --pgsql-host=/tmp prepare'
     )
 
