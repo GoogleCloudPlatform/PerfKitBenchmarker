@@ -69,7 +69,7 @@ index 4d5fcf2..1d55c8d 100644
 -    pps        = (((link_speed / wire_size) * ((port->tx_rate == 0) ? 1.0 : port->tx_rate)) / 100);
 -    pps        = ((pps > 0) ? pps : 1);
 +    uint64_t pps, cpb;
-+    pps        = 100000000; /* Hard-coded PPS */
++    pps        = 50000000; /* Hard-coded PPS */
      cpb        = (rte_get_timer_hz() / pps) * (uint64_t)port->tx_burst; /* Cycles per Burst */
  
      port->tx_cycles = (uint64_t)l2p_get_txcnt(port->pid) * cpb;

@@ -110,8 +110,10 @@ _DPDK_PKTGEN_RXD = flags.DEFINE_integer(
 # _MAX_LCORES is not really useful, pktgen-dpdk is buggy with multiple tx/rx
 # queues so we only need 1 core for 1 tx queue, 1 core for 1 rx queue, and 1 to
 # run the User interface.
-_MAX_LCORES = 16
-_START_RATE = 100000000
+# We are limited to 128 lcores to allow cpu allocation from both sockets in case
+# of a full host machine with 2 sockets with 2 physical NICs.
+_MAX_LCORES = 128
+_START_RATE = 50_000_000
 # Percent difference in PPS between consecutive iterations to terminate binary
 # search.
 _PPS_BINARY_SEARCH_THRESHOLD = 0.01
@@ -151,29 +153,52 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       and receiver_vm.tertiary_mac_addr
       and min(len(sender_vm.internal_ips), len(receiver_vm.internal_ips)) > 2
   ):
-    background_tasks.RunThreaded(
-        lambda vm: PrepareVM(
-            vm,
-            sender_vm.internal_ips[1:3],
-            [sender_vm.secondary_mac_addr, sender_vm.tertiary_mac_addr],
-            receiver_vm.internal_ips[1:3],
-            [receiver_vm.secondary_mac_addr, receiver_vm.tertiary_mac_addr],
-            _PKTGEN_2NIC_FILE,
-        ),
-        [sender_vm, receiver_vm],
-    )
+    pktgen_file = _PKTGEN_2NIC_FILE
+    sender_ips = sender_vm.internal_ips[1:3]
+    receiver_ips = receiver_vm.internal_ips[1:3]
+    sender_macs = [sender_vm.secondary_mac_addr, sender_vm.tertiary_mac_addr]
+    receiver_macs = [
+        receiver_vm.secondary_mac_addr,
+        receiver_vm.tertiary_mac_addr,
+    ]
+    # TODO: b/486014352 - Remove this hacky solution with a long-term solution.
+    if sender_vm.CLOUD == 'GCP':
+      # GCP-Specific Workaround: Realign DPDK interfaces with physical NICs.
+      # GCP assigns physical NICs to subnets in a round-robin fashion.
+      # Our default setup assumes the following mapping:
+      #   - default -> nic0
+      #   - dpdk0   -> nic0
+      #   - dpdk1   -> nic1
+      #
+      # However, GCP actually allocates them as:
+      #   - default -> nic0
+      #   - dpdk0   -> nic1
+      #   - dpdk1   -> nic0
+      #
+      # This mismatch causes spoofing drops on the sender's side. To resolve
+      # this, we swap the IPs and MACs to ensure the DPDK configurations align
+      # correctly with the underlying physical NICs.
+      sender_ips.reverse()
+      receiver_ips.reverse()
+      sender_macs.reverse()
+      receiver_macs.reverse()
   else:
-    background_tasks.RunThreaded(
-        lambda vm: PrepareVM(
-            vm,
-            [sender_vm.internal_ips[1]],
-            [sender_vm.secondary_mac_addr],
-            [receiver_vm.internal_ips[1]],
-            [receiver_vm.secondary_mac_addr],
-            _PKTGEN_FILE,
-        ),
-        [sender_vm, receiver_vm],
-    )
+    pktgen_file = _PKTGEN_FILE
+    sender_ips = [sender_vm.internal_ips[1]]
+    sender_macs = [sender_vm.secondary_mac_addr]
+    receiver_ips = [receiver_vm.internal_ips[1]]
+    receiver_macs = [receiver_vm.secondary_mac_addr]
+  background_tasks.RunThreaded(
+      lambda vm: PrepareVM(
+          vm,
+          sender_ips,
+          sender_macs,
+          receiver_ips,
+          receiver_macs,
+          pktgen_file,
+      ),
+      [sender_vm, receiver_vm],
+  )
   receiver_vm.RemoteCommand(
       'sudo sed -i "s/start all//g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
