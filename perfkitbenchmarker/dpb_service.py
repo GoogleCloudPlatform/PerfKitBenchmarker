@@ -1299,7 +1299,7 @@ class KubernetesSparkCluster(BaseDpbService):
     self.spark_drivers.append(pod)
     try:
       pod.WaitForExit()
-    except container_errors.ContainerException as e:
+    except container_errors.ContainerError as e:
       raise JobSubmissionError() from e
     end_time = datetime.datetime.now()
 
@@ -1494,7 +1494,7 @@ class KubernetesFlinkCluster(BaseDpbService):
     self.flink_jobmanagers.append(pod)
     try:
       pod.WaitForExit()
-    except container_errors.ContainerException as e:
+    except container_errors.ContainerError as e:
       raise JobSubmissionError() from e
     end_time = datetime.datetime.now()
 

@@ -120,13 +120,13 @@ class AciContainer(container_lib.BaseContainer):
 
     @vm_util.Retry(
         timeout=timeout,
-        retryable_exceptions=(container_errors.RetriableContainerException,),
+        retryable_exceptions=(container_errors.RetriableContainerError,),
     )
     def _WaitForExit():
       container = self._GetContainerInstance()['containers'][0]
       state = container['instanceView']['currentState']['state']
       if state != 'Terminated':
-        raise container_errors.RetriableContainerException(
+        raise container_errors.RetriableContainerError(
             f'Container in ({state}). Not yet in expected state Terminated.'
         )
       return container

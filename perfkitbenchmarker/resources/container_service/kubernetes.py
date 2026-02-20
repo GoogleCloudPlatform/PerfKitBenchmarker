@@ -82,7 +82,7 @@ class KubernetesPod:
     if phase == 'Succeeded':
       return
     elif phase == 'Failed':
-      raise errors.FatalContainerException(
+      raise errors.FatalContainerError(
           f'Pod {self.name} failed:\n{yaml.dump(status)}'
       )
     else:
@@ -93,7 +93,7 @@ class KubernetesPod:
             and condition['reason'] == 'Unschedulable'
         ):
           # TODO(pclay): Revisit this when we scale clusters.
-          raise errors.FatalContainerException(
+          raise errors.FatalContainerError(
               f"Pod {self.name} failed to schedule:\n{condition['message']}"
           )
       for container_status in status.get('containerStatuses', []):
@@ -102,7 +102,7 @@ class KubernetesPod:
             'ErrImagePull',
             'ImagePullBackOff',
         ]:
-          raise errors.FatalContainerException(
+          raise errors.FatalContainerError(
               f'Failed to find container image for {self.name}:\n'
               + yaml.dump(waiting_status.get('message'))
           )
@@ -112,7 +112,7 @@ class KubernetesPod:
 
     @vm_util.Retry(
         timeout=timeout,
-        retryable_exceptions=(errors.RetriableContainerException,),
+        retryable_exceptions=(errors.RetriableContainerError,),
     )
     def _WaitForExit():
       pod = self._GetPod()
@@ -122,7 +122,7 @@ class KubernetesPod:
       if phase == 'Succeeded':
         return pod
       else:
-        raise errors.RetriableContainerException(
+        raise errors.RetriableContainerError(
             f'Pod phase ({phase}) not in finished phases.'
         )
 

@@ -87,8 +87,8 @@ class BaseContainer(resource.BaseResource):
       timeout: The timeout to wait in seconds
 
     Raises:
-      FatalContainerException: If the container fails
-      RetriableContainerException: If the container times out wihout succeeding.
+      FatalContainerError: If the container fails
+      RetriableContainerError: If the container times out wihout succeeding.
     """
     raise NotImplementedError()
 
