@@ -492,7 +492,7 @@ def _LoadDatabaseInParallel(
     client_vms[0].RobustRemoteCommand(
         f'cd ~/sysbench/ && nice -15 sysbench {FLAGS.sysbench_testname}'
         f' --tables={FLAGS.sysbench_tables} --table_size=0 '
-        f' --threads={FLAGS.sysbench_tables}/2 --auto-inc=off'
+        f' --threads={FLAGS.sysbench_tables//2} --auto-inc=off'
         ' --create_tables=false --create_secondary=true --db-driver=pgsql'
         ' --pgsql-host=/tmp prepare'
     )
