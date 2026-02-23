@@ -19,6 +19,7 @@ from absl import flags
 from absl import logging
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
@@ -120,8 +121,9 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
         initial_nodes,
     )
   else:
-    logging.warning(
-        'Skipping second scale up: nodes did not return to baseline.',
+    raise errors.Benchmarks.RunError(
+        'Nodes did not return to baseline after scale-down. '
+        'Cannot proceed with second scale-up.'
     )
 
   return scaleup1_samples + scaledown_samples + scaleup2_samples
@@ -356,12 +358,10 @@ def _PollNodeDeletionUntilDone(
       done = True
       break
     if elapsed >= timeout:
-      logging.warning(
+      raise errors.Benchmarks.RunError(
           'Timed out waiting for nodes to scale down.'
-          ' Remaining above threshold: %d',
-          remaining,
+          ' Remaining above threshold: %d' % remaining
       )
-      break
 
     logging.info('Remaining scaled nodes above threshold: %d', remaining)
     time.sleep(_POLL_INTERVAL_SECONDS)
