@@ -30,6 +30,7 @@ from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import dpdk_pktgen
 
 
@@ -147,15 +148,22 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       lambda vm: vm.Install('dpdk_pktgen'),
       [sender_vm, receiver_vm],
   )
+  if vm_util.ShouldRunOnExternalIpAddress():
+    sender_vm_ips = sender_vm.GetExternalIPs()
+    receiver_vm_ips = receiver_vm.GetExternalIPs()
+  else:
+    sender_vm_ips = sender_vm.GetInternalIPs()
+    receiver_vm_ips = receiver_vm.GetInternalIPs()
+
   # If tertiary NIC is present, run DPDK Pktgen on 2 compatible NICs.
   if (
       sender_vm.tertiary_mac_addr
       and receiver_vm.tertiary_mac_addr
-      and min(len(sender_vm.internal_ips), len(receiver_vm.internal_ips)) > 2
+      and min(len(sender_vm_ips), len(receiver_vm_ips)) > 2
   ):
     pktgen_file = _PKTGEN_2NIC_FILE
-    sender_ips = sender_vm.internal_ips[1:3]
-    receiver_ips = receiver_vm.internal_ips[1:3]
+    sender_ips = sender_vm_ips[1:3]
+    receiver_ips = receiver_vm_ips[1:3]
     sender_macs = [sender_vm.secondary_mac_addr, sender_vm.tertiary_mac_addr]
     receiver_macs = [
         receiver_vm.secondary_mac_addr,
@@ -184,9 +192,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       receiver_macs.reverse()
   else:
     pktgen_file = _PKTGEN_FILE
-    sender_ips = [sender_vm.internal_ips[1]]
+    sender_ips = [sender_vm_ips[1]]
     sender_macs = [sender_vm.secondary_mac_addr]
-    receiver_ips = [receiver_vm.internal_ips[1]]
+    receiver_ips = [receiver_vm_ips[1]]
     receiver_macs = [receiver_vm.secondary_mac_addr]
   background_tasks.RunThreaded(
       lambda vm: PrepareVM(

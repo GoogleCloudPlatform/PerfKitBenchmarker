@@ -55,6 +55,7 @@ class BaseOpenStackNetworkTest(pkb_common_test_case.PkbCommonTestCase):
     spec.image = 'test-image'
     spec.install_packages = 'None'
     spec.assign_external_ip = True
+    spec.assign_external_ip_all_nics = False
     spec.background_cpu_threads = 'None'
     spec.background_network_mbits_per_sec = '1'
     spec.background_network_ip_type = 'None'

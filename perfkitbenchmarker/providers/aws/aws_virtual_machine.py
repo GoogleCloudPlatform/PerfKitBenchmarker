@@ -634,8 +634,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     if self.use_dedicated_host and self.use_spot_instance:
       raise ValueError('Tenancy=host is not supported for Spot Instances')
-    self.allocation_id = None
-    self.association_id = None
+    self.allocation_ids = {}
+    self.association_ids = {}
     self.aws_tags = {}
     # this maps the deterministic order
     # of this device in the VM's disk_spec to the device name
@@ -887,36 +887,43 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     Args:
       instance: dict which contains instance info.
     """
-    network_interface_id = None
     for network_interface in instance['NetworkInterfaces']:
-      # The primary network interface (eth0) for the instance.
-      if network_interface['Attachment']['DeviceIndex'] == 0:
-        network_interface_id = network_interface['NetworkInterfaceId']
-        break
-    assert network_interface_id is not None
+      network_interface_id = network_interface['NetworkInterfaceId']
+      device_index = network_interface['Attachment']['DeviceIndex']
+      if (
+          self.assign_external_ip and device_index == 0
+      ) or self.assign_external_ip_all_nics:
+        stdout, _, _ = vm_util.IssueCommand(
+            util.AWS_PREFIX
+            + [
+                'ec2',
+                'allocate-address',
+                f'--region={self.region}',
+                '--domain=vpc',
+            ]
+        )
+        response = json.loads(stdout)
+        public_ip = response['PublicIp']
+        allocation_id = response['AllocationId']
 
-    stdout, _, _ = vm_util.IssueCommand(
-        util.AWS_PREFIX
-        + ['ec2', 'allocate-address', f'--region={self.region}', '--domain=vpc']
-    )
-    response = json.loads(stdout)
-    self.ip_address = response['PublicIp']
-    self.allocation_id = response['AllocationId']
+        self.allocation_ids[public_ip] = allocation_id
+        util.AddDefaultTags(allocation_id, self.region)
+        if device_index == 0:
+          self.ip_address = public_ip
+        self.ip_addresses.append(public_ip)
 
-    util.AddDefaultTags(self.allocation_id, self.region)
-
-    stdout, _, _ = vm_util.IssueCommand(
-        util.AWS_PREFIX
-        + [
-            'ec2',
-            'associate-address',
-            f'--region={self.region}',
-            f'--allocation-id={self.allocation_id}',
-            f'--network-interface-id={network_interface_id}',
-        ]
-    )
-    response = json.loads(stdout)
-    self.association_id = response['AssociationId']
+        stdout, _, _ = vm_util.IssueCommand(
+            util.AWS_PREFIX
+            + [
+                'ec2',
+                'associate-address',
+                f'--region={self.region}',
+                f'--allocation-id={allocation_id}',
+                f'--network-interface-id={network_interface_id}',
+            ]
+        )
+        response = json.loads(stdout)
+        self.association_ids[public_ip] = response['AssociationId']
 
   def _InstallEfa(self):
     """Installs AWS EFA packages.
@@ -1051,6 +1058,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             'Groups': self.group_id,
             'SubnetId': self.network.subnet.id,
         })
+        # Only allowed for single NIC instances.
         if (
             self.assign_external_ip
             and self.network_eni_count == 1
@@ -1280,6 +1288,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     instance = response['Reservations'][0]['Instances'][0]
     if 'PublicIpAddress' in instance:
       self.ip_address = instance['PublicIpAddress']
+      self.ip_addresses.append(instance['PublicIpAddress'])
     else:
       logging.info('VM is pending.')
       raise AwsTransitionalVmRetryableError()
@@ -1318,25 +1327,25 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_util.IssueCommand(cancel_cmd, raise_on_failure=False)
 
     if FLAGS.aws_efa or self.network_eni_count > 1:
-      if self.association_id:
+      for association_id in self.association_ids.values():
         vm_util.IssueCommand(
             util.AWS_PREFIX
             + [
                 'ec2',
                 'disassociate-address',
                 f'--region={self.region}',
-                f'--association-id={self.association_id}',
+                f'--association-id={association_id}',
             ]
         )
 
-      if self.allocation_id:
+      for allocation_id in self.allocation_ids.values():
         vm_util.IssueCommand(
             util.AWS_PREFIX
             + [
                 'ec2',
                 'release-address',
                 f'--region={self.region}',
-                f'--allocation-id={self.allocation_id}',
+                f'--allocation-id={allocation_id}',
             ]
         )
 

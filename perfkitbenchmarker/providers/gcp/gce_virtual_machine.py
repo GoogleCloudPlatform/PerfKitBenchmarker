@@ -747,7 +747,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
             f'queue-count={gcp_flags.GCE_NIC_QUEUE_COUNTS.value[idx]}'
         ]
       no_address_arg = []
-      if not self.assign_external_ip or idx > 0:
+      if not self.assign_external_ip_all_nics and (
+          not self.assign_external_ip or idx > 0
+      ):
         no_address_arg = ['no-address']
       cmd.additional_flags += [
           '--network-interface',
@@ -1126,6 +1128,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     for network_interface in describe_response['networkInterfaces']:
       self.internal_ips.append(network_interface['networkIP'])
+      if 'accessConfigs' in network_interface:
+        self.ip_addresses.append(network_interface['accessConfigs'][0]['natIP'])
 
   @property
   def HasIpAddress(self):

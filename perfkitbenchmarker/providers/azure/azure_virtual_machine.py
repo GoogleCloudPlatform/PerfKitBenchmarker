@@ -763,9 +763,11 @@ class AzureVirtualMachine(
     self.nics: list[AzureNIC] = []
     self.public_ips: list[AzurePublicIPAddress] = []
 
-    public_ip_name = None
     for nic_num, subnet in enumerate(self.network.subnets):
-      if self.assign_external_ip:
+      public_ip_name = None
+      if (
+          self.assign_external_ip and nic_num == 0
+      ) or self.assign_external_ip_all_nics:
         public_ip_name = self.name + '-public-ip' + str(nic_num)
         public_ip = AzurePublicIPAddress(
             self.region, self.availability_zone, public_ip_name
