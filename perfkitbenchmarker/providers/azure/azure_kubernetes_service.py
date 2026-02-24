@@ -173,6 +173,9 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--nodepool-labels',
         f'pkb_nodepool={container_cluster.DEFAULT_NODEPOOL}',
     ] + self._GetNodeFlags(self.default_nodepool)
+    # AKS clusters with more than 256 nodes need to use a larger pod CIDR
+    if self.max_nodes > 256:
+      cmd += ['--pod-cidr', '100.64.0.0/10']
     if self.enable_vpa:
       cmd.append('--enable-vpa')
     if FLAGS.azure_aks_auto_node_provisioning:
@@ -214,6 +217,12 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--labels',
         f'pkb_nodepool={nodepool_config.name}',
     ] + self._GetNodeFlags(nodepool_config)
+    if self._IsAutoscalerEnabled():
+      cmd += [
+          '--enable-cluster-autoscaler',
+          f'--min-count={self.min_nodes}',
+          f'--max-count={self.max_nodes}',
+      ]
     vm_util.IssueCommand(cmd, timeout=600)
 
   def _GetNodeFlags(
