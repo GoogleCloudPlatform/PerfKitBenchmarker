@@ -79,6 +79,9 @@ _WARMUP_DURATION = benchbase.BENCHBASE_WARMUP_DURATION
 _WORKLOAD_DURATION = benchbase.BENCHBASE_WORKLOAD_DURATION
 _WAREHOUSES = benchbase.BENCHBASE_WAREHOUSES
 _RECOVERY_POINT_ARN = aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN
+# Timeout value derived from testing run:
+# https://screenshot.googleplex.com/8USL62xn9oSvABj
+_SPANNER_ANALYZE_TIMEOUT = 60 * 60 * 3
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -149,7 +152,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     client_vm.RemoteCommand(load_command)
 
   if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES:
-    benchmark_spec.relational_db.RunDDLQuery('ANALYZE;')
+    benchmark_spec.relational_db.RunDDLQuery(
+        'ANALYZE;', timeout=_SPANNER_ANALYZE_TIMEOUT
+    )
   elif FLAGS.db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
     queries = [
         'ANALYZE public.customer;',

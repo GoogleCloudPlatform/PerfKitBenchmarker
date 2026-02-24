@@ -64,7 +64,7 @@ class BenchbaseBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   @flagsaver.flagsaver(db_engine=sql_engine_utils.SPANNER_POSTGRES)
   def test_prepare_spanner_postgres_loads(self):
     benchbase_benchmark.Prepare(self.mock_benchmark_spec)
-
+    timeout = 60 * 60 * 3
     self.mock_vm.Install.assert_called_once_with('benchbase')
     self.mock_create_config.assert_called_once_with(self.mock_vm)
     self.mock_override_endpoint.assert_not_called()
@@ -74,7 +74,7 @@ class BenchbaseBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertIn('-P postgres', self.mock_vm.RemoteCommand.call_args[0][0])
     self.mock_benchmark_spec.relational_db.RunDDLQuery.assert_called_once_with(
-        'ANALYZE;'
+        'ANALYZE;', timeout=timeout
     )
 
   @flagsaver.flagsaver(
