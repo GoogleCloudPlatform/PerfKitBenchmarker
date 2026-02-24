@@ -36,8 +36,6 @@ dpdk_pktgen_multi_nic_small_pkt_loss:
     gce_subnet_name: default,dpdk0,dpdk1
     gce_nic_types: GVNIC,GVNIC,GVNIC
     gce_nic_queue_counts: default,default,default
-    gce_network_type: custom
-    ip_addresses: INTERNAL
     dpdk_pktgen_tx_rx_lcores_list: '[2:1]#[48:49];[1:2]#[48:49]'
 
 dpdk_pktgen_multi_nic:
@@ -46,8 +44,6 @@ dpdk_pktgen_multi_nic:
     gce_subnet_name: default,dpdk0,dpdk1
     gce_nic_types: GVNIC,GVNIC,GVNIC
     gce_nic_queue_counts: default,default,default
-    gce_network_type: custom
-    ip_addresses: INTERNAL
     dpdk_pktgen_tx_rx_lcores_list: '[2:1]#[48:49];[1:2]#[48:49]'
 
 speccpu2017_int_rate_GCC_O3_x86:

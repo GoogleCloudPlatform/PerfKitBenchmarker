@@ -527,6 +527,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
             'dpdk_pktgen_packet_loss_threshold': packet_loss_threshold,
             'dpdk_pktgen_tx_cores': tx_cores,
             'dpdk_pktgen_rx_cores': rx_cores,
+            'ip_type': FLAGS.ip_addresses,
         })
         best_run_results = {
             'valid_total_sender_tx_pkts': s_tx,
