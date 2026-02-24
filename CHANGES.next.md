@@ -270,6 +270,8 @@
 -   Add support for Debian 13.
 -   Add `--dpb_spark_event_logs` flag to export Spark event logs in dpb service
     benchmarks.
+-   Truncate duplicated logs to make the pkb.log more human readable. If not
+    desired, turn it off with `--notruncate_duplicate_logs`.
 
 ### Enhancements:
 
