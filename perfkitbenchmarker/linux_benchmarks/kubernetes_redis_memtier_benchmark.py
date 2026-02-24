@@ -28,7 +28,6 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import redis_memtier_benchmark
 from perfkitbenchmarker.linux_packages import memtier
@@ -92,7 +91,7 @@ def _PrepareCluster(bm_spec: _BenchmarkSpec):
   """Prepares a cluster to run the Redis benchmark."""
   redis_port = redis_server.GetRedisPorts()[0]
   replicas = bm_spec.container_cluster.nodepools['redis'].num_nodes * 2
-  with kubernetes_helper.CreateRenderedManifestFile(
+  with kubernetes_commands.CreateRenderedManifestFile(
       'container/kubernetes_redis_memtier/kubernetes_redis_memtier.yaml.j2',
       {
           'redis_replicas': replicas,

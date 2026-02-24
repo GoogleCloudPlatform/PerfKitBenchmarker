@@ -28,8 +28,8 @@ from perfkitbenchmarker import beam_pipeline_options
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import dpb_constants
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 BENCHMARK_NAME = 'beam_integration_benchmark'
 
@@ -122,7 +122,7 @@ def CheckPrerequisites(benchmark_config_spec):
 def Prepare(benchmark_spec):
   beam_benchmark_helper.InitializeBeamRepo(benchmark_spec)
   benchmark_spec.always_call_cleanup = True
-  kubernetes_helper.CreateAllFiles(getKubernetesScripts())
+  kubernetes_commands.CreateAllFiles(getKubernetesScripts())
   pass
 
 
@@ -185,5 +185,5 @@ def Run(benchmark_spec):
 
 
 def Cleanup(benchmark_spec):
-  kubernetes_helper.DeleteAllFiles(getKubernetesScripts())
+  kubernetes_commands.DeleteAllFiles(getKubernetesScripts())
   pass

@@ -225,11 +225,12 @@ def get_write_mock_from_temp_file_mock(temp_file_mock):
 
   The reason for the __enter__() in this context is due to the fact
   that NamedTemporaryFile is used in a context manager inside
-  kubernetes_helper.py.
+  kubernetes_commands.py.
 
   Args:
    temp_file_mock: mock object of the NamedTemporaryFile() contextManager
   """
+
   return temp_file_mock().__enter__().write
 
 
@@ -457,11 +458,11 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
       kub_vm._WaitForPodBootCompletion = lambda: None  # pylint: disable=invalid-name
       kub_vm._Create()
       command = issue_command.call_args[0][0]
-      command_string = ' '.join(command[:4])
+      command_string = ' '.join(command[:5])
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(
-          '{} --kubeconfig={} create -f'.format(_KUBECTL, _KUBECONFIG),
+          '{} --kubeconfig {} create -f'.format(_KUBECTL, _KUBECONFIG),
           command_string,
       )
 
@@ -576,11 +577,11 @@ class KubernetesVirtualMachineWithGpusTestCase(
       kub_vm._WaitForPodBootCompletion = lambda: None
       kub_vm._Create()
       command = issue_command.call_args[0][0]
-      command_string = ' '.join(command[:4])
+      command_string = ' '.join(command[:5])
 
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(
-          '{} --kubeconfig={} create -f'.format(_KUBECTL, _KUBECONFIG),
+          '{} --kubeconfig {} create -f'.format(_KUBECTL, _KUBECONFIG),
           command_string,
       )
 

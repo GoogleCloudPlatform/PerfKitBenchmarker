@@ -18,11 +18,11 @@ from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import events
-from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import container
 from perfkitbenchmarker.resources.container_service import errors
 from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 import requests
 import yaml
 
@@ -39,6 +39,17 @@ flags.DEFINE_string(
 )
 
 flags.DEFINE_string('kubectl', 'kubectl', 'Path to kubectl tool')
+
+flags.DEFINE_integer(
+    'k8s_get_retry_count',
+    18,
+    'Maximum number of waits for getting LoadBalancer external IP',
+)
+flags.DEFINE_integer(
+    'k8s_get_wait_interval',
+    10,
+    'Wait interval for getting LoadBalancer external IP',
+)
 
 _K8S_INGRESS = """
 apiVersion: extensions/v1beta1
@@ -225,7 +236,7 @@ class KubernetesContainerService(container.BaseContainerService):
     with vm_util.NamedTemporaryFile() as tf:
       tf.write(_K8S_INGRESS.format(service_name=self.name))
       tf.close()
-      kubernetes_helper.CreateFromFile(tf.name)
+      kubernetes_commands.CreateFromFile(tf.name)
 
   def _GetIpAddress(self):
     """Attempts to set the Service's ip address."""
@@ -258,7 +269,7 @@ class KubernetesContainerService(container.BaseContainerService):
     with vm_util.NamedTemporaryFile() as tf:
       tf.write(_K8S_INGRESS.format(service_name=self.name))
       tf.close()
-      kubernetes_helper.DeleteFromFile(tf.name)
+      kubernetes_commands.DeleteFromFile(tf.name)
 
     delete_cmd = ['delete', 'deployment', self.name]
     kubectl.RunKubectlCommand(delete_cmd, raise_on_failure=False)

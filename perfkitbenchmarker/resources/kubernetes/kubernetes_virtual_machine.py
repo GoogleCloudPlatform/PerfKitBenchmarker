@@ -24,7 +24,6 @@ from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
@@ -35,6 +34,7 @@ from perfkitbenchmarker.providers.azure import azure_virtual_machine
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.resources.container_service import container as container_service_lib
 from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.kubernetes import flags as k8s_flags
 from perfkitbenchmarker.resources.kubernetes import kubernetes_disk
 from perfkitbenchmarker.resources.kubernetes import kubernetes_pod_spec
@@ -165,22 +165,16 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     create_rc_body = self._BuildPodBody()
     logging.info('About to create a pod with the following configuration:')
     logging.info(create_rc_body)
-    kubernetes_helper.CreateResource(create_rc_body)
+    kubernetes_commands.CreateResource(create_rc_body)
 
   def _IsReady(self) -> bool:
     """Need to wait for the PODs to get up, they're created with a little delay."""
-    exists_cmd = [
-        FLAGS.kubectl,
-        '--kubeconfig=%s' % FLAGS.kubeconfig,
-        'get',
-        'pod',
-        '-o=json',
-        self.name,
-    ]
     logging.info('Waiting for POD %s', self.name)
-    pod_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
-    if pod_info:
-      pod_info = json.loads(pod_info)
+    pod_info_stdout, _, _ = kubectl.RunKubectlCommand(
+        ['get', 'pod', '-o=json', self.name], raise_on_failure=False
+    )
+    if pod_info_stdout:
+      pod_info = json.loads(pod_info_stdout)
       containers = pod_info['spec']['containers']
       if len(containers) == 1:
         pod_status = pod_info['status']['phase']
@@ -198,29 +192,18 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Delete(self):
     """Deletes a POD."""
-    delete_pod = [
-        FLAGS.kubectl,
-        '--kubeconfig=%s' % FLAGS.kubeconfig,
-        'delete',
-        'pod',
-        self.name,
-    ]
-    stdout, _, _ = vm_util.IssueCommand(delete_pod, raise_on_failure=False)
+    stdout, _, _ = kubectl.RunKubectlCommand(
+        ['delete', 'pod', self.name], raise_on_failure=False
+    )
     logging.info(stdout.rstrip())
 
   @vm_util.Retry(poll_interval=10, max_retries=20)
   def _Exists(self) -> bool:
     """POD should have been already created but this is a double check."""
-    exists_cmd = [
-        FLAGS.kubectl,
-        '--kubeconfig=%s' % FLAGS.kubeconfig,
-        'get',
-        'pod',
-        '-o=json',
-        self.name,
-    ]
-    pod_info, _, _ = vm_util.IssueCommand(exists_cmd, raise_on_failure=False)
-    if pod_info:
+    pod_info_stdout, _, _ = kubectl.RunKubectlCommand(
+        ['get', 'pod', '-o=json', self.name], raise_on_failure=False
+    )
+    if pod_info_stdout:
       return True
     return False
 
@@ -244,7 +227,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _GetInternalIp(self):
     """Gets the POD's internal ip address."""
-    pod_ip = kubernetes_helper.Get('pods', self.name, '', '.status.podIP')
+    pod_ip = kubernetes_commands.Get('pods', self.name, '', '.status.podIP')
 
     if not pod_ip:
       raise Exception('Internal POD IP address not found. Retrying.')
@@ -254,7 +237,9 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.ip_address = pod_ip
     if self.sriov_network:
       annotations = json.loads(
-          kubernetes_helper.Get('pods', self.name, '', '.metadata.annotations')
+          kubernetes_commands.Get(
+              'pods', self.name, '', '.metadata.annotations'
+          )
       )
       sriov_ip = json.loads(annotations['k8s.v1.cni.cncf.io/network-status'])[
           1

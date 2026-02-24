@@ -10,8 +10,11 @@ import logging
 import multiprocessing
 import queue as py_queue
 import re
+import tempfile
 import time
 from typing import Any, Dict, Iterable, Iterator, Optional, Sequence
+from absl import flags
+import jinja2
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -19,6 +22,8 @@ from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_events
 from perfkitbenchmarker.sample import Sample
 import yaml
+
+FLAGS = flags.FLAGS
 
 
 def ApplyManifest(
@@ -108,6 +113,18 @@ def ConvertManifestToYamlDicts(
       manifest_file, trim_spaces=False, **kwargs
   )
   return vm_util.ReadYamlAsDicts(manifest)
+
+
+def CreateRenderedManifestFile(filename: str, config: dict[str, Any]):
+  """Returns a file containing a rendered Jinja manifest (.j2) template."""
+  manifest_filename = data.ResourcePath(filename)
+  environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
+  with open(manifest_filename) as manifest_file:
+    manifest_template = environment.from_string(manifest_file.read())
+  rendered_yaml = tempfile.NamedTemporaryFile(mode='w')
+  rendered_yaml.write(manifest_template.render(config))
+  rendered_yaml.flush()
+  return rendered_yaml
 
 
 def ApplyYaml(
@@ -836,3 +853,80 @@ def CopyFilesFromPod(
   ]
 
   kubectl.RunRetryableKubectlCommand(get_cmd, **kwargs)
+
+
+def CreateFromFile(file_name: str) -> None:
+  """Executes a kubectl create -f command."""
+  create_cmd = ['create', '-f', file_name]
+  kubectl.RunRetryableKubectlCommand(create_cmd)
+
+
+def DeleteFromFile(file_name: str) -> None:
+  """Executes a kubectl delete -f command."""
+  delete_cmd = ['delete', '-f', file_name, '--ignore-not-found']
+  kubectl.RunRetryableKubectlCommand(delete_cmd)
+
+
+def DeleteAllFiles(file_list: Iterable[str]) -> None:
+  """Executes a kubectl delete -f command for each file in the list."""
+  for file in file_list:
+    DeleteFromFile(file)
+
+
+def CreateAllFiles(file_list: Iterable[str]) -> None:
+  """Executes a kubectl create -f command for each file in the list."""
+  for file in file_list:
+    CreateFromFile(file)
+
+
+def Get(
+    resource: str,
+    resource_instance_name: str = '',
+    label_filter: str = '',
+    json_selector: str = '',
+) -> str:
+  """Executes a kubectl get command and returns the output."""
+  get_cmd = ['get', resource]
+  if resource_instance_name:
+    get_cmd.append(resource_instance_name)
+  if label_filter:
+    get_cmd.append('-l ' + label_filter)
+  get_cmd.append('-ojsonpath={{{}}}'.format(json_selector))
+  stdout, stderr, _ = kubectl.RunKubectlCommand(get_cmd, raise_on_failure=False)
+  if stderr:
+    raise errors.VmUtil.IssueCommandError(
+        'Error received from kubectl get: ' + stderr
+    )
+  return stdout
+
+
+def GetWithWaitForContents(
+    resource: str,
+    resource_instance_name: str = '',
+    label_filter: str = '',
+    json_selector: str = '',
+) -> str:
+  """Executes a kubectl get command and waits for output."""
+  ret = Get(resource, resource_instance_name, label_filter, json_selector)
+  num_waits_left = FLAGS.k8s_get_retry_count
+  while not ret and num_waits_left > 0:
+    time.sleep(FLAGS.k8s_get_wait_interval)
+    ret = Get(resource, resource_instance_name, label_filter, json_selector)
+    num_waits_left -= 1
+  return ret
+
+
+def CreateResource(resource_body: str) -> None:
+  """Creates a Kubernetes resource from a string body."""
+  with vm_util.NamedTemporaryFile(mode='w') as tf:
+    tf.write(resource_body)
+    tf.close()
+    CreateFromFile(tf.name)
+
+
+def DeleteResourceFromBody(resource_body: str) -> None:
+  """Deletes a Kubernetes resource from a string body."""
+  with vm_util.NamedTemporaryFile(mode='w') as tf:
+    tf.write(resource_body)
+    tf.close()
+    DeleteFromFile(tf.name)
