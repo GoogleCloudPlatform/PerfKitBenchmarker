@@ -704,9 +704,7 @@ class EksKarpenterCluster(BaseEksCluster):
             }],
         },
         'iamIdentityMappings': [{
-            'arn': (
-                f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}'
-            ),
+            'arn': f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}',
             'username': 'system:node:{{EC2PrivateDNSName}}',
             'groups': ['system:bootstrappers', 'system:nodes'],
         }],
@@ -1013,13 +1011,13 @@ class EksKarpenterCluster(BaseEksCluster):
         '--set',
         f'settings.interruptionQueue={self.name}',
         '--set',
-        'controller.resources.requests.cpu=1',
+        'controller.resources.requests.cpu=4',
         '--set',
-        'controller.resources.requests.memory=1Gi',
+        'controller.resources.requests.memory=16Gi',
         '--set',
-        'controller.resources.limits.cpu=1',
+        'controller.resources.limits.cpu=4',
         '--set',
-        'controller.resources.limits.memory=1Gi',
+        'controller.resources.limits.memory=16Gi',
         '--set',
         'logLevel=debug',
         '--wait',
@@ -1175,6 +1173,8 @@ class EksKarpenterCluster(BaseEksCluster):
         suppress_failure=lambda stdout, stderr, retcode: (
             'no matching resources found' in stderr.lower()
             or 'timed out' in stderr.lower()
+            or 'context deadline exceeded' in stderr.lower()
+            or 'unable to connect to the server' in stderr.lower()
         ),
     )
     # Force terminate remaining EC2 instances
