@@ -653,8 +653,6 @@ kvrocks_memtier:
   name: kvrocks_memtier
   flags:
     fio_fill_block_size: 64k
-    data_disk_type: local
-    num_striped_disks: 8
     memtier_protocol: 'redis'
     memtier_cluster_mode: True
     memtier_clients: 1
