@@ -62,7 +62,8 @@ ALLOYDB_DATABASE_VERSION_MAPPING = {
 
 DEFAULT_ENGINE_VERSION = '17'
 CREATION_TIMEOUT = 30 * 60
-IS_READY_TIMEOUT = 600  # 10 minutes
+IS_READY_TIMEOUT = 10 * 60
+UPDATE_TIMEOUT = 60 * 60
 
 
 class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
@@ -324,7 +325,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
         'SELECT google_columnar_engine_jobs_wait(14400000)', database_name
     )
 
-  @vm_util.Retry()
+  @vm_util.Retry(timeout=UPDATE_TIMEOUT)
   def UpdateAlloyDBFlags(
       self,
       columnar_engine_size: int | None,
