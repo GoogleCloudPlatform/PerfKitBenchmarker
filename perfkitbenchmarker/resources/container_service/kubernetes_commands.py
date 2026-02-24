@@ -703,15 +703,19 @@ def GetPodNames() -> list[str]:
   return GetAllNamesForResourceType('pods')
 
 
-def GetNodeNames() -> list[str]:
+def GetNodeNames(suppress_logging: bool = False) -> list[str]:
   """Get the node names for the cluster."""
-  return GetAllNamesForResourceType('nodes')
+  return GetAllNamesForResourceType('nodes', suppress_logging=suppress_logging)
 
 
-def GetAllNamesForResourceType(resource_type: str) -> list[str]:
+def GetAllNamesForResourceType(
+    resource_type: str,
+    suppress_logging: bool = False,
+) -> list[str]:
   """Get all names for the specified resource. Type should be plural."""
   stdout, _, _ = kubectl.RunKubectlCommand(
-      ['get', resource_type, '-o', 'jsonpath={.items[*].metadata.name}']
+      ['get', resource_type, '-o', 'jsonpath={.items[*].metadata.name}'],
+      suppress_logging=suppress_logging,
   )
   return stdout.split()
 

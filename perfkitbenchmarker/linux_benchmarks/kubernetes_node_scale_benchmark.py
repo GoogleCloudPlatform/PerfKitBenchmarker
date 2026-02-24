@@ -323,14 +323,17 @@ def _PollNodeDeletionUntilDone(
     A tuple of (samples, whether node count reached acceptable level).
   """
   acceptable_count = initial_node_count + _SCALE_DOWN_NODE_BUFFER
-  scaled_nodes = set(kubernetes_commands.GetNodeNames()) - initial_nodes
+  scaled_nodes = (
+      set(kubernetes_commands.GetNodeNames(suppress_logging=True))
+      - initial_nodes
+  )
   deletion_times: dict[str, float] = {}
   samples: list[sample.Sample] = []
   start = time.monotonic()
   done = False
 
   while True:
-    current_nodes = set(kubernetes_commands.GetNodeNames())
+    current_nodes = set(kubernetes_commands.GetNodeNames(suppress_logging=True))
     elapsed = time.monotonic() - start
 
     # Record deletion timestamps for nodes that disappeared.
