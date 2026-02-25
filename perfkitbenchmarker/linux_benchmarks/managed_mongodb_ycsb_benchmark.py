@@ -29,9 +29,6 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import ycsb
-# Needed in order to register spec:
-from perfkitbenchmarker.providers.aws import documentdb  # pylint: disable=unused-import
-from perfkitbenchmarker.providers.gcp import firestore  # pylint: disable=unused-import
 
 
 _READ_PREFERENCE = flags.DEFINE_string(

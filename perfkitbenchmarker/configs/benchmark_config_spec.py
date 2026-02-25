@@ -48,6 +48,15 @@ from perfkitbenchmarker.resources.vertex_vector_search import vvs_resource_spec
 _NONE_OK = {'default': None, 'none_ok': True}
 
 
+def _LoadProvider(config, flag_values):
+  """Loads the provider associated with the config."""
+  cloud = config.get('cloud')
+  if not cloud or flag_values['cloud'].present:
+    cloud = flag_values.cloud
+  if cloud:
+    providers.LoadProvider(cloud)
+
+
 class _DpbApplicationListDecoder(option_decoders.ListDecoder):
   """Decodes the list of applications to be enabled on the dpb service."""
 
@@ -800,11 +809,7 @@ class _RelationalDbDecoder(option_decoders.TypeVerifier):
         value, component_full_name, flag_values
     )
     # LoadProvider is required for resources to be registered.
-    cloud = relational_db_config.get('cloud')
-    if flag_values['cloud'].present:
-      cloud = flag_values.cloud
-    if cloud:
-      providers.LoadProvider(cloud)
+    _LoadProvider(relational_db_config, flag_values)
 
     if 'engine' in relational_db_config:
       if flag_values['db_engine'].present:
@@ -848,6 +853,8 @@ class _NonRelationalDbDecoder(option_decoders.TypeVerifier):
     non_relational_db_config = super().Decode(
         value, component_full_name, flag_values
     )
+    _LoadProvider(non_relational_db_config, flag_values)
+
     service_type = None
     if 'service_type' in non_relational_db_config:
       service_type = non_relational_db_config['service_type']

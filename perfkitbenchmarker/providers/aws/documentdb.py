@@ -35,38 +35,6 @@ _ON_DEMAND = 'PAY_PER_REQUEST'
 _PROVISIONED = 'PROVISIONED'
 
 FLAGS = flags.FLAGS
-_CLUSTER_NAME = flags.DEFINE_string(
-    'aws_documentdb_cluster_name',
-    None,
-    'The name of the documentdb cluster. This makes the resource user managed'
-    ' and assumes the correct zone is passed in.',
-)
-_INSTANCE_CLASS = flags.DEFINE_string(
-    'aws_documentdb_instance_class',
-    None,
-    'The instance class to use for the documentdb cluster. Corresponds to the'
-    ' --db-instance-class parameter for the create command.',
-)
-_REPLICA_COUNT = flags.DEFINE_integer(
-    'aws_documentdb_replica_count',
-    0,
-    'The number of replicas to use for the documentdb cluster.',
-)
-_ZONES = flags.DEFINE_list(
-    'aws_documentdb_zones',
-    None,
-    'The zones to use for the documentdb cluster.',
-)
-_TLS = flags.DEFINE_bool(
-    'aws_documentdb_tls',
-    False,
-    'Whether to enable TLS for the documentdb cluster.',
-)
-_SNAPSHOT = flags.DEFINE_string(
-    'aws_documentdb_snapshot',
-    None,
-    'If supplied, creates the DocumentDB instance from the snapshot.',
-)
 
 _DEFAULT_ZONES = ['us-east-1a', 'us-east-1b', 'us-east-1c']
 _DEFAULT_STORAGE_TYPE = 'iopt1'
