@@ -16,7 +16,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.linux_packages import hammerdb
-from perfkitbenchmarker.providers.gcp import gcp_alloy_db  # pylint: disable=unused-import
+from perfkitbenchmarker.providers.gcp import gcp_alloy_db
 
 
 # Update this version when changing a config

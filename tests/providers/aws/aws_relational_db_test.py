@@ -16,6 +16,7 @@
 import builtins
 import contextlib
 import datetime
+import inspect
 import json
 import os
 import textwrap
@@ -24,16 +25,15 @@ import unittest
 
 from absl import flags
 import mock
+from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
+from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.providers.aws import aws_aurora_db  # pylint: disable=unused-import
 from perfkitbenchmarker.providers.aws import aws_disk
-from perfkitbenchmarker.providers.aws import aws_rds_db  # pylint: disable=unused-import
 from perfkitbenchmarker.providers.aws import aws_relational_db
-from perfkitbenchmarker.sql_engine_utils import AURORA_POSTGRES
-from perfkitbenchmarker.sql_engine_utils import MYSQL
 from tests import matchers
 from tests import pkb_common_test_case
 
@@ -69,6 +69,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
+    providers.LoadProvider(provider_info.AWS)
     FLAGS['run_uri'].value = '123'
     FLAGS['use_managed_db'].parse(True)
 
@@ -114,7 +115,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'NAME', **{'machine_type': 'db.t1.micro', 'zone': 'us-west-2b'}
     )
     spec_dict = {
-        'engine': MYSQL,
+        'engine': sql_engine_utils.MYSQL,
         'engine_version': '5.7.11',
         'run_uri': '123',
         'database_name': 'fakedbname',
@@ -204,7 +205,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
 
     spec_dict = {
-        'engine': AURORA_POSTGRES,
+        'engine': sql_engine_utils.AURORA_POSTGRES,
         'run_uri': '123',
         'database_name': 'fakedbname',
         'database_password': 'fakepassword',
@@ -604,6 +605,38 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     mock_start.assert_called_once()
     mock_super_collect.assert_called_once()
     db.client_vms[0].DowngradeToCheapInstance.assert_called_once()
+
+
+class ConstructAwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  def testConstructRelationalDbFromYaml(self):
+    FLAGS.run_uri = 'unused'
+    test_spec = inspect.cleandoc("""
+    sysbench:
+      relational_db:
+        engine: mysql
+        db_spec:
+          AWS:
+            machine_type: db.m4.large
+            zone: us-west-1a
+        db_disk_spec:
+          AWS:
+            disk_size: 50
+            disk_type: gp2
+        vm_groups:
+          clients:
+            vm_spec: *default_dual_core
+            disk_spec: *default_50_gb
+    """)
+    FLAGS.cloud = 'AWS'
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        test_spec, 'sysbench'
+    )
+    spec.ConstructRelationalDb()
+    # Avoid instance-of checks to verify the class is imported correctly.
+    self.assertEqual(
+        spec.relational_db.__class__.__name__, 'AwsRDSRelationalDb'
+    )
 
 
 if __name__ == '__main__':

@@ -30,8 +30,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.linux_packages import benchbase
-# Needed in order to register spec:
-from perfkitbenchmarker.providers.aws import aws_aurora_dsql_db  # pylint: disable=unused-import
+from perfkitbenchmarker.providers.aws import aws_aurora_dsql_db
 
 
 SPANNER_POSTGRES = sql_engine_utils.SPANNER_POSTGRES
