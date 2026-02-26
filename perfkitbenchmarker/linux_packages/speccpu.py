@@ -147,7 +147,7 @@ def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
 
   scratch_dir = vm.GetScratchDir()
   cfg_member = '{}/config/{}'.format(
-      speccpu_vm_state.base_spec_dir, runspec_config
+      speccpu_vm_state.base_spec_dir, os.path.basename(runspec_config)
   )
   required_members = itertools.chain(
       speccpu_vm_state.required_members, [cfg_member]

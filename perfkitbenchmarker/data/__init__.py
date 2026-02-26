@@ -153,20 +153,26 @@ class PackageResourceLoader(ResourceLoader):
 
 
 DATA_PACKAGE_NAME = 'perfkitbenchmarker.data'
-YCSB_WORKLOAD_DIR_NAME = os.path.join(
-    os.path.dirname(perfkitbenchmarker.__file__), 'data/ycsb'
-)
-EDW_SCRIPT_DIR_NAME = os.path.join(
-    os.path.dirname(perfkitbenchmarker.__file__), 'data/edw'
-)
+# These subdirectories of data/ can be looked up with data.ResourcePath without
+# having to specify the subdirectory name.
+DATA_SUBDIRECTORIES = [
+    'edw',
+    'speccpu17',
+    'ycsb',
+]
 SCRIPT_PACKAGE_NAME = 'perfkitbenchmarker.scripts'
 CONFIG_PACKAGE_NAME = 'perfkitbenchmarker.configs'
 DEFAULT_RESOURCE_LOADERS = [
     PackageResourceLoader(DATA_PACKAGE_NAME),
-    FileResourceLoader(YCSB_WORKLOAD_DIR_NAME),
-    FileResourceLoader(EDW_SCRIPT_DIR_NAME),
     PackageResourceLoader(SCRIPT_PACKAGE_NAME),
     PackageResourceLoader(CONFIG_PACKAGE_NAME),
+] + [
+    FileResourceLoader(
+        os.path.join(
+            os.path.dirname(perfkitbenchmarker.__file__), 'data', sub_dir
+        )
+    )
+    for sub_dir in DATA_SUBDIRECTORIES
 ]
 
 
