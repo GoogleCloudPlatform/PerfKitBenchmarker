@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-proxy-deployment
+spec:
+  replicas: {{ nginx_proxy_replicas }}
+  selector:
+    matchLabels:
+      app: nginx-proxy
+  template:
+    metadata:
+      labels:
+        app: nginx-proxy
+    spec:
+      {% if runtime_class_name %}
+      runtimeClassName: {{ runtime_class_name }}
+      {% endif %}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: pkb_nodepool
+                operator: In
+                values:
+                - nginx
+      initContainers:
+      - name: setup-ssl
+        image: {{ nginx_image }}
+        command: ['/bin/bash', '-c']
+        args:
+        - |
+          mkdir -p /etc/nginx/ssl
+          openssl req -x509 -nodes -newkey ec:<(openssl ecparam -name secp384r1) -keyout /etc/nginx/ssl/ecdsa.key -out /etc/nginx/ssl/ecdsa.crt -days 365 -subj "/CN=$HOSTNAME"
+        volumeMounts:
+        - name: ssl-volume
+          mountPath: /etc/nginx/ssl
+      containers:
+      - name: nginx-proxy
+        image: {{ nginx_image }}
+        ports:
+        - containerPort: {{ nginx_port }}
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx-proxy.conf
+        - name: ssl-volume
+          mountPath: /etc/nginx/ssl
+      volumes:
+      - name: ssl-volume
+        emptyDir: {}
+      - name: config-volume
+        configMap:
+          name: nginx-configs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-cluster
+spec:
+  type: LoadBalancer
+  ports:
+  - port: {{ nginx_port }}
+    targetPort: {{ nginx_port }}
+  selector:
+    app: nginx-proxy
