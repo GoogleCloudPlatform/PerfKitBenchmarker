@@ -28,6 +28,8 @@ from perfkitbenchmarker.providers.aws import aws_relational_db
 from perfkitbenchmarker.providers.aws import util
 
 
+# TODO(shuninglin): Add reaper for this new resource.
+
 FLAGS = flags.FLAGS
 
 AWS_AURORA_DSQL_RECOVERY_POINT_ARN = flags.DEFINE_string(
