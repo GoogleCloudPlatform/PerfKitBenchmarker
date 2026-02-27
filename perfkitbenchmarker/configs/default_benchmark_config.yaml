@@ -36,7 +36,8 @@ dpdk_pktgen_multi_nic_small_pkt_loss:
     gce_subnet_name: default,dpdk0,dpdk1
     gce_nic_types: GVNIC,GVNIC,GVNIC
     gce_nic_queue_counts: default,default,default
-    dpdk_pktgen_tx_rx_lcores_list: '[2:1]#[48:49];[1:2]#[48:49]'
+    dpdk_pktgen_max_lcores: 128
+    dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]','[51:52]#[2:1];[51:52]#[1:2]']
 
 dpdk_pktgen_multi_nic:
   name: dpdk_pktgen
@@ -44,7 +45,8 @@ dpdk_pktgen_multi_nic:
     gce_subnet_name: default,dpdk0,dpdk1
     gce_nic_types: GVNIC,GVNIC,GVNIC
     gce_nic_queue_counts: default,default,default
-    dpdk_pktgen_tx_rx_lcores_list: '[2:1]#[48:49];[1:2]#[48:49]'
+    dpdk_pktgen_max_lcores: 128
+    dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]','[51:52]#[2:1];[51:52]#[1:2]']
 
 speccpu2017_int_rate_GCC_O3_x86:
   name: speccpu2017

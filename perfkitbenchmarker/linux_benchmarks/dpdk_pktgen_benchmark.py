@@ -37,7 +37,7 @@ from perfkitbenchmarker.linux_packages import dpdk_pktgen
 BENCHMARK_NAME = 'dpdk_pktgen'
 BENCHMARK_CONFIG = """
 dpdk_pktgen:
-  description: Runs dpdk testpmd benchmarks
+  description: Runs dpdk pktgen benchmarks
   vm_groups:
     vm_1:
       vm_spec: *default_dual_core
@@ -111,9 +111,12 @@ _DPDK_PKTGEN_RXD = flags.DEFINE_integer(
 # _MAX_LCORES is not really useful, pktgen-dpdk is buggy with multiple tx/rx
 # queues so we only need 1 core for 1 tx queue, 1 core for 1 rx queue, and 1 to
 # run the User interface.
-# We are limited to 128 lcores to allow cpu allocation from both sockets in case
-# of a full host machine with 2 sockets with 2 physical NICs.
-_MAX_LCORES = 128
+_MAX_LCORES = flags.DEFINE_integer(
+    'dpdk_pktgen_max_lcores',
+    16,
+    'Maximum number of logical cores to use.',
+)
+
 _START_RATE = 50_000_000
 # Percent difference in PPS between consecutive iterations to terminate binary
 # search.
@@ -331,7 +334,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   sender_vm, receiver_vm = benchmark_spec.vms[:2]
   samples = []
 
-  num_lcores = min(sender_vm.NumCpusForBenchmark(), _MAX_LCORES)
+  num_lcores = min(sender_vm.NumCpusForBenchmark(), _MAX_LCORES.value)
   num_numa, _ = sender_vm.RemoteCommand(
       "lscpu | grep 'NUMA node(s)' | awk '{print $3}'"
   )
@@ -384,7 +387,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
         (abs(curr_pps - prev_pps) / (curr_pps + 1))
         > _PPS_BINARY_SEARCH_THRESHOLD
     ) or (valid_total_receiver_rx_pkts is None):
-      curr_rate = (lb + ub) / 2
+      curr_rate = (lb + ub) // 2
       sender_vm.RemoteCommand(
           f'sudo sed -i "s/pps        = {prev_rate};/pps        ='
           f' {curr_rate};/g"'
