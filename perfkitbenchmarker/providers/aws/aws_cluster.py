@@ -326,6 +326,7 @@ class AWSP6Cluster(AWSCluster):
           '/etc/sysctl.d/99-pcluster-disable-apparmor-restrict-unprivileged-userns.conf'
       )
       vm.RemoteCommand('sudo sysctl --system')
+      vm.RemoteCommand('sudo nvidia-smi -pm 1')
 
     background_tasks.RunThreaded(_PrepWorker, self.worker_vms)
     self.headnode_vm.PushFile(data.ResourcePath('docker_daemon.json'))

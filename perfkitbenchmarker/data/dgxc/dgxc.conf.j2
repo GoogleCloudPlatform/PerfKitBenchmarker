@@ -1,0 +1,19 @@
+venv_type: uv
+install_path: /opt/pkb
+slurm_info:
+  slurm:
+    account: root
+    gpu_partition: pkbworkers
+    cpu_partition: pkbworkers
+    gpu_partition_gres: 8
+    cpu_partition_gres: 8
+    node_architecture: x86_64
+gpu_type: b200
+node_architecture: x86_64
+install_method: slurm
+selected_workloads:
+{% for workload in workloads %}
+- {{ workload }}
+{% endfor %}
+env_vars:
+  HF_TOKEN: {{ hf_token }}

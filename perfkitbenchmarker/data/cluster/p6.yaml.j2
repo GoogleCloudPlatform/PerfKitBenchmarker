@@ -22,6 +22,9 @@ HeadNode:
     SubnetId: {{ headnode_subnet_id }}
   Ssh:
     KeyName: {{ ssh_key }}
+  LocalStorage:
+    RootVolume:
+      Size: 500
   SharedStorageType: Ebs
   Iam:
     S3Access:
@@ -37,7 +40,11 @@ HeadNode:
 Scheduling:
   Scheduler: slurm
   SlurmQueues:
-  - Name: queue1
+  - Name: pkbworkers
+    ComputeSettings:
+      LocalStorage:
+        RootVolume:
+          Size: 500
     CapacityType: {{ "SPOT" if enable_spot_vm else "ONDEMAND" }}
     ComputeResources:
     - Name: {{ name }}

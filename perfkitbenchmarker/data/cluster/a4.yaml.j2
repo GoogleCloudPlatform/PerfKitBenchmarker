@@ -346,7 +346,7 @@ deployment_groups:
       machine_type: a4-highgpu-8g
       enable_public_ips: true
       node_count_dynamic_max: 0
-      enable_placement: false
+      enable_placement: $(vars.a4h_enable_spot_vm)
       disk_type: hyperdisk-balanced
       on_host_maintenance: TERMINATE
       enable_oslogin: false
