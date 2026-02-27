@@ -255,7 +255,8 @@ class PkbLogFilter(logging.Filter):
       # Message will not be truncated.
       return True
     duplicate_record = None
-    for last_record in self.last_records:
+    last_records: list[PkbLogRecord] = list(self.last_records)
+    for last_record in last_records:
       if pkb_record == last_record:
         duplicate_record = last_record
         break
