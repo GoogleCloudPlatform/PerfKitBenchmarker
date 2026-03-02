@@ -294,7 +294,7 @@ def _DeleteAllFromDefaultNamespace():
     run_cmd = ['delete', 'job', '--all', '-n', 'default']
     kubectl.RunRetryableKubectlCommand(run_cmd)
 
-    timeout = 60 * 360  # 6 hours for large clusters (e.g. 5k pods)
+    timeout = 60 * 60  # 1 hour for kubectl delete all -n default (teardown)
     run_cmd = [
         'delete',
         'all',
