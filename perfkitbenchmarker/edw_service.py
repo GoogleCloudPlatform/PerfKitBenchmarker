@@ -128,7 +128,14 @@ flags.DEFINE_string(
     'A virtual warehouse, often referred to simply as a - '
     'warehouse, is a cluster of compute in Snowflake. '
     'https://docs.snowflake.com/en/user-guide/warehouses.html',
-)  # pylint: disable=line-too-long
+)
+flags.DEFINE_string(
+    'snowflake_metadata_warehouse',
+    None,
+    'Warehouse to be used for Snowflake metadata queries.'
+    'If not set, the warehouse specified by snowflake_warehouse will be used.'
+    'Should usually be set to a small warehouse size.',
+)
 flags.DEFINE_string(
     'snowflake_database',
     None,
