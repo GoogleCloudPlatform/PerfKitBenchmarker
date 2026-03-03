@@ -18,8 +18,7 @@ import posixpath
 from perfkitbenchmarker import linux_packages
 
 LMBENCH_DIR = posixpath.join(linux_packages.INSTALL_DIR, 'lmbench')
-GIT = 'https://github.com/intel/lmbench.git'
-COMMIT = '701c6c35b0270d4634fb1dc5272721340322b8ed'
+LMBENCH_GIT = 'https://github.com/intel/lmbench.git'
 
 
 def _Install(vm):
@@ -27,8 +26,7 @@ def _Install(vm):
 
   vm.Install('build_tools')
   vm.RemoteCommand(
-      'cd %s && git clone %s && cd %s && git checkout %s'
-      % (linux_packages.INSTALL_DIR, GIT, 'lmbench', COMMIT)
+      f'cd {linux_packages.INSTALL_DIR} && git clone {LMBENCH_GIT}'
   )
 
 
@@ -37,4 +35,5 @@ def YumInstall(vm):
 
 
 def AptInstall(vm):
+  vm.InstallPackages('libtirpc-dev')
   _Install(vm)
