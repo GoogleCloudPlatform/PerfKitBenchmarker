@@ -839,7 +839,7 @@ def _RunScaleUpClientsBenchmark(
       total_tps.append(current_transactions[0].value)
       total_qps.append(current_transactions[1].value)
     logging.info(
-        'num_clients: %d total_tps: %d total_qps: %d', i, total_tps, total_qps
+        'num_clients: %d total_tps: %s total_qps: %s', i, total_tps, total_qps
     )
     tps_metadata = new_metadata.copy()
     tps_metadata.update({'tps': total_tps})
