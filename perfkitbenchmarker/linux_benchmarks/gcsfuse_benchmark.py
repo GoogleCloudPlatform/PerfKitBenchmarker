@@ -118,7 +118,7 @@ def _ReadThroughputTest(vm, mountpoint):
   """Read the files in the directory via tf.io.gfile or gcsfuse."""
   data_dir = FLAGS.gcsfuse_data_dir
   options = f'--mountpoint="{mountpoint}"'
-  cmd = f'gsutil ls "{data_dir}" | {_DLVM_PYTHON} {_REMOTE_SCRIPT} {options}'
+  cmd = f'gcloud storage ls "{data_dir}" | {_DLVM_PYTHON} {_REMOTE_SCRIPT} {options}'
   logging.info(cmd)
   stdout, stderr = vm.RemoteCommand(cmd)
   logging.info(stdout)
