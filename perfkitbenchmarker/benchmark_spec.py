@@ -1260,7 +1260,7 @@ class BenchmarkSpec:
         'create_time_utc': now_utc.strftime(time_format),
         'benchmark': self.name,
         'perfkit_uuid': self.uuid,
-        'owner': FLAGS.owner,
+        'owner': self._SafeLabelKeyOrValue(FLAGS.owner),
         'benchmark_uid': self.uid,
     }
 
