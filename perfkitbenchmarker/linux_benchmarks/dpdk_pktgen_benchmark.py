@@ -69,15 +69,20 @@ _DPDK_PKTGEN_NUM_FLOWS = flags.DEFINE_integer(
     'Number of flows to use by taking a range of source ports.',
     lower_bound=0,
 )
-# Pktgen-dpdk perform incorrectly with multiple threads, causing both incorrect
-# count on the receiver and severe performance limitations. Hence restrict the
-# test to single thread. This limits the sending rate to approximately 50-55Mpps
-# but the TX path on the NIC is throttled at 48Mpps anyways.
+# On GCP, Pktgen-dpdk perform incorrectly with multiple threads, causing both
+# incorrect count on the receiver and severe performance limitations. Hence
+# restrict the test to single thread. This limits the sending rate to
+# approximately 50-55Mpps but the TX path on the NIC is throttled at 48Mpps
+# anyways.
 # https://github.com/pktgen/Pktgen-DPDK/issues/369#issue-3777028887
 _DPDK_PKTGEN_TX_RX_LCORES_LIST = flags.DEFINE_list(
     'dpdk_pktgen_tx_rx_lcores_list',
     [
+        # This is optimal on GCP since multiple queues leads to incorrect
+        # counters and cache contention.
         '[2:1];[1:2]',
+        # This is optimal on AWS.
+        '[8:1-7];[1-7:8]',
     ],
     'A list of strings designating logical cores assigned to TX and RX. Each'
     ' string is in the form'
