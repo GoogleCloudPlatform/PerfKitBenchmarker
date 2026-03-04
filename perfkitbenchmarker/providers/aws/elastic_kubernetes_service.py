@@ -24,6 +24,7 @@ from collections import abc
 import json
 import logging
 import re
+import time
 from typing import Any
 from urllib import parse
 
@@ -1246,21 +1247,52 @@ class EksKarpenterCluster(BaseEksCluster):
     if eni_ids:
       logging.info('Deleting %d orphaned network interfaces', len(eni_ids))
       for eni_id in eni_ids:
-        vm_util.IssueCommand(
-            [
-                'aws',
-                'ec2',
-                'delete-network-interface',
-                '--region',
-                self.region,
-                '--network-interface-id',
-                eni_id,
-            ],
-            suppress_failure=lambda stdout, stderr, retcode: (
-                'not found' in stderr.lower()
-                or 'does not exist' in stderr.lower()
-            ),
-        )
+        max_retries = 5
+        backoff_seconds = 10
+        for attempt in range(max_retries):
+          stdout, stderr, retcode = vm_util.IssueCommand(
+              [
+                  'aws',
+                  'ec2',
+                  'delete-network-interface',
+                  '--region',
+                  self.region,
+                  '--network-interface-id',
+                  eni_id,
+              ],
+              # Observed in logs: InvalidNetworkInterfaceID.NotFound (ENI gone),
+              # RequestLimitExceeded (throttle). Suppress so we can retry or treat as success.
+              suppress_failure=lambda _stdout, stderr, _retcode: (
+                  'invalidnetworkinterfaceid.notfound' in (stderr or '').lower()
+                  or 'requestlimitexceeded' in (stderr or '').lower()
+              ),
+          )
+          if retcode == 0:
+            break
+          stderr_lower = (stderr or '').lower()
+          # ENI already deleted (e.g. by another process or previous attempt).
+          if 'invalidnetworkinterfaceid.notfound' in stderr_lower:
+            break
+          # Throttle: retry with backoff.
+          if 'requestlimitexceeded' in stderr_lower:
+            if attempt < max_retries - 1:
+              logging.warning(
+                  'AWS rate limit on DeleteNetworkInterface for %s, retry'
+                  ' in %ds',
+                  eni_id,
+                  backoff_seconds,
+              )
+              time.sleep(backoff_seconds)
+              backoff_seconds = min(backoff_seconds * 2, 60)
+            else:
+              raise errors.VmUtil.IssueCommandError(
+                  f'DeleteNetworkInterface failed after {max_retries} retries: '
+                  f'{stderr}'
+              )
+          else:
+            raise errors.VmUtil.IssueCommandError(
+                f'DeleteNetworkInterface failed: {stderr}'
+            )
 
   def _IsReady(self):
     """Returns True if cluster is running. Autopilot defaults to 0 nodes."""
