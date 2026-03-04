@@ -421,6 +421,13 @@ class PythonClientInterface(GenericClientInterface):
     if '/' in FLAGS.gcp_service_account_key_file:
       self.key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
 
+  @override
+  def GetMetadata(self) -> dict[str, str]:
+    base_metadata = super().GetMetadata()
+    reservation = edw_service.EDW_BQ_RESERVATION.value or 'default'
+    base_metadata.update({'edw_bq_reservation': reservation})
+    return base_metadata
+
   def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query."""
     # Push the service account file to the working directory on client vm
@@ -464,6 +471,8 @@ class PythonClientInterface(GenericClientInterface):
         f' {self.dataset_id} --query_file {query_name} --feature_config'
         f' {FLAGS.edw_bq_feature_config}'
     )
+    if edw_service.EDW_BQ_RESERVATION.value:
+      cmd += f' --reservation {edw_service.EDW_BQ_RESERVATION.value}'
     if print_results:
       cmd += ' --print_results'
     if self.destination:
@@ -482,10 +491,13 @@ class PythonClientInterface(GenericClientInterface):
     cmd = (
         f'.venv/bin/python {BQ_PYTHON_CLIENT_FILE} throughput --project'
         f' {self.project_id} --credentials_file {self.key_file_name} --dataset'
-        f" {self.dataset_id} --query_streams='{json.dumps(concurrency_streams)}'"
+        f' {self.dataset_id}'
+        f" --query_streams='{json.dumps(concurrency_streams)}'"
         f' --feature_config {FLAGS.edw_bq_feature_config} --labels'
         f" '{json.dumps(labels)}'"
     )
+    if edw_service.EDW_BQ_RESERVATION.value:
+      cmd += f' --reservation {edw_service.EDW_BQ_RESERVATION.value}'
     stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
     return stdout
 
@@ -945,7 +957,7 @@ class Bigquery(edw_service.EdwService):
 
   def InjectTokenIntoTable(
       self, table_path: str, token: str, token_count: int
-    ) -> tuple[float, dict[str, Any]]:
+  ) -> tuple[float, dict[str, Any]]:
     query_name = 'inject_token_into_table'
     context = {
         'table_name': table_path,

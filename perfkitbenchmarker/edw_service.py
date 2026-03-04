@@ -190,6 +190,13 @@ flags.DEFINE_enum(
     '(enables job_creation_optional query preview feature). '
     'Only supported for Python client.',
 )
+EDW_BQ_RESERVATION = flags.DEFINE_string(
+    'edw_bq_reservation',
+    None,
+    'BigQuery reservation to use for queries. Format: '
+    'projects/{project}/locations/{location}/reservations/{reservation}'
+    'Only supported for python client.',
+)
 
 # MARK: index flags
 # Flags for EDW search index benchmarks.
