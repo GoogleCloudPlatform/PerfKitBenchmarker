@@ -1781,20 +1781,22 @@ class MemtierTestCase(
     vm1 = mock.Mock()
     vm2 = mock.Mock()
     test_vms = [vm1, vm2]
+    vm1.RobustRemoteCommand.return_value = ('', '')
+    vm2.RobustRemoteCommand.return_value = ('', '')
 
     memtier.Load(test_vms, 'test_ip', 9999)
 
-    vm1.RemoteCommand.assert_called_once_with(
-        matchers.HAS('--key-minimum 1 --key-maximum 500')
+    vm1.RobustRemoteCommand.assert_called_once_with(
+        matchers.HAS('--key-minimum 1 --key-maximum 500'), timeout=mock.ANY
     )
-    vm2.RemoteCommand.assert_called_once_with(
-        matchers.HAS('--key-minimum 500 --key-maximum 1000')
+    vm2.RobustRemoteCommand.assert_called_once_with(
+        matchers.HAS('--key-minimum 500 --key-maximum 1000'), timeout=mock.ANY
     )
-    vm1.RemoteCommand.assert_called_once_with(
-        matchers.HAS('--data-size-list 1024:1,32:1')
+    vm1.RobustRemoteCommand.assert_called_once_with(
+        matchers.HAS('--data-size-list 1024:1,32:1'), timeout=mock.ANY
     )
-    vm2.RemoteCommand.assert_called_once_with(
-        matchers.HAS('--data-size-list 1024:1,32:1')
+    vm2.RobustRemoteCommand.assert_called_once_with(
+        matchers.HAS('--data-size-list 1024:1,32:1'), timeout=mock.ANY
     )
 
   @parameterized.named_parameters(

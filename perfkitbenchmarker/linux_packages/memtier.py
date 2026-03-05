@@ -485,7 +485,7 @@ def _LoadSingleVM(
       tls=MEMTIER_TLS.value,
       expiry_range=MEMTIER_EXPIRY_RANGE.value,
   )
-  load_vm.RemoteCommand(cmd)
+  _IssueRetryableCommand(load_vm, cmd)
 
 
 def Load(
