@@ -31,6 +31,13 @@ from perfkitbenchmarker.configs import auto_registry
 
 FLAGS = flags.FLAGS
 
+_RETRY_ON_INSUFFICIENT_CAPACITY_CLOUD_FAILURE = flags.DEFINE_boolean(
+    'retry_on_insufficient_capacity_cloud_failure',
+    False,
+    'Whether to retry resource creation on insufficient capacity cloud'
+    ' failure.',
+)
+
 _RESOURCE_REGISTRY = {}
 RegisteredType = TypeVar('RegisteredType')
 ResourceType = type[RegisteredType]
@@ -286,7 +293,15 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     # that the resource was not actually being created on the
     # backend during previous failed attempts.
     self.create_start_time = time.time()
-    self._Create()
+    try:
+      self._Create()
+    except errors.Benchmarks.InsufficientCapacityCloudFailure as e:
+      if _RETRY_ON_INSUFFICIENT_CAPACITY_CLOUD_FAILURE.value:
+        raise errors.Resource.RetryableCreationError(
+            'Creation of %s failed.' % type(self).__name__
+        ) from e
+
+      raise
     try:
       if not self._Exists():
         raise errors.Resource.RetryableCreationError(
