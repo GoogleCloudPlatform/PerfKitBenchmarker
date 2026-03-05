@@ -141,6 +141,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   while numjobs > 0:
     left_iodepth = 1
     right_iodepth = max_iodepth
+    benchmark_params['numjobs'] = numjobs
     iodepth_details[numjobs] = {}
     while left_iodepth <= right_iodepth:
       iodepth = (left_iodepth + right_iodepth) // 2
