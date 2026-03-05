@@ -1573,6 +1573,7 @@ class MemtierTestCase(
                     'pipeline': 3,
                     'password': None,
                     'unique_id': vm1.ip_address,
+                    'retry_on_failure': True,
                 },
             ),
         ],
@@ -1618,6 +1619,7 @@ class MemtierTestCase(
                         '10.0.1.117:6379,10.0.2.104:6379,10.0.3.217:6379'
                     ),
                     'unique_id': 'vm1',
+                    'retry_on_failure': False,
                 },
             ),
             (
@@ -1634,6 +1636,7 @@ class MemtierTestCase(
                         '10.0.2.177:6379,10.0.1.174:6379,10.0.3.6:6379'
                     ),
                     'unique_id': 'vm2',
+                    'retry_on_failure': False,
                 },
             ),
         ],

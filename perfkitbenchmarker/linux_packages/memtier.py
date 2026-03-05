@@ -563,6 +563,7 @@ def RunOverAllClientVMs(
         clients=clients,
         password=password,
         unique_id=str(port_index),
+        retry_on_failure=len(client_vms) <= 1,
     )
 
   results = background_tasks.RunThreaded(
@@ -645,6 +646,8 @@ def _RunParallelConnections(
   connections_by_vm = collections.defaultdict(list)
   for conn in connections:
     connections_by_vm[conn.client_vm].append(conn)
+
+  base_args['retry_on_failure'] = len(connections_by_vm) <= 1
 
   # Currently more than one client VM will cause shards to be distributed
   # evenly between them. This behavior could be customized later with a flag.
@@ -1151,6 +1154,7 @@ def _Run(
     password: str | None = None,
     unique_id: str | None = None,
     shard_addresses: str | None = None,
+    retry_on_failure: bool = True,
 ) -> 'MemtierResult':
   """Runs the memtier benchmark on the vm."""
   logging.info(
@@ -1223,7 +1227,10 @@ def _Run(
   logging.info('Memtier command: %s', cmd)
   # Add a buffer to the timeout to account for command overhead.
   timeout = test_time + 100 if test_time else None
-  _IssueRetryableCommand(vm, cmd, timeout=timeout)
+  if retry_on_failure:
+    _IssueRetryableCommand(vm, cmd, timeout=timeout)
+  else:
+    vm.RobustRemoteCommand(cmd, timeout=timeout)
 
   output_path = os.path.join(vm_util.GetTempDir(), memtier_results_file_name)
   vm_util.IssueCommand(['rm', '-f', output_path])
