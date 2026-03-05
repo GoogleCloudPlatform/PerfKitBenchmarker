@@ -20,6 +20,7 @@ Homepage: http://www.bitmover.com/lmbench/index.html
 
 import itertools
 import logging
+import re
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import regex_util
@@ -158,6 +159,32 @@ def _ParseContextSwitching(lines, title, metadata, results):
     )
 
 
+def _ParseSocketBandwidth(lines, unused_title, metadata, results):
+  """Parse the socket bandwidth test results.
+
+  Args:
+    lines: The lines following socket bandwidth title.
+    metadata: A dictionary of metadata.
+    results: A list of samples to be published.
+  """
+  for line in lines:
+    parts = line.split()
+    if len(parts) == 3 and parts[2] == 'MB/sec':
+      msg_size_mb = float(parts[0])
+      bandwidth = float(parts[1])
+      unit = parts[2]
+      current_metadata = metadata.copy()
+      current_metadata['message_size_MB'] = msg_size_mb
+      results.append(
+          sample.Sample(
+              'socket_bandwidth',
+              bandwidth,
+              unit,
+              current_metadata,
+          )
+      )
+
+
 def _UpdataMetadata(lmbench_output, metadata):
   metadata['MB'] = regex_util.ExtractGroup('MB: ([0-9]*)', lmbench_output)
   metadata['BENCHMARK_HARDWARE'] = regex_util.ExtractGroup(
@@ -239,10 +266,13 @@ def _AddProcessorMetricSamples(
   """
 
   for metric in processor_metric_list:
-    regex = '%s: (.*)' % metric
-    value_unit = regex_util.ExtractGroup(regex, lmbench_output)
-    [value, unit] = value_unit.split(' ')
-    if unit == 'microseconds':
+    regex = rf'{metric}: ([^ ]+) (.+)'
+    match = re.search(regex, lmbench_output)
+    if not match:
+      logging.warning('Failed to extract metric: %s', metric)
+      continue
+    value, unit = match.groups()
+    if unit in ['microseconds', 'MB/sec']:
       results.append(
           sample.Sample(
               '%s' % metric.replace('\\', ''), float(value), unit, metadata
@@ -278,9 +308,14 @@ def _ParseOutput(lmbench_output):
       'Signal handler overhead',
       'Protection fault',
       'Pipe latency',
+      'Pipe bandwidth',
+      'AF_UNIX sock stream bandwidth',
       r'Process fork\+exit',
       r'Process fork\+execve',
       r'Process fork\+/bin/sh -c',
+      'Pagefaults on /var/tmp/XXX',
+      'TCP latency using localhost',
+      'TCP/IP connection cost to localhost',
   )
   _AddProcessorMetricSamples(
       lmbench_output, processor_metric_list, metadata, results
@@ -288,6 +323,10 @@ def _ParseOutput(lmbench_output):
 
   # Parse some sections from the output.
   parse_section_func_dict = {}
+  if 'Socket bandwidth using localhost' in lmbench_output:
+    parse_section_func_dict['Socket bandwidth using localhost'] = (
+        _ParseSocketBandwidth
+    )
   contex_switching_titles = regex_util.ExtractAllMatches(
       '"size=.* ovr=.*', lmbench_output
   )

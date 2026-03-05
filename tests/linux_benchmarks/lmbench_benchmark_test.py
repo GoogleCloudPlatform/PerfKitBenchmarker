@@ -35,7 +35,7 @@ class LmbenchTestCase(unittest.TestCase):
   def testParseLmbench(self):
     samples = lmbench_benchmark._ParseOutput(self.contents)
 
-    self.assertEqual(61, len(samples))
+    self.assertEqual(74, len(samples))
 
     # Test metadata
     metadata = samples[0].metadata
@@ -63,6 +63,15 @@ class LmbenchTestCase(unittest.TestCase):
     self.assertAlmostEqual(
         800.2188, processor_results['Process fork+/bin/sh -c']
     )
+    self.assertAlmostEqual(
+        11056.28, processor_results['AF_UNIX sock stream bandwidth']
+    )
+    self.assertAlmostEqual(2648.95, processor_results['Pipe bandwidth'])
+
+    socket_bandwidth = [s for s in samples if s.metric == 'socket_bandwidth']
+    self.assertEqual(8, len(socket_bandwidth))
+    self.assertAlmostEqual(1.71, socket_bandwidth[0].value)
+    self.assertEqual(0.000001, socket_bandwidth[0].metadata['message_size_MB'])
 
     sample = next(
         x
