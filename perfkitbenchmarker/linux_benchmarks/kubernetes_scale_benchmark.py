@@ -463,7 +463,7 @@ def ParseStatusChanges(
     )
     if not REPORT_PERCENTILES.value:
       continue
-    summaries = _SummarizeTimestamps(timestamps)
+    summaries = SummarizeTimestamps(timestamps)
     for percentile, value in summaries.items():
       samples.append(
           sample.Sample(
@@ -491,7 +491,7 @@ def ParseStatusChanges(
   return samples
 
 
-def _SummarizeTimestamps(timestamps: list[float]) -> dict[str, float]:
+def SummarizeTimestamps(timestamps: list[float]) -> dict[str, float]:
   """Returns a few metrics about a list of timestamps."""
   percentiles = [0, 10, 50, 90, 95, 99.9, 100]
   summary = {
