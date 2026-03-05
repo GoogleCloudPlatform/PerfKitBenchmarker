@@ -86,6 +86,9 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Runs the scale-up, scale-down, scale-up benchmark sequence.
 
+  Args:
+    bm_spec: The benchmark specification.
+
   Returns:
     Combined samples from all three phases, each tagged with phase metadata.
   """
@@ -333,7 +336,19 @@ def _PollNodeDeletionUntilDone(
   done = False
 
   while True:
-    current_nodes = set(kubernetes_commands.GetNodeNames(suppress_logging=True))
+    stdout, _, retcode = kubectl.RunKubectlCommand(
+        ['get', 'nodes', '-o', 'jsonpath={.items[*].metadata.name}'],
+        suppress_logging=True,
+        raise_on_failure=False,
+    )
+    if retcode:
+      logging.warning(
+          'kubectl get nodes failed (retcode=%d), retrying.',
+          retcode,
+      )
+      time.sleep(_POLL_INTERVAL_SECONDS)
+      continue
+    current_nodes = set(stdout.split())
     elapsed = time.monotonic() - start
 
     # Record deletion timestamps for nodes that disappeared.
@@ -388,7 +403,7 @@ def _SummarizeNodeDeletionTimes(
   """
   if not deletion_times:
     return []
-  summaries = kubernetes_scale_benchmark._SummarizeTimestamps(
+  summaries = kubernetes_scale_benchmark.SummarizeTimestamps(
       list(deletion_times.values())
   )
   target_percentiles = {'p50', 'p90', 'p99', 'p99.9', 'p100'}
