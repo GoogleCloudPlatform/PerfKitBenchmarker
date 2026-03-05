@@ -448,6 +448,8 @@
 -   Add support for enabling live migration on AMD SEV
 -   Increased maintenance simulation notification timeout to 4 hours in
     maintenance_simulation_trigger.py.
+-   Added `--retry_on_insufficient_capacity_cloud_failure` so that resource
+    creation can be retried on stock outs.
 
 ### Bug fixes and maintenance updates:
 
