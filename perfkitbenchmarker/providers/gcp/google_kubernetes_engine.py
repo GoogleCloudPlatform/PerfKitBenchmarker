@@ -387,6 +387,13 @@ class GkeCluster(BaseGkeCluster):
           nodepool,
           cmd,
       )
+      if (
+          self.min_nodes != self.default_nodepool.num_nodes
+          or self.max_nodes != self.default_nodepool.num_nodes
+      ):
+        cmd.args.append('--enable-autoscaling')
+        cmd.flags['max-nodes'] = self.max_nodes
+        cmd.flags['min-nodes'] = self.min_nodes
       self._IssueResourceCreationCommand(cmd)
 
   def _AddNodeParamsToCmd(
