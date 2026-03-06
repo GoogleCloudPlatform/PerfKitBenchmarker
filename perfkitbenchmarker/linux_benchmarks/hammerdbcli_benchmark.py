@@ -361,13 +361,12 @@ def _CheckAlloyDbColumnarEngine(
 def _PreRun(db: relational_db.BaseRelationalDb) -> None:
   """Prepares the database for the benchmark run."""
   db.ClearWaitStats()
-  db.QueryIOStats()
+  db.LogDatabaseDebugInfo()
 
 
 def _PostRun(db: relational_db.BaseRelationalDb) -> None:
   """Records the database metrics after the benchmark run."""
-  db.QueryWaitStats()
-  db.QueryIOStats()
+  db.LogDatabaseDebugInfo()
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
