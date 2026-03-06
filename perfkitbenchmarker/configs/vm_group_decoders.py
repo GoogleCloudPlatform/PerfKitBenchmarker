@@ -18,11 +18,11 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import static_vm_decoders
+from perfkitbenchmarker.configs import static_vm_spec
 
 _DEFAULT_DISK_COUNT = 1
 _DEFAULT_VM_COUNT = 1
@@ -52,7 +52,7 @@ class VmGroupSpec(spec.BaseSpec):
   disk_type: str
   disk_spec: disk.BaseDiskSpec
   os_type: str
-  static_vms: list[static_virtual_machine.StaticVmSpec]
+  static_vms: list[static_vm_spec.StaticVmSpec]
   vm_count: int
   vm_spec: virtual_machine_spec.BaseVmSpec
   vm_as_nfs: bool

@@ -23,6 +23,7 @@ import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import test_util
+from perfkitbenchmarker.configs import static_vm_spec
 from perfkitbenchmarker.linux_benchmarks import openfoam_benchmark
 from perfkitbenchmarker.linux_packages import openmpi
 from tests import pkb_common_test_case
@@ -95,9 +96,9 @@ class OpenfoamBenchmarkTest(
     )
 
   def testYumInstallRaisesNotImplementedError(self):
-    static_vm_spec = static_virtual_machine.StaticVmSpec('test_static_vm_spec')
+    vm_spec = static_vm_spec.StaticVmSpec('test_static_vm_spec')
     self.mock_vm = static_virtual_machine.Rhel9BasedStaticVirtualMachine(
-        static_vm_spec
+        vm_spec
     )
     self.mock_vm.install_packages = True
     with self.assertRaises(NotImplementedError):
