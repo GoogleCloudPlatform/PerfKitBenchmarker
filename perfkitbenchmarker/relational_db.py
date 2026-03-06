@@ -254,6 +254,16 @@ CAPTURE_IO_STATS_SQL = (
 
 CAPTURE_TRACE_STATUS_SQL = 'DBCC TRACESTATUS(-1)'
 CAPTURE_SERVER_EVENT_SESSIONS_SQL = 'SELECT * FROM sys.server_event_sessions'
+CAPTURE_PERFORMANCE_COUNTERS_SQL = (
+    'SELECT SYSDATETIME() AS CURRENTTIME,'
+    '[cntr_value] AS countervalue,counter_name '
+    'FROM sys.dm_os_performance_counters '
+    "WHERE [object_name] LIKE '%Manager%' "
+    "AND [counter_name] IN ('Page life expectancy',"
+    "'Buffer cache hit ratio','Buffer cache hit ratio base',"
+    "'Lazy writes/sec','Memory Grants Pending','Free list stalls/sec',"
+    "'Target Server Memory (KB)','Total Server Memory (KB)')"
+)
 SELECT_VERSION_SQL = 'SELECT @@VERSION'
 
 
@@ -477,6 +487,19 @@ class BaseRelationalDb(resource.BaseResource):
       stdout, _ = query_method()
       if stdout:
         logging.info('%s:\n%s', name, stdout)
+
+  def QueryPerformanceCounters(self) -> tuple[str, str]:
+    """Queries and logs performance counters.
+
+    Returns:
+      A tuple of stdout and stderr from the command execution.
+    """
+    if self.engine_type != sql_engine_utils.SQLSERVER:
+      return ('', '')
+    logging.info('Querying performance counters')
+    return self.client_vm_query_tools.IssueSqlCommand(
+        CAPTURE_PERFORMANCE_COUNTERS_SQL
+    )
 
   @property
   def port(self):
