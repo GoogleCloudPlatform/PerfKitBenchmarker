@@ -17,8 +17,10 @@
 This benchmark uses Windows as the OS for both the database server and the
 HammerDB client(s).
 """
+
 import datetime
 import logging
+import threading
 import time
 from absl import flags
 from perfkitbenchmarker import configs
@@ -244,9 +246,7 @@ def Prepare(benchmark_spec):
               ALTER DATABASE tpcc SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
               DROP DATABASE tpcc;
           END;"""
-      db.client_vm_query_tools.IssueSqlCommand(
-          drop_sql, timeout=60 * 20
-      )
+      db.client_vm_query_tools.IssueSqlCommand(drop_sql, timeout=60 * 20)
 
       is_azure = FLAGS.cloud == 'Azure' and FLAGS.use_managed_db
       if (
@@ -256,17 +256,13 @@ def Prepare(benchmark_spec):
         db_name = linux_hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[
             linux_hammerdb.HAMMERDB_SCRIPT.value
         ]
-        db.client_vm_query_tools.IssueSqlCommand(
-            """CREATE DATABASE [{0}];
+        db.client_vm_query_tools.IssueSqlCommand("""CREATE DATABASE [{0}];
             BACKUP DATABASE [{0}] TO DISK = 'F:\\Backup\\{0}.bak';
             ALTER AVAILABILITY GROUP [{1}] ADD DATABASE [{0}];
-            """.format(db_name, sql_engine_utils.SQLSERVER_AOAG_NAME)
-        )
+            """.format(db_name, sql_engine_utils.SQLSERVER_AOAG_NAME))
       elif is_azure and hammerdb.HAMMERDB_SCRIPT.value == 'tpc_c':
         # Create the database first only Azure requires creating the database.
-        db.client_vm_query_tools.IssueSqlCommand(
-            'CREATE DATABASE tpcc;'
-        )
+        db.client_vm_query_tools.IssueSqlCommand('CREATE DATABASE tpcc;')
 
       hammerdb.SetupConfig(
           vm,
@@ -361,12 +357,27 @@ def Run(benchmark_spec):
 
   _PreRun(db)
   start_time = datetime.datetime.now()
-  samples = hammerdb.Run(
-      client_vms[0],
-      sql_engine_utils.SQLSERVER,
-      hammerdb.HAMMERDB_SCRIPT.value,
-      timeout=linux_hammerdb.HAMMERDB_RUN_TIMEOUT.value,
-  )
+
+  stop_event = threading.Event()
+  collection_thread = None
+  if db.engine_type == sql_engine_utils.SQLSERVER and db.is_managed_db:
+    collection_thread = threading.Thread(
+        target=hammerdb.CollectDbPerformanceCounters, args=(db, stop_event)
+    )
+    collection_thread.start()
+
+  try:
+    samples = hammerdb.Run(
+        client_vms[0],
+        sql_engine_utils.SQLSERVER,
+        hammerdb.HAMMERDB_SCRIPT.value,
+        timeout=linux_hammerdb.HAMMERDB_RUN_TIMEOUT.value,
+    )
+  finally:
+    if collection_thread:
+      stop_event.set()
+      collection_thread.join()
+
   end_time = datetime.datetime.now()
   _PostRun(db)
   samples.extend(db.CollectMetrics(start_time, end_time))
