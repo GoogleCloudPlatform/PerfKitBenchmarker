@@ -27,7 +27,6 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
-from perfkitbenchmarker.configs import vm_group_decoders
 from perfkitbenchmarker.resources import kubernetes_inference_server_spec
 
 
@@ -159,7 +158,7 @@ class ContainerRegistrySpec(spec.BaseSpec):
     result = super()._GetOptionDecoderConstructions()
     result.update({
         'cloud': (option_decoders.StringDecoder, {}),
-        'spec': (vm_group_decoders.VmGroupSpecDecoder, {'default': {}}),
+        'spec': (spec.PerCloudConfigDecoder, {'default': {}}),
     })
     return result
 
@@ -228,13 +227,9 @@ class ContainerSpecsDecoder(option_decoders.TypeVerifier):
 
 
 class NodepoolSpec(spec.BaseSpec):
-  """Configurable options of a Nodepool.
+  """Configurable options of a Nodepool."""
 
-  Attributes:
-    vm_spec: The vm spec which defines the nodepool.
-  """
-
-  vm_spec: virtual_machine_spec.BaseVmSpec
+  vm_spec: spec.PerCloudConfigSpec
 
   def __init__(
       self, component_full_name, group_name, flag_values=None, **kwargs
@@ -245,7 +240,7 @@ class NodepoolSpec(spec.BaseSpec):
         **kwargs,
     )
     self.vm_count: int
-    self.vm_spec: virtual_machine_spec.BaseVmSpec
+    self.vm_spec: spec.PerCloudConfigSpec
     self.sandbox_config: SandboxSpec | None
 
   @classmethod
@@ -384,36 +379,14 @@ class _SandboxDecoder(option_decoders.TypeVerifier):
 
 
 class ContainerClusterSpec(spec.BaseSpec):
-  """Spec containing info needed to create a container cluster.
-
-  Attributes:
-    cloud: The cloud to create the container cluster in.
-    enable_vpa: Whether to enable vertical pod autoscaler.
-    nodepools: A dictionary of nodepool names to nodepool/vm_specs.
-    inference_server: If specified, spins up an AI/inference server.
-    poll_for_events: Whether to background poll for k8s events.
-    static_cluster: The name of the static cluster to use for the container
-      cluster.
-    type: Mostly Standard or Auto.
-    vm_spec: The vm spec to use for the default nodepool.
-    vm_count: The number of nodes to create for the default nodepool.
-    min_vm_count: The minimum number of nodes for autoscaling.
-    max_vm_count: The maximum number of nodes for autoscaling.
-  """
+  """Spec containing info needed to create a container cluster."""
 
   cloud: str
-  enable_vpa: bool
+  vm_spec: spec.PerCloudConfigSpec
   nodepools: dict[str, NodepoolSpec]
   inference_server: (
       kubernetes_inference_server_spec.BaseInferenceServerConfigSpec | None
   )
-  poll_for_events: bool
-  static_cluster: str | None
-  type: str
-  vm_spec: virtual_machine_spec.BaseVmSpec
-  vm_count: int
-  min_vm_count: int | None
-  max_vm_count: int | None
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
