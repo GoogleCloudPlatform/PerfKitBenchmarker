@@ -111,9 +111,9 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
           'expected_error': errors.Resource.ProvisionTimeoutError,
       },
       {
-          'testcase_name': 'SkuNotAvailable',
+          'testcase_name': 'AllocationFailed',
           'stderror': """{"error":{"code":"InvalidTemplateDeployment","message":"The template deployment 'vm_deploy_gwUdt7Sseaortu3nIvgZPN8rzgVucSOL' is not valid according to the validation procedure. The tracking id is '8b0552ca-7af5-4155-b653-8eb5f8713629'. See inner errors for details.","details":[{"code":"SkuNotAvailable","message":"The requested VM size for resource 'Following SKUs have failed for Capacity Restrictions: Standard_D2s_v4' is currently not available in location 'westus2'. Please try another size or deploy to a different location or different zone. See https://aka.ms/azureskunotavailable for details."}]}}""",  # pylint: disable=line-too-long
-          'expected_error': errors.Benchmarks.UnsupportedConfigError,
+          'expected_error': errors.Benchmarks.InsufficientCapacityCloudFailure,
       },
       {
           'testcase_name': 'ZonalAllocationFailed',

@@ -1018,9 +1018,10 @@ class AzureVirtualMachine(
       elif self.low_priority and (
           re.search(r'requested VM size \S+ is not available', stderr)
           or re.search(r'not available in location .+ for subscription', stderr)
-          or re.search(
-              r'Following SKUs have failed for Capacity Restrictions', stderr
-          )
+      ):
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
+      elif re.search(
+          r'Following SKUs have failed for Capacity Restrictions', stderr
       ):
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
       elif re.search(
