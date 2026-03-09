@@ -21,10 +21,10 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
-from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark
 
 FLAGS = flags.FLAGS
 
@@ -47,6 +47,15 @@ NUM_NODES = flags.DEFINE_integer(
 
 MANIFEST_TEMPLATE = 'container/kubernetes_scale/kubernetes_node_scale.yaml.j2'
 
+# Allow this many extra nodes above the baseline when checking whether
+# scale-down is complete.  The cluster autoscaler can be conservative and
+# keep nodes around for system workloads (e.g. metrics-server).
+_SCALE_DOWN_NODE_BUFFER = 2
+
+_SCALE_UP_TIMEOUT_SECONDS = 3 * 60 * 60  # 3 hours
+_SCALE_DOWN_TIMEOUT_SECONDS = 2 * 60 * 60  # 2 hours
+_POLL_INTERVAL_SECONDS = 60
+
 
 def CheckPrerequisites(_):
   """Validates flags and config."""
@@ -62,13 +71,9 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   bm_spec.always_call_cleanup = True
   assert bm_spec.container_cluster
   cluster = bm_spec.container_cluster
-  manifest_kwargs = dict(
-      cloud=FLAGS.cloud,
-  )
-
   yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
       MANIFEST_TEMPLATE,
-      **manifest_kwargs,
+      cloud=FLAGS.cloud,
   )
   cluster.ModifyPodSpecPlacementYaml(
       yaml_docs,
