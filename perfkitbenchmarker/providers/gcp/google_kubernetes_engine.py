@@ -371,7 +371,11 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append('--enable-autoscaling')
       cmd.flags['max-nodes'] = self.max_nodes
       cmd.flags['min-nodes'] = self.min_nodes
-    cmd.flags['cluster-ipv4-cidr'] = f'/{_CalculateCidrSize(self.max_nodes)}'
+    total_max_nodes = self.max_nodes + sum(
+        getattr(np, 'max_nodes', self.max_nodes)
+        for np in self.nodepools.values()
+    )
+    cmd.flags['cluster-ipv4-cidr'] = f'/{_CalculateCidrSize(total_max_nodes)}'
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
 
     self._RunClusterCreateCommand(cmd)
@@ -387,6 +391,13 @@ class GkeCluster(BaseGkeCluster):
           nodepool,
           cmd,
       )
+      if (
+          self.min_nodes != self.default_nodepool.num_nodes
+          or self.max_nodes != self.default_nodepool.num_nodes
+      ):
+        cmd.args.append('--enable-autoscaling')
+        cmd.flags['max-nodes'] = self.max_nodes
+        cmd.flags['min-nodes'] = self.min_nodes
       self._IssueResourceCreationCommand(cmd)
 
   def _AddNodeParamsToCmd(
