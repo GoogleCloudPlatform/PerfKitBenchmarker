@@ -78,6 +78,7 @@ AZURE_NVME_TYPES = [
     r'(Standard_L[0-9]+a?s_v3)',
     r'(Standard_L[0-9]+a?s_v4)',
     r'(Standard_D[0-9]+[ap]?ds_v6)',
+    r'(Standard_D[0-9]+[ap]?ds_v7)',
 ]
 
 # https://docs.microsoft.com/en-us/azure/virtual-machines/azure-vms-no-temp-disk
