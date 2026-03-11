@@ -27,7 +27,7 @@ spec:
         name: default
       expireAfter: 720h # 30 * 24h = 720h
   limits:
-    cpu: 10500
+    cpu: {{ KARPENTER_NODEPOOL_CPU_LIMIT }}
   disruption:
     consolidationPolicy: WhenEmptyOrUnderutilized
     consolidateAfter: 1m

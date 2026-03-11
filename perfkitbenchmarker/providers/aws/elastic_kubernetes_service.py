@@ -23,6 +23,7 @@ instructions.
 from collections import abc
 import json
 import logging
+import math
 import re
 import time
 from typing import Any
@@ -994,6 +995,14 @@ class EksKarpenterCluster(BaseEksCluster):
   def _PostCreate(self):
     """Performs post-creation steps for the cluster."""
     super()._PostCreate()
+    # Karpenter controller resources: default 1/1Gi; scale up when node_scale target is set.
+    num_nodes = getattr(FLAGS, 'kubernetes_scale_num_nodes', None)
+    if num_nodes is not None and num_nodes > 1000:
+      controller_cpu, controller_memory = 4, '16Gi'
+    elif num_nodes is not None and num_nodes >= 500:
+      controller_cpu, controller_memory = 2, '8Gi'
+    else:
+      controller_cpu, controller_memory = 1, '1Gi'
     vm_util.IssueCommand([
         'helm',
         'upgrade',
@@ -1012,13 +1021,13 @@ class EksKarpenterCluster(BaseEksCluster):
         '--set',
         f'settings.interruptionQueue={self.name}',
         '--set',
-        'controller.resources.requests.cpu=4',
+        f'controller.resources.requests.cpu={controller_cpu}',
         '--set',
-        'controller.resources.requests.memory=16Gi',
+        f'controller.resources.requests.memory={controller_memory}',
         '--set',
-        'controller.resources.limits.cpu=4',
+        f'controller.resources.limits.cpu={controller_cpu}',
         '--set',
-        'controller.resources.limits.memory=16Gi',
+        f'controller.resources.limits.memory={controller_memory}',
         '--set',
         'logLevel=debug',
         '--wait',
@@ -1056,10 +1065,14 @@ class EksKarpenterCluster(BaseEksCluster):
         'v'
         + full_version.strip().strip('"').split(f'{self.cluster_version}-v')[1]
     )
+    # NodePool CPU limit: scale with benchmark target (nodes * 2 + 5%), min 1000.
+    num_nodes = getattr(FLAGS, 'kubernetes_scale_num_nodes', 5)
+    cpu_limit = max(1000, math.ceil(num_nodes * 2 * 1.05))
     kubernetes_commands.ApplyManifest(
         'container/karpenter/nodepool.yaml.j2',
         CLUSTER_NAME=self.name,
         ALIAS_VERSION=alias_version,
+        KARPENTER_NODEPOOL_CPU_LIMIT=cpu_limit,
     )
 
   def _Delete(self):
