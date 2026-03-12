@@ -442,7 +442,9 @@ class BenchmarkSpec:
       self.config.relational_db.engine_version = (
           relational_db_class.GetDefaultEngineVersion(engine)
       )
-    self.relational_db = relational_db_class(self.config.relational_db)
+    self.relational_db = relational_db_class(
+        self.config.relational_db
+    )  # pytype: disable=not-instantiable  as BaseRelationalDb is abstract
     self.resources.append(self.relational_db)
 
   def ConstructNonRelationalDb(self) -> None:

@@ -312,6 +312,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     self._storage_target = (
         db_spec.spanner_storage_target or _DEFAULT_STORAGE_TARGET
     )
+    self.dialect: str
 
     # Cloud Spanner may not explicitly set the following common flags.
     self.project = (

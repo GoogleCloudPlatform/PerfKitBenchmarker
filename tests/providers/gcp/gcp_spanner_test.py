@@ -2,6 +2,7 @@
 
 import datetime
 import inspect
+from typing import Type, cast
 import unittest
 
 from absl import flags
@@ -26,8 +27,11 @@ def GetTestSpannerInstance(engine='spanner-googlesql'):
       'test_component', flag_values=FLAGS, **spec_args
   )
   spanner_spec.spanner_database_name = 'test_database'
-  spanner_class = relational_db.GetRelationalDbClass(
-      cloud='GCP', is_managed_db=True, engine=engine
+  spanner_class = cast(
+      Type[gcp_spanner.GcpSpannerInstance],
+      relational_db.GetRelationalDbClass(
+          cloud='GCP', is_managed_db=True, engine=engine
+      ),
   )
   return spanner_class(spanner_spec)
 
