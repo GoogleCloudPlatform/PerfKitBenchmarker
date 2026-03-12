@@ -129,7 +129,9 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   """Sets additional spec attributes."""
   bm_spec.always_call_cleanup = True
   assert bm_spec.container_cluster
-  _EnsureEksKarpenterGpuNodepool(bm_spec.container_cluster)
+  cluster = bm_spec.container_cluster
+  assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
+  _EnsureEksKarpenterGpuNodepool(cluster)
 
 
 def _GetRolloutCreationTime(rollout_name: str) -> int:
