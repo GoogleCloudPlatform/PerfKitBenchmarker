@@ -780,7 +780,7 @@ class Snowflake(edw_service.EdwService):
       self, start_timestamp: float, end_timestamp: float
   ) -> list[dict[str, Any]]:
     """Returns the auxiliary metrics for the given run."""
-    self.metadata_client_interface.SetProvisionedAttributes(self.spec)
+    self.metadata_client_interface.client_vm = self.client_interface.client_vm
     query_file_name = f'metadata_query_{start_timestamp}.sql'
     context = {
         'start_timestamp': start_timestamp,
