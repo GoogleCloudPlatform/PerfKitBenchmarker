@@ -371,7 +371,13 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append('--enable-autoscaling')
       cmd.flags['max-nodes'] = self.max_nodes
       cmd.flags['min-nodes'] = self.min_nodes
-    cmd.flags['cluster-ipv4-cidr'] = f'/{_CalculateCidrSize(self.max_nodes)}'
+    if gcp_flags.GKE_AUTOSCALING_PROFILE.value:
+      cmd.flags['autoscaling-profile'] = gcp_flags.GKE_AUTOSCALING_PROFILE.value
+    cidr_size = (
+        gcp_flags.GKE_CLUSTER_IPV4_CIDR_SIZE.value
+        or _CalculateCidrSize(self.max_nodes)
+    )
+    cmd.flags['cluster-ipv4-cidr'] = f'/{cidr_size}'
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
 
     self._RunClusterCreateCommand(cmd)
