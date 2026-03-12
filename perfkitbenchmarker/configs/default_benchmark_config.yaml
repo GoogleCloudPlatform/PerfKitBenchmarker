@@ -23,6 +23,31 @@ dpdk_pktgen_small_pkt_loss:
     dpdk_pktgen_mbuf_cache_size: 128
     dpdk_pktgen_mbufs_per_port_multiplier: 8
 
+dpdk_pktgen_multi_nic_small_pkt_loss:
+  name: dpdk_pktgen
+  flags:
+    dpdk_pktgen_tx_burst: 128
+    dpdk_pktgen_rx_burst: 128
+    dpdk_pktgen_packet_loss_threshold_rates: 0.0001
+    dpdk_pktgen_txd: 2048
+    dpdk_pktgen_rxd: 2048
+    dpdk_pktgen_mbuf_cache_size: 128
+    dpdk_pktgen_mbufs_per_port_multiplier: 8
+    gce_subnet_name: default,dpdk0,dpdk1
+    gce_nic_types: GVNIC,GVNIC,GVNIC
+    gce_nic_queue_counts: default,default,default
+    dpdk_pktgen_max_lcores: 128
+    dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]','[51:52]#[2:1];[51:52]#[1:2]']
+
+dpdk_pktgen_multi_nic:
+  name: dpdk_pktgen
+  flags:
+    gce_subnet_name: default,dpdk0,dpdk1
+    gce_nic_types: GVNIC,GVNIC,GVNIC
+    gce_nic_queue_counts: default,default,default
+    dpdk_pktgen_max_lcores: 128
+    dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]','[51:52]#[2:1];[51:52]#[1:2]']
+
 speccpu2017_int_rate_GCC_O3_x86:
   name: speccpu2017
   flags:
@@ -630,8 +655,6 @@ kvrocks_memtier:
   name: kvrocks_memtier
   flags:
     fio_fill_block_size: 64k
-    data_disk_type: local
-    num_striped_disks: 8
     memtier_protocol: 'redis'
     memtier_cluster_mode: True
     memtier_clients: 1
@@ -650,3 +673,8 @@ cassandra_stress_mixed_workload:
     cassandra_stress_run_duration: 10m
     cassandra_stress_mixed_ratio: 'write=3,read=1'
     cassandra_stress_command: 'mixed'
+
+nginx_network_saturated_workload:
+  name: nginx
+  flags:
+    nginx_content_size: 256000

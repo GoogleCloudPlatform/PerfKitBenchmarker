@@ -20,6 +20,7 @@ from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import static_virtual_machine as svm
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import static_vm_spec
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
@@ -38,14 +39,14 @@ class TestStaticVirtualMachine(
 
 
 def CreateTestStaticVm():
-  vm_spec = svm.StaticVmSpec(_COMPONENT)
+  vm_spec = static_vm_spec.StaticVmSpec(_COMPONENT)
   return TestStaticVirtualMachine(vm_spec=vm_spec)
 
 
 class StaticVmSpecTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testDefaults(self):
-    spec = svm.StaticVmSpec(_COMPONENT)
+    spec = static_vm_spec.StaticVmSpec(_COMPONENT)
     self.assertIsNone(spec.ip_address)
     self.assertIsNone(spec.user_name)
     self.assertIsNone(spec.ssh_private_key)
@@ -56,7 +57,7 @@ class StaticVmSpecTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(spec.disk_specs, [])
 
   def testDiskSpecs(self):
-    spec = svm.StaticVmSpec(_COMPONENT, disk_specs=_DISK_SPEC_DICTS)
+    spec = static_vm_spec.StaticVmSpec(_COMPONENT, disk_specs=_DISK_SPEC_DICTS)
     self.assertEqual(len(spec.disk_specs), 2)
     for disk_spec in spec.disk_specs:
       self.assertIsInstance(disk_spec, disk.BaseDiskSpec)
@@ -128,7 +129,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(2, len(vm_pool))
     self._AssertStaticVMsEqual(
         TestStaticVirtualMachine(
-            svm.StaticVmSpec(
+            static_vm_spec.StaticVmSpec(
                 _COMPONENT,
                 ip_address='174.12.14.1',
                 user_name='perfkitbenchmarker',
@@ -139,7 +140,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self._AssertStaticVMsEqual(
         TestStaticVirtualMachine(
-            svm.StaticVmSpec(
+            static_vm_spec.StaticVmSpec(
                 _COMPONENT,
                 ip_address='174.12.14.121',
                 user_name='ubuntu',
@@ -181,7 +182,7 @@ class StaticVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(1, len(vm_pool))
     self._AssertStaticVMsEqual(
         TestStaticVirtualMachine(
-            svm.StaticVmSpec(
+            static_vm_spec.StaticVmSpec(
                 _COMPONENT,
                 ip_address='174.12.14.1',
                 user_name='perfkitbenchmarker',

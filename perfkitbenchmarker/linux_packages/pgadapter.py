@@ -18,7 +18,7 @@ database. See https://cloud.google.com/spanner/docs/pgadapter.
 """
 
 PGADAPTER_URL = (
-    'https://storage.googleapis.com/pgadapter-jar-releases/pgadapter.tar.gz'
+    'https://storage.googleapis.com/pgadapter-jar-releases/pgadapter-v0.53.0.tar.gz'
 )
 
 
@@ -27,4 +27,4 @@ def AptInstall(vm):
   # psmisc helps with restarting PGAdapter.
   vm.InstallPackages('default-jre psmisc')
   vm.RemoteCommand(f'wget {PGADAPTER_URL}')
-  vm.RemoteCommand('tar -xzvf pgadapter.tar.gz')
+  vm.RemoteCommand('tar -xzvf pgadapter-v0.53.0.tar.gz')

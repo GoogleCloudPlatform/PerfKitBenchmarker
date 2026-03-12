@@ -2,9 +2,11 @@ import datetime
 import inspect
 import unittest
 from absl import flags
+from absl.testing import flagsaver
 from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3 import types
 import mock
+from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.gcp import gcp_alloy_db
 from tests import pkb_common_test_case
 
@@ -13,8 +15,9 @@ FLAGS = flags.FLAGS
 
 class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
 
-  def testCollectMetrics(self):
-    FLAGS.run_uri = '123456'
+  def setUp(self):
+    super().setUp()
+    FLAGS.run_uri = 'test_run'
     test_spec = inspect.cleandoc("""
     sysbench:
       relational_db:
@@ -38,8 +41,26 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
         yaml_string=test_spec, benchmark_name='sysbench'
     )
     spec.ConstructRelationalDb()
-    db = spec.relational_db
-    db.project = 'test_project'
+    self.db = spec.relational_db
+
+    # Mock client_vm for network resource name
+    self.db.client_vm = mock.Mock()
+    self.db.client_vm.network.network_resource.name = 'network_name'
+
+    # Default to no read replicas
+    self.enter_context(flagsaver.flagsaver(alloydb_read_pool_node_count=0))
+
+    self.mock_cmd = mock.Mock()
+    self.enter_context(
+        mock.patch.object(
+            gcp_alloy_db.GCPAlloyRelationalDb,
+            '_GetAlloyDbCommand',
+            return_value=self.mock_cmd,
+        )
+    )
+
+  def testCollectMetrics(self):
+    self.db.project = 'test_project'
 
     mock_response = types.ListTimeSeriesResponse(
         time_series=[{
@@ -74,17 +95,77 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
 
     start_time = datetime.datetime(2025, 11, 26, 10, 0, 0)
     end_time = datetime.datetime(2025, 11, 26, 10, 1, 0)
-    samples = db.CollectMetrics(start_time, end_time)
+    samples = self.db.CollectMetrics(start_time, end_time)
 
     size_avg = next(s for s in samples if s.metric == 'disk_bytes_used_average')
     size_min = next(s for s in samples if s.metric == 'disk_bytes_used_min')
     size_max = next(s for s in samples if s.metric == 'disk_bytes_used_max')
 
-    self.assertIsInstance(db, gcp_alloy_db.GCPAlloyRelationalDb)
+    self.assertIsInstance(self.db, gcp_alloy_db.GCPAlloyRelationalDb)
     self.assertEqual(size_avg.value, 3.0)
     self.assertEqual(size_avg.unit, 'GB')
     self.assertEqual(size_min.value, 2.0)
     self.assertEqual(size_max.value, 4.0)
+
+  def testCreateSuccess(self):
+    # Cluster create, Instance create, Instance describe
+    self.mock_cmd.Issue.side_effect = [
+        ('', '', 0),
+        ('', '', 0),
+        ('{"ipAddress": "1.1.1.1"}', '', 0),
+    ]
+
+    self.db._Create()
+
+    self.assertEqual(self.db.endpoint, '1.1.1.1')
+
+  def testCreateInternalError(self):
+    # Fail on first command (cluster create)
+    self.mock_cmd.Issue.side_effect = [
+        ('', 'an internal error has occurred', 1)
+    ]
+
+    with self.assertRaisesRegex(
+        errors.Resource.RetryableCreationError,
+        'Creation failed due to internal error',
+    ):
+      self.db._Create()
+
+  def testCreateInsufficientCapacity(self):
+    # Fail on first command (cluster create)
+    self.mock_cmd.Issue.side_effect = [(
+        '',
+        'does not have enough resources available to fulfill the request.',
+        1,
+    )]
+
+    with self.assertRaisesRegex(
+        errors.Benchmarks.InsufficientCapacityCloudFailure,
+        'Creation failed due to not enough resources',
+    ):
+      self.db._Create()
+
+  def testCreateAlreadyExists(self):
+    # Cluster exists, Instance exists, Instance describe success
+    self.mock_cmd.Issue.side_effect = [
+        ('', 'already exists', 1),
+        ('', 'already exists', 1),
+        ('{"ipAddress": "1.1.1.1"}', '', 0),
+    ]
+
+    self.db._Create()
+
+    self.assertEqual(self.db.endpoint, '1.1.1.1')
+
+  def testCreateOtherError(self):
+    # Fail on first command
+    self.mock_cmd.Issue.side_effect = [('', 'unknown error', 1)]
+
+    with self.assertRaisesRegex(
+        errors.VmUtil.IssueCommandError,
+        'Command failed',
+    ):
+      self.db._Create()
 
 
 if __name__ == '__main__':

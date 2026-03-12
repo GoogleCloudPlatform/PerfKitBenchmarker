@@ -1,4 +1,4 @@
-# Copyright 2015 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2026 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Requirements for running PerfKit Benchmarker on AWS.
-awscli>=1.19.75
-colorama>=0.3.7
-boto3
+
+"""Module containing nodejs/npm installation and cleanup functions."""
+
+
+def YumInstall(vm):
+  """Installs the nodejs & npm packages on the VM."""
+  vm.RemoteCommand('sudo yum install -y nodejs npm')
+
+
+def AptInstall(vm):
+  """Installs the nodejs & npm packages on the VM."""
+  vm.RemoteCommand('sudo apt-get install -y nodejs npm')
+

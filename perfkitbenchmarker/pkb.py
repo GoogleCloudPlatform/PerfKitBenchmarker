@@ -1694,6 +1694,8 @@ def SetUpPKB():
         run_uri=FLAGS.run_uri,
         file_log_level=log_util.LOG_LEVELS[FLAGS.file_log_level],
     )
+  elif log_util.TRUNCATE_DUPLICATE_LOGS.value:
+    log_util.ConfigureDedupeLogging()
   # Always output a short log.
   log_util.ConfigureShortLogging(
       logs_dir=vm_util.GetTempDir(),

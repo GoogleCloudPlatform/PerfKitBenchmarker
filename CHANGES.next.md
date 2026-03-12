@@ -270,6 +270,8 @@
 -   Add support for Debian 13.
 -   Add `--dpb_spark_event_logs` flag to export Spark event logs in dpb service
     benchmarks.
+-   Truncate duplicated logs to make the pkb.log more human readable. If not
+    desired, turn it off with `--notruncate_duplicate_logs`.
 
 ### Enhancements:
 
@@ -446,6 +448,8 @@
 -   Add support for enabling live migration on AMD SEV
 -   Increased maintenance simulation notification timeout to 4 hours in
     maintenance_simulation_trigger.py.
+-   Added `--retry_on_insufficient_capacity_cloud_failure` so that resource
+    creation can be retried on stock outs.
 
 ### Bug fixes and maintenance updates:
 

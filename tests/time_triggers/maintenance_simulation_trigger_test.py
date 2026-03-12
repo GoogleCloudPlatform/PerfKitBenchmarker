@@ -92,6 +92,7 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
                     'LM_total_time': 10.0,
                     'Host_maintenance_end': 0.0,
                     'Host_maintenance_start': 0.0,
+                    'trigger_index': 0,
                 },
                 timestamp=0,
             )

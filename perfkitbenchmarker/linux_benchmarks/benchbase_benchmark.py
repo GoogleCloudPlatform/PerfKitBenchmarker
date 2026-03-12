@@ -30,8 +30,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.linux_packages import benchbase
-# Needed in order to register spec:
-from perfkitbenchmarker.providers.aws import aws_aurora_dsql_db  # pylint: disable=unused-import
+from perfkitbenchmarker.providers.aws import aws_aurora_dsql_db
 
 
 SPANNER_POSTGRES = sql_engine_utils.SPANNER_POSTGRES
@@ -79,6 +78,9 @@ _WARMUP_DURATION = benchbase.BENCHBASE_WARMUP_DURATION
 _WORKLOAD_DURATION = benchbase.BENCHBASE_WORKLOAD_DURATION
 _WAREHOUSES = benchbase.BENCHBASE_WAREHOUSES
 _RECOVERY_POINT_ARN = aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN
+# Timeout value derived from testing run:
+# https://screenshot.googleplex.com/8USL62xn9oSvABj
+_SPANNER_ANALYZE_TIMEOUT = 60 * 60 * 3
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -147,6 +149,25 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
         ' --execute=false"'
     )
     client_vm.RemoteCommand(load_command)
+
+  if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES:
+    benchmark_spec.relational_db.RunDDLQuery(
+        'ANALYZE;', timeout=_SPANNER_ANALYZE_TIMEOUT
+    )
+  elif FLAGS.db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
+    queries = [
+        'ANALYZE public.customer;',
+        'ANALYZE public.district;',
+        'ANALYZE public.history;',
+        'ANALYZE public.item;',
+        'ANALYZE public.new_order;',
+        'ANALYZE public.oorder;',
+        'ANALYZE public.order_line;',
+        'ANALYZE public.stock;',
+        'ANALYZE public.warehouse;',
+    ]
+    for query in queries:
+      benchmark_spec.relational_db.RunSqlQuery(query)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:

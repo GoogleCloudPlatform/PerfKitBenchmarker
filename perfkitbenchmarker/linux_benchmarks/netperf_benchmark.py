@@ -223,7 +223,11 @@ def Prepare(benchmark_spec):
           (PrepareClientVM, [client_vm], {}),
           (
               PrepareServerVM,
-              [server_vm, client_vm.GetInternalIPs(), client_vm.ip_address],
+              [
+                  server_vm,
+                  client_vm.GetInternalIPs(),
+                  client_vm.GetExternalIPs(),
+              ],
               {},
           ),
       ],
@@ -284,7 +288,7 @@ def _SetupHostFirewall(server_vm, client_vm_internal_ip, client_vm_ip_address):
   """
   ip_addrs = [client_vm_internal_ip]
   if vm_util.ShouldRunOnExternalIpAddress():
-    ip_addrs.append(client_vm_ip_address)
+    ip_addrs.extend(client_vm_ip_address)
 
   logging.info(
       'setting up host firewall on %s running %s for client at %s',
@@ -763,7 +767,7 @@ def RunClientServerVMs(client_vm, server_vm):
         external_ip_results = RunNetperf(
             client_vm,
             netperf_benchmark,
-            [server_vm.ip_address],
+            server_vm.GetExternalIPs(),
             num_streams,
             # NAT translates internal to external IP when remote server IP is
             # external.

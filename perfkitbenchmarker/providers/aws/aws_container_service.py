@@ -358,12 +358,12 @@ class EcsTask(container_lib.BaseContainer):
 
     @vm_util.Retry(
         timeout=timeout,
-        retryable_exceptions=(container_errors.RetriableContainerException,),
+        retryable_exceptions=(container_errors.RetriableContainerError,),
     )
     def _WaitForExit():
       task = self._GetTask()
       if task['lastStatus'] != 'STOPPED':
-        raise container_errors.RetriableContainerException(
+        raise container_errors.RetriableContainerError(
             'Task is not STOPPED.'
         )
       return task

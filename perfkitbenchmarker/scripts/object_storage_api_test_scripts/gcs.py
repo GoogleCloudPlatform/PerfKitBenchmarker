@@ -78,10 +78,9 @@ class GcsService(object_storage_interface.ObjectStorageServiceBase):
   def WriteObjectFromBuffer(self, bucket_name, object_name, stream, size):
     stream.seek(0)
     start_time = time.time()
-    data = str(stream.read(size))
     bucket = storage.bucket.Bucket(self.client, bucket_name)
     obj = storage.blob.Blob(object_name, bucket)
-    obj.upload_from_string(data, client=self.client)
+    obj.upload_from_file(stream, client=self.client, size=size)
     latency = time.time() - start_time
     return start_time, latency
 
@@ -89,6 +88,6 @@ class GcsService(object_storage_interface.ObjectStorageServiceBase):
     start_time = time.time()
     bucket = storage.bucket.Bucket(self.client, bucket_name)
     obj = storage.blob.Blob(object_name, bucket)
-    obj.download_as_string(client=self.client)
+    obj.download_as_bytes(client=self.client)
     latency = time.time() - start_time
     return start_time, latency

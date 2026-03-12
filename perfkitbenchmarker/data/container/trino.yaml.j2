@@ -12,7 +12,7 @@ additionalConfigProperties:
   - query.max-writer-task-count=600
   - retry-policy=QUERY
   - fault-tolerant-execution.exchange-encryption-enabled=false
-  - exchange.deduplication-buffer-size=512MB
+  - exchange.deduplication-buffer-size=5GB
 
 resourceGroups:
   type: configmap
@@ -63,7 +63,7 @@ catalogs:
     iceberg.register-table-procedure.enabled=true
     iceberg.add-files-procedure.enabled=true
     iceberg.max-partitions-per-writer=1000
-    fs.memory-cache.max-size=1GB
+    fs.memory-cache.max-size=5GB
     fs.cache.enabled=true
     fs.cache.directories=/tmp/trino-cache
     fs.cache.max-disk-usage-percentages=80

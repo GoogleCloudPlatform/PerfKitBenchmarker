@@ -35,6 +35,7 @@ from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.providers.gcp import util
@@ -421,6 +422,22 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     )
     cmd.flags['instance'] = self.instance_id
     stdout, stderr, _ = cmd.Issue(raise_on_failure=False)
+    return stdout, stderr
+
+  def RunDDLQuery(
+      self, sql_query: str, timeout: int = vm_util.DEFAULT_TIMEOUT
+  ) -> tuple[str, str]:
+    """Runs a DDL query on the database."""
+    cmd = util.GcloudCommand(
+        self, 'spanner', 'databases', 'ddl', 'update', self.database
+    )
+    cmd.flags['instance'] = self.instance_id
+    cmd.flags['ddl'] = sql_query
+    stdout, stderr, retcode = cmd.Issue(
+        raise_on_failure=False, timeout=timeout
+    )
+    if retcode != 0:
+      logging.error('Failed to run DDL query: %s', sql_query)
     return stdout, stderr
 
   def _Exists(self, instance_only: bool = False) -> bool:

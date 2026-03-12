@@ -116,13 +116,26 @@ flags.DEFINE_multi_string(
     'stream should be passed in separately and the queries should be comma '
     'separated, e.g. --concurrency_streams=1,2,3 --concurrency_streams=3,2,1',
 )
+flags.DEFINE_boolean(
+    'edw_warmup_tolerate_failure',
+    False,
+    'If set, the benchmark will tolerate query failures during the warmup '
+    'phase. Mostly useful for testing.',
+)
 flags.DEFINE_string(
     'snowflake_warehouse',
     None,
     'A virtual warehouse, often referred to simply as a - '
     'warehouse, is a cluster of compute in Snowflake. '
     'https://docs.snowflake.com/en/user-guide/warehouses.html',
-)  # pylint: disable=line-too-long
+)
+flags.DEFINE_string(
+    'snowflake_metadata_warehouse',
+    None,
+    'Warehouse to be used for Snowflake metadata queries.'
+    'If not set, the warehouse specified by snowflake_warehouse will be used.'
+    'Should usually be set to a small warehouse size.',
+)
 flags.DEFINE_string(
     'snowflake_database',
     None,
@@ -176,6 +189,13 @@ flags.DEFINE_enum(
     'Currently supported: default (no special features), job_optional '
     '(enables job_creation_optional query preview feature). '
     'Only supported for Python client.',
+)
+EDW_BQ_RESERVATION = flags.DEFINE_string(
+    'edw_bq_reservation',
+    None,
+    'BigQuery reservation to use for queries. Format: '
+    'projects/{project}/locations/{location}/reservations/{reservation}'
+    'Only supported for python client.',
 )
 
 # MARK: index flags

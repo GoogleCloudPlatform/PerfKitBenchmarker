@@ -15,6 +15,7 @@
 """Contains classes/functions related to Azure Kubernetes Service."""
 
 import json
+import re
 from typing import Any, List
 
 from absl import flags
@@ -126,6 +127,8 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     # to make it work with ACR
     self.cluster_version = FLAGS.container_cluster_version
     self._deleted = False
+    # Instantiation required to delete the resource group.
+    self.network = azure_network.AzureNetwork.GetNetwork(spec.vm_spec)
 
   def InitializeNodePoolForCloud(
       self,
@@ -171,6 +174,24 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--nodepool-labels',
         f'pkb_nodepool={container_cluster.DEFAULT_NODEPOOL}',
     ] + self._GetNodeFlags(self.default_nodepool)
+    if self.max_nodes > 256:
+      cmd += [
+          # Default /16 supports ~250 nodes; /10 provides ~4M IPs for up to 16k.
+          '--pod-cidr',
+          '100.64.0.0/10',
+          # Free tier caps at 1k nodes; standard scales upto 5k nodes.
+          '--tier',
+          'standard',
+          # Standard LB exhausts SNAT ports at ~1k nodes; NAT Gateway required.
+          '--outbound-type',
+          'managedNATGateway',
+          # 4 IPs = ~256k SNAT ports (~50 ports/node at 5k nodes).
+          '--nat-gateway-managed-outbound-ip-count',
+          '4',
+          # Prevent connection drops during long bootstrap or idle keep-alives.
+          '--nat-gateway-idle-timeout',
+          '10',
+      ]
     if self.enable_vpa:
       cmd.append('--enable-vpa')
     if FLAGS.azure_aks_auto_node_provisioning:
@@ -212,7 +233,27 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--labels',
         f'pkb_nodepool={nodepool_config.name}',
     ] + self._GetNodeFlags(nodepool_config)
-    vm_util.IssueCommand(cmd, timeout=600)
+    if self._IsAutoscalerEnabled():
+      cmd += [
+          '--enable-cluster-autoscaler',
+          f'--min-count={self.min_nodes}',
+          f'--max-count={self.max_nodes}',
+      ]
+    _, stderr, _ = vm_util.IssueCommand(cmd, timeout=600)
+    # Allocation failure could be due to capacity / quota / validity.
+    # Validity should be uncovered during development. Quota and capacity
+    # will trigger failures in other VM benchmarks.
+    if re.search(
+        'Allocation failed. VM(s) with the following constraints cannot be'
+        ' allocated, because the condition is too restrictive.',
+        stderr,
+    ):
+      raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+          'Creation failed. Kubernetes does not support specific failure modes'
+          ' so failure can be due to capacity, quota, or configuration'
+          ' validity. Please run another VM benchmark to validate root cause of'
+          ' failure.'
+      )
 
   def _GetNodeFlags(
       self, nodepool_config: container.BaseNodePoolConfig

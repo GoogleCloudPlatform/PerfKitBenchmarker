@@ -15,7 +15,7 @@
 import logging
 from absl import flags
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import kubernetes_helper
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 import yaml
 
 FLAGS = flags.FLAGS
@@ -143,7 +143,7 @@ def RetrieveNodePortIp(argDescriptor):
     raise errors.Config.InvalidValue(
         'For NodePortIp arguments, you must provide a "selector"'
     )
-  ip = kubernetes_helper.GetWithWaitForContents(
+  ip = kubernetes_commands.GetWithWaitForContents(
       'pods', '', jsonSelector, '.items[0].status.podIP'
   )
   if len(ip) == 0:
@@ -158,7 +158,7 @@ def RetrieveLoadBalancerIp(argDescriptor):
     raise errors.Config.InvalidValue(
         'For LoadBalancerIp arguments, you mustprovide a "serviceName"'
     )
-  ip = kubernetes_helper.GetWithWaitForContents(
+  ip = kubernetes_commands.GetWithWaitForContents(
       'svc', serviceName, '', '.status.loadBalancer.ingress[0].ip'
   )
   if len(ip) == 0:

@@ -21,11 +21,11 @@ from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
-from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 FLAGS = flags.FLAGS
 
@@ -262,13 +262,13 @@ class PersistentVolumeClaim(resource.BaseResource):
   def _Create(self):
     """Creates the PVC."""
     body = self._BuildBody()
-    kubernetes_helper.CreateResource(body)
+    kubernetes_commands.CreateResource(body)
     self._WaitForPVCBoundCompletion()
 
   def _Delete(self):
     """Deletes the PVC."""
     body = self._BuildBody()
-    kubernetes_helper.DeleteResource(body)
+    kubernetes_commands.DeleteResourceFromBody(body)
 
   def _BuildBody(self):
     """Builds JSON representing the PVC."""
@@ -323,12 +323,12 @@ class StorageClass(resource.BaseResource):
     """Creates the StorageClass."""
     body = self._BuildBody()
     if not self._CheckStorageClassExists():
-      kubernetes_helper.CreateResource(body)
+      kubernetes_commands.CreateResource(body)
 
   def _Delete(self):
     """Deletes the StorageClass."""
     body = self._BuildBody()
-    kubernetes_helper.DeleteResource(body)
+    kubernetes_commands.DeleteResourceFromBody(body)
 
   def _BuildBody(self):
     """Builds JSON representing the StorageClass."""

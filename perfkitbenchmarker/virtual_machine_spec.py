@@ -87,7 +87,10 @@ class BaseVmSpec(spec.BaseSpec):
     gpu_count: None or int. Number of gpus to attach to the VM.
     gpu_type: None or string. Type of gpus to attach to the VM.
     image: The disk image to boot from.
-    assign_external_ip: Bool.  If true, create an external (public) IP.
+    assign_external_ip: Bool.  If true, create an external (public) IP for the
+      primary NIC.
+    assign_external_ip_all_nics: Bool. If true, create an external (public) IP
+      for each network interface.
     install_packages: If false, no packages will be installed. This is useful if
       benchmark dependencies have already been installed.
     background_cpu_threads: The number of threads of background CPU usage while
@@ -117,6 +120,7 @@ class BaseVmSpec(spec.BaseSpec):
     self.gpu_type = None
     self.image = None
     self.assign_external_ip = None
+    self.assign_external_ip_all_nics = None
     self.install_packages = None
     self.background_cpu_threads = None
     self.background_network_mbits_per_sec = None
@@ -175,6 +179,10 @@ class BaseVmSpec(spec.BaseSpec):
       config_values['gpu_count'] = flag_values.gpu_count
     if flag_values['assign_external_ip'].present:
       config_values['assign_external_ip'] = flag_values.assign_external_ip
+    if flag_values['assign_external_ip_all_nics'].present:
+      config_values['assign_external_ip_all_nics'] = (
+          flag_values.assign_external_ip_all_nics
+      )
     if flag_values['disable_interrupt_moderation'].present:
       config_values['disable_interrupt_moderation'] = (
           flag_values.disable_interrupt_moderation
@@ -233,6 +241,10 @@ class BaseVmSpec(spec.BaseSpec):
         'assign_external_ip': (
             option_decoders.BooleanDecoder,
             {'default': True},
+        ),
+        'assign_external_ip_all_nics': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
         ),
         'gpu_type': (
             option_decoders.EnumDecoder,

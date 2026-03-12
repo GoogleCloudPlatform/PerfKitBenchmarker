@@ -30,13 +30,14 @@ from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import dpdk_pktgen
 
 
 BENCHMARK_NAME = 'dpdk_pktgen'
 BENCHMARK_CONFIG = """
 dpdk_pktgen:
-  description: Runs dpdk testpmd benchmarks
+  description: Runs dpdk pktgen benchmarks
   vm_groups:
     vm_1:
       vm_spec: *default_dual_core
@@ -68,15 +69,20 @@ _DPDK_PKTGEN_NUM_FLOWS = flags.DEFINE_integer(
     'Number of flows to use by taking a range of source ports.',
     lower_bound=0,
 )
-# Pktgen-dpdk perform incorrectly with multiple threads, causing both incorrect
-# count on the receiver and severe performance limitations. Hence restrict the
-# test to single thread. This limits the sending rate to approximately 50-55Mpps
-# but the TX path on the NIC is throttled at 48Mpps anyways.
+# On GCP, Pktgen-dpdk perform incorrectly with multiple threads, causing both
+# incorrect count on the receiver and severe performance limitations. Hence
+# restrict the test to single thread. This limits the sending rate to
+# approximately 50-55Mpps but the TX path on the NIC is throttled at 48Mpps
+# anyways.
 # https://github.com/pktgen/Pktgen-DPDK/issues/369#issue-3777028887
 _DPDK_PKTGEN_TX_RX_LCORES_LIST = flags.DEFINE_list(
     'dpdk_pktgen_tx_rx_lcores_list',
     [
+        # This is optimal on GCP since multiple queues leads to incorrect
+        # counters and cache contention.
         '[2:1];[1:2]',
+        # This is optimal on AWS.
+        '[8:1-7];[1-7:8]',
     ],
     'A list of strings designating logical cores assigned to TX and RX. Each'
     ' string is in the form'
@@ -110,8 +116,13 @@ _DPDK_PKTGEN_RXD = flags.DEFINE_integer(
 # _MAX_LCORES is not really useful, pktgen-dpdk is buggy with multiple tx/rx
 # queues so we only need 1 core for 1 tx queue, 1 core for 1 rx queue, and 1 to
 # run the User interface.
-_MAX_LCORES = 16
-_START_RATE = 100000000
+_MAX_LCORES = flags.DEFINE_integer(
+    'dpdk_pktgen_max_lcores',
+    16,
+    'Maximum number of logical cores to use.',
+)
+
+_START_RATE = 50_000_000
 # Percent difference in PPS between consecutive iterations to terminate binary
 # search.
 _PPS_BINARY_SEARCH_THRESHOLD = 0.01
@@ -145,35 +156,65 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       lambda vm: vm.Install('dpdk_pktgen'),
       [sender_vm, receiver_vm],
   )
+  if vm_util.ShouldRunOnExternalIpAddress():
+    sender_vm_ips = sender_vm.GetExternalIPs()
+    receiver_vm_ips = receiver_vm.GetExternalIPs()
+  else:
+    sender_vm_ips = sender_vm.GetInternalIPs()
+    receiver_vm_ips = receiver_vm.GetInternalIPs()
+
   # If tertiary NIC is present, run DPDK Pktgen on 2 compatible NICs.
   if (
       sender_vm.tertiary_mac_addr
       and receiver_vm.tertiary_mac_addr
-      and min(len(sender_vm.internal_ips), len(receiver_vm.internal_ips)) > 2
+      and min(len(sender_vm_ips), len(receiver_vm_ips)) > 2
   ):
-    background_tasks.RunThreaded(
-        lambda vm: PrepareVM(
-            vm,
-            sender_vm.internal_ips[1:3],
-            [sender_vm.secondary_mac_addr, sender_vm.tertiary_mac_addr],
-            receiver_vm.internal_ips[1:3],
-            [receiver_vm.secondary_mac_addr, receiver_vm.tertiary_mac_addr],
-            _PKTGEN_2NIC_FILE,
-        ),
-        [sender_vm, receiver_vm],
-    )
+    pktgen_file = _PKTGEN_2NIC_FILE
+    sender_ips = sender_vm_ips[1:3]
+    receiver_ips = receiver_vm_ips[1:3]
+    sender_macs = [sender_vm.secondary_mac_addr, sender_vm.tertiary_mac_addr]
+    receiver_macs = [
+        receiver_vm.secondary_mac_addr,
+        receiver_vm.tertiary_mac_addr,
+    ]
+    # TODO: b/486014352 - Remove this hacky solution with a long-term solution.
+    if sender_vm.CLOUD == 'GCP':
+      # GCP-Specific Workaround: Realign DPDK interfaces with physical NICs.
+      # GCP assigns physical NICs to subnets in a round-robin fashion.
+      # Our default setup assumes the following mapping:
+      #   - default -> nic0
+      #   - dpdk0   -> nic0
+      #   - dpdk1   -> nic1
+      #
+      # However, GCP actually allocates them as:
+      #   - default -> nic0
+      #   - dpdk0   -> nic1
+      #   - dpdk1   -> nic0
+      #
+      # This mismatch causes spoofing drops on the sender's side. To resolve
+      # this, we swap the IPs and MACs to ensure the DPDK configurations align
+      # correctly with the underlying physical NICs.
+      sender_ips.reverse()
+      receiver_ips.reverse()
+      sender_macs.reverse()
+      receiver_macs.reverse()
   else:
-    background_tasks.RunThreaded(
-        lambda vm: PrepareVM(
-            vm,
-            [sender_vm.internal_ips[1]],
-            [sender_vm.secondary_mac_addr],
-            [receiver_vm.internal_ips[1]],
-            [receiver_vm.secondary_mac_addr],
-            _PKTGEN_FILE,
-        ),
-        [sender_vm, receiver_vm],
-    )
+    pktgen_file = _PKTGEN_FILE
+    sender_ips = [sender_vm_ips[1]]
+    sender_macs = [sender_vm.secondary_mac_addr]
+    receiver_ips = [receiver_vm_ips[1]]
+    receiver_macs = [receiver_vm.secondary_mac_addr]
+  background_tasks.RunThreaded(
+      lambda vm: PrepareVM(
+          vm,
+          sender_ips,
+          sender_macs,
+          receiver_ips,
+          receiver_macs,
+          pktgen_file,
+      ),
+      [sender_vm, receiver_vm],
+  )
   receiver_vm.RemoteCommand(
       'sudo sed -i "s/start all//g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
@@ -298,7 +339,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   sender_vm, receiver_vm = benchmark_spec.vms[:2]
   samples = []
 
-  num_lcores = min(sender_vm.NumCpusForBenchmark(), _MAX_LCORES)
+  num_lcores = min(sender_vm.NumCpusForBenchmark(), _MAX_LCORES.value)
   num_numa, _ = sender_vm.RemoteCommand(
       "lscpu | grep 'NUMA node(s)' | awk '{print $3}'"
   )
@@ -351,7 +392,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
         (abs(curr_pps - prev_pps) / (curr_pps + 1))
         > _PPS_BINARY_SEARCH_THRESHOLD
     ) or (valid_total_receiver_rx_pkts is None):
-      curr_rate = (lb + ub) / 2
+      curr_rate = (lb + ub) // 2
       sender_vm.RemoteCommand(
           f'sudo sed -i "s/pps        = {prev_rate};/pps        ='
           f' {curr_rate};/g"'
@@ -494,6 +535,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
             'dpdk_pktgen_packet_loss_threshold': packet_loss_threshold,
             'dpdk_pktgen_tx_cores': tx_cores,
             'dpdk_pktgen_rx_cores': rx_cores,
+            'ip_type': FLAGS.ip_addresses,
         })
         best_run_results = {
             'valid_total_sender_tx_pkts': s_tx,

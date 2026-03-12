@@ -16,11 +16,13 @@
 
 import ntpath
 import posixpath
+import threading
 from typing import Any, List
 
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import vm_util
@@ -49,6 +51,7 @@ MINIMUM_RECOVERY = linux_hammerdb.MINIMUM_RECOVERY
 
 # Default run timeout
 TIMEOUT = 60 * 60 * 20
+_COUNTER_QUERY_TIMEOUT = 60
 
 
 class WindowsHammerDbTclScript(linux_hammerdb.HammerDbTclScript):
@@ -170,8 +173,9 @@ def SetupConfig(
 
   if db_engine not in linux_hammerdb.SCRIPT_MAPPING:
     raise ValueError(
-        '{} is currently not supported for running '
-        'hammerdb benchmarks.'.format(db_engine)
+        '{} is currently not supported for running hammerdb benchmarks.'.format(
+            db_engine
+        )
     )
 
   if hammerdb_script not in linux_hammerdb.SCRIPT_MAPPING[db_engine]:
@@ -279,3 +283,14 @@ def PushTestFile(vm, data_file: str, path: str):
 def GetMetadata(db_engine: str):
   """Returns the meta data needed for hammerdb."""
   return linux_hammerdb.GetMetadata(db_engine)
+
+
+def CollectDbPerformanceCounters(
+    db: relational_db.BaseRelationalDb,
+    stop_event: threading.Event,
+):
+  """Background task to collect DB performance counters."""
+  while not stop_event.is_set():
+    db.QueryPerformanceCounters()
+    # Wait for timeout (default 1 minute) or until stop_event is set.
+    stop_event.wait(_COUNTER_QUERY_TIMEOUT)

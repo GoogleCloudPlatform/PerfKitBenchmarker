@@ -358,6 +358,8 @@ class Snowflake(edw_service.EdwService):
 
   CLOUD: str = None
   SERVICE_TYPE = None
+  client_interface: SnowflakeClientInterface
+  metadata_client_interface: SnowflakeClientInterface
 
   def __init__(self, edw_service_spec):
     super().__init__(edw_service_spec)
@@ -368,6 +370,17 @@ class Snowflake(edw_service.EdwService):
     self.account = FLAGS.snowflake_account
     self.client_interface = GetSnowflakeClientInterface(
         self.warehouse,
+        self.database,
+        self.schema,
+        self.CLOUD,
+        self.user,
+        self.account,
+    )
+    self.metadata_warehouse = (
+        FLAGS.snowflake_metadata_warehouse or self.warehouse
+    )
+    self.metadata_client_interface = GetSnowflakeClientInterface(
+        self.metadata_warehouse,
         self.database,
         self.schema,
         self.CLOUD,
@@ -714,7 +727,7 @@ class Snowflake(edw_service.EdwService):
         context,
         should_log_file=True,
     )
-    _, output = self.client_interface.ExecuteQuery(
+    _, output = self.metadata_client_interface.ExecuteQuery(
         query_name, print_results=True
     )
     col_res = output['query_results']
@@ -767,6 +780,7 @@ class Snowflake(edw_service.EdwService):
       self, start_timestamp: float, end_timestamp: float
   ) -> list[dict[str, Any]]:
     """Returns the auxiliary metrics for the given run."""
+    self.metadata_client_interface.client_vm = self.client_interface.client_vm
     query_file_name = f'metadata_query_{start_timestamp}.sql'
     context = {
         'start_timestamp': start_timestamp,

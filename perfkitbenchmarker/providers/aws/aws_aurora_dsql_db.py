@@ -28,8 +28,6 @@ from perfkitbenchmarker.providers.aws import aws_relational_db
 from perfkitbenchmarker.providers.aws import util
 
 
-# TODO(shuninglin): Add reaper for this new resource.
-
 FLAGS = flags.FLAGS
 
 AWS_AURORA_DSQL_RECOVERY_POINT_ARN = flags.DEFINE_string(
@@ -266,6 +264,36 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
         raise errors.Resource.RetryableDeletionError('Not yet deleted')
 
     WaitUntilClusterDeleted()
+
+  def _GetHostname(self) -> str:
+    """Returns endpoint of DSQL cluster."""
+    return f'{self.cluster_id}.dsql.{self.region}.on.aws'
+
+# TODO(shuninglin): Extend PostgresCliQueryTools for DSQL.
+  def RunSqlQuery(self, sql_query: str) -> None:
+    """Runs a SQL query on the database."""
+    # Local import to avoid dependency not found issue.
+    import boto3  # pylint: disable=g-import-not-at-top
+    hostname = self._GetHostname()
+    # Since we are using aws cli v1 where the token generation is not supported,
+    # we are using sdk here to generate the token.
+    client = boto3.client('dsql', region_name=self.region)
+    token = client.generate_db_connect_admin_auth_token(hostname, self.region)
+    connection_properties = sql_engine_utils.DbConnectionProperties(
+        engine=self.spec.engine,
+        engine_version=self.spec.engine_version,
+        endpoint=hostname,
+        port=5432,
+        database_username='admin',
+        database_password=token,
+        instance_name=self.cluster_id,
+        database_name='postgres',
+    )
+    query_tools = sql_engine_utils.PostgresCliQueryTools(
+        self.client_vm, connection_properties
+    )
+    cmd = query_tools.MakeSqlCommand(sql_query, database_name='postgres')
+    self.client_vm.RemoteCommand(f'PGSSLMODE=require {cmd}')
 
   @staticmethod
   def GetDefaultEngineVersion(engine) -> str:

@@ -18,11 +18,11 @@ from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import events
-from perfkitbenchmarker import kubernetes_helper
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import container
 from perfkitbenchmarker.resources.container_service import errors
 from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 import requests
 import yaml
 
@@ -39,6 +39,17 @@ flags.DEFINE_string(
 )
 
 flags.DEFINE_string('kubectl', 'kubectl', 'Path to kubectl tool')
+
+flags.DEFINE_integer(
+    'k8s_get_retry_count',
+    18,
+    'Maximum number of waits for getting LoadBalancer external IP',
+)
+flags.DEFINE_integer(
+    'k8s_get_wait_interval',
+    10,
+    'Wait interval for getting LoadBalancer external IP',
+)
 
 _K8S_INGRESS = """
 apiVersion: extensions/v1beta1
@@ -82,7 +93,7 @@ class KubernetesPod:
     if phase == 'Succeeded':
       return
     elif phase == 'Failed':
-      raise errors.FatalContainerException(
+      raise errors.FatalContainerError(
           f'Pod {self.name} failed:\n{yaml.dump(status)}'
       )
     else:
@@ -93,7 +104,7 @@ class KubernetesPod:
             and condition['reason'] == 'Unschedulable'
         ):
           # TODO(pclay): Revisit this when we scale clusters.
-          raise errors.FatalContainerException(
+          raise errors.FatalContainerError(
               f"Pod {self.name} failed to schedule:\n{condition['message']}"
           )
       for container_status in status.get('containerStatuses', []):
@@ -102,7 +113,7 @@ class KubernetesPod:
             'ErrImagePull',
             'ImagePullBackOff',
         ]:
-          raise errors.FatalContainerException(
+          raise errors.FatalContainerError(
               f'Failed to find container image for {self.name}:\n'
               + yaml.dump(waiting_status.get('message'))
           )
@@ -112,7 +123,7 @@ class KubernetesPod:
 
     @vm_util.Retry(
         timeout=timeout,
-        retryable_exceptions=(errors.RetriableContainerException,),
+        retryable_exceptions=(errors.RetriableContainerError,),
     )
     def _WaitForExit():
       pod = self._GetPod()
@@ -122,7 +133,7 @@ class KubernetesPod:
       if phase == 'Succeeded':
         return pod
       else:
-        raise errors.RetriableContainerException(
+        raise errors.RetriableContainerError(
             f'Pod phase ({phase}) not in finished phases.'
         )
 
@@ -225,7 +236,7 @@ class KubernetesContainerService(container.BaseContainerService):
     with vm_util.NamedTemporaryFile() as tf:
       tf.write(_K8S_INGRESS.format(service_name=self.name))
       tf.close()
-      kubernetes_helper.CreateFromFile(tf.name)
+      kubernetes_commands.CreateFromFile(tf.name)
 
   def _GetIpAddress(self):
     """Attempts to set the Service's ip address."""
@@ -258,7 +269,7 @@ class KubernetesContainerService(container.BaseContainerService):
     with vm_util.NamedTemporaryFile() as tf:
       tf.write(_K8S_INGRESS.format(service_name=self.name))
       tf.close()
-      kubernetes_helper.DeleteFromFile(tf.name)
+      kubernetes_commands.DeleteFromFile(tf.name)
 
     delete_cmd = ['delete', 'deployment', self.name]
     kubectl.RunKubectlCommand(delete_cmd, raise_on_failure=False)

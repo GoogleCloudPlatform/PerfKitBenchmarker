@@ -316,3 +316,37 @@ MEMORYDB_NODE_TYPE = flags.DEFINE_string(
 MEMORYDB_FAILOVER_ZONE = flags.DEFINE_string(
     'aws_memorydb_failover_zone', None, 'AWS MemoryDB failover zone'
 )
+
+# DocumentDB Flags
+AWS_DOCUMENTDB_CLUSTER_NAME = flags.DEFINE_string(
+    'aws_documentdb_cluster_name',
+    None,
+    'The name of the documentdb cluster. This makes the resource user managed'
+    ' and assumes the correct zone is passed in.',
+)
+AWS_DOCUMENTDB_INSTANCE_CLASS = flags.DEFINE_string(
+    'aws_documentdb_instance_class',
+    None,
+    'The instance class to use for the documentdb cluster. Corresponds to the'
+    ' --db-instance-class parameter for the create command.',
+)
+AWS_DOCUMENTDB_REPLICA_COUNT = flags.DEFINE_integer(
+    'aws_documentdb_replica_count',
+    0,
+    'The number of replicas to use for the documentdb cluster.',
+)
+AWS_DOCUMENTDB_ZONES = flags.DEFINE_list(
+    'aws_documentdb_zones',
+    None,
+    'The zones to use for the documentdb cluster.',
+)
+AWS_DOCUMENTDB_TLS = flags.DEFINE_bool(
+    'aws_documentdb_tls',
+    False,
+    'Whether to enable TLS for the documentdb cluster.',
+)
+AWS_DOCUMENTDB_SNAPSHOT = flags.DEFINE_string(
+    'aws_documentdb_snapshot',
+    None,
+    'If supplied, creates the DocumentDB instance from the snapshot.',
+)

@@ -20,7 +20,7 @@ from perfkitbenchmarker import errors
 
 DPDK_GIT_REPO = 'https://github.com/DPDK/dpdk.git'
 # LINT.IfChange(dpdk_tag)
-DPDK_GIT_REPO_TAG = 'v24.11'
+DPDK_GIT_REPO_TAG = 'v24.11.2'
 # LINT.ThenChange(:dpdk_patch)
 DPDK_GCP_DRIVER_GIT_REPO = (
     'https://github.com/google/compute-virtual-ethernet-dpdk'
@@ -56,10 +56,9 @@ def _Install(vm):
         'cp -r compute-virtual-ethernet-dpdk/* dpdk/drivers/net/gve'
     )
   # Installs DPDK.
-  # Adding /usr/local/bin to PATH needed for amazonlinux2.
   vm.RobustRemoteCommand(
       'cd dpdk && sudo env PATH=$PATH:/usr/local/bin meson setup'
-      ' -Dexamples=l3fwd,l2fwd build'
+      ' -Dexamples=l3fwd,l2fwd -Dmax_lcores=256 -Dplatform=native build'
   )
   vm.RemoteCommand(
       'cd dpdk && yes | sudo env PATH=$PATH:/usr/local/bin ninja install -C'
@@ -189,7 +188,7 @@ def _BindNICToDPDKDriver(vm):
 
   # Find bus info for secondary nic
   stdout, _ = vm.RemoteCommand(f'sudo ethtool -i {secondary_nic}')
-  bus_match = re.search('bus-info: (0000:[0-9]+:[0-9]+.0)', stdout)
+  bus_match = re.search(r'bus-info: (0000:[0-9a-z]+:[0-9a-z]+\.0)', stdout)
   if not bus_match:
     raise errors.VirtualMachine.VmStateError('No bus info for secondary NIC.')
   vm.secondary_nic_bus_info = bus_match.group(1)
@@ -200,7 +199,7 @@ def _BindNICToDPDKDriver(vm):
   vm.tertiary_nic_bus_info = None
   if tertiary_nic:
     stdout, _ = vm.RemoteCommand(f'sudo ethtool -i {tertiary_nic}')
-    bus_match = re.search('bus-info: (0000:[0-9]+:[0-9]+.0)', stdout)
+    bus_match = re.search(r'bus-info: (0000:[0-9a-z]+:[0-9a-z]+\.0)', stdout)
     if not bus_match:
       raise errors.VirtualMachine.VmStateError('No bus info for tertiary NIC.')
     vm.tertiary_nic_bus_info = bus_match.group(1)

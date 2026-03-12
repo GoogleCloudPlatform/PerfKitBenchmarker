@@ -22,11 +22,11 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
-from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import static_vm_decoders
+from perfkitbenchmarker.configs import static_vm_spec
 from perfkitbenchmarker.configs import vm_group_decoders
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
@@ -128,7 +128,7 @@ class StaticVmDecoderTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testValidInput(self):
     result = self._decoder.Decode({'ssh_port': 111}, _COMPONENT, {})
-    self.assertIsInstance(result, static_virtual_machine.StaticVmSpec)
+    self.assertIsInstance(result, static_vm_spec.StaticVmSpec)
     self.assertEqual(result.ssh_port, 111)
 
   def testVmSpecFlag(self):
@@ -318,7 +318,7 @@ class VmGroupSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertIsInstance(result.static_vms, list)
     self.assertEqual(len(result.static_vms), 1)
     self.assertIsInstance(
-        result.static_vms[0], static_virtual_machine.StaticVmSpec
+        result.static_vms[0], static_vm_spec.StaticVmSpec
     )
     self.assertEqual(result.vm_count, 0)
     self.assertIsInstance(result.vm_spec, virtual_machine_spec.BaseVmSpec)

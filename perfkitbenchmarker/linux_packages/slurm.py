@@ -127,7 +127,7 @@ def ConfigureSlurm(vms):
 
 def Running(vm):
   """Check if any slurm job is running."""
-  output, _ = vm.RemoteCommand('sinfo')
+  output, _ = vm.RemoteCommand('sinfo', login_shell=True)
   for line in output.splitlines():
     if not line:
       continue
@@ -154,7 +154,7 @@ def GetController(vms):
   Raises:
     RuntimeError: if cannot find the controller vm.
   """
-  output, _ = vms[0].RemoteCommand('sinfo')
+  output, _ = vms[0].RemoteCommand('sinfo', logging_shell=True)
   node_list = output.strip().split()[-1]
   prefix = node_list.split('[')[0]
   suffix = re.split(',|-', node_list.split('[')[1])[0]

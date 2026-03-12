@@ -189,8 +189,7 @@ class AzureStorageAccount(resource.BaseResource):
       self,
       name: str,
       region: str,
-      # TODO(pclay): Update default kind to StorageV2
-      kind: str = 'Storage',
+      kind: str = 'StorageV2',
       storage_type: str | None = None,
       access_tier: str | None = None,
       resource_group: AzureResourceGroup | None = None,

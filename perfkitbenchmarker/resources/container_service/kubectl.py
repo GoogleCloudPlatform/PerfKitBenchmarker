@@ -17,6 +17,7 @@ RETRYABLE_KUBECTL_ERRORS = [
     'connect: connection timed out',
     'error sending request:',
     '(abnormal closure): unexpected EOF',
+    'deadline exceeded',
 ]
 
 

@@ -13,8 +13,8 @@
 # limitations under the License.
 """Module containing Static VM Decoders."""
 
-from perfkitbenchmarker import static_virtual_machine
 from perfkitbenchmarker.configs import option_decoders
+from perfkitbenchmarker.configs import static_vm_spec
 
 
 class StaticVmDecoder(option_decoders.TypeVerifier):
@@ -38,7 +38,7 @@ class StaticVmDecoder(option_decoders.TypeVerifier):
       errors.Config.InvalidValue upon invalid input value.
     """
     input_dict = super().Decode(value, component_full_name, flag_values)
-    return static_virtual_machine.StaticVmSpec(
+    return static_vm_spec.StaticVmSpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
         **input_dict

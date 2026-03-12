@@ -133,8 +133,15 @@ flags.DEFINE_boolean(
 _ASSIGN_EXTERNAL_IP = flags.DEFINE_boolean(
     'assign_external_ip',
     True,
-    'If True, an external (public) IP will be created for VMs. '
+    'If True, an external (public) IP will be created for primary NIC of VMs. '
     'If False, --connect_via_internal_ip may also be needed.',
+)
+flags.DEFINE_boolean(
+    'assign_external_ip_all_nics',
+    False,
+    'If True, an external (public) IP will be created for each network '
+    'interface. If False, an external IP is created for the first '
+    'interface only if --assign_external_ip is True.',
 )
 flags.DEFINE_string(
     'boot_startup_script',
@@ -286,8 +293,9 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
 
   Attributes:
     image: The disk image used to boot.
-    internal_ip: Internal IP address.
-    assign_external_ip: If True, create an external (public) IP.
+    assign_external_ip: If True, create an external (public) IP for primary NIC.
+    assign_external_ip_all_nics: If True, create an external (public) IP for
+      each network interface.
     ip_address: Public (external) IP address.
     machine_type: The provider-specific instance type (e.g. n1-standard-8).
     project: The provider-specific project associated with the VM (e.g.
@@ -374,7 +382,9 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     )
     self.boot_completion_ip_subset = _BOOT_COMPLETION_IP_SUBSET.value
     self.assign_external_ip = vm_spec.assign_external_ip
+    self.assign_external_ip_all_nics = vm_spec.assign_external_ip_all_nics
     self.ip_address = None
+    self.ip_addresses = []
     self.internal_ip = None
     self.internal_ips = []
     self.user_name = _VM_USER_NAME.value
@@ -470,6 +480,14 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       return self.internal_ips
     elif self.internal_ip:
       return [self.internal_ip]
+    return []
+
+  def GetExternalIPs(self):
+    """Gets the External IP's for the VM."""
+    if self.ip_addresses:
+      return self.ip_addresses
+    elif self.ip_address:
+      return [self.ip_address]
     return []
 
   def GetLocalhostAddr(self):
@@ -682,8 +700,10 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
       result['id'] = self.id
     if self.name is not None:
       result['name'] = self.name
-    if self.ip_address is not None:
-      result['ip_address'] = self.ip_address
+    if self.GetInternalIPs():
+      result['internal_ips'] = self.GetInternalIPs()
+    if self.GetExternalIPs():
+      result['external_ips'] = self.GetExternalIPs()
     if pkb_flags.RECORD_PROCCPU.value and self.cpu_version:
       result['cpu_version'] = self.cpu_version
     if self.create_operation_name is not None:

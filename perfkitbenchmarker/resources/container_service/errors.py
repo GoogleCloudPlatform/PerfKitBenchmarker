@@ -3,20 +3,20 @@
 from perfkitbenchmarker import errors
 
 
-class ContainerException(errors.Error):
+class ContainerError(errors.Error):
   """Exception during the creation or execution of a container."""
 
 
-class FatalContainerException(
-    errors.Resource.CreationError, ContainerException
+class FatalContainerError(
+    errors.Resource.CreationError, ContainerError
 ):
   """Fatal Exception during the creation or execution of a container."""
 
   pass
 
 
-class RetriableContainerException(
-    errors.Resource.RetryableCreationError, ContainerException
+class RetriableContainerError(
+    errors.Resource.RetryableCreationError, ContainerError
 ):
   """Retriable Exception during the creation or execution of a container."""
 

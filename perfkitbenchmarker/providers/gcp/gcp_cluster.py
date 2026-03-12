@@ -217,5 +217,6 @@ class A4Cluster(GceCluster):
 
     def _InstallNVContainerToolkit(vm):
       vm.Install('nvidia_container_toolkit')
+      vm.RemoteCommand('sudo nvidia-smi -pm 1')
 
     background_tasks.RunThreaded(_InstallNVContainerToolkit, self.worker_vms)

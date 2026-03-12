@@ -561,7 +561,9 @@ class GoogleKubernetesEngineWithGpusTestCase(
           command_string,
       )
 
-  @mock.patch('perfkitbenchmarker.kubernetes_helper.CreateFromFile')
+  @mock.patch(
+      'perfkitbenchmarker.resources.container_service.kubernetes_commands.CreateFromFile'
+  )
   def testPostCreate(self, create_from_file_patch):
     spec = self.create_kubernetes_engine_spec('k80')
     with patch_critical_objects() as issue_command, mock.patch.object(

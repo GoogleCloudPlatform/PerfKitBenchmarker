@@ -763,9 +763,11 @@ class AzureVirtualMachine(
     self.nics: list[AzureNIC] = []
     self.public_ips: list[AzurePublicIPAddress] = []
 
-    public_ip_name = None
     for nic_num, subnet in enumerate(self.network.subnets):
-      if self.assign_external_ip:
+      public_ip_name = None
+      if (
+          self.assign_external_ip and nic_num == 0
+      ) or self.assign_external_ip_all_nics:
         public_ip_name = self.name + '-public-ip' + str(nic_num)
         public_ip = AzurePublicIPAddress(
             self.region, self.availability_zone, public_ip_name
@@ -1016,9 +1018,10 @@ class AzureVirtualMachine(
       elif self.low_priority and (
           re.search(r'requested VM size \S+ is not available', stderr)
           or re.search(r'not available in location .+ for subscription', stderr)
-          or re.search(
-              r'Following SKUs have failed for Capacity Restrictions', stderr
-          )
+      ):
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
+      elif re.search(
+          r'Following SKUs have failed for Capacity Restrictions', stderr
       ):
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
       elif re.search(
