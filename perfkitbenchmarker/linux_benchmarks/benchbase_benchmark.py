@@ -152,7 +152,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES:
     benchmark_spec.relational_db.RunDDLQuery(
-        'ANALYZE;', timeout=_SPANNER_ANALYZE_TIMEOUT
+        'ANALYZE;', timeout=_SPANNER_ANALYZE_TIMEOUT, async_proc=True
     )
   elif FLAGS.db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
     queries = [

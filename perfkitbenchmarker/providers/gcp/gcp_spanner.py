@@ -22,6 +22,7 @@ import dataclasses
 import datetime
 import json
 import logging
+import re
 import statistics
 from typing import Any, Dict
 
@@ -138,6 +139,11 @@ _DEFAULT_STORAGE_TARGET = 95
 GOOGLESQL = 'GOOGLE_STANDARD_SQL'
 POSTGRESQL = 'POSTGRESQL'
 _VALID_DIALECTS = frozenset([GOOGLESQL, POSTGRESQL])
+
+
+class SpannerAsyncOperationInProgressError(Exception):
+  """Exception raised when a Spanner async operation is still in progress."""
+
 
 # Common decoder configuration option.
 _NONE_OK = {'default': None, 'none_ok': True}
@@ -426,20 +432,78 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     return stdout, stderr
 
   def RunDDLQuery(
-      self, sql_query: str, timeout: int = vm_util.DEFAULT_TIMEOUT
+      self,
+      sql_query: str,
+      *,
+      timeout: int = vm_util.DEFAULT_TIMEOUT,
+      async_proc: bool = False,
   ) -> tuple[str, str]:
-    """Runs a DDL query on the database."""
+    """Runs a DDL query on the database.
+
+    Args:
+      sql_query: The DDL statement to run.
+      timeout: The timeout in seconds for the gcloud command. If async_proc is
+        True, this also applies to the polling loop.
+      async_proc: If True, runs the DDL update asynchronously and polls the
+        operation status until it completes or times out.
+
+    Returns:
+      A tuple containing the stdout and stderr of the initial gcloud command.
+
+    Raises:
+      errors.Benchmarks.RunError: If the gcloud command fails, if parsing the
+        async operation name fails, if the async operation times out, or if the
+        async operation completes with an error.
+    """
     cmd = util.GcloudCommand(
         self, 'spanner', 'databases', 'ddl', 'update', self.database
     )
     cmd.flags['instance'] = self.instance_id
     cmd.flags['ddl'] = sql_query
-    stdout, stderr, retcode = cmd.Issue(
-        raise_on_failure=False, timeout=timeout
-    )
-    if retcode != 0:
-      logging.error('Failed to run DDL query: %s', sql_query)
+    if async_proc:
+      cmd.flags['async'] = True
+
+    stdout, stderr, _ = cmd.Issue(raise_on_failure=True, timeout=timeout)
+    if async_proc:
+      match = re.search(r'Operation name=([^\n\s]+)', stderr)
+      if match:
+        op_name = match.group(1)
+      else:
+        raise errors.Benchmarks.RunError(
+            f'Failed to parse operation name. STDOUT: {stdout}, STDERR:'
+            f' {stderr}'
+        )
+      self._WaitForSpannerAsyncOperation(op_name, timeout=timeout)
+
     return stdout, stderr
+
+  def _WaitForSpannerAsyncOperation(self, op_name: str, timeout: int) -> None:
+    """Polls Spanner async operation until completion."""
+
+    @vm_util.Retry(
+        timeout=timeout,
+        poll_interval=10,
+        retryable_exceptions=(SpannerAsyncOperationInProgressError,),
+    )
+    def _Wait():
+      poll_cmd = util.GcloudCommand(
+          self, 'spanner', 'operations', 'describe', op_name
+      )
+      poll_cmd.flags['instance'] = self.instance_id
+      poll_cmd.flags['database'] = self.database
+      poll_stdout, _, _ = poll_cmd.Issue(raise_on_failure=True)
+      op_status = json.loads(poll_stdout)
+      if not op_status.get('done'):
+        raise SpannerAsyncOperationInProgressError(
+            f'Spanner async operation {op_name} still in progress.'
+        )
+      if 'error' in op_status:
+        raise errors.Benchmarks.RunError(
+            f'Spanner async operation {op_name} failed: {op_status["error"]}.'
+            f' Operation: {op_name}'
+        )
+
+    _Wait()
 
   def _Exists(self, instance_only: bool = False) -> bool:
     """Returns true if the instance and the database exists."""

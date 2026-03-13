@@ -11,6 +11,7 @@ from absl.testing import parameterized
 from google.cloud import monitoring_v3
 from google.cloud.monitoring_v3 import types
 import mock
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcp_spanner
@@ -301,6 +302,7 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(size_max.value, 4)
 
   def testRunDDLQuery_WithTimeout(self):
+    # Arrange
     test_instance = GetTestSpannerInstance()
     test_instance.instance_id = 'pkb-instance-test_uri'
     test_instance.database = 'pkb-database-test_uri'
@@ -309,13 +311,17 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(
         util.GcloudCommand, 'Issue', return_value=('', '', 0), autospec=True
     ) as issue:
+      # Act
       test_instance.RunDDLQuery(ddl, timeout=timeout)
+
+      # Assert
       gcloud_cmd = issue.call_args[0][0]
       self.assertEqual(gcloud_cmd.flags['instance'], test_instance.instance_id)
       self.assertEqual(gcloud_cmd.flags['ddl'], ddl)
       self.assertEqual(issue.call_args[1]['timeout'], timeout)
 
   def testRunDDLQuery_WithoutTimeout(self):
+    # Arrange
     test_instance = GetTestSpannerInstance()
     test_instance.instance_id = 'pkb-instance-test_uri'
     test_instance.database = 'pkb-database-test_uri'
@@ -323,11 +329,141 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(
         util.GcloudCommand, 'Issue', return_value=('', '', 0), autospec=True
     ) as issue:
+      # Act
       test_instance.RunDDLQuery(ddl)
+
+      # Assert
       gcloud_cmd = issue.call_args[0][0]
       self.assertEqual(gcloud_cmd.flags['instance'], test_instance.instance_id)
       self.assertEqual(gcloud_cmd.flags['ddl'], ddl)
       self.assertEqual(issue.call_args[1]['timeout'], vm_util.DEFAULT_TIMEOUT)
+
+  def testRunDDLQuery_Async(self):
+    # Arrange
+    test_instance = GetTestSpannerInstance()
+    test_instance.instance_id = 'pkb-instance-test_uri'
+    test_instance.database = 'pkb-database-test_uri'
+    ddl = 'ALTER TABLE t ADD COLUMN c INT64'
+    op_name = 'projects/p/instances/i/databases/d/operations/op1'
+    with mock.patch.object(
+        test_instance, '_WaitForSpannerAsyncOperation'
+    ) as mock_wait:
+      with mock.patch.object(
+          util.GcloudCommand,
+          'Issue',
+          return_value=('[]', f'Operation name={op_name}', 0),
+          autospec=True,
+      ) as issue:
+        # Act
+        test_instance.RunDDLQuery(ddl, async_proc=True)
+
+        # Assert
+        with self.subTest('TestInitialDDLCommand'):
+          issue.assert_called_once()
+          (gcloud_cmd,), _ = issue.call_args
+          self.assertEqual(
+              gcloud_cmd.flags['instance'], test_instance.instance_id
+          )
+          self.assertEqual(gcloud_cmd.flags['ddl'], ddl)
+          self.assertTrue(gcloud_cmd.flags['async'])
+
+        with self.subTest('TestCallsWaitForOperation'):
+          mock_wait.assert_called_once_with(
+              op_name, timeout=vm_util.DEFAULT_TIMEOUT
+          )
+
+  def testRunDDLQuery_AsyncFailure(self):
+    # Arrange
+    test_instance = GetTestSpannerInstance()
+    test_instance.instance_id = 'pkb-instance-test_uri'
+    test_instance.database = 'pkb-database-test_uri'
+    ddl = 'ALTER TABLE t ADD COLUMN c INT64'
+    op_name = 'projects/p/instances/i/databases/d/operations/op1'
+    with mock.patch.object(
+        test_instance,
+        '_WaitForSpannerAsyncOperation',
+        side_effect=errors.Benchmarks.RunError('failed'),
+    ):
+      with mock.patch.object(
+          util.GcloudCommand,
+          'Issue',
+          return_value=('[]', f'Operation name={op_name}', 0),
+          autospec=True,
+      ):
+        # Act & Assert
+        with self.assertRaisesRegex(errors.Benchmarks.RunError, 'failed'):
+          test_instance.RunDDLQuery(ddl, async_proc=True)
+
+  def testWaitForSpannerAsyncOperation_Success(self):
+    # Arrange
+    test_instance = GetTestSpannerInstance()
+    test_instance.instance_id = 'pkb-instance-test_uri'
+    test_instance.database = 'pkb-database-test_uri'
+    op_name = 'projects/p/instances/i/databases/d/operations/op1'
+    timeout = 60
+
+    with mock.patch.object(
+        util.GcloudCommand,
+        'Issue',
+        return_value=('{"done": true}', '', 0),
+        autospec=True,
+    ) as issue:
+      # Act
+      test_instance._WaitForSpannerAsyncOperation(op_name, timeout)
+
+      # Assert
+      issue.assert_called_once()
+      (poll_cmd,), _ = issue.call_args
+      self.assertIn('operations', poll_cmd.args)
+      self.assertIn('describe', poll_cmd.args)
+      self.assertIn(op_name, poll_cmd.args)
+      self.assertEqual(poll_cmd.flags['instance'], test_instance.instance_id)
+      self.assertEqual(poll_cmd.flags['database'], test_instance.database)
+
+  def testWaitForSpannerAsyncOperation_RetryThenSuccess(self):
+    # Arrange
+    test_instance = GetTestSpannerInstance()
+    test_instance.instance_id = 'pkb-instance-test_uri'
+    test_instance.database = 'pkb-database-test_uri'
+    op_name = 'projects/p/instances/i/databases/d/operations/op1'
+    timeout = 60
+
+    self.enter_context(mock.patch.object(vm_util.time, 'sleep'))
+
+    with mock.patch.object(
+        util.GcloudCommand,
+        'Issue',
+        side_effect=[
+            ('{"done": false}', '', 0),
+            ('{"done": true}', '', 0),
+        ],
+        autospec=True,
+    ) as issue:
+      # Act
+      test_instance._WaitForSpannerAsyncOperation(op_name, timeout)
+
+      # Assert
+      self.assertEqual(issue.call_count, 2)
+
+  def testWaitForSpannerAsyncOperation_Failure(self):
+    # Arrange
+    test_instance = GetTestSpannerInstance()
+    test_instance.instance_id = 'pkb-instance-test_uri'
+    test_instance.database = 'pkb-database-test_uri'
+    op_name = 'projects/p/instances/i/databases/d/operations/op1'
+    timeout = 60
+
+    with mock.patch.object(
+        util.GcloudCommand,
+        'Issue',
+        return_value=('{"done": true, "error": {"message": "failed"}}', '', 0),
+        autospec=True,
+    ):
+      # Act & Assert
+      with self.assertRaisesRegex(
+          gcp_spanner.errors.Benchmarks.RunError, 'failed'
+      ):
+        test_instance._WaitForSpannerAsyncOperation(op_name, timeout)
 
 
 class CreateTest(pkb_common_test_case.PkbCommonTestCase):
