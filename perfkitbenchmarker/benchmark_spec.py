@@ -444,7 +444,8 @@ class BenchmarkSpec:
       )
     self.relational_db = relational_db_class(
         self.config.relational_db
-    )  # pytype: disable=not-instantiable  as BaseRelationalDb is abstract
+    )  # pytype: disable=not-instantiable
+    # ^Disabled as BaseRelationalDb is abstract & therefore not instantiatable.
     self.resources.append(self.relational_db)
 
   def ConstructNonRelationalDb(self) -> None:
