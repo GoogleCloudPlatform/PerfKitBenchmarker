@@ -188,7 +188,7 @@ def Prepare(benchmark_spec):
     vm.RemoteCommand(
         'sudo mkdir -p {data_path} && '
         'sudo chmod a+w {data_path} && '
-        'gsutil -m cp -r {data_dir}/* {data_path}'.format(
+        'gcloud storage cp --recursive {data_dir}/* {data_path}'.format(
             data_dir=benchmark_spec.data_dir, data_path=local_data_path
         )
     )
