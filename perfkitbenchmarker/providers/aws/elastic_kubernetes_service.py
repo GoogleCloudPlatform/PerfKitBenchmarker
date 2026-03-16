@@ -1161,21 +1161,21 @@ class EksKarpenterCluster(BaseEksCluster):
     """Cleanup Karpenter managed nodes before cluster deletion."""
     logging.info('Cleaning up Karpenter nodes...')
     # Delete NodePool resources - this will trigger node termination
-    kubectl.RunKubectlCommand(
+    kubectl.RunRetryableKubectlCommand(
         [
             'delete',
             'nodepool,ec2nodeclass',
             '--all',
             '--timeout=120s',
         ],
+        timeout=300,
         suppress_failure=lambda stdout, stderr, retcode: (
             'no resources found' in stderr.lower()
             or 'not found' in stderr.lower()
-            or 'timed out waiting for the condition' in stderr.lower()
         ),
     )
     # Wait for all Karpenter nodes to be deleted
-    kubectl.RunKubectlCommand(
+    kubectl.RunRetryableKubectlCommand(
         [
             'wait',
             '--for=delete',
@@ -1184,11 +1184,10 @@ class EksKarpenterCluster(BaseEksCluster):
             'karpenter.sh/nodepool',
             '--timeout=120s',
         ],
+        timeout=300,
         suppress_failure=lambda stdout, stderr, retcode: (
             'no matching resources found' in stderr.lower()
-            or 'timed out' in stderr.lower()
-            or 'context deadline exceeded' in stderr.lower()
-            or 'unable to connect to the server' in stderr.lower()
+            or 'no resources found' in stderr.lower()
         ),
     )
     # Force terminate remaining EC2 instances
