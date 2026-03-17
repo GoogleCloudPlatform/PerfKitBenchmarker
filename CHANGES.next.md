@@ -122,6 +122,10 @@
 
 ### New features:
 
+-   Add `dpb_dataflow_gpu_inference_benchmark`: a Dataflow streaming benchmark
+    that measures BERT text classification latency (p50/p95/p99), throughput,
+    and cost across a configurable rate sweep. Compares Local GPU inference
+    (model runs on the Dataflow worker GPU) vs Vertex AI endpoint inference.
 -   Add support for TimescaleDB
 -   Add support for Omni
 -   Add support for systems running fedora36 and fedora37
