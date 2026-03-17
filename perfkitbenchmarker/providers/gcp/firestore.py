@@ -24,21 +24,6 @@ from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
-_NAME = flags.DEFINE_string(
-    'gcp_firestore_database_id',
-    None,
-    'Firestore instance name. If not specified, new instance '
-    'will be created and deleted on the fly. If specified, '
-    'the instance is considered user managed and will not '
-    'created/deleted by PKB.',
-)
-_LOCATION = flags.DEFINE_string(
-    'gcp_firestore_location',
-    None,
-    'Location of the firestore database. See'
-    ' https://firebase.google.com/docs/firestore/locations.',
-)
-
 _DEFAULT_LOCATION = 'us-central1'
 _DEFAULT_TYPE = 'firestore-native'
 _DEFAULT_EDITION = 'enterprise'
@@ -107,6 +92,8 @@ class Firestore(non_relational_db.BaseManagedMongoDb):
 
   def __init__(self, database_id: str | None, location: str | None, **kwargs):
     super().__init__(**kwargs)
+    if database_id:
+      self.user_managed = True
     self.database_id: str = database_id or f'pkb-firestore-{FLAGS.run_uri}'
     self.location: str = location or self._GetDefaultLocation()
     self.project: str = FLAGS.project or util.GetDefaultProject()
@@ -130,6 +117,10 @@ class Firestore(non_relational_db.BaseManagedMongoDb):
         if FLAGS.zone
         else _DEFAULT_LOCATION
     )
+
+  def _UserManagedSetup(self):
+    """See base class."""
+    self._PostCreate()
 
   def _Create(self):
     """Creates the database."""
