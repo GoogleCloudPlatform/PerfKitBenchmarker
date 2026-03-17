@@ -2972,6 +2972,22 @@ class RockyLinux10Mixin(BaseRockyLinuxMixin):
   OS_TYPE = os_types.ROCKY_LINUX10
 
 
+# Extend Rocky Linux mixins for Alma Linux to dedupe logic.
+class AlmaLinux8Mixin(RockyLinux8Mixin):
+  """Class holding Alma Linux 8 specific VM methods and attributes."""
+  OS_TYPE = os_types.ALMA_LINUX8
+
+
+class AlmaLinux9Mixin(RockyLinux9Mixin):
+  """Class holding Alma Linux 9 specific VM methods and attributes."""
+  OS_TYPE = os_types.ALMA_LINUX9
+
+
+class AlmaLinux10Mixin(RockyLinux10Mixin):
+  """Class holding Alma Linux 10 specific VM methods and attributes."""
+  OS_TYPE = os_types.ALMA_LINUX10
+
+
 class CoreOsMixin(BaseContainerLinuxMixin):
   """Class holding CoreOS Container Linux specific VM methods and attributes."""
 

@@ -36,7 +36,7 @@ def GetCurrentUser():
     return 'user_unknown'
 
 
-flags.DEFINE_boolean(
+ACCEPT_LICENSES = flags.DEFINE_boolean(
     'accept_licenses',
     False,
     'Acknowledge that PKB may install software thereby accepting license'
