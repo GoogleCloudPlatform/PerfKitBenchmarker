@@ -2917,6 +2917,13 @@ class CentOsStream9Mixin(BaseRedHatMixin):
 
   OS_TYPE = os_types.CENTOS_STREAM9
 
+  def PrepareVMEnvironment(self):
+    super().PrepareVMEnvironment()
+    self.Install('python')
+    self.RemoteCommand(
+        'sudo rm /usr/bin/python3; '
+        'sudo ln -s /usr/bin/python3.12 /usr/bin/python3')
+
   def SetupPackageManager(self):
     """Install EPEL."""
     # https://docs.fedoraproject.org/en-US/epel/#_centos_stream_9
