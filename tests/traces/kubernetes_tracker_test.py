@@ -79,9 +79,15 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = CreateMockCluster(
         name="pkb-cluster", machine_type="e2-standard-8"
     )
-    kubernetes_commands.GetNodeNames = lambda suppress_logging=False: [
-        "gke-pkb-cluster-default-pool-node-1"
-    ]
+    kubernetes_commands.GetNodeNames = mock.Mock(
+        side_effect=[
+            ["gke-pkb-cluster-default-pool-node-1"],
+            [
+                "gke-pkb-cluster-default-pool-node-1",
+                "gke-pkb-cluster-default-pool-node-2",
+            ],
+        ]
+    )
     # pylint: disable=invalid-name
     cluster.GetEvents = lambda: [
         kubernetes_events.KubernetesEvent(
