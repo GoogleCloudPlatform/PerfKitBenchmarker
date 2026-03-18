@@ -100,6 +100,11 @@ flags.DEFINE_string(
     "types that will be created for benchmarks that don't "
     'require a particular type.',
 )
+flags.DEFINE_list(
+    'k8s_machine_families',
+    [],
+    'Machine familes used when creating Kubernetes nodes.',
+)
 flags.DEFINE_integer(
     'num_vms',
     1,

@@ -31,6 +31,7 @@ class BaseContainerCluster(resource.BaseResource):
     self.name: str = (
         cluster_spec.static_cluster or 'pkb-' + FLAGS.run_uri
     )
+    self.machine_families: list[str] = cluster_spec.machine_families or []
     self.default_nodepool = self._InitializeDefaultNodePool(
         cluster_spec, cluster_spec.vm_spec
     )
@@ -76,6 +77,7 @@ class BaseContainerCluster(resource.BaseResource):
     nodepool_config = container.BaseNodePoolConfig(
         vm_config,
         DEFAULT_NODEPOOL,
+        self.machine_families,
     )
     nodepool_config.num_nodes = cluster_spec.vm_count
     self.InitializeNodePoolForCloud(vm_config, nodepool_config)

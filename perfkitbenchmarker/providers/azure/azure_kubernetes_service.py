@@ -259,10 +259,12 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
       self, nodepool_config: container.BaseNodePoolConfig
   ) -> List[str]:
     """Common flags for create and nodepools add."""
-    args = [
-        '--node-vm-size',
-        nodepool_config.machine_type,
-    ] + self.resource_group.args
+    args = [] + self.resource_group.args
+    if nodepool_config.machine_type:
+      args += [
+          '--node-vm-size',
+          nodepool_config.machine_type,
+      ]
     node_count = nodepool_config.num_nodes
     if self._IsAutoscalerEnabled():
       node_count = max(self.min_nodes, node_count)

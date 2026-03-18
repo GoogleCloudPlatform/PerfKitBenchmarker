@@ -136,8 +136,14 @@ class BaseNodePoolConfig:
   See also: https://cloud.google.com/kubernetes-engine/docs/concepts/node-pools
   """
 
-  def __init__(self, vm_spec: virtual_machine_spec.BaseVmSpec, name: str):
-    self.machine_type = vm_spec.machine_type
+  def __init__(
+      self,
+      vm_spec: virtual_machine_spec.BaseVmSpec,
+      name: str,
+      machine_families: list[str] | None = None,
+  ):
+    self.machine_type: str | None = vm_spec.machine_type
+    self.machine_families: list[str] = machine_families or []
     self.zone: str = vm_spec.zone
     self.name = NodePoolName(name)
     self.sandbox_config: container_spec_lib.SandboxSpec | None = None
