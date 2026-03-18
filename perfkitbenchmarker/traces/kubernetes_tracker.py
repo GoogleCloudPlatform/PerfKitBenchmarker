@@ -251,11 +251,11 @@ def _StartTrackingVMUsage(stage: str, benchmark_spec: bm_spec.BenchmarkSpec):
   if stage != stages.RUN:
     return
 
-  k8s_cluster: kubernetes_cluster.KubernetesCluster = (
-      benchmark_spec.container_cluster
-  )
-  if k8s_cluster is None:
+  if not isinstance(
+      benchmark_spec.container_cluster, kubernetes_cluster.KubernetesCluster
+  ):
     return
+  k8s_cluster = benchmark_spec.container_cluster
 
   global tracker
   tracker = KubernetesResourceTracker(k8s_cluster)
@@ -273,11 +273,11 @@ def _StopTrackingVMUsage(stage: str, benchmark_spec: bm_spec.BenchmarkSpec):
   if stage != stages.RUN:
     return
 
-  k8s_cluster: kubernetes_cluster.KubernetesCluster = (
-      benchmark_spec.container_cluster
-  )
-  if k8s_cluster is None:
+  if not isinstance(
+      benchmark_spec.container_cluster, kubernetes_cluster.KubernetesCluster
+  ):
     return
+  k8s_cluster = benchmark_spec.container_cluster
 
   if tracker is not None:
     tracker.StopTracking()
