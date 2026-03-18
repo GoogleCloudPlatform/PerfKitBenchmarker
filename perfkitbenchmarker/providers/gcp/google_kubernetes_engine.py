@@ -454,8 +454,9 @@ class GkeCluster(BaseGkeCluster):
         cmd.flags['local-ssd-count'] = nodepool_config.max_local_disks
 
     cmd.flags['num-nodes'] = nodepool_config.num_nodes
-    # zone may be split a comma separated list
-    if nodepool_config.zone:
+    # zone may be split a comma separated list. For regional clusters, zone
+    # holds the region name; do not set node-locations so GKE uses default.
+    if nodepool_config.zone and not util.IsRegion(nodepool_config.zone):
       cmd.flags['node-locations'] = nodepool_config.zone
 
     if nodepool_config.machine_type is None:
