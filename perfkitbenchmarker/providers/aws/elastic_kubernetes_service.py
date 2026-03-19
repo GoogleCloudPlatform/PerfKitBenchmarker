@@ -25,7 +25,6 @@ import json
 import logging
 import math
 import re
-import time
 from typing import Any
 from urllib import parse
 
@@ -1260,10 +1259,9 @@ class EksKarpenterCluster(BaseEksCluster):
     if eni_ids:
       logging.info('Deleting %d orphaned network interfaces', len(eni_ids))
       for eni_id in eni_ids:
-        max_retries = 5
-        backoff_seconds = 10
-        for attempt in range(max_retries):
-          stdout, stderr, retcode = vm_util.IssueCommand(
+        # Bind eni_id by default to avoid loop closure issues if this is refactored.
+        def _delete_one_eni(eni_id=eni_id) -> None:
+          _, stderr, retcode = vm_util.IssueCommand(
               [
                   'aws',
                   'ec2',
@@ -1273,39 +1271,27 @@ class EksKarpenterCluster(BaseEksCluster):
                   '--network-interface-id',
                   eni_id,
               ],
-              # Observed in logs: InvalidNetworkInterfaceID.NotFound (ENI gone),
-              # RequestLimitExceeded (throttle). Suppress so we can retry or treat as success.
-              suppress_failure=lambda _stdout, stderr, _retcode: (
-                  'invalidnetworkinterfaceid.notfound' in (stderr or '').lower()
-                  or 'requestlimitexceeded' in (stderr or '').lower()
-              ),
+              raise_on_failure=False,
           )
           if retcode == 0:
-            break
+            return
           stderr_lower = (stderr or '').lower()
           # ENI already deleted (e.g. by another process or previous attempt).
           if 'invalidnetworkinterfaceid.notfound' in stderr_lower:
-            break
-          # Throttle: retry with backoff.
+            return
+          # RequestLimitExceeded (throttle): retry via vm_util.Retry.
           if 'requestlimitexceeded' in stderr_lower:
-            if attempt < max_retries - 1:
-              logging.warning(
-                  'AWS rate limit on DeleteNetworkInterface for %s, retry'
-                  ' in %ds',
-                  eni_id,
-                  backoff_seconds,
-              )
-              time.sleep(backoff_seconds)
-              backoff_seconds = min(backoff_seconds * 2, 60)
-            else:
-              raise errors.VmUtil.IssueCommandError(
-                  f'DeleteNetworkInterface failed after {max_retries} retries: '
-                  f'{stderr}'
-              )
-          else:
-            raise errors.VmUtil.IssueCommandError(
-                f'DeleteNetworkInterface failed: {stderr}'
-            )
+            raise errors.Resource.RetryableDeletionError(stderr or '')
+          raise errors.VmUtil.IssueCommandError(
+              f'DeleteNetworkInterface failed: {stderr}'
+          )
+
+        # max_retries=5 yields 6 CLI attempts (tries > 5 on 6th failure).
+        vm_util.Retry(
+            poll_interval=10,
+            max_retries=5,
+            retryable_exceptions=(errors.Resource.RetryableDeletionError,),
+        )(_delete_one_eni)()
 
   def _IsReady(self):
     """Returns True if cluster is running. Autopilot defaults to 0 nodes."""
