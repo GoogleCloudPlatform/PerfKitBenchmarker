@@ -1065,9 +1065,10 @@ class EksKarpenterCluster(BaseEksCluster):
         'v'
         + full_version.strip().strip('"').split(f'{self.cluster_version}-v')[1]
     )
-    # NodePool CPU limit: scale with benchmark target (nodes * 2 + 5%), min 1000.
+    # NodePool CPU limit: scale with benchmark target (nodes * vCPU + 5%), min 1000.
     num_nodes = getattr(FLAGS, 'kubernetes_scale_num_nodes', 5)
-    cpu_limit = max(1000, math.ceil(num_nodes * 2 * 1.05))
+    vcpu_per_node = FLAGS.eks_karpenter_limits_vcpu_per_node
+    cpu_limit = max(1000, math.ceil(num_nodes * vcpu_per_node * 1.05))
     kubernetes_commands.ApplyManifest(
         'container/karpenter/nodepool.yaml.j2',
         CLUSTER_NAME=self.name,
