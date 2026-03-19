@@ -15,12 +15,21 @@ spec:
         - key: karpenter.sh/capacity-type
           operator: In
           values: ["on-demand"]
+{% if KARPENTER_INSTANCE_TYPES %}
+        - key: karpenter.k8s.aws/instance-type
+          operator: In
+          values:
+{% for instance_type in KARPENTER_INSTANCE_TYPES %}
+            - "{{ instance_type }}"
+{% endfor %}
+{% else %}
         - key: karpenter.k8s.aws/instance-category
           operator: In
           values: ["c", "m", "r", "t"]
         - key: karpenter.k8s.aws/instance-generation
           operator: Gt
           values: ["2"]
+{% endif %}
       nodeClassRef:
         group: karpenter.k8s.aws
         kind: EC2NodeClass

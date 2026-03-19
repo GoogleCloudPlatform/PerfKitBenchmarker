@@ -991,6 +991,18 @@ class EksKarpenterCluster(BaseEksCluster):
         '[PKB][EKS] Allowed ALB SG %s -> node SGs on port %s', alb_sg, port
     )
 
+  @staticmethod
+  def _DefaultNodepoolInstanceTypes() -> list[str]:
+    """EC2 types for default NodePool manifest (--eks_karpenter_nodepool_instance_types).
+
+    Empty list means the Jinja template keeps instance-category/generation rules.
+    """
+    return [
+        t.strip()
+        for t in FLAGS.eks_karpenter_nodepool_instance_types
+        if t.strip()
+    ]
+
   def _PostCreate(self):
     """Performs post-creation steps for the cluster."""
     super()._PostCreate()
@@ -1073,6 +1085,7 @@ class EksKarpenterCluster(BaseEksCluster):
         CLUSTER_NAME=self.name,
         ALIAS_VERSION=alias_version,
         KARPENTER_NODEPOOL_CPU_LIMIT=cpu_limit,
+        KARPENTER_INSTANCE_TYPES=self._DefaultNodepoolInstanceTypes(),
     )
 
   def _Delete(self):

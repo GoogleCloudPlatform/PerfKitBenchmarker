@@ -240,6 +240,12 @@ flags.DEFINE_integer(
     'limits.cpu on EKS (uses kubernetes_scale_num_nodes, this value, and 5% '
     'headroom; minimum limit 1000). Raise for larger EC2 instance shapes.',
 )
+flags.DEFINE_list(
+    'eks_karpenter_nodepool_instance_types',
+    [],
+    'Comma-separated EC2 types for the Karpenter default NodePool (worker '
+    'nodes only). Empty keeps instance-category/generation in the template.',
+)
 AWS_CAPACITY_BLOCK_RESERVATION_ID = flags.DEFINE_string(
     'aws_capacity_block_reservation_id',
     None,
