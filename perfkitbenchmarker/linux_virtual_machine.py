@@ -2919,7 +2919,7 @@ class CentOsStream9Mixin(BaseRedHatMixin):
 
   def PrepareVMEnvironment(self):
     super().PrepareVMEnvironment()
-    self.Install('python')
+    self.InstallPackages('python3.12')
     self.RemoteCommand(
         'sudo rm /usr/bin/python3; '
         'sudo ln -s /usr/bin/python3.12 /usr/bin/python3')
