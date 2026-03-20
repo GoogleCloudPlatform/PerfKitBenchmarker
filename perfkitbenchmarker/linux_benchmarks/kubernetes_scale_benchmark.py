@@ -382,10 +382,15 @@ def GetStatusConditionsForResourceType(
 
   # Use full JSON output to avoid invalid JSON when manually building from
   # jsonpath with many resources or on connection reset (truncated output).
+  # Avoid logging huge JSON: kubernetes_scale uses num_replicas; kubernetes_node_scale
+  # uses kubernetes_scale_num_nodes for the same code path (get pod/node -o json).
   stdout, _, _ = kubectl.RunKubectlCommand(
       ['get', resource_type, '-o', 'json'],
       timeout=60 * 5,  # 5 minutes for large clusters (e.g. 1000 pods)
-      suppress_logging=NUM_PODS.value > 20,
+      suppress_logging=(
+          NUM_PODS.value > 20
+          or getattr(FLAGS, 'kubernetes_scale_num_nodes', 5) > 20
+      ),
   )
   data = json.loads(stdout)
   name_to_conditions = {}

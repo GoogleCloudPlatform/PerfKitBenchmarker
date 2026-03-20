@@ -1118,16 +1118,33 @@ class EksKarpenterCluster(BaseEksCluster):
     # Start deleting the stack but likely to fail to delete this role.
     vm_util.IssueCommand(delete_stack_cmd)
     node_role = f'KarpenterNodeRole-{self.name}'
-    out, _, _ = vm_util.IssueCommand([
-        'aws',
-        'iam',
-        'list-instance-profiles-for-role',
-        '--role-name',
-        node_role,
-        '--region',
-        f'{self.region}',
-    ])
-    profiles_json = json.loads(out)
+    out, _, retcode = vm_util.IssueCommand(
+        [
+            'aws',
+            'iam',
+            'list-instance-profiles-for-role',
+            '--role-name',
+            node_role,
+            '--region',
+            f'{self.region}',
+        ],
+        suppress_failure=lambda stdout, stderr, rc: (
+            rc != 0
+            and (
+                'nosuchentity' in (stderr or '').lower()
+                or 'cannot be found' in (stderr or '').lower()
+            )
+        ),
+    )
+    if retcode == 0 and out.strip():
+      profiles_json = json.loads(out)
+    else:
+      logging.info(
+          'Karpenter node role %s not found or empty response; skipping'
+          ' instance profile cleanup',
+          node_role,
+      )
+      profiles_json = {'InstanceProfiles': []}
     for profile in profiles_json.get('InstanceProfiles', []):
       profile_name = profile['InstanceProfileName']
       vm_util.IssueCommand([
