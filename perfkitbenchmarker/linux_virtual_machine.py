@@ -2917,6 +2917,13 @@ class CentOsStream9Mixin(BaseRedHatMixin):
 
   OS_TYPE = os_types.CENTOS_STREAM9
 
+  def PrepareVMEnvironment(self):
+    super().PrepareVMEnvironment()
+    self.InstallPackages('python3.12')
+    self.RemoteCommand(
+        'sudo rm /usr/bin/python3; '
+        'sudo ln -s /usr/bin/python3.12 /usr/bin/python3')
+
   def SetupPackageManager(self):
     """Install EPEL."""
     # https://docs.fedoraproject.org/en-US/epel/#_centos_stream_9
@@ -2970,6 +2977,22 @@ class RockyLinux10Mixin(BaseRockyLinuxMixin):
   """Class holding Rocky Linux 10 specific VM methods and attributes."""
 
   OS_TYPE = os_types.ROCKY_LINUX10
+
+
+# Extend Rocky Linux mixins for Alma Linux to dedupe logic.
+class AlmaLinux8Mixin(RockyLinux8Mixin):
+  """Class holding Alma Linux 8 specific VM methods and attributes."""
+  OS_TYPE = os_types.ALMA_LINUX8
+
+
+class AlmaLinux9Mixin(RockyLinux9Mixin):
+  """Class holding Alma Linux 9 specific VM methods and attributes."""
+  OS_TYPE = os_types.ALMA_LINUX9
+
+
+class AlmaLinux10Mixin(RockyLinux10Mixin):
+  """Class holding Alma Linux 10 specific VM methods and attributes."""
+  OS_TYPE = os_types.ALMA_LINUX10
 
 
 class CoreOsMixin(BaseContainerLinuxMixin):

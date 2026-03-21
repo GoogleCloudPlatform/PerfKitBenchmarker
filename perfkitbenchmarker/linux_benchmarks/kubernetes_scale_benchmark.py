@@ -134,17 +134,6 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   _EnsureEksKarpenterGpuNodepool(cluster)
 
 
-def _GetRolloutCreationTime(rollout_name: str) -> int:
-  """Returns the time when the rollout was created."""
-  out, _, _ = kubectl.RunRetryableKubectlCommand([
-      'get',
-      rollout_name,
-      '-o',
-      'jsonpath={.metadata.creationTimestamp}',
-  ])
-  return ConvertToEpochTime(out)
-
-
 def _GetScaleTimeout() -> int:
   """Returns the timeout for the scale up & teardown."""
   base_timeout = 60 * 10  # 10 minutes
@@ -166,7 +155,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   # Warm up the cluster by creating a single pod. This compensates for
   # differences between Standard & Autopilot, where Standard already has 1 node
   # due to its starting nodepool but Autopilot does not.
-  scale_one_samples, _ = ScaleUpPods(cluster, 1)
+  scale_one_samples = ScaleUpPods(cluster, 1)
   if not scale_one_samples:
     logging.exception(
         'Failed to scale up to 1 pod; now investigating failure reasons.'
@@ -179,8 +168,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   initial_nodes = set(kubernetes_commands.GetNodeNames())
   initial_pods = set(kubernetes_commands.GetPodNames())
 
-  samples, rollout_name = ScaleUpPods(cluster, NUM_PODS.value)
-  start_time = _GetRolloutCreationTime(rollout_name)
+  start_time = time.time()
+  samples = ScaleUpPods(cluster, NUM_PODS.value)
   pod_samples = ParseStatusChanges('pod', start_time, initial_pods)
   samples += pod_samples
   CheckForFailures(cluster, pod_samples, NUM_PODS.value - 1)
@@ -204,8 +193,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
 def ScaleUpPods(
     cluster: kubernetes_cluster.KubernetesCluster,
     num_new_pods: int,
-) -> tuple[list[sample.Sample], str]:
-  """Scales up pods on a kubernetes cluster. Returns samples & rollout name."""
+) -> list[sample.Sample]:
+  """Scales up pods on a kubernetes cluster. Returns samples."""
   samples = []
   initial_pods = set(kubernetes_commands.GetPodNames())
   logging.info('Initial pods: %s', initial_pods)
@@ -276,7 +265,7 @@ def ScaleUpPods(
             'seconds',
         )
     )
-    return samples, rollout_name
+    return samples
   except (
       errors.VmUtil.IssueCommandError,
       errors.VmUtil.IssueCommandTimeoutError,
@@ -290,7 +279,7 @@ def ScaleUpPods(
         max_wait_time,
         e,
     )
-    return [], rollout_name
+    return []
 
 
 def CheckForFailures(

@@ -2,7 +2,7 @@
 
 import datetime
 import posixpath
-from typing import Any
+from typing import Any, cast
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
@@ -147,7 +147,7 @@ def _PrepareServer(db: iaas_relational_db.IAASRelationalDb):
       SetPostgresOptimizedServerConfiguration(
           optimized_server_config,
           db.server_vm,
-          db,
+          cast(postgres_iaas_relational_db.PostgresIAASRelationalDb, db),
           custom_server_config,
       )
 
@@ -221,10 +221,16 @@ def SetOptimizedServerConfiguration(
     db: Relational database class.
   """
   if db.engine == sql_engine_utils.MYSQL:
-    SetMysqlOptimizedServerConfiguration(optimized_server_config, server_vm, db)
+    SetMysqlOptimizedServerConfiguration(
+        optimized_server_config,
+        server_vm,
+        cast(mysql_iaas_relational_db.MysqlIAASRelationalDb, db),
+    )
   elif db.engine == sql_engine_utils.POSTGRES:
     SetPostgresOptimizedServerConfiguration(
-        optimized_server_config, server_vm, db
+        optimized_server_config,
+        server_vm,
+        cast(postgres_iaas_relational_db.PostgresIAASRelationalDb, db),
     )
 
 

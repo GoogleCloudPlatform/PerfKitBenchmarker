@@ -249,9 +249,7 @@ class IntegerListSerializer(flags.ArgumentSerializer):
 
   def serialize(self, il):
     return ','.join([
-        str(val)
-        if isinstance(val, int)
-        else self._SerializeRange(val)
+        str(val) if isinstance(val, int) else self._SerializeRange(val)
         for val in il.groups
     ])
 
@@ -369,7 +367,9 @@ class UnitsParser(flags.ArgumentParser):
         raise ValueError(
             "Couldn't parse unit expression %r: %s" % (inp, str(e))
         )
-      if not isinstance(quantity, units.Quantity):
+      if not isinstance(quantity, units.Quantity) or (
+          quantity.units == units.dimensionless
+      ):
         raise ValueError('Expression %r evaluates to a unitless value.' % inp)
 
     for unit in self.convertible_to:
@@ -578,4 +578,3 @@ def GetProvidedCommandLineFlags():
       for k in FLAGS
       if FLAGS[k].present
   }
-

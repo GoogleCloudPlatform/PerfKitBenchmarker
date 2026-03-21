@@ -35,6 +35,10 @@ class _UnitRegistry(pint.UnitRegistry):
     self.define('Ki = kibibyte')
     self.define('Mi = mebibyte')
     self.define('percent = [percent]')
+    # This does nothing in pint >= 0.25.3+, but it allows us to refer to this
+    # type in older pint versions without dimensionless. It does not help
+    # parsing ints into dimensionless quantities in older pint versions.
+    self.define('dimensionless = 1')
 
   def parse_expression(self, input_string, *args, **kwargs):
     # pint cannot parse percent, because it wants to be able to do python math.
@@ -79,3 +83,4 @@ gibibyte = Unit('gibibyte')
 bit = Unit('bit')
 second = Unit('second')
 percent = Unit('percent')
+dimensionless = Unit('dimensionless')

@@ -21,6 +21,7 @@ import json
 import os
 import textwrap
 import time
+from typing import Any, cast
 import unittest
 
 from absl import flags
@@ -159,7 +160,9 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     return aws_db
 
   def CreateDbFromMockSpec(self, mock_spec):
-    cls = relational_db.GetRelationalDbClass('AWS', True, mock_spec.engine)
+    cls = cast(
+        Any, relational_db.GetRelationalDbClass('AWS', True, mock_spec.engine)
+    )
     aws_db = cls(mock_spec)
 
     # Set necessary instance attributes that are not part of the spec

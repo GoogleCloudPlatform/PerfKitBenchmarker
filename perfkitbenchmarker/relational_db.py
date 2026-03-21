@@ -402,7 +402,9 @@ class BaseRelationalDb(resource.BaseResource):
     return [t for t in tools if t is not None]
 
   @property
-  def client_vm_query_tools_for_replica(self):
+  def client_vm_query_tools_for_replica(
+      self,
+  ) -> sql_engine_utils.ISQLQueryTools:
     """Query tools to make custom queries on replica."""
     if not self.replica_endpoint:
       raise ValueError('Database does not have replica.')
@@ -611,8 +613,9 @@ class BaseRelationalDb(resource.BaseResource):
 
     return metadata
 
+  @staticmethod
   @abc.abstractmethod
-  def GetDefaultEngineVersion(self, engine):
+  def GetDefaultEngineVersion(engine: str) -> str:
     """Return the default version (for PKB) for the given database engine.
 
     Args:
@@ -620,6 +623,7 @@ class BaseRelationalDb(resource.BaseResource):
 
     Returns: default version as a string for the given engine.
     """
+    raise NotImplementedError('GetDefaultEngineVersion is not implemented.')
 
   def _SetEndpoint(self):
     """Set the DB endpoint for this instance during _PostCreate."""

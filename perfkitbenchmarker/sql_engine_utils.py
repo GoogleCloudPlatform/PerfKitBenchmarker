@@ -18,7 +18,7 @@ import dataclasses
 import logging
 import time
 import timeit
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Tuple, Union
 from absl import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
@@ -151,9 +151,9 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
   def SamplesFromQueriesWithExplain(
       self,
       database_name: str,
-      queries: Dict[str, str],
-      metadata: Dict[str, Any],
-  ) -> List[sample.Sample]:
+      queries: dict[str, str],
+      metadata: dict[str, Any],
+  ) -> list[sample.Sample]:
     """Helper function to run quries."""
     results = []
     for query in queries:
@@ -170,9 +170,9 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
   def SamplesFromQueriesAfterRunningExplain(
       self,
       database_name: str,
-      queries: Dict[str, str],
-      metadata: Dict[str, Any],
-  ) -> List[sample.Sample]:
+      queries: dict[str, str],
+      metadata: dict[str, Any],
+  ) -> list[sample.Sample]:
     """Run queryset once to prewarm, then run the queryset again for timing."""
     results = []
     for query in queries:
@@ -194,10 +194,10 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
 
   def IssueSqlCommand(
       self,
-      command: Union[str, Dict[str, str]],
+      command: Union[str, dict[str, str]],
       database_name: str = '',
       superuser: bool = False,
-      session_variables: str = '',
+      session_variables: list[str] | str = '',
       timeout: int | None = None,
       ignore_failure: bool = False,
       suppress_stdout: bool = False,
@@ -243,9 +243,20 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
     """Get connection string."""
     pass
 
+  def GetDSNConnectionString(self, database_name=''):
+    """Get DSN connection string."""
+    raise NotImplementedError()
+
+  def GetSysbenchConnectionString(self):
+    """Get sysbench connection string."""
+    raise NotImplementedError()
+
   @abc.abstractmethod
   def MakeSqlCommand(
-      self, command: str, database_name: str = '', session_variables: str = ''
+      self,
+      command: str,
+      database_name: str = '',
+      session_variables: list[str] | str = '',
   ):
     """Make a sql command."""
     pass
@@ -295,12 +306,18 @@ class PostgresCliQueryTools(ISQLQueryTools):
     self.vm.Install('postgres_client')
 
   def MakeSqlCommand(
-      self, command: str, database_name: str = '', session_variables: str = ''
+      self,
+      command: str,
+      database_name: str = '',
+      session_variables: list[str] | str = '',
   ):
     """Make Sql Command."""
     if not database_name:
       database_name = self.DEFAULT_DATABASE
     sql_command = 'psql %s ' % self.GetConnectionString(database_name)
+    if isinstance(session_variables, str):
+      session_variables = [session_variables] if session_variables else []
+
     if session_variables:
       for session_variable in session_variables:
         sql_command += '-c "%s" ' % session_variable
@@ -412,10 +429,16 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
     self.vm.Install('postgres_client')
 
   def MakeSqlCommand(
-      self, command: str, database_name: str = '', session_variables: str = ''
+      self,
+      command: str,
+      database_name: str = '',
+      session_variables: list[str] | str = '',
   ) -> str:
     """Makes Sql Command."""
     sql_command = 'psql %s ' % self.GetConnectionString()
+    if isinstance(session_variables, str):
+      session_variables = [session_variables] if session_variables else []
+
     if session_variables:
       for session_variable in session_variables:
         sql_command += '-c "%s" ' % session_variable
@@ -457,7 +480,10 @@ class MysqlCliQueryTools(ISQLQueryTools):
     self.vm.Install(mysql_name)
 
   def MakeSqlCommand(
-      self, command: str, database_name: str = '', session_variables: str = ''
+      self,
+      command: str,
+      database_name: str = '',
+      session_variables: list[str] | str = '',
   ):
     """See base class."""
     if session_variables:
@@ -505,7 +531,10 @@ class SqlServerCliQueryTools(ISQLQueryTools):
     self.vm.Install('mssql_tools')
 
   def MakeSqlCommand(
-      self, command: str, database_name: str = '', session_variables: str = ''
+      self,
+      command: str,
+      database_name: str = '',
+      session_variables: list[str] | str = '',
   ):
     """See base class."""
     if session_variables:

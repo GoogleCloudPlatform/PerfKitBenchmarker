@@ -36,7 +36,7 @@ def GetCurrentUser():
     return 'user_unknown'
 
 
-flags.DEFINE_boolean(
+ACCEPT_LICENSES = flags.DEFINE_boolean(
     'accept_licenses',
     False,
     'Acknowledge that PKB may install software thereby accepting license'
@@ -99,6 +99,11 @@ flags.DEFINE_string(
     'Machine '
     "types that will be created for benchmarks that don't "
     'require a particular type.',
+)
+flags.DEFINE_list(
+    'k8s_machine_families',
+    [],
+    'Machine familes used when creating Kubernetes nodes.',
 )
 flags.DEFINE_integer(
     'num_vms',

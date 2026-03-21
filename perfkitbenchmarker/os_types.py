@@ -15,6 +15,9 @@
 
 from absl import flags
 
+ALMA_LINUX8 = 'alma_linux8'
+ALMA_LINUX9 = 'alma_linux9'
+ALMA_LINUX10 = 'alma_linux10'
 AMAZONLINUX2 = 'amazonlinux2'
 AMAZONLINUX2023 = 'amazonlinux2023'
 AMAZON_NEURON = 'amazon_neuron'
@@ -151,6 +154,9 @@ DEBIAN_OS_TYPES = [
 # All OS types that use yum or dnf for package management.
 # (In this context, "Red Hat" just means derived from Red Hat Linux).
 RED_HAT_OS_TYPES = [
+    ALMA_LINUX8,
+    ALMA_LINUX9,
+    ALMA_LINUX10,
     AMAZONLINUX2,
     AMAZONLINUX2_DL,
     AMAZONLINUX2023,

@@ -66,12 +66,18 @@ def _PrepareLmbench(vm):
   vm.Install('lmbench')
 
 
+def _GetArch(vm):
+  """Returns the lmbench architecture triplet."""
+  return 'aarch64-linux-gnu' if vm.is_aarch64 else 'x86_64-linux-gnu'
+
+
 def _ConfigureRun(vm):
   """Configure Lmbench tests."""
   logging.info('Set Lmbench run parameters')
+  arch = _GetArch(vm)
   vm.RemoteCommand(
-      'cd {} && mkdir bin && cd bin && mkdir x86_64-linux-gnu'.format(
-          lmbench.LMBENCH_DIR
+      'cd {} && mkdir bin && cd bin && mkdir {}'.format(
+          lmbench.LMBENCH_DIR, arch
       )
   )
   vm.RobustRemoteCommand(
@@ -82,14 +88,14 @@ def _ConfigureRun(vm):
   )
   sed_cmd = (
       'sed -i -e "s/OUTPUT=\\/dev\\/tty/OUTPUT=\\/dev\\/null/" '
-      '{}/bin/x86_64-linux-gnu/CONFIG.*'.format(lmbench.LMBENCH_DIR)
+      '{}/bin/{}/CONFIG.*'.format(lmbench.LMBENCH_DIR, arch)
   )
   vm.RemoteCommand(sed_cmd)
 
   if FLAGS.lmbench_mem_size:
     sed_cmd = (
-        'sed -i -e "s/MB=/MB={}/" {}/bin/x86_64-linux-gnu/CONFIG.*'.format(
-            FLAGS.lmbench_mem_size, lmbench.LMBENCH_DIR
+        'sed -i -e "s/MB=/MB={}/" {}/bin/{}/CONFIG.*'.format(
+            FLAGS.lmbench_mem_size, lmbench.LMBENCH_DIR, arch
         )
     )
     vm.RemoteCommand(sed_cmd)
@@ -97,8 +103,8 @@ def _ConfigureRun(vm):
   if FLAGS.lmbench_hardware == _LMBENCH_HARDWARE_DEFAULT:
     sed_cmd = (
         'sed -i -e "s/BENCHMARK_HARDWARE=YES/BENCHMARK_HARDWARE={}/" '
-        '{}/bin/x86_64-linux-gnu/CONFIG.*'.format(
-            FLAGS.lmbench_hardware, lmbench.LMBENCH_DIR
+        '{}/bin/{}/CONFIG.*'.format(
+            FLAGS.lmbench_hardware, lmbench.LMBENCH_DIR, arch
         )
     )
     vm.RemoteCommand(sed_cmd)
@@ -350,6 +356,7 @@ def Run(benchmark_spec):
   """
   vms = benchmark_spec.vms
   vm = vms[0]
+  arch = _GetArch(vm)
 
   # Use the current configuration to run the benchmark tests.
   vm.RobustRemoteCommand(
@@ -357,15 +364,15 @@ def Run(benchmark_spec):
   )
 
   stdout, _ = vm.RobustRemoteCommand(
-      'cd {} && cd results/x86_64-linux-gnu && cat *.*'.format(
-          lmbench.LMBENCH_DIR
+      'cd {} && cd results/{} && cat *.*'.format(
+          lmbench.LMBENCH_DIR, arch
       )
   )
 
   vm.RobustRemoteCommand(
-      'cd {} && cd results/x86_64-linux-gnu && '
+      'cd {} && cd results/{} && '
       'mkdir -p /tmp/lmbench && '
-      'sudo mv *.* /tmp/lmbench; '.format(lmbench.LMBENCH_DIR)
+      'sudo mv *.* /tmp/lmbench; '.format(lmbench.LMBENCH_DIR, arch)
   )
 
   return _ParseOutput(stdout)

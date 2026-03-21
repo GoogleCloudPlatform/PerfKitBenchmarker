@@ -678,6 +678,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     self.create_disk_strategy = gce_disk_strategies.GetCreateDiskStrategy(
         self, None, 0
     )
+    self.skip_existence_check = False
 
   def _GetNetwork(self):
     """Returns the GceNetwork to use."""
@@ -963,6 +964,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if 'name' in stdout:
       response = json.loads(stdout)
       self.create_operation_name = response[0]['name']
+      self.skip_existence_check = True
 
     self._ParseCreateErrors(self.create_cmd.rate_limited, stderr, retcode)
     if not self.create_return_time:
@@ -1162,6 +1164,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _Delete(self):
     """Delete a GCE VM instance."""
+    self.skip_existence_check = False
     delete_cmd = util.GcloudCommand(
         self, 'compute', 'instances', 'delete', self.name
     )
@@ -1192,6 +1195,13 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
   )
   def _Exists(self):
     """Returns true if the VM exists."""
+    if self.skip_existence_check:
+      # We use async creation for VMs.
+      # If the VM creation process is not yet complete,
+      # but the create operation exists, then we
+      # should skip the VM existence check and move on to checking the
+      # create operation status.
+      return True
     getinstance_cmd = util.GcloudCommand(
         self, 'compute', 'instances', 'describe', self.name
     )
