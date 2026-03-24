@@ -1692,6 +1692,13 @@ class Windows2022DesktopSQLServer2022EnterpriseAzureVirtualMachine(
   GEN2_IMAGE_URN = 'MicrosoftSQLServer:sql2022-ws2022:enterprise-gen2:latest'
 
 
+class Windows2025DesktopSQLServer2025EnterpriseAzureVirtualMachine(
+    BaseWindowsAzureVirtualMachine,
+    windows_virtual_machine.Windows2025SQLServer2025Enterprise,
+):
+  GEN2_IMAGE_URN = 'MicrosoftSQLServer:sql2025-ws2025:enterprise-gen2:latest'
+
+
 def GenerateDownloadPreprovisionedDataCommand(
     install_path, module_name, filename
 ):
