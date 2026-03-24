@@ -250,18 +250,15 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
         namespace=namespace,
         condition_type='jsonpath=',
     )
-    address = kubernetes_commands.GetResource(
+    stdout, _, _ = kubectl.RunKubectlCommand([
+        'get',
         name,
-        INGRESS_JSONPATH,
-        namespace=namespace,
-        condition_type='jsonpath=',
-    )
-    if 'ip' in address:
-      address = json.loads(address)['ip']
-    hostname = address
-    if port:
-      return f'{hostname}:{port}'
-    return hostname
+        '-n',
+        namespace,
+        '-o',
+        f'jsonpath={{{INGRESS_JSONPATH}}}',
+    ])
+    return f'{self._GetAddressFromIngress(stdout)}:{port}'
 
   def ApplyManifest(self, manifest_file: str, **kwargs) -> Any:
     """Applies a declarative Kubernetes manifest; possibly with jinja."""
@@ -336,7 +333,7 @@ def _DeleteAllFromDefaultNamespace():
     kubectl.RunRetryableKubectlCommand(run_cmd, timeout=timeout)
 
     run_cmd = ['delete', 'pvc', '--all', '-n', 'default']
-    kubectl.RunRetryableKubectlCommand(run_cmd, timeout=900)
+    kubectl.RunRetryableKubectlCommand(run_cmd, timeout=timeout)
     # There maybe a slight race if resources are cleaned up in the background
     # where deleting the cluster immediately prevents the PVCs from being
     # deleted.
