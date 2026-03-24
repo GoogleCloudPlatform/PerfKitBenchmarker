@@ -32,6 +32,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.linux_packages import redis_server
+from perfkitbenchmarker.linux_packages import rfs
 
 # location for top command output
 _TOP_OUTPUT = 'top.txt'
@@ -133,7 +134,9 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
 def PrepareSystem(bm_spec: _BenchmarkSpec) -> None:
   """Set system-wide parameters."""
   server_vms = bm_spec.vm_groups['servers']  # for cluster mode
+  client_vms = bm_spec.vm_groups['clients']
   background_tasks.RunThreaded(redis_server.PrepareSystem, server_vms)
+  background_tasks.RunThreaded(rfs.Configure, server_vms + client_vms)
 
 
 def InstallPackages(bm_spec: _BenchmarkSpec) -> None:
@@ -211,10 +214,14 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
       else [None]
   )
 
+  benchmark_metadata = {}
+  benchmark_metadata.update(rfs.GetMetadata())
+
   maximum_total_ops_throughput = 0.0
   result_with_maximum_total_ops_throughput = None
   all_results = []
   top_results = []
+  rfs_results = []
 
   try:
     for io_threads in io_threads_to_sweep:
@@ -222,11 +229,20 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
       if io_threads is not None:
         _UpdateIOThreadsForRedisServer(bm_spec.vm_groups['servers'], io_threads)
 
+      # Snapshot RFS stats
+      client_rfs_t0 = {c: rfs.GetSoftnetStat(c) for c in client_vms}
+      server_rfs_t0 = rfs.GetSoftnetStat(server_vm) if server_vm else 0
+
       raw_results = memtier.RunOverAllThreadsPipelinesAndClients(
           client_vms,
           bm_spec.redis_endpoint_ip,
           redis_server.GetRedisPorts(server_vm),
       )
+
+      # Snapshot Tend RFS stats
+      client_rfs_tend = {c: rfs.GetSoftnetStat(c) for c in client_vms}
+      server_rfs_tend = rfs.GetSoftnetStat(server_vm) if server_vm else 0
+
       redis_metadata = redis_server.GetMetadata(server_vm)
 
       total_ops_throughput = 0.0
@@ -235,6 +251,27 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
           total_ops_throughput = server_result.value
         server_result.metadata.update(redis_metadata)
         server_result.metadata.update(benchmark_metadata)
+
+      # Add RFS verification samples
+      for client, t0 in client_rfs_t0.items():
+        delta = client_rfs_tend[client] - t0
+        rfs_results.append(
+            sample.Sample(
+                f'client_{client.name}_rps_flow_steer_delta',
+                delta,
+                'count',
+                benchmark_metadata,
+            )
+        )
+      if server_vm:
+        rfs_results.append(
+            sample.Sample(
+                'server_rps_flow_steer_delta',
+                server_rfs_tend - server_rfs_t0,
+                'count',
+                benchmark_metadata,
+            )
+        )
 
       if total_ops_throughput > maximum_total_ops_throughput:
         maximum_total_ops_throughput = total_ops_throughput
@@ -257,11 +294,18 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
       for server_vm in bm_spec.vm_groups['servers']:
         redis_server.VerifyRedisAof(server_vm)
 
-  return result_with_maximum_total_ops_throughput + all_results + top_results
+  return (
+      result_with_maximum_total_ops_throughput
+      + all_results
+      + top_results
+      + rfs_results
+  )
 
 
 def Cleanup(bm_spec: _BenchmarkSpec) -> None:
-  del bm_spec
+  server_vms = bm_spec.vm_groups.get('servers', [])
+  client_vms = bm_spec.vm_groups.get('clients', [])
+  background_tasks.RunThreaded(rfs.Restore, server_vms + client_vms)
 
 
 def _UpdateIOThreadsForRedisServer(
