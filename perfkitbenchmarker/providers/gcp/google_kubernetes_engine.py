@@ -473,7 +473,7 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append('--enable-fast-socket')
 
     if FLAGS.gke_node_system_config is not None:
-        cmd.flags['system-config-from-file'] = FLAGS.gke_node_system_config
+      cmd.flags['system-config-from-file'] = FLAGS.gke_node_system_config
 
     if nodepool_config.sandbox_config is not None:
       cmd.flags['sandbox'] = nodepool_config.sandbox_config.ToSandboxFlag()

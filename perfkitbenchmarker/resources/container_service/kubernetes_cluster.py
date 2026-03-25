@@ -245,7 +245,7 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     """Waits for a deployed Ingress/load balancer resource."""
     name = f'service/{name}'
     kubernetes_commands.WaitForResource(
-    name,
+    	name,
         INGRESS_JSONPATH,
         namespace=namespace,
         condition_type='jsonpath=',
@@ -256,7 +256,7 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
         '-n',
         namespace,
         '-o',
-        f'jsonpath={{{INGRESS_JSONPATH}}}',
+        f'jsonpath={INGRESS_JSONPATH}',
     ])
     return f'{self._GetAddressFromIngress(stdout)}:{port}'
 
