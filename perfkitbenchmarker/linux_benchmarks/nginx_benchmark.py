@@ -428,6 +428,7 @@ def _RunMultiClient(clients, targets, rate, connections, duration, threads):
       'nginx_use_ssl': FLAGS.nginx_use_ssl,
       'p99_latency_threshold': _P99_LATENCY_THRESHOLD.value,
       'num_server_targets': len(targets),
+      'nginx_content_size': FLAGS.nginx_content_size,
   }
   if not FLAGS.nginx_file_server_conf:
     metadata['caching'] = True
