@@ -18,6 +18,7 @@ from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import data
+from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
@@ -144,6 +145,18 @@ class BaseNodePoolConfig:
   ):
     self.machine_type: str | None = vm_spec.machine_type
     self.machine_families: list[str] = machine_families or []
+    if self.machine_families and self.machine_type:
+      if pkb_flags.K8S_MACHINE_FAMILIES.value:
+        # Setting machine families via flag will override config specific
+        # machine type for convenience, but specifying both via config_override
+        # is a clear error.
+        self.machine_type = None
+      else:
+        raise ValueError(
+            f'Machine families was set to {self.machine_families}'
+            f' while machine type was set to {self.machine_type}.'
+            ' Specify only one at a time.'
+        )
     self.zone: str = vm_spec.zone
     self.name = NodePoolName(name)
     self.sandbox_config: container_spec_lib.SandboxSpec | None = None
