@@ -48,15 +48,12 @@ flags.DEFINE_string(
 )
 
 BENCHMARK_NAME = 'kubernetes_nginx'
+NGINX_IMAGE = 'nginx:1.29.6'
 BENCHMARK_CONFIG = """
 kubernetes_nginx:
   description: >
     Benchmarks Nginx server performance in a 3-tier architecture
     (Client -> Nginx Proxy -> Upstream Backend) on Kubernetes.
-  container_specs:
-    kubernetes_nginx:
-      image: k8s_nginx
-  container_registry: {}
   container_cluster:
     cloud: GCP
     type: Kubernetes
@@ -74,15 +71,6 @@ kubernetes_nginx:
             machine_type: Standard_D4s_v5
       upstream:
         vm_count: 2
-        vm_spec:
-          GCP:
-            machine_type: n2-standard-4
-          AWS:
-            machine_type: m6i.xlarge
-          Azure:
-            machine_type: Standard_D4s_v5
-      clients:
-        vm_count: 1
         vm_spec:
           GCP:
             machine_type: n2-standard-4
@@ -109,7 +97,7 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
   if FLAGS.nginx_client_machine_type:
-    vm_spec = config['container_cluster']['nodepools']['clients']['vm_spec']
+    vm_spec = config['vm_groups']['clients']['vm_spec']
     for cloud in vm_spec:
       vm_spec[cloud]['machine_type'] = FLAGS.nginx_client_machine_type
   if FLAGS.nginx_server_machine_type:
@@ -228,7 +216,7 @@ def _PrepareCluster(benchmark_spec):
         'nginx-configs', nginx_config_map_dirname
     )
 
-  container_image = benchmark_spec.container_specs['kubernetes_nginx'].image
+  container_image = NGINX_IMAGE
   proxy_port = 443 if FLAGS.nginx_use_ssl else 80
   upstream_port = 80
 

@@ -27,11 +27,12 @@ spec:
       initContainers:
       - name: setup-ssl
         image: {{ nginx_image }}
-        command: ['/bin/bash', '-c']
+        command: ['/bin/sh', '-c']
         args:
         - |
           mkdir -p /etc/nginx/ssl
-          openssl req -x509 -nodes -newkey ec:<(openssl ecparam -name secp384r1) -keyout /etc/nginx/ssl/ecdsa.key -out /etc/nginx/ssl/ecdsa.crt -days 365 -subj "/CN=$HOSTNAME"
+          openssl ecparam -name secp384r1 -out /tmp/ecparam.pem
+          openssl req -x509 -nodes -newkey ec:/tmp/ecparam.pem -keyout /etc/nginx/ssl/ecdsa.key -out /etc/nginx/ssl/ecdsa.crt -days 365 -subj "/CN=$HOSTNAME"
         volumeMounts:
         - name: ssl-volume
           mountPath: /etc/nginx/ssl
