@@ -374,6 +374,69 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     if receiver_vm.tertiary_nic_bus_info:
       aws_eal_arg += f' -a "{receiver_vm.tertiary_nic_bus_info},llq_policy=1"'
 
+  def RunPktgen(
+      tx_cmd: str, rx_cmd: str
+  ) -> tuple[int | None, int | None, int | None]:
+    """Runs a Pktgen instance."""
+    background_tasks.RunParallelThreads(
+        [
+            (IssueCommand, [receiver_vm, rx_cmd], {}),
+            (IssueCommand, [sender_vm, tx_cmd], {}),
+        ],
+        post_task_delay=1,  # Ensure receiver starts before sender.
+        max_concurrency=2,
+    )
+    # Parse ANSI codes from pktgen output to get packet counts.
+    stdout_rx_parser = (
+        f'cat {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/{_STDOUT_LOG_FILE} |'
+        r' grep -oP "\[7;22H\s*\K[0-9]+" | tail -1'
+    )
+    stdout_tx_parser = (
+        f'cat {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/{_STDOUT_LOG_FILE} |'
+        r' grep -oP "\[8;22H\s*\K[0-9]+" | tail -1'
+    )
+    total_sender_tx_pkts, _ = sender_vm.RemoteCommand(stdout_tx_parser)
+    total_sender_rx_pkts, _ = sender_vm.RemoteCommand(stdout_rx_parser)
+    total_receiver_rx_pkts, _ = receiver_vm.RemoteCommand(stdout_rx_parser)
+
+    if receiver_vm.tertiary_nic_bus_info:
+      stdout_rx_parser_2 = stdout_rx_parser.replace('7;22H', '7;46H')
+      stdout_tx_parser_2 = stdout_tx_parser.replace('8;22H', '8;46H')
+      total_sender_rx_pkts_2, _ = sender_vm.RemoteCommand(stdout_rx_parser_2)
+      total_sender_tx_pkts_2, _ = sender_vm.RemoteCommand(stdout_tx_parser_2)
+      total_receiver_rx_pkts_2, _ = receiver_vm.RemoteCommand(
+          stdout_rx_parser_2
+      )
+      total_sender_rx_pkts = int(total_sender_rx_pkts) + int(
+          total_sender_rx_pkts_2
+      )
+      total_sender_tx_pkts = int(total_sender_tx_pkts) + int(
+          total_sender_tx_pkts_2
+      )
+      total_receiver_rx_pkts = int(total_receiver_rx_pkts) + int(
+          total_receiver_rx_pkts_2
+      )
+    return (
+        total_sender_tx_pkts,
+        total_sender_rx_pkts,
+        total_receiver_rx_pkts,
+    )
+
+  def UpdatePpsAndRecompile(
+      vm: linux_virtual_machine.BaseLinuxVirtualMachine,
+      curr_rate: int,
+      prev_rate: int,
+  ) -> None:
+    """Updates PPS in app/pktgen.c and compiles Pktgen."""
+    vm.RemoteCommand(
+        f'sudo sed -i "s/pps        = {prev_rate};/pps        ='
+        f' {curr_rate};/g"'
+        f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/app/pktgen.c'
+    )
+    vm.RemoteCommand(
+        f'cd {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR} && make'
+    )
+
   def _FindMaxRateFromConfig(
       tx_cmd: str, rx_cmd: str, packet_loss_threshold: float, start_rate: float
   ) -> tuple[int | None, int | None, int | None, float]:
@@ -393,53 +456,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
         > _PPS_BINARY_SEARCH_THRESHOLD
     ) or (valid_total_receiver_rx_pkts is None):
       curr_rate = (lb + ub) // 2
-      sender_vm.RemoteCommand(
-          f'sudo sed -i "s/pps        = {prev_rate};/pps        ='
-          f' {curr_rate};/g"'
-          f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/app/pktgen.c'
+      UpdatePpsAndRecompile(sender_vm, int(curr_rate), int(prev_rate))
+      total_sender_tx_pkts, total_sender_rx_pkts, total_receiver_rx_pkts = (
+          RunPktgen(tx_cmd, rx_cmd)
       )
-      sender_vm.RemoteCommand(
-          f'cd {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR} && make'
-      )
-      background_tasks.RunParallelThreads(
-          [
-              (IssueCommand, [receiver_vm, rx_cmd], {}),
-              (IssueCommand, [sender_vm, tx_cmd], {}),
-          ],
-          post_task_delay=1,  # Ensure receiver starts before sender.
-          max_concurrency=2,
-      )
-
-      # Parse ANSI codes from pktgen output to get packet counts.
-      stdout_rx_parser = (
-          f'cat {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/{_STDOUT_LOG_FILE} |'
-          r' grep -oP "\[7;22H\s*\K[0-9]+" | tail -1'
-      )
-      stdout_tx_parser = (
-          f'cat {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/{_STDOUT_LOG_FILE} |'
-          r' grep -oP "\[8;22H\s*\K[0-9]+" | tail -1'
-      )
-      total_sender_tx_pkts, _ = sender_vm.RemoteCommand(stdout_tx_parser)
-      total_sender_rx_pkts, _ = sender_vm.RemoteCommand(stdout_rx_parser)
-      total_receiver_rx_pkts, _ = receiver_vm.RemoteCommand(stdout_rx_parser)
-
-      if receiver_vm.tertiary_nic_bus_info:
-        stdout_rx_parser_2 = stdout_rx_parser.replace('7;22H', '7;46H')
-        stdout_tx_parser_2 = stdout_tx_parser.replace('8;22H', '8;46H')
-        total_sender_rx_pkts_2, _ = sender_vm.RemoteCommand(stdout_rx_parser_2)
-        total_sender_tx_pkts_2, _ = sender_vm.RemoteCommand(stdout_tx_parser_2)
-        total_receiver_rx_pkts_2, _ = receiver_vm.RemoteCommand(
-            stdout_rx_parser_2
-        )
-        total_sender_rx_pkts = int(total_sender_rx_pkts) + int(
-            total_sender_rx_pkts_2
-        )
-        total_sender_tx_pkts = int(total_sender_tx_pkts) + int(
-            total_sender_tx_pkts_2
-        )
-        total_receiver_rx_pkts = int(total_receiver_rx_pkts) + int(
-            total_receiver_rx_pkts_2
-        )
       if not all([
           total_sender_tx_pkts,
           total_sender_rx_pkts,
@@ -473,14 +493,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     # Reset PPS target in app/pktgen.c so sed command can work on next
     # function invocation.
     if curr_rate:
-      sender_vm.RemoteCommand(
-          f'sudo sed -i "s/pps        = {curr_rate};/pps        ='
-          f' {start_rate};/g"'
-          f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/app/pktgen.c'
-      )
-      sender_vm.RemoteCommand(
-          f'cd {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR} && make'
-      )
+      UpdatePpsAndRecompile(sender_vm, int(start_rate), int(curr_rate))
     return (
         valid_total_sender_tx_pkts,
         valid_total_sender_rx_pkts,
