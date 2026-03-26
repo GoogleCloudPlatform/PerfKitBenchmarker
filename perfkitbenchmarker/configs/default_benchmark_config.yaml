@@ -39,6 +39,25 @@ dpdk_pktgen_multi_nic_small_pkt_loss:
     dpdk_pktgen_max_lcores: 128
     dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]','[51:52]#[2:1];[51:52]#[1:2]']
 
+dpdk_pktgen_multi_nic_small_pkt_loss_external_IP:
+  name: dpdk_pktgen
+  flags:
+    dpdk_pktgen_tx_burst: 128
+    dpdk_pktgen_rx_burst: 128
+    dpdk_pktgen_packet_loss_threshold_rates: 0.0001
+    dpdk_pktgen_txd: 4096
+    dpdk_pktgen_rxd: 4096
+    dpdk_pktgen_mbuf_cache_size: 128
+    dpdk_pktgen_mbufs_per_port_multiplier: 8
+    gce_subnet_name: default,dpdk0,dpdk1
+    gce_nic_types: GVNIC,GVNIC,GVNIC
+    gce_nic_queue_counts: default,default,default
+    dpdk_pktgen_max_lcores: 128
+    assign_external_ip_all_nics: True
+    ip_addresses: EXTERNAL
+    dpdk_pktgen_num_flows: 100
+    dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]','[51:52]#[2:1];[51:52]#[1:2]']
+
 dpdk_pktgen_multi_nic:
   name: dpdk_pktgen
   flags:
