@@ -260,6 +260,33 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     ])
     return f'{self._GetAddressFromIngress(stdout)}:{port}'
 
+  def ApplyManifest(self, manifest_file: str, **kwargs) -> Any:
+    """Applies a declarative Kubernetes manifest; possibly with jinja."""
+    return kubernetes_commands.ApplyManifest(manifest_file, **kwargs)
+
+  def WaitForResource(
+      self,
+      resource_name: str,
+      condition_name: str,
+      namespace: str | None = None,
+      timeout: int = vm_util.DEFAULT_TIMEOUT,
+      wait_for_all: bool = False,
+      condition_type: str = 'condition=',
+      extra_args: list[str] | None = None,
+      **kwargs,
+  ) -> None:
+    """Waits for a condition on a Kubernetes resource (eg: deployment, pod)."""
+    return kubernetes_commands.WaitForResource(
+        resource_name,
+        condition_name,
+        namespace,
+        timeout,
+        wait_for_all,
+        condition_type,
+        extra_args,
+        **kwargs,
+    )
+
   def _GetAddressFromIngress(self, ingress_out: str):
     """Gets the endpoint address from the Ingress resource."""
     ingress = json.loads(ingress_out.strip("'"))
@@ -306,7 +333,7 @@ def _DeleteAllFromDefaultNamespace():
     kubectl.RunRetryableKubectlCommand(run_cmd, timeout=timeout)
 
     run_cmd = ['delete', 'pvc', '--all', '-n', 'default']
-    kubectl.RunKubectlCommand(run_cmd)
+    kubectl.RunRetryableKubectlCommand(run_cmd, timeout=timeout)
     # There maybe a slight race if resources are cleaned up in the background
     # where deleting the cluster immediately prevents the PVCs from being
     # deleted.

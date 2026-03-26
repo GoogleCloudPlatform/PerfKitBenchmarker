@@ -269,6 +269,9 @@ class GkeCluster(BaseGkeCluster):
 
   def __init__(self, spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(spec)
+    # Initialize event_poller to None to avoid AttributeError
+    if not hasattr(self, 'event_poller'):
+      self.event_poller = None
     # Update the environment for gcloud commands:
     if gcp_flags.GKE_API_OVERRIDE.value:
       os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER'] = (
