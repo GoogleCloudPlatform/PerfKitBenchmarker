@@ -57,6 +57,7 @@ class MockCommand:
       just need to be a substring of the actual command. Each response is given
       in order, like with mock's normal iterating side_effect.
     default_return_value: The value to return if no command is found.
+    all_commands: String of all commands that were called.
   """
 
   def __init__(
@@ -68,6 +69,7 @@ class MockCommand:
     self.progress_through_calls = collections.defaultdict(int)
     self.call_to_response = call_to_response
     self.default_return_value = default_return_value
+    self.all_commands: str = ''
 
     mock_command_function.side_effect = self.mock_remote_command
 
@@ -87,6 +89,7 @@ class MockCommand:
             ex,
         )
         raise ex
+    self.all_commands += cmd + '\n'
     for call in self.call_to_response:
       if call in cmd:
         call_num = self.progress_through_calls[call]

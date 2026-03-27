@@ -97,6 +97,7 @@ class BaseContainerCluster(resource.BaseResource):
     nodepool_config = container.BaseNodePoolConfig(
         vm_config,
         name,
+        nodepool_spec.machine_families,
     )
     nodepool_config.sandbox_config = nodepool_spec.sandbox_config
     nodepool_config.zone = zone

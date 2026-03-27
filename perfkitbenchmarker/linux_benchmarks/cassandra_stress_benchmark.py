@@ -55,7 +55,7 @@ from perfkitbenchmarker.linux_packages import cassandra
 NUM_KEYS_PER_CORE = 2000000
 # Adding wait between prefill and the test workload to give some time
 # for the data to propagate and for the cluster to stabilize.
-PROPAGATION_WAIT_TIME = 720
+PROPAGATION_WAIT_TIME = 300
 WAIT_BETWEEN_COMPACTION_TASKS_CHECK = 300
 
 # cassandra-stress command
@@ -158,7 +158,7 @@ CASSANDRA_CLIENT_ZONES = flags.DEFINE_list(
 )
 CASSANDRA_CPU_UTILIZATION_LIMIT = flags.DEFINE_integer(
     'cassandra_cpu_utilization_limit',
-    80,
+    None,
     'Maximum cpu utilization percentage for the benchmark. ',
 )
 CASSANDRA_STRESS_MAX_RUNS = flags.DEFINE_integer(
@@ -784,12 +784,19 @@ def RunCassandraStressTestOnClients(
             command,
             metadata,
             is_preload,
+            CASSANDRA_STRESS_RUN_DURATION.value,
         ],
         {},
     ))
   if not is_preload:
     for vm in cassandra_vms:
-      tasks.append((CPUUtilizationReporting, [vm], {}))
+      tasks.append(
+          (
+              CPUUtilizationReporting,
+              [vm, CASSANDRA_STRESS_RUN_DURATION.value],
+              {},
+          )
+      )
   background_tasks.RunParallelThreads(tasks, max_concurrency=10)
   # uptime reports load average for the last 1, 5 and 15 minutes. It is
   # important to get the average the moment test is done to avoid errors.
@@ -806,6 +813,7 @@ def RunCassandraStressOnClient(
     command,
     metadata,
     is_preload,
+    cassandra_stress_run_duration,
 ):
   """Run Cassandra-stress test on a client node."""
   spec = CassandraStressCommandSpec(
@@ -815,7 +823,7 @@ def RunCassandraStressOnClient(
       cassandra_vms=cassandra_vms,
       command=command,
       metadata=metadata,
-      duration=CASSANDRA_STRESS_RUN_DURATION.value,
+      duration=cassandra_stress_run_duration,
       consistency_level=FLAGS.cassandra_stress_consistency_level,
       retries=FLAGS.cassandra_stress_retries,
       mixed_ratio=FLAGS.cassandra_stress_mixed_ratio,
@@ -828,13 +836,13 @@ def RunCassandraStressOnClient(
   )
 
 
-def CPUUtilizationReporting(vm):
+def CPUUtilizationReporting(vm, duration):
   # command : sar -u <interval> <count>
   # we are collection the data every SAR_CPU_UTILIZATION_INTERVAL seconds for
   # the duration of the test
   vm.RobustRemoteCommand(
       f'sar -u {SAR_CPU_UTILIZATION_INTERVAL}'
-      f' {CalculateNumberOfSarRequestsFromDuration(CASSANDRA_STRESS_RUN_DURATION.value, SAR_CPU_UTILIZATION_INTERVAL)}'
+      f' {CalculateNumberOfSarRequestsFromDuration(duration, SAR_CPU_UTILIZATION_INTERVAL)}'
       f' > {GenerateCpuUtilizationFileName(vm)}'
   )
 
@@ -855,7 +863,15 @@ def ParseAverageCpuUtilization(output) -> float:
 
 
 def CalculateNumberOfSarRequestsFromDuration(duration, freq):
-  """Calculates the number of sar requests to be sent from the duration of the test."""
+  """Calculates the number of sar requests.
+
+  Args:
+    duration: The duration of the test as a string (e.g., '10m', '300s').
+    freq: The frequency of sar requests in seconds.
+
+  Returns:
+    The number of sar requests to send.
+  """
   if duration is None:
     # If duration is not set, we don't need to send sar requests.
     return 0
@@ -1006,136 +1022,47 @@ def Run(benchmark_spec):
   metadata['cassandra_version'] = cassandra.GetCassandraVersion(
       benchmark_spec.vm_groups[CASSANDRA_GROUP][0]
   )
-  if CASSANDRA_STRESS_THREADS.value:
-    return RunCassandraStressOnFixedThreads(
-        client_vms,
-        cassandra_vms,
-        metadata,
-        CASSANDRA_STRESS_THREADS.value,
-    )
-  return RunTestNTimes(client_vms, cassandra_vms, metadata)
-
-
-def RunTestNTimes(client_vms, cassandra_vms, metadata):
-  """Run the cassandra stress test max_allowed_runs times.
-
-  Args:
-    client_vms: client vms.
-    cassandra_vms: cassandra server vms.
-    metadata: dict. Contains metadata for this benchmark.
-
-  Returns:
-    A list of sample.Sample objects.
-
-  Running cassandra stress test with different thread counts.
-  - We increase the thread count gradually by THREAD_INCREMENT_COUNT
-  till op rate increases.
-  - We decrease the thread count by THREAD_INCREMENT_COUNT/2
-  if the operation rate is lower than the previous run.
-  """
-  samples = []
-  left_thread_count = STARTING_THREAD_COUNT
-  # TODO(arushigaur) Remove hardcoded max thread count and just do double and
-  # half of the current thread count.
-  right_thread_count = 500
-  max_op_rate = 0
-  max_op_rate_metadata = None
-  thread_data = {}
-  while (
-      left_thread_count < right_thread_count - 1
-  ):
-    current_thread_count = int((left_thread_count + right_thread_count) / 2)
-    # running with both left_left_thread_count and current_thread_count to
-    # understand where is the current_thread_count on the curve.
-    for threads in [left_thread_count, current_thread_count]:
-      # adding nodetool status to check the ownership of each node.
-      cassandra.GetNodetoolStatus(cassandra_vms)
-      if threads in thread_data:
-        logging.info('thread count %s already tested', threads)
-        continue
-      current_metadata = copy.deepcopy(metadata)
-      current_metadata['num_cassandra_stress_threads'] = threads
-      logging.info('running thread count: %s', threads)
-      RunCassandraStressTestOnClients(
-          cassandra_vms,
-          client_vms,
-          FLAGS.cassandra_stress_command,
-          immutabledict.immutabledict(current_metadata),
-          is_preload=False,
-      )
-      current_samples = CollectResults(
-          client_vms, current_metadata
-      )
-      samples.extend(current_samples)
-      thread_data[threads] = {
-          'operation_rate': GetOperationRate(
-              current_samples
-          ),
-          'median_latency': GetMedianLatency(
-              current_samples
-          ),
-          'cpu_loads': GetCpuAverageLoad(cassandra_vms),
-          'cpu_utilization': GetCpuUtilization(
-              cassandra_vms
-          ),
-          'metadata': current_metadata,
-      }
-      logging.info(
-          'details for thread count %s are %s',
-          threads,
-          thread_data[threads],
-      )
-      PerformanceReporting(
-          cassandra_vms, thread_data[threads], current_metadata
-      )
-      WaitForCompactionTasks(cassandra_vms)
-    left_thread_count, right_thread_count = (
-        GetNextThreadCount(
-            left_thread_count,
-            current_thread_count,
-            right_thread_count,
-            thread_data,
-            MAX_MEDIAN_LATENCY_MS,
-            CASSANDRA_CPU_UTILIZATION_LIMIT.value,
-        )
-    )
-    # TODO(arushigaur) Add a stopping condition that if op rate in the last x
-    # tests hasn't changed much then exit the while loop.
-    # If op rate at the current_thread_count meets latency and cpu utilization
-    # criteria, then record it as the max_op_rate.
-    if (
-        max_op_rate < thread_data[current_thread_count]['operation_rate']
-        and int(thread_data[current_thread_count]['median_latency'])
-        < MAX_MEDIAN_LATENCY_MS
-        and sum(thread_data[current_thread_count]['cpu_utilization'])
-        / len(thread_data[current_thread_count]['cpu_utilization'])
-        < CASSANDRA_CPU_UTILIZATION_LIMIT.value * 1.01
-    ):
-      max_op_rate = thread_data[current_thread_count]['operation_rate']
-      max_op_rate_metadata = thread_data[current_thread_count]['metadata']
+  threads = CASSANDRA_STRESS_THREADS.value or [1] + list(range(100, 1001, 100))
+  samples = RunCassandraStressOnFixedThreads(
+      client_vms,
+      cassandra_vms,
+      metadata,
+      threads)
   samples.append(
-      sample.Sample(
-          'max_op_rate',
-          max_op_rate,
-          'operations per second',
-          max_op_rate_metadata,
-      )
-  )
-  thread_run_data_metadata = copy.deepcopy(max_op_rate_metadata or {})
-  thread_run_data_metadata['thread_data'] = thread_data
-  samples.append(
-      sample.Sample(
-          'thread_run_data',
-          -1,
-          '',
-          thread_run_data_metadata,
-      )
+      GenerateMaxOpRateSample(samples)
   )
   return samples
 
 
+def GenerateMaxOpRateSample(samples):
+  """Parse the max op rate from the thread run data."""
+  max_op_rate = 0
+  max_op_rate_metadata = None
+  thread_run_data = next(
+      (
+          s.metadata['thread_data']
+          for s in samples
+          if s.metric == 'thread_run_data'
+      ),
+      {},
+  )
+  for _, thread_data in thread_run_data.items():
+    if max_op_rate < thread_data['operation_rate']:
+      max_op_rate = thread_data['operation_rate']
+      max_op_rate_metadata = thread_data['metadata']
+  return sample.Sample(
+      'max_op_rate',
+      max_op_rate,
+      'operations per second',
+      max_op_rate_metadata,
+  )
+
+
 def RunCassandraStressOnFixedThreads(
-    client_vms, cassandra_vms, metadata, client_threads_array
+    client_vms,
+    cassandra_vms,
+    metadata,
+    client_threads_array,
 ):
   """Run the cassandra stress test max_allowed_runs times.
 
@@ -1165,20 +1092,18 @@ def RunCassandraStressOnFixedThreads(
         immutabledict.immutabledict(current_metadata),
         is_preload=False,
     )
-    current_samples = CollectResults(
-        client_vms, current_metadata
-    )
+    current_samples = CollectResults(client_vms, current_metadata)
     samples.extend(current_samples)
+    cpu_utilization = GetCpuUtilization(
+        cassandra_vms, CASSANDRA_STRESS_RUN_DURATION.value
+    )
     thread_data[threads] = {
-        'operation_rate': GetOperationRate(
-            current_samples
-        ),
-        'median_latency': GetMedianLatency(
-            current_samples
-        ),
+        'operation_rate': GetOperationRate(current_samples),
+        'median_latency': GetMedianLatency(current_samples),
         'cpu_loads': GetCpuAverageLoad(cassandra_vms),
-        'cpu_utilization': GetCpuUtilization(
-            cassandra_vms
+        'cpu_utilization': cpu_utilization,
+        'cpu_utilization_avg': round(
+            sum(cpu_utilization) / len(cpu_utilization), 2
         ),
         'metadata': current_metadata,
     }
@@ -1202,82 +1127,6 @@ def RunCassandraStressOnFixedThreads(
       )
   )
   return samples
-
-
-def GetNextThreadCount(
-    left_thread_count,
-    current_thread_count,
-    right_thread_count,
-    thread_data,
-    max_median_latency,
-    max_cpu_utilization,
-):
-  """Gets the next thread count bounds based on the current metrics.
-
-  Args:
-    left_thread_count: The lower bound of the thread count for the binary
-      search.
-    current_thread_count: The current thread count used for the test.
-    right_thread_count: The upper bound of the thread count for the binary
-      search.
-    thread_data: A dict of thread data containing operation_rate,
-      median_latency and average_cpu_usage.
-    max_median_latency: The maximum acceptable median latency.
-    max_cpu_utilization: The maximum acceptable cpu utilization.
-
-  Returns:
-    A tuple of the new (left_thread_count, right_thread_count) for the next
-    iteration of the binary search.
-
-  We are trying to achieve a optimal thread count to maximize the operation
-  rate. The operation rate, latency and cpu utilization increase with threads
-  till op rate reaches a max and after that op rate drops while latency and cpu
-  keeps increasing.
-  """
-  # taking average cpu utilization to consider uneven load across nodes.
-  average_cpu_usage = sum(
-      thread_data[current_thread_count]['cpu_utilization']
-  ) / len(thread_data[current_thread_count]['cpu_utilization'])
-  median_latency = int(thread_data[current_thread_count]['median_latency'])
-  if (
-      median_latency
-      >= max_median_latency
-      or average_cpu_usage
-      >= max_cpu_utilization*1.01  # cpu utilization within 1% of the limit.
-  ):
-    # decrease thread count
-    logging.info(
-        'latency is %s and cpu utilization is %s for %s threads, decreasing'
-        ' threads',
-        median_latency,
-        average_cpu_usage,
-        current_thread_count,
-    )
-    right_thread_count = current_thread_count
-  elif (
-      thread_data[current_thread_count]['operation_rate']
-      < thread_data[left_thread_count]['operation_rate']
-  ):
-    # move left on the curve because op rate dropped from left to right.
-    right_thread_count = current_thread_count
-    logging.info(
-        'op rate %s is %s and %s is %s, decreasing threads',
-        left_thread_count,
-        thread_data[left_thread_count]['operation_rate'],
-        current_thread_count,
-        thread_data[current_thread_count]['operation_rate'],
-    )
-  else:
-    # move right on the curve because op rate increased from left to right.
-    left_thread_count = current_thread_count
-    logging.info(
-        'op rate %s is %s and %s is %s, increasing threads',
-        left_thread_count,
-        thread_data[left_thread_count]['operation_rate'],
-        current_thread_count,
-        thread_data[current_thread_count]['operation_rate'],
-    )
-  return int(left_thread_count), int(right_thread_count)
 
 
 @vm_util.Retry(
@@ -1334,19 +1183,12 @@ def LogMemoryUsage(cassandra_vms):
     vm.RemoteCommand('free -h')
 
 
-def GetCpuUtilization(cassandra_vms):
-  """Get cpu utilization during the test from sar output.
-
-  Args:
-    cassandra_vms: cassandra server vms.
-
-  Returns:
-    A list of cpu utilization for each cassandra node.
-  """
+def GetCpuUtilization(cassandra_vms, run_duration):
+  """Get cpu utilization during the test from sar output."""
   cpu_utilization = []
   if (
       CalculateNumberOfSarRequestsFromDuration(
-          CASSANDRA_STRESS_RUN_DURATION.value, SAR_CPU_UTILIZATION_INTERVAL
+          run_duration, SAR_CPU_UTILIZATION_INTERVAL
       )
       == 0
   ):

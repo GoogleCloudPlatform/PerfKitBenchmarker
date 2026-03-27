@@ -244,7 +244,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     # Validity should be uncovered during development. Quota and capacity
     # will trigger failures in other VM benchmarks.
     if re.search(
-        'Allocation failed. VM(s) with the following constraints cannot be'
+        'Allocation failed. VM\\(s\\) with the following constraints cannot be'
         ' allocated, because the condition is too restrictive.',
         stderr,
     ):
