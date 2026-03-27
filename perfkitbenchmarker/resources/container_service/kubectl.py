@@ -18,6 +18,9 @@ RETRYABLE_KUBECTL_ERRORS = [
     'error sending request:',
     '(abnormal closure): unexpected EOF',
     'deadline exceeded',
+    # kubectl wait/delete timeouts and connection errors (retried in EKS cleanup)
+    'timed out',
+    'unable to connect to the server',
 ]
 
 
@@ -38,8 +41,9 @@ def RunKubectlCommand(command: list[str], **kwargs) -> tuple[str, str, int]:
     # Check for kubectl timeout. If found, treat it the same as a regular
     # timeout.
     if retcode != 0:
+      stderr_lower = stderr.lower()
       for error_substring in RETRYABLE_KUBECTL_ERRORS:
-        if error_substring in stderr:
+        if error_substring.lower() in stderr_lower:
           # Raise timeout error regardless of raise_on_failure - as the intended
           # semantics is to ignore expected errors caused by invoking the
           # command not errors from PKB infrastructure.
