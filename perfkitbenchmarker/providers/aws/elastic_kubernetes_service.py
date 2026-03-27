@@ -23,6 +23,7 @@ instructions.
 from collections import abc
 import json
 import logging
+import math
 import re
 from typing import Any
 from urllib import parse
@@ -704,9 +705,7 @@ class EksKarpenterCluster(BaseEksCluster):
             }],
         },
         'iamIdentityMappings': [{
-            'arn': (
-                f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}'
-            ),
+            'arn': f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}',
             'username': 'system:node:{{EC2PrivateDNSName}}',
             'groups': ['system:bootstrappers', 'system:nodes'],
         }],
@@ -992,9 +991,31 @@ class EksKarpenterCluster(BaseEksCluster):
         '[PKB][EKS] Allowed ALB SG %s -> node SGs on port %s', alb_sg, port
     )
 
+  @staticmethod
+  def _DefaultNodepoolInstanceTypes() -> list[str]:
+    """EC2 instance types for the default Karpenter NodePool manifest.
+
+    Controlled by --eks_karpenter_nodepool_instance_types.
+    Empty list: Jinja template keeps instance-category/generation rules.
+    """
+    return [
+        t.strip()
+        for t in FLAGS.eks_karpenter_nodepool_instance_types
+        if t.strip()
+    ]
+
   def _PostCreate(self):
     """Performs post-creation steps for the cluster."""
     super()._PostCreate()
+    # Karpenter controller resources: default 1/1Gi; scale up when
+    # node_scale target exceeds 1000 nodes.
+    num_nodes = getattr(FLAGS, 'kubernetes_scale_num_nodes', None)
+    if num_nodes is not None and num_nodes > 1000:
+      controller_cpu, controller_memory = 4, '16Gi'
+    elif num_nodes is not None and num_nodes >= 500:
+      controller_cpu, controller_memory = 2, '8Gi'
+    else:
+      controller_cpu, controller_memory = 1, '1Gi'
     vm_util.IssueCommand([
         'helm',
         'upgrade',
@@ -1013,13 +1034,13 @@ class EksKarpenterCluster(BaseEksCluster):
         '--set',
         f'settings.interruptionQueue={self.name}',
         '--set',
-        'controller.resources.requests.cpu=1',
+        f'controller.resources.requests.cpu={controller_cpu}',
         '--set',
-        'controller.resources.requests.memory=1Gi',
+        f'controller.resources.requests.memory={controller_memory}',
         '--set',
-        'controller.resources.limits.cpu=1',
+        f'controller.resources.limits.cpu={controller_cpu}',
         '--set',
-        'controller.resources.limits.memory=1Gi',
+        f'controller.resources.limits.memory={controller_memory}',
         '--set',
         'logLevel=debug',
         '--wait',
@@ -1057,10 +1078,16 @@ class EksKarpenterCluster(BaseEksCluster):
         'v'
         + full_version.strip().strip('"').split(f'{self.cluster_version}-v')[1]
     )
+    # NodePool CPU limit: benchmark target nodes * vCPU + 5%, min 1000.
+    num_nodes = getattr(FLAGS, 'kubernetes_scale_num_nodes', 5)
+    vcpu_per_node = FLAGS.eks_karpenter_limits_vcpu_per_node
+    cpu_limit = max(1000, math.ceil(num_nodes * vcpu_per_node * 1.05))
     kubernetes_commands.ApplyManifest(
         'container/karpenter/nodepool.yaml.j2',
         CLUSTER_NAME=self.name,
         ALIAS_VERSION=alias_version,
+        KARPENTER_NODEPOOL_CPU_LIMIT=cpu_limit,
+        KARPENTER_INSTANCE_TYPES=self._DefaultNodepoolInstanceTypes(),
     )
 
   def _Delete(self):
@@ -1093,16 +1120,33 @@ class EksKarpenterCluster(BaseEksCluster):
     # Start deleting the stack but likely to fail to delete this role.
     vm_util.IssueCommand(delete_stack_cmd)
     node_role = f'KarpenterNodeRole-{self.name}'
-    out, _, _ = vm_util.IssueCommand([
-        'aws',
-        'iam',
-        'list-instance-profiles-for-role',
-        '--role-name',
-        node_role,
-        '--region',
-        f'{self.region}',
-    ])
-    profiles_json = json.loads(out)
+    out, _, retcode = vm_util.IssueCommand(
+        [
+            'aws',
+            'iam',
+            'list-instance-profiles-for-role',
+            '--role-name',
+            node_role,
+            '--region',
+            f'{self.region}',
+        ],
+        suppress_failure=lambda stdout, stderr, rc: (
+            rc != 0
+            and (
+                'nosuchentity' in (stderr or '').lower()
+                or 'cannot be found' in (stderr or '').lower()
+            )
+        ),
+    )
+    if retcode == 0 and out.strip():
+      profiles_json = json.loads(out)
+    else:
+      logging.info(
+          'Karpenter node role %s not found or empty response; skipping'
+          ' instance profile cleanup',
+          node_role,
+      )
+      profiles_json = {'InstanceProfiles': []}
     for profile in profiles_json.get('InstanceProfiles', []):
       profile_name = profile['InstanceProfileName']
       vm_util.IssueCommand([
@@ -1149,21 +1193,21 @@ class EksKarpenterCluster(BaseEksCluster):
     """Cleanup Karpenter managed nodes before cluster deletion."""
     logging.info('Cleaning up Karpenter nodes...')
     # Delete NodePool resources - this will trigger node termination
-    kubectl.RunKubectlCommand(
+    kubectl.RunRetryableKubectlCommand(
         [
             'delete',
             'nodepool,ec2nodeclass',
             '--all',
             '--timeout=120s',
         ],
+        timeout=300,
         suppress_failure=lambda stdout, stderr, retcode: (
             'no resources found' in stderr.lower()
             or 'not found' in stderr.lower()
-            or 'timed out waiting for the condition' in stderr.lower()
         ),
     )
     # Wait for all Karpenter nodes to be deleted
-    kubectl.RunKubectlCommand(
+    kubectl.RunRetryableKubectlCommand(
         [
             'wait',
             '--for=delete',
@@ -1172,9 +1216,10 @@ class EksKarpenterCluster(BaseEksCluster):
             'karpenter.sh/nodepool',
             '--timeout=120s',
         ],
+        timeout=300,
         suppress_failure=lambda stdout, stderr, retcode: (
             'no matching resources found' in stderr.lower()
-            or 'timed out' in stderr.lower()
+            or 'no resources found' in stderr.lower()
         ),
     )
     # Force terminate remaining EC2 instances
@@ -1246,21 +1291,40 @@ class EksKarpenterCluster(BaseEksCluster):
     if eni_ids:
       logging.info('Deleting %d orphaned network interfaces', len(eni_ids))
       for eni_id in eni_ids:
-        vm_util.IssueCommand(
-            [
-                'aws',
-                'ec2',
-                'delete-network-interface',
-                '--region',
-                self.region,
-                '--network-interface-id',
-                eni_id,
-            ],
-            suppress_failure=lambda stdout, stderr, retcode: (
-                'not found' in stderr.lower()
-                or 'does not exist' in stderr.lower()
-            ),
-        )
+        # Bind eni_id by default to avoid loop closure issues if
+        # this is refactored.
+        def _DeleteOneEni(eni_id=eni_id) -> None:
+          _, stderr, retcode = vm_util.IssueCommand(
+              [
+                  'aws',
+                  'ec2',
+                  'delete-network-interface',
+                  '--region',
+                  self.region,
+                  '--network-interface-id',
+                  eni_id,
+              ],
+              raise_on_failure=False,
+          )
+          if retcode == 0:
+            return
+          stderr_lower = (stderr or '').lower()
+          # ENI already deleted (e.g. by another process or previous attempt).
+          if 'invalidnetworkinterfaceid.notfound' in stderr_lower:
+            return
+          # RequestLimitExceeded (throttle): retry via vm_util.Retry.
+          if 'requestlimitexceeded' in stderr_lower:
+            raise errors.Resource.RetryableDeletionError(stderr or '')
+          raise errors.VmUtil.IssueCommandError(
+              f'DeleteNetworkInterface failed: {stderr}'
+          )
+
+        # max_retries=5 yields 6 CLI attempts (tries > 5 on 6th failure).
+        vm_util.Retry(
+            poll_interval=10,
+            max_retries=5,
+            retryable_exceptions=(errors.Resource.RetryableDeletionError,),
+        )(_DeleteOneEni)()
 
   def _IsReady(self):
     """Returns True if cluster is running. Autopilot defaults to 0 nodes."""

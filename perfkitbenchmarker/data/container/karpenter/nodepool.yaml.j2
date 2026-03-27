@@ -15,19 +15,25 @@ spec:
         - key: karpenter.sh/capacity-type
           operator: In
           values: ["on-demand"]
+{%- if KARPENTER_INSTANCE_TYPES %}
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values: [{% for instance_type in KARPENTER_INSTANCE_TYPES %}"{{ instance_type }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{%- else %}
         - key: karpenter.k8s.aws/instance-category
           operator: In
-          values: ["c", "m", "r"]
+          values: ["c", "m", "r", "t"]
         - key: karpenter.k8s.aws/instance-generation
           operator: Gt
           values: ["2"]
+{%- endif %}
       nodeClassRef:
         group: karpenter.k8s.aws
         kind: EC2NodeClass
         name: default
       expireAfter: 720h # 30 * 24h = 720h
   limits:
-    cpu: 1000
+    cpu: {{ KARPENTER_NODEPOOL_CPU_LIMIT }}
   disruption:
     consolidationPolicy: WhenEmptyOrUnderutilized
     consolidateAfter: 1m
