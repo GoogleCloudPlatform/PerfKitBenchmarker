@@ -18,7 +18,8 @@ RETRYABLE_KUBECTL_ERRORS = [
     'error sending request:',
     '(abnormal closure): unexpected EOF',
     'deadline exceeded',
-    # kubectl wait/delete timeouts and connection errors (retried in EKS cleanup)
+    # kubectl wait/delete timeouts and connection errors
+    # (retried in EKS cleanup)
     'timed out',
     'unable to connect to the server',
 ]
