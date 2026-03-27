@@ -5,6 +5,8 @@ import json
 import logging
 import time
 from typing import Any
+
+from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
@@ -19,6 +21,15 @@ from perfkitbenchmarker.resources.container_service import kubernetes_events
 
 INGRESS_JSONPATH = '{.status.loadBalancer.ingress[0]}'
 RESOURCE_DELETE_SLEEP_SECONDS = 5
+
+# Timeout for "kubectl delete all --all" during teardown. Increase for
+# large-scale runs (e.g. 5000+ pods) to avoid benchmark failure.
+flags.DEFINE_integer(
+    'kubernetes_teardown_delete_timeout',
+    3600,
+    'Timeout in seconds for kubectl delete all --all during cluster teardown. '
+    'Increase for large-scale runs (e.g. 5000+ pods). Default 3600 (1 hour).',
+)
 
 
 class KubernetesCluster(container_cluster.BaseContainerCluster):
@@ -321,7 +332,7 @@ def _DeleteAllFromDefaultNamespace():
     run_cmd = ['delete', 'job', '--all', '-n', 'default']
     kubectl.RunRetryableKubectlCommand(run_cmd)
 
-    timeout = 60 * 20
+    timeout = 60 * 60  # 1 hour for kubectl delete all -n default (teardown)
     run_cmd = [
         'delete',
         'all',
