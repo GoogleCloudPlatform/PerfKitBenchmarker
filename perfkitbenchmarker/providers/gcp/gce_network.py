@@ -931,13 +931,21 @@ class GceNetwork(network.BaseNetwork):
     self.is_existing_network = True
     self.subnet_names = []
     self.primary_subnet_name = None
+    self.network_name = None
+    
+    # Determine the network name first
+    if gcp_flags.GCE_NETWORK_NAMES.value:
+      self.network_name = gcp_flags.GCE_NETWORK_NAMES.value[0]
+    else:
+      self.network_name = self._MakeGceNetworkName()
+      self.is_existing_network = False
+      
+    # Then handle subnet names
     if network_spec.subnet_names:
       self.subnet_names = network_spec.subnet_names
-    elif gcp_flags.GCE_NETWORK_NAMES.value:
-      self.subnet_names = gcp_flags.GCE_NETWORK_NAMES.value
-    else:
-      self.subnet_names = self._MakeGceNetworkName()
-      self.is_existing_network = False
+    elif not self.is_existing_network:
+      # If we're creating a new network, use the network name as subnet name by default
+      self.subnet_names = [self.network_name]
     if not isinstance(self.subnet_names, list):
       self.subnet_names = [self.subnet_names]
     self.primary_subnet_name = self.subnet_names[0]
@@ -946,28 +954,30 @@ class GceNetwork(network.BaseNetwork):
     self.subnet_resources = []
     mode = gcp_flags.GCE_NETWORK_TYPE.value
     self.subnet_resource = None
+    # Create network resources using network_name
     if not self.is_existing_network or mode == 'legacy':
-      for name in self.subnet_names:
-        self.network_resources.append(
-            GceNetworkResource(name, mode, self.project, self.mtu)
-        )
+      self.network_resources.append(
+          GceNetworkResource(self.network_name, mode, self.project, self.mtu)
+      )
+    
+    # Create subnet resources using subnet_names within the specified network
     if (self.is_existing_network and mode != 'legacy') or (mode == 'custom'):
       subnet_region = util.GetRegionFromZone(network_spec.zone)
       for name in self.subnet_names:
         self.subnet_resources.append(
             GceSubnetResource(
-                name, name, subnet_region, self.cidr, self.project
+                name, self.network_name, subnet_region, self.cidr, self.project
             )
         )
       self.subnet_resource = GceSubnetResource(
           self.primary_subnet_name,
-          self.primary_subnet_name,
+          self.network_name,
           subnet_region,
           self.cidr,
           self.project,
       )
     self.network_resource = GceNetworkResource(
-        self.primary_subnet_name, mode, self.project, self.mtu
+        self.network_name, mode, self.project, self.mtu
     )
     # Stage FW rules.
     self.all_nets = self._GetNetworksFromSpec(
