@@ -1,0 +1,292 @@
+---
+# Namespace for PostgreSQL resources
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ namespace }}
+---
+# Storage class for PostgreSQL data
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: postgres-storage-class
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: {{ disk_type }}
+  replication-type: none  # Use zonal PDs for better performance
+reclaimPolicy: Delete
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+---
+# Secret for PostgreSQL credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: {{ namespace }}
+type: Opaque
+stringData:
+  POSTGRES_USER: {{ postgres_user }}
+  POSTGRES_PASSWORD: {{ postgres_password }}
+  POSTGRES_DB: {{ postgres_database }}
+---
+# ConfigMap for PostgreSQL configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: {{ namespace }}
+data:
+  postgresql.conf: |
+    # Connection settings
+    listen_addresses = '*'
+    max_connections = {{ max_connections }}
+
+    # Memory settings
+    shared_buffers = {{ shared_buffers }}
+    effective_cache_size = {{ effective_cache_size }}
+    maintenance_work_mem = 1GB
+    work_mem = {{ work_mem }}
+
+    # Parallel execution
+    max_worker_processes = {{ max_worker_processes }}
+    max_parallel_workers_per_gather = {{ max_parallel_workers_per_gather }}
+    max_parallel_workers = {{ max_parallel_workers }}
+
+    # Write ahead log
+    wal_buffers = {{ wal_buffers }}
+    max_wal_size = {{ max_wal_size }}
+    min_wal_size = 80MB
+    checkpoint_timeout = {{ checkpoint_timeout }}
+    checkpoint_completion_target = {{ checkpoint_completion_target }}
+
+    # Query tuning
+    effective_io_concurrency = {{ effective_io_concurrency }}
+    random_page_cost = {{ random_page_cost }}
+    huge_pages = {{ huge_pages | default('try') }}
+    wal_level = {{ wal_level | default('replica') }}
+    synchronous_commit = {{ synchronous_commit | default('on') }}
+
+    # Autovacuum
+    autovacuum = on
+    autovacuum_max_workers = {{ autovacuum_max_workers }}
+    autovacuum_naptime = 10s
+
+    # Logging
+    log_destination = 'stderr'
+    logging_collector = off
+    log_line_prefix = '{{ log_line_prefix | default('%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h ') }}'
+    log_checkpoints = {{ log_checkpoints | default('on') }}
+    log_connections = {{ log_connections | default('off') }}
+    log_disconnections = {{ log_disconnections | default('off') }}
+    log_lock_waits = {{ log_lock_waits | default('off') }}
+    log_temp_files = {{ log_temp_files | default('0') }}
+    log_autovacuum_min_duration = {{ log_autovacuum_min_duration | default('-1') }}
+    log_error_verbosity = {{ log_error_verbosity | default('default') }}
+    client_min_messages = {{ client_min_messages | default('notice') }}
+    log_min_messages = {{ log_min_messages | default('warning') }}
+    log_min_error_statement = {{ log_min_error_statement | default('error') }}
+    log_min_duration_statement = {{ log_min_duration_statement | default('-1') }}
+
+    # Statistics
+    track_activities = on
+    track_counts = on
+    track_io_timing = on
+
+  pg_hba.conf: |
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    local   all             all                                     trust
+    host    all             all             0.0.0.0/0               md5
+    host    all             all             ::/0                    md5
+---
+# ConfigMap for init scripts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: {{ namespace }}
+data:
+  init.sql: |
+    -- Create benchmark database if it doesn't exist
+    SELECT 'CREATE DATABASE {{ postgres_database }}'
+    WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '{{ postgres_database }}');
+
+    -- Grant privileges
+    GRANT ALL PRIVILEGES ON DATABASE {{ postgres_database }} TO {{ postgres_user }};
+
+    -- Set default configuration
+    ALTER SYSTEM SET shared_buffers = '{{ shared_buffers }}';
+    ALTER SYSTEM SET effective_cache_size = '{{ effective_cache_size }}';
+    ALTER SYSTEM SET work_mem = '{{ work_mem }}';
+
+  init-permissions.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "Setting up PostgreSQL data directory permissions..."
+    # Ensure proper permissions on data directory
+    chown -R postgres:postgres /var/lib/postgresql/data || true
+    chmod 700 /var/lib/postgresql/data || true
+    echo "Permissions set successfully"
+---
+# Service for PostgreSQL
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-standalone
+  namespace: {{ namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres-standalone
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgres
+---
+# StatefulSet for PostgreSQL
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-standalone
+  namespace: {{ namespace }}
+spec:
+  serviceName: postgres-standalone
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-standalone
+  template:
+    metadata:
+      labels:
+        app: postgres-standalone
+    spec:
+      {% if host_network %}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {% endif %}
+      securityContext:
+        fsGroup: 999  # postgres group ID
+      # PKB will handle node selection through nodepool configuration
+      {% if use_init_container %}
+      initContainers:
+      - name: init-permissions
+        image: postgres:{{ postgres_version }}
+        command:
+        - "bash"
+        - "-c"
+        - "/scripts/init-permissions.sh"
+        securityContext:
+          runAsUser: 0  # Run as root for permissions setup
+        volumeMounts:
+        - name: init-scripts
+          mountPath: /scripts
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+      {% endif %}
+      containers:
+      - name: postgres
+        image: postgres:{{ postgres_version }}
+        ports:
+        - containerPort: 5432
+          name: postgres
+        envFrom:
+        - secretRef:
+            name: postgres-secret
+        env:
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: POSTGRES_HOST_AUTH_METHOD
+          value: "md5"
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        - name: postgres-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+        - name: postgres-config
+          mountPath: /etc/postgresql/pg_hba.conf
+          subPath: pg_hba.conf
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d/init.sql
+          subPath: init.sql
+        {% if hugepages %}
+        - name: hugepages
+          mountPath: /dev/hugepages
+          readOnly: false
+        {% endif %}
+        resources:
+          requests:
+            cpu: "{{ cpu_request | default('6') }}"
+            memory: "{{ memory_request | default('15Gi') }}"
+            {% if hugepages %}
+            {% if hugepages.hugepage_size2m %}
+            hugepages-2Mi: "{{ hugepages.hugepage_size2m * 2 }}Mi"
+            {% endif %}
+            {% if hugepages.hugepage_size1g %}
+            hugepages-1Gi: "{{ hugepages.hugepage_size1g }}Gi"
+            {% endif %}
+            {% endif %}
+          limits:
+            cpu: "{{ cpu_limit | default('10') }}"
+            memory: "{{ memory_limit | default('20Gi') }}"
+            {% if hugepages %}
+            {% if hugepages.hugepage_size2m %}
+            hugepages-2Mi: "{{ hugepages.hugepage_size2m * 2 }}Mi"
+            {% endif %}
+            {% if hugepages.hugepage_size1g %}
+            hugepages-1Gi: "{{ hugepages.hugepage_size1g }}Gi"
+            {% endif %}
+            {% endif %}
+        command:
+        - "docker-entrypoint.sh"
+        - "postgres"
+        - "-c"
+        - "config_file=/etc/postgresql/postgresql.conf"
+        - "-c"
+        - "hba_file=/etc/postgresql/pg_hba.conf"
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - {{ postgres_user }}
+            - -d
+            - {{ postgres_database }}
+          initialDelaySeconds: 180  # Increased to 3 minutes
+          periodSeconds: 15
+          timeoutSeconds: 10
+          failureThreshold: 40     # Increased to 10 minutes total
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - {{ postgres_user }}
+          initialDelaySeconds: 240  # Increased to 4 minutes
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 20      # Increased forgiveness
+      volumes:
+      - name: postgres-config
+        configMap:
+          name: postgres-config
+      - name: init-scripts
+        configMap:
+          name: postgres-init-scripts
+          defaultMode: 0755
+      {% if hugepages %}
+      - name: hugepages
+        emptyDir:
+          medium: HugePages
+      {% endif %}
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: postgres-storage-class
+      resources:
+        requests:
+          storage: {{ disk_size }}

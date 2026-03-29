@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: hugepages-enabler
+  namespace: kube-system
+  labels:
+    app: hugepages-enabler
+spec:
+  selector:
+    matchLabels:
+      app: hugepages-enabler
+  template:
+    metadata:
+      labels:
+        app: hugepages-enabler
+    spec:
+      hostPID: true
+      containers:
+      - name: hugepages-enabler
+        image: ubuntu:20.04
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Setting up HugePages..."
+          # Calculate number of pages based on size
+          # hugepage_size2m is in count of 2MB pages
+          # hugepage_size1g is in count of 1GB pages
+          
+          {% if hugepage_size2m %}
+          echo {{ hugepage_size2m }} > /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+          echo "Set hugepages-2048kB to {{ hugepage_size2m }}"
+          {% endif %}
+          
+          {% if hugepage_size1g %}
+          echo {{ hugepage_size1g }} > /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
+          echo "Set hugepages-1048576kB to {{ hugepage_size1g }}"
+          {% endif %}
+          
+          # Verify
+          grep Huge /proc/meminfo
+          
+          # Keep container running to prevent DaemonSet restart loop
+          sleep infinity
+        securityContext:
+          privileged: true
+        resources:
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        volumeMounts:
+        - name: sys
+          mountPath: /sys
+      volumes:
+      - name: sys
+        hostPath:
+          path: /sys
