@@ -87,6 +87,12 @@ TRINO_MEMORY = flags.DEFINE_integer(
     200,
     'Amount of memory in GiB used by each Trino worker.',
 )
+TRINO_EPHEMERAL_STORAGE = flags.DEFINE_integer(
+    'trino_ephemeral_storage',
+    None,
+    'Amount of ephemeral storage in GiB used by each Trino worker. If not set,'
+    ' defaults to worker memory.',
+)
 flags.DEFINE_integer(
     'edw_suite_iterations', 1, 'Number of suite iterations to perform.'
 )

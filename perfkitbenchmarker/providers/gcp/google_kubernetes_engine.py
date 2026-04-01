@@ -242,6 +242,18 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     # PD-SSD
     return 'premium-rwo'
 
+  def HasLocalSsd(self, nodepool_name: str = 'default') -> bool:
+    """Returns true if the given nodepool has local SSDs."""
+    if nodepool_name == 'default':
+      nodepool = self.default_nodepool
+    elif nodepool_name not in self.nodepools:
+      raise errors.Config.InvalidValue(
+          f'Nodepool {nodepool_name} not found in cluster.'
+      )
+    else:
+      nodepool = self.nodepools[nodepool_name]
+    return nodepool.max_local_disks is not None and nodepool.max_local_disks > 0
+
   def GetNodePoolNames(self) -> list[str]:
     """Get node pool names for the cluster."""
     # Command `gcloud container node-pools list` does not work for Autopilot
