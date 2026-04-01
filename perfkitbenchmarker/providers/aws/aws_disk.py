@@ -390,6 +390,19 @@ NUM_LOCAL_VOLUMES = {
     'm8gd.48xlarge': 6,
     'm8gd.metal-24xl': 3,
     'm8gd.metal-48xl': 6,
+    'm8id.large': 1,
+    'm8id.xlarge': 1,
+    'm8id.2xlarge': 1,
+    'm8id.4xlarge': 1,
+    'm8id.8xlarge': 1,
+    'm8id.12xlarge': 1,
+    'm8id.16xlarge': 1,
+    'm8id.24xlarge': 2,
+    'm8id.32xlarge': 2,
+    'm8id.48xlarge': 3,
+    'm8id.96xlarge': 6,
+    'm8id.metal-48xl': 3,
+    'm8id.metal-96xl': 6,
 }
 
 
