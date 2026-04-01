@@ -55,10 +55,34 @@ def GetConfig(user_config):
 
 
 def Prepare(spec: benchmark_spec.BenchmarkSpec):
+  """Prepares the VMs for running FIO against object storage.
+
+  This includes installing FIO, prefilling data if necessary, and configuring
+  object storage mounts (e.g., for Azure Blobfuse).
+
+  Args:
+    spec: The benchmark specification.
+  """
   writer_vm = spec.vm_groups['default'][1]
   writer_vm.Install('fio')
   utils.PrefillIfEnabled(writer_vm, constants.FIO_PATH, use_directory=True)
   test_vm = spec.vm_groups['default'][0]
+
+  if test_vm.CLOUD == 'Azure':
+    # Unmount and remount with different blobfuse config.
+    disk = test_vm.scratch_disks[0]
+    test_vm.RemoteCommand(
+        f'sudo blobfuse2 unmount {disk.mount_point}'
+    )
+    # Local cache path in
+    # perfkitbenchmarker/data/blobfuse2/prefill_config.yaml.j2
+    test_vm.RemoteCommand('sudo rm -rf /mnt/resource/blobfusetmp/*')
+    opts = ' '.join(FLAGS.mount_options)
+    test_vm.RemoteCommand(
+        f'sudo blobfuse2 mount {disk.mount_point} '
+        f'--config-file=blobfuse2_config.yaml '
+        f'--container-name={disk.bucket_name} {opts}'
+    )
   test_vm.Install('fio')
 
 

@@ -1,0 +1,22 @@
+logging:
+  level: log_warning
+
+components:
+  - libfuse
+  - file_cache
+  - attr_cache
+  - azstorage
+
+libfuse:
+  direct-io: false  # Must be false for the write phase
+
+file_cache:
+  path: /mnt/resource/blobfusetmp
+  timeout-sec: 0
+  max-size-mb: -1
+
+azstorage:
+  type: block
+  mode: key
+  account-name: {{ account_name }}
+  account-key: {{ account_key }}

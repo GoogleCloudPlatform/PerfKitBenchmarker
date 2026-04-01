@@ -1,0 +1,34 @@
+# Pipeline configuration. Choose components to be engaged. The order below is the priority order that needs to be followed.
+logging:
+  level: log_warning
+
+components:
+  - libfuse
+  - block_cache
+  - attr_cache
+  - azstorage
+
+libfuse:
+  # Bypasses the Linux Kernel Page Cache.
+  # Without this, subsequent reads will be from RAM.
+  direct-io: true
+  attribute-expiration-sec: 0
+  entry-expiration-sec: 0
+  negative-entry-expiration-sec: 0
+
+block_cache:
+  block-size-mb: 0.008
+  # Minimal RAM footprint
+  mem-size-mb: 128
+  prefetch: 0
+  parallelism: 1
+
+attr_cache:
+  timeout-sec: 0
+
+# Azure storage configuration
+azstorage:
+  type: block
+  mode: key
+  account-name: {{ account_name }}
+  account-key: {{ account_key }}
