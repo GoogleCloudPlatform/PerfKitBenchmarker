@@ -349,6 +349,16 @@ class KubernetesResourceStatusCondition:
         event=condition['type'],
     )
 
+  @classmethod
+  def IsValid(cls, condition: dict[str, Any]) -> bool:
+    """Returns true if the resource condition is valid."""
+    return (
+        'lastTransitionTime' in condition
+        and condition['lastTransitionTime']
+        and 'type' in condition
+        and condition['type']
+    )
+
 
 # TODO: b/458122803 - refactor by moving to a common location (e.g.
 # resources/container_service modules)
@@ -394,13 +404,28 @@ def GetStatusConditionsForResourceType(
     name_to_conditions.pop(key, None)
 
   results = []
+  failures = []
   for name in name_to_conditions.keys():
     for conditions in name_to_conditions[name]:
+      if not KubernetesResourceStatusCondition.IsValid(conditions):
+        failures.append(conditions)
+        continue
       results.append(
           KubernetesResourceStatusCondition.FromJsonPathResult(
               resource_type, name, conditions
           )
       )
+
+  if failures:
+    unique_failures = set(frozenset(f.items()) for f in failures)
+    logging.warning(
+        'Failed to parse %d K8s conditions, with %d unique failures. Printing'
+        ' the first 5.',
+        len(failures),
+        len(unique_failures),
+    )
+    for failure in list(unique_failures)[:5]:
+      logging.warning('Failed to parse the condition: %s', failure)
 
   return results
 

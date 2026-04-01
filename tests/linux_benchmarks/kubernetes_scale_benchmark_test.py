@@ -87,6 +87,34 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertLen(conditions, 5)
 
+  def testPodStatusConditionsInvalid(self):
+    self.enter_context(
+        mock.patch.object(
+            kubectl,
+            'RunKubectlCommand',
+            return_value=(
+                """
+                "pod123": [
+                  {
+                    "lastProbeTime":null,
+                    "lastTransitionTime":null,
+                    "status":"True",
+                    "message":"Image docker.io is backed by image streaming.",
+                    "type":"ImageStreaming"
+                  }
+                ],
+                """,
+                '',
+                0,
+            ),
+        )
+    )
+    conditions = kubernetes_scale_benchmark.GetStatusConditionsForResourceType(
+        'pod',
+        frozenset(),
+    )
+    self.assertEmpty(conditions)
+
   def testPodStatusConditionsWithIgnoredResources(self):
     self.enter_context(
         mock.patch.object(
