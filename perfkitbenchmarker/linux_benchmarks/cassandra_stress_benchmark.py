@@ -138,13 +138,6 @@ IS_ROW_CACHE_ENABLED = flags.DEFINE_bool(
     'Enable row cache for the cassandra server.',
 )
 
-ROW_CACHE_SIZE = flags.DEFINE_integer(
-    'row_cache_size',
-    1000,
-    'Size of the row cache for cassandra in MiB if --is_row_cache_enabled is'
-    ' true.',
-)
-
 CASSANDRA_SERVER_ZONES = flags.DEFINE_list(
     'cassandra_server_zones',
     [],
@@ -516,8 +509,6 @@ def GenerateMetadataFromFlags(benchmark_spec, cassandra_vms, client_vms):
       'population_parameters': ','.join(
           FLAGS.cassandra_stress_population_parameters
       ),
-      'is_row_cache_enabled': FLAGS.is_row_cache_enabled,
-      'row_cache_size': FLAGS.row_cache_size,
       'duration': CASSANDRA_STRESS_RUN_DURATION.value,
       'cassandra_concurrent_compactors': _GetConcurrentCompactors(
           cassandra_vms[0]
@@ -665,11 +656,6 @@ def ConfigureCassandra(seed_vm, cassandra_vms):
     custom_cassandra_conf = {
         'concurrent_reads': FLAGS.cassandra_concurrent_reads,
         'concurrent_writes': _GetConcurrentWrites(vm),
-        'row_cache_size': (
-            f'{ROW_CACHE_SIZE.value}MiB'
-            if IS_ROW_CACHE_ENABLED.value
-            else '0MiB'
-        ),
     }
     configure_tasks.append((
         cassandra.Configure,
