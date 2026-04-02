@@ -326,6 +326,7 @@ cassandra_stress:
     db_disk_type: hypderdisk-balanced
     db_disk_size: 350
     openjdk_version: 17
+    sar: True
 """
 
 CASSANDRA_GROUP = 'workers'
@@ -1203,7 +1204,7 @@ def RunCassandraStress(
 
 
 @vm_util.Retry(
-    max_retries=20,
+    max_retries=40,
     retryable_exceptions=(CassandraCompactionNotCompletedError,),
     poll_interval=WAIT_BETWEEN_COMPACTION_TASKS_CHECK,
     timeout=-1,

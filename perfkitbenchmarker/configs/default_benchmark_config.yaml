@@ -691,6 +691,9 @@ cassandra_stress_mixed_workload:
   flags:
     cassandra_stress_mixed_ratio: 'write=3,read=1'
     cassandra_stress_command: 'mixed'
+    cassandra_compaction_throughput_mb: 250
+    cassandra_stress_preload_num_keys: 550000000  # 550000000 preload keys are writing ~140G of data to the disk. The dataset size needs to be 5 times the VM memory and 8 vCPU standard machines usually have around 30G memory.
+    cassandra_stress_population_size: 550000000
 
 nginx_network_saturated_workload:
   name: nginx
