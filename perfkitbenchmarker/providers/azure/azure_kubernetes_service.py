@@ -176,6 +176,10 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     ] + self._GetNodeFlags(self.default_nodepool)
     if self.max_nodes > 256:
       cmd += [
+          '--network-plugin',
+          'azure',
+          '--network-plugin-mode',
+          'overlay',
           # Default /16 supports ~250 nodes; /10 provides ~4M IPs for up to 16k.
           '--pod-cidr',
           '100.64.0.0/10',
