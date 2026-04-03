@@ -141,6 +141,12 @@ class KubernetesResourceTracker:
     """Stop watching the cluster for node add/remove events."""
     polled_events = self._cluster.GetEvents()
 
+    # Resolve machine type only for current nodes; use "unknown" for the rest.
+    _node_names = kubernetes_commands.GetNodeNames(suppress_logging=True)
+    _current_node_names = set(_node_names)
+    if _node_names:
+      _GetMachineTypeFromNodeName(self._cluster, _node_names[0])
+
     for e in polled_events:
       if e.resource.kind != "Node":
         continue
@@ -156,10 +162,11 @@ class KubernetesResourceTracker:
         if name in self._nodes:
           continue
 
-        machine_type = _GetMachineTypeFromNodeName(self._cluster, name)
-        logging.info(
-            "DEBUG: RegisteredNode: %s, %s", name, machine_type
-        )
+        if name in _current_node_names:
+          machine_type = _GetMachineTypeFromNodeName(self._cluster, name)
+        else:
+          machine_type = "unknown"
+        logging.info("DEBUG: RegisteredNode: %s, %s", name, machine_type)
         self._nodes[name] = _NodeTracker(
             name=name,
             machine_type=machine_type,
@@ -173,7 +180,9 @@ class KubernetesResourceTracker:
               "Detected a kubernetes event indicating that a node (%s) is"
               " to be removed, but we have no record of this node. We'll"
               " ignore this node - it won't be counted in the"
-              " %s metric.", name, VM_TIME_METRIC
+              " %s metric.",
+              name,
+              VM_TIME_METRIC,
           )
           continue
 
@@ -242,11 +251,11 @@ def _StartTrackingVMUsage(stage: str, benchmark_spec: bm_spec.BenchmarkSpec):
   if stage != stages.RUN:
     return
 
-  k8s_cluster: kubernetes_cluster.KubernetesCluster = (
-      benchmark_spec.container_cluster
-  )
-  if k8s_cluster is None:
+  if not isinstance(
+      benchmark_spec.container_cluster, kubernetes_cluster.KubernetesCluster
+  ):
     return
+  k8s_cluster = benchmark_spec.container_cluster
 
   global tracker
   tracker = KubernetesResourceTracker(k8s_cluster)
@@ -264,11 +273,11 @@ def _StopTrackingVMUsage(stage: str, benchmark_spec: bm_spec.BenchmarkSpec):
   if stage != stages.RUN:
     return
 
-  k8s_cluster: kubernetes_cluster.KubernetesCluster = (
-      benchmark_spec.container_cluster
-  )
-  if k8s_cluster is None:
+  if not isinstance(
+      benchmark_spec.container_cluster, kubernetes_cluster.KubernetesCluster
+  ):
     return
+  k8s_cluster = benchmark_spec.container_cluster
 
   if tracker is not None:
     tracker.StopTracking()
