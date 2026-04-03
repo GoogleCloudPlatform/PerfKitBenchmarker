@@ -377,28 +377,20 @@ def GetStatusConditionsForResourceType(
     lastTransitionTime.
   """
 
-  jsonpath = (
-      r'{range .items[*]}'
-      # e.g. '"pod-name-1234": [<condition1>, ...],\n'
-      r'{"\""}{.metadata.name}{"\": "}{.status.conditions}{",\n"}'
-      r'{end}'
-  )
+  # Use full JSON output to avoid invalid JSON when manually building from
+  # jsonpath with many resources or on connection reset (truncated output).
   stdout, _, _ = kubectl.RunKubectlCommand(
-      [
-          'get',
-          resource_type,
-          '-o',
-          'jsonpath=' + jsonpath,
-      ],
-      timeout=60 * 2,  # 2 minutes; should be a pretty fast call.
-      # Output can be quite large, so we'll conditionally suppress it.
+      ['get', resource_type, '-o', 'json'],
+      timeout=60 * 5,  # 5 minutes for large clusters (e.g. 1000 pods)
       suppress_logging=NUM_PODS.value > 20,
   )
-
-  # Convert output to valid json and parse it
-  stdout = stdout.rstrip('\t\n\r ,')
-  stdout = '{' + stdout + '}'
-  name_to_conditions = json.loads(stdout)
+  data = json.loads(stdout)
+  name_to_conditions = {}
+  for item in data.get('items', []):
+    name = item.get('metadata', {}).get('name')
+    conditions = item.get('status', {}).get('conditions')
+    if name is not None and conditions is not None:
+      name_to_conditions[name] = conditions
 
   for key in resources_to_ignore:
     name_to_conditions.pop(key, None)

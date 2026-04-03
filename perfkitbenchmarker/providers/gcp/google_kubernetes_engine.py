@@ -394,7 +394,13 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append('--enable-autoscaling')
       cmd.flags['max-nodes'] = self.max_nodes
       cmd.flags['min-nodes'] = self.min_nodes
-    cmd.flags['cluster-ipv4-cidr'] = f'/{_CalculateCidrSize(self.max_nodes)}'
+    if gcp_flags.GKE_AUTOSCALING_PROFILE.value:
+      cmd.flags['autoscaling-profile'] = gcp_flags.GKE_AUTOSCALING_PROFILE.value
+    cidr_size = (
+        gcp_flags.GKE_CLUSTER_IPV4_CIDR_SIZE.value
+        or _CalculateCidrSize(self.max_nodes)
+    )
+    cmd.flags['cluster-ipv4-cidr'] = f'/{cidr_size}'
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
 
     self._RunClusterCreateCommand(cmd)
@@ -524,8 +530,9 @@ class GkeCluster(BaseGkeCluster):
         cmd.flags['local-ssd-count'] = nodepool_config.max_local_disks
 
     cmd.flags['num-nodes'] = nodepool_config.num_nodes
-    # zone may be split a comma separated list
-    if nodepool_config.zone:
+    # zone may be split a comma separated list. For regional clusters, zone
+    # holds the region name; do not set node-locations so GKE uses default.
+    if nodepool_config.zone and not util.IsRegion(nodepool_config.zone):
       cmd.flags['node-locations'] = nodepool_config.zone
 
     if nodepool_config.machine_type:
