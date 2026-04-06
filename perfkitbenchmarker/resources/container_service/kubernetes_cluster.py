@@ -354,3 +354,8 @@ def _DeleteAllFromDefaultNamespace():
         'Timed out while deleting all resources from default namespace. We'
         ' should still continue trying to delete everything.'
     ) from e
+  except errors.VmUtil.IssueCommandError as e:
+    if 'kubeconfig1: no such file or directory' in str(e):
+      logging.info('Kubeconfig not found, assuming cluster is already deleted.')
+      return
+    raise e
