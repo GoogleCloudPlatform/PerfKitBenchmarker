@@ -346,7 +346,6 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
 
   def _PostCreate(self):
     """Tags the cluster resource group."""
-    super()._PostCreate()
     self._GetCredentials(use_admin=True)
     self._WaitForDefaultServiceAccount()
     set_tags_cmd = [
@@ -369,6 +368,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
       kubernetes_commands.ApplyManifest(
           'container/azure/nvidia-device-plugin.yaml',
       )
+    super()._PostCreate()
 
   def _GetCredentials(self, use_admin: bool) -> None:
     """Helper method to get credentials and check service account readiness.
@@ -735,7 +735,6 @@ class AksAutomaticCluster(AksCluster):
     Needed as node_resource_group is pre-configured and fully managed in
     Automatic clusters & role assignment must be created before authenticating.
     """
-    super(kubernetes_cluster.KubernetesCluster, self)._PostCreate()
     user_type, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH,
         'account',
@@ -756,6 +755,7 @@ class AksAutomaticCluster(AksCluster):
     self._WaitForDefaultServiceAccount()
     self._AttachContainerRegistry()
     self._WaitForPolicyRelaxation()
+    super(kubernetes_cluster.KubernetesCluster, self)._PostCreate()
 
   def _ModifyPodSpecPlacementYaml(
       self,
