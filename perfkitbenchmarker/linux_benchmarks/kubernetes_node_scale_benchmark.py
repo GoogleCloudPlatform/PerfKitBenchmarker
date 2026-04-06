@@ -453,6 +453,7 @@ def _AddPhaseMetadata(
   """Adds phase metadata to all samples."""
   for s in samples:
     s.metadata['phase'] = phase
+    s.metadata['goal_replicas'] = NUM_NODES.value
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec):
