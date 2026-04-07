@@ -154,7 +154,8 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     return (
         self.min_nodes != self.default_nodepool.num_nodes
         or self.max_nodes != self.default_nodepool.num_nodes
-    )
+        # Auto node provisioning mode is incompatible with cluster autoscaler.
+    ) and not FLAGS.azure_aks_auto_node_provisioning
 
   def _Create(self):
     """Creates the AKS cluster."""
@@ -270,9 +271,8 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
           nodepool_config.machine_type,
       ]
     node_count = nodepool_config.num_nodes
-    if self._IsAutoscalerEnabled():
-      node_count = max(self.min_nodes, node_count)
-      node_count = min(self.max_nodes, node_count)
+    node_count = max(self.min_nodes, node_count)
+    node_count = min(self.max_nodes, node_count)
     args += [f'--node-count={node_count}']
     if self.default_nodepool.zone and self.default_nodepool.zone != self.region:
       zones = ' '.join(
