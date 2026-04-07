@@ -404,7 +404,6 @@ def GetStatusConditionsForResourceType(
     name_to_conditions.pop(key, None)
 
   results = []
-
   failures = []
   for name in name_to_conditions:
     for conditions in name_to_conditions[name]:
