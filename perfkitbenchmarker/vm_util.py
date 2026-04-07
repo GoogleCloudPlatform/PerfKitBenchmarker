@@ -1067,6 +1067,9 @@ def ReadYamlAsDicts(file_contents: str) -> list[dict[str, Any]]:
   return return_yamls
 
 
+EMPTY_DICT_SENTINEL = 'empty_dict'
+
+
 def ConvertToDictType(yaml_doc: Any, dict_lambda: Any) -> dict[str, Any] | Any:
   """Converts a YAML document to the given dictionary type.
 
@@ -1091,6 +1094,9 @@ def ConvertToDictType(yaml_doc: Any, dict_lambda: Any) -> dict[str, Any] | Any:
     converted_value = ConvertToDictType(value, dict_lambda)
     if not bool(converted_value) and converted_value != 0:
       return None
+    # Allow for manually inserting empty dicts via sentinel value.
+    if converted_value == EMPTY_DICT_SENTINEL:
+      converted_value = {}
     return converted_value
 
   yaml_list = []

@@ -189,3 +189,9 @@ flags.DEFINE_boolean(
     'Enable automatic node provisioning for Azure AKS clusters. '
     'This is automatically set to True for the provision_node_pools benchmark.',
 )
+BLOBFUSE_CONFIG_FILE = flags.DEFINE_enum(
+    'blobfuse_config_file',
+    'config_8kb.yaml.j2',
+    ['config_8kb.yaml.j2', 'config_2mb.yaml.j2'],
+    'The blobfuse2 config file to use.',
+)

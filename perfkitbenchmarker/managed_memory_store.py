@@ -64,6 +64,7 @@ REDIS_7_0 = 'redis_7_0'
 REDIS_7_1 = 'redis_7_1'
 REDIS_7_2 = 'redis_7_2'
 REDIS_7_X = 'redis_7_x'
+REDIS_8_0 = 'redis_8_0'
 REDIS_VERSIONS = [
     REDIS_3_2,
     REDIS_4_0,
@@ -73,16 +74,19 @@ REDIS_VERSIONS = [
     REDIS_7_1,
     REDIS_7_2,
     REDIS_7_X,
+    REDIS_8_0,
 ]
 
 # List of Valkey versions
 VALKEY_7_2 = 'VALKEY_7_2'
 VALKEY_8_0 = 'VALKEY_8_0'
 VALKEY_8_2 = 'VALKEY_8_2'
+VALKEY_9_0 = 'VALKEY_9_0'
 VALKEY_VERSIONS = [
     VALKEY_7_2,
     VALKEY_8_0,
     VALKEY_8_2,
+    VALKEY_9_0
 ]  # pyformat: disable
 
 flags.DEFINE_string(

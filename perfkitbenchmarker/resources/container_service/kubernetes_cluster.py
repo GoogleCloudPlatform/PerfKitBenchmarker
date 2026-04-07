@@ -140,13 +140,17 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     """Propagate cluster labels to disks if not done by cloud provider."""
     pass
 
+  def HasLocalSsd(self, nodepool_name: str = 'default') -> bool:
+    """Returns true if the given nodepool has local SSDs."""
+    raise NotImplementedError
+
   # TODO(pclay): integrate with kubernetes_disk.
   def GetDefaultStorageClass(self) -> str:
-    """Get the default storage class for the provider."""
+    """Gets the default storage class for the provider."""
     raise NotImplementedError
 
   def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
-    """Get the node selectors section of a yaml for the provider."""
+    """Gets the node selectors section of a yaml for the provider."""
     return {}
 
   def ModifyPodSpecPlacementYaml(
@@ -350,3 +354,8 @@ def _DeleteAllFromDefaultNamespace():
         'Timed out while deleting all resources from default namespace. We'
         ' should still continue trying to delete everything.'
     ) from e
+  except errors.VmUtil.IssueCommandError as e:
+    if 'kubeconfig1: no such file or directory' in str(e):
+      logging.info('Kubeconfig not found, assuming cluster is already deleted.')
+      return
+    raise e
