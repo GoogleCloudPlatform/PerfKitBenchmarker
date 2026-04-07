@@ -333,11 +333,10 @@ class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
     context = {
         'account_name': account_name,
         'account_key': account_key,
+        'block_size_mb': FLAGS.blobfuse_block_size_mb,
     }
     self.vm.RenderTemplate(
-        template_path=data.ResourcePath(
-            f'blobfuse2/{FLAGS.blobfuse_config_file}'
-        ),
+        template_path=data.ResourcePath('blobfuse2/config.yaml.j2'),
         remote_path='blobfuse2_config.yaml',
         context=context,
     )

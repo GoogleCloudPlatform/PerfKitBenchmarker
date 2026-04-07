@@ -17,7 +17,7 @@ libfuse:
   negative-entry-expiration-sec: 0
 
 block_cache:
-  block-size-mb: 2
+  block-size-mb: {{ block_size_mb }}
   # Minimal RAM footprint
   mem-size-mb: 128
   prefetch: 0
