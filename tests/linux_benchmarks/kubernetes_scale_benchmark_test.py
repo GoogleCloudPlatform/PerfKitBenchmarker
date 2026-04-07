@@ -106,17 +106,22 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             kubectl,
             'RunKubectlCommand',
             return_value=(
-                """
-                "pod123": [
-                  {
-                    "lastProbeTime":null,
-                    "lastTransitionTime":null,
-                    "status":"True",
-                    "message":"Image docker.io is backed by image streaming.",
-                    "type":"ImageStreaming"
-                  }
-                ],
-                """,
+                json.dumps({
+                    'items': [{
+                        'metadata': {'name': 'pod123'},
+                        'status': {
+                            'conditions': [{
+                                'lastTransitionTime': None,
+                                'status': 'True',
+                                'message': (
+                                    'Image docker.io is backed by'
+                                    ' image streaming.'
+                                ),
+                                'type': 'ImageStreaming',
+                            }]
+                        },
+                    }]
+                }),
                 '',
                 0,
             ),
