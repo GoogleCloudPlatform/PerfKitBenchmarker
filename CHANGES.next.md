@@ -76,7 +76,6 @@
     `--azure_preprovisioned_data_account` and
     `--azure_preprovisioned_data_subscription`, which allows cross-subscription
     access.
--   Remove Rocky Linux on Azure.
 -   Changed supported Python version to 3.11.
 -   Deprecate CentOS Linux 7 as it is EOL on 2024-06-30.
 -   Remove EOL CentOS 8 and CentOS Stream 8.
@@ -272,6 +271,8 @@
     benchmarks.
 -   Truncate duplicated logs to make the pkb.log more human readable. If not
     desired, turn it off with `--notruncate_duplicate_logs`.
+-   Add support for Alma Linux 8, 9, and 10 for the Azure provider.
+-   Re-enable support for Rocky Linux 8, 9, and 10 for the Azure provider.
 
 ### Enhancements:
 

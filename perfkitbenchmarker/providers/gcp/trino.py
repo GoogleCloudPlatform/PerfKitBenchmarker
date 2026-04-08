@@ -189,6 +189,12 @@ class Trino(edw_service.EdwService):
         'maxHeapSize': jvm_heap_size_str,
         'additionalJVMConfigs': f'-Xms{jvm_heap_size_str}',
     }
+    if edw_service.TRINO_EPHEMERAL_STORAGE.value:
+      ephemeral_storage = _MemoryToString(
+          edw_service.TRINO_EPHEMERAL_STORAGE.value
+      )
+    else:
+      ephemeral_storage = _MemoryToString(self.memory)
     yaml_dict['worker'] = {
         'config': {
             'query': {
@@ -203,10 +209,20 @@ class Trino(edw_service.EdwService):
         'resources': {
             'requests': {
                 'memory': f'{_MemoryToString(self.memory)}i',
-                'ephemeral-storage': f'{_MemoryToString(self.memory)}i',
+                'ephemeral-storage': f'{ephemeral_storage}i',
             },
         },
     }
+    if (
+        self.container_cluster is not None
+        and self.container_cluster.HasLocalSsd()
+    ):
+      yaml_dict['worker']['additionalVolumes'] = [
+          {'name': 'local-ssd', 'emptyDir': vm_util.EMPTY_DICT_SENTINEL}
+      ]
+      yaml_dict['worker']['additionalVolumeMounts'] = [
+          {'name': 'local-ssd', 'mountPath': '/tmp/'}
+      ]
     return vm_util.WriteYaml([yaml_dict], should_log_file=True)
 
   def _Create(self):

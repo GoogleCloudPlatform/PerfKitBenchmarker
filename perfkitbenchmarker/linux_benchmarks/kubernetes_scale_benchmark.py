@@ -129,18 +129,9 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   """Sets additional spec attributes."""
   bm_spec.always_call_cleanup = True
   assert bm_spec.container_cluster
-  _EnsureEksKarpenterGpuNodepool(bm_spec.container_cluster)
-
-
-def _GetRolloutCreationTime(rollout_name: str) -> int:
-  """Returns the time when the rollout was created."""
-  out, _, _ = kubectl.RunRetryableKubectlCommand([
-      'get',
-      rollout_name,
-      '-o',
-      'jsonpath={.metadata.creationTimestamp}',
-  ])
-  return ConvertToEpochTime(out)
+  cluster = bm_spec.container_cluster
+  assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
+  _EnsureEksKarpenterGpuNodepool(cluster)
 
 
 def _GetScaleTimeout() -> int:
@@ -164,7 +155,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   # Warm up the cluster by creating a single pod. This compensates for
   # differences between Standard & Autopilot, where Standard already has 1 node
   # due to its starting nodepool but Autopilot does not.
-  scale_one_samples, _ = ScaleUpPods(cluster, 1)
+  scale_one_samples = ScaleUpPods(cluster, 1)
   if not scale_one_samples:
     logging.exception(
         'Failed to scale up to 1 pod; now investigating failure reasons.'
@@ -177,8 +168,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   initial_nodes = set(kubernetes_commands.GetNodeNames())
   initial_pods = set(kubernetes_commands.GetPodNames())
 
-  samples, rollout_name = ScaleUpPods(cluster, NUM_PODS.value)
-  start_time = _GetRolloutCreationTime(rollout_name)
+  start_time = time.time()
+  samples = ScaleUpPods(cluster, NUM_PODS.value)
   pod_samples = ParseStatusChanges('pod', start_time, initial_pods)
   samples += pod_samples
   CheckForFailures(cluster, pod_samples, NUM_PODS.value - 1)
@@ -202,8 +193,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
 def ScaleUpPods(
     cluster: kubernetes_cluster.KubernetesCluster,
     num_new_pods: int,
-) -> tuple[list[sample.Sample], str]:
-  """Scales up pods on a kubernetes cluster. Returns samples & rollout name."""
+) -> list[sample.Sample]:
+  """Scales up pods on a kubernetes cluster. Returns samples."""
   samples = []
   initial_pods = set(kubernetes_commands.GetPodNames())
   logging.info('Initial pods: %s', initial_pods)
@@ -274,7 +265,7 @@ def ScaleUpPods(
             'seconds',
         )
     )
-    return samples, rollout_name
+    return samples
   except (
       errors.VmUtil.IssueCommandError,
       errors.VmUtil.IssueCommandTimeoutError,
@@ -288,7 +279,7 @@ def ScaleUpPods(
         max_wait_time,
         e,
     )
-    return [], rollout_name
+    return []
 
 
 def CheckForFailures(
@@ -360,6 +351,16 @@ class KubernetesResourceStatusCondition:
         event=condition['type'],
     )
 
+  @classmethod
+  def IsValid(cls, condition: dict[str, Any]) -> bool:
+    """Returns true if the resource condition is valid."""
+    return (
+        'lastTransitionTime' in condition
+        and condition['lastTransitionTime']
+        and 'type' in condition
+        and condition['type']
+    )
+
 
 # TODO: b/458122803 - refactor by moving to a common location (e.g.
 # resources/container_service modules)
@@ -380,10 +381,16 @@ def GetStatusConditionsForResourceType(
 
   # Use full JSON output to avoid invalid JSON when manually building from
   # jsonpath with many resources or on connection reset (truncated output).
+  # Avoid logging huge JSON: kubernetes_scale uses num_replicas;
+  # kubernetes_node_scale uses kubernetes_scale_num_nodes for the
+  # same code path (get pod/node -o json).
   stdout, _, _ = kubectl.RunKubectlCommand(
       ['get', resource_type, '-o', 'json'],
       timeout=60 * 5,  # 5 minutes for large clusters (e.g. 1000 pods)
-      suppress_logging=NUM_PODS.value > 20,
+      suppress_logging=(
+          NUM_PODS.value > 20
+          or getattr(FLAGS, 'kubernetes_scale_num_nodes', 5) > 20
+      ),
   )
   data = json.loads(stdout)
   name_to_conditions = {}
@@ -397,13 +404,28 @@ def GetStatusConditionsForResourceType(
     name_to_conditions.pop(key, None)
 
   results = []
-  for name in name_to_conditions.keys():
+  failures = []
+  for name in name_to_conditions:
     for conditions in name_to_conditions[name]:
+      if not KubernetesResourceStatusCondition.IsValid(conditions):
+        failures.append(conditions)
+        continue
       results.append(
           KubernetesResourceStatusCondition.FromJsonPathResult(
               resource_type, name, conditions
           )
       )
+
+  if failures:
+    unique_failures = set(frozenset(f.items()) for f in failures)
+    logging.warning(
+        'Failed to parse %d K8s conditions, with %d unique failures. Printing'
+        ' the first 5.',
+        len(failures),
+        len(unique_failures),
+    )
+    for failure in list(unique_failures)[:5]:
+      logging.warning('Failed to parse the condition: %s', failure)
 
   return results
 

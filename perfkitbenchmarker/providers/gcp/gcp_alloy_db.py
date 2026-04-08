@@ -41,10 +41,15 @@ _ENABLE_AUTO_COLUMNARIZATION = flags.DEFINE_enum(
 
 _ENABLE_COLUMNAR_RECOMMENDATION = flags.DEFINE_bool(
     'alloydb_enable_columnar_recommendation',
-    False,
+    None,
     'Set alloydb_enable_columnar_recommendation to On if true.',
 )
 
+_ENABLE_INDEX_CACHING = flags.DEFINE_bool(
+    'alloydb_enable_index_caching',
+    False,
+    'Set alloydb_enable_index_caching to On if true.',
+)
 
 _READ_POOL_NODE_COUNT = flags.DEFINE_integer(
     'alloydb_read_pool_node_count',
@@ -251,11 +256,14 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     columnar_engine_size = None
     if _COLUMNAR_ENGINE.value:
       columnar_engine_size = _COLUMNAR_ENGINE_SIZE.value
-    self.UpdateAlloyDBFlags(
+    updated = self.UpdateAlloyDBFlags(
         columnar_engine_size,
         _ENABLE_COLUMNAR_RECOMMENDATION.value,
         _ENABLE_AUTO_COLUMNARIZATION.value,
+        enable_index_caching=_ENABLE_INDEX_CACHING.value,
     )
+    if updated:
+      self.RestartInstance()
     self._UpdateLabels(util.GetDefaultTags())
 
   def _DescribeCluster(self) -> Dict[str, Any]:
@@ -329,11 +337,31 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
   def UpdateAlloyDBFlags(
       self,
       columnar_engine_size: int | None,
-      enable_columnar_recommendation: bool,
+      enable_columnar_recommendation: bool | None,
       enable_auto_columnarization: str,
+      enable_index_caching: bool = False,
       relation: str | None = None,
-  ):
+  ) -> bool:
+    """Update flags on an existing AlloyDB instance.
+
+    See https://docs.cloud.google.com/alloydb/docs/reference/database-flags for
+    information on individual flags.
+
+    Args:
+      columnar_engine_size: Set google_columnar_engine.memory_size_in_mb.
+      enable_columnar_recommendation: Set
+        google_columnar_engine.enable_columnar_recommendation.
+      enable_auto_columnarization: Set
+        google_columnar_engine.enable_auto_columnarization.
+      enable_index_caching: Set google_columnar_engine.enable_index_caching.
+      relation: Set google_columnar_engine.relations.
+
+    Returns:
+      True if flags were updated, False otherwise.
+    """
+
     database_flags = []
+    flags_updated = False
     if FLAGS.db_flags:
       database_flags += [':'.join(FLAGS.db_flags)]
 
@@ -347,9 +375,14 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
           ),
       ]
 
-      if enable_columnar_recommendation:
+      if enable_columnar_recommendation is not None:
         database_flags += [
-            'google_columnar_engine.enable_columnar_recommendation=on',
+            f'google_columnar_engine.enable_columnar_recommendation={
+                "on" if enable_columnar_recommendation else "off"}'
+        ]
+      if enable_index_caching:
+        database_flags += [
+            'google_columnar_engine.enable_index_caching=on',
         ]
       if relation:
         database_flags += [f'google_columnar_engine.relations={relation}']
@@ -365,6 +398,19 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
       ]
       cmd = self._GetAlloyDbCommand(cmd_string)
       cmd.Issue(timeout=CREATION_TIMEOUT)
+      flags_updated = True
+    return flags_updated
+
+  def RestartInstance(self):
+    cmd_string = [
+        'instances',
+        'restart',
+        self.instance_id,
+        f'--cluster={self.cluster_id}',
+        '--no-async',
+    ]
+    cmd = self._GetAlloyDbCommand(cmd_string)
+    cmd.Issue(timeout=CREATION_TIMEOUT)
 
   def GetColumnarEngineRecommendation(
       self, database_name: str

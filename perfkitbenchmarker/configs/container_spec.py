@@ -239,6 +239,7 @@ class NodepoolSpec(spec.BaseSpec):
     )
     self.vm_count: int
     self.vm_spec: virtual_machine_spec.BaseVmSpec
+    self.machine_families: list[str] | None
     self.sandbox_config: SandboxSpec | None
 
   @classmethod
@@ -252,6 +253,10 @@ class NodepoolSpec(spec.BaseSpec):
     """
     result = super()._GetOptionDecoderConstructions()
     result.update({
+        'machine_families': (
+            option_decoders.ListDecoder,
+            {'item_decoder': option_decoders.StringDecoder(), 'default': None},
+        ),
         'vm_count': (
             option_decoders.IntDecoder,
             {'default': _DEFAULT_VM_COUNT, 'min': 0},
@@ -276,6 +281,8 @@ class NodepoolSpec(spec.BaseSpec):
     super()._ApplyFlags(config_values, flag_values)
     if flag_values['container_cluster_num_vms'].present:
       config_values['vm_count'] = flag_values.container_cluster_num_vms
+    if flag_values['k8s_machine_families'].present:
+      config_values['machine_families'] = flag_values.machine_families
 
     # Need to apply the first zone in the zones flag, if specified,
     # to the spec. _NodepoolSpec does not currently support
@@ -404,6 +411,7 @@ class ContainerClusterSpec(spec.BaseSpec):
   static_cluster: str | None
   type: str
   vm_spec: virtual_machine_spec.BaseVmSpec
+  machine_families: list[str] | None
   vm_count: int
   min_vm_count: int | None
   max_vm_count: int | None
@@ -496,6 +504,11 @@ class ContainerClusterSpec(spec.BaseSpec):
         ),
         # vm_spec is used to define the machine type for the default nodepool
         'vm_spec': (spec.PerCloudConfigDecoder, {}),
+        # Also used for the default nodepool.
+        'machine_families': (
+            option_decoders.ListDecoder,
+            {'item_decoder': option_decoders.StringDecoder(), 'default': None},
+        ),
         # nodepools specifies a list of additional nodepools to create alongside
         # the default nodepool (nodepool created on cluster creation).
         'nodepools': (_NodepoolsDecoder, {'default': {}, 'none_ok': True}),
@@ -519,6 +532,8 @@ class ContainerClusterSpec(spec.BaseSpec):
       config_values['type'] = flag_values.container_cluster_type
     if flag_values['container_cluster_num_vms'].present:
       config_values['vm_count'] = flag_values.container_cluster_num_vms
+    if flag_values['k8s_machine_families'].present:
+      config_values['machine_families'] = flag_values.machine_families
 
     # Need to apply the first zone in the zones flag, if specified,
     # to the spec. ContainerClusters do not currently support

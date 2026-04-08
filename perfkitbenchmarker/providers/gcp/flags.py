@@ -666,3 +666,19 @@ flags.register_multi_flags_validator(
     _ValidateNetworkFlags,
     'gce_nic_types and gce_nic_queue_counts must be the same length.',
 )
+
+
+GCP_FIRESTORE_DATABASE_ID = flags.DEFINE_string(
+    'gcp_firestore_database_id',
+    None,
+    'Firestore instance name. If not specified, new instance '
+    'will be created and deleted on the fly. If specified, '
+    'the instance is considered user managed and will not '
+    'created/deleted by PKB.',
+)
+GCP_FIRESTORE_LOCATION = flags.DEFINE_string(
+    'gcp_firestore_location',
+    None,
+    'Location of the firestore database. See'
+    ' https://firebase.google.com/docs/firestore/locations.',
+)

@@ -39,6 +39,25 @@ dpdk_pktgen_multi_nic_small_pkt_loss:
     dpdk_pktgen_max_lcores: 128
     dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]','[51:52]#[2:1];[51:52]#[1:2]']
 
+dpdk_pktgen_multi_nic_small_pkt_loss_external_IP:
+  name: dpdk_pktgen
+  flags:
+    dpdk_pktgen_tx_burst: 128
+    dpdk_pktgen_rx_burst: 128
+    dpdk_pktgen_packet_loss_threshold_rates: 0.0001
+    dpdk_pktgen_txd: 4096
+    dpdk_pktgen_rxd: 4096
+    dpdk_pktgen_mbuf_cache_size: 128
+    dpdk_pktgen_mbufs_per_port_multiplier: 8
+    gce_subnet_name: default,dpdk0,dpdk1
+    gce_nic_types: GVNIC,GVNIC,GVNIC
+    gce_nic_queue_counts: default,default,default
+    dpdk_pktgen_max_lcores: 128
+    assign_external_ip_all_nics: True
+    ip_addresses: EXTERNAL
+    dpdk_pktgen_num_flows: 100
+    dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]','[51:52]#[2:1];[51:52]#[1:2]']
+
 dpdk_pktgen_multi_nic:
   name: dpdk_pktgen
   flags:
@@ -308,6 +327,33 @@ redis_memtier_session_storage_cluster:
       vm_count: 3
       <<: *redis_memtier_session_storage_disk_spec
 
+# GKE-optimized Redis 7 caching - uses PKB VMs with GKE optimization labels
+gke_optimized_redis_memtier:
+  name: gke_optimized_redis_memtier
+  flags:
+    # Standard Redis settings (using existing flags)
+    redis_server_version: '7.2.6'
+    redis_server_enable_snapshots: False
+    redis_server_io_threads_do_reads: True
+    redis_eviction_policy: allkeys-lru
+    enable_transparent_hugepages: False
+
+    # Memtier settings (using existing flags)
+    memtier_ratio: '1:4'
+    memtier_clients: 12
+    memtier_threads: 32
+    memtier_run_duration: 300
+    memtier_run_count: 10
+    memtier_data_size: 1024
+    memtier_key_maximum: 6400000
+    memtier_pipeline: 1
+
+    # GKE optimization
+    gke_redis_enable_optimization: True
+
+    # Monitoring
+    iostat: True
+    sar: True
 
 sparksql_tpcds_1t:
   name: dpb_sparksql_benchmark
@@ -670,9 +716,11 @@ kvrocks_memtier:
 cassandra_stress_mixed_workload:
   name: cassandra_stress
   flags:
-    cassandra_stress_run_duration: 10m
     cassandra_stress_mixed_ratio: 'write=3,read=1'
     cassandra_stress_command: 'mixed'
+    cassandra_compaction_throughput_mb: 250
+    cassandra_stress_preload_num_keys: 550000000  # 550000000 preload keys are writing ~140G of data to the disk. The dataset size needs to be 5 times the VM memory and 8 vCPU standard machines usually have around 30G memory.
+    cassandra_stress_population_size: 550000000
 
 nginx_network_saturated_workload:
   name: nginx

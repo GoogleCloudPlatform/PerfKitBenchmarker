@@ -658,6 +658,19 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(vm_metadata, {**vm_metadata, **expected})
       self.assertNotIn('image_family', vm_metadata)
 
+  def testSkipExistenceCheck(self):
+    vm_class = gce_virtual_machine.Debian11BasedGceVirtualMachine
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT, machine_type='fake-machine-type'
+    )
+    with PatchCriticalObjects([('[{"name": "fake-operation"}]', '', 0)] * 10):
+      vm = vm_class(spec)  # pytype: disable=not-instantiable
+      vm._CreateDependencies()
+      vm._Create()
+      self.assertTrue(vm.skip_existence_check)
+      vm._Delete()
+      self.assertFalse(vm.skip_existence_check)
+
   def testCosVm(self):
     vm_class = virtual_machine.GetVmClass(provider_info.GCP, os_types.COS)
     spec = gce_virtual_machine.GceVmSpec(

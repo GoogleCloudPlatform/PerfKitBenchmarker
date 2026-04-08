@@ -74,7 +74,7 @@ class BenchbaseBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertIn('-P postgres', self.mock_vm.RemoteCommand.call_args[0][0])
     self.mock_benchmark_spec.relational_db.RunDDLQuery.assert_called_once_with(
-        'ANALYZE;', timeout=timeout
+        'ANALYZE;', timeout=timeout, async_proc=True
     )
 
   @flagsaver.flagsaver(

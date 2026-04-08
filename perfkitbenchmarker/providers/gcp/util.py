@@ -20,7 +20,7 @@ import functools
 import json
 import logging
 import re
-from typing import Any, Set
+from typing import Any, Set, cast
 
 from absl import flags
 from google.cloud import monitoring_v3
@@ -360,7 +360,7 @@ class GcloudCommand:
           errors.Benchmarks.QuotaFailure.RateLimitExceededError,
       ),
   )
-  def Issue(self, **kwargs):
+  def Issue(self, **kwargs: Any):
     """Tries to run the gcloud command once, retrying if Rate Limited.
 
     Args:
@@ -377,7 +377,7 @@ class GcloudCommand:
     """
     try:
       # Increase stack_level by 2 to compensate for Retry.
-      kwargs['stack_level'] = kwargs.get('stack_level', 1) + 2
+      kwargs['stack_level'] = cast(int, kwargs.get('stack_level', 1)) + 2
       stdout, stderr, retcode = _issue_command_function(self, **kwargs)
     except errors.VmUtil.IssueCommandError as error:
       error_message = str(error)
@@ -640,6 +640,7 @@ class GcpMetricSpec(relational_db.MetricSpec):
     project: The project to query.
     aligner: The aligner to use for the metric.
   """
+
   resource_filter: str
   project: str
   aligner: Any = monitoring_v3.Aggregation.Aligner.ALIGN_MEAN

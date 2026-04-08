@@ -66,6 +66,7 @@ class DisruptionEvent:
   start_time: float = 0.0
   end_time: float = 0.0
   total_time: float = 0.0
+  trigger_index: int = 0
 
 
 @dataclasses.dataclass
@@ -151,6 +152,7 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
         'LM_total_time': event.total_time,
         'Host_maintenance_start': event.start_time,
         'Host_maintenance_end': event.end_time,
+        'trigger_index': event.trigger_index,
     }
 
   def _GenerateDisruptionTotalTimeSamples(
@@ -182,6 +184,8 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
       samples: MutableSequence[sample.Sample],
   ):
     """Append samples related to disruption."""
+    for i, event in enumerate(self.disruption_events):
+      event.trigger_index = i
     samples += self._GenerateDisruptionTotalTimeSamples(samples)
     samples += self._AppendAggregatedMetrics(samples)
 
@@ -213,7 +217,7 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
         if disruption_event_timestamps is None:
           continue
         additional_samples += self._AggregateThroughputSample(
-            s, disruption_event_timestamps
+            s, disruption_event_timestamps, disruption_event.trigger_index
         )
     return additional_samples
 
@@ -267,6 +271,7 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
       self,
       s: sample.Sample,
       disruption_event_timestamps: DisruptionEventTimestamps,
+      trigger_index: int,
   ) -> MutableSequence[sample.Sample]:
     """Aggregate a time series sample into disruption metrics.
 
@@ -277,6 +282,7 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
       s: A time series sample create using CreateTimeSeriesSample in samples.py
       disruption_event_timestamps: The DisruptionEventTimestamps being
         aggregated.
+      trigger_index: The index of the disruption event.
 
     Returns:
       A list of samples.
@@ -340,6 +346,7 @@ class BaseDisruptionTrigger(base_time_trigger.BaseTimeTrigger):
         del metadata[field]
 
     metadata = metadata | dataclasses.asdict(disruption_event_timestamps)
+    metadata['trigger_index'] = trigger_index
 
     samples = _ComputeLossPercentile(
         mean, values_after_disruption_starts, metadata

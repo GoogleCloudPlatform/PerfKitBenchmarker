@@ -122,7 +122,7 @@ class MysqlIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     """Apply Flags on the database."""
     if FLAGS.db_flags:
       for flag in FLAGS.db_flags:
-        _, stderr, _ = self.client_vm_query_tools.IssueSqlCommand(
+        _, stderr = self.client_vm_query_tools.IssueSqlCommand(
             'SET %s;' % flag, ignore_failure=True
         )
         if stderr:

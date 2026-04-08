@@ -38,12 +38,8 @@ from tests import pkb_common_test_case
 
 FLAGS = flgs.FLAGS
 
-_COMPONENT = 'test_component'
 _RUN_URI = 'abc9876'
 
-_INSTANCE_GROUPS_LIST_OUTPUT = (
-    '../../../tests/data/gcloud_compute_instance_groups_list_instances.json'
-)
 _NODE_POOLS_LIST_OUTPUT = (
     '../../../tests/data/gcloud_container_node_pools_list.json'
 )
@@ -58,48 +54,51 @@ items:
 """
 
 
-@contextlib.contextmanager
-def patch_critical_objects(stdout='', stderr='', return_code=0, flags=FLAGS):
-  with contextlib.ExitStack() as stack:
-    flags.gcloud_path = 'gcloud'
-    flags.run_uri = _RUN_URI
-    flags.data_search_paths = ''
+class PatchedObjectsTestCase(pkb_common_test_case.PkbCommonTestCase):
+  """Adds a patching context manager to the test case."""
 
-    stack.enter_context(mock.patch(builtins.__name__ + '.open'))
-    stack.enter_context(mock.patch(vm_util.__name__ + '.PrependTempDir'))
-    stack.enter_context(mock.patch(vm_util.__name__ + '.NamedTemporaryFile'))
-    stack.enter_context(
-        mock.patch(util.__name__ + '.GetDefaultUser', return_value='fakeuser')
-    )
-    stack.enter_context(
-        mock.patch(
-            util.__name__ + '.MakeFormattedDefaultTags',
-            return_value='foo=bar,timeout=yesterday',
-        )
-    )
-    stack.enter_context(
-        mock.patch(
-            gce_network.__name__ + '.GceFirewall.GetFirewall',
-            return_value='fakefirewall',
-        )
-    )
-    stack.enter_context(
-        mock.patch(
-            gce_network.__name__ + '.GceNetwork.GetNetwork',
-            return_value=gce_network.GceNetwork(
-                gce_network.GceNetworkSpec('fakeproject', zone='us-central1-a')
-            ),
-        )
-    )
+  @contextlib.contextmanager
+  def patch_critical_objects(
+      self, stdout='', stderr='', return_code=0, flags=FLAGS
+  ):
+    with contextlib.ExitStack() as stack:
+      flags.gcloud_path = 'gcloud'
+      flags.run_uri = _RUN_URI
+      flags.data_search_paths = ''
 
-    retval = (stdout, stderr, return_code)
-    issue_command = stack.enter_context(
-        mock.patch(vm_util.__name__ + '.IssueCommand', return_value=retval)
-    )
-    yield issue_command
+      stack.enter_context(mock.patch(builtins.__name__ + '.open'))
+      stack.enter_context(mock.patch(vm_util.__name__ + '.PrependTempDir'))
+      stack.enter_context(mock.patch(vm_util.__name__ + '.NamedTemporaryFile'))
+      stack.enter_context(
+          mock.patch(util.__name__ + '.GetDefaultUser', return_value='fakeuser')
+      )
+      stack.enter_context(
+          mock.patch(
+              util.__name__ + '.MakeFormattedDefaultTags',
+              return_value='foo=bar,timeout=yesterday',
+          )
+      )
+      stack.enter_context(
+          mock.patch(
+              gce_network.__name__ + '.GceFirewall.GetFirewall',
+              return_value='fakefirewall',
+          )
+      )
+      stack.enter_context(
+          mock.patch(
+              gce_network.__name__ + '.GceNetwork.GetNetwork',
+              return_value=gce_network.GceNetwork(
+                  gce_network.GceNetworkSpec(
+                      'fakeproject', zone='us-central1-a'
+                  )
+              ),
+          )
+      )
+
+      yield self.MockIssueCommand({'': [(stdout, stderr, return_code)]})
 
 
-class GoogleContainerRegistryTestCase(pkb_common_test_case.PkbCommonTestCase):
+class GoogleContainerRegistryTestCase(PatchedObjectsTestCase):
 
   class FakeContainerImage(container.ContainerImage):
 
@@ -125,7 +124,7 @@ class GoogleContainerRegistryTestCase(pkb_common_test_case.PkbCommonTestCase):
         },
     )
     spec.zone = 'us-west-1a'
-    with patch_critical_objects():
+    with self.patch_critical_objects():
       registry = google_kubernetes_engine.GoogleArtifactRegistry(spec)
       image = registry.GetFullRegistryTag('fakeimage')
     self.assertEqual(
@@ -147,9 +146,7 @@ class GoogleContainerRegistryTestCase(pkb_common_test_case.PkbCommonTestCase):
     registry._Build('fakeimage')
 
 
-class GoogleKubernetesEngineCustomMachineTypeTestCase(
-    pkb_common_test_case.PkbCommonTestCase
-):
+class GoogleKubernetesEngineCustomMachineTypeTestCase(PatchedObjectsTestCase):
 
   @staticmethod
   def create_kubernetes_engine_spec():
@@ -173,17 +170,16 @@ class GoogleKubernetesEngineCustomMachineTypeTestCase(
 
   def testCreate(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      command_string = ' '.join(issue_command.call_args[0][0])
+      self.assertIn(
+          'gcloud container clusters create', issue_command.all_commands
+      )
+      self.assertIn('--machine-type custom-4-1024', issue_command.all_commands)
 
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud container clusters create', command_string)
-      self.assertIn('--machine-type custom-4-1024', command_string)
 
-
-class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
+class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
 
   @staticmethod
   def create_kubernetes_engine_spec():
@@ -209,107 +205,104 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreate(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud container clusters create', command_string)
-      self.assertIn('--num-nodes 2', command_string)
-      self.assertIn('--cluster-ipv4-cidr /19', command_string)
-      self.assertIn('--machine-type fake-machine-type', command_string)
-      self.assertIn('--project fakeproject', command_string)
-      self.assertIn('--zone us-central1-a', command_string)
-      self.assertIn('--min-cpu-platform skylake', command_string)
-      self.assertIn('--disk-size 200', command_string)
-      self.assertIn('--disk-type foo', command_string)
-      self.assertIn('--ephemeral-storage-local-ssd count=2', command_string)
-      self.assertIn('--no-enable-shielded-nodes', command_string)
-      self.assertIn('--labels foo=bar,timeout=yesterday', command_string)
+      self.assertIn(
+          'gcloud container clusters create', issue_command.all_commands
+      )
+      self.assertIn('--num-nodes 2', issue_command.all_commands)
+      self.assertIn('--cluster-ipv4-cidr /19', issue_command.all_commands)
+      self.assertIn(
+          '--machine-type fake-machine-type', issue_command.all_commands
+      )
+      self.assertIn('--project fakeproject', issue_command.all_commands)
+      self.assertIn('--zone us-central1-a', issue_command.all_commands)
+      self.assertIn('--min-cpu-platform skylake', issue_command.all_commands)
+      self.assertIn('--disk-size 200', issue_command.all_commands)
+      self.assertIn('--disk-type foo', issue_command.all_commands)
+      self.assertIn(
+          '--ephemeral-storage-local-ssd count=2', issue_command.all_commands
+      )
+      self.assertIn('--no-enable-shielded-nodes', issue_command.all_commands)
+      self.assertIn(
+          '--labels foo=bar,timeout=yesterday', issue_command.all_commands
+      )
 
   def testCreateQuotaExceeded(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects(
+    with self.patch_critical_objects(
         stderr="""
         message=Insufficient regional quota to satisfy request: resource "CPUS":
         request requires '6400.0' and is short '5820.0'""",
         return_code=1,
-    ) as issue_command:
+    ):
       cluster = google_kubernetes_engine.GkeCluster(spec)
       with self.assertRaises(errors.Benchmarks.QuotaFailure):
         cluster._Create()
-      self.assertEqual(issue_command.call_count, 1)
 
   def testCreateResourcesExhausted(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects(
+    with self.patch_critical_objects(
         stderr="""
         [ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS]:
         Instance 'test' creation failed: The zone
         'projects/artemis-prod/zones/us-central1-a' does not have enough
         resources available to fulfill the request.""",
         return_code=1,
-    ) as issue_command:
+    ):
       cluster = google_kubernetes_engine.GkeCluster(spec)
       with self.assertRaises(
           errors.Benchmarks.InsufficientCapacityCloudFailure
       ):
         cluster._Create()
-      self.assertEqual(issue_command.call_count, 1)
 
-  def testPostCreate(self):
+  def testGetCredentials(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command, mock.patch.object(
+    with self.patch_critical_objects() as issue_command, mock.patch.object(
         kubectl, 'RunKubectlCommand'
     ) as mock_kubectl_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
       cluster._PostCreate()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
       self.assertIn(
           'gcloud container clusters get-credentials pkb-{}'.format(_RUN_URI),
-          command_string,
+          issue_command.all_commands,
       )
-      self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
+      self.assertIn(
+          'KUBECONFIG', issue_command.func_to_mock.call_args[1]['env']
+      )
 
       self.assertEqual(mock_kubectl_command.call_count, 1)
 
   def testDelete(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Delete()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 5)
+      self.assertEqual(issue_command.func_to_mock.call_count, 5)
       self.assertIn(
           'gcloud container clusters delete pkb-{}'.format(_RUN_URI),
-          command_string,
+          issue_command.all_commands,
       )
-      self.assertIn('--zone us-central1-a', command_string)
+      self.assertIn('--zone us-central1-a', issue_command.all_commands)
 
   def testExists(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Exists()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
       self.assertIn(
           'gcloud container clusters describe pkb-{}'.format(_RUN_URI),
-          command_string,
+          issue_command.all_commands,
       )
 
   def testGetResourceMetadata(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects(stdout=_KUBECTL_VERSION) as issue_command:
+    with self.patch_critical_objects(stdout=_KUBECTL_VERSION):
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster.created = True
       metadata = cluster.GetResourceMetadata()
-      self.assertEqual(issue_command.call_count, 1)
       expected = {
           'project': 'fakeproject',
           'gce_local_ssd_count': 2,
@@ -334,9 +327,7 @@ class GoogleKubernetesEngineTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(google_kubernetes_engine._CalculateCidrSize(250), 15)
 
 
-class GoogleKubernetesEngineAutoscalingTestCase(
-    pkb_common_test_case.PkbCommonTestCase
-):
+class GoogleKubernetesEngineAutoscalingTestCase(PatchedObjectsTestCase):
 
   @staticmethod
   def create_kubernetes_engine_spec():
@@ -360,26 +351,24 @@ class GoogleKubernetesEngineAutoscalingTestCase(
 
   def testCreate(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud container clusters create', command_string)
-      self.assertIn('--enable-autoscaling', command_string)
-      self.assertIn('--min-nodes 1', command_string)
-      self.assertIn('--num-nodes 2', command_string)
-      self.assertIn('--max-nodes 30', command_string)
-      self.assertIn('--cluster-ipv4-cidr /18', command_string)
+      self.assertIn(
+          'gcloud container clusters create', issue_command.all_commands
+      )
+      self.assertIn('--enable-autoscaling', issue_command.all_commands)
+      self.assertIn('--min-nodes 1', issue_command.all_commands)
+      self.assertIn('--num-nodes 2', issue_command.all_commands)
+      self.assertIn('--max-nodes 30', issue_command.all_commands)
+      self.assertIn('--cluster-ipv4-cidr /18', issue_command.all_commands)
 
   def testGetResourceMetadata(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects(stdout=_KUBECTL_VERSION) as issue_command:
+    with self.patch_critical_objects(stdout=_KUBECTL_VERSION):
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster.created = True
       metadata = cluster.GetResourceMetadata()
-      self.assertEqual(issue_command.call_count, 1)
       expected = {
           'project': 'fakeproject',
           'cloud': 'GCP',
@@ -391,23 +380,19 @@ class GoogleKubernetesEngineAutoscalingTestCase(
       self.assertEqual(metadata, {**metadata, **expected})
 
   def testLabelDisks(self):
-    with patch_critical_objects(stdout=_PVC_LIST) as issue_command:
+    with self.patch_critical_objects(stdout=_PVC_LIST) as issue_command:
       # spec must be createded inside context to get project
       spec = self.create_kubernetes_engine_spec()
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster.created = True
       cluster.LabelDisks()
-      self.assertEqual(issue_command.call_count, 2)
-      label_disk_cmd = ' '.join(issue_command.call_args_list[1][0][0])
-      self.assertIn('disks add-label', label_disk_cmd)
-      self.assertIn(_PVC_VOLUME, label_disk_cmd)
-      self.assertIn('--project fakeproject', label_disk_cmd)
-      self.assertIn('--zone us-central1-a', label_disk_cmd)
+      self.assertIn('disks add-label', issue_command.all_commands)
+      self.assertIn(_PVC_VOLUME, issue_command.all_commands)
+      self.assertIn('--project fakeproject', issue_command.all_commands)
+      self.assertIn('--zone us-central1-a', issue_command.all_commands)
 
 
-class GoogleKubernetesEngineVersionFlagTestCase(
-    pkb_common_test_case.PkbCommonTestCase
-):
+class GoogleKubernetesEngineVersionFlagTestCase(PatchedObjectsTestCase):
 
   @staticmethod
   def create_kubernetes_engine_spec():
@@ -428,45 +413,36 @@ class GoogleKubernetesEngineVersionFlagTestCase(
   @flagsaver.flagsaver(container_cluster_version='fake-version')
   def testCreateCustomVersion(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertNotIn('--release-channel', command_string)
-      self.assertIn('--cluster-version fake-version', command_string)
-      self.assertIn('--no-enable-autoupgrade', command_string)
+      self.assertNotIn('--release-channel', issue_command.all_commands)
+      self.assertIn(
+          '--cluster-version fake-version', issue_command.all_commands
+      )
+      self.assertIn('--no-enable-autoupgrade', issue_command.all_commands)
 
   def testCreateDefaultVersion(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertNotIn('--release-channel', command_string)
-      self.assertNotIn('--cluster-version', command_string)
-      self.assertIn('--no-enable-autoupgrade', command_string)
+      self.assertNotIn('--release-channel', issue_command.all_commands)
+      self.assertNotIn('--cluster-version', issue_command.all_commands)
+      self.assertIn('--no-enable-autoupgrade', issue_command.all_commands)
 
   @flagsaver.flagsaver(gke_release_channel='rapid')
   def testCreateRapidChannel(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('--release-channel rapid', command_string)
-      self.assertNotIn('--cluster-version', command_string)
-      self.assertNotIn('--no-enable-autoupgrade', command_string)
+      self.assertIn('--release-channel rapid', issue_command.all_commands)
+      self.assertNotIn('--cluster-version', issue_command.all_commands)
+      self.assertNotIn('--no-enable-autoupgrade', issue_command.all_commands)
 
 
-class GoogleKubernetesEngineGvnicFlagTestCase(
-    pkb_common_test_case.PkbCommonTestCase
-):
+class GoogleKubernetesEngineGvnicFlagTestCase(PatchedObjectsTestCase):
 
   @staticmethod
   def create_kubernetes_engine_spec():
@@ -487,29 +463,21 @@ class GoogleKubernetesEngineGvnicFlagTestCase(
   def testCreateEnableGvnic(self):
     spec = self.create_kubernetes_engine_spec()
     FLAGS.gke_enable_gvnic = True
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('--enable-gvnic', command_string)
+      self.assertIn('--enable-gvnic', issue_command.all_commands)
 
   def testCreateDisableGvnic(self):
     spec = self.create_kubernetes_engine_spec()
     FLAGS.gke_enable_gvnic = False
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('--no-enable-gvnic', command_string)
+      self.assertIn('--no-enable-gvnic', issue_command.all_commands)
 
 
-class GoogleKubernetesEngineWithGpusTestCase(
-    pkb_common_test_case.PkbCommonTestCase
-):
+class GoogleKubernetesEngineWithGpusTestCase(PatchedObjectsTestCase):
 
   @staticmethod
   def create_kubernetes_engine_spec(gpu_type):
@@ -534,53 +502,32 @@ class GoogleKubernetesEngineWithGpusTestCase(
   @flagsaver.flagsaver(gke_gpu_driver_version='latest')
   def testCreate(self):
     spec = self.create_kubernetes_engine_spec('k80')
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud container clusters create', command_string)
-      self.assertIn('--num-nodes 2', command_string)
-      self.assertIn('--machine-type fake-machine-type', command_string)
+      self.assertIn(
+          'gcloud container clusters create', issue_command.all_commands
+      )
+      self.assertIn('--num-nodes 2', issue_command.all_commands)
+      self.assertIn(
+          '--machine-type fake-machine-type', issue_command.all_commands
+      )
       self.assertIn(
           '--accelerator '
           + 'type=nvidia-tesla-k80,count=2,gpu-driver-version=latest',
-          command_string,
+          issue_command.all_commands,
       )
 
   def testCreateGpuH100(self):
     spec = self.create_kubernetes_engine_spec('h100')
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      command_string = ' '.join(issue_command.call_args[0][0])
       self.assertIn(
           '--accelerator '
           'type=nvidia-h100-80gb,count=2,gpu-driver-version=default',
-          command_string,
+          issue_command.all_commands,
       )
-
-  @mock.patch(
-      'perfkitbenchmarker.resources.container_service.kubernetes_commands.CreateFromFile'
-  )
-  def testPostCreate(self, create_from_file_patch):
-    spec = self.create_kubernetes_engine_spec('k80')
-    with patch_critical_objects() as issue_command, mock.patch.object(
-        kubectl, 'RunKubectlCommand'
-    ) as mock_kubectl_command:
-      cluster = google_kubernetes_engine.GkeCluster(spec)
-      cluster._PostCreate()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn(
-          'gcloud container clusters get-credentials pkb-{}'.format(_RUN_URI),
-          command_string,
-      )
-      self.assertIn('KUBECONFIG', issue_command.call_args[1]['env'])
-
-      self.assertEqual(mock_kubectl_command.call_count, 1)
 
 
 class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
@@ -589,14 +536,14 @@ class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
     path = os.path.join(os.path.dirname(__file__), _NODE_POOLS_LIST_OUTPUT)
     output = open(path).read()
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects(stdout=output) as issue_command:
+    with self.patch_critical_objects(stdout=output) as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       instance_groups = cluster._GetInstanceGroups()
 
-      command_string = ' '.join(issue_command.call_args[0][0])
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud container node-pools list', command_string)
-      self.assertIn('--cluster', command_string)
+      self.assertIn(
+          'gcloud container node-pools list', issue_command.all_commands
+      )
+      self.assertIn('--cluster', issue_command.all_commands)
 
       expected = {
           'gke-pkb-0c47e6fa-default-pool-167d73ee-grp',
@@ -607,18 +554,16 @@ class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
   def testGetNodePoolNames(self):
     output = ['default-pool', 'nap-e2-standard-2-iu4vquho', 'test-pool']
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects(stdout='\n'.join(output)) as issue_command:
+    with self.patch_critical_objects(stdout='\n'.join(output)) as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       node_pools = cluster.GetNodePoolNames()
 
-      command_string = ' '.join(issue_command.call_args[0][0])
-      self.assertEqual(issue_command.call_count, 1)
       self.assertIn(
           'gcloud container clusters describe ' + cluster.name,
-          command_string,
+          issue_command.all_commands,
       )
-      self.assertIn('--flatten', command_string)
-      self.assertIn('--format', command_string)
+      self.assertIn('--flatten', issue_command.all_commands)
+      self.assertIn('--format', issue_command.all_commands)
 
       expected = {
           'default-pool',
@@ -628,9 +573,7 @@ class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
       self.assertEqual(expected, set(node_pools))  # order doesn't matter
 
 
-class GoogleKubernetesEngineRegionalTestCase(
-    pkb_common_test_case.PkbCommonTestCase
-):
+class GoogleKubernetesEngineRegionalTestCase(PatchedObjectsTestCase):
 
   @staticmethod
   def create_kubernetes_engine_spec(use_zonal_nodepools=False):
@@ -677,11 +620,11 @@ class GoogleKubernetesEngineRegionalTestCase(
 
   def testCreateRegionalCluster(self):
     spec = self.create_kubernetes_engine_spec(use_zonal_nodepools=False)
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      create_cluster, create_nodepool1, create_nodepool2 = (
-          call[0][0] for call in issue_command.call_args_list
+      create_cluster, _, create_nodepool1, create_nodepool2 = (
+          call[0][0] for call in issue_command.func_to_mock.call_args_list
       )
       self.assertNotIn('--zone', create_cluster)
       self.assertContainsSubsequence(create_cluster, ['--region', 'us-west1'])
@@ -726,11 +669,11 @@ class GoogleKubernetesEngineRegionalTestCase(
 
   def testCreateRegionalClusterZonalNodepool(self):
     spec = self.create_kubernetes_engine_spec(use_zonal_nodepools=True)
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      create_cluster, create_nodepool1, create_nodepool2 = (
-          call[0][0] for call in issue_command.call_args_list
+      create_cluster, _, create_nodepool1, create_nodepool2 = (
+          call[0][0] for call in issue_command.func_to_mock.call_args_list
       )
       self.assertNotIn('--zone', create_cluster)
       self.assertContainsSubsequence(create_cluster, ['--region', 'us-west1'])
@@ -762,9 +705,53 @@ class GoogleKubernetesEngineRegionalTestCase(
       )
 
 
-class GoogleKubernetesEngineAutopilotTestCase(
-    pkb_common_test_case.PkbCommonTestCase
-):
+class GoogleKubernetesEngineMachineFamiliesTestCase(PatchedObjectsTestCase):
+
+  @staticmethod
+  def create_kubernetes_engine_spec():
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a',
+                },
+            },
+            'nodepools': {
+                'nodepool1': {
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': '',
+                            'zone': 'us-central1-a',
+                        },
+                    },
+                    'machine_families': ['n2'],
+                },
+            },
+        },
+    )
+    return kubernetes_engine_spec
+
+  def testCreateWithMachineFamilies(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command, mock.patch.object(
+        kubernetes_commands, 'ApplyYaml'
+    ):
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      self.assertIn(
+          'gcloud container node-pools update nodepool1',
+          issue_command.all_commands,
+      )
+      self.assertIn(
+          '--node-labels cloud.google.com/compute-class=nodepool1',
+          issue_command.all_commands,
+      )
+
+
+class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
 
   @staticmethod
   def create_kubernetes_engine_spec():
@@ -785,23 +772,24 @@ class GoogleKubernetesEngineAutopilotTestCase(
 
   def testCreate(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects() as issue_command:
+    with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
       cluster._Create()
-      command_string = ' '.join(issue_command.call_args[0][0])
-
-      self.assertEqual(issue_command.call_count, 1)
-      self.assertIn('gcloud container clusters create-auto', command_string)
-      self.assertIn('--project fakeproject', command_string)
-      self.assertIn('--region us-central1', command_string)
-      self.assertIn('--format json', command_string)
-      self.assertIn('--labels foo=bar,timeout=yesterday', command_string)
-      self.assertNotIn('--machine-type', command_string)
-      self.assertNotIn('--num-nodes', command_string)
+      self.assertIn(
+          'gcloud container clusters create-auto', issue_command.all_commands
+      )
+      self.assertIn('--project fakeproject', issue_command.all_commands)
+      self.assertIn('--region us-central1', issue_command.all_commands)
+      self.assertIn('--format json', issue_command.all_commands)
+      self.assertIn(
+          '--labels foo=bar,timeout=yesterday', issue_command.all_commands
+      )
+      self.assertNotIn('--machine-type', issue_command.all_commands)
+      self.assertNotIn('--num-nodes', issue_command.all_commands)
 
   def testGetResourceMetadata(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects():
+    with self.patch_critical_objects():
       cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
       metadata = cluster.GetResourceMetadata()
       self.assertDictContainsSubset(
@@ -820,7 +808,7 @@ class GoogleKubernetesEngineAutopilotTestCase(
   @flagsaver.flagsaver(gke_release_channel='rapid')
   def testGetResourceMetadataIncludesReleaseChannel(self):
     spec = self.create_kubernetes_engine_spec()
-    with patch_critical_objects():
+    with self.patch_critical_objects():
       cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
       metadata = cluster.GetResourceMetadata()
       self.assertDictContainsSubset(
