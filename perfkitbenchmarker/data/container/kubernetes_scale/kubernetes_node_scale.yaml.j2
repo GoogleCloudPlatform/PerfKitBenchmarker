@@ -24,10 +24,6 @@ spec:
                 values:
                 - app
             topologyKey: "kubernetes.io/hostname"
-      {% if gcp_compute_class_name is defined %}
-      nodeSelector:
-        cloud.google.com/compute-class: {{ gcp_compute_class_name }}
-      {% endif %}
       containers:
       - name: pause
         image: registry.k8s.io/pause:3.10

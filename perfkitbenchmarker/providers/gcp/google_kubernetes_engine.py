@@ -327,6 +327,13 @@ class GkeCluster(BaseGkeCluster):
       cmd.flags['region'] = self.region
     return cmd
 
+  def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
+    """Targets the default pool ComputeClass when custom classes are enabled."""
+    del machine_type
+    if self._UsesCustomComputeClass(self.default_nodepool):
+      return {'cloud.google.com/compute-class': self.default_nodepool.name}
+    return {}
+
   def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns a dict containing metadata about the cluster.
 

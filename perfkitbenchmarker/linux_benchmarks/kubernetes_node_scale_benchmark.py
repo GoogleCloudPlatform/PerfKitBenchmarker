@@ -4,8 +4,8 @@ Deploys a Deployment with pod anti-affinity to force one pod per node, then
 measures node provisioning and de-provisioning times across three phases.
 
 On GCP, use --k8s_machine_families (e.g. e2) so the cluster provisions the
-default ComputeClass with node pool auto-creation; pods then select that
-class via nodeSelector when machine_families is set.
+default ComputeClass with node pool auto-creation; pod placement then adds the
+matching compute-class selector when applicable.
 
   1. Scale up to NUM_NODES replicas.
   2. Scale down to 0 replicas and wait for nodes to be removed.
@@ -75,13 +75,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   bm_spec.always_call_cleanup = True
   assert bm_spec.container_cluster
   cluster = bm_spec.container_cluster
-  manifest_kwargs: dict[str, Any] = {'cloud': FLAGS.cloud}
-  if cluster.default_nodepool.machine_families:
-    manifest_kwargs['gcp_compute_class_name'] = cluster.default_nodepool.name
-  yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
-      MANIFEST_TEMPLATE,
-      **manifest_kwargs,
-  )
+  yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(MANIFEST_TEMPLATE)
   cluster.ModifyPodSpecPlacementYaml(
       yaml_docs,
       'app',
