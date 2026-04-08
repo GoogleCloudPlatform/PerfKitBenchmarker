@@ -45,6 +45,12 @@ NUM_NODES = flags.DEFINE_integer(
     'kubernetes_scale_num_nodes', 5, 'Number of new nodes to create'
 )
 
+NAP_MACHINE_TYPE = flags.DEFINE_string(
+    'kubernetes_node_scale_nap_machine_type',
+    'e2-medium',
+    'GCP NAP ComputeClass machine type (kubernetes_node_scale).',
+)
+
 MANIFEST_TEMPLATE = 'container/kubernetes_scale/kubernetes_node_scale.yaml.j2'
 
 # Allow this many extra nodes above the baseline when checking whether
@@ -74,6 +80,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
       MANIFEST_TEMPLATE,
       cloud=FLAGS.cloud,
+      nap_machine_type=NAP_MACHINE_TYPE.value,
   )
   cluster.ModifyPodSpecPlacementYaml(
       yaml_docs,

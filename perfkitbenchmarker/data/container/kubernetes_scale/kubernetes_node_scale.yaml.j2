@@ -7,7 +7,7 @@ spec:
   nodePoolAutoCreation:
     enabled: true
   priorities:
-  - machineType: e2-medium  # smallest machine-type supported by NAP
+  - machineType: {{ nap_machine_type | default('e2-medium') }}  # default: smallest NAP-supported type
     spot: false
     storage:
       bootDiskSize: 20
