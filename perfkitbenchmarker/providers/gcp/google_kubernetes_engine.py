@@ -351,6 +351,10 @@ class GkeCluster(BaseGkeCluster):
       result['max-memory'] = gcp_flags.MAX_MEMORY.value
     if gcp_flags.MAX_ACCELERATOR.value:
       result['max-accelerator'] = gcp_flags.MAX_ACCELERATOR.value
+    if gcp_flags.GKE_AUTOSCALING_PROFILE.value:
+      result['gke_autoscaling_profile'] = (
+          gcp_flags.GKE_AUTOSCALING_PROFILE.value
+      )
 
     return result
 

@@ -1,7 +1,11 @@
 """Benchmark for Kubernetes node auto-scaling: scale up, down, then up again.
 
 Deploys a Deployment with pod anti-affinity to force one pod per node, then
-measures node provisioning and de-provisioning times across three phases:
+measures node provisioning and de-provisioning times across three phases.
+
+On GCP, use --k8s_machine_families (e.g. e2) so the cluster provisions the
+default ComputeClass with node pool auto-creation; pods then select that
+class via nodeSelector when machine_families is set.
 
   1. Scale up to NUM_NODES replicas.
   2. Scale down to 0 replicas and wait for nodes to be removed.
@@ -45,12 +49,6 @@ NUM_NODES = flags.DEFINE_integer(
     'kubernetes_scale_num_nodes', 5, 'Number of new nodes to create'
 )
 
-NAP_MACHINE_TYPE = flags.DEFINE_string(
-    'kubernetes_node_scale_nap_machine_type',
-    'e2-medium',
-    'GCP NAP ComputeClass machine type (kubernetes_node_scale).',
-)
-
 MANIFEST_TEMPLATE = 'container/kubernetes_scale/kubernetes_node_scale.yaml.j2'
 
 # Allow this many extra nodes above the baseline when checking whether
@@ -77,10 +75,12 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   bm_spec.always_call_cleanup = True
   assert bm_spec.container_cluster
   cluster = bm_spec.container_cluster
+  manifest_kwargs: dict[str, Any] = {'cloud': FLAGS.cloud}
+  if cluster.default_nodepool.machine_families:
+    manifest_kwargs['gcp_compute_class_name'] = cluster.default_nodepool.name
   yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
       MANIFEST_TEMPLATE,
-      cloud=FLAGS.cloud,
-      nap_machine_type=NAP_MACHINE_TYPE.value,
+      **manifest_kwargs,
   )
   cluster.ModifyPodSpecPlacementYaml(
       yaml_docs,
