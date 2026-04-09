@@ -2,20 +2,17 @@
 
 ## Overview
 
-This guide covers two newly implemented PKB benchmark modules for PostgreSQL
+This guide covers the PKB benchmark module for PostgreSQL
 performance automation on Google Kubernetes Engine (GKE):
 
 - **`postgres_sysbench_gke`** — Standalone PostgreSQL benchmark: deploys a
   single PostgreSQL instance as a Kubernetes StatefulSet and runs Sysbench OLTP
   workloads from a client pod within the same cluster.
-- **`postgres_cnpg_benchmark`** — High Availability (HA) PostgreSQL benchmark:
-  deploys a 3-node HA cluster using the CloudNativePG (CNPG) operator and runs
-  the same Sysbench workloads against the primary read-write service.
 
-Both benchmarks:
-- Create and tear down GKE infrastructure automatically via PKB.
-- Measure TPS (Transactions Per Second), QPS (Queries Per Second), and Latency.
-- Support multiple optimization profiles for tuning PostgreSQL and GKE node configuration.
+This benchmark:
+- Creates and tears down GKE infrastructure automatically via PKB.
+- Measures TPS (Transactions Per Second), QPS (Queries Per Second), and Latency.
+- Supports multiple optimization profiles for tuning PostgreSQL and GKE node configuration.
 
 ## Architecture Overview
 
@@ -93,7 +90,6 @@ python3 pkb.py \
     --project=$PROJECT_ID \
     --postgres_gke_server_machine_type=c4-standard-16 \
     --postgres_gke_client_machine_type=c4-standard-16 \
-    --postgres_gke_client_mode=pod \
     --postgres_gke_disk_type=hyperdisk-balanced \
     --postgres_gke_disk_size=500 \
     --postgres_gke_optimization_profile=baseline \
@@ -118,7 +114,7 @@ Runs the benchmark with specific optimization profiles.
 
 
 
-### 1. Profile V6 (Postgres Tuning)
+### 1. Profile: Postgres Tuned
 Aggressive PostgreSQL configuration tuning (Shared Buffers, Workers, etc.).
 
 ```bash
@@ -130,10 +126,9 @@ python3 pkb.py \
     --project=$PROJECT_ID \
     --postgres_gke_server_machine_type=c4-standard-16 \
     --postgres_gke_client_machine_type=c4-standard-16 \
-    --postgres_gke_client_mode=pod \
     --postgres_gke_disk_type=hyperdisk-balanced \
     --postgres_gke_disk_size=500 \
-    --postgres_gke_optimization_profile=v6 \
+    --postgres_gke_optimization_profile=postgres-tuned \
     --sysbench_tables=10 \
     --sysbench_table_size=4000000 \
     --sysbench_run_threads=512 \
@@ -141,8 +136,8 @@ python3 pkb.py \
     --sysbench_testname=oltp_read_write \
     --metadata=cloud:GCP \
     --metadata=geo:us-central1 \
-    --metadata=scenario:postgres_optimized_v6 \
-    --metadata=optimization_profile:v6 \
+    --metadata=scenario:postgres_optimized \
+    --metadata=optimization_profile:postgres-tuned \
     --temp_dir=./pkb_temp \
     --run_stage_iterations=1 \
     --owner=$(whoami | tr '.' '-') \
@@ -151,72 +146,7 @@ python3 pkb.py \
 ```
 
 
-## HA (CloudNativePG) Tests
 
-These tests run the High Availability (HA) benchmark using the CloudNativePG (CNPG) operator.
-
-### 1. HA Baseline
-Standard HA deployment (3 replicas) with default settings.
-
-```bash
-python3 pkb.py \
-    --benchmarks=postgres_cnpg_benchmark \
-    --cloud=GCP \
-    --vm_platform=Kubernetes \
-    --zone=us-central1-a \
-    --project=$PROJECT_ID \
-    --config_override=postgres_cnpg_benchmark.container_cluster.nodepools.postgres.vm_spec.GCP.machine_type=c4-standard-16 \
-    --config_override=postgres_cnpg_benchmark.container_cluster.nodepools.clients.vm_spec.GCP.machine_type=c4-standard-16 \
-    --postgres_cnpg_instances=3 \
-    --postgres_cnpg_storage_class=hyperdisk-balanced \
-    --postgres_cnpg_disk_size=500Gi \
-    --postgres_cnpg_optimization_profile=baseline \
-    --sysbench_tables=10 \
-    --sysbench_table_size=4000000 \
-    --sysbench_run_threads=512 \
-    --sysbench_run_seconds=300 \
-    --sysbench_testname=oltp_read_write \
-    --metadata=cloud:GCP \
-    --metadata=geo:us-central1 \
-    --metadata=scenario:ha_baseline \
-    --temp_dir=./pkb_temp \
-    --run_stage_iterations=1 \
-    --owner=$(whoami | tr '.' '-') \
-    --log_level=error \
-    --accept_licenses
-```
-
-
-### 2. HA Profile V6 (Tuning)
-HA deployment with PostgreSQL parameter tuning.
-
-```bash
-python3 pkb.py \
-    --benchmarks=postgres_cnpg_benchmark \
-    --cloud=GCP \
-    --vm_platform=Kubernetes \
-    --zone=us-central1-a \
-    --project=$PROJECT_ID \
-    --config_override=postgres_cnpg_benchmark.container_cluster.nodepools.postgres.vm_spec.GCP.machine_type=c4-standard-16 \
-    --config_override=postgres_cnpg_benchmark.container_cluster.nodepools.clients.vm_spec.GCP.machine_type=c4-standard-16 \
-    --postgres_cnpg_instances=3 \
-    --postgres_cnpg_storage_class=hyperdisk-balanced \
-    --postgres_cnpg_disk_size=500Gi \
-    --postgres_cnpg_optimization_profile=v6 \
-    --sysbench_tables=10 \
-    --sysbench_table_size=4000000 \
-    --sysbench_run_threads=512 \
-    --sysbench_run_seconds=300 \
-    --sysbench_testname=oltp_read_write \
-    --metadata=cloud:GCP \
-    --metadata=geo:us-central1 \
-    --metadata=scenario:ha_v6 \
-    --temp_dir=./pkb_temp \
-    --run_stage_iterations=1 \
-    --owner=$(whoami | tr '.' '-') \
-    --log_level=error \
-    --accept_licenses
-```
 
 
 ## Understanding the Workload

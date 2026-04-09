@@ -18,9 +18,8 @@ This benchmark measures the performance of PostgreSQL deployed on Google
 Kubernetes Engine (GKE) using Sysbench. It supports multiple machine types
 and optimization profiles.
 
-The benchmark follows the "Pod as VM" pattern similar to the Redis benchmark,
-deploying PostgreSQL as a StatefulSet and using either client VMs or pods
-for load generation.
+This benchmark deploys PostgreSQL as a Kubernetes StatefulSet and uses native
+client pods for Sysbench load generation.
 """
 
 import functools
@@ -115,7 +114,7 @@ flags.DEFINE_string(
 flags.DEFINE_enum(
     'postgres_gke_optimization_profile',
     'baseline',
-    ['baseline', 'v1', 'v2', 'v3', 'v4', 'v6', 'v1+v6', 'v1+v6+v4', 'v1+v6+v4+hostnetwork'],
+    ['baseline', 'infra-tuned', 'fast-startup', 'kernel-tuned', 'hugepages', 'postgres-tuned', 'infra+postgres', 'infra+postgres+hugepages', 'infra+postgres+hugepages+hostnetwork'],
     'Optimization profile to use'
 )
 flags.DEFINE_bool(
@@ -123,12 +122,11 @@ flags.DEFINE_bool(
     True,
     'Whether to use init container for system updates (baseline: True, v2: False)'
 )
-flags.DEFINE_enum(
-    'postgres_gke_client_mode',
-    'pod',
-    ['vm', 'pod'],
-    'Whether to use VMs or pods for client workload generation'
-)
+flags.DEFINE_string('postgres_gke_client_cpu_request', '4', 'CPU request for Sysbench client pod')
+flags.DEFINE_string('postgres_gke_client_memory_request', '10Gi', 'Memory request for Sysbench client pod')
+flags.DEFINE_string('postgres_gke_client_cpu_limit', '8', 'CPU limit for Sysbench client pod')
+flags.DEFINE_string('postgres_gke_client_memory_limit', '20Gi', 'Memory limit for Sysbench client pod')
+
 # Note: sysbench_load_threads is already defined in sysbench_benchmark.py
 
 BENCHMARK_NAME = 'postgres_sysbench_gke'
@@ -143,8 +141,7 @@ postgres_sysbench_gke:
     vm_count: 1
     vm_spec:
       GCP:
-        machine_type: e2-standard-2
-        zone: us-central1-a
+        machine_type: c4-standard-16
     nodepools:
       postgres:
         vm_spec:
@@ -201,17 +198,11 @@ OPTIMIZATION_PROFILES = {
             'checkpoint_timeout': '5min',
             'checkpoint_completion_target': 0.9,
         },
-        'resources': {
-            'cpu_request': '14',
-            'cpu_limit': '15',
-            'memory_request': '45Gi',
-            'memory_limit': '55Gi',
-        },
         'use_init_container': True,
         'node_image': 'UBUNTU_CONTAINERD',
         'client_image': 'ubuntu:20.04',
     },
-    'v1': {
+    'infra-tuned': {
         'postgres': {
             'shared_buffers': '15GB',
             'max_connections': 1000,
@@ -227,18 +218,12 @@ OPTIMIZATION_PROFILES = {
             'random_page_cost': 1.1,
             'checkpoint_timeout': '5min',
             'checkpoint_completion_target': 0.9,
-        },
-        'resources': {
-            'cpu_request': '14',
-            'cpu_limit': '15',
-            'memory_request': '45Gi',
-            'memory_limit': '55Gi',
         },
         'use_init_container': True,
         'node_image': 'COS_CONTAINERD',
         'client_image': 'ubuntu:24.04',
     },
-    'v2': {
+    'fast-startup': {
         'postgres': {
             'shared_buffers': '15GB',
             'max_connections': 1000,
@@ -254,18 +239,12 @@ OPTIMIZATION_PROFILES = {
             'random_page_cost': 1.1,
             'checkpoint_timeout': '5min',
             'checkpoint_completion_target': 0.9,
-        },
-        'resources': {
-            'cpu_request': '14',
-            'cpu_limit': '15',
-            'memory_request': '45Gi',
-            'memory_limit': '55Gi',
         },
         'use_init_container': False,
         'node_image': 'UBUNTU_CONTAINERD',
         'client_image': 'ubuntu:20.04',
     },
-    'v3': {
+    'kernel-tuned': {
         'postgres': {
             'shared_buffers': '15GB',
             'max_connections': 1000,
@@ -281,12 +260,6 @@ OPTIMIZATION_PROFILES = {
             'random_page_cost': 1.1,
             'checkpoint_timeout': '5min',
             'checkpoint_completion_target': 0.9,
-        },
-        'resources': {
-            'cpu_request': '14',
-            'cpu_limit': '15',
-            'memory_request': '45Gi',
-            'memory_limit': '55Gi',
         },
         'use_init_container': True,
         'node_image': 'UBUNTU_CONTAINERD',
@@ -298,7 +271,7 @@ OPTIMIZATION_PROFILES = {
             'net.core.netdev_max_backlog': 4000,
         },
     },
-    'v4': {
+    'hugepages': {
         'postgres': {
             'shared_buffers': '15GB',
             'max_connections': 1000,
@@ -316,21 +289,11 @@ OPTIMIZATION_PROFILES = {
             'checkpoint_completion_target': 0.9,
             'huge_pages': 'on',
         },
-        'resources': {
-            'cpu_request': '14',
-            'cpu_limit': '15',
-            'memory_request': '13.5Gi',
-            'memory_limit': '13.5Gi',
-        },
         'use_init_container': True,
         'node_image': 'UBUNTU_CONTAINERD',
         'client_image': 'ubuntu:20.04',
-        'hugepages': {
-            'hugepage_size2m': 19456,
-            'hugepage_size1g': 0,
-        },
     },
-    'v6': {
+    'postgres-tuned': {
         'postgres': {
             'shared_buffers': '35GB',
             'max_connections': 1000,
@@ -348,17 +311,11 @@ OPTIMIZATION_PROFILES = {
             'checkpoint_completion_target': 0.9,
             'wal_level': 'replica',
         },
-        'resources': {
-            'cpu_request': '14',
-            'cpu_limit': '15',
-            'memory_request': '45Gi',
-            'memory_limit': '55Gi',
-        },
         'use_init_container': True,
         'node_image': 'UBUNTU_CONTAINERD',
         'client_image': 'ubuntu:20.04',
     },
-    'v1+v6': {
+    'infra+postgres': {
         'postgres': {
             'shared_buffers': '35GB',
             'max_connections': 1000,
@@ -375,18 +332,12 @@ OPTIMIZATION_PROFILES = {
             'checkpoint_timeout': '15min',
             'checkpoint_completion_target': 0.9,
             'wal_level': 'replica',
-        },
-        'resources': {
-            'cpu_request': '14',
-            'cpu_limit': '15',
-            'memory_request': '45Gi',
-            'memory_limit': '55Gi',
         },
         'use_init_container': True,
         'node_image': 'COS_CONTAINERD',
         'client_image': 'ubuntu:24.04',
     },
-    'v1+v6+v4': {
+    'infra+postgres+hugepages': {
         'postgres': {
             'shared_buffers': '35GB',
             'max_connections': 1000,
@@ -418,21 +369,11 @@ OPTIMIZATION_PROFILES = {
             'log_min_error_statement': 'error',
             'log_min_duration_statement': '1000',
         },
-        'resources': {
-            'cpu_request': '14',
-            'cpu_limit': '15',
-            'memory_request': '13.5Gi',
-            'memory_limit': '13.5Gi',
-        },
         'use_init_container': True,
         'node_image': 'COS_CONTAINERD',
         'client_image': 'ubuntu:24.04',
-        'hugepages': {
-            'hugepage_size2m': 19456,
-            'hugepage_size1g': 0,
-        },
     },
-    'v1+v6+v4+hostnetwork': {
+    'infra+postgres+hugepages+hostnetwork': {
         'postgres': {
             'shared_buffers': '35GB',
             'max_connections': 1000,
@@ -464,19 +405,9 @@ OPTIMIZATION_PROFILES = {
             'log_min_error_statement': 'error',
             'log_min_duration_statement': '1000',
         },
-        'resources': {
-            'cpu_request': '14',
-            'cpu_limit': '15',
-            'memory_request': '13.5Gi',
-            'memory_limit': '13.5Gi',
-        },
         'use_init_container': True,
         'node_image': 'COS_CONTAINERD',
         'client_image': 'ubuntu:24.04',
-        'hugepages': {
-            'hugepage_size2m': 19456,
-            'hugepage_size1g': 0,
-        },
         'host_network': True,
     }
 }
@@ -493,15 +424,7 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
     """
     config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
-    # Dynamically inject VM groups ONLY if VM mode is explicitly requested
-    if FLAGS.postgres_gke_client_mode == 'vm':
-        config['vm_groups'] = {
-            'clients': {
-                'vm_spec': {'GCP': {'machine_type': 'c4-standard-16'}},
-                'vm_count': 1,
-                'os_type': 'ubuntu2004'  # bypass upstream ubuntu2404 bug
-            }
-        }
+
 
     # Apply machine type overrides
     if FLAGS.postgres_gke_server_machine_type:
@@ -509,6 +432,12 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
         vm_spec = config['container_cluster']['nodepools']['postgres']['vm_spec']
         for cloud in vm_spec:
             vm_spec[cloud]['machine_type'] = FLAGS.postgres_gke_server_machine_type
+        
+        # Update default root nodepool (if it exists)
+        if 'vm_spec' in config['container_cluster']:
+            root_vm_spec = config['container_cluster']['vm_spec']
+            for cloud in root_vm_spec:
+                root_vm_spec[cloud]['machine_type'] = FLAGS.postgres_gke_server_machine_type
 
     if FLAGS.postgres_gke_client_machine_type:
         # Update nodepool
@@ -516,11 +445,7 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
         for cloud in client_vm_spec:
             client_vm_spec[cloud]['machine_type'] = FLAGS.postgres_gke_client_machine_type
 
-        # Update VM group (following Redis pattern)
-        if 'vm_groups' in config and 'clients' in config['vm_groups']:
-            vm_group_spec = config['vm_groups']['clients']['vm_spec']
-            for cloud in vm_group_spec:
-                vm_group_spec[cloud]['machine_type'] = FLAGS.postgres_gke_client_machine_type
+
 
     # Auto-select disk type based on machine type for SERVER
     server_machine = config['container_cluster']['nodepools']['postgres']['vm_spec']['GCP']['machine_type']
@@ -549,15 +474,44 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
         clients_vm_spec[cloud]['boot_disk_size'] = 100
 
     # Apply HugePages system config if needed
-    profile = OPTIMIZATION_PROFILES[FLAGS.postgres_gke_optimization_profile]
-    if 'hugepages' in profile:
-        logging.info('Enabling HugePages via GKE System Config')
-        FLAGS.gke_node_system_config = data.ResourcePath(
-            'container/postgres_sysbench/hugepages-node-config.yaml'
-        )
+    if 'hugepages' in FLAGS.postgres_gke_optimization_profile or 'all-in-one' in FLAGS.postgres_gke_optimization_profile:
+        logging.info('Enabling Dynamic HugePages via GKE System Config')
+        server_machine = config['container_cluster']['nodepools']['postgres']['vm_spec']['GCP']['machine_type']
+        
+        # Calculate dynamic HugePages needed mapped to the architecture
+        machine_family = server_machine.split('-')[0]
+        node_cpus = 16
+        try:
+            node_cpus = int(server_machine.split('-')[2])
+        except IndexError:
+            pass
+            
+        node_mem_gb = 60.0
+        if machine_family in ['c4a', 'n4', 'n4a', 'n4d']:
+            node_mem_gb = node_cpus * 4.0
+        elif machine_family == 'c4d':
+            node_mem_gb = node_cpus * 3.875
+        elif machine_family == 'c4':
+            node_mem_gb = node_cpus * 3.75
+            
+        pod_mem_gb = int(node_mem_gb * 0.85)
+        hugepage_mb = int(pod_mem_gb * 0.45) * 1024
+        hugepage_size2m = int(hugepage_mb / 2)
+        
+        import os
+        config_path = os.path.join(FLAGS.temp_dir, 'hugepages-node-config.yaml')
+        with open(config_path, 'w') as f:
+            f.write(f'linuxConfig:\n  hugepageConfig:\n    hugepage_size2m: {hugepage_size2m}\n')
+            
+        FLAGS.gke_node_system_config = config_path
+
         # FIX: GKE applies the system config globally to ALL nodepools upon creation.
-        # The default e2-standard-2 (8GB RAM) will crash trying to allocate 38GB HugePages.
         # We upgrade the default nodepool to match the server machine type.
+        if 'vm_spec' not in config['container_cluster']:
+            config['container_cluster']['vm_spec'] = {'GCP': {}}
+        elif 'GCP' not in config['container_cluster']['vm_spec']:
+            config['container_cluster']['vm_spec']['GCP'] = {}
+            
         config['container_cluster']['vm_spec']['GCP']['machine_type'] = server_machine
         logging.info('Upgraded default cluster nodepool to %s to satisfy HugePages allocation requirements.', server_machine)
 
@@ -569,9 +523,45 @@ def _GetPostgresPassword() -> str:
     return postgresql.GetPsqlUserPassword(FLAGS.run_uri)
 
 
-def _GetPostgreSQLConfig() -> Dict[str, Any]:
+def _GetDynamicResources(machine_type: str) -> Dict[str, Any]:
+    """Dynamically calculates K8s resource limits and Postgres tuning based on Machine Type."""
+    if not machine_type:
+        machine_type = 'c4-standard-16'
+
+    parts = machine_type.split('-')
+    node_mem_gb = 60.0
+    node_cpus = 16
+
+    if len(parts) >= 3:
+        family = parts[0]
+        tier = parts[1]
+        try:
+            node_cpus = int(parts[2])
+
+            if tier == 'standard':
+                if family in ['c4a', 'n4', 'n4a', 'n4d']:
+                    node_mem_gb = node_cpus * 4.0
+                elif family == 'c4d':
+                    node_mem_gb = node_cpus * 3.875
+                elif family == 'c4':
+                    node_mem_gb = node_cpus * 3.75
+        except ValueError:
+            pass
+
+    return {
+        'cpu_request': str(max(node_cpus - 2, 1)),
+        'cpu_limit': str(max(node_cpus - 1, 1)),
+        'memory_request': f"{int(node_mem_gb * 0.85)}Gi",
+        'memory_limit': f"{int(node_mem_gb * 0.85)}Gi",
+        'calculated_node_mem_gb': node_mem_gb
+    }
+
+
+def _GetPostgreSQLConfig(machine_type: str) -> Dict[str, Any]:
     """Get effective PostgreSQL configuration based on profile and flags.
 
+    Args:
+        machine_type: Discovered Server Machine type
     Returns:
         Dictionary of PostgreSQL configuration parameters.
     """
@@ -579,11 +569,23 @@ def _GetPostgreSQLConfig() -> Dict[str, Any]:
     profile = OPTIMIZATION_PROFILES[FLAGS.postgres_gke_optimization_profile]
     pg_config = OPTIMIZATION_PROFILES['baseline']['postgres'].copy()
 
+    dynamic_resources = _GetDynamicResources(machine_type)
+    pod_mem_gb = int(dynamic_resources['calculated_node_mem_gb'] * 0.85)
+
     if 'postgres' in profile:
         pg_config.update(profile['postgres'])
-        # Explicitly ensure huge_pages is carried over if present
-        if 'huge_pages' in profile['postgres']:
-            pg_config['huge_pages'] = profile['postgres']['huge_pages']
+
+        # Apply Dynamic tuning based on profile aggressiveness 
+        if 'postgres-tuned' in FLAGS.postgres_gke_optimization_profile or 'all-in-one' in FLAGS.postgres_gke_optimization_profile or 'postgres' in FLAGS.postgres_gke_optimization_profile:
+            pg_config['shared_buffers'] = f"{int(pod_mem_gb * 0.40)}GB"
+            pg_config['effective_cache_size'] = f"{int(pod_mem_gb * 0.75)}GB"
+            # If explicit HugePages mapping exists
+            if 'huge_pages' in profile['postgres']:
+                pg_config['huge_pages'] = profile['postgres']['huge_pages']
+        else:
+            # Baseline/Infrastructure focused tunings defaults
+            pg_config['shared_buffers'] = f"{int(pod_mem_gb * 0.25)}GB"
+            pg_config['effective_cache_size'] = f"{int(pod_mem_gb * 0.50)}GB"
 
     # Use FLAGS['flag_name'].present to check if user explicitly set the flag
     if FLAGS['postgres_gke_shared_buffers'].present:
@@ -616,7 +618,6 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     """
     cluster = bm_spec.container_cluster
     profile = OPTIMIZATION_PROFILES[FLAGS.postgres_gke_optimization_profile]
-    pg_config = _GetPostgreSQLConfig()
 
     # Determine disk type for storage class
     # Get machine type from config or flag
@@ -634,11 +635,23 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     machine_family = machine_type.split('-')[0] if machine_type else 'c4'
     disk_type = FLAGS.postgres_gke_disk_type or MACHINE_DISK_MAPPING.get(machine_family, 'pd-ssd')
 
+    # Get Dynamic Resource Sizing
+    pg_config = _GetPostgreSQLConfig(machine_type)
+    dynamic_resources = _GetDynamicResources(machine_type)
+    pod_mem_gb = int(dynamic_resources['calculated_node_mem_gb'] * 0.85)
+
     hugepages = profile.get('hugepages')
 
-    # Prepare template parameters
-    resources = profile.get('resources', {})
-    
+    # If HugePages is enabled, calculate exact 2MB pages mapping dynamically
+    if 'hugepages' in FLAGS.postgres_gke_optimization_profile or 'all-in-one' in FLAGS.postgres_gke_optimization_profile or 'hugepages' in profile:
+        hugepage_mb = int(pod_mem_gb * 0.45) * 1024  # 5% buffer over shared_buffers
+        hugepages = {'hugepage_size2m': int(hugepage_mb / 2), 'hugepage_size1g': 0}
+        pg_config['huge_pages'] = 'on'
+        
+        # Adjust standard K8s memory allocations downwards to leave RAM for HugePages
+        dynamic_resources['memory_request'] = f"{int(dynamic_resources['calculated_node_mem_gb'] * 0.25)}Gi"
+        dynamic_resources['memory_limit'] = f"{int(dynamic_resources['calculated_node_mem_gb'] * 0.25)}Gi"
+
     template_params = {
         'namespace': 'default',
         'postgres_version': '16',
@@ -650,27 +663,14 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
         'use_init_container': profile.get('use_init_container', True),
         'host_network': profile.get('host_network', False),
         'client_image': profile.get('client_image', 'ubuntu:20.04'),
-        # Resource configuration from profile
-        'cpu_request': resources.get('cpu_request', '6'),
-        'cpu_limit': resources.get('cpu_limit', '10'),
-        'memory_request': resources.get('memory_request', '15Gi'),
-        'memory_limit': resources.get('memory_limit', '20Gi'),
+        # Resource configuration from dynamic calculator
+        'cpu_request': dynamic_resources['cpu_request'],
+        'cpu_limit': dynamic_resources['cpu_limit'],
+        'memory_request': dynamic_resources['memory_request'],
+        'memory_limit': dynamic_resources['memory_limit'],
         'hugepages': hugepages,
         **pg_config,  # Include all PostgreSQL parameters
     }
-
-    # Dynamic Memory Adjustment:
-    # If HugePages are enabled, we maintain a safeguard to force-set memory to 13.5Gi
-    # to ensure it fits system overhead on standard nodes (e.g. c4-standard-16).
-    if hugepages and hugepages.get('hugepage_size2m', 0) > 0:
-        logging.info('HugePages enabled: Enforcing safe memory request of 13.5Gi to fit node capacity (shared_buffers uses HugePages).')
-        template_params['memory_request'] = '13.5Gi'
-        template_params['memory_limit'] = '13.5Gi'
-    else:
-        # If no HugePages, we can use the full memory for standard RAM
-        logging.info('HugePages disabled: Using full memory profile (45Gi/55Gi).')
-        template_params['memory_request'] = resources.get('memory_request', '45Gi')
-        template_params['memory_limit'] = resources.get('memory_limit', '55Gi')
 
     # Apply manifests
     with kubernetes_commands.CreateRenderedManifestFile(
@@ -679,25 +679,7 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     ) as rendered_manifest:
         cluster.ApplyManifest(rendered_manifest.name)
 
-    # Wait a bit for resources to be created
-    logging.info('Waiting 30 seconds for resources to be created...')
-    time.sleep(30)
 
-    # Check initial pod status for debugging
-    logging.info('Checking PostgreSQL deployment status...')
-    try:
-        pod_status_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-                         'get', 'pods', '-n', 'default', '-o', 'wide']
-        stdout, _, _ = vm_util.IssueCommand(pod_status_cmd, raise_on_failure=False)
-        logging.info('Initial pod status:\n%s', stdout)
-
-        # Also check PVC status
-        pvc_status_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-                         'get', 'pvc', '-n', 'default', '-o', 'wide']
-        stdout, _, _ = vm_util.IssueCommand(pvc_status_cmd, raise_on_failure=False)
-        logging.info('PVC status:\n%s', stdout)
-    except Exception as e:
-        logging.warning('Failed to get initial status: %s', e)
 
     # Wait for PostgreSQL pod to be ready (not StatefulSet ready replicas)
     try:
@@ -716,21 +698,22 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
         _WaitForPodReady()
         logging.info('PostgreSQL pod is ready')
 
-        # Give it more time to stabilize (important for large shared_buffers)
-        logging.info('Waiting 60 seconds for PostgreSQL to fully stabilize...')
-        time.sleep(60)
+        # Verify PostgreSQL is actually accepting connections using active polling
+        logging.info('Polling for PostgreSQL connectivity...')
 
-        # Verify PostgreSQL is actually accepting connections
-        logging.info('Verifying PostgreSQL connectivity...')
-        check_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-                    'exec', '-n', 'default', 'postgres-standalone-0', '--', 'pg_isready', '-U', 'benchmark', '-d', 'benchmark']
-        vm_util.IssueCommand(check_cmd)
-
-        # Check if we can execute a query
-        query_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-                    'exec', '-n', 'default', 'postgres-standalone-0', '--', 'bash', '-c', f'PGPASSWORD={_GetPostgresPassword()} psql -U benchmark -d benchmark -c "SELECT 1"']
-        vm_util.IssueCommand(query_cmd)
-        logging.info('PostgreSQL query test successful')
+        @vm_util.Retry(max_retries=12, poll_interval=5, retryable_exceptions=(errors.VmUtil.IssueCommandError,))
+        def _WaitForPostgresReady():
+            check_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+                        'exec', '-n', 'default', 'postgres-standalone-0', '--', 'pg_isready', '-U', 'benchmark', '-d', 'benchmark']
+            vm_util.IssueCommand(check_cmd)
+            
+            # Check if we can execute a query
+            query_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+                        'exec', '-n', 'default', 'postgres-standalone-0', '--', 'bash', '-c', 'psql -U benchmark -d benchmark -c "SELECT 1"']
+            vm_util.IssueCommand(query_cmd)
+            
+        _WaitForPostgresReady()
+        logging.info('PostgreSQL connectivity and query test successful')
 
     except Exception as e:
         # If waiting fails, gather debug info
@@ -768,62 +751,58 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
 
 
 def _PrepareSysbenchClient(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
-    """Prepare Sysbench on client VMs or pods.
+    """Prepare Sysbench on client pods.
 
     Args:
         bm_spec: Benchmark specification.
     """
-    if FLAGS.postgres_gke_client_mode == 'vm':
-        # Install sysbench on client VMs
-        client_vms = bm_spec.vm_groups['clients']
+    # Deploy client pod and install sysbench
+    cluster = bm_spec.container_cluster
+    profile = OPTIMIZATION_PROFILES[FLAGS.postgres_gke_optimization_profile]
 
-        def install_sysbench(vm):
-            # Install all dependencies needed for sysbench with retries
-            # Retry loop for apt-get update to handle transient mirror sync issues
-            vm.RemoteCommand('for i in {1..5}; do sudo apt-get update && break || sleep 15; done')
-            vm.RemoteCommand('sudo apt-get install -y git build-essential automake libtool pkg-config')
-            vm.RemoteCommand('sudo apt-get install -y libmysqlclient-dev libpq-dev')
-            vm.RemoteCommand('sudo apt-get install -y postgresql-client')
-            vm.Install('sysbench')
+    # Create K8s Secret for sysbench password (reviewer feedback)
+    logging.info('Creating sysbench-passwords secret...')
+    vm_util.IssueCommand([FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+                         'delete', 'secret', 'sysbench-passwords', '-n', 'default', '--ignore-not-found'])
+    vm_util.IssueCommand([FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+                         'create', 'secret', 'generic', 'sysbench-passwords',
+                         '--from-literal=benchmark-password=' + _GetPostgresPassword(),
+                         '-n', 'default'])
 
-        background_tasks.RunThreaded(install_sysbench, client_vms)
+    template_params = {
+        'namespace': 'default',
+        'client_image': profile.get('client_image', 'ubuntu:20.04'),
+        'client_cpu_request': FLAGS.postgres_gke_client_cpu_request,
+        'client_cpu_limit': FLAGS.postgres_gke_client_cpu_limit,
+        'client_memory_request': FLAGS.postgres_gke_client_memory_request,
+        'client_memory_limit': FLAGS.postgres_gke_client_memory_limit,
+    }
 
-    else:  # pod mode
-        # Deploy client pod and install sysbench
-        cluster = bm_spec.container_cluster
-        profile = OPTIMIZATION_PROFILES[FLAGS.postgres_gke_optimization_profile]
+    with kubernetes_commands.CreateRenderedManifestFile(
+        'container/postgres_sysbench/client_pod.yaml.j2',
+        template_params
+    ) as rendered_manifest:
+        cluster.ApplyManifest(rendered_manifest.name)
 
-        template_params = {
-            'namespace': 'default',
-            'client_image': profile.get('client_image', 'ubuntu:20.04'),
-            'password': _GetPostgresPassword(),
-        }
+    # Wait for client pod - WaitForResource accepts namespace parameter
+    cluster.WaitForResource('pod/postgres-client', 'Ready', namespace='default')
 
-        with kubernetes_commands.CreateRenderedManifestFile(
-            'container/postgres_sysbench/client_pod.yaml.j2',
-            template_params
-        ) as rendered_manifest:
-            cluster.ApplyManifest(rendered_manifest.name)
+    # Install sysbench and dependencies in pod
+    install_commands = [
+        'for i in {1..5}; do apt-get update && break || sleep 15; done',
+        'export DEBIAN_FRONTEND=noninteractive; for i in {1..3}; do apt-get install -y git build-essential automake libtool pkg-config && break || sleep 15; done',
+        'export DEBIAN_FRONTEND=noninteractive; for i in {1..3}; do apt-get install -y libmysqlclient-dev libpq-dev && break || sleep 15; done',
+        'export DEBIAN_FRONTEND=noninteractive; for i in {1..3}; do apt-get install -y sysbench postgresql-client && break || sleep 15; done',
+    ]
+    
+    @vm_util.Retry(max_retries=3, retryable_exceptions=(errors.VmUtil.IssueCommandError,))
+    def _RunInstallCmd(install_cmd):
+        kubectl_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+                      'exec', '-n', 'default', 'postgres-client', '--', 'bash', '-c', install_cmd]
+        vm_util.IssueCommand(kubectl_cmd)
 
-        # Wait for client pod - WaitForResource accepts namespace parameter
-        cluster.WaitForResource('pod/postgres-client', 'Ready', namespace='default')
-
-        # Install sysbench and dependencies in pod
-        install_commands = [
-            'for i in {1..5}; do apt-get update && break || sleep 15; done',
-            'export DEBIAN_FRONTEND=noninteractive; for i in {1..3}; do apt-get install -y git build-essential automake libtool pkg-config && break || sleep 15; done',
-            'export DEBIAN_FRONTEND=noninteractive; for i in {1..3}; do apt-get install -y libmysqlclient-dev libpq-dev && break || sleep 15; done',
-            'export DEBIAN_FRONTEND=noninteractive; for i in {1..3}; do apt-get install -y sysbench postgresql-client && break || sleep 15; done',
-        ]
-        
-        @vm_util.Retry(max_retries=3, retryable_exceptions=(errors.VmUtil.IssueCommandError,))
-        def _RunInstallCmd(install_cmd):
-            kubectl_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-                          'exec', '-n', 'default', 'postgres-client', '--', 'bash', '-c', install_cmd]
-            vm_util.IssueCommand(kubectl_cmd)
-
-        for cmd in install_commands:
-            _RunInstallCmd(cmd)
+    for cmd in install_commands:
+        _RunInstallCmd(cmd)
 
 
 def _LoadDatabase(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
@@ -849,33 +828,27 @@ def _LoadDatabase(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
         test=f'{sysbench.LUA_SCRIPT_PATH}oltp_read_write.lua',
     )
 
-    if FLAGS.postgres_gke_client_mode == 'vm':
-        # Run on client VM
-        prepare_cmd = sysbench.BuildLoadCommand(sysbench_params)
-        client_vm = bm_spec.vm_groups['clients'][0]
-        client_vm.RemoteCommand(prepare_cmd)
-    else:
-        # Run in client pod
-        # Manually construct command to avoid VM-specific paths and secure password
-        lua_script = '/usr/share/sysbench/oltp_read_write.lua'
-        
-        cmd = (
-            f'sysbench {lua_script} '
-            f'--db-driver=pgsql '
-            f'--tables={FLAGS.sysbench_tables} '
-            f'--table_size={FLAGS.sysbench_table_size} '
-            f'--threads={FLAGS.sysbench_load_threads} '
-            f'--pgsql-user=benchmark '
-            f'--pgsql-db=benchmark '
-            f'--pgsql-host={postgres_ip} '
-            f'--pgsql-port=5432 '
-            f'prepare'
-        )
-        
-        kubectl_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-                      'exec', '-n', 'default', 'postgres-client', '--', 
-                      'bash', '-c', f'PGPASSWORD={_GetPostgresPassword()} {cmd}']
-        vm_util.IssueCommand(kubectl_cmd)
+    # Run in client pod
+    # Manually construct command to avoid VM-specific paths and secure password
+    lua_script = '/usr/share/sysbench/oltp_read_write.lua'
+    
+    cmd = (
+        f'sysbench {lua_script} '
+        f'--db-driver=pgsql '
+        f'--tables={FLAGS.sysbench_tables} '
+        f'--table_size={FLAGS.sysbench_table_size} '
+        f'--threads={FLAGS.sysbench_load_threads} '
+        f'--pgsql-user=benchmark '
+        f'--pgsql-db=benchmark '
+        f'--pgsql-host={postgres_ip} '
+        f'--pgsql-port=5432 '
+        f'prepare'
+    )
+    
+    kubectl_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+                  'exec', '-n', 'default', 'postgres-client', '--', 
+                  'bash', '-c', cmd]
+    vm_util.IssueCommand(kubectl_cmd)
 
     logging.info('Database loaded successfully')
 
@@ -930,71 +903,63 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
         )
 
         # Execute benchmark
-        if FLAGS.postgres_gke_client_mode == 'vm':
-            run_cmd = sysbench.BuildRunCommand(sysbench_params)
-            client_vm = bm_spec.vm_groups['clients'][0]
-            stdout, _ = client_vm.RemoteCommand(run_cmd, timeout=FLAGS.sysbench_run_seconds + 60)
-            logging.info('Sysbench completed successfully on VM')
-        else:
-            # Stability: Update statistics and flush buffers
-            # Same logic as HA benchmark for consistency
-            logging.info("Running ANALYZE to update statistics for benchmark tables...")
-            for i in range(1, FLAGS.sysbench_tables + 1):
-                table_name = f"sbtest{i}"
-                analyze_cmd = f'PGPASSWORD={_GetPostgresPassword()} psql -h {postgres_ip} -U benchmark -d benchmark -c "ANALYZE {table_name};"'
-                kubectl_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-                              'exec', '-n', 'default', 'postgres-client', '--', 
-                              'bash', '-c', analyze_cmd]
-                vm_util.IssueCommand(kubectl_cmd)
-
-            logging.info("Executing 3 Checkpoints to flush buffers...")
-            checkpoint_cmd = f'PGPASSWORD={_GetPostgresPassword()} psql -h {postgres_ip} -U benchmark -d benchmark -c "CHECKPOINT;"'
-            kubectl_chk = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
-                          'exec', '-n', 'default', 'postgres-client', '--', 
-                          'bash', '-c', checkpoint_cmd]
-            
-            for i in range(3):
-                logging.info('Issuing Checkpoint %d/3', i+1)
-                vm_util.IssueCommand(kubectl_chk)
-                time.sleep(5)
-
-            logging.info("Sleeping for 40 seconds to allow cluster to settle...")
-            time.sleep(40)
-
-            # Manually construct command for Pod mode
-            lua_script = f'/usr/share/sysbench/{workload}.lua'
-            
-            run_cmd = (
-                f'sysbench {lua_script} '
-                f'--db-driver=pgsql '
-                f'--tables={FLAGS.sysbench_tables} '
-                f'--table_size={FLAGS.sysbench_table_size} '
-                f'--threads={FLAGS.sysbench_run_threads} '
-                f'--report-interval={FLAGS.sysbench_report_interval} '
-                f'--time={FLAGS.sysbench_run_seconds} '
-                f'--pgsql-user=benchmark '
-                f'--pgsql-db=benchmark '
-                f'--pgsql-host={postgres_ip} '
-                f'--pgsql-port=5432 '
-                f'run'
-            )
-            
+        # Stability: Update statistics and flush buffers
+        # Same logic as HA benchmark for consistency
+        logging.info("Running ANALYZE to update statistics for benchmark tables...")
+        for i in range(1, FLAGS.sysbench_tables + 1):
+            table_name = f"sbtest{i}"
+            analyze_cmd = f'psql -h {postgres_ip} -U benchmark -d benchmark -c "ANALYZE {table_name};"'
             kubectl_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
                           'exec', '-n', 'default', 'postgres-client', '--', 
-                          'bash', '-c', f'PGPASSWORD={_GetPostgresPassword()} {run_cmd}']
-            stdout, _, _ = vm_util.IssueCommand(kubectl_cmd, timeout=FLAGS.sysbench_run_seconds + 120)
-            logging.info('Sysbench completed successfully on pod')
+                          'bash', '-c', analyze_cmd]
+            vm_util.IssueCommand(kubectl_cmd)
+
+        logging.info("Executing 3 Checkpoints to flush buffers...")
+        checkpoint_cmd = f'psql -h {postgres_ip} -U benchmark -d benchmark -c "CHECKPOINT;"'
+        kubectl_chk = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+                      'exec', '-n', 'default', 'postgres-client', '--', 
+                      'bash', '-c', checkpoint_cmd]
+        
+        for i in range(3):
+            logging.info('Issuing Checkpoint %d/3', i+1)
+            vm_util.IssueCommand(kubectl_chk)
+
+        # Manually construct command for Pod mode
+        lua_script = f'/usr/share/sysbench/{workload}.lua'
+        
+        run_cmd = (
+            f'sysbench {lua_script} '
+            f'--db-driver=pgsql '
+            f'--tables={FLAGS.sysbench_tables} '
+            f'--table_size={FLAGS.sysbench_table_size} '
+            f'--threads={FLAGS.sysbench_run_threads} '
+            f'--report-interval={FLAGS.sysbench_report_interval} '
+            f'--time={FLAGS.sysbench_run_seconds} '
+            f'--pgsql-user=benchmark '
+            f'--pgsql-db=benchmark '
+            f'--pgsql-host={postgres_ip} '
+            f'--pgsql-port=5432 '
+            f'run'
+        )
+        
+        kubectl_cmd = [FLAGS.kubectl, '--kubeconfig', FLAGS.kubeconfig,
+                      'exec', '-n', 'default', 'postgres-client', '--', 
+                      'bash', '-c', run_cmd]
+        stdout, _, _ = vm_util.IssueCommand(kubectl_cmd, timeout=FLAGS.sysbench_run_seconds + 120)
+        logging.info('Sysbench completed successfully on pod')
 
         # Log output for debugging
         logging.debug('Sysbench output (first 500 chars): %s', stdout[:500] if stdout else 'No output')
 
-        # Parse results
+        # Parse sysbench output
         metadata = sysbench.GetMetadata(sysbench_params)
+        machine_type = FLAGS.postgres_gke_server_machine_type or 'c4-standard-16'
+        pg_conf = _GetPostgreSQLConfig(machine_type)
         metadata.update({
             'optimization_profile': FLAGS.postgres_gke_optimization_profile,
-            'postgres_shared_buffers': _GetPostgreSQLConfig()['shared_buffers'],
-            'postgres_effective_cache_size': _GetPostgreSQLConfig()['effective_cache_size'],
-            'machine_type': FLAGS.postgres_gke_server_machine_type or 'c4-standard-16',
+            'postgres_shared_buffers': pg_conf['shared_buffers'],
+            'postgres_effective_cache_size': pg_conf['effective_cache_size'],
+            'machine_type': machine_type,
             'disk_type': FLAGS.postgres_gke_disk_type or 'auto',
             'workload_type': workload,
         })

@@ -169,6 +169,11 @@ spec:
       securityContext:
         fsGroup: 999  # postgres group ID
       # PKB will handle node selection through nodepool configuration
+      tolerations:
+      - key: "kubernetes.io/arch"
+        operator: "Equal"
+        value: "arm64"
+        effect: "NoSchedule"
       {% if use_init_container %}
       initContainers:
       - name: init-permissions
@@ -267,7 +272,7 @@ spec:
           initialDelaySeconds: 240  # Increased to 4 minutes
           periodSeconds: 30
           timeoutSeconds: 10
-          failureThreshold: 20      # Increased forgiveness
+          failureThreshold: 20      # Increased forgivenesss
       volumes:
       - name: postgres-config
         configMap:

@@ -9,6 +9,11 @@ metadata:
     app: postgres-client
 spec:
   # PKB will handle node selection through nodepool configuration
+  tolerations:
+  - key: "kubernetes.io/arch"
+    operator: "Equal"
+    value: "arm64"
+    effect: "NoSchedule"
   containers:
   - name: postgres-client
     image: {{ client_image }}
@@ -18,11 +23,11 @@ spec:
     - infinity
     resources:
       requests:
-        cpu: "4"
-        memory: "10Gi"
+        cpu: "{{ client_cpu_request }}"
+        memory: "{{ client_memory_request }}"
       limits:
-        cpu: "8"
-        memory: "20Gi"
+        cpu: "{{ client_cpu_limit }}"
+        memory: "{{ client_memory_limit }}"
     env:
     - name: PGHOST
       value: postgres-standalone
@@ -31,6 +36,9 @@ spec:
     - name: PGUSER
       value: benchmark
     - name: PGPASSWORD
-      value: {{ password }}
+      valueFrom:
+        secretKeyRef:
+          name: sysbench-passwords
+          key: benchmark-password
     - name: PGDATABASE
       value: benchmark
