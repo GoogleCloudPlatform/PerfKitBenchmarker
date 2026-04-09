@@ -55,7 +55,7 @@ dpdk_pktgen_multi_nic_small_pkt_loss_external_IP:
     dpdk_pktgen_max_lcores: 128
     assign_external_ip_all_nics: True
     ip_addresses: EXTERNAL
-    dpdk_pktgen_num_flows: 100
+    dpdk_pktgen_num_flows: 70
     dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]','[51:52]#[2:1];[51:52]#[1:2]']
 
 dpdk_pktgen_multi_nic:
@@ -519,6 +519,12 @@ fio_latency:
     fio_runtime: 300
     fio_target_mode: against_device_with_fill
 
+fio_object_storage_latency_100GB_2mb:
+  name: fio_object_storage
+  flags:
+    blobfuse_block_size_mb: 2
+    fio_generate_scenarios: rand_2m_read_100GB_iodepth-1_numjobs-1
+
 fio_object_storage_latency_8kb:
   name: fio_object_storage
   flags:
@@ -526,7 +532,16 @@ fio_object_storage_latency_8kb:
     fio_fill_size: 80000K
     fio_fill_block_size: 8k
     fio_nr_files: 10000
-    fio_ramptime: 0
+    fio_runtime: 0
+
+fio_object_storage_latency_2mb:
+  name: fio_object_storage
+  flags:
+    blobfuse_block_size_mb: 2
+    fio_generate_scenarios: rand_2M_read_20000MB_iodepth-1_numjobs-1
+    fio_fill_size: 20000M
+    fio_fill_block_size: 2M
+    fio_nr_files: 10000
     fio_runtime: 0
 
 fio_remote_ssd_max_iops:

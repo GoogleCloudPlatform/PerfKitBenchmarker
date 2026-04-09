@@ -576,9 +576,9 @@ GKE_AUTOSCALING_PROFILE = flags.DEFINE_enum(
 GKE_CLUSTER_IPV4_CIDR_SIZE = flags.DEFINE_integer(
     'gke_cluster_ipv4_cidr_size',
     None,
-    'Override cluster IPv4 CIDR size in bits (e.g. 19). If set, used instead of '
-    'the size derived from max_vm_count. Use when the cluster will scale beyond '
-    'the default node pool (e.g. kubernetes_node_scale with 5k nodes).',
+    'Override cluster IPv4 CIDR size in bits (e.g. 19). If set, used instead of'
+    ' the size derived from max_vm_count. Use when the cluster will scale'
+    ' beyond the default node pool (e.g. kubernetes_node_scale with 5k nodes).',
 )
 GCE_PERFORMANCE_MONITORING_UNIT = flags.DEFINE_enum(
     'gce_performance_monitoring_unit',
