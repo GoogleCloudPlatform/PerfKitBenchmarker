@@ -174,8 +174,9 @@ MACHINE_DISK_MAPPING = {
     'c4': 'hyperdisk-balanced',
     'c4d': 'hyperdisk-balanced',
     'c4a': 'hyperdisk-balanced',
-    'n2': 'pd-ssd',
-    'n2d': 'pd-ssd',
+    'n4': 'hyperdisk-balanced',
+    'n4d': 'hyperdisk-balanced',
+    'n4a': 'hyperdisk-balanced',
 }
 
 # Optimization profiles
