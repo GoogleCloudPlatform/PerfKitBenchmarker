@@ -93,8 +93,7 @@ To enforce private networking:
 
 ### 2. Disk Type Selection
 The benchmark automatically maps machine types to optimal disk types:
-*   **C4 / C4A / C4D**: `hyperdisk-balanced`
-*   **N4 / N4A / N4D**: `pd-ssd`
+*   **C4 / C4A / C4D / N4 / N4A / N4D**: `hyperdisk-balanced`
 
 ### 3. Sysbench Execution
 *   The benchmark installs `sysbench` in the client pod via `apt-get`.
