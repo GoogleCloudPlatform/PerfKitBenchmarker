@@ -327,6 +327,13 @@ class GkeCluster(BaseGkeCluster):
       cmd.flags['region'] = self.region
     return cmd
 
+  def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
+    """Targets the default pool ComputeClass when custom classes are enabled."""
+    del machine_type
+    if self._UsesCustomComputeClass(self.default_nodepool):
+      return {'cloud.google.com/compute-class': self.default_nodepool.name}
+    return {}
+
   def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns a dict containing metadata about the cluster.
 
@@ -351,6 +358,10 @@ class GkeCluster(BaseGkeCluster):
       result['max-memory'] = gcp_flags.MAX_MEMORY.value
     if gcp_flags.MAX_ACCELERATOR.value:
       result['max-accelerator'] = gcp_flags.MAX_ACCELERATOR.value
+    if gcp_flags.GKE_AUTOSCALING_PROFILE.value:
+      result['gke_autoscaling_profile'] = (
+          gcp_flags.GKE_AUTOSCALING_PROFILE.value
+      )
 
     return result
 
@@ -394,7 +405,13 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append('--enable-autoscaling')
       cmd.flags['max-nodes'] = self.max_nodes
       cmd.flags['min-nodes'] = self.min_nodes
-    cmd.flags['cluster-ipv4-cidr'] = f'/{_CalculateCidrSize(self.max_nodes)}'
+    if gcp_flags.GKE_AUTOSCALING_PROFILE.value:
+      cmd.flags['autoscaling-profile'] = gcp_flags.GKE_AUTOSCALING_PROFILE.value
+    cidr_size = (
+        gcp_flags.GKE_CLUSTER_IPV4_CIDR_SIZE.value
+        or _CalculateCidrSize(self.max_nodes)
+    )
+    cmd.flags['cluster-ipv4-cidr'] = f'/{cidr_size}'
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
 
     self._RunClusterCreateCommand(cmd)
@@ -524,8 +541,9 @@ class GkeCluster(BaseGkeCluster):
         cmd.flags['local-ssd-count'] = nodepool_config.max_local_disks
 
     cmd.flags['num-nodes'] = nodepool_config.num_nodes
-    # zone may be split a comma separated list
-    if nodepool_config.zone:
+    # zone may be split a comma separated list. For regional clusters, zone
+    # holds the region name; do not set node-locations so GKE uses default.
+    if nodepool_config.zone and not util.IsRegion(nodepool_config.zone):
       cmd.flags['node-locations'] = nodepool_config.zone
 
     if nodepool_config.machine_type:
