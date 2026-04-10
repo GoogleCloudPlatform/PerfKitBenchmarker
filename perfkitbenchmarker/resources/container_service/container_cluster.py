@@ -59,6 +59,11 @@ class BaseContainerCluster(resource.BaseResource):
   def zone(self) -> str:
     return self.default_nodepool.zone
 
+  @property
+  def num_nodepools(self) -> int:
+    """Returns number of nodepools, with +1 from the default nodepool."""
+    return len(self.nodepools) + 1
+
   def SetContainerRegistry(self, registry):
     """Sets the container registry for the cluster."""
     self.container_registry = registry
@@ -183,6 +188,7 @@ class BaseContainerCluster(resource.BaseResource):
         'size': self.default_nodepool.num_nodes,
         'machine_type': self.default_nodepool.machine_type,
         'nodepools': nodepools_metadata,
+        'num_nodepools': self.num_nodepools,
     }
 
     if self.min_nodes != self.max_nodes:

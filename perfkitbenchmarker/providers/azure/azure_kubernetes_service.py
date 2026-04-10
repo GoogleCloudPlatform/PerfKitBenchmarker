@@ -129,6 +129,11 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     self._deleted = False
     # Instantiation required to delete the resource group.
     self.network = azure_network.AzureNetwork.GetNetwork(spec.vm_spec)
+    # AKS applies min & max limits per nodepool.
+    self.max_nodes_per_nodepool = self.max_nodes
+    self.max_nodes = self.num_nodepools * self.max_nodes
+    self.min_nodes_per_nodepool = self.min_nodes
+    self.min_nodes = self.num_nodepools * self.min_nodes
 
   def InitializeNodePoolForCloud(
       self,
@@ -148,6 +153,11 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     result = super().GetResourceMetadata()
     result['boot_disk_type'] = self.default_nodepool.disk_type
     result['boot_disk_size'] = self.default_nodepool.disk_size
+    if self._IsAutoscalerEnabled():
+      result['max_nodes_per_nodepool'] = self.max_nodes_per_nodepool
+      result['min_nodes_per_nodepool'] = self.min_nodes_per_nodepool
+    if FLAGS.azure_aks_auto_node_provisioning:
+      result['auto_node_provisioning_mode'] = True
     return result
 
   def _IsAutoscalerEnabled(self):
@@ -203,14 +213,6 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     if FLAGS.azure_aks_auto_node_provisioning:
       # For provision_node_pools benchmark, add auto provisioning mode
       cmd.append('--node-provisioning-mode=auto')
-    else:
-      if self._IsAutoscalerEnabled():
-        cmd += [
-            '--enable-cluster-autoscaler',
-            f'--min-count={self.min_nodes}',
-            f'--max-count={self.max_nodes}',
-        ]
-
     # TODO(pclay): expose quota and capacity errors
     # Creating an AKS cluster with a fresh service principal usually fails due
     # to a race condition. Active Directory knows the service principal exists,
@@ -239,12 +241,6 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--labels',
         f'pkb_nodepool={nodepool_config.name}',
     ] + self._GetNodeFlags(nodepool_config)
-    if self._IsAutoscalerEnabled():
-      cmd += [
-          '--enable-cluster-autoscaler',
-          f'--min-count={self.min_nodes}',
-          f'--max-count={self.max_nodes}',
-      ]
     _, stderr, _ = vm_util.IssueCommand(cmd, timeout=600)
     # Allocation failure could be due to capacity / quota / validity.
     # Validity should be uncovered during development. Quota and capacity
@@ -271,9 +267,15 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
           '--node-vm-size',
           nodepool_config.machine_type,
       ]
+    if self._IsAutoscalerEnabled():
+      args += [
+          '--enable-cluster-autoscaler',
+          f'--min-count={self.min_nodes_per_nodepool}',
+          f'--max-count={self.max_nodes_per_nodepool}',
+      ]
     node_count = nodepool_config.num_nodes
-    node_count = max(self.min_nodes, node_count)
-    node_count = min(self.max_nodes, node_count)
+    node_count = max(self.min_nodes_per_nodepool, node_count)
+    node_count = min(self.max_nodes_per_nodepool, node_count)
     args += [f'--node-count={node_count}']
     if self.default_nodepool.zone and self.default_nodepool.zone != self.region:
       zones = ' '.join(

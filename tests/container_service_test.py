@@ -441,6 +441,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
             'cluster_type': 'Kubernetes',
             'machine_type': 'fake-machine-type',
             'nodepools': {},
+            'num_nodepools': 1,
             'size': 1,
             'zone': 'us-east2-a',
         },
