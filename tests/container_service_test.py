@@ -386,6 +386,93 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
           'gke-pkb-8ee57c86-default-for-serving-232fa391-34qh'
       )
 
+  def testGetNodepoolMetadata(self):
+    vm_spec = {
+        container_service_mock.TEST_CLOUD: {
+            'machine_type': 'fake-machine-type',
+            'zone': 'us-east2-a',
+        },
+    }
+    nodepool_cluster = container_service_mock.TestKubernetesCluster(
+        container_spec.ContainerClusterSpec(
+            'test-cluster',
+            **{
+                'cloud': container_service_mock.TEST_CLOUD,
+                'vm_spec': vm_spec,
+                'nodepools': {
+                    'default-for-serving': {
+                        'vm_spec': vm_spec,
+                    },
+                },
+            },
+        )
+    )
+    self.assertEqual(
+        nodepool_cluster.GetResourceMetadata()['nodepools'],
+        {
+            'default-for-serving': {
+                'size': 1,
+                'machine_type': 'fake-machine-type',
+                'name': 'default-for-serving',
+            },
+        },
+    )
+
+  def testGetMetadata(self):
+    vm_spec = {
+        container_service_mock.TEST_CLOUD: {
+            'machine_type': 'fake-machine-type',
+            'zone': 'us-east2-a',
+        },
+    }
+    cluster = container_service_mock.TestKubernetesCluster(
+        container_spec.ContainerClusterSpec(
+            'test-cluster',
+            **{
+                'cloud': container_service_mock.TEST_CLOUD,
+                'vm_spec': vm_spec,
+            },
+        )
+    )
+    self.assertEqual(
+        cluster.GetResourceMetadata(),
+        {
+            'cloud': 'UnitTest',
+            'cluster_type': 'Kubernetes',
+            'machine_type': 'fake-machine-type',
+            'nodepools': {},
+            'size': 1,
+            'zone': 'us-east2-a',
+        },
+    )
+
+  def testNumNodes_overridenByMaxNodes(self):
+    vm_spec = {
+        container_service_mock.TEST_CLOUD: {
+            'machine_type': 'fake-machine-type',
+            'zone': 'us-east2-a',
+        },
+    }
+    cluster = container_service_mock.TestKubernetesCluster(
+        container_spec.ContainerClusterSpec(
+            'test-cluster',
+            **{
+                'cloud': container_service_mock.TEST_CLOUD,
+                'vm_spec': vm_spec,
+                'min_vm_count': 6,
+                'max_vm_count': 10,
+            },
+        )
+    )
+    self.assertDictContainsSubset(
+        {
+            'size': 6,
+            'min_size': 6,
+            'max_size': 10,
+        },
+        cluster.GetResourceMetadata(),
+    )
+
   @parameterized.named_parameters(
       ('eks_auto', 'hostname', 'k8s-fib-fib-123.elb.us-east-1.amazonaws.com'),
       ('gke', 'ip', '34.16.24.55'),

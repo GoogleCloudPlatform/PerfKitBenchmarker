@@ -305,6 +305,7 @@ class GkeCluster(BaseGkeCluster):
       vm_config: virtual_machine_spec.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
+    super().InitializeNodePoolForCloud(vm_config, nodepool_config)
     vm_config = typing.cast(gce_virtual_machine.GceVmSpec, vm_config)
     nodepool_config.disk_type = vm_config.boot_disk_type
     nodepool_config.disk_size = vm_config.boot_disk_size
@@ -387,10 +388,7 @@ class GkeCluster(BaseGkeCluster):
     if enable_autoprovisioning:
       cmd.args.append('--enable-autoprovisioning')
 
-    if (
-        self.min_nodes != self.default_nodepool.num_nodes
-        or self.max_nodes != self.default_nodepool.num_nodes
-    ):
+    if self.min_nodes != self.max_nodes:
       cmd.args.append('--enable-autoscaling')
       cmd.flags['max-nodes'] = self.max_nodes
       cmd.flags['min-nodes'] = self.min_nodes
@@ -623,6 +621,9 @@ class GkeAutopilotCluster(BaseGkeCluster):
       vm_config: virtual_machine_spec.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
+    kubernetes_cluster.KubernetesCluster.InitializeNodePoolForCloud(
+        self, vm_config, nodepool_config
+    )
     nodepool_config.network = gce_network.GceNetwork.GetNetwork(vm_config)
     return nodepool_config
 

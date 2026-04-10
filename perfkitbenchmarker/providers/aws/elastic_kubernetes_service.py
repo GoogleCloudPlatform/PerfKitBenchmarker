@@ -189,9 +189,6 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
       # Min / max config only apply to the default nodepool.
       group_json['minSize'] = self.min_nodes
       group_json['maxSize'] = self.max_nodes
-      group_json['desiredCapacity'] = min(
-          max(self.min_nodes, nodepool.num_nodes), self.max_nodes
-      )
     return group_json
 
   def _WriteJsonToFile(self, json_dict: dict[str, Any]) -> str:
@@ -381,6 +378,7 @@ class EksCluster(BaseEksCluster):
       vm_config: virtual_machine_spec.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
+    super().InitializeNodePoolForCloud(vm_config, nodepool_config)
     nodepool_config.disk_type = (
         aws_virtual_machine.AwsVirtualMachine.DEFAULT_ROOT_DISK_TYPE
     )
@@ -551,13 +549,6 @@ class EksAutoCluster(BaseEksCluster):
     is_rare_gpu = virtual_machine.GPU_TYPE.value in _RARE_GPU_TYPES
     self.use_spot: bool = aws_flags.USE_AWS_SPOT_INSTANCES.value or is_rare_gpu
 
-  def InitializeNodePoolForCloud(
-      self,
-      vm_config: virtual_machine_spec.BaseVmSpec,
-      nodepool_config: container.BaseNodePoolConfig,
-  ):
-    pass
-
   def _Create(self):
     """Creates the control plane and worker nodes."""
     self._EksCtlCreate({'autoModeConfig': {'enabled': True}})
@@ -651,13 +642,6 @@ class EksKarpenterCluster(BaseEksCluster):
     self._ChooseSecondZone()
     self.stack_name = f'Karpenter-{self.name}'
     self.cluster_version: str = self.cluster_version or _DEAULT_K8S_VERSION
-
-  def InitializeNodePoolForCloud(
-      self,
-      vm_config: virtual_machine_spec.BaseVmSpec,
-      nodepool_config: container.BaseNodePoolConfig,
-  ):
-    pass
 
   def _Create(self):
     """Creates the control plane and worker nodes."""

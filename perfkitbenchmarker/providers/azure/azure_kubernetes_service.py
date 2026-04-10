@@ -135,6 +135,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
       vm_config: virtual_machine_spec.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
+    super().InitializeNodePoolForCloud(vm_config, nodepool_config)
     nodepool_config.disk_type = vm_config.boot_disk_type
     nodepool_config.disk_size = vm_config.boot_disk_size
 
@@ -152,8 +153,8 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
   def _IsAutoscalerEnabled(self):
     """Returns True if the cluster autoscaler is enabled."""
     return (
-        self.min_nodes != self.default_nodepool.num_nodes
-        or self.max_nodes != self.default_nodepool.num_nodes
+        self.min_nodes
+        != self.max_nodes
         # Auto node provisioning mode is incompatible with cluster autoscaler.
     ) and not FLAGS.azure_aks_auto_node_provisioning
 

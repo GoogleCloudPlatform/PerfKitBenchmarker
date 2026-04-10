@@ -28,10 +28,10 @@ class BaseContainerCluster(resource.BaseResource):
 
   def __init__(self, cluster_spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(user_managed=bool(cluster_spec.static_cluster))
-    self.name: str = (
-        cluster_spec.static_cluster or 'pkb-' + FLAGS.run_uri
-    )
+    self.name: str = cluster_spec.static_cluster or 'pkb-' + FLAGS.run_uri
     self.machine_families: list[str] = cluster_spec.machine_families or []
+    self.min_nodes: int = cluster_spec.min_vm_count or cluster_spec.vm_count
+    self.max_nodes: int = cluster_spec.max_vm_count or cluster_spec.vm_count
     self.default_nodepool = self._InitializeDefaultNodePool(
         cluster_spec, cluster_spec.vm_spec
     )
@@ -41,12 +41,6 @@ class BaseContainerCluster(resource.BaseResource):
           name, nodepool_spec, nodepool_spec.vm_spec
       )
       self.nodepools[nodepool.name] = nodepool
-    self.min_nodes: int = (
-        cluster_spec.min_vm_count or self.default_nodepool.num_nodes
-    )
-    self.max_nodes: int = (
-        cluster_spec.max_vm_count or self.default_nodepool.num_nodes
-    )
     self.containers: dict[str, list[container.BaseContainer]] = (
         collections.defaultdict(list)
     )
@@ -111,7 +105,13 @@ class BaseContainerCluster(resource.BaseResource):
       nodepool_config: container.BaseNodePoolConfig,
   ):
     """Override to initialize cloud specific configs."""
-    pass
+    del vm_config
+    if self.min_nodes != self.max_nodes:
+      # When not set, min/max nodes derive from the defualt nodepool.
+      # Let other nodepools set num_nodes higher than the default's.
+      nodepool_config.num_nodes = min(
+          self.max_nodes, max(self.min_nodes, nodepool_config.num_nodes)
+      )
 
   def GetNodePoolFromNodeName(
       self, node_name: str
@@ -185,10 +185,7 @@ class BaseContainerCluster(resource.BaseResource):
         'nodepools': nodepools_metadata,
     }
 
-    if (
-        self.min_nodes != self.default_nodepool.num_nodes
-        or self.max_nodes != self.default_nodepool.num_nodes
-    ):
+    if self.min_nodes != self.max_nodes:
       metadata.update({
           'max_size': self.max_nodes,
           'min_size': self.min_nodes,
