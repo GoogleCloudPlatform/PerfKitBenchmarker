@@ -129,7 +129,7 @@ def _InstallEsrally(vm, master_nodes, seed_hosts, is_load_generator=False):
   vm.Install('openjdk')
   vm.InstallPackages('python3-pip python3-venv')
   vm.RemoteCommand('python3 -m venv esrally_venv')
-  vm.RemoteCommand(f'{SET_ENV} && pip3 install esrally')
+  vm.RemoteCommand(f'{SET_ENV} && pip3 install esrally==2.12.0')
   if is_load_generator:
     return
   install_cmd = (

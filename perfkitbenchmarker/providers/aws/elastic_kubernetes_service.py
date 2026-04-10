@@ -993,9 +993,10 @@ class EksKarpenterCluster(BaseEksCluster):
 
   @staticmethod
   def _DefaultNodepoolInstanceTypes() -> list[str]:
-    """EC2 types for default NodePool manifest (--eks_karpenter_nodepool_instance_types).
+    """EC2 instance types for the default Karpenter NodePool manifest.
 
-    Empty list means the Jinja template keeps instance-category/generation rules.
+    Controlled by --eks_karpenter_nodepool_instance_types.
+    Empty list: Jinja template keeps instance-category/generation rules.
     """
     return [
         t.strip()
@@ -1029,7 +1030,8 @@ class EksKarpenterCluster(BaseEksCluster):
           ],
           timeout=vm_util.DEFAULT_TIMEOUT,
       )
-    # Karpenter controller resources: default 1/1Gi; scale up when node_scale target is set.
+    # Karpenter controller resources: default 1/1Gi; scale up when
+    # node_scale target exceeds 1000 nodes.
     num_nodes = getattr(FLAGS, 'kubernetes_scale_num_nodes', None)
     if num_nodes is not None and num_nodes > 1000:
       controller_cpu, controller_memory = 4, '16Gi'
@@ -1099,7 +1101,7 @@ class EksKarpenterCluster(BaseEksCluster):
         'v'
         + full_version.strip().strip('"').split(f'{self.cluster_version}-v')[1]
     )
-    # NodePool CPU limit: scale with benchmark target (nodes * vCPU + 5%), min 1000.
+    # NodePool CPU limit: benchmark target nodes * vCPU + 5%, min 1000.
     num_nodes = getattr(FLAGS, 'kubernetes_scale_num_nodes', 5)
     vcpu_per_node = FLAGS.eks_karpenter_limits_vcpu_per_node
     cpu_limit = max(1000, math.ceil(num_nodes * vcpu_per_node * 1.05))
@@ -1243,6 +1245,7 @@ class EksKarpenterCluster(BaseEksCluster):
             or 'no resources found' in stderr.lower()
         ),
     )
+
     # Force terminate remaining EC2 instances
     stdout, _, _ = vm_util.IssueCommand(
         [
@@ -1312,8 +1315,9 @@ class EksKarpenterCluster(BaseEksCluster):
     if eni_ids:
       logging.info('Deleting %d orphaned network interfaces', len(eni_ids))
       for eni_id in eni_ids:
-        # Bind eni_id by default to avoid loop closure issues if this is refactored.
-        def _delete_one_eni(eni_id=eni_id) -> None:
+        # Bind eni_id by default to avoid loop closure issues if
+        # this is refactored.
+        def _DeleteOneEni(eni_id=eni_id) -> None:
           _, stderr, retcode = vm_util.IssueCommand(
               [
                   'aws',
@@ -1344,7 +1348,7 @@ class EksKarpenterCluster(BaseEksCluster):
             poll_interval=10,
             max_retries=5,
             retryable_exceptions=(errors.Resource.RetryableDeletionError,),
-        )(_delete_one_eni)()
+        )(_DeleteOneEni)()
 
   def _IsReady(self):
     """Returns True if cluster is running. Autopilot defaults to 0 nodes."""

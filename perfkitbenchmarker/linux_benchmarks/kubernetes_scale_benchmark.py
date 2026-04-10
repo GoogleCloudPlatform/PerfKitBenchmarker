@@ -351,6 +351,16 @@ class KubernetesResourceStatusCondition:
         event=condition['type'],
     )
 
+  @classmethod
+  def IsValid(cls, condition: dict[str, Any]) -> bool:
+    """Returns true if the resource condition is valid."""
+    return (
+        'lastTransitionTime' in condition
+        and condition['lastTransitionTime']
+        and 'type' in condition
+        and condition['type']
+    )
+
 
 # TODO: b/458122803 - refactor by moving to a common location (e.g.
 # resources/container_service modules)
@@ -371,8 +381,9 @@ def GetStatusConditionsForResourceType(
 
   # Use full JSON output to avoid invalid JSON when manually building from
   # jsonpath with many resources or on connection reset (truncated output).
-  # Avoid logging huge JSON: kubernetes_scale uses num_replicas; kubernetes_node_scale
-  # uses kubernetes_scale_num_nodes for the same code path (get pod/node -o json).
+  # Avoid logging huge JSON: kubernetes_scale uses num_replicas;
+  # kubernetes_node_scale uses kubernetes_scale_num_nodes for the
+  # same code path (get pod/node -o json).
   stdout, _, _ = kubectl.RunKubectlCommand(
       ['get', resource_type, '-o', 'json'],
       timeout=60 * 5,  # 5 minutes for large clusters (e.g. 1000 pods)
@@ -393,13 +404,28 @@ def GetStatusConditionsForResourceType(
     name_to_conditions.pop(key, None)
 
   results = []
-  for name in name_to_conditions.keys():
+  failures = []
+  for name in name_to_conditions:
     for conditions in name_to_conditions[name]:
+      if not KubernetesResourceStatusCondition.IsValid(conditions):
+        failures.append(conditions)
+        continue
       results.append(
           KubernetesResourceStatusCondition.FromJsonPathResult(
               resource_type, name, conditions
           )
       )
+
+  if failures:
+    unique_failures = set(frozenset(f.items()) for f in failures)
+    logging.warning(
+        'Failed to parse %d K8s conditions, with %d unique failures. Printing'
+        ' the first 5.',
+        len(failures),
+        len(unique_failures),
+    )
+    for failure in list(unique_failures)[:5]:
+      logging.warning('Failed to parse the condition: %s', failure)
 
   return results
 

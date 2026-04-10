@@ -173,7 +173,6 @@ class GoogleKubernetesEngineCustomMachineTypeTestCase(PatchedObjectsTestCase):
     with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-
       self.assertIn(
           'gcloud container clusters create', issue_command.all_commands
       )
@@ -258,14 +257,14 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
       ):
         cluster._Create()
 
-  def testPostCreate(self):
+  def testGetCredentials(self):
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects() as issue_command, mock.patch.object(
         kubectl, 'RunKubectlCommand'
     ) as mock_kubectl_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
       cluster._PostCreate()
-
       self.assertIn(
           'gcloud container clusters get-credentials pkb-{}'.format(_RUN_URI),
           issue_command.all_commands,
@@ -273,6 +272,7 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
       self.assertIn(
           'KUBECONFIG', issue_command.func_to_mock.call_args[1]['env']
       )
+
       self.assertEqual(mock_kubectl_command.call_count, 1)
 
   def testDelete(self):
@@ -529,27 +529,6 @@ class GoogleKubernetesEngineWithGpusTestCase(PatchedObjectsTestCase):
           issue_command.all_commands,
       )
 
-  @mock.patch(
-      'perfkitbenchmarker.resources.container_service.kubernetes_commands.CreateFromFile'
-  )
-  def testPostCreate(self, _):
-    spec = self.create_kubernetes_engine_spec('k80')
-    with self.patch_critical_objects() as issue_command, mock.patch.object(
-        kubectl, 'RunKubectlCommand'
-    ) as mock_kubectl_command:
-      cluster = google_kubernetes_engine.GkeCluster(spec)
-      cluster._PostCreate()
-
-      self.assertIn(
-          'gcloud container clusters get-credentials pkb-{}'.format(_RUN_URI),
-          issue_command.all_commands,
-      )
-      self.assertIn(
-          'KUBECONFIG', issue_command.func_to_mock.call_args[1]['env']
-      )
-
-      self.assertEqual(mock_kubectl_command.call_count, 1)
-
 
 class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
 
@@ -644,7 +623,7 @@ class GoogleKubernetesEngineRegionalTestCase(PatchedObjectsTestCase):
     with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      create_cluster, create_nodepool1, create_nodepool2 = (
+      create_cluster, _, create_nodepool1, create_nodepool2 = (
           call[0][0] for call in issue_command.func_to_mock.call_args_list
       )
       self.assertNotIn('--zone', create_cluster)
@@ -693,7 +672,7 @@ class GoogleKubernetesEngineRegionalTestCase(PatchedObjectsTestCase):
     with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Create()
-      create_cluster, create_nodepool1, create_nodepool2 = (
+      create_cluster, _, create_nodepool1, create_nodepool2 = (
           call[0][0] for call in issue_command.func_to_mock.call_args_list
       )
       self.assertNotIn('--zone', create_cluster)
@@ -723,6 +702,52 @@ class GoogleKubernetesEngineRegionalTestCase(PatchedObjectsTestCase):
       )
       self.assertContainsSubsequence(
           create_nodepool2, ['--node-locations', 'us-west1-c']
+      )
+
+
+class GoogleKubernetesEngineMachineFamiliesTestCase(PatchedObjectsTestCase):
+
+  @staticmethod
+  def create_kubernetes_engine_spec():
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a',
+                },
+            },
+            'nodepools': {
+                'nodepool1': {
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': '',
+                            'zone': 'us-central1-a',
+                        },
+                    },
+                    'machine_families': ['n2'],
+                },
+            },
+        },
+    )
+    return kubernetes_engine_spec
+
+  def testCreateWithMachineFamilies(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command, mock.patch.object(
+        kubernetes_commands, 'ApplyYaml'
+    ):
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      self.assertIn(
+          'gcloud container node-pools update nodepool1',
+          issue_command.all_commands,
+      )
+      self.assertIn(
+          '--node-labels cloud.google.com/compute-class=nodepool1',
+          issue_command.all_commands,
       )
 
 

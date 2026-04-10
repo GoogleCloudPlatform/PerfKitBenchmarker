@@ -4,19 +4,24 @@ logging:
 
 components:
   - libfuse
-  - file_cache
+  - block_cache
   - attr_cache
   - azstorage
 
 libfuse:
+  # Bypasses the Linux Kernel Page Cache.
+  # Without this, subsequent reads will be from RAM.
+  direct-io: true
   attribute-expiration-sec: 0
   entry-expiration-sec: 0
   negative-entry-expiration-sec: 0
 
-file_cache:
-  path: /opt/pkb
-  timeout-sec: 0
-  max-size-mb: -1
+block_cache:
+  block-size-mb: {{ block_size_mb }}
+  # Minimal RAM footprint
+  mem-size-mb: 128
+  prefetch: 0
+  parallelism: 1
 
 attr_cache:
   timeout-sec: 0

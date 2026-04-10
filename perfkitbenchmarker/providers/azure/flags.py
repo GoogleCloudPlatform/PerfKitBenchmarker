@@ -189,3 +189,8 @@ flags.DEFINE_boolean(
     'Enable automatic node provisioning for Azure AKS clusters. '
     'This is automatically set to True for the provision_node_pools benchmark.',
 )
+BLOBFUSE_BLOCK_SIZE_MB = flags.DEFINE_float(
+    'blobfuse_block_size_mb',
+    1,
+    'The blobfuse block size in MB. Defaults to 1.',
+)

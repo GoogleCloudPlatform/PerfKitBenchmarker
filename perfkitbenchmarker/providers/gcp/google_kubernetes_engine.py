@@ -204,15 +204,14 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
 
-  def _PostCreate(self):
-    """Acquires cluster authentication."""
+  def _GetKubeconfig(self):
+    """Returns the kubeconfig for the cluster."""
     cmd = self._GcloudCommand(
         'container', 'clusters', 'get-credentials', self.name
     )
     env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
-    super()._PostCreate()
 
   def _IsDeleting(self):
     cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
@@ -243,6 +242,18 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     # PD-SSD
     return 'premium-rwo'
 
+  def HasLocalSsd(self, nodepool_name: str = 'default') -> bool:
+    """Returns true if the given nodepool has local SSDs."""
+    if nodepool_name == 'default':
+      nodepool = self.default_nodepool
+    elif nodepool_name not in self.nodepools:
+      raise errors.Config.InvalidValue(
+          f'Nodepool {nodepool_name} not found in cluster.'
+      )
+    else:
+      nodepool = self.nodepools[nodepool_name]
+    return nodepool.max_local_disks is not None and nodepool.max_local_disks > 0
+
   def GetNodePoolNames(self) -> list[str]:
     """Get node pool names for the cluster."""
     # Command `gcloud container node-pools list` does not work for Autopilot
@@ -253,6 +264,15 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     stdout, _, _ = cmd.Issue()
     return stdout.split()
 
+  def _UsesCustomComputeClass(
+      self, nodepool_config: container.BaseNodePoolConfig
+  ) -> bool:
+    """Returns True if the nodepool config uses a custom compute class."""
+    return bool(
+        (nodepool_config.machine_type is None and not nodepool_config.cpus)
+        or nodepool_config.machine_families
+    )
+
 
 class GkeCluster(BaseGkeCluster):
   """Class representing a Google Kubernetes Engine cluster."""
@@ -261,6 +281,9 @@ class GkeCluster(BaseGkeCluster):
 
   def __init__(self, spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(spec)
+    # Initialize event_poller to None to avoid AttributeError
+    if not hasattr(self, 'event_poller'):
+      self.event_poller = None
     # Update the environment for gcloud commands:
     if gcp_flags.GKE_API_OVERRIDE.value:
       os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_CONTAINER'] = (
@@ -282,9 +305,7 @@ class GkeCluster(BaseGkeCluster):
       vm_config: virtual_machine_spec.BaseVmSpec,
       nodepool_config: container.BaseNodePoolConfig,
   ):
-    vm_config = typing.cast(
-        gce_virtual_machine.GceVmSpec, vm_config
-    )
+    vm_config = typing.cast(gce_virtual_machine.GceVmSpec, vm_config)
     nodepool_config.disk_type = vm_config.boot_disk_type
     nodepool_config.disk_size = vm_config.boot_disk_size
     nodepool_config.max_local_disks = vm_config.max_local_disks
@@ -351,6 +372,8 @@ class GkeCluster(BaseGkeCluster):
         self.default_nodepool,
         cmd,
     )
+    if self._UsesCustomComputeClass(self.default_nodepool):
+      cmd.args.append('--enable-default-compute-class')
     enable_autoprovisioning = False
     if gcp_flags.MAX_CPU.value:
       cmd.flags['max-cpu'] = gcp_flags.MAX_CPU.value
@@ -375,6 +398,8 @@ class GkeCluster(BaseGkeCluster):
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
 
     self._RunClusterCreateCommand(cmd)
+    self._GetKubeconfig()
+    self._CreateCustomComputeClass(self.default_nodepool)
     self._CreateNodePools()
 
   def _CreateNodePools(self):
@@ -388,6 +413,57 @@ class GkeCluster(BaseGkeCluster):
           cmd,
       )
       self._IssueResourceCreationCommand(cmd)
+      self._CreateCustomComputeClass(nodepool)
+
+  def _CreateCustomComputeClass(
+      self, nodepool_config: container.BaseNodePoolConfig
+  ):
+    """Creates a custom compute class for the nodepool."""
+    if not self._UsesCustomComputeClass(nodepool_config):
+      return
+    compute_manifest = {
+        'apiVersion': 'cloud.google.com/v1',
+        'kind': 'ComputeClass',
+        'metadata': {
+            'name': nodepool_config.name,
+        },
+    }
+    priorities = []
+    for machine_family in nodepool_config.machine_families:
+      priorities.append({
+          'machineFamily': machine_family,
+      })
+    is_default_class = (
+        nodepool_config.name == container_cluster.DEFAULT_NODEPOOL
+    )
+    compute_manifest['spec'] = {'priorities': priorities}
+    if is_default_class:
+      compute_manifest['spec']['nodePoolAutoCreation'] = {'enabled': True}
+    kubernetes_commands.ApplyYaml([compute_manifest])
+    if is_default_class:
+      return
+    cmd = self._GcloudCommand(
+        'container',
+        'node-pools',
+        'update',
+        nodepool_config.name,
+        '--cluster',
+        self.name,
+        '--node-labels',
+        f'cloud.google.com/compute-class={nodepool_config.name}',
+    )
+    cmd.Issue()
+    cmd = self._GcloudCommand(
+        'container',
+        'node-pools',
+        'update',
+        nodepool_config.name,
+        '--cluster',
+        self.name,
+        '--node-taints',
+        f'cloud.google.com/compute-class={nodepool_config.name}:NoSchedule',
+    )
+    cmd.Issue()
 
   def _AddNodeParamsToCmd(
       self,
@@ -452,12 +528,16 @@ class GkeCluster(BaseGkeCluster):
     if nodepool_config.zone:
       cmd.flags['node-locations'] = nodepool_config.zone
 
-    if nodepool_config.machine_type is None:
+    if nodepool_config.machine_type:
+      cmd.flags['machine-type'] = nodepool_config.machine_type
+    elif nodepool_config.cpus and nodepool_config.memory_mib:
       cmd.flags['machine-type'] = 'custom-{}-{}'.format(
           nodepool_config.cpus, nodepool_config.memory_mib
       )
     else:
-      cmd.flags['machine-type'] = nodepool_config.machine_type
+      assert (
+          nodepool_config.machine_families
+      ), 'No machine type nor custom type nor machine family specified.'
 
     if FLAGS.gke_enable_gvnic:
       cmd.args.append('--enable-gvnic')
@@ -568,6 +648,7 @@ class GkeAutopilotCluster(BaseGkeCluster):
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     self._RunClusterCreateCommand(cmd)
+    self._GetKubeconfig()
 
   def GetResourceMetadata(self) -> dict[str, Any]:
     metadata = super().GetResourceMetadata()

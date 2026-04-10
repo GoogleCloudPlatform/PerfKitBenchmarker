@@ -154,7 +154,8 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     return (
         self.min_nodes != self.default_nodepool.num_nodes
         or self.max_nodes != self.default_nodepool.num_nodes
-    )
+        # Auto node provisioning mode is incompatible with cluster autoscaler.
+    ) and not FLAGS.azure_aks_auto_node_provisioning
 
   def _Create(self):
     """Creates the AKS cluster."""
@@ -176,6 +177,10 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     ] + self._GetNodeFlags(self.default_nodepool)
     if self.max_nodes > 256:
       cmd += [
+          '--network-plugin',
+          'azure',
+          '--network-plugin-mode',
+          'overlay',
           # Default /16 supports ~250 nodes; /10 provides ~4M IPs for up to 16k.
           '--pod-cidr',
           '100.64.0.0/10',
@@ -244,7 +249,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     # Validity should be uncovered during development. Quota and capacity
     # will trigger failures in other VM benchmarks.
     if re.search(
-        'Allocation failed. VM(s) with the following constraints cannot be'
+        'Allocation failed. VM\\(s\\) with the following constraints cannot be'
         ' allocated, because the condition is too restrictive.',
         stderr,
     ):
@@ -266,9 +271,8 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
           nodepool_config.machine_type,
       ]
     node_count = nodepool_config.num_nodes
-    if self._IsAutoscalerEnabled():
-      node_count = max(self.min_nodes, node_count)
-      node_count = min(self.max_nodes, node_count)
+    node_count = max(self.min_nodes, node_count)
+    node_count = min(self.max_nodes, node_count)
     args += [f'--node-count={node_count}']
     if self.default_nodepool.zone and self.default_nodepool.zone != self.region:
       zones = ' '.join(
@@ -342,7 +346,6 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
 
   def _PostCreate(self):
     """Tags the cluster resource group."""
-    super()._PostCreate()
     self._GetCredentials(use_admin=True)
     self._WaitForDefaultServiceAccount()
     set_tags_cmd = [
@@ -365,6 +368,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
       kubernetes_commands.ApplyManifest(
           'container/azure/nvidia-device-plugin.yaml',
       )
+    super()._PostCreate()
 
   def _GetCredentials(self, use_admin: bool) -> None:
     """Helper method to get credentials and check service account readiness.
@@ -731,7 +735,6 @@ class AksAutomaticCluster(AksCluster):
     Needed as node_resource_group is pre-configured and fully managed in
     Automatic clusters & role assignment must be created before authenticating.
     """
-    super(kubernetes_cluster.KubernetesCluster, self)._PostCreate()
     user_type, _, _ = vm_util.IssueCommand([
         azure.AZURE_PATH,
         'account',
@@ -752,6 +755,7 @@ class AksAutomaticCluster(AksCluster):
     self._WaitForDefaultServiceAccount()
     self._AttachContainerRegistry()
     self._WaitForPolicyRelaxation()
+    super(kubernetes_cluster.KubernetesCluster, self)._PostCreate()
 
   def _ModifyPodSpecPlacementYaml(
       self,

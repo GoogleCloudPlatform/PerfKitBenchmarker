@@ -84,7 +84,7 @@ def _Install(vm):
 def GetCassandraVersion(vm) -> str:
   """Returns the Cassandra version installed on the VM."""
   stdout, _ = vm.RemoteCommand(f'{GetCassandraPath()} -v')
-  return stdout
+  return stdout.strip()
 
 
 def YumInstall(vm):

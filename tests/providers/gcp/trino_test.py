@@ -108,6 +108,31 @@ class TrinoTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('maxMemory: 112GB', full_logs)
     self.assertIn('maxMemoryPerNode: 22GB', full_logs)
 
+  def testYamlWrittenWithSsd(self):
+    # Arrange.
+    self.enter_context(
+        mock.patch.object(
+            vm_util,
+            'GetTempDir',
+            return_value=tempfile.gettempdir(),
+        )
+    )
+    self.enter_context(flagsaver.flagsaver(trino_worker_memory=100))
+    EDW_SERVICE_SPEC.node_count = 5
+    db = trino.Trino(EDW_SERVICE_SPEC)
+    mock_kubernetes = mock.create_autospec(
+        kubernetes_cluster.KubernetesCluster, instance=True
+    )
+    mock_kubernetes.HasLocalSsd.return_value = True
+    db.SetContainerCluster(mock_kubernetes)
+    # Act.
+    with self.assertLogs(level='DEBUG') as logs:
+      db._WriteConfigYaml()
+    # Assert.
+    full_logs = ';'.join(logs.output)
+    self.assertIn('emptyDir:', full_logs)
+    self.assertIn('additionalVolumeMounts:', full_logs)
+
 
 if __name__ == '__main__':
   unittest.main()

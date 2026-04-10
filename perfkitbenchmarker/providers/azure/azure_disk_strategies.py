@@ -324,8 +324,6 @@ class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
     if not FLAGS.object_storage_fuse_bucket_name:
       blob_client.Create()
 
-    local_path = data.ResourcePath('blobfuse2/config.yaml.j2')
-    remote_path = 'blobfuse2_config.yaml'
     # Refer to azure_blob_storage.py for the storage account name.
     account_name = f'pkb{FLAGS.run_uri}absstorage'
     account_key = util.GetAzureStorageAccountKey(
@@ -335,12 +333,21 @@ class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
     context = {
         'account_name': account_name,
         'account_key': account_key,
+        'block_size_mb': FLAGS.blobfuse_block_size_mb,
     }
     self.vm.RenderTemplate(
-        template_path=local_path, remote_path=remote_path, context=context
+        template_path=data.ResourcePath('blobfuse2/config.yaml.j2'),
+        remote_path='blobfuse2_config.yaml',
+        context=context,
+    )
+    self.vm.RenderTemplate(
+        template_path=data.ResourcePath('blobfuse2/prefill_config.yaml.j2'),
+        remote_path='blobfuse2_prefill_config.yaml',
+        context=context,
     )
     self.vm.RemoteCommand(
-        f'sudo blobfuse2 mount {target} --config-file={remote_path} '
+        f'sudo blobfuse2 mount {target} '
+        '--config-file=blobfuse2_prefill_config.yaml '
         f'--container-name={bucket_name} {opts}'
     )
     self.vm.scratch_disks.append(blob_client)
