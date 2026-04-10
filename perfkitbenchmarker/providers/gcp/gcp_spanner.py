@@ -86,6 +86,18 @@ _MAX_COMMIT_DELAY = flags.DEFINE_integer(
     ' See https://cloud.google.com/spanner/docs/throughput-optimized-writes',
 )
 
+flags.DEFINE_enum(
+    'cloud_spanner_default_backup_schedule_type',
+    None,
+    ['NONE', 'AUTOMATIC', 'DEFAULT_BACKUP_SCHEDULE_TYPE_UNSPECIFIED'],
+    'The default backup schedule type for the Cloud Spanner instance.'
+    'Possible values:'
+    'NONE: No default backup schedule is created'
+    'AUTOMATIC: Default backup schedule is created -- This is the CLI default'
+    ' behavior if this flag is not set.'
+    'DEFAULT_BACKUP_SCHEDULE_TYPE_UNSPECIFIED: Not specified',
+)
+
 # Flags related to managed autoscaler
 # https://cloud.google.com/spanner/docs/create-manage-instances#gcloud
 flags.DEFINE_boolean(
@@ -176,6 +188,7 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
   spanner_load_nodes: int
   spanner_project: str
   spanner_autoscaler: bool
+  spanner_default_backup_schedule_type: str | None
   spanner_min_processing_units: int
   spanner_max_processing_units: int
   spanner_high_priority_cpu_target: int
@@ -211,6 +224,18 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
         'db_spec': (spec.PerCloudConfigDecoder, _NONE_OK),
         'db_disk_spec': (spec.PerCloudConfigDecoder, _NONE_OK),
         'spanner_autoscaler': (option_decoders.BooleanDecoder, _NONE_OK),
+        'spanner_default_backup_schedule_type': (
+            option_decoders.EnumDecoder,
+            {
+                'valid_values': [
+                    'NONE',
+                    'AUTOMATIC',
+                    'DEFAULT_BACKUP_SCHEDULE_TYPE_UNSPECIFIED',
+                    None,
+                ],
+                'default': None,
+            },
+        ),
         'spanner_min_processing_units': (option_decoders.IntDecoder, _NONE_OK),
         'spanner_max_processing_units': (option_decoders.IntDecoder, _NONE_OK),
         'spanner_high_priority_cpu_target': (
@@ -248,6 +273,11 @@ class SpannerSpec(relational_db_spec.RelationalDbSpec):
       config_values['spanner_load_nodes'] = flag_values.cloud_spanner_load_nodes
     if flag_values['cloud_spanner_project'].present:
       config_values['spanner_project'] = flag_values.cloud_spanner_project
+
+    if flag_values['cloud_spanner_default_backup_schedule_type'].present:
+      config_values['spanner_default_backup_schedule_type'] = (
+          flag_values.cloud_spanner_default_backup_schedule_type
+      )
 
     if flag_values['cloud_spanner_autoscaler'].present:
       config_values['spanner_autoscaler'] = flag_values.cloud_spanner_autoscaler
@@ -305,6 +335,9 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     self._load_nodes = db_spec.spanner_load_nodes or self.nodes
     self._api_endpoint = None
     self._autoscaler = db_spec.spanner_autoscaler
+    self._default_backup_schedule_type = (
+        db_spec.spanner_default_backup_schedule_type
+    )
     self._min_processing_units = (
         db_spec.spanner_min_processing_units or _DEFAULT_MIN_PROCESSING_UNITS
     )
@@ -347,6 +380,11 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
 
     if self.spec.db_tier:
       cmd.flags['edition'] = self.spec.db_tier
+
+    if self._default_backup_schedule_type is not None:
+      cmd.flags['default-backup-schedule-type'] = (
+          self._default_backup_schedule_type
+      )
 
     if self._autoscaler:
       cmd.use_beta_gcloud = True
@@ -666,6 +704,10 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
       })
     else:
       metadata['gcp_spanner_node_count'] = self.nodes
+    if self._default_backup_schedule_type:
+      metadata['gcp_spanner_default_backup_schedule_type'] = (
+          self._default_backup_schedule_type
+      )
     if _MAX_COMMIT_DELAY.value:
       metadata['gcp_spanner_max_commit_delay'] = _MAX_COMMIT_DELAY.value
     return metadata
