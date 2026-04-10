@@ -705,9 +705,7 @@ class EksKarpenterCluster(BaseEksCluster):
             }],
         },
         'iamIdentityMappings': [{
-            'arn': (
-                f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}'
-            ),
+            'arn': f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}',
             'username': 'system:node:{{EC2PrivateDNSName}}',
             'groups': ['system:bootstrappers', 'system:nodes'],
         }],
@@ -1009,6 +1007,29 @@ class EksKarpenterCluster(BaseEksCluster):
   def _PostCreate(self):
     """Performs post-creation steps for the cluster."""
     super()._PostCreate()
+    if 'kubernetes_node_scale' in FLAGS.benchmarks:
+      logging.info('Tuning aws-node (VPC CNI) for kubernetes_node_scale')
+      kubectl.RunKubectlCommand([
+          'set',
+          'env',
+          'daemonset/aws-node',
+          '-n',
+          'kube-system',
+          'WARM_ENI_TARGET=0',
+          'WARM_IP_TARGET=1',
+          'MINIMUM_IP_TARGET=1',
+      ])
+      kubectl.RunRetryableKubectlCommand(
+          [
+              'rollout',
+              'status',
+              'daemonset/aws-node',
+              '-n',
+              'kube-system',
+              '--timeout=%ds' % vm_util.DEFAULT_TIMEOUT,
+          ],
+          timeout=vm_util.DEFAULT_TIMEOUT,
+      )
     # Karpenter controller resources: default 1/1Gi; scale up when
     # node_scale target exceeds 1000 nodes.
     num_nodes = getattr(FLAGS, 'kubernetes_scale_num_nodes', None)
