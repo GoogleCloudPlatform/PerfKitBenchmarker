@@ -111,6 +111,13 @@ _DPDK_PKTGEN_TXD = flags.DEFINE_integer(
 _DPDK_PKTGEN_RXD = flags.DEFINE_integer(
     'dpdk_pktgen_rxd', 8192, 'The size of the RX descriptor ring size.'
 )
+_DPDK_PKTGEN_INITIAL_RATE = flags.DEFINE_integer(
+    'dpdk_pktgen_initial_rate',
+    None,
+    'Custom initial rate (PPS) to start the binary search for max throughput in'
+    ' specific tests. If not set, the benchmark will use a default initial'
+    ' rate of 50,000,000.',
+)
 
 # DPDK Pktgen maximum logical cores
 # _MAX_LCORES is not really useful, pktgen-dpdk is buggy with multiple tx/rx
@@ -455,7 +462,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
         (abs(curr_pps - prev_pps) / (curr_pps + 1))
         > _PPS_BINARY_SEARCH_THRESHOLD
     ) or (valid_total_receiver_rx_pkts is None):
-      curr_rate = (lb + ub) // 2
+      if curr_rate is None and _DPDK_PKTGEN_INITIAL_RATE.value is not None:
+        curr_rate = _DPDK_PKTGEN_INITIAL_RATE.value
+      else:
+        curr_rate = (lb + ub) // 2
       UpdatePpsAndRecompile(sender_vm, int(curr_rate), int(prev_rate))
       total_sender_tx_pkts, total_sender_rx_pkts, total_receiver_rx_pkts = (
           RunPktgen(tx_cmd, rx_cmd)
