@@ -219,7 +219,7 @@ MEMTIER_DISTRIBUTION_BINARY_SEARCH = flags.DEFINE_bool(
     (
         'If true, uses a binary search to measure the optimal client and thread'
         ' count needed for max throughput under latency cap. Else, uses'
-        ' --memtier_clients, --memtier_threads, and --memtier_pipelines for the'
+        ' --memtier_clients, --memtier_threads, and --memtier_pipeline for the'
         ' iterations.'
     ),
 )
@@ -393,7 +393,7 @@ def BuildMemtierCommand(
     json_out_file: pathlib.PosixPath | None = None,
     command: str | None = None,
     key_prefix: str | None = None,
-) -> str:
+) -> list[str]:
   """Returns command arguments used to run memtier."""
   # Arguments passed with a parameter
   args = {
@@ -451,7 +451,7 @@ def BuildMemtierCommand(
   for no_param_arg, value in no_param_args.items():
     if value:
       cmd.append(f'--{no_param_arg}')
-  return ' '.join(cmd)
+  return cmd
 
 
 @dataclasses.dataclass(frozen=True)
@@ -485,7 +485,7 @@ def _LoadSingleVM(
       tls=MEMTIER_TLS.value,
       expiry_range=MEMTIER_EXPIRY_RANGE.value,
   )
-  _IssueRetryableCommand(load_vm, cmd)
+  _IssueRetryableCommand(load_vm, ' '.join(cmd))
 
 
 def Load(
@@ -1224,6 +1224,7 @@ def _Run(
       command=MEMTIER_COMMAND.value,
       key_prefix=MEMTIER_KEY_PREFIX.value,
   )
+  cmd = ' '.join(cmd)
   logging.info('Memtier command: %s', cmd)
   # Add a buffer to the timeout to account for command overhead.
   timeout = test_time + 100 if test_time else None

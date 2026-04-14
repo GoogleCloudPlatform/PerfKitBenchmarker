@@ -10,11 +10,9 @@ import logging
 import multiprocessing
 import queue as py_queue
 import re
-import tempfile
 import time
 from typing import Any, Dict, Iterable, Iterator, Optional, Sequence
 from absl import flags
-import jinja2
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -115,18 +113,6 @@ def ConvertManifestToYamlDicts(
   return vm_util.ReadYamlAsDicts(manifest)
 
 
-def CreateRenderedManifestFile(filename: str, config: dict[str, Any]):
-  """Returns a file containing a rendered Jinja manifest (.j2) template."""
-  manifest_filename = data.ResourcePath(filename)
-  environment = jinja2.Environment(undefined=jinja2.StrictUndefined)
-  with open(manifest_filename) as manifest_file:
-    manifest_template = environment.from_string(manifest_file.read())
-  rendered_yaml = tempfile.NamedTemporaryFile(mode='w')
-  rendered_yaml.write(manifest_template.render(config))
-  rendered_yaml.flush()
-  return rendered_yaml
-
-
 def ApplyYaml(
     yaml_dicts: list[dict[str, Any]], **logging_kwargs
 ) -> Iterator[str]:
@@ -186,7 +172,7 @@ def WaitForResourceForMultiConditions(
           resource_name,
           condition,
           namespace,
-          timeout,
+          60 * 60 * 24 * 7,  # Handle timeouts within PKB instead
           wait_for_all,
           '',
           extra_args,
@@ -209,10 +195,11 @@ def WaitForResourceForMultiConditions(
   try:
     # Wait for any one of the conditions to be met or timeout.
     condition, exc = queue.get(timeout=timeout + 1)
-    logging.info('%s condition met: %s', resource_name, condition)
+    if exc is None:
+      logging.info('%s condition met: %s', resource_name, condition)
   except py_queue.Empty:
     condition = ''
-    exc = TimeoutError(
+    exc = vm_util.TimeoutExceededRetryError(
         f'Timed out waiting for conditions on resource {resource_name}:'
         f' {conditions} '
     )
@@ -250,7 +237,11 @@ def WaitForSucceeded(
   )
 
 
-def WaitForRollout(resource_name: str, timeout: int = vm_util.DEFAULT_TIMEOUT):
+def WaitForRollout(
+    resource_name: str,
+    timeout: int = vm_util.DEFAULT_TIMEOUT,
+    namespace: str | None = None,
+):
   """Blocks until a Kubernetes rollout is completed."""
   run_cmd = [
       'rollout',
@@ -258,6 +249,8 @@ def WaitForRollout(resource_name: str, timeout: int = vm_util.DEFAULT_TIMEOUT):
       '--timeout=%ds' % timeout,
       resource_name,
   ]
+  if namespace:
+    run_cmd.append(f'--namespace={namespace}')
 
   kubectl.RunRetryableKubectlCommand(
       run_cmd,

@@ -1,61 +1,79 @@
+{% if k8s_namespace and k8s_namespace != 'default' -%}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ k8s_namespace }}
+  labels:
+    app.kubernetes.io/managed-by: pkb
+
+---
+{%- endif %}
+
+apiVersion: v1
+kind: Service
+metadata:
+  {% if k8s_namespace -%}
+  namespace: {{ k8s_namespace }}
+  {%- endif %}
+  name: redis
+  labels:
+    app.kubernetes.io/managed-by: pkb
+    app: redis
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+  ports:
+  - name: redis
+    port: {{ redis_port }}
+
+---
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: redis-cluster
+  {% if k8s_namespace -%}
+  namespace: {{ k8s_namespace }}
+  {%- endif %}
+  labels:
+    app.kubernetes.io/managed-by: pkb
+  name: redis-config
 data:
   redis.conf:  |+
-    cluster-enabled yes
-    cluster-node-timeout 15000
-    cluster-config-file /data/nodes.conf
-    appendonly yes
     protected-mode no
     dir /data
-    port {{ redis_port }}
+    {%- for (k, v) in redis_parameters.items() if v is not none %}
+    {{ k }} {{ v }}
+    {%- endfor %}
+
 ---
+
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
+  {% if k8s_namespace -%}
+  namespace: {{ k8s_namespace }}
+  {%- endif %}
+  labels:
+    app.kubernetes.io/managed-by: pkb
   name: redis
 spec:
-  serviceName: "redis-service"
-  replicas: {{ redis_replicas }}
+  serviceName: "redis"
   selector:
     matchLabels:
       app: redis
   template:
     metadata:
       labels:
+        app.kubernetes.io/managed-by: pkb
         app: redis
-        appCluster: redis-cluster
     spec:
-      {% if runtime_class_name %}runtimeClassName: {{ runtime_class_name }}{% endif %}
-      terminationGracePeriodSeconds: 20
-      topologySpreadConstraints:
-      # Enforce max 2 Redis pods per node (leader and follower)
-      - maxSkew: 2
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: DoNotSchedule
-        labelSelector:
-          matchLabels:
-            app: redis
       tolerations:
       - key: "kubernetes.io/arch"
         operator: "Equal"
         value: "arm64"
         effect: "NoSchedule"
       affinity:
-        podAffinity:
-          # Cluster Redis pods together (leader and follower)
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: app
-                  operator: In
-                  values:
-                  - redis
-              topologyKey: kubernetes.io/hostname
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
@@ -63,24 +81,14 @@ spec:
               - key: pkb_nodepool
                 operator: In
                 values:
-                - redis
-        podAntiAffinity:
-          # Prevent Redis pods from being scheduled with PKB VMs (VMs)
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchExpressions:
-              - key: pkb
-                operator: Exists
-            topologyKey: kubernetes.io/hostname
+                - servers
       containers:
       - name: redis
-        image: redis:6
+        image: redis:{{ redis_version }}
         command:
           - "redis-server"
         args:
           - "/conf/redis.conf"
-          - "--protected-mode"
-          - "no"
         resources:
           requests:
             cpu: "100m"
@@ -89,26 +97,18 @@ spec:
             - name: redis
               containerPort: {{ redis_port }}
               protocol: "TCP"
-            - name: cluster
-              containerPort: {{ redis_cluster_port }}
-              protocol: "TCP"
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "redis-cli ping | grep PONG"
+          initialDelaySeconds: 5
+          periodSeconds: 5
         volumeMounts:
         - name: conf
           mountPath: /conf
-          readOnly: false
-        - name: data
-          mountPath: /data
-          readOnly: false
       volumes:
       - name: conf
         configMap:
-          name: redis-cluster
-          defaultMode: 0755
-  volumeClaimTemplates:
-  - metadata:
-      name: data
-    spec:
-      accessModes: [ "ReadWriteOnce" ]
-      resources:
-        requests:
-          storage: 100Gi
+          name: redis-config

@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  {% if k8s_namespace -%}
+  namespace: {{ k8s_namespace }}
+  {%- endif %}
+  name: memtier
+  labels:
+    app.kubernetes.io/managed-by: pkb
+spec:
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/managed-by: pkb
+        app: memtier
+    spec:
+      containers:
+      - name: memtier
+        image: redislabs/memtier_benchmark:{{ memtier_version }}
+        command:
+          - {{ memtier_command }}
+        args:
+          {%- for arg in memtier_args %}
+          - "{{ arg }}"
+          {%- endfor %}
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: pkb_nodepool
+                operator: In
+                values:
+                - clients
+  backoffLimit: 3

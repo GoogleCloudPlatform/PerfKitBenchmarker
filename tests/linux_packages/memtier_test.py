@@ -1821,7 +1821,7 @@ class MemtierTestCase(
   )
   def testBuildMemtierCommand(self, input_args, expected_cmd_regex):
     cmd = memtier.BuildMemtierCommand(**input_args)
-    self.assertRegex(cmd, expected_cmd_regex)
+    self.assertRegex(' '.join(cmd), expected_cmd_regex)
 
   def testGetMetadataDefault(self):
     meta = memtier.GetMetadata(clients=100, threads=4, pipeline=1)

@@ -118,6 +118,8 @@
     --dpb_storage_uri is provided, files are staged in a subfolder named after
     the PKB run_uri within the given URI. If not provided, a new bucket is still
     created and managed by PKB.
+-   Refactored `kubernetes_redis_memtier_benchmark`, including removal of
+    non-functioning Redis Cluster testing.
 
 ### New features:
 
