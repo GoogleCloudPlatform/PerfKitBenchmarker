@@ -63,6 +63,12 @@ CONTAINER_IMAGE = flags.DEFINE_string(
     'The container image to use for the Kubernetes scale benchmark.'
     'If not specified, the default image will be used.',
 )
+VALIDATED_NUM_NODES = flags.DEFINE_integer(
+    'kubernetes_scale_validated_num_nodes',
+    None,
+    'If defined, the benchmark will fail if the number of nodes is not equal'
+    ' to this value after the scale up.',
+)
 
 MANIFEST_TEMPLATE = 'container/kubernetes_scale/kubernetes_scale.yaml.j2'
 DEFAULT_IMAGE = 'busybox:1.37'
@@ -145,6 +151,14 @@ def _GetScaleTimeout() -> int:
   return min(proposed_timeout, max_timeout)
 
 
+def _ShouldSuppressLogging() -> bool:
+  """Returns true if logging should be suppressed."""
+  return (
+      NUM_PODS.value > 20
+      or getattr(FLAGS, 'kubernetes_scale_num_nodes', 5) > 20
+  )
+
+
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Scales a large number of pods on kubernetes."""
   assert bm_spec.container_cluster
@@ -173,9 +187,11 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   pod_samples = ParseStatusChanges('pod', start_time, initial_pods)
   samples += pod_samples
   CheckForFailures(cluster, pod_samples, NUM_PODS.value - 1)
-  samples += ParseStatusChanges(
+  node_samples = ParseStatusChanges(
       'node', start_time, resources_to_ignore=initial_nodes
   )
+  samples += node_samples
+  CheckForNodeFailures(node_samples, initial_nodes)
   metadata = {
       'pod_memory': MEMORY_PER_POD.value,
       'pod_cpu': CPUS_PER_POD.value,
@@ -185,6 +201,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   if virtual_machine.GPU_COUNT.value:
     metadata['gpu_count'] = virtual_machine.GPU_COUNT.value
     metadata['gpu_type'] = virtual_machine.GPU_TYPE.value
+  if VALIDATED_NUM_NODES.value:
+    metadata['validated_num_nodes'] = VALIDATED_NUM_NODES.value
   for s in samples:
     s.metadata.update(metadata)
   return samples
@@ -251,7 +269,14 @@ def ScaleUpPods(
     start_polling_time = time.monotonic()
     kubernetes_commands.WaitForRollout(rollout_name, timeout=max_wait_time)
 
-    all_new_pods = set(kubernetes_commands.GetPodNames()) - initial_pods
+    all_new_pods = (
+        set(
+            kubernetes_commands.GetPodNames(
+                suppress_logging=_ShouldSuppressLogging()
+            )
+        )
+        - initial_pods
+    )
     end_polling_time = time.monotonic()
     logging.info(
         'In %d seconds, found all %s new pods',
@@ -282,6 +307,54 @@ def ScaleUpPods(
     return []
 
 
+def _GetSampleByMetricName(
+    samples: list[sample.Sample], metric: str
+) -> sample.Sample | None:
+  """Returns the sample with the given metric name."""
+  return next((s for s in samples if s.metric == metric), None)
+
+
+def CheckForNodeFailures(
+    node_samples: list[sample.Sample],
+    initial_nodes: set[str],
+):
+  """Fails the benchmark if the wrong number of nodes are present.
+
+  Args:
+    node_samples: The samples from node transition times which includes node
+      Ready count.
+    initial_nodes: The initial nodes in the cluster.
+
+  Raises:
+    RunError: If the number of nodes is not equal to the expected number of
+      nodes.
+  """
+  if VALIDATED_NUM_NODES.value is None:
+    return
+  node_ready_count_sample = _GetSampleByMetricName(
+      node_samples, 'node_Ready_count'
+  )
+  if node_ready_count_sample is None:
+    raise errors.Benchmarks.RunError(
+        'No node ready events were found & we attempted to scale up to'
+        f' {VALIDATED_NUM_NODES.value} nodes.'
+    )
+  expected_num_nodes = VALIDATED_NUM_NODES.value - len(initial_nodes)
+  if node_ready_count_sample.value != expected_num_nodes:
+    raise errors.Benchmarks.RunError(
+        'Expected %d nodes to be created, but %d nodes were created &'
+        ' ready.Expected count %d comes from validated num nodes %d - initial'
+        ' nodes %d.'
+        % (
+            expected_num_nodes,
+            node_ready_count_sample.value,
+            expected_num_nodes,
+            VALIDATED_NUM_NODES.value,
+            len(initial_nodes),
+        )
+    )
+
+
 def CheckForFailures(
     cluster: kubernetes_cluster.KubernetesCluster,
     pod_samples: list[sample.Sample],
@@ -304,9 +377,7 @@ def CheckForFailures(
       str | None, list[kubernetes_events.KubernetesEvent]
   ] = cluster.event_poller.GetAndLogFailureEvents()
 
-  ready_count_sample = next(
-      (s for s in pod_samples if s.metric == 'pod_Ready_count'), None
-  )
+  ready_count_sample = _GetSampleByMetricName(pod_samples, 'pod_Ready_count')
   if ready_count_sample is not None and ready_count_sample.value >= num_pods:
     logging.info(
         'Benchmark successfully scaled up %d pods, which is equal to or more '
@@ -387,10 +458,7 @@ def GetStatusConditionsForResourceType(
   stdout, _, _ = kubectl.RunKubectlCommand(
       ['get', resource_type, '-o', 'json'],
       timeout=60 * 5,  # 5 minutes for large clusters (e.g. 1000 pods)
-      suppress_logging=(
-          NUM_PODS.value > 20
-          or getattr(FLAGS, 'kubernetes_scale_num_nodes', 5) > 20
-      ),
+      suppress_logging=_ShouldSuppressLogging(),
   )
   data = json.loads(stdout)
   name_to_conditions = {}

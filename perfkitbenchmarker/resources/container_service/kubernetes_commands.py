@@ -708,9 +708,9 @@ def GetPodIps(resource_name) -> list[str]:
   return GetPodIpsByLabel('app', pod_label)
 
 
-def GetPodNames() -> list[str]:
+def GetPodNames(suppress_logging: bool = False) -> list[str]:
   """Returns all pod names in the cluster."""
-  return GetAllNamesForResourceType('pods')
+  return GetAllNamesForResourceType('pods', suppress_logging=suppress_logging)
 
 
 def GetNodeNames(suppress_logging: bool = False) -> list[str]:

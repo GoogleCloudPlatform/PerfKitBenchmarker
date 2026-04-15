@@ -463,6 +463,39 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
           9,
       )
 
+  @flagsaver.flagsaver(kubernetes_scale_validated_num_nodes=None)
+  def testCheckForNodeFailures_NoValidatedNumNodes(self):
+    kubernetes_scale_benchmark.CheckForNodeFailures([], set())
+
+  @flagsaver.flagsaver(kubernetes_scale_validated_num_nodes=10)
+  def testCheckForNodeFailures_NoSample(self):
+    with self.assertRaisesRegex(
+        errors.Benchmarks.RunError, 'No node ready events were found'
+    ):
+      kubernetes_scale_benchmark.CheckForNodeFailures([], set())
+
+  @flagsaver.flagsaver(kubernetes_scale_validated_num_nodes=10)
+  def testCheckForNodeFailures_Mismatch(self):
+    with self.assertRaises(
+        errors.Benchmarks.RunError,
+    ):
+      kubernetes_scale_benchmark.CheckForNodeFailures(
+          [sample.Sample('node_Ready_count', 5, 'count')],
+          set(),
+      )
+
+  @flagsaver.flagsaver(kubernetes_scale_validated_num_nodes=10)
+  def testCheckForNodeFailures_Match(self):
+    kubernetes_scale_benchmark.CheckForNodeFailures(
+        [sample.Sample('node_Ready_count', 10, 'count')], set()
+    )
+
+  @flagsaver.flagsaver(kubernetes_scale_validated_num_nodes=2)
+  def testCheckForNodeFailures_MatchWithInitialNodes(self):
+    kubernetes_scale_benchmark.CheckForNodeFailures(
+        [sample.Sample('node_Ready_count', 1, 'count')], set(['node1'])
+    )
+
 
 if __name__ == '__main__':
   unittest.main()
