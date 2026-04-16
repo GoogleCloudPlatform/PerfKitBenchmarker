@@ -80,7 +80,7 @@ _WAREHOUSES = benchbase.BENCHBASE_WAREHOUSES
 _RECOVERY_POINT_ARN = aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN
 # Timeout value derived from testing run:
 # https://screenshot.googleplex.com/8USL62xn9oSvABj
-_SPANNER_ANALYZE_TIMEOUT = 60 * 60 * 3
+_SPANNER_ANALYZE_TIMEOUT = 60 * 60 * 5
 
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -133,10 +133,11 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       FLAGS.db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES
       and _RECOVERY_POINT_ARN.value is None
   )
-  if (
-      dsql_create_from_raw
-      or FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
-  ):
+  spanner_create_from_raw: bool = (
+      FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES
+      and not getattr(benchmark_spec.relational_db, 'spanner_restored', False)
+  )
+  if dsql_create_from_raw or spanner_create_from_raw:
     profile: str = (
         'postgres'
         if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES

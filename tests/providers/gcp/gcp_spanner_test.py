@@ -1,7 +1,7 @@
-"""Tests for google3.third_party.py.perfkitbenchmarker.providers.gcp.gcp_spanner."""
-
 import datetime
 import inspect
+import json
+import time
 from typing import Type, cast
 import unittest
 
@@ -18,6 +18,7 @@ from perfkitbenchmarker.providers.gcp import gcp_spanner
 from perfkitbenchmarker.providers.gcp import util
 from tests import pkb_common_test_case
 import requests
+
 
 FLAGS = flags.FLAGS
 
@@ -277,7 +278,7 @@ class SpannerTest(pkb_common_test_case.PkbCommonTestCase):
             ],
         }]
     )
-    mock_client = mock.MagicMock()
+    mock_client = mock.Mock()
     mock_client.list_time_series.return_value = mock_response.time_series
 
     self.enter_context(
@@ -499,7 +500,7 @@ class CreateTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertFalse(self.test_instance.created)
     self.enter_context(
         mock.patch.object(
-            self.test_instance, '_Exists', side_effect=[False, True]
+            self.test_instance, '_Exists', side_effect=[False, True, True]
         )
     )
     self.enter_context(
@@ -510,6 +511,127 @@ class CreateTest(pkb_common_test_case.PkbCommonTestCase):
 
     self.assertTrue(self.test_instance.created)
     self.assertFalse(self.test_instance.user_managed)
+
+
+class RestoreTest(pkb_common_test_case.PkbCommonTestCase):
+
+  @flagsaver.flagsaver(
+      run_uri='test_uri',
+      cloud_spanner_source_instance_id='source_instance',
+      cloud_spanner_source_database_id='source_db',
+  )
+  def setUp(self):
+    super().setUp()
+    self.instance = GetTestSpannerInstance()
+    self.instance.instance_id = 'target_instance'
+    self.instance.database = 'target_db'
+
+  def testRestoreDatabase(self):
+    self.enter_context(
+        mock.patch.object(
+            self.instance,
+            '_GetLatestBackup',
+            return_value='backup_123',
+            autospec=True,
+        )
+    )
+    mock_cmd = mock.Mock()
+    mock_cmd.flags = {}
+    mock_cmd.Issue.side_effect = [
+        ('', 'Restore database in progress. Operation name=operation_123', 0),
+        (json.dumps({'done': True}), '', 0),
+    ]
+    mock_gcloud = self.enter_context(
+        mock.patch.object(
+            util, 'GcloudCommand', return_value=mock_cmd, autospec=True
+        )
+    )
+    self.enter_context(mock.patch.object(time, 'sleep', autospec=True))
+    self.enter_context(
+        mock.patch.object(
+            time, 'time', side_effect=range(0, 1000, 30), autospec=True
+        )
+    )
+
+    self.instance.RestoreDatabase('target_db')
+
+    with self.subTest('TestInstanceRestored'):
+      self.assertTrue(self.instance.spanner_restored)
+
+    with self.subTest('TestRestoreCommand'):
+      mock_gcloud.assert_any_call(
+          self.instance, 'spanner', 'databases', 'restore'
+      )
+      self.assertTrue(mock_cmd.flags['async'])
+
+    with self.subTest('TestDescribeOperationCommand'):
+      mock_gcloud.assert_any_call(
+          self.instance, 'spanner', 'operations', 'describe', 'operation_123'
+      )
+
+  def testGetLatestBackup(self):
+    mock_backups_list = [
+        {
+            'name': 'projects/p/instances/i/backups/backup_2023_10_26',
+            'create_time': '2023-10-26T10:00:00Z',
+        },
+    ]
+    mock_cmd = mock.Mock()
+    mock_cmd.flags = {}
+    mock_cmd.Issue.return_value = (json.dumps(mock_backups_list), '', 0)
+    mock_gcloud = self.enter_context(
+        mock.patch.object(
+            util, 'GcloudCommand', return_value=mock_cmd, autospec=True
+        )
+    )
+
+    backup_id = self.instance._GetLatestBackup()
+
+    self.assertEqual(backup_id, 'backup_2023_10_26')
+    mock_gcloud.assert_called_with(self.instance, 'spanner', 'backups', 'list')
+    self.assertEqual(mock_cmd.flags['instance'], 'source_instance')
+    self.assertIn('database:source_db', mock_cmd.flags['filter'])
+
+
+class FlagValidationTest(pkb_common_test_case.PkbCommonTestCase):
+
+  @flagsaver.flagsaver(run_uri='test_uri')
+  def setUp(self):
+    super().setUp()
+
+  def testInvalidFlagCombination_OnlyInstance(self):
+    with self.assertRaises(flags.IllegalFlagValueError):
+      with flagsaver.flagsaver(
+          cloud_spanner_source_instance_id='source_instance',
+          cloud_spanner_source_database_id=None,
+      ):
+        GetTestSpannerInstance()
+
+  def testInvalidFlagCombination_OnlyDatabase(self):
+    with self.assertRaises(flags.IllegalFlagValueError):
+      with flagsaver.flagsaver(
+          cloud_spanner_source_instance_id=None,
+          cloud_spanner_source_database_id='source_db',
+      ):
+        GetTestSpannerInstance()
+
+  @flagsaver.flagsaver(
+      cloud_spanner_source_instance_id='source_instance',
+      cloud_spanner_source_database_id='source_db',
+  )
+  def testValidFlagCombination_Both(self):
+    instance = GetTestSpannerInstance()
+    self.assertEqual(instance.source_instance_id, 'source_instance')
+    self.assertEqual(instance.source_database_id, 'source_db')
+
+  @flagsaver.flagsaver(
+      cloud_spanner_source_instance_id=None,
+      cloud_spanner_source_database_id=None,
+  )
+  def testValidFlagCombination_None(self):
+    instance = GetTestSpannerInstance()
+    self.assertIsNone(instance.source_instance_id)
+    self.assertIsNone(instance.source_database_id)
 
 
 if __name__ == '__main__':

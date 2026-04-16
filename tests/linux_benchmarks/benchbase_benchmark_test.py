@@ -63,8 +63,9 @@ class BenchbaseBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(db_engine=sql_engine_utils.SPANNER_POSTGRES)
   def test_prepare_spanner_postgres_loads(self):
+    self.mock_benchmark_spec.relational_db.spanner_restored = False
     benchbase_benchmark.Prepare(self.mock_benchmark_spec)
-    timeout = 60 * 60 * 3
+    timeout = 60 * 60 * 5
     self.mock_vm.Install.assert_called_once_with('benchbase')
     self.mock_create_config.assert_called_once_with(self.mock_vm)
     self.mock_override_endpoint.assert_not_called()
@@ -108,6 +109,14 @@ class BenchbaseBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         self.mock_benchmark_spec.relational_db.RunSqlQuery.call_count, 9
     )
+
+  @flagsaver.flagsaver(db_engine=sql_engine_utils.SPANNER_POSTGRES)
+  def test_prepare_spanner_postgres_restore_skips_loading(self):
+    self.mock_benchmark_spec.relational_db.spanner_restored = True
+    benchbase_benchmark.Prepare(self.mock_benchmark_spec)
+    self.mock_vm.Install.assert_called_once_with('benchbase')
+    self.mock_create_config.assert_called_once_with(self.mock_vm)
+    self.mock_vm.RemoteCommand.assert_not_called()
 
   @mock.patch('time.sleep')
   @mock.patch.object(benchbase, 'ParseResults', autospec=True)

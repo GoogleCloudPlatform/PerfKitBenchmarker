@@ -132,6 +132,30 @@ flags.DEFINE_integer(
     'Storage target when spanner starts scaling.',
 )
 
+_SOURCE_INSTANCE = flags.DEFINE_string(
+    'cloud_spanner_source_instance_id',
+    None,
+    'The name of the source Cloud Spanner instance to restore from.',
+)
+_SOURCE_DATABASE = flags.DEFINE_string(
+    'cloud_spanner_source_database_id',
+    None,
+    'The name of the source Cloud Spanner database to restore from.',
+)
+
+
+@flags.multi_flags_validator(
+    ['cloud_spanner_source_instance_id', 'cloud_spanner_source_database_id'],
+    message=(
+        'Both cloud_spanner_source_instance_id and '
+        'cloud_spanner_source_database_id must be provided, or neither.'
+    ),
+)
+def CheckSourceFlags(flags_dict: dict[str, Any]) -> bool:
+  return bool(flags_dict['cloud_spanner_source_instance_id']) is bool(
+      flags_dict['cloud_spanner_source_database_id']
+  )
+
 
 # Type aliases
 _RelationalDbSpec = relational_db_spec.RelationalDbSpec
@@ -141,6 +165,10 @@ _DEFAULT_DESCRIPTION = 'Created by PKB.'
 _DEFAULT_ENDPOINT = 'https://spanner.googleapis.com'
 _DEFAULT_NODES = 1
 _FROZEN_NODE_COUNT = 1
+_SPANNER_RESTORE_TIMEOUT = 2 * 60 * 60
+_SPANNER_READY_TIMEOUT_AFTER_RESTORE = 6 * 60 * 60
+# Default poll interval for waiting operations.
+_DEFAULT_POLL_INTERVAL = 30
 
 _DEFAULT_MIN_PROCESSING_UNITS = 5000
 _DEFAULT_MAX_PROCESSING_UNITS = 50000
@@ -306,20 +334,25 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
   will be created and torn down before and after the test.
 
   The following parameters are overridden by the corresponding FLAGs.
-    project:     FLAGS.cloud_spanner_project
-    config:      FLAGS.cloud_spanner_config
-    nodes:       FLAGS.cloud_spanner_nodes
+    project:            FLAGS.cloud_spanner_project
+    config:             FLAGS.cloud_spanner_config
+    nodes:              FLAGS.cloud_spanner_nodes
 
   Attributes:
-    name:        Name of the instance to create.
+    name: Name of the instance to create.
     description: Description of the instance.
-    database:    Name of the database to create
+    database: Name of the database to create.
+    source_instance_id: The ID of the Spanner instance to restore from.
+    source_database_id: The ID of the Spanner database to restore from.
+    spanner_restored: Whether the database has been restored from a backup.
   """
 
   CLOUD = 'GCP'
   IS_MANAGED = True
   REQUIRED_ATTRS = ['CLOUD', 'IS_MANAGED', 'ENGINE']
   METRICS_COLLECTION_DELAY_SECONDS = CPU_API_DELAY_SECONDS
+  READY_TIMEOUT = _SPANNER_READY_TIMEOUT_AFTER_RESTORE
+  POLL_INTERVAL = _DEFAULT_POLL_INTERVAL
 
   def __init__(self, db_spec: SpannerSpec, **kwargs):
     super().__init__(db_spec, **kwargs)
@@ -357,6 +390,9 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     self.project = (
         db_spec.spanner_project or FLAGS.project or util.GetDefaultProject()
     )
+    self.source_instance_id = _SOURCE_INSTANCE.value
+    self.source_database_id = _SOURCE_DATABASE.value
+    self.spanner_restored = False
 
   def _GetDefaultConfig(self) -> str:
     """Gets the config that corresponds the region used for the test."""
@@ -448,8 +484,84 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     else:
       logging.info('Deleted GCP Spanner instance.')
 
+  def _GetLatestBackup(self) -> str:
+    """Gets the latest backup from the source instance and database."""
+    cmd = util.GcloudCommand(self, 'spanner', 'backups', 'list')
+    cmd.flags['instance'] = self.source_instance_id
+    cmd.flags['database'] = self.source_database_id
+    # Filter by source database and schedule
+    filter_str = (
+        f'database:{self.source_database_id} AND '
+        'backupSchedules:default_daily_full_backup_schedule AND state:READY'
+    )
+    cmd.flags['filter'] = filter_str
+    cmd.flags['sort-by'] = '~create_time'
+    cmd.flags['limit'] = 1
+    stdout, _, _ = cmd.Issue(raise_on_failure=True)
+    backups = json.loads(stdout)
+    if not backups:
+      raise errors.Resource.CreationError(
+          f'No backups found for {self.source_database_id} in '
+          f'{self.source_instance_id}'
+      )
+    # The backup name is in the format
+    # projects/{project}/instances/{instance}/backups/{backup}
+    return backups[0]['name'].split('/')[-1]
+
+  def RestoreDatabase(self, database_name: str) -> tuple[str, str]:
+    """Restores the database from the latest backup.
+
+    This method finds the most recent backup of the source database and
+    initiates a restore operation to create a new database with the
+    specified `database_name` on the current Spanner instance. It waits for
+    the restore operation to complete and for the new database to become
+    ready.
+
+    Args:
+      database_name: The name of the new database to be created from the backup.
+
+    Returns:
+      A tuple containing the stdout and stderr from the initial `gcloud spanner
+      databases restore` command.
+    """
+    # When restore completes, the database is READY_OPTIMIZING but not READY. We
+    # need to wait for some additional time for the database to be READY.
+    # https://docs.cloud.google.com/spanner/docs/backup/restore-backup-overview#restoration-states
+    backup_id = self._GetLatestBackup()
+    logging.info('Restoring %s from backup %s', database_name, backup_id)
+    cmd = util.GcloudCommand(self, 'spanner', 'databases', 'restore')
+    cmd.flags['destination-instance'] = self.instance_id
+    cmd.flags['destination-database'] = database_name
+    cmd.flags['source-instance'] = self.source_instance_id
+    cmd.flags['source-backup'] = backup_id
+    cmd.flags['async'] = True
+    stdout, stderr, _ = cmd.Issue(raise_on_failure=True)
+
+    match = re.search(r'Operation name=([^\n\s]+)', stderr)
+    if not match:
+      raise errors.Benchmarks.RunError(
+          f'Failed to parse operation name from gcloud output: {stderr}'
+      )
+    operation_name = match.group(1)
+
+    self._WaitForSpannerAsyncOperation(
+        operation_name,
+        timeout=_SPANNER_RESTORE_TIMEOUT,
+        database_name=database_name,
+        poll_interval=self.POLL_INTERVAL,
+    )
+
+    logging.info(
+        'Restore operation complete. Waiting for database to be READY.'
+    )
+
+    self.spanner_restored = True
+    return stdout, stderr
+
   def CreateDatabase(self, database_name: str) -> tuple[str, str]:
     """Creates the database."""
+    if self.source_instance_id and self.source_database_id:
+      return self.RestoreDatabase(database_name)
     cmd = util.GcloudCommand(
         self, 'spanner', 'databases', 'create', database_name
     )
@@ -457,7 +569,11 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     cmd.flags['database-dialect'] = self.dialect
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
     if retcode != 0:
-      logging.error('Create GCP Spanner database failed.')
+      logging.error(
+          'Create GCP Spanner database %s failed with error: %s',
+          database_name,
+          stderr,
+      )
     return stdout, stderr
 
   def DeleteDatabase(self, database_name: str) -> tuple[str, str]:
@@ -515,20 +631,29 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
 
     return stdout, stderr
 
-  def _WaitForSpannerAsyncOperation(self, op_name: str, timeout: int) -> None:
+  def _WaitForSpannerAsyncOperation(
+      self,
+      op_name: str,
+      timeout: int,
+      *,
+      database_name: str | None = None,
+      poll_interval: int = _DEFAULT_POLL_INTERVAL,
+  ) -> None:
     """Polls Spanner async operation until completion."""
+    database_name = self.database if database_name is None else database_name
 
     @vm_util.Retry(
         timeout=timeout,
-        poll_interval=10,
+        poll_interval=poll_interval,
         retryable_exceptions=(SpannerAsyncOperationInProgressError,),
     )
-    def _Wait():
+    def _Wait() -> None:
       poll_cmd = util.GcloudCommand(
           self, 'spanner', 'operations', 'describe', op_name
       )
       poll_cmd.flags['instance'] = self.instance_id
-      poll_cmd.flags['database'] = self.database
+      if database_name:
+        poll_cmd.flags['database'] = database_name
       poll_stdout, _, _ = poll_cmd.Issue(raise_on_failure=True)
       op_status = json.loads(poll_stdout)
       if not op_status.get('done'):
@@ -542,6 +667,10 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
         )
 
     _Wait()
+
+  def _IsReady(self) -> bool:
+    """Returns true if the instance and the database exists/is ready."""
+    return self._Exists()
 
   def _Exists(self, instance_only: bool = False) -> bool:
     """Returns true if the instance and the database exists."""
