@@ -1007,7 +1007,7 @@ class EksKarpenterCluster(BaseEksCluster):
   def _PostCreate(self):
     """Performs post-creation steps for the cluster."""
     super()._PostCreate()
-    if 'kubernetes_node_scale' in FLAGS.benchmarks:
+    if FLAGS.eks_tune_vpc_cni_for_scale:
       logging.info('Tuning aws-node (VPC CNI) for kubernetes_node_scale')
       kubectl.RunKubectlCommand([
           'set',

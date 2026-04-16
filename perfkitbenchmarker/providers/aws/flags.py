@@ -246,6 +246,14 @@ flags.DEFINE_list(
     'Comma-separated EC2 types for the Karpenter default NodePool (worker '
     'nodes only). Empty keeps instance-category/generation in the template.',
 )
+flags.DEFINE_boolean(
+    'eks_tune_vpc_cni_for_scale',
+    False,
+    'Tune aws-node DaemonSet warm-pool settings (WARM_ENI_TARGET=0, '
+    'WARM_IP_TARGET=1, MINIMUM_IP_TARGET=1) after cluster creation. '
+    'Required when scaling to thousands of nodes to prevent subnet IP '
+    'exhaustion. Enable when running kubernetes_node_scale at large scale.',
+)
 AWS_CAPACITY_BLOCK_RESERVATION_ID = flags.DEFINE_string(
     'aws_capacity_block_reservation_id',
     None,
