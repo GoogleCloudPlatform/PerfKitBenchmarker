@@ -208,6 +208,8 @@ def _GetKeyScalingEventTimes(
 ) -> dict[str, float]:
   """Extract the time of each known milestone."""
   events = cluster.GetEvents()
+  if cluster.event_poller:
+    cluster.event_poller.PrintEvents(events, 'scaling')
   node_events = list(
       event
       for event in events
@@ -251,12 +253,18 @@ def _GetKeyScalingEventTimes(
   )
   key_events |= First(
       pod_events,
-      lambda event: event.message.startswith('Created container'),
+      lambda event: (
+          event.message.startswith('Created container')
+          or event.message.startswith('Container created')
+      ),
       'container_created',
   )
   key_events |= First(
       pod_events,
-      lambda event: event.message.startswith('Started container'),
+      lambda event: (
+          event.message.startswith('Started container')
+          or event.message.startswith('Container started')
+      ),
       'container_started',
   )
   if 'node_ready' not in key_events or 'container_started' not in key_events:

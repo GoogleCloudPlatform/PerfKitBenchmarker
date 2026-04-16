@@ -1,6 +1,7 @@
 """Classes related to k8s events."""
 
 import calendar
+from collections.abc import Iterable
 import dataclasses
 import datetime
 import logging
@@ -109,18 +110,25 @@ class KubernetesEventPoller:
         ' benchmark may still have passed. Printing these by event reason.',
         len(failure_events_list),
     )
-    failure_events_by_reason: dict[str | None, list[KubernetesEvent]] = {}
-    for event in failure_events_list:
-      failure_events_by_reason.setdefault(event.reason, []).append(event)
-    for reason, failure_events in failure_events_by_reason.items():
+    return self.PrintEvents(failure_events_list, 'failure')
+
+  def PrintEvents(
+      self, all_events: Iterable['KubernetesEvent'], adjective: str
+  ):
+    """Prints a summary of the given events & returns events by reason."""
+    events_by_reason: dict[str | None, list[KubernetesEvent]] = {}
+    for event in all_events:
+      events_by_reason.setdefault(event.reason, []).append(event)
+    for reason, reason_events in events_by_reason.items():
       logging.info(
-          'There were %d failure events for reason %s. Printing the last 20.',
-          len(failure_events),
+          'There were %d %s events for reason %s. Printing the last 20.',
+          len(reason_events),
+          adjective,
           reason,
       )
-      for event in failure_events[-20:]:
-        logging.info('Printing failure event: %s', event)
-    return failure_events_by_reason
+      for event in reason_events[-20:]:
+        logging.info('Printing %s event: %s', adjective, event)
+    return events_by_reason
 
   def CheckForQuotaFailure(
       self, failure_events_by_reason: dict[str | None, list['KubernetesEvent']]
