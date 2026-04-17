@@ -1,0 +1,6 @@
+# Google recommended HugePages configuration for GKE
+# This uses the newer linuxConfig.hugepageConfig approach instead of sysctls
+
+linuxConfig:
+  hugepageConfig:
+    hugepage_size2m: 19456  # 38Gi with 2Mi pages (19456 * 2Mi = 38Gi)
