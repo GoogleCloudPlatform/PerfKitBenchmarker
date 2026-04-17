@@ -164,6 +164,10 @@ def _CreateNginxConfigMapDir():
   Creates two config files:
     - nginx-proxy.conf: merged global + reverse proxy config
     - nginx-upstream.conf: merged global + file server config (HTTP only)
+
+  Each merged config is also logged and copied into vm_util.GetTempDir()
+  so the exact contents applied to the cluster are preserved as a run
+  artifact.
   """
   temp_dir = tempfile.TemporaryDirectory()
 
@@ -172,15 +176,24 @@ def _CreateNginxConfigMapDir():
   upstream_conf_path = data.ResourcePath('nginx/file_server.conf')
 
   proxy_conf_content = _MergeNginxConfigs(global_conf_path, proxy_conf_path)
-  with open(os.path.join(temp_dir.name, 'nginx-proxy.conf'), 'w') as f:
-    f.write(proxy_conf_content)
-
   # Upstream always uses HTTP regardless of SSL setting
   upstream_conf_content = _MergeNginxConfigs(
       global_conf_path, upstream_conf_path, force_http=True
   )
-  with open(os.path.join(temp_dir.name, 'nginx-upstream.conf'), 'w') as f:
-    f.write(upstream_conf_content)
+
+  for name, content in (
+      ('nginx-proxy.conf', proxy_conf_content),
+      ('nginx-upstream.conf', upstream_conf_content),
+  ):
+    with open(os.path.join(temp_dir.name, name), 'w') as f:
+      f.write(content)
+    artifact_path = vm_util.PrependTempDir(name)
+    with open(artifact_path, 'w') as f:
+      f.write(content)
+    logging.info(
+        'Merged nginx config %s (saved to %s):\n%s',
+        name, artifact_path, content,
+    )
 
   return temp_dir
 
