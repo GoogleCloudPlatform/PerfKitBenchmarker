@@ -48,12 +48,14 @@ flags.DEFINE_string(
 )
 
 BENCHMARK_NAME = 'kubernetes_nginx'
-NGINX_IMAGE = 'nginx:1.29.6'
 BENCHMARK_CONFIG = """
 kubernetes_nginx:
   description: >
     Benchmarks Nginx server performance in a 3-tier architecture
     (Client -> Nginx Proxy -> Upstream Backend) on Kubernetes.
+  container_specs:
+    kubernetes_nginx:
+      image: nginx:1.29.6
   container_cluster:
     cloud: GCP
     type: Kubernetes
@@ -216,7 +218,7 @@ def _PrepareCluster(benchmark_spec):
         'nginx-configs', nginx_config_map_dirname
     )
 
-  container_image = NGINX_IMAGE
+  container_image = benchmark_spec.container_specs['kubernetes_nginx'].image
   proxy_port = 443 if FLAGS.nginx_use_ssl else 80
   upstream_port = 80
 
