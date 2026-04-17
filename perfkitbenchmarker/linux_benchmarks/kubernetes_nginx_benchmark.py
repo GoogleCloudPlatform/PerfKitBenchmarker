@@ -29,13 +29,13 @@ import ipaddress
 import logging
 import os
 import tempfile
-import time
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import nginx_benchmark
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
@@ -185,29 +185,43 @@ def _CreateNginxConfigMapDir():
   return temp_dir
 
 
+@vm_util.Retry(
+    timeout=300,
+    poll_interval=10,
+    retryable_exceptions=(
+        errors.VirtualMachine.RemoteCommandError,
+        errors.Resource.RetryableGetError,
+    ),
+)
+def _ProbeNginx(vm, url):
+  """Probes the Nginx proxy URL; raises RetryableGetError on non-success."""
+  cmd = f'curl -s -o /dev/null -w "%{{http_code}}" -k {url}'
+  stdout, _ = vm.RemoteCommand(cmd)
+  status = stdout.strip()
+  if status not in ('200', '301', '302'):
+    raise errors.Resource.RetryableGetError(
+        f'Got HTTP {status} from {url}'
+    )
+
+
 def _WaitForConnectivity(benchmark_spec):
   """Waits for the Nginx proxy to be reachable from the client VM."""
   lb_ip = benchmark_spec.nginx_endpoint_ip
   scheme = 'https' if FLAGS.nginx_use_ssl else 'http'
   url = f'{scheme}://{lb_ip}/{nginx_benchmark._CONTENT_FILENAME}'
-  cmd = f'curl -s -o /dev/null -w "%{{http_code}}" -k {url}'
+  client_vm = benchmark_spec.vm_groups['clients'][0]
 
   logging.info('Waiting for connectivity to %s...', url)
-  start_time = time.time()
-  while time.time() - start_time < 300:
-    try:
-      stdout, _ = benchmark_spec.vm_groups['clients'][0].RemoteCommand(cmd)
-      if stdout.strip() in ('200', '301', '302'):
-        logging.info('Connectivity established to %s', url)
-        return
-    except errors.VirtualMachine.RemoteCommandError:
-      pass
-    logging.info('Still waiting for connectivity...')
-    time.sleep(10)
-
-  raise errors.Benchmarks.PrepareException(
-      f'Timed out waiting for connectivity to {url}'
-  )
+  try:
+    _ProbeNginx(client_vm, url)
+  except (
+      vm_util.TimeoutExceededRetryError,
+      vm_util.RetriesExceededRetryError,
+  ) as e:
+    raise errors.Benchmarks.PrepareException(
+        f'Timed out waiting for connectivity to {url}'
+    ) from e
+  logging.info('Connectivity established to %s', url)
 
 
 def _PrepareCluster(benchmark_spec):
