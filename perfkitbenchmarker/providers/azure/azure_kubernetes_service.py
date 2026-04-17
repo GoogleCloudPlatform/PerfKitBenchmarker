@@ -15,7 +15,6 @@
 """Contains classes/functions related to Azure Kubernetes Service."""
 
 import json
-import re
 from typing import Any, List
 
 from absl import flags
@@ -241,21 +240,22 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--labels',
         f'pkb_nodepool={nodepool_config.name}',
     ] + self._GetNodeFlags(nodepool_config)
-    _, stderr, _ = vm_util.IssueCommand(cmd, timeout=600)
+    _, stderr, retcode = vm_util.IssueCommand(
+        cmd, timeout=600, raise_on_failure=False
+    )
     # Allocation failure could be due to capacity / quota / validity.
     # Validity should be uncovered during development. Quota and capacity
     # will trigger failures in other VM benchmarks.
-    if re.search(
-        'Allocation failed. VM\\(s\\) with the following constraints cannot be'
-        ' allocated, because the condition is too restrictive.',
-        stderr,
-    ):
-      raise errors.Benchmarks.InsufficientCapacityCloudFailure(
-          'Creation failed. Kubernetes does not support specific failure modes'
-          ' so failure can be due to capacity, quota, or configuration'
-          ' validity. Please run another VM benchmark to validate root cause of'
-          ' failure.'
-      )
+    if retcode:
+      if 'OverconstrainedZonalAllocationRequest' in stderr:
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+            'Creation failed. Kubernetes does not support specific failure'
+            ' modes so failure can be due to capacity, quota, or configuration'
+            ' validity. Please run another VM benchmark to validate root cause'
+            ' of failure.'
+        )
+      else:
+        raise errors.Resource.CreationError(stderr)
 
   def _GetNodeFlags(
       self, nodepool_config: container.BaseNodePoolConfig

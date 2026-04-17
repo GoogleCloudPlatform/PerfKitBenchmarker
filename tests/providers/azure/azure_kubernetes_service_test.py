@@ -157,6 +157,7 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
                 '1',
             ],
             timeout=600,
+            raise_on_failure=False,
         ),
     )
 
