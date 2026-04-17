@@ -274,8 +274,9 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
           f'--max-count={self.max_nodes_per_nodepool}',
       ]
     node_count = nodepool_config.num_nodes
-    node_count = max(self.min_nodes_per_nodepool, node_count)
-    node_count = min(self.max_nodes_per_nodepool, node_count)
+    if self._IsAutoscalerEnabled():
+      node_count = max(self.min_nodes_per_nodepool, node_count)
+      node_count = min(self.max_nodes_per_nodepool, node_count)
     args += [f'--node-count={node_count}']
     if self.default_nodepool.zone and self.default_nodepool.zone != self.region:
       zones = ' '.join(
