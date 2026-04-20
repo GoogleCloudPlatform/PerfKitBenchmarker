@@ -44,6 +44,7 @@ from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import key as cloud_key
 from perfkitbenchmarker import lustre_service
 from perfkitbenchmarker import managed_memory_store
+from perfkitbenchmarker import managed_vm_group
 from perfkitbenchmarker import messaging_service
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import non_relational_db
@@ -61,6 +62,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import vpn_service
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.configs import freeze_restore_spec
+from perfkitbenchmarker.configs import vm_group_decoders
 from perfkitbenchmarker.resources import base_job
 from perfkitbenchmarker.resources import example_resource
 from perfkitbenchmarker.resources import managed_ai_model
@@ -177,7 +179,8 @@ class BenchmarkSpec:
     self.firewalls = {}
     self.networks_lock = threading.Lock()
     self.firewalls_lock = threading.Lock()
-    self.vm_groups = {}
+    self.vm_groups: dict[str, list[virtual_machine.BaseVirtualMachine]] = {}
+    self.managed_vm_groups: dict[str, managed_vm_group.BaseManagedVmGroup] = {}
     self.container_specs = benchmark_config.container_specs or {}
     self.container_registry = None
     self.deleted = False
@@ -742,12 +745,15 @@ class BenchmarkSpec:
       )
 
   def ConstructVirtualMachineGroup(
-      self, group_name, group_spec
+      self, group_name: str, group_spec: vm_group_decoders.VmGroupSpec
   ) -> list[virtual_machine.VirtualMachine]:
     """Construct the virtual machine(s) needed for a group."""
     vms = []
 
     vm_count = group_spec.vm_count
+    is_managed = group_spec.managed_spec is not None
+
+    assert not (group_spec.static_vms and is_managed)
 
     # First create the Static VM objects.
     if group_spec.static_vms:
@@ -766,6 +772,22 @@ class BenchmarkSpec:
     # This throws an exception if the benchmark is not
     # supported.
     self._CheckBenchmarkSupport(cloud)
+
+    # If the VM group is managed, create a managed VM group and return.
+    if is_managed:
+      managed_vm_group_class = managed_vm_group.GetManagedVmGroupClass(cloud)
+      # TODO(pclay): support multiple zones:
+      if FLAGS.zone:
+        assert len(FLAGS.zone) == 1, 'Managed VM groups only support one zone.'
+        group_spec.vm_spec.zone = FLAGS.zone[0]
+      vm_config = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
+      group = managed_vm_group_class(
+          group_spec, vm_config
+      )  # pytype: disable=not-instantiable
+      self.managed_vm_groups[group_name] = group
+      # Report resource provisioning times.
+      self.resources.append(group)
+      return []
 
     # Then create the remaining VM objects using VM and disk specs.
 
@@ -1002,7 +1024,7 @@ class BenchmarkSpec:
     for placement_group_object in self.placement_groups.values():
       placement_group_object.Create()
 
-    if self.vms:
+    if self.vms or self.managed_vm_groups:
       # Iterate through VM groups to apply potential provision_delay_seconds
       # and then call CreateAndBoot for each group.
       # Sorting by provision_order ensures a deterministic order if delays
@@ -1039,6 +1061,11 @@ class BenchmarkSpec:
             group_vms,
             post_task_delay=post_task_delay,
         )
+
+      for group_name, group in self.managed_vm_groups.items():
+        group.Create()
+        self.vms.extend(group.vms)
+        self.vm_groups[group_name] = list(group.vms)
 
       if self.nfs_service and self.nfs_service.CLOUD == nfs_service.UNMANAGED:
         self.nfs_service.Create()
