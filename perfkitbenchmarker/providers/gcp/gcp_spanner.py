@@ -556,6 +556,7 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     )
 
     self.spanner_restored = True
+    self._WaitUntilReady()
     return stdout, stderr
 
   def CreateDatabase(self, database_name: str) -> tuple[str, str]:

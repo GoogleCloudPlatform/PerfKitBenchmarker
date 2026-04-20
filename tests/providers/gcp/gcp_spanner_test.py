@@ -540,6 +540,8 @@ class RestoreTest(pkb_common_test_case.PkbCommonTestCase):
     mock_cmd.Issue.side_effect = [
         ('', 'Restore database in progress. Operation name=operation_123', 0),
         (json.dumps({'done': True}), '', 0),
+        (json.dumps({'state': 'READY', 'nodeCount': 1}), '', 0),
+        (json.dumps({'state': 'READY'}), '', 0),
     ]
     mock_gcloud = self.enter_context(
         mock.patch.object(
