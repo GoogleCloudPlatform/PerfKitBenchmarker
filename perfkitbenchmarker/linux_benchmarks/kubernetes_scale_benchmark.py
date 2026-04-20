@@ -528,7 +528,10 @@ def ParseStatusChanges(
   conditions = GetStatusConditionsForResourceType(
       resource_type, resources_to_ignore
   )
-
+  # Filter out conditions that are too early.
+  conditions = [
+      c for c in conditions if c.epoch_time >= start_time
+  ]
   samples = []
   overall_times = collections.defaultdict(list)
   for condition in conditions:

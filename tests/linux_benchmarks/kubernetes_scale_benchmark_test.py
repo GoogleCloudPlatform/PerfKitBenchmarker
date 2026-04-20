@@ -133,6 +133,34 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertEmpty(conditions)
 
+  def testEarlyStatIgnored(self):
+    stdout = json.dumps({
+        'items': [
+            {
+                'metadata': {'name': 'pod1'},
+                'status': {
+                    'conditions': [
+                        {
+                            'lastProbeTime': None,
+                            'lastTransitionTime': '1970-01-01T00:00:30Z',
+                            'status': 'True',
+                            'type': 'Ready',
+                        },
+                    ]
+                },
+            },
+        ]
+    })
+    self.enter_context(
+        mock.patch.object(
+            kubectl,
+            'RunKubectlCommand',
+            side_effect=[(stdout, '', 0)],
+        )
+    )
+    samples = kubernetes_scale_benchmark.ParseStatusChanges('pod', 50)
+    self.assertEmpty(samples)
+
   def testPodStatusConditionsWithIgnoredResources(self):
     stdout = json.dumps({
         'items': [
