@@ -111,6 +111,11 @@ flags.DEFINE_boolean(
     None,
     'Whether to use multi-cluster routing.',
 )
+flags.DEFINE_boolean(
+    'bigtable_row_affinity',
+    None,
+    'Whether to use row affinity when multicluster routing is enabled.',
+)
 
 
 @flags.multi_flags_validator(
@@ -160,6 +165,7 @@ class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
   replication_cluster: bool
   replication_cluster_zone: str
   multicluster_routing: bool
+  row_affinity: bool
   autoscaling_min_nodes: int
   autoscaling_max_nodes: int
   autoscaling_cpu_target: int
@@ -182,6 +188,7 @@ class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
         'replication_cluster': (option_decoders.BooleanDecoder, none_ok),
         'replication_cluster_zone': (option_decoders.StringDecoder, none_ok),
         'multicluster_routing': (option_decoders.BooleanDecoder, none_ok),
+        'row_affinity': (option_decoders.BooleanDecoder, none_ok),
         'autoscaling_min_nodes': (option_decoders.IntDecoder, none_ok),
         'autoscaling_max_nodes': (option_decoders.IntDecoder, none_ok),
         'autoscaling_cpu_target': (option_decoders.IntDecoder, none_ok),
@@ -221,6 +228,7 @@ class BigtableSpec(non_relational_db.BaseNonRelationalDbSpec):
         'bigtable_replication_cluster': 'replication_cluster',
         'bigtable_replication_cluster_zone': 'replication_cluster_zone',
         'bigtable_multicluster_routing': 'multicluster_routing',
+        'bigtable_row_affinity': 'row_affinity',
         'bigtable_autoscaling_min_nodes': 'autoscaling_min_nodes',
         'bigtable_autoscaling_max_nodes': 'autoscaling_max_nodes',
         'bigtable_autoscaling_cpu_target': 'autoscaling_cpu_target',
@@ -272,6 +280,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
       replication_cluster: bool | None,
       replication_cluster_zone: str | None,
       multicluster_routing: bool | None,
+      row_affinity: bool | None,
       autoscaling_min_nodes: int | None,
       autoscaling_max_nodes: int | None,
       autoscaling_cpu_target: int | None,
@@ -293,6 +302,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
         else None
     )
     self.multicluster_routing: bool = multicluster_routing or False
+    self.row_affinity: bool = row_affinity or False
     self.autoscaling_min_nodes: int | None = autoscaling_min_nodes or None
     self.autoscaling_max_nodes: int | None = autoscaling_max_nodes or None
     self.autoscaling_cpu_target: int | None = autoscaling_cpu_target or None
@@ -309,6 +319,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
         replication_cluster=spec.replication_cluster,
         replication_cluster_zone=spec.replication_cluster_zone,
         multicluster_routing=spec.multicluster_routing,
+        row_affinity=spec.row_affinity,
         autoscaling_min_nodes=spec.autoscaling_min_nodes,
         autoscaling_max_nodes=spec.autoscaling_max_nodes,
         autoscaling_cpu_target=spec.autoscaling_cpu_target,
@@ -391,6 +402,8 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
       )
       cmd.flags['instance'] = self.name
       cmd.flags['route-any'] = True
+      if self.row_affinity:
+        cmd.flags['row-affinity'] = True
       cmd.flags['force'] = True
       cmd.Issue()
 
@@ -467,6 +480,7 @@ class GcpBigtableInstance(non_relational_db.BaseNonRelationalDb):
       metadata['bigtable_storage_type'] = self.storage_type
       metadata['bigtable_node_count'] = self.node_count
       metadata['bigtable_multicluster_routing'] = self.multicluster_routing
+      metadata['bigtable_row_affinity'] = self.row_affinity
     return metadata
 
   def _GetClusters(self) -> List[Dict[str, Any]]:
