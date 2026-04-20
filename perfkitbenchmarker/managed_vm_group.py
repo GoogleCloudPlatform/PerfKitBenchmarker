@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Module containing class for managed VM groups."""
+
 import abc
 from collections.abc import Callable
 import copy
@@ -46,6 +47,7 @@ class BaseManagedVmGroup(resource.BaseResource):
     super().__init__()
     self.spec: vm_group_decoders.VmGroupSpec = spec
     self.vm_config = vm_config
+    self.vm_config.metadata['in_managed_vm_group'] = True
     # When we clone the VM config and rename it, our assumptions about the
     # disk names are wrong.
     # TODO(pclay): improve support for disks.
@@ -63,6 +65,12 @@ class BaseManagedVmGroup(resource.BaseResource):
   def vms(self) -> Sequence[virtual_machine.BaseVirtualMachine]:
     """Returns the VMs in the managed VM group."""
     return list(self._vms.values())
+
+  def _CreateDependencies(self):
+    self.vm_config._CreateDependencies()  # pylint: disable=protected-access
+
+  def _DeleteDependencies(self):
+    self.vm_config._DeleteDependencies()  # pylint: disable=protected-access
 
   @dataclasses.dataclass
   class VmReference:

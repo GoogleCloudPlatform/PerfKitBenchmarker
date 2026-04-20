@@ -453,6 +453,8 @@
     maintenance_simulation_trigger.py.
 -   Added `--retry_on_insufficient_capacity_cloud_failure` so that resource
     creation can be retried on stock outs.
+-   Add support for deploying VMs inside managed VM groups with
+    `--use_managed_vm_groups`.
 
 ### Bug fixes and maintenance updates:
 
