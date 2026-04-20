@@ -97,6 +97,10 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
     key, value = arg.strip().split('=', maxsplit=1)
     lpg_extra_args[key.lstrip('-')] = value
 
+  if _HPA_ENABLED.value:
+    # HPA depends on automatic application monitoring for polling metrics.
+    config['container_cluster']['enable_aam'] = True
+
   return config
 
 
@@ -368,13 +372,12 @@ def _ParseTPUModelLoadTimeMetrics(
     if (
         event.resource.kind == 'Pod'
         and event.resource.name == pod_name
-        and 'Started container inference-server' in event.message
+        and 'Container started' in event.message
     ):
       startup_event = event
   if startup_event is None:
     raise ValueError(
-        f'No events found for pod {pod_name} with message "Started container'
-        ' inference-server".'
+        f'No events found for pod {pod_name} with message "Container started".'
     )
   container_init_timestamp = _FormatUTCTimeStampToLocalTime(
       server,
@@ -430,13 +433,19 @@ def _ParseModelLoadTimeMetrics(
     if (
         event.resource.kind == 'Pod'
         and event.resource.name == pod_name
-        and 'Started container inference-server' in event.message
+        # Note: The event message format changed from "Started container <name>"
+        # to "Container started" starting in Kubernetes v1.35 (PR #134043)
+        # to make messages more generic.
+        # TODO(user): If we ever want to support running against older k8s
+        # versions and not just the latest, we may need to rethink what signals
+        # we can use that have a stronger API guarantee, like
+        # Pod.status.conditions
+        and 'Container started' in event.message
     ):
       startup_event = event
   if startup_event is None:
     raise ValueError(
-        f'No events found for pod {pod_name} with message "Started container'
-        ' inference-server".'
+        f'No events found for pod {pod_name} with message "Container started".'
     )
   container_init_timestamp = _FormatUTCTimeStampToLocalTime(
       server,

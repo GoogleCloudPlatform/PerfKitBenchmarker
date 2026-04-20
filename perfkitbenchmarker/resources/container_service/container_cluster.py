@@ -50,6 +50,7 @@ class BaseContainerCluster(resource.BaseResource):
         None
     )
     self.enable_vpa: bool = cluster_spec.enable_vpa
+    self.enable_aam: bool = cluster_spec.enable_aam
 
   @property
   def num_nodes(self) -> int:

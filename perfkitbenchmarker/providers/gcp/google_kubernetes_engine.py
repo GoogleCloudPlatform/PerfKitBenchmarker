@@ -395,6 +395,9 @@ class GkeCluster(BaseGkeCluster):
     cmd.flags['cluster-ipv4-cidr'] = f'/{_CalculateCidrSize(self.max_nodes)}'
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
 
+    if self.enable_aam:
+      cmd.args.append('--auto-monitoring-scope=ALL')
+
     self._RunClusterCreateCommand(cmd)
     self._GetKubeconfig()
     self._CreateCustomComputeClass(self.default_nodepool)
@@ -647,6 +650,9 @@ class GkeAutopilotCluster(BaseGkeCluster):
     if self.default_nodepool.network:
       cmd.flags['network'] = self.default_nodepool.network.network_resource.name
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+
+    if self.enable_aam:
+      cmd.args.append('--auto-monitoring-scope=ALL')
 
     self._RunClusterCreateCommand(cmd)
     self._GetKubeconfig()

@@ -324,7 +324,7 @@ class KubernetesAiInferenceBenchmarkTest(
             name='pod1',
         ),
         reason='Started',
-        message='Started container inference-server',
+        message='Container started',
         type='Normal',
         timestamp=datetime.datetime(
             2025, 7, 18, 22, 17, 1, tzinfo=tz
@@ -388,7 +388,7 @@ class KubernetesAiInferenceBenchmarkTest(
             name='pod1',
         ),
         reason='Started',
-        message='Started container inference-server',
+        message='Container started',
         type='Normal',
         timestamp=datetime.datetime(
             2025, 7, 18, 22, 17, 1, tzinfo=tz
@@ -463,7 +463,7 @@ class KubernetesAiInferenceBenchmarkTest(
                 name='pod1',
             ),
             reason='Started',
-            message='Started container inference-server',
+            message='Container started',
             type='Normal',
             timestamp=datetime.datetime(
                 2025, 7, 18, 22, 17, 1, tzinfo=tz
@@ -475,7 +475,7 @@ class KubernetesAiInferenceBenchmarkTest(
                 name='pod2',
             ),
             reason='Started',
-            message='Started container inference-server',
+            message='Container started',
             type='Normal',
             timestamp=datetime.datetime(
                 2025, 7, 18, 22, 17, 5, tzinfo=tz
@@ -487,7 +487,7 @@ class KubernetesAiInferenceBenchmarkTest(
                 name='pod3',
             ),
             reason='Started',
-            message='Started container inference-server',
+            message='Container started',
             type='Normal',
             timestamp=datetime.datetime(
                 2025, 7, 18, 22, 17, 10, tzinfo=tz
