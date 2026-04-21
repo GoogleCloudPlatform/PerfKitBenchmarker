@@ -641,6 +641,31 @@ class ConstructAwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         spec.relational_db.__class__.__name__, 'AwsRDSRelationalDb'
     )
 
+  def testConstructAuroraDbFromYaml(self):
+    FLAGS.run_uri = 'unused'
+    test_spec = inspect.cleandoc("""
+    sysbench:
+      relational_db:
+        engine: aurora-mysql
+        db_spec:
+          AWS:
+            machine_type: db.m4.large
+            zone: us-west-1a
+        db_disk_spec: *default_50_gb
+        vm_groups:
+          clients:
+            vm_spec: *default_dual_core
+            disk_spec: *default_50_gb
+    """)
+    FLAGS.cloud = 'AWS'
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        test_spec, 'sysbench'
+    )
+    spec.ConstructRelationalDb()
+    self.assertEqual(
+        spec.relational_db.__class__.__name__, 'AwsAuroraRelationalDb'
+    )
+
 
 if __name__ == '__main__':
   unittest.main()
