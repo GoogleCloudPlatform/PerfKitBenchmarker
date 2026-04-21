@@ -282,7 +282,7 @@ class NodepoolSpec(spec.BaseSpec):
     if flag_values['container_cluster_num_vms'].present:
       config_values['vm_count'] = flag_values.container_cluster_num_vms
     if flag_values['k8s_machine_families'].present:
-      config_values['machine_families'] = flag_values.machine_families
+      config_values['machine_families'] = flag_values.k8s_machine_families
 
     # Need to apply the first zone in the zones flag, if specified,
     # to the spec. _NodepoolSpec does not currently support
@@ -539,7 +539,7 @@ class ContainerClusterSpec(spec.BaseSpec):
     if flag_values['container_cluster_num_vms'].present:
       config_values['vm_count'] = flag_values.container_cluster_num_vms
     if flag_values['k8s_machine_families'].present:
-      config_values['machine_families'] = flag_values.machine_families
+      config_values['machine_families'] = flag_values.k8s_machine_families
 
     # Need to apply the first zone in the zones flag, if specified,
     # to the spec. ContainerClusters do not currently support

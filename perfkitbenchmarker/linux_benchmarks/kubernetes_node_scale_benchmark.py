@@ -1,7 +1,11 @@
 """Benchmark for Kubernetes node auto-scaling: scale up, down, then up again.
 
 Deploys a Deployment with pod anti-affinity to force one pod per node, then
-measures node provisioning and de-provisioning times across three phases:
+measures node provisioning and de-provisioning times across three phases.
+
+On GCP, use --k8s_machine_families (e.g. e2) so the cluster provisions the
+default ComputeClass with node pool auto-creation; pod placement then adds the
+matching compute-class selector when applicable.
 
   1. Scale up to NUM_NODES replicas.
   2. Scale down to 0 replicas and wait for nodes to be removed.
@@ -71,10 +75,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   bm_spec.always_call_cleanup = True
   assert bm_spec.container_cluster
   cluster = bm_spec.container_cluster
-  yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
-      MANIFEST_TEMPLATE,
-      cloud=FLAGS.cloud,
-  )
+  yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(MANIFEST_TEMPLATE)
   cluster.ModifyPodSpecPlacementYaml(
       yaml_docs,
       'app',
