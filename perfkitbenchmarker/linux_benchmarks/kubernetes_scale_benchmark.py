@@ -22,7 +22,6 @@ from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.container_service import kubernetes_events
 
-
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'kubernetes_scale'
@@ -179,8 +178,14 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
     # Log & check for quota failure.
     CheckForFailures(cluster, pod_samples, 1)
 
-  initial_nodes = set(kubernetes_commands.GetNodeNames())
-  initial_pods = set(kubernetes_commands.GetPodNames())
+  initial_nodes = set(
+      kubernetes_commands.GetNodeNames(
+          suppress_logging=_ShouldSuppressLogging()
+      )
+  )
+  initial_pods = set(
+      kubernetes_commands.GetPodNames(suppress_logging=_ShouldSuppressLogging())
+  )
 
   start_time = time.time()
   samples = ScaleUpPods(cluster, NUM_PODS.value)
@@ -214,7 +219,9 @@ def ScaleUpPods(
 ) -> list[sample.Sample]:
   """Scales up pods on a kubernetes cluster. Returns samples."""
   samples = []
-  initial_pods = set(kubernetes_commands.GetPodNames())
+  initial_pods = set(
+      kubernetes_commands.GetPodNames(suppress_logging=_ShouldSuppressLogging())
+  )
   logging.info('Initial pods: %s', initial_pods)
 
   if virtual_machine.GPU_COUNT.value:
@@ -529,9 +536,7 @@ def ParseStatusChanges(
       resource_type, resources_to_ignore
   )
   # Filter out conditions that are too early.
-  conditions = [
-      c for c in conditions if c.epoch_time >= start_time
-  ]
+  conditions = [c for c in conditions if c.epoch_time >= start_time]
   samples = []
   overall_times = collections.defaultdict(list)
   for condition in conditions:
