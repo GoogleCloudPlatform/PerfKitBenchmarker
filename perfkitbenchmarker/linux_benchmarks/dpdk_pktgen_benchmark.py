@@ -22,6 +22,7 @@ https://toonk.io/building-a-high-performance-linux-based-traffic-generator-with-
 """
 
 import copy
+import dataclasses
 from typing import Any, Mapping
 
 from absl import flags
@@ -32,6 +33,24 @@ from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import dpdk_pktgen
+
+
+@dataclasses.dataclass
+class PktgenStats:
+  """Stats from a Pktgen run."""
+
+  sender_tx_pkts: int | None = None
+  sender_rx_pkts: int | None = None
+  receiver_rx_pkts: int | None = None
+  packet_loss_rate: float | None = None
+
+  def GetPacketLossRate(self) -> float:
+    """Calculates packet loss rate from sender and receiver stats."""
+    return (
+        int(self.sender_tx_pkts)
+        + int(self.sender_rx_pkts)
+        - int(self.receiver_rx_pkts)
+    ) / int(self.sender_tx_pkts)
 
 
 BENCHMARK_NAME = 'dpdk_pktgen'
@@ -383,7 +402,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   def RunPktgen(
       tx_cmd: str, rx_cmd: str
-  ) -> tuple[int | None, int | None, int | None]:
+  ) -> PktgenStats:
     """Runs a Pktgen instance."""
     background_tasks.RunParallelThreads(
         [
@@ -423,10 +442,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       total_receiver_rx_pkts = int(total_receiver_rx_pkts) + int(
           total_receiver_rx_pkts_2
       )
-    return (
-        total_sender_tx_pkts,
-        total_sender_rx_pkts,
-        total_receiver_rx_pkts,
+    return PktgenStats(
+        sender_tx_pkts=total_sender_tx_pkts,
+        sender_rx_pkts=total_sender_rx_pkts,
+        receiver_rx_pkts=total_receiver_rx_pkts,
     )
 
   def UpdatePpsAndRecompile(
@@ -446,70 +465,73 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   def _FindMaxRateFromConfig(
       tx_cmd: str, rx_cmd: str, packet_loss_threshold: float, start_rate: float
-  ) -> tuple[int | None, int | None, int | None, float]:
+  ) -> PktgenStats:
     """Runs a binary search to find the max PPS for a given configuration."""
-    valid_total_sender_tx_pkts = None
-    valid_total_sender_rx_pkts = None
-    valid_total_receiver_rx_pkts = None
-    valid_packet_loss_rate = 1
+    valid_run = PktgenStats(packet_loss_rate=1.0)
 
     prev_pps, curr_pps = -float('inf'), 0
     curr_rate = None
     lb, ub = 0, start_rate * 2
     prev_rate = start_rate
+    runs_per_rate = 10
+    min_successful_runs = 8
+    max_failed_runs = runs_per_rate - min_successful_runs
 
     while (
         (abs(curr_pps - prev_pps) / (curr_pps + 1))
         > _PPS_BINARY_SEARCH_THRESHOLD
-    ) or (valid_total_receiver_rx_pkts is None):
+    ) or (valid_run.receiver_rx_pkts is None):
       if curr_rate is None and _DPDK_PKTGEN_INITIAL_RATE.value is not None:
         curr_rate = _DPDK_PKTGEN_INITIAL_RATE.value
       else:
         curr_rate = (lb + ub) // 2
+      run_count, fail_count, pass_count = 0, 0, 0
+      curr_run = PktgenStats()
       UpdatePpsAndRecompile(sender_vm, int(curr_rate), int(prev_rate))
-      total_sender_tx_pkts, total_sender_rx_pkts, total_receiver_rx_pkts = (
-          RunPktgen(tx_cmd, rx_cmd)
-      )
-      if not all([
-          total_sender_tx_pkts,
-          total_sender_rx_pkts,
-          total_receiver_rx_pkts,
-      ]):
-        # Failed run, treat as 100% loss and narrow the search space.
-        ub = curr_rate
-        prev_rate = curr_rate
-        continue
+      while (
+          run_count < runs_per_rate
+          and fail_count <= max_failed_runs
+          and pass_count < min_successful_runs
+      ):
+        stats = RunPktgen(tx_cmd, rx_cmd)
+        run_count += 1
+        if not all([
+            stats.sender_tx_pkts,
+            stats.sender_rx_pkts,
+            stats.receiver_rx_pkts,
+        ]):
+          # Failed run, treat as 100% loss.
+          fail_count += 1
+          continue
 
-      packet_loss_rate = (
-          int(total_sender_tx_pkts)
-          + int(total_sender_rx_pkts)
-          - int(total_receiver_rx_pkts)
-      ) / int(total_sender_tx_pkts)
-      if packet_loss_rate > packet_loss_threshold:
+        stats.packet_loss_rate = stats.GetPacketLossRate()
+        if stats.packet_loss_rate > packet_loss_threshold:
+          fail_count += 1
+        else:
+          pass_count += 1
+          if curr_run.sender_tx_pkts is None or (
+              int(stats.receiver_rx_pkts) > int(curr_run.receiver_rx_pkts)
+          ):
+            # This is a valid run, save the results.
+            curr_run = stats
+
+      if fail_count > max_failed_runs:
         ub = curr_rate
       else:
-        # This is a valid run, save the results.
-        valid_total_sender_tx_pkts = total_sender_tx_pkts
-        valid_total_sender_rx_pkts = total_sender_rx_pkts
-        valid_total_receiver_rx_pkts = total_receiver_rx_pkts
-        valid_packet_loss_rate = packet_loss_rate
+        valid_run = curr_run
         lb = curr_rate
-      prev_pps, curr_pps = (
-          curr_pps,
-          int(total_receiver_rx_pkts) // _DPDK_PKTGEN_DURATION.value,
-      )
+      if curr_run.sender_tx_pkts is not None:
+        prev_pps, curr_pps = (
+            curr_pps,
+            int(curr_run.sender_tx_pkts) // _DPDK_PKTGEN_DURATION.value,
+        )
       prev_rate = curr_rate
 
     # Reset PPS target in app/pktgen.c so sed command can work on next
     # function invocation.
     if curr_rate:
       UpdatePpsAndRecompile(sender_vm, int(start_rate), int(curr_rate))
-    return (
-        valid_total_sender_tx_pkts,
-        valid_total_sender_rx_pkts,
-        valid_total_receiver_rx_pkts,
-        valid_packet_loss_rate,
-    )
+    return valid_run
 
   prev_rate = _START_RATE
   for packet_loss_threshold in _DPDK_PKTGEN_PACKET_LOSS_THRESHOLDS.value:
@@ -547,8 +569,14 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
           f' > {_STDOUT_LOG_FILE}'
       )
       # Find the max rate for this specific core configuration
-      s_tx, s_rx, r_rx, loss = _FindMaxRateFromConfig(
+      stats = _FindMaxRateFromConfig(
           tx_cmd, rx_cmd, packet_loss_threshold, prev_rate
+      )
+      s_tx, s_rx, r_rx, loss = (
+          stats.sender_tx_pkts,
+          stats.sender_rx_pkts,
+          stats.receiver_rx_pkts,
+          stats.packet_loss_rate,
       )
       if r_rx and int(r_rx) > max_receiver_pkts:
         max_receiver_pkts = int(r_rx)
