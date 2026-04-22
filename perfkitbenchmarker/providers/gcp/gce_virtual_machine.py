@@ -107,6 +107,7 @@ _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     't2a': 'neoverse-n1',
     'c3a': 'ampere1',
     'c4a': 'neoverse-v2',
+    'n4a': 'neoverse-n3',
 }
 # When requesting a specific GPU type independently of the machine type, choose
 # the most common version. When using a machine type from the
