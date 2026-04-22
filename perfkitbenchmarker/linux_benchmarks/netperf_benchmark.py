@@ -662,6 +662,29 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
     )
     # They should all have the same units
     throughput_unit = throughput_samples[0].unit
+
+    if 'TCP' in benchmark_name.upper():
+      netperf_retransmissions = 0
+      netserver_retransmissions = 0
+      netperf_mss = None
+      for throughput_sample in throughput_samples:
+        netperf_retransmissions += int(
+            throughput_sample.metadata['netperf_retransmissions']
+        )
+        netserver_retransmissions += int(
+            throughput_sample.metadata['netserver_retransmissions']
+        )
+        sample_netperf_mss = throughput_sample.metadata['netperf_mss']
+        if netperf_mss is None:
+          netperf_mss = sample_netperf_mss
+        elif netperf_mss != sample_netperf_mss:
+          raise ValueError(
+              'Netperf MSS values do not match for multiple netperf threads.'
+          )
+      metadata['netperf_retransmissions'] = netperf_retransmissions
+      metadata['netserver_retransmissions'] = netserver_retransmissions
+      metadata['netperf_mss'] = netperf_mss if netperf_mss else 'unknown'
+
     # Extract the throughput values from the samples
     throughputs = [s.value for s in throughput_samples]
     # Compute some stats on the throughput values
@@ -683,16 +706,6 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
     # Create formatted output, following {benchmark_name}_Throughput_Xstream(s)
     # for TCP stream throughput metrics
     if benchmark_name.upper() == 'TCP_STREAM':
-      netperf_mss = None
-      for throughput_sample in throughput_samples:
-        sample_netperf_mss = throughput_sample.metadata['netperf_mss']
-        if netperf_mss is None:
-          netperf_mss = sample_netperf_mss
-        elif netperf_mss != sample_netperf_mss:
-          raise ValueError(
-              'Netperf MSS values do not match for multiple netperf threads.'
-          )
-      metadata['netperf_mss'] = netperf_mss if netperf_mss else 'unknown'
       samples.append(
           sample.Sample(
               f'{benchmark_name}_Throughput_{len(parsed_output)}streams',
