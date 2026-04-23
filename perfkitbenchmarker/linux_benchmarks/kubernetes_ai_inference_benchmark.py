@@ -372,7 +372,10 @@ def _ParseTPUModelLoadTimeMetrics(
     if (
         event.resource.kind == 'Pod'
         and event.resource.name == pod_name
-        and 'Container started' in event.message
+        and (
+            'Container started' in event.message
+            or 'Started container inference-server' in event.message
+        )
     ):
       startup_event = event
   if startup_event is None:
@@ -436,11 +439,12 @@ def _ParseModelLoadTimeMetrics(
         # Note: The event message format changed from "Started container <name>"
         # to "Container started" starting in Kubernetes v1.35 (PR #134043)
         # to make messages more generic.
-        # TODO(user): If we ever want to support running against older k8s
-        # versions and not just the latest, we may need to rethink what signals
-        # we can use that have a stronger API guarantee, like
-        # Pod.status.conditions
-        and 'Container started' in event.message
+        # we may need to rethink what signals we can use that have a stronger
+        # API guarantee, like Pod.status.conditions
+        and (
+            'Container started' in event.message
+            or 'Started container inference-server' in event.message
+        )
     ):
       startup_event = event
   if startup_event is None:
