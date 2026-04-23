@@ -219,7 +219,7 @@ def _WaitForConnectivity(benchmark_spec):
     """Waits for the Nginx proxy to be reachable from the client VM."""
     lb_ip = benchmark_spec.nginx_endpoint_ip
     scheme = "https" if FLAGS.nginx_use_ssl else "http"
-    url = f"{scheme}://{lb_ip}/{nginx_benchmark._CONTENT_FILENAME}"
+    url = f"{scheme}://{lb_ip}/{nginx_benchmark.CONTENT_FILENAME}"
     client_vm = benchmark_spec.vm_groups["clients"][0]
 
     logging.info("Waiting for connectivity to %s...", url)
@@ -301,7 +301,7 @@ def Run(benchmark_spec):
     This cannot delegate to nginx_benchmark.Run() because that function
     expects vm_groups['server'] (a GCE VM), which doesn't exist in the
     K8s benchmark. Instead, we construct targets from the LoadBalancer IP
-    and call _RunMultiClient directly.
+    and call RunMultiClient directly.
 
     Args:
       benchmark_spec: The benchmark specification.
@@ -327,16 +327,16 @@ def Run(benchmark_spec):
     portstr = f":{FLAGS.nginx_server_port}" if FLAGS.nginx_server_port else ""
 
     if FLAGS.nginx_scenario == "reverse_proxy":
-        target = f"{scheme}://{hoststr}{portstr}/{nginx_benchmark._CONTENT_FILENAME}"
+        target = f"{scheme}://{hoststr}{portstr}/{nginx_benchmark.CONTENT_FILENAME}"
     else:
         target = (
             f"{scheme}://{hoststr}{portstr}/"
-            f"{nginx_benchmark._API_GATEWAY_PATH}/{nginx_benchmark._CONTENT_FILENAME}"
+            f"{nginx_benchmark.API_GATEWAY_PATH}/{nginx_benchmark.CONTENT_FILENAME}"
         )
     targets = [target]
 
     if FLAGS.nginx_throttle:
-        return nginx_benchmark._RunMultiClient(
+        return nginx_benchmark.RunMultiClient(
             clients,
             targets,
             rate=100000000,
@@ -346,13 +346,13 @@ def Run(benchmark_spec):
         )
 
     # Binary search for highest RPS under the p99 latency threshold.
-    if nginx_benchmark._P99_LATENCY_THRESHOLD.value:
-        lower_bound = nginx_benchmark._TARGET_RATE_LOWER_BOUND
-        upper_bound = nginx_benchmark._TARGET_RATE_UPPER_BOUND
+    if nginx_benchmark.P99_LATENCY_THRESHOLD.value:
+        lower_bound = nginx_benchmark.TARGET_RATE_LOWER_BOUND
+        upper_bound = nginx_benchmark.TARGET_RATE_UPPER_BOUND
         target_rate = upper_bound
         valid_results = []
-        while (upper_bound - lower_bound) > nginx_benchmark._RPS_RANGE_THRESHOLD:
-            results = nginx_benchmark._RunMultiClient(
+        while (upper_bound - lower_bound) > nginx_benchmark.RPS_RANGE_THRESHOLD:
+            results = nginx_benchmark.RunMultiClient(
                 clients,
                 targets,
                 rate=target_rate,
@@ -363,7 +363,7 @@ def Run(benchmark_spec):
             for result in results:
                 if result.metric == "p99 latency":
                     p99_latency = result.value
-                    if p99_latency > nginx_benchmark._P99_LATENCY_THRESHOLD.value:
+                    if p99_latency > nginx_benchmark.P99_LATENCY_THRESHOLD.value:
                         upper_bound = target_rate
                     else:
                         lower_bound = target_rate
@@ -376,7 +376,7 @@ def Run(benchmark_spec):
     results = []
     for config in FLAGS.nginx_load_configs:
         rate, duration, threads, connections = list(map(int, config.split(":")))
-        results += nginx_benchmark._RunMultiClient(
+        results += nginx_benchmark.RunMultiClient(
             clients, targets, rate, connections, duration, threads
         )
     return results
