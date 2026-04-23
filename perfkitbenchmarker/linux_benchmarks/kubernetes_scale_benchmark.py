@@ -62,11 +62,11 @@ CONTAINER_IMAGE = flags.DEFINE_string(
     'The container image to use for the Kubernetes scale benchmark.'
     'If not specified, the default image will be used.',
 )
-VALIDATED_NUM_NODES = flags.DEFINE_integer(
-    'kubernetes_scale_validated_num_nodes',
+EXPECTED_NODES_CREATED = flags.DEFINE_integer(
+    'kubernetes_scale_nodes_created',
     None,
-    'If defined, the benchmark will fail if the number of nodes is not equal'
-    ' to this value after the scale up.',
+    'If defined, the benchmark will fail if there are not this many node ready'
+    ' events during scale up.',
 )
 
 MANIFEST_TEMPLATE = 'container/kubernetes_scale/kubernetes_scale.yaml.j2'
@@ -196,7 +196,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       'node', start_time, resources_to_ignore=initial_nodes
   )
   samples += node_samples
-  CheckForNodeFailures(node_samples, initial_nodes)
+  ValidateNodesCreated(node_samples)
+  samples += GetStartEndCountSamples(initial_nodes, initial_pods)
   metadata = {
       'pod_memory': MEMORY_PER_POD.value,
       'pod_cpu': CPUS_PER_POD.value,
@@ -206,8 +207,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   if virtual_machine.GPU_COUNT.value:
     metadata['gpu_count'] = virtual_machine.GPU_COUNT.value
     metadata['gpu_type'] = virtual_machine.GPU_TYPE.value
-  if VALIDATED_NUM_NODES.value:
-    metadata['validated_num_nodes'] = VALIDATED_NUM_NODES.value
+  if EXPECTED_NODES_CREATED.value:
+    metadata['validated_num_nodes'] = EXPECTED_NODES_CREATED.value
   for s in samples:
     s.metadata.update(metadata)
   return samples
@@ -321,22 +322,76 @@ def _GetSampleByMetricName(
   return next((s for s in samples if s.metric == metric), None)
 
 
-def CheckForNodeFailures(
+def GetStartEndCountSamples(
+    initial_nodes: set[str], initial_pods: set[str]
+) -> list[sample.Sample]:
+  """Returns the number of nodes & pods before & after scale up as samples."""
+  final_nodes = set(
+      kubernetes_commands.GetNodeNames(
+          suppress_logging=_ShouldSuppressLogging()
+      )
+  )
+  if (
+      EXPECTED_NODES_CREATED.value
+      and len(final_nodes) != EXPECTED_NODES_CREATED.value + 1
+  ):
+    logging.warning(
+        'Expected to have %d nodes after scale up, but there are %d nodes. This'
+        ' is odd behavior, but not wholly unexpected for Autopilot clusters.',
+        EXPECTED_NODES_CREATED.value + 1,
+        len(final_nodes),
+    )
+  final_pods = set(
+      kubernetes_commands.GetPodNames(suppress_logging=_ShouldSuppressLogging())
+  )
+  samples = []
+  samples.extend(_GetResourceCountSamples(initial_nodes, final_nodes, 'node'))
+  samples.extend(_GetResourceCountSamples(initial_pods, final_pods, 'pod'))
+  return samples
+
+
+def _GetResourceCountSamples(
+    initial_resources: set[str], final_resources: set[str], resource_type: str
+) -> list[sample.Sample]:
+  """Returns the number of resources before & after scale up as samples."""
+  if len(initial_resources) >= len(final_resources):
+    logging.warning(
+        'Started with %d %ss and ended with %d %ss after scale up. Expected to '
+        'add resources with scale up, but that did not happen. This is odd '
+        'behavior, but might not be wholly unexpected for Autopilot clusters.',
+        len(initial_resources),
+        resource_type,
+        len(final_resources),
+        resource_type,
+    )
+  samples = [
+      sample.Sample(
+          f'initial_{resource_type}_count',
+          len(initial_resources),
+          'count',
+      ),
+      sample.Sample(
+          f'final_{resource_type}_count',
+          len(final_resources),
+          'count',
+      ),
+  ]
+  return samples
+
+
+def ValidateNodesCreated(
     node_samples: list[sample.Sample],
-    initial_nodes: set[str],
 ):
-  """Fails the benchmark if the wrong number of nodes are present.
+  """Fails the benchmark if the wrong number of nodes were created.
 
   Args:
     node_samples: The samples from node transition times which includes node
       Ready count.
-    initial_nodes: The initial nodes in the cluster.
 
   Raises:
-    RunError: If the number of nodes is not equal to the expected number of
-      nodes.
+    RunError: If the number of node ready events is not as expected.
   """
-  if VALIDATED_NUM_NODES.value is None:
+  if EXPECTED_NODES_CREATED.value is None:
     return
   node_ready_count_sample = _GetSampleByMetricName(
       node_samples, 'node_Ready_count'
@@ -344,20 +399,14 @@ def CheckForNodeFailures(
   if node_ready_count_sample is None:
     raise errors.Benchmarks.RunError(
         'No node ready events were found & we attempted to scale up to'
-        f' {VALIDATED_NUM_NODES.value} nodes.'
+        f' {EXPECTED_NODES_CREATED.value} nodes.'
     )
-  expected_num_nodes = VALIDATED_NUM_NODES.value - len(initial_nodes)
-  if node_ready_count_sample.value != expected_num_nodes:
+  if node_ready_count_sample.value != EXPECTED_NODES_CREATED.value:
     raise errors.Benchmarks.RunError(
-        'Expected %d nodes to be created, but %d nodes were created &'
-        ' ready.Expected count %d comes from validated num nodes %d - initial'
-        ' nodes %d.'
+        'Expected %d nodes to be created, but saw %d node ready events.'
         % (
-            expected_num_nodes,
+            EXPECTED_NODES_CREATED.value,
             node_ready_count_sample.value,
-            expected_num_nodes,
-            VALIDATED_NUM_NODES.value,
-            len(initial_nodes),
         )
     )
 

@@ -11,6 +11,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.container_service import kubernetes_events
 from tests import pkb_common_test_case
 
@@ -491,38 +492,51 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
           9,
       )
 
-  @flagsaver.flagsaver(kubernetes_scale_validated_num_nodes=None)
+  @flagsaver.flagsaver(kubernetes_scale_nodes_created=None)
   def testCheckForNodeFailures_NoValidatedNumNodes(self):
-    kubernetes_scale_benchmark.CheckForNodeFailures([], set())
+    kubernetes_scale_benchmark.ValidateNodesCreated([])
 
-  @flagsaver.flagsaver(kubernetes_scale_validated_num_nodes=10)
+  @flagsaver.flagsaver(kubernetes_scale_nodes_created=10)
   def testCheckForNodeFailures_NoSample(self):
     with self.assertRaisesRegex(
         errors.Benchmarks.RunError, 'No node ready events were found'
     ):
-      kubernetes_scale_benchmark.CheckForNodeFailures([], set())
+      kubernetes_scale_benchmark.ValidateNodesCreated([])
 
-  @flagsaver.flagsaver(kubernetes_scale_validated_num_nodes=10)
+  @flagsaver.flagsaver(kubernetes_scale_nodes_created=10)
   def testCheckForNodeFailures_Mismatch(self):
     with self.assertRaises(
         errors.Benchmarks.RunError,
     ):
-      kubernetes_scale_benchmark.CheckForNodeFailures(
+      kubernetes_scale_benchmark.ValidateNodesCreated(
           [sample.Sample('node_Ready_count', 5, 'count')],
-          set(),
       )
 
-  @flagsaver.flagsaver(kubernetes_scale_validated_num_nodes=10)
+  @flagsaver.flagsaver(kubernetes_scale_nodes_created=10)
   def testCheckForNodeFailures_Match(self):
-    kubernetes_scale_benchmark.CheckForNodeFailures(
-        [sample.Sample('node_Ready_count', 10, 'count')], set()
+    kubernetes_scale_benchmark.ValidateNodesCreated(
+        [sample.Sample('node_Ready_count', 10, 'count')]
     )
 
-  @flagsaver.flagsaver(kubernetes_scale_validated_num_nodes=2)
-  def testCheckForNodeFailures_MatchWithInitialNodes(self):
-    kubernetes_scale_benchmark.CheckForNodeFailures(
-        [sample.Sample('node_Ready_count', 1, 'count')], set(['node1'])
-    )
+  def testGetStartEndCountSamples(self):
+    initial_nodes = set(['node1'])
+    initial_pods = set(['pod1'])
+    final_nodes = ['node1', 'node2']
+    final_pods = ['pod1', 'pod2', 'pod3']
+
+    with mock.patch.object(
+        kubernetes_commands, 'GetNodeNames', return_value=final_nodes
+    ), mock.patch.object(
+        kubernetes_commands, 'GetPodNames', return_value=final_pods
+    ):
+      samples = kubernetes_scale_benchmark.GetStartEndCountSamples(
+          initial_nodes, initial_pods
+      )
+    samples_by_metric = _SamplesByMetric(samples)
+    self.assertEqual(samples_by_metric['initial_node_count'].value, 1)
+    self.assertEqual(samples_by_metric['final_node_count'].value, 2)
+    self.assertEqual(samples_by_metric['initial_pod_count'].value, 1)
+    self.assertEqual(samples_by_metric['final_pod_count'].value, 3)
 
 
 if __name__ == '__main__':
