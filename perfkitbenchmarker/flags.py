@@ -100,6 +100,11 @@ flags.DEFINE_string(
     "types that will be created for benchmarks that don't "
     'require a particular type.',
 )
+flags.DEFINE_boolean(
+    'use_managed_vm_groups',
+    False,
+    'Whether to use provider managed vm groups in place of individual VMs.',
+)
 K8S_MACHINE_FAMILIES = flags.DEFINE_list(
     'k8s_machine_families',
     [],
