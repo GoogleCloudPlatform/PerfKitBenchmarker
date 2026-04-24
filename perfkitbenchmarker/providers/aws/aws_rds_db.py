@@ -100,6 +100,9 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     if self.spec.engine in _SQL_SERVER_ENGINES:
       cmd = cmd + ['--license-model=license-included']
 
+    if self.spec.aws_rds_dedicated_log_volume:
+      cmd.append('--dedicated-log-volume')
+
     # RDS does not support IOPS/throughput for GP3 disks under 400GB for
     # certain engines.
     if not (
@@ -151,6 +154,15 @@ class AwsRDSRelationalDb(aws_relational_db.BaseAwsRelationalDb):
         '--region=%s' % self.region,
     ]
     vm_util.IssueCommand(cmd)
+
+  def GetResourceMetadata(self):
+    """Returns a dict containing metadata about the RDS instance."""
+    result = super().GetResourceMetadata()
+    if self.spec.aws_rds_dedicated_log_volume:
+      result['aws_rds_dedicated_log_volume'] = (
+          self.spec.aws_rds_dedicated_log_volume
+      )
+    return result
 
   @staticmethod
   def GetDefaultEngineVersion(engine):

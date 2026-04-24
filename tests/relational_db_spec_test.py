@@ -20,6 +20,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
+from perfkitbenchmarker import resources
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import pkb_common_test_case
 
@@ -173,6 +174,7 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super().setUp()
     FLAGS['run_uri'].parse('123')
+    resources.LoadModules()
 
     self.full_spec = {
         'cloud': 'GCP',
@@ -325,7 +327,7 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
       ('SpannerGoogleSql', 'GCP', 'spanner-googlesql', 'SpannerSpec'),
       ('SpannerPostgres', 'GCP', 'spanner-postgres', 'SpannerSpec'),
       ('AuroraDsql', 'AWS', 'aurora-dsql-postgres', 'AwsAuroraDsqlSpec'),
-      ('RdsMysql', 'AWS', 'mysql', 'RelationalDbSpec'),
+      ('AwsRdsMysql', 'AWS', 'mysql', 'AwsRelationalDbSpec'),
       ('CloudSqlPostgres', 'GCP', 'postgres', 'RelationalDbSpec'),
       ('AzureFlexibleServer', 'Azure', 'flexible-server-postgres', 'RelationalDbSpec'),
       ('AzureSqlManagedInstance', 'Azure', 'sqlserver', 'RelationalDbSpec'),

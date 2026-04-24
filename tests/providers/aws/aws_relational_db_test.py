@@ -15,6 +15,7 @@
 
 import builtins
 import contextlib
+import copy
 import datetime
 import inspect
 import json
@@ -26,6 +27,7 @@ import unittest
 
 from absl import flags
 import mock
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
@@ -35,9 +37,9 @@ from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_relational_db
+from perfkitbenchmarker.resources import aws_relational_db_spec
 from tests import matchers
 from tests import pkb_common_test_case
-
 
 FLAGS = flags.FLAGS
 
@@ -57,7 +59,50 @@ def _ReadTestDataFile(filename):
 class AwsRelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
   """Class that tests the creation of an AwsRelationalDbSpec."""
 
-  pass
+  def setUp(self):
+    super().setUp()
+    FLAGS['ignore_package_requirements'].parse(True)
+    self.minimal_spec = {
+        'cloud': 'AWS',
+        'engine': 'mysql',
+        'db_spec': {
+            'AWS': {'machine_type': 'db.m4.large', 'zone': 'us-east-1a'}
+        },
+        'db_disk_spec': {'AWS': {'disk_size': 500, 'disk_type': 'gp2'}},
+    }
+
+  def testAwsRdsDedicatedLogVolumeFlag(self):
+    FLAGS['aws_rds_dedicated_log_volume'].parse(True)
+    valid_spec = copy.deepcopy(self.minimal_spec)
+    valid_spec['db_disk_spec']['AWS']['disk_type'] = 'io1'
+    spec = aws_relational_db_spec.AwsRelationalDbSpec(
+        _COMPONENT, flag_values=FLAGS, **valid_spec
+    )
+    self.assertTrue(spec.aws_rds_dedicated_log_volume)
+
+  def testAwsRdsDedicatedLogVolumeDefault(self):
+    spec = aws_relational_db_spec.AwsRelationalDbSpec(
+        _COMPONENT, flag_values=FLAGS, **self.minimal_spec
+    )
+    self.assertFalse(spec.aws_rds_dedicated_log_volume)
+
+  def testAwsRdsDedicatedLogVolumeInvalidEngine(self):
+    FLAGS['aws_rds_dedicated_log_volume'].parse(True)
+    with self.assertRaises(errors.Config.InvalidValue):
+      invalid_spec = dict(self.minimal_spec)
+      invalid_spec['engine'] = 'sqlserver-express'
+      aws_relational_db_spec.AwsRelationalDbSpec(
+          _COMPONENT, flag_values=FLAGS, **invalid_spec
+      )
+
+  def testAwsRdsDedicatedLogVolumeInvalidDiskType(self):
+    FLAGS['aws_rds_dedicated_log_volume'].parse(True)
+    with self.assertRaises(errors.Config.InvalidValue):
+      invalid_spec = copy.deepcopy(self.minimal_spec)
+      invalid_spec['db_disk_spec']['AWS']['disk_type'] = 'gp2'
+      aws_relational_db_spec.AwsRelationalDbSpec(
+          _COMPONENT, flag_values=FLAGS, **invalid_spec
+      )
 
 
 class AwsRelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
@@ -131,6 +176,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'delete_on_freeze_error': False,
         'db_flags': '',
         'backup_enabled': True,
+        'aws_rds_dedicated_log_volume': False,
     }
     if additional_spec_items:
       spec_dict.update(additional_spec_items)
@@ -221,6 +267,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'create_on_restore_error': False,
         'delete_on_freeze_error': False,
         'load_machine_type': None,
+        'aws_rds_dedicated_log_volume': False,
     }
     if additional_spec_items:
       spec_dict.update(additional_spec_items)
@@ -612,28 +659,29 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
 class ConstructAwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
+  _TEST_SPEC = inspect.cleandoc("""
+  sysbench:
+    relational_db:
+      engine: mysql
+      db_spec:
+        AWS:
+          machine_type: db.m4.large
+          zone: us-west-1a
+      db_disk_spec:
+        AWS:
+          disk_size: 50
+          disk_type: io1
+      vm_groups:
+        clients:
+          vm_spec: *default_dual_core
+          disk_spec: *default_50_gb
+  """)
+
   def testConstructRelationalDbFromYaml(self):
     FLAGS.run_uri = 'unused'
-    test_spec = inspect.cleandoc("""
-    sysbench:
-      relational_db:
-        engine: mysql
-        db_spec:
-          AWS:
-            machine_type: db.m4.large
-            zone: us-west-1a
-        db_disk_spec:
-          AWS:
-            disk_size: 50
-            disk_type: gp2
-        vm_groups:
-          clients:
-            vm_spec: *default_dual_core
-            disk_spec: *default_50_gb
-    """)
     FLAGS.cloud = 'AWS'
     spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        test_spec, 'sysbench'
+        self._TEST_SPEC, 'sysbench'
     )
     spec.ConstructRelationalDb()
     # Avoid instance-of checks to verify the class is imported correctly.
@@ -665,6 +713,44 @@ class ConstructAwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         spec.relational_db.__class__.__name__, 'AwsAuroraRelationalDb'
     )
+
+  def testConstructWithDedicatedLogVolume(self):
+    FLAGS['aws_rds_dedicated_log_volume'].parse(True)
+    FLAGS.run_uri = '123'
+    FLAGS.cloud = 'AWS'
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        self._TEST_SPEC, 'sysbench'
+    )
+    spec.ConstructRelationalDb()
+
+    with self.subTest('create'):
+      with mock.patch.object(
+          vm_util, 'IssueCommand', return_value=('', '', 0)
+      ) as issue_command:
+        spec.relational_db._Create()
+        command_string = ' '.join(issue_command.call_args[0][0])
+        self.assertIn('--dedicated-log-volume', command_string)
+
+    with self.subTest('metadata'):
+      metadata = spec.relational_db.GetResourceMetadata()
+      self.assertTrue(metadata.get('aws_rds_dedicated_log_volume'))
+
+  def testConstructWithDedicatedLogVolumeInvalidEngine(self):
+    FLAGS['aws_rds_dedicated_log_volume'].parse(True)
+    invalid_spec = inspect.cleandoc("""
+    sysbench:
+      relational_db:
+        engine: sqlserver-express
+        db_spec: *default_dual_core
+        db_disk_spec: *default_50_gb
+        vm_groups:
+          clients:
+            vm_spec: *default_dual_core
+            disk_spec: *default_50_gb
+    """)
+    FLAGS.cloud = 'AWS'
+    with self.assertRaises(errors.Config.InvalidValue):
+      pkb_common_test_case.CreateBenchmarkSpecFromYaml(invalid_spec, 'sysbench')
 
 
 if __name__ == '__main__':

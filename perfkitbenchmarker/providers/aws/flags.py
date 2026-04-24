@@ -307,6 +307,12 @@ AWS_S3_MOUNT_ENABLE_METADATA_CACHE = flags.DEFINE_boolean(
     'Whether to enable metadata cache for s3 mountpoint.',
 )
 
+AWS_RDS_DEDICATED_LOG_VOLUME = flags.DEFINE_boolean(
+    'aws_rds_dedicated_log_volume',
+    False,
+    'Whether to use dedicated log volume for AWS RDS MySQL and MariaDB.',
+)
+
 
 @flags.multi_flags_validator(
     [
