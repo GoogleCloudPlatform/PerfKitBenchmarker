@@ -97,7 +97,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   cluster = bm_spec.container_cluster
   assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
 
-  initial_nodes = set(kubernetes_commands.GetNodeNames())
+  initial_nodes = kubernetes_commands.GetNodeNames()
   initial_node_count = len(initial_nodes)
 
   # Phase 1: Scale up.
@@ -327,10 +327,7 @@ def _PollNodeDeletionUntilDone(
     A tuple of (samples, whether node count reached acceptable level).
   """
   acceptable_count = initial_node_count + _SCALE_DOWN_NODE_BUFFER
-  scaled_nodes = (
-      set(kubernetes_commands.GetNodeNames(suppress_logging=True))
-      - initial_nodes
-  )
+  scaled_nodes = kubernetes_commands.GetNodeNames() - initial_nodes
   deletion_times: dict[str, float] = {}
   samples: list[sample.Sample] = []
   start = time.monotonic()

@@ -178,14 +178,8 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
     # Log & check for quota failure.
     CheckForFailures(cluster, pod_samples, 1)
 
-  initial_nodes = set(
-      kubernetes_commands.GetNodeNames(
-          suppress_logging=_ShouldSuppressLogging()
-      )
-  )
-  initial_pods = set(
-      kubernetes_commands.GetPodNames(suppress_logging=_ShouldSuppressLogging())
-  )
+  initial_nodes = kubernetes_commands.GetNodeNames()
+  initial_pods = kubernetes_commands.GetPodNames()
 
   start_time = time.time()
   samples = ScaleUpPods(cluster, NUM_PODS.value)
@@ -220,9 +214,7 @@ def ScaleUpPods(
 ) -> list[sample.Sample]:
   """Scales up pods on a kubernetes cluster. Returns samples."""
   samples = []
-  initial_pods = set(
-      kubernetes_commands.GetPodNames(suppress_logging=_ShouldSuppressLogging())
-  )
+  initial_pods = kubernetes_commands.GetPodNames()
   logging.info('Initial pods: %s', initial_pods)
 
   if virtual_machine.GPU_COUNT.value:
@@ -277,14 +269,7 @@ def ScaleUpPods(
     start_polling_time = time.monotonic()
     kubernetes_commands.WaitForRollout(rollout_name, timeout=max_wait_time)
 
-    all_new_pods = (
-        set(
-            kubernetes_commands.GetPodNames(
-                suppress_logging=_ShouldSuppressLogging()
-            )
-        )
-        - initial_pods
-    )
+    all_new_pods = kubernetes_commands.GetPodNames() - initial_pods
     end_polling_time = time.monotonic()
     logging.info(
         'In %d seconds, found all %s new pods',
@@ -326,11 +311,7 @@ def GetStartEndCountSamples(
     initial_nodes: set[str], initial_pods: set[str]
 ) -> list[sample.Sample]:
   """Returns the number of nodes & pods before & after scale up as samples."""
-  final_nodes = set(
-      kubernetes_commands.GetNodeNames(
-          suppress_logging=_ShouldSuppressLogging()
-      )
-  )
+  final_nodes = kubernetes_commands.GetNodeNames()
   if (
       EXPECTED_NODES_CREATED.value
       and len(final_nodes) != EXPECTED_NODES_CREATED.value + 1
@@ -341,9 +322,7 @@ def GetStartEndCountSamples(
         EXPECTED_NODES_CREATED.value + 1,
         len(final_nodes),
     )
-  final_pods = set(
-      kubernetes_commands.GetPodNames(suppress_logging=_ShouldSuppressLogging())
-  )
+  final_pods = kubernetes_commands.GetPodNames()
   samples = []
   samples.extend(_GetResourceCountSamples(initial_nodes, final_nodes, 'node'))
   samples.extend(_GetResourceCountSamples(initial_pods, final_pods, 'pod'))

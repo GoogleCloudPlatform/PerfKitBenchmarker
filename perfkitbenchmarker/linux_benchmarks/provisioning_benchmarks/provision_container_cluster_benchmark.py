@@ -127,7 +127,7 @@ def _BenchmarkClusterResize(
   )
   kubernetes_commands.WaitForRollout('daemonset/daemon-set')
 
-  initial_nodes = set(kubernetes_commands.GetNodeNames())
+  initial_nodes = kubernetes_commands.GetNodeNames()
   new_node_count = len(initial_nodes) + 1
 
   resize_start_time = time.time()
@@ -155,7 +155,7 @@ def _BenchmarkClusterResize(
     raise errors.Benchmarks.RunError(failure_message)
 
   def GetNode() -> str:
-    new_nodes = set(kubernetes_commands.GetNodeNames()) - initial_nodes
+    new_nodes = kubernetes_commands.GetNodeNames() - initial_nodes
     if new_nodes:
       return new_nodes.pop()
     return ''

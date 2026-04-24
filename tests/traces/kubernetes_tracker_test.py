@@ -21,6 +21,14 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(
         mock.patch("perfkitbenchmarker.providers.LoadProvider", autospec=True)
     )
+    self.mock_get_node_names = self.enter_context(
+        mock.patch.object(
+            kubernetes_commands,
+            "GetNodeNames",
+            autospec=True,
+            return_value=set(),
+        )
+    )
 
   def testTrackUsageCalculatesTotalClusterTime(self):
     fake_time = time.time()
@@ -45,11 +53,11 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = CreateMockCluster(
         name="pkb-cluster", machine_type="e2-standard-8"
     )
-    kubernetes_commands.GetNodeNames = lambda suppress_logging=False: [
+    self.mock_get_node_names.return_value = {
         "gke-pkb-cluster-default-pool-node-1",
         "gke-pkb-cluster-default-pool-node-2",
         "gke-pkb-cluster-default-pool-node-3",
-    ]
+    }
     tracker = kubernetes_tracker.KubernetesResourceTracker(
         cluster, time_fn=lambda: fake_time
     )
@@ -79,15 +87,13 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = CreateMockCluster(
         name="pkb-cluster", machine_type="e2-standard-8"
     )
-    kubernetes_commands.GetNodeNames = mock.Mock(
-        side_effect=[
-            ["gke-pkb-cluster-default-pool-node-1"],
-            [
-                "gke-pkb-cluster-default-pool-node-1",
-                "gke-pkb-cluster-default-pool-node-2",
-            ],
-        ]
-    )
+    self.mock_get_node_names.side_effect = [
+        {"gke-pkb-cluster-default-pool-node-1"},
+        {
+            "gke-pkb-cluster-default-pool-node-1",
+            "gke-pkb-cluster-default-pool-node-2",
+        },
+    ]
     # pylint: disable=invalid-name
     cluster.GetEvents = lambda: [
         kubernetes_events.KubernetesEvent(
@@ -137,10 +143,10 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
             "node-pool-2": "n2-highcpu-96",
         },
     )
-    kubernetes_commands.GetNodeNames = lambda suppress_logging=False: [
+    self.mock_get_node_names.return_value = {
         "gke-pkb-cluster-node-pool-1-node-1",
         "gke-pkb-cluster-node-pool-2-node-2",
-    ]
+    }
     tracker = kubernetes_tracker.KubernetesResourceTracker(
         cluster, time_fn=lambda: fake_time
     )
@@ -172,9 +178,9 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = CreateMockCluster(
         name="pkb-cluster", machine_type="e2-standard-8"
     )
-    kubernetes_commands.GetNodeNames = lambda suppress_logging=False: [
+    self.mock_get_node_names.return_value = {
         "gke-pkb-cluster-default-pool-node-1"
-    ]
+    }
     cluster.GetEvents = lambda: [
         kubernetes_events.KubernetesEvent(
             resource=kubernetes_events.KubernetesEventResource(
@@ -248,7 +254,6 @@ def CreateMockCluster(
       )
   )
   cluster.GetEvents = lambda: []
-  kubernetes_commands.GetNodeNames = lambda suppress_logging=False: []
   return cluster
 
 

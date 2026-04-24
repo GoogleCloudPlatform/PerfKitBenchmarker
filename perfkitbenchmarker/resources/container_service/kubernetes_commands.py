@@ -708,26 +708,53 @@ def GetPodIps(resource_name) -> list[str]:
   return GetPodIpsByLabel('app', pod_label)
 
 
-def GetPodNames(suppress_logging: bool = False) -> list[str]:
+def GetPodNames(
+    name_log_limit: int | None = None,
+) -> set[str]:
   """Returns all pod names in the cluster."""
-  return GetAllNamesForResourceType('pods', suppress_logging=suppress_logging)
+  return GetAllNamesForResourceType(
+      'pods', name_log_limit=name_log_limit, stack_level=2
+  )
 
 
-def GetNodeNames(suppress_logging: bool = False) -> list[str]:
+def GetNodeNames(
+    name_log_limit: int | None = None,
+) -> set[str]:
   """Get the node names for the cluster."""
-  return GetAllNamesForResourceType('nodes', suppress_logging=suppress_logging)
+  return GetAllNamesForResourceType(
+      'nodes', name_log_limit=name_log_limit, stack_level=2
+  )
 
 
 def GetAllNamesForResourceType(
     resource_type: str,
-    suppress_logging: bool = False,
-) -> list[str]:
+    name_log_limit: int | None = None,
+    **kwargs: Any,
+) -> set[str]:
   """Get all names for the specified resource. Type should be plural."""
+  kwargs = vm_util.IncrementStackLevel(**kwargs)
+  kwargs['should_pre_log'] = False
+  kwargs['suppress_logging'] = True
+  cmd = ['get', resource_type, '-o', 'jsonpath={.items[*].metadata.name}']
   stdout, _, _ = kubectl.RunKubectlCommand(
-      ['get', resource_type, '-o', 'jsonpath={.items[*].metadata.name}'],
-      suppress_logging=suppress_logging,
+      cmd,
+      **kwargs,
   )
-  return stdout.split()
+  names = stdout.split()
+  if name_log_limit is None:
+    name_log_limit = 10
+  names_out = ' '.join(names)[:10]
+  if len(names) > name_log_limit:
+    names_out += f'plus {len(names) - name_log_limit} other {resource_type}'
+  logging.info(
+      'Ran %s\nGot back %d %s: %s',
+      ' '.join(['kubectl', '..'] + cmd),
+      len(names),
+      resource_type,
+      names_out,
+      stacklevel=kwargs['stack_level'],
+  )
+  return set(names)
 
 
 def RunKubectlExec(pod_name, cmd):

@@ -521,8 +521,8 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   def testGetStartEndCountSamples(self):
     initial_nodes = set(['node1'])
     initial_pods = set(['pod1'])
-    final_nodes = ['node1', 'node2']
-    final_pods = ['pod1', 'pod2', 'pod3']
+    final_nodes = set(['node1', 'node2'])
+    final_pods = set(['pod1', 'pod2', 'pod3'])
 
     with mock.patch.object(
         kubernetes_commands, 'GetNodeNames', return_value=final_nodes

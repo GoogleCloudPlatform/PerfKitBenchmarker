@@ -142,10 +142,10 @@ class KubernetesResourceTracker:
     polled_events = self._cluster.GetEvents()
 
     # Resolve machine type only for current nodes; use "unknown" for the rest.
-    _node_names = kubernetes_commands.GetNodeNames(suppress_logging=True)
-    _current_node_names = set(_node_names)
-    if _node_names:
-      _GetMachineTypeFromNodeName(self._cluster, _node_names[0])
+    _current_node_names = kubernetes_commands.GetNodeNames()
+    if _current_node_names:
+      _one_node_name = next(iter(_current_node_names))
+      _GetMachineTypeFromNodeName(self._cluster, _one_node_name)
 
     for e in polled_events:
       if e.resource.kind != "Node":
