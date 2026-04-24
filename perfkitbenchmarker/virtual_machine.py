@@ -460,7 +460,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
 
   def GetConnectionIp(self):
     """Gets the IP to use for connecting to the VM."""
-    if not self.created:
+    if not (self.created or self.user_managed):
       raise errors.VirtualMachine.VirtualMachineError(
           'VM was not properly created, but PKB is attempting to connect to '
           'it anyways. Caller should guard against VM not being created.'
