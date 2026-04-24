@@ -132,10 +132,10 @@ _DPDK_PKTGEN_RXD = flags.DEFINE_integer(
 )
 _DPDK_PKTGEN_INITIAL_RATE = flags.DEFINE_integer(
     'dpdk_pktgen_initial_rate',
-    None,
-    'Custom initial rate (PPS) to start the binary search for max throughput in'
-    ' specific tests. If not set, the benchmark will use a default initial'
-    ' rate of 50,000,000.',
+    50_000_000,
+    'Custom initial rate (PPS) per NIC to start the binary search for max'
+    ' throughput in specific tests. If not set, the benchmark will use a'
+    'default initial rate of 50,000,000.',
 )
 
 # DPDK Pktgen maximum logical cores
@@ -147,8 +147,8 @@ _MAX_LCORES = flags.DEFINE_integer(
     16,
     'Maximum number of logical cores to use.',
 )
-
-_START_RATE = 50_000_000
+# This is the default rate defined in dpdk pktgen per NIC.
+_PKTGEN_DEFAULT_RATE = 50_000_000
 # Percent difference in PPS between consecutive iterations to terminate binary
 # search.
 _PPS_BINARY_SEARCH_THRESHOLD = 0.01
@@ -464,15 +464,18 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     )
 
   def _FindMaxRateFromConfig(
-      tx_cmd: str, rx_cmd: str, packet_loss_threshold: float, start_rate: float
+      tx_cmd: str,
+      rx_cmd: str,
+      packet_loss_threshold: float,
+      pktgen_default_rate: float,
   ) -> PktgenStats:
     """Runs a binary search to find the max PPS for a given configuration."""
     valid_run = PktgenStats(packet_loss_rate=1.0)
 
     prev_pps, curr_pps = -float('inf'), 0
     curr_rate = None
-    lb, ub = 0, start_rate * 2
-    prev_rate = start_rate
+    lb, ub = 0, pktgen_default_rate * 2
+    prev_rate = pktgen_default_rate
     runs_per_rate = 10
     min_successful_runs = 8
     max_failed_runs = runs_per_rate - min_successful_runs
@@ -481,7 +484,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
         (abs(curr_pps - prev_pps) / (curr_pps + 1))
         > _PPS_BINARY_SEARCH_THRESHOLD
     ) or (valid_run.receiver_rx_pkts is None):
-      if curr_rate is None and _DPDK_PKTGEN_INITIAL_RATE.value is not None:
+      if curr_rate is None:
         curr_rate = _DPDK_PKTGEN_INITIAL_RATE.value
       else:
         curr_rate = (lb + ub) // 2
@@ -530,10 +533,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     # Reset PPS target in app/pktgen.c so sed command can work on next
     # function invocation.
     if curr_rate:
-      UpdatePpsAndRecompile(sender_vm, int(start_rate), int(curr_rate))
+      UpdatePpsAndRecompile(sender_vm, int(pktgen_default_rate), int(curr_rate))
     return valid_run
 
-  prev_rate = _START_RATE
+  prev_rate = _PKTGEN_DEFAULT_RATE
   for packet_loss_threshold in _DPDK_PKTGEN_PACKET_LOSS_THRESHOLDS.value:
     best_run_results = {}
     max_receiver_pkts = -1
