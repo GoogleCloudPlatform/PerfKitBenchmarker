@@ -811,14 +811,18 @@ class _RelationalDbDecoder(option_decoders.TypeVerifier):
     # LoadProvider is required for resources to be registered.
     _LoadProvider(relational_db_config, flag_values)
 
+    cloud = relational_db_config.get('cloud')
+    if not cloud or flag_values['cloud'].present:
+      cloud = flag_values.cloud
+
     if 'engine' in relational_db_config:
       if flag_values['db_engine'].present:
         db_spec_class = relational_db_spec.GetRelationalDbSpecClass(
-            flag_values['db_engine'].value
+            cloud, flag_values['db_engine'].value
         )
       else:
         db_spec_class = relational_db_spec.GetRelationalDbSpecClass(
-            relational_db_config['engine']
+            cloud, relational_db_config['engine']
         )
     else:
       raise errors.Config.InvalidValue(

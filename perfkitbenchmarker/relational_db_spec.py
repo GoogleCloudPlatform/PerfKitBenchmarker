@@ -33,16 +33,9 @@ from perfkitbenchmarker.configs import vm_group_decoders
 _NONE_OK = {'default': None, 'none_ok': True}
 
 
-def GetRelationalDbSpecClass(engine):
-  """Get the RelationalDbSpec class corresponding to 'engine'."""
-  if engine in [
-      sql_engine_utils.SPANNER_GOOGLESQL,
-      sql_engine_utils.SPANNER_POSTGRES,
-  ]:
-    return spec.GetSpecClass(RelationalDbSpec, SERVICE_TYPE='spanner')
-  if engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
-    return spec.GetSpecClass(RelationalDbSpec, SERVICE_TYPE='aurora-dsql')
-  return RelationalDbSpec
+def GetRelationalDbSpecClass(cloud, engine):
+  """Get the RelationalDbSpec class corresponding to 'cloud' and 'engine'."""
+  return spec.GetSpecClass(RelationalDbSpec, CLOUD=cloud, ENGINE=engine)
 
 
 class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
@@ -63,7 +56,7 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
   """
 
   SPEC_TYPE = 'RelationalDbSpec'
-  SPEC_ATTRS = ['SERVICE_TYPE']
+  SPEC_ATTRS = ['CLOUD', 'ENGINE']
 
   cloud: str
   engine: str

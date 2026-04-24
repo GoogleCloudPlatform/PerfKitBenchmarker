@@ -52,7 +52,8 @@ _NONE_OK = {'default': None, 'none_ok': True}
 class AwsAuroraDsqlSpec(relational_db_spec.RelationalDbSpec):
   """Configurable options for AWS Aurora DSQL."""
 
-  SERVICE_TYPE = 'aurora-dsql'
+  CLOUD = 'AWS'
+  ENGINE = [sql_engine_utils.AURORA_DSQL_POSTGRES]
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):

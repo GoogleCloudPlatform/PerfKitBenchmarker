@@ -206,7 +206,11 @@ _ADJUSTED_CONFIG_REGIONS = ['regional-us-east4']
 class SpannerSpec(relational_db_spec.RelationalDbSpec):
   """Configurable options of a Spanner instance."""
 
-  SERVICE_TYPE = 'spanner'
+  CLOUD = 'GCP'
+  ENGINE = [
+      sql_engine_utils.SPANNER_GOOGLESQL,
+      sql_engine_utils.SPANNER_POSTGRES,
+  ]
 
   spanner_instance_id: str
   spanner_database_id: str
