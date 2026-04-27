@@ -37,7 +37,7 @@ dpdk_pktgen_multi_nic_small_pkt_loss:
     gce_nic_types: GVNIC,GVNIC,GVNIC
     gce_nic_queue_counts: default,default,default
     dpdk_pktgen_max_lcores: 128
-    dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]','[51:52]#[2:1];[51:52]#[1:2]']
+    dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]']
 
 dpdk_pktgen_multi_nic_small_pkt_loss_external_IP:
   name: dpdk_pktgen
@@ -57,7 +57,7 @@ dpdk_pktgen_multi_nic_small_pkt_loss_external_IP:
     ip_addresses: EXTERNAL
     dpdk_pktgen_num_flows: 70
     dpdk_pktgen_initial_rate: 24_000_000
-    dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]','[51:52]#[2:1];[51:52]#[1:2]']
+    dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]']
 
 dpdk_pktgen_multi_nic:
   name: dpdk_pktgen
@@ -66,7 +66,7 @@ dpdk_pktgen_multi_nic:
     gce_nic_types: GVNIC,GVNIC,GVNIC
     gce_nic_queue_counts: default,default,default
     dpdk_pktgen_max_lcores: 128
-    dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]','[51:52]#[2:1];[51:52]#[1:2]']
+    dpdk_pktgen_tx_rx_lcores_list: ['[2:1]#[51:52];[1:2]#[51:52]']
 
 speccpu2017_int_rate_GCC_O3_x86:
   name: speccpu2017
