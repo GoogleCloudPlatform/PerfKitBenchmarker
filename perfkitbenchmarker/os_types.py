@@ -54,6 +54,7 @@ DEBIAN12_DL = 'debian12_dl'
 AMAZONLINUX2_DL = 'amazonlinux2_dl'
 UBUNTU2204 = 'ubuntu2204'
 UBUNTU2404 = 'ubuntu2404'
+UBUNTU2604 = 'ubuntu2604'
 WINDOWS2016_CORE = 'windows2016_core'
 WINDOWS2019_CORE = 'windows2019_core'
 WINDOWS2022_CORE = 'windows2022_core'
@@ -149,6 +150,7 @@ DEBIAN_OS_TYPES = [
     UBUNTU2004_DL,
     UBUNTU2204,
     UBUNTU2404,
+    UBUNTU2604,
 ]
 
 # All OS types that use yum or dnf for package management.

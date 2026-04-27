@@ -1883,6 +1883,13 @@ class Ubuntu2404BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
 
 
+class Ubuntu2604BasedGceVirtualMachine(
+    BaseLinuxGceVirtualMachine, linux_vm.Ubuntu2604Mixin
+):
+  DEFAULT_X86_IMAGE_FAMILY = 'ubuntu-2604-lts-amd64'
+  DEFAULT_IMAGE_PROJECT = 'ubuntu-os-cloud'
+
+
 class Debian12DeepLearningBasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian12DLMixin
 ):

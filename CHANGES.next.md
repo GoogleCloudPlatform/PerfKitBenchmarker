@@ -275,6 +275,7 @@
     desired, turn it off with `--notruncate_duplicate_logs`.
 -   Add support for Alma Linux 8, 9, and 10 for the Azure provider.
 -   Re-enable support for Rocky Linux 8, 9, and 10 for the Azure provider.
+-   Add Ubuntu 26.04 support for GCP, AWS, and Azure Providers.
 
 ### Enhancements:
 

@@ -3338,6 +3338,12 @@ class Ubuntu2404Mixin(BaseUbuntuMixin):
   OS_TYPE = os_types.UBUNTU2404
 
 
+class Ubuntu2604Mixin(BaseUbuntuMixin):
+  """Class holding Ubuntu 26.04 specific VM methods and attributes."""
+
+  OS_TYPE = os_types.UBUNTU2604
+
+
 class ContainerizedDebianMixin(BaseDebianMixin):
   """DEPRECATED mixin with no current implementations.
 

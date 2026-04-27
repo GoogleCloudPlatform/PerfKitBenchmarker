@@ -1848,6 +1848,13 @@ class Ubuntu2404BasedAwsVirtualMachine(
   DEFAULT_ROOT_DISK_TYPE = 'gp3'
 
 
+class Ubuntu2604BasedAwsVirtualMachine(
+    UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu2604Mixin
+):
+  IMAGE_NAME_FILTER_PATTERN = 'ubuntu/images/*/ubuntu-resolute-26.04-{alternate_architecture}-server-20*'
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
+
+
 class AmazonLinux2BasedAwsVirtualMachine(
     AwsVirtualMachine, linux_virtual_machine.AmazonLinux2Mixin
 ):
