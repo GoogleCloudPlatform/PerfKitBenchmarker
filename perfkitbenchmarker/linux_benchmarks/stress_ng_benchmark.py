@@ -25,6 +25,7 @@ http://manpages.ubuntu.com/manpages/xenial/man1/stress-ng.1.html
 """
 
 import logging
+import time
 
 from absl import flags
 import numpy
@@ -398,6 +399,12 @@ flags.DEFINE_boolean(
 flags.DEFINE_string(
     'stress_ng_vm_bytes', '1G', 'Size of the VM to run the "vm" stressor on.'
 )
+flags.DEFINE_string(
+    'stress_ng_vm_sequence', None, 'Formatted string that specifies a sequence'
+    ' of delays in seconds and --vm-bytes values to use for the "vm" stressor.'
+    ' Example: "0,10g:30,1g" would run the --vm stressor with --vm-bytes 10g'
+    ' with a delay of 0 seconds and --vm-bytes 1g with a delay of 30 seconds.'
+)
 flags.DEFINE_integer(
     'stress_ng_futex_ops',
     '1',
@@ -555,10 +562,9 @@ def _RunWorkload(vm, num_threads):
   values_to_geomean_list = []
 
   for stressor_name in stressors:
+    num_threads_override = None
     cmd_parts = [
         'stress-ng',
-        f'--{stressor_name}',
-        str(num_threads),
         '--metrics-brief',
         '-t',
         str(FLAGS.stress_ng_duration)
@@ -602,9 +608,8 @@ def _RunWorkload(vm, num_threads):
       )
 
     if stressor_name == 'vm':
+      num_threads_override = FLAGS.stress_ng_vm_count
       cmd_parts.extend([
-          '--vm',
-          str(FLAGS.stress_ng_vm_count),
           '--vm-bytes',
           str(FLAGS.stress_ng_vm_bytes),
           '--vm-keep',
@@ -620,12 +625,49 @@ def _RunWorkload(vm, num_threads):
       metadata['vm_count'] = FLAGS.stress_ng_vm_count
       metadata['vm_bytes'] = FLAGS.stress_ng_vm_bytes
 
-    cmd = ' '.join(cmd_parts)
-    stdout, _ = vm.RemoteCommand(cmd)
-    stressng_sample = _ParseStressngResult(metadata, stdout)
-    if stressng_sample:
-      samples.append(stressng_sample)
-      values_to_geomean_list.append(stressng_sample.value)
+    cmd_parts.extend([
+        f'--{stressor_name}',
+        str(num_threads_override or num_threads)
+    ])
+
+    def _RunStressor(cmd, metadata, delay=0):
+      """Runs the stressor and returns the results as a sample.
+
+      Args:
+        cmd: The command to run the stressor.
+        metadata: Metadata of the sample.
+        delay: The delay in seconds to wait before running the stressor.
+      Returns:
+        The sample.Sample object from the stressor.
+      """
+      time.sleep(delay)
+      stdout, _ = vm.RemoteCommand(cmd)
+      return _ParseStressngResult(metadata, stdout)
+
+    args = []
+    if stressor_name == 'vm' and FLAGS.stress_ng_vm_sequence:
+      del metadata['vm_bytes']
+      metadata['vm_sequence'] = FLAGS.stress_ng_vm_sequence
+      for vm_sequence_part in FLAGS.stress_ng_vm_sequence.split(':'):
+        delay, vm_bytes = vm_sequence_part.split(',')
+        # The last --vm-bytes argument overrides any previous ones.
+        vm_bytes_parts = [
+            '--vm-bytes',
+            vm_bytes,
+        ]
+        args.append(
+            ((' '.join(cmd_parts + vm_bytes_parts), metadata, int(delay)), {})
+        )
+
+    else:
+      args.append(((' '.join(cmd_parts), metadata), {}))
+
+    stressng_samples = background_tasks.RunThreaded(_RunStressor, args)
+
+    for stressng_sample in stressng_samples:
+      if stressng_sample:
+        samples.append(stressng_sample)
+        values_to_geomean_list.append(stressng_sample.value)
 
   cpu_methods = (
       VALID_CPU_METHODS
