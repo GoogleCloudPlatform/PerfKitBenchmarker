@@ -447,6 +447,87 @@ class _ManagedAiModelSpecDecoder(option_decoders.TypeVerifier):
     )
 
 
+class _AiAgentServiceSpec(spec.BaseSpec):
+  """Spec for an agentic deployment resource.
+
+  Attributes:
+    deployment_type: The type of deployment (e.g. client_vm, vertex_ai).
+    cloud: The cloud provider.
+  """
+
+  def __init__(self, component_full_name, flag_values=None, **kwargs):
+    self.cloud: str = None
+    self.deployment_type: str = None
+    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Modifies config options based on runtime flag values."""
+    super()._ApplyFlags(config_values, flag_values)
+    if flag_values['cloud'].present or 'cloud' not in config_values:
+      config_values['cloud'] = flag_values.cloud
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option."""
+    result = super()._GetOptionDecoderConstructions()
+    result.update({
+        'cloud': (
+            option_decoders.EnumDecoder,
+            {
+                'valid_values': provider_info.VALID_CLOUDS + (None,),
+                'default': provider_info.GCP,
+            },
+        ),
+        'deployment_type': (
+            option_decoders.StringDecoder,
+            {
+                'none_ok': False,
+                'default': 'client_vm',
+            },
+        ),
+    })
+    return result
+
+
+class _AiAgentServiceDecoder(option_decoders.TypeVerifier):
+  """Validate the ai_agent_service dictionary of a benchmark config object."""
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verify ai_agent_service dict of a benchmark config object.
+
+    Args:
+      value: dict. Config dictionary
+      component_full_name: string. Fully qualified name of the configurable
+        component containing the config option.
+      flag_values: flags.FlagValues. Runtime flag values to be propagated to
+        BaseSpec constructors.
+
+    Returns:
+      _AiAgentServiceSpec built from the config passed in value.
+
+    Raises:
+      errors.Config.InvalidValue upon invalid input value.
+    """
+    config = super().Decode(value, component_full_name, flag_values)
+    cloud = config.get('cloud') or (
+        flag_values.cloud if 'cloud' in flag_values else None
+    )
+    deployment_type = config.get('deployment_type')
+    if not deployment_type:
+      raise errors.Config.InvalidValue(
+          'Required attribute `deployment_type` missing from '
+          f'ai_agent_service spec config {config}.'
+      )
+    if cloud:
+      providers.LoadProvider(cloud)
+    return _AiAgentServiceSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values,
+        **config,
+    )
+
+
 class _TpuGroupSpec(spec.BaseSpec):
   """Configurable options of a TPU."""
 
@@ -1465,6 +1546,7 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             {'default': None, 'none_ok': True, 'valid_types': (dict,)},
         ),
         'vm_groups': (vm_group_decoders.VmGroupsDecoder, {'default': {}}),
+        'ai_agent_service': (_AiAgentServiceDecoder, {'default': None}),
         'placement_group_specs': (_PlacementGroupSpecsDecoder, {'default': {}}),
         'container_cluster': (
             container_spec.ContainerClusterSpecDecoder,
