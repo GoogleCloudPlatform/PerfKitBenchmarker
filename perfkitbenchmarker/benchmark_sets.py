@@ -302,7 +302,11 @@ def _GetBenchmarkOsType():
 def _GetValidBenchmarks():
   """Returns a dict mapping valid benchmark names to their modules."""
   if _GetBenchmarkOsType() == CONTAINER:
-    return {'cluster_boot': linux_benchmarks.VALID_BENCHMARKS['cluster_boot']}
+    return {
+        'cluster_boot': linux_benchmarks.VALID_BENCHMARKS['cluster_boot'],
+        'provision_and_scale_managed_vm_group':
+            linux_benchmarks.VALID_BENCHMARKS[
+                'provision_and_scale_managed_vm_group']}
   elif _GetBenchmarkOsType() == WINDOWS:
     return windows_benchmarks.VALID_BENCHMARKS
   return linux_benchmarks.VALID_BENCHMARKS
