@@ -203,7 +203,9 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     json_output: dict[str, Any] = json.loads(stdout)
     return json_output
 
-  def _IsReady(self, timeout=aws_relational_db.IS_READY_TIMEOUT) -> bool:
+  def _IsReady(
+      self, timeout=aws_relational_db.IS_READY_TIMEOUT, poll_interval=5
+  ) -> bool:
     """Returns true if the cluster is ready."""
     if self.use_backup:
       if not self.restore_job_id:
@@ -270,7 +272,7 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     """Returns endpoint of DSQL cluster."""
     return f'{self.cluster_id}.dsql.{self.region}.on.aws'
 
-# TODO(shuninglin): Extend PostgresCliQueryTools for DSQL.
+  # TODO(shuninglin): Extend PostgresCliQueryTools for DSQL.
   def RunSqlQuery(self, sql_query: str) -> None:
     """Runs a SQL query on the database."""
     # Local import to avoid dependency not found issue.

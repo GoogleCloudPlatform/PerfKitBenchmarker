@@ -278,6 +278,11 @@ AURORA_METRICS_COLLECTION_SLEEP_SECONDS = flags.DEFINE_integer(
     'The time to sleep before collecting Aurora metrics. By default this is a'
     ' long time in order to collect accurate VolumeBytesUsed metrics.',
 )
+AWS_AURORA_EXPRESS_CONFIGURATION = flags.DEFINE_boolean(
+    'aws_aurora_express_configuration',
+    False,
+    'Whether to use express configuration for Aurora cluster creation.',
+)
 AWS_EC2_INSTANCE_PROFILE = flags.DEFINE_string(
     'aws_ec2_instance_profile',
     None,

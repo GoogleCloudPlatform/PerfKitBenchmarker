@@ -106,21 +106,31 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
             'create-db-cluster',
             '--db-cluster-identifier=%s' % self.cluster_id,
             '--engine=%s' % self.spec.engine,
-            '--engine-version=%s' % self.spec.engine_version,
-            '--master-username=%s' % self.spec.database_username,
-            '--master-user-password=%s' % self.spec.database_password,
             '--region=%s' % self.region,
-            '--db-subnet-group-name=%s' % self.db_subnet_group_name,
-            '--vpc-security-group-ids=%s' % self.security_group_id,
-            '--availability-zones=%s' % self.spec.zones[0],
-            '--storage-type=%s' % self.storage_type,
             '--backup-retention-period=1',  # backups cannot be disabled
-            '--tags',
         ]
-        + util.MakeFormattedDefaultTags()
     )
+    if self.spec.aws_aurora_express_configuration:
+      cmd.append('--with-express-configuration')
+    else:
+      cmd.extend([
+          '--engine-version=%s' % self.spec.engine_version,
+          '--master-username=%s' % self.spec.database_username,
+          '--master-user-password=%s' % self.spec.database_password,
+          '--db-subnet-group-name=%s' % self.db_subnet_group_name,
+          '--vpc-security-group-ids=%s' % self.security_group_id,
+          '--availability-zones=%s' % self.spec.zones[0],
+          '--storage-type=%s' % self.storage_type,
+      ])
+    cmd.extend(['--tags'] + util.MakeFormattedDefaultTags())
 
-    vm_util.IssueCommand(cmd)
+    stdout, _, _ = vm_util.IssueCommand(cmd)
+    json_output = json.loads(stdout)
+    for member in json_output.get('DBCluster', {}).get('DBClusterMembers', []):
+      self.all_instance_ids.append(member['DBInstanceIdentifier'])
+
+    if self.spec.aws_aurora_express_configuration:
+      return
 
     for zone in self.zones:
       # The first instance is assumed to be writer -
@@ -160,6 +170,25 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     """
     super()._PostCreate()
     self._SetPrimaryAndSecondaryZones()
+
+  def _WaitUntilReady(self) -> None:
+    """Waits & retries until the resource is ready."""
+    # Poll with a shorter interval for express configuration.
+    if self.spec.aws_aurora_express_configuration:
+
+      @vm_util.Retry(
+          poll_interval=1,
+          fuzz=0,
+          timeout=self.READY_TIMEOUT,
+          retryable_exceptions=(errors.Resource.RetryableCreationError,),
+      )
+      def _InnerWaitUntilReady() -> None:
+        if not self._IsReady(poll_interval=1):
+          raise errors.Resource.RetryableCreationError('Not yet ready')
+
+      _InnerWaitUntilReady()
+    else:
+      super()._WaitUntilReady()
 
   def _UpdateClusterClass(self, instance_class: str) -> None:
     """Updates DBInstanceClass for all instances in the cluster."""
@@ -327,6 +356,8 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   def GetResourceMetadata(self) -> dict[str, Any]:
     metadata = super().GetResourceMetadata()
     metadata['aurora_storage_type'] = self.storage_type
+    if self.spec.aws_aurora_express_configuration:
+      metadata['aws_aurora_express_configuration'] = True
     return metadata
 
   def _GetMetricsToCollect(self) -> list[relational_db.MetricSpec]:

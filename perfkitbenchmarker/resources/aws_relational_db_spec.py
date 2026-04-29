@@ -35,6 +35,7 @@ class AwsRelationalDbSpec(relational_db_spec.RelationalDbSpec):
   CLOUD = 'AWS'
 
   aws_rds_dedicated_log_volume: bool
+  aws_aurora_express_configuration: bool
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -65,6 +66,10 @@ class AwsRelationalDbSpec(relational_db_spec.RelationalDbSpec):
             option_decoders.BooleanDecoder,
             {'default': False},
         ),
+        'aws_aurora_express_configuration': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
+        ),
     })
     return result
 
@@ -75,4 +80,8 @@ class AwsRelationalDbSpec(relational_db_spec.RelationalDbSpec):
     if flag_values['aws_rds_dedicated_log_volume'].present:
       config_values['aws_rds_dedicated_log_volume'] = (
           flag_values.aws_rds_dedicated_log_volume
+      )
+    if flag_values['aws_aurora_express_configuration'].present:
+      config_values['aws_aurora_express_configuration'] = (
+          flag_values.aws_aurora_express_configuration
       )
