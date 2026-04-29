@@ -882,5 +882,56 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
     self.assertIn('cloud.google.com/compute-class: Accelerator', full_logs)
 
 
+class GoogleKubernetesEngineNodepoolAutoscalingTestCase(PatchedObjectsTestCase):
+
+  def testCreateWithPerNodepoolAutoscaling(self):
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a',
+                },
+            },
+            'vm_count': 2,
+            'min_vm_count': 1,
+            'max_vm_count': 5,
+            'nodepools': {
+                'nodepool1': {
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': 'machine-type-1',
+                        },
+                    },
+                    'vm_count': 3,
+                    'min_vm_count': 2,
+                    'max_vm_count': 10,
+                },
+            },
+            'poll_for_events': False,
+        },
+    )
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(kubernetes_engine_spec)
+      cluster._Create()
+
+      create_cluster_cmd = issue_command.GetCommandWithSubstring(
+          'gcloud container clusters create'
+      )
+      self.assertIn('--enable-autoscaling', create_cluster_cmd)
+      self.assertIn('--min-nodes 1', create_cluster_cmd)
+      self.assertIn('--max-nodes 5', create_cluster_cmd)
+      self.assertIn('--num-nodes 2', create_cluster_cmd)
+
+      nodepool_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create nodepool1'
+      )
+      self.assertIn('--enable-autoscaling', nodepool_cmd)
+      self.assertIn('--min-nodes 2', nodepool_cmd)
+      self.assertIn('--max-nodes 10', nodepool_cmd)
+
+
 if __name__ == '__main__':
   unittest.main()

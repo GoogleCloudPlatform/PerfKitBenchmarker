@@ -5,6 +5,7 @@ import itertools
 from typing import Callable, Iterable
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine_spec
@@ -30,7 +31,11 @@ class BaseContainerCluster(resource.BaseResource):
     super().__init__(user_managed=bool(cluster_spec.static_cluster))
     self.name: str = cluster_spec.static_cluster or 'pkb-' + FLAGS.run_uri
     self.machine_families: list[str] = cluster_spec.machine_families or []
-    self.min_nodes: int = cluster_spec.min_vm_count or cluster_spec.vm_count
+    # Set min_nodes via ifs to allow setting it to 0.
+    if cluster_spec.min_vm_count is None:
+      self.min_nodes: int = cluster_spec.vm_count
+    else:
+      self.min_nodes: int = cluster_spec.min_vm_count
     self.max_nodes: int = cluster_spec.max_vm_count or cluster_spec.vm_count
     self.default_nodepool = self._InitializeDefaultNodePool(
         cluster_spec, cluster_spec.vm_spec
@@ -57,6 +62,14 @@ class BaseContainerCluster(resource.BaseResource):
     return self.default_nodepool.num_nodes
 
   @property
+  def max_total_nodes(self) -> int:
+    """Returns the maximum possible number of nodes in the cluster."""
+    total = self.max_nodes
+    for nodepool in self.nodepools.values():
+      total += nodepool.max_nodes
+    return total
+
+  @property
   def zone(self) -> str:
     return self.default_nodepool.zone
 
@@ -80,6 +93,8 @@ class BaseContainerCluster(resource.BaseResource):
         self.machine_families,
     )
     nodepool_config.num_nodes = cluster_spec.vm_count
+    nodepool_config.min_nodes = self.min_nodes
+    nodepool_config.max_nodes = self.max_nodes
     self.InitializeNodePoolForCloud(vm_config, nodepool_config)
     return nodepool_config
 
@@ -102,6 +117,13 @@ class BaseContainerCluster(resource.BaseResource):
     nodepool_config.sandbox_config = nodepool_spec.sandbox_config
     nodepool_config.zone = zone
     nodepool_config.num_nodes = nodepool_spec.vm_count
+    if nodepool_spec.min_vm_count is None:
+      nodepool_config.min_nodes = nodepool_spec.vm_count
+    else:
+      nodepool_config.min_nodes = nodepool_spec.min_vm_count
+    nodepool_config.max_nodes = (
+        nodepool_spec.max_vm_count or nodepool_spec.vm_count
+    )
     self.InitializeNodePoolForCloud(vm_config, nodepool_config)
     return nodepool_config
 
@@ -112,11 +134,13 @@ class BaseContainerCluster(resource.BaseResource):
   ):
     """Override to initialize cloud specific configs."""
     del vm_config
-    if self.min_nodes != self.max_nodes:
-      # When not set, min/max nodes derive from the defualt nodepool.
-      # Let other nodepools set num_nodes higher than the default's.
+    if nodepool_config.max_nodes == 0:
+      raise errors.Config.InvalidValue('max_nodes must be greater than 0.')
+    if nodepool_config.min_nodes != nodepool_config.max_nodes:
+      # If min_nodes/max_nodes are set, clamp num_nodes to be within the range.
       nodepool_config.num_nodes = min(
-          self.max_nodes, max(self.min_nodes, nodepool_config.num_nodes)
+          nodepool_config.max_nodes,
+          max(nodepool_config.min_nodes, nodepool_config.num_nodes),
       )
 
   def GetNodePoolFromNodeName(
@@ -180,6 +204,11 @@ class BaseContainerCluster(resource.BaseResource):
         nodepool_metadata['sandbox_config'] = {
             'type': nodepool.sandbox_config.type,
         }
+      if nodepool.min_nodes != nodepool.max_nodes:
+        nodepool_metadata.update({
+            'max_size': nodepool.max_nodes,
+            'min_size': nodepool.min_nodes,
+        })
       nodepools_metadata[name] = nodepool_metadata
 
     metadata = {

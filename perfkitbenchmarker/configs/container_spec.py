@@ -238,6 +238,8 @@ class NodepoolSpec(spec.BaseSpec):
         **kwargs,
     )
     self.vm_count: int
+    self.min_vm_count: int | None
+    self.max_vm_count: int | None
     self.vm_spec: virtual_machine_spec.BaseVmSpec
     self.machine_families: list[str] | None
     self.sandbox_config: SandboxSpec | None
@@ -260,6 +262,14 @@ class NodepoolSpec(spec.BaseSpec):
         'vm_count': (
             option_decoders.IntDecoder,
             {'default': _DEFAULT_VM_COUNT, 'min': 0},
+        ),
+        'min_vm_count': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True, 'min': 0},
+        ),
+        'max_vm_count': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True, 'min': 0},
         ),
         'vm_spec': (spec.PerCloudConfigDecoder, {}),
         'sandbox_config': (_SandboxDecoder, {'default': None}),

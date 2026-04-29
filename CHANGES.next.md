@@ -120,6 +120,8 @@
     created and managed by PKB.
 -   Refactored `kubernetes_redis_memtier_benchmark`, including removal of
     non-functioning Redis Cluster testing.
+-   Allow/require setting individual nodepools' min/max node counts
+    independently of the overall K8s cluster's default nodepool.
 
 ### New features:
 

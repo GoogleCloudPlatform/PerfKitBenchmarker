@@ -743,7 +743,7 @@ def GetAllNamesForResourceType(
   names = stdout.split()
   if name_log_limit is None:
     name_log_limit = 10
-  names_out = ' '.join(names)[:10]
+  names_out = ' '.join(list(names)[:10])
   if len(names) > name_log_limit:
     names_out += f'plus {len(names) - name_log_limit} other {resource_type}'
   logging.info(

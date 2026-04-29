@@ -71,9 +71,9 @@ class MockCommand:
     self.default_return_value = default_return_value
     self.all_commands: str = ''
 
-    mock_command_function.side_effect = self.mock_remote_command
+    mock_command_function.side_effect = self.MockRemoteCommand
 
-  def mock_remote_command(self, cmd: str | list[str], **kwargs) -> ReturnValues:
+  def MockRemoteCommand(self, cmd: str | list[str], **kwargs) -> ReturnValues:
     """Mocks a command, returning the next response for the command."""
     if isinstance(cmd, list):
       try:
@@ -111,6 +111,13 @@ class MockCommand:
           raise errors.VmUtil.IssueCommandError(response[1])
         return response
     return self.default_return_value
+
+  def GetCommandWithSubstring(self, substring: str) -> str:
+    """Returns the command with the given substring."""
+    for call in self.all_commands.split('\n'):
+      if substring in call:
+        return call
+    raise ValueError(f'Command with substring {substring} not found.')
 
 
 class MockRemoteCommand(MockCommand):

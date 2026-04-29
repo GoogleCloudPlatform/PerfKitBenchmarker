@@ -197,6 +197,42 @@ class ElasticKubernetesServiceTest(BaseEksTest):
         node_groups[1],
     )
 
+  def testEksClusterNodepoolsAutoscaling(self):
+    self.MockIssueCommand({'create cluster': [('Cluster created', '', 0)]})
+    spec2 = EKS_SPEC_DICT.copy()
+    spec2['min_vm_count'] = 1
+    spec2['max_vm_count'] = 5
+    spec2['vm_count'] = 2
+    spec2['nodepools'] = {
+        'nginx': {
+            'vm_count': 3,
+            'min_vm_count': 2,
+            'max_vm_count': 10,
+            'vm_spec': {
+                'AWS': {
+                    'machine_type': 'm6i.xlarge',
+                }
+            },
+        }
+    }
+    cluster = elastic_kubernetes_service.EksCluster(
+        container_spec.ContainerClusterSpec('NAME', **spec2)
+    )
+    self.MockJsonRead(cluster)
+    cluster._Create()
+    assert self.patched_read_json is not None
+    called_json = self.patched_read_json.call_args_list[0][0][0]
+    node_groups = called_json['managedNodeGroups']
+    self.assertLen(node_groups, 2)
+    # default nodepool
+    self.assertEqual(node_groups[0]['minSize'], 1)
+    self.assertEqual(node_groups[0]['maxSize'], 5)
+    self.assertEqual(node_groups[0]['desiredCapacity'], 2)
+    # nginx nodepool
+    self.assertEqual(node_groups[1]['minSize'], 2)
+    self.assertEqual(node_groups[1]['maxSize'], 10)
+    self.assertEqual(node_groups[1]['desiredCapacity'], 3)
+
   def testGetNodePoolNames(self):
     # Mock the output of the aws cli command
     cluster = elastic_kubernetes_service.EksCluster(EKS_SPEC)

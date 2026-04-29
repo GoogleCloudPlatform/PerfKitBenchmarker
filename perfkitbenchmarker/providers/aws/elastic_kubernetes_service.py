@@ -182,13 +182,9 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
             'pkb_nodepool': nodepool.name,
         },
     }
-    if (
-        nodepool.name == self.default_nodepool.name
-        and self.min_nodes != self.max_nodes
-    ):
-      # Min / max config only apply to the default nodepool.
-      group_json['minSize'] = self.min_nodes
-      group_json['maxSize'] = self.max_nodes
+    if nodepool.min_nodes != nodepool.max_nodes:
+      group_json['minSize'] = nodepool.min_nodes
+      group_json['maxSize'] = nodepool.max_nodes
     return group_json
 
   def _WriteJsonToFile(self, json_dict: dict[str, Any]) -> str:

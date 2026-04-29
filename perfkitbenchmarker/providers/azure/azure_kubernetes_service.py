@@ -128,11 +128,6 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     self._deleted = False
     # Instantiation required to delete the resource group.
     self.network = azure_network.AzureNetwork.GetNetwork(spec.vm_spec)
-    # AKS applies min & max limits per nodepool.
-    self.max_nodes_per_nodepool = self.max_nodes
-    self.max_nodes = self.num_nodepools * self.max_nodes
-    self.min_nodes_per_nodepool = self.min_nodes
-    self.min_nodes = self.num_nodepools * self.min_nodes
 
   def InitializeNodePoolForCloud(
       self,
@@ -152,18 +147,14 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     result = super().GetResourceMetadata()
     result['boot_disk_type'] = self.default_nodepool.disk_type
     result['boot_disk_size'] = self.default_nodepool.disk_size
-    if self._IsAutoscalerEnabled():
-      result['max_nodes_per_nodepool'] = self.max_nodes_per_nodepool
-      result['min_nodes_per_nodepool'] = self.min_nodes_per_nodepool
     if FLAGS.azure_aks_auto_node_provisioning:
       result['auto_node_provisioning_mode'] = True
     return result
 
-  def _IsAutoscalerEnabled(self):
+  def _IsAutoscalerEnabled(self, nodepool_config: container.BaseNodePoolConfig):
     """Returns True if the cluster autoscaler is enabled."""
     return (
-        self.min_nodes
-        != self.max_nodes
+        nodepool_config.min_nodes != nodepool_config.max_nodes
         # Auto node provisioning mode is incompatible with cluster autoscaler.
     ) and not FLAGS.azure_aks_auto_node_provisioning
 
@@ -185,7 +176,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--nodepool-labels',
         f'pkb_nodepool={container_cluster.DEFAULT_NODEPOOL}',
     ] + self._GetNodeFlags(self.default_nodepool)
-    if self.max_nodes > 256:
+    if self.max_total_nodes > 256:
       cmd += [
           '--network-plugin',
           'azure',
@@ -267,17 +258,13 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
           '--node-vm-size',
           nodepool_config.machine_type,
       ]
-    if self._IsAutoscalerEnabled():
+    if self._IsAutoscalerEnabled(nodepool_config):
       args += [
           '--enable-cluster-autoscaler',
-          f'--min-count={self.min_nodes_per_nodepool}',
-          f'--max-count={self.max_nodes_per_nodepool}',
+          f'--min-count={nodepool_config.min_nodes}',
+          f'--max-count={nodepool_config.max_nodes}',
       ]
-    node_count = nodepool_config.num_nodes
-    if self._IsAutoscalerEnabled():
-      node_count = max(self.min_nodes_per_nodepool, node_count)
-      node_count = min(self.max_nodes_per_nodepool, node_count)
-    args += [f'--node-count={node_count}']
+    args += [f'--node-count={nodepool_config.num_nodes}']
     if self.default_nodepool.zone and self.default_nodepool.zone != self.region:
       zones = ' '.join(
           zone[-1] for zone in self.default_nodepool.zone.split(',')

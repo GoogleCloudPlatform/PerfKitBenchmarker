@@ -135,6 +135,21 @@ class BaseNodePoolConfig:
   """A node pool's config, where each node in the node pool has the same config.
 
   See also: https://cloud.google.com/kubernetes-engine/docs/concepts/node-pools
+
+  Attributes:
+    machine_type: str. The machine type of the node pool.
+    machine_families: list[str]. If set, overrides machine_type. The machine
+      families allowed in the node pool.
+    zone: str. The zone the node pool is in.
+    name: str. The name of the node pool.
+    num_nodes: int. The starting number of nodes in the node pool; can vary
+      after that with autoscaling. Given sentinel value here; defined with an
+      actual value in _InitializeDefaultNodePool.
+    min_nodes: int. The minimum number of nodes in the node pool. If set to a
+      non-num_nodes value, the nodepool uses auLike above.
+    max_nodes: int. The maximum number of nodes in the node pool. Like above.
+    disk_type: str. The type of disk for the nodes in the node pool.
+    disk_size: int. The size of the disk for the nodes in the node pool in GB.
   """
 
   def __init__(
@@ -159,11 +174,14 @@ class BaseNodePoolConfig:
         )
     self.zone: str = vm_spec.zone
     self.name = NodePoolName(name)
-    self.sandbox_config: container_spec_lib.SandboxSpec | None = None
-    self.num_nodes: int
+    self.num_nodes: int = 1
+    self.min_nodes: int = 1
+    self.max_nodes: int = 1
     self.disk_type: str | None = vm_spec.boot_disk_type
     self.disk_size: int = vm_spec.boot_disk_size
     # Defined by GceVirtualMachineConfig. Used by google_kubernetes_engine
+    # pylint: disable=g-missing-from-attributes
+    self.sandbox_config: container_spec_lib.SandboxSpec | None = None
     self.max_local_disks: int | None
     self.ssd_interface: str | None
     self.gpu_type: str | None
@@ -173,3 +191,4 @@ class BaseNodePoolConfig:
     self.min_cpu_platform: str
     self.cpus: int
     self.memory_mib: int
+    # pylint: enable=g-missing-from-attributes

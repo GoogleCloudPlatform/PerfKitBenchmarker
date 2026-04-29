@@ -182,6 +182,33 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
         mock_cmd.func_to_mock.mock_calls[0].args[0],
     )
 
+  def testCreateAutoscaler_NodepoolAndClamps(self):
+    mock_cmd = self.MockIssueCommand(
+        {
+            'az aks create': [('', '', 0)],
+            'az aks nodepool': [('', '', 0)],
+        },
+    )
+    self.spec_dict['nodepools'] = {
+        'client': {
+            'vm_spec': {
+                'Azure': {
+                    'machine_type': 'Standard_D4s_v5',
+                }
+            },
+            'min_vm_count': 4,
+            'max_vm_count': 6,
+            'vm_count': 3,
+        },
+    }
+    self.initAksCluster(self.spec_dict)
+    self.aks._Create()
+    self.assertIn(
+        '--enable-cluster-autoscaler --min-count=4 --max-count=6'
+        ' --node-count=4',
+        mock_cmd.all_commands,
+    )
+
   @flagsaver.flagsaver(kubectl='kubectl', kubeconfig='dummy')
   def testFullCreateAksAutomatic(self):
     aks_auto = azure_kubernetes_service.AksAutomaticCluster(self.spec)

@@ -399,15 +399,11 @@ class GkeCluster(BaseGkeCluster):
     if enable_autoprovisioning:
       cmd.args.append('--enable-autoprovisioning')
 
-    if self.min_nodes != self.max_nodes:
-      cmd.args.append('--enable-autoscaling')
-      cmd.flags['max-nodes'] = self.max_nodes
-      cmd.flags['min-nodes'] = self.min_nodes
     if gcp_flags.GKE_AUTOSCALING_PROFILE.value:
       cmd.flags['autoscaling-profile'] = gcp_flags.GKE_AUTOSCALING_PROFILE.value
     cidr_size = (
         gcp_flags.GKE_CLUSTER_IPV4_CIDR_SIZE.value
-        or _CalculateCidrSize(self.max_nodes)
+        or _CalculateCidrSize(self.max_total_nodes)
     )
     cmd.flags['cluster-ipv4-cidr'] = f'/{cidr_size}'
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
@@ -578,6 +574,10 @@ class GkeCluster(BaseGkeCluster):
       cmd.flags['image-type'] = self.image_type
 
     cmd.flags['node-labels'] = f'pkb_nodepool={nodepool_config.name}'
+    if nodepool_config.min_nodes != nodepool_config.max_nodes:
+      cmd.args.append('--enable-autoscaling')
+      cmd.flags['min-nodes'] = nodepool_config.min_nodes
+      cmd.flags['max-nodes'] = nodepool_config.max_nodes
 
   def _PostCreate(self):
     """Waits for kube-dns to be available."""
