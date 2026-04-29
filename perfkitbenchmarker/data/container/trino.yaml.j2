@@ -1,5 +1,5 @@
 image:
-  tag: "479"
+  tag: "480"
 server:
   workers: {{ num_workers }}
 coordinator:
@@ -67,3 +67,5 @@ catalogs:
     fs.cache.enabled=true
     fs.cache.directories=/tmp/trino-cache
     fs.cache.max-disk-usage-percentages=80
+    hive.metastore.thrift.client.connect-timeout=5m
+    hive.metastore.thrift.client.read-timeout=5m

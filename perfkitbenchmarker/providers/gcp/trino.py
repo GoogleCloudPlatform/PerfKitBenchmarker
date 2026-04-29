@@ -189,6 +189,11 @@ class Trino(edw_service.EdwService):
         'maxHeapSize': jvm_heap_size_str,
         'additionalJVMConfigs': f'-Xms{jvm_heap_size_str}',
     }
+    yaml_dict['coordinator']['config'] = {
+        'query': {
+            'maxMemoryPerNode': f'{_MemoryToString(query_size_per_node_num)}B',
+        }
+    }
     if edw_service.TRINO_EPHEMERAL_STORAGE.value:
       ephemeral_storage = _MemoryToString(
           edw_service.TRINO_EPHEMERAL_STORAGE.value
