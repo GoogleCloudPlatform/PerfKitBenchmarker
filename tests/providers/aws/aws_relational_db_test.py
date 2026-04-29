@@ -120,7 +120,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['use_managed_db'].parse(True)
 
   @contextlib.contextmanager
-  def _PatchCriticalObjects(self, stdout='', stderr='', return_code=0):
+  def _PatchCriticalObjects(self, stdout='{}', stderr='', return_code=0):
     """A context manager that patches a few critical objects with mocks."""
     retval = (stdout, stderr, return_code)
     with mock.patch(
@@ -268,6 +268,7 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
         'delete_on_freeze_error': False,
         'load_machine_type': None,
         'aws_rds_dedicated_log_volume': False,
+        'aws_aurora_express_configuration': False,
     }
     if additional_spec_items:
       spec_dict.update(additional_spec_items)
@@ -299,13 +300,14 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
             (
                 'aws --output json rds create-db-cluster'
                 ' --db-cluster-identifier=pkb-db-cluster-123'
-                ' --engine=aurora-postgresql --engine-version=9.6.2'
+                ' --engine=aurora-postgresql --region=us-east-1'
+                ' --backup-retention-period=1 --engine-version=9.6.2'
                 ' --master-username=fakeusername'
-                ' --master-user-password=fakepassword --region=us-east-1'
+                ' --master-user-password=fakepassword'
                 ' --db-subnet-group-name=fake_db_subnet'
                 ' --vpc-security-group-ids=fake_security_group_id'
                 ' --availability-zones=us-east-1a --storage-type=aurora'
-                ' --backup-retention-period=1 --tags'
+                ' --tags'
             ),
             (
                 'aws --output json rds create-db-instance'
@@ -324,6 +326,23 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
                 ' --no-auto-minor-version-upgrade'
                 ' --db-instance-class=db.t1.micro --region=us-east-1'
                 ' --availability-zone=us-east-1d --tags'
+            ),
+        ],
+    )
+
+  def testCreateAuroraExpress(self):
+    command_strings = self.CreateAurora(
+        {'aws_aurora_express_configuration': True}
+    )
+    self.assertListEqual(
+        command_strings,
+        [
+            (
+                'aws --output json rds create-db-cluster'
+                ' --db-cluster-identifier=pkb-db-cluster-123'
+                ' --engine=aurora-postgresql --region=us-east-1'
+                ' --backup-retention-period=1 --with-express-configuration'
+                ' --tags'
             ),
         ],
     )
