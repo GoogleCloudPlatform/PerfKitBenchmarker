@@ -56,6 +56,13 @@ class AwsRelationalDbSpec(relational_db_spec.RelationalDbSpec):
       raise errors.Config.InvalidValue(
           'Dedicated log volume is only supported with io1 or io2 disk types.'
       )
+    if self.aws_aurora_express_configuration and (
+        flag_values and flag_values['db_machine_type'].present
+    ):
+      raise errors.Config.InvalidValue(
+          'Machine type cannot be specified when using Aurora express '
+          'configuration.'
+      )
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):

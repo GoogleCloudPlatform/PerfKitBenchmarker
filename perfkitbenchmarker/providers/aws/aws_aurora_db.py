@@ -80,6 +80,7 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     self._load_machine_type = self.spec.db_spec.machine_type
     if self.spec.load_machine_type is not None:
       self._load_machine_type = self.spec.load_machine_type
+    self.serverless_scaling_configuration = {}
 
   def _Create(self):
     """Creates the AWS RDS instance.
@@ -99,17 +100,14 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
       )
 
     # Create the cluster.
-    cmd = (
-        util.AWS_PREFIX
-        + [
-            'rds',
-            'create-db-cluster',
-            '--db-cluster-identifier=%s' % self.cluster_id,
-            '--engine=%s' % self.spec.engine,
-            '--region=%s' % self.region,
-            '--backup-retention-period=1',  # backups cannot be disabled
-        ]
-    )
+    cmd = util.AWS_PREFIX + [
+        'rds',
+        'create-db-cluster',
+        '--db-cluster-identifier=%s' % self.cluster_id,
+        '--engine=%s' % self.spec.engine,
+        '--region=%s' % self.region,
+        '--backup-retention-period=1',  # backups cannot be disabled
+    ]
     if self.spec.aws_aurora_express_configuration:
       cmd.append('--with-express-configuration')
     else:
@@ -130,6 +128,12 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
       self.all_instance_ids.append(member['DBInstanceIdentifier'])
 
     if self.spec.aws_aurora_express_configuration:
+      self.spec.db_spec.machine_type = 'aurora_serverless'
+      scaling_config = json_output.get('DBCluster', {}).get(
+          'ServerlessV2ScalingConfiguration', {}
+      )
+      if scaling_config:
+        self.serverless_scaling_configuration = scaling_config
       return
 
     for zone in self.zones:
@@ -358,6 +362,13 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     metadata['aurora_storage_type'] = self.storage_type
     if self.spec.aws_aurora_express_configuration:
       metadata['aws_aurora_express_configuration'] = True
+    if self.serverless_scaling_configuration:
+      metadata['aurora_serverless_min_capacity'] = (
+          self.serverless_scaling_configuration.get('MinCapacity')
+      )
+      metadata['aurora_serverless_max_capacity'] = (
+          self.serverless_scaling_configuration.get('MaxCapacity')
+      )
     return metadata
 
   def _GetMetricsToCollect(self) -> list[relational_db.MetricSpec]:

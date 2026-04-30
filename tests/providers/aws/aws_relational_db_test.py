@@ -104,6 +104,16 @@ class AwsRelationalDbSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
           _COMPONENT, flag_values=FLAGS, **invalid_spec
       )
 
+  def testAuroraExpressInvalidMachineType(self):
+    FLAGS['aws_aurora_express_configuration'].parse(True)
+    FLAGS['db_machine_type'].parse('db.m4.large')
+    with self.assertRaises(errors.Config.InvalidValue):
+      spec = copy.deepcopy(self.minimal_spec)
+      spec['engine'] = 'aurora-postgres'
+      aws_relational_db_spec.AwsRelationalDbSpec(
+          _COMPONENT, flag_values=FLAGS, **spec
+      )
+
 
 class AwsRelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
   """Class that tests the flags defined in AwsRelationalDb."""
@@ -331,21 +341,39 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
 
   def testCreateAuroraExpress(self):
-    command_strings = self.CreateAurora(
-        {'aws_aurora_express_configuration': True}
-    )
-    self.assertListEqual(
-        command_strings,
-        [
-            (
-                'aws --output json rds create-db-cluster'
-                ' --db-cluster-identifier=pkb-db-cluster-123'
-                ' --engine=aurora-postgresql --region=us-east-1'
-                ' --backup-retention-period=1 --with-express-configuration'
-                ' --tags'
-            ),
-        ],
-    )
+    fake_output = json.dumps({
+        'DBCluster': {
+            'ServerlessV2ScalingConfiguration': {
+                'MinCapacity': 0.5,
+                'MaxCapacity': 16.0,
+            }
+        }
+    })
+    with self._PatchCriticalObjects(stdout=fake_output):
+      db = self.CreateAuroraDbFromSpec(
+          {'aws_aurora_express_configuration': True}
+      )
+      db.spec.backup_enabled = True
+      db.spec.db_disk_spec = mock.Mock()
+      db.spec.db_disk_spec.disk_type = 'gp3'
+      db.spec.db_disk_spec.disk_size = 50
+      db.spec.vm_groups = {
+          'clients': mock.Mock(
+              vm_spec=mock.Mock(
+                  zone='us-east-1a',
+                  machine_type='n2-standard-2',
+              ),
+              disk_spec=mock.Mock(
+                  disk_type='gp3',
+                  disk_size=50,
+              ),
+          )
+      }
+      db._Create()
+      self.assertEqual(db.spec.db_spec.machine_type, 'aurora_serverless')
+      metadata = db.GetResourceMetadata()
+      self.assertEqual(metadata.get('aurora_serverless_min_capacity'), 0.5)
+      self.assertEqual(metadata.get('aurora_serverless_max_capacity'), 16.0)
 
   def testNoHighAvailability(self):
     spec_dict = {
