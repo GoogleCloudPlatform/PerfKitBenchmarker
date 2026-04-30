@@ -32,7 +32,6 @@ from perfkitbenchmarker.providers.gcp import gce_virtual_machine as gce_vm
 from perfkitbenchmarker.providers.gcp import gcp_spanner
 from tests import pkb_common_test_case
 
-
 flags.DEFINE_integer('benchmark_spec_test_flag', 0, 'benchmark_spec_test flag.')
 
 FLAGS = flags.FLAGS
@@ -124,6 +123,17 @@ class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.temp_dir = 'tmp'
     FLAGS.ignore_package_requirements = True
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
+
+
+class GenericTestCase(_BenchmarkSpecTestCase):
+
+  def testGetSamples(self):
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    test_resource = mock.MagicMock()
+    fake_sample = mock.MagicMock()
+    test_resource.GetSamples.return_value = [fake_sample]
+    spec.resources = [test_resource]
+    self.assertEqual(spec.GetSamples(), [fake_sample])
 
 
 class ConstructEdwServiceTestCase(_BenchmarkSpecTestCase):
