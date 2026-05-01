@@ -102,9 +102,9 @@ class GoogleContainerRegistryTestCase(PatchedObjectsTestCase):
 
   class FakeContainerImage(container.ContainerImage):
 
-    def __init__(self, name):
+    def __init__(self, name, directory=None):
       self.name = name
-      self.directory = f'docker/{name}/Dockerfile'
+      self.directory = directory or f'docker/{name}/Dockerfile'
 
   def setUp(self):
     super().setUp()
