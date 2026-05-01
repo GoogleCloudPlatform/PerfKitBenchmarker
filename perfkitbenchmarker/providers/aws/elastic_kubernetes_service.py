@@ -21,6 +21,7 @@ instructions.
 """
 
 from collections import abc
+import copy
 import json
 import logging
 import math
@@ -43,7 +44,6 @@ from perfkitbenchmarker.resources.container_service import container_cluster
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
-
 
 FLAGS = flags.FLAGS
 # GPU types which practically require spot to get.
@@ -621,7 +621,7 @@ class EksAutoCluster(BaseEksCluster):
 
 _KARPENTER_NAMESPACE = 'kube-system'
 _KARPENTER_VERSION = '1.8.1'
-_DEAULT_K8S_VERSION = '1.34'
+_DEFAULT_K8S_VERSION = '1.34'
 
 
 class EksKarpenterCluster(BaseEksCluster):
@@ -637,7 +637,7 @@ class EksKarpenterCluster(BaseEksCluster):
     super().__init__(spec)
     self._ChooseSecondZone()
     self.stack_name = f'Karpenter-{self.name}'
-    self.cluster_version: str = self.cluster_version or _DEAULT_K8S_VERSION
+    self.cluster_version: str = self.cluster_version or _DEFAULT_K8S_VERSION
 
   def _Create(self):
     """Creates the control plane and worker nodes."""
@@ -670,6 +670,12 @@ class EksKarpenterCluster(BaseEksCluster):
         ]
         + formation_tags,
     )
+    # The default control plane nodepool is only used for initial commands
+    # to setup Karpenter. Karpenter will setup its own nodepools later.
+    control_plane_nodepool = copy.copy(self.default_nodepool)
+    control_plane_nodepool.num_nodes = 1
+    control_plane_nodepool.min_nodes = 1
+    control_plane_nodepool.max_nodes = 1
     create_json: dict[str, Any] = {
         'metadata': {
             'tags': {'karpenter.sh/discovery': self.name},
@@ -692,7 +698,9 @@ class EksKarpenterCluster(BaseEksCluster):
             'groups': ['system:bootstrappers', 'system:nodes'],
         }],
         'addons': [{'name': 'eks-pod-identity-agent'}],
-        'managedNodeGroups': [self._RenderNodeGroupJson(self.default_nodepool)],
+        'managedNodeGroups': [
+            self._RenderNodeGroupJson(control_plane_nodepool)
+        ],
     }
     self._EksCtlCreate(create_json)
 
@@ -1012,12 +1020,11 @@ class EksKarpenterCluster(BaseEksCluster):
           ],
           timeout=vm_util.DEFAULT_TIMEOUT,
       )
-    # Karpenter controller resources: default 1/1Gi; scale up when
-    # node_scale target exceeds 1000 nodes.
-    num_nodes = getattr(FLAGS, 'kubernetes_scale_num_nodes', None)
-    if num_nodes is not None and num_nodes > 1000:
+    # Karpenter controller resources: default 1/1Gi; scale up controller when
+    # more nodes are expected.
+    if self.max_total_nodes > 1000:
       controller_cpu, controller_memory = 4, '16Gi'
-    elif num_nodes is not None and num_nodes >= 500:
+    elif self.max_total_nodes >= 500:
       controller_cpu, controller_memory = 2, '8Gi'
     else:
       controller_cpu, controller_memory = 1, '1Gi'
@@ -1083,10 +1090,9 @@ class EksKarpenterCluster(BaseEksCluster):
         'v'
         + full_version.strip().strip('"').split(f'{self.cluster_version}-v')[1]
     )
-    # NodePool CPU limit: benchmark target nodes * vCPU + 5%, min 1000.
-    num_nodes = getattr(FLAGS, 'kubernetes_scale_num_nodes', 5)
+    # NodePool CPU limit: max nodes * vCPU + 5%, min 1000.
     vcpu_per_node = FLAGS.eks_karpenter_limits_vcpu_per_node
-    cpu_limit = max(1000, math.ceil(num_nodes * vcpu_per_node * 1.05))
+    cpu_limit = max(1000, math.ceil(self.max_nodes * vcpu_per_node * 1.05))
     kubernetes_commands.ApplyManifest(
         'container/karpenter/nodepool.yaml.j2',
         CLUSTER_NAME=self.name,
@@ -1188,6 +1194,7 @@ class EksKarpenterCluster(BaseEksCluster):
             '--timeout=600s',
         ],
         timeout=660,
+        raise_on_timeout=False,
         suppress_failure=lambda stdout, stderr, retcode: (
             'deleted' in stdout
             and 'timed out waiting for the condition' in stderr
