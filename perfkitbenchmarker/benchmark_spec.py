@@ -1464,3 +1464,5 @@ class BenchmarkSpec:
       self.messaging_service.CheckPrerequisites()
     if hasattr(self, 'memory_store') and self.memory_store:
       self.memory_store.CheckPrerequisites()
+    if hasattr(self, 'ai_agent_service') and self.ai_agent_service:
+      self.ai_agent_service.CheckPrerequisites()

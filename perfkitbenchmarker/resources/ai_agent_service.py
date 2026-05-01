@@ -8,7 +8,6 @@ import abc
 
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import resource
-from perfkitbenchmarker import virtual_machine
 
 
 def GetAiAgentServiceClass(cloud: str, deployment_type: str):
@@ -31,9 +30,13 @@ class BaseAiAgentService(resource.BaseResource):
     self.client_vm = client_vm
 
   @abc.abstractmethod
+  def PrepareWorkload(self, workload_name: str, workload_data_path: str):
+    """Packages, transfers, and sets up the agent code for this service."""
+
+  @abc.abstractmethod
   def Execute(
       self,
-      workload_script: str,
+      workload_name: str,
       model: str,
       output_dir: str,
       model_location: str | None = None,
@@ -49,8 +52,3 @@ class BaseAiAgentService(resource.BaseResource):
   @abc.abstractmethod
   def storage_service(self) -> object_storage_service.ObjectStorageService:
     """Storage service accessible by this service."""
-
-  def PrepareClientVm(
-      self, client_vm: virtual_machine.BaseVirtualMachine, packages: list[str]
-  ):
-    """Hook to prepare client VM before running benchmark."""

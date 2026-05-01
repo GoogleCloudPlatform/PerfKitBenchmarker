@@ -116,11 +116,12 @@ class BaseContainerService(resource.BaseResource):
 class ContainerImage:
   """Simple class for tracking container image names and source locations."""
 
-  def __init__(self, name: str):
+  def __init__(self, name: str, directory: str | None = None):
     self.name: str = name
-    self.directory: str = os.path.dirname(
-        data.ResourcePath(os.path.join('docker', self.name, 'Dockerfile'))
-    )
+    if directory:
+      self.directory: str = data.ResourcePath(directory)
+    else:
+      self.directory: str = data.ResourcePath(os.path.join('docker', self.name))
 
 
 def NodePoolName(name: str) -> str:
