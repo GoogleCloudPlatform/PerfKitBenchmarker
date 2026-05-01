@@ -31,7 +31,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker.linux_packages import multichase
 
-
 _CHASES_WITHOUT_ARGS = (
     'simple',
     'incr',
@@ -251,6 +250,13 @@ flags.DEFINE_bool(
     'If true, skip the default run of multiload with the'
     ' stream-triad-nontemporal-injection-delay traffic pattern.',
 )
+_WARMUP_ITERATIONS = flags.DEFINE_integer(
+    'multiload_warmup_iterations',
+    100,
+    'If set, add an initial default run of multiload with this many iterations'
+    ' and thestream-triad-nontemporal-injection-delay traffic pattern. '
+    ' The results of this run are not recorded.',
+)
 
 
 def _TranslateMemorySize(get_total_memory, size):
@@ -364,6 +370,8 @@ def Run(benchmark_spec):
   if _MULTICHASE in FLAGS.multichase_benchmarks:
     samples.extend(RunMultichase(benchmark_spec))
   if _MULTILOAD in FLAGS.multichase_benchmarks:
+    if _WARMUP_ITERATIONS.value:
+      RunMultiload(benchmark_spec, num_samples=_WARMUP_ITERATIONS.value)
     samples.extend(
         RunMultiload(
             benchmark_spec,
@@ -375,16 +383,7 @@ def Run(benchmark_spec):
         )
     )
     if not FLAGS.skip_default_multiload_run:
-      samples.extend(
-          RunMultiload(
-              benchmark_spec,
-              None,
-              50,
-              '1G',
-              0,
-              'stream-triad-nontemporal-injection-delay',
-          )
-      )
+      samples.extend(RunMultiload(benchmark_spec))
   return samples
 
 
@@ -489,11 +488,11 @@ def RunMultichase(benchmark_spec):
 
 def RunMultiload(
     benchmark_spec,
-    num_threads,
-    num_samples,
-    buffer_size,
-    delay,
-    traffic_pattern,
+    num_threads=None,
+    num_samples=50,
+    buffer_size='1G',
+    delay=0,
+    traffic_pattern='stream-triad-nontemporal-injection-delay',
 ):
   """Run multiload on the VM.
 
