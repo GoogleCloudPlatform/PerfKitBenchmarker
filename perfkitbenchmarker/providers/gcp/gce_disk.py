@@ -127,20 +127,6 @@ NVME = 'NVME'
 # Latest GCE families have a preset
 # number of SSDs, so we set those attributes directly from the machine type.
 FIXED_SSD_MACHINE_TYPES = {
-    'z4d-highmem-16-standardlssd': 1,
-    'z4d-highmem-32-standardlssd': 2,
-    'z4d-highmem-48-standardlssd': 3,
-    'z4d-highmem-64-standardlssd': 4,
-    'z4d-highmem-96-standardlssd': 6,
-    'z4d-highmem-192-standardlssd': 12,
-    'z4d-highmem-384-standardlssd': 24,
-    'z4d-highmem-8-highlssd': 1,
-    'z4d-highmem-16-highlssd': 2,
-    'z4d-highmem-32-highlssd': 4,
-    'z4d-highmem-48-highlssd': 6,
-    'z4d-highmem-64-highlssd': 8,
-    'z4d-highmem-96-highlssd': 12,
-    'z4d-highmem-192-highlssd': 24,
     'z3-highmem-176': 12,
     'z3-highmem-88': 12,
     'z3-highmem-14-standardlssd': 1,
