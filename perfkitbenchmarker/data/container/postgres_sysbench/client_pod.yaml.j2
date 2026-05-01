@@ -1,0 +1,44 @@
+---
+# Client pod for running Sysbench benchmarks
+apiVersion: v1
+kind: Pod
+metadata:
+  name: postgres-client
+  namespace: {{ namespace }}
+  labels:
+    app: postgres-client
+spec:
+  # PKB will handle node selection through nodepool configuration
+  tolerations:
+  - key: "kubernetes.io/arch"
+    operator: "Equal"
+    value: "arm64"
+    effect: "NoSchedule"
+  containers:
+  - name: postgres-client
+    image: {{ client_image }}
+    imagePullPolicy: IfNotPresent
+    command:
+    - sleep
+    - infinity
+    resources:
+      requests:
+        cpu: "{{ client_cpu_request }}"
+        memory: "{{ client_memory_request }}"
+      limits:
+        cpu: "{{ client_cpu_limit }}"
+        memory: "{{ client_memory_limit }}"
+    env:
+    - name: PGHOST
+      value: postgres-standalone
+    - name: PGPORT
+      value: "5432"
+    - name: PGUSER
+      value: benchmark
+    - name: PGPASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: sysbench-passwords
+          key: benchmark-password
+    - name: PGDATABASE
+      value: benchmark
