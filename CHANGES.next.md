@@ -123,6 +123,8 @@
 -   Allow/require setting individual nodepools' min/max node counts
     independently of the overall K8s cluster's default nodepool. For Standard &
     Karpenter clusters.
+-   Support more of the Kubernetes spec in the Karpenter implementation,
+    bringing this variant more in-line with others.
 
 ### New features:
 

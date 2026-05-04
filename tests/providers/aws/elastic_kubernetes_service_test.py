@@ -1,10 +1,12 @@
 import json
+import os
 import tempfile
 import unittest
 from unittest import mock
 from urllib import parse
 from absl.testing import flagsaver
 from absl.testing import parameterized
+from perfkitbenchmarker import data
 from perfkitbenchmarker import network
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
@@ -360,11 +362,8 @@ class EksAutoClusterTest(BaseEksTest):
 
 class EksKarpenterTest(BaseEksTest):
 
-  def testInitEksClusterWorks(self):
-    elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
-
-  @flagsaver.flagsaver(kubeconfig='/tmp/kubeconfig')
-  def testEksYamlCreateFull(self):
+  def setUp(self):
+    super().setUp()
     self.enter_context(
         mock.patch.object(
             util,
@@ -375,6 +374,12 @@ class EksKarpenterTest(BaseEksTest):
             },
         )
     )
+
+  def testInitEksClusterWorks(self):
+    elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
+
+  @flagsaver.flagsaver(kubeconfig='/tmp/kubeconfig')
+  def testEksYamlCreateFull(self):
     cluster = elastic_kubernetes_service.EksKarpenterCluster(EKS_SPEC)
     self.MockJsonRead(cluster)
     mock_cmd = self.MockIssueCommand({
@@ -427,6 +432,82 @@ class EksKarpenterTest(BaseEksTest):
             )
         ),
     ])
+
+  @parameterized.named_parameters(
+      (
+          'autoscaling',
+          {
+              'max_vm_count': 10,
+              'min_vm_count': 2,
+          },
+          'limits:\n    cpu: 1000',
+      ),
+      (
+          'static',
+          {
+              'vm_count': 5,
+          },
+          'replicas: 5',
+      ),
+  )
+  @flagsaver.flagsaver(kubeconfig='/tmp/kubeconfig')
+  def testEksYamlCreateFullNodepools(self, nodepool_config, expected_content):
+    # Mock resources for _PostCreate
+    self.MockIssueCommand({
+        'helm upgrade --install karpenter': [('', '', 0)],
+        'ssm get-parameter': [('image-123', '', 0)],
+        'ec2 describe-images': [('amazon-linux-2023-1.34-v20240416', '', 0)],
+        'kubectl apply': [('', '', 0)],
+        'get events': [(json.dumps({'items': []}), '', 0)],
+    })
+
+    # Mock data.ResourcePath to point to actual data files
+    def MockResourcePath(resource):
+      return os.path.join(
+          os.path.dirname(elastic_kubernetes_service.__file__),
+          '../../data',
+          resource,
+      )
+
+    self.enter_context(
+        mock.patch.object(data, 'ResourcePath', side_effect=MockResourcePath)
+    )
+
+    spec_dict = EKS_SPEC_DICT.copy()
+    spec_dict['nodepools'] = {
+        'pool1': {
+            'vm_spec': {
+                'AWS': {
+                    'zone': 'us-west-1b',
+                }
+            },
+            'machine_families': ['m6i', 'm7i'],
+            **nodepool_config,
+        }
+    }
+    cluster = elastic_kubernetes_service.EksKarpenterCluster(
+        container_spec.ContainerClusterSpec('NAME', **spec_dict)
+    )
+
+    with self.assertLogs(level='INFO') as logs:
+      cluster._PostCreate()
+
+    full_logs = '\n'.join(logs.output)
+    self.assertContainsInOrder(
+        [
+            # Verify default nodepool
+            'name: default',
+            'node.kubernetes.io/instance-type',
+            'm5.large',
+            # Verify additional nodepool
+            'name: pool1',
+            'karpenter.k8s.aws/instance-category',
+            'm6i',
+            'm7i',
+        ],
+        full_logs,
+    )
+    self.assertIn(expected_content, full_logs)
 
   def testRecursiveDictionaryUpdate(self):
     base = {'a': 1, 'deep': {'c': 2}}
