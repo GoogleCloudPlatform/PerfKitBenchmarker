@@ -43,70 +43,19 @@ from perfkitbenchmarker.linux_benchmarks import sysbench_benchmark
 
 FLAGS = flags.FLAGS
 
-# PostgreSQL configuration flags
-flags.DEFINE_string(
-    'postgres_gke_shared_buffers',
-    '15GB',
-    'PostgreSQL shared_buffers size (baseline: 15GB, optimized: 35GB)',
-)
-flags.DEFINE_integer(
-    'postgres_gke_max_connections', 1000, 'PostgreSQL max_connections'
-)
-flags.DEFINE_string(
-    'postgres_gke_effective_cache_size',
-    '30GB',
-    'PostgreSQL effective_cache_size (baseline: 30GB, optimized: 40GB)',
-)
-flags.DEFINE_string(
-    'postgres_gke_work_mem',
-    '64MB',
-    'PostgreSQL work_mem (baseline: 64MB, optimized: 32MB)',
-)
-flags.DEFINE_integer(
-    'postgres_gke_max_worker_processes',
-    20,
-    'PostgreSQL max_worker_processes (baseline: 20, optimized: 32)',
-)
-flags.DEFINE_integer(
-    'postgres_gke_max_parallel_workers_per_gather',
-    8,
-    'PostgreSQL max_parallel_workers_per_gather (baseline: 8, optimized: 12)',
-)
-flags.DEFINE_string(
-    'postgres_gke_wal_buffers',
-    '64MB',
-    'PostgreSQL wal_buffers (baseline: 64MB, optimized: 32MB)',
-)
-flags.DEFINE_string(
-    'postgres_gke_max_wal_size',
-    '1GB',
-    'PostgreSQL max_wal_size (baseline: 1GB, optimized: 16GB)',
-)
-flags.DEFINE_integer(
-    'postgres_gke_autovacuum_max_workers',
-    3,
-    'PostgreSQL autovacuum_max_workers (baseline: 3, optimized: 8)',
-)
+
 
 # Infrastructure flags
 flags.DEFINE_string(
-    'postgres_gke_server_machine_type',
+    'postgres_kubernetes_server_machine_type',
     None,
     'Machine type for PostgreSQL server nodes',
 )
 flags.DEFINE_string(
-    'postgres_gke_client_machine_type', None, 'Machine type for client nodes'
-)
-flags.DEFINE_integer(
-    'postgres_gke_disk_size', 500, 'Disk size in GB for PostgreSQL data'
-)
-flags.DEFINE_string(
-    'postgres_gke_disk_type',
-    None,
-    'Disk type (auto-selected based on machine type if not specified)',
+    'postgres_kubernetes_client_machine_type', None, 'Machine type for client nodes'
 )
 flags.DEFINE_enum(
-    'postgres_gke_optimization_profile',
+    'postgres_kubernetes_optimization_profile',
     'baseline',
     [
         'baseline',
@@ -122,26 +71,26 @@ flags.DEFINE_enum(
     'Optimization profile to use',
 )
 flags.DEFINE_bool(
-    'postgres_gke_use_init_container',
+    'postgres_kubernetes_use_init_container',
     True,
     'Whether to use init container for system updates (baseline: True, v2:'
     ' False)',
 )
 flags.DEFINE_string(
-    'postgres_gke_client_cpu_request',
+    'postgres_kubernetes_client_cpu_request',
     '4',
     'CPU request for Sysbench client pod',
 )
 flags.DEFINE_string(
-    'postgres_gke_client_memory_request',
+    'postgres_kubernetes_client_memory_request',
     '10Gi',
     'Memory request for Sysbench client pod',
 )
 flags.DEFINE_string(
-    'postgres_gke_client_cpu_limit', '8', 'CPU limit for Sysbench client pod'
+    'postgres_kubernetes_client_cpu_limit', '8', 'CPU limit for Sysbench client pod'
 )
 flags.DEFINE_string(
-    'postgres_gke_client_memory_limit',
+    'postgres_kubernetes_client_memory_limit',
     '20Gi',
     'Memory limit for Sysbench client pod',
 )
@@ -188,14 +137,16 @@ postgres_sysbench_gke:
     sysbench_testname: oltp_read_write
 """
 
-# Machine type to disk type mapping
-MACHINE_DISK_MAPPING = {
-    'c4': 'hyperdisk-balanced',
-    'c4d': 'hyperdisk-balanced',
-    'c4a': 'hyperdisk-balanced',
-    'n4': 'hyperdisk-balanced',
-    'n4d': 'hyperdisk-balanced',
-    'n4a': 'hyperdisk-balanced',
+
+
+# Base PostgreSQL configuration shared across profiles
+BASE_POSTGRES_CONFIG = {
+    'max_connections': 1000,
+    'random_page_cost': 1.1,
+    'checkpoint_timeout': '15min',
+    'checkpoint_completion_target': 0.9,
+    'effective_io_concurrency': 200,
+    'max_wal_size': '16GB',
 }
 
 # Optimization profiles
@@ -204,19 +155,15 @@ OPTIMIZATION_PROFILES = {
     'baseline': {
         'postgres': {
             'shared_buffers': '15GB',
-            'max_connections': 1000,
             'effective_cache_size': '30GB',
             'work_mem': '64MB',
             'max_worker_processes': 20,
             'max_parallel_workers_per_gather': 8,
             'max_parallel_workers': 12,
             'wal_buffers': '64MB',
-            'max_wal_size': '16GB',
             'autovacuum_max_workers': 3,
             'effective_io_concurrency': 100,
-            'random_page_cost': 1.1,
             'checkpoint_timeout': '5min',
-            'checkpoint_completion_target': 0.9,
         },
         'use_init_container': True,
         'node_image': 'UBUNTU_CONTAINERD',
@@ -225,19 +172,15 @@ OPTIMIZATION_PROFILES = {
     'infra-tuned': {
         'postgres': {
             'shared_buffers': '15GB',
-            'max_connections': 1000,
             'effective_cache_size': '30GB',
             'work_mem': '64MB',
             'max_worker_processes': 20,
             'max_parallel_workers_per_gather': 8,
             'max_parallel_workers': 12,
             'wal_buffers': '64MB',
-            'max_wal_size': '16GB',
             'autovacuum_max_workers': 3,
             'effective_io_concurrency': 100,
-            'random_page_cost': 1.1,
             'checkpoint_timeout': '5min',
-            'checkpoint_completion_target': 0.9,
         },
         'use_init_container': True,
         'node_image': 'COS_CONTAINERD',
@@ -246,19 +189,15 @@ OPTIMIZATION_PROFILES = {
     'fast-startup': {
         'postgres': {
             'shared_buffers': '15GB',
-            'max_connections': 1000,
             'effective_cache_size': '30GB',
             'work_mem': '64MB',
             'max_worker_processes': 20,
             'max_parallel_workers_per_gather': 8,
             'max_parallel_workers': 12,
             'wal_buffers': '64MB',
-            'max_wal_size': '16GB',
             'autovacuum_max_workers': 3,
             'effective_io_concurrency': 100,
-            'random_page_cost': 1.1,
             'checkpoint_timeout': '5min',
-            'checkpoint_completion_target': 0.9,
         },
         'use_init_container': False,
         'node_image': 'UBUNTU_CONTAINERD',
@@ -267,19 +206,15 @@ OPTIMIZATION_PROFILES = {
     'kernel-tuned': {
         'postgres': {
             'shared_buffers': '15GB',
-            'max_connections': 1000,
             'effective_cache_size': '30GB',
             'work_mem': '64MB',
             'max_worker_processes': 20,
             'max_parallel_workers_per_gather': 8,
             'max_parallel_workers': 12,
             'wal_buffers': '64MB',
-            'max_wal_size': '16GB',
             'autovacuum_max_workers': 3,
             'effective_io_concurrency': 100,
-            'random_page_cost': 1.1,
             'checkpoint_timeout': '5min',
-            'checkpoint_completion_target': 0.9,
         },
         'use_init_container': True,
         'node_image': 'UBUNTU_CONTAINERD',
@@ -294,19 +229,15 @@ OPTIMIZATION_PROFILES = {
     'hugepages': {
         'postgres': {
             'shared_buffers': '15GB',
-            'max_connections': 1000,
             'effective_cache_size': '30GB',
             'work_mem': '64MB',
             'max_worker_processes': 20,
             'max_parallel_workers_per_gather': 8,
             'max_parallel_workers': 12,
             'wal_buffers': '64MB',
-            'max_wal_size': '16GB',
             'autovacuum_max_workers': 3,
             'effective_io_concurrency': 100,
-            'random_page_cost': 1.1,
             'checkpoint_timeout': '5min',
-            'checkpoint_completion_target': 0.9,
             'huge_pages': 'on',
         },
         'use_init_container': True,
@@ -316,19 +247,13 @@ OPTIMIZATION_PROFILES = {
     'postgres-tuned': {
         'postgres': {
             'shared_buffers': '35GB',
-            'max_connections': 1000,
             'effective_cache_size': '50GB',
             'work_mem': '256MB',
             'max_worker_processes': 32,
             'max_parallel_workers_per_gather': 12,
             'max_parallel_workers': 24,
             'wal_buffers': '512MB',
-            'max_wal_size': '16GB',
             'autovacuum_max_workers': 6,
-            'effective_io_concurrency': 200,
-            'random_page_cost': 1.1,
-            'checkpoint_timeout': '15min',
-            'checkpoint_completion_target': 0.9,
             'wal_level': 'replica',
         },
         'use_init_container': True,
@@ -338,19 +263,13 @@ OPTIMIZATION_PROFILES = {
     'infra+postgres': {
         'postgres': {
             'shared_buffers': '35GB',
-            'max_connections': 1000,
             'effective_cache_size': '50GB',
             'work_mem': '256MB',
             'max_worker_processes': 32,
             'max_parallel_workers_per_gather': 12,
             'max_parallel_workers': 24,
             'wal_buffers': '512MB',
-            'max_wal_size': '16GB',
             'autovacuum_max_workers': 6,
-            'effective_io_concurrency': 200,
-            'random_page_cost': 1.1,
-            'checkpoint_timeout': '15min',
-            'checkpoint_completion_target': 0.9,
             'wal_level': 'replica',
         },
         'use_init_container': True,
@@ -360,19 +279,13 @@ OPTIMIZATION_PROFILES = {
     'infra+postgres+hugepages': {
         'postgres': {
             'shared_buffers': '35GB',
-            'max_connections': 1000,
             'effective_cache_size': '50GB',
             'work_mem': '256MB',
             'max_worker_processes': 32,
             'max_parallel_workers_per_gather': 12,
             'max_parallel_workers': 24,
             'wal_buffers': '512MB',
-            'max_wal_size': '16GB',
             'autovacuum_max_workers': 6,
-            'effective_io_concurrency': 200,
-            'random_page_cost': 1.1,
-            'checkpoint_timeout': '15min',
-            'checkpoint_completion_target': 0.9,
             'wal_level': 'replica',
             'huge_pages': 'on',
             'synchronous_commit': 'on',
@@ -396,19 +309,13 @@ OPTIMIZATION_PROFILES = {
     'infra+postgres+hugepages+hostnetwork': {
         'postgres': {
             'shared_buffers': '35GB',
-            'max_connections': 1000,
             'effective_cache_size': '50GB',
             'work_mem': '256MB',
             'max_worker_processes': 32,
             'max_parallel_workers_per_gather': 12,
             'max_parallel_workers': 24,
             'wal_buffers': '512MB',
-            'max_wal_size': '16GB',
             'autovacuum_max_workers': 6,
-            'effective_io_concurrency': 200,
-            'random_page_cost': 1.1,
-            'checkpoint_timeout': '15min',
-            'checkpoint_completion_target': 0.9,
             'wal_level': 'replica',
             'huge_pages': 'on',
             'synchronous_commit': 'on',
@@ -445,11 +352,11 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
   # Apply machine type overrides
-  if FLAGS.postgres_gke_server_machine_type:
+  if FLAGS.postgres_kubernetes_server_machine_type:
     # Update postgres nodepool
     vm_spec = config['container_cluster']['nodepools']['postgres']['vm_spec']
     for cloud in vm_spec:
-      vm_spec[cloud]['machine_type'] = FLAGS.postgres_gke_server_machine_type
+      vm_spec[cloud]['machine_type'] = FLAGS.postgres_kubernetes_server_machine_type
 
     # Update default root nodepool (if it exists)
     if 'vm_spec' in config['container_cluster']:
@@ -457,9 +364,9 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
       for cloud in root_vm_spec:
         root_vm_spec[cloud][
             'machine_type'
-        ] = FLAGS.postgres_gke_server_machine_type
+        ] = FLAGS.postgres_kubernetes_server_machine_type
 
-  if FLAGS.postgres_gke_client_machine_type:
+  if FLAGS.postgres_kubernetes_client_machine_type:
     # Update nodepool
     client_vm_spec = config['container_cluster']['nodepools']['clients'][
         'vm_spec'
@@ -467,98 +374,11 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
     for cloud in client_vm_spec:
       client_vm_spec[cloud][
           'machine_type'
-      ] = FLAGS.postgres_gke_client_machine_type
+      ] = FLAGS.postgres_kubernetes_client_machine_type
 
-  # Auto-select disk type based on machine type for SERVER
-  server_machine = config['container_cluster']['nodepools']['postgres'][
-      'vm_spec'
-  ]['GCP']['machine_type']
-  server_family = server_machine.split('-')[0]
-  if FLAGS.postgres_gke_disk_type:
-    server_disk_type = FLAGS.postgres_gke_disk_type
-  else:
-    server_disk_type = MACHINE_DISK_MAPPING.get(server_family, 'pd-ssd')
 
-  # Auto-select disk type based on machine type for CLIENT
-  client_machine = config['container_cluster']['nodepools']['clients'][
-      'vm_spec'
-  ]['GCP']['machine_type']
-  client_family = client_machine.split('-')[0]
-  client_disk_type = MACHINE_DISK_MAPPING.get(client_family, 'pd-ssd')
 
-  # Update boot disk configuration for postgres nodepool
-  postgres_vm_spec = config['container_cluster']['nodepools']['postgres'][
-      'vm_spec'
-  ]
-  for cloud in postgres_vm_spec:
-    postgres_vm_spec[cloud]['boot_disk_type'] = server_disk_type
-    postgres_vm_spec[cloud]['boot_disk_size'] = FLAGS.postgres_gke_disk_size
 
-  # Update boot disk configuration for clients nodepool
-  clients_vm_spec = config['container_cluster']['nodepools']['clients'][
-      'vm_spec'
-  ]
-  for cloud in clients_vm_spec:
-    clients_vm_spec[cloud]['boot_disk_type'] = client_disk_type
-    # Client disk size is smaller (100GB default)
-    clients_vm_spec[cloud]['boot_disk_size'] = 100
-
-  # Apply HugePages system config if needed
-  if (
-      'hugepages' in FLAGS.postgres_gke_optimization_profile
-      or 'all-in-one' in FLAGS.postgres_gke_optimization_profile
-  ):
-    logging.info('Enabling Dynamic HugePages via GKE System Config')
-    server_machine = config['container_cluster']['nodepools']['postgres'][
-        'vm_spec'
-    ]['GCP']['machine_type']
-
-    # Calculate dynamic HugePages needed mapped to the architecture
-    machine_family = server_machine.split('-')[0]
-    node_cpus = 16
-    try:
-      node_cpus = int(server_machine.split('-')[2])
-    except IndexError:
-      pass
-
-    node_mem_gb = 60.0
-    if machine_family in ['c4a', 'n4', 'n4a', 'n4d']:
-      node_mem_gb = node_cpus * 4.0
-    elif machine_family == 'c4d':
-      node_mem_gb = node_cpus * 3.875
-    elif machine_family == 'c4':
-      node_mem_gb = node_cpus * 3.75
-
-    pod_mem_gb = int(node_mem_gb * 0.85)
-    hugepage_mb = int(pod_mem_gb * 0.45) * 1024
-    hugepage_size2m = int(hugepage_mb / 2)
-
-    import os
-
-    config_path = os.path.join(FLAGS.temp_dir, 'hugepages-node-config.yaml')
-    with open(config_path, 'w') as f:
-      f.write(
-          'linuxConfig:\n  hugepageConfig:\n    hugepage_size2m:'
-          f' {hugepage_size2m}\n'
-      )
-
-    FLAGS.gke_node_system_config = config_path
-
-    # FIX: GKE applies the system config globally to ALL nodepools upon creation.
-    # We upgrade the default nodepool to match the server machine type.
-    if 'vm_spec' not in config['container_cluster']:
-      config['container_cluster']['vm_spec'] = {'GCP': {}}
-    elif 'GCP' not in config['container_cluster']['vm_spec']:
-      config['container_cluster']['vm_spec']['GCP'] = {}
-
-    config['container_cluster']['vm_spec']['GCP'][
-        'machine_type'
-    ] = server_machine
-    logging.info(
-        'Upgraded default cluster nodepool to %s to satisfy HugePages'
-        ' allocation requirements.',
-        server_machine,
-    )
 
   return config
 
@@ -568,30 +388,54 @@ def _GetPostgresPassword() -> str:
   return postgresql.GetPsqlUserPassword(FLAGS.run_uri)
 
 
-def _GetDynamicResources(machine_type: str) -> Dict[str, Any]:
-  """Dynamically calculates K8s resource limits and Postgres tuning based on Machine Type."""
-  if not machine_type:
-    machine_type = 'c4-standard-16'
+def _GetNodeResources() -> tuple[float, int]:
+  """Gets allocatable memory in GB and CPU count from K8s node."""
+  mem_cmd = [
+      FLAGS.kubectl,
+      '--kubeconfig',
+      FLAGS.kubeconfig,
+      'get',
+      'nodes',
+      '-o',
+      'jsonpath={.items[0].status.allocatable.memory}',
+  ]
+  cpu_cmd = [
+      FLAGS.kubectl,
+      '--kubeconfig',
+      FLAGS.kubeconfig,
+      'get',
+      'nodes',
+      '-o',
+      'jsonpath={.items[0].status.allocatable.cpu}',
+  ]
+  mem_stdout, _, _ = vm_util.IssueCommand(mem_cmd)
+  cpu_stdout, _, _ = vm_util.IssueCommand(cpu_cmd)
+  
+  if not mem_stdout or not cpu_stdout:
+    raise ValueError("Failed to retrieve node capacity from Kubernetes")
+    
+  mem_str = mem_stdout.strip()
+  if mem_str.endswith('Ki'):
+    node_mem_gb = int(mem_str[:-2]) / (1024 * 1024)
+  elif mem_str.endswith('Mi'):
+    node_mem_gb = int(mem_str[:-2]) / 1024
+  elif mem_str.endswith('Gi'):
+    node_mem_gb = float(mem_str[:-2])
+  else:
+    node_mem_gb = int(mem_str) / (1024 * 1024 * 1024)
+    
+  cpu_str = cpu_stdout.strip()
+  if cpu_str.endswith('m'):
+    node_cpus = max(1, int(float(cpu_str[:-1]) / 1000))
+  else:
+    node_cpus = int(cpu_str)
+  
+  return node_mem_gb, node_cpus
 
-  parts = machine_type.split('-')
-  node_mem_gb = 60.0
-  node_cpus = 16
 
-  if len(parts) >= 3:
-    family = parts[0]
-    tier = parts[1]
-    try:
-      node_cpus = int(parts[2])
-
-      if tier == 'standard':
-        if family in ['c4a', 'n4', 'n4a', 'n4d']:
-          node_mem_gb = node_cpus * 4.0
-        elif family == 'c4d':
-          node_mem_gb = node_cpus * 3.875
-        elif family == 'c4':
-          node_mem_gb = node_cpus * 3.75
-    except ValueError:
-      pass
+def _GetDynamicResources() -> Dict[str, Any]:
+  """Dynamically calculates K8s resource limits based on Node capacity."""
+  node_mem_gb, node_cpus = _GetNodeResources()
 
   return {
       'cpu_request': str(max(node_cpus - 2, 1)),
@@ -602,19 +446,18 @@ def _GetDynamicResources(machine_type: str) -> Dict[str, Any]:
   }
 
 
-def _GetPostgreSQLConfig(machine_type: str) -> Dict[str, Any]:
+def _GetPostgreSQLConfig() -> Dict[str, Any]:
   """Get effective PostgreSQL configuration based on profile and flags.
 
-  Args:
-      machine_type: Discovered Server Machine type
   Returns:
       Dictionary of PostgreSQL configuration parameters.
   """
   # Start with baseline
-  profile = OPTIMIZATION_PROFILES[FLAGS.postgres_gke_optimization_profile]
-  pg_config = OPTIMIZATION_PROFILES['baseline']['postgres'].copy()
+  profile = OPTIMIZATION_PROFILES[FLAGS.postgres_kubernetes_optimization_profile]
+  pg_config = BASE_POSTGRES_CONFIG.copy()
+  pg_config.update(OPTIMIZATION_PROFILES['baseline']['postgres'])
 
-  dynamic_resources = _GetDynamicResources(machine_type)
+  dynamic_resources = _GetDynamicResources()
   pod_mem_gb = int(dynamic_resources['calculated_node_mem_gb'] * 0.85)
 
   if 'postgres' in profile:
@@ -622,9 +465,9 @@ def _GetPostgreSQLConfig(machine_type: str) -> Dict[str, Any]:
 
     # Apply Dynamic tuning based on profile aggressiveness
     if (
-        'postgres-tuned' in FLAGS.postgres_gke_optimization_profile
-        or 'all-in-one' in FLAGS.postgres_gke_optimization_profile
-        or 'postgres' in FLAGS.postgres_gke_optimization_profile
+        'postgres-tuned' in FLAGS.postgres_kubernetes_optimization_profile
+        or 'all-in-one' in FLAGS.postgres_kubernetes_optimization_profile
+        or 'postgres' in FLAGS.postgres_kubernetes_optimization_profile
     ):
       pg_config['shared_buffers'] = f'{int(pod_mem_gb * 0.40)}GB'
       pg_config['effective_cache_size'] = f'{int(pod_mem_gb * 0.75)}GB'
@@ -636,30 +479,6 @@ def _GetPostgreSQLConfig(machine_type: str) -> Dict[str, Any]:
       pg_config['shared_buffers'] = f'{int(pod_mem_gb * 0.25)}GB'
       pg_config['effective_cache_size'] = f'{int(pod_mem_gb * 0.50)}GB'
 
-  # Use FLAGS['flag_name'].present to check if user explicitly set the flag
-  if FLAGS['postgres_gke_shared_buffers'].present:
-    pg_config['shared_buffers'] = FLAGS.postgres_gke_shared_buffers
-  if FLAGS['postgres_gke_max_connections'].present:
-    pg_config['max_connections'] = FLAGS.postgres_gke_max_connections
-  if FLAGS['postgres_gke_effective_cache_size'].present:
-    pg_config['effective_cache_size'] = FLAGS.postgres_gke_effective_cache_size
-  if FLAGS['postgres_gke_work_mem'].present:
-    pg_config['work_mem'] = FLAGS.postgres_gke_work_mem
-  if FLAGS['postgres_gke_max_worker_processes'].present:
-    pg_config['max_worker_processes'] = FLAGS.postgres_gke_max_worker_processes
-  if FLAGS['postgres_gke_max_parallel_workers_per_gather'].present:
-    pg_config['max_parallel_workers_per_gather'] = (
-        FLAGS.postgres_gke_max_parallel_workers_per_gather
-    )
-  if FLAGS['postgres_gke_wal_buffers'].present:
-    pg_config['wal_buffers'] = FLAGS.postgres_gke_wal_buffers
-  if FLAGS['postgres_gke_max_wal_size'].present:
-    pg_config['max_wal_size'] = FLAGS.postgres_gke_max_wal_size
-  if FLAGS['postgres_gke_autovacuum_max_workers'].present:
-    pg_config['autovacuum_max_workers'] = (
-        FLAGS.postgres_gke_autovacuum_max_workers
-    )
-
   return pg_config
 
 
@@ -670,12 +489,12 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       bm_spec: Benchmark specification.
   """
   cluster = bm_spec.container_cluster
-  profile = OPTIMIZATION_PROFILES[FLAGS.postgres_gke_optimization_profile]
+  profile = OPTIMIZATION_PROFILES[FLAGS.postgres_kubernetes_optimization_profile]
 
   # Determine disk type for storage class
   # Get machine type from config or flag
-  if FLAGS.postgres_gke_server_machine_type:
-    machine_type = FLAGS.postgres_gke_server_machine_type
+  if FLAGS.postgres_kubernetes_server_machine_type:
+    machine_type = FLAGS.postgres_kubernetes_server_machine_type
   else:
     try:
       # Try to get from benchmark config
@@ -683,29 +502,20 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
           'postgres'
       ].vm_spec['GCP']['machine_type']
     except (KeyError, AttributeError):
-      # Default to c4-standard-16 if we can't find it
-      machine_type = 'c4-standard-16'
-      logging.warning(
-          'Could not determine machine type from config, using default: %s',
-          machine_type,
-      )
+      raise ValueError("Could not determine machine type from config. Please specify --postgres_kubernetes_server_machine_type")
 
-  machine_family = machine_type.split('-')[0] if machine_type else 'c4'
-  disk_type = FLAGS.postgres_gke_disk_type or MACHINE_DISK_MAPPING.get(
-      machine_family, 'pd-ssd'
-  )
-
+  disk_type = FLAGS.data_disk_type
   # Get Dynamic Resource Sizing
-  pg_config = _GetPostgreSQLConfig(machine_type)
-  dynamic_resources = _GetDynamicResources(machine_type)
+  pg_config = _GetPostgreSQLConfig()
+  dynamic_resources = _GetDynamicResources()
   pod_mem_gb = int(dynamic_resources['calculated_node_mem_gb'] * 0.85)
 
   hugepages = profile.get('hugepages')
 
   # If HugePages is enabled, calculate exact 2MB pages mapping dynamically
   if (
-      'hugepages' in FLAGS.postgres_gke_optimization_profile
-      or 'all-in-one' in FLAGS.postgres_gke_optimization_profile
+      'hugepages' in FLAGS.postgres_kubernetes_optimization_profile
+      or 'all-in-one' in FLAGS.postgres_kubernetes_optimization_profile
       or 'hugepages' in profile
   ):
     hugepage_mb = int(pod_mem_gb * 0.45) * 1024  # 5% buffer over shared_buffers
@@ -726,7 +536,7 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       'postgres_user': 'benchmark',
       'postgres_password': _GetPostgresPassword(),
       'postgres_database': 'benchmark',
-      'disk_size': f'{FLAGS.postgres_gke_disk_size}Gi',
+      'disk_size': f'{FLAGS.data_disk_size}Gi',
       'disk_type': disk_type,
       'use_init_container': profile.get('use_init_container', True),
       'host_network': profile.get('host_network', False),
@@ -893,7 +703,7 @@ def _PrepareSysbenchClient(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   """
   # Deploy client pod and install sysbench
   cluster = bm_spec.container_cluster
-  profile = OPTIMIZATION_PROFILES[FLAGS.postgres_gke_optimization_profile]
+  profile = OPTIMIZATION_PROFILES[FLAGS.postgres_kubernetes_optimization_profile]
 
   # Create K8s Secret for sysbench password (reviewer feedback)
   logging.info('Creating sysbench-passwords secret...')
@@ -924,10 +734,10 @@ def _PrepareSysbenchClient(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   template_params = {
       'namespace': 'default',
       'client_image': profile.get('client_image', 'ubuntu:20.04'),
-      'client_cpu_request': FLAGS.postgres_gke_client_cpu_request,
-      'client_cpu_limit': FLAGS.postgres_gke_client_cpu_limit,
-      'client_memory_request': FLAGS.postgres_gke_client_memory_request,
-      'client_memory_limit': FLAGS.postgres_gke_client_memory_limit,
+      'client_cpu_request': FLAGS.postgres_kubernetes_client_cpu_request,
+      'client_cpu_limit': FLAGS.postgres_kubernetes_client_cpu_limit,
+      'client_memory_request': FLAGS.postgres_kubernetes_client_memory_request,
+      'client_memory_limit': FLAGS.postgres_kubernetes_client_memory_limit,
   }
 
   with kubernetes_commands.CreateRenderedManifestFile(
@@ -1181,14 +991,14 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
 
     # Parse sysbench output
     metadata = sysbench.GetMetadata(sysbench_params)
-    machine_type = FLAGS.postgres_gke_server_machine_type or 'c4-standard-16'
-    pg_conf = _GetPostgreSQLConfig(machine_type)
+    machine_type = FLAGS.postgres_kubernetes_server_machine_type or 'c4-standard-16'
+    pg_conf = _GetPostgreSQLConfig()
     metadata.update({
-        'optimization_profile': FLAGS.postgres_gke_optimization_profile,
+        'optimization_profile': FLAGS.postgres_kubernetes_optimization_profile,
         'postgres_shared_buffers': pg_conf['shared_buffers'],
         'postgres_effective_cache_size': pg_conf['effective_cache_size'],
         'machine_type': machine_type,
-        'disk_type': FLAGS.postgres_gke_disk_type or 'auto',
+        'disk_type': FLAGS.data_disk_type or 'auto',
         'workload_type': workload,
     })
 
@@ -1230,48 +1040,6 @@ def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   Args:
       bm_spec: Benchmark specification.
   """
-  logging.info('Cleaning up PostgreSQL resources...')
-
-  # 1. Delete StatefulSet
-  cmd = [
-      FLAGS.kubectl,
-      '--kubeconfig',
-      FLAGS.kubeconfig,
-      'delete',
-      'statefulset',
-      'postgres-standalone',
-      '-n',
-      'default',
-      '--ignore-not-found',
-  ]
-  vm_util.IssueCommand(cmd)
-
-  # 2. Delete the Client Pod
-  cmd = [
-      FLAGS.kubectl,
-      '--kubeconfig',
-      FLAGS.kubeconfig,
-      'delete',
-      'pod',
-      'postgres-client',
-      '-n',
-      'default',
-      '--ignore-not-found',
-  ]
-  vm_util.IssueCommand(cmd)
-
-  # 3. Explicitly delete all PVCs to ensure disks are released
-  cmd = [
-      FLAGS.kubectl,
-      '--kubeconfig',
-      FLAGS.kubeconfig,
-      'delete',
-      'pvc',
-      '--all',
-      '-n',
-      'default',
-      '--ignore-not-found',
-  ]
-  vm_util.IssueCommand(cmd)
-
-  logging.info('Cleanup complete.')
+  # PKB container cluster lifecycle handles namespace and cluster deletion,
+  # which automatically garbage-collects Pods, StatefulSets, and PVCs.
+  pass
