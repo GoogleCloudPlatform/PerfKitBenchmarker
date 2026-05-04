@@ -183,7 +183,8 @@ class VertexAiCustomJobAiAgentService(GcpAiAgentService):
     benchmark_spec = context.GetThreadBenchmarkSpec()
     if not benchmark_spec.container_registry:
       raise errors.Config.MissingOption(
-          f'{type(self)} requires container_registry in benchmark config spec.'
+          f'{type(self).__name__} requires container_registry in benchmark'
+          ' config spec.'
       )
 
   @override
