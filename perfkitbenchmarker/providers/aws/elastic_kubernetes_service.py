@@ -537,7 +537,7 @@ class EksAutoCluster(BaseEksCluster):
   """
 
   CLOUD = provider_info.AWS
-  CLUSTER_TYPE = 'Autopilot'
+  CLUSTER_TYPE = 'Auto'
 
   def __init__(self, spec):
     super().__init__(spec)

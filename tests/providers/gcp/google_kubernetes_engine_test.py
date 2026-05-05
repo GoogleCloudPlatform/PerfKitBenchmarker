@@ -759,7 +759,7 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
         'NAME',
         **{
             'cloud': 'GCP',
-            'type': 'Autopilot',
+            'type': 'Auto',
             'vm_spec': {
                 'GCP': {
                     'zone': 'us-central1-a',
@@ -796,11 +796,11 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
           {
               'project': 'fakeproject',
               'cloud': 'GCP',
-              'cluster_type': 'Autopilot',
+              'cluster_type': 'Auto',
               'region': 'us-central1',
-              'machine_type': 'Autopilot',
-              'size': 'Autopilot',
-              'nodepools': 'Autopilot',
+              'machine_type': 'Auto',
+              'size': 'Auto',
+              'nodepools': 'Auto',
           },
           metadata,
       )

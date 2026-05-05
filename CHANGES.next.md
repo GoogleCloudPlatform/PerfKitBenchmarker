@@ -125,6 +125,8 @@
     Karpenter clusters.
 -   Support more of the Kubernetes spec in the Karpenter implementation,
     bringing this variant more in-line with others.
+-   Rename GKE Autopilot & EKS Auto mode's cluster_type within PKB from
+    'Autopilot' to 'Auto'.
 
 ### New features:
 
