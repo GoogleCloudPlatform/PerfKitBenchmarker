@@ -680,7 +680,7 @@ class EksKarpenterCluster(BaseEksCluster):
     bootstrapping_nodepool.num_nodes = 1
     bootstrapping_nodepool.min_nodes = 1
     bootstrapping_nodepool.max_nodes = 1
-    bootstrapping_nodepool.machine_type = 'm7i.large'
+    bootstrapping_nodepool.machine_type = 'm7i.2xlarge'
     create_json: dict[str, Any] = {
         'metadata': {
             'tags': {'karpenter.sh/discovery': self.name},
