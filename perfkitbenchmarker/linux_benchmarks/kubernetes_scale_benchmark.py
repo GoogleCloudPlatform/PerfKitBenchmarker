@@ -68,6 +68,11 @@ EXPECTED_NODES_CREATED = flags.DEFINE_integer(
     'If defined, the benchmark will fail if there are not this many node ready'
     ' events during scale up.',
 )
+_SPECIFY_NODEPOOL = flags.DEFINE_string(
+    'kubernetes_scale_nodepool',
+    None,
+    'If specified, only use this nodepool for the scale up workload.',
+)
 
 MANIFEST_TEMPLATE = 'container/kubernetes_scale/kubernetes_scale.yaml.j2'
 DEFAULT_IMAGE = 'busybox:1.37'
@@ -168,15 +173,19 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   # Warm up the cluster by creating a single pod. This compensates for
   # differences between Standard & Autopilot, where Standard already has 1 node
   # due to its starting nodepool but Autopilot does not.
-  scale_one_samples = ScaleUpPods(cluster, 1)
-  if not scale_one_samples:
-    logging.exception(
-        'Failed to scale up to 1 pod; now investigating failure reasons.'
-    )
-    unused = 0
-    pod_samples = ParseStatusChanges('pod', unused)
-    # Log & check for quota failure.
-    CheckForFailures(cluster, pod_samples, 1)
+  if NUM_PODS.value == 1:
+    logging.info('Warming up to 0 pods given end goal is only 1 pod.')
+    ScaleUpPods(cluster, 0)
+  else:
+    scale_one_samples = ScaleUpPods(cluster, 1)
+    if not scale_one_samples:
+      logging.exception(
+          'Failed to scale up to 1 pod; now investigating failure reasons.'
+      )
+      unused = 0
+      pod_samples = ParseStatusChanges('pod', unused)
+      # Log & check for quota failure.
+      CheckForFailures(cluster, pod_samples, 1)
 
   initial_nodes = kubernetes_commands.GetNodeNames()
   initial_pods = kubernetes_commands.GetPodNames()
@@ -185,7 +194,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   samples = ScaleUpPods(cluster, NUM_PODS.value)
   pod_samples = ParseStatusChanges('pod', start_time, initial_pods)
   samples += pod_samples
-  CheckForFailures(cluster, pod_samples, NUM_PODS.value - 1)
+  CheckForFailures(cluster, pod_samples, max(NUM_PODS.value - 1, 1))
   node_samples = ParseStatusChanges(
       'node', start_time, resources_to_ignore=initial_nodes
   )
@@ -253,13 +262,25 @@ def ScaleUpPods(
       MANIFEST_TEMPLATE,
       **manifest_kwargs,
   )
-
   # Use ModifyPodSpecPlacementYaml to add nodeSelectors via GetNodeSelectors()
   cluster.ModifyPodSpecPlacementYaml(
       yaml_docs,
       'kubernetes-scaleup',
       cluster.default_nodepool.machine_type,
   )
+  if _SPECIFY_NODEPOOL.value:
+    if (
+        _SPECIFY_NODEPOOL.value != 'default'
+        and _SPECIFY_NODEPOOL.value not in cluster.nodepools
+    ):
+      raise errors.Benchmarks.RunError(
+          f'Scaling was limited to {_SPECIFY_NODEPOOL.value} but that nodepool'
+          ' was not found in the cluster. Only found:'
+          f' {list(cluster.nodepools.keys())}.'
+      )
+    yaml_docs[0]['spec']['template']['spec']['nodeSelector'][
+        'pkb_nodepool'
+    ] = _SPECIFY_NODEPOOL.value
   resource_names = kubernetes_commands.ApplyYaml(yaml_docs)
 
   assert resource_names
