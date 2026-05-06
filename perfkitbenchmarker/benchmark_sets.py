@@ -14,7 +14,6 @@
 
 """Benchmark set specific functions and definitions."""
 
-
 import collections
 import copy
 import itertools
@@ -159,6 +158,7 @@ BENCHMARK_SETS = {
             'mongodb_ycsb',
             'multichase',
             'mxnet',
+            'neper',
             'netperf',
             'netperf_hammerdbcli',
             'object_storage_service',
@@ -270,6 +270,16 @@ BENCHMARK_SETS = {
             'cloudsuite_media_streaming',
             'cloudsuite_web_search',
             'cloudsuite_web_serving',
+        ],
+    },
+    'networking': {
+        MESSAGE: 'Networking benchmark set.',
+        BENCHMARK_LIST: [
+            'iperf',
+            'mesh_network',
+            'neper',
+            'netperf',
+            'ping',
         ],
     },
 }
