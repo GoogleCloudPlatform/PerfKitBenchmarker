@@ -19,6 +19,7 @@ import logging
 import time
 
 from absl import flags
+# TODO(pclay): Migrate gcs to use storage_v2.
 from google.cloud import storage
 # This is the path that we SCP object_storage_interface to.
 from providers import object_storage_interface

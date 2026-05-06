@@ -131,9 +131,18 @@ def GetRegionFromZone(zone) -> str:
   return '-'.join(parts[:2])
 
 
+_REGION_REGEX = r'[a-z]+-[a-z]+[0-9]+'
+_ZONE_REGEX = _REGION_REGEX + r'-[a-z]'
+
+
 def IsRegion(location: str) -> bool:
-  """Determine if a zone or region is a region."""
-  return bool(re.fullmatch(r'[a-z]+-[a-z]+[0-9]', location))
+  """Determine if a string looks like a region name."""
+  return bool(re.fullmatch(_REGION_REGEX, location))
+
+
+def IsZone(location: str) -> bool:
+  """Determine if a string looks like a zone name."""
+  return bool(re.fullmatch(_ZONE_REGEX, location))
 
 
 def GetAllZones() -> Set[str]:

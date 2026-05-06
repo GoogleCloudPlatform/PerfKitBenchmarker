@@ -32,9 +32,9 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
 _DEFAULT_GCP_SERVICE_KEY_FILE = 'gcp_credentials.json'
-DEFAULT_GCP_REGION = 'us-central1'
 GCLOUD_CONFIG_PATH = '.config/gcloud'
 GCS_CLIENT_PYTHON = 'python'
+GCS_CLIENT_PYTHON_GRPC = 'python_grpc'
 GCS_CLIENT_BOTO = 'boto'
 READER = 'objectViewer'
 WRITER = 'objectCreator'
@@ -47,8 +47,9 @@ flags.DEFINE_string(
 GCS_CLIENT = flags.DEFINE_enum(
     'gcs_client',
     GCS_CLIENT_PYTHON,
-    [GCS_CLIENT_PYTHON, GCS_CLIENT_BOTO],
-    'The GCS client library to use (default python).',
+    [GCS_CLIENT_PYTHON, GCS_CLIENT_PYTHON_GRPC, GCS_CLIENT_BOTO],
+    'The GCS client library to use. If benchmarking GCS Rapid, '
+    'the grpc client will be used automatically.',
 )
 
 FLAGS = flags.FLAGS
@@ -69,6 +70,7 @@ class GoogleCloudStorageBucketSpec(object_storage_service.BaseBucketSpec):
       uniform_bucket_level_access=False,
   ):
     super().__init__(mount_point, bucket_name, region, zone)
+    assert util.GetRegionFromZone(zone) == region
     self.hierarchical_name_space: bool = hierarchical_name_space
     self.uniform_bucket_level_access: bool = uniform_bucket_level_access
 
@@ -79,18 +81,16 @@ class GoogleCloudStorageBucket(object_storage_service.Bucket):
   def __init__(self, bucket_spec):
     super().__init__(bucket_spec)
     self.hierarchical_name_space = bucket_spec.hierarchical_name_space
-    self.uniform_bucket_level_access = (
-        bucket_spec.uniform_bucket_level_access
-    )
+    self.uniform_bucket_level_access = bucket_spec.uniform_bucket_level_access
     self.service = GoogleCloudStorageService()
 
   def _Create(self):
     self.service.PrepareService(
-        self.region,
+        self.zone,
         self.hierarchical_name_space,
         self.uniform_bucket_level_access,
     )
-    self.service.MakeBucket(self.bucket_name, placement=self.zone)
+    self.service.MakeBucket(self.bucket_name)
 
   def _Delete(self):
     self.service.CleanupService()
@@ -104,10 +104,12 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
   STORAGE_NAME = provider_info.GCP
 
   location: str
+  placement: str
 
   def __init__(self):
     super().__init__()
     self.location = None
+    self.placement = None
     self.hierarchical_name_space = False
     self.uniform_bucket_level_access = False
 
@@ -117,18 +119,21 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       hierarchical_name_space=False,
       uniform_bucket_level_access=False,
   ):
-    self.location = location or DEFAULT_GCP_REGION
+    assert location
+    self.placement = None
+    if util.IsZone(location):
+      self.location = util.GetRegionFromZone(location)
+      self.placement = location
+    else:
+      self.location = location
     self.hierarchical_name_space = hierarchical_name_space
     self.uniform_bucket_level_access = uniform_bucket_level_access
 
-  def MakeBucket(
-      self, bucket_name, placement=None, raise_on_failure=True, tag_bucket=True
-  ):
+  def MakeBucket(self, bucket_name, raise_on_failure=True, tag_bucket=True):
     """Creates a GCS bucket.
 
     Args:
       bucket_name: The name of the bucket to create, without gs:// prefix.
-      placement: The placement of the bucket.
       raise_on_failure: If False, exceptions are swallowed.
       tag_bucket: If True, tag the bucket with default tags.
     """
@@ -143,8 +148,8 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     elif self.location and '-' in self.location:
       # regional buckets
       command.extend(['--default-storage-class', 'regional'])
-    if placement:
-      command.extend(['--placement', placement])
+    if self.placement:
+      command.extend(['--placement', self.placement])
     if self.hierarchical_name_space:
       command.extend(['--enable-hierarchical-namespace'])
     if self.uniform_bucket_level_access:
@@ -332,7 +337,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     Args:
       vm: gce virtual machine object.
     """
-    if GCS_CLIENT.value == GCS_CLIENT_PYTHON:
+    if GCS_CLIENT.value != GCS_CLIENT_BOTO:
       return
 
     boto_src = object_storage_service.FindBotoFile()
@@ -363,7 +368,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     Args:
       vm: gce virtual machine object.
     """
-    if GCS_CLIENT.value == GCS_CLIENT_PYTHON:
+    if GCS_CLIENT.value != GCS_CLIENT_BOTO:
       return
 
     vm_pwd, _ = vm.RemoteCommand('pwd')
@@ -513,4 +518,4 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
   @classmethod
   def APIScriptFiles(cls):
-    return ['gcs.py', 'gcs_boto.py']
+    return ['gcs.py', 'gcs_grpc.py', 'gcs_boto.py']

@@ -38,6 +38,7 @@ import posixpath
 import re
 import threading
 import time
+from typing import Any, cast
 import uuid
 from absl import flags
 import numpy as np
@@ -417,8 +418,17 @@ class MultistreamOperationType(enum.StrEnum):
   redownload = enum.auto()
 
 
-def GetConfig(user_config):
-  return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
+  """Returns the benchmark config."""
+  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if (
+      FLAGS.cloud == provider_info.GCP
+      and object_storage_service.STORAGE_CLASS.value
+      and object_storage_service.STORAGE_CLASS.value.lower() == 'rapid'
+  ):
+    logging.info('Setting GCS client to gcs_grpc for rapid storage class.')
+    config['flags']['gcs_client'] = gcs.GCS_CLIENT_PYTHON_GRPC
+  return config
 
 
 # Raised when we fail to remove a bucket or its content after many retries.
@@ -1835,7 +1845,15 @@ def Prepare(benchmark_spec):
 
   service = object_storage_service.GetObjectStorageClass(FLAGS.storage)()
   if OBJECT_STORAGE_ZONE.value:
-    service.PrepareService(OBJECT_STORAGE_ZONE.value)
+    if FLAGS.storage == 'GCP':
+      gcs_service = cast(gcs.GoogleCloudStorageService, service)
+      gcs_service.PrepareService(
+          OBJECT_STORAGE_ZONE.value,
+          hierarchical_name_space=True,
+          uniform_bucket_level_access=True,
+      )
+    else:
+      service.PrepareService(OBJECT_STORAGE_ZONE.value)
     if FLAGS.storage == 'AWS':
       if FLAGS.object_storage_bucket_name:
         # If the user passed a flag, leave it alone and let S3 eror out if
