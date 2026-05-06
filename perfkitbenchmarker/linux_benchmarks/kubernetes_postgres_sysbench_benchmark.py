@@ -410,7 +410,6 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
     hugepage_mb = int(pod_mem_gb * 0.45) * 1024
     hugepage_size2m = int(hugepage_mb / 2)
 
-    import os
     config_path = os.path.join(FLAGS.temp_dir, 'hugepages-node-config.yaml')
     with open(config_path, 'w') as f:
       f.write(
