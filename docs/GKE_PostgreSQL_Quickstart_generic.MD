@@ -5,7 +5,7 @@
 This guide covers the PKB benchmark module for PostgreSQL
 performance automation on Google Kubernetes Engine (GKE):
 
-- **`postgres_sysbench_gke`** — Standalone PostgreSQL benchmark: deploys a
+- **`kubernetes_postgres_sysbench`** — Standalone PostgreSQL benchmark: deploys a
   single PostgreSQL instance as a Kubernetes StatefulSet and runs Sysbench OLTP
   workloads from a client pod within the same cluster.
 
@@ -83,7 +83,7 @@ Runs the benchmark with standard PostgreSQL settings (no special tuning).
 
 ```bash
 python3 pkb.py \
-    --benchmarks=postgres_sysbench_gke \
+    --benchmarks=kubernetes_postgres_sysbench \
     --cloud=GCP \
     --vm_platform=Kubernetes \
     --zone=us-central1-a \
@@ -119,7 +119,7 @@ Aggressive PostgreSQL configuration tuning (Shared Buffers, Workers, etc.).
 
 ```bash
 python3 pkb.py \
-    --benchmarks=postgres_sysbench_gke \
+    --benchmarks=kubernetes_postgres_sysbench \
     --cloud=GCP \
     --vm_platform=Kubernetes \
     --zone=us-central1-a \

@@ -8,14 +8,14 @@ The benchmarking suite is designed to compare the performance of standard Postgr
 
 ## Baseline Benchmark Implementation
 
-The baseline benchmark is executed using the `postgres_sysbench_gke` benchmark configuration. This configuration represents a standard, unoptimized PostgreSQL deployment on Kubernetes.
+The baseline benchmark is executed using the `kubernetes_postgres_sysbench` benchmark configuration. This configuration represents a standard, unoptimized PostgreSQL deployment on Kubernetes.
 
 ### Execution Command
 
 
 ```bash
 python3 pkb.py \
-    --benchmarks=postgres_sysbench_gke \
+    --benchmarks=kubernetes_postgres_sysbench \
     --postgres_gke_optimization_profile=baseline \
     ...
 ```
@@ -30,13 +30,13 @@ python3 pkb.py \
 
 ## Optimized Benchmark Implementation
 
-The optimized benchmark uses the same `postgres_sysbench_gke` benchmark class but applies specific "Optimization Profiles" to tune the infrastructure and database configuration.
+The optimized benchmark uses the same `kubernetes_postgres_sysbench` benchmark class but applies specific "Optimization Profiles" to tune the infrastructure and database configuration.
 
 ### Execution Command
 
 ```bash
 python3 pkb.py \
-    --benchmarks=postgres_sysbench_gke \
+    --benchmarks=kubernetes_postgres_sysbench \
     --postgres_gke_optimization_profile=infra+postgres+hugepages \
     ...
 ```

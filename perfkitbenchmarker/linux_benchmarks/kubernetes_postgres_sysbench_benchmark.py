@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Run Sysbench against PostgreSQL on GKE.
+"""Run Sysbench against PostgreSQL on Kubernetes.
 
-This benchmark measures the performance of PostgreSQL deployed on Google
-Kubernetes Engine (GKE) using Sysbench. It supports multiple machine types
-and optimization profiles.
+This benchmark measures the performance of PostgreSQL deployed on Kubernetes
+using Sysbench. It supports multiple machine architectures and optimization 
+profiles across different environments.
 
 This benchmark deploys PostgreSQL as a Kubernetes StatefulSet and uses native
 client pods for Sysbench load generation.
@@ -97,11 +97,11 @@ flags.DEFINE_string(
 
 # Note: sysbench_load_threads is already defined in sysbench_benchmark.py
 
-BENCHMARK_NAME = 'postgres_sysbench_gke'
+BENCHMARK_NAME = 'kubernetes_postgres_sysbench'
 BENCHMARK_CONFIG = """
-postgres_sysbench_gke:
+kubernetes_postgres_sysbench:
   description: >
-    Run Sysbench against PostgreSQL on GKE.
+    Run Sysbench against PostgreSQL on Kubernetes.
     Supports multiple machine types and optimization profiles.
   container_cluster:
     cloud: GCP
@@ -380,6 +380,55 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 
+  # Apply HugePages system config if needed (GCP Only)
+  if config.get('container_cluster', {}).get('cloud') == 'GCP' and (
+      'hugepages' in FLAGS.postgres_kubernetes_optimization_profile
+      or 'all-in-one' in FLAGS.postgres_kubernetes_optimization_profile
+  ):
+    logging.info('Enabling Dynamic HugePages via GKE System Config')
+    server_machine = config['container_cluster']['nodepools']['postgres'][
+        'vm_spec'
+    ]['GCP']['machine_type']
+
+    # Calculate dynamic HugePages needed
+    machine_family = server_machine.split('-')[0]
+    node_cpus = 16
+    try:
+      node_cpus = int(server_machine.split('-')[2])
+    except IndexError:
+      pass
+
+    node_mem_gb = 60.0
+    if machine_family in ['c4a', 'n4', 'n4a', 'n4d']:
+      node_mem_gb = node_cpus * 4.0
+    elif machine_family == 'c4d':
+      node_mem_gb = node_cpus * 3.875
+    elif machine_family == 'c4':
+      node_mem_gb = node_cpus * 3.75
+
+    pod_mem_gb = int(node_mem_gb * 0.85)
+    hugepage_mb = int(pod_mem_gb * 0.45) * 1024
+    hugepage_size2m = int(hugepage_mb / 2)
+
+    import os
+    config_path = os.path.join(FLAGS.temp_dir, 'hugepages-node-config.yaml')
+    with open(config_path, 'w') as f:
+      f.write(
+          'linuxConfig:\n  hugepageConfig:\n    hugepage_size2m:'
+          f' {hugepage_size2m}\n'
+      )
+
+    FLAGS.gke_node_system_config = config_path
+
+    # Upgrade the default nodepool to match the server machine type
+    if 'vm_spec' not in config['container_cluster']:
+      config['container_cluster']['vm_spec'] = {'GCP': {}}
+    elif 'GCP' not in config['container_cluster']['vm_spec']:
+      config['container_cluster']['vm_spec']['GCP'] = {}
+
+    config['container_cluster']['vm_spec']['GCP']['machine_type'] = server_machine
+    logging.info('Upgraded default cluster nodepool to %s to satisfy HugePages allocation requirements.', server_machine)
+
   return config
 
 
@@ -551,10 +600,9 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   }
 
   # Apply manifests
-  with kubernetes_commands.CreateRenderedManifestFile(
-      'container/postgres_sysbench/postgres_all.yaml.j2', template_params
-  ) as rendered_manifest:
-    cluster.ApplyManifest(rendered_manifest.name)
+  kubernetes_commands.ApplyManifest(
+      'container/postgres_sysbench/postgres_all.yaml.j2', **template_params
+  )
 
   # Wait for PostgreSQL pod to be ready (not StatefulSet ready replicas)
   try:
@@ -740,10 +788,9 @@ def _PrepareSysbenchClient(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       'client_memory_limit': FLAGS.postgres_kubernetes_client_memory_limit,
   }
 
-  with kubernetes_commands.CreateRenderedManifestFile(
-      'container/postgres_sysbench/client_pod.yaml.j2', template_params
-  ) as rendered_manifest:
-    cluster.ApplyManifest(rendered_manifest.name)
+  kubernetes_commands.ApplyManifest(
+      'container/postgres_sysbench/client_pod.yaml.j2', **template_params
+  )
 
   # Wait for client pod - WaitForResource accepts namespace parameter
   cluster.WaitForResource('pod/postgres-client', 'Ready', namespace='default')
