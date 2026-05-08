@@ -35,6 +35,7 @@ from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources.container_service import container
 from perfkitbenchmarker.resources.container_service import container_cluster
 from perfkitbenchmarker.resources.container_service import container_registry
+from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
@@ -263,6 +264,20 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     cmd.flags['format'] = 'value(nodePools.name)'
     stdout, _, _ = cmd.Issue()
     return stdout.split()
+
+  def GetMachineTypeFromNodeName(self, node_name: str) -> str | None:
+    """Get the machine type from the node name."""
+    machine_type: str | None = super().GetMachineTypeFromNodeName(node_name)
+    if machine_type is not None:
+      return machine_type
+    out, _, _ = kubectl.RunKubectlCommand([
+        'get',
+        'node',
+        node_name,
+        '-o',
+        r'jsonpath={.metadata.labels.node\.kubernetes\.io/instance-type}',
+    ])
+    return out.strip() or None
 
   def _UsesCustomComputeClass(
       self, nodepool_config: container.BaseNodePoolConfig

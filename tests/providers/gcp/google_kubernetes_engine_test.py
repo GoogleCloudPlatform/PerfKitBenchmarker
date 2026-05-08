@@ -881,6 +881,20 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
     self.assertIn('cloud.google.com/gke-gpu-driver-version: default', full_logs)
     self.assertIn('cloud.google.com/compute-class: Accelerator', full_logs)
 
+  def testGetMachineTypeFromNodeName(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
+    self.MockIssueCommand(
+        {'get node': [('ek-standard-16', '', 0)]}
+    )
+    self.assertEqual(
+        cluster.GetMachineTypeFromNodeName(
+            'gke-pkb-cluster-default-pool-node-1'
+        ),
+        'ek-standard-16',
+    )
+
 
 class GoogleKubernetesEngineNodepoolAutoscalingTestCase(PatchedObjectsTestCase):
 
