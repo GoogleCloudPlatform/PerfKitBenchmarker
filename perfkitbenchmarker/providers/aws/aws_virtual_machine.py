@@ -793,9 +793,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-instances',
-        '--region=%s' % self.region,
-        '--filter=Name=client-token,Values=%s' % self.client_token,
-    ]
+        '--region=%s' % self.region,]
+    if self.client_token:
+      describe_cmd.append(
+          f'--filter=Name=client-token,Values={self.client_token}'
+      )
+    else:
+      describe_cmd.append(f'--instance-ids={self.id}')
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     return json.loads(stdout)
 
