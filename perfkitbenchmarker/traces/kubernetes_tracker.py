@@ -24,9 +24,12 @@ from perfkitbenchmarker import stages
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
-
 CLUSTER_TIME_METRIC = "cluster/usage/cluster_time"
 VM_TIME_METRIC = "cluster/usage/vm_time"
+MAX_CONCURRENT_NODES_METRIC = "cluster/usage/max_nodes"
+MAX_CONCURRENT_NODES_PER_MACHINE_TYPE_METRIC = (
+    "cluster/usage/machine_type/max_nodes"
+)
 
 
 def Register(_):
@@ -39,6 +42,8 @@ class KubernetesResourceTracker:
   Specifically, it will calculate:
   * VM time per VM type
   * cluster time
+  * Max concurrent nodes
+  * Max concurrent nodes per VM type
   * Eventually: cpu requests of user pods (to compute costs on autopilot
     clusters).
 
@@ -107,34 +112,43 @@ class KubernetesResourceTracker:
     Raises:
       RuntimeError: If called before StopTracking()
     """
-    sums: dict[str, float] = collections.defaultdict(float)
-
-    for name in self._nodes:
-      end_time = self._nodes[name].end_time
-      if end_time is None:
+    nodes_by_type = collections.defaultdict(list)
+    for node in self._nodes.values():
+      nodes_by_type[node.machine_type].append(node)
+      if node.end_time is None:
         raise RuntimeError(
             "Must only call GenerateSamples() after StopTracking()"
         )
-      sums[self._nodes[name].machine_type] += (
-          end_time - self._nodes[name].start_time
+    for machine_type, nodes in nodes_by_type.items():
+      # Note that container_cluster_machine_type and machine_type will
+      # automatically be added to all samples. However, these both refer to
+      # the default nodepool machine type, even if other machine types are
+      # present in the cluster, so we need to add another 'machine_type'
+      # metadata.
+      metadata = {"vm_time_machine_type": machine_type}
+      yield sample.Sample(
+          metric=MAX_CONCURRENT_NODES_PER_MACHINE_TYPE_METRIC,
+          value=_CalculateMaxConcurrentNodes(nodes),
+          unit="count",
+          metadata=metadata,
       )
-
-    for machine_type in sums:
+      total_time = sum(node.end_time - node.start_time for node in nodes)
       yield sample.Sample(
           metric=VM_TIME_METRIC,
-          value=sums[machine_type],
+          value=total_time,
           unit="seconds",
-          # Note that container_cluster_machine_type and machine_type will
-          # automatically be added to all samples. However, these both refer to
-          # the default nodepool machine type, even if other machine types are
-          # present in the cluster, so we need to add another 'machine_type'
-          # metadata.
-          metadata={"vm_time_machine_type": machine_type},
+          metadata=metadata,
       )
+
     yield sample.Sample(
         metric=CLUSTER_TIME_METRIC,
         value=self._end_time - self._start_time,
         unit="seconds",
+    )
+    yield sample.Sample(
+        metric=MAX_CONCURRENT_NODES_METRIC,
+        value=_CalculateMaxConcurrentNodes(self._nodes.values()),
+        unit="count",
     )
 
   def _StopWatchingForNodeChanges(self):
@@ -233,6 +247,34 @@ def _FinalizeNodeDetails(
     if node_details[name].end_time is None:
       node_details[name].end_time = end_time
   return node_details
+
+
+def _CalculateMaxConcurrentNodes(nodes: Iterable[_NodeTracker]) -> int:
+  """Calculates the maximum number of concurrent nodes.
+
+  This is an O(n log n) implementation using a sweep-line algorithm.
+
+  Args:
+    nodes: The nodes to process.
+
+  Returns:
+    The maximum number of concurrent nodes.
+  """
+  changes = []
+  for node in nodes:
+    changes.append((node.start_time, 1))
+    if node.end_time is not None:
+      changes.append((node.end_time, -1))
+
+  # Sort by time. If times are equal, process starts (+1) before ends (-1).
+  changes.sort(key=lambda x: (x[0], -x[1]))
+
+  max_concurrent = 0
+  current = 0
+  for _, change in changes:
+    current += change
+    max_concurrent = max(max_concurrent, current)
+  return max_concurrent
 
 
 tracker: KubernetesResourceTracker = None
