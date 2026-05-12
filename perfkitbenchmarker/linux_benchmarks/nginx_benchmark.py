@@ -27,6 +27,7 @@ from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import sample
+from perfkitbenchmarker.linux_packages import rfs
 from perfkitbenchmarker.linux_packages import wrk2
 
 FLAGS = flags.FLAGS
@@ -203,8 +204,7 @@ def _ConfigureNginxServer(server, upstream_servers):
     for internal_ip in upstream_server.GetInternalIPs():
       server.RemoteCommand(
           r"sudo sed -i 's|# server <fileserver_%s_ip_or_dns>|server %s|g'"
-          ' /etc/nginx/conf.d/loadbalance.conf'
-          % (idx, internal_ip)
+          ' /etc/nginx/conf.d/loadbalance.conf' % (idx, internal_ip)
       )
       idx += 1
   if FLAGS.nginx_use_ssl:
@@ -373,12 +373,21 @@ def Prepare(benchmark_spec):
   background_tasks.RunThreaded(
       _TuneNetworkStack, clients + [server] + upstream_servers
   )
+  background_tasks.RunThreaded(
+      rfs.Configure, clients + [server] + upstream_servers
+  )
 
 
-def RunMultiClient(clients, targets, rate, connections, duration, threads):
+def RunMultiClient(
+    clients, targets, rate, connections, duration, threads, server=None
+):
   """Run multiple instances of wrk2 against a single target."""
   results = []
   num_clients = len(clients)
+
+  # Snapshot RFS stats
+  client_rfs_t0 = {c: rfs.GetSoftnetStat(c) for c in clients}
+  server_rfs_t0 = rfs.GetSoftnetStat(server) if server else None
 
   def _RunSingleClient(client, client_number, target):
     """Run wrk2 from a single client."""
@@ -401,6 +410,10 @@ def RunMultiClient(clients, targets, rate, connections, duration, threads):
     for target in targets:
       args.append(((client, i, target), {}))
   background_tasks.RunThreaded(_RunSingleClient, args)
+
+  # Snapshot Tend RFS stats
+  client_rfs_tend = {c: rfs.GetSoftnetStat(c) for c in clients}
+  server_rfs_tend = rfs.GetSoftnetStat(server) if server else None
 
   requests = 0
   errors = 0
@@ -430,8 +443,31 @@ def RunMultiClient(clients, targets, rate, connections, duration, threads):
       'num_server_targets': len(targets),
       'nginx_content_size': FLAGS.nginx_content_size,
   }
+  metadata.update(rfs.GetMetadata())
   if not FLAGS.nginx_file_server_conf:
     metadata['caching'] = True
+
+  # Add RFS verification samples
+  for client, t0 in client_rfs_t0.items():
+    delta = client_rfs_tend[client] - t0
+    results.append(
+        sample.Sample(
+            f'client_{client.name}_rps_flow_steer_delta',
+            delta,
+            'count',
+            metadata,
+        )
+    )
+  if server_rfs_t0 is not None and server_rfs_tend is not None:
+    results.append(
+        sample.Sample(
+            'server_rps_flow_steer_delta',
+            server_rfs_tend - server_rfs_t0,
+            'count',
+            metadata,
+        )
+    )
+
   results += [
       sample.Sample('achieved_rate', requests / duration, '', metadata),
       sample.Sample('aggregate requests', requests, '', metadata),
@@ -483,6 +519,7 @@ def Run(benchmark_spec):
         connections=clients[0].NumCpusForBenchmark() * 10,
         duration=60,
         threads=clients[0].NumCpusForBenchmark(),
+        server=server,
     )
 
   # Binary search for highest RPS under the p99 latency threshold.
@@ -501,6 +538,7 @@ def Run(benchmark_spec):
           connections=clients[0].NumCpusForBenchmark() * 10,
           duration=60,
           threads=clients[0].NumCpusForBenchmark(),
+          server=server,
       )
       for result in results:
         if result.metric == 'p99 latency':
@@ -519,7 +557,7 @@ def Run(benchmark_spec):
   for config in FLAGS.nginx_load_configs:
     rate, duration, threads, connections = list(map(int, config.split(':')))
     results += RunMultiClient(
-        clients, targets, rate, connections, duration, threads
+        clients, targets, rate, connections, duration, threads, server
     )
   return results
 
@@ -531,4 +569,9 @@ def Cleanup(benchmark_spec):
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  del benchmark_spec
+  clients = benchmark_spec.vm_groups['clients']
+  server = benchmark_spec.vm_groups['server'][0]
+  upstream_servers = benchmark_spec.vm_groups['upstream_servers']
+  background_tasks.RunThreaded(
+      rfs.Restore, clients + [server] + upstream_servers
+  )
