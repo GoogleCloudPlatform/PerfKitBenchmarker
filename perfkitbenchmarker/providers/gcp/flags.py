@@ -421,6 +421,7 @@ BQ_CLIENT_INTERFACE = flags.DEFINE_enum(
         'JAVA',
         'SIMBA_JDBC',
         'GOOGLE_JDBC',
+        'GOOGLE_ODBC',
         'PYTHON',
     ],
     'The Runtime Interface used when interacting with BigQuery.',
