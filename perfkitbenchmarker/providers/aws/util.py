@@ -32,6 +32,8 @@ STOCKOUT_MESSAGE = (
     'Creation failed due to insufficient capacity indicating a '
     'potential stockout scenario.'
 )
+# TODO: b/507539277 - Again allow this region once the data center is repaired.
+UNSUPPORTED_REGIONS = {'me-south-1'}
 
 
 def IsRegion(zone_or_region):
@@ -134,11 +136,12 @@ def GetAllRegions() -> Set[str]:
   ]
   stdout, _, _ = vm_util.IssueCommand(get_regions_cmd)
   response = json.loads(stdout)
-  return {
+  regions = {
       item['RegionName']
       for item in response['Regions']
       if item['OptInStatus'] in ('opt-in-not-required', 'opted-in')
   }
+  return regions - UNSUPPORTED_REGIONS
 
 
 def GetGeoFromRegion(region: str) -> str:
