@@ -151,6 +151,15 @@ _FIXED_GPU_MACHINE_TYPES = {
     'g2-standard-32': (virtual_machine_spec.GPU_L4, 1),
     'g2-standard-48': (virtual_machine_spec.GPU_L4, 4),
     'g2-standard-96': (virtual_machine_spec.GPU_L4, 8),
+    # RTX Pro 6000 GPUs. 6 -> 24 actually use fractional GPUs.
+    # https://docs.cloud.google.com/compute/docs/accelerator-optimized-machines#g4-machine-types
+    'g4-standard-6': (virtual_machine_spec.GPU_RTX_PRO_6000, 1),
+    'g4-standard-12': (virtual_machine_spec.GPU_RTX_PRO_6000, 1),
+    'g4-standard-24': (virtual_machine_spec.GPU_RTX_PRO_6000, 1),
+    'g4-standard-48': (virtual_machine_spec.GPU_RTX_PRO_6000, 1),
+    'g4-standard-96': (virtual_machine_spec.GPU_RTX_PRO_6000, 2),
+    'g4-standard-192': (virtual_machine_spec.GPU_RTX_PRO_6000, 4),
+    'g4-standard-384': (virtual_machine_spec.GPU_RTX_PRO_6000, 8),
 }
 
 PKB_SKIPPED_TEARDOWN_METADATA_KEY = 'pkb_skipped_teardown'

@@ -1303,6 +1303,15 @@ def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
   return meta
 
 
+def GetMetadataFromFlags() -> Dict[str, Any]:
+  """Metadata for memtier test."""
+  return GetMetadata(
+      clients=FLAGS.memtier_clients,
+      threads=FLAGS.memtier_threads,
+      pipeline=FLAGS.memtier_pipeline,
+  )
+
+
 @dataclasses.dataclass
 class MemtierResult:
   """Class that represents memtier results."""
