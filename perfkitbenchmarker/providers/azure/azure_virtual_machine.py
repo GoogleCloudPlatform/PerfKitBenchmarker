@@ -134,6 +134,18 @@ NUM_LOCAL_VOLUMES: dict[str, int] = {
     'Standard_D96ads_v7': 6,
     'Standard_D128ads_v7': 4,
     'Standard_D160ads_v7': 4,
+    'Standard_D2ds_v7': 1,
+    'Standard_D4ds_v7': 1,
+    'Standard_D8ds_v7': 1,
+    'Standard_D16ds_v7': 2,
+    'Standard_D32ds_v7': 4,
+    'Standard_D48ds_v7': 6,
+    'Standard_D64ds_v7': 4,
+    'Standard_D96ds_v7': 6,
+    'Standard_D128ds_v7': 4,
+    'Standard_D192ds_v7': 6,
+    'Standard_D248ds_v7': 5,
+    'Standard_D372ds_v7': 6,
 }
 
 _MACHINE_TYPES_ONLY_SUPPORT_GEN1_IMAGES = (
