@@ -6,6 +6,7 @@ import time
 from typing import Any, Dict, List, Type, TypeVar
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
@@ -244,6 +245,10 @@ class BaseAppService(resource.BaseResource):
       An object containing success, response string, & latency. Latency is
       also negative in the case of a failure.
     """
+    if not self.endpoint:
+      raise errors.Setup.InvalidSetupError(
+          f'Endpoint not set for AppService {self.name}. Cannot invoke.'
+      )
     cmd = self.builder.InvokeCommand(self.endpoint)
     if not cmd:
       return self.poller.Run(
