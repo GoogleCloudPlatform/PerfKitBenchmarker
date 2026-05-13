@@ -1140,4 +1140,3 @@ class AKSManagementClient:
                     self.delete_nodepool(pool.name)
                 except Exception as exc:  # pylint: disable=broad-except
                     logging.warning('Could not delete agent pool %s: %s', pool.name, exc)
-
