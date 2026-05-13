@@ -6,7 +6,6 @@ of agentic applications.
 
 import abc
 
-from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import resource
 
 
@@ -28,27 +27,22 @@ class BaseAiAgentService(resource.BaseResource):
   def __init__(self, client_vm, ai_agent_spec):
     super().__init__()
     self.client_vm = client_vm
-
-  @abc.abstractmethod
-  def PrepareWorkload(self, workload_name: str, workload_data_path: str):
-    """Packages, transfers, and sets up the agent code for this service."""
+    self.spec = ai_agent_spec
 
   @abc.abstractmethod
   def Execute(
       self,
-      workload_name: str,
-      model: str,
       output_dir: str,
-      model_location: str | None = None,
+      prompt: str | None = None,
   ) -> None:
     """Executes the agentic workload."""
 
   @property
   @abc.abstractmethod
-  def base_dir(self) -> str:
+  def base_dir(self):
     """Object storage path used to stage files."""
 
   @property
   @abc.abstractmethod
-  def storage_service(self) -> object_storage_service.ObjectStorageService:
+  def storage_service(self):
     """Storage service accessible by this service."""

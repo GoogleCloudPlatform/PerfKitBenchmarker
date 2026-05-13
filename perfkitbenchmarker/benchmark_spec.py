@@ -1213,6 +1213,8 @@ class BenchmarkSpec:
       self.pinecone.Delete()
     if hasattr(self, 'vvs') and self.vvs:
       self.vvs.Delete()
+    if hasattr(self, 'ai_agent_service') and self.ai_agent_service:
+      self.ai_agent_service.Delete()
 
     # Note: It is ok to delete capacity reservations before deleting the VMs,
     # and will actually save money (mere seconds of usage).

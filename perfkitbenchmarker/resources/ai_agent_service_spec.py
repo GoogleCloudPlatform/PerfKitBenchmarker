@@ -23,6 +23,12 @@ class BaseAiAgentServiceSpec(spec.BaseSpec):
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     self.cloud: str = None
     self.deployment_type: str = None
+    self.workload: str | None = None
+    self.framework: str | None = None
+    self.model: str | None = None
+    # TODO: shuninglin/odiego - this is gcp/vertex specific, pushing it down to
+    # subclasses.
+    self.model_location: str | None = None
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
 
   @classmethod
@@ -31,6 +37,15 @@ class BaseAiAgentServiceSpec(spec.BaseSpec):
     super()._ApplyFlags(config_values, flag_values)
     if flag_values['cloud'].present or 'cloud' not in config_values:
       config_values['cloud'] = flag_values.cloud
+    for flag_name, config_key in [
+        ('agentic_framework', 'framework'),
+        ('agentic_framework_model', 'model'),
+        ('agentic_framework_model_location', 'model_location'),
+    ]:
+      if flag_name in flag_values and (
+          flag_values[flag_name].present or config_key not in config_values
+      ):
+        config_values[config_key] = getattr(flag_values, flag_name)
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -50,6 +65,22 @@ class BaseAiAgentServiceSpec(spec.BaseSpec):
                 'none_ok': False,
                 'default': 'client_vm',
             },
+        ),
+        'workload': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'framework': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'model': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'model_location': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
         ),
     })
     return result
