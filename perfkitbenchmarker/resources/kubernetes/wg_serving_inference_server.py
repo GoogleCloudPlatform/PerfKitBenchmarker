@@ -55,6 +55,28 @@ FLAG_GCS_BUCKET = flags.DEFINE_string(
     'The GCS bucket that has model data for inference server to use.',
 )
 
+FLAG_BLOBSTORAGE_BUCKET = flags.DEFINE_string(
+    'k8s_inference_server_blobstorage_bucket',
+    None,
+    'The Azure Blob Storage container that has model data for the inference'
+    ' server to use.',
+)
+
+FLAG_BLOBSTORAGE_ACCOUNT = flags.DEFINE_string(
+    'k8s_inference_server_blobstorage_account',
+    None,
+    'The Azure Storage account hosting the blob container referenced by'
+    ' --k8s_inference_server_blobstorage_bucket.',
+)
+
+FLAG_BLOBSTORAGE_RESOURCE_GROUP = flags.DEFINE_string(
+    'k8s_inference_server_blobstorage_resource_group',
+    None,
+    'The Azure resource group hosting the storage account referenced by'
+    ' --k8s_inference_server_blobstorage_account. If unset, PKB resolves it'
+    ' via `az storage account show`.',
+)
+
 WG_SERVING_REPO_URL = flags.DEFINE_string(
     'wg_serving_repo_url',
     'https://github.com/kubernetes-sigs/wg-serving',
@@ -603,6 +625,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     """Returns the storage type of the inference server."""
     if 'gcsfuse' in self.spec.catalog_components:
       return 'gcsfuse'
+    if 'blobfuse' in self.spec.catalog_components:
+      return 'blobfuse'
     return 'huggingface'
 
   def _GetAcceleratorComponent(self) -> str:
@@ -1014,6 +1038,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
     if 'gcsfuse' in self.spec.catalog_components:
       self._ApplyGCSFusePVC()
+    elif 'blobfuse' in self.spec.catalog_components:
+      self._ApplyBlobFusePVC()
 
     self._ProvisionGPUNodePool()
 
@@ -1078,6 +1104,129 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         gcs_bucket=FLAG_GCS_BUCKET.value,
     )
     logging.info('Successfully applied GCSFuse PVC.')
+
+  def _ResolveBlobStorageAccount(
+      self,
+  ) -> tuple[str, str, str]:
+    """Resolves the Azure Storage account, resource group, and key.
+
+    When --k8s_inference_server_blobstorage_account is set, PKB resolves the
+    resource group (via the flag or `az storage account show`) and then reuses
+    `azure.util.GetAzureStorageAccountKey` -- the same helper invoked by
+    `AzureStorageAccount._PostCreate` in `azure_network.py`.
+
+    Otherwise, PKB falls back to the `AzureStorageAccount` instance owned by
+    the AKS cluster's network (auto-created in the cluster's resource group),
+    triggering its idempotent Create() so the cached `.name`,
+    `.resource_group.name` and `.key` are populated.
+
+    Returns:
+      A tuple of (storage_account_name, resource_group_name, account_key).
+    """
+    # Only required when Azure blobfuse is requested.
+    from perfkitbenchmarker.providers import azure
+    from perfkitbenchmarker.providers.azure import util as azure_util
+
+    if FLAG_BLOBSTORAGE_ACCOUNT.value:
+      storage_account = FLAG_BLOBSTORAGE_ACCOUNT.value
+      resource_group = (
+          FLAG_BLOBSTORAGE_RESOURCE_GROUP.value
+          or self._ResolveStorageAccountResourceGroup(storage_account)
+      )
+      account_key = azure_util.GetAzureStorageAccountKey(
+          storage_account, ['--resource-group', resource_group]
+      )
+      if not account_key:
+        raise errors.Resource.CreationError(
+            'Failed to retrieve account key for Azure Storage account '
+            f'{storage_account}.'
+        )
+      return storage_account, resource_group, account_key
+
+    cluster_network = getattr(self.cluster, 'network', None)
+    cluster_storage_account = getattr(cluster_network, 'storage_account', None)
+    if cluster_storage_account is None:
+      raise errors.Resource.CreationError(
+          'Azure Storage account is required to apply BlobFuse PVC. '
+          'Set --k8s_inference_server_blobstorage_account or run on an '
+          'Azure cluster whose network owns a storage account.'
+      )
+    cluster_storage_account.Create()
+    if not cluster_storage_account.key:
+      raise errors.Resource.CreationError(
+          f'Storage account {cluster_storage_account.name} did not expose an '
+          'access key after creation.'
+      )
+    return (
+        cluster_storage_account.name,
+        cluster_storage_account.resource_group.name,
+        cluster_storage_account.key,
+    )
+
+  @staticmethod
+  def _ResolveStorageAccountResourceGroup(storage_account: str) -> str:
+    """Discovers the resource group hosting a user-supplied storage account."""
+    from perfkitbenchmarker.providers import azure
+
+    stdout, _, _ = vm_util.IssueCommand([
+        azure.AZURE_PATH,
+        'storage',
+        'account',
+        'show',
+        '--name',
+        storage_account,
+        '--query',
+        'resourceGroup',
+        '-o',
+        'tsv',
+    ])
+    resource_group = stdout.strip()
+    if not resource_group:
+      raise errors.Resource.CreationError(
+          'Could not resolve resource group for Azure Storage account '
+          f'{storage_account}. Set '
+          '--k8s_inference_server_blobstorage_resource_group.'
+      )
+    return resource_group
+
+  def _ApplyBlobFusePVC(self):
+    """Apply the Azure Blob Storage PV & PVC to the environment."""
+    if not FLAG_BLOBSTORAGE_BUCKET.value:
+      raise errors.Resource.CreationError(
+          'Azure Blob Storage container is required to apply BlobFuse PVC. '
+          'Set --k8s_inference_server_blobstorage_bucket.'
+      )
+
+    blob_container = FLAG_BLOBSTORAGE_BUCKET.value
+    storage_account, resource_group, account_key = (
+        self._ResolveBlobStorageAccount()
+    )
+
+    encoded_account_key = base64.b64encode(account_key.encode('utf-8')).decode(
+        'utf-8'
+    )
+    encoded_account_name = base64.b64encode(
+        storage_account.encode('utf-8')
+    ).decode('utf-8')
+
+    created_resources = list(
+        kubernetes_commands.ApplyManifest(
+            'container/kubernetes_ai_inference/blobfuse_pv_pvc.yaml.j2',
+            blob_container=blob_container,
+            storage_account=storage_account,
+            resource_group=resource_group,
+            encoded_account_key=encoded_account_key,
+            encoded_account_name=encoded_account_name,
+            should_log_file=False,
+        )
+    )
+    self.created_resources.extend(created_resources)
+    logging.info(
+        'Successfully applied BlobFuse PVC for storage account %s, '
+        'container %s.',
+        storage_account,
+        blob_container,
+    )
 
   def _CollectStartupMonitorMetrics(self) -> dict[str, PodStartupMetrics]:
     collected_metrics_map = super()._CollectStartupMonitorMetrics()

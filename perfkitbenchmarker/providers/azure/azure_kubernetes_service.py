@@ -558,6 +558,9 @@ class AksAutomaticCluster(AksCluster):
         self.resource_group.name,
         '--sku',
         'automatic',
+        # Enable the Azure Blob CSI driver at creation, mirroring AksCluster
+        # and matching GKE Autopilot's default-on GCS Fuse support.
+        '--enable-blob-driver',
         '--tags',
     ] + tags_list
     vm_util.IssueCommand(
