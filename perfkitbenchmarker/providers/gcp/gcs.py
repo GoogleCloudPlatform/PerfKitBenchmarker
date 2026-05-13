@@ -32,6 +32,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
 
 _DEFAULT_GCP_SERVICE_KEY_FILE = 'gcp_credentials.json'
+DEFAULT_GCP_REGION = 'us-central1'
 GCLOUD_CONFIG_PATH = '.config/gcloud'
 GCS_CLIENT_PYTHON = 'python'
 GCS_CLIENT_PYTHON_GRPC = 'python_grpc'
@@ -115,11 +116,10 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
   def PrepareService(
       self,
-      location,
-      hierarchical_name_space=False,
-      uniform_bucket_level_access=False,
+      location: str = DEFAULT_GCP_REGION,
+      hierarchical_name_space: bool = False,
+      uniform_bucket_level_access: bool = False,
   ):
-    assert location
     self.placement = None
     if util.IsZone(location):
       self.location = util.GetRegionFromZone(location)
