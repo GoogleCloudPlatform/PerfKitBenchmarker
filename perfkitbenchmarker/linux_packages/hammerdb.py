@@ -292,9 +292,7 @@ class HammerDbTclScript:
       )
 
   @classmethod
-  def CheckErrorFromHammerdb(
-      cls, stdout: str, script_type: str = '', return_code: int = 0
-  ):
+  def CheckErrorFromHammerdb(cls, stdout: str):
     """Check errors from the stdout of Hammerdb.
 
     For Validation script, if the return code is not 0, it is considered as a
@@ -313,19 +311,10 @@ class HammerDbTclScript:
 
     Args:
       stdout: Stdout from Hammerdb script.
-      script_type: The type of script being run (e.g., BUILD, RUN, VALIDATE).
-      return_code: The return code of the Hammerdb command.
 
     Raises:
      Exception: exception when hammerdb failed
     """
-    if script_type == VALIDATE_SCRIPT_TYPE and return_code != 0:
-      raise HammerdbBenchmarkError(
-          'Validation failed with return code {} and stdout {}'.format(
-              return_code, stdout
-          )
-      )
-
     if (
         'Error' in stdout
         or 'FAILED' in stdout
@@ -356,7 +345,11 @@ class HammerDbTclScript:
     # Increase the Open file limit to a large number.
     if _HAMMERDB_SET_LINUX_OPEN_FILE_LIMIT.value:
       cmd = f'ulimit -n {_HAMMERDB_SET_LINUX_OPEN_FILE_LIMIT.value} &&'
-    stdout, _, return_code = vm.RemoteCommandWithReturnCode(
+
+    # RobustRemoteCommand is required as there might be ssh 255 error
+    # RemoteCommandWithReturnCode will retry ssh 255 error
+    # which will result in timeout.
+    stdout, _ = vm.RobustRemoteCommand(
         InDir(
             HAMMERDB_RUN_LOCATION,
             'PATH="$PATH:/opt/mssql-tools/bin" &&'
@@ -366,7 +359,7 @@ class HammerDbTclScript:
         timeout=timeout,
     )
 
-    self.CheckErrorFromHammerdb(stdout, self.script_type, return_code)
+    self.CheckErrorFromHammerdb(stdout)
     return stdout
 
 
