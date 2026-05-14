@@ -672,3 +672,5 @@
     general solution that can be used with or instead of --ycsb_max_error_rate
     and --ycsb_fail_on_incomplete_loading.
 -   Support basic TPU vm provisioning.
+-   Set firewall rule as PKB-created before deletion when using
+    --gce_firewall_rules_clean_all.
