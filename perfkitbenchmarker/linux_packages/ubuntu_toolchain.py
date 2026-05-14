@@ -18,7 +18,8 @@ def AptInstall(vm):
   for key in _REQUIRED_KEYS:
     vm.RemoteCommand(
         'curl -sL'
-        f' "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x{key}" '
-        f'| gpg --dearmor -o/etc/apt/trusted.gpg.d/ubuntu-toolchain-{key}.gpg'
+        f' "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x{key}" |'
+        ' sudo gpg --dearmor'
+        f' -o/etc/apt/trusted.gpg.d/ubuntu-toolchain-{key}.gpg'
     )
   vm.RemoteCommand('sudo apt update')
