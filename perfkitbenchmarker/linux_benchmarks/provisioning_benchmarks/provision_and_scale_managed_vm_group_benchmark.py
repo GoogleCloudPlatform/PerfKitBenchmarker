@@ -73,9 +73,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   if _SCALE_METHOD.value == RESIZE:
     vm_group.Resize(_NEW_VM_COUNT.value)
   elif _SCALE_METHOD.value == REMOVE and _NEW_VM_COUNT.value < old_vm_count:
-    vms = list(vm_group.vms.keys())
-    vms_to_remove = vms[(old_vm_count - _NEW_VM_COUNT.value) :]
-    vm_group.RemoveVms(vms_to_remove)
+    vms = list(vm_group.vms)
+    vms_to_remove = vms[: (old_vm_count - _NEW_VM_COUNT.value)]
+    vm_group.RemoveVms([vm.name for vm in vms_to_remove])
   elif _SCALE_METHOD.value == ADD and _NEW_VM_COUNT.value > old_vm_count:
     vm_group.AddVms(_NEW_VM_COUNT.value - old_vm_count)
   else:

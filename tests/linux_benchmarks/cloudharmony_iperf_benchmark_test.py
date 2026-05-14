@@ -44,7 +44,7 @@ class CloudharmonyIperfBenchmarkTestCase(
     spec = benchmark_spec.BenchmarkSpec(
         benchmark_module, benchmark_config, 'abcdefg'
     )
-    spec.vm_groups = {'client': [client], 'server': [server]}
+    spec.unmanaged_vm_groups = {'client': [client], 'server': [server]}
     results = cloudharmony_iperf_benchmark._Run(spec)
     client.RobustRemoteCommand.assert_called_with(
         'iperf/run.sh  '

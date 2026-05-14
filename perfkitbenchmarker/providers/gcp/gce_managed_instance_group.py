@@ -179,10 +179,7 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
           f'{stderr}\n'
       )
     instances = json.loads(stdout)
-    return [
-        VmReference(name=instance['name'])
-        for instance in instances
-    ]
+    return [VmReference(name=instance['name']) for instance in instances]
 
   def _AddVms(self, num_vms_to_add: int):
     cmd = self._GcloudCmd('create-instance', self.name)
@@ -192,9 +189,9 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
     cmd.Issue()
 
   def _RemoveVms(self, vm_names: list[str]):
-    cmd = self._GcloudCmd('delete-instances', self.name)
-    for vm_name in vm_names:
-      cmd.args += ['--instance', vm_name]
+    cmd = self._GcloudCmd(
+        'delete-instances', self.name, '--instances', ','.join(vm_names)
+    )
     cmd.Issue()
 
   def _Resize(self, new_vm_count: int):

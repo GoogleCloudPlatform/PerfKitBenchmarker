@@ -110,6 +110,7 @@ class BaseManagedVmGroup(resource.BaseResource):
 
   def AddVms(self, num_vms_to_add: int):
     """Adds VMs to the managed VM group."""
+    assert num_vms_to_add, 'No VMs to add.'
     self._RunOperation(
         lambda: self._AddVms(num_vms_to_add),
         new_vm_count=self.vm_count + num_vms_to_add,
@@ -117,6 +118,7 @@ class BaseManagedVmGroup(resource.BaseResource):
 
   def RemoveVms(self, vm_names: list[str]):
     """Removes VMs from the managed VM group."""
+    assert vm_names, 'No VM names provided.'
     self._RunOperation(
         lambda: self._RemoveVms(vm_names),
         new_vm_count=self.vm_count - len(vm_names),

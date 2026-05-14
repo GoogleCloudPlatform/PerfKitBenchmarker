@@ -170,7 +170,6 @@ class BenchmarkSpec:
     BenchmarkSpec.total_benchmarks += 1
     self.sequence_number = BenchmarkSpec.total_benchmarks
     self.resources: list[resource_type.BaseResource] = []
-    self.vms = []
     self.regional_networks = {}
     self.networks = {}
     self.custom_subnets = {
@@ -180,7 +179,12 @@ class BenchmarkSpec:
     self.firewalls = {}
     self.networks_lock = threading.Lock()
     self.firewalls_lock = threading.Lock()
-    self.vm_groups: dict[str, list[virtual_machine.BaseVirtualMachine]] = {}
+    # unmanaged and managed_vm_groups are unioned into read only vm_groups.
+    # VMs from bechmark_config.vm_groups provisioned by PKB
+    self.unmanaged_vm_groups: dict[
+        str, list[virtual_machine.BaseVirtualMachine]
+    ] = {}
+    # VMs from benchmark_config.vm_groups provisioned as a managed VM group.
     self.managed_vm_groups: dict[str, managed_vm_group.BaseManagedVmGroup] = {}
     self.container_specs = benchmark_config.container_specs or {}
     self.container_registry = None
@@ -272,6 +276,24 @@ class BenchmarkSpec:
 
   def __str__(self):
     return 'Benchmark name: {}\nFlags: {}'.format(self.name, self.config.flags)
+
+  @property
+  def vm_groups(self) -> dict[str, list[virtual_machine.BaseVirtualMachine]]:
+    """Returns the vm groups in the benchmark."""
+    vm_groups = dict(self.unmanaged_vm_groups)
+    vm_groups.update({
+        name: list(group.vms)
+        for name, group in self.managed_vm_groups.items()
+    })
+    return vm_groups
+
+  @property
+  def vms(self) -> list[virtual_machine.BaseVirtualMachine]:
+    """Returns the list of VMs in the benchmark."""
+    vms = []
+    for vm_group in self.vm_groups.values():
+      vms.extend(vm_group)
+    return vms
 
   @contextlib.contextmanager
   def RedirectGlobalFlags(self):
@@ -917,11 +939,11 @@ class BenchmarkSpec:
 
         jujuvm.units.extend(vms)  # pytype: disable=attribute-error
         if jujuvm and jujuvm not in self.vms:
-          self.vms.extend([jujuvm])
-          self.vm_groups['%s_juju_controller' % group_spec.cloud] = [jujuvm]
+          self.unmanaged_vm_groups[
+              '%s_juju_controller' % group_spec.cloud
+          ] = [jujuvm]
 
-      self.vm_groups[group_name] = vms
-      self.vms.extend(vms)
+      self.unmanaged_vm_groups[group_name] = vms
 
     # In the case of an un-managed yarn cluster, for hadoop software
     # installation, the dpb service instance needs access to constructed
@@ -1087,10 +1109,8 @@ class BenchmarkSpec:
             post_task_delay=post_task_delay,
         )
 
-      for group_name, group in self.managed_vm_groups.items():
+      for group in self.managed_vm_groups.values():
         group.Create()
-        self.vms.extend(group.vms)
-        self.vm_groups[group_name] = list(group.vms)
 
       if self.nfs_service and self.nfs_service.CLOUD == nfs_service.UNMANAGED:
         self.nfs_service.Create()

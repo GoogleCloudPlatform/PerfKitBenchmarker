@@ -8,7 +8,6 @@ import uuid
 from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
-from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
@@ -62,7 +61,7 @@ def MpiRun(vms) -> List[sample.Sample]:
   benchmark_config = mock.Mock(
       vm_groups={}, relational_db=mock.Mock(vm_groups={})
   )
-  spec = benchmark_spec.BenchmarkSpec(
+  spec = pkb_common_test_case.TestBenchmarkSpec(
       benchmark_module, benchmark_config, 'abcdefg'
   )
   spec.vms = vms

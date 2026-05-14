@@ -190,9 +190,7 @@ class TestVirtualMachine(
     pass
 
 
-class UbuntuTestVirtualMachine(
-    TestVirtualMachine
-):
+class UbuntuTestVirtualMachine(TestVirtualMachine):
   """Test class that has dummy methods for a base virtual machine."""
 
   CLOUD = provider_info.UNIT_TEST
@@ -234,6 +232,18 @@ cluster_boot:
 """
 
 
+class TestBenchmarkSpec(benchmark_spec.BenchmarkSpec):
+  """Test class with injection sites for testing."""
+
+  @property
+  def vms(self) -> list[virtual_machine.BaseVirtualMachine]:
+    return super().vms
+
+  @vms.setter
+  def vms(self, vms: list[virtual_machine.BaseVirtualMachine]) -> None:
+    self.unmanaged_vm_groups = {'test': vms}
+
+
 def CreateBenchmarkSpecFromYaml(
     yaml_string: str = SIMPLE_CONFIG, benchmark_name: str = 'cluster_boot'
 ) -> benchmark_spec.BenchmarkSpec:
@@ -252,7 +262,7 @@ def CreateBenchmarkSpecFromConfigDict(
       for b in linux_benchmarks.BENCHMARKS
       if b.BENCHMARK_NAME == benchmark_name
   )
-  return benchmark_spec.BenchmarkSpec(benchmark_module, config_spec, 'name0')
+  return TestBenchmarkSpec(benchmark_module, config_spec, 'name0')
 
 
 def GetTestDir() -> pathlib.Path:
