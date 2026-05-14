@@ -167,15 +167,22 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       raise errors.Benchmarks.BucketCreationError(stderr)
 
     if tag_bucket:
-      command = ['gsutil', 'label', 'ch']
-      for key, value in util.GetDefaultTags().items():
-        command.extend(['-l', f'{key}:{value}'])
-      command.extend([f'gs://{bucket_name}'])
-      _, stderr, ret_code = vm_util.IssueCommand(
-          command, raise_on_failure=False
-      )
-      if ret_code and raise_on_failure:
-        raise errors.Benchmarks.BucketCreationError(stderr)
+      tags = util.GetDefaultTags()
+      if tags:
+        labels_str = ','.join([f'{key}={value}' for key, value in tags.items()])
+        command = [
+            'gcloud',
+            'storage',
+            'buckets',
+            'update',
+            f'gs://{bucket_name}',
+            f'--update-labels={labels_str}',
+        ]
+        _, stderr, ret_code = vm_util.IssueCommand(
+            command, raise_on_failure=False
+        )
+        if ret_code and raise_on_failure:
+          raise errors.Benchmarks.BucketCreationError(stderr)
 
   def Copy(self, src_url, dst_url, recursive=False, timeout=None):
     """See base class.
@@ -187,10 +194,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       recursive: If True, copy the directory recursively.
       timeout: The timeout for the copy command.
     """
-    cmd = ['gsutil', 'cp']
-    if recursive or timeout is not None:
-      # -m runs in parallel, which is faster.
-      cmd = ['gsutil', '-m', 'cp']
+    cmd = ['gcloud', 'storage', 'cp']
     if recursive:
       cmd += ['-r']
     cmd += [src_url, dst_url]
@@ -206,7 +210,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       object_path: Path within the bucket to the object.
     """
     dst_url = self.MakeRemoteCliDownloadUrl(bucket_name, object_path)
-    vm_util.IssueCommand(['gsutil', 'cp', src_path, dst_url])
+    vm_util.IssueCommand(['gcloud', 'storage', 'cp', src_path, dst_url])
 
   def MakeRemoteCliDownloadUrl(self, bucket_name, object_path):
     """See base class.
@@ -223,14 +227,16 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
   def GenerateCliDownloadFileCommand(self, src_url, local_path):
     """See base class."""
-    return f'gsutil cp "{src_url}" "{local_path}"'
+    return f'gcloud storage cp "{src_url}" "{local_path}"'
 
   def List(self, bucket_name):
     """See base class."""
-    # Full URI is required by gsutil.
+    # Full URI is required by gcloud storage.
     if not bucket_name.startswith('gs://'):
       bucket_name = 'gs://' + bucket_name
-    stdout, _, _ = vm_util.IssueCommand(['gsutil', 'ls', bucket_name])
+    stdout, _, _ = vm_util.IssueCommand(
+        ['gcloud', 'storage', 'ls', bucket_name]
+    )
     return stdout
 
   def ListTopLevelSubfolders(self, bucket_name):
@@ -269,14 +275,14 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       return retcode and 'BucketNotFoundException' in stderr
 
     vm_util.IssueCommand(
-        ['gsutil', 'rb', f'gs://{bucket_name}'],
+        ['gcloud', 'storage', 'buckets', 'delete', f'gs://{bucket_name}'],
         suppress_failure=_bucket_not_found,
     )
 
   def EmptyBucket(self, bucket_name):
     # Ignore failures here and retry in DeleteBucket.  See more comments there.
     vm_util.IssueCommand(
-        ['gsutil', '-m', 'rm', '-r', f'gs://{bucket_name}/*'],
+        ['gcloud', 'storage', 'rm', '-r', f'gs://{bucket_name}/*'],
         raise_on_failure=False,
     )
 
@@ -288,13 +294,16 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       roles: the IAM roles to be granted.
       bucket_name: the name of the bucket to change
     """
-    vm_util.IssueCommand([
-        'gsutil',
-        'iam',
-        'ch',
-        f"{entity}:{','.join(roles)}",
-        f'gs://{bucket_name}',
-    ])
+    for role in roles:
+      vm_util.IssueCommand([
+          'gcloud',
+          'storage',
+          'buckets',
+          'add-iam-policy-binding',
+          f'gs://{bucket_name}',
+          f'--member={entity}',
+          f'--role={role}',
+      ])
 
   def MakeBucketPubliclyReadable(self, bucket_name, also_make_writable=False):
     """See base class."""
@@ -455,33 +464,10 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
         self.AcquireWritePermissionsLinux(vm)
       vm.Install('gcs_boto_plugin')
 
-    vm.gsutil_path, _ = vm.RemoteCommand('which gsutil', login_shell=True)
-    vm.gsutil_path = vm.gsutil_path.split()[0]
-
-    # Detect if we need to install crcmod for gcp.
-    # See "gsutil help crc" for details.
-    raw_result, _ = vm.RemoteCommand(f'{vm.gsutil_path} version -l')
-    logging.info('gsutil version -l raw result is %s', raw_result)
-    search_string = 'compiled crcmod: True'
-    result_string = re.findall(search_string, raw_result)
-    if not result_string:
-      logging.info('compiled crcmod is not available, installing now...')
-      try:
-        # Try uninstall first just in case there is a pure python version of
-        # crcmod on the system already, this is required by gsutil doc:
-        # https://cloud.google.com/storage/docs/
-        # gsutil/addlhelp/CRC32CandInstallingcrcmod
-        vm.Uninstall('crcmod')
-      except errors.VirtualMachine.RemoteCommandError:
-        logging.info(
-            'pip uninstall crcmod failed, could be normal if crcmod '
-            'is not available at all.'
-        )
-      vm.Install('crcmod')
-      vm.installed_crcmod = True
-    else:
-      logging.info('compiled crcmod is available, not installing again.')
-      vm.installed_crcmod = False
+    vm.gcloud_path, _ = vm.RemoteCommand('which gcloud', login_shell=True)
+    if vm.gcloud_path:
+      vm.gcloud_path = vm.gcloud_path.split()[0]
+    vm.installed_crcmod = True
 
   def CleanupVM(self, vm):
     vm.RemoveFile('google-cloud-sdk')
@@ -492,12 +478,12 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
   def CLIUploadDirectory(self, vm, directory, files, bucket_name):
     return vm.RemoteCommand(
-        'time %s -m cp %s/* gs://%s/' % (vm.gsutil_path, directory, bucket_name)
+        'time %s -m cp %s/* gs://%s/' % (vm.gcloud_path, directory, bucket_name)
     )
 
   def CLIDownloadBucket(self, vm, bucket_name, objects, dest):
     return vm.RemoteCommand(
-        'time %s -m cp gs://%s/* %s' % (vm.gsutil_path, bucket_name, dest)
+        'time %s -m cp gs://%s/* %s' % (vm.gcloud_path, bucket_name, dest)
     )
 
   def Metadata(self, vm):
