@@ -1,6 +1,7 @@
 import unittest
 from unittest import mock
 from absl.testing import flagsaver
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.providers.azure import azure_kubernetes_service
@@ -113,8 +114,31 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
                 '1',
             ],
             timeout=1800,
+            raise_on_failure=False,
         ),
     )
+
+  def testCreateError(self):
+    self.MockIssueCommand(
+        {
+            'az aks create': [('out', 'Error could not create', 1)],
+            'az aks nodepool': [('', '', 0)],
+            'az aks show': [
+                (
+                    (
+                        '{"provisioningState": "Succeeded",'
+                        ' "nodeResourceGroup": "node-resource-group"}'
+                    ),
+                    '',
+                    0,
+                ),
+                ('Succeeded', '', 0),
+            ],
+            'get serviceAccounts': [('default, foo', '', 0)],
+        },
+    )
+    with self.assertRaises(errors.Resource.CreationError):
+      self.aks.Create()
 
   def testCreateNodepool(self):
     mock_cmd = self.MockIssueCommand(

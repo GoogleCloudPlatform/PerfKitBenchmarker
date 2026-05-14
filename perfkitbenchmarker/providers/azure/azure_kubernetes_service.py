@@ -203,16 +203,31 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     if FLAGS.azure_aks_auto_node_provisioning:
       # For provision_node_pools benchmark, add auto provisioning mode
       cmd.append('--node-provisioning-mode=auto')
-    # TODO(pclay): expose quota and capacity errors
-    # Creating an AKS cluster with a fresh service principal usually fails due
-    # to a race condition. Active Directory knows the service principal exists,
-    # but AKS does not. (https://github.com/Azure/azure-cli/issues/9585)
-    # Use 5 min timeout on service principle retry. cmd will fail fast.
-    vm_util.Retry(timeout=300)(vm_util.IssueCommand)(
-        cmd,
-        # Half hour timeout on creating the cluster.
-        timeout=1800,
+
+    @vm_util.Retry(
+        timeout=3600,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
     )
+    def RunCreateClusterCmd(cmd: list[str]):
+      """Runs the create cluster command, retrying on race condition errors."""
+      try:
+        _, err, retcode = vm_util.IssueCommand(
+            cmd,
+            # Half hour timeout on creating the cluster.
+            timeout=1800,
+            raise_on_failure=False,
+        )
+      except errors.VmUtil.IssueCommandTimeoutError as e:
+        retcode = 1
+        err = str(e)
+      if retcode:
+        if 'InvalidOutputTable' in err:
+          # This is a race condition where the logs analytics workspace hasn't
+          # finished being created. Retrying solves it.
+          raise errors.Resource.RetryableCreationError(err)
+        raise errors.Resource.CreationError(err)
+
+    RunCreateClusterCmd(cmd)
 
     for _, nodepool in self.nodepools.items():
       self._CreateNodePool(nodepool)
