@@ -43,8 +43,8 @@ class GcpAiAgentService(ai_agent_service.BaseAiAgentService):
     return self._storage_service
 
   @override
-  def _CreateDependencies(self):
-    """Creates the GCS bucket dependency and discovers service account."""
+  def _EnsureObjectStorage(self):
+    """Ensures intermediate bucket for Agent communication exists."""
     if self.region:
       self.storage_service.PrepareService(location=self.region)
     self.storage_service.MakeBucket(self._bucket)
@@ -84,9 +84,8 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
 
   DEPLOYMENT_TYPE = 'client_vm'
 
-  # TODO(odiego) - Move to _CreateDependencies if appropriate
   @override
-  def _Create(self):
+  def _StageAgentCode(self):
     self.client_vm.Install('pip')
     self._CheckVmCanCallVertexAI(
         cast(gce_virtual_machine.GceVirtualMachine, self.client_vm)
@@ -113,6 +112,10 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
       )
     except errors.VirtualMachine.RemoteCommandError:
       logging.info('No pyproject.toml found in %s', pyproject_toml_path)
+
+  @override
+  def _Create(self):
+    pass
 
   @override
   def _Delete(self):
@@ -189,16 +192,19 @@ class VertexAiCustomJobAiAgentService(GcpAiAgentService):
           ' config spec.'
       )
 
-  # TODO(odiego) - Move to _CreateDependencies if appropriate
   @override
-  def _Create(self):
+  def _StageAgentCode(self):
     workload_data_path = (
         f'agentic_framework/{self.spec.workload}/{self.spec.framework}'
     )
     benchmark_spec = context.GetThreadBenchmarkSpec()
     self._image_uri = benchmark_spec.container_registry.GetOrBuild(
-        os.path.basename((workload_data_path)), workload_data_path
+        os.path.basename(workload_data_path), workload_data_path
     )
+
+  @override
+  def _Create(self):
+    pass
 
   @override
   def _Delete(self):
@@ -305,9 +311,7 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
     self.spec = ai_agent_spec
 
   @override
-  def _CreateDependencies(self):
-    """Creates GCS bucket and stages workload files on client VM."""
-    super()._CreateDependencies()
+  def _StageAgentCode(self):
     self.client_vm.Install('pip')
     workload = self.spec.workload
     framework = self.spec.framework
