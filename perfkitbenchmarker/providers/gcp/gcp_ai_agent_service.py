@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import re
 import tarfile
 from typing import cast, override
 
@@ -352,6 +353,8 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
     workload_framework = f'{workload}_{framework}'
 
     # 4. Trigger deployment script on VM
+    # TODO(odiego): Honor model_location. There are models with only global
+    # endpoints.
     location = self.region
     command_parts = [
         f'export GOOGLE_CLOUD_PROJECT={self.project}',
@@ -419,12 +422,15 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
 
   def _GrantPermissionToReasoningEngine(self) -> None:
     """Grants permission to Reasoning Engine service account on the bucket."""
+
     # Get project number using describe
     cmd = util.GcloudCommand(None, 'projects', 'describe', self.project)
     cmd.flags['format'] = 'value(projectNumber)'
     stdout, _, _ = cmd.Issue(raise_on_failure=True)
     project_number = stdout.strip()
 
+    # TODO(odiego): Allow customizing service account to pass each agent one
+    # with minimum privileges.
     service_account = (
         f'service-{project_number}@gcp-sa-aiplatform-re.iam.gserviceaccount.com'
     )
@@ -435,16 +441,34 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
         self._staging_bucket,
     )
 
-    cmd = util.GcloudCommand(
-        None,
-        'storage',
-        'buckets',
-        'add-iam-policy-binding',
-        self._staging_bucket,
-    )
-    cmd.flags['member'] = f'serviceAccount:{service_account}'
-    cmd.flags['role'] = 'roles/storage.objectAdmin'
-    cmd.Issue(raise_on_failure=True)
+    try:
+      cmd = util.GcloudCommand(
+          None,
+          'storage',
+          'buckets',
+          'add-iam-policy-binding',
+          self._staging_bucket,
+      )
+      cmd.flags['member'] = f'serviceAccount:{service_account}'
+      cmd.flags['role'] = 'roles/storage.objectAdmin'
+      cmd.Issue(raise_on_failure=True)
+    except errors.VmUtil.IssueCommandError as e:
+      default_service_account_missing = re.search(
+          r'Service account \S+ does not exist\.', str(e)
+      )
+      if default_service_account_missing:
+        # The fact new service accounts take some seconds to propagate
+        # needlessly complicates the logic unless you sleep ~1 minute on every
+        # run. Since this is a once-per-project thing, I better just surface
+        # this message to let the user what they have to do.
+        error_msg = (
+            'Default Vertex AI service account is not created for this project.'
+            ' Run "gcloud beta services identity create'
+            f' --service=aiplatform.googleapis.com --project={self.project}",'
+            ' wait a minute, then retry.'
+        )
+        raise errors.Resource.CreationError(error_msg) from e
+      raise
 
   @override
   def Execute(
@@ -455,7 +479,7 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
     """Runs the agent on Vertex AI Agent Engine."""
     if not self._remote_agent_name:
       raise errors.Benchmarks.RunError(
-          'Agent not deployed. Call PrepareWorkload() first.'
+          'Agent not deployed. Call Create() first.'
       )
 
     workload = self.spec.workload
