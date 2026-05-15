@@ -29,7 +29,6 @@ from perfkitbenchmarker.linux_benchmarks import unmanaged_mysql_sysbench_benchma
 from perfkitbenchmarker.linux_benchmarks.fio import utils as fio_utils
 from perfkitbenchmarker.linux_packages import fio
 
-
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'disk_snapshot'
@@ -83,7 +82,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   Args:
     benchmark_spec: The benchmarks specification.
   """
-  benchmark_spec.vm_groups['client'] = benchmark_spec.vm_groups['server']
+  benchmark_spec.unmanaged_vm_groups['client'] = benchmark_spec.vm_groups[
+      'server'
+  ]
   unmanaged_mysql_sysbench_benchmark.PrepareSystem(benchmark_spec)
   unmanaged_mysql_sysbench_benchmark.InstallPackages(benchmark_spec)
   unmanaged_mysql_sysbench_benchmark.StartServices(benchmark_spec)
@@ -102,7 +103,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   for samples in all_vm_samples_before_run:
     all_samples.extend(samples)
 
-  benchmark_spec.vm_groups['client'] = benchmark_spec.vm_groups['server']
+  benchmark_spec.unmanaged_vm_groups['client'] = benchmark_spec.vm_groups[
+      'server'
+  ]
   unmanaged_mysql_sysbench_benchmark.Run(benchmark_spec)
   all_vm_samples_after_run = background_tasks.RunThreaded(
       lambda vm: CreateSnapshotOnVM(vm, 2), vms
@@ -133,9 +136,7 @@ def MeasureRestoreSnapshotTime(
           latest_restore_disk_device_path = device['DevicePath']
 
   vm.RemoteCommand(
-      'sudo dd'
-      f' if={latest_restore_disk_device_path} of=/dev/null'
-      ' bs=4k count=1'
+      f'sudo dd if={latest_restore_disk_device_path} of=/dev/null bs=4k count=1'
   )
   latest_restore_disk.restore_first_byte_end_time = time.time()
 
@@ -288,10 +289,8 @@ def CreateSnapshotOnVM(
     vm_samples.append(
         sample.Sample(
             'snapshot_restore_time_to_first_byte',
-            first_restore_disk
-            .restore_first_byte_end_time
-            - first_restore_disk
-            .create_disk_start_time,
+            first_restore_disk.restore_first_byte_end_time
+            - first_restore_disk.create_disk_start_time,
             'seconds',
             metadata,
         )
@@ -300,10 +299,8 @@ def CreateSnapshotOnVM(
     vm_samples.append(
         sample.Sample(
             'snapshot_full_restore_time',
-            latest_restore_disk
-            .create_disk_full_end_time
-            - latest_restore_disk
-            .create_disk_start_time,
+            latest_restore_disk.create_disk_full_end_time
+            - latest_restore_disk.create_disk_start_time,
             'seconds',
             metadata,
         )
