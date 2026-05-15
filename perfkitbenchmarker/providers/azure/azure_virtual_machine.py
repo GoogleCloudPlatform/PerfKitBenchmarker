@@ -57,7 +57,6 @@ from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.azure import util
 import yaml
 
-
 FLAGS = flags.FLAGS
 
 
@@ -873,6 +872,8 @@ class AzureVirtualMachine(
     for nic in self.nics:
       nic.Create()
 
+    self.AllowRemoteAccessPorts()
+
     if self.use_dedicated_host:
       with self._lock:
         self.host_list = self.host_map[(self.host_series_sku, self.region)]
@@ -1168,7 +1169,12 @@ class AzureVirtualMachine(
     """Resumes the VM."""
     raise NotImplementedError()
 
-  @vm_util.Retry()
+  @vm_util.Retry(
+      retryable_exceptions=(
+          errors.VmUtil.IssueCommandError,
+          errors.Resource.RetryableCreationError,
+      )
+  )
   def _PostCreate(self):
     """Get VM data."""
     stdout, _ = vm_util.IssueRetryableCommand(
@@ -1180,10 +1186,17 @@ class AzureVirtualMachine(
             'json',
             '--name',
             self.name,
+            '--show-details',
         ]
         + self.resource_group.args
     )
     response = json.loads(stdout)
+    self.internal_ips = response['privateIps'].split(',')
+    self.internal_ip = self.internal_ips[0]
+    if self.public_ips:
+      self.ip_addresses = response['publicIps'].split(',')
+      self.ip_address = self.ip_addresses[0]
+
     self.create_os_disk_strategy.disk.name = response['storageProfile'][
         'osDisk'
     ]['name']
@@ -1200,13 +1213,6 @@ class AzureVirtualMachine(
         ]
         + self.resource_group.args
     )
-    self.internal_ip = self.nics[0].GetInternalIP()
-    self.internal_ips = [nic.GetInternalIP() for nic in self.nics]
-    if self.public_ips:
-      self.ip_address = self.public_ips[0].GetIPAddress()
-      self.ip_addresses = [
-          public_ip.GetIPAddress() for public_ip in self.public_ips
-      ]
 
   def SetupAllScratchDisks(self):
     """Set up all scratch disks of the current VM."""
