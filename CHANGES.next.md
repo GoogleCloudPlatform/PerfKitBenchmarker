@@ -283,6 +283,7 @@
 -   Add support for Alma Linux 8, 9, and 10 for the Azure provider.
 -   Re-enable support for Rocky Linux 8, 9, and 10 for the Azure provider.
 -   Add Ubuntu 26.04 support for GCP, AWS, and Azure Providers.
+-   Add neper_benchmark for testing highly concurrent networking workloads.
 
 ### Enhancements:
 
@@ -463,6 +464,8 @@
     creation can be retried on stock outs.
 -   Add support for deploying VMs inside managed VM groups with
     `--use_managed_vm_groups`.
+-   Add Receive Flow Steering (RFS) support to Neper, Nginx, and Redis
+    benchmarks with universal --rps_sock_flow_entries and --rps_flow_cnt flags.
 
 ### Bug fixes and maintenance updates:
 
