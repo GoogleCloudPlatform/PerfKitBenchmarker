@@ -396,6 +396,13 @@ def ValidateNodesCreated(
   node_ready_count_sample = _GetSampleByMetricName(
       node_samples, 'node_Ready_count'
   )
+  if EXPECTED_NODES_CREATED.value == 0:
+    if node_ready_count_sample is not None:
+      raise errors.Benchmarks.RunError(
+          'No node ready events were expected, but found'
+          f' {node_ready_count_sample.value} node ready events.'
+      )
+    return
   if node_ready_count_sample is None:
     raise errors.Benchmarks.RunError(
         'No node ready events were found & we attempted to scale up to'
