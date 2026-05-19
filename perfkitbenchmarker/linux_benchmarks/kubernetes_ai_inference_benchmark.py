@@ -316,6 +316,10 @@ def GetVLLMModelLoadTime(
       init_time, model_load_time, application_start_time = (
           _ParseTPUModelLoadTimeMetrics(server, result_stdout, pod_name)
       )
+    elif _IsUsingNeuron(server.spec.catalog_components):
+      init_time, model_load_time, application_start_time = (
+          _ParseNeuronModelLoadTimeMetrics(server, result_stdout, pod_name)
+      )
     else:
       init_time, model_load_time, application_start_time = (
           _ParseModelLoadTimeMetrics(server, result_stdout, pod_name)
@@ -391,6 +395,78 @@ def _ParseTPUModelLoadTimeMetrics(
     if 'Compilation finished in' in line:
       model_load_end_timestamp = _ParseInferenceServerTimeStamp(line)
     # Check when overall container starts
+    if 'Starting vLLM API server' in line:
+      vllm_start_timestamp = _ParseInferenceServerTimeStamp(line)
+      break
+  if container_init_timestamp is None:
+    raise ValueError('Container init timestamp is not found in the logs.')
+  if model_load_start_timestamp is None:
+    raise ValueError('Model load start timestamp is not found in the logs.')
+  if model_load_end_timestamp is None:
+    raise ValueError('Model load end timestamp is not found in the logs.')
+  if vllm_start_timestamp is None:
+    raise ValueError('VLLM start timestamp is not found in the logs.')
+  init_time = GetTimeDifference(
+      container_init_timestamp, model_load_start_timestamp
+  )
+  model_load_time = GetTimeDifference(
+      model_load_start_timestamp, model_load_end_timestamp
+  )
+  application_start_time = GetTimeDifference(
+      model_load_end_timestamp, vllm_start_timestamp
+  )
+  return init_time, model_load_time, application_start_time
+
+
+def _ParseNeuronModelLoadTimeMetrics(
+    server: k8s_server.WGServingInferenceServer,
+    result_stdout: str,
+    pod_name: str,
+) -> Tuple[float, float, float]:
+  """Parse model load time metrics from Neuron (Inferentia2/Trainium) vLLM logs.
+
+  Neuron vLLM uses the NxDI compilation path (neuronx_distributed_inference)
+  instead of standard HuggingFace weight loading. Log patterns differ from
+  the standard vLLM path.
+
+  Log patterns:
+    model_load_start: 'Saving the neuron_config to'  (application_base.py)
+    model_load_end:   'Done Sharding weights in'      (model_builder.py)
+    vllm_start:       'Starting vLLM API server'      (api_server.py)
+
+  Timestamp format in Neuron logs: '[YYYY-MM-DD HH:MM:SS]' — the HH:MM:SS
+  part is matched by the shared _TIMESTAMP_PATTERN regex.
+  """
+  model_load_start_timestamp = None
+  model_load_end_timestamp = None
+  vllm_start_timestamp = None
+  log_lines = result_stdout.splitlines()
+  events = server.cluster.GetEvents()
+  startup_event = None
+  for event in events:
+    if (
+        event.resource.kind == 'Pod'
+        and event.resource.name == pod_name
+        and 'Started container inference-server' in event.message
+    ):
+      startup_event = event
+  if startup_event is None:
+    raise ValueError(
+        f'No events found for pod {pod_name} with message "Started container'
+        ' inference-server".'
+    )
+  container_init_timestamp = _FormatUTCTimeStampToLocalTime(
+      server,
+      startup_event.timestamp,
+  )
+  for line in log_lines:
+    if (
+        'Saving the neuron_config to' in line
+        and model_load_start_timestamp is None
+    ):
+      model_load_start_timestamp = _ParseInferenceServerTimeStamp(line)
+    if 'Done Sharding weights in' in line:
+      model_load_end_timestamp = _ParseInferenceServerTimeStamp(line)
     if 'Starting vLLM API server' in line:
       vllm_start_timestamp = _ParseInferenceServerTimeStamp(line)
       break
@@ -528,6 +604,24 @@ def _IsUsingTPU(components: str) -> bool:
     Whether the components are using TPU.
   """
   pattern = re.compile(r'v\d+e-\d+x\d+')
+  return bool(pattern.search(components))
+
+
+def _IsUsingNeuron(components: str) -> bool:
+  """Returns whether the components are using AWS Inferentia/Neuron.
+
+  Neuron component format: <N>-Inf2 or <N>-Trn2
+  Examples:
+  1-Inf2
+  2-Inf2
+
+  Args:
+    components: The components of the inference server, separated by commas.
+
+  Returns:
+    Whether the components are using Neuron accelerators.
+  """
+  pattern = re.compile(r'\d+-Inf2|\d+-Trn2', re.IGNORECASE)
   return bool(pattern.search(components))
 
 

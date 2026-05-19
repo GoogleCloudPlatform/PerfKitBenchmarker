@@ -55,6 +55,28 @@ FLAG_GCS_BUCKET = flags.DEFINE_string(
     'The GCS bucket that has model data for inference server to use.',
 )
 
+FLAG_S3_BUCKET = flags.DEFINE_string(
+    'k8s_inference_server_s3_bucket',
+    None,
+    'The S3 bucket that has model data for inference server to use '
+    '(mounted via the AWS Mountpoint S3 CSI Driver).',
+)
+
+FLAG_S3_REGION = flags.DEFINE_string(
+    'k8s_inference_server_s3_region',
+    None,
+    'AWS region of the S3 bucket referenced by '
+    '--k8s_inference_server_s3_bucket. Required for the Mountpoint S3 CSI '
+    'driver mount options.',
+)
+
+# AWS Inferentia/Trainium accelerator chip names recognised in
+# `catalog_components` (e.g. "1-Inf2", "16-Trn2"). Kept local to this module so
+# that adding Neuron support does not change the shared
+# `virtual_machine_spec.VALID_GPU_TYPES` list, which is consumed by many other
+# subsystems.
+_NEURON_ACCELERATOR_TYPES = ('inf2', 'trn2')
+
 WG_SERVING_REPO_URL = flags.DEFINE_string(
     'wg_serving_repo_url',
     'https://github.com/kubernetes-sigs/wg-serving',
@@ -603,6 +625,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     """Returns the storage type of the inference server."""
     if 'gcsfuse' in self.spec.catalog_components:
       return 'gcsfuse'
+    if 's3' in self.spec.catalog_components:
+      return 's3'
     return 'huggingface'
 
   def _GetAcceleratorComponent(self) -> str:
@@ -612,6 +636,14 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       lowered = component.lower()
       for gpu in virtual_machine_spec.VALID_GPU_TYPES:
         if gpu in lowered:
+          return component
+    # AWS Neuron chips (Inf2/Trn2) are intentionally not added to the shared
+    # VALID_GPU_TYPES list; check them with a separate, narrower loop so the
+    # rest of PKB is not affected.
+    for component in components:
+      lowered = component.lower()
+      for neuron in _NEURON_ACCELERATOR_TYPES:
+        if neuron in lowered:
           return component
     return 'unknown'
 
@@ -644,7 +676,14 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           self.huggingface_token,
       )
       secret_file_path = vm_util.PrependTempDir('hf_token.secret')
-      storage_service = object_storage_service.GetObjectStorageClass('GCP')()
+      # Pick the storage backend by URI scheme so existing gs:// usage is
+      # untouched while s3:// URIs work for AWS-only runs.
+      storage_cloud = (
+          'AWS' if self.huggingface_token.startswith('s3://') else 'GCP'
+      )
+      storage_service = object_storage_service.GetObjectStorageClass(
+          storage_cloud
+      )()
       storage_service.PrepareService(None)
       storage_service.Copy(self.huggingface_token, secret_file_path)
 
@@ -666,9 +705,12 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
   def _GetInferenceServerManifest(self) -> str:
     """Generates and retrieves the inference server manifest content."""
-    provider = self.spec.cloud.lower()
-    if provider == 'gcp':
-      provider = 'gke'
+    if self.spec.catalog_provider:
+      provider = self.spec.catalog_provider
+    else:
+      provider = self.spec.cloud.lower()
+      if provider == 'gcp':
+        provider = 'gke'
     generate_args = {
         'kind': 'core/deployment',
         'model-server': self.spec.model_server,
@@ -695,7 +737,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       pod_name = kubernetes_commands.RetryableGetPodNameFromJob(job_name)
 
       kubernetes_commands.WaitForResource(
-          f'pod/{pod_name}', 'Ready', timeout=600
+          f'pod/{pod_name}', 'Ready', timeout=1800
       )
       inference_server_manifest = kubernetes_commands.GetFileContentFromPod(
           pod_name, _OUTPUT_PATH
@@ -723,6 +765,22 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     """Provisions cloud-specific GPU node pool for inference workloads."""
     if FLAGS.cloud == 'AWS':
       use_spot = bool(FLAGS.aws_spot_instances)
+      if self.accelerator_type.lower() in _NEURON_ACCELERATOR_TYPES:
+        # Reuse the AWS GPU NodePool template: it is already fully
+        # parameterised. Only the values differ for Neuron (instance family,
+        # taint, NodePool name).
+        kubernetes_commands.ApplyManifest(
+            'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
+            gpu_nodepool_name='neuron',
+            gpu_consolidate_after='1h',
+            gpu_consolidation_policy='WhenEmpty',
+            karpenter_nodeclass_name='default',
+            gpu_capacity_types=['spot'] if use_spot else ['on-demand'],
+            gpu_arch=['amd64'],
+            gpu_instance_families=[self.accelerator_type.lower()],
+            gpu_taint_key='aws.amazon.com/neuron',
+        )
+        return
       kubernetes_commands.ApplyManifest(
           'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
           gpu_nodepool_name='gpu',
@@ -1014,6 +1072,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
     if 'gcsfuse' in self.spec.catalog_components:
       self._ApplyGCSFusePVC()
+    elif 's3' in self.spec.catalog_components:
+      self._ApplyS3PVC()
 
     self._ProvisionGPUNodePool()
 
@@ -1078,6 +1138,20 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         gcs_bucket=FLAG_GCS_BUCKET.value,
     )
     logging.info('Successfully applied GCSFuse PVC.')
+
+  def _ApplyS3PVC(self):
+    """Apply the PV & PVC backed by Mountpoint for Amazon S3 CSI driver."""
+    if not FLAG_S3_BUCKET.value or not FLAG_S3_REGION.value:
+      raise errors.Resource.CreationError(
+          'Both --k8s_inference_server_s3_bucket and '
+          '--k8s_inference_server_s3_region are required to apply the S3 PVC.'
+      )
+    kubernetes_commands.ApplyManifest(
+        'container/kubernetes_ai_inference/s3_pv_pvc.yaml.j2',
+        s3_bucket=FLAG_S3_BUCKET.value,
+        s3_region=FLAG_S3_REGION.value,
+    )
+    logging.info('Successfully applied S3 PVC.')
 
   def _CollectStartupMonitorMetrics(self) -> dict[str, PodStartupMetrics]:
     collected_metrics_map = super()._CollectStartupMonitorMetrics()

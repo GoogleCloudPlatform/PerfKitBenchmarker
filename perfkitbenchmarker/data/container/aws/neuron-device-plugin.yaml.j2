@@ -1,0 +1,127 @@
+# AWS Neuron Device Plugin DaemonSet.
+# Based on upstream aws-neuron-sdk k8s manifests
+# (https://github.com/aws-neuron/aws-neuron-sdk).
+# Image: neuron_device_plugin_image (ApplyManifest kwarg); default in template.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: neuron-device-plugin-daemonset
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: neuron-device-plugin-ds
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: neuron-device-plugin-ds
+    spec:
+      serviceAccountName: neuron-device-plugin
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - key: aws.amazon.com/neuron
+          operator: Exists
+          effect: NoSchedule
+      priorityClassName: system-node-critical
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: eks.amazonaws.com/instance-family
+                    operator: In
+                    values:
+                      - inf1
+                      - inf2
+                      - trn1
+                      - trn1n
+                      - trn2
+                      - trn2u
+              - matchExpressions:
+                  - key: node.kubernetes.io/instance-type
+                    operator: In
+                    values:
+                      - inf1.xlarge
+                      - inf1.2xlarge
+                      - inf1.6xlarge
+                      - inf1.24xlarge
+                      - inf2.xlarge
+                      - inf2.4xlarge
+                      - inf2.8xlarge
+                      - inf2.24xlarge
+                      - inf2.48xlarge
+                      - trn1.2xlarge
+                      - trn1.32xlarge
+                      - trn1n.32xlarge
+                      - trn2.48xlarge
+      containers:
+        - image: {{ neuron_device_plugin_image | default('public.ecr.aws/neuron/neuron-device-plugin:2.22.4.0') }}
+          imagePullPolicy: Always
+          name: neuron-device-plugin
+          env:
+            - name: KUBECONFIG
+              value: /etc/kubernetes/kubelet.conf
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: device-plugin
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: infa-map
+              mountPath: /run
+      volumes:
+        - name: device-plugin
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+        - name: infa-map
+          hostPath:
+            path: /run
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: neuron-device-plugin
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: neuron-device-plugin
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  # Required for Driver Mode: patch capacity/allocatable (aws.amazon.com/neurondevice).
+  - apiGroups: [""]
+    resources: ["nodes/status"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["pods/status"]
+    verbs: ["patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: neuron-device-plugin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: neuron-device-plugin
+subjects:
+  - kind: ServiceAccount
+    name: neuron-device-plugin
+    namespace: kube-system

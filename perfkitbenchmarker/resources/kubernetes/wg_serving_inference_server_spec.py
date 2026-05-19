@@ -91,6 +91,10 @@ class WGServingInferenceServerConfigSpec(
     catalog_components: Name of components of inference server to use for the
       benchmark. Options are available at
       https://github.com/kubernetes-sigs/wg
+    catalog_provider: Optional override for the --provider flag passed to the
+      serving-catalog CLI. When unset, derived from cloud (e.g. aws, gke).
+      Use aws-neuron for AWS Inferentia/Trainium overlays (directory
+      aws-neuron under vllm/<model>/), distinct from aws for GPU (PR #64).
     extra_deployment_args: Extra arguments to pass to the catalog CLI.
     hpa_min_replicas: Minimum replicas for HPA.
     hpa_max_replicas: Maximum replicas for HPA.
@@ -106,6 +110,7 @@ class WGServingInferenceServerConfigSpec(
     self.model_server: str
     self.cloud: str
     self.catalog_components: str
+    self.catalog_provider: str | None
     self.extra_deployment_args: dict[str, str] | None
     self.hpa_min_replicas: int
     self.hpa_max_replicas: int
@@ -145,6 +150,10 @@ class WGServingInferenceServerConfigSpec(
         'catalog_components': (
             option_decoders.StringDecoder,
             {'default': '1-L4'},
+        ),
+        'catalog_provider': (
+            option_decoders.StringDecoder,
+            {'default': None, 'none_ok': True},
         ),
         'extra_deployment_args': (
             option_decoders.TypeVerifier,
