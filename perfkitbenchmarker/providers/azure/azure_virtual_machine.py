@@ -1412,22 +1412,35 @@ class Ubuntu2604BasedAzureVirtualMachine(
   ARM_IMAGE_URN = 'Canonical:ubuntu-26_04-lts:server-arm64:latest'
 
 
+class BaseRedHatBasedAzureVirtualMachine(
+    AzureVirtualMachine, linux_virtual_machine.BaseRedHatMixin
+):
+
+  def SetupPackageManager(self):
+    # https://learn.microsoft.com/en-us/troubleshoot/azure/virtual-machines/linux/troubleshoot-linux-rhui-certificate-issues
+    self.RemoteCommand(
+        "sudo dnf update -y --disablerepo='*' --enablerepo='*microsoft-azure*'"
+    )
+    # Install EPEL
+    super().SetupPackageManager()
+
+
 class Rhel8BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Rhel8Mixin
+    BaseRedHatBasedAzureVirtualMachine, linux_virtual_machine.Rhel8Mixin
 ):
   GEN2_IMAGE_URN = 'RedHat:RHEL:8-lvm-gen2:latest'
   GEN1_IMAGE_URN = 'RedHat:RHEL:8-LVM:latest'
 
 
 class Rhel9BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Rhel9Mixin
+    BaseRedHatBasedAzureVirtualMachine, linux_virtual_machine.Rhel9Mixin
 ):
   GEN2_IMAGE_URN = 'RedHat:RHEL:9-lvm-gen2:latest'
   GEN1_IMAGE_URN = 'RedHat:RHEL:9-lvm:latest'
 
 
 class Rhel10BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Rhel10Mixin
+    BaseRedHatBasedAzureVirtualMachine, linux_virtual_machine.Rhel10Mixin
 ):
   GEN2_IMAGE_URN = 'RedHat:RHEL:10-lvm-gen2:latest'
   GEN1_IMAGE_URN = 'RedHat:RHEL:10-lvm:latest'
