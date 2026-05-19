@@ -154,7 +154,8 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
   def _IsAutoscalerEnabled(self, nodepool_config: container.BaseNodePoolConfig):
     """Returns True if the cluster autoscaler is enabled."""
     return (
-        nodepool_config.min_nodes != nodepool_config.max_nodes
+        nodepool_config.min_nodes
+        != nodepool_config.max_nodes
         # Auto node provisioning mode is incompatible with cluster autoscaler.
     ) and not FLAGS.azure_aks_auto_node_provisioning
 
@@ -204,33 +205,33 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
       # For provision_node_pools benchmark, add auto provisioning mode
       cmd.append('--node-provisioning-mode=auto')
 
-    @vm_util.Retry(
-        timeout=3600,
-        retryable_exceptions=(errors.Resource.RetryableCreationError,),
-    )
-    def RunCreateClusterCmd(cmd: list[str]):
-      """Runs the create cluster command, retrying on race condition errors."""
-      try:
-        _, err, retcode = vm_util.IssueCommand(
-            cmd,
-            # Half hour timeout on creating the cluster.
-            timeout=1800,
-            raise_on_failure=False,
-        )
-      except errors.VmUtil.IssueCommandTimeoutError as e:
-        retcode = 1
-        err = str(e)
-      if retcode:
-        if 'InvalidOutputTable' in err:
-          # This is a race condition where the logs analytics workspace hasn't
-          # finished being created. Retrying solves it.
-          raise errors.Resource.RetryableCreationError(err)
-        raise errors.Resource.CreationError(err)
-
-    RunCreateClusterCmd(cmd)
+    self._RunCreateClusterCmd(cmd)
 
     for _, nodepool in self.nodepools.items():
       self._CreateNodePool(nodepool)
+
+  @vm_util.Retry(
+      timeout=3600,
+      retryable_exceptions=(errors.Resource.RetryableCreationError,),
+  )
+  def _RunCreateClusterCmd(self, cmd: list[str]):
+    """Runs the create cluster command, retrying on race condition errors."""
+    try:
+      _, err, retcode = vm_util.IssueCommand(
+          cmd,
+          # Half hour timeout on creating the cluster.
+          timeout=1800,
+          raise_on_failure=False,
+      )
+    except errors.VmUtil.IssueCommandTimeoutError as e:
+      retcode = 1
+      err = str(e)
+    if retcode:
+      if 'InvalidOutputTable' in err:
+        # This is a race condition where the logs analytics workspace hasn't
+        # finished being created. Retrying solves it.
+        raise errors.Resource.RetryableCreationError(err)
+      raise errors.Resource.CreationError(err)
 
   def _CreateNodePool(self, nodepool_config: container.BaseNodePoolConfig):
     """Creates a node pool."""
@@ -575,11 +576,7 @@ class AksAutomaticCluster(AksCluster):
         'automatic',
         '--tags',
     ] + tags_list
-    vm_util.IssueCommand(
-        cmd,
-        # Half hour timeout on creating the cluster.
-        timeout=1800,
-    )
+    self._RunCreateClusterCmd(cmd)
 
   def _CreateRoleAssignment(self):
     """Creates a role assignment for the current user."""
