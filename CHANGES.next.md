@@ -674,3 +674,4 @@
 -   Support basic TPU vm provisioning.
 -   Set firewall rule as PKB-created before deletion when using
     --gce_firewall_rules_clean_all.
+-   Added gke_kubernetes_nginx to default benchmark config.

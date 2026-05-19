@@ -313,6 +313,14 @@ redis_memtier_session_storage_single_node:
     servers:
       <<: *redis_memtier_session_storage_disk_spec
 
+gke_kubernetes_nginx:
+  name: kubernetes_nginx
+  flags:
+    nginx_scenario: 'reverse_proxy'
+    nginx_use_ssl: 'false'
+    nginx_content_size: 1024
+    nginx_p99_latency_threshold: 100
+
 redis_memtier_session_storage_cluster:
   name: redis_memtier
   flags:
