@@ -25,10 +25,10 @@ CENTOS_STREAM9 = 'centos_stream9'
 CLEAR = 'clear'
 COS = 'cos'  # stable
 COS_DEV = 'cos_dev'
+COS129 = 'cos129'
 COS125 = 'cos125'
 COS121 = 'cos121'
 COS117 = 'cos117'
-COS113 = 'cos113'
 CORE_OS = 'core_os'
 DEBIAN11 = 'debian11'
 DEBIAN11_BACKPORTS = 'debian11_backports'
@@ -133,10 +133,10 @@ WINDOWS = 'windows'
 CONTAINER_OS_TYPES = [
     CORE_OS,
     COS,
+    COS129,
     COS125,
     COS121,
     COS117,
-    COS113,
     COS_DEV,
 ]
 
