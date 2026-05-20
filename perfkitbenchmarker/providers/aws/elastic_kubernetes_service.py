@@ -26,6 +26,7 @@ import json
 import logging
 import math
 import re
+import threading
 from typing import Any
 from urllib import parse
 
@@ -525,6 +526,485 @@ class EksCluster(BaseEksCluster):
         '--wait',
     ]
     vm_util.IssueCommand(cmd)
+
+  def CreateNodePool(
+      self,
+      nodepool_config: container.BaseNodePoolConfig,
+      node_version: str | None = None,
+  ) -> None:
+    """Creates a single managed node group on the cluster."""
+    ng_json = self._RenderNodeGroupJson(nodepool_config)
+    if node_version:
+      ng_json['version'] = node_version
+    config_json = {
+        'apiVersion': 'eksctl.io/v1alpha5',
+        'kind': 'ClusterConfig',
+        'metadata': {
+            'name': self.name,
+            'region': self.region,
+        },
+        'managedNodeGroups': [ng_json],
+    }
+    filename = self._WriteJsonToFile(config_json)
+    cmd = [
+        FLAGS.eksctl,
+        'create',
+        'nodegroup',
+        f'--config-file={filename}',
+    ]
+    _, stderr, retcode = vm_util.IssueCommand(
+        cmd, timeout=1800, raise_on_failure=False
+    )
+    if retcode:
+      raise errors.Resource.CreationError(stderr)
+
+  def DeleteNodePool(self, name: str) -> None:
+    """Deletes the named node group."""
+    cmd = [
+        FLAGS.eksctl,
+        'delete',
+        'nodegroup',
+        f'--name={name}',
+        f'--cluster={self.name}',
+        f'--region={self.region}',
+        '--wait',
+    ]
+    vm_util.IssueCommand(cmd, timeout=1800)
+
+  def UpgradeNodePool(self, name: str, target_version: str) -> None:
+    """Upgrades the named node group to target_version."""
+    cmd = [
+        FLAGS.eksctl,
+        'upgrade',
+        'nodegroup',
+        f'--name={name}',
+        f'--cluster={self.name}',
+        f'--region={self.region}',
+        f'--kubernetes-version={target_version}',
+        '--wait',
+    ]
+    vm_util.IssueCommand(cmd, timeout=1800)
+
+  # ---- Async variants (return opaque handles) -------------------------------
+
+  def _DiscoverSubnets(self) -> list[str]:
+    """Returns the EKS cluster's subnet IDs (cached after first call)."""
+    if getattr(self, '_cached_subnets', None):
+      return self._cached_subnets
+    out, _, _ = vm_util.IssueCommand(
+        util.AWS_PREFIX
+        + [
+            'eks',
+            'describe-cluster',
+            '--name',
+            self.name,
+            '--region',
+            self.region,
+        ]
+    )
+    info = json.loads(out)
+    self._cached_subnets = info['cluster']['resourcesVpcConfig']['subnetIds']
+    return self._cached_subnets
+
+  def _ResolveReleaseVersion(self, minor: str) -> str:
+    """Returns the EKS-optimized AMI release version (e.g. '1.33.10-20260124').
+
+    Used to populate `releaseVersion` in the create-nodegroup payload so the
+    benchmark can pin specific K8s minors. Thread-safe: at scale we have N
+    workers all asking for the same minor; only the first does the SSM
+    lookup, the rest read from the cache.
+    """
+    if getattr(self, '_release_version_lock', None) is None:
+      self._release_version_lock = threading.Lock()
+    with self._release_version_lock:
+      cache = getattr(self, '_cached_release_versions', None) or {}
+      if minor in cache:
+        return cache[minor]
+      cmd = util.AWS_PREFIX + [
+          'ssm',
+          'get-parameter',
+          '--name',
+          (
+              f'/aws/service/eks/optimized-ami/{minor}/amazon-linux-2023/'
+              'x86_64/standard/recommended/release_version'
+          ),
+          '--region',
+          self.region,
+          '--query',
+          'Parameter.Value',
+          '--output',
+          'text',
+      ]
+      out, err, rc = vm_util.IssueCommand(cmd, raise_on_failure=False)
+      if rc:
+        raise errors.Resource.CreationError(
+            f'Failed to resolve EKS release version for minor {minor!r}: {err}'
+        )
+      cache[minor] = out.strip()
+      self._cached_release_versions = cache
+      return cache[minor]
+
+  def _DiscoverNodeRoleArn(self) -> str:
+    """Returns a usable node IAM role ARN by inspecting an existing nodegroup."""
+    if getattr(self, '_cached_node_role_arn', None):
+      return self._cached_node_role_arn
+    out, _, _ = vm_util.IssueCommand(
+        util.AWS_PREFIX
+        + [
+            'eks',
+            'list-nodegroups',
+            '--cluster-name',
+            self.name,
+            '--region',
+            self.region,
+        ]
+    )
+    for ng_name in json.loads(out).get('nodegroups', []):
+      ng_out, _, _ = vm_util.IssueCommand(
+          util.AWS_PREFIX
+          + [
+              'eks',
+              'describe-nodegroup',
+              '--cluster-name',
+              self.name,
+              '--nodegroup-name',
+              ng_name,
+              '--region',
+              self.region,
+          ]
+      )
+      role = json.loads(ng_out)['nodegroup'].get('nodeRole')
+      if role:
+        self._cached_node_role_arn = role
+        return role
+    raise errors.Resource.CreationError(
+        f'No existing nodegroup found to discover node role for '
+        f'cluster {self.name}.'
+    )
+
+  def CreateNodePoolAsync(
+      self,
+      nodepool_config: container.BaseNodePoolConfig,
+      node_version: str | None = None,
+  ) -> str:
+    # Pass the full request via --cli-input-json so that we can specify both
+    # `version` (e.g. "1.33") and `releaseVersion` (e.g. "1.33.11-...") in
+    # the same call. Two reasons this matters:
+    #   1. AWS CLI v1 has a bug where the top-level --version flag swallows
+    #      the subcommand --version, printing the CLI banner and exiting.
+    #      cli-input-json sidesteps CLI argument parsing entirely.
+    #   2. EKS rejects a releaseVersion that doesn't match the request's
+    #      `version`; if `version` is omitted EKS defaults it to the
+    #      cluster's version, which (for the N-1 -> N benchmark path)
+    #      produces a "release version X is not valid for kubernetes
+    #      version Y" error.
+    payload: dict[str, Any] = {
+        'clusterName': self.name,
+        'nodegroupName': nodepool_config.name,
+        'scalingConfig': {
+            'minSize': nodepool_config.num_nodes,
+            'maxSize': nodepool_config.num_nodes,
+            'desiredSize': nodepool_config.num_nodes,
+        },
+        'subnets': self._DiscoverSubnets(),
+        'instanceTypes': [nodepool_config.machine_type],
+        'amiType': 'AL2023_x86_64_STANDARD',
+        'nodeRole': self._DiscoverNodeRoleArn(),
+        'labels': {'pkb_nodepool': nodepool_config.name},
+        'tags': util.MakeDefaultTags(),
+    }
+    if node_version:
+      payload['version'] = node_version
+      payload['releaseVersion'] = self._ResolveReleaseVersion(node_version)
+    filename = self._WriteJsonToFile(payload)
+    cmd = util.AWS_PREFIX + [
+        'eks',
+        'create-nodegroup',
+        '--region',
+        self.region,
+        '--cli-input-json',
+        f'file://{filename}',
+    ]
+    _, stderr, retcode = vm_util.IssueCommand(
+        cmd, timeout=300, raise_on_failure=False
+    )
+    if retcode:
+      raise errors.Resource.CreationError(stderr)
+    return f'ng_active:{nodepool_config.name}'
+
+  def UpgradeNodePoolAsync(self, name: str, target_version: str) -> str:
+    cmd = util.AWS_PREFIX + [
+        'eks',
+        'update-nodegroup-version',
+        '--cluster-name',
+        self.name,
+        '--nodegroup-name',
+        name,
+        '--region',
+        self.region,
+        '--kubernetes-version',
+        target_version,
+    ]
+    _, stderr, retcode = vm_util.IssueCommand(
+        cmd, timeout=300, raise_on_failure=False
+    )
+    if retcode:
+      raise errors.Resource.CreationError(stderr)
+    return f'ng_active:{name}'
+
+  def DeleteNodePoolAsync(self, name: str) -> str:
+    cmd = util.AWS_PREFIX + [
+        'eks',
+        'delete-nodegroup',
+        '--cluster-name',
+        self.name,
+        '--nodegroup-name',
+        name,
+        '--region',
+        self.region,
+    ]
+    _, stderr, retcode = vm_util.IssueCommand(
+        cmd, timeout=300, raise_on_failure=False
+    )
+    if retcode:
+      raise errors.Resource.CreationError(stderr)
+    return f'ng_gone:{name}'
+
+  def UpdateClusterAsync(self) -> str:
+    """Fires a CloudWatch logging toggle; returns handle 'cluster_update:<id>'.
+
+    Returns a handle carrying the specific update id so WaitForOperation
+    can poll *that* update's status (Successful / Failed) rather than the
+    cluster's top-level status (which stays ACTIVE during config updates,
+    making the wait return instantly and silently mis-reporting latency).
+    """
+    log_types = ['api', 'audit', 'authenticator', 'controllerManager',
+                 'scheduler']
+    describe = util.AWS_PREFIX + [
+        'eks',
+        'describe-cluster',
+        '--name',
+        self.name,
+        '--region',
+        self.region,
+    ]
+    out, _, _ = vm_util.IssueCommand(describe)
+    current = (
+        json.loads(out)['cluster'].get('logging', {}).get('clusterLogging', [])
+    )
+    any_enabled = any(e.get('enabled', False) for e in current)
+    payload = json.dumps({
+        'clusterLogging': [
+            {'types': log_types, 'enabled': not any_enabled}
+        ]
+    })
+    upd = util.AWS_PREFIX + [
+        'eks',
+        'update-cluster-config',
+        '--name',
+        self.name,
+        '--region',
+        self.region,
+        '--logging',
+        payload,
+    ]
+    stdout, stderr, retcode = vm_util.IssueCommand(
+        upd, timeout=300, raise_on_failure=False
+    )
+    if retcode:
+      raise errors.Resource.CreationError(stderr)
+    update_id = json.loads(stdout)['update']['id']
+    return f'cluster_update:{update_id}'
+
+  def ResolveNodePoolVersions(self) -> tuple[str, str]:
+    """Returns (initial, target) EKS nodegroup versions.
+
+    Uses cluster_version (already set from FLAGS/describe-cluster) rather than
+    querying kubectl, which is faster and avoids a kubectl round-trip.
+    initial = N-1 (adjacent minor below cluster version)
+    target  = N   (cluster version = latest)
+    """
+    cluster_ver = self.cluster_version or self.k8s_version
+    # Strip any patch suffix e.g. '1.34.7' -> '1.34'
+    parts = cluster_ver.lstrip('v').split('.')
+    major, minor = int(parts[0]), int(parts[1])
+    target  = f'{major}.{minor}'
+    initial = f'{major}.{minor - 1}'
+    logging.info(
+        '[EKS] ResolveNodePoolVersions: cluster=%s initial=%s target=%s',
+        cluster_ver, initial, target,
+    )
+    return initial, target
+
+  def WaitForOperation(self, op_handle: str) -> None:
+    """Polls EKS resources until the expected terminal state is observed."""
+    kind, _, name = op_handle.partition(':')
+
+    @vm_util.Retry(
+        poll_interval=5,
+        fuzz=0,
+        timeout=3600,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
+    def _wait_ng_active():
+      out, err, rc = vm_util.IssueCommand(
+          util.AWS_PREFIX
+          + [
+              'eks',
+              'describe-nodegroup',
+              '--cluster-name',
+              self.name,
+              '--nodegroup-name',
+              name,
+              '--region',
+              self.region,
+          ],
+          raise_on_failure=False,
+      )
+      if rc:
+        raise errors.Resource.RetryableCreationError(err)
+      status = json.loads(out)['nodegroup']['status']
+      if status in ('ACTIVE',):
+        return
+      if status in ('CREATE_FAILED', 'DELETE_FAILED', 'DEGRADED'):
+        raise errors.Resource.CreationError(
+            f'nodegroup {name} ended in {status}'
+        )
+      raise errors.Resource.RetryableCreationError(
+          f'nodegroup {name} status={status}'
+      )
+
+    @vm_util.Retry(
+        poll_interval=5,
+        fuzz=0,
+        timeout=3600,
+        retryable_exceptions=(errors.Resource.RetryableDeletionError,),
+    )
+    def _wait_ng_gone():
+      out, err, rc = vm_util.IssueCommand(
+          util.AWS_PREFIX
+          + [
+              'eks',
+              'describe-nodegroup',
+              '--cluster-name',
+              self.name,
+              '--nodegroup-name',
+              name,
+              '--region',
+              self.region,
+          ],
+          raise_on_failure=False,
+      )
+      if rc and 'ResourceNotFoundException' in (err or ''):
+        return
+      if rc:
+        raise errors.Resource.RetryableDeletionError(err)
+      raise errors.Resource.RetryableDeletionError(
+          f'nodegroup {name} still present'
+      )
+
+    @vm_util.Retry(
+        poll_interval=5,
+        fuzz=0,
+        timeout=3600,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
+    def _wait_cluster_update():
+      out, err, rc = vm_util.IssueCommand(
+          util.AWS_PREFIX
+          + [
+              'eks',
+              'describe-update',
+              '--name',
+              self.name,
+              '--update-id',
+              name,
+              '--region',
+              self.region,
+              '--query',
+              'update.status',
+              '--output',
+              'text',
+          ],
+          raise_on_failure=False,
+      )
+      if rc:
+        raise errors.Resource.RetryableCreationError(err)
+      status = out.strip()
+      if status == 'Successful':
+        return
+      if status in ('Failed', 'Cancelled'):
+        raise errors.Resource.CreationError(
+            f'cluster update {name} ended in {status}'
+        )
+      raise errors.Resource.RetryableCreationError(
+          f'cluster update {name} status={status}'
+      )
+
+    if kind == 'ng_active':
+      _wait_ng_active()
+    elif kind == 'ng_gone':
+      _wait_ng_gone()
+    elif kind == 'cluster_update':
+      _wait_cluster_update()
+    else:
+      raise ValueError(f'Unknown EKS op handle: {op_handle!r}')
+
+  def UpdateCluster(self) -> None:
+    """Real cluster-level update via a CloudWatch logging toggle.
+
+    Reads the current cluster logging state, flips it (enable->disable or
+    vice versa), and waits for the cluster to return to ACTIVE. Enabling all
+    five log types is a 5-10 minute control-plane op, giving a meaningful
+    overlap window for Scenario B.
+    """
+    log_types = ['api', 'audit', 'authenticator', 'controllerManager',
+                 'scheduler']
+    describe = util.AWS_PREFIX + [
+        'eks', 'describe-cluster',
+        '--name', self.name,
+        '--region', self.region,
+    ]
+    stdout, _, _ = vm_util.IssueCommand(describe)
+    info = json.loads(stdout)
+    current = info['cluster'].get('logging', {}).get('clusterLogging', [])
+    any_enabled = any(entry.get('enabled', False) for entry in current)
+    new_enabled = not any_enabled
+    logging_payload = json.dumps({
+        'clusterLogging': [
+            {'types': log_types, 'enabled': new_enabled}
+        ]
+    })
+    update = util.AWS_PREFIX + [
+        'eks', 'update-cluster-config',
+        '--name', self.name,
+        '--region', self.region,
+        '--logging', logging_payload,
+    ]
+    vm_util.IssueCommand(update, timeout=900)
+
+    @vm_util.Retry(
+        poll_interval=5,
+        fuzz=0,
+        timeout=900,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
+    def _wait_active():
+      query = util.AWS_PREFIX + [
+          'eks', 'describe-cluster',
+          '--name', self.name,
+          '--region', self.region,
+          '--query', 'cluster.status',
+          '--output', 'text',
+      ]
+      out, _, _ = vm_util.IssueCommand(query)
+      status = out.strip()
+      if status != 'ACTIVE':
+        raise errors.Resource.RetryableCreationError(
+            f'cluster status={status}'
+        )
+
+    _wait_active()
 
 
 class EksAutoCluster(BaseEksCluster):

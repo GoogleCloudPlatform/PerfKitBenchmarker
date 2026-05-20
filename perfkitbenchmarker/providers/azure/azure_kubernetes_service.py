@@ -15,6 +15,7 @@
 """Contains classes/functions related to Azure Kubernetes Service."""
 
 import json
+import time
 from typing import Any, List
 
 from absl import flags
@@ -154,8 +155,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
   def _IsAutoscalerEnabled(self, nodepool_config: container.BaseNodePoolConfig):
     """Returns True if the cluster autoscaler is enabled."""
     return (
-        nodepool_config.min_nodes
-        != nodepool_config.max_nodes
+        nodepool_config.min_nodes != nodepool_config.max_nodes
         # Auto node provisioning mode is incompatible with cluster autoscaler.
     ) and not FLAGS.azure_aks_auto_node_provisioning
 
@@ -204,34 +204,19 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     if FLAGS.azure_aks_auto_node_provisioning:
       # For provision_node_pools benchmark, add auto provisioning mode
       cmd.append('--node-provisioning-mode=auto')
-
-    self._RunCreateClusterCmd(cmd)
+    # TODO(pclay): expose quota and capacity errors
+    # Creating an AKS cluster with a fresh service principal usually fails due
+    # to a race condition. Active Directory knows the service principal exists,
+    # but AKS does not. (https://github.com/Azure/azure-cli/issues/9585)
+    # Use 5 min timeout on service principle retry. cmd will fail fast.
+    vm_util.Retry(timeout=300)(vm_util.IssueCommand)(
+        cmd,
+        # Half hour timeout on creating the cluster.
+        timeout=1800,
+    )
 
     for _, nodepool in self.nodepools.items():
       self._CreateNodePool(nodepool)
-
-  @vm_util.Retry(
-      timeout=3600,
-      retryable_exceptions=(errors.Resource.RetryableCreationError,),
-  )
-  def _RunCreateClusterCmd(self, cmd: list[str]):
-    """Runs the create cluster command, retrying on race condition errors."""
-    try:
-      _, err, retcode = vm_util.IssueCommand(
-          cmd,
-          # Half hour timeout on creating the cluster.
-          timeout=1800,
-          raise_on_failure=False,
-      )
-    except errors.VmUtil.IssueCommandTimeoutError as e:
-      retcode = 1
-      err = str(e)
-    if retcode:
-      if 'InvalidOutputTable' in err:
-        # This is a race condition where the logs analytics workspace hasn't
-        # finished being created. Retrying solves it.
-        raise errors.Resource.RetryableCreationError(err)
-      raise errors.Resource.CreationError(err)
 
   def _CreateNodePool(self, nodepool_config: container.BaseNodePoolConfig):
     """Creates a node pool."""
@@ -265,7 +250,9 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         raise errors.Resource.CreationError(stderr)
 
   def _GetNodeFlags(
-      self, nodepool_config: container.BaseNodePoolConfig
+      self,
+      nodepool_config: container.BaseNodePoolConfig,
+      version_override: str | None = None,
   ) -> List[str]:
     """Common flags for create and nodepools add."""
     args = [] + self.resource_group.args
@@ -288,8 +275,9 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
       args += ['--zones', zones]
     if self.default_nodepool.disk_size:
       args += ['--node-osdisk-size', str(self.default_nodepool.disk_size)]
-    if self.cluster_version:
-      args += ['--kubernetes-version', self.cluster_version]
+    version = version_override or self.cluster_version
+    if version:
+      args += ['--kubernetes-version', version]
     return args
 
   def _Exists(self):
@@ -539,6 +527,338 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         spot=FLAGS.azure_low_priority_vms,
     )
 
+  def CreateNodePool(
+      self,
+      nodepool_config: container.BaseNodePoolConfig,
+      node_version: str | None = None,
+  ) -> None:
+    """Creates a single named node pool on the cluster."""
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'nodepool',
+        'add',
+        '--cluster-name',
+        self.name,
+        '--name',
+        _AzureNodePoolName(nodepool_config.name),
+        '--labels',
+        f'pkb_nodepool={nodepool_config.name}',
+    ] + self._GetNodeFlags(nodepool_config, version_override=node_version)
+    _, stderr, retcode = vm_util.IssueCommand(
+        cmd, timeout=1800, raise_on_failure=False
+    )
+    if retcode:
+      raise errors.Resource.CreationError(stderr)
+
+  def DeleteNodePool(self, name: str) -> None:
+    """Deletes the named node pool."""
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'nodepool',
+        'delete',
+        '--cluster-name',
+        self.name,
+        '--name',
+        _AzureNodePoolName(name),
+        '--yes',
+    ] + self.resource_group.args
+    vm_util.IssueCommand(cmd, timeout=1800)
+
+  def UpgradeNodePool(self, name: str, target_version: str) -> None:
+    """Upgrades the named node pool to target_version."""
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'nodepool',
+        'upgrade',
+        '--cluster-name',
+        self.name,
+        '--name',
+        _AzureNodePoolName(name),
+        '--kubernetes-version',
+        target_version,
+        '--yes',
+    ] + self.resource_group.args
+    vm_util.IssueCommand(cmd, timeout=1800)
+
+  def UpdateCluster(self) -> None:
+    """Real cluster-level update via a unique-timestamp tag change.
+
+    Triggers a control-plane operation (cluster-scoped, not pool-scoped) by
+    updating the cluster tags. Always succeeds because the tag value changes
+    every call.
+    """
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'update',
+        '--name',
+        self.name,
+        '--tags',
+        f'k8s-mgmt-ts={int(time.time())}',
+    ] + self.resource_group.args
+    vm_util.IssueCommand(cmd, timeout=1800)
+
+  # ---- Async variants (return opaque handles) -------------------------------
+
+  def CreateNodePoolAsync(
+      self,
+      nodepool_config: container.BaseNodePoolConfig,
+      node_version: str | None = None,
+  ) -> str:
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'nodepool',
+        'add',
+        '--cluster-name',
+        self.name,
+        '--name',
+        _AzureNodePoolName(nodepool_config.name),
+        '--labels',
+        f'pkb_nodepool={nodepool_config.name}',
+        '--no-wait',
+    ] + self._GetNodeFlags(nodepool_config, version_override=node_version)
+    _, stderr, retcode = vm_util.IssueCommand(
+        cmd, timeout=300, raise_on_failure=False
+    )
+    if retcode:
+      raise errors.Resource.CreationError(stderr)
+    return f'np_succeeded:{_AzureNodePoolName(nodepool_config.name)}'
+
+  def UpgradeNodePoolAsync(self, name: str, target_version: str) -> str:
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'nodepool',
+        'upgrade',
+        '--cluster-name',
+        self.name,
+        '--name',
+        _AzureNodePoolName(name),
+        '--kubernetes-version',
+        target_version,
+        '--no-wait',
+        '--yes',
+    ] + self.resource_group.args
+    _, stderr, retcode = vm_util.IssueCommand(
+        cmd, timeout=300, raise_on_failure=False
+    )
+    if retcode:
+      raise errors.Resource.CreationError(stderr)
+    return f'np_succeeded:{_AzureNodePoolName(name)}'
+
+  def DeleteNodePoolAsync(self, name: str) -> str:
+    cmd = [
+        azure.AZURE_PATH,
+        'aks',
+        'nodepool',
+        'delete',
+        '--cluster-name',
+        self.name,
+        '--name',
+        _AzureNodePoolName(name),
+        '--no-wait',
+        '--yes',
+    ] + self.resource_group.args
+    _, stderr, retcode = vm_util.IssueCommand(
+        cmd, timeout=300, raise_on_failure=False
+    )
+    if retcode:
+      raise errors.Resource.CreationError(stderr)
+    return f'np_gone:{_AzureNodePoolName(name)}'
+
+  def UpdateClusterAsync(self) -> str:
+    """Triggers a node-count scale on the system node pool to create a
+    long-running cluster update for Scenario B overlap testing.
+
+    Scaling the system pool by ±1 node takes 3-8 minutes on AKS, which
+    creates a meaningful overlap window for the concurrent NodePool create.
+    The scale alternates +1/-1 each call so it is always a real change.
+    Falls back to a tag update if the system pool cannot be identified.
+    """
+    # Find the system node pool name
+    list_cmd = [
+        azure.AZURE_PATH, 'aks', 'nodepool', 'list',
+        '--cluster-name', self.name,
+        '--query', '[?mode==`System`].{name:name,count:count}',
+        '--output', 'json',
+    ] + self.resource_group.args
+    out, _, rc = vm_util.IssueCommand(list_cmd, raise_on_failure=False)
+    if not rc and out.strip():
+      try:
+        pools = json.loads(out.strip())
+        if pools:
+          pool_name = pools[0]['name']
+          current_count = int(pools[0]['count'])
+          # Toggle: scale to current+1 or current-1 (minimum 1)
+          new_count = current_count + 1 if current_count <= 1 else current_count - 1
+          scale_cmd = [
+              azure.AZURE_PATH, 'aks', 'nodepool', 'scale',
+              '--cluster-name', self.name,
+              '--name', pool_name,
+              '--node-count', str(new_count),
+              '--no-wait',
+          ] + self.resource_group.args
+          _, stderr, retcode = vm_util.IssueCommand(
+              scale_cmd, timeout=300, raise_on_failure=False
+          )
+          if not retcode:
+            logging.info(
+                '[AKS] UpdateClusterAsync: scaling system pool %s %d->%d',
+                pool_name, current_count, new_count,
+            )
+            return 'cluster_succeeded'
+      except (ValueError, KeyError, json.JSONDecodeError) as e:
+        logging.warning('[AKS] UpdateClusterAsync: pool parse error: %s', e)
+    # Fallback: tag update
+    logging.warning('[AKS] UpdateClusterAsync: falling back to tag update')
+    cmd = [
+        azure.AZURE_PATH, 'aks', 'update',
+        '--name', self.name,
+        '--tags', f'k8s-mgmt-ts={int(time.time())}',
+        '--no-wait',
+    ] + self.resource_group.args
+    _, stderr, retcode = vm_util.IssueCommand(
+        cmd, timeout=300, raise_on_failure=False
+    )
+    if retcode:
+      raise errors.Resource.CreationError(stderr)
+    return 'cluster_succeeded'
+
+  def ResolveNodePoolVersions(self) -> tuple[str, str]:
+    """Returns (initial, target) AKS node pool versions.
+
+    Uses cluster_version (already set) rather than querying kubectl.
+    initial = N-1 (adjacent minor below cluster version)
+    target  = N   (cluster version = latest)
+    """
+    cluster_ver = self.cluster_version or self.k8s_version
+    parts = cluster_ver.lstrip('v').split('.')
+    major, minor = int(parts[0]), int(parts[1])
+    target  = f'{major}.{minor}'
+    initial = f'{major}.{minor - 1}'
+    logging.info(
+        '[AKS] ResolveNodePoolVersions: cluster=%s initial=%s target=%s',
+        cluster_ver, initial, target,
+    )
+    return initial, target
+
+  def WaitForOperation(self, op_handle: str) -> None:
+    """Polls AKS resources until the expected terminal state is observed."""
+    kind, _, name = op_handle.partition(':')
+
+    @vm_util.Retry(
+        poll_interval=5,
+        fuzz=0,
+        timeout=3600,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
+    def _wait_np_succeeded():
+      out, err, rc = vm_util.IssueCommand(
+          [
+              azure.AZURE_PATH,
+              'aks',
+              'nodepool',
+              'show',
+              '--cluster-name',
+              self.name,
+              '--name',
+              name,
+              '--query',
+              'provisioningState',
+              '--output',
+              'tsv',
+          ]
+          + self.resource_group.args,
+          raise_on_failure=False,
+      )
+      if rc:
+        raise errors.Resource.RetryableCreationError(err)
+      status = out.strip()
+      if status == 'Succeeded':
+        return
+      if status == 'Failed':
+        raise errors.Resource.CreationError(
+            f'nodepool {name} ended in Failed'
+        )
+      raise errors.Resource.RetryableCreationError(
+          f'nodepool {name} state={status}'
+      )
+
+    @vm_util.Retry(
+        poll_interval=5,
+        fuzz=0,
+        timeout=3600,
+        retryable_exceptions=(errors.Resource.RetryableDeletionError,),
+    )
+    def _wait_np_gone():
+      _, err, rc = vm_util.IssueCommand(
+          [
+              azure.AZURE_PATH,
+              'aks',
+              'nodepool',
+              'show',
+              '--cluster-name',
+              self.name,
+              '--name',
+              name,
+          ]
+          + self.resource_group.args,
+          raise_on_failure=False,
+      )
+      if rc and ('NotFound' in (err or '') or 'not found' in (err or '').lower()):
+        return
+      if rc:
+        raise errors.Resource.RetryableDeletionError(err)
+      raise errors.Resource.RetryableDeletionError(
+          f'nodepool {name} still present'
+      )
+
+    @vm_util.Retry(
+        poll_interval=5,
+        fuzz=0,
+        timeout=3600,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
+    def _wait_cluster_succeeded():
+      out, err, rc = vm_util.IssueCommand(
+          [
+              azure.AZURE_PATH,
+              'aks',
+              'show',
+              '--name',
+              self.name,
+              '--query',
+              'provisioningState',
+              '--output',
+              'tsv',
+          ]
+          + self.resource_group.args,
+          raise_on_failure=False,
+      )
+      if rc:
+        raise errors.Resource.RetryableCreationError(err)
+      status = out.strip()
+      if status == 'Succeeded':
+        return
+      if status == 'Failed':
+        raise errors.Resource.CreationError('cluster update ended in Failed')
+      raise errors.Resource.RetryableCreationError(
+          f'cluster state={status}'
+      )
+
+    if kind == 'np_succeeded':
+      _wait_np_succeeded()
+    elif kind == 'np_gone':
+      _wait_np_gone()
+    elif kind == 'cluster_succeeded':
+      _wait_cluster_succeeded()
+    else:
+      raise ValueError(f'Unknown AKS op handle: {op_handle!r}')
+
 
 class AksAutomaticCluster(AksCluster):
   """Class representing an AKS Automatic cluster, which has managed node pools.
@@ -576,7 +896,11 @@ class AksAutomaticCluster(AksCluster):
         'automatic',
         '--tags',
     ] + tags_list
-    self._RunCreateClusterCmd(cmd)
+    vm_util.IssueCommand(
+        cmd,
+        # Half hour timeout on creating the cluster.
+        timeout=1800,
+    )
 
   def _CreateRoleAssignment(self):
     """Creates a role assignment for the current user."""

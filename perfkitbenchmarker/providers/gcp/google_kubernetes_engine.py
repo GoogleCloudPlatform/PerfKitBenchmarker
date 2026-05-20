@@ -18,6 +18,7 @@ import logging
 import math
 import os
 import re
+import time
 import typing
 from typing import Any
 
@@ -26,6 +27,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import virtual_machine_spec
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
@@ -638,6 +640,200 @@ class GkeCluster(BaseGkeCluster):
     if node_pool != container_cluster.DEFAULT_NODEPOOL:
       cmd.flags['node-pool'] = node_pool
     cmd.Issue()
+
+  def CreateNodePool(
+      self,
+      nodepool_config: container.BaseNodePoolConfig,
+      node_version: str | None = None,
+  ) -> None:
+    """Creates a single named node pool on the cluster."""
+    cmd = self._GcloudCommand(
+        'container',
+        'node-pools',
+        'create',
+        nodepool_config.name,
+        '--cluster',
+        self.name,
+    )
+    self._AddNodeParamsToCmd(nodepool_config, cmd)
+    if node_version:
+      cmd.flags['node-version'] = node_version
+    self._IssueResourceCreationCommand(cmd)
+
+  def DeleteNodePool(self, name: str) -> None:
+    """Deletes the named node pool."""
+    cmd = self._GcloudCommand(
+        'container',
+        'node-pools',
+        'delete',
+        name,
+        '--cluster',
+        self.name,
+    )
+    cmd.args.append('--quiet')
+    cmd.Issue(timeout=ONE_HOUR)
+
+  def UpgradeNodePool(self, name: str, target_version: str) -> None:
+    """Upgrades the named node pool to target_version."""
+    cmd = self._GcloudCommand(
+        'container',
+        'clusters',
+        'upgrade',
+        self.name,
+        '--node-pool',
+        name,
+        '--cluster-version',
+        target_version,
+    )
+    cmd.args.append('--quiet')
+    cmd.Issue(timeout=ONE_HOUR)
+
+  def UpdateCluster(self) -> None:
+    """Real cluster-level update via a unique-timestamp label change.
+
+    Triggers an actual control-plane operation (cluster-level, not nodepool)
+    without destructively altering cluster configuration. Always succeeds
+    because the label value changes every call.
+    """
+    cmd = self._GcloudCommand('container', 'clusters', 'update', self.name)
+    cmd.flags['update-labels'] = f'k8s-mgmt-ts={int(time.time())}'
+    cmd.Issue(timeout=ONE_HOUR)
+
+  # ---- Async variants (return opaque handles) -------------------------------
+
+  def _IssueAsync(self, cmd: util.GcloudCommand) -> str:
+    """Issues a gcloud command with --async, returns the operation name."""
+    cmd.args.append('--async')
+    cmd.flags['format'] = 'value(name)'
+    stdout, stderr, retcode = cmd.Issue(timeout=600, raise_on_failure=False)
+    if retcode:
+      raise errors.Resource.CreationError(stderr)
+    op_name = stdout.strip().splitlines()[-1].strip() if stdout else ''
+    if not op_name:
+      raise errors.Resource.CreationError(
+          f'GKE async command returned no operation name; stderr={stderr}'
+      )
+    return op_name
+
+  def CreateNodePoolAsync(
+      self,
+      nodepool_config: container.BaseNodePoolConfig,
+      node_version: str | None = None,
+  ) -> str:
+    cmd = self._GcloudCommand(
+        'container',
+        'node-pools',
+        'create',
+        nodepool_config.name,
+        '--cluster',
+        self.name,
+    )
+    self._AddNodeParamsToCmd(nodepool_config, cmd)
+    if node_version:
+      cmd.flags['node-version'] = node_version
+    # --async is incompatible with the long --timeout flag in some gcloud
+    # builds; remove it so the CLI just hands back the op name immediately.
+    cmd.flags.pop('timeout', None)
+    return self._IssueAsync(cmd)
+
+  def UpgradeNodePoolAsync(self, name: str, target_version: str) -> str:
+    cmd = self._GcloudCommand(
+        'container',
+        'clusters',
+        'upgrade',
+        self.name,
+        '--node-pool',
+        name,
+        '--cluster-version',
+        target_version,
+    )
+    cmd.args.append('--quiet')
+    return self._IssueAsync(cmd)
+
+  def DeleteNodePoolAsync(self, name: str) -> str:
+    cmd = self._GcloudCommand(
+        'container',
+        'node-pools',
+        'delete',
+        name,
+        '--cluster',
+        self.name,
+    )
+    cmd.args.append('--quiet')
+    return self._IssueAsync(cmd)
+
+  def UpdateClusterAsync(self) -> str:
+    cmd = self._GcloudCommand('container', 'clusters', 'update', self.name)
+    cmd.flags['update-labels'] = f'k8s-mgmt-ts={int(time.time())}'
+    return self._IssueAsync(cmd)
+
+  def ResolveNodePoolVersions(self) -> tuple[str, str]:
+    """Returns (initial, target) GKE node versions: initial=N-1, target=N.
+
+    GKE requires fully-qualified node versions (e.g. '1.34.4-gke.1234'),
+    so we query `gcloud container get-server-config` and pick the newest
+    valid version per minor.
+    """
+    cmd = self._GcloudCommand('container', 'get-server-config')
+    cmd.flags['format'] = 'json'
+    stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)
+    if retcode:
+      raise errors.Resource.GetError(
+          f'gcloud get-server-config failed: {stderr}'
+      )
+    config = json.loads(stdout)
+    valid = list(config.get('validNodeVersions', []))
+    if not valid:
+      raise errors.Resource.GetError(
+          'GKE get-server-config returned no validNodeVersions'
+      )
+
+    def _version_tuple(v):
+      return tuple(int(x) for x in v.split('-', 1)[0].split('.'))
+
+    valid.sort(key=_version_tuple, reverse=True)
+    target = valid[0]
+    initial_minor = kubernetes_cluster.AdjacentMinorBelow(target)
+    for v in valid:
+      if kubernetes_cluster.BareMinor(v) == initial_minor:
+        return v, target
+    raise errors.Resource.GetError(
+        f'No GKE node version found for minor {initial_minor!r}; '
+        f'available top 5: {valid[:5]}'
+    )
+
+  def WaitForOperation(self, op_handle: str) -> None:
+    """Polls a GKE operation until terminal; raises on failure."""
+
+    @vm_util.Retry(
+        poll_interval=5,
+        fuzz=0,
+        timeout=ONE_HOUR,
+        retryable_exceptions=(errors.Resource.RetryableCreationError,),
+    )
+    def _poll():
+      describe = self._GcloudCommand(
+          'container',
+          'operations',
+          'describe',
+          op_handle,
+          '--format=value(status)',
+      )
+      out, err, rc = describe.Issue(raise_on_failure=False)
+      if rc:
+        raise errors.Resource.RetryableCreationError(
+            f'describe op failed: {err}'
+        )
+      status = out.strip()
+      if status == 'DONE':
+        return
+      if status in ('ABORTING', 'ABORTED'):
+        raise errors.Resource.CreationError(f'op {op_handle} aborted')
+      raise errors.Resource.RetryableCreationError(
+          f'op {op_handle} status={status}'
+      )
+
+    _poll()
 
 
 class GkeAutopilotCluster(BaseGkeCluster):
