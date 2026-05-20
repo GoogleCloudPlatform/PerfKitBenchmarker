@@ -927,7 +927,11 @@ class AzureVirtualMachine(
         )
     security_args = []
     secure_boot_args = []
-    # if machine is confidential or trusted launch, we can update secure boot
+    if enable_secure_boot is not None:
+      secure_boot_args = [
+          '--enable-secure-boot',
+          str(enable_secure_boot).lower(),
+      ]
     if self.machine_type_is_confidential:
       security_args = [
           '--enable-vtpm',
@@ -937,15 +941,20 @@ class AzureVirtualMachine(
           '--os-disk-security-encryption-type',
           'VMGuestStateOnly',
       ]
-      if enable_secure_boot is None:
-        secure_boot_args = [
-            '--enable-secure-boot',
-            'true',
-        ]
-    if enable_secure_boot is not None:
-      secure_boot_args = [
-          '--enable-secure-boot',
-          str(enable_secure_boot).lower(),
+    elif (
+        not self.trusted_launch_unsupported_type
+        and not self.machine_type_is_confidential
+    ):  # Trusted Launch
+      # If we don't specify TrustedLaunch security type, Azure will default to
+      # Standard.
+      security_args = [
+          '--security-type',
+          'TrustedLaunch',
+      ]
+    else:
+      # Default to Standard security type.
+      security_args = [
+          '--security-type', 'Standard',
       ]
 
     tags = {}
@@ -991,8 +1000,6 @@ class AzureVirtualMachine(
         create_cmd.extend(['--disk-controller-type', 'NVMe'])
       else:
         create_cmd.extend(['--disk-controller-type', 'SCSI'])
-    if self.trusted_launch_unsupported_type:
-      create_cmd.extend(['--security-type', 'Standard'])
     if self.boot_startup_script:
       create_cmd.extend(['--custom-data', self.boot_startup_script])
 
