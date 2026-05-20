@@ -520,13 +520,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
         stats.packet_loss_rate = stats.GetPacketLossRate()
         if stats.packet_loss_rate > packet_loss_threshold:
           fail_count += 1
+          if curr_run.sender_tx_pkts is None:
+            curr_run = stats
         else:
           pass_count += 1
-          if curr_run.sender_tx_pkts is None or (
-              int(stats.receiver_rx_pkts) > int(curr_run.receiver_rx_pkts)
-          ):
-            # This is a valid run, save the results.
-            curr_run = stats
+          curr_run = stats
 
       if fail_count > max_failed_runs:
         ub = curr_rate
