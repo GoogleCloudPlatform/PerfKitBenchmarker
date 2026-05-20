@@ -18,7 +18,6 @@ import functools
 import unittest
 from absl import flags
 import mock
-from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import context
 from perfkitbenchmarker import pkb
@@ -54,12 +53,13 @@ class TestBackgroundWorkloadFramework(pkb_common_test_case.PkbCommonTestCase):
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         NAME, flag_values=FLAGS, **config
     )
-    spec = benchmark_spec.BenchmarkSpec(ping_benchmark, config_spec, UID)
+    spec = pkb_common_test_case.TestBenchmarkSpec(
+        ping_benchmark, config_spec, UID
+    )
     vm0 = mock.MagicMock()
     vm1 = mock.MagicMock()
     vm0.IsInterruptible = mock.MagicMock(return_value=False)
     vm1.IsInterruptible = mock.MagicMock(return_value=False)
-    spec.ConstructVirtualMachines()
     spec.vms = [vm0, vm1]
     timer = timing_util.IntervalTimer()
     pkb.DoPreparePhase(spec, timer)

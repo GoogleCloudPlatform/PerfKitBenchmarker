@@ -72,7 +72,7 @@ def Run(_) -> List[sample.Sample]:
   # This command failing after the bucket is ready would be absolutely, totally,
   # and in all other ways inconceivable, but it is possible the first upload
   # might take extra time.
-  service.Copy('/dev/null', bucket)
+  service.CopyToBucket('/dev/null', bucket, 'null')
   object_created_time = time.time()
 
   metadata = {'object_storage_region': FLAGS.object_storage_region}

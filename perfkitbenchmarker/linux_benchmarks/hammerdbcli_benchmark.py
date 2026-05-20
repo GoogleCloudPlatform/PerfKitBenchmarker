@@ -201,6 +201,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       password=db.spec.database_password,
       user=db.spec.database_username,
       is_managed_azure=(FLAGS.cloud == 'Azure' and FLAGS.use_managed_db),
+      db_engine_version=db.spec.engine_version,
   )
 
   if db.engine == sql_engine_utils.ALLOYDB:

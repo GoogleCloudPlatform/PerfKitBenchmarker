@@ -468,6 +468,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       rx_cmd: str,
       packet_loss_threshold: float,
       pktgen_default_rate: float,
+      best_config_receiver_pps: int,
   ) -> PktgenStats:
     """Runs a binary search to find the max PPS for a given configuration."""
     valid_run = PktgenStats(packet_loss_rate=1.0)
@@ -481,11 +482,20 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     max_failed_runs = runs_per_rate - min_successful_runs
 
     while (
-        (abs(curr_pps - prev_pps) / (curr_pps + 1))
-        > _PPS_BINARY_SEARCH_THRESHOLD
-    ) or (valid_run.receiver_rx_pkts is None):
+        (
+            (abs(curr_pps - prev_pps) / (curr_pps + 1))
+            > _PPS_BINARY_SEARCH_THRESHOLD
+        )
+        or (valid_run.receiver_rx_pkts is None)
+    ) and (ub >= best_config_receiver_pps):
       if curr_rate is None:
-        curr_rate = _DPDK_PKTGEN_INITIAL_RATE.value
+        # If the best config receiver PPS is known from a previous
+        # configuration run, use it as the starting rate.
+        # Otherwise, start with the default rate.
+        if best_config_receiver_pps > 0:
+          curr_rate = best_config_receiver_pps
+        else:
+          curr_rate = _DPDK_PKTGEN_INITIAL_RATE.value
       else:
         curr_rate = (lb + ub) // 2
       run_count, fail_count, pass_count = 0, 0, 0
@@ -510,13 +520,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
         stats.packet_loss_rate = stats.GetPacketLossRate()
         if stats.packet_loss_rate > packet_loss_threshold:
           fail_count += 1
+          if curr_run.sender_tx_pkts is None:
+            curr_run = stats
         else:
           pass_count += 1
-          if curr_run.sender_tx_pkts is None or (
-              int(stats.receiver_rx_pkts) > int(curr_run.receiver_rx_pkts)
-          ):
-            # This is a valid run, save the results.
-            curr_run = stats
+          curr_run = stats
 
       if fail_count > max_failed_runs:
         ub = curr_rate
@@ -573,7 +581,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       )
       # Find the max rate for this specific core configuration
       stats = _FindMaxRateFromConfig(
-          tx_cmd, rx_cmd, packet_loss_threshold, prev_rate
+          tx_cmd,
+          rx_cmd,
+          packet_loss_threshold,
+          prev_rate,
+          max_receiver_pkts // _DPDK_PKTGEN_DURATION.value,
       )
       s_tx, s_rx, r_rx, loss = (
           stats.sender_tx_pkts,

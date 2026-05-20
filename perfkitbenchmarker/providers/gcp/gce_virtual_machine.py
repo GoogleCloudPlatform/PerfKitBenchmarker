@@ -95,7 +95,9 @@ _FAILED_TO_START_DUE_TO_PREEMPTION = (
 _GCE_VM_CREATE_TIMEOUT = 1200
 _GCE_NVIDIA_GPU_PREFIX = 'nvidia-'
 _GCE_NVIDIA_TESLA_GPU_PREFIX = 'nvidia-tesla-'
-_SHUTDOWN_SCRIPT = 'su "{user}" -c "echo | gsutil cp - {preempt_marker}"'
+_SHUTDOWN_SCRIPT = (
+    'su "{user}" -c "echo | gcloud storage cp - {preempt_marker}"'
+)
 METADATA_PREEMPT_URI = (
     'http://metadata.google.internal/computeMetadata/v1/instance/preempted'
 )
@@ -1834,6 +1836,12 @@ class CosDevBasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-dev'
 
 
+class Cos129BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
+  OS_TYPE = os_types.COS129
+  DEFAULT_X86_IMAGE_FAMILY = 'cos-129-lts'
+  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-129-lts'
+
+
 class Cos125BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS125
   DEFAULT_X86_IMAGE_FAMILY = 'cos-125-lts'
@@ -1850,12 +1858,6 @@ class Cos117BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
   OS_TYPE = os_types.COS117
   DEFAULT_X86_IMAGE_FAMILY = 'cos-117-lts'
   DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-117-lts'
-
-
-class Cos113BasedGceVirtualMachine(BaseCosBasedGceVirtualMachine):
-  OS_TYPE = os_types.COS113
-  DEFAULT_X86_IMAGE_FAMILY = 'cos-113-lts'
-  DEFAULT_ARM_IMAGE_FAMILY = 'cos-arm64-113-lts'
 
 
 class CoreOsBasedGceVirtualMachine(

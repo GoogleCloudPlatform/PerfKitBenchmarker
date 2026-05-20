@@ -1171,7 +1171,11 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     self._WaitForSSH(self.internal_ip)
     self.ssh_internal_time = time.time()
 
-  @vm_util.Retry(log_errors=False, poll_interval=1)
+  @vm_util.Retry(
+      log_errors=False,
+      poll_interval=1,
+      retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,),
+  )
   def _WaitForSSH(self, ip_address: Union[str, None] = None):
     """Waits until the VM is ready."""
     # Always wait for remote host command to succeed, because it is necessary to

@@ -817,6 +817,7 @@ class GceNetworkResource(resource.BaseResource):
     """Deletes the Network resource."""
     if FLAGS.gce_firewall_rules_clean_all:
       for firewall_rule in self._GetAllFirewallRules():
+        firewall_rule.created = True
         firewall_rule.Delete()
 
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'delete', self.name)

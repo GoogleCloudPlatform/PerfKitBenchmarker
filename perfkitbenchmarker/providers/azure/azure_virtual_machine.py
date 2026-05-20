@@ -57,7 +57,6 @@ from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.azure import util
 import yaml
 
-
 FLAGS = flags.FLAGS
 
 
@@ -134,6 +133,18 @@ NUM_LOCAL_VOLUMES: dict[str, int] = {
     'Standard_D96ads_v7': 6,
     'Standard_D128ads_v7': 4,
     'Standard_D160ads_v7': 4,
+    'Standard_D2ds_v7': 1,
+    'Standard_D4ds_v7': 1,
+    'Standard_D8ds_v7': 1,
+    'Standard_D16ds_v7': 2,
+    'Standard_D32ds_v7': 4,
+    'Standard_D48ds_v7': 6,
+    'Standard_D64ds_v7': 4,
+    'Standard_D96ds_v7': 6,
+    'Standard_D128ds_v7': 4,
+    'Standard_D192ds_v7': 6,
+    'Standard_D248ds_v7': 5,
+    'Standard_D372ds_v7': 6,
 }
 
 _MACHINE_TYPES_ONLY_SUPPORT_GEN1_IMAGES = (
@@ -861,6 +872,8 @@ class AzureVirtualMachine(
     for nic in self.nics:
       nic.Create()
 
+    self.AllowRemoteAccessPorts()
+
     if self.use_dedicated_host:
       with self._lock:
         self.host_list = self.host_map[(self.host_series_sku, self.region)]
@@ -1156,7 +1169,12 @@ class AzureVirtualMachine(
     """Resumes the VM."""
     raise NotImplementedError()
 
-  @vm_util.Retry()
+  @vm_util.Retry(
+      retryable_exceptions=(
+          errors.VmUtil.IssueCommandError,
+          errors.Resource.RetryableCreationError,
+      )
+  )
   def _PostCreate(self):
     """Get VM data."""
     stdout, _ = vm_util.IssueRetryableCommand(
@@ -1168,10 +1186,17 @@ class AzureVirtualMachine(
             'json',
             '--name',
             self.name,
+            '--show-details',
         ]
         + self.resource_group.args
     )
     response = json.loads(stdout)
+    self.internal_ips = response['privateIps'].split(',')
+    self.internal_ip = self.internal_ips[0]
+    if self.public_ips:
+      self.ip_addresses = response['publicIps'].split(',')
+      self.ip_address = self.ip_addresses[0]
+
     self.create_os_disk_strategy.disk.name = response['storageProfile'][
         'osDisk'
     ]['name']
@@ -1188,13 +1213,6 @@ class AzureVirtualMachine(
         ]
         + self.resource_group.args
     )
-    self.internal_ip = self.nics[0].GetInternalIP()
-    self.internal_ips = [nic.GetInternalIP() for nic in self.nics]
-    if self.public_ips:
-      self.ip_address = self.public_ips[0].GetIPAddress()
-      self.ip_addresses = [
-          public_ip.GetIPAddress() for public_ip in self.public_ips
-      ]
 
   def SetupAllScratchDisks(self):
     """Set up all scratch disks of the current VM."""
@@ -1394,22 +1412,35 @@ class Ubuntu2604BasedAzureVirtualMachine(
   ARM_IMAGE_URN = 'Canonical:ubuntu-26_04-lts:server-arm64:latest'
 
 
+class BaseRedHatBasedAzureVirtualMachine(
+    AzureVirtualMachine, linux_virtual_machine.BaseRedHatMixin
+):
+
+  def SetupPackageManager(self):
+    # https://learn.microsoft.com/en-us/troubleshoot/azure/virtual-machines/linux/troubleshoot-linux-rhui-certificate-issues
+    self.RemoteCommand(
+        "sudo dnf update -y --disablerepo='*' --enablerepo='*microsoft-azure*'"
+    )
+    # Install EPEL
+    super().SetupPackageManager()
+
+
 class Rhel8BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Rhel8Mixin
+    BaseRedHatBasedAzureVirtualMachine, linux_virtual_machine.Rhel8Mixin
 ):
   GEN2_IMAGE_URN = 'RedHat:RHEL:8-lvm-gen2:latest'
   GEN1_IMAGE_URN = 'RedHat:RHEL:8-LVM:latest'
 
 
 class Rhel9BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Rhel9Mixin
+    BaseRedHatBasedAzureVirtualMachine, linux_virtual_machine.Rhel9Mixin
 ):
   GEN2_IMAGE_URN = 'RedHat:RHEL:9-lvm-gen2:latest'
   GEN1_IMAGE_URN = 'RedHat:RHEL:9-lvm:latest'
 
 
 class Rhel10BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Rhel10Mixin
+    BaseRedHatBasedAzureVirtualMachine, linux_virtual_machine.Rhel10Mixin
 ):
   GEN2_IMAGE_URN = 'RedHat:RHEL:10-lvm-gen2:latest'
   GEN1_IMAGE_URN = 'RedHat:RHEL:10-lvm:latest'

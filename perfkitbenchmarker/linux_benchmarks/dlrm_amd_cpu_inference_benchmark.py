@@ -118,7 +118,9 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       ' ./miniconda3/bin/conda create -n pace-env-py3.9 python=3.9 -y;'
       ' ./miniconda3/bin/conda init'
   )
-  vm.RemoteCommand(f'{_SET_ENV} conda install -c conda-forge gcc=12.1.0 -y')
+  vm.RemoteCommand(
+      f'{_SET_ENV} conda install -c conda-forge gcc=12.1.0 --solver=classic -y'
+  )
   vm.RemoteCommand(f'{_SET_ENV} bash prepare_env.sh')
 
 

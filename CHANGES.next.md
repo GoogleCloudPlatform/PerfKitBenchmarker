@@ -212,7 +212,7 @@
 -   Add support for multi-network creation/attachment. PKB currently does not
     handle subnet creation on an existing network.
 -   Add support for GCE Confidential VM's.
--   Add cos-dev, cos125, cos121, cos117, and cos113 OS support for GCP.
+-   Add cos-dev, cos129, cos125, cos121, cos117, and OS support for GCP.
 -   Add --object_ttl_days flag for lifecycle management of created buckets.
 -   Add support for multi-NIC netperf throughput on AWS.
 -   Added AWS/GCP support for Data Plane Development Kit (DPDK) on Linux VM's to
@@ -672,3 +672,6 @@
     general solution that can be used with or instead of --ycsb_max_error_rate
     and --ycsb_fail_on_incomplete_loading.
 -   Support basic TPU vm provisioning.
+-   Set firewall rule as PKB-created before deletion when using
+    --gce_firewall_rules_clean_all.
+-   Added gke_kubernetes_nginx to default benchmark config.

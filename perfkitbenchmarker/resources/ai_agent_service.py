@@ -29,6 +29,19 @@ class BaseAiAgentService(resource.BaseResource):
     self.client_vm = client_vm
     self.spec = ai_agent_spec
 
+  def _CreateDependencies(self):
+    """Creates common dependencies and executes custom deployment logic."""
+    self._EnsureObjectStorage()
+    self._StageAgentCode()
+
+  @abc.abstractmethod
+  def _EnsureObjectStorage(self):
+    """Ensures intermediate object storage for Agent communication exists."""
+
+  @abc.abstractmethod
+  def _StageAgentCode(self):
+    """Prepare agent's code for deployment."""
+
   @abc.abstractmethod
   def Execute(
       self,

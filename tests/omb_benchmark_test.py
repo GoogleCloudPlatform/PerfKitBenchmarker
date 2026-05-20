@@ -3,7 +3,6 @@
 import unittest
 from absl.testing import flagsaver
 import mock
-from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker.linux_benchmarks import omb_benchmark
@@ -16,7 +15,7 @@ def MockBenchmarkSpec():
   benchmark_config = mock.Mock(
       vm_groups={}, relational_db=mock.Mock(vm_groups={})
   )
-  spec = benchmark_spec.BenchmarkSpec(
+  spec = pkb_common_test_case.TestBenchmarkSpec(
       benchmark_module, benchmark_config, 'abcdefg'
   )
   spec.vms = [mock.Mock(), mock.Mock()]

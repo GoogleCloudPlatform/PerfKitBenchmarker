@@ -52,6 +52,14 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     'netperf_test_length', 60, 'netperf test length, in seconds', lower_bound=1
 )
+flags.DEFINE_integer(
+    'netperf_warmup_test_length',
+    60,
+    'The duration of the warmup run in seconds. If --netperf_benchmarks'
+    ' contains TCP_RR, a warmup run of this duration will be performed before'
+    ' the benchmark runs. If 0, no warmup is done.',
+    lower_bound=0,
+)
 flags.DEFINE_bool(
     'netperf_enable_histograms',
     True,
@@ -233,6 +241,13 @@ def Prepare(benchmark_spec):
       ],
       2,
   )
+  if (
+      TCP_RR in FLAGS.netperf_benchmarks
+      and FLAGS.netperf_warmup_test_length > 0
+  ):
+    # If TCP_RR is requested, do a warmup run as 1st run performance could be
+    # low due to initial flow setup issue.
+    RunClientServerVMs(client_vm, server_vm, FLAGS.netperf_warmup_test_length)
 
 
 def PrepareClientVM(client_vm):
@@ -470,7 +485,9 @@ def ParseNetperfOutput(
   return (throughput_sample, latency_samples, latency_hist)
 
 
-def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
+def RunNetperf(
+    vm, benchmark_name, server_ips, num_streams, client_ips, test_length
+):
   """Spawns netperf on a remote VM, parses results.
 
   Args:
@@ -479,6 +496,7 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
     server_ips: A list of ips for a machine that is running netserver.
     num_streams: The number of netperf client threads to run.
     client_ips: A list of ips for a machine that is running netperf.
+    test_length: The length of the test in seconds.
 
   Returns:
     A sample.Sample object with the result.
@@ -501,14 +519,19 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
   verbosity = '-v2 ' if enable_latency_histograms else ''
 
   remote_cmd_timeout = (
-      FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300
+      test_length * (FLAGS.netperf_max_iter or 1) + 300
   )
 
   metadata = {
-      'netperf_test_length': FLAGS.netperf_test_length,
+      'netperf_test_length': test_length,
       'sending_thread_count': num_streams,
       'max_iter': FLAGS.netperf_max_iter or 1,
   }
+  if (
+      TCP_RR in FLAGS.netperf_benchmarks
+      and FLAGS.netperf_warmup_test_length > 0
+  ):
+    metadata['netperf_warmup_test_length'] = FLAGS.netperf_warmup_test_length
 
   remote_cmd_list = []
   assert server_ips, 'Server VM does not have an IP to use for netperf.'
@@ -524,7 +547,7 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
         f'-j {verbosity} '
         f'-t OMNI '
         f'-H {server_ip} -L {client_ip} '
-        f'-l {FLAGS.netperf_test_length} {confidence}'
+        f'-l {test_length} {confidence}'
         ' -- '
         f'-T {protocol} '
         f'-d {direction} '
@@ -593,7 +616,7 @@ def RunNetperf(vm, benchmark_name, server_ips, num_streams, client_ips):
   # Give the remote script the max possible test length plus 5 minutes to
   # complete
   remote_cmd_timeout = (
-      FLAGS.netperf_test_length * (FLAGS.netperf_max_iter or 1) + 300
+      test_length * (FLAGS.netperf_max_iter or 1) + 300
   )
   start_time = time.time()
   remote_stdout_stderr_threads = background_tasks.RunThreaded(
@@ -753,16 +776,19 @@ def Run(benchmark_spec):
   return RunClientServerVMs(client_vm, server_vm)
 
 
-def RunClientServerVMs(client_vm, server_vm):
+def RunClientServerVMs(client_vm, server_vm, test_length=None):
   """Runs a netperf process between client_vm and server_vm.
 
   Args:
     client_vm: The VM that runs the netperf binary.
     server_vm: The VM that runs the netserver binary.
+    test_length: The length of the test in seconds. If not specified,
+      FLAGS.netperf_test_length is used.
 
   Returns:
     A list of sample.Sample objects.
   """
+  run_test_length = test_length or FLAGS.netperf_test_length
   logging.info('netperf running on %s', client_vm)
   results = []
   metadata = {
@@ -785,6 +811,7 @@ def RunClientServerVMs(client_vm, server_vm):
             # NAT translates internal to external IP when remote server IP is
             # external.
             [client_vm.GetInternalIPs()[0]],
+            run_test_length,
         )
         for external_ip_result in external_ip_results:
           external_ip_result.metadata['ip_type'] = (
@@ -800,6 +827,7 @@ def RunClientServerVMs(client_vm, server_vm):
             server_vm.GetInternalIPs(),
             num_streams,
             client_vm.GetInternalIPs(),
+            run_test_length,
         )
         for internal_ip_result in internal_ip_results:
           internal_ip_result.metadata.update(metadata)

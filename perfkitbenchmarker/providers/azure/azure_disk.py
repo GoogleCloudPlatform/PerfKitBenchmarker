@@ -424,12 +424,8 @@ class AzureDisk(disk.BaseDisk):
       return '/dev/disk/cloud/azure_resource'
     else:
       try:
-        start_index = 1  # the os drive is always at index 0; skip the OS drive.
         if self.vm.SupportsNVMe():
-          # boot disk is nvme0n1. temp drive, if exists, uses scsi.
-          return '/dev/nvme0n%s' % str(1 + start_index + self.lun)
-        if HasTempDrive(self.machine_type):
-          start_index += 1
+          return f'/dev/disk/azure/data/by-lun/{self.lun}'
         return f'/dev/disk/azure/scsi1/lun{self.lun}'
       except IndexError:
         raise TooManyAzureDisksError()

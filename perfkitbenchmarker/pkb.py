@@ -1814,7 +1814,7 @@ def RunBenchmarks():
     archive.ArchiveRun(
         vm_util.GetTempDir(),
         FLAGS.archive_bucket,
-        gsutil_path=FLAGS.gsutil_path,
+        gcloud_path=FLAGS.gcloud_path,
         prefix=FLAGS.run_uri + '_',
     )
 

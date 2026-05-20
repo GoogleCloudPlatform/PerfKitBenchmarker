@@ -61,22 +61,19 @@ class BaseAiAgentServiceSpec(spec.BaseSpec):
         ),
         'deployment_type': (
             option_decoders.StringDecoder,
-            {
-                'none_ok': False,
-                'default': 'client_vm',
-            },
+            {'default': None, 'none_ok': False},
         ),
         'workload': (
             option_decoders.StringDecoder,
-            {'default': None, 'none_ok': True},
+            {'default': None, 'none_ok': False},
         ),
         'framework': (
             option_decoders.StringDecoder,
-            {'default': None, 'none_ok': True},
+            {'default': 'adk', 'none_ok': False},
         ),
         'model': (
             option_decoders.StringDecoder,
-            {'default': None, 'none_ok': True},
+            {'default': None, 'none_ok': False},
         ),
         'model_location': (
             option_decoders.StringDecoder,
@@ -105,11 +102,11 @@ class VertexAiCustomJobAiAgentServiceSpec(BaseAiAgentServiceSpec):
     result.update({
         'replica_count': (
             option_decoders.IntDecoder,
-            {'default': None, 'none_ok': True},
+            {'default': 1, 'none_ok': False},
         ),
         'machine_type': (
             option_decoders.StringDecoder,
-            {'default': None, 'none_ok': True},
+            {'default': 'n2-standard-8', 'none_ok': False},
         ),
         'executor_image_uri': (
             option_decoders.StringDecoder,
@@ -145,15 +142,6 @@ class AiAgentServiceDecoder(option_decoders.TypeVerifier):
           'Required attribute `deployment_type` missing from '
           f'ai_agent_service spec config {config}.'
       )
-    if deployment_type == 'custom_job':
-      for required_config in (
-          'replica_count',
-          'machine_type',
-      ):
-        if config.get(required_config) is None:
-          raise errors.Config.InvalidValue(
-              f'ai_agent_service.{required_config} config must be present'
-          )
     cloud = config.get('cloud') or (
         flag_values.cloud if 'cloud' in flag_values else None
     )

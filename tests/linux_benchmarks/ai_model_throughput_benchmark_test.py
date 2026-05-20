@@ -20,7 +20,6 @@ from unittest import mock
 from absl import flags
 from absl.testing import flagsaver
 from absl.testing import parameterized
-from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import test_util
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -44,7 +43,7 @@ class AiModelThroughputBenchmarkTest(
     config_spec = benchmark_config_spec.BenchmarkConfigSpec(
         ai_model_throughput_benchmark.BENCHMARK_NAME, flag_values=FLAGS
     )
-    self.bm_spec = benchmark_spec.BenchmarkSpec(
+    self.bm_spec = pkb_common_test_case.TestBenchmarkSpec(
         ai_model_throughput_benchmark, config_spec, 'benchmark_uid'
     )
     self.bm_spec.ai_model = fake_managed_ai_model.FakeManagedAiModel()
@@ -52,7 +51,7 @@ class AiModelThroughputBenchmarkTest(
     self.bm_spec.ai_model.existing_endpoints = [
         'model1',
     ]
-    self.bm_spec.vm_groups = {
+    self.bm_spec.unmanaged_vm_groups = {
         'default': [mock.create_autospec(virtual_machine.BaseVirtualMachine)]
     }
 
