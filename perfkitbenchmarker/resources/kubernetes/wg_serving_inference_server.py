@@ -55,6 +55,31 @@ FLAG_GCS_BUCKET = flags.DEFINE_string(
     'The GCS bucket that has model data for inference server to use.',
 )
 
+FLAG_K8S_INFERENCE_BLOBSTORAGE_ACCOUNT = flags.DEFINE_string(
+    'k8s_inference_server_blobstorage_account',
+    None,
+    'The Azure Storage account hosting the blob container.',
+)
+
+FLAG_K8S_INFERENCE_BLOBSTORAGE_CONTAINER = flags.DEFINE_string(
+    'k8s_inference_server_blobstorage_container',
+    None,
+    'The Azure Blob Storage container that has model data for the inference'
+    ' server to use.',
+)
+
+FLAG_K8S_INFERENCE_BLOBSTORAGE_RESOURCE_GROUP = flags.DEFINE_string(
+    'k8s_inference_server_blobstorage_resource_group',
+    None,
+    'The Azure resource group hosting the storage.',
+)
+
+FLAG_K8S_INFERENCE_BLOBSTORAGE_KEY = flags.DEFINE_string(
+    'k8s_inference_server_blobstorage_key',
+    None,
+    'The Azure Storage account key.',
+)
+
 WG_SERVING_REPO_URL = flags.DEFINE_string(
     'wg_serving_repo_url',
     'https://github.com/kubernetes-sigs/wg-serving',
@@ -1017,10 +1042,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     if 'gcsfuse' in self.spec.catalog_components:
       self._ApplyGCSFusePVC()
     elif 'blobfuse' in self.spec.catalog_components:
-      from perfkitbenchmarker.providers.azure import azure_blob_csi_mount
-      self.created_resources.extend(
-          azure_blob_csi_mount.ApplyBlobFusePVC(self.cluster)
-      )
+      self._ApplyBlobFusePVC()
 
     self._ProvisionGPUNodePool()
 
@@ -1085,6 +1107,38 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         gcs_bucket=FLAG_GCS_BUCKET.value,
     )
     logging.info('Successfully applied GCSFuse PVC.')
+
+  def _ApplyBlobFusePVC(self):
+    """Apply the Azure Blob Storage PV & PVC to the environment."""
+    if not all([
+        FLAG_K8S_INFERENCE_BLOBSTORAGE_ACCOUNT.value,
+        FLAG_K8S_INFERENCE_BLOBSTORAGE_CONTAINER.value,
+        FLAG_K8S_INFERENCE_BLOBSTORAGE_RESOURCE_GROUP.value,
+        FLAG_K8S_INFERENCE_BLOBSTORAGE_KEY.value,
+    ]):
+      raise errors.Resource.CreationError(
+          'Azure Storage account, container, resource group and key are '
+          'required to apply BlobFuse PVC. Set '
+          '--k8s_inference_server_blobstorage_account, '
+          '--k8s_inference_server_blobstorage_container, '
+          '--k8s_inference_server_blobstorage_resource_group, and '
+          '--k8s_inference_server_blobstorage_key.'
+      )
+
+    storage_account = FLAG_K8S_INFERENCE_BLOBSTORAGE_ACCOUNT.value
+    kubernetes_commands.ApplyManifest(
+        'container/kubernetes_ai_inference/blobfuse_pv_pvc.yaml.j2',
+        storage_account=FLAG_K8S_INFERENCE_BLOBSTORAGE_ACCOUNT.value,
+        blob_container=FLAG_K8S_INFERENCE_BLOBSTORAGE_CONTAINER.value,
+        resource_group=FLAG_K8S_INFERENCE_BLOBSTORAGE_RESOURCE_GROUP.value,
+        encoded_account_name=base64.b64encode(
+            storage_account.encode('utf-8')
+        ).decode('utf-8'),
+        encoded_account_key=base64.b64encode(
+            FLAG_K8S_INFERENCE_BLOBSTORAGE_KEY.value.encode('utf-8')
+        ).decode('utf-8'),
+    )
+    logging.info('Successfully applied BlobFuse PVC.')
 
   def _CollectStartupMonitorMetrics(self) -> dict[str, PodStartupMetrics]:
     collected_metrics_map = super()._CollectStartupMonitorMetrics()
