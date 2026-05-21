@@ -1,18 +1,4 @@
 apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: s3-csi-static-pvc
-  namespace: default
-spec:
-  accessModes:
-    - ReadOnlyMany
-  resources:
-    requests:
-      storage: 1200Gi
-  storageClassName: ""
-  volumeName: s3-csi-pv
----
-apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: s3-csi-pv
@@ -20,7 +6,10 @@ spec:
   accessModes:
     - ReadOnlyMany
   capacity:
-    storage: 1200Gi
+    # S3 does not enforce capacity limits and does not charge based on this
+    # value. The field is required by the Kubernetes API but ignored by the
+    # S3 CSI driver. Set to any value; it has no effect on cost or usage.
+    storage: 1Ti
   storageClassName: ""
   mountOptions:
     - allow-other
@@ -33,3 +22,17 @@ spec:
   claimRef:
     name: s3-csi-static-pvc
     namespace: default
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: s3-csi-static-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 1Ti
+  storageClassName: ""
+  volumeName: s3-csi-pv

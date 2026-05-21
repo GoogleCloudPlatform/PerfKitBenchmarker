@@ -11,8 +11,6 @@ spec:
   selector:
     matchLabels:
       name: neuron-device-plugin-ds
-  updateStrategy:
-    type: RollingUpdate
   template:
     metadata:
       labels:
@@ -20,8 +18,6 @@ spec:
     spec:
       serviceAccountName: neuron-device-plugin
       tolerations:
-        - key: CriticalAddonsOnly
-          operator: Exists
         - key: aws.amazon.com/neuron
           operator: Exists
           effect: NoSchedule
@@ -31,6 +27,8 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
+                  # Relies on the eks.amazonaws.com/instance-family label set
+                  # by Karpenter and EKS Auto Mode on Neuron-capable nodes.
                   - key: eks.amazonaws.com/instance-family
                     operator: In
                     values:
@@ -40,23 +38,6 @@ spec:
                       - trn1n
                       - trn2
                       - trn2u
-              - matchExpressions:
-                  - key: node.kubernetes.io/instance-type
-                    operator: In
-                    values:
-                      - inf1.xlarge
-                      - inf1.2xlarge
-                      - inf1.6xlarge
-                      - inf1.24xlarge
-                      - inf2.xlarge
-                      - inf2.4xlarge
-                      - inf2.8xlarge
-                      - inf2.24xlarge
-                      - inf2.48xlarge
-                      - trn1.2xlarge
-                      - trn1.32xlarge
-                      - trn1n.32xlarge
-                      - trn2.48xlarge
       containers:
         - image: {{ neuron_device_plugin_image | default('public.ecr.aws/neuron/neuron-device-plugin:2.22.4.0') }}
           imagePullPolicy: Always
