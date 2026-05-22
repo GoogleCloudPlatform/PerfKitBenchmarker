@@ -35,6 +35,7 @@ from typing import Callable
 from absl import flags
 from absl import logging
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -339,33 +340,7 @@ def _RunScenarioA(
   )
   samples += _OpSamples('ScenarioA_Upgrade', upgrade_results,
                         attempted_ops=len(created))
-  # ── Dynamic Wait: Wait until the cluster control plane reports STATUS_RUNNING ──
-  logging.info('Scenario A upgrades finished. Checking control plane status...')
-  poll_start = time.time()
-  timeout_seconds = 300
-  status = None
   
-  while status != 'RUNNING' and (time.time() - poll_start) < timeout_seconds:
-    try:
-      if hasattr(cluster, 'GetStatus'):
-        status = cluster.GetStatus()
-        logging.info('Current cluster control plane status: %s', status)
-      else:
-        logging.warning('Cluster provider does not support GetStatus(). Falling back to 30s cooldown.')
-        time.sleep(30)
-        break
-    except Exception as e:
-      logging.warning('Transient error querying cluster status: %s. Retrying...', e)
-    
-    # Only sleep if we need to poll again (status is still updating)
-    if status != 'RUNNING':
-      logging.info('Control plane busy or locking. Waiting 30 seconds before checking again...')
-      time.sleep(30)
-  if status == 'RUNNING':
-    logging.info('Cluster control plane is stable and RUNNING. Proceeding to deletes.')
-  else:
-    logging.warning('Control plane did not return to RUNNING within safety limit. Proceeding anyway.')
-
   # ── Phase 3: concurrent deletes (live-list to catch EKS rollbacks) ────────
   alive = [p for p in cluster.GetNodePoolNames() if p.startswith(f'{_PREFIX}a')]
   logging.info('Scenario A: %d live pools found for delete (originally %d)',
