@@ -147,6 +147,16 @@ flags.DEFINE_multi_string(
     'by separating each pair by commas.',
 )
 
+_PROMOTE_METADATA_TO_TOP_LEVEL = flags.DEFINE_list(
+    'promote_metadata_to_top_level',
+    [],
+    'Comma-separated list of metadata keys to promote to top-level sample '
+    'fields before publishing. Useful with --collapse_labels=true (the '
+    'BigQuery default) so these keys remain queryable as typed columns '
+    'instead of being pipe-joined into the labels string. Pass an empty '
+    'value to disable promotion.',
+)
+
 _THROW_ON_METADATA_CONFLICT = flags.DEFINE_boolean(
     'throw_on_metadata_conflict',
     True,
@@ -717,7 +727,7 @@ class BigQueryPublisher(SamplePublisher):
         prefix='perfkit-bq-pub', dir=vm_util.GetTempDir(), suffix='.json'
     ) as tf:
       json_publisher = NewlineDelimitedJSONPublisher(
-          tf.name, collapse_labels=True
+          tf.name, collapse_labels=FLAGS.collapse_labels
       )
       json_publisher.PublishSamples(samples)
       tf.close()
@@ -1220,6 +1230,18 @@ class SampleCollector:
       sample['owner'] = FLAGS.owner
       sample['run_uri'] = benchmark_spec.uuid
       sample['sample_uri'] = str(uuid.uuid4())
+
+      # Promote select metadata keys to top-level columns. With
+      # collapse_labels=True (BigQuery's default path), the rest of
+      # metadata gets pipe-joined into a string; promoting before the
+      # collapse keeps these queryable as typed columns. Configure via
+      # --promote_metadata_to_top_level; keep the list short, only for
+      # keys that are useful as join/filter keys.
+      metadata = sample.get('metadata') or {}
+      for key in _PROMOTE_METADATA_TO_TOP_LEVEL.value or ():
+        if key in metadata:
+          sample[key] = metadata.pop(key)
+
       self.samples.append(sample)
 
   def PublishSamples(self):
