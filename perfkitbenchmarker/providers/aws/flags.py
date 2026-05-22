@@ -376,3 +376,14 @@ AWS_DOCUMENTDB_SNAPSHOT = flags.DEFINE_string(
     None,
     'If supplied, creates the DocumentDB instance from the snapshot.',
 )
+
+# Flag to skip EBS CSI driver setup during EKS cluster creation.
+# Safe for benchmarks that do not use persistent volumes (e.g. k8s_management).
+# Saves ~3 minutes per run.
+flags.DEFINE_boolean(
+    'eks_skip_ebs_csi',
+    False,
+    'If True, skip EBS CSI driver setup (OIDC + IAM role + addon install) '
+    'during EKS cluster creation. Safe for the k8s_management benchmark '
+    'which does not use persistent volumes. Saves ~3 minutes per run.',
+)

@@ -57,7 +57,22 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
   def _PostCreate(self):
     super()._PostCreate()
     if self.event_poller:
-      self.event_poller.StartPolling()
+      try:
+        self.event_poller.StartPolling()
+      except Exception as exc:  # pylint: disable=broad-except
+        # Python 3.14 tightened pickling rules for multiprocessing — local
+        # functions passed to Process cannot be pickled. Rather than crashing
+        # PKB entirely (which prevents cleanup and orphans cloud resources),
+        # log a warning and continue without the event poller.
+        # Impact: no Kubernetes event streaming during the run — benchmark
+        # metrics are unaffected.
+        logging.warning(
+            'Event poller failed to start (non-fatal, continuing without '
+            'event polling): %s. This is a known Python 3.14 pickling '
+            'issue — switch to Python 3.13 to enable event polling.',
+            exc,
+        )
+        self.event_poller = None
 
   def Delete(self, freeze: bool = False) -> None:
     if self.inference_server:

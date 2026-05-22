@@ -46,6 +46,13 @@ from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
+# Flag to skip EBS CSI driver setup during cluster creation.
+# The k8s_management benchmark does not use persistent volumes, so EBS CSI
+# setup (OIDC association + IAM role + addon install) is unnecessary and adds
+# ~3 minutes to every run. Set to True to skip it and save time.
+# Defined before FLAGS = flags.FLAGS so it is registered at import time
+# and visible to PKB's flag parser before --cloud/--container_cluster_type
+# are resolved.
 FLAGS = flags.FLAGS
 # GPU types which practically require spot to get.
 _RARE_GPU_TYPES = [
@@ -129,10 +136,21 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
 
   def _EksCtlCreate(self, create_json: dict[str, Any]):
     """Creates the EKS cluster."""
-    # If multiple zones are passed use them for the control plane.
-    # Otherwise EKS will auto-select control plane zones in the region.
-    if self.control_plane_zones:
-      create_json['availabilityZones'] = self.control_plane_zones
+    # Pass all control_plane_zones to the cluster so eksctl creates VPC subnets
+    # in every requested AZ. Without this, eksctl may only create subnets in 2
+    # AZs even when 3 are requested, preventing round-robin nodegroup placement.
+    # This is critical for distributing nodegroups across AZs to avoid per-AZ
+    # EC2 capacity limits.
+    # availabilityZones is already set in create_json by _CreateDependencies
+    # via the EC2 AZ query (bypassing PKB zone flag truncation).
+    # Log it here for visibility.
+    if 'availabilityZones' in create_json:
+      logging.info(
+          '[EKS] Creating cluster with AZs: %s — '
+          'eksctl will auto-assign CIDRs for all %d zones.',
+          create_json['availabilityZones'],
+          len(create_json['availabilityZones']),
+      )
     # Schema for the cluster create command is here:
     # https://schema.eksctl.io/
     create_json = RecursivelyUpdateDictionary(
@@ -186,6 +204,11 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
     if nodepool.min_nodes != nodepool.max_nodes:
       group_json['minSize'] = nodepool.min_nodes
       group_json['maxSize'] = nodepool.max_nodes
+    # Pin the default nodegroup to control_plane_zones[0] so it stays in a
+    # single known AZ. The benchmark nodegroups (pkbma*, pkbmc*) are placed
+    # via CreateNodePoolAsync using the round-robin _DiscoverSubnetsPerAZ logic.
+    if self.control_plane_zones:
+      group_json['availabilityZones'] = [self.control_plane_zones[0]]
     return group_json
 
   def _WriteJsonToFile(self, json_dict: dict[str, Any]) -> str:
@@ -398,55 +421,103 @@ class EksCluster(BaseEksCluster):
       nodepool_jsons += [self._RenderNodeGroupJson(node_group)]
     create_json: dict[str, Any] = {
         'managedNodeGroups': nodepool_jsons,
-        'vpc': {
-            'nat': {'gateway': 'Disable'},
-        },
+        'vpc': {'nat': {'gateway': 'Disable'}},
     }
+    # Explicitly set cluster-level availabilityZones so eksctl creates VPC
+    # public+private subnets in ALL AZs in the region.
+    # IMPORTANT: PKB's deprecated --zones flag gets truncated by its own
+    # translation layer to 2 AZs even when 3 are specified. We bypass this
+    # by querying EC2 directly for all available AZs in the region and
+    # passing all of them to eksctl. This ensures the VPC gets subnets in
+    # all AZs, enabling proper round-robin nodegroup placement.
+    try:
+      az_out, _, az_rc = vm_util.IssueCommand(
+          util.AWS_PREFIX + [
+              'ec2', 'describe-availability-zones',
+              '--region', self.region,
+              '--filters', 'Name=state,Values=available',
+              '--query', 'AvailabilityZones[*].ZoneName',
+              '--output', 'json',
+          ],
+          raise_on_failure=False,
+      )
+      if az_rc == 0 and az_out.strip():
+        all_azs = json.loads(az_out.strip())
+        # Limit to 3 AZs maximum to avoid excessive subnet creation
+        cluster_azs = sorted(all_azs)[:3]
+      else:
+        # Fallback: use control_plane_zones or default to known us-east-1 AZs
+        cluster_azs = (
+            self.control_plane_zones
+            if self.control_plane_zones
+            else [f'{self.region}a', f'{self.region}b', f'{self.region}c']
+        )
+    except Exception:  # pylint: disable=broad-except
+      cluster_azs = (
+          self.control_plane_zones
+          if self.control_plane_zones
+          else [f'{self.region}a', f'{self.region}b', f'{self.region}c']
+      )
+
+    create_json['availabilityZones'] = cluster_azs
+    logging.info(
+        '[EKS] Cluster will have subnets in %d AZs: %s '
+        '(queried from EC2, bypassing PKB zone flag truncation)',
+        len(cluster_azs), cluster_azs,
+    )
     self._EksCtlCreate(create_json)
 
     # Above create command passes "withOidc=true", but it doesn't seem to work &
     # therefore this command is needed.
-    cmd = [
-        FLAGS.eksctl,
-        'utils',
-        'associate-iam-oidc-provider',
-        f'--cluster={self.name}',
-        f'--region={self.region}',
-        '--approve',
-    ]
-    vm_util.IssueCommand(cmd)
+    if not FLAGS.eks_skip_ebs_csi:
+      cmd = [
+          FLAGS.eksctl,
+          'utils',
+          'associate-iam-oidc-provider',
+          f'--cluster={self.name}',
+          f'--region={self.region}',
+          '--approve',
+      ]
+      vm_util.IssueCommand(cmd)
 
     # EBS CSI driver is required for creating EBS volumes in version > 1.23
     # https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
+    # Skip if --eks_skip_ebs_csi is set (saves ~3 min for benchmarks that
+    # do not use persistent volumes, such as k8s_management).
+    if FLAGS.eks_skip_ebs_csi:
+      logging.info(
+          '[EKS] Skipping EBS CSI driver setup (--eks_skip_ebs_csi=True). '
+          'Saves ~3 min. Set to False if your benchmark needs persistent volumes.'
+      )
+    else:
+      # Name must be unique.
+      ebs_csi_driver_role = f'AmazonEKS_EBS_CSI_DriverRole_{self.name}'
 
-    # Name must be unique.
-    ebs_csi_driver_role = f'AmazonEKS_EBS_CSI_DriverRole_{self.name}'
+      cmd = [
+          FLAGS.eksctl,
+          'create',
+          'iamserviceaccount',
+          '--name=ebs-csi-controller-sa',
+          '--namespace=kube-system',
+          f'--region={self.region}',
+          f'--cluster={self.name}',
+          '--attach-policy-arn=arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy',
+          '--approve',
+          '--role-only',
+          f'--role-name={ebs_csi_driver_role}',
+      ]
+      vm_util.IssueCommand(cmd)
 
-    cmd = [
-        FLAGS.eksctl,
-        'create',
-        'iamserviceaccount',
-        '--name=ebs-csi-controller-sa',
-        '--namespace=kube-system',
-        f'--region={self.region}',
-        f'--cluster={self.name}',
-        '--attach-policy-arn=arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy',
-        '--approve',
-        '--role-only',
-        f'--role-name={ebs_csi_driver_role}',
-    ]
-    vm_util.IssueCommand(cmd)
-
-    cmd = [
-        FLAGS.eksctl,
-        'create',
-        'addon',
-        '--name=aws-ebs-csi-driver',
-        f'--region={self.region}',
-        f'--cluster={self.name}',
-        f'--service-account-role-arn=arn:aws:iam::{self.account}:role/{ebs_csi_driver_role}',
-    ]
-    vm_util.IssueCommand(cmd)
+      cmd = [
+          FLAGS.eksctl,
+          'create',
+          'addon',
+          '--name=aws-ebs-csi-driver',
+          f'--region={self.region}',
+          f'--cluster={self.name}',
+          f'--service-account-role-arn=arn:aws:iam::{self.account}:role/{ebs_csi_driver_role}',
+      ]
+      vm_util.IssueCommand(cmd)
 
     if aws_flags.AWS_EKS_POD_IDENTITY_ROLE.value:
       cmd = util.AWS_PREFIX + [
@@ -606,6 +677,63 @@ class EksCluster(BaseEksCluster):
     self._cached_subnets = info['cluster']['resourcesVpcConfig']['subnetIds']
     return self._cached_subnets
 
+  def _DiscoverSubnetsPerAZ(self) -> dict[str, str]:
+    """Returns a mapping of {AZ: subnet_id} for the cluster's subnets.
+
+    Used by CreateNodePoolAsync to distribute nodegroups round-robin across
+    AZs, avoiding per-AZ EC2 capacity limits when creating many pools.
+    Only returns AZs that are in control_plane_zones (if specified).
+    Cached after first call.
+    """
+    if getattr(self, '_cached_subnets_per_az', None):
+      return self._cached_subnets_per_az
+
+    subnet_ids = self._DiscoverSubnets()
+    if not subnet_ids:
+      self._cached_subnets_per_az = {}
+      return {}
+
+    # Describe subnets to get their AZ mapping
+    out, _, rc = vm_util.IssueCommand(
+        util.AWS_PREFIX + [
+            'ec2', 'describe-subnets',
+            '--region', self.region,
+            '--subnet-ids', *subnet_ids,
+            '--query', 'Subnets[*].{SubnetId:SubnetId,AZ:AvailabilityZone}',
+            '--output', 'json',
+        ],
+        raise_on_failure=False,
+    )
+    if rc:
+      logging.warning('[EKS] Could not describe subnets for AZ mapping — '
+                      'falling back to all subnets')
+      self._cached_subnets_per_az = {}
+      return {}
+
+    subnets = json.loads(out)
+
+    # Do NOT filter by control_plane_zones — PKB truncates it to 2 AZs.
+    # Accept all subnets the VPC has across all AZs.
+    allowed_zones = None
+
+    az_map: dict[str, str] = {}
+    for s in subnets:
+      az = s['AZ']
+      if allowed_zones and az not in allowed_zones:
+        continue
+      # Keep only one subnet per AZ (prefer public subnets — already filtered
+      # by _DiscoverSubnets which returns the cluster's configured subnets)
+      if az not in az_map:
+        az_map[az] = s['SubnetId']
+
+    logging.info(
+        '[EKS] Subnet-per-AZ mapping: %s (from %d total subnets, '
+        'allowed_zones=%s)',
+        az_map, len(subnet_ids), allowed_zones,
+    )
+    self._cached_subnets_per_az = az_map
+    return az_map
+
   def _ResolveReleaseVersion(self, minor: str) -> str:
     """Returns the EKS-optimized AMI release version (e.g. '1.33.10-20260124').
 
@@ -698,6 +826,30 @@ class EksCluster(BaseEksCluster):
     #      cluster's version, which (for the N-1 -> N benchmark path)
     #      produces a "release version X is not valid for kubernetes
     #      version Y" error.
+
+    # ── AZ distribution ────────────────────────────────────────────────────
+    # When multiple zones are specified (e.g. us-east-1a,1b,1c), distribute
+    # nodegroups round-robin across AZs to avoid per-AZ EC2 capacity limits.
+    # Without this, EKS places all nodegroups in a single AZ causing timeouts.
+    # Pool name format: pkbma000, pkbma001, ... — extract index from suffix.
+    az_subnets = self._DiscoverSubnetsPerAZ()
+    if az_subnets and len(az_subnets) > 1:
+      # Extract numeric suffix from pool name to determine AZ assignment
+      name = nodepool_config.name
+      suffix = ''.join(c for c in name if c.isdigit())
+      idx = int(suffix) if suffix else 0
+      zones = sorted(az_subnets.keys())
+      assigned_az = zones[idx % len(zones)]
+      subnets = [az_subnets[assigned_az]]
+      logging.info(
+          '[EKS] CreateNodePool %s -> AZ=%s subnet=%s (round-robin idx=%d)',
+          name, assigned_az, subnets[0], idx,
+      )
+    else:
+      subnets = self._DiscoverSubnets()
+      logging.info('[EKS] CreateNodePool %s -> using all subnets (single AZ)',
+                   nodepool_config.name)
+
     payload: dict[str, Any] = {
         'clusterName': self.name,
         'nodegroupName': nodepool_config.name,
@@ -706,7 +858,7 @@ class EksCluster(BaseEksCluster):
             'maxSize': nodepool_config.num_nodes,
             'desiredSize': nodepool_config.num_nodes,
         },
-        'subnets': self._DiscoverSubnets(),
+        'subnets': subnets,
         'instanceTypes': [nodepool_config.machine_type],
         'amiType': 'AL2023_x86_64_STANDARD',
         'nodeRole': self._DiscoverNodeRoleArn(),

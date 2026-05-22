@@ -126,10 +126,11 @@ _MAX_CONCURRENT = flags.DEFINE_integer(
 )
 _PIPELINE_SCENARIO_A = flags.DEFINE_boolean(
     'k8s_mgmt_pipeline_scenario_a',
-    False,
+    True,
     'If True, run Scenario A as a per-pool pipeline (create->upgrade->delete '
-    'back-to-back per thread). Minimizes wall time but measures ops under '
-    'mixed-type concurrent load. Default False = phase-by-phase (spec-strict).',
+    'back-to-back per thread). Minimizes wall time: max_i(create+upgrade+delete) '
+    'vs max(creates)+max(upgrades)+max(deletes) in phase-by-phase mode. '
+    'Default True for faster runs. Set False for spec-strict phase-by-phase.',
 )
 
 # AKS caps node-pool names at 12 chars — keep all names within that limit.
