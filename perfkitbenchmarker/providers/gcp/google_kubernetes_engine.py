@@ -184,6 +184,8 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
       cmd.args.append('--enable-ip-access')
     else:
       cmd.args.append('--no-enable-ip-access')
+    if gcp_flags.GKE_ENABLE_DATAPLANE_V2.value:
+      cmd.args.append('--enable-dataplane-v2')
     if gcp_flags.GKE_MASTER_IPV4_CIDR.value:
       cmd.flags['master-ipv4-cidr'] = gcp_flags.GKE_MASTER_IPV4_CIDR.value
 

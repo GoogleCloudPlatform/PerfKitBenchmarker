@@ -581,6 +581,12 @@ GKE_MASTER_IPV4_CIDR = flags.DEFINE_string(
     None,
     'CIDR range to use for the hosted master network. Required when private nodes are enabled without DNS access.',
 )
+GKE_ENABLE_DATAPLANE_V2 = flags.DEFINE_boolean(
+    'gke_enable_dataplane_v2',
+    False,
+    'Whether to enable GKE Dataplane V2 (eBPF-based datapath, Cilium under the hood). '
+    'Requires cluster recreation; cannot be toggled on an existing cluster.',
+)
 
 
 def _ValidateGkePrivateNodeFlags(flags_dict):
