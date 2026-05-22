@@ -339,6 +339,27 @@ def _RunScenarioA(
   )
   samples += _OpSamples('ScenarioA_Upgrade', upgrade_results,
                         attempted_ops=len(created))
+  # ── Dynamic Wait: Wait until the cluster control plane reports STATUS_RUNNING ──
+  logging.info('Scenario A upgrades finished. Checking control plane status...')
+  poll_start = time.time()
+  timeout_seconds = 300  # 5-minute guardrail timeout
+  
+  while time.time() - poll_start < timeout_seconds:
+    # Most provider cluster objects expose a way to refresh or check status
+    # If your provider wrapper supports a direct get/refresh, use it here:
+    try:
+      # Example assuming standard PKB cluster status tracking:
+      # If the cluster control plane is still 'UPDATING', wait.
+      if hasattr(cluster, 'GetStatus') and cluster.GetStatus() == 'RUNNING':
+        logging.info('Cluster control plane is stable and RUNNING.')
+        break
+    except Exception as e:
+      logging.warning('Waiting for control plane to stabilize: %s', e)
+    
+    logging.info('Control plane busy or locking. Waiting 15 seconds before checking again...')
+    time.sleep(15)
+  else:
+    logging.warning('Control plane did not return to idle within timeout. Proceeding anyway.')
 
   # ── Phase 3: concurrent deletes (live-list to catch EKS rollbacks) ────────
   alive = [p for p in cluster.GetNodePoolNames() if p.startswith(f'{_PREFIX}a')]
