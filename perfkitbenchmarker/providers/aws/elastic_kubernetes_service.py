@@ -1277,7 +1277,7 @@ class EksKarpenterCluster(BaseEksCluster):
         suppress_failure=lambda stdout, stderr, retcode: 'already exists'
         in stderr,
     )
-    # 5) Installs Helm chart
+    # 5) Install via helm.
     vm_util.IssueCommand(
         ['helm', 'repo', 'add', 'eks', 'https://aws.github.io/eks-charts'],
         suppress_failure=lambda stdout, stderr, retcode: 'already exists'
@@ -1532,6 +1532,44 @@ class EksKarpenterCluster(BaseEksCluster):
     # Ensure ALB ingress support: installs AWS Load Balancer Controller.
     if FLAGS.eks_install_alb_controller:
       self._InstallAwsLoadBalancerController()
+    if virtual_machine.GPU_TYPE.value:
+      # Install NVIDIA drivers.
+      vm_util.IssueCommand(
+          [
+              'helm',
+              'repo',
+              'add',
+              'nvdp',
+              'https://nvidia.github.io/k8s-device-plugin',
+          ],
+          suppress_failure=lambda stdout, stderr, retcode: 'already exists'
+          in stderr,
+      )
+      vm_util.IssueCommand(['helm', 'repo', 'update', 'nvdp'])
+      # Allow node discovery pod to schedule even over NoSchedule taint.
+      tolerations_string = (
+          'tolerations=[{"key":"nvidia.com/gpu","operator":'
+          + '"Exists","effect":"NoSchedule"}]'
+      )
+      vm_util.IssueCommand([
+          'helm',
+          'upgrade',
+          '--install',
+          'nvdp',
+          'nvdp/nvidia-device-plugin',
+          '--namespace',
+          'kube-system',
+          '--kubeconfig',
+          FLAGS.kubeconfig,
+          '--set',
+          'gfd.enabled=true',
+          '--set',
+          'node-feature-discovery.enabled=true',
+          '--set-json',
+          f'nfd.worker.{tolerations_string}',
+          '--set-json',
+          tolerations_string,
+      ])
     # Get the AMI version for current kubernetes version.
     # See e.g. https://karpenter.sh/docs/tasks/managing-amis/ for not using
     # @latest.
@@ -1577,7 +1615,7 @@ class EksKarpenterCluster(BaseEksCluster):
     if nodepool.machine_families:
       machine_requirements = [
           {
-              'key': 'karpenter.k8s.aws/instance-category',
+              'key': 'karpenter.k8s.aws/instance-family',
               'operator': 'In',
               'values': nodepool.machine_families,
           },
@@ -1866,14 +1904,9 @@ class EksKarpenterCluster(BaseEksCluster):
   def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Gets the node selectors section of a yaml for the provider."""
     selectors = {}
-    # If GPU is requested, use the GPU nodepool
-    if virtual_machine.GPU_TYPE.value:
-      selectors['karpenter.sh/nodepool'] = 'gpu'
-    else:
-      # Otherwise, use instance-family selector if machine_type is specified
-      machine_family = util.GetMachineFamily(machine_type)
-      if machine_family:
-        selectors['karpenter.k8s.aws/instance-family'] = machine_family
+    machine_family = util.GetMachineFamily(machine_type)
+    if machine_family:
+      selectors['karpenter.k8s.aws/instance-family'] = machine_family
     return selectors
 
   def GetNodePoolNames(self) -> list[str]:

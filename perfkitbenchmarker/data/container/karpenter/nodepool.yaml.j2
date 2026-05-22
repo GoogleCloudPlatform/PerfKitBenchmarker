@@ -4,6 +4,9 @@ metadata:
   name: {{ NODEPOOL_NAME }}
 spec:
   template:
+    metadata:
+      labels:
+        pkb_nodepool: {{NODEPOOL_NAME}}
     spec:
       requirements:
         - key: kubernetes.io/arch

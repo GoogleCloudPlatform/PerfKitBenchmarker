@@ -102,46 +102,12 @@ def GetConfig(user_config):
   return config
 
 
-def _IsEksKarpenterAwsGpu(
-    cluster: kubernetes_cluster.KubernetesCluster,
-) -> bool:
-  return bool(
-      virtual_machine.GPU_COUNT.value
-      and FLAGS.cloud.lower() == 'aws'
-      and getattr(cluster, 'CLUSTER_TYPE', None) == 'Karpenter'
-  )
-
-
-def _EnsureEksKarpenterGpuNodepool(
-    cluster: kubernetes_cluster.KubernetesCluster,
-) -> None:
-  """Ensures a GPU NodePool exists for EKS Karpenter before applying workloads."""
-  if not _IsEksKarpenterAwsGpu(cluster):
-    return
-  kubernetes_commands.ApplyManifest(
-      'container/kubernetes_scale/aws-gpu-nodepool.yaml.j2',
-      gpu_nodepool_name='gpu',
-      gpu_nodepool_label='gpu',
-      karpenter_ec2nodeclass_name='default',
-      gpu_instance_categories=['g'],
-      gpu_instance_families=['g6', 'g6e'],
-      gpu_capacity_types=['on-demand'],
-      gpu_arch=['amd64'],
-      gpu_os=['linux'],
-      gpu_taint_key='nvidia.com/gpu',
-      gpu_consolidate_after='1m',
-      gpu_consolidation_policy='WhenEmptyOrUnderutilized',
-      gpu_nodepool_cpu_limit=1000,
-  )
-
-
 def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   """Sets additional spec attributes."""
   bm_spec.always_call_cleanup = True
   assert bm_spec.container_cluster
   cluster = bm_spec.container_cluster
   assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
-  _EnsureEksKarpenterGpuNodepool(cluster)
 
 
 def _GetScaleTimeout() -> int:
@@ -237,8 +203,6 @@ def ScaleUpPods(
   resource_timeout = max_wait_time + 60 * 5  # 5 minutes after waiting to avoid
   # pod delete events from polluting data collection.
 
-  is_eks_karpenter_aws_gpu = _IsEksKarpenterAwsGpu(cluster)
-
   manifest_kwargs = dict(
       Name='kubernetes-scaleup',
       Replicas=num_new_pods,
@@ -254,20 +218,11 @@ def ScaleUpPods(
       GpuTaintKey=None,
   )
 
-  # GpuTaintKey is still needed for tolerations in the yaml template
-  if is_eks_karpenter_aws_gpu:
-    manifest_kwargs['GpuTaintKey'] = 'nvidia.com/gpu'
-
   yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
       MANIFEST_TEMPLATE,
       **manifest_kwargs,
   )
   # Use ModifyPodSpecPlacementYaml to add nodeSelectors via GetNodeSelectors()
-  cluster.ModifyPodSpecPlacementYaml(
-      yaml_docs,
-      'kubernetes-scaleup',
-      cluster.default_nodepool.machine_type,
-  )
   if _SPECIFY_NODEPOOL.value:
     if (
         _SPECIFY_NODEPOOL.value != 'default'
@@ -281,6 +236,14 @@ def ScaleUpPods(
     yaml_docs[0]['spec']['template']['spec']['nodeSelector'][
         'pkb_nodepool'
     ] = _SPECIFY_NODEPOOL.value
+    nodepool = cluster.nodepools[_SPECIFY_NODEPOOL.value]
+  else:
+    nodepool = cluster.default_nodepool
+  cluster.ModifyPodSpecPlacementYaml(
+      yaml_docs,
+      'kubernetes-scaleup',
+      nodepool.machine_type or nodepool.machine_families[0],
+  )
   resource_names = kubernetes_commands.ApplyYaml(yaml_docs)
 
   assert resource_names
