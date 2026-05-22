@@ -342,24 +342,29 @@ def _RunScenarioA(
   # ── Dynamic Wait: Wait until the cluster control plane reports STATUS_RUNNING ──
   logging.info('Scenario A upgrades finished. Checking control plane status...')
   poll_start = time.time()
-  timeout_seconds = 300  # 5-minute guardrail timeout
+  timeout_seconds = 300
+  status = None
   
-  while time.time() - poll_start < timeout_seconds:
-    # Most provider cluster objects expose a way to refresh or check status
-    # If your provider wrapper supports a direct get/refresh, use it here:
+  while status != 'RUNNING' and (time.time() - poll_start) < timeout_seconds:
     try:
-      # Example assuming standard PKB cluster status tracking:
-      # If the cluster control plane is still 'UPDATING', wait.
-      if hasattr(cluster, 'GetStatus') and cluster.GetStatus() == 'RUNNING':
-        logging.info('Cluster control plane is stable and RUNNING.')
+      if hasattr(cluster, 'GetStatus'):
+        status = cluster.GetStatus()
+        logging.info('Current cluster control plane status: %s', status)
+      else:
+        logging.warning('Cluster provider does not support GetStatus(). Falling back to 30s cooldown.')
+        time.sleep(30)
         break
     except Exception as e:
-      logging.warning('Waiting for control plane to stabilize: %s', e)
+      logging.warning('Transient error querying cluster status: %s. Retrying...', e)
     
-    logging.info('Control plane busy or locking. Waiting 15 seconds before checking again...')
-    time.sleep(15)
+    # Only sleep if we need to poll again (status is still updating)
+    if status != 'RUNNING':
+      logging.info('Control plane busy or locking. Waiting 30 seconds before checking again...')
+      time.sleep(30)
+  if status == 'RUNNING':
+    logging.info('Cluster control plane is stable and RUNNING. Proceeding to deletes.')
   else:
-    logging.warning('Control plane did not return to idle within timeout. Proceeding anyway.')
+    logging.warning('Control plane did not return to RUNNING within safety limit. Proceeding anyway.')
 
   # ── Phase 3: concurrent deletes (live-list to catch EKS rollbacks) ────────
   alive = [p for p in cluster.GetNodePoolNames() if p.startswith(f'{_PREFIX}a')]
