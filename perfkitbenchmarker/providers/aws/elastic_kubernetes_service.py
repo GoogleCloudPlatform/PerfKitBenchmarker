@@ -864,6 +864,12 @@ class EksCluster(BaseEksCluster):
         'nodeRole': self._DiscoverNodeRoleArn(),
         'labels': {'pkb_nodepool': nodepool_config.name},
         'tags': util.MakeDefaultTags(),
+        # Target open capacity reservations first before falling back to
+        # regular on-demand. Ensures EC2 capacity reservations created
+        # before the benchmark are actually used by EKS nodegroups.
+        'capacityReservationSpecification': {
+            'capacityReservationPreference': 'open',
+        },
     }
     if node_version:
       payload['version'] = node_version
