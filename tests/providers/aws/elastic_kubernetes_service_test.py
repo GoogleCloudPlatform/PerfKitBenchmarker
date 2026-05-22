@@ -501,7 +501,7 @@ class EksKarpenterTest(BaseEksTest):
             'm5.large',
             # Verify additional nodepool
             'name: pool1',
-            'karpenter.k8s.aws/instance-category',
+            'karpenter.k8s.aws/instance-family',
             'm6i',
             'm7i',
         ],

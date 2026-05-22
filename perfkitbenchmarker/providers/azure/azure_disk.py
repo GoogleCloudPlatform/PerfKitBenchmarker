@@ -417,8 +417,12 @@ class AzureDisk(disk.BaseDisk):
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
     if self.disk_type == disk.LOCAL:
+      # by-index path is not supported on v5 and older verions.
       if LocalDriveIsNvme(self.machine_type):
-        return '/dev/nvme%sn1' % str(self.lun)
+        if self.vm.TryRemoteCommand('test -e /dev/disk/azure/local/by-index'):
+          return f'/dev/disk/azure/local/by-index/{self.lun}'
+        else:
+          return '/dev/nvme%sn1' % str(self.lun)
       # Temp disk naming isn't always /dev/sdb:
       # https://github.com/MicrosoftDocs/azure-docs/issues/54055
       return '/dev/disk/cloud/azure_resource'

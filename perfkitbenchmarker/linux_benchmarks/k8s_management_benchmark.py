@@ -35,6 +35,7 @@ from typing import Callable
 from absl import flags
 from absl import logging
 from perfkitbenchmarker import background_tasks
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -340,7 +341,7 @@ def _RunScenarioA(
   )
   samples += _OpSamples('ScenarioA_Upgrade', upgrade_results,
                         attempted_ops=len(created))
-
+  
   # ── Phase 3: concurrent deletes (live-list to catch EKS rollbacks) ────────
   alive = [p for p in cluster.GetNodePoolNames() if p.startswith(f'{_PREFIX}a')]
   logging.info('Scenario A: %d live pools found for delete (originally %d)',

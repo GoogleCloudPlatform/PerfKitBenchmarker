@@ -55,8 +55,8 @@ def _CalculateCidrSize(nodes: int) -> int:
   # So 2^(32 - nodes) - 2^(32 - 20) >= 2^(32 - 24) * CIDR
   # OR CIDR <= 32 - log2(2^8 * nodes + 2^12)
   cidr_size = int(32 - math.log2((nodes << 8) + (1 << 12)))
-  # /19 is narrowest CIDR range GKE supports
-  return min(cidr_size, 19)
+  # /17 is narrowest CIDR range GKE supports
+  return min(cidr_size, 16)
 
 
 class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
@@ -262,10 +262,13 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     # Command `gcloud container node-pools list` does not work for Autopilot
     # clusters - node pools are hidden and command results in 4xx.
     cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
-    cmd.flags['flatten'] = 'nodePools'
-    cmd.flags['format'] = 'value(nodePools.name)'
+    cmd.flags['format'] = 'json'
     stdout, _, _ = cmd.Issue()
-    return stdout.split()
+    try:
+      cluster_info = json.loads(stdout)
+      return [np['name'] for np in cluster_info.get('nodePools', [])]
+    except (json.JSONDecodeError, ValueError, KeyError, TypeError):
+      return stdout.split()
 
   def GetMachineTypeFromNodeName(self, node_name: str) -> str | None:
     """Get the machine type from the node name."""
@@ -817,14 +820,19 @@ class GkeCluster(BaseGkeCluster):
           'operations',
           'describe',
           op_handle,
-          '--format=value(status)',
       )
+      #describe.flags['format'] = 'value(status)'
+      describe.flags['format'] = 'json'
       out, err, rc = describe.Issue(raise_on_failure=False)
       if rc:
         raise errors.Resource.RetryableCreationError(
             f'describe op failed: {err}'
         )
-      status = out.strip()
+      #status = out.strip()
+      try:
+        status = json.loads(out).get('status')
+      except (json.JSONDecodeError, ValueError):
+        status = out.strip()
       if status == 'DONE':
         return
       if status in ('ABORTING', 'ABORTED'):

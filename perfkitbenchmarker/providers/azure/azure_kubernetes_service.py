@@ -19,6 +19,7 @@ import time
 from typing import Any, List
 
 from absl import flags
+from absl import logging
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
@@ -562,7 +563,6 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         self.name,
         '--name',
         _AzureNodePoolName(name),
-        '--yes',
     ] + self.resource_group.args
     vm_util.IssueCommand(cmd, timeout=1800)
 
@@ -579,7 +579,6 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         _AzureNodePoolName(name),
         '--kubernetes-version',
         target_version,
-        '--yes',
     ] + self.resource_group.args
     vm_util.IssueCommand(cmd, timeout=1800)
 
@@ -641,7 +640,6 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--kubernetes-version',
         target_version,
         '--no-wait',
-        '--yes',
     ] + self.resource_group.args
     _, stderr, retcode = vm_util.IssueCommand(
         cmd, timeout=300, raise_on_failure=False
@@ -661,7 +659,6 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--name',
         _AzureNodePoolName(name),
         '--no-wait',
-        '--yes',
     ] + self.resource_group.args
     _, stderr, retcode = vm_util.IssueCommand(
         cmd, timeout=300, raise_on_failure=False
