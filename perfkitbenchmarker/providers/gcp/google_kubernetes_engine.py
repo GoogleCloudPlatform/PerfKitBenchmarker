@@ -168,6 +168,25 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
         )
       cmd.flags['release-channel'] = self.release_channel
 
+    if gcp_flags.GKE_ENABLE_PRIVATE_NODES.value:
+      cmd.args.append('--enable-private-nodes')
+      # GKE requires VPC-native (alias IPs) when private nodes are enabled.
+      # Without this gcloud rejects the create with:
+      #   Cannot specify --enable-private-nodes without --enable-ip-alias.
+      cmd.args.append('--enable-ip-alias')
+    else:
+      cmd.args.append('--no-enable-private-nodes')
+    if gcp_flags.GKE_ENABLE_DNS_ACCESS.value:
+      cmd.args.append('--enable-dns-access')
+    else:
+      cmd.args.append('--no-enable-dns-access')
+    if gcp_flags.GKE_ENABLE_IP_ACCESS.value:
+      cmd.args.append('--enable-ip-access')
+    else:
+      cmd.args.append('--no-enable-ip-access')
+    if gcp_flags.GKE_MASTER_IPV4_CIDR.value:
+      cmd.flags['master-ipv4-cidr'] = gcp_flags.GKE_MASTER_IPV4_CIDR.value
+
     if FLAGS.gke_enable_alpha:
       cmd.args.append('--enable-kubernetes-alpha')
       cmd.args.append('--no-enable-autorepair')

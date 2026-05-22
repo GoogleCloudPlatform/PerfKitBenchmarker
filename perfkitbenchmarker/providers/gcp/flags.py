@@ -561,6 +561,46 @@ GKE_ENABLE_SHIELDED_NODES = flags.DEFINE_boolean(
     False,
     'Whether to enable shielded nodes.',
 )
+GKE_ENABLE_PRIVATE_NODES = flags.DEFINE_boolean(
+    'gke_enable_private_nodes',
+    False,
+    'Whether to create the cluster with private nodes (nodes have only internal IPs).',
+)
+GKE_ENABLE_DNS_ACCESS = flags.DEFINE_boolean(
+    'gke_enable_dns_access',
+    False,
+    'Whether to enable DNS-based control plane access (replaces the public/private IP endpoint model).',
+)
+GKE_ENABLE_IP_ACCESS = flags.DEFINE_boolean(
+    'gke_enable_ip_access',
+    True,
+    'Whether to enable IP-based control plane access. Disabling requires DNS access and is mutually exclusive with public clusters (nodes with public IPs).',
+)
+GKE_MASTER_IPV4_CIDR = flags.DEFINE_string(
+    'gke_master_ipv4_cidr',
+    None,
+    'CIDR range to use for the hosted master network. Required when private nodes are enabled without DNS access.',
+)
+
+
+def _ValidateGkePrivateNodeFlags(flags_dict):
+  if not flags_dict['gke_enable_ip_access'] and not flags_dict['gke_enable_dns_access']:
+    raise flags.ValidationError(
+        '--no-gke_enable_ip_access requires --gke_enable_dns_access.'
+    )
+  if (flags_dict['gke_enable_private_nodes'] and
+      not flags_dict['gke_enable_dns_access'] and
+      not flags_dict['gke_master_ipv4_cidr']):
+    raise flags.ValidationError(
+        '--gke_enable_private_nodes without --gke_enable_dns_access requires --gke_master_ipv4_cidr.'
+    )
+  return True
+
+
+flags.register_multi_flags_validator(
+    ['gke_enable_ip_access', 'gke_enable_dns_access', 'gke_enable_private_nodes', 'gke_master_ipv4_cidr'],
+    _ValidateGkePrivateNodeFlags,
+)
 GKE_ADDONS = flags.DEFINE_string(
     'gke_addons',
     '',
