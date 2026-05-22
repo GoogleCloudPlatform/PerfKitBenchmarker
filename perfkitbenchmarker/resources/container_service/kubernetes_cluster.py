@@ -77,6 +77,10 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
       return self.event_poller.GetEvents()
     return kubernetes_commands.GetEvents()
 
+  def ApplyBlobFusePVC(self):
+    """Apply an Azure Blob Storage PV & PVC. Subclasses override as needed."""
+    pass
+
   def __getstate__(self):
     state = self.__dict__.copy()
     if 'event_poller' in state:
