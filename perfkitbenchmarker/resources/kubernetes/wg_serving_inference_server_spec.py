@@ -94,7 +94,7 @@ class WGServingInferenceServerConfigSpec(
     catalog_provider: Optional override for the --provider flag passed to the
       serving-catalog CLI. When unset, derived from cloud (e.g. aws, gke).
       Use aws-neuron for AWS Inferentia/Trainium overlays (directory
-      aws-neuron under vllm/<model>/), distinct from aws for GPU (PR #64).
+      aws-neuron under vllm/<model>/), distinct from aws for GPU.
     extra_deployment_args: Extra arguments to pass to the catalog CLI.
     hpa_min_replicas: Minimum replicas for HPA.
     hpa_max_replicas: Maximum replicas for HPA.

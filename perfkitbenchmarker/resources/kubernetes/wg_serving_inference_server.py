@@ -70,12 +70,13 @@ FLAG_S3_REGION = flags.DEFINE_string(
     'driver mount options.',
 )
 
-# AWS Inferentia/Trainium accelerator chip names recognised in
-# `catalog_components` (e.g. "1-Inf2", "16-Trn2"). Kept local to this module so
+# AWS Inferentia/Trainium instance-family substrings recognised in
+# `catalog_components` (e.g. "1-Inf2", "1-Trn1"). Kept local to this module so
 # that adding Neuron support does not change the shared
 # `virtual_machine_spec.VALID_GPU_TYPES` list, which is consumed by many other
-# subsystems.
-_NEURON_ACCELERATOR_TYPES = ('inf2', 'trn2')
+# subsystems. Only Inf2 has been tested end-to-end; other generations are
+# included for forward compatibility.
+_NEURON_ACCELERATOR_TYPES = ('inf1', 'inf2', 'trn1', 'trn2', 'trn3')
 
 WG_SERVING_REPO_URL = flags.DEFINE_string(
     'wg_serving_repo_url',
@@ -637,9 +638,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       for gpu in virtual_machine_spec.VALID_GPU_TYPES:
         if gpu in lowered:
           return component
-    # AWS Neuron chips (Inf2/Trn2) are intentionally not added to the shared
-    # VALID_GPU_TYPES list; check them with a separate, narrower loop so the
-    # rest of PKB is not affected.
+    # Neuron chips are intentionally not in VALID_GPU_TYPES; match them here
+    # via _NEURON_ACCELERATOR_TYPES (Inf2 tested; other generations untested).
     for component in components:
       lowered = component.lower()
       for neuron in _NEURON_ACCELERATOR_TYPES:
@@ -761,36 +761,44 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           f'job/{job_name}', ignore_not_found=True
       )
 
+  def _ApplyAwsGpuNodePool(
+      self,
+      *,
+      nodepool_name: str,
+      instance_families: list[str],
+      taint_key: str,
+      use_spot: bool,
+  ) -> None:
+    """Applies the shared AWS Karpenter NodePool template for GPU or Neuron."""
+    kubernetes_commands.ApplyManifest(
+        'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
+        gpu_nodepool_name=nodepool_name,
+        gpu_consolidate_after='1h',
+        gpu_consolidation_policy='WhenEmpty',
+        karpenter_nodeclass_name='default',
+        gpu_capacity_types=['spot'] if use_spot else ['on-demand'],
+        gpu_arch=['amd64'],
+        gpu_instance_families=instance_families,
+        gpu_taint_key=taint_key,
+    )
+
   def _ProvisionGPUNodePool(self):
     """Provisions cloud-specific GPU node pool for inference workloads."""
     if FLAGS.cloud == 'AWS':
       use_spot = bool(FLAGS.aws_spot_instances)
       if self.accelerator_type.lower() in _NEURON_ACCELERATOR_TYPES:
-        # Reuse the AWS GPU NodePool template: it is already fully
-        # parameterised. Only the values differ for Neuron (instance family,
-        # taint, NodePool name).
-        kubernetes_commands.ApplyManifest(
-            'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
-            gpu_nodepool_name='neuron',
-            gpu_consolidate_after='1h',
-            gpu_consolidation_policy='WhenEmpty',
-            karpenter_nodeclass_name='default',
-            gpu_capacity_types=['spot'] if use_spot else ['on-demand'],
-            gpu_arch=['amd64'],
-            gpu_instance_families=[self.accelerator_type.lower()],
-            gpu_taint_key='aws.amazon.com/neuron',
+        self._ApplyAwsGpuNodePool(
+            nodepool_name='neuron',
+            instance_families=[self.accelerator_type.lower()],
+            taint_key='aws.amazon.com/neuron',
+            use_spot=use_spot,
         )
         return
-      kubernetes_commands.ApplyManifest(
-          'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
-          gpu_nodepool_name='gpu',
-          gpu_consolidate_after='1h',
-          gpu_consolidation_policy='WhenEmpty',
-          karpenter_nodeclass_name='default',  # must exist already
-          gpu_capacity_types=['spot'] if use_spot else ['on-demand'],
-          gpu_arch=['amd64'],
-          gpu_instance_families=['g6', 'p5'],
-          gpu_taint_key='nvidia.com/gpu',
+      self._ApplyAwsGpuNodePool(
+          nodepool_name='gpu',
+          instance_families=['g6', 'p5'],
+          taint_key='nvidia.com/gpu',
+          use_spot=use_spot,
       )
     elif FLAGS.cloud == 'Azure':
       kubernetes_commands.ApplyManifest(
@@ -1140,7 +1148,13 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     logging.info('Successfully applied GCSFuse PVC.')
 
   def _ApplyS3PVC(self):
-    """Apply the PV & PVC backed by Mountpoint for Amazon S3 CSI driver."""
+    """Apply the PV & PVC backed by Mountpoint for Amazon S3 CSI driver.
+
+    Prerequisites (see PR description for setup details):
+      - Model weights uploaded to the S3 bucket (--k8s_inference_server_s3_bucket).
+      - S3 CSI driver installed on the cluster with read-only IAM access to the
+        bucket (via --eks_install_s3_csi_addon or equivalent manual IAM setup).
+    """
     if not FLAG_S3_BUCKET.value or not FLAG_S3_REGION.value:
       raise errors.Resource.CreationError(
           'Both --k8s_inference_server_s3_bucket and '
