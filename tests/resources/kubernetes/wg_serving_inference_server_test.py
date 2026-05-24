@@ -79,6 +79,18 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
         cluster=self.mock_cluster,
     )
 
+  def _CreateServer(self, catalog_components: str):
+    modified_spec = _BENCHMARK_SPEC_YAML.replace(
+        'catalog_components: 1-L4', f'catalog_components: {catalog_components}'
+    )
+    config_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        modified_spec
+    )
+    return wg_serving_inference_server.WGServingInferenceServer(
+        spec=config_spec.config.container_cluster.inference_server,
+        cluster=self.mock_cluster,
+    )
+
   @parameterized.parameters(
       dict(
           catalog_components='v6e-2x2',
@@ -122,16 +134,7 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
       expected_accelerator_type,
       expected_accelerator_count,
   ):
-    modified_spec = _BENCHMARK_SPEC_YAML.replace(
-        'catalog_components: 1-L4', f'catalog_components: {catalog_components}'
-    )
-    self.config_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        modified_spec
-    )
-    self.server = wg_serving_inference_server.WGServingInferenceServer(
-        spec=self.config_spec.config.container_cluster.inference_server,
-        cluster=self.mock_cluster,
-    )
+    self.server = self._CreateServer(catalog_components)
     metadata = self.server.GetResourceMetadata()
     self.assertEqual(metadata['accelerator_type'], expected_accelerator_type)
     self.assertEqual(metadata['accelerator_count'], expected_accelerator_count)
@@ -211,7 +214,7 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
       retryable_get_pod_name_from_job_mock,
       apply_manifest_mock,
   ):
-    """Neuron catalog uses aws-neuron overlay; GPU PR #64 uses aws."""
+    """Neuron catalog uses aws-neuron overlay; GPU uses aws."""
     self.server.spec.model_server = 'vllm'
     self.server.spec.model_name = 'llama3-8b'
     self.server.spec.cloud = 'AWS'
@@ -335,18 +338,30 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
         s3_region='us-east-1',
     )
 
+  @parameterized.parameters(
+      dict(
+          catalog_components='1-Inf2',
+          nodepool_name='neuron',
+          instance_families=['inf2'],
+          taint_key='aws.amazon.com/neuron',
+      ),
+      dict(
+          catalog_components='1-L4',
+          nodepool_name='gpu',
+          instance_families=['g6', 'p5'],
+          taint_key='nvidia.com/gpu',
+      ),
+  )
   @mock.patch.object(kubernetes_commands, 'ApplyManifest')
-  def testProvisionGPUNodePoolNeuronAws(self, apply_manifest_mock):
-    modified_spec = _BENCHMARK_SPEC_YAML.replace(
-        'catalog_components: 1-L4', 'catalog_components: 1-Inf2'
-    )
-    config_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        modified_spec
-    )
-    server = wg_serving_inference_server.WGServingInferenceServer(
-        spec=config_spec.config.container_cluster.inference_server,
-        cluster=self.mock_cluster,
-    )
+  def testProvisionGPUNodePoolAws(
+      self,
+      apply_manifest_mock,
+      catalog_components,
+      nodepool_name,
+      instance_families,
+      taint_key,
+  ):
+    server = self._CreateServer(catalog_components)
     FLAGS.cloud = 'AWS'
     server._ProvisionGPUNodePool()
     apply_manifest_mock.assert_called_once()
@@ -355,24 +370,9 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
         args[0],
         'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
     )
-    self.assertEqual(kwargs['gpu_taint_key'], 'aws.amazon.com/neuron')
-    self.assertEqual(kwargs['gpu_instance_families'], ['inf2'])
-    self.assertEqual(kwargs['gpu_nodepool_name'], 'neuron')
-
-  @mock.patch.object(kubernetes_commands, 'ApplyManifest')
-  def testProvisionGPUNodePoolGpuAwsUnchanged(self, apply_manifest_mock):
-    """Regression: existing AWS GPU path is not affected by Neuron branch."""
-    FLAGS.cloud = 'AWS'
-    self.server._ProvisionGPUNodePool()
-    apply_manifest_mock.assert_called_once()
-    args, kwargs = apply_manifest_mock.call_args
-    self.assertEqual(
-        args[0],
-        'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
-    )
-    self.assertEqual(kwargs['gpu_taint_key'], 'nvidia.com/gpu')
-    self.assertEqual(kwargs['gpu_instance_families'], ['g6', 'p5'])
-    self.assertEqual(kwargs['gpu_nodepool_name'], 'gpu')
+    self.assertEqual(kwargs['gpu_taint_key'], taint_key)
+    self.assertEqual(kwargs['gpu_instance_families'], instance_families)
+    self.assertEqual(kwargs['gpu_nodepool_name'], nodepool_name)
 
   @parameterized.parameters(
       dict(token='gs://bucket/path/to/token', expected_cloud='GCP'),
