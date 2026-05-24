@@ -238,6 +238,8 @@ class NodepoolSpec(spec.BaseSpec):
         **kwargs,
     )
     self.vm_count: int
+    self.min_vm_count: int | None
+    self.max_vm_count: int | None
     self.vm_spec: virtual_machine_spec.BaseVmSpec
     self.machine_families: list[str] | None
     self.sandbox_config: SandboxSpec | None
@@ -261,6 +263,14 @@ class NodepoolSpec(spec.BaseSpec):
             option_decoders.IntDecoder,
             {'default': _DEFAULT_VM_COUNT, 'min': 0},
         ),
+        'min_vm_count': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True, 'min': 0},
+        ),
+        'max_vm_count': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True, 'min': 0},
+        ),
         'vm_spec': (spec.PerCloudConfigDecoder, {}),
         'sandbox_config': (_SandboxDecoder, {'default': None}),
     })
@@ -282,7 +292,7 @@ class NodepoolSpec(spec.BaseSpec):
     if flag_values['container_cluster_num_vms'].present:
       config_values['vm_count'] = flag_values.container_cluster_num_vms
     if flag_values['k8s_machine_families'].present:
-      config_values['machine_families'] = flag_values.machine_families
+      config_values['machine_families'] = flag_values.k8s_machine_families
 
     # Need to apply the first zone in the zones flag, if specified,
     # to the spec. _NodepoolSpec does not currently support
@@ -399,6 +409,7 @@ class ContainerClusterSpec(spec.BaseSpec):
     vm_count: The number of nodes to create for the default nodepool.
     min_vm_count: The minimum number of nodes for autoscaling.
     max_vm_count: The maximum number of nodes for autoscaling.
+    enable_aam: Whether to enable automatic application monitoring.
   """
 
   cloud: str
@@ -415,6 +426,7 @@ class ContainerClusterSpec(spec.BaseSpec):
   vm_count: int
   min_vm_count: int | None
   max_vm_count: int | None
+  enable_aam: bool
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
@@ -520,6 +532,10 @@ class ContainerClusterSpec(spec.BaseSpec):
             option_decoders.BooleanDecoder,
             {'default': False},
         ),
+        'enable_aam': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
+        ),
     })
     return result
 
@@ -533,7 +549,7 @@ class ContainerClusterSpec(spec.BaseSpec):
     if flag_values['container_cluster_num_vms'].present:
       config_values['vm_count'] = flag_values.container_cluster_num_vms
     if flag_values['k8s_machine_families'].present:
-      config_values['machine_families'] = flag_values.machine_families
+      config_values['machine_families'] = flag_values.k8s_machine_families
 
     # Need to apply the first zone in the zones flag, if specified,
     # to the spec. ContainerClusters do not currently support

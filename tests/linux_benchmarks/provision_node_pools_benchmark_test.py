@@ -20,7 +20,7 @@ class ProvisionNodePoolsBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.cluster.CLOUD = 'GCP'
 
   def setUpWithXNodes(self, num_nodes: int):
-    many_nodes = ['foo'] * num_nodes
+    many_nodes = [f'foo{i}' for i in range(num_nodes)]
     self.enter_context(
         mock.patch.object(
             kubectl,
@@ -38,7 +38,7 @@ class ProvisionNodePoolsBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         mock.patch.object(
             kubernetes_commands,
             'GetNodeNames',
-            return_value=many_nodes,
+            return_value=set(many_nodes),
         )
     )
     self.cluster.GetNodePoolNames.return_value = many_nodes

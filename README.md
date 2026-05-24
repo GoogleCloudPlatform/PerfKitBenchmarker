@@ -507,12 +507,12 @@ To upload, follow the instructions below with a filename of
 #### Google Cloud
 
 To preprovision data on Google Cloud, you will need to upload each file to
-Google Cloud Storage using gsutil. First, you will need to create a storage
-bucket that is accessible from VMs created in Google Cloud by PKB. Then copy
-each file to this bucket using the command
+Google Cloud Storage using the gcloud storage CLI. First, you will need to
+create a storage bucket that is accessible from VMs created in Google Cloud by
+PKB. Then copy each file to this bucket using the command
 
 ```bash
-gsutil cp <filename> gs://<bucket>/<benchmark-name>/<filename>
+gcloud storage cp <filename> gs://<bucket>/<benchmark-name>/<filename>
 ```
 
 To run a benchmark on Google Cloud that uses the preprovisioned data, use the

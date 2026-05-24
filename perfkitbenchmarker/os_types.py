@@ -25,10 +25,10 @@ CENTOS_STREAM9 = 'centos_stream9'
 CLEAR = 'clear'
 COS = 'cos'  # stable
 COS_DEV = 'cos_dev'
+COS129 = 'cos129'
 COS125 = 'cos125'
 COS121 = 'cos121'
 COS117 = 'cos117'
-COS113 = 'cos113'
 CORE_OS = 'core_os'
 DEBIAN11 = 'debian11'
 DEBIAN11_BACKPORTS = 'debian11_backports'
@@ -54,6 +54,7 @@ DEBIAN12_DL = 'debian12_dl'
 AMAZONLINUX2_DL = 'amazonlinux2_dl'
 UBUNTU2204 = 'ubuntu2204'
 UBUNTU2404 = 'ubuntu2404'
+UBUNTU2604 = 'ubuntu2604'
 WINDOWS2016_CORE = 'windows2016_core'
 WINDOWS2019_CORE = 'windows2019_core'
 WINDOWS2022_CORE = 'windows2022_core'
@@ -132,10 +133,10 @@ WINDOWS = 'windows'
 CONTAINER_OS_TYPES = [
     CORE_OS,
     COS,
+    COS129,
     COS125,
     COS121,
     COS117,
-    COS113,
     COS_DEV,
 ]
 
@@ -149,6 +150,7 @@ DEBIAN_OS_TYPES = [
     UBUNTU2004_DL,
     UBUNTU2204,
     UBUNTU2404,
+    UBUNTU2604,
 ]
 
 # All OS types that use yum or dnf for package management.

@@ -213,6 +213,7 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['bigtable_replication_cluster'].parse(True)
     FLAGS['bigtable_replication_cluster_zone'].parse('parsed_rep_zone')
     FLAGS['bigtable_multicluster_routing'].parse(True)
+    FLAGS['bigtable_row_affinity'].parse(True)
 
     instance = GetTestBigtableInstance(spec=_TEST_BENCHMARK_SPEC_MINIMAL)
     actual_metadata = instance.GetResourceMetadata()
@@ -223,6 +224,7 @@ class GcpBigtableTestCase(pkb_common_test_case.PkbCommonTestCase):
         'bigtable_storage_type': 'ssd',
         'bigtable_node_count': 3,
         'bigtable_multicluster_routing': True,
+        'bigtable_row_affinity': True,
     }
     self.assertEqual(actual_metadata, expected_metadata)
 

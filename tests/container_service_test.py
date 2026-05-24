@@ -474,6 +474,40 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         cluster.GetResourceMetadata(),
     )
 
+  def testMinMaxNodes_withNodepools(self):
+    vm_spec = {
+        container_service_mock.TEST_CLOUD: {
+            'machine_type': 'fake-machine-type',
+            'zone': 'us-east2-a',
+        },
+    }
+    cluster = container_service_mock.TestKubernetesCluster(
+        container_spec.ContainerClusterSpec(
+            'test-cluster',
+            **{
+                'cloud': container_service_mock.TEST_CLOUD,
+                'vm_spec': vm_spec,
+                'min_vm_count': 2,
+                'max_vm_count': 3,
+                'nodepools': {
+                    'pool1': {
+                        'vm_spec': vm_spec,
+                        'vm_count': 4,
+                        'min_vm_count': 3,
+                        'max_vm_count': 10,
+                    },
+                },
+            },
+        )
+    )
+    self.assertEqual(cluster.num_nodes, 2)
+    self.assertEqual(cluster.min_nodes, 2)
+    self.assertEqual(cluster.max_nodes, 3)
+    nodepool = cluster.nodepools['pool1']
+    self.assertEqual(nodepool.num_nodes, 4)
+    self.assertEqual(nodepool.min_nodes, 3)
+    self.assertEqual(nodepool.max_nodes, 10)
+
   @parameterized.named_parameters(
       ('eks_auto', 'hostname', 'k8s-fib-fib-123.elb.us-east-1.amazonaws.com'),
       ('gke', 'ip', '34.16.24.55'),

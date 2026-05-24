@@ -15,9 +15,12 @@
 
 import unittest
 from absl import flags
+from absl.testing import parameterized
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
+from perfkitbenchmarker import resources
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from tests import pkb_common_test_case
 
@@ -171,6 +174,7 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
   def setUp(self):
     super().setUp()
     FLAGS['run_uri'].parse('123')
+    resources.LoadModules()
 
     self.full_spec = {
         'cloud': 'GCP',
@@ -317,6 +321,22 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(
         result.vm_groups['servers_replicas'].vm_spec.zone, 'us-central1-d'
     )
+
+  # pyformat: disable
+  @parameterized.named_parameters([
+      ('SpannerGoogleSql', 'GCP', 'spanner-googlesql', 'SpannerSpec'),
+      ('SpannerPostgres', 'GCP', 'spanner-postgres', 'SpannerSpec'),
+      ('AuroraDsql', 'AWS', 'aurora-dsql-postgres', 'AwsAuroraDsqlSpec'),
+      ('AwsRdsMysql', 'AWS', 'mysql', 'AwsRelationalDbSpec'),
+      ('CloudSqlPostgres', 'GCP', 'postgres', 'RelationalDbSpec'),
+      ('AzureFlexibleServer', 'Azure', 'flexible-server-postgres', 'RelationalDbSpec'),
+      ('AzureSqlManagedInstance', 'Azure', 'sqlserver', 'RelationalDbSpec'),
+  ])
+  # pyformat: enable
+  def testGetRelationalDbSpecClass(self, cloud, engine, expected_class_name):
+    providers.LoadProvider(cloud, True)
+    actual_class = relational_db_spec.GetRelationalDbSpecClass(cloud, engine)
+    self.assertEqual(actual_class.__name__, expected_class_name)
 
 
 if __name__ == '__main__':

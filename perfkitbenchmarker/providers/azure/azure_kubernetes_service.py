@@ -128,11 +128,6 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     self._deleted = False
     # Instantiation required to delete the resource group.
     self.network = azure_network.AzureNetwork.GetNetwork(spec.vm_spec)
-    # AKS applies min & max limits per nodepool.
-    self.max_nodes_per_nodepool = self.max_nodes
-    self.max_nodes = self.num_nodepools * self.max_nodes
-    self.min_nodes_per_nodepool = self.min_nodes
-    self.min_nodes = self.num_nodepools * self.min_nodes
 
   def InitializeNodePoolForCloud(
       self,
@@ -152,18 +147,15 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     result = super().GetResourceMetadata()
     result['boot_disk_type'] = self.default_nodepool.disk_type
     result['boot_disk_size'] = self.default_nodepool.disk_size
-    if self._IsAutoscalerEnabled():
-      result['max_nodes_per_nodepool'] = self.max_nodes_per_nodepool
-      result['min_nodes_per_nodepool'] = self.min_nodes_per_nodepool
     if FLAGS.azure_aks_auto_node_provisioning:
       result['auto_node_provisioning_mode'] = True
     return result
 
-  def _IsAutoscalerEnabled(self):
+  def _IsAutoscalerEnabled(self, nodepool_config: container.BaseNodePoolConfig):
     """Returns True if the cluster autoscaler is enabled."""
     return (
-        self.min_nodes
-        != self.max_nodes
+        nodepool_config.min_nodes
+        != nodepool_config.max_nodes
         # Auto node provisioning mode is incompatible with cluster autoscaler.
     ) and not FLAGS.azure_aks_auto_node_provisioning
 
@@ -185,7 +177,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--nodepool-labels',
         f'pkb_nodepool={container_cluster.DEFAULT_NODEPOOL}',
     ] + self._GetNodeFlags(self.default_nodepool)
-    if self.max_nodes > 256:
+    if self.max_total_nodes > 256:
       cmd += [
           '--network-plugin',
           'azure',
@@ -212,19 +204,34 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
     if FLAGS.azure_aks_auto_node_provisioning:
       # For provision_node_pools benchmark, add auto provisioning mode
       cmd.append('--node-provisioning-mode=auto')
-    # TODO(pclay): expose quota and capacity errors
-    # Creating an AKS cluster with a fresh service principal usually fails due
-    # to a race condition. Active Directory knows the service principal exists,
-    # but AKS does not. (https://github.com/Azure/azure-cli/issues/9585)
-    # Use 5 min timeout on service principle retry. cmd will fail fast.
-    vm_util.Retry(timeout=300)(vm_util.IssueCommand)(
-        cmd,
-        # Half hour timeout on creating the cluster.
-        timeout=1800,
-    )
+
+    self._RunCreateClusterCmd(cmd)
 
     for _, nodepool in self.nodepools.items():
       self._CreateNodePool(nodepool)
+
+  @vm_util.Retry(
+      timeout=3600,
+      retryable_exceptions=(errors.Resource.RetryableCreationError,),
+  )
+  def _RunCreateClusterCmd(self, cmd: list[str]):
+    """Runs the create cluster command, retrying on race condition errors."""
+    try:
+      _, err, retcode = vm_util.IssueCommand(
+          cmd,
+          # Half hour timeout on creating the cluster.
+          timeout=1800,
+          raise_on_failure=False,
+      )
+    except errors.VmUtil.IssueCommandTimeoutError as e:
+      retcode = 1
+      err = str(e)
+    if retcode:
+      if 'InvalidOutputTable' in err:
+        # This is a race condition where the logs analytics workspace hasn't
+        # finished being created. Retrying solves it.
+        raise errors.Resource.RetryableCreationError(err)
+      raise errors.Resource.CreationError(err)
 
   def _CreateNodePool(self, nodepool_config: container.BaseNodePoolConfig):
     """Creates a node pool."""
@@ -267,17 +274,13 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
           '--node-vm-size',
           nodepool_config.machine_type,
       ]
-    if self._IsAutoscalerEnabled():
+    if self._IsAutoscalerEnabled(nodepool_config):
       args += [
           '--enable-cluster-autoscaler',
-          f'--min-count={self.min_nodes_per_nodepool}',
-          f'--max-count={self.max_nodes_per_nodepool}',
+          f'--min-count={nodepool_config.min_nodes}',
+          f'--max-count={nodepool_config.max_nodes}',
       ]
-    node_count = nodepool_config.num_nodes
-    if self._IsAutoscalerEnabled():
-      node_count = max(self.min_nodes_per_nodepool, node_count)
-      node_count = min(self.max_nodes_per_nodepool, node_count)
-    args += [f'--node-count={node_count}']
+    args += [f'--node-count={nodepool_config.num_nodes}']
     if self.default_nodepool.zone and self.default_nodepool.zone != self.region:
       zones = ' '.join(
           zone[-1] for zone in self.default_nodepool.zone.split(',')
@@ -573,11 +576,7 @@ class AksAutomaticCluster(AksCluster):
         'automatic',
         '--tags',
     ] + tags_list
-    vm_util.IssueCommand(
-        cmd,
-        # Half hour timeout on creating the cluster.
-        timeout=1800,
-    )
+    self._RunCreateClusterCmd(cmd)
 
   def _CreateRoleAssignment(self):
     """Creates a role assignment for the current user."""

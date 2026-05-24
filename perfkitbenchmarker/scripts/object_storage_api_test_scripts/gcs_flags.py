@@ -16,11 +16,13 @@
 from absl import flags
 
 GCS_CLIENT_PYTHON = 'python'
+GCS_CLIENT_PYTHON_GRPC = 'python_grpc'
 GCS_CLIENT_BOTO = 'boto'
 
 flags.DEFINE_enum(
     'gcs_client',
-    GCS_CLIENT_BOTO,
-    [GCS_CLIENT_PYTHON, GCS_CLIENT_BOTO],
-    'The GCS client library to use (default boto).',
+    GCS_CLIENT_PYTHON,
+    [GCS_CLIENT_PYTHON, GCS_CLIENT_BOTO, GCS_CLIENT_PYTHON_GRPC],
+    'The GCS client library to use. If benchmarking GCS Rapid Storage, '
+    'the grpc client will be used automatically.',
 )

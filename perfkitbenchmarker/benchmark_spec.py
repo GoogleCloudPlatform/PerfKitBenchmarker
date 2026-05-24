@@ -44,6 +44,7 @@ from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import key as cloud_key
 from perfkitbenchmarker import lustre_service
 from perfkitbenchmarker import managed_memory_store
+from perfkitbenchmarker import managed_vm_group
 from perfkitbenchmarker import messaging_service
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import non_relational_db
@@ -61,6 +62,8 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker import vpn_service
 from perfkitbenchmarker.configs import benchmark_config_spec
 from perfkitbenchmarker.configs import freeze_restore_spec
+from perfkitbenchmarker.configs import vm_group_decoders
+from perfkitbenchmarker.resources import ai_agent_service
 from perfkitbenchmarker.resources import base_job
 from perfkitbenchmarker.resources import example_resource
 from perfkitbenchmarker.resources import managed_ai_model
@@ -167,7 +170,6 @@ class BenchmarkSpec:
     BenchmarkSpec.total_benchmarks += 1
     self.sequence_number = BenchmarkSpec.total_benchmarks
     self.resources: list[resource_type.BaseResource] = []
-    self.vms = []
     self.regional_networks = {}
     self.networks = {}
     self.custom_subnets = {
@@ -177,7 +179,13 @@ class BenchmarkSpec:
     self.firewalls = {}
     self.networks_lock = threading.Lock()
     self.firewalls_lock = threading.Lock()
-    self.vm_groups = {}
+    # unmanaged and managed_vm_groups are unioned into read only vm_groups.
+    # VMs from bechmark_config.vm_groups provisioned by PKB
+    self.unmanaged_vm_groups: dict[
+        str, list[virtual_machine.BaseVirtualMachine]
+    ] = {}
+    # VMs from benchmark_config.vm_groups provisioned as a managed VM group.
+    self.managed_vm_groups: dict[str, managed_vm_group.BaseManagedVmGroup] = {}
     self.container_specs = benchmark_config.container_specs or {}
     self.container_registry = None
     self.deleted = False
@@ -205,6 +213,7 @@ class BenchmarkSpec:
     self.vvs = None
     self.memory_store = None
     self.data_discovery_service = None
+    self.ai_agent_service = None
     self.app_groups = {}
     self._zone_index = 0
     self.capacity_reservations = []
@@ -267,6 +276,24 @@ class BenchmarkSpec:
 
   def __str__(self):
     return 'Benchmark name: {}\nFlags: {}'.format(self.name, self.config.flags)
+
+  @property
+  def vm_groups(self) -> dict[str, list[virtual_machine.BaseVirtualMachine]]:
+    """Returns the vm groups in the benchmark."""
+    vm_groups = dict(self.unmanaged_vm_groups)
+    vm_groups.update({
+        name: list(group.vms)
+        for name, group in self.managed_vm_groups.items()
+    })
+    return vm_groups
+
+  @property
+  def vms(self) -> list[virtual_machine.BaseVirtualMachine]:
+    """Returns the list of VMs in the benchmark."""
+    vms = []
+    for vm_group in self.vm_groups.values():
+      vms.extend(vm_group)
+    return vms
 
   @contextlib.contextmanager
   def RedirectGlobalFlags(self):
@@ -337,6 +364,7 @@ class BenchmarkSpec:
     self.ConstructMemoryStore()
     self.ConstructPinecone()
     self.ConstructVertexVectorSearch()
+    self.ConstructAiAgentService()
     self.ConstructMultiAttachDisk()
 
   def ConstructContainerCluster(self):
@@ -636,6 +664,28 @@ class BenchmarkSpec:
     self.memory_store.SetVms(self.vm_groups)
     self.resources.append(self.memory_store)
 
+  def ConstructAiAgentService(self):
+    """Construct the AI agent service object."""
+    if self.config.ai_agent_service is None:
+      return
+
+    cloud = self.config.ai_agent_service.cloud
+    deployment_type = self.config.ai_agent_service.deployment_type
+    providers.LoadProvider(cloud)
+
+    assert self.vm_groups
+    vm = self.vm_groups[
+        'clients' if 'clients' in self.vm_groups else 'default'
+    ][0]
+
+    deployment_class = ai_agent_service.GetAiAgentServiceClass(
+        cloud, deployment_type
+    )
+    self.ai_agent_service = deployment_class(
+        vm, self.config.ai_agent_service
+    )  # pytype: disable=not-instantiable
+    self.resources.append(self.ai_agent_service)
+
   def ConstructNfsService(self):
     """Construct the NFS service object.
 
@@ -742,12 +792,15 @@ class BenchmarkSpec:
       )
 
   def ConstructVirtualMachineGroup(
-      self, group_name, group_spec
+      self, group_name: str, group_spec: vm_group_decoders.VmGroupSpec
   ) -> list[virtual_machine.VirtualMachine]:
     """Construct the virtual machine(s) needed for a group."""
     vms = []
 
     vm_count = group_spec.vm_count
+    is_managed = group_spec.managed_spec is not None
+
+    assert not (group_spec.static_vms and is_managed)
 
     # First create the Static VM objects.
     if group_spec.static_vms:
@@ -766,6 +819,22 @@ class BenchmarkSpec:
     # This throws an exception if the benchmark is not
     # supported.
     self._CheckBenchmarkSupport(cloud)
+
+    # If the VM group is managed, create a managed VM group and return.
+    if is_managed:
+      managed_vm_group_class = managed_vm_group.GetManagedVmGroupClass(cloud)
+      # TODO(pclay): support multiple zones:
+      if FLAGS.zone:
+        assert len(FLAGS.zone) == 1, 'Managed VM groups only support one zone.'
+        group_spec.vm_spec.zone = FLAGS.zone[0]
+      vm_config = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
+      group = managed_vm_group_class(
+          group_spec, vm_config
+      )  # pytype: disable=not-instantiable
+      self.managed_vm_groups[group_name] = group
+      # Report resource provisioning times.
+      self.resources.append(group)
+      return []
 
     # Then create the remaining VM objects using VM and disk specs.
 
@@ -870,11 +939,11 @@ class BenchmarkSpec:
 
         jujuvm.units.extend(vms)  # pytype: disable=attribute-error
         if jujuvm and jujuvm not in self.vms:
-          self.vms.extend([jujuvm])
-          self.vm_groups['%s_juju_controller' % group_spec.cloud] = [jujuvm]
+          self.unmanaged_vm_groups[
+              '%s_juju_controller' % group_spec.cloud
+          ] = [jujuvm]
 
-      self.vm_groups[group_name] = vms
-      self.vms.extend(vms)
+      self.unmanaged_vm_groups[group_name] = vms
 
     # In the case of an un-managed yarn cluster, for hadoop software
     # installation, the dpb service instance needs access to constructed
@@ -1002,7 +1071,7 @@ class BenchmarkSpec:
     for placement_group_object in self.placement_groups.values():
       placement_group_object.Create()
 
-    if self.vms:
+    if self.vms or self.managed_vm_groups:
       # Iterate through VM groups to apply potential provision_delay_seconds
       # and then call CreateAndBoot for each group.
       # Sorting by provision_order ensures a deterministic order if delays
@@ -1039,6 +1108,9 @@ class BenchmarkSpec:
             group_vms,
             post_task_delay=post_task_delay,
         )
+
+      for group in self.managed_vm_groups.values():
+        group.Create()
 
       if self.nfs_service and self.nfs_service.CLOUD == nfs_service.UNMANAGED:
         self.nfs_service.Create()
@@ -1082,6 +1154,8 @@ class BenchmarkSpec:
       self.pinecone.Create()
     if self.vvs:
       self.vvs.Create()
+    if self.ai_agent_service:
+      self.ai_agent_service.Create()
     if self.edw_service:
       if (
           not self.edw_service.user_managed
@@ -1159,6 +1233,8 @@ class BenchmarkSpec:
       self.pinecone.Delete()
     if hasattr(self, 'vvs') and self.vvs:
       self.vvs.Delete()
+    if hasattr(self, 'ai_agent_service') and self.ai_agent_service:
+      self.ai_agent_service.Delete()
 
     # Note: It is ok to delete capacity reservations before deleting the VMs,
     # and will actually save money (mere seconds of usage).
@@ -1410,3 +1486,5 @@ class BenchmarkSpec:
       self.messaging_service.CheckPrerequisites()
     if hasattr(self, 'memory_store') and self.memory_store:
       self.memory_store.CheckPrerequisites()
+    if hasattr(self, 'ai_agent_service') and self.ai_agent_service:
+      self.ai_agent_service.CheckPrerequisites()

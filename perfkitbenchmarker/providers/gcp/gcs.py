@@ -35,6 +35,7 @@ _DEFAULT_GCP_SERVICE_KEY_FILE = 'gcp_credentials.json'
 DEFAULT_GCP_REGION = 'us-central1'
 GCLOUD_CONFIG_PATH = '.config/gcloud'
 GCS_CLIENT_PYTHON = 'python'
+GCS_CLIENT_PYTHON_GRPC = 'python_grpc'
 GCS_CLIENT_BOTO = 'boto'
 READER = 'objectViewer'
 WRITER = 'objectCreator'
@@ -47,8 +48,9 @@ flags.DEFINE_string(
 GCS_CLIENT = flags.DEFINE_enum(
     'gcs_client',
     GCS_CLIENT_PYTHON,
-    [GCS_CLIENT_PYTHON, GCS_CLIENT_BOTO],
-    'The GCS client library to use (default python).',
+    [GCS_CLIENT_PYTHON, GCS_CLIENT_PYTHON_GRPC, GCS_CLIENT_BOTO],
+    'The GCS client library to use. If benchmarking GCS Rapid, '
+    'the grpc client will be used automatically.',
 )
 
 FLAGS = flags.FLAGS
@@ -69,6 +71,7 @@ class GoogleCloudStorageBucketSpec(object_storage_service.BaseBucketSpec):
       uniform_bucket_level_access=False,
   ):
     super().__init__(mount_point, bucket_name, region, zone)
+    assert util.GetRegionFromZone(zone) == region
     self.hierarchical_name_space: bool = hierarchical_name_space
     self.uniform_bucket_level_access: bool = uniform_bucket_level_access
 
@@ -79,18 +82,16 @@ class GoogleCloudStorageBucket(object_storage_service.Bucket):
   def __init__(self, bucket_spec):
     super().__init__(bucket_spec)
     self.hierarchical_name_space = bucket_spec.hierarchical_name_space
-    self.uniform_bucket_level_access = (
-        bucket_spec.uniform_bucket_level_access
-    )
+    self.uniform_bucket_level_access = bucket_spec.uniform_bucket_level_access
     self.service = GoogleCloudStorageService()
 
   def _Create(self):
     self.service.PrepareService(
-        self.region,
+        self.zone,
         self.hierarchical_name_space,
         self.uniform_bucket_level_access,
     )
-    self.service.MakeBucket(self.bucket_name, placement=self.zone)
+    self.service.MakeBucket(self.bucket_name)
 
   def _Delete(self):
     self.service.CleanupService()
@@ -104,31 +105,35 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
   STORAGE_NAME = provider_info.GCP
 
   location: str
+  placement: str
 
   def __init__(self):
     super().__init__()
     self.location = None
+    self.placement = None
     self.hierarchical_name_space = False
     self.uniform_bucket_level_access = False
 
   def PrepareService(
       self,
-      location,
-      hierarchical_name_space=False,
-      uniform_bucket_level_access=False,
+      location: str = DEFAULT_GCP_REGION,
+      hierarchical_name_space: bool = False,
+      uniform_bucket_level_access: bool = False,
   ):
-    self.location = location or DEFAULT_GCP_REGION
+    self.placement = None
+    if util.IsZone(location):
+      self.location = util.GetRegionFromZone(location)
+      self.placement = location
+    else:
+      self.location = location
     self.hierarchical_name_space = hierarchical_name_space
     self.uniform_bucket_level_access = uniform_bucket_level_access
 
-  def MakeBucket(
-      self, bucket_name, placement=None, raise_on_failure=True, tag_bucket=True
-  ):
+  def MakeBucket(self, bucket_name, raise_on_failure=True, tag_bucket=True):
     """Creates a GCS bucket.
 
     Args:
       bucket_name: The name of the bucket to create, without gs:// prefix.
-      placement: The placement of the bucket.
       raise_on_failure: If False, exceptions are swallowed.
       tag_bucket: If True, tag the bucket with default tags.
     """
@@ -143,8 +148,8 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     elif self.location and '-' in self.location:
       # regional buckets
       command.extend(['--default-storage-class', 'regional'])
-    if placement:
-      command.extend(['--placement', placement])
+    if self.placement:
+      command.extend(['--placement', self.placement])
     if self.hierarchical_name_space:
       command.extend(['--enable-hierarchical-namespace'])
     if self.uniform_bucket_level_access:
@@ -162,15 +167,22 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       raise errors.Benchmarks.BucketCreationError(stderr)
 
     if tag_bucket:
-      command = ['gsutil', 'label', 'ch']
-      for key, value in util.GetDefaultTags().items():
-        command.extend(['-l', f'{key}:{value}'])
-      command.extend([f'gs://{bucket_name}'])
-      _, stderr, ret_code = vm_util.IssueCommand(
-          command, raise_on_failure=False
-      )
-      if ret_code and raise_on_failure:
-        raise errors.Benchmarks.BucketCreationError(stderr)
+      tags = util.GetDefaultTags()
+      if tags:
+        labels_str = ','.join([f'{key}={value}' for key, value in tags.items()])
+        command = [
+            'gcloud',
+            'storage',
+            'buckets',
+            'update',
+            f'gs://{bucket_name}',
+            f'--update-labels={labels_str}',
+        ]
+        _, stderr, ret_code = vm_util.IssueCommand(
+            command, raise_on_failure=False
+        )
+        if ret_code and raise_on_failure:
+          raise errors.Benchmarks.BucketCreationError(stderr)
 
   def Copy(self, src_url, dst_url, recursive=False, timeout=None):
     """See base class.
@@ -182,10 +194,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       recursive: If True, copy the directory recursively.
       timeout: The timeout for the copy command.
     """
-    cmd = ['gsutil', 'cp']
-    if recursive or timeout is not None:
-      # -m runs in parallel, which is faster.
-      cmd = ['gsutil', '-m', 'cp']
+    cmd = ['gcloud', 'storage', 'cp']
     if recursive:
       cmd += ['-r']
     cmd += [src_url, dst_url]
@@ -201,7 +210,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       object_path: Path within the bucket to the object.
     """
     dst_url = self.MakeRemoteCliDownloadUrl(bucket_name, object_path)
-    vm_util.IssueCommand(['gsutil', 'cp', src_path, dst_url])
+    vm_util.IssueCommand(['gcloud', 'storage', 'cp', src_path, dst_url])
 
   def MakeRemoteCliDownloadUrl(self, bucket_name, object_path):
     """See base class.
@@ -218,14 +227,16 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
   def GenerateCliDownloadFileCommand(self, src_url, local_path):
     """See base class."""
-    return f'gsutil cp "{src_url}" "{local_path}"'
+    return f'gcloud storage cp "{src_url}" "{local_path}"'
 
   def List(self, bucket_name):
     """See base class."""
-    # Full URI is required by gsutil.
+    # Full URI is required by gcloud storage.
     if not bucket_name.startswith('gs://'):
       bucket_name = 'gs://' + bucket_name
-    stdout, _, _ = vm_util.IssueCommand(['gsutil', 'ls', bucket_name])
+    stdout, _, _ = vm_util.IssueCommand(
+        ['gcloud', 'storage', 'ls', bucket_name]
+    )
     return stdout
 
   def ListTopLevelSubfolders(self, bucket_name):
@@ -264,14 +275,14 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       return retcode and 'BucketNotFoundException' in stderr
 
     vm_util.IssueCommand(
-        ['gsutil', 'rb', f'gs://{bucket_name}'],
+        ['gcloud', 'storage', 'buckets', 'delete', f'gs://{bucket_name}'],
         suppress_failure=_bucket_not_found,
     )
 
   def EmptyBucket(self, bucket_name):
     # Ignore failures here and retry in DeleteBucket.  See more comments there.
     vm_util.IssueCommand(
-        ['gsutil', '-m', 'rm', '-r', f'gs://{bucket_name}/*'],
+        ['gcloud', 'storage', 'rm', '-r', f'gs://{bucket_name}/*'],
         raise_on_failure=False,
     )
 
@@ -283,13 +294,16 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       roles: the IAM roles to be granted.
       bucket_name: the name of the bucket to change
     """
-    vm_util.IssueCommand([
-        'gsutil',
-        'iam',
-        'ch',
-        f"{entity}:{','.join(roles)}",
-        f'gs://{bucket_name}',
-    ])
+    for role in roles:
+      vm_util.IssueCommand([
+          'gcloud',
+          'storage',
+          'buckets',
+          'add-iam-policy-binding',
+          f'gs://{bucket_name}',
+          f'--member={entity}',
+          f'--role={role}',
+      ])
 
   def MakeBucketPubliclyReadable(self, bucket_name, also_make_writable=False):
     """See base class."""
@@ -332,7 +346,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     Args:
       vm: gce virtual machine object.
     """
-    if GCS_CLIENT.value == GCS_CLIENT_PYTHON:
+    if GCS_CLIENT.value != GCS_CLIENT_BOTO:
       return
 
     boto_src = object_storage_service.FindBotoFile()
@@ -363,7 +377,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     Args:
       vm: gce virtual machine object.
     """
-    if GCS_CLIENT.value == GCS_CLIENT_PYTHON:
+    if GCS_CLIENT.value != GCS_CLIENT_BOTO:
       return
 
     vm_pwd, _ = vm.RemoteCommand('pwd')
@@ -450,33 +464,10 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
         self.AcquireWritePermissionsLinux(vm)
       vm.Install('gcs_boto_plugin')
 
-    vm.gsutil_path, _ = vm.RemoteCommand('which gsutil', login_shell=True)
-    vm.gsutil_path = vm.gsutil_path.split()[0]
-
-    # Detect if we need to install crcmod for gcp.
-    # See "gsutil help crc" for details.
-    raw_result, _ = vm.RemoteCommand(f'{vm.gsutil_path} version -l')
-    logging.info('gsutil version -l raw result is %s', raw_result)
-    search_string = 'compiled crcmod: True'
-    result_string = re.findall(search_string, raw_result)
-    if not result_string:
-      logging.info('compiled crcmod is not available, installing now...')
-      try:
-        # Try uninstall first just in case there is a pure python version of
-        # crcmod on the system already, this is required by gsutil doc:
-        # https://cloud.google.com/storage/docs/
-        # gsutil/addlhelp/CRC32CandInstallingcrcmod
-        vm.Uninstall('crcmod')
-      except errors.VirtualMachine.RemoteCommandError:
-        logging.info(
-            'pip uninstall crcmod failed, could be normal if crcmod '
-            'is not available at all.'
-        )
-      vm.Install('crcmod')
-      vm.installed_crcmod = True
-    else:
-      logging.info('compiled crcmod is available, not installing again.')
-      vm.installed_crcmod = False
+    vm.gcloud_path, _ = vm.RemoteCommand('which gcloud', login_shell=True)
+    if vm.gcloud_path:
+      vm.gcloud_path = vm.gcloud_path.split()[0]
+    vm.installed_crcmod = True
 
   def CleanupVM(self, vm):
     vm.RemoveFile('google-cloud-sdk')
@@ -487,12 +478,12 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
   def CLIUploadDirectory(self, vm, directory, files, bucket_name):
     return vm.RemoteCommand(
-        'time %s -m cp %s/* gs://%s/' % (vm.gsutil_path, directory, bucket_name)
+        'time %s -m cp %s/* gs://%s/' % (vm.gcloud_path, directory, bucket_name)
     )
 
   def CLIDownloadBucket(self, vm, bucket_name, objects, dest):
     return vm.RemoteCommand(
-        'time %s -m cp gs://%s/* %s' % (vm.gsutil_path, bucket_name, dest)
+        'time %s -m cp gs://%s/* %s' % (vm.gcloud_path, bucket_name, dest)
     )
 
   def Metadata(self, vm):
@@ -513,4 +504,4 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
   @classmethod
   def APIScriptFiles(cls):
-    return ['gcs.py', 'gcs_boto.py']
+    return ['gcs.py', 'gcs_grpc.py', 'gcs_boto.py']

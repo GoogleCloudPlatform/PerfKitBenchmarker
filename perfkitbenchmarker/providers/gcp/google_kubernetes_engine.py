@@ -35,6 +35,7 @@ from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources.container_service import container
 from perfkitbenchmarker.resources.container_service import container_cluster
 from perfkitbenchmarker.resources.container_service import container_registry
+from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
@@ -264,6 +265,20 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     stdout, _, _ = cmd.Issue()
     return stdout.split()
 
+  def GetMachineTypeFromNodeName(self, node_name: str) -> str | None:
+    """Get the machine type from the node name."""
+    machine_type: str | None = super().GetMachineTypeFromNodeName(node_name)
+    if machine_type is not None:
+      return machine_type
+    out, _, _ = kubectl.RunKubectlCommand([
+        'get',
+        'node',
+        node_name,
+        '-o',
+        r'jsonpath={.metadata.labels.node\.kubernetes\.io/instance-type}',
+    ])
+    return out.strip() or None
+
   def _UsesCustomComputeClass(
       self, nodepool_config: container.BaseNodePoolConfig
   ) -> bool:
@@ -328,6 +343,13 @@ class GkeCluster(BaseGkeCluster):
       cmd.flags['region'] = self.region
     return cmd
 
+  def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
+    """Targets the default pool ComputeClass when custom classes are enabled."""
+    del machine_type
+    if self._UsesCustomComputeClass(self.default_nodepool):
+      return {'cloud.google.com/compute-class': self.default_nodepool.name}
+    return {}
+
   def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns a dict containing metadata about the cluster.
 
@@ -352,6 +374,10 @@ class GkeCluster(BaseGkeCluster):
       result['max-memory'] = gcp_flags.MAX_MEMORY.value
     if gcp_flags.MAX_ACCELERATOR.value:
       result['max-accelerator'] = gcp_flags.MAX_ACCELERATOR.value
+    if gcp_flags.GKE_AUTOSCALING_PROFILE.value:
+      result['gke_autoscaling_profile'] = (
+          gcp_flags.GKE_AUTOSCALING_PROFILE.value
+      )
 
     return result
 
@@ -388,12 +414,17 @@ class GkeCluster(BaseGkeCluster):
     if enable_autoprovisioning:
       cmd.args.append('--enable-autoprovisioning')
 
-    if self.min_nodes != self.max_nodes:
-      cmd.args.append('--enable-autoscaling')
-      cmd.flags['max-nodes'] = self.max_nodes
-      cmd.flags['min-nodes'] = self.min_nodes
-    cmd.flags['cluster-ipv4-cidr'] = f'/{_CalculateCidrSize(self.max_nodes)}'
+    if gcp_flags.GKE_AUTOSCALING_PROFILE.value:
+      cmd.flags['autoscaling-profile'] = gcp_flags.GKE_AUTOSCALING_PROFILE.value
+    cidr_size = (
+        gcp_flags.GKE_CLUSTER_IPV4_CIDR_SIZE.value
+        or _CalculateCidrSize(self.max_total_nodes)
+    )
+    cmd.flags['cluster-ipv4-cidr'] = f'/{cidr_size}'
     cmd.flags['metadata'] = util.MakeFormattedDefaultTags()
+
+    if self.enable_aam:
+      cmd.args.append('--auto-monitoring-scope=ALL')
 
     self._RunClusterCreateCommand(cmd)
     self._GetKubeconfig()
@@ -522,8 +553,9 @@ class GkeCluster(BaseGkeCluster):
         cmd.flags['local-ssd-count'] = nodepool_config.max_local_disks
 
     cmd.flags['num-nodes'] = nodepool_config.num_nodes
-    # zone may be split a comma separated list
-    if nodepool_config.zone:
+    # zone may be split a comma separated list. For regional clusters, zone
+    # holds the region name; do not set node-locations so GKE uses default.
+    if nodepool_config.zone and not util.IsRegion(nodepool_config.zone):
       cmd.flags['node-locations'] = nodepool_config.zone
 
     if nodepool_config.machine_type:
@@ -557,6 +589,10 @@ class GkeCluster(BaseGkeCluster):
       cmd.flags['image-type'] = self.image_type
 
     cmd.flags['node-labels'] = f'pkb_nodepool={nodepool_config.name}'
+    if nodepool_config.min_nodes != nodepool_config.max_nodes:
+      cmd.args.append('--enable-autoscaling')
+      cmd.flags['min-nodes'] = nodepool_config.min_nodes
+      cmd.flags['max-nodes'] = nodepool_config.max_nodes
 
   def _PostCreate(self):
     """Waits for kube-dns to be available."""
@@ -608,7 +644,7 @@ class GkeAutopilotCluster(BaseGkeCluster):
   """Class representing an Autopilot GKE cluster, which has no nodepools."""
 
   CLOUD = provider_info.GCP
-  CLUSTER_TYPE = 'Autopilot'
+  CLUSTER_TYPE = 'Auto'
 
   def __init__(self, spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(spec)
@@ -647,6 +683,9 @@ class GkeAutopilotCluster(BaseGkeCluster):
     if self.default_nodepool.network:
       cmd.flags['network'] = self.default_nodepool.network.network_resource.name
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
+
+    if self.enable_aam:
+      cmd.args.append('--auto-monitoring-scope=ALL')
 
     self._RunClusterCreateCommand(cmd)
     self._GetKubeconfig()

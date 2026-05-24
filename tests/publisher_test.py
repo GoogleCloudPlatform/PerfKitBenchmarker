@@ -241,7 +241,12 @@ class CloudStoragePublisherTestCase(unittest.TestCase):
     instance = publisher.CloudStoragePublisher('test-bucket')
     instance.PublishSamples(self.samples)
     self.mock_vm_util.IssueRetryableCommand.assert_called_once_with(
-        ['gsutil', 'cp', mock.ANY, 'gs://test-bucket/141764776338_be428eb']
+        [
+            'gsutil',
+            'cp',
+            mock.ANY,
+            'gs://test-bucket/141764776338_be428eb',
+        ]
     )
 
 

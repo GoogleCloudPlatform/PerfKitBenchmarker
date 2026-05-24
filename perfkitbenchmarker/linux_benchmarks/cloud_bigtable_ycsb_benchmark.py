@@ -119,6 +119,12 @@ _CHANNEL_COUNT = flags.DEFINE_integer(
     ),
 )
 
+_YCSB_JVM_ARGS = flags.DEFINE_list(
+    'google_bigtable_ycsb_jvm_args',
+    [],
+    'A list of custom JVM arguments to pass to the YCSB runner.',
+)
+
 BENCHMARK_NAME = 'cloud_bigtable_ycsb'
 BENCHMARK_CONFIG = """
 cloud_bigtable_ycsb:
@@ -391,7 +397,10 @@ def _GetYcsbExecutor(
 ) -> ycsb.YCSBExecutor:
   """Gets the YCSB executor class for loading and running the benchmark."""
   ycsb_memory = min(vms[0].total_memory_kb // 1024, 4096)
-  jvm_args = shlex.quote(f' -Xmx{ycsb_memory}m')
+  jvm_args_list = [f'-Xmx{ycsb_memory}m']
+  if _YCSB_JVM_ARGS.value:
+    jvm_args_list.extend(_YCSB_JVM_ARGS.value)
+  jvm_args = shlex.quote(' ' + shlex.join(jvm_args_list))
   env = {}
   if _USE_JAVA_VENEER_CLIENT.value:
     executor_flags = {'jvm-args': jvm_args, 'table': _GetTableName()}

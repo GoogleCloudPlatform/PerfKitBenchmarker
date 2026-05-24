@@ -298,6 +298,16 @@ def MountDisk(vm):
     )
 
 
+def GetFioTargetModeWithoutFillForWrite():
+  """Returns the fio target mode based on the operation type.
+
+  Always prefilling for read.
+  """
+  if fio_flags.FIO_OPERATION_TYPE.value == constants.OPERATION_WRITE:
+    return constants.AGAINST_DEVICE_WITHOUT_FILL_MODE
+  return constants.AGAINST_DEVICE_WITH_FILL_MODE
+
+
 def WriteJobFileToTempFile(vm, job_file_string):
   job_file_path = vm_util.PrependTempDir(vm.name + '_fio.job')
   with open(job_file_path, 'w') as job_file:

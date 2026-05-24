@@ -164,7 +164,7 @@ _POST_BOOT_LATENCY_TEST_COMMAND = flags.DEFINE_string(
     'cluster_boot_post_boot_latency_test_command',
     None,
     'Single command to run after a VM has booted that will have its latency '
-    'tested and published as a sample.'
+    'tested and published as a sample.',
 )
 FLAGS = flags.FLAGS
 
@@ -214,9 +214,13 @@ def PrepareStartupScript() -> Tuple[str, int | None, str]:
 
 
 def GetConfig(user_config):
-  benchmark_config = configs.LoadConfig(
-      BENCHMARK_CONFIG, user_config, BENCHMARK_NAME
+  return ConfigureStartupScript(
+      configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   )
+
+
+def ConfigureStartupScript(benchmark_config):
+  """Configure flags to use the generated startup script."""
   if _LINUX_BOOT_METRICS.value or CollectNetworkSamples():
     startup_script_path, pid, output_path = PrepareStartupScript()
     benchmark_config['flags']['boot_startup_script'] = startup_script_path
@@ -369,9 +373,7 @@ def GetTimeToBoot(vms):
       assert vm.host
       assert vm.host.create_start_time
       assert vm.host.create_start_time < vm.create_start_time
-      host_create_latency_sec = (
-          vm.create_start_time - vm.host.create_start_time
-      )
+      host_create_latency_sec = vm.create_start_time - vm.host.create_start_time
       samples.append(
           sample.Sample(
               'Host Create Latency',
@@ -413,6 +415,19 @@ def GetTimeToBoot(vms):
         'The maximum delay between starting VM creations is %0.1fs.',
         max_create_delay_sec,
     )
+  if _LINUX_BOOT_METRICS.value or CollectNetworkSamples():
+    for vm in vms:
+      samples.extend(
+          linux_boot.CollectBootSamples(
+              vm,
+              vm.bootable_time - vm.create_start_time,
+              GetCallbackIPs(),
+              datetime.datetime.fromtimestamp(
+                  vm.create_start_time, pytz.timezone('UTC')
+              ),
+              include_networking_samples=CollectNetworkSamples(),
+          )
+      )
 
   return samples
 
@@ -522,18 +537,18 @@ def _RunPostBootLatencyTest(
     )
     after_test_time = time.time()
     if retcode != 0 or 'command not found' in stderr:
-      logging.warning(
-          'The test command failed: %s', stderr
-      )
-      return [sample.Sample(
-          'Post Boot Command Failed',
-          1,
-          'count',
-          {
-              'test_command': test_cmd,
-              'test_command_stderr': stderr[:1000],
-          },
-      )]
+      logging.warning('The test command failed: %s', stderr)
+      return [
+          sample.Sample(
+              'Post Boot Command Failed',
+              1,
+              'count',
+              {
+                  'test_command': test_cmd,
+                  'test_command_stderr': stderr[:1000],
+              },
+          )
+      ]
     else:
       return [
           sample.Sample(
@@ -573,19 +588,6 @@ def Run(benchmark_spec):
         _POST_BOOT_LATENCY_TEST_COMMAND.value, test_vm)
     if post_boot_samples:
       samples += post_boot_samples
-  if _LINUX_BOOT_METRICS.value or CollectNetworkSamples():
-    for vm in benchmark_spec.vms:
-      samples.extend(
-          linux_boot.CollectBootSamples(
-              vm,
-              vm.bootable_time - vm.create_start_time,
-              GetCallbackIPs(),
-              datetime.datetime.fromtimestamp(
-                  vm.create_start_time, pytz.timezone('UTC')
-              ),
-              include_networking_samples=CollectNetworkSamples(),
-          )
-      )
   if _BOOT_TIME_REBOOT.value:
     samples.extend(_MeasureReboot(benchmark_spec.vms))
 

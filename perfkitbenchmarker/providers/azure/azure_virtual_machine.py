@@ -40,7 +40,6 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import linux_virtual_machine
-from perfkitbenchmarker import os_types
 from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import resource
@@ -56,7 +55,6 @@ from perfkitbenchmarker.providers.azure import azure_network
 from perfkitbenchmarker.providers.azure import flags as azure_flags
 from perfkitbenchmarker.providers.azure import util
 import yaml
-
 
 FLAGS = flags.FLAGS
 
@@ -134,6 +132,18 @@ NUM_LOCAL_VOLUMES: dict[str, int] = {
     'Standard_D96ads_v7': 6,
     'Standard_D128ads_v7': 4,
     'Standard_D160ads_v7': 4,
+    'Standard_D2ds_v7': 1,
+    'Standard_D4ds_v7': 1,
+    'Standard_D8ds_v7': 1,
+    'Standard_D16ds_v7': 2,
+    'Standard_D32ds_v7': 4,
+    'Standard_D48ds_v7': 6,
+    'Standard_D64ds_v7': 4,
+    'Standard_D96ds_v7': 6,
+    'Standard_D128ds_v7': 4,
+    'Standard_D192ds_v7': 6,
+    'Standard_D248ds_v7': 5,
+    'Standard_D372ds_v7': 6,
 }
 
 _MACHINE_TYPES_ONLY_SUPPORT_GEN1_IMAGES = (
@@ -198,11 +208,6 @@ TRUSTED_LAUNCH_UNSUPPORTED_TYPES = [
     r'(Standard_ND[0-9]+a.*)',
     # Arm V5
     r'(Standard_[DE][0-9]+pl?d?s_v5)',
-]
-
-TRUSTED_LAUNCH_UNSUPPORTED_OS_TYPES = [
-    os_types.ROCKY_LINUX8,
-    os_types.ROCKY_LINUX9,
 ]
 
 
@@ -724,6 +729,7 @@ class AzureVirtualMachine(
   ARM_IMAGE_URN = None
   CONFIDENTIAL_IMAGE_URN = None
   IMAGE_REQUIRES_TERMS_ACCEPTANCE = False
+  SUPPORTS_TRUSTED_LAUNCH = True
 
   _lock = threading.Lock()
   # TODO(user): remove host groups & hosts as globals -> create new spec
@@ -803,7 +809,7 @@ class AzureVirtualMachine(
             re.search(machine_series, self.machine_type)
             for machine_series in TRUSTED_LAUNCH_UNSUPPORTED_TYPES
         )
-        or self.OS_TYPE in TRUSTED_LAUNCH_UNSUPPORTED_OS_TYPES
+        or not self.SUPPORTS_TRUSTED_LAUNCH
     )
     arm_arch = _GetArmArch(self.machine_type)
     self.is_aarch64 = bool(arm_arch)
@@ -861,6 +867,8 @@ class AzureVirtualMachine(
     for nic in self.nics:
       nic.Create()
 
+    self.AllowRemoteAccessPorts()
+
     if self.use_dedicated_host:
       with self._lock:
         self.host_list = self.host_map[(self.host_series_sku, self.region)]
@@ -914,7 +922,11 @@ class AzureVirtualMachine(
         )
     security_args = []
     secure_boot_args = []
-    # if machine is confidential or trusted launch, we can update secure boot
+    if enable_secure_boot is not None:
+      secure_boot_args = [
+          '--enable-secure-boot',
+          str(enable_secure_boot).lower(),
+      ]
     if self.machine_type_is_confidential:
       security_args = [
           '--enable-vtpm',
@@ -924,15 +936,21 @@ class AzureVirtualMachine(
           '--os-disk-security-encryption-type',
           'VMGuestStateOnly',
       ]
-      if enable_secure_boot is None:
-        secure_boot_args = [
-            '--enable-secure-boot',
-            'true',
-        ]
-    if enable_secure_boot is not None:
-      secure_boot_args = [
-          '--enable-secure-boot',
-          str(enable_secure_boot).lower(),
+    elif (
+        not self.trusted_launch_unsupported_type
+        and not self.machine_type_is_confidential
+    ):  # Trusted Launch
+      # If we don't specify TrustedLaunch security type, Azure will default to
+      # Standard.
+      security_args = [
+          '--security-type',
+          'TrustedLaunch',
+      ]
+    else:
+      # Default to Standard security type.
+      security_args = [
+          '--security-type',
+          'Standard',
       ]
 
     tags = {}
@@ -978,8 +996,6 @@ class AzureVirtualMachine(
         create_cmd.extend(['--disk-controller-type', 'NVMe'])
       else:
         create_cmd.extend(['--disk-controller-type', 'SCSI'])
-    if self.trusted_launch_unsupported_type:
-      create_cmd.extend(['--security-type', 'Standard'])
     if self.boot_startup_script:
       create_cmd.extend(['--custom-data', self.boot_startup_script])
 
@@ -1156,7 +1172,12 @@ class AzureVirtualMachine(
     """Resumes the VM."""
     raise NotImplementedError()
 
-  @vm_util.Retry()
+  @vm_util.Retry(
+      retryable_exceptions=(
+          errors.VmUtil.IssueCommandError,
+          errors.Resource.RetryableCreationError,
+      )
+  )
   def _PostCreate(self):
     """Get VM data."""
     stdout, _ = vm_util.IssueRetryableCommand(
@@ -1168,10 +1189,17 @@ class AzureVirtualMachine(
             'json',
             '--name',
             self.name,
+            '--show-details',
         ]
         + self.resource_group.args
     )
     response = json.loads(stdout)
+    self.internal_ips = response['privateIps'].split(',')
+    self.internal_ip = self.internal_ips[0]
+    if self.public_ips:
+      self.ip_addresses = response['publicIps'].split(',')
+      self.ip_address = self.ip_addresses[0]
+
     self.create_os_disk_strategy.disk.name = response['storageProfile'][
         'osDisk'
     ]['name']
@@ -1188,13 +1216,6 @@ class AzureVirtualMachine(
         ]
         + self.resource_group.args
     )
-    self.internal_ip = self.nics[0].GetInternalIP()
-    self.internal_ips = [nic.GetInternalIP() for nic in self.nics]
-    if self.public_ips:
-      self.ip_address = self.public_ips[0].GetIPAddress()
-      self.ip_addresses = [
-          public_ip.GetIPAddress() for public_ip in self.public_ips
-      ]
 
   def SetupAllScratchDisks(self):
     """Set up all scratch disks of the current VM."""
@@ -1349,6 +1370,7 @@ class Debian13BasedAzureVirtualMachine(
 class Ubuntu2004BasedAzureVirtualMachine(
     AzureVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin
 ):
+  """Deprecated Ubuntu 20.04 based Azure VM."""
   GEN2_IMAGE_URN = (
       'Canonical:0001-com-ubuntu-server-focal:20_04-lts-gen2:latest'
   )
@@ -1359,6 +1381,7 @@ class Ubuntu2004BasedAzureVirtualMachine(
   ARM_IMAGE_URN = (
       'Canonical:0001-com-ubuntu-server-focal:20_04-lts-arm64:latest'
   )
+  SUPPORTS_TRUSTED_LAUNCH = False
 
 
 class Ubuntu2204BasedAzureVirtualMachine(
@@ -1385,22 +1408,44 @@ class Ubuntu2404BasedAzureVirtualMachine(
   ARM_IMAGE_URN = 'Canonical:ubuntu-24_04-lts:server-arm64:latest'
 
 
+class Ubuntu2604BasedAzureVirtualMachine(
+    AzureVirtualMachine, linux_virtual_machine.Ubuntu2604Mixin
+):
+  GEN2_IMAGE_URN = 'Canonical:ubuntu-26_04-lts:server:latest'
+  GEN1_IMAGE_URN = 'Canonical:ubuntu-26_04-lts:server-gen1:latest'
+  CONFIDENTIAL_IMAGE_URN = 'Canonical:ubuntu-26_04-lts:cvm:latest'
+  ARM_IMAGE_URN = 'Canonical:ubuntu-26_04-lts:server-arm64:latest'
+
+
+class BaseRedHatBasedAzureVirtualMachine(
+    AzureVirtualMachine, linux_virtual_machine.BaseRedHatMixin
+):
+
+  def SetupPackageManager(self):
+    # https://learn.microsoft.com/en-us/troubleshoot/azure/virtual-machines/linux/troubleshoot-linux-rhui-certificate-issues
+    self.RemoteCommand(
+        "sudo dnf update -y --disablerepo='*' --enablerepo='*microsoft-azure*'"
+    )
+    # Install EPEL
+    super().SetupPackageManager()
+
+
 class Rhel8BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Rhel8Mixin
+    BaseRedHatBasedAzureVirtualMachine, linux_virtual_machine.Rhel8Mixin
 ):
   GEN2_IMAGE_URN = 'RedHat:RHEL:8-lvm-gen2:latest'
   GEN1_IMAGE_URN = 'RedHat:RHEL:8-LVM:latest'
 
 
 class Rhel9BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Rhel9Mixin
+    BaseRedHatBasedAzureVirtualMachine, linux_virtual_machine.Rhel9Mixin
 ):
   GEN2_IMAGE_URN = 'RedHat:RHEL:9-lvm-gen2:latest'
   GEN1_IMAGE_URN = 'RedHat:RHEL:9-lvm:latest'
 
 
 class Rhel10BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Rhel10Mixin
+    BaseRedHatBasedAzureVirtualMachine, linux_virtual_machine.Rhel10Mixin
 ):
   GEN2_IMAGE_URN = 'RedHat:RHEL:10-lvm-gen2:latest'
   GEN1_IMAGE_URN = 'RedHat:RHEL:10-lvm:latest'
@@ -1413,6 +1458,7 @@ class AlmaLinux8BasedAzureVirtualMachine(
   GEN2_IMAGE_URN = 'almalinux:almalinux-hpc:8_10-hpc-gen2:latest'
   GEN1_IMAGE_URN = 'almalinux:almalinux-hpc:8_10-hpc-gen1:latest'
   ARM_IMAGE_URN = 'almalinux:almalinux-arm:8-arm-gen2:latest'
+  SUPPORTS_TRUSTED_LAUNCH = False
 
 
 class AlmaLinux9BasedAzureVirtualMachine(
@@ -1421,6 +1467,7 @@ class AlmaLinux9BasedAzureVirtualMachine(
   GEN2_IMAGE_URN = 'almalinux:almalinux-hpc:9-hpc-gen2:latest'
   GEN1_IMAGE_URN = 'almalinux:almalinux-hpc:9-hpc-gen1:latest'
   ARM_IMAGE_URN = 'almalinux:almalinux-arm:9-arm-64k-gen2:latest'
+  SUPPORTS_TRUSTED_LAUNCH = False
 
 
 class AlmaLinux10BasedAzureVirtualMachine(
@@ -1441,6 +1488,7 @@ class RockyLinux8BasedAzureVirtualMachine(
   GEN2_IMAGE_URN = '/CommunityGalleries/rocky-dc1c6aa6-905b-4d9c-9577-63ccc28c482a/Images/Rocky-8-x86_64/Versions/latest'
   CONFIDENTIAL_IMAGE_URN = '/CommunityGalleries/rocky-dc1c6aa6-905b-4d9c-9577-63ccc28c482a/Images/Rocky-8-x86_64-LVM/Versions/latest'
   ARM_IMAGE_URN = '/CommunityGalleries/rocky-dc1c6aa6-905b-4d9c-9577-63ccc28c482a/Images/Rocky-8-aarch64/Versions/latest'
+  SUPPORTS_TRUSTED_LAUNCH = False
 
 
 class RockyLinux9BasedAzureVirtualMachine(
@@ -1450,6 +1498,7 @@ class RockyLinux9BasedAzureVirtualMachine(
   GEN2_IMAGE_URN = '/CommunityGalleries/rocky-dc1c6aa6-905b-4d9c-9577-63ccc28c482a/Images/Rocky-9-x86_64/Versions/latest'
   CONFIDENTIAL_IMAGE_URN = '/CommunityGalleries/rocky-dc1c6aa6-905b-4d9c-9577-63ccc28c482a/Images/Rocky-9-x86_64-LVM/Versions/latest'
   ARM_IMAGE_URN = '/CommunityGalleries/rocky-dc1c6aa6-905b-4d9c-9577-63ccc28c482a/Images/Rocky-9-aarch64/Versions/latest'
+  SUPPORTS_TRUSTED_LAUNCH = False
 
 
 class RockyLinux10BasedAzureVirtualMachine(
@@ -1579,6 +1628,7 @@ class Windows2016CoreAzureVirtualMachine(
   GEN1_IMAGE_URN = (
       'MicrosoftWindowsServer:WindowsServer:2016-Datacenter-Server-Core:latest'
   )
+  SUPPORTS_TRUSTED_LAUNCH = False
 
 
 class Windows2019CoreAzureVirtualMachine(
@@ -1588,6 +1638,7 @@ class Windows2019CoreAzureVirtualMachine(
   GEN1_IMAGE_URN = (
       'MicrosoftWindowsServer:WindowsServer:2019-Datacenter-Core:latest'
   )
+  SUPPORTS_TRUSTED_LAUNCH = False
 
 
 class Windows2022CoreAzureVirtualMachine(
@@ -1618,6 +1669,7 @@ class Windows2016DesktopAzureVirtualMachine(
 ):
   GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2016-datacenter-gen2:latest'
   GEN1_IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2016-Datacenter:latest'
+  SUPPORTS_TRUSTED_LAUNCH = False
 
 
 class Windows2019DesktopAzureVirtualMachine(
@@ -1626,6 +1678,7 @@ class Windows2019DesktopAzureVirtualMachine(
 ):
   GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2019-datacenter-gen2:latest'
   GEN1_IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest'
+  SUPPORTS_TRUSTED_LAUNCH = False
 
 
 class Windows2022DesktopAzureVirtualMachine(

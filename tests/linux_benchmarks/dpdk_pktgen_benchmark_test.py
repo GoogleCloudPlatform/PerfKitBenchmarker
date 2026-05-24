@@ -105,27 +105,24 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
       dpdk_pktgen_tx_rx_lcores_list=['[8:1];[1:8]'],
   )
   def testClientServerStdout(self):
-    self.bm_spec.vms[0].RemoteCommand.side_effect = [
-        ('6', ''),
-        ('', ''),
-        ('', ''),
-        (self.sender_stdout, ''),
-        (670441705, ''),
-        (11, ''),
-        ('', ''),
-        ('', ''),
-        (self.sender_stdout, ''),
-        (670441705, ''),
-        (11, ''),
-        ('', ''),
-        ('', ''),
-    ]
+    self.bm_spec.vms[0].RemoteCommand.side_effect = (
+        [
+            ('6', ''),
+            ('', ''),
+            ('', ''),
+            (self.sender_stdout, ''),
+        ]
+        + [
+            (670441705, ''),
+            (11, ''),
+            ('', ''),
+        ]
+        * 25
+    )
     self.bm_spec.vms[1].RemoteCommand.side_effect = [
         (self.receiver_stdout, ''),
         (670421930, ''),
-        (self.receiver_stdout, ''),
-        (670421930, ''),
-    ]
+    ] * 25
     output_samples = dpdk_pktgen_benchmark.Run(self.bm_spec)
 
     # Compare each element except timestamp for each sample

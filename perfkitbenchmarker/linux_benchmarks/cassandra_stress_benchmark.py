@@ -1165,12 +1165,13 @@ def RunCassandraStress(
   cpu_utilization_client_avg, cpu_utilization_client_max = GetCpuUtilization(
       client_vms, CASSANDRA_STRESS_RUN_DURATION.value
   )
-  cpu_utilization_client_max_avg = round(
-      sum(cpu_utilization_client_max) / len(cpu_utilization_client_max), 2
+  cpu_utilization_client_avg_mean = round(
+      sum(cpu_utilization_client_avg) / len(cpu_utilization_client_avg), 2
   )
-  if cpu_utilization_client_max_avg > 70:
+  if cpu_utilization_client_avg_mean > 70:
     raise errors.Benchmarks.RunError(
-        f'client cpu utilization is high: {cpu_utilization_client_avg}'
+        'average client cpu utilization is high:'
+        f' {cpu_utilization_client_avg_mean}'
     )
 
   op_rate = GetOperationRate(current_samples)

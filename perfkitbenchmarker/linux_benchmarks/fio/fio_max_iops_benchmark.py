@@ -79,7 +79,7 @@ def ValidateNoCustomJobFile():
 def Prepare(spec: benchmark_spec.BenchmarkSpec):
   vm = spec.vms[0]
   vm.Install('fio')
-  FLAGS['fio_target_mode'].value = _GetFioTargetMode()
+  FLAGS['fio_target_mode'].value = utils.GetFioTargetModeWithoutFillForWrite()
   utils.PrefillIfEnabled(vm, constants.FIO_PATH)
 
 
@@ -125,16 +125,6 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       )
   )
   return samples
-
-
-def _GetFioTargetMode():
-  """Returns the fio target mode based on the operation type.
-
-  Always prefilling for read.
-  """
-  if fio_flags.FIO_OPERATION_TYPE.value == constants.OPERATION_WRITE:
-    return constants.AGAINST_DEVICE_WITHOUT_FILL_MODE
-  return constants.AGAINST_DEVICE_WITH_FILL_MODE
 
 
 def _GetMaxIOPSSample(samples) -> sample.Sample:

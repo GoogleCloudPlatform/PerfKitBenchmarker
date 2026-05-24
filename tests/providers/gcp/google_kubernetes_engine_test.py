@@ -102,9 +102,9 @@ class GoogleContainerRegistryTestCase(PatchedObjectsTestCase):
 
   class FakeContainerImage(container.ContainerImage):
 
-    def __init__(self, name):
+    def __init__(self, name, directory=None):
       self.name = name
-      self.directory = f'docker/{name}/Dockerfile'
+      self.directory = directory or f'docker/{name}/Dockerfile'
 
   def setUp(self):
     super().setUp()
@@ -759,7 +759,7 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
         'NAME',
         **{
             'cloud': 'GCP',
-            'type': 'Autopilot',
+            'type': 'Auto',
             'vm_spec': {
                 'GCP': {
                     'zone': 'us-central1-a',
@@ -796,11 +796,11 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
           {
               'project': 'fakeproject',
               'cloud': 'GCP',
-              'cluster_type': 'Autopilot',
+              'cluster_type': 'Auto',
               'region': 'us-central1',
-              'machine_type': 'Autopilot',
-              'size': 'Autopilot',
-              'nodepools': 'Autopilot',
+              'machine_type': 'Auto',
+              'size': 'Auto',
+              'nodepools': 'Auto',
           },
           metadata,
       )
@@ -880,6 +880,71 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
     )
     self.assertIn('cloud.google.com/gke-gpu-driver-version: default', full_logs)
     self.assertIn('cloud.google.com/compute-class: Accelerator', full_logs)
+
+  def testGetMachineTypeFromNodeName(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
+    self.MockIssueCommand(
+        {'get node': [('ek-standard-16', '', 0)]}
+    )
+    self.assertEqual(
+        cluster.GetMachineTypeFromNodeName(
+            'gke-pkb-cluster-default-pool-node-1'
+        ),
+        'ek-standard-16',
+    )
+
+
+class GoogleKubernetesEngineNodepoolAutoscalingTestCase(PatchedObjectsTestCase):
+
+  def testCreateWithPerNodepoolAutoscaling(self):
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a',
+                },
+            },
+            'vm_count': 2,
+            'min_vm_count': 1,
+            'max_vm_count': 5,
+            'nodepools': {
+                'nodepool1': {
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': 'machine-type-1',
+                        },
+                    },
+                    'vm_count': 3,
+                    'min_vm_count': 2,
+                    'max_vm_count': 10,
+                },
+            },
+            'poll_for_events': False,
+        },
+    )
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(kubernetes_engine_spec)
+      cluster._Create()
+
+      create_cluster_cmd = issue_command.GetCommandWithSubstring(
+          'gcloud container clusters create'
+      )
+      self.assertIn('--enable-autoscaling', create_cluster_cmd)
+      self.assertIn('--min-nodes 1', create_cluster_cmd)
+      self.assertIn('--max-nodes 5', create_cluster_cmd)
+      self.assertIn('--num-nodes 2', create_cluster_cmd)
+
+      nodepool_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create nodepool1'
+      )
+      self.assertIn('--enable-autoscaling', nodepool_cmd)
+      self.assertIn('--min-nodes 2', nodepool_cmd)
+      self.assertIn('--max-nodes 10', nodepool_cmd)
 
 
 if __name__ == '__main__':

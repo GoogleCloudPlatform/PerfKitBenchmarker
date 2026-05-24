@@ -590,15 +590,15 @@ def IssueCommand(
     if should_time:
       timing_output = tf_timing.read().rstrip('\n')
 
-  logged_stdout = '[REDACTED]' if suppress_logging else stdout
-  logged_stderr = '[REDACTED]' if suppress_logging else stderr
-  debug_text = 'Ran: {%s}\nReturnCode:%s%s\nSTDOUT: %s\nSTDERR: %s' % (
+  debug_text = 'Ran: {%s}\nReturnCode:%s%s' % (
       full_cmd,
       process.returncode,
       timing_output,
-      logged_stdout,
-      logged_stderr,
   )
+  if not suppress_logging:
+    debug_text += f'\nSTDOUT: {stdout}\nSTDERR: {stderr}'
+  else:
+    debug_text += '  STDOUT & STDERR: [REDACTED]'
   if _VM_COMMAND_LOG_MODE.value == VmCommandLogMode.ALWAYS_LOG or (
       _VM_COMMAND_LOG_MODE.value == VmCommandLogMode.LOG_ON_ERROR
       and process.returncode

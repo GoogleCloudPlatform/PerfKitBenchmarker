@@ -38,12 +38,12 @@ from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import vm_group_decoders
+from perfkitbenchmarker.resources import ai_agent_service_spec
 from perfkitbenchmarker.resources import example_resource_spec
 from perfkitbenchmarker.resources import jobs_setter
 from perfkitbenchmarker.resources import managed_ai_model_spec
 from perfkitbenchmarker.resources.pinecone import pinecone_resource_spec
 from perfkitbenchmarker.resources.vertex_vector_search import vvs_resource_spec
-
 
 _NONE_OK = {'default': None, 'none_ok': True}
 
@@ -811,14 +811,18 @@ class _RelationalDbDecoder(option_decoders.TypeVerifier):
     # LoadProvider is required for resources to be registered.
     _LoadProvider(relational_db_config, flag_values)
 
+    cloud = relational_db_config.get('cloud')
+    if not cloud or flag_values['cloud'].present:
+      cloud = flag_values.cloud
+
     if 'engine' in relational_db_config:
       if flag_values['db_engine'].present:
         db_spec_class = relational_db_spec.GetRelationalDbSpecClass(
-            flag_values['db_engine'].value
+            cloud, flag_values['db_engine'].value
         )
       else:
         db_spec_class = relational_db_spec.GetRelationalDbSpecClass(
-            relational_db_config['engine']
+            cloud, relational_db_config['engine']
         )
     else:
       raise errors.Config.InvalidValue(
@@ -1461,6 +1465,10 @@ class BenchmarkConfigSpec(spec.BaseSpec):
             {'default': None, 'none_ok': True, 'valid_types': (dict,)},
         ),
         'vm_groups': (vm_group_decoders.VmGroupsDecoder, {'default': {}}),
+        'ai_agent_service': (
+            ai_agent_service_spec.AiAgentServiceDecoder,
+            {'default': None},
+        ),
         'placement_group_specs': (_PlacementGroupSpecsDecoder, {'default': {}}),
         'container_cluster': (
             container_spec.ContainerClusterSpecDecoder,

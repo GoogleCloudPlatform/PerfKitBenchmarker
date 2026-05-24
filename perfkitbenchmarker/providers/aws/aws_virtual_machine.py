@@ -793,9 +793,13 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-instances',
-        '--region=%s' % self.region,
-        '--filter=Name=client-token,Values=%s' % self.client_token,
-    ]
+        '--region=%s' % self.region,]
+    if self.client_token:
+      describe_cmd.append(
+          f'--filter=Name=client-token,Values={self.client_token}'
+      )
+    else:
+      describe_cmd.append(f'--instance-ids={self.id}')
     stdout, _ = util.IssueRetryableCommand(describe_cmd)
     return json.loads(stdout)
 
@@ -1845,6 +1849,13 @@ class Ubuntu2404BasedAwsVirtualMachine(
   IMAGE_NAME_FILTER_PATTERN = (
       'ubuntu/images/*/ubuntu-noble-24.04-{alternate_architecture}-server-20*'
   )
+  DEFAULT_ROOT_DISK_TYPE = 'gp3'
+
+
+class Ubuntu2604BasedAwsVirtualMachine(
+    UbuntuBasedAwsVirtualMachine, linux_virtual_machine.Ubuntu2604Mixin
+):
+  IMAGE_NAME_FILTER_PATTERN = 'ubuntu/images/*/ubuntu-resolute-26.04-{alternate_architecture}-server-20*'
   DEFAULT_ROOT_DISK_TYPE = 'gp3'
 
 

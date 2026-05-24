@@ -20,7 +20,6 @@ from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
-
 FLAGS = flags.FLAGS
 
 
@@ -195,6 +194,18 @@ class Trino(edw_service.EdwService):
       )
     else:
       ephemeral_storage = _MemoryToString(self.memory)
+    yaml_dict['coordinator']['config'] = {
+        'query': {
+            'maxMemoryPerNode': f'{_MemoryToString(query_size_per_node_num)}B',
+        },
+    }
+    yaml_dict['coordinator']['resources'] = {
+        'requests': {
+            'memory': f'{_MemoryToString(self.memory)}i',
+            'ephemeral-storage': f'{ephemeral_storage}i',
+        },
+    }
+
     yaml_dict['worker'] = {
         'config': {
             'query': {

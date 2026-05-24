@@ -174,14 +174,15 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
     self.db_subnet_group_name: str = None
     self.security_group_id: str = None
 
-  def _IsReady(self, timeout=IS_READY_TIMEOUT):
+  def _IsReady(self, timeout=IS_READY_TIMEOUT, poll_interval=5):
     """Return true if the underlying resource is ready.
 
-    This method will query all of the instance every 5 seconds until
+    This method will query all of the instance every poll_interval seconds until
     its instance state is 'available', or until a timeout occurs.
 
     Args:
       timeout: timeout in seconds
+      poll_interval: time in seconds between calls
 
     Returns:
       True if the resource was ready in time, False if the wait timed out
@@ -191,7 +192,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
       return False
 
     for instance_id in self.all_instance_ids:
-      if not self._IsInstanceReady(instance_id, timeout):
+      if not self._IsInstanceReady(instance_id, timeout, poll_interval):
         return False
 
     return True
@@ -424,15 +425,18 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
     json_output = json.loads(stdout)
     return json_output
 
-  def _IsInstanceReady(self, instance_id, timeout=IS_READY_TIMEOUT):
+  def _IsInstanceReady(
+      self, instance_id, timeout=IS_READY_TIMEOUT, poll_interval=5
+  ):
     """Return true if the instance is ready.
 
-    This method will query the instance every 5 seconds until
+    This method will query the instance every poll_interval seconds until
     its instance state is 'available', or until a timeout occurs.
 
     Args:
       instance_id: string of the instance to check is ready
       timeout: timeout in seconds
+      poll_interval: time in seconds between calls
 
     Returns:
       True if the resource was ready in time, False if the wait timed out
@@ -476,7 +480,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
               'Error attempting to read stdout. Creation failure.'
           )
           return False
-      time.sleep(5)
+      time.sleep(poll_interval)
 
     return True
 

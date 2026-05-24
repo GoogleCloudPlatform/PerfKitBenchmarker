@@ -115,29 +115,33 @@ class BaseContainerRegistry(resource.BaseResource):
     vm_util.IssueRetryableCommand(cmd, timeout=None)
     vm_util.IssueCommand(['docker', 'buildx', 'stop'])
 
-  def GetOrBuild(self, image: str):
+  def GetOrBuild(self, image: str, data_path: str | None = None):
     """Finds the image in the registry or builds it.
 
     TODO(pclay): Add support for build ARGs.
 
     Args:
       image: The PKB name for the image (string).
+      data_path: The PKB data directory path containing the Dockerfile if
+        different from docker/<image name>.
 
     Returns:
       The full image name (including the registry).
     """
     full_image = self.GetFullRegistryTag(image)
     self.Login()
-    self._Build(image)
+    self._Build(image, data_path)
     return full_image
 
-  def _Build(self, image: str):
+  def _Build(self, image: str, data_path: str | None = None):
     """Builds the image and pushes it to the registry if necessary.
 
     Args:
       image: The PKB name for the image (string).
+      data_path: The PKB data directory path containing the Dockerfile if
+        different from "docker/<image name>".
     """
-    image = container.ContainerImage(image)
+    image = container.ContainerImage(image, data_path)
     if not container.FLAGS.local_container_build:
       try:
         build_start = time.time()

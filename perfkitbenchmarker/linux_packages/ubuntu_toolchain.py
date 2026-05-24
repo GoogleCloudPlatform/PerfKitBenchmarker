@@ -17,8 +17,9 @@ def AptInstall(vm):
   vm.RemoteCommand('sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test')
   for key in _REQUIRED_KEYS:
     vm.RemoteCommand(
-        'curl -sL '
-        f'"http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x{key}"'
-        ' | sudo apt-key add'
+        'curl -sL'
+        f' "http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x{key}" |'
+        ' sudo gpg --dearmor'
+        f' -o/etc/apt/trusted.gpg.d/ubuntu-toolchain-{key}.gpg'
     )
   vm.RemoteCommand('sudo apt update')

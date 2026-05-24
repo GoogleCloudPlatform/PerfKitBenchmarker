@@ -254,11 +254,13 @@ flags.DEFINE_integer(
     'limits.cpu on EKS (uses kubernetes_scale_num_nodes, this value, and 5% '
     'headroom; minimum limit 1000). Raise for larger EC2 instance shapes.',
 )
-flags.DEFINE_list(
-    'eks_karpenter_nodepool_instance_types',
-    [],
-    'Comma-separated EC2 types for the Karpenter default NodePool (worker '
-    'nodes only). Empty keeps instance-category/generation in the template.',
+flags.DEFINE_boolean(
+    'eks_tune_vpc_cni_for_scale',
+    False,
+    'Tune aws-node DaemonSet warm-pool settings (WARM_ENI_TARGET=0, '
+    'WARM_IP_TARGET=1, MINIMUM_IP_TARGET=1) after cluster creation. '
+    'Required when scaling to thousands of nodes to prevent subnet IP '
+    'exhaustion. Enable when running kubernetes_node_scale at large scale.',
 )
 AWS_CAPACITY_BLOCK_RESERVATION_ID = flags.DEFINE_string(
     'aws_capacity_block_reservation_id',
@@ -283,6 +285,11 @@ AURORA_METRICS_COLLECTION_SLEEP_SECONDS = flags.DEFINE_integer(
     2 * 60 * 60,
     'The time to sleep before collecting Aurora metrics. By default this is a'
     ' long time in order to collect accurate VolumeBytesUsed metrics.',
+)
+AWS_AURORA_EXPRESS_CONFIGURATION = flags.DEFINE_boolean(
+    'aws_aurora_express_configuration',
+    False,
+    'Whether to use express configuration for Aurora cluster creation.',
 )
 AWS_EC2_INSTANCE_PROFILE = flags.DEFINE_string(
     'aws_ec2_instance_profile',
@@ -311,6 +318,12 @@ AWS_S3_MOUNT_ENABLE_METADATA_CACHE = flags.DEFINE_boolean(
     'aws_s3_mount_enable_metadata_cache',
     False,
     'Whether to enable metadata cache for s3 mountpoint.',
+)
+
+AWS_RDS_DEDICATED_LOG_VOLUME = flags.DEFINE_boolean(
+    'aws_rds_dedicated_log_volume',
+    False,
+    'Whether to use dedicated log volume for AWS RDS MySQL and MariaDB.',
 )
 
 

@@ -255,7 +255,10 @@ class CloudharmonyNetworkBenchmarkTestCase(
     spec = benchmark_spec.BenchmarkSpec(
         benchmark_module, benchmark_config, 'abcdefg'
     )
-    spec.vm_groups = {'client': [client], 'server': [server1, server2]}
+    spec.unmanaged_vm_groups = {
+        'client': [client],
+        'server': [server1, server2],
+    }
     cloudharmony_network_benchmark.Run(spec)
     client.RobustRemoteCommand.assert_called_with(
         'sudo /opt/pkb/network/run.sh --test_endpoint=10.0.0.1 '

@@ -97,6 +97,10 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
     key, value = arg.strip().split('=', maxsplit=1)
     lpg_extra_args[key.lstrip('-')] = value
 
+  if _HPA_ENABLED.value:
+    # HPA depends on automatic application monitoring for polling metrics.
+    config['container_cluster']['enable_aam'] = True
+
   return config
 
 
@@ -377,13 +381,15 @@ def _GetContainerInitTimestamp(
     if (
         event.resource.kind == 'Pod'
         and event.resource.name == pod_name
-        and 'Started container inference-server' in event.message
+        and (
+            'Container started' in event.message
+            or 'Started container inference-server' in event.message
+        )
     ):
       startup_event = event
   if startup_event is None:
     raise ValueError(
-        f'No events found for pod {pod_name} with message "Started container'
-        ' inference-server".'
+        f'No events found for pod {pod_name} with message "Container started".'
     )
   return _FormatUTCTimeStampToLocalTime(server, startup_event.timestamp)
 

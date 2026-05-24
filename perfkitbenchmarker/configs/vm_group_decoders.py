@@ -28,6 +28,34 @@ _DEFAULT_DISK_COUNT = 1
 _DEFAULT_VM_COUNT = 1
 
 
+class ManagedVmGroupSpec(spec.BaseSpec):
+  """Configurable options of a Managed VM group.
+
+  This only includes options that are specific to VM scaling.
+  Configuration of the VM (templates) comes from the surrounding VmGroupSpec.
+
+  Currently this is just a placeholder, but implemented as a spec over a
+  boolean so that it can be extended in the future and in subclasses.
+  """
+
+  pass
+
+
+class ManagedVmGroupSpecDecoder(option_decoders.TypeVerifier):
+  """Validates a single ManagedVmGroupSpec dictionary."""
+
+  def Decode(self, value, component_full_name, flag_values):
+    """Verifies vm_groups dictionary of a benchmark config object."""
+    managed_vm_group_config = super().Decode(
+        value, component_full_name, flag_values
+    )
+    return ManagedVmGroupSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values,
+        **managed_vm_group_config
+    )
+
+
 class VmGroupSpec(spec.BaseSpec):
   """Configurable options of a VM group.
 
@@ -55,6 +83,7 @@ class VmGroupSpec(spec.BaseSpec):
   static_vms: list[static_vm_spec.StaticVmSpec]
   vm_count: int
   vm_spec: virtual_machine_spec.BaseVmSpec
+  managed_spec: ManagedVmGroupSpec | None
   vm_as_nfs: bool
   vm_as_nfs_disk_spec: disk.BaseNFSDiskSpec | None
   placement_group_name: str
@@ -63,9 +92,7 @@ class VmGroupSpec(spec.BaseSpec):
   provision_delay_seconds: int
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
-    super().__init__(
-        component_full_name, flag_values=flag_values, **kwargs
-    )
+    super().__init__(component_full_name, flag_values=flag_values, **kwargs)
     ignore_package_requirements = (
         getattr(flag_values, 'ignore_package_requirements', True)
         if flag_values
@@ -154,6 +181,10 @@ class VmGroupSpec(spec.BaseSpec):
         ),
         'cidr': (option_decoders.StringDecoder, {'default': None}),
         'vm_spec': (spec.PerCloudConfigDecoder, {}),
+        'managed_spec': (
+            ManagedVmGroupSpecDecoder,
+            {'default': None, 'none_ok': True},
+        ),
         'placement_group_name': (
             option_decoders.StringDecoder,
             {'default': None, 'none_ok': True},
@@ -188,6 +219,8 @@ class VmGroupSpec(spec.BaseSpec):
       config_values['os_type'] = flag_values.os_type
     if 'vm_count' in config_values and config_values['vm_count'] is None:
       config_values['vm_count'] = flag_values.num_vms
+    if flag_values['use_managed_vm_groups'].value:
+      config_values['managed_spec'] = {}
 
 
 class VmGroupsDecoder(option_decoders.TypeVerifier):
@@ -210,9 +243,7 @@ class VmGroupsDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vm_group_configs = super().Decode(
-        value, component_full_name, flag_values
-    )
+    vm_group_configs = super().Decode(value, component_full_name, flag_values)
     result = {}
     for vm_group_name, vm_group_config in vm_group_configs.items():
       result[vm_group_name] = VmGroupSpec(
@@ -244,9 +275,7 @@ class VmGroupSpecDecoder(option_decoders.TypeVerifier):
     Raises:
       errors.Config.InvalidValue upon invalid input value.
     """
-    vm_group_config = super().Decode(
-        value, component_full_name, flag_values
-    )
+    vm_group_config = super().Decode(value, component_full_name, flag_values)
     return VmGroupSpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,

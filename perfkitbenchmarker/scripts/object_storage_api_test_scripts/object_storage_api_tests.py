@@ -1431,6 +1431,9 @@ def Main(argv=sys.argv):
       from providers import gcs
 
       service = gcs.GcsService()
+    elif FLAGS.gcs_client == gcs_flags.GCS_CLIENT_PYTHON_GRPC:
+      from providers import gcs_grpc
+      service = gcs_grpc.GcsGrpcService()
     else:
       raise ValueError('Invalid GCS client library %s' % FLAGS.gcs_client)
   elif FLAGS.storage_provider == 'S3':

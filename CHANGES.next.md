@@ -120,6 +120,13 @@
     created and managed by PKB.
 -   Refactored `kubernetes_redis_memtier_benchmark`, including removal of
     non-functioning Redis Cluster testing.
+-   Allow/require setting individual nodepools' min/max node counts
+    independently of the overall K8s cluster's default nodepool. For Standard &
+    Karpenter clusters.
+-   Support more of the Kubernetes spec in the Karpenter implementation,
+    bringing this variant more in-line with others.
+-   Rename GKE Autopilot & EKS Auto mode's cluster_type within PKB from
+    'Autopilot' to 'Auto'.
 
 ### New features:
 
@@ -205,7 +212,7 @@
 -   Add support for multi-network creation/attachment. PKB currently does not
     handle subnet creation on an existing network.
 -   Add support for GCE Confidential VM's.
--   Add cos-dev, cos125, cos121, cos117, and cos113 OS support for GCP.
+-   Add cos-dev, cos129, cos125, cos121, cos117, and OS support for GCP.
 -   Add --object_ttl_days flag for lifecycle management of created buckets.
 -   Add support for multi-NIC netperf throughput on AWS.
 -   Added AWS/GCP support for Data Plane Development Kit (DPDK) on Linux VM's to
@@ -275,6 +282,7 @@
     desired, turn it off with `--notruncate_duplicate_logs`.
 -   Add support for Alma Linux 8, 9, and 10 for the Azure provider.
 -   Re-enable support for Rocky Linux 8, 9, and 10 for the Azure provider.
+-   Add Ubuntu 26.04 support for GCP, AWS, and Azure Providers.
 
 ### Enhancements:
 
@@ -453,6 +461,8 @@
     maintenance_simulation_trigger.py.
 -   Added `--retry_on_insufficient_capacity_cloud_failure` so that resource
     creation can be retried on stock outs.
+-   Add support for deploying VMs inside managed VM groups with
+    `--use_managed_vm_groups`.
 
 ### Bug fixes and maintenance updates:
 
@@ -662,3 +672,6 @@
     general solution that can be used with or instead of --ycsb_max_error_rate
     and --ycsb_fail_on_incomplete_loading.
 -   Support basic TPU vm provisioning.
+-   Set firewall rule as PKB-created before deletion when using
+    --gce_firewall_rules_clean_all.
+-   Added gke_kubernetes_nginx to default benchmark config.

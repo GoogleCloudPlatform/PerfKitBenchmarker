@@ -141,7 +141,7 @@ class ConstructElasticacheRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
         yaml_string=test_spec, benchmark_name='cloud_redis_memtier'
     )
-    self.test_bm_spec.vm_groups = {'clients': [mock.MagicMock()]}
+    self.test_bm_spec.unmanaged_vm_groups = {'clients': [mock.MagicMock()]}
 
     self.test_bm_spec.ConstructMemoryStore()
 
@@ -170,7 +170,7 @@ class ConstructElasticacheRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
         yaml_string=test_spec, benchmark_name='cloud_redis_memtier'
     )
-    self.test_bm_spec.vm_groups = {'clients': [mock.MagicMock()]}
+    self.test_bm_spec.unmanaged_vm_groups = {'clients': [mock.MagicMock()]}
 
     self.test_bm_spec.ConstructMemoryStore()
 
