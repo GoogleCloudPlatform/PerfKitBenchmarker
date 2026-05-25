@@ -296,6 +296,10 @@ class BaseContainerCluster(resource.BaseResource):
     """Get node pool names for the cluster."""
     raise NotImplementedError
 
+  def ApplyFusePVC(self, pvc_name: str) -> None:
+    """Apply a cloud-specific fuse (e.g. blobfuse, gcsfuse) PV & PVC."""
+    pass
+
 
 def GetContainerClusterClass(
     cloud: str, cluster_type: str

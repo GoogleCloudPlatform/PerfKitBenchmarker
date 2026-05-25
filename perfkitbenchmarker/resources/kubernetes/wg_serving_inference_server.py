@@ -1017,7 +1017,10 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     if 'gcsfuse' in self.spec.catalog_components:
       self._ApplyGCSFusePVC()
     elif 'blobfuse' in self.spec.catalog_components:
-      self.cluster.ApplyBlobFusePVC()
+      extra_args = self.spec.extra_deployment_args or {}
+      self.cluster.ApplyFusePVC(
+          extra_args.get('pvc-name', 'azure-fuse-csi-static-pvc')
+      )
 
     self._ProvisionGPUNodePool()
 

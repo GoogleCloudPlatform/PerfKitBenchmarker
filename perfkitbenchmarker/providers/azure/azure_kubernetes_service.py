@@ -525,7 +525,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         spot=FLAGS.azure_low_priority_vms,
     )
 
-  def ApplyBlobFusePVC(self):
+  def ApplyFusePVC(self, pvc_name: str) -> None:
     """Apply the Azure Blob Storage PV & PVC to the cluster."""
     if not all([
         FLAGS.k8s_inference_server_blobstorage_account,
@@ -543,10 +543,11 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
       )
     storage_account = FLAGS.k8s_inference_server_blobstorage_account
     kubernetes_commands.ApplyManifest(
-        'container/kubernetes_ai_inference/blobfuse_pv_pvc.yaml.j2',
+        'container/azure/blobfuse-pv-pvc.yaml.j2',
         storage_account=storage_account,
         blob_container=FLAGS.k8s_inference_server_blobstorage_container,
         resource_group=FLAGS.k8s_inference_server_blobstorage_resource_group,
+        pvc_name=pvc_name,
         encoded_account_name=base64.b64encode(
             storage_account.encode('utf-8')
         ).decode('utf-8'),
