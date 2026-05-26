@@ -587,6 +587,16 @@ GKE_ENABLE_DATAPLANE_V2 = flags.DEFINE_boolean(
     'Whether to enable GKE Dataplane V2 (eBPF-based datapath, Cilium under the hood). '
     'Requires cluster recreation; cannot be toggled on an existing cluster.',
 )
+GKE_ENABLE_AGENT_SANDBOX = flags.DEFINE_boolean(
+    'gke_enable_agent_sandbox',
+    False,
+    'Whether to enable the GKE Agent Sandbox controller on the cluster. '
+    'Installs the managed agent-sandbox controller and CRDs, enabling '
+    'SandboxClaim/Sandbox/SandboxWarmPool reconciliation by GKE. This is '
+    'separate from the gvisor sandbox runtime (--sandbox=type=gvisor on a '
+    'node pool). Requires GKE 1.35.2-gke.1269000 or later. See '
+    'https://docs.cloud.google.com/kubernetes-engine/docs/how-to/agent-sandbox.',
+)
 
 
 def _ValidateGkePrivateNodeFlags(flags_dict):
