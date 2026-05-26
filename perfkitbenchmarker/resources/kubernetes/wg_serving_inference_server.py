@@ -28,6 +28,7 @@ from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import elastic_kubernetes_service
 from perfkitbenchmarker.resources import kubernetes_inference_server
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
@@ -53,21 +54,6 @@ FLAG_GCS_BUCKET = flags.DEFINE_string(
     'k8s_inference_server_gcs_bucket',
     None,
     'The GCS bucket that has model data for inference server to use.',
-)
-
-FLAG_S3_BUCKET = flags.DEFINE_string(
-    'k8s_inference_server_s3_bucket',
-    None,
-    'The S3 bucket that has model data for inference server to use '
-    '(mounted via the AWS Mountpoint S3 CSI Driver).',
-)
-
-FLAG_S3_REGION = flags.DEFINE_string(
-    'k8s_inference_server_s3_region',
-    None,
-    'AWS region of the S3 bucket referenced by '
-    '--k8s_inference_server_s3_bucket. Required for the Mountpoint S3 CSI '
-    'driver mount options.',
 )
 
 # AWS Inferentia/Trainium instance-family substrings recognised in
@@ -1081,7 +1067,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     if 'gcsfuse' in self.spec.catalog_components:
       self._ApplyGCSFusePVC()
     elif 's3' in self.spec.catalog_components:
-      self._ApplyS3PVC()
+      elastic_kubernetes_service.ApplyInferenceS3PvAndPvc()
 
     self._ProvisionGPUNodePool()
 
@@ -1146,26 +1132,6 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         gcs_bucket=FLAG_GCS_BUCKET.value,
     )
     logging.info('Successfully applied GCSFuse PVC.')
-
-  def _ApplyS3PVC(self):
-    """Apply the PV & PVC backed by Mountpoint for Amazon S3 CSI driver.
-
-    Prerequisites (see PR description for setup details):
-      - Model weights uploaded to the S3 bucket (--k8s_inference_server_s3_bucket).
-      - S3 CSI driver installed on the cluster with read-only IAM access to the
-        bucket (via --eks_install_s3_csi_addon or equivalent manual IAM setup).
-    """
-    if not FLAG_S3_BUCKET.value or not FLAG_S3_REGION.value:
-      raise errors.Resource.CreationError(
-          'Both --k8s_inference_server_s3_bucket and '
-          '--k8s_inference_server_s3_region are required to apply the S3 PVC.'
-      )
-    kubernetes_commands.ApplyManifest(
-        'container/kubernetes_ai_inference/s3_pv_pvc.yaml.j2',
-        s3_bucket=FLAG_S3_BUCKET.value,
-        s3_region=FLAG_S3_REGION.value,
-    )
-    logging.info('Successfully applied S3 PVC.')
 
   def _CollectStartupMonitorMetrics(self) -> dict[str, PodStartupMetrics]:
     collected_metrics_map = super()._CollectStartupMonitorMetrics()

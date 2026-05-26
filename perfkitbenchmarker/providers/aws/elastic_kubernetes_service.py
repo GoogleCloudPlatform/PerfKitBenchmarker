@@ -78,6 +78,28 @@ def RecursivelyUpdateDictionary(
   return original
 
 
+def ApplyInferenceS3PvAndPvc() -> None:
+  """Apply the PV and PVC backed by Mountpoint for Amazon S3 CSI driver.
+
+  Prerequisites:
+    - Model weights uploaded to the S3 bucket (--k8s_inference_server_s3_bucket).
+    - S3 CSI driver installed on the cluster (--eks_install_s3_csi_addon).
+  """
+  bucket = aws_flags.K8S_INFERENCE_SERVER_S3_BUCKET.value
+  region = aws_flags.K8S_INFERENCE_SERVER_S3_REGION.value
+  if not bucket or not region:
+    raise errors.Resource.CreationError(
+        'Both --k8s_inference_server_s3_bucket and '
+        '--k8s_inference_server_s3_region are required to apply the S3 PVC.'
+    )
+  kubernetes_commands.ApplyManifest(
+      'container/kubernetes_ai_inference/s3_pv_pvc.yaml.j2',
+      s3_bucket=bucket,
+      s3_region=region,
+  )
+  logging.info('Successfully applied S3 PVC.')
+
+
 class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
   """Shared base class for Elastic Kubernetes Service cluster auto mode & not."""
 
@@ -592,10 +614,7 @@ class EksAutoCluster(BaseEksCluster):
 
   def _InstallS3CsiAddon(self):
     """Installs the S3 CSI Driver and the IAM glue (Role/Policy + PIA)."""
-    # Local import: the inference-server module owns the bucket flag.
-    from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server  # pylint: disable=g-import-not-at-top
-
-    bucket = wg_serving_inference_server.FLAG_S3_BUCKET.value
+    bucket = aws_flags.K8S_INFERENCE_SERVER_S3_BUCKET.value
     if not bucket:
       raise errors.Config.InvalidValue(
           '--k8s_inference_server_s3_bucket is required when '
@@ -734,8 +753,9 @@ class EksAutoCluster(BaseEksCluster):
 
   def _InstallNeuronDevicePlugin(self):
     """Applies the AWS Neuron Device Plugin DaemonSet to the cluster."""
-    # Non-empty kwargs force Jinja render (see ReadAndRenderJinja2Template); image
-    # matches default in neuron-device-plugin.yaml.j2.
+    # PKB only renders .j2 when ApplyManifest kwargs is non-empty
+    # (vm_util.ReadAndRenderJinja2Template). With no kwargs the literal
+    # "{{ neuron_device_plugin_image }}" would be sent to kubectl.
     default_image = 'public.ecr.aws/neuron/neuron-device-plugin:2.22.4.0'
     kubernetes_commands.ApplyManifest(
         'container/aws/neuron-device-plugin.yaml.j2',

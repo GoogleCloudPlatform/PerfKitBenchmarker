@@ -88,6 +88,19 @@ EKS_INSTALL_S3_CSI_ADDON = flags.DEFINE_boolean(
     'during cluster post-create. Requires IAM permissions to be set up '
     'out-of-band (Pod Identity Association on the addon service account).',
 )
+K8S_INFERENCE_SERVER_S3_BUCKET = flags.DEFINE_string(
+    'k8s_inference_server_s3_bucket',
+    None,
+    'The S3 bucket that has model data for inference server to use '
+    '(mounted via the AWS Mountpoint S3 CSI Driver).',
+)
+K8S_INFERENCE_SERVER_S3_REGION = flags.DEFINE_string(
+    'k8s_inference_server_s3_region',
+    None,
+    'AWS region of the S3 bucket referenced by '
+    '--k8s_inference_server_s3_bucket. Required for the Mountpoint S3 CSI '
+    'driver mount options.',
+)
 EKS_INSTALL_NEURON_DEVICE_PLUGIN = flags.DEFINE_boolean(
     'eks_install_neuron_device_plugin',
     False,

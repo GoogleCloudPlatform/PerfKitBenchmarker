@@ -3,7 +3,6 @@ import tempfile
 import unittest
 
 from absl import flags
-from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import errors
@@ -314,29 +313,6 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
   def testGetStorageType(self, catalog_components, expected):
     self.server.spec.catalog_components = catalog_components
     self.assertEqual(self.server.GetStorageType(), expected)
-
-  @mock.patch.object(kubernetes_commands, 'ApplyManifest')
-  def testApplyS3PVCRaisesWhenFlagsMissing(self, apply_manifest_mock):
-    with flagsaver.flagsaver(
-        k8s_inference_server_s3_bucket=None,
-        k8s_inference_server_s3_region=None,
-    ):
-      with self.assertRaises(errors.Resource.CreationError):
-        self.server._ApplyS3PVC()
-    apply_manifest_mock.assert_not_called()
-
-  @mock.patch.object(kubernetes_commands, 'ApplyManifest')
-  def testApplyS3PVCRendersTemplate(self, apply_manifest_mock):
-    with flagsaver.flagsaver(
-        k8s_inference_server_s3_bucket='my-bucket',
-        k8s_inference_server_s3_region='us-east-1',
-    ):
-      self.server._ApplyS3PVC()
-    apply_manifest_mock.assert_called_once_with(
-        'container/kubernetes_ai_inference/s3_pv_pvc.yaml.j2',
-        s3_bucket='my-bucket',
-        s3_region='us-east-1',
-    )
 
   @parameterized.parameters(
       dict(

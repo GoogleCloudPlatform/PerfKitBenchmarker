@@ -15,9 +15,7 @@ from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import elastic_kubernetes_service
 from perfkitbenchmarker.providers.aws import util
 from perfkitbenchmarker.resources.container_service import kubectl
-# Imported to register --k8s_inference_server_s3_bucket so flagsaver can set
-# it from this test file.
-from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server  # pylint: disable=unused-import
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from tests import matchers
 from tests import pkb_common_test_case
 
@@ -365,6 +363,35 @@ class EksAutoClusterTest(BaseEksTest):
     )
     cluster = elastic_kubernetes_service.EksAutoCluster(EKS_SPEC)
     self.assertTrue(cluster._IsReady())
+
+
+class InferenceS3StorageTest(BaseEksTest):
+  """Tests S3 PV/PVC apply for kubernetes_ai_inference on AWS."""
+
+  @mock.patch.object(kubernetes_commands, 'ApplyManifest')
+  def testApplyInferenceS3PvAndPvcRaisesWhenFlagsMissing(
+      self, apply_manifest_mock
+  ):
+    with flagsaver.flagsaver(
+        k8s_inference_server_s3_bucket=None,
+        k8s_inference_server_s3_region=None,
+    ):
+      with self.assertRaises(errors.Resource.CreationError):
+        elastic_kubernetes_service.ApplyInferenceS3PvAndPvc()
+    apply_manifest_mock.assert_not_called()
+
+  @mock.patch.object(kubernetes_commands, 'ApplyManifest')
+  def testApplyInferenceS3PvAndPvcRendersTemplate(self, apply_manifest_mock):
+    with flagsaver.flagsaver(
+        k8s_inference_server_s3_bucket='my-bucket',
+        k8s_inference_server_s3_region='us-east-1',
+    ):
+      elastic_kubernetes_service.ApplyInferenceS3PvAndPvc()
+    apply_manifest_mock.assert_called_once_with(
+        'container/kubernetes_ai_inference/s3_pv_pvc.yaml.j2',
+        s3_bucket='my-bucket',
+        s3_region='us-east-1',
+    )
 
 
 class EksAutoClusterS3CsiTest(BaseEksTest):
