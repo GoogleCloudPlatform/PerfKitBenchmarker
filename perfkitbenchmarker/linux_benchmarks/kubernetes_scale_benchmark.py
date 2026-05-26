@@ -242,7 +242,8 @@ def ScaleUpPods(
   cluster.ModifyPodSpecPlacementYaml(
       yaml_docs,
       'kubernetes-scaleup',
-      nodepool.machine_type or nodepool.machine_families[0],
+      nodepool.machine_type
+      or (nodepool.machine_families and nodepool.machine_families[0]),
   )
   resource_names = kubernetes_commands.ApplyYaml(yaml_docs)
 
