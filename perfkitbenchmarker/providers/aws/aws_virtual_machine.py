@@ -441,8 +441,10 @@ class AwsKeyFileManager:
     with cls._lock:
       if _GetKeyfileSetKey(region) in cls.imported_keyfile_set:
         return
-      cat_cmd = ['cat', vm_util.GetPublicKeyPath()]
-      keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
+      # `aws ec2 import-key-pair --public-key-material` rejects a raw
+      # OpenSSH-formatted key with "Invalid base64" when the value comes
+      # in as a CLI string. The `fileb://` URI tells the CLI to read the
+      # file as bytes and send them through, which AWS accepts.
       formatted_tags = util.FormatTagSpecifications(
           'key-pair', util.MakeDefaultTags()
       )
@@ -451,7 +453,7 @@ class AwsKeyFileManager:
           '--region=%s' % region,
           'import-key-pair',
           '--key-name=%s' % cls.GetKeyNameForRun(),
-          '--public-key-material=%s' % keyfile,
+          '--public-key-material=fileb://%s' % vm_util.GetPublicKeyPath(),
           '--tag-specifications=%s' % formatted_tags,
       ]
       _, stderr, retcode = vm_util.IssueCommand(
