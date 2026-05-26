@@ -15,8 +15,8 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.resources.container_service import container_cluster
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
@@ -79,9 +79,9 @@ DEFAULT_IMAGE = 'busybox:1.37'
 NVIDIA_GPU_IMAGE = 'nvidia/cuda:11.0.3-runtime-ubuntu20.04'
 
 
-def _GetImage() -> str:
+def _GetImage(cluster: container_cluster.BaseContainerCluster) -> str:
   """Get the image for the scale deployment."""
-  if virtual_machine.GPU_COUNT.value:
+  if cluster.gpu_count:
     return NVIDIA_GPU_IMAGE
   if CONTAINER_IMAGE.value:
     return CONTAINER_IMAGE.value
@@ -110,11 +110,11 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
 
 
-def _GetScaleTimeout() -> int:
+def _GetScaleTimeout(cluster: container_cluster.BaseContainerCluster) -> int:
   """Returns the timeout for the scale up & teardown."""
   base_timeout = 60 * 10  # 10 minutes
   per_pod_timeout = NUM_PODS.value * 3  # 3 seconds per pod
-  if virtual_machine.GPU_COUNT.value:
+  if cluster.gpu_count:
     base_timeout = 60 * 30  # 30 minutes
   proposed_timeout = base_timeout + per_pod_timeout
   max_timeout = 60 * 60  # 1 hour
@@ -171,11 +171,11 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       'pod_memory': MEMORY_PER_POD.value,
       'pod_cpu': CPUS_PER_POD.value,
       'goal_replicas': NUM_PODS.value,
-      'image': _GetImage(),
+      'image': _GetImage(cluster),
   }
-  if virtual_machine.GPU_COUNT.value:
-    metadata['gpu_count'] = virtual_machine.GPU_COUNT.value
-    metadata['gpu_type'] = virtual_machine.GPU_TYPE.value
+  if cluster.gpu_count:
+    metadata['gpu_count'] = cluster.gpu_count
+    metadata['gpu_type'] = cluster.gpu_type
   if EXPECTED_NODES_CREATED.value:
     metadata['validated_num_nodes'] = EXPECTED_NODES_CREATED.value
   for s in samples:
@@ -192,14 +192,14 @@ def ScaleUpPods(
   initial_pods = kubernetes_commands.GetPodNames()
   logging.info('Initial pods: %s', initial_pods)
 
-  if virtual_machine.GPU_COUNT.value:
+  if cluster.gpu_count:
     # Use nvidia-smi to validate NVIDIA_GPU is available.
     command = ['sh', '-c', 'nvidia-smi && sleep 3600']
   else:
     command = ['sh', '-c', 'sleep infinity']
 
   # Request X new pods via YAML apply.
-  max_wait_time = _GetScaleTimeout()
+  max_wait_time = _GetScaleTimeout(cluster)
   resource_timeout = max_wait_time + 60 * 5  # 5 minutes after waiting to avoid
   # pod delete events from polluting data collection.
 
@@ -208,8 +208,8 @@ def ScaleUpPods(
       Replicas=num_new_pods,
       CpuRequest=CPUS_PER_POD.value,
       MemoryRequest=MEMORY_PER_POD.value,
-      NvidiaGpuRequest=virtual_machine.GPU_COUNT.value,
-      Image=_GetImage(),
+      NvidiaGpuRequest=cluster.gpu_count,
+      Image=_GetImage(cluster),
       Command=command,
       EphemeralStorageRequest='10Mi',
       RolloutTimeout=max_wait_time,
@@ -611,14 +611,16 @@ def SummarizeTimestamps(timestamps: list[float]) -> dict[str, float]:
   return summary
 
 
-def Cleanup(_):
+def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec):
   """Cleanups scale benchmark. Runs before teardown."""
+  cluster = bm_spec.container_cluster
   kubectl.RunKubectlCommand(['get', 'deployments'])
   kubectl.RunRetryableKubectlCommand(
       ['delete', 'deployment', 'kubernetes-scaleup'],
-      timeout=_GetScaleTimeout(),
+      timeout=_GetScaleTimeout(cluster),
       raise_on_failure=False,
   )
   kubectl.RunRetryableKubectlCommand(
-      ['delete', '--all', 'pods', '-n', 'default'], timeout=_GetScaleTimeout()
+      ['delete', '--all', 'pods', '-n', 'default'],
+      timeout=_GetScaleTimeout(cluster),
   )

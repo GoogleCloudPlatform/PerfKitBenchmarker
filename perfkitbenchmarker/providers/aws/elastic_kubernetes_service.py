@@ -542,7 +542,7 @@ class EksAutoCluster(BaseEksCluster):
   def __init__(self, spec):
     super().__init__(spec)
     self._ChooseSecondZone()
-    is_rare_gpu = virtual_machine.GPU_TYPE.value in _RARE_GPU_TYPES
+    is_rare_gpu = self.gpu_type in _RARE_GPU_TYPES
     self.use_spot: bool = aws_flags.USE_AWS_SPOT_INSTANCES.value or is_rare_gpu
 
   def _Create(self):
@@ -612,9 +612,9 @@ class EksAutoCluster(BaseEksCluster):
     selectors = {'eks.amazonaws.com/compute-type': 'auto'}
     if self.use_spot:
       selectors['karpenter.sh/capacity-type'] = 'spot'
-    if virtual_machine.GPU_TYPE.value:
+    if self.gpu_type:
       selectors['eks.amazonaws.com/instance-gpu-name'] = (
-          virtual_machine.GPU_TYPE.value
+          self.gpu_type
       )
     return selectors
 
