@@ -283,6 +283,7 @@
 -   Add support for Alma Linux 8, 9, and 10 for the Azure provider.
 -   Re-enable support for Rocky Linux 8, 9, and 10 for the Azure provider.
 -   Add Ubuntu 26.04 support for GCP, AWS, and Azure Providers.
+-   Add a kubernetes-native benchmark for MySQL using sysbench
 
 ### Enhancements:
 
