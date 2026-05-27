@@ -632,10 +632,32 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         f'pkb_nodepool={nodepool_config.name}',
         '--no-wait',
     ] + self._GetNodeFlags(nodepool_config, version_override=node_version)
-    _, stderr, retcode = vm_util.IssueCommand(
-        cmd, timeout=300, raise_on_failure=False
+    # fix: raise timeout to 600s (AKS can take >300s to accept a
+    # --no-wait request under concurrent load) and retry on transient errors
+    # that indicate the cluster is temporarily at its concurrent-op or
+    # pool-count limit.
+    _RETRYABLE = (
+        'OperationNotAllowed',
+        'ConflictingOperationInProgress',
+        'MaxAgentPoolCountReached',
     )
-    if retcode:
+    _MAX_RETRIES = 5
+    _RETRY_SLEEP_S = 30
+    for attempt in range(_MAX_RETRIES + 1):
+      _, stderr, retcode = vm_util.IssueCommand(
+          cmd, timeout=600, raise_on_failure=False
+      )
+      if not retcode:
+        break
+      if attempt < _MAX_RETRIES and any(e in stderr for e in _RETRYABLE):
+        logging.warning(
+            '[AKS] CreateNodePoolAsync %s: retryable error (attempt %d/%d),'
+            ' sleeping %ds: %s',
+            _AzureNodePoolName(nodepool_config.name),
+            attempt + 1, _MAX_RETRIES, _RETRY_SLEEP_S, stderr[:120],
+        )
+        time.sleep(_RETRY_SLEEP_S)
+        continue
       raise errors.Resource.CreationError(stderr)
     return f'np_succeeded:{_AzureNodePoolName(nodepool_config.name)}'
 
@@ -653,8 +675,10 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         target_version,
         '--no-wait',
     ] + self.resource_group.args
+    # fix: raise timeout to 600s — az aks nodepool upgrade --no-wait
+    # can take >300s to be accepted by Azure under concurrent load.
     _, stderr, retcode = vm_util.IssueCommand(
-        cmd, timeout=300, raise_on_failure=False
+        cmd, timeout=600, raise_on_failure=False
     )
     if retcode:
       raise errors.Resource.CreationError(stderr)
@@ -672,10 +696,20 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         _AzureNodePoolName(name),
         '--no-wait',
     ] + self.resource_group.args
+    # fix: raise timeout to 600s and treat NotFound as success.
+    # A pool that never existed or was already removed is the desired end-state
+    # for a delete — raising CreationError here caused all delete phases to
+    # fail for any pool whose create had previously failed.
     _, stderr, retcode = vm_util.IssueCommand(
-        cmd, timeout=300, raise_on_failure=False
+        cmd, timeout=600, raise_on_failure=False
     )
     if retcode:
+      if 'NotFound' in stderr or 'not found' in stderr.lower():
+        logging.info(
+            '[AKS] DeleteNodePoolAsync: %s already gone — treating as success',
+            _AzureNodePoolName(name),
+        )
+        return f'np_gone:{_AzureNodePoolName(name)}'
       raise errors.Resource.CreationError(stderr)
     return f'np_gone:{_AzureNodePoolName(name)}'
 
@@ -766,6 +800,8 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         retryable_exceptions=(errors.Resource.RetryableCreationError,),
     )
     def _wait_np_succeeded():
+      # fix: bound each individual poll call to 120s so a hung
+      # az aks nodepool show doesn't block the retry loop indefinitely.
       out, err, rc = vm_util.IssueCommand(
           [
               azure.AZURE_PATH,
@@ -783,6 +819,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
           ]
           + self.resource_group.args,
           raise_on_failure=False,
+          timeout=120,
       )
       if rc:
         raise errors.Resource.RetryableCreationError(err)
@@ -804,6 +841,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         retryable_exceptions=(errors.Resource.RetryableDeletionError,),
     )
     def _wait_np_gone():
+      # fix: per-poll timeout bound.
       _, err, rc = vm_util.IssueCommand(
           [
               azure.AZURE_PATH,
@@ -817,6 +855,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
           ]
           + self.resource_group.args,
           raise_on_failure=False,
+          timeout=120,
       )
       if rc and ('NotFound' in (err or '') or 'not found' in (err or '').lower()):
         return
@@ -833,6 +872,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         retryable_exceptions=(errors.Resource.RetryableCreationError,),
     )
     def _wait_cluster_succeeded():
+      # fix: per-poll timeout bound.
       out, err, rc = vm_util.IssueCommand(
           [
               azure.AZURE_PATH,
@@ -847,6 +887,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
           ]
           + self.resource_group.args,
           raise_on_failure=False,
+          timeout=120,
       )
       if rc:
         raise errors.Resource.RetryableCreationError(err)

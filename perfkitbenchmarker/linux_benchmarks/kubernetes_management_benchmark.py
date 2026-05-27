@@ -257,6 +257,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   if 'B' in scenarios:
     samples += _RunScenarioB(cluster, initial)
   if 'C' in scenarios:
+    # fix: Scenario A/B pools may still be in Deleting state and count
+    # toward AKS's 100-pool cluster limit.  Sweep them out before Scenario C
+    # so we don't hit MaxAgentPoolCountReached mid-run.
+    _CleanStartSweep(cluster)
     scales = ([int(x.strip()) for x in _SCALE_SWEEP.value]
               if _SCALE_SWEEP.value else [_LARGE_SCALE_NODEPOOLS.value])
     logging.info('Scenario C: scale sweep = %s', scales)
