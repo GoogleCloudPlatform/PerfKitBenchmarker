@@ -818,7 +818,7 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
           metadata,
       )
 
-  @flagsaver.flagsaver(gpu_type='h100', gpu_count=1, run_uri='123')
+  @flagsaver.flagsaver(run_uri='123')
   def testApplyYamlGpusH100(self):
     self.enter_context(
         mock.patch(
@@ -858,6 +858,8 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
         )
     )
     spec = self.create_kubernetes_engine_spec()
+    spec.vm_spec.gpu_count = 1
+    spec.vm_spec.gpu_type = 'h100'
     with self.assertLogs(level='INFO') as logs:
       cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
       yamls = kubernetes_commands.ConvertManifestToYamlDicts(

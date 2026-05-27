@@ -221,7 +221,7 @@ EDW_SEARCH_DATA_LOCATION = flags.DEFINE_string(
     'edw_search_data_location',
     None,
     'Cloud directory of bucket to source ongoing load data '
-    'for EDW search benchmarks (without rare token).',
+    'for EDW search benchmarks (without rare token).'
 )
 EDW_SEARCH_INDEX_NAME = flags.DEFINE_string(
     'edw_search_index_name',

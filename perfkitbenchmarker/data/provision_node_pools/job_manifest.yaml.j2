@@ -22,7 +22,7 @@ spec:
         {%- endif %}
       containers:
       - name: pause
-        image: busybox
+        image: {{ image }}
         resources:
           requests:
             memory: 50Mi

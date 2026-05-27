@@ -482,6 +482,14 @@ mysql_sysbench_tpcc:
     sysbench_use_fk: False
     sysbench_txn_isolation_level: RC
 
+kubernetes_mysql_sysbench:
+  name: kubernetes_mysql_sysbench
+  flags:
+    sysbench_run_seconds: 300
+    sysbench_run_threads: 512
+    sysbench_tables: 8
+    sysbench_table_size: 50000000
+
 postgresql_sysbench_oltp_base: &postgresql_sysbench_oltp_base
   sysbench_table_size: 21000000
   sysbench_tables: 8

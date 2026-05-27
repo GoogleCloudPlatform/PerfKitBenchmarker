@@ -24,7 +24,6 @@ from typing import Any
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
-from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
@@ -326,8 +325,6 @@ class GkeCluster(BaseGkeCluster):
     nodepool_config.disk_size = vm_config.boot_disk_size
     nodepool_config.max_local_disks = vm_config.max_local_disks
     nodepool_config.ssd_interface = vm_config.ssd_interface
-    nodepool_config.gpu_type = vm_config.gpu_type
-    nodepool_config.gpu_count = vm_config.gpu_count
     nodepool_config.threads_per_core = vm_config.threads_per_core
     nodepool_config.gce_tags = vm_config.gce_tags
     nodepool_config.min_cpu_platform = vm_config.min_cpu_platform
@@ -363,9 +360,6 @@ class GkeCluster(BaseGkeCluster):
       result['gce_local_ssd_count'] = self.default_nodepool.max_local_disks
       result['gce_local_ssd_interface'] = self.default_nodepool.ssd_interface
     result['gke_nccl_fast_socket'] = self.enable_nccl_fast_socket
-    if 'nccl' in self.nodepools:
-      result['gpu_type'] = self.nodepools['nccl'].gpu_type
-      result['gpu_count'] = self.nodepools['nccl'].gpu_count
     if self.image_type:
       result['image_type'] = self.image_type
     if gcp_flags.MAX_CPU.value:
@@ -714,9 +708,9 @@ class GkeAutopilotCluster(BaseGkeCluster):
       # bigger nodes.
       compute_class = 'Performance'
     # https://cloud.google.com/kubernetes-engine/docs/how-to/autopilot-gpus#request-gpus
-    if virtual_machine.GPU_TYPE.value:
-      gpu_count = virtual_machine.GPU_COUNT.value or 1
-      gpu_type = virtual_machine.GPU_TYPE.value
+    if self.gpu_type:
+      gpu_count = self.gpu_count or 1
+      gpu_type = self.gpu_type
       suffix = ''
       if gpu_type in gce_virtual_machine.GPU_TYPE_TO_SUFFIX:
         suffix = gce_virtual_machine.GPU_TYPE_TO_SUFFIX[gpu_type]

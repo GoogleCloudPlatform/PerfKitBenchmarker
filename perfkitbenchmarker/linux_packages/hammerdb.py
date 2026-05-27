@@ -381,7 +381,6 @@ SCRIPT_PARAMETER_TPCH_SCALE_FACTOR = '{{SCALE_FACTOR_TPC_H}}'
 SCRIPT_PARAMETER_TPCH_DEGREE_OF_PARALLEL = '{{DEGREE_OF_PARALLEL_TPC_H}}'
 SCRIPT_PARAMETER_TPCC_LOG_TRANSACTIONS = '{{LOG_TRANSACTIONS}}'
 SCRIPT_PARAMETER_WAIT_TO_COMPLETE = '{{WAIT_TO_COMPLETE}}'
-SCRIPT_PARAMETER_DATABASE_SERVICE = '{{DATABASE_SERVICE}}'
 TPCC_PARAMS = frozenset({
     SCRIPT_PARAMETER_IP,
     SCRIPT_PARAMETER_PORT,
@@ -412,14 +411,6 @@ TPCH_PARAMS = frozenset({
     SCRIPT_PARAMETER_BUILD_TIMEOUT,
 })
 
-ORACLE_TPCC_PARAMS = frozenset(
-    TPCC_PARAMS | {SCRIPT_PARAMETER_DATABASE_SERVICE}
-)
-
-ORACLE_TPCH_PARAMS = frozenset(
-    TPCH_PARAMS | {SCRIPT_PARAMETER_DATABASE_SERVICE}
-)
-
 
 class TclScriptParameters:
   """Handle of the parameters that may be needed by a TCL script."""
@@ -447,12 +438,6 @@ class TclScriptParameters:
         SCRIPT_PARAMETER_AZURE: 'true' if is_managed_azure else 'false',
         SCRIPT_PARAMETER_BUILD_TIMEOUT: HAMMERDB_BUILD_TIMEOUT.value,
     }
-
-    if db_engine == sql_engine_utils.ORACLE:
-      db_service = (
-          'orclpdb' if db_engine_version in ('26ai', '26ai_asm') else 'orcl'
-      )
-      self.map_search_to_replace[SCRIPT_PARAMETER_DATABASE_SERVICE] = db_service
 
     if hammerdb_script == HAMMERDB_SCRIPT_TPC_H:
       # If the script is TPCH and in build phase,
