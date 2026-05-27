@@ -635,6 +635,11 @@ class EdwBenchmarkPerformanceTest(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(agg.EdwPerformanceAggregationError):
       agg.geometric_mean(performance_iterable)
 
+  def test_geometric_mean_large_number_of_values(self):
+    performance_iterable = [100.0] * 500
+    expected_geometric_mean = agg.geometric_mean(performance_iterable)
+    self.assertAlmostEqual(expected_geometric_mean, 100.0)
+
 
 class EdwAggregatorTypeValidation(pkb_common_test_case.PkbCommonTestCase):
   def test_EdwPowerIterationPerformance_not_abstract(self):
