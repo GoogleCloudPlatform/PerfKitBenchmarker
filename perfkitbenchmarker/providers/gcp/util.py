@@ -579,9 +579,7 @@ def FormatTags(tags_dict: dict[str, str]):
   Returns:
     A string contains formatted tags
   """
-  return ','.join(
-      '{}={}'.format(k, v) for k, v in sorted(tags_dict.items())
-  ).lower()
+  return ','.join('{}={}'.format(k, v) for k, v in sorted(tags_dict.items()))
 
 
 def SplitTags(tags: str):
