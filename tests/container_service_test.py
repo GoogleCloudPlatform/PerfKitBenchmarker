@@ -5,6 +5,7 @@ import time
 from typing import Callable, Iterable, Protocol, Tuple
 import unittest
 from unittest import mock
+from absl import flags
 from absl.testing import parameterized
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
@@ -17,7 +18,6 @@ from perfkitbenchmarker.sample import Sample
 from tests import container_service_mock
 from tests import pkb_common_test_case
 
-
 kubectl_timeout_tuple = (
     '',
     (
@@ -26,6 +26,8 @@ kubectl_timeout_tuple = (
     ),
     1,
 )
+
+FLAGS = flags.FLAGS
 
 _ELECTION_EVENT_NO_NAME = """
 apiVersion: v1
@@ -319,6 +321,23 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
             _Sample(1, 'unready'),
             _Sample(1, 'unknown'),
         ],
+    )
+
+  def testContainerClusterSpecMissingGpuCount(self):
+    vm_spec = {
+        container_service_mock.TEST_CLOUD: {
+            'gpu_type': 'k80',
+        },
+    }
+    with self.assertRaises(errors.Config.MissingOption) as cm:
+      container_spec.ContainerClusterSpec(
+          'test-cluster',
+          flag_values=FLAGS,
+          cloud=container_service_mock.TEST_CLOUD,
+          vm_spec=vm_spec,
+      )
+    self.assertEqual(
+        str(cm.exception), 'gpu_count must be specified if gpu_type is set'
     )
 
   @parameterized.named_parameters(

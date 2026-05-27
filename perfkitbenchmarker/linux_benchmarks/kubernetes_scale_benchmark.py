@@ -15,8 +15,8 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.resources.container_service import container_cluster
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
@@ -79,9 +79,9 @@ DEFAULT_IMAGE = 'busybox:1.37'
 NVIDIA_GPU_IMAGE = 'nvidia/cuda:11.0.3-runtime-ubuntu20.04'
 
 
-def _GetImage() -> str:
+def _GetImage(cluster: container_cluster.BaseContainerCluster) -> str:
   """Get the image for the scale deployment."""
-  if virtual_machine.GPU_COUNT.value:
+  if cluster.gpu_count:
     return NVIDIA_GPU_IMAGE
   if CONTAINER_IMAGE.value:
     return CONTAINER_IMAGE.value
@@ -102,53 +102,19 @@ def GetConfig(user_config):
   return config
 
 
-def _IsEksKarpenterAwsGpu(
-    cluster: kubernetes_cluster.KubernetesCluster,
-) -> bool:
-  return bool(
-      virtual_machine.GPU_COUNT.value
-      and FLAGS.cloud.lower() == 'aws'
-      and getattr(cluster, 'CLUSTER_TYPE', None) == 'Karpenter'
-  )
-
-
-def _EnsureEksKarpenterGpuNodepool(
-    cluster: kubernetes_cluster.KubernetesCluster,
-) -> None:
-  """Ensures a GPU NodePool exists for EKS Karpenter before applying workloads."""
-  if not _IsEksKarpenterAwsGpu(cluster):
-    return
-  kubernetes_commands.ApplyManifest(
-      'container/kubernetes_scale/aws-gpu-nodepool.yaml.j2',
-      gpu_nodepool_name='gpu',
-      gpu_nodepool_label='gpu',
-      karpenter_ec2nodeclass_name='default',
-      gpu_instance_categories=['g'],
-      gpu_instance_families=['g6', 'g6e'],
-      gpu_capacity_types=['on-demand'],
-      gpu_arch=['amd64'],
-      gpu_os=['linux'],
-      gpu_taint_key='nvidia.com/gpu',
-      gpu_consolidate_after='1m',
-      gpu_consolidation_policy='WhenEmptyOrUnderutilized',
-      gpu_nodepool_cpu_limit=1000,
-  )
-
-
 def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   """Sets additional spec attributes."""
   bm_spec.always_call_cleanup = True
   assert bm_spec.container_cluster
   cluster = bm_spec.container_cluster
   assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
-  _EnsureEksKarpenterGpuNodepool(cluster)
 
 
-def _GetScaleTimeout() -> int:
+def _GetScaleTimeout(cluster: container_cluster.BaseContainerCluster) -> int:
   """Returns the timeout for the scale up & teardown."""
   base_timeout = 60 * 10  # 10 minutes
   per_pod_timeout = NUM_PODS.value * 3  # 3 seconds per pod
-  if virtual_machine.GPU_COUNT.value:
+  if cluster.gpu_count:
     base_timeout = 60 * 30  # 30 minutes
   proposed_timeout = base_timeout + per_pod_timeout
   max_timeout = 60 * 60  # 1 hour
@@ -205,11 +171,11 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       'pod_memory': MEMORY_PER_POD.value,
       'pod_cpu': CPUS_PER_POD.value,
       'goal_replicas': NUM_PODS.value,
-      'image': _GetImage(),
+      'image': _GetImage(cluster),
   }
-  if virtual_machine.GPU_COUNT.value:
-    metadata['gpu_count'] = virtual_machine.GPU_COUNT.value
-    metadata['gpu_type'] = virtual_machine.GPU_TYPE.value
+  if cluster.gpu_count:
+    metadata['gpu_count'] = cluster.gpu_count
+    metadata['gpu_type'] = cluster.gpu_type
   if EXPECTED_NODES_CREATED.value:
     metadata['validated_num_nodes'] = EXPECTED_NODES_CREATED.value
   for s in samples:
@@ -226,26 +192,24 @@ def ScaleUpPods(
   initial_pods = kubernetes_commands.GetPodNames()
   logging.info('Initial pods: %s', initial_pods)
 
-  if virtual_machine.GPU_COUNT.value:
+  if cluster.gpu_count:
     # Use nvidia-smi to validate NVIDIA_GPU is available.
     command = ['sh', '-c', 'nvidia-smi && sleep 3600']
   else:
     command = ['sh', '-c', 'sleep infinity']
 
   # Request X new pods via YAML apply.
-  max_wait_time = _GetScaleTimeout()
+  max_wait_time = _GetScaleTimeout(cluster)
   resource_timeout = max_wait_time + 60 * 5  # 5 minutes after waiting to avoid
   # pod delete events from polluting data collection.
-
-  is_eks_karpenter_aws_gpu = _IsEksKarpenterAwsGpu(cluster)
 
   manifest_kwargs = dict(
       Name='kubernetes-scaleup',
       Replicas=num_new_pods,
       CpuRequest=CPUS_PER_POD.value,
       MemoryRequest=MEMORY_PER_POD.value,
-      NvidiaGpuRequest=virtual_machine.GPU_COUNT.value,
-      Image=_GetImage(),
+      NvidiaGpuRequest=cluster.gpu_count,
+      Image=_GetImage(cluster),
       Command=command,
       EphemeralStorageRequest='10Mi',
       RolloutTimeout=max_wait_time,
@@ -254,20 +218,11 @@ def ScaleUpPods(
       GpuTaintKey=None,
   )
 
-  # GpuTaintKey is still needed for tolerations in the yaml template
-  if is_eks_karpenter_aws_gpu:
-    manifest_kwargs['GpuTaintKey'] = 'nvidia.com/gpu'
-
   yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(
       MANIFEST_TEMPLATE,
       **manifest_kwargs,
   )
   # Use ModifyPodSpecPlacementYaml to add nodeSelectors via GetNodeSelectors()
-  cluster.ModifyPodSpecPlacementYaml(
-      yaml_docs,
-      'kubernetes-scaleup',
-      cluster.default_nodepool.machine_type,
-  )
   if _SPECIFY_NODEPOOL.value:
     if (
         _SPECIFY_NODEPOOL.value != 'default'
@@ -281,6 +236,15 @@ def ScaleUpPods(
     yaml_docs[0]['spec']['template']['spec']['nodeSelector'][
         'pkb_nodepool'
     ] = _SPECIFY_NODEPOOL.value
+    nodepool = cluster.nodepools[_SPECIFY_NODEPOOL.value]
+  else:
+    nodepool = cluster.default_nodepool
+  cluster.ModifyPodSpecPlacementYaml(
+      yaml_docs,
+      'kubernetes-scaleup',
+      nodepool.machine_type
+      or (nodepool.machine_families and nodepool.machine_families[0]),
+  )
   resource_names = kubernetes_commands.ApplyYaml(yaml_docs)
 
   assert resource_names
@@ -648,14 +612,16 @@ def SummarizeTimestamps(timestamps: list[float]) -> dict[str, float]:
   return summary
 
 
-def Cleanup(_):
+def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec):
   """Cleanups scale benchmark. Runs before teardown."""
+  cluster = bm_spec.container_cluster
   kubectl.RunKubectlCommand(['get', 'deployments'])
   kubectl.RunRetryableKubectlCommand(
       ['delete', 'deployment', 'kubernetes-scaleup'],
-      timeout=_GetScaleTimeout(),
+      timeout=_GetScaleTimeout(cluster),
       raise_on_failure=False,
   )
   kubectl.RunRetryableKubectlCommand(
-      ['delete', '--all', 'pods', '-n', 'default'], timeout=_GetScaleTimeout()
+      ['delete', '--all', 'pods', '-n', 'default'],
+      timeout=_GetScaleTimeout(cluster),
   )

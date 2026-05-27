@@ -151,6 +151,8 @@ class BaseNodePoolConfig:
     max_nodes: int. The maximum number of nodes in the node pool. Like above.
     disk_type: str. The type of disk for the nodes in the node pool.
     disk_size: int. The size of the disk for the nodes in the node pool in GB.
+    gpu_type: str. The type of GPU for the nodes in the node pool.
+    gpu_count: int. The number of GPUs per node.
   """
 
   def __init__(
@@ -180,13 +182,13 @@ class BaseNodePoolConfig:
     self.max_nodes: int = 1
     self.disk_type: str | None = vm_spec.boot_disk_type
     self.disk_size: int = vm_spec.boot_disk_size
+    self.gpu_type: str | None = vm_spec.gpu_type
+    self.gpu_count: int | None = vm_spec.gpu_count
     # Defined by GceVirtualMachineConfig. Used by google_kubernetes_engine
     # pylint: disable=g-missing-from-attributes
     self.sandbox_config: container_spec_lib.SandboxSpec | None = None
     self.max_local_disks: int | None
     self.ssd_interface: str | None
-    self.gpu_type: str | None
-    self.gpu_count: int | None
     self.threads_per_core: int
     self.gce_tags: list[str]
     self.min_cpu_platform: str
