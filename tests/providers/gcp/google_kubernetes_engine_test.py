@@ -13,10 +13,11 @@
 # limitations under the License.
 """Tests for perfkitbenchmarker.providers.gcp.google_kubernetes_engine."""
 
-# pylint: disable=not-context-manager
+# pylint: disable=not-context-manager,invalid-name,protected-access
 
 import builtins
 import contextlib
+import json
 import os
 import tempfile
 import unittest
@@ -61,6 +62,7 @@ class PatchedObjectsTestCase(pkb_common_test_case.PkbCommonTestCase):
   def patch_critical_objects(
       self, stdout='', stderr='', return_code=0, flags=FLAGS
   ):
+    """Patches common objects and yields a mock IssueCommand."""
     with contextlib.ExitStack() as stack:
       flags.gcloud_path = 'gcloud'
       flags.run_uri = _RUN_URI
@@ -99,10 +101,12 @@ class PatchedObjectsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
 
 class GoogleContainerRegistryTestCase(PatchedObjectsTestCase):
+  """Tests for the GoogleArtifactRegistry container registry."""
 
   class FakeContainerImage(container.ContainerImage):
+    """Minimal ContainerImage stub for registry tests."""
 
-    def __init__(self, name, directory=None):
+    def __init__(self, name, directory=None):  # pylint: disable=super-init-not-called
       self.name = name
       self.directory = directory or f'docker/{name}/Dockerfile'
 
@@ -117,6 +121,7 @@ class GoogleContainerRegistryTestCase(PatchedObjectsTestCase):
     )
 
   def testFullRegistryTag(self):
+    """Tests that full registry tag is constructed correctly."""
     spec = container_spec.ContainerRegistrySpec(
         'NAME',
         **{
@@ -132,6 +137,7 @@ class GoogleContainerRegistryTestCase(PatchedObjectsTestCase):
     )
 
   def testRemoteBuildCreateSucceeds(self):
+    """Tests that _Build succeeds when gcloud Issue returns success."""
     spec = container_spec.ContainerRegistrySpec(
         'NAME',
         **{
@@ -147,9 +153,11 @@ class GoogleContainerRegistryTestCase(PatchedObjectsTestCase):
 
 
 class GoogleKubernetesEngineCustomMachineTypeTestCase(PatchedObjectsTestCase):
+  """Tests for GKE cluster creation with a custom machine type."""
 
   @staticmethod
   def create_kubernetes_engine_spec():
+    """Creates a GKE spec with a custom CPU/memory machine type."""
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME',
         **{
@@ -180,9 +188,11 @@ class GoogleKubernetesEngineCustomMachineTypeTestCase(PatchedObjectsTestCase):
 
 
 class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
+  """Tests for standard GKE cluster create/delete/exists operations."""
 
   @staticmethod
   def create_kubernetes_engine_spec():
+    """Creates a standard GKE cluster spec with typical VM options."""
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME',
         **{
@@ -204,6 +214,7 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
     return kubernetes_engine_spec
 
   def testCreate(self):
+    """Tests that _Create issues the correct gcloud command with all flags."""
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
@@ -242,6 +253,7 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
         cluster._Create()
 
   def testCreateResourcesExhausted(self):
+    """Tests _Create raises InsufficientCapacityCloudFailure on exhaustion."""
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects(
         stderr="""
@@ -258,6 +270,7 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
         cluster._Create()
 
   def testGetCredentials(self):
+    """Tests that _PostCreate issues get-credentials with KUBECONFIG set."""
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects() as issue_command, mock.patch.object(
         kubectl, 'RunKubectlCommand'
@@ -266,7 +279,7 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
       cluster._Create()
       cluster._PostCreate()
       self.assertIn(
-          'gcloud container clusters get-credentials pkb-{}'.format(_RUN_URI),
+          f'gcloud container clusters get-credentials pkb-{_RUN_URI}',
           issue_command.all_commands,
       )
       self.assertIn(
@@ -282,7 +295,7 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
       cluster._Delete()
       self.assertEqual(issue_command.func_to_mock.call_count, 5)
       self.assertIn(
-          'gcloud container clusters delete pkb-{}'.format(_RUN_URI),
+          f'gcloud container clusters delete pkb-{_RUN_URI}',
           issue_command.all_commands,
       )
       self.assertIn('--zone us-central1-a', issue_command.all_commands)
@@ -293,11 +306,12 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
       cluster = google_kubernetes_engine.GkeCluster(spec)
       cluster._Exists()
       self.assertIn(
-          'gcloud container clusters describe pkb-{}'.format(_RUN_URI),
+          f'gcloud container clusters describe pkb-{_RUN_URI}',
           issue_command.all_commands,
       )
 
   def testGetResourceMetadata(self):
+    """Tests that GetResourceMetadata returns all expected fields."""
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects(stdout=_KUBECTL_VERSION):
       cluster = google_kubernetes_engine.GkeCluster(spec)
@@ -328,9 +342,11 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
 
 
 class GoogleKubernetesEngineAutoscalingTestCase(PatchedObjectsTestCase):
+  """Tests for GKE cluster creation with cluster-level autoscaling."""
 
   @staticmethod
   def create_kubernetes_engine_spec():
+    """Creates a GKE spec with cluster-level autoscaling enabled."""
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME',
         **{
@@ -350,6 +366,7 @@ class GoogleKubernetesEngineAutoscalingTestCase(PatchedObjectsTestCase):
     return kubernetes_engine_spec
 
   def testCreate(self):
+    """Tests that _Create passes autoscaling flags to gcloud."""
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
@@ -364,6 +381,7 @@ class GoogleKubernetesEngineAutoscalingTestCase(PatchedObjectsTestCase):
       self.assertIn('--cluster-ipv4-cidr /18', issue_command.all_commands)
 
   def testGetResourceMetadata(self):
+    """Tests that metadata includes autoscaling size fields."""
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects(stdout=_KUBECTL_VERSION):
       cluster = google_kubernetes_engine.GkeCluster(spec)
@@ -393,9 +411,11 @@ class GoogleKubernetesEngineAutoscalingTestCase(PatchedObjectsTestCase):
 
 
 class GoogleKubernetesEngineVersionFlagTestCase(PatchedObjectsTestCase):
+  """Tests for GKE cluster creation with version and release-channel flags."""
 
   @staticmethod
   def create_kubernetes_engine_spec():
+    """Creates a GKE spec for testing version and release-channel flags."""
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME',
         **{
@@ -443,9 +463,11 @@ class GoogleKubernetesEngineVersionFlagTestCase(PatchedObjectsTestCase):
 
 
 class GoogleKubernetesEngineGvnicFlagTestCase(PatchedObjectsTestCase):
+  """Tests for GKE cluster creation with gVNIC enable/disable flags."""
 
   @staticmethod
   def create_kubernetes_engine_spec():
+    """Creates a GKE spec for testing the gVNIC flag."""
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME',
         **{
@@ -478,9 +500,11 @@ class GoogleKubernetesEngineGvnicFlagTestCase(PatchedObjectsTestCase):
 
 
 class GoogleKubernetesEngineWithGpusTestCase(PatchedObjectsTestCase):
+  """Tests for GKE cluster creation with GPU accelerator configuration."""
 
   @staticmethod
   def create_kubernetes_engine_spec(gpu_type):
+    """Creates a GKE spec with the given GPU type and 2 GPUs."""
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME',
         **{
@@ -501,6 +525,7 @@ class GoogleKubernetesEngineWithGpusTestCase(PatchedObjectsTestCase):
 
   @flagsaver.flagsaver(gke_gpu_driver_version='latest')
   def testCreate(self):
+    """Tests that _Create includes the correct --accelerator flag for K80."""
     spec = self.create_kubernetes_engine_spec('k80')
     with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
@@ -525,16 +550,19 @@ class GoogleKubernetesEngineWithGpusTestCase(PatchedObjectsTestCase):
       cluster._Create()
       self.assertIn(
           '--accelerator '
-          'type=nvidia-h100-80gb,count=2,gpu-driver-version=default',
+          + 'type=nvidia-h100-80gb,count=2,gpu-driver-version=default',
           issue_command.all_commands,
       )
 
 
 class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
+  """Tests for GKE node/instance-group enumeration methods."""
 
   def testGetInstanceGroups(self):
+    """Tests that _GetInstanceGroups parses node-pools list output."""
     path = os.path.join(os.path.dirname(__file__), _NODE_POOLS_LIST_OUTPUT)
-    output = open(path).read()
+    with open(path) as f:
+      output = f.read()
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects(stdout=output) as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
@@ -552,9 +580,13 @@ class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
       self.assertEqual(expected, set(instance_groups))  # order doesn't matter
 
   def testGetNodePoolNames(self):
-    output = ['default-pool', 'nap-e2-standard-2-iu4vquho', 'test-pool']
+    """Tests that GetNodePoolNames returns names from cluster describe."""
+    pool_names = ['default-pool', 'nap-e2-standard-2-iu4vquho', 'test-pool']
+    json_output = json.dumps(
+        {'nodePools': [{'name': n} for n in pool_names]}
+    )
     spec = self.create_kubernetes_engine_spec()
-    with self.patch_critical_objects(stdout='\n'.join(output)) as issue_command:
+    with self.patch_critical_objects(stdout=json_output) as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
       node_pools = cluster.GetNodePoolNames()
 
@@ -562,8 +594,8 @@ class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
           'gcloud container clusters describe ' + cluster.name,
           issue_command.all_commands,
       )
-      self.assertIn('--flatten', issue_command.all_commands)
-      self.assertIn('--format', issue_command.all_commands)
+      self.assertIn('--format json', issue_command.all_commands)
+      self.assertNotIn('--flatten', issue_command.all_commands)
 
       expected = {
           'default-pool',
@@ -574,9 +606,11 @@ class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
 
 
 class GoogleKubernetesEngineRegionalTestCase(PatchedObjectsTestCase):
+  """Tests for GKE regional cluster creation with multiple nodepools."""
 
   @staticmethod
   def create_kubernetes_engine_spec(use_zonal_nodepools=False):
+    """Creates a regional GKE spec with two nodepools."""
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME',
         **{
@@ -619,6 +653,7 @@ class GoogleKubernetesEngineRegionalTestCase(PatchedObjectsTestCase):
     return kubernetes_engine_spec
 
   def testCreateRegionalCluster(self):
+    """Tests regional cluster creation with region-wide nodepools."""
     spec = self.create_kubernetes_engine_spec(use_zonal_nodepools=False)
     with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
@@ -668,6 +703,7 @@ class GoogleKubernetesEngineRegionalTestCase(PatchedObjectsTestCase):
       self.assertNotIn('--node-locations', create_nodepool2)
 
   def testCreateRegionalClusterZonalNodepool(self):
+    """Tests regional cluster creation with zone-pinned nodepools."""
     spec = self.create_kubernetes_engine_spec(use_zonal_nodepools=True)
     with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeCluster(spec)
@@ -706,9 +742,11 @@ class GoogleKubernetesEngineRegionalTestCase(PatchedObjectsTestCase):
 
 
 class GoogleKubernetesEngineMachineFamiliesTestCase(PatchedObjectsTestCase):
+  """Tests for GKE nodepool creation with machine-family constraints."""
 
   @staticmethod
   def create_kubernetes_engine_spec():
+    """Creates a GKE spec with a nodepool using machine families."""
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME',
         **{
@@ -735,6 +773,7 @@ class GoogleKubernetesEngineMachineFamiliesTestCase(PatchedObjectsTestCase):
     return kubernetes_engine_spec
 
   def testCreateWithMachineFamilies(self):
+    """Tests that machine-family nodepool issues a node-pools update command."""
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects() as issue_command, mock.patch.object(
         kubernetes_commands, 'ApplyYaml'
@@ -752,9 +791,11 @@ class GoogleKubernetesEngineMachineFamiliesTestCase(PatchedObjectsTestCase):
 
 
 class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
+  """Tests for GKE Autopilot cluster creation and metadata."""
 
   @staticmethod
   def create_kubernetes_engine_spec():
+    """Creates a GKE Autopilot cluster spec."""
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME',
         **{
@@ -771,6 +812,7 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
     return kubernetes_engine_spec
 
   def testCreate(self):
+    """Tests Autopilot _Create uses create-auto without node flags."""
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects() as issue_command:
       cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
@@ -788,6 +830,7 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
       self.assertNotIn('--num-nodes', issue_command.all_commands)
 
   def testGetResourceMetadata(self):
+    """Tests that Autopilot metadata includes Auto values for size/type."""
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects():
       cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
@@ -818,8 +861,9 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
           metadata,
       )
 
-  @flagsaver.flagsaver(run_uri='123')
+  @flagsaver.flagsaver(gpu_type='h100', gpu_count=1, run_uri='123')
   def testApplyYamlGpusH100(self):
+    """Tests Autopilot YAML generation for H100 GPU node selectors."""
     self.enter_context(
         mock.patch(
             gce_network.__name__ + '.GceFirewall.GetFirewall',
@@ -858,8 +902,6 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
         )
     )
     spec = self.create_kubernetes_engine_spec()
-    spec.vm_spec.gpu_count = 1
-    spec.vm_spec.gpu_type = 'h100'
     with self.assertLogs(level='INFO') as logs:
       cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
       yamls = kubernetes_commands.ConvertManifestToYamlDicts(
@@ -884,6 +926,7 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
     self.assertIn('cloud.google.com/compute-class: Accelerator', full_logs)
 
   def testGetMachineTypeFromNodeName(self):
+    """Tests GetMachineTypeFromNodeName queries kubectl for node type."""
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects():
       cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
@@ -899,8 +942,10 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
 
 
 class GoogleKubernetesEngineNodepoolAutoscalingTestCase(PatchedObjectsTestCase):
+  """Tests GKE per-nodepool autoscaling overrides cluster-level settings."""
 
   def testCreateWithPerNodepoolAutoscaling(self):
+    """Tests per-nodepool autoscaling settings override cluster defaults."""
     kubernetes_engine_spec = container_spec.ContainerClusterSpec(
         'NAME',
         **{
@@ -947,6 +992,299 @@ class GoogleKubernetesEngineNodepoolAutoscalingTestCase(PatchedObjectsTestCase):
       self.assertIn('--enable-autoscaling', nodepool_cmd)
       self.assertIn('--min-nodes 2', nodepool_cmd)
       self.assertIn('--max-nodes 10', nodepool_cmd)
+
+
+class GkeManagementPlaneTestCase(PatchedObjectsTestCase):
+  """Tests for GKE management-plane methods (k8s_management_benchmark)."""
+
+  @staticmethod
+  def create_kubernetes_engine_spec():
+    """Creates a GKE spec for management-plane method tests."""
+    return container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a',
+                },
+            },
+            'vm_count': 2,
+            'poll_for_events': False,
+        },
+    )
+
+  def _make_nodepool_config(self, name='pkbpool0'):
+    """Returns a minimal BaseNodePoolConfig-like object."""
+    cfg = mock.MagicMock()
+    cfg.name = name
+    cfg.num_nodes = 1
+    cfg.machine_type = 'n1-standard-2'
+    cfg.disk_size = 100
+    cfg.max_local_disks = 0
+    cfg.zone = None
+    return cfg
+
+  # ---- GetNodePoolNames (JSON format) ---------------------------------------
+
+  def testGetNodePoolNamesJsonFormat(self):
+    """GetNodePoolNames parses JSON cluster describe output."""
+    cluster_json = (
+        '{"nodePools": [{"name": "default-pool"}, {"name": "extra-pool"}]}'
+    )
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(stdout=cluster_json) as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      names = cluster.GetNodePoolNames()
+
+      self.assertIn(
+          'gcloud container clusters describe ' + cluster.name,
+          issue_command.all_commands,
+      )
+      self.assertIn('--format', issue_command.all_commands)
+      # Must NOT use --flatten (old format)
+      self.assertNotIn('--flatten', issue_command.all_commands)
+      self.assertEqual({'default-pool', 'extra-pool'}, set(names))
+
+  def testGetNodePoolNamesEmptyFallback(self):
+    """GetNodePoolNames falls back to split() on non-JSON output."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(stdout='pool-a pool-b'):
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      names = cluster.GetNodePoolNames()
+      self.assertEqual({'pool-a', 'pool-b'}, set(names))
+
+  # ---- CreateNodePool -------------------------------------------------------
+
+  def testCreateNodePool(self):
+    """CreateNodePool issues gcloud node-pools create with cluster flag."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cfg = self._make_nodepool_config('mypool')
+      cluster.CreateNodePool(cfg)
+
+      cmd = issue_command.GetCommandWithSubstring('node-pools create mypool')
+      self.assertIn('--cluster', cmd)
+      self.assertNotIn('--node-version', cmd)
+
+  def testCreateNodePoolWithVersion(self):
+    """CreateNodePool passes --node-version when provided."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cfg = self._make_nodepool_config('mypool')
+      cluster.CreateNodePool(cfg, node_version='1.34.1-gke.100')
+
+      cmd = issue_command.GetCommandWithSubstring('node-pools create mypool')
+      self.assertIn('--node-version 1.34.1-gke.100', cmd)
+
+  # ---- DeleteNodePool -------------------------------------------------------
+
+  def testDeleteNodePool(self):
+    """DeleteNodePool issues gcloud node-pools delete with --quiet."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster.DeleteNodePool('old-pool')
+
+      cmd = issue_command.GetCommandWithSubstring('node-pools delete old-pool')
+      self.assertIn('--cluster', cmd)
+      self.assertIn('--quiet', cmd)
+
+  # ---- UpgradeNodePool ------------------------------------------------------
+
+  def testUpgradeNodePool(self):
+    """UpgradeNodePool issues gcloud clusters upgrade with --node-pool."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster.UpgradeNodePool('my-pool', '1.34.1-gke.200')
+
+      cmd = issue_command.GetCommandWithSubstring('clusters upgrade')
+      self.assertIn('--node-pool my-pool', cmd)
+      self.assertIn('--cluster-version 1.34.1-gke.200', cmd)
+      self.assertIn('--quiet', cmd)
+
+  # ---- UpdateCluster --------------------------------------------------------
+
+  def testUpdateCluster(self):
+    """UpdateCluster issues gcloud clusters update with a timestamp label."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster.UpdateCluster()
+
+      cmd = issue_command.GetCommandWithSubstring('clusters update')
+      self.assertIn('--update-labels', cmd)
+      self.assertIn('k8s-mgmt-ts=', cmd)
+
+  # ---- Async variants -------------------------------------------------------
+
+  def testCreateNodePoolAsyncReturnsOpName(self):
+    """CreateNodePoolAsync returns the GKE operation name."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(
+        stdout='extra line\noperation-1234\n'
+    ) as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cfg = self._make_nodepool_config('asyncpool')
+      handle = cluster.CreateNodePoolAsync(cfg)
+
+      cmd = issue_command.GetCommandWithSubstring('node-pools create asyncpool')
+      self.assertIn('--async', cmd)
+      self.assertNotIn('--timeout', cmd)
+      self.assertEqual('operation-1234', handle)
+
+  def testCreateNodePoolAsyncWithVersion(self):
+    """CreateNodePoolAsync passes --node-version when provided."""
+    spec = self.create_kubernetes_engine_spec()
+    stdout = 'operation-5678\n'
+    with self.patch_critical_objects(stdout=stdout) as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cfg = self._make_nodepool_config('verpool')
+      cluster.CreateNodePoolAsync(cfg, node_version='1.33.5-gke.1')
+
+      cmd = issue_command.GetCommandWithSubstring('node-pools create verpool')
+      self.assertIn('--node-version 1.33.5-gke.1', cmd)
+
+  def testDeleteNodePoolAsyncReturnsOpName(self):
+    """DeleteNodePoolAsync issues delete with --async."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(stdout='operation-del\n') as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      handle = cluster.DeleteNodePoolAsync('to-delete')
+
+      cmd = issue_command.GetCommandWithSubstring('node-pools delete to-delete')
+      self.assertIn('--async', cmd)
+      self.assertIn('--quiet', cmd)
+      self.assertEqual('operation-del', handle)
+
+  def testUpgradeNodePoolAsyncReturnsOpName(self):
+    """UpgradeNodePoolAsync issues upgrade with --async."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(stdout='operation-upg\n') as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      handle = cluster.UpgradeNodePoolAsync('my-pool', '1.34.2-gke.100')
+
+      cmd = issue_command.GetCommandWithSubstring('clusters upgrade')
+      self.assertIn('--async', cmd)
+      self.assertIn('--node-pool my-pool', cmd)
+      self.assertIn('--cluster-version 1.34.2-gke.100', cmd)
+      self.assertEqual('operation-upg', handle)
+
+  def testUpdateClusterAsyncReturnsOpName(self):
+    """UpdateClusterAsync issues clusters update with --async."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(stdout='operation-upd\n') as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      handle = cluster.UpdateClusterAsync()
+
+      cmd = issue_command.GetCommandWithSubstring('clusters update')
+      self.assertIn('--async', cmd)
+      self.assertIn('k8s-mgmt-ts=', cmd)
+      self.assertEqual('operation-upd', handle)
+
+  def testIssueAsyncRaisesOnNonZeroRetcode(self):
+    """_IssueAsync raises CreationError when the command fails."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(stderr='boom', return_code=1):
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cfg = self._make_nodepool_config('failpool')
+      with self.assertRaises(Exception):
+        cluster.CreateNodePoolAsync(cfg)
+
+  def testIssueAsyncRaisesOnEmptyOpName(self):
+    """_IssueAsync raises CreationError when stdout produces no op name."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(stdout='   \n   '):
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cfg = self._make_nodepool_config('emptypool')
+      with self.assertRaises(Exception):
+        cluster.CreateNodePoolAsync(cfg)
+
+  # ---- WaitForOperation -----------------------------------------------------
+
+  def testWaitForOperationDone(self):
+    """WaitForOperation returns immediately when status is DONE."""
+    spec = self.create_kubernetes_engine_spec()
+    done_json = '{"status": "DONE"}'
+    with self.patch_critical_objects(stdout=done_json):
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      # Should not raise
+      cluster.WaitForOperation('operation-xyz')
+
+  def testWaitForOperationAbortingRaises(self):
+    """WaitForOperation raises CreationError when status is ABORTING."""
+    spec = self.create_kubernetes_engine_spec()
+    aborted_json = '{"status": "ABORTING"}'
+    with self.patch_critical_objects(stdout=aborted_json):
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      with self.assertRaises(errors.Resource.CreationError):
+        cluster.WaitForOperation('operation-bad')
+
+  # ---- ResolveNodePoolVersions ----------------------------------------------
+
+  def testResolveNodePoolVersions(self):
+    """ResolveNodePoolVersions returns (N-1 qualified, N qualified)."""
+    server_config = {
+        'validNodeVersions': [
+            '1.34.5-gke.100',
+            '1.34.3-gke.50',
+            '1.33.8-gke.200',
+            '1.33.5-gke.99',
+            '1.32.1-gke.10',
+        ]
+    }
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(
+        stdout=json.dumps(server_config)
+    ) as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      initial, target = cluster.ResolveNodePoolVersions()
+
+      cmd = issue_command.GetCommandWithSubstring('get-server-config')
+      self.assertIn('--format', cmd)
+      # target = newest overall = 1.34.5-gke.100
+      self.assertEqual('1.34.5-gke.100', target)
+      # initial = best version for minor 33 = 1.33.8-gke.200
+      self.assertEqual('1.33.8-gke.200', initial)
+
+  def testResolveNodePoolVersionsNoVersionsRaises(self):
+    """ResolveNodePoolVersions raises GetError when versions list is empty."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(stdout='{"validNodeVersions": []}'):
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      with self.assertRaises(errors.Resource.GetError):
+        cluster.ResolveNodePoolVersions()
+
+  # ---- HasActiveUpgradeOperations -------------------------------------------
+
+  def testHasActiveUpgradeOperationsTrue(self):
+    """HasActiveUpgradeOperations returns True when an upgrade is running."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(stdout='operation-upgrade-123\n'):
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      self.assertTrue(cluster.HasActiveUpgradeOperations())
+
+  def testHasActiveUpgradeOperationsFalse(self):
+    """HasActiveUpgradeOperations returns False when no upgrade is running."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(stdout=''):
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      self.assertFalse(cluster.HasActiveUpgradeOperations())
+
+  def testHasActiveUpgradeOperationsUsesCorrectFilter(self):
+    """HasActiveUpgradeOperations queries for UPGRADE_NODES AND RUNNING."""
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects(stdout='') as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster.HasActiveUpgradeOperations()
+
+      self.assertIn('operations list', issue_command.all_commands)
+      self.assertIn('UPGRADE_NODES', issue_command.all_commands)
+      self.assertIn('RUNNING', issue_command.all_commands)
 
 
 if __name__ == '__main__':

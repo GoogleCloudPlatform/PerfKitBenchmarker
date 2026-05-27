@@ -11,7 +11,7 @@ from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
 from perfkitbenchmarker.resources import kubernetes_inference_server
-from perfkitbenchmarker.resources.container_service import container as container_lib
+from perfkitbenchmarker.resources.container_service import (container as container_lib)
 from perfkitbenchmarker.resources.container_service import container_cluster
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes
@@ -55,9 +55,25 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
       self.inference_server.Create()
 
   def _PostCreate(self):
+    """Starts the event poller after the cluster has been created."""
     super()._PostCreate()
     if self.event_poller:
-      self.event_poller.StartPolling()
+      try:
+        self.event_poller.StartPolling()
+      except Exception as exc:  # pylint: disable=broad-except
+        # Python 3.14 tightened pickling rules for multiprocessing — local
+        # functions passed to Process cannot be pickled. Rather than crashing
+        # PKB entirely (which prevents cleanup and orphans cloud resources),
+        # log a warning and continue without the event poller.
+        # Impact: no Kubernetes event streaming during the run — benchmark
+        # metrics are unaffected.
+        logging.warning(
+            'Event poller failed to start (non-fatal, continuing without '
+            + 'event polling): %s. This is a known Python 3.14 pickling '
+            + 'issue — switch to Python 3.13 to enable event polling.',
+            exc,
+        )
+        self.event_poller = None
 
   def Delete(self, freeze: bool = False) -> None:
     if self.inference_server:
@@ -152,6 +168,7 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
 
   def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Gets the node selectors section of a yaml for the provider."""
+    del machine_type  # Unused; subclasses may use it.
     return {}
 
   def ModifyPodSpecPlacementYaml(
@@ -166,9 +183,9 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     the most likely to change from cloud to cloud.
 
     Args:
-      yaml_dicts: The list of yaml dicts to search through & modify. See
-        https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#podspec-v1-core
-          for documentation on the pod spec fields. This is modified in place.
+      yaml_dicts: The list of yaml dicts to search through & modify. See the
+        K8s PodSpec API docs for pod spec field documentation. Modified
+        in place.
       name: The name of the app.
       machine_type: A specified machine type to request.
     """
@@ -196,9 +213,8 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     the most likely to change from cloud to cloud.
 
     Args:
-      pod_spec_yaml: The pod spec yaml to modify. See
-        https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#podspec-v1-core
-          for documentation on the pod spec fields. This is modified in place.
+      pod_spec_yaml: The pod spec yaml to modify. See the K8s PodSpec API
+        docs for pod spec field documentation. This is modified in place.
       name: The name of the app.
       machine_type: A specified machine type to request.
     """
@@ -358,14 +374,14 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     raise NotImplementedError
 
   def UpdateClusterAsync(self) -> str:
-    """Initiates cluster-level update; returns opaque op handle. Does NOT wait."""
+    """Initiates cluster-level update. Returns op handle; does NOT wait."""
     raise NotImplementedError
 
   @abc.abstractmethod
   def GetNodePoolNames(self) -> list[str]:
     """Returns the names of all node pools currently in the cluster.
 
-    Used by the k8s_management benchmark to:
+    Used by the kubernetes_management benchmark to:
       - Sweep stale pkbm* pools before each run (clean-start spec requirement)
       - Re-list live pools after creates before deleting (avoids stale names)
     """
@@ -383,7 +399,7 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     raise NotImplementedError
 
   def ResolveNodePoolVersions(self) -> tuple[str, str]:
-    """Returns (initial, target) node-pool Kubernetes versions per benchmark spec.
+    """Returns (initial, target) K8s versions per benchmark spec.
 
     Spec contract:
       target  = cluster's current K8s version (the latest available)
