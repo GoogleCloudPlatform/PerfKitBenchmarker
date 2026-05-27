@@ -865,7 +865,7 @@ class EksCluster(BaseEksCluster):
             'ec2', 'describe-subnets',
             '--region', self.region,
             '--subnet-ids', *subnet_ids,
-            '--query', 'Subnets[*].{SubnetId:SubnetId,AZ:AvailabilityZone}',
+            '--query', 'Subnets[*].{SubnetId:SubnetId,AZ:AvailabilityZone,Public:MapPublicIpOnLaunch}',
             '--output', 'json',
         ],
         raise_on_failure=False,
@@ -882,13 +882,22 @@ class EksCluster(BaseEksCluster):
 
     # Do NOT filter by control_plane_zones — PKB truncates it to 2 AZs.
     # Accept all subnets the VPC has across all AZs.
+    # Build AZ map — always prefer public subnets (MapPublicIpOnLaunch=True)
+    # which have an internet gateway route. Private subnets lack IGW routes
+    # and nodes launched there cannot reach the EKS API server to join.
     az_map: dict[str, str] = {}
+    az_map_private: dict[str, str] = {}
     for s in subnets:
       az = s['AZ']
-      # Keep only one subnet per AZ (prefer public subnets — already filtered
-      # by _DiscoverSubnets which returns the cluster's configured subnets)
-      if az not in az_map:
+      if s.get('Public'):
         az_map[az] = s['SubnetId']
+        logging.info('[EKS] AZ %s → public subnet %s', az, s['SubnetId'])
+      elif az not in az_map:
+        az_map_private[az] = s['SubnetId']
+    for az, sid in az_map_private.items():
+      if az not in az_map:
+        logging.warning('[EKS] AZ %s has no public subnet — using private %s', az, sid)
+        az_map[az] = sid
 
     logging.info(
         '[EKS] Subnet-per-AZ mapping: %s (from %d total subnets)',
@@ -1000,7 +1009,9 @@ class EksCluster(BaseEksCluster):
       # Extract numeric suffix from pool name to determine AZ assignment
       name = nodepool_config.name
       suffix = ''.join(c for c in name if c.isdigit())
-      idx = int(suffix) if suffix else 0
+      # pkbmb (Scenario B) has no suffix — assign to us-east-1b (idx=1)
+      # to avoid competing with us-east-1a which has the default nodegroup.
+      idx = int(suffix) if suffix else 1
       zones = sorted(az_subnets.keys())
       assigned_az = zones[idx % len(zones)]
       subnets = [az_subnets[assigned_az]]
@@ -1081,11 +1092,29 @@ class EksCluster(BaseEksCluster):
         '--cli-input-json',
         f'file://{filename}',
     ]
-    _, stderr, retcode = vm_util.IssueCommand(
-        cmd, timeout=300, raise_on_failure=False
-    )
-    if retcode:
+    # Retry on EC2 RunInstances throttling at high concurrency (99 pools).
+    max_retries = 5
+    base_delay = 10
+    for attempt in range(max_retries):
+      _, stderr, retcode = vm_util.IssueCommand(
+          cmd, timeout=300, raise_on_failure=False
+      )
+      if retcode == 0:
+        break
+      if 'Request limit exceeded' in stderr or 'ThrottlingException' in stderr:
+        if attempt < max_retries - 1:
+          delay = base_delay * (2 ** attempt)
+          logging.warning(
+              '[EKS] CreateNodegroup %s throttled — retry %d/%d in %ds',
+              nodepool_config.name, attempt + 1, max_retries, delay,
+          )
+          time.sleep(delay)
+          continue
       raise errors.Resource.CreationError(stderr)
+    else:
+      raise errors.Resource.CreationError(
+          f'CreateNodegroup {nodepool_config.name} failed after retries: {stderr}'
+      )
     return f'ng_active:{nodepool_config.name}'
 
   def UpgradeNodePoolAsync(self, name: str, target_version: str) -> str:
@@ -1199,10 +1228,42 @@ class EksCluster(BaseEksCluster):
         '--logging',
         payload,
     ]
-    stdout, stderr, retcode = vm_util.IssueCommand(
-        upd, timeout=300, raise_on_failure=False
-    )
-    if retcode:
+    # Wait for cluster ACTIVE before firing update — at 99-pool scale
+    # Scenario A leaves the cluster UPDATING causing ResourceInUseException.
+    logging.info('[EKS] Waiting for cluster ACTIVE before ClusterUpdate...')
+    for _ in range(60):
+      status_out, _, status_rc = vm_util.IssueCommand(
+          util.AWS_PREFIX + [
+              'eks', 'describe-cluster',
+              '--name', self.name,
+              '--region', self.region,
+              '--query', 'cluster.status',
+              '--output', 'text',
+          ],
+          raise_on_failure=False,
+      )
+      if status_rc == 0 and status_out.strip() == 'ACTIVE':
+        logging.info('[EKS] Cluster is ACTIVE — proceeding with ClusterUpdate')
+        break
+      logging.info('[EKS] Cluster status=%s — waiting 5s...', status_out.strip())
+      time.sleep(5)
+    # Retry on ResourceInUseException race condition
+    upd_max_retries = 10
+    upd_base_delay = 30
+    for upd_attempt in range(upd_max_retries):
+      stdout, stderr, retcode = vm_util.IssueCommand(
+          upd, timeout=300, raise_on_failure=False
+      )
+      if retcode == 0:
+        break
+      if 'ResourceInUseException' in stderr and upd_attempt < upd_max_retries - 1:
+        delay = upd_base_delay * (upd_attempt + 1)
+        logging.warning(
+            '[EKS] UpdateClusterConfig ResourceInUseException — retry %d/%d in %ds',
+            upd_attempt + 1, upd_max_retries, delay,
+        )
+        time.sleep(delay)
+        continue
       raise errors.Resource.CreationError(stderr)
     update_id = json.loads(stdout)['update']['id']
     return f'cluster_update:{update_id}'
