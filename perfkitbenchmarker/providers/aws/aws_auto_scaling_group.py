@@ -16,6 +16,7 @@
 import json
 from typing import Any, cast
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_vm_group
 from perfkitbenchmarker import provider_info
@@ -27,6 +28,10 @@ from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import util
 
 VmReference = managed_vm_group.BaseManagedVmGroup.VmReference
+
+MIN_ASG_SIZE = 0
+# Large VM groups are currently unused so keep small.
+MAX_ASG_SIZE = 10
 
 
 class AwsLaunchTemplate(resource.BaseResource):
@@ -137,9 +142,11 @@ class AwsAutoScalingGroup(managed_vm_group.BaseManagedVmGroup):
         '--launch-template',
         f'LaunchTemplateName={self.launch_template.name}',
         '--min-size',
-        str(self.vm_count),
+        # Set global bounds for ASG size. These are not used unless we
+        # attach a scaling policy (or other hooks)
+        str(MIN_ASG_SIZE),
         '--max-size',
-        str(self.vm_count),
+        str(MAX_ASG_SIZE),
         '--desired-capacity',
         str(self.vm_count),
         '--vpc-zone-identifier',
@@ -214,19 +221,6 @@ class AwsAutoScalingGroup(managed_vm_group.BaseManagedVmGroup):
     vm = cast(aws_virtual_machine.AwsVirtualMachine, vm)
     vm.id = reference.name
 
-  # Add VMs is compicated, so override the base class implementation.
-  def AddVms(self, num_vms_to_add: int):
-    new_vm_count = self.vm_count + num_vms_to_add
-    cmd = self.base_cmd + [
-        'update-auto-scaling-group',
-        '--auto-scaling-group-name',
-        self.name,
-        '--max-size',
-        str(new_vm_count),
-    ]
-    vm_util.IssueCommand(cmd)
-    self._RunOperation(lambda: self._AddVms(0), new_vm_count)
-
   def _AddVms(self, _):
     cmd = self.base_cmd + [
         'launch-instances',
@@ -239,28 +233,21 @@ class AwsAutoScalingGroup(managed_vm_group.BaseManagedVmGroup):
     vm_util.IssueCommand(cmd)
 
   def _RemoveVms(self, vm_names: list[str]):
-    cmd = (
-        self.base_cmd
-        + [
-            'terminate-instances-in-auto-scaling-group',
-            '--auto-scaling-group-name',
-            self.name,
-            '--instance-ids',
-        ]
-        + vm_names
-        + ['--should-decrement-desired-capacity']
-    )
-    vm_util.IssueCommand(cmd)
+    def RemoveVm(vm_name: str):
+      cmd = self.base_cmd + [
+          'terminate-instance-in-auto-scaling-group',
+          '--instance-id',
+          vm_name,
+          '--should-decrement-desired-capacity',
+      ]
+      vm_util.IssueCommand(cmd)
+    background_tasks.RunThreaded(RemoveVm, vm_names)
 
   def _Resize(self, new_vm_count: int):
     cmd = self.base_cmd + [
         'update-auto-scaling-group',
         '--auto-scaling-group-name',
         self.name,
-        '--min-size',
-        str(new_vm_count),
-        '--max-size',
-        str(new_vm_count),
         '--desired-capacity',
         str(new_vm_count),
     ]
