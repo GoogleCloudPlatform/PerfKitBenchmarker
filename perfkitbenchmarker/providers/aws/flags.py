@@ -381,6 +381,14 @@ AWS_DOCUMENTDB_SNAPSHOT = flags.DEFINE_string(
 # Safe for benchmarks that do not use persistent volumes (e.g. k8s_management).
 # Saves ~3 minutes per run.
 flags.DEFINE_boolean(
+    'eks_reserve_capacity_per_az',
+    False,
+    'If True, dynamically creates EC2 capacity reservations and launch '
+    'templates per AZ before nodegroup creation. Enable only for the '
+    'k8s_management benchmark. Leaving enabled for other benchmarks '
+    'wastes reserved capacity on wrong instance types.',
+)
+flags.DEFINE_boolean(
     'eks_skip_ebs_csi',
     False,
     'If True, skip EBS CSI driver setup (OIDC + IAM role + addon install) '
