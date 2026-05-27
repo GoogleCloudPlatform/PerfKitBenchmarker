@@ -546,6 +546,13 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
       node_version: str | None = None,
   ) -> None:
     """Creates a single named node pool on the cluster."""
+    node_flags = self._GetNodeFlags(nodepool_config)
+    if node_version:
+      # _GetNodeFlags may have added self.cluster_version; replace or append.
+      if '--kubernetes-version' in node_flags:
+        node_flags[node_flags.index('--kubernetes-version') + 1] = node_version
+      else:
+        node_flags += ['--kubernetes-version', node_version]
     cmd = [
         azure.AZURE_PATH,
         'aks',
@@ -557,7 +564,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         _AzureNodePoolName(nodepool_config.name),
         '--labels',
         f'pkb_nodepool={nodepool_config.name}',
-    ] + self._GetNodeFlags(nodepool_config, version_override=node_version)
+    ] + node_flags
     _, stderr, retcode = vm_util.IssueCommand(
         cmd, timeout=1800, raise_on_failure=False
     )
@@ -619,6 +626,13 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
       nodepool_config: container.BaseNodePoolConfig,
       node_version: str | None = None,
   ) -> str:
+    node_flags = self._GetNodeFlags(nodepool_config)
+    if node_version:
+      # _GetNodeFlags may have added self.cluster_version; replace or append.
+      if '--kubernetes-version' in node_flags:
+        node_flags[node_flags.index('--kubernetes-version') + 1] = node_version
+      else:
+        node_flags += ['--kubernetes-version', node_version]
     cmd = [
         azure.AZURE_PATH,
         'aks',
@@ -631,7 +645,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--labels',
         f'pkb_nodepool={nodepool_config.name}',
         '--no-wait',
-    ] + self._GetNodeFlags(nodepool_config, version_override=node_version)
+    ] + node_flags
     # fix: raise timeout to 600s (AKS can take >300s to accept a
     # --no-wait request under concurrent load) and retry on transient errors
     # that indicate the cluster is temporarily at its concurrent-op or
@@ -822,6 +836,10 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
           timeout=120,
       )
       if rc:
+        if 'NotFound' in (err or '') or 'not found' in (err or '').lower():
+          raise errors.Resource.CreationError(
+              f'nodepool {name} not found while waiting for Succeeded: {err}'
+          )
         raise errors.Resource.RetryableCreationError(err)
       status = out.strip()
       if status == 'Succeeded':

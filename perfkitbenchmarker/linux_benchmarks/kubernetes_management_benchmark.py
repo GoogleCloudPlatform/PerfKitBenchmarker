@@ -27,10 +27,12 @@ Optimizations for minimum run time:
 """
 
 import copy
+import dataclasses
 import statistics
 import threading
 import time
 from typing import Callable
+from unicodedata import name
 
 from absl import flags
 from absl import logging
@@ -146,6 +148,14 @@ _SCENARIO_B_NAME = f'{_PREFIX}b'
 
 def _ScenarioCName(i):
   return f'{_PREFIX}c{i:04d}'
+
+@dataclasses.dataclass
+class _OpResult:
+  """Holds timing and outcome for a single async management-plane operation."""
+  name: str
+  init_dur: float
+  e2e_dur: float
+  error: Exception | None = None
 
 
 def GetConfig(user_config):
@@ -344,7 +354,7 @@ def _RunScenarioA(
                         attempted_ops=len(pool_names))
 
   # ── Phase 2: concurrent upgrades (only successfully created pools) ───────
-  created = [name for name, _, _, err in create_results if err is None]
+  created = [r.name for r in create_results if r.error is None]
   logging.info(
       'Scenario A: %d/%d pools created — proceeding to upgrade',
       len(created), n)
@@ -489,9 +499,7 @@ def _RunScenarioB(
 
   samples: list[sample.Sample] = []
   for entry in results.entries:
-    name, init_dur, e2e_dur, err = entry
-    samples += _OpSamples(name, [(name, init_dur, e2e_dur, err)],
-                          attempted_ops=1)
+    samples += _OpSamples(entry.name, [entry], attempted_ops=1)
 
   # Remove test pool (best-effort).
   try:
@@ -536,7 +544,7 @@ def _RunScenarioC(
       items=configs_,
       get_name=lambda cfg: cfg.name,
   )
-  created_ok = sum(1 for _, _, _, err in create_results if err is None)
+  created_ok = sum(1 for r in create_results if r.error is None)
   logging.info('Scenario C scale=%d: %d/%d creates succeeded', scale,
                created_ok, scale)
   samples += _OpSamples('ScenarioC_Create',
@@ -585,12 +593,13 @@ class _Results:
 
   def __init__(self):
     self._lock = threading.Lock()
-    self.entries: list[tuple[str, float, float, Exception | None]] = []
+    self.entries: list[_OpResult] = []
 
   def add(self, name: str, init_dur: float, e2e_dur: float,
-          err: Exception | None) -> None:
+        err: Exception | None) -> None:
+    result = _OpResult(name, init_dur, e2e_dur, err)
     with self._lock:
-      self.entries.append((name, init_dur, e2e_dur, err))
+      self.entries.append(result)
 
 
 def _TimedAsync(
@@ -603,18 +612,18 @@ def _TimedAsync(
   e2e_lat  = total wall time including wait. On kickoff failure both are set
              to elapsed time at failure point.
   """
-  init_start = time.time()
+  init_start = time.monotonic()
   try:
     handle = kickoff()
   except Exception as exc:  # pylint: disable=broad-except
-    elapsed = time.time() - init_start
+    elapsed = time.monotonic() - init_start
     return elapsed, elapsed, exc
-  init_dur = time.time() - init_start
+  init_dur = time.monotonic() - init_start
   try:
     wait_fn(handle)
-    return init_dur, time.time() - init_start, None
+    return init_dur, time.monotonic() - init_start, None
   except Exception as exc:  # pylint: disable=broad-except
-    return init_dur, time.time() - init_start, exc
+    return init_dur, time.monotonic() - init_start, exc
 
 
 def _RunAsync(
@@ -659,8 +668,8 @@ def _MakeNodePoolConfig(
 
 def _OpSamples(
     metric_prefix: str,
-    results: list[tuple[str, float, float, Exception | None]],
-    attempted_ops: int = None,
+    results: list[_OpResult],
+    attempted_ops: int | None = None,
 ) -> list[sample.Sample]:
   """Per-op + aggregate samples for initiation and end-to-end latency.
 
@@ -677,19 +686,19 @@ def _OpSamples(
   e2e_latencies: list[float] = []
   success = 0
 
-  for name, init_dur, e2e_dur, err in results:
-    meta = {'operation_name': name, 'success': str(err is None)}
-    if err is not None:
-      meta['error'] = str(err)[:200]
+  for r in results:
+    meta = {'operation_name': r.name, 'success': str(r.error is None)}
+    if r.error is not None:
+        meta['error'] = str(r.error)[:200]
     else:
-      success += 1
-      init_latencies.append(init_dur)
-      e2e_latencies.append(e2e_dur)
+        success += 1
+        init_latencies.append(r.init_dur)
+        e2e_latencies.append(r.e2e_dur)
     samples.append(
-        sample.Sample(f'{metric_prefix}_InitiationLatency', init_dur,
+        sample.Sample(f'{metric_prefix}_InitiationLatency', r.init_dur,
                       'seconds', dict(meta)))
     samples.append(
-        sample.Sample(f'{metric_prefix}_EndToEndLatency', e2e_dur,
+        sample.Sample(f'{metric_prefix}_EndToEndLatency', r.e2e_dur,
                       'seconds', dict(meta)))
 
   # ── Success rate ─────────────────────────────────────────────────────────
@@ -771,7 +780,7 @@ def _OutlierSamples(metric_prefix: str, phase_label: str,
       'iqr': str(iqr),
       'upper_fence': str(upper_fence),
       'lower_fence': str(lower_fence),
-      'sample_count': str(n),
+      'sample_count': str(len(latencies)),
   }
   return [
       sample.Sample(
