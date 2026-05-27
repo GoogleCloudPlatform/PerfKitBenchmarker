@@ -186,22 +186,17 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   )
   # Spec workload: "a simple container that sleeps for a given time".
   # Confirms data-plane reachability; generates no data-plane load.
-  _, _, rc = kubectl.RunKubectlCommand(
-      [
-          'run',
-          _SLEEP_POD_NAME,
-          '--image=busybox',
-          '--restart=Never',
-          '--',
-          'sleep',
-          '86400',
-      ],
-      raise_on_failure=False,
+  kubectl.RunKubectlCommand(
+    [
+        'run',
+        _SLEEP_POD_NAME,
+        '--image=busybox',
+        '--restart=Never',
+        '--',
+        'sleep',
+        '86400',
+    ],
   )
-  if rc:
-    logging.warning(
-        'Sleep workload deploy returned rc=%d (non-fatal; continuing)', rc)
-
 
 def _CleanStartSweep(cluster: kubernetes_cluster.KubernetesCluster) -> None:
   """Deletes any stale pkbm* node pools so each run starts clean (spec C.2)."""
@@ -727,24 +722,20 @@ def _AggregateSamples(metric_prefix: str, phase_label: str,
                       latencies: list[float]) -> list[sample.Sample]:
   """Emits Mean/StdDev/Min/Median/P90/P99/Max samples for a latency series."""
   n = len(latencies)
-  sorted_lats = sorted(latencies)
   meta = {'sample_count': str(n)}
 
-  def _Percentile(p):
-    idx = (p / 100.0) * (n - 1)
-    lo = int(idx)
-    hi = min(lo + 1, n - 1)
-    frac = idx - lo
-    return sorted_lats[lo] * (1 - frac) + sorted_lats[hi] * frac
+  # statistics.quantiles with method='inclusive' matches linear interpolation
+  # and returns n-1 cut points; index 89→P90, 98→P99.
+  quantiles = statistics.quantiles(latencies, n=100, method='inclusive')
 
   stats = [
-      ('Mean', statistics.mean(latencies)),
-      ('StdDev', statistics.pstdev(latencies)),
-      ('Min', sorted_lats[0]),
-      ('Median', statistics.median(latencies)),
-      ('P90', _Percentile(90)),
-      ('P99', _Percentile(99)),
-      ('Max', sorted_lats[-1]),
+    ('Mean', statistics.mean(latencies)),
+    ('StdDev', statistics.pstdev(latencies)),
+    ('Min', min(latencies)),
+    ('Median', statistics.median(latencies)),
+    ('P90', quantiles[89]),
+    ('P99', quantiles[98]),
+    ('Max', max(latencies)),
   ]
   result = []
   for label, value in stats:
@@ -761,18 +752,9 @@ def _AggregateSamples(metric_prefix: str, phase_label: str,
 def _OutlierSamples(metric_prefix: str, phase_label: str,
                     latencies: list[float]) -> list[sample.Sample]:
   """Emits a single OutlierCount sample using IQR-fence outlier detection."""
-  sorted_lats = sorted(latencies)
-  n = len(sorted_lats)
-
-  def _Percentile(p):
-    idx = (p / 100.0) * (n - 1)
-    lo = int(idx)
-    hi = min(lo + 1, n - 1)
-    frac = idx - lo
-    return sorted_lats[lo] * (1 - frac) + sorted_lats[hi] * frac
-
-  q1 = _Percentile(25)
-  q3 = _Percentile(75)
+  # statistics.quantiles(n=4) returns [Q1, Q2, Q3]; indices 0 and 2.
+  quartiles = statistics.quantiles(latencies, n=4, method='inclusive')
+  q1, q3 = quartiles[0], quartiles[2]
   iqr = q3 - q1
   lower_fence = q1 - 1.5 * iqr
   upper_fence = q3 + 1.5 * iqr

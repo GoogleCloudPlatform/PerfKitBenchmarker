@@ -321,9 +321,15 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
       )
     return 'http://' + ip.strip()
 
-  def AddNodepool(self, batch_name: str, pool_id: str):
-    """Adds an additional nodepool with the given name to the cluster."""
-    pass
+  def AddNodepool(self, batch_name: str, pool_id: str) -> None:
+    """Adds a node pool; delegates to CreateNodePool for standard clusters.
+
+    Karpenter-based subclasses override this to apply a manifest instead.
+    """
+    nodepool_config = container_lib.BaseNodePoolConfig(
+        name=f'{batch_name}-{pool_id}',
+    )
+    self.CreateNodePool(nodepool_config)
 
   def CreateNodePool(
       self,
