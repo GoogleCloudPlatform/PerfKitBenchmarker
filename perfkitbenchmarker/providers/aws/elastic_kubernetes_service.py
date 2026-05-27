@@ -550,7 +550,13 @@ class EksCluster(BaseEksCluster):
             ],
             raise_on_failure=False,
         )
-        self.cluster_version = ver_out.strip() if ver_rc == 0 and ver_out.strip() else '1.34'
+        if ver_rc != 0 or not ver_out.strip():
+          raise errors.Resource.CreationError(
+              '[EKS] Failed to determine cluster version from describe-cluster. '
+              'Cannot proceed without a valid Kubernetes version. '
+              f'rc={ver_rc} out={ver_out.strip()!r}'
+          )
+        self.cluster_version = ver_out.strip()
         logging.info('[EKS] Resolved cluster version: %s', self.cluster_version)
       k8s_minor_str = '.'.join(self.cluster_version.split('.')[:2])
       ami_out, _, ami_rc = vm_util.IssueCommand(
