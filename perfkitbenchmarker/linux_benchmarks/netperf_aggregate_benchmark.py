@@ -93,10 +93,13 @@ def PrepareNetperfAggregate(vm):
         ' /opt/pkb/netperf-netperf-2.7.0/doc/examples/runemomniaggdemo.sh'
     )
 
-  port_end = PORT_START
+  port_end = PORT_START + 8
 
   if vm_util.ShouldRunOnExternalIpAddress():
     vm.AllowPort(PORT_START, port_end)
+
+  if vm_util.ShouldRunOnExternalIpv6Address(vm):
+    vm.AllowPort(PORT_START, port_end, ['::/0'])
 
   netserver_cmd = ('{netserver_path} -p {port_start}').format(
       port_start=PORT_START, netserver_path=netperf.NETSERVER_PATH
@@ -239,11 +242,24 @@ def Run(benchmark_spec):
   results = []
 
   if vm_util.ShouldRunOnExternalIpAddress():
+    logging.info( 'starting external ipv4 tests' )
     server_ips = list(vm.ip_address for vm in server_vms)
     external_ip_results = RunNetperfAggregate(client_vm, server_ips)
     for external_ip_result in external_ip_results:
       external_ip_result.metadata['ip_type'] = 'external'
+      external_ip_result.metadata['using_ipv6'] = (False)
     results.extend(external_ip_results)
+    logging.info( f"external ipv4 results: {external_ip_results}" )
+  
+  if vm_util.ShouldRunOnExternalIpv6Address(client_vm): # TODO: explicitly check all server and client vms
+    logging.info( 'starting external ipv6 tests' )
+    server_ips = list(vm.ipv6_address for vm in server_vms)
+    external_ipv6_results = RunNetperfAggregate(client_vm, server_ips)
+    for result in external_ipv6_results:
+      result.metadata['ip_type'] = 'external'
+      result.metadata['using_ipv6'] = (True)
+    results.extend( external_ipv6_results )
+    logging.info( f"external ipv6 results: {external_ipv6_results}" )
 
   # check if all server vms internal ips are reachable
   run_internal = True
@@ -253,12 +269,15 @@ def Run(benchmark_spec):
       break
 
   if run_internal:
+    logging.info( 'starting internal ipv4 tests' )
     server_ips = list(vm.internal_ip for vm in server_vms)
     internal_ip_results = RunNetperfAggregate(client_vm, server_ips)
 
     for internal_ip_result in internal_ip_results:
       internal_ip_result.metadata['ip_type'] = 'internal'
+      internal_ip_result.metadata['using_ipv6'] = (False)
     results.extend(internal_ip_results)
+    logging.info( f'internal ipv4 results: {internal_ip_results}' )
 
   return results
 
