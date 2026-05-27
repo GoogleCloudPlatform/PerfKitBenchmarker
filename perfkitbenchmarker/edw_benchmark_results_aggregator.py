@@ -75,6 +75,8 @@ class EdwQueryPerformance:
 
   Attributes:
     name: A string name of the query that was executed
+    query_start: The start time of the query in milliseconds since epoch.
+    query_end: The end time of the query in milliseconds since epoch.
     performance: A Float variable set to the query's completion time in secs.
       -1.0 is used as a sentinel value implying the query failed. For a
       successful query the value is expected to be positive.
@@ -83,10 +85,17 @@ class EdwQueryPerformance:
   """
 
   def __init__(
-      self, query_name: str, performance: float, metadata: dict[str, Any]
+      self,
+      query_name: str,
+      performance: float,
+      metadata: dict[str, Any],
+      query_start: int | None = None,
+      query_end: int | None = None,
   ):
-    # TODO(user): add query start and query end as attributes.
+    # TODO(user): migrate usages to rely on query_start and query_end attributes
     self.name = query_name
+    self.query_start = query_start
+    self.query_end = query_end
     self.performance = performance
     self.execution_status = (
         EdwQueryExecutionStatus.FAILED
@@ -115,12 +124,16 @@ class EdwQueryPerformance:
       metadata = results['details']
     else:
       metadata = {}
+    metadata['query_start'] = results.get('query_start')
+    metadata['query_end'] = results.get('query_end')
     if results['query_wall_time_in_secs'] == -1:
       logging.warning('Query %s failed.', results['query'])
     return cls(
         query_name=results['query'],
         performance=results['query_wall_time_in_secs'],
         metadata=metadata,
+        query_start=results.get('query_start'),
+        query_end=results.get('query_end'),
     )
 
   def get_performance_sample(self, metadata: dict[str, Any]) -> sample.Sample:
@@ -919,11 +932,7 @@ class EdwThroughputIterationPerformance(EdwBaseIterationPerformance):
     non_zero_streams = len(self.performance) >= 1
     no_duplicate_queries = self.no_duplicate_queries()
     all_queries_succeeded = self.all_queries_succeeded()
-    return (
-        non_zero_streams
-        and no_duplicate_queries
-        and all_queries_succeeded
-    )
+    return non_zero_streams and no_duplicate_queries and all_queries_succeeded
 
   def get_queries_geomean(self) -> float:
     """Gets the geometric mean of all queries in all streams of the iteration.

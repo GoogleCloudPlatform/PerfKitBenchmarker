@@ -55,7 +55,7 @@ def _CalculateCidrSize(nodes: int) -> int:
   # So 2^(32 - nodes) - 2^(32 - 20) >= 2^(32 - 24) * CIDR
   # OR CIDR <= 32 - log2(2^8 * nodes + 2^12)
   cidr_size = int(32 - math.log2((nodes << 8) + (1 << 12)))
-  # /17 is narrowest CIDR range GKE supports
+  # /16 is narrowest CIDR range GKE supports
   return min(cidr_size, 16)
 
 
@@ -718,6 +718,97 @@ class GkeCluster(BaseGkeCluster):
       )
     return op_name
 
+  def _GetLatestOperationName(
+      self,
+      operation_type: str = 'UPGRADE_NODES',
+      target_name: str = '',
+      max_attempts: int = 5,
+      retry_delay: int = 3,
+      op_start_time: float = 0.0,
+  ) -> str:
+    """Returns the name of the most recent matching operation for this cluster.
+
+    The async gcloud command may return before the GKE control plane has
+    transitioned the operation from PENDING to RUNNING.  For fast operations
+    (e.g. label updates) the operation may already be DONE by the time this
+    method is called.  Passing op_start_time handles both cases.
+
+    Args:
+        operation_type: GKE operationType to filter on, e.g. 'UPGRADE_NODES'
+            for node pool upgrades or 'UPDATE_CLUSTER' for cluster-level
+            updates via 'gcloud container clusters update'.
+        target_name: Substring to match against targetLink (e.g. nodepool name
+            for UPGRADE_NODES, or cluster name for UPDATE_CLUSTER).  If empty,
+            falls back to self.name (the cluster name).
+        max_attempts: Number of query attempts before giving up.
+        retry_delay: Seconds to wait between attempts.
+        op_start_time: Unix timestamp recorded just before the async gcloud
+            command was issued.  When provided, the status filter is broadened
+            to include DONE (so fast-completing operations are found) and a
+            startTime >= guard is added to avoid matching old operations.
+
+    Returns:
+        Operation name string, or empty string if none found.
+    """
+    link_target = target_name or self.name
+    if op_start_time:
+      # Fast operations (e.g. --update-labels) may be DONE before we query.
+      # Broaden the status filter and add a startTime guard (with a 30-second
+      # buffer for clock skew) to avoid picking up older completed operations.
+      from_time = time.strftime(
+          '%Y-%m-%dT%H:%M:%SZ', time.gmtime(op_start_time - 30)
+      )
+      status_filter = '(status=RUNNING OR status=PENDING OR status=DONE)'
+      time_filter = f' AND startTime>="{from_time}"'
+    else:
+      # Slow operations (e.g. node pool upgrades): only look for active ops.
+      status_filter = '(status=RUNNING OR status=PENDING)'
+      time_filter = ''
+
+    filter_str = (
+        f'operationType={operation_type} AND '
+        f'{status_filter} AND '
+        f'targetLink ~ {link_target}'
+        f'{time_filter}'
+    )
+    for attempt in range(1, max_attempts + 1):
+      list_cmd = self._GcloudCommand('container', 'operations', 'list')
+      list_cmd.flags['filter'] = filter_str
+      list_cmd.flags['sort-by'] = '~startTime'
+      list_cmd.flags['limit'] = 1
+      list_cmd.flags['format'] = 'value(name)'
+      stdout, stderr, _ = list_cmd.Issue(raise_on_failure=False)
+      op_name = stdout.strip()
+      if op_name:
+        logging.info(
+            '_GetLatestOperationName: found op %s (type=%s target=%s) '
+            '(attempt %d/%d)', op_name, operation_type, link_target,
+            attempt, max_attempts,
+        )
+        return op_name
+      logging.warning(
+          '_GetLatestOperationName: no %s op found for target=%s '
+          '(attempt %d/%d), retrying in %ds. stderr=%s',
+          operation_type, link_target, attempt, max_attempts, retry_delay,
+          stderr,
+      )
+      time.sleep(retry_delay)
+    return ''
+  
+#   def HasActiveUpgradeOperations(self) -> bool:
+#     """Checks if there are any active node pool upgrades running on the cluster."""
+#     cmd = self._GcloudCommand('container', 'operations', 'list')
+#     cmd.flags['project'] = self.project
+#     cmd.flags['zone'] = self.zone
+#     cmd.flags['filter'] = 'operationType=UPGRADE_NODES AND status=RUNNING'
+#     cmd.flags['sort-by'] = '~startTime'
+#     cmd.flags['limit'] = 1
+#     cmd.flags['format'] = 'value(name)'
+    
+    # Issue the command using PKB's native GcloudCommand wrapper
+    stdout, _, _ = cmd.Issue(raise_on_failure=False)
+    return bool(stdout.strip())
+
   def CreateNodePoolAsync(
       self,
       nodepool_config: container.BaseNodePoolConfig,
@@ -750,8 +841,23 @@ class GkeCluster(BaseGkeCluster):
         '--cluster-version',
         target_version,
     )
-    cmd.args.append('--quiet')
-    return self._IssueAsync(cmd)
+    try:
+        return self._IssueAsync(cmd)
+    except errors.Resource.CreationError as e:
+        if 'returned no operation name' not in str(e):
+            raise
+        # Fallback: gcloud succeeded but printed nothing. Query the operations
+        # list scoped to this specific nodepool to find the operation name.
+        logging.warning(
+            'UpgradeNodePoolAsync: falling back to operations list for '
+            'nodepool %s. Original error: %s', name, e
+        )
+        op_name = self._GetLatestOperationName(
+            operation_type='UPGRADE_NODES', target_name=name
+        )
+        if not op_name:
+            raise
+        return op_name
 
   def DeleteNodePoolAsync(self, name: str) -> str:
     cmd = self._GcloudCommand(
@@ -768,7 +874,36 @@ class GkeCluster(BaseGkeCluster):
   def UpdateClusterAsync(self) -> str:
     cmd = self._GcloudCommand('container', 'clusters', 'update', self.name)
     cmd.flags['update-labels'] = f'k8s-mgmt-ts={int(time.time())}'
-    return self._IssueAsync(cmd)
+    # 'gcloud container clusters update --async' suppresses stdout when
+    # --quiet is active (same behaviour as 'clusters upgrade'), so the
+    # operation name is never printed.  Remove --quiet here; the label-update
+    # is non-interactive so no confirmation prompt is needed.
+    cmd.flags.pop('quiet', None)
+    # Record start time BEFORE issuing.  The label-update operation completes
+    # in seconds, so it may already be DONE by the time the fallback queries
+    # the operations list.  The timestamp lets us safely include DONE ops
+    # without matching older completed operations from previous runs.
+    op_start_time = time.time()
+    try:
+      return self._IssueAsync(cmd)
+    except errors.Resource.CreationError as e:
+      if 'returned no operation name' not in str(e):
+        raise
+      # Fallback: gcloud returned retcode=0 but empty stdout.  Query the
+      # operations list including DONE status (fast label-update ops complete
+      # before we query) guarded by op_start_time to avoid stale matches.
+      logging.warning(
+          'UpdateClusterAsync: falling back to operations list for cluster %s.'
+          ' Original error: %s', self.name, e
+      )
+      op_name = self._GetLatestOperationName(
+          operation_type='UPDATE_CLUSTER',
+          target_name=self.name,
+          op_start_time=op_start_time,
+      )
+      if not op_name:
+        raise
+      return op_name
 
   def ResolveNodePoolVersions(self) -> tuple[str, str]:
     """Returns (initial, target) GKE node versions: initial=N-1, target=N.
@@ -842,7 +977,6 @@ class GkeCluster(BaseGkeCluster):
       )
 
     _poll()
-
 
 class GkeAutopilotCluster(BaseGkeCluster):
   """Class representing an Autopilot GKE cluster, which has no nodepools."""
@@ -918,9 +1052,9 @@ class GkeAutopilotCluster(BaseGkeCluster):
       # bigger nodes.
       compute_class = 'Performance'
     # https://cloud.google.com/kubernetes-engine/docs/how-to/autopilot-gpus#request-gpus
-    if virtual_machine.GPU_TYPE.value:
-      gpu_count = virtual_machine.GPU_COUNT.value or 1
-      gpu_type = virtual_machine.GPU_TYPE.value
+    if self.gpu_type:
+      gpu_count = self.gpu_count or 1
+      gpu_type = self.gpu_type
       suffix = ''
       if gpu_type in gce_virtual_machine.GPU_TYPE_TO_SUFFIX:
         suffix = gce_virtual_machine.GPU_TYPE_TO_SUFFIX[gpu_type]

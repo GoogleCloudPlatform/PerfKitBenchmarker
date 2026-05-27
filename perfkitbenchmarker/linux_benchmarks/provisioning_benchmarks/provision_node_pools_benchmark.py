@@ -34,6 +34,7 @@ Potential optimization (deliberately omitted) for GKE:
 - Use smaller machine types using Custom Compute Classes
 - Resize master VMs before running tests
 """
+
 import logging
 import time
 from typing import List
@@ -68,6 +69,10 @@ BENCHMARK_NAME = "provision_node_pools"
 BENCHMARK_CONFIG = """
 provision_node_pools:
   description: Measure the performance of node pools auto provisioning.
+  container_specs:
+    provisioning:
+      image: pkb_busybox
+  container_registry: {}
   container_cluster:
     cloud: GCP
     type: Kubernetes
@@ -101,6 +106,7 @@ def _AddNodePool(
     cluster: kubernetes_cluster.KubernetesCluster,
     batch_name: str,
     pool_id: str,
+    image: str,
 ) -> None:
   """Adds a node pool to the cluster."""
   cluster.AddNodepool(batch_name, pool_id=pool_id)
@@ -108,13 +114,17 @@ def _AddNodePool(
       JOB_MANIFEST_TEMPLATE,
       batch=batch_name,
       gpu=USE_GPU.value,
+      image=image,
       cloud=cluster.CLOUD,
       id=pool_id,
   )
 
 
 def _CreateJobsAndWait(
-    cluster: kubernetes_cluster.KubernetesCluster, batch_name: str, jobs: int
+    cluster: kubernetes_cluster.KubernetesCluster,
+    batch_name: str,
+    jobs: int,
+    image: str,
 ) -> list[sample.Sample]:
   """Creates jobs and waits for all pods to be running."""
   logging.info(
@@ -130,12 +140,12 @@ def _CreateJobsAndWait(
   for i in range(2, jobs + 1):
     tasks.append((
         _AddNodePool,
-        [cluster, batch_name, "{:03d}".format(i)],
+        [cluster, batch_name, "{:03d}".format(i), image],
         {},
     ))
   # Add the first node pool + batch prior to the rest.
   logging.info("Creating the first node pool 001")
-  _AddNodePool(cluster, batch_name, "001")
+  _AddNodePool(cluster, batch_name, "001", image)
   background_tasks.RunParallelThreads(tasks, len(tasks))
   apply_time = time.monotonic() - apply_start
   logging.info(
@@ -259,12 +269,13 @@ def _CreateNodePools(
     cluster: kubernetes_cluster.KubernetesCluster,
     batch_name: str,
     node_pools_to_add: int,
+    image: str,
 ) -> List[sample.Sample]:
   """Creates node pools and measures the time it takes to provision them."""
   nodes_before = len(kubernetes_commands.GetNodeNames())
   nodes_pools_before = len(cluster.GetNodePoolNames())
   start = time.monotonic()
-  samples = _CreateJobsAndWait(cluster, batch_name, node_pools_to_add)
+  samples = _CreateJobsAndWait(cluster, batch_name, node_pools_to_add, image)
   elapsed = time.monotonic() - start
   _AssertNodes(nodes_before, node_pools_to_add)
   _AssertNodePools(cluster, nodes_pools_before, node_pools_to_add)
@@ -302,11 +313,16 @@ def _CreateNodePools(
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Runs the node pools provisioning benchmark."""
   cluster = benchmark_spec.container_cluster
+  image = benchmark_spec.container_specs["provisioning"].image
   samples = []
   start = time.monotonic()
   if INIT_BATCH_SIZE.value > 0:
-    samples += _CreateNodePools(cluster, INIT_BATCH_NAME, INIT_BATCH_SIZE.value)
-  samples += _CreateNodePools(cluster, TEST_BATCH_NAME, TEST_BATCH_SIZE.value)
+    samples += _CreateNodePools(
+        cluster, INIT_BATCH_NAME, INIT_BATCH_SIZE.value, image
+    )
+  samples += _CreateNodePools(
+      cluster, TEST_BATCH_NAME, TEST_BATCH_SIZE.value, image
+  )
   elapsed = time.monotonic() - start
   total_node_pools = INIT_BATCH_SIZE.value + TEST_BATCH_SIZE.value
   metadata = {

@@ -54,6 +54,9 @@ class ProvisionNodePoolsBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.setUpWithXNodes(10)
     b_spec = mock.create_autospec(benchmark_spec.BenchmarkSpec, instance=True)
     b_spec.container_cluster = self.cluster
+    b_spec.container_specs = {
+        'provisioning': mock.Mock(image='pkb_busybox')
+    }
     samples = provision_node_pools_benchmark.Run(b_spec)
     metrics = [s.metric for s in samples]
     self.assertContainsSubset(

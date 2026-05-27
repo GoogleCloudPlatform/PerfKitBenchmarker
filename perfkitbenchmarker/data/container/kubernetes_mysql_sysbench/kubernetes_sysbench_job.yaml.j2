@@ -1,0 +1,149 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sysbench
+  {% if k8s_namespace -%}
+  namespace: {{ k8s_namespace }}
+  {%- endif %}
+spec:
+  template:
+    metadata:
+      labels:
+        app: sysbench
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: pkb_nodepool
+                operator: In
+                values:
+                - clients
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - sysbench
+            topologyKey: "kubernetes.io/hostname"
+      initContainers:
+        - name: sysbench-prepare
+          image: {{ image }}
+          imagePullPolicy: Always
+          securityContext:
+            runAsUser: 0
+            privileged: true
+            allowPrivilegeEscalation: true
+          volumeMounts:
+            - name: mysql-ssl
+              mountPath: /etc/mysql/ssl
+              readOnly: true
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - |
+              echo "Waiting for network/DNS to settle..."
+              until bash -c 'echo > /dev/tcp/mysql-0.mysql-svc.{{ k8s_namespace or "default" }}.svc.cluster.local/3306' 2>/dev/null; do
+                echo "Network not ready yet, sleeping 2s..."
+                sleep 2
+              done
+              {% if use_legacy_ssl -%}
+              echo "MySQL is ready! Preparing SSL certificates for sysbench 1.0..."
+              cp /etc/mysql/ssl/ca.pem ./cacert.pem
+              cp /etc/mysql/ssl/client-cert.pem ./client-cert.pem
+              cp /etc/mysql/ssl/client-key.pem ./client-key.pem
+              echo "Starting Sysbench Prepare"
+              ulimit -n 100000 || echo "Could not set ulimit";
+              sysbench \
+                oltp_read_write \
+                --table-size={{ table_size }} \
+                --tables={{ tables }} \
+                --mysql-host=mysql-0.mysql-svc.{{ k8s_namespace or 'default' }}.svc.cluster.local \
+                --mysql-db={{ mysql_db }} \
+                --mysql-user={{ mysql_user }} \
+                --mysql-password={{ mysql_password }} \
+                --mysql-ssl=on \
+                --threads={{ prepare_threads }} \
+                prepare
+              {% else -%}
+              echo "MySQL is ready! Starting Sysbench Prepare (1.1+)"
+              ulimit -n 100000 || echo "Could not set ulimit";
+              sysbench \
+                oltp_read_write \
+                --table-size={{ table_size }} \
+                --tables={{ tables }} \
+                --mysql-host=mysql-0.mysql-svc.{{ k8s_namespace or 'default' }}.svc.cluster.local \
+                --mysql-db={{ mysql_db }} \
+                --mysql-user={{ mysql_user }} \
+                --mysql-password={{ mysql_password }} \
+                --mysql-ssl=REQUIRED \
+                --mysql-ssl-ca=/etc/mysql/ssl/ca.pem \
+                --mysql-ssl-cert=/etc/mysql/ssl/client-cert.pem \
+                --mysql-ssl-key=/etc/mysql/ssl/client-key.pem \
+                --threads={{ prepare_threads }} \
+                prepare
+              {% endif %}
+      containers:
+        - name: sysbench
+          image: {{ image }}
+          imagePullPolicy: Always
+          securityContext:
+            runAsUser: 0
+            privileged: true
+            allowPrivilegeEscalation: true
+          volumeMounts:
+            - name: mysql-ssl
+              mountPath: /etc/mysql/ssl
+              readOnly: true
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - |
+              {% if use_legacy_ssl -%}
+              echo "Preparing SSL certificates for sysbench 1.0..."
+              cp /etc/mysql/ssl/ca.pem ./cacert.pem
+              cp /etc/mysql/ssl/client-cert.pem ./client-cert.pem
+              cp /etc/mysql/ssl/client-key.pem ./client-key.pem
+              ulimit -n 100000 || echo "Could not set ulimit";
+              echo "Starting Sysbench Run"
+              sysbench \
+                oltp_read_write \
+                --table-size={{ table_size }} \
+                --tables={{ tables }} \
+                --mysql-host=mysql-0.mysql-svc.{{ k8s_namespace or 'default' }}.svc.cluster.local \
+                --mysql-db={{ mysql_db }} \
+                --mysql-user={{ mysql_user }} \
+                --mysql-password={{ mysql_password }} \
+                --mysql-ssl=on \
+                --threads={{ threads }} \
+                --time={{ time }} \
+                --report-interval=1 \
+                run
+              {% else -%}
+              ulimit -n 100000 || echo "Could not set ulimit";
+              echo "Starting Sysbench Run (1.1+)"
+              sysbench \
+                oltp_read_write \
+                --table-size={{ table_size }} \
+                --tables={{ tables }} \
+                --mysql-host=mysql-0.mysql-svc.{{ k8s_namespace or 'default' }}.svc.cluster.local \
+                --mysql-db={{ mysql_db }} \
+                --mysql-user={{ mysql_user }} \
+                --mysql-password={{ mysql_password }} \
+                --mysql-ssl=REQUIRED \
+                --mysql-ssl-ca=/etc/mysql/ssl/ca.pem \
+                --mysql-ssl-cert=/etc/mysql/ssl/client-cert.pem \
+                --mysql-ssl-key=/etc/mysql/ssl/client-key.pem \
+                --threads={{ threads }} \
+                --time={{ time }} \
+                --report-interval=1 \
+                run
+              {% endif %}
+      volumes:
+        - name: mysql-ssl
+          secret:
+            secretName: mysql-ssl-secret

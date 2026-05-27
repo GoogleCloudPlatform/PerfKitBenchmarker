@@ -47,8 +47,8 @@ from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 # Flag to skip EBS CSI driver setup during cluster creation.
-# The k8s_management benchmark does not use persistent volumes, so EBS CSI
-# setup (OIDC association + IAM role + addon install) is unnecessary and adds
+# The kubernetes_management benchmark does not use persistent volumes, so
+# EBS CSI setup (OIDC + IAM role + addon install) is unnecessary and adds
 # ~3 minutes to every run. Set to True to skip it and save time.
 # Defined before FLAGS = flags.FLAGS so it is registered at import time
 # and visible to PKB's flag parser before --cloud/--container_cluster_type
@@ -62,7 +62,7 @@ _RARE_GPU_TYPES = [
 ]
 
 
-def RecursivelyUpdateDictionary(
+def _recursively_update_dictionary(
     original: dict[str, Any], updates: dict[str, Any]
 ) -> dict[str, Any]:
   """Updates a nested dictionary.
@@ -80,14 +80,14 @@ def RecursivelyUpdateDictionary(
   # Copied from https://stackoverflow.com/questions/3232943
   for k, v in updates.items():
     if isinstance(v, abc.Mapping):
-      original[k] = RecursivelyUpdateDictionary(original.get(k, {}), v)
+      original[k] = _recursively_update_dictionary(original.get(k, {}), v)
     else:
       original[k] = v
   return original
 
 
 class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
-  """Shared base class for Elastic Kubernetes Service cluster auto mode & not."""
+  """Shared base class for EKS cluster (auto mode and standard)."""
 
   def __init__(self, spec):
     # EKS requires a region and optionally a list of one or zones.
@@ -115,8 +115,9 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
     self.account: str = util.GetAccount()
     self.node_to_nodepool: dict[str, container.BaseNodePoolConfig | None] = {}
     self.node_to_machine_type: dict[str, str | None] = {}
-    # Dynamically created capacity reservations — keyed by AZ
-    self._capacity_reservation_ids: dict[str, str] = {}
+    self._cached_subnets: list[str] | None = None
+    self._cached_subnets_per_az: dict[str, str] | None = None
+    self._cached_node_role_arn: str | None = None
 
   def _ChooseSecondZone(self):
     """Choose a second zone for the control plane if only one is specified."""
@@ -145,13 +146,13 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
     if 'availabilityZones' in create_json:
       logging.info(
           '[EKS] Creating cluster with AZs: %s — '
-          'eksctl will auto-assign CIDRs for all %d zones.',
+          + 'eksctl will auto-assign CIDRs for all %d zones.',
           create_json['availabilityZones'],
           len(create_json['availabilityZones']),
       )
     # Schema for the cluster create command is here:
     # https://schema.eksctl.io/
-    create_json = RecursivelyUpdateDictionary(
+    create_json = _recursively_update_dictionary(
         {
             'apiVersion': 'eksctl.io/v1alpha5',
             'kind': 'ClusterConfig',
@@ -488,10 +489,9 @@ class EksCluster(BaseEksCluster):
     create_json['availabilityZones'] = cluster_azs
     logging.info(
         '[EKS] Cluster will have subnets in %d AZs: %s '
-        '(queried from EC2, bypassing PKB zone flag truncation)',
+        + '(queried from EC2, bypassing PKB zone flag truncation)',
         len(cluster_azs), cluster_azs,
     )
-
     self._EksCtlCreate(create_json)
 
     # Dynamically create capacity reservations + launch templates AFTER cluster
@@ -644,16 +644,19 @@ class EksCluster(BaseEksCluster):
     # EBS CSI driver is required for creating EBS volumes in version > 1.23
     # https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
     # Skip if --eks_skip_ebs_csi is set (saves ~3 min for benchmarks that
-    # do not use persistent volumes, such as k8s_management).
+    # do not use persistent volumes, such as kubernetes_management).
     if FLAGS.eks_skip_ebs_csi:
       logging.info(
           '[EKS] Skipping EBS CSI driver setup (--eks_skip_ebs_csi=True). '
-          'Saves ~3 min. Set to False if your benchmark needs persistent volumes.'
+          + 'Saves ~3 min. Set to False if benchmark needs persistent volumes.'
       )
     else:
       # Name must be unique.
       ebs_csi_driver_role = f'AmazonEKS_EBS_CSI_DriverRole_{self.name}'
 
+      ebs_policy_arn = (
+          'arn:aws:iam::aws:policy/service-role/'
+          + 'AmazonEBSCSIDriverPolicy')
       cmd = [
           FLAGS.eksctl,
           'create',
@@ -662,13 +665,15 @@ class EksCluster(BaseEksCluster):
           '--namespace=kube-system',
           f'--region={self.region}',
           f'--cluster={self.name}',
-          '--attach-policy-arn=arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy',
+          f'--attach-policy-arn={ebs_policy_arn}',
           '--approve',
           '--role-only',
           f'--role-name={ebs_csi_driver_role}',
       ]
       vm_util.IssueCommand(cmd)
 
+      svc_acct_arn = (
+          f'arn:aws:iam::{self.account}:role/{ebs_csi_driver_role}')
       cmd = [
           FLAGS.eksctl,
           'create',
@@ -676,7 +681,7 @@ class EksCluster(BaseEksCluster):
           '--name=aws-ebs-csi-driver',
           f'--region={self.region}',
           f'--cluster={self.name}',
-          f'--service-account-role-arn=arn:aws:iam::{self.account}:role/{ebs_csi_driver_role}',
+          f'--service-account-role-arn={svc_acct_arn}',
       ]
       vm_util.IssueCommand(cmd)
 
@@ -846,7 +851,7 @@ class EksCluster(BaseEksCluster):
     Only returns AZs that are in control_plane_zones (if specified).
     Cached after first call.
     """
-    if getattr(self, '_cached_subnets_per_az', None):
+    if getattr(self, '_cached_subnets_per_az', None) is not None:
       return self._cached_subnets_per_az
 
     subnet_ids = self._DiscoverSubnets()
@@ -854,20 +859,22 @@ class EksCluster(BaseEksCluster):
       self._cached_subnets_per_az = {}
       return {}
 
-    # Describe subnets to get their AZ mapping AND public/private status
+    # Describe subnets to get their AZ mapping
     out, _, rc = vm_util.IssueCommand(
         util.AWS_PREFIX + [
             'ec2', 'describe-subnets',
             '--region', self.region,
             '--subnet-ids', *subnet_ids,
-            '--query', 'Subnets[*].{SubnetId:SubnetId,AZ:AvailabilityZone,Public:MapPublicIpOnLaunch}',
+            '--query', 'Subnets[*].{SubnetId:SubnetId,AZ:AvailabilityZone}',
             '--output', 'json',
         ],
         raise_on_failure=False,
     )
     if rc:
-      logging.warning('[EKS] Could not describe subnets for AZ mapping — '
-                      'falling back to all subnets')
+      logging.warning(
+          '[EKS] Could not describe subnets for AZ mapping — '
+          + 'falling back to all subnets'
+      )
       self._cached_subnets_per_az = {}
       return {}
 
@@ -875,34 +882,17 @@ class EksCluster(BaseEksCluster):
 
     # Do NOT filter by control_plane_zones — PKB truncates it to 2 AZs.
     # Accept all subnets the VPC has across all AZs.
-    allowed_zones = None
-
-    # Build AZ map — always prefer public subnets (MapPublicIpOnLaunch=True)
-    # which have an internet gateway route. Private subnets lack IGW routes
-    # and nodes launched there cannot reach the EKS API server to join the cluster.
     az_map: dict[str, str] = {}
-    az_map_private: dict[str, str] = {}
     for s in subnets:
       az = s['AZ']
-      if allowed_zones and az not in allowed_zones:
-        continue
-      if s.get('Public'):
-        # Public subnet — always prefer this
-        az_map[az] = s['SubnetId']
-        logging.info('[EKS] AZ %s → public subnet %s', az, s['SubnetId'])
-      elif az not in az_map:
-        # Private subnet — only use as fallback if no public subnet found
-        az_map_private[az] = s['SubnetId']
-    # Fill in any AZs that only have private subnets
-    for az, sid in az_map_private.items():
+      # Keep only one subnet per AZ (prefer public subnets — already filtered
+      # by _DiscoverSubnets which returns the cluster's configured subnets)
       if az not in az_map:
-        logging.warning('[EKS] AZ %s has no public subnet — using private %s', az, sid)
-        az_map[az] = sid
+        az_map[az] = s['SubnetId']
 
     logging.info(
-        '[EKS] Subnet-per-AZ mapping: %s (from %d total subnets, '
-        'allowed_zones=%s)',
-        az_map, len(subnet_ids), allowed_zones,
+        '[EKS] Subnet-per-AZ mapping: %s (from %d total subnets)',
+        az_map, len(subnet_ids),
     )
     self._cached_subnets_per_az = az_map
     return az_map
@@ -946,7 +936,7 @@ class EksCluster(BaseEksCluster):
       return cache[minor]
 
   def _DiscoverNodeRoleArn(self) -> str:
-    """Returns a usable node IAM role ARN by inspecting an existing nodegroup."""
+    """Returns a node IAM role ARN by inspecting an existing nodegroup."""
     if getattr(self, '_cached_node_role_arn', None):
       return self._cached_node_role_arn
     out, _, _ = vm_util.IssueCommand(
@@ -1010,9 +1000,7 @@ class EksCluster(BaseEksCluster):
       # Extract numeric suffix from pool name to determine AZ assignment
       name = nodepool_config.name
       suffix = ''.join(c for c in name if c.isdigit())
-      # pkbmb (Scenario B) has no suffix — use idx=1 (us-east-1b) to avoid
-      # competing with us-east-1a which already has the default nodegroup
-      idx = int(suffix) if suffix else 1
+      idx = int(suffix) if suffix else 0
       zones = sorted(az_subnets.keys())
       assigned_az = zones[idx % len(zones)]
       subnets = [az_subnets[assigned_az]]
@@ -1039,6 +1027,12 @@ class EksCluster(BaseEksCluster):
         'nodeRole': self._DiscoverNodeRoleArn(),
         'labels': {'pkb_nodepool': nodepool_config.name},
         'tags': util.MakeDefaultTags(),
+        # Target open capacity reservations first before falling back to
+        # regular on-demand. Ensures EC2 capacity reservations created
+        # before the benchmark are actually used by EKS nodegroups.
+        'capacityReservationSpecification': {
+            'capacityReservationPreference': 'open',
+        },
     }
     _az = assigned_az if az_subnets and len(az_subnets) > 1 else f'{self.region}a'
     _lt_name = f'pkb-eks-lt-{_az}'
@@ -1278,7 +1272,7 @@ class EksCluster(BaseEksCluster):
         retryable_exceptions=(errors.Resource.RetryableDeletionError,),
     )
     def _wait_ng_gone():
-      out, err, rc = vm_util.IssueCommand(
+      _, err, rc = vm_util.IssueCommand(
           util.AWS_PREFIX
           + [
               'eks',
@@ -1510,8 +1504,9 @@ class EksAutoCluster(BaseEksCluster):
   def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Get the node selectors section of a yaml for the provider."""
     del machine_type  # Unused.
-    # Theoretically needed in mixed mode, but deployments fail without it:
-    # https://docs.aws.amazon.com/eks/latest/userguide/associate-workload.html#_require_a_workload_is_deployed_to_eks_auto_mode_nodes
+    # Theoretically needed in mixed mode, but deployments fail without it.
+    # See: docs.aws.amazon.com/eks/latest/userguide/associate-workload.html
+    # #_require_a_workload_is_deployed_to_eks_auto_mode_nodes
     selectors = {'eks.amazonaws.com/compute-type': 'auto'}
     if self.use_spot:
       selectors['karpenter.sh/capacity-type'] = 'spot'
@@ -1549,10 +1544,15 @@ class EksKarpenterCluster(BaseEksCluster):
   def _Create(self):
     """Creates the control plane and worker nodes."""
     template_filename = vm_util.PrependTempDir('cloud-formation-template.yaml')
+    cfn_url = (
+        'https://raw.githubusercontent.com/aws/karpenter-provider-aws/'
+        + f'v{_KARPENTER_VERSION}/website/content/en/preview/'
+        + 'getting-started/getting-started-with-karpenter/'
+        + 'cloudformation.yaml')
     vm_util.IssueCommand([
         'curl',
         '-fsSL',
-        f'https://raw.githubusercontent.com/aws/karpenter-provider-aws/v{_KARPENTER_VERSION}/website/content/en/preview/getting-started/getting-started-with-karpenter/cloudformation.yaml',
+        cfn_url,
         '-o',
         template_filename,
     ])
@@ -1584,6 +1584,12 @@ class EksKarpenterCluster(BaseEksCluster):
     bootstrapping_nodepool.min_nodes = 1
     bootstrapping_nodepool.max_nodes = 1
     bootstrapping_nodepool.machine_type = 'm7i.2xlarge'
+    karpenter_policy_arn = (
+        f'arn:aws:iam::{self.account}:policy/'
+        + f'KarpenterControllerPolicy-{self.name}')
+    karpenter_node_role_arn = (
+        f'arn:aws:iam::{self.account}:role/'
+        + f'KarpenterNodeRole-{self.name}')
     create_json: dict[str, Any] = {
         'metadata': {
             'tags': {'karpenter.sh/discovery': self.name},
@@ -1594,14 +1600,12 @@ class EksKarpenterCluster(BaseEksCluster):
                 'serviceAccountName': 'karpenter',
                 'roleName': f'{self.name}-karpenter',
                 'permissionPolicyARNs': [
-                    f'arn:aws:iam::{self.account}:policy/KarpenterControllerPolicy-{self.name}'
+                    karpenter_policy_arn
                 ],
             }],
         },
         'iamIdentityMappings': [{
-            'arn': (
-                f'arn:aws:iam::{self.account}:role/KarpenterNodeRole-{self.name}'
-            ),
+            'arn': karpenter_node_role_arn,
             'username': 'system:node:{{EC2PrivateDNSName}}',
             'groups': ['system:bootstrappers', 'system:nodes'],
         }],
@@ -1642,15 +1646,16 @@ class EksKarpenterCluster(BaseEksCluster):
     policy_arn = (stdout or '').strip()
     if not policy_arn or policy_arn == 'None':
       with vm_util.NamedTemporaryFile(dir=vm_util.GetTempDir(), mode='w') as tf:
+        alb_policy_url = (
+            'https://raw.githubusercontent.com/kubernetes-sigs/'
+            + 'aws-load-balancer-controller/'
+            + 'v2.13.4/docs/install/iam_policy.json')
         vm_util.IssueCommand([
             'curl',
             '-sSL',
             '-o',
             tf.name,
-            (
-                'https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/'
-                'v2.13.4/docs/install/iam_policy.json'
-            ),
+            alb_policy_url,
         ])
         stdout, _, _ = vm_util.IssueCommand(
             util.AWS_PREFIX
@@ -1691,11 +1696,14 @@ class EksKarpenterCluster(BaseEksCluster):
         in stderr,
     )
     # 4) Apply CRDs
+    crds_url = (
+        'https://raw.githubusercontent.com/aws/eks-charts/master/'
+        + 'stable/aws-load-balancer-controller/crds/crds.yaml')
     kubectl.RunKubectlCommand(
         [
             'apply',
             '-f',
-            'https://raw.githubusercontent.com/aws/eks-charts/master/stable/aws-load-balancer-controller/crds/crds.yaml',
+            crds_url,
         ],
         suppress_failure=lambda stdout, stderr, retcode: 'already exists'
         in stderr,
@@ -1786,7 +1794,8 @@ class EksKarpenterCluster(BaseEksCluster):
   def _PostIngressNetworkingFixups(
       self, namespace: str, name: str, port: int, address: str
   ) -> None:
-    """Fixs ALB -> nodes connectivity to prevent 504 errors from unhealthy targets."""
+    """Fixes ALB -> node connectivity to prevent 504 errors."""
+    del namespace, name  # Unused
 
     # 1) Get ALB security group from address
     host = (
@@ -1911,7 +1920,7 @@ class EksKarpenterCluster(BaseEksCluster):
               'daemonset/aws-node',
               '-n',
               'kube-system',
-              '--timeout=%ds' % vm_util.DEFAULT_TIMEOUT,
+              f'--timeout={vm_util.DEFAULT_TIMEOUT}s',
           ],
           timeout=vm_util.DEFAULT_TIMEOUT,
       )
@@ -1996,12 +2005,15 @@ class EksKarpenterCluster(BaseEksCluster):
     # Get the AMI version for current kubernetes version.
     # See e.g. https://karpenter.sh/docs/tasks/managing-amis/ for not using
     # @latest.
+    ssm_ami_path = (
+        f'/aws/service/eks/optimized-ami/{self.cluster_version}/'
+        + 'amazon-linux-2023/x86_64/standard/recommended/image_id')
     image_id, _, _ = vm_util.IssueCommand([
         'aws',
         'ssm',
         'get-parameter',
         '--name',
-        f'/aws/service/eks/optimized-ami/{self.cluster_version}/amazon-linux-2023/x86_64/standard/recommended/image_id',
+        ssm_ami_path,
         '--region',
         self.region,
         '--query',
@@ -2122,7 +2134,7 @@ class EksKarpenterCluster(BaseEksCluster):
     else:
       logging.info(
           'Karpenter node role %s not found or empty response; skipping'
-          ' instance profile cleanup',
+          + ' instance profile cleanup',
           node_role,
       )
       profiles_json = {'InstanceProfiles': []}
@@ -2274,7 +2286,7 @@ class EksKarpenterCluster(BaseEksCluster):
       for eni_id in eni_ids:
         # Bind eni_id by default to avoid loop closure issues if
         # this is refactored.
-        def _DeleteOneEni(eni_id=eni_id) -> None:
+        def _delete_one_eni(eni_id=eni_id) -> None:
           _, stderr, retcode = vm_util.IssueCommand(
               [
                   'aws',
@@ -2305,7 +2317,7 @@ class EksKarpenterCluster(BaseEksCluster):
             poll_interval=10,
             max_retries=5,
             retryable_exceptions=(errors.Resource.RetryableDeletionError,),
-        )(_DeleteOneEni)()
+        )(_delete_one_eni)()
 
   def _IsReady(self):
     """Returns True if cluster is running. Autopilot defaults to 0 nodes."""

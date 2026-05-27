@@ -13,7 +13,6 @@ from perfkitbenchmarker.configs import container_spec as container_spec_lib
 from perfkitbenchmarker.resources.container_service import container
 from perfkitbenchmarker.resources.container_service import container_registry
 
-
 DEFAULT_NODEPOOL = container_spec_lib.DEFAULT_NODEPOOL
 
 FLAGS = flags.FLAGS
@@ -37,6 +36,8 @@ class BaseContainerCluster(resource.BaseResource):
     else:
       self.min_nodes: int = cluster_spec.min_vm_count
     self.max_nodes: int = cluster_spec.max_vm_count or cluster_spec.vm_count
+    self.gpu_type: str | None = None
+    self.gpu_count: int | None = None
     self.default_nodepool = self._InitializeDefaultNodePool(
         cluster_spec, cluster_spec.vm_spec
     )
@@ -134,6 +135,21 @@ class BaseContainerCluster(resource.BaseResource):
   ):
     """Override to initialize cloud specific configs."""
     del vm_config
+    if nodepool_config.gpu_count and nodepool_config.gpu_type:
+      if self.gpu_type and self.gpu_type != nodepool_config.gpu_type:
+        raise errors.Config.InvalidValue(
+            f'Attempted to set gpu type to {nodepool_config.gpu_type}, but it'
+            f' was already set to {self.gpu_type}. Multiple nodepools with'
+            ' different GPU types are not currently supported.'
+        )
+      if self.gpu_count and self.gpu_count != nodepool_config.gpu_count:
+        raise errors.Config.InvalidValue(
+            f'Attempted to set gpu count to {nodepool_config.gpu_count}, but it'
+            f' was already set to {self.gpu_count}. Multiple nodepools with'
+            ' different GPU counts are not currently supported.'
+        )
+      self.gpu_type = nodepool_config.gpu_type
+      self.gpu_count = nodepool_config.gpu_count
     if nodepool_config.max_nodes == 0:
       raise errors.Config.InvalidValue('max_nodes must be greater than 0.')
     if nodepool_config.min_nodes != nodepool_config.max_nodes:
@@ -200,6 +216,11 @@ class BaseContainerCluster(resource.BaseResource):
           'machine_type': nodepool.machine_type,
           'name': name,
       }
+      if nodepool.gpu_type and nodepool.gpu_count:
+        nodepool_metadata.update({
+            'gpu_type': nodepool.gpu_type,
+            'gpu_count': nodepool.gpu_count,
+        })
       if nodepool.sandbox_config is not None:
         nodepool_metadata['sandbox_config'] = {
             'type': nodepool.sandbox_config.type,
@@ -220,6 +241,12 @@ class BaseContainerCluster(resource.BaseResource):
         'nodepools': nodepools_metadata,
         'num_nodepools': self.num_nodepools,
     }
+
+    if self.gpu_type and self.gpu_count:
+      metadata.update({
+          'gpu_type': self.gpu_type,
+          'gpu_count': self.gpu_count,
+      })
 
     if self.min_nodes != self.max_nodes:
       metadata.update({
