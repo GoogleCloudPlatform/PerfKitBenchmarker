@@ -157,6 +157,16 @@ _PROMOTE_METADATA_TO_TOP_LEVEL = flags.DEFINE_list(
     'value to disable promotion.',
 )
 
+_BQ_SCHEMA_UPDATE_OPTIONS = flags.DEFINE_list(
+    'bq_schema_update_options',
+    [],
+    'Schema update options passed through to "bq load" via '
+    '--schema_update_option, e.g. ALLOW_FIELD_ADDITION. Needed to add newly '
+    'promoted (--promote_metadata_to_top_level) keys as columns on a '
+    'pre-existing table; without it, bq load only adds columns when creating '
+    'the table. Empty by default, which preserves the prior load behavior.',
+)
+
 _THROW_ON_METADATA_CONFLICT = flags.DEFINE_boolean(
     'throw_on_metadata_conflict',
     True,
@@ -754,6 +764,10 @@ class BigQueryPublisher(SamplePublisher):
           'load',
           '--autodetect',
           '--source_format=NEWLINE_DELIMITED_JSON',
+      ])
+      for option in _BQ_SCHEMA_UPDATE_OPTIONS.value or ():
+        load_cmd.append('--schema_update_option=' + option)
+      load_cmd.extend([
           self.bigquery_table,
           tf.name,
       ])
