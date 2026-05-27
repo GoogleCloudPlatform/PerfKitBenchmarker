@@ -240,26 +240,28 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
     except Exception:  # pylint: disable=broad-except
       pass
     # Clean up dynamically created launch templates and capacity reservations
-    for az in getattr(self, '_capacity_reservation_ids', {}).keys():
-      vm_util.IssueCommand(
-          util.AWS_PREFIX + [
-              'ec2', 'delete-launch-template',
-              '--launch-template-name', f'pkb-eks-lt-{az}',
-              '--region', self.region,
-          ],
-          raise_on_failure=False,
-      )
-      logging.info('[EKS] Deleted launch template pkb-eks-lt-%s', az)
-    for az, res_id in getattr(self, '_capacity_reservation_ids', {}).items():
-      vm_util.IssueCommand(
-          util.AWS_PREFIX + [
-              'ec2', 'cancel-capacity-reservation',
-              '--capacity-reservation-id', res_id,
-              '--region', self.region,
-          ],
-          raise_on_failure=False,
-      )
-      logging.info('[EKS] Cancelled capacity reservation %s in %s', res_id, az)
+    # Only runs if capacity reservations were actually created this run.
+    if getattr(FLAGS, 'eks_reserve_capacity_per_az', False):
+      for az in getattr(self, '_capacity_reservation_ids', {}).keys():
+        vm_util.IssueCommand(
+            util.AWS_PREFIX + [
+                'ec2', 'delete-launch-template',
+                '--launch-template-name', f'pkb-eks-lt-{az}',
+                '--region', self.region,
+            ],
+            raise_on_failure=False,
+        )
+        logging.info('[EKS] Deleted launch template pkb-eks-lt-%s', az)
+      for az, res_id in getattr(self, '_capacity_reservation_ids', {}).items():
+        vm_util.IssueCommand(
+            util.AWS_PREFIX + [
+                'ec2', 'cancel-capacity-reservation',
+                '--capacity-reservation-id', res_id,
+                '--region', self.region,
+            ],
+            raise_on_failure=False,
+        )
+        logging.info('[EKS] Cancelled capacity reservation %s in %s', res_id, az)
     super()._Delete()
     cmd = [
         FLAGS.eksctl,
@@ -496,137 +498,153 @@ class EksCluster(BaseEksCluster):
 
     # Dynamically create capacity reservations + launch templates AFTER cluster
     # creation so cluster CA and endpoint are available for node bootstrap.
-    self._capacity_reservation_ids = {}
-    # Reserve enough capacity per AZ for 100 pools:
-    # ~67 pools per AZ × 2 nodes = 134 instances max per AZ (Scenario A)
-    # Plus default nodegroup (2) + buffer = 80 minimum for 10 pools, 150 for 100 pools
-    concurrent = getattr(FLAGS, 'k8s_mgmt_concurrent_nodepools', 10)
-    nodes_per_az = max(80, concurrent * 2 + 20)
-    # Fetch cluster CA and endpoint for bootstrap user data
-    import json as _json
-    cluster_out, _, cluster_rc = vm_util.IssueCommand(
-        util.AWS_PREFIX + [
-            'eks', 'describe-cluster',
-            '--name', self.name,
-            '--region', self.region,
-            '--query', 'cluster.{endpoint:endpoint,ca:certificateAuthority.data,cidr:kubernetesNetworkConfig.serviceIpv4Cidr}',
-            '--output', 'json',
-        ],
-        raise_on_failure=False,
-    )
-    cluster_ca = ''
-    cluster_endpoint = ''
-    cluster_service_cidr = '10.100.0.0/16'  # default fallback
-    if cluster_rc == 0 and cluster_out.strip():
-      cluster_info = _json.loads(cluster_out.strip())
-      cluster_ca = cluster_info.get('ca', '')
-      cluster_endpoint = cluster_info.get('endpoint', '')
-      cluster_service_cidr = cluster_info.get('cidr', '10.100.0.0/16')
-      logging.info('[EKS] Fetched cluster endpoint=%s cidr=%s for bootstrap',
-                   cluster_endpoint, cluster_service_cidr)
-
-    # Query EKS-optimized AMI once for all AZs
-    # cluster_version may be None if not explicitly set — fetch from cluster
-    if not self.cluster_version:
-      ver_out, _, ver_rc = vm_util.IssueCommand(
+    # Gate capacity reservations behind flag — disabled by default
+    # to avoid impacting other EKS benchmarks (kubernetes_nginx etc)
+    # that use different instance types and do not need reservations.
+    if not FLAGS.eks_reserve_capacity_per_az:
+      self._capacity_reservation_ids = {}
+      logging.info(
+          '[EKS] Skipping capacity reservations '
+          '(--eks_reserve_capacity_per_az=False)'
+      )
+    else:
+      self._capacity_reservation_ids = {}
+      # Reserve enough capacity per AZ for 100 pools:
+      # ~67 pools per AZ × 2 nodes = 134 instances max per AZ (Scenario A)
+      # Plus default nodegroup (2) + buffer = 80 minimum for 10 pools, 150 for 100 pools
+      concurrent = getattr(FLAGS, 'k8s_mgmt_concurrent_nodepools', 10)
+      nodes_per_az = max(80, concurrent * 2 + 20)
+      # Fetch cluster CA and endpoint for bootstrap user data
+      import json as _json
+      cluster_out, _, cluster_rc = vm_util.IssueCommand(
           util.AWS_PREFIX + [
               'eks', 'describe-cluster',
               '--name', self.name,
               '--region', self.region,
-              '--query', 'cluster.version',
-              '--output', 'text',
+              '--query', 'cluster.{endpoint:endpoint,ca:certificateAuthority.data,cidr:kubernetesNetworkConfig.serviceIpv4Cidr}',
+              '--output', 'json',
           ],
           raise_on_failure=False,
       )
-      self.cluster_version = ver_out.strip() if ver_rc == 0 and ver_out.strip() else '1.34'
-      logging.info('[EKS] Resolved cluster version: %s', self.cluster_version)
-    k8s_minor_str = '.'.join(self.cluster_version.split('.')[:2])
-    ami_out, _, ami_rc = vm_util.IssueCommand(
-        util.AWS_PREFIX + [
-            'ssm', 'get-parameter',
-            '--name', (
-                f'/aws/service/eks/optimized-ami/{k8s_minor_str}/'
-                'amazon-linux-2023/x86_64/standard/recommended/image_id'
-            ),
-            '--region', self.region,
-            '--query', 'Parameter.Value',
-            '--output', 'text',
-        ],
-        raise_on_failure=False,
-    )
-    ami_id = ami_out.strip() if ami_rc == 0 and ami_out.strip() else ''
-    logging.info('[EKS] EKS AMI for K8s %s: %s', k8s_minor_str, ami_id)
+      cluster_ca = ''
+      cluster_endpoint = ''
+      cluster_service_cidr = '10.100.0.0/16'  # default fallback
+      if cluster_rc == 0 and cluster_out.strip():
+        cluster_info = _json.loads(cluster_out.strip())
+        cluster_ca = cluster_info.get('ca', '')
+        cluster_endpoint = cluster_info.get('endpoint', '')
+        cluster_service_cidr = cluster_info.get('cidr', '10.100.0.0/16')
+        logging.info('[EKS] Fetched cluster endpoint=%s cidr=%s for bootstrap',
+                     cluster_endpoint, cluster_service_cidr)
 
-    for az in cluster_azs:
-      logging.info('[EKS] Creating capacity reservation in %s (%d instances)...', az, nodes_per_az)
-      cap_out, _, cap_rc = vm_util.IssueCommand(
+      # Query EKS-optimized AMI once for all AZs
+      # cluster_version may be None if not explicitly set — fetch from cluster
+      if not self.cluster_version:
+        ver_out, _, ver_rc = vm_util.IssueCommand(
+            util.AWS_PREFIX + [
+                'eks', 'describe-cluster',
+                '--name', self.name,
+                '--region', self.region,
+                '--query', 'cluster.version',
+                '--output', 'text',
+            ],
+            raise_on_failure=False,
+        )
+        if ver_rc != 0 or not ver_out.strip():
+          raise errors.Resource.CreationError(
+              '[EKS] Failed to determine cluster version from describe-cluster. '
+              'Cannot proceed without a valid Kubernetes version. '
+              f'rc={ver_rc} out={ver_out.strip()!r}'
+          )
+        self.cluster_version = ver_out.strip()
+        logging.info('[EKS] Resolved cluster version: %s', self.cluster_version)
+      k8s_minor_str = '.'.join(self.cluster_version.split('.')[:2])
+      ami_out, _, ami_rc = vm_util.IssueCommand(
           util.AWS_PREFIX + [
-              'ec2', 'create-capacity-reservation',
-              '--instance-type', 't3.medium',
-              '--instance-platform', 'Linux/UNIX',
-              '--availability-zone', az,
-              '--instance-count', str(nodes_per_az),
+              'ssm', 'get-parameter',
+              '--name', (
+                  f'/aws/service/eks/optimized-ami/{k8s_minor_str}/'
+                  'amazon-linux-2023/x86_64/standard/recommended/image_id'
+              ),
               '--region', self.region,
-              '--query', 'CapacityReservation.CapacityReservationId',
+              '--query', 'Parameter.Value',
               '--output', 'text',
           ],
           raise_on_failure=False,
       )
-      if cap_rc == 0 and cap_out.strip() and cap_out.strip() != 'None':
-        res_id = cap_out.strip()
-        self._capacity_reservation_ids[az] = res_id
-        logging.info('[EKS] Created capacity reservation %s in %s', res_id, az)
-        if ami_id and cluster_ca and cluster_endpoint:
-          import base64 as _b64
-          # AL2023 uses nodeadm YAML config — NOT the old bootstrap.sh
-          nodeadm_config = (
-              'apiVersion: node.eks.aws/v1alpha1' + chr(10) +
-              'kind: NodeConfig' + chr(10) +
-              'spec:' + chr(10) +
-              '  cluster:' + chr(10) +
-              f'    name: {self.name}' + chr(10) +
-              f'    apiServerEndpoint: {cluster_endpoint}' + chr(10) +
-              f'    certificateAuthority: {cluster_ca}' + chr(10) +
-              f'    cidr: {cluster_service_cidr}'
-          )
-          user_data = _b64.b64encode(('MIME-Version: 1.0' + chr(10) +
-              'Content-Type: multipart/mixed; boundary="==BOUNDARY=="' + chr(10) +
-              chr(10) +
-              '--==BOUNDARY==' + chr(10) +
-              'Content-Type: application/node.eks.aws' + chr(10) +
-              chr(10) +
-              nodeadm_config + chr(10) +
-              '--==BOUNDARY==--').encode()).decode()
-          logging.info('[EKS] Using AL2023 nodeadm bootstrap for %s', az)
-          lt_data = (
-              '{'
-              f'"ImageId":"{ami_id}",'
-              '"CapacityReservationSpecification":{'
-              '"CapacityReservationPreference":"capacity-reservations-only",'
-              f'"CapacityReservationTarget":{{"CapacityReservationId":"{res_id}"}}}},'
-              f'"UserData":"{user_data}"'
-              '}'
-          )
-          _, _, lt_rc = vm_util.IssueCommand(
-              util.AWS_PREFIX + [
-                  'ec2', 'create-launch-template',
-                  '--region', self.region,
-                  '--launch-template-name', f'pkb-eks-lt-{az}',
-                  '--launch-template-data', lt_data,
-              ],
-              raise_on_failure=False,
-          )
-          if lt_rc == 0:
-            logging.info(
-                '[EKS] Created launch template pkb-eks-lt-%s (AMI=%s) -> %s',
-                az, ami_id, res_id,
+      ami_id = ami_out.strip() if ami_rc == 0 and ami_out.strip() else ''
+      logging.info('[EKS] EKS AMI for K8s %s: %s', k8s_minor_str, ami_id)
+
+      for az in cluster_azs:
+        logging.info('[EKS] Creating capacity reservation in %s (%d instances)...', az, nodes_per_az)
+        cap_out, _, cap_rc = vm_util.IssueCommand(
+            util.AWS_PREFIX + [
+                'ec2', 'create-capacity-reservation',
+                '--instance-type', 't3.medium',
+                '--instance-platform', 'Linux/UNIX',
+                '--availability-zone', az,
+                '--instance-count', str(nodes_per_az),
+                '--region', self.region,
+                '--query', 'CapacityReservation.CapacityReservationId',
+                '--output', 'text',
+            ],
+            raise_on_failure=False,
+        )
+        if cap_rc == 0 and cap_out.strip() and cap_out.strip() != 'None':
+          res_id = cap_out.strip()
+          self._capacity_reservation_ids[az] = res_id
+          logging.info('[EKS] Created capacity reservation %s in %s', res_id, az)
+          if ami_id and cluster_ca and cluster_endpoint:
+            import base64 as _b64
+            # AL2023 uses nodeadm YAML config — NOT the old bootstrap.sh
+            nodeadm_config = (
+                'apiVersion: node.eks.aws/v1alpha1' + chr(10) +
+                'kind: NodeConfig' + chr(10) +
+                'spec:' + chr(10) +
+                '  cluster:' + chr(10) +
+                f'    name: {self.name}' + chr(10) +
+                f'    apiServerEndpoint: {cluster_endpoint}' + chr(10) +
+                f'    certificateAuthority: {cluster_ca}' + chr(10) +
+                f'    cidr: {cluster_service_cidr}'
             )
+            user_data = _b64.b64encode(('MIME-Version: 1.0' + chr(10) +
+                'Content-Type: multipart/mixed; boundary="==BOUNDARY=="' + chr(10) +
+                chr(10) +
+                '--==BOUNDARY==' + chr(10) +
+                'Content-Type: application/node.eks.aws' + chr(10) +
+                chr(10) +
+                nodeadm_config + chr(10) +
+                '--==BOUNDARY==--').encode()).decode()
+            logging.info('[EKS] Using AL2023 nodeadm bootstrap for %s', az)
+            lt_data = (
+                '{'
+                f'"ImageId":"{ami_id}",'
+                '"CapacityReservationSpecification":{'
+                '"CapacityReservationPreference":"capacity-reservations-only",'
+                f'"CapacityReservationTarget":{{"CapacityReservationId":"{res_id}"}}}},'
+                f'"UserData":"{user_data}"'
+                '}'
+            )
+            _, _, lt_rc = vm_util.IssueCommand(
+                util.AWS_PREFIX + [
+                    'ec2', 'create-launch-template',
+                    '--region', self.region,
+                    '--launch-template-name', f'pkb-eks-lt-{az}',
+                    '--launch-template-data', lt_data,
+                ],
+                raise_on_failure=False,
+            )
+            if lt_rc == 0:
+              logging.info(
+                  '[EKS] Created launch template pkb-eks-lt-%s (AMI=%s) -> %s',
+                  az, ami_id, res_id,
+              )
+            else:
+              logging.warning('[EKS] Failed to create launch template for %s', az)
           else:
-            logging.warning('[EKS] Failed to create launch template for %s', az)
+            logging.warning('[EKS] Missing AMI/CA/endpoint — no launch template for %s', az)
         else:
-          logging.warning('[EKS] Missing AMI/CA/endpoint — no launch template for %s', az)
-      else:
-        logging.warning('[EKS] Failed to create capacity reservation in %s — on-demand', az)
+          logging.warning('[EKS] Failed to create capacity reservation in %s — on-demand', az)
 
     # Above create command passes "withOidc=true", but it doesn't seem to work &
     # therefore this command is needed.
@@ -1046,36 +1064,36 @@ class EksCluster(BaseEksCluster):
         },
     }
     _az = assigned_az if az_subnets and len(az_subnets) > 1 else f'{self.region}a'
-    _lt_name = f'pkb-eks-lt-{_az}'
-    _lt_out, _, _lt_rc = vm_util.IssueCommand(
-        util.AWS_PREFIX + [
-            'ec2', 'describe-launch-templates',
-            '--region', self.region,
-            '--filters', f'Name=launch-template-name,Values={_lt_name}',
-            '--query', 'LaunchTemplates[0].LaunchTemplateId',
-            '--output', 'text',
-        ],
-        raise_on_failure=False,
-    )
-    # Use launch template WITH correct EKS bootstrap to target capacity reservation.
-    # The launch template must specify the EKS-optimized AMI and bootstrap user data
-    # so nodes can join the cluster, while also targeting the capacity reservation.
-    res_id = self._capacity_reservation_ids.get(_az, '')
-    if res_id and _lt_rc == 0 and _lt_out.strip() and _lt_out.strip() not in ('None', 'null', ''):
-      payload['launchTemplate'] = {'id': _lt_out.strip(), 'version': '$Latest'}
-      # When launch template specifies an ImageId, EKS rejects these fields:
-      # - releaseVersion: conflicts with AMI
-      # - instanceTypes:  must come from launch template only
-      # - amiType:        conflicts with AMI
-      payload.pop('releaseVersion', None)
-      payload.pop('instanceTypes', None)
-      payload.pop('amiType', None)
-      logging.info(
-          '[EKS] Nodegroup %s using launch template %s targeting reservation %s in AZ %s',
-          nodepool_config.name, _lt_name, res_id, _az,
+    # Only look up launch templates and capacity reservations when
+    # --eks_reserve_capacity_per_az=true. Other benchmarks skip this entirely.
+    if FLAGS.eks_reserve_capacity_per_az:
+      _lt_name = f'pkb-eks-lt-{_az}'
+      _lt_out, _, _lt_rc = vm_util.IssueCommand(
+          util.AWS_PREFIX + [
+              'ec2', 'describe-launch-templates',
+              '--region', self.region,
+              '--filters', f'Name=launch-template-name,Values={_lt_name}',
+              '--query', 'LaunchTemplates[0].LaunchTemplateId',
+              '--output', 'text',
+          ],
+          raise_on_failure=False,
       )
-    else:
-      logging.warning('[EKS] No reservation/template for AZ %s — using on-demand', _az)
+      res_id = self._capacity_reservation_ids.get(_az, '')
+      if res_id and _lt_rc == 0 and _lt_out.strip() and _lt_out.strip() not in ('None', 'null', ''):
+        payload['launchTemplate'] = {'id': _lt_out.strip(), 'version': '$Latest'}
+        # When launch template specifies an ImageId, EKS rejects these fields:
+        # - releaseVersion: conflicts with AMI
+        # - instanceTypes:  must come from launch template only
+        # - amiType:        conflicts with AMI
+        payload.pop('releaseVersion', None)
+        payload.pop('instanceTypes', None)
+        payload.pop('amiType', None)
+        logging.info(
+            '[EKS] Nodegroup %s using launch template %s targeting reservation %s in AZ %s',
+            nodepool_config.name, _lt_name, res_id, _az,
+        )
+      else:
+        logging.warning('[EKS] No reservation/template for AZ %s — using on-demand', _az)
 
     if node_version:
       # EKS rejects both 'version' and 'releaseVersion' when a launch template
@@ -1131,20 +1149,23 @@ class EksCluster(BaseEksCluster):
       _az = zones[idx % len(zones)]
     else:
       _az = f'{self.region}a'
-    _lt_name = f'pkb-eks-lt-{_az}'
-
-    # Check if launch template exists for this AZ
-    lt_out, _, lt_rc = vm_util.IssueCommand(
-        util.AWS_PREFIX + [
-            'ec2', 'describe-launch-templates',
-            '--region', self.region,
-            '--filters', f'Name=launch-template-name,Values={_lt_name}',
-            '--query', 'LaunchTemplates[0].LaunchTemplateId',
-            '--output', 'text',
-        ],
-        raise_on_failure=False,
-    )
-    lt_id = lt_out.strip() if lt_rc == 0 and lt_out.strip() not in ('', 'None', 'null') else ''
+    # Only look up launch template when capacity reservations are enabled.
+    # For other benchmarks, always use standard kubernetes-version upgrade.
+    lt_id = ''
+    _lt_name = ''
+    if FLAGS.eks_reserve_capacity_per_az:
+      _lt_name = f'pkb-eks-lt-{_az}'
+      lt_out, _, lt_rc = vm_util.IssueCommand(
+          util.AWS_PREFIX + [
+              'ec2', 'describe-launch-templates',
+              '--region', self.region,
+              '--filters', f'Name=launch-template-name,Values={_lt_name}',
+              '--query', 'LaunchTemplates[0].LaunchTemplateId',
+              '--output', 'text',
+          ],
+          raise_on_failure=False,
+      )
+      lt_id = lt_out.strip() if lt_rc == 0 and lt_out.strip() not in ('', 'None', 'null') else ''
 
     # Custom AMI nodegroups cannot use --kubernetes-version — use launch template only
     if lt_id:
@@ -1512,26 +1533,28 @@ class EksAutoCluster(BaseEksCluster):
     except Exception:  # pylint: disable=broad-except
       pass
     # Clean up dynamically created launch templates and capacity reservations
-    for az in getattr(self, '_capacity_reservation_ids', {}).keys():
-      vm_util.IssueCommand(
-          util.AWS_PREFIX + [
-              'ec2', 'delete-launch-template',
-              '--launch-template-name', f'pkb-eks-lt-{az}',
-              '--region', self.region,
-          ],
-          raise_on_failure=False,
-      )
-      logging.info('[EKS] Deleted launch template pkb-eks-lt-%s', az)
-    for az, res_id in getattr(self, '_capacity_reservation_ids', {}).items():
-      vm_util.IssueCommand(
-          util.AWS_PREFIX + [
-              'ec2', 'cancel-capacity-reservation',
-              '--capacity-reservation-id', res_id,
-              '--region', self.region,
-          ],
-          raise_on_failure=False,
-      )
-      logging.info('[EKS] Cancelled capacity reservation %s in %s', res_id, az)
+    # Only runs if capacity reservations were actually created this run.
+    if getattr(FLAGS, 'eks_reserve_capacity_per_az', False):
+      for az in getattr(self, '_capacity_reservation_ids', {}).keys():
+        vm_util.IssueCommand(
+            util.AWS_PREFIX + [
+                'ec2', 'delete-launch-template',
+                '--launch-template-name', f'pkb-eks-lt-{az}',
+                '--region', self.region,
+            ],
+            raise_on_failure=False,
+        )
+        logging.info('[EKS] Deleted launch template pkb-eks-lt-%s', az)
+      for az, res_id in getattr(self, '_capacity_reservation_ids', {}).items():
+        vm_util.IssueCommand(
+            util.AWS_PREFIX + [
+                'ec2', 'cancel-capacity-reservation',
+                '--capacity-reservation-id', res_id,
+                '--region', self.region,
+            ],
+            raise_on_failure=False,
+        )
+        logging.info('[EKS] Cancelled capacity reservation %s in %s', res_id, az)
     super()._Delete()
     cmd = [
         FLAGS.eksctl,
