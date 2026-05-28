@@ -404,6 +404,15 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
         f'workload/{workload_framework}/deploy_agent_engine.py',
     )
 
+    # 4. Push generic remote run script to VM
+    run_remote_script_local_path = data.ResourcePath(
+        'agentic_framework/run_agent_engine.py'
+    )
+    self.client_vm.PushDataFile(
+        run_remote_script_local_path,
+        f'workload/{workload_framework}/run_agent_engine.py',
+    )
+
     self._GrantPermissionToReasoningEngine()
 
   def _GetDeploymentConfig(self) -> dict[str, Any]:
@@ -578,15 +587,6 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
         f'workload/{workload_framework}/run_config.yaml',
         output_dir,
         'prompt.txt',
-    )
-
-    # Push generic remote run script to VM
-    run_remote_script_local_path = data.ResourcePath(
-        'agentic_framework/run_agent_engine.py'
-    )
-    self.client_vm.PushDataFile(
-        run_remote_script_local_path,
-        f'workload/{workload_framework}/run_agent_engine.py',
     )
 
     location = self.region
