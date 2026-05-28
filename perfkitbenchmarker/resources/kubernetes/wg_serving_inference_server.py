@@ -603,6 +603,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     """Returns the storage type of the inference server."""
     if 'gcsfuse' in self.spec.catalog_components:
       return 'gcsfuse'
+    if 'blobfuse' in self.spec.catalog_components:
+      return 'blobfuse'
     return 'huggingface'
 
   def _GetAcceleratorComponent(self) -> str:
@@ -1014,6 +1016,11 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
     if 'gcsfuse' in self.spec.catalog_components:
       self._ApplyGCSFusePVC()
+    elif 'blobfuse' in self.spec.catalog_components:
+      extra_args = self.spec.extra_deployment_args or {}
+      self.cluster.ApplyFusePVC(
+          extra_args.get('pvc-name', 'azure-fuse-csi-static-pvc')
+      )
 
     self._ProvisionGPUNodePool()
 

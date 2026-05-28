@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azure-blob-csi-static-secret
+  namespace: default
+type: Opaque
+data:
+  azurestorageaccountname: {{encoded_account_name}}
+  azurestorageaccountkey: {{encoded_account_key}}
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: azure-blob-csi-pv
+  annotations:
+    pv.kubernetes.io/provisioned-by: blob.csi.azure.com
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: empty-storage-class
+  mountOptions:
+    - -o allow_other
+    - --file-cache-timeout-in-seconds=120
+    - --use-attr-cache=true
+    - --cancel-list-on-mount-seconds=10
+    - --log-level=LOG_WARNING
+  csi:
+    driver: blob.csi.azure.com
+    volumeHandle: {{storage_account}}_{{blob_container}}
+    volumeAttributes:
+      resourceGroup: {{resource_group}}
+      storageAccount: {{storage_account}}
+      containerName: {{blob_container}}
+      protocol: fuse2
+    nodeStageSecretRef:
+      name: azure-blob-csi-static-secret
+      namespace: default
+  claimRef:
+    name: {{pvc_name}}
+    namespace: default
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{pvc_name}}
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: empty-storage-class
+  volumeName: azure-blob-csi-pv
