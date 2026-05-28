@@ -55,9 +55,15 @@ class BaseAiAgentService(resource.BaseResource):
   def _GetDeploymentConfig(self) -> dict[str, Any]:
     """Gets config dict for deployment/creation."""
 
-  @abc.abstractmethod
   def _GetRunConfig(self, output_dir: str, prompt_file: str) -> dict[str, Any]:
     """Gets config dict for running the agent."""
+    return {
+        'workload': self.spec.workload,
+        'framework': self.spec.framework,
+        'prompt_file': prompt_file,
+        'output_dir': output_dir,
+        'agent_config': self.agent_config,
+    }
 
   def _CreateDependencies(self):
     """Creates common dependencies and executes custom deployment logic."""

@@ -105,13 +105,19 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
     self.client_vm.RemoteCommand(f'cd workload && tar -xzf {tar_filename}')
 
     pyproject_toml_path = f'workload/{workload_name}/pyproject.toml'
-    try:
-      self.client_vm.RemoteCommand(f'ls {pyproject_toml_path}')
-      self.client_vm.RemoteCommand(
-          f'cd workload/{workload_name} && pip3 install .'
-      )
-    except errors.VirtualMachine.RemoteCommandError:
-      logging.info('No pyproject.toml found in %s', pyproject_toml_path)
+    self.client_vm.RemoteCommand(f'ls {pyproject_toml_path}')
+    self.client_vm.RemoteCommand(
+        f'cd workload/{workload_name} && pip3 install .'
+    )
+
+    # Push generic run local script to VM
+    run_remote_script_local_path = data.ResourcePath(
+        'agentic_framework/run_local_agent.py'
+    )
+    self.client_vm.PushDataFile(
+        run_remote_script_local_path,
+        f'workload/{workload_name}/run_local_agent.py',
+    )
 
   @override
   def _Create(self):
@@ -120,15 +126,6 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
   @override
   def _Delete(self):
     pass
-
-  @override
-  def _GetRunConfig(self, output_dir: str, prompt_file: str) -> dict[str, Any]:
-    """Gets config dict for running the agent."""
-    return {
-        'prompt_file': prompt_file,
-        'output_dir': output_dir,
-        'agent_config': self.agent_config,
-    }
 
   @override
   def Execute(
@@ -156,7 +153,7 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
         f' export GOOGLE_CLOUD_PROJECT={self.project} &&'
         f' export GOOGLE_CLOUD_LOCATION={location} &&'
         f' cd workload/{workload_name} &&'
-        f' python3 {workload_name}.py'
+        f' python3 run_local_agent.py'
         ' --config_file run_config.yaml'
     )
     self.client_vm.RobustRemoteCommand(command)
@@ -233,15 +230,6 @@ class VertexAiCustomJobAiAgentService(GcpAiAgentService):
   @override
   def _Delete(self):
     pass
-
-  @override
-  def _GetRunConfig(self, output_dir: str, prompt_file: str) -> dict[str, Any]:
-    """Gets config dict for running the agent."""
-    return {
-        'prompt_file': prompt_file,
-        'output_dir': output_dir,
-        'agent_config': self.agent_config,
-    }
 
   @override
   def Execute(
@@ -549,14 +537,9 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
   @override
   def _GetRunConfig(self, output_dir: str, prompt_file: str) -> dict[str, Any]:
     """Gets config dict for running the agent."""
-    return {
-        'workload': self.spec.workload,
-        'framework': self.spec.framework,
-        'agent_engine_id': self._remote_agent_name,
-        'prompt_file': prompt_file,
-        'output_dir': output_dir,
-        'agent_config': self.agent_config,
-    }
+    config = super()._GetRunConfig(output_dir, prompt_file)
+    config['agent_engine_id'] = self._remote_agent_name
+    return config
 
   @override
   def Execute(
