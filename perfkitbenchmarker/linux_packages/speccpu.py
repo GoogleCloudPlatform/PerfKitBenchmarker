@@ -14,7 +14,6 @@
 """Module to install, uninstall, and parse results for SPEC CPU 2006 and 2017."""
 
 import hashlib
-import itertools
 import logging
 import os
 import posixpath
@@ -121,13 +120,11 @@ flags.DEFINE_enum(
 VM_STATE_ATTR = 'speccpu_vm_state'
 
 
-def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
+def _CheckTarFile(vm, examine_members, speccpu_vm_state):
   """Performs preliminary checks on the format of tar file downloaded on vm.
 
   Args:
     vm: virtual machine
-    runspec_config: String. User-specified name of the config file that is
-      expected to be in the tar file.
     examine_members: Boolean. If True, this function will examine the tar file's
       members to verify that certain required members are present.
     speccpu_vm_state: SpecInstallConfigurations. Install configurations.
@@ -139,19 +136,12 @@ def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
         not a valid file name.
   """
   # Copy the cfg to the VM.
-  local_cfg_file_path = data.ResourcePath(speccpu_vm_state.runspec_config)
-  vm.PushFile(local_cfg_file_path, speccpu_vm_state.cfg_file_path)
 
   if not examine_members:
     return
 
   scratch_dir = vm.GetScratchDir()
-  cfg_member = '{}/config/{}'.format(
-      speccpu_vm_state.base_spec_dir, os.path.basename(runspec_config)
-  )
-  required_members = itertools.chain(
-      speccpu_vm_state.required_members, [cfg_member]
-  )
+  required_members = speccpu_vm_state.required_members
   missing_members = []
   for member in required_members:
     stdout, _ = vm.RemoteCommand(
@@ -170,63 +160,6 @@ def _CheckTarFile(vm, runspec_config, examine_members, speccpu_vm_state):
             linesep=os.linesep, members=os.linesep.join(sorted(missing_members))
         )
     )
-
-
-def _CheckIsoAndCfgFile(runspec_config, spec_iso, clang_flag):
-  """Searches for the iso file and cfg file.
-
-  Args:
-    runspec_config: String. Name of the config file to provide to runspec.
-    spec_iso: String. Location of spec iso file.
-    clang_flag: String. Location of the clang flag file.
-
-  Raises:
-    data.ResourcePath: If one of the required files could not be found.
-  """
-  # Search for the iso.
-  try:
-    data.ResourcePath(spec_iso)
-  except data.ResourceNotFound:
-    logging.error(
-        '%(iso)s not found. To run the speccpu benchmark, %(iso)s must be '
-        'in the perfkitbenchmarker/data directory (or one of the specified '
-        'data directories if the --data_search_paths flag is used). Visit '
-        'https://www.spec.org/ to learn more about purchasing %(iso)s.',
-        {'iso': spec_iso},
-    )
-    raise
-
-  # Search for the cfg.
-  try:
-    data.ResourcePath(runspec_config)
-  except data.ResourceNotFound:
-    logging.error(
-        '%s not found. To run the speccpu benchmark, the config file '
-        'specified by the --runspec_config flag must be in the '
-        'perfkitbenchmarker/data directory (or one of the specified data '
-        'directories if the --data_search_paths flag is used). Visit '
-        'https://www.spec.org/cpu2006/docs/runspec.html#about_config to learn '
-        'more about config files.',
-        runspec_config,
-    )
-    raise
-
-  if not clang_flag:  # 2017 ISO does not contain clang.xml
-    return
-
-  # Search for the flag.
-  try:
-    data.ResourcePath(clang_flag)
-  except data.ResourceNotFound:
-    logging.error(
-        '%s not found. To run the speccpu benchmark, the clang.xml file '
-        'must be in the perfkitbenchmarker/data directory (or one of the '
-        'specified data directories if the --data_search_paths flag is '
-        'used). Visit https://www.spec.org/cpu2017/docs/flag-description.html '
-        'to learn more about flag files.',
-        clang_flag,
-    )
-    raise
 
 
 def _GenerateMd5sum(file_name):
@@ -331,7 +264,6 @@ def InstallSPECCPU(vm, speccpu_vm_state):
     _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state)
     _CheckTarFile(
         vm,
-        speccpu_vm_state.runspec_config,
         stages.PROVISION in FLAGS.run_stage,
         speccpu_vm_state,
     )
@@ -339,13 +271,20 @@ def InstallSPECCPU(vm, speccpu_vm_state):
     if not speccpu_vm_state.base_iso_file_path:
       raise
     logging.exception('Failed to set up tar. Trying ISO file.')
-    _CheckIsoAndCfgFile(
-        speccpu_vm_state.runspec_config,
-        speccpu_vm_state.base_iso_file_path,
-        speccpu_vm_state.base_clang_flag_file_path,
-    )
+    if vm.ShouldDownloadPreprovisionedData(
+        speccpu_vm_state.package_name, speccpu_vm_state.base_iso_file_path
+    ):
+      vm.InstallPreprovisionedPackageData(
+          speccpu_vm_state.package_name,
+          [speccpu_vm_state.base_iso_file_path],
+          scratch_dir,
+      )
     _PrepareWithIsoFile(vm, speccpu_vm_state)
-  vm.Install('speccpu')
+
+  local_cfg_file_path = data.ResourcePath(speccpu_vm_state.runspec_config)
+  vm.PushFile(local_cfg_file_path, speccpu_vm_state.cfg_file_path)
+
+  Install(vm)
 
 
 def Install(vm):
@@ -378,6 +317,9 @@ def _PrepareWithPreprovisionedTarFile(vm, speccpu_vm_state):
     vm: BaseVirtualMachine. Vm on which the tar file is installed.
     speccpu_vm_state: SpecInstallConfigurations. Install configuration for spec.
   """
+  if not speccpu_vm_state.base_tar_file_path:
+    raise errors.Setup.BadPreprovisionedDataError('runspec_tar not set.')
+
   scratch_dir = vm.GetScratchDir()
   vm.InstallPreprovisionedPackageData(
       speccpu_vm_state.package_name,
@@ -405,14 +347,17 @@ def _PrepareWithIsoFile(vm, speccpu_vm_state):
   scratch_dir = vm.GetScratchDir()
 
   # Make cpu2006 or cpu2017 directory on the VM.
-  vm.RemoteCommand('mkdir {}'.format(speccpu_vm_state.spec_dir))
+  vm.RemoteCommand('mkdir -p {}'.format(speccpu_vm_state.spec_dir))
 
-  # Copy the iso to the VM.
-  local_iso_file_path = data.ResourcePath(speccpu_vm_state.base_iso_file_path)
-  vm.PushFile(local_iso_file_path, scratch_dir)
+  # Check if the iso file has already been downloaded to the VM.
+  if not vm.TryRemoteCommand(
+      'test -f {}'.format(speccpu_vm_state.iso_file_path)
+  ):
+    local_iso_file_path = data.ResourcePath(speccpu_vm_state.base_iso_file_path)
+    vm.PushFile(local_iso_file_path, scratch_dir)
 
   # Extract files from the iso to the cpu2006 or cpu2017 directory.
-  vm.RemoteCommand('mkdir {}'.format(speccpu_vm_state.mount_dir))
+  vm.RemoteCommand('mkdir -p {}'.format(speccpu_vm_state.mount_dir))
   vm.RemoteCommand(
       'sudo mount -t iso9660 -o loop {} {}'.format(
           speccpu_vm_state.iso_file_path, speccpu_vm_state.mount_dir
@@ -437,14 +382,6 @@ def _PrepareWithIsoFile(vm, speccpu_vm_state):
     )
 
   vm.RemoteCommand('chmod -R 755 {}'.format(speccpu_vm_state.spec_dir))
-
-  # Copy the cfg to the VM.
-  local_cfg_file_path = data.ResourcePath(speccpu_vm_state.runspec_config)
-  vm.PushFile(local_cfg_file_path, speccpu_vm_state.cfg_file_path)
-
-  # Run SPEC CPU2006 or 2017 installation.
-  install_script_path = posixpath.join(speccpu_vm_state.spec_dir, 'install.sh')
-  vm.RobustRemoteCommand('yes | {}'.format(install_script_path))
 
 
 def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
