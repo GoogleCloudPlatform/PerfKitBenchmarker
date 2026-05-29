@@ -461,7 +461,7 @@ mysql_sysbench_oltp_read_only_lssd:
     sysbench_testname: oltp_read_only
     <<: *sysbench_oltp_base_lssd
 
-mysql_sysbench_oltp_read_only_lssd_with_fio_prefill:
+mysql_sysbench_oltp_read_only_lssd_with_7T_fio_prefill:
   name: unmanaged_mysql_sysbench_lssd
   flags:
     sysbench_testname: oltp_read_only
@@ -469,13 +469,13 @@ mysql_sysbench_oltp_read_only_lssd_with_fio_prefill:
     sysbench_tables: 210
     sysbench_load_threads: 210
 
-mysql_sysbench_oltp_read_write_lssd_with_fio_prefill:
+mysql_sysbench_oltp_read_write_lssd_with_7T_fio_prefill:
   name: unmanaged_mysql_sysbench_lssd
   flags:
     sysbench_testname: oltp_read_write
     <<: *sysbench_oltp_base_lssd
-    sysbench_tables: 210
-    sysbench_load_threads: 210
+    sysbench_tables: 420
+    sysbench_load_threads: 420
 
 mysql_sysbench_oltp_read_write_lssd:
   name: unmanaged_mysql_sysbench

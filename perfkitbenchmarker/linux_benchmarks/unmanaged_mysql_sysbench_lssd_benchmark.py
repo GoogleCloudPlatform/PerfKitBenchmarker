@@ -25,15 +25,25 @@ from perfkitbenchmarker.linux_benchmarks import unmanaged_mysql_sysbench_benchma
 FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'unmanaged_mysql_sysbench_lssd'
-BENCHMARK_CONFIG = base_benchmark.BENCHMARK_CONFIG.replace(
-    'unmanaged_mysql_sysbench:', 'unmanaged_mysql_sysbench_lssd:'
+BENCHMARK_CONFIG = (
+    base_benchmark.BENCHMARK_CONFIG.replace(
+        'unmanaged_mysql_sysbench:', 'unmanaged_mysql_sysbench_lssd:'
+    )
+    .replace(
+        'sysbench_run_threads: 1,64,128,256,512,1024,2048',
+        'sysbench_run_threads: 2048',
+    )
+    .replace('sysbench_run_seconds: 300', 'sysbench_run_seconds: 21600')
 )
-
 MYSQL_DATA_DIR = '/var/lib/mysql'
 
 
 def GetConfig(user_config):
-  return base_benchmark.GetConfig(user_config)
+  return base_benchmark.GetConfig(
+      user_config,
+      benchmark_config=BENCHMARK_CONFIG,
+      benchmark_name=BENCHMARK_NAME,
+  )
 
 
 def PrepareSystem(benchmark_spec):
