@@ -23,6 +23,7 @@ https://toonk.io/building-a-high-performance-linux-based-traffic-generator-with-
 
 import copy
 import dataclasses
+import logging
 from typing import Any, Mapping
 
 from absl import flags
@@ -531,6 +532,16 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
           continue
 
         stats.packet_loss_rate = stats.GetPacketLossRate()
+        logging.info('Target PPS rate: %s', curr_rate)
+        logging.info(
+            'Sender PPS: %s',
+            int(stats.sender_tx_pkts) // _DPDK_PKTGEN_DURATION.value,
+        )
+        logging.info(
+            'Receiver PPS: %s',
+            int(stats.receiver_rx_pkts) // _DPDK_PKTGEN_DURATION.value,
+        )
+        logging.info('Packet loss rate: %s', stats.packet_loss_rate)
         if stats.packet_loss_rate > packet_loss_threshold:
           fail_count += 1
           if curr_run.sender_tx_pkts is None:
