@@ -321,6 +321,21 @@ gke_kubernetes_nginx:
     nginx_content_size: 1024
     nginx_p99_latency_threshold: 100
 
+gke_kubernetes_redis_memtier:
+  name: kubernetes_redis_memtier
+  flags:
+    redis_server_version: '7.4.7'
+    memtier_protocol: 'redis'
+    memtier_clients: 12
+    memtier_threads: 32
+    memtier_ratio: '1:4'
+    memtier_data_size: 1024
+    memtier_key_maximum: 6400000
+    memtier_run_duration: 15
+    redis_server_io_threads: '4'
+    redis_server_io_threads_do_reads: True
+    kubernetes_redis_memtier_save: '""'
+
 redis_memtier_session_storage_cluster:
   name: redis_memtier
   flags:

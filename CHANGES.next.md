@@ -676,3 +676,4 @@
 -   Set firewall rule as PKB-created before deletion when using
     --gce_firewall_rules_clean_all.
 -   Added gke_kubernetes_nginx to default benchmark config.
+-   Added gke_kubernetes_redis_memtier to default benchmark config.
