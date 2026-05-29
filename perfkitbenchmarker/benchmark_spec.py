@@ -1244,6 +1244,11 @@ class BenchmarkSpec:
             'Got an exception deleting CapacityReservations. '
             'Attempting to continue tearing down.'
         )
+    if self.managed_vm_groups:
+      background_tasks.RunThreaded(
+          lambda vm_group: vm_group.Delete(),
+          list(self.managed_vm_groups.values())
+      )
 
     if self.vms:
       try:
