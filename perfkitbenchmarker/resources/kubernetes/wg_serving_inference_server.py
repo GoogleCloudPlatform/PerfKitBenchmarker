@@ -614,6 +614,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       return 'gcsfuse'
     if 's3' in self.spec.catalog_components:
       return 's3'
+    if 'blobfuse' in self.spec.catalog_components:
+      return 'blobfuse'
     return 'huggingface'
 
   def _GetAcceleratorComponent(self) -> str:
@@ -1068,6 +1070,11 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       self._ApplyGCSFusePVC()
     elif 's3' in self.spec.catalog_components:
       elastic_kubernetes_service.ApplyInferenceS3PvAndPvc()
+    elif 'blobfuse' in self.spec.catalog_components:
+      extra_args = self.spec.extra_deployment_args or {}
+      self.cluster.ApplyFusePVC(
+          extra_args.get('pvc-name', 'azure-fuse-csi-static-pvc')
+      )
 
     self._ProvisionGPUNodePool()
 

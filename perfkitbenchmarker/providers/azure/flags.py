@@ -194,3 +194,24 @@ BLOBFUSE_BLOCK_SIZE_MB = flags.DEFINE_float(
     1,
     'The blobfuse block size in MB. Defaults to 1.',
 )
+FLAG_K8S_INFERENCE_BLOBSTORAGE_ACCOUNT = flags.DEFINE_string(
+    'k8s_inference_server_blobstorage_account',
+    None,
+    'The Azure Storage account hosting the blob container.',
+)
+FLAG_K8S_INFERENCE_BLOBSTORAGE_CONTAINER = flags.DEFINE_string(
+    'k8s_inference_server_blobstorage_container',
+    None,
+    'The Azure Blob Storage container that has model data for the inference'
+    ' server to use.',
+)
+FLAG_K8S_INFERENCE_BLOBSTORAGE_RESOURCE_GROUP = flags.DEFINE_string(
+    'k8s_inference_server_blobstorage_resource_group',
+    None,
+    'The Azure resource group hosting the storage.',
+)
+FLAG_K8S_INFERENCE_BLOBSTORAGE_KEY = flags.DEFINE_string(
+    'k8s_inference_server_blobstorage_key',
+    None,
+    'The Azure Storage account key.',
+)

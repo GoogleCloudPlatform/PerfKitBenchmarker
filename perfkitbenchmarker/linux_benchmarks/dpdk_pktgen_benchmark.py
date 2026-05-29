@@ -23,6 +23,7 @@ https://toonk.io/building-a-high-performance-linux-based-traffic-generator-with-
 
 import copy
 import dataclasses
+import logging
 from typing import Any, Mapping
 
 from absl import flags
@@ -473,7 +474,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     """Runs a binary search to find the max PPS for a given configuration."""
     valid_run = PktgenStats(packet_loss_rate=1.0)
 
-    prev_pps, curr_pps = -float('inf'), 0
+    # Tracks the set rate to ensure standard binary search convergence.
+    prev_offered_pps, curr_offered_pps = -float('inf'), 0
+    # Tracks the valid receiver rate to allow early termination on bottleneck.
+    prev_achieved_pps, curr_achieved_pps = -float('inf'), 0
     curr_rate = None
     lb, ub = 0, pktgen_default_rate * 2
     prev_rate = pktgen_default_rate
@@ -483,11 +487,21 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
     while (
         (
-            (abs(curr_pps - prev_pps) / (curr_pps + 1))
+            (
+                abs(curr_offered_pps - prev_offered_pps)
+                / (curr_offered_pps + 1)
+            )
             > _PPS_BINARY_SEARCH_THRESHOLD
         )
-        or (valid_run.receiver_rx_pkts is None)
-    ) and (ub >= best_config_receiver_pps):
+        and (
+            valid_run.receiver_rx_pkts is None
+            or (
+                abs(curr_achieved_pps - prev_achieved_pps)
+                / (curr_achieved_pps + 1)
+            )
+            > _PPS_BINARY_SEARCH_THRESHOLD
+        )
+    ) and (ub > best_config_receiver_pps):
       if curr_rate is None:
         # If the best config receiver PPS is known from a previous
         # configuration run, use it as the starting rate.
@@ -518,6 +532,16 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
           continue
 
         stats.packet_loss_rate = stats.GetPacketLossRate()
+        logging.info('Target PPS rate: %s', curr_rate)
+        logging.info(
+            'Sender PPS: %s',
+            int(stats.sender_tx_pkts) // _DPDK_PKTGEN_DURATION.value,
+        )
+        logging.info(
+            'Receiver PPS: %s',
+            int(stats.receiver_rx_pkts) // _DPDK_PKTGEN_DURATION.value,
+        )
+        logging.info('Packet loss rate: %s', stats.packet_loss_rate)
         if stats.packet_loss_rate > packet_loss_threshold:
           fail_count += 1
           if curr_run.sender_tx_pkts is None:
@@ -531,11 +555,19 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       else:
         valid_run = curr_run
         lb = curr_rate
-      if curr_run.sender_tx_pkts is not None:
-        prev_pps, curr_pps = (
-            curr_pps,
-            int(curr_run.sender_tx_pkts) // _DPDK_PKTGEN_DURATION.value,
-        )
+      # Always update offered PPS to track binary search progress.
+      prev_offered_pps, curr_offered_pps = (
+          curr_offered_pps,
+          curr_rate,
+      )
+      # Only update achieved PPS on valid runs to avoid early termination on
+      # bottleneck.
+      if fail_count <= max_failed_runs:
+        if valid_run.receiver_rx_pkts is not None:
+          prev_achieved_pps, curr_achieved_pps = (
+              curr_achieved_pps,
+              int(valid_run.receiver_rx_pkts) // _DPDK_PKTGEN_DURATION.value,
+          )
       prev_rate = curr_rate
 
     # Reset PPS target in app/pktgen.c so sed command can work on next

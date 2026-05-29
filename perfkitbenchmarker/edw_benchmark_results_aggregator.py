@@ -55,7 +55,7 @@ def geometric_mean(iterable: list[float]) -> float:
   if not iterable or any(perf <= 0.0 for perf in iterable):
     raise EdwPerformanceAggregationError('Invalid values cannot be aggregated.')
   a = np.array(iterable)
-  return a.prod() ** (1.0 / len(a))
+  return np.exp(np.log(a).mean())
 
 
 class EdwQueryExecutionStatus(enum.Enum):

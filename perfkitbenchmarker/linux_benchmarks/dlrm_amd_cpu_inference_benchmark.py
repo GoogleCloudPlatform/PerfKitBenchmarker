@@ -98,14 +98,11 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   )
   vm.RemoteCommand(f'cd {linux_packages.INSTALL_DIR}; unzip {_ZIP}')
   # Install MiniConda3
+  vm.InstallPackages('gcc-12 g++-12')
   vm.RemoteCommand(
-      f'sudo ln -s /home/{vm.user_name}/miniconda3/bin/conda /usr/bin/conda; '
-      f'sudo ln -s /home/{vm.user_name}/miniconda3/envs/pace-env-py3.9/'
-      'bin/python /usr/bin/python; '
-      'sudo ln -s /usr/bin/g++-12 /usr/bin/g++; '
-      'sudo ln -s /usr/bin/g++-12 /usr/bin/c++; '
-      'sudo ln -s /usr/bin/gcc-12 /usr/bin/gcc',
-      ignore_failure=True,
+      'sudo ln -sf /usr/bin/g++-12 /usr/bin/g++ && '
+      'sudo ln -sf /usr/bin/g++-12 /usr/bin/c++ && '
+      'sudo ln -sf /usr/bin/gcc-12 /usr/bin/gcc',
   )
   vm.RemoteCommand(
       'curl -O https://repo.anaconda.com/miniconda/'
@@ -119,6 +116,12 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       ' && ./miniconda3/bin/conda create -n pace-env-py3.9 python=3.9 -y &&'
       ' ./miniconda3/bin/conda init'
   )
+  # This should not be needed given _SET_ENV.
+  vm.RemoteCommand(
+      f'sudo ln -sf /home/{vm.user_name}/miniconda3/bin/conda /usr/bin/conda &&'
+      f' sudo ln -sf /home/{vm.user_name}/miniconda3/envs/pace-env-py3.9/'
+      'bin/python /usr/bin/python',
+  )
 
   # libmamba solver hits SQLite database error.
   # Conda classic solver can hang so add timeout and retries.
@@ -130,9 +133,8 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
         ' --solver=classic -y',
         timeout=300,
     )
-    vm.RemoteCommand(f'{_SET_ENV} bash prepare_env.sh', timeout=300)
-
   _InstallCondaEnv(vm)
+  vm.RemoteCommand(f'{_SET_ENV} bash -ex prepare_env.sh', timeout=300)
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:

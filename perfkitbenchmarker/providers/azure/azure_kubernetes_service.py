@@ -14,7 +14,9 @@
 
 """Contains classes/functions related to Azure Kubernetes Service."""
 
+import base64
 import json
+import logging
 from typing import Any, List
 
 from absl import flags
@@ -539,6 +541,38 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         spot=FLAGS.azure_low_priority_vms,
     )
 
+  def ApplyFusePVC(self, pvc_name: str) -> None:
+    """Apply the Azure Blob Storage PV & PVC to the cluster."""
+    if not all([
+        FLAGS.k8s_inference_server_blobstorage_account,
+        FLAGS.k8s_inference_server_blobstorage_container,
+        FLAGS.k8s_inference_server_blobstorage_resource_group,
+        FLAGS.k8s_inference_server_blobstorage_key,
+    ]):
+      raise errors.Resource.CreationError(
+          'Azure Storage account, container, resource group and key are '
+          'required to apply BlobFuse PVC. Set '
+          '--k8s_inference_server_blobstorage_account, '
+          '--k8s_inference_server_blobstorage_container, '
+          '--k8s_inference_server_blobstorage_resource_group, and '
+          '--k8s_inference_server_blobstorage_key.'
+      )
+    storage_account = FLAGS.k8s_inference_server_blobstorage_account
+    kubernetes_commands.ApplyManifest(
+        'container/azure/blobfuse-pv-pvc.yaml.j2',
+        storage_account=storage_account,
+        blob_container=FLAGS.k8s_inference_server_blobstorage_container,
+        resource_group=FLAGS.k8s_inference_server_blobstorage_resource_group,
+        pvc_name=pvc_name,
+        encoded_account_name=base64.b64encode(
+            storage_account.encode('utf-8')
+        ).decode('utf-8'),
+        encoded_account_key=base64.b64encode(
+            FLAGS.k8s_inference_server_blobstorage_key.encode('utf-8')
+        ).decode('utf-8'),
+    )
+    logging.info('Successfully applied BlobFuse PVC.')
+
 
 class AksAutomaticCluster(AksCluster):
   """Class representing an AKS Automatic cluster, which has managed node pools.
@@ -574,6 +608,9 @@ class AksAutomaticCluster(AksCluster):
         self.resource_group.name,
         '--sku',
         'automatic',
+        # Enable the Azure Blob CSI driver at creation matching GKE Autopilot's
+        # default-on GCS Fuse support.
+        '--enable-blob-driver',
         '--tags',
     ] + tags_list
     self._RunCreateClusterCmd(cmd)

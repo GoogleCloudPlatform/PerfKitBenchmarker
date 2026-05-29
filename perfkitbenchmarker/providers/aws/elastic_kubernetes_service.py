@@ -804,9 +804,7 @@ class EksAutoCluster(BaseEksCluster):
     if self.use_spot:
       selectors['karpenter.sh/capacity-type'] = 'spot'
     if self.gpu_type:
-      selectors['eks.amazonaws.com/instance-gpu-name'] = (
-          self.gpu_type
-      )
+      selectors['eks.amazonaws.com/instance-gpu-name'] = self.gpu_type
     return selectors
 
 
@@ -1226,6 +1224,9 @@ class EksKarpenterCluster(BaseEksCluster):
         f'settings.clusterName={self.name}',
         '--set',
         f'settings.interruptionQueue={self.name}',
+        # Not always needed but enable the feature.
+        '--set',
+        'settings.featureGates.staticCapacity=true',
         '--set',
         f'controller.resources.requests.cpu={controller_cpu}',
         '--set',
@@ -1344,7 +1345,8 @@ class EksKarpenterCluster(BaseEksCluster):
         machine_requirements
     )
     if nodepool.min_nodes == nodepool.max_nodes:
-      # Not using autoscaling; set static replica count.
+      # Not using autoscaling; set static replica count & don't consolidate.
+      del yaml_nodepool[0]['spec']['disruption']
       yaml_nodepool[0]['spec']['replicas'] = nodepool.num_nodes
     else:
       # NodePool CPU limit: max nodes * vCPU + 5%, max 1000.
