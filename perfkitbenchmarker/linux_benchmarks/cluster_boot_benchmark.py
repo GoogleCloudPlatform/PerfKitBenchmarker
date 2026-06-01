@@ -60,7 +60,6 @@ Metric: cluster-boot-time
     vm.bootable_time in a cluster of VMs is reported as the cluster boot time.
 """
 
-import datetime
 import logging
 import os
 import shlex
@@ -80,7 +79,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import linux_boot
-import pytz
 
 BENCHMARK_NAME = 'cluster_boot'
 BENCHMARK_CONFIG = """
@@ -165,6 +163,12 @@ _POST_BOOT_LATENCY_TEST_COMMAND = flags.DEFINE_string(
     None,
     'Single command to run after a VM has booted that will have its latency '
     'tested and published as a sample.',
+)
+_COLLECT_BTIME = flags.DEFINE_boolean(
+    'cluster_boot_collect_btime',
+    False,
+    'Collect btime from /proc/stat. This should be the same as kernel_start '
+    'from linux_boot, but does not require a startup script.',
 )
 FLAGS = flags.FLAGS
 
@@ -422,12 +426,13 @@ def GetTimeToBoot(vms):
               vm,
               vm.bootable_time - vm.create_start_time,
               GetCallbackIPs(),
-              datetime.datetime.fromtimestamp(
-                  vm.create_start_time, pytz.timezone('UTC')
-              ),
+              vm.create_start_time,
               include_networking_samples=CollectNetworkSamples(),
           )
       )
+  if _COLLECT_BTIME.value:
+    for vm in vms:
+      samples.append(linux_boot.CollectBtimeSample(vm, vm.create_start_time))
 
   return samples
 

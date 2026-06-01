@@ -52,6 +52,8 @@ provision_and_scale_managed_vm_group:
       managed_spec: {}
   flags:
     skip_vm_preparation: true
+    boot_samples: true
+    cluster_boot_collect_btime: true
 """
 
 
