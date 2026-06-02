@@ -151,6 +151,7 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
     # Disks are not striped
     vm.hasStripedDiskDevice = mock.MagicMock(return_value=False)
     vm.StripeDisks = mock.Mock()
+    vm.TryRemoteCommand = mock.MagicMock(return_value=False)
     vm.SetDiskSpec(disk_spec, 1)
     vm.create_disk_strategy.GetSetupDiskStrategy().WaitForRemoteDisksToVisibleFromVm = mock.MagicMock(
         return_value=12
@@ -158,10 +159,11 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
     vm.SetupAllScratchDisks()
     expected = {
         disk.MEDIA: goal_media,
-        disk.REPLICATION: goal_replication,
         'num_stripes': goal_stripes,
         'size': goal_size,
     }
+    if goal_replication:
+      expected[disk.REPLICATION] = goal_replication
     if goal_host_caching:
       expected[azure_disk.HOST_CACHING] = goal_host_caching
     self.assertEqual(
@@ -194,13 +196,13 @@ class AzureDiskMetadataTest(_DiskMetadataTestCase):
   @flagsaver.flagsaver(azure_version_log=False)
   def testLocalHDD(self):
     self.DoAzureDiskTest(
-        azure_flags.LRS, disk.LOCAL, 'Standard_A1', disk.HDD, disk.NONE, None
+        azure_flags.LRS, disk.LOCAL, 'Standard_A1', disk.HDD, None, None
     )
 
   @flagsaver.flagsaver(azure_version_log=False)
   def testLocalSSD(self):
     self.DoAzureDiskTest(
-        azure_flags.LRS, disk.LOCAL, 'Standard_DS2', disk.SSD, disk.NONE, None
+        azure_flags.LRS, disk.LOCAL, 'Standard_DS2', disk.SSD, None, None
     )
 
   @flagsaver.flagsaver(azure_version_log=False)
