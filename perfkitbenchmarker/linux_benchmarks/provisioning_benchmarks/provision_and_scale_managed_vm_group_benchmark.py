@@ -59,9 +59,14 @@ provision_and_scale_managed_vm_group:
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Runs the benchmark."""
+  # This needs to be done explicitly because --boot_samples only captures the
+  # VMs that exist at the end of the run phase.
+  samples = cluster_boot_benchmark.GetTimeToBoot(
+      benchmark_spec.vms, metadata={'vm_creation': 'CREATE_GROUP'}
+  )
   if not _SCALE_METHOD.value:
-    # provisioning and boot metrics are reported by the resource framework.
-    return []
+    # Provisioning metrics are reported by the resource framework.
+    return samples
 
   vm_group = benchmark_spec.managed_vm_groups['default']
   old_vm_count = vm_group.vm_count
@@ -85,7 +90,6 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
         f'{old_vm_count} to {_NEW_VM_COUNT.value}'
     )
 
-  samples = []
   samples.append(
       sample.Sample(
           metric='scale_to_ready_duration',
@@ -98,9 +102,12 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
           },
       )
   )
-  if FLAGS.boot_samples:
-    new_vms = [vm for vm in vm_group.vms if vm.name not in old_vms]
-    samples.extend(cluster_boot_benchmark.GetTimeToBoot(new_vms))
+  new_vms = [vm for vm in vm_group.vms if vm.name not in old_vms]
+  samples.extend(
+      cluster_boot_benchmark.GetTimeToBoot(
+          new_vms, metadata={'vm_creation': 'SCALE_GROUP'}
+      )
+  )
 
   return samples
 
@@ -109,8 +116,7 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
   benchmark_config = configs.LoadConfig(
       BENCHMARK_CONFIG, user_config, BENCHMARK_NAME
   )
-  if FLAGS.boot_samples:
-    cluster_boot_benchmark.ConfigureStartupScript(benchmark_config)
+  cluster_boot_benchmark.ConfigureStartupScript(benchmark_config)
   return benchmark_config
 
 
