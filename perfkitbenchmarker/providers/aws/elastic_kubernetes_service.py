@@ -78,6 +78,18 @@ def RecursivelyUpdateDictionary(
   return original
 
 
+def _ParseTaint(taint: str) -> dict[str, str]:
+  """Converts a 'key=value:Effect' taint string into eksctl's taint object.
+
+  GKE and the shared node_taints config express taints as 'key=value:Effect'
+  strings (the gcloud --node-taints format). eksctl wants {key, value, effect}
+  objects, so translate here and keep node_taints cloud-agnostic in config.
+  """
+  key_value, _, effect = taint.partition(':')
+  key, _, value = key_value.partition('=')
+  return {'key': key, 'value': value, 'effect': effect}
+
+
 class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
   """Shared base class for Elastic Kubernetes Service cluster auto mode & not."""
 
@@ -182,6 +194,12 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
             'pkb_nodepool': nodepool.name,
         },
     }
+    if nodepool.node_labels:
+      group_json['labels'].update(nodepool.node_labels)
+    if nodepool.node_taints:
+      group_json['taints'] = [
+          _ParseTaint(taint) for taint in nodepool.node_taints
+      ]
     if nodepool.min_nodes != nodepool.max_nodes:
       group_json['minSize'] = nodepool.min_nodes
       group_json['maxSize'] = nodepool.max_nodes
@@ -613,9 +631,7 @@ class EksAutoCluster(BaseEksCluster):
     if self.use_spot:
       selectors['karpenter.sh/capacity-type'] = 'spot'
     if self.gpu_type:
-      selectors['eks.amazonaws.com/instance-gpu-name'] = (
-          self.gpu_type
-      )
+      selectors['eks.amazonaws.com/instance-gpu-name'] = self.gpu_type
     return selectors
 
 

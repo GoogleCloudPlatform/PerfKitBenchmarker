@@ -235,6 +235,48 @@ class ElasticKubernetesServiceTest(BaseEksTest):
     self.assertEqual(node_groups[1]['maxSize'], 10)
     self.assertEqual(node_groups[1]['desiredCapacity'], 3)
 
+  def testRenderNodeGroupJsonWithLabelsAndTaints(self):
+    spec2 = EKS_SPEC_DICT.copy()
+    spec2['nodepools'] = {
+        'sandbox': {
+            'vm_count': 1,
+            'vm_spec': {
+                'AWS': {
+                    'machine_type': 'm5.large',
+                    'zone': 'us-west-1a',
+                }
+            },
+        }
+    }
+    cluster = elastic_kubernetes_service.EksCluster(
+        container_spec.ContainerClusterSpec('NAME', **spec2)
+    )
+    nodepool = cluster.nodepools['sandbox']
+    nodepool.node_labels = {'sandbox.gke.io/runtime': 'runsc'}
+    nodepool.node_taints = ['sandbox.gke.io/runtime=runsc:NoSchedule']
+
+    group_json = cluster._RenderNodeGroupJson(nodepool)
+
+    self.assertEqual(group_json['labels']['pkb_nodepool'], 'sandbox')
+    self.assertEqual(group_json['labels']['sandbox.gke.io/runtime'], 'runsc')
+    self.assertEqual(
+        group_json['taints'],
+        [{
+            'key': 'sandbox.gke.io/runtime',
+            'value': 'runsc',
+            'effect': 'NoSchedule',
+        }],
+    )
+
+  def testRenderNodeGroupJsonWithoutLabelsOrTaints(self):
+    cluster = elastic_kubernetes_service.EksCluster(EKS_SPEC)
+    nodepool = cluster.default_nodepool
+
+    group_json = cluster._RenderNodeGroupJson(nodepool)
+
+    self.assertEqual(group_json['labels'], {'pkb_nodepool': 'default'})
+    self.assertNotIn('taints', group_json)
+
   def testGetNodePoolNames(self):
     # Mock the output of the aws cli command
     cluster = elastic_kubernetes_service.EksCluster(EKS_SPEC)
