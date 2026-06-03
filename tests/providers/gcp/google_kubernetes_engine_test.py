@@ -887,9 +887,7 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects():
       cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
-    self.MockIssueCommand(
-        {'get node': [('ek-standard-16', '', 0)]}
-    )
+    self.MockIssueCommand({'get node': [('ek-standard-16', '', 0)]})
     self.assertEqual(
         cluster.GetMachineTypeFromNodeName(
             'gke-pkb-cluster-default-pool-node-1'
@@ -947,6 +945,89 @@ class GoogleKubernetesEngineNodepoolAutoscalingTestCase(PatchedObjectsTestCase):
       self.assertIn('--enable-autoscaling', nodepool_cmd)
       self.assertIn('--min-nodes 2', nodepool_cmd)
       self.assertIn('--max-nodes 10', nodepool_cmd)
+
+
+class GoogleKubernetesEngineNodeLabelsAndTaintsTestCase(PatchedObjectsTestCase):
+
+  def testNodepoolWithLabelsAndTaintsIncludesBothInGcloudCmd(self):
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a',
+                },
+            },
+            'vm_count': 1,
+            'nodepools': {
+                'sandbox': {
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': 'n2-standard-8',
+                        },
+                    },
+                    'vm_count': 3,
+                    'node_labels': {'sandbox.gke.io/runtime': 'runsc'},
+                    'node_taints': ['sandbox.gke.io/runtime=runsc:NoSchedule'],
+                },
+            },
+            'poll_for_events': False,
+        },
+    )
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(kubernetes_engine_spec)
+      cluster._Create()
+
+      nodepool_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create sandbox'
+      )
+      # pkb_nodepool label must always be present.
+      self.assertIn('pkb_nodepool=sandbox', nodepool_cmd)
+      # Custom label must also be present in the same --node-labels value.
+      self.assertIn('sandbox.gke.io/runtime=runsc', nodepool_cmd)
+      # Both appear under a single --node-labels flag.
+      self.assertIn('--node-labels', nodepool_cmd)
+      # Taint must be present.
+      self.assertIn(
+          '--node-taints sandbox.gke.io/runtime=runsc:NoSchedule', nodepool_cmd
+      )
+
+  def testNodepoolWithoutLabelsOrTaintsOnlyEmitsPkbNodepoolLabel(self):
+    kubernetes_engine_spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a',
+                },
+            },
+            'vm_count': 1,
+            'nodepools': {
+                'default-pool': {
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': 'n2-standard-4',
+                        },
+                    },
+                    'vm_count': 2,
+                },
+            },
+            'poll_for_events': False,
+        },
+    )
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(kubernetes_engine_spec)
+      cluster._Create()
+
+      nodepool_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create default-pool'
+      )
+      self.assertIn('--node-labels pkb_nodepool=default-pool', nodepool_cmd)
+      self.assertNotIn('--node-taints', nodepool_cmd)
 
 
 if __name__ == '__main__':

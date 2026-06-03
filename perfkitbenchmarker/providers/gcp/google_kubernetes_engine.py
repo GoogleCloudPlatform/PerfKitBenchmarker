@@ -168,10 +168,37 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
         )
       cmd.flags['release-channel'] = self.release_channel
 
+    if gcp_flags.GKE_ENABLE_PRIVATE_NODES.value:
+      cmd.args.append('--enable-private-nodes')
+      # GKE requires VPC-native (alias IPs) when private nodes are enabled.
+      # Without this gcloud rejects the create with:
+      #   Cannot specify --enable-private-nodes without --enable-ip-alias.
+      cmd.args.append('--enable-ip-alias')
+    else:
+      cmd.args.append('--no-enable-private-nodes')
+    if gcp_flags.GKE_ENABLE_DNS_ACCESS.value:
+      cmd.args.append('--enable-dns-access')
+    else:
+      cmd.args.append('--no-enable-dns-access')
+    if gcp_flags.GKE_ENABLE_IP_ACCESS.value:
+      cmd.args.append('--enable-ip-access')
+    else:
+      cmd.args.append('--no-enable-ip-access')
+    if gcp_flags.GKE_ENABLE_DATAPLANE_V2.value:
+      cmd.args.append('--enable-dataplane-v2')
+    if gcp_flags.GKE_ENABLE_AGENT_SANDBOX.value:
+      cmd.args.append('--enable-agent-sandbox')
+    if gcp_flags.GKE_MASTER_IPV4_CIDR.value:
+      cmd.flags['master-ipv4-cidr'] = gcp_flags.GKE_MASTER_IPV4_CIDR.value
+
     if FLAGS.gke_enable_alpha:
       cmd.args.append('--enable-kubernetes-alpha')
       cmd.args.append('--no-enable-autorepair')
-    cmd.flags['monitoring'] = 'SYSTEM,API_SERVER,SCHEDULER,CONTROLLER_MANAGER'
+    cmd.flags['monitoring'] = gcp_flags.GKE_MONITORING_COMPONENTS.value
+    if gcp_flags.GKE_ENABLE_MANAGED_PROMETHEUS.value:
+      cmd.args.append('--enable-managed-prometheus')
+    if gcp_flags.GKE_ENABLE_COST_ALLOCATION.value:
+      cmd.args.append('--enable-cost-allocation')
 
     user = util.GetDefaultUser()
     if FLAGS.gcp_service_account:
@@ -209,6 +236,10 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     cmd = self._GcloudCommand(
         'container', 'clusters', 'get-credentials', self.name
     )
+    if gcp_flags.GKE_ENABLE_DNS_ACCESS.value:
+      # Private-node clusters are unreachable via the IP endpoint; use the
+      # DNS-based control plane endpoint instead.
+      cmd.args.append('--dns-endpoint')
     env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
@@ -377,6 +408,10 @@ class GkeCluster(BaseGkeCluster):
     cmd = self._GcloudCommand('container', 'clusters', 'create', self.name)
     if self.default_nodepool.network:
       cmd.flags['network'] = self.default_nodepool.network.network_resource.name
+      if self.default_nodepool.network.subnet_resource:
+        cmd.flags['subnetwork'] = (
+            self.default_nodepool.network.subnet_resource.name
+        )
 
     if gcp_flags.GKE_ENABLE_SHIELDED_NODES.value:
       cmd.args.append('--enable-shielded-nodes')
@@ -576,10 +611,19 @@ class GkeCluster(BaseGkeCluster):
     if nodepool_config.sandbox_config is not None:
       cmd.flags['sandbox'] = nodepool_config.sandbox_config.ToSandboxFlag()
 
+    if nodepool_config.max_pods_per_node is not None:
+      cmd.flags['max-pods-per-node'] = nodepool_config.max_pods_per_node
+
     if self.image_type:
       cmd.flags['image-type'] = self.image_type
 
-    cmd.flags['node-labels'] = f'pkb_nodepool={nodepool_config.name}'
+    labels = {}
+    if nodepool_config.node_labels:
+      labels.update(nodepool_config.node_labels)
+    labels['pkb_nodepool'] = nodepool_config.name
+    cmd.flags['node-labels'] = ','.join(f'{k}={v}' for k, v in labels.items())
+    if nodepool_config.node_taints:
+      cmd.flags['node-taints'] = ','.join(nodepool_config.node_taints)
     if nodepool_config.min_nodes != nodepool_config.max_nodes:
       cmd.args.append('--enable-autoscaling')
       cmd.flags['min-nodes'] = nodepool_config.min_nodes
@@ -673,6 +717,10 @@ class GkeAutopilotCluster(BaseGkeCluster):
     )
     if self.default_nodepool.network:
       cmd.flags['network'] = self.default_nodepool.network.network_resource.name
+      if self.default_nodepool.network.subnet_resource:
+        cmd.flags['subnetwork'] = (
+            self.default_nodepool.network.subnet_resource.name
+        )
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     if self.enable_aam:
