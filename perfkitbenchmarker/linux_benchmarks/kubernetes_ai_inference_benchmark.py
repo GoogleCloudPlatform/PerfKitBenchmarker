@@ -474,6 +474,14 @@ def _ParseNeuronModelLoadTimeMetrics(
 
   Timestamp format in Neuron logs: '[YYYY-MM-DD HH:MM:SS]' — the HH:MM:SS
   part is matched by the shared _TIMESTAMP_PATTERN regex.
+
+  Args:
+    server: The inference server.
+    result_stdout: stdout logs from the inference server pod.
+    pod_name: The name of the pod.
+
+  Returns:
+    A tuple of (init_time, model_load_time, application_start_time) in seconds.
   """
   container_init_timestamp = _GetContainerInitTimestamp(server, pod_name)
   model_load_start_timestamp = None

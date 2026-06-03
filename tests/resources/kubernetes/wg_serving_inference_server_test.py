@@ -5,7 +5,6 @@ import unittest
 from absl import flags
 from absl.testing import parameterized
 import mock
-from perfkitbenchmarker import errors
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import kubectl
@@ -359,7 +358,7 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
   def testInjectDefaultHuggingfaceTokenSelectsCloud(
       self,
       get_storage_class_mock,
-      _apply_manifest_mock,
+      applymanifestmock,
       token,
       expected_cloud,
   ):
@@ -375,11 +374,12 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
         return_value=storage_instance
     )
 
-    def _fake_copy(_uri, dst_path):
-      with open(dst_path, 'w') as f:
+    def fakecopy(uri, dstpath):
+      del uri
+      with open(dstpath, 'w') as f:
         f.write('hf_secret_value')
 
-    storage_instance.Copy.side_effect = _fake_copy
+    storage_instance.Copy.side_effect = fakecopy
     self.server.huggingface_token = token
     self.server._InjectDefaultHuggingfaceToken()
     get_storage_class_mock.assert_called_once_with(expected_cloud)
@@ -387,7 +387,7 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
   @mock.patch.object(kubernetes_commands, 'ApplyManifest', return_value=[])
   @mock.patch.object(object_storage_service, 'GetObjectStorageClass')
   def testInjectDefaultHuggingfaceTokenRawTokenSkipsStorage(
-      self, get_storage_class_mock, _apply_manifest_mock
+      self, get_storage_class_mock, applymanifestmock
   ):
     """Regression: hf_xxx tokens never touch the object-storage path."""
     self.server.huggingface_token = 'hf_raw_token_value'
