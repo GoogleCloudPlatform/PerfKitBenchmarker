@@ -1,0 +1,57 @@
+# Reusable blueprint for the sandboxes that SandboxClaim will provision.
+# The `runtimeClassName` is set per-run via the runtime_class template
+# variable (default: runsc for GKE self-managed gVisor).
+#
+# The security/placement fields below are REQUIRED by GKE's
+# `secure-sandbox-policy` ValidatingAdmissionPolicy on Agent-Sandbox-
+# enabled clusters (Sandbox CRs without them are rejected). The same
+# fields are harmless on clusters that don't run the policy.
+apiVersion: extensions.agents.x-k8s.io/v1beta1
+kind: SandboxTemplate
+metadata:
+  name: {{ template_name }}
+spec:
+  podTemplate:
+    metadata:
+      labels:
+        sandbox: python-sandbox-bench
+    spec:
+      runtimeClassName: {{ runtime_class }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+      nodeSelector:
+        sandbox.gke.io/runtime: {{ runtime_class }}
+      tolerations:
+        - key: sandbox.gke.io/runtime
+          operator: Equal
+          value: {{ runtime_class }}
+          effect: NoSchedule
+      containers:
+        - name: python-runtime
+          image: registry.k8s.io/agent-sandbox/python-runtime-sandbox:v0.4.6
+          ports:
+            - containerPort: 8888
+          readinessProbe:
+            httpGet:
+              path: "/"
+              port: 8888
+            initialDelaySeconds: 0
+            periodSeconds: 1
+          securityContext:
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            # These values are the defaults. All four are overridable at run time
+            # via benchmark flags.
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+              ephemeral-storage: "256Mi"
+            limits:
+              # CPU limit is decoupled from the request: a limit equal to the 100m request throttled
+              # warm-pod startup. Giving the pod burst headroom (500m limit) improves startup while
+              # keeping the 100m request so node packing density is unchanged.
+              cpu: "500m"
+              memory: "1Gi"
+      restartPolicy: "OnFailure"
