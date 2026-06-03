@@ -39,9 +39,12 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     )
 
   def _InitializeEventPoller(self) -> kubernetes_events.KubernetesEventPoller:
-    return kubernetes_events.KubernetesEventPoller(
-        lambda: kubernetes_commands.GetEvents(suppress_logging=True)
-    )
+    def _GetEventsNoLogging(field_selector=None):
+      return kubernetes_commands.GetEvents(
+          field_selector=field_selector, suppress_logging=True
+      )
+
+    return kubernetes_events.KubernetesEventPoller(_GetEventsNoLogging)
 
   def Create(self, restore: bool = False) -> None:
     super().Create(restore)
@@ -66,9 +69,11 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
       self.event_poller.StopPolling()
     _DeleteAllFromDefaultNamespace()
 
-  def GetEvents(self) -> set['kubernetes_events.KubernetesEvent']:
+  def GetEvents(
+      self, field_selector: str | None = None
+  ) -> set['kubernetes_events.KubernetesEvent']:
     """Gets the events for the cluster, including previously polled events."""
-    return self.event_poller.GetEvents()
+    return self.event_poller.GetEvents(field_selector=field_selector)
 
   def __getstate__(self):
     state = self.__dict__.copy()
