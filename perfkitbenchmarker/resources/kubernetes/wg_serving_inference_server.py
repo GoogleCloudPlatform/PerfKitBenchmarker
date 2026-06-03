@@ -966,7 +966,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           created_resources,
       ):
         kubernetes_commands.WaitForResource(
-            f'{hpa}', 'ScalingActive', timeout=60
+            f'{hpa}', 'ScalingActive', timeout=180
         )
 
       if not self._hpa_poller_executor:
