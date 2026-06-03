@@ -9,6 +9,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
+from perfkitbenchmarker.resources import agent_sandbox
 from perfkitbenchmarker.resources import kubernetes_inference_server
 from perfkitbenchmarker.resources.container_service import container as container_lib
 from perfkitbenchmarker.resources.container_service import container_cluster
@@ -36,6 +37,9 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
             cluster_spec.inference_server, self
         )
     )
+    self.agent_sandbox = agent_sandbox.GetAgentSandbox(
+        cluster_spec.agent_sandbox, self
+    )
 
   def _InitializeEventPoller(self):
     if not self.cluster_spec.poll_for_events:
@@ -52,6 +56,8 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     super().Create(restore)
     if self.inference_server:
       self.inference_server.Create()
+    if self.agent_sandbox:
+      self.agent_sandbox.Create()
 
   def _PostCreate(self):
     super()._PostCreate()
@@ -61,6 +67,8 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
   def Delete(self, freeze: bool = False) -> None:
     if self.inference_server:
       self.inference_server.Delete()
+    if self.agent_sandbox:
+      self.agent_sandbox.Delete()
     super().Delete(freeze)
 
   def _PreDelete(self):

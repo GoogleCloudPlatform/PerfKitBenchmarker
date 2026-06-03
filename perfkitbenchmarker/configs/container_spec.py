@@ -27,6 +27,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.resources import agent_sandbox_spec
 from perfkitbenchmarker.resources import kubernetes_inference_server_spec
 
 
@@ -418,6 +419,7 @@ class ContainerClusterSpec(spec.BaseSpec):
   inference_server: (
       kubernetes_inference_server_spec.BaseInferenceServerConfigSpec | None
   )
+  agent_sandbox: agent_sandbox_spec.BaseAgentSandboxConfigSpec | None
   poll_for_events: bool
   static_cluster: str | None
   type: str
@@ -526,6 +528,10 @@ class ContainerClusterSpec(spec.BaseSpec):
         'nodepools': (_NodepoolsDecoder, {'default': {}, 'none_ok': True}),
         'inference_server': (
             kubernetes_inference_server_spec.InferenceServerConfigDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+        'agent_sandbox': (
+            agent_sandbox_spec.AgentSandboxConfigDecoder,
             {'default': None, 'none_ok': True},
         ),
         'enable_vpa': (
