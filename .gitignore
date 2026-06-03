@@ -12,3 +12,6 @@
 /.idea
 /*git_ignore*
 .DS_Store
+
+# Local private key, never commit
+*.pem
