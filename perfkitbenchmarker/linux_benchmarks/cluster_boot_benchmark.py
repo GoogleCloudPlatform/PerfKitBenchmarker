@@ -60,6 +60,7 @@ Metric: cluster-boot-time
     vm.bootable_time in a cluster of VMs is reported as the cluster boot time.
 """
 
+from collections.abc import Mapping
 import logging
 import os
 import shlex
@@ -67,9 +68,10 @@ import signal
 import socket
 import subprocess
 import time
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 from absl import flags
+import immutabledict
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -239,7 +241,10 @@ def Prepare(unused_benchmark_spec):
   pass
 
 
-def GetTimeToBoot(vms):
+def GetTimeToBoot(
+    vms: List[virtual_machine.BaseVirtualMachine],
+    metadata: Mapping[str, Any] = immutabledict.immutabledict(),
+):
   """Creates Samples for the boot time of a list of VMs.
 
   The time to create async return is the time difference from before the VM is
@@ -254,6 +259,7 @@ def GetTimeToBoot(vms):
 
   Args:
     vms: List of BaseVirtualMachine subclasses.
+    metadata: Additional metadata to attach to each sample.
 
   Returns:
     List of Samples containing each of the provisioning metrics listed above,
@@ -281,7 +287,7 @@ def GetTimeToBoot(vms):
     os_types.add(vm.OS_TYPE)
     create_delay_sec = vm.create_start_time - min_create_start_time
     max_create_delay_sec = max(max_create_delay_sec, create_delay_sec)
-    metadata = {
+    metadata = metadata | {
         'machine_instance': i,
         'num_vms': len(vms),
         'os_type': vm.OS_TYPE,
@@ -421,6 +427,8 @@ def GetTimeToBoot(vms):
     )
   if _LINUX_BOOT_METRICS.value or CollectNetworkSamples():
     for vm in vms:
+      assert vm.bootable_time
+      assert vm.bootable_time >= vm.create_start_time
       samples.extend(
           linux_boot.CollectBootSamples(
               vm,
