@@ -153,7 +153,11 @@ class KubernetesResourceTracker:
 
   def _StopWatchingForNodeChanges(self):
     """Stop watching the cluster for node add/remove events."""
-    polled_events = self._cluster.GetEvents()
+    # Filter to node events only — sandbox claim events can number >100k and
+    # make yaml.safe_load take several minutes for no benefit here.
+    polled_events = self._cluster.GetEvents(
+        field_selector="involvedObject.kind=Node"
+    )
 
     # Resolve machine type only for current nodes; use "unknown" for the rest.
     _current_node_names = kubernetes_commands.GetNodeNames()
