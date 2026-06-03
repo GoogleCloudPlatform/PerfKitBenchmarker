@@ -441,8 +441,10 @@ class AwsKeyFileManager:
     with cls._lock:
       if _GetKeyfileSetKey(region) in cls.imported_keyfile_set:
         return
-      cat_cmd = ['cat', vm_util.GetPublicKeyPath()]
-      keyfile, _ = vm_util.IssueRetryableCommand(cat_cmd)
+      # `aws ec2 import-key-pair --public-key-material` rejects a raw
+      # OpenSSH-formatted key with "Invalid base64" when the value comes
+      # in as a CLI string. The `fileb://` URI tells the CLI to read the
+      # file as bytes and send them through, which AWS accepts.
       formatted_tags = util.FormatTagSpecifications(
           'key-pair', util.MakeDefaultTags()
       )
@@ -451,7 +453,7 @@ class AwsKeyFileManager:
           '--region=%s' % region,
           'import-key-pair',
           '--key-name=%s' % cls.GetKeyNameForRun(),
-          '--public-key-material=%s' % keyfile,
+          '--public-key-material=fileb://%s' % vm_util.GetPublicKeyPath(),
           '--tag-specifications=%s' % formatted_tags,
       ]
       _, stderr, retcode = vm_util.IssueCommand(
@@ -793,7 +795,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-instances',
-        '--region=%s' % self.region,]
+        '--region=%s' % self.region,
+    ]
     if self.client_token:
       describe_cmd.append(
           f'--filter=Name=client-token,Values={self.client_token}'
@@ -1063,10 +1066,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             'SubnetId': self.network.subnet.id,
         })
         # Only allowed for single NIC instances.
-        if (
-            self.assign_external_ip
-            and self.network_eni_count == 1
-        ):
+        if self.assign_external_ip and self.network_eni_count == 1:
           eni_params['AssociatePublicIpAddress'] = True
         if aws_flags.AWS_NIC_QUEUE_COUNTS.value:
           eni_params['EnaQueueCount'] = aws_flags.AWS_NIC_QUEUE_COUNTS.value[
@@ -1326,7 +1326,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
           '--region=%s' % self.region,
           'ec2',
           'cancel-spot-instance-requests',
-          '--spot-instance-request-ids=%s' % self.spot_instance_request_id,  # pytype: disable=attribute-error
+          '--spot-instance-request-ids=%s'
+          % self.spot_instance_request_id,  # pytype: disable=attribute-error
       ]
       vm_util.IssueCommand(cancel_cmd, raise_on_failure=False)
 
@@ -1558,7 +1559,9 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     """Adds metadata to the VM."""
     util.AddTags(self.id, self.region, **kwargs)
     if self.use_spot_instance:
-      util.AddDefaultTags(self.spot_instance_request_id, self.region)  # pytype: disable=attribute-error
+      util.AddDefaultTags(
+          self.spot_instance_request_id, self.region
+      )  # pytype: disable=attribute-error
 
   def InstallCli(self):
     """Installs the AWS cli and credentials on this AWS vm."""
