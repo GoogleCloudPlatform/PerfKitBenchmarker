@@ -10,6 +10,7 @@ from typing import Callable, List, Tuple
 
 from absl import flags
 import jinja2
+from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
@@ -28,6 +29,7 @@ FLAGS = flags.FLAGS
 
 class StartupScriptRetrievalError(vm_util.TimeoutExceededRetryError):
   """Raised when GetStartupScriptOutput times out."""
+  STATUS = benchmark_status.FailedSubstatus.VM_NOT_READY
 
 
 def PrepareBootScriptVM(aux_vm_ips: str, aux_vm_port: int) -> str:

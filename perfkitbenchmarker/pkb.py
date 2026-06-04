@@ -55,7 +55,6 @@ all: PerfKitBenchmarker will run all of the above stages (provision,
      the run_uri.
 """
 
-
 import collections
 from collections.abc import Mapping, MutableSequence
 import copy
@@ -72,7 +71,7 @@ import sys
 import threading
 import time
 import types
-from typing import Any, Collection, Dict, List, Sequence, Set, Tuple, Type
+from typing import Any, Collection, Dict, List, Sequence, Set, Tuple
 import uuid
 
 from absl import flags
@@ -1120,30 +1119,6 @@ def _PublishEventSample(
   collector.PublishSamples()
 
 
-def _IsException(e: Exception, exception_class: Type[Exception]) -> bool:
-  """Checks if the exception is of the class or contains the class name.
-
-  When exceptions happen on on background theads (e.g. CreationInternalError on
-  CreateAndBootVm) they are not propogated as exceptions to the caller, instead
-  they are propagated as text inside a wrapper exception such as
-  errors.VmUtil.ThreadException.
-
-  Args:
-    e: The exception instance to inspect.
-    exception_class: The exception class to check if e is an instance of.
-
-  Returns:
-     true if the exception is of the class or contains the class name.
-  """
-  if isinstance(e, exception_class):
-    return True
-
-  if str(exception_class.__name__) in str(e):
-    return True
-
-  return False
-
-
 def RunBenchmark(
     spec: bm_spec.BenchmarkSpec,
     collector: publisher.SampleCollector,
@@ -1267,53 +1242,7 @@ def RunBenchmark(
       # FLAGS.always_teardown_on_exception.
       except (Exception, KeyboardInterrupt) as e:
         # Log specific type of failure, if known
-        # TODO(dlott) Move to exception chaining with Python3 support
-        if _IsException(e, errors.Benchmarks.InsufficientCapacityCloudFailure):
-          spec.failed_substatus = (
-              benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
-          )
-        elif _IsException(e, errors.Benchmarks.QuotaFailure):
-          spec.failed_substatus = benchmark_status.FailedSubstatus.QUOTA
-        elif (
-            _IsException(e, errors.Benchmarks.KnownIntermittentError)
-            or _IsException(e, errors.Resource.CreationInternalError)
-            or _IsException(e, errors.Resource.ProvisionTimeoutError)
-        ):
-          spec.failed_substatus = (
-              benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT
-          )
-        elif _IsException(e, errors.Benchmarks.UnsupportedConfigError):
-          spec.failed_substatus = benchmark_status.FailedSubstatus.UNSUPPORTED
-        elif _IsException(e, errors.Resource.RestoreError):
-          spec.failed_substatus = (
-              benchmark_status.FailedSubstatus.RESTORE_FAILED
-          )
-        elif _IsException(e, errors.Resource.FreezeError):
-          spec.failed_substatus = benchmark_status.FailedSubstatus.FREEZE_FAILED
-        elif isinstance(e, KeyboardInterrupt):
-          spec.failed_substatus = (
-              benchmark_status.FailedSubstatus.PROCESS_KILLED
-          )
-        elif isinstance(
-            e, cluster_boot_benchmark.linux_boot.StartupScriptRetrievalError
-        ):
-          spec.failed_substatus = (
-              benchmark_status.FailedSubstatus.VM_NOT_READY
-          )
-        elif _IsException(e, vm_util.TimeoutExceededRetryError):
-          spec.failed_substatus = (
-              benchmark_status.FailedSubstatus.COMMAND_TIMEOUT
-          )
-        elif _IsException(e, vm_util.RetriesExceededRetryError):
-          spec.failed_substatus = (
-              benchmark_status.FailedSubstatus.RETRIES_EXCEEDED
-          )
-        elif _IsException(e, errors.Config.InvalidValue):
-          spec.failed_substatus = benchmark_status.FailedSubstatus.INVALID_VALUE
-        elif _IsException(e, vm_util.ImageNotFoundError):
-          spec.failed_substatus = benchmark_status.FailedSubstatus.UNSUPPORTED
-        else:
-          spec.failed_substatus = benchmark_status.FailedSubstatus.UNCATEGORIZED
+        spec.failed_substatus = errors.GetBenchmarkStatusFromException(e)
         spec.status_detail = str(e)
 
         # Resource cleanup (below) can take a long time. Log the error to give
@@ -1386,9 +1315,9 @@ def PublishFailedRunSample(
       'run_stage': run_stage_that_failed,
       'flags': str(flag_util.GetProvidedCommandLineFlags()),
   }
-  vm_create_operation_names = ','.join([
-      vm.create_operation_name for vm in spec.vms if vm.create_operation_name
-  ])
+  vm_create_operation_names = ','.join(
+      [vm.create_operation_name for vm in spec.vms if vm.create_operation_name]
+  )
   if vm_create_operation_names:
     metadata['vm_create_operation_names'] = vm_create_operation_names
   background_tasks.RunThreaded(
