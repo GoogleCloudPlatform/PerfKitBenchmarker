@@ -463,18 +463,6 @@ def _ParseNeuronModelLoadTimeMetrics(
 ) -> Tuple[float, float, float]:
   """Parse model load time metrics from Neuron (Inferentia2/Trainium) vLLM logs.
 
-  Neuron vLLM uses the NxDI compilation path (neuronx_distributed_inference)
-  instead of standard HuggingFace weight loading. Log patterns differ from
-  the standard vLLM path.
-
-  Log patterns:
-    model_load_start: 'Saving the neuron_config to'  (application_base.py)
-    model_load_end:   'Done Sharding weights in'      (model_builder.py)
-    vllm_start:       'Starting vLLM API server'      (api_server.py)
-
-  Timestamp format in Neuron logs: '[YYYY-MM-DD HH:MM:SS]' — the HH:MM:SS
-  part is matched by the shared _TIMESTAMP_PATTERN regex.
-
   Args:
     server: The inference server.
     result_stdout: stdout logs from the inference server pod.
@@ -482,6 +470,18 @@ def _ParseNeuronModelLoadTimeMetrics(
 
   Returns:
     A tuple of (init_time, model_load_time, application_start_time) in seconds.
+
+  Neuron vLLM uses the NxDI compilation path (neuronx_distributed_inference)
+  instead of standard HuggingFace weight loading. Log patterns differ from
+  the standard vLLM path.
+
+  Log patterns (substring markers in stdout):
+    - 'Saving the neuron_config to' for model load start (application_base.py)
+    - 'Done Sharding weights in' for model load end (model_builder.py)
+    - 'Starting vLLM API server' for vllm start (api_server.py)
+
+  Timestamp format in Neuron logs: '[YYYY-MM-DD HH:MM:SS]' — the HH:MM:SS
+  part is matched by the shared _TIMESTAMP_PATTERN regex.
   """
   container_init_timestamp = _GetContainerInitTimestamp(server, pod_name)
   model_load_start_timestamp = None
