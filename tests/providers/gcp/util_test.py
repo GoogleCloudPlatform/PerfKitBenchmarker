@@ -523,6 +523,21 @@ class GcpUtilTest(pkb_common_test_case.PkbCommonTestCase):
     tags = {'a': 'b', 'c': 'd'}
     self.assertEqual(tags, util.SplitTags(util.FormatTags(tags)))
 
+  @mock.patch.object(
+      util,
+      'GetDefaultTags',
+      return_value={
+          'owner': 'Name_Surname',
+          'benchmark': 'kubernetes_scale',
+      },
+  )
+  def testMakeFormattedDefaultTagsLowercasesOwner(self, mock_get_default_tags):
+    del mock_get_default_tags
+    self.assertEqual(
+        'benchmark=kubernetes_scale,owner=name_surname',
+        util.MakeFormattedDefaultTags(),
+    )
+
 
 if __name__ == '__main__':
   unittest.main()
