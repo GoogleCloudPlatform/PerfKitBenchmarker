@@ -18,6 +18,8 @@ from unittest import mock
 
 import yaml
 from absl import flags
+from perfkitbenchmarker.resources import agent_sandbox
+from perfkitbenchmarker.resources import agent_sandbox_spec
 from perfkitbenchmarker.resources.kubernetes import k8s_agent_sandbox
 from perfkitbenchmarker.resources.kubernetes import k8s_agent_sandbox_spec
 from tests import pkb_common_test_case
@@ -155,6 +157,22 @@ class K8sAgentSandboxCreateTest(pkb_common_test_case.PkbCommonTestCase):
   def testDeleteIsNoOp(self):
     sandbox = self._Sandbox()
     self.assertIsNone(sandbox._Delete())
+
+
+class AgentSandboxBenchmarkConfigTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def testConfigBuildsK8sAgentSandbox(self):
+    from perfkitbenchmarker import configs
+    from perfkitbenchmarker.linux_benchmarks import agent_sandbox_benchmark
+    config = configs.LoadConfig(
+        agent_sandbox_benchmark.BENCHMARK_CONFIG, {},
+        agent_sandbox_benchmark.BENCHMARK_NAME)
+    agent_sandbox_dict = config['container_cluster']['agent_sandbox']
+    sandbox_spec = agent_sandbox_spec.AgentSandboxConfigDecoder(
+        option='agent_sandbox').Decode(
+            agent_sandbox_dict, 'test', FLAGS)
+    sandbox = agent_sandbox.GetAgentSandbox(sandbox_spec, mock.Mock())
+    self.assertIsInstance(sandbox, k8s_agent_sandbox.K8sAgentSandbox)
 
 
 if __name__ == '__main__':
