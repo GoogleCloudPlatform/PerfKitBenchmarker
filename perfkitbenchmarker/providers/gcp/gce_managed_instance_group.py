@@ -79,9 +79,6 @@ class GceInstanceTemplate(resource.BaseResource):
 
   def _Delete(self):
     cmd = self._GcloudCmd(
-        self,
-        'compute',
-        'instance-templates',
         'delete',
         self.name,
         '--region',

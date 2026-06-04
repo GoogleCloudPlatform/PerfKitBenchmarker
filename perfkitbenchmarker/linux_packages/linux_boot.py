@@ -1,6 +1,5 @@
 """Module containing tools for benchmarking fastboot performance."""
 
-import calendar
 import dataclasses
 import datetime
 import logging
@@ -15,6 +14,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+import pytz
 
 DATA_DIR = 'linux_boot'
 BOOT_STARTUP_SCRIPT = 'startup.sh'
@@ -50,28 +50,11 @@ def GetStartupScriptOutput(
   return vm.RemoteCommand(f'cat {output_file}')[0]
 
 
-def DatetimeToUTCSeconds(date: datetime.datetime) -> float:
-  """Converts a datetime object to seconds since the epoch in UTC.
-
-  Args:
-    date: A datetime to convert.
-
-  Returns:
-    The number of seconds since the epoch, in UTC, represented by the input
-    datetime.
-  """
-  if date.tzinfo is None:
-    seconds = calendar.timegm(date.utctimetuple())
-  else:
-    seconds = int(date.replace(microsecond=0).timestamp())
-  return seconds + date.microsecond / _MICROSECONDS_PER_SECOND
-
-
 def CollectBootSamples(
     vm: virtual_machine.VirtualMachine,
     boot_time_sec: float,
     runner_ip: Tuple[str, str],
-    create_time: datetime.datetime,
+    create_time: float,
     include_networking_samples: bool = False,
 ) -> List[sample.Sample]:
   """Collect boot samples.
@@ -80,7 +63,7 @@ def CollectBootSamples(
     vm: The boot vm.
     boot_time_sec: The time it took between VM creation and SSH.
     runner_ip: Runner ip addresses to collect VM-to-VM metrics.
-    create_time: VM creation time.
+    create_time: VM creation time in unix seconds
     include_networking_samples: Boolean, whether to include samples such as time
       to first egress/ingress packet.
 
@@ -93,14 +76,15 @@ def CollectBootSamples(
     raise StartupScriptRetrievalError(
         'Timeout getting startup script output.'
     ) from e
+
+  creation_datetime = datetime.datetime.fromtimestamp(
+      vm.create_start_time, pytz.timezone('UTC')
+  )
   boot_samples = ScrapeConsoleLogLines(
-      boot_output, create_time, CONSOLE_FIRST_START_MATCHERS
+      boot_output, creation_datetime, CONSOLE_FIRST_START_MATCHERS
   )
-  create_time_utc_seconds = DatetimeToUTCSeconds(create_time)
-  guest_samples = CollectGuestSamples(
-      vm, create_time_utc_seconds, boot_time_sec
-  )
-  kernel_offset = GetKernelStartTimestamp(vm) - create_time_utc_seconds
+  guest_samples = CollectGuestSamples(vm, create_time, boot_time_sec)
+  kernel_offset = GetKernelStartTimestamp(vm) - create_time
   kernel_samples = CollectKernelSamples(vm, kernel_offset)
 
   samples = boot_samples + guest_samples + kernel_samples
@@ -626,7 +610,7 @@ DMESG_METRICS = [
 def CollectVmToVmSamples(
     vm: virtual_machine.VirtualMachine,
     runner_ip: Tuple[str, str],
-    create_time: datetime.datetime,
+    create_time: float,
 ) -> List[sample.Sample]:
   """Collect samples related to vm-to-vm networking."""
   samples = []
@@ -643,23 +627,13 @@ def CollectVmToVmSamples(
     tcpdump_output = f.read()
   runner_internal_ip, runner_external_ip = runner_ip
 
-  def DeltaSec(t):
-    delta = (
-        datetime.datetime.fromtimestamp(float(t), tz=datetime.timezone.utc)
-        - create_time
-    )
-    return delta.total_seconds()
-
   for group in re.findall('Connection refused by (.+) at ([0-9.]+)', vm_output):
     ip, t = group
+    delta = float(t) - create_time
     if ip == runner_internal_ip:
-      samples.append(
-          sample.Sample('internal_ingress', DeltaSec(t), 'second', {})
-      )
+      samples.append(sample.Sample('internal_ingress', delta, 'second', {}))
     elif ip == runner_external_ip:
-      samples.append(
-          sample.Sample('external_ingress', DeltaSec(t), 'second', {})
-      )
+      samples.append(sample.Sample('external_ingress', delta, 'second', {}))
 
   # Sample TCPDUMP output:
   # 1680653297.391525 IP 34.83.176.250.33216 > 10.240.0.9.8080: Flags [S]...
@@ -670,7 +644,7 @@ def CollectVmToVmSamples(
       r'([0-9.:]+) IP ([0-9.]+)\.\d+ > [0-9.]+\.\d+.*', tcpdump_output
   ):
     t, src = group
-    delta = DeltaSec(t)
+    delta = float(t) - create_time
     # Guard against recycled IPs causing negative deltas (captured during the
     # period between tcpdump starting and VM creation)
     if delta < 0:
@@ -691,3 +665,15 @@ def CollectVmToVmSamples(
   if external_egress_sample:
     samples.append(external_egress_sample)
   return samples
+
+
+def CollectBtimeSample(
+    vm: virtual_machine.VirtualMachine,
+    create_time: float,
+) -> sample.Sample:
+  """Collect seconds to btime from /proc/stat. Should equal kernel_start."""
+  out, _ = vm.RemoteCommand('cat /proc/stat | grep btime')
+  if not out:
+    raise ValueError('Could not find btime in /proc/stat')
+  btime = float(out.split(' ')[1])
+  return sample.Sample('btime', btime - create_time, 'second', {})

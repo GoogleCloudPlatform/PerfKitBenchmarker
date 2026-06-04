@@ -60,7 +60,7 @@ Metric: cluster-boot-time
     vm.bootable_time in a cluster of VMs is reported as the cluster boot time.
 """
 
-import datetime
+from collections.abc import Mapping
 import logging
 import os
 import shlex
@@ -68,9 +68,10 @@ import signal
 import socket
 import subprocess
 import time
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 from absl import flags
+import immutabledict
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -80,7 +81,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import linux_boot
-import pytz
 
 BENCHMARK_NAME = 'cluster_boot'
 BENCHMARK_CONFIG = """
@@ -166,6 +166,12 @@ _POST_BOOT_LATENCY_TEST_COMMAND = flags.DEFINE_string(
     'Single command to run after a VM has booted that will have its latency '
     'tested and published as a sample.',
 )
+_COLLECT_BTIME = flags.DEFINE_boolean(
+    'cluster_boot_collect_btime',
+    False,
+    'Collect btime from /proc/stat. This should be the same as kernel_start '
+    'from linux_boot, but does not require a startup script.',
+)
 FLAGS = flags.FLAGS
 
 
@@ -235,7 +241,10 @@ def Prepare(unused_benchmark_spec):
   pass
 
 
-def GetTimeToBoot(vms):
+def GetTimeToBoot(
+    vms: List[virtual_machine.BaseVirtualMachine],
+    metadata: Mapping[str, Any] = immutabledict.immutabledict(),
+):
   """Creates Samples for the boot time of a list of VMs.
 
   The time to create async return is the time difference from before the VM is
@@ -250,6 +259,7 @@ def GetTimeToBoot(vms):
 
   Args:
     vms: List of BaseVirtualMachine subclasses.
+    metadata: Additional metadata to attach to each sample.
 
   Returns:
     List of Samples containing each of the provisioning metrics listed above,
@@ -277,7 +287,7 @@ def GetTimeToBoot(vms):
     os_types.add(vm.OS_TYPE)
     create_delay_sec = vm.create_start_time - min_create_start_time
     max_create_delay_sec = max(max_create_delay_sec, create_delay_sec)
-    metadata = {
+    metadata = metadata | {
         'machine_instance': i,
         'num_vms': len(vms),
         'os_type': vm.OS_TYPE,
@@ -417,17 +427,20 @@ def GetTimeToBoot(vms):
     )
   if _LINUX_BOOT_METRICS.value or CollectNetworkSamples():
     for vm in vms:
+      assert vm.bootable_time
+      assert vm.bootable_time >= vm.create_start_time
       samples.extend(
           linux_boot.CollectBootSamples(
               vm,
               vm.bootable_time - vm.create_start_time,
               GetCallbackIPs(),
-              datetime.datetime.fromtimestamp(
-                  vm.create_start_time, pytz.timezone('UTC')
-              ),
+              vm.create_start_time,
               include_networking_samples=CollectNetworkSamples(),
           )
       )
+  if _COLLECT_BTIME.value:
+    for vm in vms:
+      samples.append(linux_boot.CollectBtimeSample(vm, vm.create_start_time))
 
   return samples
 

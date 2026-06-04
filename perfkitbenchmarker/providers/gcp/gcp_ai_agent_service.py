@@ -132,6 +132,7 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
       self,
       output_dir: str,
       prompt: str | None = None,
+      agent_config: dict[str, Any] | None = None,
   ) -> None:
     """Runs the workload on the client VM."""
     location = self.spec.model_location or self.region
@@ -145,7 +146,10 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
     )
 
     self.UploadRunConfigToClientVm(
-        f'workload/{workload_name}/run_config.yaml', output_dir, 'prompt.txt'
+        f'workload/{workload_name}/run_config.yaml',
+        output_dir,
+        'prompt.txt',
+        agent_config,
     )
 
     command = (
@@ -153,7 +157,7 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
         f' export GOOGLE_CLOUD_PROJECT={self.project} &&'
         f' export GOOGLE_CLOUD_LOCATION={location} &&'
         f' cd workload/{workload_name} &&'
-        f' python3 run_local_agent.py'
+        ' python3 run_local_agent.py'
         ' --config_file run_config.yaml'
     )
     self.client_vm.RobustRemoteCommand(command)
@@ -236,6 +240,7 @@ class VertexAiCustomJobAiAgentService(GcpAiAgentService):
       self,
       output_dir: str,
       prompt: str | None = None,
+      agent_config: dict[str, Any] | None = None,
   ):
     """Triggers the Custom Job and blocks until completion."""
     job_name = f'pkb-{FLAGS.run_uri}-{self.job_count}'
@@ -255,7 +260,7 @@ class VertexAiCustomJobAiAgentService(GcpAiAgentService):
     prompt_fuse_path = f'/gcs/{self._bucket}/{job_name}_prompt.txt'
     run_config_client_path = f'workload/{job_name}_run_config.yaml'
     self.UploadRunConfigToClientVm(
-        run_config_client_path, output_dir, prompt_fuse_path
+        run_config_client_path, output_dir, prompt_fuse_path, agent_config
     )
     run_config_gcs_path = f'{self.base_dir}/{job_name}_run_config.yaml'
     self.client_vm.RemoteCommand(
@@ -535,9 +540,14 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
       raise
 
   @override
-  def _GetRunConfig(self, output_dir: str, prompt_file: str) -> dict[str, Any]:
+  def _GetRunConfig(
+      self,
+      output_dir: str,
+      prompt_file: str,
+      agent_config: dict[str, Any] | None = None,
+  ) -> dict[str, Any]:
     """Gets config dict for running the agent."""
-    config = super()._GetRunConfig(output_dir, prompt_file)
+    config = super()._GetRunConfig(output_dir, prompt_file, agent_config)
     config['agent_engine_id'] = self._remote_agent_name
     return config
 
@@ -546,6 +556,7 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
       self,
       output_dir: str,
       prompt: str | None = None,
+      agent_config: dict[str, Any] | None = None,
   ) -> None:
     """Runs the agent on Vertex AI Agent Engine."""
     if not self._remote_agent_name:
@@ -570,6 +581,7 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
         f'workload/{workload_framework}/run_config.yaml',
         output_dir,
         'prompt.txt',
+        agent_config,
     )
 
     location = self.region

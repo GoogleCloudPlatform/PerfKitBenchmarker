@@ -146,6 +146,11 @@ spec:
         app: mysql-app
         app.kubernetes.io/managed-by: pkb
     spec:
+      tolerations:
+      - key: "kubernetes.io/arch"
+        operator: "Equal"
+        value: "arm64"
+        effect: "NoSchedule"
       securityContext:
         sysctls:
         - name: net.ipv4.tcp_fin_timeout

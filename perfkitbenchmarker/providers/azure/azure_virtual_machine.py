@@ -1624,7 +1624,9 @@ class BaseWindowsAzureVirtualMachine(
 class Windows2016CoreAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine, windows_virtual_machine.Windows2016CoreMixin
 ):
-  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2016-datacenter-gen2:latest'
+  GEN2_IMAGE_URN = (
+      'MicrosoftWindowsServer:WindowsServer:2016-datacenter-gensecond:latest'
+  )
   GEN1_IMAGE_URN = (
       'MicrosoftWindowsServer:WindowsServer:2016-Datacenter-Server-Core:latest'
   )
@@ -1634,7 +1636,9 @@ class Windows2016CoreAzureVirtualMachine(
 class Windows2019CoreAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine, windows_virtual_machine.Windows2019CoreMixin
 ):
-  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2019-datacenter-gen2:latest'
+  GEN2_IMAGE_URN = (
+      'MicrosoftWindowsServer:WindowsServer:2019-datacenter-gensecond:latest'
+  )
   GEN1_IMAGE_URN = (
       'MicrosoftWindowsServer:WindowsServer:2019-Datacenter-Core:latest'
   )
@@ -1667,7 +1671,9 @@ class Windows2016DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2016DesktopMixin,
 ):
-  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2016-datacenter-gen2:latest'
+  GEN2_IMAGE_URN = (
+      'MicrosoftWindowsServer:WindowsServer:2016-datacenter-gensecond:latest'
+  )
   GEN1_IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2016-Datacenter:latest'
   SUPPORTS_TRUSTED_LAUNCH = False
 
@@ -1676,7 +1682,9 @@ class Windows2019DesktopAzureVirtualMachine(
     BaseWindowsAzureVirtualMachine,
     windows_virtual_machine.Windows2019DesktopMixin,
 ):
-  GEN2_IMAGE_URN = 'MicrosoftWindowsServer:windowsserver-gen2preview:2019-datacenter-gen2:latest'
+  GEN2_IMAGE_URN = (
+      'MicrosoftWindowsServer:WindowsServer:2019-datacenter-gensecond:latest'
+  )
   GEN1_IMAGE_URN = 'MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest'
   SUPPORTS_TRUSTED_LAUNCH = False
 

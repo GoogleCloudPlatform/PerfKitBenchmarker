@@ -467,6 +467,7 @@
 
 ### Bug fixes and maintenance updates:
 
+-   Update `sysbench_thread_init_timeout` default to 180 seconds.
 -   Add 'runcpu --update' and 'runcpu --version' commands to install phase.
 -   Set the command to download preprovisioned data to be robust and have a five
     minute timeout.
@@ -676,3 +677,4 @@
 -   Set firewall rule as PKB-created before deletion when using
     --gce_firewall_rules_clean_all.
 -   Added gke_kubernetes_nginx to default benchmark config.
+-   Added gke_kubernetes_redis_memtier to default benchmark config.
