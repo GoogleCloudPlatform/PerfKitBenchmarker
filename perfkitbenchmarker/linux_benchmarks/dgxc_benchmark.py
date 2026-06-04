@@ -47,11 +47,20 @@ dgxc:
     preprovision_ignore_checksum: True
 """
 BENCHMARK_DATA = {
-    'a4.sqsh':
+    'nvidia+nemo+25.09.00.a4.sqsh':
         '',
-    'p6.sqsh':
-        ''
+    'nvidia+nemo+25.07.01.a4.sqsh':
+        '',
+    'nvidia+nemo+25.09.00.p6.sqsh':
+        '',
+    'nvidia+nemo+25.07.01.p6.sqsh':
+        '',
 }
+WORKLOAD_IMAGE = {
+    'pretrain_nemotron4-15b': 'nvidia+nemo+25.09.00',
+    'pretrain_nemotron4-340b': 'nvidia+nemo+25.07.01',
+}
+
 FLAGS = flags.FLAGS
 """ For b200
 - finetune_llama4-maverick
@@ -63,11 +72,18 @@ FLAGS = flags.FLAGS
 - pretrain_nemotron4
 """
 _WORKLOADS = flags.DEFINE_list(
-    'dgxc_workloads', ['pretrain_nemotron4:15b:fp8'],
+    'dgxc_workloads', ['pretrain_nemotron4-15b:15b:fp8'],
     'DGXC workloads to install and run. '
     'e.g. workload_name:size:precision')
 _HF_TOKEN = flags.DEFINE_string(
     'hf_token', 'hf_fake', 'HuggingFace Token for DGXC workloads.')
+_DGXC_ENV = flags.DEFINE_list(
+    'dgxc_runtime_env', [],
+    'Additional runtime environmental variables to set. e.g.'
+    'For llama3.1, following envs are required:'
+    'ADDITIONAL_SLURM_PARAMS="container-writable;gpus-per-node=8;'
+    'ntasks-per-node=8" WORLD_SIZE=8 MASTER_ADDR=192.168.0.3 '
+    'MASTER_PORT=60007')
 
 
 def GetConfig(user_config):
@@ -88,19 +104,26 @@ def Prepare(benchmark_spec):
     benchmark_spec: The benchmark specification.
   """
   vm = benchmark_spec.cluster.headnode_vm
-  benchmark_spec.cluster.InstallSquashImage(
-      BENCHMARK_NAME,
-      f'{benchmark_spec.cluster.TYPE}.sqsh',
-      benchmark_spec.cluster.nfs_path,
-      posixpath.join(BENCHMARK_NAME,
-                     f'{benchmark_spec.cluster.TYPE}.dockerfile')
-  )
+  images = set()
+  for w in _WORKLOADS.value:
+    workload_name = w.split(':')[0]
+    image = WORKLOAD_IMAGE[workload_name]
+    if image in images:
+      continue
+    images.add(image)
+    benchmark_spec.cluster.InstallSquashImage(
+        BENCHMARK_NAME,
+        f'{image}.{benchmark_spec.cluster.TYPE}.sqsh',
+        benchmark_spec.cluster.nfs_path,
+        posixpath.join(BENCHMARK_NAME,
+                       f'{image}.{benchmark_spec.cluster.TYPE}.dockerfile')
+    )
+    vm.RemoteCommand(
+        f'cd {benchmark_spec.cluster.nfs_path}; mkdir -p images; '
+        f'mv {image}.{benchmark_spec.cluster.TYPE}.sqsh '
+        f'images/{image}.sqsh')
   vm.RemoteCommand(
-      f'cd {benchmark_spec.cluster.nfs_path}; mkdir -p images; '
-      f'mv {benchmark_spec.cluster.TYPE}.sqsh '
-      'images/nvidia+nemo+25.07.01.sqsh')
-  vm.RemoteCommand(
-      'git clone --branch v25.08.01 '
+      f'cd {benchmark_spec.cluster.nfs_path}; git clone --branch v25.10 '
       'https://github.com/NVIDIA/dgxc-benchmarking.git')
   vm.InstallPackages('git-lfs')
   workload_list = list(set(w.split(':')[0] for w in _WORKLOADS.value))
@@ -112,7 +135,8 @@ def Prepare(benchmark_spec):
           'hf_token': _HF_TOKEN.value,
       })
   vm.RemoteCommand(
-      'cd dgxc-benchmarking; echo "y\\n" | ./install.sh --play ~/pkb-dgxc.conf',
+      f'cd {benchmark_spec.cluster.nfs_path}/dgxc-benchmarking; '
+      'echo "y\\n" | ./install.sh --play ~/pkb-dgxc.conf',
       login_shell=True)
 
 
@@ -130,16 +154,15 @@ def Run(benchmark_spec):
   world_size = ngpus * len(benchmark_spec.cluster.worker_vms)
   for w in _WORKLOADS.value:
     workload_name, size, precision = w.split(':')
-    log_filter = w.replace(':', '_')
     headnode.RemoteCommand(
-        f'cd /opt/pkb/; export NCCL_DEBUG=INFO; '
+        f'cd /opt/pkb/; export NCCL_DEBUG=INFO; {" ".join(_DGXC_ENV.value)} '
         f'./llmb-run single -w {workload_name} -s {size} --dtype {precision} '
         f'--scale {world_size}', login_shell=True
     )
     while slurm.Running(headnode):
       time.sleep(60)
     result_file = headnode.RemoteCommand(
-        f'find /opt/pkb/workloads/{workload_name}/experiments/{log_filter}'
+        f'find /opt/pkb/workloads/{workload_name}/experiments/'
         '*/*/*/log*out | tail -n 1'
     )[0][:-1]
     headnode.PullFile(vm_util.GetTempDir(), result_file)
