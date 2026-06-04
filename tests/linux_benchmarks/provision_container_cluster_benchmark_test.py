@@ -22,10 +22,9 @@ class TestKubernetesCluster(
   """
 
   def __init__(self):
-    # Do not call KubernetesCluster.__init__, which tries and fails to
-    # construct a VM class
-    self.event_poller = None
-    pass
+    self.event_poller = kubernetes_events.KubernetesEventPoller(
+        kubernetes_cluster.kubernetes_commands.GetEvents
+    )
 
 
 _CONTAINER_START_YAML = """
