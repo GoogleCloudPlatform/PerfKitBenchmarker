@@ -615,8 +615,8 @@ def _IsUsingNeuron(components: str) -> bool:
 
 
 def _FormatUTCTimeStampToLocalTime(
-    server: k8s_server.WGServingInferenceServer, timestamp: Optional[float]
-) -> Optional[str]:
+    server: k8s_server.WGServingInferenceServer, timestamp: float
+) -> str:
   """Returns the time zone of the pod."""
   if server.timezone is None:
     raise ValueError('Local Pod timezone was not found.')
