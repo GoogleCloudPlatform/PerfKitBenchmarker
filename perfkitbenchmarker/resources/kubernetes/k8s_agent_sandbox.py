@@ -115,8 +115,8 @@ def install_gvisor():
   """
   _create_installer_configmap()
   # Plain .yaml files: ApplyManifest with NO kwargs.
-  kubernetes_commands.ApplyManifest(data.ResourcePath(_GVISOR_DAEMONSET))
-  kubernetes_commands.ApplyManifest(data.ResourcePath(_GVISOR_RUNTIMECLASS))
+  kubernetes_commands.ApplyManifest(_GVISOR_DAEMONSET)
+  kubernetes_commands.ApplyManifest(_GVISOR_RUNTIMECLASS)
   kubernetes_commands.WaitForRollout(
       'daemonset/gvisor-installer', namespace='kube-system'
   )
@@ -307,7 +307,7 @@ def install_warmpool(warmpool_name, template_name, replicas):
     logging.info('Warm pool replicas=0; skipping warm pool install.')
     return
   kubernetes_commands.ApplyManifest(
-      data.ResourcePath(_WARMPOOL_MANIFEST),
+      _WARMPOOL_MANIFEST,
       warmpool_name=warmpool_name,
       template_name=template_name,
       replicas=replicas,

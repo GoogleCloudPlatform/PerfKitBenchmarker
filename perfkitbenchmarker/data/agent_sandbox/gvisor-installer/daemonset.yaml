@@ -2,7 +2,7 @@
 # containerd-runsc shim onto the host, then sleeps as a pause container.
 #
 # The actual install logic comes from a ConfigMap named gvisor-installer-script
-# (created by install_gvisor() in linux_packages/agent_sandbox.py from
+# (created by install_gvisor() in resources/kubernetes/k8s_agent_sandbox.py from
 # data/agent_sandbox/gvisor-installer/install.sh before this DaemonSet is
 # applied). The ConfigMap key is "install.sh", mounted at /scripts.
 #
