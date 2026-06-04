@@ -27,6 +27,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources import agent_sandbox
 from perfkitbenchmarker.resources import agent_sandbox_spec
+from perfkitbenchmarker.resources.kubernetes import k8s_agent_sandbox_spec  # pylint: disable=unused-import
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
