@@ -119,6 +119,12 @@ _NGINX_SERVER_PORT = flags.DEFINE_integer(
     'default ports (80 or 443 depending on --nginx_use_ssl).',
 )
 
+_NGINX_CLIENT_RTO_MIN = flags.DEFINE_integer(
+    'nginx_client_rto_min',
+    None,
+    'The minimum retransmission timeout (in milliseconds) for the client',
+)
+
 
 def _ValidateLoadConfigs(load_configs):
   """Validate that each load config has all required values."""
@@ -352,6 +358,12 @@ def _TuneNetworkStack(vm):
   )
   vm.RemoteCommand(f'sudo sysctl -w net.core.somaxconn={max_port_num}')
   vm.RemoteCommand('sudo sysctl net.ipv4.tcp_autocorking=0')
+
+  if _NGINX_CLIENT_RTO_MIN.value:
+    vm.RemoteCommand(
+        f'sudo ip route replace $(ip route show default | head -n 1) '
+        f'rto_min {_NGINX_CLIENT_RTO_MIN.value}'
+    )
 
 
 def Prepare(benchmark_spec):
