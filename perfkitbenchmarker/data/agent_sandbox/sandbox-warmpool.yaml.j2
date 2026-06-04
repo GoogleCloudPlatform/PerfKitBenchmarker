@@ -4,8 +4,8 @@
 apiVersion: extensions.agents.x-k8s.io/v1beta1
 kind: SandboxWarmPool
 metadata:
-  name: {{ warmpool_name }}
+  name: {{ name }}
 spec:
   replicas: {{ replicas }}
   sandboxTemplateRef:
-    name: {{ template_name }}
+    name: {{ name }}

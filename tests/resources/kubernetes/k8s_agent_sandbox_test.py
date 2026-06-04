@@ -149,9 +149,7 @@ class K8sAgentSandboxCreateTest(pkb_common_test_case.PkbCommonTestCase):
     mock_gvisor.assert_called_once()
     mock_controller.assert_called_once()
     mock_template.assert_called_once()
-    self.assertEqual(mock_template.call_args.args[0], 'agent-sandbox')
-    self.assertIs(
-        mock_template.call_args.args[1], sandbox.spec.sandbox_template)
+    self.assertIs(mock_template.call_args.args[0], sandbox.spec.sandbox_template)
     mock_warmpool.assert_called_once()
     self.assertEqual(
         mock_controller.call_args.kwargs['controller_ref'], 'ref123')

@@ -279,12 +279,12 @@ def install_controller(
   )
 
 
-def apply_template(template_name, template_spec):
+def apply_template(template_spec):
   """Applies the SandboxTemplate rendered from the template spec."""
   labels = template_spec.labels or {'sandbox': 'python-sandbox-bench'}
   kubernetes_commands.ApplyManifest(
       _TEMPLATE_MANIFEST,
-      template_name=template_name,
+      name=_SANDBOX_NAME,
       runtime_class=template_spec.runtime_class,
       image=template_spec.image,
       cpu_request=template_spec.cpu_request,
@@ -295,7 +295,7 @@ def apply_template(template_name, template_spec):
   )
 
 
-def install_warmpool(warmpool_name, template_name, replicas):
+def install_warmpool(replicas):
   """Applies a SandboxWarmPool and waits for it to reach the target size.
 
   If replicas is 0, skips both the manifest apply and the readiness wait.
@@ -308,11 +308,10 @@ def install_warmpool(warmpool_name, template_name, replicas):
     return
   kubernetes_commands.ApplyManifest(
       _WARMPOOL_MANIFEST,
-      warmpool_name=warmpool_name,
-      template_name=template_name,
+      name=_SANDBOX_NAME,
       replicas=replicas,
   )
-  _wait_warmpool_ready(warmpool_name, replicas)
+  _wait_warmpool_ready(_SANDBOX_NAME, replicas)
 
 
 class K8sAgentSandbox(agent_sandbox.BaseAgentSandbox):
@@ -342,11 +341,10 @@ class K8sAgentSandbox(agent_sandbox.BaseAgentSandbox):
     )
 
   def _ApplyTemplate(self):
-    apply_template(_SANDBOX_NAME, self.spec.sandbox_template)
+    apply_template(self.spec.sandbox_template)
 
   def _InstallWarmpool(self):
-    install_warmpool(
-        _SANDBOX_NAME, _SANDBOX_NAME, self.spec.sandbox_warmpool.replicas)
+    install_warmpool(self.spec.sandbox_warmpool.replicas)
 
   def _BuildTuning(self):
     """Builds the controller_tuning dict from the controller sub-spec."""
