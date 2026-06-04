@@ -15,7 +15,9 @@
 
 import unittest
 
+import yaml
 from absl import flags
+from perfkitbenchmarker.resources.kubernetes import k8s_agent_sandbox
 from perfkitbenchmarker.resources.kubernetes import k8s_agent_sandbox_spec
 from tests import pkb_common_test_case
 
@@ -72,6 +74,54 @@ class K8sAgentSandboxSpecTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(spec.sandbox_warmpool.replicas, 7)
     self.assertEqual(spec.controller.claim_workers, 12)
     self.assertTrue(spec.controller.leader_elect)
+
+
+class ConfigureControllerManifestTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def _ManifestYaml(self):
+    manifest = {
+        'kind': 'Deployment',
+        'spec': {'template': {'spec': {'containers': [{
+            'name': 'manager',
+            'image': 'placeholder',
+            'args': ['--leader-elect=true', '--existing-arg'],
+            'resources': {},
+        }]}}},
+    }
+    return yaml.dump(manifest, default_flow_style=False)
+
+  def testImageAndTuningInjected(self):
+    result_yaml = k8s_agent_sandbox._configure_controller_manifest(
+        self._ManifestYaml(),
+        controller_image='my/image:tag',
+        tuning={'claim_workers': 8, 'kube_api_qps': 50, 'leader_elect': True},
+    )
+    out = yaml.safe_load(result_yaml)
+    container = out['spec']['template']['spec']['containers'][0]
+    self.assertEqual(container['image'], 'my/image:tag')
+    self.assertIn('--sandbox-claim-concurrent-workers=8', container['args'])
+    self.assertIn('--kube-api-qps=50', container['args'])
+
+  def testResourceDefaultsApplied(self):
+    result_yaml = k8s_agent_sandbox._configure_controller_manifest(
+        self._ManifestYaml(), controller_image='img', tuning={})
+    out = yaml.safe_load(result_yaml)
+    res = out['spec']['template']['spec']['containers'][0]['resources']
+    self.assertEqual(
+        res['requests']['cpu'], k8s_agent_sandbox._DEFAULT_CPU_REQUEST)
+    self.assertEqual(
+        res['limits']['memory'], k8s_agent_sandbox._DEFAULT_MEMORY_LIMIT)
+
+  def testResourceTuningOverridesDefaults(self):
+    result_yaml = k8s_agent_sandbox._configure_controller_manifest(
+        self._ManifestYaml(),
+        controller_image='img',
+        tuning={'cpu_request': '1', 'memory_limit': '2Gi'},
+    )
+    out = yaml.safe_load(result_yaml)
+    res = out['spec']['template']['spec']['containers'][0]['resources']
+    self.assertEqual(res['requests']['cpu'], '1')
+    self.assertEqual(res['limits']['memory'], '2Gi')
 
 
 if __name__ == '__main__':
