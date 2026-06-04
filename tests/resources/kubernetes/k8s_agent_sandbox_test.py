@@ -14,6 +14,7 @@
 """Tests for the Kubernetes agent sandbox spec and resource."""
 
 import unittest
+from unittest import mock
 
 import yaml
 from absl import flags
@@ -122,6 +123,38 @@ class ConfigureControllerManifestTest(pkb_common_test_case.PkbCommonTestCase):
     res = out['spec']['template']['spec']['containers'][0]['resources']
     self.assertEqual(res['requests']['cpu'], '1')
     self.assertEqual(res['limits']['memory'], '2Gi')
+
+
+class K8sAgentSandboxCreateTest(pkb_common_test_case.PkbCommonTestCase):
+
+  def _Sandbox(self, **template_overrides):
+    sandbox_spec = k8s_agent_sandbox_spec.K8sAgentSandboxConfigSpec(
+        _COMPONENT, flag_values=FLAGS,
+        type='Kubernetes', manifest_ref='ref123',
+        sandbox_warmpool={'replicas': 3},
+        sandbox_template=template_overrides or {'runtime_class': 'runsc'},
+    )
+    return k8s_agent_sandbox.K8sAgentSandbox(sandbox_spec, mock.Mock())
+
+  @mock.patch.object(k8s_agent_sandbox, 'install_warmpool')
+  @mock.patch.object(k8s_agent_sandbox, 'apply_template')
+  @mock.patch.object(k8s_agent_sandbox, 'install_controller')
+  @mock.patch.object(k8s_agent_sandbox, 'install_gvisor')
+  def testCreateOrchestration(
+      self, mock_gvisor, mock_controller, mock_template, mock_warmpool):
+    sandbox = self._Sandbox()
+    sandbox._Create()
+    mock_gvisor.assert_called_once()
+    mock_controller.assert_called_once()
+    mock_template.assert_called_once()
+    mock_warmpool.assert_called_once()
+    self.assertEqual(
+        mock_controller.call_args.kwargs['controller_ref'], 'ref123')
+    self.assertEqual(mock_warmpool.call_args.args[-1], 3)
+
+  def testDeleteIsNoOp(self):
+    sandbox = self._Sandbox()
+    self.assertIsNone(sandbox._Delete())
 
 
 if __name__ == '__main__':
