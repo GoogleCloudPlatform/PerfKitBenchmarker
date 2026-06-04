@@ -31,7 +31,7 @@ BENCHMARK_CONFIG = (
     )
     .replace(
         'sysbench_run_threads: 1,64,128,256,512,1024,2048',
-        'sysbench_run_threads: 2048',
+        'sysbench_run_threads: 256',
     )
     .replace('sysbench_run_seconds: 300', 'sysbench_run_seconds: 21600')
 )
