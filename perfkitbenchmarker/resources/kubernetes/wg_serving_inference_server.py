@@ -28,6 +28,7 @@ from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import elastic_kubernetes_service
 from perfkitbenchmarker.resources import kubernetes_inference_server
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
@@ -54,6 +55,14 @@ FLAG_GCS_BUCKET = flags.DEFINE_string(
     None,
     'The GCS bucket that has model data for inference server to use.',
 )
+
+# AWS Inferentia/Trainium instance-family substrings recognised in
+# `catalog_components` (e.g. "1-Inf2", "1-Trn1"). Kept local to this module so
+# that adding Neuron support does not change the shared
+# `virtual_machine_spec.VALID_GPU_TYPES` list, which is consumed by many other
+# subsystems. Only Inf2 has been tested end-to-end; other generations are
+# included for forward compatibility.
+_NEURON_ACCELERATOR_TYPES = ('inf1', 'inf2', 'trn1', 'trn2', 'trn3')
 
 WG_SERVING_REPO_URL = flags.DEFINE_string(
     'wg_serving_repo_url',
@@ -603,6 +612,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
     """Returns the storage type of the inference server."""
     if 'gcsfuse' in self.spec.catalog_components:
       return 'gcsfuse'
+    if 's3' in self.spec.catalog_components:
+      return 's3'
     if 'blobfuse' in self.spec.catalog_components:
       return 'blobfuse'
     return 'huggingface'
@@ -614,6 +625,13 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       lowered = component.lower()
       for gpu in virtual_machine_spec.VALID_GPU_TYPES:
         if gpu in lowered:
+          return component
+    # Neuron chips are intentionally not in VALID_GPU_TYPES; match them here
+    # via _NEURON_ACCELERATOR_TYPES (Inf2 tested; other generations untested).
+    for component in components:
+      lowered = component.lower()
+      for neuron in _NEURON_ACCELERATOR_TYPES:
+        if neuron in lowered:
           return component
     return 'unknown'
 
@@ -646,8 +664,15 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           self.huggingface_token,
       )
       secret_file_path = vm_util.PrependTempDir('hf_token.secret')
-      storage_service = object_storage_service.GetObjectStorageClass('GCP')()
-      storage_service.PrepareService()
+      # Pick the storage backend by URI scheme so existing gs:// usage is
+      # untouched while s3:// URIs work for AWS-only runs.
+      storage_cloud = (
+          'AWS' if self.huggingface_token.startswith('s3://') else 'GCP'
+      )
+      storage_service = object_storage_service.GetObjectStorageClass(
+          storage_cloud
+      )()
+      storage_service.PrepareService(None)
       storage_service.Copy(self.huggingface_token, secret_file_path)
 
       with open(secret_file_path, mode='r+') as secret_file:
@@ -668,9 +693,12 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
   def _GetInferenceServerManifest(self) -> str:
     """Generates and retrieves the inference server manifest content."""
-    provider = self.spec.cloud.lower()
-    if provider == 'gcp':
-      provider = 'gke'
+    if self.spec.catalog_provider:
+      provider = self.spec.catalog_provider
+    else:
+      provider = self.spec.cloud.lower()
+      if provider == 'gcp':
+        provider = 'gke'
     generate_args = {
         'kind': 'core/deployment',
         'model-server': self.spec.model_server,
@@ -697,7 +725,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       pod_name = kubernetes_commands.RetryableGetPodNameFromJob(job_name)
 
       kubernetes_commands.WaitForResource(
-          f'pod/{pod_name}', 'Ready', timeout=600
+          f'pod/{pod_name}', 'Ready', timeout=1800
       )
       inference_server_manifest = kubernetes_commands.GetFileContentFromPod(
           pod_name, _OUTPUT_PATH
@@ -721,20 +749,44 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
           f'job/{job_name}', ignore_not_found=True
       )
 
+  def _ApplyAwsGpuNodePool(
+      self,
+      *,
+      nodepool_name: str,
+      instance_families: list[str],
+      taint_key: str,
+      use_spot: bool,
+  ) -> None:
+    """Applies the shared AWS Karpenter NodePool template for GPU or Neuron."""
+    kubernetes_commands.ApplyManifest(
+        'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
+        gpu_nodepool_name=nodepool_name,
+        gpu_consolidate_after='1h',
+        gpu_consolidation_policy='WhenEmpty',
+        karpenter_nodeclass_name='default',
+        gpu_capacity_types=['spot'] if use_spot else ['on-demand'],
+        gpu_arch=['amd64'],
+        gpu_instance_families=instance_families,
+        gpu_taint_key=taint_key,
+    )
+
   def _ProvisionGPUNodePool(self):
     """Provisions cloud-specific GPU node pool for inference workloads."""
     if FLAGS.cloud == 'AWS':
       use_spot = bool(FLAGS.aws_spot_instances)
-      kubernetes_commands.ApplyManifest(
-          'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
-          gpu_nodepool_name='gpu',
-          gpu_consolidate_after='1h',
-          gpu_consolidation_policy='WhenEmpty',
-          karpenter_nodeclass_name='default',  # must exist already
-          gpu_capacity_types=['spot'] if use_spot else ['on-demand'],
-          gpu_arch=['amd64'],
-          gpu_instance_families=['g6', 'p5'],
-          gpu_taint_key='nvidia.com/gpu',
+      if self.accelerator_type.lower() in _NEURON_ACCELERATOR_TYPES:
+        self._ApplyAwsGpuNodePool(
+            nodepool_name='neuron',
+            instance_families=[self.accelerator_type.lower()],
+            taint_key='aws.amazon.com/neuron',
+            use_spot=use_spot,
+        )
+        return
+      self._ApplyAwsGpuNodePool(
+          nodepool_name='gpu',
+          instance_families=['g6', 'p5'],
+          taint_key='nvidia.com/gpu',
+          use_spot=use_spot,
       )
     elif FLAGS.cloud == 'Azure':
       kubernetes_commands.ApplyManifest(
@@ -1016,6 +1068,8 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
 
     if 'gcsfuse' in self.spec.catalog_components:
       self._ApplyGCSFusePVC()
+    elif 's3' in self.spec.catalog_components:
+      elastic_kubernetes_service.ApplyInferenceS3PvAndPvc()
     elif 'blobfuse' in self.spec.catalog_components:
       extra_args = self.spec.extra_deployment_args or {}
       self.cluster.ApplyFusePVC(

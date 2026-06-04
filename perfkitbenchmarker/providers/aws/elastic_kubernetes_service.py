@@ -78,6 +78,29 @@ def RecursivelyUpdateDictionary(
   return original
 
 
+def ApplyInferenceS3PvAndPvc() -> None:
+  """Apply the PV and PVC backed by Mountpoint for Amazon S3 CSI driver.
+
+  Prerequisites:
+    - Model weights uploaded to the S3 bucket
+    (--k8s_inference_server_s3_bucket).
+    - S3 CSI driver installed on the cluster (--eks_install_s3_csi_addon).
+  """
+  bucket = aws_flags.K8S_INFERENCE_SERVER_S3_BUCKET.value
+  region = aws_flags.K8S_INFERENCE_SERVER_S3_REGION.value
+  if not bucket or not region:
+    raise errors.Resource.CreationError(
+        'Both --k8s_inference_server_s3_bucket and '
+        '--k8s_inference_server_s3_region are required to apply the S3 PVC.'
+    )
+  kubernetes_commands.ApplyManifest(
+      'container/kubernetes_ai_inference/s3_pv_pvc.yaml.j2',
+      s3_bucket=bucket,
+      s3_region=region,
+  )
+  logging.info('Successfully applied S3 PVC.')
+
+
 class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
   """Shared base class for Elastic Kubernetes Service cluster auto mode & not."""
 
@@ -160,7 +183,7 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
         f'--kubeconfig={FLAGS.kubeconfig}',
     ]
     stdout, _, retcode = vm_util.IssueCommand(
-        cmd, timeout=1800, raise_on_failure=False
+        cmd, timeout=2700, raise_on_failure=False
     )
     if retcode:
       if 'The maximum number of VPCs has been reached' in stdout:
@@ -547,7 +570,12 @@ class EksAutoCluster(BaseEksCluster):
 
   def _Create(self):
     """Creates the control plane and worker nodes."""
-    self._EksCtlCreate({'autoModeConfig': {'enabled': True}})
+    self._EksCtlCreate({
+        'autoModeConfig': {
+            'enabled': True,
+            'nodePools': ['general-purpose', 'system'],
+        }
+    })
 
     # Enable public and private access to the cluster.
     vpc_cmd = [
@@ -571,6 +599,170 @@ class EksAutoCluster(BaseEksCluster):
           'container/auto/nodepool.yaml.j2',
           CLUSTER_NAME=self.name,
       )
+    if aws_flags.EKS_INSTALL_S3_CSI_ADDON.value:
+      self._InstallS3CsiAddon()
+    if aws_flags.EKS_INSTALL_NEURON_DEVICE_PLUGIN.value:
+      self._InstallNeuronDevicePlugin()
+
+  # AWS-stable identifiers for the Mountpoint for S3 CSI driver:
+  # https://docs.aws.amazon.com/eks/latest/userguide/s3-csi.html
+  _S3_CSI_ADDON_NAME = 'aws-mountpoint-s3-csi-driver'
+  _S3_CSI_SERVICE_ACCOUNT_NAME = 's3-csi-driver-sa'
+  _S3_CSI_SERVICE_ACCOUNT_NAMESPACE = 'kube-system'
+  # PKB-managed IAM resources reused across runs.
+  _S3_CSI_ROLE_NAME = 'PkbS3CsiDriverRole'
+  _S3_CSI_POLICY_NAME_PREFIX = 'PkbS3CsiDriverReadOnly'
+
+  def _InstallS3CsiAddon(self):
+    """Installs the S3 CSI Driver and the IAM glue (Role/Policy + PIA)."""
+    bucket = aws_flags.K8S_INFERENCE_SERVER_S3_BUCKET.value
+    if not bucket:
+      raise errors.Config.InvalidValue(
+          '--k8s_inference_server_s3_bucket is required when '
+          '--eks_install_s3_csi_addon is enabled.'
+      )
+    policy_arn = self._EnsureS3CsiPolicy(bucket)
+    role_arn = self._EnsureS3CsiRole(policy_arn)
+
+    vm_util.IssueRetryableCommand(
+        util.AWS_PREFIX
+        + [
+            'eks',
+            'create-addon',
+            '--region',
+            self.region,
+            '--cluster-name',
+            self.name,
+            '--addon-name',
+            self._S3_CSI_ADDON_NAME,
+            '--resolve-conflicts',
+            'OVERWRITE',
+        ]
+    )
+    vm_util.IssueRetryableCommand(
+        util.AWS_PREFIX
+        + [
+            'eks',
+            'wait',
+            'addon-active',
+            '--region',
+            self.region,
+            '--cluster-name',
+            self.name,
+            '--addon-name',
+            self._S3_CSI_ADDON_NAME,
+        ],
+        timeout=900,
+    )
+    self._EnsureS3CsiPodIdentityAssociation(role_arn)
+    logging.info('Successfully installed Mountpoint for S3 CSI Driver.')
+
+  def _EnsureS3CsiPolicy(self, bucket: str) -> str:
+    """Idempotently creates the read-only S3 policy; returns its ARN."""
+    name = f'{self._S3_CSI_POLICY_NAME_PREFIX}-{bucket}'
+    doc = {
+        'Version': '2012-10-17',
+        'Statement': [
+            {
+                'Effect': 'Allow',
+                'Action': ['s3:ListBucket'],
+                'Resource': [f'arn:aws:s3:::{bucket}'],
+            },
+            {
+                'Effect': 'Allow',
+                'Action': ['s3:GetObject'],
+                'Resource': [f'arn:aws:s3:::{bucket}/*'],
+            },
+        ],
+    }
+    vm_util.IssueCommand(
+        util.AWS_PREFIX
+        + [
+            'iam',
+            'create-policy',
+            '--policy-name',
+            name,
+            '--policy-document',
+            json.dumps(doc),
+        ],
+        suppress_failure=lambda stdout, stderr, retcode: (
+            'EntityAlreadyExists' in stderr
+        ),
+    )
+    return f'arn:aws:iam::{self.account}:policy/{name}'
+
+  def _EnsureS3CsiRole(self, policy_arn: str) -> str:
+    """Idempotently creates the S3 CSI driver role; returns its ARN."""
+    trust = {
+        'Version': '2012-10-17',
+        'Statement': [{
+            'Effect': 'Allow',
+            'Principal': {'Service': 'pods.eks.amazonaws.com'},
+            'Action': ['sts:AssumeRole', 'sts:TagSession'],
+        }],
+    }
+    vm_util.IssueCommand(
+        util.AWS_PREFIX
+        + [
+            'iam',
+            'create-role',
+            '--role-name',
+            self._S3_CSI_ROLE_NAME,
+            '--assume-role-policy-document',
+            json.dumps(trust),
+        ],
+        suppress_failure=lambda stdout, stderr, retcode: (
+            'EntityAlreadyExists' in stderr
+        ),
+    )
+    # attach-role-policy is idempotent at the AWS API level.
+    vm_util.IssueCommand(
+        util.AWS_PREFIX
+        + [
+            'iam',
+            'attach-role-policy',
+            '--role-name',
+            self._S3_CSI_ROLE_NAME,
+            '--policy-arn',
+            policy_arn,
+        ]
+    )
+    return f'arn:aws:iam::{self.account}:role/{self._S3_CSI_ROLE_NAME}'
+
+  def _EnsureS3CsiPodIdentityAssociation(self, role_arn: str) -> None:
+    """Idempotently binds the role to s3-csi-driver-sa via Pod Identity."""
+    vm_util.IssueCommand(
+        util.AWS_PREFIX
+        + [
+            'eks',
+            'create-pod-identity-association',
+            '--region',
+            self.region,
+            '--cluster-name',
+            self.name,
+            '--namespace',
+            self._S3_CSI_SERVICE_ACCOUNT_NAMESPACE,
+            '--service-account',
+            self._S3_CSI_SERVICE_ACCOUNT_NAME,
+            '--role-arn',
+            role_arn,
+        ],
+        suppress_failure=lambda stdout, stderr, retcode: (
+            'already exists' in stderr.lower()
+        ),
+    )
+
+  def _InstallNeuronDevicePlugin(self):
+    """Applies the AWS Neuron Device Plugin DaemonSet to the cluster."""
+    # PKB only renders .j2 when ApplyManifest kwargs is non-empty
+    # (vm_util.ReadAndRenderJinja2Template). With no kwargs the literal
+    # "{{ neuron_device_plugin_image }}" would be sent to kubectl.
+    default_image = 'public.ecr.aws/neuron/neuron-device-plugin:2.22.4.0'
+    kubernetes_commands.ApplyManifest(
+        'container/aws/neuron-device-plugin.yaml.j2',
+        neuron_device_plugin_image=default_image,
+    )
+    logging.info('Successfully applied Neuron Device Plugin DaemonSet.')
 
   def _Delete(self):
     """Deletes the control plane and worker nodes."""
@@ -613,9 +805,7 @@ class EksAutoCluster(BaseEksCluster):
     if self.use_spot:
       selectors['karpenter.sh/capacity-type'] = 'spot'
     if self.gpu_type:
-      selectors['eks.amazonaws.com/instance-gpu-name'] = (
-          self.gpu_type
-      )
+      selectors['eks.amazonaws.com/instance-gpu-name'] = self.gpu_type
     return selectors
 
 
