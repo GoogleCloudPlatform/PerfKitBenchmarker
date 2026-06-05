@@ -237,6 +237,47 @@ class ElasticKubernetesServiceTest(BaseEksTest):
     self.assertEqual(node_groups[1]['maxSize'], 10)
     self.assertEqual(node_groups[1]['desiredCapacity'], 3)
 
+  def testEksClusterNodepoolLabels(self):
+    cluster = elastic_kubernetes_service.EksCluster(EKS_SPEC)
+    nodepool = cluster.default_nodepool
+    nodepool.node_labels = {'env': 'prod', 'team': 'ml'}
+    actual = cluster._RenderNodeGroupJson(nodepool)
+    self.assertEqual(
+        actual['labels'],
+        {'pkb_nodepool': nodepool.name, 'env': 'prod', 'team': 'ml'},
+    )
+
+  def testEksClusterNodepoolTaints(self):
+    cluster = elastic_kubernetes_service.EksCluster(EKS_SPEC)
+    nodepool = cluster.default_nodepool
+    nodepool.node_taints = [
+        'sandbox.gke.io/runtime=runsc:NoSchedule',
+        'dedicated:NoExecute',
+    ]
+    actual = cluster._RenderNodeGroupJson(nodepool)
+    self.assertEqual(
+        actual['taints'],
+        [
+            {
+                'key': 'sandbox.gke.io/runtime',
+                'value': 'runsc',
+                'effect': 'NoSchedule',
+            },
+            {'key': 'dedicated', 'effect': 'NoExecute'},
+        ],
+    )
+
+
+  def testParseTaint(self):
+    self.assertEqual(
+        elastic_kubernetes_service._ParseTaint('key=value:NoSchedule'),
+        {'key': 'key', 'value': 'value', 'effect': 'NoSchedule'},
+    )
+    self.assertEqual(
+        elastic_kubernetes_service._ParseTaint('dedicated:NoExecute'),
+        {'key': 'dedicated', 'effect': 'NoExecute'},
+    )
+
   def testGetNodePoolNames(self):
     # Mock the output of the aws cli command
     cluster = elastic_kubernetes_service.EksCluster(EKS_SPEC)
