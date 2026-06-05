@@ -767,11 +767,14 @@ def GetPvcs() -> Sequence[Any]:
   return yaml.safe_load(stdout)['items']
 
 
-def GetEvents(**kwargs) -> set['kubernetes_events.KubernetesEvent']:
+def GetEvents(
+    field_selector: str | None = None, **kwargs
+) -> set['kubernetes_events.KubernetesEvent']:
   """Get the events for the cluster."""
-  stdout, _, _ = kubectl.RunRetryableKubectlCommand(
-      ['get', 'events', '-o', 'yaml'], **kwargs
-  )
+  cmd = ['get', 'events', '-o', 'yaml']
+  if field_selector:
+    cmd.append(f'--field-selector={field_selector}')
+  stdout, _, _ = kubectl.RunRetryableKubectlCommand(cmd, **kwargs)
   k8s_events = set()
   parsed = yaml.safe_load(stdout) or {}
   for item in parsed.get('items', []):

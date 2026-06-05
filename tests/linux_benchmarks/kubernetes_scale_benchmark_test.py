@@ -428,7 +428,9 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresPassesWithCorrectNumberOfPods(self):
-    self.cluster.event_poller = kubernetes_events.KubernetesEventPoller(set)
+    self.cluster.event_poller = kubernetes_events.KubernetesEventPoller(
+        lambda field_selector=None: set()
+    )
     kubernetes_scale_benchmark.CheckForFailures(
         self.cluster,
         [
@@ -441,7 +443,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresThrowsRegularError(self):
     self.cluster.event_poller = kubernetes_events.KubernetesEventPoller(
-        lambda: {
+        lambda field_selector=None: {
             kubernetes_events.KubernetesEvent(
                 reason='PodReady',
                 message='Pod is ready',
@@ -466,7 +468,7 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresThrowsQuotaExceeded(self):
     self.cluster.event_poller = kubernetes_events.KubernetesEventPoller(
-        lambda: {
+        lambda field_selector=None: {
             kubernetes_events.KubernetesEvent(
                 reason='FailedScaleUp',
                 message=(

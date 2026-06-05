@@ -15,11 +15,54 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 
 
+def _MatchesFieldSelector(
+    event: 'KubernetesEvent', field_selector: str
+) -> bool:
+  """Returns True if the event matches a simple key=value field selector.
+
+  Supports the subset of field selector keys used by this module:
+    involvedObject.kind, involvedObject.name, reason, type
+  Multiple selectors may be comma-separated (all must match).
+  """
+  for clause in field_selector.split(','):
+    clause = clause.strip()
+    if '==' in clause:
+      key, value = clause.split('==', 1)
+    elif '=' in clause:
+      key, value = clause.split('=', 1)
+    else:
+      continue
+    key, value = key.strip(), value.strip()
+    if key == 'involvedObject.kind':
+      if event.resource.kind != value:
+        return False
+    elif key == 'involvedObject.name':
+      if event.resource.name != value:
+        return False
+    elif key == 'reason':
+      if event.reason != value:
+        return False
+    elif key == 'type':
+      if event.type != value:
+        return False
+    else:
+      raise ValueError(
+          f'Unsupported field selector key {key!r}. Supported keys: '
+          'involvedObject.kind, involvedObject.name, reason, type'
+      )
+  return True
+
+
 class KubernetesEventPoller:
   """Wrapper which polls for Kubernetes events."""
 
-  def __init__(self, get_events_fn: Callable[[], set['KubernetesEvent']]):
+  def __init__(
+      self,
+      get_events_fn: Callable[..., set['KubernetesEvent']],
+      poll_field_selector: str | None = None,
+  ):
     self.get_events_fn = get_events_fn
+    self._poll_field_selector = poll_field_selector
     self.polled_events: set['KubernetesEvent'] = set()
     self.stop_polling = multiprocessing.Event()
     self.event_queue: multiprocessing.Queue = multiprocessing.Queue()
@@ -47,7 +90,7 @@ class KubernetesEventPoller:
     """
     while True:
       try:
-        k8s_events = self.get_events_fn()
+        k8s_events = self.get_events_fn(self._poll_field_selector)
         logging.info(
             'From async get events process, got %s events', len(k8s_events)
         )
@@ -91,12 +134,20 @@ class KubernetesEventPoller:
       self.event_poller.kill()
       self.event_poller.join(timeout=30)
 
-  def GetEvents(self) -> set['KubernetesEvent']:
+  def GetEvents(
+      self, field_selector: str | None = None
+  ) -> set['KubernetesEvent']:
     """Gets the events for the cluster, including previously polled events."""
-    k8s_events = self.get_events_fn()
+    k8s_events = self.get_events_fn(field_selector)
     self.polled_events.update(k8s_events)
     while not self.event_queue.empty():
       self.polled_events.add(self.event_queue.get())
+    if field_selector:
+      return {
+          e
+          for e in self.polled_events
+          if _MatchesFieldSelector(e, field_selector)
+      }
     return self.polled_events
 
   def GetAndLogFailureEvents(self) -> dict[str | None, list['KubernetesEvent']]:
