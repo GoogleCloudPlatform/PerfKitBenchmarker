@@ -168,6 +168,7 @@ _WORKER_CONNECTIONS = 1024
 TARGET_RATE_LOWER_BOUND = 0
 TARGET_RATE_UPPER_BOUND = 1000000
 RPS_RANGE_THRESHOLD = 1000
+RPS_BINARY_SEARCH_THRESHOLD = 0.01
 
 
 def GetConfig(user_config):
@@ -442,6 +443,8 @@ def RunMultiClient(clients, targets, rate, connections, duration, threads):
       'num_server_targets': len(targets),
       'nginx_content_size': FLAGS.nginx_content_size,
   }
+  if _NGINX_CLIENT_RTO_MIN.value:
+    metadata['nginx_client_rto_min'] = _NGINX_CLIENT_RTO_MIN.value
   if not FLAGS.nginx_file_server_conf:
     metadata['caching'] = True
   results += [
@@ -505,7 +508,9 @@ def Run(benchmark_spec):
     )
     target_rate = upper_bound
     valid_results = []
-    while (upper_bound - lower_bound) > RPS_RANGE_THRESHOLD:
+    while (
+        (upper_bound - lower_bound) / (upper_bound)
+    ) > RPS_BINARY_SEARCH_THRESHOLD:
       results = RunMultiClient(
           clients,
           targets,
