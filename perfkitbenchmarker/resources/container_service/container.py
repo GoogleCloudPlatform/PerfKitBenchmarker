@@ -184,6 +184,8 @@ class BaseNodePoolConfig:
     self.disk_size: int = vm_spec.boot_disk_size
     self.gpu_type: str | None = vm_spec.gpu_type
     self.gpu_count: int | None = vm_spec.gpu_count
+    self.node_labels: dict[str, str] | None = None
+    self.node_taints: list[str] | None = None
     # Defined by GceVirtualMachineConfig. Used by google_kubernetes_engine
     # pylint: disable=g-missing-from-attributes
     self.sandbox_config: container_spec_lib.SandboxSpec | None = None
