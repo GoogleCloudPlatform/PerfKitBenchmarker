@@ -49,9 +49,25 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
       self.inference_server.Create()
 
   def _PostCreate(self):
+    """Starts the event poller after the cluster has been created."""
     super()._PostCreate()
-    if self.cluster_spec.poll_for_events:
-      self.event_poller.StartPolling()
+    if self.event_poller:
+      try:
+        self.event_poller.StartPolling()
+      except Exception as exc:  # pylint: disable=broad-except
+        # Python 3.14 tightened pickling rules for multiprocessing — local
+        # functions passed to Process cannot be pickled. Rather than crashing
+        # PKB entirely (which prevents cleanup and orphans cloud resources),
+        # log a warning and continue without the event poller.
+        # Impact: no Kubernetes event streaming during the run — benchmark
+        # metrics are unaffected.
+        logging.warning(
+            'Event poller failed to start (non-fatal, continuing without '
+            + 'event polling): %s. This is a known Python 3.14 pickling '
+            + 'issue — switch to Python 3.13 to enable event polling.',
+            exc,
+        )
+        self.event_poller = None
 
   def Delete(self, freeze: bool = False) -> None:
     if self.inference_server:
@@ -297,9 +313,132 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
       )
     return 'http://' + ip.strip()
 
-  def AddNodepool(self, batch_name: str, pool_id: str):
-    """Adds an additional nodepool with the given name to the cluster."""
-    pass
+
+  def AddNodepool(self, batch_name: str, pool_id: str) -> None:
+    """Adds a node pool; delegates to CreateNodePool for standard clusters.
+
+    Karpenter-based subclasses override this to apply a manifest instead.
+    """
+    nodepool_config = container_lib.BaseNodePoolConfig(
+        self.nodepools[container_cluster.DEFAULT_NODEPOOL].vm_spec,
+        name=f'{batch_name}-{pool_id}',
+    )
+    self.CreateNodePool(nodepool_config)
+
+  def CreateNodePool(
+      self,
+      nodepool_config: container_lib.BaseNodePoolConfig,
+      node_version: str | None = None,
+  ) -> None:
+    """Creates a node pool and blocks until ready (sync wrapper).
+
+    Args:
+      nodepool_config: Node pool definition (name, machine type, node count).
+      node_version: Optional Kubernetes version to pin the node pool to. None
+        means use the cluster default.
+    """
+    op = self.CreateNodePoolAsync(nodepool_config, node_version)
+    self.WaitForOperation(op)
+
+  def DeleteNodePool(self, name: str) -> None:
+    """Deletes the named node pool and blocks until removed (sync wrapper)."""
+    op = self.DeleteNodePoolAsync(name)
+    self.WaitForOperation(op)
+
+  def UpgradeNodePool(self, name: str, target_version: str) -> None:
+    """Upgrades the named node pool and blocks until done (sync wrapper)."""
+    op = self.UpgradeNodePoolAsync(name, target_version)
+    self.WaitForOperation(op)
+
+  def UpdateCluster(self) -> None:
+    """Performs a cluster-level update and blocks until done (sync wrapper).
+
+    Intended for management-plane benchmarks that need to overlap a real
+    cluster-level operation with a node-pool operation. The implementation
+    should issue a control-plane mutation (so an actual operation runs) that
+    is non-destructive and idempotent across repeated invocations.
+    """
+    op = self.UpdateClusterAsync()
+    self.WaitForOperation(op)
+
+  def CreateNodePoolAsync(
+      self,
+      nodepool_config: container_lib.BaseNodePoolConfig,
+      node_version: str | None = None,
+  ) -> str:
+    """Initiates node-pool create; returns opaque op handle. Does NOT wait."""
+    raise NotImplementedError
+
+  def UpgradeNodePoolAsync(self, name: str, target_version: str) -> str:
+    """Initiates node-pool upgrade; returns opaque op handle. Does NOT wait."""
+    raise NotImplementedError
+
+  def DeleteNodePoolAsync(self, name: str) -> str:
+    """Initiates node-pool delete; returns opaque op handle. Does NOT wait."""
+    raise NotImplementedError
+
+  def UpdateClusterAsync(self) -> str:
+    """Initiates cluster-level update. Returns op handle; does NOT wait."""
+    raise NotImplementedError
+
+  @abc.abstractmethod
+  def GetNodePoolNames(self) -> list[str]:
+    """Returns the names of all node pools currently in the cluster.
+
+    Used by the kubernetes_management benchmark to:
+      - Sweep stale pkbm* pools before each run (clean-start spec requirement)
+      - Re-list live pools after creates before deleting (avoids stale names)
+    """
+
+  def WaitForOperation(self, op_handle: str) -> None:
+    """Blocks until the operation identified by op_handle completes.
+
+    Args:
+      op_handle: provider-specific opaque string from one of the *Async
+        methods above.
+
+    Raises:
+      errors.Resource.RetryableCreationError or similar on timeout/failure.
+    """
+    raise NotImplementedError
+
+  def ResolveNodePoolVersions(self) -> tuple[str, str]:
+    """Returns (initial, target) K8s versions per benchmark spec.
+
+    Spec contract:
+      target  = cluster's current K8s version (the latest available)
+      initial = the adjacent minor below target (e.g., target=1.35 -> 1.34)
+    Default implementation returns bare-minor strings ("1.34", "1.35") which
+    EKS and AKS accept directly. Providers requiring fully-qualified versions
+    (notably GKE) must override.
+    """
+    target = BareMinor(self.k8s_version)
+    initial = AdjacentMinorBelow(self.k8s_version)
+    return initial, target
+
+
+def BareMinor(version: str) -> str:
+  """Returns the 'major.minor' part of a K8s version string.
+
+  Accepts and normalizes formats like 'v1.35.4', '1.35.4-gke.1234', '1.35'.
+  """
+  if version.startswith('v'):
+    version = version[1:]
+  bare = version.split('-', 1)[0]
+  parts = bare.split('.')
+  if len(parts) < 2 or not parts[0].isdigit() or not parts[1].isdigit():
+    raise ValueError(f'Cannot parse K8s version: {version!r}')
+  return f'{parts[0]}.{parts[1]}'
+
+
+def AdjacentMinorBelow(version: str) -> str:
+  """Returns the bare minor one below the given version: '1.35.4' -> '1.34'."""
+  bare = BareMinor(version)
+  major_s, minor_s = bare.split('.')
+  minor = int(minor_s)
+  if minor <= 0:
+    raise ValueError(f'No adjacent minor below {version!r}')
+  return f'{major_s}.{minor - 1}'
 
 
 def _DeleteAllFromDefaultNamespace():
