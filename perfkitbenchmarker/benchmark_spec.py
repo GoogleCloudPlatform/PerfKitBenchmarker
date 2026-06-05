@@ -245,7 +245,7 @@ class BenchmarkSpec:
     self.data_dir: str
     self.ckpt_dir: str
     # Used by redis_memtier and keydb_memtier
-    self.redis_endpoint_ip: str
+    self.redis_endpoint_ip: list[str]
     self.keydb_endpoint_ip: str
     # Used by mongodb_ycsb
     self.mongodb_url: str
