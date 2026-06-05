@@ -52,9 +52,25 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
       self.inference_server.Create()
 
   def _PostCreate(self):
+    """Starts the event poller after the cluster has been created."""
     super()._PostCreate()
-    if self.cluster_spec.poll_for_events:
-      self.event_poller.StartPolling()
+    if self.event_poller:
+      try:
+        self.event_poller.StartPolling()
+      except Exception as exc:  # pylint: disable=broad-except
+        # Python 3.14 tightened pickling rules for multiprocessing — local
+        # functions passed to Process cannot be pickled. Rather than crashing
+        # PKB entirely (which prevents cleanup and orphans cloud resources),
+        # log a warning and continue without the event poller.
+        # Impact: no Kubernetes event streaming during the run — benchmark
+        # metrics are unaffected.
+        logging.warning(
+            'Event poller failed to start (non-fatal, continuing without '
+            + 'event polling): %s. This is a known Python 3.14 pickling '
+            + 'issue — switch to Python 3.13 to enable event polling.',
+            exc,
+        )
+        self.event_poller = None
 
   def Delete(self, freeze: bool = False) -> None:
     if self.inference_server:
@@ -316,32 +332,36 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
       nodepool_config: container_lib.BaseNodePoolConfig,
       node_version: str | None = None,
   ) -> None:
-    """Creates a single named node pool on the cluster (blocks until ready).
+    """Creates a node pool and blocks until ready (sync wrapper).
 
     Args:
       nodepool_config: Node pool definition (name, machine type, node count).
       node_version: Optional Kubernetes version to pin the node pool to. None
         means use the cluster default.
     """
-    raise NotImplementedError
+    op = self.CreateNodePoolAsync(nodepool_config, node_version)
+    self.WaitForOperation(op)
 
   def DeleteNodePool(self, name: str) -> None:
-    """Deletes the named node pool (blocks until removed)."""
-    raise NotImplementedError
+    """Deletes the named node pool and blocks until removed (sync wrapper)."""
+    op = self.DeleteNodePoolAsync(name)
+    self.WaitForOperation(op)
 
   def UpgradeNodePool(self, name: str, target_version: str) -> None:
-    """Upgrades the named node pool to the given Kubernetes version."""
-    raise NotImplementedError
+    """Upgrades the named node pool and blocks until done (sync wrapper)."""
+    op = self.UpgradeNodePoolAsync(name, target_version)
+    self.WaitForOperation(op)
 
   def UpdateCluster(self) -> None:
-    """Performs a lightweight cluster-level update operation (blocks).
+    """Performs a cluster-level update and blocks until done (sync wrapper).
 
     Intended for management-plane benchmarks that need to overlap a real
     cluster-level operation with a node-pool operation. The implementation
     should issue a control-plane mutation (so an actual operation runs) that
     is non-destructive and idempotent across repeated invocations.
     """
-    raise NotImplementedError
+    op = self.UpdateClusterAsync()
+    self.WaitForOperation(op)
 
   def CreateNodePoolAsync(
       self,

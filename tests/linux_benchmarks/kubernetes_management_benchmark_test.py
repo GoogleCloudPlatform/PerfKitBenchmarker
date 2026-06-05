@@ -13,11 +13,11 @@
 # limitations under the License.
 """Tests for linux_benchmarks.kubernetes_management_benchmark."""
 
+# pylint: disable=invalid-name,protected-access
+
 import threading
 import time
 import unittest
-
-# pylint: disable=invalid-name,protected-access
 from unittest import mock
 
 from absl import flags
