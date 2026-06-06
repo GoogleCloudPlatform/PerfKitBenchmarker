@@ -672,7 +672,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       storage_service = object_storage_service.GetObjectStorageClass(
           storage_cloud
       )()
-      storage_service.PrepareService(None)
+      storage_service.PrepareService()
       storage_service.Copy(self.huggingface_token, secret_file_path)
 
       with open(secret_file_path, mode='r+') as secret_file:
