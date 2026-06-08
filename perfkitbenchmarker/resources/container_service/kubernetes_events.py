@@ -1,5 +1,7 @@
 """Classes related to k8s events."""
 
+from __future__ import annotations
+
 import calendar
 from collections.abc import Iterable
 import dataclasses
@@ -14,11 +16,15 @@ from typing import Any, Callable
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 
+K8S_EVENT_POLLER: KubernetesEventPoller | None = None
+
 
 class KubernetesEventPoller:
   """Wrapper which polls for Kubernetes events."""
 
   def __init__(self, get_events_fn: Callable[[], set['KubernetesEvent']]):
+    global K8S_EVENT_POLLER
+    K8S_EVENT_POLLER = self
     self.get_events_fn = get_events_fn
     self.polled_events: set['KubernetesEvent'] = set()
     self.stop_polling = multiprocessing.Event()
