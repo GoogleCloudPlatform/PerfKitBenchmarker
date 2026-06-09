@@ -651,6 +651,7 @@ class AwsDpbEmrServerless(
     """See base class."""
 
     assert job_type
+    job_arguments = job_arguments or []
 
     # Set vars according to job type.
     if job_type == dpb_constants.PYSPARK_JOB_TYPE:
