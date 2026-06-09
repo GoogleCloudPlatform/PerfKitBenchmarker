@@ -57,27 +57,10 @@ kubernetes_management:
     Benchmarks GKE/EKS/AKS management plane operations: concurrent node pool
     create/upgrade/delete, overlapping cluster + node-pool ops, and large-scale
     provisioning. Focused on control-plane API responsiveness.
-    Spec regions: GCP us-central1, AWS us-east-1 (closest), Azure eastus.
-    Equivalent machine types across clouds per Google benchmark spec.
   container_cluster:
     type: Kubernetes
     vm_count: 1
-    vm_spec:
-      GCP:
-        # us-central1-a: spec primary region for GCP
-        # e2-standard-2: 2 vCPU 8GB — equivalent to t3.medium / D2s_v3
-        machine_type: e2-standard-2
-        zone: us-central1-a
-      AWS:
-        # us-east-1a: closest comparable region to GCP us-central1
-        # t3.medium: 2 vCPU 4GB — closest equivalent to e2-standard-2
-        machine_type: t3.medium
-        zone: us-east-1a
-      Azure:
-        # eastus: closest comparable region to GCP us-central1
-        # Standard_D2s_v3: 2 vCPU 8GB — equivalent to e2-standard-2
-        machine_type: Standard_D2s_v3
-        zone: eastus
+    vm_spec: *default_dual_core
 """
 
 _VALID_SCENARIOS = frozenset({"A", "B", "C"})
@@ -195,8 +178,9 @@ def CheckPrerequisites(
 
 
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
-  """Asserts the cluster is reachable; deploys spec-defined sleep workload."""
+  """Deploys a sleep pod to confirm data-plane reachability."""
   cluster = benchmark_spec.container_cluster
+  # Type narrowing for pytype; reachability is confirmed by the sleep pod below.
   assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
   benchmark_spec.always_call_cleanup = True
   logging.info(
@@ -378,28 +362,6 @@ def _RunScenarioA(
   samples += _OpSamples(
       "ScenarioA_Upgrade", upgrade_results, attempted_ops=len(created)
   )
-
-  # # ── Idiomatic Control Plane Synchronization Barrier ──────────────────────
-  # # Give the GKE control plane a brief window to register the async ops.
-  # time.sleep(15)
-
-  # # Check if the cluster object has our native upgrade tracking capability.
-  # if hasattr(cluster, 'HasActiveUpgradeOperations'):
-  #   logging.info('GCP GKE cluster detected; polling via provider API.')
-
-  #   while cluster.HasActiveUpgradeOperations():
-  #     logging.info(
-  #         'Upgrade operations active; holding delete phase for 30s.')
-  #     time.sleep(30)
-
-  #   logging.info(
-  #       'All upgrade ops completed; flushing API gateway write-locks.')
-  #   time.sleep(10)
-  # else:
-  #   # Non-GCP providers (Azure AKS / AWS EKS): standard safety pause.
-  #   logging.info(
-  #       'Non-GCP cluster; proceeding with stabilization pause.')
-  #   time.sleep(5)
 
   # ── Phase 3: concurrent deletes (live-list to catch EKS rollbacks) ──────
   alive = [p for p in cluster.GetNodePoolNames() if p.startswith(f"{_PREFIX}a")]
