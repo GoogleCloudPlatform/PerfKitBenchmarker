@@ -191,14 +191,6 @@ class CheckPrerequisitesTest(pkb_common_test_case.PkbCommonTestCase):
       with self.assertRaises(errors.Config.InvalidValue):
         kubernetes_management_benchmark.CheckPrerequisites(_make_mock_config())
 
-  def testVersionFlagWithoutConcurrentRaises(self):
-    with flagsaver.flagsaver(
-        k8s_mgmt_scenarios=['large_scale_provisioning'],
-        k8s_mgmt_target_version='1.34',
-    ):
-      with self.assertRaises(errors.Config.InvalidValue):
-        kubernetes_management_benchmark.CheckPrerequisites(_make_mock_config())
-
   def testScaleSweepWithoutLargeScaleRaises(self):
     with flagsaver.flagsaver(
         k8s_mgmt_scenarios=['concurrent_node_pool_ops'],
@@ -870,7 +862,6 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     meta = samples[0].metadata
     for key in (
         'initial_version',
-        'target_version',
         'cluster_k8s_version',
         'nodes_per_nodepool',
         'concurrent_nodepools',
@@ -880,7 +871,6 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
   @flagsaver.flagsaver(
       k8s_mgmt_scenarios=['concurrent_node_pool_ops'],
       k8s_mgmt_initial_version='1.30',
-      k8s_mgmt_target_version='1.31',
       k8s_mgmt_scale_sweep=[],
       k8s_mgmt_large_scale_nodepools=10,
   )
@@ -902,7 +892,6 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
       samples = kubernetes_management_benchmark.Run(bm_spec)
     cluster.ResolveNodePoolVersions.assert_not_called()
     self.assertEqual('1.30', samples[0].metadata['initial_version'])
-    self.assertEqual('1.31', samples[0].metadata['target_version'])
 
   @flagsaver.flagsaver(
       k8s_mgmt_scenarios=['concurrent_node_pool_ops'],
@@ -928,39 +917,34 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
       samples = kubernetes_management_benchmark.Run(bm_spec)
     cluster.ResolveNodePoolVersions.assert_called_once()
     self.assertEqual('1.33', samples[0].metadata['initial_version'])
-    self.assertEqual('1.34', samples[0].metadata['target_version'])
 
 
 class RunScenarioATest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for the _RunScenarioA phase-by-phase and pipelined modes."""
+  """Tests for the _RunScenarioA phase-by-phase create/delete path."""
 
   @flagsaver.flagsaver(
       k8s_mgmt_concurrent_nodepools=2,
       k8s_mgmt_nodes_per_nodepool=1,
       k8s_mgmt_max_concurrent=50,
-      k8s_mgmt_pipeline_scenario_a=False,
   )
-  def testPhaseByPhaseProducesCreateUpgradeDeleteSamples(self):
-    """Tests Scenario A produces Create, Upgrade, and Delete samples."""
+  def testProducesCreateAndDeleteSamples(self):
+    """Tests Scenario A produces Create and Delete samples."""
     cluster = _make_mock_cluster(pool_names=['pkbma000', 'pkbma001'])
-    samples = kubernetes_management_benchmark._RunScenarioA(
-        cluster, '1.33', '1.34'
-    )
+    samples = kubernetes_management_benchmark._RunScenarioA(cluster, '1.33')
     metrics = {s.metric for s in samples}
     self.assertTrue(any('ScenarioA_Create' in m for m in metrics))
-    self.assertTrue(any('ScenarioA_Upgrade' in m for m in metrics))
     self.assertTrue(any('ScenarioA_Delete' in m for m in metrics))
+    self.assertFalse(any('ScenarioA_Upgrade' in m for m in metrics))
 
   @flagsaver.flagsaver(
       k8s_mgmt_concurrent_nodepools=2,
       k8s_mgmt_nodes_per_nodepool=1,
       k8s_mgmt_max_concurrent=50,
-      k8s_mgmt_pipeline_scenario_a=False,
   )
-  def testPhaseByPhasePassesInitialVersionToCreate(self):
+  def testPassesInitialVersionToCreate(self):
     """Tests _RunScenarioA passes initial_version to CreateNodePoolAsync."""
     cluster = _make_mock_cluster(pool_names=['pkbma000', 'pkbma001'])
-    kubernetes_management_benchmark._RunScenarioA(cluster, '1.33', '1.34')
+    kubernetes_management_benchmark._RunScenarioA(cluster, '1.33')
     for call in cluster.CreateNodePoolAsync.call_args_list:
       kw = call.kwargs if call.kwargs else {}
       pos = call.args
@@ -973,68 +957,12 @@ class RunScenarioATest(pkb_common_test_case.PkbCommonTestCase):
       k8s_mgmt_concurrent_nodepools=2,
       k8s_mgmt_nodes_per_nodepool=1,
       k8s_mgmt_max_concurrent=50,
-      k8s_mgmt_pipeline_scenario_a=False,
   )
-  def testPhaseByPhaseDeleteUsesLivePoolList(self):
+  def testDeleteUsesLivePoolList(self):
     """Tests that _RunScenarioA deletes only the pools it finds at runtime."""
     cluster = _make_mock_cluster(pool_names=['pkbma000'])
-    kubernetes_management_benchmark._RunScenarioA(cluster, '1.33', '1.34')
+    kubernetes_management_benchmark._RunScenarioA(cluster, '1.33')
     self.assertEqual(1, cluster.DeleteNodePoolAsync.call_count)
-
-  @flagsaver.flagsaver(
-      k8s_mgmt_concurrent_nodepools=2,
-      k8s_mgmt_nodes_per_nodepool=1,
-      k8s_mgmt_max_concurrent=50,
-      k8s_mgmt_pipeline_scenario_a=True,
-  )
-  def testPipelinedModeActivatedByFlag(self):
-    """Tests pipelined mode is activated by the pipeline_scenario_a flag."""
-    cluster = _make_mock_cluster(pool_names=[])
-    samples = kubernetes_management_benchmark._RunScenarioA(
-        cluster, '1.33', '1.34'
-    )
-    metrics = {s.metric for s in samples}
-    self.assertTrue(any('ScenarioA_Create' in m for m in metrics))
-    self.assertTrue(any('ScenarioA_Upgrade' in m for m in metrics))
-    self.assertTrue(any('ScenarioA_Delete' in m for m in metrics))
-
-
-class RunScenarioAPipelinedTest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for the _RunScenarioAPipelined pipelined execution path."""
-
-  @flagsaver.flagsaver(
-      k8s_mgmt_nodes_per_nodepool=1,
-      k8s_mgmt_max_concurrent=50,
-  )
-  def testPipelinedProducesAllThreePhases(self):
-    """Tests pipelined Scenario A produces Create/Upgrade/Delete samples."""
-    cluster = _make_mock_cluster(pool_names=[])
-    samples = kubernetes_management_benchmark._RunScenarioAPipelined(
-        cluster, n=2, initial='1.33', target='1.34'
-    )
-    metrics = {s.metric for s in samples}
-    self.assertTrue(any('ScenarioA_Create' in m for m in metrics))
-    self.assertTrue(any('ScenarioA_Upgrade' in m for m in metrics))
-    self.assertTrue(any('ScenarioA_Delete' in m for m in metrics))
-
-  @flagsaver.flagsaver(
-      k8s_mgmt_nodes_per_nodepool=1,
-      k8s_mgmt_max_concurrent=50,
-  )
-  def testPipelinedSkipsUpgradeAfterCreateFailure(self):
-    """Tests pipelined mode skips upgrade when create fails."""
-    cluster = _make_mock_cluster(pool_names=[])
-    cluster.CreateNodePoolAsync.side_effect = RuntimeError('create failed')
-    samples = kubernetes_management_benchmark._RunScenarioAPipelined(
-        cluster, n=1, initial='1.33', target='1.34'
-    )
-    cluster.UpgradeNodePoolAsync.assert_not_called()
-    upgrade_rate = next(
-        (s for s in samples if s.metric == 'ScenarioA_Upgrade_SuccessRate'),
-        None,
-    )
-    if upgrade_rate is not None:
-      self.assertEqual(0.0, upgrade_rate.value)
 
 
 class RunScenarioBTest(pkb_common_test_case.PkbCommonTestCase):

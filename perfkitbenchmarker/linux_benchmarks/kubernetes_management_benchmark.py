@@ -14,13 +14,12 @@
 """Benchmark for Kubernetes management plane operations.
 
 Measures GKE/EKS/AKS control-plane API responsiveness via three scenarios:
-  concurrent_node_pool_ops: concurrent node-pool create/upgrade/delete.
+  concurrent_node_pool_ops: concurrent node-pool create/delete.
   overlapping_cluster_update: node-pool create overlapping a cluster update.
   large_scale_provisioning: large-scale node-pool provisioning (scale/sweep).
 
 Optimizations for minimum run time:
   - Streaming concurrency in large_scale_provisioning (no batch barriers)
-  - Optional pipelined concurrent_node_pool_ops (create/upgrade/delete)
   - Reduced poll_interval in provider WaitForOperation (5s vs 10s)
   - Per-op threads capped at _MAX_CONCURRENT to avoid OS limits
   - Accurate delete success rate via attempted_ops denominator
@@ -55,7 +54,7 @@ BENCHMARK_CONFIG = """
 kubernetes_management:
   description: >
     Benchmarks GKE/EKS/AKS management plane operations: concurrent node pool
-    create/upgrade/delete, overlapping cluster + node-pool ops, and large-scale
+    create/delete, overlapping cluster + node-pool ops, and large-scale
     provisioning. Focused on control-plane API responsiveness.
   container_cluster:
     type: Kubernetes
@@ -64,8 +63,8 @@ kubernetes_management:
 """
 
 # Scenarios measured by this benchmark (select via --k8s_mgmt_scenarios):
-#   concurrent_node_pool_ops: concurrently create, upgrade, and delete N
-#     node pools; measures control-plane throughput under parallel ops.
+#   concurrent_node_pool_ops: concurrently create and delete N node pools;
+#     measures control-plane throughput under parallel ops.
 #   overlapping_cluster_update: run a cluster update and a node-pool create
 #     simultaneously; measures behaviour when a cluster-scoped op overlaps a
 #     node-pool-scoped one.
@@ -106,25 +105,13 @@ _MAX_CONCURRENT = flags.DEFINE_integer(
 _CONCURRENT_NODEPOOLS = flags.DEFINE_integer(
     "k8s_mgmt_concurrent_nodepools",
     5,
-    "Number of node pools to create/upgrade/delete concurrently in the "
+    "Number of node pools to create and delete concurrently in the "
     + "concurrent_node_pool_ops scenario.",
 )
 _INITIAL_VERSION = flags.DEFINE_string(
     "k8s_mgmt_initial_version",
     None,
     "Kubernetes version for newly-created node pools (N-1). None = auto.",
-)
-_TARGET_VERSION = flags.DEFINE_string(
-    "k8s_mgmt_target_version",
-    None,
-    "Kubernetes version to upgrade node pools to (N). None = cluster version.",
-)
-_PIPELINE_SCENARIO_A = flags.DEFINE_boolean(
-    "k8s_mgmt_pipeline_scenario_a",
-    True,
-    "If True, run concurrent_node_pool_ops as a per-pool pipeline "
-    + "(create->upgrade->delete back-to-back per thread). Minimizes wall time. "
-    + "Default False for spec-strict phase-by-phase.",
 )
 
 # ── large_scale_provisioning flags ──
@@ -191,13 +178,6 @@ def CheckPrerequisites(
         + f"Valid options: {sorted(_VALID_SCENARIOS)}."
     )
   selected = {s.strip() for s in _SCENARIOS.value}
-  if (
-      _INITIAL_VERSION.value or _TARGET_VERSION.value
-  ) and "concurrent_node_pool_ops" not in selected:
-    raise errors.Config.InvalidValue(
-        "--k8s_mgmt_initial_version / --k8s_mgmt_target_version apply only to "
-        + "the concurrent_node_pool_ops scenario, which is not selected."
-    )
   if _SCALE_SWEEP.value and "large_scale_provisioning" not in selected:
     raise errors.Config.InvalidValue(
         "--k8s_mgmt_scale_sweep applies only to the large_scale_provisioning "
@@ -261,28 +241,19 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   # Spec C.2: start clean.
   _CleanStartSweep(cluster)
 
-  # Resolve versions once; log clearly; tag every sample.
-  # Google spec: initial=N-1, target=N (adjacent minor upgrade).
+  # Resolve the initial node-pool version once; log clearly; tag every sample.
   flag_initial = _INITIAL_VERSION.value
-  flag_target = _TARGET_VERSION.value
-  if not (flag_initial and flag_target):
-    resolved_initial, resolved_target = cluster.ResolveNodePoolVersions()
-    flag_initial = flag_initial or resolved_initial
-    flag_target = flag_target or resolved_target
-  initial, target = flag_initial, flag_target
-  if _INITIAL_VERSION.value and _TARGET_VERSION.value:
-    source = "flags"
-  elif not (_INITIAL_VERSION.value or _TARGET_VERSION.value):
-    source = "auto-resolved"
-  else:
-    source = "mixed"
+  if not flag_initial:
+    resolved_initial, _ = cluster.ResolveNodePoolVersions()
+    flag_initial = resolved_initial
+  initial = flag_initial
+  source = "flag" if _INITIAL_VERSION.value else "auto-resolved"
 
   logging.info(
-      "NodePool versions (%s): initial=%s -> target=%s "
+      "NodePool version (%s): initial=%s "
       + "(cluster k8s_version=%s) | nodes_per_pool=%d | machine_type=%s",
       source,
       initial,
-      target,
       cluster.k8s_version,
       _NODES_PER_NODEPOOL.value,
       cluster.default_nodepool.machine_type
@@ -294,7 +265,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   samples: list[sample.Sample] = []
 
   if "concurrent_node_pool_ops" in scenarios:
-    samples += _RunScenarioA(cluster, initial, target)
+    samples += _RunScenarioA(cluster, initial)
   if "overlapping_cluster_update" in scenarios:
     samples += _RunScenarioB(cluster, initial)
   if "large_scale_provisioning" in scenarios:
@@ -317,7 +288,6 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   # Tag all samples with version path and run config for published results.
   run_meta = {
       "initial_version": str(initial),
-      "target_version": str(target),
       "cluster_k8s_version": str(cluster.k8s_version),
       "nodes_per_nodepool": str(_NODES_PER_NODEPOOL.value),
       "concurrent_nodepools": str(_CONCURRENT_NODEPOOLS.value),
@@ -352,25 +322,10 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 def _RunScenarioA(
     cluster: kubernetes_cluster.KubernetesCluster,
     initial: str,
-    target: str,
 ) -> list[sample.Sample]:
-  """Concurrent CreateNodePool, UpgradeNodePool, DeleteNodePool."""
+  """Concurrent CreateNodePool then DeleteNodePool."""
   n = _CONCURRENT_NODEPOOLS.value
-  if _PIPELINE_SCENARIO_A.value:
-    logging.info(
-        "Scenario A (pipelined): %d pools, initial=%s, target=%s",
-        n,
-        initial,
-        target,
-    )
-    return _RunScenarioAPipelined(cluster, n, initial, target)
-
-  logging.info(
-      "Scenario A (phase-by-phase): %d pools, initial=%s, target=%s",
-      n,
-      initial,
-      target,
-  )
+  logging.info("concurrent_node_pool_ops: %d pools, initial=%s", n, initial)
   pool_names = [_ScenarioAName(i) for i in range(n)]
   configs_ = [_MakeNodePoolConfig(cluster, name) for name in pool_names]
   samples: list[sample.Sample] = []
@@ -388,25 +343,10 @@ def _RunScenarioA(
       "ScenarioA_Create", create_results, attempted_ops=len(pool_names)
   )
 
-  # ── Phase 2: concurrent upgrades (only successfully created pools) ───────
-  created = [r.name for r in create_results if r.error is None]
-  logging.info(
-      "Scenario A: %d/%d pools created — proceeding to upgrade", len(created), n
-  )
-  upgrade_results = _RunAsync(
-      kickoff=lambda name: cluster.UpgradeNodePoolAsync(name, target),
-      wait_fn=cluster.WaitForOperation,
-      items=created,
-      get_name=str,
-  )
-  samples += _OpSamples(
-      "ScenarioA_Upgrade", upgrade_results, attempted_ops=len(created)
-  )
-
-  # ── Phase 3: concurrent deletes (live-list to catch EKS rollbacks) ──────
+  # ── Phase 2: concurrent deletes (live-list to catch EKS rollbacks) ──────
   alive = [p for p in cluster.GetNodePoolNames() if p.startswith(f"{_PREFIX}a")]
   logging.info(
-      "Scenario A: %d live pools found for delete (originally %d)",
+      "concurrent_node_pool_ops: %d live pools for delete (originally %d)",
       len(alive),
       n,
   )
@@ -419,56 +359,6 @@ def _RunScenarioA(
   # attempted_ops=n: success rate reflects original request, not just live.
   # EKS rolls back timed-out pools silently — without this shows 100%.
   samples += _OpSamples("ScenarioA_Delete", delete_results, attempted_ops=n)
-  return samples
-
-
-def _RunScenarioAPipelined(
-    cluster: kubernetes_cluster.KubernetesCluster,
-    n: int,
-    initial: str,
-    target: str,
-) -> list[sample.Sample]:
-  """Per-pool pipeline: create->upgrade->delete back-to-back per thread.
-
-  Minimizes wall time: max_i(create_i + upgrade_i + delete_i) vs
-  max(creates)+max(upgrades)+max(deletes) in phase-by-phase mode.
-  Trade-off: ops run under mixed-type concurrent load.
-  """
-  pool_names = [_ScenarioAName(i) for i in range(n)]
-  creates = _Results()
-  upgrades = _Results()
-  deletes = _Results()
-
-  def DoPool(pool_name: str):
-    """Runs timed create/upgrade/delete for one pool."""
-    cfg = _MakeNodePoolConfig(cluster, pool_name)
-    init, e2e, err = _TimedAsync(
-        lambda: cluster.CreateNodePoolAsync(cfg, node_version=initial),
-        cluster.WaitForOperation,
-    )
-    creates.add(pool_name, init, e2e, err)
-    if err is not None:
-      return
-    init, e2e, err = _TimedAsync(
-        lambda: cluster.UpgradeNodePoolAsync(pool_name, target),
-        cluster.WaitForOperation,
-    )
-    upgrades.add(pool_name, init, e2e, err)
-    init, e2e, err = _TimedAsync(
-        lambda: cluster.DeleteNodePoolAsync(pool_name),
-        cluster.WaitForOperation,
-    )
-    deletes.add(pool_name, init, e2e, err)
-
-  background_tasks.RunThreaded(
-      DoPool,
-      pool_names,
-      max_concurrent_threads=min(n, _MAX_CONCURRENT.value),
-  )
-  samples: list[sample.Sample] = []
-  samples += _OpSamples("ScenarioA_Create", creates.entries, attempted_ops=n)
-  samples += _OpSamples("ScenarioA_Upgrade", upgrades.entries, attempted_ops=n)
-  samples += _OpSamples("ScenarioA_Delete", deletes.entries, attempted_ops=n)
   return samples
 
 
