@@ -899,7 +899,6 @@ class GkeCluster(BaseGkeCluster):
         raise errors.Resource.RetryableCreationError(
             f'describe op failed: {err}'
         )
-      # status = out.strip()
       try:
         status = json.loads(out).get('status')
       except (json.JSONDecodeError, ValueError):
