@@ -732,12 +732,6 @@ class GkeCluster(BaseGkeCluster):
         f'stderr={stderr}'
     )
 
-    #     cmd.flags['zone'] = self.zone
-    #     cmd.flags['filter'] = 'operationType=UPGRADE_NODES AND status=RUNNING'
-    #     cmd.flags['sort-by'] = '~startTime'
-    #     cmd.flags['limit'] = 1
-    #     cmd.flags['format'] = 'value(name)'
-
   def CreateNodePoolAsync(
       self,
       nodepool_config: container.BaseNodePoolConfig,
@@ -892,7 +886,6 @@ class GkeCluster(BaseGkeCluster):
           'describe',
           op_handle,
       )
-      # describe.flags['format'] = 'value(status)'
       describe.flags['format'] = 'json'
       out, err, rc = describe.Issue(raise_on_failure=False)
       if rc:
