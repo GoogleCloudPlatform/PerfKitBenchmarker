@@ -14,13 +14,13 @@
 """Benchmark for Kubernetes management plane operations.
 
 Measures GKE/EKS/AKS control-plane API responsiveness via three scenarios:
-  A. Concurrent node-pool create/upgrade/delete.
-  B. Node-pool create overlapping with a long-running cluster update.
-  C. Large-scale node-pool provisioning (single scale or sweep).
+  concurrent_node_pool_ops: concurrent node-pool create/upgrade/delete.
+  overlapping_cluster_update: node-pool create overlapping a cluster update.
+  large_scale_provisioning: large-scale node-pool provisioning (scale/sweep).
 
 Optimizations for minimum run time:
-  - Streaming concurrency in Scenario C (no batch barriers)
-  - Optional pipelined Scenario A (create->upgrade->delete per thread)
+  - Streaming concurrency in large_scale_provisioning (no batch barriers)
+  - Optional pipelined concurrent_node_pool_ops (create/upgrade/delete)
   - Reduced poll_interval in provider WaitForOperation (5s vs 10s)
   - Per-op threads capped at _MAX_CONCURRENT to avoid OS limits
   - Accurate delete success rate via attempted_ops denominator
@@ -63,23 +63,51 @@ kubernetes_management:
     vm_spec: *default_dual_core
 """
 
-_VALID_SCENARIOS = frozenset({"A", "B", "C"})
+# Scenarios measured by this benchmark (select via --k8s_mgmt_scenarios):
+#   concurrent_node_pool_ops: concurrently create, upgrade, and delete N
+#     node pools; measures control-plane throughput under parallel ops.
+#   overlapping_cluster_update: run a cluster update and a node-pool create
+#     simultaneously; measures behaviour when a cluster-scoped op overlaps a
+#     node-pool-scoped one.
+#   large_scale_provisioning: create then delete a large number of node pools
+#     (optionally swept via --k8s_mgmt_scale_sweep); measures scaling limits
+#     and large-batch provisioning latency.
+_VALID_SCENARIOS = frozenset({
+    "concurrent_node_pool_ops",
+    "overlapping_cluster_update",
+    "large_scale_provisioning",
+})
 
-_CONCURRENT_NODEPOOLS = flags.DEFINE_integer(
-    "k8s_mgmt_concurrent_nodepools",
-    5,
-    "Number of node pools to create/upgrade/delete concurrently in Scenario A.",
-)
-_LARGE_SCALE_NODEPOOLS = flags.DEFINE_integer(
-    "k8s_mgmt_large_scale_nodepools",
-    1000,
-    "Number of node pools to provision in the large-scale Scenario C. "
-    + "Spec target is 1000; ensure VPC/quota is available before running.",
+# ── Shared flags (apply across all scenarios) ──
+_SCENARIOS = flags.DEFINE_list(
+    "k8s_mgmt_scenarios",
+    [
+        "concurrent_node_pool_ops",
+        "overlapping_cluster_update",
+        "large_scale_provisioning",
+    ],
+    "Comma-separated subset of scenarios to run. Valid values: "
+    + "concurrent_node_pool_ops, overlapping_cluster_update, "
+    + "large_scale_provisioning.",
 )
 _NODES_PER_NODEPOOL = flags.DEFINE_integer(
     "k8s_mgmt_nodes_per_nodepool",
     2,
     "Number of nodes per node pool. Google spec: 2 nodes per pool.",
+)
+_MAX_CONCURRENT = flags.DEFINE_integer(
+    "k8s_mgmt_max_concurrent",
+    50,
+    "Cap on concurrent provider API calls within a batch. "
+    + "Higher = faster but more aggressive on connection pools.",
+)
+
+# ── concurrent_node_pool_ops flags ──
+_CONCURRENT_NODEPOOLS = flags.DEFINE_integer(
+    "k8s_mgmt_concurrent_nodepools",
+    5,
+    "Number of node pools to create/upgrade/delete concurrently in the "
+    + "concurrent_node_pool_ops scenario.",
 )
 _INITIAL_VERSION = flags.DEFINE_string(
     "k8s_mgmt_initial_version",
@@ -91,31 +119,30 @@ _TARGET_VERSION = flags.DEFINE_string(
     None,
     "Kubernetes version to upgrade node pools to (N). None = cluster version.",
 )
-_SCENARIOS = flags.DEFINE_list(
-    "k8s_mgmt_scenarios",
-    ["A", "B", "C"],
-    "Comma-separated subset of scenarios to run. Valid values: A, B, C.",
+_PIPELINE_SCENARIO_A = flags.DEFINE_boolean(
+    "k8s_mgmt_pipeline_scenario_a",
+    True,
+    "If True, run concurrent_node_pool_ops as a per-pool pipeline "
+    + "(create->upgrade->delete back-to-back per thread). Minimizes wall time. "
+    + "Default False for spec-strict phase-by-phase.",
+)
+
+# ── large_scale_provisioning flags ──
+_LARGE_SCALE_NODEPOOLS = flags.DEFINE_integer(
+    "k8s_mgmt_large_scale_nodepools",
+    1000,
+    "Number of node pools to provision in the large_scale_provisioning "
+    + "scenario. Spec target is 1000; ensure VPC/quota is available before "
+    + "running.",
 )
 _SCALE_SWEEP = flags.DEFINE_list(
     "k8s_mgmt_scale_sweep",
     [],
-    "Comma-separated list of node-pool counts for Scenario C scale sweep. "
-    + "Each scale runs as a separate sub-run with full create/delete cycle. "
-    + "Example: --k8s_mgmt_scale_sweep=10,50,100,500,1000. "
+    "Comma-separated list of node-pool counts for the large_scale_provisioning "
+    + "scale sweep. Each scale runs as a separate sub-run with full "
+    + "create/delete cycle. Example:"
+    " --k8s_mgmt_scale_sweep=10,50,100,500,1000. "
     + "If empty, uses --k8s_mgmt_large_scale_nodepools.",
-)
-_MAX_CONCURRENT = flags.DEFINE_integer(
-    "k8s_mgmt_max_concurrent",
-    50,
-    "Cap on concurrent provider API calls within a batch. "
-    + "Higher = faster but more aggressive on connection pools.",
-)
-_PIPELINE_SCENARIO_A = flags.DEFINE_boolean(
-    "k8s_mgmt_pipeline_scenario_a",
-    True,
-    "If True, run Scenario A as per-pool pipeline (create->upgrade->delete "
-    + "back-to-back per thread). Minimizes wall time. "
-    + "Default False for spec-strict phase-by-phase.",
 )
 
 # AKS caps node-pool names at 12 chars — keep all names within that limit.
@@ -162,6 +189,19 @@ def CheckPrerequisites(
     raise errors.Config.InvalidValue(
         f"Invalid value(s) for --k8s_mgmt_scenarios: {invalid}. "
         + f"Valid options: {sorted(_VALID_SCENARIOS)}."
+    )
+  selected = {s.strip() for s in _SCENARIOS.value}
+  if (
+      _INITIAL_VERSION.value or _TARGET_VERSION.value
+  ) and "concurrent_node_pool_ops" not in selected:
+    raise errors.Config.InvalidValue(
+        "--k8s_mgmt_initial_version / --k8s_mgmt_target_version apply only to "
+        + "the concurrent_node_pool_ops scenario, which is not selected."
+    )
+  if _SCALE_SWEEP.value and "large_scale_provisioning" not in selected:
+    raise errors.Config.InvalidValue(
+        "--k8s_mgmt_scale_sweep applies only to the large_scale_provisioning "
+        + "scenario, which is not selected."
     )
   for s in _SCALE_SWEEP.value:
     try:
@@ -250,14 +290,14 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       else "unknown",
   )
 
-  scenarios = {s.strip().upper() for s in _SCENARIOS.value}
+  scenarios = {s.strip() for s in _SCENARIOS.value}
   samples: list[sample.Sample] = []
 
-  if "A" in scenarios:
+  if "concurrent_node_pool_ops" in scenarios:
     samples += _RunScenarioA(cluster, initial, target)
-  if "B" in scenarios:
+  if "overlapping_cluster_update" in scenarios:
     samples += _RunScenarioB(cluster, initial)
-  if "C" in scenarios:
+  if "large_scale_provisioning" in scenarios:
     # fix: Scenario A/B pools may still be in Deleting state and count
     # toward AKS's 100-pool cluster limit.  Sweep them out before Scenario C
     # so we don't hit MaxAgentPoolCountReached mid-run.

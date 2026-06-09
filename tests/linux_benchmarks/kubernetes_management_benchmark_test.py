@@ -143,7 +143,13 @@ class CheckPrerequisitesTest(pkb_common_test_case.PkbCommonTestCase):
   """Tests for the CheckPrerequisites validation function."""
 
   def testValidScenariosPass(self):
-    with flagsaver.flagsaver(k8s_mgmt_scenarios=['A', 'B', 'C']):
+    with flagsaver.flagsaver(
+        k8s_mgmt_scenarios=[
+            'concurrent_node_pool_ops',
+            'overlapping_cluster_update',
+            'large_scale_provisioning',
+        ]
+    ):
       kubernetes_management_benchmark.CheckPrerequisites(_make_mock_config())
 
   def testInvalidScenarioRaises(self):
@@ -152,12 +158,14 @@ class CheckPrerequisitesTest(pkb_common_test_case.PkbCommonTestCase):
         kubernetes_management_benchmark.CheckPrerequisites(_make_mock_config())
 
   def testMixedValidInvalidRaises(self):
-    with flagsaver.flagsaver(k8s_mgmt_scenarios=['A', 'Z']):
+    with flagsaver.flagsaver(
+        k8s_mgmt_scenarios=['concurrent_node_pool_ops', 'Z']
+    ):
       with self.assertRaises(errors.Config.InvalidValue):
         kubernetes_management_benchmark.CheckPrerequisites(_make_mock_config())
 
   def testNonKubernetesClusterTypeRaises(self):
-    with flagsaver.flagsaver(k8s_mgmt_scenarios=['A']):
+    with flagsaver.flagsaver(k8s_mgmt_scenarios=['concurrent_node_pool_ops']):
       with self.assertRaises(errors.Config.InvalidValue):
         kubernetes_management_benchmark.CheckPrerequisites(
             _make_mock_config(cluster_type='Mesos')
@@ -165,19 +173,37 @@ class CheckPrerequisitesTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testInvalidScaleSweepRaises(self):
     with flagsaver.flagsaver(
-        k8s_mgmt_scenarios=['C'], k8s_mgmt_scale_sweep=['10', 'abc']
+        k8s_mgmt_scenarios=['large_scale_provisioning'],
+        k8s_mgmt_scale_sweep=['10', 'abc'],
     ):
       with self.assertRaises(errors.Config.InvalidValue):
         kubernetes_management_benchmark.CheckPrerequisites(_make_mock_config())
 
   def testValidScaleSweepPasses(self):
     with flagsaver.flagsaver(
-        k8s_mgmt_scenarios=['C'], k8s_mgmt_scale_sweep=['10', '50', '100']
+        k8s_mgmt_scenarios=['large_scale_provisioning'],
+        k8s_mgmt_scale_sweep=['10', '50', '100'],
     ):
       kubernetes_management_benchmark.CheckPrerequisites(_make_mock_config())
 
   def testLowercaseScenarioRaises(self):
     with flagsaver.flagsaver(k8s_mgmt_scenarios=['a']):
+      with self.assertRaises(errors.Config.InvalidValue):
+        kubernetes_management_benchmark.CheckPrerequisites(_make_mock_config())
+
+  def testVersionFlagWithoutConcurrentRaises(self):
+    with flagsaver.flagsaver(
+        k8s_mgmt_scenarios=['large_scale_provisioning'],
+        k8s_mgmt_target_version='1.34',
+    ):
+      with self.assertRaises(errors.Config.InvalidValue):
+        kubernetes_management_benchmark.CheckPrerequisites(_make_mock_config())
+
+  def testScaleSweepWithoutLargeScaleRaises(self):
+    with flagsaver.flagsaver(
+        k8s_mgmt_scenarios=['concurrent_node_pool_ops'],
+        k8s_mgmt_scale_sweep=['10', '50'],
+    ):
       with self.assertRaises(errors.Config.InvalidValue):
         kubernetes_management_benchmark.CheckPrerequisites(_make_mock_config())
 
@@ -674,7 +700,11 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
   """Tests for the Run benchmark entry-point function."""
 
   @flagsaver.flagsaver(
-      k8s_mgmt_scenarios=['A', 'B', 'C'],
+      k8s_mgmt_scenarios=[
+          'concurrent_node_pool_ops',
+          'overlapping_cluster_update',
+          'large_scale_provisioning',
+      ],
       k8s_mgmt_scale_sweep=[],
       k8s_mgmt_large_scale_nodepools=10,
   )
@@ -696,7 +726,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     mock_clean.assert_called_with(cluster)
 
   @flagsaver.flagsaver(
-      k8s_mgmt_scenarios=['A'],
+      k8s_mgmt_scenarios=['concurrent_node_pool_ops'],
       k8s_mgmt_scale_sweep=[],
       k8s_mgmt_large_scale_nodepools=10,
   )
@@ -719,7 +749,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     mock_c.assert_not_called()
 
   @flagsaver.flagsaver(
-      k8s_mgmt_scenarios=['B'],
+      k8s_mgmt_scenarios=['overlapping_cluster_update'],
       k8s_mgmt_scale_sweep=[],
       k8s_mgmt_large_scale_nodepools=10,
   )
@@ -742,7 +772,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     mock_c.assert_not_called()
 
   @flagsaver.flagsaver(
-      k8s_mgmt_scenarios=['C'],
+      k8s_mgmt_scenarios=['large_scale_provisioning'],
       k8s_mgmt_scale_sweep=[],
       k8s_mgmt_large_scale_nodepools=42,
   )
@@ -765,7 +795,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(42, scale)
 
   @flagsaver.flagsaver(
-      k8s_mgmt_scenarios=['C'],
+      k8s_mgmt_scenarios=['large_scale_provisioning'],
       k8s_mgmt_scale_sweep=['10', '50'],
       k8s_mgmt_large_scale_nodepools=100,
   )
@@ -791,7 +821,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn(50, scales)
 
   @flagsaver.flagsaver(
-      k8s_mgmt_scenarios=['C'],
+      k8s_mgmt_scenarios=['large_scale_provisioning'],
       k8s_mgmt_scale_sweep=['10'],
       k8s_mgmt_large_scale_nodepools=10,
   )
@@ -816,7 +846,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual('10', samples[0].metadata['scenario_c_scale'])
 
   @flagsaver.flagsaver(
-      k8s_mgmt_scenarios=['A'],
+      k8s_mgmt_scenarios=['concurrent_node_pool_ops'],
       k8s_mgmt_scale_sweep=[],
       k8s_mgmt_large_scale_nodepools=10,
   )
@@ -848,7 +878,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn(key, meta)
 
   @flagsaver.flagsaver(
-      k8s_mgmt_scenarios=['A'],
+      k8s_mgmt_scenarios=['concurrent_node_pool_ops'],
       k8s_mgmt_initial_version='1.30',
       k8s_mgmt_target_version='1.31',
       k8s_mgmt_scale_sweep=[],
@@ -875,7 +905,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual('1.31', samples[0].metadata['target_version'])
 
   @flagsaver.flagsaver(
-      k8s_mgmt_scenarios=['A'],
+      k8s_mgmt_scenarios=['concurrent_node_pool_ops'],
       k8s_mgmt_scale_sweep=[],
       k8s_mgmt_large_scale_nodepools=10,
   )
