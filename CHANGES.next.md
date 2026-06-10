@@ -466,6 +466,8 @@
     creation can be retried on stock outs.
 -   Add support for deploying VMs inside managed VM groups with
     `--use_managed_vm_groups`.
+-   Add support for configuring IMDSv2 Http Tokens on AWS VMs via
+    `aws_metadata_http_tokens`.
 
 ### Bug fixes and maintenance updates:
 

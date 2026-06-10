@@ -1002,6 +1002,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         + bandwidth_weighting_args
     )
 
+    if aws_flags.AWS_METADATA_HTTP_TOKENS.value:
+      create_cmd.append(
+          '--metadata-options=HttpEndpoint=enabled,HttpTokens=%s'
+          % aws_flags.AWS_METADATA_HTTP_TOKENS.value
+      )
+
     if FLAGS.aws_vm_hibernate:
       create_cmd.extend([
           '--hibernation-options=Configured=true',
