@@ -36,10 +36,12 @@ class KubernetesStatusCondition:
   resource_name: str
   epoch_time: int
   event: str
+  metadata: dict[str, str]
 
   @classmethod
   def FromJsonPathResult(
-      cls, resource_type: str, resource_name: str, condition: dict[str, Any]
+      cls, resource_type: str, resource_name: str, condition: dict[str, Any],
+      extra_metadata: dict[str, str],
   ) -> 'KubernetesStatusCondition':
     """Parses the json result of kubectl get."""
     str_time = condition['lastTransitionTime']
@@ -48,6 +50,7 @@ class KubernetesStatusCondition:
         resource_name,
         epoch_time=ConvertToEpochTime(str_time),
         event=condition['type'],
+        metadata=extra_metadata,
     )
 
   @classmethod
@@ -88,8 +91,17 @@ def GetStatusConditionsForResourceType(
   )
   data = json.loads(stdout)
   name_to_conditions = {}
+  name_to_metadata: dict[str, dict[str, str]] = {}
   for item in data.get('items', []):
-    name = item.get('metadata', {}).get('name')
+    metadata = item.get('metadata', {})
+    name = metadata.get('name')
+    labels = metadata.get('labels', {})
+    found_metadata = {}
+    if 'node.kubernetes.io/instance-type' in labels:
+      found_metadata['machine_type'] = labels[
+          'node.kubernetes.io/instance-type'
+      ]
+    name_to_metadata[name] = found_metadata
     conditions = item.get('status', {}).get('conditions')
     if name is not None and conditions is not None:
       name_to_conditions[name] = conditions
@@ -106,7 +118,7 @@ def GetStatusConditionsForResourceType(
         continue
       results.append(
           KubernetesStatusCondition.FromJsonPathResult(
-              resource_type, name, conditions
+              resource_type, name, conditions, name_to_metadata[name]
           )
       )
 

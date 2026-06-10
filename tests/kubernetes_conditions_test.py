@@ -178,6 +178,46 @@ class KubernetesConditionsTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertLen(conditions, 2)
 
+  def testStatusConditionsWithInstanceType(self):
+    stdout = json.dumps({
+        'items': [
+            {
+                'metadata': {
+                    'name': 'node123',
+                    'labels': {
+                        'node.kubernetes.io/instance-type': 'n2-standard-4',
+                    },
+                },
+                'status': {
+                    'conditions': [
+                        {
+                            'lastProbeTime': None,
+                            'lastTransitionTime': '1970-01-01T00:01:19Z',
+                            'status': 'True',
+                            'type': 'Ready',
+                        },
+                    ]
+                },
+            },
+        ]
+    })
+    self.enter_context(
+        mock.patch.object(
+            kubectl,
+            'RunKubectlCommand',
+            return_value=(stdout, '', 0),
+        )
+    )
+    conditions = kubernetes_conditions.GetStatusConditionsForResourceType(
+        'node',
+        frozenset(),
+    )
+    self.assertLen(conditions, 1)
+    self.assertEqual(
+        conditions[0].metadata,
+        {'machine_type': 'n2-standard-4'},
+    )
+
 
 if __name__ == '__main__':
   unittest.main()

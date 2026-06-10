@@ -271,6 +271,52 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         },
     )
 
+  @flagsaver.flagsaver(kubernetes_scale_report_latency_percentiles=False)
+  @flagsaver.flagsaver(kubernetes_scale_report_individual_latencies=True)
+  def testReportLatenciesContainsMachineType(self):
+    stdout = json.dumps({
+        'items': [
+            {
+                'metadata': {
+                    'name': 'node1',
+                    'labels': {
+                        'node.kubernetes.io/instance-type': 'n2-standard-4',
+                    },
+                },
+                'status': {
+                    'conditions': [
+                        {
+                            'lastProbeTime': None,
+                            'lastTransitionTime': '1970-01-01T00:01:00Z',
+                            'status': 'True',
+                            'type': 'Ready',
+                        },
+                    ]
+                },
+            },
+        ]
+    })
+    self.enter_context(
+        mock.patch.object(
+            kubectl,
+            'RunKubectlCommand',
+            side_effect=[(stdout, '', 0)],
+        )
+    )
+    samples = kubernetes_scale_benchmark.ParseStatusChanges(
+        'node', start_time=0
+    )
+    samples_by_metric = _SamplesByMetric(samples)
+    self.assertIn('node_Ready', samples_by_metric)
+    node_ready_sample = samples_by_metric['node_Ready']
+    self.assertEqual(
+        node_ready_sample.metadata,
+        {
+            'k8s_resource_name': 'node1',
+            'machine_type': 'n2-standard-4',
+        },
+    )
+
   @flagsaver.flagsaver(kubernetes_scale_num_replicas=10)
   def testCheckFailuresPassesWithCorrectNumberOfPods(self):
     self.cluster.event_poller = kubernetes_events.KubernetesEventPoller(set)

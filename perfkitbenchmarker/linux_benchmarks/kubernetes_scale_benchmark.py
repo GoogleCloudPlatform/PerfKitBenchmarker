@@ -445,10 +445,12 @@ def ParseStatusChanges(
     A list of samples, with various percentiles for each status condition.
   """
 
-  conditions = kubernetes_conditions.GetStatusConditionsForResourceType(
-      resource_type,
-      resources_to_ignore,
-      suppress_logging=_ShouldSuppressLogging(),
+  conditions: list[kubernetes_conditions.KubernetesStatusCondition] = (
+      kubernetes_conditions.GetStatusConditionsForResourceType(
+          resource_type,
+          resources_to_ignore,
+          suppress_logging=_ShouldSuppressLogging(),
+      )
   )
   # Filter out conditions that are too early.
   conditions = [c for c in conditions if c.epoch_time >= start_time]
@@ -482,7 +484,7 @@ def ParseStatusChanges(
     return samples
 
   for condition in conditions:
-    metadata = {
+    metadata = condition.metadata | {
         'k8s_resource_name': condition.resource_name,
     }
     samples.append(
