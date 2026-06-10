@@ -441,6 +441,16 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     data_details = edw.GetDataDetails()
     self.assertEqual(data_details, data_details | expected_fields)
 
+  def testSplitClusterIdentifier(self):
+    self.assertEqual(
+        bigquery._SplitClusterIdentifier('project.dataset'),
+        ('project', 'dataset'),
+    )
+    self.assertEqual(
+        bigquery._SplitClusterIdentifier('catalog.namespace.dataset'),
+        ('catalog', 'namespace.dataset'),
+    )
+
 
 if __name__ == '__main__':
   unittest.main()
