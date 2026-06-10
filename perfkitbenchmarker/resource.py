@@ -18,6 +18,7 @@ The Resource class wraps unreliable create and delete commands in retry loops
 and checks for resource existence so that resources can be created and deleted
 reliably.
 """
+
 import abc
 import logging
 import time
@@ -407,6 +408,7 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
 
   def _WaitUntilReady(self) -> None:
     """Waits & retries until the resource is ready."""
+
     @vm_util.Retry(
         # Inner function needed to allow for self.POLL_INTERVAL as default.
         poll_interval=self.POLL_INTERVAL,
@@ -417,6 +419,7 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     def _InnerWaitUntilReady() -> None:
       if not self._IsReady():
         raise errors.Resource.RetryableCreationError('Not yet ready')
+
     _InnerWaitUntilReady()
 
   def Freeze(self) -> None:
@@ -519,7 +522,7 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
               'Time to Create',
               self.create_end_time - self.create_start_time,
               'seconds',
-              metadata,
+              metadata.copy(),
           )
       )
     if self.create_start_time and self.resource_ready_time:
@@ -528,7 +531,7 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
               'Time to Ready',
               self.resource_ready_time - self.create_start_time,
               'seconds',
-              metadata,
+              metadata.copy(),
           )
       )
     if self.delete_start_time and self.delete_end_time:
@@ -537,9 +540,10 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
               'Time to Delete',
               self.delete_end_time - self.delete_start_time,
               'seconds',
-              metadata,
+              metadata.copy(),
           )
       )
+
     return samples
 
   def CheckPrerequisites(self) -> None:
