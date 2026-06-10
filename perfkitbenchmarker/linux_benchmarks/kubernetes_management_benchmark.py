@@ -136,14 +136,14 @@ _SCALE_SWEEP = flags.DEFINE_list(
 _PREFIX = "pkbm"
 
 
-def _ScenarioAName(i):
+def _ConcurrentPoolName(i):
   return f"{_PREFIX}a{i:03d}"
 
 
-_SCENARIO_B_NAME = f"{_PREFIX}b"
+_OVERLAPPING_POOL_NAME = f"{_PREFIX}b"
 
 
-def _ScenarioCName(i):
+def _ScalePoolName(i):
   return f"{_PREFIX}c{i:04d}"
 
 
@@ -265,25 +265,15 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   samples: list[sample.Sample] = []
 
   if "concurrent_node_pool_ops" in scenarios:
-    samples += _RunScenarioA(cluster, initial)
+    samples += _RunConcurrentNodePoolOps(cluster, initial)
   if "overlapping_cluster_update" in scenarios:
-    samples += _RunScenarioB(cluster, initial)
+    samples += _RunOverlappingClusterUpdate(cluster, initial)
   if "large_scale_provisioning" in scenarios:
-    # fix: Scenario A/B pools may still be in Deleting state and count
-    # toward AKS's 100-pool cluster limit.  Sweep them out before Scenario C
+    # Stale pools from earlier scenarios may still be in Deleting state and
+    # count toward AKS's 100-pool cluster limit; sweep before the scale work
     # so we don't hit MaxAgentPoolCountReached mid-run.
     _CleanStartSweep(cluster)
-    scales = (
-        [int(x.strip()) for x in _SCALE_SWEEP.value]
-        if _SCALE_SWEEP.value
-        else [_LARGE_SCALE_NODEPOOLS.value]
-    )
-    logging.info("Scenario C: scale sweep = %s", scales)
-    for scale in scales:
-      scenario_c_samples = _RunScenarioC(cluster, initial, scale)
-      for s in scenario_c_samples:
-        s.metadata["scenario_c_scale"] = str(scale)
-      samples += scenario_c_samples
+    samples += _SweepScales(cluster, initial)
 
   # Tag all samples with version path and run config for published results.
   run_meta = {
@@ -314,19 +304,39 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   background_tasks.RunThreaded(cluster.DeleteNodePool, leftover)
 
 
-# ---------------------------------------------------------------------------
-# Scenario A
-# ---------------------------------------------------------------------------
+def _SweepScales(
+    cluster: kubernetes_cluster.KubernetesCluster,
+    initial: str,
+) -> list[sample.Sample]:
+  """Runs large-scale provisioning across each requested scale.
+
+  Scales come from --k8s_mgmt_scale_sweep when set, else the single
+  --k8s_mgmt_large_scale_nodepools value. Each scale's samples are tagged
+  with large_scale_scale so results stay distinguishable.
+  """
+  scales = (
+      [int(x.strip()) for x in _SCALE_SWEEP.value]
+      if _SCALE_SWEEP.value
+      else [_LARGE_SCALE_NODEPOOLS.value]
+  )
+  logging.info("large_scale_provisioning: scale sweep = %s", scales)
+  samples: list[sample.Sample] = []
+  for scale in scales:
+    scale_samples = _ScaleToPoolCount(cluster, initial, scale)
+    for s in scale_samples:
+      s.metadata["large_scale_scale"] = str(scale)
+    samples += scale_samples
+  return samples
 
 
-def _RunScenarioA(
+def _RunConcurrentNodePoolOps(
     cluster: kubernetes_cluster.KubernetesCluster,
     initial: str,
 ) -> list[sample.Sample]:
   """Concurrent CreateNodePool then DeleteNodePool."""
   n = _CONCURRENT_NODEPOOLS.value
   logging.info("concurrent_node_pool_ops: %d pools, initial=%s", n, initial)
-  pool_names = [_ScenarioAName(i) for i in range(n)]
+  pool_names = [_ConcurrentPoolName(i) for i in range(n)]
   configs_ = [_MakeNodePoolConfig(cluster, name) for name in pool_names]
   samples: list[sample.Sample] = []
 
@@ -340,11 +350,11 @@ def _RunScenarioA(
       get_name=lambda cfg: cfg.name,
   )
   samples += _OpSamples(
-      "ScenarioA_Create", create_results, attempted_ops=len(pool_names)
+      "ConcurrentOps_Create", create_results, attempted_ops=len(pool_names)
   )
 
   # ── Phase 2: concurrent deletes (live-list to catch EKS rollbacks) ──────
-  alive = [p for p in cluster.GetNodePoolNames() if p.startswith(f"{_PREFIX}a")]
+  alive = _LiveNodePoolNames(cluster, f"{_PREFIX}a")
   logging.info(
       "concurrent_node_pool_ops: %d live pools for delete (originally %d)",
       len(alive),
@@ -358,16 +368,11 @@ def _RunScenarioA(
   )
   # attempted_ops=n: success rate reflects original request, not just live.
   # EKS rolls back timed-out pools silently — without this shows 100%.
-  samples += _OpSamples("ScenarioA_Delete", delete_results, attempted_ops=n)
+  samples += _OpSamples("ConcurrentOps_Delete", delete_results, attempted_ops=n)
   return samples
 
 
-# ---------------------------------------------------------------------------
-# Scenario B
-# ---------------------------------------------------------------------------
-
-
-def _RunScenarioB(
+def _RunOverlappingClusterUpdate(
     cluster: kubernetes_cluster.KubernetesCluster,
     initial: str,
 ) -> list[sample.Sample]:
@@ -377,14 +382,14 @@ def _RunScenarioB(
   recorded independently. Overlap window = ClusterUpdate E2E latency.
   """
   logging.info("Scenario B: overlapping cluster update + node-pool create")
-  cfg = _MakeNodePoolConfig(cluster, _SCENARIO_B_NAME)
+  cfg = _MakeNodePoolConfig(cluster, _OVERLAPPING_POOL_NAME)
   results = _Results()
 
   def DoClusterUpdate():
     init, e2e, err = _TimedAsync(
         cluster.UpdateClusterAsync, cluster.WaitForOperation
     )
-    results.add("ScenarioB_ClusterUpdate", init, e2e, err)
+    results.add("OverlappingUpdate_ClusterUpdate", init, e2e, err)
     logging.info(
         "Scenario B ClusterUpdate: init=%.2fs e2e=%.2fs ok=%s",
         init,
@@ -397,7 +402,7 @@ def _RunScenarioB(
         lambda: cluster.CreateNodePoolAsync(cfg, node_version=initial),
         cluster.WaitForOperation,
     )
-    results.add("ScenarioB_NodePoolCreate", init, e2e, err)
+    results.add("OverlappingUpdate_NodePoolCreate", init, e2e, err)
     logging.info(
         "Scenario B NodePoolCreate: init=%.2fs e2e=%.2fs ok=%s",
         init,
@@ -412,16 +417,11 @@ def _RunScenarioB(
     samples += _OpSamples(entry.name, [entry], attempted_ops=1)
 
   # Remove test pool (best-effort).
-  cluster.DeleteNodePool(_SCENARIO_B_NAME)
+  cluster.DeleteNodePool(_OVERLAPPING_POOL_NAME)
   return samples
 
 
-# ---------------------------------------------------------------------------
-# Scenario C
-# ---------------------------------------------------------------------------
-
-
-def _RunScenarioC(
+def _ScaleToPoolCount(
     cluster: kubernetes_cluster.KubernetesCluster,
     initial: str,
     scale: int,
@@ -439,7 +439,7 @@ def _RunScenarioC(
       _MAX_CONCURRENT.value,
       initial,
   )
-  pool_names = [_ScenarioCName(i) for i in range(scale)]
+  pool_names = [_ScalePoolName(i) for i in range(scale)]
   configs_ = [_MakeNodePoolConfig(cluster, name) for name in pool_names]
   samples: list[sample.Sample] = []
 
@@ -456,10 +456,12 @@ def _RunScenarioC(
   logging.info(
       "Scenario C scale=%d: %d/%d creates succeeded", scale, created_ok, scale
   )
-  samples += _OpSamples("ScenarioC_Create", create_results, attempted_ops=scale)
+  samples += _OpSamples(
+      "LargeScale_Create", create_results, attempted_ops=scale
+  )
 
   # ── Deletes (live-list) ──────────────────────────────────────────────────
-  alive = [p for p in cluster.GetNodePoolNames() if p.startswith(f"{_PREFIX}c")]
+  alive = _LiveNodePoolNames(cluster, f"{_PREFIX}c")
   logging.info(
       "Scenario C scale=%d: %d live pools for delete (originally %d;"
       + " %d rolled back by cloud)",
@@ -470,7 +472,7 @@ def _RunScenarioC(
   )
   if not alive:
     logging.info("Scenario C scale=%d: all creates rolled back.", scale)
-    samples += _OpSamples("ScenarioC_Delete", [], attempted_ops=scale)
+    samples += _OpSamples("LargeScale_Delete", [], attempted_ops=scale)
     return samples
 
   delete_results = _RunAsync(
@@ -480,7 +482,9 @@ def _RunScenarioC(
       get_name=str,
   )
   # attempted_ops=scale: accurate rate against original request count.
-  samples += _OpSamples("ScenarioC_Delete", delete_results, attempted_ops=scale)
+  samples += _OpSamples(
+      "LargeScale_Delete", delete_results, attempted_ops=scale
+  )
   return samples
 
 
@@ -573,6 +577,13 @@ def _MakeNodePoolConfig(
   return cfg
 
 
+def _LiveNodePoolNames(
+    cluster: kubernetes_cluster.KubernetesCluster, prefix: str
+) -> list[str]:
+  """Returns current node-pool names matching the given prefix."""
+  return [p for p in cluster.GetNodePoolNames() if p.startswith(prefix)]
+
+
 def _OpSamples(
     metric_prefix: str,
     results: list[_OpResult],
@@ -594,8 +605,6 @@ def _OpSamples(
   success = 0
 
   for r in results:
-    if isinstance(r, tuple):
-      r = _OpResult(*r)
     meta = {"operation_name": r.name, "success": str(r.error is None)}
     if r.error is not None:
       meta["error"] = str(r.error)[:200]
@@ -617,23 +626,43 @@ def _OpSamples(
         )
     )
 
-  # ── Success rate ─────────────────────────────────────────────────────────
+  # ── Counts + success rate ──────────────────────────────────────────────
   total = attempted_ops if attempted_ops is not None else len(results)
   executed = len(results)
-  if total > 0:
+  if total == 0:
+    raise errors.Benchmarks.RunError(
+        f"{metric_prefix}: zero operations attempted — the scenario "
+        "produced no work, which indicates a setup or dispatch failure."
+    )
+  # Expose each count as its own metric (not just SuccessRate metadata).
+  count_meta = {
+      "total_ops": str(total),
+      "executed_ops": str(executed),
+      "successful_ops": str(success),
+      "skipped_ops": str(total - executed),
+  }
+  for count_label, count_value in (
+      ("TotalOps", total),
+      ("ExecutedOps", executed),
+      ("SuccessfulOps", success),
+      ("SkippedOps", total - executed),
+  ):
     samples.append(
         sample.Sample(
-            f"{metric_prefix}_SuccessRate",
-            100.0 * success / total,
-            "percent",
-            {
-                "total_ops": str(total),
-                "executed_ops": str(executed),
-                "successful_ops": str(success),
-                "skipped_ops": str(total - executed),
-            },
+            f"{metric_prefix}_{count_label}",
+            count_value,
+            "count",
+            dict(count_meta),
         )
     )
+  samples.append(
+      sample.Sample(
+          f"{metric_prefix}_SuccessRate",
+          100.0 * success / total,
+          "percent",
+          dict(count_meta),
+      )
+  )
 
   # ── Aggregate stats (successful ops only) ────────────────────────────────
   for phase_label, latencies in (

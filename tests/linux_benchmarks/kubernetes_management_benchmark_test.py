@@ -81,61 +81,61 @@ def _make_mock_config(cluster_type='Kubernetes'):
 
 
 class ScenarioNameTest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for _SCENARIO_A_NAME, _SCENARIO_B_NAME, _SCENARIO_C_NAME."""
+  """Tests for _SCENARIO_A_NAME, _OVERLAPPING_POOL_NAME, _SCENARIO_C_NAME."""
 
   def testScenarioANameZeroPadsToThreeDigits(self):
     self.assertEqual(
         'pkbma000',
-        kubernetes_management_benchmark._ScenarioAName(0),
+        kubernetes_management_benchmark._ConcurrentPoolName(0),
     )
 
   def testScenarioANameTwoDigitIndex(self):
     self.assertEqual(
         'pkbma042',
-        kubernetes_management_benchmark._ScenarioAName(42),
+        kubernetes_management_benchmark._ConcurrentPoolName(42),
     )
 
   def testScenarioANameMaxThreeDigits(self):
     self.assertEqual(
         'pkbma999',
-        kubernetes_management_benchmark._ScenarioAName(999),
+        kubernetes_management_benchmark._ConcurrentPoolName(999),
     )
 
   def testScenarioBNameIsConstant(self):
     self.assertEqual(
         'pkbmb',
-        kubernetes_management_benchmark._SCENARIO_B_NAME,
+        kubernetes_management_benchmark._OVERLAPPING_POOL_NAME,
     )
 
   def testScenarioCNameZeroPadsToFourDigits(self):
     self.assertEqual(
         'pkbmc0000',
-        kubernetes_management_benchmark._ScenarioCName(0),
+        kubernetes_management_benchmark._ScalePoolName(0),
     )
 
   def testScenarioCNameSingleDigitIndex(self):
     self.assertEqual(
         'pkbmc0007',
-        kubernetes_management_benchmark._ScenarioCName(7),
+        kubernetes_management_benchmark._ScalePoolName(7),
     )
 
   def testScenarioCNameFourDigitIndex(self):
     self.assertEqual(
         'pkbmc1000',
-        kubernetes_management_benchmark._ScenarioCName(1000),
+        kubernetes_management_benchmark._ScalePoolName(1000),
     )
 
   def testAllNamesWithinAksLimit(self):
     for i in range(1000):
       self.assertLessEqual(
-          len(kubernetes_management_benchmark._ScenarioAName(i)), 12
+          len(kubernetes_management_benchmark._ConcurrentPoolName(i)), 12
       )
     for i in range(10000):
       self.assertLessEqual(
-          len(kubernetes_management_benchmark._ScenarioCName(i)), 12
+          len(kubernetes_management_benchmark._ScalePoolName(i)), 12
       )
     self.assertLessEqual(
-        len(kubernetes_management_benchmark._SCENARIO_B_NAME), 12
+        len(kubernetes_management_benchmark._OVERLAPPING_POOL_NAME), 12
     )
 
 
@@ -493,7 +493,10 @@ class OpSamplesTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(0.0, rate.value)
 
   def testPerOpInitiationAndE2eSamplesGenerated(self):
-    results = [('op1', 0.1, 1.0, None), ('op2', 0.2, 2.0, None)]
+    results = [
+        kubernetes_management_benchmark._OpResult('op1', 0.1, 1.0, None),
+        kubernetes_management_benchmark._OpResult('op2', 0.2, 2.0, None),
+    ]
     samples = kubernetes_management_benchmark._OpSamples(
         'MyOp', results, attempted_ops=2
     )
@@ -502,7 +505,10 @@ class OpSamplesTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('MyOp_EndToEndLatency', metrics)
 
   def testSuccessRateHundredPercentWhenAllSucceed(self):
-    results = [('op1', 1.0, 2.0, None), ('op2', 0.5, 1.5, None)]
+    results = [
+        kubernetes_management_benchmark._OpResult('op1', 1.0, 2.0, None),
+        kubernetes_management_benchmark._OpResult('op2', 0.5, 1.5, None),
+    ]
     samples = kubernetes_management_benchmark._OpSamples(
         'Op', results, attempted_ops=2
     )
@@ -511,8 +517,10 @@ class OpSamplesTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testSuccessRateFiftyPercentWhenHalfFail(self):
     results = [
-        ('op1', 1.0, 2.0, None),
-        ('op2', 0.5, 0.5, RuntimeError('fail')),
+        kubernetes_management_benchmark._OpResult('op1', 1.0, 2.0, None),
+        kubernetes_management_benchmark._OpResult(
+            'op2', 0.5, 0.5, RuntimeError('fail')
+        ),
     ]
     samples = kubernetes_management_benchmark._OpSamples(
         'Op', results, attempted_ops=2
@@ -521,15 +529,38 @@ class OpSamplesTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertAlmostEqual(50.0, rate.value)
 
   def testAttemptedOpsExceedingExecutedOpsLowersRate(self):
-    results = [('op1', 1.0, 2.0, None)]
+    results = [kubernetes_management_benchmark._OpResult('op1', 1.0, 2.0, None)]
     samples = kubernetes_management_benchmark._OpSamples(
         'Op', results, attempted_ops=3
     )
     rate = next(s for s in samples if s.metric == 'Op_SuccessRate')
     self.assertAlmostEqual(100.0 / 3, rate.value, places=3)
 
+  def testCountsExposedAsSeparateMetrics(self):
+    """630: Total/Executed/Successful/Skipped each emitted as a metric."""
+    results = [
+        kubernetes_management_benchmark._OpResult('op1', 1.0, 2.0, None),
+        kubernetes_management_benchmark._OpResult(
+            'op2', 0.5, 0.5, Exception('e')
+        ),
+    ]
+    samples = kubernetes_management_benchmark._OpSamples(
+        'Op', results, attempted_ops=3
+    )
+    metrics = {s.metric: s.value for s in samples}
+    self.assertEqual(3, metrics['Op_TotalOps'])
+    self.assertEqual(2, metrics['Op_ExecutedOps'])
+    self.assertEqual(1, metrics['Op_SuccessfulOps'])
+    self.assertEqual(1, metrics['Op_SkippedOps'])
+
   def testSuccessRateMetadataFields(self):
-    results = [('op1', 1.0, 2.0, None), ('op2', 0.5, 0.5, Exception('err'))]
+    """SuccessRate sample carries the op-count metadata fields."""
+    results = [
+        kubernetes_management_benchmark._OpResult('op1', 1.0, 2.0, None),
+        kubernetes_management_benchmark._OpResult(
+            'op2', 0.5, 0.5, Exception('err')
+        ),
+    ]
     samples = kubernetes_management_benchmark._OpSamples(
         'Op', results, attempted_ops=3
     )
@@ -539,8 +570,17 @@ class OpSamplesTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual('1', rate.metadata['successful_ops'])
     self.assertEqual('1', rate.metadata['skipped_ops'])
 
+  def testZeroAttemptedOpsRaisesRunError(self):
+    """total==0 indicates a dispatch/setup failure; fail loudly (623)."""
+    with self.assertRaises(errors.Benchmarks.RunError):
+      kubernetes_management_benchmark._OpSamples('Op', [], attempted_ops=0)
+
   def testFailedOpIncludesErrorMessage(self):
-    results = [('fail-op', 0.5, 0.5, RuntimeError('oops'))]
+    results = [
+        kubernetes_management_benchmark._OpResult(
+            'fail-op', 0.5, 0.5, RuntimeError('oops')
+        )
+    ]
     samples = kubernetes_management_benchmark._OpSamples(
         'Op', results, attempted_ops=1
     )
@@ -549,7 +589,13 @@ class OpSamplesTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('oops', init_s.metadata['error'])
 
   def testAggregatesGeneratedForTwoOrMoreSuccesses(self):
-    results = [(f'op{i}', float(i), float(i) * 2, None) for i in range(1, 4)]
+    """Aggregate stat samples appear once there are >=2 successes."""
+    results = [
+        kubernetes_management_benchmark._OpResult(
+            f'op{i}', float(i), float(i) * 2, None
+        )
+        for i in range(1, 4)
+    ]
     samples = kubernetes_management_benchmark._OpSamples(
         'Op', results, attempted_ops=3
     )
@@ -558,14 +604,20 @@ class OpSamplesTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('Op_EndToEndLatency_Mean', metrics)
 
   def testAggregatesNotGeneratedForSingleSuccess(self):
-    results = [('op1', 1.0, 2.0, None)]
+    results = [kubernetes_management_benchmark._OpResult('op1', 1.0, 2.0, None)]
     samples = kubernetes_management_benchmark._OpSamples(
         'Op', results, attempted_ops=1
     )
     self.assertNotIn('Op_InitiationLatency_Mean', [s.metric for s in samples])
 
   def testOutliersGeneratedForFourOrMoreSuccesses(self):
-    results = [(f'op{i}', float(i), float(i) * 2, None) for i in range(1, 6)]
+    """Outlier-count samples appear once there are >=4 successes."""
+    results = [
+        kubernetes_management_benchmark._OpResult(
+            f'op{i}', float(i), float(i) * 2, None
+        )
+        for i in range(1, 6)
+    ]
     samples = kubernetes_management_benchmark._OpSamples(
         'Op', results, attempted_ops=5
     )
@@ -574,7 +626,12 @@ class OpSamplesTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('Op_EndToEndLatency_OutlierCount', metrics)
 
   def testOutliersNotGeneratedForThreeOrFewerSuccesses(self):
-    results = [(f'op{i}', float(i), float(i) * 2, None) for i in range(1, 4)]
+    results = [
+        kubernetes_management_benchmark._OpResult(
+            f'op{i}', float(i), float(i) * 2, None
+        )
+        for i in range(1, 4)
+    ]
     samples = kubernetes_management_benchmark._OpSamples(
         'Op', results, attempted_ops=3
     )
@@ -707,11 +764,15 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(
         kubernetes_management_benchmark, '_CleanStartSweep'
     ) as mock_clean, mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioA', return_value=[]
+        kubernetes_management_benchmark,
+        '_RunConcurrentNodePoolOps',
+        return_value=[],
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioB', return_value=[]
+        kubernetes_management_benchmark,
+        '_RunOverlappingClusterUpdate',
+        return_value=[],
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioC', return_value=[]
+        kubernetes_management_benchmark, '_ScaleToPoolCount', return_value=[]
     ):
       kubernetes_management_benchmark.Run(bm_spec)
     self.assertEqual(mock_clean.call_count, 2)
@@ -723,17 +784,21 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
       k8s_mgmt_large_scale_nodepools=10,
   )
   def testRunOnlyScenarioACallsOnlyA(self):
-    """Tests that Run only calls _RunScenarioA when scenarios=['A']."""
+    """Run dispatches only to _RunConcurrentNodePoolOps for that scenario."""
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
         kubernetes_management_benchmark, '_CleanStartSweep'
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioA', return_value=[]
+        kubernetes_management_benchmark,
+        '_RunConcurrentNodePoolOps',
+        return_value=[],
     ) as mock_a, mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioB', return_value=[]
+        kubernetes_management_benchmark,
+        '_RunOverlappingClusterUpdate',
+        return_value=[],
     ) as mock_b, mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioC', return_value=[]
+        kubernetes_management_benchmark, '_ScaleToPoolCount', return_value=[]
     ) as mock_c:
       kubernetes_management_benchmark.Run(bm_spec)
     mock_a.assert_called_once()
@@ -746,17 +811,21 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
       k8s_mgmt_large_scale_nodepools=10,
   )
   def testRunOnlyScenarioBCallsOnlyB(self):
-    """Tests that Run only calls _RunScenarioB when scenarios=['B']."""
+    """Run dispatches only to _RunOverlappingClusterUpdate for that scenario."""
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
         kubernetes_management_benchmark, '_CleanStartSweep'
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioA', return_value=[]
+        kubernetes_management_benchmark,
+        '_RunConcurrentNodePoolOps',
+        return_value=[],
     ) as mock_a, mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioB', return_value=[]
+        kubernetes_management_benchmark,
+        '_RunOverlappingClusterUpdate',
+        return_value=[],
     ) as mock_b, mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioC', return_value=[]
+        kubernetes_management_benchmark, '_ScaleToPoolCount', return_value=[]
     ) as mock_c:
       kubernetes_management_benchmark.Run(bm_spec)
     mock_a.assert_not_called()
@@ -769,17 +838,21 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
       k8s_mgmt_large_scale_nodepools=42,
   )
   def testRunScenarioCPassesLargeScaleFlag(self):
-    """Tests that Run passes the large-scale-nodepools flag to _RunScenarioC."""
+    """Run passes the large-scale-nodepools flag down to _ScaleToPoolCount."""
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
         kubernetes_management_benchmark, '_CleanStartSweep'
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioA', return_value=[]
+        kubernetes_management_benchmark,
+        '_RunConcurrentNodePoolOps',
+        return_value=[],
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioB', return_value=[]
+        kubernetes_management_benchmark,
+        '_RunOverlappingClusterUpdate',
+        return_value=[],
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioC', return_value=[]
+        kubernetes_management_benchmark, '_ScaleToPoolCount', return_value=[]
     ) as mock_c:
       kubernetes_management_benchmark.Run(bm_spec)
     mock_c.assert_called_once()
@@ -792,18 +865,22 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
       k8s_mgmt_large_scale_nodepools=100,
   )
   def testRunScenarioCScaleSweepRunsTwice(self):
-    """Tests that Run calls _RunScenarioC once per scale in the sweep."""
+    """Tests that Run calls _ScaleToPoolCount once per scale in the sweep."""
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
         kubernetes_management_benchmark, '_CleanStartSweep'
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioA', return_value=[]
-    ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioB', return_value=[]
+        kubernetes_management_benchmark,
+        '_RunConcurrentNodePoolOps',
+        return_value=[],
     ), mock.patch.object(
         kubernetes_management_benchmark,
-        '_RunScenarioC',
+        '_RunOverlappingClusterUpdate',
+        return_value=[],
+    ), mock.patch.object(
+        kubernetes_management_benchmark,
+        '_ScaleToPoolCount',
         return_value=[_make_sample('m', 1.0)],
     ) as mock_c:
       kubernetes_management_benchmark.Run(bm_spec)
@@ -818,24 +895,28 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
       k8s_mgmt_large_scale_nodepools=10,
   )
   def testRunTagsScenarioCScaleInMetadata(self):
-    """Tests that Run adds scenario_c_scale to each sample's metadata."""
+    """Tests that Run adds large_scale_scale to each sample's metadata."""
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     test_sample = _make_sample('metric', 1.0)
     with mock.patch.object(
         kubernetes_management_benchmark, '_CleanStartSweep'
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioA', return_value=[]
-    ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioB', return_value=[]
+        kubernetes_management_benchmark,
+        '_RunConcurrentNodePoolOps',
+        return_value=[],
     ), mock.patch.object(
         kubernetes_management_benchmark,
-        '_RunScenarioC',
+        '_RunOverlappingClusterUpdate',
+        return_value=[],
+    ), mock.patch.object(
+        kubernetes_management_benchmark,
+        '_ScaleToPoolCount',
         return_value=[test_sample],
     ):
       samples = kubernetes_management_benchmark.Run(bm_spec)
-    self.assertIn('scenario_c_scale', samples[0].metadata)
-    self.assertEqual('10', samples[0].metadata['scenario_c_scale'])
+    self.assertIn('large_scale_scale', samples[0].metadata)
+    self.assertEqual('10', samples[0].metadata['large_scale_scale'])
 
   @flagsaver.flagsaver(
       k8s_mgmt_scenarios=['concurrent_node_pool_ops'],
@@ -851,12 +932,14 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
         kubernetes_management_benchmark, '_CleanStartSweep'
     ), mock.patch.object(
         kubernetes_management_benchmark,
-        '_RunScenarioA',
+        '_RunConcurrentNodePoolOps',
         return_value=[test_sample],
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioB', return_value=[]
+        kubernetes_management_benchmark,
+        '_RunOverlappingClusterUpdate',
+        return_value=[],
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioC', return_value=[]
+        kubernetes_management_benchmark, '_ScaleToPoolCount', return_value=[]
     ):
       samples = kubernetes_management_benchmark.Run(bm_spec)
     meta = samples[0].metadata
@@ -882,12 +965,14 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
         kubernetes_management_benchmark, '_CleanStartSweep'
     ), mock.patch.object(
         kubernetes_management_benchmark,
-        '_RunScenarioA',
+        '_RunConcurrentNodePoolOps',
         return_value=[_make_sample('m', 1.0)],
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioB', return_value=[]
+        kubernetes_management_benchmark,
+        '_RunOverlappingClusterUpdate',
+        return_value=[],
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioC', return_value=[]
+        kubernetes_management_benchmark, '_ScaleToPoolCount', return_value=[]
     ):
       samples = kubernetes_management_benchmark.Run(bm_spec)
     cluster.ResolveNodePoolVersions.assert_not_called()
@@ -907,12 +992,14 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
         kubernetes_management_benchmark, '_CleanStartSweep'
     ), mock.patch.object(
         kubernetes_management_benchmark,
-        '_RunScenarioA',
+        '_RunConcurrentNodePoolOps',
         return_value=[_make_sample('m', 1.0)],
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioB', return_value=[]
+        kubernetes_management_benchmark,
+        '_RunOverlappingClusterUpdate',
+        return_value=[],
     ), mock.patch.object(
-        kubernetes_management_benchmark, '_RunScenarioC', return_value=[]
+        kubernetes_management_benchmark, '_ScaleToPoolCount', return_value=[]
     ):
       samples = kubernetes_management_benchmark.Run(bm_spec)
     cluster.ResolveNodePoolVersions.assert_called_once()
@@ -920,7 +1007,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
 
 
 class RunScenarioATest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for the _RunScenarioA phase-by-phase create/delete path."""
+  """Tests the _RunConcurrentNodePoolOps create/delete path."""
 
   @flagsaver.flagsaver(
       k8s_mgmt_concurrent_nodepools=2,
@@ -930,11 +1017,13 @@ class RunScenarioATest(pkb_common_test_case.PkbCommonTestCase):
   def testProducesCreateAndDeleteSamples(self):
     """Tests Scenario A produces Create and Delete samples."""
     cluster = _make_mock_cluster(pool_names=['pkbma000', 'pkbma001'])
-    samples = kubernetes_management_benchmark._RunScenarioA(cluster, '1.33')
+    samples = kubernetes_management_benchmark._RunConcurrentNodePoolOps(
+        cluster, '1.33'
+    )
     metrics = {s.metric for s in samples}
-    self.assertTrue(any('ScenarioA_Create' in m for m in metrics))
-    self.assertTrue(any('ScenarioA_Delete' in m for m in metrics))
-    self.assertFalse(any('ScenarioA_Upgrade' in m for m in metrics))
+    self.assertTrue(any('ConcurrentOps_Create' in m for m in metrics))
+    self.assertTrue(any('ConcurrentOps_Delete' in m for m in metrics))
+    self.assertFalse(any('ConcurrentOps_Upgrade' in m for m in metrics))
 
   @flagsaver.flagsaver(
       k8s_mgmt_concurrent_nodepools=2,
@@ -942,9 +1031,9 @@ class RunScenarioATest(pkb_common_test_case.PkbCommonTestCase):
       k8s_mgmt_max_concurrent=50,
   )
   def testPassesInitialVersionToCreate(self):
-    """Tests _RunScenarioA passes initial_version to CreateNodePoolAsync."""
+    """_RunConcurrentNodePoolOps passes initial_version to creates."""
     cluster = _make_mock_cluster(pool_names=['pkbma000', 'pkbma001'])
-    kubernetes_management_benchmark._RunScenarioA(cluster, '1.33')
+    kubernetes_management_benchmark._RunConcurrentNodePoolOps(cluster, '1.33')
     for call in cluster.CreateNodePoolAsync.call_args_list:
       kw = call.kwargs if call.kwargs else {}
       pos = call.args
@@ -959,25 +1048,32 @@ class RunScenarioATest(pkb_common_test_case.PkbCommonTestCase):
       k8s_mgmt_max_concurrent=50,
   )
   def testDeleteUsesLivePoolList(self):
-    """Tests that _RunScenarioA deletes only the pools it finds at runtime."""
+    """_RunConcurrentNodePoolOps deletes only pools found at runtime."""
     cluster = _make_mock_cluster(pool_names=['pkbma000'])
-    kubernetes_management_benchmark._RunScenarioA(cluster, '1.33')
+    kubernetes_management_benchmark._RunConcurrentNodePoolOps(cluster, '1.33')
     self.assertEqual(1, cluster.DeleteNodePoolAsync.call_count)
 
 
 class RunScenarioBTest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for the _RunScenarioB cluster-update + nodepool-create scenario."""
+  """Tests the _RunOverlappingClusterUpdate overlap scenario."""
 
   @flagsaver.flagsaver(
       k8s_mgmt_nodes_per_nodepool=1,
       k8s_mgmt_max_concurrent=50,
   )
   def testProducesClusterUpdateAndNodePoolCreateSamples(self):
+    """Overlap scenario emits both cluster-update and create samples."""
     cluster = _make_mock_cluster(pool_names=[])
-    samples = kubernetes_management_benchmark._RunScenarioB(cluster, '1.33')
+    samples = kubernetes_management_benchmark._RunOverlappingClusterUpdate(
+        cluster, '1.33'
+    )
     metrics = {s.metric for s in samples}
-    self.assertTrue(any('ScenarioB_ClusterUpdate' in m for m in metrics))
-    self.assertTrue(any('ScenarioB_NodePoolCreate' in m for m in metrics))
+    self.assertTrue(
+        any('OverlappingUpdate_ClusterUpdate' in m for m in metrics)
+    )
+    self.assertTrue(
+        any('OverlappingUpdate_NodePoolCreate' in m for m in metrics)
+    )
 
   @flagsaver.flagsaver(
       k8s_mgmt_nodes_per_nodepool=1,
@@ -985,9 +1081,11 @@ class RunScenarioBTest(pkb_common_test_case.PkbCommonTestCase):
   )
   def testDeletesTestPoolAfterRun(self):
     cluster = _make_mock_cluster(pool_names=[])
-    kubernetes_management_benchmark._RunScenarioB(cluster, '1.33')
+    kubernetes_management_benchmark._RunOverlappingClusterUpdate(
+        cluster, '1.33'
+    )
     cluster.DeleteNodePool.assert_called_once_with(
-        kubernetes_management_benchmark._SCENARIO_B_NAME
+        kubernetes_management_benchmark._OVERLAPPING_POOL_NAME
     )
 
   @flagsaver.flagsaver(
@@ -998,16 +1096,20 @@ class RunScenarioBTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = _make_mock_cluster(pool_names=[])
     cluster.DeleteNodePool.side_effect = RuntimeError('delete failed')
     with self.assertRaises(RuntimeError):
-      kubernetes_management_benchmark._RunScenarioB(cluster, '1.33')
+      kubernetes_management_benchmark._RunOverlappingClusterUpdate(
+          cluster, '1.33'
+      )
 
   @flagsaver.flagsaver(
       k8s_mgmt_nodes_per_nodepool=1,
       k8s_mgmt_max_concurrent=50,
   )
   def testPassesInitialVersionToCreate(self):
-    """Tests _RunScenarioB passes initial_version to CreateNodePoolAsync."""
+    """_RunOverlappingClusterUpdate passes initial_version to the create."""
     cluster = _make_mock_cluster(pool_names=[])
-    kubernetes_management_benchmark._RunScenarioB(cluster, '1.33')
+    kubernetes_management_benchmark._RunOverlappingClusterUpdate(
+        cluster, '1.33'
+    )
     for call in cluster.CreateNodePoolAsync.call_args_list:
       kw = call.kwargs if call.kwargs else {}
       pos = call.args
@@ -1018,7 +1120,7 @@ class RunScenarioBTest(pkb_common_test_case.PkbCommonTestCase):
 
 
 class RunScenarioCTest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for the _RunScenarioC large-scale create-and-delete scenario."""
+  """Tests for the _ScaleToPoolCount large-scale create-and-delete scenario."""
 
   @flagsaver.flagsaver(
       k8s_mgmt_nodes_per_nodepool=1,
@@ -1026,12 +1128,12 @@ class RunScenarioCTest(pkb_common_test_case.PkbCommonTestCase):
   )
   def testProducesCreateAndDeleteSamples(self):
     cluster = _make_mock_cluster(pool_names=['pkbmc0000', 'pkbmc0001'])
-    samples = kubernetes_management_benchmark._RunScenarioC(
+    samples = kubernetes_management_benchmark._ScaleToPoolCount(
         cluster, '1.33', scale=2
     )
     metrics = {s.metric for s in samples}
-    self.assertTrue(any('ScenarioC_Create' in m for m in metrics))
-    self.assertTrue(any('ScenarioC_Delete' in m for m in metrics))
+    self.assertTrue(any('LargeScale_Create' in m for m in metrics))
+    self.assertTrue(any('LargeScale_Delete' in m for m in metrics))
 
   @flagsaver.flagsaver(
       k8s_mgmt_nodes_per_nodepool=1,
@@ -1040,11 +1142,11 @@ class RunScenarioCTest(pkb_common_test_case.PkbCommonTestCase):
   def testZeroLivePoolsRecordsZeroDeleteSuccessRate(self):
     """Tests Scenario C records 0% delete rate when no live pools exist."""
     cluster = _make_mock_cluster(pool_names=[])
-    samples = kubernetes_management_benchmark._RunScenarioC(
+    samples = kubernetes_management_benchmark._ScaleToPoolCount(
         cluster, '1.33', scale=3
     )
     delete_rate = next(
-        s for s in samples if s.metric == 'ScenarioC_Delete_SuccessRate'
+        s for s in samples if s.metric == 'LargeScale_Delete_SuccessRate'
     )
     self.assertEqual(0.0, delete_rate.value)
     cluster.DeleteNodePoolAsync.assert_not_called()
@@ -1055,7 +1157,7 @@ class RunScenarioCTest(pkb_common_test_case.PkbCommonTestCase):
   )
   def testDeleteUsesLiveListNotOriginalCreateList(self):
     cluster = _make_mock_cluster(pool_names=['pkbmc0000', 'pkbmc0001'])
-    kubernetes_management_benchmark._RunScenarioC(cluster, '1.33', scale=3)
+    kubernetes_management_benchmark._ScaleToPoolCount(cluster, '1.33', scale=3)
     self.assertEqual(2, cluster.DeleteNodePoolAsync.call_count)
 
   @flagsaver.flagsaver(
@@ -1065,11 +1167,11 @@ class RunScenarioCTest(pkb_common_test_case.PkbCommonTestCase):
   def testCreateSuccessRateUsesScaleAsDenominator(self):
     """Tests Scenario C create success rate uses scale as total_ops."""
     cluster = _make_mock_cluster(pool_names=['pkbmc0000'])
-    samples = kubernetes_management_benchmark._RunScenarioC(
+    samples = kubernetes_management_benchmark._ScaleToPoolCount(
         cluster, '1.33', scale=3
     )
     create_rate = next(
-        s for s in samples if s.metric == 'ScenarioC_Create_SuccessRate'
+        s for s in samples if s.metric == 'LargeScale_Create_SuccessRate'
     )
     self.assertLessEqual(create_rate.value, 100.0)
     self.assertEqual('3', create_rate.metadata['total_ops'])
