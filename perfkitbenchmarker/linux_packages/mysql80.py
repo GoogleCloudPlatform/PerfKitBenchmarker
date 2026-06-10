@@ -18,11 +18,20 @@
 import logging
 import re
 
+from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
+
+FLAGS = flags.FLAGS
+
+_DISABLE_LOG_BIN = flags.DEFINE_boolean(
+    'mysql_disable_log_bin',
+    False,
+    'Whether to disable binary logging in MySQL.',
+)
 
 
 MYSQL_PSWD = 'perfkitbenchmarker'
@@ -238,6 +247,7 @@ def WriteMysqlConfiguration(
       'server_id': str(server_id),
       'buffer_pool_size': buffer_pool_size,
       'log_dir': remote_final_log_dir,
+      'disable_log_bin': FLAGS.mysql_disable_log_bin,
   }
 
   vm.RenderTemplate(
