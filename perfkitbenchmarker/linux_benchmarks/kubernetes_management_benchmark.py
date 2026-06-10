@@ -149,17 +149,26 @@ def _ScalePoolName(i):
 
 @dataclasses.dataclass
 class _OpResult:
-  """Holds timing and outcome for a single async management-plane operation."""
+  """Timing and outcome for a single async management-plane operation.
+
+  Attributes:
+    name: Node-pool (or operation) name the result is for.
+    initiation_latency: Seconds from issuing the async API call until it is
+      accepted and an operation handle is returned (time to *start*).
+    end_to_end_latency: Seconds from issuing the call until the operation
+      fully completes (initiation plus server-side execution).
+    error: The exception raised if the operation failed, else None.
+  """
 
   name: str
-  init_dur: float
-  e2e_dur: float
+  initiation_latency: float
+  end_to_end_latency: float
   error: Exception | None = None
 
   def __iter__(self):
     yield self.name
-    yield self.init_dur
-    yield self.e2e_dur
+    yield self.initiation_latency
+    yield self.end_to_end_latency
     yield self.error
 
 
@@ -608,19 +617,22 @@ def _OpSamples(
       meta["error"] = str(r.error)[:200]
     else:
       success += 1
-      init_latencies.append(r.init_dur)
-      e2e_latencies.append(r.e2e_dur)
+      init_latencies.append(r.initiation_latency)
+      e2e_latencies.append(r.end_to_end_latency)
     samples.append(
         sample.Sample(
             f"{metric_prefix}_InitiationLatency",
-            r.init_dur,
+            r.initiation_latency,
             "seconds",
             dict(meta),
         )
     )
     samples.append(
         sample.Sample(
-            f"{metric_prefix}_EndToEndLatency", r.e2e_dur, "seconds", dict(meta)
+            f"{metric_prefix}_EndToEndLatency",
+            r.end_to_end_latency,
+            "seconds",
+            dict(meta),
         )
     )
 

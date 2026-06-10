@@ -22,6 +22,7 @@ from unittest import mock
 
 from absl import flags
 from absl.testing import flagsaver
+from absl.testing import parameterized
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import kubernetes_management_benchmark
@@ -80,49 +81,32 @@ def _make_mock_config(cluster_type='Kubernetes'):
   return cfg
 
 
-class ScenarioNameTest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for _SCENARIO_A_NAME, _OVERLAPPING_POOL_NAME, _SCENARIO_C_NAME."""
+class NodePoolNameTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for the node-pool name-generation helpers."""
 
-  def testScenarioANameZeroPadsToThreeDigits(self):
+  @parameterized.named_parameters(
+      ('zero', 0, 'pkbma000'),
+      ('two_digit', 42, 'pkbma042'),
+      ('max_three_digit', 999, 'pkbma999'),
+  )
+  def testConcurrentPoolNameZeroPadsToThreeDigits(self, index, expected):
     self.assertEqual(
-        'pkbma000',
-        kubernetes_management_benchmark._ConcurrentPoolName(0),
+        expected, kubernetes_management_benchmark._ConcurrentPoolName(index)
     )
 
-  def testScenarioANameTwoDigitIndex(self):
+  @parameterized.named_parameters(
+      ('zero', 0, 'pkbmc0000'),
+      ('single_digit', 7, 'pkbmc0007'),
+      ('four_digit', 1000, 'pkbmc1000'),
+  )
+  def testScalePoolNameZeroPadsToFourDigits(self, index, expected):
     self.assertEqual(
-        'pkbma042',
-        kubernetes_management_benchmark._ConcurrentPoolName(42),
+        expected, kubernetes_management_benchmark._ScalePoolName(index)
     )
 
-  def testScenarioANameMaxThreeDigits(self):
+  def testOverlappingPoolNameIsConstant(self):
     self.assertEqual(
-        'pkbma999',
-        kubernetes_management_benchmark._ConcurrentPoolName(999),
-    )
-
-  def testScenarioBNameIsConstant(self):
-    self.assertEqual(
-        'pkbmb',
-        kubernetes_management_benchmark._OVERLAPPING_POOL_NAME,
-    )
-
-  def testScenarioCNameZeroPadsToFourDigits(self):
-    self.assertEqual(
-        'pkbmc0000',
-        kubernetes_management_benchmark._ScalePoolName(0),
-    )
-
-  def testScenarioCNameSingleDigitIndex(self):
-    self.assertEqual(
-        'pkbmc0007',
-        kubernetes_management_benchmark._ScalePoolName(7),
-    )
-
-  def testScenarioCNameFourDigitIndex(self):
-    self.assertEqual(
-        'pkbmc1000',
-        kubernetes_management_benchmark._ScalePoolName(1000),
+        'pkbmb', kubernetes_management_benchmark._OVERLAPPING_POOL_NAME
     )
 
   def testAllNamesWithinAksLimit(self):

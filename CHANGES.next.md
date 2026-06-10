@@ -1,9 +1,6 @@
 ### New features:
 -   Add kubernetes_management benchmark for measuring GKE/EKS/AKS management
-    plane API responsiveness. (from @ashishsuneja)
--   Add KubernetesCluster base class management plane abstract methods:
-    CreateNodePool, DeleteNodePool, UpgradeNodePool, UpdateCluster and
-    their async counterparts. (from @ashishsuneja)
+    plane API responsiveness.
 
 ### Breaking changes:
 
