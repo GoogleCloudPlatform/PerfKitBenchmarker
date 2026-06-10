@@ -282,14 +282,14 @@ class CleanupTest(pkb_common_test_case.PkbCommonTestCase):
     kubernetes_management_benchmark.Cleanup(bm_spec)
 
 
-class CleanStartSweepTest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for the _CleanStartSweep helper function."""
+class SweepNodePoolsTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for the _SweepNodePools helper function."""
 
   def testDeletesStalePkbmPools(self):
     cluster = _make_mock_cluster(
         pool_names=['pkbma000', 'pkbmc0001', 'user-pool']
     )
-    kubernetes_management_benchmark._CleanStartSweep(cluster)
+    kubernetes_management_benchmark._SweepNodePools(cluster)
     deleted = {c.args[0] for c in cluster.DeleteNodePool.call_args_list}
     self.assertIn('pkbma000', deleted)
     self.assertIn('pkbmc0001', deleted)
@@ -297,14 +297,14 @@ class CleanStartSweepTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testDoesNothingWhenNoPkbmPools(self):
     cluster = _make_mock_cluster(pool_names=['user-pool', 'default-pool'])
-    kubernetes_management_benchmark._CleanStartSweep(cluster)
+    kubernetes_management_benchmark._SweepNodePools(cluster)
     cluster.DeleteNodePool.assert_not_called()
 
-  def testCleanStartSweepRaisesOnGetNodePoolNamesException(self):
+  def testSweepRaisesOnGetNodePoolNamesException(self):
     cluster = _make_mock_cluster()
     cluster.GetNodePoolNames.side_effect = RuntimeError('API error')
     with self.assertRaises(RuntimeError):
-      kubernetes_management_benchmark._CleanStartSweep(cluster)
+      kubernetes_management_benchmark._SweepNodePools(cluster)
 
 
 class ResultsTest(pkb_common_test_case.PkbCommonTestCase):
@@ -757,12 +757,12 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
       k8s_mgmt_scale_sweep=[],
       k8s_mgmt_large_scale_nodepools=10,
   )
-  def testRunCallsCleanStartSweep(self):
-    """Tests that Run invokes _CleanStartSweep before executing scenarios."""
+  def testRunSweepsAfterEachScenario(self):
+    """Run sweeps node pools after each scenario that executes."""
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_CleanStartSweep'
+        kubernetes_management_benchmark, '_SweepNodePools'
     ) as mock_clean, mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -775,7 +775,8 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
         kubernetes_management_benchmark, '_ScaleToPoolCount', return_value=[]
     ):
       kubernetes_management_benchmark.Run(bm_spec)
-    self.assertEqual(mock_clean.call_count, 2)
+    # All three scenarios run by default -> one sweep after each.
+    self.assertEqual(mock_clean.call_count, 3)
     mock_clean.assert_called_with(cluster)
 
   @flagsaver.flagsaver(
@@ -788,7 +789,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_CleanStartSweep'
+        kubernetes_management_benchmark, '_SweepNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -815,7 +816,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_CleanStartSweep'
+        kubernetes_management_benchmark, '_SweepNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -842,7 +843,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_CleanStartSweep'
+        kubernetes_management_benchmark, '_SweepNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -869,7 +870,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_CleanStartSweep'
+        kubernetes_management_benchmark, '_SweepNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -900,7 +901,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     bm_spec = _make_mock_benchmark_spec(cluster)
     test_sample = _make_sample('metric', 1.0)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_CleanStartSweep'
+        kubernetes_management_benchmark, '_SweepNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -929,7 +930,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     bm_spec = _make_mock_benchmark_spec(cluster)
     test_sample = _make_sample('m', 1.0)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_CleanStartSweep'
+        kubernetes_management_benchmark, '_SweepNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -962,7 +963,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_CleanStartSweep'
+        kubernetes_management_benchmark, '_SweepNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -989,7 +990,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     cluster.ResolveNodePoolVersions.return_value = ('1.33', '1.34')
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_CleanStartSweep'
+        kubernetes_management_benchmark, '_SweepNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',

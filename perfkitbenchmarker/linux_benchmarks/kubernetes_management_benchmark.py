@@ -223,23 +223,24 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   )
 
 
-def _CleanStartSweep(cluster: kubernetes_cluster.KubernetesCluster) -> None:
-  """Deletes any stale pkbm* node pools so each run starts clean (spec C.2)."""
-  stale = [n for n in cluster.GetNodePoolNames() if n.startswith(_PREFIX)]
-  if not stale:
-    logging.info("CleanStart: no stale pools found — clean start confirmed.")
+def _SweepNodePools(cluster: kubernetes_cluster.KubernetesCluster) -> None:
+  """Deletes all pkbm* node pools, blocking until each delete completes.
+
+  Called after each scenario so the next one starts from a clean cluster,
+  and from Cleanup() as a final best-effort teardown.
+  """
+  pools = [n for n in cluster.GetNodePoolNames() if n.startswith(_PREFIX)]
+  if not pools:
+    logging.info("Sweep: no pkbm* pools present — cluster is clean.")
     return
-  logging.info("CleanStart: deleting %d stale pools: %s", len(stale), stale)
-  background_tasks.RunThreaded(cluster.DeleteNodePool, stale)
+  logging.info("Sweep: deleting %d pkbm* pools: %s", len(pools), pools)
+  background_tasks.RunThreaded(cluster.DeleteNodePool, pools)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Runs the selected scenarios and returns flat list of samples."""
   cluster = benchmark_spec.container_cluster
   assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
-
-  # Spec C.2: start clean.
-  _CleanStartSweep(cluster)
 
   # Resolve the initial node-pool version once; log clearly; tag every sample.
   flag_initial = _INITIAL_VERSION.value
@@ -266,14 +267,14 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   if "concurrent_node_pool_ops" in scenarios:
     samples += _RunConcurrentNodePoolOps(cluster, initial)
+    # Each scenario leaves the cluster clean for the next one.
+    _SweepNodePools(cluster)
   if "overlapping_cluster_update" in scenarios:
     samples += _RunOverlappingClusterUpdate(cluster, initial)
+    _SweepNodePools(cluster)
   if "large_scale_provisioning" in scenarios:
-    # Stale pools from earlier scenarios may still be in Deleting state and
-    # count toward AKS's 100-pool cluster limit; sweep before the scale work
-    # so we don't hit MaxAgentPoolCountReached mid-run.
-    _CleanStartSweep(cluster)
     samples += _SweepScales(cluster, initial)
+    _SweepNodePools(cluster)
 
   # Tag all samples with version path and run config for published results.
   run_meta = {
@@ -297,11 +298,8 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       ["delete", "pod", _SLEEP_POD_NAME, "--ignore-not-found"],
       raise_on_failure=False,
   )
-  leftover = [n for n in cluster.GetNodePoolNames() if n.startswith(_PREFIX)]
-  if not leftover:
-    return
-  logging.info("Cleanup: deleting %d leftover node pools", len(leftover))
-  background_tasks.RunThreaded(cluster.DeleteNodePool, leftover)
+  # Final teardown reuses the same sweep the scenarios use.
+  _SweepNodePools(cluster)
 
 
 def _SweepScales(
