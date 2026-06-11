@@ -109,7 +109,7 @@ def Prepare(benchmark_spec):
   _InstallMemtier(clients[0])
   _InstallMemcached(server)
   memcached_server.ConfigureAndStart(server)
-  memtier.Load(clients, server.internal_ip, memcached_server.MEMCACHED_PORT)
+  memtier.Load(clients, [server.internal_ip], memcached_server.MEMCACHED_PORT)
 
 
 def Run(benchmark_spec):
@@ -131,7 +131,7 @@ def Run(benchmark_spec):
       'memcached_server_threads': FLAGS.memcached_num_threads,
   }
   samples = memtier.RunOverAllThreadsPipelinesAndClients(
-      client, server_ip, [memcached_server.MEMCACHED_PORT]
+      client, [server_ip], [memcached_server.MEMCACHED_PORT]
   )
   for sample in samples:
     sample.metadata.update(metadata)

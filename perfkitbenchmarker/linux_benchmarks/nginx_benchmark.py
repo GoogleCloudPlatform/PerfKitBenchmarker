@@ -119,6 +119,12 @@ _NGINX_SERVER_PORT = flags.DEFINE_integer(
     'default ports (80 or 443 depending on --nginx_use_ssl).',
 )
 
+_NGINX_CLIENT_RTO_MIN = flags.DEFINE_integer(
+    'nginx_client_rto_min',
+    None,
+    'The minimum retransmission timeout (in milliseconds) for the client',
+)
+
 
 def _ValidateLoadConfigs(load_configs):
   """Validate that each load config has all required values."""
@@ -162,6 +168,7 @@ _WORKER_CONNECTIONS = 1024
 TARGET_RATE_LOWER_BOUND = 0
 TARGET_RATE_UPPER_BOUND = 1000000
 RPS_RANGE_THRESHOLD = 1000
+RPS_BINARY_SEARCH_THRESHOLD = 0.01
 
 
 def GetConfig(user_config):
@@ -353,6 +360,12 @@ def _TuneNetworkStack(vm):
   vm.RemoteCommand(f'sudo sysctl -w net.core.somaxconn={max_port_num}')
   vm.RemoteCommand('sudo sysctl net.ipv4.tcp_autocorking=0')
 
+  if _NGINX_CLIENT_RTO_MIN.value:
+    vm.RemoteCommand(
+        f'sudo ip route replace $(ip route show default | head -n 1) '
+        f'rto_min {_NGINX_CLIENT_RTO_MIN.value}'
+    )
+
 
 def Prepare(benchmark_spec):
   """Install Nginx on the server and a load generator on the clients.
@@ -430,6 +443,8 @@ def RunMultiClient(clients, targets, rate, connections, duration, threads):
       'num_server_targets': len(targets),
       'nginx_content_size': FLAGS.nginx_content_size,
   }
+  if _NGINX_CLIENT_RTO_MIN.value:
+    metadata['nginx_client_rto_min'] = _NGINX_CLIENT_RTO_MIN.value
   if not FLAGS.nginx_file_server_conf:
     metadata['caching'] = True
   results += [
@@ -493,7 +508,9 @@ def Run(benchmark_spec):
     )
     target_rate = upper_bound
     valid_results = []
-    while (upper_bound - lower_bound) > RPS_RANGE_THRESHOLD:
+    while (
+        (upper_bound - lower_bound) / (upper_bound)
+    ) > RPS_BINARY_SEARCH_THRESHOLD:
       results = RunMultiClient(
           clients,
           targets,

@@ -288,6 +288,8 @@
 ### Enhancements:
 
 -   Add numactl and perf support to netperf for analysis
+-   Add support for multi-NIC setups in Redis Memtier benchmark to distribute
+    load across multiple network interfaces.
 -   Additions to MongoDB in Artemis/PKB to facilitate workload analysis
 -   Updated `sar` switch to efficiently collect all sar metrics during the run,
     and download the file for hands-on analysis (no parsing).
@@ -464,6 +466,8 @@
     creation can be retried on stock outs.
 -   Add support for deploying VMs inside managed VM groups with
     `--use_managed_vm_groups`.
+-   Add support for configuring IMDSv2 Http Tokens on AWS VMs via
+    `aws_metadata_http_tokens`.
 
 ### Bug fixes and maintenance updates:
 

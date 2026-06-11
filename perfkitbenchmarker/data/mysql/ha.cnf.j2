@@ -60,6 +60,9 @@ binlog_expire_logs_seconds                  = 3600
 
 gtid_mode                                   = ON
 enforce-gtid-consistency
+{% if disable_log_bin %}
+disable_log_bin
+{% endif %}
 
 #####################
 #Logging

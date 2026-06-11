@@ -168,7 +168,7 @@ def StartServices(bm_spec: _BenchmarkSpec) -> None:
   # Load the redis server with preexisting data.
   # Run 4 at a time with only the first client VM to reduce memory
   # fragmentation and avoid overloading the server
-  bm_spec.redis_endpoint_ip = bm_spec.vm_groups['servers'][0].internal_ip
+  bm_spec.redis_endpoint_ip = server_vm.GetInternalIPs()
   ports = redis_server.GetRedisPorts(server_vm)
   ports_group_of_four = [ports[i : i + 4] for i in range(0, len(ports), 4)]
   assert bm_spec.redis_endpoint_ip

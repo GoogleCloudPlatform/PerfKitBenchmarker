@@ -451,7 +451,7 @@ class EdwService(resource.BaseResource):
     # resource is pkb managed by default
     is_user_managed = self.IsUserManaged(edw_service_spec)
     # edw_service attribute
-    self.cluster_identifier = self.GetClusterIdentifier(edw_service_spec)
+    self.cluster_identifier: str = self.GetClusterIdentifier(edw_service_spec)
     super().__init__(user_managed=is_user_managed)
 
     # Provision related attributes
@@ -500,7 +500,7 @@ class EdwService(resource.BaseResource):
     """
     return edw_service_spec.cluster_identifier is not None
 
-  def GetClusterIdentifier(self, edw_service_spec):
+  def GetClusterIdentifier(self, edw_service_spec) -> str:
     """Returns a string name of the Cluster Identifier.
 
     Args:

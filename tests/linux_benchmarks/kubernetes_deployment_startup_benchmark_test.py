@@ -18,8 +18,8 @@ from unittest import mock
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import kubernetes_deployment_startup_benchmark as kdsb
-from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark as ksb
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_conditions
 from tests import pkb_common_test_case
 
 
@@ -38,7 +38,9 @@ class KubernetesDeploymentStartupBenchmarkTest(
 
   @mock.patch.object(kubernetes_commands, 'WaitForRollout')
   @mock.patch.object(kubernetes_commands, 'ApplyManifest')
-  @mock.patch.object(ksb, 'GetStatusConditionsForResourceType')
+  @mock.patch.object(
+      kubernetes_conditions, 'GetStatusConditionsForResourceType'
+  )
   def testRun(
       self, mock_get_conditions, mock_apply_manifest, mock_wait_for_rollout
   ):
@@ -73,7 +75,9 @@ class KubernetesDeploymentStartupBenchmarkTest(
 
   @mock.patch.object(kubernetes_commands, 'WaitForRollout')
   @mock.patch.object(kubernetes_commands, 'ApplyManifest')
-  @mock.patch.object(ksb, 'GetStatusConditionsForResourceType')
+  @mock.patch.object(
+      kubernetes_conditions, 'GetStatusConditionsForResourceType'
+  )
   def testRunNoPods(
       self, mock_get_conditions, mock_apply_manifest, mock_wait_for_rollout
   ):

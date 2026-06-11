@@ -358,7 +358,12 @@ def _CheckAlloyDbColumnarEngine(
 ) -> list[sample.Sample]:
   """Checks AlloyDB columnar engine recommendation and reruns if needed."""
   columnar_size, relation = db.GetColumnarEngineRecommendation('tpch')
-  db.UpdateAlloyDBFlags(columnar_size, True, 'off', relation=relation)
+  db.UpdateAlloyDBFlags(
+      columnar_engine_size=columnar_size,
+      enable_columnar_recommendation=True,
+      enable_auto_columnarization='off',
+      relation=relation,
+  )
   db.WaitColumnarEnginePopulates(database_name)
   # Another prewarm
   stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)

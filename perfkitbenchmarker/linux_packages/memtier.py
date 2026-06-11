@@ -490,7 +490,7 @@ def _LoadSingleVM(
 
 def Load(
     vms: list[virtual_machine.VirtualMachine],
-    server_ip: str,
+    server_ips: list[str],
     server_port: int,
     server_password: str | None = None,
 ) -> None:
@@ -509,7 +509,7 @@ def Load(
             key_minimum=max(i * load_records_per_vm, 1),
             key_maximum=(i + 1) * load_records_per_vm,
             server_port=server_port,
-            server_ip=server_ip,
+            server_ip=server_ips[i % len(server_ips)],
             server_password=server_password,
         ),
     ))
@@ -521,7 +521,7 @@ def Load(
 
 def RunOverAllClientVMs(
     client_vms,
-    server_ip: str,
+    server_ips: list[str],
     ports: List[int],
     pipeline,
     threads,
@@ -534,7 +534,7 @@ def RunOverAllClientVMs(
 
   Args:
     client_vms: A list of client vms.
-    server_ip: Ip address of the server.
+    server_ips: List of IP addresses of the server.
     ports: List of ports to run against the server.
     pipeline: Number of pipeline to use in memtier.
     threads: Number of threads to use in memtier.
@@ -556,7 +556,7 @@ def RunOverAllClientVMs(
     vm = client_vms[client_index]
     return _Run(
         vm=vm,
-        server_ip=server_ip,
+        server_ip=server_ips[client_index % len(server_ips)],
         server_port=port,
         threads=threads,
         pipeline=pipeline,
@@ -575,7 +575,7 @@ def RunOverAllClientVMs(
 
 def RunOverAllThreadsPipelinesAndClients(
     client_vms,
-    server_ip: str,
+    server_ips: list[str],
     server_ports: List[int],
     password: str | None = None,
 ) -> List[sample.Sample]:
@@ -586,7 +586,7 @@ def RunOverAllThreadsPipelinesAndClients(
       for clients in FLAGS.memtier_clients:
         results = RunOverAllClientVMs(
             client_vms=client_vms,
-            server_ip=server_ip,
+            server_ips=server_ips,
             ports=server_ports,
             threads=threads,
             pipeline=pipeline,

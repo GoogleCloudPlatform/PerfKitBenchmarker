@@ -31,7 +31,6 @@ from perfkitbenchmarker.linux_packages import google_cloud_sdk
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 
-
 FLAGS = flags.FLAGS
 
 INITIALIZE_SEARCH_TABLE_PARTITIONED = flags.DEFINE_bool(
@@ -197,12 +196,9 @@ class JdbcClientInterface(GenericClientInterface):
 
   def SetProvisionedAttributes(self, benchmark_spec):
     super().SetProvisionedAttributes(benchmark_spec)
-    self.project_id = re.split(
-        r'\.', benchmark_spec.edw_service.cluster_identifier
-    )[0]
-    self.dataset_id = re.split(
-        r'\.', benchmark_spec.edw_service.cluster_identifier
-    )[1]
+    self.project_id, self.dataset_id = _SplitClusterIdentifier(
+        benchmark_spec.edw_service.cluster_identifier
+    )
 
   def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query.
@@ -527,8 +523,7 @@ class Bigquery(edw_service.EdwService):
 
   def __init__(self, edw_service_spec):
     super().__init__(edw_service_spec)
-    project_id = re.split(r'\.', self.cluster_identifier)[0]
-    dataset_id = re.split(r'\.', self.cluster_identifier)[1]
+    project_id, dataset_id = _SplitClusterIdentifier(self.cluster_identifier)
     self.client_interface = GetBigQueryClientInterface(project_id, dataset_id)
 
   def _Create(self):
@@ -571,7 +566,7 @@ class Bigquery(edw_service.EdwService):
     return (
         (self.cluster_identifier.split('.')[0] + ':' + dataset)
         if dataset
-        else self.cluster_identifier.replace('.', ':')
+        else self.cluster_identifier.replace('.', ':', 1)
     )
 
   def GetDatasetLastUpdatedTime(self, dataset=None):
@@ -1005,7 +1000,7 @@ class Endor(Bigquery):
       A dictionary set to underlying data's details (format, etc.)
     """
     data_details = {}
-    dataset_id = re.split(r'\.', self.cluster_identifier)[1]
+    _, dataset_id = _SplitClusterIdentifier(self.cluster_identifier)
     parsed_id = re.split(r'_', dataset_id)
     data_details['format'] = parsed_id[1]
     data_details['compression'] = parsed_id[2]
@@ -1071,7 +1066,7 @@ class Bqfederated(Bigquery):
     """
     # TODO(jguertin): Review & update for current datasets
     data_details = {}
-    project_id, dataset_id = re.split(r'\.', self.cluster_identifier)
+    project_id, dataset_id = _SplitClusterIdentifier(self.cluster_identifier)
     data_details['metadata_caching'] = str('metadata-caching' in project_id)
     parsed_id = re.split(r'_', dataset_id)
     if len(parsed_id) == 5:
@@ -1103,3 +1098,8 @@ class Bqfederated(Bigquery):
       data_details['storage'] = 'unknown'
       data_details['location'] = 'unknown'
     return data_details
+
+
+def _SplitClusterIdentifier(cluster_identifier: str) -> tuple[str, str]:
+  """Split the cluster identifier into project ID and dataset ID."""
+  return tuple(cluster_identifier.split('.', 1))

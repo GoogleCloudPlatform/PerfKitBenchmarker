@@ -664,6 +664,26 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         'run-instances .*--network-interfaces .*AssociatePublicIpAddress=True',
     )
 
+  @parameterized.named_parameters(
+      ('default', None, False, None),
+      ('required', 'required', True, 'required'),
+      ('optional', 'optional', True, 'optional'),
+  )
+  def testMetadataHttpTokens(
+      self, token_value, expected_present, expected_value
+  ):
+    FLAGS.aws_metadata_http_tokens = token_value
+    aws_cmd = CreateVm()
+    if expected_present:
+      self.assertRegex(
+          aws_cmd,
+          r'run-instances'
+          r' .*--metadata-options=HttpEndpoint=enabled,HttpTokens=%s'
+          % expected_value,
+      )
+    else:
+      self.assertNotRegex(aws_cmd, r'--metadata-options')
+
   def testSkipEfaInstall(self):
     # when aws_efa_version is blanked out do not install EFA
     FLAGS.aws_efa = True

@@ -81,6 +81,33 @@ USE_AWS_SPOT_INSTANCES = flags.DEFINE_boolean(
     False,
     'Whether to use AWS spot instances for any AWS VMs.',
 )
+EKS_INSTALL_S3_CSI_ADDON = flags.DEFINE_boolean(
+    'eks_install_s3_csi_addon',
+    False,
+    'Install AWS Mountpoint for Amazon S3 CSI Driver as an EKS managed addon '
+    'during cluster post-create. Requires IAM permissions to be set up '
+    'out-of-band (Pod Identity Association on the addon service account).',
+)
+K8S_INFERENCE_SERVER_S3_BUCKET = flags.DEFINE_string(
+    'k8s_inference_server_s3_bucket',
+    None,
+    'The S3 bucket that has model data for inference server to use '
+    '(mounted via the AWS Mountpoint S3 CSI Driver).',
+)
+K8S_INFERENCE_SERVER_S3_REGION = flags.DEFINE_string(
+    'k8s_inference_server_s3_region',
+    None,
+    'AWS region of the S3 bucket referenced by '
+    '--k8s_inference_server_s3_bucket. Required for the Mountpoint S3 CSI '
+    'driver mount options.',
+)
+EKS_INSTALL_NEURON_DEVICE_PLUGIN = flags.DEFINE_boolean(
+    'eks_install_neuron_device_plugin',
+    False,
+    'Install the AWS Neuron Device Plugin DaemonSet on the EKS cluster during '
+    'post-create. Required so that pods can request the '
+    'aws.amazon.com/neuron resource on Inferentia/Trainium nodes.',
+)
 flags.DEFINE_float(
     'aws_spot_price',
     None,
@@ -375,4 +402,10 @@ AWS_DOCUMENTDB_SNAPSHOT = flags.DEFINE_string(
     'aws_documentdb_snapshot',
     None,
     'If supplied, creates the DocumentDB instance from the snapshot.',
+)
+AWS_METADATA_HTTP_TOKENS = flags.DEFINE_enum(
+    'aws_metadata_http_tokens',
+    None,
+    ['required', 'optional'],
+    'The metadata http tokens state for the ec2 instance (IMDSv2).',
 )

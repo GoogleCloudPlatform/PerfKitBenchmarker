@@ -320,6 +320,10 @@ def GetVLLMModelLoadTime(
       init_time, model_load_time, application_start_time = (
           _ParseTPUModelLoadTimeMetrics(server, result_stdout, pod_name)
       )
+    elif _IsUsingNeuron(server.spec.catalog_components):
+      init_time, model_load_time, application_start_time = (
+          _ParseNeuronModelLoadTimeMetrics(server, result_stdout, pod_name)
+      )
     else:
       init_time, model_load_time, application_start_time = (
           _ParseModelLoadTimeMetrics(server, result_stdout, pod_name)
@@ -356,19 +360,24 @@ def GetVLLMModelLoadTime(
   ]
 
 
-def _ParseTPUModelLoadTimeMetrics(
+def _GetContainerInitTimestamp(
     server: k8s_server.WGServingInferenceServer,
-    result_stdout: str,
     pod_name: str,
-) -> Tuple[float, float, float]:
-  """Parse the model load time metrics from the logs."""
-  model_load_start_timestamp = None
-  model_load_end_timestamp = None
-  vllm_start_timestamp = None
-  log_lines = result_stdout.splitlines()
-  events = server.cluster.GetEvents()
+) -> str:
+  """Returns the local-time HH:MM:SS timestamp when the inference container started.
+
+  Args:
+    server: The inference server.
+    pod_name: The name of the pod.
+
+  Returns:
+    The container start timestamp in HH:MM:SS format.
+
+  Raises:
+    ValueError: If no matching startup event is found for the pod.
+  """
   startup_event = None
-  for event in events:
+  for event in server.cluster.GetEvents():
     if (
         event.resource.kind == 'Pod'
         and event.resource.name == pod_name
@@ -382,42 +391,119 @@ def _ParseTPUModelLoadTimeMetrics(
     raise ValueError(
         f'No events found for pod {pod_name} with message "Container started".'
     )
-  container_init_timestamp = _FormatUTCTimeStampToLocalTime(
-      server,
-      startup_event.timestamp,
+  return _FormatUTCTimeStampToLocalTime(server, startup_event.timestamp)
+
+
+def _ComputeModelLoadDurations(
+    container_init: str,
+    model_load_start: Optional[str],
+    model_load_end: Optional[str],
+    vllm_start: Optional[str],
+) -> Tuple[float, float, float]:
+  """Validates timestamps and returns (init_time, model_load_time, app_start_time).
+
+  Args:
+    container_init: Timestamp when the container started (HH:MM:SS).
+    model_load_start: Timestamp when model loading started (HH:MM:SS).
+    model_load_end: Timestamp when model loading ended (HH:MM:SS).
+    vllm_start: Timestamp when vLLM API server started (HH:MM:SS).
+
+  Returns:
+    A tuple of (init_time, model_load_time, application_start_time) in seconds.
+
+  Raises:
+    ValueError: If any of the model load timestamps is not found.
+  """
+  if model_load_start is None:
+    raise ValueError('Model load start timestamp is not found in the logs.')
+  if model_load_end is None:
+    raise ValueError('Model load end timestamp is not found in the logs.')
+  if vllm_start is None:
+    raise ValueError('VLLM start timestamp is not found in the logs.')
+  return (
+      GetTimeDifference(container_init, model_load_start),
+      GetTimeDifference(model_load_start, model_load_end),
+      GetTimeDifference(model_load_end, vllm_start),
   )
-  for line in log_lines:
-    # Check model load start timestamp
+
+
+def _ParseTPUModelLoadTimeMetrics(
+    server: k8s_server.WGServingInferenceServer,
+    result_stdout: str,
+    pod_name: str,
+) -> Tuple[float, float, float]:
+  """Parse the model load time metrics from the logs."""
+  container_init_timestamp = _GetContainerInitTimestamp(server, pod_name)
+  model_load_start_timestamp = None
+  model_load_end_timestamp = None
+  vllm_start_timestamp = None
+  for line in result_stdout.splitlines():
     if (
         'Downloading weights from HF' in line
         or 'Found weights from local' in line
     ) and model_load_start_timestamp is None:
       model_load_start_timestamp = _ParseInferenceServerTimeStamp(line)
-    # Check model load end timestamp
     if 'Compilation finished in' in line:
       model_load_end_timestamp = _ParseInferenceServerTimeStamp(line)
-    # Check when overall container starts
     if 'Starting vLLM API server' in line:
       vllm_start_timestamp = _ParseInferenceServerTimeStamp(line)
       break
-  if container_init_timestamp is None:
-    raise ValueError('Container init timestamp is not found in the logs.')
-  if model_load_start_timestamp is None:
-    raise ValueError('Model load start timestamp is not found in the logs.')
-  if model_load_end_timestamp is None:
-    raise ValueError('Model load end timestamp is not found in the logs.')
-  if vllm_start_timestamp is None:
-    raise ValueError('VLLM start timestamp is not found in the logs.')
-  init_time = GetTimeDifference(
-      container_init_timestamp, model_load_start_timestamp
+  return _ComputeModelLoadDurations(
+      container_init_timestamp,
+      model_load_start_timestamp,
+      model_load_end_timestamp,
+      vllm_start_timestamp,
   )
-  model_load_time = GetTimeDifference(
-      model_load_start_timestamp, model_load_end_timestamp
+
+
+def _ParseNeuronModelLoadTimeMetrics(
+    server: k8s_server.WGServingInferenceServer,
+    result_stdout: str,
+    pod_name: str,
+) -> Tuple[float, float, float]:
+  """Parse model load time metrics from Neuron (Inferentia2/Trainium) vLLM logs.
+
+  Args:
+    server: The inference server.
+    result_stdout: stdout logs from the inference server pod.
+    pod_name: The name of the pod.
+
+  Returns:
+    A tuple of (init_time, model_load_time, application_start_time) in seconds.
+
+  Neuron vLLM uses the NxDI compilation path (neuronx_distributed_inference)
+  instead of standard HuggingFace weight loading. Log patterns differ from
+  the standard vLLM path.
+
+  Log patterns (substring markers in stdout):
+    - 'Saving the neuron_config to' for model load start (application_base.py)
+    - 'Done Sharding weights in' for model load end (model_builder.py)
+    - 'Starting vLLM API server' for vllm start (api_server.py)
+
+  Timestamp format in Neuron logs: '[YYYY-MM-DD HH:MM:SS]' — the HH:MM:SS
+  part is matched by the shared _TIMESTAMP_PATTERN regex.
+  """
+  container_init_timestamp = _GetContainerInitTimestamp(server, pod_name)
+  model_load_start_timestamp = None
+  model_load_end_timestamp = None
+  vllm_start_timestamp = None
+  for line in result_stdout.splitlines():
+    if (
+        'Saving the neuron_config to' in line
+        and model_load_start_timestamp is None
+    ):
+      model_load_start_timestamp = _ParseInferenceServerTimeStamp(line)
+    if 'Done Sharding weights in' in line:
+      model_load_end_timestamp = _ParseInferenceServerTimeStamp(line)
+    if 'Starting vLLM API server' in line:
+      vllm_start_timestamp = _ParseInferenceServerTimeStamp(line)
+      break
+  return _ComputeModelLoadDurations(
+      container_init_timestamp,
+      model_load_start_timestamp,
+      model_load_end_timestamp,
+      vllm_start_timestamp,
   )
-  application_start_time = GetTimeDifference(
-      model_load_end_timestamp, vllm_start_timestamp
-  )
-  return init_time, model_load_time, application_start_time
 
 
 def _ParseModelLoadTimeMetrics(
@@ -426,63 +512,24 @@ def _ParseModelLoadTimeMetrics(
     pod_name: str,
 ) -> Tuple[float, float, float]:
   """Parse the model load time metrics from the logs."""
+  container_init_timestamp = _GetContainerInitTimestamp(server, pod_name)
   model_load_start_timestamp = None
   model_load_end_timestamp = None
   vllm_start_timestamp = None
-  log_lines = result_stdout.splitlines()
-  events = server.cluster.GetEvents()
-  startup_event = None
-  for event in events:
-    if (
-        event.resource.kind == 'Pod'
-        and event.resource.name == pod_name
-        # Note: The event message format changed from "Started container <name>"
-        # to "Container started" starting in Kubernetes v1.35 (PR #134043)
-        # to make messages more generic.
-        # we may need to rethink what signals we can use that have a stronger
-        # API guarantee, like Pod.status.conditions
-        and (
-            'Container started' in event.message
-            or 'Started container inference-server' in event.message
-        )
-    ):
-      startup_event = event
-  if startup_event is None:
-    raise ValueError(
-        f'No events found for pod {pod_name} with message "Container started".'
-    )
-  container_init_timestamp = _FormatUTCTimeStampToLocalTime(
-      server,
-      startup_event.timestamp,
-  )
-  for line in log_lines:
+  for line in result_stdout.splitlines():
     if 'Starting to load model' in line and model_load_start_timestamp is None:
       model_load_start_timestamp = _ParseInferenceServerTimeStamp(line)
-    # Check model load end timestamp
     if 'Model loading took' in line:
       model_load_end_timestamp = _ParseInferenceServerTimeStamp(line)
-    # Check when overall container starts
     if 'Starting vLLM API server on' in line:
       vllm_start_timestamp = _ParseInferenceServerTimeStamp(line)
       break
-  if container_init_timestamp is None:
-    raise ValueError('Container init timestamp is not found in the logs.')
-  if model_load_start_timestamp is None:
-    raise ValueError('Model load start timestamp is not found in the logs.')
-  if model_load_end_timestamp is None:
-    raise ValueError('Model load end timestamp is not found in the logs.')
-  if vllm_start_timestamp is None:
-    raise ValueError('VLLM start timestamp is not found in the logs.')
-  init_time = GetTimeDifference(
-      container_init_timestamp, model_load_start_timestamp
+  return _ComputeModelLoadDurations(
+      container_init_timestamp,
+      model_load_start_timestamp,
+      model_load_end_timestamp,
+      vllm_start_timestamp,
   )
-  model_load_time = GetTimeDifference(
-      model_load_start_timestamp, model_load_end_timestamp
-  )
-  application_start_time = GetTimeDifference(
-      model_load_end_timestamp, vllm_start_timestamp
-  )
-  return init_time, model_load_time, application_start_time
 
 
 def GetTimeDifference(start_time: str, end_time: str) -> float:
@@ -544,9 +591,32 @@ def _IsUsingTPU(components: str) -> bool:
   return bool(pattern.search(components))
 
 
+def _IsUsingNeuron(components: str) -> bool:
+  """Returns whether the components are using AWS Inferentia/Trainium (Neuron).
+
+  Matches any Inferentia or Trainium generation: Inf1, Inf2, Trn1, Trn2, etc.
+  Component format: <N>-<Family><Generation>
+  Examples:
+  1-Inf2
+  1-Trn1
+  2-Trn2
+
+  Note: log parsing in _ParseNeuronModelLoadTimeMetrics has only been tested
+  on Inf2. Other generations may produce different log patterns.
+
+  Args:
+    components: The components of the inference server, separated by commas.
+
+  Returns:
+    Whether the components are using Neuron accelerators.
+  """
+  pattern = re.compile(r'\d+-(Inf|Trn)\d+', re.IGNORECASE)
+  return bool(pattern.search(components))
+
+
 def _FormatUTCTimeStampToLocalTime(
-    server: k8s_server.WGServingInferenceServer, timestamp: Optional[float]
-) -> Optional[str]:
+    server: k8s_server.WGServingInferenceServer, timestamp: float
+) -> str:
   """Returns the time zone of the pod."""
   if server.timezone is None:
     raise ValueError('Local Pod timezone was not found.')

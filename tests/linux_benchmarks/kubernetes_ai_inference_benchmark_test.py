@@ -297,9 +297,7 @@ class KubernetesAiInferenceBenchmarkTest(
     # v5e-2x4
 
     self.assertTrue(
-        kubernetes_ai_inference_benchmark._IsUsingTPU(
-            'v6e-2x4,gcsfuse,spot'
-        )
+        kubernetes_ai_inference_benchmark._IsUsingTPU('v6e-2x4,gcsfuse,spot')
     )
     self.assertFalse(
         kubernetes_ai_inference_benchmark._IsUsingTPU(
@@ -533,6 +531,140 @@ class KubernetesAiInferenceBenchmarkTest(
         sample.Sample(
             'avg_ai_inference_post_model_load_to_start_time',
             152.667,  # avg: (68 + 135 + 255) / 3
+            'seconds',
+            metadata,
+            fake_timestamp,
+        ),
+    ]
+    self.assertEqual(results, expected_results)
+
+  def test_is_using_neuron(self):
+    self.assertTrue(
+        kubernetes_ai_inference_benchmark._IsUsingNeuron('1-Inf2,s3')
+    )
+    self.assertTrue(
+        kubernetes_ai_inference_benchmark._IsUsingNeuron('1-INF2,s3')
+    )
+    self.assertTrue(
+        kubernetes_ai_inference_benchmark._IsUsingNeuron('1-Trn1,s3')
+    )
+    self.assertTrue(kubernetes_ai_inference_benchmark._IsUsingNeuron('2-Trn2'))
+    self.assertFalse(
+        kubernetes_ai_inference_benchmark._IsUsingNeuron('v6e-2x4,gcsfuse')
+    )
+    self.assertFalse(
+        kubernetes_ai_inference_benchmark._IsUsingNeuron('8-H100-80GB,gcsfuse')
+    )
+
+  def test_get_container_init_timestamp(self):
+    startup_event = kubernetes_events.KubernetesEvent(
+        resource=kubernetes_events.KubernetesEventResource(
+            kind='Pod',
+            name='pod1',
+        ),
+        reason='Started',
+        message='Started container inference-server',
+        type='Normal',
+        timestamp=datetime.datetime(
+            2025, 7, 18, 22, 17, 1, tzinfo=tz
+        ).timestamp(),
+    )
+    mock_k8s_server = self._create_mock_k8s_server()
+    mock_k8s_server.cluster.GetEvents.return_value = [startup_event]
+    result = kubernetes_ai_inference_benchmark._GetContainerInitTimestamp(
+        mock_k8s_server, 'pod1'
+    )
+    self.assertRegex(result, r'^\d{2}:\d{2}:\d{2}$')
+
+  def test_get_container_init_timestamp_missing_event(self):
+    mock_k8s_server = self._create_mock_k8s_server()
+    mock_k8s_server.cluster.GetEvents.return_value = []
+    with self.assertRaises(ValueError):
+      kubernetes_ai_inference_benchmark._GetContainerInitTimestamp(
+          mock_k8s_server, 'pod1'
+      )
+
+  def test_compute_model_load_durations(self):
+    init_time, model_load_time, app_start_time = (
+        kubernetes_ai_inference_benchmark._ComputeModelLoadDurations(
+            '22:17:01', '22:17:30', '22:17:52', '22:19:00'
+        )
+    )
+    self.assertEqual(init_time, 29)
+    self.assertEqual(model_load_time, 22)
+    self.assertEqual(app_start_time, 68)
+
+  def test_compute_model_load_durations_missing_start(self):
+    with self.assertRaises(ValueError):
+      kubernetes_ai_inference_benchmark._ComputeModelLoadDurations(
+          '22:17:01', None, '22:17:52', '22:19:00'
+      )
+
+  def test_compute_model_load_durations_missing_end(self):
+    with self.assertRaises(ValueError):
+      kubernetes_ai_inference_benchmark._ComputeModelLoadDurations(
+          '22:17:01', '22:17:30', None, '22:19:00'
+      )
+
+  def test_compute_model_load_durations_missing_vllm(self):
+    with self.assertRaises(ValueError):
+      kubernetes_ai_inference_benchmark._ComputeModelLoadDurations(
+          '22:17:01', '22:17:30', '22:17:52', None
+      )
+
+  @mock.patch.object(
+      kubernetes_commands,
+      'GetResourceMetadataByName',
+      return_value=['pod1'],
+  )
+  def test_neuron_get_model_load_time(self, get_resource_metadata_by_name_mock):
+    logs = """[2025-07-18 22:17:30] INFO application_base.py: Saving the neuron_config to /var/cache/neuron/model_config.json
+    [2025-07-18 22:17:52] INFO model_builder.py: Done Sharding weights in 22.0
+    22:19:00 Starting vLLM API server 0 on http://0.0.0.0:8000
+    """
+    startup_event = kubernetes_events.KubernetesEvent(
+        resource=kubernetes_events.KubernetesEventResource(
+            kind='Pod',
+            name='pod1',
+        ),
+        reason='Started',
+        message='Started container inference-server',
+        type='Normal',
+        timestamp=datetime.datetime(
+            2025, 7, 18, 22, 17, 1, tzinfo=tz
+        ).timestamp(),
+    )
+    mock_k8s_server = self._create_mock_k8s_server(hpa_enabled=False)
+    mock_k8s_server.app_selector = 'vllm_inference_server'
+    mock_k8s_server.spec.catalog_components = '1-Inf2,s3'
+    mock_k8s_server.cluster.GetEvents.return_value = [startup_event]
+    mock_k8s_server.GetStartupLogsFromPod.side_effect = [logs]
+    results = kubernetes_ai_inference_benchmark.GetVLLMModelLoadTime(
+        mock_k8s_server
+    )
+    fake_timestamp = mock_k8s_server.model_load_timestamp
+    metadata = {
+        'hpa_enabled': False,
+        'num_pods': 1,
+    }
+    expected_results = [
+        sample.Sample(
+            'ai_inference_container_init_time',
+            29.0,
+            'seconds',
+            metadata,
+            fake_timestamp,
+        ),
+        sample.Sample(
+            'ai_inference_storage_model_load_time',
+            22.0,
+            'seconds',
+            metadata,
+            fake_timestamp,
+        ),
+        sample.Sample(
+            'ai_inference_post_model_load_to_start_time',
+            68.0,
             'seconds',
             metadata,
             fake_timestamp,

@@ -26,7 +26,6 @@ from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker import vm_util
 
 # Import sysbench_benchmark to reuse its flags
 from perfkitbenchmarker.linux_benchmarks import sysbench_benchmark  # pylint: disable=unused-import
@@ -294,7 +293,6 @@ def _GenerateCertificates() -> tuple[str, str, str, str, str]:
 
 
 def _LogDebugInfo(
-    cluster,
     ns: str,
     label_selector: str,
     resource_name: str | None = None,
@@ -303,21 +301,17 @@ def _LogDebugInfo(
   """Logs debug information for a Kubernetes failure."""
   if resource_name:
     describe_cmd = [
-        FLAGS.kubectl,
-        '--kubeconfig',
-        FLAGS.kubeconfig,
         'describe',
         resource_name,
         '-n',
         ns,
     ]
-    stdout, _, _ = vm_util.IssueCommand(describe_cmd, raise_on_failure=False)
+    stdout, _, _ = kubectl.RunKubectlCommand(
+        describe_cmd, raise_on_failure=False
+    )
     logging.error('%s description:\n%s', resource_name, stdout)
 
   pod_describe_cmd = [
-      FLAGS.kubectl,
-      '--kubeconfig',
-      FLAGS.kubeconfig,
       'describe',
       'pod',
       '-n',
@@ -325,13 +319,12 @@ def _LogDebugInfo(
       '-l',
       label_selector,
   ]
-  stdout, _, _ = vm_util.IssueCommand(pod_describe_cmd, raise_on_failure=False)
+  stdout, _, _ = kubectl.RunKubectlCommand(
+      pod_describe_cmd, raise_on_failure=False
+  )
   logging.error('Pod description:\n%s', stdout)
 
   logs_cmd = [
-      FLAGS.kubectl,
-      '--kubeconfig',
-      FLAGS.kubeconfig,
       'logs',
       '-n',
       ns,
@@ -339,24 +332,8 @@ def _LogDebugInfo(
       label_selector,
       f'--tail={log_tail}',
   ]
-  stdout, _, _ = vm_util.IssueCommand(logs_cmd, raise_on_failure=False)
+  stdout, _, _ = kubectl.RunKubectlCommand(logs_cmd, raise_on_failure=False)
   logging.error('Pod logs:\n%s', stdout)
-
-  if getattr(cluster, 'event_poller', None):
-    cluster.event_poller.GetAndLogFailureEvents()
-  else:
-    events_cmd = [
-        FLAGS.kubectl,
-        '--kubeconfig',
-        FLAGS.kubeconfig,
-        'get',
-        'events',
-        '-n',
-        ns,
-        '--sort-by=.lastTimestamp',
-    ]
-    stdout, _, _ = vm_util.IssueCommand(events_cmd, raise_on_failure=False)
-    logging.error('Recent events:\n%s', stdout)
 
 
 def Prepare(bm_spec: _BenchmarkSpec) -> None:
@@ -414,7 +391,6 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
     logging.error('MySQL pod failed to become ready: %s', e)
     ns = FLAGS.kubernetes_mysql_sysbench_namespace or 'default'
     _LogDebugInfo(
-        cluster=bm_spec.container_cluster,
         ns=ns,
         label_selector='app=mysql-app',
         log_tail=100,
@@ -472,7 +448,6 @@ def Run(bm_spec: _BenchmarkSpec) -> list[sample.Sample]:
     logging.error('Sysbench job wait timed out or failed: %s', e)
     ns = FLAGS.kubernetes_mysql_sysbench_namespace or 'default'
     _LogDebugInfo(
-        cluster=bm_spec.container_cluster,
         ns=ns,
         label_selector='app=sysbench',
         resource_name=f'job/{job_name}',
