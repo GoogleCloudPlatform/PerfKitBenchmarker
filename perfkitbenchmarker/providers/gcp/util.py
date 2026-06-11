@@ -620,7 +620,7 @@ def MakeFormattedDefaultTags(timeout_minutes: int | None = None):
   Returns:
     A string contains tags, contributed from the benchmark spec.
   """
-  return FormatTags(GetDefaultTags(timeout_minutes)).lower()
+  return FormatTags(GetDefaultTags(timeout_minutes))
 
 
 def GetAccessToken(application_default: bool = True) -> str:
