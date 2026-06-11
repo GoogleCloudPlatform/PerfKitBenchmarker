@@ -681,6 +681,15 @@ class BaseDpbService(resource.BaseResource):
       return None
     return self.resource_ready_time - self.create_start_time
 
+  def GetServiceReportedClusterCreateTime(self) -> float | None:
+    """Returns the cluster creation time as reported by the service.
+
+    Returns:
+      A float representing the creation time in seconds or None if not
+      implemented.
+    """
+    return None
+
   def GetServiceWrapperScriptsToUpload(self) -> List[str]:
     """Gets service wrapper scripts to upload alongside benchmark scripts."""
     return []
@@ -756,9 +765,13 @@ class BaseDpbService(resource.BaseResource):
     """Gets samples with service statistics."""
     samples = []
     metrics: dict[str, tuple[float | None, str]] = {
-        # Cluster creation time as reported by the DPB service
-        # (non-Serverless DPB services only).
+        # Cluster creation time as measured on PKB's end (E2E).
         'dpb_cluster_create_time': (self.GetClusterCreateTime(), 'seconds'),
+        # Cluster creation time as reported by the DPB service backend.
+        'dpb_service_reported_cluster_create_time': (
+            self.GetServiceReportedClusterCreateTime(),
+            'seconds',
+        ),
         # Cluster duration as computed by the underlying benchmark.
         # (non-Serverless DPB services only).
         'dpb_cluster_duration': (self.GetClusterDuration(), 'seconds'),
@@ -803,6 +816,9 @@ class DpbServiceServerlessMixin:
     pass
 
   def GetClusterCreateTime(self) -> float | None:
+    return None
+
+  def GetServiceReportedClusterCreateTime(self) -> float | None:
     return None
 
   def GetClusterDuration(self) -> float | None:
