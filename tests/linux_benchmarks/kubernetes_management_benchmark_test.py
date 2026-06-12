@@ -871,8 +871,8 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
       k8s_mgmt_scale_sweep=['10'],
       k8s_mgmt_large_scale_nodepools=10,
   )
-  def testRunTagsScenarioCScaleInMetadata(self):
-    """Tests that Run adds large_scale_scale to each sample's metadata."""
+  def testRunTagsScenarioCGoalInMetadata(self):
+    """Tests that Run adds goal_nodepools to each sample's metadata."""
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     test_sample = _make_sample('metric', 1.0)
@@ -892,8 +892,8 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
         return_value=[test_sample],
     ):
       samples = kubernetes_management_benchmark.Run(bm_spec)
-    self.assertIn('large_scale_scale', samples[0].metadata)
-    self.assertEqual('10', samples[0].metadata['large_scale_scale'])
+    self.assertIn('goal_nodepools', samples[0].metadata)
+    self.assertEqual('10', samples[0].metadata['goal_nodepools'])
 
   @flagsaver.flagsaver(
       k8s_mgmt_scenarios=['concurrent_node_pool_ops'],
@@ -1106,7 +1106,7 @@ class RunScenarioCTest(pkb_common_test_case.PkbCommonTestCase):
   def testProducesCreateAndDeleteSamples(self):
     cluster = _make_mock_cluster(pool_names=['pkbmc0000', 'pkbmc0001'])
     samples = kubernetes_management_benchmark._ScaleToPoolCount(
-        cluster, '1.33', scale=2
+        cluster, '1.33', goal_nodepools=2
     )
     metrics = {s.metric for s in samples}
     self.assertTrue(any('LargeScale_Create' in m for m in metrics))
@@ -1120,7 +1120,7 @@ class RunScenarioCTest(pkb_common_test_case.PkbCommonTestCase):
     """Tests Scenario C records 0% delete rate when no live pools exist."""
     cluster = _make_mock_cluster(pool_names=[])
     samples = kubernetes_management_benchmark._ScaleToPoolCount(
-        cluster, '1.33', scale=3
+        cluster, '1.33', goal_nodepools=3
     )
     delete_rate = next(
         s for s in samples if s.metric == 'LargeScale_Delete_SuccessRate'
@@ -1134,7 +1134,9 @@ class RunScenarioCTest(pkb_common_test_case.PkbCommonTestCase):
   )
   def testDeleteUsesLiveListNotOriginalCreateList(self):
     cluster = _make_mock_cluster(pool_names=['pkbmc0000', 'pkbmc0001'])
-    kubernetes_management_benchmark._ScaleToPoolCount(cluster, '1.33', scale=3)
+    kubernetes_management_benchmark._ScaleToPoolCount(
+        cluster, '1.33', goal_nodepools=3
+    )
     self.assertEqual(2, cluster.DeleteNodePoolAsync.call_count)
 
   @flagsaver.flagsaver(
@@ -1145,7 +1147,7 @@ class RunScenarioCTest(pkb_common_test_case.PkbCommonTestCase):
     """Tests Scenario C create success rate uses scale as total_ops."""
     cluster = _make_mock_cluster(pool_names=['pkbmc0000'])
     samples = kubernetes_management_benchmark._ScaleToPoolCount(
-        cluster, '1.33', scale=3
+        cluster, '1.33', goal_nodepools=3
     )
     create_rate = next(
         s for s in samples if s.metric == 'LargeScale_Create_SuccessRate'

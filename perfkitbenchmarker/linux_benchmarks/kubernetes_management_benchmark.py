@@ -314,24 +314,26 @@ def _SweepScales(
     cluster: kubernetes_cluster.KubernetesCluster,
     initial: str,
 ) -> list[sample.Sample]:
-  """Runs large-scale provisioning across each requested scale.
+  """Runs large-scale provisioning at each requested goal node-pool count.
 
-  Scales come from --k8s_mgmt_scale_sweep when set, else the single
-  --k8s_mgmt_large_scale_nodepools value. Each scale's samples are tagged
-  with large_scale_scale so results stay distinguishable.
+  Goal counts come from --k8s_mgmt_scale_sweep when set, else the single
+  --k8s_mgmt_large_scale_nodepools value. Each count's samples are tagged
+  with goal_nodepools so results stay distinguishable.
   """
-  scales = (
+  goal_counts = (
       [int(x.strip()) for x in _SCALE_SWEEP.value]
       if _SCALE_SWEEP.value
       else [_LARGE_SCALE_NODEPOOLS.value]
   )
-  logging.info("large_scale_provisioning: scale sweep = %s", scales)
+  logging.info(
+      "large_scale_provisioning: goal node-pool counts = %s", goal_counts
+  )
   samples: list[sample.Sample] = []
-  for scale in scales:
-    scale_samples = _ScaleToPoolCount(cluster, initial, scale)
-    for s in scale_samples:
-      s.metadata["large_scale_scale"] = str(scale)
-    samples += scale_samples
+  for goal_nodepools in goal_counts:
+    goal_samples = _ScaleToPoolCount(cluster, initial, goal_nodepools)
+    for s in goal_samples:
+      s.metadata["goal_nodepools"] = str(goal_nodepools)
+    samples += goal_samples
   return samples
 
 
@@ -418,26 +420,26 @@ def _RunOverlappingClusterUpdate(
 def _ScaleToPoolCount(
     cluster: kubernetes_cluster.KubernetesCluster,
     initial: str,
-    scale: int,
+    goal_nodepools: int,
 ) -> list[sample.Sample]:
-  """Large-scale node-pool provisioning at a given scale.
+  """Large-goal_nodepools node-pool provisioning to a goal node-pool count.
 
-  Streams all `scale` creates through a single executor capped at
+  Streams all `goal_nodepools` creates through a single executor capped at
   _MAX_CONCURRENT workers — as each op completes the next starts immediately
   (no batch barriers). Delete uses a live-list so EKS-rolled-back pools are
   excluded from the denominator correctly.
   """
   logging.info(
-      "Scenario C: scale=%d, max_concurrent=%d, initial_version=%s",
-      scale,
+      "large_scale goal=%d, max_concurrent=%d, initial_version=%s",
+      goal_nodepools,
       _MAX_CONCURRENT.value,
       initial,
   )
-  pool_names = [_ScalePoolName(i) for i in range(scale)]
+  pool_names = [_ScalePoolName(i) for i in range(goal_nodepools)]
   configs_ = [_MakeNodePoolConfig(cluster, name) for name in pool_names]
   samples: list[sample.Sample] = []
 
-  # ── Creates (tolerant — partial failure expected at scale) ───────────────
+  # ── Creates (tolerant — partial failure expected at scale) ──────────────
   create_results, create_failed = _RunAsyncTolerant(
       kickoff=lambda cfg: cluster.CreateNodePoolAsync(
           cfg, node_version=initial
@@ -447,30 +449,35 @@ def _ScaleToPoolCount(
       get_name=lambda cfg: cfg.name,
   )
   logging.info(
-      "Scenario C scale=%d: %d/%d creates succeeded (%d failed)",
-      scale,
+      "large_scale goal=%d: %d/%d creates succeeded (%d failed)",
+      goal_nodepools,
       len(create_results),
-      scale,
+      goal_nodepools,
       len(create_failed),
   )
   samples += _LargeScaleSamples(
-      "LargeScale_Create", create_results, create_failed, attempted_ops=scale
+      "LargeScale_Create",
+      create_results,
+      create_failed,
+      attempted_ops=goal_nodepools,
   )
 
   # ── Deletes (live-list) ──────────────────────────────────────────────────
   alive = _LiveNodePoolNames(cluster, f"{_PREFIX}c")
   logging.info(
-      "Scenario C scale=%d: %d live pools for delete (originally %d;"
+      "large_scale goal=%d: %d live pools for delete (originally %d;"
       + " %d rolled back by cloud)",
-      scale,
+      goal_nodepools,
       len(alive),
-      scale,
-      scale - len(alive),
+      goal_nodepools,
+      goal_nodepools - len(alive),
   )
   if not alive:
-    logging.info("Scenario C scale=%d: all creates rolled back.", scale)
+    logging.info(
+        "large_scale goal=%d: all creates rolled back.", goal_nodepools
+    )
     samples += _LargeScaleSamples(
-        "LargeScale_Delete", [], [], attempted_ops=scale
+        "LargeScale_Delete", [], [], attempted_ops=goal_nodepools
     )
     return samples
 
@@ -480,9 +487,12 @@ def _ScaleToPoolCount(
       items=alive,
       get_name=str,
   )
-  # attempted_ops=scale: accurate rate against original request count.
+  # attempted_ops=goal_nodepools: accurate rate against original request count.
   samples += _LargeScaleSamples(
-      "LargeScale_Delete", delete_results, delete_failed, attempted_ops=scale
+      "LargeScale_Delete",
+      delete_results,
+      delete_failed,
+      attempted_ops=goal_nodepools,
   )
   return samples
 
