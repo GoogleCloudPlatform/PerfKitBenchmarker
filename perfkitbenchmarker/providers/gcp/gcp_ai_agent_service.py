@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import tarfile
 from typing import Any, cast, override
 
@@ -71,6 +72,20 @@ class GcpAiAgentService(ai_agent_service.BaseAiAgentService):
       tar.add(
           full_local_workload_data_path,
           arcname=workload_name,
+      )
+      common_utils_path = data.ResourcePath('agentic_framework/common_utils.py')
+      tar.add(
+          common_utils_path,
+          arcname=f'{workload_name}/common_utils.py',
+      )
+
+      framework_utils_name = f'{self.spec.framework}_utils.py'
+      utils_path = data.ResourcePath(
+          f'agentic_framework/{framework_utils_name}'
+      )
+      tar.add(
+          utils_path,
+          arcname=f'{workload_name}/{framework_utils_name}',
       )
     return tar_filename, tar_local_path
 
@@ -222,9 +237,21 @@ class VertexAiCustomJobAiAgentService(GcpAiAgentService):
     workload_data_path = (
         f'agentic_framework/{self.spec.workload}/{self.spec.framework}'
     )
+
+    temp_dir = vm_util.PrependTempDir(f'custom_job_{self.spec.workload}')
+
+    full_workload_path = data.ResourcePath(workload_data_path)
+    shutil.copytree(full_workload_path, temp_dir, dirs_exist_ok=True)
+    common_utils_path = data.ResourcePath('agentic_framework/common_utils.py')
+    shutil.copy2(common_utils_path, os.path.join(temp_dir, 'common_utils.py'))
+
+    framework_utils_name = f'{self.spec.framework}_utils.py'
+    utils_path = data.ResourcePath(f'agentic_framework/{framework_utils_name}')
+    shutil.copy2(utils_path, os.path.join(temp_dir, framework_utils_name))
+
     benchmark_spec = context.GetThreadBenchmarkSpec()
     self._image_uri = benchmark_spec.container_registry.GetOrBuild(
-        os.path.basename(workload_data_path), workload_data_path
+        os.path.basename(workload_data_path), temp_dir
     )
 
   @override
