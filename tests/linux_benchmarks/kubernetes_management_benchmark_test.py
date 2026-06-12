@@ -266,14 +266,14 @@ class CleanupTest(pkb_common_test_case.PkbCommonTestCase):
     kubernetes_management_benchmark.Cleanup(bm_spec)
 
 
-class SweepNodePoolsTest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for the _SweepNodePools helper function."""
+class ClearNodePoolsTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for the _ClearNodePools helper function."""
 
   def testDeletesStalePkbmPools(self):
     cluster = _make_mock_cluster(
         pool_names=['pkbma000', 'pkbmc0001', 'user-pool']
     )
-    kubernetes_management_benchmark._SweepNodePools(cluster)
+    kubernetes_management_benchmark._ClearNodePools(cluster)
     deleted = {c.args[0] for c in cluster.DeleteNodePool.call_args_list}
     self.assertIn('pkbma000', deleted)
     self.assertIn('pkbmc0001', deleted)
@@ -281,42 +281,44 @@ class SweepNodePoolsTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testDoesNothingWhenNoPkbmPools(self):
     cluster = _make_mock_cluster(pool_names=['user-pool', 'default-pool'])
-    kubernetes_management_benchmark._SweepNodePools(cluster)
+    kubernetes_management_benchmark._ClearNodePools(cluster)
     cluster.DeleteNodePool.assert_not_called()
 
-  def testSweepRaisesOnGetNodePoolNamesException(self):
+  def testClearRaisesOnGetNodePoolNamesException(self):
     cluster = _make_mock_cluster()
     cluster.GetNodePoolNames.side_effect = RuntimeError('API error')
     with self.assertRaises(RuntimeError):
-      kubernetes_management_benchmark._SweepNodePools(cluster)
+      kubernetes_management_benchmark._ClearNodePools(cluster)
 
 
-class ResultsTest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for the _Results result-accumulator helper."""
+class ThreadSafeResultsTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for the ThreadSafeResults collector."""
 
   def testAddSingleEntry(self):
-    r = kubernetes_management_benchmark._Results()
-    r.add('op1', 0.1, 1.0, None)
+    r = kubernetes_management_benchmark.ThreadSafeResults()
+    r.add('op1', kubernetes_management_benchmark.OpTiming(0.1, 1.0))
     self.assertLen(r.entries, 1)
-    name, init, e2e, err = r.entries[0]
+    name, timing = r.entries[0]
     self.assertEqual('op1', name)
-    self.assertAlmostEqual(0.1, init, places=5)
-    self.assertAlmostEqual(1.0, e2e, places=5)
-    self.assertIsNone(err)
+    self.assertAlmostEqual(0.1, timing.initiation_latency, places=5)
+    self.assertAlmostEqual(1.0, timing.end_to_end_latency, places=5)
 
-  def testAddMultipleEntries(self):
-    r = kubernetes_management_benchmark._Results()
-    r.add('op1', 0.1, 1.0, None)
-    r.add('op2', 0.2, 2.0, ValueError('fail'))
-    self.assertLen(r.entries, 2)
+  def testAddFailureRecordsName(self):
+    r = kubernetes_management_benchmark.ThreadSafeResults()
+    r.add_failure('bad-op')
+    self.assertEqual(['bad-op'], r.failed)
+    self.assertEmpty(r.entries)
 
   def testAddIsThreadSafe(self):
     """Tests that concurrent add() calls from multiple threads are safe."""
-    r = kubernetes_management_benchmark._Results()
+    r = kubernetes_management_benchmark.ThreadSafeResults()
     n = 100
 
     def _add(i):
-      r.add(f'op{i}', float(i), float(i) * 2, None)
+      r.add(
+          f'op{i}',
+          kubernetes_management_benchmark.OpTiming(float(i), float(i) * 2),
+      )
 
     threads = [threading.Thread(target=_add, args=(i,)) for i in range(n)]
     for t in threads:
@@ -325,13 +327,6 @@ class ResultsTest(pkb_common_test_case.PkbCommonTestCase):
       t.join()
     self.assertLen(r.entries, n)
 
-  def testAddPreservesError(self):
-    r = kubernetes_management_benchmark._Results()
-    exc = RuntimeError('test error')
-    r.add('failing-op', 0.5, 0.5, exc)
-    _, _, _, err = r.entries[0]
-    self.assertIs(exc, err)
-
 
 class TimedAsyncTest(pkb_common_test_case.PkbCommonTestCase):
   """Tests for the _TimedAsync timing helper."""
@@ -339,44 +334,34 @@ class TimedAsyncTest(pkb_common_test_case.PkbCommonTestCase):
   def testSuccessfulKickoffAndWait(self):
     kickoff = mock.Mock(return_value='op-handle')
     wait_fn = mock.Mock(return_value=None)
-    init_lat, e2e_lat, err = kubernetes_management_benchmark._TimedAsync(
-        kickoff, wait_fn
-    )
+    timing = kubernetes_management_benchmark._TimedAsync(kickoff, wait_fn)
     kickoff.assert_called_once()
     wait_fn.assert_called_once_with('op-handle')
-    self.assertIsNone(err)
-    self.assertGreaterEqual(init_lat, 0.0)
-    self.assertGreaterEqual(e2e_lat, init_lat)
+    self.assertGreaterEqual(timing.initiation_latency, 0.0)
+    self.assertGreaterEqual(
+        timing.end_to_end_latency, timing.initiation_latency
+    )
 
-  def testKickoffFailureReturnsError(self):
+  def testKickoffFailurePropagates(self):
     exc = RuntimeError('kickoff failed')
     kickoff = mock.Mock(side_effect=exc)
     wait_fn = mock.Mock()
-    init_lat, e2e_lat, err = kubernetes_management_benchmark._TimedAsync(
-        kickoff, wait_fn
-    )
-    self.assertIs(exc, err)
+    with self.assertRaises(RuntimeError):
+      kubernetes_management_benchmark._TimedAsync(kickoff, wait_fn)
     wait_fn.assert_not_called()
-    self.assertAlmostEqual(init_lat, e2e_lat, places=2)
 
-  def testWaitFailureReturnsError(self):
+  def testWaitFailurePropagates(self):
     exc = RuntimeError('wait failed')
     kickoff = mock.Mock(return_value='op-handle')
     wait_fn = mock.Mock(side_effect=exc)
-    _, e2e_lat, err = kubernetes_management_benchmark._TimedAsync(
-        kickoff, wait_fn
-    )
-    self.assertIs(exc, err)
-    self.assertGreater(e2e_lat, 0.0)
+    with self.assertRaises(RuntimeError):
+      kubernetes_management_benchmark._TimedAsync(kickoff, wait_fn)
 
   def testInitLatencyNotGreaterThanE2eLatency(self):
     kickoff = mock.Mock(return_value='handle')
     wait_fn = mock.Mock(side_effect=lambda _: time.sleep(0.01))
-    init_lat, e2e_lat, err = kubernetes_management_benchmark._TimedAsync(
-        kickoff, wait_fn
-    )
-    self.assertIsNone(err)
-    self.assertLessEqual(init_lat, e2e_lat)
+    timing = kubernetes_management_benchmark._TimedAsync(kickoff, wait_fn)
+    self.assertLessEqual(timing.initiation_latency, timing.end_to_end_latency)
 
   def testHandlePassedToWaitFn(self):
     kickoff = mock.Mock(return_value='my-op-handle')
@@ -386,7 +371,7 @@ class TimedAsyncTest(pkb_common_test_case.PkbCommonTestCase):
 
 
 class RunAsyncTest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for the _RunAsync concurrent execution helper."""
+  """Tests for the _RunAsync fail-hard concurrent execution helper."""
 
   def testEmptyItemsReturnsEmptyList(self):
     results = kubernetes_management_benchmark._RunAsync(
@@ -405,17 +390,16 @@ class RunAsyncTest(pkb_common_test_case.PkbCommonTestCase):
         kickoff=kickoff, wait_fn=wait_fn, items=['a', 'b', 'c'], get_name=str
     )
     self.assertLen(results, 3)
-    self.assertEqual({'a', 'b', 'c'}, {name for name, _, _, _ in results})
+    self.assertEqual({'a', 'b', 'c'}, {name for name, _ in results})
 
   @flagsaver.flagsaver(k8s_mgmt_max_concurrent=50)
-  def testKickoffErrorCapturedInResults(self):
+  def testKickoffErrorPropagates(self):
+    """Fail-hard: a failing op raises rather than being captured."""
     kickoff = mock.Mock(side_effect=RuntimeError('kaboom'))
-    results = kubernetes_management_benchmark._RunAsync(
-        kickoff=kickoff, wait_fn=mock.Mock(), items=['x'], get_name=str
-    )
-    self.assertLen(results, 1)
-    _, _, _, err = results[0]
-    self.assertIsNotNone(err)
+    with self.assertRaises(Exception):
+      kubernetes_management_benchmark._RunAsync(
+          kickoff=kickoff, wait_fn=mock.Mock(), items=['x'], get_name=str
+      )
 
   @flagsaver.flagsaver(k8s_mgmt_max_concurrent=2)
   def testConcurrencyCapDoesNotDropItems(self):
@@ -437,8 +421,48 @@ class RunAsyncTest(pkb_common_test_case.PkbCommonTestCase):
         items=[cfg],
         get_name=lambda c: c.name,
     )
-    name, _, _, _ = results[0]
+    name, _ = results[0]
     self.assertEqual('poolname', name)
+
+
+class RunAsyncTolerantTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for the _RunAsyncTolerant helper (large_scale path)."""
+
+  @flagsaver.flagsaver(k8s_mgmt_max_concurrent=50)
+  def testAllSucceed(self):
+    results, failed = kubernetes_management_benchmark._RunAsyncTolerant(
+        kickoff=mock.Mock(return_value='op'),
+        wait_fn=mock.Mock(return_value=None),
+        items=['a', 'b'],
+        get_name=str,
+    )
+    self.assertLen(results, 2)
+    self.assertEmpty(failed)
+
+  @flagsaver.flagsaver(k8s_mgmt_max_concurrent=50)
+  def testFailuresRecordedNotRaised(self):
+    """Tolerant path catches failures and records their names."""
+
+    def _kickoff(item):
+      if item == 'b':
+        raise RuntimeError('b failed')
+      return 'op'
+
+    results, failed = kubernetes_management_benchmark._RunAsyncTolerant(
+        kickoff=_kickoff,
+        wait_fn=mock.Mock(return_value=None),
+        items=['a', 'b', 'c'],
+        get_name=str,
+    )
+    self.assertLen(results, 2)
+    self.assertEqual(['b'], failed)
+
+  def testEmptyItemsReturnsEmpty(self):
+    results, failed = kubernetes_management_benchmark._RunAsyncTolerant(
+        kickoff=mock.Mock(), wait_fn=mock.Mock(), items=[], get_name=str
+    )
+    self.assertEmpty(results)
+    self.assertEmpty(failed)
 
 
 class MakeNodePoolConfigTest(pkb_common_test_case.PkbCommonTestCase):
@@ -467,161 +491,129 @@ class MakeNodePoolConfigTest(pkb_common_test_case.PkbCommonTestCase):
 
 
 class OpSamplesTest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for the _OpSamples sample-generation helper."""
+  """Tests for the _OpSamples latency-only sample helper (fail-hard path)."""
 
-  def testEmptyResultsYieldsSuccessRateOfZero(self):
-    samples = kubernetes_management_benchmark._OpSamples(
-        'PrefixOp', [], attempted_ops=5
-    )
-    rate = next(s for s in samples if s.metric == 'PrefixOp_SuccessRate')
-    self.assertEqual(0.0, rate.value)
+  def testEmptyResultsYieldsNoSamples(self):
+    samples = kubernetes_management_benchmark._OpSamples('PrefixOp', [])
+    self.assertEmpty(samples)
 
   def testPerOpInitiationAndE2eSamplesGenerated(self):
     results = [
-        kubernetes_management_benchmark._OpResult('op1', 0.1, 1.0, None),
-        kubernetes_management_benchmark._OpResult('op2', 0.2, 2.0, None),
+        ('op1', kubernetes_management_benchmark.OpTiming(0.1, 1.0)),
+        ('op2', kubernetes_management_benchmark.OpTiming(0.2, 2.0)),
     ]
-    samples = kubernetes_management_benchmark._OpSamples(
-        'MyOp', results, attempted_ops=2
-    )
+    samples = kubernetes_management_benchmark._OpSamples('MyOp', results)
     metrics = [s.metric for s in samples]
     self.assertIn('MyOp_InitiationLatency', metrics)
     self.assertIn('MyOp_EndToEndLatency', metrics)
 
-  def testSuccessRateHundredPercentWhenAllSucceed(self):
+  def testNoSuccessRateOrCountMetrics(self):
+    """Fail-hard path emits no SuccessRate/count metrics (B1)."""
     results = [
-        kubernetes_management_benchmark._OpResult('op1', 1.0, 2.0, None),
-        kubernetes_management_benchmark._OpResult('op2', 0.5, 1.5, None),
+        ('op1', kubernetes_management_benchmark.OpTiming(1.0, 2.0)),
+        ('op2', kubernetes_management_benchmark.OpTiming(0.5, 1.5)),
     ]
-    samples = kubernetes_management_benchmark._OpSamples(
-        'Op', results, attempted_ops=2
-    )
-    rate = next(s for s in samples if s.metric == 'Op_SuccessRate')
-    self.assertAlmostEqual(100.0, rate.value)
+    samples = kubernetes_management_benchmark._OpSamples('Op', results)
+    metrics = {s.metric for s in samples}
+    self.assertNotIn('Op_SuccessRate', metrics)
+    self.assertNotIn('Op_TotalOps', metrics)
 
-  def testSuccessRateFiftyPercentWhenHalfFail(self):
-    results = [
-        kubernetes_management_benchmark._OpResult('op1', 1.0, 2.0, None),
-        kubernetes_management_benchmark._OpResult(
-            'op2', 0.5, 0.5, RuntimeError('fail')
-        ),
-    ]
-    samples = kubernetes_management_benchmark._OpSamples(
-        'Op', results, attempted_ops=2
-    )
-    rate = next(s for s in samples if s.metric == 'Op_SuccessRate')
-    self.assertAlmostEqual(50.0, rate.value)
-
-  def testAttemptedOpsExceedingExecutedOpsLowersRate(self):
-    results = [kubernetes_management_benchmark._OpResult('op1', 1.0, 2.0, None)]
-    samples = kubernetes_management_benchmark._OpSamples(
-        'Op', results, attempted_ops=3
-    )
-    rate = next(s for s in samples if s.metric == 'Op_SuccessRate')
-    self.assertAlmostEqual(100.0 / 3, rate.value, places=3)
-
-  def testCountsExposedAsSeparateMetrics(self):
-    """630: Total/Executed/Successful/Skipped each emitted as a metric."""
-    results = [
-        kubernetes_management_benchmark._OpResult('op1', 1.0, 2.0, None),
-        kubernetes_management_benchmark._OpResult(
-            'op2', 0.5, 0.5, Exception('e')
-        ),
-    ]
-    samples = kubernetes_management_benchmark._OpSamples(
-        'Op', results, attempted_ops=3
-    )
-    metrics = {s.metric: s.value for s in samples}
-    self.assertEqual(3, metrics['Op_TotalOps'])
-    self.assertEqual(2, metrics['Op_ExecutedOps'])
-    self.assertEqual(1, metrics['Op_SuccessfulOps'])
-    self.assertEqual(1, metrics['Op_SkippedOps'])
-
-  def testSuccessRateMetadataFields(self):
-    """SuccessRate sample carries the op-count metadata fields."""
-    results = [
-        kubernetes_management_benchmark._OpResult('op1', 1.0, 2.0, None),
-        kubernetes_management_benchmark._OpResult(
-            'op2', 0.5, 0.5, Exception('err')
-        ),
-    ]
-    samples = kubernetes_management_benchmark._OpSamples(
-        'Op', results, attempted_ops=3
-    )
-    rate = next(s for s in samples if s.metric == 'Op_SuccessRate')
-    self.assertEqual('3', rate.metadata['total_ops'])
-    self.assertEqual('2', rate.metadata['executed_ops'])
-    self.assertEqual('1', rate.metadata['successful_ops'])
-    self.assertEqual('1', rate.metadata['skipped_ops'])
-
-  def testZeroAttemptedOpsRaisesRunError(self):
-    """total==0 indicates a dispatch/setup failure; fail loudly (623)."""
-    with self.assertRaises(errors.Benchmarks.RunError):
-      kubernetes_management_benchmark._OpSamples('Op', [], attempted_ops=0)
-
-  def testFailedOpIncludesErrorMessage(self):
-    results = [
-        kubernetes_management_benchmark._OpResult(
-            'fail-op', 0.5, 0.5, RuntimeError('oops')
-        )
-    ]
-    samples = kubernetes_management_benchmark._OpSamples(
-        'Op', results, attempted_ops=1
-    )
+  def testOperationNameInMetadata(self):
+    results = [('mypool', kubernetes_management_benchmark.OpTiming(1.0, 2.0))]
+    samples = kubernetes_management_benchmark._OpSamples('Op', results)
     init_s = next(s for s in samples if s.metric == 'Op_InitiationLatency')
-    self.assertIn('error', init_s.metadata)
-    self.assertIn('oops', init_s.metadata['error'])
+    self.assertEqual('mypool', init_s.metadata['operation_name'])
 
-  def testAggregatesGeneratedForTwoOrMoreSuccesses(self):
-    """Aggregate stat samples appear once there are >=2 successes."""
+  def testAggregatesGeneratedForTwoOrMore(self):
     results = [
-        kubernetes_management_benchmark._OpResult(
-            f'op{i}', float(i), float(i) * 2, None
+        (
+            f'op{i}',
+            kubernetes_management_benchmark.OpTiming(float(i), float(i) * 2),
         )
         for i in range(1, 4)
     ]
-    samples = kubernetes_management_benchmark._OpSamples(
-        'Op', results, attempted_ops=3
-    )
+    samples = kubernetes_management_benchmark._OpSamples('Op', results)
     metrics = [s.metric for s in samples]
     self.assertIn('Op_InitiationLatency_Mean', metrics)
     self.assertIn('Op_EndToEndLatency_Mean', metrics)
 
-  def testAggregatesNotGeneratedForSingleSuccess(self):
-    results = [kubernetes_management_benchmark._OpResult('op1', 1.0, 2.0, None)]
-    samples = kubernetes_management_benchmark._OpSamples(
-        'Op', results, attempted_ops=1
-    )
+  def testAggregatesNotGeneratedForSingle(self):
+    results = [('op1', kubernetes_management_benchmark.OpTiming(1.0, 2.0))]
+    samples = kubernetes_management_benchmark._OpSamples('Op', results)
     self.assertNotIn('Op_InitiationLatency_Mean', [s.metric for s in samples])
 
-  def testOutliersGeneratedForFourOrMoreSuccesses(self):
-    """Outlier-count samples appear once there are >=4 successes."""
+  def testOutliersGeneratedForFourOrMore(self):
     results = [
-        kubernetes_management_benchmark._OpResult(
-            f'op{i}', float(i), float(i) * 2, None
+        (
+            f'op{i}',
+            kubernetes_management_benchmark.OpTiming(float(i), float(i) * 2),
         )
         for i in range(1, 6)
     ]
-    samples = kubernetes_management_benchmark._OpSamples(
-        'Op', results, attempted_ops=5
-    )
+    samples = kubernetes_management_benchmark._OpSamples('Op', results)
     metrics = [s.metric for s in samples]
     self.assertIn('Op_InitiationLatency_OutlierCount', metrics)
-    self.assertIn('Op_EndToEndLatency_OutlierCount', metrics)
 
-  def testOutliersNotGeneratedForThreeOrFewerSuccesses(self):
+  def testOutliersNotGeneratedForThreeOrFewer(self):
     results = [
-        kubernetes_management_benchmark._OpResult(
-            f'op{i}', float(i), float(i) * 2, None
+        (
+            f'op{i}',
+            kubernetes_management_benchmark.OpTiming(float(i), float(i) * 2),
         )
         for i in range(1, 4)
     ]
-    samples = kubernetes_management_benchmark._OpSamples(
-        'Op', results, attempted_ops=3
-    )
+    samples = kubernetes_management_benchmark._OpSamples('Op', results)
     self.assertNotIn(
         'Op_InitiationLatency_OutlierCount', [s.metric for s in samples]
     )
+
+
+class LargeScaleSamplesTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for the _LargeScaleSamples tolerant-path helper."""
+
+  def testSuccessRateHundredWhenAllSucceed(self):
+    results = [
+        ('op1', kubernetes_management_benchmark.OpTiming(1.0, 2.0)),
+        ('op2', kubernetes_management_benchmark.OpTiming(0.5, 1.5)),
+    ]
+    samples = kubernetes_management_benchmark._LargeScaleSamples(
+        'Op', results, [], attempted_ops=2
+    )
+    rate = next(s for s in samples if s.metric == 'Op_SuccessRate')
+    self.assertAlmostEqual(100.0, rate.value)
+
+  def testSuccessRateReflectsFailures(self):
+    results = [('op1', kubernetes_management_benchmark.OpTiming(1.0, 2.0))]
+    samples = kubernetes_management_benchmark._LargeScaleSamples(
+        'Op', results, ['op2', 'op3'], attempted_ops=3
+    )
+    rate = next(s for s in samples if s.metric == 'Op_SuccessRate')
+    self.assertAlmostEqual(100.0 / 3, rate.value, places=3)
+
+  def testFailedPoolsListedInMetadata(self):
+    results = [('op1', kubernetes_management_benchmark.OpTiming(1.0, 2.0))]
+    samples = kubernetes_management_benchmark._LargeScaleSamples(
+        'Op', results, ['op2', 'op3'], attempted_ops=3
+    )
+    failed = next(s for s in samples if s.metric == 'Op_FailedOps')
+    self.assertEqual(2, failed.value)
+    self.assertEqual('op2,op3', failed.metadata['failed_pools'])
+
+  def testCountMetricsExposed(self):
+    results = [('op1', kubernetes_management_benchmark.OpTiming(1.0, 2.0))]
+    samples = kubernetes_management_benchmark._LargeScaleSamples(
+        'Op', results, ['op2'], attempted_ops=2
+    )
+    metrics = {s.metric: s.value for s in samples}
+    self.assertEqual(2, metrics['Op_TotalOps'])
+    self.assertEqual(1, metrics['Op_SucceededOps'])
+    self.assertEqual(1, metrics['Op_FailedOps'])
+
+  def testZeroAttemptedRaisesRunError(self):
+    with self.assertRaises(errors.Benchmarks.RunError):
+      kubernetes_management_benchmark._LargeScaleSamples(
+          'Op', [], [], attempted_ops=0
+      )
 
 
 class AggregateSamplesTest(pkb_common_test_case.PkbCommonTestCase):
@@ -746,7 +738,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_SweepNodePools'
+        kubernetes_management_benchmark, '_ClearNodePools'
     ) as mock_clean, mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -773,7 +765,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_SweepNodePools'
+        kubernetes_management_benchmark, '_ClearNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -800,7 +792,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_SweepNodePools'
+        kubernetes_management_benchmark, '_ClearNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -827,7 +819,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_SweepNodePools'
+        kubernetes_management_benchmark, '_ClearNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -854,7 +846,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_SweepNodePools'
+        kubernetes_management_benchmark, '_ClearNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -885,7 +877,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     bm_spec = _make_mock_benchmark_spec(cluster)
     test_sample = _make_sample('metric', 1.0)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_SweepNodePools'
+        kubernetes_management_benchmark, '_ClearNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -914,7 +906,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     bm_spec = _make_mock_benchmark_spec(cluster)
     test_sample = _make_sample('m', 1.0)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_SweepNodePools'
+        kubernetes_management_benchmark, '_ClearNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -947,7 +939,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     cluster = _make_mock_cluster()
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_SweepNodePools'
+        kubernetes_management_benchmark, '_ClearNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',
@@ -974,7 +966,7 @@ class RunTest(pkb_common_test_case.PkbCommonTestCase):
     cluster.ResolveNodePoolVersions.return_value = ('1.33', '1.34')
     bm_spec = _make_mock_benchmark_spec(cluster)
     with mock.patch.object(
-        kubernetes_management_benchmark, '_SweepNodePools'
+        kubernetes_management_benchmark, '_ClearNodePools'
     ), mock.patch.object(
         kubernetes_management_benchmark,
         '_RunConcurrentNodePoolOps',

@@ -137,6 +137,10 @@ _PREFIX = "pkbm"
 
 
 def _ConcurrentPoolName(i):
+  """Returns the i-th concurrent-ops pool name.
+
+  Three-digit zero-padded so names stay within AKS's 12-char node-pool limit.
+  """
   return f"{_PREFIX}a{i:03d}"
 
 
@@ -148,28 +152,23 @@ def _ScalePoolName(i):
 
 
 @dataclasses.dataclass
-class _OpResult:
-  """Timing and outcome for a single async management-plane operation.
+class OpTiming:
+  """Latency of a single async management-plane operation.
+
+  Pure timing data — the metric name is supplied by the sample builder, and
+  failures abort the run rather than being recorded here (so there is no
+  error field). large_scale_provisioning, which tolerates partial failure,
+  tracks failed pool names separately.
 
   Attributes:
-    name: Node-pool (or operation) name the result is for.
     initiation_latency: Seconds from issuing the async API call until it is
       accepted and an operation handle is returned (time to *start*).
     end_to_end_latency: Seconds from issuing the call until the operation
       fully completes (initiation plus server-side execution).
-    error: The exception raised if the operation failed, else None.
   """
 
-  name: str
   initiation_latency: float
   end_to_end_latency: float
-  error: Exception | None = None
-
-  def __iter__(self):
-    yield self.name
-    yield self.initiation_latency
-    yield self.end_to_end_latency
-    yield self.error
 
 
 def GetConfig(user_config):
@@ -232,17 +231,17 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   )
 
 
-def _SweepNodePools(cluster: kubernetes_cluster.KubernetesCluster) -> None:
-  """Deletes all pkbm* node pools, blocking until each delete completes.
+def _ClearNodePools(cluster: kubernetes_cluster.KubernetesCluster) -> None:
+  """Clears all pkbm* node pools, blocking until each delete completes.
 
   Called after each scenario so the next one starts from a clean cluster,
   and from Cleanup() as a final best-effort teardown.
   """
   pools = [n for n in cluster.GetNodePoolNames() if n.startswith(_PREFIX)]
   if not pools:
-    logging.info("Sweep: no pkbm* pools present — cluster is clean.")
+    logging.info("Clear: no pkbm* pools present — cluster is clean.")
     return
-  logging.info("Sweep: deleting %d pkbm* pools: %s", len(pools), pools)
+  logging.info("Clear: deleting %d pkbm* pools: %s", len(pools), pools)
   background_tasks.RunThreaded(cluster.DeleteNodePool, pools)
 
 
@@ -277,13 +276,13 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   if "concurrent_node_pool_ops" in scenarios:
     samples += _RunConcurrentNodePoolOps(cluster, initial)
     # Each scenario leaves the cluster clean for the next one.
-    _SweepNodePools(cluster)
+    _ClearNodePools(cluster)
   if "overlapping_cluster_update" in scenarios:
     samples += _RunOverlappingClusterUpdate(cluster, initial)
-    _SweepNodePools(cluster)
+    _ClearNodePools(cluster)
   if "large_scale_provisioning" in scenarios:
     samples += _SweepScales(cluster, initial)
-    _SweepNodePools(cluster)
+    _ClearNodePools(cluster)
 
   # Tag all samples with version path and run config for published results.
   run_meta = {
@@ -308,7 +307,7 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       raise_on_failure=False,
   )
   # Final teardown reuses the same sweep the scenarios use.
-  _SweepNodePools(cluster)
+  _ClearNodePools(cluster)
 
 
 def _SweepScales(
@@ -347,7 +346,7 @@ def _RunConcurrentNodePoolOps(
   configs_ = [_MakeNodePoolConfig(cluster, name) for name in pool_names]
   samples: list[sample.Sample] = []
 
-  # ── Phase 1: concurrent creates ─────────────────────────────────────────
+  # ── Phase 1: concurrent creates (fail-hard — any failure aborts) ────────
   create_results = _RunAsync(
       kickoff=lambda cfg: cluster.CreateNodePoolAsync(
           cfg, node_version=initial
@@ -356,26 +355,18 @@ def _RunConcurrentNodePoolOps(
       items=configs_,
       get_name=lambda cfg: cfg.name,
   )
-  samples += _OpSamples(
-      "ConcurrentOps_Create", create_results, attempted_ops=len(pool_names)
-  )
+  samples += _OpSamples("ConcurrentOps_Create", create_results)
 
-  # ── Phase 2: concurrent deletes (live-list to catch EKS rollbacks) ──────
+  # ── Phase 2: concurrent deletes (live-list; all creates succeeded) ──────
   alive = _LiveNodePoolNames(cluster, f"{_PREFIX}a")
-  logging.info(
-      "concurrent_node_pool_ops: %d live pools for delete (originally %d)",
-      len(alive),
-      n,
-  )
+  logging.info("concurrent_node_pool_ops: deleting %d pools", len(alive))
   delete_results = _RunAsync(
       kickoff=cluster.DeleteNodePoolAsync,
       wait_fn=cluster.WaitForOperation,
       items=alive,
       get_name=str,
   )
-  # attempted_ops=n: success rate reflects original request, not just live.
-  # EKS rolls back timed-out pools silently — without this shows 100%.
-  samples += _OpSamples("ConcurrentOps_Delete", delete_results, attempted_ops=n)
+  samples += _OpSamples("ConcurrentOps_Delete", delete_results)
   return samples
 
 
@@ -390,38 +381,34 @@ def _RunOverlappingClusterUpdate(
   """
   logging.info("Scenario B: overlapping cluster update + node-pool create")
   cfg = _MakeNodePoolConfig(cluster, _OVERLAPPING_POOL_NAME)
-  results = _Results()
+  results = ThreadSafeResults()
 
   def DoClusterUpdate():
-    init, e2e, err = _TimedAsync(
-        cluster.UpdateClusterAsync, cluster.WaitForOperation
-    )
-    results.add("OverlappingUpdate_ClusterUpdate", init, e2e, err)
+    timing = _TimedAsync(cluster.UpdateClusterAsync, cluster.WaitForOperation)
+    results.add("OverlappingUpdate_ClusterUpdate", timing)
     logging.info(
-        "Scenario B ClusterUpdate: init=%.2fs e2e=%.2fs ok=%s",
-        init,
-        e2e,
-        err is None,
+        "Scenario B ClusterUpdate: init=%.2fs e2e=%.2fs",
+        timing.initiation_latency,
+        timing.end_to_end_latency,
     )
 
   def DoCreate():
-    init, e2e, err = _TimedAsync(
+    timing = _TimedAsync(
         lambda: cluster.CreateNodePoolAsync(cfg, node_version=initial),
         cluster.WaitForOperation,
     )
-    results.add("OverlappingUpdate_NodePoolCreate", init, e2e, err)
+    results.add("OverlappingUpdate_NodePoolCreate", timing)
     logging.info(
-        "Scenario B NodePoolCreate: init=%.2fs e2e=%.2fs ok=%s",
-        init,
-        e2e,
-        err is None,
+        "Scenario B NodePoolCreate: init=%.2fs e2e=%.2fs",
+        timing.initiation_latency,
+        timing.end_to_end_latency,
     )
 
   background_tasks.RunThreaded(lambda fn: fn(), [DoClusterUpdate, DoCreate])
 
   samples: list[sample.Sample] = []
-  for entry in results.entries:
-    samples += _OpSamples(entry.name, [entry], attempted_ops=1)
+  for name, timing in results.entries:
+    samples += _OpSamples(name, [(name, timing)])
 
   # Remove test pool (best-effort).
   cluster.DeleteNodePool(_OVERLAPPING_POOL_NAME)
@@ -450,8 +437,8 @@ def _ScaleToPoolCount(
   configs_ = [_MakeNodePoolConfig(cluster, name) for name in pool_names]
   samples: list[sample.Sample] = []
 
-  # ── Creates ──────────────────────────────────────────────────────────────
-  create_results = _RunAsync(
+  # ── Creates (tolerant — partial failure expected at scale) ───────────────
+  create_results, create_failed = _RunAsyncTolerant(
       kickoff=lambda cfg: cluster.CreateNodePoolAsync(
           cfg, node_version=initial
       ),
@@ -459,12 +446,15 @@ def _ScaleToPoolCount(
       items=configs_,
       get_name=lambda cfg: cfg.name,
   )
-  created_ok = sum(1 for r in create_results if r.error is None)
   logging.info(
-      "Scenario C scale=%d: %d/%d creates succeeded", scale, created_ok, scale
+      "Scenario C scale=%d: %d/%d creates succeeded (%d failed)",
+      scale,
+      len(create_results),
+      scale,
+      len(create_failed),
   )
-  samples += _OpSamples(
-      "LargeScale_Create", create_results, attempted_ops=scale
+  samples += _LargeScaleSamples(
+      "LargeScale_Create", create_results, create_failed, attempted_ops=scale
   )
 
   # ── Deletes (live-list) ──────────────────────────────────────────────────
@@ -479,18 +469,20 @@ def _ScaleToPoolCount(
   )
   if not alive:
     logging.info("Scenario C scale=%d: all creates rolled back.", scale)
-    samples += _OpSamples("LargeScale_Delete", [], attempted_ops=scale)
+    samples += _LargeScaleSamples(
+        "LargeScale_Delete", [], [], attempted_ops=scale
+    )
     return samples
 
-  delete_results = _RunAsync(
+  delete_results, delete_failed = _RunAsyncTolerant(
       kickoff=cluster.DeleteNodePoolAsync,
       wait_fn=cluster.WaitForOperation,
       items=alive,
       get_name=str,
   )
   # attempted_ops=scale: accurate rate against original request count.
-  samples += _OpSamples(
-      "LargeScale_Delete", delete_results, attempted_ops=scale
+  samples += _LargeScaleSamples(
+      "LargeScale_Delete", delete_results, delete_failed, attempted_ops=scale
   )
   return samples
 
@@ -500,43 +492,40 @@ def _ScaleToPoolCount(
 # ---------------------------------------------------------------------------
 
 
-class _Results:
-  """Thread-safe collector for (name, init_latency, e2e_latency, error)."""
+class ThreadSafeResults:
+  """Thread-safe collector of (name, OpTiming) pairs from concurrent ops."""
 
   def __init__(self):
     self._lock = threading.Lock()
-    self.entries: list[_OpResult] = []
+    self.entries: list[tuple[str, OpTiming]] = []
+    self.failed: list[str] = []
 
-  def add(
-      self, name: str, init_dur: float, e2e_dur: float, err: Exception | None
-  ) -> None:
-    result = _OpResult(name, init_dur, e2e_dur, err)
+  def add(self, name: str, timing: OpTiming) -> None:
     with self._lock:
-      self.entries.append(result)
+      self.entries.append((name, timing))
+
+  def add_failure(self, name: str) -> None:
+    with self._lock:
+      self.failed.append(name)
 
 
 def _TimedAsync(
     kickoff: Callable[[], str],
     wait_fn: Callable[[str], None],
-) -> tuple[float, float, Exception | None]:
-  """Runs kickoff() then wait_fn(handle); returns (init_lat, e2e_lat, err).
+) -> OpTiming:
+  """Runs kickoff() then wait_fn(handle); returns the OpTiming.
 
-  init_lat = time for kickoff() to return (API accepted).
-  e2e_lat  = total wall time including wait. On kickoff failure both are set
-             to elapsed time at failure point.
+  Lets exceptions propagate — a failed management-plane op aborts the
+  benchmark rather than being silently absorbed. initiation_latency is the
+  time for kickoff() to return (API accepted); end_to_end_latency is total
+  wall time including the wait.
   """
   init_start = time.monotonic()
-  try:
-    handle = kickoff()
-  except Exception as exc:  # pylint: disable=broad-except
-    elapsed = time.monotonic() - init_start
-    return elapsed, elapsed, exc
-  init_dur = time.monotonic() - init_start
-  try:
-    wait_fn(handle)
-    return init_dur, time.monotonic() - init_start, None
-  except Exception as exc:  # pylint: disable=broad-except
-    return init_dur, time.monotonic() - init_start, exc
+  handle = kickoff()
+  initiation_latency = time.monotonic() - init_start
+  wait_fn(handle)
+  end_to_end_latency = time.monotonic() - init_start
+  return OpTiming(initiation_latency, end_to_end_latency)
 
 
 def _RunAsync(
@@ -544,31 +533,70 @@ def _RunAsync(
     wait_fn: Callable[[str], None],
     items: list,
     get_name: Callable[[object], str],
-) -> list[tuple[str, float, float, Exception | None]]:
-  """Fires kickoff(item) concurrently for all items; returns timed results.
+) -> list[tuple[str, OpTiming]]:
+  """Fires kickoff(item) concurrently; returns (name, OpTiming) per item.
 
-  Uses background_tasks.RunThreaded with a concurrency cap for streaming
+  Fail-hard: any op that raises aborts the run (RunThreaded propagates the
+  exception). Used by the create/upgrade/delete scenarios where a single
+  failure is a benchmark failure. Uses a concurrency cap for streaming
   execution — completed ops free their slot immediately for the next one.
   """
   if not items:
     return []
-  results = _Results()
+  results = ThreadSafeResults()
   cap = min(len(items), _MAX_CONCURRENT.value)
 
   def DoWrap(item):
-    init_dur, e2e_dur, err = _TimedAsync(lambda: kickoff(item), wait_fn)
+    timing = _TimedAsync(lambda: kickoff(item), wait_fn)
     name = get_name(item)
-    results.add(name, init_dur, e2e_dur, err)
+    results.add(name, timing)
     logging.info(
-        "%s ok=%s initiation=%.2fs end_to_end=%.2fs",
+        "%s initiation=%.2fs end_to_end=%.2fs",
         name,
-        err is None,
-        init_dur,
-        e2e_dur,
+        timing.initiation_latency,
+        timing.end_to_end_latency,
     )
 
   background_tasks.RunThreaded(DoWrap, items, max_concurrent_threads=cap)
   return results.entries
+
+
+def _RunAsyncTolerant(
+    kickoff: Callable,
+    wait_fn: Callable[[str], None],
+    items: list,
+    get_name: Callable[[object], str],
+) -> tuple[list[tuple[str, OpTiming]], list[str]]:
+  """Like _RunAsync but tolerates per-op failures (large_scale only).
+
+  Returns (successful (name, OpTiming) pairs, failed names). A failing op is
+  caught, its name recorded, and execution continues — appropriate only for
+  large-scale provisioning where overshooting quota is an expected scenario,
+  not a benchmark failure.
+  """
+  if not items:
+    return [], []
+  results = ThreadSafeResults()
+  cap = min(len(items), _MAX_CONCURRENT.value)
+
+  def DoWrap(item):
+    name = get_name(item)
+    try:
+      timing = _TimedAsync(lambda: kickoff(item), wait_fn)
+    except Exception as exc:  # pylint: disable=broad-except
+      results.add_failure(name)
+      logging.warning("%s FAILED: %s", name, str(exc)[:200])
+      return
+    results.add(name, timing)
+    logging.info(
+        "%s initiation=%.2fs end_to_end=%.2fs",
+        name,
+        timing.initiation_latency,
+        timing.end_to_end_latency,
+    )
+
+  background_tasks.RunThreaded(DoWrap, items, max_concurrent_threads=cap)
+  return results.entries, results.failed
 
 
 def _MakeNodePoolConfig(
@@ -593,36 +621,30 @@ def _LiveNodePoolNames(
 
 def _OpSamples(
     metric_prefix: str,
-    results: list[_OpResult],
-    attempted_ops: int | None = None,
+    results: list[tuple[str, OpTiming]],
 ) -> list[sample.Sample]:
-  """Per-op + aggregate samples for initiation and end-to-end latency.
+  """Per-op + aggregate latency samples for fail-hard scenarios.
+
+  Every op in `results` succeeded (a failure would have aborted the run), so
+  there is no success-rate or error accounting here — just initiation and
+  end-to-end latency per op, plus aggregate stats.
 
   Args:
     metric_prefix: prefix for all metric names.
-    results:       list of (operation_name, init_lat, e2e_lat, err).
-    attempted_ops: total ops originally requested. Used as the denominator
-                   for SuccessRate so EKS-rolled-back pools (which never
-                   appear in results) are counted as failures, not ignored.
-                   If None, len(results) is used (original behavior).
+    results: (name, OpTiming) pairs from _RunAsync.
   """
   samples: list[sample.Sample] = []
   init_latencies: list[float] = []
   e2e_latencies: list[float] = []
-  success = 0
 
-  for r in results:
-    meta = {"operation_name": r.name, "success": str(r.error is None)}
-    if r.error is not None:
-      meta["error"] = str(r.error)[:200]
-    else:
-      success += 1
-      init_latencies.append(r.initiation_latency)
-      e2e_latencies.append(r.end_to_end_latency)
+  for name, timing in results:
+    meta = {"operation_name": name}
+    init_latencies.append(timing.initiation_latency)
+    e2e_latencies.append(timing.end_to_end_latency)
     samples.append(
         sample.Sample(
             f"{metric_prefix}_InitiationLatency",
-            r.initiation_latency,
+            timing.initiation_latency,
             "seconds",
             dict(meta),
         )
@@ -630,51 +652,105 @@ def _OpSamples(
     samples.append(
         sample.Sample(
             f"{metric_prefix}_EndToEndLatency",
-            r.end_to_end_latency,
+            timing.end_to_end_latency,
             "seconds",
             dict(meta),
         )
     )
 
-  # ── Counts + success rate ──────────────────────────────────────────────
-  total = attempted_ops if attempted_ops is not None else len(results)
-  executed = len(results)
-  if total == 0:
-    raise errors.Benchmarks.RunError(
-        f"{metric_prefix}: zero operations attempted — the scenario "
-        "produced no work, which indicates a setup or dispatch failure."
+  samples += _AggregateAndOutlierSamples(
+      metric_prefix, init_latencies, e2e_latencies
+  )
+  return samples
+
+
+def _LargeScaleSamples(
+    metric_prefix: str,
+    results: list[tuple[str, OpTiming]],
+    failed: list[str],
+    attempted_ops: int,
+) -> list[sample.Sample]:
+  """Latency + success/failure accounting for the tolerant large-scale path.
+
+  Unlike _OpSamples, large_scale_provisioning tolerates partial failure, so
+  this reports how many ops succeeded/failed (against the originally-attempted
+  count) and lists the failed pool names in metadata.
+
+  Args:
+    metric_prefix: prefix for all metric names.
+    results: successful (name, OpTiming) pairs.
+    failed: names of ops that failed.
+    attempted_ops: total ops originally requested (the denominator).
+  """
+  samples: list[sample.Sample] = []
+  init_latencies: list[float] = []
+  e2e_latencies: list[float] = []
+
+  for name, timing in results:
+    meta = {"operation_name": name}
+    init_latencies.append(timing.initiation_latency)
+    e2e_latencies.append(timing.end_to_end_latency)
+    samples.append(
+        sample.Sample(
+            f"{metric_prefix}_InitiationLatency",
+            timing.initiation_latency,
+            "seconds",
+            dict(meta),
+        )
     )
-  # Expose each count as its own metric (not just SuccessRate metadata).
+    samples.append(
+        sample.Sample(
+            f"{metric_prefix}_EndToEndLatency",
+            timing.end_to_end_latency,
+            "seconds",
+            dict(meta),
+        )
+    )
+
+  if attempted_ops == 0:
+    raise errors.Benchmarks.RunError(
+        f"{metric_prefix}: zero operations attempted — the scenario produced "
+        "no work, which indicates a setup or dispatch failure."
+    )
+  succeeded = len(results)
   count_meta = {
-      "total_ops": str(total),
-      "executed_ops": str(executed),
-      "successful_ops": str(success),
-      "skipped_ops": str(total - executed),
+      "total_ops": str(attempted_ops),
+      "succeeded_ops": str(succeeded),
+      "failed_ops": str(attempted_ops - succeeded),
+      "failed_pools": ",".join(failed) if failed else "none",
   }
-  for count_label, count_value in (
-      ("TotalOps", total),
-      ("ExecutedOps", executed),
-      ("SuccessfulOps", success),
-      ("SkippedOps", total - executed),
+  for label, value in (
+      ("TotalOps", attempted_ops),
+      ("SucceededOps", succeeded),
+      ("FailedOps", attempted_ops - succeeded),
   ):
     samples.append(
         sample.Sample(
-            f"{metric_prefix}_{count_label}",
-            count_value,
-            "count",
-            dict(count_meta),
+            f"{metric_prefix}_{label}", value, "count", dict(count_meta)
         )
     )
   samples.append(
       sample.Sample(
           f"{metric_prefix}_SuccessRate",
-          100.0 * success / total,
+          100.0 * succeeded / attempted_ops,
           "percent",
           dict(count_meta),
       )
   )
 
-  # ── Aggregate stats (successful ops only) ────────────────────────────────
+  samples += _AggregateAndOutlierSamples(
+      metric_prefix, init_latencies, e2e_latencies
+  )
+  return samples
+
+
+def _AggregateAndOutlierSamples(
+    metric_prefix: str,
+    init_latencies: list[float],
+    e2e_latencies: list[float],
+) -> list[sample.Sample]:
+  """Emits aggregate stats (>=2 samples) and outlier counts (>=4 samples)."""
+  samples: list[sample.Sample] = []
   for phase_label, latencies in (
       ("InitiationLatency", init_latencies),
       ("EndToEndLatency", e2e_latencies),
@@ -683,7 +759,6 @@ def _OpSamples(
       samples += _AggregateSamples(metric_prefix, phase_label, latencies)
     if len(latencies) >= 4:
       samples += _OutlierSamples(metric_prefix, phase_label, latencies)
-
   return samples
 
 
