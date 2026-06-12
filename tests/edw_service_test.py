@@ -13,9 +13,12 @@
 # limitations under the License.
 """Tests for edw_service.py."""
 
+import builtins
 import copy
 import unittest
+from unittest import mock
 from absl import flags
+from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker.configs import benchmark_config_spec
@@ -31,6 +34,11 @@ _PASSWORD = 'pkb-password'
 _TEST_RUN_URI = 'fakeru'
 
 _AWS_ZONE_US_EAST_1A = 'us-east-1a'
+
+CSV_CONTENT = """Question ID,DB ID,Question,Evidence,Difficulty,Ground Truth SQL,Table Referenced,cuj_tag
+6,call_center,Which 3 customer segments have the most conversations,,Simple,SELECT 1;,"[call_center.transcript, retail_banking.client]",ca_tag
+7,ecomm,How many sessions with a cart in 2023?,,Simple,SELECT 2;,ecomm.events,ca_tag
+"""
 
 _BASE_REDSHIFT_SPEC = {
     'cluster_identifier': _PKB_CLUSTER,
@@ -148,6 +156,84 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
             f' {edw_service.EdwService.ColsToRows(cols)}'
         ),
     )
+
+  @flagsaver.flagsaver(
+      conversational_analytics_questions_file='test_questions.csv'
+  )
+  def testInitLoadsQuestionsFromResource(self):
+    mock_resource_path = self.enter_context(
+        mock.patch.object(
+            edw_service.data,
+            'ResourcePath',
+            autospec=True,
+            return_value='/fake/path/test_questions.csv',
+        )
+    )
+
+    mock_open = mock.mock_open(read_data=CSV_CONTENT)
+    with mock.patch.object(builtins, 'open', mock_open):
+      kwargs = copy.copy({'db': _PKB_CLUSTER_DATABASE})
+      spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
+      service = FakeEdwService(spec)
+
+    with self.subTest('FileRead'):
+      mock_resource_path.assert_called_once_with('test_questions.csv')
+      mock_open.assert_called_once_with(
+          '/fake/path/test_questions.csv', 'r', encoding='utf-8'
+      )
+
+    with self.subTest('QuestionsContent'):
+      questions = service.GetConversationalAnalyticsQuestionList()
+      self.assertLen(questions, 2)
+
+      self.assertEqual(
+          questions[0].question,
+          'Which 3 customer segments have the most conversations',
+      )
+      self.assertEqual(questions[0].db_id, 'call_center')
+      self.assertEqual(questions[0].ground_truth_sql, 'SELECT 1;')
+
+      self.assertEqual(
+          questions[1].question, 'How many sessions with a cart in 2023?'
+      )
+      self.assertEqual(questions[1].db_id, 'ecomm')
+      self.assertEqual(questions[1].ground_truth_sql, 'SELECT 2;')
+
+  def testGetConversationalAnalyticsQuestionListNotPrepared(self):
+    kwargs = copy.copy({'db': _PKB_CLUSTER_DATABASE})
+    spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
+    service = FakeEdwService(spec)
+    with self.assertRaisesRegex(
+        ValueError, 'Conversational analytics questions not loaded.'
+    ):
+      service.GetConversationalAnalyticsQuestionList()
+
+  @flagsaver.flagsaver(
+      conversational_analytics_questions_file='test_questions_empty.csv'
+  )
+  def testInitLoadsQuestionsEmptyFileThrowsError(self):
+    self.enter_context(
+        mock.patch.object(
+            edw_service.data,
+            'ResourcePath',
+            autospec=True,
+            return_value='/fake/path/test_questions_empty.csv',
+        )
+    )
+    mock_open = mock.mock_open(
+        read_data=(
+            'Question ID,DB ID,Question,Evidence,Difficulty,Ground Truth'
+            ' SQL,Table Referenced,cuj_tag\n'
+        )
+    )
+    with mock.patch.object(builtins, 'open', mock_open):
+      kwargs = copy.copy({'db': _PKB_CLUSTER_DATABASE})
+      spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
+      with self.assertRaisesRegex(
+          edw_service.errors.Benchmarks.RunError,
+          'Loaded 0 questions from /fake/path/test_questions_empty.csv.',
+      ):
+        FakeEdwService(spec)
 
 
 if __name__ == '__main__':

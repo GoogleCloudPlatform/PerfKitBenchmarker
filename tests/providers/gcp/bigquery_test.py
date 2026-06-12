@@ -18,6 +18,7 @@ import unittest
 from unittest import mock
 from absl import flags
 from absl.testing import parameterized
+from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.gcp import bigquery
 from tests import pkb_common_test_case
 
@@ -450,6 +451,250 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
         bigquery._SplitClusterIdentifier('catalog.namespace.dataset'),
         ('catalog', 'namespace.dataset'),
     )
+
+  @parameterized.named_parameters(
+      (
+          'missing_text_response',
+          {
+              'query_wall_time_in_secs': 5.0,
+              'details': {
+                  'query_results': {
+                      'generated_sql': 'SELECT * FROM foo',
+                      'retrieved_data': [['a', 'b']],
+                  }
+              },
+          },
+          (
+              "Conversational Analytics query failed: 'text_response' is"
+              ' missing or empty. Got: None'
+          ),
+      ),
+      (
+          'empty_text_response',
+          {
+              'query_wall_time_in_secs': 5.0,
+              'details': {
+                  'query_results': {
+                      'text_response': '',
+                      'generated_sql': 'SELECT * FROM foo',
+                      'retrieved_data': [['a', 'b']],
+                  }
+              },
+          },
+          (
+              "Conversational Analytics query failed: 'text_response' is"
+              " missing or empty. Got: ''"
+          ),
+      ),
+      (
+          'missing_generated_sql',
+          {
+              'query_wall_time_in_secs': 5.0,
+              'details': {
+                  'query_results': {
+                      'text_response': 'Fake answer',
+                      'retrieved_data': [['a', 'b']],
+                  }
+              },
+          },
+          (
+              "Conversational Analytics query failed: 'generated_sql' is"
+              ' missing or empty. Got: None'
+          ),
+      ),
+      (
+          'empty_generated_sql',
+          {
+              'query_wall_time_in_secs': 5.0,
+              'details': {
+                  'query_results': {
+                      'text_response': 'Fake answer',
+                      'generated_sql': '',
+                      'retrieved_data': [['a', 'b']],
+                  }
+              },
+          },
+          (
+              "Conversational Analytics query failed: 'generated_sql' is"
+              " missing or empty. Got: ''"
+          ),
+      ),
+      (
+          'missing_retrieved_data',
+          {
+              'query_wall_time_in_secs': 5.0,
+              'details': {
+                  'query_results': {
+                      'text_response': 'Fake answer',
+                      'generated_sql': 'SELECT * FROM foo',
+                  }
+              },
+          },
+          (
+              "Conversational Analytics query failed: 'retrieved_data' is"
+              ' missing or empty. Got: None'
+          ),
+      ),
+      (
+          'empty_retrieved_data',
+          {
+              'query_wall_time_in_secs': 5.0,
+              'details': {
+                  'query_results': {
+                      'text_response': 'Fake answer',
+                      'generated_sql': 'SELECT * FROM foo',
+                      'retrieved_data': [],
+                  }
+              },
+          },
+          (
+              "Conversational Analytics query failed: 'retrieved_data' is"
+              ' missing or empty. Got: []'
+          ),
+      ),
+  )
+  def testConversationalAnalyticsClientInterfaceExecuteQueryValidationErrors(
+      self, response_dict, expected_error_msg
+  ):
+    FLAGS.gcp_service_account_key_file = '/path/to/SERVICE_ACCOUNT_KEY_FILE'
+    FLAGS.bq_ca_agent = 'AGENT_ID'
+    interface = bigquery.ConversationalAnalyticsClientInterface(
+        PROJECT_ID, DATASET_ID
+    )
+    mock_vm = mock.MagicMock()
+    bm_spec = FakeBenchmarkSpec(mock_vm)
+    interface.SetProvisionedAttributes(bm_spec)
+
+    mock_vm.RemoteCommand.side_effect = [
+        (None, None),  # For directory check in CreateRemoteFile
+        (json.dumps(response_dict), None),  # For executing query
+    ]
+
+    execution_time, metadata = interface.ExecuteQuery(QUERY_NAME)
+    self.assertEqual(execution_time, -1.0)
+    self.assertEqual(metadata['error'], expected_error_msg)
+
+    # Assertions
+    expected_query_file = interface._GetQueryFileName(QUERY_NAME)
+    mock_vm.RemoteCommand.assert_has_calls([
+        mock.call('[ -d . ] || mkdir -p .'),
+        mock.call(
+            'source .venv/bin/activate && python3 bq_ca_driver.py single '
+            f'--project={PROJECT_ID} --agent=AGENT_ID '
+            '--credentials_file=SERVICE_ACCOUNT_KEY_FILE --print_results '
+            f'--query_file={expected_query_file}'
+        )
+    ])
+    mock_vm.PushFile.assert_called_once_with(mock.ANY, expected_query_file)
+
+  def testGetQueryFileName(self):
+    FLAGS.gcp_service_account_key_file = '/path/to/SERVICE_ACCOUNT_KEY_FILE'
+    interface = bigquery.ConversationalAnalyticsClientInterface(
+        PROJECT_ID, DATASET_ID
+    )
+    query = 'What is the total sales in 2023?'
+    filename = interface._GetQueryFileName(query)
+    self.assertTrue(filename.startswith('./What_is_the_total_sales_in_202'))
+    self.assertTrue(filename.endswith('.txt'))
+    # Length should be: 2 (for ./) + 30 (for sanitized prefix) + 1 (for _) + 8
+    # (for hash) + 4 (for .txt) = 45
+    self.assertLen(filename, 45)
+
+  def testParseConversationalAnalyticsResultsSuccess(self):
+    FLAGS.gcp_service_account_key_file = '/path/to/SERVICE_ACCOUNT_KEY_FILE'
+    interface = bigquery.ConversationalAnalyticsClientInterface(
+        PROJECT_ID, DATASET_ID
+    )
+    results = {
+        'query_wall_time_in_secs': 5.0,
+        'details': {
+            'job_id': 'job_123',
+            'query_results': {
+                'text_response': 'The total sales is $1000.',
+                'generated_sql': 'SELECT sum(sales) FROM t',
+                'retrieved_data': [['1000']],
+                'thoughts': ['thought 1'],
+                'progress_messages': ['progress 1'],
+                'time_to_first_token_secs': 1.0,
+                'total_stream_time_secs': 4.0,
+            }
+        }
+    }
+    execution_time, metadata = interface._ParseConversationalAnalyticsResults(
+        results, 'test query'
+    )
+    self.assertEqual(execution_time, 5.0)
+    self.assertEqual(metadata['question'], 'test query')
+    self.assertEqual(metadata['text_response'], 'The total sales is $1000.')
+    self.assertEqual(metadata['generated_sql'], 'SELECT sum(sales) FROM t')
+    self.assertEqual(metadata['retrieved_data'], [['1000']])
+    self.assertEqual(metadata['thoughts'], ['thought 1'])
+    self.assertEqual(metadata['progress_messages'], ['progress 1'])
+    self.assertEqual(metadata['time_to_first_token_secs'], 1.0)
+    self.assertEqual(metadata['total_stream_time_secs'], 4.0)
+    self.assertEqual(metadata['job_id'], 'job_123')
+    self.assertNotIn('error', metadata)
+
+  def testConversationalAnalyticsClientInterfaceExecuteQuerySuccess(self):
+    FLAGS.gcp_service_account_key_file = '/path/to/SERVICE_ACCOUNT_KEY_FILE'
+    FLAGS.bq_ca_agent = 'AGENT_ID'
+    interface = bigquery.ConversationalAnalyticsClientInterface(
+        PROJECT_ID, DATASET_ID
+    )
+    mock_vm = mock.MagicMock()
+    bm_spec = FakeBenchmarkSpec(mock_vm)
+    interface.SetProvisionedAttributes(bm_spec)
+
+    response_dict = {
+        'query_wall_time_in_secs': 5.0,
+        'details': {
+            'job_id': 'job_123',
+            'query_results': {
+                'text_response': 'The total sales is $1000.',
+                'generated_sql': 'SELECT sum(sales) FROM t',
+                'retrieved_data': [['1000']],
+            }
+        }
+    }
+
+    mock_vm.RemoteCommand.side_effect = [
+        (None, None),  # For directory check in CreateRemoteFile
+        (json.dumps(response_dict), None),  # For executing query
+    ]
+
+    execution_time, metadata = interface.ExecuteQuery(QUERY_NAME)
+    self.assertEqual(execution_time, 5.0)
+    self.assertEqual(metadata['text_response'], 'The total sales is $1000.')
+
+    expected_query_file = interface._GetQueryFileName(QUERY_NAME)
+    mock_vm.RemoteCommand.assert_has_calls([
+        mock.call('[ -d . ] || mkdir -p .'),
+        mock.call(
+            'source .venv/bin/activate && python3 bq_ca_driver.py single '
+            f'--project={PROJECT_ID} --agent=AGENT_ID '
+            '--credentials_file=SERVICE_ACCOUNT_KEY_FILE --print_results '
+            f'--query_file={expected_query_file}'
+        )
+    ])
+    mock_vm.PushFile.assert_called_once_with(mock.ANY, expected_query_file)
+
+  def testConversationalAnalyticsClientInterfaceExecuteQueryInvalidJson(self):
+    FLAGS.gcp_service_account_key_file = '/path/to/SERVICE_ACCOUNT_KEY_FILE'
+    FLAGS.bq_ca_agent = 'AGENT_ID'
+    interface = bigquery.ConversationalAnalyticsClientInterface(
+        PROJECT_ID, DATASET_ID
+    )
+    mock_vm = mock.MagicMock()
+    bm_spec = FakeBenchmarkSpec(mock_vm)
+    interface.SetProvisionedAttributes(bm_spec)
+
+    mock_vm.RemoteCommand.side_effect = [
+        (None, None),  # For directory check in CreateRemoteFile
+        ('invalid json', None),  # For executing query
+    ]
+
+    with self.assertRaises(errors.Benchmarks.RunError):
+      interface.ExecuteQuery(QUERY_NAME)
 
 
 if __name__ == '__main__':
