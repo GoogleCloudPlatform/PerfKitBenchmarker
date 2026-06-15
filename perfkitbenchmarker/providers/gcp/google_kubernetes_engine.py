@@ -632,19 +632,58 @@ class GkeCluster(BaseGkeCluster):
       cmd.flags['node-pool'] = node_pool
     cmd.Issue()
 
-  def _IssueAsync(self, cmd: util.GcloudCommand) -> str:
-    """Issues a gcloud command with --async, returns the operation name."""
+  def _IssueAsync(
+      self,
+      cmd: util.GcloudCommand,
+      fallback_op_type: str | None = None,
+      fallback_target: str = '',
+  ) -> str:
+    """Issues a gcloud --async command and returns the operation name.
+
+    Most async commands (node-pool create/delete) print the operation name to
+    stdout. A few (`clusters upgrade --node-pool`, `clusters update`) reliably
+    return success with empty stdout — gcloud simply does not emit the name for
+    those subcommands. For those, pass fallback_op_type/fallback_target and the
+    operation name is recovered from `gcloud container operations list`.
+
+    Args:
+      cmd: the gcloud command to issue (--async and format are added here).
+      fallback_op_type: GKE operationType (e.g. 'UPGRADE_NODES',
+        'UPDATE_CLUSTER') to look up if stdout is empty. None disables the
+        fallback (create/delete, which always print the name).
+      fallback_target: targetLink substring for the fallback lookup (node-pool
+        or cluster name).
+
+    Returns:
+      The operation name.
+    """
     cmd.args.append('--async')
     cmd.flags['format'] = 'value(name)'
+    # Recorded before issuing so the fallback's startTime>= guard can include
+    # fast ops that may already be DONE before the operations-list query runs.
+    op_start_time = time.time()
     stdout, stderr, retcode = cmd.Issue(timeout=600, raise_on_failure=False)
     if retcode:
       raise errors.Resource.CreationError(stderr)
     op_name = stdout.strip().splitlines()[-1].strip() if stdout else ''
-    if not op_name:
+    if op_name:
+      return op_name
+    # Empty stdout. For commands that print the name this is a real failure;
+    # for upgrade/update it is expected, so recover via the operations list.
+    if fallback_op_type is None:
       raise errors.Resource.CreationError(
           f'GKE async command returned no operation name; stderr={stderr}'
       )
-    return op_name
+    logging.info(
+        '_IssueAsync: no op name printed; ops-list fallback type=%s target=%s',
+        fallback_op_type,
+        fallback_target,
+    )
+    return self._GetLatestOperationName(
+        operation_type=fallback_op_type,
+        target_name=fallback_target,
+        op_start_time=op_start_time,
+    )
 
   def _GetLatestOperationName(
       self,
@@ -656,48 +695,40 @@ class GkeCluster(BaseGkeCluster):
   ) -> str:
     """Returns the name of the most recent matching operation for this cluster.
 
-    The async gcloud command may return before the GKE control plane has
-    transitioned the operation from PENDING to RUNNING.  For fast operations
-    (e.g. label updates) the operation may already be DONE by the time this
-    method is called.  Passing op_start_time handles both cases.
+    Used to recover an operation name for async commands that don't print one
+    (upgrade/update). The async gcloud command may return before the control
+    plane has transitioned the operation out of PENDING, and fast operations
+    (e.g. label updates) may already be DONE by the time this runs — so the
+    status filter always includes RUNNING/PENDING/DONE, with a startTime guard
+    (op_start_time minus a 30s clock-skew buffer) to avoid matching older
+    completed operations.
 
     Args:
         operation_type: GKE operationType to filter on, e.g. 'UPGRADE_NODES'
             for node pool upgrades or 'UPDATE_CLUSTER' for cluster-level
-            updates via 'gcloud container clusters update'.
-        target_name: Substring to match against targetLink (e.g. nodepool name
-            for UPGRADE_NODES, or cluster name for UPDATE_CLUSTER).  If empty,
-            falls back to self.name (the cluster name).
+            updates.
+        target_name: Substring to match against targetLink (node-pool name for
+            UPGRADE_NODES, cluster name for UPDATE_CLUSTER). If empty, falls
+            back to self.name.
         max_attempts: Number of query attempts before giving up.
         retry_delay: Seconds to wait between attempts.
-        op_start_time: Unix timestamp recorded just before the async gcloud
-            command was issued.  When provided, the status filter is broadened
-            to include DONE (so fast-completing operations are found) and a
-            startTime >= guard is added to avoid matching old operations.
+        op_start_time: Unix timestamp recorded just before the async command
+            was issued; used for the startTime>= guard. Defaults to now minus
+            the buffer if not supplied.
 
     Returns:
-        Operation name string, or empty string if none found.
+        Operation name string.
     """
     link_target = target_name or self.name
-    if op_start_time:
-      # Fast operations (e.g. --update-labels) may be DONE before we query.
-      # Broaden the status filter and add a startTime guard (with a 30-second
-      # buffer for clock skew) to avoid picking up older completed operations.
-      from_time = time.strftime(
-          '%Y-%m-%dT%H:%M:%SZ', time.gmtime(op_start_time - 30)
-      )
-      status_filter = '(status=RUNNING OR status=PENDING OR status=DONE)'
-      time_filter = f' AND startTime>="{from_time}"'
-    else:
-      # Slow operations (e.g. node pool upgrades): only look for active ops.
-      status_filter = '(status=RUNNING OR status=PENDING)'
-      time_filter = ''
-
+    # 30-second buffer absorbs clock skew between client and control plane.
+    from_time = time.strftime(
+        '%Y-%m-%dT%H:%M:%SZ', time.gmtime((op_start_time or time.time()) - 30)
+    )
     filter_str = (
         f'operationType={operation_type} AND '
-        f'{status_filter} AND '
-        f'targetLink ~ {link_target}'
-        f'{time_filter}'
+        '(status=RUNNING OR status=PENDING OR status=DONE) AND '
+        f'targetLink ~ {link_target} AND '
+        f'startTime>="{from_time}"'
     )
     for attempt in range(1, max_attempts + 1):
       list_cmd = self._GcloudCommand('container', 'operations', 'list')
@@ -755,7 +786,12 @@ class GkeCluster(BaseGkeCluster):
     return self._IssueAsync(cmd)
 
   def UpgradeNodePoolAsync(self, name: str, target_version: str) -> str:
-    """Initiates node pool upgrade; returns op handle. Does NOT wait."""
+    """Initiates node pool upgrade; returns op handle. Does NOT wait.
+
+    `clusters upgrade --node-pool --async` returns success with empty stdout
+    (gcloud doesn't print the op name for this subcommand), so the operation
+    name is recovered from the operations list via _IssueAsync's fallback.
+    """
     cmd = self._GcloudCommand(
         'container',
         'clusters',
@@ -766,24 +802,9 @@ class GkeCluster(BaseGkeCluster):
         '--cluster-version',
         target_version,
     )
-    try:
-      return self._IssueAsync(cmd)
-    except errors.Resource.CreationError as e:
-      if 'returned no operation name' not in str(e):
-        raise
-      # Fallback: gcloud succeeded but printed nothing. Query the operations
-      # list scoped to this specific nodepool to find the operation name.
-      logging.info(
-          'UpgradeNodePoolAsync: ops list fallback for %s: %s',
-          name,
-          e,
-      )
-      op_name = self._GetLatestOperationName(
-          operation_type='UPGRADE_NODES', target_name=name
-      )
-      if not op_name:
-        raise
-      return op_name
+    return self._IssueAsync(
+        cmd, fallback_op_type='UPGRADE_NODES', fallback_target=name
+    )
 
   def DeleteNodePoolAsync(self, name: str) -> str:
     cmd = self._GcloudCommand(
@@ -798,40 +819,22 @@ class GkeCluster(BaseGkeCluster):
     return self._IssueAsync(cmd)
 
   def UpdateClusterAsync(self) -> str:
-    """Initiates cluster update; returns op handle. Does NOT wait."""
+    """Initiates cluster update; returns op handle. Does NOT wait.
+
+    Toggles a label for a non-destructive cluster update. Like
+    `clusters upgrade`, `clusters update --async` returns success with empty
+    stdout, so the op name is recovered via _IssueAsync's fallback. The
+    label-update completes in seconds, so the fallback may find it already
+    DONE — handled by _GetLatestOperationName's startTime-guarded filter.
+    """
     cmd = self._GcloudCommand('container', 'clusters', 'update', self.name)
     cmd.flags['update-labels'] = f'k8s-mgmt-ts={int(time.time())}'
-    # 'gcloud container clusters update --async' suppresses stdout when
-    # --quiet is active (same behaviour as 'clusters upgrade'), so the
-    # operation name is never printed.  Remove --quiet here; the label-update
-    # is non-interactive so no confirmation prompt is needed.
+    # GcloudCommand sets --quiet by default; the label update is
+    # non-interactive so it's safe to drop (matches how this was validated).
     cmd.flags.pop('quiet', None)
-    # Record start time BEFORE issuing.  The label-update operation completes
-    # in seconds, so it may already be DONE by the time the fallback queries
-    # the operations list.  The timestamp lets us safely include DONE ops
-    # without matching older completed operations from previous runs.
-    op_start_time = time.time()
-    try:
-      return self._IssueAsync(cmd)
-    except errors.Resource.CreationError as e:
-      if 'returned no operation name' not in str(e):
-        raise
-      # Fallback: gcloud returned retcode=0 but empty stdout.  Query the
-      # operations list including DONE status (fast label-update ops complete
-      # before we query) guarded by op_start_time to avoid stale matches.
-      logging.info(
-          'UpdateClusterAsync: ops list fallback for %s: %s',
-          self.name,
-          e,
-      )
-      op_name = self._GetLatestOperationName(
-          operation_type='UPDATE_CLUSTER',
-          target_name=self.name,
-          op_start_time=op_start_time,
-      )
-      if not op_name:
-        raise
-      return op_name
+    return self._IssueAsync(
+        cmd, fallback_op_type='UPDATE_CLUSTER', fallback_target=self.name
+    )
 
   def ResolveNodePoolVersions(self) -> tuple[str, str]:
     """Returns (initial, target) GKE node versions: initial=N-1, target=N.
