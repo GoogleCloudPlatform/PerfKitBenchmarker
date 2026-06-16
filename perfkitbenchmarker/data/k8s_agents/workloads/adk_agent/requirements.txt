@@ -1,0 +1,11 @@
+# Requirements for GKE Performance Agent
+google-adk[gke,extensions]==1.34.1
+k8s-agent-sandbox==0.4.6
+kubernetes>=36.0.1  # Fix: v36.0.0 has auth key mismatch bug (PR #2585)
+google-cloud-aiplatform[adk]==1.153.1
+google-cloud-logging==3.15.0
+fastapi==0.135.3
+uvicorn[standard]==0.44.0
+python-dotenv==1.0.1
+playwright==1.59.0
+

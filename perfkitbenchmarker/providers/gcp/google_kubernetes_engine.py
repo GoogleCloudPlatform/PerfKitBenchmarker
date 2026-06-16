@@ -512,6 +512,12 @@ class GkeCluster(BaseGkeCluster):
     if self.enable_aam:
       cmd.args.append('--auto-monitoring-scope=ALL')
 
+    # --- PKB Extension: beta gcloud and additional cluster create flags ---
+    if gcp_flags.GKE_USE_BETA.value:
+      cmd.use_beta_gcloud = True
+    for additional_flag in gcp_flags.GKE_ADDITIONAL_FLAGS.value:
+      cmd.args.append(additional_flag)
+
     self._RunClusterCreateCommand(cmd)
     self._GetKubeconfig()
     self._CreateCustomComputeClass(self.default_nodepool)
@@ -527,6 +533,14 @@ class GkeCluster(BaseGkeCluster):
           'container', 'node-pools', 'create', name, '--cluster', self.name
       )
       self._AddNodeParamsToCmd(nodepool, cmd)
+      self._AddNodeParamsToCmd(
+          nodepool,
+          cmd,
+      )
+      # --- PKB Extension: additional node pool create flags ---
+      for additional_flag in gcp_flags.GKE_ADDITIONAL_NODEPOOL_FLAGS.value:
+        cmd.args.append(additional_flag)
+
       self._IssueResourceCreationCommand(cmd)
       self._CreateCustomComputeClass(nodepool)
 

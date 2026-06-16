@@ -1,4 +1,4 @@
-# Copyright 2014 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2025 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,26 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-absl-py
-beautifulsoup4
-blinker>=1.3
-colorlog[windows]==2.6.0
-google-cloud-core
-google-cloud-monitoring>=2.0.0
-immutabledict
-jinja2>=2.10.2
-numpy>=1.16.5
-packaging
-pandas>=1.1.5
-pint
-pytz
-PyYAML>=5.4.1
-pywinrm
-requests
-rsa>=4.7.2
-seaborn
-setuptools>=40.3.0,<81
-six>=1.13.0
-timeout-decorator
-scipy
-matplotlib
