@@ -16,7 +16,6 @@ The baseline benchmark is executed using the `kubernetes_postgres_sysbench` benc
 ```bash
 python3 pkb.py \
     --benchmarks=kubernetes_postgres_sysbench \
-    --postgres_gke_optimization_profile=baseline \
     ...
 ```
 
@@ -30,28 +29,23 @@ python3 pkb.py \
 
 ## Optimized Benchmark Implementation
 
-The optimized benchmark uses the same `kubernetes_postgres_sysbench` benchmark class but applies specific "Optimization Profiles" to tune the infrastructure and database configuration.
+The optimized benchmark uses the same `kubernetes_postgres_sysbench` benchmark class but allows users to apply specific "Custom Manifest Templates" to tune the infrastructure and database configuration.
 
 ### Execution Command
 
 ```bash
 python3 pkb.py \
     --benchmarks=kubernetes_postgres_sysbench \
-    --postgres_gke_optimization_profile=infra+postgres+hugepages \
+    --kubernetes_postgres_sysbench_template_path=/path/to/optimized_postgres.yaml.j2 \
     ...
 ```
 
-### Optimization Profiles
-The benchmark supports granular optimization profiles that can be combined:
+### Manifest Override Architecture
+Unlike the baseline benchmark which uses a standard default YAML manifest, optimized runs bypass internal parameter sizing engines entirely. Users provide a fully customized standalone Jinja2 manifest (`.yaml.j2`) that explicitly defines:
 
-*   **infra-tuned**: Uses Container-Optimized OS (COS) for nodes and Ubuntu 24.04 for the client.
-*   **fast-startup**: Uses Ubuntu node image and removes the init container for faster startup (at the cost of less robust permission handling).
-*   **kernel-tuned**: Applies sysctl tuning (`vm.swappiness=1`, `vm.dirty_ratio=10`, etc.) to the node.
-*   **hugepages**: Enables HugePages (2MB) on the node and configures PostgreSQL (`huge_pages=on`) to use them. This reduces TLB misses and improves memory management efficiency.
-*   **postgres-tuned**: Applies aggressive PostgreSQL configuration tuning.
-*   **infra+postgres**: Combines Infrastructure and Postgres Tuning profiles.
-*   **infra+postgres+hugepages**: Combines Infrastructure, Postgres Tuning, and HugePages for maximum performance.
-*   **infra+postgres+hugepages+hostnetwork**: Extends the "All-in-One" profile by enabling Host Networking (`hostNetwork: true`) for the PostgreSQL pods. This bypasses the Kubernetes CNI/Overlay network stack, allowing the database to use the node's native network interface for maximum throughput and reduced latency.
+*   **Infrastructure Sizing**: Kubernetes Pod CPU and Memory Requests/Limits.
+*   **Database Parameters**: PostgreSQL `postgresql.conf` parameters (e.g., `shared_buffers`, `effective_cache_size`, `max_worker_processes`) set via environment variables or ConfigMaps.
+*   **Kernel & Hardware Tuning**: Linux HugePages allocations (`huge_pages=on`), custom Pod `securityContext.sysctls`, and Host Networking (`hostNetwork: true`).
 
 ## Control Parameters Comparison
 
@@ -70,18 +64,18 @@ The following table summarizes the key control parameters used in both the Basel
 
 ### PostgreSQL Server Parameters
 
-Memory configurations like `shared_buffers` and `effective_cache_size` are determined dynamically by a rule-based sizing engine that detects the Server Machine Type (`--postgres_gke_server_machine_type`) and aggressively scales K8s pod resources to ~85% of total node RAM, assigning proportionate limits to PostgreSQL to prevent Out-Of-Memory. 
+In the Baseline run, PKB applies sensible, middle-of-the-road database defaults to the upstream `postgres_all.yaml.j2` manifest. In Optimized runs, all values are explicitly configured by the user's custom manifest template.
 
-| Parameter | Baseline | Optimized (postgres-tuned / infra+postgres+hugepages) |
+| Parameter | Baseline Run (`postgres_all.yaml.j2`) | Custom Optimized Manifest (Example) |
 | :--- | :--- | :--- |
-| **Shared Buffers** | 25% of Pod RAM | 40% of Pod RAM |
-| **Effective Cache Size** | 50% of Pod RAM | 75% of Pod RAM |
+| **Shared Buffers** | 15GB | 35GB |
+| **Effective Cache Size** | 30GB | 50GB |
 | **Work Mem** | 64MB | 256MB |
 | **Effective IO Concurrency** | 100 | 200 |
-| **Huge Pages** | Off | On (hugepages) |
+| **Huge Pages** | Off | On (`huge_pages=on`) |
 | **WAL Buffers** | 64MB | 512MB |
 | **Max Worker Processes** | 20 | 32 |
-| **Host Network** | False | Optional (infra+postgres+hugepages+hostnetwork) |
+| **Host Network** | False | True (`hostNetwork: true`) |
 
 ## Implementation Details
 

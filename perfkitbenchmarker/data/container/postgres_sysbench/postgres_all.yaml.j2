@@ -10,7 +10,7 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: postgres-storage-class
-provisioner: kubernetes.io/gce-pd
+provisioner: {{ storage_class_provisioner }}
 parameters:
   type: {{ disk_type }}
   replication-type: none  # Use zonal PDs for better performance
@@ -63,7 +63,6 @@ data:
     # Query tuning
     effective_io_concurrency = {{ effective_io_concurrency }}
     random_page_cost = {{ random_page_cost }}
-    huge_pages = {{ huge_pages | default('try') }}
     wal_level = {{ wal_level | default('replica') }}
     synchronous_commit = {{ synchronous_commit | default('on') }}
 
@@ -162,19 +161,27 @@ spec:
       labels:
         app: postgres-standalone
     spec:
-      {% if host_network %}
+      {% if host_network is defined and host_network %}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       {% endif %}
       securityContext:
         fsGroup: 999  # postgres group ID
-      # PKB will handle node selection through nodepool configuration
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: pkb_nodepool
+                operator: In
+                values:
+                - postgres
       tolerations:
       - key: "kubernetes.io/arch"
         operator: "Equal"
         value: "arm64"
         effect: "NoSchedule"
-      {% if use_init_container %}
+      {% if use_init_container is defined and use_init_container %}
       initContainers:
       - name: init-permissions
         image: postgres:{{ postgres_version }}
@@ -216,34 +223,13 @@ spec:
         - name: init-scripts
           mountPath: /docker-entrypoint-initdb.d/init.sql
           subPath: init.sql
-        {% if hugepages %}
-        - name: hugepages
-          mountPath: /dev/hugepages
-          readOnly: false
-        {% endif %}
         resources:
           requests:
             cpu: "{{ cpu_request | default('6') }}"
             memory: "{{ memory_request | default('15Gi') }}"
-            {% if hugepages %}
-            {% if hugepages.hugepage_size2m %}
-            hugepages-2Mi: "{{ hugepages.hugepage_size2m * 2 }}Mi"
-            {% endif %}
-            {% if hugepages.hugepage_size1g %}
-            hugepages-1Gi: "{{ hugepages.hugepage_size1g }}Gi"
-            {% endif %}
-            {% endif %}
           limits:
             cpu: "{{ cpu_limit | default('10') }}"
             memory: "{{ memory_limit | default('20Gi') }}"
-            {% if hugepages %}
-            {% if hugepages.hugepage_size2m %}
-            hugepages-2Mi: "{{ hugepages.hugepage_size2m * 2 }}Mi"
-            {% endif %}
-            {% if hugepages.hugepage_size1g %}
-            hugepages-1Gi: "{{ hugepages.hugepage_size1g }}Gi"
-            {% endif %}
-            {% endif %}
         command:
         - "docker-entrypoint.sh"
         - "postgres"
@@ -281,11 +267,6 @@ spec:
         configMap:
           name: postgres-init-scripts
           defaultMode: 0755
-      {% if hugepages %}
-      - name: hugepages
-        emptyDir:
-          medium: HugePages
-      {% endif %}
   volumeClaimTemplates:
   - metadata:
       name: postgres-data

@@ -8,7 +8,15 @@ metadata:
   labels:
     app: postgres-client
 spec:
-  # PKB will handle node selection through nodepool configuration
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: pkb_nodepool
+            operator: In
+            values:
+            - clients
   tolerations:
   - key: "kubernetes.io/arch"
     operator: "Equal"

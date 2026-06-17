@@ -88,11 +88,10 @@ python3 pkb.py \
     --vm_platform=Kubernetes \
     --zone=us-central1-a \
     --project=$PROJECT_ID \
-    --postgres_gke_server_machine_type=c4-standard-16 \
-    --postgres_gke_client_machine_type=c4-standard-16 \
-    --postgres_gke_disk_type=hyperdisk-balanced \
-    --postgres_gke_disk_size=500 \
-    --postgres_gke_optimization_profile=baseline \
+    --postgres_kubernetes_server_machine_type=c4-standard-16 \
+    --postgres_kubernetes_client_machine_type=c4-standard-16 \
+    --data_disk_type=hyperdisk-balanced \
+    --data_disk_size=500 \
     --sysbench_tables=10 \
     --sysbench_table_size=4000000 \
     --sysbench_run_threads=512 \
@@ -108,14 +107,9 @@ python3 pkb.py \
     --accept_licenses
 ```
 
-## Optimized Tests - example
+## Customized Manifest Templates - example
 
-Runs the benchmark with specific optimization profiles.
-
-
-
-### 1. Profile: Postgres Tuned
-Aggressive PostgreSQL configuration tuning (Shared Buffers, Workers, etc.).
+You can fully customize the PostgreSQL deployment (adjusting Shared Buffers, Worker counts, Linux HugePages, or injecting sysctls) by supplying your own standalone Jinja2 manifest template via the `--kubernetes_postgres_sysbench_template_path` flag.
 
 ```bash
 python3 pkb.py \
@@ -124,11 +118,9 @@ python3 pkb.py \
     --vm_platform=Kubernetes \
     --zone=us-central1-a \
     --project=$PROJECT_ID \
-    --postgres_gke_server_machine_type=c4-standard-16 \
-    --postgres_gke_client_machine_type=c4-standard-16 \
-    --postgres_gke_disk_type=hyperdisk-balanced \
-    --postgres_gke_disk_size=500 \
-    --postgres_gke_optimization_profile=postgres-tuned \
+    --kubernetes_postgres_sysbench_template_path=/path/to/your/custom_postgres_template.yaml.j2 \
+    --data_disk_type=hyperdisk-balanced \
+    --data_disk_size=500 \
     --sysbench_tables=10 \
     --sysbench_table_size=4000000 \
     --sysbench_run_threads=512 \
@@ -136,8 +128,7 @@ python3 pkb.py \
     --sysbench_testname=oltp_read_write \
     --metadata=cloud:GCP \
     --metadata=geo:us-central1 \
-    --metadata=scenario:postgres_optimized \
-    --metadata=optimization_profile:postgres-tuned \
+    --metadata=scenario:postgres_custom \
     --temp_dir=./pkb_temp \
     --run_stage_iterations=1 \
     --owner=$(whoami | tr '.' '-') \
