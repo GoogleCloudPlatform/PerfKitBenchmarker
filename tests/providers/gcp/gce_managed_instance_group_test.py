@@ -45,7 +45,7 @@ class GceManagedInstanceGroupTest(pkb_common_test_case.PkbCommonTestCase):
             os_type='debian12',
             vm_spec={'GCP': {'machine_type': 'n1-standard-4'}},
         ),
-        vm_config,
+        [vm_config],
     )
 
   def testCreate(self, *_):
@@ -69,6 +69,40 @@ class GceManagedInstanceGroupTest(pkb_common_test_case.PkbCommonTestCase):
         ' projects/test_project/regions/us-central1/instanceTemplates/pkb-test_run-0'
         ' --size 1 --format json --project test_project --quiet --region'
         ' us-central1',
+        self.mock_cmd.all_commands,
+    )
+
+  @mock.patch.object(gcp_utils, 'GetRegionFromZone', return_value='us-central1')
+  @mock.patch.object(gce_virtual_machine.gce_network.GceFirewall, 'GetFirewall')
+  @mock.patch.object(gce_virtual_machine.gce_network.GceNetwork, 'GetNetwork')
+  def testCreateMultiZone(self, mock_get_network, *_):
+    mock_get_network.return_value.placement_group.name = 'test_placement_group'
+    vm_configs = [
+        pkb_common_test_case.TestGceVirtualMachine(
+            gce_virtual_machine.GceVmSpec(
+                'test_component',
+                machine_type='n1-standard-4',
+                zone=zone,
+            )
+        )
+        for zone in ['us-central1-a', 'us-central1-b']
+    ]
+    mig = gce_managed_instance_group.GceManagedInstanceGroup(
+        vm_group_decoders.VmGroupSpec(
+            'test_component',
+            cloud='GCP',
+            os_type='debian12',
+            vm_spec={'GCP': {'machine_type': 'n1-standard-4'}},
+        ),
+        vm_configs,
+    )
+    mig._Create()
+    self.assertIn(
+        'gcloud compute instance-groups managed create pkb-test_run-0'
+        ' --template'
+        ' projects/test_project/regions/us-central1/instanceTemplates/pkb-test_run-0'
+        ' --size 1 --zones=us-central1-a,us-central1-b --format json'
+        ' --project test_project --quiet --region us-central1',
         self.mock_cmd.all_commands,
     )
 

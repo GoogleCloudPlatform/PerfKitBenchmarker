@@ -107,21 +107,22 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
   def __init__(
       self,
       spec: vm_group_decoders.VmGroupSpec,
-      vm_config: virtual_machine.BaseVirtualMachine,
+      vm_configs: list[virtual_machine.BaseVirtualMachine],
   ):
-    super().__init__(spec, vm_config)
+    super().__init__(spec, vm_configs)
     self.vm_config: gce_virtual_machine.GceVirtualMachine = cast(
         gce_virtual_machine.GceVirtualMachine, self.vm_config
     )
+    self.zoned_vm_configs: list[gce_virtual_machine.GceVirtualMachine] = cast(
+        list[gce_virtual_machine.GceVirtualMachine], self.zoned_vm_configs
+    )
     self.project = self.vm_config.project
     # in theory we could use the users defaults, but this is cleaner.
-    assert self.vm_config.zone
-    if util.IsZone(self.vm_config.zone):
-      self.zone = self.vm_config.zone
-      self.region = util.GetRegionFromZone(self.zone)
-    elif util.IsRegion(self.vm_config.zone):
-      self.region = self.vm_config.zone
-      self.zone = None
+    assert self.zones
+    if util.IsZone(self.zones[0]):
+      self.region = util.GetRegionFromZone(self.zones[0])
+    elif util.IsRegion(self.zones[0]):
+      self.region = self.zones[0]
     else:
       raise ValueError(
           f'Unsupported zone: {self.vm_config.zone}. Must be a zone or region.'
@@ -140,7 +141,7 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
         self, 'compute', 'instance-groups', 'managed', *args
     )
     # GcloudCommand does not have support for regional resources.
-    if not self.zone:
+    if self.is_regional:
       cmd.flags['region'] = self.region
     return cmd
 
@@ -153,6 +154,9 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
         '--size',
         str(self.vm_count),
     )
+    # --zone and --region are handled by GcloudCommand.
+    if len(self.zones) > 1:
+      cmd.args.append('--zones=' + ','.join(self.zones))
     # TODO(pclay): Consider beta and --resource-manager-tags for labels.
     cmd.Issue()
 
