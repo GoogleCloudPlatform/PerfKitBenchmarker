@@ -1,3 +1,39 @@
+"""GKE Performance Agent -- ADK agent definition.
+
+This file runs INSIDE the GKE cluster as part of the adk-agent Deployment
+(see gke_deploy_utils.py for the K8s manifest). It is NOT run from the
+machine executing PKB. The ADK agent pod serves a FastAPI app (main.py)
+that PKB calls via HTTP through a kubectl port-forward tunnel.
+
+Execution flow:
+  PKB (your laptop/CI) -> kubectl port-forward -> adk-agent pod -> this file
+  -> GkeCodeExecutor -> SandboxClient -> gVisor sandbox pod
+"""
+
+"""GKE Performance Agent â ADK agent definition for sandbox benchmarking.
+
+EXECUTION CONTEXT:
+    This file runs INSIDE the GKE cluster, NOT on the PKB orchestrator machine.
+    It is packaged into a container image (see ../Dockerfile) and deployed as
+    the 'adk-agent' Deployment in the benchmark namespace.
+
+    Execution flow:
+      PKB machine                          GKE Cluster
+      ----------                           -----------
+      benchmark.Run()
+        -> CallAgentApi("/benchmark/...")   -> main.py (FastAPI)
+                                              -> Runner(agent=root_agent)
+                                                -> MockLlm yields code
+                                                -> V3GkeCodeExecutor._execute_in_sandbox()
+                                                  -> SandboxClient.create_sandbox()
+                                                  -> sandbox.files.write("script.py", code)
+                                                  -> sandbox.commands.run("python3 script.py")
+                                                  -> SandboxClient.delete_sandbox()
+
+    The PKB machine communicates with this agent via HTTP (port-forwarded
+    through kubectl or via a LoadBalancer/ClusterIP service).
+"""
+
 from google.adk.agents import LlmAgent
 from google.adk.code_executors import GkeCodeExecutor
 from google.adk.code_executors.code_execution_utils import CodeExecutionResult
@@ -19,7 +55,7 @@ logging.basicConfig(level=logging.INFO)
 basedir = os.path.abspath(os.path.dirname(__file__))
 agent_dir = os.path.join(basedir, "..")
 
-# Load generated.env (auto-generated from gke-benchmark.conf by deploy_gke.sh).
+# Load generated.env (rendered by gke_image_build_utils._GenerateEnvFile from PKB flags).
 # In GKE, K8s manifest env vars take precedence.
 load_dotenv(os.path.join(agent_dir, "generated.env"))
 
@@ -67,9 +103,9 @@ def _build_benchmark_code() -> str:
     """Build the benchmark script with current env values injected.
 
     Selects the script based on BENCHMARK_MODE env var:
-      - 'density'  → benchmark_density.py  (Use Case B)
-      - 'payload'  → benchmark_payload.py  (Use Case D)
-      - 'qps'      → benchmark_qps.py      (Use Case F)
+      - 'density'  → benchmark_density.py
+      - 'payload'  → benchmark_payload.py
+      - 'qps'      → benchmark_qps.py
     """
     mode = os.getenv("BENCHMARK_MODE", "density")
 

@@ -581,12 +581,6 @@ GKE_CLUSTER_IPV4_CIDR_SIZE = flags.DEFINE_integer(
     ' beyond the default node pool (e.g. kubernetes_node_scale with 5k nodes).',
 )
 
-GKE_USE_BETA = flags.DEFINE_boolean(
-    'gke_use_beta',
-    False,
-    'Use gcloud beta for cluster creation (required for preview features '
-    'like pod snapshots).',
-)
 
 GKE_ADDITIONAL_FLAGS = flags.DEFINE_list(
     'gke_additional_flags',

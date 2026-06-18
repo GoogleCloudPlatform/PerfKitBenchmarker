@@ -1,0 +1,118 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: adk-agent-sa
+  namespace: {{ ns }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: adk-agent-sandbox-role
+rules:
+  - apiGroups: ["agents.x-k8s.io"]
+    resources: ["sandboxes"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["agents.x-k8s.io"]
+    resources: ["sandboxwarmpool", "sandboxwarmpools"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions.agents.x-k8s.io"]
+    resources: ["sandboxclaims"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec", "services", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/portforward"]
+    verbs: ["create"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: adk-agent-sandbox-binding
+  namespace: {{ ns }}
+subjects:
+  - kind: ServiceAccount
+    name: adk-agent-sa
+    namespace: {{ ns }}
+roleRef:
+  kind: ClusterRole
+  name: adk-agent-sandbox-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adk-agent
+  namespace: {{ ns }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: adk-agent
+  template:
+    metadata:
+      labels:
+        app: adk-agent
+    spec:
+      serviceAccountName: adk-agent-sa
+      containers:
+      - name: adk-agent
+        imagePullPolicy: Always
+        image: {{ adk_image }}
+        resources:
+          limits:
+            memory: "16384Mi"
+            cpu: "6000m"
+          requests:
+            memory: "512Mi"
+            cpu: "1000m"
+        ports:
+        - containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 6
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        env:
+          - name: PORT
+            value: "8080"
+          - name: GOOGLE_CLOUD_PROJECT
+            value: "{{ project }}"
+          - name: GOOGLE_CLOUD_LOCATION
+            value: "{{ region }}"
+          - name: GOOGLE_GENAI_USE_VERTEXAI
+            value: "true"
+          - name: CLUSTER_NAME
+            value: "{{ cluster }}"
+          - name: AGENTIC_NAMESPACE
+            value: "{{ ns }}"
+          - name: SANDBOX_ROUTER_URL
+            value: "http://sandbox-router-svc.{{ ns }}.svc.cluster.local:8080"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: adk-agent
+  namespace: {{ ns }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8080
+  selector:
+    app: adk-agent

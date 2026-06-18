@@ -1,0 +1,324 @@
+# Agentic Benchmark Configuration for GKE
+# Used with: --benchmark_config_file=perfkitbenchmarker/data/k8s_agents/config/agentic_benchmark_config.yaml
+#
+# User/environment-specific flags that MUST be passed on CLI:
+#   --project=<project>
+#   --owner=<owner>
+#   --gce_network_name=<user>-agentic-vpc
+#   --gke_additional_flags="--workload-pool=<project>.svc.id.goog,--subnetwork=<user>-agentic-subnet,--enable-master-authorized-networks,--master-authorized-networks=$(curl -s ifconfig.me)/32"
+#
+# Per-run flags:
+#   --run_stage=provision|prepare|run,cleanup|teardown
+#   --run_uri=<unique_id>
+#   --temp_dir=<path>
+#
+# Benchmark-specific sweep parameters (vary per run):
+#   --gke_python_density_concurrent_sandbox_count=N
+#   --gke_snapshot_preload_mb=N
+#   etc.
+
+# ===========================================================================
+# Shared cluster configuration (identical across all benchmarks)
+# ===========================================================================
+
+gke_python_density:
+  flags:
+    # --- Cluster creation flags ---
+    gke_additional_flags:
+      - "--enable-pod-snapshots"
+      - "--enable-dataplane-v2"
+      - "--enable-private-nodes"
+      - "--enable-ip-alias"
+      - "--master-ipv4-cidr=172.16.0.0/28"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+    container_cluster_version: "1.35.3-gke.1389000"
+    gke_enable_shielded_nodes: false
+    gce_subnet_region: "us-central1"
+
+    # --- Agentic workload flags ---
+    k8s_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_gvisor: true
+    k8s_agent_api_url: "http://localhost:8080"
+    skip_image_build: false
+
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-central1-a
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-central1-a
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor
+
+
+gke_chromium_density:
+  flags:
+    gke_additional_flags:
+      - "--enable-pod-snapshots"
+      - "--enable-dataplane-v2"
+      - "--enable-private-nodes"
+      - "--enable-ip-alias"
+      - "--master-ipv4-cidr=172.16.0.0/28"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+    container_cluster_version: "1.35.3-gke.1389000"
+    gke_enable_shielded_nodes: false
+    gce_subnet_region: "us-central1"
+
+    k8s_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_gvisor: true
+    k8s_agent_api_url: "http://localhost:8080"
+    skip_image_build: false
+
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-central1-a
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-central1-a
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor
+
+
+gke_payload:
+  flags:
+    gke_additional_flags:
+      - "--enable-pod-snapshots"
+      - "--enable-dataplane-v2"
+      - "--enable-private-nodes"
+      - "--enable-ip-alias"
+      - "--master-ipv4-cidr=172.16.0.0/28"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+    container_cluster_version: "1.35.3-gke.1389000"
+    gke_enable_shielded_nodes: false
+    gce_subnet_region: "us-central1"
+
+    k8s_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_gvisor: true
+    k8s_agent_api_url: "http://localhost:8080"
+    skip_image_build: false
+
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-central1-a
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-central1-a
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor
+
+
+gke_qps:
+  flags:
+    gke_additional_flags:
+      - "--enable-pod-snapshots"
+      - "--enable-dataplane-v2"
+      - "--enable-private-nodes"
+      - "--enable-ip-alias"
+      - "--master-ipv4-cidr=172.16.0.0/28"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+    container_cluster_version: "1.35.3-gke.1389000"
+    gke_enable_shielded_nodes: false
+    gce_subnet_region: "us-central1"
+
+    k8s_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_gvisor: true
+    k8s_agent_api_url: "http://localhost:8080"
+    skip_image_build: false
+
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-central1-a
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-central1-a
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor
+
+
+gke_snapshot:
+  flags:
+    gke_additional_flags:
+      - "--enable-pod-snapshots"
+      - "--enable-dataplane-v2"
+      - "--enable-private-nodes"
+      - "--enable-ip-alias"
+      - "--master-ipv4-cidr=172.16.0.0/28"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+    container_cluster_version: "1.35.3-gke.1389000"
+    gke_enable_shielded_nodes: false
+    gce_subnet_region: "us-central1"
+
+    k8s_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_gvisor: true
+    k8s_agent_api_url: "http://localhost:8080"
+    skip_image_build: false
+
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-central1-a
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-central1-a
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor
+
+
+gke_warmpool:
+  flags:
+    gke_additional_flags:
+      - "--enable-pod-snapshots"
+      - "--enable-dataplane-v2"
+      - "--enable-private-nodes"
+      - "--enable-ip-alias"
+      - "--master-ipv4-cidr=172.16.0.0/28"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+    container_cluster_version: "1.35.3-gke.1389000"
+    gke_enable_shielded_nodes: false
+    gce_subnet_region: "us-central1"
+
+    k8s_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_gvisor: true
+    k8s_agent_api_url: "http://localhost:8080"
+    skip_image_build: false
+
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-central1-a
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-central1-a
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor
+
+
+gke_deletion:
+  flags:
+    gke_additional_flags:
+      - "--enable-pod-snapshots"
+      - "--enable-dataplane-v2"
+      - "--enable-private-nodes"
+      - "--enable-ip-alias"
+      - "--master-ipv4-cidr=172.16.0.0/28"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+    container_cluster_version: "1.35.3-gke.1389000"
+    gke_enable_shielded_nodes: false
+    gce_subnet_region: "us-central1"
+
+    k8s_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_gvisor: true
+    k8s_agent_api_url: "http://localhost:8080"
+    skip_image_build: false
+
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-central1-a
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-central1-a
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor

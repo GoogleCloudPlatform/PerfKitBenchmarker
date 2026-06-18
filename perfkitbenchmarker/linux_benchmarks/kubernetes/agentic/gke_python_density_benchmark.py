@@ -1,4 +1,4 @@
-"""PKB Benchmark: GKE Agent Python Sandbox Density (Use Case B).
+"""PKB Benchmark: GKE Agent Python Sandbox Density .
 
 Atomic single-point measurement of Python sandbox density on a
 pre-provisioned GKE cluster with gVisor isolation. Measures Code Execution
@@ -6,17 +6,25 @@ Latency (CEL), Time To First Execution (TTFE), RSS memory growth, and
 per-type latency breakdown (compute, syscall, import) at a given
 concurrent session count.
 
+Workflow per session:
+  1. Claim a pre-warmed sandbox pod from the SandboxWarmPool
+  2. Upload and execute the benchmark script inside the gVisor sandbox
+  3. Run `sample_warmup` iterations (results discarded - stabilizes caches)
+  4. Run `sample_count` measured iterations (results recorded)
+  5. Report TTFE, per-iteration CEL, RSS, and per-task-type breakdown
+  6. Release the sandbox claim
+
 This benchmark is designed to be invoked repeatedly by an external sweep
 controller that varies the density parameter across iterations to find
 the saturation point.
 
 Usage:
   python pkb.py --benchmarks=gke_python_density \\
-                --gke_python_density=16 \\
+                --gke_python_density_concurrent_sandbox_count=16 \\
                 --gke_python_density_sample_count=20 \\
                 --gke_python_density_sample_warmup=0 \\
-                --gke_namespace=agentic \\
-                --gke_api_url=http://localhost:8080
+                --k8s_namespace=agentic \\
+                --k8s_agent_api_url=http://localhost:8080
 
 Samples emitted (per run):
   - gke_python_density_orchestrator_cel_mean       (ms)
@@ -52,7 +60,6 @@ from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_deploy_utils as deploy_utils,
 )
-from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import gke_provision_utils
 
 FLAGS = flags.FLAGS
 
@@ -72,7 +79,7 @@ _WARMPOOL_LABEL = "sandbox=python-sandbox-example"
 # ---------------------------------------------------------------------------
 
 flags.DEFINE_integer(
-    "gke_python_density",
+    "gke_python_density_concurrent_sandbox_count",
     1,
     "Number of concurrent sandbox sessions to run.",
 )
@@ -86,7 +93,11 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     "gke_python_density_sample_warmup",
     0,
-    "Number of warmup iterations per session (excluded from stats).",
+    "Number of warmup iterations per session (excluded from stats). "
+    "Warmup iterations execute the same benchmark tasks as measured "
+    "iterations but their latency results are discarded. This allows "
+    "JIT compilation, caches, and gVisor page faults to stabilize "
+    "before measurement begins.",
 )
 
 flags.DEFINE_bool(
@@ -107,11 +118,6 @@ flags.DEFINE_integer(
 # ---------------------------------------------------------------------------
 
 
-def Provision(benchmark_spec):
-    """Provision GKE cluster and all dependencies."""
-    gke_provision_utils.Provision()
-
-
 def GetConfig(user_config):
     """Load and return benchmark config.
 
@@ -123,7 +129,7 @@ def GetConfig(user_config):
 def Prepare(benchmark_spec):
     """Deploy workloads and verify agent API."""
     logging.info("=== Prepare: deploying workloads ===")
-    deploy_utils.DeployWorkloads()
+    deploy_utils.DeployWorkloads(benchmark_spec)
     utils.CheckAgentHealthz(required=False)
     utils.EnsurePortForward()
     logging.info("Prepare complete.")
@@ -135,8 +141,10 @@ def Run(benchmark_spec):
     Returns:
       List of sample.Sample objects.
     """
-    ns = FLAGS.gke_namespace
-    density = FLAGS.gke_python_density
+    utils.set_benchmark_spec(benchmark_spec)
+
+    ns = FLAGS.k8s_namespace
+    density = FLAGS.gke_python_density_concurrent_sandbox_count
 
     logging.info("=== Run: density=%d ===", density)
 
@@ -323,7 +331,7 @@ def Run(benchmark_spec):
 
 def Cleanup(benchmark_spec):
     """Clean up after measurement. Scale warm pool to 0."""
-    ns = FLAGS.gke_namespace
+    ns = FLAGS.k8s_namespace
     logging.info("Cleanup: draining warm pool.")
 
     if FLAGS.gke_python_density_patch_warmpool:
@@ -337,18 +345,25 @@ def Cleanup(benchmark_spec):
     logging.info("Cleanup complete (cluster persists).")
 
 
-def Teardown(benchmark_spec):
-    """Teardown GKE cluster and all dependencies."""
-    gke_provision_utils.Teardown()
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
 def _emit(samples, agg, agg_key, metric_suffix, unit, namespace, extra):
-    """Emit a sample if the key exists in the aggregate dict."""
+    """Emit a sample if the key exists in the aggregate dict.
+
+    Args:
+        samples: List to append the new sample.Sample to.
+        agg: Aggregate metrics dict returned by the agent API response.
+        agg_key: Key to look up in `agg` (e.g. "orchestrator_cel_mean_ms").
+        metric_suffix: Suffix appended to BENCHMARK_NAME to form the metric
+            name (e.g. "orchestrator_cel_mean").
+        unit: Unit string for the sample (e.g. "ms", "MB", "seconds").
+        namespace: Kubernetes namespace (included in sample metadata).
+        extra: Dict of additional metadata key-value pairs attached to
+            every sample (density, session counts, wall time, etc.).
+    """
     value = agg.get(agg_key)
     if value is not None:
         samples.append(
