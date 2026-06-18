@@ -18,7 +18,7 @@ from collections.abc import Callable
 import copy
 import dataclasses
 import time
-from typing import Sequence
+from typing import Any, Sequence
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
@@ -57,9 +57,16 @@ class BaseManagedVmGroup(resource.BaseResource):
     self.name = self.vm_config.name
     self.vm_count = self.spec.vm_count
     self._vms: dict[str, virtual_machine.BaseVirtualMachine] = {}
+    self._deleted_vms: list[virtual_machine.BaseVirtualMachine] = []
 
     self.last_operation_start_time: float | None = None
     self.last_ready_time: float | None = None
+
+  def GetResourceMetadata(self) -> dict[Any, Any]:
+    metadata = super().GetResourceMetadata().copy()
+    vm = (list(self.vms) + self._deleted_vms + [self.vm_config])[0]
+    metadata.update(vm.GetResourceMetadata())
+    return metadata
 
   @property
   def vms(self) -> Sequence[virtual_machine.BaseVirtualMachine]:
@@ -105,6 +112,8 @@ class BaseManagedVmGroup(resource.BaseResource):
     raise NotImplementedError()
 
   def _PostCreate(self):
+    # Needed for GetResourceMetadata.
+    self.vm_config.created = True
     self.last_operation_start_time = self.create_start_time
     self._UpdateVmList()
 
@@ -146,8 +155,10 @@ class BaseManagedVmGroup(resource.BaseResource):
           f'Managed VM group {self.name} has {len(found_vms)} instances,'
           f' expected {self.vm_count}.'
       )
-    for vm in old_vms - set(vm.name for vm in found_vms):
-      del self._vms[vm]
+    for name in old_vms - set(vm.name for vm in found_vms):
+      vm = self._vms.pop(name)
+      vm.deleted = True
+      self._deleted_vms.append(vm)
     new_vms = [vm for vm in found_vms if vm.name not in old_vms]
 
     def WaitForNewVm(vm_reference: 'BaseManagedVmGroup.VmReference'):
