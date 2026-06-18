@@ -14,51 +14,46 @@ import urllib.error
 
 from absl import flags
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.resources.container_service import kubectl
 
 FLAGS = flags.FLAGS
+
+# Module-level benchmark_spec reference for metadata derivation.
+# Set by each benchmark's Run() via set_benchmark_spec().
+_current_benchmark_spec = None
+
 
 # ---------------------------------------------------------------------------
 # Shared flags (registered once; importable by benchmark modules)
 # ---------------------------------------------------------------------------
 
 flags.DEFINE_string(
-    "gke_namespace",
+    "k8s_namespace",
     "agentic",
     "Kubernetes namespace where the agentic workloads are deployed.",
 )
 
-flags.DEFINE_string(
-    "gke_machine_type",
-    "",
-    "Machine type of the sandbox node pool. Recorded in sample metadata.",
-)
-
-flags.DEFINE_string(
-    "gke_kubeconfig",
-    "",
-    "Path to a kubeconfig file. If empty, the system default is used.",
-)
-
 flags.DEFINE_bool(
-    "gke_gvisor",
+    "k8s_gvisor",
     True,
     "Whether the sandbox node pool uses gVisor. Recorded in sample metadata.",
 )
 
 flags.DEFINE_string(
-    "gke_note",
+    "gke_benchmark_note",
     "",
     "Arbitrary note string attached to every sample for tagging runs.",
 )
 
 flags.DEFINE_string(
-    "gke_api_url",
+    "k8s_agent_api_url",
     "http://localhost:8080",
     "Base URL of the ADK Agent API.",
 )
 
 flags.DEFINE_integer(
-    "gke_api_timeout",
+    "k8s_agent_api_timeout",
     600,
     "HTTP timeout in seconds for agent API benchmark calls.",
 )
@@ -71,14 +66,14 @@ flags.DEFINE_integer(
 
 def GetAgentApiUrl():
     """Return the base URL of the ADK agent API service."""
-    return FLAGS.gke_api_url.rstrip("/")
+    return FLAGS.k8s_agent_api_url.rstrip("/")
 
 
 def CheckAgentHealthz(api_url=None, required=True):
     """Verify the agent API is reachable via /healthz.
 
     Args:
-        api_url: Base URL to check. Defaults to FLAGS.gke_api_url.
+        api_url: Base URL to check. Defaults to FLAGS.k8s_agent_api_url.
         required: If True (default), raise on failure. If False, log warning.
     """
     if api_url is None:
@@ -102,7 +97,7 @@ def CheckAgentHealthz(api_url=None, required=True):
 def CallAgentApi(endpoint, payload, timeout=None):
     """POST JSON to an agent API endpoint and return the parsed response."""
     if timeout is None:
-        timeout = FLAGS.gke_api_timeout
+        timeout = FLAGS.k8s_agent_api_timeout
     base_url = GetAgentApiUrl()
     url = f"{base_url}{endpoint}"
     data = json.dumps(payload).encode("utf-8")
@@ -131,23 +126,17 @@ def CallAgentApi(endpoint, payload, timeout=None):
 # ---------------------------------------------------------------------------
 
 
-def _KubectlCmd(args):
-    """Build a kubectl command list, optionally injecting --kubeconfig."""
-    cmd = ["kubectl"]
-    if FLAGS.gke_kubeconfig:
-        cmd += ["--kubeconfig", FLAGS.gke_kubeconfig]
-    return cmd + list(args)
-
-
 def RunKubectl(args, timeout=120, raise_on_failure=True):
-    """Run a kubectl command and return (stdout, stderr, retcode)."""
-    cmd = _KubectlCmd(args)
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-    if raise_on_failure and proc.returncode != 0:
-        raise RuntimeError(
-            f"kubectl failed (rc={proc.returncode}): {proc.stderr}"
-        )
-    return proc.stdout, proc.stderr, proc.returncode
+    """Run a kubectl command and return (stdout, stderr, retcode).
+
+    Delegates to PKB's native kubectl module which handles kubeconfig
+    and retries for transient connection errors automatically.
+    """
+    return kubectl.RunKubectlCommand(
+        list(args),
+        timeout=timeout,
+        raise_on_failure=raise_on_failure,
+    )
 
 
 def CountPods(namespace, label, phase=None):
@@ -190,6 +179,13 @@ def DrainWarmPool(namespace, warmpool_name, label, timeout=120):
         "patch", "sandboxwarmpool", warmpool_name,
         "-n", namespace, "--type=merge", f"-p={patch_json}",
     ], raise_on_failure=False)
+
+    # Delete lingering SandboxClaims that may prevent pod termination
+    RunKubectl([
+        "delete", "sandboxclaims", "--all",
+        "-n", namespace, "--ignore-not-found=true",
+    ], timeout=60, raise_on_failure=False)
+
     deadline = time.time() + timeout
     while time.time() < deadline:
         remaining = CountPods(namespace, label)
@@ -197,10 +193,18 @@ def DrainWarmPool(namespace, warmpool_name, label, timeout=120):
             logging.info("Warm pool drained successfully")
             return True
         logging.info("Draining... %d pods remaining", remaining)
-        time.sleep(3)
+        time.sleep(2)
     logging.warning("Drain timed out, %d pods still present",
                     CountPods(namespace, label))
     return False
+
+
+def set_benchmark_spec(benchmark_spec):
+    """Store benchmark_spec for metadata derivation (called by Run())."""
+    global _current_benchmark_spec
+    _current_benchmark_spec = benchmark_spec
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -212,12 +216,25 @@ def BuildMetadata(namespace, extra=None):
     """Construct the common metadata dict for all samples."""
     metadata = {
         "namespace": namespace,
-        "gvisor": FLAGS.gke_gvisor,
+        "gvisor": FLAGS.k8s_gvisor,
     }
-    if FLAGS.gke_machine_type:
-        metadata["machine_type"] = FLAGS.gke_machine_type
-    if FLAGS.gke_note:
-        metadata["note"] = FLAGS.gke_note
+    # Derive machine_type from benchmark_spec (set via set_benchmark_spec)
+    machine_type = None
+    if _current_benchmark_spec:
+        cluster = getattr(_current_benchmark_spec, 'container_cluster', None)
+        if cluster:
+            # Prefer sandbox nodepool machine_type over default pool
+            nodepools = getattr(cluster, 'nodepools', None)
+            if nodepools and isinstance(nodepools, dict):
+                sandbox_pool = nodepools.get('sandbox')
+                if sandbox_pool and hasattr(sandbox_pool, 'vm_spec'):
+                    machine_type = getattr(sandbox_pool.vm_spec, 'machine_type', None)
+            if not machine_type and hasattr(cluster, 'vm_spec'):
+                machine_type = getattr(cluster.vm_spec, 'machine_type', None)
+    if machine_type:
+        metadata["machine_type"] = machine_type
+    if FLAGS.gke_benchmark_note:
+        metadata["note"] = FLAGS.gke_benchmark_note
     if extra:
         metadata.update(extra)
     return metadata
@@ -238,37 +255,37 @@ def MakeSample(metric, value, unit, namespace, extra_metadata=None):
 # ---------------------------------------------------------------------------
 
 flags.DEFINE_bool(
-    "gke_auto_portforward",
+    "k8s_auto_portforward",
     True,
     "Automatically manage kubectl port-forward to the agent service.",
 )
 
 flags.DEFINE_integer(
-    "gke_portforward_local_port",
+    "k8s_portforward_local_port",
     8080,
     "Local port for kubectl port-forward.",
 )
 
 flags.DEFINE_integer(
-    "gke_portforward_remote_port",
+    "k8s_portforward_remote_port",
     80,
     "Remote service port for kubectl port-forward.",
 )
 
 flags.DEFINE_string(
-    "gke_portforward_service",
+    "k8s_portforward_service",
     "svc/adk-agent",
     "Kubernetes service to port-forward to.",
 )
 
 flags.DEFINE_float(
-    "gke_portforward_reconnect_delay",
+    "k8s_portforward_reconnect_delay",
     1.0,
     "Seconds to wait before reconnecting after port-forward drops.",
 )
 
 flags.DEFINE_float(
-    "gke_portforward_health_timeout",
+    "k8s_portforward_health_timeout",
     30.0,
     "Seconds to wait for agent health check after starting port-forward.",
 )
@@ -339,15 +356,15 @@ class _PortForwardManager:
 
     def _loop(self):
         """Background reconnect loop."""
-        ns = FLAGS.gke_namespace
-        svc = FLAGS.gke_portforward_service
-        local_port = FLAGS.gke_portforward_local_port
-        remote_port = FLAGS.gke_portforward_remote_port
-        delay = FLAGS.gke_portforward_reconnect_delay
+        ns = FLAGS.k8s_namespace
+        svc = FLAGS.k8s_portforward_service
+        local_port = FLAGS.k8s_portforward_local_port
+        remote_port = FLAGS.k8s_portforward_remote_port
+        delay = FLAGS.k8s_portforward_reconnect_delay
 
         cmd = ["kubectl"]
-        if FLAGS.gke_kubeconfig:
-            cmd += ["--kubeconfig", FLAGS.gke_kubeconfig]
+        if FLAGS.kubeconfig:
+            cmd += ["--kubeconfig", FLAGS.kubeconfig]
         cmd += [
             "port-forward", svc,
             "-n", ns,
@@ -425,7 +442,7 @@ class _PortForwardManager:
         except (OSError, ValueError):
             self._cleanup_pid_file()
 
-        local_port = FLAGS.gke_portforward_local_port
+        local_port = FLAGS.k8s_portforward_local_port
         try:
             result = subprocess.run(
                 ["lsof", "-ti", f":{local_port}"],
@@ -456,14 +473,14 @@ def EnsurePortForward():
     Blocks until the agent health check passes or timeout is reached.
     Safe to call multiple times - only starts one background loop.
     """
-    if not FLAGS.gke_auto_portforward:
-        logging.info("Auto port-forward disabled (--gke_auto_portforward=false)")
+    if not FLAGS.k8s_auto_portforward:
+        logging.info("Auto port-forward disabled (--k8s_auto_portforward=false)")
         return
 
     _port_forward_manager.start()
 
     import time as _time
-    timeout = FLAGS.gke_portforward_health_timeout
+    timeout = FLAGS.k8s_portforward_health_timeout
     deadline = _time.time() + timeout
     api_url = GetAgentApiUrl()
 

@@ -1,4 +1,4 @@
-"""PKB Benchmark: GKE Agent QPS Saturation (Use Case F).
+"""PKB Benchmark: GKE Agent QPS Saturation .
 
 Atomic single-point measurement of scheduling throughput on a pre-provisioned
 GKE cluster.  Fires sandbox claim requests at a controlled QPS rate for a
@@ -19,8 +19,8 @@ Usage:
                 --gke_qps_pool_size=70 \\
                 --gke_qps_step_duration_s=30.0 \\
                 --gke_qps_mode=agent \\
-                --gke_namespace=agentic \\
-                --gke_api_url=http://localhost:8080
+                --k8s_namespace=agentic \\
+                --k8s_agent_api_url=http://localhost:8080
 
   # Raw claim mode
   python pkb.py --benchmarks=gke_qps \\
@@ -29,7 +29,7 @@ Usage:
                 --gke_qps_step_duration_s=30.0 \\
                 --gke_qps_mode=raw_claim \\
                 --gke_qps_claim_timeout_s=60.0 \\
-                --gke_namespace=agentic
+                --k8s_namespace=agentic
 
 Samples emitted (per run):
   - gke_qps_ttfe_mean                (ms)
@@ -51,21 +51,22 @@ Samples emitted (per run):
 """
 
 import json
+import os
 import logging
-import subprocess
 import threading
 import time
 import uuid
 
 from absl import flags
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import data
+from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_benchmark_utils as utils,
 )
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_deploy_utils as deploy_utils,
 )
-from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import gke_provision_utils
 
 FLAGS = flags.FLAGS
 
@@ -135,11 +136,6 @@ flags.DEFINE_float(
 # ---------------------------------------------------------------------------
 
 
-def Provision(benchmark_spec):
-    """Provision GKE cluster and all dependencies."""
-    gke_provision_utils.Provision()
-
-
 def GetConfig(user_config):
     """Load and return benchmark config.
 
@@ -151,7 +147,7 @@ def GetConfig(user_config):
 def Prepare(benchmark_spec):
     """Deploy workloads and verify agent API."""
     logging.info("=== Prepare: deploying workloads ===")
-    deploy_utils.DeployWorkloads()
+    deploy_utils.DeployWorkloads(benchmark_spec)
 
     mode = FLAGS.gke_qps_mode
     if mode == "agent":
@@ -166,7 +162,9 @@ def Run(benchmark_spec):
     Returns:
       List of sample.Sample objects.
     """
-    ns = FLAGS.gke_namespace
+    utils.set_benchmark_spec(benchmark_spec)
+
+    ns = FLAGS.k8s_namespace
     pool_size = FLAGS.gke_qps_pool_size
 
     # Scale warm pool (moved from Prepare for sweep compatibility)
@@ -188,7 +186,7 @@ def Run(benchmark_spec):
 
 def Cleanup(benchmark_spec):
     """Delete benchmark claims and drain warm pool."""
-    ns = FLAGS.gke_namespace
+    ns = FLAGS.k8s_namespace
     logging.info("Cleanup: deleting benchmark claims and draining warm pool.")
 
     # Delete any lingering benchmark claims
@@ -205,11 +203,6 @@ def Cleanup(benchmark_spec):
     logging.info("Cleanup complete.")
 
 
-def Teardown(benchmark_spec):
-    """Teardown GKE cluster and all dependencies."""
-    gke_provision_utils.Teardown()
-
-
 # ---------------------------------------------------------------------------
 # Agent mode
 # ---------------------------------------------------------------------------
@@ -217,7 +210,7 @@ def Teardown(benchmark_spec):
 
 def _RunAgent(benchmark_spec):
     """Fire QPS burst via the orchestrator API."""
-    ns = FLAGS.gke_namespace
+    ns = FLAGS.k8s_namespace
     target_qps = FLAGS.gke_qps_target_qps
     pool_size = FLAGS.gke_qps_pool_size
     step_duration = FLAGS.gke_qps_step_duration_s
@@ -384,7 +377,7 @@ def _RunAgent(benchmark_spec):
 
 def _RunRawClaim(benchmark_spec):
     """Fire SandboxClaims directly at target_qps (no agent)."""
-    ns = FLAGS.gke_namespace
+    ns = FLAGS.k8s_namespace
     target_qps = FLAGS.gke_qps_target_qps
     pool_size = FLAGS.gke_qps_pool_size
     step_duration = FLAGS.gke_qps_step_duration_s
@@ -667,21 +660,30 @@ def _CreateClaim(namespace, template, claim_name):
                 "labels": {"created-by": "pkb-qps-benchmark"},
             },
             "spec": {
-                "sandboxTemplateName": template,
+                "sandboxTemplateRef": {"name": template},
             },
         }
     )
-    proc = subprocess.run(
-        ["kubectl", "apply", "-n", namespace, "-f", "-"],
-        input=manifest,
-        capture_output=True,
-        text=True,
-        timeout=30,
+    tmp_dir = os.path.join(
+        data.ResourcePath("k8s_agents/manifests"), "tmp"
     )
+    os.makedirs(tmp_dir, exist_ok=True)
+    tmp_path = os.path.join(tmp_dir, f"qps-claim-{claim_name}.json")
+    try:
+        with open(tmp_path, "w") as f:
+            f.write(manifest)
+        stdout, stderr, retcode = kubectl.RunKubectlCommand(
+            ["apply", "-f", tmp_path],
+            timeout=30,
+            raise_on_failure=False,
+        )
+    finally:
+        if os.path.isfile(tmp_path):
+            os.unlink(tmp_path)
     t_create = time.time()
-    if proc.returncode != 0:
+    if retcode != 0:
         raise RuntimeError(
-            f"Failed to create claim {claim_name}: {proc.stderr.strip()}"
+            f"Failed to create claim {claim_name}: {stderr.strip()}"
         )
     return t_create
 

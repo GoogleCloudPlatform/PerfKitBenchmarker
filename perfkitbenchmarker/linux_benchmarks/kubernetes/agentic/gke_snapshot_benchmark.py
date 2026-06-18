@@ -1,4 +1,4 @@
-"""PKB Benchmark: GKE Agent Pod Snapshot Saturation (Use Case A).
+"""PKB Benchmark: GKE Agent Pod Snapshot Saturation .
 
 Atomic single-point measurement of GKE Pod Snapshot create/restore latency
 on a pre-provisioned GKE cluster with gVisor isolation.  Measures snapshot
@@ -13,7 +13,7 @@ Usage:
   python pkb.py --benchmarks=gke_snapshot \\
                 --gke_snapshot_preload_mb=50 \\
                 --gke_snapshot_burst_size=3 \\
-                --gke_namespace=agentic \\
+                --k8s_namespace=agentic \\
                 --gke_snapshot_skip_snapshot=false
 
 Samples emitted (per run):
@@ -35,12 +35,15 @@ import json
 import logging
 import os
 import re
-import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from jinja2 import Template
+
 from absl import flags
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import data
+from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_benchmark_utils as utils,
@@ -48,7 +51,6 @@ from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_deploy_utils as deploy_utils,
 )
-from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import gke_provision_utils
 
 FLAGS = flags.FLAGS
 
@@ -107,11 +109,6 @@ flags.DEFINE_string(
 # ---------------------------------------------------------------------------
 
 
-def Provision(benchmark_spec):
-    """Provision GKE cluster and all dependencies."""
-    gke_provision_utils.Provision()
-
-
 def GetConfig(user_config):
     """Load and return benchmark config.
 
@@ -122,7 +119,7 @@ def GetConfig(user_config):
 
 def Prepare(benchmark_spec):
     """Deploy workloads, snapshot infra, and validate readiness."""
-    ns = FLAGS.gke_namespace
+    ns = FLAGS.k8s_namespace
     preload_mb = FLAGS.gke_snapshot_preload_mb
 
     logging.info(
@@ -132,7 +129,7 @@ def Prepare(benchmark_spec):
     )
 
     # Deploy Agent Sandbox ecosystem (idempotent)
-    deploy_utils.DeployWorkloads()
+    deploy_utils.DeployWorkloads(benchmark_spec)
 
     # Deploy Pod Snapshot infrastructure (idempotent)
     deploy_utils.DeploySnapshots()
@@ -189,7 +186,9 @@ def Run(benchmark_spec):
     Returns:
       List of sample.Sample objects.
     """
-    ns = FLAGS.gke_namespace
+    utils.set_benchmark_spec(benchmark_spec)
+
+    ns = FLAGS.k8s_namespace
     preload_mb = FLAGS.gke_snapshot_preload_mb
     burst_size = FLAGS.gke_snapshot_burst_size
     skip_snapshot = FLAGS.gke_snapshot_skip_snapshot
@@ -284,7 +283,7 @@ def Run(benchmark_spec):
 
 def Cleanup(benchmark_spec):
     """Clean up any leftover benchmark resources."""
-    ns = FLAGS.gke_namespace
+    ns = FLAGS.k8s_namespace
     logging.info("Cleanup — deleting any leftover snapshot-benchmark resources.")
 
     for kind in (
@@ -308,11 +307,6 @@ def Cleanup(benchmark_spec):
         )
     utils.StopPortForward()
     logging.info("Cleanup complete.")
-
-
-def Teardown(benchmark_spec):
-    """Teardown GKE cluster and all dependencies."""
-    gke_provision_utils.Teardown()
 
 
 # ---------------------------------------------------------------------------
@@ -592,15 +586,24 @@ def _ApplyClaim(name, namespace, template_name):
             "spec": {"sandboxTemplateRef": {"name": template_name}},
         }
     )
-    proc = subprocess.run(
-        ["kubectl", "apply", "-f", "-"],
-        input=manifest,
-        capture_output=True,
-        text=True,
-        timeout=30,
+    tmp_dir = os.path.join(
+        data.ResourcePath("k8s_agents/manifests"), "tmp"
     )
-    if proc.returncode != 0:
-        raise RuntimeError(f"Failed to create SandboxClaim {name}: {proc.stderr}")
+    os.makedirs(tmp_dir, exist_ok=True)
+    tmp_path = os.path.join(tmp_dir, f"snap-claim-{name}.json")
+    try:
+        with open(tmp_path, "w") as f:
+            f.write(manifest)
+        stdout, stderr, retcode = kubectl.RunKubectlCommand(
+            ["apply", "-f", tmp_path],
+            timeout=30,
+            raise_on_failure=False,
+        )
+    finally:
+        if os.path.isfile(tmp_path):
+            os.unlink(tmp_path)
+    if retcode != 0:
+        raise RuntimeError(f"Failed to create SandboxClaim {name}: {stderr}")
 
 
 def _RenderAndApplyTemplate(
@@ -611,7 +614,7 @@ def _RenderAndApplyTemplate(
     preload_mb,
     preload_mode,
 ):
-    """Render the .yaml.template with step-specific values and kubectl apply."""
+    """Render the Jinja2 template with step-specific values and kubectl apply."""
     if preload_mode.startswith("script:"):
         return _RenderAndApplyScriptTemplate(
             template_name,
@@ -626,50 +629,44 @@ def _RenderAndApplyTemplate(
 
     memory_mi = max(512, preload_mb + 256)
 
-    rendered = (
-        content.replace("$AGENTIC_NAMESPACE", namespace)
-        .replace("$SNAPSHOT_KSA_NAME", ksa_name)
-        .replace("$SNAPSHOT_PRELOAD_MB", str(preload_mb))
-    )
-    rendered = rendered.replace(
-        "name: snapshot-benchmark-template",
-        f"name: {template_name}",
-    )
-    rendered = rendered.replace(
-        'memory: "512Mi"',
-        f'memory: "{memory_mi}Mi"',
+    tmpl = Template(content)
+    rendered = tmpl.render(
+        template_name=template_name,
+        namespace=namespace,
+        ksa_name=ksa_name,
+        preload_mb=preload_mb,
+        memory_mi=memory_mi,
     )
 
-    proc = subprocess.run(
-        ["kubectl", "apply", "-f", "-"],
-        input=rendered,
-        capture_output=True,
-        text=True,
-        timeout=30,
+    tmp_dir = os.path.join(
+        data.ResourcePath("k8s_agents/manifests"), "tmp"
     )
-    if proc.returncode != 0:
-        logging.warning("kubectl apply stderr: %s", proc.stderr)
-    return proc.returncode == 0
+    os.makedirs(tmp_dir, exist_ok=True)
+    tmp_path = os.path.join(tmp_dir, f"snap-template-{template_name}.yaml")
+    try:
+        with open(tmp_path, "w") as f:
+            f.write(rendered)
+        stdout, stderr, retcode = kubectl.RunKubectlCommand(
+            ["apply", "-f", tmp_path],
+            timeout=30,
+            raise_on_failure=False,
+        )
+    finally:
+        if os.path.isfile(tmp_path):
+            os.unlink(tmp_path)
+    if retcode != 0:
+        logging.warning("kubectl apply stderr: %s", stderr)
+    return retcode == 0
 
 
 def _get_sandbox_node_selector():
-    """Return the correct nodeSelector based on provisioning mode."""
-    try:
-        mode = FLAGS.gke_provision_mode
-    except AttributeError:
-        mode = "custom"
-    if mode == "native":
-        return {"pkb_nodepool": "sandbox"}
-    return {"dedicated": "agentic-sandbox"}
+    """Return the nodeSelector for sandbox pods."""
+    return {"pkb_nodepool": "sandbox"}
 
 
 def _get_sandbox_tolerations():
-    """Return the correct tolerations based on provisioning mode."""
-    try:
-        mode = FLAGS.gke_provision_mode
-    except AttributeError:
-        mode = "custom"
-    tolerations = [
+    """Return tolerations for sandbox pods."""
+    return [
         {
             "key": "sandbox.gke.io/runtime",
             "operator": "Equal",
@@ -677,17 +674,6 @@ def _get_sandbox_tolerations():
             "effect": "NoSchedule",
         },
     ]
-    if mode != "native":
-        tolerations.insert(
-            0,
-            {
-                "key": "dedicated",
-                "operator": "Equal",
-                "value": "agentic-sandbox",
-                "effect": "NoSchedule",
-            },
-        )
-    return tolerations
 
 
 def _RenderAndApplyScriptTemplate(
@@ -725,7 +711,7 @@ def _RenderAndApplyScriptTemplate(
         "done\n"
     )
 
-    manifest = {
+    manifest = json.dumps({
         "apiVersion": "extensions.agents.x-k8s.io/v1alpha1",
         "kind": "SandboxTemplate",
         "metadata": {
@@ -762,18 +748,27 @@ def _RenderAndApplyScriptTemplate(
                 },
             }
         },
-    }
+    })
 
-    proc = subprocess.run(
-        ["kubectl", "apply", "-f", "-"],
-        input=json.dumps(manifest),
-        capture_output=True,
-        text=True,
-        timeout=30,
+    tmp_dir = os.path.join(
+        data.ResourcePath("k8s_agents/manifests"), "tmp"
     )
-    if proc.returncode != 0:
-        logging.warning("kubectl apply stderr: %s", proc.stderr)
-    return proc.returncode == 0
+    os.makedirs(tmp_dir, exist_ok=True)
+    tmp_path = os.path.join(tmp_dir, f"snap-script-template-{template_name}.json")
+    try:
+        with open(tmp_path, "w") as f:
+            f.write(manifest)
+        stdout, stderr, retcode = kubectl.RunKubectlCommand(
+            ["apply", "-f", tmp_path],
+            timeout=30,
+            raise_on_failure=False,
+        )
+    finally:
+        if os.path.isfile(tmp_path):
+            os.unlink(tmp_path)
+    if retcode != 0:
+        logging.warning("kubectl apply stderr: %s", stderr)
+    return retcode == 0
 
 
 def _MeasureSingleSource(name, namespace, t0, pod_timeout, preload_mode):
@@ -861,15 +856,24 @@ def _TriggerAndWaitSnapshot(trigger_name, target_pod, namespace, t0, timeout_s=3
             "spec": {"targetPod": target_pod},
         }
     )
-    proc = subprocess.run(
-        ["kubectl", "apply", "-f", "-"],
-        input=manifest,
-        capture_output=True,
-        text=True,
-        timeout=30,
+    tmp_dir = os.path.join(
+        data.ResourcePath("k8s_agents/manifests"), "tmp"
     )
-    if proc.returncode != 0:
-        result["error"] = f"Failed to create trigger: {proc.stderr}"
+    os.makedirs(tmp_dir, exist_ok=True)
+    tmp_path = os.path.join(tmp_dir, f"snap-trigger-{trigger_name}.json")
+    try:
+        with open(tmp_path, "w") as f:
+            f.write(manifest)
+        stdout, stderr, retcode = kubectl.RunKubectlCommand(
+            ["apply", "-f", tmp_path],
+            timeout=30,
+            raise_on_failure=False,
+        )
+    finally:
+        if os.path.isfile(tmp_path):
+            os.unlink(tmp_path)
+    if retcode != 0:
+        result["error"] = f"Failed to create trigger: {stderr}"
         return result
 
     deadline = t0 + timeout_s
@@ -985,13 +989,9 @@ def _CleanupStep(source_names, restore_names, trigger_names, template_name, name
 
 def _GetTemplatePath():
     """Return the absolute path to the snapshot SandboxTemplate template."""
-    pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(
-        pkg_dir,
-        "data",
-        "k8s_agents",
-        "manifests",
-        "snapshot-sandbox-template.yaml.template",
+        data.ResourcePath("k8s_agents/manifests"),
+        "snapshot-sandbox-template.yaml.j2",
     )
 
 

@@ -1,0 +1,46 @@
+---
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: {{ template_name }}
+  namespace: {{ ns }}
+spec:
+  podTemplate:
+    metadata:
+      labels:
+        app: snapshot-benchmark-workload
+    spec:
+      serviceAccountName: {{ ksa_name }}
+      runtimeClassName: gvisor
+      containers:
+      - name: preloader
+        image: python:3.11-slim
+        command: ["python3", "-c"]
+        args:
+          - |
+            import time, os
+            preload_mb = int(os.environ.get("PRELOAD_MB", "10"))
+            print(f"Preloading {preload_mb} MB of memory...", flush=True)
+            _ballast = bytearray(preload_mb * 1024 * 1024)
+            print(f"Preload complete. Starting counter.", flush=True)
+            i = 0
+            while True:
+                print(f"Count: {i}", flush=True)
+                i += 1
+                time.sleep(1)
+        env:
+          - name: PRELOAD_MB
+            value: "{{ preload_mb }}"
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "{{ memory_mi }}Mi"
+            ephemeral-storage: "512Mi"
+      nodeSelector:
+        pkb_nodepool: sandbox
+      tolerations:
+        - key: "sandbox.gke.io/runtime"
+          operator: "Equal"
+          value: "gvisor"
+          effect: "NoSchedule"
+      restartPolicy: "OnFailure"

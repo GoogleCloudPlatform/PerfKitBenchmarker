@@ -1,4 +1,4 @@
-"""PKB Benchmark: GKE Agent Payload Transfer Saturation (Use Case D).
+"""PKB Benchmark: GKE Agent Payload Transfer Saturation .
 
 Atomic single-point measurement of payload transfer latency from a gVisor
 sandbox back to the orchestrator on a pre-provisioned GKE cluster.  Measures
@@ -14,8 +14,8 @@ Usage:
                 --gke_payload_size_mb=50 \
                 --gke_payload_iterations=20 \
                 --gke_payload_concurrent_sessions=5 \
-                --gke_namespace=agentic \
-                --gke_api_url=http://localhost:8080
+                --k8s_namespace=agentic \
+                --k8s_agent_api_url=http://localhost:8080
 
 Samples emitted (per run):
   - gke_payload_orchestrator_transfer_mean       (ms)
@@ -71,7 +71,6 @@ from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_deploy_utils as deploy_utils,
 )
-from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import gke_provision_utils
 
 FLAGS = flags.FLAGS
 
@@ -126,11 +125,6 @@ flags.DEFINE_bool(
 # ---------------------------------------------------------------------------
 
 
-def Provision(benchmark_spec):
-    """Provision GKE cluster and all dependencies."""
-    gke_provision_utils.Provision()
-
-
 def GetConfig(user_config):
     """Load and return benchmark config.
 
@@ -142,7 +136,7 @@ def GetConfig(user_config):
 def Prepare(benchmark_spec):
     """Deploy workloads and verify agent API."""
     logging.info("=== Prepare: deploying workloads ===")
-    deploy_utils.DeployWorkloads()
+    deploy_utils.DeployWorkloads(benchmark_spec)
     utils.CheckAgentHealthz(required=False)
     utils.EnsurePortForward()
     logging.info("Prepare complete.")
@@ -154,7 +148,9 @@ def Run(benchmark_spec):
     Returns:
       List of sample.Sample objects.
     """
-    ns = FLAGS.gke_namespace
+    utils.set_benchmark_spec(benchmark_spec)
+
+    ns = FLAGS.k8s_namespace
     payload_size_mb = FLAGS.gke_payload_size_mb
     iterations = FLAGS.gke_payload_iterations
     concurrent = FLAGS.gke_payload_concurrent_sessions
@@ -575,7 +571,7 @@ def Run(benchmark_spec):
 
 def Cleanup(benchmark_spec):
     """Clean up after measurement. Scale warm pool to 0."""
-    ns = FLAGS.gke_namespace
+    ns = FLAGS.k8s_namespace
     logging.info("Cleanup: draining warm pool.")
 
     utils.DrainWarmPool(
@@ -588,18 +584,25 @@ def Cleanup(benchmark_spec):
     logging.info("Cleanup complete (cluster persists).")
 
 
-def Teardown(benchmark_spec):
-    """Teardown GKE cluster and all dependencies."""
-    gke_provision_utils.Teardown()
-
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
 def _emit(samples, agg, agg_key, metric_suffix, unit, namespace, extra):
-    """Emit a sample if the key exists in the aggregate dict."""
+    """Emit a sample if the key exists in the aggregate dict.
+
+    Args:
+        samples: List to append the new sample.Sample to.
+        agg: Aggregate metrics dict returned by the agent API response.
+        agg_key: Key to look up in `agg` (e.g. "orchestrator_cel_mean_ms").
+        metric_suffix: Suffix appended to BENCHMARK_NAME to form the metric
+            name (e.g. "orchestrator_cel_mean").
+        unit: Unit string for the sample (e.g. "ms", "MB", "seconds").
+        namespace: Kubernetes namespace (included in sample metadata).
+        extra: Dict of additional metadata key-value pairs attached to
+            every sample (density, session counts, wall time, etc.).
+    """
     value = agg.get(agg_key)
     if value is not None:
         samples.append(

@@ -1,4 +1,4 @@
-"""PKB Benchmark: GKE Agent Deletion & Cleanup (Use Case G).
+"""PKB Benchmark: GKE Agent Deletion & Cleanup .
 
 Atomic single-point measurement of bulk deletion efficiency and IP
 reclamation on a pre-provisioned GKE cluster with gVisor isolation.
@@ -18,7 +18,7 @@ Usage:
                 --gke_deletion_poll_interval_s=1.0 \\
                 --gke_deletion_provision_timeout_s=120.0 \\
                 --gke_deletion_drain_timeout_s=300.0 \\
-                --gke_namespace=agentic \\
+                --k8s_namespace=agentic \\
                 --gke_machine_type=c4-standard-8
 
 Samples emitted (per run):
@@ -48,7 +48,6 @@ from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_deploy_utils as deploy_utils,
 )
-from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import gke_provision_utils
 
 FLAGS = flags.FLAGS
 
@@ -106,11 +105,6 @@ flags.DEFINE_float(
 # ---------------------------------------------------------------------------
 
 
-def Provision(benchmark_spec):
-    """Provision GKE cluster and all dependencies."""
-    gke_provision_utils.Provision()
-
-
 def GetConfig(user_config):
     """Load and return benchmark config.
 
@@ -122,7 +116,7 @@ def GetConfig(user_config):
 def Prepare(benchmark_spec):
     """Deploy workloads onto the cluster."""
     logging.info("=== Prepare: deploying workloads ===")
-    deploy_utils.DeployWorkloads()
+    deploy_utils.DeployWorkloads(benchmark_spec)
     utils.EnsurePortForward()
     logging.info("Prepare complete.")
 
@@ -133,7 +127,9 @@ def Run(benchmark_spec):
     Returns:
       List of sample.Sample objects.
     """
-    ns = FLAGS.gke_namespace
+    utils.set_benchmark_spec(benchmark_spec)
+
+    ns = FLAGS.k8s_namespace
     batch_size = FLAGS.gke_deletion_batch_size
     warmpool_name = FLAGS.gke_deletion_warmpool_name
     label = FLAGS.gke_deletion_pod_label
@@ -144,7 +140,7 @@ def Run(benchmark_spec):
     logging.info("=== Run: batch_size=%d ===", batch_size)
 
     # Drain to 0 for clean measurement (moved from Prepare for sweep compatibility)
-    _DrainPool(ns, warmpool_name, label, drain_timeout)
+    utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(drain_timeout))
     time.sleep(2)
 
     t_wall_start = time.time()
@@ -395,19 +391,14 @@ def Run(benchmark_spec):
 
 def Cleanup(benchmark_spec):
     """Best-effort drain of warm pool after measurement."""
-    ns = FLAGS.gke_namespace
+    ns = FLAGS.k8s_namespace
     warmpool_name = FLAGS.gke_deletion_warmpool_name
     label = FLAGS.gke_deletion_pod_label
 
     logging.info("Cleanup: draining warm pool to 0.")
-    _DrainPool(ns, warmpool_name, label, FLAGS.gke_deletion_drain_timeout_s)
+    utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(FLAGS.gke_deletion_drain_timeout_s))
     utils.StopPortForward()
     logging.info("Cleanup complete.")
-
-
-def Teardown(benchmark_spec):
-    """Teardown GKE cluster and all dependencies."""
-    gke_provision_utils.Teardown()
 
 
 # ---------------------------------------------------------------------------
@@ -430,35 +421,6 @@ def _PatchReplicas(namespace, warmpool_name, replicas):
         ],
         raise_on_failure=False,
     )
-
-
-def _DrainPool(namespace, warmpool_name, label, timeout_s):
-    """Scale pool to 0 and wait for all pods to terminate."""
-    _PatchReplicas(namespace, warmpool_name, 0)
-
-    # Delete any lingering SandboxClaims
-    utils.RunKubectl(
-        [
-            "delete",
-            "sandboxclaims",
-            "--all",
-            "-n",
-            namespace,
-            "--ignore-not-found=true",
-        ],
-        timeout=60,
-        raise_on_failure=False,
-    )
-
-    t0 = time.time()
-    while time.time() - t0 < timeout_s:
-        remaining = utils.CountPods(namespace, label)
-        if remaining == 0:
-            logging.info("Pool drained in %.1fs", time.time() - t0)
-            return
-        time.sleep(2)
-
-    logging.warning("Drain timed out after %.0fs", timeout_s)
 
 
 def _GetPodNames(namespace, label):

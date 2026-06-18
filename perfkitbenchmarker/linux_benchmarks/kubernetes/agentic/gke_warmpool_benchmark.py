@@ -17,7 +17,7 @@ Usage:
                 --gke_warmpool_ready_threshold_s=300 \
                 --gke_warmpool_poll_interval_s=2.0 \
                 --gke_warmpool_drain_timeout_s=300 \
-                --gke_namespace=agentic \
+                --k8s_namespace=agentic \
                 --gke_machine_type=c4-standard-8
 
 Samples emitted (per run):
@@ -55,7 +55,6 @@ from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_deploy_utils as deploy_utils,
 )
-from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import gke_provision_utils
 
 FLAGS = flags.FLAGS
 
@@ -113,11 +112,6 @@ flags.DEFINE_float(
 # ---------------------------------------------------------------------------
 
 
-def Provision(benchmark_spec):
-    """Provision GKE cluster and all dependencies."""
-    gke_provision_utils.Provision()
-
-
 def GetConfig(user_config):
     """Load and return benchmark config.
 
@@ -129,7 +123,7 @@ def GetConfig(user_config):
 def Prepare(benchmark_spec):
     """Deploy workloads onto the cluster."""
     logging.info("=== Prepare: deploying workloads ===")
-    deploy_utils.DeployWorkloads()
+    deploy_utils.DeployWorkloads(benchmark_spec)
     utils.EnsurePortForward()
     logging.info("Prepare complete.")
 
@@ -140,7 +134,9 @@ def Run(benchmark_spec):
     Returns:
       List of sample.Sample objects.
     """
-    ns = FLAGS.gke_namespace
+    utils.set_benchmark_spec(benchmark_spec)
+
+    ns = FLAGS.k8s_namespace
     target = FLAGS.gke_warmpool_target_replicas
     warmpool_name = FLAGS.gke_warmpool_name
     label = FLAGS.gke_warmpool_pod_label
@@ -148,7 +144,7 @@ def Run(benchmark_spec):
     poll_interval = FLAGS.gke_warmpool_poll_interval_s
 
     # Drain to 0 for clean measurement (moved from Prepare for sweep compatibility)
-    _DrainPool(ns, warmpool_name, label, FLAGS.gke_warmpool_drain_timeout_s)
+    utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(FLAGS.gke_warmpool_drain_timeout_s))
     time.sleep(3)
 
     logging.info("=== Run: scaling %s to %d replicas ===", warmpool_name, target)
@@ -157,7 +153,7 @@ def Run(benchmark_spec):
 
     # 1. Measure drain time (should be near-zero since Prepare drained)
     t0 = time.time()
-    _DrainPool(ns, warmpool_name, label, FLAGS.gke_warmpool_drain_timeout_s)
+    utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(FLAGS.gke_warmpool_drain_timeout_s))
     drain_time_s = round(time.time() - t0, 2)
 
     time.sleep(2)
@@ -185,8 +181,8 @@ def Run(benchmark_spec):
 
     while time.time() < deadline:
         elapsed = time.time() - t_scale
-        running = _CountPods(ns, label, "Running")
-        pending = _CountPods(ns, label, "Pending")
+        running = utils.CountPods(ns, label, "Running")
+        pending = utils.CountPods(ns, label, "Pending")
 
         if first_pod_time is None and running > 0:
             first_pod_time = elapsed
@@ -207,8 +203,8 @@ def Run(benchmark_spec):
         time.sleep(poll_interval)
 
     total_time = round(time.time() - t_scale, 2)
-    final_running = _CountPods(ns, label, "Running")
-    final_pending = _CountPods(ns, label, "Pending")
+    final_running = utils.CountPods(ns, label, "Running")
+    final_pending = utils.CountPods(ns, label, "Pending")
     rate = round(final_running / total_time, 2) if total_time > 0 else 0
 
     logging.info(
@@ -312,77 +308,19 @@ def Run(benchmark_spec):
 
 def Cleanup(benchmark_spec):
     """Drain warm pool back to 0 after measurement."""
-    ns = FLAGS.gke_namespace
+    ns = FLAGS.k8s_namespace
     warmpool_name = FLAGS.gke_warmpool_name
     label = FLAGS.gke_warmpool_pod_label
 
     logging.info("Cleanup: draining warm pool to 0.")
-    _DrainPool(ns, warmpool_name, label, FLAGS.gke_warmpool_drain_timeout_s)
+    utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(FLAGS.gke_warmpool_drain_timeout_s))
     utils.StopPortForward()
     logging.info("Cleanup complete.")
-
-
-def Teardown(benchmark_spec):
-    """Teardown GKE cluster and all dependencies."""
-    gke_provision_utils.Teardown()
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _CountPods(namespace, label, phase=None):
-    """Count pods matching label (and optionally phase)."""
-    cmd = ["get", "pods", "-n", namespace, "-l", label, "-o", "name"]
-    if phase:
-        cmd += [f"--field-selector=status.phase={phase}"]
-    stdout, _, rc = utils.RunKubectl(cmd, raise_on_failure=False)
-    if rc != 0 or not stdout:
-        return 0
-    return len(stdout.strip().splitlines())
-
-
-def _DrainPool(namespace, warmpool_name, label, timeout_s):
-    """Scale pool to 0 and wait for all pods to terminate."""
-    patch_json = json.dumps({"spec": {"replicas": 0}})
-    utils.RunKubectl(
-        [
-            "patch",
-            "sandboxwarmpool",
-            warmpool_name,
-            "-n",
-            namespace,
-            "--type=merge",
-            f"-p={patch_json}",
-        ],
-        raise_on_failure=False,
-    )
-
-    # Delete any lingering SandboxClaims
-    utils.RunKubectl(
-        [
-            "delete",
-            "sandboxclaims",
-            "--all",
-            "-n",
-            namespace,
-            "--ignore-not-found=true",
-        ],
-        timeout=60,
-        raise_on_failure=False,
-    )
-
-    t0 = time.time()
-    while time.time() - t0 < timeout_s:
-        remaining = _CountPods(namespace, label)
-        if remaining == 0:
-            elapsed = time.time() - t0
-            logging.info("Pool drained in %.1fs", elapsed)
-            return
-        time.sleep(2)
-
-    logging.warning("Drain timed out after %.0fs", timeout_s)
 
 
 def _ScrapeLifecycle(namespace, label, scale_start_epoch):

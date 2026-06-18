@@ -90,7 +90,7 @@ from dotenv import load_dotenv
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-# Load generated.env (auto-generated from gke-benchmark.conf by build_images_gke.sh).
+# Load generated.env (rendered by gke_image_build_utils._GenerateEnvFile from PKB flags).
 # In GKE, K8s manifest env vars take precedence.
 load_dotenv(os.path.join(basedir, "generated.env"))
 

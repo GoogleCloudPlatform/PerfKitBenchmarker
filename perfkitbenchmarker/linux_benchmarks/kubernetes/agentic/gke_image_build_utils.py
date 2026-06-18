@@ -25,12 +25,57 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+
 # ---------------------------------------------------------------------------
-# Public API
+# Architecture detection
 # ---------------------------------------------------------------------------
 
+_ARCH_MAP = {
+    "X86_64": "amd64",
+    "ARM64": "arm64",
+}
 
-def build_images_with_config(project, region, machine_type, cloud_build_sa=None):
+
+def _DetectArchitecture(machine_type, zone, project):
+    """Detect CPU architecture for a GCP machine type.
+
+    Uses gcloud to query the machine type's architecture, then maps
+    GCP naming (X86_64/ARM64) to Docker platform naming (amd64/arm64).
+
+    Falls back to amd64 if gcloud fails.
+    """
+    try:
+        stdout, _, retcode = vm_util.IssueCommand(
+            [
+                "gcloud", "compute", "machine-types", "describe",
+                machine_type,
+                f"--zone={zone}",
+                f"--project={project}",
+                "--format=value(architecture)",
+            ],
+            raise_on_failure=False,
+            timeout=30,
+        )
+        if retcode == 0 and stdout.strip():
+            gcp_arch = stdout.strip().upper()
+            docker_arch = _ARCH_MAP.get(gcp_arch)
+            if docker_arch:
+                logging.info(
+                    "Detected architecture for %s: %s -> %s",
+                    machine_type, gcp_arch, docker_arch,
+                )
+                return docker_arch
+            logging.warning(
+                "Unknown GCP architecture '%s' for %s. Falling back to amd64.",
+                gcp_arch, machine_type,
+            )
+    except Exception as e:
+        logging.warning("gcloud machine-type describe failed: %s. Falling back to amd64.", e)
+
+    return "amd64"
+
+
+def build_images_with_config(project, region, machine_type, zone, arch, cloud_build_sa=None):
     """Core image build logic — no FLAGS dependency.
 
     Callable from both PKB (via BuildImages()) and prerequisite_setup.py.
@@ -43,9 +88,8 @@ def build_images_with_config(project, region, machine_type, cloud_build_sa=None)
         cloud_build_sa: Cloud Build service account email.
             If None, defaults to "adk-cloud-build-sa@{project}.iam.gserviceaccount.com".
     """
-    # Derive architecture from machine family
-    machine_family = machine_type.split("-")[0] if machine_type else "c4"
-    target_arch = "arm64" if machine_family == "c4a" else "amd64"
+    # Architecture passed in from caller (detected via gcloud)
+    target_arch = arch
 
     # Derive image paths
     adk_image = f"{region}-docker.pkg.dev/{project}/adk-repo/adk-agent:{target_arch}"
@@ -101,15 +145,19 @@ def build_images_with_config(project, region, machine_type, cloud_build_sa=None)
 
 
 def BuildImages():
-    """FLAGS-based entry point (called from PKB Provision).
+    """FLAGS-based entry point.
 
-    Reads configuration from FLAGS (set in gke_provision_utils.py).
+    Reads configuration from native PKB FLAGS.
     Delegates to build_images_with_config() for the actual work.
     """
+    project = getattr(FLAGS, 'project', '') or ''
+    zone = getattr(FLAGS, 'zone', '') or ''
+    region = zone[:-2] if zone else ''
+    machine_type = getattr(FLAGS, 'machine_type', '') or ''
     build_images_with_config(
-        project=FLAGS.gke_project_id,
-        region=FLAGS.gke_region,
-        machine_type=FLAGS.gke_sandbox_machine_type,
+        project=project,
+        region=region,
+        machine_type=machine_type,
     )
 
 
