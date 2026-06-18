@@ -59,6 +59,9 @@ class BaseManagedVmGroup(resource.BaseResource):
     self._vms: dict[str, virtual_machine.BaseVirtualMachine] = {}
     self._deleted_vms: list[virtual_machine.BaseVirtualMachine] = []
 
+    self.region: str | None = None
+    self.zone: str | None = None
+
     self.last_operation_start_time: float | None = None
     self.last_ready_time: float | None = None
 
@@ -66,6 +69,9 @@ class BaseManagedVmGroup(resource.BaseResource):
     metadata = super().GetResourceMetadata().copy()
     vm = (list(self.vms) + self._deleted_vms + [self.vm_config])[0]
     metadata.update(vm.GetResourceMetadata())
+    metadata['region'] = self.region
+    metadata['zone'] = self.zone
+    metadata['is_regional'] = self.zone is None
     return metadata
 
   @property
