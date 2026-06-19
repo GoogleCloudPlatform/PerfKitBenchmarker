@@ -63,14 +63,13 @@ containerd cgroup hierarchy, etc.).
     Bulk-index + search query under swap pressure (esrally or curl).
 """
 
-import json
 import logging
-import re
 import textwrap
 import time
 from typing import Any
 
 from absl import flags
+from perfkitbenchmarker import benchmark_spec as bm_spec_lib
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
@@ -79,14 +78,11 @@ from perfkitbenchmarker.resources.container_service import kubectl
 
 FLAGS = flags.FLAGS
 
+_BenchmarkSpec = bm_spec_lib.BenchmarkSpec
+
 # ---------------------------------------------------------------------------
 # Benchmark identity
 # ---------------------------------------------------------------------------
-
-
-
-FLAGS = flags.FLAGS
-
 
 BENCHMARK_NAME = 'swap_encryption'
 
@@ -277,15 +273,91 @@ _SWAP_DISK_SIZE_GB = flags.DEFINE_integer(
     'hyperdisk-balanced IOPS constraint: provisioned_iops ≤ size_gb × 80.',
 )
 
+_ENABLE_DMCRYPT = flags.DEFINE_boolean(
+    'swap_encryption_enable_dmcrypt',
+    True,
+    'When True (default), wrap the swap device in dm-crypt plain mode '
+    "(aes-xts-plain64, ephemeral random key) matching GKE's "
+    'go/node:swap-encryption implementation.  Set False to measure plain '
+    '(unencrypted) swap overhead as a baseline.',
+)
+
+_SWAP_DEVICE = flags.DEFINE_string(
+    'swap_encryption_device',
+    '',
+    'Explicit block device path to use as the swap device, e.g. '
+    '/dev/nvme1n1 or /dev/mapper/swap_encrypted.  When empty (default), '
+    'the device is auto-detected from /proc/swaps inside the benchmark pod.',
+)
+
+_SWAP_TYPE = flags.DEFINE_string(
+    'swap_encryption_swap_type',
+    'hyperdisk',
+    'Storage target for the swap device.  One of: hyperdisk (default), '
+    'lssd, instance_store, io2.',
+)
+
+_KERNEL_VERSION = flags.DEFINE_string(
+    'swap_encryption_kernel_version',
+    '',
+    'Kernel version string to embed in the DaemonSet pod spec as a label.  '
+    'When empty (default) the version is not pinned.',
+)
+
+_ENABLE_ZSWAP = flags.DEFINE_boolean(
+    'swap_encryption_enable_zswap',
+    False,
+    'When True, enable zswap compressed swap cache on the benchmark node.',
+)
+
+_MIN_FREE_KBYTES = flags.DEFINE_integer(
+    'swap_encryption_min_free_kbytes',
+    0,
+    'Value to write to /proc/sys/vm/min_free_kbytes before benchmarking. '
+    '0 (default) leaves the kernel default unchanged.',
+)
+
+_FIO_RUNTIME_SEC = flags.DEFINE_integer(
+    'swap_encryption_fio_runtime_sec',
+    60,
+    'Wall-clock seconds each fio job runs in Phase 1 microbenchmarks.',
+)
+
+_STRESS_VM_BYTES = flags.DEFINE_string(
+    'swap_encryption_stress_vm_bytes',
+    '28G',
+    'stress-ng --vm-bytes value for Phase 2a swap-pressure stressor.  '
+    'Should exceed available node RAM to force sustained paging.',
+)
+
+_STRESS_VM_BYTES_LIST = flags.DEFINE_list(
+    'swap_encryption_stress_vm_bytes_list',
+    [],
+    'Comma-separated list of --vm-bytes values to sweep in Phase 2a, '
+    'e.g. "14G,28G,56G".  Overrides --swap_encryption_stress_vm_bytes.',
+)
+
+_STRESS_TIMEOUT_SEC = flags.DEFINE_integer(
+    'swap_encryption_stress_timeout_sec',
+    300,
+    'Maximum seconds to wait for the stress-ng swap-pressure phase.',
+)
 
 _DS_NAME = 'pkb-swap-benchmark'
-
-
 _DS_NAMESPACE = 'default'
-
-
 _DS_LABEL = 'pkb-swap-benchmark'
 
+# Transient kubectl errors that are safe to retry.
+_TRANSIENT_KUBECTL_ERRORS = ('connection reset by peer', 'websocket: close')
+
+# Errors indicating the container/pod is gone and needs recovery.
+_CONTAINER_GONE_KUBECTL_ERRORS = (
+    'container not found',
+    'procReady not received',
+    'unable to upgrade connection',
+    'not found',
+    'deleted state',
+)
 
 _active_pod: list[str] = []  # single-element list so closures can mutate it
 
@@ -298,10 +370,7 @@ _pod_lost: list[str] = []
 
 _oom_events: list[str] = []
 
-
 _BENCHMARK_NODEPOOL = 'benchmark'
-
-
 _DEFAULT_NODEPOOL = 'default-pool'
 
 
@@ -325,10 +394,11 @@ def _daemonset_yaml(image: str) -> str:
 
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
+  """Load and return benchmark config spec."""
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def Prepare(spec) -> None:
+def Prepare(spec: _BenchmarkSpec) -> None:
   """Two-step nodepool setup then DaemonSet deployment.
 
   Step 1 (handled by PKB infrastructure): cluster provisioned with a cheap
@@ -345,8 +415,27 @@ def Prepare(spec) -> None:
   cluster = spec.container_cluster
 
   # ── Step 2a: add real benchmark nodepool ────────────────────────────────
-  if getattr(cluster, 'project', None):
-    # GCP path: true two-step nodepool setup
+  if not getattr(cluster, 'project', None):
+    # Guard: AWS / EKS path — nodepool management is external.
+    # PKB labels nodes pkb_nodepool=default; re-label to match the DaemonSet
+    # nodeSelector (pkb_nodepool=benchmark) before deploying the pod.
+    logging.info(
+        '[swap_encryption] EKS cluster — labelling existing nodes with '
+        'pkb_nodepool=%s so the DaemonSet nodeSelector matches.',
+        _BENCHMARK_NODEPOOL,
+    )
+    kubectl.RunKubectlCommand([
+        'label',
+        'nodes',
+        '--all',
+        '--overwrite',
+        f'pkb_nodepool={_BENCHMARK_NODEPOOL}',
+    ])
+    # io2 test-matrix row: create + attach a real io2 EBS volume so swap runs
+    # on io2 hardware-encrypted storage (no-op unless swap_type=io2).
+    _ensure_io2_volume()
+  else:
+    # GCP path: true two-step nodepool setup.
     logging.info('[swap_encryption] Step 2a: creating benchmark nodepool')
     _create_benchmark_node_pool(cluster)
 
@@ -355,26 +444,9 @@ def Prepare(spec) -> None:
     _wait_for_benchmark_node()
 
     # ── Step 2b2: attach dedicated swap disk (if requested) ───────────────
-    # --additional-node-disk is not available in all gcloud versions, so we
-    # create + attach the disk after the node is up using gcloud compute.
     if _ADD_SWAP_DISK.value:
       logging.info('[swap_encryption] Step 2b2: attaching dedicated swap disk')
       _attach_swap_disk(cluster)
-  else:
-    # AWS / EKS: nodepool management is external.  PKB's cluster creation
-    # labels nodes pkb_nodepool=default, so re-label all existing nodes here
-    # to match the DaemonSet nodeSelector (pkb_nodepool=benchmark).
-    logging.info(
-        '[swap_encryption] EKS cluster — labelling existing nodes with '
-        'pkb_nodepool=%s so the DaemonSet nodeSelector matches.',
-        _BENCHMARK_NODEPOOL)
-    kubectl.RunKubectlCommand([
-        'label', 'nodes', '--all', '--overwrite',
-        f'pkb_nodepool={_BENCHMARK_NODEPOOL}',
-    ])
-    # io2 test-matrix row: create + attach a real io2 EBS volume so swap runs
-    # on io2 hardware-encrypted storage (no-op unless swap_type=io2).
-    _ensure_io2_volume()
 
   # ── Step 2c: deploy DaemonSet ────────────────────────────────────────────
   # Deploy and wait for the pod BEFORE deleting the default nodepool.
@@ -395,8 +467,10 @@ def Prepare(spec) -> None:
     # the nodepool deletion (cluster control plane briefly interrupts pod
     # lifecycle).  Re-resolve the pod name to avoid stale-reference errors on
     # all subsequent _pod_exec calls.
-    logging.info('[swap_encryption] Step 2d: re-resolving benchmark pod '
-                 'after nodepool deletion')
+    logging.info(
+        '[swap_encryption] Step 2d: re-resolving benchmark pod '
+        'after nodepool deletion'
+    )
     pod = _wait_for_benchmark_pod()
     logging.info('[swap_encryption] Benchmark pod (post-deletion): %s', pod)
 
@@ -411,7 +485,7 @@ def _phase_selected(token: str) -> bool:
   return (not selected) or ('all' in selected) or (token.lower() in selected)
 
 
-def Run(spec) -> list[sample.Sample]:
+def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:
   """Execute all benchmark phases with gate logic.
 
   Execution is structured in three gated tiers matching the execution plan:
@@ -432,6 +506,10 @@ def Run(spec) -> list[sample.Sample]:
   application-level swap performance when the raw device is inaccessible.
   """
   pod = _wait_for_benchmark_pod()
+  if pod is None:
+    raise errors.Benchmarks.RunError(
+        '[swap_encryption] Benchmark pod never became ready.'
+    )
   # Initialise the module-level active-pod tracker so _pod_exec and
   # _recover_pod can transparently redirect to a replacement pod if the
   # original is evicted during the run.
@@ -461,37 +539,43 @@ def Run(spec) -> list[sample.Sample]:
   # Detect those conditions here and surface them explicitly.
   if _active_pod and _active_pod[0] != original_pod:
     _degraded_reasons.append(
-        f'benchmark pod was replaced during the run '
+        'benchmark pod was replaced during the run '
         f'({original_pod} → {_active_pod[0]}) — it was OOM-evicted under swap '
-        f'pressure; phases executed after the eviction ran against a '
-        f'freshly-initialised pod (empty /tmp, swap re-setup) and may be '
-        f'invalid')
+        'pressure; phases executed after the eviction ran against a '
+        'freshly-initialised pod (empty /tmp, swap re-setup) and may be '
+        'invalid'
+    )
   if _pod_lost:
     _degraded_reasons.append(
-        f'benchmark pod(s) went NotFound during the run ({", ".join(_pod_lost)}) '
-        f'— the pod died (node memory-pressure eviction or container exit) and '
-        f'any phase running at or after that point (e.g. kernel-build baseline, '
-        f'OpenSearch) produced invalid data')
+        f'pod(s) NotFound during run: {", ".join(_pod_lost)} — pod died'
+        ' (eviction/exit); phases at/after that point (e.g.'
+        ' kernel-build, OpenSearch) produced invalid data'
+    )
   if _oom_events:
     _degraded_reasons.append(
-        f'OOM kill(s) (rc=137) occurred during the run on pod(s) '
+        'OOM kill(s) (rc=137) occurred during the run on pod(s) '
         f'{", ".join(_oom_events)} — a phase exceeded memory and was killed by '
-        f'the OOM killer (the container may have restarted in place), so the '
-        f'affected phase(s) produced no or partial data')
+        'the OOM killer (the container may have restarted in place), so the '
+        'affected phase(s) produced no or partial data'
+    )
 
   degraded = bool(_degraded_reasons)
-  results.append(sample.Sample(
-      'swap_encryption_run_status',
-      0.0 if degraded else 1.0,
-      'status',
-      dict(base_meta,
-           degraded=degraded,
-           degraded_reasons='; '.join(_degraded_reasons) or 'none',
-           num_samples=len(results) + 1)))
+  results.append(
+      sample.Sample(
+          'swap_encryption_run_status',
+          0.0 if degraded else 1.0,
+          'status',
+          dict(
+              base_meta,
+              degraded=degraded,
+              degraded_reasons='; '.join(_degraded_reasons) or 'none',
+              num_samples=len(results) + 1,
+          ),
+      )
+  )
 
   if degraded:
-    msg = ('[swap_encryption] RUN DEGRADED — '
-           + '; '.join(_degraded_reasons))
+    msg = '[swap_encryption] RUN DEGRADED — ' + '; '.join(_degraded_reasons)
     logging.error(msg)
     if _FAIL_ON_DEGRADED.value:
       # Raise so PKB marks the benchmark FAILED instead of SUCCEEDED.  The
@@ -499,23 +583,31 @@ def Run(spec) -> list[sample.Sample]:
       # is recorded, so no data is lost.
       raise errors.Benchmarks.RunError(msg)
   else:
-    logging.info('[swap_encryption] Run completed cleanly (%d samples)',
-                 len(results))
+    logging.info(
+        '[swap_encryption] Run completed cleanly (%d samples)', len(results)
+    )
 
   return results
 
 
-def Cleanup(spec) -> None:
+def Cleanup(spec: _BenchmarkSpec) -> None:
   """Remove the DaemonSet and tear down any swap configuration."""
   pod = _wait_for_benchmark_pod(timeout=30)
   if pod:
     _pod_exec(pod, 'swapoff -a 2>/dev/null || true', ignore_failure=True)
-    _pod_exec(pod, textwrap.dedent("""
-      swapoff /dev/mapper/swap_encrypted 2>/dev/null || true
-      dmsetup remove --noudevrules --noudevsync swap_encrypted 2>/dev/null || true
-    """), ignore_failure=True)
+    _pod_exec(
+        pod,
+        textwrap.dedent("""
+          swapoff /dev/mapper/swap_encrypted 2>/dev/null || true
+          dmsetup remove --noudevrules --noudevsync \
+            swap_encrypted 2>/dev/null || true
+        """),
+        ignore_failure=True,
+    )
     # Clean up loop device backing files (single-disk fallback path).
-    _pod_exec(pod, textwrap.dedent("""
+    _pod_exec(
+        pod,
+        textwrap.dedent("""
       for backing in /var/pkb_swap_backing /run/pkb_swap_backing \
                      /mnt/stateful_partition/pkb_swap_backing
       do
@@ -526,9 +618,14 @@ def Cleanup(spec) -> None:
           done
         rm -f "$backing"
       done
-    """), ignore_failure=True)
-    _pod_exec(pod, "pkill -9 'stress-ng|fio' 2>/dev/null || true",
-             ignore_failure=True)
+    """),
+        ignore_failure=True,
+    )
+    _pod_exec(
+        pod,
+        "pkill -9 'stress-ng|fio' 2>/dev/null || true",
+        ignore_failure=True,
+    )
 
   _delete_daemonset()
 
@@ -561,18 +658,25 @@ def _wait_for_benchmark_pod(timeout: int = 900) -> str | None:
   """
   deadline = time.time() + timeout
   last_phase = ''
-  ready_pod  = None   # pod name once phase == Running
+  ready_pod = None  # pod name once phase == Running
 
   while time.time() < deadline:
     # ── Step 1: wait for Running phase ──────────────────────────────────────
     if ready_pod is None:
-      out, _, rc = kubectl.RunKubectlCommand([
-          'get', 'pods',
-          '-l', f'app={_DS_LABEL}',
-          '-n', _DS_NAMESPACE,
-          '-o',
-          r'jsonpath={range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}',
-      ], raise_on_failure=False)
+      out, _, rc = kubectl.RunKubectlCommand(
+          [
+              'get',
+              'pods',
+              '-l',
+              f'app={_DS_LABEL}',
+              '-n',
+              _DS_NAMESPACE,
+              '-o',
+              r'jsonpath={range .items[*]}{.metadata.name}'
+              r'{"\t"}{.status.phase}{"\n"}{end}',
+          ],
+          raise_on_failure=False,
+      )
 
       if rc == 0 and out.strip():
         for line in out.strip().splitlines():
@@ -580,12 +684,17 @@ def _wait_for_benchmark_pod(timeout: int = 900) -> str | None:
           if len(parts) == 2:
             pod_name, phase = parts[0].strip(), parts[1].strip()
             if phase == 'Running':
-              logging.info('[swap_encryption] Pod %s is Running – '
-                           'waiting for tool install to finish...', pod_name)
+              logging.info(
+                  '[swap_encryption] Pod %s is Running – '
+                  'waiting for tool install to finish...',
+                  pod_name,
+              )
               ready_pod = pod_name
               break
             if phase != last_phase:
-              logging.info('[swap_encryption] Pod %s phase: %s', pod_name, phase)
+              logging.info(
+                  '[swap_encryption] Pod %s phase: %s', pod_name, phase
+              )
               last_phase = phase
               if phase in ('Pending',):
                 _log_pod_events(pod_name)
@@ -594,39 +703,63 @@ def _wait_for_benchmark_pod(timeout: int = 900) -> str | None:
 
     # ── Step 2: poll for /tmp/pkb_ready sentinel ────────────────────────────
     if ready_pod is not None:
-      sentinel_out, sentinel_err, sentinel_rc = kubectl.RunKubectlCommand([
-          'exec', ready_pod, '-n', _DS_NAMESPACE,
-          '--', 'test', '-f', '/tmp/pkb_ready',
-      ], raise_on_failure=False)
+      sentinel_out, sentinel_err, sentinel_rc = kubectl.RunKubectlCommand(
+          [
+              'exec',
+              ready_pod,
+              '-n',
+              _DS_NAMESPACE,
+              '--',
+              'test',
+              '-f',
+              '/tmp/pkb_ready',
+          ],
+          raise_on_failure=False,
+      )
       if sentinel_rc == 0:
         logging.info(
-            '[swap_encryption] Pod %s ready (tools installed)', ready_pod)
+            '[swap_encryption] Pod %s ready (tools installed)', ready_pod
+        )
         return ready_pod
-      # "container not found" means the container crashed (CrashLoopBackOff or
-      # exited) — treat it as a hard reset: re-check pod phase on next iteration.
-      if ('container not found' in sentinel_err
-          or 'unable to upgrade connection' in sentinel_err):
-        logging.warning('[swap_encryption] Pod %s: container not running (%s) '
-                        '— will re-check pod state', ready_pod, sentinel_err.strip())
+      # "container not found" means the container crashed (CrashLoopBackOff
+      # or exited) — hard reset: re-check pod phase on next iteration.
+      if (
+          'container not found' in sentinel_err
+          or 'unable to upgrade connection' in sentinel_err
+      ):
+        logging.warning(
+            '[swap_encryption] Pod %s: container not running (%s)'
+            ' — will re-check pod state',
+            ready_pod,
+            sentinel_err.strip(),
+        )
         ready_pod = None
         last_phase = ''
       else:
         logging.info(
-            '[swap_encryption] Pod %s: still installing tools...', ready_pod)
+            '[swap_encryption] Pod %s: still installing tools...', ready_pod
+        )
 
     time.sleep(15)
 
   logging.warning(
-      '[swap_encryption] Benchmark pod not ready after %ds', timeout)
+      '[swap_encryption] Benchmark pod not ready after %ds', timeout
+  )
   return None
 
 
 def _log_pod_events(pod_name: str) -> None:
-  """Dump recent Kubernetes events for the pod to help diagnose startup hangs."""
-  events_out, _, _ = kubectl.RunKubectlCommand([
-      'describe', 'pod', pod_name,
-      '-n', _DS_NAMESPACE,
-  ], raise_on_failure=False)
+  """Dump recent Kubernetes events for the pod to diagnose startup hangs."""
+  events_out, _, _ = kubectl.RunKubectlCommand(
+      [
+          'describe',
+          'pod',
+          pod_name,
+          '-n',
+          _DS_NAMESPACE,
+      ],
+      raise_on_failure=False,
+  )
   # Only log the Events section to keep output manageable
   in_events = False
   lines = []
@@ -638,106 +771,30 @@ def _log_pod_events(pod_name: str) -> None:
   if lines:
     logging.info('[swap_encryption] Pod events:\n%s', '\n'.join(lines[:30]))
   else:
-    logging.info('[swap_encryption] kubectl describe output:\n%s',
-                 events_out[-2000:] if len(events_out) > 2000 else events_out)
+    logging.info(
+        '[swap_encryption] kubectl describe output:\n%s',
+        events_out[-2000:] if len(events_out) > 2000 else events_out,
+    )
 
 
 def _delete_daemonset() -> None:
   """Delete the benchmark DaemonSet."""
-  kubectl.RunKubectlCommand([
-      'delete', 'daemonset', _DS_NAME,
-      '-n', _DS_NAMESPACE,
-      '--ignore-not-found',
-  ], raise_on_failure=False)
+  kubectl.RunKubectlCommand(
+      [
+          'delete',
+          'daemonset',
+          _DS_NAME,
+          '-n',
+          _DS_NAMESPACE,
+          '--ignore-not-found',
+      ],
+      raise_on_failure=False,
+  )
   logging.info('[swap_encryption] DaemonSet deleted')
 
 
-def _build_node_startup_script(enable_dmcrypt: bool, lssd: bool) -> str:
-  """Return a bash startup script for the benchmark nodepool.
-
-  NOTE: This function is not currently used. GKE reserves the
-  `startup-script` node metadata key, so dm-crypt setup is performed
-  from within the privileged DaemonSet pod instead (see
-  _setup_gke_hyperdisk_swap / _setup_gke_lssd_swap). Kept as reference.
-
-  Args:
-    enable_dmcrypt: When True, wrap the swap device in dm-crypt plain
-      mode (aes-xts-plain64, ephemeral random key) matching GKE's
-      go/node:swap-encryption implementation.
-    lssd: When True, build a RAID-0 array across all local SSDs before
-      setting up swap (matches go/gke-swap-lssd).
-
-  Returns:
-    A bash script string suitable for running as root at node boot.
-  """
-  dmcrypt_str = 'true' if enable_dmcrypt else 'false'
-  lssd_str = 'true' if lssd else 'false'
-
-  return textwrap.dedent(f"""\
-    #!/bin/bash
-    # PKB swap_encryption_benchmark — nodepool startup script.
-    # Configures swap once at node boot so all benchmark phases see a
-    # pre-warmed swap device.  Runs as root on the COS host.
-    set -euo pipefail
-    ENABLE_DMCRYPT={dmcrypt_str}
-    LSSD={lssd_str}
-
-    _wait_dev() {{
-      local d=$1 i
-      for i in $(seq 1 30); do [ -b "$d" ] && return 0; sleep 2; done
-      echo "[pkb-startup] device $d not ready" >&2; return 1
-    }}
-
-    _boot_dev() {{
-      lsblk -no pkname "$(findmnt -n -o SOURCE /)" 2>/dev/null | head -1 || echo nvme0n1
-    }}
-
-    if $LSSD; then
-      BOOT=$(_boot_dev)
-      # Collect all non-rotational non-boot block devices (local SSDs)
-      DEVS=$(lsblk -d -o NAME,ROTA | awk '$2=="0"{{print "/dev/"$1}}' | grep -v "/dev/$BOOT" || true)
-      N=$(echo "$DEVS" | grep -c /dev/ || true)
-      if [ "$N" -gt 1 ]; then
-        modprobe raid0 || true
-        # shellcheck disable=SC2086
-        mdadm --create /dev/md0 --level=0 --raid-devices="$N" $DEVS --force
-        TARGET=/dev/md0
-      elif [ "$N" -eq 1 ]; then
-        TARGET=$(echo "$DEVS" | head -1)
-      else
-        echo "[pkb-startup] no LSSD devices found; skipping swap setup" >&2
-        exit 0
-      fi
-    else
-      BOOT=$(_boot_dev)
-      RAW=$(lsblk -d -o NAME,TYPE | awk '$2=="disk"{{print $1}}' | grep -v "^$BOOT$" | head -1 || true)
-      if [ -z "$RAW" ]; then
-        echo "[pkb-startup] no secondary disk found for hyperdisk swap" >&2
-        exit 0
-      fi
-      TARGET=/dev/$RAW
-    fi
-
-    _wait_dev "$TARGET"
-
-    if $ENABLE_DMCRYPT; then
-      modprobe dm-crypt || true
-      dd if=/dev/urandom bs=32 count=1 2>/dev/null | \\
-        cryptsetup open --type plain \\
-          --cipher aes-xts-plain64 --key-size 256 \\
-          --key-file=- "$TARGET" pkb_swap
-      SWAP_DEV=/dev/mapper/pkb_swap
-    else
-      SWAP_DEV=$TARGET
-    fi
-
-    mkswap "$SWAP_DEV"
-    swapon "$SWAP_DEV"
-    echo "[pkb-startup] swap active on $SWAP_DEV (dmcrypt=$ENABLE_DMCRYPT lssd=$LSSD)"
-  """)
-
-
-_HYPERDISK_MAX_IOPS_PER_MBPS = 256  # GCP Hyperdisk Balanced: IOPS <= 256 x MiB/s
+# GCP Hyperdisk Balanced: max IOPS = 256 × MiB/s provisioned throughput.
+_HYPERDISK_MAX_IOPS_PER_MBPS = 256
 
 
 def _valid_hyperdisk_throughput(iops: int, throughput: int) -> int:
@@ -755,7 +812,11 @@ def _valid_hyperdisk_throughput(iops: int, throughput: int) -> int:
     logging.warning(
         '[swap_encryption] boot/swap disk throughput %d MiB/s is too low for '
         '%d IOPS (Hyperdisk needs >= ceil(iops/256) = %d MiB/s); raising to %d',
-        throughput, iops, min_tput, min_tput)
+        throughput,
+        iops,
+        min_tput,
+        min_tput,
+    )
     return min_tput
   return throughput
 
@@ -795,15 +856,27 @@ def _create_benchmark_node_pool(cluster) -> None:
 
   disk_type = _BOOT_DISK_TYPE.value
   cmd = [
-      'gcloud', 'container', 'node-pools', 'create', _BENCHMARK_NODEPOOL,
-      '--cluster',      cluster.name,
-      '--project',      cluster.project,
-      '--machine-type', machine_type,
-      '--image-type',   _NODE_IMAGE_TYPE.value,
-      '--disk-type',    disk_type,
-      '--disk-size',    str(disk_size_gb),
-      '--num-nodes',    '1',
-      '--node-labels',  f'pkb_nodepool={_BENCHMARK_NODEPOOL}',
+      'gcloud',
+      'container',
+      'node-pools',
+      'create',
+      _BENCHMARK_NODEPOOL,
+      '--cluster',
+      cluster.name,
+      '--project',
+      cluster.project,
+      '--machine-type',
+      machine_type,
+      '--image-type',
+      _NODE_IMAGE_TYPE.value,
+      '--disk-type',
+      disk_type,
+      '--disk-size',
+      str(disk_size_gb),
+      '--num-nodes',
+      '1',
+      '--node-labels',
+      f'pkb_nodepool={_BENCHMARK_NODEPOOL}',
       '--no-enable-autoupgrade',
       '--no-enable-autorepair',
   ] + zone_flags
@@ -815,10 +888,14 @@ def _create_benchmark_node_pool(cluster) -> None:
   # hyperdisk-balanced per-GiB cap (80 IOPS/GiB × 100 GiB = 8 000 max).
   if disk_type.startswith('hyperdisk') and not is_lssd:
     cmd += [
-        '--boot-disk-provisioned-iops', str(_BOOT_DISK_IOPS.value),
+        '--boot-disk-provisioned-iops',
+        str(_BOOT_DISK_IOPS.value),
         '--boot-disk-provisioned-throughput',
-        str(_valid_hyperdisk_throughput(_BOOT_DISK_IOPS.value,
-                                        _BOOT_DISK_THROUGHPUT.value)),
+        str(
+            _valid_hyperdisk_throughput(
+                _BOOT_DISK_IOPS.value, _BOOT_DISK_THROUGHPUT.value
+            )
+        ),
     ]
 
   # For LSSD machines, expose local NVMe as raw block devices so fio/mdadm
@@ -826,18 +903,26 @@ def _create_benchmark_node_pool(cluster) -> None:
   if is_lssd:
     cmd += ['--local-nvme-ssd-block', f'count={_LSSD_COUNT.value}']
 
-  logging.info('[swap_encryption] Creating benchmark nodepool: %s / %s / '
-               'image=%s / disk=%dGiB / iops=%d / dmcrypt=%s / lssd=%s / '
-               'add_swap_disk=%s',
-               _BENCHMARK_NODEPOOL, machine_type, _NODE_IMAGE_TYPE.value,
-               disk_size_gb, _BOOT_DISK_IOPS.value,
-               _ENABLE_DMCRYPT.value, is_lssd, _ADD_SWAP_DISK.value)
+  logging.info(
+      '[swap_encryption] Creating benchmark nodepool: %s / %s / '
+      'image=%s / disk=%dGiB / iops=%d / dmcrypt=%s / lssd=%s / '
+      'add_swap_disk=%s',
+      _BENCHMARK_NODEPOOL,
+      machine_type,
+      _NODE_IMAGE_TYPE.value,
+      disk_size_gb,
+      _BOOT_DISK_IOPS.value,
+      _ENABLE_DMCRYPT.value,
+      is_lssd,
+      _ADD_SWAP_DISK.value,
+  )
 
   # LSSD nodepools take longer to provision than PD-only nodepools because
   # GKE must also initialise the local NVMe devices before marking nodes Ready.
   # 1200 s (20 min) covers observed worst-case times on c4-lssd and n4 configs.
-  stdout, stderr, rc = vm_util.IssueCommand(cmd, timeout=1200,
-                                            raise_on_failure=False)
+  stdout, stderr, rc = vm_util.IssueCommand(
+      cmd, timeout=1200, raise_on_failure=False
+  )
 
   if rc != 0:
     # Idempotent prepare: if the nodepool already exists (e.g. re-running
@@ -846,11 +931,13 @@ def _create_benchmark_node_pool(cluster) -> None:
     # "Already exists" message in this case.
     low = (stderr or '').lower()
     if 'already exists' in low or 'alreadyexists' in low or 'code=409' in low:
-      logging.info('[swap_encryption] Benchmark nodepool already exists — '
-                   'reusing it (idempotent prepare); proceeding to DaemonSet')
+      logging.info(
+          '[swap_encryption] Benchmark nodepool already exists — '
+          'reusing it (idempotent prepare); proceeding to DaemonSet'
+      )
       return
     raise errors.Benchmarks.RunError(
-        f'[swap_encryption] Failed to create benchmark nodepool '
+        '[swap_encryption] Failed to create benchmark nodepool '
         f'(rc={rc}): {stderr}'
     )
   logging.info('[swap_encryption] Benchmark nodepool ready')
@@ -869,28 +956,38 @@ def _wait_for_benchmark_node(timeout: int = 900) -> None:
   pkb_nodepool=benchmark has Ready=True, then returns.
   """
   deadline = time.time() + timeout
-  logging.info('[swap_encryption] Waiting for benchmark node '
-               '(pkb_nodepool=benchmark) to be Ready...')
+  logging.info(
+      '[swap_encryption] Waiting for benchmark node '
+      '(pkb_nodepool=benchmark) to be Ready...'
+  )
   while time.time() < deadline:
-    out, _, rc = kubectl.RunKubectlCommand([
-        'get', 'nodes',
-        '-l', f'pkb_nodepool={_BENCHMARK_NODEPOOL}',
-        '-o', r'jsonpath={range .items[*]}'
-               r'{.metadata.name}{"\t"}'
-               r'{range .status.conditions[?(@.type=="Ready")]}'
-               r'{.status}{"\n"}{end}{end}',
-    ], raise_on_failure=False)
+    out, _, rc = kubectl.RunKubectlCommand(
+        [
+            'get',
+            'nodes',
+            '-l',
+            f'pkb_nodepool={_BENCHMARK_NODEPOOL}',
+            '-o',
+            r'jsonpath={range .items[*]}'
+            r'{.metadata.name}{"\t"}'
+            r'{range .status.conditions[?(@.type=="Ready")]}'
+            r'{.status}{"\n"}{end}{end}',
+        ],
+        raise_on_failure=False,
+    )
 
     if rc == 0 and out.strip():
       for line in out.strip().splitlines():
         parts = line.split('\t')
         if len(parts) == 2 and parts[1].strip() == 'True':
-          logging.info('[swap_encryption] Benchmark node ready: %s',
-                       parts[0].strip())
+          logging.info(
+              '[swap_encryption] Benchmark node ready: %s', parts[0].strip()
+          )
           return
 
-    logging.info('[swap_encryption] Benchmark node not yet Ready — '
-                 'retrying in 15 s...')
+    logging.info(
+        '[swap_encryption] Benchmark node not yet Ready — retrying in 15 s...'
+    )
     time.sleep(15)
 
   raise errors.Benchmarks.RunError(
@@ -922,7 +1019,8 @@ def _attach_swap_disk(cluster) -> None:
     zone = cluster.region
   if not zone:
     raise errors.Benchmarks.RunError(
-        '[swap_encryption] Cannot attach swap disk: cluster zone unknown')
+        '[swap_encryption] Cannot attach swap disk: cluster zone unknown'
+    )
 
   project = cluster.project
   disk_name = f'pkb-swap-{cluster.name}'
@@ -930,60 +1028,97 @@ def _attach_swap_disk(cluster) -> None:
   disk_size_gb = _SWAP_DISK_SIZE_GB.value
 
   # ── Step 1: get the GCE instance name of the benchmark node ───────────────
-  node_out, _, rc = kubectl.RunKubectlCommand([
-      'get', 'nodes',
-      '-l', f'pkb_nodepool={_BENCHMARK_NODEPOOL}',
-      '-o', 'jsonpath={.items[0].metadata.name}',
-  ], raise_on_failure=False)
+  node_out, _, rc = kubectl.RunKubectlCommand(
+      [
+          'get',
+          'nodes',
+          '-l',
+          f'pkb_nodepool={_BENCHMARK_NODEPOOL}',
+          '-o',
+          'jsonpath={.items[0].metadata.name}',
+      ],
+      raise_on_failure=False,
+  )
   instance_name = node_out.strip()
   if rc != 0 or not instance_name:
     raise errors.Benchmarks.RunError(
-        '[swap_encryption] Cannot find benchmark node for swap disk attach')
+        '[swap_encryption] Cannot find benchmark node for swap disk attach'
+    )
   logging.info('[swap_encryption] Benchmark node instance: %s', instance_name)
 
   # ── Step 2: create the hyperdisk ──────────────────────────────────────────
-  logging.info('[swap_encryption] Creating swap disk %s (%dGiB %s)',
-               disk_name, disk_size_gb, disk_type)
+  logging.info(
+      '[swap_encryption] Creating swap disk %s (%dGiB %s)',
+      disk_name,
+      disk_size_gb,
+      disk_type,
+  )
   create_cmd = [
-      'gcloud', 'compute', 'disks', 'create', disk_name,
-      '--project', project,
-      '--zone', zone,
-      '--type', disk_type,
-      '--size', f'{disk_size_gb}GB',
+      'gcloud',
+      'compute',
+      'disks',
+      'create',
+      disk_name,
+      '--project',
+      project,
+      '--zone',
+      zone,
+      '--type',
+      disk_type,
+      '--size',
+      f'{disk_size_gb}GB',
       '--quiet',
   ]
   if disk_type.startswith('hyperdisk'):
     create_cmd += [
-        '--provisioned-iops', str(_BOOT_DISK_IOPS.value),
+        '--provisioned-iops',
+        str(_BOOT_DISK_IOPS.value),
         '--provisioned-throughput',
-        str(_valid_hyperdisk_throughput(_BOOT_DISK_IOPS.value,
-                                        _BOOT_DISK_THROUGHPUT.value)),
+        str(
+            _valid_hyperdisk_throughput(
+                _BOOT_DISK_IOPS.value, _BOOT_DISK_THROUGHPUT.value
+            )
+        ),
     ]
-  _, stderr, rc = vm_util.IssueCommand(create_cmd, timeout=120,
-                                       raise_on_failure=False)
+  _, stderr, rc = vm_util.IssueCommand(
+      create_cmd, timeout=120, raise_on_failure=False
+  )
   if rc != 0:
     raise errors.Benchmarks.RunError(
-        f'[swap_encryption] Failed to create swap disk {disk_name}: {stderr}')
+        f'[swap_encryption] Failed to create swap disk {disk_name}: {stderr}'
+    )
 
   # ── Step 3: attach the disk to the node VM ────────────────────────────────
-  logging.info('[swap_encryption] Attaching swap disk %s to %s',
-               disk_name, instance_name)
+  logging.info(
+      '[swap_encryption] Attaching swap disk %s to %s', disk_name, instance_name
+  )
   attach_cmd = [
-      'gcloud', 'compute', 'instances', 'attach-disk', instance_name,
-      '--project', project,
-      '--zone', zone,
-      '--disk', disk_name,
-      '--device-name', 'pkb-swap',
+      'gcloud',
+      'compute',
+      'instances',
+      'attach-disk',
+      instance_name,
+      '--project',
+      project,
+      '--zone',
+      zone,
+      '--disk',
+      disk_name,
+      '--device-name',
+      'pkb-swap',
       '--quiet',
   ]
-  _, stderr, rc = vm_util.IssueCommand(attach_cmd, timeout=120,
-                                       raise_on_failure=False)
+  _, stderr, rc = vm_util.IssueCommand(
+      attach_cmd, timeout=120, raise_on_failure=False
+  )
   if rc != 0:
     raise errors.Benchmarks.RunError(
         f'[swap_encryption] Failed to attach swap disk to {instance_name}: '
-        f'{stderr}')
-  logging.info('[swap_encryption] Swap disk attached: %s → %s',
-               disk_name, instance_name)
+        f'{stderr}'
+    )
+  logging.info(
+      '[swap_encryption] Swap disk attached: %s → %s', disk_name, instance_name
+  )
 
 
 def _delete_disk_by_name(disk_name: str, project: str, zone: str) -> bool:
@@ -996,35 +1131,85 @@ def _delete_disk_by_name(disk_name: str, project: str, zone: str) -> bool:
   """
   for attempt in range(1, 5):
     users, _, rc = vm_util.IssueCommand(
-        ['gcloud', 'compute', 'disks', 'describe', disk_name,
-         '--project', project, '--zone', zone, '--format=value(users)'],
-        timeout=60, raise_on_failure=False)
+        [
+            'gcloud',
+            'compute',
+            'disks',
+            'describe',
+            disk_name,
+            '--project',
+            project,
+            '--zone',
+            zone,
+            '--format=value(users)',
+        ],
+        timeout=60,
+        raise_on_failure=False,
+    )
     if rc != 0:
-      logging.info('[swap_encryption] Swap disk %s not present — nothing to '
-                   'delete', disk_name)
+      logging.info(
+          '[swap_encryption] Swap disk %s not present — nothing to delete',
+          disk_name,
+      )
       return True  # already gone
     user = users.strip()
     if user:
       inst = user.split('/')[-1]
-      logging.info('[swap_encryption] Detaching swap disk %s from %s',
-                   disk_name, inst)
+      logging.info(
+          '[swap_encryption] Detaching swap disk %s from %s', disk_name, inst
+      )
       vm_util.IssueCommand(
-          ['gcloud', 'compute', 'instances', 'detach-disk', inst,
-           '--project', project, '--zone', zone, '--disk', disk_name,
-           '--quiet'], timeout=120, raise_on_failure=False)
+          [
+              'gcloud',
+              'compute',
+              'instances',
+              'detach-disk',
+              inst,
+              '--project',
+              project,
+              '--zone',
+              zone,
+              '--disk',
+              disk_name,
+              '--quiet',
+          ],
+          timeout=120,
+          raise_on_failure=False,
+      )
     _, derr, drc = vm_util.IssueCommand(
-        ['gcloud', 'compute', 'disks', 'delete', disk_name,
-         '--project', project, '--zone', zone, '--quiet'],
-        timeout=180, raise_on_failure=False)
+        [
+            'gcloud',
+            'compute',
+            'disks',
+            'delete',
+            disk_name,
+            '--project',
+            project,
+            '--zone',
+            zone,
+            '--quiet',
+        ],
+        timeout=180,
+        raise_on_failure=False,
+    )
     if drc == 0:
       logging.info('[swap_encryption] Swap disk deleted: %s', disk_name)
       return True
-    logging.warning('[swap_encryption] Swap disk delete attempt %d/4 failed '
-                    '(%s); retrying in 10s', attempt, derr.strip()[:160])
+    logging.warning(
+        '[swap_encryption] Swap disk delete attempt %d/4 failed '
+        '(%s); retrying in 10s',
+        attempt,
+        derr.strip()[:160],
+    )
     time.sleep(10)
-  logging.error('[swap_encryption] Could NOT delete swap disk %s after retries '
-                '— delete it manually: gcloud compute disks delete %s '
-                '--zone %s --quiet', disk_name, disk_name, zone)
+  logging.error(
+      '[swap_encryption] Could NOT delete swap disk %s after retries '
+      '— delete it manually: gcloud compute disks delete %s '
+      '--zone %s --quiet',
+      disk_name,
+      disk_name,
+      zone,
+  )
   return False
 
 
@@ -1054,19 +1239,30 @@ def _delete_default_node_pool(cluster) -> None:
     zone_flags = ['--region', cluster.region]
 
   cmd = [
-      'gcloud', 'container', 'node-pools', 'delete', _DEFAULT_NODEPOOL,
-      '--cluster', cluster.name,
-      '--project', cluster.project,
+      'gcloud',
+      'container',
+      'node-pools',
+      'delete',
+      _DEFAULT_NODEPOOL,
+      '--cluster',
+      cluster.name,
+      '--project',
+      cluster.project,
       '--quiet',
   ] + zone_flags
 
   logging.info(
-      '[swap_encryption] Deleting default nodepool: %s', _DEFAULT_NODEPOOL)
-  stdout, stderr, rc = vm_util.IssueCommand(cmd, timeout=300,
-                                            raise_on_failure=False)
+      '[swap_encryption] Deleting default nodepool: %s', _DEFAULT_NODEPOOL
+  )
+  stdout, stderr, rc = vm_util.IssueCommand(
+      cmd, timeout=300, raise_on_failure=False
+  )
   if rc != 0:
-    logging.warning('[swap_encryption] Could not delete default nodepool '
-                    '(rc=%d): %s', rc, stderr)
+    logging.warning(
+        '[swap_encryption] Could not delete default nodepool (rc=%d): %s',
+        rc,
+        stderr,
+    )
   else:
     logging.info('[swap_encryption] Default nodepool deleted')
 
@@ -1079,9 +1275,17 @@ def _is_pod_gone(pod: str) -> bool:
   """
   try:
     _, err, rc = kubectl.RunKubectlCommand(
-        ['get', 'pod', pod, '-n', _DS_NAMESPACE,
-         '-o', 'jsonpath={.metadata.name}'],
-        raise_on_failure=False, timeout=15,
+        [
+            'get',
+            'pod',
+            pod,
+            '-n',
+            _DS_NAMESPACE,
+            '-o',
+            'jsonpath={.metadata.name}',
+        ],
+        raise_on_failure=False,
+        timeout=15,
     )
     return rc != 0 and 'not found' in (err or '').lower()
   except Exception:  # pylint: disable=broad-except
@@ -1112,33 +1316,27 @@ def _pod_exec(
   Returns:
     Tuple of (stdout, stderr) strings.
   """
-  _TRANSIENT_ERRORS = ('connection reset by peer', 'websocket: close')
-  # Errors that indicate the container/pod is gone and needs recovery.
-  # 'not found' covers "Error from server (NotFound): pods ... not found"
-  # which occurs when the DaemonSet pod was evicted and recreated under a
-  # new name (e.g. after OOM-triggered node pressure eviction).
-  # 'deleted state' covers "cannot exec in a deleted state" — the container
-  # was OOM-killed and is mid-termination (not yet recreated).
-  _CONTAINER_GONE_ERRORS = ('container not found', 'procReady not received',
-                             'unable to upgrade connection', 'not found',
-                             'deleted state')
+  # Use module-level constants for error strings (defined at top of module).
   # Use the globally-tracked active pod name — it may have been updated by
   # a previous _recover_pod call when eviction replaced the pod.
   active = _active_pod[0] if _active_pod else pod
 
   for attempt in range(_retries + 1):
     out, err, rc = kubectl.RunKubectlCommand(
-        ['exec', active, '-n', _DS_NAMESPACE,
-         '--', 'bash', '-c', cmd],
+        ['exec', active, '-n', _DS_NAMESPACE, '--', 'bash', '-c', cmd],
         raise_on_failure=False,
-        raise_on_timeout=False,  # let _pod_exec's own retry loop handle transient resets
+        # Retry loop in _pod_exec handles transient resets.
+        raise_on_timeout=False,
         timeout=timeout,
     )
-    is_transient = rc != 0 and any(e in err for e in _TRANSIENT_ERRORS)
+    is_transient = rc != 0 and any(e in err for e in _TRANSIENT_KUBECTL_ERRORS)
     if is_transient and attempt < _retries:
       logging.warning(
           '[swap_encryption] kubectl exec connection reset (attempt %d/%d); '
-          'retrying in 10 s', attempt + 1, _retries + 1)
+          'retrying in 10 s',
+          attempt + 1,
+          _retries + 1,
+      )
       time.sleep(10)
       continue
     # rc=137 (SIGKILL): the OOM killer terminated the container process.
@@ -1162,27 +1360,33 @@ def _pod_exec(
       # "Error from server (NotFound): pods … not found".
       logging.warning(
           '[swap_encryption] rc=137 — sleeping 15s for Kubernetes to update '
-          'pod state before recovery check')
+          'pod state before recovery check'
+      )
       time.sleep(15)
       pod_gone = _is_pod_gone(active)
       if pod_gone:
         logging.warning(
-            '[swap_encryption] OOM-eviction detected (rc=137, pod gone) — '
-            'recovering pod name for subsequent commands (not retrying this cmd)')
+            '[swap_encryption] OOM-eviction (rc=137, pod gone) —'
+            ' recovering pod name (cmd not retried)'
+        )
       else:
         logging.warning(
-            '[swap_encryption] Container OOM-killed (rc=137, pod still exists) — '
-            'waiting for container restart and tool re-install before continuing')
+            '[swap_encryption] OOM-kill (rc=137, pod exists) —'
+            ' waiting for container restart before continuing'
+        )
       new_pod = _recover_pod(active)
       if new_pod != active:
-        logging.info('[swap_encryption] Pod name updated: %s → %s', active, new_pod)
+        logging.info(
+            '[swap_encryption] Pod name updated: %s → %s', active, new_pod
+        )
         if _active_pod:
           _active_pod[0] = new_pod
         active = new_pod
       break  # Do NOT retry — the OOM cmd itself is not re-run on the new pod.
 
-    is_container_gone = (rc != 0 and
-                         any(e in err.lower() for e in _CONTAINER_GONE_ERRORS))
+    is_container_gone = rc != 0 and any(
+        e in err.lower() for e in _CONTAINER_GONE_KUBECTL_ERRORS
+    )
     if is_container_gone:
       # Record the loss for the run-level degradation gate REGARDLESS of retry
       # budget or ignore_failure.  A "pods … not found" on a best-effort command
@@ -1193,14 +1397,22 @@ def _pod_exec(
         _pod_lost.append(active)
         logging.error(
             '[swap_encryption] Benchmark pod %s is gone (%s) — recording run '
-            'as degraded', active, (err or '').strip()[:160])
+            'as degraded',
+            active,
+            (err or '').strip()[:160],
+        )
       if attempt < _retries:
         logging.warning(
             '[swap_encryption] Container gone/restarting (attempt %d/%d) — '
-            'waiting for pod to recover...', attempt + 1, _retries + 1)
+            'waiting for pod to recover...',
+            attempt + 1,
+            _retries + 1,
+        )
         new_pod = _recover_pod(active)
         if new_pod != active:
-          logging.info('[swap_encryption] Pod name updated: %s → %s', active, new_pod)
+          logging.info(
+              '[swap_encryption] Pod name updated: %s → %s', active, new_pod
+          )
           if _active_pod:
             _active_pod[0] = new_pod
           active = new_pod
@@ -1209,7 +1421,8 @@ def _pod_exec(
 
   if rc != 0 and not ignore_failure:
     raise errors.VmUtil.IssueCommandError(
-        f'[swap_encryption] _pod_exec failed (rc={rc}): {err}')
+        f'[swap_encryption] _pod_exec failed (rc={rc}): {err}'
+    )
   return out, err
 
 
@@ -1227,8 +1440,11 @@ def _recover_pod(pod: str, timeout_sec: int = 600) -> str:
   Returns the (possibly new) pod name once it is Running and ready.
   """
   deadline = time.time() + timeout_sec
-  logging.info('[swap_encryption] Waiting for pod %s to recover '
-               '(up to %ds)...', pod, timeout_sec)
+  logging.info(
+      '[swap_encryption] Waiting for pod %s to recover (up to %ds)...',
+      pod,
+      timeout_sec,
+  )
 
   # Phase 1: wait for a Running pod — either the named one (container
   # restart) or a replacement pod found via label selector (eviction).
@@ -1246,9 +1462,17 @@ def _recover_pod(pod: str, timeout_sec: int = 600) -> str:
     # lives entirely in status_err.  Discarding stderr (using _) means the
     # 'not found' check below never fires and we spin until deadline.
     status_out, status_err, status_rc = kubectl.RunKubectlCommand(
-        ['get', 'pod', pod, '-n', _DS_NAMESPACE,
-         '-o', 'jsonpath={.status.phase}|{.metadata.deletionTimestamp}'],
-        raise_on_failure=False, timeout=30,
+        [
+            'get',
+            'pod',
+            pod,
+            '-n',
+            _DS_NAMESPACE,
+            '-o',
+            'jsonpath={.status.phase}|{.metadata.deletionTimestamp}',
+        ],
+        raise_on_failure=False,
+        timeout=30,
     )
     # Parse "Running|" (no deletionTimestamp) vs "Running|2026-…" (terminating)
     fields = status_out.strip().split('|')
@@ -1262,62 +1486,91 @@ def _recover_pod(pod: str, timeout_sec: int = 600) -> str:
     # Pod no longer exists, OR it exists but is being terminated (Terminating
     # state or deletionTimestamp set) — look for a replacement pod by label.
     pod_gone_or_terminating = (
-        (status_rc != 0 and 'not found' in (status_out + status_err).lower())
-        or is_terminating
-    )
+        status_rc != 0 and 'not found' in (status_out + status_err).lower()
+    ) or is_terminating
     if pod_gone_or_terminating:
       label_out, _, label_rc = kubectl.RunKubectlCommand(
-          ['get', 'pods', '-n', _DS_NAMESPACE,
-           '-l', f'app={_DS_LABEL}',
-           '-o', 'jsonpath={range .items[?(@.status.phase=="Running")]}'
-                 '{.metadata.name}{"\\n"}{end}'],
-          raise_on_failure=False, timeout=30,
+          [
+              'get',
+              'pods',
+              '-n',
+              _DS_NAMESPACE,
+              '-l',
+              f'app={_DS_LABEL}',
+              '-o',
+              (
+                  'jsonpath={range .items[?(@.status.phase=="Running")]}'
+                  '{.metadata.name}{"\\n"}{end}'
+              ),
+          ],
+          raise_on_failure=False,
+          timeout=30,
       )
-      new_pods = [p.strip() for p in label_out.strip().splitlines() if p.strip()
-                  and p.strip() != pod]  # exclude the dying pod
+      new_pods = [
+          p.strip()
+          for p in label_out.strip().splitlines()
+          if p.strip() and p.strip() != pod
+      ]  # exclude the dying pod
       if label_rc == 0 and new_pods:
         recovered_pod = new_pods[0]
-        logging.info('[swap_encryption] Original pod %s gone/terminating; '
-                     'found replacement %s', pod, recovered_pod)
+        logging.info(
+            '[swap_encryption] Original pod %s gone/terminating; '
+            'found replacement %s',
+            pod,
+            recovered_pod,
+        )
         break
 
     time.sleep(10)
   else:
     raise errors.VmUtil.IssueCommandError(
         f'[swap_encryption] No Running pod found (original: {pod}) '
-        f'within {timeout_sec}s after OOM kill / eviction')
+        f'within {timeout_sec}s after OOM kill / eviction'
+    )
 
   # Phase 2: wait for init script to finish (sentinel written last).
   while time.time() < deadline:
     ready_out, _, ready_rc = kubectl.RunKubectlCommand(
-        ['exec', recovered_pod, '-n', _DS_NAMESPACE,
-         '--', 'bash', '-c', 'test -f /tmp/pkb_ready && echo READY'],
-        raise_on_failure=False, timeout=30,
+        [
+            'exec',
+            recovered_pod,
+            '-n',
+            _DS_NAMESPACE,
+            '--',
+            'bash',
+            '-c',
+            'test -f /tmp/pkb_ready && echo READY',
+        ],
+        raise_on_failure=False,
+        timeout=30,
     )
     if ready_rc == 0 and 'READY' in ready_out:
-      logging.info('[swap_encryption] Pod %s recovered and ready', recovered_pod)
+      logging.info(
+          '[swap_encryption] Pod %s recovered and ready', recovered_pod
+      )
       return recovered_pod
     time.sleep(15)
 
   raise errors.VmUtil.IssueCommandError(
       f'[swap_encryption] Pod {recovered_pod} did not become ready '
-      f'within {timeout_sec}s after OOM kill / eviction')
+      f'within {timeout_sec}s after OOM kill / eviction'
+  )
 
 
 _INSTANCE_PRICE_USD_PER_HR: dict[str, float] = {
     # GCP  (on-demand, us-central1 unless noted)
     'c4-standard-8-lssd': 0.5888,  # 8 vCPU, 32 GB RAM + 1×375 GB LSSD
-    'c4-standard-8':      0.5008,  # 8 vCPU, 32 GB RAM, no LSSD
-    'n4-highmem-32':      3.0256,  # 32 vCPU, 256 GB RAM
-    'n2-highmem-32':      2.5216,  # 32 vCPU, 256 GB RAM
-    'n2-standard-32':     1.5264,  # 32 vCPU, 120 GB RAM
-    'z3-highmem-8':       2.7248,  # 8 vCPU + 4× LSSD
+    'c4-standard-8': 0.5008,  # 8 vCPU, 32 GB RAM, no LSSD
+    'n4-highmem-32': 3.0256,  # 32 vCPU, 256 GB RAM
+    'n2-highmem-32': 2.5216,  # 32 vCPU, 256 GB RAM
+    'n2-standard-32': 1.5264,  # 32 vCPU, 120 GB RAM
+    'z3-highmem-8': 2.7248,  # 8 vCPU + 4× LSSD
     # AWS
-    'i4i.4xlarge':        1.4960,  # 16 vCPU, 128 GB RAM, NVMe Instance Store
-    'i4i.2xlarge':        0.7480,
-    'm6id.4xlarge':       0.9072,  # 16 vCPU, 64 GB RAM, NVMe Instance Store
-    'm6i.4xlarge':        0.7680,  # 16 vCPU, 64 GB RAM, no Instance Store
-    'r6i.4xlarge':        1.0080,  # 16 vCPU, 128 GB RAM, no Instance Store
+    'i4i.4xlarge': 1.4960,  # 16 vCPU, 128 GB RAM, NVMe Instance Store
+    'i4i.2xlarge': 0.7480,
+    'm6id.4xlarge': 0.9072,  # 16 vCPU, 64 GB RAM, NVMe Instance Store
+    'm6i.4xlarge': 0.7680,  # 16 vCPU, 64 GB RAM, no Instance Store
+    'r6i.4xlarge': 1.0080,  # 16 vCPU, 128 GB RAM, no Instance Store
 }
 
 
@@ -1342,11 +1595,13 @@ def _collect_cost_sample(
   instance_type = ''
 
   # GCP: machine type is the last segment of the metadata URL value
+  _gcp_meta_url = (
+      'http://metadata.google.internal/computeMetadata/v1/instance/machine-type'
+  )
   gcp_type_out, _ = _pod_exec(
       pod,
-      'curl -s -m 3 --fail '
-      'http://metadata.google.internal/computeMetadata/v1/instance/machine-type '
-      '-H "Metadata-Flavor: Google" 2>/dev/null || echo ""',
+      f'curl -s -m 3 --fail {_gcp_meta_url}'
+      ' -H "Metadata-Flavor: Google" 2>/dev/null || echo ""',
       ignore_failure=True,
   )
   if gcp_type_out.strip():
@@ -1434,16 +1689,18 @@ def _detect_swap_device(pod: str) -> str:
   )
 
 
-def _build_metadata(pod: str, swap_dev: str) -> dict:
+def _build_metadata(pod: str, swap_dev: str) -> dict[str, Any]:
   """Collect node environment, encryption type, and config into a dict."""
 
   kernel_out, _ = _pod_exec(pod, 'uname -r', ignore_failure=True)
   mem_out, _ = _pod_exec(
-      pod, "awk '/MemTotal/{print $2}' /proc/meminfo",
+      pod,
+      "awk '/MemTotal/{print $2}' /proc/meminfo",
       ignore_failure=True,
   )
   swap_out, _ = _pod_exec(
-      pod, "awk 'NR>1{sum+=$3} END{print sum+0}' /proc/swaps",
+      pod,
+      "awk 'NR>1{sum+=$3} END{print sum+0}' /proc/swaps",
       ignore_failure=True,
   )
 
@@ -1468,9 +1725,9 @@ def _build_metadata(pod: str, swap_dev: str) -> dict:
     )
     enc = 'dm-crypt-plain' if 'crypt' in table_out.lower() else 'dm-other'
   elif _SWAP_TYPE.value in ('instance_store', 'io2'):
-    enc = 'nitro_hardware_offload'   # AWS: encrypted by the Nitro card
+    enc = 'nitro_hardware_offload'  # AWS: encrypted by the Nitro card
   elif not _ENABLE_DMCRYPT.value:
-    enc = 'none'                      # GKE plain swap (encryption OFF)
+    enc = 'none'  # GKE plain swap (encryption OFF)
 
   cloud = _detect_cloud(pod)
 
@@ -1479,11 +1736,14 @@ def _build_metadata(pod: str, swap_dev: str) -> dict:
   # cloud metadata so that the field is always populated.
   instance_label = _INSTANCE_SIZE_LABEL.value
   if not instance_label:
+    _gcp_mt_url = (
+        'http://metadata.google.internal'
+        '/computeMetadata/v1/instance/machine-type'
+    )
     gcp_type_out, _ = _pod_exec(
         pod,
-        'curl -s -m 3 --fail '
-        'http://metadata.google.internal/computeMetadata/v1/instance/machine-type '
-        '-H "Metadata-Flavor: Google" 2>/dev/null || echo ""',
+        f'curl -s -m 3 --fail {_gcp_mt_url}'
+        ' -H "Metadata-Flavor: Google" 2>/dev/null || echo ""',
         ignore_failure=True,
     )
     if gcp_type_out.strip():
@@ -1527,3 +1787,32 @@ def _build_metadata(pod: str, swap_dev: str) -> dict:
       'stress_timeout_sec': _STRESS_TIMEOUT_SEC.value,
       'nodepool': _NODEPOOL.value,
   }
+
+
+def _detect_cloud(pod: str) -> str:
+  """Detect whether the benchmark pod is running on GCP or AWS.
+
+  Queries the cloud instance metadata endpoint inside the pod.  Returns
+  'GCP' if the GCP metadata server responds, 'AWS' otherwise.
+  """
+  gcp_out, _ = _pod_exec(
+      pod,
+      'curl -s -m 2 --fail '
+      'http://metadata.google.internal/computeMetadata/v1/project/project-id'
+      ' -H "Metadata-Flavor: Google" 2>/dev/null || echo ""',
+      ignore_failure=True,
+  )
+  if gcp_out.strip():
+    return 'GCP'
+  return 'AWS'
+
+
+def _ensure_io2_volume() -> None:
+  """Create and attach an io2 EBS volume for swap on EKS (no-op if not io2).
+
+  Only executed when --swap_encryption_swap_type=io2.  Full implementation
+  is deferred to PR2 (swap-capability layer).
+  """
+  if _SWAP_TYPE.value != 'io2':
+    return
+  logging.info('[swap_encryption] io2 swap volume provisioning deferred to PR2')
