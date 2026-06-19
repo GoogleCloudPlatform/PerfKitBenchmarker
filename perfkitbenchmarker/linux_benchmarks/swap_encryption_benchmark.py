@@ -75,6 +75,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.resources.container_service import kubectl
 
 FLAGS = flags.FLAGS
@@ -83,13 +84,7 @@ FLAGS = flags.FLAGS
 # Benchmark identity
 # ---------------------------------------------------------------------------
 
-
-
-FLAGS = flags.FLAGS
-
-
 BENCHMARK_NAME = 'swap_encryption'
-
 
 BENCHMARK_CONFIG = """
 swap_encryption:
@@ -116,6 +111,9 @@ swap_encryption:
         boot_disk_size: 20
 """
 
+# ---------------------------------------------------------------------------
+# Flags
+# ---------------------------------------------------------------------------
 
 _SWAP_DEVICE = flags.DEFINE_string(
     'swap_encryption_device',
@@ -124,16 +122,12 @@ _SWAP_DEVICE = flags.DEFINE_string(
     '/dev/nvme1n1 or /dev/dm-0.  When empty the benchmark auto-detects '
     'via /proc/swaps after setup.',
 )
-
-
 _SWAP_SIZE_GB = flags.DEFINE_integer(
     'swap_encryption_swap_size_gb',
     32,
     'Size in GB of the swap space to configure on the node. '
     'Ignored when a ready swap device already exists.',
 )
-
-
 _SWAP_TYPE = flags.DEFINE_enum(
     'swap_encryption_swap_type',
     'auto',
@@ -149,22 +143,16 @@ _SWAP_TYPE = flags.DEFINE_enum(
     '--swap_encryption_enable_dmcrypt is set; AWS targets are encrypted by '
     'Nitro at the hardware level.  auto = detect from cloud + instance type.',
 )
-
-
 _FIO_RUNTIME_SEC = flags.DEFINE_integer(
     'swap_encryption_fio_runtime_sec',
     60,
     'Wall-clock runtime in seconds for each individual fio job.',
 )
-
-
 _STRESS_TIMEOUT_SEC = flags.DEFINE_integer(
     'swap_encryption_stress_timeout_sec',
     300,
     'Duration in seconds of each stress-ng memory-pressure phase.',
 )
-
-
 _STRESS_VM_BYTES = flags.DEFINE_string(
     'swap_encryption_stress_vm_bytes',
     '28G',
@@ -173,8 +161,6 @@ _STRESS_VM_BYTES = flags.DEFINE_string(
     'workers before being passed to stress-ng, so the total memory touched '
     'equals this value.  Should exceed node RAM to force kernel swapping.',
 )
-
-
 _STRESS_VM_BYTES_LIST = flags.DEFINE_string(
     'swap_encryption_stress_vm_bytes_list',
     '',
@@ -183,8 +169,6 @@ _STRESS_VM_BYTES_LIST = flags.DEFINE_string(
     'this overrides --swap_encryption_stress_vm_bytes and Phase 2a is run '
     'once per entry so that the swap-pressure intensity curve is captured.',
 )
-
-
 _STRESS_VM_WORKERS = flags.DEFINE_integer(
     'swap_encryption_stress_vm_workers',
     4,
@@ -199,37 +183,47 @@ _STRESS_VM_WORKERS = flags.DEFINE_integer(
     '(without those, identical write64 pages across workers were merged, '
     'leaving only ~vm_bytes/N resident and swap_out ~0).',
 )
-
-
+_REDIS_DATASET_MB = flags.DEFINE_integer(
+    'swap_encryption_redis_dataset_mb',
+    1024,
+    'Approximate Redis dataset size in MB to load before the latency test.',
+)
+_REDIS_MAXMEMORY_MB = flags.DEFINE_integer(
+    'swap_encryption_redis_maxmemory_mb',
+    512,
+    'Redis maxmemory in MB.  Must be less than dataset size to force swap.',
+)
+_KERNEL_VERSION = flags.DEFINE_string(
+    'swap_encryption_kernel_version',
+    '6.1.38',
+    'Linux kernel version to download and compile for the build workload.',
+)
+_KERNEL_MEMORY_MB = flags.DEFINE_integer(
+    'swap_encryption_kernel_memory_mb',
+    512,
+    'cgroup memory limit in MB applied during the constrained kernel build.',
+)
 _ENABLE_ZSWAP = flags.DEFINE_boolean(
     'swap_encryption_enable_zswap',
     False,
     'Enable zswap (lz4 compressor, 20%% max pool) before running tests.',
 )
-
-
 _MIN_FREE_KBYTES = flags.DEFINE_integer(
     'swap_encryption_min_free_kbytes',
     65536,
     'Value written to /proc/sys/vm/min_free_kbytes to trigger earlier '
     'swapping. Set 0 to leave the kernel default unchanged.',
 )
-
-
 _DAEMONSET_IMAGE = flags.DEFINE_string(
     'swap_encryption_daemonset_image',
     'ubuntu:22.04',
     'Container image used for the privileged benchmark DaemonSet pod.',
 )
-
-
 _NODEPOOL = flags.DEFINE_string(
     'swap_encryption_nodepool',
     'benchmark',
     'Name of the node pool to deploy the benchmark DaemonSet on.',
 )
-
-
 _INSTANCE_SIZE_LABEL = flags.DEFINE_string(
     'swap_encryption_instance_size_label',
     '',
@@ -239,16 +233,12 @@ _INSTANCE_SIZE_LABEL = flags.DEFINE_string(
     'collated and compared.  Defaults to the value reported by the cloud '
     'metadata endpoint inside the pod.',
 )
-
-
 _COLLECT_COST = flags.DEFINE_boolean(
     'swap_encryption_collect_cost',
     False,
     'When True, emit a cost_estimate_usd sample using on-demand pricing '
     'for the instance type detected at runtime.',
 )
-
-
 _IO2_ENCRYPTED = flags.DEFINE_boolean(
     'swap_encryption_io2_encrypted',
     True,
@@ -257,16 +247,12 @@ _IO2_ENCRYPTED = flags.DEFINE_boolean(
     'Set False for the unencrypted io2 baseline row. Only applies when '
     '--swap_encryption_swap_type=io2 on AWS/EKS.',
 )
-
-
 _IO2_KMS_KEY_ID = flags.DEFINE_string(
     'swap_encryption_io2_kms_key_id',
     '',
     'Optional KMS key id/ARN for the encrypted io2 volume. Empty = the '
     'account default aws/ebs key. Ignored unless io2_encrypted is True.',
 )
-
-
 _FAIL_ON_DEGRADED = flags.DEFINE_boolean(
     'swap_encryption_fail_on_degraded',
     True,
@@ -278,8 +264,6 @@ _FAIL_ON_DEGRADED = flags.DEFINE_boolean(
     'empty or meaningless data.  Set False to keep the legacy behaviour of '
     'always returning whatever partial samples were collected.',
 )
-
-
 _PHASES = flags.DEFINE_list(
     'swap_encryption_phases',
     ['all'],
@@ -292,8 +276,6 @@ _PHASES = flags.DEFINE_list(
     'Phases not listed are skipped and do not affect the degraded-run gate '
     '(e.g. skipping fio will not be reported as "Gate 1 produced no samples").',
 )
-
-
 _MIN_SWAP_OUT_PAGES = flags.DEFINE_integer(
     'swap_encryption_min_swap_out_pages',
     1000,
@@ -306,6 +288,9 @@ _MIN_SWAP_OUT_PAGES = flags.DEFINE_integer(
     'non-zero swap-out (legacy behaviour).',
 )
 
+# ---------------------------------------------------------------------------
+# New flags — benchmark nodepool, COS image, encryption toggle, IOPS
+# ---------------------------------------------------------------------------
 
 _BENCHMARK_MACHINE_TYPE = flags.DEFINE_string(
     'swap_encryption_benchmark_machine_type',
@@ -314,16 +299,12 @@ _BENCHMARK_MACHINE_TYPE = flags.DEFINE_string(
     'Use n4-highmem-32 (hyperdisk, default) or c4-standard-8-lssd '
     '(LSSD RAID-0).  The matching swap setup is selected automatically.',
 )
-
-
 _BENCHMARK_LSSD = flags.DEFINE_boolean(
     'swap_encryption_lssd',
     False,
     'Force LSSD RAID-0 swap path even when the machine type name does not '
     'contain "lssd".  Auto-detected from machine type when False.',
 )
-
-
 _LSSD_COUNT = flags.DEFINE_integer(
     'swap_encryption_lssd_count',
     1,
@@ -333,8 +314,6 @@ _LSSD_COUNT = flags.DEFINE_integer(
     'c4-standard-16-lssd=2, i4i.4xlarge has NVMe Instance Store (AWS).  '
     'Default 1 covers most single-lssd machine types.',
 )
-
-
 _ENABLE_DMCRYPT = flags.DEFINE_boolean(
     'swap_encryption_enable_dmcrypt',
     True,
@@ -342,8 +321,6 @@ _ENABLE_DMCRYPT = flags.DEFINE_boolean(
     '"encryption enabled" column of the test matrix.  Set False to use '
     'plain swap (encryption disabled column).',
 )
-
-
 _NODE_IMAGE_TYPE = flags.DEFINE_string(
     'swap_encryption_node_image_type',
     'UBUNTU_CONTAINERD',
@@ -357,8 +334,6 @@ _NODE_IMAGE_TYPE = flags.DEFINE_string(
     '(--noswap_encryption_enable_dmcrypt) to measure plain-swap overhead.  '
     'AL2 on EKS.',
 )
-
-
 _BOOT_DISK_TYPE = flags.DEFINE_string(
     'swap_encryption_boot_disk_type',
     'hyperdisk-balanced',
@@ -366,16 +341,12 @@ _BOOT_DISK_TYPE = flags.DEFINE_string(
     'for production machines (n4, c3, c4 families).  Use pd-ssd for n2/e2 '
     'dev/test machines, which do not support hyperdisk-balanced.',
 )
-
-
 _BOOT_DISK_IOPS = flags.DEFINE_integer(
     'swap_encryption_boot_disk_iops',
     80000,
     'Provisioned IOPS for the boot disk (hyperdisk-balanced only).  '
     '80 000 is the COS max-IOPS target.  Ignored for pd-ssd.',
 )
-
-
 _BOOT_DISK_THROUGHPUT = flags.DEFINE_integer(
     'swap_encryption_boot_disk_throughput',
     1200,
@@ -384,8 +355,6 @@ _BOOT_DISK_THROUGHPUT = flags.DEFINE_integer(
     'IOPS for production; use 140 (minimum) for dev/test.  Ignored for '
     'pd-ssd.',
 )
-
-
 _BOOT_DISK_SIZE_GB = flags.DEFINE_integer(
     'swap_encryption_boot_disk_size_gb',
     500,
@@ -394,8 +363,6 @@ _BOOT_DISK_SIZE_GB = flags.DEFINE_integer(
     '(see Engineer Assignments table in execution-plan.md).  '
     'For LSSD configs the boot disk is smaller; 100 GiB is fine.',
 )
-
-
 _ADD_SWAP_DISK = flags.DEFINE_boolean(
     'swap_encryption_add_swap_disk',
     False,
@@ -406,8 +373,6 @@ _ADD_SWAP_DISK = flags.DEFINE_boolean(
     '--additional-node-disk using the same type/IOPS/throughput as the boot '
     'disk flags.',
 )
-
-
 _SWAP_DISK_SIZE_GB = flags.DEFINE_integer(
     'swap_encryption_swap_disk_size_gb',
     500,
@@ -416,37 +381,42 @@ _SWAP_DISK_SIZE_GB = flags.DEFINE_integer(
     'hyperdisk-balanced IOPS constraint: provisioned_iops ≤ size_gb × 80.',
 )
 
+# ---------------------------------------------------------------------------
+# Internal constants
+# ---------------------------------------------------------------------------
 
 _DS_NAME = 'pkb-swap-benchmark'
-
-
 _DS_NAMESPACE = 'default'
-
-
 _DS_LABEL = 'pkb-swap-benchmark'
 
-
+# Active pod name — may be updated by _recover_pod when the DaemonSet
+# replaces an evicted pod with a new name.
 _active_pod: list[str] = []  # single-element list so closures can mutate it
-
-
+# Cache for the stress-ng --vm-method string, detected once per pod at runtime.
+# Different GKE images ship different stress-ng versions: some support 'mmap',
+# others (e.g. Ubuntu on n4-highmem-32) don't.  We detect once and reuse.
 _stress_vm_method: list[str] = []  # single-element list; '' means no --vm-method flag
-
-
+# Human-readable reasons the current run is considered degraded.  Populated by
+# phases when they detect a fatal-but-swallowed condition (pod eviction, stress
+# OOM kill, empty critical data) and consumed by Run()'s final gate so a
+# silently-broken run is reported as FAILED rather than SUCCEEDED.
 _degraded_reasons: list[str] = []
-
-
+# Names of benchmark pods observed as gone ("pods ... not found") at any point
+# during the run.  Recorded by _pod_exec even for ignore_failure commands —
+# without this a pod that dies during a best-effort phase (e.g. the kernel
+# build) is invisible to the degradation gate because _active_pod is never
+# renamed.  Consumed by Run()'s final gate.
 _pod_lost: list[str] = []
-
-
+# Short descriptions of rc=137 (SIGKILL/OOM) events seen during the run.  An
+# OOM that restarts the container IN PLACE keeps the same pod name, so neither
+# the "pod replaced" nor the "pod NotFound" check fires — the run would look
+# clean.  Recording every rc=137 here lets the gate flag those too.
 _oom_events: list[str] = []
 
-
 _BENCHMARK_NODEPOOL = 'benchmark'
-
-
 _DEFAULT_NODEPOOL = 'default-pool'
 
-
+# fio jobs: (name, rw_mode, blocksize, iodepth, description)
 _FIO_JOBS = (
     ('rand_write_iops', 'randwrite', '4k', 256, 'Random write IOPS'),
     ('rand_read_iops', 'randread', '4k', 256, 'Random read IOPS'),
@@ -457,15 +427,13 @@ _FIO_JOBS = (
     ('lat_read', 'randread', '4k', 1, 'Random read latency'),
 )
 
-
 _VMSTAT_LOG = '/tmp/pkb_vmstat.log'
-
-
 _PIDSTAT_LOG = '/tmp/pkb_pidstat.log'
-
-
 _CRYPTO_PROCS = ('kswapd', 'kworker', 'kcryptd', 'dmcrypt_write')
 
+# ---------------------------------------------------------------------------
+# DaemonSet manifest (embedded YAML)
+# ---------------------------------------------------------------------------
 
 def _daemonset_yaml(image: str) -> str:
   """Render the privileged benchmark DaemonSet manifest.
@@ -485,6 +453,10 @@ def _daemonset_yaml(image: str) -> str:
       kernel_version=_KERNEL_VERSION.value,
   )
 
+
+# ---------------------------------------------------------------------------
+# PKB entry points
+# ---------------------------------------------------------------------------
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -611,7 +583,6 @@ def Prepare(spec) -> None:
     _setup_plain_swap_file(pod, _SWAP_SIZE_GB.value)
 
 
-
 def _phase_selected(token: str) -> bool:
   """Return True if phase `token` should run given --swap_encryption_phases.
 
@@ -659,6 +630,23 @@ def Run(spec) -> list[sample.Sample]:
 
   logging.info('[swap_encryption] swap device: %s', swap_dev)
 
+  # ── Phase 3c (OpenSearch) runs FIRST, on a clean node ─────────────────────
+  # OpenSearch needs several GB of free RAM to start, which it cannot get once
+  # the swap phases (2a/2b) have saturated RAM+swap — there it is OOM-killed
+  # during startup and never binds :9200.  Running it first (the node is clean
+  # at benchmark start) lets it start reliably; its OWN stressor provides the
+  # swap pressure for its index/query, and it tears itself down afterwards so
+  # the node is clean again for Tier 1/2.  Order in the results is unaffected
+  # (samples carry their own phase labels).
+  if _phase_selected('3c'):
+    logging.info('[swap_encryption] ── Phase OpenSearch (3c) — run first on '
+                 'clean node ──')
+    try:
+      results += _phase3c_opensearch(pod, base_meta)
+    except Exception as e:  # pylint: disable=broad-except
+      logging.error('[swap_encryption] OpenSearch (3c) FAILED: %s — continuing',
+                    e)
+
   # ── Tier 1 / Gate 1: fio microbenchmarks ─────────────────────────────────
   tier1_results = []
   if _phase_selected('fio'):
@@ -696,6 +684,25 @@ def Run(spec) -> list[sample.Sample]:
       logging.warning('[swap_encryption] Proceeding to Tier 3 (workloads are '
                       'independent of stress-ng results)')
 
+  # ── Tier 3 / Gate 3: real-world workloads ────────────────────────────────
+  # NOTE: 3c (OpenSearch) is intentionally NOT here — it runs first, on a clean
+  # node, before the swap phases saturate memory (see top of Run()).
+  tier3 = [
+      ('3a', 'Redis latency (3a)', lambda: _phase3a_redis(pod, base_meta)),
+      ('3b', 'Kernel build (3b)', lambda: _phase3b_kernel_build(pod, base_meta)),
+  ]
+  if any(_phase_selected(tok) for tok, _, _ in tier3):
+    logging.info('[swap_encryption] ── Tier 3 / Gate 3: workloads ──')
+    for tok, phase_name, phase_fn in tier3:
+      if not _phase_selected(tok):
+        continue
+      try:
+        logging.info('[swap_encryption] Phase %s', phase_name)
+        results += phase_fn()
+      except Exception as e:  # pylint: disable=broad-except
+        logging.error('[swap_encryption] %s FAILED: %s — continuing with '
+                      'remaining workloads', phase_name, e)
+
   # ── Cost estimate ─────────────────────────────────────────────────────────
   if _COLLECT_COST.value:
     elapsed = time.time() - t_run_start
@@ -726,7 +733,6 @@ def Run(spec) -> list[sample.Sample]:
         f'{", ".join(_oom_events)} — a phase exceeded memory and was killed by '
         f'the OOM killer (the container may have restarted in place), so the '
         f'affected phase(s) produced no or partial data')
-
   if _phase_selected('fio') and not tier1_results:
     if swap_dev.startswith('/dev/loop'):
       # Expected: COS blocks device-mapper from pod namespaces on single-disk
@@ -741,7 +747,6 @@ def Run(spec) -> list[sample.Sample]:
       _degraded_reasons.append(
           'Gate 1 (fio microbenchmarks) produced no samples — the raw swap '
           'device was never characterised')
-
 
   degraded = bool(_degraded_reasons)
   results.append(sample.Sample(
@@ -801,6 +806,10 @@ def Cleanup(spec) -> None:
   if _ADD_SWAP_DISK.value and getattr(cluster, 'project', None):
     _detach_and_delete_swap_disk(cluster)
 
+
+# ---------------------------------------------------------------------------
+# DaemonSet lifecycle helpers
+# ---------------------------------------------------------------------------
 
 def _deploy_daemonset() -> None:
   """Apply the benchmark DaemonSet manifest to the cluster."""
@@ -915,6 +924,10 @@ def _delete_daemonset() -> None:
   ], raise_on_failure=False)
   logging.info('[swap_encryption] DaemonSet deleted')
 
+
+# ---------------------------------------------------------------------------
+# Two-step GKE nodepool helpers
+# ---------------------------------------------------------------------------
 
 def _build_node_startup_script(enable_dmcrypt: bool, lssd: bool) -> str:
   """Return a bash startup script for the benchmark nodepool.
@@ -1335,6 +1348,10 @@ def _delete_default_node_pool(cluster) -> None:
     logging.info('[swap_encryption] Default nodepool deleted')
 
 
+# ---------------------------------------------------------------------------
+# Pod exec wrapper
+# ---------------------------------------------------------------------------
+
 def _is_pod_gone(pod: str) -> bool:
   """Return True if the named pod no longer exists in the cluster.
 
@@ -1567,6 +1584,10 @@ def _recover_pod(pod: str, timeout_sec: int = 600) -> str:
       f'[swap_encryption] Pod {recovered_pod} did not become ready '
       f'within {timeout_sec}s after OOM kill / eviction')
 
+
+# ---------------------------------------------------------------------------
+# Cloud-specific swap setup
+# ---------------------------------------------------------------------------
 
 def _detect_cloud(pod: str) -> str:
   """Detect GCP vs AWS from DMI product info exposed via /sys hostPath mount.
@@ -2461,6 +2482,10 @@ def _enable_zswap(pod: str) -> None:
     _pod_exec(pod, cmd, ignore_failure=True)
 
 
+# ---------------------------------------------------------------------------
+# Phase 1 – fio Microbenchmarks
+# ---------------------------------------------------------------------------
+
 def _phase1_fio(
     pod: str, swap_dev: str, base_meta: dict
 ) -> list[sample.Sample]:
@@ -2596,6 +2621,10 @@ def _parse_fio_json(
       ]
   return results
 
+
+# ---------------------------------------------------------------------------
+# Phase 2a – CPU Overhead Under Swap Pressure
+# ---------------------------------------------------------------------------
 
 def _parse_vm_bytes_to_mb(vm_bytes: str) -> float:
   """Parse a vm-bytes string like '28G', '512M', '1024k' into megabytes."""
@@ -3148,6 +3177,10 @@ def _parse_pidstat(output: str, base_meta: dict) -> list[sample.Sample]:
   return results
 
 
+# ---------------------------------------------------------------------------
+# Phase 2b – I/O Interference
+# ---------------------------------------------------------------------------
+
 def _launch_confined_bg_stress(pod: str, timeout_s: int, logfile: str) -> None:
   """Launch the Phase 2b/3a background swap stressor confined to its OWN
   memory-capped cgroup, so it drives swap pressure WITHOUT starving the
@@ -3318,6 +3351,625 @@ def _phase2b_io_interference(pod: str, base_meta: dict) -> list[sample.Sample]:
   return results
 
 
+# ---------------------------------------------------------------------------
+# Phase 3a – Redis Latency Under Memory Pressure
+# ---------------------------------------------------------------------------
+
+def _phase3a_redis(pod: str, base_meta: dict) -> list[sample.Sample]:
+  """Load Redis beyond its memory cap and measure GET/SET P50/P90/P99 latency.
+
+  Uses memtier_benchmark (installed in the DaemonSet) instead of the built-in
+  redis-benchmark because memtier reports per-percentile latency (P50/P90/P99)
+  which is required by the test plan (redis SET/GET P90/P99 under memory
+  pressure).  This mirrors the approach in PKB's redis_memtier_benchmark.
+  """
+  results = []
+  meta = dict(base_meta, workload='redis', tool='memtier_benchmark')
+
+  # Swap, don't OOM, when the dataset + background stressor exceed RAM.
+  # No-op on large-RAM nodes (config2).
+  _set_memory_high_guard(pod)
+
+  # Start Redis and wait up to 30 s for it to accept connections.
+  # `service redis-server start` fails inside a container (no init system)
+  # so we fall through to a direct redis-server invocation.  A retry loop
+  # on redis-cli PING is more reliable than a fixed sleep.
+  _pod_exec(pod, textwrap.dedent("""
+    pkill -x redis-server 2>/dev/null || true
+    sleep 1
+    redis-server --port 6379 --daemonize yes \
+      --bind 127.0.0.1 \
+      --logfile /tmp/redis.log \
+      --loglevel notice \
+      --save "" \
+      --appendonly no 2>/dev/null || true
+    for i in $(seq 1 30)
+    do
+      redis-cli -p 6379 ping 2>/dev/null | grep -q PONG && echo "Redis ready" && break
+      sleep 1
+    done
+  """), ignore_failure=True, timeout=45)
+
+  maxmem = _REDIS_MAXMEMORY_MB.value * 1024 * 1024
+  _pod_exec(pod, f'redis-cli CONFIG SET maxmemory {maxmem}',
+            ignore_failure=True)
+  _pod_exec(pod, 'redis-cli CONFIG SET maxmemory-policy allkeys-lru',
+            ignore_failure=True)
+
+  # Pre-load dataset (forces eviction/swap once dataset > maxmemory)
+  n_keys = (_REDIS_DATASET_MB.value * 1024 * 1024) // 128
+  logging.info('[swap_encryption] Loading %d Redis keys (%d MB)',
+               n_keys, _REDIS_DATASET_MB.value)
+  _pod_exec(pod,
+           f'redis-benchmark -n {n_keys} -d 128 -t SET -q >/dev/null 2>&1',
+           ignore_failure=True, timeout=600)
+
+  # Apply swap pressure with the confined stressor so it can't OOM Redis or
+  # the pod on a small node (pages within a 60%-RAM cgroup; see helper).
+  _launch_confined_bg_stress(pod, 120, '/tmp/pkb_stress_redis.log')
+  time.sleep(8)
+
+  # Run the latency workload.  Prefer memtier_benchmark (gives per-percentile
+  # JSON) but fall back to redis-benchmark --csv which is always available via
+  # the redis-tools package installed in the DaemonSet init script.
+  # memtier installs via `make install` to /usr/local/bin; a non-login
+  # kubectl-exec shell often drops that from PATH, so `command -v` misses a
+  # binary that IS present (this is why earlier runs fell back to throughput-
+  # only).  Resolve the absolute path explicitly.
+  # memtier installs via `make install` to /usr/local/bin; a non-login
+  # kubectl-exec shell often drops that from PATH, so resolve the path.
+  mt_out, _ = _pod_exec(
+      pod,
+      'command -v memtier_benchmark 2>/dev/null; '
+      'ls /usr/local/bin/memtier_benchmark 2>/dev/null',
+      ignore_failure=True)
+  mt_bin = next((l.strip() for l in mt_out.splitlines() if l.strip()), '')
+
+  memtier_ok = False
+  if mt_bin:
+    # Reuse PKB's memtier package to BUILD the command (incl. the gaussian
+    # access pattern the methodology asks for) and PARSE the result, instead of
+    # hand-rolling both.  We still launch it via our own kubectl-exec because
+    # memtier runs INSIDE the privileged swap pod, under swap pressure — not on
+    # a PKB VM (so we can't use memtier.RunOverAllThreadsPipelinesAndClients,
+    # which expects a vm object).  memtier.MemtierResult.Parse needs the
+    # percentile columns below to be present, so request them explicitly.
+    meta = dict(base_meta, workload='redis', tool='memtier_benchmark')
+    n_keys = (_REDIS_DATASET_MB.value * 1024 * 1024) // 128
+    mt_args = memtier.BuildMemtierCommand(
+        server='127.0.0.1', port=6379, protocol='redis',
+        clients=50, threads=4, ratio='1:1', data_size=128,
+        key_pattern='G:G', key_minimum=1, key_maximum=n_keys,
+        test_time=60,
+    )
+    # mt_args[0] is the binary name; substitute the resolved absolute path and
+    # add the percentile columns + --hide-histogram.
+    cmd = (' '.join([mt_bin] + mt_args[1:]) +
+           ' --hide-histogram '
+           '--print-percentiles 50,90,95,99,99.5,99.9,99.950,99.990 2>&1')
+    out, _ = _pod_exec(pod, cmd, ignore_failure=True, timeout=120)
+    try:
+      r = memtier.MemtierResult.Parse(out, None)
+      results.append(
+          sample.Sample('redis_total_ops_per_sec', r.ops_per_sec, 'ops/s', meta))
+      results.append(
+          sample.Sample('redis_total_lat_avg_ms', r.latency_ms, 'ms', meta))
+      for pct, lbl in (('50', 'p50'), ('90', 'p90'),
+                       ('99', 'p99'), ('99.9', 'p999')):
+        if pct in r.latency_dic:
+          results.append(
+              sample.Sample(f'redis_total_lat_{lbl}_ms',
+                            r.latency_dic[pct], 'ms', meta))
+      memtier_ok = True
+    except Exception as e:  # pylint: disable=broad-except
+      logging.warning('[swap_encryption] memtier package parse failed (%s); '
+                      'falling back to redis-benchmark', e)
+
+  if not memtier_ok:
+    # Fallback: redis-benchmark (always present via redis-tools).  Run WITHOUT
+    # --csv so the latency percentile distribution is printed, then parse both
+    # throughput and percentiles via _parse_redis_benchmark.
+    if not mt_bin:
+      logging.warning('[swap_encryption] memtier_benchmark not on PATH or in '
+                      '/usr/local/bin; using redis-benchmark for latency')
+      # Surface WHY memtier is missing (build log) for diagnosis.
+      blog, _ = _pod_exec(
+          pod,
+          'tail -n 15 /tmp/pkb_memtier_build.log 2>/dev/null || echo "(no log)"',
+          ignore_failure=True, _retries=0, timeout=15)
+      logging.warning('[swap_encryption] memtier build log tail:\n%s',
+                      (blog or '').strip())
+    meta = dict(base_meta, workload='redis', tool='redis_benchmark_fallback')
+    rb_out, _ = _pod_exec(
+        pod,
+        'redis-benchmark -h 127.0.0.1 -p 6379 -c 50 -n 100000 -d 128 '
+        '-t get,set 2>&1',
+        ignore_failure=True, timeout=180)
+    results += _parse_redis_benchmark(rb_out, meta)
+
+  _reset_memory_high_guard(pod)
+  return results
+
+
+def _parse_redis_benchmark(
+    output: str, base_meta: dict
+) -> list[sample.Sample]:
+  """Parse redis-benchmark (non-CSV) output: throughput + latency percentiles.
+
+  redis-benchmark groups its output per operation.  We track the current op
+  from '====== SET ======' / '====== GET ======' headers and extract:
+    * throughput  — 'throughput summary: N requests per second' OR the older
+      'N requests per second' line  -> redis_<op>_ops_per_sec
+    * percentiles — the 'latency summary (msec)' table (redis 7+, columns
+      avg/min/p50/p95/p99/max) OR the 'NN.NNN% <= X milliseconds' percentile
+      distribution lines (redis 6) -> redis_<op>_lat_p{50,95,99}_ms
+
+  Best-effort across redis-tools versions; whatever percentiles the installed
+  redis-benchmark prints are captured.  Throughput is always emitted.
+  """
+  results = []
+  op = None
+  buckets: list[tuple[float, float]] = []  # (cumulative_pct, latency_ms) for op
+  expect_summary_row = False
+
+  def _flush(cur_op, bkts):
+    """Emit P50/P90/P99 by inverting the cumulative distribution: for each
+    target percentile, take the smallest latency whose cumulative %% >= target.
+    """
+    if not cur_op or not bkts:
+      return
+    ordered = sorted(bkts, key=lambda x: x[0])  # ascending cumulative pct
+    m = dict(base_meta, operation=cur_op)
+    for target, lbl in ((50.0, 'p50'), (90.0, 'p90'), (99.0, 'p99')):
+      lat = next((ms for pct, ms in ordered if pct >= target), None)
+      if lat is not None:
+        results.append(
+            sample.Sample(f'redis_{cur_op}_lat_{lbl}_ms', lat, 'ms', m))
+
+  for raw in output.splitlines():
+    line = raw.strip()
+    header = re.search(r'======\s*([A-Za-z_]+)\s*======', line)
+    if header:
+      _flush(op, buckets)              # finalise the previous op's percentiles
+      op = header.group(1).lower()
+      buckets = []
+      expect_summary_row = False
+      continue
+    if op is None:
+      continue
+    m = dict(base_meta, operation=op)
+
+    tput = re.search(r'([\d.]+)\s+requests per second', line)
+    if tput:
+      results.append(
+          sample.Sample(f'redis_{op}_ops_per_sec', float(tput.group(1)),
+                        'ops/s', m))
+      continue
+
+    # redis 7+ summary table: 'latency summary (msec):' header then a row of
+    # avg/min/p50/p95/p99/max values.
+    if 'latency summary' in line.lower():
+      expect_summary_row = True
+      continue
+    if expect_summary_row and re.match(r'^[\d.]+(\s+[\d.]+){3,}', line):
+      cols = line.split()
+      for lbl, val in zip(['avg', 'min', 'p50', 'p95', 'p99', 'max'], cols):
+        if lbl in ('p50', 'p95', 'p99'):
+          results.append(
+              sample.Sample(f'redis_{op}_lat_{lbl}_ms', float(val), 'ms', m))
+      expect_summary_row = False
+      continue
+
+    # redis 6 CUMULATIVE distribution: 'NN.NN% <= X milliseconds'.  The
+    # percentages are arbitrary cumulative buckets (e.g. 80.27%, 95.65%,
+    # 99.14%), NOT fixed 50/95/99 — collect them and invert in _flush().
+    pdist = re.search(r'([\d.]+)%\s*<=\s*([\d.]+)\s*milli', line)
+    if pdist:
+      buckets.append((float(pdist.group(1)), float(pdist.group(2))))
+  _flush(op, buckets)                  # finalise the last op
+  if not results:
+    logging.warning('[swap_encryption] redis-benchmark parse produced no samples')
+  return results
+
+
+# ---------------------------------------------------------------------------
+# Phase 3b – Kernel Build Under Memory Constraint
+# ---------------------------------------------------------------------------
+
+def _phase3b_kernel_build(pod: str, base_meta: dict) -> list[sample.Sample]:
+  """Compile Linux inside a cgroup memory cap; compare to unconstrained."""
+  results = []
+  ver = _KERNEL_VERSION.value
+  # Use the stateful partition (hostPath SSD mount) so:
+  # (a) extraction persists across container restarts — no re-extraction after
+  #     an OOM pod eviction;
+  # (b) xz decompression runs in init (before stress-ng memory pressure) so
+  #     it doesn't OOM the container mid-benchmark;
+  # (c) no overlay-FS overhead for the extracted 1 GB of source files.
+  root = '/mnt/stateful_partition/pkb_kernel'
+  tarball = f'{root}/linux-{ver}.tar.xz'
+  src = f'{root}/linux-{ver}'
+  url = (
+      f'https://cdn.kernel.org/pub/linux/kernel/'
+      f'v{ver.split(".")[0]}.x/linux-{ver}.tar.xz'
+  )
+
+  # Ensure build tools are present — apt-get may have failed during DaemonSet
+  # init (network transient, repo unavailable).  Idempotent on re-install.
+  _pod_exec(pod, textwrap.dedent("""
+    command -v make >/dev/null 2>&1 && command -v cgexec >/dev/null 2>&1 || {
+      apt-get install -y -qq build-essential cgroup-tools 2>/dev/null || true
+    }
+  """), ignore_failure=True, timeout=180)
+
+  # Download and extract only if the init script didn't already do it
+  # (e.g. if the stateful partition was freshly formatted).
+  _pod_exec(pod, f'mkdir -p {root}')
+  _pod_exec(pod, f'test -f {tarball} || wget -q --timeout=300 -O {tarball} {url}',
+           timeout=600)
+  _pod_exec(pod, f'test -d {src} || tar -xf {tarball} -C {root}',
+           timeout=600)
+  _pod_exec(pod, f'make -C {src} defconfig -j$(nproc) 2>&1', timeout=300)
+
+  mem_bytes = _KERNEL_MEMORY_MB.value * 1024 * 1024
+
+  # Detect cgroup version and set up the memory-limited cgroup.
+  # cgroup v1: /sys/fs/cgroup/memory/<name>/memory.limit_in_bytes
+  # cgroup v2: /sys/fs/cgroup/<name>/memory.max  (value in bytes or 'max')
+  # On GKE kernel 6.x (e.g. 6.8.0-1049-gke) cgroup v1 memory controller is
+  # unavailable from pod namespaces — only cgroup v2 works.
+  cgroup_setup_out, _ = _pod_exec(pod, textwrap.dedent(f"""
+    if [ -d /sys/fs/cgroup/memory ] && \
+       mkdir -p /sys/fs/cgroup/memory/pkb_kernelbuild 2>/dev/null && \
+       echo {mem_bytes} > /sys/fs/cgroup/memory/pkb_kernelbuild/memory.limit_in_bytes 2>/dev/null; then
+      echo CGROUPV1
+    elif [ -d /sys/fs/cgroup/system.slice ] || [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+      mkdir -p /sys/fs/cgroup/pkb_kernelbuild 2>/dev/null || true
+      echo {mem_bytes} > /sys/fs/cgroup/pkb_kernelbuild/memory.max 2>/dev/null || true
+      echo $$ > /sys/fs/cgroup/pkb_kernelbuild/cgroup.procs 2>/dev/null || true
+      echo CGROUPV2
+    else
+      echo CGROUP_NONE
+    fi
+  """), ignore_failure=True, timeout=30)
+  cgroup_mode = cgroup_setup_out.strip().splitlines()[-1] if cgroup_setup_out.strip() else 'CGROUP_NONE'
+  logging.info('[swap_encryption] cgroup mode: %s (mem_limit=%dMB)', cgroup_mode, _KERNEL_MEMORY_MB.value)
+
+  def _build(label: str, use_cgroup: bool) -> sample.Sample:
+    _pod_exec(pod, f'make -C {src} clean 2>&1')
+    if use_cgroup and cgroup_mode == 'CGROUPV1':
+      # cgroup v1: cgexec pins the process to the named memory cgroup.
+      # Fallback (||) runs without cgroup if cgexec itself fails.
+      cmd = (f'cgexec -g memory:pkb_kernelbuild '
+             f'make -C {src} -j$(nproc) vmlinux 2>&1 '
+             f'|| make -C {src} -j$(nproc) vmlinux 2>&1')
+    elif use_cgroup and cgroup_mode == 'CGROUPV2':
+      # cgroup v2: write PID into the cgroup's cgroup.procs, then run make.
+      # The memory.max limit set above applies to all processes in the cgroup.
+      cmd = textwrap.dedent(f"""
+        mkdir -p /sys/fs/cgroup/pkb_kernelbuild 2>/dev/null || true
+        echo {mem_bytes} > /sys/fs/cgroup/pkb_kernelbuild/memory.max 2>/dev/null || true
+        echo $$ > /sys/fs/cgroup/pkb_kernelbuild/cgroup.procs 2>/dev/null || true
+        make -C {src} -j$(nproc) vmlinux 2>&1 || true
+      """)
+    else:
+      # No cgroup available or unconstrained run — plain make.
+      cmd = f'make -C {src} -j$(nproc) vmlinux 2>&1'
+    t0 = time.time()
+    # ignore_failure=True: rc=137 (OOM-kill during linking) is expected on
+    # memory-constrained runs.  We still record elapsed time — even a partial
+    # build gives a valid lower bound.  Pod recovery is handled inside
+    # _pod_exec (OOM-eviction path) so subsequent phases use the new pod name.
+    _pod_exec(pod, cmd, timeout=3600, ignore_failure=True)
+    elapsed = time.time() - t0
+    m = dict(base_meta,
+             workload='kernel_build',
+             kernel_version=ver,
+             build_variant=label,
+             cgroup_mode=cgroup_mode,
+             memory_limit_mb=(
+                 _KERNEL_MEMORY_MB.value if use_cgroup else 'unconstrained'))
+    return sample.Sample('kernel_build_elapsed_sec', elapsed, 's', m)
+
+  s_constrained = _build('constrained', use_cgroup=True)
+  s_unconstrained = _build('unconstrained', use_cgroup=False)
+  results += [s_constrained, s_unconstrained]
+
+  if s_unconstrained.value > 0:
+    ratio = s_constrained.value / s_unconstrained.value
+    results.append(sample.Sample(
+        'kernel_build_slowdown_ratio', ratio, 'ratio',
+        dict(base_meta, workload='kernel_build', kernel_version=ver,
+             memory_limit_mb=_KERNEL_MEMORY_MB.value),
+    ))
+  return results
+
+
+# ---------------------------------------------------------------------------
+# Phase 3c – OpenSearch
+# ---------------------------------------------------------------------------
+
+def _phase3c_opensearch(pod: str, base_meta: dict) -> list[sample.Sample]:
+  """Index + query workload under swap pressure (esrally or curl fallback).
+
+  IMPORTANT: the swap-pressure stressor is NOT started here.  Starting a 370 GB
+  memory hog before the search server is up starves the JVM during startup so
+  it never binds :9200 (the process lingers but never serves — observed pid
+  running yet :9200 down).  The server is launched and confirmed serving first,
+  then the stressor is applied for the actual index/query measurement (done
+  inside _run_opensearch_curl / _run_esrally).
+  """
+  meta = dict(base_meta, workload='opensearch')
+
+  # Free the node first.  Coming out of the swap-heavy phases (2a/2b) the node
+  # is so memory/swap-saturated that even this tiny cleanup exec was itself
+  # OOM-killed (rc 137) before it could free anything (run 005).  Make the
+  # cleanup OOM-IMMUNE (oom_score_adj=-1000) so it always survives, kill any
+  # lingering stress-ng / non-serving OpenSearch, drop caches, and then POLL
+  # until memory actually recovers before we try to launch OpenSearch.
+  _pod_exec(pod, textwrap.dedent("""
+    echo -1000 > /proc/self/oom_score_adj 2>/dev/null || true
+    pkill -9 stress-ng 2>/dev/null || true
+    if [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://localhost:9200/ 2>/dev/null)" != "200" ]; then
+      if [ -f /tmp/opensearch.pid ]; then kill -9 "$(cat /tmp/opensearch.pid 2>/dev/null)" 2>/dev/null || true; rm -f /tmp/opensearch.pid; fi
+    fi
+    # Wait (up to ~60s) for the kernel to reclaim RAM after the swap stressors
+    # so OpenSearch has headroom; OpenSearch needs only a few GB.
+    for _i in $(seq 1 30); do
+      sync; echo 1 > /proc/sys/vm/drop_caches 2>/dev/null || true
+      avail=$(awk '/MemAvailable/{print $2}' /proc/meminfo)
+      [ "${avail:-0}" -gt 16777216 ] && break   # >16 GiB available
+      sleep 2
+    done
+    echo "[pkb] 3c pre-clean free:"; free -h | head -2
+  """), ignore_failure=True, timeout=90)
+
+  esrally_out, _ = _pod_exec(
+      pod, 'which esrally 2>/dev/null', ignore_failure=True)
+  if esrally_out.strip():
+    return _run_esrally(pod, meta)
+  else:
+    logging.info('[swap_encryption] esrally absent – using curl fallback')
+    return _run_opensearch_curl(pod, meta)
+
+
+def _run_esrally(pod: str, meta: dict) -> list[sample.Sample]:
+  """Run esrally geonames track with a capped JVM heap to induce swap pressure.
+
+  esrally is installed via pip3 in the DaemonSet init script and uses the
+  same geonames track as PKB's standalone esrally_benchmark.py, so results
+  are directly comparable.  The JVM heap is capped to 512 MB so the OS page
+  cache overflows to swap during indexing — the key swap pressure scenario
+  described in the methodology doc.
+  """
+  jvm_heap_mb = 512
+  # Patch jvm.options before starting Elasticsearch/OpenSearch
+  _pod_exec(pod, textwrap.dedent(f"""
+    for f in /etc/elasticsearch/jvm.options /etc/opensearch/jvm.options \\
+              /usr/share/elasticsearch/config/jvm.options \\
+              /usr/share/opensearch/config/jvm.options
+    do
+      test -f "$f" || continue
+      sed -i 's/^-Xms.*/-Xms{jvm_heap_mb}m/' "$f"
+      sed -i 's/^-Xmx.*/-Xmx{jvm_heap_mb}m/' "$f"
+    done
+    export ES_JAVA_OPTS="-Xms{jvm_heap_mb}m -Xmx{jvm_heap_mb}m"
+    export OPENSEARCH_JAVA_OPTS="-Xms{jvm_heap_mb}m -Xmx{jvm_heap_mb}m"
+  """), ignore_failure=True)
+
+  _pod_exec(pod,
+           'systemctl start elasticsearch 2>/dev/null || '
+           'systemctl start opensearch 2>/dev/null || true',
+           ignore_failure=True)
+  time.sleep(15)  # wait for the engine to be ready
+
+  _pod_exec(pod, textwrap.dedent("""
+    esrally race \\
+      --track=geonames \\
+      --target-hosts=localhost:9200 \\
+      --pipeline=benchmark-only \\
+      --report-format=csv \\
+      --report-file=/tmp/pkb_esrally.csv \\
+      --track-param="number_of_replicas:0" \\
+      2>&1
+  """), ignore_failure=True, timeout=3600)
+
+  csv_out, _ = _pod_exec(pod, 'cat /tmp/pkb_esrally.csv 2>/dev/null || echo ""')
+  results = []
+  for line in csv_out.splitlines():
+    parts = [p.strip() for p in line.split(',')]
+    if len(parts) < 3:
+      continue
+    metric = parts[0].lower().replace(' ', '_').replace('-', '_')
+    try:
+      value = float(parts[2])
+      unit = parts[3].strip() if len(parts) > 3 else 'unknown'
+      results.append(sample.Sample(f'opensearch_{metric}', value, unit,
+                                   dict(meta, tool='esrally',
+                                        jvm_heap_mb=jvm_heap_mb)))
+    except (ValueError, IndexError):
+      pass
+  return results
+
+
+def _run_opensearch_curl(pod: str, meta: dict) -> list[sample.Sample]:
+  """Minimal OpenSearch benchmark via curl (fallback).
+
+  Elasticsearch/OpenSearch JVM heap is deliberately capped to a small value
+  so that the JVM off-heap buffers and OS page cache overflow to swap during
+  indexing, making this a realistic swap-pressure workload (gap 4).
+  """
+  # Cap the JVM heap so OS page cache / off-heap memory causes swap pressure.
+  # 512 MB heap on a 32-vCPU node leaves almost all RAM available for page
+  # cache, which the kernel will then need to reclaim under bulk-index load.
+  jvm_heap_mb = 512
+  _pod_exec(pod, textwrap.dedent(f"""
+    # Patch jvm.options in-place for Elasticsearch and OpenSearch installs
+    for jvm_opts_file in \\
+        /etc/elasticsearch/jvm.options \\
+        /etc/opensearch/jvm.options \\
+        /usr/share/elasticsearch/config/jvm.options \\
+        /usr/share/opensearch/config/jvm.options
+    do
+      test -f "$jvm_opts_file" || continue
+      sed -i 's/^-Xms.*/-Xms{jvm_heap_mb}m/' "$jvm_opts_file"
+      sed -i 's/^-Xmx.*/-Xmx{jvm_heap_mb}m/' "$jvm_opts_file"
+      echo "[swap_encryption] Patched $jvm_opts_file"
+    done
+    # Environment-variable fallback (works with both ES and OpenSearch)
+    export ES_JAVA_OPTS="-Xms{jvm_heap_mb}m -Xmx{jvm_heap_mb}m"
+    export OPENSEARCH_JAVA_OPTS="-Xms{jvm_heap_mb}m -Xmx{jvm_heap_mb}m"
+  """), ignore_failure=True)
+
+  # Start the search server.  The pod has no systemd, so after trying any
+  # packaged ES/OS via systemctl we launch the OpenSearch bundle installed by
+  # the DaemonSet init directly (as the unprivileged pkbos user; -d daemonises).
+  # Redirect the whole launch session to a log file FIRST, so the file always
+  # exists and records every decision even if a guard short-circuits — this is
+  # the only artifact that tells us whether the launch ran and why it stopped.
+  _pod_exec(pod, textwrap.dedent("""
+    exec >/tmp/pkb_opensearch_run.log 2>&1
+    # Make this launch session OOM-immune so it always survives long enough to
+    # kill a stale server and relaunch, even if the node is memory-saturated.
+    echo -1000 > /proc/self/oom_score_adj 2>/dev/null || true
+    echo "[pkb] opensearch launch attempt at $(date -u)"
+    sysctl -w vm.max_map_count=262144 2>/dev/null || true
+    # NOTE: do NOT trust `systemctl start` (returns 0 without starting anything
+    # in this pod) and do NOT trust a mere process match — a prior attempt can
+    # leave a stuck OpenSearch JVM that is running but never bound :9200
+    # (observed: "already running pid 300885" yet :9200 down).  Only a real HTTP
+    # 200 on :9200 counts as up; otherwise kill the stale process and relaunch.
+    if [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 http://localhost:9200/ 2>/dev/null)" = "200" ]; then
+      echo "[pkb] opensearch already serving on :9200"; exit 0
+    fi
+    if [ -f /tmp/opensearch.pid ] && kill -0 "$(cat /tmp/opensearch.pid 2>/dev/null)" 2>/dev/null; then
+      echo "[pkb] stale opensearch process not serving :9200 — killing and relaunching"
+      kill -9 "$(cat /tmp/opensearch.pid 2>/dev/null)" 2>/dev/null || true
+      rm -f /tmp/opensearch.pid
+      sleep 5
+    fi
+    if [ ! -x /opt/opensearch/bin/opensearch ]; then
+      echo "[pkb] FATAL: /opt/opensearch/bin/opensearch missing — install failed; see /tmp/pkb_opensearch_build.log"; exit 0
+    fi
+    # OpenSearch refuses to run as root; run as pkbos with a writable HOME, and
+    # clear any root-owned log files that would otherwise block startup.
+    id pkbos >/dev/null 2>&1 || useradd -r -d /opt/opensearch -s /bin/bash pkbos 2>/dev/null || true
+    rm -f /opt/opensearch/logs/* 2>/dev/null || true
+    chown -R pkbos /opt/opensearch 2>/dev/null || true
+    echo "[pkb] launching opensearch as pkbos ..."
+    su pkbos -s /bin/bash -c 'export HOME=/opt/opensearch OPENSEARCH_HOME=/opt/opensearch; /opt/opensearch/bin/opensearch -d -p /tmp/opensearch.pid'
+    echo "[pkb] launch command returned rc=$?"
+    sleep 20
+    if [ -f /tmp/opensearch.pid ] && kill -0 "$(cat /tmp/opensearch.pid 2>/dev/null)" 2>/dev/null; then
+      echo "[pkb] opensearch process is up 20s after launch; recent log:"
+    else
+      echo "[pkb] opensearch NOT running 20s after launch — it crashed; log:"
+    fi
+    tail -60 /opt/opensearch/logs/*.log 2>/dev/null
+    echo "[pkb] ---------- diagnostics ----------"
+    echo "[pkb] memory:"; free -h
+    echo "[pkb] swap:"; (swapon --show 2>/dev/null; cat /proc/swaps 2>/dev/null) | head
+    echo "[pkb] java:"; /opt/opensearch/jdk/bin/java -version 2>&1 | head -3
+    echo "[pkb] opensearch.yml:"; cat /opt/opensearch/config/opensearch.yml 2>/dev/null
+    echo "[pkb] heap opts:"; cat /opt/opensearch/config/jvm.options.d/pkb-heap.options 2>/dev/null
+    echo "[pkb] pkbos can write data/logs?:"; su pkbos -s /bin/bash -c 'touch /opt/opensearch/data/.pkbtest /opt/opensearch/logs/.pkbtest 2>&1 && echo OK && rm -f /opt/opensearch/data/.pkbtest /opt/opensearch/logs/.pkbtest' 2>&1 | head
+    echo "[pkb] :9200 probe:"; curl -s -m 3 http://localhost:9200/ 2>&1 | head -8
+    echo "[pkb] kernel OOM kills (dmesg):"; dmesg 2>/dev/null | grep -iE 'killed process|out of memory|oom-kill' | tail -5
+    echo "[pkb] -------- end diagnostics --------"
+  """), ignore_failure=True, timeout=120)
+
+  # Wait for the HTTP endpoint to actually accept connections before timing
+  # anything.  Without this probe a server that never starts (curl exit 7,
+  # connection refused) still produced opensearch_*_sec samples that were
+  # really just failed-connection round trips, polluting the results.  An
+  # OpenSearch JVM cold start can take ~60-90 s, so poll up to ~120 s.
+  ready_out, _ = _pod_exec(pod, textwrap.dedent("""
+    for _i in $(seq 1 60); do
+      code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 \
+             http://localhost:9200/ 2>/dev/null || echo 000)
+      if [ "$code" = "200" ]; then echo READY; break; fi
+      sleep 2
+    done
+  """), ignore_failure=True, timeout=150)
+
+  if 'READY' not in ready_out:
+    logging.warning(
+        '[swap_encryption] OpenSearch/Elasticsearch HTTP endpoint never came '
+        'up on localhost:9200 (curl could not connect); skipping opensearch '
+        'samples for this run rather than recording failed-connection timings')
+    # Stop any hung OpenSearch so it does not hold memory into the swap phases
+    # (kill by pidfile — never `pkill -f`, which would match this shell).
+    _pod_exec(pod,
+              'if [ -f /tmp/opensearch.pid ]; then '
+              'kill -9 "$(cat /tmp/opensearch.pid 2>/dev/null)" 2>/dev/null; '
+              'rm -f /tmp/opensearch.pid; fi || true',
+              ignore_failure=True)
+    return []
+
+  # Server is up.  NOW apply swap pressure (detached) so the index/query below
+  # run under memory pressure — which is the point of the phase — WITHOUT
+  # evicting the pod.  This phase runs FIRST, so a pod eviction here would
+  # cascade into every later phase (fio Gate 1, stress 2a, …) and fail the
+  # whole run.  Use the confined stressor (capped at 60% RAM in its own cgroup)
+  # so it cannot starve the OpenSearch JVM or trip the node OOM/eviction.
+  _launch_confined_bg_stress(pod, _STRESS_TIMEOUT_SEC.value,
+                             '/tmp/pkb_stress_opensearch.log')
+  time.sleep(10)
+
+  doc = '{"index":{}}\n{"field":"benchmark","ts":"2026-01-01"}\n'
+  bulk = doc * 500
+
+  # _pod_exec returns (stdout, stderr) — not an exit code — so we make curl
+  # itself emit a success/failure token on stdout (curl -f fails on HTTP >=400
+  # and on connection errors) and inspect that.
+  t0 = time.time()
+  bulk_out, _ = _pod_exec(pod, (
+      f'printf "%s" \'{bulk}\' | '
+      "curl -s -f -X POST 'http://localhost:9200/pkb_test/_bulk' "
+      "-H 'Content-Type: application/x-ndjson' "
+      "--data-binary @- -o /dev/null && echo PKB_OK || echo PKB_FAIL"
+  ), ignore_failure=True)
+  index_sec = time.time() - t0
+
+  t0 = time.time()
+  query_out, _ = _pod_exec(pod, (
+      "curl -s -f 'http://localhost:9200/pkb_test/_search?q=field:benchmark' "
+      "-o /dev/null && echo PKB_OK || echo PKB_FAIL"
+  ), ignore_failure=True)
+  query_sec = time.time() - t0
+
+  # 3c runs FIRST (before the swap phases), so tear it down now: kill its
+  # stressor and stop OpenSearch, then reclaim — leaving a clean node for
+  # Phase 2a's swap measurement.  OOM-immune so it always completes.
+  _pod_exec(pod, textwrap.dedent("""
+    echo -1000 > /proc/self/oom_score_adj 2>/dev/null || true
+    pkill -9 stress-ng 2>/dev/null || true
+    if [ -f /tmp/opensearch.pid ]; then kill -9 "$(cat /tmp/opensearch.pid 2>/dev/null)" 2>/dev/null || true; rm -f /tmp/opensearch.pid; fi
+    sleep 3; sync; echo 1 > /proc/sys/vm/drop_caches 2>/dev/null || true
+    echo "[pkb] 3c teardown free:"; free -h | head -2
+  """), ignore_failure=True, timeout=60)
+
+  if 'PKB_OK' not in bulk_out or 'PKB_OK' not in query_out:
+    logging.warning(
+        '[swap_encryption] OpenSearch bulk/query curl failed after the server '
+        'reported ready (bulk ok=%s, query ok=%s); skipping opensearch samples',
+        'PKB_OK' in bulk_out, 'PKB_OK' in query_out)
+    return []
+
+  m = dict(meta, tool='curl_fallback')
+  return [
+      sample.Sample('opensearch_bulk_index_sec', index_sec, 's', m),
+      sample.Sample('opensearch_query_latency_sec', query_sec, 's', m),
+  ]
+
+
+# ---------------------------------------------------------------------------
+# Gap 7 – Cloud cost estimation
+# ---------------------------------------------------------------------------
+
+# On-demand pricing (USD/hr) for the primary benchmark instance types.
+# Values are approximate list prices (us-central1 / us-east-1) as of 2026-05.
+# Update this table when running on other regions or reserved/spot capacity.
 _INSTANCE_PRICE_USD_PER_HR: dict[str, float] = {
     # GCP  (on-demand, us-central1 unless noted)
     'c4-standard-8-lssd': 0.5888,  # 8 vCPU, 32 GB RAM + 1×375 GB LSSD
@@ -3413,6 +4065,10 @@ def _collect_cost_sample(
   return [sample.Sample('cost_estimate_usd', cost, 'USD', meta)]
 
 
+# ---------------------------------------------------------------------------
+# Swap device detection (runs inside the pod)
+# ---------------------------------------------------------------------------
+
 def _detect_swap_device(pod: str) -> str:
   """Return the active swap device path on the cluster node."""
   if _SWAP_DEVICE.value:
@@ -3447,6 +4103,10 @@ def _detect_swap_device(pod: str) -> str:
       'Use --swap_encryption_device to specify one.'
   )
 
+
+# ---------------------------------------------------------------------------
+# Metadata builder
+# ---------------------------------------------------------------------------
 
 def _build_metadata(pod: str, swap_dev: str) -> dict:
   """Collect node environment, encryption type, and config into a dict."""
