@@ -773,7 +773,8 @@ def GetEvents(**kwargs) -> set['kubernetes_events.KubernetesEvent']:
       ['get', 'events', '-o', 'yaml'], **kwargs
   )
   k8s_events = set()
-  for item in yaml.safe_load(stdout)['items']:
+  parsed = yaml.safe_load(stdout) or {}
+  for item in parsed.get('items', []):
     k8s_event = kubernetes_events.KubernetesEvent.FromDict(item)
     if k8s_event:
       k8s_events.add(k8s_event)

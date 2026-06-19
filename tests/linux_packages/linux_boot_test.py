@@ -31,14 +31,6 @@ class LinuxBootTest(
     vm_spec = pkb_common_test_case.CreateTestVmSpec()
     self.mock_vm = pkb_common_test_case.TestLinuxVirtualMachine(vm_spec=vm_spec)
 
-  def testDatetimeToUTCSeconds(self):
-    self.assertEqual(
-        linux_boot.DatetimeToUTCSeconds(
-            datetime.datetime(2023, 4, 6, 18, 1, 1)
-        ),
-        1680804061,
-    )
-
   def testScrapeConsoleLogLines(self):
     """Test startup script output parsing."""
     with open(os.path.join(self.data_dir, 'boot.output')) as f:
@@ -247,7 +239,7 @@ class LinuxBootTest(
         linux_boot.CollectVmToVmSamples(
             self.mock_vm,
             ('10.128.0.2', ''),
-            datetime.datetime.fromtimestamp(1680741767, pytz.timezone('UTC')),
+            1680741767.0,
         ),
         [
             sample.Sample(
@@ -278,7 +270,7 @@ class LinuxBootTest(
     )
     with self.assertRaises(linux_boot.StartupScriptRetrievalError):
       linux_boot.CollectBootSamples(
-          self.mock_vm, 0, ('', ''), datetime.datetime.now()
+          self.mock_vm, 0, ('', ''), 1680741767.0
       )
 
 

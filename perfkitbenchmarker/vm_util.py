@@ -32,6 +32,7 @@ from typing import Any, Callable, Dict, Iterable, Literal, Tuple
 
 from absl import flags
 import jinja2
+from perfkitbenchmarker import benchmark_status
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import log_util
@@ -154,20 +155,23 @@ _SSH_PRIVATE_KEY = flags.DEFINE_string(
 _SSH_KEY_TYPE = flags.DEFINE_string('ssh_key_type', 'rsa', 'SSH key type.')
 
 
-class RetryError(Exception):
+class RetryError(errors.Error):
   """Base class for retry errors."""
 
 
 class TimeoutExceededRetryError(RetryError):
   """Exception that is raised when a retryable function times out."""
+  STATUS = benchmark_status.FailedSubstatus.COMMAND_TIMEOUT
 
 
 class RetriesExceededRetryError(RetryError):
   """Exception that is raised when a retryable function hits its retry limit."""
+  STATUS = benchmark_status.FailedSubstatus.RETRIES_EXCEEDED
 
 
-class ImageNotFoundError(Exception):
+class ImageNotFoundError(errors.Error):
   """Exception that is raised when an image is not found."""
+  STATUS = benchmark_status.FailedSubstatus.UNSUPPORTED
 
 
 class IpAddressSubset:

@@ -37,11 +37,17 @@ class AzureVmScalingSet(managed_vm_group.BaseManagedVmGroup):
   def __init__(
       self,
       spec: vm_group_decoders.VmGroupSpec,
-      vm_config: virtual_machine.BaseVirtualMachine,
+      vm_configs: list[virtual_machine.BaseVirtualMachine],
   ):
-    super().__init__(spec, vm_config)
+    super().__init__(spec, vm_configs)
     self.vm_config: azure_virtual_machine.AzureVirtualMachine = cast(
         azure_virtual_machine.AzureVirtualMachine, self.vm_config
+    )
+    self.zoned_vm_configs: list[azure_virtual_machine.AzureVirtualMachine] = (
+        cast(
+            list[azure_virtual_machine.AzureVirtualMachine],
+            self.zoned_vm_configs,
+        )
     )
     # VMSS cannot use preconstructed NICs and IPs.
     # AFAICT there is no reason to pre-create them for VMs either.
@@ -92,7 +98,8 @@ class AzureVmScalingSet(managed_vm_group.BaseManagedVmGroup):
     )
 
     if self.vm_config.availability_zone:
-      cmd.extend(['--zones', self.vm_config.availability_zone])
+      zones = [vm.availability_zone for vm in self.zoned_vm_configs]
+      cmd.extend(['--zones', ','.join(zones)])
 
     if self.vm_config.boot_startup_script:
       cmd.extend(['--custom-data', self.vm_config.boot_startup_script])

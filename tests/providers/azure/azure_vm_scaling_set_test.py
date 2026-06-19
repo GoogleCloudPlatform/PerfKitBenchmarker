@@ -69,7 +69,7 @@ class AzureVmScalingSetTest(pkb_common_test_case.PkbCommonTestCase):
             os_type='debian12',
             vm_spec={'Azure': {'machine_type': 'Standard_D2s_v5'}},
         ),
-        vm_config,
+        [vm_config],
     )
 
   @mock.patch.object(

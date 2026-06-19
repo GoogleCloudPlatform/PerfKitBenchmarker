@@ -292,15 +292,27 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         'create',
         '--resource-group',
         self.resource_group.name,
-        '--name',
-        self.instance_id,
-        '--rule-name',
-        'allow-all-ips',
+    ]
+    if self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_POSTGRES:
+      cmd.extend([
+          '--server-name',
+          self.instance_id,
+          '--name',
+          'allow-all-ips',
+      ])
+    else:
+      cmd.extend([
+          '--name',
+          self.instance_id,
+          '--rule-name',
+          'allow-all-ips',
+      ])
+    cmd.extend([
         '--start-ip-address',
         ip,
         '--end-ip-address',
         ip,
-    ]
+    ])
     vm_util.IssueCommand(cmd)
 
   def SetDbConfiguration(self, name: str, value: str) -> Tuple[str, str, int]:
@@ -325,7 +337,7 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         value,
         '--resource-group',
         self.resource_group.name,
-        '--server',
+        '--server-name',
         self.instance_id,
     ]
     return vm_util.IssueCommand(cmd, raise_on_failure=False)

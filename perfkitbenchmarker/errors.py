@@ -15,10 +15,13 @@
 """A common location for all perfkitbenchmarker-defined exceptions."""
 
 import pprint
+from typing import Type
+
+from perfkitbenchmarker import benchmark_status
 
 
 class Error(Exception):
-  pass
+  STATUS = benchmark_status.FailedSubstatus.UNCATEGORIZED
 
 
 class Setup:
@@ -187,10 +190,12 @@ class Benchmarks:
     pass
 
   class InsufficientCapacityCloudFailure(Error):
-    pass
+    STATUS = benchmark_status.FailedSubstatus.INSUFFICIENT_CAPACITY
 
   class QuotaFailure(Error):
     """Errors that are related to insufficient quota on cloud provider."""
+
+    STATUS = benchmark_status.FailedSubstatus.QUOTA
 
     class RateLimitExceededError(Error):
       pass
@@ -202,13 +207,15 @@ class Benchmarks:
     recommended that the benchmark be completely re-run.
     """
 
+    STATUS = benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT
+
   class UnsupportedConfigError(Error):
     """Errors due to an unsupported configuration running.
 
     This is a retryable error when --zone=any.
     """
 
-    pass
+    STATUS = benchmark_status.FailedSubstatus.UNSUPPORTED
 
 
 class Resource:
@@ -226,7 +233,7 @@ class Resource:
     resource (probably by rerunning the benchmark).
     """
 
-    pass
+    STATUS = benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT
 
   class CleanupError(Error):
     pass
@@ -256,17 +263,17 @@ class Resource:
   class RestoreError(Error):
     """Errors while restoring a resource."""
 
-    pass
+    STATUS = benchmark_status.FailedSubstatus.RESTORE_FAILED
 
   class FreezeError(Error):
     """Errors while freezing a resource."""
 
-    pass
+    STATUS = benchmark_status.FailedSubstatus.FREEZE_FAILED
 
   class ProvisionTimeoutError(Error):
     """Timeout errors while provisioning a resource."""
 
-    pass
+    STATUS = benchmark_status.FailedSubstatus.KNOWN_INTERMITTENT
 
 
 class Config:
@@ -275,7 +282,7 @@ class Config:
   class InvalidValue(Error):
     """User provided an invalid value for a config option."""
 
-    pass
+    STATUS = benchmark_status.FailedSubstatus.INVALID_VALUE
 
   class MissingOption(Error):
     """User did not provide a value for a required config option."""
@@ -301,3 +308,48 @@ class Juju:
 
   class UnitErrorException(Error):
     pass
+
+
+def _GetAllErrorSubclasses(cls: Type[Error]) -> list[Type[Error]]:
+  """Recursively finds all subclasses of Error."""
+  subclasses = []
+  for subclass in cls.__subclasses__():
+    subclasses.append(subclass)
+    subclasses.extend(_GetAllErrorSubclasses(subclass))
+  return subclasses
+
+
+def GetBenchmarkStatusFromException(
+    e: BaseException,
+) -> str:
+  """Returns the benchmark status from the exception.
+
+  When exceptions happen on on background theads (e.g. CreationInternalError on
+  CreateAndBootVm) they are not propogated as exceptions to the caller, instead
+  they are propagated as text inside a wrapper exception such as
+  errors.VmUtil.ThreadException.
+
+  Args:
+    e: The exception instance to inspect.
+
+  Returns:
+    The benchmark status of the exception or its wrapped exception.
+  """
+  if isinstance(e, KeyboardInterrupt) or KeyboardInterrupt.__name__ in str(e):
+    return benchmark_status.FailedSubstatus.PROCESS_KILLED
+
+  if (
+      isinstance(e, Error)
+      and e.STATUS != benchmark_status.FailedSubstatus.UNCATEGORIZED
+  ):
+    return e.STATUS
+
+  e_str = str(e)
+  for cls in _GetAllErrorSubclasses(Error):
+    if (
+        cls.STATUS != benchmark_status.FailedSubstatus.UNCATEGORIZED
+        and cls.__name__ in e_str
+    ):
+      return cls.STATUS
+
+  return benchmark_status.FailedSubstatus.UNCATEGORIZED

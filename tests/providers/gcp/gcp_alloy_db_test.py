@@ -51,7 +51,7 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
     self.enter_context(flagsaver.flagsaver(alloydb_read_pool_node_count=0))
 
     self.mock_cmd = mock.Mock()
-    self.enter_context(
+    self.mock_get_cmd = self.enter_context(
         mock.patch.object(
             gcp_alloy_db.GCPAlloyRelationalDb,
             '_GetAlloyDbCommand',
@@ -166,6 +166,158 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
         'Command failed',
     ):
       self.db._Create()
+
+  def testUpdateAlloyDBFlagsEnabledNoOtherFlags(self):
+    self.mock_cmd.Issue.return_value = ('', '', 0)
+    self.db.enable_columnar_engine = True
+
+    self.db.UpdateAlloyDBFlags()
+
+    # Assert _GetAlloyDbCommand was called with expected arguments
+    self.mock_get_cmd.assert_called_once()
+    cmd_args = self.mock_get_cmd.call_args[0][0]
+    with self.subTest(msg='Command structure'):
+      self.assertIn('instances', cmd_args)
+      self.assertIn('update', cmd_args)
+
+    # Find the --database-flags argument
+    db_flags_arg = next(
+        arg for arg in cmd_args if arg.startswith('--database-flags=')
+    )
+    with self.subTest(msg='google_columnar_engine.enabled'):
+      self.assertIn('google_columnar_engine.enabled=on', db_flags_arg)
+    with self.subTest(msg='google_columnar_engine.memory_size_in_mb'):
+      self.assertNotIn(
+          'google_columnar_engine.memory_size_in_mb=', db_flags_arg
+      )
+    with self.subTest(msg='google_columnar_engine.enable_auto_columnarization'):
+      self.assertNotIn(
+          'google_columnar_engine.enable_auto_columnarization=', db_flags_arg
+      )
+    with self.subTest(
+        msg='google_columnar_engine.enable_columnar_recommendation'
+    ):
+      self.assertNotIn(
+          'google_columnar_engine.enable_columnar_recommendation=',
+          db_flags_arg,
+      )
+    with self.subTest(msg='google_columnar_engine.enable_index_caching'):
+      self.assertNotIn(
+          'google_columnar_engine.enable_index_caching=', db_flags_arg
+      )
+    with self.subTest(msg='google_columnar_engine.relations'):
+      self.assertNotIn('google_columnar_engine.relations=', db_flags_arg)
+
+  def testUpdateAlloyDBFlagsEnabledAllFlagsEnabled(self):
+    self.mock_cmd.Issue.return_value = ('', '', 0)
+    self.db.enable_columnar_engine = True
+
+    self.db.UpdateAlloyDBFlags(
+        columnar_engine_size=1024,
+        enable_columnar_recommendation=True,
+        enable_auto_columnarization=True,
+        enable_index_caching=True,
+        relation='relation_name',
+    )
+
+    # Assert _GetAlloyDbCommand was called with expected arguments
+    self.mock_get_cmd.assert_called_once()
+    cmd_args = self.mock_get_cmd.call_args[0][0]
+    with self.subTest(msg='Command structure'):
+      self.assertIn('instances', cmd_args)
+      self.assertIn('update', cmd_args)
+
+    # Find the --database-flags argument
+    db_flags_arg = next(
+        arg for arg in cmd_args if arg.startswith('--database-flags=')
+    )
+    with self.subTest(msg='google_columnar_engine.enabled'):
+      self.assertIn('google_columnar_engine.enabled=on', db_flags_arg)
+    with self.subTest(msg='google_columnar_engine.memory_size_in_mb'):
+      self.assertIn(
+          'google_columnar_engine.memory_size_in_mb=1024', db_flags_arg
+      )
+    with self.subTest(msg='google_columnar_engine.enable_auto_columnarization'):
+      self.assertIn(
+          'google_columnar_engine.enable_auto_columnarization=on', db_flags_arg
+      )
+    with self.subTest(
+        msg='google_columnar_engine.enable_columnar_recommendation'
+    ):
+      self.assertIn(
+          'google_columnar_engine.enable_columnar_recommendation=on',
+          db_flags_arg,
+      )
+    with self.subTest(msg='google_columnar_engine.enable_index_caching'):
+      self.assertIn(
+          'google_columnar_engine.enable_index_caching=on', db_flags_arg
+      )
+    with self.subTest(msg='google_columnar_engine.relations'):
+      self.assertIn(
+          'google_columnar_engine.relations=relation_name', db_flags_arg
+      )
+
+  def testUpdateAlloyDBFlagsEnabledAllFlagsDisabled(self):
+    self.mock_cmd.Issue.return_value = ('', '', 0)
+    self.db.enable_columnar_engine = True
+
+    self.db.UpdateAlloyDBFlags(
+        columnar_engine_size=None,
+        enable_columnar_recommendation=False,
+        enable_auto_columnarization=False,
+        enable_index_caching=False,
+        relation=None,
+    )
+
+    # Assert _GetAlloyDbCommand was called with expected arguments
+    self.mock_get_cmd.assert_called_once()
+    cmd_args = self.mock_get_cmd.call_args[0][0]
+    with self.subTest(msg='Command structure'):
+      self.assertIn('instances', cmd_args)
+      self.assertIn('update', cmd_args)
+
+    # Find the --database-flags argument
+    db_flags_arg = next(
+        arg for arg in cmd_args if arg.startswith('--database-flags=')
+    )
+    with self.subTest(msg='google_columnar_engine.enabled'):
+      self.assertIn('google_columnar_engine.enabled=on', db_flags_arg)
+    with self.subTest(msg='google_columnar_engine.memory_size_in_mb'):
+      self.assertNotIn(
+          'google_columnar_engine.memory_size_in_mb=', db_flags_arg
+      )
+    with self.subTest(msg='google_columnar_engine.enable_auto_columnarization'):
+      self.assertIn(
+          'google_columnar_engine.enable_auto_columnarization=off', db_flags_arg
+      )
+    with self.subTest(
+        msg='google_columnar_engine.enable_columnar_recommendation'
+    ):
+      self.assertIn(
+          'google_columnar_engine.enable_columnar_recommendation=off',
+          db_flags_arg,
+      )
+    with self.subTest(msg='google_columnar_engine.enable_index_caching'):
+      self.assertIn(
+          'google_columnar_engine.enable_index_caching=off', db_flags_arg
+      )
+    with self.subTest(msg='google_columnar_engine.relations'):
+      self.assertNotIn('google_columnar_engine.relations=', db_flags_arg)
+
+  def testUpdateAlloyDBFlagsDisabled(self):
+    self.mock_cmd.Issue.return_value = ('', '', 0)
+    self.db.enable_columnar_engine = False
+
+    self.db.UpdateAlloyDBFlags(
+        columnar_engine_size=1024,
+        enable_columnar_recommendation=True,
+        enable_auto_columnarization=True,
+        enable_index_caching=True,
+        relation='relation_name',
+    )
+
+    # Assert _GetAlloyDbCommand was not called as CE is disabled
+    self.mock_get_cmd.assert_not_called()
 
 
 if __name__ == '__main__':

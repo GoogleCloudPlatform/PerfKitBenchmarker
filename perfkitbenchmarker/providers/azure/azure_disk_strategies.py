@@ -177,15 +177,19 @@ class AzureSetUpLocalSSDDiskStrategy(disk_strategies.SetUpDiskStrategy):
     super().__init__(vm, disk_spec)
     self.vm = vm
     self.disk_spec = disk_spec
+    # parse serial numbers here
+    self.nvme_disk_serial_numbers = []
+    serial_mapping_exists = vm.TryRemoteCommand(
+        'test -e /dev/disk/azure/local/by-serial/'
+    )
+    if serial_mapping_exists:
+      stdout, _ = vm.RemoteHostCommand('ls /dev/disk/azure/local/by-serial/')
+      self.nvme_disk_serial_numbers = [
+          line.strip() for line in stdout.splitlines() if line.strip()
+      ]
 
   def SetUpDisk(self):
     disks = []
-
-    if self.vm.SupportsNVMe():
-      nvme_devices = self.vm.GetNVMEDeviceInfo()
-      if len(nvme_devices) == self.vm.max_local_disks + 1:
-        # boot disk is nvme, and boot disk takes position 0
-        next(self.vm.lun_counter)
 
     for _ in range(self.disk_spec.num_striped_disks):
       data_disk = self._CreateLocalDisk()
@@ -213,8 +217,15 @@ class AzureSetUpLocalSSDDiskStrategy(disk_strategies.SetUpDiskStrategy):
     self.vm.local_disk_counter += 1
     if self.vm.local_disk_counter > self.vm.max_local_disks:
       raise errors.Error('Not enough local disks.')
-    lun = next(self.vm.lun_counter)
-    data_disk = azure_disk.AzureDisk(self.disk_spec, self.vm, lun)
+    # SCSI disks don't have a serial number, so we use 0.
+    disk_serial_number = (
+        self.nvme_disk_serial_numbers.pop(0)
+        if self.nvme_disk_serial_numbers
+        else None
+    )
+    data_disk = azure_disk.AzureLocalDisk(
+        self.disk_spec, self.vm, serial_number=disk_serial_number
+    )
     data_disk.disk_number = disk_number
     return data_disk
 

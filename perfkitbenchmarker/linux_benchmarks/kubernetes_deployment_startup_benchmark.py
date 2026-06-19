@@ -20,8 +20,8 @@ from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_benchmarks import kubernetes_scale_benchmark as ksb
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_conditions
 
 BENCHMARK_NAME = 'kubernetes_deployment_startup'
 BENCHMARK_CONFIG = """
@@ -97,7 +97,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   pod_name_to_start_end_times: dict[str, tuple[int, int]] = (
       collections.defaultdict(lambda: (0, 0))
   )
-  for c in ksb.GetStatusConditionsForResourceType('pod'):
+  for c in kubernetes_conditions.GetStatusConditionsForResourceType('pod'):
     if c.event == 'PodReadyToStartContainers':
       prev_end_time = pod_name_to_start_end_times[c.resource_name][1]
       pod_name_to_start_end_times[c.resource_name] = (

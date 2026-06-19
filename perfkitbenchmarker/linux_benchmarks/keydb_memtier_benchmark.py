@@ -131,7 +131,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
         '--cacert=ca.crt'
     )
   memtier.Load(
-      [client_vms[0]], bm_spec.keydb_endpoint_ip, keydb_server.DEFAULT_PORT
+      [client_vms[0]], [bm_spec.keydb_endpoint_ip], keydb_server.DEFAULT_PORT
   )
 
 
@@ -146,7 +146,7 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
 
   raw_results = memtier.RunOverAllThreadsPipelinesAndClients(
       client_vms,
-      bm_spec.keydb_endpoint_ip,
+      [bm_spec.keydb_endpoint_ip],
       [keydb_server.DEFAULT_PORT],
   )
   keydb_metadata = keydb_server.GetMetadata(server_vm)

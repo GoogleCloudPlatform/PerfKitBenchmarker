@@ -1,3 +1,4 @@
+import itertools
 import os
 import pickle
 import tempfile
@@ -113,6 +114,11 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         container_service_mock.CreateTestKubernetesCluster()
     )
 
+    self.enter_context(
+        mock.patch.object(time, 'time', side_effect=itertools.count(10, 10))
+    )
+    self.enter_context(mock.patch.object(time, 'sleep', autospec=True))
+
   @parameterized.parameters('created', 'configured')
   def test_apply_manifest_gets_deployment_name(self, suffix):
     self.MockIssueCommand(
@@ -218,9 +224,8 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
       ],
       autospec=True,
   )
-  @mock.patch.object(time, 'sleep', autospec=True)
   def test_retriable_kubectl_command_retries_on_retriable_error(
-      self, sleep_mock, issue_command_mock
+      self, issue_command_mock
   ):
     out, err, ret = kubectl.RunRetryableKubectlCommand(['get', 'pods'])
     self.assertEqual(out, 'pod1, pod2')

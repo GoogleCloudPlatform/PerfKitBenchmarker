@@ -2,14 +2,10 @@
 
 import collections
 from collections import abc
-import dataclasses
-import json
 import time
-from typing import Any
 
 from absl import flags
 from absl import logging
-from dateutil import parser
 import numpy as np
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
@@ -20,6 +16,7 @@ from perfkitbenchmarker.resources.container_service import container_cluster
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_conditions
 from perfkitbenchmarker.resources.container_service import kubernetes_events
 
 FLAGS = flags.FLAGS
@@ -427,110 +424,6 @@ def CheckForFailures(
   )
 
 
-@dataclasses.dataclass
-class KubernetesResourceStatusCondition:
-  """Stores the information of a Kubernetes resource status condition."""
-
-  resource_type: str
-  resource_name: str
-  epoch_time: int
-  event: str
-
-  @classmethod
-  def FromJsonPathResult(
-      cls, resource_type: str, resource_name: str, condition: dict[str, Any]
-  ) -> 'KubernetesResourceStatusCondition':
-    """Parses the json result of kubectl get."""
-    str_time = condition['lastTransitionTime']
-    return cls(
-        resource_type,
-        resource_name,
-        epoch_time=ConvertToEpochTime(str_time),
-        event=condition['type'],
-    )
-
-  @classmethod
-  def IsValid(cls, condition: dict[str, Any]) -> bool:
-    """Returns true if the resource condition is valid."""
-    return (
-        'lastTransitionTime' in condition
-        and condition['lastTransitionTime']
-        and 'type' in condition
-        and condition['type']
-    )
-
-
-# TODO: b/458122803 - refactor by moving to a common location (e.g.
-# resources/container_service modules)
-def GetStatusConditionsForResourceType(
-    resource_type: str,
-    resources_to_ignore: abc.Set[str] = frozenset(),
-) -> list[KubernetesResourceStatusCondition]:
-  """Returns the status conditions for a resource type.
-
-  Args:
-    resource_type: The type of the resource to get the status conditions for.
-    resources_to_ignore: A set of resource names to ignore.
-
-  Returns:
-    A list of status condition, where each condition is a dict with type &
-    lastTransitionTime.
-  """
-
-  # Use full JSON output to avoid invalid JSON when manually building from
-  # jsonpath with many resources or on connection reset (truncated output).
-  # Avoid logging huge JSON: kubernetes_scale uses num_replicas;
-  # kubernetes_node_scale uses kubernetes_scale_num_nodes for the
-  # same code path (get pod/node -o json).
-  stdout, _, _ = kubectl.RunKubectlCommand(
-      ['get', resource_type, '-o', 'json'],
-      timeout=60 * 5,  # 5 minutes for large clusters (e.g. 1000 pods)
-      suppress_logging=_ShouldSuppressLogging(),
-  )
-  data = json.loads(stdout)
-  name_to_conditions = {}
-  for item in data.get('items', []):
-    name = item.get('metadata', {}).get('name')
-    conditions = item.get('status', {}).get('conditions')
-    if name is not None and conditions is not None:
-      name_to_conditions[name] = conditions
-
-  for key in resources_to_ignore:
-    name_to_conditions.pop(key, None)
-
-  results = []
-  failures = []
-  for name in name_to_conditions:
-    for conditions in name_to_conditions[name]:
-      if not KubernetesResourceStatusCondition.IsValid(conditions):
-        failures.append(conditions)
-        continue
-      results.append(
-          KubernetesResourceStatusCondition.FromJsonPathResult(
-              resource_type, name, conditions
-          )
-      )
-
-  if failures:
-    unique_failures = set(frozenset(f.items()) for f in failures)
-    logging.warning(
-        'Failed to parse %d K8s conditions, with %d unique failures. Printing'
-        ' the first 5.',
-        len(failures),
-        len(unique_failures),
-    )
-    for failure in list(unique_failures)[:5]:
-      logging.warning('Failed to parse the condition: %s', failure)
-
-  return results
-
-
-def ConvertToEpochTime(timestamp: str) -> int:
-  """Converts a timestamp to epoch time."""
-  # Example: 2024-11-08T23:44:36Z
-  return int(parser.parse(timestamp).timestamp())
-
-
 def ParseStatusChanges(
     resource_type: str,
     start_time: float,
@@ -552,8 +445,12 @@ def ParseStatusChanges(
     A list of samples, with various percentiles for each status condition.
   """
 
-  conditions = GetStatusConditionsForResourceType(
-      resource_type, resources_to_ignore
+  conditions: list[kubernetes_conditions.KubernetesStatusCondition] = (
+      kubernetes_conditions.GetStatusConditionsForResourceType(
+          resource_type,
+          resources_to_ignore,
+          suppress_logging=_ShouldSuppressLogging(),
+      )
   )
   # Filter out conditions that are too early.
   conditions = [c for c in conditions if c.epoch_time >= start_time]
@@ -587,7 +484,7 @@ def ParseStatusChanges(
     return samples
 
   for condition in conditions:
-    metadata = {
+    metadata = condition.metadata | {
         'k8s_resource_name': condition.resource_name,
     }
     samples.append(

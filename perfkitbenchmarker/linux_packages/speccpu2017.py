@@ -15,6 +15,7 @@
 """Module containing installation functions for SPEC CPU 2017."""
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_packages import speccpu
 
 FLAGS = flags.FLAGS
@@ -48,7 +49,7 @@ _PACKAGE_NAME = 'speccpu2017'
 _MOUNT_DIR = 'cpu2017_mnt'
 _SPECCPU2017_DIR = 'cpu2017'
 _SPECCPU2017_TAR = 'cpu2017-1.1.8.tar.gz'
-_SPECCPU2017_ISO = 'cpu2017-1.1.8.iso'
+_SPECCPU2017_ISO = 'cpu2017-1.1.9.iso'
 _TAR_REQUIRED_MEMBERS = 'cpu2017', 'cpu2017/bin/runcpu'
 _LOG_FORMAT = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
 _DEFAULT_RUNSPEC_CONFIG = 'pkb-gcc-linux-x86.cfg'
@@ -62,6 +63,9 @@ PREPROVISIONED_DATA = {
     'cpu2017-1.1.8_aocc_full.tar.gz': None,  # AOCC (rate/speed)
     'cpu2017-1.1.8.tar.gz': None,  # spec v1.1.8
     'cpu2017-1.1.8_icc.tar.gz': None,  # ICC
+    _SPECCPU2017_ISO: (
+        '9b67bdf77cf749b96520a4ee4f1acb3cc5aeb87c89f0dbf3f0bc7f718ed1de09'
+    ),
 }
 
 
@@ -100,9 +104,14 @@ def Install(vm):
 
   # Updates SPECCPU 2017.
   # spec17 had several updates, hence let's ensure to run the latest version
-  vm.RemoteCommand(
-      'echo yes | {}/cpu2017/bin/runcpu --update'.format(vm.GetScratchDir())
+  stdout, _, retcode = vm.RemoteCommandWithReturnCode(
+      'echo yes | {}/cpu2017/bin/runcpu --update'.format(vm.GetScratchDir()),
+      ignore_failure=True,
   )
+  if retcode and 'No updates available' not in stdout:
+    raise errors.Benchmarks.PrepareException(
+        'Failed to update SPECCPU 2017. Error: %s' % stdout
+    )
 
 
 def AptInstall(vm):

@@ -8,6 +8,7 @@ range all src port 1234 1234 1234 0
 range all dst ip <DST_IP> <DST_IP> <DST_IP> 0.0.0.1
 range all dst mac <DST_MAC> <DST_MAC> <DST_MAC> 00:00:00:00:00:01
 range all dst port 5678 5678 5678 0
+range all size <PACKET_SIZE>
 clr
 # BEGIN_SENDER_CONFIG
 # Send an initial burst (one or a few packets suffice) to trigger the

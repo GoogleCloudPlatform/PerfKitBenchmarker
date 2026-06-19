@@ -1,12 +1,19 @@
+import os
+import tempfile
 import unittest
 
+from absl import flags
 from absl.testing import parameterized
 import mock
+from perfkitbenchmarker import object_storage_service
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.kubernetes import wg_serving_inference_server
 from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 _BENCHMARK_SPEC_YAML = """
 cluster_boot:
@@ -70,6 +77,18 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
         cluster=self.mock_cluster,
     )
 
+  def _CreateServer(self, catalog_components: str):
+    modified_spec = _BENCHMARK_SPEC_YAML.replace(
+        'catalog_components: 1-L4', f'catalog_components: {catalog_components}'
+    )
+    config_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        modified_spec
+    )
+    return wg_serving_inference_server.WGServingInferenceServer(
+        spec=config_spec.config.container_cluster.inference_server,
+        cluster=self.mock_cluster,
+    )
+
   @parameterized.parameters(
       dict(
           catalog_components='v6e-2x2',
@@ -91,6 +110,21 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
           expected_accelerator_type='unknown',
           expected_accelerator_count=0,
       ),
+      dict(
+          catalog_components='1-Inf2',
+          expected_accelerator_type='Inf2',
+          expected_accelerator_count=1,
+      ),
+      dict(
+          catalog_components='1-Inf2,s3',
+          expected_accelerator_type='Inf2',
+          expected_accelerator_count=1,
+      ),
+      dict(
+          catalog_components='16-Trn2',
+          expected_accelerator_type='Trn2',
+          expected_accelerator_count=16,
+      ),
   )
   def testMetadataAcceleratorType(
       self,
@@ -98,16 +132,7 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
       expected_accelerator_type,
       expected_accelerator_count,
   ):
-    modified_spec = _BENCHMARK_SPEC_YAML.replace(
-        'catalog_components: 1-L4', f'catalog_components: {catalog_components}'
-    )
-    self.config_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
-        modified_spec
-    )
-    self.server = wg_serving_inference_server.WGServingInferenceServer(
-        spec=self.config_spec.config.container_cluster.inference_server,
-        cluster=self.mock_cluster,
-    )
+    self.server = self._CreateServer(catalog_components)
     metadata = self.server.GetResourceMetadata()
     self.assertEqual(metadata['accelerator_type'], expected_accelerator_type)
     self.assertEqual(metadata['accelerator_count'], expected_accelerator_count)
@@ -158,9 +183,46 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
     manifest = self.server._GetInferenceServerManifest()
     self.assertIn('runtimeClassName: test-runtime', manifest)
     self.assertIn('kind: Deployment', manifest)
+    _, apply_kwargs = apply_manifest_mock.call_args
+    self.assertIn('--provider gke', apply_kwargs['generate_args'])
     delete_resource_mock.assert_called_with(
         'job/test-job', ignore_not_found=True
     )
+
+  @mock.patch.object(
+      kubernetes_commands,
+      'ApplyManifest',
+      return_value=['job/test-job'],
+  )
+  @mock.patch.object(
+      kubernetes_commands,
+      'RetryableGetPodNameFromJob',
+      return_value='test-pod',
+  )
+  @mock.patch.object(
+      kubernetes_commands,
+      'GetFileContentFromPod',
+      return_value=(_INFERENCE_SERVER_MANIFEST),
+  )
+  @mock.patch.object(kubernetes_commands, 'DeleteResource')
+  def testGetInferenceServerManifestCatalogProviderOverride(
+      self,
+      delete_resource_mock,
+      get_file_content_from_pod_mock,
+      retryable_get_pod_name_from_job_mock,
+      apply_manifest_mock,
+  ):
+    """Neuron catalog uses aws-neuron overlay; GPU uses aws."""
+    self.server.spec.model_server = 'vllm'
+    self.server.spec.model_name = 'llama3-8b'
+    self.server.spec.cloud = 'AWS'
+    self.server.spec.catalog_provider = 'aws-neuron'
+    self.server.spec.catalog_components = '1-Inf2,s3'
+    self.server.spec.extra_deployment_args = {}
+    self.server.spec.runtime_class_name = None
+    self.server._GetInferenceServerManifest()
+    _, apply_kwargs = apply_manifest_mock.call_args
+    self.assertIn('--provider aws-neuron', apply_kwargs['generate_args'])
 
   @parameterized.parameters(
       dict(
@@ -241,6 +303,96 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
       self.assertEqual(
           result.metadata.get(key), value, f'{description}: {key} mismatch'
       )
+
+  @parameterized.parameters(
+      dict(catalog_components='gcsfuse,1-L4', expected='gcsfuse'),
+      dict(catalog_components='1-Inf2,s3', expected='s3'),
+      dict(catalog_components='1-L4', expected='huggingface'),
+  )
+  def testGetStorageType(self, catalog_components, expected):
+    self.server.spec.catalog_components = catalog_components
+    self.assertEqual(self.server.GetStorageType(), expected)
+
+  @parameterized.parameters(
+      dict(
+          catalog_components='1-Inf2',
+          nodepool_name='neuron',
+          instance_families=['inf2'],
+          taint_key='aws.amazon.com/neuron',
+      ),
+      dict(
+          catalog_components='1-L4',
+          nodepool_name='gpu',
+          instance_families=['g6', 'p5'],
+          taint_key='nvidia.com/gpu',
+      ),
+  )
+  @mock.patch.object(kubernetes_commands, 'ApplyManifest')
+  def testProvisionGPUNodePoolAws(
+      self,
+      apply_manifest_mock,
+      catalog_components,
+      nodepool_name,
+      instance_families,
+      taint_key,
+  ):
+    server = self._CreateServer(catalog_components)
+    FLAGS.cloud = 'AWS'
+    server._ProvisionGPUNodePool()
+    apply_manifest_mock.assert_called_once()
+    args, kwargs = apply_manifest_mock.call_args
+    self.assertEqual(
+        args[0],
+        'container/kubernetes_ai_inference/aws-gpu-nodepool.yaml.j2',
+    )
+    self.assertEqual(kwargs['gpu_taint_key'], taint_key)
+    self.assertEqual(kwargs['gpu_instance_families'], instance_families)
+    self.assertEqual(kwargs['gpu_nodepool_name'], nodepool_name)
+
+  @parameterized.parameters(
+      dict(token='gs://bucket/path/to/token', expected_cloud='GCP'),
+      dict(token='s3://bucket/path/to/token', expected_cloud='AWS'),
+  )
+  @mock.patch.object(kubernetes_commands, 'ApplyManifest', return_value=[])
+  @mock.patch.object(object_storage_service, 'GetObjectStorageClass')
+  def testInjectDefaultHuggingfaceTokenSelectsCloud(
+      self,
+      get_storage_class_mock,
+      applymanifestmock,
+      token,
+      expected_cloud,
+  ):
+    tmp_dir = tempfile.mkdtemp()
+    self.addCleanup(lambda: os.path.exists(tmp_dir) and None)
+    secret_path = os.path.join(tmp_dir, 'hf_token.secret')
+    self.enter_context(
+        mock.patch.object(vm_util, 'PrependTempDir', return_value=secret_path)
+    )
+
+    storage_instance = mock.MagicMock()
+    get_storage_class_mock.return_value = mock.MagicMock(
+        return_value=storage_instance
+    )
+
+    def fakecopy(uri, dstpath):
+      del uri
+      with open(dstpath, 'w') as f:
+        f.write('hf_secret_value')
+
+    storage_instance.Copy.side_effect = fakecopy
+    self.server.huggingface_token = token
+    self.server._InjectDefaultHuggingfaceToken()
+    get_storage_class_mock.assert_called_once_with(expected_cloud)
+
+  @mock.patch.object(kubernetes_commands, 'ApplyManifest', return_value=[])
+  @mock.patch.object(object_storage_service, 'GetObjectStorageClass')
+  def testInjectDefaultHuggingfaceTokenRawTokenSkipsStorage(
+      self, get_storage_class_mock, applymanifestmock
+  ):
+    """Regression: hf_xxx tokens never touch the object-storage path."""
+    self.server.huggingface_token = 'hf_raw_token_value'
+    self.server._InjectDefaultHuggingfaceToken()
+    get_storage_class_mock.assert_not_called()
 
 
 if __name__ == '__main__':

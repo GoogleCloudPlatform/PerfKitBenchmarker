@@ -250,6 +250,11 @@ def _BuildStartCommand(vm, port: int) -> str:
       f'--port {port}',
       '--protected-mode no',
   ]
+  # Bind to all interfaces (0.0.0.0) only for multi-NIC setups to allow
+  # traffic from secondary NICs. Single-NIC setups keep the default flow
+  # as-is to avoid breaking existing tests.
+  if len(vm.GetInternalIPs()) > 1:
+    cmd_args.append('--bind 0.0.0.0')
   if CLUSTER_MODE.value:
     cmd_args += [
         '--cluster-enabled yes',
@@ -308,7 +313,8 @@ def Start(vm) -> None:
   """Start redis server process."""
   ports = GetRedisPorts(vm)
   for port in ports:
-    vm.RemoteCommand(_BuildStartCommand(vm, port))
+    cmd = _BuildStartCommand(vm, port)
+    vm.RemoteCommand(cmd)
     # The redis-server command starts in the background, so we need to wait for
     # it to be up before issuing commands to it.
     _WaitForRedisUp(vm, port)

@@ -3,14 +3,14 @@ from unittest import mock
 
 from absl.testing import flagsaver
 from perfkitbenchmarker import benchmark_spec
-from perfkitbenchmarker.linux_benchmarks.provisioning_benchmarks import provision_node_pools_benchmark
+from perfkitbenchmarker.linux_benchmarks.provisioning_benchmarks import provision_pools_benchmark
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from tests import pkb_common_test_case
 
 
-class ProvisionNodePoolsBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
+class ProvisionPoolsBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
@@ -45,11 +45,11 @@ class ProvisionNodePoolsBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   def test_IndividualChecks(self):
     self.setUpWithXNodes(20)
-    provision_node_pools_benchmark._AssertNodes(10, 10)
-    provision_node_pools_benchmark._AssertNodePools(self.cluster, 10, 10)
+    provision_pools_benchmark._AssertNodes(10, 10)
+    provision_pools_benchmark._AssertNodePools(self.cluster, 10, 10)
 
-  @flagsaver.flagsaver(provision_node_pools_init_batch=0)
-  @flagsaver.flagsaver(provision_node_pools_test_batch=10)
+  @flagsaver.flagsaver(provision_pools_init_batch=0)
+  @flagsaver.flagsaver(provision_pools_test_batch=10)
   def test_FullRun(self):
     self.setUpWithXNodes(10)
     b_spec = mock.create_autospec(benchmark_spec.BenchmarkSpec, instance=True)
@@ -57,7 +57,7 @@ class ProvisionNodePoolsBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     b_spec.container_specs = {
         'provisioning': mock.Mock(image='pkb_busybox')
     }
-    samples = provision_node_pools_benchmark.Run(b_spec)
+    samples = provision_pools_benchmark.Run(b_spec)
     metrics = [s.metric for s in samples]
     self.assertContainsSubset(
         [

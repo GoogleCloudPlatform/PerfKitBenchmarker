@@ -4,6 +4,7 @@ import pickle
 import unittest
 
 from absl import flags
+from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import errors
@@ -58,6 +59,8 @@ class GetResourceClassTest(pkb_common_test_case.PkbCommonTestCase):
 
 class NonFreezeRestoreResource(resource.BaseResource):
   """Dummy class that is missing _Freeze()/_Restore()/_UpdateTimeout()."""
+
+  RESOURCE_TYPE = 'NonFreezeRestoreResource'
 
   def _Create(self):
     pass

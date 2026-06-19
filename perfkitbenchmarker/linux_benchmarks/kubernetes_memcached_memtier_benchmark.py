@@ -177,7 +177,7 @@ def Run(bm_spec: _BenchmarkSpec):
   }
 
   samples = memtier.RunOverAllThreadsPipelinesAndClients(
-      [client], server_ip, [memcached_port]
+      [client], [server_ip], [memcached_port]
   )
   for sample in samples:
     sample.metadata.update(metadata)

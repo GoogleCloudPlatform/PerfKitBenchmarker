@@ -28,24 +28,19 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
 
   def __init__(self, cluster_spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(cluster_spec)
-    self.event_poller: kubernetes_events.KubernetesEventPoller | None = None
     self.cluster_spec = cluster_spec
-    self._InitializeEventPoller()
+    self.event_poller: kubernetes_events.KubernetesEventPoller = (
+        self._InitializeEventPoller()
+    )
     self.inference_server = (
         kubernetes_inference_server.GetKubernetesInferenceServer(
             cluster_spec.inference_server, self
         )
     )
 
-  def _InitializeEventPoller(self):
-    if not self.cluster_spec.poll_for_events:
-      return
-
-    def _GetEventsNoLogging():
-      return kubernetes_commands.GetEvents(suppress_logging=True)
-
-    self.event_poller = kubernetes_events.KubernetesEventPoller(
-        _GetEventsNoLogging
+  def _InitializeEventPoller(self) -> kubernetes_events.KubernetesEventPoller:
+    return kubernetes_events.KubernetesEventPoller(
+        lambda: kubernetes_commands.GetEvents(suppress_logging=True)
     )
 
   def Create(self, restore: bool = False) -> None:
@@ -55,7 +50,7 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
 
   def _PostCreate(self):
     super()._PostCreate()
-    if self.event_poller:
+    if self.cluster_spec.poll_for_events:
       self.event_poller.StartPolling()
 
   def Delete(self, freeze: bool = False) -> None:
@@ -67,15 +62,13 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     _DeleteAllFromDefaultNamespace()
 
   def _Delete(self):
-    if self.event_poller:
+    if self.cluster_spec.poll_for_events:
       self.event_poller.StopPolling()
     _DeleteAllFromDefaultNamespace()
 
   def GetEvents(self) -> set['kubernetes_events.KubernetesEvent']:
     """Gets the events for the cluster, including previously polled events."""
-    if self.event_poller:
-      return self.event_poller.GetEvents()
-    return kubernetes_commands.GetEvents()
+    return self.event_poller.GetEvents()
 
   def __getstate__(self):
     state = self.__dict__.copy()
@@ -85,7 +78,7 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
 
   def __setstate__(self, state):
     self.__dict__ = state
-    self._InitializeEventPoller()
+    self.event_poller = self._InitializeEventPoller()
 
   @functools.cached_property
   def k8s_version(self) -> str:

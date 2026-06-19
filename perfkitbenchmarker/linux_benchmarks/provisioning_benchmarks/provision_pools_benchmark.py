@@ -49,17 +49,17 @@ from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 INIT_BATCH_SIZE = flags.DEFINE_integer(
-    "provision_node_pools_init_batch",
+    "provision_pools_init_batch",
     100,
     "Number of node pools to create in the initial batch",
 )
 TEST_BATCH_SIZE = flags.DEFINE_integer(
-    "provision_node_pools_test_batch",
+    "provision_pools_test_batch",
     20,
     "Number of node pools to create in the test batch after the initial batch",
 )
 USE_GPU = flags.DEFINE_boolean(
-    "provision_node_pools_with_gpu",
+    "provision_pools_with_gpu",
     False,
     "Whether the node pools should use GPUs. Requires setting flag"
     "with GKE gpu limit --gke_max_accelerator='type=nvidia-tesla-t4,count=120'",

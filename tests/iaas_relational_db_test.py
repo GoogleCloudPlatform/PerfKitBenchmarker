@@ -453,6 +453,5 @@ class RelationalDbUnmanagedTestCase(pkb_common_test_case.PkbCommonTestCase):
       ]
       self.assertCountEqual(db.server_vm.RemoteCommand.call_args_list, command)
 
-
 if __name__ == '__main__':
   unittest.main()

@@ -245,7 +245,7 @@ class BenchmarkSpec:
     self.data_dir: str
     self.ckpt_dir: str
     # Used by redis_memtier and keydb_memtier
-    self.redis_endpoint_ip: str
+    self.redis_endpoint_ip: list[str]
     self.keydb_endpoint_ip: str
     # Used by mongodb_ycsb
     self.mongodb_url: str
@@ -823,13 +823,17 @@ class BenchmarkSpec:
     # If the VM group is managed, create a managed VM group and return.
     if is_managed:
       managed_vm_group_class = managed_vm_group.GetManagedVmGroupClass(cloud)
-      # TODO(pclay): support multiple zones:
-      if FLAGS.zone:
-        assert len(FLAGS.zone) == 1, 'Managed VM groups only support one zone.'
-        group_spec.vm_spec.zone = FLAGS.zone[0]
-      vm_config = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
+      zones = FLAGS.zone or [group_spec.vm_spec.zone]
+      vm_configs = []
+      # VM groups needs a VM for each zone to create subnets in each zone.
+      for zone in zones:
+        spec = copy.copy(group_spec.vm_spec)
+        spec.zone = zone
+        vm_config = self._CreateVirtualMachine(spec, os_type, cloud)
+        vm_config.zone = zone
+        vm_configs.append(vm_config)
       group = managed_vm_group_class(
-          group_spec, vm_config
+          group_spec, vm_configs
       )  # pytype: disable=not-instantiable
       self.managed_vm_groups[group_name] = group
       # Report resource provisioning times.
@@ -1244,6 +1248,11 @@ class BenchmarkSpec:
             'Got an exception deleting CapacityReservations. '
             'Attempting to continue tearing down.'
         )
+    if self.managed_vm_groups:
+      background_tasks.RunThreaded(
+          lambda vm_group: vm_group.Delete(),
+          list(self.managed_vm_groups.values())
+      )
 
     if self.vms:
       try:

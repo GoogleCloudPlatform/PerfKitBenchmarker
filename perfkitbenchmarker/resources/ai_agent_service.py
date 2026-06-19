@@ -42,9 +42,13 @@ class BaseAiAgentService(resource.BaseResource):
     self.client_vm.PushDataFile(config_local_path, client_vm_path)
 
   def UploadRunConfigToClientVm(
-      self, client_vm_path: str, output_dir: str, prompt_file: str
+      self,
+      client_vm_path: str,
+      output_dir: str,
+      prompt_file: str,
+      agent_config: dict[str, Any] | None = None,
   ) -> None:
-    config_dict = self._GetRunConfig(output_dir, prompt_file)
+    config_dict = self._GetRunConfig(output_dir, prompt_file, agent_config)
     config_str = yaml.safe_dump(config_dict)
     config_local_path = vm_util.WriteTemporaryFile(
         config_str, origin='run_config.yaml'
@@ -55,14 +59,21 @@ class BaseAiAgentService(resource.BaseResource):
   def _GetDeploymentConfig(self) -> dict[str, Any]:
     """Gets config dict for deployment/creation."""
 
-  def _GetRunConfig(self, output_dir: str, prompt_file: str) -> dict[str, Any]:
+  def _GetRunConfig(
+      self,
+      output_dir: str,
+      prompt_file: str,
+      agent_config: dict[str, Any] | None = None,
+  ) -> dict[str, Any]:
     """Gets config dict for running the agent."""
     return {
         'workload': self.spec.workload,
         'framework': self.spec.framework,
         'prompt_file': prompt_file,
         'output_dir': output_dir,
-        'agent_config': self.agent_config,
+        'agent_config': (
+            agent_config if agent_config is not None else self.agent_config
+        ),
     }
 
   def _CreateDependencies(self):
@@ -83,6 +94,7 @@ class BaseAiAgentService(resource.BaseResource):
       self,
       output_dir: str,
       prompt: str | None = None,
+      agent_config: dict[str, Any] | None = None,
   ) -> None:
     """Executes the agentic workload."""
 

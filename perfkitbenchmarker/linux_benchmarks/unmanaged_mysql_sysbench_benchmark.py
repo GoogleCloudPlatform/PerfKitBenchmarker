@@ -142,16 +142,22 @@ _OLTP_WRITE_ONLY = 'oltp_write_only'
 _OLTP = [_OLTP_READ_WRITE, _OLTP_READ_ONLY, _OLTP_WRITE_ONLY]
 
 
-def GetConfig(user_config):
+def GetConfig(user_config, benchmark_config=None, benchmark_name=None):
   """Get the benchmark config, applying user overrides.
 
   Args:
     user_config:
+    benchmark_config: Optional config string to override the default.
+    benchmark_name: Optional benchmark name to override the default.
 
   Returns:
     Benchmark config.
   """
-  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  if benchmark_config is None:
+    benchmark_config = BENCHMARK_CONFIG
+  if benchmark_name is None:
+    benchmark_name = BENCHMARK_NAME
+  config = configs.LoadConfig(benchmark_config, user_config, benchmark_name)
   # Instead of changing the default data dir of database in (multiple) configs,
   # Force the scratch disk as database default dir (simpler code).
   disk_spec = config['vm_groups']['server']['disk_spec']

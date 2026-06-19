@@ -116,15 +116,17 @@ class AwsAutoScalingGroup(managed_vm_group.BaseManagedVmGroup):
   def __init__(
       self,
       spec: vm_group_decoders.VmGroupSpec,
-      vm_config: virtual_machine.BaseVirtualMachine,
+      vm_configs: list[virtual_machine.BaseVirtualMachine],
   ):
-    super().__init__(spec, vm_config)
+    super().__init__(spec, vm_configs)
     self.vm_config: aws_virtual_machine.AwsVirtualMachine = cast(
         aws_virtual_machine.AwsVirtualMachine, self.vm_config
     )
+    self.zoned_vm_configs: list[aws_virtual_machine.AwsVirtualMachine] = cast(
+        list[aws_virtual_machine.AwsVirtualMachine], self.zoned_vm_configs
+    )
     self.name = self.vm_config.name
     self.region = self.vm_config.region
-    self.zone = self.vm_config.zone
 
     self.launch_template = AwsLaunchTemplate(self.vm_config, name=self.name)
     self.base_cmd = util.AWS_PREFIX + ['autoscaling', '--region', self.region]
@@ -134,7 +136,9 @@ class AwsAutoScalingGroup(managed_vm_group.BaseManagedVmGroup):
     self.launch_template.Create()
 
   def _Create(self):
-    subnets = self.vm_config.network.subnet.id
+    subnets = []
+    for vm in self.zoned_vm_configs:
+      subnets.append(vm.network.subnet.id)
     cmd = self.base_cmd + [
         'create-auto-scaling-group',
         '--auto-scaling-group-name',
@@ -150,7 +154,7 @@ class AwsAutoScalingGroup(managed_vm_group.BaseManagedVmGroup):
         '--desired-capacity',
         str(self.vm_count),
         '--vpc-zone-identifier',
-        subnets,
+        ','.join(subnets),
     ]
     if self.vm_config.aws_tags:
       cmd.append('--tags')

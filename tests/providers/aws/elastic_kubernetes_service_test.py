@@ -7,6 +7,7 @@ from urllib import parse
 from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import network
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec
@@ -14,6 +15,7 @@ from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import elastic_kubernetes_service
 from perfkitbenchmarker.providers.aws import util
 from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from tests import matchers
 from tests import pkb_common_test_case
 
@@ -337,7 +339,10 @@ class EksAutoClusterTest(BaseEksTest):
     cluster._Create()
     assert self.patched_read_json is not None
     called_json = self.patched_read_json.call_args_list[0][0][0]
-    self.assertEqual(called_json['autoModeConfig'], {'enabled': True})
+    self.assertEqual(
+        called_json['autoModeConfig'],
+        {'enabled': True, 'nodePools': ['general-purpose', 'system']},
+    )
 
   def testEksClusterIsReady(self):
     self.enter_context(
@@ -358,6 +363,73 @@ class EksAutoClusterTest(BaseEksTest):
     )
     cluster = elastic_kubernetes_service.EksAutoCluster(EKS_SPEC)
     self.assertTrue(cluster._IsReady())
+
+
+class InferenceS3StorageTest(BaseEksTest):
+  """Tests S3 PV/PVC apply for kubernetes_ai_inference on AWS."""
+
+  @mock.patch.object(kubernetes_commands, 'ApplyManifest')
+  def testApplyInferenceS3PvAndPvcRaisesWhenFlagsMissing(
+      self, apply_manifest_mock
+  ):
+    with flagsaver.flagsaver(
+        k8s_inference_server_s3_bucket=None,
+        k8s_inference_server_s3_region=None,
+    ):
+      with self.assertRaises(errors.Resource.CreationError):
+        elastic_kubernetes_service.ApplyInferenceS3PvAndPvc()
+    apply_manifest_mock.assert_not_called()
+
+  @mock.patch.object(kubernetes_commands, 'ApplyManifest')
+  def testApplyInferenceS3PvAndPvcRendersTemplate(self, apply_manifest_mock):
+    with flagsaver.flagsaver(
+        k8s_inference_server_s3_bucket='my-bucket',
+        k8s_inference_server_s3_region='us-east-1',
+    ):
+      elastic_kubernetes_service.ApplyInferenceS3PvAndPvc()
+    apply_manifest_mock.assert_called_once_with(
+        'container/kubernetes_ai_inference/s3_pv_pvc.yaml.j2',
+        s3_bucket='my-bucket',
+        s3_region='us-east-1',
+    )
+
+
+class EksAutoClusterS3CsiTest(BaseEksTest):
+  """Tests S3 CSI addon installation with IAM glue (Role/Policy + PIA)."""
+
+  def setUp(self):
+    super().setUp()
+    self.mock_retryable = self.enter_context(
+        mock.patch.object(
+            vm_util, 'IssueRetryableCommand', return_value=('', '', 0)
+        )
+    )
+
+  def testInstallS3CsiAddonRequiresBucket(self):
+    cluster = elastic_kubernetes_service.EksAutoCluster(EKS_SPEC)
+    with self.assertRaises(errors.Config.InvalidValue):
+      cluster._InstallS3CsiAddon()
+
+  @flagsaver.flagsaver(k8s_inference_server_s3_bucket='my-bucket')
+  def testInstallS3CsiAddonIssuesAllCommands(self):
+    mock_cmd = self.MockIssueCommand({})
+    cluster = elastic_kubernetes_service.EksAutoCluster(EKS_SPEC)
+    cluster._InstallS3CsiAddon()
+
+    # create-addon + wait addon-active = 2 retryable calls.
+    self.assertEqual(self.mock_retryable.call_count, 2)
+    # IAM glue + Pod Identity Association are issued via IssueCommand.
+    self.assertIn('iam create-policy', mock_cmd.all_commands)
+    self.assertIn('iam create-role', mock_cmd.all_commands)
+    self.assertIn('iam attach-role-policy', mock_cmd.all_commands)
+    self.assertIn('create-pod-identity-association', mock_cmd.all_commands)
+    # Policy is scoped to the requested bucket.
+    self.assertIn('PkbS3CsiDriverReadOnly-my-bucket', mock_cmd.all_commands)
+    self.assertIn('arn:aws:s3:::my-bucket', mock_cmd.all_commands)
+    # Role ARN is constructed from account + role name (no get-role call).
+    self.assertIn(
+        'arn:aws:iam::1234:role/PkbS3CsiDriverRole', mock_cmd.all_commands
+    )
 
 
 class EksKarpenterTest(BaseEksTest):

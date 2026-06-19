@@ -284,10 +284,13 @@
 -   Re-enable support for Rocky Linux 8, 9, and 10 for the Azure provider.
 -   Add Ubuntu 26.04 support for GCP, AWS, and Azure Providers.
 -   Add a kubernetes-native benchmark for MySQL using sysbench
+-   Add `kafka_benchmark` support.
 
 ### Enhancements:
 
 -   Add numactl and perf support to netperf for analysis
+-   Add support for multi-NIC setups in Redis Memtier benchmark to distribute
+    load across multiple network interfaces.
 -   Additions to MongoDB in Artemis/PKB to facilitate workload analysis
 -   Updated `sar` switch to efficiently collect all sar metrics during the run,
     and download the file for hands-on analysis (no parsing).
@@ -464,9 +467,12 @@
     creation can be retried on stock outs.
 -   Add support for deploying VMs inside managed VM groups with
     `--use_managed_vm_groups`.
+-   Add support for configuring IMDSv2 Http Tokens on AWS VMs via
+    `aws_metadata_http_tokens`.
 
 ### Bug fixes and maintenance updates:
 
+-   Update `sysbench_thread_init_timeout` default to 180 seconds.
 -   Add 'runcpu --update' and 'runcpu --version' commands to install phase.
 -   Set the command to download preprovisioned data to be robust and have a five
     minute timeout.
@@ -676,3 +682,4 @@
 -   Set firewall rule as PKB-created before deletion when using
     --gce_firewall_rules_clean_all.
 -   Added gke_kubernetes_nginx to default benchmark config.
+-   Added gke_kubernetes_redis_memtier to default benchmark config.
