@@ -158,6 +158,49 @@ _FIO_RUNTIME_SEC = flags.DEFINE_integer(
 )
 
 
+_STRESS_TIMEOUT_SEC = flags.DEFINE_integer(
+    'swap_encryption_stress_timeout_sec',
+    300,
+    'Duration in seconds of each stress-ng memory-pressure phase.',
+)
+
+
+_STRESS_VM_BYTES = flags.DEFINE_string(
+    'swap_encryption_stress_vm_bytes',
+    '28G',
+    'Combined stress-ng working-set size (total in-flight footprint, not '
+    'per-worker).  It is divided equally across --swap_encryption_stress_vm_'
+    'workers before being passed to stress-ng, so the total memory touched '
+    'equals this value.  Should exceed node RAM to force kernel swapping.',
+)
+
+
+_STRESS_VM_BYTES_LIST = flags.DEFINE_string(
+    'swap_encryption_stress_vm_bytes_list',
+    '',
+    'Comma-separated list of stress-ng --vm-bytes values to iterate over '
+    'in Phase 2a CPU-overhead sweeps, e.g. "14G,21G,28G".  When non-empty '
+    'this overrides --swap_encryption_stress_vm_bytes and Phase 2a is run '
+    'once per entry so that the swap-pressure intensity curve is captured.',
+)
+
+
+_STRESS_VM_WORKERS = flags.DEFINE_integer(
+    'swap_encryption_stress_vm_workers',
+    4,
+    'Number of parallel stress-ng --vm workers for Phase 2a.  The total '
+    'working set (the autoscaled vm_bytes) is divided equally across workers, '
+    'so the combined footprint stays under RAM+swap (no OOM) while exceeding '
+    'RAM (forcing swap).  Multiple workers are needed for fill speed — a '
+    'single write64 worker cannot dirty enough memory within the timeout to '
+    'reach RAM (run swap1: ~184 GB resident, no swap).  To stop the N '
+    'workers\' resident sets from collapsing to one worker\'s share, the '
+    'stressor uses random access (rand-set) and disables KSM page-merging '
+    '(without those, identical write64 pages across workers were merged, '
+    'leaving only ~vm_bytes/N resident and swap_out ~0).',
+)
+
+
 _ENABLE_ZSWAP = flags.DEFINE_boolean(
     'swap_encryption_enable_zswap',
     False,
@@ -248,6 +291,19 @@ _PHASES = flags.DEFINE_list(
     'Example: --swap_encryption_phases=2a runs only the swap-pressure phase. '
     'Phases not listed are skipped and do not affect the degraded-run gate '
     '(e.g. skipping fio will not be reported as "Gate 1 produced no samples").',
+)
+
+
+_MIN_SWAP_OUT_PAGES = flags.DEFINE_integer(
+    'swap_encryption_min_swap_out_pages',
+    1000,
+    'Minimum peak swap-out rate (pages/s) that Phase 2a must reach for the run '
+    'to count as a real swap-encryption measurement.  Below this the working '
+    'set never meaningfully paged (e.g. run swap1 peaked at 176 pages/s of '
+    'noise yet "passed" the old zero-only gate), so the dm-crypt overhead is '
+    'hollow and the run is flagged degraded.  A genuinely swapping run peaks in '
+    'the tens-to-hundreds of thousands of pages/s.  Set 0 to accept any '
+    'non-zero swap-out (legacy behaviour).',
 )
 
 
@@ -373,6 +429,9 @@ _DS_LABEL = 'pkb-swap-benchmark'
 _active_pod: list[str] = []  # single-element list so closures can mutate it
 
 
+_stress_vm_method: list[str] = []  # single-element list; '' means no --vm-method flag
+
+
 _degraded_reasons: list[str] = []
 
 
@@ -397,6 +456,15 @@ _FIO_JOBS = (
     ('lat_write', 'randwrite', '4k', 1, 'Random write latency'),
     ('lat_read', 'randread', '4k', 1, 'Random read latency'),
 )
+
+
+_VMSTAT_LOG = '/tmp/pkb_vmstat.log'
+
+
+_PIDSTAT_LOG = '/tmp/pkb_pidstat.log'
+
+
+_CRYPTO_PROCS = ('kswapd', 'kworker', 'kcryptd', 'dmcrypt_write')
 
 
 def _daemonset_yaml(image: str) -> str:
@@ -611,6 +679,22 @@ def Run(spec) -> list[sample.Sample]:
   else:
     logging.info('[swap_encryption] Skipping Tier 1 (fio) — not selected by '
                  '--swap_encryption_phases=%s', ','.join(_PHASES.value))
+
+  # ── Tier 2 / Gate 2: stress-ng CPU overhead + I/O interference ───────────
+  if _phase_selected('2a') or _phase_selected('2b'):
+    logging.info('[swap_encryption] ── Tier 2 / Gate 2: stress-ng phases ──')
+    try:
+      if _phase_selected('2a'):
+        logging.info('[swap_encryption] Phase 2a: CPU overhead')
+        results += _phase2a_cpu_overhead(pod, base_meta)
+      if _phase_selected('2b'):
+        logging.info('[swap_encryption] Phase 2b: I/O interference')
+        results += _phase2b_io_interference(pod, base_meta)
+    except Exception as e:  # pylint: disable=broad-except
+      logging.error('[swap_encryption] Gate 2 FAILED — stress phase error: %s',
+                    e)
+      logging.warning('[swap_encryption] Proceeding to Tier 3 (workloads are '
+                      'independent of stress-ng results)')
 
   # ── Cost estimate ─────────────────────────────────────────────────────────
   if _COLLECT_COST.value:
@@ -2510,6 +2594,727 @@ def _parse_fio_json(
           sample.Sample(
               f'{job_name}_{direction}_lat_p999', lat_p999, 'us', m),
       ]
+  return results
+
+
+def _parse_vm_bytes_to_mb(vm_bytes: str) -> float:
+  """Parse a vm-bytes string like '28G', '512M', '1024k' into megabytes."""
+  vm_bytes = vm_bytes.strip()
+  if not vm_bytes:
+    return 0.0
+  suffix = vm_bytes[-1].upper()
+  try:
+    value = float(vm_bytes[:-1])
+  except ValueError:
+    return 0.0
+  if suffix == 'G':
+    return value * 1024.0
+  elif suffix == 'M':
+    return value
+  elif suffix == 'K':
+    return value / 1024.0
+  elif suffix == 'T':
+    return value * 1024.0 * 1024.0
+  else:
+    # Assume bytes
+    try:
+      return float(vm_bytes) / (1024.0 * 1024.0)
+    except ValueError:
+      return 0.0
+
+
+def _per_worker_vm_bytes(total_vm_bytes: str, workers: int) -> str:
+  """Split a *total* vm-bytes target across N stress-ng --vm workers.
+
+  stress-ng allocates ``--vm-bytes`` PER worker, so ``--vm N --vm-bytes B``
+  touches ``N * B`` of memory.  Every vm_bytes value in this benchmark (the
+  --swap_encryption_stress_vm_bytes flag and the _autoscale_vm_bytes result)
+  represents the intended *combined* footprint, as documented on
+  --swap_encryption_stress_vm_workers ("workers divide vm_bytes equally ...
+  the combined in-flight footprint equals vm_bytes").  We therefore divide by
+  the worker count before handing the value to stress-ng; otherwise N>1
+  workers allocate N x the target and the kernel OOM-kills the whole pod
+  (observed as stress-ng rc=137, after which all later phases fail with
+  "pods not found").
+
+  Returns a stress-ng-friendly ``<int>M`` string (megabytes), floored to at
+  least 1M.
+  """
+  workers = max(1, int(workers))
+  total_mb = _parse_vm_bytes_to_mb(total_vm_bytes)
+  if total_mb <= 0:
+    # Unparseable — fall back to letting stress-ng divide nothing rather than
+    # silently changing behaviour; the caller's value is passed through.
+    return total_vm_bytes
+  per_worker_mb = max(1, int(total_mb / workers))
+  return f'{per_worker_mb}M'
+
+
+def _cgroup_swap_limit_mb(pod: str) -> float:
+  """Return the swap budget (in MB) that the benchmark cgroup can actually use.
+
+  GKE sets the per-container cgroup v2 ``memory.swap.max`` to 0, so even though
+  the node advertises a large swap device the container cannot page anything
+  out.  Sizing stress-ng against the *node* swap total in that case guarantees
+  an OOM kill.  This probe finds the swap budget of *our* cgroup so the caller
+  can size against reality.
+
+  We locate our own cgroup from the host-mounted /sys by finding the
+  ``cgroup.procs`` file that lists this shell's PID — ``hostPID: true`` means
+  ``$$`` is a host-namespace PID that appears in those files, and the
+  kubectl-exec'd shell shares the container's cgroup with stress-ng.
+
+  Returns:
+    ``float('inf')`` when swap is uncapped (``max``); the limit in MB when
+    capped to a finite value; ``0.0`` when swap is fully locked
+    (``memory.swap.max == 0``); ``-1.0`` when the limit could not be read (the
+    caller then falls back to the legacy node-total behaviour).
+  """
+  probe = textwrap.dedent("""
+    mypid=$$
+    for procf in $(find /sys/fs/cgroup -path '*kubepods*' -name cgroup.procs 2>/dev/null)
+    do
+      if grep -qx "$mypid" "$procf" 2>/dev/null
+      then
+        d=$(dirname "$procf")
+        if [ -f "$d/memory.swap.max" ]
+        then
+          echo "V2=$(cat "$d/memory.swap.max" 2>/dev/null)"
+        elif [ -f "$d/memory.memsw.limit_in_bytes" ] && [ -f "$d/memory.limit_in_bytes" ]
+        then
+          echo "MEMSW=$(cat "$d/memory.memsw.limit_in_bytes" 2>/dev/null) MEM=$(cat "$d/memory.limit_in_bytes" 2>/dev/null)"
+        fi
+        break
+      fi
+    done
+  """)
+  try:
+    out, _ = _pod_exec(pod, probe, timeout=20, ignore_failure=True)
+  except Exception as e:  # pylint: disable=broad-except
+    logging.warning('[swap_encryption] cgroup swap-limit probe failed: %s', e)
+    return -1.0
+
+  text = (out or '').strip()
+  m = re.search(r'V2=(\S+)', text)
+  if m:
+    val = m.group(1)
+    if val == 'max':
+      return float('inf')
+    try:
+      return int(val) / (1024.0 * 1024.0)
+    except ValueError:
+      return -1.0
+  # cgroup v1: the combined RAM+swap ceiling is memsw; swap budget = memsw-mem.
+  m = re.search(r'MEMSW=(\S+)\s+MEM=(\S+)', text)
+  if m:
+    try:
+      memsw = int(m.group(1))
+      mem = int(m.group(2))
+    except ValueError:
+      return -1.0
+    # A near-2^63 sentinel means "unlimited" in cgroup v1.
+    if memsw >= (1 << 62):
+      return float('inf')
+    return max(0.0, (memsw - mem) / (1024.0 * 1024.0))
+  return -1.0
+
+
+def _autoscale_vm_bytes(pod: str, vm_bytes: str) -> str:
+  """Ensure vm_bytes forces real swap I/O without hard-crashing the container.
+
+  Strategy
+  --------
+  We want stress-ng to overflow into swap so that dm-crypt / Nitro encryption
+  overhead is actually measured.  Two competing constraints apply:
+
+  1. vm_bytes must exceed available RAM so that anonymous pages are paged out
+     to the swap device.  A value below ~95 % of RAM fits entirely in memory
+     and produces swap_out_pages_per_sec = 0 (benchmark defeats itself).
+
+  2. vm_bytes must not be so large that the kernel OOM-kills the whole
+     container before any meaningful swap activity is recorded.
+
+  Target formula
+  --------------
+  target = RAM + min(swap_size × 0.25, 64 GB)
+
+  This guarantees at least 25 % of the swap device is actively exercised
+  (measured swap I/O) while keeping the allocation safely within what the
+  kernel can page out given the available swap space.  The 64 GB cap prevents
+  extremely large targets on machines with huge swap devices.
+
+  On large-RAM machines (e.g. n4-highmem-32, 252 GB) the old 110%-of-RAM
+  formula only overflowed by ~25 GB; with sequential write64 patterns the
+  kernel handled that via LRU page eviction without actually hitting the swap
+  device, yielding swap_out = 0.  The new formula forces a much larger working
+  set into swap.
+
+  Hard ceiling
+  ------------
+  Regardless of the formula, cap at RAM + swap_size - 4 GB (4 GB headroom)
+  to avoid exhausting the swap device and triggering kernel panics.
+  """
+  try:
+    meminfo_out, _ = _pod_exec(pod, 'cat /proc/meminfo', timeout=15)
+    node_ram_kb = 0
+    swap_total_kb = 0
+    for line in meminfo_out.splitlines():
+      if line.startswith('MemTotal:'):
+        parts = line.split()
+        if len(parts) >= 2:
+          node_ram_kb = int(parts[1])
+      elif line.startswith('SwapTotal:'):
+        parts = line.split()
+        if len(parts) >= 2:
+          swap_total_kb = int(parts[1])
+      if node_ram_kb and swap_total_kb:
+        break
+
+    if node_ram_kb <= 0:
+      logging.warning('[swap_encryption] Could not read MemTotal; using vm_bytes=%s', vm_bytes)
+      return vm_bytes
+
+    node_ram_mb = node_ram_kb / 1024.0
+    swap_total_mb = swap_total_kb / 1024.0
+    requested_mb = _parse_vm_bytes_to_mb(vm_bytes)
+    if requested_mb <= 0:
+      return vm_bytes
+
+    # The node may advertise a large SwapTotal while THIS cgroup is forbidden
+    # from using it (GKE sets memory.swap.max=0 per container).  Size against
+    # the swap the cgroup can actually reach, not the node total — otherwise a
+    # value like 32G OOM-kills the pod the instant it exceeds RAM.
+    cgroup_swap_mb = _cgroup_swap_limit_mb(pod)
+    usable_swap_mb = swap_total_mb  # default / legacy when probe is inconclusive
+    if cgroup_swap_mb == 0.0:
+      # Swap is fully locked.  Cap the working set just under RAM so the pod
+      # survives, and mark the run degraded: swap-encryption overhead cannot be
+      # measured when the cgroup cannot page out.
+      safe_gb = max(1, int(node_ram_mb * 0.9 / 1024))
+      msg = (f'cgroup swap is locked (memory.swap.max=0); the '
+             f'{swap_total_mb/1024:.0f} GB node swap device is unreachable. '
+             f'Capping stress-ng vm_bytes {vm_bytes} → {safe_gb}G (0.9 x RAM) '
+             f'to keep the pod alive — swap-encryption overhead will NOT be '
+             f'measured this run')
+      logging.error('[swap_encryption] %s', msg)
+      _degraded_reasons.append(msg)
+      return f'{safe_gb}G'
+    if 0.0 < cgroup_swap_mb < float('inf'):
+      # cgroup permits a finite swap budget smaller than the device.
+      usable_swap_mb = min(swap_total_mb, cgroup_swap_mb)
+    # cgroup_swap_mb == inf -> swap fully usable (node total stands)
+    # cgroup_swap_mb == -1  -> undetermined; fall back to node total (legacy)
+
+    # Desired overflow: 25% of usable swap capped at 64 GB, minimum 4 GB.
+    overflow_mb = max(min(usable_swap_mb * 0.25, 64.0 * 1024), 4.0 * 1024)
+    target_mb = node_ram_mb + overflow_mb
+
+    # Hard ceiling: never exceed RAM + usable swap − 4 GB headroom.
+    if usable_swap_mb > 0:
+      ceiling_mb = node_ram_mb + usable_swap_mb - 4096.0
+      target_mb = min(target_mb, ceiling_mb)
+    else:
+      # No usable swap at all (and not the locked-at-0 case handled above):
+      # keep the working set just under RAM.
+      target_mb = min(target_mb, node_ram_mb * 0.9)
+
+    target_gb = max(1, int(target_mb / 1024))  # floor to GB for a clean flag
+
+    if requested_mb < node_ram_mb * 0.95:
+      new_vm_bytes = f'{target_gb}G'
+      logging.warning(
+          '[swap_encryption] Auto-scaling vm_bytes UP: %s → %s '
+          '(RAM %.0f GB, swap %.0f GB; original value would not trigger swap)',
+          vm_bytes, new_vm_bytes, node_ram_mb / 1024, swap_total_mb / 1024,
+      )
+      return new_vm_bytes
+
+    if requested_mb > target_mb:
+      new_vm_bytes = f'{target_gb}G'
+      logging.warning(
+          '[swap_encryption] Capping vm_bytes DOWN: %s → %s '
+          '(RAM %.0f GB, swap %.0f GB; original value risks swap exhaustion)',
+          vm_bytes, new_vm_bytes, node_ram_mb / 1024, swap_total_mb / 1024,
+      )
+      return new_vm_bytes
+
+    return vm_bytes
+  except Exception as e:  # pylint: disable=broad-except
+    logging.warning('[swap_encryption] _autoscale_vm_bytes failed (%s); using %s', e, vm_bytes)
+    return vm_bytes
+
+
+def _get_stress_vm_method(pod: str) -> str:
+  """Detect the best --vm-method argument for stress-ng on this node.
+
+  stress-ng vm-method support varies by version and distro:
+  - Older Ubuntu / some GKE images: supports 'mmap'
+  - Newer Ubuntu on n4-highmem-32 (kernel 6.8+ GKE): 'mmap' removed; supports
+    'write64', 'rand-set', etc.
+
+  We prefer 'mmap' (lowest overhead, no kernel structure cycling), fall back to
+  'write64' (simple sequential writes, universally available), then 'rand-set',
+  and if none are listed we return '' so callers omit the --vm-method flag
+  entirely (stress-ng then uses its compiled-in default).
+
+  NOTE on forcing swap (two independent requirements):
+  (a) The working set must exceed RAM.  Without --vm-keep each worker re-mmaps
+      and re-touches its full slice every iteration, so all
+      --swap_encryption_stress_vm_workers slices are simultaneously resident and
+      the combined footprint exceeds RAM (run 910c8da5 swapped ~10k pages/s with
+      write64 and no --vm-keep).  Adding --vm-keep made stress-ng reuse one
+      quiescent mapping, the resident set plateaued below RAM, and the gate
+      fired — so we must NOT pass --vm-keep.
+  (b) The workers must stay BUSY for the whole phase.  Do NOT pass --vm-hang 0:
+      stress-ng documents "--vm-hang 0" as "sleep for an INFINITE time before
+      unmapping", so each worker wrote its slice once and then slept for the
+      rest of the run — usr+sys CPU was ~10 s out of 300 s and si/so stayed 0
+      (runs 14907cff, config1/111, even with KSM disabled and rand-set).
+      Omitting --vm-hang entirely lets the workers loop continuously, keeping
+      the slices hot so the over-RAM remainder pages to swap throughout.
+
+  Result is cached in _stress_vm_method so the detection kubectl exec only runs
+  once per benchmark run.
+  """
+  if _stress_vm_method:
+    return _stress_vm_method[0]
+
+  try:
+    # stress-ng prints its valid vm-methods to stdout when given an invalid one.
+    out, _, _ = kubectl.RunKubectlCommand(
+        ['exec', (_active_pod[0] if _active_pod else pod),
+         '-n', _DS_NAMESPACE,
+         '--', 'bash', '-c',
+         'stress-ng --vm 1 --vm-bytes 1M --vm-method __invalid__ --timeout 1s 2>&1 || true'],
+        raise_on_failure=False, timeout=15,
+    )
+    combined = out.lower()
+    # Prefer rand-set: random access keeps every page of each worker's slice
+    # hot (no cold pages behind a sequential write pointer to reclaim) and
+    # writes non-identical data (so KSM cannot merge the workers' regions).
+    # write64 is sequential and was empirically reclaimed / merged, leaving the
+    # resident set below RAM and swap_out ~0.
+    if 'rand-set' in combined:
+      method = 'rand-set'
+    elif 'mmap' in combined:
+      method = 'mmap'
+    elif 'write64' in combined:
+      method = 'write64'
+    else:
+      method = ''  # omit flag; use stress-ng default
+    logging.info('[swap_encryption] stress-ng vm-method detected: %r', method or '(default)')
+  except Exception as e:  # pylint: disable=broad-except
+    logging.warning('[swap_encryption] vm-method detection failed (%s); using rand-set', e)
+    method = 'rand-set'
+
+  _stress_vm_method.append(method)
+  return method
+
+
+def _stress_vm_method_flag(pod: str) -> str:
+  """Return the --vm-method <method> flag string, or empty string if none."""
+  method = _get_stress_vm_method(pod)
+  return f'--vm-method {method}' if method else ''
+
+
+def _phase2a_cpu_overhead(pod: str, base_meta: dict) -> list[sample.Sample]:
+  """Measure CPU cost of dm-crypt / Nitro while stress-ng drives swap I/O.
+
+  If --swap_encryption_stress_vm_bytes_list is set the phase is run once per
+  listed intensity value so that a full pressure-curve is captured (gap 5).
+  Otherwise the single value from --swap_encryption_stress_vm_bytes is used.
+
+  Auto-scaling: if the requested vm_bytes is less than 95% of node RAM, it is
+  automatically increased to 110% of node RAM so that swap is actually
+  triggered on large-RAM machines (e.g. n4-highmem-32 with 256 GB).
+  """
+  # Build the list of vm-bytes intensities to sweep (gap 5)
+  if _STRESS_VM_BYTES_LIST.value.strip():
+    intensities = [v.strip() for v in _STRESS_VM_BYTES_LIST.value.split(',')
+                   if v.strip()]
+  else:
+    intensities = [_STRESS_VM_BYTES.value]
+
+  results = []
+  for vm_bytes in intensities:
+    scaled = _autoscale_vm_bytes(pod, vm_bytes)
+    logging.info('[swap_encryption] Phase 2a: stress-ng intensity %s', scaled)
+    results += _run_cpu_overhead_sweep(pod, base_meta, scaled)
+  return results
+
+
+def _run_cpu_overhead_sweep(
+    pod: str, base_meta: dict, vm_bytes: str
+) -> list[sample.Sample]:
+  """Phase 2a stressor sweep, WITH RETRY for flaky swap.
+
+  Driving the multi-worker rand-set working set past RAM into swap is
+  empirically non-deterministic on these nodes: the SAME config produced
+  ~670k pages/s on some runs and <300 on others.  So we retry: if an attempt
+  completes but peak swap-out is below the threshold (and it did not OOM),
+  reclaim memory and re-run, keeping the BEST attempt.  An OOM, or a peak
+  at/above threshold, ends the retries immediately.
+  """
+  meta = dict(base_meta, phase='cpu_overhead', stress_vm_bytes=vm_bytes)
+  timeout = _STRESS_TIMEOUT_SEC.value
+  interval = 2
+  n_samples = timeout // interval + 10
+  vmstat_log = f'/tmp/pkb_vmstat_{vm_bytes}.log'
+  pidstat_log = f'/tmp/pkb_pidstat_{vm_bytes}.log'
+  workers = max(1, _STRESS_VM_WORKERS.value)
+  per_worker = _per_worker_vm_bytes(vm_bytes, workers)
+  min_so = _MIN_SWAP_OUT_PAGES.value
+  method_flag = _stress_vm_method_flag(pod)
+  max_attempts = 3
+  best = None
+
+  for attempt in range(1, max_attempts + 1):
+    t0 = time.time()
+    stress_out, _ = _pod_exec(pod, textwrap.dedent(f"""
+      echo 2 > /sys/kernel/mm/ksm/run 2>/dev/null || true
+      echo 0 > /sys/kernel/mm/ksm/run 2>/dev/null || true
+      sysctl -w vm.swappiness=100 >/dev/null 2>&1 || true
+      PKB_MCG=$(awk -F: '/^0::/{{print $3}}' /proc/self/cgroup 2>/dev/null)
+      echo "[pkb] phase2a attempt={attempt}/{max_attempts} ksm_run=$(cat /sys/kernel/mm/ksm/run 2>/dev/null || echo n/a) swappiness=$(cat /proc/sys/vm/swappiness 2>/dev/null) MemAvailable_kB=$(awk '/MemAvailable/{{print $2}}' /proc/meminfo) memory.swap.max=$(cat /sys/fs/cgroup$PKB_MCG/memory.swap.max 2>/dev/null || echo n/a) workers={workers} per_worker={per_worker}"
+      vmstat {interval} {n_samples} > {vmstat_log} 2>&1 &
+      VMSTAT_PID=$!
+      pidstat -u {interval} {n_samples} -p ALL > {pidstat_log} 2>&1 &
+      PISTAT_PID=$!
+      stress-ng --vm {workers} \\
+        --vm-bytes {per_worker} \\
+        {method_flag} \\
+        --timeout {timeout}s \\
+        --metrics-brief 2>&1 || true
+      kill $VMSTAT_PID $PISTAT_PID 2>/dev/null || true
+    """), timeout=timeout + 60, ignore_failure=True)
+    elapsed = time.time() - t0
+
+    completed_cleanly = ('successful run completed' in stress_out.lower()
+                         or 'metrics-brief' in stress_out.lower()
+                         or 'bogo-ops' in stress_out.lower())
+    oom_killed = (not completed_cleanly) and elapsed < timeout * 0.8
+    vmstat_out, _ = _pod_exec(pod, f'cat {vmstat_log}', ignore_failure=True)
+    pidstat_out, _ = _pod_exec(pod, f'cat {pidstat_log}', ignore_failure=True)
+    vmstat_samples = _parse_vmstat(vmstat_out, meta)
+    swap_out_max = max(
+        (s.value for s in vmstat_samples
+         if s.metric in ('swap_out_pages_per_sec',
+                         'swap_out_pages_per_sec_max')), default=0.0)
+    bogo = None
+    for line in stress_out.splitlines():
+      mm = re.search(r'vm\s+\d+\s+(\d+)\s+\S+\s+bogo-ops', line)
+      if mm:
+        bogo = float(mm.group(1))
+        break
+    logging.info('[swap_encryption] Phase 2a attempt %d/%d: peak swap-out '
+                 '%.0f pages/s (completed=%s, oom=%s)', attempt, max_attempts,
+                 swap_out_max, completed_cleanly, oom_killed)
+    if best is None or swap_out_max > best['swap_out_max']:
+      best = dict(elapsed=elapsed, oom_killed=oom_killed,
+                  swap_out_max=swap_out_max, vmstat_samples=vmstat_samples,
+                  pidstat_out=pidstat_out, bogo=bogo)
+    if oom_killed or swap_out_max >= min_so:
+      break
+    if attempt < max_attempts:
+      logging.warning('[swap_encryption] Phase 2a swap-out %.0f < %d threshold '
+                      '— reclaiming and retrying (%d/%d)', swap_out_max, min_so,
+                      attempt + 1, max_attempts)
+      _pod_exec(pod, textwrap.dedent("""
+        echo -1000 > /proc/self/oom_score_adj 2>/dev/null || true
+        pkill -9 stress-ng 2>/dev/null || true
+        sleep 3; sync; echo 1 > /proc/sys/vm/drop_caches 2>/dev/null || true
+      """), ignore_failure=True, timeout=60)
+
+  # Emit samples from the BEST attempt.
+  results = [
+      sample.Sample('stress_ng_duration_sec', best['elapsed'], 's', meta),
+      sample.Sample('stress_ng_completed',
+                    0.0 if best['oom_killed'] else 1.0, 'status', meta),
+  ]
+  if best['bogo'] is not None:
+    results.append(sample.Sample('stress_ng_bogo_ops', best['bogo'], 'ops',
+                                 meta))
+  results += best['vmstat_samples']
+  results += _parse_pidstat(best['pidstat_out'], meta)
+
+  # Swap-activity gate: a completed run that moved ~no pages to swap never
+  # exercised the encrypted swap path (the headline numbers would be hollow).
+  if best['oom_killed']:
+    msg = (f'stress-ng (vm_bytes={vm_bytes}) was OOM-killed — the cgroup could '
+           f'not page anonymous memory out to swap; swap-encryption overhead '
+           f'was not measured')
+    logging.error('[swap_encryption] %s', msg)
+    _degraded_reasons.append(msg)
+  elif best['swap_out_max'] < min_so:
+    msg = (f'stress-ng (vm_bytes={vm_bytes}) peak swap-out was only '
+           f'{best["swap_out_max"]:.0f} pages/s (< {min_so} threshold) after '
+           f'{max_attempts} attempts — the working set never meaningfully '
+           f'paged to swap. Check vm_bytes vs RAM and the swap device')
+    logging.error('[swap_encryption] %s', msg)
+    _degraded_reasons.append(msg)
+
+  return results
+
+
+def _parse_vmstat(output: str, base_meta: dict) -> list[sample.Sample]:
+  """Parse vmstat output for swap rates AND CPU utilisation.
+
+  Standard vmstat column layout (non-header data lines, 0-indexed):
+    r b swpd free buff cache  si  so  bi  bo  in  cs  us  sy  id  wa  st
+    0 1    2    3    4     5   6   7   8   9  10  11  12  13  14  15  16
+
+  si=6, so=7  – swap-in / swap-out pages/s
+  us=12        – user CPU %
+  sy=13        – system (kernel) CPU %  ← gap 2: system time %
+  id=14        – idle CPU %
+  wa=15        – I/O wait CPU %
+  total_active = us + sy + wa          ← gap 1: total CPU utilisation
+  """
+  si_vals, so_vals = [], []
+  us_vals, sy_vals, wa_vals = [], [], []
+
+  for line in output.splitlines():
+    parts = line.split()
+    if len(parts) < 17 or not parts[0].isdigit():
+      continue
+    try:
+      si_vals.append(float(parts[6]))
+      so_vals.append(float(parts[7]))
+      us_vals.append(float(parts[12]))
+      sy_vals.append(float(parts[13]))
+      wa_vals.append(float(parts[15]))
+    except (ValueError, IndexError):
+      pass
+
+  if not si_vals:
+    return []
+
+  meta = dict(base_meta, metric_source='vmstat')
+
+  def _mean(lst):
+    return sum(lst) / len(lst) if lst else 0.0
+
+  def _peak(lst):
+    return max(lst) if lst else 0.0
+
+  total_active = [u + s + w for u, s, w in zip(us_vals, sy_vals, wa_vals)]
+
+  return [
+      # Swap rates
+      sample.Sample(
+          'swap_in_pages_per_sec', _mean(si_vals), 'pages/s', meta),
+      sample.Sample(
+          'swap_in_pages_per_sec_max', _peak(si_vals), 'pages/s', meta),
+      sample.Sample(
+          'swap_out_pages_per_sec', _mean(so_vals), 'pages/s', meta),
+      sample.Sample(
+          'swap_out_pages_per_sec_max', _peak(so_vals), 'pages/s', meta),
+      # Total CPU utilisation (gap 1)
+      sample.Sample(
+          'total_cpu_pct_avg', _mean(total_active), '%', meta),
+      sample.Sample(
+          'total_cpu_pct_max', _peak(total_active), '%', meta),
+      # System (kernel) time % – encryption overhead signal (gap 2)
+      sample.Sample('system_time_pct_avg', _mean(sy_vals), '%', meta),
+      sample.Sample('system_time_pct_max', _peak(sy_vals), '%', meta),
+      # User and I/O-wait for completeness
+      sample.Sample('user_cpu_pct_avg', _mean(us_vals), '%', meta),
+      sample.Sample('iowait_cpu_pct_avg', _mean(wa_vals), '%', meta),
+  ]
+
+
+def _parse_pidstat(output: str, base_meta: dict) -> list[sample.Sample]:
+  """Parse CPU % for swap/encryption-related kernel threads from pidstat."""
+  cpu_by_proc: dict[str, list[float]] = {}
+  for line in output.splitlines():
+    parts = line.split()
+    if len(parts) < 9:
+      continue
+    proc = parts[-1]
+    if not any(t in proc for t in _CRYPTO_PROCS):
+      continue
+    try:
+      cpu_by_proc.setdefault(proc, []).append(float(parts[7]))
+    except (ValueError, IndexError):
+      pass
+  results = []
+  meta = dict(base_meta, metric_source='pidstat')
+  for proc, vals in cpu_by_proc.items():
+    m = dict(meta, process=proc)
+    results += [
+        sample.Sample(f'cpu_pct_avg_{proc}', sum(vals) / len(vals), '%', m),
+        sample.Sample(f'cpu_pct_max_{proc}', max(vals), '%', m),
+    ]
+  return results
+
+
+def _launch_confined_bg_stress(pod: str, timeout_s: int, logfile: str) -> None:
+  """Launch the Phase 2b/3a background swap stressor confined to its OWN
+  memory-capped cgroup, so it drives swap pressure WITHOUT starving the
+  concurrent foreground workload (fio / Redis) or OOM-killing the pod.
+
+  On a small node (config1, 30 GB) a flat 32 GB stressor plus a concurrent
+  workload exhausts RAM faster than the kernel pages out, and the OOM killer
+  takes the foreground process (the under-pressure app_io fio died with
+  rc=137).  Confining the stressor to memory.max = 60% of RAM (with unlimited
+  swap) makes it page within its own budget; the other ~40% of RAM stays free
+  for the workload, and if the stressor overruns its cap only IT is killed —
+  never the pod or the workload.
+
+  Config-2 safety: on a 256 GB node, 60% = ~150 GB, far above the 32 GB
+  stressor, so the cap is never reached and behaviour is unchanged.
+  Best-effort: if the cgroup can't be created the stressor still runs in the
+  main cgroup (degrades to prior behaviour, not worse).  MemTotal is read with
+  grep/cut (no awk) to keep this clear of f-string brace escaping.
+  """
+  method = _stress_vm_method_flag(pod)
+  vm_bytes = _STRESS_VM_BYTES.value
+  _pod_exec(pod, textwrap.dedent(f"""
+    nohup bash -c '
+      BG=/sys/fs/cgroup/pkb_bgstress
+      mkdir -p "$BG" 2>/dev/null || true
+      echo +memory > /sys/fs/cgroup/cgroup.subtree_control 2>/dev/null || true
+      echo max > "$BG/memory.swap.max" 2>/dev/null || true
+      MT_KB=$(grep -m1 MemTotal /proc/meminfo | tr -s " " | cut -d" " -f2)
+      echo $(( MT_KB * 1024 * 60 / 100 )) > "$BG/memory.max" 2>/dev/null || true
+      echo $$ > "$BG/cgroup.procs" 2>/dev/null || true
+      exec stress-ng --vm 1 --vm-bytes {vm_bytes} {method} --timeout {timeout_s}s
+    ' >{logfile} 2>&1 &
+    disown
+    echo STRESS_STARTED
+  """), timeout=30)
+
+
+def _set_memory_high_guard(pod: str, fraction: float = 0.9) -> None:
+  """Cap the container cgroup ``memory.high`` at `fraction` x RAM.
+
+  Phases 2b (I/O interference) and 3a (Redis) run a background stressor *and* a
+  concurrent foreground workload (an 8 GB fio file / a Redis dataset).  On a
+  small-RAM node (config1, 30 GB) their combined footprint exceeds RAM and the
+  hard OOM killer (``memory.max``) terminates the pod (rc=137), wiping out both
+  phases.  ``memory.high`` is a soft limit: when the cgroup crosses it the
+  kernel reclaims and *swaps* aggressively (throttling the cgroup) instead of
+  killing it — which is exactly the swap pressure these phases want to create.
+
+  Config-2 safety: this is a no-op in effect on large-RAM nodes.  On
+  n4-highmem-32 (256 GB) the 32 GB background workload never approaches 0.9 x
+  256 GB = 230 GB, so the soft limit is never crossed and behaviour is
+  unchanged.  Phase 2a is deliberately NOT guarded (it works on both configs).
+  Best-effort; any failure is ignored.
+  """
+  _pod_exec(pod, textwrap.dedent(f"""
+    PKB_MCG=$(awk -F: '/^0::/{{print $3}}' /proc/self/cgroup 2>/dev/null)
+    MT_KB=$(awk '/MemTotal/{{print $2}}' /proc/meminfo)
+    HIGH=$(( MT_KB * 1024 / 100 * {int(fraction * 100)} ))
+    if [ -n "$PKB_MCG" ] && [ -f "/sys/fs/cgroup$PKB_MCG/memory.high" ]; then
+      echo $HIGH > "/sys/fs/cgroup$PKB_MCG/memory.high" 2>/dev/null \
+        && echo "[pkb] memory.high set to $HIGH bytes ({int(fraction * 100)}% RAM) — pod will swap, not OOM" \
+        || echo "[pkb] WARNING: could not set memory.high" >&2
+    fi
+  """), ignore_failure=True, timeout=30, _retries=0)
+
+
+def _reset_memory_high_guard(pod: str) -> None:
+  """Restore ``memory.high`` to ``max`` after a guarded phase."""
+  _pod_exec(pod, textwrap.dedent("""
+    PKB_MCG=$(awk -F: '/^0::/{print $3}' /proc/self/cgroup 2>/dev/null)
+    if [ -n "$PKB_MCG" ] && [ -f "/sys/fs/cgroup$PKB_MCG/memory.high" ]; then
+      echo max > "/sys/fs/cgroup$PKB_MCG/memory.high" 2>/dev/null || true
+    fi
+  """), ignore_failure=True, timeout=30, _retries=0)
+
+
+def _phase2b_io_interference(pod: str, base_meta: dict) -> list[sample.Sample]:
+  """Quantify drop in application I/O when swap is under simultaneous pressure."""
+  results = []
+  # IMPORTANT: keep this OFF tmpfs.  /tmp is RAM-backed (tmpfs/overlay), so an
+  # 8 GB fio file there consumes 8 GB of RAM and OOM-kills the pod on a small
+  # node (config1, rc=137 at "Laying out IO file") before any swap pressure is
+  # even applied.  /mnt/stateful_partition is the node's persistent boot disk
+  # (hostPath mount) — the file lives on disk, not RAM, and the fio results
+  # then measure real disk I/O under swap pressure, which is the intent.
+  app_file = '/mnt/stateful_partition/pkb_app_io'
+  timeout = _STRESS_TIMEOUT_SEC.value
+  meta = dict(base_meta, phase='io_interference')
+
+  # Relieve memory pressure via swap rather than the OOM killer (see helper).
+  # No-op on large-RAM nodes; prevents the config1 Phase 2b OOM (rc=137).
+  _set_memory_high_guard(pod)
+
+  # Ensure fio is available — apt-get may have failed during DaemonSet init.
+  _pod_exec(pod, textwrap.dedent("""
+    command -v fio >/dev/null 2>&1 || {
+      apt-get install -y -qq fio 2>/dev/null || true
+    }
+  """), ignore_failure=True, timeout=120)
+
+  # Reclaim node memory BEFORE creating the test file.  By this point Phase 2a
+  # has hard-swapped the node and Phase 3c's OpenSearch (which runs first) may
+  # have left a multi-GB JVM footprint; on a 30 GB node the file create then
+  # gets OOM-killed (rc=137) at the NODE level — which neither --direct=1 nor
+  # the cgroup memory.high guard can prevent (those are cgroup/page-cache
+  # tools, not node-eviction controls).  Kill any leftover stressors/servers,
+  # flush dirty pages, and drop caches so the node starts Phase 2b clean.
+  _pod_exec(pod, textwrap.dedent("""
+    pkill -9 stress-ng 2>/dev/null || true
+    pkill -9 -f 'opensearch|elasticsearch' 2>/dev/null || true
+    pkill -9 redis-server 2>/dev/null || true
+    sync
+    echo 3 > /proc/sys/vm/drop_caches 2>/dev/null || true
+    sleep 2
+    echo "[pkb] pre-2b MemAvailable_kB=$(awk '/MemAvailable/{print $2}' /proc/meminfo) SwapFree_kB=$(awk '/SwapFree/{print $2}' /proc/meminfo)"
+  """), ignore_failure=True, timeout=60)
+
+  # Create the test file on the persistent disk (see app_file note above).
+  # --direct=1 (O_DIRECT, ext4 supports it) bypasses the page cache.  Size is
+  # kept at 4 GB (not 8) so the create + the concurrent background stressor
+  # cannot exhaust a 30 GB node even with swap already in use.
+  _pod_exec(pod, (
+      f'fio --name=create --filename={app_file} '
+      f'--rw=write --bs=1m --size=4G --verify=0 --direct=1'
+  ), timeout=600, ignore_failure=True)
+
+  def _run_app_fio(pressure_label: str) -> list[sample.Sample]:
+    # --direct=1 (O_DIRECT) avoids page-cache buildup; ext4 on the persistent
+    # disk supports it.  --size=4G matches the file created above.  This
+    # measures the disk's I/O under swap pressure directly.
+    cmd = (
+        f'fio --name=app_io --filename={app_file} '
+        f'--ioengine=libaio --direct=1 '
+        f'--rw=randrw --bs=4k --iodepth=32 --size=4G --verify=0 '
+        f'--time_based --runtime=60s --output-format=json'
+    )
+    # ignore_failure=True: fio rc=137 is expected when the pod is OOM-evicted
+    # under heavy swap pressure.  _pod_exec handles recovery; callers rely on
+    # _parse_fio_json returning [] on empty/bad output rather than an exception.
+    out, _ = _pod_exec(pod, cmd, ignore_failure=True)
+    return _parse_fio_json(
+        out, 'app_io', f'App I/O ({pressure_label})',
+        dict(meta, pressure=pressure_label),
+    )
+
+  # 1. Baseline – no swap pressure
+  logging.info('[swap_encryption] I/O interference: baseline (no pressure)')
+  results += _run_app_fio('no_pressure')
+
+  # 2. Under swap pressure
+  # Use nohup + disown so bash exits immediately after launching stress-ng;
+  # otherwise kubectl exec keeps the session alive until stress-ng finishes
+  # (300 s) and PKB's IssueCommand times out.
+  logging.info('[swap_encryption] I/O interference: under swap pressure')
+  # Confined background stressor: pages within a 60%-RAM cgroup so it can't
+  # OOM the concurrent app_io fio on a small node (see helper).
+  _launch_confined_bg_stress(pod, timeout, '/tmp/pkb_stress_io.log')
+  time.sleep(10)  # let swap pressure build
+  results += _run_app_fio('with_swap_pressure')
+
+  # Stop background stress-ng.  If the pod was OOM-evicted while fio ran,
+  # stress-ng is already dead — kill is a no-op and we skip the long wait.
+  # _retries=0: no recovery here; the first Phase 3a command will recover
+  # the pod properly if needed (and it already waits for /tmp/pkb_ready).
+  _pod_exec(pod, 'pkill -9 stress-ng 2>/dev/null || true',
+            ignore_failure=True, _retries=0, timeout=15)
+  _reset_memory_high_guard(pod)
   return results
 
 
