@@ -151,6 +151,13 @@ _SWAP_TYPE = flags.DEFINE_enum(
 )
 
 
+_FIO_RUNTIME_SEC = flags.DEFINE_integer(
+    'swap_encryption_fio_runtime_sec',
+    60,
+    'Wall-clock runtime in seconds for each individual fio job.',
+)
+
+
 _ENABLE_ZSWAP = flags.DEFINE_boolean(
     'swap_encryption_enable_zswap',
     False,
@@ -381,6 +388,17 @@ _BENCHMARK_NODEPOOL = 'benchmark'
 _DEFAULT_NODEPOOL = 'default-pool'
 
 
+_FIO_JOBS = (
+    ('rand_write_iops', 'randwrite', '4k', 256, 'Random write IOPS'),
+    ('rand_read_iops', 'randread', '4k', 256, 'Random read IOPS'),
+    ('rand_rw_mixed', 'randrw', '4k', 256, 'Mixed random R/W (50/50)'),
+    ('seq_write_bw', 'write', '1m', 64, 'Sequential write bandwidth'),
+    ('seq_read_bw', 'read', '1m', 64, 'Sequential read bandwidth'),
+    ('lat_write', 'randwrite', '4k', 1, 'Random write latency'),
+    ('lat_read', 'randread', '4k', 1, 'Random read latency'),
+)
+
+
 def _daemonset_yaml(image: str) -> str:
   """Render the privileged benchmark DaemonSet manifest.
 
@@ -573,6 +591,27 @@ def Run(spec) -> list[sample.Sample]:
 
   logging.info('[swap_encryption] swap device: %s', swap_dev)
 
+  # ── Tier 1 / Gate 1: fio microbenchmarks ─────────────────────────────────
+  tier1_results = []
+  if _phase_selected('fio'):
+    logging.info(
+        '[swap_encryption] ── Tier 1 / Gate 1: fio microbenchmarks ──')
+    try:
+      tier1_results = _phase1_fio(pod, swap_dev, base_meta)
+      results += tier1_results
+    except Exception as e:  # pylint: disable=broad-except
+      logging.error('[swap_encryption] Gate 1 FAILED — fio phase error: %s', e)
+      logging.error('[swap_encryption] Skipping Tiers 2 and 3 (no swap device)')
+      return results
+
+    if not tier1_results:
+      logging.warning('[swap_encryption] Gate 1 produced no samples '
+                      '(loop-device skip or parse error) — '
+                      'continuing to Tier 2 with caution')
+  else:
+    logging.info('[swap_encryption] Skipping Tier 1 (fio) — not selected by '
+                 '--swap_encryption_phases=%s', ','.join(_PHASES.value))
+
   # ── Cost estimate ─────────────────────────────────────────────────────────
   if _COLLECT_COST.value:
     elapsed = time.time() - t_run_start
@@ -603,6 +642,22 @@ def Run(spec) -> list[sample.Sample]:
         f'{", ".join(_oom_events)} — a phase exceeded memory and was killed by '
         f'the OOM killer (the container may have restarted in place), so the '
         f'affected phase(s) produced no or partial data')
+
+  if _phase_selected('fio') and not tier1_results:
+    if swap_dev.startswith('/dev/loop'):
+      # Expected: COS blocks device-mapper from pod namespaces on single-disk
+      # nodes (n2/n4 without --swap_encryption_add_swap_disk or lssd).
+      # Tier 2/3 results are still valid; do NOT mark the run as degraded.
+      logging.warning(
+          '[swap_encryption] Gate 1 (fio) skipped — loop device %s has no '
+          'dm-crypt support from inside a pod.  Tier 2/3 results are valid. '
+          'Use c4-*-lssd or --swap_encryption_add_swap_disk for fio data.',
+          swap_dev)
+    else:
+      _degraded_reasons.append(
+          'Gate 1 (fio microbenchmarks) produced no samples — the raw swap '
+          'device was never characterised')
+
 
   degraded = bool(_degraded_reasons)
   results.append(sample.Sample(
@@ -2320,6 +2375,142 @@ def _enable_zswap(pod: str) -> None:
       'echo z3fold > /sys/module/zswap/parameters/zpool',
   ]:
     _pod_exec(pod, cmd, ignore_failure=True)
+
+
+def _phase1_fio(
+    pod: str, swap_dev: str, base_meta: dict
+) -> list[sample.Sample]:
+  """Run fio directly on the swap block device for raw I/O characterisation.
+
+  Skipped only for an UNINTENTIONAL loop fallback (a single-disk node with no
+  dedicated swap disk, where fio on the loop would measure the boot ext4
+  filesystem rather than the swap stack).  When the user explicitly selects the
+  boot_disk target (--swap_encryption_swap_type=boot_disk, methodology rows
+  1-4), the loop over the boot disk IS the device under test, so fio runs and
+  characterises it.
+
+  For dedicated second disks (hyperdisk, LSSD, NVMe) direct I/O is always
+  used and swap is restored (mkswap + swapon) after the fio run.
+  To get fio results use c4-*-lssd (local NVMe) or
+  --swap_encryption_add_swap_disk to provision a dedicated second disk.
+  """
+  if swap_dev.startswith('/dev/loop') and _SWAP_TYPE.value != 'boot_disk':
+    logging.warning(
+        '[swap_encryption] Phase 1 (fio) SKIPPED for plain loop device %s '
+        '(unintentional single-disk fallback). '
+        'fio on a loop-backed device measures the underlying ext4 filesystem '
+        '(stateful_partition), not the swap stack. '
+        'Use c4-*-lssd, --swap_encryption_add_swap_disk, or '
+        '--swap_encryption_swap_type=boot_disk for fio data.',
+        swap_dev,
+    )
+    return []
+
+  results = []
+
+  _pod_exec(pod, f'swapoff {swap_dev}', ignore_failure=True)
+
+  # Pre-fill device so read tests have real data (avoids zero-block optimisation
+  # by the storage controller skewing read latency measurements).
+  # Cap at 20 GiB — enough to warm up the dm-crypt pipeline and cover the fio
+  # runtime window.  Writing 100% of a 500 GiB hyperdisk takes ~500+ seconds
+  # at provisioned throughput, which exceeds the PKB command timeout.
+  # Timeout: 20 GiB / ~150 MB/s (conservative dm-crypt write rate) + 60 s buffer.
+  _PREFILL_GIB = 20
+  prefill_timeout = _PREFILL_GIB * 1024 // 150 + 60  # ~197 s, rounds up to ~200 s
+  prefill_timeout = max(prefill_timeout, 300)          # floor at 5 min
+  logging.info('[swap_encryption] Pre-filling %d GiB of %s', _PREFILL_GIB, swap_dev)
+  # No --output-format=json for prefill; we only care that it completes.
+  # Still use --output to avoid streaming large stdout over the websocket.
+  _pod_exec(pod, (
+      f'fio --name=prefill --filename={swap_dev} '
+      f'--ioengine=libaio --direct=1 --rw=write --bs=1m '
+      f'--size={_PREFILL_GIB}g --verify=0 --output=/tmp/pkb_fio_prefill.log'
+  ), timeout=prefill_timeout, ignore_failure=True)
+
+  # Each fio job: runtime + 90 s buffer (run + JSON write + file read).
+  # We write fio output to a file inside the pod and retrieve it in a second
+  # short-lived kubectl exec, because:
+  #   - A single 120 s kubectl exec session over GKE websocket can be reset
+  #     by the control-plane load balancer mid-stream ("connection reset by
+  #     peer"), losing the output.
+  #   - Separating the long run from the short file-read gives each exec a
+  #     much shorter window, avoiding the keepalive timeout.
+  fio_run_timeout = _FIO_RUNTIME_SEC.value + 90
+  fio_read_timeout = 60  # just a cat of the JSON file
+
+  for name, rw, bs, depth, label in _FIO_JOBS:
+    logging.info('[swap_encryption] fio: %s', name)
+    out_file = f'/tmp/pkb_fio_{name}.json'
+    # Remove any stale output first so a parse can never silently reuse a
+    # previous job's/run's result (rules out byte-identical results between
+    # runs being a caching artifact rather than a true device ceiling).
+    _pod_exec(pod, f'rm -f {out_file}', ignore_failure=True, _retries=0,
+              timeout=15)
+    run_cmd = (
+        f'fio --name={name} --filename={swap_dev} '
+        f'--ioengine=libaio --direct=1 --verify=0 --randrepeat=0 '
+        f'--bs={bs} --iodepth={depth} --rw={rw} '
+        f'--time_based --runtime={_FIO_RUNTIME_SEC.value}s '
+        f'--output-format=json --output={out_file}'
+    )
+    _, err = _pod_exec(pod, run_cmd, timeout=fio_run_timeout,
+                       ignore_failure=True, _retries=0)
+    if 'connection reset by peer' in err:
+      logging.warning('[swap_encryption] fio %s: kubectl exec connection '
+                      'reset; result may be incomplete', name)
+    out, _ = _pod_exec(pod, f'cat {out_file} 2>/dev/null || echo ""',
+                       timeout=fio_read_timeout, ignore_failure=True)
+    results += _parse_fio_json(out, name, label, base_meta)
+
+  # fio prefill overwrites the entire device, destroying the mkswap header.
+  # Re-stamp and re-enable before the remaining phases need active swap.
+  _pod_exec(pod, f'mkswap {swap_dev} && swapon {swap_dev}',
+           ignore_failure=True, timeout=120)
+  return results
+
+
+def _parse_fio_json(
+    stdout: str, job_name: str, label: str, base_meta: dict
+) -> list[sample.Sample]:
+  """Parse fio JSON output into PKB Samples."""
+  results = []
+  try:
+    data = json.loads(stdout)
+  except (json.JSONDecodeError, ValueError):
+    logging.warning('[swap_encryption] fio JSON parse failed for %s', job_name)
+    return results
+
+  meta = dict(base_meta, fio_job=job_name, fio_label=label)
+  for job in data.get('jobs', []):
+    for direction in ('read', 'write'):
+      d = job.get(direction, {})
+      if not d or d.get('io_bytes', 0) == 0:
+        continue
+      iops = float(d.get('iops', 0))
+      bw_kib = float(d.get('bw', 0))
+      clat = d.get('clat_ns', {})
+      pct = clat.get('percentile', {})
+      lat_mean = float(clat.get('mean', 0)) / 1000.0
+      lat_p50 = float(pct.get('50.000000', 0)) / 1000.0
+      lat_p99 = float(pct.get('99.000000', 0)) / 1000.0
+      lat_p999 = float(pct.get('99.900000', 0)) / 1000.0
+      m = dict(meta, direction=direction)
+      results += [
+          sample.Sample(
+              f'{job_name}_{direction}_iops', iops, 'iops', m),
+          sample.Sample(
+              f'{job_name}_{direction}_bw_mbps', bw_kib / 1024, 'MB/s', m),
+          sample.Sample(
+              f'{job_name}_{direction}_lat_mean', lat_mean, 'us', m),
+          sample.Sample(
+              f'{job_name}_{direction}_lat_p50', lat_p50, 'us', m),
+          sample.Sample(
+              f'{job_name}_{direction}_lat_p99', lat_p99, 'us', m),
+          sample.Sample(
+              f'{job_name}_{direction}_lat_p999', lat_p999, 'us', m),
+      ]
+  return results
 
 
 _INSTANCE_PRICE_USD_PER_HR: dict[str, float] = {
