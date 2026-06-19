@@ -117,6 +117,55 @@ swap_encryption:
 """
 
 
+_SWAP_DEVICE = flags.DEFINE_string(
+    'swap_encryption_device',
+    '',
+    'Explicit swap block-device path on the cluster node, e.g. '
+    '/dev/nvme1n1 or /dev/dm-0.  When empty the benchmark auto-detects '
+    'via /proc/swaps after setup.',
+)
+
+
+_SWAP_SIZE_GB = flags.DEFINE_integer(
+    'swap_encryption_swap_size_gb',
+    32,
+    'Size in GB of the swap space to configure on the node. '
+    'Ignored when a ready swap device already exists.',
+)
+
+
+_SWAP_TYPE = flags.DEFINE_enum(
+    'swap_encryption_swap_type',
+    'auto',
+    ['auto', 'hyperdisk', 'lssd', 'boot_disk', 'instance_store', 'io2'],
+    'Swap backing storage target, one per methodology test-matrix row:\n'
+    '  GKE:  boot_disk (swap file on the OS boot disk — pd-balanced or '
+    'hyperdisk-balanced, chosen via --swap_encryption_boot_disk_type),\n'
+    '        hyperdisk (dedicated hyperdisk-balanced data disk),\n'
+    '        lssd (dedicated Local SSD RAID-0).\n'
+    '  AWS:  instance_store (NVMe Instance Store, Nitro-encrypted),\n'
+    '        io2 (EBS io2 data/root volume).\n'
+    'dm-crypt is applied on the GKE targets when '
+    '--swap_encryption_enable_dmcrypt is set; AWS targets are encrypted by '
+    'Nitro at the hardware level.  auto = detect from cloud + instance type.',
+)
+
+
+_ENABLE_ZSWAP = flags.DEFINE_boolean(
+    'swap_encryption_enable_zswap',
+    False,
+    'Enable zswap (lz4 compressor, 20%% max pool) before running tests.',
+)
+
+
+_MIN_FREE_KBYTES = flags.DEFINE_integer(
+    'swap_encryption_min_free_kbytes',
+    65536,
+    'Value written to /proc/sys/vm/min_free_kbytes to trigger earlier '
+    'swapping. Set 0 to leave the kernel default unchanged.',
+)
+
+
 _DAEMONSET_IMAGE = flags.DEFINE_string(
     'swap_encryption_daemonset_image',
     'ubuntu:22.04',
@@ -147,6 +196,24 @@ _COLLECT_COST = flags.DEFINE_boolean(
     False,
     'When True, emit a cost_estimate_usd sample using on-demand pricing '
     'for the instance type detected at runtime.',
+)
+
+
+_IO2_ENCRYPTED = flags.DEFINE_boolean(
+    'swap_encryption_io2_encrypted',
+    True,
+    'When True (default), the dedicated io2 swap volume is created with EBS '
+    'encryption (Nitro/KMS) -> matrix row "io2 + hardware encryption". '
+    'Set False for the unencrypted io2 baseline row. Only applies when '
+    '--swap_encryption_swap_type=io2 on AWS/EKS.',
+)
+
+
+_IO2_KMS_KEY_ID = flags.DEFINE_string(
+    'swap_encryption_io2_kms_key_id',
+    '',
+    'Optional KMS key id/ARN for the encrypted io2 volume. Empty = the '
+    'account default aws/ebs key. Ignored unless io2_encrypted is True.',
 )
 
 
@@ -202,6 +269,15 @@ _LSSD_COUNT = flags.DEFINE_integer(
     'count for the chosen machine type: c4-standard-8-lssd=1, '
     'c4-standard-16-lssd=2, i4i.4xlarge has NVMe Instance Store (AWS).  '
     'Default 1 covers most single-lssd machine types.',
+)
+
+
+_ENABLE_DMCRYPT = flags.DEFINE_boolean(
+    'swap_encryption_enable_dmcrypt',
+    True,
+    'When True (default), configure dm-crypt on the swap device — the '
+    '"encryption enabled" column of the test matrix.  Set False to use '
+    'plain swap (encryption disabled column).',
 )
 
 
@@ -399,6 +475,55 @@ def Prepare(spec) -> None:
                  'after nodepool deletion')
     pod = _wait_for_benchmark_pod()
     logging.info('[swap_encryption] Benchmark pod (post-deletion): %s', pod)
+
+  # Tune kernel swap aggressiveness.
+  # vm.swappiness=100 (maximum): GKE nodes default to 0 (avoid swap, prefer
+  # OOM-kill).  At 60 the kernel still under-swapped on n4-highmem-32 — under
+  # cgroup-level memory pressure with ~160 GB node RAM free it would leave
+  # anonymous pages resident and record swap_out ~0 (run bb4a782d), making the
+  # result non-deterministic.  100 maximally biases the kernel toward paging
+  # anonymous pages out to the (encrypted) swap device, which is exactly the
+  # path this benchmark is meant to exercise.
+  _pod_exec(pod, 'sysctl -w vm.swappiness=100', ignore_failure=True)
+  if _MIN_FREE_KBYTES.value > 0:
+    _pod_exec(pod, f'sysctl -w vm.min_free_kbytes={_MIN_FREE_KBYTES.value}')
+
+  # Unlock container cgroup swap.
+  # GKE cgroup v2 sets memory.swap.max=0 per-container even when the node has
+  # a swap device.  This blocks swap for the container regardless of
+  # vm.swappiness.  Stress-ng gets OOM-killed in ~15s because the kernel can
+  # page out for this cgroup.  Set 'max' so the container can use all swap.
+  _pod_exec(pod, textwrap.dedent("""
+    PKB_CG=$(awk -F: '/^0::/{print $3; exit}' /proc/self/cgroup 2>/dev/null)
+    if [ -n "$PKB_CG" ] && [ -f "/sys/fs/cgroup${PKB_CG}/memory.swap.max" ]; then
+      echo max > "/sys/fs/cgroup${PKB_CG}/memory.swap.max" 2>/dev/null || true
+    fi
+    PKB_CG1=$(awk -F: '/:memory:/{print $3; exit}' /proc/self/cgroup 2>/dev/null)
+    if [ -n "$PKB_CG1" ] && \
+       [ -f "/sys/fs/cgroup/memory${PKB_CG1}/memory.memsw.limit_in_bytes" ]; then
+      echo -1 > "/sys/fs/cgroup/memory${PKB_CG1}/memory.memsw.limit_in_bytes" \
+        2>/dev/null || true
+    fi
+  """), ignore_failure=True)
+
+  # Enable zswap if requested
+  if _ENABLE_ZSWAP.value:
+    _enable_zswap(pod)
+
+  # Configure cloud-specific swap
+  cloud = _detect_cloud(pod)
+  logging.info('[swap_encryption] Detected cloud: %s', cloud)
+
+  if cloud == 'gcp':
+    _setup_gke_swap(pod)
+  elif cloud == 'aws':
+    _setup_eks_swap(pod)
+  else:
+    logging.warning(
+        '[swap_encryption] Unknown cloud – falling back to plain swapfile'
+    )
+    _setup_plain_swap_file(pod, _SWAP_SIZE_GB.value)
+
 
 
 def _phase_selected(token: str) -> bool:
@@ -1302,6 +1427,899 @@ def _recover_pod(pod: str, timeout_sec: int = 600) -> str:
   raise errors.VmUtil.IssueCommandError(
       f'[swap_encryption] Pod {recovered_pod} did not become ready '
       f'within {timeout_sec}s after OOM kill / eviction')
+
+
+def _detect_cloud(pod: str) -> str:
+  """Detect GCP vs AWS from DMI product info exposed via /sys hostPath mount.
+
+  DMI is the most reliable in-container detection method because it reads
+  directly from the host kernel's SMBIOS table via /sys (already mounted).
+  It avoids HTTP metadata endpoint quoting issues and network timeouts.
+
+  Falls back to metadata HTTP endpoints if DMI is inconclusive.
+  """
+  # Primary: DMI product name / vendor (available via /sys hostPath mount)
+  dmi_out, _ = _pod_exec(
+      pod,
+      'cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name '
+      '/sys/class/dmi/id/bios_vendor 2>/dev/null || echo ""',
+      ignore_failure=True,
+  )
+  dmi = dmi_out.strip().lower()
+  if 'google' in dmi:
+    logging.info(
+        '[swap_encryption] Cloud detected via DMI: gcp (%s)', dmi_out.strip())
+    return 'gcp'
+  if any(k in dmi for k in ('amazon', 'ec2', 'aws')):
+    logging.info(
+        '[swap_encryption] Cloud detected via DMI: aws (%s)', dmi_out.strip())
+    return 'aws'
+
+  # Secondary: GCP metadata endpoint.
+  # Use -H with no space after colon to avoid shell-quoting issues through
+  # the kubectl exec → bash -c pipeline.
+  gcp_out, _ = _pod_exec(
+      pod,
+      'curl -s -m 3 '
+      'http://metadata.google.internal/computeMetadata/v1/instance/zone '
+      '-H Metadata-Flavor:Google 2>/dev/null || echo ""',
+      ignore_failure=True,
+  )
+  if gcp_out.strip():
+    logging.info('[swap_encryption] Cloud detected via metadata: gcp')
+    return 'gcp'
+
+  # Tertiary: AWS IMDS (IMDSv2 token-based; IMDSv1 is often disabled).
+  aws_out, _ = _pod_exec(
+      pod,
+      'T=$(curl -s -m 3 -X PUT '
+      'http://169.254.169.254/latest/api/token '
+      '-H "X-aws-ec2-metadata-token-ttl-seconds: 60" 2>/dev/null); '
+      'curl -s -m 3 -H "X-aws-ec2-metadata-token: $T" '
+      'http://169.254.169.254/latest/meta-data/instance-id '
+      '2>/dev/null || echo ""',
+      ignore_failure=True,
+  )
+  if aws_out.strip():
+    logging.info('[swap_encryption] Cloud detected via IMDS: aws')
+    return 'aws'
+
+  logging.warning(
+      '[swap_encryption] Could not detect cloud from DMI or metadata')
+  return 'unknown'
+
+
+def _setup_gke_swap(pod: str) -> None:
+  """Configure dm-crypt swap on the GKE node, mirroring go/node:swap-encryption.
+
+  GKE nodes use dm-crypt with an ephemeral random key so that swap contents
+  are encrypted at rest without requiring persistent key management.
+  We replicate this exactly using cryptsetup in plain mode (no LUKS header).
+  """
+  swap_type = _SWAP_TYPE.value
+  if swap_type == 'auto':
+    # Check whether Local SSDs are present
+    lssd_out, _ = _pod_exec(
+        pod,
+        "lsblk -d -o NAME,MODEL | grep -i 'local\\|nvme' | "
+        "grep -v 'nvme0' | awk '{print $1}' | head -1",
+        ignore_failure=True,
+    )
+    swap_type = 'lssd' if lssd_out.strip() else 'hyperdisk'
+
+  if swap_type == 'lssd':
+    _setup_gke_lssd_swap(pod)
+  elif swap_type == 'boot_disk':
+    _setup_gke_bootdisk_swap(pod)
+  else:
+    _setup_gke_hyperdisk_swap(pod)
+
+
+def _setup_gke_hyperdisk_swap(pod: str) -> None:
+  """Configure dm-crypt swap on hyperdisk-balanced (GKE default).
+
+  Disk detection is split into two separate commands so that the boot-device
+  name is resolved first and then substituted as a literal string — nested
+  $() expansions inside a kubectl exec bash -c argument are unreliable.
+
+  If no dedicated data disk is attached (single-disk node) dm-crypt is set up
+  over a loop device backed by a file on the boot hyperdisk, which still
+  exercises the full encryption path on the same storage tier.
+  """
+  logging.info('[swap_encryption] GKE: setting up dm-crypt on hyperdisk')
+
+  # Step 1: identify the boot device name (e.g. "nvme0n1", "sda")
+  boot_out, _ = _pod_exec(
+      pod,
+      'lsblk -no pkname "$(findmnt -n -o SOURCE /)" 2>/dev/null | head -1',
+      ignore_failure=True,
+  )
+  boot_base = boot_out.strip() or 'nvme0n1'
+  logging.info('[swap_encryption] GKE: boot device: %s', boot_base)
+
+  # Step 2: find a non-boot disk using the literal name from step 1
+  disk_out, _ = _pod_exec(
+      pod,
+      f"lsblk -d -o NAME,TYPE | awk '$2==\"disk\"{{print $1}}' "
+      f"| grep -v '^{boot_base}$' | head -1",
+      ignore_failure=True,
+  )
+  disk_name = disk_out.strip()
+
+  if not disk_name:
+    logging.info(
+        '[swap_encryption] No dedicated data disk found – '
+        'falling back to loop device on /mnt/stateful_partition '
+        '(direct-io=on, dm-crypt=%s)', _ENABLE_DMCRYPT.value)
+    _setup_gke_loop_device_swap(pod)
+    return
+
+  disk = f'/dev/{disk_name}'
+  logging.info('[swap_encryption] GKE: swap target disk: %s  dmcrypt=%s',
+               disk, _ENABLE_DMCRYPT.value)
+
+  # Clean up any stale mapping from a previous failed run.
+  _pod_exec(pod, textwrap.dedent(f"""
+    swapoff /dev/mapper/swap_encrypted 2>/dev/null || true
+    dmsetup remove --noudevrules --noudevsync swap_encrypted 2>/dev/null || true
+    wipefs -a {disk} 2>/dev/null || true
+  """), ignore_failure=True)
+
+  if _ENABLE_DMCRYPT.value:
+    # We cannot use cryptsetup open from inside a container because
+    # libdevmapper calls dm_udev_wait() after creating the target, which
+    # blocks on /run/udev/control.  That socket belongs to udevd which is
+    # not running inside the container — so cryptsetup hangs forever.
+    #
+    # Instead we drive dmsetup directly with --noudevrules --noudevsync,
+    # which skips all udev synchronisation, and call dmsetup mknodes to
+    # ensure /dev/mapper/swap_encrypted appears without udev.
+    #
+    # insmod (not modprobe) loads the kernel module: modprobe also talks to
+    # systemd-udevd and can deadlock from a container for the same reason.
+    _pod_exec(pod, textwrap.dedent(f"""
+      grep -q dm_crypt /proc/modules 2>/dev/null || {{
+        KO=$(find /lib/modules/$(uname -r) -name 'dm-crypt.ko*' 2>/dev/null | head -1)
+        [ -n "$KO" ] && insmod "$KO" 2>/dev/null || true
+      }}
+      KEY=$(dd if=/dev/urandom bs=32 count=1 2>/dev/null | od -A n -t x1 | tr -d ' \\n')
+      SIZE=$(blockdev --getsz {disk})
+      printf "0 %s crypt aes-xts-plain64 %s 0 %s 0\\n" "$SIZE" "$KEY" "{disk}" | \\
+        dmsetup create swap_encrypted --noudevrules --noudevsync
+      unset KEY
+      dmsetup mknodes swap_encrypted 2>/dev/null || true
+      mkswap /dev/mapper/swap_encrypted
+      swapon /dev/mapper/swap_encrypted
+    """))
+    logging.info('[swap_encryption] GKE: dm-crypt swap active on '
+                 '/dev/mapper/swap_encrypted')
+  else:
+    # Encryption-disabled column of the test matrix
+    _pod_exec(pod, textwrap.dedent(f"""
+      mkswap {disk} && \\
+      swapon {disk}
+    """))
+    logging.info('[swap_encryption] GKE: plain (unencrypted) swap active '
+                 'on %s', disk)
+
+
+def _setup_gke_loop_device_swap(pod: str) -> None:
+  """Plain loop-device swap for single-disk GKE nodes (no dedicated swap disk).
+
+  Used when _setup_gke_hyperdisk_swap finds no dedicated second disk (e.g.
+  n2-highmem-32 / n4-highmem-32 single-boot-disk nodes, regardless of image
+  type).
+
+  dm-crypt is skipped on this path for two reasons:
+  1. On COS (Container-Optimised OS): the device-mapper kernel subsystem is
+     inaccessible from inside a Kubernetes pod (even privileged).  Calls to
+     cryptsetup/dmsetup block indefinitely and are killed by the PKB timeout.
+     This is a deliberate COS security restriction, not a permissions issue.
+  2. On UBUNTU_CONTAINERD: the loop device is created in the container
+     namespace; its behaviour under nsenter (needed for dm-crypt on dedicated
+     disks) is untested, so plain loop swap is used for safety.
+  For dedicated block devices (hyperdisk, LSSD) nsenter into the host mount
+  namespace works around the COS restriction (see _setup_gke_hyperdisk_swap).
+  The loop device path skips dm-crypt on all image types; plain loop swap is
+  used instead.
+
+  Therefore this path uses a plain loop device as swap without dm-crypt.
+  Phase 1 (fio) is skipped for plain loop devices — the goal is enc-on vs
+  enc-off comparison, and fio on a plain loop device measures the backing
+  filesystem rather than the swap stack.  Tiers 2–6 (stress-ng, Redis,
+  kernel build, OpenSearch) run normally.
+
+  For dm-crypt measurement on GCP use a machine type with local NVMe (LSSD)
+  or provision a dedicated hyperdisk on a second disk slot (n4-highmem-32+).
+
+  Improvements over the old /var path:
+  - Backing file on /mnt/stateful_partition (ext4), not the container
+    overlayfs — avoids overlayfs O_DIRECT limitation.
+  - losetup --direct-io=on passes I/O through to the host ext4, reducing
+    double-buffering for Tiers 2–6 workloads.
+  """
+  size_gb = _SWAP_SIZE_GB.value
+  # /mnt/stateful_partition is ext4 on COS (mounted from the stateful
+  # partition of the node's persistent disk).  It is NOT the container
+  # overlay filesystem and is mounted into the pod via the DaemonSet
+  # hostPath volume.
+  backing = '/mnt/stateful_partition/pkb_swap_backing'
+
+  # ── Step 0: detach any stale loop device from a previous failed run ───────
+  _pod_exec(pod, textwrap.dedent(f"""
+    losetup -j {backing} 2>/dev/null | awk -F: '{{print $1}}' | \
+      while read dev
+      do
+        swapoff "$dev" 2>/dev/null || true
+        losetup -d "$dev" 2>/dev/null || true
+      done
+    rm -f {backing}
+  """), ignore_failure=True)
+
+  # ── Step 1: allocate backing file on stateful partition (ext4) ───────────
+  logging.info(
+      '[swap_encryption] GKE: creating %dG backing file on stateful_partition',
+      size_gb)
+  # fallocate preallocates real ext4 blocks (avoids fragmentation during swap
+  # I/O); truncate is the sparse fallback for filesystems where fallocate
+  # fails.
+  _pod_exec(pod, textwrap.dedent(f"""
+    fallocate -l {size_gb}G {backing} 2>/dev/null || \\
+      truncate -s {size_gb}G {backing}
+  """))
+
+  # ── Step 2: loop device with direct-io passthrough ───────────────────────
+  # --direct-io=on lets the loop driver pass O_DIRECT to the host ext4,
+  # reducing double-buffering for workload I/O (kernel 5.x+, present on
+  # GKE COS ≥ 1.29).
+  loop_out, _ = _pod_exec(pod, textwrap.dedent(f"""
+    LOOP=$(losetup -f) && \\
+    losetup --direct-io=on "$LOOP" {backing} && \\
+    echo "$LOOP"
+  """))
+  loop_dev = loop_out.strip()
+  if not loop_dev.startswith('/dev/loop'):
+    raise RuntimeError(
+        f'[swap_encryption] losetup failed – output: {loop_out!r}'
+    )
+  logging.info('[swap_encryption] GKE: loop device: %s  direct-io=on', loop_dev)
+
+  # ── Step 3: plain mkswap + swapon (dm-crypt skipped on loop devices) ────────
+  _pod_exec(pod, f'mkswap {loop_dev}')
+  _pod_exec(pod, f'swapon {loop_dev}')
+  logging.warning(
+      '[swap_encryption] GKE: plain loop swap active on %s '
+      '(dm-crypt unavailable from COS pod — device-mapper is blocked by '
+      'COS kernel namespace restrictions). '
+      'Phase 1 (fio) will be skipped. '
+      'Use a machine with LSSD (c4-*-lssd) or attach a dedicated second '
+      'hyperdisk for dm-crypt measurement.',
+      loop_dev,
+  )
+
+
+def _setup_gke_bootdisk_swap(pod: str) -> None:
+  """Swap on the OS BOOT disk — methodology Table 0 rows 1-4.
+
+  Creates a loop-backed swap file on /mnt/stateful_partition (the node's boot
+  disk, whose type — pd-balanced or hyperdisk-balanced — is chosen at
+  nodepool-creation time via --swap_encryption_boot_disk_type).  dm-crypt is
+  layered on the loop device when --swap_encryption_enable_dmcrypt is set
+  (encryption-on rows 2/4); otherwise plain swap is used (encryption-off rows
+  1/3).
+
+  Reuses the same loop-creation and dmsetup patterns as the LSSD/hyperdisk
+  paths — no shared provider module is touched.  Requires an Ubuntu node image
+  (dm-crypt from a pod is blocked on COS).
+  """
+  size_gb = _SWAP_SIZE_GB.value
+  backing = '/mnt/stateful_partition/pkb_swap_backing'
+  logging.info('[swap_encryption] GKE: boot-disk swap (%dG backing, dmcrypt=%s)',
+               size_gb, _ENABLE_DMCRYPT.value)
+
+  # Clean up any stale loop/mapping from a previous run.
+  _pod_exec(pod, textwrap.dedent(f"""
+    swapoff /dev/mapper/swap_encrypted 2>/dev/null || true
+    dmsetup remove --noudevrules --noudevsync swap_encrypted 2>/dev/null || true
+    losetup -j {backing} 2>/dev/null | awk -F: '{{print $1}}' | while read d
+    do
+      swapoff "$d" 2>/dev/null || true
+      losetup -d "$d" 2>/dev/null || true
+    done
+    rm -f {backing}
+  """), ignore_failure=True)
+
+  # Allocate the backing file on the boot-disk ext4 stateful partition.
+  _pod_exec(pod, textwrap.dedent(f"""
+    fallocate -l {size_gb}G {backing} 2>/dev/null || truncate -s {size_gb}G {backing}
+  """))
+
+  loop_out, _ = _pod_exec(pod, textwrap.dedent(f"""
+    LOOP=$(losetup -f) && losetup --direct-io=on "$LOOP" {backing} && echo "$LOOP"
+  """))
+  loop_dev = loop_out.strip().splitlines()[-1].strip() if loop_out.strip() else ''
+  if not loop_dev.startswith('/dev/loop'):
+    raise RuntimeError(
+        f'[swap_encryption] boot-disk losetup failed: {loop_out!r}')
+  logging.info('[swap_encryption] GKE: boot-disk loop device: %s', loop_dev)
+
+  if _ENABLE_DMCRYPT.value:
+    _pod_exec(pod, textwrap.dedent(f"""
+      grep -q dm_crypt /proc/modules 2>/dev/null || {{
+        KO=$(find /lib/modules/$(uname -r) -name 'dm-crypt.ko*' 2>/dev/null | head -1)
+        [ -n "$KO" ] && insmod "$KO" 2>/dev/null || true
+      }}
+      KEY=$(dd if=/dev/urandom bs=32 count=1 2>/dev/null | od -A n -t x1 | tr -d ' \\n')
+      SIZE=$(blockdev --getsz {loop_dev})
+      printf "0 %s crypt aes-xts-plain64 %s 0 %s 0\\n" "$SIZE" "$KEY" "{loop_dev}" | \\
+        dmsetup create swap_encrypted --noudevrules --noudevsync
+      unset KEY
+      dmsetup mknodes swap_encrypted 2>/dev/null || true
+      mkswap /dev/mapper/swap_encrypted
+      swapon /dev/mapper/swap_encrypted
+    """))
+    logging.info('[swap_encryption] GKE: boot-disk dm-crypt swap active on '
+                 '/dev/mapper/swap_encrypted')
+  else:
+    _pod_exec(pod, textwrap.dedent(f"""
+      mkswap {loop_dev} && swapon {loop_dev}
+    """))
+    logging.info('[swap_encryption] GKE: boot-disk plain swap active on %s',
+                 loop_dev)
+
+
+def _setup_gke_lssd_swap(pod: str) -> None:
+  """Configure dm-crypt on LSSD RAID-0 array (go/gke-swap-lssd)."""
+  logging.info('[swap_encryption] GKE: setting up LSSD RAID-0 swap')
+
+  # Reused-node hygiene: a previous run on this node may have left an ACTIVE
+  # dm-crypt swap (e.g. /dev/nvme0n1 └─swap_encrypted [SWAP]).  That makes the
+  # LSSD look "unclean/busy" to the device selector below, which then wrongly
+  # falls back to the hyperdisk path and tries the boot disk.  Tear down any
+  # prior PKB swap mapping FIRST so the underlying LSSD is freed and selectable.
+  _pod_exec(pod, textwrap.dedent("""
+    swapoff /dev/mapper/swap_encrypted 2>/dev/null || true
+    swapoff -a 2>/dev/null || true
+    dmsetup remove --force --noudevrules --noudevsync swap_encrypted 2>/dev/null || true
+  """), ignore_failure=True)
+
+  # Log the full block-device topology up front for diagnosis (every prior
+  # swap failure traced back to picking the wrong device).
+  topo, _ = _pod_exec(
+      pod, 'lsblk -o NAME,TYPE,SIZE,ROTA,MOUNTPOINT 2>/dev/null',
+      ignore_failure=True)
+  logging.info('[swap_encryption] block device topology:\n%s',
+               (topo or '').strip())
+
+  # Identify candidate swap devices = whole disks that are NOT the boot/OS
+  # disk.  We must NOT rely on a device name (boot disk enumerates as nvme0n1
+  # on some nodes, nvme1n1 on others) and we cannot use `findmnt /` because the
+  # container root is an overlay.  Instead we EXCLUDE any disk that:
+  #   * has partition children (boot disk has p1/p14/p15/p16), or
+  #   * has any mounted filesystem (itself or a child).
+  # A raw local SSD intended for swap has neither.  This robustly prevents the
+  # catastrophic bug where the 100 GB boot disk (root mounted) was RAIDed into
+  # the swap device, yielding a non-functional swap (fio empty + stress OOM).
+  lssd_out, _ = _pod_exec(
+      pod,
+      textwrap.dedent("""
+        for d in $(lsblk -dno NAME,ROTA | awk '$2==0{print $1}')
+        do
+          if lsblk -no TYPE "/dev/$d" 2>/dev/null | grep -q '^part$'; then
+            continue   # has partitions -> boot/OS disk
+          fi
+          if lsblk -no MOUNTPOINT "/dev/$d" 2>/dev/null | grep -q '[^[:space:]]'; then
+            continue   # mounted somewhere -> not a free swap device
+          fi
+          echo "/dev/$d"
+        done
+      """),
+      ignore_failure=True,
+  )
+  devices = [d.strip() for d in lssd_out.strip().splitlines() if d.strip()]
+  if not devices:
+    logging.warning(
+        '[swap_encryption] No clean (unpartitioned, unmounted) local SSD found '
+        '— falling back to hyperdisk swap path')
+    _setup_gke_hyperdisk_swap(pod)
+    return
+
+  device_list = ' '.join(devices)
+  n = len(devices)
+  logging.info('[swap_encryption] GKE: LSSD RAID-0 across %d clean device(s): '
+               '%s  dmcrypt=%s', n, device_list, _ENABLE_DMCRYPT.value)
+
+  # Clean up stale mappings, RAID arrays, and GKE-managed mounts.
+  #
+  # GKE UBUNTU nodes run google-ssd-startup.service at boot which formats
+  # local NVMe SSDs as ext4 and mounts them at /mnt/disks/ssd0 etc. even
+  # when --local-nvme-ssd-block is set.  The mount makes the block device
+  # busy so mdadm/wipefs fail silently (we had || true).  We must unmount
+  # those paths first.  /proc-host/mounts reflects the host mount table
+  # (hostPID:true + privileged gives us access).
+  #
+  # pkb_swap is the dm-crypt device created by the node startup script (for
+  # single-LSSD nodes it holds /dev/nvme1n1 directly without an md0 layer).
+  _pod_exec(pod, textwrap.dedent(f"""
+    echo "[pkb-lssd-cleanup] /proc/mdstat:" >&2
+    cat /proc/mdstat 2>/dev/null || true
+    echo "[pkb-lssd-cleanup] dmsetup ls:" >&2
+    dmsetup ls 2>/dev/null || true
+    echo "[pkb-lssd-cleanup] /proc/swaps:" >&2
+    cat /proc/swaps 2>/dev/null || true
+    echo "[pkb-lssd-cleanup] host mounts on {device_list}:" >&2
+    grep -E '{('|'.join(devices))}' /proc-host/mounts 2>/dev/null || true
+    echo "[pkb-lssd-cleanup] sysfs holders:" >&2
+    for dev in {device_list}
+    do
+      devname=$(basename "$dev")
+      ls -1 /sys/block/$devname/holders/ 2>/dev/null | while read h
+      do
+        echo "[pkb-lssd-cleanup]   $dev held by $h" >&2
+      done
+    done
+    echo "[pkb-lssd-cleanup] --- begin teardown ---" >&2
+    for dev in {device_list}
+    do
+      test -b "$dev" || continue
+      devname=$(basename "$dev")
+      for holder in /sys/block/$devname/holders/*
+      do
+        test -e "$holder" || continue
+        h=$(basename "$holder")
+        echo "[pkb-lssd-cleanup] removing holder /dev/$h from $dev" >&2
+        if echo "$h" | grep -q "^md"
+        then
+          mdadm --stop /dev/$h 2>/dev/null || true
+        else
+          dmsetup remove --force --noudevrules --noudevsync /dev/$h 2>/dev/null || true
+        fi
+      done
+      mounts=$(awk -v d="$dev" '$1==d{{print $2}}' /proc-host/mounts 2>/dev/null || true)
+      for mp in $mounts
+      do
+        echo "[pkb-lssd-cleanup] unmounting $mp from $dev" >&2
+        umount -f "$mp" 2>/dev/null || true
+      done
+    done
+    swapoff -a 2>/dev/null || true
+    swapoff /dev/mapper/pkb_swap 2>/dev/null || true
+    swapoff /dev/mapper/swap_encrypted 2>/dev/null || true
+    dmsetup remove --force --noudevrules --noudevsync pkb_swap 2>/dev/null || true
+    dmsetup remove --force --noudevrules --noudevsync swap_encrypted 2>/dev/null || true
+    mdadm --stop --scan 2>/dev/null || true
+    mdadm --zero-superblock {device_list} 2>/dev/null || true
+    wipefs -a {device_list} 2>/dev/null || true
+    echo "[pkb-lssd-cleanup] lsblk after wipefs:" >&2
+    lsblk {device_list} 2>/dev/null || true
+    partx -u {device_list} 2>/dev/null || true
+    losetup -D 2>/dev/null || true
+    rm -f /mnt/stateful_partition/pkb_swap.img 2>/dev/null || true
+    sleep 2
+  """), ignore_failure=True)
+
+  # Step 3: verify the devices are truly raw (unpartitioned).  On GKE Ubuntu
+  # nodes the local NVMe device may be partitioned by node startup scripts
+  # even when --local-nvme-ssd-block is specified.  The kernel refuses a
+  # whole-disk exclusive open (DM_TABLE_LOAD → EBUSY) when any partition of
+  # the disk is open by another process (e.g. the container overlay FS is
+  # backed by nvme1n1p1).  Detect this and fall back to a loop device backed
+  # by a file on /mnt/stateful_partition (which IS the SSD partition).
+  raw_check_out, _ = _pod_exec(
+      pod,
+      textwrap.dedent(f"""
+        for dev in {device_list}
+        do
+          if lsblk -ln -o TYPE "$dev" 2>/dev/null | grep -q '^part$'
+          then
+            echo "[pkb-lssd] $dev is partitioned — cannot use as raw block device" >&2
+          else
+            echo "$dev"
+          fi
+        done
+      """),
+      ignore_failure=True,
+  )
+  raw_devices = [d.strip() for d in raw_check_out.strip().splitlines() if d.strip()]
+
+  if not raw_devices:
+    logging.info(
+        '[swap_encryption] GKE: all LSSD devices are partitioned — '
+        'falling back to loop device on /mnt/stateful_partition'
+    )
+    _setup_gke_lssd_stateful_loop_swap(pod)
+    return
+
+  # Use only raw (unpartitioned) devices going forward.
+  devices = raw_devices
+  device_list = ' '.join(devices)
+  n = len(devices)
+  logging.info('[swap_encryption] GKE: using %d raw LSSD device(s): %s  '
+               'dmcrypt=%s', n, device_list, _ENABLE_DMCRYPT.value)
+
+  # For N=1 LSSD, skip mdadm entirely and target the raw device directly.
+  # For N>1 we stripe across multiple NVMe devices.
+  if n > 1:
+    _pod_exec(pod, textwrap.dedent(f"""
+      mdadm --create /dev/md0 --force \\
+        --level=0 --raid-devices={n} \\
+        {device_list}
+      test -b /dev/md0 || {{ echo "mdadm: /dev/md0 not created" >&2; exit 1; }}
+    """))
+    swap_block_dev = '/dev/md0'
+  else:
+    swap_block_dev = devices[0]
+    logging.info('[swap_encryption] GKE: single LSSD — skipping mdadm, '
+                 'using %s directly', swap_block_dev)
+
+  if _ENABLE_DMCRYPT.value:
+    # Same dmsetup --noudevrules --noudevsync approach as _setup_gke_hyperdisk_swap.
+    _pod_exec(pod, textwrap.dedent(f"""
+      grep -q dm_crypt /proc/modules 2>/dev/null || {{
+        KO=$(find /lib/modules/$(uname -r) -name 'dm-crypt.ko*' 2>/dev/null | head -1)
+        [ -n "$KO" ] && insmod "$KO" 2>/dev/null || true
+      }}
+      udevadm control --stop-exec-queue 2>/dev/null || true
+      KEY=$(dd if=/dev/urandom bs=32 count=1 2>/dev/null | od -A n -t x1 | tr -d ' \\n')
+      SIZE=$(blockdev --getsz {swap_block_dev})
+      printf "0 %s crypt aes-xts-plain64 %s 0 %s 0\\n" "$SIZE" "$KEY" "{swap_block_dev}" | \\
+        dmsetup create swap_encrypted --noudevrules --noudevsync
+      udevadm control --start-exec-queue 2>/dev/null || true
+      unset KEY
+      dmsetup mknodes swap_encrypted 2>/dev/null || true
+      mkswap /dev/mapper/swap_encrypted
+      swapon /dev/mapper/swap_encrypted
+    """))
+    logging.info('[swap_encryption] GKE: LSSD dm-crypt swap active on %s',
+                 swap_block_dev)
+  else:
+    _pod_exec(pod, textwrap.dedent(f"""
+      mkswap {swap_block_dev}
+      swapon {swap_block_dev}
+    """))
+    logging.info('[swap_encryption] GKE: LSSD plain swap active on %s',
+                 swap_block_dev)
+
+
+def _setup_gke_lssd_stateful_loop_swap(pod: str) -> None:
+  """Set up swap on the LSSD partition via a loop device.
+
+  Used when the local NVMe device is partitioned by GKE startup scripts
+  and cannot be opened as a whole raw block device (DM_TABLE_LOAD EBUSY).
+  The DaemonSet mounts /mnt/stateful_partition (hostPath) from the host's
+  nvme1n1p1 — which is still local SSD storage.  We create a large file
+  there and layer loop → dm-crypt → swap on top of it.
+  """
+  img_path = '/mnt/stateful_partition/pkb_swap.img'
+
+  # Clean up any previous run artifacts.
+  _pod_exec(pod, textwrap.dedent(f"""
+    swapoff -a 2>/dev/null || true
+    dmsetup remove --force --noudevrules --noudevsync swap_encrypted 2>/dev/null || true
+    losetup -D 2>/dev/null || true
+    rm -f {img_path} 2>/dev/null || true
+  """), ignore_failure=True)
+
+  # Determine file size: 80% of available space, at least 16 GB.
+  size_out, _ = _pod_exec(
+      pod,
+      f"df -P /mnt/stateful_partition | awk 'NR==2{{print $4}}'",
+      ignore_failure=True,
+  )
+  avail_kb = int(size_out.strip() or '0')
+  swap_gb = max(16, int(avail_kb * 0.8 / 1024 / 1024))
+  logging.info('[swap_encryption] GKE: LSSD stateful-loop: %d GB image at %s',
+               swap_gb, img_path)
+
+  # Allocate file (fallocate is instant on ext4; dd fallback for others).
+  _pod_exec(pod, textwrap.dedent(f"""
+    fallocate -l {swap_gb}G {img_path} 2>/dev/null || \\
+      dd if=/dev/zero of={img_path} bs=1G count={swap_gb}
+    chmod 600 {img_path}
+    losetup --direct-io=on -f {img_path}
+  """), timeout=300)
+
+  loop_out, _ = _pod_exec(
+      pod,
+      f"losetup -j {img_path} | awk -F: '{{print $1}}' | head -1",
+      ignore_failure=True,
+  )
+  loop_dev = loop_out.strip()
+  if not loop_dev.startswith('/dev/loop'):
+    raise RuntimeError(
+        f'[swap_encryption] losetup failed for {img_path} — got: {loop_out!r}'
+    )
+  logging.info('[swap_encryption] GKE: LSSD stateful-loop device: %s', loop_dev)
+
+  if _ENABLE_DMCRYPT.value:
+    _pod_exec(pod, textwrap.dedent(f"""
+      grep -q dm_crypt /proc/modules 2>/dev/null || {{
+        KO=$(find /lib/modules/$(uname -r) -name 'dm-crypt.ko*' 2>/dev/null | head -1)
+        [ -n "$KO" ] && insmod "$KO" 2>/dev/null || true
+      }}
+      udevadm control --stop-exec-queue 2>/dev/null || true
+      KEY=$(dd if=/dev/urandom bs=32 count=1 2>/dev/null | od -A n -t x1 | tr -d ' \\n')
+      SIZE=$(blockdev --getsz {loop_dev})
+      printf "0 %s crypt aes-xts-plain64 %s 0 %s 0\\n" "$SIZE" "$KEY" "{loop_dev}" | \\
+        dmsetup create swap_encrypted --noudevrules --noudevsync
+      udevadm control --start-exec-queue 2>/dev/null || true
+      unset KEY
+      dmsetup mknodes swap_encrypted 2>/dev/null || true
+      mkswap /dev/mapper/swap_encrypted
+      swapon /dev/mapper/swap_encrypted
+    """))
+    logging.info('[swap_encryption] GKE: LSSD stateful-loop dm-crypt swap active '
+                 'on %s → %s', img_path, loop_dev)
+  else:
+    _pod_exec(pod, textwrap.dedent(f"""
+      mkswap {loop_dev}
+      swapon {loop_dev}
+    """))
+    logging.info('[swap_encryption] GKE: LSSD stateful-loop plain swap active '
+                 'on %s → %s', img_path, loop_dev)
+
+
+_IO2_VOLUME_ID = ''  # set by _ensure_io2_volume; serial-based detection
+
+
+def _ensure_io2_volume() -> None:
+  """Create + attach a dedicated io2 EBS volume to the benchmark node so the
+  io2 test-matrix row swaps on real io2 hardware-encrypted storage.
+
+  No-op unless --swap_encryption_swap_type=io2 on an AWS/EKS cluster.
+  Best-effort: logs and returns on failure.  Stashes the created volume id in
+  _IO2_VOLUME_ID for serial-based device detection in _setup_eks_io2_swap.
+  """
+  global _IO2_VOLUME_ID
+  if _SWAP_TYPE.value != 'io2':
+    return
+  out, _, rc = kubectl.RunKubectlCommand(
+      ['get', 'nodes', '-o', 'jsonpath={.items[0].spec.providerID}'],
+      raise_on_failure=False,
+  )
+  provider = (out or '').strip()  # aws:///us-east-1a/i-0abc...
+  if rc != 0 or 'aws://' not in provider:
+    logging.warning(
+        '[swap_encryption] io2 attach skipped: could not resolve '
+        'EC2 instance from providerID=%r', provider)
+    return
+  parts = [p for p in provider.split('/') if p]
+  instance_id, az = parts[-1], parts[-2]
+  region = az[:-1]
+  base = ['aws', 'ec2', '--region', region]
+  try:
+    create_args = [
+        'create-volume',
+        '--volume-type', 'io2',
+        '--size', '500',
+        '--iops', '16000',
+        '--availability-zone', az,
+        '--tag-specifications',
+        'ResourceType=volume,Tags=[{Key=pkb,Value=swap_encryption}]',
+    ]
+    if _IO2_ENCRYPTED.value:
+      create_args.append('--encrypted')
+      if _IO2_KMS_KEY_ID.value:
+        create_args += ['--kms-key-id', _IO2_KMS_KEY_ID.value]
+      logging.info(
+          '[swap_encryption] io2 volume will be EBS-encrypted '
+          '(row: hardware encryption)')
+    else:
+      logging.info('[swap_encryption] io2 volume UNENCRYPTED (baseline row)')
+    create_args += ['--query', 'VolumeId', '--output', 'text']
+    vol_id, _, vrc = vm_util.IssueCommand(
+        base + create_args, raise_on_failure=False)
+    vol_id = (vol_id or '').strip()
+    if vrc != 0 or not vol_id.startswith('vol-'):
+      logging.warning('[swap_encryption] io2 create-volume failed: %r', vol_id)
+      return
+    vm_util.IssueCommand(
+        base + ['wait', 'volume-available', '--volume-ids', vol_id],
+        raise_on_failure=False)
+    vm_util.IssueCommand(
+        base + [
+            'attach-volume',
+            '--volume-id', vol_id,
+            '--instance-id', instance_id,
+            '--device', '/dev/sdf',
+        ],
+        raise_on_failure=False)
+    vm_util.IssueCommand(
+        base + ['wait', 'volume-in-use', '--volume-ids', vol_id],
+        raise_on_failure=False)
+    _IO2_VOLUME_ID = vol_id
+    logging.info(
+        '[swap_encryption] Attached io2 volume %s to %s as /dev/sdf',
+        vol_id, instance_id)
+    time.sleep(15)  # allow the NVMe device node to appear
+  except Exception as e:  # pylint: disable=broad-except
+    logging.warning('[swap_encryption] io2 attach error (continuing): %s', e)
+
+
+def _setup_eks_swap(pod: str) -> None:
+  """Configure swap on EKS nodes — Instance Store OR io2 root disk.
+
+  Swap type is selected by --swap_encryption_swap_type:
+    instance_store (default) – NVMe SSD attached by Nitro (i4i, m6id, c6id).
+      Nitro encrypts all block-device writes at hardware level; no extra
+      cryptsetup needed.
+    io2 – EBS io2 volume provisioned as the node root/data disk.
+      Used for apples-to-apples comparison against GKE hyperdisk-balanced.
+  """
+  swap_type = _SWAP_TYPE.value
+  if swap_type in ('auto', 'instance_store'):
+    _setup_eks_instance_store_swap(pod)
+  elif swap_type == 'io2':
+    _setup_eks_io2_swap(pod)
+  else:
+    logging.warning(
+        '[swap_encryption] Unknown EKS swap type %s – fallback', swap_type)
+    _setup_eks_instance_store_swap(pod)
+
+
+def _setup_eks_instance_store_swap(pod: str) -> None:
+  """Swap on AWS NVMe Instance Store (Nitro hardware-offloaded encryption)."""
+  logging.info('[swap_encryption] EKS: setting up Instance Store swap')
+
+  # Find the Instance Store NVMe device (not the root EBS volume)
+  nvme_out, _ = _pod_exec(
+      pod,
+      "nvme list 2>/dev/null | awk '/Instance Storage/{print $1}' | head -1 || "
+      "lsblk -d -o NAME,MODEL | grep -i 'instance\\|nvme' | "
+      "grep -v 'nvme0' | awk '{print \"/dev/\"$1}' | head -1",
+      ignore_failure=True,
+  )
+  device = nvme_out.strip()
+  if not device:
+    # Common Instance Store device paths on AWS
+    for candidate in ['/dev/nvme1n1', '/dev/nvme2n1', '/dev/xvdb']:
+      exists_out, _ = _pod_exec(
+          pod, f'test -b {candidate} && echo yes || echo no',
+          ignore_failure=True,
+      )
+      if exists_out.strip() == 'yes':
+        device = candidate
+        break
+
+  if not device:
+    logging.warning(
+        '[swap_encryption] No Instance Store NVMe found – creating swapfile'
+    )
+    _setup_plain_swap_file(pod, _SWAP_SIZE_GB.value)
+    return
+
+  logging.info('[swap_encryption] EKS: Instance Store device: %s', device)
+
+  # Nitro encrypts all Instance Store writes automatically.
+  # No additional cryptsetup required.
+  _pod_exec(pod, textwrap.dedent(f"""
+    mkswap {device} && \\
+    swapon {device}
+  """))
+  logging.info(
+      '[swap_encryption] EKS: Instance Store swap active on %s', device)
+
+
+def _setup_eks_io2_swap(pod: str) -> None:
+  """Swap on AWS EBS io2 volume – apples-to-apples comparison vs GKE hyperdisk.
+
+  EBS io2 volumes on Nitro instances are encrypted at rest by AWS KMS (if
+  enabled on the volume) or via Nitro-level hardware encryption.  No additional
+  cryptsetup is needed here; we simply format the attached data disk as swap.
+
+  Device discovery order:
+    1. Match the io2 volume created by _ensure_io2_volume() by its NVMe serial
+       (serial == volume id without the dash).  This is unambiguous and never
+       picks the root disk or the instance store regardless of nvmeXn1
+       enumeration order on Nitro.
+    2. First non-root EBS ("Elastic Block Store") block device that is not
+       currently mounted.
+  """
+  logging.info('[swap_encryption] EKS: setting up io2 EBS swap')
+
+  # Identify root device so we can exclude it.
+  root_out, _ = _pod_exec(
+      pod,
+      'lsblk -no pkname $(findmnt -n -o SOURCE /) 2>/dev/null || echo nvme0n1',
+      ignore_failure=True,
+  )
+  root_base = root_out.strip() or 'nvme0n1'
+
+  # Identify the io2 volume UNAMBIGUOUSLY by its NVMe serial == volume id.
+  # An EBS NVMe device's serial equals the volume id minus the dash
+  # (vol-0abc... -> serial vol0abc...).
+  device = ''
+  target = _IO2_VOLUME_ID.replace('-', '')
+  if target:
+    ser_out, _ = _pod_exec(
+        pod,
+        'for d in /sys/block/nvme*n1; do '
+        '[ -e "$d" ] || continue; '
+        's=$(cat "$d/device/serial" 2>/dev/null | tr -d "-" | tr -d " "); '
+        f'[ "$s" = "{target}" ] && {{ echo "/dev/$(basename "$d")"; break; }}; '
+        'done',
+        ignore_failure=True,
+    )
+    device = ser_out.strip()
+    if device:
+      logging.info(
+          '[swap_encryption] EKS: io2 matched by serial %s -> %s',
+          target, device)
+
+  if not device:
+    # Fallback: first non-root EBS device, excluding any device that is
+    # currently mounted (root) or already active swap.
+    disk_out, _ = _pod_exec(
+        pod,
+        'for d in /sys/block/nvme*n1 /sys/block/xvd[b-z] /sys/block/sd[b-z];'
+        ' do [ -e "$d" ] || continue; n=$(basename "$d"); [ "$n" ='
+        f' "{root_base}" ] && continue; m=$(cat "$d/device/model" 2>/dev/null);'
+        ' echo "$m" | grep -qi "Elastic Block Store" || continue; mnt=$(lsblk'
+        ' -no MOUNTPOINT "/dev/$n" 2>/dev/null | tr -d " "); [ -n "$mnt" ] &&'
+        ' continue; echo "/dev/$n"; break; done',
+        ignore_failure=True,
+    )
+    device = disk_out.strip()
+    if device:
+      logging.info(
+          '[swap_encryption] EKS: io2 fallback EBS device: %s', device)
+
+  if not device:
+    logging.warning(
+        '[swap_encryption] No io2 EBS disk found – creating plain swapfile')
+    _setup_plain_swap_file(pod, _SWAP_SIZE_GB.value)
+    return
+
+  logging.info('[swap_encryption] EKS: io2 EBS device: %s', device)
+
+  # EBS io2 encryption is handled at the AWS level (Nitro / KMS).
+  out, _ = _pod_exec(
+      pod,
+      textwrap.dedent(f"""
+    swapoff {device} 2>/dev/null || true
+    wipefs -a {device} 2>/dev/null || true
+    mkswap -f {device} && swapon {device}
+    swapon --show
+  """),
+      ignore_failure=True,
+  )
+  if device not in out:
+    raise RuntimeError(
+        f'[swap_encryption] io2 swap did not activate on {device}; '
+        f'swapon --show output: {out!r}. The device may be busy/mounted '
+        '(wrong device picked) or mkswap failed.')
+  logging.info('[swap_encryption] EKS: io2 EBS swap active on %s', device)
+
+
+def _setup_plain_swap_file(pod: str, size_gb: int) -> None:
+  """Fallback: create a loop-device-backed swapfile.
+
+  A plain file on overlayfs (the container root) cannot be used as swap —
+  the kernel rejects it with EINVAL.  Routing it through a loop device
+  presents a proper block device to the mm subsystem and succeeds.
+  """
+  logging.info('[swap_encryption] Creating %dGB loop-device swap', size_gb)
+  _pod_exec(pod, textwrap.dedent(f"""
+    fallocate -l {size_gb}G /tmp/pkb_swapfile && \\
+    chmod 600 /tmp/pkb_swapfile && \\
+    LOOP=$(losetup -f) && \\
+    losetup "$LOOP" /tmp/pkb_swapfile && \\
+    mkswap "$LOOP" && \\
+    swapon "$LOOP" && \\
+    echo "swap loop device: $LOOP"
+  """))
+
+
+def _enable_zswap(pod: str) -> None:
+  """Enable zswap with lz4 compressor and 20% pool limit inside the pod."""
+  logging.info('[swap_encryption] Enabling zswap (lz4, 20%% pool)')
+  for cmd in [
+      'echo 1      > /sys/module/zswap/parameters/enabled',
+      'echo lz4    > /sys/module/zswap/parameters/compressor',
+      'echo 20     > /sys/module/zswap/parameters/max_pool_percent',
+      'echo z3fold > /sys/module/zswap/parameters/zpool',
+  ]:
+    _pod_exec(pod, cmd, ignore_failure=True)
 
 
 _INSTANCE_PRICE_USD_PER_HR: dict[str, float] = {
