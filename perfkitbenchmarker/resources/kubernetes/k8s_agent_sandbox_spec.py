@@ -24,42 +24,10 @@ flags.DEFINE_string(
     'agent-sandbox release ref (tag or SHA) for CRD, RBAC, and controller '
     'manifests.')
 flags.DEFINE_string(
-    'agent_sandbox_namespace', None,
-    'Namespace in which SandboxClaims are created.')
-flags.DEFINE_string(
     'agent_sandbox_runtime_class', None, 'RuntimeClass for sandbox pods.')
 flags.DEFINE_integer(
     'agent_sandbox_warmpool_replicas', None,
     'SandboxWarmPool size to provision in Prepare.')
-flags.DEFINE_string(
-    'agent_sandbox_controller_image', None, 'Controller container image.')
-flags.DEFINE_integer(
-    'agent_sandbox_controller_claim_workers', None,
-    'Controller --sandbox-claim-concurrent-workers value.')
-flags.DEFINE_integer(
-    'agent_sandbox_controller_sandbox_workers', None,
-    'Controller --sandbox-concurrent-workers value.')
-flags.DEFINE_integer(
-    'agent_sandbox_controller_warmpool_workers', None,
-    'Controller --sandbox-warm-pool-concurrent-workers value.')
-flags.DEFINE_integer(
-    'agent_sandbox_controller_warmpool_max_batch_size', None,
-    'Controller --sandbox-warm-pool-max-batch-size value.')
-flags.DEFINE_integer(
-    'agent_sandbox_controller_kube_api_burst', None,
-    'Controller --kube-api-burst value.')
-flags.DEFINE_integer(
-    'agent_sandbox_controller_kube_api_qps', None,
-    'Controller --kube-api-qps value.')
-flags.DEFINE_boolean(
-    'agent_sandbox_controller_enable_tracing', False,
-    'Enable controller OpenTelemetry tracing.')
-flags.DEFINE_string(
-    'agent_sandbox_controller_otel_endpoint', None,
-    'OTLP exporter endpoint when tracing is enabled.')
-flags.DEFINE_boolean(
-    'agent_sandbox_controller_leader_elect', False,
-    'Whether the controller runs with leader election enabled.')
 
 _DEFAULT_MANIFEST_REF = '32c4f231a116f76eb707fe34510b8143d61268ae'
 _DEFAULT_CONTROLLER_IMAGE = (
@@ -118,33 +86,11 @@ class ControllerSpec(spec.BaseSpec):
     })
     return result
 
-  @classmethod
-  def _ApplyFlags(cls, config_values, flag_values):
-    super()._ApplyFlags(config_values, flag_values)
-    if flag_values['agent_sandbox_controller_image'].present:
-      config_values['image'] = flag_values.agent_sandbox_controller_image
-    for flag_name, key in (
-        ('agent_sandbox_controller_claim_workers', 'claim_workers'),
-        ('agent_sandbox_controller_sandbox_workers', 'sandbox_workers'),
-        ('agent_sandbox_controller_warmpool_workers', 'warmpool_workers'),
-        ('agent_sandbox_controller_warmpool_max_batch_size',
-         'warmpool_max_batch_size'),
-        ('agent_sandbox_controller_kube_api_burst', 'kube_api_burst'),
-        ('agent_sandbox_controller_kube_api_qps', 'kube_api_qps'),
-        ('agent_sandbox_controller_otel_endpoint', 'otel_endpoint'),
-        ('agent_sandbox_controller_enable_tracing', 'enable_tracing'),
-        ('agent_sandbox_controller_leader_elect', 'leader_elect'),
-    ):
-      if flag_values[flag_name].present:
-        config_values[key] = flag_values[flag_name].value
-
 
 class SandboxTemplateSpec(spec.BaseSpec):
   """Config for the SandboxTemplate (models SandboxTemplateSpec).
 
-  Pod-shape fields (runtime_class, image, resources, labels) are rendered into
-  the template. The remaining fields are accepted and validated stubs, not yet
-  rendered.
+  Fields rendered into the template: runtime_class, image, resources, labels.
   """
 
   def __init__(self, *args, **kwargs):
@@ -155,14 +101,6 @@ class SandboxTemplateSpec(spec.BaseSpec):
     self.memory_request: str
     self.memory_limit: str
     self.labels: dict | None
-    self.command: list | None
-    self.args: list | None
-    self.env: dict | None
-    self.service_account: str | None
-    self.annotations: dict | None
-    self.network_policy_management: str
-    self.env_vars_injection_policy: str
-    self.service: bool | None
     super().__init__(*args, **kwargs)
 
   @classmethod
@@ -178,27 +116,6 @@ class SandboxTemplateSpec(spec.BaseSpec):
         'memory_limit': (option_decoders.StringDecoder, {'default': '1Gi'}),
         'labels': (option_decoders.TypeVerifier,
                    {'default': None, 'none_ok': True}),
-        'command': (option_decoders.ListDecoder,
-                    {'item_decoder': option_decoders.StringDecoder(),
-                     'default': None, 'none_ok': True}),
-        'args': (option_decoders.ListDecoder,
-                 {'item_decoder': option_decoders.StringDecoder(),
-                  'default': None, 'none_ok': True}),
-        'env': (option_decoders.TypeVerifier,
-                {'default': None, 'none_ok': True}),
-        'service_account': (option_decoders.StringDecoder,
-                            {'default': None, 'none_ok': True}),
-        'annotations': (option_decoders.TypeVerifier,
-                        {'default': None, 'none_ok': True}),
-        'network_policy_management': (option_decoders.EnumDecoder,
-                                      {'valid_values': ['Managed', 'Unmanaged'],
-                                       'default': 'Managed'}),
-        'env_vars_injection_policy': (
-            option_decoders.EnumDecoder,
-            {'valid_values': ['Disallowed', 'Allowed', 'Overrides'],
-             'default': 'Disallowed'}),
-        'service': (option_decoders.BooleanDecoder,
-                    {'default': None, 'none_ok': True}),
     })
     return result
 
@@ -305,5 +222,3 @@ class K8sAgentSandboxConfigSpec(agent_sandbox_spec.BaseAgentSandboxConfigSpec):
     super()._ApplyFlags(config_values, flag_values)
     if flag_values['agent_sandbox_manifest_ref'].present:
       config_values['manifest_ref'] = flag_values.agent_sandbox_manifest_ref
-    if flag_values['agent_sandbox_namespace'].present:
-      config_values['namespace'] = flag_values.agent_sandbox_namespace

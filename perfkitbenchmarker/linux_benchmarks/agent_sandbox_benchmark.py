@@ -13,10 +13,9 @@
 # limitations under the License.
 """Stub benchmark that provisions the Kubernetes agent sandbox resource.
 
-The agent sandbox is installed via the container_cluster.agent_sandbox config
-block (cluster construction calls K8sAgentSandbox.Create()). The load
-generator and metrics land in a follow-up change; Run currently returns no
-samples.
+The agent sandbox is installed via the top-level agent_sandbox config block,
+wired through benchmark_spec.ConstructAgentSandbox. The load generator and
+metrics land in a follow-up change; Run currently returns no samples.
 """
 
 from absl import flags
@@ -57,8 +56,8 @@ agent_sandbox:
           sandbox.gke.io/runtime: runsc
         node_taints:
           - sandbox.gke.io/runtime=runsc:NoSchedule
-    agent_sandbox:
-      type: Kubernetes
+  agent_sandbox:
+    type: Kubernetes
 """
 
 
@@ -70,7 +69,7 @@ def GetConfig(user_config):
 
 
 def Prepare(benchmark_spec):
-  """No-op: the agent sandbox is installed during cluster construction."""
+  """No-op: the agent sandbox is provisioned via benchmark_spec."""
   del benchmark_spec
 
 
