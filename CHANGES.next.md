@@ -469,6 +469,7 @@
     `--use_managed_vm_groups`.
 -   Add support for configuring IMDSv2 Http Tokens on AWS VMs via
     `aws_metadata_http_tokens`.
+-   Add aggregate memtier results to `kubernetes_redis_memtier` benchmark.
 
 ### Bug fixes and maintenance updates:
 

@@ -213,7 +213,9 @@ def _RunMemtier(
       pipeline=pipeline,
   )
 
-  return result.GetSamples(metadata)
+  samples = result.GetSamples(metadata)
+  samples.extend(memtier.AggregateMemtierResults([result], metadata))
+  return samples
 
 
 class MemtierRunConfig(NamedTuple):
