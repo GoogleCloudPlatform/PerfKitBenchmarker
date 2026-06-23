@@ -24,6 +24,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import test_util
 # from perfkitbenchmarker.linux_benchmarks import speccpu2017_benchmark  # noqa
 from perfkitbenchmarker.linux_packages import build_tools
+from perfkitbenchmarker.linux_packages import fortran
 from perfkitbenchmarker.linux_packages import speccpu
 
 FLAGS = flags.FLAGS
@@ -59,6 +60,7 @@ GOOD_METADATA = {
     'spec17_threads': None,
     'spec17_subset': ['intrate'],
     'gcc_version': '7',
+    'gfortran_version': '7',
 }
 
 EXPECTED_RESULT_SPECINT = [
@@ -603,6 +605,7 @@ class Speccpu2006BenchmarkTestCase(
   def setUp(self):
     super().setUp()
     mock.patch.object(build_tools, 'GetVersion').start().return_value = '7'
+    mock.patch.object(fortran, 'GetFortranVersion').start().return_value = '7'
     mock.patch.object(speccpu, '_GenerateMd5sum').start().return_value = 'abcd'
     self.addCleanup(mock.patch.stopall)
 
