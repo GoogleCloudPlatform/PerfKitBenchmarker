@@ -1,0 +1,65 @@
+# Privileged DaemonSet that runs an init container to install runsc and the
+# containerd-runsc shim onto the host, then sleeps as a pause container.
+#
+# The actual install logic comes from a ConfigMap named gvisor-installer-script
+# (created by install_gvisor() in resources/kubernetes/k8s_agent_sandbox.py from
+# data/agent_sandbox/gvisor-installer/install.sh before this DaemonSet is
+# applied). The ConfigMap key is "install.sh", mounted at /scripts.
+#
+# nodeSelector and tolerations are injected at apply time (see
+# _render_gvisor_daemonset in resources/kubernetes/k8s_agent_sandbox.py) so the
+# DaemonSet targets the sandbox node pool via the pkb_nodepool label.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: gvisor-installer
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: gvisor-installer
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gvisor-installer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gvisor-installer
+    spec:
+      hostPID: true
+      initContainers:
+        - name: install
+          image: docker.io/library/ubuntu:24.04
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          env:
+            - name: GVISOR_VERSION
+              # Pinned for benchmarking. Update in lockstep across all envs.
+              # Verify available releases at https://gvisor.dev/docs/user_guide/install/
+              value: "20260511"
+          command: ["/bin/bash", "/scripts/install.sh"]
+          volumeMounts:
+            - name: host
+              mountPath: /host
+            - name: script
+              mountPath: /scripts
+              readOnly: true
+      containers:
+        # Pause container keeps the DaemonSet "Running" after install completes.
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+      volumes:
+        - name: host
+          hostPath:
+            path: /
+        - name: script
+          configMap:
+            name: gvisor-installer-script
+            defaultMode: 0755

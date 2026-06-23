@@ -29,7 +29,7 @@ flags.DEFINE_integer(
     'agent_sandbox_warmpool_replicas', None,
     'SandboxWarmPool size to provision in Prepare.')
 
-_DEFAULT_MANIFEST_REF = '32c4f231a116f76eb707fe34510b8143d61268ae'
+_DEFAULT_MANIFEST_REF = '98952fdc8b17523e1534db6626e9f9542b0792e5'
 _DEFAULT_CONTROLLER_IMAGE = (
     'us-central1-docker.pkg.dev/k8s-staging-images/agent-sandbox/'
     'agent-sandbox-controller:v20260527-v0.4.6-31-gd43447b-main')

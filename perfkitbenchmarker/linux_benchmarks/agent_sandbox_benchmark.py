@@ -11,26 +11,53 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Stub benchmark that provisions the Kubernetes agent sandbox resource.
+"""Benchmarks agent sandbox SandboxClaim provisioning latency.
 
-The agent sandbox is installed via the top-level agent_sandbox config block,
-wired through benchmark_spec.ConstructAgentSandbox. The load generator and
-metrics land in a follow-up change; Run currently returns no samples.
+Submits SandboxClaim custom resources at a target QPS against the agent
+sandbox installed on the cluster (via benchmark_spec.agent_sandbox) and
+reports claim-to-Ready latency percentiles, throughput, and peak concurrency.
 """
 
 from absl import flags
 from perfkitbenchmarker import configs
-# Imported so the K8sAgentSandbox resource and its config spec register.
-from perfkitbenchmarker.resources.kubernetes import k8s_agent_sandbox  # pylint: disable=unused-import
+from perfkitbenchmarker import errors
+from perfkitbenchmarker import stages
+from perfkitbenchmarker.linux_benchmarks import agent_sandbox_loadgen
+from perfkitbenchmarker.linux_benchmarks import agent_sandbox_metrics
+from perfkitbenchmarker.resources.kubernetes import k8s_agent_sandbox
 
 FLAGS = flags.FLAGS
+
+_QPS = flags.DEFINE_float(
+    'agent_sandbox_qps', 10.0,
+    'Target SandboxClaim submission rate (claims per second).')
+_DURATION = flags.DEFINE_float(
+    'agent_sandbox_duration', 60.0,
+    'Submission window in seconds. Combined with qps to derive total.')
+_TOTAL = flags.DEFINE_integer(
+    'agent_sandbox_total', None,
+    'Total claims to submit. If set, overrides duration derivation.')
+_MAX_CONCURRENT = flags.DEFINE_integer(
+    'agent_sandbox_max_concurrent', 200, 'Maximum in-flight claims.')
+_READY_TIMEOUT = flags.DEFINE_integer(
+    'agent_sandbox_ready_timeout', 180, 'Per-claim ready timeout in seconds.')
+_WORKLOAD_DURATION = flags.DEFINE_integer(
+    'agent_sandbox_workload_duration', 0,
+    'Seconds to run a CPU busy-loop inside each sandbox after it becomes '
+    'Ready, before releasing it. 0 (default) releases immediately (pure '
+    'provisioning benchmark). >0 holds the sandbox so peak_concurrency '
+    'reflects simultaneously-alive sandboxes and exec/lifecycle metrics emit.')
+_CLAIM_TTL = flags.DEFINE_integer(
+    'agent_sandbox_claim_ttl_seconds', 120,
+    'Server-side TTL set on each SandboxClaim so the controller auto-deletes '
+    'orphaned claims if the driver is hard-killed. 0 disables the TTL.')
 
 BENCHMARK_NAME = 'agent_sandbox'
 BENCHMARK_CONFIG = """
 agent_sandbox:
   description: >
-    Provision the agent-sandbox stack on a Kubernetes cluster. Load generation
-    and metrics are added in a follow-up change.
+    Submit SandboxClaims at a target QPS and measure provisioning latency on
+    the agent-sandbox stack.
   container_cluster:
     cloud: GCP
     type: Kubernetes
@@ -52,8 +79,6 @@ agent_sandbox:
           AWS:
             machine_type: m8i.4xlarge
             zone: us-east-1a
-        node_labels:
-          sandbox.gke.io/runtime: runsc
         node_taints:
           - sandbox.gke.io/runtime=runsc:NoSchedule
   agent_sandbox:
@@ -69,14 +94,62 @@ def GetConfig(user_config):
 
 
 def Prepare(benchmark_spec):
-  """No-op: the agent sandbox is provisioned via benchmark_spec."""
-  del benchmark_spec
+  """Installs the controller, sandbox template, and warm pool.
+
+  CRDs, RBAC, and gVisor are installed during provision. The controller stack
+  is installed here so it can be re-applied against an existing cluster with
+  `--run_stage=prepare` to iterate on controller settings without recreating
+  the cluster. On a prepare-stage resume the benchmark spec was pickled at
+  provision, so the config is rebuilt from the current flags; re-run with your
+  full flag set plus whatever you are changing.
+  """
+  sandbox = benchmark_spec.agent_sandbox
+  if sandbox is None:
+    raise errors.Benchmarks.PrepareException(
+        'agent_sandbox must be configured for this benchmark')
+  if stages.PROVISION not in FLAGS.run_stage:
+    sandbox.RefreshSpecFromFlags()
+  sandbox.InstallWorkload()
 
 
 def Run(benchmark_spec):
-  """Returns no samples yet. Load generation lands in a follow-up change."""
-  del benchmark_spec
-  return []  # TODO(followup): run the load generator and return samples.
+  """Submits claims at the target rate and returns latency samples."""
+  spec = benchmark_spec.agent_sandbox.spec
+  shape = agent_sandbox_loadgen.resolve_run_shape(
+      qps=_QPS.value,
+      duration=_DURATION.value if _TOTAL.value is None else None,
+      total=_TOTAL.value)
+  driver = agent_sandbox_loadgen.ClaimDriver(
+      namespace=spec.namespace,
+      template_name=k8s_agent_sandbox.SANDBOX_NAME,
+      warmpool_name=k8s_agent_sandbox.SANDBOX_NAME,
+      claim_ttl_seconds=_CLAIM_TTL.value,
+      max_concurrent=_MAX_CONCURRENT.value)
+  workload_duration = _WORKLOAD_DURATION.value
+  executor = None
+  if workload_duration > 0:
+    pool_size = _MAX_CONCURRENT.value + 50
+    executor = agent_sandbox_loadgen.StreamExecExecutor(
+        core_v1_api=agent_sandbox_loadgen._make_core_v1_api(pool_size),
+        custom_objects_api=agent_sandbox_loadgen._make_custom_objects_api(
+            pool_size),
+        namespace=spec.namespace,
+        workload_duration=workload_duration)
+  generator = agent_sandbox_loadgen.LoadGenerator(
+      driver, ready_timeout=_READY_TIMEOUT.value,
+      max_concurrent=_MAX_CONCURRENT.value,
+      workload_executor=executor, workload_duration=workload_duration)
+  records = generator.run(shape)
+  metadata = {
+      'target_qps': shape.qps,
+      'duration': shape.duration,
+      'total_claims': shape.total,
+      'warmpool_replicas': spec.sandbox_warmpool.replicas,
+      'runtime_class': spec.sandbox_template.runtime_class,
+  }
+  metadata.update(benchmark_spec.container_cluster.GetResourceMetadata())
+  return agent_sandbox_metrics.build_samples(
+      records, generator.peak_concurrency, metadata)
 
 
 def Cleanup(benchmark_spec):
