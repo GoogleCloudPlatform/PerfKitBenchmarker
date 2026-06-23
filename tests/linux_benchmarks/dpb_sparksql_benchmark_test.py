@@ -18,7 +18,6 @@ sys.modules['pyspark'] = PYSPARK_MOCK
 
 from perfkitbenchmarker.scripts.spark_sql_test_scripts import spark_sql_runner
 
-
 FLAGS = flags.FLAGS
 _TPCH_TABLES = [
     'customer',
@@ -390,6 +389,52 @@ class DpbSparksqlBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         '}\n'
     )
     self.assertIn(expected_substr, rendered_script)
+
+  @flagsaver.flagsaver(
+      dpb_sparksql_order=['1', '2', '3', '4'],
+      dpb_sparksql_fetch_results_from_logs=True,
+  )
+  def testSampleFailingQueries(self):
+    # Arrange
+    self.benchmark_spec_mock.table_subdirs = list(_TPCH_TABLES)
+    self.benchmark_spec_mock.query_streams = [['1', '2', '3']]
+    self.benchmark_spec_mock.queries_and_script_upload_time = None
+    self.benchmark_spec_mock.hive_tables_creation_time = None
+
+    job_result_mock = mock.Mock(
+        wall_time=42.0,
+        pending_time=5.0,
+        stdout=(
+            '----@spark_sql_runner:results_start@----\n'
+            '[{"query_id": "1", "duration": 10.0},\n'
+            ' {"query_id": "2", "duration": 10.0},\n'
+            ' {"query_id": "3", "duration": 10.0}]\n'
+            '----@spark_sql_runner:results_end@----\n'
+        ),
+        stderr='',
+    )
+    self.benchmark_spec_mock.dpb_service.SubmitJob.return_value = (
+        job_result_mock
+    )
+    self.benchmark_spec_mock.dpb_service.GetResourceMetadata.return_value = {
+        'cluster_name': 'test_cluster'
+    }
+    self.benchmark_spec_mock.dpb_service.GetClusterCreateTime.return_value = (
+        100.0
+    )
+    self.benchmark_spec_mock.dpb_service.metadata = {}
+
+    # Act
+    samples = dpb_sparksql_benchmark.Run(self.benchmark_spec_mock)
+
+    # Assert
+    query_sample = next(s for s in samples if s.metric == 'sparksql_run_time')
+    global_sample = next(
+        s for s in samples if s.metric == 'sparksql_total_wall_time'
+    )
+    self.assertIn('failing_queries', global_sample.metadata)
+    self.assertEqual(global_sample.metadata['failing_queries'], '4')
+    self.assertNotIn('failing_queries', query_sample.metadata)
 
 
 if __name__ == '__main__':

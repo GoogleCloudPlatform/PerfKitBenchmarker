@@ -127,6 +127,7 @@
     bringing this variant more in-line with others.
 -   Rename GKE Autopilot & EKS Auto mode's cluster_type within PKB from
     'Autopilot' to 'Auto'.
+-   Duplicate metadata for all samples.
 
 ### New features:
 

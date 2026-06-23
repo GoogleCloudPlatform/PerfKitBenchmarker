@@ -551,12 +551,15 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
     missing_results.append(spec_name)
 
   if missing_results:
+    missing_results_str = ','.join(missing_results)
     if keep_partial_results:
       metadata['partial'] = 'true'
-      metadata['missing_results'] = ','.join(missing_results)
+      metadata['missing_results'] = missing_results_str
+      for result in results:
+        result.metadata.update(metadata)
     else:
       raise errors.Benchmarks.RunError(
-          'speccpu: results missing, see log: ' + ','.join(missing_results)
+          'speccpu: results missing, see log: ' + missing_results_str
       )
 
   if spec_score:
