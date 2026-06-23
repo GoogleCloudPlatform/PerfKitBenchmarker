@@ -52,8 +52,8 @@ BENCHMARK_CONFIG = """
 kubernetes_management:
   description: >
     Benchmarks GKE/EKS/AKS management plane operations: concurrent node pool
-    create/delete, overlapping cluster + node-pool ops, and large-scale
-    provisioning. Focused on control-plane API responsiveness.
+    create/delete, and overlapping cluster + node-pool ops. Focused on
+    control-plane API responsiveness.
   container_cluster:
     type: Kubernetes
     vm_count: 1
@@ -164,7 +164,6 @@ def CheckPrerequisites(
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """Deploys a sleep pod to confirm data-plane reachability."""
   cluster = benchmark_spec.container_cluster
-  # Type narrowing for pytype; reachability is confirmed by the sleep pod below.
   assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
   benchmark_spec.always_call_cleanup = True
   logging.info(
@@ -207,12 +206,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
 
   # Resolve the initial node-pool version once; log clearly; tag every sample.
-  flag_initial = _INITIAL_VERSION.value
-  if not flag_initial:
-    resolved_initial, _ = cluster.ResolveNodePoolVersions()
-    flag_initial = resolved_initial
-  initial = flag_initial
-  source = "flag" if _INITIAL_VERSION.value else "auto-resolved"
+  initial = _INITIAL_VERSION.value
+  source = "flag" if initial else "auto-resolved"
+  if not initial:
+    initial, _ = cluster.ResolveNodePoolVersions()
+  assert initial is not None
 
   logging.info(
       "NodePool version (%s): initial=%s "
@@ -255,6 +253,7 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   cluster = benchmark_spec.container_cluster
   if cluster is None:
     return
+  assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
   kubectl.RunKubectlCommand(
       ["delete", "pod", _SLEEP_POD_NAME, "--ignore-not-found"],
       raise_on_failure=False,
@@ -307,7 +306,9 @@ def _RunOverlappingClusterUpdate(
   Both ops kick off async on separate threads; initiation + E2E latency
   recorded independently. Overlap window = ClusterUpdate E2E latency.
   """
-  logging.info("Scenario B: overlapping cluster update + node-pool create")
+  logging.info(
+      "overlapping_cluster_update: cluster update + node-pool create"
+  )
   cfg = _MakeNodePoolConfig(cluster, _OVERLAPPING_POOL_NAME)
   results = ThreadSafeResults()
 
@@ -315,7 +316,7 @@ def _RunOverlappingClusterUpdate(
     timing = _TimedAsync(cluster.UpdateClusterAsync, cluster.WaitForOperation)
     results.add("OverlappingUpdate_ClusterUpdate", timing)
     logging.info(
-        "Scenario B ClusterUpdate: init=%.2fs e2e=%.2fs",
+        "overlapping_cluster_update ClusterUpdate: init=%.2fs e2e=%.2fs",
         timing.initiation_latency,
         timing.end_to_end_latency,
     )
@@ -327,7 +328,7 @@ def _RunOverlappingClusterUpdate(
     )
     results.add("OverlappingUpdate_NodePoolCreate", timing)
     logging.info(
-        "Scenario B NodePoolCreate: init=%.2fs e2e=%.2fs",
+        "overlapping_cluster_update NodePoolCreate: init=%.2fs e2e=%.2fs",
         timing.initiation_latency,
         timing.end_to_end_latency,
     )
