@@ -30,6 +30,7 @@ from typing import Any
 from urllib import parse
 
 from absl import flags
+import yaml
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine
@@ -208,7 +209,142 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
     if nodepool.min_nodes != nodepool.max_nodes:
       group_json['minSize'] = nodepool.min_nodes
       group_json['maxSize'] = nodepool.max_nodes
+    if nodepool.swap_config and nodepool.swap_config.enabled:
+      self._AddSwapToNodeGroupJson(nodepool, group_json)
     return group_json
+
+  # Device name the io2 swap volume is attached as; the kernel renames it to a
+  # /dev/nvme*n1 node on Nitro, which the bootstrap script resolves by EBS model.
+  _EKS_IO2_SWAP_DEVICE = '/dev/sdf'
+  # Default io2 provisioned IOPS for the swap volume (overridable via the
+  # benchmark if a swap_config.iops field is later added).
+  _EKS_IO2_DEFAULT_IOPS = 16000
+
+  def _AddSwapToNodeGroupJson(
+      self,
+      nodepool: container.BaseNodePoolConfig,
+      group_json: dict[str, Any],
+  ) -> None:
+    """Wire swap into an eksctl managed-nodegroup spec (AmazonLinux2023).
+
+    EKS does not have a managed swap. Swap on EKS is handled by two requirements,
+    which are rendered here in the provider instead of individual benchmarks:
+
+      1. The swap device.
+         - instance_store: The NVMe Instance Store is physically present and
+           Nitro hardware-encrypted at rest. No extra volume or cryptsetup needed.
+         - io2: An EBS io2 volume added via eksctl `additionalVolumes`. The
+           `volumeEncrypted` field follows swap_config.encrypted.
+      2. Kubelet swap behavior, allowing scheduled pods to use swap. AL2023
+         uses nodeadm. We emit a nodeadm `NodeConfig` via
+         `overrideBootstrapCommand`. Eksctl prepends it, and nodeadm merges it
+         with the default config, so we only set the swap-related fields.
+
+    The device is formatted and activated by `preBootstrapCommands`. These run
+    before the kubelet starts, ensuring the swap device is active when the kubelet
+    applies memorySwap.swapBehavior.
+
+    Note: There are reports of preBootstrapCommands being flaky on some
+    AL2023 eksctl versions (eksctl-io/eksctl#7903). If this happens, these
+    commands can be delivered via a custom launch-template userData script.
+    """
+    swap = nodepool.swap_config
+    if swap.backing_store not in ('instance_store', 'io2'):
+      raise errors.Config.InvalidValue(
+          'EKS swap backing_store must be "instance_store" or "io2"; got '
+          f'{swap.backing_store!r}.'
+      )
+
+    # ---- 1. swap device ----------------------------------------------------
+    if swap.backing_store == 'io2':
+      size_gb = swap.size_gb or 100
+      volume: dict[str, Any] = {
+          'volumeName': self._EKS_IO2_SWAP_DEVICE,
+          'volumeType': 'io2',
+          'volumeSize': size_gb,
+          'volumeIOPS': self._EKS_IO2_DEFAULT_IOPS,
+          # encrypted=False provides an unencrypted baseline. True uses KMS/Nitro.
+          'volumeEncrypted': swap.encrypted,
+      }
+      group_json.setdefault('additionalVolumes', []).append(volume)
+      device_resolver = self._EksIo2DeviceResolverShell()
+    else:  # instance_store
+      if not swap.encrypted:
+        # Instance Store on Nitro is always encrypted at rest; there is no
+        # unencrypted instance-store row. Use io2 (volumeEncrypted=false) for an
+        # unencrypted AWS baseline instead.
+        logging.warning(
+            '[eks swap] instance_store is always Nitro-encrypted; '
+            'encrypted=False is ignored. Use backing_store=io2 for an '
+            'unencrypted AWS baseline.'
+        )
+      device_resolver = self._EksInstanceStoreDeviceResolverShell()
+
+    # ---- 2. device activation (runs before kubelet) ------------------------
+    # mkswap formats the whole device; the size was already set on the volume
+    # (io2) or is fixed by the instance (instance store).
+    group_json.setdefault('preBootstrapCommands', []).extend([
+        device_resolver,
+        # SWAP_DEV is exported by the resolver snippet above.
+        'mkswap "$SWAP_DEV"',
+        'swapon "$SWAP_DEV"',
+        'swapon --show',
+    ])
+
+    # ---- 3. kubelet swap behavior (nodeadm NodeConfig, merged by nodeadm) ---
+    nodeadm = {
+        'apiVersion': 'node.eks.aws/v1alpha1',
+        'kind': 'NodeConfig',
+        'spec': {
+            'kubelet': {
+                'config': {
+                    'memorySwap': {'swapBehavior': swap.behavior},
+                },
+                # failSwapOn must be false for the kubelet to start with swap on.
+                'flags': ['--fail-swap-on=false'],
+            },
+        },
+    }
+    group_json['overrideBootstrapCommand'] = yaml.safe_dump(
+        nodeadm, default_flow_style=False, sort_keys=False
+    )
+    logging.info(
+        '[eks swap] nodegroup %s: backing_store=%s encrypted=%s behavior=%s',
+        nodepool.name,
+        swap.backing_store,
+        swap.encrypted,
+        swap.behavior,
+    )
+
+  def _EksInstanceStoreDeviceResolverShell(self) -> str:
+    """Shell that exports SWAP_DEV = first NVMe Instance Store device."""
+    # 'Amazon EC2 NVMe Instance Storage' is the model string Nitro reports for
+    # instance-store volumes; EBS volumes report 'Amazon Elastic Block Store'.
+    return (
+        'SWAP_DEV=$(for d in /dev/nvme*n1; do '
+        '[ -e "$d" ] || continue; '
+        'm=$(nvme id-ctrl "$d" 2>/dev/null | grep -i "mn " | head -1); '
+        'echo "$m" | grep -qi "Instance Storage" && { echo "$d"; break; }; '
+        'done); '
+        '[ -n "$SWAP_DEV" ] || { echo "no instance-store NVMe found" >&2; '
+        'exit 1; }; export SWAP_DEV'
+    )
+
+  def _EksIo2DeviceResolverShell(self) -> str:
+    """Shell that exports SWAP_DEV = the attached io2 EBS volume's NVMe node."""
+    # On Nitro, /dev/sdf is renamed to a /dev/nvme*n1 node; match the EBS model
+    # and exclude the root device so we never pick the OS disk.
+    return (
+        'ROOT=$(lsblk -no pkname "$(findmnt -no SOURCE /)" 2>/dev/null); '
+        'SWAP_DEV=$(for d in /dev/nvme*n1; do '
+        '[ -e "$d" ] || continue; '
+        'n=$(basename "$d"); [ "$n" = "$ROOT" ] && continue; '
+        'm=$(nvme id-ctrl "$d" 2>/dev/null | grep -i "mn " | head -1); '
+        'echo "$m" | grep -qi "Elastic Block Store" && { echo "$d"; break; }; '
+        'done); '
+        '[ -n "$SWAP_DEV" ] || { echo "no io2 EBS swap device found" >&2; '
+        'exit 1; }; export SWAP_DEV'
+    )
 
   def _WriteJsonToFile(self, json_dict: dict[str, Any]) -> str:
     """Renders the given json dict to a file.

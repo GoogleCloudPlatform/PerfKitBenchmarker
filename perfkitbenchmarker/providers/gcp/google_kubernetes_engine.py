@@ -18,13 +18,16 @@ import logging
 import math
 import os
 import re
+import tempfile
 import typing
 from typing import Any
 
 from absl import flags
+import yaml
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine_spec
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import gce_disk
@@ -570,7 +573,15 @@ class GkeCluster(BaseGkeCluster):
     ):
       cmd.args.append('--enable-fast-socket')
 
-    if FLAGS.gke_node_system_config is not None:
+    # Node system config (kubelet/sysctl) and swap config both flow through
+    # --system-config-from-file. Swap takes precedence because it must inject
+    # linuxConfig.swapConfig + kubeletConfig.memorySwapBehavior. It merges any
+    # user-provided gke_node_system_config so both coexist.
+    if nodepool_config.swap_config and nodepool_config.swap_config.enabled:
+      cmd.flags['system-config-from-file'] = self._WriteSwapSystemConfigFile(
+          nodepool_config.swap_config, FLAGS.gke_node_system_config
+      )
+    elif FLAGS.gke_node_system_config is not None:
       cmd.flags['system-config-from-file'] = FLAGS.gke_node_system_config
 
     if nodepool_config.sandbox_config is not None:
@@ -584,6 +595,92 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append('--enable-autoscaling')
       cmd.flags['min-nodes'] = nodepool_config.min_nodes
       cmd.flags['max-nodes'] = nodepool_config.max_nodes
+
+  def _WriteSwapSystemConfigFile(
+      self,
+      swap_config: container_spec_lib.SwapConfigSpec,
+      base_config_path: str | None = None,
+  ) -> str:
+    """Builds the GKE node system-config file that enables managed swap.
+
+    GKE provisions and encrypts the swap device itself when given
+    linuxConfig.swapConfig. Privileged DaemonSets, in-pod dm-crypt, and
+    cgroup memory.swap.max edits are not required. See:
+    https://docs.cloud.google.com/kubernetes-engine/docs/how-to/node-memory-swap
+
+    Args:
+      swap_config: The declarative swap config for this node pool.
+      base_config_path: Optional path to a user-supplied system-config YAML
+        (gke_node_system_config) whose keys are merged in first.
+
+    Returns:
+      Path to a temp YAML file suitable for `gcloud ... --system-config-from-file`.
+    """
+    config: dict[str, Any] = {}
+    if base_config_path:
+      with open(base_config_path) as f:
+        config = yaml.safe_load(f) or {}
+
+    linux_config = config.setdefault('linuxConfig', {})
+    swap_block: dict[str, Any] = {'enabled': True}
+
+    # Each profile accepts swapSizeGib OR swapSizePercent (LinuxNodeConfig API).
+    size_field = (
+        {'swapSizeGib': swap_config.size_gb}
+        if swap_config.size_gb
+        else {'swapSizePercent': swap_config.size_percent}
+    )
+    if swap_config.backing_store == 'local_ssd':
+      swap_block['ephemeralLocalSsdProfile'] = size_field
+    elif swap_config.backing_store == 'boot_disk':
+      # Boot-disk-backed managed swap. NOTE: this is NOT a dedicated,
+      # IOPS-provisioned hyperdisk swap device -- GKE managed swap only backs
+      # onto the boot disk / ephemeral / dedicated local SSD. A separately
+      # attached hyperdisk swap volume with provisioned IOPS still needs a disk
+      # attach path (see the PR-6776 review).
+      swap_block['bootDiskProfile'] = size_field
+    else:
+      raise errors.Config.InvalidValue(
+          'GKE swap backing_store must be "local_ssd" or "boot_disk"; got '
+          f'{swap_config.backing_store!r}.'
+      )
+
+    # Encrypted is GKE's default (ephemeral key). False disables encryption.
+    if not swap_config.encrypted:
+      swap_block['encryptionConfig'] = {'disabled': True}
+
+    linux_config['swapConfig'] = swap_block
+
+    # NOTE: we deliberately do NOT emit a kubelet swapBehavior key here. GKE's
+    # managed swap applies LimitedSwap proportionally on its own, and the GKE
+    # node system-config schema (LinuxNodeConfig) does not expose a kubelet
+    # memory-swap field -- injecting an unknown key would make gcloud reject the
+    # whole system-config. swap_config.behavior is honored on EKS, where the
+    # standard k8s KubeletConfiguration (memorySwap.swapBehavior) must be set
+    # explicitly. If a non-default behavior is ever requested on GKE, surface it
+    # rather than silently dropping it.
+    if swap_config.behavior and swap_config.behavior != 'LimitedSwap':
+      logging.warning(
+          'GKE manages swap behavior automatically (LimitedSwap); ignoring '
+          'requested swap behavior %r.',
+          swap_config.behavior,
+      )
+
+    tmp = tempfile.NamedTemporaryFile(
+        mode='w',
+        prefix='pkb_gke_swap_syscfg_',
+        suffix='.yaml',
+        delete=False,
+        dir=vm_util.GetTempDir(),
+    )
+    yaml.safe_dump(config, tmp)
+    tmp.close()
+    logging.info(
+        'GKE swap node system config written to %s:\n%s',
+        tmp.name,
+        yaml.safe_dump(config),
+    )
+    return tmp.name
 
   def _PostCreate(self):
     """Waits for kube-dns to be available."""
