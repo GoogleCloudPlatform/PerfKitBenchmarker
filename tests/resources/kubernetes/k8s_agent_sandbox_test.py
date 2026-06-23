@@ -69,14 +69,10 @@ class K8sAgentSandboxSpecTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS['agent_sandbox_manifest_ref'].parse('deadbeef')
     FLAGS['agent_sandbox_runtime_class'].parse('gvisor')
     FLAGS['agent_sandbox_warmpool_replicas'].parse(7)
-    FLAGS['agent_sandbox_controller_claim_workers'].parse(12)
-    FLAGS['agent_sandbox_controller_leader_elect'].parse(True)
     spec = self._Decode()
     self.assertEqual(spec.manifest_ref, 'deadbeef')
     self.assertEqual(spec.sandbox_template.runtime_class, 'gvisor')
     self.assertEqual(spec.sandbox_warmpool.replicas, 7)
-    self.assertEqual(spec.controller.claim_workers, 12)
-    self.assertTrue(spec.controller.leader_elect)
 
 
 class ConfigureControllerManifestTest(pkb_common_test_case.PkbCommonTestCase):
@@ -167,13 +163,11 @@ class K8sAgentSandboxCreateTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testRefreshSpecFromFlagsAppliesCurrentFlags(self):
     sandbox = self._Sandbox()
-    FLAGS['agent_sandbox_controller_image'].parse('new/image:tag')
-    FLAGS['agent_sandbox_controller_claim_workers'].parse(99)
     FLAGS['agent_sandbox_warmpool_replicas'].parse(42)
+    FLAGS['agent_sandbox_runtime_class'].parse('gvisor')
     sandbox.RefreshSpecFromFlags()
-    self.assertEqual(sandbox.spec.controller.image, 'new/image:tag')
-    self.assertEqual(sandbox.spec.controller.claim_workers, 99)
     self.assertEqual(sandbox.spec.sandbox_warmpool.replicas, 42)
+    self.assertEqual(sandbox.spec.sandbox_template.runtime_class, 'gvisor')
 
   def testDeleteIsNoOp(self):
     sandbox = self._Sandbox()
@@ -182,11 +176,14 @@ class K8sAgentSandboxCreateTest(pkb_common_test_case.PkbCommonTestCase):
 
 class AgentSandboxRunTest(pkb_common_test_case.PkbCommonTestCase):
 
-  def testRunSourcesConfigFromResourceSpec(self):
+  def testRunUsesJobFlowAndParsesJsonl(self):
     from perfkitbenchmarker.linux_benchmarks import agent_sandbox_benchmark
     from perfkitbenchmarker.linux_benchmarks import agent_sandbox_loadgen
     from perfkitbenchmarker.linux_benchmarks import agent_sandbox_metrics
-    from perfkitbenchmarker.resources.kubernetes import k8s_agent_sandbox
+    from perfkitbenchmarker.resources.container_service import kubectl as kubectl_mod
+    from perfkitbenchmarker.resources.container_service import kubernetes_commands
+    import dataclasses
+    import json
 
     sandbox_spec = k8s_agent_sandbox_spec.K8sAgentSandboxConfigSpec(
         _COMPONENT, flag_values=FLAGS, type='Kubernetes',
@@ -196,27 +193,54 @@ class AgentSandboxRunTest(pkb_common_test_case.PkbCommonTestCase):
     bm_spec.agent_sandbox = sandbox
     bm_spec.container_cluster.GetResourceMetadata.return_value = {}
 
+    rec = agent_sandbox_loadgen.ClaimRecord(
+        name='claim-0', requested_at=100.0, ready_at=102.0,
+        warm_served=False, released_at=103.0)
+    rec_line = json.dumps(dataclasses.asdict(rec))
+    summary_line = json.dumps({'summary': {'peak_concurrency': 3}})
+    fake_logs = f'some startup output\n---RESULTS---\n{rec_line}\n{summary_line}\n'
+
     sentinel = [mock.sentinel.sample]
     with mock.patch.object(
-        agent_sandbox_loadgen, 'ClaimDriver') as mock_driver, \
+        kubectl_mod, 'RunKubectlCommand',
+        return_value=('pod-abc-123', '', 0)) as mock_kubectl, \
         mock.patch.object(
-            agent_sandbox_loadgen, 'LoadGenerator') as mock_gen, \
+            kubernetes_commands, 'ApplyManifest') as mock_apply, \
+        mock.patch.object(
+            kubernetes_commands, 'WaitForResourceForMultiConditions',
+            return_value='condition=Complete') as mock_wait, \
         mock.patch.object(
             agent_sandbox_metrics, 'build_samples',
             return_value=sentinel) as mock_build:
-      mock_gen.return_value.run.return_value = ['rec']
-      mock_gen.return_value.peak_concurrency = 4
+      # First RunKubectlCommand call is 'delete job'; second is 'get pods';
+      # third is 'logs'. Override side_effect for logs call.
+      kubectl_calls = [
+          ('', '', 0),          # delete job --ignore-not-found
+          ('pod-abc-123', '', 0),  # get pods -l job-name=...
+          (fake_logs, '', 0),   # logs pod-abc-123
+      ]
+      mock_kubectl.side_effect = kubectl_calls
       result = agent_sandbox_benchmark.Run(bm_spec)
 
-    self.assertEqual(mock_driver.call_args.kwargs['namespace'], 'sandboxes')
-    self.assertEqual(
-        mock_driver.call_args.kwargs['template_name'],
-        k8s_agent_sandbox.SANDBOX_NAME)
-    self.assertEqual(
-        mock_driver.call_args.kwargs['warmpool_name'],
-        k8s_agent_sandbox.SANDBOX_NAME)
     self.assertIs(result, sentinel)
-    mock_build.assert_called_once_with(['rec'], 4, mock.ANY)
+    mock_wait.assert_called_once()
+    wait_kwargs = mock_wait.call_args
+    actual_conditions = wait_kwargs.kwargs.get(
+        'conditions', wait_kwargs.args[1] if len(wait_kwargs.args) > 1 else [])
+    self.assertIn('condition=Complete', actual_conditions)
+    self.assertIn('condition=Failed', actual_conditions)
+    mock_apply.assert_called()
+    apply_calls = [str(c) for c in mock_apply.call_args_list]
+    self.assertTrue(
+        any('load_runner_job' in c for c in apply_calls),
+        f'Expected ApplyManifest call for load_runner_job manifest; got: {apply_calls}')
+    mock_build.assert_called_once()
+    build_args = mock_build.call_args
+    parsed_records, peak, meta = build_args.args
+    self.assertEqual(len(parsed_records), 1)
+    self.assertEqual(parsed_records[0].name, 'claim-0')
+    self.assertEqual(peak, 3)
+    self.assertEqual(meta['warmpool_replicas'], 4)
 
 
 class AgentSandboxBenchmarkConfigTest(pkb_common_test_case.PkbCommonTestCase):

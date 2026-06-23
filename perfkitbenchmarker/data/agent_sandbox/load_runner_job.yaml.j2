@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: agent-sandbox-load-runner
+  namespace: {{ namespace }}
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: agent-sandbox-load-runner
+    spec:
+      restartPolicy: Never
+      serviceAccountName: agent-sandbox-load-runner
+      containers:
+        - name: runner
+          image: python:3.12-slim
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              mkdir -p /tmp/results
+              pip install --no-cache-dir --quiet kubernetes
+              python /opt/load-runner/load_runner.py \
+                --namespace {{ namespace }} \
+                --template-name {{ template_name }} \
+                --max-concurrent {{ max_concurrent }} \
+                --workload-duration {{ workload_duration }} \
+                {% if qps is not none %}--qps {{ qps }} \
+                {% endif %}{% if total is not none %}--total {{ total }} \
+                {% endif %}{% if duration is not none %}--duration {{ duration }} \
+                {% endif %}{% if ready_timeout is not none %}--ready-timeout {{ ready_timeout }} \
+                {% endif %}--output /tmp/results/run.jsonl
+              echo '---RESULTS---'
+              cat /tmp/results/run.jsonl
+          resources:
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          volumeMounts:
+            - name: script
+              mountPath: /opt/load-runner
+              readOnly: true
+            - name: results
+              mountPath: /tmp/results
+      volumes:
+        - name: script
+          configMap:
+            name: agent-sandbox-load-runner-script
+        - name: results
+          emptyDir: {}

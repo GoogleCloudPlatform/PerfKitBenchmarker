@@ -15,6 +15,7 @@
 
 import collections
 import math
+from typing import Any
 
 from perfkitbenchmarker import sample
 
@@ -22,7 +23,7 @@ _PERCENTILES = (50, 90, 95, 99)
 
 
 
-def percentile(values, pct):
+def percentile(values: list[float], pct: float) -> float:
   """Linear-interpolated percentile. Returns 0.0 for an empty input."""
   if not values:
     return 0.0
@@ -35,7 +36,11 @@ def percentile(values, pct):
   return float(ordered[low] + (ordered[high] - ordered[low]) * (rank - low))
 
 
-def build_samples(records, peak_concurrency, metadata):
+def build_samples(
+    records: list[Any],
+    peak_concurrency: int,
+    metadata: dict[str, Any],
+) -> list[sample.Sample]:
   """Builds the sample list for one benchmark Run.
 
   Args:

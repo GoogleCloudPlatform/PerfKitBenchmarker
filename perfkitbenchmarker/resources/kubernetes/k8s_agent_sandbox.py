@@ -456,7 +456,7 @@ class K8sAgentSandbox(agent_sandbox.BaseAgentSandbox):
     self.spec.sandbox_warmpool = k8s_agent_sandbox_spec.SandboxWarmPoolSpec(
         'agent_sandbox.sandbox_warmpool', flag_values=FLAGS
     )
-    if FLAGS['agent_sandbox_namespace'].present:
+    if 'agent_sandbox_namespace' in FLAGS and FLAGS['agent_sandbox_namespace'].present:
       self.spec.namespace = FLAGS.agent_sandbox_namespace
     if FLAGS['agent_sandbox_manifest_ref'].present:
       self.spec.manifest_ref = FLAGS.agent_sandbox_manifest_ref

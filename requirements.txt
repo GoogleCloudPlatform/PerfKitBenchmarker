@@ -19,7 +19,6 @@ google-cloud-core
 google-cloud-monitoring>=2.0.0
 immutabledict
 jinja2>=2.10.2
-kubernetes>=31.0.0
 numpy>=1.16.5
 packaging
 pandas>=1.1.5

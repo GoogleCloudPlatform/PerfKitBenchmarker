@@ -16,14 +16,27 @@
 Submits SandboxClaim custom resources at a target QPS against the agent
 sandbox installed on the cluster (via benchmark_spec.agent_sandbox) and
 reports claim-to-Ready latency percentiles, throughput, and peak concurrency.
+
+The load generator runs INSIDE a pod on the cluster (Job: agent-sandbox-load-runner)
+so the kubernetes Python client is not a PKB core dependency.
 """
 
+import inspect
+import json
+import os
+import tempfile
+from typing import Any
+
 from absl import flags
+from absl import logging
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker.linux_benchmarks import agent_sandbox_loadgen
 from perfkitbenchmarker.linux_benchmarks import agent_sandbox_metrics
+from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.kubernetes import k8s_agent_sandbox
 
 FLAGS = flags.FLAGS
@@ -47,10 +60,6 @@ _WORKLOAD_DURATION = flags.DEFINE_integer(
     'Ready, before releasing it. 0 (default) releases immediately (pure '
     'provisioning benchmark). >0 holds the sandbox so peak_concurrency '
     'reflects simultaneously-alive sandboxes and exec/lifecycle metrics emit.')
-_CLAIM_TTL = flags.DEFINE_integer(
-    'agent_sandbox_claim_ttl_seconds', 120,
-    'Server-side TTL set on each SandboxClaim so the controller auto-deletes '
-    'orphaned claims if the driver is hard-killed. 0 disables the TTL.')
 
 BENCHMARK_NAME = 'agent_sandbox'
 BENCHMARK_CONFIG = """
@@ -85,23 +94,54 @@ agent_sandbox:
     type: Kubernetes
 """
 
+# K8s object names for the in-pod load runner.
+_LOAD_RUNNER_CONFIGMAP = 'agent-sandbox-load-runner-script'
+_LOAD_RUNNER_JOB = 'agent-sandbox-load-runner'
+_LOAD_RUNNER_RBAC_MANIFEST = 'agent_sandbox/load_runner_rbac.yaml.j2'
+_LOAD_RUNNER_JOB_MANIFEST = 'agent_sandbox/load_runner_job.yaml.j2'
+_RESULTS_SENTINEL = '---RESULTS---'
 
-def GetConfig(user_config):
+
+def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
   """Loads the benchmark config and merges user overrides."""
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   config['container_cluster']['cloud'] = FLAGS.cloud
   return config
 
 
-def Prepare(benchmark_spec):
-  """Installs the controller, sandbox template, and warm pool.
+def _create_loadgen_configmap(namespace: str) -> None:
+  """Creates or updates the load-runner-script ConfigMap from the loadgen source.
+
+  Uses --dry-run=client -o yaml to render the ConfigMap (idempotent on
+  re-runs), writes it to a temp file, and applies it.
+  """
+  script_path = inspect.getsourcefile(agent_sandbox_loadgen)
+  yaml_out, _, _ = kubectl.RunKubectlCommand([
+      'create',
+      'configmap',
+      _LOAD_RUNNER_CONFIGMAP,
+      f'--from-file=load_runner.py={script_path}',
+      '--namespace', namespace,
+      '--dry-run=client',
+      '-o', 'yaml',
+  ])
+  tmpfile = tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False)
+  with tmpfile as tmp:
+    tmp.write(yaml_out)
+    tmp_path = tmp.name
+  try:
+    kubectl.RunKubectlCommand(['apply', '-f', tmp_path])
+  finally:
+    os.unlink(tmp_path)
+
+
+def Prepare(benchmark_spec: Any) -> None:
+  """Installs the controller, sandbox template, warm pool, and load runner RBAC.
 
   CRDs, RBAC, and gVisor are installed during provision. The controller stack
   is installed here so it can be re-applied against an existing cluster with
   `--run_stage=prepare` to iterate on controller settings without recreating
-  the cluster. On a prepare-stage resume the benchmark spec was pickled at
-  provision, so the config is rebuilt from the current flags; re-run with your
-  full flag set plus whatever you are changing.
+  the cluster.
   """
   sandbox = benchmark_spec.agent_sandbox
   if sandbox is None:
@@ -111,35 +151,102 @@ def Prepare(benchmark_spec):
     sandbox.RefreshSpecFromFlags()
   sandbox.InstallWorkload()
 
+  namespace = sandbox.spec.namespace
+  _create_loadgen_configmap(namespace)
+  kubernetes_commands.ApplyManifest(
+      _LOAD_RUNNER_RBAC_MANIFEST,
+      namespace=namespace,
+  )
 
-def Run(benchmark_spec):
-  """Submits claims at the target rate and returns latency samples."""
-  spec = benchmark_spec.agent_sandbox.spec
+
+def Run(benchmark_spec: Any) -> list[sample.Sample]:
+  """Runs the load generator Job inside the cluster and returns latency samples."""
+  sandbox = benchmark_spec.agent_sandbox
+  spec = sandbox.spec
+  namespace = spec.namespace
+
   shape = agent_sandbox_loadgen.resolve_run_shape(
       qps=_QPS.value,
       duration=_DURATION.value if _TOTAL.value is None else None,
       total=_TOTAL.value)
-  driver = agent_sandbox_loadgen.ClaimDriver(
-      namespace=spec.namespace,
+
+  # Delete any previous job so kubectl apply works cleanly.
+  kubectl.RunKubectlCommand(
+      ['delete', 'job', _LOAD_RUNNER_JOB, '--namespace', namespace,
+       '--ignore-not-found'],
+  )
+
+  # Render and apply the Job manifest.
+  kubernetes_commands.ApplyManifest(
+      _LOAD_RUNNER_JOB_MANIFEST,
+      namespace=namespace,
       template_name=k8s_agent_sandbox.SANDBOX_NAME,
-      warmpool_name=k8s_agent_sandbox.SANDBOX_NAME,
-      claim_ttl_seconds=_CLAIM_TTL.value,
-      max_concurrent=_MAX_CONCURRENT.value)
-  workload_duration = _WORKLOAD_DURATION.value
-  executor = None
-  if workload_duration > 0:
-    pool_size = _MAX_CONCURRENT.value + 50
-    executor = agent_sandbox_loadgen.StreamExecExecutor(
-        core_v1_api=agent_sandbox_loadgen._make_core_v1_api(pool_size),
-        custom_objects_api=agent_sandbox_loadgen._make_custom_objects_api(
-            pool_size),
-        namespace=spec.namespace,
-        workload_duration=workload_duration)
-  generator = agent_sandbox_loadgen.LoadGenerator(
-      driver, ready_timeout=_READY_TIMEOUT.value,
+      qps=shape.qps,
+      total=shape.total,
+      duration=shape.duration,
       max_concurrent=_MAX_CONCURRENT.value,
-      workload_executor=executor, workload_duration=workload_duration)
-  records = generator.run(shape)
+      workload_duration=_WORKLOAD_DURATION.value,
+      ready_timeout=_READY_TIMEOUT.value,
+  )
+
+  # Derive a generous wait timeout: submission window + per-claim timeout +
+  # workload duration + margin.
+  wait_timeout = int(
+      shape.duration + _READY_TIMEOUT.value + _WORKLOAD_DURATION.value + 120
+  )
+
+  # Wait for the Job to complete OR fail (whichever comes first).
+  condition = kubernetes_commands.WaitForResourceForMultiConditions(
+      f'job/{_LOAD_RUNNER_JOB}',
+      conditions=['condition=Complete', 'condition=Failed'],
+      namespace=namespace,
+      timeout=wait_timeout,
+  )
+
+  # Fetch logs regardless; we need them for results or the error message.
+  pod_out, _, _ = kubectl.RunKubectlCommand([
+      'get', 'pods',
+      '--namespace', namespace,
+      '-l', f'job-name={_LOAD_RUNNER_JOB}',
+      '-o', 'jsonpath={.items[0].metadata.name}',
+  ])
+  pod_name = pod_out.strip()
+
+  logs_out, _, _ = kubectl.RunKubectlCommand(
+      ['logs', pod_name, '--namespace', namespace],
+  )
+
+  if condition == 'condition=Failed':
+    raise errors.Benchmarks.RunError(
+        f'Load runner Job {_LOAD_RUNNER_JOB!r} failed.\n'
+        f'Pod logs:\n{logs_out}'
+    )
+
+  # Split on the LAST ---RESULTS--- sentinel.
+  parts = logs_out.split(_RESULTS_SENTINEL)
+  if len(parts) < 2:
+    raise errors.Benchmarks.RunError(
+        f'No {_RESULTS_SENTINEL!r} sentinel found in pod logs.\n'
+        f'Pod logs:\n{logs_out}'
+    )
+  jsonl_section = parts[-1].strip()
+
+  records = []
+  peak_concurrency = None
+  for line in jsonl_section.splitlines():
+    line = line.strip()
+    if not line:
+      continue
+    obj = json.loads(line)
+    if 'summary' in obj:
+      peak_concurrency = obj['summary']['peak_concurrency']
+    else:
+      records.append(agent_sandbox_loadgen.ClaimRecord(**obj))
+
+  if peak_concurrency is None:
+    logging.warning('No summary line found; defaulting peak_concurrency to 0')
+    peak_concurrency = 0
+
   metadata = {
       'target_qps': shape.qps,
       'duration': shape.duration,
@@ -149,9 +256,9 @@ def Run(benchmark_spec):
   }
   metadata.update(benchmark_spec.container_cluster.GetResourceMetadata())
   return agent_sandbox_metrics.build_samples(
-      records, generator.peak_concurrency, metadata)
+      records, peak_concurrency, metadata)
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(benchmark_spec: Any) -> None:
   """No-op: cluster teardown reclaims the agent sandbox stack."""
   del benchmark_spec

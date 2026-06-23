@@ -23,12 +23,17 @@ from status events rather than per-claim polling, so we never flood the
 apiserver with individual status GETs under concurrency.
 """
 
+from __future__ import annotations
+
+import argparse
 import dataclasses
+import json
 import logging
+import sys
 import threading
 import time
 from concurrent import futures
-from typing import Any, Optional, cast
+from typing import Any, Callable, Iterator, Optional, cast
 
 
 # Default connection pool size for kubernetes ApiClient instances. Callers that
@@ -50,7 +55,11 @@ class RunShape:
   total: int
 
 
-def resolve_run_shape(qps=None, duration=None, total=None):
+def resolve_run_shape(
+    qps: Optional[float] = None,
+    duration: Optional[float] = None,
+    total: Optional[int] = None,
+) -> RunShape:
   """Resolves any two of qps, duration, total into a complete RunShape.
 
   Args:
@@ -84,14 +93,14 @@ CLAIM_PLURAL = 'sandboxclaims'
 CLAIM_KIND = 'SandboxClaim'
 
 
-def _load_kube_config():
+def _load_kube_config() -> None:
   """Loads kubeconfig for the current PKB run. Isolated for test mocking."""
   from kubernetes import config  # pylint: disable=import-error,no-name-in-module
 
   config.load_kube_config()
 
 
-def _register_bearer_token_auth(cfg):
+def _register_bearer_token_auth(cfg: Any) -> None:
   """Registers the exec-plugin bearer token under the key the client expects.
 
   kubernetes-client>=36 auth_settings() looks for the token under the
@@ -107,7 +116,7 @@ def _register_bearer_token_auth(cfg):
     cfg.api_key_prefix['BearerToken'] = 'Bearer'
 
 
-def _new_api_client(connection_pool_maxsize=_CONNECTION_POOL_MAXSIZE):
+def _new_api_client(connection_pool_maxsize: int = _CONNECTION_POOL_MAXSIZE) -> Any:
   """Builds a Kubernetes ApiClient with a sized connection pool and working
   bearer-token auth.
 
@@ -125,14 +134,14 @@ def _new_api_client(connection_pool_maxsize=_CONNECTION_POOL_MAXSIZE):
   return client.ApiClient(cfg)
 
 
-def _make_custom_objects_api(connection_pool_maxsize=_CONNECTION_POOL_MAXSIZE):
+def _make_custom_objects_api(connection_pool_maxsize: int = _CONNECTION_POOL_MAXSIZE) -> Any:
   """Builds a CustomObjectsApi client with a sized connection pool."""
   from kubernetes import client  # pylint: disable=import-error,no-name-in-module
 
   return client.CustomObjectsApi(_new_api_client(connection_pool_maxsize))
 
 
-def _make_core_v1_api(connection_pool_maxsize=_CONNECTION_POOL_MAXSIZE):
+def _make_core_v1_api(connection_pool_maxsize: int = _CONNECTION_POOL_MAXSIZE) -> Any:
   """Builds a CoreV1Api client with a sized connection pool (for pod exec)."""
   from kubernetes import client  # pylint: disable=import-error,no-name-in-module
 
@@ -153,25 +162,25 @@ class ClaimRecord:
   released_at: Optional[float] = None
 
   @property
-  def startup_time_s(self):
+  def startup_time_s(self) -> Optional[float]:
     if self.ready_at is None:
       return None
     return self.ready_at - self.requested_at
 
   @property
-  def exec_duration_s(self):
+  def exec_duration_s(self) -> Optional[float]:
     if self.exec_started_at is None or self.exec_completed_at is None:
       return None
     return self.exec_completed_at - self.exec_started_at
 
   @property
-  def total_lifecycle_s(self):
+  def total_lifecycle_s(self) -> Optional[float]:
     if self.released_at is None:
       return None
     return self.released_at - self.requested_at
 
 
-def _busy_loop_code(workload_duration):
+def _busy_loop_code(workload_duration: float) -> str:
   """Python source for a CPU busy-loop that runs ~workload_duration seconds."""
   return (
       'import time\n'
@@ -187,21 +196,21 @@ def _busy_loop_code(workload_duration):
 class WorkloadExecutor:
   """Runs a workload inside a Ready sandbox and blocks until it completes."""
 
-  def prepare(self, _claim_name, _status):
+  def prepare(self, _claim_name: str, _status: dict[str, Any]) -> Any:
     """Called eagerly in the watch consumer when the claim becomes Ready.
 
     Returns any pre-fetched data that execute() needs. The return value is
     passed through as the `prepared` argument to execute(). Default: None."""
     return None
 
-  def execute(self, _claim_name, _status, _prepared):
+  def execute(self, _claim_name: str, _status: Optional[dict[str, Any]], _prepared: Any) -> None:
     raise NotImplementedError
 
 
 class NoopExecutor(WorkloadExecutor):
   """No workload: used when workload_duration == 0 (immediate release)."""
 
-  def execute(self, _claim_name, _status, _prepared):
+  def execute(self, _claim_name: str, _status: Optional[dict[str, Any]], _prepared: Any) -> None:
     return
 
 
@@ -211,14 +220,14 @@ class StreamExecExecutor(WorkloadExecutor):
 
   def __init__(
       self,
-      core_v1_api,
-      custom_objects_api,
-      namespace,
-      workload_duration,
-      sandbox_group='agents.x-k8s.io',
-      sandbox_version='v1beta1',
-      sandbox_plural='sandboxes',
-  ):
+      core_v1_api: Any,
+      custom_objects_api: Any,
+      namespace: str,
+      workload_duration: float,
+      sandbox_group: str = 'agents.x-k8s.io',
+      sandbox_version: str = 'v1beta1',
+      sandbox_plural: str = 'sandboxes',
+  ) -> None:
     self._core = core_v1_api
     self._co = custom_objects_api
     self._namespace = namespace
@@ -227,7 +236,7 @@ class StreamExecExecutor(WorkloadExecutor):
     self._sandbox_version = sandbox_version
     self._sandbox_plural = sandbox_plural
 
-  def _resolve_pod_name(self, status):
+  def _resolve_pod_name(self, status: dict[str, Any]) -> Optional[str]:
     """Ready claim -> sandbox pod name. status.sandbox.name is the Sandbox CR
     name; the actual pod is that name UNLESS a warm-pool pod was adopted, in
     which case the pod name is in the Sandbox's agents.x-k8s.io/pod-name
@@ -246,11 +255,11 @@ class StreamExecExecutor(WorkloadExecutor):
     annotations = (sb.get('metadata') or {}).get('annotations') or {}
     return annotations.get('agents.x-k8s.io/pod-name') or sandbox_name
 
-  def prepare(self, claim_name, status):
+  def prepare(self, claim_name: str, status: dict[str, Any]) -> Optional[str]:
     """Resolves the pod name while the Sandbox CR is guaranteed to exist."""
     return self._resolve_pod_name(status)
 
-  def execute(self, claim_name, _status, prepared):
+  def execute(self, claim_name: str, _status: Optional[dict[str, Any]], prepared: Optional[str]) -> None:
     from kubernetes.stream import stream  # pylint: disable=import-error,no-name-in-module
 
     pod_name = prepared
@@ -279,16 +288,18 @@ class ClaimDriver:
 
   def __init__(
       self,
-      namespace,
-      template_name,
-      warmpool_name=None,
-      group=CLAIM_API_GROUP,
-      version=CLAIM_API_VERSION,
-      plural=CLAIM_PLURAL,
-      claim_ttl_seconds=None,
-      max_concurrent=64,
-  ):
-    _load_kube_config()
+      namespace: str,
+      template_name: str,
+      warmpool_name: Optional[str] = None,
+      group: str = CLAIM_API_GROUP,
+      version: str = CLAIM_API_VERSION,
+      plural: str = CLAIM_PLURAL,
+      claim_ttl_seconds: Optional[int] = None,
+      max_concurrent: int = 64,
+      load_config: bool = True,
+  ) -> None:
+    if load_config:
+      _load_kube_config()
     pool_size = max_concurrent + 50
     self._api = _make_custom_objects_api(pool_size)
     self._delete_api = _make_custom_objects_api(pool_size)
@@ -300,7 +311,7 @@ class ClaimDriver:
     self._plural = plural
     self._claim_ttl_seconds = claim_ttl_seconds or 0
 
-  def _body(self, name):
+  def _body(self, name: str) -> dict[str, Any]:
     lifecycle: dict[str, Any] = {'shutdownPolicy': 'Delete'}
     if self._claim_ttl_seconds:
       lifecycle['ttlSecondsAfterFinished'] = self._claim_ttl_seconds
@@ -319,7 +330,7 @@ class ClaimDriver:
         'spec': spec,
     }
 
-  def create(self, name, sleeper=time.sleep):
+  def create(self, name: str, sleeper: Callable[[float], None] = time.sleep) -> None:
     """Creates a SandboxClaim, retrying on 429 up to _CREATE_MAX_RETRIES."""
     from kubernetes.client.rest import ApiException  # pylint: disable=import-error,no-name-in-module
 
@@ -355,13 +366,13 @@ class ClaimDriver:
         else:
           raise
 
-  def is_ready(self, status):
+  def is_ready(self, status: dict[str, Any]) -> bool:
     for condition in status.get('conditions', []):
       if condition.get('type') == 'Ready' and condition.get('status') == 'True':
         return True
     return False
 
-  def served_warm(self, status):
+  def served_warm(self, status: dict[str, Any]) -> Optional[bool]:
     """Warm-served iff the bound sandbox name carries the warm pool prefix.
 
     Cold-provisioned sandboxes are named after the claim; warm-served ones
@@ -373,7 +384,11 @@ class ClaimDriver:
       return None
     return bool(self._warmpool_name) and name.startswith(self._warmpool_name)
 
-  def stream_claim_events(self, stop_event, timeout_seconds=60):
+  def stream_claim_events(
+      self,
+      stop_event: threading.Event,
+      timeout_seconds: int = 60,
+  ) -> Iterator[dict[str, Any]]:
     """Generates {'name': str, 'status': dict} dicts from a Watch stream.
 
     Re-establishes the watch if it times out, until stop_event is set.
@@ -450,7 +465,7 @@ class ClaimDriver:
         logging.warning('Watch stream error (will reconnect): %s', exc)
         time.sleep(1)
 
-  def delete(self, name):
+  def delete(self, name: str) -> None:
     self._delete_api.delete_namespaced_custom_object(
         self._group, self._version, self._namespace, self._plural, name
     )
@@ -476,12 +491,12 @@ class LoadGenerator:
 
   def __init__(
       self,
-      driver,
-      ready_timeout,
-      max_concurrent,
-      workload_executor=None,
-      workload_duration=0,
-  ):
+      driver: ClaimDriver,
+      ready_timeout: float,
+      max_concurrent: int,
+      workload_executor: Optional[WorkloadExecutor] = None,
+      workload_duration: float = 0,
+  ) -> None:
     self._driver = driver
     self._ready_timeout = ready_timeout
     self._max_concurrent = max_concurrent
@@ -569,7 +584,12 @@ class LoadGenerator:
         released.add(name)
         self._in_flight -= 1
 
-  def run(self, shape, clock=time.monotonic, sleeper=time.sleep):
+  def run(
+      self,
+      shape: RunShape,
+      clock: Callable[[], float] = time.monotonic,
+      sleeper: Callable[[float], None] = time.sleep,
+  ) -> list[ClaimRecord]:
     """Run the load shape, returning a list of ClaimRecord in submission order.
 
     Args:
@@ -736,3 +756,98 @@ class LoadGenerator:
       )
       records.append(rec)
     return records
+
+
+def main(argv: Optional[list[str]] = None) -> None:
+  """Entry point when running as an in-pod script.
+
+  Parses CLI arguments, runs the load generator, and writes one JSON line per
+  ClaimRecord to --output followed by a summary line with peak_concurrency.
+  """
+  parser = argparse.ArgumentParser(
+      description='Agent sandbox in-pod load runner.')
+  parser.add_argument('--namespace', required=True,
+                      help='Kubernetes namespace.')
+  parser.add_argument('--template-name', required=True,
+                      help='SandboxWarmPool / SandboxTemplate name.')
+  parser.add_argument('--qps', type=float, default=None,
+                      help='Target claims per second.')
+  parser.add_argument('--total', type=int, default=None,
+                      help='Total number of claims to submit.')
+  parser.add_argument('--duration', type=float, default=None,
+                      help='Submission window in seconds.')
+  parser.add_argument('--max-concurrent', type=int, required=True,
+                      help='Maximum in-flight claims.')
+  parser.add_argument('--workload-duration', type=float, default=0,
+                      help='Seconds to hold each sandbox after Ready (0 = immediate release).')
+  parser.add_argument('--ready-timeout', type=float, default=180,
+                      help='Per-claim ready timeout in seconds.')
+  parser.add_argument('--output', required=True,
+                      help='Path to write JSONL results.')
+  args = parser.parse_args(argv)
+
+  logging.basicConfig(
+      level=logging.INFO,
+      format='%(asctime)s [%(levelname)s] %(message)s',
+      stream=sys.stderr,
+  )
+
+  # Load in-cluster config with fallback to kubeconfig for local runs.
+  from kubernetes import config as k8s_config  # pylint: disable=import-error,no-name-in-module
+  try:
+    k8s_config.load_incluster_config()
+  except Exception:  # noqa: BLE001
+    k8s_config.load_kube_config()
+
+  # Apply bearer-token fix (needed for both in-cluster and kubeconfig paths
+  # with kubernetes-client>=36).
+  from kubernetes import client as k8s_client  # pylint: disable=import-error,no-name-in-module
+  cfg = k8s_client.Configuration.get_default_copy()
+  _register_bearer_token_auth(cfg)
+  k8s_client.Configuration.set_default(cfg)
+
+  shape = resolve_run_shape(
+      qps=args.qps,
+      duration=args.duration,
+      total=args.total,
+  )
+
+  workload_duration = args.workload_duration
+  if workload_duration > 0:
+    pool_size = args.max_concurrent + 50
+    executor = StreamExecExecutor(
+        core_v1_api=_make_core_v1_api(pool_size),
+        custom_objects_api=_make_custom_objects_api(pool_size),
+        namespace=args.namespace,
+        workload_duration=workload_duration,
+    )
+  else:
+    executor = None
+
+  driver = ClaimDriver(
+      namespace=args.namespace,
+      template_name=args.template_name,
+      warmpool_name=args.template_name,
+      max_concurrent=args.max_concurrent,
+      load_config=False,
+  )
+
+  generator = LoadGenerator(
+      driver=driver,
+      ready_timeout=args.ready_timeout,
+      max_concurrent=args.max_concurrent,
+      workload_executor=executor,
+      workload_duration=workload_duration,
+  )
+
+  records = generator.run(shape)
+  peak_concurrency = generator.peak_concurrency
+
+  with open(args.output, 'w') as f:
+    for rec in records:
+      f.write(json.dumps(dataclasses.asdict(rec)) + '\n')
+    f.write(json.dumps({'summary': {'peak_concurrency': peak_concurrency}}) + '\n')
+
+
+if __name__ == '__main__':
+  main()
