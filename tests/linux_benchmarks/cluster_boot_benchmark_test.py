@@ -216,13 +216,6 @@ class ClusterBootBenchmarkTest(
             vm_util, 'IssueCommand', return_value=('{}', '', 0), autospec=True
         )
     )
-    self.enter_context(
-        mock.patch(
-            'perfkitbenchmarker.linux_packages.linux_boot.CollectBtimeSample',
-            return_value=sample.Sample('btime', 5.0, 'second', {}),
-            autospec=True,
-        )
-    )
     vm_spec = vm_spec_class(
         'cluster_boot_benchmark_test', zone=zone, machine_type=machine_type
     )
@@ -272,16 +265,6 @@ class ClusterBootBenchmarkTest(
             timestamp=1678147200.0,
         )
     )
-    expecteds.append(
-        sample.Sample(
-            metric='btime',
-            value=5.0,
-            unit='second',
-            metadata={},
-            timestamp=1678147200.0,
-        )
-    )
-
     self.assertCountEqual(actuals, expecteds)
 
 
