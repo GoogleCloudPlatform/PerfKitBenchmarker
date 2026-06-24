@@ -65,6 +65,7 @@ from perfkitbenchmarker.configs import freeze_restore_spec
 from perfkitbenchmarker.configs import vm_group_decoders
 from perfkitbenchmarker.resources import ai_agent_service
 from perfkitbenchmarker.resources import base_job
+from perfkitbenchmarker.resources import agent_sandbox
 from perfkitbenchmarker.resources import example_resource
 from perfkitbenchmarker.resources import managed_ai_model
 from perfkitbenchmarker.resources.container_service import container_cluster
@@ -202,6 +203,7 @@ class BenchmarkSpec:
     self.base_job = None
     self.edw_service = None
     self.edw_compute_resource = None
+    self.agent_sandbox = None
     self.example_resource = None
     self.multi_attach_disk = None
     self.nfs_service = None
@@ -337,6 +339,7 @@ class BenchmarkSpec:
     # Put registry first, as it can be needed by cluster.
     self.ConstructContainerRegistry()
     self.ConstructContainerCluster()
+    self.ConstructAgentSandbox()
     # dpb service needs to go first, because it adds some vms.
     self.ConstructDpbService()
     self.ConstructCluster()
@@ -588,6 +591,19 @@ class BenchmarkSpec:
         self.config.example_resource
     )  # pytype: disable=not-instantiable
     self.resources.append(self.example_resource)
+
+  def ConstructAgentSandbox(self):
+    """Create the agent_sandbox object (requires a container_cluster)."""
+    if self.config.agent_sandbox is None:
+      return
+    if self.container_cluster is None:
+      raise errors.Config.InvalidValue(
+          'agent_sandbox requires a container_cluster to be configured.')
+    self.agent_sandbox = agent_sandbox.GetAgentSandbox(
+        self.config.agent_sandbox, self.container_cluster
+    )
+    if self.agent_sandbox:
+      self.resources.append(self.agent_sandbox)
 
   def ConstructBaseJob(self):
     """Create an instance of the base job.It is also called from pkb.py."""
@@ -1061,6 +1077,8 @@ class BenchmarkSpec:
 
     if self.container_cluster:
       self.container_cluster.Create()
+    if self.agent_sandbox:
+      self.agent_sandbox.Create()
 
     # do after network setup but before VM created
     if self.nfs_service and self.nfs_service.CLOUD != nfs_service.UNMANAGED:
@@ -1211,6 +1229,8 @@ class BenchmarkSpec:
       self.edw_service.Delete()
     if hasattr(self, 'edw_compute_resource') and self.edw_compute_resource:
       self.edw_compute_resource.Delete()
+    if self.agent_sandbox:
+      self.agent_sandbox.Delete()
     if self.example_resource:
       self.example_resource.Delete()
     if self.base_job:
