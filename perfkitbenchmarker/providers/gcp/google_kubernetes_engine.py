@@ -287,6 +287,18 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
         or nodepool_config.machine_families
     )
 
+  def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
+    """Returns node selectors for the default nodepool."""
+    del machine_type
+    if gcp_flags.GCE_RESERVATION_ID.value:
+      return {
+          'cloud.google.com/reservation-name': (
+              gcp_flags.GCE_RESERVATION_ID.value
+          ),
+          'cloud.google.com/reservation-affinity': 'specific',
+      }
+    return {}
+
 
 class GkeCluster(BaseGkeCluster):
   """Class representing a Google Kubernetes Engine cluster."""
@@ -339,10 +351,12 @@ class GkeCluster(BaseGkeCluster):
 
   def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Targets the default pool ComputeClass when custom classes are enabled."""
-    del machine_type
+    selectors = super().GetNodeSelectors(machine_type)
     if self._UsesCustomComputeClass(self.default_nodepool):
-      return {'cloud.google.com/compute-class': self.default_nodepool.name}
-    return {}
+      return selectors | {
+          'cloud.google.com/compute-class': self.default_nodepool.name
+      }
+    return selectors
 
   def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns a dict containing metadata about the cluster.
@@ -696,7 +710,7 @@ class GkeAutopilotCluster(BaseGkeCluster):
 
   def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Node selectors for instance capabilites in AutoPilot clusters."""
-    selectors = {}
+    selectors = super().GetNodeSelectors(machine_type)
     compute_class = None
     machine_family: str | None = util.GetMachineFamily(machine_type)
     if machine_family:
