@@ -276,7 +276,7 @@ class SetUpNFSDiskStrategy(SetUpDiskStrategy):
         nfs_disk.mount_options,
         nfs_disk.fstab_options,
     )
-
+    nfs_disk.UpdateDevicePath(self.disk_spec.mount_point)
     self.vm.scratch_disks.append(nfs_disk)
 
 

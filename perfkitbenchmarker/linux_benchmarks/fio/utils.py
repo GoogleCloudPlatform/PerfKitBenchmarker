@@ -22,6 +22,7 @@ from absl import flags
 import jinja2
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
+from perfkitbenchmarker import disk as disk_lib
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -35,6 +36,7 @@ FLAGS = flags.FLAGS
 # Used in some fio job files.
 _FILENAME_PREFIX = 'fill-device'
 _MAX_OPEN_FILES = 1000
+_FIO_TEMP_FILE_NAME = 'fio-temp-file'
 
 
 def AgainstDevice():
@@ -190,6 +192,11 @@ def FillDevice(
     dir_or_filename_arg = 'directory'
   else:
     dir_or_filename_arg = 'filename'
+  if disk.disk_type == disk_lib.NFS:
+    # NFS is a network filesystem, not a raw device.
+    raise errors.Setup.InvalidSetupError(
+        'We can not prefill NFS targets.'
+    )
   command = (
       f'sudo {exec_path} --{dir_or_filename_arg}={disk.GetDevicePath()} '
       f'--ioengine=libaio --name={_FILENAME_PREFIX} '
@@ -371,3 +378,47 @@ def RunTest(
       sample.Sample('end_time', end_time, 'sec', samples[0].metadata)
   )
   return samples
+
+
+def AgainstNFS():
+  """Check whether we're running against an NFS target."""
+  return FLAGS.data_disk_type == 'nfs'
+
+
+def WriteFile(
+    vm,
+    disk,
+    fill_size,
+    exec_path,
+    fill_access_pattern='write',
+):
+  """Write the file of given size to the device path.
+
+  Args:
+    vm: a linux_virtual_machine.BaseLinuxMixin object.
+    disk: a disk.BaseDisk attached to the given vm.
+    fill_size: amount of device to fill, in fio format.
+    exec_path: string path to the fio executable.
+    fill_access_pattern: string. The access pattern to use for filling the disk.
+      Can be 'write' or 'randwrite'.
+  """
+  if fill_access_pattern not in ('write', 'randwrite'):
+    raise ValueError(
+        f'fill_access_pattern must be "write" or "randwrite", got '
+        f'{fill_access_pattern}'
+    )
+  filename = f'{disk.GetDevicePath()}/{_FIO_TEMP_FILE_NAME}'
+  command = (
+      f'sudo {exec_path} --filename={filename} '
+      f'--ioengine=libaio --name={_FILENAME_PREFIX} '
+      f'--blocksize={fio_flags.FIO_FILL_BLOCK_SIZE.value} --iodepth=64 '
+      f'--rw={fill_access_pattern} --direct=1 --size={fill_size} '
+      f'--nrfiles={fio_flags.FIO_NR_FILES.value} --fallocate=none '
+      '--create_on_open=1'
+  )
+  if fio_flags.FIO_NR_FILES.value > _MAX_OPEN_FILES:
+    command += ' --openfiles=1000'
+
+  vm.RobustRemoteCommand(command)
+  # Clear the OS page cache
+  vm.DropCaches()

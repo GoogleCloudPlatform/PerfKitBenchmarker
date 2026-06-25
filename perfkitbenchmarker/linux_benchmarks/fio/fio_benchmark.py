@@ -614,6 +614,9 @@ def WarnOnBadFlags():
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  # We always prefill a raw device.
+  # against_file_with_fill : pre-fills the raw device and runs the benchmark
+  # on a file in the filesystem. We will mount the device after prefilling.
   if fio_flags.FIO_TARGET_MODE.value != AGAINST_FILE_WITHOUT_FILL_MODE:
     disk_spec = config['vm_groups']['default']['disk_spec']
     for cloud in disk_spec:
@@ -727,6 +730,10 @@ def PrepareWithExec(vm, exec_path):
     return
 
   disk = vm.scratch_disks[0]
+  # Prefilling is done on a raw device. We will be running the benchmark
+  # against a file which needs a mounted filesystem.
+  # TODO(arushigaur): We should format disk without discard to avoid cleaning
+  # up the data and prefill the file before run phase.
   if fio_flags.FIO_TARGET_MODE.value == AGAINST_FILE_WITH_FILL_MODE:
     disk.mount_point = FLAGS.scratch_dir or MOUNT_POINT
     disk_spec = vm.create_disk_strategy.disk_specs[0]

@@ -165,6 +165,10 @@ class CreateLSSDDiskStrategy(GCPCreateDiskStrategy):
 class GCECreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
   """CreateDiskStrategy when there is no pd disks."""
 
+  def __init__(self, vm, disk_spec, disk_count):
+    super().__init__(vm, disk_spec, disk_count)
+    self.disk_specs = [disk_spec]
+
   def DiskCreatedOnVMCreation(self) -> bool:
     # This have to be set to False due to _CreateScratchDiskFromDisks in
     # virtual_machine.py.
