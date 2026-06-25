@@ -468,6 +468,14 @@ class EdwClientInterface:
     raise NotImplementedError
 
 
+class ConversationalAnalyticsClientInterface(EdwClientInterface):
+
+  @property
+  def fetches_results_immediately(self) -> bool:
+    """Returns True if the client fetches query results immediately."""
+    raise NotImplementedError
+
+
 class EdwService(resource.BaseResource):
   """Object representing a EDW Service."""
 
@@ -954,7 +962,7 @@ class EdwService(resource.BaseResource):
 
   def GetConversationalAnalyticsClientInterface(
       self,
-  ) -> EdwClientInterface:
+  ) -> ConversationalAnalyticsClientInterface:
     """Returns the Conversational Analytics Client Interface instance."""
     raise NotImplementedError(
         'Conversational Analytics is not supported for this service.'

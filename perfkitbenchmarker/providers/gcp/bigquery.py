@@ -517,8 +517,14 @@ class PythonClientInterface(GenericClientInterface):
     return stdout
 
 
-class ConversationalAnalyticsClientInterface(PythonClientInterface):
+class ConversationalAnalyticsClientInterface(
+    PythonClientInterface, edw_service.ConversationalAnalyticsClientInterface
+):
   """Conversational Analytics Client Interface subclassing PythonClientInterface."""
+
+  @property
+  def fetches_results_immediately(self) -> bool:
+    return True
 
   def _GetQueryFileName(self, query_name: str) -> str:
     """Generates a filename from a query name."""
@@ -582,6 +588,7 @@ class ConversationalAnalyticsClientInterface(PythonClientInterface):
   @override
   def Prepare(self, package_name: str) -> None:
     """Prepares the client vm by installing geminidataanalytics package and driver."""
+    assert self.client_vm is not None
     super().Prepare(package_name)
 
     # Install BQ CA specific SDK
@@ -601,6 +608,7 @@ class ConversationalAnalyticsClientInterface(PythonClientInterface):
       self, query_name: str, print_results: bool = False
   ) -> tuple[float, dict[str, Any]]:
     """Executes a single conversational analytics question."""
+    assert self.client_vm is not None
     logging.info('Conversational Analytics Question: %s', query_name)
     key_file = os.path.basename(FLAGS.gcp_service_account_key_file)
     cmd = (
