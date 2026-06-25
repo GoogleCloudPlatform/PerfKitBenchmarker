@@ -92,7 +92,7 @@ swap_encryption:
     GKE vs. EKS swap encryption and LSSD performance comparison.
     Two-step nodepool setup: PKB provisions a minimal cluster with a cheap
     default nodepool (Step 1), then Prepare() adds the real benchmark
-    nodepool (n4-highmem-32 / c4-*-lssd, COS_CONTAINERD, 80k IOPS) with a
+    nodepool (n4-highmem-32 / c4-*-lssd, UBUNTU_CONTAINERD, 80k IOPS) with a
     node-level startup script that configures dm-crypt swap before any pod
     is scheduled, then removes the default nodepool (Step 2).  All benchmark
     phases run inside a privileged DaemonSet pinned to the benchmark nodepool.
@@ -425,7 +425,7 @@ def Prepare(spec) -> None:
 
     Step 2 (this function):
       a. Create the benchmark nodepool (n4-highmem-32 or c4-*-lssd) with
-         COS_CONTAINERD, 80 000 IOPS, and a node startup script that configures
+         UBUNTU_CONTAINERD, 80 000 IOPS, and a node startup script that configures
          dm-crypt swap at the OS level — before any pod is scheduled.
       b. Delete the dummy default nodepool to stop its cost immediately.
       c. Deploy the privileged DaemonSet (pinned via nodeSelector to the
@@ -1063,7 +1063,7 @@ def _create_benchmark_node_pool(cluster) -> None:
 
     Uses:
       --swap_encryption_benchmark_machine_type  (default n4-highmem-32)
-      --swap_encryption_node_image_type         (default COS_CONTAINERD)
+      --swap_encryption_node_image_type         (default UBUNTU_CONTAINERD)
       --swap_encryption_boot_disk_iops          (default 80000)
       --swap_encryption_enable_dmcrypt          (default True)
 
