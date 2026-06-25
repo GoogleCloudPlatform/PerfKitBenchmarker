@@ -562,7 +562,7 @@ class ConversationalAnalyticsClientInterface(
         'question': query_name,
         'text_response': text_response or '',
         'generated_sql': generated_sql or '',
-        'retrieved_data': retrieved_data or [],
+        'predict_data': retrieved_data or [],
         'thoughts': query_results.get('thoughts', []),
         'progress_messages': query_results.get('progress_messages', []),
         'time_to_first_token_secs': query_results.get(
