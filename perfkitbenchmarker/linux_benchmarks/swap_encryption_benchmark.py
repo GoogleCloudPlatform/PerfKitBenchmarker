@@ -97,7 +97,7 @@ swap_encryption:
     GKE vs. EKS swap encryption and LSSD performance comparison.
     Two-step nodepool setup: PKB provisions a minimal cluster with a cheap
     default nodepool (Step 1), then Prepare() adds the real benchmark
-    nodepool (n4-highmem-32 / c4-*-lssd, COS_CONTAINERD, 80k IOPS) with a
+    nodepool (n4-highmem-32 / c4-*-lssd, UBUNTU_CONTAINERD, 80k IOPS) with a
     node-level startup script that configures dm-crypt swap before any pod
     is scheduled, then removes the default nodepool (Step 2).  All benchmark
     phases run inside a privileged DaemonSet pinned to the benchmark nodepool.
@@ -286,17 +286,6 @@ _ENABLE_DMCRYPT = flags.DEFINE_boolean(
     "(unencrypted) swap overhead as a baseline.",
 )
 
-_GKE_KUBELET_MEMORY_SWAP = flags.DEFINE_string(
-    "swap_encryption_gke_kubelet_memory_swap",
-    "LimitedSwap",
-    "Value for kubeletConfig.memorySwapBehavior injected via "
-    "--system-config-from-file when creating the GKE benchmark nodepool.  "
-    "LimitedSwap (default) — the kubelet allows pods to use swap up to their "
-    "memory limit; required for the DaemonSet pod to drive kernel swapping.  "
-    "NoSwap — disables swap at the kubelet level (use for a baseline run that "
-    "confirms zero swap activity).  Set empty string to omit the flag entirely "
-    "and rely on the cluster-level default.",
-)
 
 _SWAP_DEVICE = flags.DEFINE_string(
     "swap_encryption_device",
@@ -412,7 +401,7 @@ def Prepare(spec: _BenchmarkSpec) -> None:
 
     Step 2 (this function):
       a. Create the benchmark nodepool (n4-highmem-32 or c4-*-lssd) with
-         COS_CONTAINERD, 80 000 IOPS, and a node startup script that configures
+         UBUNTU_CONTAINERD, 80 000 IOPS, and a node startup script that configures
          dm-crypt swap at the OS level — before any pod is scheduled.
       b. Delete the dummy default nodepool to stop its cost immediately.
       c. Deploy the privileged DaemonSet (pinned via nodeSelector to the
@@ -683,9 +672,9 @@ def _configure_eks_kubelet_swap(spec) -> None:
             memorySwapBehavior: LimitedSwap
             failSwapOn: false
 
-    GKE equivalent: linuxConfig.swapConfig + kubeletConfig.memorySwapBehavior
-    via --system-config-from-file, already implemented in
-    _create_benchmark_node_pool.
+    GKE equivalent: linuxConfig.swapConfig via --system-config-from-file
+    (swapConfig automatically enables memorySwapBehavior=LimitedSwap),
+    already implemented in _create_benchmark_node_pool.
 
     See: https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/pull/6780
     """
@@ -912,7 +901,7 @@ def _create_benchmark_node_pool(cluster) -> None:
 
     Uses:
       --swap_encryption_benchmark_machine_type  (default n4-highmem-32)
-      --swap_encryption_node_image_type         (default COS_CONTAINERD)
+      --swap_encryption_node_image_type         (default UBUNTU_CONTAINERD)
       --swap_encryption_boot_disk_iops          (default 80000)
       --swap_encryption_enable_dmcrypt          (default True)
 
@@ -975,67 +964,54 @@ def _create_benchmark_node_pool(cluster) -> None:
     if is_lssd:
         cmd.flags["local-nvme-ssd-block"] = f"count={_LSSD_COUNT.value}"
 
-    # ── GKE kubelet swap config ───────────────────────────────────────────────
-    # Per Ajay's review comment (go/pkb-swap-encryption-pr1): the benchmark
-    # nodepool must be created with kubeletConfig.memorySwapBehavior=LimitedSwap
-    # so that the kubelet allocates swap to the DaemonSet pod.  Without this flag
-    # the Linux kernel swap device may exist but the kubelet blocks pod-level
-    # swap usage and the benchmark pod cannot drive swap I/O.
-    #
-    # Passed as --system-config-from-file pointing to a temp YAML, which is the
-    # same mechanism PKB's gke_node_system_config flag uses:
-    #   perfkitbenchmarker/providers/gcp/google_kubernetes_engine.py
-    swap_behavior = _GKE_KUBELET_MEMORY_SWAP.value
+    # ── GKE swap system-config ───────────────────────────────────────────────
+    # Pass linuxConfig.swapConfig + linuxConfig.sysctl via --system-config-from-file.
+    # Per Ajay's review (go/pkb-swap-encryption-pr1 #r3457877984):
+    #   linuxConfig.swapConfig: GKE enables node-level swap device and
+    #     automatically sets kubeletConfig.memorySwapBehavior=LimitedSwap.
+    #     For LSSD machines, dedicatedLocalSsdProfile tells GKE to use the
+    #     local NVMe as the swap device (avoids boot-disk overhead).
+    #   linuxConfig.sysctl: swap aggressiveness tuning so benchmark workloads
+    #     can drive sustained swap I/O.
+    # Reference:
+    #   https://docs.cloud.google.com/kubernetes-engine/docs/how-to/
+    #   node-memory-swap#enable
     system_config_tmp = None
-    if swap_behavior:
-        # Build system-config YAML for --system-config-from-file.
-        # Per Ajay's review (go/pkb-swap-encryption-pr1 #r3457877984):
-        #   kubeletConfig.memorySwapBehavior: kubelet allocates swap to pods.
-        #   linuxConfig.swapConfig: GKE enables node-level swap device.
-        #     For LSSD machines, dedicatedLocalSsdProfile tells GKE to use
-        #     the local NVMe as the swap device (avoids boot-disk overhead).
-        #   linuxConfig.sysctl: swap aggressiveness tuning so the benchmark
-        #     workloads can drive sustained swap I/O.
-        # Reference:
-        #   https://docs.cloud.google.com/kubernetes-engine/docs/how-to/
-        #   node-memory-swap#enable
-        if is_lssd:
-            swap_config_block = (
-                "  swapConfig:\n"
-                "    enabled: true\n"
-                "    dedicatedLocalSsdProfile:\n"
-                f"      diskCount: {_LSSD_COUNT.value}\n"
-            )
-        else:
-            swap_config_block = "  swapConfig:\n    enabled: true\n"
-        kubelet_yaml = (
-            "kubeletConfig:\n  memorySwapBehavior:"
-            f" {swap_behavior}\nlinuxConfig:\n"
-            + swap_config_block
-            + "  sysctl:\n"
-            "    vm.min_free_kbytes: 200\n"
-            "    vm.watermark_scale_factor: 500\n"
-            "    vm.swappiness: 100\n"
+    if is_lssd:
+        swap_config_block = (
+            "  swapConfig:\n"
+            "    enabled: true\n"
+            "    dedicatedLocalSsdProfile:\n"
+            f"      diskCount: {_LSSD_COUNT.value}\n"
         )
-        system_config_tmp = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".yaml", delete=False
-        )
-        system_config_tmp.write(kubelet_yaml)
-        system_config_tmp.flush()
-        cmd.flags["system-config-from-file"] = system_config_tmp.name
-        logging.info(
-            "[swap_encryption] system-config-from-file: "
-            "kubelet_swap=%s lssd=%s (written to %s):\n%s",
-            swap_behavior,
-            is_lssd,
-            system_config_tmp.name,
-            kubelet_yaml,
-        )
+    else:
+        swap_config_block = "  swapConfig:\n    enabled: true\n"
+    swap_config_yaml = (
+        "linuxConfig:\n"
+        + swap_config_block
+        + "  sysctl:\n"
+        "    vm.min_free_kbytes: 200\n"
+        "    vm.watermark_scale_factor: 500\n"
+        "    vm.swappiness: 100\n"
+    )
+    system_config_tmp = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".yaml", delete=False
+    )
+    system_config_tmp.write(swap_config_yaml)
+    system_config_tmp.flush()
+    cmd.flags["system-config-from-file"] = system_config_tmp.name
+    logging.info(
+        "[swap_encryption] system-config-from-file: "
+        "lssd=%s (written to %s):\n%s",
+        is_lssd,
+        system_config_tmp.name,
+        swap_config_yaml,
+    )
 
     logging.info(
         "[swap_encryption] Creating benchmark nodepool: %s / %s / "
         "image=%s / disk=%dGiB / iops=%d / dmcrypt=%s / lssd=%s / "
-        "add_swap_disk=%s / kubelet_swap=%s",
+        "add_swap_disk=%s",
         _BENCHMARK_NODEPOOL,
         machine_type,
         _NODE_IMAGE_TYPE.value,
@@ -1044,7 +1020,6 @@ def _create_benchmark_node_pool(cluster) -> None:
         _ENABLE_DMCRYPT.value,
         is_lssd,
         _ADD_SWAP_DISK.value,
-        swap_behavior or "unset",
     )
 
     # LSSD nodepools take longer to provision than PD-only nodepools because
