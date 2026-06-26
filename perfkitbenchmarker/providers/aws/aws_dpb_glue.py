@@ -54,7 +54,6 @@ class AwsDpbGlue(
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(location=self.region)
     self.role = FLAGS.aws_glue_job_role
-    self._cluster_create_time = None
     self._job_counter = 0
 
     # Last job run cost

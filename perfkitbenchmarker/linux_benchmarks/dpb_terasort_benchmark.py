@@ -188,7 +188,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec):
     if create_time is not None:
       results.append(
           sample.Sample(
-              'dpb_cluster_create_time', create_time, 'seconds', metadata.copy()
+              'Time to Create', create_time, 'seconds', metadata.copy()
           )
       )
 

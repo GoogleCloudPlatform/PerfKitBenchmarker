@@ -763,10 +763,12 @@ class BaseDpbService(resource.BaseResource):
 
   def GetSamples(self) -> list[sample.Sample]:
     """Gets samples with service statistics."""
-    samples = []
+    # Due to how readiness is measured in some implementations with synchronous
+    # CLIs, 'Time to Create' will be greater than 'Time to Ready', which is
+    # weird. So I'm removing the 'Time to Create' datapoint, because we only
+    # care about 'Time to Ready' anyways.
+    samples = [s for s in super().GetSamples() if s.metric != 'Time to Create']
     metrics: dict[str, tuple[float | None, str]] = {
-        # Cluster creation time as measured on PKB's end (E2E).
-        'dpb_cluster_create_time': (self.GetClusterCreateTime(), 'seconds'),
         # Cluster creation time as reported by the DPB service backend.
         'dpb_service_reported_cluster_create_time': (
             self.GetServiceReportedClusterCreateTime(),

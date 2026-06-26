@@ -308,7 +308,6 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     if retcode:
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
-
     self.resource_ready_time = time.time()
 
   @classmethod
@@ -538,9 +537,10 @@ class GcpDpbDpgke(GcpDpbDataproc):
         cmd.args,
     )
     stdout, stderr, retcode = cmd.Issue(timeout=timeout, raise_on_failure=False)
-    self._cluster_create_time, self._cluster_delete_time = (
-        self._ParseClusterCreateTime(stdout)
-    )
+    (
+        self._service_reported_cluster_create_time,
+        self._service_reported_cluster_ready_time,
+    ) = self._ParseClusterCreateTime(stdout)
     if retcode:
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)

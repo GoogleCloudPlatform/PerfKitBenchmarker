@@ -44,12 +44,17 @@ class MockDpbService(dpb_service.BaseDpbService):
       cluster_duration: float | None = None,
   ):
     super().__init__(dpb_service_spec)
-    self._cluster_create_time = cluster_create_time
     self.cluster_duration = cluster_duration
     self.metadata = {'foo': 42}
-
-  def GetClusterCreateTime(self) -> float | None:
-    return self._cluster_create_time
+    self.create_start_time = None
+    self.create_end_time = None
+    self.resource_ready_time = None
+    self.delete_start_time = None
+    self.delete_end_time = None
+    if cluster_create_time is not None:
+      self.create_start_time = 1.0
+      self.create_end_time = 1.0 + cluster_create_time
+      self.resource_ready_time = 1.0 + cluster_create_time
 
   def SubmitJob(self, *args, **kwargs) -> dpb_service.JobResult:
     return dpb_service.JobResult(
@@ -140,7 +145,7 @@ class DpbServiceTest(pkb_common_test_case.PkbCommonTestCase):
               ('dpb_cluster_premium_hourly_cost', 4.0),
           ],
           unexpected_metrics=[
-              'dpb_cluster_create_time',
+              'Time to Ready',
           ],
       ),
       dict(
@@ -150,7 +155,7 @@ class DpbServiceTest(pkb_common_test_case.PkbCommonTestCase):
           hardware_hourly_cost=6.0,
           premium_hourly_cost=4.0,
           expected_datapoints=[
-              ('dpb_cluster_create_time', 42),
+              ('Time to Ready', 42),
               ('dpb_cluster_hardware_hourly_cost', 6.0),
               ('dpb_cluster_premium_hourly_cost', 4.0),
           ],
@@ -168,7 +173,7 @@ class DpbServiceTest(pkb_common_test_case.PkbCommonTestCase):
           hardware_hourly_cost=None,
           premium_hourly_cost=4.0,
           expected_datapoints=[
-              ('dpb_cluster_create_time', 42.0),
+              ('Time to Ready', 42.0),
               ('dpb_cluster_duration', 900.0),
               ('dpb_cluster_premium_cost', 1.0),
               ('dpb_cluster_premium_hourly_cost', 4.0),
@@ -186,7 +191,7 @@ class DpbServiceTest(pkb_common_test_case.PkbCommonTestCase):
           hardware_hourly_cost=6.0,
           premium_hourly_cost=None,
           expected_datapoints=[
-              ('dpb_cluster_create_time', 42.0),
+              ('Time to Ready', 42.0),
               ('dpb_cluster_duration', 900.0),
               ('dpb_cluster_hardware_cost', 1.5),
               ('dpb_cluster_hardware_hourly_cost', 6.0),
@@ -204,7 +209,7 @@ class DpbServiceTest(pkb_common_test_case.PkbCommonTestCase):
           hardware_hourly_cost=6.0,
           premium_hourly_cost=4.0,
           expected_datapoints=[
-              ('dpb_cluster_create_time', 42.0),
+              ('Time to Ready', 42.0),
               ('dpb_cluster_duration', 900.0),
               ('dpb_cluster_hardware_cost', 1.5),
               ('dpb_cluster_premium_cost', 1.0),
@@ -237,7 +242,7 @@ class DpbServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = mock_dpb_service.GetSamples()
     for s in samples:
-      self.assertEqual(s.metadata, {'foo': 42})
+      self.assertEqual(s.metadata['foo'], 42)
     actual_datapoints = [(s.metric, s.value) for s in samples]
     actual_metrics = [s.metric for s in samples]
     self.assertContainsSubset(expected_datapoints, actual_datapoints)
