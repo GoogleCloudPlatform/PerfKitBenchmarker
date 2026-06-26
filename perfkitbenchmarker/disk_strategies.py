@@ -329,6 +329,29 @@ class SetUpSMBDiskStrategy(SetUpDiskStrategy):
     self.vm.scratch_disks.append(smb_disk)
 
 
+def _PreconditionDisk(vm, scratch_disk):
+  """Preconditions a raw disk device using fio."""
+  # pylint: disable=g-import-not-at-top
+  from perfkitbenchmarker import linux_packages
+  logging.info(
+      'Preconditioning disk %s on %s', scratch_disk.GetDevicePath(), vm.name
+  )
+  # Ensure the install directory exists
+  vm.RemoteCommand(
+      f'sudo mkdir -p {linux_packages.INSTALL_DIR} && '
+      f'sudo chmod a+rwxt {linux_packages.INSTALL_DIR}'
+  )
+  vm.Install('fio')
+  device_path = scratch_disk.GetDevicePath()
+  fio_path = f'{linux_packages.INSTALL_DIR}/fio/fio'
+  cmd = (
+      f'sudo {fio_path} --filename={device_path} --ioengine=libaio '
+      f'--name=precondition --blocksize=1M --iodepth=64 '
+      f'--rw=write --direct=1 --fallocate=none --size=100%'
+  )
+  vm.RobustRemoteCommand(cmd)
+
+
 class PrepareScratchDiskStrategy:
   """Strategies to prepare scratch disks."""
 
@@ -375,6 +398,8 @@ class PrepareScratchDiskStrategy:
     if disk_spec.mount_point and not vm.IsMounted(
         disk_spec.mount_point, scratch_disk.GetDevicePath()
     ):
+      if FLAGS.precondition_disks:
+        _PreconditionDisk(vm, scratch_disk)
       vm.FormatDisk(scratch_disk.GetDevicePath(), disk_spec.disk_type)
       vm.MountDisk(
           scratch_disk.GetDevicePath(),
