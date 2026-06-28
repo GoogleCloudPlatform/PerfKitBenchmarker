@@ -39,6 +39,7 @@ from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import vm_group_decoders
 from perfkitbenchmarker.resources import ai_agent_service_spec
+from perfkitbenchmarker.resources import agent_sandbox_spec
 from perfkitbenchmarker.resources import example_resource_spec
 from perfkitbenchmarker.resources import jobs_setter
 from perfkitbenchmarker.resources import managed_ai_model_spec
@@ -1488,6 +1489,10 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'tpu_groups': (_TpuGroupsDecoder, {'default': {}}),
         'edw_compute_resource': (_EdwComputeResourceDecoder, {'default': None}),
         'edw_service': (_EdwServiceDecoder, {'default': None}),
+        'agent_sandbox': (
+            agent_sandbox_spec.AgentSandboxConfigDecoder,
+            {'default': None, 'none_ok': True},
+        ),
         'example_resource': (_ExampleResourceDecoder, {'default': None}),
         'base_job': (_BaseJobDecoder, {'default': None}),
         'memory_store': (_MemoryStoreDecoder, {'default': None}),
