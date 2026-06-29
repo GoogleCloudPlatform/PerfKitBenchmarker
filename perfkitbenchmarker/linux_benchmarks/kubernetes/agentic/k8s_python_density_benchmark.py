@@ -20,9 +20,9 @@ the saturation point.
 
 Usage:
   python pkb.py --benchmarks=gke_python_density \\
-                --gke_python_density_concurrent_sandbox_count=16 \\
-                --gke_python_density_sample_count=20 \\
-                --gke_python_density_sample_warmup=0 \\
+                --k8s_python_density_concurrent_sandbox_count=16 \\
+                --k8s_python_density_sample_count=20 \\
+                --k8s_python_density_sample_warmup=0 \\
                 --k8s_namespace=agentic \\
                 --k8s_agent_api_url=http://localhost:8080
 
@@ -55,7 +55,7 @@ import time
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
-    gke_benchmark_utils as utils,
+    k8s_benchmark_utils as utils,
 )
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_deploy_utils as deploy_utils,
@@ -63,9 +63,9 @@ from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = "gke_python_density"
+BENCHMARK_NAME = "k8s_python_density"
 BENCHMARK_CONFIG = """
-gke_python_density:
+k8s_python_density:
   description: >
     Atomic single-point Python sandbox density measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
@@ -79,19 +79,19 @@ _WARMPOOL_LABEL = "sandbox=python-sandbox-example"
 # ---------------------------------------------------------------------------
 
 flags.DEFINE_integer(
-    "gke_python_density_concurrent_sandbox_count",
+    "k8s_python_density_concurrent_sandbox_count",
     1,
     "Number of concurrent sandbox sessions to run.",
 )
 
 flags.DEFINE_integer(
-    "gke_python_density_sample_count",
+    "k8s_python_density_sample_count",
     20,
     "Number of sample iterations per sandbox session.",
 )
 
 flags.DEFINE_integer(
-    "gke_python_density_sample_warmup",
+    "k8s_python_density_sample_warmup",
     0,
     "Number of warmup iterations per session (excluded from stats). "
     "Warmup iterations execute the same benchmark tasks as measured "
@@ -101,13 +101,13 @@ flags.DEFINE_integer(
 )
 
 flags.DEFINE_bool(
-    "gke_python_density_patch_warmpool",
+    "k8s_python_density_patch_warmpool",
     True,
     "Patch SandboxWarmPool replicas to match density before measurement.",
 )
 
 flags.DEFINE_integer(
-    "gke_python_density_exec_timeout",
+    "k8s_python_density_exec_timeout",
     600,
     "Timeout in seconds for the API call.",
 )
@@ -144,7 +144,7 @@ def Run(benchmark_spec):
     utils.set_benchmark_spec(benchmark_spec)
 
     ns = FLAGS.k8s_namespace
-    density = FLAGS.gke_python_density_concurrent_sandbox_count
+    density = FLAGS.k8s_python_density_concurrent_sandbox_count
 
     logging.info("=== Run: density=%d ===", density)
 
@@ -152,7 +152,7 @@ def Run(benchmark_spec):
     utils.EnsurePortForward()
 
     # Patch warm pool to match density (moved from Prepare for sweep compatibility)
-    if FLAGS.gke_python_density_patch_warmpool:
+    if FLAGS.k8s_python_density_patch_warmpool:
         utils.PatchWarmPool(
             namespace=ns,
             warmpool_name=_WARMPOOL_NAME,
@@ -162,10 +162,10 @@ def Run(benchmark_spec):
 
     # POST to agent API
     payload = {
-        "sample_count": FLAGS.gke_python_density_sample_count,
-        "sample_warmup": FLAGS.gke_python_density_sample_warmup,
+        "sample_count": FLAGS.k8s_python_density_sample_count,
+        "sample_warmup": FLAGS.k8s_python_density_sample_warmup,
         "concurrent_sessions": density,
-        "sandbox_exec_timeout_s": FLAGS.gke_python_density_exec_timeout,
+        "sandbox_exec_timeout_s": FLAGS.k8s_python_density_exec_timeout,
     }
 
     t0 = time.time()
@@ -188,8 +188,8 @@ def Run(benchmark_spec):
         "density": density,
         "successful_sessions": successful,
         "failed_sessions": failed,
-        "sample_count": FLAGS.gke_python_density_sample_count,
-        "sample_warmup": FLAGS.gke_python_density_sample_warmup,
+        "sample_count": FLAGS.k8s_python_density_sample_count,
+        "sample_warmup": FLAGS.k8s_python_density_sample_warmup,
         "wall_time_s": round(wall_time, 2),
     }
 
@@ -334,7 +334,7 @@ def Cleanup(benchmark_spec):
     ns = FLAGS.k8s_namespace
     logging.info("Cleanup: draining warm pool.")
 
-    if FLAGS.gke_python_density_patch_warmpool:
+    if FLAGS.k8s_python_density_patch_warmpool:
         utils.DrainWarmPool(
             namespace=ns,
             warmpool_name=_WARMPOOL_NAME,

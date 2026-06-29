@@ -15,20 +15,20 @@ the QPS saturation point.
 Usage:
   # Agent mode
   python pkb.py --benchmarks=gke_qps \\
-                --gke_qps_target_qps=5.0 \\
-                --gke_qps_pool_size=70 \\
-                --gke_qps_step_duration_s=30.0 \\
-                --gke_qps_mode=agent \\
+                --k8s_qps_target_qps=5.0 \\
+                --k8s_qps_pool_size=70 \\
+                --k8s_qps_step_duration_s=30.0 \\
+                --k8s_qps_mode=agent \\
                 --k8s_namespace=agentic \\
                 --k8s_agent_api_url=http://localhost:8080
 
   # Raw claim mode
   python pkb.py --benchmarks=gke_qps \\
-                --gke_qps_target_qps=5.0 \\
-                --gke_qps_pool_size=70 \\
-                --gke_qps_step_duration_s=30.0 \\
-                --gke_qps_mode=raw_claim \\
-                --gke_qps_claim_timeout_s=60.0 \\
+                --k8s_qps_target_qps=5.0 \\
+                --k8s_qps_pool_size=70 \\
+                --k8s_qps_step_duration_s=30.0 \\
+                --k8s_qps_mode=raw_claim \\
+                --k8s_qps_claim_timeout_s=60.0 \\
                 --k8s_namespace=agentic
 
 Samples emitted (per run):
@@ -62,7 +62,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
-    gke_benchmark_utils as utils,
+    k8s_benchmark_utils as utils,
 )
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_deploy_utils as deploy_utils,
@@ -70,9 +70,9 @@ from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = "gke_qps"
+BENCHMARK_NAME = "k8s_qps"
 BENCHMARK_CONFIG = """
-gke_qps:
+k8s_qps:
   description: >
     Atomic single-point QPS saturation measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
@@ -88,44 +88,44 @@ _QPS_CLAIM_LABEL = "created-by=pkb-qps-benchmark"
 # ---------------------------------------------------------------------------
 
 flags.DEFINE_float(
-    "gke_qps_target_qps",
+    "k8s_qps_target_qps",
     5.0,
     "Target requests per second (sandbox claims per second).",
 )
 
 flags.DEFINE_integer(
-    "gke_qps_pool_size",
+    "k8s_qps_pool_size",
     70,
     "Warm pool size maintained during the measurement.",
 )
 
 flags.DEFINE_float(
-    "gke_qps_step_duration_s",
+    "k8s_qps_step_duration_s",
     30.0,
     "Duration of the QPS burst in seconds.",
 )
 
 flags.DEFINE_integer(
-    "gke_qps_sandbox_exec_timeout_s",
+    "k8s_qps_sandbox_exec_timeout_s",
     30,
     "Sandbox command execution timeout in seconds.",
 )
 
 flags.DEFINE_float(
-    "gke_qps_provision_timeout_s",
+    "k8s_qps_provision_timeout_s",
     180.0,
     "Max seconds to wait for pool pods to reach Running.",
 )
 
 flags.DEFINE_string(
-    "gke_qps_mode",
+    "k8s_qps_mode",
     "agent",
     "Operating mode: 'agent' (POST to orchestrator API) or "
     "'raw_claim' (create SandboxClaims directly via kubectl).",
 )
 
 flags.DEFINE_float(
-    "gke_qps_claim_timeout_s",
+    "k8s_qps_claim_timeout_s",
     60.0,
     "Max seconds to wait for a raw claim to bind " "(only used with mode=raw_claim).",
 )
@@ -149,7 +149,7 @@ def Prepare(benchmark_spec):
     logging.info("=== Prepare: deploying workloads ===")
     deploy_utils.DeployWorkloads(benchmark_spec)
 
-    mode = FLAGS.gke_qps_mode
+    mode = FLAGS.k8s_qps_mode
     if mode == "agent":
         utils.CheckAgentHealthz(required=False)
     utils.EnsurePortForward()
@@ -165,7 +165,7 @@ def Run(benchmark_spec):
     utils.set_benchmark_spec(benchmark_spec)
 
     ns = FLAGS.k8s_namespace
-    pool_size = FLAGS.gke_qps_pool_size
+    pool_size = FLAGS.k8s_qps_pool_size
 
     # Scale warm pool (moved from Prepare for sweep compatibility)
     utils.PatchWarmPool(
@@ -173,10 +173,10 @@ def Run(benchmark_spec):
         warmpool_name=_WARMPOOL_NAME,
         replicas=pool_size,
         label=_WARMPOOL_LABEL,
-        wait_timeout=int(FLAGS.gke_qps_provision_timeout_s),
+        wait_timeout=int(FLAGS.k8s_qps_provision_timeout_s),
     )
 
-    mode = FLAGS.gke_qps_mode
+    mode = FLAGS.k8s_qps_mode
 
     if mode == "raw_claim":
         return _RunRawClaim(benchmark_spec)
@@ -211,9 +211,9 @@ def Cleanup(benchmark_spec):
 def _RunAgent(benchmark_spec):
     """Fire QPS burst via the orchestrator API."""
     ns = FLAGS.k8s_namespace
-    target_qps = FLAGS.gke_qps_target_qps
-    pool_size = FLAGS.gke_qps_pool_size
-    step_duration = FLAGS.gke_qps_step_duration_s
+    target_qps = FLAGS.k8s_qps_target_qps
+    pool_size = FLAGS.k8s_qps_pool_size
+    step_duration = FLAGS.k8s_qps_step_duration_s
 
     logging.info(
         "=== Run (agent): target_qps=%s, pool_size=%d, duration=%ss ===",
@@ -232,7 +232,7 @@ def _RunAgent(benchmark_spec):
     payload = {
         "target_qps": target_qps,
         "duration_s": step_duration,
-        "sandbox_exec_timeout_s": FLAGS.gke_qps_sandbox_exec_timeout_s,
+        "sandbox_exec_timeout_s": FLAGS.k8s_qps_sandbox_exec_timeout_s,
     }
 
     t0 = time.time()
@@ -378,10 +378,10 @@ def _RunAgent(benchmark_spec):
 def _RunRawClaim(benchmark_spec):
     """Fire SandboxClaims directly at target_qps (no agent)."""
     ns = FLAGS.k8s_namespace
-    target_qps = FLAGS.gke_qps_target_qps
-    pool_size = FLAGS.gke_qps_pool_size
-    step_duration = FLAGS.gke_qps_step_duration_s
-    claim_timeout = FLAGS.gke_qps_claim_timeout_s
+    target_qps = FLAGS.k8s_qps_target_qps
+    pool_size = FLAGS.k8s_qps_pool_size
+    step_duration = FLAGS.k8s_qps_step_duration_s
+    claim_timeout = FLAGS.k8s_qps_claim_timeout_s
 
     logging.info(
         "=== Run (raw_claim): target_qps=%s, pool_size=%d, duration=%ss ===",

@@ -12,12 +12,12 @@ the deletion saturation point.
 
 Usage:
   python pkb.py --benchmarks=gke_deletion \\
-                --gke_deletion_batch_size=100 \\
-                --gke_deletion_warmpool_name=python-sandbox-warmpool \\
-                --gke_deletion_pod_label=sandbox=python-sandbox-example \\
-                --gke_deletion_poll_interval_s=1.0 \\
-                --gke_deletion_provision_timeout_s=120.0 \\
-                --gke_deletion_drain_timeout_s=300.0 \\
+                --k8s_deletion_batch_size=100 \\
+                --k8s_deletion_warmpool_name=python-sandbox-warmpool \\
+                --k8s_deletion_pod_label=sandbox=python-sandbox-example \\
+                --k8s_deletion_poll_interval_s=1.0 \\
+                --k8s_deletion_provision_timeout_s=120.0 \\
+                --k8s_deletion_drain_timeout_s=300.0 \\
                 --k8s_namespace=agentic \\
                 --gke_machine_type=c4-standard-8
 
@@ -43,7 +43,7 @@ import time
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
-    gke_benchmark_utils as utils,
+    k8s_benchmark_utils as utils,
 )
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_deploy_utils as deploy_utils,
@@ -51,9 +51,9 @@ from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = "gke_deletion"
+BENCHMARK_NAME = "k8s_deletion"
 BENCHMARK_CONFIG = """
-gke_deletion:
+k8s_deletion:
   description: >
     Atomic single-point bulk deletion and IP reclamation measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
@@ -64,37 +64,37 @@ gke_deletion:
 # ---------------------------------------------------------------------------
 
 flags.DEFINE_integer(
-    "gke_deletion_batch_size",
+    "k8s_deletion_batch_size",
     100,
     "Number of sandbox pods to provision then bulk-delete.",
 )
 
 flags.DEFINE_string(
-    "gke_deletion_warmpool_name",
+    "k8s_deletion_warmpool_name",
     "python-sandbox-warmpool",
     "SandboxWarmPool resource name.",
 )
 
 flags.DEFINE_string(
-    "gke_deletion_pod_label",
+    "k8s_deletion_pod_label",
     "sandbox=python-sandbox-example",
     "Label selector for warm pool pods.",
 )
 
 flags.DEFINE_float(
-    "gke_deletion_poll_interval_s",
+    "k8s_deletion_poll_interval_s",
     1.0,
     "Seconds between kubectl polls during deletion.",
 )
 
 flags.DEFINE_float(
-    "gke_deletion_provision_timeout_s",
+    "k8s_deletion_provision_timeout_s",
     120.0,
     "Max seconds to wait for pods to reach Running before deletion.",
 )
 
 flags.DEFINE_float(
-    "gke_deletion_drain_timeout_s",
+    "k8s_deletion_drain_timeout_s",
     300.0,
     "Max seconds to wait for all pods to terminate after scale-to-0.",
 )
@@ -130,12 +130,12 @@ def Run(benchmark_spec):
     utils.set_benchmark_spec(benchmark_spec)
 
     ns = FLAGS.k8s_namespace
-    batch_size = FLAGS.gke_deletion_batch_size
-    warmpool_name = FLAGS.gke_deletion_warmpool_name
-    label = FLAGS.gke_deletion_pod_label
-    poll_interval = FLAGS.gke_deletion_poll_interval_s
-    provision_timeout = FLAGS.gke_deletion_provision_timeout_s
-    drain_timeout = FLAGS.gke_deletion_drain_timeout_s
+    batch_size = FLAGS.k8s_deletion_batch_size
+    warmpool_name = FLAGS.k8s_deletion_warmpool_name
+    label = FLAGS.k8s_deletion_pod_label
+    poll_interval = FLAGS.k8s_deletion_poll_interval_s
+    provision_timeout = FLAGS.k8s_deletion_provision_timeout_s
+    drain_timeout = FLAGS.k8s_deletion_drain_timeout_s
 
     logging.info("=== Run: batch_size=%d ===", batch_size)
 
@@ -392,11 +392,11 @@ def Run(benchmark_spec):
 def Cleanup(benchmark_spec):
     """Best-effort drain of warm pool after measurement."""
     ns = FLAGS.k8s_namespace
-    warmpool_name = FLAGS.gke_deletion_warmpool_name
-    label = FLAGS.gke_deletion_pod_label
+    warmpool_name = FLAGS.k8s_deletion_warmpool_name
+    label = FLAGS.k8s_deletion_pod_label
 
     logging.info("Cleanup: draining warm pool to 0.")
-    utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(FLAGS.gke_deletion_drain_timeout_s))
+    utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(FLAGS.k8s_deletion_drain_timeout_s))
     utils.StopPortForward()
     logging.info("Cleanup complete.")
 

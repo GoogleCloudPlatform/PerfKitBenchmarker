@@ -124,6 +124,14 @@ def _RenderAndApply(template_name, **kwargs):
     return retcode == 0
 
 
+flags.DEFINE_bool(
+    "skip_deploy_snapshots",
+    False,
+    "Skip deployment of Pod Snapshot infrastructure. "
+    "Set to True on non-GKE clusters where pod snapshots are not supported.",
+)
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -230,6 +238,10 @@ def DeploySnapshots():
       4. Bind IAM roles
       5. Deploy PodSnapshotStorageConfig + PodSnapshotPolicy
     """
+    if FLAGS.skip_deploy_snapshots:
+        logging.info("Skipping snapshot infrastructure (--skip_deploy_snapshots=True).")
+        return
+
     ns = FLAGS.k8s_namespace
     project = getattr(FLAGS, 'project', '') or ''
     zone = getattr(FLAGS, 'zone', '') or ''
@@ -241,7 +253,7 @@ def DeploySnapshots():
 
     bucket_name = "agent-sandbox-snapshots-{}".format(project)
     snapshot_folder = "benchmark-snapshots"
-    ksa_name = FLAGS.gke_snapshot_ksa_name
+    ksa_name = FLAGS.k8s_snapshot_ksa_name
 
     logging.info("=== DeploySnapshots: bucket=%s ===", bucket_name)
 
