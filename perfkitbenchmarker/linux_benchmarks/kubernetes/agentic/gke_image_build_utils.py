@@ -30,6 +30,14 @@ logger = logging.getLogger(__name__)
 # Architecture detection
 # ---------------------------------------------------------------------------
 
+flags.DEFINE_string(
+    "target_arch",
+    "",
+    "Target CPU architecture for container images (amd64 or arm64). "
+    "If set, skips gcloud machine-type detection. "
+    "Use this for non-GCP environments or when gcloud is unavailable.",
+)
+
 _ARCH_MAP = {
     "X86_64": "amd64",
     "ARM64": "arm64",
@@ -44,6 +52,18 @@ def _DetectArchitecture(machine_type, zone, project):
 
     Falls back to amd64 if gcloud fails.
     """
+    # Quick exit if user provided arch explicitly
+    if FLAGS.target_arch:
+        arch = FLAGS.target_arch.lower()
+        if arch in ("amd64", "arm64"):
+            logging.info("Using user-provided target_arch: %s", arch)
+            return arch
+        logging.warning(
+            "Invalid --target_arch='%s'. Must be amd64 or arm64. "
+            "Proceeding with gcloud detection.",
+            FLAGS.target_arch,
+        )
+
     try:
         stdout, _, retcode = vm_util.IssueCommand(
             [

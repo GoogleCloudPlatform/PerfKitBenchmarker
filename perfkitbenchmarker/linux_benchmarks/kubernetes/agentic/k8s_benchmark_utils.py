@@ -41,7 +41,7 @@ flags.DEFINE_bool(
 )
 
 flags.DEFINE_string(
-    "gke_benchmark_note",
+    "k8s_benchmark_note",
     "",
     "Arbitrary note string attached to every sample for tagging runs.",
 )
@@ -233,8 +233,8 @@ def BuildMetadata(namespace, extra=None):
                 machine_type = getattr(cluster.vm_spec, 'machine_type', None)
     if machine_type:
         metadata["machine_type"] = machine_type
-    if FLAGS.gke_benchmark_note:
-        metadata["note"] = FLAGS.gke_benchmark_note
+    if FLAGS.k8s_benchmark_note:
+        metadata["note"] = FLAGS.k8s_benchmark_note
     if extra:
         metadata.update(extra)
     return metadata

@@ -13,7 +13,7 @@
 #   --temp_dir=<path>
 #
 # Benchmark-specific sweep parameters (vary per run):
-#   --gke_python_density_concurrent_sandbox_count=N
+#   --k8s_python_density_concurrent_sandbox_count=N
 #   --gke_snapshot_preload_mb=N
 #   etc.
 
@@ -21,7 +21,7 @@
 # Shared cluster configuration (identical across all benchmarks)
 # ===========================================================================
 
-gke_python_density:
+k8s_python_density:
   flags:
     # --- Cluster creation flags ---
     gke_additional_flags:
@@ -66,7 +66,7 @@ gke_python_density:
           type: gvisor
 
 
-gke_chromium_density:
+k8s_chromium_density:
   flags:
     gke_additional_flags:
       - "--enable-pod-snapshots"
@@ -109,7 +109,7 @@ gke_chromium_density:
           type: gvisor
 
 
-gke_payload:
+k8s_payload:
   flags:
     gke_additional_flags:
       - "--enable-pod-snapshots"
@@ -152,7 +152,7 @@ gke_payload:
           type: gvisor
 
 
-gke_qps:
+k8s_qps:
   flags:
     gke_additional_flags:
       - "--enable-pod-snapshots"
@@ -195,7 +195,7 @@ gke_qps:
           type: gvisor
 
 
-gke_snapshot:
+k8s_snapshot:
   flags:
     gke_additional_flags:
       - "--enable-pod-snapshots"
@@ -238,7 +238,7 @@ gke_snapshot:
           type: gvisor
 
 
-gke_warmpool:
+k8s_warmpool:
   flags:
     gke_additional_flags:
       - "--enable-pod-snapshots"
@@ -281,7 +281,7 @@ gke_warmpool:
           type: gvisor
 
 
-gke_deletion:
+k8s_deletion:
   flags:
     gke_additional_flags:
       - "--enable-pod-snapshots"

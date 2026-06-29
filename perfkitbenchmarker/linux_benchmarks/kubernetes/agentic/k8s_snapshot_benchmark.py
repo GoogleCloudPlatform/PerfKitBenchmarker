@@ -11,24 +11,24 @@ the saturation point.
 
 Usage:
   python pkb.py --benchmarks=gke_snapshot \\
-                --gke_snapshot_preload_mb=50 \\
-                --gke_snapshot_burst_size=3 \\
+                --k8s_snapshot_preload_mb=50 \\
+                --k8s_snapshot_burst_size=3 \\
                 --k8s_namespace=agentic \\
-                --gke_snapshot_skip_snapshot=false
+                --k8s_snapshot_skip_snapshot=false
 
 Samples emitted (per run):
-  - gke_snapshot_snapshot_p50        (seconds)
-  - gke_snapshot_snapshot_p95        (seconds)
-  - gke_snapshot_snapshot_max        (seconds)
-  - gke_snapshot_restore_p50         (seconds)
-  - gke_snapshot_restore_p95         (seconds)
-  - gke_snapshot_restore_max         (seconds)
-  - gke_snapshot_ttfe_p50            (seconds)
-  - gke_snapshot_ttfe_p95            (seconds)
-  - gke_snapshot_ttfe_max            (seconds)
-  - gke_snapshot_startup_time        (seconds)
-  - gke_snapshot_restore_correct_count (count)
-  - gke_snapshot_wall_time           (seconds)
+  - k8s_snapshot_snapshot_p50        (seconds)
+  - k8s_snapshot_snapshot_p95        (seconds)
+  - k8s_snapshot_snapshot_max        (seconds)
+  - k8s_snapshot_restore_p50         (seconds)
+  - k8s_snapshot_restore_p95         (seconds)
+  - k8s_snapshot_restore_max         (seconds)
+  - k8s_snapshot_ttfe_p50            (seconds)
+  - k8s_snapshot_ttfe_p95            (seconds)
+  - k8s_snapshot_ttfe_max            (seconds)
+  - k8s_snapshot_startup_time        (seconds)
+  - k8s_snapshot_restore_correct_count (count)
+  - k8s_snapshot_wall_time           (seconds)
 """
 
 import json
@@ -46,7 +46,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
-    gke_benchmark_utils as utils,
+    k8s_benchmark_utils as utils,
 )
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_deploy_utils as deploy_utils,
@@ -54,9 +54,9 @@ from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = "gke_snapshot"
+BENCHMARK_NAME = "k8s_snapshot"
 BENCHMARK_CONFIG = """
-gke_snapshot:
+k8s_snapshot:
   description: >
     Atomic single-point Pod Snapshot saturation measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
@@ -67,37 +67,37 @@ gke_snapshot:
 # ---------------------------------------------------------------------------
 
 flags.DEFINE_integer(
-    "gke_snapshot_preload_mb",
+    "k8s_snapshot_preload_mb",
     10,
     "Megabytes of memory to pre-allocate in the sandbox before snapshot.",
 )
 
 flags.DEFINE_integer(
-    "gke_snapshot_burst_size",
+    "k8s_snapshot_burst_size",
     1,
     "Number of concurrent source/snapshot/restore pods per measurement.",
 )
 
 flags.DEFINE_string(
-    "gke_snapshot_ksa_name",
+    "k8s_snapshot_ksa_name",
     "pod-snapshot-sa",
     "Kubernetes service account for pod snapshots.",
 )
 
 flags.DEFINE_integer(
-    "gke_snapshot_pod_timeout",
+    "k8s_snapshot_pod_timeout",
     180,
     "Max seconds to wait for pod Running / preload.",
 )
 
 flags.DEFINE_boolean(
-    "gke_snapshot_skip_snapshot",
+    "k8s_snapshot_skip_snapshot",
     False,
     "Skip snapshot/restore phases — measure cold-start TTFE only.",
 )
 
 flags.DEFINE_string(
-    "gke_snapshot_preload_mode",
+    "k8s_snapshot_preload_mode",
     "synthetic",
     "Preload mode: 'synthetic' (os.urandom fill) or "
     "'script:<path>' to run a custom startup script.",
@@ -120,19 +120,28 @@ def GetConfig(user_config):
 def Prepare(benchmark_spec):
     """Deploy workloads, snapshot infra, and validate readiness."""
     ns = FLAGS.k8s_namespace
-    preload_mb = FLAGS.gke_snapshot_preload_mb
+    preload_mb = FLAGS.k8s_snapshot_preload_mb
 
     logging.info(
         "=== Prepare: preload_mb=%d, burst_size=%d ===",
         preload_mb,
-        FLAGS.gke_snapshot_burst_size,
+        FLAGS.k8s_snapshot_burst_size,
     )
 
     # Deploy Agent Sandbox ecosystem (idempotent)
     deploy_utils.DeployWorkloads(benchmark_spec)
 
     # Deploy Pod Snapshot infrastructure (idempotent)
-    deploy_utils.DeploySnapshots()
+        # Pod Snapshots are GKE-specific; skip on other platforms
+    cloud = getattr(
+        getattr(benchmark_spec, "container_cluster", None), "cloud", "GCP"
+    )
+    if cloud == "GCP" and not FLAGS.skip_deploy_snapshots:
+        deploy_utils.DeploySnapshots()
+    elif cloud != "GCP":
+        logging.info(
+            "Pod Snapshot infrastructure skipped (cloud=%s, GKE required).", cloud
+        )
 
     # 1. Verify PodSnapshotStorageConfig exists (cluster-scoped).
     _, _, retcode = utils.RunKubectl(
@@ -157,7 +166,7 @@ def Prepare(benchmark_spec):
         logging.warning("PodSnapshotPolicy not found in namespace %s.", ns)
 
     # 3. Verify the service account exists.
-    ksa = FLAGS.gke_snapshot_ksa_name
+    ksa = FLAGS.k8s_snapshot_ksa_name
     _, _, retcode = utils.RunKubectl(
         ["get", "serviceaccount", ksa, "-n", ns],
         timeout=30,
@@ -189,12 +198,12 @@ def Run(benchmark_spec):
     utils.set_benchmark_spec(benchmark_spec)
 
     ns = FLAGS.k8s_namespace
-    preload_mb = FLAGS.gke_snapshot_preload_mb
-    burst_size = FLAGS.gke_snapshot_burst_size
-    skip_snapshot = FLAGS.gke_snapshot_skip_snapshot
-    preload_mode = FLAGS.gke_snapshot_preload_mode
-    ksa_name = FLAGS.gke_snapshot_ksa_name
-    pod_timeout = FLAGS.gke_snapshot_pod_timeout
+    preload_mb = FLAGS.k8s_snapshot_preload_mb
+    burst_size = FLAGS.k8s_snapshot_burst_size
+    skip_snapshot = FLAGS.k8s_snapshot_skip_snapshot
+    preload_mode = FLAGS.k8s_snapshot_preload_mode
+    ksa_name = FLAGS.k8s_snapshot_ksa_name
+    pod_timeout = FLAGS.k8s_snapshot_pod_timeout
 
     logging.info(
         "=== Run: preload_mb=%d, burst_size=%d, skip_snapshot=%s ===",

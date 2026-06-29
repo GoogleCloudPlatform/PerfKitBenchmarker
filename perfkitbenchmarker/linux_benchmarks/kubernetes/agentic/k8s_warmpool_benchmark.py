@@ -11,12 +11,12 @@ find the provisioning saturation point.
 
 Usage:
   python pkb.py --benchmarks=gke_warmpool \
-                --gke_warmpool_target_replicas=100 \
-                --gke_warmpool_name=python-sandbox-warmpool \
-                --gke_warmpool_pod_label=sandbox=python-sandbox-example \
-                --gke_warmpool_ready_threshold_s=300 \
-                --gke_warmpool_poll_interval_s=2.0 \
-                --gke_warmpool_drain_timeout_s=300 \
+                --k8s_warmpool_target_replicas=100 \
+                --k8s_warmpool_name=python-sandbox-warmpool \
+                --k8s_warmpool_pod_label=sandbox=python-sandbox-example \
+                --k8s_warmpool_ready_threshold_s=300 \
+                --k8s_warmpool_poll_interval_s=2.0 \
+                --k8s_warmpool_drain_timeout_s=300 \
                 --k8s_namespace=agentic \
                 --gke_machine_type=c4-standard-8
 
@@ -50,7 +50,7 @@ from absl import flags
 from datetime import datetime, timezone
 from perfkitbenchmarker import configs
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
-    gke_benchmark_utils as utils,
+    k8s_benchmark_utils as utils,
 )
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_deploy_utils as deploy_utils,
@@ -58,9 +58,9 @@ from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = "gke_warmpool"
+BENCHMARK_NAME = "k8s_warmpool"
 BENCHMARK_CONFIG = """
-gke_warmpool:
+k8s_warmpool:
   description: >
     Atomic single-point warm pool scale-up measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
@@ -71,37 +71,37 @@ gke_warmpool:
 # ---------------------------------------------------------------------------
 
 flags.DEFINE_integer(
-    "gke_warmpool_target_replicas",
+    "k8s_warmpool_target_replicas",
     100,
     "Number of warm pool replicas to provision from zero.",
 )
 
 flags.DEFINE_string(
-    "gke_warmpool_name",
+    "k8s_warmpool_name",
     "python-sandbox-warmpool",
     "SandboxWarmPool resource name.",
 )
 
 flags.DEFINE_string(
-    "gke_warmpool_pod_label",
+    "k8s_warmpool_pod_label",
     "sandbox=python-sandbox-example",
     "Label selector for warm pool pods.",
 )
 
 flags.DEFINE_float(
-    "gke_warmpool_ready_threshold_s",
+    "k8s_warmpool_ready_threshold_s",
     300.0,
     "Max seconds allowed for all pods to reach Running.",
 )
 
 flags.DEFINE_float(
-    "gke_warmpool_poll_interval_s",
+    "k8s_warmpool_poll_interval_s",
     2.0,
     "Seconds between kubectl polls during provisioning.",
 )
 
 flags.DEFINE_float(
-    "gke_warmpool_drain_timeout_s",
+    "k8s_warmpool_drain_timeout_s",
     300.0,
     "Max seconds to wait for drain to 0.",
 )
@@ -137,14 +137,14 @@ def Run(benchmark_spec):
     utils.set_benchmark_spec(benchmark_spec)
 
     ns = FLAGS.k8s_namespace
-    target = FLAGS.gke_warmpool_target_replicas
-    warmpool_name = FLAGS.gke_warmpool_name
-    label = FLAGS.gke_warmpool_pod_label
-    threshold_s = FLAGS.gke_warmpool_ready_threshold_s
-    poll_interval = FLAGS.gke_warmpool_poll_interval_s
+    target = FLAGS.k8s_warmpool_target_replicas
+    warmpool_name = FLAGS.k8s_warmpool_name
+    label = FLAGS.k8s_warmpool_pod_label
+    threshold_s = FLAGS.k8s_warmpool_ready_threshold_s
+    poll_interval = FLAGS.k8s_warmpool_poll_interval_s
 
     # Drain to 0 for clean measurement (moved from Prepare for sweep compatibility)
-    utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(FLAGS.gke_warmpool_drain_timeout_s))
+    utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(FLAGS.k8s_warmpool_drain_timeout_s))
     time.sleep(3)
 
     logging.info("=== Run: scaling %s to %d replicas ===", warmpool_name, target)
@@ -153,7 +153,7 @@ def Run(benchmark_spec):
 
     # 1. Measure drain time (should be near-zero since Prepare drained)
     t0 = time.time()
-    utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(FLAGS.gke_warmpool_drain_timeout_s))
+    utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(FLAGS.k8s_warmpool_drain_timeout_s))
     drain_time_s = round(time.time() - t0, 2)
 
     time.sleep(2)
@@ -309,11 +309,11 @@ def Run(benchmark_spec):
 def Cleanup(benchmark_spec):
     """Drain warm pool back to 0 after measurement."""
     ns = FLAGS.k8s_namespace
-    warmpool_name = FLAGS.gke_warmpool_name
-    label = FLAGS.gke_warmpool_pod_label
+    warmpool_name = FLAGS.k8s_warmpool_name
+    label = FLAGS.k8s_warmpool_pod_label
 
     logging.info("Cleanup: draining warm pool to 0.")
-    utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(FLAGS.gke_warmpool_drain_timeout_s))
+    utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(FLAGS.k8s_warmpool_drain_timeout_s))
     utils.StopPortForward()
     logging.info("Cleanup complete.")
 

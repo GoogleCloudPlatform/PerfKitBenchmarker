@@ -11,9 +11,9 @@ find the saturation point.
 
 Usage:
   python pkb.py --benchmarks=gke_payload \
-                --gke_payload_size_mb=50 \
-                --gke_payload_iterations=20 \
-                --gke_payload_concurrent_sessions=5 \
+                --k8s_payload_size_mb=50 \
+                --k8s_payload_iterations=20 \
+                --k8s_payload_concurrent_sessions=5 \
                 --k8s_namespace=agentic \
                 --k8s_agent_api_url=http://localhost:8080
 
@@ -66,7 +66,7 @@ import time
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
-    gke_benchmark_utils as utils,
+    k8s_benchmark_utils as utils,
 )
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_deploy_utils as deploy_utils,
@@ -74,9 +74,9 @@ from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = "gke_payload"
+BENCHMARK_NAME = "k8s_payload"
 BENCHMARK_CONFIG = """
-gke_payload:
+k8s_payload:
   description: >
     Atomic single-point payload transfer saturation measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
@@ -90,31 +90,31 @@ _WARMPOOL_LABEL = "sandbox=python-sandbox-example"
 # ---------------------------------------------------------------------------
 
 flags.DEFINE_float(
-    "gke_payload_size_mb",
+    "k8s_payload_size_mb",
     1.0,
     "Payload size in megabytes to transfer from the sandbox.",
 )
 
 flags.DEFINE_integer(
-    "gke_payload_iterations",
+    "k8s_payload_iterations",
     20,
     "Number of transfer iterations per sandbox session.",
 )
 
 flags.DEFINE_integer(
-    "gke_payload_concurrent_sessions",
+    "k8s_payload_concurrent_sessions",
     5,
     "Number of parallel sandbox sessions.",
 )
 
 flags.DEFINE_integer(
-    "gke_payload_exec_timeout",
+    "k8s_payload_exec_timeout",
     300,
     "Sandbox command execution timeout in seconds.",
 )
 
 flags.DEFINE_bool(
-    "gke_payload_patch_warmpool",
+    "k8s_payload_patch_warmpool",
     True,
     "Patch SandboxWarmPool replicas to match concurrent_sessions before measurement.",
 )
@@ -151,9 +151,9 @@ def Run(benchmark_spec):
     utils.set_benchmark_spec(benchmark_spec)
 
     ns = FLAGS.k8s_namespace
-    payload_size_mb = FLAGS.gke_payload_size_mb
-    iterations = FLAGS.gke_payload_iterations
-    concurrent = FLAGS.gke_payload_concurrent_sessions
+    payload_size_mb = FLAGS.k8s_payload_size_mb
+    iterations = FLAGS.k8s_payload_iterations
+    concurrent = FLAGS.k8s_payload_concurrent_sessions
 
     logging.info(
         "=== Run: payload_size_mb=%s, iterations=%d, concurrent=%d ===",
@@ -166,7 +166,7 @@ def Run(benchmark_spec):
     utils.EnsurePortForward()
 
     # Patch warm pool (moved from Prepare for sweep compatibility)
-    if FLAGS.gke_payload_patch_warmpool:
+    if FLAGS.k8s_payload_patch_warmpool:
         utils.PatchWarmPool(
             namespace=ns,
             warmpool_name=_WARMPOOL_NAME,
@@ -179,7 +179,7 @@ def Run(benchmark_spec):
         "payload_size_mb": payload_size_mb,
         "payload_iterations": iterations,
         "concurrent_sessions": concurrent,
-        "sandbox_exec_timeout_s": FLAGS.gke_payload_exec_timeout,
+        "sandbox_exec_timeout_s": FLAGS.k8s_payload_exec_timeout,
     }
 
     t0 = time.time()

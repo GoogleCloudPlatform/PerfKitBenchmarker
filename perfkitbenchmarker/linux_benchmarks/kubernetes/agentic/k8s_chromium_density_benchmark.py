@@ -11,9 +11,9 @@ the saturation point.
 
 Usage:
   python pkb.py --benchmarks=gke_chromium_density \\
-                --gke_chromium_density_concurrent_sessions=4 \\
-                --gke_chromium_density_task_count=10 \\
-                --gke_chromium_density_warmup_tasks=5 \\
+                --k8s_chromium_density_concurrent_sessions=4 \\
+                --k8s_chromium_density_task_count=10 \\
+                --k8s_chromium_density_warmup_tasks=5 \\
                 --k8s_namespace=agentic \\
                 --k8s_agent_api_url=http://localhost:8080
 
@@ -43,7 +43,7 @@ import time
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
-    gke_benchmark_utils as utils,
+    k8s_benchmark_utils as utils,
 )
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     gke_deploy_utils as deploy_utils,
@@ -51,9 +51,9 @@ from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = "gke_chromium_density"
+BENCHMARK_NAME = "k8s_chromium_density"
 BENCHMARK_CONFIG = """
-gke_chromium_density:
+k8s_chromium_density:
   description: >
     Atomic single-point Chromium browser sandbox density measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
@@ -67,37 +67,37 @@ _WARMPOOL_LABEL = "sandbox=chromium-sandbox-example"
 # ---------------------------------------------------------------------------
 
 flags.DEFINE_integer(
-    "gke_chromium_density_concurrent_sessions",
+    "k8s_chromium_density_concurrent_sessions",
     1,
     "Number of concurrent Chromium browser sessions to run.",
 )
 
 flags.DEFINE_integer(
-    "gke_chromium_density_task_count",
+    "k8s_chromium_density_task_count",
     10,
     "Number of browser task iterations per Chromium session.",
 )
 
 flags.DEFINE_integer(
-    "gke_chromium_density_warmup_tasks",
+    "k8s_chromium_density_warmup_tasks",
     5,
     "Number of warmup iterations per session (excluded from stats).",
 )
 
 flags.DEFINE_bool(
-    "gke_chromium_density_patch_warmpool",
+    "k8s_chromium_density_patch_warmpool",
     True,
     "Patch SandboxWarmPool replicas to match density before measurement.",
 )
 
 flags.DEFINE_integer(
-    "gke_chromium_density_exec_timeout",
+    "k8s_chromium_density_exec_timeout",
     120,
     "Sandbox command execution timeout in seconds.",
 )
 
 flags.DEFINE_integer(
-    "gke_chromium_density_provision_timeout",
+    "k8s_chromium_density_provision_timeout",
     300,
     "Max seconds to wait for warm pool pods to reach Running.",
 )
@@ -134,7 +134,7 @@ def Run(benchmark_spec):
     utils.set_benchmark_spec(benchmark_spec)
 
     ns = FLAGS.k8s_namespace
-    density = FLAGS.gke_chromium_density_concurrent_sessions
+    density = FLAGS.k8s_chromium_density_concurrent_sessions
 
     logging.info("=== Run: chromium_density=%d ===", density)
 
@@ -142,21 +142,21 @@ def Run(benchmark_spec):
     utils.EnsurePortForward()
 
     # Patch warm pool (moved from Prepare for sweep compatibility)
-    if FLAGS.gke_chromium_density_patch_warmpool:
+    if FLAGS.k8s_chromium_density_patch_warmpool:
         utils.PatchWarmPool(
             namespace=ns,
             warmpool_name=_WARMPOOL_NAME,
             replicas=density,
             label=_WARMPOOL_LABEL,
-            wait_timeout=FLAGS.gke_chromium_density_provision_timeout,
+            wait_timeout=FLAGS.k8s_chromium_density_provision_timeout,
         )
 
     # POST to agent API
     payload = {
-        "task_count": FLAGS.gke_chromium_density_task_count,
-        "warmup_tasks": FLAGS.gke_chromium_density_warmup_tasks,
+        "task_count": FLAGS.k8s_chromium_density_task_count,
+        "warmup_tasks": FLAGS.k8s_chromium_density_warmup_tasks,
         "concurrent_sessions": density,
-        "sandbox_exec_timeout_s": FLAGS.gke_chromium_density_exec_timeout,
+        "sandbox_exec_timeout_s": FLAGS.k8s_chromium_density_exec_timeout,
     }
 
     t0 = time.time()
@@ -179,8 +179,8 @@ def Run(benchmark_spec):
         "density": density,
         "successful_sessions": successful,
         "failed_sessions": failed,
-        "task_count": FLAGS.gke_chromium_density_task_count,
-        "warmup_tasks": FLAGS.gke_chromium_density_warmup_tasks,
+        "task_count": FLAGS.k8s_chromium_density_task_count,
+        "warmup_tasks": FLAGS.k8s_chromium_density_warmup_tasks,
         "wall_time_s": round(wall_time, 2),
     }
 
