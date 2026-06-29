@@ -187,6 +187,10 @@ class BaseNodePoolConfig:
     # Defined by GceVirtualMachineConfig. Used by google_kubernetes_engine
     # pylint: disable=g-missing-from-attributes
     self.sandbox_config: container_spec_lib.SandboxSpec | None = None
+    # Set by container_cluster._InitializeNodePool() when NodepoolSpec
+    # declares swap_config. Consumed by _AddNodeParamsToCmd() in the cloud
+    # provider to apply swap configuration during nodepool creation.
+    self.swap_config: container_spec_lib.SwapConfigSpec | None = None
     self.max_local_disks: int | None
     self.ssd_interface: str | None
     self.threads_per_core: int
