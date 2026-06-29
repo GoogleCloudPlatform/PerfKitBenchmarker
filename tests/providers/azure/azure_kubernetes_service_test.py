@@ -285,6 +285,32 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
         mock_cmd.all_commands,
     )
 
+  def testCreateNodepoolLabels(self):
+    mock_cmd = self.MockIssueCommand({
+        'az aks nodepool add': [('', '', 0)],
+    })
+    nodepool_config = self.aks.default_nodepool
+    nodepool_config.node_labels = {'env': 'prod', 'team': 'ml'}
+    self.aks._CreateNodePool(nodepool_config)
+    call_args = str(mock_cmd.func_to_mock.mock_calls[0])
+    self.assertIn('env=prod', call_args)
+    self.assertIn('team=ml', call_args)
+
+  def testCreateNodepoolTaints(self):
+    mock_cmd = self.MockIssueCommand({
+        'az aks nodepool add': [('', '', 0)],
+    })
+    nodepool_config = self.aks.default_nodepool
+    nodepool_config.node_taints = [
+        'sandbox.gke.io/runtime=runsc:NoSchedule',
+        'dedicated:NoExecute',
+    ]
+    self.aks._CreateNodePool(nodepool_config)
+    call_args = str(mock_cmd.func_to_mock.mock_calls[0])
+    self.assertIn('--node-taints', call_args)
+    self.assertIn('sandbox.gke.io/runtime=runsc:NoSchedule', call_args)
+    self.assertIn('dedicated:NoExecute', call_args)
+
   def testGetNodePoolNames(self):
     self.MockIssueCommand(
         {
