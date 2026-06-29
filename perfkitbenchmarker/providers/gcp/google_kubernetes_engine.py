@@ -642,12 +642,14 @@ class GkeCluster(BaseGkeCluster):
 
     Most async commands (node-pool create/delete) print the operation name to
     stdout. A few (`clusters upgrade --node-pool`, `clusters update`) reliably
-    return success with empty stdout — gcloud simply does not emit the name for
-    those subcommands. For those, pass fallback_op_type/fallback_target and the
-    operation name is recovered from `gcloud container operations list`.
+    return success with empty stdout -- gcloud simply does not emit the name
+    for those subcommands. For those, pass fallback_op_type/fallback_target
+    and the operation name is recovered from `gcloud container operations
+    list` via GcloudCommand.IssueAsync's get_latest_op_fn fallback.
 
     Args:
-      cmd: the gcloud command to issue (--async and format are added here).
+      cmd: the gcloud command to issue (--async and format are added by
+        GcloudCommand.IssueAsync).
       fallback_op_type: GKE operationType (e.g. 'UPGRADE_NODES',
         'UPDATE_CLUSTER') to look up if stdout is empty. None disables the
         fallback (create/delete, which always print the name).
@@ -657,33 +659,17 @@ class GkeCluster(BaseGkeCluster):
     Returns:
       The operation name.
     """
-    cmd.args.append('--async')
-    cmd.flags['format'] = 'value(name)'
     # Recorded before issuing so the fallback's startTime>= guard can include
     # fast ops that may already be DONE before the operations-list query runs.
     op_start_time = time.time()
-    stdout, stderr, retcode = cmd.Issue(timeout=600, raise_on_failure=False)
-    if retcode:
-      raise errors.Resource.CreationError(stderr)
-    op_name = stdout.strip().splitlines()[-1].strip() if stdout else ''
-    if op_name:
-      return op_name
-    # Empty stdout. For commands that print the name this is a real failure;
-    # for upgrade/update it is expected, so recover via the operations list.
-    if fallback_op_type is None:
-      raise errors.Resource.CreationError(
-          f'GKE async command returned no operation name; stderr={stderr}'
+    get_latest_op_fn = None
+    if fallback_op_type is not None:
+      get_latest_op_fn = lambda: self._GetLatestOperationName(
+          operation_type=fallback_op_type,
+          target_name=fallback_target,
+          op_start_time=op_start_time,
       )
-    logging.info(
-        '_IssueAsync: no op name printed; ops-list fallback type=%s target=%s',
-        fallback_op_type,
-        fallback_target,
-    )
-    return self._GetLatestOperationName(
-        operation_type=fallback_op_type,
-        target_name=fallback_target,
-        op_start_time=op_start_time,
-    )
+    return cmd.IssueAsync(get_latest_op_fn=get_latest_op_fn, timeout=600)
 
   def _GetLatestOperationName(
       self,
