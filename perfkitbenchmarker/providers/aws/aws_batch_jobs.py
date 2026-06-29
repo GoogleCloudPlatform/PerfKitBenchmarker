@@ -92,6 +92,9 @@ class AwsBatchComputeEnvironment(resource.BaseResource):
       vm_util.IssueCommand(modify_subnet_cmd)
     compute_resources = {
         'subnets': [self.network.subnet.id],
+        'securityGroupIds': [
+            self.network.regional_network.vpc.default_security_group_id
+        ],
         'maxvCpus': 256,
     }
 
@@ -105,6 +108,7 @@ class AwsBatchComputeEnvironment(resource.BaseResource):
       )
       compute_resources.update({
           'type': _EC2,
+          'minvCpus': 0,  # Required
           'instanceTypes': [self.machine_type],
           'instanceRole': instance_profile,
       })
