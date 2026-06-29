@@ -88,9 +88,18 @@ _DISK_TYPE = flags.DEFINE_string(
     'Override disk type for the benchmark nodepool.',
 )
 
+_DAEMONSET_IMAGE = flags.DEFINE_string(
+    'swap_encryption_daemonset_image',
+    'ubuntu:22.04',
+    'Container image for the privileged benchmark DaemonSet.',
+)
+
 _BenchmarkSpec = benchmark_spec.BenchmarkSpec
 _BENCHMARK_NODEPOOL = 'benchmark'
 _DEFAULT_POOL = 'default-pool'
+_DS_NAME = 'pkb-swap-benchmark'
+_DS_NAMESPACE = 'default'
+_DS_LABEL = 'pkb-swap-benchmark'
 
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
@@ -124,7 +133,13 @@ def Prepare(spec: _BenchmarkSpec) -> None:
     spec: PKB BenchmarkSpec with spec.container_cluster already created.
   """
   cluster = spec.container_cluster
-  daemonset = swap_daemonset.SwapDaemonSet(cluster=cluster)
+  daemonset = swap_daemonset.SwapDaemonSet(
+      name=_DS_NAME,
+      namespace=_DS_NAMESPACE,
+      label=_DS_LABEL,
+      nodepool=_BENCHMARK_NODEPOOL,
+      image=_DAEMONSET_IMAGE.value,
+  )
   daemonset.Create()
   spec.resources.append(daemonset)
   pod = daemonset.WaitForPod()
