@@ -1,7 +1,3 @@
-### New features:
--   Add kubernetes_management benchmark for measuring GKE/EKS/AKS management
-    plane API responsiveness.
-
 ### Breaking changes:
 
 -   Added --accept_licenses flag. User have to turn this flag on to acknowledge
@@ -288,6 +284,8 @@
 -   Re-enable support for Rocky Linux 8, 9, and 10 for the Azure provider.
 -   Add Ubuntu 26.04 support for GCP, AWS, and Azure Providers.
 -   Add a kubernetes-native benchmark for MySQL using sysbench
+-   Add kubernetes_management benchmark for measuring GKE/EKS/AKS management
+    plane API responsiveness.
 
 ### Enhancements:
 
