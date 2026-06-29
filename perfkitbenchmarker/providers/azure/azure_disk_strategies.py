@@ -17,6 +17,7 @@ This module abstract out the disk algorithm for formatting and creating
 scratch disks.
 """
 
+import logging
 import time
 from typing import Any
 from absl import flags
@@ -244,6 +245,32 @@ class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
     self.scratch_disks = []
 
   def SetUpDisk(self):
+    try:
+      self._SetUpDisk()
+    except errors.VmUtil.ThreadException as e:
+      if self._ShouldFallbackForPremiumV2(e):
+        logging.warning(
+            'PremiumV2_LRS SKU is not available or unsupported in this zone. '
+            'Falling back to Premium_LRS.'
+        )
+        self._CleanUpPartiallyCreatedDisks()
+        self._FallbackToPremiumLRS()
+        try:
+          self._SetUpDisk()
+        except errors.VmUtil.ThreadException as e2:
+          if self._IsSkuNotAvailable(e2):
+            raise errors.Benchmarks.UnsupportedConfigError(
+                f'Failed to create fallback disk Premium_LRS: {e2}'
+            ) from e2
+          raise
+      elif self._IsSkuNotAvailable(e):
+        raise errors.Benchmarks.UnsupportedConfigError(
+            f'Disk SKU is not available: {e}'
+        ) from e
+      else:
+        raise
+
+  def _SetUpDisk(self):
     create_tasks = []
     scratch_disks = []
     for disk_spec_id, disk_spec in enumerate(self.disk_specs):
@@ -263,6 +290,42 @@ class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
       AzurePrepareScratchDiskStrategy().PrepareScratchDisk(
           self.vm, scratch_disk, disk_spec
       )
+
+  def _ShouldFallbackForPremiumV2(
+      self, exception: errors.VmUtil.ThreadException
+  ) -> bool:
+    exc_str = str(exception)
+    return (
+        azure_disk.PREMIUM_STORAGE_V2 in exc_str
+        and ('SkuNotAvailable' in exc_str or 'Availability Zone' in exc_str)
+    )
+
+  def _IsSkuNotAvailable(
+      self, exception: errors.VmUtil.ThreadException
+  ) -> bool:
+    return 'SkuNotAvailable' in str(exception)
+
+  def _CleanUpPartiallyCreatedDisks(self):
+    for disk_group in self.vm.create_disk_strategy.remote_disk_groups:
+      for disk_resource in disk_group:
+        if disk_resource.created:
+          try:
+            disk_resource.Delete()
+          except Exception:  # pylint: disable=broad-except
+            logging.exception(
+                'Failed to delete partially created disk %s', disk_resource.name
+            )
+
+  def _FallbackToPremiumLRS(self):
+    for spec in self.disk_specs:
+      if spec.disk_type == azure_disk.PREMIUM_STORAGE_V2:
+        spec.disk_type = azure_disk.PREMIUM_STORAGE
+
+    for disk_group in self.vm.create_disk_strategy.remote_disk_groups:
+      for disk_resource in disk_group:
+        if disk_resource.disk_type == azure_disk.PREMIUM_STORAGE_V2:
+          disk_resource.disk_type = azure_disk.PREMIUM_STORAGE
+          disk_resource.metadata['type'] = azure_disk.PREMIUM_STORAGE
 
   def AttachDisks(self):
     attach_tasks = []
