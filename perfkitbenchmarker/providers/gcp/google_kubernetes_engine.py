@@ -429,11 +429,15 @@ class GkeCluster(BaseGkeCluster):
       cmd = self._GcloudCommand(
           'container', 'node-pools', 'create', name, '--cluster', self.name
       )
-      self._AddNodeParamsToCmd(
-          nodepool,
-          cmd,
-      )
-      self._IssueResourceCreationCommand(cmd)
+      self._AddNodeParamsToCmd(nodepool, cmd)
+      # If swap_config wrote a linuxConfig tempfile, clean it up after Issue().
+      swap_cfg = getattr(nodepool, '_gke_swap_config', None)
+      try:
+        self._IssueResourceCreationCommand(cmd)
+      finally:
+        if swap_cfg is not None:
+          swap_cfg.CleanupYaml()
+          nodepool._gke_swap_config = None  # pylint: disable=protected-access
       self._CreateCustomComputeClass(nodepool)
 
   def _CreateCustomComputeClass(
@@ -575,6 +579,8 @@ class GkeCluster(BaseGkeCluster):
     if nodepool_config.swap_config is not None:
       gke_swap = swap_config_lib.GkeSwapConfig.from_spec(nodepool_config.swap_config)
       cmd.flags['system-config-from-file'] = gke_swap.WriteLinuxConfigYaml()
+      # Store on nodepool so _CreateNodePools() can clean up the tempfile.
+      nodepool_config._gke_swap_config = gke_swap  # pylint: disable=protected-access
       # dm-crypt requires UBUNTU_CONTAINERD (Ajay r3472549985).
       cmd.flags['image-type'] = 'UBUNTU_CONTAINERD'
       # Prevent GKE from replacing the node after swap setup is complete.
