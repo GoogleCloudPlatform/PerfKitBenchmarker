@@ -126,6 +126,7 @@ _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     'c8g': 'graviton4',
     'r8g': 'graviton4',
     'i8g': 'graviton4',
+    'm9g': 'graviton5',
     't4g': 'graviton2',
     'im4g': 'graviton2',
     'is4ge': 'graviton2',
@@ -1001,6 +1002,12 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         + reservation_args
         + bandwidth_weighting_args
     )
+
+    if aws_flags.AWS_METADATA_HTTP_TOKENS.value:
+      create_cmd.append(
+          '--metadata-options=HttpEndpoint=enabled,HttpTokens=%s'
+          % aws_flags.AWS_METADATA_HTTP_TOKENS.value
+      )
 
     if FLAGS.aws_vm_hibernate:
       create_cmd.extend([

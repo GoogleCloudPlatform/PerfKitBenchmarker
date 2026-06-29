@@ -16,7 +16,14 @@
 
 import logging
 import re
+from absl import flags
 from perfkitbenchmarker import errors
+
+_DPDK_INSTALL_PLATFORM = flags.DEFINE_string(
+    'dpdk_install_platform',
+    'native',
+    'DPDK install platform. Default is native.',
+)
 
 DPDK_GIT_REPO = 'https://github.com/DPDK/dpdk.git'
 # LINT.IfChange(dpdk_tag)
@@ -58,7 +65,8 @@ def _Install(vm):
   # Installs DPDK.
   vm.RobustRemoteCommand(
       'cd dpdk && sudo env PATH=$PATH:/usr/local/bin meson setup'
-      ' -Dexamples=l3fwd,l2fwd -Dmax_lcores=256 -Dplatform=native build'
+      ' -Dexamples=l3fwd,l2fwd -Dmax_lcores=256'
+      f' -Dplatform={_DPDK_INSTALL_PLATFORM.value} build'
   )
   vm.RemoteCommand(
       'cd dpdk && yes | sudo env PATH=$PATH:/usr/local/bin ninja install -C'

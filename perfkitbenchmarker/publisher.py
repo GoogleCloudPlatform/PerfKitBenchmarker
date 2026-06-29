@@ -79,7 +79,7 @@ JSON_PATH = flags.DEFINE_string(
 )
 flags.DEFINE_enum(
     'json_write_mode',
-    'w',
+    'a',
     ['w', 'a'],
     'Open mode for file specified by --json_path. Default: overwrite file',
 )

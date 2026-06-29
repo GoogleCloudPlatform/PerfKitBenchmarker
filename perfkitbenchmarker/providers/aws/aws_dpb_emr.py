@@ -22,6 +22,7 @@ import gzip
 import json
 import logging
 import os
+import time
 from typing import Any, Dict
 
 from absl import flags
@@ -38,7 +39,6 @@ from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
-
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -197,8 +197,8 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(self.region)
     self.bucket_to_delete = None
-    self._cluster_create_time: float | None = None
-    self._cluster_ready_time: float | None = None
+    self._service_reported_cluster_create_time: float | None = None
+    self._service_reported_cluster_ready_time: float | None = None
     self._cluster_delete_time: float | None = None
     if not self.GetDpbVersion():
       raise errors.Setup.InvalidSetupError(
@@ -212,17 +212,26 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
   def GetDpbVersion(self) -> str | None:
     return FLAGS.dpb_emr_release_label or super().GetDpbVersion()
 
-  def GetClusterCreateTime(self) -> float | None:
-    """Returns the cluster creation time.
+  def GetServiceReportedClusterCreateTime(self) -> float | None:
+    """Returns the cluster creation time as reported by the service.
 
     On this implementation, the time returned is based on the timestamps
-    reported by the EMR API (which is stored in the _cluster_create_time
+    reported by the EMR API (which is stored in the
+    _service_reported_cluster_create_time
     attribute).
 
     Returns:
       A float representing the creation time in seconds or None.
     """
-    return self._cluster_ready_time - self._cluster_create_time
+    if (
+        self._service_reported_cluster_create_time is None
+        or self._service_reported_cluster_ready_time is None
+    ):
+      return None
+    return (
+        self._service_reported_cluster_ready_time
+        - self._service_reported_cluster_create_time
+    )
 
   @property
   def security_group_id(self):
@@ -397,9 +406,11 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
     # TODO(saksena): Handle error outcomees when spinning up emr clusters
     is_ready = result['Cluster']['Status']['State'] == READY_STATE
     if is_ready:
-      self._cluster_create_time, self._cluster_ready_time = (
-          self._ParseClusterCreateTime(result)
-      )
+      (
+          self._service_reported_cluster_create_time,
+          self._service_reported_cluster_ready_time,
+      ) = self._ParseClusterCreateTime(result)
+      self.resource_ready_time = time.time()
     return is_ready
 
   @classmethod
@@ -575,8 +586,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         's3',
         'cp',
         os.path.join(
-            self.base_dir,
-            f'{self.cluster_id}/steps/{step_id}/stderr.gz'
+            self.base_dir, f'{self.cluster_id}/steps/{step_id}/stderr.gz'
         ),
         local_stdout_path,
     ]
@@ -615,7 +625,7 @@ class AwsDpbEmrServerless(
     self.cmd_prefix += ['--region', self.region]
     self.storage_service = s3.S3Service()
     self.storage_service.PrepareService(self.region)
-    self._cluster_create_time = None
+    self._service_reported_cluster_create_time = None
     if not self.GetDpbVersion():
       raise errors.Setup.InvalidSetupError(
           'dpb_service.version must be provided. Versions follow the format: '

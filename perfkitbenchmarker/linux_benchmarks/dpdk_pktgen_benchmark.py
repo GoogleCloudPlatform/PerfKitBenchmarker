@@ -77,6 +77,9 @@ FLAGS = flags.FLAGS
 _DPDK_PKTGEN_DURATION = flags.DEFINE_integer(
     'dpdk_pktgen_duration', 60, 'Run duration in seconds.'
 )
+_DPDK_PKTGEN_PACKET_SIZE = flags.DEFINE_integer(
+    'dpdk_pktgen_packet_size', 64, 'The packet size in bytes.'
+)
 _DPDK_PKTGEN_PACKET_LOSS_THRESHOLDS = flags.DEFINE_multi_float(
     'dpdk_pktgen_packet_loss_threshold_rates',
     [0],
@@ -339,6 +342,11 @@ def PrepareVM(
       f'sudo sed -i "s/<RX_BURST>/{_DPDK_PKTGEN_RX_BURST.value}/g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
+  # Update packet size.
+  vm.RemoteCommand(
+      f'sudo sed -i "s/<PACKET_SIZE>/{_DPDK_PKTGEN_PACKET_SIZE.value}/g"'
+      f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
+  )
 
 
 def IssueCommand(vm: linux_virtual_machine.BaseLinuxVirtualMachine, cmd: str):
@@ -378,6 +386,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   base_metadata = {
       'dpdk_pktgen_tx_burst': _DPDK_PKTGEN_TX_BURST.value,
       'dpdk_pktgen_rx_burst': _DPDK_PKTGEN_RX_BURST.value,
+      'dpdk_pktgen_packet_size': _DPDK_PKTGEN_PACKET_SIZE.value,
       'dpdk_pktgen_lcores': num_lcores,
       'dpdk_pktgen_num_memory_channels': num_memory_channels,
       'dpdk_pktgen_duration': _DPDK_PKTGEN_DURATION.value,

@@ -50,26 +50,8 @@ provision_relational_db:
         disk_size: 128
     vm_groups:
       clients:
-        vm_spec:
-          GCP:
-            machine_type: n1-standard-2
-            zone: us-central1-c
-          AWS:
-            machine_type: m4.large
-            zone: us-east-1a
-          Azure:
-            machine_type: Standard_B1s
-            zone: westus
-        disk_spec:
-          GCP:
-            disk_size: 500
-            disk_type: pd-ssd
-          AWS:
-            disk_size: 500
-            disk_type: gp2
-          Azure:
-            disk_size: 500
-            disk_type: Premium_LRS
+        vm_spec: *default_dual_core
+        disk_spec: *default_500_gb
 """
 
 

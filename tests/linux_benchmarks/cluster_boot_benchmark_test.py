@@ -265,7 +265,6 @@ class ClusterBootBenchmarkTest(
             timestamp=1678147200.0,
         )
     )
-
     self.assertCountEqual(actuals, expecteds)
 
 

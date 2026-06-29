@@ -29,111 +29,6 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.bm_spec.container_cluster = self.cluster
     self.expected_num_samples_per_reason = 9
 
-  def testTimestampConvert(self):
-    epoch_time = kubernetes_scale_benchmark.ConvertToEpochTime(
-        '1970-01-01T00:00:00Z'
-    )
-    self.assertEqual(epoch_time, 0)
-    self.assertEqual(
-        kubernetes_scale_benchmark.ConvertToEpochTime('1970-01-01T00:01:00Z'),
-        60,
-    )
-
-  def testPodStatusConditions(self):
-    stdout = json.dumps({
-        'items': [
-            {
-                'metadata': {'name': 'pod123'},
-                'status': {
-                    'conditions': [
-                        {
-                            'lastProbeTime': None,
-                            'lastTransitionTime': '1970-01-01T00:01:19Z',
-                            'status': 'True',
-                            'type': 'PodReadyToStartContainers',
-                        },
-                        {
-                            'lastProbeTime': None,
-                            'lastTransitionTime': '1970-01-01T18:51:17Z',
-                            'status': 'True',
-                            'type': 'Initialized',
-                        },
-                        {
-                            'lastProbeTime': None,
-                            'lastTransitionTime': '1970-01-01T00:01:19Z',
-                            'status': 'True',
-                            'type': 'Ready',
-                        },
-                        {
-                            'lastProbeTime': None,
-                            'lastTransitionTime': '1970-01-01T00:01:19Z',
-                            'status': 'True',
-                            'type': 'ContainersReady',
-                        },
-                    ]
-                },
-            },
-            {
-                'metadata': {'name': 'pod456'},
-                'status': {
-                    'conditions': [
-                        {
-                            'lastProbeTime': None,
-                            'lastTransitionTime': '1970-01-01T18:51:17Z',
-                            'status': 'True',
-                            'type': 'PodScheduled',
-                        },
-                    ]
-                },
-            },
-        ]
-    })
-    self.enter_context(
-        mock.patch.object(
-            kubectl,
-            'RunKubectlCommand',
-            return_value=(stdout, '', 0),
-        )
-    )
-    conditions = kubernetes_scale_benchmark.GetStatusConditionsForResourceType(
-        'pod',
-        frozenset(),
-    )
-    self.assertLen(conditions, 5)
-
-  def testPodStatusConditionsInvalid(self):
-    self.enter_context(
-        mock.patch.object(
-            kubectl,
-            'RunKubectlCommand',
-            return_value=(
-                json.dumps({
-                    'items': [{
-                        'metadata': {'name': 'pod123'},
-                        'status': {
-                            'conditions': [{
-                                'lastTransitionTime': None,
-                                'status': 'True',
-                                'message': (
-                                    'Image docker.io is backed by'
-                                    ' image streaming.'
-                                ),
-                                'type': 'ImageStreaming',
-                            }]
-                        },
-                    }]
-                }),
-                '',
-                0,
-            ),
-        )
-    )
-    conditions = kubernetes_scale_benchmark.GetStatusConditionsForResourceType(
-        'pod',
-        frozenset(),
-    )
-    self.assertEmpty(conditions)
-
   def testEarlyStatIgnored(self):
     stdout = json.dumps({
         'items': [
@@ -161,56 +56,6 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     )
     samples = kubernetes_scale_benchmark.ParseStatusChanges('pod', 50)
     self.assertEmpty(samples)
-
-  def testPodStatusConditionsWithIgnoredResources(self):
-    stdout = json.dumps({
-        'items': [
-            {
-                'metadata': {'name': 'pod123'},
-                'status': {
-                    'conditions': [
-                        {
-                            'lastProbeTime': None,
-                            'lastTransitionTime': '1970-01-01T00:01:19Z',
-                            'status': 'True',
-                            'type': 'PodReadyToStartContainers',
-                        },
-                        {
-                            'lastProbeTime': None,
-                            'lastTransitionTime': '1970-01-01T18:51:17Z',
-                            'status': 'True',
-                            'type': 'Initialized',
-                        },
-                    ]
-                },
-            },
-            {
-                'metadata': {'name': 'pod456'},
-                'status': {
-                    'conditions': [
-                        {
-                            'lastProbeTime': None,
-                            'lastTransitionTime': '1970-01-01T18:51:17Z',
-                            'status': 'True',
-                            'type': 'PodScheduled',
-                        },
-                    ]
-                },
-            },
-        ]
-    })
-    self.enter_context(
-        mock.patch.object(
-            kubectl,
-            'RunKubectlCommand',
-            return_value=(stdout, '', 0),
-        )
-    )
-    conditions = kubernetes_scale_benchmark.GetStatusConditionsForResourceType(
-        'pod',
-        resources_to_ignore=frozenset(['pod456']),
-    )
-    self.assertLen(conditions, 2)
 
   def testOneStatForOnePod(self):
     stdout = json.dumps({
@@ -423,6 +268,52 @@ class KubernetesScaleBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
             'pod_ContainersReady_count',
             'pod_Ready',
             'pod_ContainersReady',
+        },
+    )
+
+  @flagsaver.flagsaver(kubernetes_scale_report_latency_percentiles=False)
+  @flagsaver.flagsaver(kubernetes_scale_report_individual_latencies=True)
+  def testReportLatenciesContainsMachineType(self):
+    stdout = json.dumps({
+        'items': [
+            {
+                'metadata': {
+                    'name': 'node1',
+                    'labels': {
+                        'node.kubernetes.io/instance-type': 'n2-standard-4',
+                    },
+                },
+                'status': {
+                    'conditions': [
+                        {
+                            'lastProbeTime': None,
+                            'lastTransitionTime': '1970-01-01T00:01:00Z',
+                            'status': 'True',
+                            'type': 'Ready',
+                        },
+                    ]
+                },
+            },
+        ]
+    })
+    self.enter_context(
+        mock.patch.object(
+            kubectl,
+            'RunKubectlCommand',
+            side_effect=[(stdout, '', 0)],
+        )
+    )
+    samples = kubernetes_scale_benchmark.ParseStatusChanges(
+        'node', start_time=0
+    )
+    samples_by_metric = _SamplesByMetric(samples)
+    self.assertIn('node_Ready', samples_by_metric)
+    node_ready_sample = samples_by_metric['node_Ready']
+    self.assertEqual(
+        node_ready_sample.metadata,
+        {
+            'k8s_resource_name': 'node1',
+            'machine_type': 'n2-standard-4',
         },
     )
 

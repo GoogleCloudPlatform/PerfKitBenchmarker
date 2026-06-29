@@ -7,9 +7,12 @@ of agentic applications.
 import abc
 from typing import Any
 
+from absl import flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import vm_util
 import yaml
+
+FLAGS = flags.FLAGS
 
 
 def GetAiAgentServiceClass(cloud: str, deployment_type: str):
@@ -45,32 +48,41 @@ class BaseAiAgentService(resource.BaseResource):
       self,
       client_vm_path: str,
       output_dir: str,
-      prompt_file: str,
+      prompt: str,
+      session_id: str,
+      user_id: str,
       agent_config: dict[str, Any] | None = None,
   ) -> None:
-    config_dict = self._GetRunConfig(output_dir, prompt_file, agent_config)
+    config_dict = self._GetRunConfig(
+        output_dir, prompt, session_id, user_id, agent_config
+    )
     config_str = yaml.safe_dump(config_dict)
     config_local_path = vm_util.WriteTemporaryFile(
         config_str, origin='run_config.yaml'
     )
     self.client_vm.PushDataFile(config_local_path, client_vm_path)
 
-  @abc.abstractmethod
   def _GetDeploymentConfig(self) -> dict[str, Any]:
     """Gets config dict for deployment/creation."""
+    return {'run_uri': FLAGS.run_uri}
 
   def _GetRunConfig(
       self,
       output_dir: str,
-      prompt_file: str,
+      prompt: str,
+      session_id: str,
+      user_id: str,
       agent_config: dict[str, Any] | None = None,
   ) -> dict[str, Any]:
     """Gets config dict for running the agent."""
     return {
         'workload': self.spec.workload,
         'framework': self.spec.framework,
-        'prompt_file': prompt_file,
+        'prompt': prompt,
         'output_dir': output_dir,
+        'session_id': session_id,
+        'user_id': user_id,
+        'run_uri': FLAGS.run_uri,
         'agent_config': (
             agent_config if agent_config is not None else self.agent_config
         ),
@@ -95,6 +107,8 @@ class BaseAiAgentService(resource.BaseResource):
       output_dir: str,
       prompt: str | None = None,
       agent_config: dict[str, Any] | None = None,
+      session_id: str | None = None,
+      user_id: str | None = None,
   ) -> None:
     """Executes the agentic workload."""
 

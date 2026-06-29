@@ -27,9 +27,17 @@ class SampleTestCase(unittest.TestCase):
   def testProvidedMetadataSet(self):
     metadata = {'origin': 'unit test'}
     instance = sample.Sample(
-        metric='Test', value=1.0, unit='Mbps', metadata=metadata.copy()
+        metric='Test', value=1.0, unit='Mbps', metadata=metadata
     )
     self.assertDictEqual(metadata, instance.metadata)
+
+  def testProvidedMetadataUnchanged(self):
+    metadata = {'origin': 'unit test'}
+    instance = sample.Sample(
+        metric='Test', value=1.0, unit='Mbps', metadata=metadata
+    )
+    metadata['new_key'] = 'new_value'
+    self.assertNotEqual(metadata, instance.metadata)
 
   def testNoneValueShouldBeZero(self):
     instance = sample.Sample(metric='Test', value=None, unit='Mbps')

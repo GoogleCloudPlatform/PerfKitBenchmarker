@@ -403,3 +403,9 @@ AWS_DOCUMENTDB_SNAPSHOT = flags.DEFINE_string(
     None,
     'If supplied, creates the DocumentDB instance from the snapshot.',
 )
+AWS_METADATA_HTTP_TOKENS = flags.DEFINE_enum(
+    'aws_metadata_http_tokens',
+    None,
+    ['required', 'optional'],
+    'The metadata http tokens state for the ec2 instance (IMDSv2).',
+)

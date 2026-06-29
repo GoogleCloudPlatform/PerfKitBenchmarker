@@ -390,8 +390,6 @@ def Run(benchmark_spec):
 
 def GetMetadata():
   metadata = hammerdb.GetMetadata(sql_engine_utils.SQLSERVER)
-  # No reason to support multiple runs in a single benchmark run yet.
-  metadata.pop('hammerdbcli_num_run', None)
   # columnar engine not applicable to sqlserver.
   metadata.pop('hammerdbcli_load_tpch_tables_to_columnar_engine', None)
   return metadata

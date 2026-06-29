@@ -14,6 +14,7 @@
 """GCE Managed Instance Group resource."""
 
 import json
+import re
 from typing import Any, cast
 
 from perfkitbenchmarker import errors
@@ -101,21 +102,31 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
   """GCE Managed Instance Group."""
 
   CLOUD = provider_info.GCP
+  instance_template: GceInstanceTemplate
 
   def __init__(
       self,
       spec: vm_group_decoders.VmGroupSpec,
-      vm_config: virtual_machine.BaseVirtualMachine,
+      vm_configs: list[virtual_machine.BaseVirtualMachine],
   ):
-    super().__init__(spec, vm_config)
+    super().__init__(spec, vm_configs)
     self.vm_config: gce_virtual_machine.GceVirtualMachine = cast(
         gce_virtual_machine.GceVirtualMachine, self.vm_config
     )
+    self.zoned_vm_configs: list[gce_virtual_machine.GceVirtualMachine] = cast(
+        list[gce_virtual_machine.GceVirtualMachine], self.zoned_vm_configs
+    )
     self.project = self.vm_config.project
-    # TODO(pclay): Add support for regional managed instance groups.
-    # It's unclear how multiple zones would be plumbed through BaseVmSpec.
-    self.zone = self.vm_config.zone
-    self.region = util.GetRegionFromZone(self.zone)
+    # in theory we could use the users defaults, but this is cleaner.
+    assert self.zones
+    if util.IsZone(self.zones[0]):
+      self.region = util.GetRegionFromZone(self.zones[0])
+    elif util.IsRegion(self.zones[0]):
+      self.region = self.zones[0]
+    else:
+      raise ValueError(
+          f'Unsupported zone: {self.vm_config.zone}. Must be a zone or region.'
+      )
 
     self.instance_template = GceInstanceTemplate(
         self.vm_config, self.region, name=self.name
@@ -126,9 +137,13 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
     self.instance_template.Create()
 
   def _GcloudCmd(self, *args) -> util.GcloudCommand:
-    return util.GcloudCommand(
+    cmd = util.GcloudCommand(
         self, 'compute', 'instance-groups', 'managed', *args
     )
+    # GcloudCommand does not have support for regional resources.
+    if self.is_regional:
+      cmd.flags['region'] = self.region
+    return cmd
 
   def _Create(self):
     cmd = self._GcloudCmd(
@@ -139,6 +154,9 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
         '--size',
         str(self.vm_count),
     )
+    # --zone and --region are handled by GcloudCommand.
+    if len(self.zones) > 1:
+      cmd.args.append('--zones=' + ','.join(self.zones))
     # TODO(pclay): Consider beta and --resource-manager-tags for labels.
     cmd.Issue()
 
@@ -176,7 +194,14 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
           f'{stderr}\n'
       )
     instances = json.loads(stdout)
-    return [VmReference(name=instance['name']) for instance in instances]
+    references = []
+    for instance in instances:
+      match = re.search(
+          r'/zones/([^/]+)/instances/([^/]+)', instance['instance']
+      )
+      assert match
+      references.append(VmReference(name=match.group(2), zone=match.group(1)))
+    return references
 
   def _AddVms(self, num_vms_to_add: int):
     cmd = self._GcloudCmd('create-instance', self.name)

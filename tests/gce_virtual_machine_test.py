@@ -1104,6 +1104,14 @@ class GCEVMCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
           ),
           'expected_error': errors.Resource.RetryableCreationError,
       },
+      {
+          'testcase_name': 'IP stockout',
+          'fake_stderr': (
+              '{"errors": [{"code": "RESOURCE_POOL_EXHAUSTED", "message": "The'
+              ' global or regional External IP resource pool is exhausted"}]}'
+          ),
+          'expected_error': errors.Benchmarks.InsufficientCapacityCloudFailure,
+      }
   )
   def testCreateVMErrorCases(self, fake_stderr, expected_error):
     fake_rets = [('stdout', fake_stderr, 1)]

@@ -127,6 +127,7 @@
     bringing this variant more in-line with others.
 -   Rename GKE Autopilot & EKS Auto mode's cluster_type within PKB from
     'Autopilot' to 'Auto'.
+-   Duplicate metadata for all samples.
 
 ### New features:
 
@@ -468,6 +469,9 @@
     creation can be retried on stock outs.
 -   Add support for deploying VMs inside managed VM groups with
     `--use_managed_vm_groups`.
+-   Add support for configuring IMDSv2 Http Tokens on AWS VMs via
+    `aws_metadata_http_tokens`.
+-   Add aggregate memtier results to `kubernetes_redis_memtier` benchmark.
 
 ### Bug fixes and maintenance updates:
 
@@ -682,3 +686,4 @@
     --gce_firewall_rules_clean_all.
 -   Added gke_kubernetes_nginx to default benchmark config.
 -   Added gke_kubernetes_redis_memtier to default benchmark config.
+-   Added new fio microbenchmark for NFS

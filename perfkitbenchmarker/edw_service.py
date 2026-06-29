@@ -17,12 +17,17 @@ Classes to wrap specific backend services are in the corresponding provider
 directory as a subclass of BaseEdwService.
 """
 
+import csv
+import dataclasses
 import datetime
+import io
 import os
 from typing import Any, Dict, List
 
 from absl import flags
 from absl import logging
+from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 
@@ -223,11 +228,39 @@ EDW_SEARCH_DATA_LOCATION = flags.DEFINE_string(
     'Cloud directory of bucket to source ongoing load data '
     'for EDW search benchmarks (without rare token).'
 )
+EDW_CONVERSATIONAL_ANALYTICS_QUESTIONS_FILE = flags.DEFINE_string(
+    'conversational_analytics_questions_file',
+    None,
+    'Filename of the conversational analytics questions CSV (resolved via'
+    ' data_search_paths).',
+)
 EDW_SEARCH_INDEX_NAME = flags.DEFINE_string(
     'edw_search_index_name',
     None,
     'Name of index for edw search index benchmarks',
 )
+
+
+@dataclasses.dataclass
+class ConversationalAnalyticsQuestion:
+  """Representation of a Conversational Analytics Question.
+
+  Attributes:
+    question: The natural language question to be asked.
+    db_id: The database targeted by the question(ecomm or call_center).
+    ground_truth_sql: The ground truth SQL query for the question.
+  """
+
+  def __init__(
+      self,
+      *,
+      question: str,
+      db_id: str,
+      ground_truth_sql: str,
+  ):
+    self.question = question
+    self.db_id = db_id
+    self.ground_truth_sql = ground_truth_sql
 
 
 FLAGS = flags.FLAGS
@@ -435,6 +468,14 @@ class EdwClientInterface:
     raise NotImplementedError
 
 
+class ConversationalAnalyticsClientInterface(EdwClientInterface):
+
+  @property
+  def fetches_results_immediately(self) -> bool:
+    """Returns True if the client fetches query results immediately."""
+    raise NotImplementedError
+
+
 class EdwService(resource.BaseResource):
   """Object representing a EDW Service."""
 
@@ -451,7 +492,7 @@ class EdwService(resource.BaseResource):
     # resource is pkb managed by default
     is_user_managed = self.IsUserManaged(edw_service_spec)
     # edw_service attribute
-    self.cluster_identifier = self.GetClusterIdentifier(edw_service_spec)
+    self.cluster_identifier: str = self.GetClusterIdentifier(edw_service_spec)
     super().__init__(user_managed=is_user_managed)
 
     # Provision related attributes
@@ -483,6 +524,11 @@ class EdwService(resource.BaseResource):
     self.supports_wait_on_delete = True
     self.client_interface: EdwClientInterface
     self.container_cluster: kubernetes_cluster.KubernetesCluster | None = None
+    self._conversational_analytics_questions: (
+        list[ConversationalAnalyticsQuestion] | None
+    ) = None
+    if EDW_CONVERSATIONAL_ANALYTICS_QUESTIONS_FILE.value:
+      self._LoadConversationalAnalyticsQuestions()
 
   def GetClientInterface(self) -> EdwClientInterface:
     """Gets the active Client Interface."""
@@ -500,7 +546,7 @@ class EdwService(resource.BaseResource):
     """
     return edw_service_spec.cluster_identifier is not None
 
-  def GetClusterIdentifier(self, edw_service_spec):
+  def GetClusterIdentifier(self, edw_service_spec) -> str:
     """Returns a string name of the Cluster Identifier.
 
     Args:
@@ -862,6 +908,65 @@ class EdwService(resource.BaseResource):
       A tuple of execution time in seconds and a dictionary of metadata.
     """
     raise NotImplementedError
+
+  def _LoadConversationalAnalyticsQuestions(self) -> None:
+    """Reads the spreadsheet and loads all data into memory."""
+    if not EDW_CONVERSATIONAL_ANALYTICS_QUESTIONS_FILE.value:
+      raise ValueError(
+          'conversational_analytics_questions_file flag must be set.'
+      )
+
+    logging.info(
+        'Loading dataset from resource: %s',
+        EDW_CONVERSATIONAL_ANALYTICS_QUESTIONS_FILE.value,
+    )
+    csv_path = data.ResourcePath(
+        EDW_CONVERSATIONAL_ANALYTICS_QUESTIONS_FILE.value
+    )
+    with open(csv_path, 'r', encoding='utf-8') as f:
+      csv_content = f.read()
+
+    new_question_list = []
+    f = io.StringIO(csv_content)
+    reader = csv.DictReader(f)
+    for row in reader:
+      db_id = row.get('DB ID', '').strip()
+      question = row.get('Question', '').strip()
+      ground_truth_sql = row.get('Ground Truth SQL', '').strip()
+
+      if question and db_id and ground_truth_sql:
+        q = ConversationalAnalyticsQuestion(
+            question=question,
+            db_id=db_id,
+            ground_truth_sql=ground_truth_sql,
+        )
+        new_question_list.append(q)
+
+    if not new_question_list:
+      raise errors.Benchmarks.RunError(
+          f'Loaded 0 questions from {csv_path}.'
+      )
+
+    self._conversational_analytics_questions = new_question_list
+    logging.info(
+        'Loaded %d questions.', len(self._conversational_analytics_questions)
+    )
+
+  def GetConversationalAnalyticsQuestionList(
+      self,
+  ) -> List[ConversationalAnalyticsQuestion]:
+    """Returns the loaded question list."""
+    if self._conversational_analytics_questions is None:
+      raise ValueError('Conversational analytics questions not loaded.')
+    return self._conversational_analytics_questions
+
+  def GetConversationalAnalyticsClientInterface(
+      self,
+  ) -> ConversationalAnalyticsClientInterface:
+    """Returns the Conversational Analytics Client Interface instance."""
+    raise NotImplementedError(
+        'Conversational Analytics is not supported for this service.'
+    )
 
   @staticmethod
   def ColsToRows(col_res: dict[str, list[Any]]) -> list[dict[str, Any]]:

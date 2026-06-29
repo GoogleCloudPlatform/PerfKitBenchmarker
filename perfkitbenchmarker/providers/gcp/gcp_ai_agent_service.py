@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import tarfile
 from typing import Any, cast, override
 
@@ -72,6 +73,20 @@ class GcpAiAgentService(ai_agent_service.BaseAiAgentService):
           full_local_workload_data_path,
           arcname=workload_name,
       )
+      common_utils_path = data.ResourcePath('agentic_framework/common_utils.py')
+      tar.add(
+          common_utils_path,
+          arcname=f'{workload_name}/common_utils.py',
+      )
+
+      framework_utils_name = f'{self.spec.framework}_utils.py'
+      utils_path = data.ResourcePath(
+          f'agentic_framework/{framework_utils_name}'
+      )
+      tar.add(
+          utils_path,
+          arcname=f'{workload_name}/{framework_utils_name}',
+      )
     return tar_filename, tar_local_path
 
 
@@ -133,22 +148,19 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
       output_dir: str,
       prompt: str | None = None,
       agent_config: dict[str, Any] | None = None,
+      session_id: str | None = None,
+      user_id: str | None = None,
   ) -> None:
     """Runs the workload on the client VM."""
     location = self.spec.model_location or self.region
     workload_name = f'{self.spec.workload}_{self.spec.framework}'
 
-    prompt_file_path = vm_util.PrependTempDir('prompt.txt')
-    with open(prompt_file_path, 'w') as f:
-      f.write(prompt or '')
-    self.client_vm.PushDataFile(
-        prompt_file_path, f'workload/{workload_name}/prompt.txt'
-    )
-
     self.UploadRunConfigToClientVm(
         f'workload/{workload_name}/run_config.yaml',
         output_dir,
-        'prompt.txt',
+        prompt or '',
+        session_id or 'default_session',
+        user_id or 'default_user',
         agent_config,
     )
 
@@ -181,10 +193,6 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
           ' enabled, gcloud_scopes includes "cloud-platform" and the Service'
           ' Account has "roles/aiplatform.user".'
       ) from e
-
-  def _GetDeploymentConfig(self) -> dict[str, Any]:
-    """Gets config dict for deployment/creation. No-op for this class."""
-    return {}
 
 
 class VertexAiCustomJobAiAgentService(GcpAiAgentService):
@@ -222,9 +230,21 @@ class VertexAiCustomJobAiAgentService(GcpAiAgentService):
     workload_data_path = (
         f'agentic_framework/{self.spec.workload}/{self.spec.framework}'
     )
+
+    temp_dir = vm_util.PrependTempDir(f'custom_job_{self.spec.workload}')
+
+    full_workload_path = data.ResourcePath(workload_data_path)
+    shutil.copytree(full_workload_path, temp_dir, dirs_exist_ok=True)
+    common_utils_path = data.ResourcePath('agentic_framework/common_utils.py')
+    shutil.copy2(common_utils_path, os.path.join(temp_dir, 'common_utils.py'))
+
+    framework_utils_name = f'{self.spec.framework}_utils.py'
+    utils_path = data.ResourcePath(f'agentic_framework/{framework_utils_name}')
+    shutil.copy2(utils_path, os.path.join(temp_dir, framework_utils_name))
+
     benchmark_spec = context.GetThreadBenchmarkSpec()
     self._image_uri = benchmark_spec.container_registry.GetOrBuild(
-        os.path.basename(workload_data_path), workload_data_path
+        os.path.basename(workload_data_path), temp_dir
     )
 
   @override
@@ -241,26 +261,22 @@ class VertexAiCustomJobAiAgentService(GcpAiAgentService):
       output_dir: str,
       prompt: str | None = None,
       agent_config: dict[str, Any] | None = None,
+      session_id: str | None = None,
+      user_id: str | None = None,
   ):
     """Triggers the Custom Job and blocks until completion."""
     job_name = f'pkb-{FLAGS.run_uri}-{self.job_count}'
     self.job_count += 1
     location = self.spec.model_location or self.region
 
-    prompt_file_path = vm_util.PrependTempDir('prompt.txt')
-    with open(prompt_file_path, 'w') as f:
-      f.write(prompt or '')
-    prompt_client_path = f'workload/{job_name}_prompt.txt'
-    self.client_vm.PushDataFile(prompt_file_path, prompt_client_path)
-    prompt_gcs_path = f'{self.base_dir}/{job_name}_prompt.txt'
-    self.client_vm.RemoteCommand(
-        f'gcloud storage cp {prompt_client_path} {prompt_gcs_path}'
-    )
-
-    prompt_fuse_path = f'/gcs/{self._bucket}/{job_name}_prompt.txt'
     run_config_client_path = f'workload/{job_name}_run_config.yaml'
     self.UploadRunConfigToClientVm(
-        run_config_client_path, output_dir, prompt_fuse_path, agent_config
+        run_config_client_path,
+        output_dir,
+        prompt or '',
+        session_id or 'default_session',
+        user_id or 'default_user',
+        agent_config,
     )
     run_config_gcs_path = f'{self.base_dir}/{job_name}_run_config.yaml'
     self.client_vm.RemoteCommand(
@@ -344,10 +360,6 @@ class VertexAiCustomJobAiAgentService(GcpAiAgentService):
           f'Job {job_id} is not finished. Status: {status}'
       )
 
-  def _GetDeploymentConfig(self) -> dict[str, Any]:
-    """Gets config dict for deployment/creation. No-op for this class."""
-    return {}
-
 
 class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
   """Object representing a Vertex AI Agent Engine AI agent service."""
@@ -410,12 +422,13 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
 
   def _GetDeploymentConfig(self) -> dict[str, Any]:
     """Gets config dict for deployment/creation."""
-    config = {
+    config = super()._GetDeploymentConfig()
+    config.update({
         'workload': self.spec.workload,
         'framework': self.spec.framework,
         'staging_bucket': self._staging_bucket,
         'agent_config': self.agent_config,
-    }
+    })
     return config
 
   def _Create(self):
@@ -543,11 +556,15 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
   def _GetRunConfig(
       self,
       output_dir: str,
-      prompt_file: str,
+      prompt: str,
+      session_id: str,
+      user_id: str,
       agent_config: dict[str, Any] | None = None,
   ) -> dict[str, Any]:
     """Gets config dict for running the agent."""
-    config = super()._GetRunConfig(output_dir, prompt_file, agent_config)
+    config = super()._GetRunConfig(
+        output_dir, prompt, session_id, user_id, agent_config
+    )
     config['agent_engine_id'] = self._remote_agent_name
     return config
 
@@ -557,6 +574,8 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
       output_dir: str,
       prompt: str | None = None,
       agent_config: dict[str, Any] | None = None,
+      session_id: str | None = None,
+      user_id: str | None = None,
   ) -> None:
     """Runs the agent on Vertex AI Agent Engine."""
     if not self._remote_agent_name:
@@ -570,17 +589,12 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
 
     logging.info('Running agent on Vertex AI Agent Engine via client VM...')
 
-    prompt_file_path = vm_util.PrependTempDir('prompt.txt')
-    with open(prompt_file_path, 'w') as f:
-      f.write(prompt or '')
-    self.client_vm.PushDataFile(
-        prompt_file_path, f'workload/{workload_framework}/prompt.txt'
-    )
-
     self.UploadRunConfigToClientVm(
         f'workload/{workload_framework}/run_config.yaml',
         output_dir,
-        'prompt.txt',
+        prompt or '',
+        session_id or 'default_session',
+        user_id or 'default_user',
         agent_config,
     )
 

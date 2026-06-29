@@ -15,6 +15,7 @@
 
 import copy
 import datetime
+import hashlib
 import json
 import logging
 import os
@@ -25,12 +26,12 @@ from typing import Any, override
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import util as gcp_util
-
 
 FLAGS = flags.FLAGS
 
@@ -39,6 +40,13 @@ INITIALIZE_SEARCH_TABLE_PARTITIONED = flags.DEFINE_bool(
     True,
     'Whether to partition the initial search table for text index'
     ' benchmarking.',
+)
+
+BQ_CA_AGENT = flags.DEFINE_string(
+    'bq_ca_agent',
+    None,
+    'The full resource name of the agent to use, e.g. '
+    'projects/{project}/locations/{location}/dataAgents/{agent_id}',
 )
 
 BQ_CLIENT_FILE = 'bq-jdbc-simba-client-1.8-temp-labels.jar'
@@ -197,12 +205,9 @@ class JdbcClientInterface(GenericClientInterface):
 
   def SetProvisionedAttributes(self, benchmark_spec):
     super().SetProvisionedAttributes(benchmark_spec)
-    self.project_id = re.split(
-        r'\.', benchmark_spec.edw_service.cluster_identifier
-    )[0]
-    self.dataset_id = re.split(
-        r'\.', benchmark_spec.edw_service.cluster_identifier
-    )[1]
+    self.project_id, self.dataset_id = _SplitClusterIdentifier(
+        benchmark_spec.edw_service.cluster_identifier
+    )
 
   def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query.
@@ -512,6 +517,124 @@ class PythonClientInterface(GenericClientInterface):
     return stdout
 
 
+class ConversationalAnalyticsClientInterface(
+    PythonClientInterface, edw_service.ConversationalAnalyticsClientInterface
+):
+  """Conversational Analytics Client Interface subclassing PythonClientInterface."""
+
+  @property
+  def fetches_results_immediately(self) -> bool:
+    return True
+
+  def _GetQueryFileName(self, query_name: str) -> str:
+    """Generates a filename from a query name."""
+    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', query_name)
+    # Limit sanitized part to 30 chars
+    sanitized = sanitized[:30]
+    # Add hash of full query name to ensure uniqueness
+    query_hash = hashlib.md5(query_name.encode('utf-8')).hexdigest()[:8]
+    return f'./{sanitized}_{query_hash}.txt'
+
+  def _ParseConversationalAnalyticsResults(
+      self, results: dict[str, Any], query_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    """Parses the results from Conversational Analytics query execution."""
+    execution_time = results.get('query_wall_time_in_secs', -1.0)
+    details = results.get('details', {})
+    query_results = details.get('query_results', {})
+
+    # Extract essential fields
+    text_response = query_results.get('text_response')
+    generated_sql = query_results.get('generated_sql')
+    retrieved_data = query_results.get('retrieved_data')
+    # Fail fast validation
+    error_msg = None
+    if not text_response:
+      error_msg = f"'text_response' is missing or empty. Got: {text_response!r}"
+    elif not generated_sql:
+      error_msg = f"'generated_sql' is missing or empty. Got: {generated_sql!r}"
+    elif not retrieved_data:
+      error_msg = (
+          f"'retrieved_data' is missing or empty. Got: {retrieved_data!r}"
+      )
+
+    metadata = {
+        'question': query_name,
+        'text_response': text_response or '',
+        'generated_sql': generated_sql or '',
+        'predict_data': retrieved_data or [],
+        'thoughts': query_results.get('thoughts', []),
+        'progress_messages': query_results.get('progress_messages', []),
+        'time_to_first_token_secs': query_results.get(
+            'time_to_first_token_secs', 0.0
+        ),
+        'total_stream_time_secs': query_results.get(
+            'total_stream_time_secs', 0.0
+        ),
+        'job_id': details.get('job_id', ''),
+    }
+
+    if error_msg:
+      logging.warning('Conversational Analytics query failed: %s', error_msg)
+      metadata['error'] = f'Conversational Analytics query failed: {error_msg}'
+      return -1.0, metadata
+
+    logging.info(
+        'Conversational Analytics Response: %s',
+        metadata.get('text_response', ''),
+    )
+    return execution_time, metadata
+
+  @override
+  def Prepare(self, package_name: str) -> None:
+    """Prepares the client vm by installing geminidataanalytics package and driver."""
+    assert self.client_vm is not None
+    super().Prepare(package_name)
+
+    # Install BQ CA specific SDK
+    self.client_vm.RemoteCommand(
+        'source .venv/bin/activate && pip install'
+        ' google-cloud-geminidataanalytics'
+    )
+
+    # Push Conversational Analytics driver script.
+    driver_local_path = data.ResourcePath(
+        os.path.join('edw/bigquery/clients/python', 'bq_ca_driver.py')
+    )
+    self.client_vm.PushFile(driver_local_path, 'bq_ca_driver.py')
+
+  @override
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
+    """Executes a single conversational analytics question."""
+    assert self.client_vm is not None
+    logging.info('Conversational Analytics Question: %s', query_name)
+    key_file = os.path.basename(FLAGS.gcp_service_account_key_file)
+    cmd = (
+        'source .venv/bin/activate && python3 bq_ca_driver.py single '
+        f'--project={self.project_id} '
+        f'--agent={BQ_CA_AGENT.value} '
+        f'--credentials_file={key_file} '
+        '--print_results '
+    )
+
+    remote_query_file = self._GetQueryFileName(query_name)
+    # Write question to remote file to handle quotes securely
+    vm_util.CreateRemoteFile(self.client_vm, query_name, remote_query_file)
+    cmd += f'--query_file={remote_query_file}'
+
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+
+    try:
+      results = json.loads(stdout)
+    except ValueError as e:
+      raise errors.Benchmarks.RunError(
+          f'Failed to parse Conversational Analytics response: {stdout}'
+      ) from e
+    return self._ParseConversationalAnalyticsResults(results, query_name)
+
+
 class Bigquery(edw_service.EdwService):
   """Object representing a Bigquery cluster.
 
@@ -527,9 +650,16 @@ class Bigquery(edw_service.EdwService):
 
   def __init__(self, edw_service_spec):
     super().__init__(edw_service_spec)
-    project_id = re.split(r'\.', self.cluster_identifier)[0]
-    dataset_id = re.split(r'\.', self.cluster_identifier)[1]
+    project_id, dataset_id = _SplitClusterIdentifier(self.cluster_identifier)
     self.client_interface = GetBigQueryClientInterface(project_id, dataset_id)
+
+  @override
+  def GetConversationalAnalyticsClientInterface(
+      self,
+  ) -> ConversationalAnalyticsClientInterface:
+    """Returns the Conversational Analytics Client Interface instance."""
+    project_id, dataset_id = _SplitClusterIdentifier(self.cluster_identifier)
+    return ConversationalAnalyticsClientInterface(project_id, dataset_id)
 
   def _Create(self):
     """Create a BigQuery cluster.
@@ -571,7 +701,7 @@ class Bigquery(edw_service.EdwService):
     return (
         (self.cluster_identifier.split('.')[0] + ':' + dataset)
         if dataset
-        else self.cluster_identifier.replace('.', ':')
+        else self.cluster_identifier.replace('.', ':', 1)
     )
 
   def GetDatasetLastUpdatedTime(self, dataset=None):
@@ -1005,7 +1135,7 @@ class Endor(Bigquery):
       A dictionary set to underlying data's details (format, etc.)
     """
     data_details = {}
-    dataset_id = re.split(r'\.', self.cluster_identifier)[1]
+    _, dataset_id = _SplitClusterIdentifier(self.cluster_identifier)
     parsed_id = re.split(r'_', dataset_id)
     data_details['format'] = parsed_id[1]
     data_details['compression'] = parsed_id[2]
@@ -1071,7 +1201,7 @@ class Bqfederated(Bigquery):
     """
     # TODO(jguertin): Review & update for current datasets
     data_details = {}
-    project_id, dataset_id = re.split(r'\.', self.cluster_identifier)
+    project_id, dataset_id = _SplitClusterIdentifier(self.cluster_identifier)
     data_details['metadata_caching'] = str('metadata-caching' in project_id)
     parsed_id = re.split(r'_', dataset_id)
     if len(parsed_id) == 5:
@@ -1103,3 +1233,8 @@ class Bqfederated(Bigquery):
       data_details['storage'] = 'unknown'
       data_details['location'] = 'unknown'
     return data_details
+
+
+def _SplitClusterIdentifier(cluster_identifier: str) -> tuple[str, str]:
+  """Split the cluster identifier into project ID and dataset ID."""
+  return tuple(cluster_identifier.split('.', 1))

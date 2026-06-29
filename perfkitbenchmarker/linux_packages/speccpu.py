@@ -26,6 +26,7 @@ from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker.linux_packages import build_tools
+from perfkitbenchmarker.linux_packages import fortran
 
 BASE_MODE = 'base'
 PEAK_MODE = 'peak'
@@ -290,9 +291,10 @@ def InstallSPECCPU(vm, speccpu_vm_state):
 def Install(vm):
   """Installs SPECCPU dependencies."""
   vm.Install('wget')
-  vm.Install('fortran')
   # Install gcc, g++, fortran according to --gcc_version
   vm.Install('build_tools')
+  # Verify fortran is installed correctly
+  fortran.GetFortranVersion(vm, required_version_prefix=FLAGS.gcc_version)
 
   # Install libxcrypt-compat is needed on RHEL 9 based OSes, but not available
   # on RHEL 8 based OSes.
@@ -505,6 +507,7 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       'spec17_fdo': FLAGS.spec17_fdo,
       'spec17_subset': FLAGS.spec17_subset,
       'gcc_version': build_tools.GetVersion(vm, 'gcc'),
+      'gfortran_version': fortran.GetFortranVersion(vm),
   }
   if cpu_version:
     major, minor = cpu_version
@@ -551,12 +554,15 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
     missing_results.append(spec_name)
 
   if missing_results:
+    missing_results_str = ','.join(missing_results)
     if keep_partial_results:
       metadata['partial'] = 'true'
-      metadata['missing_results'] = ','.join(missing_results)
+      metadata['missing_results'] = missing_results_str
+      for result in results:
+        result.metadata.update(metadata)
     else:
       raise errors.Benchmarks.RunError(
-          'speccpu: results missing, see log: ' + ','.join(missing_results)
+          'speccpu: results missing, see log: ' + missing_results_str
       )
 
   if spec_score:

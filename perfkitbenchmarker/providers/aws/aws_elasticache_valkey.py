@@ -24,6 +24,7 @@ _VALKEY_VERSION_MAPPING = {
     'VALKEY_7_2': '7.2',
     'VALKEY_8_0': '8.0',
     'VALKEY_8_2': '8.2',
+    'VALKEY_9_0': '9.0',
 }
 
 

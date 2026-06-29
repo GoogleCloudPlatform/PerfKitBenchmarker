@@ -31,6 +31,7 @@ def _CreateCmd(tier='STANDARD'):
   return [
       'create',
       _NFS_NAME,
+      '--async',
       '--file-share',
       'name=vol0,capacity=1024',
       '--network',
@@ -129,9 +130,10 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreate(self):
     nfs = self._NfsService()
-    self._SetResponses(_CREATE_RES)
+    self._SetResponses(_CREATE_RES, _DescribeResult())
     nfs._Create()
-    self.assertCommandCalled(*_CreateCmd())
+    describe_cmd = ['describe', _NFS_NAME]
+    self.assertMultipleCommands(_CreateCmd(), describe_cmd)
 
   def testCreateWithErrors(self):
     self._SetResponses(_ERROR, _ERROR)
@@ -142,7 +144,7 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertMultipleCommands(_CreateCmd(), describe_cmd)
 
   def testCreate2TBDisk(self):
-    self._SetResponses(_CREATE_RES)
+    self._SetResponses(_CREATE_RES, _DescribeResult())
     nfs = self._NfsService(disk_size=2048)
     nfs._Create()
     cmd = self.issue_cmd.call_args_list[0][0][0]

@@ -95,7 +95,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
           metric='scale_to_ready_duration',
           value=vm_group.last_ready_time - vm_group.last_operation_start_time,
           unit='seconds',
-          metadata={
+          metadata=vm_group.GetResourceMetadata()
+          | {
               'scale_method': _SCALE_METHOD.value,
               'original_vm_count': old_vm_count,
               'new_vm_count': _NEW_VM_COUNT.value,

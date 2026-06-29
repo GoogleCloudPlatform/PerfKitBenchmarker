@@ -172,9 +172,6 @@ HAMMERDB_TPCC_ALL_WAREHOUSE = flags.DEFINE_bool(
     'Uses all warehouse in TPCC benchmark',
 )
 
-NUM_RUN = flags.DEFINE_integer(
-    'hammerdbcli_num_runs', 1, 'Run the benchmark n times.'
-)
 
 LOAD_TPCH_TABLES_TO_COLUMNAR_ENGINE = flags.DEFINE_bool(
     'hammerdbcli_load_tpch_tables_to_columnar_engine',
@@ -1171,7 +1168,6 @@ def GetMetadata(db_engine: str):
 
   metadata['hammerdbcli_version'] = HAMMERDB_VERSION.value
   metadata['hammerdbcli_vu'] = HAMMERDB_NUM_VU.value
-  metadata['hammerdbcli_num_run'] = NUM_RUN.value
   if not FLAGS.use_managed_db and HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value:
     metadata['hammerdbcli_optimized_server_configuration'] = (
         HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value

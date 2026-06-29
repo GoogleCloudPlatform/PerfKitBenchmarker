@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import Any, Dict, Tuple
 
 from absl import flags
@@ -88,8 +89,8 @@ class GcpDpbBaseDataproc(dpb_service.BaseDpbService):
     self.region = self.dpb_service_zone.rsplit('-', 1)[0]
     self.storage_service = gcs.GoogleCloudStorageService()
     self.storage_service.PrepareService(location=self.region)
-    self._cluster_create_time: float | None = None
-    self._cluster_ready_time: float | None = None
+    self._service_reported_cluster_create_time: float | None = None
+    self._service_reported_cluster_ready_time: float | None = None
     self._cluster_delete_time: float | None = None
 
   @property
@@ -179,19 +180,26 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
         gcp_flags.GCP_DATAPROC_LIGHTNING_ENGINE_RUNTIME.value
     )
 
-  def GetClusterCreateTime(self) -> float | None:
-    """Returns the cluster creation time.
+  def GetServiceReportedClusterCreateTime(self) -> float | None:
+    """Returns the cluster creation time as reported by the service.
 
     On this implementation, the time returned is based on the timestamps
-    reported by the Dataproc API (which is stored in the _cluster_create_time
+    reported by the Dataproc API (which is stored in the
+    _service_reported_cluster_create_time
     attribute).
 
     Returns:
       A float representing the creation time in seconds or None.
     """
-    if self._cluster_create_time is None or self._cluster_ready_time is None:
+    if (
+        self._service_reported_cluster_create_time is None
+        or self._service_reported_cluster_ready_time is None
+    ):
       return None
-    return self._cluster_ready_time - self._cluster_create_time
+    return (
+        self._service_reported_cluster_ready_time
+        - self._service_reported_cluster_create_time
+    )
 
   def _Create(self):
     """Creates the cluster."""
@@ -293,12 +301,14 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
     timeout = 900  # 15 min
     stdout, stderr, retcode = cmd.Issue(timeout=timeout, raise_on_failure=False)
-    self._cluster_create_time, self._cluster_ready_time = (
-        self._ParseClusterCreateTime(stdout)
-    )
+    (
+        self._service_reported_cluster_create_time,
+        self._service_reported_cluster_ready_time,
+    ) = self._ParseClusterCreateTime(stdout)
     if retcode:
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
+    self.resource_ready_time = time.time()
 
   @classmethod
   def _ParseClusterCreateTime(
@@ -527,9 +537,10 @@ class GcpDpbDpgke(GcpDpbDataproc):
         cmd.args,
     )
     stdout, stderr, retcode = cmd.Issue(timeout=timeout, raise_on_failure=False)
-    self._cluster_create_time, self._cluster_delete_time = (
-        self._ParseClusterCreateTime(stdout)
-    )
+    (
+        self._service_reported_cluster_create_time,
+        self._service_reported_cluster_ready_time,
+    ) = self._ParseClusterCreateTime(stdout)
     if retcode:
       util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Resource.CreationError(stderr)
