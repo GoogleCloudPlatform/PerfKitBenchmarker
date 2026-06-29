@@ -602,10 +602,10 @@ class AksAutomaticCluster(AksCluster):
         self.name,
         '--location',
         self.region,
-        '--ssh-key-value',
-        vm_util.GetPublicKeyPath(),
         '--resource-group',
         self.resource_group.name,
+        # AKS Automatic clusters do not support SSH.
+        '--no-ssh-key',
         '--sku',
         'automatic',
         # Enable the Azure Blob CSI driver at creation matching GKE Autopilot's
