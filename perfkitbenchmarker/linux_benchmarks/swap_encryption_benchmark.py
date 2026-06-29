@@ -39,7 +39,6 @@ containerd cgroup hierarchy, etc.).
 
 Infrastructure lifecycle lives in two BaseResource subclasses:
 
-  SwapNodePool  (perfkitbenchmarker/resources/container_service/swap_nodepool.py)
     _Create():  gcloud container node-pools create with linuxConfig.swapConfig
                 + sysctl via --system-config-from-file; waits for node Ready;
                 optionally creates and attaches a dedicated swap disk.
@@ -85,7 +84,6 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import swap_daemonset as _ds_mod
-from perfkitbenchmarker.resources.container_service import swap_nodepool as _np_mod
 
 FLAGS = flags.FLAGS
 
@@ -101,26 +99,34 @@ BENCHMARK_NAME = 'swap_encryption'
 BENCHMARK_CONFIG = """
 swap_encryption:
   description: >
-    GKE vs. EKS swap encryption and LSSD performance comparison.
-    Two-step nodepool setup: PKB provisions a minimal cluster with a cheap
-    default nodepool (Step 1), then Prepare() adds the real benchmark
-    nodepool (n4-highmem-32 / c4-*-lssd, UBUNTU_CONTAINERD, 80k IOPS) with a
-    node-level startup script that configures dm-crypt swap before any pod
-    is scheduled, then removes the default nodepool (Step 2).  All benchmark
-    phases run inside a privileged DaemonSet pinned to the benchmark nodepool.
-  flags: {}
+    Verify dm-crypt encrypted swap on GKE/EKS nodes. Swap-enabled 'benchmark' nodepool declared in BENCHMARK_CONFIG;
+    GKE cluster creation applies --system-config-from-file (dm-crypt swapConfig)
+    automatically via swap_config field on NodepoolSpec.
   container_cluster:
+    cloud: GCP
     type: Kubernetes
     vm_count: 1
     vm_spec:
       GCP:
-        # Cheap placeholder — the benchmark nodepool is created in Prepare().
         machine_type: e2-medium
         boot_disk_size: 20
-      AWS:
-        # Cheap placeholder — the benchmark nodegroup is added in Prepare().
-        machine_type: t3.medium
-        boot_disk_size: 20
+        zone: us-central1-a
+    nodepools:
+      benchmark:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: n4-highmem-32
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 500
+            zone: us-central1-a
+        swap_config:
+          enabled: true
+          swappiness: 100
+          min_free_kbytes: 200
+          watermark_scale_factor: 500
+          boot_disk_iops: 160000
+          boot_disk_throughput: 2400
 """
 
 
@@ -409,60 +415,20 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
 def Prepare(spec: _BenchmarkSpec) -> None:
     """Two-step nodepool setup then DaemonSet deployment.
 
-    Step 1 (handled by PKB infrastructure): cluster provisioned with a cheap
-    e2-medium default nodepool.
+    PKB cluster creation automatically provisions the swap-enabled 'benchmark'
+    nodepool (swap_config in BENCHMARK_CONFIG). This function only:
+      1. Deploys the privileged SwapDaemonSet and waits for Running.
+      2. Deletes the cheap e2-medium default-pool (required at cluster create).
 
-    Step 2 (this function):
-      a. GCP: Create SwapNodePool (benchmark nodepool + optional swap disk).
-         EKS: label existing nodes with pkb_nodepool=benchmark.
-      b. Create SwapDaemonSet: deploy manifest + wait for Running + sentinel.
-      c. GCP: DeleteDefaultPool() — safe now that DaemonSet pod is Running.
-      d. GCP: re-resolve pod name in case default-pool deletion evicts the pod.
-
-    Both resources are appended to spec.resources for auto-cleanup.
+    DaemonSet is appended to spec.resources for PKB auto-cleanup.
     """
     cluster = spec.container_cluster
-    is_gcp = getattr(cluster, 'project', None) is not None
 
-    if is_gcp:
-        # ── Step 2a (GCP): create benchmark nodepool + wait for node ──────────
-        logging.info('[swap_encryption] Step 2a: creating benchmark nodepool')
-        nodepool = _np_mod.SwapNodePool(
-            cluster=cluster,
-            machine_type=_BENCHMARK_MACHINE_TYPE.value,
-            node_image_type=_NODE_IMAGE_TYPE.value,
-            disk_type=_BOOT_DISK_TYPE.value,
-            disk_size_gb=_BOOT_DISK_SIZE_GB.value,
-            disk_iops=_BOOT_DISK_IOPS.value,
-            disk_throughput=_BOOT_DISK_THROUGHPUT.value,
-            lssd=_BENCHMARK_LSSD.value,
-            lssd_count=_LSSD_COUNT.value,
-            add_swap_disk=_ADD_SWAP_DISK.value,
-            swap_disk_size_gb=_SWAP_DISK_SIZE_GB.value,
-        )
-        nodepool.Create()
-        spec.resources.append(nodepool)
-    else:
-        # ── Step 2a (EKS): label existing nodes to match DaemonSet selector ──
-        logging.info(
-            '[swap_encryption] EKS cluster — labelling existing nodes with'
-            ' pkb_nodepool=%s so the DaemonSet nodeSelector matches.',
-            _BENCHMARK_NODEPOOL,
-        )
-        kubectl.RunKubectlCommand([
-            'label',
-            'nodes',
-            '--all',
-            '--overwrite',
-            f'pkb_nodepool={_BENCHMARK_NODEPOOL}',
-        ])
-        _ensure_io2_volume()
-
-    # ── Step 2b: deploy DaemonSet and wait for pod ────────────────────────────
-    # Deploy BEFORE deleting the default pool: deleting the default pool while
-    # the benchmark node is still joining causes a brief API-server I/O timeout.
-    # The pod being Running means the cluster is fully stable.
-    logging.info('[swap_encryption] Step 2b: deploying privileged DaemonSet')
+    # The swap-enabled 'benchmark' nodepool is already provisioned by GKE
+    # cluster creation (swap_config declared in BENCHMARK_CONFIG).
+    # Prepare() only deploys the privileged DaemonSet + deletes the cheap
+    # e2-medium default pool that GKE requires at cluster creation time.
+    logging.info('[swap_encryption] Deploying privileged DaemonSet')
     daemonset = _ds_mod.SwapDaemonSet(
         name=_DS_NAME,
         namespace=_DS_NAMESPACE,
@@ -472,27 +438,12 @@ def Prepare(spec: _BenchmarkSpec) -> None:
     )
     daemonset.Create()
     spec.resources.append(daemonset)
+    logging.info('[swap_encryption] Benchmark pod ready: %s', daemonset.pod_name)
+    _delete_default_pool(cluster)
+    daemonset.WaitForPod()
     logging.info(
-        '[swap_encryption] Benchmark pod ready: %s', daemonset.pod_name
+        '[swap_encryption] Benchmark pod (post-deletion): %s', daemonset.pod_name
     )
-
-    # ── Step 2c+d (GCP): delete dummy default nodepool, re-resolve pod name ──
-    if is_gcp:
-        logging.info(
-            '[swap_encryption] Step 2c: deleting dummy default nodepool'
-        )
-        nodepool.DeleteDefaultPool()
-        # The pod may be evicted and rescheduled with a new name during the
-        # default nodepool deletion.  Re-resolve to avoid stale references.
-        logging.info(
-            '[swap_encryption] Step 2d: re-resolving benchmark pod after'
-            ' nodepool deletion'
-        )
-        daemonset.WaitForPod()
-        logging.info(
-            '[swap_encryption] Benchmark pod (post-deletion): %s',
-            daemonset.pod_name,
-        )
 
 
 def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:
@@ -644,6 +595,32 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:
     return results
 
 
+
+def _delete_default_pool(cluster) -> None:
+  """Delete the dummy e2-medium default-pool once the benchmark pod is Running.
+
+  GKE requires at least one nodepool at cluster creation time; the e2-medium
+  default-pool satisfies that requirement. Deleting it before the DaemonSet
+  pod is Running can trigger a brief API-server timeout while two concurrent
+  nodepool operations are in progress.
+  """
+  try:
+    cmd = cluster._GcloudCommand(  # pylint: disable=protected-access
+        'container', 'node-pools', 'delete', _DEFAULT_POOL,
+        '--cluster', cluster.name,
+    )
+    cmd.args.append('--quiet')
+    logging.info('[swap_encryption] Deleting default nodepool: %s', _DEFAULT_POOL)
+    _, stderr, rc = cmd.Issue(timeout=300, raise_on_failure=False)
+    if rc != 0:
+      logging.warning(
+          '[swap_encryption] Could not delete default nodepool (rc=%d): %s',
+          rc, stderr,
+      )
+    else:
+      logging.info('[swap_encryption] Default nodepool deleted')
+  except Exception as e:  # pylint: disable=broad-except
+    logging.warning('[swap_encryption] _delete_default_pool failed: %s', e)
 def Cleanup(spec: _BenchmarkSpec) -> None:
     """Resources in spec.resources are auto-deleted by the PKB framework.
 
