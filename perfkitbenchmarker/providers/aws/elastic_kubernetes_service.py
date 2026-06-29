@@ -22,8 +22,8 @@ instructions.
 
 from collections import abc
 import copy
+import functools
 import json
-import threading
 import time
 import logging
 import math
@@ -552,12 +552,9 @@ class EksCluster(BaseEksCluster):
     ]
     vm_util.IssueCommand(cmd)
 
+  @functools.lru_cache(maxsize=None)
   def _DiscoverSubnets(self) -> list[str]:
     """Returns the EKS cluster's subnet IDs (cached after first call)."""
-    # pylint: disable-next=access-member-before-definition
-    if getattr(self, '_cached_subnets', None):
-      # pylint: disable-next=access-member-before-definition
-      return self._cached_subnets
     out, _, _ = vm_util.IssueCommand(
         util.AWS_PREFIX
         + [
@@ -570,25 +567,19 @@ class EksCluster(BaseEksCluster):
         ]
     )
     info = json.loads(out)
-    self._cached_subnets = info['cluster']['resourcesVpcConfig']['subnetIds']
-    return self._cached_subnets
+    return info['cluster']['resourcesVpcConfig']['subnetIds']
 
+  @functools.lru_cache(maxsize=None)
   def _DiscoverSubnetsPerAZ(self) -> dict[str, str]:
     """Returns a mapping of {AZ: subnet_id} for the cluster's subnets.
 
     Used by CreateNodePoolAsync to distribute nodegroups round-robin across
     AZs, avoiding per-AZ EC2 capacity limits when creating many pools.
     Only returns AZs that are in control_plane_zones (if specified).
-    Cached after first call.
+    Cached after first call (via functools.lru_cache).
     """
-    # pylint: disable-next=access-member-before-definition
-    if getattr(self, '_cached_subnets_per_az', None) is not None:
-      # pylint: disable-next=access-member-before-definition
-      return self._cached_subnets_per_az
-
     subnet_ids = self._DiscoverSubnets()
     if not subnet_ids:
-      self._cached_subnets_per_az = {}
       return {}
 
     # Describe subnets to get their AZ mapping
@@ -616,7 +607,6 @@ class EksCluster(BaseEksCluster):
           '[EKS] Could not describe subnets for AZ mapping —'
           ' falling back to all subnets'
       )
-      self._cached_subnets_per_az = {}
       return {}
 
     subnets = json.loads(out)
@@ -647,53 +637,42 @@ class EksCluster(BaseEksCluster):
         az_map,
         len(subnet_ids),
     )
-    self._cached_subnets_per_az = az_map
     return az_map
 
+  @functools.lru_cache(maxsize=None)
   def _ResolveReleaseVersion(self, minor: str) -> str:
     """Returns the EKS-optimized AMI release version (e.g. '1.33.10-20260124').
 
     Used to populate `releaseVersion` in the create-nodegroup payload so the
-    benchmark can pin specific K8s minors. Thread-safe: at scale we have N
-    workers all asking for the same minor; only the first does the SSM
-    lookup, the rest read from the cache.
+    benchmark can pin specific K8s minors. lru_cache is thread-safe by
+    construction, so at scale, of N workers asking for the same minor, only
+    the first does the SSM lookup -- the rest get the cached result.
     """
-    if getattr(self, '_release_version_lock', None) is None:
-      self._release_version_lock = threading.Lock()
-    with self._release_version_lock:
-      cache = getattr(self, '_cached_release_versions', None) or {}
-      if minor in cache:
-        return cache[minor]
-      cmd = util.AWS_PREFIX + [
-          'ssm',
-          'get-parameter',
-          '--name',
-          (
-              f'/aws/service/eks/optimized-ami/{minor}/amazon-linux-2023/'
-              'x86_64/standard/recommended/release_version'
-          ),
-          '--region',
-          self.region,
-          '--query',
-          'Parameter.Value',
-          '--output',
-          'text',
-      ]
-      out, err, rc = vm_util.IssueCommand(cmd, raise_on_failure=False)
-      if rc:
-        raise errors.Resource.CreationError(
-            f'Failed to resolve EKS release version for minor {minor!r}: {err}'
-        )
-      cache[minor] = out.strip()
-      self._cached_release_versions = cache
-      return cache[minor]
+    cmd = util.AWS_PREFIX + [
+        'ssm',
+        'get-parameter',
+        '--name',
+        (
+            f'/aws/service/eks/optimized-ami/{minor}/amazon-linux-2023/'
+            'x86_64/standard/recommended/release_version'
+        ),
+        '--region',
+        self.region,
+        '--query',
+        'Parameter.Value',
+        '--output',
+        'text',
+    ]
+    out, err, rc = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    if rc:
+      raise errors.Resource.CreationError(
+          f'Failed to resolve EKS release version for minor {minor!r}: {err}'
+      )
+    return out.strip()
 
+  @functools.lru_cache(maxsize=None)
   def _DiscoverNodeRoleArn(self) -> str:
     """Returns a node IAM role ARN by inspecting an existing nodegroup."""
-    # pylint: disable-next=access-member-before-definition
-    if getattr(self, '_cached_node_role_arn', None):
-      # pylint: disable-next=access-member-before-definition
-      return self._cached_node_role_arn
     out, _, _ = vm_util.IssueCommand(
         util.AWS_PREFIX
         + [
@@ -721,7 +700,6 @@ class EksCluster(BaseEksCluster):
       )
       role = json.loads(ng_out)['nodegroup'].get('nodeRole')
       if role:
-        self._cached_node_role_arn = role
         return role
     raise errors.Resource.CreationError(
         'No existing nodegroup found to discover node role for '
