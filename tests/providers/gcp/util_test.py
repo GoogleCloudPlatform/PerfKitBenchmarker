@@ -526,6 +526,8 @@ class GcpUtilTest(pkb_common_test_case.PkbCommonTestCase):
 
 if __name__ == '__main__':
   unittest.main()
+
+
 class GcloudCommandIssueAsyncTestCase(unittest.TestCase):
   """Tests for GcloudCommand.IssueAsync (generic async-issue + fallback)."""
 
