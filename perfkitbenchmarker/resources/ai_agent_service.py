@@ -76,7 +76,7 @@ class BaseAiAgentService(resource.BaseResource):
   ) -> dict[str, Any]:
     """Gets config dict for running the agent."""
     return {
-        'workload': self.spec.workload,
+        'agent': self.spec.agent,
         'framework': self.spec.framework,
         'prompt': prompt,
         'output_dir': output_dir,
@@ -110,7 +110,7 @@ class BaseAiAgentService(resource.BaseResource):
       session_id: str | None = None,
       user_id: str | None = None,
   ) -> None:
-    """Executes the agentic workload."""
+    """Runs the prompt on the client VM."""
 
   @property
   @abc.abstractmethod

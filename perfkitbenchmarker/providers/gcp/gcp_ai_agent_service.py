@@ -60,32 +60,30 @@ class GcpAiAgentService(ai_agent_service.BaseAiAgentService):
   def base_dir(self) -> str:
     return 'gs://' + self._bucket
 
-  def _CreateWorkloadTarball(
-      self, workload_name: str, workload_data_path: str
+  def _CreateAgentTarball(
+      self, agent_name: str, agent_data_path: str
   ) -> tuple[str, str]:
-    """Creates tarball of the workload. Returns the filename and local path."""
-    tar_filename = f'{workload_name}.tar.gz'
+    """Creates tarball of the agent. Returns the filename and local path."""
+    tar_filename = f'{agent_name}.tar.gz'
     tar_local_path = vm_util.PrependTempDir(tar_filename)
-    full_local_workload_data_path = data.ResourcePath(workload_data_path)
+    full_local_agent_data_path = data.ResourcePath(agent_data_path)
 
     with tarfile.open(tar_local_path, 'w:gz') as tar:
       tar.add(
-          full_local_workload_data_path,
-          arcname=workload_name,
+          full_local_agent_data_path,
+          arcname=agent_name,
       )
-      common_utils_path = data.ResourcePath('agentic_framework/common_utils.py')
+      common_utils_path = data.ResourcePath('agents/common_utils.py')
       tar.add(
           common_utils_path,
-          arcname=f'{workload_name}/common_utils.py',
+          arcname=f'{agent_name}/common_utils.py',
       )
 
       framework_utils_name = f'{self.spec.framework}_utils.py'
-      utils_path = data.ResourcePath(
-          f'agentic_framework/{framework_utils_name}'
-      )
+      utils_path = data.ResourcePath(f'agents/{framework_utils_name}')
       tar.add(
           utils_path,
-          arcname=f'{workload_name}/{framework_utils_name}',
+          arcname=f'{agent_name}/{framework_utils_name}',
       )
     return tar_filename, tar_local_path
 
@@ -107,31 +105,27 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
     )
     self.client_vm.RemoteCommand('mkdir -p workload')
 
-    workload_name = f'{self.spec.workload}_{self.spec.framework}'
-    workload_data_path = (
-        f'agentic_framework/{self.spec.workload}/{self.spec.framework}'
-    )
+    agent_name = f'{self.spec.agent}_{self.spec.framework}'
+    agent_data_path = f'agents/{self.spec.agent}/{self.spec.framework}'
 
-    tar_filename, tar_local_path = self._CreateWorkloadTarball(
-        workload_name, workload_data_path
+    tar_filename, tar_local_path = self._CreateAgentTarball(
+        agent_name, agent_data_path
     )
 
     self.client_vm.PushDataFile(tar_local_path, f'workload/{tar_filename}')
     self.client_vm.RemoteCommand(f'cd workload && tar -xzf {tar_filename}')
 
-    pyproject_toml_path = f'workload/{workload_name}/pyproject.toml'
+    pyproject_toml_path = f'workload/{agent_name}/pyproject.toml'
     self.client_vm.RemoteCommand(f'ls {pyproject_toml_path}')
-    self.client_vm.RemoteCommand(
-        f'cd workload/{workload_name} && pip3 install .'
-    )
+    self.client_vm.RemoteCommand(f'cd workload/{agent_name} && pip3 install .')
 
     # Push generic run local script to VM
     run_remote_script_local_path = data.ResourcePath(
-        'agentic_framework/run_local_agent.py'
+        'agents/run_local_agent.py'
     )
     self.client_vm.PushDataFile(
         run_remote_script_local_path,
-        f'workload/{workload_name}/run_local_agent.py',
+        f'workload/{agent_name}/run_local_agent.py',
     )
 
   @override
@@ -151,12 +145,12 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
       session_id: str | None = None,
       user_id: str | None = None,
   ) -> None:
-    """Runs the workload on the client VM."""
+    """Runs the prompt on the client VM."""
     location = self.spec.model_location or self.region
-    workload_name = f'{self.spec.workload}_{self.spec.framework}'
+    agent_name = f'{self.spec.agent}_{self.spec.framework}'
 
     self.UploadRunConfigToClientVm(
-        f'workload/{workload_name}/run_config.yaml',
+        f'workload/{agent_name}/run_config.yaml',
         output_dir,
         prompt or '',
         session_id or 'default_session',
@@ -168,7 +162,7 @@ class GcpClientVmAiAgentService(GcpAiAgentService):
         'export GOOGLE_GENAI_USE_VERTEXAI=TRUE &&'
         f' export GOOGLE_CLOUD_PROJECT={self.project} &&'
         f' export GOOGLE_CLOUD_LOCATION={location} &&'
-        f' cd workload/{workload_name} &&'
+        f' cd workload/{agent_name} &&'
         ' python3 run_local_agent.py'
         ' --config_file run_config.yaml'
     )
@@ -227,19 +221,17 @@ class VertexAiCustomJobAiAgentService(GcpAiAgentService):
 
   @override
   def _StageAgentCode(self):
-    workload_data_path = (
-        f'agentic_framework/{self.spec.workload}/{self.spec.framework}'
-    )
+    workload_data_path = f'agents/{self.spec.agent}/{self.spec.framework}'
 
-    temp_dir = vm_util.PrependTempDir(f'custom_job_{self.spec.workload}')
+    temp_dir = vm_util.PrependTempDir(f'custom_job_{self.spec.agent}')
 
     full_workload_path = data.ResourcePath(workload_data_path)
     shutil.copytree(full_workload_path, temp_dir, dirs_exist_ok=True)
-    common_utils_path = data.ResourcePath('agentic_framework/common_utils.py')
+    common_utils_path = data.ResourcePath('agents/common_utils.py')
     shutil.copy2(common_utils_path, os.path.join(temp_dir, 'common_utils.py'))
 
     framework_utils_name = f'{self.spec.framework}_utils.py'
-    utils_path = data.ResourcePath(f'agentic_framework/{framework_utils_name}')
+    utils_path = data.ResourcePath(f'agents/{framework_utils_name}')
     shutil.copy2(utils_path, os.path.join(temp_dir, framework_utils_name))
 
     benchmark_spec = context.GetThreadBenchmarkSpec()
@@ -264,7 +256,7 @@ class VertexAiCustomJobAiAgentService(GcpAiAgentService):
       session_id: str | None = None,
       user_id: str | None = None,
   ):
-    """Triggers the Custom Job and blocks until completion."""
+    """Runs the prompt on the client VM."""
     job_name = f'pkb-{FLAGS.run_uri}-{self.job_count}'
     self.job_count += 1
     location = self.spec.model_location or self.region
@@ -375,47 +367,45 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
   @override
   def _StageAgentCode(self):
     self.client_vm.Install('pip')
-    workload = self.spec.workload
+    agent = self.spec.agent
     framework = self.spec.framework
-    workload_framework = f'{workload}_{framework}'
-    workload_dir_local_path = f'agentic_framework/{workload}/{framework}'
+    agent_framework = f'{agent}_{framework}'
+    agent_dir_local_path = f'agents/{agent}/{framework}'
 
-    logging.info(
-        'Preparing workload %s for deployment from client VM', workload
-    )
+    logging.info('Preparing workload %s for deployment from client VM', agent)
 
     # 1. Setup directories on VM
     self.client_vm.RemoteCommand('mkdir -p workload')
 
     # 2. Create tarball of agent code and push to VM
-    tar_filename, tar_local_path = self._CreateWorkloadTarball(
-        workload_framework, workload_dir_local_path
+    tar_filename, tar_local_path = self._CreateAgentTarball(
+        agent_framework, agent_dir_local_path
     )
     self.client_vm.PushDataFile(tar_local_path, f'workload/{tar_filename}')
     self.client_vm.RemoteCommand(f'cd workload && tar -xzf {tar_filename}')
 
     # Install dependencies and build wheel on client VM
     self.client_vm.RemoteCommand(
-        f'cd workload/{workload_framework} && pip3 install . && pip3 install'
+        f'cd workload/{agent_framework} && pip3 install . && pip3 install'
         ' build && python3 -m build'
     )
 
     # 3. Push generic deployment script to VM
     deploy_script_local_path = data.ResourcePath(
-        'agentic_framework/deploy_agent_engine.py'
+        'agents/deploy_agent_engine.py'
     )
     self.client_vm.PushDataFile(
         deploy_script_local_path,
-        f'workload/{workload_framework}/deploy_agent_engine.py',
+        f'workload/{agent_framework}/deploy_agent_engine.py',
     )
 
     # 4. Push generic remote run script to VM
     run_remote_script_local_path = data.ResourcePath(
-        'agentic_framework/run_agent_engine.py'
+        'agents/run_agent_engine.py'
     )
     self.client_vm.PushDataFile(
         run_remote_script_local_path,
-        f'workload/{workload_framework}/run_agent_engine.py',
+        f'workload/{agent_framework}/run_agent_engine.py',
     )
 
     self._GrantPermissionToReasoningEngine()
@@ -424,7 +414,7 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
     """Gets config dict for deployment/creation."""
     config = super()._GetDeploymentConfig()
     config.update({
-        'workload': self.spec.workload,
+        'agent': self.spec.agent,
         'framework': self.spec.framework,
         'staging_bucket': self._staging_bucket,
         'agent_config': self.agent_config,
@@ -433,12 +423,12 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
 
   def _Create(self):
     """Initializes Vertex AI and deploys agent."""
-    workload = self.spec.workload
+    agent = self.spec.agent
     framework = self.spec.framework
-    workload_framework = f'{workload}_{framework}'
+    agent_framework = f'{agent}_{framework}'
 
     self.UploadDeployConfigToClientVm(
-        f'workload/{workload_framework}/deploy_config.yaml'
+        f'workload/{agent_framework}/deploy_config.yaml'
     )
 
     # 4. Trigger deployment script on VM
@@ -450,7 +440,7 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
         f'export GOOGLE_CLOUD_LOCATION={location}',
     ]
 
-    command_parts.append(f'cd workload/{workload_framework}')
+    command_parts.append(f'cd workload/{agent_framework}')
     deploy_cmd = 'python3 deploy_agent_engine.py --config deploy_config.yaml'
     command_parts.append(deploy_cmd)
     command = ' && '.join(command_parts)
@@ -577,20 +567,20 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
       session_id: str | None = None,
       user_id: str | None = None,
   ) -> None:
-    """Runs the agent on Vertex AI Agent Engine."""
+    """Runs the prompt on the client VM."""
     if not self._remote_agent_name:
       raise errors.Benchmarks.RunError(
           'Agent not deployed. Call Create() first.'
       )
 
-    workload = self.spec.workload
+    agent = self.spec.agent
     framework = self.spec.framework
-    workload_framework = f'{workload}_{framework}'
+    agent_framework = f'{agent}_{framework}'
 
     logging.info('Running agent on Vertex AI Agent Engine via client VM...')
 
     self.UploadRunConfigToClientVm(
-        f'workload/{workload_framework}/run_config.yaml',
+        f'workload/{agent_framework}/run_config.yaml',
         output_dir,
         prompt or '',
         session_id or 'default_session',
@@ -601,7 +591,7 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
     location = self.region
     command = (
         f'export GOOGLE_CLOUD_PROJECT={self.project} && export'
-        f' GOOGLE_CLOUD_LOCATION={location} && cd workload/{workload_framework}'
+        f' GOOGLE_CLOUD_LOCATION={location} && cd workload/{agent_framework}'
         ' && python3 run_agent_engine.py --config_file run_config.yaml'
     )
     stdout, _ = self.client_vm.RemoteCommand(command)
