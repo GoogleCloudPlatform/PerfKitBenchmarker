@@ -914,6 +914,7 @@ class GceNetwork(network.BaseNetwork):
   def __init__(self, network_spec: GceNetworkSpec):
     super().__init__(network_spec)
     self.project: str | None = network_spec.project
+    self._zone: str = network_spec.zone
     self.vpn_gateway: Dict[str, GceVpnGateway] = {}
 
     #  Figuring out the type of network here.
@@ -1231,6 +1232,60 @@ class GceNetwork(network.BaseNetwork):
         for group_spec in benchmark_spec.config.vm_groups.values()
     )
 
+  def _CreateCloudNat(self):
+    """Provision a Cloud Router + NAT so private resources can egress.
+
+    Called during network provisioning so NAT has time to fully propagate
+    before any cluster lifecycle code starts. Shared across all resources
+    in the network.
+    """
+    region = util.GetRegionFromZone(self._zone)
+    router_name = f'{self.primary_subnet_name}-router'
+    nat_name = f'{self.primary_subnet_name}-nat'
+
+    router_cmd = util.GcloudCommand(
+        self, 'compute', 'routers', 'create', router_name
+    )
+    router_cmd.flags['network'] = self.primary_subnet_name
+    router_cmd.flags['region'] = region
+    router_cmd.flags.pop('zone', None)
+    _, stderr, retcode = router_cmd.Issue(raise_on_failure=False)
+    if retcode and 'already exists' not in stderr:
+      logging.warning('Cloud Router create failed: %s', stderr)
+
+    nat_cmd = util.GcloudCommand(
+        self, 'compute', 'routers', 'nats', 'create', nat_name
+    )
+    nat_cmd.flags['router'] = router_name
+    nat_cmd.flags['region'] = region
+    nat_cmd.flags.pop('zone', None)
+    nat_cmd.args.append('--auto-allocate-nat-external-ips')
+    nat_cmd.args.append('--nat-all-subnet-ip-ranges')
+    _, stderr, retcode = nat_cmd.Issue(raise_on_failure=False)
+    if retcode and 'already exists' not in stderr:
+      logging.warning('Cloud NAT create failed: %s', stderr)
+
+  def _DeleteCloudNat(self):
+    """Best-effort teardown of the NAT and router this network created."""
+    region = util.GetRegionFromZone(self._zone)
+    router_name = f'{self.primary_subnet_name}-router'
+    nat_name = f'{self.primary_subnet_name}-nat'
+
+    nat_cmd = util.GcloudCommand(
+        self, 'compute', 'routers', 'nats', 'delete', nat_name
+    )
+    nat_cmd.flags['router'] = router_name
+    nat_cmd.flags['region'] = region
+    nat_cmd.flags.pop('zone', None)
+    nat_cmd.Issue(raise_on_failure=False)
+
+    router_cmd = util.GcloudCommand(
+        self, 'compute', 'routers', 'delete', router_name
+    )
+    router_cmd.flags['region'] = region
+    router_cmd.flags.pop('zone', None)
+    router_cmd.Issue(raise_on_failure=False)
+
   def Create(self):
     """Creates the actual network."""
     if not self.is_existing_network:
@@ -1244,6 +1299,8 @@ class GceNetwork(network.BaseNetwork):
             lambda rule: self.external_nets_rules[rule].Create(),
             list(self.external_nets_rules.keys()),
         )
+      if gcp_flags.GKE_ENABLE_PRIVATE_NODES.value:
+        self._CreateCloudNat()
       if getattr(self, 'vpn_gateway', False):
         background_tasks.RunThreaded(
             lambda gateway: self.vpn_gateway[gateway].Create(),
@@ -1257,6 +1314,12 @@ class GceNetwork(network.BaseNetwork):
     if self.placement_group:
       self.placement_group.Delete()
     if not self.is_existing_network:
+      # Always attempt NAT+router cleanup: both gcloud calls use
+      # raise_on_failure=False so this is a no-op when none was created.
+      # Checking the live flag here is wrong because teardown runs from a
+      # restored pickle and the flag may default to False even when a NAT
+      # was created at provision time.
+      self._DeleteCloudNat()
       if getattr(self, 'vpn_gateway', False):
         background_tasks.RunThreaded(
             lambda gateway: self.vpn_gateway[gateway].Delete(),

@@ -243,6 +243,9 @@ class NodepoolSpec(spec.BaseSpec):
     self.vm_spec: virtual_machine_spec.BaseVmSpec
     self.machine_families: list[str] | None
     self.sandbox_config: SandboxSpec | None
+    self.max_pods_per_node: int | None
+    self.node_labels: dict[str, str] | None
+    self.node_taints: list[str] | None
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -273,6 +276,18 @@ class NodepoolSpec(spec.BaseSpec):
         ),
         'vm_spec': (spec.PerCloudConfigDecoder, {}),
         'sandbox_config': (_SandboxDecoder, {'default': None}),
+        'max_pods_per_node': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True, 'min': 1},
+        ),
+        'node_labels': (
+            option_decoders.TypeVerifier,
+            {'valid_types': (dict,), 'default': None, 'none_ok': True},
+        ),
+        'node_taints': (
+            option_decoders.TypeVerifier,
+            {'valid_types': (list,), 'default': None, 'none_ok': True},
+        ),
     })
     return result
 

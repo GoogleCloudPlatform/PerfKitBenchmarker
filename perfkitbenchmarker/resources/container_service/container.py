@@ -187,6 +187,9 @@ class BaseNodePoolConfig:
     # Defined by GceVirtualMachineConfig. Used by google_kubernetes_engine
     # pylint: disable=g-missing-from-attributes
     self.sandbox_config: container_spec_lib.SandboxSpec | None = None
+    self.node_labels: dict[str, str] | None = None
+    self.node_taints: list[str] | None = None
+    self.max_pods_per_node: int | None = None
     self.max_local_disks: int | None
     self.ssd_interface: str | None
     self.threads_per_core: int
