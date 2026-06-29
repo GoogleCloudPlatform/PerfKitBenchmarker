@@ -540,6 +540,27 @@ class GoogleKubernetesEngineWithGpusTestCase(PatchedObjectsTestCase):
       }
       self.assertEqual(cluster.GetNodeSelectors(), expected)
 
+  @flagsaver.flagsaver(gce_reservation_id='test_reservation')
+  def testCreateWithReservation(self):
+    spec = self.create_kubernetes_engine_spec('k80')
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      self.assertIn(
+          '--reservation test_reservation', issue_command.all_commands
+      )
+      self.assertIn(
+          '--reservation-affinity specific', issue_command.all_commands
+      )
+      self.assertIn(
+          'cloud.google.com/reservation-affinity=specific',
+          issue_command.all_commands,
+      )
+      self.assertIn(
+          'cloud.google.com/reservation-name=test_reservation',
+          issue_command.all_commands,
+      )
+
 
 class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
 

@@ -512,6 +512,7 @@ class GkeCluster(BaseGkeCluster):
     # Parameter is not documented well but is available in CLI.
     cmd.flags['timeout'] = ONE_HOUR
 
+    nodepool_labels = [f'pkb_nodepool={nodepool_config.name}']
     if nodepool_config.gpu_count:
       if 'a2-' not in nodepool_config.machine_type:
         accelerator_spec = gce_virtual_machine.GenerateAcceleratorSpecString(
@@ -522,6 +523,14 @@ class GkeCluster(BaseGkeCluster):
               ',gpu-driver-version=' + gcp_flags.GKE_GPU_DRIVER_VERSION.value
           )
         cmd.flags['accelerator'] = accelerator_spec
+    if gcp_flags.GCE_RESERVATION_ID.value:
+      cmd.flags['reservation'] = gcp_flags.GCE_RESERVATION_ID.value
+      cmd.flags['reservation-affinity'] = 'specific'
+      nodepool_labels.append('cloud.google.com/reservation-affinity=specific')
+      nodepool_labels.append(
+          f'cloud.google.com/reservation-name={gcp_flags.GCE_RESERVATION_ID.value}'
+      )
+    cmd.flags['node-labels'] = ','.join(nodepool_labels)
 
     gce_tags = FLAGS.gce_tags
     if nodepool_config.gce_tags:
@@ -593,7 +602,6 @@ class GkeCluster(BaseGkeCluster):
     if self.image_type:
       cmd.flags['image-type'] = self.image_type
 
-    cmd.flags['node-labels'] = f'pkb_nodepool={nodepool_config.name}'
     if nodepool_config.min_nodes != nodepool_config.max_nodes:
       cmd.args.append('--enable-autoscaling')
       cmd.flags['min-nodes'] = nodepool_config.min_nodes
