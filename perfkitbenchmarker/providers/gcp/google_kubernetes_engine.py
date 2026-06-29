@@ -730,7 +730,13 @@ class GkeCluster(BaseGkeCluster):
         f'targetLink ~ {link_target} AND '
         f'startTime>="{from_time}"'
     )
-    for attempt in range(1, max_attempts + 1):
+    @vm_util.Retry(
+        poll_interval=retry_delay,
+        max_retries=max_attempts,
+        retryable_exceptions=(errors.Resource.GetError,),
+        log_errors=False,
+    )
+    def _QueryOnce() -> str:
       list_cmd = self._GcloudCommand('container', 'operations', 'list')
       list_cmd.flags['filter'] = filter_str
       list_cmd.flags['sort-by'] = '~startTime'
@@ -738,30 +744,20 @@ class GkeCluster(BaseGkeCluster):
       list_cmd.flags['format'] = 'value(name)'
       stdout, stderr, _ = list_cmd.Issue(raise_on_failure=False)
       op_name = stdout.strip()
-      if op_name:
-        logging.info(
-            'GetLatestOp: found %s type=%s target=%s attempt=%d/%d',
-            op_name,
-            operation_type,
-            link_target,
-            attempt,
-            max_attempts,
+      if not op_name:
+        raise errors.Resource.GetError(
+            f'_GetLatestOperationName: no {operation_type} op found '
+            f'for target={link_target}. stderr={stderr}'
         )
-        return op_name
       logging.info(
-          'GetLatestOp: no %s op for %s attempt=%d/%d retry in %ds.',
+          'GetLatestOp: found %s type=%s target=%s',
+          op_name,
           operation_type,
           link_target,
-          attempt,
-          max_attempts,
-          retry_delay,
       )
-      time.sleep(retry_delay)
-    raise errors.Resource.GetError(
-        f'_GetLatestOperationName: no {operation_type} op found '
-        f'for target={link_target} after {max_attempts} attempts. '
-        f'stderr={stderr}'
-    )
+      return op_name
+
+    return _QueryOnce()
 
   def CreateNodePoolAsync(
       self,
