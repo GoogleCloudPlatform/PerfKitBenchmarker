@@ -16,6 +16,7 @@
 import json
 import unittest
 from absl import flags
+from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker.providers.aws import aws_batch_jobs as ab_jobs
 from perfkitbenchmarker.providers.aws import aws_network
@@ -32,12 +33,10 @@ class AwsBatchJobTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.run_uri = 'run_uri'
     FLAGS.zone = ['us-east-1a']
 
-    # Mock AWS util methods that query account details or network
     self.enter_context(
         mock.patch.object(aws_util, 'GetAccount', return_value='123456789012')
     )
 
-    # Mock network resources to avoid live AWS VPC calls during construction
     self.mock_network = mock.Mock(spec=aws_network.AwsNetwork)
     self.mock_network.subnet = mock.Mock(id='subnet-1234')
     self.mock_network.regional_network = mock.Mock()
@@ -52,24 +51,25 @@ class AwsBatchJobTestCase(pkb_common_test_case.PkbCommonTestCase):
         )
     )
 
-    # Construct Job Spec and Job instance
     self.job_spec = mock.Mock()
     self.job_spec.job_region = 'us-east-1'
     self.job_spec.job_type = 'AwsBatchJob'
 
-    self.job = ab_jobs.AwsBatchJob(
-        self.job_spec, container_registry=mock.Mock()
-    )
-    self.job.name = 'pkb-job-run_uri'
-    self.job.container_image = 'fake-image'
+  def _CreateJob(self) -> ab_jobs.AwsBatchJob:
+    job = ab_jobs.AwsBatchJob(self.job_spec, container_registry=mock.Mock())
+    job.name = 'pkb-job-run_uri'
+    job.container_image = 'fake-image'
+    return job
 
   def testInitialization(self):
-    self.assertEqual(self.job.region, 'us-east-1')
-    self.assertEqual(self.job.account, '123456789012')
-    self.assertEqual(self.job.compute_type, 'FARGATE')
-    self.assertIsNone(self.job.start_timestamp)
+    job = self._CreateJob()
+    self.assertEqual(job.region, 'us-east-1')
+    self.assertEqual(job.account, '123456789012')
+    self.assertEqual(job.compute_type, 'FARGATE')
+    self.assertIsNone(job.start_timestamp)
 
   def testExecuteAndTimestampParsing(self):
+    job = self._CreateJob()
     mock_submit_stdout = '{"jobId": "job-1234"}'
     mock_describe_stdout = json.dumps({
         'jobs': [{
@@ -86,14 +86,40 @@ class AwsBatchJobTestCase(pkb_common_test_case.PkbCommonTestCase):
         'batch describe-jobs': [(mock_describe_stdout, '', 0)],
     })
 
-    self.job.job_queue.arn = 'arn:queue'
-    self.job.job_definition.arn = 'arn:def'
+    job.job_queue.arn = 'arn:queue'
+    job.job_definition.arn = 'arn:def'
 
-    self.job.Execute()
+    job.Execute()
 
-    self.assertIn('submit-job', mock_cmd.all_commands)
     self.assertEqual(mock_cmd.func_to_mock.call_count, 2)
-    self.assertEqual(self.job.start_timestamp, 1782504600.0)
+    self.assertEqual(job.start_timestamp, 1782504600.0)
+
+  @flagsaver.flagsaver(aws_batch_compute_type='EC2', machine_type='m8i.large')
+  def testCreateComputeEnvironment(self):
+    job = self._CreateJob()
+    mock_cmd = self.MockIssueCommand({
+        'ec2 modify-subnet-attribute': [('', '', 0)],
+        'batch create-compute-environment': [
+            ('{"computeEnvironmentArn": "arn:ce"}', '', 0)
+        ],
+        'batch describe-compute-environments': [
+            ('{"computeEnvironments": [{"status": "VALID"}]}', '', 0)
+        ],
+    })
+
+    job.compute_env.Create()
+
+    create_cmd = None
+    for call in mock_cmd.func_to_mock.call_args_list:
+      cmd = call[0][0]
+      if 'create-compute-environment' in cmd:
+        create_cmd = cmd
+        break
+    self.assertIsNotNone(create_cmd)
+    idx = create_cmd.index('--compute-resources')
+    resources = json.loads(create_cmd[idx + 1])
+    self.assertEqual(resources['minvCpus'], 0)
+    self.assertEqual(resources['securityGroupIds'], ['sg-5678'])
 
 
 if __name__ == '__main__':
