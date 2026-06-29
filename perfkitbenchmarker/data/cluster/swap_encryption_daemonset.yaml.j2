@@ -13,8 +13,11 @@ data:
     # Installs measurement tools, verifies the swap device, then writes /tmp/pkb_ready.
     set -euo pipefail
 
-    echo "[pkb] Installing measurement tools..."
-    # Only tools needed for Phase 1 (raw-device fio) and Phase 2 (CPU/I/O overhead).
+    echo "[pkb] Installing benchmark measurement tools..."
+    # Phase 1 tools: fio (raw-device I/O), cryptsetup/mdadm (dm-crypt inspection),
+    # sysstat (vmstat/pidstat), nvme-cli (NVMe telemetry).
+    # Phase 2 tools: stress-ng (CPU/I/O overhead), cgroup-tools (cgroup v1 guard),
+    # util-linux (taskset/ionice).
     # Workload benchmarks (redis, opensearch, kernel-build) run in separate pods.
     PKB_APT_OK=0
     for _attempt in 1 2 3; do
@@ -25,15 +28,21 @@ data:
         mdadm \
         sysstat \
         nvme-cli \
+        stress-ng \
+        cgroup-tools \
+        util-linux \
         2>&1 && PKB_APT_OK=1 && break
       echo "[pkb] apt-get attempt $_attempt failed, retrying in 15s..." >&2
       sleep 15
     done
-    if [ "$PKB_APT_OK" != "1" ] || ! command -v fio >/dev/null 2>&1; then
-      echo "[pkb] FATAL: fio not installed after 3 attempts" >&2
+    if [ "$PKB_APT_OK" != "1" ] || \
+       ! command -v fio >/dev/null 2>&1 || \
+       ! command -v stress-ng >/dev/null 2>&1; then
+      echo "[pkb] FATAL: critical tools (fio, stress-ng) not installed after 3 attempts" >&2
       exit 1
     fi
-    echo "[pkb] fio installed: $(fio --version 2>&1 | head -1)"
+    echo "[pkb] fio: $(fio --version 2>&1 | head -1)"
+    echo "[pkb] stress-ng: $(stress-ng --version 2>&1 | head -1)"
 
     echo "[pkb] Verifying swap device is active..."
     PKB_SWAP_FOUND=0
@@ -53,7 +62,7 @@ data:
       exit 1
     fi
 
-    echo "[pkb] Measurement tools ready. Writing ready sentinel."
+    echo "[pkb] Benchmark tools ready. Writing ready sentinel."
     touch /tmp/pkb_ready
     exec sleep infinity
 ---
@@ -85,86 +94,7 @@ spec:
         image: {{ image }}
         command:
         - bash
-<<<<<<< HEAD
         - /scripts/setup.sh
-=======
-        - -c
-        - |
-          echo "[pkb] Installing benchmark measurement tools..."
-          # Phase 1+2 tools: fio (raw-device I/O), stress-ng (CPU overhead),
-          # cryptsetup/mdadm (dm-crypt inspection), sysstat (vmstat/pidstat),
-          # nvme-cli (NVMe telemetry), cgroup-tools (cgroup v1 guard).
-          # Phase 3b tools: gcc/make/etc. (kernel build inside memory cap).
-          # Redis/memtier/esrally/opensearch are NOT installed here —
-          # those workloads run in separate PKB benchmark pods (Phase 3a, 3c)
-          # per Ajay review comment r3457826290.
-          PKB_APT_OK=0
-          for _attempt in 1 2 3; do
-            apt-get update -qq 2>&1 || true
-            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-              fio \
-              stress-ng \
-              cryptsetup \
-              mdadm \
-              sysstat \
-              nvme-cli \
-              cgroup-tools \
-              util-linux \
-              gcc \
-              make \
-              bc \
-              flex \
-              bison \
-              libelf-dev \
-              libssl-dev \
-              2>&1 && PKB_APT_OK=1 && break
-            echo "[pkb] apt-get attempt $_attempt failed, retrying in 15s..." >&2
-            sleep 15
-          done
-          if [ "$PKB_APT_OK" != "1" ] || \
-             ! command -v fio >/dev/null 2>&1 || \
-             ! command -v stress-ng >/dev/null 2>&1; then
-            echo "[pkb] FATAL: critical tools (fio, stress-ng) not installed" >&2
-            exit 1
-          fi
-          echo "[pkb] fio: $(fio --version 2>&1 | head -1)"
-          echo "[pkb] stress-ng: $(stress-ng --version 2>&1 | head -1)"
-          echo "[pkb] Verifying swap device is active..."
-          PKB_SWAP_FOUND=0
-          for _attempt in $(seq 1 30); do
-            if awk 'NR>1{found=1} END{exit !found}' /proc/swaps 2>/dev/null; then
-              PKB_SWAP_DEV=$(awk 'NR==2{print $1}' /proc/swaps)
-              echo "[pkb] Swap device active: $PKB_SWAP_DEV"
-              PKB_SWAP_FOUND=1
-              break
-            fi
-            echo "[pkb] Waiting for swap device (attempt $_attempt/30)..." >&2
-            sleep 5
-          done
-          if [ "$PKB_SWAP_FOUND" != "1" ]; then
-            echo "[pkb] WARNING: no active swap device after 150s — " \
-                 "check linuxConfig.swapConfig / kubelet swap config." >&2
-          fi
-          echo "[pkb] Pre-fetching kernel source for Phase 3b build workload..."
-          PKB_KVER="{{ kernel_version }}"
-          PKB_KROOT="/mnt/stateful_partition/pkb_kernel"
-          PKB_KTARBALL="$PKB_KROOT/linux-$PKB_KVER.tar.xz"
-          PKB_KSRC="$PKB_KROOT/linux-$PKB_KVER"
-          PKB_KURL="https://cdn.kernel.org/pub/linux/kernel/v${PKB_KVER%%.*}.x/linux-$PKB_KVER.tar.xz"
-          mkdir -p "$PKB_KROOT"
-          if [ ! -f "$PKB_KTARBALL" ]; then
-            wget -q --timeout=300 -O "$PKB_KTARBALL" "$PKB_KURL" 2>&1 || \
-              echo "[pkb] WARNING: kernel tarball download failed" >&2
-          fi
-          if [ -f "$PKB_KTARBALL" ] && [ ! -d "$PKB_KSRC" ]; then
-            echo "[pkb] Extracting kernel source (xz, may take ~60 s)..."
-            tar -xf "$PKB_KTARBALL" -C "$PKB_KROOT" 2>&1 || \
-              echo "[pkb] WARNING: kernel source extraction failed" >&2
-          fi
-          echo "[pkb] Benchmark tools ready. Writing ready sentinel."
-          touch /tmp/pkb_ready
-          sleep infinity
->>>>>>> 6652ee70f (fix(swap_encryption/pr4): slim DaemonSet, duplicate FLAGS, EKS stub, formatting)
         securityContext:
           privileged: true
           capabilities:
