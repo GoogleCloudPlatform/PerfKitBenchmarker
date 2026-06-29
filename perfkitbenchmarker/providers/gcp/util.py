@@ -426,19 +426,25 @@ class GcloudCommand:
       The operation name.
 
     Raises:
-      errors.Resource.CreationError: if stdout is empty and no
-        get_latest_op_fn is supplied, or if the command itself fails.
+      errors.VmUtil.IssueCommandError: if stdout is empty and no
+        get_latest_op_fn is supplied. If the command itself fails, the
+        exception raised is whatever Issue()/IssueCommand raises by
+        default (also errors.VmUtil.IssueCommandError), unless the caller
+        passes raise_on_failure=False via **kwargs.
     """
     self.args.append('--async')
     self.flags['format'] = 'value(name)'
-    stdout, stderr, retcode = self.Issue(raise_on_failure=False, **kwargs)
-    if retcode:
-      raise errors.Resource.CreationError(stderr)
+    # No explicit retcode check here: Issue() defaults raise_on_failure=True
+    # (forwarded via **kwargs), so a failing command already raises before
+    # we get here. Callers that want raise_on_failure=False behavior can
+    # pass it explicitly through **kwargs and handle the empty stdout/
+    # stderr themselves.
+    stdout, stderr, _ = self.Issue(**kwargs)
     op_name = stdout.strip().splitlines()[-1].strip() if stdout else ''
     if op_name:
       return op_name
     if get_latest_op_fn is None:
-      raise errors.Resource.CreationError(
+      raise errors.VmUtil.IssueCommandError(
           f'Async gcloud command returned no operation name; stderr={stderr}'
       )
     return get_latest_op_fn()

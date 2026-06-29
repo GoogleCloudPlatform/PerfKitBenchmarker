@@ -546,13 +546,18 @@ class GcloudCommandIssueAsyncTestCase(unittest.TestCase):
   def testIssueAsyncRaisesWhenEmptyStdoutAndNoFallback(self):
     cmd = util.GcloudCommand(None, 'fake', 'create')
     with mock.patch.object(cmd, 'Issue', return_value=('', 'some error', 0)):
-      with self.assertRaises(errors.Resource.CreationError):
+      with self.assertRaises(errors.VmUtil.IssueCommandError):
         cmd.IssueAsync()
 
   def testIssueAsyncRaisesOnCommandFailure(self):
     cmd = util.GcloudCommand(None, 'fake', 'create')
-    with mock.patch.object(cmd, 'Issue', return_value=('', 'boom', 1)):
-      with self.assertRaises(errors.Resource.CreationError):
+    # Issue() defaults raise_on_failure=True, so a real failure surfaces as
+    # an exception from Issue() itself, not a returned (stdout, stderr, rc)
+    # failure tuple -- IssueAsync no longer checks retcode.
+    with mock.patch.object(
+        cmd, 'Issue', side_effect=errors.VmUtil.IssueCommandError('boom')
+    ):
+      with self.assertRaises(errors.VmUtil.IssueCommandError):
         cmd.IssueAsync()
 
   def testIssueAsyncSetsAsyncFlagAndFormat(self):

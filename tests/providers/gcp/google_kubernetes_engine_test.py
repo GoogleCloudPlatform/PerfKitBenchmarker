@@ -526,7 +526,7 @@ class GoogleKubernetesEngineAsyncOpsTestCase(PatchedObjectsTestCase):
       self.MockIssueCommand({'': [('', '', 0)]})
       # pylint: disable=protected-access
       cmd = cluster._GcloudCommand('container', 'node-pools', 'delete', 'x')
-      with self.assertRaises(errors.Resource.CreationError):
+      with self.assertRaises(errors.VmUtil.IssueCommandError):
         cluster._IssueAsync(cmd)
       # pylint: enable=protected-access
 
