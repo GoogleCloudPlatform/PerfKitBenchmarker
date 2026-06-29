@@ -93,15 +93,15 @@ def GetDefaultUser():
 
 def GetProjectNumber(project_id: str | None = None) -> str:
   """Get the number of the default project."""
-  # All GCP projects have both a project number & a project id. The project id
-  # is the human-readable name of the project.
+  # All GCP projects have project number, a human readable project ID, and
+  # a human readable project name.
   if not project_id:
     project_id = GetDefaultProject()
   cmd = [
       FLAGS.gcloud_path,
       'projects',
       'list',
-      f'--filter=name:{project_id}',
+      f'--filter=projectId:{project_id}',
       '--format=json',
   ]
   stdout, _, _ = vm_util.IssueCommand(cmd)

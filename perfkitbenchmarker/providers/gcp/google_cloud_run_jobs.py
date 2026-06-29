@@ -5,10 +5,12 @@ and managing lifecycle of Google Cloud Run jobs. More details at
 https://cloud.google.com/run/docs/quickstarts/jobs/create-execute
 """
 
+import json
 import logging
 import time
 
 from absl import flags
+import dateutil.parser
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import util
@@ -49,9 +51,12 @@ class GoogleCloudRunJob(base_job.BaseJob):
         'Run_Environment': 'gen2',
     })
     self.project_number = util.GetProjectNumber(self.project)
+    self.start_timestamp = None
 
   def _Create(self) -> None:
     """Creates the underlying resource."""
+    if not self.container_image:
+      raise AttributeError('container_image must be set')
     # https://cloud.google.com/sdk/gcloud/reference/run/jobs/create
     cmd = ['gcloud']
     # TODO(user): Remove alpha once the feature is GA.
@@ -127,6 +132,7 @@ class GoogleCloudRunJob(base_job.BaseJob):
   def Execute(self):
     """Executes the job."""
     # https://cloud.google.com/sdk/gcloud/reference/run/jobs/execute
+    self.submit_timestamp = time.time()
     self.last_execution_start_time = time.time()
     cmd = [
         'gcloud',
@@ -140,6 +146,34 @@ class GoogleCloudRunJob(base_job.BaseJob):
     ]
     vm_util.IssueCommand(cmd)
     self.last_execution_end_time = time.time()
+
+    # Query the latest execution to retrieve start and creation timestamps
+    list_cmd = [
+        'gcloud',
+        'run',
+        'jobs',
+        'executions',
+        'list',
+        f'--job={self.name}',
+        f'--region={self.region}',
+        f'--project={self.project}',
+        '--limit=1',
+        '--format=json',
+    ]
+    stdout, _, _ = vm_util.IssueCommand(list_cmd)
+    data = json.loads(stdout)[0]
+
+    # The Cloud Run API returns two "start" times:
+    # - status.startTime: When GCP began orchestration/provisioning.
+    # - status.conditions['Started'].lastTransitionTime: When the container
+    #   actually booted.
+    # We use the latter to measure true container start latency.
+    conditions = {
+        c['type']: c['lastTransitionTime'] for c in data['status']['conditions']
+    }
+    self.start_timestamp = dateutil.parser.parse(
+        conditions['Started']
+    ).timestamp()
 
   def GetMonitoringLink(self):
     """Returns link to internal Cloud Run Jobsmonitoring page."""

@@ -1,7 +1,7 @@
 """Base class for representing a job / instance."""
 
 import threading
-from typing import List, Type, TypeVar
+from typing import Any, Dict, List, Optional, Type, TypeVar
 
 from absl import flags
 from perfkitbenchmarker import resource
@@ -48,6 +48,8 @@ class BaseJob(resource.BaseResource):
     self.job_gpu_type: str = base_job_spec.job_gpu_type
     self.job_gpu_count: int = base_job_spec.job_gpu_count
     self.task_count: int = base_job_spec.task_count
+    self.container_image: Optional[str] = None
+    self.submit_timestamp: Optional[float] = None
 
     # update metadata
     self.metadata.update({
@@ -59,6 +61,14 @@ class BaseJob(resource.BaseResource):
         # 'concurrency': 'default',
     })
     self.samples: List[sample.Sample] = []
+
+  def GetResourceMetadata(self) -> Dict[Any, Any]:
+    metadata = super().GetResourceMetadata()
+    metadata.update({
+        'submit_timestamp': self.submit_timestamp,
+        'container_image': self.container_image,
+    })
+    return metadata
 
   def _GenerateName(self) -> str:
     """Generates a unique name for the job.
