@@ -154,6 +154,11 @@ flags.DEFINE_enum(
     [_DEFAULT_DISK_FS_TYPE, 'xfs'],
     'File system type used to format disk.',
 )
+flags.DEFINE_bool(
+    'precondition_disks',
+    False,
+    'Precondition scratch disks using fio before formatting.',
+)
 flags.DEFINE_integer(
     'disk_block_size',
     None,
@@ -582,6 +587,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       if not self._has_remote_command_script:
         # Python is needed for RobustRemoteCommands
         self.Install('python')
+        self._CreateVmTmpDir()
 
         for f in (EXECUTE_COMMAND, WAIT_FOR_COMMAND):
           remote_path = os.path.join(vm_util.VM_TMP_DIR, os.path.basename(f))
@@ -1334,9 +1340,16 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       fmt_cmd = 'sudo mkfs.xfs -f -i size={} {}'.format(block_size, device_path)
     else:
       block_size = FLAGS.disk_block_size or 4096
+      mke2fs_options = 'lazy_itable_init=0'
+      if FLAGS.precondition_disks:
+        mke2fs_options += ',nodiscard'
+      else:
+        mke2fs_options += ',discard'
       fmt_cmd = (
-          'sudo mke2fs -F -E lazy_itable_init=0,discard -O '
-          '^has_journal -t ext4 -b {} {}'.format(block_size, device_path)
+          'sudo mke2fs -F -E {} -O '
+          '^has_journal -t ext4 -b {} {}'.format(
+              mke2fs_options, block_size, device_path
+          )
       )
     self.os_metadata['disk_filesystem_type'] = FLAGS.disk_fs_type
     self.os_metadata['disk_filesystem_blocksize'] = block_size
