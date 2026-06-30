@@ -20,6 +20,7 @@ https://cloud.google.com/run/docs/quickstarts/jobs/create-execute
 import json
 import logging
 import time
+from typing import Any, Dict
 
 from absl import flags
 import dateutil.parser
@@ -173,6 +174,13 @@ class GoogleCloudRunJob(base_job.BaseJob):
     self.start_timestamp = dateutil.parser.parse(
         started_cond['lastTransitionTime']
     ).timestamp()
+
+  def GetResourceMetadata(self) -> Dict[str, Any]:
+    metadata = super().GetResourceMetadata()
+    metadata.update({
+        'job_compute_type': 'GCP_SERVERLESS',
+    })
+    return metadata
 
   def GetMonitoringLink(self) -> str:
     utc_end = int(time.time()) + _TWO_HOURS - 5 * 60

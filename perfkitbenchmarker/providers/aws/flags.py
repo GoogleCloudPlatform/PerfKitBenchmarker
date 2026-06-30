@@ -409,3 +409,17 @@ AWS_METADATA_HTTP_TOKENS = flags.DEFINE_enum(
     ['required', 'optional'],
     'The metadata http tokens state for the ec2 instance (IMDSv2).',
 )
+
+# AWS Batch Flags
+flags.DEFINE_string(
+    'aws_batch_compute_type',
+    'FARGATE',
+    'The compute type for AWS Batch. Options: FARGATE',
+)
+flags.DEFINE_string(
+    'aws_batch_execution_role',
+    None,
+    'The IAM execution role ARN for Fargate tasks. '
+    'If not specified, defaults to '
+    'arn:aws:iam::{account}:role/ecsTaskExecutionRole.',
+)
