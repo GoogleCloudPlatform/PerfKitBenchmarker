@@ -37,7 +37,6 @@ FLAGS = flags.FLAGS
 
 _FARGATE = 'FARGATE'
 _EC2 = 'EC2'
-
 _JOB_SPEC = jobs_setter.BaseJobSpec
 
 
@@ -62,26 +61,54 @@ class AwsBatchComputeEnvironment(resource.BaseResource):
       network: aws_network.AwsNetwork,
       account: str,
       region: str,
+      compute_type: str,
+      machine_type: Optional[str] = None,
   ):
     super().__init__()
     self.name = name
     self.network = network
     self.account = account
     self.region = region
+    self.compute_type = compute_type
+    self.machine_type = machine_type
     self.arn: Optional[str] = None
 
   def _Create(self) -> None:
     assert (
         self.network.subnet is not None
     ), 'Subnet must be created before creating Compute Environment.'
+
+    if self.compute_type == 'EC2':
+      modify_subnet_cmd = [
+          'aws',
+          'ec2',
+          'modify-subnet-attribute',
+          '--subnet-id',
+          self.network.subnet.id,
+          '--map-public-ip-on-launch',
+          '--region',
+          self.region,
+      ]
+      vm_util.IssueCommand(modify_subnet_cmd)
     compute_resources = {
         'subnets': [self.network.subnet.id],
-        'securityGroupIds': [
-            self.network.regional_network.vpc.default_security_group_id
-        ],
         'maxvCpus': 256,
-        'type': _FARGATE,
     }
+
+    if self.compute_type == _FARGATE:
+      compute_resources.update({
+          'type': _FARGATE,
+      })
+    elif self.compute_type == _EC2:
+      instance_profile = FLAGS.aws_batch_instance_profile or (
+          f'arn:aws:iam::{self.account}:instance-profile/ecsInstanceRole'
+      )
+      compute_resources.update({
+          'type': _EC2,
+          'instanceTypes': [self.machine_type],
+          'instanceRole': instance_profile,
+      })
+
     service_role = f'arn:aws:iam::{self.account}:role/aws-service-role/batch.amazonaws.com/AWSServiceRoleForBatch'
 
     cmd = [
@@ -92,8 +119,6 @@ class AwsBatchComputeEnvironment(resource.BaseResource):
         self.name,
         '--type',
         'MANAGED',
-        '--state',
-        'ENABLED',
         '--compute-resources',
         json.dumps(compute_resources),
         '--service-role',
@@ -388,10 +413,6 @@ class AwsBatchJobDefinition(resource.BaseResource):
               'assignPublicIp': 'ENABLED',
           },
       })
-    else:
-      raise errors.Resource.CreationError(
-          f'Unsupported compute type: {self.compute_type}'
-      )
 
     cmd = [
         'aws',
@@ -462,6 +483,9 @@ class AwsBatchJob(base_job.BaseJob):
     self.zone = FLAGS.zone[0] if FLAGS.zone else f'{self.region}a'
     self.account = aws_util.GetAccount()
     self.compute_type = FLAGS.aws_batch_compute_type.upper()
+    self.machine_type = None
+    if self.compute_type == _EC2:
+      self.machine_type = FLAGS.machine_type or 'm8i.large'
 
     network_spec = aws_network.AwsNetworkSpec(zone=self.zone)
     self.network = aws_network.AwsNetwork.GetNetworkFromNetworkSpec(
@@ -473,6 +497,8 @@ class AwsBatchJob(base_job.BaseJob):
         network=self.network,
         account=self.account,
         region=self.region,
+        compute_type=self.compute_type,
+        machine_type=self.machine_type,
     )
 
     self.job_queue = AwsBatchJobQueue(
@@ -579,6 +605,8 @@ class AwsBatchJob(base_job.BaseJob):
     metadata.update({
         'job_compute_type': self.compute_type,
     })
+    if self.machine_type:
+      metadata['machine_type'] = self.machine_type
     return metadata
 
   def GetSamples(self) -> List[sample.Sample]:
