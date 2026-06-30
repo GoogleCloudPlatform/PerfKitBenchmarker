@@ -264,6 +264,9 @@ class TestKubernetesCluster(kubernetes_cluster.KubernetesCluster):
   def _Delete(self):
     pass
 
+  def GetNodePoolNames(self) -> list[str]:
+    return []
+
 
 def _CreateEvent(
     name: str, reason: str, timestamp: float
