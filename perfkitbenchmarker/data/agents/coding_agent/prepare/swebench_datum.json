@@ -1,0 +1,19 @@
+{
+  "repo": "ScottLinnn/coding-agent-testing",
+  "instance_id": "ScottLinnn__coding-agent-testing-1",
+  "base_commit": "e4b490ca4fde147b3acd509e4ee2a7b6d93ded91",
+  "patch": "diff --git a/tests/missing_colon.py b/tests/missing_colon.py\n--- a/tests/missing_colon.py\n+++ b/tests/missing_colon.py\n@@ -1,4 +1,4 @@\n #!/usr/bin/env python3\n \n-def division(a: float, b: float) -> float\n+def division(a: float, b: float) -> float:\n     return a/b\n",
+  "test_patch": "diff --git a/tests/test_missing_colon.py b/tests/test_missing_colon.py\nnew file mode 100644\n--- /dev/null\n+++ b/tests/test_missing_colon.py\n@@ -0,0 +1,5 @@\n+from tests.missing_colon import division\n+\n+def test_division():\n+    assert division(10, 2) == 5.0\n+    assert division(10, 5) == 2.0\n",
+  "problem_statement": "I'm running `missing_colon.py` as follows:\n\n```python\ndivision(23, 0)\n```\n\nbut I get the following error:\n\n```\n    def division(a: float, b: float) -> float\n                                             \nSyntaxError: invalid syntax\n```",
+  "hints_text": "",
+  "created_at": "2026-04-03T19:15:00Z",
+  "version": "1.0",
+  "FAIL_TO_PASS": [
+    "tests/test_missing_colon.py::test_division"
+  ],
+  "PASS_TO_PASS": [
+    "tests/test_nothing.py::test_nothing"
+  ],
+  "environment_setup_commit": "e4b490ca4fde147b3acd509e4ee2a7b6d93ded91",
+  "difficulty": "5 min"
+}
