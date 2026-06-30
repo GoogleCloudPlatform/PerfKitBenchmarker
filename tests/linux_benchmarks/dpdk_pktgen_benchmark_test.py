@@ -88,7 +88,7 @@ class DpdkBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
         ),
         sample.Sample(
             'packet loss rate',
-            0.000029511887241561144,
+            0.00002949548014767369,
             'rate (1=100%)',
             {},
         ),

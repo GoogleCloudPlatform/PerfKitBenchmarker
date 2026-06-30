@@ -26,14 +26,7 @@ _DPDK_INSTALL_PLATFORM = flags.DEFINE_string(
 )
 
 DPDK_GIT_REPO = 'https://github.com/DPDK/dpdk.git'
-# LINT.IfChange(dpdk_tag)
-DPDK_GIT_REPO_TAG = 'v24.11.2'
-# LINT.ThenChange(:dpdk_patch)
-DPDK_GCP_DRIVER_GIT_REPO = (
-    'https://github.com/google/compute-virtual-ethernet-dpdk'
-)
-# Head as of 2025-03-15.
-DPDK_GCP_DRIVER_GIT_REPO_COMMIT = '0342498eaa38e8db1cd663a99d470989fb60f803'
+DPDK_GIT_REPO_TAG = 'v26.03'
 DPDK_AWS_DRIVER_GIT_REPO = 'https://github.com/amzn/amzn-drivers'
 DPDK_AWS_DRIVER_GIT_REPO_TAG = 'ena_linux_2.16.1'
 DPDK_AWS_VFIO_DRIVER_DIR = 'amzn-drivers/userspace/dpdk/enav2-vfio-patch'
@@ -44,24 +37,7 @@ def _Install(vm):
   vm.Install('pip')
   vm.RobustRemoteCommand(f'git clone {DPDK_GIT_REPO}')
   vm.RobustRemoteCommand(f'cd dpdk && git checkout {DPDK_GIT_REPO_TAG}')
-  # LINT.IfChange(dpdk_patch)
-  # This patch has the list of bugs fixed in DPDK 24.11.
-  # Bug List : [https://bugs.dpdk.org/show_bug.cgi?id=1869]
-  vm.PushDataFile('dpdk/dpdk.patch', '/tmp/dpdk.patch')
-  vm.RobustRemoteCommand(
-      'cd dpdk && git apply /tmp/dpdk.patch && rm /tmp/dpdk.patch'
-  )
-  # LINT.ThenChange()
-  if vm.CLOUD == 'GCP':
-    # Get out of tree driver
-    vm.RobustRemoteCommand(f'git clone {DPDK_GCP_DRIVER_GIT_REPO}')
-    vm.RobustRemoteCommand(
-        'cd compute-virtual-ethernet-dpdk && git checkout'
-        f' {DPDK_GCP_DRIVER_GIT_REPO_COMMIT}'
-    )
-    vm.RemoteCommand(
-        'cp -r compute-virtual-ethernet-dpdk/* dpdk/drivers/net/gve'
-    )
+
   # Installs DPDK.
   vm.RobustRemoteCommand(
       'cd dpdk && sudo env PATH=$PATH:/usr/local/bin meson setup'

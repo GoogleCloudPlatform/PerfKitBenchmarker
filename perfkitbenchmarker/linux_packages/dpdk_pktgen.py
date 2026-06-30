@@ -18,7 +18,7 @@ from absl import flags
 
 DPDK_PKTGEN_GIT_REPO = 'https://github.com/pktgen/Pktgen-DPDK'
 DPDK_PKTGEN_GIT_REPO_DIR = 'Pktgen-DPDK'
-DPDK_PKTGEN_GIT_REPO_TAG = '0e3a9c50daedccc7a83597f187d96288264edac0'
+DPDK_PKTGEN_GIT_REPO_TAG = 'pktgen-26.03.0'
 
 DPDK_PKTGEN_MBUF_CACHE_SIZE = flags.DEFINE_integer(
     'dpdk_pktgen_mbuf_cache_size', 512, 'The size of the mbuf cache per lcore.'
@@ -38,8 +38,6 @@ def _Install(vm):
       f'cd {DPDK_PKTGEN_GIT_REPO_DIR} && git checkout'
       f' {DPDK_PKTGEN_GIT_REPO_TAG}'
   )
-  # AWS ENA needs explicit IPv4/UDP checksum offloading validation.
-  # AWS ENA does not expose link rate, so hard-code PPS.
   vm.PushDataFile(
       'dpdk_pktgen/pktgen.patch',
       f'{DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.patch',
