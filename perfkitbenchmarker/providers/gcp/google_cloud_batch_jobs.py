@@ -191,6 +191,10 @@ class GoogleCloudBatchJob(base_job.BaseJob):
             f'Cloud Batch job not completed yet (state: {state}).'
         )
       if state != 'SUCCEEDED':
+        events = job_data.get('status', {}).get('statusEvents', [])
+        for event in events:
+          # Pass retcode=1 since the job has reached a failed state.
+          util.CheckGcloudResponseKnownFailures(event.get('description', ''), 1)
         raise errors.Resource.CreationError(
             f'Cloud Batch job failed with state: {state}.'
         )
