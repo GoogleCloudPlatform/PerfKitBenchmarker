@@ -11,12 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""GkeSwapConfig and EksSwapConfig: swap configuration as PKB BaseResource.
+"""Swap configuration as PKB BaseResource: BaseSwapConfig, GkeSwapConfig, EksSwapConfig.
 
 These resources encapsulate cloud-specific swap configuration for GKE and EKS
 nodepools. They are referenced via NodepoolSpec.swap_config (declared in the
 benchmark BENCHMARK_CONFIG YAML) and consumed by the cloud provider's
 _AddNodeParamsToCmd() during cluster/nodepool creation.
+
+Class hierarchy:
+  BaseSwapConfig(BaseResource)   — common sysctl attrs + abstract from_spec()
+    GkeSwapConfig(BaseSwapConfig) — linuxConfig YAML for --system-config-from-file
+    EksSwapConfig(BaseSwapConfig) — nodeadm kubelet config (deferred to PR #6780)
 
 Usage in BENCHMARK_CONFIG:
   container_cluster:
@@ -51,16 +56,58 @@ from perfkitbenchmarker import resource
 _HYPERDISK_MAX_IOPS_PER_MBPS = 256
 
 
-class GkeSwapConfig(resource.BaseResource):
+class BaseSwapConfig(resource.BaseResource):
+  """Abstract base class for cloud-specific nodepool swap configuration.
+
+  Subclasses (GkeSwapConfig, EksSwapConfig) implement the cloud-specific
+  method for applying swap configuration during nodepool creation.
+
+  Common sysctl attributes (vm.swappiness, vm.min_free_kbytes,
+  vm.watermark_scale_factor) are shared across all cloud providers.
+
+  _Create() and _Delete() are no-ops: the swap config is applied as a
+  parameter to nodepool creation, not as a standalone cloud resource.
+  """
+
+  RESOURCE_TYPE = 'BaseSwapConfig'
+  REQUIRED_ATTRS = []
+
+  def __init__(
+      self,
+      swappiness: int = 100,
+      min_free_kbytes: int = 200,
+      watermark_scale_factor: int = 500,
+  ) -> None:
+    super().__init__()
+    self.swappiness = swappiness
+    self.min_free_kbytes = min_free_kbytes
+    self.watermark_scale_factor = watermark_scale_factor
+
+  @classmethod
+  def from_spec(cls, swap_spec) -> 'BaseSwapConfig':
+    """Create a BaseSwapConfig subclass from a SwapConfigSpec.
+
+    Subclasses must override this to instantiate with cloud-specific attrs.
+    """
+    raise NotImplementedError(
+        f'{cls.__name__}.from_spec() must be implemented by subclasses.'
+    )
+
+  def _Create(self) -> None:
+    """No-op: swap config is applied during nodepool creation."""
+
+  def _Delete(self) -> None:
+    """No-op: cleaned up when the nodepool is deleted."""
+
+
+class GkeSwapConfig(BaseSwapConfig):
   """GKE swap configuration for a nodepool.
 
   Encapsulates the linuxConfig (swapConfig + sysctl) YAML for
   --system-config-from-file and optional Hyperdisk IOPS/throughput overrides.
 
   Consumed by GkeCluster._AddNodeParamsToCmd() when nodepool_config.swap_config
-  is set. _Create() and _Delete() are no-ops because the swap config is applied
-  as part of the gcloud node-pools create command; the nodepool itself manages
-  the lifecycle.
+  is set.
 
   Attributes:
     swappiness: vm.swappiness sysctl value (0-200, default 100).
@@ -85,10 +132,11 @@ class GkeSwapConfig(resource.BaseResource):
       boot_disk_iops: int = 0,
       boot_disk_throughput: int = 0,
   ) -> None:
-    super().__init__()
-    self.swappiness = swappiness
-    self.min_free_kbytes = min_free_kbytes
-    self.watermark_scale_factor = watermark_scale_factor
+    super().__init__(
+        swappiness=swappiness,
+        min_free_kbytes=min_free_kbytes,
+        watermark_scale_factor=watermark_scale_factor,
+    )
     self.lssd = lssd
     self.lssd_count = lssd_count
     self.boot_disk_iops = boot_disk_iops
@@ -108,11 +156,8 @@ class GkeSwapConfig(resource.BaseResource):
         boot_disk_throughput=swap_spec.boot_disk_throughput,
     )
 
-  def _Create(self) -> None:
-    """No-op: swap config is applied during nodepool creation."""
-
   def _Delete(self) -> None:
-    """No-op: cleaned up when the nodepool is deleted."""
+    """Cleans up any written YAML tempfile."""
     self._CleanupYaml()
 
   def WriteLinuxConfigYaml(self) -> str:
@@ -207,13 +252,16 @@ class GkeSwapConfig(resource.BaseResource):
     self.CleanupYaml()
 
 
-class EksSwapConfig(resource.BaseResource):
+class EksSwapConfig(BaseSwapConfig):
   """EKS swap configuration for a nodepool (stub).
 
   Configures kubelet LimitedSwap via nodeadm bootstrap configuration.
   Full implementation deferred to PR #6780.
 
   Attributes:
+    swappiness: vm.swappiness sysctl value (inherited from BaseSwapConfig).
+    min_free_kbytes: vm.min_free_kbytes sysctl (inherited from BaseSwapConfig).
+    watermark_scale_factor: vm.watermark_scale_factor (inherited from BaseSwapConfig).
     memory_swap_behavior: kubelet memorySwapBehavior value ('LimitedSwap').
     fail_swap_on: kubelet failSwapOn setting (False to allow swap on EKS).
   """
@@ -223,17 +271,28 @@ class EksSwapConfig(resource.BaseResource):
 
   def __init__(
       self,
+      swappiness: int = 100,
+      min_free_kbytes: int = 200,
+      watermark_scale_factor: int = 500,
       memory_swap_behavior: str = 'LimitedSwap',
       fail_swap_on: bool = False,
   ) -> None:
-    super().__init__()
+    super().__init__(
+        swappiness=swappiness,
+        min_free_kbytes=min_free_kbytes,
+        watermark_scale_factor=watermark_scale_factor,
+    )
     self.memory_swap_behavior = memory_swap_behavior
     self.fail_swap_on = fail_swap_on
 
   @classmethod
   def from_spec(cls, swap_spec) -> 'EksSwapConfig':
     """Create an EksSwapConfig from a SwapConfigSpec."""
-    return cls()
+    return cls(
+        swappiness=swap_spec.swappiness,
+        min_free_kbytes=swap_spec.min_free_kbytes,
+        watermark_scale_factor=swap_spec.watermark_scale_factor,
+    )
 
   def _Create(self) -> None:
     """Stub: EKS kubelet LimitedSwap config via nodeadm (deferred to PR #6780)."""
@@ -242,9 +301,6 @@ class EksSwapConfig(resource.BaseResource):
         'EKS kubelet LimitedSwap config via nodeadm not yet implemented '
         '(deferred to PR #6780). Swap will not be enabled on EKS nodes.'
     )
-
-  def _Delete(self) -> None:
-    """No-op."""
 
   def GetNodeadmConfig(self) -> str:
     """Return nodeadm bootstrap YAML for kubelet swap settings."""
@@ -256,4 +312,9 @@ class EksSwapConfig(resource.BaseResource):
         '    config:\n'
         f'      memorySwapBehavior: {self.memory_swap_behavior}\n'
         f'      failSwapOn: {str(self.fail_swap_on).lower()}\n'
+        '  containerd:\n'
+        '    config:\n'
+        f'      vm.swappiness: {self.swappiness}\n'
+        f'      vm.min_free_kbytes: {self.min_free_kbytes}\n'
+        f'      vm.watermark_scale_factor: {self.watermark_scale_factor}\n'
     )
