@@ -164,7 +164,7 @@ class UnmanagedNfsService(BaseNfsService):
           'echo "{export_dir} *(rw,sync,no_subtree_check,no_root_squash)" | '
           'sudo tee -a /etc/exports'
       ),
-      'sudo exportfs -a',
+      'sudo exportfs -ra',
   ])
 
   _NFS_NAME = {
