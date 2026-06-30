@@ -398,6 +398,7 @@ class _BaseJobDecoder(option_decoders.TypeVerifier):
         errors.Config.InvalidValue upon invalid input value.
     """
     base_job_config = super().Decode(value, component_full_name, flag_values)
+    _LoadProvider(base_job_config, flag_values)
     if 'job_type' in base_job_config:
       spec_class = jobs_setter.GetJobSpecClass(base_job_config['job_type'])
     else:

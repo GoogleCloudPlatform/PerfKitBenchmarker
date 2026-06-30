@@ -1,7 +1,19 @@
-"""Module containing implementation of GoogleCloudRun service and builder.
+# Copyright 2026 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Module containing implementation of Google Cloud Run jobs.
 
-This module contains classes responsible for preparing the deployment artifacts
-and managing lifecycle of Google Cloud Run jobs. More details at
+More details at
 https://cloud.google.com/run/docs/quickstarts/jobs/create-execute
 """
 
@@ -17,25 +29,23 @@ from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources import base_job
 from perfkitbenchmarker.resources import jobs_setter
 
-
 CLOUD_RUN_PRODUCT = 'GoogleCloudRunJob'
 _JOB_SPEC = jobs_setter.BaseJobSpec
-# For more info, see:
-# https://cloud.google.com/blog/products/serverless/cloud-run-gets-always-on-cpu-allocation
 _TWO_HOURS = 60 * 60 * 2  # Two hours in seconds
 
 
 class GoogleCloudRunJobsSpec(_JOB_SPEC):
-  """Spec storing various data needed to create cloud run jobs."""
+  """Specification for Google Cloud Run jobs."""
 
   SERVICE = CLOUD_RUN_PRODUCT
   CLOUD = 'GCP'
+
 
 FLAGS = flags.FLAGS
 
 
 class GoogleCloudRunJob(base_job.BaseJob):
-  """Class representing a Google cloud Run Job / instance."""
+  """Class representing a Google Cloud Run Job."""
 
   SERVICE = CLOUD_RUN_PRODUCT
   _default_region = 'us-central1'
@@ -54,10 +64,8 @@ class GoogleCloudRunJob(base_job.BaseJob):
     self.start_timestamp = None
 
   def _Create(self) -> None:
-    """Creates the underlying resource."""
     if not self.container_image:
       raise AttributeError('container_image must be set')
-    # https://cloud.google.com/sdk/gcloud/reference/run/jobs/create
     cmd = ['gcloud']
     # TODO(user): Remove alpha once the feature is GA.
     if self.job_gpu_type or self.job_gpu_count:
@@ -68,17 +76,17 @@ class GoogleCloudRunJob(base_job.BaseJob):
         'jobs',
         'create',
         self.name,
-        '--image=%s' % self.container_image,
-        '--region=%s' % self.region,
-        '--memory=%s' % self.backend,
-        '--project=%s' % self.project,
-        '--tasks=%s' % self.task_count,
+        f'--image={self.container_image}',
+        f'--region={self.region}',
+        f'--memory={self.backend}',
+        f'--project={self.project}',
+        f'--tasks={self.task_count}',
     ])
 
     if self.job_gpu_type:
-      cmd.append('--gpu-type=%s' % self.job_gpu_type)
+      cmd.append(f'--gpu-type={self.job_gpu_type}')
     if self.job_gpu_count:
-      cmd.append('--gpu=%s' % self.job_gpu_count)
+      cmd.append(f'--gpu={self.job_gpu_count}')
     if self.job_gpu_type or self.job_gpu_count:
       cmd.append('--no-gpu-zonal-redundancy')
 
@@ -91,47 +99,39 @@ class GoogleCloudRunJob(base_job.BaseJob):
     )
     vm_util.IssueCommand(cmd)
 
-  def _Delete(self):
-    """Deletes the underlying resource."""
-    # https://cloud.google.com/sdk/gcloud/reference/run/jobs/delete
+  def _Delete(self) -> None:
+    if not self._Exists():
+      return
+
     cmd = [
         'gcloud',
         'run',
         'jobs',
         'delete',
         self.name,
-        '--region=%s' % self.region,
-        '--project=%s' % self.project,
+        f'--region={self.region}',
+        f'--project={self.project}',
         '--quiet',
     ]
-
     vm_util.IssueCommand(cmd)
 
-  def _Exists(self):
+  def _Exists(self) -> bool:
     cmd = [
         'gcloud',
         'run',
         'jobs',
         'describe',
         self.name,
-        '--region=%s' % self.region,
-        '--project=%s' % self.project,
+        f'--region={self.region}',
+        f'--project={self.project}',
     ]
     try:
-      out = vm_util.IssueCommand(cmd)
-      logging.info(out)
-    except (KeyError, ValueError, errors.VmUtil.IssueCommandError):
-      logging.error(
-          'Cloud Run Job: %s, in region: %s could not be found.',
-          self.name,
-          self.region,
-      )
+      vm_util.IssueCommand(cmd)
+      return True
+    except errors.VmUtil.IssueCommandError:
       return False
-    return True
 
-  def Execute(self):
-    """Executes the job."""
-    # https://cloud.google.com/sdk/gcloud/reference/run/jobs/execute
+  def Execute(self) -> None:
     self.submit_timestamp = time.time()
     self.last_execution_start_time = time.time()
     cmd = [
@@ -140,14 +140,13 @@ class GoogleCloudRunJob(base_job.BaseJob):
         'jobs',
         'execute',
         self.name,
-        '--wait',  # wait for the execution to complete.
-        '--region=%s' % self.region,
-        '--project=%s' % self.project,
+        '--wait',
+        f'--region={self.region}',
+        f'--project={self.project}',
     ]
     vm_util.IssueCommand(cmd)
     self.last_execution_end_time = time.time()
 
-    # Query the latest execution to retrieve start and creation timestamps
     list_cmd = [
         'gcloud',
         'run',
@@ -168,18 +167,15 @@ class GoogleCloudRunJob(base_job.BaseJob):
     # - status.conditions['Started'].lastTransitionTime: When the container
     #   actually booted.
     # We use the latter to measure true container start latency.
-    conditions = {
-        c['type']: c['lastTransitionTime'] for c in data['status']['conditions']
-    }
+    started_cond = next(
+        c for c in data['status']['conditions'] if c['type'] == 'Started'
+    )
     self.start_timestamp = dateutil.parser.parse(
-        conditions['Started']
+        started_cond['lastTransitionTime']
     ).timestamp()
 
-  def GetMonitoringLink(self):
-    """Returns link to internal Cloud Run Jobsmonitoring page."""
-
+  def GetMonitoringLink(self) -> str:
     utc_end = int(time.time()) + _TWO_HOURS - 5 * 60
-
     return (
         'https://monitoring.corp.google.com/dashboard/run/jobs%2Finstances?'
         f'scope=cloud_project_number%3D{self.project_number}&'
