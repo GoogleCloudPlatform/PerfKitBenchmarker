@@ -862,6 +862,8 @@ class BenchmarkSpec:
         )
       if group_spec.cidr:  # apply cidr range to all vms in vm_group
         group_spec.vm_spec.cidr = group_spec.cidr
+      vm_class = virtual_machine.GetVmClass(cloud, os_type)
+      vm_class.AdjustVmSpec(group_spec.vm_spec, disk_spec)
       vm = self._CreateVirtualMachine(group_spec.vm_spec, os_type, cloud)
       vm.vm_group = group_name
       if disk_spec and not vm.is_static:
