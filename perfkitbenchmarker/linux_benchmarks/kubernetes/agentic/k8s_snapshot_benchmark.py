@@ -78,11 +78,9 @@ flags.DEFINE_integer(
     "Number of concurrent source/snapshot/restore pods per measurement.",
 )
 
-flags.DEFINE_string(
-    "k8s_snapshot_ksa_name",
-    "pod-snapshot-sa",
-    "Kubernetes service account for pod snapshots.",
-)
+# k8s_snapshot_ksa_name is defined in gke_deploy_utils.py
+# (where DeploySnapshots() consumes it) and is available here
+# via the deploy_utils import.
 
 flags.DEFINE_integer(
     "k8s_snapshot_pod_timeout",
@@ -131,16 +129,23 @@ def Prepare(benchmark_spec):
     # Deploy Agent Sandbox ecosystem (idempotent)
     deploy_utils.DeployWorkloads(benchmark_spec)
 
-    # Deploy Pod Snapshot infrastructure (idempotent)
-        # Pod Snapshots are GKE-specific; skip on other platforms
-    cloud = getattr(
-        getattr(benchmark_spec, "container_cluster", None), "cloud", "GCP"
-    )
-    if cloud == "GCP" and not FLAGS.skip_deploy_snapshots:
+    # Deploy Pod Snapshot infrastructure (idempotent).
+    # Pod Snapshots are GKE-specific; skip on other platforms.
+    # Only attempt deployment when we have a confirmed GCP cluster
+    # (avoids surprise failures on pre-existing clusters where
+    # benchmark_spec.container_cluster may be None).
+    cluster = getattr(benchmark_spec, "container_cluster", None)
+    if cluster and getattr(cluster, "cloud", None) == "GCP" and not FLAGS.skip_deploy_snapshots:
         deploy_utils.DeploySnapshots()
-    elif cloud != "GCP":
+    elif not cluster:
         logging.info(
-            "Pod Snapshot infrastructure skipped (cloud=%s, GKE required).", cloud
+            "Pod Snapshot infrastructure skipped (no container_cluster in "
+            "benchmark_spec). Use --skip_deploy_snapshots=False to force."
+        )
+    elif getattr(cluster, "cloud", None) != "GCP":
+        logging.info(
+            "Pod Snapshot infrastructure skipped (cloud=%s, GKE required).",
+            getattr(cluster, "cloud", "unknown"),
         )
 
     # 1. Verify PodSnapshotStorageConfig exists (cluster-scoped).
