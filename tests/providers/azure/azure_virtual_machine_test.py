@@ -149,6 +149,30 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(errors.Benchmarks.InsufficientCapacityCloudFailure):
       vm._Create()
 
+  def testAdjustVmSpecForcesZone(self):
+    spec = azure_virtual_machine.AzureVmSpec(
+        _COMPONENT, machine_type='Standard_D2s_v5', zone='centralus'
+    )
+    disk_spec = mock.Mock(disk_type='PremiumV2_LRS')
+    azure_virtual_machine.AzureVirtualMachine.AdjustVmSpec(spec, disk_spec)
+    self.assertEqual(spec.zone, 'centralus-1')
+
+  def testAdjustVmSpecDoesNotForceZoneIfAlreadyZonal(self):
+    spec = azure_virtual_machine.AzureVmSpec(
+        _COMPONENT, machine_type='Standard_D2s_v5', zone='centralus-2'
+    )
+    disk_spec = mock.Mock(disk_type='PremiumV2_LRS')
+    azure_virtual_machine.AzureVirtualMachine.AdjustVmSpec(spec, disk_spec)
+    self.assertEqual(spec.zone, 'centralus-2')
+
+  def testAdjustVmSpecDoesNotForceZoneForNonZonalDisk(self):
+    spec = azure_virtual_machine.AzureVmSpec(
+        _COMPONENT, machine_type='Standard_D2s_v5', zone='centralus'
+    )
+    disk_spec = mock.Mock(disk_type='Premium_LRS')
+    azure_virtual_machine.AzureVirtualMachine.AdjustVmSpec(spec, disk_spec)
+    self.assertEqual(spec.zone, 'centralus')
+
 
 class AzurePublicIPAddressTest(pkb_common_test_case.PkbCommonTestCase):
 

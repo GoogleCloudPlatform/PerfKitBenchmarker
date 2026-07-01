@@ -338,6 +338,11 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
   # inheritence, we need it here.
   cpu_arch: str
 
+  @classmethod
+  def AdjustVmSpec(cls, vm_spec, disk_spec):
+    """Adjusts the vm_spec based on the disk_spec before VM creation."""
+    pass
+
   def __init__(self, vm_spec: virtual_machine_spec.BaseVmSpec):
     """Initialize BaseVirtualMachine class.
 

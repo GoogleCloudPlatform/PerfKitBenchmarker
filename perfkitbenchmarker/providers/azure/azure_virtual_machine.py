@@ -744,6 +744,22 @@ class AzureVirtualMachine(
   low_priority_status_code: int | None
   spot_early_termination: bool
 
+  @classmethod
+  def AdjustVmSpec(cls, vm_spec, disk_spec):
+    super().AdjustVmSpec(vm_spec, disk_spec)
+    if disk_spec and disk_spec.disk_type in (
+        azure_disk.PREMIUM_STORAGE_V2,
+        azure_disk.ULTRA_STORAGE,
+    ):
+      if vm_spec.zone and not util.GetAvailabilityZoneFromZone(vm_spec.zone):
+        region = util.GetRegionFromZone(vm_spec.zone)
+        vm_spec.zone = f'{region}-1'
+        logging.info(
+            'Forcing zone to %s for VM spec because disk type %s requires it.',
+            vm_spec.zone,
+            disk_spec.disk_type,
+        )
+
   def __init__(self, vm_spec):
     """Initialize an Azure virtual machine.
 
