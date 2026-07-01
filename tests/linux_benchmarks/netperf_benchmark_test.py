@@ -54,6 +54,7 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     self.should_run_internal = p.start()
     self.addCleanup(p.stop)
     FLAGS.netperf_enable_histograms = False
+    FLAGS.netperf_warmup_test_length = 0
 
   def _ConfigureIpTypes(self, run_external=True, run_internal=True):
     self.should_run_external.return_value = run_external
@@ -243,6 +244,25 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
         ],
         [i[:3] for i in result],
     )
+
+  @flagsaver.flagsaver(netperf_benchmarks=['TCP_STREAM'])
+  @flagsaver.flagsaver(netperf_num_streams=[1])
+  @flagsaver.flagsaver(netperf_warmup_test_length=5)
+  def testWarmup(self):
+    self._ConfigureIpTypes(run_external=False, run_internal=True)
+    vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
+    vm_spec.vms = [mock.MagicMock(), mock.MagicMock()]
+    vm_spec.vms[0].RobustRemoteCommand.side_effect = [
+        (self.expected_stdout[0], ''),  # Warmup
+        (self.expected_stdout[0], ''),  # Actual
+    ]
+    vm_spec.vms[1].GetInternalIPs.return_value = ['test_ip']
+    vm_spec.vms[0].GetInternalIPs.return_value = ['test_ip']
+    unused_run_result = netperf_benchmark.Run(vm_spec)
+    self.assertEqual(vm_spec.vms[0].RobustRemoteCommand.call_count, 2)
+    call_args_list = vm_spec.vms[0].RobustRemoteCommand.call_args_list
+    self.assertIn('-l 5', call_args_list[0][0][0])
+    self.assertIn('-l 60', call_args_list[1][0][0])
 
 
 if __name__ == '__main__':

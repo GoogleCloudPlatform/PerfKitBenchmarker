@@ -55,9 +55,8 @@ flags.DEFINE_integer(
 flags.DEFINE_integer(
     'netperf_warmup_test_length',
     60,
-    'The duration of the warmup run in seconds. If --netperf_benchmarks'
-    ' contains TCP_RR, a warmup run of this duration will be performed before'
-    ' the benchmark runs. If 0, no warmup is done.',
+    'The duration of the warmup run in seconds. If greater than 0, a warmup '
+    'run of this duration will be performed before each benchmark run.',
     lower_bound=0,
 )
 flags.DEFINE_bool(
@@ -241,13 +240,6 @@ def Prepare(benchmark_spec):
       ],
       2,
   )
-  if (
-      TCP_RR in FLAGS.netperf_benchmarks
-      and FLAGS.netperf_warmup_test_length > 0
-  ):
-    # If TCP_RR is requested, do a warmup run as 1st run performance could be
-    # low due to initial flow setup issue.
-    RunClientServerVMs(client_vm, server_vm, FLAGS.netperf_warmup_test_length)
 
 
 def PrepareClientVM(client_vm):
@@ -526,12 +518,8 @@ def RunNetperf(
       'netperf_test_length': test_length,
       'sending_thread_count': num_streams,
       'max_iter': FLAGS.netperf_max_iter or 1,
+      'netperf_warmup_test_length': FLAGS.netperf_warmup_test_length,
   }
-  if (
-      TCP_RR in FLAGS.netperf_benchmarks
-      and FLAGS.netperf_warmup_test_length > 0
-  ):
-    metadata['netperf_warmup_test_length'] = FLAGS.netperf_warmup_test_length
 
   remote_cmd_list = []
   assert server_ips, 'Server VM does not have an IP to use for netperf.'
@@ -803,6 +791,20 @@ def RunClientServerVMs(client_vm, server_vm, test_length=None):
 
     for netperf_benchmark in FLAGS.netperf_benchmarks:
       if vm_util.ShouldRunOnExternalIpAddress():
+        if FLAGS.netperf_warmup_test_length > 0:
+          logging.info(
+              'Running warmup for %s for %d seconds',
+              netperf_benchmark,
+              FLAGS.netperf_warmup_test_length,
+          )
+          RunNetperf(
+              client_vm,
+              netperf_benchmark,
+              server_vm.GetExternalIPs(),
+              num_streams,
+              [client_vm.GetInternalIPs()[0]],
+              FLAGS.netperf_warmup_test_length,
+          )
         external_ip_results = RunNetperf(
             client_vm,
             netperf_benchmark,
@@ -821,6 +823,20 @@ def RunClientServerVMs(client_vm, server_vm, test_length=None):
         results.extend(external_ip_results)
 
       if vm_util.ShouldRunOnInternalIpAddress(client_vm, server_vm):
+        if FLAGS.netperf_warmup_test_length > 0:
+          logging.info(
+              'Running warmup for %s for %d seconds',
+              netperf_benchmark,
+              FLAGS.netperf_warmup_test_length,
+          )
+          RunNetperf(
+              client_vm,
+              netperf_benchmark,
+              server_vm.GetInternalIPs(),
+              num_streams,
+              client_vm.GetInternalIPs(),
+              FLAGS.netperf_warmup_test_length,
+          )
         internal_ip_results = RunNetperf(
             client_vm,
             netperf_benchmark,
