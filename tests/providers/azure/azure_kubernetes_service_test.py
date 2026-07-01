@@ -308,5 +308,55 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(self.aks.GetNodePoolNames(), ['default', 'nodepool1'])
 
 
+  def testWaitForOperationNpSucceeded(self):
+    """np_succeeded handle polls nodepool show until Succeeded."""
+    self.MockIssueCommand({
+        'az aks nodepool show': [('Succeeded', '', 0)],
+    })
+    self.aks.WaitForOperation('np_succeeded:pkbma001')  # should not raise
+
+  def testWaitForOperationNpSucceededFailed(self):
+    """np_succeeded raises CreationError when nodepool reaches Failed."""
+    self.MockIssueCommand({
+        'az aks nodepool show': [('Failed', '', 0)],
+    })
+    with self.assertRaises(errors.Resource.CreationError):
+      self.aks.WaitForOperation('np_succeeded:pkbma001')
+
+  def testWaitForOperationNpSucceededNotFound(self):
+    """np_succeeded raises CreationError when nodepool is not found."""
+    self.MockIssueCommand({
+        'az aks nodepool show': [('', 'ResourceNotFound', 1)],
+    })
+    with self.assertRaises(errors.Resource.CreationError):
+      self.aks.WaitForOperation('np_succeeded:pkbma001')
+
+  def testWaitForOperationNpGone(self):
+    """np_gone handle returns once nodepool is NotFound."""
+    self.MockIssueCommand({
+        'az aks nodepool show': [('', 'ResourceNotFound', 1)],
+    })
+    self.aks.WaitForOperation('np_gone:pkbma001')  # should not raise
+
+  def testWaitForOperationClusterSucceeded(self):
+    """cluster_succeeded handle polls cluster show until Succeeded."""
+    self.MockIssueCommand({
+        'az aks show': [('Succeeded', '', 0)],
+    })
+    self.aks.WaitForOperation('cluster_succeeded')  # should not raise
+
+  def testWaitForOperationClusterFailed(self):
+    """cluster_succeeded raises CreationError when cluster reaches Failed."""
+    self.MockIssueCommand({
+        'az aks show': [('Failed', '', 0)],
+    })
+    with self.assertRaises(errors.Resource.CreationError):
+      self.aks.WaitForOperation('cluster_succeeded')
+
+  def testWaitForOperationInvalidHandle(self):
+    """Unknown op_handle kind raises ValueError."""
+    with self.assertRaises(ValueError):
+      self.aks.WaitForOperation('unknown:foo')
+
 if __name__ == '__main__':
   unittest.main()
