@@ -58,7 +58,6 @@ class AwsClusterTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreateDependencies(self):
     self.mock_issue.side_effect = [
-        ('fake_key', None, None),  # Mock 'cat key' from __init__
         ('', None, None),  # Mock import key from ImportKeyfile
         # Mock vpc creation
         ('''Creating CloudFormation stack...
