@@ -243,6 +243,7 @@ class NodepoolSpec(spec.BaseSpec):
     self.vm_spec: virtual_machine_spec.BaseVmSpec
     self.machine_families: list[str] | None
     self.sandbox_config: SandboxSpec | None
+    self.swap_config: SwapConfigSpec | None
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -259,6 +260,7 @@ class NodepoolSpec(spec.BaseSpec):
             option_decoders.ListDecoder,
             {'item_decoder': option_decoders.StringDecoder(), 'default': None},
         ),
+        'swap_config': (_SwapConfigDecoder, {'default': None, 'none_ok': True}),
         'vm_count': (
             option_decoders.IntDecoder,
             {'default': _DEFAULT_VM_COUNT, 'min': 0},
@@ -387,6 +389,93 @@ class _SandboxDecoder(option_decoders.TypeVerifier):
     """
     super().Decode(value, component_full_name, flag_values)
     return SandboxSpec(
+        self._GetOptionFullName(component_full_name),
+        flag_values=flag_values,
+        **value,
+    )
+
+
+# Backing stores accepted per cloud. Validated by each provider, not here, so
+# that adding a cloud doesn't require editing this shared spec.
+#   GCP/GKE : 'local_ssd' (ephemeral local SSD) | 'boot_disk'
+#   AWS/EKS : 'instance_store' (NVMe, Nitro-encrypted) | 'io2'
+_DEFAULT_SWAP_BACKING_STORE = 'local_ssd'
+
+
+class SwapConfigSpec(spec.BaseSpec):
+  """Declarative swap configuration for a node pool.
+
+  This treats swap as a node-pool property workloads can request, instead of
+  requiring benchmarks to configure it at runtime. Providers translate these
+  cloud-neutral fields into their native mechanisms:
+
+    GKE  -> linuxConfig.swapConfig passed via `gcloud ... --system-config-from-file`.
+            GKE provisions and encrypts the swap device itself.
+    EKS  -> kubelet swapBehavior in the nodeadm user-data, plus an
+            instance-store or io2 device formatted at boot.
+
+  Attributes:
+    enabled: Whether swap is configured on the node pool.
+    encrypted: Whether the swap device is encrypted. True uses GKE's default
+      ephemeral keys or AWS Nitro encryption. False provides an unencrypted baseline.
+    backing_store: Which device backs swap (see per-cloud values above).
+    size_percent: Swap size as a percentage of the backing store (GKE local-SSD
+      profile). Ignored when size_gb is set.
+    size_gb: Explicit swap size in GiB (used by EKS or boot-disk profiles).
+    behavior: kubelet memory-swap behavior ('LimitedSwap' or 'NoSwap'). Default
+      is LimitedSwap so scheduled pods can use the swap.
+  """
+
+  def __init__(self, *args, **kwargs):
+    self.enabled: bool = False
+    self.encrypted: bool = True
+    self.backing_store: str = _DEFAULT_SWAP_BACKING_STORE
+    self.size_percent: int = 30
+    self.size_gb: int | None = None
+    self.behavior: str = 'LimitedSwap'
+    super().__init__(*args, **kwargs)
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    result = super()._GetOptionDecoderConstructions()
+    result.update({
+        'enabled': (
+            option_decoders.BooleanDecoder,
+            {'default': False},
+        ),
+        'encrypted': (
+            option_decoders.BooleanDecoder,
+            {'default': True},
+        ),
+        'backing_store': (
+            option_decoders.StringDecoder,
+            {'default': _DEFAULT_SWAP_BACKING_STORE},
+        ),
+        'size_percent': (
+            option_decoders.IntDecoder,
+            {'default': 30, 'min': 1, 'max': 100},
+        ),
+        'size_gb': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True, 'min': 1},
+        ),
+        'behavior': (
+            option_decoders.StringDecoder,
+            {'default': 'LimitedSwap'},
+        ),
+    })
+    return result
+
+
+class _SwapConfigDecoder(option_decoders.TypeVerifier):
+  """Decodes the swap_config option of a nodepool."""
+
+  def __init__(self, **kwargs):
+    super().__init__(valid_types=(dict,), **kwargs)
+
+  def Decode(self, value, component_full_name, flag_values):
+    super().Decode(value, component_full_name, flag_values)
+    return SwapConfigSpec(
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
         **value,

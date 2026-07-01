@@ -184,6 +184,11 @@ class BaseNodePoolConfig:
     self.disk_size: int = vm_spec.boot_disk_size
     self.gpu_type: str | None = vm_spec.gpu_type
     self.gpu_count: int | None = vm_spec.gpu_count
+    # Declarative swap config for this node pool. None means no swap.
+    # Providers (GKE/EKS) translate this into their native node-pool swap
+    # mechanisms. This makes swap a node-pool resource workloads can request
+    # instead of requiring benchmarks to configure it at runtime.
+    self.swap_config: container_spec_lib.SwapConfigSpec | None = None
     # Defined by GceVirtualMachineConfig. Used by google_kubernetes_engine
     # pylint: disable=g-missing-from-attributes
     self.sandbox_config: container_spec_lib.SandboxSpec | None = None

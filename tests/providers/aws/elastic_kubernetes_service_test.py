@@ -327,6 +327,84 @@ class ElasticKubernetesServiceTest(BaseEksTest):
     self.assertEqual(machine_type, 'm6i.xlarge')
 
 
+class EksSwapConfigTest(BaseEksTest):
+  """Declarative node-pool swap_config to eksctl managedNodeGroup rendering.
+
+  Tests that swap_config in the nodepool spec renders correctly in
+  _RenderNodeGroupJson, treating swap as a node-pool property instead of
+  configuring it at runtime.
+  """
+
+  def _RenderSwapNodeGroup(self, swap_config_dict):
+    spec_dict = EKS_SPEC_DICT.copy()
+    spec_dict['nodepools'] = {
+        'benchmark': {
+            'vm_count': 1,
+            'vm_spec': {'AWS': {'machine_type': 'i4i.4xlarge'}},
+            'swap_config': swap_config_dict,
+        }
+    }
+    cluster = elastic_kubernetes_service.EksCluster(
+        container_spec.ContainerClusterSpec('NAME', **spec_dict)
+    )
+    # nodepools is name -> config; the benchmark pool is the non-default one.
+    nodepool = cluster.nodepools['benchmark']
+    return cluster._RenderNodeGroupJson(nodepool)
+
+  def testIo2EncryptedRow(self):
+    ng = self._RenderSwapNodeGroup({
+        'enabled': True,
+        'backing_store': 'io2',
+        'encrypted': True,
+        'size_gb': 200,
+    })
+    # io2 swap device attached as an additional EBS volume, encrypted.
+    self.assertLen(ng['additionalVolumes'], 1)
+    vol = ng['additionalVolumes'][0]
+    self.assertEqual(vol['volumeType'], 'io2')
+    self.assertEqual(vol['volumeSize'], 200)
+    self.assertTrue(vol['volumeEncrypted'])
+    # Device is formatted + activated before kubelet starts.
+    self.assertIn('mkswap "$SWAP_DEV"', ng['preBootstrapCommands'])
+    self.assertIn('swapon "$SWAP_DEV"', ng['preBootstrapCommands'])
+    # Kubelet swap behavior via nodeadm NodeConfig.
+    self.assertIn('node.eks.aws/v1alpha1', ng['overrideBootstrapCommand'])
+    self.assertIn('swapBehavior: LimitedSwap', ng['overrideBootstrapCommand'])
+    self.assertIn('--fail-swap-on=false', ng['overrideBootstrapCommand'])
+
+  def testIo2UnencryptedBaselineRow(self):
+    ng = self._RenderSwapNodeGroup({
+        'enabled': True,
+        'backing_store': 'io2',
+        'encrypted': False,
+        'size_gb': 200,
+    })
+    self.assertFalse(ng['additionalVolumes'][0]['volumeEncrypted'])
+
+  def testInstanceStoreRowAddsNoExtraVolume(self):
+    ng = self._RenderSwapNodeGroup({
+        'enabled': True,
+        'backing_store': 'instance_store',
+    })
+    # Instance Store is physically present (Nitro-encrypted); no extra volume.
+    self.assertNotIn('additionalVolumes', ng)
+    self.assertIn('mkswap "$SWAP_DEV"', ng['preBootstrapCommands'])
+    self.assertIn('Instance Storage', ng['preBootstrapCommands'][0])
+
+  def testInvalidBackingStoreRaises(self):
+    with self.assertRaises(errors.Config.InvalidValue):
+      self._RenderSwapNodeGroup({
+          'enabled': True,
+          'backing_store': 'hyperdisk',  # GCP-only; invalid for EKS
+      })
+
+  def testSwapAbsentByDefault(self):
+    cluster = elastic_kubernetes_service.EksCluster(EKS_SPEC)
+    ng = cluster._RenderNodeGroupJson(cluster.default_nodepool)
+    self.assertNotIn('additionalVolumes', ng)
+    self.assertNotIn('overrideBootstrapCommand', ng)
+
+
 class EksAutoClusterTest(BaseEksTest):
 
   def testInitEksClusterWorks(self):
