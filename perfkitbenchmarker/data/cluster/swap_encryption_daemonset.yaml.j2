@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ ds_name }}
+  namespace: {{ ds_namespace }}
+  labels:
+    app: {{ ds_label }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ ds_label }}
+  template:
+    metadata:
+      labels:
+        app: {{ ds_label }}
+    spec:
+      hostPID: true
+      hostNetwork: true
+      # Pin to the benchmark nodepool — never schedule on the dummy default pool.
+      nodeSelector:
+        pkb_nodepool: {{ benchmark_nodepool }}
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: benchmark
+        image: {{ image }}
+        command:
+        - bash
+        - -c
+        - |
+          echo "[pkb] Installing measurement tools..."
+          # Only the tools needed for Phase 1 (raw-device fio) and Phase 2
+          # (CPU/I/O overhead) are installed here.  Workload benchmarks
+          # (redis, opensearch, kernel-build) run in separate pods via
+          # existing PKB benchmark modules and are NOT installed here.
+          PKB_APT_OK=0
+          for _attempt in 1 2 3; do
+            apt-get update -qq 2>&1 || true
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+              fio \
+              cryptsetup \
+              mdadm \
+              sysstat \
+              nvme-cli \
+              2>&1 && PKB_APT_OK=1 && break
+            echo "[pkb] apt-get attempt $_attempt failed, retrying in 15s..." >&2
+            sleep 15
+          done
+          if [ "$PKB_APT_OK" != "1" ] || ! command -v fio >/dev/null 2>&1; then
+            echo "[pkb] FATAL: fio not installed after 3 attempts" >&2
+            exit 1
+          fi
+          echo "[pkb] fio installed: $(fio --version 2>&1 | head -1)"
+          echo "[pkb] Verifying swap device is active..."
+          PKB_SWAP_FOUND=0
+          for _attempt in $(seq 1 30); do
+            if awk 'NR>1{found=1} END{exit !found}' /proc/swaps 2>/dev/null; then
+              PKB_SWAP_DEV=$(awk 'NR==2{print $1}' /proc/swaps)
+              echo "[pkb] Swap device active: $PKB_SWAP_DEV"
+              PKB_SWAP_FOUND=1
+              break
+            fi
+            echo "[pkb] Waiting for swap device (attempt $_attempt/30)..." >&2
+            sleep 5
+          done
+          if [ "$PKB_SWAP_FOUND" != "1" ]; then
+            echo "[pkb] WARNING: no active swap device after 150s — " \
+                 "check linuxConfig.swapConfig / kubelet swap config." >&2
+          fi
+          echo "[pkb] Measurement tools ready. Writing ready sentinel."
+          touch /tmp/pkb_ready
+          sleep infinity
+        securityContext:
+          privileged: true
+          capabilities:
+            add: ["SYS_ADMIN", "IPC_LOCK"]
+        resources:
+          requests:
+            memory: "512Mi"
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - name: dev
+          mountPath: /dev
+        - name: sys
+          mountPath: /sys
+        - name: run
+          mountPath: /run
+        - name: proc-host
+          mountPath: /proc-host
+          readOnly: true
+        - name: stateful-partition
+          mountPath: /mnt/stateful_partition
+        - name: lib-modules
+          mountPath: /lib/modules
+          readOnly: true
+      volumes:
+      - name: dev
+        hostPath:
+          path: /dev
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: run
+        hostPath:
+          path: /run
+      - name: proc-host
+        hostPath:
+          path: /proc
+      - name: stateful-partition
+        hostPath:
+          path: /mnt/stateful_partition
+          type: DirectoryOrCreate
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules
+          type: Directory
