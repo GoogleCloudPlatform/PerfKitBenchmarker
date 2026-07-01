@@ -105,6 +105,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     self.enable_columnar_engine_recommendation = (
         _ENABLE_COLUMNAR_RECOMMENDATION.value
     )
+    self._start_snap_id = None
 
   @staticmethod
   def GetDefaultEngineVersion(engine: str) -> str:
@@ -155,6 +156,35 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     return self._CreateSamples(
         points, metric.sample_name, metric.unit, collect_percentiles
     )
+
+  def _TakePerfSnap(self) -> int | None:
+    """Takes a perfsnap snapshot and returns the snapshot ID, or None if failed."""
+    stdout, _ = self.client_vm_query_tools.IssueSqlCommand(
+        'SELECT perfsnap.snap();', ignore_failure=True
+    )
+    if not stdout:
+      return None
+    try:
+      return regex_util.ExtractInt(r'(\d+)', stdout)
+    except (regex_util.NoMatchError, ValueError):
+      return None
+
+  def QueryPerfSnapReport(self) -> tuple[str, str]:
+    """Queries perfsnap and generates a report between pre-run and post-run."""
+    snap_id = self._TakePerfSnap()
+    if snap_id is None:
+      self._start_snap_id = None
+      return ('', '')
+
+    if self._start_snap_id is None:
+      self._start_snap_id = snap_id
+      return (f'Start snapshot taken: {snap_id}', '')
+    report, _ = self.client_vm_query_tools.IssueSqlCommand(
+        f'SELECT perfsnap.report({self._start_snap_id}, {snap_id});',
+        ignore_failure=True,
+    )
+    self._start_snap_id = None
+    return (report, '')
 
   def GetResourceMetadata(self) -> Dict[str, Any]:
     metadata = super().GetResourceMetadata()
