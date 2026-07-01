@@ -15,7 +15,7 @@
 
 # Tests intentionally access private module symbols (_SWAP_*, _SwapMetadata,
 # _CreateRunConfigMatrix) to verify internal behaviour without a full cluster.
-# pylint: disable=protected-access
+# pylint: disable=protected-access,invalid-name
 
 import collections
 import unittest
@@ -32,6 +32,7 @@ from tests import pkb_common_test_case
 class KubernetesRedisMemtierBenchmarkTest(
     pkb_common_test_case.PkbCommonTestCase
 ):
+  """Tests for the _CreateRunConfigMatrix helper."""
 
   def test__CreateRunConfigMatrix(self):
     cls = collections.namedtuple('cls', ['field_a', 'field_b', 'field_c'])

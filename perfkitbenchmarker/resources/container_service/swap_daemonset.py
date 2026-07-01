@@ -20,12 +20,14 @@ swap_encryption benchmark:
         and wait for the pod to reach Running + /tmp/pkb_ready.
   _Delete()   — run in-pod cleanup (swapoff, dmsetup remove, losetup teardown,
         pkill fio/stress-ng) then kubectl delete daemonset.
-  PodExec()   — kubectl exec wrapper with transient-reset retry, OOM-kill (rc=137)
+  PodExec()   — kubectl exec wrapper with transient-reset retry,
+        OOM-kill (rc=137)
         detection, and automatic RecoverPod() after eviction or container
         restart.
   WaitForPod()  — polls for Running phase + sentinel; updates self.pod_name.
   RecoverPod()  — waits for DaemonSet to recreate / restart the container,
-                  checking deletionTimestamp to avoid false-positive Running state.
+                  checking deletionTimestamp to avoid false-positive
+                  Running state.
 
 Extracted from swap_encryption_benchmark.py to satisfy PKB resource pattern
 (go/pkb-resources): infrastructure lifecycle belongs in BaseResource subclasses,
@@ -136,7 +138,7 @@ class SwapDaemonSet(resource.BaseResource):
       self.PodExec(
         'swapoff -a 2>/dev/null || true',
         ignore_failure=True,
-        _retries=0,
+        retries=0,
       )
       self.PodExec(
         textwrap.dedent("""\
@@ -145,7 +147,7 @@ class SwapDaemonSet(resource.BaseResource):
                       swap_encrypted 2>/dev/null || true
         """),
         ignore_failure=True,
-        _retries=0,
+        retries=0,
       )
       self.PodExec(
         textwrap.dedent("""\
@@ -162,12 +164,12 @@ class SwapDaemonSet(resource.BaseResource):
           done
         """),
         ignore_failure=True,
-        _retries=0,
+        retries=0,
       )
       self.PodExec(
         "pkill -9 'stress-ng|fio' 2>/dev/null || true",
         ignore_failure=True,
-        _retries=0,
+        retries=0,
       )
 
     kubectl.RunKubectlCommand(
@@ -228,28 +230,8 @@ class SwapDaemonSet(resource.BaseResource):
           raise_on_failure=False,
         )
         if rc == 0 and out.strip():
-          for line in out.strip().splitlines():
-            parts = line.split('\t')
-            if len(parts) == 2:
-              pod_name = parts[0].strip()
-              phase = parts[1].strip()
-              if phase == 'Running':
-                logging.info(
-                  '[swap_encryption] Pod %s is Running'
-                  ' — waiting for sentinel...',
-                  pod_name,
-                )
-                ready_pod = pod_name
-                break
-              if phase != last_phase:
-                logging.info(
-                  '[swap_encryption] Pod %s phase: %s',
-                  pod_name,
-                  phase,
-                )
-                last_phase = phase
-                if phase == 'Pending':
-                  self._LogPodEvents(pod_name)
+          ready_pod, last_phase = self._FindRunningPod(
+              out, last_phase)
         else:
           logging.info(
             '[swap_encryption] Waiting for DaemonSet pod to'
@@ -304,6 +286,38 @@ class SwapDaemonSet(resource.BaseResource):
     )
     return None
 
+  def _FindRunningPod(
+      self, out: str, last_phase: str
+  ) -> tuple[Optional[str], str]:
+    """Parse 'kubectl get pods' output for a Running pod.
+
+    Args:
+      out: Raw kubectl output (name\tphase per line).
+      last_phase: Last observed phase for change-detection logging.
+
+    Returns:
+      Tuple of (pod_name_if_running_else_None, updated_last_phase).
+    """
+    for line in out.strip().splitlines():
+      parts = line.split('\t')
+      if len(parts) != 2:
+        continue
+      pod_name, phase = parts[0].strip(), parts[1].strip()
+      if phase == 'Running':
+        logging.info(
+          '[swap_encryption] Pod %s is Running'
+          ' — waiting for sentinel...',
+          pod_name,
+        )
+        return pod_name, last_phase
+      if phase != last_phase:
+        logging.info(
+          '[swap_encryption] Pod %s phase: %s', pod_name, phase)
+        last_phase = phase
+        if phase == 'Pending':
+          self._LogPodEvents(pod_name)
+    return None, last_phase
+
   def _LogPodEvents(self, pod_name: str) -> None:
     """Dump recent Kubernetes events for a pod to help diagnose hangs."""
     events_out, _, _ = kubectl.RunKubectlCommand(
@@ -352,12 +366,12 @@ class SwapDaemonSet(resource.BaseResource):
     cmd: str,
     ignore_failure: bool = False,
     timeout: int = 300,
-    _retries: int = 2,
+    retries: int = 2,
   ) -> tuple[str, str]:
     """Run a shell command inside the benchmark pod via kubectl exec.
 
     Handles:
-          - Transient GKE websocket resets: automatic retry (up to _retries).
+          - Transient GKE websocket resets: automatic retry (up to retries).
           - OOM kill (rc=137): records to self.oom_events, calls RecoverPod,
       does NOT retry the OOM-triggering command itself.
           - Container/pod gone: records to self.pod_lost, calls RecoverPod,
@@ -371,14 +385,14 @@ class SwapDaemonSet(resource.BaseResource):
       raised.
           timeout: Seconds before PKB kills the kubectl exec process.  Pass a
       larger value for long-running jobs (fio, stress-ng, kernel build).
-          _retries: Max automatic retries on transient websocket resets.
+          retries: Max automatic retries on transient websocket resets.
 
     Returns:
           Tuple of (stdout, stderr) strings.
     """
     active = self.pod_name
 
-    for attempt in range(_retries + 1):
+    for attempt in range(retries + 1):
       out, err, rc = kubectl.RunKubectlCommand(
         [
           'exec',
@@ -399,12 +413,12 @@ class SwapDaemonSet(resource.BaseResource):
       is_transient = rc != 0 and any(
         e in err for e in _TRANSIENT_KUBECTL_ERRORS
       )
-      if is_transient and attempt < _retries:
+      if is_transient and attempt < retries:
         logging.warning(
           '[swap_encryption] kubectl exec connection reset (attempt'
           ' %d/%d); retrying in 10 s',
           attempt + 1,
-          _retries + 1,
+          retries + 1,
         )
         time.sleep(10)
         continue
@@ -455,12 +469,12 @@ class SwapDaemonSet(resource.BaseResource):
             active,
             (err or '').strip()[:160],
           )
-        if attempt < _retries:
+        if attempt < retries:
           logging.warning(
             '[swap_encryption] Container gone/restarting (attempt'
             ' %d/%d) — waiting for pod to recover...',
             attempt + 1,
-            _retries + 1,
+            retries + 1,
           )
           new_pod = self.RecoverPod(active)
           if new_pod != active:

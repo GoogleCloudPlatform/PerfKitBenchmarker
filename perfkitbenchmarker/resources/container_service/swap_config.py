@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Swap configuration as PKB BaseResource: BaseSwapConfig, GkeSwapConfig, EksSwapConfig.
+"""Swap configuration as PKB BaseResource.
+
+Classes: BaseSwapConfig, GkeSwapConfig, EksSwapConfig.
 
 These resources encapsulate cloud-specific swap configuration for GKE and EKS
 nodepools. They are referenced via NodepoolSpec.swap_config (declared in the
@@ -19,9 +21,11 @@ benchmark BENCHMARK_CONFIG YAML) and consumed by the cloud provider's
 _AddNodeParamsToCmd() during cluster/nodepool creation.
 
 Class hierarchy:
-  BaseSwapConfig(BaseResource)   — common sysctl attrs + abstract from_spec()
-    GkeSwapConfig(BaseSwapConfig) — linuxConfig YAML for --system-config-from-file
-    EksSwapConfig(BaseSwapConfig) — nodeadm kubelet config (deferred to PR #6780)
+  BaseSwapConfig(BaseResource)   -- common sysctl attrs + abstract from_spec()
+    GkeSwapConfig(BaseSwapConfig) -- linuxConfig YAML
+        for --system-config-from-file
+    EksSwapConfig(BaseSwapConfig) -- nodeadm kubelet config
+        (deferred to PR #6780)
 
 Usage in BENCHMARK_CONFIG:
   container_cluster:
@@ -43,7 +47,7 @@ Usage in BENCHMARK_CONFIG:
 GkeCluster._AddNodeParamsToCmd() creates a GkeSwapConfig from the
 SwapConfigSpec and calls WriteLinuxConfigYaml() to obtain the path for
 --system-config-from-file. No separate resource.Create() call is needed
-for the swap config itself — it is applied as part of nodepool creation.
+for the swap config itself -- it is applied as part of nodepool creation.
 """
 
 import logging
@@ -52,7 +56,7 @@ import tempfile
 
 from perfkitbenchmarker import resource
 
-# GCP Hyperdisk Balanced constraint: provisioned_iops <= 256 × throughput_MiB_s.
+# GCP Hyperdisk Balanced constraint: provisioned_iops <= 256 x throughput_MiB_s.
 _HYPERDISK_MAX_IOPS_PER_MBPS = 256
 
 
@@ -84,7 +88,7 @@ class BaseSwapConfig(resource.BaseResource):
     self.watermark_scale_factor = watermark_scale_factor
 
   @classmethod
-  def from_spec(cls, swap_spec) -> 'BaseSwapConfig':
+  def from_spec(cls, swap_spec) -> 'BaseSwapConfig':  # pylint: disable=invalid-name
     """Create a BaseSwapConfig subclass from a SwapConfigSpec.
 
     Subclasses must override this to instantiate with cloud-specific attrs.
@@ -111,7 +115,8 @@ class GkeSwapConfig(BaseSwapConfig):
 
   Attributes:
     swappiness: vm.swappiness sysctl value (0-200, default 100).
-    min_free_kbytes: vm.min_free_kbytes sysctl (default 67584, GKE minimum >= 67584).
+    min_free_kbytes: vm.min_free_kbytes sysctl (default 67584,
+        GKE minimum >= 67584).
     watermark_scale_factor: vm.watermark_scale_factor sysctl (default 500).
     lssd: True if the nodepool uses local NVMe SSDs for swap device.
     lssd_count: Number of local NVMe SSDs (dedicatedLocalSsdProfile.diskCount).
@@ -145,7 +150,7 @@ class GkeSwapConfig(BaseSwapConfig):
 
   @classmethod
   def from_spec(cls, swap_spec) -> 'GkeSwapConfig':
-    """Create a GkeSwapConfig from a SwapConfigSpec decoded from BENCHMARK_CONFIG."""
+    """Create a GkeSwapConfig from a SwapConfigSpec."""
     return cls(
         swappiness=swap_spec.swappiness,
         min_free_kbytes=swap_spec.min_free_kbytes,
@@ -169,7 +174,7 @@ class GkeSwapConfig(BaseSwapConfig):
 
     Per Ajay review r3472513706:
       linuxConfig.swapConfig.enabled=true automatically sets
-      kubeletConfig.memorySwapBehavior=LimitedSwap — no need to set
+      kubeletConfig.memorySwapBehavior=LimitedSwap -- no need to set
       kubeletConfig explicitly.
     For LSSD machines, dedicatedLocalSsdProfile.diskCount instructs GKE to
     use local NVMe as the swap device.
@@ -196,19 +201,16 @@ class GkeSwapConfig(BaseSwapConfig):
         + f'    vm.watermark_scale_factor: "{self.watermark_scale_factor}"\n'
     )
 
-    tmp = tempfile.NamedTemporaryFile(
+    with tempfile.NamedTemporaryFile(
         mode='w', suffix='.yaml', delete=False
-    )
-    try:
+    ) as tmp:
       tmp.write(yaml_content)
       tmp.flush()
       self._yaml_path = tmp.name
-    finally:
-      tmp.close()
 
     logging.info(
-        '[swap_config] Wrote linuxConfig YAML (lssd=%s, lssd_count=%d)'
-        ' to %s:\n%s',
+        '[swap_config] Wrote linuxConfig YAML'
+        ' lssd=%s count=%d path=%s\n%s',
         self.lssd,
         self.lssd_count,
         self._yaml_path,
@@ -219,7 +221,7 @@ class GkeSwapConfig(BaseSwapConfig):
   def ValidHyperdiskThroughput(self) -> int:
     """Return clamped throughput satisfying GCP Hyperdisk Balanced constraints.
 
-    GCP Hyperdisk Balanced requires: provisioned_iops <= 256 × throughput_MiB_s.
+    GCP Hyperdisk Balanced requires: provisioned_iops <= 256 x throughput_MiB_s.
     Clamps throughput UP so a mismatched pair cannot abort nodepool creation.
     """
     if not self.boot_disk_iops or not self.boot_disk_throughput:
@@ -261,7 +263,8 @@ class EksSwapConfig(BaseSwapConfig):
   Attributes:
     swappiness: vm.swappiness sysctl value (inherited from BaseSwapConfig).
     min_free_kbytes: vm.min_free_kbytes sysctl (inherited from BaseSwapConfig).
-    watermark_scale_factor: vm.watermark_scale_factor (inherited from BaseSwapConfig).
+    watermark_scale_factor: vm.watermark_scale_factor
+        (inherited from BaseSwapConfig).
     memory_swap_behavior: kubelet memorySwapBehavior value ('LimitedSwap').
     fail_swap_on: kubelet failSwapOn setting (False to allow swap on EKS).
   """
@@ -295,7 +298,7 @@ class EksSwapConfig(BaseSwapConfig):
     )
 
   def _Create(self) -> None:
-    """Stub: EKS kubelet LimitedSwap config via nodeadm (deferred to PR #6780)."""
+    """Stub: EKS kubelet LimitedSwap via nodeadm (deferred to PR #6780)."""
     logging.warning(
         '[swap_config] EksSwapConfig._Create() is a stub. '
         'EKS kubelet LimitedSwap config via nodeadm not yet implemented '
