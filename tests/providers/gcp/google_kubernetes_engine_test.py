@@ -326,6 +326,15 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
     self.assertEqual(google_kubernetes_engine._CalculateCidrSize(49), 17)
     self.assertEqual(google_kubernetes_engine._CalculateCidrSize(250), 15)
 
+  @flagsaver.flagsaver(gke_enable_workload_identity=False)
+  def testCreateWorkloadIdentityDisabled(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      self.assertNotIn('--workload-pool', issue_command.all_commands)
+      self.assertNotIn('--workload-metadata', issue_command.all_commands)
+
 
 class GoogleKubernetesEngineAutoscalingTestCase(PatchedObjectsTestCase):
 

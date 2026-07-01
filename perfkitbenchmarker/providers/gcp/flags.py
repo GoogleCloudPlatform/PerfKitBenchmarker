@@ -561,6 +561,12 @@ GKE_ENABLE_SHIELDED_NODES = flags.DEFINE_boolean(
     False,
     'Whether to enable shielded nodes.',
 )
+GKE_ENABLE_WORKLOAD_IDENTITY = flags.DEFINE_boolean(
+    'gke_enable_workload_identity',
+    True,
+    'Enable GKE Workload Identity on the cluster so pods can authenticate to'
+    ' Google Cloud APIs as a Kubernetes service account.',
+)
 GKE_ADDONS = flags.DEFINE_string(
     'gke_addons',
     '',

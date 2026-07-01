@@ -398,6 +398,8 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append('--no-enable-shielded-nodes')
     if gcp_flags.GKE_ADDONS.value:
       cmd.args.append(f'--addons={gcp_flags.GKE_ADDONS.value}')
+    if gcp_flags.GKE_ENABLE_WORKLOAD_IDENTITY.value:
+      cmd.flags['workload-pool'] = f'{self.project}.svc.id.goog'
     if not self.release_channel:
       cmd.args.append('--no-enable-autoupgrade')
     self._AddNodeParamsToCmd(
@@ -592,6 +594,8 @@ class GkeCluster(BaseGkeCluster):
         and nodepool_config.name != container_cluster.DEFAULT_NODEPOOL
     ):
       cmd.args.append('--enable-fast-socket')
+    if gcp_flags.GKE_ENABLE_WORKLOAD_IDENTITY.value:
+      cmd.flags['workload-metadata'] = 'GKE_METADATA'
 
     if FLAGS.gke_node_system_config is not None:
       cmd.flags['system-config-from-file'] = FLAGS.gke_node_system_config
