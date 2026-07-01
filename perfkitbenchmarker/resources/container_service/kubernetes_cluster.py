@@ -1,5 +1,6 @@
 """Classes related to KubernetesCluster."""
 
+import abc
 import functools
 import json
 import logging
