@@ -19,6 +19,20 @@ Redis.
 
 Redis homepage: http://redis.io/
 memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
+
+Swap encryption toggle
+----------------------
+Pass --kubernetes_redis_memtier_swap_enabled=true to run with dm-crypt
+encrypted swap on the Redis servers nodepool.  When the flag is set:
+
+* GetConfig() upgrades the servers nodepool to n4-highmem-32
+  (hyperdisk-balanced) and injects a swap_config block so the GKE nodepool
+  is provisioned with swap enabled.
+* Prepare() deploys a privileged SwapDaemonSet onto the servers nodepool
+  that activates dm-crypt encrypted swap on every node.
+* Run() attaches swap metadata (swap_enabled, swap_swappiness,
+  swap_machine_type, ...) to every sample.
+* Cleanup() tears down the SwapDaemonSet.
 """
 
 from collections.abc import Callable, Iterable
@@ -36,6 +50,7 @@ from perfkitbenchmarker.linux_packages import memtier
 from perfkitbenchmarker.linux_packages import redis_server
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import swap_daemonset as _swap_daemonset_lib
 
 FLAGS = flags.FLAGS
 
@@ -50,6 +65,21 @@ SAVE = flags.DEFINE_string(
     None,
     'Value of the `save` directive in redis.conf.',
 )
+SWAP_ENABLED = flags.DEFINE_boolean(
+    'kubernetes_redis_memtier_swap_enabled',
+    False,
+    'If True, runs the Redis servers nodepool with dm-crypt encrypted swap. '
+    'Injects swap_config into the servers nodepool, deploys a SwapDaemonSet '
+    'in Prepare(), and attaches swap metadata to all samples in Run().',
+)
+SWAP_SWAPPINESS = flags.DEFINE_integer(
+    'kubernetes_redis_memtier_swap_swappiness',
+    100,
+    'Kernel vm.swappiness value when --kubernetes_redis_memtier_swap_enabled.',
+    lower_bound=0,
+    upper_bound=200,
+)
+
 BENCHMARK_NAME = 'kubernetes_redis_memtier'
 BENCHMARK_CONFIG = """
 kubernetes_redis_memtier:
@@ -73,6 +103,17 @@ kubernetes_redis_memtier:
         vm_count: 1
 """
 
+_SWAP_SERVERS_NODEPOOL = 'servers'
+_SWAP_MACHINE_TYPE = 'n4-highmem-32'
+_SWAP_BOOT_DISK_TYPE = 'hyperdisk-balanced'
+_SWAP_BOOT_DISK_SIZE = 500
+_SWAP_BOOT_DISK_IOPS = 160000
+_SWAP_BOOT_DISK_THROUGHPUT = 2400
+_SWAP_MIN_FREE_KBYTES = 200
+_SWAP_WATERMARK_SCALE_FACTOR = 500
+_SWAP_DS_NAME = 'pkb-redis-memtier-swap'
+_SWAP_DS_NAMESPACE = 'kube-system'
+
 _BenchmarkSpec = benchmark_spec.BenchmarkSpec
 
 
@@ -89,7 +130,12 @@ def CheckPrerequisites(_):
 
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
-  """Load and return benchmark config spec."""
+  """Load and return benchmark config spec.
+
+  When --kubernetes_redis_memtier_swap_enabled is True the servers nodepool is
+  upgraded to a high-memory machine type and a swap_config block is injected so
+  the GKE nodepool provisions encrypted swap automatically.
+  """
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
   if FLAGS.redis_memtier_server_machine_type:
@@ -102,11 +148,38 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
     for cloud in vm_spec:
       vm_spec[cloud]['machine_type'] = FLAGS.redis_memtier_client_machine_type
 
+  if SWAP_ENABLED.value:
+    server_np = config['container_cluster']['nodepools'][_SWAP_SERVERS_NODEPOOL]
+    for cloud in server_np.get('vm_spec', {}):
+      # --redis_memtier_server_machine_type takes precedence over the swap
+      # default; only set the swap machine type if not explicitly overridden.
+      if not FLAGS.redis_memtier_server_machine_type:
+        server_np['vm_spec'][cloud]['machine_type'] = _SWAP_MACHINE_TYPE
+      server_np['vm_spec'][cloud]['boot_disk_type'] = _SWAP_BOOT_DISK_TYPE
+      server_np['vm_spec'][cloud]['boot_disk_size'] = _SWAP_BOOT_DISK_SIZE
+    server_np['swap_config'] = {
+        'enabled': True,
+        'swappiness': SWAP_SWAPPINESS.value,
+        'min_free_kbytes': _SWAP_MIN_FREE_KBYTES,
+        'watermark_scale_factor': _SWAP_WATERMARK_SCALE_FACTOR,
+        'boot_disk_iops': _SWAP_BOOT_DISK_IOPS,
+        'boot_disk_throughput': _SWAP_BOOT_DISK_THROUGHPUT,
+    }
+
   return config
 
 
 def Prepare(_: _BenchmarkSpec) -> None:
   """Prepares a cluster to run the Redis benchmark."""
+  # Deploy SwapDaemonSet before Redis so every servers node has encrypted swap
+  # active when the Redis pods schedule.
+  if SWAP_ENABLED.value:
+    _swap_daemonset_lib.SwapDaemonSet(
+        name=_SWAP_DS_NAME,
+        namespace=_SWAP_DS_NAMESPACE,
+        nodepool=_SWAP_SERVERS_NODEPOOL,
+    ).Create()
+
   # Set up the Kubernetes Service, Redis configuration, and Redis server.
   if not FLAGS['redis_server_io_threads_do_reads'].present:
     do_reads = None
@@ -146,7 +219,7 @@ def _RunMemtier(
     kubectl_args.append(f'--namespace={NAMESPACE.value}')
   kubectl.RunKubectlCommand(kubectl_args)
 
-  server = f'redis.{NAMESPACE.value or 'default'}.svc.cluster.local'
+  server = f"redis.{NAMESPACE.value or 'default'}.svc.cluster.local"
   memtier_command = memtier.BuildMemtierCommand(
       server=server,
       protocol=memtier.MEMTIER_PROTOCOL.value,
@@ -195,8 +268,7 @@ def _RunMemtier(
       f'jobs/{job_name}',
       ['condition=Complete', 'condition=Failed'],
       namespace=NAMESPACE.value,
-      # Add 30 seconds to account for initial connection errors as Redis comes
-      # up.
+      # Add 30 seconds to account for initial connection errors as Redis comes up.
       timeout=memtier.MEMTIER_RUN_DURATION.value + 30,
   )
   if condition == 'condition=Failed':
@@ -243,6 +315,21 @@ def _CreateRunConfigMatrix[T](
   return run_configs
 
 
+def _SwapMetadata() -> dict[str, Any]:
+  """Returns metadata dict describing the active swap configuration."""
+  return {
+      'swap_enabled': True,
+      'swap_swappiness': SWAP_SWAPPINESS.value,
+      'swap_machine_type': _SWAP_MACHINE_TYPE,
+      'swap_boot_disk_type': _SWAP_BOOT_DISK_TYPE,
+      'swap_boot_disk_size_gb': _SWAP_BOOT_DISK_SIZE,
+      'swap_boot_disk_iops': _SWAP_BOOT_DISK_IOPS,
+      'swap_boot_disk_throughput': _SWAP_BOOT_DISK_THROUGHPUT,
+      'swap_min_free_kbytes': _SWAP_MIN_FREE_KBYTES,
+      'swap_watermark_scale_factor': _SWAP_WATERMARK_SCALE_FACTOR,
+  }
+
+
 def Run(_: _BenchmarkSpec) -> list[sample.Sample]:
   """Run the benchmark."""
   samples: list[sample.Sample] = []
@@ -254,14 +341,25 @@ def Run(_: _BenchmarkSpec) -> list[sample.Sample]:
       pipeline=FLAGS.memtier_pipeline,
   )
 
+  swap_meta = _SwapMetadata() if SWAP_ENABLED.value else {}
+
   for run_config in run_configs:
     run_samples = _RunMemtier(
         run_config.clients, run_config.threads, run_config.pipeline
     )
+    if swap_meta:
+      for s in run_samples:
+        s.metadata.update(swap_meta)
     samples.extend(run_samples)
 
   return samples
 
 
 def Cleanup(_: _BenchmarkSpec) -> None:
-  pass
+  """Tears down benchmark resources, including SwapDaemonSet if deployed."""
+  if SWAP_ENABLED.value:
+    _swap_daemonset_lib.SwapDaemonSet(
+        name=_SWAP_DS_NAME,
+        namespace=_SWAP_DS_NAMESPACE,
+        nodepool=_SWAP_SERVERS_NODEPOOL,
+    ).Delete()
