@@ -100,9 +100,9 @@ class GkeSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('linuxConfig:', content)
       self.assertIn('swapConfig:', content)
       self.assertIn('enabled: true', content)
-      self.assertIn('vm.swappiness: 80', content)
-      self.assertIn('vm.min_free_kbytes: 300', content)
-      self.assertIn('vm.watermark_scale_factor: 400', content)
+      self.assertIn('vm.swappiness: "80"', content)
+      self.assertIn('vm.min_free_kbytes: "300"', content)
+      self.assertIn('vm.watermark_scale_factor: "400"', content)
     finally:
       cfg.CleanupYaml()
 

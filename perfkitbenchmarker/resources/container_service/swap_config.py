@@ -191,9 +191,9 @@ class GkeSwapConfig(BaseSwapConfig):
         'linuxConfig:\n'
         + swap_block
         + '  sysctl:\n'
-        + f'    vm.swappiness: {self.swappiness}\n'
-        + f'    vm.min_free_kbytes: {self.min_free_kbytes}\n'
-        + f'    vm.watermark_scale_factor: {self.watermark_scale_factor}\n'
+        + f'    vm.swappiness: "{self.swappiness}"\n'
+        + f'    vm.min_free_kbytes: "{self.min_free_kbytes}"\n'
+        + f'    vm.watermark_scale_factor: "{self.watermark_scale_factor}"\n'
     )
 
     tmp = tempfile.NamedTemporaryFile(
