@@ -70,11 +70,7 @@ flags.DEFINE_integer(
     "Timeout in seconds for workload deployment rollout.",
 )
 
-flags.DEFINE_bool(
-    "skip_image_build",
-    False,
-    "Skip container image builds during Prepare.",
-)
+
 
 
 # Module-level derived images (set during DeployWorkloads)
@@ -131,6 +127,12 @@ flags.DEFINE_bool(
     "Set to True on non-GKE clusters where pod snapshots are not supported.",
 )
 
+flags.DEFINE_string(
+    "k8s_snapshot_ksa_name",
+    "pod-snapshot-sa",
+    "Kubernetes service account for pod snapshots.",
+)
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -175,6 +177,7 @@ def DeployWorkloads(benchmark_spec=None):
     region = ""
     machine_type = ""
     cluster_name = ""
+    cluster = None
     if benchmark_spec:
         cluster = getattr(benchmark_spec, 'container_cluster', None)
         if cluster:
@@ -197,31 +200,36 @@ def DeployWorkloads(benchmark_spec=None):
         zone = getattr(FLAGS, 'zone', '') or ''
         region = zone[:-2] if zone else ''
 
-    # Build images if requested
-    # Detect architecture and derive image paths
+    # Derive image paths for template rendering.
+    # Chrome and Router images are built during prerequisites
+    # (gke_prerequisites.py), not during Prepare.
+    # ADK agent image is built by PKB container_specs during Provision.
     from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
         gke_image_build_utils,
     )
-    zone = cluster.zone if cluster else FLAGS.zone
-    arch = gke_image_build_utils._DetectArchitecture(machine_type, zone, project)
-
+    arch = FLAGS.target_arch or "amd64"
     global _derived_images
     _derived_images = _DeriveImagePaths(project, region, arch)
-
-    if not FLAGS.skip_image_build:
-        gke_image_build_utils.build_images_with_config(
-            project=project,
-            region=region,
-            machine_type=machine_type,
-            zone=zone,
-            arch=arch,
-        )
+    logging.info(
+        "DeployWorkloads: project=%s region=%s arch=%s",
+        project, region, arch,
+    )
+    logging.info("_derived_images: %s", _derived_images)
 
     _CreateNamespace(ns)
     _InstallCRDs()
     _DeploySandboxTemplates(ns)
     _DeploySandboxRouter(ns)
-    _DeployADKAgent(ns, project=project, region=region, cluster_name=cluster_name)
+    # Prefer ADK image from PKB-native container_specs (built during Provision).
+    # Falls back to FLAGS.k8s_agent_image or derived image path.
+    adk_image_from_specs = ""
+    if benchmark_spec:
+        specs = getattr(benchmark_spec, "container_specs", {})
+        adk_spec = specs.get("adk_agent")
+        if adk_spec and getattr(adk_spec, "image", None):
+            adk_image_from_specs = adk_spec.image
+            logging.info("Using ADK image from container_specs: %s", adk_image_from_specs)
+    _DeployADKAgent(ns, project=project, region=region, cluster_name=cluster_name, adk_image_override=adk_image_from_specs)
     _DeployPSIReader(ns)
     _WaitForAgentReady(ns)
 
@@ -365,12 +373,28 @@ def _DeploySandboxRouter(ns):
     )
 
 
-def _DeployADKAgent(ns, project="", region="", cluster_name=""):
+def _DeployADKAgent(ns, project="", region="", cluster_name="", adk_image_override=""):
     """Deploy ADK Agent: SA, ClusterRole, RoleBinding, Deployment, Service."""
-    adk_image = FLAGS.k8s_agent_image or _derived_images.get("adk_agent", "")
+    adk_image = adk_image_override or FLAGS.k8s_agent_image or _derived_images.get("adk_agent", "")
+
+    # Validate the image looks like a registry path, not a Dockerfile path.
+    # When Prepare runs separately from Provision, container_specs may not
+    # have the built image path. The config YAML default (agentic/adk-agent)
+    # is the Dockerfile lookup path, not a valid registry reference.
+    if adk_image and "docker.pkg.dev" not in adk_image:
+        derived = _derived_images.get("adk_agent", "")
+        if derived:
+            logging.warning(
+                "ADK image %s is not a registry path. Using derived: %s",
+                adk_image, derived,
+            )
+            adk_image = derived
+
     if not adk_image:
         logging.info("ADK agent image not set, skipping agent deployment.")
         return
+
+    logging.info("Using ADK image: %s", adk_image)
 
     project = project or ""
     region = region or ""
@@ -392,14 +416,17 @@ def _DeployPSIReader(ns):
 
 
 def _WaitForAgentReady(ns):
-    """Wait for ADK agent deployment to be ready."""
-    adk_image = FLAGS.k8s_agent_image
-    if not adk_image:
-        logging.info("ADK agent not deployed, skipping rollout wait.")
-        return
+    """Wait for ADK agent deployment to be ready.
+
+    Always attempts the rollout wait regardless of how the image was
+    specified (FLAGS.k8s_agent_image, container_specs, or _derived_images).
+    kubectl rollout status returns non-zero harmlessly if the deployment
+    does not exist, and raise_on_failure=False prevents that from
+    propagating.
+    """
     timeout = FLAGS.k8s_deploy_timeout
     logging.info("Waiting for adk-agent rollout (timeout=%ds)...", timeout)
-    kubectl.RunKubectlCommand(
+    _, stderr, retcode = kubectl.RunKubectlCommand(
         [
             "rollout", "status", "deployment/adk-agent",
             "-n", ns,
@@ -407,6 +434,11 @@ def _WaitForAgentReady(ns):
         ],
         raise_on_failure=False,
     )
+    if retcode != 0:
+        logging.warning(
+            "adk-agent rollout status returned %d: %s",
+            retcode, stderr.strip()[:200],
+        )
 
 
 def _GetProjectNumber(project):

@@ -386,8 +386,13 @@ async def benchmark_python_density(req: BenchmarkRequest):
 
         prompt = "Please start the GKE performance benchmark workflow."
 
-        # Fire concurrent sessions. Run each session in its own thread so
-        # blocking ADK/Runner activity cannot serialize session start.
+        # Fire concurrent sessions.
+        # DESIGN NOTE: Each session runs in its own thread via asyncio.to_thread()
+        # with a nested asyncio.run() to create a per-thread event loop. This is
+        # intentional -- the ADK Runner performs blocking I/O (sandbox lifecycle
+        # via kubectl/HTTP) that would starve a shared event loop and serialize
+        # session starts. The per-thread event loop overhead (~0.1ms) is negligible
+        # compared to sandbox round-trip times (~200ms+).
         thread_tasks = [
             asyncio.create_task(
                 asyncio.to_thread(
@@ -472,8 +477,13 @@ async def benchmark_python_payload(req: PayloadBenchmarkRequest):
 
         prompt = "Please start the GKE performance benchmark workflow."
 
-        # Fire concurrent sessions. Run each session in its own thread so
-        # blocking ADK/Runner activity cannot serialize session start.
+        # Fire concurrent sessions.
+        # DESIGN NOTE: Each session runs in its own thread via asyncio.to_thread()
+        # with a nested asyncio.run() to create a per-thread event loop. This is
+        # intentional -- the ADK Runner performs blocking I/O (sandbox lifecycle
+        # via kubectl/HTTP) that would starve a shared event loop and serialize
+        # session starts. The per-thread event loop overhead (~0.1ms) is negligible
+        # compared to sandbox round-trip times (~200ms+).
         thread_tasks = [
             asyncio.create_task(
                 asyncio.to_thread(
@@ -544,7 +554,7 @@ async def benchmark_python_qps(req: QpsBenchmarkRequest):
         qps_code = "import json; print(json.dumps({'sandbox_status': 'ok'}))"
 
     sandbox_template = os.getenv("SANDBOX_TEMPLATE", "python-sandbox-template")
-    sandbox_namespace = os.getenv("SANDBOX_NAMESPACE", "agentic")
+    sandbox_namespace = os.getenv("AGENTIC_NAMESPACE", "agentic")
     exec_timeout = req.sandbox_exec_timeout_s
     qps_claim_label = {"created-by": "pkb-qps-benchmark"}
 
@@ -791,7 +801,7 @@ async def benchmark_chromium_density(req: ChromiumBenchmarkRequest):
             k8s_config.load_kube_config()
         core_v1 = k8s_client.CoreV1Api()
 
-        # Inline HTML test page (same as benchmark_density.js used)
+        # Inline HTML test page (data: URL avoids network dependencies)
         test_page = """data:text/html,
 <!DOCTYPE html>
 <html>

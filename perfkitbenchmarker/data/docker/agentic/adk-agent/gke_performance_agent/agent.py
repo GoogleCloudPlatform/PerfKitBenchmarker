@@ -40,6 +40,7 @@ from google.adk.code_executors.code_execution_utils import CodeExecutionResult
 from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
+from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 from google.adk.apps import App
 import logging
@@ -166,6 +167,12 @@ class MockLlm(BaseLlm):
 # =========================================================================
 
 
+# Module-level thread pool for sandbox I/O operations.
+# Initialized once at import time to avoid thread-safety issues
+# with lazy initialization inside _execute_in_sandbox().
+_SANDBOX_POOL = ThreadPoolExecutor(max_workers=16)
+
+
 class V3GkeCodeExecutor(GkeCodeExecutor):
     def _execute_in_sandbox(self, code: str) -> CodeExecutionResult:
         """Executes code using the v0.4.6 compatible SandboxClient."""
@@ -173,17 +180,10 @@ class V3GkeCodeExecutor(GkeCodeExecutor):
         from k8s_agent_sandbox.models import SandboxDirectConnectionConfig
         import logging
         import time
-        from concurrent.futures import ThreadPoolExecutor
 
         logging.info("Executing via V3 SandboxClient (v0.4.6 compatible).")
 
-        # Shared thread pool for sandbox operations to allow overlapping
-        # blocking I/O when sessions run on different threads.
-        global _SANDBOX_POOL
-        try:
-            _SANDBOX_POOL
-        except NameError:
-            _SANDBOX_POOL = ThreadPoolExecutor(max_workers=16)
+        # _SANDBOX_POOL is initialized at module level (thread-safe).
 
         # Use DirectConnection when SANDBOX_ROUTER_URL is set (in-cluster),
         # otherwise fall back to kubectl port-forward (dev mode).

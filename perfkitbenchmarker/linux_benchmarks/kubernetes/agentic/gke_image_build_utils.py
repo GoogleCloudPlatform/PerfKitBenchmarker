@@ -1,14 +1,15 @@
 """Shared image build utilities for GKE Agent Sandbox benchmarks.
 
-Builds and pushes container images (ADK agent, Chrome sandbox, Sandbox Router)
-via Google Cloud Build. Called from:
-  - Provision() when --gke_skip_image_build is False (via BuildImages())
-  - prerequisite_setup.py (via build_images_with_config())
+Builds and pushes container images (Chrome sandbox, Sandbox Router) via
+Google Cloud Build. Called from gke_deploy_utils.DeployWorkloads() during
+the Prepare stage.
+
+NOTE: The ADK Agent image is built by the PKB native container_specs
+mechanism during the Provision stage, not by this module.
 
 Images built:
-  - ADK Agent: perfkitbenchmarker/data/k8s_agents/workloads/adk_agent/ -> {region}-docker.pkg.dev/{project}/adk-repo/adk-agent:{arch}
-  - Chrome Sandbox: cloned from agent-sandbox repo -> {region}-docker.pkg.dev/{project}/agent-sandbox/chrome-sandbox:{arch}
-  - Sandbox Router: cloned from agent-sandbox repo -> {region}-docker.pkg.dev/{project}/agent-sandbox/sandbox-router:{arch}
+  - Chrome Sandbox: cloned from agent-sandbox repo
+  - Sandbox Router: cloned from agent-sandbox repo
 """
 
 import logging
@@ -18,12 +19,12 @@ import subprocess
 import tempfile
 
 from absl import flags
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 
 # ---------------------------------------------------------------------------
@@ -95,18 +96,17 @@ def _DetectArchitecture(machine_type, zone, project):
     return "amd64"
 
 
-def build_images_with_config(project, region, machine_type, zone, arch, cloud_build_sa=None):
+def build_images_with_config(project, region, machine_type, zone, arch):
     """Core image build logic — no FLAGS dependency.
 
     Callable from both PKB (via BuildImages()) and prerequisite_setup.py.
+    Uses the project's default Cloud Build SA (no custom SA needed).
 
     Args:
         project: GCP project ID.
         region: GCP region (e.g. "us-central1").
         machine_type: Machine type string (e.g. "c4-standard-8").
             Used to derive target architecture (arm64 for c4a, amd64 otherwise).
-        cloud_build_sa: Cloud Build service account email.
-            If None, defaults to "adk-cloud-build-sa@{project}.iam.gserviceaccount.com".
     """
     # Architecture passed in from caller (detected via gcloud)
     target_arch = arch
@@ -120,33 +120,20 @@ def build_images_with_config(project, region, machine_type, zone, arch, cloud_bu
         f"{region}-docker.pkg.dev/{project}/agent-sandbox/sandbox-router:{target_arch}"
     )
 
-    # Cloud Build SA
-    if cloud_build_sa is None:
-        cloud_build_sa = f"adk-cloud-build-sa@{project}.iam.gserviceaccount.com"
 
-    logger.info("=== Building Container Images ===")
+    logger.info("=== Building Container Images (Chrome + Router only) ===")
     logger.info("  Project: %s", project)
     logger.info("  Region: %s", region)
     logger.info("  Architecture: %s", target_arch)
-    logger.info("  Cloud Build SA: %s", cloud_build_sa)
+    logger.info("  Cloud Build SA: default (project Cloud Build SA)")
+    logger.info("  NOTE: ADK Agent image is built by PKB via container_specs")
 
-    # 1. Build ADK Agent
-    _BuildADKAgentImage(
-        project=project,
-        region=region,
-        target_arch=target_arch,
-        image_path=adk_image,
-        cloud_build_sa=cloud_build_sa,
-        machine_type=machine_type,
-    )
-
-    # 2. Build Chrome Sandbox
+    # 1. Build Chrome Sandbox
     _BuildChromeSandboxImage(
         project=project,
         region=region,
         target_arch=target_arch,
         image_path=chrome_image,
-        cloud_build_sa=cloud_build_sa,
     )
 
     # 3. Build Sandbox Router
@@ -155,86 +142,19 @@ def build_images_with_config(project, region, machine_type, zone, arch, cloud_bu
         region=region,
         target_arch=target_arch,
         image_path=router_image,
-        cloud_build_sa=cloud_build_sa,
     )
 
-    logger.info("=== All images built successfully ===")
-    logger.info("  ADK Agent:      %s", adk_image)
+    logger.info("=== Chrome + Router images built successfully ===")
     logger.info("  Chrome Sandbox: %s", chrome_image)
     logger.info("  Sandbox Router: %s", router_image)
-
-
-def BuildImages():
-    """FLAGS-based entry point.
-
-    Reads configuration from native PKB FLAGS.
-    Delegates to build_images_with_config() for the actual work.
-    """
-    project = getattr(FLAGS, 'project', '') or ''
-    zone = getattr(FLAGS, 'zone', '') or ''
-    region = zone[:-2] if zone else ''
-    machine_type = getattr(FLAGS, 'machine_type', '') or ''
-    build_images_with_config(
-        project=project,
-        region=region,
-        machine_type=machine_type,
-    )
+    logger.info("  (ADK Agent built by PKB via container_specs)")
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-
-def _BuildADKAgentImage(
-    project, region, target_arch, image_path, cloud_build_sa, machine_type=None
-):
-    """Build and push the ADK Agent image.
-
-    Uses the existing perfkitbenchmarker/data/k8s_agents/workloads/adk_agent/cloudbuild.yaml with --substitutions
-    rather than generating a new one (avoids overwriting the committed file).
-    """
-    logger.info("Building ADK Agent image: %s", image_path)
-
-    # Locate the agent source directory
-    # Expected layout: repo_root/perfkitbenchmarker/data/k8s_agents/workloads/adk_agent/
-    repo_root = _FindRepoRoot()
-    agent_dir = os.path.join(repo_root, "perfkitbenchmarker", "data", "k8s_agents", "workloads", "adk_agent")
-
-    if not os.path.isdir(agent_dir):
-        raise RuntimeError(
-            f"ADK agent source not found at {agent_dir}. "
-            "Ensure you are running from the repository root."
-        )
-
-    # Generate generated.env from template
-    _GenerateEnvFile(agent_dir, project, region, machine_type=machine_type)
-
-    # Use the existing cloudbuild.yaml with substitutions (don't overwrite)
-    cloudbuild_path = os.path.join(agent_dir, "cloudbuild.yaml")
-    if not os.path.isfile(cloudbuild_path):
-        raise RuntimeError(
-            f"cloudbuild.yaml not found at {cloudbuild_path}. "
-            "Expected perfkitbenchmarker/data/k8s_agents/workloads/adk_agent/cloudbuild.yaml to exist."
-        )
-
-    _RunCmd(
-        [
-            "gcloud",
-            "builds",
-            "submit",
-            agent_dir,
-            f"--config={cloudbuild_path}",
-            f"--substitutions=_IMAGE_PATH={image_path},_PLATFORM=linux/{target_arch}",
-            f"--project={project}",
-            f"--service-account=projects/{project}/serviceAccounts/{cloud_build_sa}",
-        ]
-    )
-
-    logger.info("ADK Agent image built successfully.")
-
-
-def _BuildChromeSandboxImage(project, region, target_arch, image_path, cloud_build_sa):
+def _BuildChromeSandboxImage(project, region, target_arch, image_path):
     """Build and push the Chrome Sandbox image."""
     logger.info("Building Chrome Sandbox image: %s", image_path)
 
@@ -280,7 +200,6 @@ def _BuildChromeSandboxImage(project, region, target_arch, image_path, cloud_bui
             image_path=image_path,
             target_arch=target_arch,
             project=project,
-            cloud_build_sa=cloud_build_sa,
         )
 
         logger.info("Chrome Sandbox image built successfully.")
@@ -288,7 +207,7 @@ def _BuildChromeSandboxImage(project, region, target_arch, image_path, cloud_bui
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def _BuildSandboxRouterImage(project, region, target_arch, image_path, cloud_build_sa):
+def _BuildSandboxRouterImage(project, region, target_arch, image_path):
     """Build and push the Sandbox Router image."""
     logger.info("Building Sandbox Router image: %s", image_path)
 
@@ -330,7 +249,6 @@ def _BuildSandboxRouterImage(project, region, target_arch, image_path, cloud_bui
             image_path=image_path,
             target_arch=target_arch,
             project=project,
-            cloud_build_sa=cloud_build_sa,
         )
 
         logger.info("Sandbox Router image built successfully.")
@@ -338,60 +256,11 @@ def _BuildSandboxRouterImage(project, region, target_arch, image_path, cloud_bui
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def _GenerateEnvFile(
-    agent_dir, project, region, machine_type=None, namespace="agentic"
-):
-    """Render generated.env from template with current config values."""
-    template_path = os.path.join(agent_dir, "generated.env.template")
-    output_path = os.path.join(agent_dir, "generated.env")
-
-    if not os.path.isfile(template_path):
-        logger.warning(
-            "generated.env.template not found at %s, skipping.", template_path
-        )
-        return
-
-    with open(template_path, "r") as f:
-        content = f.read()
-
-    # Derive cluster name
-    machine_family = machine_type.split("-")[0] if machine_type else "c4"
-    suffix_map = {"c3": "c3metal", "c4": "c4", "c4d": "c4d", "c4a": "c4a"}
-    cluster_suffix = suffix_map.get(machine_family, "c4")
-
-    # Get username prefix for cluster name
-    user = os.environ.get("USER", "benchmark")
-    user_prefix = user.split(".")[0] if "." in user else user
-    cluster_name = f"{user_prefix}-agentic-{cluster_suffix}"
-
-    # Substitute variables
-    replacements = {
-        "${CLUSTER_NAME}": cluster_name,
-        "${GOOGLE_CLOUD_PROJECT}": project,
-        "${GOOGLE_CLOUD_LOCATION}": region,
-        "${AGENTIC_NAMESPACE}": namespace,
-        "${GOOGLE_GENAI_USE_VERTEXAI}": "true",
-        "${SANDBOX_ROUTER_URL}": f"http://sandbox-router-svc.{namespace}.svc.cluster.local:8080",
-        "${SAMPLE_COUNT}": "20",
-        "${SAMPLE_WARMUP}": "0",
-        "${PAYLOAD_SIZE_MB}": "1",
-        "${PAYLOAD_ITERATIONS}": "20",
-    }
-
-    for key, value in replacements.items():
-        content = content.replace(key, value)
-
-    with open(output_path, "w") as f:
-        f.write(content)
-
-    logger.info("Generated %s", output_path)
-
-
-def _SubmitCloudBuild(source_dir, image_path, target_arch, project, cloud_build_sa):
+def _SubmitCloudBuild(source_dir, image_path, target_arch, project):
     """Generate a cloudbuild.yaml with substitutions and submit via Cloud Build.
 
     Used for Chrome and Router images (built in temp directories).
-    The ADK agent uses its own committed cloudbuild.yaml instead.
+    Uses the project's default Cloud Build SA.
     """
     cloudbuild_content = """steps:
   - name: 'gcr.io/cloud-builders/docker'
@@ -419,33 +288,7 @@ substitutions:
             f"--config={cloudbuild_path}",
             f"--substitutions=_IMAGE_PATH={image_path},_PLATFORM=linux/{target_arch}",
             f"--project={project}",
-            f"--service-account=projects/{project}/serviceAccounts/{cloud_build_sa}",
         ]
-    )
-
-
-def _FindRepoRoot():
-    """Find the repository root by looking for known markers."""
-    # Try relative to this file
-    this_dir = os.path.dirname(os.path.abspath(__file__))
-    # Expected: perfkitbenchmarker/linux_benchmarks/ -> go up 2 levels
-    candidate = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(this_dir))))
-    if os.path.isdir(os.path.join(candidate, "perfkitbenchmarker", "data", "k8s_agents", "workloads", "adk_agent")):
-        return candidate
-
-    # Try CWD
-    cwd = os.getcwd()
-    if os.path.isdir(os.path.join(cwd, "perfkitbenchmarker", "data", "k8s_agents", "workloads", "adk_agent")):
-        return cwd
-
-    # Try parent of CWD
-    parent = os.path.dirname(cwd)
-    if os.path.isdir(os.path.join(parent, "perfkitbenchmarker", "data", "k8s_agents", "workloads", "adk_agent")):
-        return parent
-
-    raise RuntimeError(
-        "Cannot locate repository root (looking for perfkitbenchmarker/data/k8s_agents/workloads/adk_agent/). "
-        "Run from the repository root directory."
     )
 
 

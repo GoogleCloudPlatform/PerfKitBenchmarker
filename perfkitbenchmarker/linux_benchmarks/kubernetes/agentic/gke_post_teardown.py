@@ -27,17 +27,31 @@ def _run(cmd, check=False, timeout=300):
     return result
 
 
-def teardown_cloud_build_sa(project_id):
-    logger.info("=== Deleting Cloud Build SA ===")
-    sa_email = f"adk-cloud-build-sa@{project_id}.iam.gserviceaccount.com"
+def revoke_cloudbuild_sa_permissions(project_id):
+    """Revoke extra IAM roles from Cloud Build SA(s).
+
+    Mirrors grant_cloudbuild_sa_permissions() from gke_prerequisites.py.
+    Revokes roles from both possible SAs. Does NOT delete them
+    (they are project-managed).
+    """
+    logger.info("=== Revoking extra permissions from Cloud Build SA(s) ===")
+    result = _run(["gcloud", "projects", "describe", project_id,
+                   "--format=value(projectNumber)"])
+    project_number = result.stdout.strip()
+    if not project_number:
+        logger.warning("Could not determine project number, skipping SA cleanup")
+        return
+    sa_emails = [
+        f"{project_number}@cloudbuild.gserviceaccount.com",
+        f"{project_number}-compute@developer.gserviceaccount.com",
+    ]
     roles = ["roles/logging.logWriter", "roles/storage.objectViewer",
              "roles/artifactregistry.writer", "roles/serviceusage.serviceUsageConsumer"]
-    for role in roles:
-        _run(["gcloud", "projects", "remove-iam-policy-binding", project_id,
-              f"--member=serviceAccount:{sa_email}", f"--role={role}", "--quiet"])
-    _run(["gcloud", "iam", "service-accounts", "delete", sa_email,
-          f"--project={project_id}", "--quiet"])
-    logger.info("Cloud Build SA deleted.")
+    for sa_email in sa_emails:
+        for role in roles:
+            _run(["gcloud", "projects", "remove-iam-policy-binding", project_id,
+                  f"--member=serviceAccount:{sa_email}", f"--role={role}", "--quiet"])
+    logger.info("Cloud Build SA extra permissions revoked.")
 
 
 def teardown_snapshot_bucket(project_id, region):
@@ -52,7 +66,11 @@ def teardown_snapshot_bucket(project_id, region):
 
 def teardown_images(project_id, region):
     logger.info("=== Deleting AR repos ===")
-    for repo in ["adk-repo", "agent-sandbox"]:
+    # "adk-repo" is created/deleted by PKB container_registry lifecycle
+    # (Provision creates it, Teardown deletes it). If you skip PKB Teardown,
+    # run: gcloud artifacts repositories delete adk-repo --location=<region>
+    # Only "agent-sandbox" (Chrome + Router images) needs manual cleanup here.
+    for repo in ["agent-sandbox"]:
         _run(["gcloud", "artifacts", "repositories", "delete", repo,
               f"--location={region}", f"--project={project_id}", "--quiet"])
     logger.info("AR repos deleted.")
@@ -65,7 +83,7 @@ def main():
     p.add_argument("--keep_images", action="store_true", help="Skip AR repo deletion")
     p.add_argument("--keep_bucket", action="store_true", help="Skip snapshot bucket deletion")
     args = p.parse_args()
-    teardown_cloud_build_sa(args.project_id)
+    revoke_cloudbuild_sa_permissions(args.project_id)
     if not args.keep_bucket:
         teardown_snapshot_bucket(args.project_id, args.region)
     if not args.keep_images:
