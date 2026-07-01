@@ -34,6 +34,7 @@ from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources.container_service import container
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import swap_config as swap_config_lib
 from tests import pkb_common_test_case
 
 FLAGS = flgs.FLAGS
@@ -947,6 +948,161 @@ class GoogleKubernetesEngineNodepoolAutoscalingTestCase(PatchedObjectsTestCase):
       self.assertIn('--enable-autoscaling', nodepool_cmd)
       self.assertIn('--min-nodes 2', nodepool_cmd)
       self.assertIn('--max-nodes 10', nodepool_cmd)
+
+
+class GoogleKubernetesEngineSwapConfigTestCase(PatchedObjectsTestCase):
+  """Tests that _AddNodeParamsToCmd wires swap_config flags correctly."""
+
+  @staticmethod
+  def _make_swap_spec(
+      boot_disk_iops=160000,
+      boot_disk_throughput=2400,
+      lssd=False,
+      lssd_count=0,
+  ):
+    """Build a ContainerClusterSpec with swap_config on the benchmark nodepool."""
+    return container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'e2-medium',
+                    'zone': 'us-central1-a',
+                },
+            },
+            'nodepools': {
+                'benchmark': {
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': 'n4-highmem-32',
+                            'zone': 'us-central1-a',
+                        },
+                    },
+                    'swap_config': {
+                        'enabled': True,
+                        'swappiness': 100,
+                        'min_free_kbytes': 200,
+                        'watermark_scale_factor': 500,
+                        'lssd': lssd,
+                        'lssd_count': lssd_count,
+                        'boot_disk_iops': boot_disk_iops,
+                        'boot_disk_throughput': boot_disk_throughput,
+                    },
+                },
+            },
+        },
+    )
+
+  def setUp(self):
+    super().setUp()
+    # Avoid real tempfile creation in GKE command-generation tests.
+    # GkeSwapConfig implementation is tested separately in swap_config_test.py.
+    self.enter_context(
+        mock.patch.object(
+            swap_config_lib.GkeSwapConfig,
+            'WriteLinuxConfigYaml',
+            return_value='/tmp/fake_linux_config.yaml',
+        )
+    )
+
+  def test_swap_config_sets_system_config_from_file_flag(self):
+    spec = self._make_swap_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      nodepool_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create benchmark'
+      )
+      self.assertIsNotNone(nodepool_cmd)
+      self.assertIn('--system-config-from-file', nodepool_cmd)
+      self.assertIn('/tmp/fake_linux_config.yaml', nodepool_cmd)
+
+  def test_swap_config_sets_ubuntu_containerd_image_type(self):
+    spec = self._make_swap_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      nodepool_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create benchmark'
+      )
+      self.assertIn('UBUNTU_CONTAINERD', nodepool_cmd)
+
+  def test_swap_config_sets_no_enable_autorepair(self):
+    spec = self._make_swap_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      nodepool_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create benchmark'
+      )
+      self.assertIn('--no-enable-autorepair', nodepool_cmd)
+
+  def test_swap_config_with_boot_disk_iops_sets_provisioned_flags(self):
+    spec = self._make_swap_spec(boot_disk_iops=160000, boot_disk_throughput=2400)
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      nodepool_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create benchmark'
+      )
+      self.assertIn('--boot-disk-provisioned-iops', nodepool_cmd)
+      self.assertIn('--boot-disk-provisioned-throughput', nodepool_cmd)
+
+  def test_swap_config_lssd_omits_boot_disk_provisioned_flags(self):
+    # When lssd=True the swap device is local NVMe, not the boot disk.
+    spec = self._make_swap_spec(lssd=True, lssd_count=2, boot_disk_iops=0)
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      nodepool_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create benchmark'
+      )
+      self.assertNotIn('--boot-disk-provisioned-iops', nodepool_cmd)
+      self.assertNotIn('--boot-disk-provisioned-throughput', nodepool_cmd)
+
+  def test_nodepool_without_swap_config_omits_all_swap_flags(self):
+    spec = container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'e2-medium',
+                    'zone': 'us-central1-a',
+                },
+            },
+            'nodepools': {
+                'benchmark': {
+                    'vm_spec': {
+                        'GCP': {
+                            'machine_type': 'n4-highmem-32',
+                            'zone': 'us-central1-a',
+                        },
+                    },
+                },
+            },
+        },
+    )
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      nodepool_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create benchmark'
+      )
+      self.assertNotIn('--system-config-from-file', nodepool_cmd)
+      self.assertNotIn('UBUNTU_CONTAINERD', nodepool_cmd)
+      self.assertNotIn('--no-enable-autorepair', nodepool_cmd)
+
+  def test_cleanup_yaml_called_after_nodepool_create(self):
+    spec = self._make_swap_spec()
+    with mock.patch.object(
+        swap_config_lib.GkeSwapConfig, 'CleanupYaml'
+    ) as mock_cleanup:
+      with self.patch_critical_objects():
+        cluster = google_kubernetes_engine.GkeCluster(spec)
+        cluster._Create()
+    mock_cleanup.assert_called_once()
 
 
 if __name__ == '__main__':
