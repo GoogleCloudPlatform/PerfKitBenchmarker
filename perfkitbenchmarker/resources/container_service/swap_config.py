@@ -35,7 +35,7 @@ Usage in BENCHMARK_CONFIG:
         swap_config:
           enabled: true
           swappiness: 100
-          min_free_kbytes: 200
+          min_free_kbytes: 67584
           watermark_scale_factor: 500
           boot_disk_iops: 160000
           boot_disk_throughput: 2400
@@ -75,7 +75,7 @@ class BaseSwapConfig(resource.BaseResource):
   def __init__(
       self,
       swappiness: int = 100,
-      min_free_kbytes: int = 200,
+      min_free_kbytes: int = 67584,
       watermark_scale_factor: int = 500,
   ) -> None:
     super().__init__()
@@ -111,7 +111,7 @@ class GkeSwapConfig(BaseSwapConfig):
 
   Attributes:
     swappiness: vm.swappiness sysctl value (0-200, default 100).
-    min_free_kbytes: vm.min_free_kbytes sysctl (default 200).
+    min_free_kbytes: vm.min_free_kbytes sysctl (default 67584, GKE minimum >= 67584).
     watermark_scale_factor: vm.watermark_scale_factor sysctl (default 500).
     lssd: True if the nodepool uses local NVMe SSDs for swap device.
     lssd_count: Number of local NVMe SSDs (dedicatedLocalSsdProfile.diskCount).
@@ -125,7 +125,7 @@ class GkeSwapConfig(BaseSwapConfig):
   def __init__(
       self,
       swappiness: int = 100,
-      min_free_kbytes: int = 200,
+      min_free_kbytes: int = 67584,
       watermark_scale_factor: int = 500,
       lssd: bool = False,
       lssd_count: int = 0,
@@ -272,7 +272,7 @@ class EksSwapConfig(BaseSwapConfig):
   def __init__(
       self,
       swappiness: int = 100,
-      min_free_kbytes: int = 200,
+      min_free_kbytes: int = 67584,
       watermark_scale_factor: int = 500,
       memory_swap_behavior: str = 'LimitedSwap',
       fail_swap_on: bool = False,
