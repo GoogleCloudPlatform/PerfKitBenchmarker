@@ -71,7 +71,7 @@ swap_encryption:
         swap_config:
           enabled: true
           swappiness: 100
-          min_free_kbytes: 200
+          min_free_kbytes: 67584
           watermark_scale_factor: 500
           boot_disk_iops: 160000
           boot_disk_throughput: 2400

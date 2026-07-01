@@ -27,7 +27,7 @@ class BaseSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
   def test_default_attrs(self):
     cfg = swap_config.BaseSwapConfig()
     self.assertEqual(cfg.swappiness, 100)
-    self.assertEqual(cfg.min_free_kbytes, 200)
+    self.assertEqual(cfg.min_free_kbytes, 67584)
     self.assertEqual(cfg.watermark_scale_factor, 500)
 
   def test_custom_attrs(self):
@@ -58,7 +58,7 @@ class GkeSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
     """Return a mock SwapConfigSpec with sensible defaults."""
     spec = mock.Mock()
     spec.swappiness = kwargs.get('swappiness', 100)
-    spec.min_free_kbytes = kwargs.get('min_free_kbytes', 200)
+    spec.min_free_kbytes = kwargs.get('min_free_kbytes', 67584)
     spec.watermark_scale_factor = kwargs.get('watermark_scale_factor', 500)
     spec.lssd = kwargs.get('lssd', False)
     spec.lssd_count = kwargs.get('lssd_count', 0)
@@ -192,7 +192,7 @@ class EksSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
   def _make_spec(self, **kwargs):
     spec = mock.Mock()
     spec.swappiness = kwargs.get('swappiness', 100)
-    spec.min_free_kbytes = kwargs.get('min_free_kbytes', 200)
+    spec.min_free_kbytes = kwargs.get('min_free_kbytes', 67584)
     spec.watermark_scale_factor = kwargs.get('watermark_scale_factor', 500)
     return spec
 
@@ -257,4 +257,4 @@ class EksSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
 
 
 if __name__ == '__main__':
-  unittest.main()
+  unittest.m

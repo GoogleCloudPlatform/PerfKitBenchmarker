@@ -345,7 +345,7 @@ class SwapConfigSpec(spec.BaseSpec):
   Attributes:
     enabled: Whether to enable swap on the nodepool (default True).
     swappiness: vm.swappiness sysctl value (0-200, default 100).
-    min_free_kbytes: vm.min_free_kbytes sysctl (default 200).
+    min_free_kbytes: vm.min_free_kbytes sysctl (default 67584, GKE minimum).
     watermark_scale_factor: vm.watermark_scale_factor sysctl (default 500).
     lssd: True if the nodepool uses local NVMe SSDs for the swap device.
     lssd_count: Number of local NVMe SSDs (GKE dedicatedLocalSsdProfile).
@@ -356,7 +356,7 @@ class SwapConfigSpec(spec.BaseSpec):
   def __init__(self, *args, **kwargs):
     self.enabled: bool = True
     self.swappiness: int = 100
-    self.min_free_kbytes: int = 200
+    self.min_free_kbytes: int = 67584
     self.watermark_scale_factor: int = 500
     self.lssd: bool = False
     self.lssd_count: int = 0

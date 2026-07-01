@@ -109,9 +109,11 @@ _SWAP_BOOT_DISK_TYPE = 'hyperdisk-balanced'
 _SWAP_BOOT_DISK_SIZE = 500
 _SWAP_BOOT_DISK_IOPS = 160000
 _SWAP_BOOT_DISK_THROUGHPUT = 2400
-_SWAP_MIN_FREE_KBYTES = 200
+_SWAP_MIN_FREE_KBYTES = 67584
 _SWAP_WATERMARK_SCALE_FACTOR = 500
 _SWAP_DS_NAME = 'pkb-redis-memtier-swap'
+_SWAP_DS_LABEL = 'pkb-redis-memtier-swap'
+_SWAP_DS_IMAGE = 'ubuntu:22.04'
 _SWAP_DS_NAMESPACE = 'kube-system'
 
 _BenchmarkSpec = benchmark_spec.BenchmarkSpec
@@ -177,7 +179,9 @@ def Prepare(_: _BenchmarkSpec) -> None:
     _swap_daemonset_lib.SwapDaemonSet(
         name=_SWAP_DS_NAME,
         namespace=_SWAP_DS_NAMESPACE,
+        label=_SWAP_DS_LABEL,
         nodepool=_SWAP_SERVERS_NODEPOOL,
+        image=_SWAP_DS_IMAGE,
     ).Create()
 
   # Set up the Kubernetes Service, Redis configuration, and Redis server.
@@ -222,7 +226,13 @@ def _RunMemtier(
   server = f"redis.{NAMESPACE.value or 'default'}.svc.cluster.local"
   memtier_command = memtier.BuildMemtierCommand(
       server=server,
-      protocol=memtier.MEMTIER_PROTOCOL.value,
+      # Redis protocol required; MEMTIER_PROTOCOL defaults to memcache_binary
+      # which silently produces 0 ops against Redis.
+      protocol=(
+          memtier.MEMTIER_PROTOCOL.value
+          if FLAGS['memtier_protocol'].present
+          else 'redis'
+      ),
       clients=clients,
       threads=threads,
       ratio=memtier.MEMTIER_RATIO.value,
@@ -269,7 +279,10 @@ def _RunMemtier(
       ['condition=Complete', 'condition=Failed'],
       namespace=NAMESPACE.value,
       # Add 30 seconds to account for initial connection errors as Redis comes up.
-      timeout=memtier.MEMTIER_RUN_DURATION.value + 30,
+      # When run_duration is None (request-count mode), fall back to 3600s
+      # to accommodate image pulls, pod scheduling, and large request counts.
+      timeout=(memtier.MEMTIER_RUN_DURATION.value + 30
+               if memtier.MEMTIER_RUN_DURATION.value is not None else 3600),
   )
   if condition == 'condition=Failed':
     raise errors.Benchmarks.RunError(f"Memtier job '{job_name}' failed.")
@@ -361,5 +374,7 @@ def Cleanup(_: _BenchmarkSpec) -> None:
     _swap_daemonset_lib.SwapDaemonSet(
         name=_SWAP_DS_NAME,
         namespace=_SWAP_DS_NAMESPACE,
+        label=_SWAP_DS_LABEL,
         nodepool=_SWAP_SERVERS_NODEPOOL,
+        image=_SWAP_DS_IMAGE,
     ).Delete()

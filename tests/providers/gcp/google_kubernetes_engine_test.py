@@ -982,7 +982,7 @@ class GoogleKubernetesEngineSwapConfigTestCase(PatchedObjectsTestCase):
                     'swap_config': {
                         'enabled': True,
                         'swappiness': 100,
-                        'min_free_kbytes': 200,
+                        'min_free_kbytes': 67584,
                         'watermark_scale_factor': 500,
                         'lssd': lssd,
                         'lssd_count': lssd_count,
