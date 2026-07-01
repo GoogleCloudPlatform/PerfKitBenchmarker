@@ -345,6 +345,7 @@ class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
         'account_name': account_name,
         'account_key': account_key,
         'block_size_mb': FLAGS.blobfuse_block_size_mb,
+        'log_trace': FLAGS.object_storage_fuse_log_trace,
     }
     self.vm.RenderTemplate(
         template_path=data.ResourcePath('blobfuse2/config.yaml.j2'),

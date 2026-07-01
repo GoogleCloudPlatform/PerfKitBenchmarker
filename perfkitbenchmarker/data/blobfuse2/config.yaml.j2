@@ -1,6 +1,12 @@
 # Pipeline configuration. Choose components to be engaged. The order below is the priority order that needs to be followed.
 logging:
+{% if log_trace %}
+  type: base
+  level: log_debug
+  file-path: /tmp/logs/blobfuse2.log
+{% else %}
   level: log_warning
+{% endif %}
 
 components:
   - libfuse
@@ -15,6 +21,9 @@ libfuse:
   attribute-expiration-sec: 0
   entry-expiration-sec: 0
   negative-entry-expiration-sec: 0
+{% if log_trace %}
+  fuse-trace: true
+{% endif %}
 
 block_cache:
   block-size-mb: {{ block_size_mb }}
@@ -32,3 +41,6 @@ azstorage:
   mode: key
   account-name: {{ account_name }}
   account-key: {{ account_key }}
+{% if log_trace %}
+  sdk-trace: true
+{% endif %}

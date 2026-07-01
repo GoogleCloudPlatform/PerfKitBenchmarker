@@ -96,9 +96,12 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       benchmark_params,
       job_file='fio-object-storage.job',
   )
-  return utils.RunTest(
+  samples = utils.RunTest(
       vm, constants.FIO_PATH, job_file_str, latency_measure='lat'
   )
+  if FLAGS.object_storage_fuse_log_trace:
+    vm.RemoteCommand('sudo cat /tmp/logs/*')
+  return samples
 
 
 def Cleanup(_):
