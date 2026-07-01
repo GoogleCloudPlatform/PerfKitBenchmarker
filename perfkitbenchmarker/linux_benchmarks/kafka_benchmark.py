@@ -33,17 +33,21 @@ kafka:
       vm_spec: *default_dual_core
     consumer:
       vm_spec: *default_dual_core
+    controller:
+      vm_spec: *default_dual_core
 """
 
 BENCHMARK_DATA = {}
 KAFKA_VERSION = '2.13-4.2.0'
 KAFKA_TAR = f'kafka_{KAFKA_VERSION}.tgz'
-KAFKA_URL = f'https://downloads.apache.org/kafka/4.2.0/{KAFKA_TAR}'
+KAFKA_URL = (
+    f'https://downloads.apache.org/kafka/{KAFKA_VERSION.split("-")[1]}/{KAFKA_TAR}'
+)
 
 KAFKA_DIR = f'kafka_{KAFKA_VERSION}'
-KAFKA_TOPIC_NAME = 'kafka_benchmark_test'
+KAFKA_TOPIC_NAME = 'kafka-benchmark-test'
 KAFKA_BROKER_PORT = 9092
-KAFKA_CONSUMER_TIMEOUT_MS = 100_000
+KAFKA_CONSUMER_TIMEOUT_MS = 120_000
 
 FLAGS = flags.FLAGS
 _KAFKA_NUM_PARTITIONS = flags.DEFINE_integer(
@@ -67,7 +71,9 @@ def _InstallKafka(vm):
   vm.InstallPackages('openjdk-17-jdk')
   vm.Install('build_tools')
   vm.Install('pip')
-  vm.RemoteCommand(f'wget {KAFKA_URL}')
+
+  fallback_url = f'https://archive.apache.org/dist/kafka/4.2.0/{KAFKA_TAR}'
+  vm.RemoteCommand(f'wget {KAFKA_URL} || wget {fallback_url}')
   vm.RemoteCommand(f'tar -xzf {KAFKA_TAR}')
 
 
@@ -96,36 +102,61 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     executor.map(_InstallKafka, vms)
 
   broker_vm = benchmark_spec.vm_groups['broker'][0]
+  controller_vm = benchmark_spec.vm_groups['controller'][0]
 
-  broker_vm.RemoteCommand(
-      f'cd {KAFKA_DIR} && sed -i '
-      f"'s/advertised.listeners=PLAINTEXT:\\/\\/localhost:{KAFKA_BROKER_PORT}/advertised.listeners=PLAINTEXT:\\/\\/{broker_vm.internal_ip}:{KAFKA_BROKER_PORT}/g' "
-      'config/server.properties'
-  )
-
-  kafka_cluster_id, _ = broker_vm.RemoteCommand(
+  kafka_cluster_id, _ = controller_vm.RemoteCommand(
       f'cd {KAFKA_DIR} && bin/kafka-storage.sh random-uuid'
   )
-  broker_vm.RemoteCommand(
-      f'cd {KAFKA_DIR} && bin/kafka-storage.sh format --standalone -t'
-      f' {kafka_cluster_id.strip()} -c config/server.properties'
-  )
+  cluster_id = kafka_cluster_id.strip()
 
-  # Start the broker
-  broker_vm.RemoteCommand(
-      f'cd {KAFKA_DIR} && bin/kafka-server-start.sh -daemon'
-      ' config/server.properties'
+  controller_config = (
+      'process.roles=controller\n'
+      'node.id=1\n'
+      f'controller.quorum.voters=1@{controller_vm.internal_ip}:9093\n'
+      'listeners=CONTROLLER://0.0.0.0:9093\n'
+      'controller.listener.names=CONTROLLER\n'
+      'listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT\n'
+      'log.dirs=/tmp/kraft-controller-logs\n'
   )
-  # Wait for the broker to start.
-  time.sleep(10)
+  controller_vm.RemoteCommand(
+      f'cat <<EOF > {KAFKA_DIR}/config/controller.properties\n'
+      f'{controller_config}EOF'
+  )
+  controller_vm.RemoteCommand(
+      f'cd {KAFKA_DIR} && bin/kafka-storage.sh format -t {cluster_id} -c'
+      ' config/controller.properties'
+  )
+  controller_vm.RemoteCommand(
+      f'cd {KAFKA_DIR} && ulimit -n 100000 && bin/kafka-server-start.sh -daemon'
+      ' config/controller.properties'
+  )
+  time.sleep(5)
 
+  broker_config = (
+      'process.roles=broker\n'
+      'node.id=2\n'
+      f'controller.quorum.voters=1@{controller_vm.internal_ip}:9093\n'
+      f'listeners=PLAINTEXT://0.0.0.0:{KAFKA_BROKER_PORT}\n'
+      f'advertised.listeners=PLAINTEXT://{broker_vm.internal_ip}:{KAFKA_BROKER_PORT}\n'
+      'controller.listener.names=CONTROLLER\n'
+      'inter.broker.listener.name=PLAINTEXT\n'
+      'listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT\n'
+      'log.dirs=/tmp/kraft-broker-logs\n'
+      f'offsets.topic.replication.factor={_KAFKA_REPLICATION_FACTOR.value}\n'
+      f'transaction.state.log.replication.factor={_KAFKA_REPLICATION_FACTOR.value}\n'
+      'transaction.state.log.min.isr=1\n'
+  )
   broker_vm.RemoteCommand(
-      f'cd {KAFKA_DIR} && bin/kafka-topics.sh --create --topic'
-      f' {KAFKA_TOPIC_NAME} --bootstrap-server localhost:{KAFKA_BROKER_PORT}'
-      f' --partitions={_KAFKA_NUM_PARTITIONS.value}'
-      f' --replication-factor={_KAFKA_REPLICATION_FACTOR.value}'
-      f' --config min.insync.replicas={_KAFKA_REPLICATION_FACTOR.value}'
-      ' --if-not-exists'
+      f'cat <<EOF > {KAFKA_DIR}/config/broker.properties\n'
+      f'{broker_config}EOF'
+  )
+  broker_vm.RemoteCommand(
+      f'cd {KAFKA_DIR} && bin/kafka-storage.sh format -t {cluster_id} -c'
+      ' config/broker.properties'
+  )
+  broker_vm.RemoteCommand(
+      f'cd {KAFKA_DIR} && ulimit -n 100000 && bin/kafka-server-start.sh -daemon'
+      ' config/broker.properties'
   )
 
 
@@ -148,11 +179,12 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     benchmark_spec: The benchmark specification.
   """
   broker_vm = benchmark_spec.vm_groups['broker'][0]
+  controller_vm = benchmark_spec.vm_groups['controller'][0]
 
-  broker_vm.RemoteCommand(
-      f'cd {KAFKA_DIR} && bin/kafka-server-stop.sh', ignore_failure=True
-  )
-
-  broker_vm.RemoteCommand(
-      'rm -rf /tmp/kraft-combined-logs', ignore_failure=True
-  )
+  for vm in (broker_vm, controller_vm):
+    vm.RemoteCommand(
+        f'cd {KAFKA_DIR} && bin/kafka-server-stop.sh', ignore_failure=True
+    )
+    vm.RemoteCommand(
+        'rm -rf /tmp/kraft-*-logs', ignore_failure=True
+    )
