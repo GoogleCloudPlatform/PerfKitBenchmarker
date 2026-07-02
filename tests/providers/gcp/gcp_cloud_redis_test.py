@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for perfkitbenchmarker.providers.gcp.gcp_cloud_redis."""
+
 
 import inspect
 import unittest
@@ -19,6 +19,7 @@ import unittest
 from absl import flags
 from absl.testing import flagsaver
 import mock
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker.providers.gcp import gcp_cloud_redis
 from perfkitbenchmarker.providers.gcp import util
@@ -36,6 +37,7 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
     ):
       FLAGS.project = 'project'
       FLAGS.zone = ['us-central1-a']
+      FLAGS.cloud_redis_region = 'us-central1'
       mock_spec = mock.Mock()
       self.redis = gcp_cloud_redis.CloudRedis(mock_spec)
 
@@ -46,6 +48,20 @@ class GcpCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.redis._Create()
       gcloud.assert_called_once()
       self.assertTrue(self.redis._Exists())
+
+  def testCreateResourceExhausted(self):
+    stderr = (
+        'ERROR: (gcloud.redis.instances.create) '
+        'Not enough zonal resources are available to fulfill the request. '
+        'Try again later.'
+    )
+    with mock.patch.object(
+        util.GcloudCommand, 'Issue', return_value=('', stderr, 1)
+    ):
+      with self.assertRaises(
+          errors.Benchmarks.InsufficientCapacityCloudFailure
+      ):
+        self.redis._Create()
 
   def testDelete(self):
     with mock.patch.object(
