@@ -1,0 +1,69 @@
+# esrally Kubernetes Job
+# Rendered by kubernetes_opensearch_esrally_benchmark.py Run().
+#
+# Template variables:
+#   k8s_namespace      - Kubernetes namespace (default: 'default')
+#   race_id            - Unique race identifier string
+#   target_hosts       - OpenSearch Service host:port
+#   esrally_track      - esrally track name, e.g. geonames
+#   esrally_challenge  - esrally challenge, e.g. append-no-conflicts
+#   esrally_version    - esrally pip package version, e.g. 2.12.0
+#
+# The Job installs esrally at runtime, runs the race in benchmark-only
+# mode against the OpenSearch headless Service, then prints the
+# race.json between PKB sentinel markers so Run() can parse the results.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: esrally-pkb
+  namespace: {{ k8s_namespace | default('default') }}
+  labels:
+    pkb: "true"
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        pkb: "true"
+    spec:
+      nodeSelector:
+        pkb_nodepool: clients
+      restartPolicy: Never
+      containers:
+      - name: esrally
+        image: python:3.11-slim
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+          limits:
+            memory: "8Gi"
+            cpu: "4"
+        env:
+        - name: RALLY_HOME
+          value: /var/rally
+        command:
+        - bash
+        - -c
+        - |
+          set -euo pipefail
+          echo "[pkb] Installing esrally {{ esrally_version }}..."
+          pip install esrally=={{ esrally_version }} --quiet
+
+          echo "[pkb] Running esrally race (track={{ esrally_track }}, challenge={{ esrally_challenge }})..."
+          esrally race \
+            --pipeline=benchmark-only \
+            --target-host="{{ target_hosts }}" \
+            --track="{{ esrally_track }}" \
+            --challenge="{{ esrally_challenge }}" \
+            --track-params=number_of_replicas:0 \
+            --race-id="{{ race_id }}" \
+            --quiet
+
+          echo "[pkb] Race complete. Emitting race.json..."
+          RACE_JSON="$RALLY_HOME/benchmarks/races/{{ race_id }}/race.json"
+          echo "=== PKB_RACE_JSON_BEGIN ==="
+          cat "$RACE_JSON"
+          echo ""
+          echo "=== PKB_RACE_JSON_END ==="
