@@ -14,6 +14,12 @@ import yaml
 
 FLAGS = flags.FLAGS
 
+AI_AGENT_INITIAL_PROMPT_URL = flags.DEFINE_string(
+    'ai_agent_initial_prompt_url',
+    None,
+    'Object storage URL (e.g. gs://bucket/prompt.txt) to an initial prompt.',
+)
+
 
 def GetAiAgentServiceClass(cloud: str, deployment_type: str):
   """Returns the correct AI agent service class based on cloud/type."""
@@ -65,6 +71,17 @@ class BaseAiAgentService(resource.BaseResource):
   def _GetDeploymentConfig(self) -> dict[str, Any]:
     """Gets config dict for deployment/creation."""
     return {'run_uri': FLAGS.run_uri}
+
+  def _GetInitialPromptText(self) -> str | None:
+    """Fetches the initial prompt text from object storage."""
+    url = AI_AGENT_INITIAL_PROMPT_URL.value
+    if not url:
+      return None
+
+    local_path = vm_util.PrependTempDir('initial_prompt.txt')
+    self.storage_service.Copy(url, local_path)
+    with open(local_path, 'r') as f:
+      return f.read().strip()
 
   def _GetRunConfig(
       self,

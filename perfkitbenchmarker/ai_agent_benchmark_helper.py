@@ -122,6 +122,7 @@ class BaseAgent(abc.ABC):
     self.agent_service.agent_config = self._GetDefaultAgentConfig()
 
     self.BeforeCreateAgent()
+    self.spec.always_call_cleanup = True
     self.agent_service.Create()
     self.UploadValidatorScript()
     self.PostPrepare()

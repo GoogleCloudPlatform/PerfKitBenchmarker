@@ -3,7 +3,7 @@
 import abc
 import collections.abc
 import json
-from typing import Any
+from typing import Any, Self
 import urllib.parse
 
 from absl import logging
@@ -37,6 +37,19 @@ class PromptConfig[AgentConfigT](BasePromptConfig):
   user_id: str
   run_uri: str
   agent_config: AgentConfigT
+
+  @classmethod
+  def create_for_initial_prompt(cls, deployment_config: Any) -> Self:
+    return cls(
+        agent=deployment_config.agent,
+        framework=deployment_config.framework,
+        prompt=deployment_config.initial_prompt,
+        output_dir="",
+        session_id="timetoreadysession",
+        user_id="timetoreadyuser",
+        run_uri=deployment_config.run_uri,
+        agent_config=deployment_config.agent_config,
+    )
 
 
 class BaseEndpoint(abc.ABC):

@@ -4,10 +4,13 @@ This is usually called on Agent Service's creation.
 """
 
 import argparse
+import asyncio
 import importlib
 import os
+import time
 from typing import Any
 
+import common_utils
 import pydantic
 import vertexai
 import yaml
@@ -33,12 +36,38 @@ class DeploymentConfig[AgentConfigT](BaseDeploymentConfig):
   staging_bucket: str
   run_uri: str
   agent_config: AgentConfigT
+  initial_prompt: str | None = None
 
 
 def _import_agent_module(agent: str, framework: str) -> Any:
   """Imports the agent module."""
   module_name = f"{agent}_{framework}"
   return importlib.import_module(module_name)
+
+
+async def _measure_time_to_ready[AgentConfigT](
+    remote_agent: Any,
+    handler: Any,
+    config: DeploymentConfig[AgentConfigT],
+) -> float | None:
+  """Measures the time to first chunk."""
+  print("Sending initial prompt...")
+  endpoint = handler.create_endpoint(remote_agent)
+  prompt_config = common_utils.PromptConfig[
+      AgentConfigT
+  ].create_for_initial_prompt(config)
+  first_chunk_time = None
+  try:
+    async for _ in endpoint.stream_execute(prompt_config=prompt_config):
+      if first_chunk_time is None:
+        first_chunk_time = time.monotonic()
+    return first_chunk_time
+  except Exception as e:  # pylint: disable=broad-exception-caught
+    # Since the agent has already been created, it's better to let this script
+    # finish normally, so the resource is marked as created and can be cleaned
+    # up normally.
+    print(f"Error measuring time to ready: {e}")
+    return None
 
 
 def run_deployment[AgentConfigT](
@@ -75,12 +104,24 @@ def run_deployment[AgentConfigT](
       "display_name": display_name,
   }
 
+  create_start = time.monotonic()
   remote_agent = client.agent_engines.create(
       agent=agent_to_deploy,
       config=deploy_config,
   )
+  create_time = time.monotonic() - create_start
+  print(f"Time to Create: {create_time}")
+
   print("Successfully deployed Agent Engine!")
   print(f"Resource name: {remote_agent.api_resource.name}")
+
+  if config.initial_prompt:
+    first_chunk_time = asyncio.run(
+        _measure_time_to_ready(remote_agent, handler, config)
+    )
+    if first_chunk_time is not None:
+      ready_time = first_chunk_time - create_start
+      print(f"Time to Ready: {ready_time}")
 
 
 def main() -> None:

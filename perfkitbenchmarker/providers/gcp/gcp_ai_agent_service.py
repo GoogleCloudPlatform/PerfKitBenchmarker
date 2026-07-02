@@ -12,6 +12,7 @@ from absl import flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.providers.gcp import gcs
@@ -363,6 +364,8 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
     self._remote_agent_name = None
     self._staging_bucket = self.base_dir
     self.spec = ai_agent_spec
+    self._time_to_create: float | None = None
+    self._time_to_ready: float | None = None
 
   @override
   def _StageAgentCode(self):
@@ -419,6 +422,9 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
         'staging_bucket': self._staging_bucket,
         'agent_config': self.agent_config,
     })
+    initial_prompt = self._GetInitialPromptText()
+    if initial_prompt:
+      config['initial_prompt'] = initial_prompt
     return config
 
   def _Create(self):
@@ -446,12 +452,17 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
     command = ' && '.join(command_parts)
     stdout, _ = self.client_vm.RemoteCommand(command)
 
-    # 5. Parse output to get remote agent name
+    # 5. Parse output to get remote agent name and latencies
     for line in stdout.split('\n'):
       if line.startswith('Resource name: '):
         _, _, agent_name = line.partition('Resource name: ')
         self._remote_agent_name = agent_name.strip()
-        break
+      elif line.startswith('Time to Create: '):
+        _, _, time_str = line.partition('Time to Create: ')
+        self._time_to_create = float(time_str.strip())
+      elif line.startswith('Time to Ready: '):
+        _, _, time_str = line.partition('Time to Ready: ')
+        self._time_to_ready = float(time_str.strip())
 
     if not self._remote_agent_name:
       raise errors.Benchmarks.PrepareException(
@@ -463,6 +474,16 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
         ' Name: %s',
         self._remote_agent_name,
     )
+
+  def _PostCreate(self):
+    if (
+        ai_agent_service.AI_AGENT_INITIAL_PROMPT_URL.value
+        and not self._time_to_ready
+    ):
+      raise errors.Benchmarks.PrepareException(
+          'Initial prompt was explictly passed, but failed to get remote ready'
+          ' time from deploy script output.'
+      )
 
   def _Delete(self):
     """Deletes the remote agent."""
@@ -600,3 +621,38 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
         'Agent execution finished. Raw output:\n%s',
         stdout,
     )
+
+  @override
+  def GetSamples(self):
+    samples = super().GetSamples()
+    create_time_sample = [s for s in samples if s.metric == 'Time to Create'][0]
+    resource_type = create_time_sample.metadata.get('resource_type')
+    resource_class = create_time_sample.metadata.get('resource_class')
+    metadata = {
+        'resource_type': resource_type,
+        'resource_class': resource_class,
+    }
+
+    # Remove existing samples for 'Time to Create' and 'Time to Ready' if any
+    samples = [
+        s
+        for s in samples
+        if s.metric not in ('Time to Create', 'Time to Ready')
+    ]
+
+    if self._time_to_create is not None:
+      samples.append(
+          sample.Sample(
+              'Time to Create',
+              self._time_to_create,
+              'seconds',
+              metadata=metadata,
+          )
+      )
+    if self._time_to_ready is not None:
+      samples.append(
+          sample.Sample(
+              'Time to Ready', self._time_to_ready, 'seconds', metadata=metadata
+          )
+      )
+    return samples
