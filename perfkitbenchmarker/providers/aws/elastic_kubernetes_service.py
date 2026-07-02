@@ -375,9 +375,6 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
     nodegroups = json.loads(stdout)
     return [ng['Name'] for ng in nodegroups]
 
-  def AddNodepool(self, batch_name, pool_id):
-    pass
-
 
 class EksCluster(BaseEksCluster):
   """Class representing an Elastic Kubernetes Service cluster."""
