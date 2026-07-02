@@ -1,0 +1,150 @@
+# Agentic Benchmark Configuration for GKE
+# Used with: --benchmark_config_file=perfkitbenchmarker/data/k8s_agents/config/agentic_benchmark_config.yaml
+#
+# User/environment-specific flags that MUST be passed on CLI:
+#   --project=<project>
+#   --owner=<owner>
+#   --gce_network_name=<user>-agentic-vpc
+#   --gke_additional_flags="--workload-pool=<project>.svc.id.goog,--subnetwork=<user>-agentic-subnet,--enable-master-authorized-networks,--master-authorized-networks=$(curl -s ifconfig.me)/32"
+#
+# Per-run flags:
+#   --run_stage=provision|prepare|run,cleanup|teardown
+#   --run_uri=<unique_id>
+#   --temp_dir=<path>
+#
+# Benchmark-specific sweep parameters (vary per run):
+#   --k8s_python_density_concurrent_sandbox_count=N
+#   --k8s_snapshot_preload_mb=N
+#   etc.
+
+# ===========================================================================
+# Shared configuration (defined once, referenced by all benchmarks via YAML
+# anchors). PKB ignores top-level keys that don't match a benchmark name.
+# ===========================================================================
+
+_shared_flags: &shared_flags
+  # --- Cluster creation flags ---
+  gke_additional_flags:
+    - "--enable-pod-snapshots"
+    - "--enable-dataplane-v2"
+    - "--enable-private-nodes"
+    - "--enable-ip-alias"
+    - "--master-ipv4-cidr=172.16.0.0/28"
+  gke_additional_nodepool_flags:
+    - "--max-pods-per-node=250"
+  container_cluster_version: "1.35.5-gke.1057002"
+  gke_enable_shielded_nodes: false
+  gce_subnet_region: "us-central1"
+
+  # --- Agentic workload flags ---
+  k8s_namespace: "agentic"
+  agent_sandbox_version: "v0.4.6"
+  k8s_gvisor: true
+  k8s_agent_api_url: "http://localhost:8080"
+
+_shared_cluster: &shared_cluster
+  cloud: GCP
+  type: Kubernetes
+  vm_count: 1
+  vm_spec:
+    GCP:
+      machine_type: c4-standard-8
+      zone: us-central1-a
+      boot_disk_type: hyperdisk-balanced
+      boot_disk_size: 50
+  nodepools:
+    sandbox:
+      vm_count: 1
+      vm_spec:
+        GCP:
+          machine_type: c4-standard-8
+          zone: us-central1-a
+          boot_disk_type: hyperdisk-balanced
+          boot_disk_size: 100
+      sandbox_config:
+        type: gvisor
+
+_shared_registry: &shared_registry
+  cloud: GCP
+  spec:
+    GCP:
+      zone: us-central1-a
+
+
+_shared_container_specs: &shared_container_specs
+  adk_agent:
+    image: agentic/adk-agent
+
+# ===========================================================================
+# Benchmark definitions (each references the shared anchors above)
+# ===========================================================================
+
+k8s_python_density:
+  flags:
+    <<: *shared_flags
+  container_registry:
+    <<: *shared_registry
+  container_specs:
+    <<: *shared_container_specs
+  container_cluster:
+    <<: *shared_cluster
+
+k8s_chromium_density:
+  flags:
+    <<: *shared_flags
+  container_registry:
+    <<: *shared_registry
+  container_specs:
+    <<: *shared_container_specs
+  container_cluster:
+    <<: *shared_cluster
+
+k8s_payload:
+  flags:
+    <<: *shared_flags
+  container_registry:
+    <<: *shared_registry
+  container_specs:
+    <<: *shared_container_specs
+  container_cluster:
+    <<: *shared_cluster
+
+k8s_qps:
+  flags:
+    <<: *shared_flags
+  container_registry:
+    <<: *shared_registry
+  container_specs:
+    <<: *shared_container_specs
+  container_cluster:
+    <<: *shared_cluster
+
+k8s_snapshot:
+  flags:
+    <<: *shared_flags
+  container_registry:
+    <<: *shared_registry
+  container_specs:
+    <<: *shared_container_specs
+  container_cluster:
+    <<: *shared_cluster
+
+k8s_warmpool:
+  flags:
+    <<: *shared_flags
+  container_registry:
+    <<: *shared_registry
+  container_specs:
+    <<: *shared_container_specs
+  container_cluster:
+    <<: *shared_cluster
+
+k8s_deletion:
+  flags:
+    <<: *shared_flags
+  container_registry:
+    <<: *shared_registry
+  container_specs:
+    <<: *shared_container_specs
+  container_cluster:
+    <<: *shared_cluster
