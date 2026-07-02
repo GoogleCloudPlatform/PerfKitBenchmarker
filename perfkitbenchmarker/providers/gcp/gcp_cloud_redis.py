@@ -186,7 +186,14 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
     if self.clustered:
       cmd = self._GetClusterCreateCommand()
     cmd.flags['region'] = self.redis_region
-    cmd.Issue(timeout=COMMAND_TIMEOUT)
+    _, stderr, retcode = cmd.Issue(
+        timeout=COMMAND_TIMEOUT, raise_on_failure=False
+    )
+    if retcode:
+      util.CheckGcloudResponseKnownFailures(stderr, retcode)
+      raise errors.VmUtil.IssueCommandError(
+          f'Required gcloud command failed: {cmd}\n{stderr}'
+      )
 
   def _IsReady(self):
     """Returns whether cluster is ready."""
