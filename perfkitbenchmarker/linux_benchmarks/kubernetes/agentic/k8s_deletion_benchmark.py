@@ -115,6 +115,7 @@ def GetConfig(user_config):
 
 def Prepare(benchmark_spec):
     """Deploy workloads onto the cluster."""
+    benchmark_spec.always_call_cleanup = True
     logging.info("=== Prepare: deploying workloads ===")
     deploy_utils.DeployWorkloads(benchmark_spec)
     utils.EnsurePortForward()

@@ -1,0 +1,20 @@
+# Cloud Build config for cross-compiling to ARM64.
+# Used by PKB when --container_remote_build_config points to this file.
+# The _IMAGE substitution is passed by PKB RemoteBuild() automatically.
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['run', '--privileged', 'multiarch/qemu-user-static', '--reset', '-p', 'yes']
+    id: 'qemu-setup'
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['buildx', 'create', '--use', '--name', 'multiarch-builder']
+    id: 'create-builder'
+    waitFor: ['qemu-setup']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['buildx', 'build', '--platform', 'linux/arm64', '-t', '${_IMAGE}', '--push', '.']
+    id: 'build-and-push'
+    waitFor: ['create-builder']
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_32
+substitutions:
+  _IMAGE: ''

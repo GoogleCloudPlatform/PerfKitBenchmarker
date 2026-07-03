@@ -68,7 +68,10 @@ def _DetectArchitecture(machine_type, zone, project):
     try:
         stdout, _, retcode = vm_util.IssueCommand(
             [
-                "gcloud", "compute", "machine-types", "describe",
+                "gcloud",
+                "compute",
+                "machine-types",
+                "describe",
                 machine_type,
                 f"--zone={zone}",
                 f"--project={project}",
@@ -83,15 +86,20 @@ def _DetectArchitecture(machine_type, zone, project):
             if docker_arch:
                 logging.info(
                     "Detected architecture for %s: %s -> %s",
-                    machine_type, gcp_arch, docker_arch,
+                    machine_type,
+                    gcp_arch,
+                    docker_arch,
                 )
                 return docker_arch
             logging.warning(
                 "Unknown GCP architecture '%s' for %s. Falling back to amd64.",
-                gcp_arch, machine_type,
+                gcp_arch,
+                machine_type,
             )
     except Exception as e:
-        logging.warning("gcloud machine-type describe failed: %s. Falling back to amd64.", e)
+        logging.warning(
+            "gcloud machine-type describe failed: %s. Falling back to amd64.", e
+        )
 
     return "amd64"
 
@@ -119,7 +127,6 @@ def build_images_with_config(project, region, machine_type, zone, arch):
     router_image = (
         f"{region}-docker.pkg.dev/{project}/agent-sandbox/sandbox-router:{target_arch}"
     )
-
 
     logger.info("=== Building Container Images (Chrome + Router only) ===")
     logger.info("  Project: %s", project)
@@ -153,6 +160,7 @@ def build_images_with_config(project, region, machine_type, zone, arch):
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _BuildChromeSandboxImage(project, region, target_arch, image_path):
     """Build and push the Chrome Sandbox image."""
@@ -261,8 +269,15 @@ def _SubmitCloudBuild(source_dir, image_path, target_arch, project):
 
     Used for Chrome and Router images (built in temp directories).
     Uses the project's default Cloud Build SA.
+
+    For cross-architecture builds (e.g. arm64 on amd64 workers), uses
+    QEMU emulation + Docker Buildx to produce the target-arch image.
+    A high-CPU machine type (E2_HIGHCPU_32) is used to offset the
+    overhead of QEMU instruction translation.
     """
-    cloudbuild_content = """steps:
+    if target_arch == "amd64":
+        # Native build — no emulation needed
+        cloudbuild_content = """steps:
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '--platform', '${_PLATFORM}', '-t', '${_IMAGE_PATH}', '.']
     env:
@@ -271,6 +286,32 @@ images:
   - '${_IMAGE_PATH}'
 options:
   logging: CLOUD_LOGGING_ONLY
+substitutions:
+  _IMAGE_PATH: ''
+  _PLATFORM: 'linux/amd64'
+"""
+    else:
+        # Cross-arch build — QEMU + Buildx required.
+        # Cloud Build workers are amd64; QEMU registers binfmt handlers
+        # so the kernel can execute arm64 binaries transparently.
+        # E2_HIGHCPU_32 provides 32 vCPUs to offset emulation overhead.
+        # Buildx --push handles the registry push directly, so no
+        # top-level 'images:' key is needed.
+        cloudbuild_content = """steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['run', '--privileged', 'multiarch/qemu-user-static', '--reset', '-p', 'yes']
+    id: 'qemu-setup'
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['buildx', 'create', '--use', '--name', 'multiarch-builder']
+    id: 'create-builder'
+    waitFor: ['qemu-setup']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['buildx', 'build', '--platform', '${_PLATFORM}', '-t', '${_IMAGE_PATH}', '--push', '.']
+    id: 'build-and-push'
+    waitFor: ['create-builder']
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_32
 substitutions:
   _IMAGE_PATH: ''
   _PLATFORM: 'linux/amd64'
@@ -302,7 +343,7 @@ def _RunCmd(cmd, cwd=None):
         capture_output=True,
         text=True,
         cwd=cwd,
-        timeout=600,
+        timeout=2400,  # 40 min: allows for QEMU cross-arch builds
         env=env,
     )
 
