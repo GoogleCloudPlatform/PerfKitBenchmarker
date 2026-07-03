@@ -102,14 +102,25 @@ class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
     ).Issue()
 
   def RemoteBuild(self, image: container.ContainerImage):
-    """Builds the image remotely."""
-    if not gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value:
-      full_tag = self.GetFullRegistryTag(image.name)
+    """Builds the image remotely.
+
+    If --container_remote_build_config is set, uses it as the
+    --config argument to `gcloud builds submit` and passes the
+    image tag via --substitutions _IMAGE=<tag>.
+    Otherwise uses the simple --tag shorthand.
+    """
+    full_tag = self.GetFullRegistryTag(image.name)
+    if gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value:
+      build_cmd = util.GcloudCommand(
+          self, 'builds', 'submit',
+          '--config', gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value,
+          '--substitutions', f'_IMAGE={full_tag}',
+          image.directory,
+      )
     else:
-      full_tag = gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value
-    build_cmd = util.GcloudCommand(
-        self, 'builds', 'submit', '--tag', full_tag, image.directory
-    )
+      build_cmd = util.GcloudCommand(
+          self, 'builds', 'submit', '--tag', full_tag, image.directory,
+      )
     build_cmd.Issue(timeout=None)
 
 

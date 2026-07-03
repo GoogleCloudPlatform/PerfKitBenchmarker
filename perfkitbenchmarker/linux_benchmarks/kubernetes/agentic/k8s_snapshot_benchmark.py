@@ -117,6 +117,7 @@ def GetConfig(user_config):
 
 def Prepare(benchmark_spec):
     """Deploy workloads, snapshot infra, and validate readiness."""
+    benchmark_spec.always_call_cleanup = True
     ns = FLAGS.k8s_namespace
     preload_mb = FLAGS.k8s_snapshot_preload_mb
 
