@@ -113,8 +113,8 @@ _ESRALLY_CHALLENGE = flags.DEFINE_string(
 )
 _ESRALLY_VERSION = flags.DEFINE_string(
     'kubernetes_opensearch_esrally_version',
-    '2.12.0',
-    'esrally pip package version to install in the client Job pod.',
+    '1.7.0',
+    'opensearch-benchmark pip package version to install in the Job pod.',
 )
 _NAMESPACE = flags.DEFINE_string(
     'kubernetes_opensearch_esrally_namespace',
@@ -196,8 +196,17 @@ def Prepare(_: _BenchmarkSpec) -> None:
 
 
 def Run(_: _BenchmarkSpec) -> list[sample.Sample]:
-  """Run esrally as a K8s Job; parse race.json from pod logs."""
+  """Run opensearch-benchmark as a K8s Job; parse results from pod logs."""
   ns = _NAMESPACE.value or 'default'
+
+  # Job spec.template is immutable; delete any leftover Job from a prior run
+  # so that ApplyManifest (kubectl apply) does not get an immutable-field error.
+  kubectl.RunKubectlCommand(
+      ['delete', 'job', 'esrally-pkb',
+       f'--namespace={ns}', '--ignore-not-found=true'],
+      raise_on_failure=False,
+  )
+
   target = (
       f'opensearch.{ns}.svc.cluster.local:{_OPENSEARCH_HTTP_PORT}'
   )
@@ -280,7 +289,10 @@ def _ParseResults(logs: str) -> list[sample.Sample]:
     return []
 
   metadata: dict[str, Any] = {
-      'rally_version': race_data.get('rally-version', 'unknown'),
+      'rally_version': (
+          race_data.get('benchmark-version')
+          or race_data.get('rally-version', 'unknown')
+      ),
       'rally_track': race_data.get('track', _ESRALLY_TRACK.value),
       'rally_challenge': race_data.get(
           'challenge', _ESRALLY_CHALLENGE.value
