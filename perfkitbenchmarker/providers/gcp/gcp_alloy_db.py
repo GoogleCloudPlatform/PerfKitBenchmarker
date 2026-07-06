@@ -305,18 +305,23 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     self._UpdateLabels(util.GetDefaultTags())
 
   def _DescribeCluster(self) -> Dict[str, Any]:
-    cmd = util.GcloudCommand(
-        self,
-        'alloydb',
+    cmd = self._GetAlloyDbCommand([
         'clusters',
         'describe',
         self.cluster_id,
-    )
-    cmd.flags['project'] = self.project
-    cmd.flags['zone'] = []
-    cmd.flags['region'] = self.region
+    ])
     stdout, _, _ = cmd.Issue()
     return json.loads(stdout)
+
+  def _Exists(self) -> bool:
+    """Returns true if the cluster exists."""
+    try:
+      self._DescribeCluster()
+      return True
+    except errors.VmUtil.IssueCommandError as e:
+      if 'not found' in str(e).lower():
+        return False
+      raise
 
   def _GetLabels(self) -> Dict[str, Any]:
     """Gets labels from the current instance."""
