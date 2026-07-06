@@ -94,6 +94,7 @@ class KubernetesPostgresSysbenchBenchmarkTest(
     expected_cmds = {
         'delete secret': [('', '', 0)],
         'create secret': [('', '', 0)],
+        'label namespace default': [('', '', 0)],
         'pg_isready': [('accepting connections', '', 0)],
         'psql -U benchmark -d benchmark -c "SELECT 1"': [('1', '', 0)],
         'get pod postgres-standalone-0': [('10.244.0.5', '', 0)],
@@ -135,6 +136,7 @@ class KubernetesPostgresSysbenchBenchmarkTest(
     expected_cmds = {
         'delete secret': [('', '', 0)],
         'create secret': [('', '', 0)],
+        'label namespace default': [('', '', 0)],
         'pg_isready': [('accepting connections', '', 0)],
         'psql -U benchmark -d benchmark -c "SELECT 1"': [('1', '', 0)],
         'get pod postgres-standalone-0': [('10.244.0.5', '', 0)],
@@ -169,6 +171,7 @@ class KubernetesPostgresSysbenchBenchmarkTest(
     expected_cmds = {
         'delete secret': [('', '', 0)],
         'create secret': [('', '', 0)],
+        'label namespace default': [('', '', 0)],
         'pg_isready': [('accepting connections', '', 0)],
         'psql -U benchmark -d benchmark -c "SELECT 1"': [('1', '', 0)],
         'get pod postgres-standalone-0': [('10.244.0.5', '', 0)],
@@ -206,6 +209,7 @@ class KubernetesPostgresSysbenchBenchmarkTest(
     expected_cmds = {
         'delete secret': [('', '', 0)],
         'create secret': [('', '', 0)],
+        'label namespace default': [('', '', 0)],
         'pg_isready': [('accepting connections', '', 0)],
         'psql -U benchmark -d benchmark -c "SELECT 1"': [('1', '', 0)],
         'get pod postgres-standalone-0': [('10.244.0.5', '', 0)],
@@ -223,6 +227,37 @@ class KubernetesPostgresSysbenchBenchmarkTest(
         'container/postgres_sysbench/custom_template.yaml.j2',
     )
     self.assertIsNotNone(custom_call)
+
+  def testPrepare_FailsAndLogsDebugInfo(self):
+    cluster = self._SetupCluster('GCP')
+
+    # Mock WaitForResource to simulate a timeout/failure on the postgres pod
+    def _WaitForResourceSideEffect(resource, *unused_args, **unused_kwargs):
+      if resource == 'pod/postgres-standalone-0':
+        raise errors.Resource.RetryableGetError('Pod failed to become ready')
+      return
+    cluster.WaitForResource = mock.MagicMock(
+        side_effect=_WaitForResourceSideEffect
+    )
+
+    expected_cmds = {
+        'delete secret': [('', '', 0)],
+        'create secret': [('', '', 0)],
+        'label namespace default': [('', '', 0)],
+        'get statefulset': [('postgres-standalone', '', 0)],
+        'describe pods': [('all-pods-description', '', 0)],
+        'describe statefulset postgres-standalone': [
+            ('statefulset-description', '', 0)
+        ],
+        'logs postgres-standalone-0': [('database-logs', '', 0)],
+    }
+    self.MockIssueCommand(expected_cmds)
+
+    with mock.patch(
+        'perfkitbenchmarker.linux_benchmarks.kubernetes_postgres_sysbench_benchmark.kubernetes_commands.ApplyManifest'
+    ):
+      with self.assertRaises(errors.VmUtil.ThreadException):
+        kubernetes_postgres_sysbench_benchmark.Prepare(self.bm_spec)
 
   def testCheckPrerequisites_GCP_GkeNodeSystemConfig_Passes(self):
     with flagsaver.flagsaver(gke_node_system_config='node_config.yaml'):

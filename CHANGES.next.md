@@ -471,6 +471,8 @@
 -   Add support for configuring IMDSv2 Http Tokens on AWS VMs via
     `aws_metadata_http_tokens`.
 -   Add aggregate memtier results to `kubernetes_redis_memtier` benchmark.
+-   Update `kubernetes_postgres_sysbench` to label the namespace as privileged
+    to allow `hostNetwork` and custom sysctls.
 
 ### Bug fixes and maintenance updates:
 

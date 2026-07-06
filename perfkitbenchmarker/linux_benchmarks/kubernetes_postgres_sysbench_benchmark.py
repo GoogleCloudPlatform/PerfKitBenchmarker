@@ -284,6 +284,19 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       'autovacuum_max_workers': 3,
   }
 
+  # Allow hostNetwork pods in default namespace
+  label_cmd = [
+      FLAGS.kubectl,
+      '--kubeconfig',
+      FLAGS.kubeconfig,
+      'label',
+      'namespace',
+      'default',
+      'pod-security.kubernetes.io/enforce=privileged',
+      '--overwrite',
+  ]
+  vm_util.IssueCommand(label_cmd)
+
   # Apply manifests
   kubernetes_commands.ApplyManifest(
       FLAGS.kubernetes_postgres_sysbench_template_path, **template_params
@@ -361,49 +374,60 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     # If waiting fails, gather debug info
     logging.error('PostgreSQL pod failed to become ready: %s', e)
 
-    # Get pod details
-    describe_cmd = [
+    get_ss_cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig',
+        FLAGS.kubeconfig,
+        'get',
+        'statefulset',
+        '-n',
+        'default',
+        '-o',
+        'jsonpath={.items[0].metadata.name}',
+    ]
+    stdout, _, _ = vm_util.IssueCommand(get_ss_cmd, raise_on_failure=False)
+    ss_name = stdout.strip() if stdout else 'postgres-standalone'
+
+    describe_pods_cmd = [
         FLAGS.kubectl,
         '--kubeconfig',
         FLAGS.kubeconfig,
         'describe',
-        'pod',
+        'pods',
         '-n',
         'default',
-        '-l',
-        'app=postgres-standalone',
     ]
-    stdout, _, _ = vm_util.IssueCommand(describe_cmd, raise_on_failure=False)
-    logging.error('Pod description:\n%s', stdout)
+    stdout, _, _ = vm_util.IssueCommand(
+        describe_pods_cmd, raise_on_failure=False
+    )
+    logging.error('All Pods description:\n%s', stdout)
 
-    # Get pod logs
+    describe_ss_cmd = [
+        FLAGS.kubectl,
+        '--kubeconfig',
+        FLAGS.kubeconfig,
+        'describe',
+        'statefulset',
+        ss_name,
+        '-n',
+        'default',
+    ]
+    stdout, _, _ = vm_util.IssueCommand(describe_ss_cmd, raise_on_failure=False)
+    logging.error('StatefulSet description:\n%s', stdout)
+
+    db_pod_name = f'{ss_name}-0'
     logs_cmd = [
         FLAGS.kubectl,
         '--kubeconfig',
         FLAGS.kubeconfig,
         'logs',
+        db_pod_name,
         '-n',
         'default',
-        '-l',
-        'app=postgres-standalone',
         '--tail=100',
     ]
     stdout, _, _ = vm_util.IssueCommand(logs_cmd, raise_on_failure=False)
-    logging.error('Pod logs:\n%s', stdout)
-
-    # Get events
-    events_cmd = [
-        FLAGS.kubectl,
-        '--kubeconfig',
-        FLAGS.kubeconfig,
-        'get',
-        'events',
-        '-n',
-        'default',
-        '--sort-by=.lastTimestamp',
-    ]
-    stdout, _, _ = vm_util.IssueCommand(events_cmd, raise_on_failure=False)
-    logging.error('Recent events:\n%s', stdout)
+    logging.error('Database Pod logs:\n%s', stdout)
 
     raise
 
