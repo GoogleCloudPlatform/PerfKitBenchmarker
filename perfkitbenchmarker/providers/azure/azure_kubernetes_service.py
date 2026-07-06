@@ -614,70 +614,20 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
       nodepool_config: container.BaseNodePoolConfig,
       node_version: str | None = None,
   ) -> None:
-    """Creates a single named node pool on the cluster."""
-    node_flags = self._GetNodeFlags(nodepool_config)
-    if node_version:
-      # Remove any --kubernetes-version _GetNodeFlags may have added from
-      # self.cluster_version, then always append the caller-supplied version.
-      while '--kubernetes-version' in node_flags:
-        idx = node_flags.index('--kubernetes-version')
-        node_flags.pop(idx)
-        node_flags.pop(idx)
-      node_flags += ['--kubernetes-version', node_version]
-    cmd = self._BuildNodePoolAddCmd(nodepool_config, node_flags)
-    _, stderr, retcode = vm_util.IssueCommand(
-        cmd, timeout=1800, raise_on_failure=False
-    )
-    if retcode:
-      raise errors.Resource.CreationError(stderr)
+    """Creates a node pool and blocks until ready."""
+    self.WaitForOperation(self.CreateNodePoolAsync(nodepool_config, node_version))
 
   def DeleteNodePool(self, name: str) -> None:
-    """Deletes the named node pool."""
-    cmd = [
-        azure.AZURE_PATH,
-        'aks',
-        'nodepool',
-        'delete',
-        '--cluster-name',
-        self.name,
-        '--name',
-        _AzureNodePoolName(name),
-    ] + self.resource_group.args
-    self._RunCreateClusterCmd(cmd)
+    """Deletes the named node pool and blocks until removed."""
+    self.WaitForOperation(self.DeleteNodePoolAsync(name))
 
   def UpgradeNodePool(self, name: str, target_version: str) -> None:
-    """Upgrades the named node pool to target_version."""
-    cmd = [
-        azure.AZURE_PATH,
-        'aks',
-        'nodepool',
-        'upgrade',
-        '--cluster-name',
-        self.name,
-        '--name',
-        _AzureNodePoolName(name),
-        '--kubernetes-version',
-        target_version,
-    ] + self.resource_group.args
-    vm_util.IssueCommand(cmd, timeout=1800)
+    """Upgrades the named node pool and blocks until done."""
+    self.WaitForOperation(self.UpgradeNodePoolAsync(name, target_version))
 
   def UpdateCluster(self) -> None:
-    """Real cluster-level update via a unique-timestamp tag change.
-
-    Triggers a control-plane operation (cluster-scoped, not pool-scoped) by
-    updating the cluster tags. Always succeeds because the tag value changes
-    every call.
-    """
-    cmd = [
-        azure.AZURE_PATH,
-        'aks',
-        'update',
-        '--name',
-        self.name,
-        '--tags',
-        f'k8s-mgmt-ts={int(time.time())}',
-    ] + self.resource_group.args
-    vm_util.IssueCommand(cmd, timeout=1800)
+    """Performs a cluster-level update and blocks until done."""
+    self.WaitForOperation(self.UpdateClusterAsync())
 
   # ---- Async variants (return opaque handles) -------------------------------
 
