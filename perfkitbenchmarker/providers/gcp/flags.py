@@ -437,13 +437,19 @@ GCP_CREATE_DISKS_WITH_VM = flags.DEFINE_boolean(
 )
 CLOUD_REDIS_API_OVERRIDE = flags.DEFINE_string(
     'gcp_cloud_redis_api_override',
-    default='https://redis.googleapis.com/',
-    help='Cloud redis API endpoint override. Defaults to prod.',
+    default=None,
+    help=(
+        'Cloud redis API endpoint override.'
+        ' e.g. https://redis.googleapis.com/'
+    ),
 )
 CLOUD_VALKEY_API_OVERRIDE = flags.DEFINE_string(
     'gcp_cloud_valkey_api_override',
-    default='https://memorystore.googleapis.com/',
-    help='Cloud valkey API endpoint override. Defaults to prod.',
+    default=None,
+    help=(
+        'Cloud valkey API endpoint override.'
+        ' e.g. https://memorystore.googleapis.com/'
+    ),
 )
 GKE_API_OVERRIDE = flags.DEFINE_string(
     'gke_api_override',

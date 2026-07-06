@@ -62,9 +62,10 @@ class CloudValkey(managed_memory_store.BaseManagedMemoryStore):
         else gcp_flags.GCE_SUBNET_NAMES.value[0]
     )
     # Update the environment for gcloud commands:
-    os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_MEMORYSTORE'] = (
-        gcp_flags.CLOUD_VALKEY_API_OVERRIDE.value
-    )
+    if gcp_flags.CLOUD_VALKEY_API_OVERRIDE.value:
+      os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_MEMORYSTORE'] = (
+          gcp_flags.CLOUD_VALKEY_API_OVERRIDE.value
+      )
 
   def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns a dict containing metadata about the instance.

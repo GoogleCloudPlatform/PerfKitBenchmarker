@@ -73,9 +73,10 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
         else gcp_flags.GCE_SUBNET_NAMES.value[0]
     )
     # Update the environment for gcloud commands:
-    os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_REDIS'] = (
-        gcp_flags.CLOUD_REDIS_API_OVERRIDE.value
-    )
+    if gcp_flags.CLOUD_REDIS_API_OVERRIDE.value:
+      os.environ['CLOUDSDK_API_ENDPOINT_OVERRIDES_REDIS'] = (
+          gcp_flags.CLOUD_REDIS_API_OVERRIDE.value
+      )
 
   def _GetTier(self) -> str | None:
     """Returns the tier of the instance."""
