@@ -689,3 +689,4 @@
 -   Added gke_kubernetes_nginx to default benchmark config.
 -   Added gke_kubernetes_redis_memtier to default benchmark config.
 -   Added new fio microbenchmark for NFS
+-   Document "what are resources?" in a README
