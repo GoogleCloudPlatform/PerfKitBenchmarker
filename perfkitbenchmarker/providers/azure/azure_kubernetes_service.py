@@ -16,9 +16,9 @@
 
 import base64
 import json
-import time
 import logging
-from typing import Any, List
+import time
+from typing import Any
 
 from absl import flags
 from perfkitbenchmarker import errors
@@ -238,18 +238,9 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
 
   def _CreateNodePool(self, nodepool_config: container.BaseNodePoolConfig):
     """Creates a node pool."""
-    cmd = [
-        azure.AZURE_PATH,
-        'aks',
-        'nodepool',
-        'add',
-        '--cluster-name',
-        self.name,
-        '--name',
-        _AzureNodePoolName(nodepool_config.name),
-        '--labels',
-        f'pkb_nodepool={nodepool_config.name}',
-    ] + self._GetNodeFlags(nodepool_config)
+    cmd = self._BuildNodePoolAddCmd(
+        nodepool_config, self._GetNodeFlags(nodepool_config)
+    )
     _, stderr, retcode = vm_util.IssueCommand(
         cmd, timeout=600, raise_on_failure=False
     )
@@ -269,7 +260,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
 
   def _GetNodeFlags(
       self, nodepool_config: container.BaseNodePoolConfig
-  ) -> List[str]:
+  ) -> list[str]:
     """Common flags for create and nodepools add."""
     args = [] + self.resource_group.args
     if nodepool_config.machine_type:
@@ -647,10 +638,9 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         node_flags.pop(idx)
       node_flags += ['--kubernetes-version', node_version]
     cmd = self._BuildNodePoolAddCmd(nodepool_config, node_flags, no_wait=True)
-    # fix: raise timeout to 600s (AKS can take >300s to accept a
-    # --no-wait request under concurrent load) and retry on transient errors
-    # that indicate the cluster is temporarily at its concurrent-op or
-    # pool-count limit.
+    # Timeout of 600s: AKS can take >300s to accept a --no-wait request
+    # under concurrent load. Retry on transient errors indicating the
+    # cluster is temporarily at its concurrent-op or pool-count limit.
     retryable_errors = (
         'OperationNotAllowed',
         'ConflictingOperationInProgress',
@@ -691,8 +681,8 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         target_version,
         '--no-wait',
     ] + self.resource_group.args
-    # fix: raise timeout to 600s — az aks nodepool upgrade --no-wait
-    # can take >300s to be accepted by Azure under concurrent load.
+    # Timeout of 600s: az aks nodepool upgrade --no-wait can take >300s
+    # to be accepted by Azure under concurrent load.
     _, stderr, retcode = vm_util.IssueCommand(
         cmd, timeout=600, raise_on_failure=False
     )
@@ -713,10 +703,9 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         _AzureNodePoolName(name),
         '--no-wait',
     ] + self.resource_group.args
-    # fix: raise timeout to 600s and treat NotFound as success.
-    # A pool that never existed or was already removed is the desired end-state
-    # for a delete — raising CreationError here caused all delete phases to
-    # fail for any pool whose create had previously failed.
+    # Timeout of 600s: az aks nodepool delete --no-wait can take >300s
+    # under concurrent load. NotFound is treated as success since a pool
+    # that never existed or was already removed is the desired end-state.
     _, stderr, retcode = vm_util.IssueCommand(
         cmd, timeout=600, raise_on_failure=False
     )
