@@ -26,6 +26,9 @@ class TestKubernetesCluster(kubernetes_cluster.KubernetesCluster):
   def _Delete(self):
     pass
 
+  def GetNodePoolNames(self) -> list[str]:
+    return []
+
 
 def CreateTestKubernetesCluster(
     container_cluster_spec: container_spec.ContainerClusterSpec | None = None,
