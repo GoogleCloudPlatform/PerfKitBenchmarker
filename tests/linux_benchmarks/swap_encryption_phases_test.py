@@ -377,3 +377,315 @@ class RunPhase3bTest(pkb_common_test_case.PkbCommonTestCase):
 
 if __name__ == '__main__':
   unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# PR5-specific helper tests
+# ---------------------------------------------------------------------------
+
+class ParseVmBytesToMbTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for phases._parse_vm_bytes_to_mb()."""
+
+  def test_gigabytes_suffix(self):
+    self.assertAlmostEqual(phases._parse_vm_bytes_to_mb('4G'), 4096.0)
+
+  def test_megabytes_suffix(self):
+    self.assertAlmostEqual(phases._parse_vm_bytes_to_mb('512M'), 512.0)
+
+  def test_kilobytes_suffix(self):
+    self.assertAlmostEqual(phases._parse_vm_bytes_to_mb('2048K'), 2.0)
+
+  def test_terabytes_suffix(self):
+    self.assertAlmostEqual(phases._parse_vm_bytes_to_mb('1T'), 1024.0 * 1024.0)
+
+  def test_lowercase_suffix(self):
+    self.assertAlmostEqual(phases._parse_vm_bytes_to_mb('2g'), 2048.0)
+
+  def test_empty_string_returns_zero(self):
+    self.assertAlmostEqual(phases._parse_vm_bytes_to_mb(''), 0.0)
+
+  def test_invalid_string_returns_zero(self):
+    self.assertAlmostEqual(phases._parse_vm_bytes_to_mb('invalid'), 0.0)
+
+  def test_whitespace_stripped(self):
+    self.assertAlmostEqual(phases._parse_vm_bytes_to_mb('  2G  '), 2048.0)
+
+  def test_bare_bytes_converted_to_mb(self):
+    # 1048576 bytes == 1 MB
+    result = phases._parse_vm_bytes_to_mb('1048576')
+    self.assertAlmostEqual(result, 1.0)
+
+
+class PerWorkerVmBytesTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for phases._per_worker_vm_bytes()."""
+
+  def test_splits_evenly(self):
+    # 4096 MB / 4 workers = 1024 MB
+    self.assertEqual(phases._per_worker_vm_bytes('4096M', 4), '1024M')
+
+  def test_gigabyte_input_splits(self):
+    # 2G = 2048 MB / 2 workers = 1024 MB
+    self.assertEqual(phases._per_worker_vm_bytes('2G', 2), '1024M')
+
+  def test_single_worker_returns_full(self):
+    self.assertEqual(phases._per_worker_vm_bytes('2G', 1), '2048M')
+
+  def test_zero_workers_treated_as_one(self):
+    # workers clamped to max(1, 0) = 1
+    self.assertEqual(phases._per_worker_vm_bytes('1G', 0), '1024M')
+
+  def test_negative_workers_treated_as_one(self):
+    self.assertEqual(phases._per_worker_vm_bytes('512M', -5), '512M')
+
+  def test_zero_total_returns_original(self):
+    # _parse_vm_bytes_to_mb('0M') = 0 → returns as-is
+    self.assertEqual(phases._per_worker_vm_bytes('0M', 4), '0M')
+
+  def test_minimum_one_mb_per_worker(self):
+    # 1M / 4 workers = 0.25 → clamped to max(1, 0) = 1M
+    self.assertEqual(phases._per_worker_vm_bytes('1M', 4), '1M')
+
+
+class ParseVmstatTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for phases._parse_vmstat()."""
+
+  _META = {'benchmark': 'swap_encryption'}
+
+  # vmstat column layout (0-indexed):
+  # r b swpd free buff cache si so bi bo in cs us sy id wa st
+  _SINGLE_LINE = (
+      'procs -----------memory---------- ---swap-- -----io---- -system-- cpu\n'
+      ' r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs'
+      ' us sy id  wa st\n'
+      ' 0  0  10240 123456  12345 456789  100  200   50   100  200  400'
+      ' 10  5  80   5  0\n'
+  )
+
+  def test_single_data_line_returns_ten_samples(self):
+    samples = phases._parse_vmstat(self._SINGLE_LINE, self._META)
+    self.assertLen(samples, 10)
+
+  def test_empty_output_returns_empty(self):
+    self.assertEmpty(phases._parse_vmstat('', self._META))
+
+  def test_header_only_returns_empty(self):
+    header = ' r  b   swpd   free   buff  cache   si   so    bi    bo\n'
+    self.assertEmpty(phases._parse_vmstat(header, self._META))
+
+  def test_swap_in_mean_value(self):
+    samples = phases._parse_vmstat(self._SINGLE_LINE, self._META)
+    si = next(s for s in samples if s.metric == 'swap_in_pages_per_sec')
+    self.assertAlmostEqual(si.value, 100.0)
+
+  def test_swap_out_mean_value(self):
+    samples = phases._parse_vmstat(self._SINGLE_LINE, self._META)
+    so = next(s for s in samples if s.metric == 'swap_out_pages_per_sec')
+    self.assertAlmostEqual(so.value, 200.0)
+
+  def test_peak_computed_over_multiple_lines(self):
+    # Two data lines: si=100 and si=200 → max=200
+    two_lines = (
+        ' 0  0  10240 123456  12345 456789  100  200   50   100  200  400'
+        ' 10  5  80   5  0\n'
+        ' 0  0  10240 123456  12345 456789  200  400   50   100  200  400'
+        ' 10  5  80   5  0\n'
+    )
+    samples = phases._parse_vmstat(two_lines, self._META)
+    si_max = next(s for s in samples if s.metric == 'swap_in_pages_per_sec_max')
+    self.assertAlmostEqual(si_max.value, 200.0)
+
+  def test_mean_computed_over_multiple_lines(self):
+    two_lines = (
+        ' 0  0  10240 123456  12345 456789  100  200   50   100  200  400'
+        ' 10  5  80   5  0\n'
+        ' 0  0  10240 123456  12345 456789  200  400   50   100  200  400'
+        ' 10  5  80   5  0\n'
+    )
+    samples = phases._parse_vmstat(two_lines, self._META)
+    si_avg = next(s for s in samples if s.metric == 'swap_in_pages_per_sec')
+    self.assertAlmostEqual(si_avg.value, 150.0)
+
+  def test_metric_source_metadata(self):
+    samples = phases._parse_vmstat(self._SINGLE_LINE, self._META)
+    for s in samples:
+      self.assertEqual(s.metadata.get('metric_source'), 'vmstat')
+
+  def test_total_cpu_is_sum_of_us_sy_wa(self):
+    # us=10, sy=5, wa=5 → total=20
+    samples = phases._parse_vmstat(self._SINGLE_LINE, self._META)
+    total = next(s for s in samples if s.metric == 'total_cpu_pct_avg')
+    self.assertAlmostEqual(total.value, 20.0)
+
+
+class ParsePidstatTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for phases._parse_pidstat()."""
+
+  _META = {'benchmark': 'swap_encryption'}
+
+  # pidstat output (10 cols, 0-indexed):
+  # Timestamp UID PID %usr %system %guest %wait %CPU CPU Command
+  # parts[7] = %CPU, parts[-1] = Command
+  _KCRYPTD_LINE = (
+      '15:32:01      0    1234    0.00    4.00    0.00    0.00    4.00'
+      '     0  kcryptd\n'
+  )
+  _KSWAPD_LINE = (
+      '15:32:01      0    1235    0.00    2.00    0.00    0.00    2.00'
+      '     0  kswapd0\n'
+  )
+  _UNKNOWN_LINE = (
+      '15:32:01      0    9999    0.00    1.00    0.00    0.00    1.00'
+      '     0  bash\n'
+  )
+
+  def test_matching_process_returns_two_samples(self):
+    samples = phases._parse_pidstat(self._KCRYPTD_LINE, self._META)
+    self.assertLen(samples, 2)
+
+  def test_unknown_process_returns_empty(self):
+    self.assertEmpty(phases._parse_pidstat(self._UNKNOWN_LINE, self._META))
+
+  def test_empty_output_returns_empty(self):
+    self.assertEmpty(phases._parse_pidstat('', self._META))
+
+  def test_cpu_avg_metric_name(self):
+    samples = phases._parse_pidstat(self._KCRYPTD_LINE, self._META)
+    names = {s.metric for s in samples}
+    self.assertIn('cpu_pct_avg_kcryptd', names)
+
+  def test_cpu_max_metric_name(self):
+    samples = phases._parse_pidstat(self._KCRYPTD_LINE, self._META)
+    names = {s.metric for s in samples}
+    self.assertIn('cpu_pct_max_kcryptd', names)
+
+  def test_cpu_value_correct(self):
+    samples = phases._parse_pidstat(self._KCRYPTD_LINE, self._META)
+    avg = next(s for s in samples if 'avg' in s.metric)
+    self.assertAlmostEqual(avg.value, 4.0)
+
+  def test_multiple_processes_returns_four_samples(self):
+    both = self._KCRYPTD_LINE + self._KSWAPD_LINE
+    samples = phases._parse_pidstat(both, self._META)
+    self.assertLen(samples, 4)
+
+  def test_metric_source_metadata(self):
+    samples = phases._parse_pidstat(self._KCRYPTD_LINE, self._META)
+    for s in samples:
+      self.assertEqual(s.metadata.get('metric_source'), 'pidstat')
+
+  def test_short_line_skipped(self):
+    short = '15:32:01 0 1234 kcryptd\n'
+    self.assertEmpty(phases._parse_pidstat(short, self._META))
+
+
+class CgroupSwapLimitMbTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for phases._cgroup_swap_limit_mb()."""
+
+  def _make_ds(self, output: str) -> mock.MagicMock:
+    ds = mock.MagicMock()
+    ds.PodExec.return_value = (output, '')
+    return ds
+
+  def test_v2_max_returns_infinity(self):
+    ds = self._make_ds('V2=max')
+    self.assertEqual(phases._cgroup_swap_limit_mb(ds), float('inf'))
+
+  def test_v2_numeric_converted_to_mb(self):
+    # 1073741824 bytes = 1024 MB
+    ds = self._make_ds('V2=1073741824')
+    self.assertAlmostEqual(phases._cgroup_swap_limit_mb(ds), 1024.0)
+
+  def test_v2_zero_returns_zero(self):
+    ds = self._make_ds('V2=0')
+    self.assertAlmostEqual(phases._cgroup_swap_limit_mb(ds), 0.0)
+
+  def test_v1_memsw_minus_mem(self):
+    # memsw=2147483648 (2GB), mem=1073741824 (1GB) → swap=1GB=1024MB
+    ds = self._make_ds('MEMSW=2147483648 MEM=1073741824')
+    self.assertAlmostEqual(phases._cgroup_swap_limit_mb(ds), 1024.0)
+
+  def test_v1_uncapped_returns_infinity(self):
+    # memsw >= 1<<62 → uncapped
+    ds = self._make_ds(f'MEMSW={1 << 62} MEM=1073741824')
+    self.assertEqual(phases._cgroup_swap_limit_mb(ds), float('inf'))
+
+  def test_empty_output_returns_minus_one(self):
+    ds = self._make_ds('')
+    self.assertAlmostEqual(phases._cgroup_swap_limit_mb(ds), -1.0)
+
+  def test_pod_exec_exception_returns_minus_one(self):
+    ds = mock.MagicMock()
+    ds.PodExec.side_effect = RuntimeError('pod gone')
+    self.assertAlmostEqual(phases._cgroup_swap_limit_mb(ds), -1.0)
+
+  def test_v2_invalid_value_returns_minus_one(self):
+    ds = self._make_ds('V2=notanumber')
+    self.assertAlmostEqual(phases._cgroup_swap_limit_mb(ds), -1.0)
+
+
+class AutoscaleVmBytesTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for phases._autoscale_vm_bytes()."""
+
+  # /proc/meminfo with 32 GB RAM and 64 GB swap
+  _MEMINFO_32G_64G = (
+      'MemTotal:       33554432 kB\n'   # 32 GB
+      'MemFree:        10000000 kB\n'
+      'SwapTotal:      67108864 kB\n'   # 64 GB
+      'SwapFree:       67108864 kB\n'
+  )
+
+  def _make_ds(
+      self, meminfo: str = _MEMINFO_32G_64G, cgroup_out: str = 'V2=max'
+  ) -> mock.MagicMock:
+    ds = mock.MagicMock()
+    def _exec(cmd, **_):
+      if 'meminfo' in cmd:
+        return (meminfo, '')
+      return (cgroup_out, '')
+    ds.PodExec.side_effect = _exec
+    return ds
+
+  def test_scales_up_small_request(self):
+    # Requested 1G, RAM=32G → should scale up (1G < 0.95 × 32G)
+    ds = self._make_ds()
+    result = phases._autoscale_vm_bytes(ds, '1G', [])
+    self.assertNotEqual(result, '1G')
+    # Result should be in 'NNg' form, larger than 1G
+    self.assertTrue(result.endswith('G'), f'Expected G suffix, got {result}')
+    self.assertGreater(int(result[:-1]), 1)
+
+  def test_caps_oversized_request(self):
+    # RAM=32G, swap=64G → ceiling = 32 + 64 - 4 = 92 GB
+    # Request 200G > ceiling → should be capped
+    ds = self._make_ds()
+    result = phases._autoscale_vm_bytes(ds, '200G', [])
+    self.assertTrue(result.endswith('G'))
+    self.assertLess(int(result[:-1]), 200)
+
+  def test_locked_cgroup_caps_to_ram(self):
+    # V2=0 → cgroup swap locked → result capped to ~0.9 × RAM
+    ds = self._make_ds(cgroup_out='V2=0')
+    reasons = []
+    result = phases._autoscale_vm_bytes(ds, '100G', reasons)
+    self.assertLen(reasons, 1)
+    self.assertIn('cgroup swap is locked', reasons[0])
+    self.assertTrue(result.endswith('G'))
+
+  def test_pod_exec_exception_returns_original(self):
+    ds = mock.MagicMock()
+    ds.PodExec.side_effect = RuntimeError('network error')
+    result = phases._autoscale_vm_bytes(ds, '4G', [])
+    self.assertEqual(result, '4G')
+
+  def test_missing_memtotal_returns_original(self):
+    # meminfo without MemTotal line
+    ds = self._make_ds(meminfo='SwapTotal: 67108864 kB\n')
+    result = phases._autoscale_vm_bytes(ds, '4G', [])
+    self.assertEqual(result, '4G')
+
+  def test_adequate_request_unchanged(self):
+    # Requested = 40G = 40960 MB; RAM=32G=32768MB; 40960 > 0.95×32768=31130
+    # ceiling = 32768 + 65536 - 4096 = 94208 MB = 92G; 40960 < 94208 → no cap
+    ds = self._make_ds()
+    result = phases._autoscale_vm_bytes(ds, '40G', [])
+    self.assertEqual(result, '40G')
