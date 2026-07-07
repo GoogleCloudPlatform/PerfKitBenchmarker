@@ -468,8 +468,8 @@ class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
 
   DEFAULT_MOUNT_OPTIONS = [
       '--allow-other',
-      '--dir-mode=755',
-      '--file-mode=755',
+      '--dir-mode=777',
+      '--file-mode=777',
       # Sets part size to 64MiB. Max upload 64000MiB.
       '--write-part-size=67108864',
       '--incremental-upload',
@@ -477,7 +477,7 @@ class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
       '--allow-delete',
   ]
 
-  def SetUpDisk(self):
+  def SetUpDiskOnLinux(self):
     """Performs setup of S3 buckets."""
     self.vm.Install('mountpoint')
     target = self.disk_spec.mount_point

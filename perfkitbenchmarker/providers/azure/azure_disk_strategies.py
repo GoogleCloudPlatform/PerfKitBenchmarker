@@ -312,7 +312,9 @@ class AzLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
 class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
   """Strategies to set up Azure Blob Containers."""
 
-  DEFAULT_MOUNT_OPTIONS = []
+  DEFAULT_MOUNT_OPTIONS = [
+      '--allow-other',
+  ]
 
   def SetUpDiskOnLinux(self):
     """Performs setup of Blobfuse2 containers on Linux."""
@@ -348,7 +350,9 @@ class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
         'log_trace': FLAGS.object_storage_fuse_log_trace,
     }
     self.vm.RenderTemplate(
-        template_path=data.ResourcePath('blobfuse2/config.yaml.j2'),
+        template_path=data.ResourcePath(
+            f'blobfuse2/{FLAGS.blobfuse_config_file_path}'
+        ),
         remote_path='blobfuse2_config.yaml',
         context=context,
     )

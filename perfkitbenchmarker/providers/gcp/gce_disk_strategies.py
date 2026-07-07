@@ -378,8 +378,8 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
   # https://cloud.google.com/storage/docs/cloud-storage-fuse/performance#compute-engine
   DEFAULT_MOUNT_OPTIONS = [
       'allow_other',
-      '--dir-mode=755',
-      '--file-mode=755',
+      '--dir-mode=777',
+      '--file-mode=777',
       '--implicit-dirs',
       '--rename-dir-limit=200000',
   ]
@@ -387,6 +387,15 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
       '--cache-dir=/tmp/gcsfuse-cache-path',
       '--file-cache-max-size-mb=-1',
       '--file-cache-cache-file-for-range-read=true',
+  ]
+  ENABLE_METADATA_CACHE_OPTIONS = [
+      '--write-global-max-blocks=-1',
+  ]
+  DISABLE_METADATA_CACHE_OPTIONS = [
+      '--metadata-cache-ttl-secs=0',
+      '--stat-cache-max-size-mb=0',
+      '--metadata-cache-negative-ttl-secs=0',
+      '--kernel-list-cache-ttl-secs=0',
   ]
 
   def SetUpDiskOnLinux(self):
@@ -398,31 +407,21 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
         'sudo mkdir -p /tmp/logs && sudo chmod a+w /tmp/logs'
     )
 
-    metadata_cache_option_val = '0'
-    if FLAGS.gcs_fuse_enable_metadata_cache:
-      metadata_cache_option_val = '-1'
-    metadata_cache_options = [
-        f'--metadata-cache-ttl-secs={metadata_cache_option_val}',
-        f'--stat-cache-max-size-mb={metadata_cache_option_val}',
-        f'--type-cache-max-size-mb={metadata_cache_option_val}',
-        f'--metadata-cache-negative-ttl-secs={metadata_cache_option_val}',
-        f'--kernel-list-cache-ttl-secs={metadata_cache_option_val}',
-    ]
-    logging_options = []
-    if FLAGS.object_storage_fuse_log_trace:
-      logging_options = [
-          '--log-severity=trace',
-          '--log-file=/tmp/logs/gcsfuse.log',
-      ]
     all_mount_options = (
         self.DEFAULT_MOUNT_OPTIONS
         + FLAGS.mount_options
-        + metadata_cache_options
-        + logging_options
     )
+    if FLAGS.gcs_fuse_enable_metadata_cache:
+      all_mount_options += self.ENABLE_METADATA_CACHE_OPTIONS
+    else:
+      all_mount_options += self.DISABLE_METADATA_CACHE_OPTIONS
     if FLAGS.gcs_fuse_enable_file_cache:
       all_mount_options += self.FILE_CACHE_OPTIONS
-
+    if FLAGS.object_storage_fuse_log_trace:
+      all_mount_options += [
+          '--log-severity=trace',
+          '--log-file=/tmp/logs/gcsfuse.log',
+      ]
     opts = ' '.join(all_mount_options)
     bucket_name = (
         FLAGS.object_storage_fuse_bucket_name or f'gcsfuse-{FLAGS.run_uri}'
@@ -440,8 +439,6 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
       gcs_client.Create()
 
     self.vm.RemoteCommand(f'sudo gcsfuse -o {opts} {bucket_name} {target}')
-    # Pre-populate the metadata cache
-    self.vm.RemoteCommand(f'ls -R {target} > /dev/null')
     # Increase kernel read-ahead size
     self.vm.RemoteCommand(
         'echo 1024 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'

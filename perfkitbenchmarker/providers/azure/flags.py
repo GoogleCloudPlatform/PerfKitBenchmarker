@@ -194,6 +194,11 @@ BLOBFUSE_BLOCK_SIZE_MB = flags.DEFINE_float(
     2,
     'The blobfuse block size in MB. Defaults to 2.',
 )
+BLOBFUSE_CONFIG_FILE_PATH = flags.DEFINE_string(
+    'blobfuse_config_file_path',
+    'fio_config.yaml.j2',
+    'The name of the blobfuse config file. Defaults to fio_config.yaml.j2.',
+)
 FLAG_K8S_INFERENCE_BLOBSTORAGE_ACCOUNT = flags.DEFINE_string(
     'k8s_inference_server_blobstorage_account',
     None,

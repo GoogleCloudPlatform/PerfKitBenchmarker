@@ -24,6 +24,7 @@ There are two types of diks strategies.
 import copy
 import json
 import logging
+import posixpath
 import time
 from typing import Any, Union
 
@@ -158,7 +159,13 @@ class SetUpDiskStrategy:
     self.scratch_disks = []
 
   def SetUpDisk(self) -> None:
+    target = self.disk_spec.mount_point
     if self.vm.OS_TYPE in os_types.LINUX_OS_TYPES:
+      # Use absolute path if a relative path is provided.
+      if target and not target.startswith('/'):
+        vm_pwd, _ = self.vm.RemoteCommand('pwd')
+        target = posixpath.join(vm_pwd.strip(), target)
+        self.disk_spec.mount_point = target
       self.SetUpDiskOnLinux()
     else:
       self.SetUpDiskOnWindows()
