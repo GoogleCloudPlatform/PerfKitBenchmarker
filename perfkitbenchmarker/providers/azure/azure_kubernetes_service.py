@@ -237,6 +237,9 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
 
   def _CreateNodePool(self, nodepool_config: container.BaseNodePoolConfig):
     """Creates a node pool."""
+    labels = {'pkb_nodepool': nodepool_config.name}
+    if nodepool_config.node_labels:
+      labels.update(nodepool_config.node_labels)
     cmd = [
         azure.AZURE_PATH,
         'aks',
@@ -247,8 +250,10 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--name',
         _AzureNodePoolName(nodepool_config.name),
         '--labels',
-        f'pkb_nodepool={nodepool_config.name}',
+        ' '.join(f'{k}={v}' for k, v in labels.items()),
     ] + self._GetNodeFlags(nodepool_config)
+    if nodepool_config.node_taints:
+      cmd += ['--node-taints', ','.join(nodepool_config.node_taints)]
     _, stderr, retcode = vm_util.IssueCommand(
         cmd, timeout=600, raise_on_failure=False
     )
