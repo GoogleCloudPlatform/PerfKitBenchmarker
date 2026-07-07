@@ -209,7 +209,10 @@ class SwapDaemonSet(resource.BaseResource):
           timeout: Maximum seconds to wait.
 
     Returns:
-          Pod name on success; None on timeout.  Also updates self.pod_name.
+          Pod name (str) on success. Also updates self.pod_name.
+
+    Raises:
+          errors.Benchmarks.PrepareException: if the pod is not ready within timeout.
     """
     deadline = time.time() + timeout
     last_phase = ''
