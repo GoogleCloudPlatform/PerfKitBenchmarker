@@ -11,14 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for swap_config, gcp_swap_config, and aws_swap_config resources."""
+"""Tests for perfkitbenchmarker.resources.container_service.swap_config."""
+
+# pylint: disable=missing-function-docstring,protected-access
 
 import os
 import unittest
 from unittest import mock
 
-from perfkitbenchmarker.providers.aws import aws_swap_config
-from perfkitbenchmarker.providers.gcp import gcp_swap_config
 from perfkitbenchmarker.resources.container_service import swap_config
 from tests import pkb_common_test_case
 
@@ -46,17 +46,18 @@ class BaseSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
 
   def test_create_is_noop(self):
     cfg = swap_config.BaseSwapConfig()
-    cfg._Create()
+    cfg._Create()  # Must not raise.
 
   def test_delete_is_noop(self):
     cfg = swap_config.BaseSwapConfig()
-    cfg._Delete()
+    cfg._Delete()  # Must not raise.
 
 
 class GkeSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for GkeSwapConfig: YAML generation, Hyperdisk validation, lifecycle."""
+  """Tests for GkeSwapConfig: YAML generation, Hyperdisk clamping, lifecycle."""
 
   def _make_spec(self, **kwargs):
+    """Return a mock SwapConfigSpec with sensible defaults."""
     spec = mock.Mock()
     spec.swappiness = kwargs.get('swappiness', 100)
     spec.min_free_kbytes = kwargs.get('min_free_kbytes', 67584)
@@ -67,12 +68,19 @@ class GkeSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
     spec.boot_disk_throughput = kwargs.get('boot_disk_throughput', 0)
     return spec
 
+  # ── from_spec ─────────────────────────────────────────────────────────────
+
   def test_from_spec_maps_all_attrs(self):
     spec = self._make_spec(
-        swappiness=60, min_free_kbytes=400, watermark_scale_factor=200,
-        lssd=True, lssd_count=2, boot_disk_iops=160000, boot_disk_throughput=2400,
+        swappiness=60,
+        min_free_kbytes=400,
+        watermark_scale_factor=200,
+        lssd=True,
+        lssd_count=2,
+        boot_disk_iops=160000,
+        boot_disk_throughput=2400,
     )
-    cfg = gcp_swap_config.GkeSwapConfig.from_spec(spec)
+    cfg = swap_config.GkeSwapConfig.from_spec(spec)
     self.assertEqual(cfg.swappiness, 60)
     self.assertEqual(cfg.min_free_kbytes, 400)
     self.assertEqual(cfg.watermark_scale_factor, 200)
@@ -81,13 +89,15 @@ class GkeSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(cfg.boot_disk_iops, 160000)
     self.assertEqual(cfg.boot_disk_throughput, 2400)
 
+  # ── WriteLinuxConfigYaml ──────────────────────────────────────────────────
+
   def test_write_linux_config_yaml_basic_content(self):
-    cfg = gcp_swap_config.GkeSwapConfig(
+    cfg = swap_config.GkeSwapConfig(
         swappiness=80, min_free_kbytes=300, watermark_scale_factor=400
     )
     path = cfg.WriteLinuxConfigYaml()
     try:
-      with open(path) as f:
+      with open(path, encoding='utf-8') as f:
         content = f.read()
       self.assertIn('linuxConfig:', content)
       self.assertIn('swapConfig:', content)
@@ -99,10 +109,10 @@ class GkeSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
       cfg.CleanupYaml()
 
   def test_write_linux_config_yaml_no_lssd_has_no_disk_profile(self):
-    cfg = gcp_swap_config.GkeSwapConfig(lssd=False)
+    cfg = swap_config.GkeSwapConfig(lssd=False)
     path = cfg.WriteLinuxConfigYaml()
     try:
-      with open(path) as f:
+      with open(path, encoding='utf-8') as f:
         content = f.read()
       self.assertNotIn('dedicatedLocalSsdProfile', content)
       self.assertNotIn('diskCount', content)
@@ -110,10 +120,10 @@ class GkeSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
       cfg.CleanupYaml()
 
   def test_write_linux_config_yaml_lssd_includes_disk_profile(self):
-    cfg = gcp_swap_config.GkeSwapConfig(lssd=True, lssd_count=2)
+    cfg = swap_config.GkeSwapConfig(lssd=True, lssd_count=2)
     path = cfg.WriteLinuxConfigYaml()
     try:
-      with open(path) as f:
+      with open(path, encoding='utf-8') as f:
         content = f.read()
       self.assertIn('dedicatedLocalSsdProfile:', content)
       self.assertIn('diskCount: 2', content)
@@ -121,51 +131,60 @@ class GkeSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
       cfg.CleanupYaml()
 
   def test_write_linux_config_yaml_returns_existing_file_path(self):
-    cfg = gcp_swap_config.GkeSwapConfig()
+    cfg = swap_config.GkeSwapConfig()
     path = cfg.WriteLinuxConfigYaml()
     try:
       self.assertTrue(os.path.isfile(path))
     finally:
       cfg.CleanupYaml()
 
+  # ── CleanupYaml ───────────────────────────────────────────────────────────
+
   def test_cleanup_yaml_removes_tempfile(self):
-    cfg = gcp_swap_config.GkeSwapConfig()
+    cfg = swap_config.GkeSwapConfig()
     path = cfg.WriteLinuxConfigYaml()
     self.assertTrue(os.path.exists(path))
     cfg.CleanupYaml()
     self.assertFalse(os.path.exists(path))
 
   def test_cleanup_yaml_noop_before_write(self):
-    cfg = gcp_swap_config.GkeSwapConfig()
-    cfg.CleanupYaml()
+    cfg = swap_config.GkeSwapConfig()
+    cfg.CleanupYaml()  # Must not raise.
 
   def test_cleanup_yaml_noop_on_second_call(self):
-    cfg = gcp_swap_config.GkeSwapConfig()
+    cfg = swap_config.GkeSwapConfig()
     cfg.WriteLinuxConfigYaml()
     cfg.CleanupYaml()
-    cfg.CleanupYaml()
+    cfg.CleanupYaml()  # Second call must not raise.
 
-  def test_valid_hyperdisk_throughput_no_raise_needed(self):
-    cfg = gcp_swap_config.GkeSwapConfig(boot_disk_iops=160000, boot_disk_throughput=2400)
+  # ── ValidHyperdiskThroughput ──────────────────────────────────────────────
+
+  def test_valid_hyperdisk_throughput_no_clamp_needed(self):
+    # min_throughput = ceil(160000 / 256) = 625; 2400 > 625 → unchanged.
+    cfg = swap_config.GkeSwapConfig(
+        boot_disk_iops=160000, boot_disk_throughput=2400
+    )
     self.assertEqual(cfg.ValidHyperdiskThroughput(), 2400)
 
-  def test_valid_hyperdisk_throughput_raises_when_too_low(self):
-    # min = ceil(160000/256) = 625; 100 < 625 -> ValueError
-    cfg = gcp_swap_config.GkeSwapConfig(boot_disk_iops=160000, boot_disk_throughput=100)
-    with self.assertRaises(ValueError):
-      cfg.ValidHyperdiskThroughput()
+  def test_valid_hyperdisk_throughput_clamps_up(self):
+    # min_throughput = ceil(160000 / 256) = 625; 100 < 625 → clamp to 625.
+    cfg = swap_config.GkeSwapConfig(
+        boot_disk_iops=160000, boot_disk_throughput=100
+    )
+    self.assertEqual(cfg.ValidHyperdiskThroughput(), 625)
 
   def test_valid_hyperdisk_throughput_no_iops_returns_throughput(self):
-    cfg = gcp_swap_config.GkeSwapConfig(boot_disk_iops=0, boot_disk_throughput=500)
+    # iops=0 means no constraint → return throughput unchanged.
+    cfg = swap_config.GkeSwapConfig(boot_disk_iops=0, boot_disk_throughput=500)
     self.assertEqual(cfg.ValidHyperdiskThroughput(), 500)
 
   def test_valid_hyperdisk_throughput_both_zero_returns_zero(self):
-    cfg = gcp_swap_config.GkeSwapConfig(boot_disk_iops=0, boot_disk_throughput=0)
+    cfg = swap_config.GkeSwapConfig(boot_disk_iops=0, boot_disk_throughput=0)
     self.assertEqual(cfg.ValidHyperdiskThroughput(), 0)
 
-  def test_valid_hyperdisk_throughput_exact_minimum_no_raise(self):
-    # iops=256, throughput=1 -> min=1; at boundary -> no raise
-    cfg = gcp_swap_config.GkeSwapConfig(boot_disk_iops=256, boot_disk_throughput=1)
+  def test_valid_hyperdisk_throughput_exact_minimum_no_clamp(self):
+    # iops=256, throughput=1 → min=1; exactly at boundary → unchanged.
+    cfg = swap_config.GkeSwapConfig(boot_disk_iops=256, boot_disk_throughput=1)
     self.assertEqual(cfg.ValidHyperdiskThroughput(), 1)
 
 
@@ -173,45 +192,53 @@ class EksSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
   """Tests for EksSwapConfig: nodeadm YAML output and from_spec mapping."""
 
   def _make_spec(self, **kwargs):
+    """Return a mock SwapConfigSpec for EKS tests."""
     spec = mock.Mock()
     spec.swappiness = kwargs.get('swappiness', 100)
     spec.min_free_kbytes = kwargs.get('min_free_kbytes', 67584)
     spec.watermark_scale_factor = kwargs.get('watermark_scale_factor', 500)
     return spec
 
+  # ── from_spec ─────────────────────────────────────────────────────────────
+
   def test_from_spec_maps_sysctl_attrs(self):
-    spec = self._make_spec(swappiness=60, min_free_kbytes=400, watermark_scale_factor=200)
-    cfg = aws_swap_config.EksSwapConfig.from_spec(spec)
+    spec = self._make_spec(
+        swappiness=60, min_free_kbytes=400, watermark_scale_factor=200
+    )
+    cfg = swap_config.EksSwapConfig.from_spec(spec)
     self.assertEqual(cfg.swappiness, 60)
     self.assertEqual(cfg.min_free_kbytes, 400)
     self.assertEqual(cfg.watermark_scale_factor, 200)
 
   def test_from_spec_eks_specific_attrs_use_defaults(self):
-    cfg = aws_swap_config.EksSwapConfig.from_spec(self._make_spec())
+    # from_spec does not accept memory_swap_behavior / fail_swap_on from spec.
+    cfg = swap_config.EksSwapConfig.from_spec(self._make_spec())
     self.assertEqual(cfg.memory_swap_behavior, 'LimitedSwap')
     self.assertFalse(cfg.fail_swap_on)
 
+  # ── GetNodeadmConfig ──────────────────────────────────────────────────────
+
   def test_get_nodeadm_config_api_version(self):
-    cfg = aws_swap_config.EksSwapConfig()
+    cfg = swap_config.EksSwapConfig()
     self.assertIn('apiVersion: node.eks.aws/v1alpha1', cfg.GetNodeadmConfig())
 
   def test_get_nodeadm_config_memory_swap_behavior(self):
-    cfg = aws_swap_config.EksSwapConfig()
+    cfg = swap_config.EksSwapConfig()
     self.assertIn('memorySwapBehavior: LimitedSwap', cfg.GetNodeadmConfig())
 
   def test_get_nodeadm_config_fail_swap_on_false(self):
-    cfg = aws_swap_config.EksSwapConfig(fail_swap_on=False)
+    cfg = swap_config.EksSwapConfig(fail_swap_on=False)
     self.assertIn('failSwapOn: false', cfg.GetNodeadmConfig())
 
   def test_get_nodeadm_config_sysctl_keys_present(self):
-    cfg = aws_swap_config.EksSwapConfig()
+    cfg = swap_config.EksSwapConfig()
     output = cfg.GetNodeadmConfig()
     self.assertIn('vm.swappiness:', output)
     self.assertIn('vm.min_free_kbytes:', output)
     self.assertIn('vm.watermark_scale_factor:', output)
 
   def test_get_nodeadm_config_reflects_custom_sysctl_values(self):
-    cfg = aws_swap_config.EksSwapConfig(
+    cfg = swap_config.EksSwapConfig(
         swappiness=60, min_free_kbytes=400, watermark_scale_factor=200
     )
     output = cfg.GetNodeadmConfig()
@@ -219,9 +246,12 @@ class EksSwapConfigTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('vm.min_free_kbytes: 400', output)
     self.assertIn('vm.watermark_scale_factor: 200', output)
 
+  # ── _Create stub ──────────────────────────────────────────────────────────
+
   def test_create_raises_not_implemented(self):
-    # EKS impl deferred to PR #6780 - must raise, not silently pass.
-    cfg = aws_swap_config.EksSwapConfig()
+    # EksSwapConfig._Create() is a stub; must raise NotImplementedError so
+    # callers fail fast rather than silently skipping swap activation.
+    cfg = swap_config.EksSwapConfig()
     with self.assertRaises(NotImplementedError):
       cfg._Create()
 

@@ -173,7 +173,7 @@ def RunPhase1Fio(  # pylint: disable=invalid-name
     daemonset.PodExec(
         f'rm -f {out_file}',
         ignore_failure=True,
-        _retries=0,
+        retries=0,
         timeout=15,
     )
     run_cmd = (
@@ -187,7 +187,7 @@ def RunPhase1Fio(  # pylint: disable=invalid-name
         run_cmd,
         timeout=fio_run_timeout,
         ignore_failure=True,
-        _retries=0,
+        retries=0,
     )
     if 'connection reset by peer' in err:
       raise errors.Benchmarks.RunError(
@@ -619,7 +619,7 @@ def _set_memory_high_guard(daemonset, fraction: float = 0.9) -> None:
   """),
       ignore_failure=True,
       timeout=30,
-      _retries=0,
+      retries=0,
   )
 
 
@@ -634,7 +634,7 @@ def _reset_memory_high_guard(daemonset) -> None:
   """),
       ignore_failure=True,
       timeout=30,
-      _retries=0,
+      retries=0,
   )
 
 
@@ -904,7 +904,7 @@ def RunPhase2b(  # pylint: disable=invalid-name
   daemonset.PodExec(
       'pkill -9 stress-ng 2>/dev/null || true',
       ignore_failure=True,
-      _retries=0,
+      retries=0,
       timeout=15,
   )
   _reset_memory_high_guard(daemonset)
