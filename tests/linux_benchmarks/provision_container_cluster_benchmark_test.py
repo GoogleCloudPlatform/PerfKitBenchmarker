@@ -24,6 +24,9 @@ class TestKubernetesCluster(
         kubernetes_cluster.kubernetes_commands.GetEvents
     )
 
+  def GetNodePoolNames(self) -> list[str]:
+    return []
+
 
 _CONTAINER_START_YAML = """
 - apiVersion: v1
