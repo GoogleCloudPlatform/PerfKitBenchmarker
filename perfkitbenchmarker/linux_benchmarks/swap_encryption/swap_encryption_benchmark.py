@@ -41,6 +41,7 @@ Phase 2 flags (_STRESS_*) are defined in phases.py alongside the phase code.
 """
 
 import logging
+import textwrap
 import time
 from typing import Any
 
@@ -49,9 +50,13 @@ from perfkitbenchmarker import benchmark_spec as bm_spec_lib
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_benchmarks.swap_encryption import phases as _phases
-from perfkitbenchmarker.linux_benchmarks.swap_encryption import utils as _utils
-from perfkitbenchmarker.resources.container_service import swap_daemonset as _ds_mod
+from perfkitbenchmarker.linux_benchmarks.swap_encryption import (
+    phases as _phases,
+    utils as _utils,
+)
+from perfkitbenchmarker.resources.container_service import (
+    swap_daemonset as _ds_mod,
+)
 
 _BenchmarkSpec = bm_spec_lib.BenchmarkSpec
 
@@ -184,15 +189,13 @@ _FAIL_ON_DEGRADED = flags.DEFINE_boolean(
 _PHASES = flags.DEFINE_list(
     'swap_encryption_phases',
     ['all'],
-    'Comma-separated subset of phases to run: fio, 2a, 2b. '
-    "Default 'all' runs every phase.",
+    "Comma-separated phases: fio, 2a, 2b. Default 'all' runs every phase.",
 )
 
 _BENCHMARK_MACHINE_TYPE = flags.DEFINE_string(
     'swap_encryption_benchmark_machine_type',
     '',
-    'Machine type string used for cost estimation when cloud metadata is '
-    'unavailable.',
+    'Machine type for cost estimation when cloud metadata is unavailable.',
 )
 
 _BENCHMARK_LSSD = flags.DEFINE_boolean(
@@ -264,24 +267,31 @@ _DS_NAMESPACE = 'default'
 _DS_LABEL = 'pkb-swap-benchmark'
 _BENCHMARK_NODEPOOL = 'benchmark'
 
+# Set by _ensure_io2_volume(); passed to SetupSwap for serial-based detection.
+_IO2_VOLUME_ID = ''
+
 
 # ---------------------------------------------------------------------------
 # PKB entry points
 # ---------------------------------------------------------------------------
 
 
-def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
+def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:  # pylint: disable=invalid-name
   """Load and return benchmark config spec."""
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def Prepare(spec: _BenchmarkSpec) -> None:
-  """Deploy DaemonSet and delete the cheap default nodepool.
+def Prepare(spec: _BenchmarkSpec) -> None:  # pylint: disable=invalid-name
+  """Deploy DaemonSet, tune kernel swap settings, and configure swap device.
 
   PKB cluster creation automatically provisions the swap-enabled 'benchmark'
-  nodepool (swap_config declared in BENCHMARK_CONFIG). This function only:
+  nodepool (swap_config declared in BENCHMARK_CONFIG). This function:
     1. Deploys the privileged SwapDaemonSet and waits for Running.
     2. Deletes the cheap e2-medium default-pool.
+    3. Tunes kernel swap aggressiveness (swappiness, min_free_kbytes).
+    4. Unlocks container cgroup swap limits.
+    5. Optionally enables zswap.
+    6. Configures cloud-specific swap via SwapDaemonSet.SetupSwap().
   """
   cluster = spec.container_cluster
 
@@ -298,9 +308,52 @@ def Prepare(spec: _BenchmarkSpec) -> None:
   logging.info('[swap_encryption] Benchmark pod ready: %s', daemonset.pod_name)
   _delete_default_pool(cluster)
   daemonset.WaitForPod()
+  logging.info(
+      '[swap_encryption] Benchmark pod (post-deletion): %s', daemonset.pod_name
+  )
+
+  # Tune kernel swap aggressiveness.
+  daemonset.PodExec('sysctl -w vm.swappiness=100', ignore_failure=True)
+  if _MIN_FREE_KBYTES.value > 0:
+    daemonset.PodExec(
+        f'sysctl -w vm.min_free_kbytes={_MIN_FREE_KBYTES.value}'
+    )
+
+  # Unlock container cgroup swap.
+  daemonset.PodExec(
+      textwrap.dedent("""
+    PKB_CG=$(awk -F: '/^0::/{print $3; exit}' /proc/self/cgroup 2>/dev/null)
+    if [ -n "$PKB_CG" ] && [ -f "/sys/fs/cgroup${PKB_CG}/memory.swap.max" ]; then
+      echo max > "/sys/fs/cgroup${PKB_CG}/memory.swap.max" 2>/dev/null || true
+    fi
+    PKB_CG1=$(awk -F: '/:memory:/{print $3; exit}' /proc/self/cgroup 2>/dev/null)
+    if [ -n "$PKB_CG1" ] && \
+       [ -f "/sys/fs/cgroup/memory${PKB_CG1}/memory.memsw.limit_in_bytes" ]; then
+      echo -1 > "/sys/fs/cgroup/memory${PKB_CG1}/memory.memsw.limit_in_bytes" \
+        2>/dev/null || true
+    fi
+  """),
+      ignore_failure=True,
+  )
+
+  # Enable zswap if requested.
+  if _ENABLE_ZSWAP.value:
+    daemonset.EnableZswap()
+
+  # Configure cloud-specific swap via the daemonset abstraction.
+  _ensure_io2_volume()
+  cloud = daemonset.DetectCloud()
+  logging.info('[swap_encryption] Detected cloud: %s', cloud)
+  daemonset.SetupSwap(
+      cloud=cloud,
+      swap_type=_SWAP_TYPE.value,
+      enable_dmcrypt=_ENABLE_DMCRYPT.value,
+      swap_size_gb=_SWAP_SIZE_GB.value,
+      io2_volume_id=_IO2_VOLUME_ID,
+  )
 
 
-def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:
+def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:  # pylint: disable=invalid-name
   """Execute all benchmark phases with gate logic.
 
   Tier 1 (Gate 1): fio microbenchmarks — raw I/O ceiling of the swap device.
@@ -361,7 +414,8 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:
       )
   else:
     logging.info(
-        '[swap_encryption] Skipping Tier 1 (fio) — not in --swap_encryption_phases'
+        '[swap_encryption] Skipping Tier 1 (fio)'
+        ' — not in --swap_encryption_phases'
     )
 
   # ── Tier 2 / Gate 2: stress-ng CPU overhead + IO interference ─────────────
@@ -410,8 +464,7 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:
   if _phase_selected('fio') and not tier1_results:
     if swap_dev.startswith('/dev/loop'):
       logging.info(
-          '[swap_encryption] Gate 1 (fio) skipped — loop device %s '
-          '(no dm-crypt support from pod namespace). Tier 2 results valid.',
+          '[swap_encryption] Gate 1 (fio) skipped (loop) — Tier 2 valid: %s',
           swap_dev,
       )
     else:
@@ -447,7 +500,7 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:
   return results
 
 
-def Cleanup(spec: _BenchmarkSpec) -> None:
+def Cleanup(spec: _BenchmarkSpec) -> None:  # pylint: disable=unused-argument,invalid-name
   """Resources in spec.resources are auto-deleted by the PKB framework.
 
   SwapDaemonSet._Delete() runs in-pod teardown (swapoff, dmsetup remove,

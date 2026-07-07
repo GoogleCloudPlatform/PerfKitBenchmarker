@@ -27,9 +27,13 @@ PR2 additions tested here:
 import unittest
 from unittest import mock
 
-from perfkitbenchmarker.linux_benchmarks.swap_encryption import swap_encryption_benchmark
+from perfkitbenchmarker.linux_benchmarks.swap_encryption import (
+    swap_encryption_benchmark,
+)
 from perfkitbenchmarker.resources.container_service import swap_daemonset
 from tests import pkb_common_test_case
+
+# pylint: disable=protected-access
 
 
 def _make_daemonset():
@@ -122,7 +126,7 @@ class DetectSwapDeviceTest(pkb_common_test_case.PkbCommonTestCase):
 class GetResourceMetadataTest(pkb_common_test_case.PkbCommonTestCase):
   """Tests for SwapDaemonSet.GetResourceMetadata()."""
 
-  def _make_ds_with_responses(
+  def _make_ds_with_responses(  # pylint: disable=missing-function-docstring
       self,
       swap_path='/dev/dm-0',
       kver='5.15.0-gke-1234',
@@ -172,7 +176,7 @@ class GetResourceMetadataTest(pkb_common_test_case.PkbCommonTestCase):
 class DetectCloudTest(pkb_common_test_case.PkbCommonTestCase):
   """Tests for SwapDaemonSet.DetectCloud() added in PR2."""
 
-  def _ds_with_dmi(self, dmi_text, gcp_meta='', aws_meta=''):
+  def _ds_with_dmi(self, dmi_text, gcp_meta='', aws_meta=''):  # pylint: disable=missing-function-docstring
     ds = _make_daemonset()
 
     def _pod_exec(cmd, **_):

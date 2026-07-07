@@ -46,6 +46,17 @@ _INSTANCE_PRICE_USD_PER_HR: dict[str, float] = {
     'r6i.4xlarge': 1.0080,          # 16 vCPU, 128 GB RAM, no Instance Store
 }
 
+_GCP_INSTANCE_TYPE_CMD = (
+    'curl -s -m 3 --fail'
+    ' http://metadata.google.internal/computeMetadata/v1/instance/machine-type'
+    ' -H "Metadata-Flavor: Google" 2>/dev/null || echo ""'
+)
+_AWS_INSTANCE_TYPE_CMD = (
+    'curl -s -m 3 --fail '
+    'http://169.254.169.254/latest/meta-data/instance-type '
+    '2>/dev/null || echo ""'
+)
+
 
 def BuildMetadata(
     daemonset,
@@ -136,18 +147,14 @@ def BuildMetadata(
   instance_label = instance_size_label
   if not instance_label:
     gcp_type_out, _ = daemonset.PodExec(
-        'curl -s -m 3 --fail'
-        ' http://metadata.google.internal/computeMetadata/v1/instance/machine-type'
-        ' -H "Metadata-Flavor: Google" 2>/dev/null || echo ""',
+        _GCP_INSTANCE_TYPE_CMD,
         ignore_failure=True,
     )
     if gcp_type_out.strip():
       instance_label = gcp_type_out.strip().split('/')[-1]
   if not instance_label:
     aws_type_out, _ = daemonset.PodExec(
-        'curl -s -m 3 --fail '
-        'http://169.254.169.254/latest/meta-data/instance-type '
-        '2>/dev/null || echo ""',
+        _AWS_INSTANCE_TYPE_CMD,
         ignore_failure=True,
     )
     instance_label = aws_type_out.strip()
@@ -208,9 +215,7 @@ def CollectCostSample(
 
   # GCP: machine type is the last segment of the metadata URL value
   gcp_type_out, _ = daemonset.PodExec(
-      'curl -s -m 3 --fail'
-      ' http://metadata.google.internal/computeMetadata/v1/instance/machine-type'
-      ' -H "Metadata-Flavor: Google" 2>/dev/null || echo ""',
+      _GCP_INSTANCE_TYPE_CMD,
       ignore_failure=True,
   )
   if gcp_type_out.strip():
@@ -219,9 +224,7 @@ def CollectCostSample(
   if not instance_type:
     # AWS: instance-type is a plain string
     aws_type_out, _ = daemonset.PodExec(
-        'curl -s -m 3 --fail '
-        'http://169.254.169.254/latest/meta-data/instance-type '
-        '2>/dev/null || echo ""',
+        _AWS_INSTANCE_TYPE_CMD,
         ignore_failure=True,
     )
     instance_type = aws_type_out.strip()
@@ -234,20 +237,18 @@ def CollectCostSample(
   if not instance_type and benchmark_machine_type:
     instance_type = benchmark_machine_type
     logging.info(
-        '[swap_encryption] Instance type from metadata unavailable; using'
-        ' --swap_encryption_benchmark_machine_type=%s for cost tracking',
+        '[swap_encryption] Metadata unavailable; using machine_type=%s',
         instance_type,
     )
 
   price = _INSTANCE_PRICE_USD_PER_HR.get(instance_type)
   if price is None:
     logging.info(
-        '[swap_encryption] Unknown instance type "%s" — skipping cost'
-        ' sample. Add it to _INSTANCE_PRICE_USD_PER_HR to enable cost'
-        ' tracking.',
+        '[swap_encryption] No price for type "%s"; skipping cost sample.',
         instance_type,
     )
     return []
+
 
   hours = elapsed_sec / 3600.0
   cost = hours * price

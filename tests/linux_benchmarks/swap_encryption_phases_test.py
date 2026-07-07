@@ -155,6 +155,7 @@ class ParseFioJsonTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEmpty(result)
 
   def test_mixed_rw_job_returns_twelve_samples(self):
+    """Mixed read/write fio job produces 12 samples (6 read + 6 write)."""
     data = {
         'jobs': [{
             'read': {
@@ -195,10 +196,10 @@ class RunPhase1FioTest(pkb_common_test_case.PkbCommonTestCase):
     return ds
 
   def _make_ds_with_jobs(self) -> mock.MagicMock:
-    """Daemonset that returns valid fio JSON for cat, empty for everything else."""
+    """Daemonset returning valid fio JSON for cat, empty for everything else."""
     ds = mock.MagicMock()
 
-    def _exec(cmd, **kwargs):
+    def _exec(cmd, **_):
       if cmd.startswith('cat '):
         # Return valid single-read-job JSON.
         return (
@@ -221,7 +222,7 @@ class RunPhase1FioTest(pkb_common_test_case.PkbCommonTestCase):
 
   def test_loop_device_boot_disk_runs_fio(self):
     ds = self._make_ds_with_jobs()
-    result = phases.RunPhase1Fio(
+    phases.RunPhase1Fio(
         ds, '/dev/loop0', {}, 60, swap_type='boot_disk'
     )
     # boot_disk loop is intentional — fio should run.
@@ -229,7 +230,7 @@ class RunPhase1FioTest(pkb_common_test_case.PkbCommonTestCase):
 
   def test_non_loop_device_runs_all_jobs(self):
     ds = self._make_ds_with_jobs()
-    result = phases.RunPhase1Fio(
+    phases.RunPhase1Fio(
         ds, '/dev/mapper/swap_encrypted', {}, 60, swap_type='hyperdisk'
     )
     # swapoff + prefill + 7×(rm + fio + cat) + mkswap+swapon = 1+1+21+1 = 24
@@ -238,7 +239,7 @@ class RunPhase1FioTest(pkb_common_test_case.PkbCommonTestCase):
   def test_connection_reset_raises_run_error(self):
     ds = mock.MagicMock()
 
-    def _exec(cmd, **kwargs):
+    def _exec(cmd, **_):
       if cmd.startswith('fio '):
         return ('', 'connection reset by peer')
       return ('', '')
@@ -263,7 +264,7 @@ class RunPhase1FioTest(pkb_common_test_case.PkbCommonTestCase):
   def test_default_swap_type_empty_string_non_loop_runs(self):
     ds = self._make_ds_with_jobs()
     # swap_type defaults to '' — non-loop device should run normally.
-    result = phases.RunPhase1Fio(ds, '/dev/sda', {}, 60)
+    phases.RunPhase1Fio(ds, '/dev/sda', {}, 60)
     self.assertGreater(ds.PodExec.call_count, 0)
 
 

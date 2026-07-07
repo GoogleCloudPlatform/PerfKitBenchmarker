@@ -34,7 +34,7 @@ def _make_daemonset(responses: dict | None = None):
   ds = mock.MagicMock()
   ds.DetectCloud.return_value = 'gcp'
 
-  def _pod_exec(cmd, **kwargs):
+  def _pod_exec(cmd, **_):
     if responses:
       for key, val in responses.items():
         if key in cmd:
@@ -56,6 +56,7 @@ class BuildMetadataTest(pkb_common_test_case.PkbCommonTestCase):
     })
 
   def test_metadata_contains_required_keys(self):
+    """Metadata dict contains all required benchmark keys."""
     ds = self._basic_ds()
     meta = utils.BuildMetadata(
         ds,
@@ -84,7 +85,8 @@ class BuildMetadataTest(pkb_common_test_case.PkbCommonTestCase):
         'dmsetup table': ('0 67108864 crypt aes-xts-plain64 0 8:16 0\n', ''),
     })
     meta = utils.BuildMetadata(
-        ds, '/dev/mapper/swap_encrypted', swap_type='hyperdisk', enable_dmcrypt=True,
+        ds, '/dev/mapper/swap_encrypted',
+        swap_type='hyperdisk', enable_dmcrypt=True,
     )
     self.assertEqual(meta['swap_encryption'], 'dm-crypt-plain')
 
@@ -122,7 +124,8 @@ class BuildMetadataTest(pkb_common_test_case.PkbCommonTestCase):
         'uname': ('5.15.0\n', ''),
         'MemTotal': ('0\n', ''),
         'proc/swaps': ('0\n', ''),
-        'metadata.google.internal': ('projects/12345/machineTypes/n4-highmem-32\n', ''),
+        'metadata.google.internal': (
+            'projects/12345/machineTypes/n4-highmem-32\n', ''),
     })
     meta = utils.BuildMetadata(
         ds, '/dev/sda', swap_type='boot_disk', enable_dmcrypt=True,
@@ -138,6 +141,7 @@ class BuildMetadataTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(meta['benchmark'], 'swap_encryption')
 
   def test_flag_values_stored_in_metadata(self):
+    """Flag values (swap_type, enable_dmcrypt) are recorded in metadata."""
     ds = self._basic_ds()
     meta = utils.BuildMetadata(
         ds, '/dev/sda', swap_type='hyperdisk', enable_dmcrypt=True,

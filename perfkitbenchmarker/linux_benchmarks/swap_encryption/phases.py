@@ -47,34 +47,27 @@ _STRESS_TIMEOUT_SEC = flags.DEFINE_integer(
 _STRESS_VM_BYTES = flags.DEFINE_string(
     'swap_encryption_stress_vm_bytes',
     '28G',
-    'Combined stress-ng working-set size (total in-flight footprint, not '
-    'per-worker).  It is divided equally across --swap_encryption_stress_vm_'
-    'workers before being passed to stress-ng, so the total memory touched '
-    'equals this value regardless of worker count.',
+    ('Combined stress-ng working-set size divided equally across workers.')
 )
 
 _STRESS_VM_BYTES_LIST = flags.DEFINE_string(
     'swap_encryption_stress_vm_bytes_list',
     '',
-    'Comma-separated list of stress-ng --vm-bytes values to iterate over '
-    'in Phase 2a (pressure-curve sweep, gap 5).  When non-empty, '
-    'this overrides --swap_encryption_stress_vm_bytes and Phase 2a is run '
-    'once per listed value.',
+    ('Comma-separated vm-bytes sweep list for Phase 2a. Overrides'
+     ' --swap_encryption_stress_vm_bytes when non-empty.')
 )
 
 _STRESS_VM_WORKERS = flags.DEFINE_integer(
     'swap_encryption_stress_vm_workers',
     4,
-    'Number of parallel stress-ng --vm workers for Phase 2a.  The total '
-    'vm_bytes is divided by this number per worker.',
+    'Parallel stress-ng --vm workers for Phase 2a (vm_bytes split equally).'
 )
 
 _MIN_SWAP_OUT_PAGES = flags.DEFINE_integer(
     'swap_encryption_min_swap_out_pages',
     500,
-    'Minimum peak swap-out pages/s required to consider a Phase 2a attempt '
-    'valid.  If all attempts fall below this threshold the run is marked '
-    'degraded.',
+    ('Min peak swap-out pages/s for a valid Phase 2a attempt.'
+     ' Below threshold marks run degraded.')
 )
 
 # ---------------------------------------------------------------------------
@@ -100,7 +93,8 @@ _PREFILL_GIB = 20
 # ---------------------------------------------------------------------------
 
 # Mutable single-element list used as a module-level cache for the detected
-# stress-ng --vm-method value.  Populated on first call to _get_stress_vm_method.
+# stress-ng --vm-method value.
+# Populated on first call to _get_stress_vm_method.
 _stress_vm_method: list[str] = []
 
 # Kernel thread names associated with swap encryption.
@@ -111,7 +105,7 @@ _CRYPTO_PROCS = ('kswapd', 'kworker', 'kcryptd', 'dmcrypt_write')
 # Phase 1: fio microbenchmarks
 # ===========================================================================
 
-def RunPhase1Fio(
+def RunPhase1Fio(  # pylint: disable=invalid-name
     daemonset,
     swap_dev: str,
     base_meta: dict[str, Any],
@@ -144,8 +138,7 @@ def RunPhase1Fio(
   """
   if swap_dev.startswith('/dev/loop') and swap_type != 'boot_disk':
     logging.info(
-        '[swap_encryption] Phase 1 (fio) SKIPPED for plain loop device %s'
-        ' (unintentional single-disk fallback).',
+        '[swap_encryption] Phase 1 skipped: plain loop device %s',
         swap_dev,
     )
     return []
@@ -217,7 +210,7 @@ def RunPhase1Fio(
   return results
 
 
-def ParseFioJson(
+def ParseFioJson(  # pylint: disable=invalid-name
     fio_output: str,
     job_name: str,
     base_meta: dict[str, Any],
@@ -436,8 +429,7 @@ def _autoscale_vm_bytes(
     if requested_mb < node_ram_mb * 0.95:
       new_vm_bytes = f'{target_gb}G'
       logging.info(
-          '[swap_encryption] Auto-scaling vm_bytes UP: %s → %s '
-          '(RAM %.0f GB, swap %.0f GB)',
+          '[swap_encryption] Scale vm_bytes %s→%s (RAM %.0fG swap %.0fG)',
           vm_bytes, new_vm_bytes,
           node_ram_mb / 1024, swap_total_mb / 1024,
       )
@@ -446,8 +438,7 @@ def _autoscale_vm_bytes(
     if requested_mb > target_mb:
       new_vm_bytes = f'{target_gb}G'
       logging.info(
-          '[swap_encryption] Capping vm_bytes DOWN: %s → %s '
-          '(RAM %.0f GB, swap %.0f GB)',
+          '[swap_encryption] Cap vm_bytes %s→%s (RAM %.0fG swap %.0fG)',
           vm_bytes, new_vm_bytes,
           node_ram_mb / 1024, swap_total_mb / 1024,
       )
@@ -456,7 +447,7 @@ def _autoscale_vm_bytes(
     return vm_bytes
   except Exception as e:  # pylint: disable=broad-except
     logging.info(
-        '[swap_encryption] _autoscale_vm_bytes failed (%s); using %s', e, vm_bytes
+        '[swap_encryption] _autoscale failed (%s); keeping %s', e, vm_bytes
     )
     return vm_bytes
 
@@ -467,7 +458,9 @@ def _get_stress_vm_method(daemonset) -> str:
     return _stress_vm_method[0]
 
   try:
-    from perfkitbenchmarker.resources.container_service import kubectl  # pylint: disable=g-import-not-at-top
+    from perfkitbenchmarker.resources.container_service import (  # pylint: disable=g-import-not-at-top,import-outside-toplevel
+        kubectl
+    )
     out, _, _ = kubectl.RunKubectlCommand(
         [
             'exec', daemonset.pod_name,
@@ -549,9 +542,11 @@ def _parse_vmstat(output: str, base_meta: dict) -> list[sample.Sample]:
 
   return [
       sample.Sample('swap_in_pages_per_sec', _mean(si_vals), 'pages/s', meta),
-      sample.Sample('swap_in_pages_per_sec_max', _peak(si_vals), 'pages/s', meta),
+      sample.Sample(
+          'swap_in_pages_per_sec_max', _peak(si_vals), 'pages/s', meta),
       sample.Sample('swap_out_pages_per_sec', _mean(so_vals), 'pages/s', meta),
-      sample.Sample('swap_out_pages_per_sec_max', _peak(so_vals), 'pages/s', meta),
+      sample.Sample(
+          'swap_out_pages_per_sec_max', _peak(so_vals), 'pages/s', meta),
       sample.Sample('total_cpu_pct_avg', _mean(total_active), '%', meta),
       sample.Sample('total_cpu_pct_max', _peak(total_active), '%', meta),
       sample.Sample('system_time_pct_avg', _mean(sy_vals), '%', meta),
@@ -587,7 +582,7 @@ def _parse_pidstat(output: str, base_meta: dict) -> list[sample.Sample]:
 
 
 def _launch_confined_bg_stress(daemonset, timeout_s: int, logfile: str) -> None:
-  """Launch Phase 2b background swap stressor in its own memory-capped cgroup."""
+  """Launch Phase 2b background swap stressor in a memory-capped cgroup."""
   method = _stress_vm_method_flag(daemonset)
   vm_bytes = _STRESS_VM_BYTES.value
   daemonset.PodExec(
@@ -645,7 +640,7 @@ def _reset_memory_high_guard(daemonset) -> None:
 # Phase 2a: stress-ng CPU overhead
 # ===========================================================================
 
-def RunPhase2a(
+def RunPhase2a(  # pylint: disable=invalid-name
     daemonset,
     base_meta: dict[str, Any],
     degraded_reasons: list[str],
@@ -758,19 +753,18 @@ def _run_cpu_overhead_sweep(
         bogo = float(mm.group(1))
         break
     logging.info(
-        '[swap_encryption] Phase 2a attempt %d/%d: peak swap-out '
-        '%.0f pages/s (completed=%s, oom=%s)',
+        '[swap_encryption] Phase 2a %d/%d: swap-out %.0f p/s (ok=%s oom=%s)',
         attempt, max_attempts, swap_out_max, completed_cleanly, oom_killed,
     )
     if best is None or swap_out_max > best['swap_out_max']:
-      best = dict(
-          elapsed=elapsed,
-          oom_killed=oom_killed,
-          swap_out_max=swap_out_max,
-          vmstat_samples=vmstat_samples,
-          pidstat_out=pidstat_out,
-          bogo=bogo,
-      )
+      best = {
+          'elapsed': elapsed,
+          'oom_killed': oom_killed,
+          'swap_out_max': swap_out_max,
+          'vmstat_samples': vmstat_samples,
+          'pidstat_out': pidstat_out,
+          'bogo': bogo,
+      }
     if oom_killed or swap_out_max >= min_so:
       break
     if attempt < max_attempts:
@@ -829,7 +823,7 @@ def _run_cpu_overhead_sweep(
 # Phase 2b: IO interference
 # ===========================================================================
 
-def RunPhase2b(
+def RunPhase2b(  # pylint: disable=invalid-name
     daemonset,
     base_meta: dict[str, Any],
 ) -> list[sample.Sample]:
