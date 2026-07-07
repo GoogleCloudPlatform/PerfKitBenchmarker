@@ -256,7 +256,7 @@ class ThreadSafeResultsTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testAddSingleEntry(self):
     r = kubernetes_management_benchmark.ThreadSafeResults()
-    r.add('op1', kubernetes_management_benchmark.OpTiming(0.1, 1.0))
+    r.Add('op1', kubernetes_management_benchmark.OpTiming(0.1, 1.0))
     self.assertLen(r.entries, 1)
     name, timing = r.entries[0]
     self.assertEqual('op1', name)
@@ -265,7 +265,7 @@ class ThreadSafeResultsTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testAddFailureRecordsName(self):
     r = kubernetes_management_benchmark.ThreadSafeResults()
-    r.add_failure('bad-op')
+    r.AddFailure('bad-op')
     self.assertEqual(['bad-op'], r.failed)
     self.assertEmpty(r.entries)
 
@@ -275,7 +275,7 @@ class ThreadSafeResultsTest(pkb_common_test_case.PkbCommonTestCase):
     n = 100
 
     def _add(i):
-      r.add(
+      r.Add(
           f'op{i}',
           kubernetes_management_benchmark.OpTiming(float(i), float(i) * 2),
       )
