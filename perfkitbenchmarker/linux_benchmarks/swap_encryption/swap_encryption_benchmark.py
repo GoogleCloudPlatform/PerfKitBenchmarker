@@ -64,7 +64,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.linux_benchmarks import swap_encryption_phases as _phases
+from perfkitbenchmarker.linux_benchmarks.swap_encryption import phases as _phases
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import swap_daemonset as _ds_mod
 

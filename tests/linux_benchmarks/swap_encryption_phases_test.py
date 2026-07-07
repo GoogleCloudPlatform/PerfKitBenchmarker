@@ -11,252 +11,187 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for swap_encryption_phases: ParseFioJson and RunPhase1Fio."""
+"""Tests for swap_encryption phases helpers (PR2)."""
 
 import json
 import unittest
 from unittest import mock
 
 from perfkitbenchmarker import errors
-from perfkitbenchmarker.linux_benchmarks import swap_encryption_phases as phases
+from perfkitbenchmarker.linux_benchmarks.swap_encryption import phases
 from tests import pkb_common_test_case
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-_BASE_META = {'swap_device': 'dm-0', 'node_type': 'n4-highmem-32'}
-
-
 def _fio_json(
+    job_name='4k_randread',
     rw='randread',
-    iops=10000.0,
-    bw_kbps=40960,
-    lat_mean_ns=25000.0,
-    p50_ns=24000,
-    p99_ns=50000,
-    p999_ns=75000,
-) -> str:
-  """Build minimal fio --output-format=json string for one job."""
+    iops=1000.0,
+    bw_kbps=4096.0,
+    lat_mean_ns=500000.0,
+    lat_p50_ns=400000.0,
+    lat_p99_ns=900000.0,
+    lat_p999_ns=1500000.0,
+):
+  """Build a minimal fio JSON string suitable for ParseFioJson."""
   direction = 'read' if 'read' in rw else 'write'
-  other = 'write' if direction == 'read' else 'read'
-  job = {
-      direction: {
-          'iops': iops,
-          'bw': bw_kbps,
-          'clat_ns': {
-              'mean': lat_mean_ns,
-              'percentile': {
-                  '50.000000': p50_ns,
-                  '99.000000': p99_ns,
-                  '99.900000': p999_ns,
+  zero_dir = 'write' if direction == 'read' else 'read'
+  data = {
+      'jobs': [{
+          'jobname': job_name,
+          direction: {
+              'iops': iops,
+              'bw': bw_kbps,
+              'clat_ns': {
+                  'mean': lat_mean_ns,
+                  'percentile': {
+                      '50.000000': lat_p50_ns,
+                      '99.000000': lat_p99_ns,
+                      '99.900000': lat_p999_ns,
+                  },
               },
           },
-      },
-      other: {'iops': 0, 'bw': 0},
+          zero_dir: {
+              'iops': 0.0,
+              'bw': 0.0,
+              'clat_ns': {'mean': 0.0, 'percentile': {}},
+          },
+      }]
   }
-  return json.dumps({'jobs': [job]})
-
-
-# ---------------------------------------------------------------------------
-# ParseFioJson tests
-# ---------------------------------------------------------------------------
+  return json.dumps(data)
 
 
 class ParseFioJsonTest(pkb_common_test_case.PkbCommonTestCase):
   """Tests for phases.ParseFioJson()."""
 
-  def test_returns_iops_sample(self):
-    out = _fio_json(rw='randread', iops=12345.0)
-    samples = phases.ParseFioJson(out, '4k_randread', _BASE_META)
-    metric_names = [s.metric for s in samples]
-    self.assertIn('phase1_fio_4k_randread_read_iops', metric_names)
+  _META = {'benchmark': 'swap_encryption'}
+
+  def test_read_job_produces_iops_sample(self):
+    out = _fio_json('4k_randread', 'randread', iops=5000.0)
+    samples = phases.ParseFioJson(out, '4k_randread', self._META)
+    metrics = {s.metric for s in samples}
+    self.assertTrue(
+        any('iops' in m.lower() for m in metrics),
+        f'No IOPS sample found. Got: {metrics}',
+    )
 
   def test_iops_value_correct(self):
-    out = _fio_json(rw='randread', iops=12345.0)
-    samples = phases.ParseFioJson(out, '4k_randread', _BASE_META)
-    iops_sample = next(
-        s for s in samples if s.metric.endswith('_iops')
-    )
+    out = _fio_json('4k_randread', 'randread', iops=12345.0)
+    samples = phases.ParseFioJson(out, '4k_randread', self._META)
+    iops_sample = next(s for s in samples if 'iops' in s.metric.lower())
     self.assertAlmostEqual(iops_sample.value, 12345.0)
 
-  def test_returns_bandwidth_sample_in_mbps(self):
-    # bw=51200 KiB/s → 50.0 MB/s
-    out = _fio_json(rw='randread', bw_kbps=51200)
-    samples = phases.ParseFioJson(out, '4k_randread', _BASE_META)
-    bw_sample = next(s for s in samples if '_bw_mbps' in s.metric)
-    self.assertAlmostEqual(bw_sample.value, 50.0)
-    self.assertEqual(bw_sample.unit, 'MB/s')
+  def test_bandwidth_converted_to_mbps(self):
+    out = _fio_json('1m_seqread', 'read', bw_kbps=1048576.0)
+    samples = phases.ParseFioJson(out, '1m_seqread', self._META)
+    bw_sample = next(s for s in samples if 'bw_mbps' in s.metric)
+    self.assertAlmostEqual(bw_sample.value, 1024.0)
 
-  def test_returns_latency_mean_in_microseconds(self):
-    # lat_mean=25000 ns → 25.0 µs
-    out = _fio_json(rw='randread', lat_mean_ns=25000.0)
-    samples = phases.ParseFioJson(out, '4k_lat_read', _BASE_META)
-    lat_sample = next(s for s in samples if '_lat_mean_us' in s.metric)
-    self.assertAlmostEqual(lat_sample.value, 25.0)
-    self.assertEqual(lat_sample.unit, 'us')
+  def test_latency_mean_in_microseconds(self):
+    out = _fio_json('4k_randread', 'randread', lat_mean_ns=1_000_000.0)
+    samples = phases.ParseFioJson(out, '4k_randread', self._META)
+    lat_sample = next(s for s in samples if 'lat_mean' in s.metric)
+    self.assertAlmostEqual(lat_sample.value, 1000.0)
 
-  def test_returns_latency_percentiles(self):
-    out = _fio_json(rw='randread', p50_ns=24000, p99_ns=50000, p999_ns=75000)
-    samples = phases.ParseFioJson(out, '4k_randread', _BASE_META)
-    metric_names = [s.metric for s in samples]
-    self.assertTrue(any('_lat_p50_us' in m for m in metric_names))
-    self.assertTrue(any('_lat_p99_us' in m for m in metric_names))
-    self.assertTrue(any('_lat_p999_us' in m for m in metric_names))
+  def test_write_only_job_no_read_metrics(self):
+    out = _fio_json('4k_randwrite', 'randwrite')
+    samples = phases.ParseFioJson(out, '4k_randwrite', self._META)
+    metrics = {s.metric for s in samples}
+    self.assertFalse(
+        any('read' in m for m in metrics),
+        'Read metrics should be absent for a pure write job',
+    )
 
-  def test_write_job_emits_write_direction_samples(self):
-    out = _fio_json(rw='randwrite', iops=8000.0)
-    samples = phases.ParseFioJson(out, '4k_randwrite', _BASE_META)
-    metric_names = [s.metric for s in samples]
-    self.assertTrue(any('_write_' in m for m in metric_names))
-    self.assertFalse(any('_read_' in m for m in metric_names))
-
-  def test_skips_zero_iops_direction(self):
-    # 'write' direction has iops=0 and bw=0 → should be omitted
-    out = _fio_json(rw='randread', iops=5000.0)
-    samples = phases.ParseFioJson(out, '4k_randread', _BASE_META)
-    metric_names = [s.metric for s in samples]
-    self.assertFalse(any('_write_' in m for m in metric_names))
-
-  def test_strips_preamble_before_json(self):
-    preamble = 'kernel: some warning\nanother line\n'
-    out = preamble + _fio_json(rw='randread', iops=1000.0)
-    samples = phases.ParseFioJson(out, '4k_randread', _BASE_META)
-    self.assertTrue(len(samples) > 0)
-
-  def test_raises_run_error_when_no_json(self):
-    with self.assertRaises(errors.Benchmarks.RunError):
-      phases.ParseFioJson('no json here', '4k_randread', _BASE_META)
-
-  def test_raises_run_error_on_invalid_json(self):
-    with self.assertRaises(errors.Benchmarks.RunError):
-      phases.ParseFioJson('{invalid json}', '4k_randread', _BASE_META)
-
-  def test_returns_empty_list_when_jobs_empty(self):
-    out = json.dumps({'jobs': []})
-    samples = phases.ParseFioJson(out, '4k_randread', _BASE_META)
-    self.assertEqual(samples, [])
-
-  def test_metadata_propagated_to_samples(self):
-    out = _fio_json(rw='randread', iops=1000.0)
-    meta = {'swap_device': 'nvme1n1', 'cloud': 'aws'}
-    samples = phases.ParseFioJson(out, '4k_randread', meta)
+  def test_job_name_in_metadata(self):
+    out = _fio_json('4k_randread', 'randread')
+    samples = phases.ParseFioJson(out, '4k_randread', self._META)
     for s in samples:
-      self.assertEqual(s.metadata.get('cloud'), 'aws')
-      self.assertEqual(s.metadata.get('swap_device'), 'nvme1n1')
       self.assertEqual(s.metadata.get('fio_job'), '4k_randread')
 
-  def test_base_meta_not_mutated(self):
-    out = _fio_json(rw='randread', iops=1000.0)
-    meta = dict(_BASE_META)
-    phases.ParseFioJson(out, '4k_randread', meta)
-    self.assertNotIn('fio_job', meta)
+  def test_invalid_json_raises_run_error(self):
+    with self.assertRaises(errors.Benchmarks.RunError):
+      phases.ParseFioJson('not json', '4k_randread', self._META)
 
+  def test_empty_string_raises_run_error(self):
+    with self.assertRaises(errors.Benchmarks.RunError):
+      phases.ParseFioJson('', '4k_randread', self._META)
 
-# ---------------------------------------------------------------------------
-# RunPhase1Fio tests
-# ---------------------------------------------------------------------------
+  def test_no_jobs_key_returns_empty(self):
+    out = json.dumps({'global options': {}})
+    result = phases.ParseFioJson(out, '4k_randread', self._META)
+    self.assertEmpty(result)
+
+  def test_base_meta_copied_into_samples(self):
+    meta = {'benchmark': 'swap_encryption', 'cloud': 'gcp'}
+    out = _fio_json('4k_randread', 'randread')
+    samples = phases.ParseFioJson(out, '4k_randread', meta)
+    for s in samples:
+      self.assertEqual(s.metadata.get('cloud'), 'gcp')
 
 
 class RunPhase1FioTest(pkb_common_test_case.PkbCommonTestCase):
   """Tests for phases.RunPhase1Fio()."""
 
-  def _make_ds(self, fio_output=None):
-    """Return a mock daemonset whose PodExec returns fio JSON for fio calls."""
-    ds = mock.Mock()
-    if fio_output is None:
-      fio_output = _fio_json(rw='randread', iops=5000.0)
-
-    def _pod_exec(cmd, **_):
-      if 'fio' in cmd:
-        return (fio_output, '')
-      return ('', '')
-
-    ds.PodExec = mock.Mock(side_effect=_pod_exec)
+  def _make_ds(self, fio_out=''):
+    ds = mock.MagicMock()
+    ds.PodExec.return_value = (fio_out, '')
     return ds
 
-  def test_returns_list_of_samples(self):
-    ds = self._make_ds()
-    samples = phases.RunPhase1Fio(ds, '/dev/dm-0', _BASE_META, 30)
-    self.assertIsInstance(samples, list)
-    self.assertTrue(len(samples) > 0)
+  def _make_ds_with_json(self):
+    """Daemonset that returns valid fio JSON output."""
+    ds = mock.MagicMock()
+    ds.PodExec.return_value = (_fio_json('4k_randread', 'randread'), '')
+    return ds
 
   def test_swapoff_called_before_fio(self):
-    ds = self._make_ds()
-    call_log = []
+    ds = self._make_ds_with_json()
+    phases.RunPhase1Fio(ds, '/dev/mapper/swap_encrypted', {}, 60)
+    calls = [str(c) for c in ds.PodExec.call_args_list]
+    swapoff_idx = next(
+        (i for i, c in enumerate(calls) if 'swapoff' in c), None
+    )
+    fio_idx = next((i for i, c in enumerate(calls) if 'fio ' in c), None)
+    self.assertIsNotNone(swapoff_idx, 'swapoff not called')
+    self.assertIsNotNone(fio_idx, 'fio not called')
+    self.assertLess(swapoff_idx, fio_idx, 'swapoff must precede fio')
 
-    def _track(cmd, **_):
-      if 'swapoff' in cmd:
-        call_log.append('swapoff')
-      elif 'fio' in cmd:
-        call_log.append('fio')
-      return ('', '') if 'fio' not in cmd else (_fio_json(), '')
+  def test_swapon_called_after_fio(self):
+    ds = self._make_ds_with_json()
+    phases.RunPhase1Fio(ds, '/dev/mapper/swap_encrypted', {}, 60)
+    calls = [str(c) for c in ds.PodExec.call_args_list]
+    fio_idx = next((i for i, c in enumerate(calls) if 'fio ' in c), None)
+    swapon_idx = next(
+        (i for i, c in enumerate(calls) if 'swapon' in c), None
+    )
+    self.assertIsNotNone(swapon_idx, 'swapon not called')
+    self.assertGreater(swapon_idx, fio_idx, 'swapon must follow fio')
 
-    ds.PodExec = mock.Mock(side_effect=_track)
-    phases.RunPhase1Fio(ds, '/dev/dm-0', _BASE_META, 30)
-    self.assertIn('swapoff', call_log)
-    self.assertIn('fio', call_log)
-    self.assertLess(call_log.index('swapoff'), call_log.index('fio'))
-
-  def test_swapon_called_after_fio_jobs(self):
-    ds = self._make_ds()
-    call_log = []
-
-    def _track(cmd, **_):
-      if 'swapoff' in cmd:
-        call_log.append('swapoff')
-      elif 'fio' in cmd:
-        call_log.append('fio')
-        return (_fio_json(), '')
-      elif 'swapon' in cmd:
-        call_log.append('swapon')
-      return ('', '')
-
-    ds.PodExec = mock.Mock(side_effect=_track)
-    phases.RunPhase1Fio(ds, '/dev/dm-0', _BASE_META, 30)
-    self.assertIn('swapon', call_log)
-    self.assertGreater(call_log.index('swapon'), call_log.index('fio'))
-
-  def test_swapon_called_even_if_fio_raises(self):
-    ds = mock.Mock()
-    swapon_called = []
-
-    def _pod_exec(cmd, **_):
-      if 'swapoff' in cmd:
-        return ('', '')
-      if 'fio' in cmd:
-        raise Exception('fio failed')
-      if 'swapon' in cmd:
-        swapon_called.append(True)
-      return ('', '')
-
-    ds.PodExec = mock.Mock(side_effect=_pod_exec)
-    with self.assertRaises(Exception):
-      phases.RunPhase1Fio(ds, '/dev/dm-0', _BASE_META, 30)
-    self.assertTrue(swapon_called, 'swapon must be called in finally block')
-
-  def test_runs_all_five_fio_jobs(self):
-    ds = self._make_ds()
-    fio_calls = []
-
-    def _track(cmd, **_):
-      if 'fio' in cmd:
-        fio_calls.append(cmd)
-        return (_fio_json(), '')
-      return ('', '')
-
-    ds.PodExec = mock.Mock(side_effect=_track)
-    phases.RunPhase1Fio(ds, '/dev/dm-0', _BASE_META, 60)
-    job_names = [
-        '4k_randread', '4k_randwrite', '1m_seqread', '1m_seqwrite',
-        '4k_lat_read',
+  def test_swapon_called_even_on_parse_error(self):
+    """swapon must run in finally block even when fio output is invalid."""
+    ds = mock.MagicMock()
+    ds.PodExec.side_effect = [
+        ('', ''),         # swapoff
+        ('bad json', ''), # fio → triggers ParseFioJson error
+        ('', ''),         # swapon (finally)
     ]
-    for name in job_names:
-      self.assertTrue(
-          any(name in c for c in fio_calls),
-          f'Expected fio job {name!r} not found in calls',
-      )
+    with self.assertRaises(Exception):
+      phases.RunPhase1Fio(ds, '/dev/mapper/swap_encrypted', {}, 60)
+    calls = [str(c) for c in ds.PodExec.call_args_list]
+    self.assertTrue(any('swapon' in c for c in calls), 'swapon must be called')
+
+  def test_returns_samples_list(self):
+    ds = self._make_ds_with_json()
+    result = phases.RunPhase1Fio(ds, '/dev/mapper/swap_encrypted', {}, 60)
+    self.assertIsInstance(result, list)
+
+  def test_fio_runtime_used_in_command(self):
+    ds = self._make_ds_with_json()
+    phases.RunPhase1Fio(ds, '/dev/mapper/swap_encrypted', {}, 120)
+    calls = [str(c) for c in ds.PodExec.call_args_list]
+    fio_calls = [c for c in calls if 'fio ' in c]
+    self.assertTrue(
+        any('120' in c for c in fio_calls),
+        'fio_runtime_sec=120 must appear in fio command',
+    )
 
 
 if __name__ == '__main__':

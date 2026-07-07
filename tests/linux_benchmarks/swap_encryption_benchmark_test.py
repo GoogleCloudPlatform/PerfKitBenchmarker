@@ -27,7 +27,7 @@ PR2 additions tested here:
 import unittest
 from unittest import mock
 
-from perfkitbenchmarker.linux_benchmarks import swap_encryption_benchmark
+from perfkitbenchmarker.linux_benchmarks.swap_encryption import swap_encryption_benchmark
 from perfkitbenchmarker.resources.container_service import swap_daemonset
 from tests import pkb_common_test_case
 
