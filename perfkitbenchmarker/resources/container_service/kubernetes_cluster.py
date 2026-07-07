@@ -304,6 +304,10 @@ class KubernetesCluster(container_cluster.BaseContainerCluster):
     """Adds a node pool; delegates to CreateNodePool for standard clusters.
 
     Karpenter-based subclasses override this to apply a manifest instead.
+
+    Args:
+      batch_name: The batch identifier for the new node pool.
+      pool_id: The pool identifier within the batch.
     """
     nodepool_config = container_lib.BaseNodePoolConfig(
         self.nodepools[container_cluster.DEFAULT_NODEPOOL].vm_spec,
@@ -403,6 +407,12 @@ def BareMinor(version: str) -> str:
   """Returns the 'major.minor' part of a K8s version string.
 
   Accepts and normalizes formats like 'v1.35.4', '1.35.4-gke.1234', '1.35'.
+
+  Args:
+    version: A Kubernetes version string in any of the accepted formats.
+
+  Returns:
+    A 'major.minor' string, e.g. '1.35'.
   """
   if version.startswith('v'):
     version = version[1:]

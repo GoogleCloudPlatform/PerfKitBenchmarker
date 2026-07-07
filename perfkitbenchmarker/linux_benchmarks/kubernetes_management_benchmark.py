@@ -110,10 +110,16 @@ _INITIAL_VERSION = flags.DEFINE_string(
 _PREFIX = "pkbm"
 
 
-def _ConcurrentPoolName(i):
+def _ConcurrentPoolName(i: int) -> str:
   """Returns the i-th concurrent-ops pool name.
 
   Three-digit zero-padded so names stay within AKS's 12-char node-pool limit.
+
+  Args:
+    i: Zero-based index of the pool.
+
+  Returns:
+    Pool name string, e.g. 'pkbma001'.
   """
   return f"{_PREFIX}a{i:03d}"
 
@@ -191,6 +197,9 @@ def _ClearNodePools(cluster: kubernetes_cluster.KubernetesCluster) -> None:
 
   Called after each scenario so the next one starts from a clean cluster,
   and from Cleanup() as a final best-effort teardown.
+
+  Args:
+    cluster: The Kubernetes cluster whose pkbm* node pools will be deleted.
   """
   pools = [n for n in cluster.GetNodePoolNames() if n.startswith(_PREFIX)]
   if not pools:
@@ -305,6 +314,13 @@ def _RunOverlappingClusterUpdate(
 
   Both ops kick off async on separate threads; initiation + E2E latency
   recorded independently. Overlap window = ClusterUpdate E2E latency.
+
+  Args:
+    cluster: The Kubernetes cluster to run the scenario against.
+    initial: The initial (N-1) Kubernetes version for the node pool.
+
+  Returns:
+    List of samples with initiation and end-to-end latency for both ops.
   """
   logging.info(
       "overlapping_cluster_update: cluster update + node-pool create"
@@ -314,7 +330,7 @@ def _RunOverlappingClusterUpdate(
 
   def DoClusterUpdate():
     timing = _TimedAsync(cluster.UpdateClusterAsync, cluster.WaitForOperation)
-    results.add("OverlappingUpdate_ClusterUpdate", timing)
+    results.Add("OverlappingUpdate_ClusterUpdate", timing)
     logging.info(
         "overlapping_cluster_update ClusterUpdate: init=%.2fs e2e=%.2fs",
         timing.initiation_latency,
@@ -326,7 +342,7 @@ def _RunOverlappingClusterUpdate(
         lambda: cluster.CreateNodePoolAsync(cfg, node_version=initial),
         cluster.WaitForOperation,
     )
-    results.add("OverlappingUpdate_NodePoolCreate", timing)
+    results.Add("OverlappingUpdate_NodePoolCreate", timing)
     logging.info(
         "overlapping_cluster_update NodePoolCreate: init=%.2fs e2e=%.2fs",
         timing.initiation_latency,
@@ -357,11 +373,11 @@ class ThreadSafeResults:
     self.entries: list[tuple[str, OpTiming]] = []
     self.failed: list[str] = []
 
-  def add(self, name: str, timing: OpTiming) -> None:
+  def Add(self, name: str, timing: OpTiming) -> None:
     with self._lock:
       self.entries.append((name, timing))
 
-  def add_failure(self, name: str) -> None:
+  def AddFailure(self, name: str) -> None:
     with self._lock:
       self.failed.append(name)
 
@@ -376,6 +392,15 @@ def _TimedAsync(
   benchmark rather than being silently absorbed. initiation_latency is the
   time for kickoff() to return (API accepted); end_to_end_latency is total
   wall time including the wait.
+
+  Args:
+    kickoff: Zero-arg callable that fires the async operation and returns
+      an opaque handle.
+    wait_fn: Callable that blocks until the operation identified by the
+      handle reaches a terminal state.
+
+  Returns:
+    OpTiming with initiation_latency and end_to_end_latency in seconds.
   """
   init_start = time.monotonic()
   handle = kickoff()
@@ -386,9 +411,9 @@ def _TimedAsync(
 
 
 def _RunAsync(
-    kickoff: Callable,
+    kickoff: Callable[..., str],
     wait_fn: Callable[[str], None],
-    items: list,
+    items: list[object],
     get_name: Callable[[object], str],
 ) -> list[tuple[str, OpTiming]]:
   """Fires kickoff(item) concurrently; returns (name, OpTiming) per item.
@@ -397,6 +422,18 @@ def _RunAsync(
   exception). Used by the create/upgrade/delete scenarios where a single
   failure is a benchmark failure. Uses a concurrency cap for streaming
   execution — completed ops free their slot immediately for the next one.
+
+  Args:
+    kickoff: Callable that accepts one item and fires the async operation,
+      returning an opaque handle.
+    wait_fn: Callable that blocks until the operation handle reaches a
+      terminal state.
+    items: List of items to process concurrently (one op per item).
+    get_name: Callable that maps an item to its string name for tagging
+      result samples.
+
+  Returns:
+    List of (name, OpTiming) pairs, one per item in the same order.
   """
   if not items:
     return []
@@ -406,7 +443,7 @@ def _RunAsync(
   def DoWrap(item):
     timing = _TimedAsync(lambda: kickoff(item), wait_fn)
     name = get_name(item)
-    results.add(name, timing)
+    results.Add(name, timing)
     logging.info(
         "%s initiation=%.2fs end_to_end=%.2fs",
         name,
@@ -451,6 +488,9 @@ def _OpSamples(
   Args:
     metric_prefix: prefix for all metric names.
     results: (name, OpTiming) pairs from _RunAsync.
+
+  Returns:
+    List of Sample objects with per-op and aggregate latency metrics.
   """
   samples: list[sample.Sample] = []
   init_latencies: list[float] = []
