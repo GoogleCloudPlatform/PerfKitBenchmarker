@@ -42,6 +42,16 @@ from perfkitbenchmarker import resource
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
+def _ParseCipher(dmsetup_status: str) -> str:
+  """Extract cipher name from dmsetup status output."""
+  parts = dmsetup_status.split()
+  try:
+    idx = parts.index('crypt')
+    return parts[idx + 1] if idx + 1 < len(parts) else ''
+  except ValueError:
+    return ''
+
+
 # Transient kubectl errors that are safe to retry automatically.
 _TRANSIENT_KUBECTL_ERRORS = ('connection reset by peer', 'websocket: close')
 
@@ -114,12 +124,7 @@ class SwapDaemonSet(resource.BaseResource):
       image=self.image,
     )
     logging.info('[swap_encryption] Swap-infra DaemonSet applied')
-    pod = self.WaitForPod()
-    if pod is None:
-      raise errors.Benchmarks.PrepareException(
-        '[swap_encryption] DaemonSet pod did not become ready within'
-        ' timeout'
-      )
+    self.WaitForPod()  # raises PrepareException on timeout
 
   def _Delete(self) -> None:
     """Run in-pod teardown then delete the DaemonSet.
@@ -128,9 +133,12 @@ class SwapDaemonSet(resource.BaseResource):
     pod (best-effort, ignore_failure=True) before deleting the DaemonSet.
     This mirrors the original Cleanup() logic so no swap state is leaked.
     """
-    # Try to get the pod name quickly if not set.
+    # Try to get the pod name quickly if not set; ignore timeout during cleanup.
     if self.pod_name is None:
-      self.WaitForPod(timeout=30)
+      try:
+        self.WaitForPod(timeout=30)
+      except errors.Benchmarks.PrepareException:
+        logging.info('[swap_encryption] Pod not found during cleanup; proceeding with DaemonSet deletion.')
 
     if self.pod_name:
       self.PodExec(
@@ -185,7 +193,7 @@ class SwapDaemonSet(resource.BaseResource):
 
   # ── Pod lifecycle helpers ─────────────────────────────────────────────────
 
-  def WaitForPod(self, timeout: int = 600) -> Optional[str]:
+  def WaitForPod(self, timeout: int = 600) -> str:
     """Wait until the DaemonSet pod is Running AND /tmp/pkb_ready exists.
 
     Two-phase poll:
@@ -235,8 +243,7 @@ class SwapDaemonSet(resource.BaseResource):
               phase = parts[1].strip()
               if phase == 'Running':
                 logging.info(
-                  '[swap_encryption] Pod %s is Running'
-                  ' — waiting for sentinel...',
+                  '[swap_encryption] Pod %s is Running — waiting for sentinel...',
                   pod_name,
                 )
                 ready_pod = pod_name
@@ -283,9 +290,8 @@ class SwapDaemonSet(resource.BaseResource):
         if 'container not found' in sentinel_err or (
           'unable to upgrade connection' in sentinel_err
         ):
-          logging.warning(
-            '[swap_encryption] Pod %s: container not running'
-            ' (%s) — will re-check pod state',
+          logging.info(
+            '[swap_encryption] Pod %s: container not running (%s) — will re-check pod state',
             ready_pod,
             sentinel_err.strip(),
           )
@@ -299,10 +305,10 @@ class SwapDaemonSet(resource.BaseResource):
 
       time.sleep(15)
 
-    logging.warning(
-      '[swap_encryption] Benchmark pod not ready after %ds', timeout
+    raise errors.Benchmarks.PrepareException(
+        f'[swap_encryption] Benchmark pod not ready after {timeout}s. '
+        'Check DaemonSet events and node status.'
     )
-    return None
 
   def _LogPodEvents(self, pod_name: str) -> None:
     """Dump recent Kubernetes events for a pod to help diagnose hangs."""
@@ -327,25 +333,58 @@ class SwapDaemonSet(resource.BaseResource):
         events_out[-2000:] if len(events_out) > 2000 else events_out,
       )
 
+  def GetResourceMetadata(self) -> dict:
+    """Return metadata dict describing the active swap device and kernel.
+
+    Called by the benchmark to attach swap-specific metadata to all samples.
+    Raises on error rather than silently swallowing failures.
+
+    Returns:
+      Dict with keys: swap_device, kernel_version, swap_cipher.
+
+    Raises:
+      errors.Benchmarks.RunError: if the pod is not reachable or commands fail.
+    """
+    swap_dev = self._DetectSwapDevice()
+    kver, _ = self.PodExec('uname -r')
+    cipher = ''
+    if swap_dev:
+      dm_out, _ = self.PodExec(
+          f'dmsetup status {swap_dev} 2>/dev/null || echo not_encrypted'
+      )
+      cipher = _ParseCipher(dm_out)
+    return {
+        'swap_device': swap_dev or 'unknown',
+        'kernel_version': kver.strip(),
+        'swap_cipher': cipher,
+    }
+
+  def _DetectSwapDevice(self) -> str:
+    """Return the first active swap device name (e.g. 'dm-0') or empty string.
+
+    Raises:
+      errors.Benchmarks.RunError: propagated from PodExec on failure.
+    """
+    out, _ = self.PodExec("awk 'NR>1 {print $1}' /proc/swaps")
+    dev = out.strip().split('\n')[0].strip()
+    return dev.split('/')[-1] if dev else ''
+
   def _IsPodGone(self, pod: str) -> bool:
     """Return True if the named pod no longer exists in the cluster."""
-    try:
-      _, err, rc = kubectl.RunKubectlCommand(
-        [
-          'get',
-          'pod',
-          pod,
-          '-n',
-          self.namespace,
-          '-o',
-          'jsonpath={.metadata.name}',
-        ],
-        raise_on_failure=False,
-        timeout=15,
-      )
-      return rc != 0 and 'not found' in (err or '').lower()
-    except Exception:  # pylint: disable=broad-except
-      return False
+    _, err, rc = kubectl.RunKubectlCommand(
+      [
+        'get',
+        'pod',
+        pod,
+        '-n',
+        self.namespace,
+        '-o',
+        'jsonpath={.metadata.name}',
+      ],
+      raise_on_failure=False,
+      timeout=15,
+    )
+    return rc != 0 and 'not found' in (err or '').lower()
 
   def PodExec(
     self,
@@ -400,9 +439,8 @@ class SwapDaemonSet(resource.BaseResource):
         e in err for e in _TRANSIENT_KUBECTL_ERRORS
       )
       if is_transient and attempt < _retries:
-        logging.warning(
-          '[swap_encryption] kubectl exec connection reset (attempt'
-          ' %d/%d); retrying in 10 s',
+        logging.info(
+          '[swap_encryption] kubectl exec connection reset (attempt %d/%d); retrying in 10 s',
           attempt + 1,
           _retries + 1,
         )
@@ -416,18 +454,18 @@ class SwapDaemonSet(resource.BaseResource):
           self.oom_events.append(active)
         # Kubernetes takes a few seconds to update pod state after
         # eviction — sleep before checking to avoid false-positive Running.
-        logging.warning(
+        logging.info(
           '[swap_encryption] rc=137 — sleeping 15 s for Kubernetes'
           ' to update pod state before recovery check'
         )
         time.sleep(15)
         if self._IsPodGone(active):
-          logging.warning(
+          logging.info(
             '[swap_encryption] OOM-eviction detected (rc=137, pod'
             ' gone) — recovering pod name for subsequent commands'
           )
         else:
-          logging.warning(
+          logging.info(
             '[swap_encryption] Container OOM-killed (rc=137, pod'
             ' still exists) — waiting for container restart'
           )
@@ -450,15 +488,13 @@ class SwapDaemonSet(resource.BaseResource):
         if active and active not in self.pod_lost:
           self.pod_lost.append(active)
           logging.error(
-            '[swap_encryption] Benchmark pod %s is gone (%s) —'
-            ' recording run as degraded',
+            '[swap_encryption] Benchmark pod %s is gone (%s) — recording run as degraded',
             active,
             (err or '').strip()[:160],
           )
         if attempt < _retries:
-          logging.warning(
-            '[swap_encryption] Container gone/restarting (attempt'
-            ' %d/%d) — waiting for pod to recover...',
+          logging.info(
+            '[swap_encryption] Container gone/restarting (attempt %d/%d) — waiting for pod to recover...',
             attempt + 1,
             _retries + 1,
           )
@@ -564,8 +600,7 @@ class SwapDaemonSet(resource.BaseResource):
         if label_rc == 0 and new_pods:
           recovered_pod = new_pods[0]
           logging.info(
-            '[swap_encryption] Original pod %s gone/terminating;'
-            ' found replacement %s',
+            '[swap_encryption] Original pod %s gone/terminating; found replacement %s',
             pod,
             recovered_pod,
           )
@@ -574,8 +609,8 @@ class SwapDaemonSet(resource.BaseResource):
       time.sleep(10)
     else:
       raise errors.VmUtil.IssueCommandError(
-        f'[swap_encryption] No Running pod found (original: {pod})'
-        f' within {timeout_sec}s after OOM kill / eviction'
+          f'[swap_encryption] No Running pod found (original: {pod})'
+          f' within {timeout_sec}s after OOM kill / eviction'
       )
 
     # Phase 2: wait for init script to finish (sentinel written last).
@@ -604,6 +639,6 @@ class SwapDaemonSet(resource.BaseResource):
       time.sleep(15)
 
     raise errors.VmUtil.IssueCommandError(
-      f'[swap_encryption] Pod {recovered_pod} did not become ready'
-      f' within {timeout_sec}s after OOM kill / eviction'
+        f'[swap_encryption] Pod {recovered_pod} did not become ready'
+        f' within {timeout_sec}s after OOM kill / eviction'
     )

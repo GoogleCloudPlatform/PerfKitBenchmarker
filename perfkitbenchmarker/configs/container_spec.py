@@ -27,7 +27,13 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.configs import swap_config_spec as _swap_config_spec_lib
 from perfkitbenchmarker.resources import kubernetes_inference_server_spec
+
+# Re-export so existing code that imports SwapConfigSpec from container_spec
+# continues to work while the canonical home is now swap_config_spec.py.
+SwapConfigSpec = _swap_config_spec_lib.SwapConfigSpec
+_SwapConfigDecoder = _swap_config_spec_lib._SwapConfigDecoder  # pylint: disable=protected-access
 
 
 _DEFAULT_VM_COUNT = 1
@@ -333,100 +339,6 @@ class _NodepoolsDecoder(option_decoders.TypeVerifier):
           **nodepool_config,
       )
     return result
-
-
-class SwapConfigSpec(spec.BaseSpec):
-  """Configurable swap options for a GKE/EKS nodepool.
-
-  Declared in BENCHMARK_CONFIG under nodepools.<name>.swap_config.
-  Consumed by the cloud provider's _AddNodeParamsToCmd() / equivalent to
-  apply the cloud-specific swap configuration during nodepool creation.
-
-  Attributes:
-    enabled: Whether to enable swap on the nodepool (default True).
-    swappiness: vm.swappiness sysctl value (0-200, default 100).
-    min_free_kbytes: vm.min_free_kbytes sysctl (default 200).
-    watermark_scale_factor: vm.watermark_scale_factor sysctl (default 500).
-    lssd: True if the nodepool uses local NVMe SSDs for the swap device.
-    lssd_count: Number of local NVMe SSDs (GKE dedicatedLocalSsdProfile).
-    boot_disk_iops: Provisioned IOPS for hyperdisk-balanced (0 = not set).
-    boot_disk_throughput: Provisioned throughput MiB/s for hyperdisk-balanced.
-  """
-
-  def __init__(self, *args, **kwargs):
-    self.enabled: bool = True
-    self.swappiness: int = 100
-    self.min_free_kbytes: int = 200
-    self.watermark_scale_factor: int = 500
-    self.lssd: bool = False
-    self.lssd_count: int = 0
-    self.boot_disk_iops: int = 0
-    self.boot_disk_throughput: int = 0
-    super().__init__(*args, **kwargs)
-
-  @classmethod
-  def _GetOptionDecoderConstructions(cls):
-    result = super()._GetOptionDecoderConstructions()
-    result.update({
-        'enabled': (
-            option_decoders.BooleanDecoder,
-            {'default': True},
-        ),
-        'swappiness': (
-            option_decoders.IntDecoder,
-            {'default': 100, 'min': 0, 'max': 200},
-        ),
-        'min_free_kbytes': (
-            option_decoders.IntDecoder,
-            {'default': 200, 'min': 0},
-        ),
-        'watermark_scale_factor': (
-            option_decoders.IntDecoder,
-            {'default': 500, 'min': 0},
-        ),
-        'lssd': (
-            option_decoders.BooleanDecoder,
-            {'default': False},
-        ),
-        'lssd_count': (
-            option_decoders.IntDecoder,
-            {'default': 0, 'min': 0},
-        ),
-        'boot_disk_iops': (
-            option_decoders.IntDecoder,
-            {'default': 0, 'min': 0},
-        ),
-        'boot_disk_throughput': (
-            option_decoders.IntDecoder,
-            {'default': 0, 'min': 0},
-        ),
-    })
-    return result
-
-
-class _SwapConfigDecoder(option_decoders.TypeVerifier):
-  """Decodes the swap_config option of a NodepoolSpec."""
-
-  def Decode(self, value, component_full_name, flag_values):
-    """Decodes the swap_config dictionary into a SwapConfigSpec.
-
-    Args:
-      value: dict. Keys match SwapConfigSpec._GetOptionDecoderConstructions.
-      component_full_name: str. Fully qualified name of the parent component.
-      flag_values: flags.FlagValues. Runtime flags propagated to BaseSpec.
-
-    Returns:
-      SwapConfigSpec instance.
-
-    Raises:
-      errors.Config.InvalidValue upon invalid input value.
-    """
-    super().Decode(value, component_full_name, flag_values)
-    return SwapConfigSpec(
-        self._GetOptionFullName(component_full_name),
-        flag_values=flag_values,
-        **value,
-    )
 
 
 class SandboxSpec(spec.BaseSpec):
