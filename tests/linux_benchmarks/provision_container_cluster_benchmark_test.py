@@ -1,9 +1,7 @@
 import os
 import unittest
-from unittest import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_benchmarks.provisioning_benchmarks import provision_container_cluster_benchmark
-from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_events
 from tests import pkb_common_test_case
@@ -102,14 +100,13 @@ _POD_NAME = 'daemon-set-jntzg'
 
 class ProvisionKubernetesClusterTest(pkb_common_test_case.PkbCommonTestCase):
 
-  @mock.patch.object(kubectl, 'RunKubectlCommand')
-  def test_GetKeyScalingEventTimes(self, mock_run_kubectl):
+  def test_GetKeyScalingEventTimes(self):
     test_path = os.path.join(
         os.path.dirname(__file__), '../data/kubectl_get_events.yaml'
     )
     with open(test_path) as f:
       events_yaml = f.read()
-    mock_run_kubectl.return_value = (events_yaml, None, None)
+    mock_cmd = self.MockIssueCommand({'get events': [(events_yaml, '', 0)]})
 
     cluster = TestKubernetesCluster()
     events = provision_container_cluster_benchmark._GetKeyScalingEventTimes(
@@ -127,16 +124,13 @@ class ProvisionKubernetesClusterTest(pkb_common_test_case.PkbCommonTestCase):
     }
 
     self.assertEqual(events, expected_event_times)
-    mock_run_kubectl.assert_called_once_with(
-        ['get', 'events', '-o', 'yaml'],
-        raise_on_timeout=True, timeout=None, stack_level=3)
+    self.assertIn('get events -o yaml', mock_cmd.all_commands)
 
-  @mock.patch.object(kubectl, 'RunKubectlCommand')
-  def test_GetMinimumKeyScalingEventTimes(self, mock_run_kubectl):
+  def test_GetMinimumKeyScalingEventTimes(self):
     events_yaml = (
         _YAML_START + _NODE_READY_YAML + _CONTAINER_START_YAML + _YAML_EMD
     )
-    mock_run_kubectl.return_value = (events_yaml, None, None)
+    mock_cmd = self.MockIssueCommand({'get events': [(events_yaml, '', 0)]})
 
     cluster = TestKubernetesCluster()
     events = provision_container_cluster_benchmark._GetKeyScalingEventTimes(
@@ -149,14 +143,11 @@ class ProvisionKubernetesClusterTest(pkb_common_test_case.PkbCommonTestCase):
     }
 
     self.assertEqual(events, expected_event_times)
-    mock_run_kubectl.assert_called_once_with(
-        ['get', 'events', '-o', 'yaml'],
-        raise_on_timeout=True, timeout=None, stack_level=3)
+    self.assertIn('get events -o yaml', mock_cmd.all_commands)
 
-  @mock.patch.object(kubectl, 'RunKubectlCommand')
-  def test_NoMinimumEventsThrows(self, mock_run_kubectl):
+  def test_NoMinimumEventsThrows(self):
     events_yaml = _YAML_START + _CONTAINER_START_YAML + _YAML_EMD
-    mock_run_kubectl.return_value = (events_yaml, None, None)
+    self.MockIssueCommand({'get events': [(events_yaml, '', 0)]})
 
     cluster = TestKubernetesCluster()
     with self.assertRaises(errors.Benchmarks.RunError):
