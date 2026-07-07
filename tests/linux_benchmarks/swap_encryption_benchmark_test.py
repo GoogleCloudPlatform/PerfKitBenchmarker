@@ -17,6 +17,11 @@ After the Zac review refactor:
   - _ParseCipher / _DetectSwapDevice / GetResourceMetadata live in
     swap_daemonset, not in the benchmark module.
   - The benchmark module exposes only GetConfig / Prepare / Run / Cleanup.
+
+PR2 additions tested here:
+  - DetectCloud(): DMI -> GCP/AWS, metadata fallback, raises on failure
+  - GetActiveSwapDevice(): explicit passthrough, /proc/swaps detection, raises
+  - SetupSwap(): routes to _SetupGkeSwap (gcp) or _SetupEksSwap (aws)
 """
 
 import unittest
@@ -108,7 +113,6 @@ class DetectSwapDeviceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(ds._DetectSwapDevice(), '')
 
   def test_detect_swap_device_raises_on_pod_exec_failure(self):
-    # Per Zac review: fail fast - no silent swallowing.
     ds = _make_daemonset()
     ds.PodExec = mock.Mock(side_effect=Exception('pod not found'))
     with self.assertRaises(Exception):
@@ -159,11 +163,122 @@ class GetResourceMetadataTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(meta['swap_cipher'], 'aes-xts-plain64')
 
   def test_metadata_raises_on_pod_exec_failure(self):
-    # Per Zac review: fail fast - no silent swallowing.
     ds = _make_daemonset()
     ds.PodExec = mock.Mock(side_effect=Exception('timeout'))
     with self.assertRaises(Exception):
       ds.GetResourceMetadata()
+
+
+class DetectCloudTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for SwapDaemonSet.DetectCloud() added in PR2."""
+
+  def _ds_with_dmi(self, dmi_text, gcp_meta='', aws_meta=''):
+    ds = _make_daemonset()
+
+    def _pod_exec(cmd, **_):
+      if 'sys_vendor' in cmd or 'product_name' in cmd or 'bios_vendor' in cmd:
+        return (dmi_text, '')
+      if 'metadata.google.internal' in cmd:
+        return (gcp_meta, '')
+      if '169.254.169.254' in cmd:
+        return (aws_meta, '')
+      return ('', '')
+
+    ds.PodExec = mock.Mock(side_effect=_pod_exec)
+    return ds
+
+  def test_detect_cloud_gcp_via_dmi_google(self):
+    ds = self._ds_with_dmi('Google\nGoogle Compute Engine\n')
+    self.assertEqual(ds.DetectCloud(), 'gcp')
+
+  def test_detect_cloud_aws_via_dmi_amazon(self):
+    ds = self._ds_with_dmi('Amazon EC2\n')
+    self.assertEqual(ds.DetectCloud(), 'aws')
+
+  def test_detect_cloud_gcp_via_metadata_fallback(self):
+    ds = self._ds_with_dmi('', gcp_meta='projects/123/zones/us-central1-a')
+    self.assertEqual(ds.DetectCloud(), 'gcp')
+
+  def test_detect_cloud_aws_via_imds_fallback(self):
+    ds = self._ds_with_dmi('', gcp_meta='', aws_meta='i-0abcdef1234567890')
+    self.assertEqual(ds.DetectCloud(), 'aws')
+
+  def test_detect_cloud_raises_when_nothing_responds(self):
+    ds = self._ds_with_dmi('', gcp_meta='', aws_meta='')
+    with self.assertRaises(Exception):
+      ds.DetectCloud()
+
+
+class GetActiveSwapDeviceTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for SwapDaemonSet.GetActiveSwapDevice() added in PR2."""
+
+  def test_explicit_device_returned_without_pod_exec(self):
+    ds = _make_daemonset()
+    ds.PodExec = mock.Mock()
+    result = ds.GetActiveSwapDevice('/dev/nvme1n1')
+    self.assertEqual(result, '/dev/nvme1n1')
+    ds.PodExec.assert_not_called()
+
+  def test_detects_mapper_device_from_proc_swaps(self):
+    ds = _make_daemonset()
+    ds.PodExec = mock.Mock(return_value=('/dev/mapper/swap_encrypted\n', ''))
+    self.assertEqual(ds.GetActiveSwapDevice(), '/dev/mapper/swap_encrypted')
+
+  def test_detects_nvme_device(self):
+    ds = _make_daemonset()
+    ds.PodExec = mock.Mock(return_value=('/dev/nvme1n1\n', ''))
+    self.assertEqual(ds.GetActiveSwapDevice(), '/dev/nvme1n1')
+
+  def test_raises_when_no_device_found(self):
+    ds = _make_daemonset()
+    ds.PodExec = mock.Mock(return_value=('', ''))
+    with self.assertRaises(Exception):
+      ds.GetActiveSwapDevice()
+
+
+class SetupSwapRoutingTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for SwapDaemonSet.SetupSwap() routing logic added in PR2."""
+
+  def _ds_with_mocked_setups(self):
+    ds = _make_daemonset()
+    ds._SetupGkeSwap = mock.Mock()
+    ds._SetupEksSwap = mock.Mock()
+    return ds
+
+  def test_setup_swap_routes_gcp_to_gke(self):
+    ds = self._ds_with_mocked_setups()
+    ds.SetupSwap(
+        cloud='gcp', swap_type='hyperdisk',
+        enable_dmcrypt=True, swap_size_gb=32,
+    )
+    ds._SetupGkeSwap.assert_called_once_with('hyperdisk', True, 32)
+    ds._SetupEksSwap.assert_not_called()
+
+  def test_setup_swap_routes_aws_to_eks(self):
+    ds = self._ds_with_mocked_setups()
+    ds.SetupSwap(
+        cloud='aws', swap_type='instance_store',
+        enable_dmcrypt=False, swap_size_gb=64,
+    )
+    ds._SetupEksSwap.assert_called_once_with('instance_store', 64, '')
+    ds._SetupGkeSwap.assert_not_called()
+
+  def test_setup_swap_passes_io2_volume_id_to_eks(self):
+    ds = self._ds_with_mocked_setups()
+    ds.SetupSwap(
+        cloud='aws', swap_type='io2',
+        enable_dmcrypt=False, swap_size_gb=0,
+        io2_volume_id='vol-0abc123',
+    )
+    ds._SetupEksSwap.assert_called_once_with('io2', 0, 'vol-0abc123')
+
+  def test_setup_swap_raises_on_unknown_cloud(self):
+    ds = self._ds_with_mocked_setups()
+    with self.assertRaises(Exception):
+      ds.SetupSwap(
+          cloud='azure', swap_type='auto',
+          enable_dmcrypt=False, swap_size_gb=16,
+      )
 
 
 if __name__ == '__main__':
