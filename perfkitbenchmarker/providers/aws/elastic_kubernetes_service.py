@@ -101,6 +101,22 @@ def ApplyInferenceS3PvAndPvc() -> None:
   logging.info('Successfully applied S3 PVC.')
 
 
+def _ParseTaint(taint_str: str) -> dict[str, str]:
+  """Parses a taint string into eksctl's dict format.
+
+  Args:
+    taint_str: Taint in 'key=value:Effect' or 'key:Effect' format.
+
+  Returns:
+    Dict with 'key', 'value' (optional), and 'effect' keys for eksctl.
+  """
+  key_value, effect = taint_str.rsplit(':', 1)
+  if '=' in key_value:
+    key, value = key_value.split('=', 1)
+    return {'key': key, 'value': value, 'effect': effect}
+  return {'key': key_value, 'effect': effect}
+
+
 class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
   """Shared base class for Elastic Kubernetes Service cluster auto mode & not."""
 
@@ -195,16 +211,19 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
       self, nodepool: container.BaseNodePoolConfig
   ) -> dict[str, Any]:
     """Constructs the node group json dictionary."""
+    labels = {'pkb_nodepool': nodepool.name}
+    if nodepool.node_labels:
+      labels.update(nodepool.node_labels)
     group_json = {
         'name': nodepool.name,
         'instanceType': nodepool.machine_type,
         'desiredCapacity': nodepool.num_nodes,
         'amiFamily': 'AmazonLinux2023',
         'tags': util.MakeDefaultTags(),
-        'labels': {
-            'pkb_nodepool': nodepool.name,
-        },
+        'labels': labels,
     }
+    if nodepool.node_taints:
+      group_json['taints'] = [_ParseTaint(t) for t in nodepool.node_taints]
     if nodepool.min_nodes != nodepool.max_nodes:
       group_json['minSize'] = nodepool.min_nodes
       group_json['maxSize'] = nodepool.max_nodes
