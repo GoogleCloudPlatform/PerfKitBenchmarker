@@ -41,6 +41,7 @@ from typing import Any
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.resources.container_service import swap_daemonset
 
@@ -199,4 +200,4 @@ def _GetDaemonSet(spec: _BenchmarkSpec) -> swap_daemonset.SwapDaemonSet:
   for r in spec.resources:
     if isinstance(r, swap_daemonset.SwapDaemonSet):
       return r
-  raise RuntimeError('[swap_encryption] SwapDaemonSet not found in spec.resources')
+  raise errors.Benchmarks.RunError('[swap_encryption] SwapDaemonSet not found in spec.resources')
