@@ -361,7 +361,9 @@ def Run(benchmark_spec):
     upper_bound = nginx_benchmark.TARGET_RATE_UPPER_BOUND
     target_rate = upper_bound
     valid_results = []
-    while (upper_bound - lower_bound) > nginx_benchmark.RPS_RANGE_THRESHOLD:
+    while (
+        (upper_bound - lower_bound) / (upper_bound)
+    ) > nginx_benchmark.RPS_BINARY_SEARCH_THRESHOLD:
       results = nginx_benchmark.RunMultiClient(
           clients,
           targets,

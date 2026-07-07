@@ -1077,6 +1077,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       # Occurs when creating a large number >30 of VMs in parallel.
       if 'gcloud crashed (SSLError)' in stderr:
         raise errors.Resource.RetryableCreationError(stderr)
+      if (
+          'The global or regional External IP resource pool is exhausted'
+          in stderr
+      ):
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
       raise errors.Resource.CreationError(
           f'Failed to create VM {self.name}:\n{stderr}\nreturn code: {retcode}'
       )

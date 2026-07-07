@@ -14,6 +14,7 @@
 """Utilities for working with Google Cloud Platform resources."""
 
 import collections
+from collections.abc import Sequence
 import dataclasses
 import datetime
 import functools
@@ -93,15 +94,15 @@ def GetDefaultUser():
 
 def GetProjectNumber(project_id: str | None = None) -> str:
   """Get the number of the default project."""
-  # All GCP projects have both a project number & a project id. The project id
-  # is the human-readable name of the project.
+  # All GCP projects have project number, a human readable project ID, and
+  # a human readable project name.
   if not project_id:
     project_id = GetDefaultProject()
   cmd = [
       FLAGS.gcloud_path,
       'projects',
       'list',
-      f'--filter=name:{project_id}',
+      f'--filter=projectId:{project_id}',
       '--format=json',
   ]
   stdout, _, _ = vm_util.IssueCommand(cmd)
@@ -459,10 +460,13 @@ _QUOTA_EXCEEDED_REGEX = re.compile(
 
 # Resource availability errors documented at
 # https://cloud.google.com/compute/docs/resource-error#resource_availability
-_NOT_ENOUGH_RESOURCES_ERROR_SNIPPETS = (
-    'does not have enough resources available to fulfill the request.',
-    'ZONE_RESOURCE_POOL_EXHAUSTED',
-    'ERROR_STOCKOUT',
+_NOT_ENOUGH_RESOURCES_ERROR_REGEXES: Sequence[re.Pattern[str]] = (
+    re.compile(
+        r'does not have enough resources available to fulfill (the )?request'
+    ),
+    # Not actually regex so escape as best practice
+    re.compile(re.escape('ZONE_RESOURCE_POOL_EXHAUSTED')),
+    re.compile(re.escape('ERROR_STOCKOUT')),
 )
 _NOT_ENOUGH_RESOURCES_MESSAGE = 'Creation failed due to not enough resources: '
 
@@ -492,8 +496,8 @@ def CheckGcloudResponseKnownFailures(stderr: str, retcode: int):
       message = virtual_machine.QUOTA_EXCEEDED_MESSAGE + stderr
       logging.error(message)
       raise errors.Benchmarks.QuotaFailure(message)
-    for snippet in _NOT_ENOUGH_RESOURCES_ERROR_SNIPPETS:
-      if snippet in stderr:
+    for regex in _NOT_ENOUGH_RESOURCES_ERROR_REGEXES:
+      if re.search(regex, stderr):
         message = _NOT_ENOUGH_RESOURCES_MESSAGE + stderr
         logging.error(message)
         raise errors.Benchmarks.InsufficientCapacityCloudFailure(message)

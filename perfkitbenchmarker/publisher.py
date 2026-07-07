@@ -79,7 +79,7 @@ JSON_PATH = flags.DEFINE_string(
 )
 flags.DEFINE_enum(
     'json_write_mode',
-    'w',
+    'a',
     ['w', 'a'],
     'Open mode for file specified by --json_path. Default: overwrite file',
 )
@@ -1205,6 +1205,7 @@ class SampleCollector:
       benchmark: string. The name of the benchmark.
       benchmark_spec: BenchmarkSpec. Benchmark specification.
     """
+
     for s in samples:
       # Annotate the sample.
       sample: pkb_sample.SampleDict = s.asdict()
@@ -1220,6 +1221,7 @@ class SampleCollector:
       sample['owner'] = FLAGS.owner
       sample['run_uri'] = benchmark_spec.uuid
       sample['sample_uri'] = str(uuid.uuid4())
+
       self.samples.append(sample)
 
   def PublishSamples(self):

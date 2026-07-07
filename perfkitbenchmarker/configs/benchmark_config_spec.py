@@ -38,6 +38,7 @@ from perfkitbenchmarker.configs import container_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
 from perfkitbenchmarker.configs import vm_group_decoders
+from perfkitbenchmarker.resources import agent_sandbox_spec
 from perfkitbenchmarker.resources import ai_agent_service_spec
 from perfkitbenchmarker.resources import example_resource_spec
 from perfkitbenchmarker.resources import jobs_setter
@@ -397,6 +398,7 @@ class _BaseJobDecoder(option_decoders.TypeVerifier):
         errors.Config.InvalidValue upon invalid input value.
     """
     base_job_config = super().Decode(value, component_full_name, flag_values)
+    _LoadProvider(base_job_config, flag_values)
     if 'job_type' in base_job_config:
       spec_class = jobs_setter.GetJobSpecClass(base_job_config['job_type'])
     else:
@@ -1468,6 +1470,10 @@ class BenchmarkConfigSpec(spec.BaseSpec):
         'ai_agent_service': (
             ai_agent_service_spec.AiAgentServiceDecoder,
             {'default': None},
+        ),
+        'agent_sandbox': (
+            agent_sandbox_spec.AgentSandboxConfigDecoder,
+            {'default': None, 'none_ok': True},
         ),
         'placement_group_specs': (_PlacementGroupSpecsDecoder, {'default': {}}),
         'container_cluster': (

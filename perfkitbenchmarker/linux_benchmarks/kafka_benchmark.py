@@ -14,11 +14,15 @@
 """Runs Apache Kafka benchmarks."""
 
 import concurrent.futures
+import re
+import time
 from typing import Any, Mapping
 
+from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import virtual_machine
 
 BENCHMARK_NAME = 'kafka'
 BENCHMARK_CONFIG = """
@@ -31,20 +35,70 @@ kafka:
       vm_spec: *default_dual_core
     consumer:
       vm_spec: *default_dual_core
+    controller:
+      vm_spec: *default_dual_core
 """
 
 BENCHMARK_DATA = {}
 KAFKA_VERSION = '2.13-4.2.0'
 KAFKA_TAR = f'kafka_{KAFKA_VERSION}.tgz'
-KAFKA_URL = f'https://downloads.apache.org/kafka/4.2.0/{KAFKA_TAR}'
+KAFKA_URL = (
+    f'https://downloads.apache.org/kafka/{KAFKA_VERSION.split("-")[1]}/{KAFKA_TAR}'
+)
+
+KAFKA_DIR = f'kafka_{KAFKA_VERSION}'
+KAFKA_TOPIC_NAME = 'kafka-benchmark-test'
+KAFKA_BROKER_PORT = 9092
+KAFKA_CONSUMER_TIMEOUT_MS = 120_000
+
+FLAGS = flags.FLAGS
+_KAFKA_NUM_PARTITIONS = flags.DEFINE_integer(
+    'kafka_num_partitions',
+    256,
+    'Number of partitions for the topic.',
+)
+_KAFKA_REPLICATION_FACTOR = flags.DEFINE_integer(
+    'kafka_replication_factor',
+    1,
+    'Replication factor for the topic.',
+)
+_KAFKA_NUM_RECORDS = flags.DEFINE_integer(
+    'kafka_num_records', 9_000_000, 'Number of records to produce/consume.'
+)
+_KAFKA_RECORD_SIZE = flags.DEFINE_integer(
+    'kafka_record_size', 1024, 'Size of each record in bytes.'
+)
+_KAFKA_PRODUCER_BATCH_SIZE = flags.DEFINE_integer(
+    'kafka_producer_batch_size',
+    1024 * 128 * 1,  # 128 KB
+    'Batch size of the producer in bytes, default is 128 KB.',
+)
+_KAFKA_CONSUMER_FETCH_SIZE = flags.DEFINE_integer(
+    'kafka_consumer_fetch_size',
+    1024 * 1024 * 5,  # 5 MB
+    'Fetch size of the consumer in bytes, default is 5 MB.',
+)
+_KAFKA_NUM_THREADS = flags.DEFINE_integer(
+    'kafka_num_threads',
+    16,
+    'Number of threads to use for the benchmark.',
+)
 
 
 def _InstallKafka(vm):
-  """Installs Kafka on a VM."""
+  """Installs Kafka on a VM.
+
+  Args:
+    vm: The VM to install Kafka on.
+  """
   vm.InstallPackages('openjdk-17-jdk')
   vm.Install('build_tools')
   vm.Install('pip')
-  vm.RemoteCommand(f'wget {KAFKA_URL}')
+
+  fallback_url = (
+      f'https://archive.apache.org/dist/kafka/{KAFKA_VERSION.split("-")[1]}/{KAFKA_TAR}'
+  )
+  vm.RemoteCommand(f'wget {KAFKA_URL} || wget {fallback_url}')
   vm.RemoteCommand(f'tar -xzf {KAFKA_TAR}')
 
 
@@ -72,12 +126,360 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   with concurrent.futures.ThreadPoolExecutor(max_workers=len(vms)) as executor:
     executor.map(_InstallKafka, vms)
 
+  broker_vm = benchmark_spec.vm_groups['broker'][0]
+  controller_vm = benchmark_spec.vm_groups['controller'][0]
+
+  stdout, _ = controller_vm.RemoteCommand(
+      f'cd {KAFKA_DIR} && bin/kafka-storage.sh random-uuid'
+  )
+  cluster_id = stdout.strip()
+
+  controller_config = (
+      'process.roles=controller\n'
+      'node.id=1\n'
+      f'controller.quorum.voters=1@{controller_vm.internal_ip}:9093\n'
+      'listeners=CONTROLLER://0.0.0.0:9093\n'
+      'controller.listener.names=CONTROLLER\n'
+      'listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT\n'
+      'log.dirs=/tmp/kraft-controller-logs\n'
+  )
+  controller_vm.RemoteCommand(
+      f'cat <<EOF > {KAFKA_DIR}/config/controller.properties\n'
+      f'{controller_config}EOF'
+  )
+  controller_vm.RemoteCommand(
+      f'cd {KAFKA_DIR} && bin/kafka-storage.sh format -t {cluster_id} -c'
+      ' config/controller.properties'
+  )
+  controller_vm.RemoteCommand(
+      f'cd {KAFKA_DIR} && ulimit -n 100000 && bin/kafka-server-start.sh -daemon'
+      ' config/controller.properties'
+  )
+  time.sleep(5)
+
+  broker_config = (
+      'process.roles=broker\n'
+      'node.id=2\n'
+      f'controller.quorum.voters=1@{controller_vm.internal_ip}:9093\n'
+      f'listeners=PLAINTEXT://0.0.0.0:{KAFKA_BROKER_PORT}\n'
+      f'advertised.listeners=PLAINTEXT://{broker_vm.internal_ip}:{KAFKA_BROKER_PORT}\n'
+      'controller.listener.names=CONTROLLER\n'
+      'inter.broker.listener.name=PLAINTEXT\n'
+      'listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT\n'
+      'log.dirs=/tmp/kraft-broker-logs\n'
+      f'offsets.topic.replication.factor={_KAFKA_REPLICATION_FACTOR.value}\n'
+      f'transaction.state.log.replication.factor={_KAFKA_REPLICATION_FACTOR.value}\n'
+      'transaction.state.log.min.isr=1\n'
+  )
+  broker_vm.RemoteCommand(
+      f'cat <<EOF > {KAFKA_DIR}/config/broker.properties\n'
+      f'{broker_config}EOF'
+  )
+  broker_vm.RemoteCommand(
+      f'cd {KAFKA_DIR} && bin/kafka-storage.sh format -t {cluster_id} -c'
+      ' config/broker.properties'
+  )
+  broker_vm.RemoteCommand(
+      f'cd {KAFKA_DIR} && ulimit -n 100000 && bin/kafka-server-start.sh -daemon'
+      ' config/broker.properties'
+  )
+  time.sleep(10)
+
+
+def _CreateTopic(
+    broker_vm: virtual_machine.BaseVirtualMachine,
+    bootstrap_server: str,
+    topic_name: str,
+) -> None:
+  """Creates a Kafka topic for the trial.
+
+  Args:
+    broker_vm: The broker VM.
+    bootstrap_server: The Kafka bootstrap server address.
+    topic_name: The name of the topic to create.
+  """
+  broker_vm.RemoteCommand(
+      f'cd {KAFKA_DIR} && bin/kafka-topics.sh --create --topic'
+      f' {topic_name} --bootstrap-server {bootstrap_server}'
+      f' --partitions={_KAFKA_NUM_PARTITIONS.value}'
+      f' --replication-factor={_KAFKA_REPLICATION_FACTOR.value}'
+      f' --config min.insync.replicas={_KAFKA_REPLICATION_FACTOR.value}'
+      ' --if-not-exists'
+  )
+
+
+def _RunProducer(
+    producer_vm: virtual_machine.BaseVirtualMachine,
+    bootstrap_server: str,
+    topic_name: str,
+    num_threads: int,
+    num_records: int,
+) -> str:
+  """Runs the Kafka producer performance test across multiple threads.
+
+  Args:
+    producer_vm: The producer VM.
+    bootstrap_server: The Kafka bootstrap server address.
+    topic_name: The topic to produce records to.
+    num_threads: The number of concurrent producer threads.
+    num_records: The number of records to produce.
+
+  Returns:
+    The concatenated standard output from all producer threads.
+  """
+  producer_vm.RemoteCommand(
+      f'echo "batch.size={_KAFKA_PRODUCER_BATCH_SIZE.value}" >'
+      ' /tmp/producer.properties && echo "acks=all" >>'
+      ' /tmp/producer.properties && echo "compression.type=zstd" >>'
+      ' /tmp/producer.properties'
+  )
+  cmd = (
+      f'cd {KAFKA_DIR} && rm -f /tmp/producer_*.log && '
+      f'for i in $(seq 1 {num_threads}); do '
+      'bin/kafka-producer-perf-test.sh '
+      f'--topic={topic_name} '
+      f'--num-records={num_records} '
+      f'--record-size={_KAFKA_RECORD_SIZE.value} '
+      '--throughput=-1 '
+      f'--bootstrap-server {bootstrap_server} '
+      '--command-config /tmp/producer.properties '
+      '> /tmp/producer_$i.log 2>&1 & '
+      'done && wait'
+  )
+  producer_vm.RemoteCommand(cmd)
+  stdout, _ = producer_vm.RemoteCommand(
+      'cat /tmp/producer_*.log && rm -f /tmp/producer_*.log'
+      ' /tmp/producer.properties'
+  )
+  return stdout
+
+
+def _RunConsumer(
+    consumer_vm: virtual_machine.BaseVirtualMachine,
+    bootstrap_server: str,
+    topic_name: str,
+    num_threads: int,
+    num_records: int,
+) -> str:
+  """Runs the Kafka consumer performance test across multiple threads.
+
+  Args:
+    consumer_vm: The consumer VM.
+    bootstrap_server: The Kafka bootstrap server address.
+    topic_name: The topic to consume records from.
+    num_threads: The number of concurrent consumer threads.
+    num_records: The number of records to consume.
+
+  Returns:
+    The concatenated standard output from all consumer threads.
+  """
+  consumer_vm.RemoteCommand(
+      'echo "auto.offset.reset=earliest" > /tmp/consumer.properties'
+  )
+  cmd = (
+      f'cd {KAFKA_DIR} && rm -f /tmp/consumer_*.log && '
+      f'for i in $(seq 1 {num_threads}); do '
+      'bin/kafka-consumer-perf-test.sh '
+      f'--topic={topic_name} '
+      f'--bootstrap-server {bootstrap_server} '
+      f'--group pkb-group-t{num_threads} '
+      f'--num-records={num_records} '
+      f'--fetch-size={_KAFKA_CONSUMER_FETCH_SIZE.value} '
+      f'--timeout {KAFKA_CONSUMER_TIMEOUT_MS} '
+      '--command-config /tmp/consumer.properties '
+      '> /tmp/consumer_$i.log 2>&1 & '
+      'done && wait'
+  )
+  consumer_vm.RemoteCommand(cmd)
+  stdout, _ = consumer_vm.RemoteCommand(
+      'cat /tmp/consumer_*.log && rm -f /tmp/consumer_*.log'
+      ' /tmp/consumer.properties'
+  )
+  return stdout
+
+
+def _ParseProducerResults(
+    producer_stdout: str, metadata: dict[str, Any]
+) -> list[sample.Sample]:
+  """Parses the producer output and returns a list of samples.
+
+  Args:
+    producer_stdout: The stdout from running the producer test.
+    metadata: The metadata dictionary to attach to each sample.
+
+  Returns:
+    A list of sample.Sample objects for producer throughput and latency.
+  """
+  results = []
+  producer_matches = re.findall(
+      r'([\d.]+) records/sec \(([\d.]+) MB/sec\), ([\d.]+) ms avg latency',
+      producer_stdout,
+  )
+  if producer_matches:
+    results.append(
+        sample.Sample(
+            'Producer Throughput (Records/sec)',
+            sum(float(m[0]) for m in producer_matches),
+            'records/sec',
+            metadata.copy(),
+        )
+    )
+    results.append(
+        sample.Sample(
+            'Producer Throughput (MB/sec)',
+            sum(float(m[1]) for m in producer_matches),
+            'MB/sec',
+            metadata.copy(),
+        )
+    )
+    results.append(
+        sample.Sample(
+            'Producer Avg Latency',
+            sum(float(m[2]) for m in producer_matches) / len(producer_matches),
+            'ms',
+            metadata.copy(),
+        )
+    )
+  return results
+
+
+def _ParseConsumerResults(
+    consumer_stdout: str, metadata: dict[str, Any]
+) -> list[sample.Sample]:
+  """Parses the consumer output and returns a list of samples.
+
+  Args:
+    consumer_stdout: The stdout from running the consumer test.
+    metadata: The metadata dictionary to attach to each sample.
+
+  Returns:
+    A list of sample.Sample objects for consumer throughput.
+  """
+  results = []
+  mb_per_sec_values = []
+  records_per_sec_values = []
+  for line in consumer_stdout.strip().split('\n'):
+    columns = [col.strip() for col in line.split(',')]
+    if len(columns) >= 6:
+      try:
+        mb_per_sec_values.append(float(columns[3]))
+        records_per_sec_values.append(float(columns[5]))
+      except ValueError:
+        continue
+
+  if mb_per_sec_values:
+    results.append(
+        sample.Sample(
+            'Consumer Throughput (MB/sec)',
+            sum(mb_per_sec_values),
+            'MB/sec',
+            metadata.copy(),
+        )
+    )
+    results.append(
+        sample.Sample(
+            'Consumer Throughput (Records/sec)',
+            sum(records_per_sec_values),
+            'records/sec',
+            metadata.copy(),
+        )
+    )
+  return results
+
+
+def _RunSingleTrial(
+    benchmark_spec: bm_spec.BenchmarkSpec,
+    num_threads: int,
+    num_records: int,
+) -> list[sample.Sample]:
+  """Runs a single trial with the specified number of concurrent threads.
+
+  Args:
+    benchmark_spec: The benchmark specification.
+    num_threads: The number of threads to use for the benchmark.
+    num_records: The number of records to produce/consume.
+
+  Returns:
+    A list of samples.
+  """
+  broker_vm = benchmark_spec.vm_groups['broker'][0]
+  producer_vm = benchmark_spec.vm_groups['producer'][0]
+  consumer_vm = benchmark_spec.vm_groups['consumer'][0]
+  bootstrap_server = f'{broker_vm.internal_ip}:{KAFKA_BROKER_PORT}'
+
+  trial_topic_name = (
+      f'{KAFKA_TOPIC_NAME}-threads-{num_threads}-records-{num_records}'
+  )
+  _CreateTopic(broker_vm, bootstrap_server, trial_topic_name)
+
+  with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    producer_future = executor.submit(
+        _RunProducer,
+        producer_vm,
+        bootstrap_server,
+        trial_topic_name,
+        num_threads,
+        num_records,
+    )
+    consumer_future = executor.submit(
+        _RunConsumer,
+        consumer_vm,
+        bootstrap_server,
+        trial_topic_name,
+        num_threads,
+        num_records,
+    )
+    producer_stdout = producer_future.result()
+    consumer_stdout = consumer_future.result()
+
+  metadata = {
+      'kafka_num_records': int(num_records),
+      'kafka_record_size': int(_KAFKA_RECORD_SIZE.value),
+      'kafka_producer_batch_size': int(_KAFKA_PRODUCER_BATCH_SIZE.value),
+      'kafka_consumer_fetch_size': int(_KAFKA_CONSUMER_FETCH_SIZE.value),
+      'kafka_num_threads': num_threads,
+  }
+
+  trial_results = []
+  trial_results.extend(_ParseProducerResults(producer_stdout, metadata))
+  trial_results.extend(_ParseConsumerResults(consumer_stdout, metadata))
+  return trial_results
+
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
-  """Runs Kafka benchmarks."""
-  return []
+  """Runs Kafka benchmarks.
+
+  Args:
+    benchmark_spec: The benchmark specification.
+
+  Returns:
+    A list of samples.
+  """
+  producer_vm = benchmark_spec.vm_groups['producer'][0]
+  consumer_vm = benchmark_spec.vm_groups['consumer'][0]
+
+  num_threads = min(
+      producer_vm.NumCpusForBenchmark(),
+      consumer_vm.NumCpusForBenchmark(),
+      _KAFKA_NUM_THREADS.value,
+  )
+  num_records = int(_KAFKA_NUM_RECORDS.value)
+  return _RunSingleTrial(benchmark_spec, num_threads, num_records)
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
-  """Cleans up the benchmark."""
-  pass
+  """Cleans up the benchmark.
+
+  Args:
+    benchmark_spec: The benchmark specification.
+  """
+  broker_vm = benchmark_spec.vm_groups['broker'][0]
+  controller_vm = benchmark_spec.vm_groups['controller'][0]
+
+  for vm in (broker_vm, controller_vm):
+    vm.RemoteCommand(
+        f'cd {KAFKA_DIR} && bin/kafka-server-stop.sh', ignore_failure=True
+    )
+    vm.RemoteCommand(
+        'rm -rf /tmp/kraft-*-logs', ignore_failure=True
+    )

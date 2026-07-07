@@ -327,6 +327,15 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
     self.assertEqual(google_kubernetes_engine._CalculateCidrSize(49), 17)
     self.assertEqual(google_kubernetes_engine._CalculateCidrSize(250), 15)
 
+  @flagsaver.flagsaver(gke_enable_workload_identity=False)
+  def testCreateWorkloadIdentityDisabled(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      self.assertNotIn('--workload-pool', issue_command.all_commands)
+      self.assertNotIn('--workload-metadata', issue_command.all_commands)
+
 
 class GoogleKubernetesEngineAutoscalingTestCase(PatchedObjectsTestCase):
 
@@ -527,6 +536,38 @@ class GoogleKubernetesEngineWithGpusTestCase(PatchedObjectsTestCase):
       self.assertIn(
           '--accelerator '
           'type=nvidia-h100-80gb,count=2,gpu-driver-version=default',
+          issue_command.all_commands,
+      )
+
+  @flagsaver.flagsaver(gce_reservation_id='test_reservation')
+  def testReservation(self):
+    spec = self.create_kubernetes_engine_spec('k80')
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      expected = {
+          'cloud.google.com/reservation-name': 'test_reservation',
+          'cloud.google.com/reservation-affinity': 'specific',
+      }
+      self.assertEqual(cluster.GetNodeSelectors(), expected)
+
+  @flagsaver.flagsaver(gce_reservation_id='test_reservation')
+  def testCreateWithReservation(self):
+    spec = self.create_kubernetes_engine_spec('k80')
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      self.assertIn(
+          '--reservation test_reservation', issue_command.all_commands
+      )
+      self.assertIn(
+          '--reservation-affinity specific', issue_command.all_commands
+      )
+      self.assertIn(
+          'cloud.google.com/reservation-affinity=specific',
+          issue_command.all_commands,
+      )
+      self.assertIn(
+          'cloud.google.com/reservation-name=test_reservation',
           issue_command.all_commands,
       )
 
@@ -888,9 +929,7 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects():
       cluster = google_kubernetes_engine.GkeAutopilotCluster(spec)
-    self.MockIssueCommand(
-        {'get node': [('ek-standard-16', '', 0)]}
-    )
+    self.MockIssueCommand({'get node': [('ek-standard-16', '', 0)]})
     self.assertEqual(
         cluster.GetMachineTypeFromNodeName(
             'gke-pkb-cluster-default-pool-node-1'

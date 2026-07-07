@@ -474,6 +474,10 @@ class BaseRelationalDb(resource.BaseResource):
         CAPTURE_SERVER_EVENT_SESSIONS_SQL
     )
 
+  def QueryPerfSnapReport(self) -> tuple[str, str]:
+    """Queries PerfSnap report if supported by the engine."""
+    return ('', '')
+
   def LogDatabaseDebugInfo(self) -> None:
     """Logs database debug information."""
     queries = [
@@ -483,6 +487,7 @@ class BaseRelationalDb(resource.BaseResource):
         (self.QueryDatabaseScopedConfigurations, 'DB Configuration'),
         (self.QueryTraceStatus, 'Trace Status'),
         (self.QueryServerEventSessions, 'Server Event Sessions'),
+        (self.QueryPerfSnapReport, 'PerfSnap Report'),
     ]
 
     for query_method, name in queries:

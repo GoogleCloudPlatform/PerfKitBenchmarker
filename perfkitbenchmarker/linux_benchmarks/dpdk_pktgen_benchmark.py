@@ -30,6 +30,7 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
@@ -49,7 +50,6 @@ class PktgenStats:
     """Calculates packet loss rate from sender and receiver stats."""
     return (
         int(self.sender_tx_pkts)
-        + int(self.sender_rx_pkts)
         - int(self.receiver_rx_pkts)
     ) / int(self.sender_tx_pkts)
 
@@ -414,14 +414,33 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       tx_cmd: str, rx_cmd: str
   ) -> PktgenStats:
     """Runs a Pktgen instance."""
-    background_tasks.RunParallelThreads(
-        [
-            (IssueCommand, [receiver_vm, rx_cmd], {}),
-            (IssueCommand, [sender_vm, tx_cmd], {}),
-        ],
-        post_task_delay=1,  # Ensure receiver starts before sender.
-        max_concurrency=2,
-    )
+    try:
+      background_tasks.RunParallelThreads(
+          [
+              (IssueCommand, [receiver_vm, rx_cmd], {}),
+              (IssueCommand, [sender_vm, tx_cmd], {}),
+          ],
+          post_task_delay=1,  # Ensure receiver starts before sender.
+          max_concurrency=2,
+      )
+    except errors.VmUtil.ThreadException as e:
+      logging.exception('Pktgen command failed. Checking for crash log.')
+      try:
+        stdout, _ = receiver_vm.RemoteCommand(
+            f'cat {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/{_STDOUT_LOG_FILE}'
+        )
+        logging.exception('Receiver Pktgen Log:\n%s', stdout)
+      except Exception as read_err:  # pylint: disable=broad-except
+        logging.exception('Failed to read log from receiver: %s', read_err)
+      try:
+        stdout, _ = sender_vm.RemoteCommand(
+            f'cat {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/{_STDOUT_LOG_FILE}'
+        )
+        logging.exception('Sender Pktgen Log:\n%s', stdout)
+      except Exception as read_err:  # pylint: disable=broad-except
+        logging.exception('Failed to read log from sender: %s', read_err)
+      raise e
+
     # Parse ANSI codes from pktgen output to get packet counts.
     stdout_rx_parser = (
         f'cat {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/{_STDOUT_LOG_FILE} |'

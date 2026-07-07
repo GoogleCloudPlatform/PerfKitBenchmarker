@@ -15,6 +15,7 @@
 
 import logging
 from absl import flags
+from perfkitbenchmarker import errors
 
 VERSION = flags.DEFINE_integer(
     'fortran_version', None, 'Version of gfortran to install'
@@ -33,7 +34,7 @@ def YumInstall(vm):
     _YumInstallVersion(vm, VERSION.value)
   else:
     vm.InstallPackages('gcc-gfortran libgfortran')
-  _LogFortranVersion(vm)
+  logging.info('Version of fortran: %s', GetFortranVersion(vm))
 
 
 def AptInstall(vm):
@@ -42,7 +43,7 @@ def AptInstall(vm):
     _AptInstallVersion(vm, VERSION.value)
   else:
     vm.InstallPackages('gfortran')
-  _LogFortranVersion(vm)
+  logging.info('Version of fortran: %s', GetFortranVersion(vm))
 
 
 def _YumInstallVersion(vm, version):
@@ -73,7 +74,18 @@ def _AptInstallVersion(vm, version):
   )
 
 
-def _LogFortranVersion(vm):
-  """Logs the version of gfortran."""
-  txt, _ = vm.RemoteCommand('gfortran -dumpversion')
-  logging.info('Version of fortran: %s', txt.strip())
+def GetFortranVersion(vm, required_version_prefix: str | None = None) -> str:
+  """Returns the full version of gfortran e.g. 11.5.0."""
+  txt, _ = vm.RemoteCommand('gfortran -dumpfullversion')
+  version = txt.strip()
+  if not required_version_prefix and VERSION.value:
+    required_version_prefix = str(VERSION.value)
+
+  if required_version_prefix and not version.startswith(
+      required_version_prefix
+  ):
+    raise errors.Benchmarks.PrepareException(
+        f'gfortran version {version} does not match expected version'
+        f' {required_version_prefix}'
+    )
+  return version

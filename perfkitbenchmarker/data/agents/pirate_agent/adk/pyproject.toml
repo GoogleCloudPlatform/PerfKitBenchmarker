@@ -1,0 +1,21 @@
+[project]
+name = "pirate_agent_adk"
+version = "0.1.0"
+description = "Pirate ADK Agent"
+requires-python = ">=3.12"
+dependencies = [
+    "absl-py",
+    "cloudpickle",
+    "google-adk",
+    "google-cloud-aiplatform",
+    "google-cloud-storage",
+    "opentelemetry-sdk",
+    "pydantic"
+]
+
+[tool.setuptools]
+py-modules = [
+  "pirate_agent_adk",
+  "adk_utils",
+  "common_utils",
+]

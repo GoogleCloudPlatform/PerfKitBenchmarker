@@ -17,6 +17,7 @@ from typing import Any
 
 from absl import flags
 
+
 flags.DEFINE_string(
     'aws_user_name',
     '',
@@ -408,4 +409,25 @@ AWS_METADATA_HTTP_TOKENS = flags.DEFINE_enum(
     None,
     ['required', 'optional'],
     'The metadata http tokens state for the ec2 instance (IMDSv2).',
+)
+
+# AWS Batch Flags
+flags.DEFINE_string(
+    'aws_batch_compute_type',
+    'FARGATE',
+    'The compute type for AWS Batch. Options: FARGATE, EC2',
+)
+flags.DEFINE_string(
+    'aws_batch_execution_role',
+    None,
+    'The IAM execution role ARN for Fargate tasks. '
+    'If not specified, defaults to '
+    'arn:aws:iam::{account}:role/ecsTaskExecutionRole.',
+)
+flags.DEFINE_string(
+    'aws_batch_instance_profile',
+    None,
+    'The IAM instance profile ARN for EC2 container instances (EC2). If not'
+    ' specified, defaults to'
+    ' arn:aws:iam::{account}:instance-profile/ecsInstanceRole.',
 )

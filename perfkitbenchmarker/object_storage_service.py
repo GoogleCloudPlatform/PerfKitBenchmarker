@@ -47,6 +47,11 @@ STORAGE_CLASS = flags.DEFINE_string(
     None,
     'Storage class to use in object storage benchmark.',
 )
+OBJECT_STORAGE_FUSE_LOG_TRACE = flags.DEFINE_boolean(
+    'object_storage_fuse_log_trace',
+    False,
+    'Whether to enable logging trace for object storage FUSE mount.',
+)
 
 
 FLAGS = flags.FLAGS

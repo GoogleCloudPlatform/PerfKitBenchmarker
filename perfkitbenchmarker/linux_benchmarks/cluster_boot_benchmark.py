@@ -168,7 +168,7 @@ _POST_BOOT_LATENCY_TEST_COMMAND = flags.DEFINE_string(
 )
 _COLLECT_BTIME = flags.DEFINE_boolean(
     'cluster_boot_collect_btime',
-    True,
+    False,
     'Collect btime from /proc/stat. This should be the same as kernel_start '
     'from linux_boot, but does not require a startup script.',
 )

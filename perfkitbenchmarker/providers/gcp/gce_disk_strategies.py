@@ -165,6 +165,10 @@ class CreateLSSDDiskStrategy(GCPCreateDiskStrategy):
 class GCECreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
   """CreateDiskStrategy when there is no pd disks."""
 
+  def __init__(self, vm, disk_spec, disk_count):
+    super().__init__(vm, disk_spec, disk_count)
+    self.disk_specs = [disk_spec]
+
   def DiskCreatedOnVMCreation(self) -> bool:
     # This have to be set to False due to _CreateScratchDiskFromDisks in
     # virtual_machine.py.
@@ -389,7 +393,10 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
     """Performs Linux specific setup of GCSFuse."""
     self.vm.Install('gcsfuse')
     target = self.disk_spec.mount_point
-    self.vm.RemoteCommand(f'sudo mkdir -p {target} && sudo chmod a+w {target}')
+    self.vm.RemoteCommand(
+        f'sudo mkdir -p {target} && sudo chmod a+w {target} && '
+        'sudo mkdir -p /tmp/logs && sudo chmod a+w /tmp/logs'
+    )
 
     metadata_cache_option_val = '0'
     if FLAGS.gcs_fuse_enable_metadata_cache:
@@ -401,10 +408,17 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
         f'--metadata-cache-negative-ttl-secs={metadata_cache_option_val}',
         f'--kernel-list-cache-ttl-secs={metadata_cache_option_val}',
     ]
+    logging_options = []
+    if FLAGS.object_storage_fuse_log_trace:
+      logging_options = [
+          '--log-severity=trace',
+          '--log-file=/tmp/logs/gcsfuse.log',
+      ]
     all_mount_options = (
         self.DEFAULT_MOUNT_OPTIONS
         + FLAGS.mount_options
         + metadata_cache_options
+        + logging_options
     )
     if FLAGS.gcs_fuse_enable_file_cache:
       all_mount_options += self.FILE_CACHE_OPTIONS

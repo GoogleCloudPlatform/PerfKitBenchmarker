@@ -410,30 +410,27 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   samples = []
   try:
-    for i in range(1, 1 + hammerdb.NUM_RUN.value):
-      metadata['run_iteration'] = i
-      _PreRun(db)
-      start_time = datetime.datetime.now()
-      stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)
-      end_time = datetime.datetime.now()
-      current_samples = hammerdb.ParseResults(
-          script=script, stdout=stdout, vm=client_vm
+    _PreRun(db)
+    start_time = datetime.datetime.now()
+    stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)
+    end_time = datetime.datetime.now()
+    current_samples = hammerdb.ParseResults(
+        script=script, stdout=stdout, vm=client_vm
+    )
+    _PostRun(db)
+    if (
+        db.engine == sql_engine_utils.ALLOYDB
+        and db.enable_columnar_engine_recommendation
+    ):
+      database_name = hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[script]
+      current_samples = _CheckAlloyDbColumnarEngine(
+          db, client_vm, script, timeout, database_name
       )
-      _PostRun(db)
-      if (
-          db.engine == sql_engine_utils.ALLOYDB
-          and db.enable_columnar_engine_recommendation
-          and i == 1
-      ):
-        database_name = hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[script]
-        current_samples = _CheckAlloyDbColumnarEngine(
-            db, client_vm, script, timeout, database_name
-        )
-      current_samples.extend(db.CollectMetrics(start_time, end_time))
+    current_samples.extend(db.CollectMetrics(start_time, end_time))
 
-      for s in current_samples:
-        s.metadata.update(metadata)
-      samples += current_samples
+    for s in current_samples:
+      s.metadata.update(metadata)
+    samples += current_samples
   finally:
     if _ENABLE_HAMMERDBCLI_VALIDATION.value:
       hammerdb.RunValidation(client_vm, db.engine, script, timeout=timeout)

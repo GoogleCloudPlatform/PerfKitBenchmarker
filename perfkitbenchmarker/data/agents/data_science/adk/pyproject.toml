@@ -1,0 +1,28 @@
+[project]
+name = "data_science_adk"
+version = "0.1.0"
+description = "Data Science ADK Agent"
+requires-python = ">=3.12"
+dependencies = [
+    "absl-py",
+    "cloudpickle",
+    "duckdb",
+    "google-adk",
+    "google-cloud-aiplatform",
+    "google-cloud-storage",
+    "matplotlib",
+    "numpy",
+    "opentelemetry-sdk",
+    "pandas",
+    "pydantic",
+    "seaborn"
+]
+
+[tool.setuptools]
+py-modules = [
+  "data_science_adk",
+  "data_science_adk_tools",
+  "data_science_adk_agents",
+  "adk_utils",
+  "common_utils",
+]

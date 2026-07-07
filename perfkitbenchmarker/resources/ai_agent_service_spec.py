@@ -23,7 +23,7 @@ class BaseAiAgentServiceSpec(spec.BaseSpec):
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     self.cloud: str = None
     self.deployment_type: str = None
-    self.workload: str | None = None
+    self.agent: str | None = None
     self.framework: str | None = None
     self.model: str | None = None
     # TODO: shuninglin/odiego - this is gcp/vertex specific, pushing it down to
@@ -39,8 +39,8 @@ class BaseAiAgentServiceSpec(spec.BaseSpec):
       config_values['cloud'] = flag_values.cloud
     for flag_name, config_key in [
         ('agentic_framework', 'framework'),
-        ('agentic_framework_model', 'model'),
-        ('agentic_framework_model_location', 'model_location'),
+        ('agent_model', 'model'),
+        ('agent_model_location', 'model_location'),
     ]:
       if flag_name in flag_values and (
           flag_values[flag_name].present or config_key not in config_values
@@ -63,7 +63,7 @@ class BaseAiAgentServiceSpec(spec.BaseSpec):
             option_decoders.StringDecoder,
             {'default': None, 'none_ok': False},
         ),
-        'workload': (
+        'agent': (
             option_decoders.StringDecoder,
             {'default': None, 'none_ok': False},
         ),

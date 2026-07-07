@@ -319,6 +319,32 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
     # Assert _GetAlloyDbCommand was not called as CE is disabled
     self.mock_get_cmd.assert_not_called()
 
+  def testQueryPerfSnapReport(self):
+    mock_query_tools = mock.Mock()
+    mock_query_tools.IssueSqlCommand.side_effect = [
+        ('1\n', ''),
+        ('2\n', ''),
+        ('Full report content\n', ''),
+    ]
+    with mock.patch.object(
+        gcp_alloy_db.GCPAlloyRelationalDb,
+        'client_vm_query_tools',
+        new_callable=mock.PropertyMock,
+        return_value=mock_query_tools,
+    ):
+      res1, _ = self.db.QueryPerfSnapReport()
+      self.assertIn('Start snapshot taken: 1', res1)
+
+      res2, _ = self.db.QueryPerfSnapReport()
+      self.assertEqual(res2, 'Full report content\n')
+
+      self.assertEqual(mock_query_tools.IssueSqlCommand.call_count, 3)
+      mock_query_tools.IssueSqlCommand.assert_has_calls([
+          mock.call('SELECT perfsnap.snap();', ignore_failure=True),
+          mock.call('SELECT perfsnap.snap();', ignore_failure=True),
+          mock.call('SELECT perfsnap.report(1, 2);', ignore_failure=True),
+      ])
+
 
 if __name__ == '__main__':
   unittest.main()

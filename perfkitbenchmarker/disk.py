@@ -826,6 +826,9 @@ class NfsDisk(NetworkDisk):
     self.vm = vm
     self.vm.Install('nfs_utils')
 
+  def UpdateDevicePath(self, device_path):
+    self.device_path = device_path
+
 
 class SmbDisk(NetworkDisk):
   """Provides options for mounting SMB drives.

@@ -1,0 +1,26 @@
+[project]
+name = "coding_agent_adk"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "google-adk",
+    "google-cloud-aiplatform",
+    "google-genai",
+    "python-dotenv",
+    "cloudpickle",
+    "pydantic",
+    "duckduckgo-search",
+    "beautifulsoup4",
+    "google-cloud-storage",
+    "absl-py",
+]
+
+[tool.setuptools]
+py-modules = [
+    "coding_agent_adk_agents",
+    "coding_agent_adk_tools",
+    "coding_agent_adk",
+    "adk_utils",
+    "common_utils",
+]
+

@@ -437,13 +437,19 @@ GCP_CREATE_DISKS_WITH_VM = flags.DEFINE_boolean(
 )
 CLOUD_REDIS_API_OVERRIDE = flags.DEFINE_string(
     'gcp_cloud_redis_api_override',
-    default='https://redis.googleapis.com/',
-    help='Cloud redis API endpoint override. Defaults to prod.',
+    default=None,
+    help=(
+        'Cloud redis API endpoint override.'
+        ' e.g. https://redis.googleapis.com/'
+    ),
 )
 CLOUD_VALKEY_API_OVERRIDE = flags.DEFINE_string(
     'gcp_cloud_valkey_api_override',
-    default='https://memorystore.googleapis.com/',
-    help='Cloud valkey API endpoint override. Defaults to prod.',
+    default=None,
+    help=(
+        'Cloud valkey API endpoint override.'
+        ' e.g. https://memorystore.googleapis.com/'
+    ),
 )
 GKE_API_OVERRIDE = flags.DEFINE_string(
     'gke_api_override',
@@ -560,6 +566,12 @@ GKE_ENABLE_SHIELDED_NODES = flags.DEFINE_boolean(
     'gke_enable_shielded_nodes',
     False,
     'Whether to enable shielded nodes.',
+)
+GKE_ENABLE_WORKLOAD_IDENTITY = flags.DEFINE_boolean(
+    'gke_enable_workload_identity',
+    True,
+    'Enable GKE Workload Identity on the cluster so pods can authenticate to'
+    ' Google Cloud APIs as a Kubernetes service account.',
 )
 GKE_ADDONS = flags.DEFINE_string(
     'gke_addons',

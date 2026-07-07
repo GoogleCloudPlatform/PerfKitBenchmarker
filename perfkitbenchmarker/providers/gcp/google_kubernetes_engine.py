@@ -288,6 +288,18 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
         or nodepool_config.machine_families
     )
 
+  def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
+    """Returns node selectors for the default nodepool."""
+    del machine_type
+    if gcp_flags.GCE_RESERVATION_ID.value:
+      return {
+          'cloud.google.com/reservation-name': (
+              gcp_flags.GCE_RESERVATION_ID.value
+          ),
+          'cloud.google.com/reservation-affinity': 'specific',
+      }
+    return {}
+
 
 class GkeCluster(BaseGkeCluster):
   """Class representing a Google Kubernetes Engine cluster."""
@@ -340,10 +352,12 @@ class GkeCluster(BaseGkeCluster):
 
   def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Targets the default pool ComputeClass when custom classes are enabled."""
-    del machine_type
+    selectors = super().GetNodeSelectors(machine_type)
     if self._UsesCustomComputeClass(self.default_nodepool):
-      return {'cloud.google.com/compute-class': self.default_nodepool.name}
-    return {}
+      return selectors | {
+          'cloud.google.com/compute-class': self.default_nodepool.name
+      }
+    return selectors
 
   def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns a dict containing metadata about the cluster.
@@ -385,6 +399,8 @@ class GkeCluster(BaseGkeCluster):
       cmd.args.append('--no-enable-shielded-nodes')
     if gcp_flags.GKE_ADDONS.value:
       cmd.args.append(f'--addons={gcp_flags.GKE_ADDONS.value}')
+    if gcp_flags.GKE_ENABLE_WORKLOAD_IDENTITY.value:
+      cmd.flags['workload-pool'] = f'{self.project}.svc.id.goog'
     if not self.release_channel:
       cmd.args.append('--no-enable-autoupgrade')
     self._AddNodeParamsToCmd(
@@ -503,6 +519,7 @@ class GkeCluster(BaseGkeCluster):
     # Parameter is not documented well but is available in CLI.
     cmd.flags['timeout'] = ONE_HOUR
 
+    nodepool_labels = [f'pkb_nodepool={nodepool_config.name}']
     if nodepool_config.gpu_count:
       if 'a2-' not in nodepool_config.machine_type:
         accelerator_spec = gce_virtual_machine.GenerateAcceleratorSpecString(
@@ -513,6 +530,14 @@ class GkeCluster(BaseGkeCluster):
               ',gpu-driver-version=' + gcp_flags.GKE_GPU_DRIVER_VERSION.value
           )
         cmd.flags['accelerator'] = accelerator_spec
+    if gcp_flags.GCE_RESERVATION_ID.value:
+      cmd.flags['reservation'] = gcp_flags.GCE_RESERVATION_ID.value
+      cmd.flags['reservation-affinity'] = 'specific'
+      nodepool_labels.append('cloud.google.com/reservation-affinity=specific')
+      nodepool_labels.append(
+          f'cloud.google.com/reservation-name={gcp_flags.GCE_RESERVATION_ID.value}'
+      )
+    cmd.flags['node-labels'] = ','.join(nodepool_labels)
 
     gce_tags = FLAGS.gce_tags
     if nodepool_config.gce_tags:
@@ -574,6 +599,8 @@ class GkeCluster(BaseGkeCluster):
         and nodepool_config.name != container_cluster.DEFAULT_NODEPOOL
     ):
       cmd.args.append('--enable-fast-socket')
+    if gcp_flags.GKE_ENABLE_WORKLOAD_IDENTITY.value:
+      cmd.flags['workload-metadata'] = 'GKE_METADATA'
 
     # Per-nodepool swap config takes precedence over the global flag.
     if nodepool_config.swap_config is not None:
@@ -601,7 +628,6 @@ class GkeCluster(BaseGkeCluster):
     if self.image_type and 'image-type' not in cmd.flags:
       cmd.flags['image-type'] = self.image_type
 
-    cmd.flags['node-labels'] = f'pkb_nodepool={nodepool_config.name}'
     if nodepool_config.min_nodes != nodepool_config.max_nodes:
       cmd.args.append('--enable-autoscaling')
       cmd.flags['min-nodes'] = nodepool_config.min_nodes
@@ -718,7 +744,7 @@ class GkeAutopilotCluster(BaseGkeCluster):
 
   def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Node selectors for instance capabilites in AutoPilot clusters."""
-    selectors = {}
+    selectors = super().GetNodeSelectors(machine_type)
     compute_class = None
     machine_family: str | None = util.GetMachineFamily(machine_type)
     if machine_family:

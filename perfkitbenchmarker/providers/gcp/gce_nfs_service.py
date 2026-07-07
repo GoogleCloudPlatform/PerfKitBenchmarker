@@ -41,7 +41,10 @@ class GceNfsService(nfs_service.BaseNfsService):
 
   @property
   def network(self):
-    spec = gce_network.GceNetworkSpec(project=FLAGS.project)
+    spec = gce_network.GceNetworkSpec(
+        project=FLAGS.project,
+        zone=self.zone
+    )
     network = gce_network.GceNetwork.GetNetworkFromNetworkSpec(spec)
     return network.network_resource.name
 
@@ -55,6 +58,7 @@ class GceNfsService(nfs_service.BaseNfsService):
     )
     network_arg = 'name={}'.format(self.network)
     args = [
+        '--async',
         '--file-share',
         volume_arg,
         '--network',
@@ -66,6 +70,7 @@ class GceNfsService(nfs_service.BaseNfsService):
       args += ['--tier', self.nfs_tier]
     try:
       self._NfsCommand('create', *args)
+      self._WaitUntilReady()
     except errors.Error as ex:
       # if this NFS service already exists reuse it
       if self._Exists():

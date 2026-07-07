@@ -39,6 +39,7 @@ _RETRY_ON_INSUFFICIENT_CAPACITY_CLOUD_FAILURE = flags.DEFINE_boolean(
     ' failure.',
 )
 
+
 _RESOURCE_REGISTRY = {}
 RegisteredType = TypeVar('RegisteredType')
 ResourceType = type[RegisteredType]

@@ -191,8 +191,8 @@ flags.DEFINE_boolean(
 )
 BLOBFUSE_BLOCK_SIZE_MB = flags.DEFINE_float(
     'blobfuse_block_size_mb',
-    1,
-    'The blobfuse block size in MB. Defaults to 1.',
+    2,
+    'The blobfuse block size in MB. Defaults to 2.',
 )
 FLAG_K8S_INFERENCE_BLOBSTORAGE_ACCOUNT = flags.DEFINE_string(
     'k8s_inference_server_blobstorage_account',

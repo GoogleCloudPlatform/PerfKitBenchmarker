@@ -4,7 +4,6 @@ import pickle
 import unittest
 
 from absl import flags
-from absl.testing import flagsaver
 from absl.testing import parameterized
 import mock
 from perfkitbenchmarker import errors

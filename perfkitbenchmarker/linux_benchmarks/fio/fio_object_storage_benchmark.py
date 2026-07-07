@@ -37,7 +37,7 @@ fio_object_storage:
     data_disk_type: object_storage
     scratch_dir: fuse_dir
     fio_target_mode: against_file_with_fill
-    fio_generate_scenarios: rand_8k_read_100GB_iodepth-1_numjobs-1
+    fio_generate_scenarios: rand_2m_read_100GB_iodepth-1_numjobs-1
     fio_fill_size: 100G
     fio_ioengine: sync
     fio_ramptime: 0
@@ -96,9 +96,12 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       benchmark_params,
       job_file='fio-object-storage.job',
   )
-  return utils.RunTest(
+  samples = utils.RunTest(
       vm, constants.FIO_PATH, job_file_str, latency_measure='lat'
   )
+  if FLAGS.object_storage_fuse_log_trace:
+    vm.RemoteCommand('sudo cat /tmp/logs/*')
+  return samples
 
 
 def Cleanup(_):

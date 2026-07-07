@@ -627,7 +627,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(metadata['question'], 'test query')
     self.assertEqual(metadata['text_response'], 'The total sales is $1000.')
     self.assertEqual(metadata['generated_sql'], 'SELECT sum(sales) FROM t')
-    self.assertEqual(metadata['retrieved_data'], [['1000']])
+    self.assertEqual(metadata['predict_data'], [['1000']])
     self.assertEqual(metadata['thoughts'], ['thought 1'])
     self.assertEqual(metadata['progress_messages'], ['progress 1'])
     self.assertEqual(metadata['time_to_first_token_secs'], 1.0)

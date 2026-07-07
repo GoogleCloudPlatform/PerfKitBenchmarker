@@ -147,9 +147,12 @@ def _Install(vm, spanner_oltp=False, args=immutabledict.immutabledict()):
           ' spanner_oltp_write_only.diff'
       )
 
+  # Build with --with-system-luajit to link against system 64-bit LuaJIT
+  # (libluajit-5.1-dev), avoiding the 2GB (32-bit address space) heap limit of
+  # the bundled LuaJIT under high thread counts (e.g., 512 threads).
   vm_util.Retry(max_retries=10)(vm.RemoteCommand)(
       f'cd {SYSBENCH_DIR} && ./autogen.sh && ./configure --with-pgsql'
-      f' {without_mysql}'
+      f' {without_mysql} --with-system-luajit'
   )
   vm.RemoteCommand(f'cd {SYSBENCH_DIR} && make -j && sudo make install')
 
@@ -174,7 +177,7 @@ def YumInstall(vm, args=immutabledict.immutabledict()):
     mariadb_pkg_name = 'mysql-devel'
   vm.InstallPackages(
       f'make automake libtool pkgconfig libaio-devel {mariadb_pkg_name} '
-      f'openssl-devel {devel_pkg_name}'
+      f'openssl-devel {devel_pkg_name} luajit luajit-devel'
   )
   _Install(vm, args=args)
 
@@ -183,7 +186,7 @@ def AptInstall(vm, spanner_oltp=False, args=immutabledict.immutabledict()):
   """Installs the sysbench package on the VM."""
   vm.InstallPackages(
       'make automake libtool pkg-config libaio-dev default-libmysqlclient-dev '
-      'libssl-dev libpq-dev'
+      'libssl-dev libpq-dev libluajit-5.1-dev'
   )
   _Install(vm, spanner_oltp=spanner_oltp, args=args)
 

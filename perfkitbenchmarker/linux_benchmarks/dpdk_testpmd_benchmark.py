@@ -31,7 +31,6 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_packages import dpdk
 
 
 BENCHMARK_NAME = 'dpdk_testpmd'
@@ -299,18 +298,4 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   Args:
     benchmark_spec: The benchmark specification.
   """
-  client_vm, server_vm = benchmark_spec.vms[:2]
-  dpdk_git_repo_dir = _GetDirFromRepo(dpdk.DPDK_GIT_REPO)
-  dpdk_driver_git_repo_dir = _GetDirFromRepo(dpdk.DPDK_GCP_DRIVER_GIT_REPO)
-  background_tasks.RunThreaded(
-      lambda vm_: vm_.RemoteCommand(f'rm -rf {dpdk_git_repo_dir}'),
-      [client_vm, server_vm],
-  )
-  background_tasks.RunThreaded(
-      lambda vm_: vm_.RemoteCommand(f'rm -rf {dpdk_driver_git_repo_dir}'),
-      [client_vm, server_vm],
-  )
-
-
-def _GetDirFromRepo(repo: str) -> str:
-  return repo.split('/')[-1].strip('.git')
+  del benchmark_spec

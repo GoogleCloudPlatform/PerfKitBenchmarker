@@ -20,13 +20,16 @@ benchmarks.
 
 import copy
 import datetime
+import hashlib
 import json
 import logging
 import os
+import re
 from typing import Any, Union, override
 from absl import flags
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 
@@ -41,6 +44,13 @@ JdbcClientDict = {
 # if you would like to run this benchmark to get the file.
 SNOWFLAKE_PYTHON_CLIENT_FILE = 'sf_python_driver.py'
 SNOWFLAKE_PYTHON_CLIENT_DIR = 'edw/snowflake/clients/python'
+
+SNOWFLAKE_CA_SEMANTIC_VIEW = flags.DEFINE_string(
+    'snowflake_ca_semantic_view',
+    None,
+    'Fully qualified name of the pre-created Snowflake Cortex Analyst semantic'
+    ' view.',
+)
 
 
 class SnowflakeClientInterface(edw_service.EdwClientInterface):
@@ -274,6 +284,133 @@ class PythonClientInterface(SnowflakeClientInterface):
     """Executes a query and returns performance details and query output."""
     args = [f'--query_file {query_name}', '--print_results']
     return self._RunPythonClientCommand('single', args)
+
+
+class ConversationalAnalyticsClientInterface(
+    SnowflakeClientInterface, edw_service.ConversationalAnalyticsClientInterface
+):
+  """Conversational Analytics Client Interface subclassing SnowflakeClientInterface."""
+
+  @property
+  def fetches_results_immediately(self) -> bool:
+    return False
+
+  def _GetQueryFileName(self, query_name: str) -> str:
+    """Generates a filename from a query name."""
+    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', query_name)
+    sanitized = sanitized[:30]
+    query_hash = hashlib.md5(query_name.encode('utf-8')).hexdigest()[:8]
+    return f'./{sanitized}_{query_hash}.txt'
+
+  def _ParseConversationalAnalyticsResults(
+      self, results: dict[str, Any], query_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    """Parses the results from Conversational Analytics query execution."""
+    execution_time = results.get('query_wall_time_in_secs', -1.0)
+    details = results.get('details', {})
+    query_results = details.get('query_results', {})
+
+    text_response = query_results.get('text_response')
+    generated_sql = query_results.get('generated_sql')
+
+    error_msg = None
+    if not text_response:
+      error_msg = f"'text_response' is missing or empty. Got: {text_response!r}"
+    elif not generated_sql:
+      error_msg = f"'generated_sql' is missing or empty. Got: {generated_sql!r}"
+
+    metadata = {
+        'question': query_name,
+        'text_response': text_response or '',
+        'generated_sql': generated_sql or '',
+        'progress_messages': query_results.get('progress_messages', []),
+        'time_to_first_token_secs': query_results.get(
+            'time_to_first_token_secs', 0.0
+        ),
+        'total_stream_time_secs': query_results.get(
+            'total_stream_time_secs', 0.0
+        ),
+        'job_id': details.get('job_id', ''),
+    }
+
+    if error_msg:
+      logging.warning('Conversational Analytics query failed: %s', error_msg)
+      metadata['error'] = f'Conversational Analytics query failed: {error_msg}'
+      return -1.0, metadata
+
+    logging.info(
+        'Conversational Analytics Response: %s',
+        metadata.get('text_response', ''),
+    )
+    return execution_time, metadata
+
+  def Prepare(self, package_name: str) -> None:
+    """Prepares the client vm by installing packages and driver."""
+    assert self.client_vm is not None
+    self.client_vm.Install('pip')
+    self.client_vm.RemoteCommand(
+        'sudo apt-get -qq update && DEBIAN_FRONTEND=noninteractive sudo apt-get'
+        ' -qq install python3.12-venv'
+    )
+    self.client_vm.RemoteCommand('python3 -m venv .venv')
+    self.client_vm.RemoteCommand(
+        'source .venv/bin/activate && pip install pyjwt cryptography requests'
+        ' absl-py'
+    )
+
+    driver_local_path = data.ResourcePath(
+        os.path.join('edw/snowflake/clients/python', 'sf_ca_driver.py')
+    )
+    self.client_vm.PushFile(driver_local_path, 'sf_ca_driver.py')
+
+    self.client_vm.PushDataFile(
+        os.path.join(
+            edw_service.EDW_PYTHON_DRIVER_LIB_DIR,
+            edw_service.EDW_PYTHON_DRIVER_LIB_FILE,
+        )
+    )
+
+    # Push the private key to the working directory on client vm
+    if FLAGS.snowflake_jdbc_key_file:
+      self.client_vm.PushFile(FLAGS.snowflake_jdbc_key_file)
+    else:
+      self.client_vm.InstallPreprovisionedPackageData(
+          package_name, ['snowflake_keyfile.p8'], ''
+      )
+
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
+    """Asks a single conversational analytics question."""
+    assert self.client_vm is not None
+    logging.info('Conversational Analytics Question: %s', query_name)
+    key_file = (
+        os.path.basename(FLAGS.snowflake_jdbc_key_file)
+        if FLAGS.snowflake_jdbc_key_file
+        else 'snowflake_keyfile.p8'
+    )
+    cmd = (
+        'source .venv/bin/activate && python3 sf_ca_driver.py single '
+        f'--snowflake_account={FLAGS.snowflake_account} '
+        f'--snowflake_user={FLAGS.snowflake_user} '
+        f'--credentials_file={key_file} '
+        f'--semantic_view={SNOWFLAKE_CA_SEMANTIC_VIEW.value} '
+        '--print_results '
+    )
+
+    remote_query_file = self._GetQueryFileName(query_name)
+    vm_util.CreateRemoteFile(self.client_vm, query_name, remote_query_file)
+    cmd += f'--query_file={remote_query_file}'
+
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+
+    try:
+      results = json.loads(stdout)
+    except ValueError as e:
+      raise errors.Benchmarks.RunError(
+          f'Failed to parse Conversational Analytics response: {stdout}'
+      ) from e
+    return self._ParseConversationalAnalyticsResults(results, query_name)
 
 
 def GetSnowflakeClientInterface(
@@ -564,6 +701,17 @@ class Snowflake(edw_service.EdwService):
       basic_data['account'] = self.account
     basic_data.update(self.client_interface.GetMetadata())
     return basic_data
+
+  @override
+  def GetConversationalAnalyticsClientInterface(
+      self,
+  ) -> ConversationalAnalyticsClientInterface:
+    """Returns the Conversational Analytics Client Interface instance."""
+    return ConversationalAnalyticsClientInterface(
+        self.warehouse,
+        self.database,
+        self.schema,
+    )
 
   def CreateSearchIndex(
       self, table_path: str, index_name: str

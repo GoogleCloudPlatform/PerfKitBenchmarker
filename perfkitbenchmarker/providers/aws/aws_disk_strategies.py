@@ -483,7 +483,17 @@ class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
     target = self.disk_spec.mount_point
     self.vm.RemoteCommand(f'sudo mkdir -p {target} && sudo chmod a+w {target}')
 
-    all_mount_options = self.DEFAULT_MOUNT_OPTIONS + FLAGS.mount_options
+    logging_options = []
+    if FLAGS.object_storage_fuse_log_trace:
+      logging_options = [
+          '--log-metrics',
+          '--log-directory=/tmp/logs',
+      ]
+    all_mount_options = (
+        self.DEFAULT_MOUNT_OPTIONS
+        + FLAGS.mount_options
+        + logging_options
+    )
     if not FLAGS.aws_s3_mount_enable_metadata_cache:
       all_mount_options += ['--metadata-ttl=0']
 

@@ -470,7 +470,7 @@ class GCENFSDiskTest(GCEDiskTest):
       ]
       self.CompareCallArgs(expected_commands, issue_command.call_args_list)
       self.assertEqual(
-          self.linux_vm.scratch_disks[0].GetDevicePath(), '10.198.13.2:/vol0'
+          self.linux_vm.scratch_disks[0].GetDevicePath(), '/scratch'
       )
 
 
