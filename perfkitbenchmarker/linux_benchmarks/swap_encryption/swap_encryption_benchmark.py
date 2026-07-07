@@ -39,11 +39,22 @@ containerd cgroup hierarchy, etc.).
 
 Infrastructure lifecycle lives in two BaseResource subclasses:
 
-    SwapNodePool  (provisioned via swap_config field on NodepoolSpec)
-    SwapDaemonSet (perfkitbenchmarker/resources/container_service/swap_daemonset.py)
+    _Create():  gcloud container node-pools create with linuxConfig.swapConfig
+                + sysctl via --system-config-from-file; waits for node Ready;
+                optionally creates and attaches a dedicated swap disk.
+    _Delete():  detach+delete disk; delete the nodepool.
+    DeleteDefaultPool(): remove the dummy e2-medium default pool after the
+                DaemonSet pod is Running (separate step to avoid API-server
+                contention during nodepool ops).
 
-Both resources are added to spec.resources in Prepare() and are
-auto-deleted by the PKB framework in Cleanup().
+  SwapDaemonSet  (perfkitbenchmarker/resources/container_service/swap_daemonset.py)
+    _Create():  apply Jinja2 manifest; wait for Running + /tmp/pkb_ready.
+    _Delete():  in-pod swapoff / dmsetup / losetup teardown; kubectl delete.
+    PodExec():  kubectl exec wrapper with transient-reset retry, OOM-kill
+                detection (rc=137), and automatic pod recovery.
+
+Both resources are added to spec.resources in Prepare() and are auto-deleted
+by the PKB framework in Cleanup().
 
 == Benchmark Phases ==
 
@@ -51,6 +62,26 @@ auto-deleted by the PKB framework in Cleanup().
     Run fio directly on the swap block device (swapoff first) to measure
     the hardware + encryption ceiling: random IOPS (4K), sequential
     bandwidth (1M), and completion latency (iodepth=1).
+
+  Phase 2a – CPU Overhead
+    stress-ng drives sustained swap I/O; vmstat and pidstat capture
+    swap-in/out rates and per-process CPU cost (kswapd, kcryptd,
+    dm-crypt threads on GKE; Nitro offload on EKS).
+
+  Phase 2b – I/O Interference
+    Baseline fio on a scratch volume → re-run with concurrent swap
+    pressure.  IOPS/latency delta = storage contention cost.
+
+  Phase 3a – Redis Latency
+    Dataset loaded beyond container memory limit → GET/SET p99 latency
+    measured while kernel swaps pages.
+
+  Phase 3b – Kernel Build
+    Linux compiled inside a memory-capped cgroup; slowdown ratio vs
+    unconstrained baseline.
+
+  Phase 3c – OpenSearch
+    Bulk-index + search query under swap pressure (esrally or curl).
 """
 
 import logging
@@ -65,6 +96,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks.swap_encryption import phases as _phases
+from perfkitbenchmarker.linux_benchmarks.swap_encryption import utils as _utils
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import swap_daemonset as _ds_mod
 
@@ -78,13 +110,13 @@ _BenchmarkSpec = bm_spec_lib.BenchmarkSpec
 
 BENCHMARK_NAME = 'swap_encryption'
 
+
 BENCHMARK_CONFIG = """
 swap_encryption:
   description: >
-    Verify dm-crypt encrypted swap on GKE/EKS nodes. Swap-enabled 'benchmark'
-    nodepool declared in BENCHMARK_CONFIG; GKE cluster creation applies
-    --system-config-from-file (dm-crypt swapConfig) automatically via
-    swap_config field on NodepoolSpec.
+    fio microbenchmarks (Tier 1) on swap-encrypted GKE/EKS nodes. Swap-enabled 'benchmark' nodepool declared in BENCHMARK_CONFIG;
+    GKE cluster creation applies --system-config-from-file (dm-crypt swapConfig)
+    automatically via swap_config field on NodepoolSpec.
   container_cluster:
     cloud: GCP
     type: Kubernetes
@@ -124,6 +156,7 @@ _SWAP_DEVICE = flags.DEFINE_string(
     'via /proc/swaps after setup.',
 )
 
+
 _SWAP_SIZE_GB = flags.DEFINE_integer(
     'swap_encryption_swap_size_gb',
     32,
@@ -131,27 +164,28 @@ _SWAP_SIZE_GB = flags.DEFINE_integer(
     'Ignored when a ready swap device already exists.',
 )
 
-_SWAP_TYPE = flags.DEFINE_enum(
+
+_SWAP_TYPE = flags.DEFINE_string(
     'swap_encryption_swap_type',
-    'auto',
-    ['auto', 'hyperdisk', 'lssd', 'boot_disk', 'instance_store', 'io2'],
-    'Swap backing storage target, one per methodology test-matrix row:\n'
-    '  GKE:  boot_disk (swap file on the OS boot disk — pd-balanced or '
-    'hyperdisk-balanced, chosen via --swap_encryption_boot_disk_type),\n'
-    '        hyperdisk (dedicated hyperdisk-balanced data disk),\n'
-    '        lssd (dedicated Local SSD RAID-0).\n'
-    '  AWS:  instance_store (NVMe Instance Store, Nitro-encrypted),\n'
-    '        io2 (EBS io2 data/root volume).\n'
-    'dm-crypt is applied on the GKE targets when '
-    '--swap_encryption_enable_dmcrypt is set; AWS targets are encrypted by '
-    'Nitro at the hardware level.  auto = detect from cloud + instance type.',
+    'hyperdisk',
+    'Storage target for the swap device.  One of: hyperdisk (default), '
+    'lssd, boot_disk, instance_store, io2.',
 )
+
+
+_FIO_RUNTIME_SEC = flags.DEFINE_integer(
+    'swap_encryption_fio_runtime_sec',
+    60,
+    'Wall-clock runtime in seconds for each individual fio job.',
+)
+
 
 _ENABLE_ZSWAP = flags.DEFINE_boolean(
     'swap_encryption_enable_zswap',
     False,
     'Enable zswap (lz4 compressor, 20%% max pool) before running tests.',
 )
+
 
 _MIN_FREE_KBYTES = flags.DEFINE_integer(
     'swap_encryption_min_free_kbytes',
@@ -160,17 +194,20 @@ _MIN_FREE_KBYTES = flags.DEFINE_integer(
     'swapping. Set 0 to leave the kernel default unchanged.',
 )
 
+
 _DAEMONSET_IMAGE = flags.DEFINE_string(
     'swap_encryption_daemonset_image',
     'ubuntu:22.04',
     'Container image used for the privileged benchmark DaemonSet pod.',
 )
 
+
 _NODEPOOL = flags.DEFINE_string(
     'swap_encryption_nodepool',
     'benchmark',
     'Name of the node pool to deploy the benchmark DaemonSet on.',
 )
+
 
 _INSTANCE_SIZE_LABEL = flags.DEFINE_string(
     'swap_encryption_instance_size_label',
@@ -182,12 +219,14 @@ _INSTANCE_SIZE_LABEL = flags.DEFINE_string(
     'metadata endpoint inside the pod.',
 )
 
+
 _COLLECT_COST = flags.DEFINE_boolean(
     'swap_encryption_collect_cost',
     False,
     'When True, emit a cost_estimate_usd sample using on-demand pricing '
     'for the instance type detected at runtime.',
 )
+
 
 _IO2_ENCRYPTED = flags.DEFINE_boolean(
     'swap_encryption_io2_encrypted',
@@ -198,12 +237,14 @@ _IO2_ENCRYPTED = flags.DEFINE_boolean(
     '--swap_encryption_swap_type=io2 on AWS/EKS.',
 )
 
+
 _IO2_KMS_KEY_ID = flags.DEFINE_string(
     'swap_encryption_io2_kms_key_id',
     '',
     'Optional KMS key id/ARN for the encrypted io2 volume. Empty = the '
     'account default aws/ebs key. Ignored unless io2_encrypted is True.',
 )
+
 
 _FAIL_ON_DEGRADED = flags.DEFINE_boolean(
     'swap_encryption_fail_on_degraded',
@@ -216,6 +257,7 @@ _FAIL_ON_DEGRADED = flags.DEFINE_boolean(
     'empty or meaningless data.  Set False to keep the legacy behaviour of '
     'always returning whatever partial samples were collected.',
 )
+
 
 _PHASES = flags.DEFINE_list(
     'swap_encryption_phases',
@@ -230,6 +272,7 @@ _PHASES = flags.DEFINE_list(
     '(e.g. skipping fio will not be reported as "Gate 1 produced no samples").',
 )
 
+
 _BENCHMARK_MACHINE_TYPE = flags.DEFINE_string(
     'swap_encryption_benchmark_machine_type',
     'n4-highmem-32',
@@ -238,12 +281,14 @@ _BENCHMARK_MACHINE_TYPE = flags.DEFINE_string(
     '(LSSD RAID-0).  The matching swap setup is selected automatically.',
 )
 
+
 _BENCHMARK_LSSD = flags.DEFINE_boolean(
     'swap_encryption_lssd',
     False,
     'Force LSSD RAID-0 swap path even when the machine type name does not '
     'contain "lssd".  Auto-detected from machine type when False.',
 )
+
 
 _LSSD_COUNT = flags.DEFINE_integer(
     'swap_encryption_lssd_count',
@@ -255,6 +300,7 @@ _LSSD_COUNT = flags.DEFINE_integer(
     'Default 1 covers most single-lssd machine types.',
 )
 
+
 _ENABLE_DMCRYPT = flags.DEFINE_boolean(
     'swap_encryption_enable_dmcrypt',
     True,
@@ -262,6 +308,7 @@ _ENABLE_DMCRYPT = flags.DEFINE_boolean(
     '"encryption enabled" column of the test matrix.  Set False to use '
     'plain swap (encryption disabled column).',
 )
+
 
 _NODE_IMAGE_TYPE = flags.DEFINE_string(
     'swap_encryption_node_image_type',
@@ -277,6 +324,7 @@ _NODE_IMAGE_TYPE = flags.DEFINE_string(
     'AL2 on EKS.',
 )
 
+
 _BOOT_DISK_TYPE = flags.DEFINE_string(
     'swap_encryption_boot_disk_type',
     'hyperdisk-balanced',
@@ -285,12 +333,14 @@ _BOOT_DISK_TYPE = flags.DEFINE_string(
     'dev/test machines, which do not support hyperdisk-balanced.',
 )
 
+
 _BOOT_DISK_IOPS = flags.DEFINE_integer(
     'swap_encryption_boot_disk_iops',
     80000,
     'Provisioned IOPS for the boot disk (hyperdisk-balanced only).  '
     '80 000 is the COS max-IOPS target.  Ignored for pd-ssd.',
 )
+
 
 _BOOT_DISK_THROUGHPUT = flags.DEFINE_integer(
     'swap_encryption_boot_disk_throughput',
@@ -301,6 +351,7 @@ _BOOT_DISK_THROUGHPUT = flags.DEFINE_integer(
     'pd-ssd.',
 )
 
+
 _BOOT_DISK_SIZE_GB = flags.DEFINE_integer(
     'swap_encryption_boot_disk_size_gb',
     500,
@@ -309,6 +360,7 @@ _BOOT_DISK_SIZE_GB = flags.DEFINE_integer(
     '(see Engineer Assignments table in execution-plan.md).  '
     'For LSSD configs the boot disk is smaller; 100 GiB is fine.',
 )
+
 
 _ADD_SWAP_DISK = flags.DEFINE_boolean(
     'swap_encryption_add_swap_disk',
@@ -321,19 +373,15 @@ _ADD_SWAP_DISK = flags.DEFINE_boolean(
     'disk flags.',
 )
 
+
 _SWAP_DISK_SIZE_GB = flags.DEFINE_integer(
     'swap_encryption_swap_disk_size_gb',
     500,
     'Size in GiB of the dedicated swap disk when '
     '--swap_encryption_add_swap_disk is True.  Must satisfy the '
-    'hyperdisk-balanced IOPS constraint: provisioned_iops ≤ size_gb × 80.',
+    'hyperdisk-balanced IOPS constraint: provisioned_iops <= size_gb * 80.',
 )
 
-_FIO_RUNTIME_SEC = flags.DEFINE_integer(
-    'swap_encryption_fio_runtime_sec',
-    60,
-    'Wall-clock seconds each fio job runs in Phase 1 microbenchmarks.',
-)
 
 _STRESS_VM_BYTES = flags.DEFINE_string(
     'swap_encryption_stress_vm_bytes',
@@ -342,12 +390,14 @@ _STRESS_VM_BYTES = flags.DEFINE_string(
     'Should exceed available node RAM to force sustained paging.',
 )
 
+
 _STRESS_VM_BYTES_LIST = flags.DEFINE_list(
     'swap_encryption_stress_vm_bytes_list',
     [],
     'Comma-separated list of --vm-bytes values to sweep in Phase 2a, '
     'e.g. "14G,28G,56G".  Overrides --swap_encryption_stress_vm_bytes.',
 )
+
 
 _STRESS_TIMEOUT_SEC = flags.DEFINE_integer(
     'swap_encryption_stress_timeout_sec',
@@ -369,23 +419,6 @@ _DEFAULT_POOL = 'default-pool'
 # Module-level stash for the io2 volume id created by _ensure_io2_volume().
 _IO2_VOLUME_ID = ''
 
-# On-demand instance pricing (USD/hr) for cost_estimate_usd sample.
-_INSTANCE_PRICE_USD_PER_HR: dict[str, float] = {
-    # GCP  (on-demand, us-central1 unless noted)
-    'c4-standard-8-lssd': 0.5888,
-    'c4-standard-8': 0.5008,
-    'n4-highmem-32': 3.0256,
-    'n2-highmem-32': 2.5216,
-    'n2-standard-32': 1.5264,
-    'z3-highmem-8': 2.7248,
-    # AWS
-    'i4i.4xlarge': 1.4960,
-    'i4i.2xlarge': 0.7480,
-    'm6id.4xlarge': 0.9072,
-    'm6i.4xlarge': 0.7680,
-    'r6i.4xlarge': 1.0080,
-}
-
 
 # ---------------------------------------------------------------------------
 # PKB benchmark API
@@ -393,21 +426,25 @@ _INSTANCE_PRICE_USD_PER_HR: dict[str, float] = {
 
 
 def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
-    """Load and return benchmark config spec."""
     return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
 def Prepare(spec: _BenchmarkSpec) -> None:
-    """Deploy privileged SwapDaemonSet and delete the dummy default nodepool.
+    """Two-step nodepool setup then DaemonSet deployment.
 
     PKB cluster creation automatically provisions the swap-enabled 'benchmark'
-    nodepool (swap_config declared in BENCHMARK_CONFIG). This function only:
+    nodepool (swap_config declared in BENCHMARK_CONFIG). This function:
       1. Deploys the privileged SwapDaemonSet and waits for Running.
       2. Deletes the cheap e2-medium default-pool (required at cluster create).
+      3. Tunes kernel swap aggressiveness (swappiness, min_free_kbytes).
+      4. Unlocks container cgroup swap limits.
+      5. Optionally enables zswap.
+      6. Configures cloud-specific swap via SwapDaemonSet.SetupSwap().
 
     DaemonSet is appended to spec.resources for PKB auto-cleanup.
     """
     cluster = spec.container_cluster
+
     logging.info('[swap_encryption] Deploying privileged DaemonSet')
     daemonset = _ds_mod.SwapDaemonSet(
         name=_DS_NAME,
@@ -426,33 +463,14 @@ def Prepare(spec: _BenchmarkSpec) -> None:
         '[swap_encryption] Benchmark pod (post-deletion): %s', daemonset.pod_name
     )
 
-
-def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:
-    """Execute all benchmark phases with gate logic.
-
-    Execution is structured in gated tiers matching the execution plan:
-
-      Tier 1 (Gate 1) — fio microbenchmarks
-        Raw I/O ceiling of the swap device.  Gate 1 fails if fio produces
-        zero samples (device not found, O_DIRECT error, etc.).
-
-    If Gate 1 fails, subsequent tiers (added in later PRs) are skipped.
-    """
-    daemonset = _get_daemonset(spec)
-
-    pod = daemonset.WaitForPod()
-    daemonset.oom_events.clear()
-    daemonset.pod_lost.clear()
-    original_pod = pod
-    degraded_reasons: list[str] = []
-
-    # ── Swap setup ────────────────────────────────────────────────────────────
+    # Tune kernel swap aggressiveness.
     daemonset.PodExec('sysctl -w vm.swappiness=100', ignore_failure=True)
     if _MIN_FREE_KBYTES.value > 0:
         daemonset.PodExec(
             f'sysctl -w vm.min_free_kbytes={_MIN_FREE_KBYTES.value}'
         )
-    # Lift cgroup swap limits so the pod can actually use swap.
+
+    # Unlock container cgroup swap.
     daemonset.PodExec(
         textwrap.dedent("""
     PKB_CG=$(awk -F: '/^0::/{print $3; exit}' /proc/self/cgroup 2>/dev/null)
@@ -469,9 +487,11 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:
         ignore_failure=True,
     )
 
+    # Enable zswap if requested.
     if _ENABLE_ZSWAP.value:
         daemonset.EnableZswap()
 
+    # Configure cloud-specific swap via the daemonset abstraction.
     cloud = daemonset.DetectCloud()
     logging.info('[swap_encryption] Detected cloud: %s', cloud)
     daemonset.SetupSwap(
@@ -482,60 +502,161 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:
         io2_volume_id=_IO2_VOLUME_ID,
     )
 
+
+def _phase_selected(token: str) -> bool:
+    """Return True if phase `token` should run given --swap_encryption_phases.
+
+    'all' (the default) selects every phase.  Otherwise only the comma-separated
+    tokens listed in the flag run.  Tokens: fio, 2a, 2b, 3a, 3b, 3c.
+    """
+    selected = [p.strip().lower() for p in _PHASES.value if p.strip()]
+    return (not selected) or ('all' in selected) or (token.lower() in selected)
+
+
+def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:
+    """Execute all benchmark phases with gate logic.
+
+    Execution is structured in three gated tiers matching the execution plan:
+
+      Tier 1 (Gate 1) — fio microbenchmarks
+        Raw I/O ceiling of the swap device.  Gate 1 fails if fio produces
+        zero samples (device not found, O_DIRECT error, etc.).
+
+      Tier 2 (Gate 2) — stress-ng CPU overhead + I/O interference
+        Requires an active swap device (Gate 1 must pass).  Gate 2 fails if
+        stress-ng does not complete within timeout.
+
+      Tier 3 (Gate 3) — real-world workloads (Redis, kernel build, OpenSearch)
+        Independent of Tier 2 results; always attempted if Gate 1 passed.
+        Individual workload failures are logged but do not abort the others.
+
+    If Gate 1 fails, Tiers 2 and 3 are skipped — there is no point measuring
+    application-level swap performance when the raw device is inaccessible.
+    """
+    daemonset = _get_daemonset(spec)
+
+    # WaitForPod raises PrepareException on timeout — never returns None.
+    pod = daemonset.WaitForPod()
+    # Reset per-run accumulators before starting phases.
+    daemonset.oom_events.clear()
+    daemonset.pod_lost.clear()
+    original_pod = pod
+    degraded_reasons: list[str] = []
+
     swap_dev = daemonset.GetActiveSwapDevice(_SWAP_DEVICE.value)
-    base_meta = _build_metadata(daemonset, swap_dev)
+    base_meta = _utils.BuildMetadata(
+        daemonset,
+        swap_dev,
+        swap_type=_SWAP_TYPE.value,
+        enable_dmcrypt=_ENABLE_DMCRYPT.value,
+        node_image_type=_NODE_IMAGE_TYPE.value,
+        boot_disk_type=_BOOT_DISK_TYPE.value,
+        boot_disk_iops=_BOOT_DISK_IOPS.value,
+        benchmark_machine_type=_BENCHMARK_MACHINE_TYPE.value,
+        enable_zswap=_ENABLE_ZSWAP.value,
+        min_free_kbytes=_MIN_FREE_KBYTES.value,
+        fio_runtime_sec=_FIO_RUNTIME_SEC.value,
+        stress_vm_bytes=_STRESS_VM_BYTES.value,
+        stress_vm_bytes_list=_STRESS_VM_BYTES_LIST.value,
+        stress_timeout_sec=_STRESS_TIMEOUT_SEC.value,
+        nodepool=_NODEPOOL.value,
+        instance_size_label=_INSTANCE_SIZE_LABEL.value,
+        benchmark_name=BENCHMARK_NAME,
+    )
     results: list[sample.Sample] = []
     t_run_start = time.time()
+
     logging.info('[swap_encryption] swap device: %s', swap_dev)
 
-    # ── Phase 1: fio microbenchmarks on raw swap device ───────────────────────
+    # ── Tier 1 / Gate 1: fio microbenchmarks ─────────────────────────────────
+    tier1_results = []
     if _phase_selected('fio'):
         logging.info(
-            '[swap_encryption] Phase 1: fio microbenchmarks on %s', swap_dev
+            '[swap_encryption] ── Tier 1 / Gate 1: fio microbenchmarks ──'
         )
         try:
-            phase1_samples = _phases.RunPhase1Fio(
-                daemonset, swap_dev, base_meta, _FIO_RUNTIME_SEC.value
+            tier1_results = _phases.RunPhase1Fio(
+                daemonset,
+                swap_dev,
+                base_meta,
+                _FIO_RUNTIME_SEC.value,
+                _SWAP_TYPE.value,
             )
-            results += phase1_samples
-            if not phase1_samples:
-                degraded_reasons.append(
-                    'Phase 1 (fio) produced no samples — '
-                    'check fio install and swap device accessibility'
-                )
-                logging.error('[swap_encryption] Phase 1: no samples produced')
+            results += tier1_results
         except Exception as e:  # pylint: disable=broad-except
-            degraded_reasons.append(f'Phase 1 fio failed: {e}')
-            logging.error('[swap_encryption] Phase 1 fio error: %s', e)
+            logging.error(
+                '[swap_encryption] Gate 1 FAILED — fio phase error: %s', e
+            )
+            logging.error(
+                '[swap_encryption] Skipping Tiers 2 and 3 (no swap device)'
+            )
+            return results
+
+        if not tier1_results:
+            logging.info(
+                '[swap_encryption] Gate 1 produced no samples '
+                '(loop-device skip or parse error) — '
+                'continuing to Tier 2; degradation gate will assess'
+            )
+    else:
+        logging.info(
+            '[swap_encryption] Skipping Tier 1 (fio) — not selected by '
+            '--swap_encryption_phases=%s',
+            ','.join(_PHASES.value),
+        )
 
     # ── Cost estimate ─────────────────────────────────────────────────────────
     if _COLLECT_COST.value:
         elapsed = time.time() - t_run_start
-        results += _collect_cost_sample(daemonset, elapsed, base_meta)
+        results += _utils.CollectCostSample(
+            daemonset,
+            elapsed,
+            base_meta,
+            _INSTANCE_SIZE_LABEL.value,
+            _BENCHMARK_MACHINE_TYPE.value,
+        )
 
     # ── Final degradation gate ────────────────────────────────────────────────
     if daemonset.pod_name and daemonset.pod_name != original_pod:
         degraded_reasons.append(
             f'benchmark pod was replaced during the run ({original_pod} →'
-            f' {daemonset.pod_name}) — it was OOM-evicted under swap'
-            ' pressure; phases executed after the eviction ran against a'
-            ' freshly-initialised pod (empty /tmp, swap re-setup) and may'
-            ' be invalid'
+            f' {daemonset.pod_name}) — it was OOM-evicted under swap pressure;'
+            ' phases executed after the eviction ran against a'
+            ' freshly-initialised pod (empty /tmp, swap re-setup) and may be'
+            ' invalid'
         )
     if daemonset.pod_lost:
         degraded_reasons.append(
             'benchmark pod(s) went NotFound during the run'
-            f' ({", ".join(daemonset.pod_lost)}) — the pod died (node'
-            ' memory-pressure eviction or container exit) and any phase'
-            ' running at or after that point produced invalid data'
+            f' ({", ".join(daemonset.pod_lost)}) — the pod died (node memory-pressure'
+            ' eviction or container exit) and any phase running at or after'
+            ' that point (e.g. kernel-build baseline, OpenSearch) produced'
+            ' invalid data'
         )
     if daemonset.oom_events:
         degraded_reasons.append(
-            'OOM kill(s) (rc=137) occurred during the run on pod(s) '
-            f'{", ".join(daemonset.oom_events)} — a phase exceeded memory'
-            ' and was killed by the OOM killer; the affected phase(s)'
-            ' produced no or partial data'
+            f'OOM kill(s) (rc=137) occurred during the run on pod(s) '
+            f'{", ".join(daemonset.oom_events)} — a phase exceeded memory and was'
+            ' killed by the OOM killer (the container may have restarted in place),'
+            ' so the affected phase(s) produced no or partial data'
         )
+
+    if _phase_selected('fio') and not tier1_results:
+        if swap_dev.startswith('/dev/loop'):
+            # Expected: COS blocks device-mapper from pod namespaces on single-disk
+            # nodes.  Tier 2/3 results are still valid; do NOT mark the run as degraded.
+            logging.info(
+                '[swap_encryption] Gate 1 (fio) skipped — loop device %s has no'
+                ' dm-crypt support from inside a pod. Tier 2/3 results are'
+                ' valid. Use c4-*-lssd or --swap_encryption_add_swap_disk for'
+                ' fio data.',
+                swap_dev,
+            )
+        else:
+            degraded_reasons.append(
+                'Gate 1 (fio microbenchmarks) produced no samples — the raw'
+                ' swap device was never characterised'
+            )
 
     degraded = bool(degraded_reasons)
     results.append(
@@ -559,8 +680,7 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:
             raise errors.Benchmarks.RunError(msg)
     else:
         logging.info(
-            '[swap_encryption] Run completed cleanly (%d samples)',
-            len(results),
+            '[swap_encryption] Run completed cleanly (%d samples)', len(results)
         )
 
     return results
@@ -571,6 +691,8 @@ def Cleanup(spec: _BenchmarkSpec) -> None:
 
     SwapDaemonSet._Delete() runs in-pod teardown (swapoff, dmsetup remove,
     losetup cleanup, pkill fio/stress-ng) then deletes the DaemonSet.
+    SwapNodePool._Delete() detaches+deletes the swap disk (if any) then
+    deletes the benchmark nodepool.
     """
 
 
@@ -583,7 +705,9 @@ def _delete_default_pool(cluster) -> None:
     """Delete the dummy e2-medium default-pool once the benchmark pod is Running.
 
     GKE requires at least one nodepool at cluster creation time; the e2-medium
-    default-pool satisfies that requirement.
+    default-pool satisfies that requirement. Deleting it before the DaemonSet
+    pod is Running can trigger a brief API-server timeout while two concurrent
+    nodepool operations are in progress.
     """
     try:
         cmd = cluster._GcloudCommand(  # pylint: disable=protected-access
@@ -623,22 +747,13 @@ def _get_daemonset(spec: _BenchmarkSpec) -> _ds_mod.SwapDaemonSet:
     return daemonset
 
 
-def _phase_selected(token: str) -> bool:
-    """Return True if phase `token` should run given --swap_encryption_phases.
-
-    'all' (the default) selects every phase.  Otherwise only the
-    comma-separated tokens listed in the flag run.
-    """
-    selected = [p.strip().lower() for p in _PHASES.value if p.strip()]
-    return (not selected) or ('all' in selected) or (token.lower() in selected)
-
-
 def _ensure_io2_volume() -> None:
     """Create + attach a dedicated io2 EBS volume to the benchmark node.
 
-    NOTE: Deferred — requires EKS kubelet LimitedSwap support to be
-    enabled.  Stashes the created volume id in _IO2_VOLUME_ID for
-    serial-based device detection in SwapDaemonSet._SetupEksIo2Swap.
+    No-op unless --swap_encryption_swap_type=io2 on an AWS/EKS cluster.
+    Best-effort: logs and returns on failure.  Stashes the created volume id in
+    the module-level _IO2_VOLUME_ID for serial-based device detection in
+    SwapDaemonSet._SetupEksIo2Swap.
     """
     global _IO2_VOLUME_ID
     if _SWAP_TYPE.value != 'io2':
@@ -647,7 +762,7 @@ def _ensure_io2_volume() -> None:
         ['get', 'nodes', '-o', 'jsonpath={.items[0].spec.providerID}'],
         raise_on_failure=False,
     )
-    provider = (out or '').strip()
+    provider = (out or '').strip()  # aws:///us-east-1a/i-0abc...
     if rc != 0 or 'aws://' not in provider:
         raise errors.Benchmarks.RunError(
             f'[swap_encryption] io2 setup: could not resolve EC2 instance'
@@ -659,8 +774,10 @@ def _ensure_io2_volume() -> None:
     base = ['aws', 'ec2', '--region', region]
     try:
         create_args = [
-            'create-volume', '--volume-type', 'io2',
-            '--size', '500', '--iops', '16000',
+            'create-volume',
+            '--volume-type', 'io2',
+            '--size', '500',
+            '--iops', '16000',
             '--availability-zone', az,
             '--tag-specifications',
             'ResourceType=volume,Tags=[{Key=pkb,Value=swap_encryption}]',
@@ -704,9 +821,10 @@ def _ensure_io2_volume() -> None:
         _IO2_VOLUME_ID = vol_id
         logging.info(
             '[swap_encryption] Attached io2 volume %s to %s as /dev/sdf',
-            vol_id, instance_id,
+            vol_id,
+            instance_id,
         )
-        time.sleep(15)
+        time.sleep(15)  # allow the NVMe device node to appear
     except Exception as e:  # pylint: disable=broad-except
         raise errors.Benchmarks.RunError(
             f'[swap_encryption] io2 attach error: {e}'
@@ -721,147 +839,9 @@ def _configure_eks_kubelet_swap(spec) -> None:
     a preBootstrapCommands block writing nodeadm config with
     memorySwapBehavior: LimitedSwap before kubelet starts.
 
-    GKE equivalent: linuxConfig.swapConfig via --system-config-from-file
-    (already implemented in SwapNodePool._CreateNodePool()).
+    See also: https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/pull/6780
     """
     raise NotImplementedError(
         '[swap_encryption] EKS kubelet LimitedSwap config via nodeadm is '
         'deferred (blocked on PR #6780). EKS swap setup not yet implemented.'
     )
-
-
-def _build_metadata(
-    daemonset: _ds_mod.SwapDaemonSet, swap_dev: str
-) -> dict[str, Any]:
-    """Collect node environment, encryption type, and config into a dict."""
-    kernel_out, _ = daemonset.PodExec('uname -r', ignore_failure=True)
-    mem_out, _ = daemonset.PodExec(
-        "awk '/MemTotal/{print $2}' /proc/meminfo", ignore_failure=True
-    )
-    swap_out, _ = daemonset.PodExec(
-        "awk 'NR>1{sum+=$3} END{print sum+0}' /proc/swaps", ignore_failure=True
-    )
-
-    try:
-        mem_gb = round(int(mem_out.strip()) / (1024 * 1024), 1)
-    except ValueError:
-        mem_gb = 0
-    try:
-        swap_gb = round(int(swap_out.strip()) / (1024 * 1024), 1)
-    except ValueError:
-        swap_gb = 0
-
-    enc = 'unknown'
-    if '/dev/mapper/' in swap_dev:
-        table_out, _ = daemonset.PodExec(
-            f'dmsetup table {swap_dev.split("/")[-1]} 2>/dev/null || echo ""',
-            ignore_failure=True,
-        )
-        enc = 'dm-crypt-plain' if 'crypt' in table_out.lower() else 'dm-other'
-    elif _SWAP_TYPE.value in ('instance_store', 'io2'):
-        enc = 'nitro_hardware_offload'
-    elif not _ENABLE_DMCRYPT.value:
-        enc = 'none'
-
-    cloud = daemonset.DetectCloud()
-
-    instance_label = _INSTANCE_SIZE_LABEL.value
-    if not instance_label:
-        gcp_type_out, _ = daemonset.PodExec(
-            'curl -s -m 3 --fail'
-            ' http://metadata.google.internal/computeMetadata/v1/instance/machine-type'
-            ' -H "Metadata-Flavor: Google" 2>/dev/null || echo ""',
-            ignore_failure=True,
-        )
-        if gcp_type_out.strip():
-            instance_label = gcp_type_out.strip().split('/')[-1]
-    if not instance_label:
-        aws_type_out, _ = daemonset.PodExec(
-            'curl -s -m 3 --fail '
-            'http://169.254.169.254/latest/meta-data/instance-type '
-            '2>/dev/null || echo ""',
-            ignore_failure=True,
-        )
-        instance_label = aws_type_out.strip()
-
-    return {
-        'benchmark': BENCHMARK_NAME,
-        'execution_mode': 'kubernetes_privileged_pod',
-        'cloud': cloud,
-        'instance_size': instance_label,
-        'kernel_version': kernel_out.strip(),
-        'host_memory_gb': mem_gb,
-        'swap_device': swap_dev,
-        'swap_size_gb': swap_gb,
-        'swap_encryption': enc,
-        'storage_target': _SWAP_TYPE.value,
-        'boot_disk_type': _BOOT_DISK_TYPE.value,
-        'dmcrypt_enabled': _ENABLE_DMCRYPT.value,
-        'node_image_type': _NODE_IMAGE_TYPE.value,
-        'boot_disk_iops_target': _BOOT_DISK_IOPS.value,
-        'benchmark_machine_type': _BENCHMARK_MACHINE_TYPE.value,
-        'zswap_enabled': _ENABLE_ZSWAP.value,
-        'min_free_kbytes': _MIN_FREE_KBYTES.value,
-        'fio_runtime_sec': _FIO_RUNTIME_SEC.value,
-        'stress_vm_bytes_requested': _STRESS_VM_BYTES.value,
-        'stress_vm_bytes_list': _STRESS_VM_BYTES_LIST.value,
-        'stress_timeout_sec': _STRESS_TIMEOUT_SEC.value,
-        'nodepool': _NODEPOOL.value,
-    }
-
-
-def _collect_cost_sample(
-    daemonset: _ds_mod.SwapDaemonSet,
-    elapsed_sec: float,
-    base_meta: dict,
-) -> list[sample.Sample]:
-    """Emit a cost_estimate_usd sample for the benchmark run."""
-    instance_type = ''
-
-    gcp_type_out, _ = daemonset.PodExec(
-        'curl -s -m 3 --fail'
-        ' http://metadata.google.internal/computeMetadata/v1/instance/machine-type'
-        ' -H "Metadata-Flavor: Google" 2>/dev/null || echo ""',
-        ignore_failure=True,
-    )
-    if gcp_type_out.strip():
-        instance_type = gcp_type_out.strip().split('/')[-1]
-
-    if not instance_type:
-        aws_type_out, _ = daemonset.PodExec(
-            'curl -s -m 3 --fail '
-            'http://169.254.169.254/latest/meta-data/instance-type '
-            '2>/dev/null || echo ""',
-            ignore_failure=True,
-        )
-        instance_type = aws_type_out.strip()
-
-    if _INSTANCE_SIZE_LABEL.value:
-        instance_type = _INSTANCE_SIZE_LABEL.value
-
-    if not instance_type and _BENCHMARK_MACHINE_TYPE.value:
-        instance_type = _BENCHMARK_MACHINE_TYPE.value
-        logging.info(
-            '[swap_encryption] Instance type from metadata unavailable; using'
-            ' --swap_encryption_benchmark_machine_type=%s for cost tracking',
-            instance_type,
-        )
-
-    price = _INSTANCE_PRICE_USD_PER_HR.get(instance_type)
-    if price is None:
-        logging.info(
-            '[swap_encryption] Unknown instance type "%s" — skipping cost'
-            ' sample. Add it to _INSTANCE_PRICE_USD_PER_HR to enable cost'
-            ' tracking.',
-            instance_type,
-        )
-        return []
-
-    hours = elapsed_sec / 3600.0
-    meta = dict(
-        base_meta,
-        instance_type=instance_type,
-        price_usd_per_hr=price,
-        benchmark_elapsed_sec=round(elapsed_sec, 1),
-    )
-    return [sample.Sample('cost_estimate_usd', hours * price, 'USD', meta)]
