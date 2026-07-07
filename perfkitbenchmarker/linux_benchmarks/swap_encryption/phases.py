@@ -13,12 +13,14 @@
 # limitations under the License.
 """Phase helper functions for swap_encryption_benchmark.
 
-Contains fio phase runner (Phase 1) and stress-ng CPU/IO overhead phases
-(Phase 2a / 2b) used by swap_encryption_benchmark.
+Contains fio phase runner (Phase 1), stress-ng CPU/IO overhead phases
+(Phase 2a / 2b), and kernel build under memory constraint (Phase 3b) used
+by swap_encryption_benchmark.
 Mirrors the pattern used by fio/utils.py for the fio benchmark.
 
 PR4 adds Phase 2a (stress-ng CPU overhead sweep) and Phase 2b (IO interference
 under concurrent swap pressure) on top of the PR3 Phase 1 fio microbenchmarks.
+PR5 adds Phase 3b (kernel build under memory-capped cgroup).
 Phase 2 flags are defined here to keep this module self-contained.
 """
 
@@ -906,4 +908,147 @@ def RunPhase2b(  # pylint: disable=invalid-name
       timeout=15,
   )
   _reset_memory_high_guard(daemonset)
+  return results
+
+
+# ===========================================================================
+# Phase 3b: kernel build under memory constraint
+# ===========================================================================
+
+def RunPhase3b(  # pylint: disable=invalid-name
+    daemonset,
+    base_meta: dict[str, Any],
+    kernel_version: str = '6.1.38',
+    kernel_memory_mb: int = 512,
+) -> list[sample.Sample]:
+  """Compile Linux inside a cgroup memory cap; compare to unconstrained.
+
+  Downloads and builds the specified kernel version twice: once with a
+  memory-capped cgroup (simulating swap pressure) and once unconstrained.
+  Emits elapsed time samples and a slowdown ratio.
+
+  Args:
+    daemonset: Active SwapDaemonSet resource.
+    base_meta: Shared metadata dict from BuildMetadata().
+    kernel_version: Kernel version string to download (e.g. '6.1.38').
+    kernel_memory_mb: cgroup memory limit in MB for the constrained build.
+
+  Returns:
+    List of Sample objects: constrained elapsed, unconstrained elapsed, and
+    (when unconstrained > 0) a slowdown_ratio sample.
+  """
+  results = []
+  ver = kernel_version
+  root = '/mnt/stateful_partition/pkb_kernel'
+  tarball = f'{root}/linux-{ver}.tar.xz'
+  src = f'{root}/linux-{ver}'
+  url = (
+      f'https://cdn.kernel.org/pub/linux/kernel/'
+      f'v{ver.split(".")[0]}.x/linux-{ver}.tar.xz'
+  )
+
+  daemonset.PodExec(
+      textwrap.dedent("""
+    command -v make >/dev/null 2>&1 && command -v cgexec >/dev/null 2>&1 || {
+      apt-get install -y -qq build-essential cgroup-tools 2>/dev/null || true
+    }
+  """),
+      ignore_failure=True,
+      timeout=180,
+  )
+
+  daemonset.PodExec(f'mkdir -p {root}')
+  daemonset.PodExec(
+      f'test -f {tarball} || wget -q --timeout=300 -O {tarball} {url}',
+      timeout=600,
+  )
+  daemonset.PodExec(
+      f'test -d {src} || tar -xf {tarball} -C {root}', timeout=600
+  )
+  daemonset.PodExec(
+      f'make -C {src} defconfig -j$(nproc) 2>&1', timeout=300
+  )
+
+  mem_bytes = kernel_memory_mb * 1024 * 1024
+
+  cgroup_setup_out, _ = daemonset.PodExec(
+      textwrap.dedent(f"""
+    if [ -d /sys/fs/cgroup/memory ] && \
+       mkdir -p /sys/fs/cgroup/memory/pkb_kernelbuild 2>/dev/null && \
+       echo {mem_bytes} > /sys/fs/cgroup/memory/pkb_kernelbuild/memory.limit_in_bytes 2>/dev/null; then
+      echo CGROUPV1
+    elif [ -d /sys/fs/cgroup/system.slice ] || [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+      mkdir -p /sys/fs/cgroup/pkb_kernelbuild 2>/dev/null || true
+      echo {mem_bytes} > /sys/fs/cgroup/pkb_kernelbuild/memory.max 2>/dev/null || true
+      echo $$ > /sys/fs/cgroup/pkb_kernelbuild/cgroup.procs 2>/dev/null || true
+      echo CGROUPV2
+    else
+      echo CGROUP_NONE
+    fi
+  """),
+      ignore_failure=True,
+      timeout=30,
+  )
+  cgroup_mode = (
+      cgroup_setup_out.strip().splitlines()[-1]
+      if cgroup_setup_out.strip()
+      else 'CGROUP_NONE'
+  )
+  logging.info(
+      '[swap_encryption] cgroup mode: %s (mem_limit=%dMB)',
+      cgroup_mode,
+      kernel_memory_mb,
+  )
+
+  def _build(label: str, use_cgroup: bool) -> sample.Sample:
+    daemonset.PodExec(f'make -C {src} clean 2>&1')
+    if use_cgroup and cgroup_mode == 'CGROUPV1':
+      cmd = (
+          'cgexec -g memory:pkb_kernelbuild '
+          f'make -C {src} -j$(nproc) vmlinux 2>&1 '
+          f'|| make -C {src} -j$(nproc) vmlinux 2>&1'
+      )
+    elif use_cgroup and cgroup_mode == 'CGROUPV2':
+      cmd = textwrap.dedent(f"""
+        mkdir -p /sys/fs/cgroup/pkb_kernelbuild 2>/dev/null || true
+        echo {mem_bytes} > /sys/fs/cgroup/pkb_kernelbuild/memory.max 2>/dev/null || true
+        echo $$ > /sys/fs/cgroup/pkb_kernelbuild/cgroup.procs 2>/dev/null || true
+        make -C {src} -j$(nproc) vmlinux 2>&1 || true
+      """)
+    else:
+      cmd = f'make -C {src} -j$(nproc) vmlinux 2>&1'
+    t0 = time.time()
+    daemonset.PodExec(cmd, timeout=3600, ignore_failure=True)
+    elapsed = time.time() - t0
+    m = dict(
+        base_meta,
+        workload='kernel_build',
+        kernel_version=ver,
+        build_variant=label,
+        cgroup_mode=cgroup_mode,
+        memory_limit_mb=(
+            kernel_memory_mb if use_cgroup else 'unconstrained'
+        ),
+    )
+    return sample.Sample('kernel_build_elapsed_sec', elapsed, 's', m)
+
+  s_constrained = _build('constrained', use_cgroup=True)
+  s_unconstrained = _build('unconstrained', use_cgroup=False)
+  results += [s_constrained, s_unconstrained]
+
+  if s_unconstrained.value > 0:
+    ratio = s_constrained.value / s_unconstrained.value
+    results.append(
+        sample.Sample(
+            'kernel_build_slowdown_ratio',
+            ratio,
+            'ratio',
+            dict(
+                base_meta,
+                workload='kernel_build',
+                kernel_version=ver,
+                memory_limit_mb=kernel_memory_mb,
+            ),
+        )
+    )
   return results

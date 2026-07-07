@@ -37,7 +37,12 @@ containerd cgroup hierarchy, etc.).
   Tier 2 (Gate 2) — stress-ng CPU overhead + I/O interference (Phase 2a/2b)
     Requires an active swap device (Gate 1 must pass).
 
+  Phase 3b — kernel build under memory-capped cgroup
+    Downloads and compiles Linux kernel; compares constrained vs.
+    unconstrained build time to quantify swap pressure impact.
+
 Phase 2 flags (_STRESS_*) are defined in phases.py alongside the phase code.
+Phase 3b flags (_KERNEL_*) are defined here (benchmark-level config).
 """
 
 import logging
@@ -69,7 +74,8 @@ BENCHMARK_NAME = 'swap_encryption'
 BENCHMARK_CONFIG = """
 swap_encryption:
   description: >
-    CPU/IO overhead benchmarks (Tier 2) on swap-encrypted GKE/EKS nodes.
+    CPU/IO overhead + kernel build benchmarks (Tiers 2 + 3b) on swap-encrypted
+    GKE/EKS nodes.
     Swap-enabled 'benchmark' nodepool declared in BENCHMARK_CONFIG;
     GKE cluster creation applies --system-config-from-file (dm-crypt
     swapConfig) automatically via swap_config field on NodepoolSpec.
@@ -189,7 +195,7 @@ _FAIL_ON_DEGRADED = flags.DEFINE_boolean(
 _PHASES = flags.DEFINE_list(
     'swap_encryption_phases',
     ['all'],
-    "Comma-separated phases: fio, 2a, 2b. Default 'all' runs every phase.",
+    "Comma-separated phases: fio, 2a, 2b, 3b. Default 'all' runs every phase.",
 )
 
 _BENCHMARK_MACHINE_TYPE = flags.DEFINE_string(
@@ -256,6 +262,18 @@ _SWAP_DISK_SIZE_GB = flags.DEFINE_integer(
     'swap_encryption_swap_disk_size_gb',
     375,
     'Size of the dedicated swap disk in GiB.',
+)
+
+_KERNEL_VERSION = flags.DEFINE_string(
+    'swap_encryption_kernel_version',
+    '6.1.38',
+    'Linux kernel version to download and compile for the build workload.',
+)
+
+_KERNEL_MEMORY_MB = flags.DEFINE_integer(
+    'swap_encryption_kernel_memory_mb',
+    512,
+    'cgroup memory limit in MB applied during the constrained kernel build.',
 )
 
 # ---------------------------------------------------------------------------
@@ -360,6 +378,7 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:  # pylint: disable=invalid
   Tier 2 (Gate 2): stress-ng CPU overhead (2a) + IO interference (2b).
     Requires Gate 1 to pass (no point measuring app-level swap when the raw
     device is inaccessible).
+  Phase 3b: kernel build under memory-capped cgroup (independent gate).
   """
   daemonset = _get_daemonset(spec)
 
@@ -431,6 +450,21 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:  # pylint: disable=invalid
     except Exception as e:  # pylint: disable=broad-except
       logging.error(
           '[swap_encryption] Gate 2 FAILED — stress phase error: %s', e
+      )
+
+  # ── Phase 3b: kernel build under memory constraint ─────────────────────────
+  if _phase_selected('3b'):
+    logging.info('[swap_encryption] Phase 3b: kernel build under memory cap')
+    try:
+      results += _phases.RunPhase3b(
+          daemonset,
+          base_meta,
+          kernel_version=_KERNEL_VERSION.value,
+          kernel_memory_mb=_KERNEL_MEMORY_MB.value,
+      )
+    except Exception as e:  # pylint: disable=broad-except
+      logging.error(
+          '[swap_encryption] Kernel build (3b) FAILED: %s — continuing', e
       )
 
   # ── Cost estimate ──────────────────────────────────────────────────────────

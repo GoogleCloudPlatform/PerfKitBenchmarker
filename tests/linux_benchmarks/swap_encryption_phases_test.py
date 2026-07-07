@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for swap_encryption_phases helpers (PR3).
+"""Tests for swap_encryption phases helpers (PR4 + PR5).
 
 PR3 update: RunPhase1Fio gains swap_type parameter and loop-device skip logic.
 ParseFioJson gains a label parameter and uses io_bytes for zero-direction
 detection.
+PR5 update: RunPhase3b measures kernel build time under memory-capped cgroup.
 """
 
 import json
@@ -266,6 +267,112 @@ class RunPhase1FioTest(pkb_common_test_case.PkbCommonTestCase):
     # swap_type defaults to '' — non-loop device should run normally.
     phases.RunPhase1Fio(ds, '/dev/sda', {}, 60)
     self.assertGreater(ds.PodExec.call_count, 0)
+
+
+class RunPhase3bTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for phases.RunPhase3b() — kernel build under memory constraint."""
+
+  _META = {'benchmark': 'swap_encryption', 'swap_device': '/dev/dm-0'}
+
+  def _make_ds(self, cgroup_mode: str = 'CGROUPV1') -> mock.MagicMock:
+    """Return a mock daemonset that simulates a successful kernel build."""
+    ds = mock.MagicMock()
+
+    def _pod_exec(cmd, **_):
+      # cgroup probe: return mode token on last line
+      if 'cgroup.controllers' in cmd or 'memory.limit_in_bytes' in cmd:
+        return (cgroup_mode, '')
+      return ('', '')
+
+    ds.PodExec = mock.Mock(side_effect=_pod_exec)
+    return ds
+
+  def test_returns_three_samples(self):
+    """Constrained, unconstrained, and slowdown_ratio samples emitted."""
+    ds = self._make_ds()
+    # Patch time so elapsed > 0 for slowdown_ratio to be emitted.
+    with mock.patch('time.time', side_effect=[0.0, 60.0, 60.0, 90.0]):
+      samples = phases.RunPhase3b(
+          ds, self._META, kernel_version='6.1.38', kernel_memory_mb=512
+      )
+    self.assertLen(samples, 3)
+    metric_names = {s.metric for s in samples}
+    self.assertIn('kernel_build_elapsed_sec', metric_names)
+    self.assertIn('kernel_build_slowdown_ratio', metric_names)
+
+  def test_constrained_sample_has_memory_limit_metadata(self):
+    ds = self._make_ds()
+    samples = phases.RunPhase3b(
+        ds, self._META, kernel_version='6.1.38', kernel_memory_mb=512
+    )
+    constrained = next(
+        s for s in samples
+        if s.metric == 'kernel_build_elapsed_sec'
+        and s.metadata.get('build_variant') == 'constrained'
+    )
+    self.assertEqual(constrained.metadata['memory_limit_mb'], 512)
+    self.assertEqual(constrained.metadata['kernel_version'], '6.1.38')
+
+  def test_unconstrained_sample_has_unconstrained_label(self):
+    ds = self._make_ds()
+    samples = phases.RunPhase3b(
+        ds, self._META, kernel_version='6.1.38', kernel_memory_mb=512
+    )
+    unconstrained = next(
+        s for s in samples
+        if s.metric == 'kernel_build_elapsed_sec'
+        and s.metadata.get('build_variant') == 'unconstrained'
+    )
+    self.assertEqual(unconstrained.metadata['memory_limit_mb'], 'unconstrained')
+
+  def test_slowdown_ratio_value(self):
+    """ratio = constrained_elapsed / unconstrained_elapsed."""
+    ds = self._make_ds()
+    # constrained: 0→60 (60s), unconstrained: 60→90 (30s) → ratio=2.0
+    with mock.patch('time.time', side_effect=[0, 60, 60, 90]):
+      samples = phases.RunPhase3b(
+          ds, self._META, kernel_version='6.1.38', kernel_memory_mb=512
+      )
+    ratio_sample = next(
+        s for s in samples if s.metric == 'kernel_build_slowdown_ratio'
+    )
+    self.assertAlmostEqual(ratio_sample.value, 2.0)
+
+  def test_cgroup_none_still_returns_samples(self):
+    """Builds run even when cgroup setup fails; ratio sample still emitted."""
+    ds = self._make_ds(cgroup_mode='CGROUP_NONE')
+    with mock.patch('time.time', side_effect=[0.0, 60.0, 60.0, 90.0]):
+      samples = phases.RunPhase3b(
+          ds, self._META, kernel_version='6.1.38', kernel_memory_mb=512
+      )
+    self.assertLen(samples, 3)
+    constrained = next(
+        s for s in samples
+        if s.metric == 'kernel_build_elapsed_sec'
+        and s.metadata.get('build_variant') == 'constrained'
+    )
+    self.assertEqual(constrained.metadata['cgroup_mode'], 'CGROUP_NONE')
+
+  def test_zero_unconstrained_time_skips_ratio(self):
+    """No ratio sample when unconstrained elapsed is 0 (avoid division)."""
+    ds = self._make_ds()
+    # Both builds return instantly (elapsed=0)
+    with mock.patch('time.time', return_value=0.0):
+      samples = phases.RunPhase3b(
+          ds, self._META, kernel_version='6.1.38', kernel_memory_mb=512
+      )
+    metric_names = {s.metric for s in samples}
+    self.assertNotIn('kernel_build_slowdown_ratio', metric_names)
+    self.assertLen(samples, 2)  # constrained + unconstrained only
+
+  def test_explicit_kernel_version_stored_in_metadata(self):
+    """kernel_version arg is recorded in all sample metadata."""
+    ds = self._make_ds()
+    samples = phases.RunPhase3b(
+        ds, self._META, kernel_version='5.15.120', kernel_memory_mb=256
+    )
+    for s in samples:
+      self.assertEqual(s.metadata.get('kernel_version'), '5.15.120')
 
 
 if __name__ == '__main__':

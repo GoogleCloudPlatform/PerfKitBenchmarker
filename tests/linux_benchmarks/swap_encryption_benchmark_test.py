@@ -22,6 +22,10 @@ PR2 additions tested here:
   - DetectCloud(): DMI -> GCP/AWS, metadata fallback, raises on failure
   - GetActiveSwapDevice(): explicit passthrough, /proc/swaps detection, raises
   - SetupSwap(): routes to _SetupGkeSwap (gcp) or _SetupEksSwap (aws)
+
+PR5 additions tested here:
+  - _phase_selected(): '3b' phase token included/excluded correctly
+  - _KERNEL_VERSION, _KERNEL_MEMORY_MB flags registered with defaults
 """
 
 import unittest
@@ -283,6 +287,56 @@ class SetupSwapRoutingTest(pkb_common_test_case.PkbCommonTestCase):
           cloud='azure', swap_type='auto',
           enable_dmcrypt=False, swap_size_gb=16,
       )
+
+
+class PhaseSelectedKernelBuildTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for _phase_selected() with the PR5-added '3b' phase token."""
+
+  def test_phase_selected_all_includes_3b(self):
+    with mock.patch.object(
+        swap_encryption_benchmark._PHASES, 'value', ['all']
+    ):
+      self.assertTrue(swap_encryption_benchmark._phase_selected('3b'))
+
+  def test_phase_selected_explicit_3b_only(self):
+    with mock.patch.object(
+        swap_encryption_benchmark._PHASES, 'value', ['3b']
+    ):
+      self.assertTrue(swap_encryption_benchmark._phase_selected('3b'))
+      self.assertFalse(swap_encryption_benchmark._phase_selected('fio'))
+      self.assertFalse(swap_encryption_benchmark._phase_selected('2a'))
+
+  def test_phase_selected_explicit_fio_excludes_3b(self):
+    with mock.patch.object(
+        swap_encryption_benchmark._PHASES, 'value', ['fio']
+    ):
+      self.assertFalse(swap_encryption_benchmark._phase_selected('3b'))
+
+  def test_phase_selected_multi_explicit(self):
+    with mock.patch.object(
+        swap_encryption_benchmark._PHASES, 'value', ['2a', '3b']
+    ):
+      self.assertTrue(swap_encryption_benchmark._phase_selected('2a'))
+      self.assertTrue(swap_encryption_benchmark._phase_selected('3b'))
+      self.assertFalse(swap_encryption_benchmark._phase_selected('fio'))
+
+
+class KernelVersionFlagTest(pkb_common_test_case.PkbCommonTestCase):
+  """Verify PR5-specific flags are registered with valid defaults."""
+
+  def test_kernel_version_flag_has_default(self):
+    self.assertIsNotNone(swap_encryption_benchmark._KERNEL_VERSION.value)
+
+  def test_kernel_version_flag_default_is_string(self):
+    self.assertIsInstance(swap_encryption_benchmark._KERNEL_VERSION.value, str)
+
+  def test_kernel_memory_mb_flag_positive(self):
+    self.assertGreater(swap_encryption_benchmark._KERNEL_MEMORY_MB.value, 0)
+
+  def test_kernel_memory_mb_flag_is_int(self):
+    self.assertIsInstance(
+        swap_encryption_benchmark._KERNEL_MEMORY_MB.value, int
+    )
 
 
 if __name__ == '__main__':
