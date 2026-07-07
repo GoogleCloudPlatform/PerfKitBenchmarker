@@ -116,6 +116,7 @@ class BaseContainerCluster(resource.BaseResource):
         nodepool_spec.machine_families,
     )
     nodepool_config.sandbox_config = nodepool_spec.sandbox_config
+    nodepool_config.swap_config = nodepool_spec.swap_config
     nodepool_config.zone = zone
     nodepool_config.num_nodes = nodepool_spec.vm_count
     if nodepool_spec.min_vm_count is None:
