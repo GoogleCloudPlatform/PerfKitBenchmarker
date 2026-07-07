@@ -235,6 +235,7 @@ class BaseContainerCluster(resource.BaseResource):
     metadata = {
         'cloud': self.CLOUD,
         'cluster_type': self.CLUSTER_TYPE,
+        'name': self.name,
         'zone': self.default_nodepool.zone,
         'size': self.default_nodepool.num_nodes,
         'machine_type': self.default_nodepool.machine_type,

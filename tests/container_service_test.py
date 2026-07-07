@@ -483,6 +483,7 @@ class ContainerServiceTest(pkb_common_test_case.PkbCommonTestCase):
         cluster.GetResourceMetadata(),
         {
             'cloud': 'UnitTest',
+            'name': 'pkb-123',
             'cluster_type': 'Kubernetes',
             'machine_type': 'fake-machine-type',
             'nodepools': {},
