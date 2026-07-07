@@ -438,10 +438,7 @@ def Prepare(spec: _BenchmarkSpec) -> None:
     )
     # Register before Create() so PKB auto-deletes on failure/cleanup.
     spec.resources.append(daemonset)
-<<<<<<< HEAD
     daemonset.Create()
-=======
->>>>>>> fe41aa0f9 (refactor(swap_encryption/pr2): thin benchmark using BaseResource pattern)
     logging.info('[swap_encryption] Benchmark pod ready: %s', daemonset.pod_name)
     _delete_default_pool(cluster)
     daemonset.WaitForPod()
@@ -613,7 +610,6 @@ def _delete_default_pool(cluster) -> None:
     logging.info('[swap_encryption] Deleting default nodepool: %s', _DEFAULT_POOL)
     _, stderr, rc = cmd.Issue(timeout=300, raise_on_failure=False)
     if rc != 0:
-<<<<<<< HEAD
       raise errors.Benchmarks.RunError(
           f'[swap_encryption] Could not delete default nodepool (rc={rc}): {stderr}'
       )
@@ -624,16 +620,6 @@ def _delete_default_pool(cluster) -> None:
     raise errors.Benchmarks.RunError(
         f'[swap_encryption] _delete_default_pool failed: {e}'
     ) from e
-=======
-      logging.warning(
-          '[swap_encryption] Could not delete default nodepool (rc=%d): %s',
-          rc, stderr,
-      )
-    else:
-      logging.info('[swap_encryption] Default nodepool deleted')
-  except Exception as e:  # pylint: disable=broad-except
-    logging.warning('[swap_encryption] _delete_default_pool failed: %s', e)
->>>>>>> fe41aa0f9 (refactor(swap_encryption/pr2): thin benchmark using BaseResource pattern)
 def Cleanup(spec: _BenchmarkSpec) -> None:
     """Resources in spec.resources are auto-deleted by the PKB framework.
 
