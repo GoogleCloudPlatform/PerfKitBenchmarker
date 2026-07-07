@@ -34,7 +34,7 @@ from perfkitbenchmarker.providers.gcp import util
 from perfkitbenchmarker.resources.container_service import container
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
-from perfkitbenchmarker.resources.container_service import swap_config as swap_config_lib
+from perfkitbenchmarker.providers.gcp import gcp_swap_config as swap_config_lib
 from tests import pkb_common_test_case
 
 FLAGS = flgs.FLAGS
