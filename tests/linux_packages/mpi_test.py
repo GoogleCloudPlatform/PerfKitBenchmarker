@@ -67,7 +67,7 @@ def _CreateMpiResponseFromDict(
 
 
 def ReadParsedOutput(file_name: str) -> List[mpi.MpiResult]:
-  return _CreateMpiResponseFromDict(ReadJson(file_name))
+  return _CreateMpiResponseFromDict(ReadJson(file_name))  # pyrefly: ignore[bad-argument-type]
 
 
 def _MockVm(ip: str) -> mock.Mock:

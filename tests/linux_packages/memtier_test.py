@@ -119,7 +119,7 @@ class MemtierTestCase(
             {'microsec': 2000.0, 'count': 4500},
         ])
     }
-    get_metadata.update(METADATA)
+    get_metadata.update(METADATA)  # pyrefly: ignore[no-matching-overload]
     set_metadata = {
         'histogram': json.dumps([
             {'microsec': 0.0, 'count': 50},
@@ -134,12 +134,12 @@ class MemtierTestCase(
             {'microsec': 9000.0, 'count': 10},
         ])
     }
-    set_metadata.update(METADATA)
+    set_metadata.update(METADATA)  # pyrefly: ignore[no-matching-overload]
 
     time_series_metadata = {'time_series': {'0': 3, '1': 4}}
-    time_series_metadata.update(METADATA)
+    time_series_metadata.update(METADATA)  # pyrefly: ignore[no-matching-overload]
     latency_series_metadata = {'time_series': {'0': 1, '1': 2.1}}
-    latency_series_metadata.update(METADATA)
+    latency_series_metadata.update(METADATA)  # pyrefly: ignore[no-matching-overload]
     runtime_info_metadata = {
         'Start_time': 1657947420452,
         'Finish_time': 1657947420454,
@@ -1452,7 +1452,7 @@ class MemtierTestCase(
             {'microsec': 2000.0, 'count': 4500},
         ])
     }
-    get_metadata.update(METADATA)
+    get_metadata.update(METADATA)  # pyrefly: ignore[no-matching-overload]
     set_metadata = {
         'histogram': json.dumps([
             {'microsec': 0.0, 'count': 50},
@@ -1467,12 +1467,12 @@ class MemtierTestCase(
             {'microsec': 9000.0, 'count': 10},
         ])
     }
-    set_metadata.update(METADATA)
+    set_metadata.update(METADATA)  # pyrefly: ignore[no-matching-overload]
 
     time_series_metadata = {'time_series': {'0': 3, '1': 4}}
-    time_series_metadata.update(METADATA)
+    time_series_metadata.update(METADATA)  # pyrefly: ignore[no-matching-overload]
     latency_series_metadata = {'time_series': {'0': 1, '1': 2.1}}
-    latency_series_metadata.update(METADATA)
+    latency_series_metadata.update(METADATA)  # pyrefly: ignore[no-matching-overload]
 
     expected_result = [
         sample.Sample(

@@ -209,7 +209,7 @@ class IostatCollector(base_collector.BaseCollector):
   def _CollectorRunCommand(
       self, vm: virtual_machine.BaseVirtualMachine, collector_file: str
   ):
-    if vm.BASE_OS_TYPE == os_types.WINDOWS:
+    if vm.BASE_OS_TYPE == os_types.WINDOWS:  # pyrefly: ignore[missing-argument]
       raise NotImplementedError('iostat is not supported on Windows.')
     return (
         f'export S_TIME_FORMAT=ISO; iostat -xt {self.interval} -o'
@@ -239,7 +239,7 @@ class IostatCollector(base_collector.BaseCollector):
             samples,
             self.disk_metrics,
             self.cpu_metrics,
-            self.interval,
+            self.interval,  # pyrefly: ignore[bad-argument-type]
             self.device_regex,
         )
 

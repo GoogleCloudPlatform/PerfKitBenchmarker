@@ -277,7 +277,7 @@ class BaseKubernetesVirtualMachineTestCase(
     pkb_common_test_case.PkbCommonTestCase
 ):
 
-  def assertJsonEqual(self, str1, str2):
+  def assertJsonEqual(self, str1, str2):  # pyrefly: ignore[bad-override]
     json1 = json.loads(str1)
     json2 = json.loads(str2)
     self.assertEqual(
@@ -352,7 +352,7 @@ class KubernetesVirtualMachineOsTypesTestCase(
         provider_info.GCP, os_type, provider_info.KUBERNETES
     )
     kub_vm = vm_class(spec)  # pytype: disable=not-instantiable
-    kub_vm._WaitForPodBootCompletion = lambda: None
+    kub_vm._WaitForPodBootCompletion = lambda: None  # pyrefly: ignore[missing-attribute]
     kub_vm._Create()
 
   def testCreateUbuntu2404(self):
@@ -425,7 +425,7 @@ class KubernetesVirtualMachineVmGroupAffinityTestCase(
     kub_vm = TestKubernetesVirtualMachine(spec)
     kub_vm.name = _NAME
     kub_vm.vm_group = 'my_vm_group'
-    kub_vm._WaitForPodBootCompletion = lambda: None  # pylint: disable=invalid-name
+    kub_vm._WaitForPodBootCompletion = lambda: None  # pylint: disable=invalid-name  # pyrefly: ignore[missing-attribute]
     kub_vm._Create()
 
   def testCreateVmGroupAffinity(self):
@@ -455,7 +455,7 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
     spec = self.create_virtual_machine_spec()
     with patch_critical_objects() as (issue_command, _):
       kub_vm = TestKubernetesVirtualMachine(spec)
-      kub_vm._WaitForPodBootCompletion = lambda: None  # pylint: disable=invalid-name
+      kub_vm._WaitForPodBootCompletion = lambda: None  # pylint: disable=invalid-name  # pyrefly: ignore[missing-attribute]
       kub_vm._Create()
       command = issue_command.call_args[0][0]
       command_string = ' '.join(command[:5])
@@ -475,7 +475,7 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
       # instance counter is at an unpredictable number at this stage, and it is
       # used to set the name.
       kub_vm.name = _NAME
-      kub_vm._WaitForPodBootCompletion = lambda: None
+      kub_vm._WaitForPodBootCompletion = lambda: None  # pyrefly: ignore[missing-attribute]
       kub_vm._Create()
 
       write_mock = get_write_mock_from_temp_file_mock(temp_file)
@@ -493,7 +493,7 @@ class KubernetesVirtualMachineTestCase(BaseKubernetesVirtualMachineTestCase):
       # instance counter is at an unpredictable number at this stage, and it is
       # used to set the name.
       kub_vm.name = _NAME
-      kub_vm._WaitForPodBootCompletion = lambda: None
+      kub_vm._WaitForPodBootCompletion = lambda: None  # pyrefly: ignore[missing-attribute]
       kub_vm._Create()
 
       write_mock = get_write_mock_from_temp_file_mock(temp_file)
@@ -574,7 +574,7 @@ class KubernetesVirtualMachineWithGpusTestCase(
     spec = self.create_virtual_machine_spec()
     with patch_critical_objects() as (issue_command, _):
       kub_vm = TestKubernetesVirtualMachine(spec)
-      kub_vm._WaitForPodBootCompletion = lambda: None
+      kub_vm._WaitForPodBootCompletion = lambda: None  # pyrefly: ignore[missing-attribute]
       kub_vm._Create()
       command = issue_command.call_args[0][0]
       command_string = ' '.join(command[:5])
@@ -594,7 +594,7 @@ class KubernetesVirtualMachineWithGpusTestCase(
       # instance counter is at an unpredictable number at this stage, and it is
       # used to set the name.
       kub_vm.name = _NAME
-      kub_vm._WaitForPodBootCompletion = lambda: None
+      kub_vm._WaitForPodBootCompletion = lambda: None  # pyrefly: ignore[missing-attribute]
       kub_vm._Create()
 
       write_mock = get_write_mock_from_temp_file_mock(temp_file)
@@ -627,7 +627,7 @@ class KubernetesVirtualMachine(BaseKubernetesVirtualMachineTestCase):
       # instance counter is at an unpredictable number at this stage, and it is
       # used to set the name.
       kub_vm.name = _NAME
-      kub_vm._WaitForPodBootCompletion = lambda: None
+      kub_vm._WaitForPodBootCompletion = lambda: None  # pyrefly: ignore[missing-attribute]
       kub_vm._Create()
 
       write_mock = get_write_mock_from_temp_file_mock(temp_file)

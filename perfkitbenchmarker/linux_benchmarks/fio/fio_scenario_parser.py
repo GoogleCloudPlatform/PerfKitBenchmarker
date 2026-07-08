@@ -119,7 +119,7 @@ class FioScenarioParser:
         access_pattern,
         blocksize_str,
         operation,
-        rwkind,
+        rwkind,  # pyrefly: ignore[bad-argument-type]
         workingset_str,
         name,
         extra_params,

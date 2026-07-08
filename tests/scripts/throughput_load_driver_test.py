@@ -115,7 +115,7 @@ class ThroughputLoadDriverTest(
   def testPastTimeoutThrows(self):
     orig_fail_latency = throughput_load_driver._FAIL_LATENCY
     orig_queue_wait_time = throughput_load_driver._QUEUE_WAIT_TIME
-    throughput_load_driver._FAIL_LATENCY = 2
+    throughput_load_driver._FAIL_LATENCY = 2  # pyrefly: ignore[bad-assignment]
     throughput_load_driver._QUEUE_WAIT_TIME = 4
     try:
 
@@ -144,7 +144,7 @@ class ThroughputLoadDriverTest(
   def testPastTimeoutCompletes(self):
     orig_fail_latency = throughput_load_driver._FAIL_LATENCY
     orig_queue_wait_time = throughput_load_driver._QUEUE_WAIT_TIME
-    throughput_load_driver._FAIL_LATENCY = 2
+    throughput_load_driver._FAIL_LATENCY = 2  # pyrefly: ignore[bad-assignment]
     throughput_load_driver._QUEUE_WAIT_TIME = 4
     try:
 

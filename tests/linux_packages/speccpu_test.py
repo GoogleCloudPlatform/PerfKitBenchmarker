@@ -613,7 +613,7 @@ class Speccpu2006BenchmarkTestCase(
   def testParseResultsC(self):
     vm = mock.Mock(vm=linux_virtual_machine.Ubuntu2004Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
-    spec_test_config.benchmark_name = 'speccpu2006'
+    spec_test_config.benchmark_name = 'speccpu2006'  # pyrefly: ignore[missing-attribute]
     spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
     spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config
@@ -647,7 +647,7 @@ class Speccpu2006BenchmarkTestCase(
   def testParseSpeedResults(self):
     vm = mock.Mock(vm=linux_virtual_machine.Ubuntu2004Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
-    spec_test_config.benchmark_name = 'speccpu2006'
+    spec_test_config.benchmark_name = 'speccpu2006'  # pyrefly: ignore[missing-attribute]
     spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
     spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config
@@ -660,7 +660,7 @@ class Speccpu2006BenchmarkTestCase(
   def testParseAllResults(self):
     vm = mock.Mock(vm=linux_virtual_machine.Ubuntu2004Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
-    spec_test_config.benchmark_name = 'speccpu2017'
+    spec_test_config.benchmark_name = 'speccpu2017'  # pyrefly: ignore[missing-attribute]
     spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
     spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config
@@ -673,7 +673,7 @@ class Speccpu2006BenchmarkTestCase(
   def testParsePeakResults(self):
     vm = mock.Mock(vm=linux_virtual_machine.Ubuntu2004Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
-    spec_test_config.benchmark_name = 'speccpu2017'
+    spec_test_config.benchmark_name = 'speccpu2017'  # pyrefly: ignore[missing-attribute]
     spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
     spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config
@@ -686,7 +686,7 @@ class Speccpu2006BenchmarkTestCase(
   def testParsePartialPeakResults(self):
     vm = mock.Mock(vm=linux_virtual_machine.Ubuntu2004Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
-    spec_test_config.benchmark_name = 'speccpu2017'
+    spec_test_config.benchmark_name = 'speccpu2017'  # pyrefly: ignore[missing-attribute]
     spec_test_config.log_format = r'Est. (SPEC.*2017_.*_base)\s*(\S*)'
     spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config
@@ -699,7 +699,7 @@ class Speccpu2006BenchmarkTestCase(
   def testGeometricMeanWithNoScores(self):
     vm = mock.Mock(vm=linux_virtual_machine.Ubuntu2004Mixin)
     spec_test_config = speccpu.SpecInstallConfigurations()
-    spec_test_config.benchmark_name = 'speccpu2006'
+    spec_test_config.benchmark_name = 'speccpu2006'  # pyrefly: ignore[missing-attribute]
     spec_test_config.log_format = r'Est. (SPEC.*_base2006)\s*(\S*)'
     spec_test_config.runspec_config = r'linux64-x64-gcc47.cfg'
     vm.speccpu_vm_state = spec_test_config

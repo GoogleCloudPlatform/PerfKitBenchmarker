@@ -71,7 +71,7 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
 
   def pull_message(
       self, timeout: float = client.TIMEOUT
-  ) -> Optional[types.ReceivedMessage]:
+  ) -> Optional[types.ReceivedMessage]:  # pyrefly: ignore[missing-attribute]
     """See base class."""
     # Cloud Pub/Sub has support for 2 different ways of retrieving messages:
     # Pull, and StreamingPull. We're using Pull, and doing 1 message / request.
@@ -90,7 +90,7 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
       return None
 
   def acknowledge_received_message(
-      self, message: Union[types.ReceivedMessage, pubsub_message.Message]
+      self, message: Union[types.ReceivedMessage, pubsub_message.Message]  # pyrefly: ignore[missing-attribute]
   ) -> None:
     # Acknowledges the received message so it will not be sent again.
     self.subscriber.acknowledge(
@@ -101,11 +101,11 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
     )
 
   def _get_first_six_bytes_from_payload(
-      self, message: Union[types.ReceivedMessage, pubsub_message.Message]
+      self, message: Union[types.ReceivedMessage, pubsub_message.Message]  # pyrefly: ignore[missing-attribute]
   ) -> bytes:
     """Gets the first 6 bytes of a message (as returned by pull_message or PullingStream)."""
-    if isinstance(message, types.ReceivedMessage):
-      return typing.cast(types.ReceivedMessage, message).message.data[:6]
+    if isinstance(message, types.ReceivedMessage):  # pyrefly: ignore[missing-attribute]
+      return typing.cast(types.ReceivedMessage, message).message.data[:6]  # pyrefly: ignore[missing-attribute]
     elif isinstance(message, pubsub_message.Message):
       return typing.cast(pubsub_message.Message, message).data[:6]
     else:
@@ -117,7 +117,7 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
     timestamp.FromDatetime(
         datetime.datetime.now() + datetime.timedelta(days=30)
     )
-    request = types.SeekRequest(
+    request = types.SeekRequest(  # pyrefly: ignore[missing-attribute]
         subscription=self.subscription,
         time=timestamp,
     )

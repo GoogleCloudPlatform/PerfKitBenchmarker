@@ -39,7 +39,7 @@ def GetSpecClass(base_class, **kwargs) -> 'BaseSpecMetaClass':
   Raises:
     Exception: If class found was not a subclass of base class.
   """
-  return auto_registry.GetRegisteredClass(
+  return auto_registry.GetRegisteredClass(  # pyrefly: ignore[bad-return]
       _SPEC_REGISTRY, base_class, base_class, **kwargs
   )
 
@@ -59,7 +59,7 @@ class BaseSpecMetaClass(type):
     cls._decoders = collections.OrderedDict()
     cls._required_options = set()
     auto_registry.RegisterClass(
-        _SPEC_REGISTRY, cls, cls.SPEC_ATTRS, cls.SPEC_TYPE
+        _SPEC_REGISTRY, cls, cls.SPEC_ATTRS, cls.SPEC_TYPE  # pyrefly: ignore[bad-argument-type]
     )
 
 
@@ -103,14 +103,14 @@ class BaseSpec(metaclass=BaseSpecMetaClass):
       self._InitDecoders()
     if flag_values:
       self._ApplyFlags(kwargs, flag_values)
-    missing_options = self._required_options.difference(kwargs)
+    missing_options = self._required_options.difference(kwargs)  # pyrefly: ignore[missing-attribute]
     if missing_options:
       raise errors.Config.MissingOption(
           'Required options were missing from {}: {}.'.format(
               component_full_name, ', '.join(sorted(missing_options))
           )
       )
-    unrecognized_options = frozenset(kwargs).difference(self._decoders)
+    unrecognized_options = frozenset(kwargs).difference(self._decoders)  # pyrefly: ignore[bad-argument-type]
     if unrecognized_options:
       logging.info(
           'Unrecognized options: %s for class {%s}. Could not find match in any'
@@ -126,7 +126,7 @@ class BaseSpec(metaclass=BaseSpecMetaClass):
           )
       )
     self._DecodeAndInit(
-        component_full_name, kwargs, self._decoders, flag_values
+        component_full_name, kwargs, self._decoders, flag_values  # pyrefly: ignore[bad-argument-type]
     )
 
   @classmethod
@@ -150,7 +150,7 @@ class BaseSpec(metaclass=BaseSpecMetaClass):
 
     Populates cls._decoders and cls._required_options.
     """
-    with cls._init_decoders_lock:
+    with cls._init_decoders_lock:  # pyrefly: ignore[bad-context-manager]
       if not cls._decoders:
         constructions = cls._GetOptionDecoderConstructions()
         for option, decoder_construction in sorted(
@@ -158,9 +158,9 @@ class BaseSpec(metaclass=BaseSpecMetaClass):
         ):
           decoder_class, init_args = decoder_construction
           decoder = decoder_class(option=option, **init_args)
-          cls._decoders[option] = decoder
+          cls._decoders[option] = decoder  # pyrefly: ignore[unsupported-operation]
           if decoder.required:
-            cls._required_options.add(option)
+            cls._required_options.add(option)  # pyrefly: ignore[missing-attribute]
 
   @classmethod
   def _ApplyFlags(

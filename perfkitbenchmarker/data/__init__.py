@@ -51,7 +51,7 @@ class ResourceNotFound(ValueError):
   pass
 
 
-class ResourceLoader(six.with_metaclass(abc.ABCMeta, object)):
+class ResourceLoader(six.with_metaclass(abc.ABCMeta, object)):  # pyrefly: ignore[invalid-inheritance]
   """An interface for loading named resources."""
 
   @abc.abstractmethod

@@ -106,7 +106,7 @@ class InferenceServerConfigDecoder(option_decoders.TypeVerifier):
               inference_server_type
           )
       )
-    return config_spec_class(
+    return config_spec_class(  # pyrefly: ignore[not-callable]
         self._GetOptionFullName(component_full_name),
         flag_values=flag_values,
         **value

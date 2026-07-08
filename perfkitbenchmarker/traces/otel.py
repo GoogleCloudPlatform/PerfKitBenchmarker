@@ -218,7 +218,7 @@ class _OTELCollector(base_collector.BaseCollector):
 
       for key, value in parsed_metrics.items():
         if _HIDE_LOGGING.value:
-          value[sample.DISABLE_CONSOLE_LOG] = True
+          value[sample.DISABLE_CONSOLE_LOG] = True  # pyrefly: ignore[unsupported-operation]
         samples.append(
             sample.Sample(
                 metric=key, value=-1, unit=value['unit'], metadata=value

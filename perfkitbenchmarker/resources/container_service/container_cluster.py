@@ -116,7 +116,7 @@ class BaseContainerCluster(resource.BaseResource):
         nodepool_spec.machine_families,
     )
     nodepool_config.sandbox_config = nodepool_spec.sandbox_config
-    nodepool_config.zone = zone
+    nodepool_config.zone = zone  # pyrefly: ignore[bad-assignment]
     nodepool_config.num_nodes = nodepool_spec.vm_count
     if nodepool_spec.min_vm_count is None:
       nodepool_config.min_nodes = nodepool_spec.vm_count
@@ -222,7 +222,7 @@ class BaseContainerCluster(resource.BaseResource):
             'gpu_count': nodepool.gpu_count,
         })
       if nodepool.sandbox_config is not None:
-        nodepool_metadata['sandbox_config'] = {
+        nodepool_metadata['sandbox_config'] = {  # pyrefly: ignore[bad-assignment]
             'type': nodepool.sandbox_config.type,
         }
       if nodepool.min_nodes != nodepool.max_nodes:

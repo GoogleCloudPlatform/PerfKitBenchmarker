@@ -21,8 +21,8 @@ class BaseAiAgentServiceSpec(spec.BaseSpec):
   DEPLOYMENT_TYPE = None
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
-    self.cloud: str = None
-    self.deployment_type: str = None
+    self.cloud: str = None  # pyrefly: ignore[bad-assignment]
+    self.deployment_type: str = None  # pyrefly: ignore[bad-assignment]
     self.agent: str | None = None
     self.framework: str | None = None
     self.model: str | None = None
@@ -152,7 +152,7 @@ class AiAgentServiceDecoder(option_decoders.TypeVerifier):
           'ai_agent_service requires a cloud to be set.'
       )
     spec_class = GetAiAgentServiceSpecClass(cloud, deployment_type)
-    return spec_class(
+    return spec_class(  # pyrefly: ignore[not-callable]
         self._GetOptionFullName(component_full_name),
         flag_values,
         **config,

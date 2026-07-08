@@ -705,7 +705,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
         'model': self.spec.model_name,
         'provider': provider,
         'components': self.spec.catalog_components,
-        **self.spec.extra_deployment_args,
+        **self.spec.extra_deployment_args,  # pyrefly: ignore[invalid-argument]
     }
     created_resources = list(
         kubernetes_commands.ApplyManifest(
@@ -1030,7 +1030,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
             self._PollForHPAEvents,
             self.replica,
             self._hpa_polling_stop_event,
-            on_hpa_scale_event,
+            on_hpa_scale_event,  # pyrefly: ignore[bad-argument-type]
         )
       else:
         raise errors.Resource.CreationError(
@@ -1116,7 +1116,7 @@ class WGServingInferenceServer(BaseWGServingInferenceServer):
       )
       self.created_resources.extend(created_resources)
 
-    deployment_name = self.deployment_metadata['metadata']['name']
+    deployment_name = self.deployment_metadata['metadata']['name']  # pyrefly: ignore[unsupported-operation]
     try:
       kubernetes_commands.WaitForResource(
           f'deployment/{deployment_name}',

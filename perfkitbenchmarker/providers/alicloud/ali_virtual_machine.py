@@ -218,7 +218,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     stdout, _ = vm_util.IssueRetryableCommand(describe_cmd)
     response = json.loads(stdout)
     instance = response['Instances']['Instance'][0]
-    if self.network.use_vpc:
+    if self.network.use_vpc:  # pyrefly: ignore[missing-attribute]
       pub_ip_address = instance['EipAddress']['IpAddress']
       self.internal_ip = instance['VpcAttributes']['PrivateIpAddress'][
           'IpAddress'
@@ -231,7 +231,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
 
     self._WaitForInstanceStatus(['Running'])
 
-    self.firewall.AllowPort(self, SSH_PORT)
+    self.firewall.AllowPort(self, SSH_PORT)  # pyrefly: ignore[missing-attribute]
     tags = {}
     tags.update(self.vm_metadata)
     util.AddTags(self.id, util.ResourceTypes.INSTANCE, self.region, **tags)
@@ -296,7 +296,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--ZoneId %s' % self.zone,
         '--ImageId %s' % self.image,
         '--InstanceType %s' % self.machine_type,
-        '--SecurityGroupId %s' % self.network.security_group.group_id,
+        '--SecurityGroupId %s' % self.network.security_group.group_id,  # pyrefly: ignore[missing-attribute]
         '--KeyPairName %s' % self.key_pair_name,
         '--SystemDisk.Category %s' % self.system_disk_type,
         '--SystemDisk.Size %s' % self.system_disk_size,
@@ -315,7 +315,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       create_cmd.extend(['--IoOptimized optimized'])
 
     if FLAGS.ali_use_vpc:
-      create_cmd.extend(['--VSwitchId %s' % self.network.vswitch.id])
+      create_cmd.extend(['--VSwitchId %s' % self.network.vswitch.id])  # pyrefly: ignore[missing-attribute]
     else:
       create_cmd.extend([
           '--InternetChargeType PayByTraffic',
@@ -400,7 +400,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
     assert status in INSTANCE_KNOWN_STATUSES, status
     return status in INSTANCE_EXISTS_STATUSES
 
-  def CreateScratchDisk(self, disk_spec):
+  def CreateScratchDisk(self, disk_spec):  # pyrefly: ignore[bad-override]
     """Create a VM's scratch disk.
 
     Args:
@@ -417,7 +417,7 @@ class AliVirtualMachine(virtual_machine.BaseVirtualMachine):
       data_disk.device_letter = DRIVE_START_LETTER
 
     self.FormatDisk(data_disk.GetDevicePath(), disk_spec.disk_type)  # pytype: disable=attribute-error
-    self.MountDisk(
+    self.MountDisk(  # pyrefly: ignore[missing-attribute]
         data_disk.GetDevicePath(),
         disk_spec.mount_point,
         disk_spec.disk_type,

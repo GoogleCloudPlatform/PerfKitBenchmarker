@@ -68,7 +68,7 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec):
   utils.PrefillIfEnabled(writer_vm, constants.FIO_PATH, use_directory=True)
   test_vm = spec.vm_groups['default'][0]
 
-  if test_vm.CLOUD == 'Azure':
+  if test_vm.CLOUD == 'Azure':  # pyrefly: ignore[missing-argument]
     # Unmount and remount with different blobfuse config.
     disk = test_vm.scratch_disks[0]
     test_vm.RemoteCommand(
@@ -79,6 +79,7 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec):
     test_vm.RemoteCommand('sudo rm -rf /mnt/resource/blobfusetmp/*')
     opts = ' '.join(FLAGS.mount_options)
     test_vm.RemoteCommand(
+        # pyrefly: ignore[missing-attribute]
         f'sudo blobfuse2 mount {disk.mount_point} '
         f'--config-file=blobfuse2_config.yaml '
         f'--container-name={disk.bucket_name} {opts}'

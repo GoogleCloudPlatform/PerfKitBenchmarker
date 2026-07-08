@@ -95,7 +95,7 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
         },
     ]
     # pylint: disable=invalid-name
-    cluster.GetEvents = lambda: [
+    cluster.GetEvents = lambda: [  # pyrefly: ignore[bad-assignment]
         _CreateEvent(
             "gke-pkb-cluster-default-pool-node-2",
             "RegisteredNode",
@@ -173,7 +173,7 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_get_node_names.return_value = {
         "gke-pkb-cluster-default-pool-node-1"
     }
-    cluster.GetEvents = lambda: [
+    cluster.GetEvents = lambda: [  # pyrefly: ignore[bad-assignment]
         _CreateEvent(
             "gke-pkb-cluster-default-pool-node-1",
             "RegisteredNode",
@@ -216,7 +216,7 @@ class UsageTrackerTest(pkb_common_test_case.PkbCommonTestCase):
         {node_1},
         {node_1, node_2, node_3, node_4},
     ]
-    cluster.GetEvents = lambda: [
+    cluster.GetEvents = lambda: [  # pyrefly: ignore[bad-assignment]
         _CreateEvent(node_1, "RegisteredNode", start_time),
         _CreateEvent(node_1, "RemovingNode", start_time + 40.0),
         _CreateEvent(node_2, "RegisteredNode", start_time + 20.0),
@@ -313,7 +313,7 @@ def CreateMockCluster(
           },
       )
   )
-  cluster.GetEvents = lambda: []
+  cluster.GetEvents = lambda: []  # pyrefly: ignore[bad-assignment]
   return cluster
 
 

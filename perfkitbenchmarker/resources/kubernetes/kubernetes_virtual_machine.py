@@ -275,7 +275,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
   def _SetupDevicesPaths(self):
     """Sets the path to each scratch disk device."""
     for scratch_disk in self.scratch_disks:
-      scratch_disk.SetDevicePath(self)
+      scratch_disk.SetDevicePath(self)  # pyrefly: ignore[missing-attribute]
 
   def _BuildPodBody(self) -> str:
     """Builds a JSON.
@@ -306,23 +306,23 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     }
 
     if self.host_network:
-      template['spec']['hostNetwork'] = True
+      template['spec']['hostNetwork'] = True  # pyrefly: ignore[bad-assignment]
       # https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy
-      template['spec']['dnsPolicy'] = 'ClusterFirstWithHostNet'
+      template['spec']['dnsPolicy'] = 'ClusterFirstWithHostNet'  # pyrefly: ignore[bad-assignment]
     else:
-      template['spec']['dnsPolicy'] = 'ClusterFirst'
+      template['spec']['dnsPolicy'] = 'ClusterFirst'  # pyrefly: ignore[bad-assignment]
 
     if k8s_flags.USE_NODE_SELECTORS.value and self.vm_group:
       if self.vm_group == 'default':
         nodepool = k8s_flags.DEFAULT_VM_GROUP_NODEPOOL.value
       else:
         nodepool = self.vm_group
-      template['spec']['nodeSelector'] = {
+      template['spec']['nodeSelector'] = {  # pyrefly: ignore[bad-assignment]
           'pkb_nodepool': container_service_lib.NodePoolName(nodepool)
       }
 
     if FLAGS.kubernetes_anti_affinity:
-      template['spec']['affinity'] = {
+      template['spec']['affinity'] = {  # pyrefly: ignore[bad-assignment]
           'podAntiAffinity': {
               'requiredDuringSchedulingIgnoredDuringExecution': [{
                   'labelSelector': {
@@ -348,7 +348,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     volumes = []
 
     for scratch_disk in self.scratch_disks:
-      scratch_disk.AttachVolumeInfo(volumes)
+      scratch_disk.AttachVolumeInfo(volumes)  # pyrefly: ignore[missing-attribute]
 
     return volumes
 
@@ -368,7 +368,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     }
 
     for scratch_disk in self.scratch_disks:
-      scratch_disk.AttachVolumeMountInfo(container['volumeMounts'])
+      scratch_disk.AttachVolumeMountInfo(container['volumeMounts'])  # pyrefly: ignore[missing-attribute]
 
     resource_body = self._BuildResourceBody()
     if resource_body:
@@ -427,7 +427,7 @@ class DebianBasedKubernetesVirtualMachine(
 ):
   """Base class for Debian based containers running inside k8s."""
 
-  def RemoteHostCommandWithReturnCode(
+  def RemoteHostCommandWithReturnCode(  # pyrefly: ignore[bad-override]
       self,
       command: str,
       retries: int | None = None,
@@ -484,7 +484,7 @@ class DebianBasedKubernetesVirtualMachine(
     for _ in range(retries):
       stdout, stderr, retcode = vm_util.IssueCommand(
           cmd,
-          timeout=timeout,
+          timeout=timeout,  # pyrefly: ignore[bad-argument-type]
           raise_on_failure=False,
           stack_level=stack_level,
           should_pre_log=False,

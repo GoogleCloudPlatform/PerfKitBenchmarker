@@ -27,7 +27,7 @@ class FakeManagedAiModel(managed_ai_model.BaseManagedAiModel):
     )
     self.existing_endpoints: list[str] = ['one-endpoint']
     self.zone = 'us-central1-a'
-    self.vm = None
+    self.vm = None  # pyrefly: ignore[bad-assignment]
 
   def GetRegionFromZone(self, zone: str) -> str:
     return zone + '-region'

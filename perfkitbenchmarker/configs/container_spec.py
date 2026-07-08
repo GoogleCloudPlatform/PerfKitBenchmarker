@@ -337,7 +337,7 @@ class SandboxSpec(spec.BaseSpec):
   """Configurable options for sandboxed node pools."""
 
   def __init__(self, *args, **kwargs):
-    self.type: str = None
+    self.type: str = None  # pyrefly: ignore[bad-assignment]
     super().__init__(*args, **kwargs)
 
   @classmethod
