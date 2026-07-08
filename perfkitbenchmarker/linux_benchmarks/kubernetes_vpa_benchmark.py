@@ -103,7 +103,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
   kmc = KubernetesMetricsCollector(samples, stop)
 
   def RunLocust():
-    for s in locust.Run(vm, addr):
+    for s in locust.Run(vm, addr):  # pyrefly: ignore[bad-argument-type]
       samples.append(s)
     stop.set()
 

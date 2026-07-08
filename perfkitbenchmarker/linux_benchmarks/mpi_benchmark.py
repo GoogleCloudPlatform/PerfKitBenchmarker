@@ -301,7 +301,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
     # thread per real (1/2 of vCPUs) CPUs.
     on_real_cpus = process_count == real_cpus
     samples.extend(
-        _RunTest(
+        _RunTest(  # pyrefly: ignore[bad-specialization]
             vms,
             process_count * len(vms),  # this is num ranks
             FLAGS.mpi_ppn,
@@ -433,7 +433,7 @@ def _MpiDataToSamples(row: mpi.MpiData) -> List[sample.Sample]:
     metadata = {'bytes': row.bytes, 'mpi_timeout': FLAGS.mpi_timeout}
     # value=1 so that the timeline chart can show a blip when this happens
     return [sample.Sample('timeout_error', 1, 'count', metadata)]
-  found_metrics = _METRIC_NAMES.intersection(row.data)
+  found_metrics = _METRIC_NAMES.intersection(row.data)  # pyrefly: ignore[bad-argument-type]
   if not found_metrics:
     logging.warning(
         'Skipping row %s as missing a required metric name %s',
@@ -442,7 +442,7 @@ def _MpiDataToSamples(row: mpi.MpiData) -> List[sample.Sample]:
     )
     return []
   metric = list(found_metrics)[0]
-  ret = [sample.Sample(metric, row.data[metric], 'usec', row.data)]
+  ret = [sample.Sample(metric, row.data[metric], 'usec', row.data)]  # pyrefly: ignore[unsupported-operation]
   if row.histogram:
     # change the key of the histogram to a string to match existing TCP_RR data
     metadata = {

@@ -129,7 +129,7 @@ def _ShouldSuppressLogging() -> bool:
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Scales a large number of pods on kubernetes."""
   assert bm_spec.container_cluster
-  cluster = bm_spec.container_cluster
+  cluster = bm_spec.container_cluster  # pyrefly: ignore[bad-assignment]
   assert isinstance(cluster, kubernetes_cluster.KubernetesCluster)
   cluster: kubernetes_cluster.KubernetesCluster = cluster
 
@@ -172,7 +172,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   }
   if cluster.gpu_count:
     metadata['gpu_count'] = cluster.gpu_count
-    metadata['gpu_type'] = cluster.gpu_type
+    metadata['gpu_type'] = cluster.gpu_type  # pyrefly: ignore[bad-assignment]
   if EXPECTED_NODES_CREATED.value:
     metadata['validated_num_nodes'] = EXPECTED_NODES_CREATED.value
   for s in samples:
@@ -239,7 +239,7 @@ def ScaleUpPods(
   cluster.ModifyPodSpecPlacementYaml(
       yaml_docs,
       'kubernetes-scaleup',
-      nodepool.machine_type
+      nodepool.machine_type  # pyrefly: ignore[bad-argument-type]
       or (nodepool.machine_families and nodepool.machine_families[0]),
   )
   resource_names = kubernetes_commands.ApplyYaml(yaml_docs)
@@ -506,7 +506,7 @@ def SummarizeTimestamps(timestamps: list[float]) -> dict[str, float]:
   }
   for percentile in percentiles:
     summary[f'p{percentile}'] = np.percentile(timestamps, percentile)
-  return summary
+  return summary  # pyrefly: ignore[bad-return]
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec):

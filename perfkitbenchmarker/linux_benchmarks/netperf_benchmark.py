@@ -732,7 +732,7 @@ def RunNetperf(
         latency_histogram.update(histogram)
       # Create a sample for the aggregate latency histogram
       hist_metadata = {'histogram': json.dumps(latency_histogram)}
-      hist_metadata.update(metadata)
+      hist_metadata.update(metadata)  # pyrefly: ignore[no-matching-overload]
       samples.append(
           sample.Sample(
               f'{benchmark_name}_Latency_Histogram', 0, 'us', hist_metadata

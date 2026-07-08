@@ -49,9 +49,9 @@ class PktgenStats:
   def GetPacketLossRate(self) -> float:
     """Calculates packet loss rate from sender and receiver stats."""
     return (
-        int(self.sender_tx_pkts)
-        - int(self.receiver_rx_pkts)
-    ) / int(self.sender_tx_pkts)
+        int(self.sender_tx_pkts)  # pyrefly: ignore[bad-argument-type]
+        - int(self.receiver_rx_pkts)  # pyrefly: ignore[bad-argument-type]
+    ) / int(self.sender_tx_pkts)  # pyrefly: ignore[bad-argument-type]
 
 
 BENCHMARK_NAME = 'dpdk_pktgen'
@@ -195,20 +195,20 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   # If tertiary NIC is present, run DPDK Pktgen on 2 compatible NICs.
   if (
-      sender_vm.tertiary_mac_addr
-      and receiver_vm.tertiary_mac_addr
+      sender_vm.tertiary_mac_addr  # pyrefly: ignore[missing-attribute]
+      and receiver_vm.tertiary_mac_addr  # pyrefly: ignore[missing-attribute]
       and min(len(sender_vm_ips), len(receiver_vm_ips)) > 2
   ):
     pktgen_file = _PKTGEN_2NIC_FILE
     sender_ips = sender_vm_ips[1:3]
     receiver_ips = receiver_vm_ips[1:3]
-    sender_macs = [sender_vm.secondary_mac_addr, sender_vm.tertiary_mac_addr]
+    sender_macs = [sender_vm.secondary_mac_addr, sender_vm.tertiary_mac_addr]  # pyrefly: ignore[missing-attribute]
     receiver_macs = [
-        receiver_vm.secondary_mac_addr,
+        receiver_vm.secondary_mac_addr,  # pyrefly: ignore[missing-attribute]
         receiver_vm.tertiary_mac_addr,
     ]
     # TODO: b/486014352 - Remove this hacky solution with a long-term solution.
-    if sender_vm.CLOUD == 'GCP':
+    if sender_vm.CLOUD == 'GCP':  # pyrefly: ignore[missing-argument]
       # GCP-Specific Workaround: Realign DPDK interfaces with physical NICs.
       # GCP assigns physical NICs to subnets in a round-robin fashion.
       # Our default setup assumes the following mapping:
@@ -231,16 +231,16 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   else:
     pktgen_file = _PKTGEN_FILE
     sender_ips = [sender_vm_ips[1]]
-    sender_macs = [sender_vm.secondary_mac_addr]
+    sender_macs = [sender_vm.secondary_mac_addr]  # pyrefly: ignore[missing-attribute]
     receiver_ips = [receiver_vm_ips[1]]
-    receiver_macs = [receiver_vm.secondary_mac_addr]
+    receiver_macs = [receiver_vm.secondary_mac_addr]  # pyrefly: ignore[missing-attribute]
   background_tasks.RunThreaded(
       lambda vm: PrepareVM(
           vm,
           sender_ips,
-          sender_macs,
+          sender_macs,  # pyrefly: ignore[bad-argument-type]
           receiver_ips,
-          receiver_macs,
+          receiver_macs,  # pyrefly: ignore[bad-argument-type]
           pktgen_file,
       ),
       [sender_vm, receiver_vm],
@@ -404,10 +404,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   # Incorrect llq_policy default:
   # https://github.com/amzn/amzn-drivers/issues/331
   aws_eal_arg = ''
-  if sender_vm.CLOUD == 'AWS':
+  if sender_vm.CLOUD == 'AWS':  # pyrefly: ignore[missing-argument]
     pktgen_env_var = ' LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib64'
-    aws_eal_arg = f' -a "{receiver_vm.secondary_nic_bus_info},llq_policy=1"'
-    if receiver_vm.tertiary_nic_bus_info:
+    aws_eal_arg = f' -a "{receiver_vm.secondary_nic_bus_info},llq_policy=1"'  # pyrefly: ignore[missing-attribute]
+    if receiver_vm.tertiary_nic_bus_info:  # pyrefly: ignore[missing-attribute]
       aws_eal_arg += f' -a "{receiver_vm.tertiary_nic_bus_info},llq_policy=1"'
 
   def RunPktgen(
@@ -454,7 +454,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     total_sender_rx_pkts, _ = sender_vm.RemoteCommand(stdout_rx_parser)
     total_receiver_rx_pkts, _ = receiver_vm.RemoteCommand(stdout_rx_parser)
 
-    if receiver_vm.tertiary_nic_bus_info:
+    if receiver_vm.tertiary_nic_bus_info:  # pyrefly: ignore[missing-attribute]
       stdout_rx_parser_2 = stdout_rx_parser.replace('7;22H', '7;46H')
       stdout_tx_parser_2 = stdout_tx_parser.replace('8;22H', '8;46H')
       total_sender_rx_pkts_2, _ = sender_vm.RemoteCommand(stdout_rx_parser_2)
@@ -472,9 +472,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
           total_receiver_rx_pkts_2
       )
     return PktgenStats(
-        sender_tx_pkts=total_sender_tx_pkts,
-        sender_rx_pkts=total_sender_rx_pkts,
-        receiver_rx_pkts=total_receiver_rx_pkts,
+        sender_tx_pkts=total_sender_tx_pkts,  # pyrefly: ignore[bad-argument-type]
+        sender_rx_pkts=total_sender_rx_pkts,  # pyrefly: ignore[bad-argument-type]
+        receiver_rx_pkts=total_receiver_rx_pkts,  # pyrefly: ignore[bad-argument-type]
     )
 
   def UpdatePpsAndRecompile(
@@ -542,7 +542,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
         curr_rate = (lb + ub) // 2
       run_count, fail_count, pass_count = 0, 0, 0
       curr_run = PktgenStats()
-      UpdatePpsAndRecompile(sender_vm, int(curr_rate), int(prev_rate))
+      UpdatePpsAndRecompile(sender_vm, int(curr_rate), int(prev_rate))  # pyrefly: ignore[bad-argument-type]
       while (
           run_count < runs_per_rate
           and fail_count <= max_failed_runs
@@ -563,11 +563,11 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
         logging.info('Target PPS rate: %s', curr_rate)
         logging.info(
             'Sender PPS: %s',
-            int(stats.sender_tx_pkts) // _DPDK_PKTGEN_DURATION.value,
+            int(stats.sender_tx_pkts) // _DPDK_PKTGEN_DURATION.value,  # pyrefly: ignore[bad-argument-type]
         )
         logging.info(
             'Receiver PPS: %s',
-            int(stats.receiver_rx_pkts) // _DPDK_PKTGEN_DURATION.value,
+            int(stats.receiver_rx_pkts) // _DPDK_PKTGEN_DURATION.value,  # pyrefly: ignore[bad-argument-type]
         )
         logging.info('Packet loss rate: %s', stats.packet_loss_rate)
         if stats.packet_loss_rate > packet_loss_threshold:
@@ -601,7 +601,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     # Reset PPS target in app/pktgen.c so sed command can work on next
     # function invocation.
     if curr_rate:
-      UpdatePpsAndRecompile(sender_vm, int(pktgen_default_rate), int(curr_rate))
+      UpdatePpsAndRecompile(sender_vm, int(pktgen_default_rate), int(curr_rate))  # pyrefly: ignore[bad-argument-type]
     return valid_run
 
   prev_rate = _PKTGEN_DEFAULT_RATE
@@ -657,7 +657,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
         max_receiver_pkts = int(r_rx)
         # Store the metadata and results of this better-performing run
         current_metadata = copy.deepcopy(base_metadata)
-        current_metadata.update({
+        current_metadata.update({  # pyrefly: ignore[no-matching-overload]
             'dpdk_pktgen_packet_loss_threshold': packet_loss_threshold,
             'dpdk_pktgen_tx_cores': tx_cores,
             'dpdk_pktgen_rx_cores': rx_cores,
@@ -675,9 +675,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     # create samples for the best performing one.
     if best_run_results:
       duration = _DPDK_PKTGEN_DURATION.value
-      s_tx_pkts = int(best_run_results['valid_total_sender_tx_pkts'])
-      s_rx_pkts = int(best_run_results['valid_total_sender_rx_pkts'])
-      r_rx_pkts = int(best_run_results['valid_total_receiver_rx_pkts'])
+      s_tx_pkts = int(best_run_results['valid_total_sender_tx_pkts'])  # pyrefly: ignore[bad-argument-type]
+      s_rx_pkts = int(best_run_results['valid_total_sender_rx_pkts'])  # pyrefly: ignore[bad-argument-type]
+      r_rx_pkts = int(best_run_results['valid_total_receiver_rx_pkts'])  # pyrefly: ignore[bad-argument-type]
       meta = best_run_results['metadata']
 
       samples.extend([

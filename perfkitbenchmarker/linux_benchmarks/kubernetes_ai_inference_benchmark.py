@@ -121,7 +121,7 @@ def Run(
     A list of result samples collected from the json files.
   """
   cluster: kubernetes_cluster.KubernetesCluster = (
-      benchmark_spec.container_cluster
+      benchmark_spec.container_cluster  # pyrefly: ignore[bad-assignment]
   )
   server: kubernetes_inference_server.BaseKubernetesInferenceServer | None = (
       cluster.inference_server
@@ -548,11 +548,11 @@ def GetTimeDifference(start_time: str, end_time: str) -> float:
   if start_time is None or end_time is None:
     return 0
 
-  start_time = datetime.datetime.strptime(start_time, time_format)
-  end_time = datetime.datetime.strptime(end_time, time_format)
+  start_time = datetime.datetime.strptime(start_time, time_format)  # pyrefly: ignore[bad-assignment]
+  end_time = datetime.datetime.strptime(end_time, time_format)  # pyrefly: ignore[bad-assignment]
   if end_time < start_time:
-    end_time += datetime.timedelta(days=1)
-  time_difference = end_time - start_time
+    end_time += datetime.timedelta(days=1)  # pyrefly: ignore[unsupported-operation]
+  time_difference = end_time - start_time  # pyrefly: ignore[unsupported-operation]
 
   return int(time_difference.total_seconds())
 

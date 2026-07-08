@@ -170,7 +170,7 @@ def Run(bm_spec: _BenchmarkSpec):
   """
   client = bm_spec.vm_groups['clients'][0]
   assert bm_spec.container_cluster
-  server_ip = bm_spec.container_cluster.GetPodIpsByLabel('app', 'memcached')[0]
+  server_ip = bm_spec.container_cluster.GetPodIpsByLabel('app', 'memcached')[0]  # pyrefly: ignore[missing-attribute]
   metadata = {
       'memcached_server_size': FLAGS.memcached_size_mb,
       'memcached_server_threads': FLAGS.memcached_num_threads,

@@ -1840,7 +1840,7 @@ def Prepare(benchmark_spec):
       # clouds cannot contain non-alphanumeric characters.
       bucket_name = '%s%s' % (
           bucket_name,
-          re.sub(r'[\W_]', '', OBJECT_STORAGE_REGION.value),
+          re.sub(r'[\W_]', '', OBJECT_STORAGE_REGION.value),  # pyrefly: ignore[no-matching-overload]
       )
 
   service = object_storage_service.GetObjectStorageClass(FLAGS.storage)()
@@ -1876,8 +1876,8 @@ def Prepare(benchmark_spec):
         # On Azure, use an existing storage account if we
         # are reading existing objects
         (
-            benchmark_spec.read_objects['azure_storage_account'],
-            benchmark_spec.read_objects['azure_resource_group'],
+            benchmark_spec.read_objects['azure_storage_account'],  # pyrefly: ignore[unsupported-operation]
+            benchmark_spec.read_objects['azure_resource_group'],  # pyrefly: ignore[unsupported-operation]
         ),
     )
   elif FLAGS.storage == 'Azure' and FLAGS.object_storage_bucket_name:

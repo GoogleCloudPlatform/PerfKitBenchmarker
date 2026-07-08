@@ -99,7 +99,7 @@ def Prepare(benchmark_spec):
       'create',
       benchmark_spec.input_subscription_snapshot_name,
   )
-  cmd.flags = {
+  cmd.flags = {  # pyrefly: ignore[bad-assignment]
       'project': util.GetDefaultProject(),
       'subscription': benchmark_spec.input_subscription_name,
       'format': 'json',
@@ -179,7 +179,7 @@ def Cleanup(benchmark_spec):
       'seek',
       benchmark_spec.input_subscription_name,
   )
-  cmd.flags = {
+  cmd.flags = {  # pyrefly: ignore[bad-assignment]
       'project': util.GetDefaultProject(),
       'snapshot': benchmark_spec.input_subscription_snapshot_name,
       'format': 'json',
@@ -205,7 +205,7 @@ def Cleanup(benchmark_spec):
       'delete',
       benchmark_spec.input_subscription_snapshot_name,
   )
-  cmd.flags = {
+  cmd.flags = {  # pyrefly: ignore[bad-assignment]
       'project': util.GetDefaultProject(),
       'format': 'json',
   }

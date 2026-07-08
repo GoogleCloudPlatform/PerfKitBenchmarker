@@ -505,11 +505,11 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   )
 
   if not FLAGS.mongodb_primary_only:
-    _PrepareMembers(server_vms, arbiter)
+    _PrepareMembers(server_vms, arbiter)  # pyrefly: ignore[bad-argument-type]
 
-  benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
+  benchmark_spec.executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)  # pyrefly: ignore[missing-attribute]
   benchmark_spec.mongodb_url = _GetMongoDbURL(benchmark_spec)
-  benchmark_spec.mongodb_version = re.findall(
+  benchmark_spec.mongodb_version = re.findall(  # pyrefly: ignore[missing-attribute]
       _VERSION_REGEX,
       mongosh.RunCommand(primary, 'db.version()')[0],
   )[-1]
@@ -519,7 +519,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       'mongodb.upsert': True,
       'core_workload_insertion_retry_limit': 10,
   }
-  benchmark_spec.executor.Load(clients, load_kwargs=load_kwargs)
+  benchmark_spec.executor.Load(clients, load_kwargs=load_kwargs)  # pyrefly: ignore[missing-attribute]
 
   # Print some useful loading stats
   mongosh.RunCommand(primary, 'db.stats()')
@@ -561,7 +561,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       'mongodb.upsert': True,
   }
   samples = list(
-      benchmark_spec.executor.Run(
+      benchmark_spec.executor.Run(  # pyrefly: ignore[missing-attribute]
           benchmark_spec.vm_groups['clients'],
           run_kwargs=run_kwargs,
       )
@@ -582,8 +582,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   # Copy client and server logs to the scratch directory.
   for _, vms in benchmark_spec.vm_groups.items():
     for vm in vms:
-      vm.CopyLogs('/var/log')
-      vm.CopyLogs('/etc/mongod.conf')
+      vm.CopyLogs('/var/log')  # pyrefly: ignore[missing-attribute]
+      vm.CopyLogs('/etc/mongod.conf')  # pyrefly: ignore[missing-attribute]
   return samples
 
 
@@ -610,7 +610,7 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       server_vms += benchmark_spec.vm_groups['arbiter']
 
   for vm in server_vms:
-    CleanupServer(vm)
+    CleanupServer(vm)  # pyrefly: ignore[bad-argument-type]
 
 
 def _GetReplicaSetMemberState(vm, host_port: str) -> tuple[str, str]:

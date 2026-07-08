@@ -296,7 +296,7 @@ def _PrepareBucket(benchmark_spec):
   """
   # set up Google Cloud Service
   service = gcs.GoogleCloudStorageService()
-  location = cloud_harmony_util.GetRegionFromZone(ENDPOINT_ZONE.value)
+  location = cloud_harmony_util.GetRegionFromZone(ENDPOINT_ZONE.value)  # pyrefly: ignore[bad-argument-type]
   service.PrepareService(location)
   # create bucket in specified bucket region
   bucket = f'ch-{location}-{FLAGS.run_uri}'
@@ -417,7 +417,7 @@ def _AddStorageMetadata(vm, metadata):
   """Updates the metadata with object storage metadata."""
   storage_metadata = {
       'test_instance_id': '',
-      'test_region': cloud_harmony_util.GetRegionFromZone(ENDPOINT_ZONE.value),
+      'test_region': cloud_harmony_util.GetRegionFromZone(ENDPOINT_ZONE.value),  # pyrefly: ignore[bad-argument-type]
       'meta_instance_id': vm.machine_type,
       'meta_region': cloud_harmony_util.GetRegionFromZone(vm.zone),
       'meta_zone': vm.zone,

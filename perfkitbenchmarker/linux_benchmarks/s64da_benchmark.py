@@ -197,7 +197,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   db = benchmark_spec.relational_db
   s64da.PrepareBenchmark(
       vm,
-      db,
+      db,  # pyrefly: ignore[bad-argument-type]
       _BENCHMARK_TYPE.value,
       _SCHEMA.value,
       _SCALE_FACTOR.value,
@@ -237,7 +237,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
 
   samples = s64da.RunBenchmark(
       vm,
-      db,
+      db,  # pyrefly: ignore[bad-argument-type]
       _BENCHMARK_TYPE.value,
       _OLTP_WORKERS.value,
       _OLAP_WORKERS.value,

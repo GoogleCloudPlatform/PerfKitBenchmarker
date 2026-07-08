@@ -76,7 +76,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   assert bm_spec.container_cluster
   cluster = bm_spec.container_cluster
   yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(MANIFEST_TEMPLATE)
-  cluster.ModifyPodSpecPlacementYaml(
+  cluster.ModifyPodSpecPlacementYaml(  # pyrefly: ignore[missing-attribute]
       yaml_docs,
       'app',
       cluster.default_nodepool.machine_type,

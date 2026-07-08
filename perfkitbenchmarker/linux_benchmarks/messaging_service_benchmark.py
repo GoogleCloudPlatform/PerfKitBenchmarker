@@ -184,7 +184,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   Args:
     benchmark_spec: The benchmark specification.
   """
-  benchmark_spec.messaging_service.PrepareClientVm()
+  benchmark_spec.messaging_service.PrepareClientVm()  # pyrefly: ignore[missing-attribute]
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -202,14 +202,14 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """
   service = benchmark_spec.messaging_service
   if _MEASUREMENT.value == SINGLE_OP:
-    publish_results = service.Run(
-        service.PUBLISH_LATENCY,
+    publish_results = service.Run(  # pyrefly: ignore[missing-attribute]
+        service.PUBLISH_LATENCY,  # pyrefly: ignore[missing-attribute]
         int(_NUMBER_OF_MESSAGES.value),
         int(_MESSAGE_SIZE.value),
         int(_WARMUP_MESSAGES.value),
     )
-    pull_results = service.Run(
-        service.PULL_LATENCY,
+    pull_results = service.Run(  # pyrefly: ignore[missing-attribute]
+        service.PULL_LATENCY,  # pyrefly: ignore[missing-attribute]
         int(_NUMBER_OF_MESSAGES.value),
         int(_MESSAGE_SIZE.value),
         int(_WARMUP_MESSAGES.value),
@@ -217,8 +217,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
     publish_results.update(pull_results)
     results = publish_results
   elif _MEASUREMENT.value == END_TO_END:
-    results = service.Run(
-        service.END_TO_END_LATENCY,
+    results = service.Run(  # pyrefly: ignore[missing-attribute]
+        service.END_TO_END_LATENCY,  # pyrefly: ignore[missing-attribute]
         int(_NUMBER_OF_MESSAGES.value),
         int(_MESSAGE_SIZE.value),
         int(_WARMUP_MESSAGES.value),
@@ -226,7 +226,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
     )
   # Creating samples from results
   samples = _CreateSamples(
-      results,
+      results,  # pyrefly: ignore[unbound-name]
       int(_NUMBER_OF_MESSAGES.value),
       int(_MESSAGE_SIZE.value),
       FLAGS.cloud,
