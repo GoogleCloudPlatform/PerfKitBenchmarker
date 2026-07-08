@@ -163,7 +163,7 @@ class BaseTest(pkb_common_test_case.PkbCommonTestCase):
     disk_spec = self._CreateDiskSpec(disk.NFS)
     nfs = aws_nfs_service.AwsNfsService(disk_spec, _AWS_ZONE)
     nfs.aws_commands = self.issue_cmd
-    nfs.networks = [self._CreateMockNetwork()]
+    nfs.networks = [self._CreateMockNetwork()]  # pyrefly: ignore[missing-attribute]
     return nfs
 
 
@@ -274,8 +274,8 @@ class AwsVirtualMachineTest(BaseTest):
     aws_machine.RemoteHostCommand = mock.Mock()
     aws_machine.GetNVMEDeviceInfo = mock.Mock()
     aws_machine.GetNVMEDeviceInfo.return_value = []
-    aws_machine.GetPathByDevice = mock.Mock()
-    aws_machine.GetPathByDevice.return_value = '/dev/xvdb'
+    aws_machine.GetPathByDevice = mock.Mock()  # pyrefly: ignore[missing-attribute]
+    aws_machine.GetPathByDevice.return_value = '/dev/xvdb'  # pyrefly: ignore[missing-attribute]
     return aws_machine
 
   def _SetBmSpec(self, nfs):

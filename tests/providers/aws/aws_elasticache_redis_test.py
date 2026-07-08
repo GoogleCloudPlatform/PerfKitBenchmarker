@@ -147,11 +147,11 @@ class ConstructElasticacheRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     instance = self.test_bm_spec.memory_store
     with self.subTest('service_type'):
-      self.assertEqual(instance.SERVICE_TYPE, 'elasticache')
+      self.assertEqual(instance.SERVICE_TYPE, 'elasticache')  # pyrefly: ignore[missing-attribute]
     with self.subTest('memory_store_type'):
-      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
+      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)  # pyrefly: ignore[missing-attribute]
     with self.subTest('redis_version'):
-      self.assertEqual(instance.version, '6.x')
+      self.assertEqual(instance.version, '6.x')  # pyrefly: ignore[missing-attribute]
 
   def testInitializationFlagOverrides(self):
     test_spec = inspect.cleandoc(f"""
@@ -176,17 +176,17 @@ class ConstructElasticacheRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     instance = self.test_bm_spec.memory_store
     with self.subTest('service_type'):
-      self.assertEqual(instance.SERVICE_TYPE, 'elasticache')
+      self.assertEqual(instance.SERVICE_TYPE, 'elasticache')  # pyrefly: ignore[missing-attribute]
     with self.subTest('memory_store_type'):
-      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
+      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)  # pyrefly: ignore[missing-attribute]
     with self.subTest('version'):
-      self.assertEqual(instance.version, '7.1')
+      self.assertEqual(instance.version, '7.1')  # pyrefly: ignore[missing-attribute]
     with self.subTest('node_type'):
-      self.assertEqual(instance.node_type, 'cache.m4.large')
+      self.assertEqual(instance.node_type, 'cache.m4.large')  # pyrefly: ignore[missing-attribute]
     with self.subTest('redis_region'):
-      self.assertEqual(instance.redis_region, 'us-east-1')
+      self.assertEqual(instance.redis_region, 'us-east-1')  # pyrefly: ignore[missing-attribute]
     with self.subTest('failover_zone'):
-      self.assertEqual(instance.failover_zone, 'us-east-1a')
+      self.assertEqual(instance.failover_zone, 'us-east-1a')  # pyrefly: ignore[missing-attribute]
 
 
 if __name__ == '__main__':

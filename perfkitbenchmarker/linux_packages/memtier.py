@@ -510,7 +510,7 @@ def Load(
             key_maximum=(i + 1) * load_records_per_vm,
             server_port=server_port,
             server_ip=server_ips[i % len(server_ips)],
-            server_password=server_password,
+            server_password=server_password,  # pyrefly: ignore[bad-argument-type]
         ),
     ))
 
@@ -666,7 +666,7 @@ def _RunParallelConnections(
   else:
     for connection in connections:
       args = copy.deepcopy(base_args)
-      args.update({
+      args.update({  # pyrefly: ignore[no-matching-overload]
           'vm': connection.client_vm,
           'unique_id': connection.client_vm.ip_address,
       })
@@ -712,7 +712,7 @@ class _PipelineModifier(_LoadModifier):
     return MemtierBinarySearchParameters(
         lower_bound=lower_bound,
         upper_bound=upper_bound,
-        pipelines=pipelines,
+        pipelines=pipelines,  # pyrefly: ignore[bad-argument-type]
         threads=1,
         clients=1,
     )
@@ -753,14 +753,14 @@ class _ClientModifier(_LoadModifier):
       upper_bound = parameters.clients * parameters.threads - 1
 
     total_clients = lower_bound + math.ceil((upper_bound - lower_bound) / 2)
-    threads = _FindFactor(total_clients, self.max_threads, self.max_clients)
+    threads = _FindFactor(total_clients, self.max_threads, self.max_clients)  # pyrefly: ignore[bad-argument-type]
     clients = total_clients // threads
     return MemtierBinarySearchParameters(
         lower_bound=lower_bound,
         upper_bound=upper_bound,
         pipelines=1,
         threads=threads,
-        clients=clients,
+        clients=clients,  # pyrefly: ignore[bad-argument-type]
     )
 
 
@@ -772,14 +772,14 @@ def _CombineResults(results: list['MemtierResult']) -> 'MemtierResult':
   latency_dic = collections.defaultdict(int)
   for result in results:
     for k, v in result.latency_dic.items():
-      latency_dic[k] += v
+      latency_dic[k] += v  # pyrefly: ignore[unsupported-operation]
   for k in latency_dic:
-    latency_dic[k] /= len(results)
+    latency_dic[k] /= len(results)  # pyrefly: ignore[unsupported-operation]
   return MemtierResult(
       ops_per_sec=ops_per_sec,
       kb_per_sec=kb_per_sec,
       latency_ms=latency_ms,
-      latency_dic=latency_dic,
+      latency_dic=latency_dic,  # pyrefly: ignore[bad-argument-type]
       metadata=results[0].metadata,
       parameters=results[0].parameters,
   )
@@ -941,7 +941,7 @@ def MeasureLatencyCappedThroughputDistribution(
       'Starting test iterations with parameters %s', parameters_for_test
   )
   results: list[MemtierResult] = []
-  for _ in range(MEMTIER_DISTRIBUTION_ITERATIONS.value):
+  for _ in range(MEMTIER_DISTRIBUTION_ITERATIONS.value):  # pyrefly: ignore[bad-argument-type]
     results_for_run = _RunParallelConnections(
         connections,
         server_ip,
@@ -1264,7 +1264,7 @@ def _Run(
   with open(output_path) as output:
     summary_data = output.read()
     logging.info(summary_data)
-  return MemtierResult.Parse(summary_data, time_series_json)
+  return MemtierResult.Parse(summary_data, time_series_json)  # pyrefly: ignore[bad-argument-type]
 
 
 def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
@@ -1296,7 +1296,7 @@ def GetMetadata(clients: int, threads: int, pipeline: int) -> Dict[str, Any]:
   if MEMTIER_RUN_DURATION.value:
     meta['memtier_run_duration'] = MEMTIER_RUN_DURATION.value
   if MEMTIER_RUN_MODE.value == MemtierMode.MEASURE_CPU_LATENCY:
-    meta['memtier_cpu_target'] = MEMTIER_CPU_TARGET.value
+    meta['memtier_cpu_target'] = MEMTIER_CPU_TARGET.value  # pyrefly: ignore[bad-assignment]
     meta['memtier_cpu_duration'] = MEMTIER_CPU_DURATION.value
   if MEMTIER_LOAD_KEY_MAXIMUM.value:
     meta['memtier_load_key_maximum'] = MEMTIER_LOAD_KEY_MAXIMUM.value
@@ -1558,7 +1558,7 @@ def AggregateMemtierResults(
   samples.append(
       sample.CreateTimeSeriesSample(
           ops_series,
-          timestamps,
+          timestamps,  # pyrefly: ignore[bad-argument-type]
           sample.OPS_TIME_SERIES,
           'ops',
           1,
@@ -1570,7 +1570,7 @@ def AggregateMemtierResults(
     samples.append(
         sample.CreateTimeSeriesSample(
             value,
-            timestamps[0 : len(value)],
+            timestamps[0 : len(value)],  # pyrefly: ignore[bad-argument-type]
             f'{key}_time_series',
             'ms',
             1,
@@ -1594,7 +1594,7 @@ def AggregateMemtierResults(
       samples.append(
           sample.CreateTimeSeriesSample(
               latencies,
-              timestamps[0 : len(latencies)],
+              timestamps[0 : len(latencies)],  # pyrefly: ignore[bad-argument-type]
               f'{metric}_time_series',
               'ms',
               1,
@@ -1620,10 +1620,10 @@ def _ParseHistogram(
   for raw_line in memtier_results.splitlines():
     line = raw_line.strip()
     last_total_sets = _ParseLine(
-        r'^SET', line, approx_total_sets, last_total_sets, set_histogram
+        r'^SET', line, approx_total_sets, last_total_sets, set_histogram  # pyrefly: ignore[bad-argument-type]
     )
     last_total_gets = _ParseLine(
-        r'^GET', line, approx_total_gets, last_total_gets, get_histogram
+        r'^GET', line, approx_total_gets, last_total_gets, get_histogram  # pyrefly: ignore[bad-argument-type]
     )
   return set_histogram, get_histogram
 

@@ -44,8 +44,8 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
     self.db = spec.relational_db
 
     # Mock client_vm for network resource name
-    self.db.client_vm = mock.Mock()
-    self.db.client_vm.network.network_resource.name = 'network_name'
+    self.db.client_vm = mock.Mock()  # pyrefly: ignore[missing-attribute]
+    self.db.client_vm.network.network_resource.name = 'network_name'  # pyrefly: ignore[missing-attribute]
 
     # Default to no read replicas
     self.enter_context(flagsaver.flagsaver(alloydb_read_pool_node_count=0))
@@ -60,7 +60,7 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
     )
 
   def testCollectMetrics(self):
-    self.db.project = 'test_project'
+    self.db.project = 'test_project'  # pyrefly: ignore[missing-attribute]
 
     mock_response = types.ListTimeSeriesResponse(
         time_series=[{
@@ -95,7 +95,7 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
 
     start_time = datetime.datetime(2025, 11, 26, 10, 0, 0)
     end_time = datetime.datetime(2025, 11, 26, 10, 1, 0)
-    samples = self.db.CollectMetrics(start_time, end_time)
+    samples = self.db.CollectMetrics(start_time, end_time)  # pyrefly: ignore[missing-attribute]
 
     size_avg = next(s for s in samples if s.metric == 'disk_bytes_used_average')
     size_min = next(s for s in samples if s.metric == 'disk_bytes_used_min')
@@ -115,9 +115,9 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
         ('{"ipAddress": "1.1.1.1"}', '', 0),
     ]
 
-    self.db._Create()
+    self.db._Create()  # pyrefly: ignore[missing-attribute]
 
-    self.assertEqual(self.db.endpoint, '1.1.1.1')
+    self.assertEqual(self.db.endpoint, '1.1.1.1')  # pyrefly: ignore[missing-attribute]
 
   def testCreateInternalError(self):
     # Fail on first command (cluster create)
@@ -129,7 +129,7 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
         errors.Resource.RetryableCreationError,
         'Creation failed due to internal error',
     ):
-      self.db._Create()
+      self.db._Create()  # pyrefly: ignore[missing-attribute]
 
   def testCreateInsufficientCapacity(self):
     # Fail on first command (cluster create)
@@ -143,7 +143,7 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
         errors.Benchmarks.InsufficientCapacityCloudFailure,
         'Creation failed due to not enough resources',
     ):
-      self.db._Create()
+      self.db._Create()  # pyrefly: ignore[missing-attribute]
 
   def testCreateAlreadyExists(self):
     # Cluster exists, Instance exists, Instance describe success
@@ -153,9 +153,9 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
         ('{"ipAddress": "1.1.1.1"}', '', 0),
     ]
 
-    self.db._Create()
+    self.db._Create()  # pyrefly: ignore[missing-attribute]
 
-    self.assertEqual(self.db.endpoint, '1.1.1.1')
+    self.assertEqual(self.db.endpoint, '1.1.1.1')  # pyrefly: ignore[missing-attribute]
 
   def testCreateOtherError(self):
     # Fail on first command
@@ -165,13 +165,13 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
         errors.VmUtil.IssueCommandError,
         'Command failed',
     ):
-      self.db._Create()
+      self.db._Create()  # pyrefly: ignore[missing-attribute]
 
   def testUpdateAlloyDBFlagsEnabledNoOtherFlags(self):
     self.mock_cmd.Issue.return_value = ('', '', 0)
-    self.db.enable_columnar_engine = True
+    self.db.enable_columnar_engine = True  # pyrefly: ignore[missing-attribute]
 
-    self.db.UpdateAlloyDBFlags()
+    self.db.UpdateAlloyDBFlags()  # pyrefly: ignore[missing-attribute]
 
     # Assert _GetAlloyDbCommand was called with expected arguments
     self.mock_get_cmd.assert_called_once()
@@ -210,9 +210,9 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testUpdateAlloyDBFlagsEnabledAllFlagsEnabled(self):
     self.mock_cmd.Issue.return_value = ('', '', 0)
-    self.db.enable_columnar_engine = True
+    self.db.enable_columnar_engine = True  # pyrefly: ignore[missing-attribute]
 
-    self.db.UpdateAlloyDBFlags(
+    self.db.UpdateAlloyDBFlags(  # pyrefly: ignore[missing-attribute]
         columnar_engine_size=1024,
         enable_columnar_recommendation=True,
         enable_auto_columnarization=True,
@@ -259,9 +259,9 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testUpdateAlloyDBFlagsEnabledAllFlagsDisabled(self):
     self.mock_cmd.Issue.return_value = ('', '', 0)
-    self.db.enable_columnar_engine = True
+    self.db.enable_columnar_engine = True  # pyrefly: ignore[missing-attribute]
 
-    self.db.UpdateAlloyDBFlags(
+    self.db.UpdateAlloyDBFlags(  # pyrefly: ignore[missing-attribute]
         columnar_engine_size=None,
         enable_columnar_recommendation=False,
         enable_auto_columnarization=False,
@@ -306,9 +306,9 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testUpdateAlloyDBFlagsDisabled(self):
     self.mock_cmd.Issue.return_value = ('', '', 0)
-    self.db.enable_columnar_engine = False
+    self.db.enable_columnar_engine = False  # pyrefly: ignore[missing-attribute]
 
-    self.db.UpdateAlloyDBFlags(
+    self.db.UpdateAlloyDBFlags(  # pyrefly: ignore[missing-attribute]
         columnar_engine_size=1024,
         enable_columnar_recommendation=True,
         enable_auto_columnarization=True,
@@ -332,10 +332,10 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
         new_callable=mock.PropertyMock,
         return_value=mock_query_tools,
     ):
-      res1, _ = self.db.QueryPerfSnapReport()
+      res1, _ = self.db.QueryPerfSnapReport()  # pyrefly: ignore[missing-attribute]
       self.assertIn('Start snapshot taken: 1', res1)
 
-      res2, _ = self.db.QueryPerfSnapReport()
+      res2, _ = self.db.QueryPerfSnapReport()  # pyrefly: ignore[missing-attribute]
       self.assertEqual(res2, 'Full report content\n')
 
       self.assertEqual(mock_query_tools.IssueSqlCommand.call_count, 3)

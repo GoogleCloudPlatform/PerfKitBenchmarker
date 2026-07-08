@@ -44,14 +44,14 @@ class AiModelCreateBenchmarkTest(
     self.bm_spec.resources.append(self.bm_spec.ai_model)
 
   def testBenchmarkPassesForOneModel(self):
-    self.bm_spec.ai_model.existing_endpoints = [
+    self.bm_spec.ai_model.existing_endpoints = [  # pyrefly: ignore[missing-attribute]
         'model1',
     ]
     ai_model_create_benchmark.Run(self.bm_spec)
 
   @flagsaver.flagsaver(validate_existing_models=True)
   def testBenchmarkFailsIfMoreModelsFound(self):
-    self.bm_spec.ai_model.existing_endpoints = [
+    self.bm_spec.ai_model.existing_endpoints = [  # pyrefly: ignore[missing-attribute]
         'model1',
         'model2',
     ]
@@ -60,7 +60,7 @@ class AiModelCreateBenchmarkTest(
 
   @flagsaver.flagsaver(validate_existing_models=False)
   def testBenchmarkPassesWithoutValidation(self):
-    self.bm_spec.ai_model.existing_endpoints = [
+    self.bm_spec.ai_model.existing_endpoints = [  # pyrefly: ignore[missing-attribute]
         'model1',
         'model2',
     ]
@@ -68,10 +68,10 @@ class AiModelCreateBenchmarkTest(
 
   def testBenchmarkRunGivesCorrectSamplesForOneModel(self):
     self.enter_context(flagsaver.flagsaver(create_second_model=False))
-    self.bm_spec.ai_model.existing_endpoints = [
+    self.bm_spec.ai_model.existing_endpoints = [  # pyrefly: ignore[missing-attribute]
         'model1',
     ]
-    self.bm_spec.ai_model.Create()
+    self.bm_spec.ai_model.Create()  # pyrefly: ignore[missing-attribute]
     ai_model_create_benchmark.Run(self.bm_spec)
     samples = self.bm_spec.GetSamples()
     metrics = [sample.metric for sample in samples]
@@ -88,9 +88,9 @@ class AiModelCreateBenchmarkTest(
 
   def testBenchmarkRunGivesCorrectSamplesForTwoModels(self):
     self.enter_context(flagsaver.flagsaver(create_second_model=True))
-    self.bm_spec.ai_model.existing_endpoints = []
-    self.bm_spec.ai_model.Create()
-    self.bm_spec.ai_model.existing_endpoints = ['existing-endpoint']
+    self.bm_spec.ai_model.existing_endpoints = []  # pyrefly: ignore[missing-attribute]
+    self.bm_spec.ai_model.Create()  # pyrefly: ignore[missing-attribute]
+    self.bm_spec.ai_model.existing_endpoints = ['existing-endpoint']  # pyrefly: ignore[missing-attribute]
     ai_model_create_benchmark.Run(self.bm_spec)
     samples = self.bm_spec.GetSamples()
     metrics = [sample.metric for sample in samples]

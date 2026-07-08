@@ -170,7 +170,7 @@ class IbmCloudDisk(disk.BaseDisk):
       return
     volcmd = ibm.IbmAPICommand(self)
     volcmd.flags.update(
-        {'instanceid': self.attached_vm.vmid, 'volume': self.vol_id}
+        {'instanceid': self.attached_vm.vmid, 'volume': self.vol_id}  # pyrefly: ignore[missing-attribute]
     )
     logging.info(
         'Checking volume on instance %s, volume: %s', vm.vmid, self.vol_id
@@ -200,7 +200,7 @@ class IbmCloudDisk(disk.BaseDisk):
     endtime = time.time() + _MAX_FIND_DEVICE_SECONDS
     self.device_path = None
     while time.time() < endtime:
-      stdout, _ = self.attached_vm.RemoteCommand(cmd)
+      stdout, _ = self.attached_vm.RemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
       # parse for lines that contain disk size in bytes
       disks = re.findall(r'\Disk (\S+): .* (\d+) bytes,', stdout)
       for device_path, disk_size in disks:

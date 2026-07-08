@@ -292,14 +292,14 @@ class PostBootLatencyTest(ClusterBootBenchmarkTest):
       )
 
       self.assertLen(result, 2)
-      self.assertEqual(result[0].metric, 'Post Boot Command Latency')
-      self.assertEqual(result[0].value, 2)
-      self.assertEqual(result[0].unit, 'seconds')
-      self.assertEqual(result[0].metadata['test_command'], 'test_command')
-      self.assertEqual(result[1].metric, 'Create to Post Boot Command')
-      self.assertEqual(result[1].value, 12)
-      self.assertEqual(result[1].unit, 'seconds')
-      self.assertEqual(result[1].metadata['test_command'], 'test_command')
+      self.assertEqual(result[0].metric, 'Post Boot Command Latency')  # pyrefly: ignore[unsupported-operation]
+      self.assertEqual(result[0].value, 2)  # pyrefly: ignore[unsupported-operation]
+      self.assertEqual(result[0].unit, 'seconds')  # pyrefly: ignore[unsupported-operation]
+      self.assertEqual(result[0].metadata['test_command'], 'test_command')  # pyrefly: ignore[unsupported-operation]
+      self.assertEqual(result[1].metric, 'Create to Post Boot Command')  # pyrefly: ignore[unsupported-operation]
+      self.assertEqual(result[1].value, 12)  # pyrefly: ignore[unsupported-operation]
+      self.assertEqual(result[1].unit, 'seconds')  # pyrefly: ignore[unsupported-operation]
+      self.assertEqual(result[1].metadata['test_command'], 'test_command')  # pyrefly: ignore[unsupported-operation]
       self.test_vm.RemoteCommandWithReturnCode.assert_called_once_with(
           self.test_cmd, ignore_failure=True
       )
@@ -318,10 +318,10 @@ class PostBootLatencyTest(ClusterBootBenchmarkTest):
     )
 
     self.assertLen(result, 1)
-    self.assertEqual(result[0].metric, 'Post Boot Command Failed')
-    self.assertEqual(result[0].value, 1)
-    self.assertEqual(result[0].unit, 'count')
-    self.assertEqual(result[0].metadata['test_command'], 'test_command')
+    self.assertEqual(result[0].metric, 'Post Boot Command Failed')  # pyrefly: ignore[unsupported-operation]
+    self.assertEqual(result[0].value, 1)  # pyrefly: ignore[unsupported-operation]
+    self.assertEqual(result[0].unit, 'count')  # pyrefly: ignore[unsupported-operation]
+    self.assertEqual(result[0].metadata['test_command'], 'test_command')  # pyrefly: ignore[unsupported-operation]
     mock_warning.assert_called_once_with(
         'The test command failed: %s', 'error message'
     )
@@ -344,10 +344,10 @@ class PostBootLatencyTest(ClusterBootBenchmarkTest):
     )
 
     self.assertLen(result, 1)
-    self.assertEqual(result[0].metric, 'Post Boot Command Failed')
-    self.assertEqual(result[0].value, 1)
-    self.assertEqual(result[0].unit, 'count')
-    self.assertEqual(result[0].metadata['test_command'], 'test_command')
+    self.assertEqual(result[0].metric, 'Post Boot Command Failed')  # pyrefly: ignore[unsupported-operation]
+    self.assertEqual(result[0].value, 1)  # pyrefly: ignore[unsupported-operation]
+    self.assertEqual(result[0].unit, 'count')  # pyrefly: ignore[unsupported-operation]
+    self.assertEqual(result[0].metadata['test_command'], 'test_command')  # pyrefly: ignore[unsupported-operation]
     mock_warning.assert_called_once_with(
         'The test command failed: %s', error_message
     )

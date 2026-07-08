@@ -28,7 +28,7 @@ def GetTestSpannerInstance(engine='spanner-googlesql'):
   spanner_spec = gcp_spanner.SpannerSpec(
       'test_component', flag_values=FLAGS, **spec_args
   )
-  spanner_spec.spanner_database_name = 'test_database'
+  spanner_spec.spanner_database_name = 'test_database'  # pyrefly: ignore[missing-attribute]
   spanner_class = cast(
       Type[gcp_spanner.GcpSpannerInstance],
       relational_db.GetRelationalDbClass(

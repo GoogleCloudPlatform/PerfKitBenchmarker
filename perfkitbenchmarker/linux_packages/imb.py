@@ -111,12 +111,12 @@ def Install(vm) -> None:
     mpilib = 'openmpi'
     install_benchmarks = _InstallForOpenMpiLibrary
 
-  vm.Install(mpilib)
+  vm.Install(mpilib)  # pyrefly: ignore[unbound-name]
   if not COMPILE_FROM_SOURCE.value:
     return
   logging.info('Installing Intel MPI benchmarks from source')
   vm.Install('build_tools')
-  install_benchmarks(vm)
+  install_benchmarks(vm)  # pyrefly: ignore[unbound-name]
 
 
 def _MpiRunCommandForIntelMpiLibrary(

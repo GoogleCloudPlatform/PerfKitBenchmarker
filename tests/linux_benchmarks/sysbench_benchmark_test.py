@@ -267,7 +267,7 @@ class SpannerBenchmarkTestCase(
           )
       )
 
-      sysbench_benchmark._LoadDatabaseInParallel(mock_bm_spec.relational_db, [])
+      sysbench_benchmark._LoadDatabaseInParallel(mock_bm_spec.relational_db, [])  # pyrefly: ignore[bad-argument-type]
 
       mock_update_instance.assert_has_calls(
           [mock.call('db.r7g.16xlarge'), mock.call('db.m4.4xlarge')]
@@ -289,7 +289,7 @@ class SpannerBenchmarkTestCase(
           mock.patch.object(mock_bm_spec.relational_db, '_SetNodes')
       )
 
-      sysbench_benchmark._LoadDatabaseInParallel(mock_bm_spec.relational_db, [])
+      sysbench_benchmark._LoadDatabaseInParallel(mock_bm_spec.relational_db, [])  # pyrefly: ignore[bad-argument-type]
 
       mock_set_nodes.assert_has_calls([mock.call(6), mock.call(3)])
 
@@ -313,7 +313,7 @@ class SpannerBenchmarkTestCase(
           )
       )
 
-      sysbench_benchmark._LoadDatabaseInParallel(mock_bm_spec.relational_db, [])
+      sysbench_benchmark._LoadDatabaseInParallel(mock_bm_spec.relational_db, [])  # pyrefly: ignore[bad-argument-type]
 
       mock_update_instance.assert_has_calls(
           [mock.call('db.r7g.16xlarge'), mock.call('db.m4.4xlarge')]

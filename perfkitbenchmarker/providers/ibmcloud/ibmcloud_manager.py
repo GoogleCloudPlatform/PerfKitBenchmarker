@@ -215,7 +215,7 @@ class IbmCloud:
     else:
       path += '?' + self._generation
 
-    h = {'Authorization': 'Bearer ' + self._token}
+    h = {'Authorization': 'Bearer ' + self._token}  # pyrefly: ignore[unsupported-operation]
     if self._trace:
       h['trace'] = 'on'
     if data is not None and not isinstance(data, io.IOBase):
@@ -245,7 +245,7 @@ class IbmCloud:
       if session is None:
         res = requests.request(
             method,
-            self._url + path,
+            self._url + path,  # pyrefly: ignore[unsupported-operation]
             data=data,
             headers=h,
             timeout=(HTTP_TIMEOUT_CONNECT, data_timeout),
@@ -253,7 +253,7 @@ class IbmCloud:
       else:
         res = session.request(
             method,
-            self._url + path,
+            self._url + path,  # pyrefly: ignore[unsupported-operation]
             data=data,
             headers=h,
             timeout=(HTTP_TIMEOUT_CONNECT, data_timeout),
@@ -406,7 +406,7 @@ class InstanceManager(BaseManager):
 
   _type = 'instance'
 
-  def Create(
+  def Create(  # pyrefly: ignore[bad-override]
       self,
       name,
       imageid,
@@ -589,7 +589,7 @@ class InstanceManager(BaseManager):
     """Send a vm profiles list request."""
     return self._g.Request('GET', '%s' % self.GetProfileUri())
 
-  def List(self, next_start=None, session=None) -> Dict[str, Any]:
+  def List(self, next_start=None, session=None) -> Dict[str, Any]:  # pyrefly: ignore[bad-override]
     """Send a vm list request."""
     inst_uri = '/' + self._g.version + '/instances?limit=100'
     if next_start:
@@ -619,11 +619,11 @@ class VolumeManager(BaseManager):
         'profile': {'name': kwargs.get('profile', 'general-purpose')},
     }
     if kwargs.get('capacity', None):
-      req_data['capacity'] = kwargs.get('capacity')
+      req_data['capacity'] = kwargs.get('capacity')  # pyrefly: ignore[bad-assignment]
     if kwargs.get('iops', None):
-      req_data['iops'] = kwargs.get('iops')
+      req_data['iops'] = kwargs.get('iops')  # pyrefly: ignore[bad-assignment]
     if kwargs.get('name', None):
-      req_data['name'] = kwargs.get('name')
+      req_data['name'] = kwargs.get('name')  # pyrefly: ignore[bad-assignment]
     if kwargs.get('resource_group', None):
       req_data['resource_group'] = {'id': kwargs.get('resource_group')}
     if kwargs.get('encryption_key', None):
@@ -638,7 +638,7 @@ class VolumeManager(BaseManager):
     """Send a volume delete request."""
     return self._g.Request('DELETE', 'volumes/%s' % vol_id)
 
-  def List(self, next_start=None) -> Dict[str, Any]:
+  def List(self, next_start=None) -> Dict[str, Any]:  # pyrefly: ignore[bad-override]
     """Send a volume list request."""
     uri = '/' + self._g.version + '/volumes?limit=100'
     if next_start:
@@ -797,11 +797,11 @@ class SGManager(BaseManager):
     if resource_group:
       req_data['resource_group'] = {'id': resource_group}
     if kwargs.get('name', None):
-      req_data['name'] = kwargs.get('name', None)
+      req_data['name'] = kwargs.get('name', None)  # pyrefly: ignore[bad-assignment]
 
     return self._g.create_security_groups(req_data)
 
-  def List(self) -> Dict[str, Any]:
+  def List(self) -> Dict[str, Any]:  # pyrefly: ignore[bad-override]
     """Send a security group list request."""
     return self._g.Request('GET', self._type)
 
@@ -893,12 +893,12 @@ class PGManager(BaseManager):
     if resource_group:
       req_data['resource_group'] = {'id': resource_group}
     if kwargs.get('name', None):
-      req_data['name'] = kwargs.get('name', None)
+      req_data['name'] = kwargs.get('name', None)  # pyrefly: ignore[bad-assignment]
     if kwargs.get('floating_ip', None):
       req_data['floating_ip'] = {'id': kwargs.get('floating_ip')}
     return self._g.create_public_gateways(req_data)
 
-  def List(self) -> Dict[str, Any]:
+  def List(self) -> Dict[str, Any]:  # pyrefly: ignore[bad-override]
     """Send a public gateway list request."""
     return self._g.Request('GET', self._type)
 
@@ -946,7 +946,7 @@ class KeyManager(BaseManager):
       req_data['resource_group'] = {'id': kwargs.get('resource_group', None)}
     return self._g.create_key(req_data)
 
-  def List(self) -> Dict[str, Any]:
+  def List(self) -> Dict[str, Any]:  # pyrefly: ignore[bad-override]
     """Send a key list request."""
     return self._g.Request('GET', self._type)
 
@@ -978,7 +978,7 @@ class NetworkAclManager(BaseManager):
     req_data = {'name': name}
     return self._g.create_network_acls(req_data)
 
-  def List(self) -> Dict[str, Any]:
+  def List(self) -> Dict[str, Any]:  # pyrefly: ignore[bad-override]
     """Send a network_acl list request."""
     return self._g.Request('GET', 'network_acls')
 
@@ -1107,13 +1107,13 @@ class FipManager(BaseManager):
     if resource_group:
       req_data['resource_group'] = {'id': resource_group}
     if kwargs.get('name', None):
-      req_data['name'] = kwargs.get('name', None)
+      req_data['name'] = kwargs.get('name', None)  # pyrefly: ignore[bad-assignment]
     if kwargs.get('zone', None):
       req_data['zone'] = {'name': kwargs.get('name', None)}
 
     return self._g.create_floating_ips(req_data)
 
-  def List(self) -> Dict[str, Any]:
+  def List(self) -> Dict[str, Any]:  # pyrefly: ignore[bad-override]
     """Send a fip list request."""
     return self._g.Request('GET', self._type)
 

@@ -160,11 +160,11 @@ class ConstructCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     instance = self.test_bm_spec.memory_store
     with self.subTest('service_type'):
-      self.assertEqual(instance.SERVICE_TYPE, 'memorystore')
+      self.assertEqual(instance.SERVICE_TYPE, 'memorystore')  # pyrefly: ignore[missing-attribute]
     with self.subTest('memory_store_type'):
-      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
+      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)  # pyrefly: ignore[missing-attribute]
     with self.subTest('redis_version'):
-      self.assertEqual(instance.version, 'redis_6_x')
+      self.assertEqual(instance.version, 'redis_6_x')  # pyrefly: ignore[missing-attribute]
 
   def testInitializationFlagOverrides(self):
     test_spec = inspect.cleandoc(f"""
@@ -188,17 +188,17 @@ class ConstructCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     instance = self.test_bm_spec.memory_store
     with self.subTest('service_type'):
-      self.assertEqual(instance.SERVICE_TYPE, 'memorystore')
+      self.assertEqual(instance.SERVICE_TYPE, 'memorystore')  # pyrefly: ignore[missing-attribute]
     with self.subTest('memory_store_type'):
-      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
+      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)  # pyrefly: ignore[missing-attribute]
     with self.subTest('redis_version'):
-      self.assertEqual(instance.version, 'redis_7_0')
+      self.assertEqual(instance.version, 'redis_7_0')  # pyrefly: ignore[missing-attribute]
     with self.subTest('size'):
-      self.assertEqual(instance.size, 100)
+      self.assertEqual(instance.size, 100)  # pyrefly: ignore[missing-attribute]
     with self.subTest('redis_region'):
-      self.assertEqual(instance.redis_region, 'us-central1')
+      self.assertEqual(instance.redis_region, 'us-central1')  # pyrefly: ignore[missing-attribute]
     with self.subTest('zone_distribution'):
-      self.assertEqual(instance.zone_distribution, 'multi-zone')
+      self.assertEqual(instance.zone_distribution, 'multi-zone')  # pyrefly: ignore[missing-attribute]
 
 
 if __name__ == '__main__':

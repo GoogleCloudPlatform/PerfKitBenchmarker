@@ -147,7 +147,7 @@ def HadoopVersion() -> version.Version:
   soup = bs4.BeautifulSoup(response.content, 'html.parser')
   link = soup.find('a', href=HADOOP_TAR_PATTERN)
   if link:
-    match = re.match(HADOOP_TAR_PATTERN, link['href'])
+    match = re.match(HADOOP_TAR_PATTERN, link['href'])  # pyrefly: ignore[bad-index, no-matching-overload]
     if match:
       return version.Version(match.group(1))
   raise errors.Setup.MissingExecutableError(

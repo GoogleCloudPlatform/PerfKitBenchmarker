@@ -117,8 +117,8 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
             'zone': 'us-west1-b',
         }
     )
-    db_spec.cpus = None
-    db_spec.memory = None
+    db_spec.cpus = None  # pyrefly: ignore[missing-attribute]
+    db_spec.memory = None  # pyrefly: ignore[missing-attribute]
     db_disk_spec = disk.BaseDiskSpec('NAME', **{'disk_size': 50})
     return {
         'engine': MYSQL,
@@ -208,14 +208,14 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     spec.ConstructRelationalDb()
     with self.subTest('disk_iops'):
       self.assertEqual(
-          spec.relational_db.spec.db_disk_spec.provisioned_iops, 10000
+          spec.relational_db.spec.db_disk_spec.provisioned_iops, 10000  # pyrefly: ignore[missing-attribute]
       )
     with self.subTest('disk_throughput'):
       self.assertEqual(
-          spec.relational_db.spec.db_disk_spec.provisioned_throughput, 1200
+          spec.relational_db.spec.db_disk_spec.provisioned_throughput, 1200  # pyrefly: ignore[missing-attribute]
       )
     with self.subTest('metadata'):
-      metadata = spec.relational_db.GetResourceMetadata()
+      metadata = spec.relational_db.GetResourceMetadata()  # pyrefly: ignore[missing-attribute]
       self.assertEqual(metadata['disk_iops'], 10000)
       self.assertEqual(metadata['disk_throughput_mb'], 1200)
 

@@ -143,7 +143,7 @@ def _ConvertLocustResultsToSamples(
   reader = csv.DictReader(lines)
 
   for row in reader:
-    for field in reader.fieldnames:
+    for field in reader.fieldnames:  # pyrefly: ignore[not-iterable]
       if field in ['Timestamp', 'Type', 'Name']:
         continue
       if row[field] == 'N/A':
