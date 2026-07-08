@@ -35,7 +35,8 @@ spec:
             mountPath: /output
         resources:
           requests:
-            cpu: "250m"
+            cpu: "1.0"
+            memory: "2Gi"
       restartPolicy: Never
       volumes:
       - name: output
