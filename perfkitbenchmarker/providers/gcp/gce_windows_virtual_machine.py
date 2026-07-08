@@ -219,7 +219,7 @@ class WindowsGceVirtualMachine(
 
   def GetDefaultImageFamily(self, is_arm: bool) -> str:
     assert not is_arm
-    return self.DEFAULT_X86_IMAGE_FAMILY[self.OS_TYPE]
+    return self.DEFAULT_X86_IMAGE_FAMILY[self.OS_TYPE]  # pyrefly: ignore[bad-index]
 
   def GetDefaultImageProject(self) -> str:
     if self.OS_TYPE in os_types.WINDOWS_SQLSERVER_OS_TYPES:

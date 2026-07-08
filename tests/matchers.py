@@ -59,7 +59,7 @@ class REGEXP(_NotEqualMixin):
     if isinstance(o, REGEXP):
       return self._f == o._f and self._p == o._p  # pylint: disable=protected-access
     try:
-      if not bool(self._f(o)):
+      if not bool(self._f(o)):  # pyrefly: ignore[not-callable]
         logging.info("%s did not match %s", o, self)
         return False
       else:
@@ -249,7 +249,7 @@ class HASALLOF(_NotEqualMixin):
       return False
     if self._hashable:
       try:
-        return self._values.issubset(set(collection))
+        return self._values.issubset(set(collection))  # pyrefly: ignore[missing-attribute]
       except TypeError:
         pass
     return all(v in collection for v in self._values)
@@ -399,7 +399,7 @@ def _FuncArgCount(f, builtin=1):
     # Check for bound methods.
     has_bound_self = 1 if getattr(f, method_self, None) is not None else 0
 
-    return f.__code__.co_argcount - has_bound_self
+    return f.__code__.co_argcount - has_bound_self  # pyrefly: ignore[missing-attribute]
 
   except AttributeError:
     # Probably missing __call__ or func_code

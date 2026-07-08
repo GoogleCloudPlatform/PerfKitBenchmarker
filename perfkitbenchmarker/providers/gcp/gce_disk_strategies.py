@@ -36,7 +36,7 @@ virtual_machine = Any  # pylint: disable=invalid-name
 
 
 def GetCreateDiskStrategy(
-    vm: 'virtual_machine.BaseVirtualMachine',
+    vm: 'virtual_machine.BaseVirtualMachine',  # pyrefly: ignore[missing-attribute]
     disk_spec: gce_disk.GceDiskSpec,
     disk_count: int,
 ) -> disk_strategies.CreateDiskStrategy:
@@ -140,7 +140,7 @@ class CreatePDDiskStrategy(GCPCreateDiskStrategy):
     """Returns the SetUpDiskStrategy for the disk."""
     if self.disk_spec.multi_writer_mode:
       self.setup_disk_strategy = SetUpMultiWriterPDDiskStrategy(  # pytype: disable=wrong-arg-types
-          self.vm, self.disk_specs
+          self.vm, self.disk_specs  # pyrefly: ignore[bad-argument-type]
       )
     elif self.setup_disk_strategy is None:
       self.setup_disk_strategy = SetUpPDDiskStrategy(self.vm, self.disk_specs)  # pytype: disable=wrong-arg-types
@@ -490,7 +490,7 @@ class GCEPrepareScratchDiskStrategy(disk_strategies.PrepareScratchDiskStrategy):
 
 
 def _GenerateDiskNamePrefix(
-    vm: 'virtual_machine. BaseVirtualMachine',
+    vm: 'virtual_machine. BaseVirtualMachine',  # pyrefly: ignore[missing-attribute]
     group_name: str,
     disk_spec_id: int,
     is_multiwriter: bool,

@@ -63,12 +63,12 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
   """
 
   def __init__(self):
-    self.storage_account: azure_network.AzureStorageAccount = None
+    self.storage_account: azure_network.AzureStorageAccount = None  # pyrefly: ignore[bad-assignment]
     self.resource_group = None
 
   STORAGE_NAME = provider_info.AZURE
 
-  def PrepareService(
+  def PrepareService(  # pyrefly: ignore[bad-override]
       self,
       region,
       existing_storage_account_and_resource_group=None,

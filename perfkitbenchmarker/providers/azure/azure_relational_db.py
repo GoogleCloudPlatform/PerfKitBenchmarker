@@ -290,7 +290,7 @@ class AzureRelationalDb(relational_db.BaseRelationalDb):
     _PostCreate().
     """
     server_show_json = self._AzServerShow()
-    self.endpoint = server_show_json['fullyQualifiedDomainName']
+    self.endpoint = server_show_json['fullyQualifiedDomainName']  # pyrefly: ignore[unsupported-operation]
 
   def _FailoverHA(self) -> None:
     raise NotImplementedError()

@@ -130,7 +130,7 @@ class ServicePrincipal(resource.BaseResource):
     # Use show rather than list, because list requires admin privileges.
     cmd = [azure.AZURE_PATH, 'ad', 'sp', 'show', '--id', self.app_id]
     try:
-      vm_util.IssueCommand(cmd, raise_on_failure=True)
+      vm_util.IssueCommand(cmd, raise_on_failure=True)  # pyrefly: ignore[bad-argument-type]
       return True
     except errors.VmUtil.IssueCommandError:
       return False
@@ -138,4 +138,4 @@ class ServicePrincipal(resource.BaseResource):
   def _Delete(self):
     """Deletes the service principal."""
     cmd = [azure.AZURE_PATH, 'ad', 'sp', 'delete', '--id', self.app_id]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]

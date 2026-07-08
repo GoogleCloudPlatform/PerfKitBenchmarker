@@ -220,7 +220,7 @@ class AzureDisk(disk.BaseDisk):
   def _Create(self):
     """Creates the disk."""
     assert not self.is_image
-    if self.disk_type == ULTRA_STORAGE and not self.vm.availability_zone:
+    if self.disk_type == ULTRA_STORAGE and not self.vm.availability_zone:  # pyrefly: ignore[missing-attribute]
       raise Exception(
           f'Azure Ultradisk is being created in zone "{self.zone}"'
           'which was not specified to have an availability zone. '
@@ -401,7 +401,7 @@ class AzureDisk(disk.BaseDisk):
             'disk',
             'detach',
             '--vm-name',
-            self.vm.name,
+            self.vm.name,  # pyrefly: ignore[missing-attribute]
             '--name',
             self.name,
         ]
@@ -417,7 +417,7 @@ class AzureDisk(disk.BaseDisk):
   def GetDevicePath(self):
     """Returns the path to the device inside the VM."""
     try:
-      if self.vm.SupportsNVMe():
+      if self.vm.SupportsNVMe():  # pyrefly: ignore[missing-attribute]
         return f'/dev/disk/azure/data/by-lun/{self.lun}'
       return f'/dev/disk/azure/scsi1/lun{self.lun}'
     except IndexError:
@@ -427,7 +427,7 @@ class AzureDisk(disk.BaseDisk):
     if self.disk_type == disk.LOCAL:
       return LocalDriveIsNvme(self.machine_type)
     elif self.disk_type in AZURE_REMOTE_DISK_TYPES:
-      return self.vm.SupportsNVMe()
+      return self.vm.SupportsNVMe()  # pyrefly: ignore[missing-attribute]
     else:
       return False
 
@@ -616,7 +616,7 @@ class AzureDiskSnapshot(disk.DiskSnapshot):
     )
     restore_disk = AzureDisk(
         self.disk_spec,
-        self.source_disk.vm,
+        self.source_disk.vm,  # pyrefly: ignore[missing-attribute]
         self.GetNumAttachedRestoreDisks(),
         num_detached_restore_disks=self.GetNumDetachedRestoreDisks(),
     )
@@ -627,8 +627,8 @@ class AzureDiskSnapshot(disk.DiskSnapshot):
     return self.restore_disks[-1]
 
   def GetNumAttachedRestoreDisks(self):
-    num_disks = len(self.source_disk.vm.scratch_disks)
-    for source_disk in self.source_disk.vm.scratch_disks:
+    num_disks = len(self.source_disk.vm.scratch_disks)  # pyrefly: ignore[missing-attribute]
+    for source_disk in self.source_disk.vm.scratch_disks:  # pyrefly: ignore[missing-attribute]
       for snapshot in source_disk.snapshots:
         num_disks += (
             snapshot.num_restore_disks - snapshot.num_detached_restore_disks
@@ -637,12 +637,12 @@ class AzureDiskSnapshot(disk.DiskSnapshot):
 
   def GetNumDetachedRestoreDisks(self):
     num_detached_restore_disks = 0
-    for source_disk in self.source_disk.vm.scratch_disks:
+    for source_disk in self.source_disk.vm.scratch_disks:  # pyrefly: ignore[missing-attribute]
       for snapshot in source_disk.snapshots:
         num_detached_restore_disks += snapshot.num_detached_restore_disks
     return num_detached_restore_disks
 
-  def Delete(self):
+  def Delete(self):  # pyrefly: ignore[bad-override]
     """Deletes the snapshot."""
     if self.restore_disks:
       for restore_disk in self.restore_disks:

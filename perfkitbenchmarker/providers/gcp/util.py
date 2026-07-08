@@ -395,10 +395,10 @@ class GcloudCommand:
         self._RaiseRateLimitedException(error_message)
       else:
         raise error
-    if retcode and GcloudCommand._IsIssueRateLimitMessage(stderr):
+    if retcode and GcloudCommand._IsIssueRateLimitMessage(stderr):  # pyrefly: ignore[unbound-name]
       self._RaiseRateLimitedException(stderr)
 
-    return stdout, stderr, retcode
+    return stdout, stderr, retcode  # pyrefly: ignore[unbound-name]
 
   def _RaiseRateLimitedException(self, error):
     """Raise rate limited exception based on the retry_on_rate_limited flag.

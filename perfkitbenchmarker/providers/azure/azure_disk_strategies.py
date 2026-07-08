@@ -34,7 +34,7 @@ virtual_machine = Any  # pylint: disable=invalid-name
 
 
 def GetCreateDiskStrategy(
-    vm: 'virtual_machine.BaseVirtualMachine',
+    vm: 'virtual_machine.BaseVirtualMachine',  # pyrefly: ignore[missing-attribute]
     disk_spec: disk.BaseDiskSpec | None,
     disk_count: int,
 ) -> disk_strategies.CreateDiskStrategy:
@@ -58,7 +58,7 @@ class AzureCreateOSDiskStrategy(AzureCreateDiskStrategy):
 
   def __init__(
       self,
-      vm: 'virtual_machine.BaseVirtualMachine',
+      vm: 'virtual_machine.BaseVirtualMachine',  # pyrefly: ignore[missing-attribute]
       disk_spec: disk.BaseDiskSpec,
       disk_count: int,
   ):
@@ -92,11 +92,11 @@ class AzureCreateRemoteDiskStrategy(AzureCreateDiskStrategy):
 
   def __init__(
       self,
-      vm: 'virtual_machine.BaseVirtualMachine',
+      vm: 'virtual_machine.BaseVirtualMachine',  # pyrefly: ignore[missing-attribute]
       disk_spec: disk.BaseDiskSpec | None,
       disk_count: int,
   ):
-    super().__init__(vm, disk_spec, disk_count)
+    super().__init__(vm, disk_spec, disk_count)  # pyrefly: ignore[bad-argument-type]
     self.remote_disk_groups = []
     self.vm = vm
     self.setup_disk_strategy = None
@@ -171,7 +171,7 @@ class AzureSetUpLocalSSDDiskStrategy(disk_strategies.SetUpDiskStrategy):
 
   def __init__(
       self,
-      vm: 'virtual_machine.BaseVirtualMachine',
+      vm: 'virtual_machine.BaseVirtualMachine',  # pyrefly: ignore[missing-attribute]
       disk_spec: disk.BaseDiskSpec,
   ):
     super().__init__(vm, disk_spec)
@@ -224,7 +224,7 @@ class AzureSetUpLocalSSDDiskStrategy(disk_strategies.SetUpDiskStrategy):
         else None
     )
     data_disk = azure_disk.AzureLocalDisk(
-        self.disk_spec, self.vm, serial_number=disk_serial_number
+        self.disk_spec, self.vm, serial_number=disk_serial_number  # pyrefly: ignore[bad-argument-type]
     )
     data_disk.disk_number = disk_number
     return data_disk
@@ -235,7 +235,7 @@ class AzureSetUpRemoteDiskStrategy(disk_strategies.SetUpDiskStrategy):
 
   def __init__(
       self,
-      vm: 'virtual_machine.BaseVirtualMachine',
+      vm: 'virtual_machine.BaseVirtualMachine',  # pyrefly: ignore[missing-attribute]
       disk_specs: list[disk.BaseDiskSpec],
   ):
     super().__init__(vm, disk_specs[0])
@@ -295,7 +295,7 @@ class AzurePrepareScratchDiskStrategy(
     # Temp disk is automatically setup on Azure and default to disk D.
     return ['Microsoft NVMe Direct Disk']
 
-  def PrepareTempDbDisk(self, vm: 'virtual_machine.BaseVirtualMachine'):
+  def PrepareTempDbDisk(self, vm: 'virtual_machine.BaseVirtualMachine'):  # pyrefly: ignore[missing-attribute]
     if azure_disk.HasTempDrive(vm.machine_type):
       vm.RemoteCommand('mkdir D:\\TEMPDB')
 

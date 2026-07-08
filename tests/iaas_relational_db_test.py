@@ -48,7 +48,7 @@ class FakeMysqlRelationalDb(mysql_iaas_relational_db.MysqlIAASRelationalDb):
   def _Delete(self):
     pass
 
-  def GetDefaultEngineVersion(self, _):
+  def GetDefaultEngineVersion(self, _):  # pyrefly: ignore[bad-override]
     pass
 
   def _FailoverHA(self):
@@ -71,7 +71,7 @@ class FakePostgresRelationalDb(
   def _Delete(self):
     pass
 
-  def GetDefaultEngineVersion(self, _):
+  def GetDefaultEngineVersion(self, _):  # pyrefly: ignore[bad-override]
     pass
 
   def _FailoverHA(self):
@@ -94,7 +94,7 @@ class FakeSQLServerRelationalDb(
   def _Delete(self):
     pass
 
-  def GetDefaultEngineVersion(self, _):
+  def GetDefaultEngineVersion(self, _):  # pyrefly: ignore[bad-override]
     pass
 
   def _FailoverHA(self):

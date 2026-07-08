@@ -452,10 +452,10 @@ class TestGetProvidedCommandLineFlags(unittest.TestCase):
             'flag_enum', virtual_machine.BootCompletionIpSubset.BOTH, True
         ),
     }
-    flag_util.FLAGS = flag_dict
+    flag_util.FLAGS = flag_dict  # pyrefly: ignore[bad-assignment]
 
   def tearDown(self):
-    flag_util.FLAGS = {}
+    flag_util.FLAGS = {}  # pyrefly: ignore[bad-assignment]
 
   def testGetProvidedCommandLineFlags(self):
     self.assertDictEqual(

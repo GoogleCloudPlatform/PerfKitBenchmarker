@@ -758,12 +758,12 @@ class TestRunBenchmarks(pkb_common_test_case.PkbCommonTestCase):
 
     # us-west1-b is chosen.
     test_retry_manager._ChooseAndSetNewZone(possible_zones)
-    self.assertEqual(FLAGS[zone_flag].value[0], 'us-west1-b')
+    self.assertEqual(FLAGS[zone_flag].value[0], 'us-west1-b')  # pyrefly: ignore[unsupported-operation]
     self.assertEqual(test_retry_manager._zones_tried, {'us-west1-a'})
 
     # All possible zones are exhausted so the original zone is used.
     test_retry_manager._ChooseAndSetNewZone(possible_zones)
-    self.assertEqual(FLAGS[zone_flag].value[0], 'us-west1-a')
+    self.assertEqual(FLAGS[zone_flag].value[0], 'us-west1-a')  # pyrefly: ignore[unsupported-operation]
     self.assertEmpty(test_retry_manager._zones_tried)
 
 
@@ -900,7 +900,7 @@ class TestConditionalSkipTeardown(parameterized.TestCase):
     self.assertTrue(
         pkb.ShouldTeardown(
             skip_teardown_conditions=conditions,
-            samples=self.SAMPLES,
+            samples=self.SAMPLES,  # pyrefly: ignore[bad-argument-type]
         )
     )
 
@@ -954,7 +954,7 @@ class TestConditionalSkipTeardown(parameterized.TestCase):
     self.assertFalse(
         pkb.ShouldTeardown(
             skip_teardown_conditions=conditions,
-            samples=self.SAMPLES,
+            samples=self.SAMPLES,  # pyrefly: ignore[bad-argument-type]
             skip_teardown_on_command_timeout=skip_teardown_on_command_timeout,
         )
     )
@@ -991,7 +991,7 @@ class TestConditionalSkipTeardown(parameterized.TestCase):
         expected_result,
         pkb.ShouldTeardown(
             skip_teardown_conditions=test_conditions,
-            samples=self.SAMPLES,
+            samples=self.SAMPLES,  # pyrefly: ignore[bad-argument-type]
             vms=[test_vm] * num_vms,
             skip_teardown_zonal_vm_limit=zonal_vm_limit,
         )

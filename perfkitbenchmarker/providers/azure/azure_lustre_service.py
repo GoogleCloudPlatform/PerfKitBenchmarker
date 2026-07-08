@@ -60,7 +60,7 @@ class AzureLustreService(lustre_service.BaseLustreService):
             '--sku',
             f'AMLFS-Durable-Premium-{self.lustre_tier}',
             '--storage-capacity',
-            str(int(self.capacity / 1024)),
+            str(int(self.capacity / 1024)),  # pyrefly: ignore[unsupported-operation]
             '--zones',
             '[1]',
             '--maintenance-window',

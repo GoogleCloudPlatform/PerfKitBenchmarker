@@ -98,7 +98,7 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
     self.subscription_id = ''
     self.database_id = ''
     self.version = REDIS_VERSION_MAPPING[spec.version]
-    self.shard_info: _ShardConfiguration = None
+    self.shard_info: _ShardConfiguration = None  # pyrefly: ignore[bad-assignment]
     self.peering_name = f'pkb-redis-cloud-peering-{FLAGS.run_uri}'
     self.multi_az = len(self.zones) > 1
     self.metadata['multi_az'] = self.multi_az
@@ -216,7 +216,7 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
         'networking': {'deploymentCIDR': '192.168.0.0/24'},
     }
     if self.zones:
-      region_config['preferredAvailabilityZones'] = self.zones
+      region_config['preferredAvailabilityZones'] = self.zones  # pyrefly: ignore[bad-assignment]
     database_config = {
         'name': f'pkb-{FLAGS.run_uri}',
         'protocol': 'redis',
@@ -231,7 +231,7 @@ class GcpRedisEnterprise(managed_memory_store.BaseManagedMemoryStore):
         'quantity': 1,
     }
     if _ENABLE_VECTOR_SEARCH.value:
-      database_config['modules'] = [{'name': 'RediSearch'}]
+      database_config['modules'] = [{'name': 'RediSearch'}]  # pyrefly: ignore[bad-assignment]
     return {
         'name': self.name,
         'deploymentType': 'single-region',

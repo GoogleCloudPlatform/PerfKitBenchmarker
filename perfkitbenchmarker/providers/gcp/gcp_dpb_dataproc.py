@@ -939,9 +939,9 @@ class GcpDpbDataprocFlink(GcpDpbDataproc):
     job_script_args.append('--')
     if job_type == dpb_constants.BEAM_JOB_TYPE:
       job_script_args.append('--runner=FlinkRunner')
-      job_script_args.extend(job_arguments)
+      job_script_args.extend(job_arguments)  # pyrefly: ignore[bad-argument-type]
     else:
-      job_script_args.extend([arg.replace('=', ' ') for arg in job_arguments])
+      job_script_args.extend([arg.replace('=', ' ') for arg in job_arguments])  # pyrefly: ignore[not-iterable]
     self.ExecuteOnMaster(
         data.ResourcePath(DATAPROC_FLINK_TRIGGER_SCRIPT), job_script_args
     )

@@ -78,9 +78,9 @@ class AzureSmbService(smb_service.BaseSmbService):
     self.resource_group = azure_network.GetResourceGroup(self.region)
 
     # set during _Create()
-    self.connection_string: str = None
-    self.storage_account_key: str = None
-    self.storage_account_name: str = None
+    self.connection_string: str = None  # pyrefly: ignore[bad-assignment]
+    self.storage_account_key: str = None  # pyrefly: ignore[bad-assignment]
+    self.storage_account_name: str = None  # pyrefly: ignore[bad-assignment]
 
   @property
   def network(self):

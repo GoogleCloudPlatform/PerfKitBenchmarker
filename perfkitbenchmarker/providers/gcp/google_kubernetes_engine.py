@@ -66,7 +66,7 @@ class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
     self.project = self.project or util.GetDefaultProject()
     self.region = util.GetRegionFromZone(self.zone)
     # Remove from gcloud commands
-    self.zone = None
+    self.zone = None  # pyrefly: ignore[bad-assignment]
     self.endpoint = f'{self.region}-docker.pkg.dev'
 
   def GetFullRegistryTag(self, image: str) -> str:
@@ -118,7 +118,7 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
 
   def __init__(self, spec: container_spec_lib.ContainerClusterSpec):
     super().__init__(spec)
-    self.project: str = spec.vm_spec.GetProject()
+    self.project: str = spec.vm_spec.GetProject()  # pyrefly: ignore[missing-attribute]
     self.cluster_version: str = FLAGS.container_cluster_version
     self.release_channel: str | None = gcp_flags.CONTAINER_RELEASE_CHANNEL.value
     self.use_application_default_credentials: bool = True
@@ -337,9 +337,9 @@ class GkeCluster(BaseGkeCluster):
     nodepool_config.threads_per_core = vm_config.threads_per_core
     nodepool_config.gce_tags = vm_config.gce_tags
     nodepool_config.min_cpu_platform = vm_config.min_cpu_platform
-    nodepool_config.network = gce_network.GceNetwork.GetNetwork(vm_config)
-    nodepool_config.cpus: int = vm_config.cpus
-    nodepool_config.memory_mib: int = vm_config.memory
+    nodepool_config.network = gce_network.GceNetwork.GetNetwork(vm_config)  # pyrefly: ignore[missing-attribute]
+    nodepool_config.cpus: int = vm_config.cpus  # pyrefly: ignore[bad-assignment]
+    nodepool_config.memory_mib: int = vm_config.memory  # pyrefly: ignore[bad-assignment]
 
   def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
     """Fix zone and region."""
@@ -389,8 +389,8 @@ class GkeCluster(BaseGkeCluster):
   def _Create(self):
     """Creates the cluster."""
     cmd = self._GcloudCommand('container', 'clusters', 'create', self.name)
-    if self.default_nodepool.network:
-      cmd.flags['network'] = self.default_nodepool.network.network_resource.name
+    if self.default_nodepool.network:  # pyrefly: ignore[missing-attribute]
+      cmd.flags['network'] = self.default_nodepool.network.network_resource.name  # pyrefly: ignore[missing-attribute]
 
     if gcp_flags.GKE_ENABLE_SHIELDED_NODES.value:
       cmd.args.append('--enable-shielded-nodes')
@@ -472,9 +472,9 @@ class GkeCluster(BaseGkeCluster):
     is_default_class = (
         nodepool_config.name == container_cluster.DEFAULT_NODEPOOL
     )
-    compute_manifest['spec'] = {'priorities': priorities}
+    compute_manifest['spec'] = {'priorities': priorities}  # pyrefly: ignore[bad-assignment]
     if is_default_class:
-      compute_manifest['spec']['nodePoolAutoCreation'] = {'enabled': True}
+      compute_manifest['spec']['nodePoolAutoCreation'] = {'enabled': True}  # pyrefly: ignore[bad-assignment, unsupported-operation]
     kubernetes_commands.ApplyYaml([compute_manifest])
     if is_default_class:
       return
@@ -516,9 +516,9 @@ class GkeCluster(BaseGkeCluster):
 
     nodepool_labels = [f'pkb_nodepool={nodepool_config.name}']
     if nodepool_config.gpu_count:
-      if 'a2-' not in nodepool_config.machine_type:
+      if 'a2-' not in nodepool_config.machine_type:  # pyrefly: ignore[not-iterable]
         accelerator_spec = gce_virtual_machine.GenerateAcceleratorSpecString(
-            nodepool_config.gpu_type, nodepool_config.gpu_count
+            nodepool_config.gpu_type, nodepool_config.gpu_count  # pyrefly: ignore[bad-argument-type]
         )
         if gcp_flags.GKE_GPU_DRIVER_VERSION.value:
           accelerator_spec += (
@@ -677,7 +677,7 @@ class GkeAutopilotCluster(BaseGkeCluster):
     kubernetes_cluster.KubernetesCluster.InitializeNodePoolForCloud(
         self, vm_config, nodepool_config
     )
-    nodepool_config.network = gce_network.GceNetwork.GetNetwork(vm_config)
+    nodepool_config.network = gce_network.GceNetwork.GetNetwork(vm_config)  # pyrefly: ignore[missing-attribute]
     return nodepool_config
 
   def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
@@ -697,8 +697,8 @@ class GkeAutopilotCluster(BaseGkeCluster):
         self.name,
         '--no-autoprovisioning-enable-insecure-kubelet-readonly-port',
     )
-    if self.default_nodepool.network:
-      cmd.flags['network'] = self.default_nodepool.network.network_resource.name
+    if self.default_nodepool.network:  # pyrefly: ignore[missing-attribute]
+      cmd.flags['network'] = self.default_nodepool.network.network_resource.name  # pyrefly: ignore[missing-attribute]
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     if self.enable_aam:

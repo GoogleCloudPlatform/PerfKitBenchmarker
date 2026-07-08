@@ -46,7 +46,7 @@ class FioUtitTest(pkb_common_test_case.PkbCommonTestCase):
   def testGetAllDiskPaths(self):
     test_disk = self.disks[0]
     test_disk.is_striped = True
-    test_disk.disks = [copy.deepcopy(test_disk), copy.deepcopy(test_disk)]
+    test_disk.disks = [copy.deepcopy(test_disk), copy.deepcopy(test_disk)]  # pyrefly: ignore[missing-attribute]
     disk_paths = utils.GetAllDiskPaths([test_disk])
     self.assertEqual(disk_paths, ['/tmp/disk/path', '/tmp/disk/path'])
 
@@ -64,7 +64,7 @@ class FioUtitTest(pkb_common_test_case.PkbCommonTestCase):
   @flagsaver.flagsaver(fio_runtime=30)
   def testJobRenderingForMultipleDisks(self):
     test_disk = self.disks[0]
-    test_disk.disks = [copy.deepcopy(test_disk), copy.deepcopy(test_disk)]
+    test_disk.disks = [copy.deepcopy(test_disk), copy.deepcopy(test_disk)]  # pyrefly: ignore[missing-attribute]
     test_disk.is_striped = True
     FLAGS['fio_separate_jobs_for_disks'].value = True
     generated_job_file = utils.GenerateJobFile(

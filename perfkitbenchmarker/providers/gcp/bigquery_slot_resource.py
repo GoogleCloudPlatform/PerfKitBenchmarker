@@ -135,5 +135,5 @@ class BigquerySlotResource(edw_compute_resource.EdwComputeResource):
         '--force',
         self.compute_resource_identifier,
     ]
-    stdout, _, _ = vm_util.IssueCommand(cmd)
+    stdout, _, _ = vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
     logging.info('Flex Slot Deletion Result: %s', str(stdout))

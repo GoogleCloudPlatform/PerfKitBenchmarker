@@ -487,7 +487,7 @@ class ModelGardenCliVertexAiModel(BaseCliVertexAiModel):
     )
     # Above command created the endpoint & the model, so setup the endpoint as
     # if it was created by the CLI.
-    self.endpoint.endpoint_name = _FindRegexInOutput(
+    self.endpoint.endpoint_name = _FindRegexInOutput(  # pyrefly: ignore[bad-assignment]
         out,
         r'endpoint: (.*)\n',
         exception_type=errors.Resource.CreationError,
@@ -554,7 +554,7 @@ class BaseVertexAiEndpoint(resource.BaseResource):
     """
     if self.endpoint_name is None:
       return None
-    return self.endpoint_name.split('/')[-1]
+    return self.endpoint_name.split('/')[-1]  # pyrefly: ignore[missing-attribute]
 
   def UpdateLabels(self) -> None:
     """Updates the labels of the endpoint."""
@@ -577,7 +577,7 @@ class VertexAiCliEndpoint(BaseVertexAiEndpoint):
         f' --labels={util.MakeFormattedDefaultTags()}',
         ignore_failure=True,
     )
-    self.endpoint_name = _FindRegexInOutput(
+    self.endpoint_name = _FindRegexInOutput(  # pyrefly: ignore[bad-assignment]
         err, r'Created Vertex AI endpoint: (.+)\.'
     )
     if not self.endpoint_name:

@@ -567,7 +567,7 @@ class CSVPublisherTestCase(unittest.TestCase):
     self.tf.seek(0)
     reader = csv.DictReader(self.tf)
     rows = list(reader)
-    self.assertEqual(['key1', 'key3'], reader.fieldnames[-2:])
+    self.assertEqual(['key1', 'key3'], reader.fieldnames[-2:])  # pyrefly: ignore[unsupported-operation]
     self.assertEqual(3, len(rows))
 
 

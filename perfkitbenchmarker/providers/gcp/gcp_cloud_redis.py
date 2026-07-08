@@ -266,7 +266,7 @@ class CloudRedis(managed_memory_store.BaseManagedMemoryStore):
 
     time_series = client.list_time_series(
         name='projects/' + self.project,
-        filter_=api_filter,
+        filter_=api_filter,  # pyrefly: ignore[unexpected-keyword]
         interval=interval,
         view=monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
     )

@@ -362,6 +362,6 @@ class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):
     if cli is None:
       cli = mock.create_autospec(command_interface.CommandInterface)
     cli.RunCommand.mock_command = mock_command.MockCommand(
-        call_to_response, cli.RunCommand, ('', '', 0)
+        call_to_response, cli.RunCommand, ('', '', 0)  # pyrefly: ignore[bad-argument-type]
     )
     return cli

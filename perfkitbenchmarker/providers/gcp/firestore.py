@@ -99,7 +99,7 @@ class Firestore(non_relational_db.BaseManagedMongoDb):
     self.project: str = FLAGS.project or util.GetDefaultProject()
     self.edition: str = _DEFAULT_EDITION
     self.type: str = _DEFAULT_TYPE
-    self.uid: str = None
+    self.uid: str = None  # pyrefly: ignore[bad-assignment]
     self.port: int = 443
     self.tls_enabled: bool = True
 
