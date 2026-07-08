@@ -526,3 +526,46 @@ class GcpUtilTest(pkb_common_test_case.PkbCommonTestCase):
 
 if __name__ == '__main__':
   unittest.main()
+
+
+class GcloudCommandIssueAsyncTestCase(unittest.TestCase):
+  """Tests for GcloudCommand.IssueAsync (generic async-issue + fallback)."""
+
+  def testIssueAsyncReturnsOpNameDirectly(self):
+    cmd = util.GcloudCommand(None, 'fake', 'create')
+    with mock.patch.object(cmd, 'Issue', return_value=('op-123\n', '', 0)):
+      result = cmd.IssueAsync()
+    self.assertEqual(result, 'op-123')
+
+  def testIssueAsyncFallsBackWhenEmptyStdout(self):
+    cmd = util.GcloudCommand(None, 'fake', 'update')
+    with mock.patch.object(cmd, 'Issue', return_value=('', '', 0)):
+      result = cmd.IssueAsync(get_latest_op_fn=lambda: 'recovered-op')
+    self.assertEqual(result, 'recovered-op')
+
+  def testIssueAsyncRaisesWhenEmptyStdoutAndNoFallback(self):
+    cmd = util.GcloudCommand(None, 'fake', 'create')
+    with mock.patch.object(cmd, 'Issue', return_value=('', 'some error', 0)):
+      with self.assertRaises(errors.VmUtil.IssueCommandError):
+        cmd.IssueAsync()
+
+  def testIssueAsyncRaisesOnCommandFailure(self):
+    cmd = util.GcloudCommand(None, 'fake', 'create')
+    # Issue() defaults raise_on_failure=True, so a real failure surfaces as
+    # an exception from Issue() itself, not a returned (stdout, stderr, rc)
+    # failure tuple -- IssueAsync no longer checks retcode.
+    with mock.patch.object(
+        cmd, 'Issue', side_effect=errors.VmUtil.IssueCommandError('boom')
+    ):
+      with self.assertRaises(errors.VmUtil.IssueCommandError):
+        cmd.IssueAsync()
+
+  def testIssueAsyncSetsAsyncFlagAndFormat(self):
+    cmd = util.GcloudCommand(None, 'fake', 'create')
+    with mock.patch.object(
+        cmd, 'Issue', return_value=('op-456\n', '', 0)
+    ) as mock_issue:
+      cmd.IssueAsync()
+    self.assertIn('--async', cmd.args)
+    self.assertEqual(cmd.flags['format'], 'value(name)')
+    mock_issue.assert_called_once()
