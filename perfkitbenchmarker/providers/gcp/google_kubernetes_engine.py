@@ -525,13 +525,14 @@ class GkeCluster(BaseGkeCluster):
               ',gpu-driver-version=' + gcp_flags.GKE_GPU_DRIVER_VERSION.value
           )
         cmd.flags['accelerator'] = accelerator_spec
-    if gcp_flags.GCE_RESERVATION_ID.value:
-      cmd.flags['reservation'] = gcp_flags.GCE_RESERVATION_ID.value
-      cmd.flags['reservation-affinity'] = 'specific'
-      nodepool_labels.append('cloud.google.com/reservation-affinity=specific')
-      nodepool_labels.append(
-          f'cloud.google.com/reservation-name={gcp_flags.GCE_RESERVATION_ID.value}'
-      )
+      # Not guaranteed, but atm reservations only needed for GPUs.
+      if gcp_flags.GCE_RESERVATION_ID.value:
+        cmd.flags['reservation'] = gcp_flags.GCE_RESERVATION_ID.value
+        cmd.flags['reservation-affinity'] = 'specific'
+        nodepool_labels.extend([
+            'cloud.google.com/reservation-affinity=specific',
+            f'cloud.google.com/reservation-name={gcp_flags.GCE_RESERVATION_ID.value}',
+        ])
     cmd.flags['node-labels'] = ','.join(nodepool_labels)
 
     gce_tags = FLAGS.gce_tags
