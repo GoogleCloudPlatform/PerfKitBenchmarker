@@ -14,8 +14,8 @@ Usage:
                 --k8s_payload_size_mb=50 \
                 --k8s_payload_iterations=20 \
                 --k8s_payload_concurrent_sessions=5 \
-                --k8s_namespace=agentic \
-                --k8s_agent_api_url=http://localhost:8080
+                --k8s_agentic_namespace=agentic \
+                --k8s_agentic_agent_api_url=http://localhost:8080
 
 Samples emitted (per run):
   - gke_payload_orchestrator_transfer_mean       (ms)
@@ -59,6 +59,9 @@ Samples emitted (per run):
   - gke_payload_sandbox_rss_growth               (MB)
   - gke_payload_wall_time                        (seconds)
 """
+
+from __future__ import annotations
+
 
 import logging
 import time
@@ -125,7 +128,7 @@ flags.DEFINE_bool(
 # ---------------------------------------------------------------------------
 
 
-def GetConfig(user_config):
+def GetConfig(user_config: dict) -> dict:
     """Load and return benchmark config.
 
     No vm_groups — PKB skips Provision() and Teardown().
@@ -133,7 +136,7 @@ def GetConfig(user_config):
     return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def Prepare(benchmark_spec):
+def Prepare(benchmark_spec: object) -> None:
     """Deploy workloads and verify agent API."""
     benchmark_spec.always_call_cleanup = True
     logging.info("=== Prepare: deploying workloads ===")
@@ -143,7 +146,7 @@ def Prepare(benchmark_spec):
     logging.info("Prepare complete.")
 
 
-def Run(benchmark_spec):
+def Run(benchmark_spec: object) -> list[sample.Sample]:
     """Execute a single payload transfer measurement and return samples.
 
     Returns:
@@ -151,7 +154,7 @@ def Run(benchmark_spec):
     """
     utils.set_benchmark_spec(benchmark_spec)
 
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     payload_size_mb = FLAGS.k8s_payload_size_mb
     iterations = FLAGS.k8s_payload_iterations
     concurrent = FLAGS.k8s_payload_concurrent_sessions
@@ -570,9 +573,9 @@ def Run(benchmark_spec):
     return samples
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(benchmark_spec: object) -> None:
     """Clean up after measurement. Scale warm pool to 0."""
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     logging.info("Cleanup: draining warm pool.")
 
     utils.DrainWarmPool(
@@ -590,7 +593,7 @@ def Cleanup(benchmark_spec):
 # ---------------------------------------------------------------------------
 
 
-def _emit(samples, agg, agg_key, metric_suffix, unit, namespace, extra):
+def _emit(samples: list, agg: dict, agg_key: str, metric_suffix: str, unit: str, namespace: str, extra: dict) -> None:
     """Emit a sample if the key exists in the aggregate dict.
 
     Args:

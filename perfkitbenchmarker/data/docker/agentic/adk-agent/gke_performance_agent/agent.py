@@ -1,16 +1,4 @@
-"""GKE Performance Agent -- ADK agent definition.
-
-This file runs INSIDE the GKE cluster as part of the adk-agent Deployment
-(see gke_deploy_utils.py for the K8s manifest). It is NOT run from the
-machine executing PKB. The ADK agent pod serves a FastAPI app (main.py)
-that PKB calls via HTTP through a kubectl port-forward tunnel.
-
-Execution flow:
-  PKB (your laptop/CI) -> kubectl port-forward -> adk-agent pod -> this file
-  -> GkeCodeExecutor -> SandboxClient -> gVisor sandbox pod
-"""
-
-"""GKE Performance Agent â ADK agent definition for sandbox benchmarking.
+"""GKE Performance Agent -- ADK agent definition for sandbox benchmarking.
 
 EXECUTION CONTEXT:
     This file runs INSIDE the GKE cluster, NOT on the PKB orchestrator machine.
@@ -34,6 +22,9 @@ EXECUTION CONTEXT:
     through kubectl or via a LoadBalancer/ClusterIP service).
 """
 
+from __future__ import annotations
+
+
 from google.adk.agents import LlmAgent
 from google.adk.code_executors import GkeCodeExecutor
 from google.adk.code_executors.code_execution_utils import CodeExecutionResult
@@ -45,6 +36,10 @@ from dotenv import load_dotenv
 from google.adk.apps import App
 import logging
 import os
+import time
+
+from k8s_agent_sandbox.sandbox_client import SandboxClient
+from k8s_agent_sandbox.models import SandboxDirectConnectionConfig
 
 # --- Configure Logging ---
 logging.basicConfig(level=logging.INFO)
@@ -64,33 +59,28 @@ load_dotenv(os.path.join(agent_dir, "generated.env"))
 # 2. Mock LLM Definition (Inheriting from BaseLlm for Pydantic)
 # =========================================================================
 
-# Load the benchmark scripts
-density_script_path = os.path.join(
-    basedir, "../sandboxed_apps/python_test_app/benchmark_density.py"
-)
-try:
-    with open(density_script_path, "r") as f:
-        density_benchmark_code = f.read()
-except Exception:
-    density_benchmark_code = "import os; print(os.uname())"
+# ---------------------------------------------------------------------------
+# Benchmark script loading
+# ---------------------------------------------------------------------------
+# Scripts are loaded at module import time (container startup). If any script
+# is missing, the container will fail to start and enter CrashLoopBackOff —
+# this is intentional. A missing script means the Docker image was built
+# incorrectly, and we want immediate visibility rather than silently running
+# a no-op that produces garbage metrics.
 
-payload_script_path = os.path.join(
-    basedir, "../sandboxed_apps/python_test_app/benchmark_payload.py"
-)
-try:
-    with open(payload_script_path, "r") as f:
-        payload_benchmark_code = f.read()
-except Exception:
-    payload_benchmark_code = "import os; print(os.uname())"
+_SCRIPTS_DIR = os.path.join(basedir, "..", "sandboxed_apps", "python_test_app")
 
-qps_script_path = os.path.join(
-    basedir, "../sandboxed_apps/python_test_app/benchmark_qps.py"
-)
-try:
-    with open(qps_script_path, "r") as f:
-        qps_benchmark_code = f.read()
-except Exception:
-    qps_benchmark_code = "import json; print(json.dumps({'sandbox_status': 'ok'}))"
+
+def _load_script(filename: str) -> str:
+    """Load a benchmark script from the sandboxed_apps directory."""
+    path = os.path.join(_SCRIPTS_DIR, filename)
+    with open(path, "r") as f:
+        return f.read()
+
+
+density_benchmark_code = _load_script("benchmark_density.py")
+payload_benchmark_code = _load_script("benchmark_payload.py")
+qps_benchmark_code = _load_script("benchmark_qps.py")
 
 # Keys that main.py sets in os.environ per-request.  We inject them into
 # the script so they reach the sandbox pod.  If unset, the benchmark scripts
@@ -101,37 +91,41 @@ _QPS_ENV_KEYS: list[str] = []  # QPS script needs no env config
 
 
 def _build_benchmark_code() -> str:
-    """Build the benchmark script with current env values injected.
+    """Select the benchmark script based on BENCHMARK_MODE env var."""
+    mode = os.getenv("BENCHMARK_MODE", "density")
+    if mode == "payload":
+        return payload_benchmark_code
+    elif mode == "qps":
+        return qps_benchmark_code
+    return density_benchmark_code
 
-    Selects the script based on BENCHMARK_MODE env var:
-      - 'density'  → benchmark_density.py
-      - 'payload'  → benchmark_payload.py
-      - 'qps'      → benchmark_qps.py
+
+def _build_env_prefix() -> str:
+    """Build shell env var prefix for the sandbox command.
+
+    Returns a string like "KEY1=val1 KEY2=val2" prepended to the
+    python3 command so env vars are set in the sandbox shell.
     """
     mode = os.getenv("BENCHMARK_MODE", "density")
-
     if mode == "payload":
         env_keys = _PAYLOAD_ENV_KEYS
-        script = payload_benchmark_code
     elif mode == "qps":
         env_keys = _QPS_ENV_KEYS
-        script = qps_benchmark_code
     else:
         env_keys = _DENSITY_ENV_KEYS
-        script = density_benchmark_code
-
-    lines = ["import os"]
+    parts = []
     for k in env_keys:
         v = os.getenv(k)
         if v is not None:
-            lines.append(f"os.environ['{k}'] = '{v}'")
-    return "\n".join(lines) + "\n\n" + script
+            parts.append(f"{k}={v}")
+    return " ".join(parts)
+
 
 
 class MockLlm(BaseLlm):
     model: str = "mock-model"
 
-    async def generate_content_async(self, llm_request, stream=False):
+    async def generate_content_async(self, llm_request: object, stream: bool = False):
         """Mock the ADK response loop.
 
         BaseLlm.generate_content_async is an AsyncGenerator — it must YIELD
@@ -176,11 +170,6 @@ _SANDBOX_POOL = ThreadPoolExecutor(max_workers=16)
 class V3GkeCodeExecutor(GkeCodeExecutor):
     def _execute_in_sandbox(self, code: str) -> CodeExecutionResult:
         """Executes code using the v0.4.6 compatible SandboxClient."""
-        from k8s_agent_sandbox.sandbox_client import SandboxClient
-        from k8s_agent_sandbox.models import SandboxDirectConnectionConfig
-        import logging
-        import time
-
         logging.info("Executing via V3 SandboxClient (v0.4.6 compatible).")
 
         # _SANDBOX_POOL is initialized at module level (thread-safe).
@@ -217,10 +206,17 @@ class V3GkeCodeExecutor(GkeCodeExecutor):
             # Default 60 s keeps density/snapshot runs tight; payload
             # sweeps raise it for large blobs.
             run_timeout = int(os.getenv("SANDBOX_EXEC_TIMEOUT_S", "60"))
+            env_prefix = _build_env_prefix()
+            # Wrap in /bin/sh -c because sandbox.commands.run() uses
+            # exec() directly -- env var prefix needs shell interpretation.
+            if env_prefix:
+                run_cmd = f"/bin/sh -c '{env_prefix} python3 script.py'"
+            else:
+                run_cmd = "python3 script.py"
 
             t0 = time.time()
             run_future = _SANDBOX_POOL.submit(
-                sandbox.commands.run, "python3 script.py", timeout=run_timeout
+                sandbox.commands.run, run_cmd, timeout=run_timeout
             )
             result = run_future.result()
             run_ms = (time.time() - t0) * 1000.0

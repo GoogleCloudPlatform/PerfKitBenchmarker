@@ -19,8 +19,8 @@ Usage:
                 --k8s_qps_pool_size=70 \\
                 --k8s_qps_step_duration_s=30.0 \\
                 --k8s_qps_mode=agent \\
-                --k8s_namespace=agentic \\
-                --k8s_agent_api_url=http://localhost:8080
+                --k8s_agentic_namespace=agentic \\
+                --k8s_agentic_agent_api_url=http://localhost:8080
 
   # Raw claim mode
   python pkb.py --benchmarks=gke_qps \\
@@ -29,7 +29,7 @@ Usage:
                 --k8s_qps_step_duration_s=30.0 \\
                 --k8s_qps_mode=raw_claim \\
                 --k8s_qps_claim_timeout_s=60.0 \\
-                --k8s_namespace=agentic
+                --k8s_agentic_namespace=agentic
 
 Samples emitted (per run):
   - gke_qps_ttfe_mean                (ms)
@@ -49,6 +49,9 @@ Samples emitted (per run):
   - gke_qps_pool_after               (count)
   - gke_qps_wall_time                (seconds)
 """
+
+from __future__ import annotations
+
 
 import json
 import os
@@ -136,7 +139,7 @@ flags.DEFINE_float(
 # ---------------------------------------------------------------------------
 
 
-def GetConfig(user_config):
+def GetConfig(user_config: dict) -> dict:
     """Load and return benchmark config.
 
     No vm_groups — PKB skips Provision() and Teardown().
@@ -144,7 +147,7 @@ def GetConfig(user_config):
     return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def Prepare(benchmark_spec):
+def Prepare(benchmark_spec: object) -> None:
     """Deploy workloads and verify agent API."""
     benchmark_spec.always_call_cleanup = True
     logging.info("=== Prepare: deploying workloads ===")
@@ -157,7 +160,7 @@ def Prepare(benchmark_spec):
     logging.info("Prepare complete.")
 
 
-def Run(benchmark_spec):
+def Run(benchmark_spec: object) -> list[sample.Sample]:
     """Execute a single QPS measurement and return samples.
 
     Returns:
@@ -165,7 +168,7 @@ def Run(benchmark_spec):
     """
     utils.set_benchmark_spec(benchmark_spec)
 
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     pool_size = FLAGS.k8s_qps_pool_size
 
     # Scale warm pool (moved from Prepare for sweep compatibility)
@@ -185,9 +188,9 @@ def Run(benchmark_spec):
         return _RunAgent(benchmark_spec)
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(benchmark_spec: object) -> None:
     """Delete benchmark claims and drain warm pool."""
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     logging.info("Cleanup: deleting benchmark claims and draining warm pool.")
 
     # Delete any lingering benchmark claims
@@ -209,9 +212,9 @@ def Cleanup(benchmark_spec):
 # ---------------------------------------------------------------------------
 
 
-def _RunAgent(benchmark_spec):
+def _RunAgent(benchmark_spec: object) -> list[sample.Sample]:
     """Fire QPS burst via the orchestrator API."""
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     target_qps = FLAGS.k8s_qps_target_qps
     pool_size = FLAGS.k8s_qps_pool_size
     step_duration = FLAGS.k8s_qps_step_duration_s
@@ -376,9 +379,9 @@ def _RunAgent(benchmark_spec):
 # ---------------------------------------------------------------------------
 
 
-def _RunRawClaim(benchmark_spec):
+def _RunRawClaim(benchmark_spec: object) -> list[sample.Sample]:
     """Fire SandboxClaims directly at target_qps (no agent)."""
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     target_qps = FLAGS.k8s_qps_target_qps
     pool_size = FLAGS.k8s_qps_pool_size
     step_duration = FLAGS.k8s_qps_step_duration_s
@@ -408,7 +411,7 @@ def _RunRawClaim(benchmark_spec):
     claim_results = []
     lock = threading.Lock()
 
-    def _fire_and_wait(idx, fire_time):
+    def _fire_and_wait(idx: int, fire_time: float) -> None:
         claim_name = f"pkb-qps-0-{idx}-{uuid.uuid4().hex[:6]}"
         result = {"request_id": idx, "fire_time_s": round(fire_time, 3)}
         try:
@@ -649,7 +652,7 @@ def _RunRawClaim(benchmark_spec):
 # ---------------------------------------------------------------------------
 
 
-def _CreateClaim(namespace, template, claim_name):
+def _CreateClaim(namespace: str, template: str, claim_name: str) -> float:
     """Create a single SandboxClaim via kubectl and return creation timestamp."""
     manifest = json.dumps(
         {
@@ -689,7 +692,7 @@ def _CreateClaim(namespace, template, claim_name):
     return t_create
 
 
-def _WaitClaimBound(namespace, claim_name, timeout_s):
+def _WaitClaimBound(namespace: str, claim_name: str, timeout_s: float) -> float | None:
     """Wait for a SandboxClaim to reach Bound phase. Returns timestamp or None."""
     deadline = time.time() + timeout_s
     while time.time() < deadline:
@@ -712,7 +715,7 @@ def _WaitClaimBound(namespace, claim_name, timeout_s):
     return None
 
 
-def _DeleteBenchmarkClaims(namespace):
+def _DeleteBenchmarkClaims(namespace: str) -> int:
     """Delete SandboxClaims labelled created-by=pkb-qps-benchmark."""
     stdout, _, rc = utils.RunKubectl(
         [
@@ -779,7 +782,7 @@ def _DeleteBenchmarkClaims(namespace):
 # ---------------------------------------------------------------------------
 
 
-def _percentile(sorted_values, pct):
+def _percentile(sorted_values: list[float], pct: float) -> float:
     """Calculate percentile (0-100) with linear interpolation."""
     if not sorted_values:
         return 0.0
@@ -790,7 +793,7 @@ def _percentile(sorted_values, pct):
     return sorted_values[lo] * (1 - frac) + sorted_values[hi] * frac
 
 
-def _emit(samples, data, data_key, metric_suffix, unit, namespace, extra):
+def _emit(samples: list, data: dict, data_key: str, metric_suffix: str, unit: str, namespace: str, extra: dict) -> None:
     """Emit a sample if the key exists in the data dict."""
     value = data.get(data_key)
     if value is not None:

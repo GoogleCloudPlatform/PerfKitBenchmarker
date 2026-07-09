@@ -10,6 +10,9 @@ Three task categories:
 
 Metrics: all sandbox_* keys.
 """
+
+from __future__ import annotations
+
 import time
 import json
 import os
@@ -32,12 +35,12 @@ print(f"SAMPLE_WARMUP: {SAMPLE_WARMUP}")
 _RESIDENT_DATA = [bytearray(1024 * 1024) for _ in range(20)]  # 20 × 1MB
 
 
-def get_rss_mb():
+def get_rss_mb() -> float:
     """Get current RSS memory in MB."""
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
 
 
-def get_static_tasks():
+def get_static_tasks() -> list[dict]:
     """Return deterministic static tasks to measure execution latency.
 
     Three task categories enable decomposition of CEL degradation:
@@ -103,28 +106,22 @@ def get_static_tasks():
     ]
 
 
-def _percentile(sorted_vals, pct):
-    """Return the value at the given percentile from a pre-sorted list."""
-    idx = int(len(sorted_vals) * pct)
-    return sorted_vals[min(idx, len(sorted_vals) - 1)]
-
-
-def run_benchmark():
-    results = {"ttfe_ms": None, "cel_ms": [], "rss_mb_start": None, "rss_mb_end": None}
-
-    # Measure TTFE
-    ttfe_start = time.perf_counter()
-    exec("x = 1 + 1", globals())
-    results["ttfe_ms"] = round((time.perf_counter() - ttfe_start) * 1000, 6)
+def run_benchmark() -> dict:
+    results = {"cel_ms": [], "rss_mb_start": None, "rss_mb_end": None}
 
     results["rss_mb_start"] = get_rss_mb()
 
     tasks = get_static_tasks()
     sampled_tasks = [t for t in tasks if t["type"] != "import"]
-    import_task = next((t for t in tasks if t["type"] == "import"), None)
+    import_task = [t for t in tasks if t["type"] == "import"][0]
 
-    # Warmup — sampled tasks only (import uses C-extension modules that
-    # error on repeated reimport, so it runs once outside the loop)
+    # Warmup iterations stabilize measurements by pre-warming:
+    #   - Python bytecode cache (first exec compiles .pyc)
+    #   - gVisor sentry page cache (first memory access triggers page faults)
+    #   - OS dentry/inode cache (first stat/listdir populates kernel caches)
+    #   - CPU branch predictor (first iterations train prediction tables)
+    # Only sampled tasks (compute + syscall) are warmed up; import task
+    # runs once separately because C-extension modules break on reimport.
     for _ in range(SAMPLE_WARMUP):
         for task in sampled_tasks:
             exec(task["code"], globals())
@@ -170,7 +167,6 @@ def run_benchmark():
     # Output raw arrays — cross-sandbox stats computed by main.py
     summary = {
         "hostname": os.environ.get("HOSTNAME", "unknown"),
-        "sandbox_ttfe_ms": results["ttfe_ms"],
         "sandbox_total_cel_ms": iteration_totals,
         "sandbox_import_cel_ms": import_elapsed_ms,
         "sandbox_rss_start_mb": results["rss_mb_start"],

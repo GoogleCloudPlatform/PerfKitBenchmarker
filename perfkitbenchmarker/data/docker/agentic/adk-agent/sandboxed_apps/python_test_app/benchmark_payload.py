@@ -22,12 +22,16 @@ Environment variables (injected by the agent):
   PAYLOAD_ITERATIONS  — number of transfer iterations (default: 20)
 """
 
+from __future__ import annotations
+
+
 import base64
 import json
 import os
 import resource
 import sys
 import time
+import traceback
 
 PAYLOAD_SIZE_MB = float(os.environ.get("PAYLOAD_SIZE_MB") or "1")
 PAYLOAD_ITERATIONS = int(os.environ.get("PAYLOAD_ITERATIONS") or "20")
@@ -35,7 +39,7 @@ PAYLOAD_ITERATIONS = int(os.environ.get("PAYLOAD_ITERATIONS") or "20")
 
 # Use stderr for all diagnostic/metric output so stdout is reserved for
 # the actual payload transfer (the measured data path).
-def _log(msg):
+def _log(msg: str) -> None:
     print(msg, file=sys.stderr, flush=True)
 
 
@@ -43,20 +47,12 @@ _log(f"PAYLOAD_SIZE_MB: {PAYLOAD_SIZE_MB}")
 _log(f"PAYLOAD_ITERATIONS: {PAYLOAD_ITERATIONS}")
 
 
-def get_rss_mb():
+def get_rss_mb() -> float:
     """Get current RSS memory in MB."""
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
 
 
-def _percentile(sorted_vals, pct):
-    """Return the value at the given percentile from a pre-sorted list."""
-    if not sorted_vals:
-        return 0.0
-    idx = int(len(sorted_vals) * pct)
-    return sorted_vals[min(idx, len(sorted_vals) - 1)]
-
-
-def _stats_for(latencies):
+def _stats_for(latencies: list[float]) -> dict[str, float]:
     """Compute mean/p50/p95/p99/min/max for a list of latencies (ms)."""
     latencies.sort()
     return {
@@ -69,7 +65,7 @@ def _stats_for(latencies):
     }
 
 
-def run_benchmark():
+def run_benchmark() -> dict:
     """Execute the payload transfer benchmark and print JSON results."""
     target_bytes = int(PAYLOAD_SIZE_MB * 1024 * 1024)
     rss_start = get_rss_mb()
@@ -81,6 +77,8 @@ def run_benchmark():
     throughputs = []  # MB/s based on stdout write time
 
     # --- Warmup (2 iterations, not recorded) ---
+    # Stabilizes os.urandom() entropy pool and base64 codec
+    # initialization before measured iterations begin.
     for _ in range(2):
         raw = os.urandom(target_bytes)
         _ = base64.b64encode(raw).decode("ascii")
@@ -198,6 +196,4 @@ if __name__ == "__main__":
     try:
         run_benchmark()
     except Exception as e:
-        import traceback
-
         traceback.print_exc()

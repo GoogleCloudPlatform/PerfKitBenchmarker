@@ -68,6 +68,9 @@ Data Flow:
   main.py (this file)                  → orchestrator_* timing + cross-session aggregation
 """
 
+from __future__ import annotations
+
+
 import json
 import logging
 import os
@@ -76,6 +79,7 @@ import time
 import asyncio
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
+import subprocess
 
 import uvicorn
 from contextlib import asynccontextmanager
@@ -87,6 +91,11 @@ from google.adk.artifacts import InMemoryArtifactService
 from google.adk.runners import Runner
 
 from dotenv import load_dotenv
+from k8s_agent_sandbox.sandbox_client import SandboxClient
+from k8s_agent_sandbox.models import SandboxDirectConnectionConfig
+from playwright.async_api import async_playwright
+from kubernetes import client as k8s_client, config as k8s_config
+import google.cloud.logging as gcl
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -98,7 +107,7 @@ from gke_performance_agent import agent
 
 
 # ── SandboxClient factory (DirectConnection vs Dev-mode tunnel) ──────────
-def _make_sandbox_client():
+def _make_sandbox_client() -> SandboxClient:
     """Create a SandboxClient with the optimal connection strategy.
 
     When SANDBOX_ROUTER_URL is set (in-cluster), uses DirectConnectionConfig
@@ -106,11 +115,8 @@ def _make_sandbox_client():
     parallelism.  Without it, falls back to LocalTunnelConnectionConfig
     (dev mode, serialized through a single SPDY stream).
     """
-    from k8s_agent_sandbox.sandbox_client import SandboxClient
-
     router_url = os.getenv("SANDBOX_ROUTER_URL")
     if router_url:
-        from k8s_agent_sandbox.models import SandboxDirectConnectionConfig
 
         return SandboxClient(
             connection_config=SandboxDirectConnectionConfig(api_url=router_url)
@@ -124,8 +130,6 @@ USER_ID = "benchmark_user"
 
 # --- Configure Logging ---
 try:
-    import google.cloud.logging as gcl
-
     gcl.Client().setup_logging()
 except Exception:
     logging.basicConfig(level=logging.INFO)
@@ -358,7 +362,7 @@ async def _run_single_session(session_id: int, prompt: str) -> dict:
 
 # --- Endpoints ---
 @app.get("/healthz")
-async def healthz():
+async def healthz() -> dict:
     return {"status": "ok"}
 
 
@@ -694,9 +698,7 @@ async def benchmark_python_qps(req: QpsBenchmarkRequest):
         # Only targets claims labelled created-by=pkb-qps-benchmark so
         # we never touch claims created by other workloads.
         try:
-            import subprocess as _sp
-
-            _claims = _sp.run(
+            _claims = subprocess.run(
                 [
                     "kubectl",
                     "get",
@@ -714,7 +716,7 @@ async def benchmark_python_qps(req: QpsBenchmarkRequest):
             claim_names = _claims.stdout.strip().split()
             if claim_names and claim_names != [""]:
                 logger.info("Cleaning up %d lingering pkb-qps claims", len(claim_names))
-                _sp.run(
+                subprocess.run(
                     [
                         "kubectl",
                         "delete",

@@ -110,6 +110,10 @@ class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
     Otherwise uses the simple --tag shorthand.
     """
     full_tag = self.GetFullRegistryTag(image.name)
+    if gcp_flags.SKIP_CONTAINER_IMAGE_BUILD.value:
+      logging.info('Skipping container image build (--skip_container_image_build). '
+                   'Assuming image exists: %s', full_tag)
+      return
     if gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value:
       build_cmd = util.GcloudCommand(
           self, 'builds', 'submit',

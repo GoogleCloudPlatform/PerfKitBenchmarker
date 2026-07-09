@@ -643,6 +643,12 @@ GCS_FUSE_ENABLE_METADATA_CACHE = flags.DEFINE_boolean(
     False,
     'Whether to enable metadata cache for gcs fuse.',
 )
+SKIP_CONTAINER_IMAGE_BUILD = flags.DEFINE_bool(
+    'skip_container_image_build',
+    False,
+    'Skip container image builds during provision. Use when images are '
+    'pre-built. The image tag is still computed but no build runs.',
+)
 
 
 def _ValidatePreemptFlags(flags_dict):

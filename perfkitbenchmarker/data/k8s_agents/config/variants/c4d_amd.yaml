@@ -1,0 +1,52 @@
+# UC-B Variant 8: C4D (AMD)
+# Knob: c4d-standard-8 (AMD EPYC)
+# Expected: Different gVisor overhead on AMD microarchitecture
+
+k8s_python_density:
+  description: >
+    UC-B Var-8: C4D (AMD EPYC) c4d-standard-8.
+  flags:
+    gke_additional_flags:
+      - "--enable-dataplane-v2"
+      - "--enable-ip-alias"
+      - "--release-channel=None"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+      - "--no-enable-autoupgrade"
+      - "--no-enable-autorepair"
+    container_cluster_version: "1.36.0-gke.3070003"
+    gce_subnet_region: "us-east1"
+    k8s_agentic_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_agentic_gvisor: true
+    k8s_agentic_agent_api_url: "http://localhost:8080"
+    k8s_agentic_benchmark_note: "c4d-amd"
+  container_registry:
+    cloud: GCP
+    spec:
+      GCP:
+        zone: us-east1-c
+  container_specs:
+    adk_agent:
+      image: agentic/adk-agent
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4d-standard-8
+        zone: us-east1-c
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4d-standard-8
+            zone: us-east1-c
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor

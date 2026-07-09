@@ -5,6 +5,9 @@ management, and sample construction used by all GKE agent benchmark
 definitions.
 """
 
+from __future__ import annotations
+
+
 import json
 import logging
 import subprocess
@@ -29,31 +32,31 @@ _current_benchmark_spec = None
 # ---------------------------------------------------------------------------
 
 flags.DEFINE_string(
-    "k8s_namespace",
+    "k8s_agentic_namespace",
     "agentic",
     "Kubernetes namespace where the agentic workloads are deployed.",
 )
 
 flags.DEFINE_bool(
-    "k8s_gvisor",
+    "k8s_agentic_gvisor",
     True,
     "Whether the sandbox node pool uses gVisor. Recorded in sample metadata.",
 )
 
 flags.DEFINE_string(
-    "k8s_benchmark_note",
+    "k8s_agentic_benchmark_note",
     "",
     "Arbitrary note string attached to every sample for tagging runs.",
 )
 
 flags.DEFINE_string(
-    "k8s_agent_api_url",
+    "k8s_agentic_agent_api_url",
     "http://localhost:8080",
     "Base URL of the ADK Agent API.",
 )
 
 flags.DEFINE_integer(
-    "k8s_agent_api_timeout",
+    "k8s_agentic_agent_api_timeout",
     600,
     "HTTP timeout in seconds for agent API benchmark calls.",
 )
@@ -64,16 +67,16 @@ flags.DEFINE_integer(
 # ---------------------------------------------------------------------------
 
 
-def GetAgentApiUrl():
+def GetAgentApiUrl() -> str:
     """Return the base URL of the ADK agent API service."""
-    return FLAGS.k8s_agent_api_url.rstrip("/")
+    return FLAGS.k8s_agentic_agent_api_url.rstrip("/")
 
 
-def CheckAgentHealthz(api_url=None, required=True):
+def CheckAgentHealthz(api_url: str | None = None, required: bool = True) -> None:
     """Verify the agent API is reachable via /healthz.
 
     Args:
-        api_url: Base URL to check. Defaults to FLAGS.k8s_agent_api_url.
+        api_url: Base URL to check. Defaults to FLAGS.k8s_agentic_agent_api_url.
         required: If True (default), raise on failure. If False, log warning.
     """
     if api_url is None:
@@ -94,10 +97,10 @@ def CheckAgentHealthz(api_url=None, required=True):
             logging.warning("Health check deferred (non-fatal): %s", msg)
 
 
-def CallAgentApi(endpoint, payload, timeout=None):
+def CallAgentApi(endpoint: str, payload: dict, timeout: int | None = None) -> dict:
     """POST JSON to an agent API endpoint and return the parsed response."""
     if timeout is None:
-        timeout = FLAGS.k8s_agent_api_timeout
+        timeout = FLAGS.k8s_agentic_agent_api_timeout
     base_url = GetAgentApiUrl()
     url = f"{base_url}{endpoint}"
     data = json.dumps(payload).encode("utf-8")
@@ -126,7 +129,7 @@ def CallAgentApi(endpoint, payload, timeout=None):
 # ---------------------------------------------------------------------------
 
 
-def RunKubectl(args, timeout=120, raise_on_failure=True):
+def RunKubectl(args: list[str], timeout: int = 120, raise_on_failure: bool = True) -> tuple[str, str, int]:
     """Run a kubectl command and return (stdout, stderr, retcode).
 
     Delegates to PKB's native kubectl module which handles kubeconfig
@@ -139,7 +142,7 @@ def RunKubectl(args, timeout=120, raise_on_failure=True):
     )
 
 
-def CountPods(namespace, label, phase=None):
+def CountPods(namespace: str, label: str, phase: str | None = None) -> int:
     """Count pods matching label (and optionally phase)."""
     cmd = ["get", "pods", "-n", namespace, "-l", label, "-o", "name"]
     if phase:
@@ -150,7 +153,7 @@ def CountPods(namespace, label, phase=None):
     return len(stdout.strip().splitlines())
 
 
-def PatchWarmPool(namespace, warmpool_name, replicas, label, wait_timeout=180):
+def PatchWarmPool(namespace: str, warmpool_name: str, replicas: int, label: str, wait_timeout: int = 180) -> bool:
     """Patch SandboxWarmPool replicas and wait for pods to be ready."""
     logging.info("Patching %s replicas -> %d", warmpool_name, replicas)
     patch_json = json.dumps({"spec": {"replicas": replicas}})
@@ -171,7 +174,7 @@ def PatchWarmPool(namespace, warmpool_name, replicas, label, wait_timeout=180):
     return False
 
 
-def DrainWarmPool(namespace, warmpool_name, label, timeout=120):
+def DrainWarmPool(namespace: str, warmpool_name: str, label: str, timeout: int = 120) -> bool:
     """Scale warm pool to 0 and wait for all pods to terminate."""
     logging.info("Draining warm pool %s to 0", warmpool_name)
     patch_json = json.dumps({"spec": {"replicas": 0}})
@@ -199,7 +202,7 @@ def DrainWarmPool(namespace, warmpool_name, label, timeout=120):
     return False
 
 
-def set_benchmark_spec(benchmark_spec):
+def set_benchmark_spec(benchmark_spec: object) -> None:
     """Store benchmark_spec for metadata derivation (called by Run())."""
     global _current_benchmark_spec
     _current_benchmark_spec = benchmark_spec
@@ -212,11 +215,11 @@ def set_benchmark_spec(benchmark_spec):
 # ---------------------------------------------------------------------------
 
 
-def BuildMetadata(namespace, extra=None):
+def BuildMetadata(namespace: str, extra: dict | None = None) -> dict[str, object]:
     """Construct the common metadata dict for all samples."""
     metadata = {
         "namespace": namespace,
-        "gvisor": FLAGS.k8s_gvisor,
+        "gvisor": FLAGS.k8s_agentic_gvisor,
     }
     # Derive machine_type from benchmark_spec (set via set_benchmark_spec)
     machine_type = None
@@ -233,14 +236,14 @@ def BuildMetadata(namespace, extra=None):
                 machine_type = getattr(cluster.vm_spec, 'machine_type', None)
     if machine_type:
         metadata["machine_type"] = machine_type
-    if FLAGS.k8s_benchmark_note:
-        metadata["note"] = FLAGS.k8s_benchmark_note
+    if FLAGS.k8s_agentic_benchmark_note:
+        metadata["note"] = FLAGS.k8s_agentic_benchmark_note
     if extra:
         metadata.update(extra)
     return metadata
 
 
-def MakeSample(metric, value, unit, namespace, extra_metadata=None):
+def MakeSample(metric: str, value: float, unit: str, namespace: str, extra_metadata: dict | None = None) -> sample.Sample:
     """Create a single sample.Sample with standard metadata."""
     return sample.Sample(
         metric=metric,
@@ -255,37 +258,37 @@ def MakeSample(metric, value, unit, namespace, extra_metadata=None):
 # ---------------------------------------------------------------------------
 
 flags.DEFINE_bool(
-    "k8s_auto_portforward",
+    "k8s_agentic_auto_portforward",
     True,
     "Automatically manage kubectl port-forward to the agent service.",
 )
 
 flags.DEFINE_integer(
-    "k8s_portforward_local_port",
+    "k8s_agentic_portforward_local_port",
     8080,
     "Local port for kubectl port-forward.",
 )
 
 flags.DEFINE_integer(
-    "k8s_portforward_remote_port",
+    "k8s_agentic_portforward_remote_port",
     80,
     "Remote service port for kubectl port-forward.",
 )
 
 flags.DEFINE_string(
-    "k8s_portforward_service",
+    "k8s_agentic_portforward_service",
     "svc/adk-agent",
     "Kubernetes service to port-forward to.",
 )
 
 flags.DEFINE_float(
-    "k8s_portforward_reconnect_delay",
+    "k8s_agentic_portforward_reconnect_delay",
     1.0,
     "Seconds to wait before reconnecting after port-forward drops.",
 )
 
 flags.DEFINE_float(
-    "k8s_portforward_health_timeout",
+    "k8s_agentic_portforward_health_timeout",
     30.0,
     "Seconds to wait for agent health check after starting port-forward.",
 )
@@ -317,7 +320,7 @@ class _PortForwardManager:
     Thread-safe. Idempotent start/stop. Cleans up orphans via PID file.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._proc = None
         self._thread = None
         self._stop_event = threading.Event()
@@ -325,10 +328,10 @@ class _PortForwardManager:
         self._started = False
 
     @property
-    def is_running(self):
+    def is_running(self) -> bool:
         return self._started and not self._stop_event.is_set()
 
-    def start(self):
+    def start(self) -> None:
         """Start the port-forward loop (idempotent)."""
         with self._lock:
             if self._started and not self._stop_event.is_set():
@@ -344,7 +347,7 @@ class _PortForwardManager:
             )
             self._thread.start()
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the port-forward loop and kill the subprocess."""
         with self._lock:
             if not self._started:
@@ -354,13 +357,13 @@ class _PortForwardManager:
             self._started = False
             self._cleanup_pid_file()
 
-    def _loop(self):
+    def _loop(self) -> None:
         """Background reconnect loop."""
-        ns = FLAGS.k8s_namespace
-        svc = FLAGS.k8s_portforward_service
-        local_port = FLAGS.k8s_portforward_local_port
-        remote_port = FLAGS.k8s_portforward_remote_port
-        delay = FLAGS.k8s_portforward_reconnect_delay
+        ns = FLAGS.k8s_agentic_namespace
+        svc = FLAGS.k8s_agentic_portforward_service
+        local_port = FLAGS.k8s_agentic_portforward_local_port
+        remote_port = FLAGS.k8s_agentic_portforward_remote_port
+        delay = FLAGS.k8s_agentic_portforward_reconnect_delay
 
         cmd = ["kubectl"]
         if FLAGS.kubeconfig:
@@ -396,7 +399,7 @@ class _PortForwardManager:
                 )
                 self._stop_event.wait(timeout=delay)
 
-    def _kill_proc(self):
+    def _kill_proc(self) -> None:
         """Kill the current subprocess if alive."""
         if self._proc and self._proc.poll() is None:
             try:
@@ -409,7 +412,7 @@ class _PortForwardManager:
                     pass
         self._proc = None
 
-    def _write_pid_file(self, pid):
+    def _write_pid_file(self, pid: int) -> None:
         """Write PID to file for orphan detection."""
         try:
             with open(_PID_FILE, "w") as f:
@@ -417,14 +420,14 @@ class _PortForwardManager:
         except Exception:
             pass
 
-    def _cleanup_pid_file(self):
+    def _cleanup_pid_file(self) -> None:
         """Remove PID file."""
         try:
             _os.unlink(_PID_FILE)
         except OSError:
             pass
 
-    def _kill_orphan(self):
+    def _kill_orphan(self) -> None:
         """Kill a port-forward process left by a previous PKB run."""
         try:
             if _os.path.exists(_PID_FILE):
@@ -432,8 +435,7 @@ class _PortForwardManager:
                     pid = int(f.read().strip())
                 logging.info("Killing orphan port-forward (PID %d)", pid)
                 _os.kill(pid, signal.SIGTERM)
-                import time as _time
-                _time.sleep(0.5)
+                time.sleep(0.5)
                 try:
                     _os.kill(pid, signal.SIGKILL)
                 except OSError:
@@ -442,7 +444,7 @@ class _PortForwardManager:
         except (OSError, ValueError):
             self._cleanup_pid_file()
 
-        local_port = FLAGS.k8s_portforward_local_port
+        local_port = FLAGS.k8s_agentic_portforward_local_port
         try:
             result = subprocess.run(
                 ["lsof", "-ti", f":{local_port}"],
@@ -467,31 +469,30 @@ _port_forward_manager = _PortForwardManager()
 atexit.register(_port_forward_manager.stop)
 
 
-def EnsurePortForward():
+def EnsurePortForward() -> None:
     """Start port-forward if auto_portforward is enabled (idempotent).
 
     Blocks until the agent health check passes or timeout is reached.
     Safe to call multiple times - only starts one background loop.
     """
-    if not FLAGS.k8s_auto_portforward:
-        logging.info("Auto port-forward disabled (--k8s_auto_portforward=false)")
+    if not FLAGS.k8s_agentic_auto_portforward:
+        logging.info("Auto port-forward disabled (--k8s_agentic_auto_portforward=false)")
         return
 
     _port_forward_manager.start()
 
-    import time as _time
-    timeout = FLAGS.k8s_portforward_health_timeout
-    deadline = _time.time() + timeout
+    timeout = FLAGS.k8s_agentic_portforward_health_timeout
+    deadline = time.time() + timeout
     api_url = GetAgentApiUrl()
 
-    while _time.time() < deadline:
+    while time.time() < deadline:
         try:
             req = urllib.request.Request(f"{api_url}/healthz")
             with urllib.request.urlopen(req, timeout=3) as resp:
                 logging.info("Port-forward healthy: %s", resp.read().decode())
                 return
         except Exception:
-            _time.sleep(1)
+            time.sleep(1)
 
     logging.warning(
         "Port-forward health check did not pass within %.0fs. "
@@ -500,7 +501,7 @@ def EnsurePortForward():
     )
 
 
-def StopPortForward():
+def StopPortForward() -> None:
     """Stop the port-forward subprocess and clean up."""
     _port_forward_manager.stop()
     logging.info("Port-forward stopped.")

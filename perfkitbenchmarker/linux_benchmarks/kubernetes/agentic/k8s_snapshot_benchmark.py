@@ -13,7 +13,7 @@ Usage:
   python pkb.py --benchmarks=gke_snapshot \\
                 --k8s_snapshot_preload_mb=50 \\
                 --k8s_snapshot_burst_size=3 \\
-                --k8s_namespace=agentic \\
+                --k8s_agentic_namespace=agentic \\
                 --k8s_snapshot_skip_snapshot=false
 
 Samples emitted (per run):
@@ -30,6 +30,9 @@ Samples emitted (per run):
   - k8s_snapshot_restore_correct_count (count)
   - k8s_snapshot_wall_time           (seconds)
 """
+
+from __future__ import annotations
+
 
 import json
 import logging
@@ -107,7 +110,7 @@ flags.DEFINE_string(
 # ---------------------------------------------------------------------------
 
 
-def GetConfig(user_config):
+def GetConfig(user_config: dict) -> dict:
     """Load and return benchmark config.
 
     No vm_groups — PKB skips Provision() and Teardown().
@@ -115,10 +118,10 @@ def GetConfig(user_config):
     return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def Prepare(benchmark_spec):
+def Prepare(benchmark_spec: object) -> None:
     """Deploy workloads, snapshot infra, and validate readiness."""
     benchmark_spec.always_call_cleanup = True
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     preload_mb = FLAGS.k8s_snapshot_preload_mb
 
     logging.info(
@@ -195,7 +198,7 @@ def Prepare(benchmark_spec):
     logging.info("Prepare complete.")
 
 
-def Run(benchmark_spec):
+def Run(benchmark_spec: object) -> list[sample.Sample]:
     """Execute a single snapshot/restore measurement and return samples.
 
     Returns:
@@ -203,7 +206,7 @@ def Run(benchmark_spec):
     """
     utils.set_benchmark_spec(benchmark_spec)
 
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     preload_mb = FLAGS.k8s_snapshot_preload_mb
     burst_size = FLAGS.k8s_snapshot_burst_size
     skip_snapshot = FLAGS.k8s_snapshot_skip_snapshot
@@ -296,9 +299,9 @@ def Run(benchmark_spec):
     return samples
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(benchmark_spec: object) -> None:
     """Clean up any leftover benchmark resources."""
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     logging.info("Cleanup — deleting any leftover snapshot-benchmark resources.")
 
     for kind in (
@@ -330,15 +333,15 @@ def Cleanup(benchmark_spec):
 
 
 def _RunSnapshotCycle(
-    namespace,
-    preload_mb,
-    burst_size,
-    skip_snapshot,
-    preload_mode,
-    ksa_name,
-    pod_timeout,
-    template_path,
-):
+    namespace: str,
+    preload_mb: int,
+    burst_size: int,
+    skip_snapshot: bool,
+    preload_mode: str,
+    ksa_name: str,
+    pod_timeout: int,
+    template_path: str,
+) -> dict:
     """Execute one full snapshot/restore cycle and return a result dict.
 
     Handles source creation, snapshot, restore, TTFE measurement,
@@ -587,7 +590,7 @@ def _RunSnapshotCycle(
 # ---------------------------------------------------------------------------
 
 
-def _ApplyClaim(name, namespace, template_name):
+def _ApplyClaim(name: str, namespace: str, template_name: str) -> None:
     """Create a SandboxClaim."""
     manifest = json.dumps(
         {
@@ -622,13 +625,13 @@ def _ApplyClaim(name, namespace, template_name):
 
 
 def _RenderAndApplyTemplate(
-    template_path,
-    template_name,
-    namespace,
-    ksa_name,
-    preload_mb,
-    preload_mode,
-):
+    template_path: str,
+    template_name: str,
+    namespace: str,
+    ksa_name: str,
+    preload_mb: int,
+    preload_mode: str,
+) -> bool:
     """Render the Jinja2 template with step-specific values and kubectl apply."""
     if preload_mode.startswith("script:"):
         return _RenderAndApplyScriptTemplate(
@@ -674,12 +677,12 @@ def _RenderAndApplyTemplate(
     return retcode == 0
 
 
-def _get_sandbox_node_selector():
+def _get_sandbox_node_selector() -> dict[str, str]:
     """Return the nodeSelector for sandbox pods."""
     return {"pkb_nodepool": "sandbox"}
 
 
-def _get_sandbox_tolerations():
+def _get_sandbox_tolerations() -> list[dict[str, str]]:
     """Return tolerations for sandbox pods."""
     return [
         {
@@ -692,12 +695,12 @@ def _get_sandbox_tolerations():
 
 
 def _RenderAndApplyScriptTemplate(
-    template_name,
-    namespace,
-    ksa_name,
-    preload_mb,
-    preload_mode,
-):
+    template_name: str,
+    namespace: str,
+    ksa_name: str,
+    preload_mb: int,
+    preload_mode: str,
+) -> bool:
     """Render a SandboxTemplate that runs a user-provided startup script."""
     script_path = preload_mode.split(":", 1)[1]
     if not os.path.isfile(script_path):
@@ -786,7 +789,7 @@ def _RenderAndApplyScriptTemplate(
     return retcode == 0
 
 
-def _MeasureSingleSource(name, namespace, t0, pod_timeout, preload_mode):
+def _MeasureSingleSource(name: str, namespace: str, t0: float, pod_timeout: int, preload_mode: str) -> dict:
     """Wait for a source pod to be Running and preloaded."""
     result = {
         "pod": name,
@@ -825,7 +828,7 @@ def _MeasureSingleSource(name, namespace, t0, pod_timeout, preload_mode):
     return result
 
 
-def _WaitForPreload(name, namespace, timeout_s, preload_mode):
+def _WaitForPreload(name: str, namespace: str, timeout_s: float, preload_mode: str) -> bool:
     """Wait for preload to complete."""
     deadline = time.time() + timeout_s
     while time.time() < deadline:
@@ -842,7 +845,7 @@ def _WaitForPreload(name, namespace, timeout_s, preload_mode):
     return False
 
 
-def _GetLastCounter(name, namespace):
+def _GetLastCounter(name: str, namespace: str) -> int | None:
     """Extract the last Count: N value from pod logs."""
     stdout, _, rc = utils.RunKubectl(
         ["logs", name, "-n", namespace, "--tail=10"],
@@ -855,7 +858,7 @@ def _GetLastCounter(name, namespace):
     return int(matches[-1]) if matches else None
 
 
-def _TriggerAndWaitSnapshot(trigger_name, target_pod, namespace, t0, timeout_s=300):
+def _TriggerAndWaitSnapshot(trigger_name: str, target_pod: str, namespace: str, t0: float, timeout_s: int = 300) -> dict:
     """Create a snapshot trigger and wait for Complete."""
     result = {
         "trigger": trigger_name,
@@ -914,7 +917,7 @@ def _TriggerAndWaitSnapshot(trigger_name, target_pod, namespace, t0, timeout_s=3
     return result
 
 
-def _MeasureSingleRestore(name, namespace, t0, snapshot_counter, pod_timeout):
+def _MeasureSingleRestore(name: str, namespace: str, t0: float, snapshot_counter: int | None, pod_timeout: int) -> dict:
     """Measure restore_time and TTFE for a single pod."""
     result = {
         "pod": name,
@@ -966,7 +969,7 @@ def _MeasureSingleRestore(name, namespace, t0, snapshot_counter, pod_timeout):
     return result
 
 
-def _CleanupStep(source_names, restore_names, trigger_names, template_name, namespace):
+def _CleanupStep(source_names: list[str], restore_names: list[str], trigger_names: list[str], template_name: str, namespace: str) -> None:
     """Delete source claims, restore claims, triggers, snapshots, and template."""
     to_delete = [("sandboxtemplate", template_name)]
     for name in source_names:
@@ -1002,7 +1005,7 @@ def _CleanupStep(source_names, restore_names, trigger_names, template_name, name
 # ---------------------------------------------------------------------------
 
 
-def _GetTemplatePath():
+def _GetTemplatePath() -> str:
     """Return the absolute path to the snapshot SandboxTemplate template."""
     return os.path.join(
         data.ResourcePath("k8s_agents/manifests"),
@@ -1010,7 +1013,7 @@ def _GetTemplatePath():
     )
 
 
-def _Percentile(values, pct):
+def _Percentile(values: list[float], pct: float) -> float:
     """Calculate percentile (0-100) from a list of values."""
     if not values:
         return 0.0
@@ -1022,7 +1025,7 @@ def _Percentile(values, pct):
     return s[lo] * (1 - frac) + s[hi] * frac
 
 
-def _emit(samples, data, data_key, metric_suffix, unit, namespace, extra):
+def _emit(samples: list, data: dict, data_key: str, metric_suffix: str, unit: str, namespace: str, extra: dict) -> None:
     """Emit a sample if the key exists in the data dict."""
     value = data.get(data_key)
     if value is not None:

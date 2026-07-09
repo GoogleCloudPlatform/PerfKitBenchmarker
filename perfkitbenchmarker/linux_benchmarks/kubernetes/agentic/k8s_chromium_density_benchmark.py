@@ -14,8 +14,8 @@ Usage:
                 --k8s_chromium_density_concurrent_sessions=4 \\
                 --k8s_chromium_density_task_count=10 \\
                 --k8s_chromium_density_warmup_tasks=5 \\
-                --k8s_namespace=agentic \\
-                --k8s_agent_api_url=http://localhost:8080
+                --k8s_agentic_namespace=agentic \\
+                --k8s_agentic_agent_api_url=http://localhost:8080
 
 Samples emitted (per run):
   - gke_chromium_density_interaction_mean      (ms)
@@ -36,6 +36,9 @@ Samples emitted (per run):
   - gke_chromium_density_rss_growth            (MB)
   - gke_chromium_density_wall_time             (seconds)
 """
+
+from __future__ import annotations
+
 
 import logging
 import time
@@ -108,7 +111,7 @@ flags.DEFINE_integer(
 # ---------------------------------------------------------------------------
 
 
-def GetConfig(user_config):
+def GetConfig(user_config: dict) -> dict:
     """Load and return benchmark config.
 
     No vm_groups — PKB skips Provision() and Teardown().
@@ -116,7 +119,7 @@ def GetConfig(user_config):
     return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def Prepare(benchmark_spec):
+def Prepare(benchmark_spec: object) -> None:
     """Deploy workloads and verify agent API."""
     benchmark_spec.always_call_cleanup = True
     logging.info("=== Prepare: deploying workloads ===")
@@ -126,7 +129,7 @@ def Prepare(benchmark_spec):
     logging.info("Prepare complete.")
 
 
-def Run(benchmark_spec):
+def Run(benchmark_spec: object) -> list[sample.Sample]:
     """Execute a single Chromium density measurement and return samples.
 
     Returns:
@@ -134,7 +137,7 @@ def Run(benchmark_spec):
     """
     utils.set_benchmark_spec(benchmark_spec)
 
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     density = FLAGS.k8s_chromium_density_concurrent_sessions
 
     logging.info("=== Run: chromium_density=%d ===", density)
@@ -222,9 +225,9 @@ def Run(benchmark_spec):
     return samples
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(benchmark_spec: object) -> None:
     """Clean up after measurement. Delete claims and drain warm pool."""
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     logging.info("Cleanup: deleting SandboxClaims and draining warm pool.")
 
     # Delete any lingering SandboxClaims to release claimed pods
@@ -257,7 +260,7 @@ def Cleanup(benchmark_spec):
 # ---------------------------------------------------------------------------
 
 
-def _emit(samples, agg, agg_key, metric_suffix, unit, namespace, extra):
+def _emit(samples: list, agg: dict, agg_key: str, metric_suffix: str, unit: str, namespace: str, extra: dict) -> None:
     """Emit a sample if the key exists in the aggregate dict.
 
     Args:
