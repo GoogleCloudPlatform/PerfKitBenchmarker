@@ -124,17 +124,22 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   )
 
   # libmamba solver hits SQLite database error.
+  # Force classic solver to avoid libmamba SQLite locking bug in conda install
+  # and prepare_env.sh
+  vm.RemoteCommand(f'{_SET_ENV} conda config --set solver classic')
+
   # Conda classic solver can hang so add timeout and retries.
   @vm_util.Retry(max_retries=3)
   def _InstallCondaEnv(vm: virtual_machine.VirtualMachine):
     vm.RemoteCommand(f'{_SET_ENV} conda clean --all -y')
     vm.RemoteCommand(
-        f'{_SET_ENV} conda install -c conda-forge gcc=12.1.0'
-        ' --solver=classic -y',
+        f'{_SET_ENV} conda install -c conda-forge gcc=12.1.0 -y',
         timeout=300,
     )
   _InstallCondaEnv(vm)
-  vm.RemoteCommand(f'{_SET_ENV} bash -ex prepare_env.sh', timeout=300)
+  vm.RobustRemoteCommand(
+      f'bash -c "{_SET_ENV} bash -ex prepare_env.sh"', timeout=1800
+  )
 
 
 def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
