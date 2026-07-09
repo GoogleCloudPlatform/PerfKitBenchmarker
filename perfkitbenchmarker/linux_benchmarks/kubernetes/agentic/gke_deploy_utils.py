@@ -7,6 +7,9 @@ pre-provisioned GKE cluster. Called by each benchmark's Prepare() stage.
 All functions are idempotent -- safe to call repeatedly without side effects.
 """
 
+from __future__ import annotations
+
+
 import logging
 import os
 
@@ -15,6 +18,7 @@ from jinja2 import Template
 from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.scripts.agentic import gke_image_build_utils
 
 FLAGS = flags.FLAGS
 
@@ -35,13 +39,13 @@ flags.DEFINE_string(
 )
 
 flags.DEFINE_string(
-    "k8s_agent_image",
+    "k8s_agentic_agent_image",
     "",
     "ADK agent container image. If empty, agent deployment is skipped.",
 )
 
 flags.DEFINE_string(
-    "k8s_chromium_image",
+    "k8s_agentic_chromium_image",
     "",
     "Chromium sandbox container image. If empty, uses placeholder.",
 )
@@ -59,13 +63,13 @@ flags.DEFINE_integer(
 )
 
 flags.DEFINE_string(
-    "k8s_python_image",
+    "k8s_agentic_python_image",
     "registry.k8s.io/agent-sandbox/python-runtime-sandbox:v0.1.0",
     "Python runtime sandbox container image.",
 )
 
 flags.DEFINE_integer(
-    "k8s_deploy_timeout",
+    "k8s_agentic_deploy_timeout",
     120,
     "Timeout in seconds for workload deployment rollout.",
 )
@@ -83,7 +87,7 @@ _derived_images = {}
 _MANIFESTS_DIR = "k8s_agents/manifests"
 
 
-def _LoadTemplate(template_name):
+def _LoadTemplate(template_name: str) -> Template:
     """Load a Jinja2 template from the data directory."""
     template_path = os.path.join(
         data.ResourcePath(_MANIFESTS_DIR), template_name
@@ -92,7 +96,7 @@ def _LoadTemplate(template_name):
         return Template(f.read())
 
 
-def _RenderAndApply(template_name, **kwargs):
+def _RenderAndApply(template_name: str, **kwargs: object) -> bool:
     """Load a Jinja2 template, render it, write to file, and kubectl apply."""
     template = _LoadTemplate(template_name)
     rendered = template.render(**kwargs)
@@ -139,7 +143,7 @@ flags.DEFINE_string(
 # ---------------------------------------------------------------------------
 
 
-def _DeriveImagePaths(project, region, arch):
+def _DeriveImagePaths(project: str, region: str, arch: str) -> dict[str, str]:
     """Derive container image paths from cluster config.
 
     Args:
@@ -156,7 +160,7 @@ def _DeriveImagePaths(project, region, arch):
         "chromium": f"{region}-docker.pkg.dev/{project}/agent-sandbox/chrome-sandbox:{arch}",
     }
 
-def DeployWorkloads(benchmark_spec=None):
+def DeployWorkloads(benchmark_spec: object | None = None) -> None:
     """Deploy the full Agent Sandbox ecosystem onto the GKE cluster.
 
     Idempotent: safe to call repeatedly. Sequence:
@@ -169,7 +173,7 @@ def DeployWorkloads(benchmark_spec=None):
       7. Deploy PSI Reader DaemonSet
       8. Wait for ADK Agent rollout
     """
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     logging.info("=== DeployWorkloads: namespace=%s ===", ns)
 
     # Derive project, region, machine_type, cluster_name from benchmark_spec
@@ -202,11 +206,8 @@ def DeployWorkloads(benchmark_spec=None):
 
     # Derive image paths for template rendering.
     # Chrome and Router images are built during prerequisites
-    # (gke_prerequisites.py), not during Prepare.
+    # (perfkitbenchmarker.scripts.agentic.gke_prerequisites), not during Prepare.
     # ADK agent image is built by PKB container_specs during Provision.
-    from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
-        gke_image_build_utils,
-    )
     arch = FLAGS.target_arch or "amd64"
     global _derived_images
     _derived_images = _DeriveImagePaths(project, region, arch)
@@ -221,7 +222,7 @@ def DeployWorkloads(benchmark_spec=None):
     _DeploySandboxTemplates(ns)
     _DeploySandboxRouter(ns)
     # Prefer ADK image from PKB-native container_specs (built during Provision).
-    # Falls back to FLAGS.k8s_agent_image or derived image path.
+    # Falls back to FLAGS.k8s_agentic_agent_image or derived image path.
     adk_image_from_specs = ""
     if benchmark_spec:
         specs = getattr(benchmark_spec, "container_specs", {})
@@ -236,7 +237,7 @@ def DeployWorkloads(benchmark_spec=None):
     logging.info("DeployWorkloads complete.")
 
 
-def DeploySnapshots():
+def DeploySnapshots() -> None:
     """Deploy Pod Snapshot infrastructure.
 
     Idempotent: safe to call repeatedly. Sequence:
@@ -250,7 +251,7 @@ def DeploySnapshots():
         logging.info("Skipping snapshot infrastructure (--skip_deploy_snapshots=True).")
         return
 
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     project = getattr(FLAGS, 'project', '') or ''
     zone = getattr(FLAGS, 'zone', '') or ''
     region = zone[:-2] if zone else ''
@@ -316,7 +317,7 @@ def DeploySnapshots():
 # ---------------------------------------------------------------------------
 
 
-def _CreateNamespace(ns):
+def _CreateNamespace(ns: str) -> None:
     """Create namespace if it doesn't exist."""
     kubectl.RunKubectlCommand(
         ["create", "namespace", ns],
@@ -324,7 +325,7 @@ def _CreateNamespace(ns):
     )
 
 
-def _InstallCRDs():
+def _InstallCRDs() -> None:
     """Install Agent Sandbox CRDs from GitHub release."""
     version = FLAGS.agent_sandbox_version
     base_url = (
@@ -342,10 +343,10 @@ def _InstallCRDs():
     )
 
 
-def _DeploySandboxTemplates(ns):
+def _DeploySandboxTemplates(ns: str) -> None:
     """Deploy SandboxTemplate + WarmPool for Python and Chromium."""
-    python_image = FLAGS.k8s_python_image
-    chromium_image = FLAGS.k8s_chromium_image or _derived_images.get("chromium", "chromium-placeholder:latest")
+    python_image = FLAGS.k8s_agentic_python_image
+    chromium_image = FLAGS.k8s_agentic_chromium_image or _derived_images.get("chromium", "chromium-placeholder:latest")
     warmpool_replicas = FLAGS.agent_sandbox_warmpool_replicas
     chromium_replicas = FLAGS.agent_sandbox_chromium_replicas
 
@@ -359,7 +360,7 @@ def _DeploySandboxTemplates(ns):
     )
 
 
-def _DeploySandboxRouter(ns):
+def _DeploySandboxRouter(ns: str) -> None:
     """Deploy the Sandbox Router Deployment + Service."""
     router_image = FLAGS.agent_sandbox_router_image or _derived_images.get("sandbox_router", "")
     if not router_image:
@@ -373,14 +374,20 @@ def _DeploySandboxRouter(ns):
     )
 
 
-def _DeployADKAgent(ns, project="", region="", cluster_name="", adk_image_override=""):
+def _DeployADKAgent(ns: str, project: str = "", region: str = "", cluster_name: str = "", adk_image_override: str = "") -> None:
     """Deploy ADK Agent: SA, ClusterRole, RoleBinding, Deployment, Service."""
-    adk_image = adk_image_override or FLAGS.k8s_agent_image or _derived_images.get("adk_agent", "")
+
+    # Prefer explicit --k8s_agentic_agent_image when set (e.g., pre-built ARM images)
+    if FLAGS.k8s_agentic_agent_image:
+        adk_image = FLAGS.k8s_agentic_agent_image
+        logging.info("Using explicit k8s_agentic_agent_image: %s", adk_image)
+    elif adk_image_override:
+        adk_image = adk_image_override
+        logging.info("Using ADK image from container_specs: %s", adk_image)
+    else:
+        adk_image = _derived_images.get("adk_agent", "")
 
     # Validate the image looks like a registry path, not a Dockerfile path.
-    # When Prepare runs separately from Provision, container_specs may not
-    # have the built image path. The config YAML default (agentic/adk-agent)
-    # is the Dockerfile lookup path, not a valid registry reference.
     if adk_image and "docker.pkg.dev" not in adk_image:
         derived = _derived_images.get("adk_agent", "")
         if derived:
@@ -410,21 +417,21 @@ def _DeployADKAgent(ns, project="", region="", cluster_name="", adk_image_overri
     )
 
 
-def _DeployPSIReader(ns):
+def _DeployPSIReader(ns: str) -> None:
     """Deploy PSI Reader DaemonSet for cgroup pressure metrics."""
     _RenderAndApply("psi-reader.yaml.j2", ns=ns)
 
 
-def _WaitForAgentReady(ns):
+def _WaitForAgentReady(ns: str) -> None:
     """Wait for ADK agent deployment to be ready.
 
     Always attempts the rollout wait regardless of how the image was
-    specified (FLAGS.k8s_agent_image, container_specs, or _derived_images).
+    specified (FLAGS.k8s_agentic_agent_image, container_specs, or _derived_images).
     kubectl rollout status returns non-zero harmlessly if the deployment
     does not exist, and raise_on_failure=False prevents that from
     propagating.
     """
-    timeout = FLAGS.k8s_deploy_timeout
+    timeout = FLAGS.k8s_agentic_deploy_timeout
     logging.info("Waiting for adk-agent rollout (timeout=%ds)...", timeout)
     _, stderr, retcode = kubectl.RunKubectlCommand(
         [
@@ -441,7 +448,7 @@ def _WaitForAgentReady(ns):
         )
 
 
-def _GetProjectNumber(project):
+def _GetProjectNumber(project: str) -> str | None:
     """Get GCP project number from project ID."""
     stdout, _, retcode = vm_util.IssueCommand(
         [
@@ -453,7 +460,7 @@ def _GetProjectNumber(project):
     return stdout.strip() if retcode == 0 else None
 
 
-def _BindSnapshotIAM(bucket_name, project, project_number, ns, ksa_name):
+def _BindSnapshotIAM(bucket_name: str, project: str, project_number: str, ns: str, ksa_name: str) -> None:
     """Bind IAM roles for pod snapshot access."""
     # bucketViewer to namespace
     vm_util.IssueCommand(

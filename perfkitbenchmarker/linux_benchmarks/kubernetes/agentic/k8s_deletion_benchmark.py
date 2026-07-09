@@ -18,7 +18,7 @@ Usage:
                 --k8s_deletion_poll_interval_s=1.0 \\
                 --k8s_deletion_provision_timeout_s=120.0 \\
                 --k8s_deletion_drain_timeout_s=300.0 \\
-                --k8s_namespace=agentic \\
+                --k8s_agentic_namespace=agentic \\
                 --gke_machine_type=c4-standard-8
 
 Samples emitted (per run):
@@ -35,6 +35,9 @@ Samples emitted (per run):
   - gke_deletion_final_running_count         (count)
   - gke_deletion_wall_time                   (seconds)
 """
+
+from __future__ import annotations
+
 
 import json
 import logging
@@ -105,7 +108,7 @@ flags.DEFINE_float(
 # ---------------------------------------------------------------------------
 
 
-def GetConfig(user_config):
+def GetConfig(user_config: dict) -> dict:
     """Load and return benchmark config.
 
     No vm_groups — PKB skips Provision() and Teardown().
@@ -113,7 +116,7 @@ def GetConfig(user_config):
     return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def Prepare(benchmark_spec):
+def Prepare(benchmark_spec: object) -> None:
     """Deploy workloads onto the cluster."""
     benchmark_spec.always_call_cleanup = True
     logging.info("=== Prepare: deploying workloads ===")
@@ -122,7 +125,7 @@ def Prepare(benchmark_spec):
     logging.info("Prepare complete.")
 
 
-def Run(benchmark_spec):
+def Run(benchmark_spec: object) -> list[sample.Sample]:
     """Provision N pods, bulk-delete, measure deletion latency and IP reclamation.
 
     Returns:
@@ -130,7 +133,7 @@ def Run(benchmark_spec):
     """
     utils.set_benchmark_spec(benchmark_spec)
 
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     batch_size = FLAGS.k8s_deletion_batch_size
     warmpool_name = FLAGS.k8s_deletion_warmpool_name
     label = FLAGS.k8s_deletion_pod_label
@@ -390,9 +393,9 @@ def Run(benchmark_spec):
     return samples
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(benchmark_spec: object) -> None:
     """Best-effort drain of warm pool after measurement."""
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     warmpool_name = FLAGS.k8s_deletion_warmpool_name
     label = FLAGS.k8s_deletion_pod_label
 
@@ -407,7 +410,7 @@ def Cleanup(benchmark_spec):
 # ---------------------------------------------------------------------------
 
 
-def _PatchReplicas(namespace, warmpool_name, replicas):
+def _PatchReplicas(namespace: str, warmpool_name: str, replicas: int) -> None:
     """Patch SandboxWarmPool to a specific replica count."""
     patch_json = json.dumps({"spec": {"replicas": replicas}})
     utils.RunKubectl(
@@ -424,7 +427,7 @@ def _PatchReplicas(namespace, warmpool_name, replicas):
     )
 
 
-def _GetPodNames(namespace, label):
+def _GetPodNames(namespace: str, label: str) -> list[str]:
     """Return list of pod names matching the label selector."""
     stdout, _, rc = utils.RunKubectl(
         [
@@ -445,7 +448,7 @@ def _GetPodNames(namespace, label):
     return stdout.split()
 
 
-def _CountAllocatedIPs(namespace, label):
+def _CountAllocatedIPs(namespace: str, label: str) -> int:
     """Count pod IPs currently allocated for pods matching the label.
 
     Scoped to the warm pool label to accurately measure IPAM release
@@ -470,7 +473,7 @@ def _CountAllocatedIPs(namespace, label):
     return len([ip for ip in stdout.split() if ip])
 
 
-def _Percentile(sorted_values, pct):
+def _Percentile(sorted_values: list[float], pct: float) -> float:
     """Calculate percentile (0-100) with linear interpolation."""
     if not sorted_values:
         return 0.0

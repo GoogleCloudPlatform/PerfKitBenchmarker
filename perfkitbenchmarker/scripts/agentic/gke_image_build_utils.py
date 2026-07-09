@@ -12,6 +12,9 @@ Images built:
   - Sandbox Router: cloned from agent-sandbox repo
 """
 
+from __future__ import annotations
+
+
 import logging
 import os
 import shutil
@@ -45,7 +48,7 @@ _ARCH_MAP = {
 }
 
 
-def _DetectArchitecture(machine_type, zone, project):
+def _DetectArchitecture(machine_type: str, zone: str, project: str) -> str:
     """Detect CPU architecture for a GCP machine type.
 
     Uses gcloud to query the machine type's architecture, then maps
@@ -104,7 +107,7 @@ def _DetectArchitecture(machine_type, zone, project):
     return "amd64"
 
 
-def build_images_with_config(project, region, machine_type, zone, arch):
+def build_images_with_config(project: str, region: str, machine_type: str, zone: str, arch: str) -> None:
     """Core image build logic — no FLAGS dependency.
 
     Callable from both PKB (via BuildImages()) and prerequisite_setup.py.
@@ -162,7 +165,7 @@ def build_images_with_config(project, region, machine_type, zone, arch):
 # ---------------------------------------------------------------------------
 
 
-def _BuildChromeSandboxImage(project, region, target_arch, image_path):
+def _BuildChromeSandboxImage(project: str, region: str, target_arch: str, image_path: str) -> None:
     """Build and push the Chrome Sandbox image."""
     logger.info("Building Chrome Sandbox image: %s", image_path)
 
@@ -215,7 +218,7 @@ def _BuildChromeSandboxImage(project, region, target_arch, image_path):
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def _BuildSandboxRouterImage(project, region, target_arch, image_path):
+def _BuildSandboxRouterImage(project: str, region: str, target_arch: str, image_path: str) -> None:
     """Build and push the Sandbox Router image."""
     logger.info("Building Sandbox Router image: %s", image_path)
 
@@ -264,7 +267,7 @@ def _BuildSandboxRouterImage(project, region, target_arch, image_path):
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-def _SubmitCloudBuild(source_dir, image_path, target_arch, project):
+def _SubmitCloudBuild(source_dir: str, image_path: str, target_arch: str, project: str) -> None:
     """Generate a cloudbuild.yaml with substitutions and submit via Cloud Build.
 
     Used for Chrome and Router images (built in temp directories).
@@ -333,7 +336,7 @@ substitutions:
     )
 
 
-def _RunCmd(cmd, cwd=None):
+def _RunCmd(cmd: list[str], cwd: str | None = None) -> str:
     """Run a shell command, raising on failure."""
     logger.info("  CMD: %s", " ".join(cmd))
     env = os.environ.copy()

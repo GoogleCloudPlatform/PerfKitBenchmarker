@@ -17,7 +17,7 @@ Usage:
                 --k8s_warmpool_ready_threshold_s=300 \
                 --k8s_warmpool_poll_interval_s=2.0 \
                 --k8s_warmpool_drain_timeout_s=300 \
-                --k8s_namespace=agentic \
+                --k8s_agentic_namespace=agentic \
                 --gke_machine_type=c4-standard-8
 
 Samples emitted (per run):
@@ -41,6 +41,9 @@ Samples emitted (per run):
   - gke_warmpool_time_to_running_count       (count)
   - gke_warmpool_wall_time                   (seconds)
 """
+
+from __future__ import annotations
+
 
 import json
 import logging
@@ -112,7 +115,7 @@ flags.DEFINE_float(
 # ---------------------------------------------------------------------------
 
 
-def GetConfig(user_config):
+def GetConfig(user_config: dict) -> dict:
     """Load and return benchmark config.
 
     No vm_groups — PKB skips Provision() and Teardown().
@@ -120,7 +123,7 @@ def GetConfig(user_config):
     return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def Prepare(benchmark_spec):
+def Prepare(benchmark_spec: object) -> None:
     """Deploy workloads onto the cluster."""
     benchmark_spec.always_call_cleanup = True
     logging.info("=== Prepare: deploying workloads ===")
@@ -129,7 +132,7 @@ def Prepare(benchmark_spec):
     logging.info("Prepare complete.")
 
 
-def Run(benchmark_spec):
+def Run(benchmark_spec: object) -> list[sample.Sample]:
     """Scale warm pool from 0 to target and measure provisioning time.
 
     Returns:
@@ -137,7 +140,7 @@ def Run(benchmark_spec):
     """
     utils.set_benchmark_spec(benchmark_spec)
 
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     target = FLAGS.k8s_warmpool_target_replicas
     warmpool_name = FLAGS.k8s_warmpool_name
     label = FLAGS.k8s_warmpool_pod_label
@@ -307,9 +310,9 @@ def Run(benchmark_spec):
     return samples
 
 
-def Cleanup(benchmark_spec):
+def Cleanup(benchmark_spec: object) -> None:
     """Drain warm pool back to 0 after measurement."""
-    ns = FLAGS.k8s_namespace
+    ns = FLAGS.k8s_agentic_namespace
     warmpool_name = FLAGS.k8s_warmpool_name
     label = FLAGS.k8s_warmpool_pod_label
 
@@ -324,7 +327,7 @@ def Cleanup(benchmark_spec):
 # ---------------------------------------------------------------------------
 
 
-def _ScrapeLifecycle(namespace, label, scale_start_epoch):
+def _ScrapeLifecycle(namespace: str, label: str, scale_start_epoch: float) -> dict:
     """Scrape pod metadata to compute time-to-created/scheduled/running.
 
     Returns a dict with P50/P95/max/count for each phase relative to
@@ -392,7 +395,7 @@ def _ScrapeLifecycle(namespace, label, scale_start_epoch):
     }
 
 
-def _EmitLifecycleSamples(samples, lifecycle, namespace, extra):
+def _EmitLifecycleSamples(samples: list, lifecycle: dict, namespace: str, extra: dict) -> None:
     """Emit pod lifecycle percentile samples for all three phases."""
     _PHASE_MAP = [
         ("time_to_created_s", "time_to_created"),

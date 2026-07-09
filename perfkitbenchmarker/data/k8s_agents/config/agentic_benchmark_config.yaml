@@ -32,15 +32,15 @@ _shared_flags: &shared_flags
     - "--master-ipv4-cidr=172.16.0.0/28"
   gke_additional_nodepool_flags:
     - "--max-pods-per-node=250"
-  container_cluster_version: "1.35.5-gke.1057002"
+  container_cluster_version: "1.36.0-gke.3070003"
   gke_enable_shielded_nodes: false
   gce_subnet_region: "us-central1"
 
   # --- Agentic workload flags ---
-  k8s_namespace: "agentic"
+  k8s_agentic_namespace: "agentic"
   agent_sandbox_version: "v0.4.6"
-  k8s_gvisor: true
-  k8s_agent_api_url: "http://localhost:8080"
+  k8s_agentic_gvisor: true
+  k8s_agentic_agent_api_url: "http://localhost:8080"
 
 _shared_cluster: &shared_cluster
   cloud: GCP
