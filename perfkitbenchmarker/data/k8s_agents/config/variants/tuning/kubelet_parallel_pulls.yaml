@@ -1,0 +1,9 @@
+# Kubelet config for parallel image pulls + image GC tuning
+# Applied via --system-config-from-file on node pool creation
+#
+# GKE-supported kubelet fields only.
+# serializeImagePulls, registryPullQPS, registryBurst are NOT exposed by GKE.
+kubeletConfig:
+  maxParallelImagePulls: 5
+  imageGcHighThresholdPercent: 70
+  imageGcLowThresholdPercent: 50

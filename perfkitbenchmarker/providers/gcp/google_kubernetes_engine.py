@@ -104,14 +104,29 @@ class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
     ).Issue()
 
   def RemoteBuild(self, image: container.ContainerImage):
-    """Builds the image remotely."""
-    if not gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value:
-      full_tag = self.GetFullRegistryTag(image.name)
+    """Builds the image remotely.
+
+    If --container_remote_build_config is set, uses it as the
+    --config argument to `gcloud builds submit` and passes the
+    image tag via --substitutions _IMAGE=<tag>.
+    Otherwise uses the simple --tag shorthand.
+    """
+    full_tag = self.GetFullRegistryTag(image.name)
+    if gcp_flags.SKIP_CONTAINER_IMAGE_BUILD.value:
+      logging.info('Skipping container image build (--skip_container_image_build). '
+                   'Assuming image exists: %s', full_tag)
+      return
+    if gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value:
+      build_cmd = util.GcloudCommand(
+          self, 'builds', 'submit',
+          '--config', gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value,
+          '--substitutions', f'_IMAGE={full_tag}',
+          image.directory,
+      )
     else:
-      full_tag = gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value
-    build_cmd = util.GcloudCommand(
-        self, 'builds', 'submit', '--tag', full_tag, image.directory
-    )
+      build_cmd = util.GcloudCommand(
+          self, 'builds', 'submit', '--tag', full_tag, image.directory,
+      )
     build_cmd.Issue(timeout=None)
 
 
@@ -435,6 +450,10 @@ class GkeCluster(BaseGkeCluster):
     if self.enable_aam:
       cmd.args.append('--auto-monitoring-scope=ALL')
 
+    # --- PKB Extension: additional cluster create flags ---
+    for additional_flag in gcp_flags.GKE_ADDITIONAL_FLAGS.value:
+      cmd.args.append(additional_flag)
+
     self._RunClusterCreateCommand(cmd)
     self._GetKubeconfig()
     self._CreateCustomComputeClass(self.default_nodepool)
@@ -450,6 +469,10 @@ class GkeCluster(BaseGkeCluster):
           nodepool,
           cmd,
       )
+      # --- PKB Extension: additional node pool create flags ---
+      for additional_flag in gcp_flags.GKE_ADDITIONAL_NODEPOOL_FLAGS.value:
+        cmd.args.append(additional_flag)
+
       self._IssueResourceCreationCommand(cmd)
       self._CreateCustomComputeClass(nodepool)
 
