@@ -17,7 +17,7 @@
 import unittest
 from unittest import mock
 from absl import flags
-from perfkitbenchmarker.linux_benchmarks import kubernetes_mysql_sysbench_benchmark
+from perfkitbenchmarker.linux_benchmarks.kubernetes import kubernetes_mysql_sysbench_benchmark
 from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS

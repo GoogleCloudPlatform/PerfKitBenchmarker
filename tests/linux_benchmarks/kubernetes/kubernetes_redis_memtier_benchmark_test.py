@@ -1,7 +1,7 @@
 import collections
 import unittest
 
-from perfkitbenchmarker.linux_benchmarks import kubernetes_redis_memtier_benchmark
+from perfkitbenchmarker.linux_benchmarks.kubernetes import kubernetes_redis_memtier_benchmark
 from tests import pkb_common_test_case
 
 

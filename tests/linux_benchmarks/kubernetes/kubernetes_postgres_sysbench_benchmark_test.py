@@ -21,7 +21,7 @@ from absl import flags
 from absl.testing import flagsaver
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.configs import container_spec
-from perfkitbenchmarker.linux_benchmarks import kubernetes_postgres_sysbench_benchmark
+from perfkitbenchmarker.linux_benchmarks.kubernetes import kubernetes_postgres_sysbench_benchmark
 from tests import container_service_mock
 from tests import pkb_common_test_case
 
@@ -41,7 +41,11 @@ class KubernetesPostgresSysbenchBenchmarkTest(
 
     # Load sample sysbench output for mocking Run
     sysbench_output_path = os.path.join(
-        os.path.dirname(__file__), '..', 'data', 'sysbench-output-sample.txt'
+        os.path.dirname(__file__),
+        '..',
+        '..',
+        'data',
+        'sysbench-output-sample.txt',
     )
     with open(sysbench_output_path) as fp:
       self.sysbench_output = fp.read()
@@ -83,7 +87,7 @@ class KubernetesPostgresSysbenchBenchmarkTest(
       data_disk_size=100,
   )
   @mock.patch(
-      'perfkitbenchmarker.linux_benchmarks.kubernetes_postgres_sysbench_benchmark.kubernetes_commands.ApplyManifest'
+      'perfkitbenchmarker.linux_benchmarks.kubernetes.kubernetes_postgres_sysbench_benchmark.kubernetes_commands.ApplyManifest'
   )
   def testPrepare_GCP(self, mock_apply_manifest):
     cluster = self._SetupCluster('GCP')
@@ -129,7 +133,7 @@ class KubernetesPostgresSysbenchBenchmarkTest(
       data_disk_size=100,
   )
   @mock.patch(
-      'perfkitbenchmarker.linux_benchmarks.kubernetes_postgres_sysbench_benchmark.kubernetes_commands.ApplyManifest'
+      'perfkitbenchmarker.linux_benchmarks.kubernetes.kubernetes_postgres_sysbench_benchmark.kubernetes_commands.ApplyManifest'
   )
   def testPrepare_AWS(self, mock_apply_manifest):
     cluster = self._SetupCluster('AWS', machine_type='m7i.4xlarge')
@@ -164,7 +168,7 @@ class KubernetesPostgresSysbenchBenchmarkTest(
       data_disk_size=100,
   )
   @mock.patch(
-      'perfkitbenchmarker.linux_benchmarks.kubernetes_postgres_sysbench_benchmark.kubernetes_commands.ApplyManifest'
+      'perfkitbenchmarker.linux_benchmarks.kubernetes.kubernetes_postgres_sysbench_benchmark.kubernetes_commands.ApplyManifest'
   )
   def testPrepare_Azure(self, mock_apply_manifest):
     cluster = self._SetupCluster('Azure', machine_type='Standard_D16s_v5')
@@ -202,7 +206,7 @@ class KubernetesPostgresSysbenchBenchmarkTest(
       data_disk_type='pd-ssd',
   )
   @mock.patch(
-      'perfkitbenchmarker.linux_benchmarks.kubernetes_postgres_sysbench_benchmark.kubernetes_commands.ApplyManifest'
+      'perfkitbenchmarker.linux_benchmarks.kubernetes.kubernetes_postgres_sysbench_benchmark.kubernetes_commands.ApplyManifest'
   )
   def testPrepare_CustomTemplatePathForwarded(self, mock_apply_manifest):
     cluster = self._SetupCluster('GCP')
@@ -236,6 +240,7 @@ class KubernetesPostgresSysbenchBenchmarkTest(
       if resource == 'pod/postgres-standalone-0':
         raise errors.Resource.RetryableGetError('Pod failed to become ready')
       return
+
     cluster.WaitForResource = mock.MagicMock(
         side_effect=_WaitForResourceSideEffect
     )
@@ -254,7 +259,7 @@ class KubernetesPostgresSysbenchBenchmarkTest(
     self.MockIssueCommand(expected_cmds)
 
     with mock.patch(
-        'perfkitbenchmarker.linux_benchmarks.kubernetes_postgres_sysbench_benchmark.kubernetes_commands.ApplyManifest'
+        'perfkitbenchmarker.linux_benchmarks.kubernetes.kubernetes_postgres_sysbench_benchmark.kubernetes_commands.ApplyManifest'
     ):
       with self.assertRaises(errors.VmUtil.ThreadException):
         kubernetes_postgres_sysbench_benchmark.Prepare(self.bm_spec)

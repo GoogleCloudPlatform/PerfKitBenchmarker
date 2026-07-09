@@ -128,6 +128,7 @@
 -   Rename GKE Autopilot & EKS Auto mode's cluster_type within PKB from
     'Autopilot' to 'Auto'.
 -   Duplicate metadata for all samples.
+-   Move many kubernetes benchmarks to their own folder within linux_benchmarks.
 
 ### New features:
 

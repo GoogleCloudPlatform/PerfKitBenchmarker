@@ -18,7 +18,7 @@ from unittest import mock
 
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_benchmarks import kubernetes_vpa_benchmark
+from perfkitbenchmarker.linux_benchmarks.kubernetes import kubernetes_vpa_benchmark
 from tests import pkb_common_test_case
 
 

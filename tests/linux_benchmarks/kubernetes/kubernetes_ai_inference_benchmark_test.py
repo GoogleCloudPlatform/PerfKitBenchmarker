@@ -7,7 +7,7 @@ from unittest import mock
 import zoneinfo
 
 from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_benchmarks import kubernetes_ai_inference_benchmark
+from perfkitbenchmarker.linux_benchmarks.kubernetes import kubernetes_ai_inference_benchmark
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.container_service import kubernetes_events
