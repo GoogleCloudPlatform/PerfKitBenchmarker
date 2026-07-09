@@ -64,7 +64,7 @@ def _GetJobRunMockPayload(
   if max_capacity is not None:
     payload['JobRun']['MaxCapacity'] = max_capacity
   if execution_time is not None:
-    payload['JobRun']['ExecutionTime'] = execution_time
+    payload['JobRun']['ExecutionTime'] = execution_time  # pyrefly: ignore[bad-assignment]
 
   return payload
 

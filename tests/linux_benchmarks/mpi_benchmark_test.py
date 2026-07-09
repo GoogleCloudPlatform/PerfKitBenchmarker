@@ -100,7 +100,7 @@ class MpiBenchmarkTestCase(
     found = MpiRun([Vm()])
     expected = []
     for row in mpi_test.ReadJson('mpi_tests_samples.json'):
-      expected.append(sample.Sample(**row))
+      expected.append(sample.Sample(**row))  # pyrefly: ignore[bad-unpacking, missing-argument]
       expected[-1].metadata['installed_mkl'] = False
     self.assertSampleListsEqualUpToTimestamp(expected, found)
     self.assertLen(expected, 8)
@@ -147,7 +147,7 @@ class MpiBenchmarkTestCase(
     vms = [Vm(ip='1.2.3.4'), Vm(ip='5.6.7.8')]
     total_processes = 32
     ppn = 0
-    mpi.RunMpiStats.return_value = mpi.MpiResponse('', '', '', '', [], [], {})
+    mpi.RunMpiStats.return_value = mpi.MpiResponse('', '', '', '', [], [], {})  # pyrefly: ignore[missing-attribute]
     mpi_benchmark._RunTest(vms, total_processes, ppn, False)
     # RunMpiStats called for each one of the --mpi_benchmarks and also for each
     # of the msglog values: len(['PingPong','AllGather']) * len([10,11]) = 4

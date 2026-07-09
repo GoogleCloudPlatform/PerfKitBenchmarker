@@ -183,7 +183,7 @@ def ConfigureSystemSettings(vm: virtual_machine.VirtualMachine):
   Args:
     vm: The VM to configure.
   """
-  if vm.OS_TYPE not in os_types.LINUX_OS_TYPES:
+  if vm.OS_TYPE not in os_types.LINUX_OS_TYPES:  # pyrefly: ignore[missing-argument]
     assert isinstance(vm, linux_virtual_machine.BaseLinuxMixin)
     logging.error(
         'System settings not configured for unsupported OS: %s', vm.os_info
@@ -237,11 +237,11 @@ def WriteMysqlConfiguration(
 ):
   """Write mysql configuration files."""
   remote_temp_config = '/tmp/my.cnf'
-  remote_final_config = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_CONFIG_PATH]
+  remote_final_config = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_CONFIG_PATH]  # pyrefly: ignore[missing-argument]
   logrotation = 'mysql/logrotation'
   remote_temp_logrotation = '/tmp/logrotation'
   remote_final_logrotation = '/etc/logrotate.d/mysqld'
-  remote_final_log_dir = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_LOG_PATH]
+  remote_final_log_dir = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_LOG_PATH]  # pyrefly: ignore[missing-argument]
   context = {
       'scratch_dir': vm.GetScratchDir(),
       'server_id': str(server_id),
@@ -294,7 +294,7 @@ def ConfigureAndStartServer(
   # Start the server.
   vm.RemoteCommand('sudo -g mysql -u mysql nohup mysqld &> /dev/null &')
 
-  log_file_path = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_LOG_PATH]
+  log_file_path = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_LOG_PATH]  # pyrefly: ignore[missing-argument]
 
   socket_file = f'{scratch_dir}/mysql.sock'
 
@@ -312,7 +312,7 @@ def ConfigureAndStartServer(
 
 def UpdatePassword(vm: virtual_machine.VirtualMachine, new_password: str):
   """Update the password of the root user."""
-  log_path = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_LOG_PATH]
+  log_path = GetOSDependentDefaults(vm.OS_TYPE)[MYSQL_LOG_PATH]  # pyrefly: ignore[missing-argument]
   password = vm.RemoteCommand(
       f'sudo grep "A temporary password" {log_path} | '
       'sed "s/.*generated for root@localhost: //"'

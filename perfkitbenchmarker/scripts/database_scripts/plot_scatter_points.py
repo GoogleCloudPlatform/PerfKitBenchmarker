@@ -111,7 +111,7 @@ class GnuplotInfo(object):
     # If you want to move the legend to the top left, use this:
     output_file.write('set key left top\n')
 
-    if self.y_height > 0:
+    if self.y_height > 0:  # pyrefly: ignore[unsupported-operation]
       output_file.write('y=' + self.y_height + '\n')
       output_file.write('set yrange [0:y]\n')
       output_file.write('set ytics ' + Y_TICS + '\n')

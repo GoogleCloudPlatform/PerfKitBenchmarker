@@ -215,7 +215,7 @@ class GCESimulateMaintenanceTool:
       if len(event_info_parts) == 2:
         self.metadata[event_info_parts[0]] = event_info_parts[1]
 
-    self.metadata[lm_total_time_key] = float(
+    self.metadata[lm_total_time_key] = float(  # pyrefly: ignore[unsupported-operation]
         self.metadata[lm_end_time_key]
     ) - float(self.metadata[lm_start_time_key])
     migration_event = base_disruption_trigger.DisruptionEvent(
@@ -321,7 +321,7 @@ class GCESimulateMaintenanceToolForWindows(GCESimulateMaintenanceTool):
       if len(event_info_parts) == 2:
         events_dict[event_info_parts[0]] = event_info_parts[1]
 
-    events_dict[lm_total_time_key] = float(
+    events_dict[lm_total_time_key] = float(  # pyrefly: ignore[unsupported-operation]
         events_dict[lm_end_time_key]
     ) - float(events_dict[lm_start_time_key])
 
@@ -352,11 +352,11 @@ class MaintenanceEventTrigger(base_disruption_trigger.BaseDisruptionTrigger):
 
   def TriggerMethod(self, vm: virtual_machine.VirtualMachine):
     if self.capture_live_migration_timestamps:
-      self.gce_simulate_maintenance_helpers[vm].StartLMNotification()
+      self.gce_simulate_maintenance_helpers[vm].StartLMNotification()  # pyrefly: ignore[bad-index]
     if SIMULATE_MAINTENANCE_WITH_LOG.value:
-      self.gce_simulate_maintenance_helpers[vm].SimulateMaintenanceWithLog()
+      self.gce_simulate_maintenance_helpers[vm].SimulateMaintenanceWithLog()  # pyrefly: ignore[bad-index]
     else:
-      self.gce_simulate_maintenance_helpers[vm].SimulateMaintenanceEvent()
+      self.gce_simulate_maintenance_helpers[vm].SimulateMaintenanceEvent()  # pyrefly: ignore[bad-index]
     self.WaitForDisruption()
 
   def SetUp(self):

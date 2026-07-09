@@ -756,7 +756,7 @@ class GceDiskSnapshot(disk.DiskSnapshot):
 
     return self.restore_disks[-1]
 
-  def Delete(self):
+  def Delete(self):  # pyrefly: ignore[bad-override]
     """Deletes the snapshot."""
     if self.restore_disks:
       for restore_disk in self.restore_disks:
@@ -845,7 +845,7 @@ class GceHyperdiskML(disk.MultiAttachDisk):
     self.disk = GceDisk(disk_spec, name, zone, project)
     self.lock = threading.Lock()
 
-  def Create(self):
+  def Create(self):  # pyrefly: ignore[bad-override]
     self.disk.Create()
 
   def GetDevicePath(self):

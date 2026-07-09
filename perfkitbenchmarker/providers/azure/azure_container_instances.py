@@ -89,7 +89,7 @@ class AciContainer(container_lib.BaseContainer):
     vm_util.IssueCommand(delete_cmd, raise_on_failure=False)
 
   @property
-  def ip_address(self):
+  def ip_address(self):  # pyrefly: ignore[bad-override]
     """Container instances don't have private ips yet."""
     raise NotImplementedError("ACI containers don't have private ips.")
 

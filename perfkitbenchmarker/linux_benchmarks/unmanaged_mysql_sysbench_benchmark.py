@@ -386,7 +386,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   # Copy client and server logs to the scratch directory.
   for _, vms in benchmark_spec.vm_groups.items():
     for vm in vms:
-      vm.CopyLogs('/var/log')
+      vm.CopyLogs('/var/log')  # pyrefly: ignore[missing-attribute]
   return results
 
 

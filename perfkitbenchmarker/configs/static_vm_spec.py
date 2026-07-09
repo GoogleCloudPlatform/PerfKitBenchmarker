@@ -69,7 +69,7 @@ class StaticVmSpec(virtual_machine_spec.BaseVmSpec):
     self.ip_address = ip_address
     self.user_name = user_name
     self.ssh_private_key = ssh_private_key
-    self.internal_ip = internal_ip
+    self.internal_ip = internal_ip  # pyrefly: ignore[bad-assignment]
     self.internal_ips = internal_ips
     self.ssh_port = ssh_port
     self.password = password

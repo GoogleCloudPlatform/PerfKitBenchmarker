@@ -69,7 +69,7 @@ class AzureSqlManagedInstance(azure_relational_db.AzureRelationalDb):
     self._CheckPrerequisites()
 
     self.resource_group = azure_network.GetResourceGroup(self.region)
-    self.subnet: azure_network.AzureSubnet = None
+    self.subnet: azure_network.AzureSubnet = None  # pyrefly: ignore[bad-assignment]
 
   def _CheckPrerequisites(self):
     if self.tier not in _VALID_TIERS:
@@ -270,7 +270,7 @@ class AzureSqlManagedInstance(azure_relational_db.AzureRelationalDb):
   def _WaitUntilRunning(self) -> None:
     """Waits until the managed instance is ready."""
     json_output = self._AzServerShow()
-    if json_output['state'] != 'Ready':
+    if json_output['state'] != 'Ready':  # pyrefly: ignore[unsupported-operation]
       raise errors.Resource.CreationError(
           'Managed instance is not ready: {}'.format(json_output['state'])
       )

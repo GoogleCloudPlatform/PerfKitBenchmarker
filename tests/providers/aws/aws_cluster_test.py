@@ -44,7 +44,7 @@ class AwsClusterTest(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.run_uri = 'run12345'
     self.cluster_spec = TestAwsClusterSpec(
         'test_aws_cluster', headnode=vm_config, workers=vm_config)
-    self.cluster_spec.workers.vm_spec.zone = 'us-fake-1a'
+    self.cluster_spec.workers.vm_spec.zone = 'us-fake-1a'  # pyrefly: ignore[missing-attribute]
     self.mock_issue = self.enter_context(
         mock.patch.object(vm_util, 'IssueCommand', autospec=True))
     self.mock_issue.return_value = ('fake_key', None, None)
@@ -248,11 +248,11 @@ Monitoring:
     # Test _PostCreate
     self.cluster._PostCreate()
     self.assertEqual(
-        self.cluster.headnode_vm.name, 'pkb-run12345-0')
+        self.cluster.headnode_vm.name, 'pkb-run12345-0')  # pyrefly: ignore[missing-attribute]
     self.assertEqual(
-        self.cluster.headnode_vm.ip_address, '54.82.234.236')
+        self.cluster.headnode_vm.ip_address, '54.82.234.236')  # pyrefly: ignore[missing-attribute]
     self.assertEqual(
-        self.cluster.headnode_vm.internal_ip, '10.0.0.4')
+        self.cluster.headnode_vm.internal_ip, '10.0.0.4')  # pyrefly: ignore[missing-attribute]
     self.assertEqual(
         self.cluster.worker_vms[0].name, 'pkb-run12345-1')
     self.assertEqual(

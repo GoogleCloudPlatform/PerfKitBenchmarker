@@ -75,7 +75,7 @@ def _ParseOutput(output_text):
     raise ValueError('{} not found in\n{}'.format(_CSV_PREFIX, output_text))
   csv_fp = six.StringIO(str(output_text).rsplit(_CSV_PREFIX, 1)[-1])
   reader = csv.DictReader(csv_fp)
-  if frozenset(reader.fieldnames) != frozenset(['variable', 'value', 'unit']):
+  if frozenset(reader.fieldnames) != frozenset(['variable', 'value', 'unit']):  # pyrefly: ignore[bad-argument-type]
     raise ValueError('Unexpected fields: {}'.format(reader.fieldnames))
   for row in reader:
     yield row['variable'], float(row['value']), row['unit']

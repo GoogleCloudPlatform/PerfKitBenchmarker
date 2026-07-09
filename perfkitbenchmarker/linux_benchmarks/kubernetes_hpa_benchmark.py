@@ -83,7 +83,7 @@ def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
 def PrepareCluster(benchmark_spec: bm_spec.BenchmarkSpec, manifest_path: str):
   """Prepares a cluster to run the hpa benchmark."""
   cluster: kubernetes_cluster.KubernetesCluster = (
-      benchmark_spec.container_cluster
+      benchmark_spec.container_cluster  # pyrefly: ignore[bad-assignment]
   )
   fib_image = benchmark_spec.container_specs['kubernetes_fib'].image
 
@@ -107,8 +107,8 @@ def PrepareLocust(benchmark_spec: bm_spec.BenchmarkSpec):
   """Prepares a vm to run locust."""
   vm = benchmark_spec.vms[0]
   vm.Install('http_poller')
-  locust.Install(vm)
-  locust.Prep(vm)
+  locust.Install(vm)  # pyrefly: ignore[bad-argument-type]
+  locust.Prep(vm)  # pyrefly: ignore[bad-argument-type]
 
 
 def Prepare(
@@ -148,7 +148,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[Sample]:
   kmc = KubernetesMetricsCollector(samples, stop)
 
   def RunLocust():
-    for s in locust.Run(vm, addr):
+    for s in locust.Run(vm, addr):  # pyrefly: ignore[bad-argument-type]
       samples.append(s)
     stop.set()
 

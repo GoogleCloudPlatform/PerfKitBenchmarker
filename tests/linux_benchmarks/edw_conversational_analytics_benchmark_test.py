@@ -60,16 +60,16 @@ class EdwConversationalAnalyticsBenchmarkTest(
     self.mock_client_interface.dataset_id = 'test-dataset'
     self.mock_client_interface.client_vm = mock.Mock()
 
-    self.service.client_interface = self.mock_client_interface
+    self.service.client_interface = self.mock_client_interface  # pyrefly: ignore[missing-attribute]
 
     self.ca_client = bigquery.ConversationalAnalyticsClientInterface(
         'test-project', 'test-dataset'
     )
-    self.service.GetConversationalAnalyticsClientInterface = mock.Mock(
+    self.service.GetConversationalAnalyticsClientInterface = mock.Mock(  # pyrefly: ignore[missing-attribute]
         return_value=self.ca_client
     )
 
-    self.spec.vms = [self.mock_client_interface.client_vm]
+    self.spec.vms = [self.mock_client_interface.client_vm]  # pyrefly: ignore[read-only]
     setattr(self.spec, 'ca_client', self.ca_client)
 
     self.create_remote_file_patcher = mock.patch.object(
@@ -162,10 +162,10 @@ class EdwConversationalAnalyticsBenchmarkTest(
               ground_truth_sql='SELECT 2;',
           ),
       ]
-    self.service.GetConversationalAnalyticsQuestionList = mock.Mock(
+    self.service.GetConversationalAnalyticsQuestionList = mock.Mock(  # pyrefly: ignore[missing-attribute]
         return_value=questions
     )
-    self.service.GetMetadata = mock.Mock(return_value={'service_meta': 'val'})
+    self.service.GetMetadata = mock.Mock(return_value={'service_meta': 'val'})  # pyrefly: ignore[missing-attribute]
     return questions
 
   def _CreateSuccessIterationPerformance(self, iteration_id, queries):

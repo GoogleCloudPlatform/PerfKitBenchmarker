@@ -76,7 +76,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec):
   assert bm_spec.container_cluster
   cluster = bm_spec.container_cluster
   yaml_docs = kubernetes_commands.ConvertManifestToYamlDicts(MANIFEST_TEMPLATE)
-  cluster.ModifyPodSpecPlacementYaml(
+  cluster.ModifyPodSpecPlacementYaml(  # pyrefly: ignore[missing-attribute]
       yaml_docs,
       'app',
       cluster.default_nodepool.machine_type,
@@ -175,7 +175,19 @@ def _ScaleUpAndCollect(
       resources_to_ignore=initial_nodes,
   )
 
-  all_samples = phase_log_samples + pod_samples + node_samples
+  ready_sample = next(
+      s for s in node_samples if s.metric == 'node_Ready_p99.9'
+  )
+  highlighted_sample = sample.Sample(
+      f'{phase}_node_Ready_p99.9',
+      ready_sample.value,
+      ready_sample.unit,
+      ready_sample.metadata,
+      ready_sample.timestamp,
+  )
+  all_samples = (
+      phase_log_samples + pod_samples + node_samples + [highlighted_sample]
+  )
   _AddPhaseMetadata(all_samples, phase)
   return all_samples
 

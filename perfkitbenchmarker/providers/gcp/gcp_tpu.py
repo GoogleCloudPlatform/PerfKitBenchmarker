@@ -69,7 +69,7 @@ class GcpTpu(cloud_tpu.BaseTpu):
     cmd.flags['project'] = self.project
     self.create_start_time = time.time()
     _, stderr, retcode = cmd.Issue(raise_on_failure=False)
-    self.create_time = time.time() - self.create_start_time
+    self.create_time = time.time() - self.create_start_time  # pyrefly: ignore[bad-assignment]
 
     if _INSUFFICIENT_CAPACITY in stderr:
       logging.error(util.STOCKOUT_MESSAGE)

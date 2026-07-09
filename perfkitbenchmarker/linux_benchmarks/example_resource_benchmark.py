@@ -65,8 +65,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   logging.info('Running Run phase of the example benchmark')
   ex_resource = benchmark_spec.example_resource
   # Every resource supplies create times by default.
-  samples = ex_resource.GetSamples()
-  metadata = ex_resource.GetResourceMetadata()
+  samples = ex_resource.GetSamples()  # pyrefly: ignore[missing-attribute]
+  metadata = ex_resource.GetResourceMetadata()  # pyrefly: ignore[missing-attribute]
   samples.append(sample.Sample('Example Sample Latency', 0.5, 'ms', metadata))
   return samples
 

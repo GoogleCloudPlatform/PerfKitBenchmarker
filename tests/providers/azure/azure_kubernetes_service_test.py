@@ -149,7 +149,7 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.spec_dict['nodepools'] = {
         'client': {
-            'vm_spec': {
+            'vm_spec': {  # pyrefly: ignore[bad-assignment]
                 'Azure': {
                     'machine_type': 'Standard_D4s_v5',
                     'zone': 'eastus2-1',
@@ -192,8 +192,8 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
             'az aks nodepool': [('', '', 0)],
         },
     )
-    self.spec_dict['min_vm_count'] = 2
-    self.spec_dict['max_vm_count'] = 4
+    self.spec_dict['min_vm_count'] = 2  # pyrefly: ignore[bad-assignment]
+    self.spec_dict['max_vm_count'] = 4  # pyrefly: ignore[bad-assignment]
     self.initAksCluster(self.spec_dict)
     self.aks._Create()
     self.assertContainsSubset(
@@ -215,14 +215,14 @@ class AzureKubernetesServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.spec_dict['nodepools'] = {
         'client': {
-            'vm_spec': {
+            'vm_spec': {  # pyrefly: ignore[bad-assignment]
                 'Azure': {
                     'machine_type': 'Standard_D4s_v5',
                 }
             },
-            'min_vm_count': 4,
-            'max_vm_count': 6,
-            'vm_count': 3,
+            'min_vm_count': 4,  # pyrefly: ignore[bad-assignment]
+            'max_vm_count': 6,  # pyrefly: ignore[bad-assignment]
+            'vm_count': 3,  # pyrefly: ignore[bad-assignment]
         },
     }
     self.initAksCluster(self.spec_dict)

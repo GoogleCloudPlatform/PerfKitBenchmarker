@@ -284,13 +284,13 @@ def GetTimeToBoot(
     assert vm.bootable_time
     assert vm.bootable_time >= vm.create_start_time
 
-    os_types.add(vm.OS_TYPE)
+    os_types.add(vm.OS_TYPE)  # pyrefly: ignore[missing-argument]
     create_delay_sec = vm.create_start_time - min_create_start_time
     max_create_delay_sec = max(max_create_delay_sec, create_delay_sec)
-    metadata = metadata | {
+    metadata = metadata | {  # pyrefly: ignore[unsupported-operation]
         'machine_instance': i,
         'num_vms': len(vms),
-        'os_type': vm.OS_TYPE,
+        'os_type': vm.OS_TYPE,  # pyrefly: ignore[missing-argument]
         'create_delay_sec': '%0.1f' % create_delay_sec,
     }
 
@@ -362,10 +362,10 @@ def GetTimeToBoot(
     # TIME TO RDP LISTENING
     # TODO(pclay): refactor so Windows specifics aren't in linux_benchmarks
     if FLAGS.cluster_boot_test_rdp_port_listening:
-      assert vm.rdp_port_listening_time
-      assert vm.rdp_port_listening_time >= vm.create_start_time
+      assert vm.rdp_port_listening_time  # pyrefly: ignore[missing-attribute]
+      assert vm.rdp_port_listening_time >= vm.create_start_time  # pyrefly: ignore[unsupported-operation]
       rdp_port_listening_time_sec = (
-          vm.rdp_port_listening_time - min_create_start_time
+          vm.rdp_port_listening_time - min_create_start_time  # pyrefly: ignore[unsupported-operation]
       )
       max_rdp_port_listening_time_sec = max(
           max_rdp_port_listening_time_sec, rdp_port_listening_time_sec
@@ -480,11 +480,11 @@ def MeasureDelete(
   if not vms:
     return []
   # Collect a delete time from each VM.
-  delete_times = [vm.delete_end_time - vm.delete_start_time for vm in vms]
+  delete_times = [vm.delete_end_time - vm.delete_start_time for vm in vms]  # pyrefly: ignore[unsupported-operation]
   # Get the cluster delete time.
-  min_delete_start_time = min([vm.delete_start_time for vm in vms])
-  max_delete_end_time = max([vm.delete_end_time for vm in vms])
-  cluster_delete_time = max_delete_end_time - min_delete_start_time
+  min_delete_start_time = min([vm.delete_start_time for vm in vms])  # pyrefly: ignore[bad-specialization]
+  max_delete_end_time = max([vm.delete_end_time for vm in vms])  # pyrefly: ignore[bad-specialization]
+  cluster_delete_time = max_delete_end_time - min_delete_start_time  # pyrefly: ignore[unsupported-operation]
   # Record the delete metrics as samples.
   return _GetVmOperationDataSamples(
       delete_times, cluster_delete_time, 'Delete', vms
@@ -514,14 +514,14 @@ def _GetVmOperationDataSamples(
     metadata = {
         'machine_instance': i,
         'num_vms': len(vms),
-        'os_type': vm.OS_TYPE,
+        'os_type': vm.OS_TYPE,  # pyrefly: ignore[missing-argument]
     }
     metadata_list.append(metadata)
   for operation_time, metadata in zip(operation_times, metadata_list):
     samples.append(
         sample.Sample(f'{operation} Time', operation_time, 'seconds', metadata)
     )
-  os_types = {vm.OS_TYPE for vm in vms}
+  os_types = {vm.OS_TYPE for vm in vms}  # pyrefly: ignore[missing-argument]
   metadata = {'num_vms': len(vms), 'os_type': ','.join(sorted(os_types))}
   samples.append(
       sample.Sample(

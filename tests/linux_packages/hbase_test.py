@@ -18,7 +18,7 @@ from absl import flags
 import mock
 from perfkitbenchmarker.linux_packages import hbase
 from tests import pkb_common_test_case
-from six.moves import urllib
+from six.moves import urllib  # pyrefly: ignore[missing-source-for-stubs]
 
 FLAGS = flags.FLAGS
 

@@ -127,14 +127,14 @@ def _GetVmOperationDataSamples(
     metadata = {
         'machine_instance': i,
         'num_vms': len(vms),
-        'os_type': vm.OS_TYPE,
+        'os_type': vm.OS_TYPE,  # pyrefly: ignore[missing-argument]
     }
     metadata_list.append(metadata)
   for operation_time, metadata in zip(operation_times, metadata_list):
     samples.append(
         sample.Sample(f'{operation} Time', operation_time, 'seconds', metadata)
     )
-  os_types = {vm.OS_TYPE for vm in vms}
+  os_types = {vm.OS_TYPE for vm in vms}  # pyrefly: ignore[missing-argument]
   metadata = {'num_vms': len(vms), 'os_type': ','.join(sorted(os_types))}
   samples.append(
       sample.Sample(

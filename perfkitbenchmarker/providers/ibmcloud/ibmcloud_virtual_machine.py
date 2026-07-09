@@ -192,7 +192,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     self._CreateInstance()
     if self.subnet:  # this is for the primary vnic and fip
       self.fip_address, self.fip_id = self.network.CreateFip(
-          self.name + 'fip', self.vmid
+          self.name + 'fip', self.vmid  # pyrefly: ignore[bad-argument-type]
       )
       self.ip_address = self.fip_address
       self.internal_ip = self._WaitForIPAssignment(self.subnet)
@@ -231,7 +231,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
       return
     self._StopInstance()
     if self.fip_address:
-      self.network.DeleteFip(self.vmid, self.fip_address, self.fip_id)
+      self.network.DeleteFip(self.vmid, self.fip_address, self.fip_id)  # pyrefly: ignore[bad-argument-type]
     time.sleep(10)
     self._DeleteInstance()
     if not FLAGS.ibmcloud_resources_keep:
@@ -365,7 +365,7 @@ class IbmCloudVirtualMachine(virtual_machine.BaseVirtualMachine):
     )
     disks = [
         ibmcloud_disk.IbmCloudDisk(
-            disk_spec, name, self.zone, encryption_key=self.data_encryption_key
+            disk_spec, name, self.zone, encryption_key=self.data_encryption_key  # pyrefly: ignore[bad-argument-type]
         )
         for name in disks_names
     ]

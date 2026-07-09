@@ -120,7 +120,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
 
   if FLAGS.db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
     dsql: aws_aurora_dsql_db.AwsAuroraDsqlRelationalDb = (
-        benchmark_spec.relational_db
+        benchmark_spec.relational_db  # pyrefly: ignore[bad-assignment]
     )
     # Ideally we want to use endpoint from get-cluster command but it's not
     # returning endpoint as documented. That said this hard-coded endpoint
@@ -152,7 +152,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     client_vm.RemoteCommand(load_command)
 
   if FLAGS.db_engine == sql_engine_utils.SPANNER_POSTGRES:
-    benchmark_spec.relational_db.RunDDLQuery(
+    benchmark_spec.relational_db.RunDDLQuery(  # pyrefly: ignore[missing-attribute]
         'ANALYZE;', timeout=_SPANNER_ANALYZE_TIMEOUT, async_proc=True
     )
   elif FLAGS.db_engine == sql_engine_utils.AURORA_DSQL_POSTGRES:
@@ -168,7 +168,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
         'ANALYZE public.warehouse;',
     ]
     for query in queries:
-      benchmark_spec.relational_db.RunSqlQuery(query)
+      benchmark_spec.relational_db.RunSqlQuery(query)  # pyrefly: ignore[missing-attribute]
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -212,7 +212,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
       _WORKLOAD_DURATION.value,
   )
   client_vm.RemoteCommand(run_command)
-  metadata = benchmark_spec.relational_db.GetResourceMetadata()
+  metadata = benchmark_spec.relational_db.GetResourceMetadata()  # pyrefly: ignore[missing-attribute]
   return benchbase.ParseResults(client_vm, metadata)
 
 

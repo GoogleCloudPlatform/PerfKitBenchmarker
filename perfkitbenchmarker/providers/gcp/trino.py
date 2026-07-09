@@ -56,21 +56,21 @@ class TrinoClientInterface(edw_service.EdwClientInterface):
   def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query."""
     # Install dependencies for driver
-    self.client_vm.Install('pip')
-    self.client_vm.RemoteCommand(
+    self.client_vm.Install('pip')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.RemoteCommand(  # pyrefly: ignore[missing-attribute]
         'sudo apt-get -qq update && DEBIAN_FRONTEND=noninteractive sudo apt-get'
         ' -qq install python3.12-venv'
     )
-    self.client_vm.RemoteCommand('python3 -m venv .venv')
-    self.client_vm.RemoteCommand(
+    self.client_vm.RemoteCommand('python3 -m venv .venv')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.RemoteCommand(  # pyrefly: ignore[missing-attribute]
         'source .venv/bin/activate && pip install trino absl-py'
     )
 
     # Push driver script to client vm
-    self.client_vm.PushDataFile(
+    self.client_vm.PushDataFile(  # pyrefly: ignore[missing-attribute]
         os.path.join(_TRINO_PYTHON_CLIENT_DIR, _TRINO_PYTHON_CLIENT_FILE)
     )
-    self.client_vm.PushDataFile(
+    self.client_vm.PushDataFile(  # pyrefly: ignore[missing-attribute]
         os.path.join(
             edw_service.EDW_PYTHON_DRIVER_LIB_DIR,
             edw_service.EDW_PYTHON_DRIVER_LIB_FILE,
@@ -90,7 +90,7 @@ class TrinoClientInterface(edw_service.EdwClientInterface):
     ]
     cmd_parts.extend(additional_args)
     cmd = ' '.join(cmd_parts)
-    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
   def ExecuteQuery(
@@ -228,10 +228,10 @@ class Trino(edw_service.EdwService):
         self.container_cluster is not None
         and self.container_cluster.HasLocalSsd()
     ):
-      yaml_dict['worker']['additionalVolumes'] = [
+      yaml_dict['worker']['additionalVolumes'] = [  # pyrefly: ignore[bad-assignment]
           {'name': 'local-ssd', 'emptyDir': vm_util.EMPTY_DICT_SENTINEL}
       ]
-      yaml_dict['worker']['additionalVolumeMounts'] = [
+      yaml_dict['worker']['additionalVolumeMounts'] = [  # pyrefly: ignore[bad-assignment]
           {'name': 'local-ssd', 'mountPath': '/tmp/'}
       ]
     return vm_util.WriteYaml([yaml_dict], should_log_file=True)

@@ -178,7 +178,7 @@ class GceVpnGateway(network.BaseVpnGateway):
       return
     if not hasattr(tunnel_config, 'psk'):
       logging.debug('tunnel_config: PSK not provided... setting to runid')
-      tunnel_config.psk = 'key' + FLAGS.run_uri
+      tunnel_config.psk = 'key' + FLAGS.run_uri  # pyrefly: ignore[missing-attribute]
     self._SetupTunnel(tunnel_config)
 
     # configure routing
@@ -225,7 +225,7 @@ class GceVpnGateway(network.BaseVpnGateway):
     vpn_gateway_id = self.name
     target_ip = tunnel_config.endpoints[target_endpoint]['ip_address']
     assert isinstance(target_ip, str)
-    psk = tunnel_config.psk
+    psk = tunnel_config.psk  # pyrefly: ignore[missing-attribute]
     ike_version = tunnel_config.ike_version
     suffix = tunnel_config.suffix
     name = 'tun-' + self.name + '-' + suffix
@@ -535,7 +535,7 @@ class GceForwardingRule(resource.BaseResource):
     self.src_region = src_vpn_gateway.region
     self.project = src_vpn_gateway.project
 
-  def __eq__(self, other: 'GceForwardingRule') -> bool:
+  def __eq__(self, other: 'GceForwardingRule') -> bool:  # pyrefly: ignore[bad-override]
     """Defines equality to make comparison easy."""
     return (
         self.name == other.name
@@ -595,7 +595,7 @@ class GceFirewallRule(resource.BaseResource):
     self.network_name = network_name
     self.source_range = source_range
 
-  def __eq__(self, other: 'GceFirewallRule') -> bool:
+  def __eq__(self, other: 'GceFirewallRule') -> bool:  # pyrefly: ignore[bad-override]
     """Defines equality to make comparison easy."""
     return (
         self.name == other.name
@@ -686,7 +686,7 @@ class GceFirewall(network.BaseFirewall):
     if vm.is_static:
       return
     if source_range:
-      source_range = ','.join(source_range)
+      source_range = ','.join(source_range)  # pyrefly: ignore[bad-assignment]
     with self._lock:
       if end_port is None:
         end_port = start_port
@@ -717,7 +717,7 @@ class GceFirewall(network.BaseFirewall):
           vm.project,
           allow,
           vm.network.network_resource.name,
-          source_range,
+          source_range,  # pyrefly: ignore[bad-argument-type]
       )
       self.firewall_rules[key] = firewall_rule
       firewall_rule.Create()
@@ -950,14 +950,14 @@ class GceNetwork(network.BaseNetwork):
     if not self.is_existing_network or mode == 'legacy':
       for name in self.subnet_names:
         self.network_resources.append(
-            GceNetworkResource(name, mode, self.project, self.mtu)
+            GceNetworkResource(name, mode, self.project, self.mtu)  # pyrefly: ignore[bad-argument-type]
         )
     if (self.is_existing_network and mode != 'legacy') or (mode == 'custom'):
       subnet_region = util.GetRegionFromZone(network_spec.zone)
       for name in self.subnet_names:
         self.subnet_resources.append(
             GceSubnetResource(
-                name, name, subnet_region, self.cidr, self.project
+                name, name, subnet_region, self.cidr, self.project  # pyrefly: ignore[bad-argument-type]
             )
         )
       self.subnet_resource = GceSubnetResource(
@@ -965,10 +965,10 @@ class GceNetwork(network.BaseNetwork):
           self.primary_subnet_name,
           subnet_region,
           self.cidr,
-          self.project,
+          self.project,  # pyrefly: ignore[bad-argument-type]
       )
     self.network_resource = GceNetworkResource(
-        self.primary_subnet_name, mode, self.project, self.mtu
+        self.primary_subnet_name, mode, self.project, self.mtu  # pyrefly: ignore[bad-argument-type]
     )
     # Stage FW rules.
     self.all_nets = self._GetNetworksFromSpec(
@@ -984,7 +984,7 @@ class GceNetwork(network.BaseNetwork):
       firewall_name = self._MakeGceFWRuleName()
       self.default_firewall_rule = GceFirewallRule(
           firewall_name,
-          self.project,
+          self.project,  # pyrefly: ignore[bad-argument-type]
           ALLOW_ALL,
           self.primary_subnet_name,
           self.cidr,
@@ -997,7 +997,7 @@ class GceNetwork(network.BaseNetwork):
         rule_name = self._MakeGceFWRuleName(dst_cidr=ext_net)
         self.external_nets_rules[rule_name] = GceFirewallRule(
             rule_name,
-            self.project,
+            self.project,  # pyrefly: ignore[bad-argument-type]
             ALLOW_ALL,
             self.primary_subnet_name,
             ext_net,
@@ -1015,8 +1015,8 @@ class GceNetwork(network.BaseNetwork):
             vpn_gateway_name,
             self.primary_subnet_name,
             util.GetRegionFromZone(network_spec.zone),
-            network_spec.cidr,
-            self.project,
+            network_spec.cidr,  # pyrefly: ignore[bad-argument-type]
+            self.project,  # pyrefly: ignore[bad-argument-type]
         )
 
     # Placement Group
@@ -1031,7 +1031,7 @@ class GceNetwork(network.BaseNetwork):
     if no_placement_group:
       self.placement_group = None
     elif has_optional_pg and not IsPlacementGroupCompatible(
-        network_spec.machine_type
+        network_spec.machine_type  # pyrefly: ignore[bad-argument-type]
     ):
       logging.warning(
           'machine type %s does not support placement groups. '
@@ -1045,7 +1045,7 @@ class GceNetwork(network.BaseNetwork):
           'Placement group style set to none.'
       )
       self.placement_group = None
-    elif not IsPlacementGroupCompatible(network_spec.machine_type):
+    elif not IsPlacementGroupCompatible(network_spec.machine_type):  # pyrefly: ignore[bad-argument-type]
       raise errors.Benchmarks.UnsupportedConfigError(
           f'machine type {network_spec.machine_type} does not support '
           'placement groups. Use placement group style none.'
@@ -1060,7 +1060,7 @@ class GceNetwork(network.BaseNetwork):
       if (
           not max_distance
           and gcp_flags.GCE_PREFER_RACK_PLACEMENT.value
-          and not re.match(_SAME_RACK_DENYLIST_REGEX, network_spec.machine_type)
+          and not re.match(_SAME_RACK_DENYLIST_REGEX, network_spec.machine_type)  # pyrefly: ignore[no-matching-overload]
       ):
         max_distance = 1
 
@@ -1214,7 +1214,7 @@ class GceNetwork(network.BaseNetwork):
         network_key += (','.join(spec.subnet_names),)
       else:
         network_key += (spec.subnet_names,)
-    return network_key
+    return network_key  # pyrefly: ignore[bad-return]
 
   def _GetNumberVms(self) -> int:
     """Counts the number of VMs to be used in this benchmark.

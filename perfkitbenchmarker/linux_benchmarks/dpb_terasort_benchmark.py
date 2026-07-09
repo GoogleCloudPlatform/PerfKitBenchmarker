@@ -263,7 +263,7 @@ def RunStage(
     jar = TERASORT_JAR
   args = [stage]
   if FLAGS.dpb_terasort_block_size_mb:
-    scheme = service.PERSISTENT_FS_PREFIX.strip(':/')
+    scheme = service.PERSISTENT_FS_PREFIX.strip(':/')  # pyrefly: ignore[missing-attribute]
     args.append(
         '-Dfs.{}.block.size={}'.format(
             scheme, FLAGS.dpb_terasort_block_size_mb * 1024 * 1024

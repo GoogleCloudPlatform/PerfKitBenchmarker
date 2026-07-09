@@ -36,7 +36,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker.linux_packages import tomcat
 from perfkitbenchmarker.linux_packages import wrk
 import six
-import six.moves.urllib.parse
+import six.moves.urllib.parse  # pyrefly: ignore[missing-source-for-stubs]
 
 
 flags.DEFINE_integer(

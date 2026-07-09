@@ -70,7 +70,7 @@ def GetConfig(user_config):
 def CheckPrerequisites(
     benchmark_config: benchmark_config_spec.BenchmarkConfigSpec,
 ):
-  if benchmark_config.container_cluster.type != container_lib.KUBERNETES:
+  if benchmark_config.container_cluster.type != container_lib.KUBERNETES:  # pyrefly: ignore[missing-attribute]
     raise errors.Config.InvalidValue(
         'provision_container_cluster only supports Kubernetes clusters.'
     )

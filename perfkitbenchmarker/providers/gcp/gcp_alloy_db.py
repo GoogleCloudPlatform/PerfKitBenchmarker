@@ -473,8 +473,8 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
       cmd_string: List[str],
   ) -> util.GcloudCommand:
     """Used to issue alloydb command."""
-    cmd_string = [self, 'alpha', 'alloydb'] + cmd_string
-    cmd = util.GcloudCommand(*cmd_string)
+    cmd_string = [self, 'alpha', 'alloydb'] + cmd_string  # pyrefly: ignore[bad-assignment]
+    cmd = util.GcloudCommand(*cmd_string)  # pyrefly: ignore[bad-argument-type]
     cmd.flags['project'] = self.project
     cmd.flags['zone'] = []
     cmd.flags['region'] = self.region

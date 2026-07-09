@@ -72,15 +72,15 @@ class EndToEndLatencyRunner(runners.BaseRunner):
     self._receiver = None
 
   def _record_message_published(self, ack_publish: protocol.AckPublish) -> None:
-    self._published_timestamps[ack_publish.seq] = ack_publish.publish_timestamp
+    self._published_timestamps[ack_publish.seq] = ack_publish.publish_timestamp  # pyrefly: ignore[unsupported-operation]
 
   def _record_message_reception(
       self, reception_report: protocol.ReceptionReport
   ) -> None:
-    self._receive_timestamps[reception_report.seq] = (
+    self._receive_timestamps[reception_report.seq] = (  # pyrefly: ignore[unsupported-operation]
         reception_report.receive_timestamp
     )
-    self._ack_timestamps[reception_report.seq] = reception_report.ack_timestamp
+    self._ack_timestamps[reception_report.seq] = reception_report.ack_timestamp  # pyrefly: ignore[unsupported-operation]
 
   def _compute_metrics(self, number_of_messages: int) -> Dict[str, Any]:
     e2e_pull_latencies = [None] * number_of_messages
@@ -95,21 +95,21 @@ class EndToEndLatencyRunner(runners.BaseRunner):
       if None in (published_timestamp, receive_timestamp, ack_timestamp):
         failure_counter += 1
         continue
-      e2e_pull_latencies[i] = nanoseconds_to_milliseconds(
+      e2e_pull_latencies[i] = nanoseconds_to_milliseconds(  # pyrefly: ignore[unsupported-operation]
           receive_timestamp - published_timestamp
       )
-      e2e_ack_latencies[i] = nanoseconds_to_milliseconds(
+      e2e_ack_latencies[i] = nanoseconds_to_milliseconds(  # pyrefly: ignore[unsupported-operation]
           ack_timestamp - published_timestamp
       )
       i += 1
     e2e_pull_latencies = e2e_pull_latencies[:i]
     e2e_ack_latencies = e2e_ack_latencies[:i]
     pull_metrics = self._get_summary_statistics(
-        'e2e_latency', e2e_pull_latencies, number_of_messages, failure_counter
+        'e2e_latency', e2e_pull_latencies, number_of_messages, failure_counter  # pyrefly: ignore[bad-argument-type]
     )
     acknowledge_metrics = self._get_summary_statistics(
         'e2e_acknowledge_latency',
-        e2e_ack_latencies,
+        e2e_ack_latencies,  # pyrefly: ignore[bad-argument-type]
         number_of_messages,
         failure_counter,
     )

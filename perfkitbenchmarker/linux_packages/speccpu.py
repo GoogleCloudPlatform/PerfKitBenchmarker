@@ -235,7 +235,7 @@ class SpecInstallConfigurations:
 
     self.spec_dir = posixpath.join(scratch_dir, self.base_spec_dir)
     self.cfg_file_path = posixpath.join(
-        self.spec_dir, 'config', os.path.basename(self.runspec_config)
+        self.spec_dir, 'config', os.path.basename(self.runspec_config)  # pyrefly: ignore[no-matching-overload]
     )
     if self.base_iso_file_path:
       self.iso_file_path = posixpath.join(scratch_dir, self.base_iso_file_path)
@@ -448,7 +448,7 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
   results = []
   speccpu_vm_state = getattr(vm, VM_STATE_ATTR, None)
   re_begin_section = re.compile('^={1,}')
-  re_end_section = re.compile(speccpu_vm_state.log_format)
+  re_end_section = re.compile(speccpu_vm_state.log_format)  # pyrefly: ignore[missing-attribute]
   result_section = []
   in_result_section = False
   at_peak_results_line, peak_name, peak_score = False, None, None
@@ -495,8 +495,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
       result_section.pop()
 
   metadata = {
-      'runspec_config': speccpu_vm_state.runspec_config,
-      'runspec_config_md5sum': _GenerateMd5sum(speccpu_vm_state.runspec_config),
+      'runspec_config': speccpu_vm_state.runspec_config,  # pyrefly: ignore[missing-attribute]
+      'runspec_config_md5sum': _GenerateMd5sum(speccpu_vm_state.runspec_config),  # pyrefly: ignore[missing-attribute]
       'runspec_iterations': str(FLAGS.runspec_iterations),
       'runspec_enable_32bit': str(FLAGS.runspec_enable_32bit),
       'runspec_define': FLAGS.runspec_define,
@@ -550,8 +550,8 @@ def _ExtractScore(stdout, vm, keep_partial_results, runspec_metric):
           sample.Sample(str(name) + ':peak', peak_score_float, '', metadata)
       )
 
-  if spec_score is None and FLAGS.spec_runmode != PEAK_MODE:
-    missing_results.append(spec_name)
+  if spec_score is None and FLAGS.spec_runmode != PEAK_MODE:  # pyrefly: ignore[unbound-name]
+    missing_results.append(spec_name)  # pyrefly: ignore[unbound-name]
 
   if missing_results:
     missing_results_str = ','.join(missing_results)
@@ -613,7 +613,7 @@ def ParseOutput(
   results = []
 
   for log in log_files:
-    results_dir = results_directory or '%s/result' % speccpu_vm_state.spec_dir
+    results_dir = results_directory or '%s/result' % speccpu_vm_state.spec_dir  # pyrefly: ignore[missing-attribute]
     stdout, _ = vm.RemoteCommand('cat %s/%s' % (results_dir, log))
     results.extend(
         _ExtractScore(
@@ -641,7 +641,7 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
   """
   speccpu_vm_state = getattr(vm, VM_STATE_ATTR, None)
   runspec_flags = [
-      ('config', posixpath.basename(speccpu_vm_state.cfg_file_path)),
+      ('config', posixpath.basename(speccpu_vm_state.cfg_file_path)),  # pyrefly: ignore[missing-attribute]
       ('tune', FLAGS.spec_runmode),
       ('size', 'ref'),
       ('iterations', FLAGS.runspec_iterations),
@@ -655,7 +655,7 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
     fl += ' '.join(version_specific_parameters)
 
   if FLAGS.runspec_script:
-    vm.PushDataFile(FLAGS.runspec_script, remote_path=speccpu_vm_state.spec_dir)
+    vm.PushDataFile(FLAGS.runspec_script, remote_path=speccpu_vm_state.spec_dir)  # pyrefly: ignore[missing-attribute]
     runspec_cmd = f'sudo bash {FLAGS.runspec_script}'
   else:
     runspec_cmd = '{cmd} --noreportable {flags} {subset}'.format(
@@ -663,7 +663,7 @@ def Run(vm, cmd, benchmark_subset, version_specific_parameters=None):
     )
 
   cmd = ' && '.join((
-      'cd {}'.format(speccpu_vm_state.spec_dir),
+      'cd {}'.format(speccpu_vm_state.spec_dir),  # pyrefly: ignore[missing-attribute]
       'rm -rf result',
       '. ./shrc',
       '. ./shrc',

@@ -415,11 +415,11 @@ def _BuildGenericCommand(
   if sysbench_parameters.skip_trx:
     cmd += ['--skip_trx=on']
   cmd += GetSysbenchDatabaseFlags(
-      sysbench_parameters.db_driver,
-      sysbench_parameters.db_user,
-      sysbench_parameters.db_password,
-      sysbench_parameters.db_name,
-      sysbench_parameters.host_ip,
+      sysbench_parameters.db_driver,  # pyrefly: ignore[bad-argument-type]
+      sysbench_parameters.db_user,  # pyrefly: ignore[bad-argument-type]
+      sysbench_parameters.db_password,  # pyrefly: ignore[bad-argument-type]
+      sysbench_parameters.db_name,  # pyrefly: ignore[bad-argument-type]
+      sysbench_parameters.host_ip,  # pyrefly: ignore[bad-argument-type]
       sysbench_parameters.ssl_setting,
       sysbench_parameters.port,
   )

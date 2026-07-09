@@ -71,7 +71,7 @@ class GceInstanceTemplate(resource.BaseResource):
         '--instance-template-region',
         self.region,
     )
-    cmd.flags = {
+    cmd.flags = {  # pyrefly: ignore[bad-assignment]
         k: v
         for k, v in self.vm_config.create_cmd.flags.items()
         if k not in self.FLAGS_NOT_SHARED_WITH_VM
@@ -183,7 +183,7 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
     return bool(self._Get())
 
   def _IsReady(self) -> bool:
-    return self._Get()['status']['isStable']
+    return self._Get()['status']['isStable']  # pyrefly: ignore[unsupported-operation]
 
   def _GetCurrentVms(self) -> list[VmReference]:
     cmd = self._GcloudCmd('list-instances', self.name)

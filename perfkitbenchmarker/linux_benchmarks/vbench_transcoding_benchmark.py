@@ -232,7 +232,7 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
           _FFMPEG_THREADS_LIST.value if _FFMPEG_THREADS_LIST else [4, 8]
       )
 
-    for jobs, threads in itertools.product(jobs_list, threads_list):
+    for jobs, threads in itertools.product(jobs_list, threads_list):  # pyrefly: ignore[unbound-name]
       if _FFMPEG_COPIES.value > 0:
         duplication_cmd = (
             "for f in $(ls *.mkv | grep -v '_copy'); do "
@@ -249,6 +249,7 @@ def RunParallel(spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       threads_arg = f'-threads {threads} '
       # Sort video largest to smallest to mitigate load imbalance.
       parallel_cmd = (
+          # pyrefly: ignore[unbound-name]
           f'ls -S *.mkv | parallel {jobs_arg} \'{_FFMPEG_DIR.value}ffmpeg '
           f'{threads_arg} -y {cuda_args} -i {{}} {ffmpeg_args} '
           '{.}.out.mkv </dev/null >&/dev/null\''

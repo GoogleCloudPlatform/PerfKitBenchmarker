@@ -73,7 +73,7 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
         _BENCHMARK_SPEC_YAML
     )
     self.server = wg_serving_inference_server.WGServingInferenceServer(
-        spec=self.config_spec.config.container_cluster.inference_server,
+        spec=self.config_spec.config.container_cluster.inference_server,  # pyrefly: ignore[missing-attribute]
         cluster=self.mock_cluster,
     )
 
@@ -85,7 +85,7 @@ class WgServingInferenceServerTest(pkb_common_test_case.PkbCommonTestCase):
         modified_spec
     )
     return wg_serving_inference_server.WGServingInferenceServer(
-        spec=config_spec.config.container_cluster.inference_server,
+        spec=config_spec.config.container_cluster.inference_server,  # pyrefly: ignore[missing-attribute]
         cluster=self.mock_cluster,
     )
 

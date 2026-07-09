@@ -138,7 +138,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
   ):
     super().InitializeNodePoolForCloud(vm_config, nodepool_config)
     nodepool_config.disk_type = vm_config.boot_disk_type
-    nodepool_config.disk_size = vm_config.boot_disk_size
+    nodepool_config.disk_size = vm_config.boot_disk_size  # pyrefly: ignore[bad-assignment]
 
   def GetResourceMetadata(self):
     """Returns a dict containing metadata about the cluster.
@@ -366,7 +366,7 @@ class AksCluster(kubernetes_cluster.KubernetesCluster):
         '--set',
         util.GetTagsJson(self.resource_group.timeout_minutes),
     ]
-    vm_util.IssueCommand(set_tags_cmd)
+    vm_util.IssueCommand(set_tags_cmd)  # pyrefly: ignore[bad-argument-type]
     self._AttachContainerRegistry()
     # Install NVIDIA device plugin as a DaemonSet to enable GPU support
     # in the Kubernetes cluster.
@@ -806,7 +806,7 @@ class AksAutomaticCluster(AksCluster):
     """Modifies the pod spec yaml with additional needed attributes."""
     # Topology spread constraints needed to fix an issue with Azure AKS where
     # admission webhook "validation.gatekeeper.sh" denied the request.
-    super()._ModifyPodSpecPlacementYaml(pod_spec_yaml, machine_type)
+    super()._ModifyPodSpecPlacementYaml(pod_spec_yaml, machine_type)  # pyrefly: ignore[bad-argument-type]
     pod_spec_yaml['topologySpreadConstraints'] = [{
         'maxSkew': 1,
         'topologyKey': 'kubernetes.io/hostname',

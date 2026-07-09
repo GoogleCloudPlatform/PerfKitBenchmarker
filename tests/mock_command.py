@@ -109,7 +109,7 @@ class MockCommand:
             and not kwargs.get('ignore_failure', False)
         ):
           raise errors.VmUtil.IssueCommandError(response[1])
-        return response
+        return response  # pyrefly: ignore[bad-return]
     return self.default_return_value
 
   def GetCommandWithSubstring(self, substring: str) -> str:
@@ -128,7 +128,7 @@ class MockRemoteCommand(MockCommand):
       call_to_response: dict[str, list[tuple[str, str]]],
       vm: virtual_machine.BaseVirtualMachine,
   ):
-    super().__init__(call_to_response, vm.RemoteCommand)
+    super().__init__(call_to_response, vm.RemoteCommand)  # pyrefly: ignore[bad-argument-type]
 
 
 class MockIssueCommand(MockCommand):
@@ -145,4 +145,4 @@ class MockIssueCommand(MockCommand):
             'IssueCommand',
         )
     )
-    super().__init__(call_to_response, self.func_to_mock, ('', '', 0))
+    super().__init__(call_to_response, self.func_to_mock, ('', '', 0))  # pyrefly: ignore[bad-argument-type]

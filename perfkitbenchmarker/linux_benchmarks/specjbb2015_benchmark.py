@@ -173,7 +173,7 @@ def Prepare(benchmark_spec):
   # Used on m6g (AWS Graviton 2) machines for optimal performance
   if FLAGS.build_openjdk_neoverse:
     openjdk_neoverse.InstallNeoverseCompiledOpenJDK(
-        vm, openjdk.OPENJDK_VERSION.value
+        vm, openjdk.OPENJDK_VERSION.value  # pyrefly: ignore[bad-argument-type]
     )
   vm.InstallPackages('numactl')
 

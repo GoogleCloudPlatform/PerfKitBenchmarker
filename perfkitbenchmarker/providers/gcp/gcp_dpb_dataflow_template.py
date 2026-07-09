@@ -51,16 +51,16 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
     if not FLAGS.dpb_dataflow_template_gcs_location:
       raise errors.Config.InvalidValue('Template GCS location missing.')
 
-  def Create(self):
+  def Create(self):  # pyrefly: ignore[bad-override]
     """See base class."""
     pass
 
-  def Delete(self):
+  def Delete(self):  # pyrefly: ignore[bad-override]
     """See base class."""
     pass
 
   # TODO(odiego): Update signature to match parent and BaseDpbService class
-  def SubmitJob(
+  def SubmitJob(  # pyrefly: ignore[bad-override]
       self,
       template_gcs_location=None,
       job_poll_interval=None,
@@ -73,12 +73,12 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
 
     now = datetime.datetime.now()
     job_name = '_'.join(
-        [template_gcs_location.split('/')[-1], now.strftime('%Y%m%d_%H%M%S')]
+        [template_gcs_location.split('/')[-1], now.strftime('%Y%m%d_%H%M%S')]  # pyrefly: ignore[missing-attribute]
     )
     region = util.GetRegionFromZone(FLAGS.dpb_service_zone)
 
     cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'run', job_name)
-    cmd.flags = {
+    cmd.flags = {  # pyrefly: ignore[bad-assignment]
         'project': self.project,
         'gcs-location': template_gcs_location,
         'staging-location': FLAGS.dpb_dataflow_temp_location,
@@ -87,7 +87,7 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
         'worker-machine-type': worker_machine_type,
         'num-workers': num_workers,
         'max-workers': max_workers,
-        'parameters': ','.join(job_arguments),
+        'parameters': ','.join(job_arguments),  # pyrefly: ignore[no-matching-overload]
         'format': 'json',
     }
 
@@ -124,7 +124,7 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
         self.input_sub_empty = True
         # Start draining job once input subscription is empty
         cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'drain', self.job_id)
-        cmd.flags = {
+        cmd.flags = {  # pyrefly: ignore[bad-assignment]
             'project': self.project,
             'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),
             'format': 'json',
@@ -137,7 +137,7 @@ class GcpDpbDataflowTemplate(gcp_dpb_dataflow.GcpDpbDataflow):
     if not self.job_drained:
       # Confirm job is drained
       cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'show', self.job_id)
-      cmd.flags = {
+      cmd.flags = {  # pyrefly: ignore[bad-assignment]
           'project': self.project,
           'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),
           'format': 'json',

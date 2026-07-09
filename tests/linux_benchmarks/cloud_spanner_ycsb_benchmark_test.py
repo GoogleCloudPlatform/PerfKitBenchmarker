@@ -54,7 +54,7 @@ class CloudSpannerYcsbBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self._CreateMockSpec(3, 6)
 
     cloud_spanner_ycsb_benchmark._LoadDatabase(
-        self.executor, self.mock_bm_spec.relational_db, [], {}
+        self.executor, self.mock_bm_spec.relational_db, [], {}  # pyrefly: ignore[bad-argument-type]
     )
 
     self.mock_set_nodes.assert_has_calls([mock.call(6), mock.call(3)])
@@ -62,10 +62,10 @@ class CloudSpannerYcsbBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testLoadDatabaseNotCalledRestored(self):
     self._CreateMockSpec(3, 6)
-    self.mock_bm_spec.relational_db.restored = True
+    self.mock_bm_spec.relational_db.restored = True  # pyrefly: ignore[missing-attribute]
 
     cloud_spanner_ycsb_benchmark._LoadDatabase(
-        self.executor, self.mock_bm_spec.relational_db, [], {}
+        self.executor, self.mock_bm_spec.relational_db, [], {}  # pyrefly: ignore[bad-argument-type]
     )
 
     self.mock_set_nodes.assert_not_called()
@@ -74,10 +74,10 @@ class CloudSpannerYcsbBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
   @flagsaver.flagsaver(ycsb_skip_load_stage=True)
   def testLoadDatabaseNotCalledSkipFlag(self):
     self._CreateMockSpec(3, 6)
-    self.mock_bm_spec.relational_db.restored = True
+    self.mock_bm_spec.relational_db.restored = True  # pyrefly: ignore[missing-attribute]
 
     cloud_spanner_ycsb_benchmark._LoadDatabase(
-        self.executor, self.mock_bm_spec.relational_db, [], {}
+        self.executor, self.mock_bm_spec.relational_db, [], {}  # pyrefly: ignore[bad-argument-type]
     )
 
     self.mock_set_nodes.assert_not_called()

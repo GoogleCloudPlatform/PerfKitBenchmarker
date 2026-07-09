@@ -140,7 +140,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   # Prepare Netperf benchmark
   netperf_client_vm, netperf_server_vm = (
       benchmark_spec.vm_groups['netperf_clients'][0],
-      benchmark_spec.relational_db.server_vm,
+      benchmark_spec.relational_db.server_vm,  # pyrefly: ignore[missing-attribute]
   )
   background_tasks.RunThreaded(
       netperf_benchmark.PrepareNetperf, [netperf_client_vm, netperf_server_vm]
@@ -179,7 +179,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """
   netperf_client_vm, netperf_server_vm = (
       benchmark_spec.vm_groups['netperf_clients'][0],
-      benchmark_spec.relational_db.server_vm,
+      benchmark_spec.relational_db.server_vm,  # pyrefly: ignore[missing-attribute]
   )
   # TODO(andytzhu) - synchronize the Run phases and add support for
   # targeting TPM and CPU load.
@@ -207,6 +207,6 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   """
   netperf_client_vm, netperf_server_vm = (
       benchmark_spec.vm_groups['netperf_clients'][0],
-      benchmark_spec.relational_db.server_vm,
+      benchmark_spec.relational_db.server_vm,  # pyrefly: ignore[missing-attribute]
   )
   netperf_benchmark.CleanupClientServerVMs(netperf_client_vm, netperf_server_vm)

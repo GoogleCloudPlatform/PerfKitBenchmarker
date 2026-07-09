@@ -152,7 +152,7 @@ def GetConfig(user_config):
 
 
 def _GetDefaultBatchSize(model, num_layers=None):
-  return DEFAULT_BATCH_SIZES_BY_MODEL.get(model, {}).get(
+  return DEFAULT_BATCH_SIZES_BY_MODEL.get(model, {}).get(  # pyrefly: ignore[no-matching-overload]
       num_layers or DEFAULT, DEFAULT_BATCH_SIZE
   )
 

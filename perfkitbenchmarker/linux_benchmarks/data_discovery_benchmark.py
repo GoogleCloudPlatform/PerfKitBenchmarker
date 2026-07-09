@@ -50,13 +50,13 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   Returns:
     A list of samples, comprised of the data discovery duration in seconds.
   """
-  discovery_duration = benchmark_spec.data_discovery_service.DiscoverData()
+  discovery_duration = benchmark_spec.data_discovery_service.DiscoverData()  # pyrefly: ignore[missing-attribute]
   return [
       sample.Sample(
           'data_discovery_duration',
           discovery_duration,
           'seconds',
-          benchmark_spec.data_discovery_service.GetMetadata(),
+          benchmark_spec.data_discovery_service.GetMetadata(),  # pyrefly: ignore[missing-attribute]
       )
   ]
 

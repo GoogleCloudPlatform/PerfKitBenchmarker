@@ -173,7 +173,7 @@ class _BenchmarkPerformanceSuite:
       predict_iteration_performance = (
           results_aggregator.EdwPowerIterationPerformance(
               iteration_id=iteration_id,
-              total_queries=len(self.predict_expected_queries),
+              total_queries=len(self.predict_expected_queries),  # pyrefly: ignore[bad-argument-type]
           )
       )
 
@@ -182,7 +182,7 @@ class _BenchmarkPerformanceSuite:
       gt_iteration_performance = (
           results_aggregator.EdwPowerIterationPerformance(
               iteration_id=iteration_id,
-              total_queries=len(self.gt_expected_queries),
+              total_queries=len(self.gt_expected_queries),  # pyrefly: ignore[bad-argument-type]
           )
       )
 
@@ -458,10 +458,10 @@ def Run(benchmark_spec) -> list[Any]:
     suite.ca_performance.add_iteration_performance(ca_iter_perf)
     if suite.predict_query_performance:
       suite.predict_query_performance.add_iteration_performance(
-          predict_iter_perf
+          predict_iter_perf  # pyrefly: ignore[bad-argument-type]
       )
     if suite.gt_query_performance:
-      suite.gt_query_performance.add_iteration_performance(gt_iter_perf)
+      suite.gt_query_performance.add_iteration_performance(gt_iter_perf)  # pyrefly: ignore[bad-argument-type]
 
   return suite.BuildResults()
 

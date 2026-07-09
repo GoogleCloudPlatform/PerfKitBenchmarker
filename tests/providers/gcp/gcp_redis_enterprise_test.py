@@ -41,11 +41,11 @@ class ConstructCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     instance = self.test_bm_spec.memory_store
     with self.subTest('service_type'):
-      self.assertEqual(instance.SERVICE_TYPE, 'redis_enterprise')
+      self.assertEqual(instance.SERVICE_TYPE, 'redis_enterprise')  # pyrefly: ignore[missing-attribute]
     with self.subTest('memory_store_type'):
-      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
+      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)  # pyrefly: ignore[missing-attribute]
     with self.subTest('redis_version'):
-      self.assertEqual(instance.version, '7.2')
+      self.assertEqual(instance.version, '7.2')  # pyrefly: ignore[missing-attribute]
 
   def testInitializationFlagOverrides(self):
     test_spec = inspect.cleandoc(f"""
@@ -67,13 +67,13 @@ class ConstructCloudRedisTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     instance = self.test_bm_spec.memory_store
     with self.subTest('service_type'):
-      self.assertEqual(instance.SERVICE_TYPE, 'redis_enterprise')
+      self.assertEqual(instance.SERVICE_TYPE, 'redis_enterprise')  # pyrefly: ignore[missing-attribute]
     with self.subTest('memory_store_type'):
-      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)
+      self.assertEqual(instance.MEMORY_STORE, managed_memory_store.REDIS)  # pyrefly: ignore[missing-attribute]
     with self.subTest('redis_version'):
-      self.assertEqual(instance.version, '7.2')
+      self.assertEqual(instance.version, '7.2')  # pyrefly: ignore[missing-attribute]
     with self.subTest('redis_region'):
-      self.assertEqual(instance.redis_region, 'us-central1')
+      self.assertEqual(instance.redis_region, 'us-central1')  # pyrefly: ignore[missing-attribute]
 
 
 if __name__ == '__main__':

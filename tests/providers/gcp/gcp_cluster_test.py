@@ -48,7 +48,7 @@ class GcpClusterTest(pkb_common_test_case.PkbCommonTestCase):
     # Test _PostCreate
     self.cluster._PostCreate()
     self.assertEqual(
-        self.cluster.headnode_vm.name, 'test_gcp_cluster-controller')
+        self.cluster.headnode_vm.name, 'test_gcp_cluster-controller')  # pyrefly: ignore[missing-attribute]
     self.assertEqual(
         self.cluster.worker_vms[0].name, 'test_gcp_cluster-computenodeset-0')
     self.assertEqual(
@@ -62,7 +62,7 @@ class GcpClusterTest(pkb_common_test_case.PkbCommonTestCase):
     self.cluster.vms[0].RemoteCommand = mock.MagicMock()
     self.cluster.AuthenticateVM()
     self.assertTrue(self.cluster.vms[0].has_private_key)
-    self.cluster.vms[0].RemoteHostCopy.assert_called_once_with(
+    self.cluster.vms[0].RemoteHostCopy.assert_called_once_with(  # pyrefly: ignore[missing-attribute]
         '/tmp/perfkitbenchmarker/runs/run12345/perfkitbenchmarker_keyfile',
         '~/.ssh/id_rsa')
     self.assertSequenceEqual(

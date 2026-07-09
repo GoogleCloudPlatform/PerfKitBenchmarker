@@ -91,7 +91,7 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   """
   for vm in bm_spec.vms:
     vm.RemoteCommand(f'{_ENV.value} pip install absl-py')
-    vm.AuthenticateVm()
+    vm.AuthenticateVm()  # pyrefly: ignore[missing-attribute]
     for script in [_TEST_SCRIPT, _SERVER_SCRIPT]:
       vm.PushFile(data.ResourcePath(script), script)
   server1, server2 = bm_spec.vms[0], bm_spec.vms[1]

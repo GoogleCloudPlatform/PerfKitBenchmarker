@@ -21,7 +21,7 @@ import functools
 import json
 import logging
 import re
-from typing import Any, Set, cast
+from typing import Any, Callable, Set, cast
 
 from absl import flags
 from google.cloud import monitoring_v3
@@ -395,10 +395,59 @@ class GcloudCommand:
         self._RaiseRateLimitedException(error_message)
       else:
         raise error
-    if retcode and GcloudCommand._IsIssueRateLimitMessage(stderr):
+    if retcode and GcloudCommand._IsIssueRateLimitMessage(stderr):  # pyrefly: ignore[unbound-name]
       self._RaiseRateLimitedException(stderr)
 
-    return stdout, stderr, retcode
+    return stdout, stderr, retcode  # pyrefly: ignore[unbound-name]
+
+  def IssueAsync(
+      self,
+      get_latest_op_fn: Callable[[], str] | None = None,
+      **kwargs,
+  ) -> str:
+    """Issues this command with --async and returns the operation name.
+
+    Most async gcloud commands print an operation name to stdout. Some
+    subcommands (e.g. GKE's `clusters upgrade --node-pool`, `clusters
+    update`) reliably return success with empty stdout instead. For those,
+    pass get_latest_op_fn -- a zero-arg callable that looks up the
+    operation name by some resource-specific means (e.g. listing
+    operations and filtering) when stdout is empty.
+
+    Args:
+      get_latest_op_fn: Optional callable invoked when stdout is empty after
+        issuing the async command. Resource-specific -- e.g. for GKE this
+        queries `gcloud container operations list` with a type/target filter. If
+        None, empty stdout raises an error (the default for resources where
+        async commands always print the operation name, e.g. create/delete).
+      **kwargs: Forwarded to Issue().
+
+    Returns:
+      The operation name.
+
+    Raises:
+      errors.VmUtil.IssueCommandError: if stdout is empty and no
+        get_latest_op_fn is supplied. If the command itself fails, the
+        exception raised is whatever Issue()/IssueCommand raises by
+        default (also errors.VmUtil.IssueCommandError), unless the caller
+        passes raise_on_failure=False via **kwargs.
+    """
+    self.args.append('--async')
+    self.flags['format'] = 'value(name)'
+    # No explicit retcode check here: Issue() defaults raise_on_failure=True
+    # (forwarded via **kwargs), so a failing command already raises before
+    # we get here. Callers that want raise_on_failure=False behavior can
+    # pass it explicitly through **kwargs and handle the empty stdout/
+    # stderr themselves.
+    stdout, stderr, _ = self.Issue(**kwargs)
+    op_name = stdout.strip().splitlines()[-1].strip() if stdout else ''
+    if op_name:
+      return op_name
+    if get_latest_op_fn is None:
+      raise errors.VmUtil.IssueCommandError(
+          f'Async gcloud command returned no operation name; stderr={stderr}'
+      )
+    return get_latest_op_fn()
 
   def _RaiseRateLimitedException(self, error):
     """Raise rate limited exception based on the retry_on_rate_limited flag.

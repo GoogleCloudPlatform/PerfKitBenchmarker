@@ -67,13 +67,13 @@ class RedshiftTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testInvalidClusterCreationError(self):
     kwargs = copy.copy(BASE_REDSHIFT_SPEC)
-    kwargs['node_count'] = None
+    kwargs['node_count'] = None  # pyrefly: ignore[bad-assignment]
     with self.assertRaises(errors.Config.InvalidValue):
       benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
 
   def testSingleNodeClusterCreation(self):
     kwargs = copy.copy(BASE_REDSHIFT_SPEC)
-    kwargs['node_count'] = 1
+    kwargs['node_count'] = 1  # pyrefly: ignore[bad-assignment]
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
     redshift_local = redshift.Redshift(spec)
     self.assertIsNone(redshift_local.snapshot)
@@ -121,7 +121,7 @@ class RedshiftTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testMultiNodeClusterCreation(self):
     kwargs = copy.copy(BASE_REDSHIFT_SPEC)
-    kwargs['node_count'] = 2
+    kwargs['node_count'] = 2  # pyrefly: ignore[bad-assignment]
     spec = benchmark_config_spec._EdwServiceSpec('NAME', **kwargs)
     redshift_local = redshift.Redshift(spec)
     with mock.patch(

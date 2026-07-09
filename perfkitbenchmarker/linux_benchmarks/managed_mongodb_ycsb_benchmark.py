@@ -93,7 +93,7 @@ def _PrepareClient(vm: _LinuxVM) -> None:
 
 def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
   """Returns the connection string used to connect to the instance."""
-  instance: _ManagedMongoDb = benchmark_spec.non_relational_db
+  instance: _ManagedMongoDb = benchmark_spec.non_relational_db  # pyrefly: ignore[bad-assignment]
   read_preference = _READ_PREFERENCE.value
   write_concern = _WRITE_CONCERN.value
   return (
@@ -105,7 +105,7 @@ def _GetMongoDbURL(benchmark_spec: bm_spec.BenchmarkSpec) -> str:
 
 def _GetCommonYcsbArgs(benchmark_spec: bm_spec.BenchmarkSpec) -> dict[str, Any]:
   """Returns the args to use for YCSB."""
-  instance: _ManagedMongoDb = benchmark_spec.non_relational_db
+  instance: _ManagedMongoDb = benchmark_spec.non_relational_db  # pyrefly: ignore[bad-assignment]
   args = {
       'mongodb.url': _GetMongoDbURL(benchmark_spec),
   }
@@ -119,7 +119,7 @@ def _GetCommonYcsbArgs(benchmark_spec: bm_spec.BenchmarkSpec) -> dict[str, Any]:
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Prepare the clients and load the database."""
   clients = benchmark_spec.vm_groups['clients']
-  db: _ManagedMongoDb = benchmark_spec.non_relational_db
+  db: _ManagedMongoDb = benchmark_spec.non_relational_db  # pyrefly: ignore[bad-assignment]
   executor = ycsb.YCSBExecutor('mongodb', cp=ycsb.YCSB_DIR)
 
   if db.tls_enabled:
@@ -152,7 +152,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     A list of sample.Sample objects.
   """
   clients = benchmark_spec.vm_groups['clients']
-  instance: _ManagedMongoDb = benchmark_spec.non_relational_db
+  instance: _ManagedMongoDb = benchmark_spec.non_relational_db  # pyrefly: ignore[bad-assignment]
 
   run_kwargs = _GetCommonYcsbArgs(benchmark_spec)
   run_kwargs.update({

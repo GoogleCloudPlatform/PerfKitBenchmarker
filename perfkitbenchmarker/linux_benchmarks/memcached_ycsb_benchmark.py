@@ -167,7 +167,7 @@ def Prepare(benchmark_spec):
           FLAGS.memcached_elasticache_node_type,
           FLAGS.memcached_elasticache_num_servers,
       )
-    service.Create()
+    service.Create()  # pyrefly: ignore[unbound-name]
     hosts = service.GetHosts()
     benchmark_spec.service = service
     benchmark_spec.metadata = service.GetMetadata()

@@ -27,6 +27,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import disk_strategies
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import s3
@@ -196,7 +197,7 @@ class CreateNonResourceDiskStrategy(
     elif self.disk_spec.disk_type == disk.SMB:
       return disk_strategies.SetUpSMBDiskStrategy(self.vm, self.disk_spec)
     elif self.disk_spec.disk_type == disk.NFS:
-      return disk_strategies.SetUpNFSDiskStrategy(self.vm, self.disk_spec)
+      return AWSSetUpNFSDiskStrategy(self.vm, self.disk_spec)
     elif self.disk_spec.disk_type == disk.OBJECT_STORAGE:
       return SetUpS3MountPointDiskStrategy(self.vm, self.disk_spec)
     elif self.disk_spec.disk_type == disk.LUSTRE:
@@ -208,6 +209,32 @@ class CreateNonResourceDiskStrategy(
       self,
   ):
     return []
+
+
+class AWSSetUpNFSDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
+  """Strategies to prepare NFS disks on AWS."""
+
+  def SetUpDiskOnLinux(self):
+    nfs_disk = self.nfs_service.CreateNfsDisk()
+    device_path = nfs_disk.GetDevicePath()
+    host = device_path.rsplit(':', 1)[0]
+    logging.info(
+        'Waiting for NFS host %s to resolve on VM %s', host, self.vm.name
+    )
+
+    @vm_util.Retry(
+        poll_interval=60,
+        max_retries=10,
+        retryable_exceptions=(errors.Resource.CreationError,),
+    )
+    def _WaitForDnsResolution():
+      if not self.vm.TryRemoteCommand(f'getent hosts {host}'):
+        raise errors.Resource.CreationError(
+            f'DNS for {host} not resolved yet on VM.'
+        )
+
+    _WaitForDnsResolution()
+    super().SetUpDiskOnLinux()
 
 
 class AWSSetupDiskStrategy(disk_strategies.SetUpDiskStrategy):
@@ -468,8 +495,8 @@ class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
 
   DEFAULT_MOUNT_OPTIONS = [
       '--allow-other',
-      '--dir-mode=755',
-      '--file-mode=755',
+      '--dir-mode=777',
+      '--file-mode=777',
       # Sets part size to 64MiB. Max upload 64000MiB.
       '--write-part-size=67108864',
       '--incremental-upload',
@@ -477,7 +504,7 @@ class SetUpS3MountPointDiskStrategy(AWSSetupDiskStrategy):
       '--allow-delete',
   ]
 
-  def SetUpDisk(self):
+  def SetUpDiskOnLinux(self):
     """Performs setup of S3 buckets."""
     self.vm.Install('mountpoint')
     target = self.disk_spec.mount_point

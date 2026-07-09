@@ -64,7 +64,7 @@ class TestBackgroundWorkloadFramework(pkb_common_test_case.PkbCommonTestCase):
     timer = timing_util.IntervalTimer()
     pkb.DoPreparePhase(spec, timer)
     for vm in spec.vms:
-      self.assertEqual(vm.PrepareBackgroundWorkload.call_count, 1)
+      self.assertEqual(vm.PrepareBackgroundWorkload.call_count, 1)  # pyrefly: ignore[missing-attribute]
 
     with mock.patch(ping_benchmark.__name__ + '.Run'):
       vm0.StopBackgroundWorkload.side_effect = functools.partial(
@@ -72,9 +72,9 @@ class TestBackgroundWorkloadFramework(pkb_common_test_case.PkbCommonTestCase):
       )
       pkb.DoCleanupPhase(spec, timer)
       for vm in spec.vms:
-        self.assertEqual(vm.StartBackgroundWorkload.call_count, 1)
-        self.assertEqual(vm.StopBackgroundWorkload.call_count, 1)
-        self.assertEqual(vm.PrepareBackgroundWorkload.call_count, 1)
+        self.assertEqual(vm.StartBackgroundWorkload.call_count, 1)  # pyrefly: ignore[missing-attribute]
+        self.assertEqual(vm.StopBackgroundWorkload.call_count, 1)  # pyrefly: ignore[missing-attribute]
+        self.assertEqual(vm.PrepareBackgroundWorkload.call_count, 1)  # pyrefly: ignore[missing-attribute]
 
 
 if __name__ == '__main__':

@@ -33,8 +33,8 @@ class BaseContainerRegistry(resource.BaseResource):
     container_cluster = getattr(benchmark_spec, 'container_cluster', None)
     zone = getattr(container_cluster, 'zone', None)
     project = getattr(container_cluster, 'project', None)
-    self.zone: str = registry_spec.zone or zone
-    self.project: str = registry_spec.project or project
+    self.zone: str = registry_spec.zone or zone  # pyrefly: ignore[bad-assignment]
+    self.project: str = registry_spec.project or project  # pyrefly: ignore[bad-assignment]
     self.name: str = registry_spec.name or 'pkb%s' % container.FLAGS.run_uri
     self.local_build_times: dict[str, float] = {}
     self.remote_build_times: dict[str, float] = {}
@@ -141,23 +141,23 @@ class BaseContainerRegistry(resource.BaseResource):
       data_path: The PKB data directory path containing the Dockerfile if
         different from "docker/<image name>".
     """
-    image = container.ContainerImage(image, data_path)
+    image = container.ContainerImage(image, data_path)  # pyrefly: ignore[bad-assignment]
     if not container.FLAGS.local_container_build:
       try:
         build_start = time.time()
         # Build the image remotely using an image building service.
-        self.RemoteBuild(image)
-        self.remote_build_times[image.name] = time.time() - build_start
+        self.RemoteBuild(image)  # pyrefly: ignore[bad-argument-type]
+        self.remote_build_times[image.name] = time.time() - build_start  # pyrefly: ignore[missing-attribute]
         return
       except NotImplementedError:
         pass
 
     # TODO(pclay): Refactor ECR and remove.
-    self.PrePush(image)
+    self.PrePush(image)  # pyrefly: ignore[bad-argument-type]
     # Build the image locally using docker.
     build_start = time.time()
-    self.LocalBuildAndPush(image)
-    self.local_build_times[image.name] = time.time() - build_start
+    self.LocalBuildAndPush(image)  # pyrefly: ignore[bad-argument-type]
+    self.local_build_times[image.name] = time.time() - build_start  # pyrefly: ignore[missing-attribute]
 
 
 def GetContainerRegistryClass(cloud: str) -> type[BaseContainerRegistry]:

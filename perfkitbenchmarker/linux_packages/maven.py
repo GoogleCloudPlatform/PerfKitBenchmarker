@@ -130,8 +130,8 @@ def _Install(vm):
   maven_tar = maven_url.split('/')[-1]
   # will only work with preprovision_ignore_checksum
   if maven_tar not in PREPROVISIONED_DATA:
-    PREPROVISIONED_DATA[maven_tar] = ''
-    PACKAGE_DATA_URL[maven_tar] = maven_url
+    PREPROVISIONED_DATA[maven_tar] = ''  # pyrefly: ignore[unsupported-operation]
+    PACKAGE_DATA_URL[maven_tar] = maven_url  # pyrefly: ignore[unsupported-operation]
   maven_remote_path = posixpath.join(linux_packages.INSTALL_DIR, maven_tar)
   vm.InstallPreprovisionedPackageData(
       PACKAGE_NAME, [maven_tar], linux_packages.INSTALL_DIR

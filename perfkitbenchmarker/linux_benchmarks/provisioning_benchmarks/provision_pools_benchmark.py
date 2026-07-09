@@ -318,10 +318,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   start = time.monotonic()
   if INIT_BATCH_SIZE.value > 0:
     samples += _CreateNodePools(
-        cluster, INIT_BATCH_NAME, INIT_BATCH_SIZE.value, image
+        cluster, INIT_BATCH_NAME, INIT_BATCH_SIZE.value, image  # pyrefly: ignore[bad-argument-type]
     )
   samples += _CreateNodePools(
-      cluster, TEST_BATCH_NAME, TEST_BATCH_SIZE.value, image
+      cluster, TEST_BATCH_NAME, TEST_BATCH_SIZE.value, image  # pyrefly: ignore[bad-argument-type]
   )
   elapsed = time.monotonic() - start
   total_node_pools = INIT_BATCH_SIZE.value + TEST_BATCH_SIZE.value

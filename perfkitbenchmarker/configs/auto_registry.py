@@ -47,7 +47,7 @@ def GetRegisteredClass(
   """
   key = [base_class.__name__]
   key += sorted(kwargs.items())
-  resource = registry.get(tuple(key), default_class)
+  resource = registry.get(tuple(key), default_class)  # pyrefly: ignore[no-matching-overload]
   if not resource:
     possibilites = {
         key: value
@@ -91,12 +91,12 @@ def RegisterClass(
       be registered.
     cls_type: The class type to be registered (typically base class name).
   """
-  if not (all(hasattr(cls, attr) for attr in required_attrs) and cls_type):
+  if not (all(hasattr(cls, attr) for attr in required_attrs) and cls_type):  # pyrefly: ignore[not-iterable]
     return
 
   # Use the manually overriden attributes if set.
-  if cls.GetAttributes():
-    for key in cls.GetAttributes():
+  if cls.GetAttributes():  # pyrefly: ignore[missing-attribute]
+    for key in cls.GetAttributes():  # pyrefly: ignore[missing-attribute]
       registry[key] = cls
     return
 
@@ -109,12 +109,12 @@ def RegisterClass(
   # GetResourceClass(Example, CLOUD='GCP', ENGINE='mysql')
   # would return Example.
   attributes = [[cls_type]]
-  for attr in sorted(required_attrs):
+  for attr in sorted(required_attrs):  # pyrefly: ignore[bad-argument-type]
     value = getattr(cls, attr)
     if not isinstance(value, list):
-      attributes.append([(attr, value)])
+      attributes.append([(attr, value)])  # pyrefly: ignore[bad-argument-type]
     else:
-      attributes.append([(attr, i) for i in value])
+      attributes.append([(attr, i) for i in value])  # pyrefly: ignore[bad-argument-type]
   # Cross product
   for key in itertools.product(*attributes):
-    registry[tuple(key)] = cls
+    registry[tuple(key)] = cls  # pyrefly: ignore[unsupported-operation]

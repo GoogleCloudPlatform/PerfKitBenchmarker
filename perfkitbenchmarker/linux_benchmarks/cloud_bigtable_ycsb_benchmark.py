@@ -385,7 +385,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   benchmark_spec.always_call_cleanup = True
   vms = benchmark_spec.vms
 
-  instance: _Bigtable = benchmark_spec.non_relational_db
+  instance: _Bigtable = benchmark_spec.non_relational_db  # pyrefly: ignore[bad-assignment]
   args = [((vm, instance), {}) for vm in vms]
   background_tasks.RunThreaded(_Install, args)
 
@@ -453,7 +453,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
     A list of sample.Sample instances.
   """
   vms = benchmark_spec.vms
-  instance: _Bigtable = benchmark_spec.non_relational_db
+  instance: _Bigtable = benchmark_spec.non_relational_db  # pyrefly: ignore[bad-assignment]
 
   metadata = {
       'ycsb_client_vms': len(vms),
@@ -577,7 +577,7 @@ def _CreateTable(benchmark_spec: bm_spec.BenchmarkSpec):
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  instance: _Bigtable = benchmark_spec.non_relational_db
+  instance: _Bigtable = benchmark_spec.non_relational_db  # pyrefly: ignore[bad-assignment]
   vm = benchmark_spec.vms[0]
   splits = ','.join([
       f'user{1000 + i * (9999 - 1000) // hbase_ycsb.TABLE_SPLIT_COUNT}'
@@ -614,7 +614,7 @@ def _CleanupTable(benchmark_spec: bm_spec.BenchmarkSpec):
       required to run the benchmark.
   """
   vm = benchmark_spec.vms[0]
-  instance: _Bigtable = benchmark_spec.non_relational_db
+  instance: _Bigtable = benchmark_spec.non_relational_db  # pyrefly: ignore[bad-assignment]
   command = [
       google_cloud_cbt.CBT_BIN,
       f'-project={FLAGS.project or _GetDefaultProject()}',
@@ -633,7 +633,7 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     benchmark_spec: The benchmark specification. Contains all data that is
       required to run the benchmark.
   """
-  instance: _Bigtable = benchmark_spec.non_relational_db
+  instance: _Bigtable = benchmark_spec.non_relational_db  # pyrefly: ignore[bad-assignment]
   if instance.user_managed and (
       _STATIC_TABLE_NAME.value is None or _DELETE_STATIC_TABLE.value
   ):

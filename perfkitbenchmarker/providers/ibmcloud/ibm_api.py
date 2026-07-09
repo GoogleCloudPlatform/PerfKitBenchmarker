@@ -80,7 +80,7 @@ class IbmAPICommand:
     boot_encryption_key: boot encryption key for account.
   """
 
-  gen: ibmcloud_manager.IbmCloud = None
+  gen: ibmcloud_manager.IbmCloud = None  # pyrefly: ignore[bad-assignment]
   gen_instmgr: ibmcloud_manager.InstanceManager
   gen_imgmgr: ibmcloud_manager.ImageManager
   gen_keymgr: ibmcloud_manager.KeyManager
@@ -134,7 +134,7 @@ class IbmAPICommand:
       IbmAPICommand.gen_vpcmgr = ibmcloud_manager.VPCManager(IbmAPICommand.gen)
       IbmAPICommand.gen_sgmgr = ibmcloud_manager.SGManager(IbmAPICommand.gen)
       self.ibmcloud_auth_token = self.GetToken()
-      self.ibmcloud_auth_token_time = time.time()
+      self.ibmcloud_auth_token_time = time.time()  # pyrefly: ignore[bad-assignment]
 
     self.args = args
     self.flags = kwargs
@@ -497,7 +497,7 @@ class IbmAPICommand:
     resp = self.gen_vpcmgr.Create(self.name)
     if resp:
       vpcid = resp.get('id')
-      sgid = resp.get('default_security_group')['id']
+      sgid = resp.get('default_security_group')['id']  # pyrefly: ignore[unsupported-operation]
       logging.info('Created vpc: %s, sgid: %s', vpcid, sgid)
       self.flags['sgid'] = sgid
       self.CreateSgRules()

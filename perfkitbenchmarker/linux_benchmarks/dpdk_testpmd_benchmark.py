@@ -183,6 +183,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   client_cmd = (
       dpdk_cmd
+      # pyrefly: ignore[missing-attribute]
       + f' -a {client_vm.secondary_nic_bus_info}'
       f' -l 0-{_DPDK_NB_CORES.value} --'
       f' --forward-mode={_DPDK_FORWARD_MODE.value[0]}'
@@ -194,14 +195,15 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       f' --burst={_DPDK_BURST.value}'
       ' -i'
   )
-  if client_vm.CLOUD == 'AWS':
-    client_cmd += f' --eth-peer=0,{server_vm.secondary_mac_addr}'
+  if client_vm.CLOUD == 'AWS':  # pyrefly: ignore[missing-argument]
+    client_cmd += f' --eth-peer=0,{server_vm.secondary_mac_addr}'  # pyrefly: ignore[missing-attribute]
 
   if _DPDK_TXONLY_MULTI_FLOW.value:
     client_cmd += ' --txonly-multi-flow'
 
   server_cmd = (
       dpdk_cmd
+      # pyrefly: ignore[missing-attribute]
       + f' -a {server_vm.secondary_nic_bus_info}'
       f' -l 0-{_DPDK_NB_CORES.value} --'
       f' --txq={_DPDK_TXQ.value}'

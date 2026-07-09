@@ -143,7 +143,7 @@ class ConstructEdwServiceTestCase(_BenchmarkSpecTestCase):
         yaml_string=_SIMPLE_EDW_CONFIG, benchmark_name='edw_benchmark'
     )
     spec.ConstructEdwService()
-    self.assertEqual('snowflake_aws', spec.edw_service.SERVICE_TYPE)
+    self.assertEqual('snowflake_aws', spec.edw_service.SERVICE_TYPE)  # pyrefly: ignore[missing-attribute]
     self.assertIsInstance(
         spec.edw_service, providers.aws.snowflake_aws.Snowflake
     )
@@ -231,7 +231,7 @@ class ConstructSpannerTestCase(_BenchmarkSpecTestCase):
 
     self.test_bm_spec.ConstructRelationalDb()
 
-    self.assertEqual(self.test_bm_spec.relational_db.nodes, 10)
+    self.assertEqual(self.test_bm_spec.relational_db.nodes, 10)  # pyrefly: ignore[missing-attribute]
 
 
 class ConstructVmsTestCase(_BenchmarkSpecTestCase):
@@ -245,7 +245,7 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
 
     self.assertEqual(vm.machine_type, 'n1-standard-4')
     self.assertEqual(vm.zone, 'us-central1-c')
-    self.assertEqual(vm.project, 'my-project')
+    self.assertEqual(vm.project, 'my-project')  # pyrefly: ignore[missing-attribute]
     self.assertEqual(vm.disk_specs, [])
 
   def testMultiCloud(self):
@@ -282,7 +282,7 @@ class ConstructVmsTestCase(_BenchmarkSpecTestCase):
     vms = spec.vm_groups['default']
     self.assertEqual(len(vms), 2)
     for vm in vms:
-      self.assertEqual(len(vm.create_disk_strategy.remote_disk_groups), 3)
+      self.assertEqual(len(vm.create_disk_strategy.remote_disk_groups), 3)  # pyrefly: ignore[missing-attribute]
       self.assertTrue(
           all(disk_spec.disk_size == 75 for disk_spec in vm.disk_specs)
       )

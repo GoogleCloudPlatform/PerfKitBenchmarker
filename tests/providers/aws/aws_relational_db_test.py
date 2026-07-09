@@ -774,12 +774,12 @@ class ConstructAwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       with mock.patch.object(
           vm_util, 'IssueCommand', return_value=('', '', 0)
       ) as issue_command:
-        spec.relational_db._Create()
+        spec.relational_db._Create()  # pyrefly: ignore[missing-attribute]
         command_string = ' '.join(issue_command.call_args[0][0])
         self.assertIn('--dedicated-log-volume', command_string)
 
     with self.subTest('metadata'):
-      metadata = spec.relational_db.GetResourceMetadata()
+      metadata = spec.relational_db.GetResourceMetadata()  # pyrefly: ignore[missing-attribute]
       self.assertTrue(metadata.get('aws_rds_dedicated_log_volume'))
 
   def testConstructWithDedicatedLogVolumeInvalidEngine(self):

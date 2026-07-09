@@ -150,8 +150,9 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
   def testColsToRows(self, cols=None, expected=None):
     self.assertEqual(
         expected,
-        edw_service.EdwService.ColsToRows(cols),
+        edw_service.EdwService.ColsToRows(cols),  # pyrefly: ignore[bad-argument-type]
         msg=(
+            # pyrefly: ignore[bad-argument-type]
             f'Expected {expected} but got'
             f' {edw_service.EdwService.ColsToRows(cols)}'
         ),

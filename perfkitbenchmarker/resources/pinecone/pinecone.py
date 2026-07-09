@@ -89,4 +89,4 @@ def GetPineconeResourceClass(
     cloud: str,
 ) -> resource.AutoRegisterResourceMeta | None:
   """Gets the pinecone server class for the given cloud."""
-  return resource.GetResourceClass(PineconeServer, CLOUD=cloud)
+  return resource.GetResourceClass(PineconeServer, CLOUD=cloud)  # pyrefly: ignore[bad-return]

@@ -175,13 +175,13 @@ class BaseNodePoolConfig:
             f' while machine type was set to {self.machine_type}.'
             ' Specify only one at a time.'
         )
-    self.zone: str = vm_spec.zone
+    self.zone: str = vm_spec.zone  # pyrefly: ignore[bad-assignment]
     self.name = NodePoolName(name)
     self.num_nodes: int = 1
     self.min_nodes: int = 1
     self.max_nodes: int = 1
     self.disk_type: str | None = vm_spec.boot_disk_type
-    self.disk_size: int = vm_spec.boot_disk_size
+    self.disk_size: int = vm_spec.boot_disk_size  # pyrefly: ignore[bad-assignment]
     self.gpu_type: str | None = vm_spec.gpu_type
     self.gpu_count: int | None = vm_spec.gpu_count
     # Defined by GceVirtualMachineConfig. Used by google_kubernetes_engine

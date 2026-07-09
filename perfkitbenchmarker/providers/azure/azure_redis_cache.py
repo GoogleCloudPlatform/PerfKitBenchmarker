@@ -109,7 +109,7 @@ class AzureRedisCache(managed_memory_store.BaseManagedMemoryStore):
         '--redis-version',
         self.version,
     ]
-    vm_util.IssueCommand(cmd, timeout=TIMEOUT)
+    vm_util.IssueCommand(cmd, timeout=TIMEOUT)  # pyrefly: ignore[bad-argument-type]
 
   def _Delete(self):
     """Deletes the cache."""

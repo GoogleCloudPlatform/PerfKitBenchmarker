@@ -244,7 +244,7 @@ class AzureVmSpec(virtual_machine_spec.BaseVmSpec):
     ):
       self.tier = self.machine_type.tier
       self.compute_units = self.machine_type.compute_units
-      self.machine_type = None
+      self.machine_type = None  # pyrefly: ignore[bad-assignment]
     elif isinstance(
         self.machine_type,
         custom_virtual_machine_spec.CustomMachineTypeSpec,
@@ -717,7 +717,7 @@ def _GetArmArch(machine_type) -> str | None:
   return None
 
 
-class AzureVirtualMachine(
+class AzureVirtualMachine(  # pyrefly: ignore[invalid-inheritance]
     virtual_machine.BaseVirtualMachine, metaclass=abc.ABCMeta
 ):
   """Object representing an Azure Virtual Machine."""
@@ -1792,7 +1792,7 @@ def GenerateDownloadPreprovisionedDataCommand(
       )
   )
   if install_path:
-    return '{} && {}'.format(mkdir_command, download_command)
+    return '{} && {}'.format(mkdir_command, download_command)  # pyrefly: ignore[unbound-name]
   return download_command
 
 

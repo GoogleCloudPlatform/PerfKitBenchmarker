@@ -288,7 +288,7 @@ def Run(benchmark_spec):
   logging.info('Simulating %s scenario.', FLAGS.workload_mode)
   vms = benchmark_spec.vms
   vm = vms[0]
-  return RUN_SCENARIO_FUNCTION_DICT[FLAGS.workload_mode][METHOD](vm)
+  return RUN_SCENARIO_FUNCTION_DICT[FLAGS.workload_mode][METHOD](vm)  # pyrefly: ignore[not-callable]
 
 
 def Cleanup(benchmark_spec):

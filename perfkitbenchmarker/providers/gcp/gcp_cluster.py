@@ -56,7 +56,7 @@ class GceCluster(cluster.BaseCluster):
       cluster_spec: cluster.GceClusterSpec object.
     """
     super().__init__(cluster_spec)
-    self.project: str = cluster_spec.workers.vm_spec.project
+    self.project: str = cluster_spec.workers.vm_spec.project  # pyrefly: ignore[missing-attribute]
     self._config_path: str = os.path.join(
         vm_util.GetTempDir(), _CONFIG_FILE_NAME)
     self._pub_key, _, _ = vm_util.IssueCommand(
@@ -94,8 +94,8 @@ class GceCluster(cluster.BaseCluster):
           num_workers=self.num_workers,
           worker_machine_type=self.worker_machine_type,
           headnode_machine_type=self.headnode_machine_type,
-          image_family=self.workers_spec.image_family,
-          image_project=self.workers_spec.image_project,
+          image_family=self.workers_spec.image_family,  # pyrefly: ignore[missing-attribute]
+          image_project=self.workers_spec.image_project,  # pyrefly: ignore[missing-attribute]
           project=self.project,
           # boot disk of headnode is also mounted as NFS
           nfs_size=self.headnode_spec.boot_disk_size,
@@ -196,7 +196,7 @@ class GceCluster(cluster.BaseCluster):
           ' ~/.ssh/config'
       )
       vm.RemoteCommand('chmod 600 ~/.ssh/config')
-      vm.has_private_key: bool = True
+      vm.has_private_key: bool = True  # pyrefly: ignore[bad-assignment]
 
 
 class H4dCluster(GceCluster):

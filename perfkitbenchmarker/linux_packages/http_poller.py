@@ -118,7 +118,7 @@ class HttpPoller:
         retries,
         retry_interval,
         timeout,
-        expected_response_code,
+        expected_response_code,  # pyrefly: ignore[bad-argument-type]
         expected_response,
     )
     out, _ = vm.RemoteCommand(cmd)

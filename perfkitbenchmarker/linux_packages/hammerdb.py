@@ -488,7 +488,7 @@ class TclScriptParameters:
       parameter: str,
   ):
     SearchAndReplaceTclScript(
-        vm, parameter, self.map_search_to_replace[parameter], script_name
+        vm, parameter, self.map_search_to_replace[parameter], script_name  # pyrefly: ignore[bad-argument-type]
     )
 
 
@@ -676,7 +676,7 @@ def ParseTpcCTimeProfileResultsFromFile(stdout: str) -> List[sample.Sample]:
   # >>>>> PROC: NEWORD
   # CALLS: 322104 MIN: 2.269ms AVG: 9.236ms MAX: 36.366ms TOTAL: 2975206.250ms
   # P99: 14.197ms P95: 12.399ms P50: 9.087ms SD: 1808.882 RATIO: 41.115%
-  stdout = stdout.split('>>>>')[-5:]
+  stdout = stdout.split('>>>>')[-5:]  # pyrefly: ignore[bad-assignment]
   for line in stdout:
     query_type = str.lower(
         regex_util.ExtractGroup('PROC: ([A-Z]*)', line, flags=re.M)
@@ -1167,32 +1167,32 @@ def GetMetadata(db_engine: str):
   }
 
   metadata['hammerdbcli_version'] = HAMMERDB_VERSION.value
-  metadata['hammerdbcli_vu'] = HAMMERDB_NUM_VU.value
+  metadata['hammerdbcli_vu'] = HAMMERDB_NUM_VU.value  # pyrefly: ignore[bad-assignment]
   if not FLAGS.use_managed_db and HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value:
     metadata['hammerdbcli_optimized_server_configuration'] = (
         HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value
     )
 
   if script == HAMMERDB_SCRIPT_TPC_H:
-    metadata['hammerdbcli_scale_factor'] = HAMMERDB_TPCH_SCALE_FACTOR.value
+    metadata['hammerdbcli_scale_factor'] = HAMMERDB_TPCH_SCALE_FACTOR.value  # pyrefly: ignore[bad-assignment]
     metadata['hammerdbcli_load_tpch_tables_to_columnar_engine'] = (
-        LOAD_TPCH_TABLES_TO_COLUMNAR_ENGINE.value
+        LOAD_TPCH_TABLES_TO_COLUMNAR_ENGINE.value  # pyrefly: ignore[bad-assignment]
     )
-    metadata['hammerdbcli_build_tpch_num_vu'] = HAMMERDB_BUILD_TPCH_NUM_VU.value
+    metadata['hammerdbcli_build_tpch_num_vu'] = HAMMERDB_BUILD_TPCH_NUM_VU.value  # pyrefly: ignore[bad-assignment]
     if db_engine == sql_engine_utils.POSTGRES:
       metadata['hammerdbcli_degree_of_parallel'] = (
-          HAMMERDB_TPCH_DEGREE_OF_PARALLEL.value
+          HAMMERDB_TPCH_DEGREE_OF_PARALLEL.value  # pyrefly: ignore[bad-assignment]
       )
   elif script == HAMMERDB_SCRIPT_TPC_C:
-    metadata['hammerdbcli_num_warehouse'] = HAMMERDB_TPCC_NUM_WAREHOUSE.value
-    metadata['hammerdbcli_all_warehouse'] = HAMMERDB_TPCC_ALL_WAREHOUSE.value
-    metadata['hammerdbcli_rampup'] = HAMMERDB_TPCC_RAMPUP.value
-    metadata['hammerdbcli_duration'] = HAMMERDB_TPCC_DURATION.value
-    metadata['hammerdbcli_tpcc_time_profile'] = HAMMERDB_TPCC_TIME_PROFILE.value
-    metadata['hammerdbcli_tpcc_log_transactions'] = TPCC_LOG_TRANSACTIONS.value
+    metadata['hammerdbcli_num_warehouse'] = HAMMERDB_TPCC_NUM_WAREHOUSE.value  # pyrefly: ignore[bad-assignment]
+    metadata['hammerdbcli_all_warehouse'] = HAMMERDB_TPCC_ALL_WAREHOUSE.value  # pyrefly: ignore[bad-assignment]
+    metadata['hammerdbcli_rampup'] = HAMMERDB_TPCC_RAMPUP.value  # pyrefly: ignore[bad-assignment]
+    metadata['hammerdbcli_duration'] = HAMMERDB_TPCC_DURATION.value  # pyrefly: ignore[bad-assignment]
+    metadata['hammerdbcli_tpcc_time_profile'] = HAMMERDB_TPCC_TIME_PROFILE.value  # pyrefly: ignore[bad-assignment]
+    metadata['hammerdbcli_tpcc_log_transactions'] = TPCC_LOG_TRANSACTIONS.value  # pyrefly: ignore[bad-assignment]
     if HAMMERDB_BUILD_TPCC_NUM_VU.value is None:
       FLAGS.hammerdbcli_build_tpcc_num_vu = HAMMERDB_NUM_VU.value
-    metadata['hammerdbcli_build_tpcc_num_vu'] = HAMMERDB_BUILD_TPCC_NUM_VU.value
+    metadata['hammerdbcli_build_tpcc_num_vu'] = HAMMERDB_BUILD_TPCC_NUM_VU.value  # pyrefly: ignore[bad-assignment]
     metadata['hammerdbcli_restart_before_run'] = (
-        HAMMERDB_RESTART_BEFORE_RUN.value)
+        HAMMERDB_RESTART_BEFORE_RUN.value)  # pyrefly: ignore[bad-assignment]
   return metadata

@@ -165,7 +165,7 @@ def GetRouteCommands(data: str, index: int, target_index: int) -> List[str]:
       interface = None
       for line in data.splitlines():
         items = line.split()
-        if len(items) > 6 and items[0] == route_entry:
+        if len(items) > 6 and items[0] == route_entry:  # pyrefly: ignore[unbound-name]
           interface = items[7]
           route_cmds.append(
               f'ip route add {target_cidr_block} via '

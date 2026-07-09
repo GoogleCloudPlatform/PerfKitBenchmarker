@@ -308,7 +308,7 @@ def GetRemoteCredentialsFullPath(vm):
 
 def GenerateCredentials(vm) -> None:
   """Generates AWS credentials properties file and pushes it to the VM."""
-  key_id, secret = aws_credentials.GetCredentials(profile=_CLI_PROFILE.value)
+  key_id, secret = aws_credentials.GetCredentials(profile=_CLI_PROFILE.value)  # pyrefly: ignore[bad-argument-type]
 
   with vm_util.NamedTemporaryFile(prefix=AWS_CREDENTIALS_FILE, mode='w') as f:
     f.write(f"""

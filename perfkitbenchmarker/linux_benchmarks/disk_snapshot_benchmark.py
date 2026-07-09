@@ -128,7 +128,7 @@ def MeasureRestoreSnapshotTime(
 
   # TODO(andytzhu) - Refactor GetDevicePath disk methods.
   latest_restore_disk_device_path = latest_restore_disk.GetDevicePath() or ''
-  if vm.CLOUD == 'AWS':
+  if vm.CLOUD == 'AWS':  # pyrefly: ignore[missing-argument]
     nvme_devices = vm.GetNVMEDeviceInfo()
     for device in nvme_devices:
       if device['ModelNumber'] == 'Amazon Elastic Block Store':
@@ -167,7 +167,7 @@ def HydrateLatestRestoreDisk(
   latest_restore_disk = vm.scratch_disks[-1].snapshots[-1].restore_disks[-1]
   fio_exe = fio.GetFioExec()
   latest_restore_disk_device_path = latest_restore_disk.GetDevicePath() or ''
-  if vm.CLOUD == 'AWS':
+  if vm.CLOUD == 'AWS':  # pyrefly: ignore[missing-argument]
     nvme_devices = vm.GetNVMEDeviceInfo()
     for device in nvme_devices:
       if device['ModelNumber'] == 'Amazon Elastic Block Store':
@@ -195,7 +195,7 @@ def MeasureLatestRestoreDiskLatency(
   """
   latest_restore_disk = vm.scratch_disks[-1].snapshots[-1].restore_disks[-1]
   latest_restore_disk_device_path = latest_restore_disk.GetDevicePath() or ''
-  if vm.CLOUD == 'AWS':
+  if vm.CLOUD == 'AWS':  # pyrefly: ignore[missing-argument]
     nvme_devices = vm.GetNVMEDeviceInfo()
     for device in nvme_devices:
       if device['ModelNumber'] == 'Amazon Elastic Block Store':

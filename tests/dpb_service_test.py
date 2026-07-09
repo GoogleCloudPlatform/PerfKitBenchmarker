@@ -46,9 +46,9 @@ class MockDpbService(dpb_service.BaseDpbService):
     super().__init__(dpb_service_spec)
     self.cluster_duration = cluster_duration
     self.metadata = {'foo': 42}
-    self.create_start_time = None
-    self.create_end_time = None
-    self.resource_ready_time = None
+    self.create_start_time = None  # pyrefly: ignore[bad-assignment]
+    self.create_end_time = None  # pyrefly: ignore[bad-assignment]
+    self.resource_ready_time = None  # pyrefly: ignore[bad-assignment]
     self.delete_start_time = None
     self.delete_end_time = None
     if cluster_create_time is not None:

@@ -8,6 +8,11 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import kubernetes_events
 
 
+class RetryableKubectlError(errors.VmUtil.IssueCommandTimeoutError):
+  pass
+
+
+# Error messages mostly from transient connection issues.
 RETRYABLE_KUBECTL_ERRORS = [
     (
         '"unable to decode an event from the watch stream: http2: client'
@@ -28,9 +33,45 @@ RETRYABLE_KUBECTL_ERRORS = [
     'unable to connect to the server',
 ]
 
+# Indicate the command timed out rather than hitting a retryable error.
+_TIMEOUT_ERRORS = [
+    'exceeded its progress deadline',
+]
 
-def RunKubectlCommand(command: list[str], **kwargs) -> tuple[str, str, int]:
-  """Run a kubectl command."""
+
+def _CheckForQuotaFailure(command: list[str]) -> None:
+  """Check for quota failure errors in the stderr of a kubectl command."""
+  cmd_str = ' '.join(command)
+  if (
+      not kubernetes_events.K8S_EVENT_POLLER or 'get events' in cmd_str
+  ):  # Avoid infinite loop if get events times out.
+    return
+  try:
+    events = kubernetes_events.K8S_EVENT_POLLER.GetAndLogFailureEvents()
+    kubernetes_events.K8S_EVENT_POLLER.CheckForQuotaFailure(events)
+  except vm_util.RetryError:
+    logging.warning(
+        'Failed to get events from K8s event poller. Proceeding'
+        ' with original error.'
+    )
+
+
+def RunKubectlCommand(
+    command: list[str],
+    check_for_quota_failure: bool = True,
+    **kwargs,
+) -> tuple[str, str, int]:
+  """Runs a kubectl command.
+
+  Args:
+    command: The kubectl command to run.
+    check_for_quota_failure: Whether to check for quota failures when
+      encountering suspect retryable/timeout error messages.
+    **kwargs: Keyword arguments to pass to vm_util.IssueCommand.
+
+  Returns:
+    A tuple of (stdout, stderr, retcode).
+  """
   kwargs = vm_util.IncrementStackLevel(**kwargs)
   cmd = [
       flags.FLAGS.kubectl,
@@ -43,38 +84,25 @@ def RunKubectlCommand(command: list[str], **kwargs) -> tuple[str, str, int]:
     orig_suppress_failure = kwargs['suppress_failure']
 
   def _DetectTimeoutViaSuppressFailure(stdout, stderr, retcode):
-    # Check for kubectl timeout. If found, treat it the same as a regular
-    # timeout.
-    if retcode != 0:
+    # Raise timeout error regardless of raise_on_failure - as the intended
+    # semantics is to ignore expected errors caused by invoking the
+    # command not errors from PKB infrastructure.
+    raise_on_timeout = (
+        kwargs['raise_on_timeout'] if 'raise_on_timeout' in kwargs else True
+    )
+    if retcode != 0 and raise_on_timeout:
       stderr_lower = stderr.lower()
+      raisable_error_type = None
       for error_substring in RETRYABLE_KUBECTL_ERRORS:
         if error_substring.lower() in stderr_lower:
-          # Raise timeout error regardless of raise_on_failure - as the intended
-          # semantics is to ignore expected errors caused by invoking the
-          # command not errors from PKB infrastructure.
-          raise_on_timeout = (
-              kwargs['raise_on_timeout']
-              if 'raise_on_timeout' in kwargs
-              else True
-          )
-          if raise_on_timeout:
-            cmd_str = ' '.join(command)
-            if (
-                kubernetes_events.K8S_EVENT_POLLER
-                and 'get events' not in cmd_str
-            ):  # Avoid infinite loop if get events times out.
-              try:
-                events = (
-                    kubernetes_events.K8S_EVENT_POLLER.GetAndLogFailureEvents()
-                )
-                kubernetes_events.K8S_EVENT_POLLER.CheckForQuotaFailure(events)
-              except vm_util.RetryError:
-                logging.warning(
-                    'Failed to get events from K8s event poller. Proceeding'
-                    ' with original timeout error.'
-                )
-                pass
-            raise errors.VmUtil.IssueCommandTimeoutError(stderr)
+          raisable_error_type = RetryableKubectlError
+          break
+      for error_substring in _TIMEOUT_ERRORS:
+        if error_substring.lower() in stderr_lower:
+          raisable_error_type = errors.VmUtil.IssueCommandTimeoutError
+          break
+      if raisable_error_type:
+        raise raisable_error_type(stderr)
     # Else, revert to user supplied kwargs values.
     if orig_suppress_failure is not None:
       return orig_suppress_failure(stdout, stderr, retcode)
@@ -84,7 +112,14 @@ def RunKubectlCommand(command: list[str], **kwargs) -> tuple[str, str, int]:
 
   kwargs['suppress_failure'] = _DetectTimeoutViaSuppressFailure
 
-  return vm_util.IssueCommand(cmd, **kwargs)
+  try:
+    return vm_util.IssueCommand(cmd, **kwargs)
+  except errors.VmUtil.IssueCommandTimeoutError:
+    # Check for quota failure to catch both string errors above & timeouts from
+    # within IssueCommand.
+    if check_for_quota_failure:
+      _CheckForQuotaFailure(command)
+    raise
 
 
 def RunRetryableKubectlCommand(
@@ -101,11 +136,18 @@ def RunRetryableKubectlCommand(
 
   @vm_util.Retry(
       timeout=timeout,
-      retryable_exceptions=(errors.VmUtil.IssueCommandTimeoutError,),
+      retryable_exceptions=(RetryableKubectlError,),
   )
   def _RunRetryablePart(run_cmd: list[str], **kwargs) -> tuple[str, str, int]:
     """Inner function retries command so timeout can be passed to decorator."""
     kwargs['stack_level'] += 1
-    return RunKubectlCommand(run_cmd, raise_on_timeout=True, **kwargs)
+    return RunKubectlCommand(
+        run_cmd, check_for_quota_failure=False, raise_on_timeout=True, **kwargs
+    )
 
-  return _RunRetryablePart(run_cmd, timeout=timeout, **kwargs)
+  try:
+    return _RunRetryablePart(run_cmd, timeout=timeout, **kwargs)
+  except (errors.VmUtil.IssueCommandTimeoutError, vm_util.RetryError):
+    # Wait till the end to check for quota failures rather than during retries.
+    _CheckForQuotaFailure(run_cmd)
+    raise

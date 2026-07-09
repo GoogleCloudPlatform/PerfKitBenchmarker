@@ -255,7 +255,7 @@ def _GenNumactlIncFile(vm):
       )
     vm.RemoteCommand(f'cat {remote_numactl_path}')
   else:
-    cfg_file_path = getattr(vm, speccpu.VM_STATE_ATTR, config).cfg_file_path
+    cfg_file_path = getattr(vm, speccpu.VM_STATE_ATTR, config).cfg_file_path  # pyrefly: ignore[missing-attribute]
     vm.RemoteCommand(f'sed -i "/include: numactl.inc/d" {cfg_file_path}')
 
 
@@ -306,7 +306,7 @@ def _OverwriteGccOptimize(vm):
   if SPEC17_GCC_FLAGS.value is None:
     return
   config = speccpu2017.GetSpecInstallConfig(vm.GetScratchDir())
-  config_filepath = getattr(vm, speccpu.VM_STATE_ATTR, config).cfg_file_path
+  config_filepath = getattr(vm, speccpu.VM_STATE_ATTR, config).cfg_file_path  # pyrefly: ignore[missing-attribute]
   cmd = f"sed -Ei 's/i(\\s+OPTIMIZE\\s+=).*/\\1 {SPEC17_GCC_FLAGS.value}/' "
   cmd += config_filepath
   vm.RemoteCommand(cmd)

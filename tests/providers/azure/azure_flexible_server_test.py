@@ -56,8 +56,8 @@ class AzureFlexibleServerMetricsTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.spec.ConstructRelationalDb()
     self.server = self.spec.relational_db
-    self.server.resource_group = mock.Mock()
-    self.server.resource_group.name = 'test-group'
+    self.server.resource_group = mock.Mock()  # pyrefly: ignore[missing-attribute]
+    self.server.resource_group.name = 'test-group'  # pyrefly: ignore[missing-attribute]
     self.enter_context(
         mock.patch.object(util, 'GetSubscriptionId', return_value='test-sub')
     )
@@ -90,7 +90,7 @@ class AzureFlexibleServerMetricsTest(pkb_common_test_case.PkbCommonTestCase):
 
     start_time = datetime.datetime(2025, 11, 26, 10, 0, 0)
     end_time = datetime.datetime(2025, 11, 26, 10, 1, 0)
-    samples = self.server.CollectMetrics(start_time, end_time)
+    samples = self.server.CollectMetrics(start_time, end_time)  # pyrefly: ignore[missing-attribute]
 
     # Check the number of samples returned (4 per metric * 6 metrics)
     self.assertLen(samples, 24)
@@ -129,7 +129,7 @@ class AzureFlexibleServerMetricsTest(pkb_common_test_case.PkbCommonTestCase):
     count_metric = relational_db.MetricSpec(
         'some_count', 'some_count', 'count', None
     )
-    self.server._CollectProviderMetric(count_metric, start_time, end_time)
+    self.server._CollectProviderMetric(count_metric, start_time, end_time)  # pyrefly: ignore[missing-attribute]
 
     call_args = mock_issue_cmd.call_args[0][0]
     self.assertIn('--aggregation', call_args)
@@ -139,7 +139,7 @@ class AzureFlexibleServerMetricsTest(pkb_common_test_case.PkbCommonTestCase):
     avg_metric = relational_db.MetricSpec(
         'some_metric', 'some_metric', 'percent', None
     )
-    self.server._CollectProviderMetric(avg_metric, start_time, end_time)
+    self.server._CollectProviderMetric(avg_metric, start_time, end_time)  # pyrefly: ignore[missing-attribute]
 
     call_args = mock_issue_cmd.call_args[0][0]
     self.assertIn('--aggregation', call_args)
@@ -189,8 +189,8 @@ class AzureFlexibleServerCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     bm_spec.ConstructRelationalDb()
 
-    bm_spec.relational_db._Create()
-    metadata = bm_spec.relational_db.GetResourceMetadata()
+    bm_spec.relational_db._Create()  # pyrefly: ignore[missing-attribute]
+    metadata = bm_spec.relational_db.GetResourceMetadata()  # pyrefly: ignore[missing-attribute]
 
     cmd = ' '.join(self.mock_command.call_args[0][0])
     with self.subTest(name='StorageType'):
@@ -226,8 +226,8 @@ class AzureFlexibleServerCreateTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     bm_spec.ConstructRelationalDb()
 
-    bm_spec.relational_db._Create()
-    metadata = bm_spec.relational_db.GetResourceMetadata()
+    bm_spec.relational_db._Create()  # pyrefly: ignore[missing-attribute]
+    metadata = bm_spec.relational_db.GetResourceMetadata()  # pyrefly: ignore[missing-attribute]
 
     cmd = ' '.join(self.mock_command.call_args[0][0])
     with self.subTest(name='AutoScaleIops'):
@@ -321,7 +321,7 @@ class AzureFlexibleServerPremiumV2CreateTestCase(
     )
     bm_spec.ConstructRelationalDb()
 
-    bm_spec.relational_db._Create()
+    bm_spec.relational_db._Create()  # pyrefly: ignore[missing-attribute]
 
     self.assertEqual(mock_cmd.func_to_mock.call_count, 3)
     put_call, get_call1, get_call2 = mock_cmd.func_to_mock.call_args_list
@@ -375,7 +375,7 @@ class AzureFlexibleServerPremiumV2CreateTestCase(
     bm_spec.ConstructRelationalDb()
 
     with self.assertRaises(errors.Resource.CreationError):
-      bm_spec.relational_db._Create()
+      bm_spec.relational_db._Create()  # pyrefly: ignore[missing-attribute]
 
   def testCreatePostgresPremiumV2NoAsyncHeader(self):
     self.MockIssueCommand(
@@ -413,7 +413,7 @@ class AzureFlexibleServerPremiumV2CreateTestCase(
     bm_spec.ConstructRelationalDb()
 
     with self.assertRaises(errors.Resource.CreationError):
-      bm_spec.relational_db._Create()
+      bm_spec.relational_db._Create()  # pyrefly: ignore[missing-attribute]
 
 
 if __name__ == '__main__':

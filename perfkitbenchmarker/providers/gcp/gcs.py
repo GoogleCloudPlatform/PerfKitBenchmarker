@@ -109,8 +109,8 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
 
   def __init__(self):
     super().__init__()
-    self.location = None
-    self.placement = None
+    self.location = None  # pyrefly: ignore[bad-assignment]
+    self.placement = None  # pyrefly: ignore[bad-assignment]
     self.hierarchical_name_space = False
     self.uniform_bucket_level_access = False
 
@@ -120,7 +120,7 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
       hierarchical_name_space: bool = False,
       uniform_bucket_level_access: bool = False,
   ):
-    self.placement = None
+    self.placement = None  # pyrefly: ignore[bad-assignment]
     if util.IsZone(location):
       self.location = util.GetRegionFromZone(location)
       self.placement = location

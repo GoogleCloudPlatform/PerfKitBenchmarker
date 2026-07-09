@@ -72,7 +72,7 @@ class TensorflowServingBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(samples[3].value, 3.3)
     self.assertDictEqual(samples[3].metadata, expected_metadata)
 
-    expected_metadata.update({'latency_array': [1.1, 2.2, 3.3]})
+    expected_metadata.update({'latency_array': [1.1, 2.2, 3.3]})  # pyrefly: ignore[no-matching-overload]
     self.assertEqual(samples[4].metric, 'Latency')
     self.assertEqual(samples[4].unit, 'seconds')
     self.assertEqual(samples[4].value, -1)

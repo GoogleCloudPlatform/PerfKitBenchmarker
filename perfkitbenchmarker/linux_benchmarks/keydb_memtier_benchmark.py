@@ -114,7 +114,7 @@ def Prepare(bm_spec: _BenchmarkSpec) -> None:
   if FLAGS.memtier_tls:
     for client_vm in client_vms:
       for filename in ['keydb.crt', 'keydb.key', 'ca.crt']:
-        server_vm.MoveHostFile(
+        server_vm.MoveHostFile(  # pyrefly: ignore[missing-attribute]
             client_vm,
             f'{keydb_server.GetKeydbDir()}/tests/tls/{filename}',
             remote_path='',

@@ -38,13 +38,13 @@ class PgbenchBenchmarkTestCase(unittest.TestCase):
     num_clients = 32
     num_jobs = 16
     expected_tps_metadata = testMetadata.copy()
-    expected_tps_metadata.update({
+    expected_tps_metadata.update({  # pyrefly: ignore[no-matching-overload]
         'clients': num_clients,
         'jobs': num_jobs,
         'tps': [7.0, 14.0, 13.0, 14.0, 13.0],
     })
     expected_latency_metadata = testMetadata.copy()
-    expected_latency_metadata.update({
+    expected_latency_metadata.update({  # pyrefly: ignore[no-matching-overload]
         'clients': num_clients,
         'jobs': num_jobs,
         'latency': [435.396, 1038.548, 1055.813, 1123.461, 1358.214],

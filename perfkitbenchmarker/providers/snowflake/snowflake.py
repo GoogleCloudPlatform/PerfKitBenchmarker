@@ -96,21 +96,21 @@ class JdbcClientInterface(SnowflakeClientInterface):
       package_name: String name of the package defining the preprovisioned data
         (certificates, etc.) to extract and use during client vm preparation.
     """
-    self.client_vm.Install('openjdk')
+    self.client_vm.Install('openjdk')  # pyrefly: ignore[missing-attribute]
 
     # Push the executable jar to the working directory on client vm
     if FLAGS.snowflake_jdbc_client_jar:
-      self.client_vm.PushFile(FLAGS.snowflake_jdbc_client_jar)
+      self.client_vm.PushFile(FLAGS.snowflake_jdbc_client_jar)  # pyrefly: ignore[missing-attribute]
     else:
-      self.client_vm.InstallPreprovisionedPackageData(
+      self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
           package_name, [self.jdbc_client], ''
       )
 
     # Push the private key to the working directory on client vm
     if FLAGS.snowflake_jdbc_key_file:
-      self.client_vm.PushFile(FLAGS.snowflake_jdbc_key_file)
+      self.client_vm.PushFile(FLAGS.snowflake_jdbc_key_file)  # pyrefly: ignore[missing-attribute]
     else:
-      self.client_vm.InstallPreprovisionedPackageData(
+      self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
           package_name, ['snowflake_keyfile.p8'], ''
       )
 
@@ -141,7 +141,7 @@ class JdbcClientInterface(SnowflakeClientInterface):
     )
     if print_results:
       query_command += ' --print_results true'
-    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)  # pyrefly: ignore[missing-attribute]
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
     result = (json.loads(stdout)['query_wall_time_in_secs'], details)
@@ -173,7 +173,7 @@ class JdbcClientInterface(SnowflakeClientInterface):
         '--query_streams '
         f'{" ".join([",".join(stream) for stream in concurrency_streams])}'
     )
-    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)  # pyrefly: ignore[missing-attribute]
     return stdout
 
 
@@ -202,29 +202,29 @@ class PythonClientInterface(SnowflakeClientInterface):
 
     # Push the private key to the working directory on client vm
     if FLAGS.snowflake_jdbc_key_file:
-      self.client_vm.PushFile(FLAGS.snowflake_jdbc_key_file)
+      self.client_vm.PushFile(FLAGS.snowflake_jdbc_key_file)  # pyrefly: ignore[missing-attribute]
     else:
-      self.client_vm.InstallPreprovisionedPackageData(
+      self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
           package_name, ['snowflake_keyfile.p8'], ''
       )
 
     # Install dependencies for driver
-    self.client_vm.Install('pip')
-    self.client_vm.RemoteCommand(
+    self.client_vm.Install('pip')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.RemoteCommand(  # pyrefly: ignore[missing-attribute]
         'sudo apt-get -qq update && DEBIAN_FRONTEND=noninteractive sudo apt-get'
         ' -qq install python3.12-venv'
     )
-    self.client_vm.RemoteCommand('python3 -m venv .venv')
-    self.client_vm.RemoteCommand(
+    self.client_vm.RemoteCommand('python3 -m venv .venv')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.RemoteCommand(  # pyrefly: ignore[missing-attribute]
         'source .venv/bin/activate && pip install snowflake-connector-python'
         ' pyarrow absl-py pandas'
     )
 
     # Push driver script to client vm
-    self.client_vm.PushDataFile(
+    self.client_vm.PushDataFile(  # pyrefly: ignore[missing-attribute]
         os.path.join(SNOWFLAKE_PYTHON_CLIENT_DIR, SNOWFLAKE_PYTHON_CLIENT_FILE)
     )
-    self.client_vm.PushDataFile(
+    self.client_vm.PushDataFile(  # pyrefly: ignore[missing-attribute]
         os.path.join(
             edw_service.EDW_PYTHON_DRIVER_LIB_DIR,
             edw_service.EDW_PYTHON_DRIVER_LIB_FILE,
@@ -255,7 +255,7 @@ class PythonClientInterface(SnowflakeClientInterface):
     ]
     cmd_parts.extend(additional_args)
     cmd = ' '.join(cmd_parts)
-    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
   def ExecuteQuery(
@@ -493,7 +493,7 @@ class Snowflake(edw_service.EdwService):
       f'{SEARCH_QUERY_TEMPLATE_LOCATION}/inject_token_into_table.sql.j2'
   )
 
-  CLOUD: str = None
+  CLOUD: str = None  # pyrefly: ignore[bad-assignment]
   SERVICE_TYPE = None
   client_interface: SnowflakeClientInterface
   metadata_client_interface: SnowflakeClientInterface
@@ -721,7 +721,7 @@ class Snowflake(edw_service.EdwService):
         'table_name': table_path,
         'index_name': index_name,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.CREATE_INDEX_QUERY_TEMPLATE),
         query_name,
         context,
@@ -737,7 +737,7 @@ class Snowflake(edw_service.EdwService):
         'table_name': table_path,
         'index_name': index_name,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.DELETE_INDEX_QUERY_TEMPLATE),
         query_name,
         context,
@@ -753,7 +753,7 @@ class Snowflake(edw_service.EdwService):
         'table_name': table_path,
         'index_name': index_name,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.GET_INDEX_STATUS_QUERY_TEMPLATE),
         query_name,
         context,
@@ -770,7 +770,7 @@ class Snowflake(edw_service.EdwService):
     context = {
         'table_name': table_path,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.INITIALIZE_SEARCH_TABLE_QUERY_TEMPLATE),
         query_name,
         context,
@@ -786,7 +786,7 @@ class Snowflake(edw_service.EdwService):
         'table_name': table_path,
         'storage_path': storage_path,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.LOAD_SEARCH_DATA_QUERY_TEMPLATE),
         query_name,
         context,
@@ -801,7 +801,7 @@ class Snowflake(edw_service.EdwService):
     context = {
         'table_name': table_path,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.GET_ROW_COUNT_QUERY_TEMPLATE),
         query_name,
         context,
@@ -827,7 +827,7 @@ class Snowflake(edw_service.EdwService):
         'limit': limit,
         'date_between': date_between,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.INDEX_SEARCH_QUERY_TEMPLATE),
         query_name,
         context,
@@ -850,7 +850,7 @@ class Snowflake(edw_service.EdwService):
         'token': token,
         'token_count': token_count,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.INJECT_TOKEN_INTO_TABLE),
         query_name,
         context,
@@ -869,7 +869,7 @@ class Snowflake(edw_service.EdwService):
   def _RunMetadataQuery(
       self, query_template: str, query_name: str, context: dict[str, Any]
   ) -> dict[str, Any]:
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(query_template),
         query_name,
         context,

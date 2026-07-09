@@ -452,6 +452,95 @@ class GoogleKubernetesEngineVersionFlagTestCase(PatchedObjectsTestCase):
       self.assertNotIn('--no-enable-autoupgrade', issue_command.all_commands)
 
 
+class GoogleKubernetesEngineAsyncOpsTestCase(PatchedObjectsTestCase):
+  """Tests async management-plane ops and the op-name fallback.
+
+  create/delete print the operation name to stdout. upgrade/update reliably
+  return success with empty stdout (gcloud does not print the name for those
+  subcommands), so _IssueAsync recovers it from `operations list`.
+  """
+
+  @staticmethod
+  def _spec():
+    return container_spec.ContainerClusterSpec(
+        'NAME',
+        **{
+            'cloud': 'GCP',
+            'vm_spec': {
+                'GCP': {
+                    'machine_type': 'fake-machine-type',
+                    'zone': 'us-central1-a',
+                },
+            },
+            'vm_count': 2,
+        },
+    )
+
+  def test_create_returns_op_name_directly(self):
+    """create prints an op name on stdout - no fallback needed."""
+    spec = self._spec()
+    op = 'operation-create-1779870000000-abcd'
+    with self.patch_critical_objects(stdout=op + '\n') as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      pool = mock.Mock(name='pool-cfg')
+      pool.name = 'pkbma000'
+      pool.num_nodes = 2
+      pool.machine_type = 'fake-machine-type'
+      self.enter_context(mock.patch.object(cluster, '_AddNodeParamsToCmd'))
+      handle = cluster.CreateNodePoolAsync(pool)
+    self.assertEqual(op, handle)
+    self.assertIn(
+        'gcloud container node-pools create', issue_command.all_commands
+    )
+    self.assertNotIn(
+        'gcloud container operations list', issue_command.all_commands
+    )
+
+  def test_upgrade_falls_back_to_ops_list(self):
+    """upgrade returns empty stdout; op name recovered from operations list."""
+    spec = self._spec()
+    found_op = 'operation-1779870514692-250d3b27-upgrade'
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      issue = self.MockIssueCommand({
+          'clusters upgrade': [('', '', 0)],
+          'operations list': [(found_op + '\n', '', 0)],
+      })
+      handle = cluster.UpgradeNodePoolAsync('pkbma000', '1.34')
+    self.assertEqual(found_op, handle)
+    self.assertIn('gcloud container clusters upgrade', issue.all_commands)
+    self.assertIn('gcloud container operations list', issue.all_commands)
+    self.assertIn('operationType=UPGRADE_NODES', issue.all_commands)
+
+  def test_update_cluster_falls_back_to_ops_list(self):
+    """update returns empty stdout; op name recovered from operations list."""
+    spec = self._spec()
+    found_op = 'operation-1779873580306-efa66f70-update'
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      issue = self.MockIssueCommand({
+          'clusters update': [('', '', 0)],
+          'operations list': [(found_op + '\n', '', 0)],
+      })
+      handle = cluster.UpdateClusterAsync()
+    self.assertEqual(found_op, handle)
+    self.assertIn('operationType=UPDATE_CLUSTER', issue.all_commands)
+    self.assertIn('status=DONE', issue.all_commands)
+    self.assertIn('startTime>=', issue.all_commands)
+
+  def test_issue_async_raises_when_no_op_name_and_no_fallback(self):
+    """Empty stdout with no fallback configured is a hard error."""
+    spec = self._spec()
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      self.MockIssueCommand({'': [('', '', 0)]})
+      # pylint: disable=protected-access
+      cmd = cluster._GcloudCommand('container', 'node-pools', 'delete', 'x')
+      with self.assertRaises(errors.VmUtil.IssueCommandError):
+        cluster._IssueAsync(cmd)
+      # pylint: enable=protected-access
+
+
 class GoogleKubernetesEngineGvnicFlagTestCase(PatchedObjectsTestCase):
 
   @staticmethod

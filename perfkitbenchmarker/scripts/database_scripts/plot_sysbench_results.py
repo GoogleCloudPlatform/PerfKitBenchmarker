@@ -38,7 +38,7 @@ How to use plot_sysbench_results:
 """
 import datetime
 import subprocess
-from six.moves import range
+from six.moves import range  # pyrefly: ignore[missing-source-for-stubs]
 from . import plot_scatter_points
 
 # Assumes Sysbench 0.5 stderr output.
@@ -142,7 +142,7 @@ class Plotter(object):
           tps = float(line[start_id:end_id].strip())
           tps_values.append(tps)
           if tps > self.max_tps:
-            self.max_tps = tps
+            self.max_tps = tps  # pyrefly: ignore[bad-assignment]
         break
       line = f.readline()
     return tps_values

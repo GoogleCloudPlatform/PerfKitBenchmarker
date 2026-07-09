@@ -67,6 +67,6 @@ def GetExampleResourceClass(
     example_type: str,
 ) -> resource.AutoRegisterResourceMeta | None:
   """Gets the example resource class corresponding to 'example_type'."""
-  return resource.GetResourceClass(
+  return resource.GetResourceClass(  # pyrefly: ignore[bad-return]
       BaseExampleResource, EXAMPLE_TYPE=example_type
   )

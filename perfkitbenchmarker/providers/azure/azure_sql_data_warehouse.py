@@ -109,10 +109,10 @@ class CliClientInterface(edw_service.EdwClientInterface):
       package_name: String name of the package defining the preprovisioned data
         (certificates, etc.) to extract and use during client vm preparation.
     """
-    self.client_vm.Install('pip')
-    self.client_vm.RemoteCommand('sudo pip install absl-py')
-    self.client_vm.Install('mssql_tools')
-    self.whitelist_ip = self.client_vm.ip_address
+    self.client_vm.Install('pip')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.RemoteCommand('sudo pip install absl-py')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.Install('mssql_tools')  # pyrefly: ignore[missing-attribute]
+    self.whitelist_ip = self.client_vm.ip_address  # pyrefly: ignore[missing-attribute]
 
     cmd = [
         azure.AZURE_PATH,
@@ -137,17 +137,17 @@ class CliClientInterface(edw_service.EdwClientInterface):
     service_specific_dir = os.path.join(
         'edw', Azuresqldatawarehouse.SERVICE_TYPE
     )
-    self.client_vm.PushFile(
+    self.client_vm.PushFile(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(
             os.path.join(service_specific_dir, 'script_runner.sh')
         )
     )
     runner_permission_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
-    self.client_vm.RemoteCommand(runner_permission_update_cmd)
-    self.client_vm.PushFile(
+    self.client_vm.RemoteCommand(runner_permission_update_cmd)  # pyrefly: ignore[missing-attribute]
+    self.client_vm.PushFile(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(os.path.join('edw', 'script_driver.py'))
     )
-    self.client_vm.PushFile(
+    self.client_vm.PushFile(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(
             os.path.join(
                 service_specific_dir, 'provider_specific_script_driver.py'
@@ -184,7 +184,7 @@ class CliClientInterface(edw_service.EdwClientInterface):
     )
     if print_results:
       query_command += ' --print_results=true'
-    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)  # pyrefly: ignore[missing-attribute]
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())
     details['job_id'] = performance[query_name]['job_id']
@@ -229,10 +229,10 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
       package_name: String name of the package defining the preprovisioned data
         (certificates, etc.) to extract and use during client vm preparation.
     """
-    self.client_vm.Install('openjdk')
-    self.client_vm.Install('mssql_tools')
-    self.client_vm.Install('azure_cli')
-    self.whitelist_ip = self.client_vm.ip_address
+    self.client_vm.Install('openjdk')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.Install('mssql_tools')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.Install('azure_cli')  # pyrefly: ignore[missing-attribute]
+    self.whitelist_ip = self.client_vm.ip_address  # pyrefly: ignore[missing-attribute]
 
     cmd = [
         azure.AZURE_PATH,
@@ -254,7 +254,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     vm_util.IssueCommand(cmd)
 
     # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedPackageData(
+    self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
         package_name, [SYNAPSE_JDBC_JAR], ''
     )
 
@@ -283,7 +283,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     )
     if print_results:
       query_command += ' --print_results true'
-    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)  # pyrefly: ignore[missing-attribute]
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())
     if 'failure_reason' in performance:
@@ -315,7 +315,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         f'--submission_interval {submission_interval} --query_timeout '
         f'{FLAGS.query_timeout} --query_files {query_list}'
     )
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
   def ExecuteThroughput(
@@ -341,7 +341,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
         f'--server {self.server_name} --database {self.database} '
         f'--query_timeout {FLAGS.query_timeout} --query_streams {query_list}'
     )
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
   def GetMetadata(self) -> Dict[str, str]:

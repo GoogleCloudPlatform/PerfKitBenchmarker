@@ -170,7 +170,7 @@ def ParseOutput(oldisim_output):
     if match:
       target_qps = float(match.group('qps'))
       target_lat = float(match.group('lat'))
-  return peak_qps, peak_lat, target_qps, target_lat
+  return peak_qps, peak_lat, target_qps, target_lat  # pyrefly: ignore[unbound-name]
 
 
 def RunLoadTest(benchmark_spec, fanout):
@@ -251,7 +251,7 @@ def Run(benchmark_spec):
     if fanout == 1:
       base_qps = qps
     name = 'Scaling efficiency of %s leaves' % fanout
-    scaling_efficiency = round(min(qps_dict[fanout] / base_qps, 1), 2)
+    scaling_efficiency = round(min(qps_dict[fanout] / base_qps, 1), 2)  # pyrefly: ignore[unbound-name]
     metadata = {}
     results.append(sample.Sample(name, scaling_efficiency, '', metadata))
 

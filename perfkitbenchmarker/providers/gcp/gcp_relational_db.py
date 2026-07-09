@@ -153,7 +153,7 @@ class GCPSQLServerIAASRelationalDb(
         self.server_vm.network.primary_subnet_name,
     )
     self._reserved_ip_address.Create()
-    return self._reserved_ip_address.ip_address
+    return self._reserved_ip_address.ip_address  # pyrefly: ignore[bad-return]
 
   def ReleaseIpReservation(self) -> bool:
     if self._reserved_ip_address:
@@ -293,7 +293,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         cmd_string.append('--enable-point-in-time-recovery')
     else:
       cmd_string.append('--no-backup')
-    cmd = util.GcloudCommand(*cmd_string)
+    cmd = util.GcloudCommand(*cmd_string)  # pyrefly: ignore[bad-argument-type]
     cmd.flags['project'] = self.project
     # Needed for labels and allocated-ip-range-name
     cmd.use_beta_gcloud = True
@@ -555,7 +555,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         self.instance_id,
         '--database-flags=%s' % ','.join(FLAGS.db_flags),
     ]
-    cmd = util.GcloudCommand(*cmd_string)
+    cmd = util.GcloudCommand(*cmd_string)  # pyrefly: ignore[bad-argument-type]
     _, stderr, _ = cmd.Issue()
     if stderr:
       # sql instance patch outputs information to stderr
@@ -571,7 +571,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
 
   def _Reboot(self):
     cmd_string = [self, 'sql', 'instances', 'restart', self.instance_id]
-    cmd = util.GcloudCommand(*cmd_string)
+    cmd = util.GcloudCommand(*cmd_string)  # pyrefly: ignore[bad-argument-type]
     cmd.Issue()
 
     if not self._IsReady():
@@ -643,7 +643,7 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         'failover',
         self.instance_id,
     ]
-    cmd = util.GcloudCommand(*cmd_string)
+    cmd = util.GcloudCommand(*cmd_string)  # pyrefly: ignore[bad-argument-type]
     cmd.flags['project'] = self.project
     # this command doesnt support the specifier: 'format'
     del cmd.flags['format']

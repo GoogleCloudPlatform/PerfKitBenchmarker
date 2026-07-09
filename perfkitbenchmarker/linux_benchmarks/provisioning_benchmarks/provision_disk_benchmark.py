@@ -127,24 +127,24 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   # TODO(user) in order for this to be cloud agnostic, we need to
   # refactor the virtual machine code for all the clouds to use disk strategies
   # like GCE
-  if vm.create_disk_strategy is None:
+  if vm.create_disk_strategy is None:  # pyrefly: ignore[missing-attribute]
     raise ValueError('VM Create Disk Strategy is None')
-  if vm.create_disk_strategy.DiskCreatedOnVMCreation():
+  if vm.create_disk_strategy.DiskCreatedOnVMCreation():  # pyrefly: ignore[missing-attribute]
     raise ValueError(
         'Disk created on vm creation, cannot measure provisioning time.'
         'Please check the flags.'
     )
   samples = []
-  time_to_create = ParseCreateTimeFromScratchDisks(vm)
-  time_to_attach = ParseAttachTimeFromScratchDisks(vm)
+  time_to_create = ParseCreateTimeFromScratchDisks(vm)  # pyrefly: ignore[bad-argument-type]
+  time_to_attach = ParseAttachTimeFromScratchDisks(vm)  # pyrefly: ignore[bad-argument-type]
   time_to_visible_after_create = (
-      vm.create_disk_strategy.GetSetupDiskStrategy().time_to_visible
+      vm.create_disk_strategy.GetSetupDiskStrategy().time_to_visible  # pyrefly: ignore[missing-attribute]
   )
-  disk_metadata = GetDiskMetadata(vm)
+  disk_metadata = GetDiskMetadata(vm)  # pyrefly: ignore[bad-argument-type]
   if disk_metadata is None:
     raise ValueError('Disk metadata is None')
   time_to_create_and_attach = time_to_create + time_to_attach
-  detach_time, time_to_detach_from_guest = DetachDisks(vm)
+  detach_time, time_to_detach_from_guest = DetachDisks(vm)  # pyrefly: ignore[bad-argument-type]
   samples.append(
       sample.Sample(
           'Time to Create and Attach Disks',
@@ -194,11 +194,11 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
       ),
   )
   time.sleep(60)
-  vm.create_disk_strategy.GetSetupDiskStrategy().AttachDisks()
+  vm.create_disk_strategy.GetSetupDiskStrategy().AttachDisks()  # pyrefly: ignore[missing-attribute]
   time_to_visible_after_detach = (
-      vm.create_disk_strategy.GetSetupDiskStrategy().time_to_visible
+      vm.create_disk_strategy.GetSetupDiskStrategy().time_to_visible  # pyrefly: ignore[missing-attribute]
   )
-  time_to_attach_after_detach = ParseAttachTimeFromScratchDisks(vm)
+  time_to_attach_after_detach = ParseAttachTimeFromScratchDisks(vm)  # pyrefly: ignore[bad-argument-type]
   samples.append(
       sample.Sample(
           'Time to Attach Disk after detach',
@@ -215,22 +215,22 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
           disk_metadata,
       )
   )
-  DetachDisks(vm)
+  DetachDisks(vm)  # pyrefly: ignore[bad-argument-type]
   vm_secondary = bm_spec.vm_groups['secondary'][0]
 
   time.sleep(60)
   # re-attach to a new VM
-  vm_secondary.create_disk_strategy = copy.copy(vm.create_disk_strategy)
-  vm_secondary.create_disk_strategy.vm = vm_secondary
-  vm_secondary.create_disk_strategy.setup_disk_strategy = copy.copy(
-      vm.create_disk_strategy.GetSetupDiskStrategy()
+  vm_secondary.create_disk_strategy = copy.copy(vm.create_disk_strategy)  # pyrefly: ignore[missing-attribute]
+  vm_secondary.create_disk_strategy.vm = vm_secondary  # pyrefly: ignore[missing-attribute]
+  vm_secondary.create_disk_strategy.setup_disk_strategy = copy.copy(  # pyrefly: ignore[missing-attribute]
+      vm.create_disk_strategy.GetSetupDiskStrategy()  # pyrefly: ignore[missing-attribute]
   )
-  vm_secondary.create_disk_strategy.setup_disk_strategy.vm = vm_secondary
-  vm_secondary.create_disk_strategy.GetSetupDiskStrategy().AttachDisks()
+  vm_secondary.create_disk_strategy.setup_disk_strategy.vm = vm_secondary  # pyrefly: ignore[missing-attribute]
+  vm_secondary.create_disk_strategy.GetSetupDiskStrategy().AttachDisks()  # pyrefly: ignore[missing-attribute]
   time_to_visible_to_another_vm = (
-      vm_secondary.create_disk_strategy.GetSetupDiskStrategy().time_to_visible
+      vm_secondary.create_disk_strategy.GetSetupDiskStrategy().time_to_visible  # pyrefly: ignore[missing-attribute]
   )
-  time_to_reattach_to_another_vm = ParseAttachTimeFromScratchDisks(vm)
+  time_to_reattach_to_another_vm = ParseAttachTimeFromScratchDisks(vm)  # pyrefly: ignore[bad-argument-type]
   samples.append(
       sample.Sample(
           'Time to Re-attach to New VM',

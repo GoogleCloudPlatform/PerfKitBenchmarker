@@ -84,10 +84,10 @@ class VertexAiCliInterfaceTest(VertexAiTest):
         self.pkb_ai.vm,
     )
     self.pkb_ai.endpoint.endpoint_name = (
-        'projects/6789/locations/us-east1/endpoints/1234'
+        'projects/6789/locations/us-east1/endpoints/1234'  # pyrefly: ignore[bad-assignment]
     )
     self.pkb_ai._Create()
-    cli.RunCommand.assert_has_calls([
+    cli.RunCommand.assert_has_calls([  # pyrefly: ignore[missing-attribute]
         mock.call(
             'gcloud ai models upload --display-name=pkb123 --project=my-project'
             ' --region=us-west'
@@ -121,7 +121,7 @@ class VertexAiCliInterfaceTest(VertexAiTest):
 
   def test_model_create_via_gcloud_waits_until_ready(self):
     self.pkb_ai.endpoint.endpoint_name = (
-        'projects/6789/locations/us-east1/endpoints/1234'
+        'projects/6789/locations/us-east1/endpoints/1234'  # pyrefly: ignore[bad-assignment]
     )
     cli = self.MockRunCommand(
         {
@@ -213,7 +213,7 @@ class VertexAiCliInterfaceTest(VertexAiTest):
 
   def test_send_prompt(self):
     self.pkb_ai.endpoint.endpoint_name = (
-        'projects/1234/locations/us-east1/endpoints/12345'
+        'projects/1234/locations/us-east1/endpoints/12345'  # pyrefly: ignore[bad-assignment]
     )
     self.MockRunCommand(
         {
@@ -232,7 +232,7 @@ class VertexAiCliInterfaceTest(VertexAiTest):
 
   def test_prompt_gives_samples(self):
     self.pkb_ai.endpoint.endpoint_name = (
-        'projects/1234/locations/us-east1/endpoints/12345'
+        'projects/1234/locations/us-east1/endpoints/12345'  # pyrefly: ignore[bad-assignment]
     )
     self.MockRunCommand(
         {
@@ -329,7 +329,7 @@ dedicatedEndpointEnabled: true""",
   @flagsaver.flagsaver(ai_fast_tryout=True)
   def test_get_prompt_command_fast_tryout(self):
     self.pkb_ai.endpoint.endpoint_name = (
-        'projects/pid1/locations/us-east1/endpoints/fooendpoint'
+        'projects/pid1/locations/us-east1/endpoints/fooendpoint'  # pyrefly: ignore[bad-assignment]
     )
     self.assertRegex(
         self.pkb_ai.GetPromptCommand('How are you?', 512, 1.0),
@@ -398,7 +398,7 @@ deployedModels:
 
   def test_endpoint_delete(self):
     self.endpoint.endpoint_name = (
-        'projects/6789/locations/us-east1/endpoints/1234'
+        'projects/6789/locations/us-east1/endpoints/1234'  # pyrefly: ignore[bad-assignment]
     )
     cli = self.MockRunCommand(
         {
@@ -429,7 +429,7 @@ deployedModels:
 
   def test_endpoint_delete_no_deployed_models(self):
     self.endpoint.endpoint_name = (
-        'projects/6789/locations/us-east1/endpoints/1234'
+        'projects/6789/locations/us-east1/endpoints/1234'  # pyrefly: ignore[bad-assignment]
     )
     cli = self.MockRunCommand(
         {

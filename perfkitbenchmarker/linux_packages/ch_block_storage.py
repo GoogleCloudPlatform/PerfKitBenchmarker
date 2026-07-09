@@ -74,9 +74,9 @@ def _ParseFioJson(fio_json):
       job['jobname'] = regex_util.Substitute(
           STEADY_STATE_MEASUREMENT_WINDOW, '', job['jobname']
       )
-      additional_metadata['steady_state'] = True
+      additional_metadata['steady_state'] = True  # pyrefly: ignore[bad-assignment]
     except regex_util.NoMatchError:
-      additional_metadata['steady_state'] = False
+      additional_metadata['steady_state'] = False  # pyrefly: ignore[bad-assignment]
 
     # Mock fio_json to reuse fio parser.
     mock_json = {'jobs': [job]}

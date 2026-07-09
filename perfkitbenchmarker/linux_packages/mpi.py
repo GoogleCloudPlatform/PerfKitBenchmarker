@@ -208,7 +208,7 @@ def RunMpiStats(vm, request: MpiRequest) -> MpiResponse:
       BuildMpiBenchmarkArgs(request, latency_file, bool(request.ppn))
   )
   try:
-    stdout, stderr = vm.RobustRemoteCommand(mpirun + ' ' + common)
+    stdout, stderr = vm.RobustRemoteCommand(mpirun + ' ' + common)  # pyrefly: ignore[unsupported-operation]
   except errors.VirtualMachine.RemoteCommandError:
     # tail last 100 lines of syslog as might tell us something
     for client_vm in request.vms:
@@ -227,10 +227,10 @@ def RunMpiStats(vm, request: MpiRequest) -> MpiResponse:
     if latencies:
       _CreateMpiDataForHistogram(latencies, results)
   return MpiResponse(
-      mpi_run=mpirun,
+      mpi_run=mpirun,  # pyrefly: ignore[bad-argument-type]
       args=common,
       vendor=FLAGS.mpi_vendor,
-      version=GetMpiVersion(vm),
+      version=GetMpiVersion(vm),  # pyrefly: ignore[bad-argument-type]
       results=results,
       mpi_pinning=omb.ParseMpiPinning(lines),
       mpi_env=ParseMpiEnv(lines),
@@ -384,7 +384,7 @@ class MpiResultParser(Iterable[MpiResult]):
     """
     # Keep the last non-latency data row as the next row might contain the
     # percent latency numbers for it.
-    on_deck: MpiData = None
+    on_deck: MpiData = None  # pyrefly: ignore[bad-assignment]
     for line in self._lines:
       if not line:
         break
@@ -394,7 +394,7 @@ class MpiResultParser(Iterable[MpiResult]):
         if on_deck:  # emit the last row if available
           yield on_deck
         yield MpiData(is_error=True, bytes=int(m.group(1)))
-        on_deck: MpiData = None
+        on_deck: MpiData = None  # pyrefly: ignore[bad-assignment]
       elif line.startswith('['):
         # This is [p_min, p10, p..] list of latencies
         values: List[float] = [
@@ -414,7 +414,7 @@ class MpiResultParser(Iterable[MpiResult]):
             raise ValueError('MpiData on_deck has None data')
           on_deck.data.update(percentiles)
         yield on_deck
-        on_deck: MpiData = None
+        on_deck: MpiData = None  # pyrefly: ignore[bad-assignment]
       else:
         # This is the regular MPI output of time_avg
         if on_deck:
@@ -423,7 +423,7 @@ class MpiResultParser(Iterable[MpiResult]):
         number_bytes = data.pop('bytes', 0)
         repetitions = data.pop('repetitions', -1)
         on_deck = MpiData(
-            bytes=number_bytes, repetitions=repetitions, data=data
+            bytes=number_bytes, repetitions=repetitions, data=data  # pyrefly: ignore[bad-argument-type]
         )
     if on_deck:
       # Last record in this stanza was a normal MPI row.
@@ -561,9 +561,9 @@ def _MpiHistogramAcceptable(
         len(histograms),
     )
     return False
-  for mpi_data, histogram in zip(mpi_data, histograms):
-    bytes_same = mpi_data.bytes == histogram.bytes
-    repetitions_same = mpi_data.repetitions == histogram.repetitions
+  for mpi_data, histogram in zip(mpi_data, histograms):  # pyrefly: ignore[bad-assignment]
+    bytes_same = mpi_data.bytes == histogram.bytes  # pyrefly: ignore[missing-attribute]
+    repetitions_same = mpi_data.repetitions == histogram.repetitions  # pyrefly: ignore[missing-attribute]
     if not bytes_same or not repetitions_same:
       logging.warning(
           'Parsed MPI data %s does not match with histogram %s',

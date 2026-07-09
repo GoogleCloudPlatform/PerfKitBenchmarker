@@ -203,6 +203,6 @@ def GetManagedAiModelClass(
     interface: str,
 ) -> resource.AutoRegisterResourceMeta | None:
   """Gets the managed AI model class for the given cloud."""
-  return resource.GetResourceClass(
+  return resource.GetResourceClass(  # pyrefly: ignore[bad-return]
       BaseManagedAiModel, CLOUD=cloud, INTERFACE=interface
   )

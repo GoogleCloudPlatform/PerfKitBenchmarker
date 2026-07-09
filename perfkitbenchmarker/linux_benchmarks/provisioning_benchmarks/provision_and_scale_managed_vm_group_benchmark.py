@@ -93,7 +93,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   samples.append(
       sample.Sample(
           metric='scale_to_ready_duration',
-          value=vm_group.last_ready_time - vm_group.last_operation_start_time,
+          value=vm_group.last_ready_time - vm_group.last_operation_start_time,  # pyrefly: ignore[unsupported-operation]
           unit='seconds',
           metadata=vm_group.GetResourceMetadata()
           | {

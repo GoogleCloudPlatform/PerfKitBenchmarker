@@ -142,10 +142,10 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
   # Refactor with Intel benchmarks.
   vm = bm_spec.vms[0]
   # physical cores since we turn off SMT
-  cpus_per_socket = vm.CheckLsCpu().cores_per_socket
+  cpus_per_socket = vm.CheckLsCpu().cores_per_socket  # pyrefly: ignore[missing-attribute]
   metadata = {
       'scenario': 'offline',
-      'num_sockets': vm.CheckLsCpu().socket_count,
+      'num_sockets': vm.CheckLsCpu().socket_count,  # pyrefly: ignore[missing-attribute]
       'cpus_per_socket': cpus_per_socket,
       'cpus_per_process': cpus_per_socket,
       'cpus_for_loadgen': 1,
@@ -154,6 +154,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       'target': dlrm.TARGET.value,
   }
   cmd_prefix = (
+      # pyrefly: ignore[missing-attribute]
       f'{_SET_ENV} '
       'source ~/miniconda3/bin/activate pace-env-py3.9; conda env list;  '
       'chmod 755 run_*.sh; '

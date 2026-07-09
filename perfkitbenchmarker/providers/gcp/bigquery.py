@@ -128,16 +128,16 @@ class CliClientInterface(GenericClientInterface):
       package_name: String name of the package defining the preprovisioned data
         (certificates, etc.) to extract and use during client vm preparation.
     """
-    self.client_vm.Install('pip')
-    self.client_vm.RemoteCommand('sudo pip install absl-py')
-    self.client_vm.Install('google_cloud_sdk')
+    self.client_vm.Install('pip')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.RemoteCommand('sudo pip install absl-py')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.Install('google_cloud_sdk')  # pyrefly: ignore[missing-attribute]
 
     # Push the service account file to the working directory on client vm
     key_file_name = FLAGS.gcp_service_account_key_file.split('/')[-1]
     if '/' in FLAGS.gcp_service_account_key_file:
-      self.client_vm.PushFile(FLAGS.gcp_service_account_key_file)
+      self.client_vm.PushFile(FLAGS.gcp_service_account_key_file)  # pyrefly: ignore[missing-attribute]
     else:
-      self.client_vm.InstallPreprovisionedPackageData(
+      self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
           package_name, [FLAGS.gcp_service_account_key_file], ''
       )
 
@@ -146,21 +146,21 @@ class CliClientInterface(GenericClientInterface):
     activate_cmd = '{} auth activate-service-account {} --key-file={}'.format(
         vm_gcloud_path, FLAGS.gcp_service_account, key_file_name
     )
-    self.client_vm.RemoteCommand(activate_cmd)
+    self.client_vm.RemoteCommand(activate_cmd)  # pyrefly: ignore[missing-attribute]
 
     # Push the framework to execute a sql query and gather performance details
     service_specific_dir = os.path.join('edw', Bigquery.SERVICE_TYPE)
-    self.client_vm.PushFile(
+    self.client_vm.PushFile(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(
             os.path.join(service_specific_dir, 'script_runner.sh')
         )
     )
     runner_permission_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
-    self.client_vm.RemoteCommand(runner_permission_update_cmd)
-    self.client_vm.PushFile(
+    self.client_vm.RemoteCommand(runner_permission_update_cmd)  # pyrefly: ignore[missing-attribute]
+    self.client_vm.PushFile(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(os.path.join('edw', 'script_driver.py'))
     )
-    self.client_vm.PushFile(
+    self.client_vm.PushFile(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(
             os.path.join(
                 service_specific_dir, 'provider_specific_script_driver.py'
@@ -190,7 +190,7 @@ class CliClientInterface(GenericClientInterface):
     ).format(query_name, self.project_id, self.dataset_id)
     if print_results:
       query_command += ' --print_results=true'
-    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)  # pyrefly: ignore[missing-attribute]
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details['job_id'] = performance[query_name]['job_id']
@@ -223,15 +223,15 @@ class JdbcClientInterface(GenericClientInterface):
       package_name: String name of the package defining the preprovisioned data
         (certificates, etc.) to extract and use during client vm preparation.
     """
-    self.client_vm.Install('openjdk')
+    self.client_vm.Install('openjdk')  # pyrefly: ignore[missing-attribute]
 
     # Push the service account file to the working directory on client vm
-    self.client_vm.InstallPreprovisionedPackageData(
+    self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
         package_name, [FLAGS.gcp_service_account_key_file], ''
     )
 
     # Push the executable jars to the working directory on client vm
-    self.client_vm.InstallPreprovisionedPackageData(
+    self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
         package_name,
         [
             BQ_JDBC_CLIENT_FILE,
@@ -243,8 +243,8 @@ class JdbcClientInterface(GenericClientInterface):
       unzip_cmd = 'unzip {} -d ./'.format(
           BQ_JDBC_FILE[gcp_flags.BQ_CLIENT_INTERFACE.value]
       )
-      self.client_vm.Install('unzip')
-      self.client_vm.RemoteCommand(unzip_cmd)
+      self.client_vm.Install('unzip')  # pyrefly: ignore[missing-attribute]
+      self.client_vm.RemoteCommand(unzip_cmd)  # pyrefly: ignore[missing-attribute]
 
   def ExecuteQuery(
       self, query_name: str, print_results: bool = False
@@ -277,7 +277,7 @@ class JdbcClientInterface(GenericClientInterface):
     )
     if print_results:
       query_command += ' --print_results true'
-    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)  # pyrefly: ignore[missing-attribute]
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
     return json.loads(stdout)['performance'], details
@@ -301,17 +301,17 @@ class JavaClientInterface(GenericClientInterface):
       package_name: String name of the package defining the preprovisioned data
         (certificates, etc.) to extract and use during client vm preparation.
     """
-    self.client_vm.Install('openjdk')
+    self.client_vm.Install('openjdk')  # pyrefly: ignore[missing-attribute]
 
     # Push the service account file to the working directory on client vm
     if '/' in FLAGS.gcp_service_account_key_file:
-      self.client_vm.PushFile(FLAGS.gcp_service_account_key_file)
+      self.client_vm.PushFile(FLAGS.gcp_service_account_key_file)  # pyrefly: ignore[missing-attribute]
     else:
-      self.client_vm.InstallPreprovisionedPackageData(
+      self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
           package_name, [FLAGS.gcp_service_account_key_file], ''
       )
     # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedPackageData(
+    self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
         package_name, [BQ_CLIENT_FILE], ''
     )
 
@@ -349,7 +349,7 @@ class JavaClientInterface(GenericClientInterface):
     )
     if print_results:
       query_command += ' --print_results true'
-    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)  # pyrefly: ignore[missing-attribute]
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
     return json.loads(stdout)['query_wall_time_in_secs'], details
@@ -385,7 +385,7 @@ class JavaClientInterface(GenericClientInterface):
             ' '.join(queries),
         )
     )
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
   def ExecuteThroughput(
@@ -412,7 +412,7 @@ class JavaClientInterface(GenericClientInterface):
         )
         + runlabels
     )
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
 
@@ -437,29 +437,29 @@ class PythonClientInterface(GenericClientInterface):
     """Prepares the client vm to execute query."""
     # Push the service account file to the working directory on client vm
     if '/' in FLAGS.gcp_service_account_key_file:
-      self.client_vm.PushFile(FLAGS.gcp_service_account_key_file)
+      self.client_vm.PushFile(FLAGS.gcp_service_account_key_file)  # pyrefly: ignore[missing-attribute]
     else:
-      self.client_vm.InstallPreprovisionedPackageData(
+      self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
           package_name, [FLAGS.gcp_service_account_key_file], ''
       )
 
     # Install dependencies for driver
-    self.client_vm.Install('pip')
-    self.client_vm.RemoteCommand(
+    self.client_vm.Install('pip')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.RemoteCommand(  # pyrefly: ignore[missing-attribute]
         'sudo apt-get -qq update && DEBIAN_FRONTEND=noninteractive sudo apt-get'
         ' -qq install python3.12-venv'
     )
-    self.client_vm.RemoteCommand('python3 -m venv .venv')
-    self.client_vm.RemoteCommand(
+    self.client_vm.RemoteCommand('python3 -m venv .venv')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.RemoteCommand(  # pyrefly: ignore[missing-attribute]
         'source .venv/bin/activate && pip install google-cloud-bigquery absl-py'
         ' google-cloud-bigquery-storage pyarrow'
     )
 
     # Push driver script to client vm
-    self.client_vm.PushDataFile(
+    self.client_vm.PushDataFile(  # pyrefly: ignore[missing-attribute]
         os.path.join(BQ_PYTHON_CLIENT_DIR, BQ_PYTHON_CLIENT_FILE)
     )
-    self.client_vm.PushDataFile(
+    self.client_vm.PushDataFile(  # pyrefly: ignore[missing-attribute]
         os.path.join(
             edw_service.EDW_PYTHON_DRIVER_LIB_DIR,
             edw_service.EDW_PYTHON_DRIVER_LIB_FILE,
@@ -482,7 +482,7 @@ class PythonClientInterface(GenericClientInterface):
       cmd += ' --print_results'
     if self.destination:
       cmd += f' --destination {self.destination}'
-    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     details = copy.copy(self.GetMetadata())
     details.update(json.loads(stdout)['details'])
     return json.loads(stdout)['query_wall_time_in_secs'], details
@@ -503,7 +503,7 @@ class PythonClientInterface(GenericClientInterface):
     )
     if edw_service.EDW_BQ_RESERVATION.value:
       cmd += f' --reservation {edw_service.EDW_BQ_RESERVATION.value}'
-    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
   def RunQueryWithResults(self, query_name: str) -> str:
@@ -513,7 +513,7 @@ class PythonClientInterface(GenericClientInterface):
         f' {self.project_id} --credentials_file {self.key_file_name} --dataset'
         f' {self.dataset_id} --query_file {query_name} --print_results'
     )
-    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)
+    stdout, _ = self.client_vm.RobustRemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
 
@@ -812,7 +812,7 @@ class Bigquery(edw_service.EdwService):
     cmd.append(project_dataset)
     vm_util.IssueCommand(cmd)
 
-  def LoadDataset(
+  def LoadDataset(  # pyrefly: ignore[bad-override]
       self,  # pytype: disable=signature-mismatch  # overriding-parameter-count-checks
       source_bucket,
       tables,
@@ -902,7 +902,7 @@ class Bigquery(edw_service.EdwService):
             f'{self.client_interface.project_id}.region-{self.GetDatasetRegion()}'
         ),
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.RUN_COST_QUERY_TEMPLATE),
         query_file_name,
         context,
@@ -962,12 +962,12 @@ class Bigquery(edw_service.EdwService):
         'table_name': table_path,
         'index_name': index_name,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.CREATE_INDEX_QUERY_TEMPLATE),
         query_name,
         context,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')  # pyrefly: ignore[missing-attribute]
     return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
   def DropSearchIndex(
@@ -978,12 +978,12 @@ class Bigquery(edw_service.EdwService):
         'table_name': table_path,
         'index_name': index_name,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.DELETE_INDEX_QUERY_TEMPLATE),
         query_name,
         context,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')  # pyrefly: ignore[missing-attribute]
     return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
   def GetSearchIndexCompletionPercentage(
@@ -994,12 +994,12 @@ class Bigquery(edw_service.EdwService):
         'table_name': table_path,
         'index_name': index_name,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.GET_INDEX_STATUS_QUERY_TEMPLATE),
         query_name,
         context,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')  # pyrefly: ignore[missing-attribute]
     _, meta = self.client_interface.ExecuteQuery(query_name, print_results=True)
     qres = meta['query_results']['coverage_percentage'][0]
     return qres, meta
@@ -1016,12 +1016,12 @@ class Bigquery(edw_service.EdwService):
         if INITIALIZE_SEARCH_TABLE_PARTITIONED.value
         else self.INITIALIZE_UNPART_SEARCH_TABLE_QUERY_TEMPLATE
     )
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(init_table_query),
         query_name,
         context,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')  # pyrefly: ignore[missing-attribute]
     return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
   def InsertSearchData(
@@ -1034,12 +1034,12 @@ class Bigquery(edw_service.EdwService):
         'storage_path': storage_path,
         'random_id': random_8_char_long_hex,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.LOAD_SEARCH_DATA_QUERY_TEMPLATE),
         query_name,
         context,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')  # pyrefly: ignore[missing-attribute]
     return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
   def GetTableRowCount(self, table_path: str) -> tuple[int, dict[str, Any]]:
@@ -1047,12 +1047,12 @@ class Bigquery(edw_service.EdwService):
     context = {
         'table_name': table_path,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.GET_ROW_COUNT_QUERY_TEMPLATE),
         query_name,
         context,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')  # pyrefly: ignore[missing-attribute]
     _, meta = self.client_interface.ExecuteQuery(query_name, print_results=True)
     qres = meta['query_results']['total_row_count'][0]
     return qres, meta
@@ -1073,12 +1073,12 @@ class Bigquery(edw_service.EdwService):
         'limit': limit,
         'date_between': date_between,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.INDEX_SEARCH_QUERY_TEMPLATE),
         query_name,
         context,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')  # pyrefly: ignore[missing-attribute]
     res, meta = self.client_interface.ExecuteQuery(
         query_name, print_results=True
     )
@@ -1096,12 +1096,12 @@ class Bigquery(edw_service.EdwService):
         'token': token,
         'token_count': token_count,
     }
-    self.client_interface.client_vm.RenderTemplate(
+    self.client_interface.client_vm.RenderTemplate(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(self.INJECT_TOKEN_INTO_TABLE),
         query_name,
         context,
     )
-    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')
+    self.client_interface.client_vm.RemoteCommand(f'cat {query_name}')  # pyrefly: ignore[missing-attribute]
     return self.client_interface.ExecuteQuery(query_name, print_results=True)
 
 
@@ -1237,4 +1237,4 @@ class Bqfederated(Bigquery):
 
 def _SplitClusterIdentifier(cluster_identifier: str) -> tuple[str, str]:
   """Split the cluster identifier into project ID and dataset ID."""
-  return tuple(cluster_identifier.split('.', 1))
+  return tuple(cluster_identifier.split('.', 1))  # pyrefly: ignore[bad-return]

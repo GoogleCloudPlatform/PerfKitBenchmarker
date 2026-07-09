@@ -164,8 +164,8 @@ class ElasticKubernetesServiceTest(BaseEksTest):
     spec2 = EKS_SPEC_DICT.copy()
     spec2['nodepools'] = {
         'nginx': {
-            'vm_count': 3,
-            'vm_spec': {
+            'vm_count': 3,  # pyrefly: ignore[bad-assignment]
+            'vm_spec': {  # pyrefly: ignore[bad-assignment]
                 'AWS': {
                     'machine_type': 'm6i.xlarge',
                     'zone': 'us-west-1b',
@@ -204,15 +204,15 @@ class ElasticKubernetesServiceTest(BaseEksTest):
   def testEksClusterNodepoolsAutoscaling(self):
     self.MockIssueCommand({'create cluster': [('Cluster created', '', 0)]})
     spec2 = EKS_SPEC_DICT.copy()
-    spec2['min_vm_count'] = 1
-    spec2['max_vm_count'] = 5
-    spec2['vm_count'] = 2
+    spec2['min_vm_count'] = 1  # pyrefly: ignore[unsupported-operation]
+    spec2['max_vm_count'] = 5  # pyrefly: ignore[unsupported-operation]
+    spec2['vm_count'] = 2  # pyrefly: ignore[unsupported-operation]
     spec2['nodepools'] = {
         'nginx': {
-            'vm_count': 3,
-            'min_vm_count': 2,
-            'max_vm_count': 10,
-            'vm_spec': {
+            'vm_count': 3,  # pyrefly: ignore[bad-assignment]
+            'min_vm_count': 2,  # pyrefly: ignore[bad-assignment]
+            'max_vm_count': 10,  # pyrefly: ignore[bad-assignment]
+            'vm_spec': {  # pyrefly: ignore[bad-assignment]
                 'AWS': {
                     'machine_type': 'm6i.xlarge',
                 }
@@ -281,8 +281,8 @@ class ElasticKubernetesServiceTest(BaseEksTest):
     spec2 = EKS_SPEC_DICT.copy()
     spec2['nodepools'] = {
         'nginx': {
-            'vm_count': 3,
-            'vm_spec': {
+            'vm_count': 3,  # pyrefly: ignore[bad-assignment]
+            'vm_spec': {  # pyrefly: ignore[bad-assignment]
                 'AWS': {
                     'machine_type': 'm6i.xlarge',
                     'zone': 'us-west-1b',
@@ -302,8 +302,8 @@ class ElasticKubernetesServiceTest(BaseEksTest):
     spec2 = EKS_SPEC_DICT.copy()
     spec2['nodepools'] = {
         'nginx': {
-            'vm_count': 3,
-            'vm_spec': {
+            'vm_count': 3,  # pyrefly: ignore[bad-assignment]
+            'vm_spec': {  # pyrefly: ignore[bad-assignment]
                 'AWS': {
                     'machine_type': 'm6i.xlarge',
                     'zone': 'us-west-1b',
@@ -548,12 +548,12 @@ class EksKarpenterTest(BaseEksTest):
     spec_dict = EKS_SPEC_DICT.copy()
     spec_dict['nodepools'] = {
         'pool1': {
-            'vm_spec': {
+            'vm_spec': {  # pyrefly: ignore[bad-assignment]
                 'AWS': {
                     'zone': 'us-west-1b',
                 }
             },
-            'machine_families': ['m6i', 'm7i'],
+            'machine_families': ['m6i', 'm7i'],  # pyrefly: ignore[bad-assignment]
             **nodepool_config,
         }
     }

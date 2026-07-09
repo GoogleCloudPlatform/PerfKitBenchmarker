@@ -808,7 +808,7 @@ class LinuxVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     disable_le_cstates = 'C1'
     FLAGS['disable_cstate_by_name_and_deeper'].parse(disable_le_cstates)
     responses = self.normal_boot_responses.copy()
-    responses.update({
+    responses.update({  # pyrefly: ignore[no-matching-overload]
         'ls /sys/devices/system/cpu/cpu0/cpuidle/state*/name >> /dev/null 2>&1 || echo file_not_exist': (
             ''
         ),

@@ -435,11 +435,11 @@ def GenerateJobFileString(
     # (scenario X io_depths X num_jobs)
     # which allows a single run to produce all of these metrics
     for scenario in scenarios:
-      for num_job in num_jobs:
-        for io_depth in io_depths:
+      for num_job in num_jobs:  # pyrefly: ignore[not-iterable]
+        for io_depth in io_depths:  # pyrefly: ignore[not-iterable]
           scenario_copy = scenario.copy()
-          scenario_copy['iodepth'] = io_depth
-          scenario_copy['numjobs'] = num_job
+          scenario_copy['iodepth'] = io_depth  # pyrefly: ignore[unsupported-operation]
+          scenario_copy['numjobs'] = num_job  # pyrefly: ignore[unsupported-operation]
           jinja_scenarios.append(scenario_copy)
 
   disks_list = [{'index': 0}]
@@ -447,7 +447,7 @@ def GenerateJobFileString(
   for scenario in jinja_scenarios:
     if fio_flags.FIO_RATE_BANDWIDTH_LIMIT.value:
       scenario['rate'] = fio_flags.FIO_RATE_BANDWIDTH_LIMIT.value
-    scenario['target_raw_device'] = require_merge
+    scenario['target_raw_device'] = require_merge  # pyrefly: ignore[unsupported-operation]
 
     if require_merge and raw_files:
       disks_list = [

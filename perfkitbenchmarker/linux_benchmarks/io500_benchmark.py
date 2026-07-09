@@ -18,6 +18,7 @@ See https://github.com/IO500/io500 for more info.
 
 import logging
 import math
+import os
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -26,6 +27,7 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
@@ -35,6 +37,13 @@ _IO500_TESTS = flags.DEFINE_list(
     'ior_easy_read, ior_hard_write, ior_hard_read, mdtest_easy_write, '
     'mdtest_easy_stat, mdtest_easy_delete, mdtest_hard_write, '
     'mdtest_hard_stat, mdtest_hard_read, mdtest_hard_delete, find')
+
+_IO500_MAX_TOTAL_SIZE = flags.DEFINE_integer(
+    'io500_max_total_size',
+    1649267441664,
+    'Maximum total size of the data to be used for the benchmark. Used to set '
+    'BlockSize in io500.ini. Default is 1536GiB.',
+)
 
 # Section names in io500.ini.j2 that can be run
 RUNNABLE_SECTIONS = [
@@ -89,29 +98,29 @@ def Prepare(benchmark_spec):
   # Among them, the pinned commit for pfind is currently broken,
   # where it looks for *.o files. This commit aaba722 fixes the script
   # to look for *.a files.
-  # Install binary on all vms.
-  background_tasks.RunThreaded(lambda vm: vm.RemoteCommand(
+  # Build only on headnode.
+  headnode.RobustRemoteCommand(
       f'cd {BENCHMARK_DIR} && git clone {GIT_REPO} -b io500-isc24 && '
       'cd io500 && '
       'sed -i "s/778dca8/aaba722/g" prepare.sh && '
-      './prepare.sh'), vms)
-  # TODO(yuyanting) Make this a flag to accept other configs.
-  local_path = data.ResourcePath('io500/io500.ini.j2')
-  remote_path = f'{BENCHMARK_DIR}/io500.ini'
+      './prepare.sh')
 
-  tests_to_run = _IO500_TESTS.value
-  run_all = 'all' in tests_to_run
+  # Package and distribute compiled folder to all other VMs in parallel
+  if len(vms) > 1:
+    headnode.RemoteCommand(f'cd {BENCHMARK_DIR} && tar -czf io500.tar.gz io500')
+    temp_dir = vm_util.GetTempDir()
+    local_tar_path = os.path.join(temp_dir, 'io500.tar.gz')
+    headnode.PullFile(local_tar_path, f'{BENCHMARK_DIR}/io500.tar.gz')
 
-  context = {'directory': headnode.scratch_disks[0].mount_point}
-  for section in RUNNABLE_SECTIONS:
-    should_run = run_all or section in tests_to_run
-    context[f'run_{section}'] = 'TRUE' if should_run else 'FALSE'
-  logging.info('io500 context: %s', context)
+    def DistributeBinary(vm):
+      vm.RemoteCommand(f'mkdir -p {BENCHMARK_DIR}')
+      vm.PushFile(local_tar_path, f'{BENCHMARK_DIR}/io500.tar.gz')
+      vm.RemoteCommand(
+          f'cd {BENCHMARK_DIR} && tar -xzf io500.tar.gz && rm'
+          ' io500.tar.gz'
+      )
 
-  background_tasks.RunThreaded(lambda vm: vm.RenderTemplate(
-      template_path=local_path, remote_path=remote_path,
-      context=context
-      ), vms)
+    background_tasks.RunThreaded(DistributeBinary, vms[1:])
 
 
 def _Run(headnode, ranks, ppn):
@@ -186,12 +195,63 @@ def Run(benchmark_spec):
   Returns:
     A list of sample.Sample objects.
   """
-  headnode = benchmark_spec.vm_groups['default'][0]
-  num_nodes = len(benchmark_spec.vm_groups['default'])
+  vms = benchmark_spec.vm_groups['default']
+  headnode = vms[0]
+  num_nodes = len(vms)
   results = []
   num_cpus = headnode.NumCpusForBenchmark()
+
+  # Pre-stage directories for object storage to resolve consistency issues
+  # across multiple VMs (for AWS S3 Mountpoint).
+  if FLAGS.data_disk_type == 'object_storage':
+    mount_point = headnode.scratch_disks[0].mount_point
+    logging.info('Pre-staging directory prefixes at %s', mount_point)
+    for directory in _IO500_TESTS.value:
+      if directory not in ['ior_easy_write', 'ior_easy_read']:
+        raise ValueError(
+            f'Unsupported test: {directory} for object storage via FUSE.'
+        )
+
+    cmd = (
+        f'rm -rf {mount_point}/data/ior-easy && mkdir -p'
+        f' {mount_point}/data/ior-easy && touch'
+        f' {mount_point}/data/ior-easy/.keep'
+    )
+    if headnode.CLOUD == 'AWS':
+      background_tasks.RunThreaded(lambda vm: vm.RemoteCommand(cmd), vms)
+    else:
+      headnode.RemoteCommand(cmd)
+      background_tasks.RunThreaded(
+          lambda vm: vm.RemoteCommand(f'ls -la {mount_point}/data/ior-easy/'),
+          vms,
+      )
+
+  local_path = data.ResourcePath('io500/io500.ini.j2')
+  remote_path = f'{BENCHMARK_DIR}/io500.ini'
+  tests_to_run = _IO500_TESTS.value
+  run_all = 'all' in tests_to_run
+
   for total_ranks in FLAGS.mpi_ranks_list or [num_nodes * num_cpus]:
     ppn = math.ceil(float(total_ranks) / num_nodes)
+    # BlockSize * total_ranks = max total size, which must be a multiple of
+    # TransferSize.
+    block_size = _IO500_MAX_TOTAL_SIZE.value // int(total_ranks)
+    io500_context = {
+        'directory': headnode.scratch_disks[0].mount_point,
+        'block_size': block_size,
+    }
+    for section in RUNNABLE_SECTIONS:
+      should_run = run_all or section in tests_to_run
+      io500_context[f'run_{section}'] = 'TRUE' if should_run else 'FALSE'
+    logging.info('io500 context for ranks %s: %s', total_ranks, io500_context)
+
+    background_tasks.RunThreaded(
+        lambda vm, ctx=io500_context: vm.RenderTemplate(
+            template_path=local_path, remote_path=remote_path, context=ctx
+        ),
+        vms,
+    )
+
     results.extend(_Run(headnode, int(total_ranks), ppn))
   return results
 

@@ -251,4 +251,4 @@ def GetVVSResourceClass(
     cloud: str,
 ) -> resource.AutoRegisterResourceMeta | None:
   """Gets the Vertex Vector Search resource class for the given cloud."""
-  return resource.GetResourceClass(VertexVectorSearch, CLOUD=cloud)
+  return resource.GetResourceClass(VertexVectorSearch, CLOUD=cloud)  # pyrefly: ignore[bad-return]

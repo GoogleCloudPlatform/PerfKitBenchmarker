@@ -204,7 +204,7 @@ class KubernetesResourceTracker:
         # timestamp of the last event we see.
         end_time = e.timestamp
         if self._nodes[name].end_time is not None:
-          end_time = max(end_time, self._nodes[name].end_time)
+          end_time = max(end_time, self._nodes[name].end_time)  # pyrefly: ignore[bad-specialization]
         self._nodes[name].end_time = end_time
 
 
@@ -277,7 +277,7 @@ def _CalculateMaxConcurrentNodes(nodes: Iterable[_NodeTracker]) -> int:
   return max_concurrent
 
 
-tracker: KubernetesResourceTracker = None
+tracker: KubernetesResourceTracker = None  # pyrefly: ignore[bad-assignment]
 
 
 @events.before_phase.connect

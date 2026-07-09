@@ -88,7 +88,7 @@ class ReceiverRunner:
       self.close()
 
   def process_state(self) -> None:
-    self.state = self.state.process_state()
+    self.state = self.state.process_state()  # pyrefly: ignore[bad-assignment]
 
   def await_message_received(self) -> Optional[protocol.ReceptionReport]:
     """Awaits a message from the messaging service and gets a reception report.

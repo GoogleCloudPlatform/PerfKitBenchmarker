@@ -625,6 +625,25 @@ fio_remote_ssd_max_throughput:
           disk_size: 1024
           disk_type: UltraSSD_LRS
 
+fuse_io500:
+  name: io500
+  flags:
+    io500_tests: [ior_easy_write, ior_easy_read]
+    data_disk_type: object_storage
+    scratch_dir: fuse_dir
+    mpi_ranks_list: [1, 2, 4, 8, 16, 32, 64, 128, 192]
+    io500_max_total_size: 1649267441664
+  vm_groups:
+    default:
+      vm_spec:
+        GCP:
+          boot_disk_size: 2000
+        AWS:
+          boot_disk_size: 2000
+        Azure:
+          boot_disk_size: 2000
+      vm_count: 1
+
 gpu_jobs_provisioning:
   name: jobs_benchmark
   base_job:

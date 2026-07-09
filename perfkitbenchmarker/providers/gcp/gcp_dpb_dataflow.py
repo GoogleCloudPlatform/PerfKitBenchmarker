@@ -175,7 +175,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       self._local_service_account_path = os.path.join(
           temp_dir.GetRunDirPath(), 'sak.json'
       )
-      self.storage_service.Copy(
+      self.storage_service.Copy(  # pyrefly: ignore[missing-attribute]
           FLAGS.dpb_dataflow_service_account_key,
           self._local_service_account_path,
       )
@@ -186,7 +186,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
   # TODO(saksena): Make this actually follow the contract or better yet delete
   # this class.
-  def SubmitJob(
+  def SubmitJob(  # pyrefly: ignore[bad-override]
       self,
       jarfile='',
       classname=None,
@@ -230,7 +230,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     cmd.append(jarfile)
 
     cmd.append(classname)
-    cmd += job_arguments
+    cmd += job_arguments  # pyrefly: ignore[unsupported-operation]
 
     cmd.append(f'--gcpTempLocation={self._GetTempLocation()}')
     cmd.append(f'--stagingLocation={self.GetStagingLocation()}')
@@ -283,7 +283,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
   def GetJobStatus(self):
     cmd = util.GcloudCommand(self, 'dataflow', 'jobs', 'show', self.job_id)
-    cmd.flags = {
+    cmd.flags = {  # pyrefly: ignore[bad-assignment]
         'project': self.project,
         'format': 'json',
     }
@@ -359,7 +359,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
 
     cmd = util.GcloudCommand(self, 'dataflow', 'metrics', 'list', self.job_id)
     cmd.use_alpha_gcloud = True
-    cmd.flags = {
+    cmd.flags = {  # pyrefly: ignore[bad-assignment]
         'project': self.project,
         'region': util.GetRegionFromZone(FLAGS.dpb_service_zone),
         'format': 'json',
@@ -402,7 +402,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     if self.job_metrics is None:
       self._PullJobMetrics()
 
-    return self.job_metrics[metric_type][name]
+    return self.job_metrics[metric_type][name]  # pyrefly: ignore[unsupported-operation]
 
   def GetAvgCpuUtilization(
       self, start_time: datetime.datetime, end_time: datetime.datetime
@@ -432,8 +432,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     # Shift TZ of datetime arguments since FromDatetime() assumes UTC
     # See
     # https://googleapis.dev/python/protobuf/latest/google/protobuf/timestamp_pb2.html#google.protobuf.timestamp_pb2.Timestamp.FromDatetime
-    interval.start_time = start_time.astimezone(datetime.timezone.utc)
-    interval.end_time = end_time.astimezone(datetime.timezone.utc)
+    interval.start_time = start_time.astimezone(datetime.timezone.utc)  # pyrefly: ignore[bad-assignment]
+    interval.end_time = end_time.astimezone(datetime.timezone.utc)  # pyrefly: ignore[bad-assignment]
 
     api_filter = (
         'metric.type = "compute.googleapis.com/instance/cpu/utilization" '
@@ -467,7 +467,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     # Multiply fractional cpu util by 100 to display a percentage usage
     # TODO(odiego): Handle edge case where _GetAvgValueFromTimeSeries returns
     # None.
-    return round(self._GetAvgValueFromTimeSeries(results) * 100, 2)
+    return round(self._GetAvgValueFromTimeSeries(results) * 100, 2)  # pyrefly: ignore[bad-argument-type]
 
   def GetMaxOutputThroughput(
       self,
@@ -503,8 +503,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     # Shift TZ of datetime arguments since FromDatetime() assumes UTC
     # See
     # https://googleapis.dev/python/protobuf/latest/google/protobuf/timestamp_pb2.html#google.protobuf.timestamp_pb2.Timestamp.FromDatetime
-    interval.start_time = start_time.astimezone(datetime.timezone.utc)
-    interval.end_time = end_time.astimezone(datetime.timezone.utc)
+    interval.start_time = start_time.astimezone(datetime.timezone.utc)  # pyrefly: ignore[bad-assignment]
+    interval.end_time = end_time.astimezone(datetime.timezone.utc)  # pyrefly: ignore[bad-assignment]
 
     api_filter = (
         'metric.type = "dataflow.googleapis.com/job/elements_produced_count" '
@@ -534,7 +534,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       )
       return None
 
-    return self._GetMaxValueFromTimeSeries(results)
+    return self._GetMaxValueFromTimeSeries(results)  # pyrefly: ignore[bad-argument-type]
 
   # TODO(user): Consider move to separate class to deal specifically with
   # streaming pubsub input workloads
@@ -546,8 +546,8 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
     delta = datetime.timedelta(minutes=interval_length)
 
     interval = types.TimeInterval()
-    interval.start_time = now - delta
-    interval.end_time = now
+    interval.start_time = now - delta  # pyrefly: ignore[bad-assignment]
+    interval.end_time = now  # pyrefly: ignore[bad-assignment]
 
     api_filter = (
         'metric.type = "pubsub.googleapis.com/subscription/'
@@ -562,7 +562,7 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
         view=monitoring_v3.ListTimeSeriesRequest.TimeSeriesView.FULL,
     )
 
-    return round(self._GetLastValueFromTimeSeries(results), 2)
+    return round(self._GetLastValueFromTimeSeries(results), 2)  # pyrefly: ignore[bad-argument-type]
 
   def _GetAvgValueFromTimeSeries(
       self, time_series: types.ListTimeSeriesResponse
@@ -622,6 +622,6 @@ class GcpDpbDataflow(dpb_service.BaseDpbService):
       Last value across intervals
     """
     try:
-      return list(time_series)[0].points[0].value.int64_value
+      return list(time_series)[0].points[0].value.int64_value  # pyrefly: ignore[bad-argument-type]
     except IndexError:
       return None

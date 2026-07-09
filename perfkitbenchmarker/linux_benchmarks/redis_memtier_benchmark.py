@@ -257,7 +257,7 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
       for server_vm in bm_spec.vm_groups['servers']:
         redis_server.VerifyRedisAof(server_vm)
 
-  return result_with_maximum_total_ops_throughput + all_results + top_results
+  return result_with_maximum_total_ops_throughput + all_results + top_results  # pyrefly: ignore[unsupported-operation]
 
 
 def Cleanup(bm_spec: _BenchmarkSpec) -> None:
@@ -271,7 +271,7 @@ def _UpdateIOThreadsForRedisServer(
     redis_server.Stop(server_vm)
 
   for server_vm in server_vms:
-    redis_server.CURRENT_IO_THREADS = io_threads
+    redis_server.CURRENT_IO_THREADS = io_threads  # pyrefly: ignore[bad-assignment]
     redis_server.Start(server_vm)
 
   if redis_server.CLUSTER_MODE.value:

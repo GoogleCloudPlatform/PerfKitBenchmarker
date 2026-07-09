@@ -202,23 +202,23 @@ class GceVmSpec(virtual_machine_spec.BaseVmSpec):
   CLOUD = provider_info.GCP
 
   def __init__(self, *args, **kwargs):
-    self.num_local_ssds: int = None
-    self.preemptible: bool = None
-    self.boot_disk_size: int = None
-    self.boot_disk_type: str = None
-    self.boot_disk_iops: int = None
-    self.boot_disk_throughput: int = None
+    self.num_local_ssds: int = None  # pyrefly: ignore[bad-assignment]
+    self.preemptible: bool = None  # pyrefly: ignore[bad-assignment]
+    self.boot_disk_size: int = None  # pyrefly: ignore[bad-assignment]
+    self.boot_disk_type: str = None  # pyrefly: ignore[bad-assignment]
+    self.boot_disk_iops: int = None  # pyrefly: ignore[bad-assignment]
+    self.boot_disk_throughput: int = None  # pyrefly: ignore[bad-assignment]
     # But prefer GetProject()
-    self.project: str = None
-    self.image_family: str = None
-    self.image_project: str = None
-    self.node_type: str = None
-    self.min_cpu_platform: str = None
-    self.threads_per_core: int = None
-    self.visible_core_count: int = None
-    self.gce_tags: List[str] = None
-    self.min_node_cpus: int = None
-    self.subnet_names: List[str] = None
+    self.project: str = None  # pyrefly: ignore[bad-assignment]
+    self.image_family: str = None  # pyrefly: ignore[bad-assignment]
+    self.image_project: str = None  # pyrefly: ignore[bad-assignment]
+    self.node_type: str = None  # pyrefly: ignore[bad-assignment]
+    self.min_cpu_platform: str = None  # pyrefly: ignore[bad-assignment]
+    self.threads_per_core: int = None  # pyrefly: ignore[bad-assignment]
+    self.visible_core_count: int = None  # pyrefly: ignore[bad-assignment]
+    self.gce_tags: List[str] = None  # pyrefly: ignore[bad-assignment]
+    self.min_node_cpus: int = None  # pyrefly: ignore[bad-assignment]
+    self.subnet_names: List[str] = None  # pyrefly: ignore[bad-assignment]
     self.ssd_interface: str
     self.mtu: int | None
     super().__init__(*args, **kwargs)
@@ -243,7 +243,7 @@ class GceVmSpec(virtual_machine_spec.BaseVmSpec):
       )
       self.cpus = self.machine_type.cpus
       self.memory = self.machine_type.memory
-      self.machine_type = None
+      self.machine_type = None  # pyrefly: ignore[bad-assignment]
     else:
       self.cpus = None
       self.memory = None
@@ -604,7 +604,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     super().__init__(vm_spec)
     self.vm_spec = typing.cast(GceVmSpec, vm_spec)
-    self.create_cmd: util.GcloudCommand = None
+    self.create_cmd: util.GcloudCommand = None  # pyrefly: ignore[bad-assignment]
     self.boot_metadata = {}
     self.boot_metadata_from_file = {}
     if self.boot_startup_script:
@@ -688,7 +688,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.is_aarch64
     )
     self.create_disk_strategy = gce_disk_strategies.GetCreateDiskStrategy(
-        self, None, 0
+        self, None, 0  # pyrefly: ignore[bad-argument-type]
     )
     self.skip_existence_check = False
 
@@ -741,18 +741,18 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       if gcp_flags.GCE_CONFIDENTIAL_COMPUTE_TYPE.value == 'sev':
         cmd.flags['confidential-compute-type'] = 'SEV'
 
-    if self.network.subnet_resources:
+    if self.network.subnet_resources:  # pyrefly: ignore[missing-attribute]
       net_resources = self.network.subnet_resources
       ni_arg_name = 'subnet'
     else:
-      net_resources = self.network.network_resources
+      net_resources = self.network.network_resources  # pyrefly: ignore[missing-attribute]
       ni_arg_name = 'network'
 
     # Bundle network-related arguments with --network-interface
     # This flag is mutually exclusive with any of these flags:
     # --address, --network, --network-tier, --subnet, --private-network-ip.
     # gcloud compute instances create ... --network-interface=
-    for idx, net_resource in enumerate(net_resources):
+    for idx, net_resource in enumerate(net_resources):  # pyrefly: ignore[bad-argument-type]
       gce_nic_type = self.gce_nic_types[idx].upper()
       gce_nic_queue_count_arg = []
       if gcp_flags.GCE_NIC_QUEUE_COUNTS.value[idx] != 'default':
@@ -815,7 +815,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         )
     ):
       cmd.flags['accelerator'] = GenerateAcceleratorSpecString(
-          self.gpu_type, self.gpu_count
+          self.gpu_type, self.gpu_count  # pyrefly: ignore[bad-argument-type]
       )
 
     cmd.flags['tags'] = ','.join(['perfkitbenchmarker'] + (self.gce_tags or []))
@@ -827,9 +827,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.gce_shielded_secure_boot:
       cmd.flags['shielded-secure-boot'] = True
 
-    if self.network.placement_group:
-      self.metadata.update(self.network.placement_group.GetResourceMetadata())
-      cmd.flags['resource-policies'] = self.network.placement_group.name
+    if self.network.placement_group:  # pyrefly: ignore[missing-attribute]
+      self.metadata.update(self.network.placement_group.GetResourceMetadata())  # pyrefly: ignore[missing-attribute]
+      cmd.flags['resource-policies'] = self.network.placement_group.name  # pyrefly: ignore[missing-attribute]
     else:
       self.metadata['placement_group_style'] = (
           placement_group.PLACEMENT_GROUP_NONE
@@ -1300,7 +1300,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         self.project,
         util.GetRegionFromZone(self.zone),
         ip_address_name,
-        self.network.primary_subnet_name,
+        self.network.primary_subnet_name,  # pyrefly: ignore[missing-attribute]
     )
     reserv_ip_address.Delete()
 
@@ -1337,21 +1337,21 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       result['gce_local_ssd_interface'] = self.ssd_interface
     # self.network.network_resources can be None when subnet_names are populated
     network_resources = (
-        self.network.network_resources or self.network.subnet_resources
+        self.network.network_resources or self.network.subnet_resources  # pyrefly: ignore[missing-attribute]
     )
     result['gce_network_name'] = ','.join(
         network_resource.name for network_resource in network_resources
     )
     result['gce_subnet_name'] = ','.join(
         subnet_resource.name
-        for subnet_resource in self.network.subnet_resources
+        for subnet_resource in self.network.subnet_resources  # pyrefly: ignore[missing-attribute]
     )
     result['gce_network_tier'] = self.gce_network_tier
     result['gce_nic_type'] = self.gce_nic_types
     result['gce_shielded_secure_boot'] = self.gce_shielded_secure_boot
     if self.visible_core_count:
       result['visible_core_count'] = self.visible_core_count
-    if self.network.mtu:
+    if self.network.mtu:  # pyrefly: ignore[missing-attribute]
       result['mtu'] = self.network.mtu
     if gcp_flags.GCE_CONFIDENTIAL_COMPUTE.value:
       result['confidential_compute'] = True
@@ -1409,7 +1409,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
 
   def _UpdateInterruptibleVmStatusThroughMetadataService(self):
     _, _, retcode = vm_util.IssueCommand(
-        [FLAGS.gsutil_path, 'stat', self.preempt_marker], raise_on_failure=False
+        [FLAGS.gsutil_path, 'stat', self.preempt_marker], raise_on_failure=False  # pyrefly: ignore[bad-argument-type]
     )
     # The VM is preempted if the command exits without an error
     self.spot_early_termination = not bool(retcode)
@@ -1601,7 +1601,7 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
   def _GetNetworkDeviceProperties(self, device_name: str) -> Dict[str, str]:
     """Returns a dict of the network device properties."""
     # ethtool can exist under /usr/sbin or needs to be installed (debian9)
-    if self.HasPackage('ethtool'):
+    if self.HasPackage('ethtool'):  # pyrefly: ignore[missing-attribute]
       self.InstallPackages('ethtool')
     try:
       stdout, _ = self.RemoteCommand(
@@ -1626,15 +1626,15 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
       if self.DEFAULT_ARM_IMAGE_FAMILY:
         return self.DEFAULT_ARM_IMAGE_FAMILY
 
-      assert 'arm64' not in self.DEFAULT_X86_IMAGE_FAMILY
-      if 'amd64' in self.DEFAULT_X86_IMAGE_FAMILY:
+      assert 'arm64' not in self.DEFAULT_X86_IMAGE_FAMILY  # pyrefly: ignore[not-iterable]
+      if 'amd64' in self.DEFAULT_X86_IMAGE_FAMILY:  # pyrefly: ignore[not-iterable]
         # New convention as of Ubuntu 23
-        arm_image_family = self.DEFAULT_X86_IMAGE_FAMILY.replace(
+        arm_image_family = self.DEFAULT_X86_IMAGE_FAMILY.replace(  # pyrefly: ignore[missing-attribute]
             'amd64', 'arm64'
         )
       else:
         # Older convention
-        arm_image_family = self.DEFAULT_X86_IMAGE_FAMILY + '-arm64'
+        arm_image_family = self.DEFAULT_X86_IMAGE_FAMILY + '-arm64'  # pyrefly: ignore[unsupported-operation]
       logging.info(
           'ARM image must be used; changing image to %s',
           arm_image_family,
@@ -1697,7 +1697,7 @@ class Debian11BasedGceVirtualMachine(
   DEFAULT_IMAGE_PROJECT = 'debian-cloud'
 
   @property
-  def DEFAULT_ARM_IMAGE_FAMILY(self):
+  def DEFAULT_ARM_IMAGE_FAMILY(self):  # pyrefly: ignore[bad-override]
     raise errors.Config.InvalidValue(
         'GCE does not support Debian 11 on ARM during LTS.'
     )

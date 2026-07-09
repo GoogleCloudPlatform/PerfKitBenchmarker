@@ -343,7 +343,7 @@ class _ExampleResourceDecoder(option_decoders.TypeVerifier):
           'Required attribute `example_type` missing from example_resource '
           'config.'
       )
-    return spec_class(
+    return spec_class(  # pyrefly: ignore[not-callable]
         self._GetOptionFullName(component_full_name),
         flag_values,
         **example_config,
@@ -405,7 +405,7 @@ class _BaseJobDecoder(option_decoders.TypeVerifier):
       raise errors.Config.InvalidValue(
           'job_type is required for base_job config'
       )
-    return spec_class(
+    return spec_class(  # pyrefly: ignore[not-callable]
         self._GetOptionFullName(component_full_name),
         flag_values,
         **base_job_config,
@@ -442,7 +442,7 @@ class _ManagedAiModelSpecDecoder(option_decoders.TypeVerifier):
       raise errors.Config.InvalidValue(
           f'Required attribute missing from model spec config {config}.'
       )
-    return spec_class(
+    return spec_class(  # pyrefly: ignore[not-callable]
         self._GetOptionFullName(component_full_name),
         flag_values,
         **config,
@@ -464,7 +464,7 @@ class _TpuGroupSpec(spec.BaseSpec):
     )
     if not self.tpu_name:
       self.tpu_name = 'pkb-tpu-{group_name}-{run_uri}'.format(
-          group_name=group_name, run_uri=flag_values.run_uri
+          group_name=group_name, run_uri=flag_values.run_uri  # pyrefly: ignore[missing-attribute]
       )
 
   @classmethod
@@ -1024,7 +1024,7 @@ class _VPNServiceSpec(spec.BaseSpec):
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
     if not self.name:
-      self.name = 'pkb-vpn-svc-{}'.format(flag_values.run_uri)
+      self.name = 'pkb-vpn-svc-{}'.format(flag_values.run_uri)  # pyrefly: ignore[missing-attribute]
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -1392,7 +1392,7 @@ class _KeyDecoder(option_decoders.TypeVerifier):
       raise errors.Config.InvalidValue(
           'Required attribute "cloud" missing from "key" config.'
       )
-    return key_spec_class(
+    return key_spec_class(  # pyrefly: ignore[not-callable]
         self._GetOptionFullName(component_full_name), flag_values, **key_config
     )
 

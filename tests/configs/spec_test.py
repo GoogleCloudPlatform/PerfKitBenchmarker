@@ -54,7 +54,7 @@ class BaseSpecFixedDecodeOrderTestCase(unittest.TestCase):
         config_option_name: callback
         for config_option_name in self.config_option_names
     }
-    _TestFixedDecodeOrderSpec(_COMPONENT, **config)
+    _TestFixedDecodeOrderSpec(_COMPONENT, **config)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(observed_decode_call_order, expected_decode_call_order)
 
   def testDecodersPrint(self):

@@ -93,14 +93,14 @@ class LargeScaleBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     }
 
     metadata1 = copy.deepcopy(common_metadata)
-    metadata1.update({
+    metadata1.update({  # pyrefly: ignore[no-matching-overload]
         'zone': 'zone',
         'launcher_successes': 3,
         'launcher_boot_durations_ns': [2, 3, 7],
         'launcher_closed_incoming': 0,
     })
     metadata2 = copy.deepcopy(common_metadata)
-    metadata2.update({
+    metadata2.update({  # pyrefly: ignore[no-matching-overload]
         'zone': 'zone',
         'launcher_successes': 2,
         'launcher_boot_durations_ns': [2, 4],

@@ -88,9 +88,9 @@ class AzureVmScalingSet(managed_vm_group.BaseManagedVmGroup):
         '--ssh-key-value',
         self.vm_config.ssh_public_key,
         '--vnet-name',
-        self.vm_config.network.vnet.name,
+        self.vm_config.network.vnet.name,  # pyrefly: ignore[missing-attribute]
         '--subnet',
-        self.vm_config.network.subnet.name,
+        self.vm_config.network.subnet.name,  # pyrefly: ignore[missing-attribute]
         '--upgrade-policy-mode',
         'Manual',
         '--lb',

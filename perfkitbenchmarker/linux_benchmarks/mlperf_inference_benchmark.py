@@ -139,14 +139,14 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
       f'{repository}/closed/NVIDIA/configs/{benchmark}/{_SCENARIOS.value}/*.py'
   )
   if _SCENARIOS.value == SERVER:
-    bm_spec.metric = _SERVER_QPS
+    bm_spec.metric = _SERVER_QPS  # pyrefly: ignore[missing-attribute]
   elif _SCENARIOS.value == OFFLINE:
-    bm_spec.metric = _OFFLINE_QPS
+    bm_spec.metric = _OFFLINE_QPS  # pyrefly: ignore[missing-attribute]
   if _TARGET_QPS.value:
     vm_util.ReplaceText(
         vm,
-        f'{bm_spec.metric} = .*',
-        f'{bm_spec.metric} = {_TARGET_QPS.value}',
+        f'{bm_spec.metric} = .*',  # pyrefly: ignore[missing-attribute]
+        f'{bm_spec.metric} = {_TARGET_QPS.value}',  # pyrefly: ignore[missing-attribute]
         config,
     )
 
@@ -163,12 +163,13 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     vm.Install('nvidia_driver')
     vm.Install('nvidia_docker')
 
-  bm_spec.env_cmd = (
+  bm_spec.env_cmd = (  # pyrefly: ignore[missing-attribute]
       f'export MLPERF_SCRATCH_PATH={_MLPERF_SCRATCH_PATH} && '
       f'cd {repository}/closed/NVIDIA'
   )
   docker.AddUser(vm)
   vm.RobustRemoteCommand(
+      # pyrefly: ignore[missing-attribute]
       f'{bm_spec.env_cmd} && '
       'make build_docker NO_BUILD=1 && '
       'make docker_add_user && '
@@ -232,22 +233,26 @@ def Prepare(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
     )
   else:
     vm.RobustRemoteCommand(
+        # pyrefly: ignore[missing-attribute]
         f'{bm_spec.env_cmd} && '
         'make launch_docker DOCKER_COMMAND='
         f'"make download_data BENCHMARKS={benchmark}"'
     )
     vm.RobustRemoteCommand(
+        # pyrefly: ignore[missing-attribute]
         f'{bm_spec.env_cmd} && '
         'make launch_docker DOCKER_COMMAND='
         f'"make download_model BENCHMARKS={benchmark}"'
     )
     vm.RobustRemoteCommand(
+        # pyrefly: ignore[missing-attribute]
         f'{bm_spec.env_cmd} && '
         'make launch_docker DOCKER_COMMAND='
         f'"make preprocess_data BENCHMARKS={benchmark}"'
     )
 
   vm.RobustRemoteCommand(
+      # pyrefly: ignore[missing-attribute]
       f'{bm_spec.env_cmd} && '
       'make launch_docker DOCKER_COMMAND='
       '"make build" && '
@@ -311,12 +316,12 @@ def MakePerformanceSamplesFromOutput(
 
   return [
       sample.Sample(
-          'throughput', metadata[metric], 'samples per second', metadata
+          'throughput', metadata[metric], 'samples per second', metadata  # pyrefly: ignore[unbound-name]
       )
   ]
 
 
-def _Run(bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float) -> bool:
+def _Run(bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float) -> bool:  # pyrefly: ignore[bad-return]
   """Runs MLPerf inference test under a server target QPS.
 
   Args:
@@ -331,12 +336,14 @@ def _Run(bm_spec: benchmark_spec.BenchmarkSpec, target_qps: float) -> bool:
   config = f'configs/{FLAGS.mlperf_benchmark}/{_SCENARIOS.value}/*.py'
 
   vm.RobustRemoteCommand(
+      # pyrefly: ignore[missing-attribute]
       f"{bm_spec.env_cmd} && sed -i 's/{bm_spec.metric} = .*/{bm_spec.metric} ="
       f" {target_qps}/g' {config}"
   )
   # For valid log, result_validity is VALID
   # For invalid log, result_validity is INVALID
   stdout, _ = vm.RobustRemoteCommand(
+      # pyrefly: ignore[missing-attribute]
       f'{bm_spec.env_cmd} && '
       'make launch_docker DOCKER_COMMAND="make run_harness RUN_ARGS=\''
       f'--benchmarks={FLAGS.mlperf_benchmark} '
@@ -360,6 +367,7 @@ def _LastRunResults(bm_spec: benchmark_spec.BenchmarkSpec) -> str:
   """
   vm = bm_spec.vms[0]
   stdout, _ = vm.RobustRemoteCommand(
+      # pyrefly: ignore[missing-attribute]
       f'{bm_spec.env_cmd} && grep -l \'\\"result_validity\\": \\"VALID\\"\''
       ' build/logs/*/*/*/*/metadata.json | xargs ls -t | head -n 1 | xargs cat'
   )

@@ -94,7 +94,7 @@ class GceManagedInstanceGroupTest(pkb_common_test_case.PkbCommonTestCase):
             os_type='debian12',
             vm_spec={'GCP': {'machine_type': 'n1-standard-4'}},
         ),
-        vm_configs,
+        vm_configs,  # pyrefly: ignore[bad-argument-type]
     )
     mig._Create()
     self.assertIn(
