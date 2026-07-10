@@ -516,6 +516,26 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
     cluster = self._DescribeCluster()
     return cluster['state'] == 'READY'
 
+  def _Exists(self) -> bool:
+    """Returns true if the underlying resource exists."""
+    try:
+      self._DescribeCluster()
+      return True
+    except errors.VmUtil.IssueCommandError as e:
+      if 'not found' in str(e).lower():
+        return False
+      raise e
+
+  def _IsDeleting(self) -> bool:
+    """Return true if the underlying resource is getting deleted."""
+    try:
+      cluster = self._DescribeCluster()
+      return cluster.get('state') == 'DELETING'
+    except errors.VmUtil.IssueCommandError as e:
+      if 'not found' in str(e).lower():
+        return False
+      raise e
+
   def _ApplyDbFlags(self):
     # Database flags is applied during creation.
     pass

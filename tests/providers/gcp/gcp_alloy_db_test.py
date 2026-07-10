@@ -345,6 +345,58 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
           mock.call('SELECT perfsnap.report(1, 2);', ignore_failure=True),
       ])
 
+  def testExistsTrue(self):
+    with mock.patch.object(
+        gcp_alloy_db.GCPAlloyRelationalDb,
+        '_DescribeCluster',
+        return_value={'state': 'READY'},
+    ):
+      self.assertTrue(self.db._Exists())
+
+  def testExistsFalse(self):
+    error_msg = 'Command failed: ... NOT_FOUND: Resource ... was not found.'
+    with mock.patch.object(
+        gcp_alloy_db.GCPAlloyRelationalDb,
+        '_DescribeCluster',
+        side_effect=errors.VmUtil.IssueCommandError(error_msg),
+    ):
+      self.assertFalse(self.db._Exists())
+
+  def testExistsOtherError(self):
+    error_msg = 'Command failed: ... Some other error'
+    with mock.patch.object(
+        gcp_alloy_db.GCPAlloyRelationalDb,
+        '_DescribeCluster',
+        side_effect=errors.VmUtil.IssueCommandError(error_msg),
+    ):
+      with self.assertRaises(errors.VmUtil.IssueCommandError):
+        self.db._Exists()
+
+  def testIsDeletingTrue(self):
+    with mock.patch.object(
+        gcp_alloy_db.GCPAlloyRelationalDb,
+        '_DescribeCluster',
+        return_value={'state': 'DELETING'},
+    ):
+      self.assertTrue(self.db._IsDeleting())
+
+  def testIsDeletingFalse(self):
+    with mock.patch.object(
+        gcp_alloy_db.GCPAlloyRelationalDb,
+        '_DescribeCluster',
+        return_value={'state': 'READY'},
+    ):
+      self.assertFalse(self.db._IsDeleting())
+
+  def testIsDeletingNotFound(self):
+    error_msg = 'Command failed: ... NOT_FOUND: Resource ... was not found.'
+    with mock.patch.object(
+        gcp_alloy_db.GCPAlloyRelationalDb,
+        '_DescribeCluster',
+        side_effect=errors.VmUtil.IssueCommandError(error_msg),
+    ):
+      self.assertFalse(self.db._IsDeleting())
+
 
 if __name__ == '__main__':
   unittest.main()
