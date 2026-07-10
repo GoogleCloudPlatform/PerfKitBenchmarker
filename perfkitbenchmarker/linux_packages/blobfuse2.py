@@ -20,8 +20,21 @@ _BLOBFUSE2_VERSION = 'blobfuse2-2.5.0'
 
 
 def AptInstall(vm):
-  """Installs Blobfuse2 on the VM."""
+  """Installs the Blobfuse2 package on the VM."""
   vm.InstallPackages('golang-go libfuse3-dev fuse3')
+  _Install(vm)
+
+
+def YumInstall(vm):
+  """Installs the Blobfuse2 package on the VM."""
+  vm.InstallPackages('golang fuse3-devel fuse3')
+  vm.InstallPackages('git')
+  _Install(vm)
+  vm.RemoteCommand('sudo ln -s /usr/local/bin/blobfuse2 /usr/bin/blobfuse2')
+
+
+def _Install(vm):
+  """Installs Blobfuse2 on the VM."""
   vm.RemoteCommand(f'git clone {_BLOBFUSE2_REPO_URL}')
   vm.RemoteCommand(
       f'cd {_BLOBFUSE2_REPO_NAME} && git checkout {_BLOBFUSE2_VERSION} &&'

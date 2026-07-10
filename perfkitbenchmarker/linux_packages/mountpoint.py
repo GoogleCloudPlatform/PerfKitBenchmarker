@@ -64,7 +64,6 @@ def _Install(vm, url, out_file):
       f'sudo mkdir -p {linux_packages.INSTALL_DIR} && sudo wget {url} -O'
       f' {linux_packages.INSTALL_DIR}/{out_file}'
   )
-  vm.RemoteCommand(
-      f'cd {linux_packages.INSTALL_DIR} && sudo apt-get install -y ./{out_file}'
-  )
+  vm.InstallPackages(f'{linux_packages.INSTALL_DIR}/{out_file}')
   vm.RemoteCommand('mount-s3 --version')
+
