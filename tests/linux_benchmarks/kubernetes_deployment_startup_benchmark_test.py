@@ -1,4 +1,4 @@
-# Copyright 2024 PerfKitBenchmarker Authors. All rights reserved.
+# Copyright 2025 PerfKitBenchmarker Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,379 +11,438 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for kubernetes_deployment_startup_benchmark and startup_metrics.
-
-PR 1 — Metrics & Observability (Layer 0)
-"""
+"""Tests for kubernetes_deployment_startup_benchmark (PR 1 + PR 2 + PR 3)."""
 
 import threading
-import time
 import unittest
 from unittest import mock
 
 from absl.testing import flagsaver
-from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import sample
-from perfkitbenchmarker.linux_benchmarks import kubernetes_deployment_startup_benchmark as bench
-from perfkitbenchmarker.linux_benchmarks import kubernetes_deployment_startup_benchmark as kdsb
-from perfkitbenchmarker.resources.container_service import kubernetes_commands
-from perfkitbenchmarker.resources.container_service import kubernetes_conditions
+from perfkitbenchmarker.linux_benchmarks import (
+    kubernetes_deployment_startup_benchmark as bench,
+)
 from tests import pkb_common_test_case
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-_BASE_METADATA = {
-    'workload': 'jvm',
-    'scenario': 'baseline',
-    'cloud': 'GCP',
-    'replicas': 1,
-    'namespace': 'default',
-    'app_label': 'slowjvmstartup',
-}
+def _MakeCondition(resource_name, event, epoch_time):
+  """Returns a mock KubernetesStatusCondition."""
+  c = mock.MagicMock()
+  c.resource_name = resource_name
+  c.event = event
+  c.epoch_time = epoch_time
+  return c
 
 
-def _MakePodJson(
-    pod_name: str,
-    scheduled_ts: str,
-    started_at: str | None = None,
-    ready_ts: str | None = None,
-) -> dict:
-  """Builds a minimal pod JSON dict for testing."""
-  conditions = [
-      {
-          'type': 'PodScheduled',
-          'status': 'True',
-          'lastTransitionTime': scheduled_ts,
-      }
-  ]
-  if ready_ts:
-    conditions.append({
-        'type': 'Ready',
-        'status': 'True',
-        'lastTransitionTime': ready_ts,
-    })
-
-  container_statuses = []
-  if started_at:
-    container_statuses = [{
-        'name': 'app',
-        'ready': True,
-        'state': {'running': {'startedAt': started_at}},
-    }]
-
-  return {
-      'metadata': {'name': pod_name},
-      'status': {
-          'startTime': scheduled_ts,
-          'conditions': conditions,
-          'containerStatuses': container_statuses,
-      },
+def _MakeSpec(image='slowjvmstartup'):
+  """Returns a mock BenchmarkSpec."""
+  bm = mock.MagicMock()
+  bm.container_specs = {
+      'kubernetes_deployment_startup': mock.MagicMock(image=image)
   }
+  return bm
+
+
+def _DefaultConditions():
+  return [
+      _MakeCondition('pod-0', 'PodReadyToStartContainers', 1000),
+      _MakeCondition('pod-0', 'Ready', 1030),
+  ]
+
+
+def _RunWithConditions(conditions, flag_kwargs=None):
+  """Runs bench.Run() with mocked kubectl calls."""
+  flag_kwargs = flag_kwargs or {'cloud': 'GCP'}
+  with mock.patch.object(
+      bench.kubernetes_commands, 'ApplyManifest'
+  ), mock.patch.object(
+      bench.kubernetes_commands, 'WaitForRollout'
+  ), mock.patch.object(
+      bench.kubernetes_conditions,
+      'GetStatusConditionsForResourceType',
+      return_value=conditions,
+  ), mock.patch.object(
+      bench, '_GetTotalCpuMillicores', return_value=None
+  ), flagsaver.flagsaver(**flag_kwargs):
+    return bench.Run(_MakeSpec())
 
 
 # ---------------------------------------------------------------------------
-# startup_metrics tests
+# PR 1: existing + new metrics
 # ---------------------------------------------------------------------------
 
 
-class StartupMetricsTest(pkb_common_test_case.PkbCommonTestCase):
+class MaxPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for max_pod_ready_time metric (existing, preserved)."""
 
-  def testExtractLatencyFromContainerStartedAt(self):
-    """Prefers containerStatuses[0].state.running.startedAt over Ready cond."""
-    pod = _MakePodJson(
-        'pod-1',
-        scheduled_ts='2024-01-01T00:00:00Z',
-        started_at='2024-01-01T00:00:30Z',   # 30s latency
-        ready_ts='2024-01-01T00:00:35Z',      # 35s — should NOT be used
-    )
-    latency = startup_metrics._ExtractPodStartupLatency(pod)
-    self.assertAlmostEqual(latency, 30.0, places=1)
+  def testEmitsMaxPodReadyTime(self):
+    samples = _RunWithConditions(_DefaultConditions())
+    self.assertIn('max_pod_ready_time', {s.metric for s in samples})
 
-  def testExtractLatencyFallsBackToReadyCondition(self):
-    """Falls back to Ready condition when containerStatuses is absent."""
-    pod = _MakePodJson(
-        'pod-2',
-        scheduled_ts='2024-01-01T00:00:00Z',
-        ready_ts='2024-01-01T00:00:45Z',      # 45s latency via Ready cond
-    )
-    latency = startup_metrics._ExtractPodStartupLatency(pod)
-    self.assertAlmostEqual(latency, 45.0, places=1)
-
-  def testExtractLatencyReturnsNoneWhenNoReadyTimestamp(self):
-    """Returns None when no container-ready or Ready-condition timestamp exists."""
-    pod = _MakePodJson('pod-3', scheduled_ts='2024-01-01T00:00:00Z')
-    latency = startup_metrics._ExtractPodStartupLatency(pod)
-    self.assertIsNone(latency)
-
-  def testExtractLatencyReturnsNoneForNegativeLatency(self):
-    """Returns None when container-ready precedes scheduled (clock skew)."""
-    pod = _MakePodJson(
-        'pod-4',
-        scheduled_ts='2024-01-01T00:01:00Z',
-        started_at='2024-01-01T00:00:30Z',    # before scheduled → negative
-    )
-    latency = startup_metrics._ExtractPodStartupLatency(pod)
-    self.assertIsNone(latency)
-
-  def testLatenciesToSamplesEmitsAllStats(self):
-    """_LatenciesToSamples emits min/max/mean/p50/p90/p99/count."""
-    latencies = [10.0, 20.0, 30.0, 40.0, 50.0]
-    samples = startup_metrics._LatenciesToSamples(latencies, _BASE_METADATA)
-    metric_names = {s.metric for s in samples}
-    expected = {
-        'startup_latency_min',
-        'startup_latency_max',
-        'startup_latency_mean',
-        'startup_latency_p50',
-        'startup_latency_p90',
-        'startup_latency_p99',
-        'startup_latency_pod_count',
-    }
-    self.assertEqual(metric_names, expected)
-
-  def testLatenciesToSamplesValues(self):
-    """Verifies min/max/mean values are correct."""
-    latencies = [10.0, 20.0, 30.0]
-    samples = startup_metrics._LatenciesToSamples(latencies, _BASE_METADATA)
+  def testMaxPodReadyTimeValue(self):
+    conditions = [
+        _MakeCondition('pod-0', 'PodReadyToStartContainers', 1000),
+        _MakeCondition('pod-0', 'Ready', 1020),
+        _MakeCondition('pod-1', 'PodReadyToStartContainers', 1000),
+        _MakeCondition('pod-1', 'Ready', 1035),
+    ]
+    samples = _RunWithConditions(conditions)
     by_metric = {s.metric: s.value for s in samples}
-    self.assertAlmostEqual(by_metric['startup_latency_min'], 10.0)
-    self.assertAlmostEqual(by_metric['startup_latency_max'], 30.0)
-    self.assertAlmostEqual(by_metric['startup_latency_mean'], 20.0)
-    self.assertEqual(by_metric['startup_latency_pod_count'], 3)
+    self.assertAlmostEqual(by_metric['max_pod_ready_time'], 35)
 
-  def testLatenciesToSamplesCarryBaseMetadata(self):
-    """All samples carry the base metadata keys."""
-    latencies = [15.0]
-    samples = startup_metrics._LatenciesToSamples(latencies, _BASE_METADATA)
-    for s in samples:
-      for key in ('workload', 'scenario', 'cloud'):
-        self.assertIn(key, s.metadata)
+  def testRaisesWhenNoPodsReady(self):
+    with self.assertRaises(RuntimeError):
+      _RunWithConditions([])
 
-  def testGetStartupLatencySamplesEmptyOnKubectlError(self):
-    """Returns empty list when kubectl returns non-zero exit code."""
-    with mock.patch.object(
-        startup_metrics.kubectl, 'RunKubectlCommand',
-        return_value=('', 'error', 1),
-    ):
-      result = startup_metrics.GetStartupLatencySamples(
-          namespace='default', app_label='app', metadata=_BASE_METADATA
-      )
-    self.assertEqual(result, [])
 
-  def testGetStartupLatencySamplesEmptyOnBadJson(self):
-    """Returns empty list when kubectl output is not valid JSON."""
-    with mock.patch.object(
-        startup_metrics.kubectl, 'RunKubectlCommand',
-        return_value=('not json', '', 0),
-    ):
-      result = startup_metrics.GetStartupLatencySamples(
-          namespace='default', app_label='app', metadata=_BASE_METADATA
-      )
-    self.assertEqual(result, [])
+class PerPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for per_pod_ready_time metric (PR 1)."""
+
+  def testEmitsOnePerPod(self):
+    conditions = [
+        _MakeCondition('pod-0', 'PodReadyToStartContainers', 1000),
+        _MakeCondition('pod-0', 'Ready', 1025),
+        _MakeCondition('pod-1', 'PodReadyToStartContainers', 1000),
+        _MakeCondition('pod-1', 'Ready', 1040),
+    ]
+    samples = _RunWithConditions(conditions)
+    per_pod = [s for s in samples if s.metric == 'per_pod_ready_time']
+    self.assertLen(per_pod, 2)
+
+  def testPerPodCarriesPodName(self):
+    conditions = [
+        _MakeCondition('pod-abc', 'PodReadyToStartContainers', 1000),
+        _MakeCondition('pod-abc', 'Ready', 1030),
+    ]
+    samples = _RunWithConditions(conditions)
+    per_pod = [s for s in samples if s.metric == 'per_pod_ready_time']
+    self.assertEqual(per_pod[0].metadata['pod_name'], 'pod-abc')
+
+
+class SampleMetadataTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for sample metadata (PR 1)."""
+
+  def testAllSamplesCarryScenarioWorkloadCloud(self):
+    samples = _RunWithConditions(
+        _DefaultConditions(),
+        flag_kwargs={
+            'cloud': 'GCP',
+            'kubernetes_deployment_startup_scenario': 'baseline',
+            'kubernetes_deployment_startup_workload': 'jvm',
+        },
+    )
+    pod_samples = [
+        s for s in samples
+        if s.metric in ('max_pod_ready_time', 'per_pod_ready_time')
+    ]
+    for s in pod_samples:
+      self.assertEqual(s.metadata['scenario'], 'baseline')
+      self.assertEqual(s.metadata['workload'], 'jvm')
+      self.assertEqual(s.metadata['cloud'], 'GCP')
 
 
 # ---------------------------------------------------------------------------
-# _CpuUtilizationCollector tests
+# PR 1: CPU utilization collector
 # ---------------------------------------------------------------------------
 
 
 class CpuUtilizationCollectorTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for _CpuUtilizationCollector (PR 1)."""
 
-  def setUp(self):
-    super().setUp()
-    self.spec = mock.Mock(spec=benchmark_spec.BenchmarkSpec)
-    self.spec.container_cluster = mock.Mock()
-    self.spec.container_specs = {
-        'kubernetes_deployment_startup': mock.Mock(image='test_image')
-    }
+  def _MakeCollector(self):
+    samples = []
+    stop = threading.Event()
+    collector = bench._CpuUtilizationCollector(samples, stop)
+    return collector, samples, stop
 
-  @mock.patch.object(kubernetes_commands, 'WaitForRollout')
-  @mock.patch.object(kubernetes_commands, 'ApplyManifest')
-  @mock.patch.object(
-      kubernetes_conditions, 'GetStatusConditionsForResourceType'
-  )
-  def testRun(
-      self, mock_get_conditions, mock_apply_manifest, mock_wait_for_rollout
-  ):
-    """Tests the Run method with mock pod data."""
-    mock_get_conditions.return_value = [
-        mock.Mock(
-            event='PodReadyToStartContainers',
-            resource_name='pod1',
-            epoch_time=10,
-        ),
-        mock.Mock(event='Ready', resource_name='pod1', epoch_time=20),
-        mock.Mock(
-            event='PodReadyToStartContainers',
-            resource_name='pod2',
-            epoch_time=12,
-        ),
-        mock.Mock(event='Ready', resource_name='pod2', epoch_time=25),
-    ]
-    result = kdsb.Run(self.spec)
+  def testEmitsPeakMeanCount(self):
+    collector, samples, stop = self._MakeCollector()
+    collector._readings = [100.0, 200.0, 300.0]
+    stop.set()
+    collector.ObserveCpuUtilization()
+    metrics = {s.metric for s in samples}
+    self.assertIn('cpu_utilization_peak_millicores', metrics)
+    self.assertIn('cpu_utilization_mean_millicores', metrics)
+    self.assertIn('cpu_utilization_reading_count', metrics)
 
-    mock_apply_manifest.assert_called_with(
-        kdsb.DEPLOYMENT_YAML.value, name='startup', image='test_image'
-    )
-    mock_wait_for_rollout.assert_called_with('deployment/startup', timeout=600)
-    self.assertLen(result, 1)
-    self.assertEqual(
-        result[0],
-        sample.Sample(
-            'max_pod_ready_time', 13, 'seconds', {}, result[0].timestamp
-        ),
-    )
-
-  @mock.patch.object(kubernetes_commands, 'WaitForRollout')
-  @mock.patch.object(kubernetes_commands, 'ApplyManifest')
-  @mock.patch.object(
-      kubernetes_conditions, 'GetStatusConditionsForResourceType'
-  )
-  def testRunNoPods(
-      self, mock_get_conditions, mock_apply_manifest, mock_wait_for_rollout
-  ):
-    """Tests the Run method when no pods are found."""
-    mock_get_conditions.return_value = []
-    with self.assertRaises(RuntimeError):
-      kdsb.Run(self.spec)
-
-    self.collector = bench._CpuUtilizationCollector(
-        namespace='default',
-        app_label='slowjvmstartup',
-        poll_interval=1,
-    )
-
-  def testCollectorAccumulatesReadings(self):
-    """Collector accumulates readings while running."""
-    call_count = [0]
-
-    def fake_poll():
-      call_count[0] += 1
-      return 250.0
-
-    with mock.patch.object(self.collector, '_PollCpuMillicores', side_effect=fake_poll):
-      self.collector.Start()
-      time.sleep(2.5)   # Allow ~2 polls at 1s interval
-      self.collector.Stop()
-
-    self.assertGreaterEqual(len(self.collector._readings), 1)
-
-  def testGetSamplesEmitsPeakAndMean(self):
-    """GetSamples emits cpu_utilization_peak and cpu_utilization_mean."""
-    self.collector._readings = [100.0, 200.0, 300.0]
-    samples = self.collector.GetSamples(_BASE_METADATA)
-    metric_names = {s.metric for s in samples}
-    self.assertIn('cpu_utilization_peak', metric_names)
-    self.assertIn('cpu_utilization_mean', metric_names)
-    self.assertIn('cpu_utilization_reading_count', metric_names)
-
-  def testGetSamplesValues(self):
-    """Peak = max, mean = average of readings."""
-    self.collector._readings = [100.0, 200.0, 300.0]
-    samples = self.collector.GetSamples(_BASE_METADATA)
+  def testPeakAndMeanValues(self):
+    collector, samples, stop = self._MakeCollector()
+    collector._readings = [100.0, 200.0, 300.0]
+    stop.set()
+    collector.ObserveCpuUtilization()
     by_metric = {s.metric: s.value for s in samples}
-    self.assertAlmostEqual(by_metric['cpu_utilization_peak'], 300.0)
-    self.assertAlmostEqual(by_metric['cpu_utilization_mean'], 200.0)
+    self.assertAlmostEqual(by_metric['cpu_utilization_peak_millicores'], 300.0)
+    self.assertAlmostEqual(by_metric['cpu_utilization_mean_millicores'], 200.0)
     self.assertEqual(by_metric['cpu_utilization_reading_count'], 3)
 
-  def testGetSamplesEmptyWhenNoReadings(self):
-    """Returns empty list when no readings collected."""
-    self.collector._readings = []
-    samples = self.collector.GetSamples(_BASE_METADATA)
+  def testNoSamplesWhenNoReadings(self):
+    collector, samples, stop = self._MakeCollector()
+    collector._readings = []
+    stop.set()
+    collector.ObserveCpuUtilization()
     self.assertEqual(samples, [])
 
-  def testGetSamplesCarryMetadata(self):
-    """All samples carry the base metadata and cpu-specific keys."""
-    self.collector._readings = [150.0]
-    samples = self.collector.GetSamples(_BASE_METADATA)
-    for s in samples:
-      self.assertIn('workload', s.metadata)
-      self.assertIn('scenario', s.metadata)
+  def testObserveIgnoresIssueCommandError(self):
+    collector, _, stop = self._MakeCollector()
+    call_count = [0]
 
-  def testPollCpuMillicoresParsesMilliSuffix(self):
-    """_PollCpuMillicores correctly parses '250m' → 250.0."""
-    fake_output = 'slowjvmstartup-abc   250m   128Mi\n'
-    with mock.patch.object(
-        bench.kubectl, 'RunKubectlCommand',
-        return_value=(fake_output, '', 0),
-    ):
-      result = self.collector._PollCpuMillicores()
-    self.assertAlmostEqual(result, 250.0)
+    def flaky():
+      call_count[0] += 1
+      if call_count[0] < 3:
+        raise errors.VmUtil.IssueCommandError('transient')
+      stop.set()
+      return []
 
-  def testPollCpuMillicoresParsesCoreSuffix(self):
-    """_PollCpuMillicores correctly parses '1' (core) → 1000.0 millicores."""
-    fake_output = 'slowjvmstartup-abc   1   512Mi\n'
-    with mock.patch.object(
-        bench.kubectl, 'RunKubectlCommand',
-        return_value=(fake_output, '', 0),
-    ):
-      result = self.collector._PollCpuMillicores()
-    self.assertAlmostEqual(result, 1000.0)
+    collector._Observe(flaky)
+    self.assertEqual(call_count[0], 3)
 
-  def testPollCpuMillicoresReturnsZeroOnError(self):
-    """_PollCpuMillicores returns 0.0 when kubectl returns non-zero rc."""
-    with mock.patch.object(
-        bench.kubectl, 'RunKubectlCommand',
-        return_value=('', 'error', 1),
-    ):
-      result = self.collector._PollCpuMillicores()
-    self.assertEqual(result, 0.0)
+  def testThreadSafety(self):
+    collector, _, _ = self._MakeCollector()
+    errs = []
 
-  def testCollectorIsThreadSafe(self):
-    """Concurrent Stop() and GetSamples() do not race."""
-    self.collector._readings = [100.0] * 50
-    errors = []
-
-    def read():
+    def append_readings():
       try:
-        self.collector.GetSamples(_BASE_METADATA)
+        for _ in range(50):
+          with collector._lock:
+            collector._readings.append(1.0)
       except Exception as e:  # pylint: disable=broad-except
-        errors.append(e)
+        errs.append(e)
 
-    threads = [threading.Thread(target=read) for _ in range(10)]
+    threads = [threading.Thread(target=append_readings) for _ in range(4)]
     for t in threads:
       t.start()
     for t in threads:
       t.join()
-
-    self.assertEqual(errors, [])
+    self.assertEqual(errs, [])
+    self.assertEqual(len(collector._readings), 200)
 
 
 # ---------------------------------------------------------------------------
-# Benchmark lifecycle tests
+# PR 1: _GetTotalCpuMillicores
 # ---------------------------------------------------------------------------
 
 
-class BenchmarkLifecycleTest(pkb_common_test_case.PkbCommonTestCase):
+class GetTotalCpuMillicoresTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for _GetTotalCpuMillicores helper (PR 1)."""
+
+  def _MockKubectl(self, stdout, rc=0):
+    return mock.patch.object(
+        bench.kubectl, 'RunKubectlCommand',
+        return_value=(stdout, '', rc),
+    )
+
+  def testParsesMiliSuffix(self):
+    with self._MockKubectl('pod-abc   250m   128Mi\n'):
+      self.assertAlmostEqual(bench._GetTotalCpuMillicores(), 250.0)
+
+  def testParsesCoreSuffix(self):
+    with self._MockKubectl('pod-abc   1   512Mi\n'):
+      self.assertAlmostEqual(bench._GetTotalCpuMillicores(), 1000.0)
+
+  def testSumsMultiplePods(self):
+    with self._MockKubectl('pod-0   100m   64Mi\npod-1   150m   64Mi\n'):
+      self.assertAlmostEqual(bench._GetTotalCpuMillicores(), 250.0)
+
+  def testReturnsNoneOnError(self):
+    with self._MockKubectl('', rc=1):
+      self.assertIsNone(bench._GetTotalCpuMillicores())
+
+  def testReturnsNoneOnEmpty(self):
+    with self._MockKubectl(''):
+      self.assertIsNone(bench._GetTotalCpuMillicores())
+
+
+# ---------------------------------------------------------------------------
+# PR 2: vLLM workload
+# ---------------------------------------------------------------------------
+
+
+class VllmWorkloadTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for vLLM workload support (PR 2)."""
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_workload='vllm', cloud='GCP'
+  )
+  def testPrepareDeploysVllmManifest(self):
+    bm = _MakeSpec(image='public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:latest')
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest'
+    ) as mock_apply:
+      bench.Prepare(bm)
+      call_args = mock_apply.call_args[0][0]
+      self.assertIn('vllm', call_args)
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_workload='jvm', cloud='GCP'
+  )
+  def testPrepareDeploysJvmManifest(self):
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest'
+    ) as mock_apply:
+      bench.Prepare(_MakeSpec())
+      call_args = mock_apply.call_args[0][0]
+      self.assertIn('slowjvmstartup', call_args)
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_workload='vllm', cloud='GCP'
+  )
+  def testRunWaitsOnVllmDeployment(self):
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest'
+    ), mock.patch.object(
+        bench.kubernetes_commands, 'WaitForRollout'
+    ) as mock_wait, mock.patch.object(
+        bench.kubernetes_conditions,
+        'GetStatusConditionsForResourceType',
+        return_value=_DefaultConditions(),
+    ), mock.patch.object(bench, '_GetTotalCpuMillicores', return_value=None):
+      bench.Run(_MakeSpec())
+      mock_wait.assert_called_with('deployment/vllm-startup', timeout=600)
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_workload='jvm', cloud='GCP'
+  )
+  def testRunWaitsOnJvmDeployment(self):
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest'
+    ), mock.patch.object(
+        bench.kubernetes_commands, 'WaitForRollout'
+    ) as mock_wait, mock.patch.object(
+        bench.kubernetes_conditions,
+        'GetStatusConditionsForResourceType',
+        return_value=_DefaultConditions(),
+    ), mock.patch.object(bench, '_GetTotalCpuMillicores', return_value=None):
+      bench.Run(_MakeSpec())
+      mock_wait.assert_called_with('deployment/startup', timeout=600)
+
+
+# ---------------------------------------------------------------------------
+# PR 3: VPA scenario + boost factor
+# ---------------------------------------------------------------------------
+
+
+class ScenarioTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for VPA scenario and CPU Startup Boost (PR 3)."""
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='jvm',
+      cloud='GCP',
+  )
+  def testCheckPrerequisitesPassesOptimizedGcp(self):
+    bench.CheckPrerequisites(None)
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='jvm',
+      cloud='AWS',
+  )
+  def testCheckPrerequisitesRaisesOptimizedNonGcp(self):
+    with self.assertRaises(ValueError):
+      bench.CheckPrerequisites(None)
 
   @flagsaver.flagsaver(
       kubernetes_deployment_startup_scenario='optimized',
       kubernetes_deployment_startup_workload='vllm',
+      cloud='GCP',
   )
-  def testCheckPrerequisitesRaisesForOptimizedVllm(self):
-    """optimized + vLLM combination not supported in PR 1."""
+  def testCheckPrerequisitesRaisesOptimizedVllm(self):
     with self.assertRaises(ValueError):
       bench.CheckPrerequisites(None)
 
   @flagsaver.flagsaver(
       kubernetes_deployment_startup_scenario='baseline',
-      kubernetes_deployment_startup_workload='jvm',
+      cloud='AWS',
   )
-  def testCheckPrerequisitesPassesForBaselineJvm(self):
-    """baseline + jvm is always valid."""
-    bench.CheckPrerequisites(None)  # Should not raise
+  def testCheckPrerequisitesPassesBaselineAnyCloud(self):
+    bench.CheckPrerequisites(None)
 
   @flagsaver.flagsaver(
       kubernetes_deployment_startup_scenario='optimized',
       kubernetes_deployment_startup_workload='jvm',
+      cloud='GCP',
   )
-  def testCheckPrerequisitesPassesForOptimizedJvm(self):
-    """optimized + jvm is valid (VPA logic is added in PR 3)."""
-    bench.CheckPrerequisites(None)  # Should not raise
+  def testGetConfigEnablesVpa(self):
+    config = bench.GetConfig({})
+    self.assertTrue(config['container_cluster'].get('enable_vpa'))
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='baseline',
+      cloud='GCP',
+  )
+  def testGetConfigNoVpaForBaseline(self):
+    config = bench.GetConfig({})
+    self.assertFalse(config['container_cluster'].get('enable_vpa', False))
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='jvm',
+      kubernetes_deployment_startup_boost_factor=2,
+      cloud='GCP',
+  )
+  def testPrepareAppliesVpaManifest(self):
+    apply_calls = []
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest',
+        side_effect=lambda *a, **kw: apply_calls.append(a[0])
+    ):
+      bench.Prepare(_MakeSpec())
+    self.assertLen(apply_calls, 2)
+    self.assertTrue(any('vpa' in c for c in apply_calls))
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='baseline',
+      kubernetes_deployment_startup_workload='jvm',
+      cloud='GCP',
+  )
+  def testPrepareSkipsVpaForBaseline(self):
+    apply_calls = []
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest',
+        side_effect=lambda *a, **kw: apply_calls.append(a[0])
+    ):
+      bench.Prepare(_MakeSpec())
+    self.assertLen(apply_calls, 1)
+    self.assertFalse(any('vpa' in c for c in apply_calls))
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='jvm',
+      kubernetes_deployment_startup_boost_factor=3,
+      cloud='GCP',
+  )
+  def testBoostFactorInMetadata(self):
+    samples = _RunWithConditions(
+        _DefaultConditions(),
+        flag_kwargs={
+            'cloud': 'GCP',
+            'kubernetes_deployment_startup_scenario': 'optimized',
+            'kubernetes_deployment_startup_workload': 'jvm',
+            'kubernetes_deployment_startup_boost_factor': 3,
+        },
+    )
+    pod_samples = [s for s in samples if 'boost_factor' in s.metadata]
+    self.assertTrue(len(pod_samples) > 0)
+    for s in pod_samples:
+      self.assertEqual(s.metadata['boost_factor'], 3)
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='baseline',
+      kubernetes_deployment_startup_workload='jvm',
+      cloud='GCP',
+  )
+  def testBoostFactorIsOneForBaseline(self):
+    samples = _RunWithConditions(
+        _DefaultConditions(),
+        flag_kwargs={
+            'cloud': 'GCP',
+            'kubernetes_deployment_startup_scenario': 'baseline',
+            'kubernetes_deployment_startup_workload': 'jvm',
+        },
+    )
+    pod_samples = [s for s in samples if 'boost_factor' in s.metadata]
+    for s in pod_samples:
+      self.assertEqual(s.metadata['boost_factor'], 1)
 
 
 if __name__ == '__main__':
