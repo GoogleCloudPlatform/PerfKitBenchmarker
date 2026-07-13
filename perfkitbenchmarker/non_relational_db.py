@@ -158,7 +158,7 @@ def GetNonRelationalDbSpecClass(
     service_type: str,
 ) -> type[BaseNonRelationalDbSpec]:
   """Gets the non-relational db spec class corresponding to 'service_type'."""
-  return spec.GetSpecClass(BaseNonRelationalDbSpec, SERVICE_TYPE=service_type)
+  return spec.GetSpecClass(BaseNonRelationalDbSpec, SERVICE_TYPE=service_type)  # pyrefly: ignore[bad-return]
 
 
 def GetNonRelationalDbClass(service_type: str) -> type[BaseNonRelationalDb]:

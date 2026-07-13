@@ -44,7 +44,7 @@ from perfkitbenchmarker import version
 from perfkitbenchmarker import vm_util
 import pytz
 import six
-from six.moves import urllib
+from six.moves import urllib  # pyrefly: ignore[missing-source-for-stubs]
 
 FLAGS = flags.FLAGS
 
@@ -814,7 +814,7 @@ class ElasticsearchPublisher(SamplePublisher):
     """
     super().__init__()
     self.es_uri = es_uri
-    self.es_index = es_index.lower()
+    self.es_index = es_index.lower()  # pyrefly: ignore[missing-attribute]
     self.es_type = es_type
     self.mapping_5_plus = {
         'mappings': {
@@ -1035,9 +1035,9 @@ class InfluxDBPublisher(SamplePublisher):
         'Accept': 'text/plain',
     }
     params = urllib.parse.urlencode(
-        {'q': 'CREATE DATABASE ' + self.influx_db_name}
+        {'q': 'CREATE DATABASE ' + self.influx_db_name}  # pyrefly: ignore[unsupported-operation]
     )
-    conn = httplib.HTTPConnection(self.influx_uri)
+    conn = httplib.HTTPConnection(self.influx_uri)  # pyrefly: ignore[bad-argument-type]
     conn.request('POST', '/query?' + params, headers=header)
     response = conn.getresponse()
     conn.close()
@@ -1056,9 +1056,9 @@ class InfluxDBPublisher(SamplePublisher):
     successful_http_request_codes = [200, 202, 204]
     params = data
     header = {'Content-type': 'application/octet-stream'}
-    conn = httplib.HTTPConnection(self.influx_uri)
+    conn = httplib.HTTPConnection(self.influx_uri)  # pyrefly: ignore[bad-argument-type]
     conn.request(
-        'POST', '/write?' + 'db=' + self.influx_db_name, params, headers=header
+        'POST', '/write?' + 'db=' + self.influx_db_name, params, headers=header  # pyrefly: ignore[unsupported-operation]
     )
     response = conn.getresponse()
     conn.close()

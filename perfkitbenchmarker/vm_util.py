@@ -546,7 +546,7 @@ def IssueCommand(
     if should_pre_log:
       logger.info('Running: %s', full_cmd, stacklevel=stack_level)
     try:
-      process = subprocess.Popen(
+      process = subprocess.Popen(  # pyrefly: ignore[no-matching-overload]
           cmd_to_use,
           env=env,
           shell=shell_value,
@@ -580,7 +580,7 @@ def IssueCommand(
       process.kill()
       was_killed.value = True
 
-    timer = threading.Timer(timeout, _KillProcess)
+    timer = threading.Timer(timeout, _KillProcess)  # pyrefly: ignore[bad-argument-type]
     timer.start()
 
     try:
@@ -997,7 +997,7 @@ def RenderTemplate(
   return WriteTemporaryFile(
       rendered_template,
       origin=f'jinja2 template {template_path}',
-      **logging_kwargs,
+      **logging_kwargs,  # pyrefly: ignore[bad-argument-type]
   )
 
 

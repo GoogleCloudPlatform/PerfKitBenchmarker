@@ -432,7 +432,7 @@ class ObjectStorageService(
     return []
 
 
-def GetObjectStorageClass(storage_name) -> type(ObjectStorageService):
+def GetObjectStorageClass(storage_name) -> type(ObjectStorageService):  # pyrefly: ignore[invalid-annotation]
   """Return the ObjectStorageService subclass corresponding to storage_name."""
 
   return _OBJECT_STORAGE_REGISTRY[storage_name]

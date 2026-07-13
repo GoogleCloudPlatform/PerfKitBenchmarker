@@ -147,7 +147,7 @@ def RetrieveNodePortIp(argDescriptor):
       'pods', '', jsonSelector, '.items[0].status.podIP'
   )
   if len(ip) == 0:
-    raise 'Could not retrieve NodePort IP address'
+    raise 'Could not retrieve NodePort IP address'  # pyrefly: ignore[bad-raise]
   logging.info('Using NodePort IP Address: ' + ip)
   return ip
 
@@ -162,6 +162,6 @@ def RetrieveLoadBalancerIp(argDescriptor):
       'svc', serviceName, '', '.status.loadBalancer.ingress[0].ip'
   )
   if len(ip) == 0:
-    raise 'Could not retrieve LoadBalancer IP address'
+    raise 'Could not retrieve LoadBalancer IP address'  # pyrefly: ignore[bad-raise]
   logging.info('Using LoadBalancer IP Address: ' + ip)
   return ip

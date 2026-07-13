@@ -119,7 +119,7 @@ def GeoMean(iterable):
 SampleDict = NewType('SampleDict', Dict[str, Any])
 
 
-class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):
+class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):  # pyrefly: ignore[bad-class-definition]
   """A performance sample.
 
   Attributes:

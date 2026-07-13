@@ -73,8 +73,8 @@ from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.pinecone import pinecone as pinecone_resource
 from perfkitbenchmarker.resources.vertex_vector_search import vvs as vvs_resource  # pylint: disable=line-too-long
 import six
-import six.moves._thread
-import six.moves.copyreg
+import six.moves._thread  # pyrefly: ignore[missing-source-for-stubs]
+import six.moves.copyreg  # pyrefly: ignore[missing-source-for-stubs]
 
 
 def PickleLock(lock: threading.Lock):
@@ -186,14 +186,14 @@ class BenchmarkSpec:
     ] = {}
     # VMs from benchmark_config.vm_groups provisioned as a managed VM group.
     self.managed_vm_groups: dict[str, managed_vm_group.BaseManagedVmGroup] = {}
-    self.container_specs = benchmark_config.container_specs or {}
+    self.container_specs = benchmark_config.container_specs or {}  # pyrefly: ignore[missing-attribute]
     self.container_registry = None
     self.deleted = False
     self.uuid = '%s-%s' % (FLAGS.run_uri, uuid.uuid4())
     self.always_call_cleanup = pkb_flags.ALWAYS_CALL_CLEANUP.value
-    self.dpb_service: dpb_service.BaseDpbService = None
-    self.container_cluster: container_cluster.BaseContainerCluster = None
-    self.cluster: cluster.BaseCluster = None
+    self.dpb_service: dpb_service.BaseDpbService = None  # pyrefly: ignore[bad-assignment]
+    self.container_cluster: container_cluster.BaseContainerCluster = None  # pyrefly: ignore[bad-assignment]
+    self.cluster: cluster.BaseCluster = None  # pyrefly: ignore[bad-assignment]
     self.key = None
     self.relational_db = None
     self.non_relational_db = None
@@ -217,18 +217,18 @@ class BenchmarkSpec:
     self.app_groups = {}
     self._zone_index = 0
     self.capacity_reservations = []
-    self.placement_group_specs = benchmark_config.placement_group_specs or {}
+    self.placement_group_specs = benchmark_config.placement_group_specs or {}  # pyrefly: ignore[missing-attribute]
     self.placement_groups = {}
     # Benchmark configs for relational_db and vm_groups can both be included.
     # This is currently used for combo benchmarks.
     self.vms_to_boot = {}
-    if self.config.relational_db:
+    if self.config.relational_db:  # pyrefly: ignore[missing-attribute]
       self.vms_to_boot.update(
-          relational_db.VmsToBoot(self.config.relational_db.vm_groups)
+          relational_db.VmsToBoot(self.config.relational_db.vm_groups)  # pyrefly: ignore[missing-attribute]
       )
     if self.config.vm_groups:
       self.vms_to_boot.update(self.config.vm_groups)
-    self.vpc_peering = self.config.vpc_peering
+    self.vpc_peering = self.config.vpc_peering  # pyrefly: ignore[missing-attribute]
 
     self.vpn_service = None
     self.vpns = {}  # dict of vpn's
@@ -369,17 +369,17 @@ class BenchmarkSpec:
 
   def ConstructContainerCluster(self):
     """Create the container cluster."""
-    if self.config.container_cluster is None:
+    if self.config.container_cluster is None:  # pyrefly: ignore[missing-attribute]
       return
 
-    cloud = self.config.container_cluster.cloud
-    cluster_type = self.config.container_cluster.type
+    cloud = self.config.container_cluster.cloud  # pyrefly: ignore[missing-attribute]
+    cluster_type = self.config.container_cluster.type  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(cloud)
     container_cluster_class = container_cluster.GetContainerClusterClass(
         cloud, cluster_type
     )
     self.container_cluster = container_cluster_class(
-        self.config.container_cluster
+        self.config.container_cluster  # pyrefly: ignore[bad-argument-type]
     )
 
     if self.container_registry:
@@ -389,9 +389,9 @@ class BenchmarkSpec:
 
   def ConstructCluster(self):
     """Create the cluster."""
-    if self.config.cluster is None:
+    if self.config.cluster is None:  # pyrefly: ignore[missing-attribute]
       return
-    cloud = self.config.cluster.cloud
+    cloud = self.config.cluster.cloud  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(cloud)
     cluster_class = cluster.GetClusterClass(cloud)
     self.cluster = cluster_class(self.config.cluster)
@@ -400,32 +400,32 @@ class BenchmarkSpec:
 
   def ConstructContainerRegistry(self):
     """Create the container registry."""
-    if self.config.container_registry is None:
+    if self.config.container_registry is None:  # pyrefly: ignore[missing-attribute]
       return
-    cloud = self.config.container_registry.cloud
+    cloud = self.config.container_registry.cloud  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(cloud)
     container_registry_class = container_registry.GetContainerRegistryClass(
         cloud
     )
     self.container_registry = container_registry_class(
-        self.config.container_registry
+        self.config.container_registry  # pyrefly: ignore[bad-argument-type]
     )
     self.resources.append(self.container_registry)
 
   def ConstructDpbService(self):
     """Create the dpb_service object and create groups for its vms."""
-    if self.config.dpb_service is None:
+    if self.config.dpb_service is None:  # pyrefly: ignore[missing-attribute]
       return
     dpb_service_spec = self.config.dpb_service
-    dpb_service_cloud = dpb_service_spec.worker_group.cloud
-    dpb_service_spec.worker_group.vm_count = dpb_service_spec.worker_count
+    dpb_service_cloud = dpb_service_spec.worker_group.cloud  # pyrefly: ignore[missing-attribute]
+    dpb_service_spec.worker_group.vm_count = dpb_service_spec.worker_count  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(dpb_service_cloud)
 
-    dpb_service_type = dpb_service_spec.service_type
+    dpb_service_type = dpb_service_spec.service_type  # pyrefly: ignore[missing-attribute]
     dpb_service_class = dpb_service.GetDpbServiceClass(
         dpb_service_cloud, dpb_service_type
     )
-    self.dpb_service = dpb_service_class(dpb_service_spec)
+    self.dpb_service = dpb_service_class(dpb_service_spec)  # pyrefly: ignore[not-callable]
 
     # If the dpb service is un-managed, the provisioning needs to be handed
     # over to the vm creation module.
@@ -440,11 +440,11 @@ class BenchmarkSpec:
             'unmanaged dpb service'.format(self.vms_to_boot)
         )
 
-      base_vm_spec = dpb_service_spec.worker_group
+      base_vm_spec = dpb_service_spec.worker_group  # pyrefly: ignore[missing-attribute]
       base_vm_spec.vm_spec.zone = self.dpb_service.dpb_service_zone
 
-      if dpb_service_spec.worker_count:
-        self.vms_to_boot['worker_group'] = dpb_service_spec.worker_group
+      if dpb_service_spec.worker_count:  # pyrefly: ignore[missing-attribute]
+        self.vms_to_boot['worker_group'] = dpb_service_spec.worker_group  # pyrefly: ignore[missing-attribute]
       # else we have a single node cluster.
 
       master_group_spec = copy.copy(base_vm_spec)
@@ -455,19 +455,19 @@ class BenchmarkSpec:
 
   def ConstructRelationalDb(self):
     """Creates the relational db and create groups for its vms."""
-    if self.config.relational_db is None:
+    if self.config.relational_db is None:  # pyrefly: ignore[missing-attribute]
       return
-    if self._InitializeFromSpec('relational_db', self.config.relational_db):
+    if self._InitializeFromSpec('relational_db', self.config.relational_db):  # pyrefly: ignore[bad-argument-type]
       return
-    cloud = self.config.relational_db.cloud
-    is_managed_db = self.config.relational_db.is_managed_db
-    engine = self.config.relational_db.engine
+    cloud = self.config.relational_db.cloud  # pyrefly: ignore[missing-attribute]
+    is_managed_db = self.config.relational_db.is_managed_db  # pyrefly: ignore[missing-attribute]
+    engine = self.config.relational_db.engine  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(cloud)
     relational_db_class = relational_db.GetRelationalDbClass(
         cloud, is_managed_db, engine
     )
-    if not self.config.relational_db.engine_version:
-      self.config.relational_db.engine_version = (
+    if not self.config.relational_db.engine_version:  # pyrefly: ignore[missing-attribute]
+      self.config.relational_db.engine_version = (  # pyrefly: ignore[missing-attribute]
           relational_db_class.GetDefaultEngineVersion(engine)
       )
     self.relational_db = relational_db_class(
@@ -479,7 +479,7 @@ class BenchmarkSpec:
   def ConstructNonRelationalDb(self) -> None:
     """Initializes the non_relational db."""
     db_spec: non_relational_db.BaseNonRelationalDbSpec = (
-        self.config.non_relational_db
+        self.config.non_relational_db  # pyrefly: ignore[missing-attribute]
     )
     if not db_spec:
       return
@@ -498,12 +498,12 @@ class BenchmarkSpec:
 
   def ConstructKey(self) -> None:
     """Initializes the cryptographic key."""
-    key_spec: cloud_key.BaseKeySpec = self.config.key
+    key_spec: cloud_key.BaseKeySpec = self.config.key  # pyrefly: ignore[missing-attribute]
     if not key_spec:
       return
     logging.info('Constructing key with spec: %s.', key_spec)
     key_class = cloud_key.GetKeyClass(key_spec.cloud)
-    self.key = key_class(key_spec)
+    self.key = key_class(key_spec)  # pyrefly: ignore[not-callable]
     self.resources.append(self.key)
 
   def ConstructTpuGroup(self, group_spec):
@@ -517,7 +517,7 @@ class BenchmarkSpec:
 
   def ConstructTpu(self):
     """Constructs the BenchmarkSpec's cloud TPU objects."""
-    tpu_group_specs = self.config.tpu_groups
+    tpu_group_specs = self.config.tpu_groups  # pyrefly: ignore[missing-attribute]
 
     for group_name, group_spec in sorted(tpu_group_specs.items()):
       tpu = self.ConstructTpuGroup(group_spec)
@@ -527,18 +527,18 @@ class BenchmarkSpec:
 
   def ConstructEdwService(self):
     """Create the edw_service object."""
-    if self.config.edw_service is None:
+    if self.config.edw_service is None:  # pyrefly: ignore[missing-attribute]
       return
     # Load necessary modules from the provider to account for dependencies
     # TODO(saksena): Replace with
     # providers.LoadProvider(string.lower(FLAGS.cloud))
     providers.LoadProvider(
-        edw_service.TYPE_2_PROVIDER.get(self.config.edw_service.type)
+        edw_service.TYPE_2_PROVIDER.get(self.config.edw_service.type)  # pyrefly: ignore[missing-attribute]
     )
     # Load the module for the edw service based on type
-    edw_service_type = self.config.edw_service.type
+    edw_service_type = self.config.edw_service.type  # pyrefly: ignore[missing-attribute]
     edw_service_module = importlib.import_module(
-        edw_service.TYPE_2_MODULE.get(edw_service_type)
+        edw_service.TYPE_2_MODULE.get(edw_service_type)  # pyrefly: ignore[bad-argument-type]
     )
     # The edw_service_type in certain cases may be qualified with a hosting
     # cloud eg. snowflake_aws,snowflake_gcp, etc.
@@ -561,74 +561,74 @@ class BenchmarkSpec:
 
   def ConstructEdwComputeResource(self):
     """Create an edw_compute_resource object."""
-    if self.config.edw_compute_resource is None:
+    if self.config.edw_compute_resource is None:  # pyrefly: ignore[missing-attribute]
       return
-    edw_compute_resource_cloud = self.config.edw_compute_resource.cloud
-    edw_compute_resource_type = self.config.edw_compute_resource.type
+    edw_compute_resource_cloud = self.config.edw_compute_resource.cloud  # pyrefly: ignore[missing-attribute]
+    edw_compute_resource_type = self.config.edw_compute_resource.type  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(edw_compute_resource_cloud)
     edw_compute_resource_class = (
         edw_compute_resource.GetEdwComputeResourceClass(
             edw_compute_resource_cloud, edw_compute_resource_type
         )
     )
-    self.edw_compute_resource = edw_compute_resource_class(
+    self.edw_compute_resource = edw_compute_resource_class(  # pyrefly: ignore[not-callable]
         self.config.edw_compute_resource
     )  # pytype: disable=not-instantiable
     self.resources.append(self.edw_compute_resource)
 
   def ConstructExampleResource(self):
     """Create an example_resource object."""
-    if self.config.example_resource is None:
+    if self.config.example_resource is None:  # pyrefly: ignore[missing-attribute]
       return
-    example_resource_type = self.config.example_resource.example_type
+    example_resource_type = self.config.example_resource.example_type  # pyrefly: ignore[missing-attribute]
     example_resource_class = example_resource.GetExampleResourceClass(
         example_resource_type
     )
-    self.example_resource = example_resource_class(
+    self.example_resource = example_resource_class(  # pyrefly: ignore[not-callable]
         self.config.example_resource
     )  # pytype: disable=not-instantiable
     self.resources.append(self.example_resource)
 
   def ConstructBaseJob(self):
     """Create an instance of the base job.It is also called from pkb.py."""
-    if self.config.base_job is None:
+    if self.config.base_job is None:  # pyrefly: ignore[missing-attribute]
       return
-    job_type = self.config.base_job.job_type
-    cloud = self.config.base_job.CLOUD
+    job_type = self.config.base_job.job_type  # pyrefly: ignore[missing-attribute]
+    cloud = self.config.base_job.CLOUD  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(cloud)
     job_class = base_job.GetJobClass(job_type)
 
-    self.base_job = job_class(
+    self.base_job = job_class(  # pyrefly: ignore[not-callable]
         self.config.base_job, self.container_registry
     )  # pytype: disable=not-instantiable
     self.resources.append(self.base_job)
 
   def ConstructManagedAiModel(self):
     """Create an example_resource object."""
-    if self.config.ai_model is None:
+    if self.config.ai_model is None:  # pyrefly: ignore[missing-attribute]
       return
-    cloud = self.config.ai_model.cloud
+    cloud = self.config.ai_model.cloud  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(cloud)
     model_class = managed_ai_model.GetManagedAiModelClass(
-        cloud, self.config.ai_model.interface
+        cloud, self.config.ai_model.interface  # pyrefly: ignore[missing-attribute]
     )
     assert self.vm_groups
     vm = self.vm_groups[
         'clients' if 'clients' in self.vm_groups else 'default'
     ][0]
-    self.ai_model = model_class(
+    self.ai_model = model_class(  # pyrefly: ignore[not-callable]
         vm, self.config.ai_model
     )  # pytype: disable=not-instantiable
     self.resources.append(self.ai_model)
 
   def ConstructPinecone(self):
     """Create an example_resource object."""
-    if self.config.pinecone is None:
+    if self.config.pinecone is None:  # pyrefly: ignore[missing-attribute]
       return
-    cloud = self.config.pinecone.cloud
+    cloud = self.config.pinecone.cloud  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(cloud)
     model_class = pinecone_resource.GetPineconeResourceClass(cloud)
-    self.pinecone = model_class(
+    self.pinecone = model_class(  # pyrefly: ignore[not-callable]
         self.config.pinecone
     )  # pytype: disable=not-instantiable
     self.pinecone.SetVms(self.vm_groups)
@@ -636,9 +636,9 @@ class BenchmarkSpec:
 
   def ConstructVertexVectorSearch(self):
     """Construct the Vertex Vector Search instance."""
-    if self.config.vvs is None:
+    if self.config.vvs is None:  # pyrefly: ignore[missing-attribute]
       return
-    cloud = self.config.vvs.cloud
+    cloud = self.config.vvs.cloud  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(cloud)
     model_class = vvs_resource.GetVVSResourceClass(cloud)
     self.vvs = model_class(self.config.vvs)  # pytype: disable=not-instantiable
@@ -647,15 +647,15 @@ class BenchmarkSpec:
 
   def ConstructMemoryStore(self):
     """Create the memory store instance."""
-    if self.config.memory_store is None:
+    if self.config.memory_store is None:  # pyrefly: ignore[missing-attribute]
       return
-    cloud = self.config.memory_store.cloud
+    cloud = self.config.memory_store.cloud  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(cloud)
     managed_memory_store_class = (
         managed_memory_store.GetManagedMemoryStoreClass(
             cloud,
-            self.config.memory_store.service_type,
-            self.config.memory_store.memory_store_type,
+            self.config.memory_store.service_type,  # pyrefly: ignore[missing-attribute]
+            self.config.memory_store.memory_store_type,  # pyrefly: ignore[missing-attribute]
         )
     )
     self.memory_store = managed_memory_store_class(
@@ -666,11 +666,11 @@ class BenchmarkSpec:
 
   def ConstructAiAgentService(self):
     """Construct the AI agent service object."""
-    if self.config.ai_agent_service is None:
+    if self.config.ai_agent_service is None:  # pyrefly: ignore[missing-attribute]
       return
 
-    cloud = self.config.ai_agent_service.cloud
-    deployment_type = self.config.ai_agent_service.deployment_type
+    cloud = self.config.ai_agent_service.cloud  # pyrefly: ignore[missing-attribute]
+    deployment_type = self.config.ai_agent_service.deployment_type  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(cloud)
 
     assert self.vm_groups
@@ -848,7 +848,7 @@ class BenchmarkSpec:
       disk_spec = None
 
     if group_spec.placement_group_name:
-      group_spec.vm_spec.placement_group = self.placement_groups[
+      group_spec.vm_spec.placement_group = self.placement_groups[  # pyrefly: ignore[missing-attribute]
           group_spec.placement_group_name
       ]
 
@@ -877,7 +877,7 @@ class BenchmarkSpec:
     if not FLAGS.use_capacity_reservations:
       return
     for vm_group in self.vm_groups.values():
-      cloud = vm_group[0].CLOUD
+      cloud = vm_group[0].CLOUD  # pyrefly: ignore[missing-argument]
       providers.LoadProvider(cloud)
       capacity_reservation_class = capacity_reservation.GetResourceClass(cloud)
       self.capacity_reservations.append(
@@ -952,15 +952,15 @@ class BenchmarkSpec:
     # In the case of an un-managed yarn cluster, for hadoop software
     # installation, the dpb service instance needs access to constructed
     # master group and worker group.
-    if self.config.dpb_service and self.config.dpb_service.service_type in [
+    if self.config.dpb_service and self.config.dpb_service.service_type in [  # pyrefly: ignore[missing-attribute]
         dpb_constants.UNMANAGED_DPB_SVC_YARN_CLUSTER,
         dpb_constants.UNMANAGED_SPARK_CLUSTER,
     ]:
-      self.dpb_service.vms['master_group'] = self.vm_groups['master_group']
-      if self.config.dpb_service.worker_count:
-        self.dpb_service.vms['worker_group'] = self.vm_groups['worker_group']
+      self.dpb_service.vms['master_group'] = self.vm_groups['master_group']  # pyrefly: ignore[missing-attribute]
+      if self.config.dpb_service.worker_count:  # pyrefly: ignore[missing-attribute]
+        self.dpb_service.vms['worker_group'] = self.vm_groups['worker_group']  # pyrefly: ignore[missing-attribute]
       else:  # single node cluster
-        self.dpb_service.vms['worker_group'] = []
+        self.dpb_service.vms['worker_group'] = []  # pyrefly: ignore[missing-attribute]
 
   def ConstructPlacementGroups(self):
     for placement_group_name, placement_group_spec in (
@@ -972,7 +972,7 @@ class BenchmarkSpec:
 
   def ConstructVPNService(self):
     """Create the VPNService object."""
-    if self.config.vpn_service is None:
+    if self.config.vpn_service is None:  # pyrefly: ignore[missing-attribute]
       return
     self.vpn_service = vpn_service.VPNService(self.config.vpn_service)
 
@@ -981,10 +981,10 @@ class BenchmarkSpec:
 
     Assumes VMs are already constructed.
     """
-    if self.config.messaging_service is None:
+    if self.config.messaging_service is None:  # pyrefly: ignore[missing-attribute]
       return
-    cloud = self.config.messaging_service.cloud
-    delivery = self.config.messaging_service.delivery
+    cloud = self.config.messaging_service.cloud  # pyrefly: ignore[missing-attribute]
+    delivery = self.config.messaging_service.delivery  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(cloud)
     messaging_service_class = messaging_service.GetMessagingServiceClass(
         cloud, delivery
@@ -996,10 +996,10 @@ class BenchmarkSpec:
 
   def ConstructDataDiscoveryService(self):
     """Create the data_discovery_service object."""
-    if not self.config.data_discovery_service:
+    if not self.config.data_discovery_service:  # pyrefly: ignore[missing-attribute]
       return
-    cloud = self.config.data_discovery_service.cloud
-    service_type = self.config.data_discovery_service.service_type
+    cloud = self.config.data_discovery_service.cloud  # pyrefly: ignore[missing-attribute]
+    service_type = self.config.data_discovery_service.service_type  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(cloud)
     data_discovery_service_class = (
         data_discovery_service.GetDataDiscoveryServiceClass(cloud, service_type)
@@ -1124,14 +1124,14 @@ class BenchmarkSpec:
         logging.info('Skipping VM preparation.')
 
       sshable_vms = [
-          vm for vm in self.vms if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES
+          vm for vm in self.vms if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES  # pyrefly: ignore[missing-argument]
       ]
       sshable_vm_groups = {}
       for group_name, group_vms in self.vm_groups.items():
         sshable_vm_groups[group_name] = [
             vm
             for vm in group_vms
-            if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES
+            if vm.OS_TYPE not in os_types.WINDOWS_OS_TYPES  # pyrefly: ignore[missing-argument]
         ]
       vm_util.GenerateSSHConfig(sshable_vms, sshable_vm_groups)
     if self.cluster:

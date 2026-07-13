@@ -791,7 +791,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
   def _EnableRealTimeKernel(self):
     """Enables real-time kernel features on the VM."""
     raise NotImplementedError(
-        f'Real-time kernel not supported for {self.OS_TYPE}'
+        f'Real-time kernel not supported for {self.OS_TYPE}'  # pyrefly: ignore[missing-argument]
     )
 
   def SetFiles(self):
@@ -1148,7 +1148,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       background_tasks.RunParallelThreads(connect_threads, len(connect_threads))
     else:
       raise ValueError(
-          'Unknown --boot_completion_ip_subset: '
+          'Unknown --boot_completion_ip_subset: '  # pyrefly: ignore[unsupported-operation]
           + self.boot_completion_ip_subset
       )
 
@@ -1161,7 +1161,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
         virtual_machine.BootCompletionIpSubset.BOTH,
     )
     self._WaitForSSH(self.ip_address)
-    self.ssh_external_time = time.time()
+    self.ssh_external_time = time.time()  # pyrefly: ignore[bad-assignment]
 
   def _WaitForSshInternal(self):
     assert self.boot_completion_ip_subset in (
@@ -1169,7 +1169,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
         virtual_machine.BootCompletionIpSubset.BOTH,
     )
     self._WaitForSSH(self.internal_ip)
-    self.ssh_internal_time = time.time()
+    self.ssh_internal_time = time.time()  # pyrefly: ignore[bad-assignment]
 
   @vm_util.Retry(
       log_errors=False,
@@ -1645,7 +1645,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       for _ in range(retries):
         stdout, stderr, retcode = vm_util.IssueCommand(
             ssh_cmd,
-            timeout=timeout,
+            timeout=timeout,  # pyrefly: ignore[bad-argument-type]
             should_pre_log=False,
             raise_on_failure=False,
             suppress_logging=suppress_logging,
@@ -1713,7 +1713,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     self._kernel_command_line = None
     self._lscpu_cache = None
     # recalculated in RecordAdditionalMetadata
-    self.num_cpus = None
+    self.num_cpus = None  # pyrefly: ignore[bad-assignment]
     self.RecordAdditionalMetadata()
     if self.install_packages:
       self._CreateInstallDir()
@@ -2034,7 +2034,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     self.RemoteHostCommand(cmd)
 
     # Make the disk available during reboot for VMs running Debian based Linux
-    if self.OS_TYPE != os_types.RHEL8:
+    if self.OS_TYPE != os_types.RHEL8:  # pyrefly: ignore[missing-argument]
       init_ram_fs_cmd = self.INIT_RAM_FS_CMD
       self.RemoteHostCommand(init_ram_fs_cmd)
 
@@ -2798,7 +2798,7 @@ class BaseRedHatMixin(BaseLinuxMixin):
     if FLAGS.http_proxy:
       self.RemoteCommand(
           "echo -e 'proxy= %s' | sudo tee -a %s"
-          % (FLAGS.http_proxy, yum_proxy_file)
+          % (FLAGS.http_proxy, yum_proxy_file)  # pyrefly: ignore[unbound-name]
       )
 
   def AppendKernelCommandLine(self, command_line, reboot=True):
@@ -3395,8 +3395,8 @@ class ContainerizedDebianMixin(BaseDebianMixin):
         % (CONTAINER_WORK_DIR, vm_util.VM_TMP_DIR, CONTAINER_MOUNT_DIR)
     ]
     for sd in self.scratch_disks:
-      init_docker_cmd.append('-v %s:%s ' % (sd.mount_point, sd.mount_point))
-    init_docker_cmd.append('%s sleep infinity ' % self.BASE_DOCKER_IMAGE)
+      init_docker_cmd.append('-v %s:%s ' % (sd.mount_point, sd.mount_point))  # pyrefly: ignore[bad-argument-type]
+    init_docker_cmd.append('%s sleep infinity ' % self.BASE_DOCKER_IMAGE)  # pyrefly: ignore[bad-argument-type]
     init_docker_cmd = ''.join(init_docker_cmd)
 
     resp, _ = self.RemoteHostCommand(init_docker_cmd)

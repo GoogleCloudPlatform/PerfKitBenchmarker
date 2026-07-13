@@ -56,7 +56,7 @@ class CreateDiskStrategy:
 
   def __init__(
       self,
-      vm: 'virtual_machine. BaseVirtualMachine',
+      vm: 'virtual_machine. BaseVirtualMachine',  # pyrefly: ignore[missing-attribute]
       disk_spec: disk.BaseDiskSpec,
       disk_count: int,
   ):
@@ -110,7 +110,7 @@ class EmptyCreateDiskStrategy(CreateDiskStrategy):
   def __init__(
       self, vm: Any, disk_spec: disk.BaseDiskSpec | None, disk_count: int
   ):
-    self.disk_spec = disk_spec
+    self.disk_spec = disk_spec  # pyrefly: ignore[bad-assignment]
     self.disk_count = disk_count
     self.vm = vm
 
@@ -151,7 +151,7 @@ class SetUpDiskStrategy:
 
   def __init__(
       self,
-      vm: 'virtual_machine.BaseVirtualMachine',
+      vm: 'virtual_machine.BaseVirtualMachine',  # pyrefly: ignore[missing-attribute]
       disk_spec: disk.BaseDiskSpec,
   ):
     self.vm = vm
@@ -536,7 +536,7 @@ class PrepareScratchDiskStrategy:
         str(int(device_id)) for device_id in stdout.split('\n') if device_id
     ]
 
-  def PrepareTempDbDisk(self, vm: 'virtual_machine.BaseVirtualMachine'):
+  def PrepareTempDbDisk(self, vm: 'virtual_machine.BaseVirtualMachine'):  # pyrefly: ignore[missing-attribute]
     """Format and mount temp db disk for sql server."""
     # Create and then run a Diskpart script that will initialize the disks,
     # create a volume, and then format and mount the volume.

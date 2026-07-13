@@ -36,8 +36,8 @@ class BootDiskSpec:
   ):
     self.boot_disk_size: int = boot_disk_size
     self.boot_disk_type: str = boot_disk_type
-    self.boot_disk_iops: int = boot_disk_iops
-    self.boot_disk_throughput: int = boot_disk_throughput
+    self.boot_disk_iops: int = boot_disk_iops  # pyrefly: ignore[bad-assignment]
+    self.boot_disk_throughput: int = boot_disk_throughput  # pyrefly: ignore[bad-assignment]
 
 
 class BootDisk(resource.BaseResource):

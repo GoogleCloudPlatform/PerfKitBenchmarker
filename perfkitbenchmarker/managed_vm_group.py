@@ -80,7 +80,7 @@ class BaseManagedVmGroup(resource.BaseResource):
     # When we clone the VM config and rename it, our assumptions about the
     # disk names are wrong.
     # TODO(pclay): improve support for disks.
-    self.vm_config.disks = []
+    self.vm_config.disks = []  # pyrefly: ignore[missing-attribute]
     self.vm_config.user_managed = True
 
     self.name = self.vm_config.name
@@ -92,7 +92,7 @@ class BaseManagedVmGroup(resource.BaseResource):
     self._vms: dict[str, virtual_machine.BaseVirtualMachine] = {}
     self._deleted_vms: list[virtual_machine.BaseVirtualMachine] = []
 
-    self.zones: list[str] = [vm.zone for vm in vm_configs]
+    self.zones: list[str] = [vm.zone for vm in vm_configs]  # pyrefly: ignore[bad-assignment]
 
     self.last_operation_start_time: float | None = None
     self.last_ready_time: float | None = None
@@ -220,7 +220,7 @@ class BaseManagedVmGroup(resource.BaseResource):
     def WaitForNewVm(vm_reference: 'BaseManagedVmGroup.VmReference'):
       vm = copy.copy(self.vm_config)
       self._vms[vm_reference.name] = vm
-      vm.create_start_time = self.last_operation_start_time
+      vm.create_start_time = self.last_operation_start_time  # pyrefly: ignore[bad-assignment]
       self._ConfigureVm(vm, vm_reference)
       # vm._WaitUntilRunning tends to rely on specifics of the creation request
       # Either an operation ID or a request ID, rather than just polling on the

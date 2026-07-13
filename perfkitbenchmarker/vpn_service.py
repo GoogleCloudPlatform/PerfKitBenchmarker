@@ -90,9 +90,9 @@ class VPN:
   def __init__(self, *args, **kwargs):
     # set by Create
     self.gateway_pair: Tuple[network.BaseVpnGateway, network.BaseVpnGateway] = (
-        None
+        None  # pyrefly: ignore[bad-assignment]
     )
-    self.tunnel_config: TunnelConfig = None
+    self.tunnel_config: TunnelConfig = None  # pyrefly: ignore[bad-assignment]
     return object.__init__(self, *args, **kwargs)
 
   def getKeyFromGatewayPair(self, gateway_pair, suffix=''):
@@ -375,7 +375,7 @@ class VPNService(resource.BaseResource):
     )
 
     def filterGateways(gateway_pair):
-      return r.search(gateway_pair[0]).group('gateway_prefix') != r.search(
+      return r.search(gateway_pair[0]).group('gateway_prefix') != r.search(  # pyrefly: ignore[missing-attribute]
           gateway_pair[1]
       ).group('gateway_prefix')
 

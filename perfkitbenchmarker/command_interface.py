@@ -154,7 +154,7 @@ class VmUtilCommandInterface(CommandInterface):
     try:
       return vm_util.IssueCommand(
           cmd=cmd_list,
-          timeout=timeout,
+          timeout=timeout,  # pyrefly: ignore[bad-argument-type]
           should_pre_log=should_pre_log,
           stack_level=stack_level,
           raise_on_failure=raise_on_failure,

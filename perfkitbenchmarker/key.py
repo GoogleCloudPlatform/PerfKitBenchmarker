@@ -58,4 +58,4 @@ def GetKeySpecClass(cloud: str) -> spec.BaseSpecMetaClass | None:
 
 def GetKeyClass(cloud: str) -> resource.AutoRegisterResourceMeta | None:
   """Gets the key class corresponding to 'cloud'."""
-  return resource.GetResourceClass(BaseKey, CLOUD=cloud)
+  return resource.GetResourceClass(BaseKey, CLOUD=cloud)  # pyrefly: ignore[bad-return]

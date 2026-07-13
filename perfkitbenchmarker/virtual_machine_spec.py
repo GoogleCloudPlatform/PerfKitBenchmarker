@@ -127,8 +127,8 @@ class BaseVmSpec(spec.BaseSpec):
     self.background_network_ip_type = None
     self.disable_interrupt_moderation = None
     self.disable_rss = None
-    self.vm_metadata: Dict[str, Any] = None
-    self.boot_startup_script: str = None
+    self.vm_metadata: Dict[str, Any] = None  # pyrefly: ignore[bad-assignment]
+    self.boot_startup_script: str = None  # pyrefly: ignore[bad-assignment]
     self.internal_ip: str
     super().__init__(*args, **kwargs)
 

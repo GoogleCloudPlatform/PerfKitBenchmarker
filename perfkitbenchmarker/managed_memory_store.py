@@ -203,9 +203,9 @@ class BaseManagedMemoryStore(resource.BaseResource):
     """
     super().__init__()
     self.name: str = 'pkb-%s' % FLAGS.run_uri
-    self._ip: str = None
-    self._port: int = None
-    self._password: str = None
+    self._ip: str = None  # pyrefly: ignore[bad-assignment]
+    self._port: int = None  # pyrefly: ignore[bad-assignment]
+    self._password: str = None  # pyrefly: ignore[bad-assignment]
 
     self.failover_style = FAILOVER_STYLE.value
     # TODO(liubrandon): Remove `clustered` attr once all Redis resources support
@@ -219,7 +219,7 @@ class BaseManagedMemoryStore(resource.BaseResource):
     self.zones = _ZONES.value
     self.multi_az = self.clustered and len(self.zones) > 1
 
-    self.version: str = None
+    self.version: str = None  # pyrefly: ignore[bad-assignment]
     self.enable_tls = _TLS.value
 
     self._client_vms = None
@@ -310,7 +310,7 @@ class BaseManagedMemoryStore(resource.BaseResource):
 
   def _GetClientVm(self):
     """Conveniently returns the client VM to use for the instance."""
-    return self._client_vms[0]
+    return self._client_vms[0]  # pyrefly: ignore[unsupported-operation]
 
   def GetReadableVersion(self) -> str:
     """Parses Redis major and minor version number.

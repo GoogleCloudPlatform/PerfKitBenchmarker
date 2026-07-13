@@ -116,9 +116,9 @@ class RelationalDbSpec(freeze_restore_spec.FreezeRestoreSpec):
     # Set defaults that were not able to be set in
     # GetOptionDecoderConstructions()
     if not self.database_name:
-      self.database_name = 'pkb-db-%s' % flag_values.run_uri
+      self.database_name = 'pkb-db-%s' % flag_values.run_uri  # pyrefly: ignore[missing-attribute]
     if not self.database_username:
-      self.database_username = 'pkb%s' % flag_values.run_uri
+      self.database_username = 'pkb%s' % flag_values.run_uri  # pyrefly: ignore[missing-attribute]
     if not self.database_password:
       self.database_password = db_util.GenerateRandomDbPassword()
 

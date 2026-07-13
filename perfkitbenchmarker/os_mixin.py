@@ -64,7 +64,7 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
   # container can have side effects in certain situations.
   IS_REBOOTABLE = True
 
-  password: str = None
+  password: str = None  # pyrefly: ignore[bad-assignment]
   install_packages: bool  # mixed from BaseVirtualMachine
   is_static: bool  # mixed from BaseVirtualMachine
   scratch_disks: List[disk.BaseDisk]  # mixed from BaseVirtualMachine
@@ -92,7 +92,7 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
     self.bootable_time = None
     self.port_listening_time = None
     self.hostname = None
-    self.proxy_jump = None
+    self.proxy_jump = None  # pyrefly: ignore[bad-assignment]
 
     # Ports that will be opened by benchmark_spec to permit access to the VM.
     self.remote_access_ports = []
@@ -102,7 +102,7 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
     # Cached values
     self._reachable = {}
     self._total_memory_kb = None
-    self.num_cpus: int = None
+    self.num_cpus: int = None  # pyrefly: ignore[bad-assignment]
     self._is_smt_enabled = None
     # Update to Json type if ever available:
     # https://github.com/python/typing/issues/182
@@ -431,7 +431,7 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
     events.on_vm_startup.send(vm=self)
     # Resets the cached SMT enabled status and number cpus value.
     self._is_smt_enabled = None
-    self.num_cpus = None
+    self.num_cpus = None  # pyrefly: ignore[bad-assignment]
 
   def RecordAdditionalMetadata(self):
     """After the VM has been prepared, store VM metadata."""
@@ -740,7 +740,7 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
     """Start the background workload."""
     for workload in background_workload.BACKGROUND_WORKLOADS:
       if workload.IsEnabled(self):
-        if self.OS_TYPE in workload.EXCLUDED_OS_TYPES:
+        if self.OS_TYPE in workload.EXCLUDED_OS_TYPES:  # pyrefly: ignore[missing-argument]
           raise NotImplementedError()
         workload.Start(self)
 
@@ -748,7 +748,7 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
     """Stop the background workoad."""
     for workload in background_workload.BACKGROUND_WORKLOADS:
       if workload.IsEnabled(self):
-        if self.OS_TYPE in workload.EXCLUDED_OS_TYPES:
+        if self.OS_TYPE in workload.EXCLUDED_OS_TYPES:  # pyrefly: ignore[missing-argument]
           raise NotImplementedError()
         workload.Stop(self)
 
@@ -756,7 +756,7 @@ class BaseOsMixin(command_interface.CommandInterface, metaclass=abc.ABCMeta):
     """Prepare for the background workload."""
     for workload in background_workload.BACKGROUND_WORKLOADS:
       if workload.IsEnabled(self):
-        if self.OS_TYPE in workload.EXCLUDED_OS_TYPES:
+        if self.OS_TYPE in workload.EXCLUDED_OS_TYPES:  # pyrefly: ignore[missing-argument]
           raise NotImplementedError()
         workload.Prepare(self)
 
@@ -871,7 +871,7 @@ class DeprecatedOsMixin(BaseOsMixin):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    assert self.OS_TYPE
+    assert self.OS_TYPE  # pyrefly: ignore[missing-argument]
     assert self.END_OF_LIFE
     warning = "os_type '%s' is deprecated and will be removed after %s." % (
         self.OS_TYPE,

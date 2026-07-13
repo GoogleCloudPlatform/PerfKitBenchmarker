@@ -114,7 +114,7 @@ class ExistingNetworkFirewall(BaseFirewall):
     super().__init__()
     self.network_name = network_name
 
-  def __eq__(self, other: 'ExistingNetworkFirewall') -> bool:
+  def __eq__(self, other: 'ExistingNetworkFirewall') -> bool:  # pyrefly: ignore[bad-override]
     """Defines equality."""
     return self.network_name == other.network_name
 
@@ -182,7 +182,7 @@ class BaseVpnGateway(metaclass=abc.ABCMeta):
       cidr: The cidr for the VpnGateway.
     """
     self.zone = zone
-    self.cidr: str = cidr
+    self.cidr: str = cidr  # pyrefly: ignore[bad-assignment]
     # Set to True if we need target Gateway up front (AWS)
     self.require_target_to_init = False
 

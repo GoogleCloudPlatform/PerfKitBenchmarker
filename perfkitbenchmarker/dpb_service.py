@@ -876,7 +876,7 @@ class UnmanagedDpbService(BaseDpbService):
       )
 
     if self.storage_service:
-      self.storage_service.PrepareService(location=self.region)
+      self.storage_service.PrepareService(location=self.region)  # pyrefly: ignore[bad-argument-type]
 
     # set in _Create of derived classes
     self.leader = None
@@ -1466,7 +1466,7 @@ class KubernetesFlinkCluster(BaseDpbService):
     }
     # User specified properties
     properties.update(super().GetJobProperties())
-    return properties
+    return properties  # pyrefly: ignore[bad-return]
 
   def SubmitJob(
       self,
@@ -1492,7 +1492,7 @@ class KubernetesFlinkCluster(BaseDpbService):
         job_manager_name=job_manager_name,
         job_manager_service=self.FLINK_JOB_MANAGER_SERVICE,
         classname=classname,
-        job_arguments=','.join(job_arguments),
+        job_arguments=','.join(job_arguments),  # pyrefly: ignore[no-matching-overload]
         image=self.image,
         task_manager_replicas=self.k8s_cluster.num_nodes - 1,
         task_manager_rpc_port=job_properties.get('taskmanager.rpc.port'),

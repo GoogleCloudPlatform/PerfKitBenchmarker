@@ -18,7 +18,7 @@ unit registry.
 """
 
 import pint
-import six.moves.copyreg
+import six.moves.copyreg  # pyrefly: ignore[missing-source-for-stubs]
 
 
 class _UnitRegistry(pint.UnitRegistry):
@@ -62,7 +62,7 @@ def _PickleQuantity(q):
 
 
 def _UnPickleQuantity(inp):
-  return _UNIT_REGISTRY.Quantity.from_tuple(inp)
+  return _UNIT_REGISTRY.Quantity.from_tuple(inp)  # pyrefly: ignore[missing-attribute]
 
 
 six.moves.copyreg.pickle(_UNIT_REGISTRY.Quantity, _PickleQuantity)

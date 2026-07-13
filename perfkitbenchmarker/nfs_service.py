@@ -180,7 +180,7 @@ class UnmanagedNfsService(BaseNfsService):
       check_export_not_same_mount=True,
       server_directory=None,
   ):
-    super().__init__(disk_spec, None)
+    super().__init__(disk_spec, None)  # pyrefly: ignore[bad-argument-type]
     self.server_vm = server_vm
     # Path on the server to export. Must be different from mount_point.
     if server_directory:

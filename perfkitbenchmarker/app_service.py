@@ -50,7 +50,7 @@ def GetAppServiceSpecClass(service) -> Type['BaseAppServiceSpec']:
     service: String which matches an inherited BaseAppServiceSpec's required
       SERVICE value.
   """
-  return spec.GetSpecClass(BaseAppServiceSpec, SERVICE=service)
+  return spec.GetSpecClass(BaseAppServiceSpec, SERVICE=service)  # pyrefly: ignore[bad-return]
 
 
 class BaseAppServiceSpec(spec.BaseSpec):

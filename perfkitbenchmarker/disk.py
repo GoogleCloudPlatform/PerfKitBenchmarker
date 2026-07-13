@@ -173,19 +173,19 @@ class BaseDiskSpec(spec.BaseSpec):
   CLOUD = None
 
   def __init__(self, *args, **kwargs):
-    self.device_path: str = None
-    self.mount_point: str = None
-    self.disk_type: str = None
-    self.disk_size: int = None
-    self.num_striped_disks: int = None
+    self.device_path: str = None  # pyrefly: ignore[bad-assignment]
+    self.mount_point: str = None  # pyrefly: ignore[bad-assignment]
+    self.disk_type: str = None  # pyrefly: ignore[bad-assignment]
+    self.disk_size: int = None  # pyrefly: ignore[bad-assignment]
+    self.num_striped_disks: int = None  # pyrefly: ignore[bad-assignment]
     self.num_partitions = None
     self.partition_size = None
     self.provisioned_iops = None
     self.provisioned_throughput = None
     self.multi_writer_mode: bool = False
-    self.multi_writer_group_name: str = None
-    self.snapshot_name: str = None
-    self.snapshot_id: str = None
+    self.multi_writer_group_name: str = None  # pyrefly: ignore[bad-assignment]
+    self.snapshot_name: str = None  # pyrefly: ignore[bad-assignment]
+    self.snapshot_id: str = None  # pyrefly: ignore[bad-assignment]
     super().__init__(*args, **kwargs)
 
   @classmethod
@@ -300,7 +300,7 @@ class BaseLustreDiskSpec(BaseDiskSpec):
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
-    self.device_path: str = None
+    self.device_path: str = None  # pyrefly: ignore[bad-assignment]
     self.disk_type = LUSTRE
 
 
@@ -313,8 +313,8 @@ class BaseNFSDiskSpec(BaseDiskSpec):
   SPEC_ATTRS = ['CLOUD', 'DISK_TYPE']
 
   def __init__(self, *args, **kwargs):
-    self.device_path: str = None
-    self.mount_point: str = None
+    self.device_path: str = None  # pyrefly: ignore[bad-assignment]
+    self.mount_point: str = None  # pyrefly: ignore[bad-assignment]
     super().__init__(*args, **kwargs)
     self.disk_type = NFS
 
@@ -393,8 +393,8 @@ class BaseSMBDiskSpec(BaseDiskSpec):
   SPEC_ATTRS = ['CLOUD', 'DISK_TYPE']
 
   def __init__(self, *args, **kwargs):
-    self.device_path: str = None
-    self.mount_point: str = None
+    self.device_path: str = None  # pyrefly: ignore[bad-assignment]
+    self.mount_point: str = None  # pyrefly: ignore[bad-assignment]
     super().__init__(*args, **kwargs)
 
   @classmethod
@@ -484,15 +484,15 @@ class BaseDisk(resource.BaseResource):
     # numbers are used in diskpart scripts in order to identify the disks
     # that we want to operate on.
     self.disk_number = disk_spec.disk_number
-    self.attach_start_time: float = None
-    self.attach_end_time: float = None
-    self.detach_start_time: float = None
-    self.detach_end_time: float = None
-    self.create_disk_start_time: float = None
-    self.create_disk_end_time: float = None
-    self.disk_create_time: float = None
-    self.disk_detach_time: float = None
-    self.time_to_visibility: float = None
+    self.attach_start_time: float = None  # pyrefly: ignore[bad-assignment]
+    self.attach_end_time: float = None  # pyrefly: ignore[bad-assignment]
+    self.detach_start_time: float = None  # pyrefly: ignore[bad-assignment]
+    self.detach_end_time: float = None  # pyrefly: ignore[bad-assignment]
+    self.create_disk_start_time: float = None  # pyrefly: ignore[bad-assignment]
+    self.create_disk_end_time: float = None  # pyrefly: ignore[bad-assignment]
+    self.disk_create_time: float = None  # pyrefly: ignore[bad-assignment]
+    self.disk_detach_time: float = None  # pyrefly: ignore[bad-assignment]
+    self.time_to_visibility: float = None  # pyrefly: ignore[bad-assignment]
 
   @property
   def mount_options(self):

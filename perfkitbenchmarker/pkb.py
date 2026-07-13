@@ -358,11 +358,11 @@ def ShouldTeardown(
         )
         return False
   if skip_teardown_zonal_vm_limit:
-    for vm in vms:
+    for vm in vms:  # pyrefly: ignore[not-iterable]
       num_lingering_vms = vm.GetNumTeardownSkippedVms()
       if (
           num_lingering_vms is not None
-          and num_lingering_vms + len(vms) > skip_teardown_zonal_vm_limit
+          and num_lingering_vms + len(vms) > skip_teardown_zonal_vm_limit  # pyrefly: ignore[bad-argument-type]
       ):
         logging.warning(
             'Too many lingering VMs: tearing down resources regardless of skip'
@@ -459,7 +459,7 @@ def _PrintHelpMD(matches=None):
 
   flags_by_module = FLAGS.flags_by_module_dict()
   modules = sorted(flags_by_module)
-  regex = re.compile(matches)
+  regex = re.compile(matches)  # pyrefly: ignore[no-matching-overload]
   for module_name in modules:
     if regex.search(module_name):
       # Compile regex patterns.
@@ -847,7 +847,7 @@ def DoRunPhase(
     if FLAGS.record_lscpu:
       samples.extend(linux_virtual_machine.CreateLscpuSamples(spec.vms))
     if FLAGS.record_ulimit:
-      samples.extend(linux_virtual_machine.CreateUlimitSamples(spec.vms))
+      samples.extend(linux_virtual_machine.CreateUlimitSamples(spec.vms))  # pyrefly: ignore[bad-argument-type]
 
     if pkb_flags.RECORD_PROCCPU.value:
       samples.extend(linux_virtual_machine.CreateProcCpuSamples(spec.vms))
@@ -1210,7 +1210,7 @@ def RunBenchmark(
             )
             should_teardown = ShouldTeardown(
                 skip_teardown_conditions,
-                collector.published_samples + collector.samples,
+                collector.published_samples + collector.samples,  # pyrefly: ignore[bad-argument-type]
                 spec.vms,
                 pkb_flags.SKIP_TEARDOWN_ZONAL_VM_LIMIT.value,
                 pkb_flags.SKIP_TEARDOWN_ON_COMMAND_TIMEOUT.value,
@@ -1341,7 +1341,7 @@ def PublishFailedRunSample(
     metadata['failed_substatus'] = spec.failed_substatus
 
   if interruptible_vm_count:
-    metadata.update({
+    metadata.update({  # pyrefly: ignore[no-matching-overload]
         'interruptible_vms': interruptible_vm_count,
         'interrupted_vms': interrupted_vm_count,
         'vm_status_codes': vm_status_codes,
@@ -1409,7 +1409,7 @@ def RunBenchmarkTask(
   for current_run_count in range(max_run_count):
     # Attempt to return the most recent results.
     if _TEARDOWN_EVENT.is_set():
-      if result_specs and collector:
+      if result_specs and collector:  # pyrefly: ignore[unbound-name]
         return result_specs, collector.samples
       return [spec], []
 
@@ -1498,7 +1498,7 @@ class ZoneRetryManager:
       )
 
   def _GetCurrentZoneFlag(self):
-    return FLAGS[self._zone_flag].value[0]
+    return FLAGS[self._zone_flag].value[0]  # pyrefly: ignore[unsupported-operation]
 
   def _CheckFlag(self, machine_types: Collection[str]) -> None:
     for zone_flag in ['zone', 'zones']:
@@ -1759,7 +1759,7 @@ def RunBenchmarks():
 
   # Upload PKB logs to GCS after all benchmark runs are complete.
   log_collector.CollectPKBLogs(
-      run_uri=FLAGS.run_uri, log_local_path=log_util.log_local_path
+      run_uri=FLAGS.run_uri, log_local_path=log_util.log_local_path  # pyrefly: ignore[bad-argument-type]
   )
   all_benchmarks_succeeded = all(
       spec.status == benchmark_status.SUCCEEDED for spec in benchmark_specs
@@ -1913,18 +1913,18 @@ def _CollectMeminfoHandler(
   def CollectMeminfo(vm):
     txt, _ = vm.RemoteCommand('cat /proc/meminfo')
     meminfo, malformed = _ParseMeminfo(txt)
-    meminfo.update({
+    meminfo.update({  # pyrefly: ignore[no-matching-overload]
         'meminfo_keys': ','.join(sorted(meminfo)),
         'meminfo_vmname': vm.name,
         'meminfo_machine_type': vm.machine_type,
         'meminfo_os_type': vm.OS_TYPE,
     })
     if malformed:
-      meminfo['meminfo_malformed'] = ','.join(sorted(malformed))
+      meminfo['meminfo_malformed'] = ','.join(sorted(malformed))  # pyrefly: ignore[unsupported-operation]
     return sample.Sample('meminfo', 0, '', meminfo)
 
   linux_vms = [
-      vm for vm in benchmark_spec.vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES
+      vm for vm in benchmark_spec.vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES  # pyrefly: ignore[missing-argument]
   ]
 
   samples.extend(background_tasks.RunThreaded(CollectMeminfo, linux_vms))
@@ -1987,7 +1987,7 @@ def _CollectLsmemHandler(
     )
 
   linux_vms = [
-      vm for vm in benchmark_spec.vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES
+      vm for vm in benchmark_spec.vms if vm.OS_TYPE in os_types.LINUX_OS_TYPES  # pyrefly: ignore[missing-argument]
   ]
 
   samples.extend(background_tasks.RunThreaded(CollectLsmem, linux_vms))

@@ -339,8 +339,8 @@ class UnitsParser(flags.ArgumentParser):
         at least one of the specified Units, or the parse() method will raise a
         ValueError.
     """
-    if isinstance(convertible_to, ((str,), units.Unit)):
-      self.convertible_to = [units.Unit(convertible_to)]
+    if isinstance(convertible_to, ((str,), units.Unit)):  # pyrefly: ignore[invalid-argument]
+      self.convertible_to = [units.Unit(convertible_to)]  # pyrefly: ignore[invalid-type-var]
     else:
       self.convertible_to = [units.Unit(u) for u in convertible_to]
 
@@ -358,7 +358,7 @@ class UnitsParser(flags.ArgumentParser):
       ValueError: If the input cannot be parsed, or if it parses to a value with
           improper units.
     """
-    if isinstance(inp, units.Quantity):
+    if isinstance(inp, units.Quantity):  # pyrefly: ignore[invalid-argument]
       quantity = inp
     else:
       try:
@@ -367,7 +367,7 @@ class UnitsParser(flags.ArgumentParser):
         raise ValueError(
             "Couldn't parse unit expression %r: %s" % (inp, str(e))
         )
-      if not isinstance(quantity, units.Quantity) or (
+      if not isinstance(quantity, units.Quantity) or (  # pyrefly: ignore[invalid-argument]
           quantity.units == units.dimensionless
       ):
         raise ValueError('Expression %r evaluates to a unitless value.' % inp)

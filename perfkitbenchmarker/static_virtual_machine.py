@@ -92,16 +92,16 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       vm_spec: A StaticVmSpec object containing arguments.
     """
     super().__init__(vm_spec)
-    self.ip_address = vm_spec.ip_address
-    self.user_name = vm_spec.user_name
-    self.ssh_private_key = vm_spec.ssh_private_key
+    self.ip_address = vm_spec.ip_address  # pyrefly: ignore[bad-assignment]
+    self.user_name = vm_spec.user_name  # pyrefly: ignore[bad-assignment]
+    self.ssh_private_key = vm_spec.ssh_private_key  # pyrefly: ignore[bad-assignment]
     self.internal_ip = vm_spec.internal_ip
-    self.internal_ips = vm_spec.internal_ips
+    self.internal_ips = vm_spec.internal_ips  # pyrefly: ignore[bad-assignment]
     self.zone = self.zone or (
         'Static - %s@%s' % (self.user_name, self.ip_address)
     )
     self.ssh_port = vm_spec.ssh_port
-    self.password = vm_spec.password
+    self.password = vm_spec.password  # pyrefly: ignore[bad-assignment]
     self.disk_specs = vm_spec.disk_specs
     self.from_pool = False
     self.preemptible = False

@@ -369,23 +369,23 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     self.vm_spec = vm_spec
     self.machine_type = vm_spec.machine_type
     self.zone = vm_spec.zone
-    self.disable_interrupt_moderation = vm_spec.disable_interrupt_moderation
-    self.disable_rss = vm_spec.disable_rss
+    self.disable_interrupt_moderation = vm_spec.disable_interrupt_moderation  # pyrefly: ignore[bad-assignment]
+    self.disable_rss = vm_spec.disable_rss  # pyrefly: ignore[bad-assignment]
     self.boot_disk_size = vm_spec.boot_disk_size
     self.cidr = vm_spec.cidr
     self.gpu_count = vm_spec.gpu_count
     self.gpu_type = vm_spec.gpu_type
     self.image = vm_spec.image
-    self.install_packages = vm_spec.install_packages
+    self.install_packages = vm_spec.install_packages  # pyrefly: ignore[bad-assignment]
     self.can_connect_via_internal_ip = (
         FLAGS.ssh_via_internal_ip or FLAGS.connect_via_internal_ip
     )
-    self.boot_completion_ip_subset = _BOOT_COMPLETION_IP_SUBSET.value
+    self.boot_completion_ip_subset = _BOOT_COMPLETION_IP_SUBSET.value  # pyrefly: ignore[bad-assignment]
     self.assign_external_ip = vm_spec.assign_external_ip
     self.assign_external_ip_all_nics = vm_spec.assign_external_ip_all_nics
-    self.ip_address = None
+    self.ip_address = None  # pyrefly: ignore[bad-assignment]
     self.ip_addresses = []
-    self.internal_ip = None
+    self.internal_ip = None  # pyrefly: ignore[bad-assignment]
     self.internal_ips = []
     self.user_name = _VM_USER_NAME.value
     self.ssh_public_key = vm_util.GetPublicKeyPath()
@@ -408,7 +408,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     self.firewall = None
     self.tcp_congestion_control = None
     self.numa_node_count = None
-    self.num_disable_cpus = None
+    self.num_disable_cpus = None  # pyrefly: ignore[bad-assignment]
     self.capacity_reservation_id = None
     self.vm_metadata = dict(item.split(':', 1) for item in vm_spec.vm_metadata)
     self.vm_group = None
@@ -420,7 +420,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     self.is_running_time = None
     self.boot_startup_script = vm_spec.boot_startup_script
     self.create_cmd_info_log = None
-    if self.OS_TYPE == os_types.CORE_OS and self.boot_startup_script:
+    if self.OS_TYPE == os_types.CORE_OS and self.boot_startup_script:  # pyrefly: ignore[missing-argument]
       raise errors.Setup.InvalidConfigurationError(
           'Startup script are not supported on CoreOS.'
       )
@@ -667,7 +667,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     result = self.metadata.copy()
     result.update({
         'image': self.image,
-        'cloud': self.CLOUD,
+        'cloud': self.CLOUD,  # pyrefly: ignore[missing-argument]
         'os_type': type(self).OS_TYPE,
         'vm_platform': self.PLATFORM,
     })

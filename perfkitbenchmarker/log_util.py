@@ -220,12 +220,12 @@ class PkbLogRecord:
         _FALLBACK_TIME_FORMAT, time.localtime(seconds_timestamp)
     )
 
-  def __eq__(self, other: 'PkbLogRecord') -> bool:
+  def __eq__(self, other: 'PkbLogRecord') -> bool:  # pyrefly: ignore[bad-override]
     if type(self) != type(other):
       return NotImplemented
     return (
         self.message == other.message
-        and self.record.pkb_label == other.record.pkb_label
+        and self.record.pkb_label == other.record.pkb_label  # pyrefly: ignore[missing-attribute]
     )
 
 

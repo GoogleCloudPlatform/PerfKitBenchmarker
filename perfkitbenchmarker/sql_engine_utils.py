@@ -119,7 +119,7 @@ class ISQLQueryTools(metaclass=abc.ABCMeta):
       connection_properties: DbConnectionProperties,
   ):
     """Initialize ISQLQuery class."""
-    self.vm = vm
+    self.vm = vm  # pyrefly: ignore[invalid-type-var]
     self.connection_properties = connection_properties
 
   def TimeQuery(
@@ -325,7 +325,7 @@ class PostgresCliQueryTools(ISQLQueryTools):
     sql_command += '-c "%s"' % command
     return sql_command
 
-  def GetConnectionString(self, database_name='', endpoint=''):
+  def GetConnectionString(self, database_name='', endpoint=''):  # pyrefly: ignore[bad-override]
     if not database_name:
       database_name = self.DEFAULT_DATABASE
     if not endpoint:
@@ -407,7 +407,7 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
       sessions_arg = sessions_arg + '"'
 
     properties = self.connection_properties
-    database_name = database_name or properties.database_name
+    database_name = database_name or properties.database_name  # pyrefly: ignore[bad-assignment]
     command = (
         'java -jar pgadapter.jar '
         '-dir /tmp '
@@ -496,7 +496,7 @@ class MysqlCliQueryTools(ISQLQueryTools):
 
     return mysql_command + '-e "%s"' % command
 
-  def GetConnectionString(self, endpoint=''):
+  def GetConnectionString(self, endpoint=''):  # pyrefly: ignore[bad-override]
     if not endpoint:
       endpoint = self.connection_properties.endpoint
     return '-h {} -P 3306 -u {} -p{}'.format(
@@ -552,7 +552,7 @@ class SqlServerCliQueryTools(ISQLQueryTools):
     sqlserver_command = sqlserver_command + '-Q "%s"' % command
     return sqlserver_command
 
-  def GetConnectionString(self, database_name='', endpoint=''):
+  def GetConnectionString(self, database_name='', endpoint=''):  # pyrefly: ignore[bad-override]
     raise NotImplementedError('Connection string currently not supported')
 
   def RunSqlScript(

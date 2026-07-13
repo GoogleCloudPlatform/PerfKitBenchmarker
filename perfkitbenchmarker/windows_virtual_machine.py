@@ -155,9 +155,9 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
     self.remote_access_ports = [self.winrm_port, self.smb_port, RDP_PORT]
     self.primary_remote_access_port = self.winrm_port
     self.rdp_port_listening_time = None
-    self.temp_dir: str = None
-    self.home_dir: str = None
-    self.system_drive: str = None
+    self.temp_dir: str = None  # pyrefly: ignore[bad-assignment]
+    self.home_dir: str = None  # pyrefly: ignore[bad-assignment]
+    self.system_drive: str = None  # pyrefly: ignore[bad-assignment]
     self.assigned_disk_letter = ATTACHED_DISK_LETTER
 
   def RobustRemoteCommand(
@@ -183,7 +183,7 @@ class BaseWindowsMixin(os_mixin.BaseOsMixin):
     """
     return self.RemoteCommand(command, ignore_failure, timeout)
 
-  def RemoteCommand(
+  def RemoteCommand(  # pyrefly: ignore[bad-override]
       self,
       command: str,
       ignore_failure: bool = False,

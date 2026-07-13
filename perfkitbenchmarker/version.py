@@ -45,7 +45,7 @@ def _GetVersion():
     except OSError:
       # Could not determine version.
       return 'unknown'
-  return version.rstrip('\n')
+  return version.rstrip('\n')  # pyrefly: ignore[bad-argument-type]
 
 
 VERSION = _GetVersion()

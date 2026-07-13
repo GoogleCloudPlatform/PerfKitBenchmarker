@@ -78,7 +78,7 @@ class AutoRegisterResourceMeta(abc.ABCMeta):
 
   def __init__(cls, name, bases, dct):
     auto_registry.RegisterClass(
-        _RESOURCE_REGISTRY, cls, cls.REQUIRED_ATTRS, cls.RESOURCE_TYPE
+        _RESOURCE_REGISTRY, cls, cls.REQUIRED_ATTRS, cls.RESOURCE_TYPE  # pyrefly: ignore[bad-argument-type]
     )
     super().__init__(name, bases, dct)
 
@@ -145,11 +145,11 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
 
     # Creation and deletion time information
     # that we may make use of later.
-    self.create_start_time: float = None
+    self.create_start_time: float = None  # pyrefly: ignore[bad-assignment]
     self.delete_start_time = None
-    self.create_end_time: float = None
+    self.create_end_time: float = None  # pyrefly: ignore[bad-assignment]
     self.delete_end_time = None
-    self.resource_ready_time: float = None
+    self.resource_ready_time: float = None  # pyrefly: ignore[bad-assignment]
     self.metadata = dict()
 
   def GetResourceMetadata(self):

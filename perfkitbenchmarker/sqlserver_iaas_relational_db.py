@@ -879,7 +879,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
       SQL Server Version
     """
 
-    return_value: str = None
+    return_value: str = None  # pyrefly: ignore[bad-assignment]
     sql_srv_version_prefix = "sqlserver_"
     sql_srv_supported_versions = [
         "2022",
@@ -891,7 +891,7 @@ class SQLServerIAASRelationalDb(iaas_relational_db.IAASRelationalDb):
     ]
 
     for version in sql_srv_supported_versions:
-      if vm.OS_TYPE.find(sql_srv_version_prefix+version) > 0:
+      if vm.OS_TYPE.find(sql_srv_version_prefix+version) > 0:  # pyrefly: ignore[missing-argument]
         return_value = version
         break
     return return_value
