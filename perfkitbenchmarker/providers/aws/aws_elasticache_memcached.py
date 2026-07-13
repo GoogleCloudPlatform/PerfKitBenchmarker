@@ -44,7 +44,7 @@ class ElastiCacheMemcached(managed_memory_store.BaseManagedMemoryStore):
     self.zone = spec.zone or _DEFAULT_ZONE
     self.region = util.GetRegionFromZone(self.zone)
     self.node_type = aws_flags.ELASTICACHE_NODE_TYPE.value
-    self.version = managed_memory_store.MANAGED_MEMORY_STORE_VERSION.value
+    self.version = managed_memory_store.MANAGED_MEMORY_STORE_VERSION.value  # pyrefly: ignore[bad-assignment]
 
   def CheckPrerequisites(self):
     if self.version and self.version not in MEMCACHED_VERSIONS:

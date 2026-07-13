@@ -38,7 +38,7 @@ virtual_machine = Any  # pylint: disable=invalid-name
 
 
 def GetCreateDiskStrategy(
-    vm: 'virtual_machine.BaseVirtualMachine',
+    vm: 'virtual_machine.BaseVirtualMachine',  # pyrefly: ignore[missing-attribute]
     disk_spec: aws_disk.AwsDiskSpec,
     disk_count: int,
 ) -> 'AWSCreateDiskStrategy':
@@ -106,13 +106,13 @@ class CreateRemoteDiskStrategy(AWSCreateDiskStrategy):
 
   def __init__(
       self,
-      vm: 'virtual_machine.BaseVirtualMachine',
+      vm: 'virtual_machine.BaseVirtualMachine',  # pyrefly: ignore[missing-attribute]
       disk_spec: aws_disk.AwsDiskSpec,
       disk_count: int,
   ):
     super().__init__(vm, disk_spec, disk_count)
     self.remote_disk_groups = []
-    for spec_id, disk_spec in enumerate(self.disk_specs):
+    for spec_id, disk_spec in enumerate(self.disk_specs):  # pyrefly: ignore[bad-assignment]
       disks = []
       for i in range(disk_spec.num_striped_disks):
         disk_spec_id = self.BuildDiskSpecId(spec_id, i)
@@ -135,7 +135,7 @@ class CreateRemoteDiskStrategy(AWSCreateDiskStrategy):
     """Returns the SetUpDiskStrategy for the disk."""
     if self.setup_disk_strategy is None:
       self.setup_disk_strategy = SetUpRemoteDiskStrategy(  # pytype: disable=wrong-arg-types
-          self.vm, self.disk_specs
+          self.vm, self.disk_specs  # pyrefly: ignore[bad-argument-type]
       )
     return self.setup_disk_strategy
 
@@ -334,7 +334,7 @@ class SetUpLocalDiskStrategy(AWSSetupDiskStrategy):
 
   def __init__(
       self,
-      vm: 'virtual_machine.BaseVirtualMachine',
+      vm: 'virtual_machine.BaseVirtualMachine',  # pyrefly: ignore[missing-attribute]
       disk_specs: list[aws_disk.AwsDiskSpec],
   ):
     super().__init__(vm, disk_specs[0])
@@ -422,7 +422,7 @@ class SetUpRemoteDiskStrategy(AWSSetupDiskStrategy):
 
   def __init__(
       self,
-      vm: 'virtual_machine.BaseVirtualMachine',
+      vm: 'virtual_machine.BaseVirtualMachine',  # pyrefly: ignore[missing-attribute]
       disk_specs: list[aws_disk.AwsDiskSpec],
   ):
     super().__init__(vm, disk_specs[0])

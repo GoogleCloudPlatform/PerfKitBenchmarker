@@ -72,7 +72,7 @@ def RecursivelyUpdateDictionary(
   # Copied from https://stackoverflow.com/questions/3232943
   for k, v in updates.items():
     if isinstance(v, abc.Mapping):
-      original[k] = RecursivelyUpdateDictionary(original.get(k, {}), v)
+      original[k] = RecursivelyUpdateDictionary(original.get(k, {}), v)  # pyrefly: ignore[bad-argument-type]
     else:
       original[k] = v
   return original
@@ -138,7 +138,7 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
       # and --zones must have at least 2 zones
       # https://github.com/weaveworks/eksctl/issues/4735
       self.control_plane_zones.append(
-          self.region + ('b' if self.zone.endswith('a') else 'a')
+          self.region + ('b' if self.zone.endswith('a') else 'a')  # pyrefly: ignore[unsupported-operation]
       )
 
   def _CreateDependencies(self):
@@ -244,7 +244,7 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
         '--region',
         self.region,
     ]
-    vm_util.IssueCommand(cmd, timeout=1800)
+    vm_util.IssueCommand(cmd, timeout=1800)  # pyrefly: ignore[bad-argument-type]
 
   def GetNodePoolFromNodeName(
       self, node_name: str
@@ -368,7 +368,7 @@ class BaseEksCluster(kubernetes_cluster.KubernetesCluster):
         '-o',
         'json',
     ]
-    stdout, stderr, retcode = vm_util.IssueCommand(cmd)
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
     if retcode:
       logging.warning('Failed to get nodegroups: %s, error: %s', stdout, stderr)
       return []
@@ -729,7 +729,7 @@ class EksAutoCluster(BaseEksCluster):
   def _EnsureS3CsiPodIdentityAssociation(self, role_arn: str) -> None:
     """Idempotently binds the role to s3-csi-driver-sa via Pod Identity."""
     vm_util.IssueCommand(
-        util.AWS_PREFIX
+        util.AWS_PREFIX  # pyrefly: ignore[bad-argument-type]
         + [
             'eks',
             'create-pod-identity-association',
@@ -773,7 +773,7 @@ class EksAutoCluster(BaseEksCluster):
         '--region',
         self.region,
     ]
-    vm_util.IssueCommand(cmd, timeout=1800)
+    vm_util.IssueCommand(cmd, timeout=1800)  # pyrefly: ignore[bad-argument-type]
 
   def _IsReady(self):
     """Returns True if cluster is running. Autopilot defaults to 0 nodes."""
@@ -954,7 +954,7 @@ class EksKarpenterCluster(BaseEksCluster):
         policy_arn = (stdout or '').strip()
     # 3) Ensure ServiceAccount
     vm_util.IssueCommand(
-        [
+        [  # pyrefly: ignore[bad-argument-type]
             FLAGS.eksctl,
             'create',
             'iamserviceaccount',
@@ -1129,7 +1129,7 @@ class EksKarpenterCluster(BaseEksCluster):
     if not instance_ids:
       raise errors.Resource.GetError('No valid instance IDs found from nodes')
     out, _, _ = vm_util.IssueCommand(
-        util.AWS_PREFIX
+        util.AWS_PREFIX  # pyrefly: ignore[bad-argument-type]
         + [
             'ec2',
             'describe-instances',
@@ -1151,7 +1151,7 @@ class EksKarpenterCluster(BaseEksCluster):
     # 4) CRITICAL: Allow ALB to reach nodes on app port (fixes 504 errors)
     for sg in node_sgs:
       vm_util.IssueCommand(
-          util.AWS_PREFIX
+          util.AWS_PREFIX  # pyrefly: ignore[bad-argument-type]
           + [
               'ec2',
               'authorize-security-group-ingress',
@@ -1283,7 +1283,7 @@ class EksKarpenterCluster(BaseEksCluster):
     # Get the AMI version for current kubernetes version.
     # See e.g. https://karpenter.sh/docs/tasks/managing-amis/ for not using
     # @latest.
-    image_id, _, _ = vm_util.IssueCommand([
+    image_id, _, _ = vm_util.IssueCommand([  # pyrefly: ignore[bad-argument-type]
         'aws',
         'ssm',
         'get-parameter',
@@ -1295,7 +1295,7 @@ class EksKarpenterCluster(BaseEksCluster):
         'Parameter.Value',
     ])
     image_id = image_id.strip().strip('"')
-    full_version, _, _ = vm_util.IssueCommand([
+    full_version, _, _ = vm_util.IssueCommand([  # pyrefly: ignore[bad-argument-type]
         'aws',
         'ec2',
         'describe-images',
@@ -1493,7 +1493,7 @@ class EksKarpenterCluster(BaseEksCluster):
 
     # Force terminate remaining EC2 instances
     stdout, _, _ = vm_util.IssueCommand(
-        [
+        [  # pyrefly: ignore[bad-argument-type]
             'aws',
             'ec2',
             'describe-instances',
@@ -1513,7 +1513,7 @@ class EksKarpenterCluster(BaseEksCluster):
     if instance_ids:
       logging.info('Terminating %d remaining instances', len(instance_ids))
       vm_util.IssueCommand(
-          [
+          [  # pyrefly: ignore[bad-argument-type]
               'aws',
               'ec2',
               'terminate-instances',
@@ -1524,7 +1524,7 @@ class EksKarpenterCluster(BaseEksCluster):
           ],
       )
       vm_util.IssueCommand(
-          [
+          [  # pyrefly: ignore[bad-argument-type]
               'aws',
               'ec2',
               'wait',
@@ -1538,7 +1538,7 @@ class EksKarpenterCluster(BaseEksCluster):
       )
     # Cleanup orphaned network interfaces
     stdout, _, _ = vm_util.IssueCommand(
-        [
+        [  # pyrefly: ignore[bad-argument-type]
             'aws',
             'ec2',
             'describe-network-interfaces',
@@ -1564,7 +1564,7 @@ class EksKarpenterCluster(BaseEksCluster):
         # this is refactored.
         def _DeleteOneEni(eni_id=eni_id) -> None:
           _, stderr, retcode = vm_util.IssueCommand(
-              [
+              [  # pyrefly: ignore[bad-argument-type]
                   'aws',
                   'ec2',
                   'delete-network-interface',

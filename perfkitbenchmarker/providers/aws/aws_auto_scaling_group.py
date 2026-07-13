@@ -46,7 +46,7 @@ class AwsLaunchTemplate(resource.BaseResource):
   ):
     super().__init__()
     self.vm_config = vm_config
-    self.vm_config.client_token = None
+    self.vm_config.client_token = None  # pyrefly: ignore[bad-assignment]
     self.name = name
     self.region = vm_config.region
     self.base_cmd = util.AWS_PREFIX + ['ec2', '--region', self.region]
@@ -70,7 +70,7 @@ class AwsLaunchTemplate(resource.BaseResource):
             'AssociatePublicIpAddress': self.vm_config.assign_external_ip,
             'DeviceIndex': 0,
             'Groups': [self.vm_config.group_id],
-            'SubnetId': self.vm_config.network.subnet.id,
+            'SubnetId': self.vm_config.network.subnet.id,  # pyrefly: ignore[missing-attribute]
         }],
     }
 
@@ -138,7 +138,7 @@ class AwsAutoScalingGroup(managed_vm_group.BaseManagedVmGroup):
   def _Create(self):
     subnets = []
     for vm in self.zoned_vm_configs:
-      subnets.append(vm.network.subnet.id)
+      subnets.append(vm.network.subnet.id)  # pyrefly: ignore[missing-attribute]
     cmd = self.base_cmd + [
         'create-auto-scaling-group',
         '--auto-scaling-group-name',

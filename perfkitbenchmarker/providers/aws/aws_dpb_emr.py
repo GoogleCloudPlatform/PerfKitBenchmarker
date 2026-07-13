@@ -130,7 +130,7 @@ class _AwsDpbEmrServerlessJobRun:
     """Computes the cost of a run for region given this usage."""
     if not self.HasStats():
       return dpb_service.JobCosts()
-    region_prices = aws_dpb_emr_serverless_prices.EMR_SERVERLESS_PRICES.get(
+    region_prices = aws_dpb_emr_serverless_prices.EMR_SERVERLESS_PRICES.get(  # pyrefly: ignore[no-matching-overload]
         self.region, {}
     )
     memory_gb_hour_price = region_prices.get('memory_gb_hours')
@@ -328,7 +328,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
           _GetClusterConfiguration(self.GetClusterProperties()),
       ]
 
-    stdout, _, _ = vm_util.IssueCommand(cmd)
+    stdout, _, _ = vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
     result = json.loads(stdout)
     self.cluster_id = result['ClusterId']
     logging.info('Cluster created with id %s', self.cluster_id)
@@ -500,7 +500,7 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       if job_arguments:
         arg_list += job_arguments
       arg_spec = 'Args=[' + ','.join(arg_list) + ']'
-      step_list = ['Jar=' + jarfile, arg_spec]
+      step_list = ['Jar=' + jarfile, arg_spec]  # pyrefly: ignore[unsupported-operation]
     elif job_type == dpb_constants.SPARK_JOB_TYPE:
       arg_list = []
       if job_files:
@@ -538,10 +538,10 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
       jar_spec = 'Jar="command-runner.jar"'
       for k, v in all_properties.items():
         arg_list += ['--conf', '{}={}'.format(k, v)]
-      arg_spec = 'Args=[spark-sql,-f,{}]'.format(','.join(arg_list))
+      arg_spec = 'Args=[spark-sql,-f,{}]'.format(','.join(arg_list))  # pyrefly: ignore[no-matching-overload]
       step_list = [jar_spec, arg_spec]
 
-    step_string = ','.join(step_list)
+    step_string = ','.join(step_list)  # pyrefly: ignore[unbound-name]
 
     step_cmd = self.cmd_prefix + [
         'emr',
@@ -690,7 +690,7 @@ class AwsDpbEmrServerless(
     }
     # Create the application.
     stdout, _, _ = vm_util.IssueCommand(
-        self.cmd_prefix
+        self.cmd_prefix  # pyrefly: ignore[bad-argument-type]
         + [
             'emr-serverless',
             'create-application',
@@ -853,7 +853,7 @@ class AwsDpbEmrServerless(
         '--job-run-id',
         job_run.job_run_id,
     ]
-    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)  # pyrefly: ignore[bad-argument-type]
     if retcode:
       if 'ThrottlingException' in stderr:
         logging.warning(
@@ -874,7 +874,7 @@ class AwsDpbEmrServerless(
       return dpb_service.JobResult(
           run_time=end_time - start_time,
           fetch_output_fn=lambda: (
-              self._FetchLogs(job_run.application_id, job_run.job_run_id),
+              self._FetchLogs(job_run.application_id, job_run.job_run_id),  # pyrefly: ignore[bad-argument-type]
               None,
           ),
       )

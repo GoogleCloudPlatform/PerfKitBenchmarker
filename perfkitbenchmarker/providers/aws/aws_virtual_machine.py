@@ -646,7 +646,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     # AWS-side identifiers are assigned by AWS at creation time.
     self.disk_identifiers_by_device = {}
     self.create_disk_strategy = aws_disk_strategies.GetCreateDiskStrategy(
-        self, None, 0
+        self, None, 0  # pyrefly: ignore[bad-argument-type]
     )
     self.instance_profile = aws_flags.AWS_EC2_INSTANCE_PROFILE.value
 
@@ -1135,7 +1135,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             and self.host_list[-1].fill_fraction + 1.0 / self.num_vms_per_host
             > 1.0
         ):
-          host = AwsDedicatedHost(self.machine_type, self.zone)
+          host = AwsDedicatedHost(self.machine_type, self.zone)  # pyrefly: ignore[bad-argument-type]
           self.host_list.append(host)
           host.Create()
         self.host = self.host_list[-1]
@@ -1176,7 +1176,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         )
         with self._lock:
           if self.num_hosts == len(self.host_list):
-            host = AwsDedicatedHost(self.machine_type, self.zone)
+            host = AwsDedicatedHost(self.machine_type, self.zone)  # pyrefly: ignore[bad-argument-type]
             self.host_list.append(host)
             host.Create()
           self.host = self.host_list[-1]
@@ -1675,7 +1675,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
         '--instance-type',
         'Value=t3.micro',
     ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
     self.Start()
 
 

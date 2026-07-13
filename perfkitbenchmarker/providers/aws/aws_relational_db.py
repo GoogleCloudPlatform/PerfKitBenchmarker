@@ -171,8 +171,8 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
     self.subnets_used_by_db = []
 
     # dependencies which will be created
-    self.db_subnet_group_name: str = None
-    self.security_group_id: str = None
+    self.db_subnet_group_name: str = None  # pyrefly: ignore[bad-assignment]
+    self.security_group_id: str = None  # pyrefly: ignore[bad-assignment]
 
   def _IsReady(self, timeout=IS_READY_TIMEOUT, poll_interval=5):
     """Return true if the underlying resource is ready.
@@ -553,7 +553,7 @@ class BaseAwsRelationalDb(relational_db.BaseRelationalDb):
     metrics = RDS_COMMON_METRICS + _RDS_ONLY_METRICS
     for metric in metrics:
       metric.dimensions['DBInstanceIdentifier'] = self.instance_id
-    return metrics
+    return metrics  # pyrefly: ignore[bad-return]
 
   def _CollectProviderMetric(
       self,

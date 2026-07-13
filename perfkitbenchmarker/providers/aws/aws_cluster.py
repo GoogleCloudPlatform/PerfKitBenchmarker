@@ -46,7 +46,7 @@ class AWSCluster(cluster.BaseCluster):
     self.region = util.GetRegionFromZone(self.zone)
     self._config_path = os.path.join(vm_util.GetTempDir(), self.name + '.yaml')
     self._network_stack = None
-    self._vpc: aws_network.AwsVpc = None
+    self._vpc: aws_network.AwsVpc = None  # pyrefly: ignore[bad-assignment]
     self.nfs_path = '/opt/apps'
 
   def _CreateDependencies(self):
@@ -143,7 +143,7 @@ class AWSCluster(cluster.BaseCluster):
   def _DeleteDependencies(self):
     """Deletes vpc and cloudformation template."""
     self._key_manager.DeleteKeyfile(self.region)
-    vm_util.IssueCommand([
+    vm_util.IssueCommand([  # pyrefly: ignore[bad-argument-type]
         'aws',
         'cloudformation',
         'delete-stack',
@@ -257,10 +257,10 @@ class AWSCluster(cluster.BaseCluster):
       self.worker_vms.append(vm)
       _PopulateVM(vm, instance)
       vm.ip_address = vm.internal_ips[0]
-      vm.proxy_jump = self.headnode_vm.name
+      vm.proxy_jump = self.headnode_vm.name  # pyrefly: ignore[missing-attribute]
       vm.has_private_key = True
-    self.vms = [self.headnode_vm] + self.worker_vms
-    self.headnode_vm.network.regional_network._reference_count += 1
+    self.vms = [self.headnode_vm] + self.worker_vms  # pyrefly: ignore[bad-assignment]
+    self.headnode_vm.network.regional_network._reference_count += 1  # pyrefly: ignore[missing-attribute]
 
     vm_util.GenerateSSHConfig(
         self.vms, {'headnode': [self.headnode_vm], 'worker': self.worker_vms}
@@ -329,16 +329,16 @@ class AWSP6Cluster(AWSCluster):
       vm.RemoteCommand('sudo nvidia-smi -pm 1')
 
     background_tasks.RunThreaded(_PrepWorker, self.worker_vms)
-    self.headnode_vm.PushFile(data.ResourcePath('docker_daemon.json'))
-    self.headnode_vm.RemoteCommand(
+    self.headnode_vm.PushFile(data.ResourcePath('docker_daemon.json'))  # pyrefly: ignore[missing-attribute]
+    self.headnode_vm.RemoteCommand(  # pyrefly: ignore[missing-attribute]
         'echo "root = \\"/opt/apps/containerd\\"" | sudo tee -a '
         '/etc/containerd/config.toml'
     )
-    self.headnode_vm.RemoteCommand(
+    self.headnode_vm.RemoteCommand(  # pyrefly: ignore[missing-attribute]
         'sudo mv docker_daemon.json /etc/docker/daemon.json')
-    self.headnode_vm.RemoteCommand(
+    self.headnode_vm.RemoteCommand(  # pyrefly: ignore[missing-attribute]
         'sudo systemctl restart containerd')
-    self.headnode_vm.RemoteCommand(
+    self.headnode_vm.RemoteCommand(  # pyrefly: ignore[missing-attribute]
         'sudo systemctl restart docker')
 
   def RemoteCommand(

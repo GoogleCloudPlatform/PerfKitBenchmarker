@@ -128,7 +128,7 @@ class DocumentDb(non_relational_db.BaseManagedMongoDb):
     self.db_instance_class = db_instance_class or _DEFAULT_INSTANCE_CLASS
     self.replica_count = replica_count or 0
     self.region = util.GetRegionFromZone(self.zones[0])
-    self.resource_arn: str = None  # Set during the _Exists() call.
+    self.resource_arn: str = None  # Set during the _Exists() call.  # pyrefly: ignore[bad-assignment]
     self.subnet_group_name: str = self.name + '-subnet-group'
     self.subnets: list[aws_network.AwsSubnet] = []
     self.storage_type = storage_type or _DEFAULT_STORAGE_TYPE

@@ -379,7 +379,7 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
         metric.dimensions['DBClusterIdentifier'] = self.cluster_id
       elif 'DBInstanceIdentifier' in metric.dimensions:
         metric.dimensions['DBInstanceIdentifier'] = self.instance_id
-    return metrics
+    return metrics  # pyrefly: ignore[bad-return]
 
   def CollectMetrics(
       self, start_time: datetime.datetime, end_time: datetime.datetime

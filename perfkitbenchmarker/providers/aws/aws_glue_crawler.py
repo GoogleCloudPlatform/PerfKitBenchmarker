@@ -84,7 +84,7 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
         '--tags',
         ','.join(f'{k}={v}' for k, v in util.MakeDefaultTags().items()),
     ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
 
   def _Exists(self) -> bool:
     return self._DbExists() and self._CrawlerExists()  # pytype: disable=bad-return-type
@@ -111,7 +111,7 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
         '--region',
         self.region,
     ]
-    vm_util.IssueCommand(cmd, raise_on_failure=False)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)  # pyrefly: ignore[bad-argument-type]
 
     # deleting crawler
     cmd = util.AWS_PREFIX + [
@@ -122,14 +122,14 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
         '--region',
         self.region,
     ]
-    vm_util.IssueCommand(cmd, raise_on_failure=False)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)  # pyrefly: ignore[bad-argument-type]
 
   def _IsDeleting(self) -> bool:
     crawler_exists = self._CrawlerExists()
     db_exists = self._DbExists()
     if db_exists is None or crawler_exists is None:
       return True
-    return self._DbExists() or self._CrawlerExists()
+    return self._DbExists() or self._CrawlerExists()  # pyrefly: ignore[bad-return]
 
   def DiscoverData(self) -> float:
     """Runs the AWS Glue Crawler. Returns the time elapsed in secs."""
@@ -142,7 +142,7 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
         '--region',
         self.region,
     ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
     self._WaitUntilCrawlerReady()
     cmd = util.AWS_PREFIX + [
         'glue',
@@ -152,7 +152,7 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
         '--region',
         self.region,
     ]
-    output, _, _ = vm_util.IssueCommand(cmd)
+    output, _, _ = vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
     data = json.loads(output)
     assert (
         isinstance(data['CrawlerMetricsList'], list)
@@ -198,7 +198,7 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
         '--region',
         self.region,
     ]
-    _, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    _, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)  # pyrefly: ignore[bad-argument-type]
     if not retcode:
       return True
     return False if 'EntityNotFoundException' in stderr else None
@@ -226,4 +226,4 @@ class AwsGlueCrawler(data_discovery_service.BaseDataDiscoveryService):
         '--region',
         self.region,
     ]
-    return vm_util.IssueCommand(cmd, raise_on_failure=raise_on_failure)
+    return vm_util.IssueCommand(cmd, raise_on_failure=raise_on_failure)  # pyrefly: ignore[bad-argument-type]

@@ -264,7 +264,7 @@ class AwsVpc(resource.BaseResource):
         '--region',
         self.region,
         '--filters',
-        'Name=vpc-id,Values=' + self.id,
+        'Name=vpc-id,Values=' + self.id,  # pyrefly: ignore[unsupported-operation]
     ]
     if group_name:
       cmd.append('Name=group-name,Values={}'.format(group_name))
@@ -365,7 +365,7 @@ class AwsVpc(resource.BaseResource):
         self.default_security_group_id,
     ]
     try:
-      vm_util.IssueCommand(cmd)
+      vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
     except errors.VmUtil.IssueCommandError as ex:
       # do not retry if this rule already exists
       if ex.message.find('InvalidPermission.Duplicate') == -1:  # pytype: disable=attribute-error  # enable-nested-classes
@@ -582,7 +582,7 @@ class AwsRouteTable(resource.BaseResource):
     super().__init__()
     self.region = region
     self.vpc_id = vpc_id
-    self.id: str = None  # set by _PostCreate
+    self.id: str = None  # set by _PostCreate  # pyrefly: ignore[bad-assignment]
 
   def _Create(self):
     """Creates the route table.

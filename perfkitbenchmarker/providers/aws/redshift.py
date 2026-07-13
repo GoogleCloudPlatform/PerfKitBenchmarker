@@ -121,7 +121,7 @@ class CliClientInterface(edw_service.EdwClientInterface):
   def SetProvisionedAttributes(self, bm_spec: benchmark_spec.BenchmarkSpec):
     """Sets any attributes that were unknown during initialization."""
     super().SetProvisionedAttributes(bm_spec)
-    self.host = bm_spec.edw_service.endpoint
+    self.host = bm_spec.edw_service.endpoint  # pyrefly: ignore[missing-attribute]
 
   def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query.
@@ -132,23 +132,23 @@ class CliClientInterface(edw_service.EdwClientInterface):
       package_name: String name of the package defining the preprovisioned data
         (certificates, etc.) to extract and use during client vm preparation.
     """
-    self.client_vm.Install('pip')
-    self.client_vm.RemoteCommand('sudo pip install absl-py')
-    self.client_vm.Install('pgbench')
+    self.client_vm.Install('pip')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.RemoteCommand('sudo pip install absl-py')  # pyrefly: ignore[missing-attribute]
+    self.client_vm.Install('pgbench')  # pyrefly: ignore[missing-attribute]
 
     # Push the framework to execute a sql query and gather performance details
     service_specific_dir = os.path.join('edw', Redshift.SERVICE_TYPE)
-    self.client_vm.PushFile(
+    self.client_vm.PushFile(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(
             os.path.join(service_specific_dir, 'script_runner.sh')
         )
     )
     runner_permission_update_cmd = 'chmod 755 {}'.format('script_runner.sh')
-    self.client_vm.RemoteCommand(runner_permission_update_cmd)
-    self.client_vm.PushFile(
+    self.client_vm.RemoteCommand(runner_permission_update_cmd)  # pyrefly: ignore[missing-attribute]
+    self.client_vm.PushFile(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(os.path.join('edw', 'script_driver.py'))
     )
-    self.client_vm.PushFile(
+    self.client_vm.PushFile(  # pyrefly: ignore[missing-attribute]
         data.ResourcePath(
             os.path.join(
                 service_specific_dir, 'provider_specific_script_driver.py'
@@ -178,7 +178,7 @@ class CliClientInterface(edw_service.EdwClientInterface):
     ).format(query_name, self.host, self.database, self.user, self.password)
     if print_results:
       query_command += ' --print_results=true'
-    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)  # pyrefly: ignore[missing-attribute]
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())
     details['job_id'] = performance[query_name]['job_id']
@@ -214,7 +214,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
   def SetProvisionedAttributes(self, bm_spec: benchmark_spec.BenchmarkSpec):
     """Sets any attributes that were unknown during initialization."""
     super().SetProvisionedAttributes(bm_spec)
-    endpoint = bm_spec.edw_service.endpoint
+    endpoint = bm_spec.edw_service.endpoint  # pyrefly: ignore[missing-attribute]
     self.host = f'jdbc:redshift://{endpoint}:{self.port}/{self.database}'
 
   def Prepare(self, package_name: str) -> None:
@@ -226,10 +226,10 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
       package_name: String name of the package defining the preprovisioned data
         (certificates, etc.) to extract and use during client vm preparation.
     """
-    self.client_vm.Install('openjdk')
+    self.client_vm.Install('openjdk')  # pyrefly: ignore[missing-attribute]
 
     # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedPackageData(
+    self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
         package_name, [REDSHIFT_JDBC_JAR], ''
     )
 
@@ -255,7 +255,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
     ).format(REDSHIFT_JDBC_JAR, self.host, query_name)
     if print_results:
       query_command += ' --print_results true'
-    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)  # pyrefly: ignore[missing-attribute]
     performance = json.loads(stdout)
     details = copy.copy(self.GetMetadata())
     if 'failure_reason' in performance:
@@ -285,7 +285,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
             REDSHIFT_JDBC_JAR, self.host, submission_interval, ' '.join(queries)
         )
     )
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
   def ExecuteThroughput(
@@ -312,7 +312,7 @@ class JdbcClientInterface(edw_service.EdwClientInterface):
             ' '.join([','.join(stream) for stream in concurrency_streams]),
         )
     )
-    stdout, _ = self.client_vm.RemoteCommand(cmd)
+    stdout, _ = self.client_vm.RemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
   def GetMetadata(self) -> Dict[str, str]:
@@ -498,7 +498,7 @@ class Redshift(edw_service.EdwService):
     node_count = result['Snapshots'][0]['NumberOfNodes']
     return node_type, node_count
 
-  def Restore(self, snapshot_identifier, cluster_identifier):
+  def Restore(self, snapshot_identifier, cluster_identifier):  # pyrefly: ignore[bad-override]
     """Method to restore a Redshift cluster from an existing snapshot.
 
     A snapshot of cluster in VPC can be restored only in VPC. Therefore, subnet

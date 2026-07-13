@@ -253,7 +253,7 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     self.billing_mode = billing_mode or _PROVISIONED
     self.zone = zone or _DEFAULT_ZONE
     self.region = util.GetRegionFromZone(self.zone)
-    self.resource_arn: str = None  # Set during the _Exists() call.
+    self.resource_arn: str = None  # Set during the _Exists() call.  # pyrefly: ignore[bad-assignment]
 
     self.rcu = rcu or _FREE_TIER_RCU
     self.wcu = wcu or _FREE_TIER_WCU
@@ -437,13 +437,13 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
         _RCU_SCALABLE_DIMENSION,
         _RCU_SCALING_METRIC,
         self.rcu,
-        _AUTOSCALING_MAX_RCU.value,
+        _AUTOSCALING_MAX_RCU.value,  # pyrefly: ignore[bad-argument-type]
     )
     self._CreateAutoscalingPolicy(
         _WCU_SCALABLE_DIMENSION,
         _WCU_SCALING_METRIC,
         self.wcu,
-        _AUTOSCALING_MAX_WCU.value,
+        _AUTOSCALING_MAX_WCU.value,  # pyrefly: ignore[bad-argument-type]
     )
 
   def _CreateScalableTarget(
@@ -598,7 +598,7 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
         'aws_dynamodb_gsi_count': self.gsi_count,
     }
     if self.IsAutoscaling():
-      metadata.update({
+      metadata.update({  # pyrefly: ignore[no-matching-overload]
           'aws_dynamodb_autoscaling': True,
           'aws_dynamodb_autoscaling_rcu_min_capacity': self.rcu,
           'aws_dynamodb_autoscaling_rcu_max_capacity': (
@@ -720,10 +720,10 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     """
     if self._HasAutoscalingPolicies():
       self._CreateScalableTarget(
-          _RCU_SCALABLE_DIMENSION, _FREE_TIER_RCU, _AUTOSCALING_MAX_RCU.value
+          _RCU_SCALABLE_DIMENSION, _FREE_TIER_RCU, _AUTOSCALING_MAX_RCU.value  # pyrefly: ignore[bad-argument-type]
       )
       self._CreateScalableTarget(
-          _WCU_SCALABLE_DIMENSION, _FREE_TIER_WCU, _AUTOSCALING_MAX_WCU.value
+          _WCU_SCALABLE_DIMENSION, _FREE_TIER_WCU, _AUTOSCALING_MAX_WCU.value  # pyrefly: ignore[bad-argument-type]
       )
       return
     if self.billing_mode == _ON_DEMAND:
@@ -747,10 +747,10 @@ class AwsDynamoDBInstance(non_relational_db.BaseNonRelationalDb):
     if self._HasAutoscalingPolicies():
       # If the flags are not provided, this should default to previous levels.
       self._CreateScalableTarget(
-          _RCU_SCALABLE_DIMENSION, self.rcu, _AUTOSCALING_MAX_RCU.value
+          _RCU_SCALABLE_DIMENSION, self.rcu, _AUTOSCALING_MAX_RCU.value  # pyrefly: ignore[bad-argument-type]
       )
       self._CreateScalableTarget(
-          _WCU_SCALABLE_DIMENSION, self.wcu, _AUTOSCALING_MAX_WCU.value
+          _WCU_SCALABLE_DIMENSION, self.wcu, _AUTOSCALING_MAX_WCU.value  # pyrefly: ignore[bad-argument-type]
       )
       return
     if self.billing_mode == _ON_DEMAND:

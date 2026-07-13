@@ -155,13 +155,13 @@ class AwsDpbGlue(
       if properties:
         all_properties.update(properties)
       glue_default_args = {
-          '--extra-py-files': ','.join(extra_py_files),
+          '--extra-py-files': ','.join(extra_py_files),  # pyrefly: ignore[no-matching-overload]
           **all_properties,
       }
     else:
       raise ValueError(f'Unsupported job type {job_type} for AWS Glue.')
     vm_util.IssueCommand(
-        self.cmd_prefix
+        self.cmd_prefix  # pyrefly: ignore[bad-argument-type]
         + [
             'glue',
             'create-job',
@@ -274,7 +274,7 @@ class AwsDpbGlue(
       return dpb_service.JobCosts()
     # dpu_seconds is only reported directly in auto-scaling jobs.
     if dpu_seconds is None:
-      dpu_seconds = max_capacity * execution_time
+      dpu_seconds = max_capacity * execution_time  # pyrefly: ignore[unsupported-operation]
     hourly_dpu = dpu_seconds / 3600
     cost = hourly_dpu * dpu_hourly_price
     return dpb_service.JobCosts(

@@ -197,7 +197,7 @@ class AwsDax(resource.BaseResource):
             str(_DAX_TCP_PORT),
         ]
 
-    _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)
+    _, stderror, retcode = vm_util.IssueCommand(cmd, raise_on_failure=True)  # pyrefly: ignore[unbound-name]
     if retcode != 0:
       logging.warning('Failed to config Dax port! %s', stderror)
 

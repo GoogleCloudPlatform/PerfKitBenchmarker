@@ -89,7 +89,7 @@ class AwsBatchComputeEnvironment(resource.BaseResource):
           '--region',
           self.region,
       ]
-      vm_util.IssueCommand(modify_subnet_cmd)
+      vm_util.IssueCommand(modify_subnet_cmd)  # pyrefly: ignore[bad-argument-type]
     compute_resources = {
         'subnets': [self.network.subnet.id],
         'securityGroupIds': [
@@ -99,14 +99,14 @@ class AwsBatchComputeEnvironment(resource.BaseResource):
     }
 
     if self.compute_type == _FARGATE:
-      compute_resources.update({
+      compute_resources.update({  # pyrefly: ignore[no-matching-overload]
           'type': _FARGATE,
       })
     elif self.compute_type == _EC2:
       instance_profile = FLAGS.aws_batch_instance_profile or (
           f'arn:aws:iam::{self.account}:instance-profile/ecsInstanceRole'
       )
-      compute_resources.update({
+      compute_resources.update({  # pyrefly: ignore[no-matching-overload]
           'type': _EC2,
           'minvCpus': 0,  # Required
           'instanceTypes': [self.machine_type],
@@ -408,7 +408,7 @@ class AwsBatchJobDefinition(resource.BaseResource):
       execution_role = self.execution_role or (
           f'arn:aws:iam::{self.account}:role/ecsTaskExecutionRole'
       )
-      container_properties.update({
+      container_properties.update({  # pyrefly: ignore[no-matching-overload]
           'executionRoleArn': execution_role,
           'fargatePlatformConfiguration': {
               'platformVersion': 'LATEST',
@@ -451,7 +451,7 @@ class AwsBatchJobDefinition(resource.BaseResource):
         '--region',
         self.region,
     ]
-    vm_util.IssueCommand(cmd)
+    vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
 
   def _Exists(self) -> bool:
     cmd = [
@@ -553,7 +553,7 @@ class AwsBatchJob(base_job.BaseJob):
         self.region,
     ]
 
-    stdout, _, _ = vm_util.IssueCommand(cmd)
+    stdout, _, _ = vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
     data = json.loads(stdout)
     self.job_id = data.get('jobId')
     self.submit_timestamp = time.time()
@@ -582,7 +582,7 @@ class AwsBatchJob(base_job.BaseJob):
         '--region',
         self.region,
     ]
-    stdout, _, _ = vm_util.IssueCommand(cmd)
+    stdout, _, _ = vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
     job_data = json.loads(stdout)['jobs'][0]
     status = job_data.get('status')
 

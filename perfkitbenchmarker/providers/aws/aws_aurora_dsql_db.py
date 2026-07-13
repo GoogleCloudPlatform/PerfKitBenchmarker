@@ -124,7 +124,7 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
         ' \\"isDeletionProtectionEnabled\\": false}]"}'
         % self.region,
     ]
-    stdout, _, _ = vm_util.IssueCommand(cmd)
+    stdout, _, _ = vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
     response = json.loads(stdout)
     self.restore_job_id = response['RestoreJobId']
     if self.restore_job_id:
@@ -229,7 +229,7 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     """Add tags if we are restoring from backup."""
     super()._PostCreate()
     if self.use_backup:
-      self._AddTagsToCluster(self.cluster_arn)
+      self._AddTagsToCluster(self.cluster_arn)  # pyrefly: ignore[bad-argument-type]
 
   def _Exists(self) -> bool:
     """Returns true if the underlying cluster exists."""

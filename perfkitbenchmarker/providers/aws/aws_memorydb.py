@@ -169,7 +169,7 @@ class AwsMemoryDb(managed_memory_store.BaseManagedMemoryStore):
         '--region',
         self.redis_region,
     ]
-    vm_util.IssueCommand(cmd, raise_on_failure=False)
+    vm_util.IssueCommand(cmd, raise_on_failure=False)  # pyrefly: ignore[bad-argument-type]
 
   def _IsDeleting(self) -> bool:
     """Returns True if cluster is being deleted and false otherwise."""
@@ -200,7 +200,7 @@ class AwsMemoryDb(managed_memory_store.BaseManagedMemoryStore):
         '--region',
         self.redis_region,
     ]
-    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    stdout, stderr, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)  # pyrefly: ignore[bad-argument-type]
     if retcode != 0:
       logging.info('Could not find cluster %s, %s', self.name, stderr)
       return {}

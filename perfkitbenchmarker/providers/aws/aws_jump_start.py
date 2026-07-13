@@ -191,7 +191,7 @@ class JumpStartModelInRegistry(managed_ai_model.BaseManagedAiModel):
 
   def _PostCreate(self) -> None:
     """Adds tags & metadata after creation timing."""
-    self._AddTags('endpoint', self.endpoint_name)
+    self._AddTags('endpoint', self.endpoint_name)  # pyrefly: ignore[bad-argument-type]
     self._AddTags('model', self.model_name)
     describe_cmd = (
         f'aws sagemaker describe-endpoint --region={self.region} '

@@ -144,9 +144,9 @@ class JavaClientInterface(GenericClientInterface):
       package_name: String name of the package defining the preprovisioned data
         (certificates, etc.) to extract and use during client vm preparation.
     """
-    self.client_vm.Install('openjdk')
+    self.client_vm.Install('openjdk')  # pyrefly: ignore[missing-attribute]
     # Push the executable jar to the working directory on client vm
-    self.client_vm.InstallPreprovisionedPackageData(
+    self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
         package_name, [LATEST_CLIENT_JAR], ''
     )
 
@@ -189,7 +189,7 @@ class JavaClientInterface(GenericClientInterface):
           f'{query_command} --delete_workgroup {FLAGS.athena_workgroup_delete}'
       )
 
-    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    stdout, _ = self.client_vm.RemoteCommand(query_command)  # pyrefly: ignore[missing-attribute]
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
     details.update(json.loads(stdout)['details'])
     details['query_start'] = json.loads(stdout)['query_start']
@@ -227,7 +227,7 @@ def PrepareQueryString(query_string_template, substitutions):
   """
   for key, value in substitutions.items():
     query_string = query_string_template.replace(key, value)
-  return query_string
+  return query_string  # pyrefly: ignore[unbound-name]
 
 
 def RunScriptCommand(script_command):

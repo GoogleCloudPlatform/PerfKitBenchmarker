@@ -922,7 +922,7 @@ class AwsDiskSnapshot(disk.DiskSnapshot):
         f'/restore{self.num_restore_disks}{self.disk_spec.mount_point}'
     )
     restore_disk = AwsDisk(
-        self.disk_spec, self.zone, self.source_disk.machine_type
+        self.disk_spec, self.zone, self.source_disk.machine_type  # pyrefly: ignore[missing-attribute]
     )
     restore_disk.Create()
     self.restore_disks.append(restore_disk)
@@ -930,7 +930,7 @@ class AwsDiskSnapshot(disk.DiskSnapshot):
 
     return self.restore_disks[-1]
 
-  def Delete(self):
+  def Delete(self):  # pyrefly: ignore[bad-override]
     """Deletes the snapshot."""
     if self.restore_disks:
       for restore_disk in self.restore_disks:

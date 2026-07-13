@@ -345,7 +345,7 @@ class EcsTask(container_lib.BaseContainer):
         '--tasks',
         self.arn,
     ]
-    stdout, _, _ = vm_util.IssueCommand(describe_cmd)
+    stdout, _, _ = vm_util.IssueCommand(describe_cmd)  # pyrefly: ignore[bad-argument-type]
     response = json.loads(stdout)
     return response['tasks'][0]
 
