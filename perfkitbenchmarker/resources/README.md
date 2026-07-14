@@ -112,13 +112,6 @@ Here are some guidelines to keep in mind when developing flags:
 *   DO add benchmark level flags for values which are only used in that
     benchmark & don’t make sense in the resource. Clear examples are eg “amount
     of QPS the client VM sends”, “number of times to repeat an operation”.
-*   ~~When trying out different configurations & scales, prefer smaller scale
-    tests. Smaller scale tests are faster & cheaper to execute and easier to
-    develop, but often have the same performance characteristics as larger
-    tests. ie if configuration A scales to 10, 100, & 500 QPS better than
-    configuration B, it will likely scale to 1000 & 10000 QPS better as well.
-    This is obviously not always the case, but when possible prefer the smaller
-    scale.~~
 
 ## Metadata
 
