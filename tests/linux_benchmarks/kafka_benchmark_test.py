@@ -209,7 +209,10 @@ class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
     self.assertIn('--num-records=1000', exec_call)
     self.assertIn('--record-size=1024', exec_call)
     self.assertIn('--bootstrap-server 10.0.0.1:9092', exec_call)
-    self.assertIn('--reporting-interval=5000', exec_call)
+    self.assertIn(
+        f'--reporting-interval={kafka_benchmark._KAFKA_REPORTING_INTERVAL.value}',
+        exec_call,
+    )
 
     # Check 3rd call (cat logs)
     cat_call = self.producer_vm.RemoteCommand.call_args_list[2][0][0]
@@ -254,11 +257,18 @@ class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
     self.assertIn('--bootstrap-server 10.0.0.1:9092', exec_call)
     self.assertIn('--group pkb-group-t8', exec_call)
     self.assertIn('--num-records=5000', exec_call)
-    self.assertIn('--fetch-size=5242880', exec_call)
     self.assertIn(
-        f'--timeout {kafka_benchmark.KAFKA_CONSUMER_TIMEOUT_MS}', exec_call
+        f'--fetch-size={kafka_benchmark._KAFKA_CONSUMER_FETCH_SIZE.value}',
+        exec_call,
     )
-    self.assertIn('--reporting-interval=5000', exec_call)
+    self.assertIn(
+        f'--timeout {kafka_benchmark._KAFKA_CONSUMER_TIMEOUT_MS.value}',
+        exec_call,
+    )
+    self.assertIn(
+        f'--reporting-interval={kafka_benchmark._KAFKA_REPORTING_INTERVAL.value}',
+        exec_call,
+    )
 
     # Check 3rd call (cat logs)
     cat_call = self.consumer_vm.RemoteCommand.call_args_list[2][0][0]
@@ -276,6 +286,20 @@ class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
     )
     exec_call = self.consumer_vm.RemoteCommand.call_args_list[1][0][0]
     self.assertIn('--fetch-size=1048576', exec_call)
+
+  @flagsaver.flagsaver(kafka_consumer_timeout_ms=50000)
+  def testRunConsumerCustomTimeout(self):
+    self.consumer_vm.RemoteCommand.side_effect = [
+        ('', ''),
+        ('', ''),
+        ('output', ''),
+    ]
+    kafka_benchmark._RunConsumer(
+        self.consumer_vm, '10.0.0.1:9092', 'test-topic', 2, 500
+    )
+    exec_call = self.consumer_vm.RemoteCommand.call_args_list[1][0][0]
+
+    self.assertIn('--timeout 50000', exec_call)
 
 
 class KafkaBenchmarkResultParserTest(pkb_common_test_case.PkbCommonTestCase):
@@ -525,6 +549,27 @@ class KafkaBenchmarkResultParserTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(results[6].value, 5.0)
     self.assertEqual(results[7].value, 2.2)
 
+  def testParseProducerResultsWithoutPercentilesIgnoresIntermediateProgress(
+      self,
+  ):
+    stdout = (
+        '1000 records sent, 200.0 records/sec (2.0 MB/sec), 3.0 ms avg latency,'
+        ' 10.0 ms max latency.\n'
+        '2000 records sent, 400.0 records/sec (4.0 MB/sec), 3.0 ms avg latency,'
+        ' 10.0 ms max latency.\n'
+        '3000 records sent, 300.0 records/sec (3.0 MB/sec), 3.0 ms avg latency,'
+        ' 10.0 ms max latency.\n'
+    )
+    metadata = {'kafka_num_records': 3000}
+    results = kafka_benchmark._ParseProducerResults(stdout, metadata)
+    self.assertLen(results, 5)
+    self.assertEqual(results[0].value, 300.0)
+    self.assertEqual(results[1].value, 3.0)
+    self.assertEqual(
+        results[4].metric, 'Producer P95 Maximum sustained ingress scale'
+    )
+    self.assertEqual(results[4].value, 4.0)
+
   def testParseProducerResultsMetadataCopy(self):
     metadata = {'key': 'initial'}
 
@@ -640,7 +685,9 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
           'kafka_num_records': 50000,
           'kafka_record_size': 1024,
           'kafka_producer_batch_size': 131072,
-          'kafka_consumer_fetch_size': 5242880,
+          'kafka_consumer_fetch_size': (
+              kafka_benchmark._KAFKA_CONSUMER_FETCH_SIZE.value
+          ),
           'kafka_num_threads': 8,
       }
       mock_parse_prod.assert_called_once_with('prod_out', expected_metadata)

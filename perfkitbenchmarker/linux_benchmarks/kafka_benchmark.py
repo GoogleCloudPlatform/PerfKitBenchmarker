@@ -50,7 +50,6 @@ KAFKA_URL = (
 KAFKA_DIR = f'kafka_{KAFKA_VERSION}'
 KAFKA_TOPIC_NAME = 'kafka-benchmark-test'
 KAFKA_BROKER_PORT = 9092
-KAFKA_CONSUMER_TIMEOUT_MS = 120_000
 
 FLAGS = flags.FLAGS
 _KAFKA_NUM_PARTITIONS = flags.DEFINE_integer(
@@ -76,7 +75,7 @@ _KAFKA_PRODUCER_BATCH_SIZE = flags.DEFINE_integer(
 )
 _KAFKA_CONSUMER_FETCH_SIZE = flags.DEFINE_integer(
     'kafka_consumer_fetch_size',
-    1024 * 1024 * 5,  # 5 MB
+    1024 * 1024 * 50,  # 50 MB
     'Fetch size of the consumer in bytes, default is 5 MB.',
 )
 _KAFKA_NUM_THREADS = flags.DEFINE_integer(
@@ -86,8 +85,13 @@ _KAFKA_NUM_THREADS = flags.DEFINE_integer(
 )
 _KAFKA_REPORTING_INTERVAL = flags.DEFINE_integer(
     'kafka_reporting_interval',
-    5000,
+    20_000,
     'Interval in milliseconds at which the performance test reports progress.',
+)
+_KAFKA_CONSUMER_TIMEOUT_MS = flags.DEFINE_integer(
+    'kafka_consumer_timeout_ms',
+    10_000,
+    'Timeout in milliseconds for the consumer performance test.',
 )
 
 _SUMMARY_PERCENTILE_REGEX = re.compile(r'\b\d+(?:\.\d+)?th\b')
@@ -294,7 +298,7 @@ def _RunConsumer(
       f'--group pkb-group-t{num_threads} '
       f'--num-records={num_records} '
       f'--fetch-size={_KAFKA_CONSUMER_FETCH_SIZE.value} '
-      f'--timeout {KAFKA_CONSUMER_TIMEOUT_MS} '
+      f'--timeout {_KAFKA_CONSUMER_TIMEOUT_MS.value} '
       f'--reporting-interval={_KAFKA_REPORTING_INTERVAL.value} '
       '--command-config /tmp/consumer.properties '
       '> /tmp/consumer_$i.log 2>&1 & '
@@ -310,11 +314,14 @@ def _RunConsumer(
 
 def _ExtractProducerSummaryAndProgressLines(
     lines: list[str],
+    metadata: Mapping[str, Any] | None = None,
 ) -> tuple[list[str], list[list[float]]]:
   """Extracts summary output lines and periodic progress throughputs.
 
   Args:
     lines: The lines from running the producer test.
+    metadata: Optional metadata dict containing test parameters like
+      'kafka_num_records'.
 
   Returns:
     A tuple of summary lines and periodic progress throughputs.
@@ -326,27 +333,41 @@ def _ExtractProducerSummaryAndProgressLines(
   threads_progress_mb = []
   current_thread_mb = []
 
-  if has_percentiles:
-    for line in lines:
-      if _SUMMARY_PERCENTILE_REGEX.search(line):
-        summary_lines.append(line)
-        if current_thread_mb:
-          threads_progress_mb.append(current_thread_mb)
-          current_thread_mb = []
-      elif 'records sent' in line:
-        throughput_mb_match = re.search(r'\(([\d.]+)\s+MB/sec\)', line)
-        if throughput_mb_match:
-          current_thread_mb.append(float(throughput_mb_match.group(1)))
-    if current_thread_mb:
-      threads_progress_mb.append(current_thread_mb)
-  else:
-    # Fallback for legacy outputs/tests: treat any line matching the throughput
-    # regex as a summary line.
-    for line in lines:
-      if re.search(
-          r'[\d.]+ records/sec \([\d.]+ MB/sec\), [\d.]+ ms avg latency', line
+  num_records = None
+  if metadata and 'kafka_num_records' in metadata:
+    try:
+      num_records = int(metadata['kafka_num_records'])
+    except (ValueError, TypeError):
+      num_records = None
+
+  for line in lines:
+    records_sent_match = re.match(r'^(\d+)\s+records sent,', line)
+    is_summary = False
+
+    if _SUMMARY_PERCENTILE_REGEX.search(line):
+      is_summary = True
+    elif records_sent_match:
+      if (
+          num_records is not None
+          and int(records_sent_match.group(1)) == num_records
+          and not has_percentiles
       ):
-        summary_lines.append(line)
+        is_summary = True
+    elif re.search(r'[\d.]+\s+records/sec\s+\([\d.]+\s+MB/sec\)', line):
+      is_summary = True
+
+    if is_summary:
+      summary_lines.append(line)
+      if current_thread_mb:
+        threads_progress_mb.append(current_thread_mb)
+        current_thread_mb = []
+    elif 'records sent' in line:
+      throughput_mb_match = re.search(r'\(([\d.]+)\s+MB/sec\)', line)
+      if throughput_mb_match:
+        current_thread_mb.append(float(throughput_mb_match.group(1)))
+
+  if current_thread_mb:
+    threads_progress_mb.append(current_thread_mb)
 
   return summary_lines, threads_progress_mb
 
@@ -571,7 +592,7 @@ def _ParseProducerResults(
       if line.strip()
   ]
   summary_lines, threads_progress_mb = _ExtractProducerSummaryAndProgressLines(
-      lines
+      lines, metadata
   )
   metrics = _ExtractProducerSummaryMetrics(summary_lines)
   results = _CreateProducerThroughputSamples(metrics, metadata)
