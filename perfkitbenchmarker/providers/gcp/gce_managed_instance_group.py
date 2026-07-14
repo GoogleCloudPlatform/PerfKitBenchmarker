@@ -185,6 +185,15 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
   def _IsReady(self) -> bool:
     return self._Get()['status']['isStable']  # pyrefly: ignore[unsupported-operation]
 
+  def _CheckForReadinessErrors(self):
+    stdout, _, _ = self._GcloudCmd('list-errors', self.name).Issue()
+    if json.loads(stdout):
+      self.vm_config._ParseCreateErrors(  # pylint: disable=protected-access
+          cmd_rate_limited=False,
+          stderr=stdout,
+          retcode=1,
+      )
+
   def _GetCurrentVms(self) -> list[VmReference]:
     cmd = self._GcloudCmd('list-instances', self.name)
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False)

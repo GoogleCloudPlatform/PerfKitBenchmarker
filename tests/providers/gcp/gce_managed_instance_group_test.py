@@ -3,6 +3,7 @@ import unittest
 from unittest import mock
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import vm_group_decoders
@@ -125,6 +126,25 @@ class GceManagedInstanceGroupTest(pkb_common_test_case.PkbCommonTestCase):
         ' test_placement_group --tags perfkitbenchmarker',
         self.mock_cmd.all_commands,
     )
+
+  def testCheckForReadinessErrorsNoErrors(self):
+    mig = self.TestMig()
+    self.mock_cmd = self.MockIssueCommand({
+        'list-errors': [('[]', '', 0)],
+    })
+    mig._CheckForReadinessErrors()
+
+  def testCheckForReadinessErrorsWithErrors(self):
+    mig = self.TestMig()
+    error_resp = (
+        '[{"error": {"code": "ZONE_RESOURCE_POOL_EXHAUSTED", "message": "does'
+        ' not have enough resources available to fulfill the request."}}]'
+    )
+    self.mock_cmd = self.MockIssueCommand({
+        'list-errors': [(error_resp, '', 0)],
+    })
+    with self.assertRaises(errors.Benchmarks.InsufficientCapacityCloudFailure):
+      mig._CheckForReadinessErrors()
 
   def testGetCurrentVms(self):
     list_instances_response = (
