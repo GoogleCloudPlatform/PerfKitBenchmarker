@@ -18,6 +18,7 @@ import unittest
 from unittest import mock
 
 from absl.testing import flagsaver
+from absl.testing import parameterized
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
@@ -208,6 +209,7 @@ class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
     self.assertIn('--num-records=1000', exec_call)
     self.assertIn('--record-size=1024', exec_call)
     self.assertIn('--bootstrap-server 10.0.0.1:9092', exec_call)
+    self.assertIn('--reporting-interval=5000', exec_call)
 
     # Check 3rd call (cat logs)
     cat_call = self.producer_vm.RemoteCommand.call_args_list[2][0][0]
@@ -256,6 +258,7 @@ class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
     self.assertIn(
         f'--timeout {kafka_benchmark.KAFKA_CONSUMER_TIMEOUT_MS}', exec_call
     )
+    self.assertIn('--reporting-interval=5000', exec_call)
 
     # Check 3rd call (cat logs)
     cat_call = self.consumer_vm.RemoteCommand.call_args_list[2][0][0]
@@ -278,38 +281,64 @@ class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
 class KafkaBenchmarkResultParserTest(pkb_common_test_case.PkbCommonTestCase):
   """Tests for _ParseProducerResults and _ParseConsumerResults."""
 
-  def testParseProducerResultsSingleThread(self):
+  @parameterized.named_parameters(
+      (
+          'RecordsPerSec',
+          0,
+          'Producer Throughput (Records/sec)',
+          5000.0,
+          'records/sec',
+      ),
+      (
+          'MBPerSec',
+          1,
+          'Producer Throughput (MB/sec)',
+          5.0,
+          'MB/sec',
+      ),
+      (
+          'AvgLatency',
+          2,
+          'Producer Avg Latency',
+          12.5,
+          'ms',
+      ),
+      (
+          'P95Ingress',
+          3,
+          'Producer P95 Maximum sustained ingress scale',
+          5.0,
+          'MB/s',
+      ),
+  )
+  def testParseProducerResultsSingleThread(
+      self, index, expected_metric, expected_value, expected_unit
+  ):
     stdout = '5000.0 records/sec (5.0 MB/sec), 12.5 ms avg latency\n'
     metadata = {'test_key': 'test_val'}
+
     results = kafka_benchmark._ParseProducerResults(stdout, metadata)
-    self.assertLen(results, 3)
 
-    r_sec = results[0]
-    self.assertEqual(r_sec.metric, 'Producer Throughput (Records/sec)')
-    self.assertEqual(r_sec.value, 5000.0)
-    self.assertEqual(r_sec.unit, 'records/sec')
-    self.assertEqual(r_sec.metadata, metadata)
-
-    mb_sec = results[1]
-    self.assertEqual(mb_sec.metric, 'Producer Throughput (MB/sec)')
-    self.assertEqual(mb_sec.value, 5.0)
-    self.assertEqual(mb_sec.unit, 'MB/sec')
-
-    lat_avg = results[2]
-    self.assertEqual(lat_avg.metric, 'Producer Avg Latency')
-    self.assertEqual(lat_avg.value, 12.5)
-    self.assertEqual(lat_avg.unit, 'ms')
+    self.assertLen(results, 4)
+    sample_item = results[index]
+    self.assertEqual(sample_item.metric, expected_metric)
+    self.assertEqual(sample_item.value, expected_value)
+    self.assertEqual(sample_item.unit, expected_unit)
+    self.assertEqual(sample_item.metadata, metadata)
 
   def testParseProducerResultsMultiThread(self):
     stdout = (
         '5000.0 records/sec (5.0 MB/sec), 10.0 ms avg latency\n'
         '3000.0 records/sec (3.0 MB/sec), 20.0 ms avg latency\n'
     )
+
     results = kafka_benchmark._ParseProducerResults(stdout, {})
-    self.assertLen(results, 3)
+
+    self.assertLen(results, 4)
     self.assertEqual(results[0].value, 8000.0)
     self.assertEqual(results[1].value, 8.0)
     self.assertEqual(results[2].value, 15.0)
+    self.assertEqual(results[3].value, 8.0)
 
   def testParseProducerResultsEmptyOrInvalid(self):
     self.assertEqual(kafka_benchmark._ParseProducerResults('', {}), [])
@@ -323,39 +352,222 @@ class KafkaBenchmarkResultParserTest(pkb_common_test_case.PkbCommonTestCase):
         '2500.5 records/sec (2.5 MB/sec), 10.0 ms avg latency\n'
         '[INFO] Done.\n'
     )
+
     results = kafka_benchmark._ParseProducerResults(stdout, {})
-    self.assertLen(results, 3)
+
+    self.assertLen(results, 4)
     self.assertEqual(results[0].value, 2500.5)
     self.assertEqual(results[1].value, 2.5)
     self.assertEqual(results[2].value, 10.0)
+    self.assertEqual(results[3].value, 2.5)
+
+  @parameterized.named_parameters(
+      (
+          'RecordsPerSec',
+          0,
+          'Producer Throughput (Records/sec)',
+          10.0,
+          'records/sec',
+      ),
+      (
+          'MBPerSec',
+          1,
+          'Producer Throughput (MB/sec)',
+          0.01,
+          'MB/sec',
+      ),
+      (
+          'AvgLatency',
+          2,
+          'Producer Avg Latency',
+          1.9,
+          'ms',
+      ),
+      (
+          'MaxLatency',
+          3,
+          'Producer Max Latency',
+          172.0,
+          'ms',
+      ),
+      (
+          'P95Latency',
+          4,
+          'Producer p95 Latency',
+          3.0,
+          'ms',
+      ),
+      (
+          'P99Latency',
+          5,
+          'Producer p99 Latency',
+          5.0,
+          'ms',
+      ),
+      (
+          'P999Latency',
+          6,
+          'Producer p99.9 Latency',
+          172.0,
+          'ms',
+      ),
+      (
+          'P95Ingress',
+          7,
+          'Producer P95 Maximum sustained ingress scale',
+          1.47,
+          'MB/s',
+      ),
+  )
+  def testParseProducerResultsWithPercentiles(
+      self, index, expected_metric, expected_value, expected_unit
+  ):
+    stdout = (
+        '5005 records sent, 1000.6 records/sec (0.98 MB/sec), 3.7 ms avg'
+        ' latency, 41.0 ms max latency.\n3003 records sent, 1500.0 records/sec'
+        ' (1.47 MB/sec), 3.0 ms avg latency, 20.0 ms max latency.\n10000'
+        ' records sent, 10.0 records/sec (0.01 MB/sec), 1.9 ms avg latency,'
+        ' 172.0 ms max latency, 2 ms 50th, 3 ms 95th, 5 ms 99th, 172 ms'
+        ' 99.9th.\n'
+    )
+    metadata = {'test_key': 'test_val'}
+
+    results = kafka_benchmark._ParseProducerResults(stdout, metadata)
+
+    self.assertLen(results, 8)
+    sample_item = results[index]
+    self.assertEqual(sample_item.metric, expected_metric)
+    self.assertEqual(sample_item.value, expected_value)
+    self.assertEqual(sample_item.unit, expected_unit)
+    self.assertEqual(sample_item.metadata, metadata)
+
+  def testParseProducerResultsMultiThreadWithPercentiles(self):
+    stdout = (
+        '1000 records sent, 1000.0 records/sec (1.0 MB/sec), 3.0 ms avg'
+        ' latency, 10.0 ms max latency.\n1000 records sent, 1200.0 records/sec'
+        ' (1.2 MB/sec), 3.0 ms avg latency, 10.0 ms max latency.\n1000 records'
+        ' sent, 1000.0 records/sec (1.0 MB/sec), 3.0 ms avg latency, 10.0 ms'
+        ' max latency, 2 ms 50th, 3 ms 95th, 4 ms 99th, 5 ms 99.9th.\n1000'
+        ' records sent, 800.0 records/sec (0.8 MB/sec), 3.0 ms avg latency,'
+        ' 10.0 ms max latency.\n1000 records sent, 900.0 records/sec (0.9'
+        ' MB/sec), 3.0 ms avg latency, 10.0 ms max latency.\n1000 records sent,'
+        ' 700.0 records/sec (0.7 MB/sec), 3.0 ms avg latency, 10.0 ms max'
+        ' latency.\n1000 records sent, 800.0 records/sec (0.8 MB/sec), 3.0 ms'
+        ' avg latency, 10.0 ms max latency, 2 ms 50th, 4 ms 95th, 5 ms 99th, 6'
+        ' ms 99.9th.\n'
+    )
+
+    results = kafka_benchmark._ParseProducerResults(stdout, {})
+
+    self.assertLen(results, 8)
+    self.assertEqual(results[0].value, 1800.0)
+    self.assertEqual(results[1].value, 1.8)
+    self.assertEqual(results[2].value, 3.0)
+    self.assertEqual(results[3].value, 10.0)
+    self.assertEqual(results[4].value, 3.5)
+    self.assertEqual(results[5].value, 4.5)
+    self.assertEqual(results[6].value, 5.5)
+    self.assertEqual(results[7].value, 2.1)
+
+  def testParseProducerResultsSyntheticLog(self):
+    stdout = """1000 records sent, 50.0 records/sec (5.0 MB/sec), 3.0 ms avg latency, 10.0 ms max latency.
+2000 records sent, 70.0 records/sec (7.0 MB/sec), 3.0 ms avg latency, 10.0 ms max latency.
+3000 records sent, 10.0 records/sec (1.0 MB/sec), 1.9 ms avg latency, 172.0 ms max latency, 2 ms 50th, 3 ms 95th, 5 ms 99th, 172 ms 99.9th.
+1000 records sent, 60.0 records/sec (6.0 MB/sec), 3.0 ms avg latency, 10.0 ms max latency.
+2000 records sent, 80.0 records/sec (8.0 MB/sec), 3.0 ms avg latency, 10.0 ms max latency.
+3000 records sent, 12.0 records/sec (1.2 MB/sec), 2.5 ms avg latency, 180.0 ms max latency, 2 ms 50th, 4 ms 95th, 6 ms 99th, 180 ms 99.9th.
+1000 records sent, 70.0 records/sec (7.0 MB/sec), 3.0 ms avg latency, 10.0 ms max latency.
+2000 records sent, 90.0 records/sec (9.0 MB/sec), 3.0 ms avg latency, 10.0 ms max latency.
+3000 records sent, 15.0 records/sec (1.5 MB/sec), 2.1 ms avg latency, 169.0 ms max latency, 2 ms 50th, 5 ms 95th, 7 ms 99th, 169 ms 99.9th.
+"""
+
+    results = kafka_benchmark._ParseProducerResults(stdout, {})
+
+    self.assertLen(results, 8)
+
+    # Records/sec sum: 10.0 + 12.0 + 15.0 = 37.0
+    self.assertAlmostEqual(results[0].value, 37.0, places=3)
+    # MB/sec sum: 1.0 + 1.2 + 1.5 = 3.7
+    self.assertAlmostEqual(results[1].value, 3.7, places=2)
+    # Avg latency average: (1.9 + 2.5 + 2.1) / 3 = 2.166666... -> 2.167
+    self.assertAlmostEqual(results[2].value, 2.1666666666666665, places=4)
+    # Max latency maximum: max([172.0, 180.0, 169.0]) = 180.0
+    self.assertAlmostEqual(results[3].value, 180.0, places=2)
+    self.assertEqual(results[3].unit, 'ms')
+    # p95 latency average: (3 + 4 + 5) / 3 = 4.0
+    self.assertEqual(results[4].value, 4.0)
+    # p99 latency average: (5 + 6 + 7) / 3 = 6.0
+    self.assertEqual(results[5].value, 6.0)
+    # p99.9 latency average: (172 + 180 + 169) / 3 = 173.6666... -> 173.67
+    self.assertAlmostEqual(results[6].value, 173.66666666666666, places=2)
+    # P95 maximum sustained ingress scale: 24.0 (95th %-ile of [18.0, 24.0])
+    self.assertAlmostEqual(results[7].value, 24.0, places=2)
+    self.assertEqual(results[7].unit, 'MB/s')
+
+  def testParseProducerResultsTrailingMetricsWithPercentiles(self):
+    stdout = (
+        '1000 records sent, 1000.0 records/sec (1.0 MB/sec), 3.0 ms avg'
+        ' latency, 10.0 ms max latency.\n1000 records sent, 1000.0 records/sec'
+        ' (1.0 MB/sec), 3.0 ms avg latency, 10.0 ms max latency, 2 ms 50th, 3'
+        ' ms 95th, 4 ms 99th, 5 ms 99.9th.\n1000 records sent, 1200.0'
+        ' records/sec (1.2 MB/sec), 3.0 ms avg latency, 10.0 ms max latency.\n'
+    )
+
+    results = kafka_benchmark._ParseProducerResults(stdout, {})
+
+    self.assertLen(results, 8)
+    self.assertEqual(results[0].value, 1000.0)
+    self.assertEqual(results[1].value, 1.0)
+    self.assertEqual(results[2].value, 3.0)
+    self.assertEqual(results[3].value, 10.0)
+    self.assertEqual(results[4].value, 3.0)
+    self.assertEqual(results[5].value, 4.0)
+    self.assertEqual(results[6].value, 5.0)
+    self.assertEqual(results[7].value, 2.2)
 
   def testParseProducerResultsMetadataCopy(self):
     metadata = {'key': 'initial'}
+
     results = kafka_benchmark._ParseProducerResults(
         '100.0 records/sec (1.0 MB/sec), 5.0 ms avg latency', metadata
     )
+
     metadata['key'] = 'modified'
     self.assertEqual(results[0].metadata['key'], 'initial')
 
-  def testParseConsumerResultsSingleThread(self):
+  @parameterized.named_parameters(
+      (
+          'MBPerSec',
+          0,
+          'Consumer Throughput (MB/sec)',
+          10.5,
+          'MB/sec',
+      ),
+      (
+          'RecordsPerSec',
+          1,
+          'Consumer Throughput (Records/sec)',
+          1000.0,
+          'records/sec',
+      ),
+  )
+  def testParseConsumerResultsSingleThread(
+      self, index, expected_metric, expected_value, expected_unit
+  ):
     stdout = (
         '2026-07-01 00:00:00, 2026-07-01 00:00:01, 10485760,'
         ' 10.5, 1000, 1000.0, 0, 10, 0, 0\n'
     )
     metadata = {'test_key': 'test_val'}
+
     results = kafka_benchmark._ParseConsumerResults(stdout, metadata)
+
     self.assertLen(results, 2)
-
-    mb_sec = results[0]
-    self.assertEqual(mb_sec.metric, 'Consumer Throughput (MB/sec)')
-    self.assertEqual(mb_sec.value, 10.5)
-    self.assertEqual(mb_sec.unit, 'MB/sec')
-    self.assertEqual(mb_sec.metadata, metadata)
-
-    r_sec = results[1]
-    self.assertEqual(r_sec.metric, 'Consumer Throughput (Records/sec)')
-    self.assertEqual(r_sec.value, 1000.0)
-    self.assertEqual(r_sec.unit, 'records/sec')
+    sample_item = results[index]
+    self.assertEqual(sample_item.metric, expected_metric)
+    self.assertEqual(sample_item.value, expected_value)
+    self.assertEqual(sample_item.unit, expected_unit)
+    self.assertEqual(sample_item.metadata, metadata)
 
   def testParseConsumerResultsMultiThread(self):
     stdout = (

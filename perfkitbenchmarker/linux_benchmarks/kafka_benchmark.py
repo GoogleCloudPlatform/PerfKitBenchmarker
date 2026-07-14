@@ -14,6 +14,7 @@
 """Runs Apache Kafka benchmarks."""
 
 import concurrent.futures
+import itertools
 import re
 import time
 from typing import Any, Mapping
@@ -83,6 +84,13 @@ _KAFKA_NUM_THREADS = flags.DEFINE_integer(
     16,
     'Number of threads to use for the benchmark.',
 )
+_KAFKA_REPORTING_INTERVAL = flags.DEFINE_integer(
+    'kafka_reporting_interval',
+    5000,
+    'Interval in milliseconds at which the performance test reports progress.',
+)
+
+_SUMMARY_PERCENTILE_REGEX = re.compile(r'\b\d+(?:\.\d+)?th\b')
 
 
 def _InstallKafka(vm):
@@ -242,6 +250,7 @@ def _RunProducer(
       f'--record-size={_KAFKA_RECORD_SIZE.value} '
       '--throughput=-1 '
       f'--bootstrap-server {bootstrap_server} '
+      f'--reporting-interval={_KAFKA_REPORTING_INTERVAL.value} '
       '--command-config /tmp/producer.properties '
       '> /tmp/producer_$i.log 2>&1 & '
       'done && wait'
@@ -286,6 +295,7 @@ def _RunConsumer(
       f'--num-records={num_records} '
       f'--fetch-size={_KAFKA_CONSUMER_FETCH_SIZE.value} '
       f'--timeout {KAFKA_CONSUMER_TIMEOUT_MS} '
+      f'--reporting-interval={_KAFKA_REPORTING_INTERVAL.value} '
       '--command-config /tmp/consumer.properties '
       '> /tmp/consumer_$i.log 2>&1 & '
       'done && wait'
@@ -296,6 +306,251 @@ def _RunConsumer(
       ' /tmp/consumer.properties'
   )
   return stdout
+
+
+def _ExtractProducerSummaryAndProgressLines(
+    lines: list[str],
+) -> tuple[list[str], list[list[float]]]:
+  """Extracts summary output lines and periodic progress throughputs.
+
+  Args:
+    lines: The lines from running the producer test.
+
+  Returns:
+    A tuple of summary lines and periodic progress throughputs.
+  """
+  has_percentiles = any(
+      _SUMMARY_PERCENTILE_REGEX.search(line) for line in lines
+  )
+  summary_lines = []
+  threads_progress_mb = []
+  current_thread_mb = []
+
+  if has_percentiles:
+    for line in lines:
+      if _SUMMARY_PERCENTILE_REGEX.search(line):
+        summary_lines.append(line)
+        if current_thread_mb:
+          threads_progress_mb.append(current_thread_mb)
+          current_thread_mb = []
+      elif 'records sent' in line:
+        throughput_mb_match = re.search(r'\(([\d.]+)\s+MB/sec\)', line)
+        if throughput_mb_match:
+          current_thread_mb.append(float(throughput_mb_match.group(1)))
+    if current_thread_mb:
+      threads_progress_mb.append(current_thread_mb)
+  else:
+    # Fallback for legacy outputs/tests: treat any line matching the throughput
+    # regex as a summary line.
+    for line in lines:
+      if re.search(
+          r'[\d.]+ records/sec \([\d.]+ MB/sec\), [\d.]+ ms avg latency', line
+      ):
+        summary_lines.append(line)
+
+  return summary_lines, threads_progress_mb
+
+
+def _ExtractProducerSummaryMetrics(
+    summary_lines: list[str],
+) -> dict[str, list[float]]:
+  """Extracts numeric metrics from producer summary lines.
+
+  Args:
+    summary_lines: The summary lines from running the producer test.
+
+  Returns:
+    A dictionary of metrics with keys 'rps', 'mb', 'avg_lat', 'max_lat',
+    'p95', 'p99', and 'p99_9'.
+  """
+  metrics: dict[str, list[float]] = {
+      'rps': [],
+      'mb': [],
+      'avg_lat': [],
+      'max_lat': [],
+      'p95': [],
+      'p99': [],
+      'p99_9': [],
+  }
+  for line in summary_lines:
+    throughput_rps_match = re.search(r'([\d.]+)\s+records/sec', line)
+    throughput_mb_match = re.search(r'\(([\d.]+)\s+MB/sec\)', line)
+    avg_latency_match = re.search(r'([\d.]+)\s+ms\s+avg\s+latency', line)
+    max_latency_match = re.search(r'([\d.]+)\s+ms\s+max\s+latency', line)
+    p95_match = re.search(r'([\d.]+)\s+ms\s+95th', line)
+    p99_match = re.search(r'([\d.]+)\s+ms\s+99th', line)
+    p99_9_match = re.search(r'([\d.]+)\s+ms\s+99\.9th', line)
+
+    if throughput_rps_match:
+      metrics['rps'].append(float(throughput_rps_match.group(1)))
+    if throughput_mb_match:
+      metrics['mb'].append(float(throughput_mb_match.group(1)))
+    if avg_latency_match:
+      metrics['avg_lat'].append(float(avg_latency_match.group(1)))
+    if max_latency_match:
+      metrics['max_lat'].append(float(max_latency_match.group(1)))
+    if p95_match:
+      metrics['p95'].append(float(p95_match.group(1)))
+    if p99_match:
+      metrics['p99'].append(float(p99_match.group(1)))
+    if p99_9_match:
+      metrics['p99_9'].append(float(p99_9_match.group(1)))
+
+  return metrics
+
+
+def _CreateProducerThroughputSamples(
+    metrics: dict[str, list[float]],
+    metadata: dict[str, Any],
+) -> list[sample.Sample]:
+  """Creates producer throughput samples from extracted metrics.
+
+  Args:
+    metrics: The metrics dictionary to attach to each sample.
+    metadata: The metadata dictionary to attach to each sample.
+
+  Returns:
+    A list of sample.Sample objects for producer throughput samples.
+  """
+  results = []
+  thread_rps = metrics['rps']
+  thread_mb = metrics['mb']
+
+  if thread_rps:
+    results.append(
+        sample.Sample(
+            'Producer Throughput (Records/sec)',
+            sum(thread_rps),
+            'records/sec',
+            metadata.copy(),
+        )
+    )
+  if thread_mb:
+    results.append(
+        sample.Sample(
+            'Producer Throughput (MB/sec)',
+            sum(thread_mb),
+            'MB/sec',
+            metadata.copy(),
+        )
+    )
+  return results
+
+
+def _CreateProducerLatencySamples(
+    metrics: dict[str, list[float]],
+    metadata: dict[str, Any],
+) -> list[sample.Sample]:
+  """Creates producer latency and percentile samples from extracted metrics.
+
+  Args:
+    metrics: The metrics dictionary to attach to each sample.
+    metadata: The metadata dictionary to attach to each sample.
+
+  Returns:
+    A list of sample.Sample objects for producer latency and percentile samples.
+  """
+  results = []
+  thread_avg_lat = metrics['avg_lat']
+  thread_max_lat = metrics['max_lat']
+  thread_p95 = metrics['p95']
+  thread_p99 = metrics['p99']
+  thread_p99_9 = metrics['p99_9']
+
+  if thread_avg_lat:
+    results.append(
+        sample.Sample(
+            'Producer Avg Latency',
+            sum(thread_avg_lat) / len(thread_avg_lat),
+            'ms',
+            metadata.copy(),
+        )
+    )
+  if thread_max_lat:
+    results.append(
+        sample.Sample(
+            'Producer Max Latency',
+            max(thread_max_lat),
+            'ms',
+            metadata.copy(),
+        )
+    )
+  if thread_p95:
+    results.append(
+        sample.Sample(
+            'Producer p95 Latency',
+            sum(thread_p95) / len(thread_p95),
+            'ms',
+            metadata.copy(),
+        )
+    )
+  if thread_p99:
+    results.append(
+        sample.Sample(
+            'Producer p99 Latency',
+            sum(thread_p99) / len(thread_p99),
+            'ms',
+            metadata.copy(),
+        )
+    )
+  if thread_p99_9:
+    results.append(
+        sample.Sample(
+            'Producer p99.9 Latency',
+            sum(thread_p99_9) / len(thread_p99_9),
+            'ms',
+            metadata.copy(),
+        )
+    )
+  return results
+
+
+def _CreateProducerIngressSample(
+    metrics: dict[str, list[float]],
+    threads_progress_mb: list[list[float]],
+    metadata: dict[str, Any],
+) -> list[sample.Sample]:
+  """Creates producer P95 maximum sustained ingress scale sample.
+
+  Args:
+    metrics: The metrics dictionary to attach to each sample.
+    threads_progress_mb: The progress throughputs from each thread.
+    metadata: The metadata dictionary to attach to each sample.
+
+  Returns:
+    A list of sample.Sample objects for producer P95 maximum sustained ingress
+    scale.
+  """
+  results = []
+  thread_mb = metrics['mb']
+  aggregated_throughputs = []
+
+  if threads_progress_mb:
+    aggregated_throughputs = [
+        sum(interval)
+        for interval in itertools.zip_longest(
+            *threads_progress_mb, fillvalue=0.0
+        )
+    ]
+
+  p95_ingress = 0.0
+  if aggregated_throughputs:
+    p95_ingress = sample.PercentileCalculator(
+        aggregated_throughputs, [95]
+    )['p95']
+  elif thread_mb:
+    p95_ingress = sum(thread_mb)
+
+  if p95_ingress > 0.0 or thread_mb:
+    results.append(
+        sample.Sample(
+            'Producer P95 Maximum sustained ingress scale',
+            p95_ingress,
+            'MB/s',
+            metadata.copy(),
+        )
+    )
+  return results
 
 
 def _ParseProducerResults(
@@ -310,36 +565,20 @@ def _ParseProducerResults(
   Returns:
     A list of sample.Sample objects for producer throughput and latency.
   """
-  results = []
-  producer_matches = re.findall(
-      r'([\d.]+) records/sec \(([\d.]+) MB/sec\), ([\d.]+) ms avg latency',
-      producer_stdout,
+  lines = [
+      line.strip()
+      for line in producer_stdout.strip().split('\n')
+      if line.strip()
+  ]
+  summary_lines, threads_progress_mb = _ExtractProducerSummaryAndProgressLines(
+      lines
   )
-  if producer_matches:
-    results.append(
-        sample.Sample(
-            'Producer Throughput (Records/sec)',
-            sum(float(m[0]) for m in producer_matches),
-            'records/sec',
-            metadata.copy(),
-        )
-    )
-    results.append(
-        sample.Sample(
-            'Producer Throughput (MB/sec)',
-            sum(float(m[1]) for m in producer_matches),
-            'MB/sec',
-            metadata.copy(),
-        )
-    )
-    results.append(
-        sample.Sample(
-            'Producer Avg Latency',
-            sum(float(m[2]) for m in producer_matches) / len(producer_matches),
-            'ms',
-            metadata.copy(),
-        )
-    )
+  metrics = _ExtractProducerSummaryMetrics(summary_lines)
+  results = _CreateProducerThroughputSamples(metrics, metadata)
+  results.extend(_CreateProducerLatencySamples(metrics, metadata))
+  results.extend(
+      _CreateProducerIngressSample(metrics, threads_progress_mb, metadata)
+  )
   return results
 
 
