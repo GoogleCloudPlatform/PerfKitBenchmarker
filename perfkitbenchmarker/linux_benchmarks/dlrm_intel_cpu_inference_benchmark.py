@@ -124,6 +124,8 @@ def _BuildDocker(vm):
         r'\/opt\/conda\/bin\/conda install -y python=\${PYTHON_VERSION} \&\& '
         # switch python version wipe out tos files
         rf'{conda_licensing}|g" Dockerfile && '
+        'sed -i "s|Miniconda3-latest-Linux-x86_64.sh|'
+        'Miniconda3-py39_25.9.1-3-Linux-x86_64.sh|g" Dockerfile && '
         'bash build_dlrm-v2-99_int8_container.sh'
     )
     vm.RemoteCommand(
