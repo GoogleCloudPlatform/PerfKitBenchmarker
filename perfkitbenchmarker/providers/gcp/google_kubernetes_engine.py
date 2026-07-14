@@ -140,6 +140,15 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     else:
       self.region: str = util.GetRegionFromZone(self.zones[0])
 
+  def InitializeNodePoolForCloud(
+      self,
+      vm_config: virtual_machine_spec.BaseVmSpec,
+      nodepool_config: container.BaseNodePoolConfig,
+  ):
+    super().InitializeNodePoolForCloud(vm_config, nodepool_config)
+    vm_config = typing.cast(gce_virtual_machine.GceVmSpec, vm_config)
+    nodepool_config.network = gce_network.GceNetwork.GetNetwork(vm_config)  # pyrefly: ignore[missing-attribute]
+
   def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns a dict containing metadata about the cluster.
 
@@ -339,7 +348,6 @@ class GkeCluster(BaseGkeCluster):
     nodepool_config.threads_per_core = vm_config.threads_per_core
     nodepool_config.gce_tags = vm_config.gce_tags
     nodepool_config.min_cpu_platform = vm_config.min_cpu_platform
-    nodepool_config.network = gce_network.GceNetwork.GetNetwork(vm_config)  # pyrefly: ignore[missing-attribute]
     nodepool_config.cpus: int = vm_config.cpus  # pyrefly: ignore[bad-assignment]
     nodepool_config.memory_mib: int = vm_config.memory  # pyrefly: ignore[bad-assignment]
 
@@ -800,7 +808,7 @@ class GkeCluster(BaseGkeCluster):
     `clusters upgrade --node-pool --async` returns success with empty stdout
     (gcloud doesn't print the op name for this subcommand), so the operation
     name is recovered from the operations list via _IssueAsync's fallback.
-    
+
     Returns:
         Operation name string.
     """
@@ -933,17 +941,6 @@ class GkeAutopilotCluster(BaseGkeCluster):
     # Nodepools are not supported for Autopilot clusters, but default vm_spec
     # still used for pod spec input.
     self.nodepools = {}
-
-  def InitializeNodePoolForCloud(
-      self,
-      vm_config: virtual_machine_spec.BaseVmSpec,
-      nodepool_config: container.BaseNodePoolConfig,
-  ):
-    kubernetes_cluster.KubernetesCluster.InitializeNodePoolForCloud(
-        self, vm_config, nodepool_config
-    )
-    nodepool_config.network = gce_network.GceNetwork.GetNetwork(vm_config)  # pyrefly: ignore[missing-attribute]
-    return nodepool_config
 
   def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
     """Creates a gcloud command."""
