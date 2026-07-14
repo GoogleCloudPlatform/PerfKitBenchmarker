@@ -68,7 +68,12 @@ class PatchedObjectsTestCase(pkb_common_test_case.PkbCommonTestCase):
 
       stack.enter_context(mock.patch(builtins.__name__ + '.open'))
       stack.enter_context(mock.patch(vm_util.__name__ + '.PrependTempDir'))
-      stack.enter_context(mock.patch(vm_util.__name__ + '.NamedTemporaryFile'))
+      mock_tmp_file = stack.enter_context(
+          mock.patch(vm_util.__name__ + '.NamedTemporaryFile')
+      )
+      mock_tmp_file.return_value.__enter__.return_value.name = (
+          'patch_temp_file.yaml'
+      )
       stack.enter_context(
           mock.patch(util.__name__ + '.GetDefaultUser', return_value='fakeuser')
       )
@@ -658,6 +663,121 @@ class GoogleKubernetesEngineWithGpusTestCase(PatchedObjectsTestCase):
           'cloud.google.com/reservation-name=test_reservation',
           issue_command.all_commands,
       )
+
+
+class GoogleKubernetesEngineWithTpusTestCase(PatchedObjectsTestCase):
+
+  @staticmethod
+  def create_kubernetes_engine_spec():
+    spec_dict = {
+        'cloud': 'GCP',
+        'vm_spec': {
+            'GCP': {
+                'machine_type': 'ct6e-standard-4t',
+                'zone': 'us-west1-a',
+            },
+        },
+        'vm_count': 1,
+        'poll_for_events': False,
+        'nodepools': {
+            'tbu-pool': {
+                'vm_spec': {
+                    'GCP': {
+                        'machine_type': 'ct6e-standard-4t',
+                    },
+                },
+                'tpu_topology': '2x2x1',
+                'tpu_count': 4,
+                'vm_count': 1,
+            },
+        },
+    }
+    return container_spec.ContainerClusterSpec('NAME', **spec_dict)
+
+  def testCreateNodePoolCommand(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      cluster._Create()
+      nodepool_cmd = issue_command.GetCommandWithSubstring(
+          'node-pools create tbu-pool'
+      )
+      # There's actually no additional command here.
+      self.assertIn('--machine-type ct6e-standard-4t', nodepool_cmd)
+      self.assertNotIn('tpu', nodepool_cmd)
+
+  @flagsaver.flagsaver(gce_reservation_id='test_reservation')
+  def testReservation(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      expected = {
+          'cloud.google.com/gke-tpu-topology': '2x2x1',
+          'cloud.google.com/gke-tpu-accelerator': 'tpu-v6e-slice',
+          'cloud.google.com/reservation-name': 'test_reservation',
+          'cloud.google.com/reservation-affinity': 'specific',
+      }
+      self.assertEqual(cluster.GetNodeSelectors(), expected)
+
+  @flagsaver.flagsaver(run_uri='123')
+  def testModifyPodSpecPlacementYaml(self):
+    spec = self.create_kubernetes_engine_spec()
+    with mock.patch.object(
+        data,
+        'ResourcePath',
+        return_value=os.path.join(
+            os.path.dirname(__file__),
+            '..',
+            '..',
+            'data',
+            'kube_apply.yaml.j2',
+        ),
+    ):
+      yamls = kubernetes_commands.ConvertManifestToYamlDicts(
+          'tests/data/kube_apply.yaml.j2',
+          name='hello-tpu',
+          command=[],
+      )
+    with self.patch_critical_objects():
+      with self.assertLogs(level='INFO') as logs:
+        cluster = google_kubernetes_engine.GkeCluster(spec)
+        cluster.ModifyPodSpecPlacementYaml(
+            yamls,
+            'hello-tpu',
+        )
+        kubernetes_commands.ApplyYaml(
+            yamls,
+            should_log_file=True,
+        )
+      full_logs = ';'.join(logs.output)
+      self.assertIn('cloud.google.com/gke-tpu-topology: 2x2x1', full_logs)
+      self.assertIn(
+          'cloud.google.com/gke-tpu-accelerator: tpu-v6e-slice', full_logs
+      )
+      self.assertIn("google.com/tpu: '4'", full_logs)
+
+  def testTpusInDefaultNodepool(self):
+    spec_dict = {
+        'cloud': 'GCP',
+        'vm_spec': {
+            'GCP': {
+                'machine_type': 'ct6e-standard-4t',
+                'zone': 'us-west1-a',
+            },
+        },
+        'vm_count': 1,
+        'poll_for_events': False,
+        'tpu_topology': '2x2x1',
+        'tpu_count': 4,
+    }
+    spec = container_spec.ContainerClusterSpec('NAME', **spec_dict)
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      self.assertEqual(cluster.tpu_topology, '2x2x1')
+      self.assertEqual(cluster.tpu_count, 4)
+      self.assertEqual(cluster.tpu_type, 'tpu-v6e-slice')
+      self.assertEqual(cluster.default_nodepool.tpu_topology, '2x2x1')
+      self.assertEqual(cluster.default_nodepool.tpu_count, 4)
 
 
 class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):

@@ -45,6 +45,20 @@ FLAGS = flags.FLAGS
 SERVICE_ACCOUNT_PATTERN = r'.*((?<!iam)|{project}.iam).gserviceaccount.com'
 ONE_HOUR = 60 * 60
 
+TPU_MACHINE_TO_ACCELERATOR_MAP: dict[str, str] = {
+    'tpu7x-standard-4t': 'tpu7x',
+    'ct6e-standard-1t': 'tpu-v6e-slice',
+    'ct6e-standard-4t': 'tpu-v6e-slice',
+    'ct6e-standard-8t': 'tpu-v6e-slice',
+    'ct5p-hightpu-4t': 'tpu-v5p-slice',
+    'ct5lp-hightpu-1t': 'tpu-v5-lite-podslice',
+    'ct5lp-hightpu-4t': 'tpu-v5-lite-podslice',
+    'ct5lp-hightpu-8t': 'tpu-v5-lite-podslice',
+    'ct4p-hightpu-4t': 'tpu-v4-podslice',
+    'ct3-hightpu-4t': 'tpu-v3-device',
+    'ct3p-hightpu-4t': 'tpu-v3-slice',
+}
+
 
 def _CalculateCidrSize(nodes: int) -> int:
   # Defaults are used for pod and services CIDR ranges:
@@ -119,6 +133,9 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
   """Base class for regular & Autopilot GKE clusters."""
 
   def __init__(self, spec: container_spec_lib.ContainerClusterSpec):
+    self.tpu_topology: str | None = None
+    self.tpu_count: int | None = None
+    self.tpu_type: str | None = None
     super().__init__(spec)
     self.project: str = spec.vm_spec.GetProject()  # pyrefly: ignore[missing-attribute]
     self.cluster_version: str = FLAGS.container_cluster_version
@@ -148,6 +165,27 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     super().InitializeNodePoolForCloud(vm_config, nodepool_config)
     vm_config = typing.cast(gce_virtual_machine.GceVmSpec, vm_config)
     nodepool_config.network = gce_network.GceNetwork.GetNetwork(vm_config)  # pyrefly: ignore[missing-attribute]
+    if nodepool_config.tpu_topology:
+      if self.tpu_topology:
+        raise errors.Config.InvalidValue(
+            f'Attempted to set TPU topology to {nodepool_config.tpu_topology}'
+            f', but it was already set to {self.tpu_topology}. Multiple'
+            ' nodepools with different TPU topologies are not currently'
+            ' supported.'
+        )
+      if nodepool_config.tpu_topology and not nodepool_config.tpu_count:
+        raise errors.Config.InvalidValue(
+            'tpu_count must be set if tpu_topology is set.'
+        )
+      if nodepool_config.machine_type not in TPU_MACHINE_TO_ACCELERATOR_MAP:
+        raise errors.Config.InvalidValue(
+            f'Unsupported TPU machine type: {nodepool_config.machine_type}'
+        )
+      self.tpu_type = TPU_MACHINE_TO_ACCELERATOR_MAP[
+          nodepool_config.machine_type
+      ]
+      self.tpu_topology = nodepool_config.tpu_topology
+      self.tpu_count = nodepool_config.tpu_count
 
   def GetResourceMetadata(self) -> dict[str, Any]:
     """Returns a dict containing metadata about the cluster.
@@ -301,14 +339,37 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
   def GetNodeSelectors(self, machine_type: str | None = None) -> dict[str, str]:
     """Returns node selectors for the default nodepool."""
     del machine_type
+    selectors = {}
+    if self.tpu_topology and self.tpu_type:
+      selectors.update({
+          'cloud.google.com/gke-tpu-topology': self.tpu_topology,
+          'cloud.google.com/gke-tpu-accelerator': self.tpu_type,
+      })
     if gcp_flags.GCE_RESERVATION_ID.value:
-      return {
+      selectors.update({
           'cloud.google.com/reservation-name': (
               gcp_flags.GCE_RESERVATION_ID.value
           ),
           'cloud.google.com/reservation-affinity': 'specific',
-      }
-    return {}
+      })
+    return selectors
+
+  def _ModifyPodSpecPlacementYaml(
+      self,
+      pod_spec_yaml: dict[str, Any],
+      name: str,
+      machine_type: str | None = None,
+  ) -> None:
+    """Modifies the pod spec yaml with additional needed attributes."""
+    super()._ModifyPodSpecPlacementYaml(pod_spec_yaml, name, machine_type)
+    if self.tpu_count:
+      for c in pod_spec_yaml['containers']:
+        c['resources']['limits']['google.com/tpu'] = (
+            str(self.tpu_count)
+        )
+        c['resources']['requests']['google.com/tpu'] = (
+            str(self.tpu_count)
+        )
 
 
 class GkeCluster(BaseGkeCluster):
@@ -535,6 +596,7 @@ class GkeCluster(BaseGkeCluster):
               ',gpu-driver-version=' + gcp_flags.GKE_GPU_DRIVER_VERSION.value
           )
         cmd.flags['accelerator'] = accelerator_spec
+    if nodepool_config.gpu_count or nodepool_config.tpu_count:
       # Not guaranteed, but atm reservations only needed for GPUs.
       if gcp_flags.GCE_RESERVATION_ID.value:
         cmd.flags['reservation'] = gcp_flags.GCE_RESERVATION_ID.value

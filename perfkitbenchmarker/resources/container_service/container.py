@@ -194,4 +194,7 @@ class BaseNodePoolConfig:
     self.min_cpu_platform: str
     self.cpus: int
     self.memory_mib: int
+    # Defined by NodepoolSpec. Used by google_kubernetes_engine.
+    self.tpu_topology: str | None = None
+    self.tpu_count: int | None = None
     # pylint: enable=g-missing-from-attributes
