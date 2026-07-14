@@ -39,6 +39,7 @@ from perfkitbenchmarker.resources.container_service import container_registry
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.providers.gcp import gcp_swap_config as gcp_swap_config_lib
 
 FLAGS = flags.FLAGS
 
@@ -446,12 +447,37 @@ class GkeCluster(BaseGkeCluster):
       cmd = self._GcloudCommand(
           'container', 'node-pools', 'create', name, '--cluster', self.name
       )
-      self._AddNodeParamsToCmd(
-          nodepool,
-          cmd,
-      )
-      self._IssueResourceCreationCommand(cmd)
+      self._AddNodeParamsToCmd(nodepool, cmd)
+      # If swap_config wrote a linuxConfig tempfile, clean it up after Issue().
+      swap_cfg = getattr(nodepool, 'gke_swap_config', None)
+      try:
+        self._IssueResourceCreationCommand(cmd)
+      finally:
+        if swap_cfg is not None:
+          swap_cfg.CleanupYaml()
+          nodepool.gke_swap_config = None
       self._CreateCustomComputeClass(nodepool)
+
+  def DeleteDefaultNodePool(self, name: str = 'default-pool') -> None:
+    """Delete a nodepool by name (typically the dummy e2-medium default-pool).
+
+    GKE requires at least one nodepool at cluster creation time. The default
+    pool can be deleted once the benchmark nodepool and its DaemonSet are
+    Running. Must be called from the benchmark, not _GcloudCommand directly.
+
+    Args:
+      name: Nodepool name to delete (default: 'default-pool').
+
+    Raises:
+      errors.VmUtil.IssueCommandError: if the gcloud command returns non-zero.
+    """
+    cmd = self._GcloudCommand(
+        'container', 'node-pools', 'delete', name,
+        '--cluster', self.name,
+    )
+    cmd.args.append('--quiet')
+    logging.info('[gke] Deleting nodepool: %s', name)
+    cmd.Issue(timeout=300)
 
   def _CreateCustomComputeClass(
       self, nodepool_config: container.BaseNodePoolConfig
@@ -600,13 +626,32 @@ class GkeCluster(BaseGkeCluster):
     if gcp_flags.GKE_ENABLE_WORKLOAD_IDENTITY.value:
       cmd.flags['workload-metadata'] = 'GKE_METADATA'
 
-    if FLAGS.gke_node_system_config is not None:
+    # Per-nodepool swap config takes precedence over the global flag.
+    if nodepool_config.swap_config is not None:
+      gke_swap = gcp_swap_config_lib.GkeSwapConfig.from_spec(
+          nodepool_config.swap_config
+      )
+      cmd.flags['system-config-from-file'] = gke_swap.WriteLinuxConfigYaml()
+      # Store on nodepool so _CreateNodePools() can clean up the tempfile.
+      nodepool_config.gke_swap_config = gke_swap
+      # dm-crypt requires UBUNTU_CONTAINERD (Ajay r3472549985).
+      cmd.flags['image-type'] = 'UBUNTU_CONTAINERD'
+      # Prevent GKE from replacing the node after swap setup is complete.
+      cmd.args.append('--no-enable-autorepair')
+      sc = nodepool_config.swap_config
+      if sc.boot_disk_iops and not sc.lssd:
+        cmd.flags['boot-disk-provisioned-iops'] = sc.boot_disk_iops
+        cmd.flags['boot-disk-provisioned-throughput'] = (
+            gke_swap.ValidHyperdiskThroughput()
+        )
+    elif FLAGS.gke_node_system_config is not None:
+      # Fall back to global flag when no per-nodepool swap config is set.
       cmd.flags['system-config-from-file'] = FLAGS.gke_node_system_config
 
     if nodepool_config.sandbox_config is not None:
       cmd.flags['sandbox'] = nodepool_config.sandbox_config.ToSandboxFlag()
 
-    if self.image_type:
+    if self.image_type and 'image-type' not in cmd.flags:
       cmd.flags['image-type'] = self.image_type
 
     if nodepool_config.min_nodes != nodepool_config.max_nodes:

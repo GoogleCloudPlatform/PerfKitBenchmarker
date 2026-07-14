@@ -27,7 +27,13 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.configs import swap_config_spec as _swap_config_spec_lib
 from perfkitbenchmarker.resources import kubernetes_inference_server_spec
+
+# Re-export so existing code that imports SwapConfigSpec from container_spec
+# continues to work while the canonical home is now swap_config_spec.py.
+SwapConfigSpec = _swap_config_spec_lib.SwapConfigSpec
+_SwapConfigDecoder = _swap_config_spec_lib._SwapConfigDecoder  # pylint: disable=protected-access
 
 
 _DEFAULT_VM_COUNT = 1
@@ -243,6 +249,7 @@ class NodepoolSpec(spec.BaseSpec):
     self.vm_spec: virtual_machine_spec.BaseVmSpec
     self.machine_families: list[str] | None
     self.sandbox_config: SandboxSpec | None
+    self.swap_config: SwapConfigSpec | None
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -273,6 +280,7 @@ class NodepoolSpec(spec.BaseSpec):
         ),
         'vm_spec': (spec.PerCloudConfigDecoder, {}),
         'sandbox_config': (_SandboxDecoder, {'default': None}),
+        'swap_config': (_SwapConfigDecoder, {'default': None}),
     })
     return result
 
