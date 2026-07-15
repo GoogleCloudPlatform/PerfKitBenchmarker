@@ -111,8 +111,8 @@ VLLM_YAML = flags.DEFINE_string(
 BOOST_FACTOR = flags.DEFINE_integer(
     'kubernetes_deployment_startup_boost_factor',
     2,
-    'CPU Startup Boost factor for VPA (scenario=optimized only). '
-    'Matches Kam\'s recommended "factor of 2 or 3". GCP only.',
+    'CPU Startup Boost factor for VPA (scenario=optimized only, GCP only). '
+    + 'Matches Kam\'s recommended "factor of 2 or 3".',
     lower_bound=1,
     upper_bound=10,
 )
@@ -172,7 +172,7 @@ def CheckPrerequisites(_) -> None:
   if SCENARIO.value == 'optimized':
     if FLAGS.cloud != 'GCP':
       raise ValueError(
-          f'--kubernetes_deployment_startup_scenario=optimized requires '
+          '--kubernetes_deployment_startup_scenario=optimized requires '
           f'--cloud=GCP (GKE only). Got --cloud={FLAGS.cloud}.'
       )
     if WORKLOAD.value == 'vllm':
@@ -186,8 +186,18 @@ def CheckPrerequisites(_) -> None:
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   """Prepares the Kubernetes cluster for the benchmark.
 
-  For scenario=optimized, also deploys a VerticalPodAutoscaler manifest
-  with a startup boost policy targeting the JVM deployment.
+  For scenario=optimized, first deploys a VerticalPodAutoscaler manifest
+  with a startup boost policy targeting the JVM deployment, and only then
+  deploys the JVM deployment itself.
+
+  Ordering matters here: GKE's CPU Startup Boost takes effect via a
+  mutating admission webhook that intercepts *new* pod creation events.
+  If the Deployment (and its first pod) were applied before the VPA
+  object exists, that pod's initial CPU request would never be boosted,
+  and this benchmark would end up measuring an unboosted startup even
+  though scenario=optimized was requested. The VPA is safe to create
+  before its targetRef Deployment exists -- it simply waits for the
+  target to appear.
 
   Args:
     benchmark_spec: The benchmark specification.
@@ -204,17 +214,12 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
         image=image,
     )
   else:
-    logging.info('[startup] Deploying JVM workload (image=%s)', image)
-    kubernetes_commands.ApplyManifest(
-        DEPLOYMENT_YAML.value,
-        name=_JVM_DEPLOYMENT_NAME,
-        image=image,
-    )
-
-    # PR 3: apply VPA with startup boost for optimized scenario.
+    # PR 3: apply VPA with startup boost for optimized scenario BEFORE the
+    # deployment, so the boost's admission-time mutation applies to the
+    # very first pod this benchmark measures (see docstring above).
     if scenario == 'optimized':
       logging.info(
-          '[startup] scenario=optimized: applying VPA with boost_factor=%d',
+          '[startup] scenario=optimized: VPA boost_factor=%d applied first',
           BOOST_FACTOR.value,
       )
       kubernetes_commands.ApplyManifest(
@@ -222,6 +227,13 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
           name=_JVM_DEPLOYMENT_NAME,
           boost_factor=BOOST_FACTOR.value,
       )
+
+    logging.info('[startup] Deploying JVM workload (image=%s)', image)
+    kubernetes_commands.ApplyManifest(
+        DEPLOYMENT_YAML.value,
+        name=_JVM_DEPLOYMENT_NAME,
+        image=image,
+    )
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
@@ -242,16 +254,24 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   For scenario=optimized, the VPA startup boost is already active from
   Prepare() — no additional Run() changes needed.
 
+  Required metrics fail loudly rather than silently degrading: if a
+  metric can't be computed at all for the whole run, this raises instead
+  of logging a warning and returning partial results. (A silent warning
+  here is exactly what let a prior VPA-ordering bug ship a "successful"
+  optimized-scenario run that never actually applied the CPU boost.)
+
   Args:
     benchmark_spec: The benchmark specification.
 
   Raises:
-    RuntimeError: If no pods become ready.
+    RuntimeError: If no pods become ready, if no pod had both a
+      PodRunning and Ready timestamp (startup_latency uncomputable), or
+      if zero CPU utilization readings were collected all run.
 
   Returns:
     List of sample.Sample objects.
   """
-  image = benchmark_spec.container_specs['kubernetes_deployment_startup'].image
+  del benchmark_spec  # Image/deployment name are resolved via flags below.
   workload = WORKLOAD.value
   scenario = SCENARIO.value
 
@@ -272,10 +292,20 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   all_samples: List[sample.Sample] = []
   stop = threading.Event()
   cpu_collector = _CpuUtilizationCollector(all_samples, stop)
+  collector_errors: List[BaseException] = []
+
+  def _RunCollector() -> None:
+    # Runs in a background thread: exceptions raised here (e.g. zero CPU
+    # readings collected all run) don't propagate to the main thread on
+    # their own, so capture and re-raise below once the thread is joined.
+    try:
+      cpu_collector.ObserveCpuUtilization()
+    except Exception as e:  # pylint: disable=broad-except
+      collector_errors.append(e)
 
   try:
     collector_thread = threading.Thread(
-        target=cpu_collector.ObserveCpuUtilization,
+        target=_RunCollector,
         daemon=True,
     )
     collector_thread.start()
@@ -287,6 +317,9 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   finally:
     stop.set()
     collector_thread.join(timeout=_CPU_POLL_INTERVAL_SECS * 3)
+
+  if collector_errors:
+    raise collector_errors[0]
 
   # ── Parse pod conditions ──────────────────────────────────────────────
   # max_pod_ready_time uses PodReadyToStartContainers -> Ready (existing).
@@ -380,29 +413,29 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
         )
     )
 
-  if max_startup_latency >= 0:
-    all_samples.append(
-        sample.Sample(
-            'startup_latency',
-            max_startup_latency,
-            'seconds',
-            {**base_metadata},
-        )
-    )
-  else:
-    logging.warning(
-        '[startup] Could not compute startup_latency: no pod had both a'
+  if max_startup_latency < 0:
+    raise RuntimeError(
+        'Could not compute startup_latency: no pod had both a'
         ' PodRunning and Ready timestamp (container runtime may not report'
         ' containerStatuses[].state.running.startedAt on this cluster).'
     )
 
+  all_samples.append(
+      sample.Sample(
+          'startup_latency',
+          max_startup_latency,
+          'seconds',
+          {**base_metadata},
+      )
+  )
+
   logging.info(
       '[startup] scenario=%s workload=%s max_pod_ready_time=%.2fs'
-      ' startup_latency=%s pods=%d',
+      + ' startup_latency=%.2fs pods=%d',
       scenario,
       workload,
       max_pod_ready_t,
-      max_startup_latency if max_startup_latency >= 0 else 'n/a',
+      max_startup_latency,
       len(pod_name_to_start_end_times),
   )
 
@@ -433,17 +466,39 @@ class _CpuUtilizationCollector:
     self._lock = threading.Lock()
 
   def ObserveCpuUtilization(self) -> None:
+    """Polls CPU utilization for the duration of the run.
+
+    Transient poll failures (e.g. the Kubernetes Metrics API still
+    warming up on a freshly created cluster) are tolerated by _Observe
+    and simply retried. This only raises if the metric ends up with zero
+    data for the entire run -- the same standard applied to
+    startup_latency, so a total collection failure is surfaced as a
+    benchmark failure instead of silently shipping incomplete results.
+
+    Raises:
+      RuntimeError: If not a single CPU reading was collected all run.
+    """
     self._Observe(self._PollCpuMillicoresSample)
     with self._lock:
       readings = list(self._readings)
     if not readings:
-      return
+      raise RuntimeError(
+          'Collected zero CPU utilization readings for the entire run --'
+          ' the Kubernetes Metrics API may never have become available.'
+          ' cpu_utilization_peak/mean_millicores cannot be computed.'
+      )
     peak = max(readings)
     mean = sum(readings) / len(readings)
     self._samples.extend([
-        sample.Sample('cpu_utilization_peak_millicores', peak, 'millicores', {}),
-        sample.Sample('cpu_utilization_mean_millicores', mean, 'millicores', {}),
-        sample.Sample('cpu_utilization_reading_count', len(readings), 'count', {}),
+        sample.Sample(
+            'cpu_utilization_peak_millicores', peak, 'millicores', {}
+        ),
+        sample.Sample(
+            'cpu_utilization_mean_millicores', mean, 'millicores', {}
+        ),
+        sample.Sample(
+            'cpu_utilization_reading_count', len(readings), 'count', {}
+        ),
     ])
 
   def _PollCpuMillicoresSample(self) -> List[sample.Sample]:
@@ -468,8 +523,16 @@ class _CpuUtilizationCollector:
 
 
 def _GetTotalCpuMillicores() -> float | None:
+  """Returns summed CPU millicores across pods from `kubectl top`, or None.
+
+  Returns None (rather than raising) on any parse/command failure so a
+  single bad poll doesn't take down the whole collector loop; _Observe
+  above retries on the next poll interval regardless.
+  """
   try:
-    from perfkitbenchmarker.resources.container_service import kubectl  # pylint: disable=g-import-not-at-top
+    # pylint: disable=import-outside-toplevel
+    from perfkitbenchmarker.resources.container_service import kubectl
+
     stdout, _, rc = kubectl.RunKubectlCommand(
         ['top', 'pods', '--no-headers'], raise_on_failure=False
     )
@@ -481,7 +544,10 @@ def _GetTotalCpuMillicores() -> float | None:
       if len(parts) < 2:
         continue
       cpu_str = parts[1]
-      total_m += float(cpu_str[:-1]) if cpu_str.endswith('m') else float(cpu_str) * 1000.0
+      if cpu_str.endswith('m'):
+        total_m += float(cpu_str[:-1])
+      else:
+        total_m += float(cpu_str) * 1000.0
     return total_m
   except (ValueError, IndexError):
     return None

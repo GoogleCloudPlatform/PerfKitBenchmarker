@@ -48,14 +48,28 @@ def _MakeSpec(image='slowjvmstartup'):
 
 
 def _DefaultConditions():
+  # Includes a PodRunning entry so startup_latency is always computable by
+  # default -- tests that specifically exercise the "PodRunning missing"
+  # failure path build their own conditions list without it.
   return [
       _MakeCondition('pod-0', 'PodReadyToStartContainers', 1000),
+      _MakeCondition('pod-0', 'PodRunning', 1015),
       _MakeCondition('pod-0', 'Ready', 1030),
   ]
 
 
-def _RunWithConditions(conditions, flag_kwargs=None):
-  """Runs bench.Run() with mocked kubectl calls."""
+def _RunWithConditions(conditions, flag_kwargs=None, cpu_millicores=100.0):
+  """Runs bench.Run() with mocked kubectl calls.
+
+  Args:
+    conditions: Pod status conditions to return from
+      GetStatusConditionsForResourceType.
+    flag_kwargs: Flags to set via flagsaver.
+    cpu_millicores: Value _GetTotalCpuMillicores should return on every
+      poll. Defaults to a real value (not None) so cpu_utilization is
+      computable by default -- tests exercising the "zero CPU readings"
+      failure path override this to None explicitly.
+  """
   flag_kwargs = flag_kwargs or {'cloud': 'GCP'}
   with mock.patch.object(
       bench.kubernetes_commands, 'ApplyManifest'
@@ -66,8 +80,10 @@ def _RunWithConditions(conditions, flag_kwargs=None):
       'GetStatusConditionsForResourceType',
       return_value=conditions,
   ), mock.patch.object(
-      bench, '_GetTotalCpuMillicores', return_value=None
-  ), flagsaver.flagsaver(**flag_kwargs):
+      bench, '_GetTotalCpuMillicores', return_value=cpu_millicores
+  ), flagsaver.flagsaver(
+      **flag_kwargs
+  ):
     return bench.Run(_MakeSpec())
 
 
@@ -86,8 +102,10 @@ class MaxPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
   def testMaxPodReadyTimeValue(self):
     conditions = [
         _MakeCondition('pod-0', 'PodReadyToStartContainers', 1000),
+        _MakeCondition('pod-0', 'PodRunning', 1010),
         _MakeCondition('pod-0', 'Ready', 1020),
         _MakeCondition('pod-1', 'PodReadyToStartContainers', 1000),
+        _MakeCondition('pod-1', 'PodRunning', 1010),
         _MakeCondition('pod-1', 'Ready', 1035),
     ]
     samples = _RunWithConditions(conditions)
@@ -105,8 +123,10 @@ class PerPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
   def testEmitsOnePerPod(self):
     conditions = [
         _MakeCondition('pod-0', 'PodReadyToStartContainers', 1000),
+        _MakeCondition('pod-0', 'PodRunning', 1010),
         _MakeCondition('pod-0', 'Ready', 1025),
         _MakeCondition('pod-1', 'PodReadyToStartContainers', 1000),
+        _MakeCondition('pod-1', 'PodRunning', 1010),
         _MakeCondition('pod-1', 'Ready', 1040),
     ]
     samples = _RunWithConditions(conditions)
@@ -116,6 +136,7 @@ class PerPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
   def testPerPodCarriesPodName(self):
     conditions = [
         _MakeCondition('pod-abc', 'PodReadyToStartContainers', 1000),
+        _MakeCondition('pod-abc', 'PodRunning', 1010),
         _MakeCondition('pod-abc', 'Ready', 1030),
     ]
     samples = _RunWithConditions(conditions)
@@ -183,13 +204,18 @@ class StartupLatencyTest(pkb_common_test_case.PkbCommonTestCase):
         by_metric['startup_latency'], by_metric['max_pod_ready_time']
     )
 
-  def testNoStartupLatencyWhenPodRunningMissing(self):
-    # Cluster/runtime doesn't report containerStatuses startedAt (or the
-    # mock omits it) -- benchmark should still succeed on the other
-    # metrics, just skip startup_latency.
-    samples = _RunWithConditions(_DefaultConditions())
-    self.assertNotIn('startup_latency', {s.metric for s in samples})
-    self.assertIn('max_pod_ready_time', {s.metric for s in samples})
+  def testRaisesWhenPodRunningMissing(self):
+    # Per review: if the cluster/runtime never reports containerStatuses
+    # startedAt for any pod, startup_latency can't be computed at all --
+    # this must fail loudly rather than silently succeeding with the
+    # metric missing (a silent warning here is exactly what let the VPA
+    # ordering bug ship an unboosted "optimized" run undetected).
+    conditions = [
+        _MakeCondition('pod-0', 'PodReadyToStartContainers', 1000),
+        _MakeCondition('pod-0', 'Ready', 1030),
+    ]
+    with self.assertRaises(RuntimeError):
+      _RunWithConditions(conditions)
 
 
 class SampleMetadataTest(pkb_common_test_case.PkbCommonTestCase):
@@ -205,7 +231,8 @@ class SampleMetadataTest(pkb_common_test_case.PkbCommonTestCase):
         },
     )
     pod_samples = [
-        s for s in samples
+        s
+        for s in samples
         if s.metric in ('max_pod_ready_time', 'per_pod_ready_time')
     ]
     for s in pod_samples:
@@ -248,11 +275,14 @@ class CpuUtilizationCollectorTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertAlmostEqual(by_metric['cpu_utilization_mean_millicores'], 200.0)
     self.assertEqual(by_metric['cpu_utilization_reading_count'], 3)
 
-  def testNoSamplesWhenNoReadings(self):
+  def testRaisesWhenNoReadings(self):
+    # Per review: zero CPU readings for the whole run must fail loudly
+    # rather than silently shipping results with cpu_utilization missing.
     collector, samples, stop = self._MakeCollector()
     collector._readings = []
     stop.set()
-    collector.ObserveCpuUtilization()
+    with self.assertRaises(RuntimeError):
+      collector.ObserveCpuUtilization()
     self.assertEqual(samples, [])
 
   def testObserveIgnoresIssueCommandError(self):
@@ -268,6 +298,13 @@ class CpuUtilizationCollectorTest(pkb_common_test_case.PkbCommonTestCase):
 
     collector._Observe(flaky)
     self.assertEqual(call_count[0], 3)
+
+  def testRunRaisesWhenCpuCollectionFailsEntirely(self):
+    # End-to-end: bench.Run() runs the collector on a background thread,
+    # so this also verifies the collector's RuntimeError is captured and
+    # re-raised on the main thread rather than silently disappearing.
+    with self.assertRaises(RuntimeError):
+      _RunWithConditions(_DefaultConditions(), cpu_millicores=None)
 
   def testThreadSafety(self):
     collector, _, _ = self._MakeCollector()
@@ -300,7 +337,8 @@ class GetTotalCpuMillicoresTest(pkb_common_test_case.PkbCommonTestCase):
 
   def _MockKubectl(self, stdout, rc=0):
     return mock.patch.object(
-        bench.kubectl, 'RunKubectlCommand',
+        bench.kubectl,
+        'RunKubectlCommand',
         return_value=(stdout, '', rc),
     )
 
@@ -368,7 +406,9 @@ class VllmWorkloadTest(pkb_common_test_case.PkbCommonTestCase):
         bench.kubernetes_conditions,
         'GetStatusConditionsForResourceType',
         return_value=_DefaultConditions(),
-    ), mock.patch.object(bench, '_GetTotalCpuMillicores', return_value=None):
+    ), mock.patch.object(
+        bench, '_GetTotalCpuMillicores', return_value=100.0
+    ):
       bench.Run(_MakeSpec())
       mock_wait.assert_called_with('deployment/vllm-startup', timeout=600)
 
@@ -384,7 +424,9 @@ class VllmWorkloadTest(pkb_common_test_case.PkbCommonTestCase):
         bench.kubernetes_conditions,
         'GetStatusConditionsForResourceType',
         return_value=_DefaultConditions(),
-    ), mock.patch.object(bench, '_GetTotalCpuMillicores', return_value=None):
+    ), mock.patch.object(
+        bench, '_GetTotalCpuMillicores', return_value=100.0
+    ):
       bench.Run(_MakeSpec())
       mock_wait.assert_called_with('deployment/startup', timeout=600)
 
@@ -456,12 +498,45 @@ class ScenarioTest(pkb_common_test_case.PkbCommonTestCase):
   def testPrepareAppliesVpaManifest(self):
     apply_calls = []
     with mock.patch.object(
-        bench.kubernetes_commands, 'ApplyManifest',
-        side_effect=lambda *a, **kw: apply_calls.append(a[0])
+        bench.kubernetes_commands,
+        'ApplyManifest',
+        side_effect=lambda *a, **kw: apply_calls.append(a[0]),
     ):
       bench.Prepare(_MakeSpec())
     self.assertLen(apply_calls, 2)
     self.assertTrue(any('vpa' in c for c in apply_calls))
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='jvm',
+      kubernetes_deployment_startup_boost_factor=2,
+      cloud='GCP',
+  )
+  def testPrepareAppliesVpaBeforeDeployment(self):
+    # Regression test: GKE CPU Startup Boost only mutates a pod's CPU
+    # request at admission time, for pods created AFTER the VPA object
+    # exists. If the Deployment (and its first pod) were applied before
+    # the VPA, the boost would never apply to the pod this benchmark
+    # measures -- which is exactly what happened in the config 4 run that
+    # showed no improvement over baseline. The VPA must be applied first.
+    apply_calls = []
+    with mock.patch.object(
+        bench.kubernetes_commands,
+        'ApplyManifest',
+        side_effect=lambda *a, **kw: apply_calls.append(a[0]),
+    ):
+      bench.Prepare(_MakeSpec())
+    self.assertLen(apply_calls, 2)
+    vpa_index = next(i for i, c in enumerate(apply_calls) if 'vpa' in c)
+    deployment_index = next(
+        i for i, c in enumerate(apply_calls) if 'vpa' not in c
+    )
+    self.assertLess(
+        vpa_index,
+        deployment_index,
+        'VPA manifest must be applied before the JVM deployment manifest,'
+        ' otherwise CPU Startup Boost cannot affect the measured pod.',
+    )
 
   @flagsaver.flagsaver(
       kubernetes_deployment_startup_scenario='baseline',
@@ -471,8 +546,9 @@ class ScenarioTest(pkb_common_test_case.PkbCommonTestCase):
   def testPrepareSkipsVpaForBaseline(self):
     apply_calls = []
     with mock.patch.object(
-        bench.kubernetes_commands, 'ApplyManifest',
-        side_effect=lambda *a, **kw: apply_calls.append(a[0])
+        bench.kubernetes_commands,
+        'ApplyManifest',
+        side_effect=lambda *a, **kw: apply_calls.append(a[0]),
     ):
       bench.Prepare(_MakeSpec())
     self.assertLen(apply_calls, 1)
@@ -583,6 +659,4 @@ class ManifestResourceResolutionTest(pkb_common_test_case.PkbCommonTestCase):
     )
     docs = list(yaml.safe_load_all(rendered))
     self.assertEqual(docs[0]['kind'], 'VerticalPodAutoscaler')
-    self.assertEqual(
-        docs[0]['spec']['startupBoost']['cpu']['factor'], 3
-    )
+    self.assertEqual(docs[0]['spec']['startupBoost']['cpu']['factor'], 3)
