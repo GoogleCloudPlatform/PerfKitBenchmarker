@@ -13,11 +13,15 @@
 # limitations under the License.
 """Tests for kubernetes_deployment_startup_benchmark (PR 1 + PR 2 + PR 3)."""
 
+import os
 import threading
 import unittest
 from unittest import mock
 
 from absl.testing import flagsaver
+import jinja2
+import yaml
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.linux_benchmarks import (
     kubernetes_deployment_startup_benchmark as bench,
@@ -117,6 +121,75 @@ class PerPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
     samples = _RunWithConditions(conditions)
     per_pod = [s for s in samples if s.metric == 'per_pod_ready_time']
     self.assertEqual(per_pod[0].metadata['pod_name'], 'pod-abc')
+
+
+class StartupLatencyTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for the startup_latency metric (PodRunning -> Ready)."""
+
+  def testEmitsStartupLatency(self):
+    conditions = [
+        _MakeCondition('pod-0', 'PodReadyToStartContainers', 1000),
+        _MakeCondition('pod-0', 'PodRunning', 1005),
+        _MakeCondition('pod-0', 'Ready', 1030),
+    ]
+    samples = _RunWithConditions(conditions)
+    self.assertIn('startup_latency', {s.metric for s in samples})
+
+  def testStartupLatencyValue(self):
+    conditions = [
+        _MakeCondition('pod-0', 'PodRunning', 1005),
+        _MakeCondition('pod-0', 'Ready', 1030),
+    ]
+    samples = _RunWithConditions(conditions)
+    by_metric = {s.metric: s.value for s in samples}
+    self.assertAlmostEqual(by_metric['startup_latency'], 25)
+
+  def testStartupLatencyTakesMaxAcrossPods(self):
+    conditions = [
+        _MakeCondition('pod-0', 'PodRunning', 1000),
+        _MakeCondition('pod-0', 'Ready', 1020),
+        _MakeCondition('pod-1', 'PodRunning', 1000),
+        _MakeCondition('pod-1', 'Ready', 1040),
+    ]
+    samples = _RunWithConditions(conditions)
+    by_metric = {s.metric: s.value for s in samples}
+    self.assertAlmostEqual(by_metric['startup_latency'], 40)
+
+  def testEmitsOnePerPodStartupLatency(self):
+    conditions = [
+        _MakeCondition('pod-0', 'PodRunning', 1000),
+        _MakeCondition('pod-0', 'Ready', 1020),
+        _MakeCondition('pod-1', 'PodRunning', 1000),
+        _MakeCondition('pod-1', 'Ready', 1040),
+    ]
+    samples = _RunWithConditions(conditions)
+    per_pod = [s for s in samples if s.metric == 'per_pod_startup_latency']
+    self.assertLen(per_pod, 2)
+
+  def testDistinctFromMaxPodReadyTime(self):
+    # PodReadyToStartContainers is earlier than PodRunning (scheduling +
+    # image pull happen first), so startup_latency should be smaller than
+    # max_pod_ready_time for the same pod.
+    conditions = [
+        _MakeCondition('pod-0', 'PodReadyToStartContainers', 1000),
+        _MakeCondition('pod-0', 'PodRunning', 1015),
+        _MakeCondition('pod-0', 'Ready', 1030),
+    ]
+    samples = _RunWithConditions(conditions)
+    by_metric = {s.metric: s.value for s in samples}
+    self.assertAlmostEqual(by_metric['max_pod_ready_time'], 30)
+    self.assertAlmostEqual(by_metric['startup_latency'], 15)
+    self.assertLess(
+        by_metric['startup_latency'], by_metric['max_pod_ready_time']
+    )
+
+  def testNoStartupLatencyWhenPodRunningMissing(self):
+    # Cluster/runtime doesn't report containerStatuses startedAt (or the
+    # mock omits it) -- benchmark should still succeed on the other
+    # metrics, just skip startup_latency.
+    samples = _RunWithConditions(_DefaultConditions())
+    self.assertNotIn('startup_latency', {s.metric for s in samples})
+    self.assertIn('max_pod_ready_time', {s.metric for s in samples})
 
 
 class SampleMetadataTest(pkb_common_test_case.PkbCommonTestCase):
@@ -447,3 +520,69 @@ class ScenarioTest(pkb_common_test_case.PkbCommonTestCase):
 
 if __name__ == '__main__':
   unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# Regression test: manifest files must actually exist on disk.
+#
+# All tests above mock kubernetes_commands.ApplyManifest, so none of them
+# ever resolve DEPLOYMENT_YAML/VLLM_YAML/VPA_YAML against the real `data/`
+# directory. That blind spot let PR 2 and PR 3 ship referencing
+# vllm.yaml.j2 and slowjvmstartup_vpa.yaml.j2 without ever committing them,
+# which only surfaced as a runtime ResourceNotFound crash in production.
+# These tests close that gap by calling data.ResourcePath() for real.
+# ---------------------------------------------------------------------------
+
+
+class ManifestResourceResolutionTest(pkb_common_test_case.PkbCommonTestCase):
+  """Confirms every manifest flag default resolves to a real, valid file."""
+
+  def testJvmManifestResolves(self):
+    path = data.ResourcePath(bench.DEPLOYMENT_YAML.value)
+    self.assertTrue(os.path.isfile(path))
+
+  def testVllmManifestResolves(self):
+    path = data.ResourcePath(bench.VLLM_YAML.value)
+    self.assertTrue(os.path.isfile(path))
+
+  def testVpaManifestResolves(self):
+    path = data.ResourcePath(bench.VPA_YAML.value)
+    self.assertTrue(os.path.isfile(path))
+
+  def testJvmManifestRendersValidYaml(self):
+    path = data.ResourcePath(bench.DEPLOYMENT_YAML.value)
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(os.path.dirname(path))
+    )
+    rendered = env.get_template(os.path.basename(path)).render(
+        name='startup', image='slowjvmstartup'
+    )
+    docs = list(yaml.safe_load_all(rendered))
+    self.assertEqual(docs[0]['kind'], 'Deployment')
+
+  def testVllmManifestRendersValidYaml(self):
+    path = data.ResourcePath(bench.VLLM_YAML.value)
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(os.path.dirname(path))
+    )
+    rendered = env.get_template(os.path.basename(path)).render(
+        name='vllm-startup',
+        image='public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:latest',
+    )
+    docs = list(yaml.safe_load_all(rendered))
+    self.assertEqual(docs[0]['kind'], 'Deployment')
+    self.assertEqual(docs[1]['kind'], 'Service')
+
+  def testVpaManifestRendersValidYamlWithBoostFactor(self):
+    path = data.ResourcePath(bench.VPA_YAML.value)
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(os.path.dirname(path))
+    )
+    rendered = env.get_template(os.path.basename(path)).render(
+        name='startup', boost_factor=3
+    )
+    docs = list(yaml.safe_load_all(rendered))
+    self.assertEqual(docs[0]['kind'], 'VerticalPodAutoscaler')
+    self.assertEqual(
+        docs[0]['spec']['startupBoost']['cpu']['factor'], 3
+    )

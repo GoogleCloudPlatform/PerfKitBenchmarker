@@ -227,10 +227,17 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
   """Runs the benchmark and collects startup metrics.
 
-  Collects all three metric categories from PR 1 + metadata from PR 3:
-    1. max_pod_ready_time  — existing metric.
-    2. per_pod_ready_time  — per-pod samples (PR 1).
-    3. cpu_utilization_*   — background CPU collector (PR 1).
+  Collects all metrics required by the benchmark methodology doc, plus
+  metadata from PR 3:
+    1. max_pod_ready_time     — PodReadyToStartContainers -> Ready.
+    2. startup_latency        — PodRunning -> Ready (per-pod:
+       per_pod_startup_latency). PodRunning is synthesized in
+       kubernetes_conditions from containerStatuses[].state.running.
+       startedAt, since Kubernetes doesn't report it as a real condition.
+    3. cpu_utilization_*       — background CPU collector (PR 1).
+    (per_pod_ready_time is also emitted as a PR 1 bonus metric, not
+    required by the doc but useful for percentile analysis across
+    replicas.)
 
   For scenario=optimized, the VPA startup boost is already active from
   Prepare() — no additional Run() changes needed.
@@ -282,7 +289,16 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
     collector_thread.join(timeout=_CPU_POLL_INTERVAL_SECS * 3)
 
   # ── Parse pod conditions ──────────────────────────────────────────────
+  # max_pod_ready_time uses PodReadyToStartContainers -> Ready (existing).
+  # startup_latency uses PodRunning -> Ready (container process started ->
+  # app passed its readiness probe), per the requirements doc's Metrics
+  # table. PodRunning is synthesized by kubernetes_conditions from
+  # containerStatuses[].state.running.startedAt, since it isn't a real
+  # pod condition.
   pod_name_to_start_end_times: dict[str, tuple[int, int]] = (
+      collections.defaultdict(lambda: (0, 0))
+  )
+  pod_name_to_running_ready_times: dict[str, tuple[int, int]] = (
       collections.defaultdict(lambda: (0, 0))
   )
   for c in kubernetes_conditions.GetStatusConditionsForResourceType('pod'):
@@ -292,10 +308,23 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
           c.epoch_time,
           prev_end_time,
       )
+    elif c.event == 'PodRunning':
+      prev_end_time = pod_name_to_running_ready_times[c.resource_name][1]
+      pod_name_to_running_ready_times[c.resource_name] = (
+          c.epoch_time,
+          prev_end_time,
+      )
     elif c.event == 'Ready':
       prev_start_time = pod_name_to_start_end_times[c.resource_name][0]
       pod_name_to_start_end_times[c.resource_name] = (
           prev_start_time,
+          c.epoch_time,
+      )
+      prev_running_start_time = pod_name_to_running_ready_times[
+          c.resource_name
+      ][0]
+      pod_name_to_running_ready_times[c.resource_name] = (
+          prev_running_start_time,
           c.epoch_time,
       )
 
@@ -330,9 +359,51 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> List[sample.Sample]:
           )
       )
 
+  # ── Metric 3: startup_latency (PodRunning -> Ready) ──────────────────
+  # Required by the doc's Metrics table alongside Max Pod Ready Time and
+  # CPU Utilization. Only computed for pods where both a PodRunning
+  # timestamp and a Ready timestamp were observed.
+  max_startup_latency = -1
+  for pod_name, (running_t, ready_t) in pod_name_to_running_ready_times.items():
+    if running_t <= 0 or ready_t <= 0:
+      continue
+    latency = ready_t - running_t
+    if latency < 0:
+      continue
+    max_startup_latency = max(max_startup_latency, latency)
+    all_samples.append(
+        sample.Sample(
+            'per_pod_startup_latency',
+            latency,
+            'seconds',
+            {**base_metadata, 'pod_name': pod_name},
+        )
+    )
+
+  if max_startup_latency >= 0:
+    all_samples.append(
+        sample.Sample(
+            'startup_latency',
+            max_startup_latency,
+            'seconds',
+            {**base_metadata},
+        )
+    )
+  else:
+    logging.warning(
+        '[startup] Could not compute startup_latency: no pod had both a'
+        ' PodRunning and Ready timestamp (container runtime may not report'
+        ' containerStatuses[].state.running.startedAt on this cluster).'
+    )
+
   logging.info(
-      '[startup] scenario=%s workload=%s max_pod_ready_time=%.2fs pods=%d',
-      scenario, workload, max_pod_ready_t, len(pod_name_to_start_end_times),
+      '[startup] scenario=%s workload=%s max_pod_ready_time=%.2fs'
+      ' startup_latency=%s pods=%d',
+      scenario,
+      workload,
+      max_pod_ready_t,
+      max_startup_latency if max_startup_latency >= 0 else 'n/a',
+      len(pod_name_to_start_end_times),
   )
 
   return all_samples

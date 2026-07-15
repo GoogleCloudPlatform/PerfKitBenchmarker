@@ -178,6 +178,108 @@ class KubernetesConditionsTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertLen(conditions, 2)
 
+  def testPodRunningSynthesizedFromContainerStatuses(self):
+    stdout = json.dumps({
+        'items': [{
+            'metadata': {'name': 'pod123'},
+            'status': {
+                'conditions': [
+                    {
+                        'lastProbeTime': None,
+                        'lastTransitionTime': '1970-01-01T00:01:19Z',
+                        'status': 'True',
+                        'type': 'Ready',
+                    },
+                ],
+                'containerStatuses': [{
+                    'name': 'main',
+                    'state': {
+                        'running': {'startedAt': '1970-01-01T00:01:05Z'}
+                    },
+                }],
+            },
+        }]
+    })
+    self.enter_context(
+        mock.patch.object(
+            kubectl,
+            'RunKubectlCommand',
+            return_value=(stdout, '', 0),
+        )
+    )
+    conditions = kubernetes_conditions.GetStatusConditionsForResourceType(
+        'pod',
+        frozenset(),
+    )
+    events = {c.event: c.epoch_time for c in conditions}
+    self.assertIn('PodRunning', events)
+    self.assertEqual(events['PodRunning'], 65)
+    self.assertEqual(events['Ready'], 79)
+
+  def testPodRunningUsesLatestContainerAmongMultiple(self):
+    stdout = json.dumps({
+        'items': [{
+            'metadata': {'name': 'pod123'},
+            'status': {
+                'conditions': [],
+                'containerStatuses': [
+                    {
+                        'name': 'sidecar',
+                        'state': {
+                            'running': {'startedAt': '1970-01-01T00:00:10Z'}
+                        },
+                    },
+                    {
+                        'name': 'main',
+                        'state': {
+                            'running': {'startedAt': '1970-01-01T00:00:20Z'}
+                        },
+                    },
+                ],
+            },
+        }]
+    })
+    self.enter_context(
+        mock.patch.object(
+            kubectl,
+            'RunKubectlCommand',
+            return_value=(stdout, '', 0),
+        )
+    )
+    conditions = kubernetes_conditions.GetStatusConditionsForResourceType(
+        'pod',
+        frozenset(),
+    )
+    running = [c for c in conditions if c.event == 'PodRunning']
+    self.assertLen(running, 1)
+    self.assertEqual(running[0].epoch_time, 20)
+
+  def testNoPodRunningWhenNoContainerIsRunningYet(self):
+    stdout = json.dumps({
+        'items': [{
+            'metadata': {'name': 'pod123'},
+            'status': {
+                'conditions': [],
+                'containerStatuses': [{
+                    'name': 'main',
+                    'state': {'waiting': {'reason': 'ContainerCreating'}},
+                }],
+            },
+        }]
+    })
+    self.enter_context(
+        mock.patch.object(
+            kubectl,
+            'RunKubectlCommand',
+            return_value=(stdout, '', 0),
+        )
+    )
+    conditions = kubernetes_conditions.GetStatusConditionsForResourceType(
+        'pod',
+        frozenset(),
+    )
+    self.assertEmpty(conditions)
+
   def testStatusConditionsWithInstanceType(self):
     stdout = json.dumps({
         'items': [

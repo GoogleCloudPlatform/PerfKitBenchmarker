@@ -1,0 +1,39 @@
+# VerticalPodAutoscaler with GKE CPU Startup Boost policy.
+#
+# Applied only for --kubernetes_deployment_startup_scenario=optimized
+# (GKE-only). Requires enable_vpa: True on the container_cluster (already
+# set by GetConfig() for this scenario).
+#
+# Schema reference: GKE VPA `startupBoost.cpu` field temporarily multiplies
+# the container's CPU request/limit by `factor` while the pod is starting,
+# then scales back down in-place (updateMode: InPlaceOrRecreate) once the
+# pod is Ready and durationSeconds has elapsed.
+#
+# NOTE: durationSeconds is set to comfortably exceed the observed JVM
+# baseline startup time (~67s measured on config 1). Confirm against
+# Kam's linked guide before relying on this for production comparisons:
+# https://docs.google.com/document/d/1yEV5Xc3Xx0xVNilBlfQ0isXlLbY4AEIGI8FDHrS8WVM/edit?tab=t.0
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ name }}
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: {{ name }}
+  updatePolicy:
+    updateMode: "InPlaceOrRecreate"
+  startupBoost:
+    cpu:
+      type: "Factor"
+      factor: {{ boost_factor }}
+      durationSeconds: 120
+  resourcePolicy:
+    containerPolicies:
+      - containerName: '*'
+        controlledResources: ["cpu"]
+        minAllowed:
+          cpu: "100m"
+        maxAllowed:
+          cpu: "1"

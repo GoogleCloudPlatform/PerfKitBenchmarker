@@ -1,0 +1,55 @@
+# vLLM CPU inference workload for the kubernetes_deployment_startup
+# benchmark (--kubernetes_deployment_startup_workload=vllm).
+#
+# NOTE: CPU/memory sizing (2 cores / 4Gi) is a starting default for the
+# public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo image and may need tuning
+# per the actual model loaded. Port 8000 and the /health readiness path
+# match vLLM's default OpenAI-compatible server configuration.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ name }}
+  labels:
+    app: {{ name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ name }}
+  template:
+    metadata:
+      labels:
+        app: {{ name }}
+    spec:
+      containers:
+        - name: {{ name }}
+          image: {{ image }}
+          imagePullPolicy: "Always"
+          ports:
+          - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 1
+          resources:
+            requests:
+              cpu: "2"
+              memory: "4Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ name }}
+spec:
+  selector:
+    app: {{ name }}
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: LoadBalancer
