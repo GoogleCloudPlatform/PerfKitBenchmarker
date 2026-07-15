@@ -501,6 +501,8 @@ class ScenarioTest(pkb_common_test_case.PkbCommonTestCase):
         bench.kubernetes_commands,
         'ApplyManifest',
         side_effect=lambda *a, **kw: apply_calls.append(a[0]),
+    ), mock.patch.object(
+        bench.kubectl, 'RunKubectlCommand', return_value=('', '', 0)
     ):
       bench.Prepare(_MakeSpec())
     self.assertLen(apply_calls, 2)
@@ -524,6 +526,8 @@ class ScenarioTest(pkb_common_test_case.PkbCommonTestCase):
         bench.kubernetes_commands,
         'ApplyManifest',
         side_effect=lambda *a, **kw: apply_calls.append(a[0]),
+    ), mock.patch.object(
+        bench.kubectl, 'RunKubectlCommand', return_value=('', '', 0)
     ):
       bench.Prepare(_MakeSpec())
     self.assertLen(apply_calls, 2)
@@ -592,6 +596,60 @@ class ScenarioTest(pkb_common_test_case.PkbCommonTestCase):
     pod_samples = [s for s in samples if 'boost_factor' in s.metadata]
     for s in pod_samples:
       self.assertEqual(s.metadata['boost_factor'], 1)
+
+
+# ---------------------------------------------------------------------------
+# PR 3: VPA CRD registration race fix
+#
+# Enabling VPA via --enable-vertical-pod-autoscaling triggers an
+# asynchronous GKE addon install for the VPA CRDs, which can lag behind the
+# cluster's own RUNNING status and kube-dns readiness. A production run
+# (config 4) hit exactly this: `kubectl apply` for the VerticalPodAutoscaler
+# manifest failed with "no matches for kind VerticalPodAutoscaler" just a
+# few seconds after kube-dns reported ready, because the CRD wasn't
+# registered yet. _WaitForVpaCrd polls for the CRD before Prepare() applies
+# the VPA manifest, instead of assuming it's already there.
+# ---------------------------------------------------------------------------
+
+
+class WaitForVpaCrdTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for _WaitForVpaCrd (VPA CRD registration race fix)."""
+
+  def testSucceedsWhenCrdAlreadyRegistered(self):
+    with mock.patch.object(
+        bench.kubectl, 'RunKubectlCommand', return_value=('', '', 0)
+    ) as mock_kubectl:
+      bench._WaitForVpaCrd()
+    # Must NOT pass raise_on_failure=False: kubectl.RunKubectlCommand's
+    # suppress_failure wrapper rewrites a suppressed failure's return code
+    # to 0, which would silently defeat any retcode-based readiness check
+    # -- this is exactly the bug that shipped in the first version of this
+    # fix (a failing "get crd" was reported as success). _WaitForVpaCrd
+    # must rely on RunKubectlCommand raising naturally instead.
+    mock_kubectl.assert_called_once_with(['get', 'crd', bench._VPA_CRD_NAME])
+
+  def testRaisesRuntimeErrorWhenCrdNeverRegisters(self):
+    # A short timeout keeps this test fast: vm_util.Retry checks the
+    # deadline before sleeping, so with timeout << poll_interval it raises
+    # on the very first failed poll instead of actually waiting.
+    #
+    # side_effect (a raised IssueCommandError), not return_value with an
+    # rc=1 tuple: kubectl.RunKubectlCommand's suppress_failure wrapper
+    # rewrites a suppressed failure's return code to 0, so a mock that
+    # just returns rc=1 would not reproduce the real "get crd" failure
+    # mode -- this distinction is exactly what let the CRD-wait fix ship
+    # with a check that could never actually trigger.
+    with mock.patch.object(
+        bench, '_VPA_CRD_WAIT_TIMEOUT_SECS', 1
+    ), mock.patch.object(
+        bench.kubectl,
+        'RunKubectlCommand',
+        side_effect=errors.VmUtil.IssueCommandError(
+            'Error from server (NotFound)'
+        ),
+    ):
+      with self.assertRaises(RuntimeError):
+        bench._WaitForVpaCrd()
 
 
 if __name__ == '__main__':

@@ -47,6 +47,8 @@ from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 from perfkitbenchmarker.resources.container_service import kubernetes_conditions
 
@@ -126,6 +128,51 @@ _JVM_DEPLOYMENT_NAME = 'startup'
 _VLLM_DEPLOYMENT_NAME = 'vllm-startup'
 _CPU_POLL_INTERVAL_SECS = 5
 
+_VPA_CRD_NAME = 'verticalpodautoscalers.autoscaling.k8s.io'
+_VPA_CRD_WAIT_TIMEOUT_SECS = 180
+
+
+def _WaitForVpaCrd() -> None:
+  """Waits for the VerticalPodAutoscaler CRD to be registered on the API server.
+
+  Enabling VPA via --enable-vertical-pod-autoscaling at cluster creation
+  triggers an asynchronous GKE addon install for the VPA CRDs. That install
+  can lag behind the cluster's own RUNNING status and behind kube-dns
+  readiness, so applying a VerticalPodAutoscaler manifest immediately after
+  the cluster comes up can race the CRD registration -- confirmed in
+  production logs where `kubectl apply` failed with "no matches for kind
+  VerticalPodAutoscaler" just seconds after kube-dns reported ready.
+  Poll for the CRD instead of assuming it's already there.
+
+  Raises:
+    RuntimeError: If the CRD never registers within the timeout.
+  """
+
+  @vm_util.Retry(
+      timeout=_VPA_CRD_WAIT_TIMEOUT_SECS,
+      retryable_exceptions=(errors.VmUtil.IssueCommandError,),
+  )
+  def _Poll():
+    # Deliberately do NOT pass raise_on_failure=False here: kubectl.
+    # RunKubectlCommand's suppress_failure wrapper rewrites a suppressed
+    # failure's return code to 0 (see vm_util.IssueCommand), which would
+    # silently defeat a `retcode != 0` check on the result -- this exact
+    # bug let a failing "get crd" report success and skip straight to
+    # applying the VPA manifest in production. Let a failing `get crd`
+    # raise IssueCommandError naturally and use that as the retry signal.
+    kubectl.RunKubectlCommand(['get', 'crd', _VPA_CRD_NAME])
+
+  try:
+    _Poll()
+  except vm_util.RetryError as e:
+    raise RuntimeError(
+        f'VerticalPodAutoscaler CRD ({_VPA_CRD_NAME}) never registered'
+        f' within {_VPA_CRD_WAIT_TIMEOUT_SECS}s. GKE installs VPA CRDs'
+        ' asynchronously after --enable-vertical-pod-autoscaling; either'
+        ' the addon install is unusually slow, or CPU Startup Boost is'
+        ' not supported on this cluster configuration.'
+    ) from e
+
 
 def GetConfig(user_config: Dict[str, Any]) -> Dict[str, Any]:
   """Returns merged benchmark config.
@@ -199,8 +246,18 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   before its targetRef Deployment exists -- it simply waits for the
   target to appear.
 
+  For scenario=optimized, also waits for the VerticalPodAutoscaler CRD to
+  be registered before applying the VPA manifest -- GKE installs VPA CRDs
+  asynchronously after cluster creation, and that install can still be in
+  flight even once the cluster and kube-dns report ready (see
+  _WaitForVpaCrd).
+
   Args:
     benchmark_spec: The benchmark specification.
+
+  Raises:
+    RuntimeError: If scenario=optimized and the VerticalPodAutoscaler CRD
+      never registers within the wait timeout.
   """
   image = benchmark_spec.container_specs['kubernetes_deployment_startup'].image
   workload = WORKLOAD.value
@@ -218,6 +275,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
     # deployment, so the boost's admission-time mutation applies to the
     # very first pod this benchmark measures (see docstring above).
     if scenario == 'optimized':
+      _WaitForVpaCrd()
       logging.info(
           '[startup] scenario=optimized: VPA boost_factor=%d applied first',
           BOOST_FACTOR.value,
@@ -530,9 +588,6 @@ def _GetTotalCpuMillicores() -> float | None:
   above retries on the next poll interval regardless.
   """
   try:
-    # pylint: disable=import-outside-toplevel
-    from perfkitbenchmarker.resources.container_service import kubectl
-
     stdout, _, rc = kubectl.RunKubectlCommand(
         ['top', 'pods', '--no-headers'], raise_on_failure=False
     )
