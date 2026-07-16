@@ -564,6 +564,21 @@ postgres_sysbench_tpcc:
     sysbench_scale: 100
     sysbench_use_fk: False
 
+postgresql_sysbench_oltp_base_lssd: &postgresql_sysbench_oltp_base_lssd
+  <<: *postgresql_sysbench_oltp_base
+
+postgres_sysbench_oltp_read_write_lssd:
+  name: unmanaged_postgresql_sysbench_lssd
+  flags:
+    sysbench_testname: oltp_read_write
+    <<: *postgresql_sysbench_oltp_base_lssd
+
+postgres_sysbench_oltp_read_only_lssd:
+  name: unmanaged_postgresql_sysbench_lssd
+  flags:
+    sysbench_testname: oltp_read_only
+    <<: *postgresql_sysbench_oltp_base_lssd
+
 fio_latency:
   name: fio
   flags:
