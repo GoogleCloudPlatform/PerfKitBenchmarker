@@ -160,11 +160,33 @@ class KafkaBenchmarkPrepareTest(KafkaBenchmarkTestCaseBase):
     self.assertIn('offsets.topic.replication.factor=3', props)
     self.assertIn('transaction.state.log.replication.factor=3', props)
 
+  @flagsaver.flagsaver(kafka_file_delete_delay_ms=5000)
+  def testPrepareWithCustomFileDeleteDelay(self):
+    self.controller_vm.RemoteCommand.return_value = ('test-uuid-1234\n', '')
+    self.broker_vm.RemoteCommand.return_value = ('', '')
+
+    with mock.patch.object(
+        kafka_benchmark, '_InstallKafka'
+    ), mock.patch.object(time, 'sleep'):
+      kafka_benchmark.Prepare(self.benchmark_spec)
+
+    broker_properties_write_call = [
+        call_args[0][0]
+        for call_args in self.broker_vm.RemoteCommand.call_args_list
+        if 'config/broker.properties' in call_args[0][0]
+        and 'cat <<EOF' in call_args[0][0]
+    ]
+    self.assertLen(broker_properties_write_call, 1)
+    props = broker_properties_write_call[0]
+    self.assertIn('file.delete.delay.ms=5000', props)
+    self.assertIn('log.segment.delete.delay.ms=5000', props)
+
 
 class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
   """Tests for _CreateTopic, _RunProducer, and _RunConsumer."""
 
-  def testCreateTopicDefault(self):
+  @mock.patch.object(time, 'sleep')
+  def testCreateTopicDefault(self, mock_sleep):
     kafka_benchmark._CreateTopic(self.broker_vm, '10.0.0.1:9092', 'test-topic')
     self.broker_vm.RemoteCommand.assert_called_once_with(
         f'cd {kafka_benchmark.KAFKA_DIR} && bin/kafka-topics.sh --create'
@@ -172,9 +194,11 @@ class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
         ' --replication-factor=1 --config min.insync.replicas=1'
         ' --if-not-exists'
     )
+    mock_sleep.assert_called_once_with(5)
 
+  @mock.patch.object(time, 'sleep')
   @flagsaver.flagsaver(kafka_num_partitions=64, kafka_replication_factor=3)
-  def testCreateTopicCustomFlags(self):
+  def testCreateTopicCustomFlags(self, mock_sleep):
     kafka_benchmark._CreateTopic(self.broker_vm, '10.0.0.1:9092', 'test-topic')
     self.broker_vm.RemoteCommand.assert_called_once_with(
         f'cd {kafka_benchmark.KAFKA_DIR} && bin/kafka-topics.sh --create'
@@ -182,6 +206,27 @@ class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
         ' --replication-factor=3 --config min.insync.replicas=3'
         ' --if-not-exists'
     )
+    mock_sleep.assert_called_once_with(5)
+
+  def testDeleteTopic(self):
+    self.broker_vm.RemoteCommand.side_effect = [
+        ('', ''),
+        ('other-topic\n', ''),
+    ]
+    kafka_benchmark._DeleteTopic(self.broker_vm, '10.0.0.1:9092', 'test-topic')
+    self.assertLen(self.broker_vm.RemoteCommand.call_args_list, 2)
+    self.broker_vm.RemoteCommand.assert_has_calls([
+        mock.call(
+            f'cd {kafka_benchmark.KAFKA_DIR} && bin/kafka-topics.sh --delete'
+            ' --topic test-topic --bootstrap-server 10.0.0.1:9092',
+            ignore_failure=True,
+        ),
+        mock.call(
+            f'cd {kafka_benchmark.KAFKA_DIR} && bin/kafka-topics.sh --list'
+            ' --bootstrap-server 10.0.0.1:9092',
+            ignore_failure=True,
+        ),
+    ])
 
   def testRunProducerDefault(self):
     self.producer_vm.RemoteCommand.side_effect = [
@@ -659,6 +704,8 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
     with mock.patch.object(
         kafka_benchmark, '_CreateTopic'
     ) as mock_topic, mock.patch.object(
+        kafka_benchmark, '_DeleteTopic'
+    ) as mock_delete, mock.patch.object(
         kafka_benchmark, '_RunProducer', return_value='prod_out'
     ) as mock_prod, mock.patch.object(
         kafka_benchmark, '_RunConsumer', return_value='cons_out'
@@ -672,6 +719,9 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
 
       expected_topic = 'kafka-benchmark-test-threads-8-records-50000'
       mock_topic.assert_called_once_with(
+          self.broker_vm, '10.0.0.1:9092', expected_topic
+      )
+      mock_delete.assert_called_once_with(
           self.broker_vm, '10.0.0.1:9092', expected_topic
       )
       mock_prod.assert_called_once_with(
@@ -694,39 +744,95 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
       mock_parse_cons.assert_called_once_with('cons_out', expected_metadata)
       self.assertEqual(results, [s1, s2])
 
-  def testRunDefaultThreadsAndRecords(self):
-    self.producer_vm.NumCpusForBenchmark.return_value = 32
-    self.consumer_vm.NumCpusForBenchmark.return_value = 64
+  def testRunSweepAllThreads(self):
+    def _mock_single(spec, num_threads, num_records):
+      del spec, num_records
+      return [
+          sample.Sample(
+              'Producer Throughput (MB/sec)', num_threads * 100.0, 'MB/sec'
+          ),
+          sample.Sample(
+              'Consumer Throughput (MB/sec)', num_threads * 90.0, 'MB/sec'
+          ),
+      ]
+
     with mock.patch.object(
-        kafka_benchmark, '_RunSingleTrial', return_value=['sample1']
+        kafka_benchmark, '_RunSingleTrial', side_effect=_mock_single
     ) as mock_single:
       results = kafka_benchmark.Run(self.benchmark_spec)
-      mock_single.assert_called_once_with(
-          self.benchmark_spec, 16, 9_000_000
-      )
-      self.assertEqual(results, ['sample1'])
+      self.assertLen(mock_single.call_args_list, 9)
+      expected_calls = [
+          mock.call(self.benchmark_spec, 2**i, 10_000_000) for i in range(9)
+      ]
+      mock_single.assert_has_calls(expected_calls)
+      self.assertLen(results, 2)
+      self.assertEqual(results[0].value, 25600.0)
 
-  def testRunProducerCpuBottleneck(self):
-    self.producer_vm.NumCpusForBenchmark.return_value = 4
-    self.consumer_vm.NumCpusForBenchmark.return_value = 32
-    with mock.patch.object(kafka_benchmark, '_RunSingleTrial') as mock_single:
-      kafka_benchmark.Run(self.benchmark_spec)
-      mock_single.assert_called_once_with(self.benchmark_spec, 4, 9_000_000)
+  def testRunSweepEarlyStopping(self):
+    trial_data = {
+        1: (100.0, 90.0),
+        2: (200.0, 180.0),
+        4: (201.0, 180.9),
+    }
 
-  def testRunConsumerCpuBottleneck(self):
-    self.producer_vm.NumCpusForBenchmark.return_value = 32
-    self.consumer_vm.NumCpusForBenchmark.return_value = 2
-    with mock.patch.object(kafka_benchmark, '_RunSingleTrial') as mock_single:
-      kafka_benchmark.Run(self.benchmark_spec)
-      mock_single.assert_called_once_with(self.benchmark_spec, 2, 9_000_000)
+    def _mock_single(spec, num_threads, num_records):
+      del spec, num_records
+      prod_val, cons_val = trial_data[num_threads]
+      return [
+          sample.Sample('Producer Throughput (MB/sec)', prod_val, 'MB/sec'),
+          sample.Sample('Consumer Throughput (MB/sec)', cons_val, 'MB/sec'),
+      ]
 
-  @flagsaver.flagsaver(kafka_num_threads=8, kafka_num_records=12345)
+    with mock.patch.object(
+        kafka_benchmark, '_RunSingleTrial', side_effect=_mock_single
+    ) as mock_single:
+      results = kafka_benchmark.Run(self.benchmark_spec)
+      self.assertLen(mock_single.call_args_list, 3)
+      expected_calls = [
+          mock.call(self.benchmark_spec, t, 10_000_000) for t in [1, 2, 4]
+      ]
+      mock_single.assert_has_calls(expected_calls)
+      self.assertLen(results, 2)
+      self.assertEqual(results[0].value, 200.0)
+
+  @flagsaver.flagsaver(kafka_num_threads=['8'], kafka_num_records=12345)
   def testRunWithCustomFlags(self):
-    self.producer_vm.NumCpusForBenchmark.return_value = 32
-    self.consumer_vm.NumCpusForBenchmark.return_value = 32
-    with mock.patch.object(kafka_benchmark, '_RunSingleTrial') as mock_single:
-      kafka_benchmark.Run(self.benchmark_spec)
+    mock_sample = sample.Sample(
+        'Producer Throughput (MB/sec)', 100.0, 'MB/sec'
+    )
+    with mock.patch.object(
+        kafka_benchmark, '_RunSingleTrial', return_value=[mock_sample]
+    ) as mock_single:
+      results = kafka_benchmark.Run(self.benchmark_spec)
       mock_single.assert_called_once_with(self.benchmark_spec, 8, 12345)
+      self.assertEqual(results, [mock_sample])
+
+  @flagsaver.flagsaver(
+      kafka_num_threads=['2', '4', '8'], kafka_num_records=12345
+  )
+  def testRunWithCustomThreadList(self):
+    def _mock_single(spec, num_threads, num_records):
+      del spec, num_records
+      return [
+          sample.Sample(
+              'Producer Throughput (MB/sec)', num_threads * 100.0, 'MB/sec'
+          ),
+          sample.Sample(
+              'Consumer Throughput (MB/sec)', num_threads * 90.0, 'MB/sec'
+          ),
+      ]
+
+    with mock.patch.object(
+        kafka_benchmark, '_RunSingleTrial', side_effect=_mock_single
+    ) as mock_single:
+      results = kafka_benchmark.Run(self.benchmark_spec)
+      self.assertLen(mock_single.call_args_list, 3)
+      expected_calls = [
+          mock.call(self.benchmark_spec, t, 12345) for t in [2, 4, 8]
+      ]
+      mock_single.assert_has_calls(expected_calls)
+      self.assertLen(results, 2)
+      self.assertEqual(results[0].value, 800.0)
 
 
 class KafkaBenchmarkCleanupTest(KafkaBenchmarkTestCaseBase):
