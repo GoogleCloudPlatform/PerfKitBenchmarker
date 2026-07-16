@@ -123,6 +123,8 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
   # Time between retries.
   POLL_INTERVAL = 5
 
+  CHECK_FOR_ERRORS_EVERY_N_READY_POLLS = 10
+
   def __init__(
       self,
       user_managed=False,
@@ -285,6 +287,16 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
     """
     pass
 
+  def _CheckForReadinessErrors(self):
+    """Method that raises failing errors during readiness polling.
+
+    _IsReady can also raise errors, but this is for more heavy weight
+    investigations that would slow down the main polling loop.
+
+    This is called every CHECK_FOR_ERRORS_EVERY_N_READY_POLLS.
+    """
+    pass
+
   @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
   def _CreateResource(self):
     """Reliably creates the underlying resource."""
@@ -409,6 +421,7 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
 
   def _WaitUntilReady(self) -> None:
     """Waits & retries until the resource is ready."""
+    ready_checks_performed = 0
 
     @vm_util.Retry(
         # Inner function needed to allow for self.POLL_INTERVAL as default.
@@ -418,7 +431,15 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
         retryable_exceptions=(errors.Resource.RetryableCreationError,),
     )
     def _InnerWaitUntilReady() -> None:
-      if not self._IsReady():
+      ready = self._IsReady()
+      nonlocal ready_checks_performed
+      ready_checks_performed += 1
+      if not ready:
+        if (
+            ready_checks_performed % self.CHECK_FOR_ERRORS_EVERY_N_READY_POLLS
+            == 0
+        ):
+          self._CheckForReadinessErrors()
         raise errors.Resource.RetryableCreationError('Not yet ready')
 
     _InnerWaitUntilReady()

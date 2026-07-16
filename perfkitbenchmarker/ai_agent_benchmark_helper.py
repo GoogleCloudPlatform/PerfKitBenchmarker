@@ -123,7 +123,7 @@ class BaseAgent(abc.ABC):
 
     self.BeforeCreateAgent()
     self.spec.always_call_cleanup = True  # pyrefly: ignore[missing-attribute]
-    self.agent_service.Create()
+    self.agent_service.Create()  # pyrefly: ignore[missing-attribute]
     self.UploadValidatorScript()
     self.PostPrepare()
 

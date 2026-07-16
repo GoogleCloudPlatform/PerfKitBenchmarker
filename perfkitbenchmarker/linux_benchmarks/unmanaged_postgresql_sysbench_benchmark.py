@@ -151,16 +151,22 @@ def GetBufferSize() -> str:
   return f'{buffer_size}G'
 
 
-def GetConfig(user_config):
+def GetConfig(
+    user_config,
+    benchmark_config=BENCHMARK_CONFIG,
+    benchmark_name=BENCHMARK_NAME,
+):
   """Get the benchmark config, applying user overrides.
 
   Args:
-    user_config:
+    user_config: User specified config overrides.
+    benchmark_config: The benchmark configuration string.
+    benchmark_name: The name of the benchmark.
 
   Returns:
     Benchmark config.
   """
-  config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+  config = configs.LoadConfig(benchmark_config, user_config, benchmark_name)
   # Instead of changing the default data dir of database in (multiple) configs,
   # Force the scratch disk as database default dir (simpler code).
   disk_spec = config['vm_groups']['server']['disk_spec']

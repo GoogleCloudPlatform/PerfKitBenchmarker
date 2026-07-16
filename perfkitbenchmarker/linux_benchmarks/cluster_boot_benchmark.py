@@ -58,6 +58,12 @@ Metric: cluster-boot-time
   bootable_time recorded:
     This timestamp is captured once all times are captured. The maximum
     vm.bootable_time in a cluster of VMs is reported as the cluster boot time.
+Metric: data-disk-visible
+  disk_visible_time recorded:
+    This timestamp is captured by checking the inode birth time of the first
+    data disk in /dev/. Note: cluster_boot does not provision data disks by
+    default; this metric is only measured when a data disk is configured via
+    config overrides (e.g. --config_override='...disk_count=1').
 """
 
 from collections.abc import Mapping
@@ -392,6 +398,24 @@ def GetTimeToBoot(
               metadata,
           )
       )
+
+    # TIME TO DATA DISK VISIBLE
+    if vm.scratch_disks:
+      device_path = vm.scratch_disks[0].GetDevicePath()
+
+      try:
+        out, _ = vm.RemoteCommand(f"stat -c '%.W' {device_path}")
+        disk_visible_time = float(out.strip())
+        samples.append(
+            sample.Sample(
+                'Data Disk Visible',
+                disk_visible_time - min_create_start_time,
+                'seconds',
+                metadata,
+            )
+        )
+      except errors.VirtualMachine.RemoteCommandError as e:
+        logging.warning('Failed to measure data disk visibility: %s', e)
 
   # Add a total cluster boot sample as the maximum boot time.
   metadata = {

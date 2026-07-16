@@ -12,32 +12,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Sysbench Benchmark for unmanaged MySQL db on a VM with LSSD prefilling.
+"""Sysbench Benchmark for unmanaged PostgreSQL db on a VM with LSSD prefilling.
 
-This benchmark measures performance of Sysbench Databases on unmanaged MySQL,
-with FIO prefilling of the disk.
+This benchmark measures performance of Sysbench Databases on unmanaged
+PostgreSQL, with FIO prefilling of the disk.
 """
 
 import logging
 from absl import flags
 from perfkitbenchmarker.linux_benchmarks import lssd_workloads_util
-from perfkitbenchmarker.linux_benchmarks import unmanaged_mysql_sysbench_benchmark as base_benchmark
+from perfkitbenchmarker.linux_benchmarks import unmanaged_postgresql_sysbench_benchmark as base_benchmark
 
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = 'unmanaged_mysql_sysbench_lssd'
-BENCHMARK_CONFIG = (
-    base_benchmark.BENCHMARK_CONFIG.replace(
-        'unmanaged_mysql_sysbench:', 'unmanaged_mysql_sysbench_lssd:'
-    )
-    .replace(
-        'sysbench_run_threads: 1,64,128,256,512,1024,2048',
-        'sysbench_run_threads: 256',
-    )
-    .replace('sysbench_run_seconds: 300', 'sysbench_run_seconds: 21600')
-)
-MYSQL_DATA_DIR = '/var/lib/mysql'
+BENCHMARK_NAME = 'unmanaged_postgresql_sysbench_lssd'
+BENCHMARK_CONFIG = """
+unmanaged_postgresql_sysbench_lssd:
+  description: PostgreSQL on a VM with Local SSDs benchmarked using Sysbench.
+  vm_groups:
+    client:
+      vm_spec:
+        GCP:
+          machine_type: c3-highmem-22
+    server:
+      vm_spec:
+        GCP:
+          machine_type: z3-highmem-16-highlssd
+          zone: us-east1-b
+      disk_spec:
+        GCP:
+          disk_type: local # LSSD Default
+          interface: NVME
+          num_striped_disks: 2
+  flags:
+    sysbench_version: df89d34c410a2277e19f77e47e535d0890b2029b
+    disk_fs_type: ext4 # LSSD standard
+    db_engine: postgresql
+    os_type: ubuntu2204
+    skip_system_config: true
+    sysbench_tables: 200
+    sysbench_table_size: 60000000
+    sysbench_report_interval: 1
+    sysbench_run_threads: 128
+    sysbench_run_seconds: 21600  # 6 hrs tests
+"""
 
 
 def GetConfig(user_config):
@@ -71,6 +90,7 @@ def InstallPackages(benchmark_spec):
 
 def StartServices(benchmark_spec):
   """Start services for the benchmark run."""
+  # Precondition the disk if required.
   server = benchmark_spec.vm_groups['server'][0]
   if lssd_workloads_util.LSSD_WORKLOAD_PRECONDITION_DISK.value:
     lssd_workloads_util.PreconditionDisk(server)
@@ -81,8 +101,9 @@ def StartServices(benchmark_spec):
   # Call base StartServices to load DB data and start services
   base_benchmark.StartServices(benchmark_spec)
   logging.info('Checking disk space after database load...')
-  stdout, _ = server.RemoteCommand(f'df -h {MYSQL_DATA_DIR}')
-  logging.info('Disk space usage for %s:\n%s', MYSQL_DATA_DIR, stdout)
+  data_dir = server.scratch_disks[0].mount_point
+  stdout, _ = server.RemoteCommand(f'df -h {data_dir}')
+  logging.info('Disk space usage for %s:\n%s', data_dir, stdout)
 
 
 def Run(benchmark_spec):

@@ -99,7 +99,9 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
   def _NfsService(self, disk_size=1024, **kwargs):
     for key, value in kwargs.items():
       FLAGS[key].parse(value)
-    spec = disk.BaseDiskSpec('test_component', disk_size=disk_size)
+    spec = disk.BaseNFSDiskSpec(
+        'test_component', FLAGS, disk_size=disk_size
+    )
     return gce_nfs_service.GceNfsService(spec, _ZONE)
 
   def _SetResponses(self, *responses):
@@ -142,6 +144,22 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
       nfs._Create()
     describe_cmd = ['describe', 'nfs-fb810a9b']
     self.assertMultipleCommands(_CreateCmd(), describe_cmd)
+
+  def testCreateWithNfsVersion4(self):
+    nfs = self._NfsService(nfs_version='4.1')
+    self._SetResponses(_CREATE_RES, _DescribeResult())
+    nfs._Create()
+    expected_create_cmd = _CreateCmd() + ['--protocol', 'NFS_V4_1']
+    describe_cmd = ['describe', _NFS_NAME]
+    self.assertMultipleCommands(expected_create_cmd, describe_cmd)
+
+  def testCreateWithNfsVersion3(self):
+    nfs = self._NfsService(nfs_version='3')
+    self._SetResponses(_CREATE_RES, _DescribeResult())
+    nfs._Create()
+    expected_create_cmd = _CreateCmd() + ['--protocol', 'NFS_V3']
+    describe_cmd = ['describe', _NFS_NAME]
+    self.assertMultipleCommands(expected_create_cmd, describe_cmd)
 
   def testCreate2TBDisk(self):
     self._SetResponses(_CREATE_RES, _DescribeResult())

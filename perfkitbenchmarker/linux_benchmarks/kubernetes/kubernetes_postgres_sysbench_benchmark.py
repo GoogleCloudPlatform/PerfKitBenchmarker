@@ -299,7 +299,7 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
 
   # Apply manifests
   kubernetes_commands.ApplyManifest(
-      FLAGS.kubernetes_postgres_sysbench_template_path, **template_params
+      FLAGS.kubernetes_postgres_sysbench_template_path, **template_params  # pyrefly: ignore[bad-argument-type]
   )
 
   # Wait for PostgreSQL pod to be ready (not StatefulSet ready replicas)
@@ -315,7 +315,7 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
         ),
     )
     def _WaitForPodReady():
-      cluster.WaitForResource(
+      cluster.WaitForResource(  # pyrefly: ignore[missing-attribute]
           'pod/postgres-standalone-0',  # resource_name
           'Ready',  # condition_name
           namespace='default',
@@ -501,7 +501,7 @@ def _PrepareSysbenchClient(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   )
 
   # Wait for client pod - WaitForResource accepts namespace parameter
-  cluster.WaitForResource('pod/postgres-client', 'Ready', namespace='default')
+  cluster.WaitForResource('pod/postgres-client', 'Ready', namespace='default')  # pyrefly: ignore[missing-attribute]
 
   # Install sysbench and dependencies in pod
   install_commands = [

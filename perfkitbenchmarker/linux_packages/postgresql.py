@@ -62,6 +62,18 @@ SHARED_BUFFERS_CONF = {
         'max_memory': '108.8G',
         'nr_hugepages': '23000',
     },
+    'SIZE_64G': {  # 3TB DB (200 tables, 60M tablesize) for read/write
+        'shared_buffers': '64GB',
+        'effective_cache_size': '94GB',
+        'max_memory': '120G',
+        'nr_hugepages': '35000',
+    },
+    'SIZE_32G': {  # 3TB DB (200 tables, 60M tablesize) for read-only
+        'shared_buffers': '32GB',
+        'effective_cache_size': '94GB',
+        'max_memory': '120G',
+        'nr_hugepages': '25000',
+    },
 }
 
 POSTGRES_CLUSTER_NAME = 'main'
