@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Tests for kubernetes_deployment_startup_benchmark (PR 1 + PR 2 + PR 3)."""
+"""Tests for kubernetes_deployment_startup_benchmark (PR 1-4)."""
 
 import os
 import threading
@@ -461,9 +461,12 @@ class ScenarioTest(pkb_common_test_case.PkbCommonTestCase):
       kubernetes_deployment_startup_workload='vllm',
       cloud='GCP',
   )
-  def testCheckPrerequisitesRaisesOptimizedVllm(self):
-    with self.assertRaises(ValueError):
-      bench.CheckPrerequisites(None)
+  def testCheckPrerequisitesPassesOptimizedVllm(self):
+    # PR 4: vLLM now supports scenario=optimized too -- CPU Startup Boost
+    # also benefits AI/inference workloads, which spend significant
+    # startup time loading models into memory (same admission-time boost
+    # mechanism as JVM). Only the cloud=GCP restriction still applies.
+    bench.CheckPrerequisites(None)
 
   @flagsaver.flagsaver(
       kubernetes_deployment_startup_scenario='baseline',
@@ -599,6 +602,265 @@ class ScenarioTest(pkb_common_test_case.PkbCommonTestCase):
 
 
 # ---------------------------------------------------------------------------
+# PR 4: CPU Startup Boost for vLLM
+#
+# scenario=optimized was previously JVM-only (CheckPrerequisites raised for
+# workload=vllm). Rich's guidance: AI/inference workloads spend a lot of
+# startup time loading models into memory, so they should benefit from the
+# same CPU Startup Boost mechanism -- just with workload-specific sizing,
+# since vLLM's baseline CPU request (2 cores) and expected startup time are
+# both much larger than the JVM's.
+# ---------------------------------------------------------------------------
+
+
+class VllmOptimizedScenarioTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for scenario=optimized with workload=vllm (PR 4)."""
+
+  def _MakeVllmSpec(self):
+    return _MakeSpec(
+        image='public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:latest'
+    )
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='vllm',
+      kubernetes_deployment_startup_boost_factor=2,
+      cloud='GCP',
+  )
+  def testPrepareAppliesVpaBeforeVllmDeployment(self):
+    apply_calls = []
+    apply_kwargs = []
+
+    def _record(*args, **kwargs):
+      apply_calls.append(args[0])
+      apply_kwargs.append(kwargs)
+
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest', side_effect=_record
+    ), mock.patch.object(
+        bench.kubectl, 'RunKubectlCommand', return_value=('', '', 0)
+    ):
+      bench.Prepare(self._MakeVllmSpec())
+
+    self.assertLen(apply_calls, 2)
+    vpa_index = next(i for i, c in enumerate(apply_calls) if 'vpa' in c)
+    deployment_index = next(i for i, c in enumerate(apply_calls) if 'vllm' in c)
+    self.assertLess(
+        vpa_index,
+        deployment_index,
+        'VPA manifest must be applied before the vLLM deployment manifest,'
+        ' otherwise CPU Startup Boost cannot affect the measured pod.',
+    )
+    # The VPA must target the vLLM deployment name, not the JVM one.
+    self.assertEqual(apply_kwargs[vpa_index]['name'], 'vllm-startup')
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='vllm',
+      cloud='GCP',
+  )
+  def testPrepareUsesVllmVpaSizingDefaults(self):
+    captured = {}
+
+    def _record(*args, **kwargs):
+      if 'vpa' in args[0]:
+        captured.update(kwargs)
+
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest', side_effect=_record
+    ), mock.patch.object(
+        bench.kubectl, 'RunKubectlCommand', return_value=('', '', 0)
+    ):
+      bench.Prepare(self._MakeVllmSpec())
+
+    # vLLM's baseline 2-core request exceeds the JVM-tuned "1" ceiling, and
+    # model loading is expected to take longer than the JVM's ~67s baseline
+    # -- these defaults must differ from the JVM ones, not be shared.
+    self.assertEqual(
+        captured['max_allowed_cpu'], bench._VPA_DEFAULT_MAX_CPU['vllm']
+    )
+    self.assertEqual(
+        captured['duration_seconds'],
+        bench._VPA_DEFAULT_DURATION_SECONDS['vllm'],
+    )
+    self.assertNotEqual(
+        bench._VPA_DEFAULT_MAX_CPU['vllm'], bench._VPA_DEFAULT_MAX_CPU['jvm']
+    )
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='jvm',
+      cloud='GCP',
+  )
+  def testPrepareUsesJvmVpaSizingDefaults(self):
+    captured = {}
+
+    def _record(*args, **kwargs):
+      if 'vpa' in args[0]:
+        captured.update(kwargs)
+
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest', side_effect=_record
+    ), mock.patch.object(
+        bench.kubectl, 'RunKubectlCommand', return_value=('', '', 0)
+    ):
+      bench.Prepare(_MakeSpec())
+
+    self.assertEqual(
+        captured['max_allowed_cpu'], bench._VPA_DEFAULT_MAX_CPU['jvm']
+    )
+    self.assertEqual(
+        captured['duration_seconds'],
+        bench._VPA_DEFAULT_DURATION_SECONDS['jvm'],
+    )
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='vllm',
+      kubernetes_deployment_startup_vpa_max_cpu='6',
+      kubernetes_deployment_startup_vpa_duration_seconds=400,
+      cloud='GCP',
+  )
+  def testVpaSizingOverridableViaFlags(self):
+    captured = {}
+
+    def _record(*args, **kwargs):
+      if 'vpa' in args[0]:
+        captured.update(kwargs)
+
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest', side_effect=_record
+    ), mock.patch.object(
+        bench.kubectl, 'RunKubectlCommand', return_value=('', '', 0)
+    ):
+      bench.Prepare(self._MakeVllmSpec())
+
+    self.assertEqual(captured['max_allowed_cpu'], '6')
+    self.assertEqual(captured['duration_seconds'], 400)
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='vllm',
+      cloud='GCP',
+  )
+  def testPrepareUsesGpuMemoryUtilizationDefault(self):
+    # PR 5: Prepare() must forward the gpu_memory_utilization flag to the
+    # vLLM deployment manifest, otherwise vLLM's own ~0.9 default crash-loops
+    # against the container's 4Gi memory limit.
+    captured = {}
+
+    def _record(*args, **kwargs):
+      if 'vllm' in args[0]:
+        captured.update(kwargs)
+
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest', side_effect=_record
+    ), mock.patch.object(
+        bench.kubectl, 'RunKubectlCommand', return_value=('', '', 0)
+    ):
+      bench.Prepare(self._MakeVllmSpec())
+
+    self.assertEqual(
+        captured['gpu_memory_utilization'],
+        bench.VLLM_GPU_MEMORY_UTILIZATION.default,
+    )
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='vllm',
+      kubernetes_deployment_startup_vllm_gpu_memory_utilization=0.3,
+      cloud='GCP',
+  )
+  def testPrepareGpuMemoryUtilizationOverridableViaFlag(self):
+    captured = {}
+
+    def _record(*args, **kwargs):
+      if 'vllm' in args[0]:
+        captured.update(kwargs)
+
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest', side_effect=_record
+    ), mock.patch.object(
+        bench.kubectl, 'RunKubectlCommand', return_value=('', '', 0)
+    ):
+      bench.Prepare(self._MakeVllmSpec())
+
+    self.assertEqual(captured['gpu_memory_utilization'], 0.3)
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='vllm',
+      cloud='GCP',
+  )
+  def testPrepareUsesMemoryLimitDefault(self):
+    # PR 6: Prepare() must forward the memory_limit flag to the vLLM
+    # deployment manifest -- the old hardcoded 4Gi OOMKilled during vLLM's
+    # compile/warmup phase.
+    captured = {}
+
+    def _record(*args, **kwargs):
+      if 'vllm' in args[0]:
+        captured.update(kwargs)
+
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest', side_effect=_record
+    ), mock.patch.object(
+        bench.kubectl, 'RunKubectlCommand', return_value=('', '', 0)
+    ):
+      bench.Prepare(self._MakeVllmSpec())
+
+    self.assertEqual(captured['memory_limit'], bench.VLLM_MEMORY_LIMIT.default)
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='vllm',
+      kubernetes_deployment_startup_vllm_memory_limit='12Gi',
+      cloud='GCP',
+  )
+  def testPrepareMemoryLimitOverridableViaFlag(self):
+    captured = {}
+
+    def _record(*args, **kwargs):
+      if 'vllm' in args[0]:
+        captured.update(kwargs)
+
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest', side_effect=_record
+    ), mock.patch.object(
+        bench.kubectl, 'RunKubectlCommand', return_value=('', '', 0)
+    ):
+      bench.Prepare(self._MakeVllmSpec())
+
+    self.assertEqual(captured['memory_limit'], '12Gi')
+
+  @flagsaver.flagsaver(
+      kubernetes_deployment_startup_scenario='optimized',
+      kubernetes_deployment_startup_workload='vllm',
+      cloud='GCP',
+  )
+  def testRunWaitsOnVllmDeploymentWhenOptimized(self):
+    # Regression guard: the vLLM branch of Prepare()/Run() must keep
+    # waiting on the vllm-startup deployment (not startup) once VPA support
+    # was wired into that branch too.
+    with mock.patch.object(
+        bench.kubernetes_commands, 'ApplyManifest'
+    ), mock.patch.object(
+        bench.kubectl, 'RunKubectlCommand', return_value=('', '', 0)
+    ), mock.patch.object(
+        bench.kubernetes_commands, 'WaitForRollout'
+    ) as mock_wait, mock.patch.object(
+        bench.kubernetes_conditions,
+        'GetStatusConditionsForResourceType',
+        return_value=_DefaultConditions(),
+    ), mock.patch.object(
+        bench, '_GetTotalCpuMillicores', return_value=100.0
+    ):
+      bench.Prepare(self._MakeVllmSpec())
+      bench.Run(self._MakeVllmSpec())
+      mock_wait.assert_called_with('deployment/vllm-startup', timeout=600)
+
+
+# ---------------------------------------------------------------------------
 # PR 3: VPA CRD registration race fix
 #
 # Enabling VPA via --enable-vertical-pod-autoscaling triggers an
@@ -702,10 +964,35 @@ class ManifestResourceResolutionTest(pkb_common_test_case.PkbCommonTestCase):
     rendered = env.get_template(os.path.basename(path)).render(
         name='vllm-startup',
         image='public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:latest',
+        gpu_memory_utilization=bench.VLLM_GPU_MEMORY_UTILIZATION.default,
+        memory_limit=bench.VLLM_MEMORY_LIMIT.default,
     )
     docs = list(yaml.safe_load_all(rendered))
     self.assertEqual(docs[0]['kind'], 'Deployment')
     self.assertEqual(docs[1]['kind'], 'Service')
+    # PR 5: --gpu-memory-utilization must be passed to the vLLM container,
+    # otherwise the process defaults to ~0.9 and crash-loops against the
+    # container memory limit below.
+    container_args = docs[0]['spec']['template']['spec']['containers'][0][
+        'args'
+    ]
+    self.assertIn('--gpu-memory-utilization', container_args)
+    self.assertEqual(
+        container_args[container_args.index('--gpu-memory-utilization') + 1],
+        str(bench.VLLM_GPU_MEMORY_UTILIZATION.default),
+    )
+    # PR 6: requests/limits.memory must reflect memory_limit (Guaranteed
+    # QoS -- requests == limits), otherwise the pod OOMKills during vLLM's
+    # compile/warmup phase against the old hardcoded 4Gi.
+    resources = docs[0]['spec']['template']['spec']['containers'][0][
+        'resources'
+    ]
+    self.assertEqual(
+        resources['requests']['memory'], bench.VLLM_MEMORY_LIMIT.default
+    )
+    self.assertEqual(
+        resources['limits']['memory'], bench.VLLM_MEMORY_LIMIT.default
+    )
 
   def testVpaManifestRendersValidYamlWithBoostFactor(self):
     path = data.ResourcePath(bench.VPA_YAML.value)
@@ -713,8 +1000,46 @@ class ManifestResourceResolutionTest(pkb_common_test_case.PkbCommonTestCase):
         loader=jinja2.FileSystemLoader(os.path.dirname(path))
     )
     rendered = env.get_template(os.path.basename(path)).render(
-        name='startup', boost_factor=3
+        name='startup',
+        boost_factor=3,
+        max_allowed_cpu=bench._VPA_DEFAULT_MAX_CPU['jvm'],
+        duration_seconds=bench._VPA_DEFAULT_DURATION_SECONDS['jvm'],
     )
     docs = list(yaml.safe_load_all(rendered))
     self.assertEqual(docs[0]['kind'], 'VerticalPodAutoscaler')
     self.assertEqual(docs[0]['spec']['startupBoost']['cpu']['factor'], 3)
+    self.assertEqual(
+        docs[0]['spec']['startupBoost']['cpu']['durationSeconds'], 120
+    )
+    self.assertEqual(
+        docs[0]['spec']['resourcePolicy']['containerPolicies'][0]['maxAllowed'][
+            'cpu'
+        ],
+        '1',
+    )
+
+  def testVpaManifestRendersValidYamlForVllmSizing(self):
+    # PR 4: same template, targeting the vLLM deployment name with vLLM's
+    # (larger) CPU ceiling and boost duration.
+    path = data.ResourcePath(bench.VPA_YAML.value)
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(os.path.dirname(path))
+    )
+    rendered = env.get_template(os.path.basename(path)).render(
+        name='vllm-startup',
+        boost_factor=2,
+        max_allowed_cpu=bench._VPA_DEFAULT_MAX_CPU['vllm'],
+        duration_seconds=bench._VPA_DEFAULT_DURATION_SECONDS['vllm'],
+    )
+    docs = list(yaml.safe_load_all(rendered))
+    self.assertEqual(docs[0]['kind'], 'VerticalPodAutoscaler')
+    self.assertEqual(docs[0]['spec']['targetRef']['name'], 'vllm-startup')
+    self.assertEqual(
+        docs[0]['spec']['resourcePolicy']['containerPolicies'][0]['maxAllowed'][
+            'cpu'
+        ],
+        '4',
+    )
+    self.assertEqual(
+        docs[0]['spec']['startupBoost']['cpu']['durationSeconds'], 300
+    )
