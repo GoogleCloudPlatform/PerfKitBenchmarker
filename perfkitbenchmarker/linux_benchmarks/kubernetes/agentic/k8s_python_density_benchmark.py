@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 
 from absl import flags
 from perfkitbenchmarker import configs
@@ -72,6 +73,10 @@ k8s_python_density:
   description: >
     Atomic single-point Python sandbox density measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
+  flags: {}
+  container_registry: {}
+  container_specs: {}
+  container_cluster: {}
 """
 
 _WARMPOOL_NAME = "python-sandbox-warmpool"
@@ -188,7 +193,10 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     )
 
     # Build samples
+    run_id = str(uuid.uuid4())[:8]
+
     extra = {
+        "run_id": run_id,
         "density": density,
         "successful_sessions": successful,
         "failed_sessions": failed,
@@ -281,42 +289,34 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
         extra,
     )
 
-    # TTFE
-    _emit(samples, agg, "sandbox_ttfe_ms", "sandbox_ttfe", "ms", ns, extra)
-
     # RSS
     _emit(samples, agg, "sandbox_rss_start_mb", "sandbox_rss_start", "MB", ns, extra)
     _emit(samples, agg, "sandbox_rss_end_mb", "sandbox_rss_end", "MB", ns, extra)
     _emit(samples, agg, "sandbox_rss_growth_mb", "sandbox_rss_growth", "MB", ns, extra)
 
-    # Per-type CEL breakdown
-    _emit(
-        samples,
-        agg,
-        "sandbox_compute_cel_mean_ms",
-        "sandbox_compute_cel_mean",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_syscall_cel_mean_ms",
-        "sandbox_syscall_cel_mean",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_import_cel_mean_ms",
-        "sandbox_import_cel_mean",
-        "ms",
-        ns,
-        extra,
-    )
+    # Per-type CEL breakdown (compute)
+    _emit(samples, agg, "sandbox_compute_cel_mean_ms", "sandbox_compute_cel_mean", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_compute_cel_p50_ms", "sandbox_compute_cel_p50", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_compute_cel_p95_ms", "sandbox_compute_cel_p95", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_compute_cel_p99_ms", "sandbox_compute_cel_p99", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_compute_cel_min_ms", "sandbox_compute_cel_min", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_compute_cel_max_ms", "sandbox_compute_cel_max", "ms", ns, extra)
+
+    # Per-type CEL breakdown (syscall)
+    _emit(samples, agg, "sandbox_syscall_cel_mean_ms", "sandbox_syscall_cel_mean", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_syscall_cel_p50_ms", "sandbox_syscall_cel_p50", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_syscall_cel_p95_ms", "sandbox_syscall_cel_p95", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_syscall_cel_p99_ms", "sandbox_syscall_cel_p99", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_syscall_cel_min_ms", "sandbox_syscall_cel_min", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_syscall_cel_max_ms", "sandbox_syscall_cel_max", "ms", ns, extra)
+
+    # Per-type CEL breakdown (import)
+    _emit(samples, agg, "sandbox_import_cel_mean_ms", "sandbox_import_cel_mean", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_import_cel_p50_ms", "sandbox_import_cel_p50", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_import_cel_p95_ms", "sandbox_import_cel_p95", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_import_cel_p99_ms", "sandbox_import_cel_p99", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_import_cel_min_ms", "sandbox_import_cel_min", "ms", ns, extra)
+    _emit(samples, agg, "sandbox_import_cel_max_ms", "sandbox_import_cel_max", "ms", ns, extra)
 
     # Wall time
     samples.append(

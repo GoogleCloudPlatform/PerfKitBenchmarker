@@ -79,6 +79,10 @@ k8s_qps:
   description: >
     Atomic single-point QPS saturation measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
+  flags: {}
+  container_registry: {}
+  container_specs: {}
+  container_cluster: {}
 """
 
 _WARMPOOL_NAME = "python-sandbox-warmpool"
@@ -264,7 +268,10 @@ def _RunAgent(benchmark_spec: object) -> list[sample.Sample]:
     )
 
     # Build samples
+    run_id = str(uuid.uuid4())[:8]
+
     extra = {
+        "run_id": run_id,
         "target_qps": target_qps,
         "pool_size": pool_size,
         "step_duration_s": step_duration,
@@ -468,7 +475,10 @@ def _RunRawClaim(benchmark_spec: object) -> list[sample.Sample]:
     )
 
     # Build samples
+    run_id = str(uuid.uuid4())[:8]
+
     extra = {
+        "run_id": run_id,
         "target_qps": target_qps,
         "pool_size": pool_size,
         "step_duration_s": step_duration,
@@ -685,7 +695,7 @@ def _CreateClaim(namespace: str, template: str, claim_name: str) -> float:
         if os.path.isfile(tmp_path):
             os.unlink(tmp_path)
     t_create = time.time()
-    if retcode != 0:
+    if not stdout.strip():
         raise RuntimeError(
             f"Failed to create claim {claim_name}: {stderr.strip()}"
         )

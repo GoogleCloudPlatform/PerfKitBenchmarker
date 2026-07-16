@@ -237,28 +237,49 @@ def DeployWorkloads(benchmark_spec: object | None = None) -> None:
     logging.info("DeployWorkloads complete.")
 
 
-def DeploySnapshots() -> None:
+def DeploySnapshots(benchmark_spec: object | None = None) -> None:
     """Deploy Pod Snapshot infrastructure.
 
-    Idempotent: safe to call repeatedly. Sequence:
+    Sequence:
       1. Create GCS bucket (hierarchical namespace)
       2. Create managed folder
       3. Create KSA for snapshots
       4. Bind IAM roles
       5. Deploy PodSnapshotStorageConfig + PodSnapshotPolicy
+
+    Pre-checks resource existence before creating. Fails loudly
+    on real errors; skips resources that already exist.
     """
     if FLAGS.skip_deploy_snapshots:
         logging.info("Skipping snapshot infrastructure (--skip_deploy_snapshots=True).")
         return
 
     ns = FLAGS.k8s_agentic_namespace
-    project = getattr(FLAGS, 'project', '') or ''
-    zone = getattr(FLAGS, 'zone', '') or ''
-    region = zone[:-2] if zone else ''
+
+    # Derive project and region from benchmark_spec (like DeployWorkloads)
+    project = ''
+    region = ''
+    if benchmark_spec:
+        cluster = getattr(benchmark_spec, 'container_cluster', None)
+        if cluster:
+            project = getattr(cluster, 'project', '') or ''
+            zone = getattr(cluster, 'zone', '') or ''
+            region = zone[:-2] if zone else ''
+    # Fallback to FLAGS
+    if not project:
+        project = getattr(FLAGS, 'project', '') or ''
+    if not region:
+        zone = getattr(FLAGS, 'zone', '') or ''
+        region = zone[:-2] if zone else ''
 
     if not project:
-        logging.warning("DeploySnapshots: FLAGS.project not set, skipping.")
+        logging.warning("DeploySnapshots: project not set, skipping.")
         return
+    if not region:
+        raise RuntimeError(
+            "DeploySnapshots: region could not be derived. "
+            "Ensure benchmark_spec has a container_cluster with a zone."
+        )
 
     bucket_name = "agent-sandbox-snapshots-{}".format(project)
     snapshot_folder = "benchmark-snapshots"
@@ -266,35 +287,68 @@ def DeploySnapshots() -> None:
 
     logging.info("=== DeploySnapshots: bucket=%s ===", bucket_name)
 
-    # 1. Create GCS bucket
-    vm_util.IssueCommand(
+    # 1. Create GCS bucket (skip if exists)
+    stdout, _, rc = vm_util.IssueCommand(
         [
-            "gcloud", "storage", "buckets", "create",
+            "gcloud", "storage", "buckets", "describe",
             "gs://{}".format(bucket_name),
-            "--uniform-bucket-level-access",
-            "--enable-hierarchical-namespace",
-            "--soft-delete-duration=0d",
-            "--location={}".format(region),
+            "--format=value(location)",
             "--project={}".format(project),
         ],
         raise_on_failure=False,
     )
+    if rc == 0:
+        logging.info("GCS bucket %s already exists (location=%s).", bucket_name, stdout.strip())
+    else:
+        logging.info("Creating GCS bucket %s in %s...", bucket_name, region)
+        vm_util.IssueCommand(
+            [
+                "gcloud", "storage", "buckets", "create",
+                "gs://{}".format(bucket_name),
+                "--uniform-bucket-level-access",
+                "--enable-hierarchical-namespace",
+                "--soft-delete-duration=0d",
+                "--location={}".format(region),
+                "--project={}".format(project),
+            ],
+            raise_on_failure=True,
+        )
 
-    # 2. Create managed folder
-    vm_util.IssueCommand(
+    # 2. Create managed folder (skip if exists)
+    _, _, rc = vm_util.IssueCommand(
         [
-            "gcloud", "storage", "managed-folders", "create",
+            "gcloud", "storage", "managed-folders", "describe",
             "gs://{}/{}/".format(bucket_name, snapshot_folder),
             "--project={}".format(project),
         ],
         raise_on_failure=False,
     )
+    if rc == 0:
+        logging.info("Managed folder %s/%s already exists.", bucket_name, snapshot_folder)
+    else:
+        logging.info("Creating managed folder %s/%s...", bucket_name, snapshot_folder)
+        vm_util.IssueCommand(
+            [
+                "gcloud", "storage", "managed-folders", "create",
+                "gs://{}/{}/".format(bucket_name, snapshot_folder),
+                "--project={}".format(project),
+            ],
+            raise_on_failure=True,
+        )
 
-    # 3. Create KSA
-    kubectl.RunKubectlCommand(
-        ["create", "serviceaccount", ksa_name, "--namespace", ns],
+    # 3. Create KSA (skip if exists)
+    stdout, _, _ = kubectl.RunKubectlCommand(
+        ["get", "serviceaccount", ksa_name, "--namespace", ns],
         raise_on_failure=False,
     )
+    if stdout.strip():
+        logging.info("ServiceAccount %s already exists in %s.", ksa_name, ns)
+    else:
+        logging.info("Creating ServiceAccount %s in %s...", ksa_name, ns)
+        kubectl.RunKubectlCommand(
+            ["create", "serviceaccount", ksa_name, "--namespace", ns],
+            raise_on_failure=True,
+        )
 
     # 4. IAM bindings
     project_number = _GetProjectNumber(project)

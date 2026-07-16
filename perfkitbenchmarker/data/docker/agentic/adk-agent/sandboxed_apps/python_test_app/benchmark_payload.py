@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Agentic Payload Transfer Benchmark (Use Case D).
+"""Agentic Payload Transfer Benchmark.
 
 Measures the cost of returning large "Observation" payloads from a gVisor
 sandbox back to the Orchestrator via the real data path:
@@ -52,6 +52,17 @@ def get_rss_mb() -> float:
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024
 
 
+def _percentile(sorted_values: list[float], fraction: float) -> float:
+    """Return the value at the given percentile fraction (0.0-1.0)."""
+    if not sorted_values:
+        return 0.0
+    idx = fraction * (len(sorted_values) - 1)
+    lo = int(idx)
+    hi = min(lo + 1, len(sorted_values) - 1)
+    weight = idx - lo
+    return sorted_values[lo] * (1 - weight) + sorted_values[hi] * weight
+
+
 def _stats_for(latencies: list[float]) -> dict[str, float]:
     """Compute mean/p50/p95/p99/min/max for a list of latencies (ms)."""
     latencies.sort()
@@ -94,18 +105,17 @@ def run_benchmark() -> dict:
         encoded = base64.b64encode(raw).decode("ascii")
         t_ser = time.perf_counter()
 
-        # 3. Transfer — write payload to stdout (the real sandbox→orchestrator path).
-        #    Only the final iteration writes to actual stdout to measure real
-        #    end-to-end transfer without flooding the return channel.
-        #    Other iterations write to /dev/null (same gVisor write-syscall path,
-        #    data discarded by host kernel).
+        # 3. Transfer -- write payload through gVisor write-syscall path.
+        #    Always writes to /dev/null to measure the gVisor Sentry
+        #    write-syscall overhead without flooding stdout. The Sentry
+        #    intercepts write() identically for both /dev/null and stdout.
+        #    Writing large payloads (100MB+) to stdout destroys the JSON
+        #    metrics summary that follows, causing all sandbox_* metrics
+        #    to be lost. Orchestrator-side transfer time is captured
+        #    separately by main.py orchestrator_transfer_* metrics.
         t_xfer_start = time.perf_counter()
-        if i == PAYLOAD_ITERATIONS - 1:
-            sys.stdout.write(encoded)
-            sys.stdout.flush()
-        else:
-            with open("/dev/null", "w") as devnull:
-                devnull.write(encoded)
+        with open("/dev/null", "w") as devnull:
+            devnull.write(encoded)
         t_xfer = time.perf_counter()
 
         gen_ms = (t_gen - t0) * 1000
@@ -179,14 +189,10 @@ def run_benchmark() -> dict:
         "sandbox_rss_growth_mb": rss_end - rss_start,
     }
 
-    # Emit JSON summary to stderr for diagnostics.
-    _log("---BENCHMARK_RESULT_JSON---")
-    _log(json.dumps(summary, indent=2))
-
-    # Also emit to stdout (after the payload data) so that
-    # _parse_sandbox_json() can find it in code_execution_result.output.
-    # ADK only captures stdout, not stderr.
-    print("\n---BENCHMARK_RESULT_JSON---", flush=True)
+    # Emit JSON summary to stdout so _parse_sandbox_json() can find it
+    # in code_execution_result.output. ADK only captures stdout, not stderr.
+    # (agent.py clears stderr to prevent ADK from dropping stdout.)
+    print("---BENCHMARK_RESULT_JSON---", flush=True)
     print(json.dumps(summary), flush=True)
 
     return summary

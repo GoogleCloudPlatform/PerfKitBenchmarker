@@ -68,8 +68,17 @@ flags.DEFINE_integer(
 
 
 def GetAgentApiUrl() -> str:
-    """Return the base URL of the ADK agent API service."""
-    return FLAGS.k8s_agentic_agent_api_url.rstrip("/")
+    """Return the base URL of the ADK agent API service.
+    
+    Auto-derives the URL from the port-forward local port when the
+    API URL is at its default value but the port has been changed.
+    This allows concurrent runs with just --k8s_agentic_portforward_local_port.
+    """
+    url = FLAGS.k8s_agentic_agent_api_url
+    port = FLAGS.k8s_agentic_portforward_local_port
+    if url == "http://localhost:8080" and port != 8080:
+        url = f"http://localhost:{port}"
+    return url.rstrip("/")
 
 
 def CheckAgentHealthz(api_url: str | None = None, required: bool = True) -> None:
@@ -148,7 +157,7 @@ def CountPods(namespace: str, label: str, phase: str | None = None) -> int:
     if phase:
         cmd += [f"--field-selector=status.phase={phase}"]
     stdout, _, rc = RunKubectl(cmd, raise_on_failure=False)
-    if rc != 0 or not stdout:
+    if not stdout or not stdout.strip():
         return 0
     return len(stdout.strip().splitlines())
 

@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 
 from absl import flags
 from perfkitbenchmarker import configs
@@ -60,6 +61,10 @@ k8s_chromium_density:
   description: >
     Atomic single-point Chromium browser sandbox density measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
+  flags: {}
+  container_registry: {}
+  container_specs: {}
+  container_cluster: {}
 """
 
 _WARMPOOL_NAME = "chromium-sandbox-warmpool"
@@ -179,7 +184,10 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     )
 
     # Build samples
+    run_id = str(uuid.uuid4())[:8]
+
     extra = {
+        "run_id": run_id,
         "density": density,
         "successful_sessions": successful,
         "failed_sessions": failed,
@@ -208,7 +216,26 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
 
     # RSS memory
     _emit(samples, agg, "rss_end_mb", "rss_end", "MB", ns, extra)
-    _emit(samples, agg, "rss_growth_mb", "rss_growth", "MB", ns, extra)
+
+    # Session counts (always emitted, even on total failure)
+    samples.append(
+        utils.MakeSample(
+            f"{BENCHMARK_NAME}_successful_sessions",
+            float(successful),
+            "count",
+            ns,
+            extra,
+        )
+    )
+    samples.append(
+        utils.MakeSample(
+            f"{BENCHMARK_NAME}_failed_sessions",
+            float(failed),
+            "count",
+            ns,
+            extra,
+        )
+    )
 
     # Wall time
     samples.append(

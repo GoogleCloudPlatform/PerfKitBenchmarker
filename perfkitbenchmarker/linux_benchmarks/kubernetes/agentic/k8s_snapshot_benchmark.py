@@ -39,6 +39,7 @@ import logging
 import os
 import re
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 from jinja2 import Template
@@ -63,6 +64,10 @@ k8s_snapshot:
   description: >
     Atomic single-point Pod Snapshot saturation measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
+  flags: {}
+  container_registry: {}
+  container_specs: {}
+  container_cluster: {}
 """
 
 # ---------------------------------------------------------------------------
@@ -139,26 +144,26 @@ def Prepare(benchmark_spec: object) -> None:
     # (avoids surprise failures on pre-existing clusters where
     # benchmark_spec.container_cluster may be None).
     cluster = getattr(benchmark_spec, "container_cluster", None)
-    if cluster and getattr(cluster, "cloud", None) == "GCP" and not FLAGS.skip_deploy_snapshots:
-        deploy_utils.DeploySnapshots()
+    if cluster and getattr(cluster, "CLOUD", None) == "GCP" and not FLAGS.skip_deploy_snapshots:
+        deploy_utils.DeploySnapshots(benchmark_spec)
     elif not cluster:
         logging.info(
             "Pod Snapshot infrastructure skipped (no container_cluster in "
             "benchmark_spec). Use --skip_deploy_snapshots=False to force."
         )
-    elif getattr(cluster, "cloud", None) != "GCP":
+    elif getattr(cluster, "CLOUD", None) != "GCP":
         logging.info(
             "Pod Snapshot infrastructure skipped (cloud=%s, GKE required).",
-            getattr(cluster, "cloud", "unknown"),
+            getattr(cluster, "CLOUD", "unknown"),
         )
 
     # 1. Verify PodSnapshotStorageConfig exists (cluster-scoped).
-    _, _, retcode = utils.RunKubectl(
+    stdout, _, _ = utils.RunKubectl(
         ["get", "podsnapshotstorageconfigs.podsnapshot.gke.io", "--no-headers"],
         timeout=30,
         raise_on_failure=False,
     )
-    if retcode != 0:
+    if not stdout.strip():
         raise RuntimeError(
             "PodSnapshotStorageConfig CRD not found. "
             "Ensure pod snapshots are enabled on the cluster."
@@ -166,22 +171,22 @@ def Prepare(benchmark_spec: object) -> None:
     logging.info("PodSnapshotStorageConfig verified.")
 
     # 2. Verify PodSnapshotPolicy exists in the namespace.
-    _, _, retcode = utils.RunKubectl(
+    stdout, _, _ = utils.RunKubectl(
         ["get", "podsnapshotpolicies.podsnapshot.gke.io", "-n", ns, "--no-headers"],
         timeout=30,
         raise_on_failure=False,
     )
-    if retcode != 0:
+    if not stdout.strip():
         logging.warning("PodSnapshotPolicy not found in namespace %s.", ns)
 
     # 3. Verify the service account exists.
     ksa = FLAGS.k8s_snapshot_ksa_name
-    _, _, retcode = utils.RunKubectl(
+    stdout, _, _ = utils.RunKubectl(
         ["get", "serviceaccount", ksa, "-n", ns],
         timeout=30,
         raise_on_failure=False,
     )
-    if retcode != 0:
+    if not stdout.strip():
         raise RuntimeError(
             f"ServiceAccount {ksa} not found in namespace {ns}. "
             "Run setup_snapshot_gke.sh or ensure DeploySnapshots() succeeded."
@@ -239,7 +244,10 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     wall_time = time.time() - t0
 
     # Build samples
+    run_id = str(uuid.uuid4())[:8]
+
     extra = {
+        "run_id": run_id,
         "preload_mb": preload_mb,
         "burst_size": burst_size,
         "skip_snapshot": skip_snapshot,
@@ -620,7 +628,7 @@ def _ApplyClaim(name: str, namespace: str, template_name: str) -> None:
     finally:
         if os.path.isfile(tmp_path):
             os.unlink(tmp_path)
-    if retcode != 0:
+    if not stdout.strip():
         raise RuntimeError(f"Failed to create SandboxClaim {name}: {stderr}")
 
 
@@ -672,9 +680,10 @@ def _RenderAndApplyTemplate(
     finally:
         if os.path.isfile(tmp_path):
             os.unlink(tmp_path)
-    if retcode != 0:
+    if not stdout.strip():
         logging.warning("kubectl apply stderr: %s", stderr)
-    return retcode == 0
+        return False
+    return True
 
 
 def _get_sandbox_node_selector() -> dict[str, str]:
@@ -852,7 +861,7 @@ def _GetLastCounter(name: str, namespace: str) -> int | None:
         timeout=10,
         raise_on_failure=False,
     )
-    if rc != 0:
+    if not stdout.strip():
         return None
     matches = re.findall(r"Count:\s*(\d+)", stdout)
     return int(matches[-1]) if matches else None
@@ -890,7 +899,7 @@ def _TriggerAndWaitSnapshot(trigger_name: str, target_pod: str, namespace: str, 
     finally:
         if os.path.isfile(tmp_path):
             os.unlink(tmp_path)
-    if retcode != 0:
+    if not stdout.strip():
         result["error"] = f"Failed to create trigger: {stderr}"
         return result
 

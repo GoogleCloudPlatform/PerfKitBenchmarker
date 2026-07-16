@@ -6,10 +6,10 @@ create gVisor sandboxes natively.
 
 Endpoints:
   GET  /healthz                      → liveness probe
-  POST /benchmark/python/density     → run the Python density benchmark (UC-B)
-  POST /benchmark/python/payload     → run the payload transfer benchmark (UC-D)
-  POST /benchmark/python/qps         → run the QPS saturation benchmark (UC-F)
-  POST /benchmark/chromium/density   → run the Chromium density benchmark (UC-C)
+  POST /benchmark/python/density     → run the Python density benchmark
+  POST /benchmark/python/payload     → run the payload transfer benchmark
+  POST /benchmark/python/qps         → run the QPS saturation benchmark
+  POST /benchmark/chromium/density   → run the Chromium density benchmark
   POST /run                          → raw ADK agent interaction
 
 POST /benchmark/python/density — Request:
@@ -936,33 +936,54 @@ async def benchmark_chromium_density(req: ChromiumBenchmarkRequest):
                             interaction_ms.append(elapsed)
 
                     # Read pod memory usage from K8s Metrics API
+                    # Retry: metrics-server scrapes every 15-60s; short-lived
+                    # sessions may finish before the first scrape (404).
                     rss_mb = None
-                    try:
-                        async with _metrics_semaphore:
-                            custom_api = k8s_client.CustomObjectsApi()
-                            pod_metrics = await asyncio.to_thread(
-                                custom_api.get_namespaced_custom_object,
-                                group="metrics.k8s.io",
-                                version="v1beta1",
-                                namespace=sandbox_namespace,
-                                plural="pods",
-                                name=pod_name,
+                    for _metrics_attempt in range(4):
+                        try:
+                            async with _metrics_semaphore:
+                                custom_api = k8s_client.CustomObjectsApi()
+                                pod_metrics = await asyncio.to_thread(
+                                    custom_api.get_namespaced_custom_object,
+                                    group="metrics.k8s.io",
+                                    version="v1beta1",
+                                    namespace=sandbox_namespace,
+                                    plural="pods",
+                                    name=pod_name,
+                                )
+                            for c in pod_metrics.get("containers", []):
+                                usage = c.get("usage", {}).get("memory", "")
+                                if usage.endswith("Ki"):
+                                    rss_mb = round(int(usage[:-2]) / 1024, 1)
+                                elif usage.endswith("Mi"):
+                                    rss_mb = round(float(usage[:-2]), 1)
+                                elif usage.endswith("Gi"):
+                                    rss_mb = round(float(usage[:-2]) * 1024, 1)
+                                break
+                            break  # success
+                        except k8s_client.exceptions.ApiException as e:
+                            if e.status == 404 and _metrics_attempt < 3:
+                                logger.info(
+                                    "Metrics not yet available for %s "
+                                    "(attempt %d/4, retrying in 5s)",
+                                    pod_name,
+                                    _metrics_attempt + 1,
+                                )
+                                await asyncio.sleep(5)
+                                continue
+                            logger.warning(
+                                "Failed to read pod metrics for %s",
+                                pod_name,
+                                exc_info=True,
                             )
-                        for c in pod_metrics.get("containers", []):
-                            usage = c.get("usage", {}).get("memory", "")
-                            if usage.endswith("Ki"):
-                                rss_mb = round(int(usage[:-2]) / 1024, 1)
-                            elif usage.endswith("Mi"):
-                                rss_mb = round(float(usage[:-2]), 1)
-                            elif usage.endswith("Gi"):
-                                rss_mb = round(float(usage[:-2]) * 1024, 1)
                             break
-                    except Exception:
-                        logger.warning(
-                            "Failed to read pod metrics for %s",
-                            pod_name,
-                            exc_info=True,
-                        )
+                        except Exception:
+                            logger.warning(
+                                "Failed to read pod metrics for %s",
+                                pod_name,
+                                exc_info=True,
+                            )
+                            break
 
                     await browser.close()
 
