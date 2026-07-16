@@ -80,7 +80,7 @@ def CheckPrerequisites(_):
   """Verifies that benchmark setup is correct."""
   if (
       redis_server.IO_THREADS.present
-      and len(redis_server.IO_THREADS.value) != 1
+      and len(redis_server.IO_THREADS.value) != 1  # pyrefly: ignore[bad-argument-type]
   ):
     raise errors.Setup.InvalidFlagConfigurationError(
         'kubernetes_redis_memtier_benchmark only supports a single value for'
@@ -114,7 +114,7 @@ def Prepare(_: _BenchmarkSpec) -> None:
     do_reads = 'yes' if FLAGS.redis_server_io_threads_do_reads else 'no'
 
   io_threads = (
-      redis_server.IO_THREADS.value[0]
+      redis_server.IO_THREADS.value[0]  # pyrefly: ignore[unsupported-operation]
       if redis_server.IO_THREADS.present
       else None
   )
@@ -197,7 +197,7 @@ def _RunMemtier(
       namespace=NAMESPACE.value,
       # Add 30 seconds to account for initial connection errors as Redis comes
       # up.
-      timeout=memtier.MEMTIER_RUN_DURATION.value + 30,
+      timeout=memtier.MEMTIER_RUN_DURATION.value + 30,  # pyrefly: ignore[unsupported-operation]
   )
   if condition == 'condition=Failed':
     raise errors.Benchmarks.RunError(f"Memtier job '{job_name}' failed.")

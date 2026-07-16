@@ -692,3 +692,5 @@
 -   Added gke_kubernetes_redis_memtier to default benchmark config.
 -   Added new fio microbenchmark for NFS
 -   Document "what are resources?" in a README
+-   Add support for measuring VM create to data disk visibility.
+-   Add GKE postgres sysbench default benchmark config alias.

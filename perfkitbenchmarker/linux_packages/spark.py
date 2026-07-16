@@ -83,7 +83,7 @@ def SparkVersion() -> version.Version:
   soup = bs4.BeautifulSoup(response.content, 'html.parser')
   found_versions = []
   for link in soup.find_all('a', href=SPARK_VERSION_DIR_PATTERN):
-    match = re.match(SPARK_VERSION_DIR_PATTERN, link.get('href'))
+    match = re.match(SPARK_VERSION_DIR_PATTERN, link.get('href'))  # pyrefly: ignore[missing-attribute]
     if match:
       found_versions.append(version.Version(match.group(1)))
   if not found_versions:

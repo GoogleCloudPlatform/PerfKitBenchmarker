@@ -808,6 +808,7 @@ class GceNetworkResource(resource.BaseResource):
   def _Create(self):
     """Creates the Network resource."""
     cmd = util.GcloudCommand(self, 'compute', 'networks', 'create', self.name)
+    cmd.flags['description'] = util.GetDefaultTags()
     cmd.flags['subnet-mode'] = self.mode
     if self.mtu:
       cmd.flags['mtu'] = self.mtu

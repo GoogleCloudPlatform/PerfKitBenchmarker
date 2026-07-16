@@ -175,18 +175,20 @@ def _ScaleUpAndCollect(
       resources_to_ignore=initial_nodes,
   )
 
-  ready_sample = next(
-      s for s in node_samples if s.metric == 'node_Ready_p99.9'
-  )
-  highlighted_sample = sample.Sample(
-      f'{phase}_node_Ready_p99.9',
-      ready_sample.value,
-      ready_sample.unit,
-      ready_sample.metadata,
-      ready_sample.timestamp,
-  )
+  highlighted_sample = []
+  if kubernetes_scale_benchmark.REPORT_PERCENTILES.value:
+    ready_sample = next(
+        s for s in node_samples if s.metric == 'node_Ready_p99.9'
+    )
+    highlighted_sample = [sample.Sample(
+        f'{phase}_node_Ready_p99.9',
+        ready_sample.value,
+        ready_sample.unit,
+        ready_sample.metadata,
+        ready_sample.timestamp,
+    )]
   all_samples = (
-      phase_log_samples + pod_samples + node_samples + [highlighted_sample]
+      phase_log_samples + pod_samples + node_samples + highlighted_sample
   )
   _AddPhaseMetadata(all_samples, phase)
   return all_samples

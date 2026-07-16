@@ -177,7 +177,7 @@ class CreateRemoteDiskStrategy(AWSCreateDiskStrategy):
     return mappings
 
 
-class CreateNonResourceDiskStrategy(
+class CreateNonResourceDiskStrategy(  # pyrefly: ignore[inconsistent-inheritance]
     disk_strategies.EmptyCreateDiskStrategy, AWSCreateDiskStrategy
 ):
   """Strategies to create non remote and non local disks like RAM, SMB."""

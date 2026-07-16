@@ -806,7 +806,7 @@ class AksAutomaticCluster(AksCluster):
     """Modifies the pod spec yaml with additional needed attributes."""
     # Topology spread constraints needed to fix an issue with Azure AKS where
     # admission webhook "validation.gatekeeper.sh" denied the request.
-    super()._ModifyPodSpecPlacementYaml(pod_spec_yaml, machine_type)  # pyrefly: ignore[bad-argument-type]
+    super()._ModifyPodSpecPlacementYaml(pod_spec_yaml, name, machine_type)
     pod_spec_yaml['topologySpreadConstraints'] = [{
         'maxSkew': 1,
         'topologyKey': 'kubernetes.io/hostname',

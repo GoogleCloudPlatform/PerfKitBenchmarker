@@ -160,7 +160,7 @@ def CheckPrerequisites(
         f"Invalid value(s) for --k8s_mgmt_scenarios: {invalid}. "
         + f"Valid options: {sorted(_VALID_SCENARIOS)}."
     )
-  if benchmark_config.container_cluster.type != "Kubernetes":
+  if benchmark_config.container_cluster.type != "Kubernetes":  # pyrefly: ignore[missing-attribute]
     raise errors.Config.InvalidValue(
         "kubernetes_management benchmark requires a Kubernetes"
         + " container cluster."
@@ -288,8 +288,8 @@ def _RunConcurrentNodePoolOps(
           cfg, node_version=initial
       ),
       wait_fn=cluster.WaitForOperation,
-      items=configs_,
-      get_name=lambda cfg: cfg.name,
+      items=configs_,  # pyrefly: ignore[bad-argument-type]
+      get_name=lambda cfg: cfg.name,  # pyrefly: ignore[missing-attribute]
   )
   samples += _OpSamples("ConcurrentOps_Create", create_results)
 
@@ -299,7 +299,7 @@ def _RunConcurrentNodePoolOps(
   delete_results = _RunAsync(
       kickoff=cluster.DeleteNodePoolAsync,
       wait_fn=cluster.WaitForOperation,
-      items=alive,
+      items=alive,  # pyrefly: ignore[bad-argument-type]
       get_name=str,
   )
   samples += _OpSamples("ConcurrentOps_Delete", delete_results)

@@ -68,6 +68,12 @@ class GceNfsService(nfs_service.BaseNfsService):
     ]
     if self.nfs_tier:
       args += ['--tier', self.nfs_tier]
+    nfs_version = self.disk_spec.nfs_version
+    if nfs_version:
+      if nfs_version.startswith('4'):
+        args += ['--protocol', 'NFS_V4_1']
+      elif nfs_version.startswith('3'):
+        args += ['--protocol', 'NFS_V3']
     try:
       self._NfsCommand('create', *args)
       self._WaitUntilReady()

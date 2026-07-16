@@ -14,6 +14,7 @@
 """AWS Auto Scaling Group resource."""
 
 import json
+import re
 from typing import Any, cast
 
 from perfkitbenchmarker import background_tasks
@@ -196,6 +197,37 @@ class AwsAutoScalingGroup(managed_vm_group.BaseManagedVmGroup):
     return bool(self._Get())
 
   def _IsReady(self) -> bool:
+    cmd = self.base_cmd + [
+        'describe-scaling-activities',
+        '--auto-scaling-group-name',
+        self.name,
+    ]
+    stdout, _, _ = vm_util.IssueCommand(cmd)
+    activities = json.loads(stdout)['Activities']
+    unsuccessful_activities = [
+        a for a in activities if a['StatusCode'] in ['Failed', 'Cancelled']
+    ]
+    if unsuccessful_activities:
+      error_message = (
+          'Found the following unsuccessful activities in ASG '
+          f'{self.name}:\n'
+      )
+      for a in unsuccessful_activities:
+        # Description usually includes StatusMessage, but include both for
+        # completeness.
+        error_message += f'- {a['Description']:}\n'
+        error_message += f'  {a['StatusCode']} - {a['StatusMessage']:}\n'
+      if 'InsufficientInstanceCapacity' in error_message or re.search(
+          r'do not have sufficient \S+ capacity ', error_message
+      ):
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(error_message)
+      if 'Unsupported' in error_message or 'not supported' in error_message:
+        raise errors.Benchmarks.UnsupportedConfigError(error_message)
+      raise errors.Resource.UpdateError(error_message)
+    if not all(a['StatusCode'] == 'Successful' for a in activities):
+      return False
+    # If all sctivies are completed all VMs should be ready, but double check.
+    # This is a small increase in latency.
     asg = self._Get()
     if not asg:
       return False
@@ -245,6 +277,7 @@ class AwsAutoScalingGroup(managed_vm_group.BaseManagedVmGroup):
           '--should-decrement-desired-capacity',
       ]
       vm_util.IssueCommand(cmd)
+
     background_tasks.RunThreaded(RemoveVm, vm_names)
 
   def _Resize(self, new_vm_count: int):
