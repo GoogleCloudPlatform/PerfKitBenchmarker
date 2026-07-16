@@ -226,6 +226,10 @@ class ClusterBootBenchmarkTest(
     vm.ssh_internal_time = 4
     vm.ssh_external_time = 5
     vm.bootable_time = 7
+    vm.scratch_disks = [
+        mock.Mock(GetDevicePath=mock.Mock(return_value='/dev/nvme1n1'))
+    ]
+    vm.RemoteCommand = mock.Mock(return_value=('6', ''))
 
     actuals = cluster_boot_benchmark.GetTimeToBoot([vm])
 
@@ -235,6 +239,7 @@ class ClusterBootBenchmarkTest(
         'Time to SSH - External': 4.0,
         'Time to SSH - Internal': 3.0,
         'Boot Time': 6.0,
+        'Data Disk Visible': 5.0,
     }
     expecteds = []
     for metric, value in metrics.items():

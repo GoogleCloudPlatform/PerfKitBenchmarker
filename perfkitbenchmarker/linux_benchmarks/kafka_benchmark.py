@@ -15,6 +15,7 @@
 
 import concurrent.futures
 import itertools
+import logging
 import re
 import time
 from typing import Any, Mapping
@@ -50,7 +51,6 @@ KAFKA_URL = (
 KAFKA_DIR = f'kafka_{KAFKA_VERSION}'
 KAFKA_TOPIC_NAME = 'kafka-benchmark-test'
 KAFKA_BROKER_PORT = 9092
-KAFKA_CONSUMER_TIMEOUT_MS = 120_000
 
 FLAGS = flags.FLAGS
 _KAFKA_NUM_PARTITIONS = flags.DEFINE_integer(
@@ -64,7 +64,9 @@ _KAFKA_REPLICATION_FACTOR = flags.DEFINE_integer(
     'Replication factor for the topic.',
 )
 _KAFKA_NUM_RECORDS = flags.DEFINE_integer(
-    'kafka_num_records', 9_000_000, 'Number of records to produce/consume.'
+    'kafka_num_records',
+    10_000_000,  # 10 million
+    'Number of records to produce/consume per thread.',
 )
 _KAFKA_RECORD_SIZE = flags.DEFINE_integer(
     'kafka_record_size', 1024, 'Size of each record in bytes.'
@@ -76,18 +78,31 @@ _KAFKA_PRODUCER_BATCH_SIZE = flags.DEFINE_integer(
 )
 _KAFKA_CONSUMER_FETCH_SIZE = flags.DEFINE_integer(
     'kafka_consumer_fetch_size',
-    1024 * 1024 * 5,  # 5 MB
+    1024 * 1024 * 50,  # 50 MB
     'Fetch size of the consumer in bytes, default is 5 MB.',
 )
-_KAFKA_NUM_THREADS = flags.DEFINE_integer(
+_KAFKA_NUM_THREADS = flags.DEFINE_list(
     'kafka_num_threads',
-    16,
-    'Number of threads to use for the benchmark.',
+    None,
+    'List of thread counts to use for the benchmark (e.g. 8,16,32). If None '
+    'or empty, sweeps through powers of 2 from 1 up to 256 with early '
+    'stopping.',
 )
 _KAFKA_REPORTING_INTERVAL = flags.DEFINE_integer(
     'kafka_reporting_interval',
-    5000,
+    20_000,
     'Interval in milliseconds at which the performance test reports progress.',
+)
+_KAFKA_CONSUMER_TIMEOUT_MS = flags.DEFINE_integer(
+    'kafka_consumer_timeout_ms',
+    10_000,
+    'Timeout in milliseconds for the consumer performance test.',
+)
+_KAFKA_FILE_DELETE_DELAY_MS = flags.DEFINE_integer(
+    'kafka_file_delete_delay_ms',
+    60_000,
+    'Delay in milliseconds before deleting file segments and log segments on'
+    ' the broker once marked for deletion after a topic drop.',
 )
 
 _SUMMARY_PERCENTILE_REGEX = re.compile(r'\b\d+(?:\.\d+)?th\b')
@@ -175,6 +190,8 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       'inter.broker.listener.name=PLAINTEXT\n'
       'listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT\n'
       'log.dirs=/tmp/kraft-broker-logs\n'
+      f'file.delete.delay.ms={_KAFKA_FILE_DELETE_DELAY_MS.value}\n'
+      f'log.segment.delete.delay.ms={_KAFKA_FILE_DELETE_DELAY_MS.value}\n'
       f'offsets.topic.replication.factor={_KAFKA_REPLICATION_FACTOR.value}\n'
       f'transaction.state.log.replication.factor={_KAFKA_REPLICATION_FACTOR.value}\n'
       'transaction.state.log.min.isr=1\n'
@@ -214,6 +231,39 @@ def _CreateTopic(
       f' --config min.insync.replicas={_KAFKA_REPLICATION_FACTOR.value}'
       ' --if-not-exists'
   )
+  # Allow 5 seconds for partition log creation and leader elections to settle
+  # across all partitions before starting high-throughput producer clients.
+  time.sleep(5)
+
+
+def _DeleteTopic(
+    broker_vm: virtual_machine.BaseVirtualMachine,
+    bootstrap_server: str,
+    topic_name: str,
+) -> None:
+  """Deletes a Kafka topic synchronously right after a trial completes.
+
+  Args:
+    broker_vm: The broker VM.
+    bootstrap_server: The Kafka bootstrap server address.
+    topic_name: The name of the topic to delete.
+  """
+  broker_vm.RemoteCommand(
+      f'cd {KAFKA_DIR} && bin/kafka-topics.sh --delete --topic {topic_name}'
+      f' --bootstrap-server {bootstrap_server}',
+      ignore_failure=True,
+  )
+  for _ in range(10):
+    stdout, _ = broker_vm.RemoteCommand(
+        f'cd {KAFKA_DIR} && bin/kafka-topics.sh --list --bootstrap-server'
+        f' {bootstrap_server}',
+        ignore_failure=True,
+    )
+    if topic_name not in stdout.split():
+      logging.info('Topic %s deleted successfully.', topic_name)
+      return
+    time.sleep(5)
+  logging.warning('Topic %s not deleted.', topic_name)
 
 
 def _RunProducer(
@@ -294,7 +344,7 @@ def _RunConsumer(
       f'--group pkb-group-t{num_threads} '
       f'--num-records={num_records} '
       f'--fetch-size={_KAFKA_CONSUMER_FETCH_SIZE.value} '
-      f'--timeout {KAFKA_CONSUMER_TIMEOUT_MS} '
+      f'--timeout {_KAFKA_CONSUMER_TIMEOUT_MS.value} '
       f'--reporting-interval={_KAFKA_REPORTING_INTERVAL.value} '
       '--command-config /tmp/consumer.properties '
       '> /tmp/consumer_$i.log 2>&1 & '
@@ -310,11 +360,14 @@ def _RunConsumer(
 
 def _ExtractProducerSummaryAndProgressLines(
     lines: list[str],
+    metadata: Mapping[str, Any] | None = None,
 ) -> tuple[list[str], list[list[float]]]:
   """Extracts summary output lines and periodic progress throughputs.
 
   Args:
     lines: The lines from running the producer test.
+    metadata: Optional metadata dict containing test parameters like
+      'kafka_num_records'.
 
   Returns:
     A tuple of summary lines and periodic progress throughputs.
@@ -326,27 +379,41 @@ def _ExtractProducerSummaryAndProgressLines(
   threads_progress_mb = []
   current_thread_mb = []
 
-  if has_percentiles:
-    for line in lines:
-      if _SUMMARY_PERCENTILE_REGEX.search(line):
-        summary_lines.append(line)
-        if current_thread_mb:
-          threads_progress_mb.append(current_thread_mb)
-          current_thread_mb = []
-      elif 'records sent' in line:
-        throughput_mb_match = re.search(r'\(([\d.]+)\s+MB/sec\)', line)
-        if throughput_mb_match:
-          current_thread_mb.append(float(throughput_mb_match.group(1)))
-    if current_thread_mb:
-      threads_progress_mb.append(current_thread_mb)
-  else:
-    # Fallback for legacy outputs/tests: treat any line matching the throughput
-    # regex as a summary line.
-    for line in lines:
-      if re.search(
-          r'[\d.]+ records/sec \([\d.]+ MB/sec\), [\d.]+ ms avg latency', line
+  num_records = None
+  if metadata and 'kafka_num_records' in metadata:
+    try:
+      num_records = int(metadata['kafka_num_records'])
+    except (ValueError, TypeError):
+      num_records = None
+
+  for line in lines:
+    records_sent_match = re.match(r'^(\d+)\s+records sent,', line)
+    is_summary = False
+
+    if _SUMMARY_PERCENTILE_REGEX.search(line):
+      is_summary = True
+    elif records_sent_match:
+      if (
+          num_records is not None
+          and int(records_sent_match.group(1)) == num_records
+          and not has_percentiles
       ):
-        summary_lines.append(line)
+        is_summary = True
+    elif re.search(r'[\d.]+\s+records/sec\s+\([\d.]+\s+MB/sec\)', line):
+      is_summary = True
+
+    if is_summary:
+      summary_lines.append(line)
+      if current_thread_mb:
+        threads_progress_mb.append(current_thread_mb)
+        current_thread_mb = []
+    elif 'records sent' in line:
+      throughput_mb_match = re.search(r'\(([\d.]+)\s+MB/sec\)', line)
+      if throughput_mb_match:
+        current_thread_mb.append(float(throughput_mb_match.group(1)))
+
+  if current_thread_mb:
+    threads_progress_mb.append(current_thread_mb)
 
   return summary_lines, threads_progress_mb
 
@@ -571,7 +638,7 @@ def _ParseProducerResults(
       if line.strip()
   ]
   summary_lines, threads_progress_mb = _ExtractProducerSummaryAndProgressLines(
-      lines
+      lines, metadata
   )
   metrics = _ExtractProducerSummaryMetrics(summary_lines)
   results = _CreateProducerThroughputSamples(metrics, metadata)
@@ -651,59 +718,101 @@ def _RunSingleTrial(
   )
   _CreateTopic(broker_vm, bootstrap_server, trial_topic_name)
 
-  with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-    producer_future = executor.submit(
-        _RunProducer,
-        producer_vm,
-        bootstrap_server,
-        trial_topic_name,
-        num_threads,
-        num_records,
-    )
-    consumer_future = executor.submit(
-        _RunConsumer,
-        consumer_vm,
-        bootstrap_server,
-        trial_topic_name,
-        num_threads,
-        num_records,
-    )
-    producer_stdout = producer_future.result()
-    consumer_stdout = consumer_future.result()
+  try:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+      producer_future = executor.submit(
+          _RunProducer,
+          producer_vm,
+          bootstrap_server,
+          trial_topic_name,
+          num_threads,
+          num_records,
+      )
+      consumer_future = executor.submit(
+          _RunConsumer,
+          consumer_vm,
+          bootstrap_server,
+          trial_topic_name,
+          num_threads,
+          num_records,
+      )
+      producer_stdout = producer_future.result()
+      consumer_stdout = consumer_future.result()
 
-  metadata = {
-      'kafka_num_records': int(num_records),
-      'kafka_record_size': int(_KAFKA_RECORD_SIZE.value),
-      'kafka_producer_batch_size': int(_KAFKA_PRODUCER_BATCH_SIZE.value),
-      'kafka_consumer_fetch_size': int(_KAFKA_CONSUMER_FETCH_SIZE.value),
-      'kafka_num_threads': num_threads,
-  }
+    metadata = {
+        'kafka_num_records': int(num_records),
+        'kafka_record_size': int(_KAFKA_RECORD_SIZE.value),
+        'kafka_producer_batch_size': int(_KAFKA_PRODUCER_BATCH_SIZE.value),
+        'kafka_consumer_fetch_size': int(_KAFKA_CONSUMER_FETCH_SIZE.value),
+        'kafka_num_threads': num_threads,
+    }
 
-  trial_results = []
-  trial_results.extend(_ParseProducerResults(producer_stdout, metadata))
-  trial_results.extend(_ParseConsumerResults(consumer_stdout, metadata))
-  return trial_results
+    trial_results = []
+    trial_results.extend(_ParseProducerResults(producer_stdout, metadata))
+    trial_results.extend(_ParseConsumerResults(consumer_stdout, metadata))
+    return trial_results
+  finally:
+    _DeleteTopic(broker_vm, bootstrap_server, trial_topic_name)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
-  """Runs Kafka benchmarks.
+  """Runs Kafka benchmarks across a sweep of thread counts with early stopping.
 
   Args:
     benchmark_spec: The benchmark specification.
 
   Returns:
-    A list of samples.
+    A list of samples corresponding to the winning (optimal) thread count.
   """
-  producer_vm = benchmark_spec.vm_groups['producer'][0]
-  consumer_vm = benchmark_spec.vm_groups['consumer'][0]
+  if _KAFKA_NUM_THREADS.value:
+    thread_counts = [int(t) for t in _KAFKA_NUM_THREADS.value]
+  else:
+    thread_counts = [2**i for i in range(9)]
 
-  num_threads = min(
-      producer_vm.NumCpusForBenchmark(),
-      consumer_vm.NumCpusForBenchmark(),
-      _KAFKA_NUM_THREADS.value,
-  )
   num_records = int(_KAFKA_NUM_RECORDS.value)
-  return _RunSingleTrial(benchmark_spec, num_threads, num_records)
+  winning_samples: list[sample.Sample] = []
+  prev_producer_mb = 0.0
+  prev_consumer_mb = 0.0
+
+  throughput_margin = 0.05
+
+  for num_threads in thread_counts:
+    trial_samples = _RunSingleTrial(benchmark_spec, num_threads, num_records)
+    if not winning_samples:
+      winning_samples = trial_samples
+
+    curr_producer_mb = 0.0
+    curr_consumer_mb = 0.0
+
+    for s in trial_samples:
+      if getattr(s, 'metric', '') == 'Producer Throughput (MB/sec)':
+        curr_producer_mb = getattr(s, 'value', 0.0)
+      elif getattr(s, 'metric', '') == 'Consumer Throughput (MB/sec)':
+        curr_consumer_mb = getattr(s, 'value', 0.0)
+
+    if prev_producer_mb > 0 and prev_consumer_mb > 0:
+      prod_improvement = (
+          curr_producer_mb - prev_producer_mb
+      ) / prev_producer_mb
+      cons_improvement = (
+          curr_consumer_mb - prev_consumer_mb
+      ) / prev_consumer_mb
+
+      throughput_stalled = (
+          prod_improvement <= throughput_margin
+          and cons_improvement <= throughput_margin
+      )
+      throughput_declined = prod_improvement < 0.0 or cons_improvement < 0.0
+
+      if throughput_stalled or throughput_declined:
+        break
+
+      winning_samples = trial_samples
+
+    prev_producer_mb = curr_producer_mb
+    prev_consumer_mb = curr_consumer_mb
+
+  return winning_samples
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:

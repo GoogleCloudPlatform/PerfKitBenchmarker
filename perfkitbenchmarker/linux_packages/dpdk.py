@@ -132,7 +132,7 @@ def _AllocateHugePages(vm):
           f' /sys/devices/system/node/node{numa_node_num}/hugepages/hugepages-2048kB/nr_hugepages'
       )
       vm.RemoteCommand(
-          f'echo {int(4/vm.numa_node_count)} | sudo tee'
+          f'echo {max(1, int(4/vm.numa_node_count))} | sudo tee'
           f' /sys/devices/system/node/node{numa_node_num}/hugepages/hugepages-1048576kB/nr_hugepages'
       )
 

@@ -315,6 +315,7 @@ class BaseNFSDiskSpec(BaseDiskSpec):
   def __init__(self, *args, **kwargs):
     self.device_path: str = None  # pyrefly: ignore[bad-assignment]
     self.mount_point: str = None  # pyrefly: ignore[bad-assignment]
+    self.nfs_version: str | None = None
     super().__init__(*args, **kwargs)
     self.disk_type = NFS
 

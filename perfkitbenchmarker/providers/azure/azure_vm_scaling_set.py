@@ -143,12 +143,35 @@ class AzureVmScalingSet(managed_vm_group.BaseManagedVmGroup):
     assert data is not None
     return data['provisioningState'] == 'Succeeded'
 
+  def _CheckForReadinessErrors(self) -> None:
+    """Retrieves VM provisioning errors by inspecting VMs in the scale set."""
+    instances = self._GetInstances()
+    failed_instance_ids = []
+    for i in instances:
+      state = i.get('provisioningState') or i.get('properties', {}).get(
+          'provisioningState'
+      )
+      if state == 'Failed':
+        failed_instance_ids.append(i['instanceId'])
+
+    if failed_instance_ids:
+      cmd = self._Cmd('get-instance-view', '--name', self.name)
+      stdout, stderr, _ = vm_util.IssueCommand(cmd, raise_on_failure=False)
+      raise errors.Resource.CreationError(
+          f'Failed to provision VMSS {self.name} because VMs failed: '
+          f'{", ".join(failed_instance_ids)}. Details:\n{stdout or stderr}'
+      )
+
+  def _GetInstances(self) -> list[dict[str, Any]]:
+    """Returns the instances in the VMSS."""
+    cmd = self._Cmd('list-instances', '--name', self.name)
+    stdout, _, _ = vm_util.IssueCommand(cmd)
+    return json.loads(stdout)
+
   def _GetCurrentVms(
       self,
   ) -> list[VmReference]:
-    cmd = self._Cmd('list-instances', '--name', self.name)
-    stdout, _, _ = vm_util.IssueCommand(cmd)
-    instances = json.loads(stdout)
+    instances = self._GetInstances()
     vms = []
     for i in instances:
       # PKB assumes GCP-style "zones" of region with an optional zone suffix.

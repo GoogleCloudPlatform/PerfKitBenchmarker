@@ -2,6 +2,7 @@ import unittest
 from unittest import mock
 
 from absl import flags
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.configs import vm_group_decoders
@@ -107,6 +108,54 @@ class AzureVmScalingSetTest(pkb_common_test_case.PkbCommonTestCase):
         'az vmss list-instances --resource-group test_project --name'
         ' pkb-test_run-0',
         self.mock_cmd.all_commands,
+    )
+
+  def testCheckForReadinessErrorsNoFailed(self):
+    self.mock_cmd = self.MockIssueCommand(
+        {
+            'list-instances': [(
+                (
+                    '[{"instanceId": "0", "location": "eastus2",'
+                    ' "provisioningState": "Succeeded"}]'
+                ),
+                '',
+                0,
+            )],
+        },
+    )
+    mig = self.TestMig()
+    # Should not raise any exceptions.
+    mig._CheckForReadinessErrors()
+
+  def testCheckForReadinessErrorsWithFailed(self):
+    get_instance_view_resp = (
+        '{"statuses": [{"code": "ProvisioningState/failed", "message": "out of'
+        ' capacity"}]}'
+    )
+    self.mock_cmd = self.MockIssueCommand(
+        {
+            'list-instances': [(
+                (
+                    '[{"instanceId": "0", "location": "eastus2", "properties":'
+                    ' {"provisioningState": "Failed"}}]'
+                ),
+                '',
+                0,
+            )],
+            'get-instance-view': [(
+                get_instance_view_resp,
+                '',
+                0,
+            )],
+        },
+    )
+    mig = self.TestMig()
+    with self.assertRaises(errors.Resource.CreationError) as cm:
+      mig._CheckForReadinessErrors()
+
+    self.assertIn(
+        'Failed to provision VMSS pkb-test_run-0 because VMs failed: 0',
+        str(cm.exception),
     )
 
 

@@ -243,6 +243,9 @@ class NodepoolSpec(spec.BaseSpec):
     self.vm_spec: virtual_machine_spec.BaseVmSpec
     self.machine_families: list[str] | None
     self.sandbox_config: SandboxSpec | None
+    # For GCP TPUs:
+    self.tpu_topology: str | None
+    self.tpu_count: int | None
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -273,6 +276,8 @@ class NodepoolSpec(spec.BaseSpec):
         ),
         'vm_spec': (spec.PerCloudConfigDecoder, {}),
         'sandbox_config': (_SandboxDecoder, {'default': None}),
+        'tpu_topology': (option_decoders.StringDecoder, {'default': None}),
+        'tpu_count': (option_decoders.IntDecoder, {'default': None}),
     })
     return result
 
@@ -409,6 +414,8 @@ class ContainerClusterSpec(spec.BaseSpec):
     vm_count: The number of nodes to create for the default nodepool.
     min_vm_count: The minimum number of nodes for autoscaling.
     max_vm_count: The maximum number of nodes for autoscaling.
+    tpu_topology: The TPU topology of the default nodepool.
+    tpu_count: The number of TPUs per node for the default nodepool.
     enable_aam: Whether to enable automatic application monitoring.
   """
 
@@ -426,10 +433,14 @@ class ContainerClusterSpec(spec.BaseSpec):
   vm_count: int
   min_vm_count: int | None
   max_vm_count: int | None
+  tpu_topology: str | None
+  tpu_count: int | None
   enable_aam: bool
 
   def __init__(self, component_full_name, flag_values=None, **kwargs):
     super().__init__(component_full_name, flag_values=flag_values, **kwargs)
+    self.tpu_topology: str | None
+    self.tpu_count: int | None
     vm_config = getattr(self.vm_spec, self.cloud, None)
     if vm_config is None:
       raise errors.Config.MissingOption(
@@ -536,6 +547,8 @@ class ContainerClusterSpec(spec.BaseSpec):
             option_decoders.BooleanDecoder,
             {'default': False},
         ),
+        'tpu_topology': (option_decoders.StringDecoder, {'default': None}),
+        'tpu_count': (option_decoders.IntDecoder, {'default': None}),
     })
     return result
 

@@ -336,6 +336,9 @@ gke_kubernetes_redis_memtier:
     redis_server_io_threads_do_reads: True
     kubernetes_redis_memtier_save: '""'
 
+gke_kubernetes_postgres_sysbench:
+  name: kubernetes_postgres_sysbench
+
 redis_memtier_session_storage_cluster:
   name: redis_memtier
   flags:

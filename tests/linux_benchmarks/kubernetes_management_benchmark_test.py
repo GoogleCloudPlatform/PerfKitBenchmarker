@@ -379,7 +379,7 @@ class RunAsyncTest(pkb_common_test_case.PkbCommonTestCase):
         kickoff=mock.Mock(return_value='h'),
         wait_fn=mock.Mock(),
         items=[cfg],
-        get_name=lambda c: c.name,
+        get_name=lambda c: c.name,  # pyrefly: ignore[missing-attribute]
     )
     name, _ = results[0]
     self.assertEqual('poolname', name)
