@@ -457,6 +457,62 @@ class EdwConversationalAnalyticsBenchmarkTest(
         'What is the revenue?', 1.5, {'meta': 'data'}
     )
 
+  @mock.patch.object(
+      edw_conversational_analytics_benchmark,
+      '_GetSerializedMetadataSize',
+      autospec=True,
+  )
+  def testEnforceQueryResultSizeLimit(self, mock_get_size):
+    with self.subTest(name='within_limit'):
+      metadata_ok = {'foo': 'bar'}
+      mock_get_size.return_value = 100
+      res = edw_conversational_analytics_benchmark._EnforceQueryResultSizeLimit(
+          metadata_ok, 2.5
+      )
+      self.assertEqual(res, 2.5)
+      self.assertNotIn('is_result_too_large', metadata_ok)
+
+    with self.subTest(name='exceeds_limit'):
+      metadata_large = {'query_results': 'large_data'}
+      mock_get_size.return_value = 900000
+      res = edw_conversational_analytics_benchmark._EnforceQueryResultSizeLimit(
+          metadata_large, 2.5
+      )
+      self.assertEqual(res, -1.0)
+      self.assertTrue(metadata_large.get('is_result_too_large'))
+      self.assertNotIn('query_results', metadata_large)
+
+  @mock.patch.object(
+      edw_conversational_analytics_benchmark,
+      '_GetSerializedMetadataSize',
+      autospec=True,
+  )
+  def testRunConversationalQueryTooLarge(self, mock_get_size):
+    # Arrange
+    q = mock.Mock(question='What is the revenue?')
+    ca_client = mock.Mock()
+    ca_client.ExecuteQuery.return_value = (1.5, {'predict_data': 'results'})
+    ca_iteration_performance = mock.Mock()
+    mock_get_size.return_value = 900000
+
+    # Act
+    edw_conversational_analytics_benchmark._RunConversationalQuery(
+        q, ca_client, ca_iteration_performance
+    )
+
+    # Assert
+    ca_iteration_performance.add_query_performance.assert_called_once_with(
+        'What is the revenue?',
+        -1.0,
+        {
+            'is_result_too_large': True,
+            'error_message': (
+                'Query result size exceeded safety limit of 800KB. Got 900000'
+                ' bytes.'
+            ),
+        },
+    )
+
   def testRunGroundTruthQuery(self):
     # Arrange
     q = mock.Mock(

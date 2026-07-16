@@ -328,6 +328,9 @@ def _RunConversationalQuery(
 ) -> None:
   """Ask the conversational analytics question and record performance."""
   execution_time, metadata = ca_client.ExecuteQuery(q.question)
+
+  # Enforce result size limit (safety check for Capacitor)
+  execution_time = _EnforceQueryResultSizeLimit(metadata, execution_time)
   ca_iteration_performance.add_query_performance(
       q.question, execution_time, metadata
   )
@@ -371,6 +374,38 @@ def _GetSerializedMetadataSize(metadata: dict[str, Any]) -> int:
   return len(json.dumps(metadata, default=str).encode('utf-8'))
 
 
+def _EnforceQueryResultSizeLimit(
+    metadata: dict[str, Any],
+    execution_time: float,
+) -> float:
+  """Enforces the result size limit for query execution.
+
+  Args:
+    metadata: The metadata dictionary containing query details.
+    execution_time: The execution time of the query in seconds.
+
+  Returns:
+    The execution time if result size is within the limit, or -1.0 if the
+    serialized result size exceeds the limit.
+  """
+  serialized_size = _GetSerializedMetadataSize(metadata)
+  if serialized_size > _QUERY_RESULT_SIZE_LIMIT_BYTES:
+    logging.warning(
+        'Query results size is too large: %d bytes. Treating as failure.',
+        serialized_size,
+    )
+    metadata.pop('query_results', None)
+    metadata.pop('predict_data', None)
+    metadata['is_result_too_large'] = True
+    limit_kb = _QUERY_RESULT_SIZE_LIMIT_BYTES / 1024
+    metadata['error_message'] = (
+        f'Query result size exceeded safety limit of {limit_kb:.0f}KB. Got'
+        f' {serialized_size} bytes.'
+    )
+    return -1.0
+  return execution_time
+
+
 def _RunPredictQuery(
     q: Any,
     predict_sql: str,
@@ -389,22 +424,9 @@ def _RunPredictQuery(
     predict_metadata['predict_data'] = predict_metadata['query_results']
 
   # Enforce result size limit (safety check for Capacitor)
-  serialized_size = _GetSerializedMetadataSize(predict_metadata)
-  if serialized_size > _QUERY_RESULT_SIZE_LIMIT_BYTES:
-    logging.warning(
-        'Predict query results size is too large: %d bytes. Treating as'
-        ' failure.',
-        serialized_size,
-    )
-    predict_metadata.pop('query_results', None)
-    predict_metadata.pop('predict_data', None)
-    predict_metadata['is_result_too_large'] = True
-    limit_kb = _QUERY_RESULT_SIZE_LIMIT_BYTES / 1024
-    predict_metadata['error_message'] = (
-        f'Query result size exceeded safety limit of {limit_kb:.0f}KB. Got'
-        f' {serialized_size} bytes.'
-    )
-    predict_execution_time = -1.0
+  predict_execution_time = _EnforceQueryResultSizeLimit(
+      predict_metadata, predict_execution_time
+  )
   predict_iteration_performance.add_query_performance(
       f'{q.question}_predict', predict_execution_time, predict_metadata
   )
