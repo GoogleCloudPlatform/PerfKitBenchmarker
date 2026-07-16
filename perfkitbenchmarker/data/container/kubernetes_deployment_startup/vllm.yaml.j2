@@ -1,0 +1,73 @@
+# vLLM CPU inference workload for the kubernetes_deployment_startup
+# benchmark (--kubernetes_deployment_startup_workload=vllm).
+#
+# NOTE: CPU sizing (2 cores) and memory sizing (memory_limit, default
+# 8Gi -- see PR 6 below) are starting defaults for the
+# public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo image and may need tuning
+# per the actual model loaded. Port 8000 and the /health readiness path
+# match vLLM's default OpenAI-compatible server configuration.
+#
+# gpu_memory_utilization (PR 5, default 0.5, see
+# --kubernetes_deployment_startup_vllm_gpu_memory_utilization) is passed
+# as --gpu-memory-utilization to keep vLLM's memory reservation within
+# the container memory limit below -- vLLM's own default (~0.9) exceeds
+# the headroom available once Python/PyTorch/runtime overhead is
+# subtracted, producing a deterministic crash-loop.
+#
+# memory_limit (PR 6, default 8Gi, see
+# --kubernetes_deployment_startup_vllm_memory_limit) replaces the old
+# hardcoded 4Gi requests/limits.memory -- production runs OOMKilled
+# during the compile/warmup phase even with gpu_memory_utilization
+# lowered to 0.3, confirming the compile/warmup overhead (not the KV
+# cache reservation) was what exceeded 4Gi.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ name }}
+  labels:
+    app: {{ name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ name }}
+  template:
+    metadata:
+      labels:
+        app: {{ name }}
+    spec:
+      containers:
+        - name: {{ name }}
+          image: {{ image }}
+          imagePullPolicy: "Always"
+          args:
+            - "--gpu-memory-utilization"
+            - "{{ gpu_memory_utilization }}"
+          ports:
+          - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 1
+          resources:
+            requests:
+              cpu: "2"
+              memory: "{{ memory_limit }}"
+            limits:
+              cpu: "2"
+              memory: "{{ memory_limit }}"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ name }}
+spec:
+  selector:
+    app: {{ name }}
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+  type: LoadBalancer

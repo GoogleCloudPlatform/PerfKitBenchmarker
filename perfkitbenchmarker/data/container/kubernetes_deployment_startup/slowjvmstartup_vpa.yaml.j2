@@ -1,0 +1,47 @@
+# VerticalPodAutoscaler with GKE CPU Startup Boost policy.
+#
+# Applied only for --kubernetes_deployment_startup_scenario=optimized
+# (GKE-only), shared by both --kubernetes_deployment_startup_workload
+# values (jvm or vllm, PR 4). Requires enable_vpa: True on the
+# container_cluster (already set by GetConfig() for this scenario).
+#
+# Schema reference: GKE VPA `startupBoost.cpu` field temporarily multiplies
+# the container's CPU request/limit by `factor` while the pod is starting,
+# then scales back down in-place (updateMode: InPlaceOrRecreate) once the
+# pod is Ready and durationSeconds has elapsed.
+#
+# max_allowed_cpu and duration_seconds are per-workload (see
+# _VPA_DEFAULT_MAX_CPU / _VPA_DEFAULT_DURATION_SECONDS in
+# kubernetes_deployment_startup_benchmark.py, overridable via
+# --kubernetes_deployment_startup_vpa_max_cpu /
+# --kubernetes_deployment_startup_vpa_duration_seconds): vLLM's baseline
+# CPU request (2 full cores, see vllm.yaml.j2) already exceeds the
+# JVM-tuned "1" ceiling, and model loading is expected to take longer than
+# the JVM's ~67s baseline that 120s was originally sized for. Confirm
+# against Kam's linked guide before relying on this for production
+# comparisons:
+# https://docs.google.com/document/d/1yEV5Xc3Xx0xVNilBlfQ0isXlLbY4AEIGI8FDHrS8WVM/edit?tab=t.0
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ name }}
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: {{ name }}
+  updatePolicy:
+    updateMode: "InPlaceOrRecreate"
+  startupBoost:
+    cpu:
+      type: "Factor"
+      factor: {{ boost_factor }}
+      durationSeconds: {{ duration_seconds }}
+  resourcePolicy:
+    containerPolicies:
+      - containerName: '*'
+        controlledResources: ["cpu"]
+        minAllowed:
+          cpu: "100m"
+        maxAllowed:
+          cpu: "{{ max_allowed_cpu }}"
