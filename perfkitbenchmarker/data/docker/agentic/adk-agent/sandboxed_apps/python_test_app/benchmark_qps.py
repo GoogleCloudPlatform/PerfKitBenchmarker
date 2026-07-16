@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Minimal QPS benchmark script for UC-F (Scheduling Throughput).
+"""Minimal QPS benchmark script (Scheduling Throughput).
 
 Runs inside the GKE Agent Sandbox to validate claim readiness.
 Executes a trivial operation and reports status.  The orchestrator-side

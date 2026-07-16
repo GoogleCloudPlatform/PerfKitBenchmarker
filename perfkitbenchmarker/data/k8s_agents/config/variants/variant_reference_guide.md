@@ -244,17 +244,6 @@ Key questions this variant answers:
 
 ---
 
-### combined — Combined Best Knobs
-
-**What changes vs baseline:**
-- Machine type: `c4-standard-16` (from var3)
-- `maxParallelImagePulls: 5` (from var1)
-- NOTE: Currently also applies overlay2=none (var2) and sched tuning (var6) — these should be removed
-
-**What it tests:** Whether combining individually-beneficial knobs produces compounding improvement.
-
----
-
 ## Expansion Plan: Which Variants to Test Per Benchmark
 
 Based on the analysis above, here's the recommended test matrix. Only variants with a plausible positive or unknown influence are included — proven-harmful variants (var2, var5, var6) are excluded.
@@ -270,7 +259,7 @@ Based on the analysis above, here's the recommended test matrix. Only variants w
 | **k8s_deletion** | var4, var10, baseline | Disk cleanup + IPAM — multi-node distributes pressure |
 | **k8s_snapshot** | var3, var4, var8 | CRIU restore is CPU+disk, AMD may help |
 
-### Variants to Skip for Non-UC-B Benchmarks
+### Variants to Skip for Non-Density Benchmarks
 
 | Variant | Reason to Skip |
 |---------|---------------|
@@ -314,4 +303,3 @@ Based on the analysis above, here's the recommended test matrix. Only variants w
 | var8 (AMD) | Y | Y | Y | Y | Y | | Y |
 | var9 (ARM) | Y | | | | | | |
 | var10 (multi-node) | Y | Y | Y | | | Y | Y |
-| combined | Y | Y | | | | | |

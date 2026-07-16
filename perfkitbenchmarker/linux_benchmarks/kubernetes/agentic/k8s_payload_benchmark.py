@@ -65,6 +65,7 @@ from __future__ import annotations
 
 import logging
 import time
+import uuid
 
 from absl import flags
 from perfkitbenchmarker import configs
@@ -83,6 +84,10 @@ k8s_payload:
   description: >
     Atomic single-point payload transfer saturation measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
+  flags: {}
+  container_registry: {}
+  container_specs: {}
+  container_cluster: {}
 """
 
 _WARMPOOL_NAME = "python-sandbox-warmpool"
@@ -202,7 +207,10 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     )
 
     # Build samples
+    run_id = str(uuid.uuid4())[:8]
+
     extra = {
+        "run_id": run_id,
         "payload_size_mb": payload_size_mb,
         "payload_iterations": iterations,
         "concurrent_sessions": concurrent,

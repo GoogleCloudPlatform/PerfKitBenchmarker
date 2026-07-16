@@ -5,11 +5,10 @@ Runs baseline + variant benchmarks for any GKE agentic benchmark.
 Drains warm pool between sweep levels for clean measurements.
 
 Usage:
-  python sweep_optimization.py --benchmark k8s_python_density --variant baseline --stages run --sweep-values 1,4,8,16
-  python sweep_optimization.py --benchmark k8s_payload --variant baseline --stages run --sweep-values 0.01,0.1,1,5,10
-  python sweep_optimization.py --benchmark k8s_python_density --variant baseline --stages run \
-      --sweep-values 50,100 -- --k8s_python_density_sample_count=50
-  python sweep_optimization.py --benchmark k8s_python_density --all --stages provision,prepare,run,teardown
+  python perfkitbenchmarker/scripts/agentic/sweep.py --benchmark k8s_python_density --variant baseline --stages run --sweep-values 1,4,8,16
+  python perfkitbenchmarker/scripts/agentic/sweep.py --benchmark k8s_payload --variant baseline --stages run --sweep-values 0.01,0.1,1,5,10
+  python perfkitbenchmarker/scripts/agentic/sweep.py --benchmark k8s_python_density --variant baseline --stages run --sweep-values 50,100 -- --k8s_python_density_sample_count=50
+  python perfkitbenchmarker/scripts/agentic/sweep.py --benchmark k8s_python_density --all --stages provision,prepare,run,teardown
 """
 
 import argparse
@@ -261,26 +260,54 @@ def drain_warmpool(warmpool_name, pod_label):
     logger.warning("Drain timeout: pods may still be terminating")
 
 
-def _read_yaml_gke_flags(config_path):
-    """Read gke_additional_flags from a variant YAML config file."""
+def _read_yaml_flags(config_path, benchmark, flag_name, flag_type="list"):
+    """Read a single flag from a variant YAML config file.
+
+    Args:
+        config_path: Path to the variant YAML file.
+        benchmark: Benchmark key to look up (e.g. 'k8s_snapshot').
+        flag_name: Flag name under the 'flags:' section.
+        flag_type: 'list' returns a list of strings, 'string' returns
+            a single string or None.
+
+    Returns:
+        list[str] when flag_type='list' (empty list if not found).
+        str or None when flag_type='string' (None if not found).
+    """
+    empty = [] if flag_type == "list" else None
     try:
         with open(config_path, "r") as f:
             data = yaml.safe_load(f)
         if not data:
-            return []
-        for bench_name, bench_config in data.items():
-            if isinstance(bench_config, dict):
-                fl = bench_config.get("flags", {})
-                if isinstance(fl, dict):
-                    gke_flags = fl.get("gke_additional_flags", [])
-                    if isinstance(gke_flags, list):
-                        return [str(f).strip() for f in gke_flags if f]
-        return []
+            return empty
+        # Look up the specific benchmark key first
+        bench_config = data.get(benchmark)
+        if bench_config is None:
+            # Fall back to first benchmark key (backward compat)
+            for _, bench_config in data.items():
+                if isinstance(bench_config, dict):
+                    break
+            else:
+                return empty
+        if not isinstance(bench_config, dict):
+            return empty
+        fl = bench_config.get("flags", {})
+        if not isinstance(fl, dict):
+            return empty
+        value = fl.get(flag_name)
+        if value is None:
+            return empty
+        if flag_type == "list":
+            if isinstance(value, list):
+                return [str(v).strip() for v in value if v]
+            return [str(value).strip()]
+        else:
+            return str(value).strip()
     except Exception as e:
         logger.warning(
-            "Could not read gke_additional_flags from %s: %s", config_path, e
+            "Could not read %s from %s: %s", flag_name, config_path, e
         )
-        return []
+        return empty
 
 
 def run_pkb(
@@ -288,7 +315,7 @@ def run_pkb(
 ):
     """Run PKB with the given benchmark, variant, and stage."""
     config = os.path.join(CONFIG_DIR, VARIANT_CONFIGS[variant])
-    uri = re.sub(r"[^a-zA-Z0-9]", "", variant)
+    uri = re.sub(r"[^a-zA-Z0-9]", "", variant)[:12]
     results = os.path.join(RESULTS_BASE, benchmark)
     os.makedirs(results, exist_ok=True)
 
@@ -313,11 +340,14 @@ def run_pkb(
             "--enable-master-authorized-networks",
             "--master-authorized-networks=" + my_ip + "/32",
         ]
-        yaml_flags = _read_yaml_gke_flags(config)
-        for yf in yaml_flags:
+        yaml_gke_flags = _read_yaml_flags(config, benchmark, "gke_additional_flags")
+        for yf in yaml_gke_flags:
             if yf not in gke_flag_list:
                 gke_flag_list.append(yf)
         parts.append("--gke_additional_flags=" + ",".join(gke_flag_list))
+        yaml_nodepool_flags = _read_yaml_flags(config, benchmark, "gke_additional_nodepool_flags")
+        if yaml_nodepool_flags:
+            parts.append("--gke_additional_nodepool_flags=" + ",".join(yaml_nodepool_flags))
 
     if "teardown" in stage:
         parts.append("--gce_network_name=" + NETWORK)

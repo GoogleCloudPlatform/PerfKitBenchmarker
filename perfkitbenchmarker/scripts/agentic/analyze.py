@@ -180,8 +180,11 @@ def auto_discover_sweep_label(results_dir):
 def load_variant_data(results_dir, metric_prefix, sweep_label):
     """Load all variant NDJSON files into a structured dict.
 
+    Groups records by (sweep_val, run_id) to distinguish separate
+    runs at the same sweep value; keys are suffixed with _runN.
+
     Returns:
-        dict: {variant: {sweep_value: {metric: value}}}
+        dict: {variant: {sweep_key: {metric: value}}}
     """
     all_data = {}
 
@@ -204,7 +207,9 @@ def load_variant_data(results_dir, metric_prefix, sweep_label):
             continue
 
         print(f"  Loading {variant_name} from {results_file}")
-        variant_data = defaultdict(dict)
+
+        # Phase 1: Group records by (sweep_val, wall_time_s)
+        run_groups = defaultdict(dict)  # (sweep_val, wall_time_s) -> {metric: value}
         line_count = 0
         metric_count = 0
 
@@ -237,21 +242,39 @@ def load_variant_data(results_dir, metric_prefix, sweep_label):
                 except (ValueError, TypeError):
                     pass
 
-                variant_data[sweep_val][metric] = value
+                # run_id is a unique UUID prefix per Run() invocation
+                rid = labels.get("run_id", "")
+
+                group_key = (sweep_val, rid)
+                if metric in run_groups[group_key]:
+                    print(f"    WARNING: duplicate metric {metric} in group {group_key}")
+                run_groups[group_key][metric] = value
                 metric_count += 1
 
-        if variant_data:
-            all_data[variant_name] = dict(variant_data)
-            sweep_vals = sorted(variant_data.keys())
-            metrics_found = set()
-            for d in variant_data.values():
-                metrics_found.update(d.keys())
-            print(f"    {metric_count} samples, {len(metrics_found)} unique metrics, {sweep_label}: {sweep_vals}")
-        else:
+        if not run_groups:
             print(f"    WARNING: no benchmark metrics found ({line_count} total lines)")
+            continue
+
+        # Phase 2: Assign display keys (plain or _runN suffixed)
+        sweep_val_runs = defaultdict(list)
+        for (sv, wt), metrics in sorted(run_groups.items()):
+            sweep_val_runs[sv].append((wt, metrics))
+
+        variant_data = {}
+        for sv, runs in sorted(sweep_val_runs.items()):
+            for idx, (wt, metrics) in enumerate(runs, 1):
+                key = f"{sv}_run{idx}"
+                variant_data[key] = metrics
+
+        all_data[variant_name] = variant_data
+        sweep_keys = sorted(variant_data.keys(), key=lambda k: (str(k), k))
+        metrics_found = set()
+        for d in variant_data.values():
+            metrics_found.update(d.keys())
+        print(f"    {metric_count} samples, {len(metrics_found)} unique metrics, "
+              f"{len(run_groups)} runs, keys: {sweep_keys}")
 
     return all_data
-
 
 def discover_metrics(all_data):
     """Auto-discover all metrics across all variants and sweep values."""

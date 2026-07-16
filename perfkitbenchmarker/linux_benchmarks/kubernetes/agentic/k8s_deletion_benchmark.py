@@ -42,6 +42,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+import uuid
 
 from absl import flags
 from perfkitbenchmarker import configs
@@ -60,6 +61,10 @@ k8s_deletion:
   description: >
     Atomic single-point bulk deletion and IP reclamation measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
+  flags: {}
+  container_registry: {}
+  container_specs: {}
+  container_cluster: {}
 """
 
 # ---------------------------------------------------------------------------
@@ -264,7 +269,10 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     wall_time = time.time() - t_wall_start
 
     # 6. Build samples
+    run_id = str(uuid.uuid4())[:8]
+
     extra = {
+        "run_id": run_id,
         "batch_size": batch_size,
         "final_running_count": final_running,
         "ip_before": ip_before,
@@ -443,7 +451,7 @@ def _GetPodNames(namespace: str, label: str) -> list[str]:
         timeout=30,
         raise_on_failure=False,
     )
-    if rc != 0 or not stdout:
+    if not stdout or not stdout.strip():
         return []
     return stdout.split()
 
@@ -468,7 +476,7 @@ def _CountAllocatedIPs(namespace: str, label: str) -> int:
         timeout=30,
         raise_on_failure=False,
     )
-    if rc != 0 or not stdout:
+    if not stdout or not stdout.strip():
         return 0
     return len([ip for ip in stdout.split() if ip])
 

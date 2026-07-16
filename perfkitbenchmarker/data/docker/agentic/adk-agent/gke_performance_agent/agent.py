@@ -12,7 +12,7 @@ EXECUTION CONTEXT:
         -> CallAgentApi("/benchmark/...")   -> main.py (FastAPI)
                                               -> Runner(agent=root_agent)
                                                 -> MockLlm yields code
-                                                -> V3GkeCodeExecutor._execute_in_sandbox()
+                                                -> BenchmarkGkeCodeExecutor._execute_in_sandbox()
                                                   -> SandboxClient.create_sandbox()
                                                   -> sandbox.files.write("script.py", code)
                                                   -> sandbox.commands.run("python3 script.py")
@@ -164,13 +164,30 @@ class MockLlm(BaseLlm):
 # Module-level thread pool for sandbox I/O operations.
 # Initialized once at import time to avoid thread-safety issues
 # with lazy initialization inside _execute_in_sandbox().
-_SANDBOX_POOL = ThreadPoolExecutor(max_workers=16)
+def _sandbox_io_workers() -> int:
+    """Compute worker count for sandbox I/O thread pool.
+
+    Uses the same 2 * cpu_count heuristic as main.py's
+    _compute_thread_count(), capped between 2 and 64.  On
+    c4-standard-8 (8 vCPUs) this produces 16 — matching the
+    original hardcoded value.
+
+    Override via kubectl set env or Deployment patch:
+        kubectl set env deploy/adk-agent SANDBOX_IO_WORKERS=32
+    """
+    env_val = os.getenv("SANDBOX_IO_WORKERS")
+    if env_val:
+        return int(env_val)
+    return max(2, min(64, 2 * (os.cpu_count() or 1)))
 
 
-class V3GkeCodeExecutor(GkeCodeExecutor):
+_SANDBOX_POOL = ThreadPoolExecutor(max_workers=_sandbox_io_workers())
+
+
+class BenchmarkGkeCodeExecutor(GkeCodeExecutor):
     def _execute_in_sandbox(self, code: str) -> CodeExecutionResult:
-        """Executes code using the v0.4.6 compatible SandboxClient."""
-        logging.info("Executing via V3 SandboxClient (v0.4.6 compatible).")
+        """Executes code in a sandbox with benchmark instrumentation."""
+        logging.info("Executing in benchmark-instrumented sandbox.")
 
         # _SANDBOX_POOL is initialized at module level (thread-safe).
 
@@ -183,7 +200,7 @@ class V3GkeCodeExecutor(GkeCodeExecutor):
             )
         else:
             client = SandboxClient()
-        # v0.4.6 create_sandbox uses 'template' and 'namespace' arguments
+        # create_sandbox uses 'template' and 'namespace' arguments
         create_ms = upload_ms = run_ms = delete_ms = 0.0
         sandbox = None
         # Time sandbox creation
@@ -196,7 +213,7 @@ class V3GkeCodeExecutor(GkeCodeExecutor):
         sandbox = create_future.result()
         create_ms = (time.time() - t0) * 1000.0
         try:
-            # v0.4.6 handles file I/O via the .files namespace
+            # File I/O via the .files namespace
             t0 = time.time()
             upload_future = _SANDBOX_POOL.submit(sandbox.files.write, "script.py", code)
             upload_future.result()
@@ -249,7 +266,7 @@ class V3GkeCodeExecutor(GkeCodeExecutor):
             logging.info("SANDBOX_TIMINGS_DELETE: delete_ms=%.3f", delete_ms)
 
 
-gke_executor = V3GkeCodeExecutor(
+gke_executor = BenchmarkGkeCodeExecutor(
     cluster_name=os.getenv("CLUSTER_NAME"),
     location=os.getenv("GOOGLE_CLOUD_LOCATION"),
     namespace=os.getenv("AGENTIC_NAMESPACE"),

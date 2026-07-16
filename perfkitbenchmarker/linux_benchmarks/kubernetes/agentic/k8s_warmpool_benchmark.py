@@ -1,4 +1,4 @@
-"""PKB Benchmark: GKE Agent Warmpool Scale-Up (Use Case E).
+"""PKB Benchmark: GKE Agent Warmpool Scale-Up.
 
 Atomic single-point measurement of warm pool provisioning speed on a
 pre-provisioned GKE cluster.  Measures how quickly N sandbox pods can be
@@ -48,6 +48,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+import uuid
 
 from absl import flags
 from datetime import datetime, timezone
@@ -67,6 +68,10 @@ k8s_warmpool:
   description: >
     Atomic single-point warm pool scale-up measurement on a
     pre-provisioned GKE cluster with gVisor isolation.
+  flags: {}
+  container_registry: {}
+  container_specs: {}
+  container_cluster: {}
 """
 
 # ---------------------------------------------------------------------------
@@ -225,7 +230,10 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     wall_time = round(time.time() - t_wall_start, 2)
 
     # 5. Build samples
+    run_id = str(uuid.uuid4())[:8]
+
     extra = {
+        "run_id": run_id,
         "target_replicas": target,
         "final_running_count": final_running,
         "final_pending_count": final_pending,
