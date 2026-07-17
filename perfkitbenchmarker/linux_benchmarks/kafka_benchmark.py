@@ -25,6 +25,12 @@ from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import virtual_machine
+from perfkitbenchmarker import vm_util
+
+
+class DiskNotFullyRecoveredError(Exception):
+  """Exception raised when broker disk space is not fully recovered."""
+
 
 BENCHMARK_NAME = 'kafka'
 BENCHMARK_CONFIG = """
@@ -693,6 +699,94 @@ def _ParseConsumerResults(
   return results
 
 
+def _GetBrokerFreeDiskSpaceGb(
+    broker_vm: virtual_machine.BaseVirtualMachine,
+) -> float:
+  """Returns the free disk space on the broker VM root filesystem in GB.
+
+  Args:
+    broker_vm: The broker VM instance to query.
+
+  Returns:
+    The available disk space across the root filesystem in gigabytes, or 0.0
+    if the query fails.
+  """
+  stdout, _ = broker_vm.RemoteCommand(
+      "df -k / | tail -1 | awk '{print $4}'", ignore_failure=True
+  )
+  try:
+    return float(stdout.strip()) / (1024 * 1024)
+  except (ValueError, TypeError):
+    return 0.0
+
+
+def _WaitForBrokerDiskRecovery(
+    broker_vm: virtual_machine.BaseVirtualMachine,
+    initial_free_gb: float,
+    recovery_threshold: float = 0.90,
+    min_wait_seconds: int = 300,
+    delay_multiplier: int = 4,
+) -> None:
+  """Waits until free disk space on broker recovers near original capacity.
+
+  Args:
+    broker_vm: The broker VM instance to monitor during cleanup.
+    initial_free_gb: The initial available disk space in gigabytes captured
+      before the trial run began.
+    recovery_threshold: The target fraction of initial free space (default
+      0.90).
+    min_wait_seconds: The minimum waiting timeout in seconds (default 300).
+    delay_multiplier: Multiplier for file delete delay ms calculation
+      (default 4).
+  """
+  if initial_free_gb <= 0:
+    return
+
+  target_free_gb = initial_free_gb * recovery_threshold
+  max_wait_seconds = max(
+      min_wait_seconds,
+      int(_KAFKA_FILE_DELETE_DELAY_MS.value / 1000) * delay_multiplier,
+  )
+
+  @vm_util.Retry(
+      retryable_exceptions=(DiskNotFullyRecoveredError,),
+      poll_interval=15,
+      timeout=max_wait_seconds,
+      fuzz=0,
+  )
+  def _Wait() -> None:
+    curr_free_gb = _GetBrokerFreeDiskSpaceGb(broker_vm)
+    if curr_free_gb >= target_free_gb:
+      logging.info(
+          (
+              'Broker disk space recovered: current free=%.1f GB,'
+              ' target=%.1f GB (initial=%.1f GB)'
+          ),
+          curr_free_gb,
+          target_free_gb,
+          initial_free_gb,
+      )
+      return
+    logging.info(
+        (
+            'Waiting for broker disk recovery: current free=%.1f GB,'
+            ' target=%.1f GB (initial=%.1f GB)'
+        ),
+        curr_free_gb,
+        target_free_gb,
+        initial_free_gb,
+    )
+    raise DiskNotFullyRecoveredError()
+
+  try:
+    _Wait()
+  except vm_util.TimeoutExceededRetryError:
+    logging.warning(
+        'Broker disk space did not fully recover within %s seconds.',
+        max_wait_seconds,
+    )
+
+
 def _RunSingleTrial(
     benchmark_spec: bm_spec.BenchmarkSpec,
     num_threads: int,
@@ -713,12 +807,14 @@ def _RunSingleTrial(
   consumer_vm = benchmark_spec.vm_groups['consumer'][0]
   bootstrap_server = f'{broker_vm.internal_ip}:{KAFKA_BROKER_PORT}'
 
+  initial_free_gb = _GetBrokerFreeDiskSpaceGb(broker_vm)
   trial_topic_name = (
       f'{KAFKA_TOPIC_NAME}-threads-{num_threads}-records-{num_records}'
   )
   _CreateTopic(broker_vm, bootstrap_server, trial_topic_name)
 
   try:
+    # Execute producer and consumer workloads concurrently against the broker.
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
       producer_future = executor.submit(
           _RunProducer,
@@ -753,6 +849,7 @@ def _RunSingleTrial(
     return trial_results
   finally:
     _DeleteTopic(broker_vm, bootstrap_server, trial_topic_name)
+    _WaitForBrokerDiskRecovery(broker_vm, initial_free_gb)
 
 
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
