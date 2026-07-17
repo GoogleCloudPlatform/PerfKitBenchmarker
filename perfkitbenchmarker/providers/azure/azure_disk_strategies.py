@@ -301,10 +301,64 @@ class AzurePrepareScratchDiskStrategy(
 
 
 class AzLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
+  """Strategies to setup Lustre."""
 
   def SetUpDiskOnLinux(self):
     """Performs Linux specific setup of Lustre disk."""
+    # https://learn.microsoft.com/en-us/azure/azure-managed-lustre/client-install?tabs=kmod&pivots=ubuntu-24
     vm = self.vm
+    vm.InstallPackages(
+        'ca-certificates curl apt-transport-https lsb-release gnupg dpkg-dev'
+    )
+    cmd = (
+        'source /etc/lsb-release && '
+        'ARCH=$(dpkg-architecture -q DEB_BUILD_ARCH) && '
+        'echo "deb [arch=${ARCH}]'
+        ' https://packages.microsoft.com/repos/amlfs-${DISTRIB_CODENAME}/'
+        ' ${DISTRIB_CODENAME} main" | sudo tee'
+        ' /etc/apt/sources.list.d/amlfs.list && '
+        'curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg'
+        ' --dearmor | sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg >'
+        ' /dev/null && '
+        'sudo apt-get update'
+    )
+    vm.RemoteCommand(cmd)
+
+    kernel_version = vm.kernel_release
+    target_kernel, _ = vm.RemoteCommand(
+        'apt list -a "amlfs-lustre-client*" 2>/dev/null |'
+        ' awk \'{print $2}\' | grep -E \'^[0-9]+.*-azure$\' |'
+        ' sort -V | tail -n 1'
+    )
+    target_kernel = target_kernel.strip()
+    if not target_kernel:
+      raise errors.Benchmarks.UnsupportedConfigError(
+          'Could not determine latest supported kernel version from AMLFS repo.'
+      )
+    vm.InstallPackages(
+        f'linux-image-{target_kernel} linux-headers-{target_kernel}'
+    )
+    vm.RemoteCommand('sudo apt remove -y linux-image-azure')
+    # Override linux-check-removal so dpkg does not throw the abort prompt/error
+    vm.RemoteCommand(
+        'sudo rm -f /usr/bin/linux-check-removal && sudo ln -s /bin/true'
+        ' /usr/bin/linux-check-removal && sudo DEBIAN_FRONTEND=noninteractive'
+        f' apt remove -y linux-image-{kernel_version}'
+    )
+
+    package_name, _ = vm.RemoteCommand(
+        'apt list -a "amlfs-lustre-client*" 2>/dev/null |'
+        f' grep "{kernel_version}" |'
+        ' awk -F/ \'{print $1}\' | head -n 1'
+    )
+    package_name = package_name.strip()
+    if not package_name:
+      raise errors.Benchmarks.UnsupportedConfigError(
+          f'No matching Lustre client package found for kernel {kernel_version}'
+      )
+    vm.InstallPackages(f'{package_name}={kernel_version}')
+    vm.RemoteCommand('sudo modprobe lustre')
+
     super().SetUpDiskOnLinux()
     vm.RemoteCommand('echo "module load mpi/hpcx" >> .bashrc')
 

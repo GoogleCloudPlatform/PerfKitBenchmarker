@@ -554,6 +554,10 @@ class BaseDisk(resource.BaseResource):
     """Returns the path to the device inside a Linux VM."""
     return self.device_path
 
+  def UpdateDevicePath(self, device_path):
+    """Updates the device path for the disk inside a VM."""
+    self.device_path = device_path
+
   def GetDeviceId(self):
     """Return the Windows DeviceId of this disk."""
     return r'\\.\PHYSICALDRIVE%s' % self.disk_number
@@ -826,9 +830,6 @@ class NfsDisk(NetworkDisk):
   def Attach(self, vm):
     self.vm = vm
     self.vm.Install('nfs_utils')
-
-  def UpdateDevicePath(self, device_path):
-    self.device_path = device_path
 
 
 class SmbDisk(NetworkDisk):

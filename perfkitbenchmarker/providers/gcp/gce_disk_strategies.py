@@ -506,8 +506,32 @@ def _GenerateDiskNamePrefix(
 
 
 class GcpLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
+  """Strategies to set up Lustre."""
 
   def SetUpDiskOnLinux(self):
     """Performs Linux specific setup of Lustre disk."""
-    self.vm.Install('lustre_client')
+    # https://docs.cloud.google.com/managed-lustre/docs/connect-from-compute-engine#ubuntu-24.04-lts_1
+    cmd = (
+        'curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg |'
+        ' sudo gpg --dearmor --yes -o /usr/share/keyrings/google-cloud.gpg && '
+        'curl -fsSL https://us-apt.pkg.dev/doc/repo-signing-key.gpg | sudo gpg'
+        ' --dearmor --yes -o /usr/share/keyrings/lustre-client.gpg && '
+        'echo "deb [signed-by=/usr/share/keyrings/google-cloud.gpg]'
+        ' http://packages.cloud.google.com/apt'
+        ' apt-transport-artifact-registry-stable main" | sudo tee'
+        ' /etc/apt/sources.list.d/artifact-registry.list && '
+        'sudo apt-get update && sudo apt-get install -y'
+        ' apt-transport-artifact-registry && '
+        'echo "deb [signed-by=/usr/share/keyrings/lustre-client.gpg]'
+        ' ar+https://us-apt.pkg.dev/projects/lustre-client-binaries'
+        ' lustre-client-ubuntu-noble main" | sudo tee -a'
+        ' /etc/apt/sources.list.d/artifact-registry.list && '
+        'sudo apt-get update'
+    )
+    self.vm.RemoteCommand(cmd)
+    self.vm.InstallPackages(
+        'lustre-client-modules-$(uname -r)/lustre-client-ubuntu-noble'
+    )
+    self.vm.InstallPackages('lustre-client-utils/lustre-client-ubuntu-noble')
+    self.vm.RemoteCommand('sudo modprobe lustre')
     super().SetUpDiskOnLinux()

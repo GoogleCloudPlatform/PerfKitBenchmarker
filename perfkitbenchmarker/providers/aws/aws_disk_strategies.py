@@ -558,10 +558,23 @@ class AwsLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
 
   def SetUpDiskOnLinux(self):
     """Performs Linux specific setup of Lustre disk."""
+    # https://docs.aws.amazon.com/fsx/latest/LustreGuide/configure-efa-clients.html
     vm = self.vm
-    vm.InstallPackages('lustre-client')
+    vm.InstallPackages('curl unzip')
+    vm.RemoteCommand(
+        'curl -O'
+        ' https://docs.aws.amazon.com/fsx/latest/LustreGuide/samples/install-fsx-lustre-client.zip'
+        ' && unzip -o install-fsx-lustre-client.zip'
+    )
+    cmd = (
+        'cd install-fsx-lustre-client && sudo'
+        ' ./bin/install-fsx-lustre-client.sh --install-lustre'
+    )
     if FLAGS.aws_efa:
-      # https://docs.aws.amazon.com/fsx/latest/LustreGuide/configure-efa-clients.html
+      cmd += ' --install-efa'
+    vm.RemoteCommand(cmd)
+    vm.RemoteCommand('sudo modprobe lustre')
+    if FLAGS.aws_efa:
       stdout, _ = vm.RemoteCommand('ip -br -4 a sh | grep $(hostname -i)')
       eth = stdout.split()[0]
       vm.RemoteCommand(
@@ -570,7 +583,8 @@ class AwsLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
           'sudo modprobe ksocklnd; sudo lnetctl lnet configure'
       )
       vm.RemoteCommand(
-          f'sudo lnet del --net tcp; sudo lnetctl net add --net tcp --if {eth}'
+          'sudo lnetctl net del --net tcp; sudo lnetctl net add --net tcp --if'
+          f' {eth}'
       )
       stdout, _ = vm.RemoteCommand('ls -1 /sys/class/infiniband | wc -l')
       num_efa = int(stdout)

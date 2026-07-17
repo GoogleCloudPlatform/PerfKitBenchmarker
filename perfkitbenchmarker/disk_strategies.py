@@ -314,7 +314,7 @@ class SetUpLustreDiskStrategy(SetUpDiskStrategy):
         lustre_disk.mount_options,
         lustre_disk.fstab_options,
     )
-
+    lustre_disk.UpdateDevicePath(self.disk_spec.mount_point)
     self.vm.scratch_disks.append(lustre_disk)
 
 
