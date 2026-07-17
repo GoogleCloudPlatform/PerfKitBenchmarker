@@ -712,6 +712,11 @@ class AwsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
         ]),
     )
 
+  def testPostCreateOfficialCreateTime(self):
+    vm = InitVm()
+    vm._PostCreate()
+    self.assertEqual(vm.official_create_time, 1784116800)
+
 
 def CreateVm():
   """Returns the AWS run-instances command line."""
@@ -735,6 +740,7 @@ def InitVm():
               'PublicIpAddress': '10.0.0.1',
               'PrivateIpAddress': '10.0.0.2',
               'SecurityGroups': [{'GroupId': None}],
+              'LaunchTime': '2026-07-15T12:00:00.000Z',
           }]
       }]
   }

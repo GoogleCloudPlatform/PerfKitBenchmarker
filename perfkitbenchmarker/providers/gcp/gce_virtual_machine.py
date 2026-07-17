@@ -39,6 +39,7 @@ import typing
 from typing import Dict, List, Tuple
 
 from absl import flags
+import dateutil.parser
 from perfkitbenchmarker import boot_disk
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import errors
@@ -1140,6 +1141,11 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       KeyError, IndexError: If the ID and IP addresses cannot be parsed.
     """
     self.id = describe_response['id']
+    creation_timestamp = describe_response.get('creationTimestamp')
+    if creation_timestamp:
+      self.official_create_time = int(
+          dateutil.parser.parse(creation_timestamp).timestamp()
+      )
     network_interface = describe_response['networkInterfaces'][0]
     self.internal_ip = network_interface['networkIP']
     if 'accessConfigs' in network_interface:

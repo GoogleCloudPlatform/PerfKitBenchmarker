@@ -28,7 +28,9 @@ import re
 import threading
 import time
 import uuid
+
 from absl import flags
+import dateutil.parser
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import flags as pkb_flags
@@ -815,6 +817,11 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     response = self._RunDescribeInstancesCommand()
     instance = response['Reservations'][0]['Instances'][0]
     self.internal_ip = instance['PrivateIpAddress']
+    launch_time = instance.get('LaunchTime')
+    if launch_time:
+      self.official_create_time = int(
+          dateutil.parser.parse(launch_time).timestamp()
+      )
     for network_interface in instance.get('NetworkInterfaces', []):
       # Ensures primary NIC is first
       if network_interface['Attachment']['DeviceIndex'] == 0:

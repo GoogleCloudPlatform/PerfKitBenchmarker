@@ -35,6 +35,7 @@ import re
 import threading
 
 from absl import flags
+import dateutil.parser
 from perfkitbenchmarker import custom_virtual_machine_spec
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
@@ -1199,6 +1200,12 @@ class AzureVirtualMachine(  # pyrefly: ignore[invalid-inheritance]
     if self.public_ips:
       self.ip_addresses = response['publicIps'].split(',')
       self.ip_address = self.ip_addresses[0]
+
+    created_time = response.get('systemData', {}).get('createdAt')
+    if created_time:
+      self.official_create_time = int(
+          dateutil.parser.parse(created_time).timestamp()
+      )
 
     self.create_os_disk_strategy.disk.name = response['storageProfile'][
         'osDisk'

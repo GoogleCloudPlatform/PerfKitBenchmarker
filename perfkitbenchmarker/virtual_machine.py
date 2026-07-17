@@ -321,6 +321,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     create_operation_name: The name of a VM's create command operation, used to
       poll the operation in WaitUntilRunning.
     create_return_time: The time at which a VM's create command returns.
+    official_create_time: The time the provider reports the VM was created.
     is_running_time: The time at which the VM entered the running state.
   """
 
@@ -417,6 +418,7 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     self.cpu_version = None
     self.create_operation_name = None
     self.create_return_time = None
+    self.official_create_time: int | None = None
     self.is_running_time = None
     self.boot_startup_script = vm_spec.boot_startup_script
     self.create_cmd_info_log = None

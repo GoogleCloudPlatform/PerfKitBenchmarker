@@ -1,5 +1,6 @@
 """Tests for perfkitbenchmarker.tests.providers.azure.azure_virtual_machine."""
 
+import json
 import unittest
 from absl.testing import parameterized
 import mock
@@ -148,6 +149,34 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     self.mock_cmd.side_effect = [('', 'OverconstrainedAllocationRequest', 1)]
     with self.assertRaises(errors.Benchmarks.InsufficientCapacityCloudFailure):
       vm._Create()
+
+  def testPostCreateOfficialCreateTime(self):
+    spec = azure_virtual_machine.AzureVmSpec(
+        _COMPONENT, machine_type='Standard_D2s_v5', zone='testing'
+    )
+    vm = TestAzureVirtualMachine(spec)
+    vm.SetDiskSpec(None, 0)
+
+    fake_response = {
+        'privateIps': '10.0.0.1',
+        'publicIps': '1.2.3.4',
+        'storageProfile': {
+            'osDisk': {
+                'name': 'fake_os_disk'
+            }
+        },
+        'systemData': {
+            'createdAt': '2026-07-15T12:00:00.000Z'
+        }
+    }
+
+    with mock.patch.object(
+        vm_util,
+        'IssueRetryableCommand',
+        return_value=(json.dumps(fake_response), ''),
+    ), mock.patch.object(util, 'GetResourceTags', return_value={}):
+      vm._PostCreate()
+      self.assertEqual(vm.official_create_time, 1784116800)
 
 
 class AzurePublicIPAddressTest(pkb_common_test_case.PkbCommonTestCase):

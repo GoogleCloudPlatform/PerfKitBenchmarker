@@ -311,6 +311,16 @@ def GetTimeToBoot(
               metadata,
           )
       )
+    if vm.official_create_time:
+      time_to_create_sec = vm.official_create_time - min_create_start_time
+      samples.append(
+          sample.Sample(
+              'Time to Service Reported Creation',
+              time_to_create_sec,
+              'seconds',
+              metadata,
+          )
+      )
 
     # TIME TO RUNNING
     if vm.is_running_time:

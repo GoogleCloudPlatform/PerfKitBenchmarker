@@ -49,6 +49,7 @@ _FLAGS = None
 
 _FAKE_INSTANCE_METADATA = {
     'id': '123456',
+    'creationTimestamp': '2026-07-15T12:00:00.000-07:00',
     'networkInterfaces': [{
         'accessConfigs': [{'natIP': '1.2.3.4'}],
         'networkIP': '1.2.3.4',
@@ -528,6 +529,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       )
       self.assertNotIn('--boot-disk-size', command_string)
       vm._PostCreate()
+      self.assertEqual(vm.official_create_time, 1784142000)
       self.assertEqual(issue_command.call_count, 3)
       expected = {
           'image': fake_image,
