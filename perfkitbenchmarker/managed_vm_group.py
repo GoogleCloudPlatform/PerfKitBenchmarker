@@ -156,7 +156,7 @@ class BaseManagedVmGroup(resource.BaseResource):
     raise NotImplementedError()
 
   @abc.abstractmethod
-  def _AddVms(self, num_vms_to_add: int):
+  def _AddVms(self, num_vms_to_add: int, zone: str | None = None):
     raise NotImplementedError()
 
   @abc.abstractmethod
@@ -173,11 +173,11 @@ class BaseManagedVmGroup(resource.BaseResource):
     self.last_operation_start_time = self.create_start_time
     self._UpdateVmList()
 
-  def AddVms(self, num_vms_to_add: int):
+  def AddVms(self, num_vms_to_add: int, zone: str | None = None):
     """Adds VMs to the managed VM group."""
     assert num_vms_to_add, 'No VMs to add.'
     self._RunOperation(
-        lambda: self._AddVms(num_vms_to_add),
+        lambda: self._AddVms(num_vms_to_add, zone=zone),
         new_vm_count=self.vm_count + num_vms_to_add,
     )
 

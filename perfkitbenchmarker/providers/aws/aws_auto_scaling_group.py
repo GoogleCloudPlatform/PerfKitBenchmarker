@@ -257,7 +257,8 @@ class AwsAutoScalingGroup(managed_vm_group.BaseManagedVmGroup):
     vm = cast(aws_virtual_machine.AwsVirtualMachine, vm)
     vm.id = reference.name
 
-  def _AddVms(self, _):
+  def _AddVms(self, num_vms_to_add: int, zone: str | None = None):
+    del num_vms_to_add
     cmd = self.base_cmd + [
         'launch-instances',
         '--auto-scaling-group-name',
@@ -266,6 +267,8 @@ class AwsAutoScalingGroup(managed_vm_group.BaseManagedVmGroup):
         # _RunOperation already updates the desired capacity.
         str(self.vm_count),
     ]
+    if zone:
+      cmd.extend(['--availability-zones', zone])
     vm_util.IssueCommand(cmd)
 
   def _RemoveVms(self, vm_names: list[str]):

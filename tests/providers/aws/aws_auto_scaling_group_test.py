@@ -162,6 +162,48 @@ class AwsAutoScalingGroupTest(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(errors.Benchmarks.UnsupportedConfigError):
       asg._IsReady()
 
+  def testAddVms(self):
+    asg = self._CreateAsg()
+    asg.vm_count = 2
+    asg._AddVms(1)
+    self.mock_cmd.func_to_mock.assert_called_with(
+        [
+            'aws',
+            '--output',
+            'json',
+            'autoscaling',
+            '--region',
+            'us-east-1',
+            'launch-instances',
+            '--auto-scaling-group-name',
+            'pkb-test_run-0',
+            '--requested-capacity',
+            '2',
+        ],
+    )
+
+  def testAddVmsWithZone(self):
+    asg = self._CreateAsg()
+    asg.vm_count = 2
+    asg._AddVms(1, zone='us-east-1a')
+    self.mock_cmd.func_to_mock.assert_called_with(
+        [
+            'aws',
+            '--output',
+            'json',
+            'autoscaling',
+            '--region',
+            'us-east-1',
+            'launch-instances',
+            '--auto-scaling-group-name',
+            'pkb-test_run-0',
+            '--requested-capacity',
+            '2',
+            '--availability-zones',
+            'us-east-1a',
+        ],
+    )
+
 
 if __name__ == '__main__':
   unittest.main()

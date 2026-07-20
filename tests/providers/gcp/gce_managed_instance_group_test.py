@@ -68,8 +68,8 @@ class GceManagedInstanceGroupTest(pkb_common_test_case.PkbCommonTestCase):
         'gcloud compute instance-groups managed create pkb-test_run-0'
         ' --template'
         ' projects/test_project/regions/us-central1/instanceTemplates/pkb-test_run-0'
-        ' --size 1 --format json --project test_project --quiet --region'
-        ' us-central1',
+        ' --size 1 --instance-redistribution-type NONE --format json --project'
+        ' test_project --quiet --region us-central1',
         self.mock_cmd.all_commands,
     )
 
@@ -102,8 +102,9 @@ class GceManagedInstanceGroupTest(pkb_common_test_case.PkbCommonTestCase):
         'gcloud compute instance-groups managed create pkb-test_run-0'
         ' --template'
         ' projects/test_project/regions/us-central1/instanceTemplates/pkb-test_run-0'
-        ' --size 1 --zones=us-central1-a,us-central1-b --format json'
-        ' --project test_project --quiet --region us-central1',
+        ' --size 1 --instance-redistribution-type NONE'
+        ' --zones=us-central1-a,us-central1-b --format json --project'
+        ' test_project --quiet --region us-central1',
         self.mock_cmd.all_commands,
     )
 
@@ -152,18 +153,48 @@ class GceManagedInstanceGroupTest(pkb_common_test_case.PkbCommonTestCase):
         ' "https://www.googleapis.com/compute/v1/projects/test_project/'
         'zones/us-central1-c/instances/pkb-test_run-0-0"}]'
     )
-    self.MockIssueCommand(
-        {
-            'gcloud compute instance-groups managed list-instances': [
-                (list_instances_response, '', 0)
-            ]
-        }
-    )
+    self.MockIssueCommand({
+        'gcloud compute instance-groups managed list-instances': [
+            (list_instances_response, '', 0)
+        ]
+    })
     mig = self.TestMig()
     vms = mig._GetCurrentVms()
     self.assertEqual(len(vms), 1)
     self.assertEqual(vms[0].name, 'pkb-test_run-0-0')
     self.assertEqual(vms[0].zone, 'us-central1-c')
+
+  def testAddVms(self):
+    mig = self.TestMig(zone='us-central1-c')
+    mig._AddVms(2)
+    self.assertIn(
+        'gcloud compute instance-groups managed create-instance pkb-test_run-0'
+        ' --instance pkb-test_run-0-0'
+        ' --format json --project test_project --quiet --zone us-central1-c',
+        self.mock_cmd.all_commands,
+    )
+    self.assertIn(
+        'gcloud compute instance-groups managed create-instance pkb-test_run-0'
+        ' --instance pkb-test_run-0-1'
+        ' --format json --project test_project --quiet --zone us-central1-c',
+        self.mock_cmd.all_commands,
+    )
+
+  def testAddVmsRegionalWithZone(self):
+    mig = self.TestMig(zone='us-central1')
+    mig._AddVms(2, zone='us-central1-a')
+    self.assertIn(
+        'gcloud compute instance-groups managed create-instance pkb-test_run-0'
+        ' --instance /us-central1-a/pkb-test_run-0-0 --format json --project'
+        ' test_project --quiet --region us-central1',
+        self.mock_cmd.all_commands,
+    )
+    self.assertIn(
+        'gcloud compute instance-groups managed create-instance pkb-test_run-0'
+        ' --instance /us-central1-a/pkb-test_run-0-1 --format json --project'
+        ' test_project --quiet --region us-central1',
+        self.mock_cmd.all_commands,
+    )
 
 
 if __name__ == '__main__':

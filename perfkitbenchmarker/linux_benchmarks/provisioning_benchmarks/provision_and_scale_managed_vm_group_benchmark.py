@@ -13,6 +13,7 @@
 # limitations under the License.
 """Benchmark that provisions and then optionally scales a managed VM group."""
 
+import random
 from typing import Any
 
 from absl import flags
@@ -83,7 +84,10 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     vms_to_remove = vms[: (old_vm_count - _NEW_VM_COUNT.value)]
     vm_group.RemoveVms([vm.name for vm in vms_to_remove])
   elif _SCALE_METHOD.value == ADD and _NEW_VM_COUNT.value > old_vm_count:
-    vm_group.AddVms(_NEW_VM_COUNT.value - old_vm_count)
+    zone = None
+    if vm_group.zones and len(vm_group.zones) > 1:
+      zone = random.choice(vm_group.zones)
+    vm_group.AddVms(_NEW_VM_COUNT.value - old_vm_count, zone=zone)
   else:
     raise ValueError(
         f'Invalid scale method: {_SCALE_METHOD.value} for scaling from '

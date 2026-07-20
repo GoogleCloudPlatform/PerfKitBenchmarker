@@ -17,6 +17,7 @@ import json
 import re
 from typing import Any, cast
 
+from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import managed_vm_group
 from perfkitbenchmarker import provider_info
@@ -154,6 +155,9 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
         '--size',
         str(self.vm_count),
     )
+    if self.is_regional:
+      # This is required to use create-instance for regional MIGs.
+      cmd.args.extend(['--instance-redistribution-type', 'NONE'])
     # --zone and --region are handled by GcloudCommand.
     if len(self.zones) > 1:
       cmd.args.append('--zones=' + ','.join(self.zones))
@@ -212,12 +216,20 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
       references.append(VmReference(name=match.group(2), zone=match.group(1)))
     return references
 
-  def _AddVms(self, num_vms_to_add: int):
-    cmd = self._GcloudCmd('create-instance', self.name)
+  def _AddVms(self, num_vms_to_add: int, zone: str | None = None):
+    vm_names = []
     for i in range(num_vms_to_add):
-      vm_name = f'{self.name}-{i}'
-      cmd.args += ['--instance', vm_name]
-    cmd.Issue()
+      vm_names.append(f'{self.name}-{i}')
+
+    def _AddVm(vm_name: str):
+      # There is no flag for instance zone, but it can be parsed from the
+      # instance name.
+      vm_ref = f'/{zone}/{vm_name}' if zone else vm_name
+      self._GcloudCmd(
+          'create-instance', self.name, '--instance', vm_ref
+      ).Issue()
+
+    background_tasks.RunThreaded(_AddVm, vm_names)
 
   def _RemoveVms(self, vm_names: list[str]):
     cmd = self._GcloudCmd(

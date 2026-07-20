@@ -193,7 +193,7 @@ class AzureVmScalingSet(managed_vm_group.BaseManagedVmGroup):
     )
     vm_util.IssueCommand(cmd)
 
-  def _AddVms(self, _):
+  def _AddVms(self, *_, **__):
     raise NotImplementedError(
         'Azure only supports scaling up by resizing the VMSS.'
     )
