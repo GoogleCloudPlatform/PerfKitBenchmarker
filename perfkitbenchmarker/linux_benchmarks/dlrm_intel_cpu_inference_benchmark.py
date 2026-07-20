@@ -158,6 +158,8 @@ def _BuildDocker(vm):
         'cd mlcommons/inference_results_v3.1/ && '
         f'git apply ~/{patch} && '
         'cd closed/Intel/code/dlrm-v2-99/pytorch-cpu-int8/docker/ && '
+        'sed -i "s|Miniconda3-latest-Linux-x86_64.sh|'
+        'Miniconda3-py39_25.9.1-3-Linux-x86_64.sh|g" Dockerfile && '
         'bash build_dlrm-v2-99_int8_container.sh'
     )
     vm.RemoteCommand(
