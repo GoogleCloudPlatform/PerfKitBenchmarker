@@ -22,6 +22,7 @@ from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import resource
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import container_spec as container_spec_lib
+from perfkitbenchmarker.configs import swap_config_spec
 
 
 BenchmarkSpec = Any  # benchmark_spec lib imports this module.
@@ -89,7 +90,7 @@ class BaseContainer(resource.BaseResource):
 
     Raises:
       FatalContainerError: If the container fails
-      RetriableContainerError: If the container times out wihout succeeding.
+      RetriableContainerError: If the container times out without succeeding.
     """
     raise NotImplementedError()
 
@@ -153,6 +154,9 @@ class BaseNodePoolConfig:
     disk_size: int. The size of the disk for the nodes in the node pool in GB.
     gpu_type: str. The type of GPU for the nodes in the node pool.
     gpu_count: int. The number of GPUs per node.
+    sandbox_config: Optional SandboxSpec for sandboxed node pools.
+    swap_config: Optional SwapConfigSpec for the node pool.
+    gke_swap_config: Optional cloud-specific swap config instance.
   """
 
   def __init__(
@@ -184,9 +188,9 @@ class BaseNodePoolConfig:
     self.disk_size: int = vm_spec.boot_disk_size  # pyrefly: ignore[bad-assignment]
     self.gpu_type: str | None = vm_spec.gpu_type
     self.gpu_count: int | None = vm_spec.gpu_count
-    # Defined by GceVirtualMachineConfig. Used by google_kubernetes_engine
     # pylint: disable=g-missing-from-attributes
     self.sandbox_config: container_spec_lib.SandboxSpec | None = None
+    self.swap_config: swap_config_spec.SwapConfigSpec | None = None
     self.max_local_disks: int | None
     self.ssd_interface: str | None
     self.threads_per_core: int

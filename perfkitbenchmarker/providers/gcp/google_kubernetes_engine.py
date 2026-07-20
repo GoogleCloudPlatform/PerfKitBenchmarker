@@ -39,6 +39,7 @@ from perfkitbenchmarker.resources.container_service import container_registry
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import swap_config
 
 FLAGS = flags.FLAGS
 
@@ -508,6 +509,9 @@ class GkeCluster(BaseGkeCluster):
     self._GetKubeconfig()
     self._CreateCustomComputeClass(self.default_nodepool)
     self._CreateNodePools()
+    if hasattr(self, '_swap_configs'):
+      for swap_cfg in self._swap_configs:
+        swap_cfg.CleanupYaml()
 
   def _CreateNodePools(self):
     """Creates additional nodepools for the cluster, if applicable."""
@@ -515,10 +519,7 @@ class GkeCluster(BaseGkeCluster):
       cmd = self._GcloudCommand(
           'container', 'node-pools', 'create', name, '--cluster', self.name
       )
-      self._AddNodeParamsToCmd(
-          nodepool,
-          cmd,
-      )
+      self._AddNodeParamsToCmd(nodepool, cmd)
       self._IssueResourceCreationCommand(cmd)
       self._CreateCustomComputeClass(nodepool)
 
@@ -634,8 +635,8 @@ class GkeCluster(BaseGkeCluster):
           ssd_flag = 'ephemeral-storage-local-ssd'
         else:
           ssd_flag = 'local-nvme-ssd-block'
-        # Technically the count paramter is optional for gen 3+ VMs.
-        # However gce_virtual_machine always passes it explitly, so be
+        # Technically the count parameter is optional for gen 3+ VMs.
+        # However gce_virtual_machine always passes it explicitly, so be
         # consistent here.
         cmd.flags[ssd_flag] = f'count={nodepool_config.max_local_disks}'
       else:
@@ -670,13 +671,36 @@ class GkeCluster(BaseGkeCluster):
     if gcp_flags.GKE_ENABLE_WORKLOAD_IDENTITY.value:
       cmd.flags['workload-metadata'] = 'GKE_METADATA'
 
-    if FLAGS.gke_node_system_config is not None:
+    if nodepool_config.swap_config is not None:
+      if FLAGS.gke_node_system_config is not None:
+        raise errors.Config.InvalidValue(
+            'Cannot set both per-nodepool swap_config and global '
+            'gke_node_system_config.'
+        )
+      gke_swap = swap_config.GetSwapConfigClass(self.CLOUD).from_spec(
+          nodepool_config.swap_config
+      )
+      if not hasattr(self, '_swap_configs'):
+        self._swap_configs = []
+      self._swap_configs.append(gke_swap)
+      cmd.flags['system-config-from-file'] = gke_swap.WriteLinuxConfigYaml()
+      # dm-crypt requires UBUNTU_CONTAINERD (Ajay r3472549985).
+      cmd.flags['image-type'] = 'UBUNTU_CONTAINERD'
+      # Prevent GKE from replacing the node after swap setup is complete.
+      cmd.args.append('--no-enable-autorepair')
+      sc = nodepool_config.swap_config
+      if sc.boot_disk_iops and not sc.lssd:
+        cmd.flags['boot-disk-provisioned-iops'] = sc.boot_disk_iops
+        cmd.flags['boot-disk-provisioned-throughput'] = (
+            gke_swap.ValidHyperdiskThroughput()
+        )
+    elif FLAGS.gke_node_system_config is not None:
       cmd.flags['system-config-from-file'] = FLAGS.gke_node_system_config
 
     if nodepool_config.sandbox_config is not None:
       cmd.flags['sandbox'] = nodepool_config.sandbox_config.ToSandboxFlag()
 
-    if self.image_type:
+    if self.image_type and 'image-type' not in cmd.flags:
       cmd.flags['image-type'] = self.image_type
 
     if nodepool_config.min_nodes != nodepool_config.max_nodes:
