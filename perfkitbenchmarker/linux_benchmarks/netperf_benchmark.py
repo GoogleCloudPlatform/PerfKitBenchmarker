@@ -679,6 +679,8 @@ def RunNetperf(
       netserver_retransmissions = 0
       netperf_mss = None
       for throughput_sample in throughput_samples:
+        if throughput_sample.metadata['netserver_retransmissions'] == '-1':
+          continue
         netperf_retransmissions += int(
             throughput_sample.metadata['netperf_retransmissions']
         )
