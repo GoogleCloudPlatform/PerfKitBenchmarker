@@ -571,6 +571,7 @@ class EdwConversationalAnalyticsBenchmarkTest(
         ca_expected_queries=['q1', 'q2'],
         ca_performance=mock.Mock(),
         gt_expected_queries=['q1_gt', 'q2_gt'],
+        gt_query_performance=mock.Mock(),
     )
 
     # Act
@@ -716,6 +717,8 @@ class EdwConversationalAnalyticsBenchmarkTest(
         ca_expected_queries=['q1', 'q2'],
         ca_performance=mock.Mock(),
         predict_expected_queries=['q1_predict', 'q2_predict'],
+        gt_expected_queries=['q1_gt', 'q2_gt'],
+        gt_query_performance=mock.Mock(),
     )
 
     # Act
@@ -725,11 +728,12 @@ class EdwConversationalAnalyticsBenchmarkTest(
     self.assertEqual(mock_run_ca.call_count, 2)
     self.assertEqual(mock_retrieve_predict.call_count, 2)
     self.assertEqual(mock_run_predict.call_count, 2)
-    self.assertEqual(mock_run_gt.call_count, 0)
+    self.assertEqual(mock_run_gt.call_count, 2)
     self.assertIsNotNone(ca_perf)
-    self.assertIsNone(gt_perf)
+    self.assertIsNotNone(gt_perf)
     self.assertIsNotNone(predict_perf)
     self.assertEqual(ca_perf.id, '1')
+    self.assertEqual(gt_perf.id, '1')
     self.assertEqual(predict_perf.id, '1')
 
   @flagsaver.flagsaver(
@@ -780,6 +784,10 @@ class EdwConversationalAnalyticsBenchmarkTest(
     ca_iter1.add_query_performance('What is the total revenue?', 1.5, {})
     ca_iter1.add_query_performance('Show me top users', 2.0, {})
 
+    gt_iter1 = results_aggregator.EdwPowerIterationPerformance('1', 2)
+    gt_iter1.add_query_performance('What is the total revenue?_gt', 0.5, {})
+    gt_iter1.add_query_performance('Show me top users_gt', 0.8, {})
+
     predict_iter1 = results_aggregator.EdwPowerIterationPerformance('1', 2)
     predict_iter1.add_query_performance(
         'What is the total revenue?_predict', 1.0, {}
@@ -790,6 +798,10 @@ class EdwConversationalAnalyticsBenchmarkTest(
     ca_iter2.add_query_performance('What is the total revenue?', 1.1, {})
     ca_iter2.add_query_performance('Show me top users', 1.9, {})
 
+    gt_iter2 = results_aggregator.EdwPowerIterationPerformance('2', 2)
+    gt_iter2.add_query_performance('What is the total revenue?_gt', 0.4, {})
+    gt_iter2.add_query_performance('Show me top users_gt', 0.9, {})
+
     predict_iter2 = results_aggregator.EdwPowerIterationPerformance('2', 2)
     predict_iter2.add_query_performance(
         'What is the total revenue?_predict', 0.9, {}
@@ -797,8 +809,8 @@ class EdwConversationalAnalyticsBenchmarkTest(
     predict_iter2.add_query_performance('Show me top users_predict', 1.1, {})
 
     mock_run_iteration.side_effect = [
-        (ca_iter1, None, predict_iter1),
-        (ca_iter2, None, predict_iter2),
+        (ca_iter1, gt_iter1, predict_iter1),
+        (ca_iter2, gt_iter2, predict_iter2),
     ]
 
     # Act
@@ -817,17 +829,20 @@ class EdwConversationalAnalyticsBenchmarkTest(
         suite_1.ca_expected_queries,
         ['What is the total revenue?', 'Show me top users'],
     )
-    self.assertIsNone(suite_1.gt_expected_queries)
+    self.assertEqual(
+        suite_1.gt_expected_queries,
+        ['What is the total revenue?_gt', 'Show me top users_gt'],
+    )
     self.assertEqual(
         suite_1.predict_expected_queries,
         ['What is the total revenue?_predict', 'Show me top users_predict'],
     )
 
     metrics = [s.metric for s in samples]
-    self.assertEqual(metrics.count('edw_raw_query_time'), 8)
-    self.assertEqual(metrics.count('edw_aggregated_query_time'), 4)
-    self.assertEqual(metrics.count('edw_iteration_geomean_time'), 4)
-    self.assertEqual(metrics.count('edw_aggregated_geomean'), 2)
+    self.assertEqual(metrics.count('edw_raw_query_time'), 12)
+    self.assertEqual(metrics.count('edw_aggregated_query_time'), 6)
+    self.assertEqual(metrics.count('edw_iteration_geomean_time'), 6)
+    self.assertEqual(metrics.count('edw_aggregated_geomean'), 3)
     for sample in samples:
       self.assertEqual(
           sample.metadata.get('agent'), 'my-snowflake-semantic-view'

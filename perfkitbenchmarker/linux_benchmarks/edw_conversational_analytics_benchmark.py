@@ -64,8 +64,8 @@ class _BenchmarkPerformanceSuite:
   question_list: list[Any]
   ca_expected_queries: list[str]
   ca_performance: results_aggregator.EdwBenchmarkPerformance
-  gt_expected_queries: list[str] | None = None
-  gt_query_performance: results_aggregator.EdwBenchmarkPerformance | None = None
+  gt_expected_queries: list[str]
+  gt_query_performance: results_aggregator.EdwBenchmarkPerformance
   predict_expected_queries: list[str] | None = None
   predict_query_performance: (
       results_aggregator.EdwBenchmarkPerformance | None
@@ -90,7 +90,6 @@ class _BenchmarkPerformanceSuite:
       performances.
     """
     run_predict = not ca_client.fetches_results_immediately
-    is_competitor = IsCompetitor(edw_service_instance)
 
     question_list = [
         q
@@ -105,8 +104,11 @@ class _BenchmarkPerformanceSuite:
         expected_queries=ca_expected_queries,
     )
 
-    gt_expected_queries = None
-    gt_query_performance = None
+    gt_expected_queries = [f'{q.question}_gt' for q in question_list]
+    gt_query_performance = results_aggregator.EdwBenchmarkPerformance(
+        total_iterations=FLAGS.edw_suite_iterations,
+        expected_queries=gt_expected_queries,
+    )
     predict_expected_queries = None
     predict_query_performance = None
 
@@ -117,12 +119,6 @@ class _BenchmarkPerformanceSuite:
       predict_query_performance = results_aggregator.EdwBenchmarkPerformance(
           total_iterations=FLAGS.edw_suite_iterations,
           expected_queries=predict_expected_queries,
-      )
-    if not is_competitor:
-      gt_expected_queries = [f'{q.question}_gt' for q in question_list]
-      gt_query_performance = results_aggregator.EdwBenchmarkPerformance(
-          total_iterations=FLAGS.edw_suite_iterations,
-          expected_queries=gt_expected_queries,
       )
 
     return cls(
@@ -164,7 +160,6 @@ class _BenchmarkPerformanceSuite:
     ca_iteration_performance = results_aggregator.EdwPowerIterationPerformance(
         iteration_id=iteration_id, total_queries=len(self.ca_expected_queries)
     )
-    gt_iteration_performance = None
     predict_iteration_performance = None
 
     # If the service does not fetch results immediately, it requires two-step
@@ -177,14 +172,10 @@ class _BenchmarkPerformanceSuite:
           )
       )
 
-    # Only run ground truth queries for BQ/Looker
-    if not IsCompetitor(self.edw_service_instance):
-      gt_iteration_performance = (
-          results_aggregator.EdwPowerIterationPerformance(
-              iteration_id=iteration_id,
-              total_queries=len(self.gt_expected_queries),  # pyrefly: ignore[bad-argument-type]
-          )
-      )
+    gt_iteration_performance = results_aggregator.EdwPowerIterationPerformance(
+        iteration_id=iteration_id,
+        total_queries=len(self.gt_expected_queries),  # pyrefly: ignore[bad-argument-type]
+    )
 
     for q in self.question_list:
       _RunConversationalQuery(q, self.ca_client, ca_iteration_performance)
@@ -210,8 +201,7 @@ class _BenchmarkPerformanceSuite:
               },
           )
 
-      if gt_iteration_performance:
-        _RunGroundTruthQuery(q, self.query_client, gt_iteration_performance)
+      _RunGroundTruthQuery(q, self.query_client, gt_iteration_performance)
 
     return (
         ca_iteration_performance,
@@ -224,9 +214,11 @@ class _BenchmarkPerformanceSuite:
     if self.predict_query_performance:
       if _ShouldFailBenchmarkForQueryFailure(self.predict_query_performance):
         raise errors.Benchmarks.RunError('Predict query execution failed.')
-    if self.gt_query_performance:
-      if not self.gt_query_performance.is_successful():
-        raise errors.Benchmarks.RunError('Ground Truth query execution failed.')
+    if (
+        self.gt_query_performance
+        and not self.gt_query_performance.is_successful()
+    ):
+      raise errors.Benchmarks.RunError('Ground Truth query execution failed.')
 
     benchmark_metadata = {
         'dataset': _DATASET.value,
@@ -262,17 +254,16 @@ class _BenchmarkPerformanceSuite:
                 metadata=benchmark_metadata
             )
         )
-    if self.gt_query_performance:
-      results.extend(
-          self.gt_query_performance.get_all_query_performance_samples(
-              metadata=benchmark_metadata
-          )
-      )
-      results.extend(
-          self.gt_query_performance.get_queries_geomean_performance_samples(
-              metadata=benchmark_metadata
-          )
-      )
+    results.extend(
+        self.gt_query_performance.get_all_query_performance_samples(
+            metadata=benchmark_metadata
+        )
+    )
+    results.extend(
+        self.gt_query_performance.get_queries_geomean_performance_samples(
+            metadata=benchmark_metadata
+        )
+    )
 
     return results
 
@@ -432,13 +423,6 @@ def _RunPredictQuery(
   )
 
 
-def IsCompetitor(edw_service_instance) -> bool:
-  """Returns True if the edw service is a competitor (Snowflake or Databricks)."""
-  return edw_service_instance.SERVICE_TYPE.startswith(
-      'snowflake'
-  ) or edw_service_instance.SERVICE_TYPE.startswith('databricks')
-
-
 def _ShouldFailBenchmarkForQueryFailure(predict_query_performance) -> bool:
   """Returns True if there are failures that should fail the benchmark.
 
@@ -478,12 +462,12 @@ def Run(benchmark_spec) -> list[Any]:
         iteration_id=str(i)
     )
     suite.ca_performance.add_iteration_performance(ca_iter_perf)
-    if suite.predict_query_performance:
+    if suite.predict_query_performance and predict_iter_perf is not None:
       suite.predict_query_performance.add_iteration_performance(
-          predict_iter_perf  # pyrefly: ignore[bad-argument-type]
+          predict_iter_perf
       )
-    if suite.gt_query_performance:
-      suite.gt_query_performance.add_iteration_performance(gt_iter_perf)  # pyrefly: ignore[bad-argument-type]
+    if suite.gt_query_performance and gt_iter_perf is not None:
+      suite.gt_query_performance.add_iteration_performance(gt_iter_perf)
 
   return suite.BuildResults()
 
