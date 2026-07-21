@@ -125,6 +125,13 @@ _YCSB_JVM_ARGS = flags.DEFINE_list(
     'A list of custom JVM arguments to pass to the YCSB runner.',
 )
 
+_YCSB_ENV_VARS = flags.DEFINE_list(
+    'google_bigtable_ycsb_env_vars',
+    [],
+    'A list of custom environment variables to pass to the YCSB runner, in the'
+    ' format KEY=VALUE.',
+)
+
 BENCHMARK_NAME = 'cloud_bigtable_ycsb'
 BENCHMARK_CONFIG = """
 cloud_bigtable_ycsb:
@@ -402,6 +409,10 @@ def _GetYcsbExecutor(
     jvm_args_list.extend(_YCSB_JVM_ARGS.value)
   jvm_args = shlex.quote(' ' + shlex.join(jvm_args_list))
   env = {}
+  if _YCSB_ENV_VARS.value:
+    for item in _YCSB_ENV_VARS.value:
+      k, v = item.split('=', 1)
+      env[k] = v
   if _USE_JAVA_VENEER_CLIENT.value:
     executor_flags = {'jvm-args': jvm_args, 'table': _GetTableName()}
     # Temporary until old driver is deprecated.
