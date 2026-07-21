@@ -1,3 +1,10 @@
+# Providers
+
+This directory is for cloud provider specific logic. Some examples of provider
+code are GCP products, and gcloud commands to interact with these products. This
+also means that any logic/code that is provider-specific should reside in the
+/providers directory.
+
 Before you can run the PerfKit Benchmarker, you need account(s) on the cloud
 provider(s) you want to benchmark:
 
