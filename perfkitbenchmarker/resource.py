@@ -38,6 +38,11 @@ _RETRY_ON_INSUFFICIENT_CAPACITY_CLOUD_FAILURE = flags.DEFINE_boolean(
     'Whether to retry resource creation on insufficient capacity cloud'
     ' failure.',
 )
+_ENSURE_EXISTS_ON_CREATE = flags.DEFINE_boolean(
+    'ensure_exists_on_create',
+    True,
+    'Whether to ensure the resource exists on create.',
+)
 
 
 _RESOURCE_REGISTRY = {}
@@ -316,13 +321,14 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
         ) from e
 
       raise
-    try:
-      if not self._Exists():
-        raise errors.Resource.RetryableCreationError(
-            'Creation of %s failed.' % type(self).__name__
-        )
-    except NotImplementedError:
-      pass
+    if _ENSURE_EXISTS_ON_CREATE.value:
+      try:
+        if not self._Exists():
+          raise errors.Resource.RetryableCreationError(
+              'Creation of %s failed.' % type(self).__name__
+          )
+      except NotImplementedError:
+        pass
     self._WaitUntilRunning()
     self.created = True
     self.create_end_time = time.time()

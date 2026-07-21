@@ -52,6 +52,7 @@ provision_and_scale_managed_vm_group:
       vm_count: null
       managed_spec: {}
   flags:
+    ensure_exists_on_create: false
     skip_vm_preparation: true
     boot_samples: true
     cluster_boot_collect_btime: true
