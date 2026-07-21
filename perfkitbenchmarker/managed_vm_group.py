@@ -111,8 +111,12 @@ class BaseManagedVmGroup(resource.BaseResource):
 
   def GetResourceMetadata(self) -> dict[Any, Any]:
     metadata = super().GetResourceMetadata().copy()
-    vm = (list(self.vms) + self._deleted_vms + [self.vm_config])[0]
-    metadata.update(vm.GetResourceMetadata())
+    vm = (list(self.vms)[:-1] + self._deleted_vms + [self.vm_config])[0]
+    # Add a prefix to avoid collisions with VM metadata when there are multiple
+    # VMs.
+    for key, value in vm.GetResourceMetadata().items():
+      metadata[f'vm_{key}'] = value
+    metadata['machine_type'] = vm.machine_type
     metadata['region'] = self.region
     metadata['zones'] = self.zones
     metadata['is_regional'] = self.is_regional

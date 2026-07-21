@@ -104,6 +104,7 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
 
   CLOUD = provider_info.GCP
   instance_template: GceInstanceTemplate
+  group_id: str | None = None
 
   def __init__(
       self,
@@ -132,6 +133,11 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
     self.instance_template = GceInstanceTemplate(
         self.vm_config, self.region, name=self.name
     )
+
+  def GetResourceMetadata(self) -> dict[Any, Any]:
+    metadata = super().GetResourceMetadata().copy()
+    metadata['vm_group_id'] = self.group_id
+    return metadata
 
   def _CreateDependencies(self):
     super()._CreateDependencies()
@@ -181,7 +187,10 @@ class GceManagedInstanceGroup(managed_vm_group.BaseManagedVmGroup):
       raise errors.Resource.GetError(
           f'Failed to describe managed instance group {self.name}:\n{stderr}\n'
       )
-    return json.loads(stdout)
+    data = json.loads(stdout)
+    if not self.group_id:
+      self.group_id = data['id']
+    return data
 
   def _Exists(self) -> bool:
     return bool(self._Get())
