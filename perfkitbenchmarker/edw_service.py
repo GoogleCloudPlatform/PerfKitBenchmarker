@@ -20,8 +20,11 @@ directory as a subclass of BaseEdwService.
 import csv
 import dataclasses
 import datetime
+import hashlib
 import io
+import json
 import os
+import re
 from typing import Any, Dict, List
 
 from absl import flags
@@ -29,6 +32,7 @@ from absl import logging
 from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import kubernetes_cluster
 
 flags.DEFINE_integer(
@@ -468,12 +472,94 @@ class EdwClientInterface:
     raise NotImplementedError
 
 
-class ConversationalAnalyticsClientInterface(EdwClientInterface):
+class BaseConversationalAnalyticsClientInterface(EdwClientInterface):
+  """Base class for Conversational Analytics EDW client interfaces."""
 
   @property
   def fetches_results_immediately(self) -> bool:
     """Returns True if the client fetches query results immediately."""
     raise NotImplementedError
+
+  def _GetQueryFileName(self, query_name: str) -> str:
+    """Generates a sanitized remote filename for a query question."""
+    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', query_name)
+    sanitized = sanitized[:30]
+    query_hash = hashlib.md5(query_name.encode('utf-8')).hexdigest()[:8]
+    return f'./{sanitized}_{query_hash}.txt'
+
+  def _ParseConversationalAnalyticsResults(
+      self, results: dict[str, Any], query_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    """Parses the results from Conversational Analytics query execution."""
+    execution_time = results.get('query_wall_time_in_secs', -1.0)
+    details = results.get('details', {})
+    query_results = details.get('query_results', {})
+
+    text_response = query_results.get('text_response')
+    generated_sql = query_results.get('generated_sql')
+    retrieved_data = query_results.get('retrieved_data')
+
+    error_msg = None
+    if not text_response:
+      error_msg = f"'text_response' is missing or empty. Got: {text_response!r}"
+    elif not generated_sql:
+      error_msg = f"'generated_sql' is missing or empty. Got: {generated_sql!r}"
+    elif self.fetches_results_immediately and not retrieved_data:
+      error_msg = (
+          f"'retrieved_data' is missing or empty. Got: {retrieved_data!r}"
+      )
+
+    metadata = {
+        'question': query_name,
+        'text_response': text_response or '',
+        'generated_sql': generated_sql or '',
+        'predict_data': retrieved_data or [],
+        'thoughts': query_results.get('thoughts', []),
+        'progress_messages': query_results.get('progress_messages', []),
+        'time_to_first_token_secs': query_results.get(
+            'time_to_first_token_secs', 0.0
+        ),
+        'total_stream_time_secs': query_results.get(
+            'total_stream_time_secs', 0.0
+        ),
+        'job_id': details.get('job_id', ''),
+    }
+
+    if error_msg:
+      logging.warning('Conversational Analytics query failed: %s', error_msg)
+      metadata['error'] = f'Conversational Analytics query failed: {error_msg}'
+      return -1.0, metadata
+
+    logging.info(
+        'Conversational Analytics Response: %s',
+        metadata.get('text_response', ''),
+    )
+    return execution_time, metadata
+
+  def _GetConversationalAnalyticsCommand(self, remote_query_file: str) -> str:
+    """Returns the provider-specific CLI command to execute the driver script."""
+    raise NotImplementedError
+
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
+    """Executes a single conversational analytics question."""
+    assert self.client_vm is not None
+    logging.info('Conversational Analytics Question: %s', query_name)
+
+    remote_query_file = self._GetQueryFileName(query_name)
+    vm_util.CreateRemoteFile(self.client_vm, query_name, remote_query_file)
+
+    cmd = self._GetConversationalAnalyticsCommand(remote_query_file)
+    stdout, _ = self.client_vm.RemoteCommand(cmd)
+
+    try:
+      results = json.loads(stdout)
+    except ValueError as e:
+      raise errors.Benchmarks.RunError(
+          f'Failed to parse Conversational Analytics response: {stdout}'
+      ) from e
+    return self._ParseConversationalAnalyticsResults(results, query_name)
 
 
 class EdwService(resource.BaseResource):
@@ -962,7 +1048,7 @@ class EdwService(resource.BaseResource):
 
   def GetConversationalAnalyticsClientInterface(
       self,
-  ) -> ConversationalAnalyticsClientInterface:
+  ) -> BaseConversationalAnalyticsClientInterface:
     """Returns the Conversational Analytics Client Interface instance."""
     raise NotImplementedError(
         'Conversational Analytics is not supported for this service.'
