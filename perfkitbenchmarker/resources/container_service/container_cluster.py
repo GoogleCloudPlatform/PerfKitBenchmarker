@@ -120,6 +120,7 @@ class BaseContainerCluster(resource.BaseResource):
     nodepool_config.sandbox_config = nodepool_spec.sandbox_config
     nodepool_config.tpu_topology = nodepool_spec.tpu_topology
     nodepool_config.tpu_count = nodepool_spec.tpu_count
+    nodepool_config.swap_config = nodepool_spec.swap_config
     nodepool_config.zone = zone  # pyrefly: ignore[bad-assignment]
     nodepool_config.num_nodes = nodepool_spec.vm_count
     if nodepool_spec.min_vm_count is None:
