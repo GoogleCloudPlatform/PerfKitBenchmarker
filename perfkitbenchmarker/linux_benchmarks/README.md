@@ -108,6 +108,44 @@ benchmark_spec.always_call_cleanup = True
 
 Inverse of Provision. Deletes resources that were created during provisioning.
 
+## Benchmarking Data
+
+Some benchmarks come with their own data set, others come with source scripts to
+run. These resources are placed in the /data directory.
+
+Additions to /data directory are organized by benchmarks.
+
+Large data sources and proprietary datasets cannot be added to the PKB source
+code. In order to use large source data, the benchmark can point to a
+proprietary GCS source using a preprovisioned data bucket. See above example for
+using preprovisioned data in a benchmark.
+
+## Providers vs Packages vs Benchmark
+
+### Provider
+
+The /provider directory is for cloud provider specific logic. These are logic
+unique to a cloud provider. Some examples of provider code are GCP products, and
+gcloud commands to interact with these products. This also means that any
+logic/code that is provider-specific should reside in the /provider directory.
+If you find yourself writing ‘if cloud == GCP’, then there is a good chance you
+are not following best practices.
+
+### Packages
+
+Packages include both /linux_packages and /windows_packages directories.
+Packages are universal ways to install the package in question on all providers
+across different benchmarks. This ensures that benchmarking is done fairly.
+Installation of packages MUST happen in the package file. Issuing of package
+commands and parsing of package generated output can optionally be implemented
+in the package file or benchmark file.
+
+### Benchmark
+
+Benchmarks are located in /linux_benchmarks and /windows_benchmark directories.
+Benchmark files define the phases of a benchmark as described above.
+Benchmark files should not contain provider specific code.
+
 ## Difference between PKB & Other Frameworks
 
 PKB is a benchmarking framework which provisions resources & runs benchmarks
@@ -185,3 +223,4 @@ resources. This has a couple of consequences:
     `Prepare` function, the third adds partials of `Run` function, the fourth
     adds the parsing of results etc.
 *   Add related unit tests.
+*   Avoid code duplication.
