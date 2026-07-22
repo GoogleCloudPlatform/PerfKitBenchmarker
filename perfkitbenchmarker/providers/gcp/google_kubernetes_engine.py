@@ -23,6 +23,7 @@ import typing
 from typing import Any
 
 from absl import flags
+from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import virtual_machine_spec
@@ -671,7 +672,9 @@ class GkeCluster(BaseGkeCluster):
       cmd.flags['workload-metadata'] = 'GKE_METADATA'
 
     if FLAGS.gke_node_system_config is not None:
-      cmd.flags['system-config-from-file'] = FLAGS.gke_node_system_config
+      cmd.flags['system-config-from-file'] = data.ResourcePath(
+          FLAGS.gke_node_system_config
+      )
 
     if nodepool_config.sandbox_config is not None:
       cmd.flags['sandbox'] = nodepool_config.sandbox_config.ToSandboxFlag()
