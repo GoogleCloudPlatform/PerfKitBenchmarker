@@ -229,9 +229,11 @@ class GCESimulateMaintenanceTool:
 class GCESimulateMaintenanceToolForWindows(GCESimulateMaintenanceTool):
   """Helper class for simulating maintenance on a GCE VM."""
 
+  vm_temp_dir: str
+
   def __init__(self, vm: gce_virtual_machine.GceVirtualMachine):
     super().__init__(vm)
-    if vm is not WindowsGceVirtualMachine:
+    if not isinstance(vm, WindowsGceVirtualMachine):
       raise ValueError('WindowsGceVirtualMachine is required.')
 
     self.vm_temp_dir = typing.cast(WindowsGceVirtualMachine, vm).temp_dir
