@@ -258,14 +258,12 @@ class AwsAutoScalingGroup(managed_vm_group.BaseManagedVmGroup):
     vm.id = reference.name
 
   def _AddVms(self, num_vms_to_add: int, zone: str | None = None):
-    del num_vms_to_add
     cmd = self.base_cmd + [
         'launch-instances',
         '--auto-scaling-group-name',
         self.name,
         '--requested-capacity',
-        # _RunOperation already updates the desired capacity.
-        str(self.vm_count),
+        str(num_vms_to_add),
     ]
     if zone:
       cmd.extend(['--availability-zones', zone])

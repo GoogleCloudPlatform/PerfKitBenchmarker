@@ -178,7 +178,7 @@ class AwsAutoScalingGroupTest(pkb_common_test_case.PkbCommonTestCase):
             '--auto-scaling-group-name',
             'pkb-test_run-0',
             '--requested-capacity',
-            '2',
+            '1',
         ],
     )
 
@@ -198,7 +198,7 @@ class AwsAutoScalingGroupTest(pkb_common_test_case.PkbCommonTestCase):
             '--auto-scaling-group-name',
             'pkb-test_run-0',
             '--requested-capacity',
-            '2',
+            '1',
             '--availability-zones',
             'us-east-1a',
         ],
