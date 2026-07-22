@@ -10,9 +10,7 @@ last_modified_date: 2020-08-21T17:54:08+0000
 # Open source performance for clouds
 PerfKitBenchmarker helps to measure and compare cloud offerings using a standard set of benchmarks.
 
-[Get started now](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/README.md#installation-and-setup){ .md-button .md-button--primary }
-
-## [View it on GitHub](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker) { .md-button }
+[Get started now](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker/blob/master/README.md#installation-and-setup){ .md-button .md-button--primary } [View it on GitHub](https://github.com/GoogleCloudPlatform/PerfKitBenchmarker){ .md-button }
 
 # What is PerfKitBenchmarker?
 
