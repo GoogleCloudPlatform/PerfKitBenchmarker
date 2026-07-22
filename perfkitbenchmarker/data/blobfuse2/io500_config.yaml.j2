@@ -1,41 +1,40 @@
 # Pipeline configuration. Choose components to be engaged. The order below is the priority order that needs to be followed.
+# https://github.com/Azure/azure-storage-fuse/wiki/Blobfuse2%E2%80%90Config-Guide
+# https://github.com/Azure/azure-storage-fuse/wiki/Blobfuse2%E2%80%90Cli%E2%80%90Parameters
 logging:
-{% if log_trace %}
   type: base
-  level: log_debug
   file-path: /tmp/logs/blobfuse2.log
+{% if log_trace %}
+  level: log_debug
 {% else %}
-  level: log_warning
+  level: log_err
 {% endif %}
 
 components:
   - libfuse
-  - attr_cache
   - block_cache
+  - attr_cache
   - azstorage
 
 libfuse:
-  # Bypasses the Linux Kernel Page Cache.
-  # Without this, subsequent reads will be from RAM.
-  direct-io: true
-  attribute-expiration-sec: 60
-  entry-expiration-sec: 60
-  negative-entry-expiration-sec: 0
-  disable-writeback-cache: true
+  attribute-expiration-sec: 120
+  entry-expiration-sec: 120
+  negative-entry-expiration-sec: 240
   ignore-open-flags: true
-  max-fuse-threads: 512     # Boosted to handle massive parallel worker queues
 {% if log_trace %}
   fuse-trace: true
 {% endif %}
 
 block_cache:
-  block-size-mb: 16         # Kept tight to prevent multi-node initialization locks
+  block-size-mb: 64
   mem-size-mb: 524288
+  prefetch-on-open: true
   prefetch: 16
-  parallelism: 32
+  parallelism: 128
+
 
 attr_cache:
-  timeout-sec: 60
+  timeout-sec: 7200
 
 # Azure storage configuration
 azstorage:

@@ -658,6 +658,7 @@ fuse_io500:
     io500_tests: [ior_easy_write, ior_easy_read]
     data_disk_type: object_storage
     scratch_dir: fuse_dir
+    openmpi_version: 4.1.6
     mpi_ranks_list: [1, 2, 4, 8, 16, 32, 64, 128, 192]
     io500_max_total_size: 1649267441664
   vm_groups:
