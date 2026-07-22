@@ -592,6 +592,21 @@ GKE_CLUSTER_IPV4_CIDR_SIZE = flags.DEFINE_integer(
     ' the size derived from max_vm_count. Use when the cluster will scale'
     ' beyond the default node pool (e.g. kubernetes_node_scale with 5k nodes).',
 )
+
+
+GKE_ADDITIONAL_FLAGS = flags.DEFINE_list(
+    'gke_additional_flags',
+    [],
+    'Additional flags to pass to gcloud container clusters create. '
+    'Example: --gke_additional_flags=--enable-pod-snapshots,--enable-dataplane-v2',
+)
+
+GKE_ADDITIONAL_NODEPOOL_FLAGS = flags.DEFINE_list(
+    'gke_additional_nodepool_flags',
+    [],
+    'Additional flags to pass to gcloud container node-pools create. '
+    'Example: --gke_additional_nodepool_flags=--max-pods-per-node=250',
+)
 GCE_PERFORMANCE_MONITORING_UNIT = flags.DEFINE_enum(
     'gce_performance_monitoring_unit',
     None,
@@ -639,6 +654,12 @@ GCS_FUSE_ENABLE_METADATA_CACHE = flags.DEFINE_boolean(
     'gcs_fuse_enable_metadata_cache',
     False,
     'Whether to enable metadata cache for gcs fuse.',
+)
+SKIP_CONTAINER_IMAGE_BUILD = flags.DEFINE_bool(
+    'skip_container_image_build',
+    False,
+    'Skip container image builds during provision. Use when images are '
+    'pre-built. The image tag is still computed but no build runs.',
 )
 
 
