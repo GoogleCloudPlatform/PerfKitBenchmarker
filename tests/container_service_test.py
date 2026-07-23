@@ -821,5 +821,57 @@ def _ClearTimestamps(samples: Iterable[Sample]) -> Iterable[Sample]:
     yield Sample(s.metric, s.value, s.unit, s.metadata, timestamp=0)
 
 
+class GetTotalCpuMillicoresTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for GetTotalCpuMillicores helper."""
+
+  def testParsesMiliSuffix(self):
+    with mock.patch(
+        'perfkitbenchmarker.resources.container_service.kubectl.RunKubectlCommand',
+        return_value=('pod-abc   250m   128Mi\n', '', 0),
+    ):
+      self.assertAlmostEqual(
+          float(kubernetes_commands.GetTotalCpuMillicores() or 0.0),
+          250.0,
+      )
+
+  def testParsesCoreSuffix(self):
+    with mock.patch(
+        'perfkitbenchmarker.resources.container_service.kubectl.RunKubectlCommand',
+        return_value=('p1 1 p', '', 0),
+    ):
+      self.assertAlmostEqual(
+          float(kubernetes_commands.GetTotalCpuMillicores() or 0.0),
+          1000.0,
+      )
+
+  def testSumsMultiplePods(self):
+    with mock.patch(
+        'perfkitbenchmarker.resources.container_service.kubectl.RunKubectlCommand',
+        return_value=('p1 150m p\np2 100m p', '', 0),
+    ):
+      self.assertAlmostEqual(
+          float(kubernetes_commands.GetTotalCpuMillicores() or 0.0),
+          250.0,
+      )
+
+  def testReturnsNoneOnError(self):
+    with mock.patch(
+        'perfkitbenchmarker.resources.container_service.kubectl.RunKubectlCommand',
+        return_value=('', '', 1),
+    ):
+      self.assertIsNone(
+          kubernetes_commands.GetTotalCpuMillicores()
+      )
+
+  def testReturnsNoneOnEmpty(self):
+    with mock.patch(
+        'perfkitbenchmarker.resources.container_service.kubectl.RunKubectlCommand',
+        return_value=('', '', 0),
+    ):
+      self.assertIsNone(
+          kubernetes_commands.GetTotalCpuMillicores()
+      )
+
+
 if __name__ == '__main__':
   unittest.main()

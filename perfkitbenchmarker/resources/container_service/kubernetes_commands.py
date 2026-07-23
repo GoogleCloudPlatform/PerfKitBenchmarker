@@ -955,3 +955,39 @@ def DeleteResourceFromBody(resource_body: str) -> None:
     tf.write(resource_body)
     tf.close()
     DeleteFromFile(tf.name)
+
+
+def GetTotalCpuMillicores(label_selector: str | None = None) -> float | None:
+  """Returns total CPU millicores across all pods via kubectl top pods.
+
+  Args:
+    label_selector: The label selector for the pods.
+
+  Returns:
+    Total CPU millicores, or None if the command fails or output is empty.
+  """
+  try:
+    cmd = ['top', 'pods', '--no-headers']
+    if label_selector:
+      cmd.extend(['-l', label_selector])
+    stdout, _, rc = kubectl.RunKubectlCommand(cmd, raise_on_failure=False)
+    if rc != 0 or not stdout.strip():
+      return None
+
+    total_m = 0.0
+    for line in stdout.strip().splitlines():
+      parts = line.split()
+      # kubectl top format: NAME  CPU(cores)  MEMORY(bytes)
+      if len(parts) < 2:
+        continue
+      cpu_str = parts[1]
+      if cpu_str.endswith('m'):
+        total_m += float(cpu_str[:-1])
+      else:
+        # Expressed as fractional cores (e.g. "1" = 1000m).
+        total_m += float(cpu_str) * 1000.0
+
+    return total_m
+  except (ValueError, IndexError) as e:
+    logging.debug('[startup/cpu] Parse error: %s', e)
+    return None
