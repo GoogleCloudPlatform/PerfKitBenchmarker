@@ -27,6 +27,7 @@ from perfkitbenchmarker import providers
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.configs import spec
+from perfkitbenchmarker.configs import swap_config_spec
 from perfkitbenchmarker.resources import kubernetes_inference_server_spec
 
 
@@ -246,6 +247,7 @@ class NodepoolSpec(spec.BaseSpec):
     # For GCP TPUs:
     self.tpu_topology: str | None
     self.tpu_count: int | None
+    self.swap_config: swap_config_spec.SwapConfigSpec | None
 
   @classmethod
   def _GetOptionDecoderConstructions(cls):
@@ -278,6 +280,10 @@ class NodepoolSpec(spec.BaseSpec):
         'sandbox_config': (_SandboxDecoder, {'default': None}),
         'tpu_topology': (option_decoders.StringDecoder, {'default': None}),
         'tpu_count': (option_decoders.IntDecoder, {'default': None}),
+        'swap_config': (
+            swap_config_spec.SwapConfigDecoder,
+            {'default': None},
+        ),
     })
     return result
 
