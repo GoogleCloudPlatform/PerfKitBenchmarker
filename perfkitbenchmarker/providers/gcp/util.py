@@ -516,6 +516,9 @@ _NOT_ENOUGH_RESOURCES_ERROR_REGEXES: Sequence[re.Pattern[str]] = (
     # Not actually regex so escape as best practice
     re.compile(re.escape('ZONE_RESOURCE_POOL_EXHAUSTED')),
     re.compile(re.escape('ERROR_STOCKOUT')),
+    re.compile(
+        r'Not enough zonal resources are available to fulfill the request'
+    ),
 )
 _NOT_ENOUGH_RESOURCES_MESSAGE = 'Creation failed due to not enough resources: '
 
