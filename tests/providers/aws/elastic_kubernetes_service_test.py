@@ -327,6 +327,38 @@ class ElasticKubernetesServiceTest(BaseEksTest):
     self.assertEqual(machine_type, 'm6i.xlarge')
 
 
+  def testDiscoverSubnetsPerAZPrefersPublicSubnets(self):
+    """Public subnets are preferred; private used only when no public exists."""
+    cluster = elastic_kubernetes_service.EksCluster(EKS_SPEC)
+    describe_cluster_out = json.dumps({
+        'cluster': {
+            'resourcesVpcConfig': {
+                'subnetIds': ['subnet-pub-a', 'subnet-priv-a', 'subnet-priv-b']
+            }
+        }
+    })
+    # NOTE: keys here are AZ/Public/SubnetId (not AvailabilityZone/
+    # MapPublicIpOnLaunch) because the code's --query JMESPath renames
+    # them server-side before this mocked stdout is "returned".
+    describe_subnets_out = json.dumps([
+        {'SubnetId': 'subnet-pub-a', 'AZ': 'us-east-1a', 'Public': True},
+        {'SubnetId': 'subnet-priv-a', 'AZ': 'us-east-1a', 'Public': False},
+        {'SubnetId': 'subnet-priv-b', 'AZ': 'us-east-1b', 'Public': False},
+    ])
+    self.MockIssueCommand({
+        'describe-cluster': [(describe_cluster_out, '', 0)],
+        'describe-subnets': [(describe_subnets_out, '', 0)],
+    })
+    result = cluster._DiscoverSubnetsPerAZ()
+    self.assertEqual(
+        result,
+        {
+            'us-east-1a': 'subnet-pub-a',   # public preferred in same AZ
+            'us-east-1b': 'subnet-priv-b',  # falls back to private
+        },
+    )
+
+
 class EksAutoClusterTest(BaseEksTest):
 
   def testInitEksClusterWorks(self):
