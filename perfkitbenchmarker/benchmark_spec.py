@@ -129,15 +129,20 @@ _ENFORCE_DISK_MOUNT_POINT_OVERRIDE = flags.DEFINE_bool(
 )
 # pyformat: disable
 # TODO(user): Delete this flag after fulling updating gcl.
-flags.DEFINE_enum('benchmark_compatibility_checking', SUPPORTED,
-                  [SUPPORTED, NOT_EXCLUDED, SKIP_CHECK],
-                  'Method used to check compatibility between the benchmark '
-                  ' and the cloud.  ' + SUPPORTED + ' runs the benchmark only'
-                  ' if the cloud provider has declared it supported. ' +
-                  NOT_EXCLUDED + ' runs the benchmark unless it has been'
-                  ' declared not supported by the cloud provider. ' + SKIP_CHECK
-                  + ' does not do the compatibility'
-                  ' check.')
+flags.DEFINE_enum(
+    'benchmark_compatibility_checking',
+    SUPPORTED,
+    [SUPPORTED, NOT_EXCLUDED, SKIP_CHECK],
+    'Method used to check compatibility between the benchmark  and the cloud.  '
+    + SUPPORTED
+    + ' runs the benchmark only'
+    ' if the cloud provider has declared it supported. '
+    + NOT_EXCLUDED
+    + ' runs the benchmark unless it has been'
+    ' declared not supported by the cloud provider. '
+    + SKIP_CHECK
+    + ' does not do the compatibility check.',
+)
 # pyformat: enable
 
 
@@ -282,8 +287,7 @@ class BenchmarkSpec:
     """Returns the vm groups in the benchmark."""
     vm_groups = dict(self.unmanaged_vm_groups)
     vm_groups.update({
-        name: list(group.vms)
-        for name, group in self.managed_vm_groups.items()
+        name: list(group.vms) for name, group in self.managed_vm_groups.items()
     })
     return vm_groups
 
@@ -881,7 +885,9 @@ class BenchmarkSpec:
       providers.LoadProvider(cloud)
       capacity_reservation_class = capacity_reservation.GetResourceClass(cloud)
       self.capacity_reservations.append(
-          capacity_reservation_class(vm_group)  # pytype: disable=not-instantiable
+          capacity_reservation_class(
+              vm_group
+          )  # pytype: disable=not-instantiable
       )
 
   def _CheckBenchmarkSupport(self, cloud):
@@ -943,9 +949,9 @@ class BenchmarkSpec:
 
         jujuvm.units.extend(vms)  # pytype: disable=attribute-error
         if jujuvm and jujuvm not in self.vms:
-          self.unmanaged_vm_groups[
-              '%s_juju_controller' % group_spec.cloud
-          ] = [jujuvm]
+          self.unmanaged_vm_groups['%s_juju_controller' % group_spec.cloud] = [
+              jujuvm
+          ]
 
       self.unmanaged_vm_groups[group_name] = vms
 
@@ -1251,7 +1257,7 @@ class BenchmarkSpec:
     if self.managed_vm_groups:
       background_tasks.RunThreaded(
           lambda vm_group: vm_group.Delete(),
-          list(self.managed_vm_groups.values())
+          list(self.managed_vm_groups.values()),
       )
 
     if self.vms:
@@ -1342,9 +1348,9 @@ class BenchmarkSpec:
     tags = {
         resource_type.TIMEOUT_METADATA_KEY: timeout_utc.strftime(time_format),
         'create_time_utc': now_utc.strftime(time_format),
-        'benchmark': self.name,
+        'benchmark': self._SafeLabelKeyOrValue(self.name),
         'perfkit_uuid': self.uuid,
-        'owner': FLAGS.owner,
+        'owner': self._SafeLabelKeyOrValue(FLAGS.owner),
         'benchmark_uid': self.uid,
     }
 
