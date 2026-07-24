@@ -89,8 +89,6 @@ class _BenchmarkPerformanceSuite:
       A _BenchmarkPerformanceSuite containing initialized queries and
       performances.
     """
-    run_predict = not ca_client.fetches_results_immediately
-
     question_list = [
         q
         for q in edw_service_instance.GetConversationalAnalyticsQuestionList()
@@ -109,17 +107,12 @@ class _BenchmarkPerformanceSuite:
         total_iterations=FLAGS.edw_suite_iterations,
         expected_queries=gt_expected_queries,
     )
-    predict_expected_queries = None
-    predict_query_performance = None
 
-    if run_predict:
-      predict_expected_queries = [
-          f'{q.question}_predict' for q in question_list
-      ]
-      predict_query_performance = results_aggregator.EdwBenchmarkPerformance(
-          total_iterations=FLAGS.edw_suite_iterations,
-          expected_queries=predict_expected_queries,
-      )
+    predict_expected_queries = [f'{q.question}_predict' for q in question_list]
+    predict_query_performance = results_aggregator.EdwBenchmarkPerformance(
+        total_iterations=FLAGS.edw_suite_iterations,
+        expected_queries=predict_expected_queries,
+    )
 
     return cls(
         edw_service_instance=edw_service_instance,
@@ -140,7 +133,7 @@ class _BenchmarkPerformanceSuite:
   ) -> tuple[
       results_aggregator.EdwPowerIterationPerformance,
       results_aggregator.EdwPowerIterationPerformance | None,
-      results_aggregator.EdwPowerIterationPerformance | None,
+      results_aggregator.EdwPowerIterationPerformance,
   ]:
     """Runs a single iteration of the benchmark suite.
 
@@ -154,23 +147,18 @@ class _BenchmarkPerformanceSuite:
           conversational analytics query performance.
         - gt_iteration_performance: EdwPowerIterationPerformance or None if the
           service is a competitor.
-        - predict_iteration_performance: EdwPowerIterationPerformance or None
-          if the client fetches results immediately.
+        - predict_iteration_performance: EdwPowerIterationPerformance containing
+          predict SQL query performance.
     """
     ca_iteration_performance = results_aggregator.EdwPowerIterationPerformance(
         iteration_id=iteration_id, total_queries=len(self.ca_expected_queries)
     )
-    predict_iteration_performance = None
 
-    # If the service does not fetch results immediately, it requires two-step
-    # execution: firstly run agent to get predict SQL, then run the predict SQL.
-    if not self.ca_client.fetches_results_immediately:
-      predict_iteration_performance = (
-          results_aggregator.EdwPowerIterationPerformance(
-              iteration_id=iteration_id,
-              total_queries=len(self.predict_expected_queries),  # pyrefly: ignore[bad-argument-type]
-          )
-      )
+    # Always run predict SQL.
+    predict_iteration_performance = results_aggregator.EdwPowerIterationPerformance(
+        iteration_id=iteration_id,
+        total_queries=len(self.predict_expected_queries),  # pyrefly: ignore[bad-argument-type]
+    )
 
     gt_iteration_performance = results_aggregator.EdwPowerIterationPerformance(
         iteration_id=iteration_id,
@@ -228,6 +216,7 @@ class _BenchmarkPerformanceSuite:
     if FLAGS.snowflake_ca_semantic_view:
       benchmark_metadata['agent'] = FLAGS.snowflake_ca_semantic_view
     benchmark_metadata.update(self.edw_service_instance.GetMetadata())
+    benchmark_metadata.update(self.ca_client.GetMetadata())
 
     results = []
     results.extend(

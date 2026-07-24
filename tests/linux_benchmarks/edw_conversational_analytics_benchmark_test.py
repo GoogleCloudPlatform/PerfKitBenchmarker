@@ -172,13 +172,17 @@ class EdwConversationalAnalyticsBenchmarkTest(
     ca_iter = results_aggregator.EdwPowerIterationPerformance(
         iteration_id, len(queries)
     )
+    predict_iter = results_aggregator.EdwPowerIterationPerformance(
+        iteration_id, len(queries)
+    )
     gt_iter = results_aggregator.EdwPowerIterationPerformance(
         iteration_id, len(queries)
     )
     for q in queries:
       ca_iter.add_query_performance(q, 1.0, {})
+      predict_iter.add_query_performance(f'{q}_predict', 1.0, {})
       gt_iter.add_query_performance(f'{q}_gt', 1.0, {})
-    return ca_iter, gt_iter, None
+    return ca_iter, gt_iter, predict_iter
 
   @flagsaver.flagsaver(
       bq_ca_agent='projects/test/locations/us-central1/dataAgents/test-agent',
@@ -219,7 +223,10 @@ class EdwConversationalAnalyticsBenchmarkTest(
         suite_1.gt_expected_queries,
         ['What is the total revenue?_gt', 'Show me top users_gt'],
     )
-    self.assertIsNone(suite_1.predict_expected_queries)
+    self.assertEqual(
+        suite_1.predict_expected_queries,
+        ['What is the total revenue?_predict', 'Show me top users_predict'],
+    )
 
     # Inspect suite properties passed in call 2 (same instance).
     suite_2 = mock_run_iteration.call_args_list[1][0][0]
@@ -245,6 +252,18 @@ class EdwConversationalAnalyticsBenchmarkTest(
         'What is the total revenue?', 1.5, {'job_id': 'job1'}
     )
     ca_iter1.add_query_performance('Show me top users', 2.0, {'job_id': 'job2'})
+
+    predict_iter1 = results_aggregator.EdwPowerIterationPerformance('1', 2)
+    predict_iter1.add_query_performance(
+        'What is the total revenue?_predict',
+        1.0,
+        {'job_id': 'pred_job1', 'predict_sql': 'SELECT 1;'},
+    )
+    predict_iter1.add_query_performance(
+        'Show me top users_predict',
+        1.2,
+        {'job_id': 'pred_job2', 'predict_sql': 'SELECT 2;'},
+    )
 
     gt_iter1 = results_aggregator.EdwPowerIterationPerformance('1', 2)
     gt_iter1.add_query_performance(
@@ -273,6 +292,18 @@ class EdwConversationalAnalyticsBenchmarkTest(
     )
     ca_iter2.add_query_performance('Show me top users', 2.2, {'job_id': 'job4'})
 
+    predict_iter2 = results_aggregator.EdwPowerIterationPerformance('2', 2)
+    predict_iter2.add_query_performance(
+        'What is the total revenue?_predict',
+        0.9,
+        {'job_id': 'pred_job3', 'predict_sql': 'SELECT 1;'},
+    )
+    predict_iter2.add_query_performance(
+        'Show me top users_predict',
+        1.1,
+        {'job_id': 'pred_job4', 'predict_sql': 'SELECT 2;'},
+    )
+
     gt_iter2 = results_aggregator.EdwPowerIterationPerformance('2', 2)
     gt_iter2.add_query_performance(
         'What is the total revenue?_gt',
@@ -294,8 +325,8 @@ class EdwConversationalAnalyticsBenchmarkTest(
     )
 
     mock_run_iteration.side_effect = [
-        (ca_iter1, gt_iter1, None),
-        (ca_iter2, gt_iter2, None),
+        (ca_iter1, gt_iter1, predict_iter1),
+        (ca_iter2, gt_iter2, predict_iter2),
     ]
 
     # Act
@@ -303,14 +334,14 @@ class EdwConversationalAnalyticsBenchmarkTest(
 
     # Assert
     # Sample count assertions
-    self.assertLen(samples, 18)
+    self.assertLen(samples, 27)
 
     # Assert metric types and content
     metrics = [s.metric for s in samples]
-    self.assertEqual(metrics.count('edw_raw_query_time'), 8)
-    self.assertEqual(metrics.count('edw_aggregated_query_time'), 4)
-    self.assertEqual(metrics.count('edw_iteration_geomean_time'), 4)
-    self.assertEqual(metrics.count('edw_aggregated_geomean'), 2)
+    self.assertEqual(metrics.count('edw_raw_query_time'), 12)
+    self.assertEqual(metrics.count('edw_aggregated_query_time'), 6)
+    self.assertEqual(metrics.count('edw_iteration_geomean_time'), 6)
+    self.assertEqual(metrics.count('edw_aggregated_geomean'), 3)
 
     # GT Metadata Verification
     gt_samples = [
@@ -403,7 +434,13 @@ class EdwConversationalAnalyticsBenchmarkTest(
         'Show me top users_gt', 0.8, {'query_results': {'rows': [{'b': 2}]}}
     )
 
-    mock_run_iteration.return_value = (ca_iter, gt_iter, None)
+    predict_iter = results_aggregator.EdwPowerIterationPerformance('1', 2)
+    predict_iter.add_query_performance(
+        'What is the total revenue?_predict', -1.0, {}
+    )
+    predict_iter.add_query_performance('Show me top users_predict', -1.0, {})
+
+    mock_run_iteration.return_value = (ca_iter, gt_iter, predict_iter)
 
     # Act
     samples = edw_conversational_analytics_benchmark.Run(self.spec)
@@ -433,7 +470,17 @@ class EdwConversationalAnalyticsBenchmarkTest(
     gt_iter.add_query_performance('What is the total revenue?_gt', -1.0, {})
     gt_iter.add_query_performance('Show me top users_gt', 0.8, {})
 
-    mock_run_iteration.return_value = (ca_iter, gt_iter, None)
+    predict_iter = results_aggregator.EdwPowerIterationPerformance('1', 2)
+    predict_iter.add_query_performance(
+        'What is the total revenue?_predict',
+        1.0,
+        {'predict_sql': 'SELECT 1;'},
+    )
+    predict_iter.add_query_performance(
+        'Show me top users_predict', 1.0, {'predict_sql': 'SELECT 2;'}
+    )
+
+    mock_run_iteration.return_value = (ca_iter, gt_iter, predict_iter)
 
     # Act & Assert
     with self.assertRaises(errors.Benchmarks.RunError):
@@ -552,16 +599,33 @@ class EdwConversationalAnalyticsBenchmarkTest(
     )
 
   @mock.patch.object(
-      edw_conversational_analytics_benchmark, '_RunConversationalQuery'
+      edw_conversational_analytics_benchmark,
+      '_RunConversationalQuery',
+      autospec=True,
   )
   @mock.patch.object(
-      edw_conversational_analytics_benchmark, '_RunGroundTruthQuery'
+      edw_conversational_analytics_benchmark,
+      '_RunGroundTruthQuery',
+      autospec=True,
   )
-  def testRunIteration(self, mock_run_gt, mock_run_ca):
+  @mock.patch.object(
+      edw_conversational_analytics_benchmark,
+      '_RetrievePredictQuery',
+      autospec=True,
+  )
+  @mock.patch.object(
+      edw_conversational_analytics_benchmark,
+      '_RunPredictQuery',
+      autospec=True,
+  )
+  def testRunIteration(
+      self, mock_run_predict, mock_retrieve_predict, mock_run_gt, mock_run_ca
+  ):
     # Arrange
     question_list = [mock.Mock(), mock.Mock()]
     ca_client = mock.Mock()
     query_client = mock.Mock()
+    mock_retrieve_predict.return_value = 'SELECT 1;'
 
     suite = edw_conversational_analytics_benchmark._BenchmarkPerformanceSuite(
         edw_service_instance=self.service,
@@ -570,6 +634,8 @@ class EdwConversationalAnalyticsBenchmarkTest(
         question_list=question_list,
         ca_expected_queries=['q1', 'q2'],
         ca_performance=mock.Mock(),
+        predict_expected_queries=['q1_predict', 'q2_predict'],
+        predict_query_performance=mock.Mock(),
         gt_expected_queries=['q1_gt', 'q2_gt'],
         gt_query_performance=mock.Mock(),
     )
@@ -579,12 +645,15 @@ class EdwConversationalAnalyticsBenchmarkTest(
 
     # Assert
     self.assertEqual(mock_run_ca.call_count, 2)
+    self.assertEqual(mock_retrieve_predict.call_count, 2)
+    self.assertEqual(mock_run_predict.call_count, 2)
     self.assertEqual(mock_run_gt.call_count, 2)
-    assert ca_perf is not None
-    assert gt_perf is not None
+    self.assertIsNotNone(ca_perf)
+    self.assertIsNotNone(gt_perf)
+    self.assertIsNotNone(predict_perf)
     self.assertEqual(ca_perf.id, '1')
     self.assertEqual(gt_perf.id, '1')
-    self.assertIsNone(predict_perf)
+    self.assertEqual(predict_perf.id, '1')
 
   def testRetrievePredictQuerySuccess(self):
     # Arrange
@@ -773,6 +842,7 @@ class EdwConversationalAnalyticsBenchmarkTest(
 
     mock_ca_client = mock.Mock()
     mock_ca_client.fetches_results_immediately = False
+    mock_ca_client.GetMetadata.return_value = {'client': 'Snowflake'}
 
     snowflake_spec = mock.Mock(
         edw_service=mock_snowflake_service,
@@ -847,6 +917,7 @@ class EdwConversationalAnalyticsBenchmarkTest(
       self.assertEqual(
           sample.metadata.get('agent'), 'my-snowflake-semantic-view'
       )
+      self.assertEqual(sample.metadata.get('client'), 'Snowflake')
 
 
 if __name__ == '__main__':

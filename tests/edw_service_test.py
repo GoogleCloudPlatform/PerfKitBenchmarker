@@ -236,6 +236,21 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
       ):
         FakeEdwService(spec)
 
+  def testBaseConversationalAnalyticsClientInterfaceGetMetadata(self):
+    class TestCaClientInterface(
+        edw_service.BaseConversationalAnalyticsClientInterface
+    ):
+
+      @property
+      def fetches_results_immediately(self) -> bool:
+        return True
+
+    ca_client = TestCaClientInterface()
+    self.assertEqual(
+        ca_client.GetMetadata(),
+        {'fetches_results_immediately': 'True'},
+    )
+
 
 if __name__ == '__main__':
   unittest.main()

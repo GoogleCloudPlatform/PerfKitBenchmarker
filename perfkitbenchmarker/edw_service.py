@@ -482,6 +482,13 @@ class BaseConversationalAnalyticsClientInterface(EdwClientInterface):
     """Returns True if the client fetches query results immediately."""
     raise NotImplementedError
 
+  def GetMetadata(self) -> dict[str, str]:
+    """Returns the client interface metadata."""
+    metadata = {
+        'fetches_results_immediately': str(self.fetches_results_immediately)
+    }
+    return metadata
+
   def _GetQueryFileName(self, query_name: str) -> str:
     """Generates a sanitized remote filename for a query question."""
     sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', query_name)
