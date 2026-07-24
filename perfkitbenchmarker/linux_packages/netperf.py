@@ -67,10 +67,11 @@ def _Install(vm):
 
   vm.RemoteCommand(
       f'cd {NETPERF_DIR} && '
-      f'CFLAGS=-DHIST_NUM_OF_BUCKET={FLAGS.netperf_histogram_buckets} '
+      'CFLAGS="-fcommon '
+      f'-DHIST_NUM_OF_BUCKET={FLAGS.netperf_histogram_buckets}" '
       './configure --enable-burst '
       '--enable-demo --enable-histogram '
-      '--enable-sctp'
+      '--enable-sctp --enable-intervals '
       '&& make && sudo make install'
   )
 

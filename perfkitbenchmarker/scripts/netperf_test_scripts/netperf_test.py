@@ -23,6 +23,14 @@ from absl import flags
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_float(
+    'stream_startup_delay_s',
+    0.0,
+    'Optional delay in seconds between starting each netperf stream to avoid'
+    ' thundering herds on the CPU and network queues. Default is 0.0 (no'
+    ' delay).',
+)
+
 flags.DEFINE_integer('num_streams', 1, 'Number of netperf processes to run')
 
 flags.DEFINE_string('netperf_cmd', None, 'netperf command to run')
@@ -66,6 +74,8 @@ def Main():
         shell=True,
         universal_newlines=True,
     )
+    if FLAGS.stream_startup_delay_s > 0:
+      time.sleep(FLAGS.stream_startup_delay_s)
   end_starting_processes = time.time()
   # Wait for all of the netperf processes to finish and save their return codes
   for i, process in enumerate(processes):
