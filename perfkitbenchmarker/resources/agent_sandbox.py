@@ -43,6 +43,10 @@ class BaseAgentSandbox(pkb_resource.BaseResource):
           'A kubernetes cluster is required for an agent sandbox resource.'
       )
 
+  def InstallWorkload(self):
+    """Installs the controller and workload components."""
+    raise NotImplementedError()
+
 
 def GetAgentSandbox(spec, cluster) -> Optional[BaseAgentSandbox]:
   """Returns an agent sandbox resource for the given spec, or None."""

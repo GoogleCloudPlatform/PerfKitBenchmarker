@@ -470,6 +470,10 @@ class GkeCluster(BaseGkeCluster):
     cmd = self._GcloudCommand('container', 'clusters', 'create', self.name)
     if self.default_nodepool.network:  # pyrefly: ignore[missing-attribute]
       cmd.flags['network'] = self.default_nodepool.network.network_resource.name  # pyrefly: ignore[missing-attribute]
+      if getattr(self.default_nodepool.network, 'primary_subnet_name', None):
+        cmd.flags['subnetwork'] = (
+            self.default_nodepool.network.primary_subnet_name
+        )
 
     if gcp_flags.GKE_ENABLE_SHIELDED_NODES.value:
       cmd.args.append('--enable-shielded-nodes')
