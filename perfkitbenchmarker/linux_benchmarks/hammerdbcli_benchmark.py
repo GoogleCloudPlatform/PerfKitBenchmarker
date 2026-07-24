@@ -192,6 +192,10 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   if not FLAGS.use_managed_db:
     _PrepareServer(db)  # pyrefly: ignore[bad-argument-type]
 
+  db_service = None
+  if db.engine == sql_engine_utils.ORACLE:  # pyrefly: ignore[missing-attribute]
+    db_service = 'orclpdb' if getattr(db, 'is_cdb', False) else 'orcl'
+
   hammerdb.SetupConfig(
       vm=client_vm,
       db_engine=db.engine,  # pyrefly: ignore[bad-argument-type]
@@ -202,6 +206,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       user=db.spec.database_username,  # pyrefly: ignore[missing-attribute]
       is_managed_azure=(FLAGS.cloud == 'Azure' and FLAGS.use_managed_db),
       db_engine_version=db.spec.engine_version,  # pyrefly: ignore[missing-attribute]
+      db_service=db_service,
   )
 
   if db.engine == sql_engine_utils.ALLOYDB:
