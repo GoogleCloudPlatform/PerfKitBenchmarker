@@ -13,6 +13,7 @@
 # limitations under the License.
 """Runs Apache Kafka benchmarks."""
 
+from collections import abc
 import concurrent.futures
 import itertools
 import logging
@@ -50,9 +51,7 @@ kafka:
 BENCHMARK_DATA = {}
 KAFKA_VERSION = '2.13-4.2.0'
 KAFKA_TAR = f'kafka_{KAFKA_VERSION}.tgz'
-KAFKA_URL = (
-    f'https://downloads.apache.org/kafka/{KAFKA_VERSION.split("-")[1]}/{KAFKA_TAR}'
-)
+KAFKA_URL = f'https://downloads.apache.org/kafka/{KAFKA_VERSION.split("-")[1]}/{KAFKA_TAR}'
 
 KAFKA_DIR = f'kafka_{KAFKA_VERSION}'
 KAFKA_TOPIC_NAME = 'kafka-benchmark-test'
@@ -91,8 +90,8 @@ _KAFKA_NUM_THREADS = flags.DEFINE_list(
     'kafka_num_threads',
     None,
     'List of thread counts to use for the benchmark (e.g. 8,16,32). If None '
-    'or empty, sweeps through powers of 2 from 1 up to 256 with early '
-    'stopping.',
+    'or empty, sweeps through powers of 2 from 1 up to 256 iteratively, then '
+    'refines the optimal thread count via binary search.',
 )
 _KAFKA_REPORTING_INTERVAL = flags.DEFINE_integer(
     'kafka_reporting_interval',
@@ -124,9 +123,7 @@ def _InstallKafka(vm):
   vm.Install('build_tools')
   vm.Install('pip')
 
-  fallback_url = (
-      f'https://archive.apache.org/dist/kafka/{KAFKA_VERSION.split("-")[1]}/{KAFKA_TAR}'
-  )
+  fallback_url = f'https://archive.apache.org/dist/kafka/{KAFKA_VERSION.split("-")[1]}/{KAFKA_TAR}'
   vm.RemoteCommand(f'wget {KAFKA_URL} || wget {fallback_url}')
   vm.RemoteCommand(f'tar -xzf {KAFKA_TAR}')
 
@@ -203,8 +200,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       'transaction.state.log.min.isr=1\n'
   )
   broker_vm.RemoteCommand(
-      f'cat <<EOF > {KAFKA_DIR}/config/broker.properties\n'
-      f'{broker_config}EOF'
+      f'cat <<EOF > {KAFKA_DIR}/config/broker.properties\n{broker_config}EOF'
   )
   broker_vm.RemoteCommand(
       f'cd {KAFKA_DIR} && bin/kafka-storage.sh format -t {cluster_id} -c'
@@ -608,9 +604,9 @@ def _CreateProducerIngressSample(
 
   p95_ingress = 0.0
   if aggregated_throughputs:
-    p95_ingress = sample.PercentileCalculator(
-        aggregated_throughputs, [95]
-    )['p95']
+    p95_ingress = sample.PercentileCalculator(aggregated_throughputs, [95])[
+        'p95'
+    ]
   elif thread_mb:
     p95_ingress = sum(thread_mb)
 
@@ -736,8 +732,8 @@ def _WaitForBrokerDiskRecovery(
     recovery_threshold: The target fraction of initial free space (default
       0.90).
     min_wait_seconds: The minimum waiting timeout in seconds (default 300).
-    delay_multiplier: Multiplier for file delete delay ms calculation
-      (default 4).
+    delay_multiplier: Multiplier for file delete delay ms calculation (default
+      4).
   """
   if initial_free_gb <= 0:
     return
@@ -852,6 +848,130 @@ def _RunSingleTrial(
     _WaitForBrokerDiskRecovery(broker_vm, initial_free_gb)
 
 
+def _GetThroughputs(
+    samples: abc.Sequence[sample.Sample],
+) -> tuple[float, float]:
+  """Extracts producer and consumer throughputs from samples.
+
+  Args:
+    samples: The samples to extract throughputs from.
+
+  Returns:
+    A tuple of producer and consumer throughputs.
+  """
+  producer_mb = 0.0
+  consumer_mb = 0.0
+  for s in samples:
+    if getattr(s, 'metric', '') == 'Producer Throughput (MB/sec)':
+      producer_mb = getattr(s, 'value', 0.0)
+    elif getattr(s, 'metric', '') == 'Consumer Throughput (MB/sec)':
+      consumer_mb = getattr(s, 'value', 0.0)
+  return producer_mb, consumer_mb
+
+
+def _IsThroughputImproved(
+    curr_samples: abc.Sequence[sample.Sample],
+    prev_samples: abc.Sequence[sample.Sample],
+    margin: float = 0.05,
+) -> bool:
+  """Returns True if current samples show adequate throughput improvement.
+
+  Args:
+    curr_samples: The current samples to check for improvement.
+    prev_samples: The previous samples to compare against.
+    margin: The margin of improvement to tolerate.
+  """
+  curr_prod, curr_cons = _GetThroughputs(curr_samples)
+  prev_prod, prev_cons = _GetThroughputs(prev_samples)
+
+  if prev_prod <= 0 or prev_cons <= 0:
+    return True
+
+  prod_improvement = (curr_prod - prev_prod) / prev_prod
+  cons_improvement = (curr_cons - prev_cons) / prev_cons
+
+  throughput_stalled = prod_improvement <= margin and cons_improvement <= margin
+  throughput_declined = prod_improvement < 0.0 or cons_improvement < 0.0
+
+  return not (throughput_stalled or throughput_declined)
+
+
+def _CoarseSearch(
+    benchmark_spec: bm_spec.BenchmarkSpec,
+    num_records: int,
+    thread_counts: list[int],
+) -> tuple[list[sample.Sample], int | None, int | None]:
+  """Runs a coarse search to find the optimal thread count.
+
+  Args:
+    benchmark_spec: The benchmark specification.
+    num_records: The number of records to produce/consume.
+    thread_counts: The sequence of thread counts to try.
+
+  Returns:
+    A tuple of (winning samples, last pass thread count, last failed thread
+    count).
+  """
+  winning_samples: list[sample.Sample] = []
+  last_pass_threads = None
+  last_failed_threads = None
+  prev_threads = None
+  prev_samples = []
+
+  for num_threads in thread_counts:
+    trial_samples = _RunSingleTrial(benchmark_spec, num_threads, num_records)
+    if not winning_samples:
+      winning_samples = trial_samples
+
+    if prev_samples:
+      if not _IsThroughputImproved(trial_samples, prev_samples):
+        last_failed_threads = num_threads
+        last_pass_threads = prev_threads
+        break
+
+    winning_samples = trial_samples
+    prev_samples = trial_samples
+    prev_threads = num_threads
+
+  return winning_samples, last_pass_threads, last_failed_threads
+
+
+def _BinarySearch(
+    benchmark_spec: bm_spec.BenchmarkSpec,
+    num_records: int,
+    low_threads: int,
+    high_threads: int,
+    best_samples: list[sample.Sample],
+) -> list[sample.Sample]:
+  """Runs binary search for optimal thread count between low and high.
+
+  Args:
+    benchmark_spec: The benchmark specification.
+    num_records: The number of records to produce/consume.
+    low_threads: The lower bound thread count (e.g. last pass).
+    high_threads: The upper bound thread count (e.g. last failed).
+    best_samples: The samples from the lower bound thread count.
+
+  Returns:
+    A list of samples corresponding to the winning thread count.
+  """
+  low = low_threads
+  high = high_threads - 1
+  current_best_samples = best_samples
+
+  while low < high:
+    mid = (low + high + 1) // 2
+    trial_samples = _RunSingleTrial(benchmark_spec, mid, num_records)
+
+    if not _IsThroughputImproved(trial_samples, current_best_samples):
+      high = mid - 1
+    else:
+      low = mid
+      current_best_samples = trial_samples
+
+  return current_best_samples
+
+
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Runs Kafka benchmarks across a sweep of thread counts with early stopping.
 
@@ -862,52 +982,20 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     A list of samples corresponding to the winning (optimal) thread count.
   """
   if _KAFKA_NUM_THREADS.value:
-    thread_counts = [int(t) for t in _KAFKA_NUM_THREADS.value]
+    thread_counts = sorted(int(t) for t in _KAFKA_NUM_THREADS.value)
   else:
     thread_counts = [2**i for i in range(9)]
 
   num_records = int(_KAFKA_NUM_RECORDS.value)
-  winning_samples: list[sample.Sample] = []
-  prev_producer_mb = 0.0
-  prev_consumer_mb = 0.0
 
-  throughput_margin = 0.05
+  winning_samples, last_pass, last_failed = _CoarseSearch(
+      benchmark_spec, num_records, thread_counts
+  )
 
-  for num_threads in thread_counts:
-    trial_samples = _RunSingleTrial(benchmark_spec, num_threads, num_records)
-    if not winning_samples:
-      winning_samples = trial_samples
-
-    curr_producer_mb = 0.0
-    curr_consumer_mb = 0.0
-
-    for s in trial_samples:
-      if getattr(s, 'metric', '') == 'Producer Throughput (MB/sec)':
-        curr_producer_mb = getattr(s, 'value', 0.0)
-      elif getattr(s, 'metric', '') == 'Consumer Throughput (MB/sec)':
-        curr_consumer_mb = getattr(s, 'value', 0.0)
-
-    if prev_producer_mb > 0 and prev_consumer_mb > 0:
-      prod_improvement = (
-          curr_producer_mb - prev_producer_mb
-      ) / prev_producer_mb
-      cons_improvement = (
-          curr_consumer_mb - prev_consumer_mb
-      ) / prev_consumer_mb
-
-      throughput_stalled = (
-          prod_improvement <= throughput_margin
-          and cons_improvement <= throughput_margin
-      )
-      throughput_declined = prod_improvement < 0.0 or cons_improvement < 0.0
-
-      if throughput_stalled or throughput_declined:
-        break
-
-      winning_samples = trial_samples
-
-    prev_producer_mb = curr_producer_mb
-    prev_consumer_mb = curr_consumer_mb
+  if last_pass is not None and last_failed is not None:
+    winning_samples = _BinarySearch(
+        benchmark_spec, num_records, last_pass, last_failed, winning_samples
+    )
 
   return winning_samples
 
@@ -925,6 +1013,4 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
     vm.RemoteCommand(
         f'cd {KAFKA_DIR} && bin/kafka-server-stop.sh', ignore_failure=True
     )
-    vm.RemoteCommand(
-        'rm -rf /tmp/kraft-*-logs', ignore_failure=True
-    )
+    vm.RemoteCommand('rm -rf /tmp/kraft-*-logs', ignore_failure=True)

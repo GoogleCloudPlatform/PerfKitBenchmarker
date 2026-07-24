@@ -228,6 +228,23 @@ class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
         ),
     ])
 
+  @mock.patch.object(time, 'sleep')
+  def testDeleteTopicTimeout(self, mock_sleep):
+    self.broker_vm.RemoteCommand.side_effect = [('', '')] + [
+        ('test-topic\n', '')
+    ] * 10
+
+    with mock.patch.object(kafka_benchmark.logging, 'warning') as mock_warning:
+      kafka_benchmark._DeleteTopic(
+          self.broker_vm, '10.0.0.1:9092', 'test-topic'
+      )
+
+      mock_warning.assert_called_once_with(
+          'Topic %s not deleted.', 'test-topic'
+      )
+      self.assertEqual(mock_sleep.call_count, 10)
+      mock_sleep.assert_called_with(5)
+
   def testRunProducerDefault(self):
     self.producer_vm.RemoteCommand.side_effect = [
         ('', ''),
@@ -255,7 +272,10 @@ class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
     self.assertIn('--record-size=1024', exec_call)
     self.assertIn('--bootstrap-server 10.0.0.1:9092', exec_call)
     self.assertIn(
-        f'--reporting-interval={kafka_benchmark._KAFKA_REPORTING_INTERVAL.value}',
+        (
+            f'--reporting-interval='
+            f'{kafka_benchmark._KAFKA_REPORTING_INTERVAL.value}'
+        ),
         exec_call,
     )
 
@@ -311,7 +331,10 @@ class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
         exec_call,
     )
     self.assertIn(
-        f'--reporting-interval={kafka_benchmark._KAFKA_REPORTING_INTERVAL.value}',
+        (
+            f'--reporting-interval='
+            f'{kafka_benchmark._KAFKA_REPORTING_INTERVAL.value}'
+        ),
         exec_call,
     )
 
@@ -615,6 +638,21 @@ class KafkaBenchmarkResultParserTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertEqual(results[4].value, 4.0)
 
+  def testParseProducerResultsWithInvalidNumRecords(self):
+    stdout = (
+        '1000 records sent, 200.0 records/sec (2.0 MB/sec), 3.0 ms avg latency,'
+        ' 10.0 ms max latency.\n'
+        '2000 records sent, 400.0 records/sec (4.0 MB/sec), 3.0 ms avg latency,'
+        ' 10.0 ms max latency.\n'
+    )
+    metadata = {'kafka_num_records': 'invalid'}
+    results = kafka_benchmark._ParseProducerResults(stdout, metadata)
+    self.assertLen(results, 1)
+    self.assertEqual(
+        results[0].metric, 'Producer P95 Maximum sustained ingress scale'
+    )
+    self.assertEqual(results[0].value, 4.0)
+
   def testParseProducerResultsMetadataCopy(self):
     metadata = {'key': 'initial'}
 
@@ -702,10 +740,6 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
     s2 = sample.Sample('Cons Metric', 2, 'unit')
     self.broker_vm.RemoteCommand.side_effect = [
         ('300_000_000\n', ''),  # 1. initial _GetBrokerFreeDiskSpaceKb
-        (
-            '290_000_000\n',
-            '',
-        ),  # 2. curr_free_kb check in _WaitForBrokerDiskRecovery
     ]
 
     with mock.patch.object(
@@ -720,7 +754,9 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
         kafka_benchmark, '_ParseProducerResults', return_value=[s1]
     ) as mock_parse_prod, mock.patch.object(
         kafka_benchmark, '_ParseConsumerResults', return_value=[s2]
-    ) as mock_parse_cons:
+    ) as mock_parse_cons, mock.patch.object(
+        kafka_benchmark, '_WaitForBrokerDiskRecovery'
+    ) as mock_wait:
       results = kafka_benchmark._RunSingleTrial(self.benchmark_spec, 8, 50_000)
 
       expected_topic = 'kafka-benchmark-test-threads-8-records-50000'
@@ -736,6 +772,10 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
       mock_cons.assert_called_once_with(
           self.consumer_vm, '10.0.0.1:9092', expected_topic, 8, 50_000
       )
+      # 300_000_000 KB = 286.102294921875 GB. Floating point eq check.
+      mock_wait.assert_called_once()
+      self.assertEqual(mock_wait.call_args[0][0], self.broker_vm)
+      self.assertAlmostEqual(mock_wait.call_args[0][1], 286.10229492)
 
       expected_metadata = {
           'kafka_num_records': 50_000,
@@ -749,6 +789,68 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
       mock_parse_prod.assert_called_once_with('prod_out', expected_metadata)
       mock_parse_cons.assert_called_once_with('cons_out', expected_metadata)
       self.assertEqual(results, [s1, s2])
+
+  @parameterized.named_parameters(
+      ('prod_zero', 0, 100),
+      ('cons_neg', 100, -50),
+      ('both_zero', 0, 0),
+  )
+  def testIsThroughputImprovedPrevZeroOrNegative(self, prev_prod, prev_cons):
+    curr_samples = [
+        sample.Sample('Producer Throughput (MB/sec)', 100, 'MB/sec'),
+        sample.Sample('Consumer Throughput (MB/sec)', 100, 'MB/sec'),
+    ]
+    if prev_prod == 0 and prev_cons == 0:
+      # Uses empty list to yield 0.0 for both prev_prod and prev_cons
+      prev_samples = []
+    else:
+      prev_samples = [
+          sample.Sample('Producer Throughput (MB/sec)', prev_prod, 'MB/sec'),
+          sample.Sample('Consumer Throughput (MB/sec)', prev_cons, 'MB/sec'),
+      ]
+
+    self.assertTrue(
+        kafka_benchmark._IsThroughputImproved(curr_samples, prev_samples)
+    )
+
+  @parameterized.named_parameters(
+      ('producer_improves', 120, 104),
+      ('consumer_improves', 104, 120),
+  )
+  def testIsThroughputImprovedPartialStall(self, curr_prod, curr_cons):
+    # Tests that if one metric completely stalls, but another strictly improves
+    # without any declining, improvement is evaluated as True.
+    # Catching mutants replacing 'and' with 'or' for throughput_stalled checks.
+    prev_samples = [
+        sample.Sample('Producer Throughput (MB/sec)', 100, 'MB/sec'),
+        sample.Sample('Consumer Throughput (MB/sec)', 100, 'MB/sec'),
+    ]
+    curr_samples = [
+        sample.Sample('Producer Throughput (MB/sec)', curr_prod, 'MB/sec'),
+        sample.Sample('Consumer Throughput (MB/sec)', curr_cons, 'MB/sec'),
+    ]
+
+    self.assertTrue(
+        kafka_benchmark._IsThroughputImproved(curr_samples, prev_samples)
+    )
+
+  @parameterized.named_parameters(
+      ('producer_declines', 99, 150),
+      ('consumer_declines', 150, 99),
+  )
+  def testIsThroughputImprovedThroughputDeclined(self, curr_prod, curr_cons):
+    prev_samples = [
+        sample.Sample('Producer Throughput (MB/sec)', 100, 'MB/sec'),
+        sample.Sample('Consumer Throughput (MB/sec)', 100, 'MB/sec'),
+    ]
+    curr_samples = [
+        sample.Sample('Producer Throughput (MB/sec)', curr_prod, 'MB/sec'),
+        sample.Sample('Consumer Throughput (MB/sec)', curr_cons, 'MB/sec'),
+    ]
+
+    self.assertFalse(
+        kafka_benchmark._IsThroughputImproved(curr_samples, prev_samples)
+    )
 
   @mock.patch.object(time, 'sleep')
   def testWaitForBrokerDiskRecovery(self, mock_sleep):
@@ -776,6 +878,22 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
     self.assertLen(self.broker_vm.RemoteCommand.call_args_list, 1)
     mock_sleep.assert_not_called()
 
+  @mock.patch.object(time, 'sleep')
+  def testWaitForBrokerDiskRecoveryStrictThreshold(self, mock_sleep):
+    # 89.5 GB is less than the expected 90.0 GB threshold (0.90 * 100).
+    # It must sleep and wait for the second attempt. 90.1 GB easily passes.
+    # 89.5 GB = 89.5 * 1024 * 1024 KB = 93847552 KB
+    # 90.1 GB = 90.1 * 1024 * 1024 KB = 94476697 KB (rounded down)
+    self.broker_vm.RemoteCommand.side_effect = [
+        ('93847552\n', ''),
+        ('94476697\n', ''),
+    ]
+
+    kafka_benchmark._WaitForBrokerDiskRecovery(self.broker_vm, 100.0)
+
+    self.assertLen(self.broker_vm.RemoteCommand.call_args_list, 2)
+    mock_sleep.assert_called_once_with(15)
+
   def testGetBrokerFreeDiskSpaceGbError(self):
     self.broker_vm.RemoteCommand.return_value = ('invalid_float\n', '')
 
@@ -794,12 +912,19 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
   @mock.patch.object(time, 'time')
   @mock.patch.object(time, 'sleep')
   def testWaitForBrokerDiskRecoveryTimeout(self, mock_sleep, mock_time):
+    # min_wait_seconds=300. Start time is 100.0, deadline is 400.0.
+    # Attempt 1 -> time 100.0 + 15 <= 400.0 (sleep)
+    # Attempt 2 -> time 500.0 + 15 >= 400.0 (timeout)
     mock_time.side_effect = [100.0, 100.0, 500.0, 501.0]
     self.broker_vm.RemoteCommand.return_value = ('100_000_000\n', '')
 
-    kafka_benchmark._WaitForBrokerDiskRecovery(
-        self.broker_vm, 286.10, min_wait_seconds=300
-    )
+    with mock.patch.object(kafka_benchmark.logging, 'warning') as mock_warning:
+      kafka_benchmark._WaitForBrokerDiskRecovery(
+          self.broker_vm, 286.10, min_wait_seconds=300
+      )
+      mock_warning.assert_called_once_with(
+          'Broker disk space did not fully recover within %s seconds.', 300
+      )
 
     self.assertLen(self.broker_vm.RemoteCommand.call_args_list, 2)
     mock_sleep.assert_called_once_with(15)
@@ -810,12 +935,21 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
   def testWaitForBrokerDiskRecoveryTimeoutWithLargeDelay(
       self, mock_sleep, mock_time
   ):
-    mock_time.side_effect = [100.0, 100.0, 450.0, 550.0, 551.0]
+    # max_wait_seconds = int(100000 / 1000) * 4 = 400.
+    # Start time is 100.0, deadline is 500.0.
+    # Attempt 1 -> time 100.0 + 15 <= 500.0 (sleep)
+    # Attempt 2 -> time 484.5 + 15 = 499.5 <= 500.0 (sleep).
+    # Attempt 3 -> time 550.0 + 15 > 500.0 (timeout)
+    mock_time.side_effect = [100.0, 100.0, 484.5, 550.0, 551.0]
     self.broker_vm.RemoteCommand.return_value = ('100_000_000\n', '')
 
-    kafka_benchmark._WaitForBrokerDiskRecovery(
-        self.broker_vm, 286.10, min_wait_seconds=300
-    )
+    with mock.patch.object(kafka_benchmark.logging, 'warning') as mock_warning:
+      kafka_benchmark._WaitForBrokerDiskRecovery(
+          self.broker_vm, 286.10, min_wait_seconds=300
+      )
+      mock_warning.assert_called_once_with(
+          'Broker disk space did not fully recover within %s seconds.', 400
+      )
 
     self.assertLen(self.broker_vm.RemoteCommand.call_args_list, 3)
     self.assertLen(mock_sleep.call_args_list, 2)
@@ -849,6 +983,7 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
         1: (100.0, 90.0),
         2: (200.0, 180.0),
         4: (201.0, 180.9),
+        3: (202.0, 182.0),
     }
 
     def _mock_single(spec, num_threads, num_records):
@@ -863,9 +998,9 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
         kafka_benchmark, '_RunSingleTrial', side_effect=_mock_single
     ) as mock_single, mock.patch.object(time, 'sleep'):
       results = kafka_benchmark.Run(self.benchmark_spec)
-      self.assertLen(mock_single.call_args_list, 3)
+      self.assertLen(mock_single.call_args_list, 4)
       expected_calls = [
-          mock.call(self.benchmark_spec, t, 10_000_000) for t in [1, 2, 4]
+          mock.call(self.benchmark_spec, t, 10_000_000) for t in [1, 2, 4, 3]
       ]
       mock_single.assert_has_calls(expected_calls)
       self.assertLen(results, 2)
@@ -884,7 +1019,7 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
       self.assertEqual(results, [mock_sample])
 
   @flagsaver.flagsaver(
-      kafka_num_threads=['2', '4', '8'], kafka_num_records=12345
+      kafka_num_threads=['8', '2', '4'], kafka_num_records=12345
   )
   def testRunWithCustomThreadList(self):
     def _mock_single(spec, num_threads, num_records):
@@ -909,6 +1044,101 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
       mock_single.assert_has_calls(expected_calls)
       self.assertLen(results, 2)
       self.assertEqual(results[0].value, 800.0)
+
+  def testRunBinarySearchRefinement(self):
+    # Coarse search: 1 -> 2 -> 4 -> 8
+    # 1: 100
+    # 2: 200 (pass, 100% inc)
+    # 4: 400 (pass, 100% inc)
+    # 8: 400 (fail, 0% inc) => Coarse loop breaks. last_pass=4, last_fail=8
+    # Binary search over [4, 7]:
+    # mid = (4 + 7 + 1) // 2 = 6
+    # 6: 500 (pass over 4 which was 400, 25% inc > 5%) -> low=6, best=6
+    # Next loop over [6, 7]:
+    # mid = (6 + 7 + 1) // 2 = 7
+    # 7: 504 (fail over 6 which was 500, < 5% inc) -> high=6
+    # Loop terminates (low=6, high=6), returns 6.
+    trial_data = {
+        1: (100.0, 90.0),
+        2: (200.0, 180.0),
+        4: (400.0, 360.0),
+        8: (400.0, 360.0),
+        6: (500.0, 450.0),
+        7: (504.0, 453.0),
+    }
+
+    def _mock_single(spec, num_threads, num_records):
+      del spec, num_records
+      prod_val, cons_val = trial_data[num_threads]
+      return [
+          sample.Sample('Producer Throughput (MB/sec)', prod_val, 'MB/sec'),
+          sample.Sample('Consumer Throughput (MB/sec)', cons_val, 'MB/sec'),
+      ]
+
+    with mock.patch.object(
+        kafka_benchmark, '_RunSingleTrial', side_effect=_mock_single
+    ) as mock_single, mock.patch.object(time, 'sleep'):
+      results = kafka_benchmark.Run(self.benchmark_spec)
+
+      expected_calls = [
+          mock.call(self.benchmark_spec, 1, 10_000_000),
+          mock.call(self.benchmark_spec, 2, 10_000_000),
+          mock.call(self.benchmark_spec, 4, 10_000_000),
+          mock.call(self.benchmark_spec, 8, 10_000_000),
+          # Binary search
+          mock.call(self.benchmark_spec, 6, 10_000_000),
+          mock.call(self.benchmark_spec, 7, 10_000_000),
+      ]
+      self.assertEqual(mock_single.call_args_list, expected_calls)
+      self.assertLen(results, 2)
+      self.assertEqual(results[0].value, 500.0)
+
+  def testRunBinarySearchRefinementMidMinusOneCrucial(self):
+    # Coarse search: 1 -> 2 -> 4 -> 8
+    # 4: 400 (last pass, 100% inc)
+    # 8: 400 (fail, 0% inc) => low=4, high=7
+    # Binary search over [4, 7]:
+    # mid = (4 + 7 + 1) // 2 = 6
+    # 6: 410 (fails, < 5% inc over 400) -> high=5
+    # Next loop over [4, 5]:
+    # mid = (4 + 5 + 1) // 2 = 5
+    # 5: 450 (passes, > 5% inc over 400) -> low=5, best=5
+    # Loop terminates (low=5, high=5), returns 5.
+
+    trial_data = {
+        1: (100.0, 90.0),
+        2: (200.0, 180.0),
+        4: (400.0, 360.0),
+        8: (400.0, 360.0),
+        6: (410.0, 369.0),
+        5: (450.0, 405.0),
+    }
+
+    def _mock_single(spec, num_threads, num_records):
+      del spec, num_records
+      prod_val, cons_val = trial_data[num_threads]
+      return [
+          sample.Sample('Producer Throughput (MB/sec)', prod_val, 'MB/sec'),
+          sample.Sample('Consumer Throughput (MB/sec)', cons_val, 'MB/sec'),
+      ]
+
+    with mock.patch.object(
+        kafka_benchmark, '_RunSingleTrial', side_effect=_mock_single
+    ) as mock_single, mock.patch.object(time, 'sleep'):
+      results = kafka_benchmark.Run(self.benchmark_spec)
+
+      expected_calls = [
+          mock.call(self.benchmark_spec, 1, 10_000_000),
+          mock.call(self.benchmark_spec, 2, 10_000_000),
+          mock.call(self.benchmark_spec, 4, 10_000_000),
+          mock.call(self.benchmark_spec, 8, 10_000_000),
+          # Binary search
+          mock.call(self.benchmark_spec, 6, 10_000_000),
+          mock.call(self.benchmark_spec, 5, 10_000_000),
+      ]
+      self.assertEqual(mock_single.call_args_list, expected_calls)
+      self.assertLen(results, 2)
+      self.assertEqual(results[0].value, 450.0)
 
 
 class KafkaBenchmarkCleanupTest(KafkaBenchmarkTestCaseBase):
