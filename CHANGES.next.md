@@ -480,6 +480,7 @@
 
 ### Bug fixes and maintenance updates:
 
+-   Implement `_Exists` and `_IsDeleting` for `GCPAlloyRelationalDb`.
 -   Update `sysbench_thread_init_timeout` default to 180 seconds.
 -   Add 'runcpu --update' and 'runcpu --version' commands to install phase.
 -   Set the command to download preprovisioned data to be robust and have a five
