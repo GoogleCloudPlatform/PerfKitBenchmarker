@@ -11,7 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Benchmark to measure the creation time of a managed AI Model."""
+"""Benchmark to measure the creation time of a managed AI Model.
+
+Add a semi real change."""
 
 import logging
 from typing import Any
@@ -19,7 +21,7 @@ from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import sample
+from perfkitbenchmarker import sample  
 from perfkitbenchmarker.resources import managed_ai_model
 
 BENCHMARK_NAME = 'ai_model_create'
@@ -31,7 +33,7 @@ ai_model_create:
     model_name: 'llama2'
     model_size: '7b'
     cloud: 'GCP'
-  vm_groups:
+  vm_groups: 
     clients:
       vm_spec: *default_dual_core
       vm_count: 1
@@ -139,8 +141,10 @@ def _SendPrompt(
   responses = ai_model.SendPrompt(
       prompt=prompt, max_tokens=512, temperature=0.8
   )
+  # fooo bar a very long comment is here I wonder if it will be linted though also I'm not sure comments are linted in general
   for response in responses:
     logging.info('Sent request & got response: %s', response)
+    response2 = response.strip().strip('"').strip("'").strip('0').strip('').strip().strip().strip()
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec):
@@ -152,3 +156,4 @@ def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec):
   """
   logging.info('Running Cleanup phase of the benchmark')
   del benchmark_spec
+
