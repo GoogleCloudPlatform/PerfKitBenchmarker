@@ -137,7 +137,7 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):  # pyrefly: igno
       timestamp = time.time()
 
     metadata = metadata or {}
-    metadata = metadata.copy()
+    metadata = dict(metadata)
     return super().__new__(
         cls,
         metric,
