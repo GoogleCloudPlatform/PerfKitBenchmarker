@@ -277,6 +277,7 @@ TYPE_2_PROVIDER = dict([
     ('redshift', 'aws'),
     ('spectrum', 'aws'),
     ('trino', 'gcp'),
+    ('clickhouse', 'gcp'),
     ('snowflake_aws', 'aws'),
     ('snowflake_azure', 'azure'),
     ('snowflakeexternal_aws', 'aws'),
@@ -294,6 +295,7 @@ TYPE_2_MODULE = dict([
     ('redshift', 'perfkitbenchmarker.providers.aws.redshift'),
     ('spectrum', 'perfkitbenchmarker.providers.aws.spectrum'),
     ('trino', 'perfkitbenchmarker.providers.gcp.trino'),
+    ('clickhouse', 'perfkitbenchmarker.providers.gcp.clickhouse'),
     ('snowflake_aws', 'perfkitbenchmarker.providers.aws.snowflake_aws'),
     (
         'snowflake_azure',
