@@ -25,15 +25,15 @@ import time
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sql_engine_utils
+from perfkitbenchmarker.linux_benchmarks import hammerdbcli_benchmark as linux_hammerdb_benchmark
 from perfkitbenchmarker.linux_packages import hammerdb as linux_hammerdb
 from perfkitbenchmarker.windows_packages import hammerdb
 
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = 'hammerdbcli'
+BENCHMARK_NAME = linux_hammerdb_benchmark.BENCHMARK_NAME
 BENCHMARK_CONFIG = """
 hammerdbcli:
   description: Runs hammerdb against specified databases.
@@ -71,108 +71,19 @@ hammerdbcli:
     vm_groups:
       controller:
         os_type: windows2022_desktop
-        vm_spec:
-          GCP:
-            machine_type: n2-standard-4
-            zone: us-central1-c
-            boot_disk_size: 50
-          AWS:
-            machine_type: m6i.xlarge
-            zone: us-east-1a
-          Azure:
-            machine_type: Standard_D4s_v5
-            zone: eastus
-            boot_disk_type: Premium_LRS
+        vm_spec: *default_dual_core
       servers_replicas:
         os_type: windows2022_desktop_sqlserver_2019_standard
-        vm_spec:
-          GCP:
-            machine_type: n2-standard-4
-            zone: us-central1-c
-            boot_disk_size: 50
-          AWS:
-            machine_type: m6i.xlarge
-            zone: us-east-1a
-          Azure:
-            machine_type: Standard_D4s_v5
-            zone: eastus
-            boot_disk_type: Premium_LRS
-        disk_spec:
-          GCP:
-            disk_size: 500
-            disk_type: pd-ssd
-            num_striped_disks: 1
-            mount_point: /scratch
-          AWS:
-            disk_size: 500
-            disk_type: gp2
-            num_striped_disks: 1
-            mount_point: /scratch
-          Azure:
-            disk_size: 500
-            disk_type: Premium_LRS
-            num_striped_disks: 1
-            mount_point: /scratch
+        vm_spec: *default_dual_core
+        disk_spec: *default_500_gb
       servers:
         os_type: windows2022_desktop_sqlserver_2019_standard
-        vm_spec:
-          GCP:
-            machine_type: n2-standard-4
-            zone: us-central1-c
-            boot_disk_size: 50
-          AWS:
-            machine_type: m6i.xlarge
-            zone: us-east-1a
-          Azure:
-            machine_type: Standard_D4s_v5
-            zone: eastus
-            boot_disk_type: Premium_LRS
-        disk_spec:
-          GCP:
-            disk_size: 500
-            disk_type: pd-ssd
-            num_striped_disks: 1
-            mount_point: /scratch
-          AWS:
-            disk_size: 500
-            disk_type: gp2
-            num_striped_disks: 1
-            mount_point: /scratch
-          Azure:
-            disk_size: 500
-            disk_type: Premium_LRS
-            num_striped_disks: 1
-            mount_point: /scratch
+        vm_spec: *default_dual_core
+        disk_spec: *default_500_gb
       clients:
         os_type: windows2022_desktop
-        vm_spec:
-          GCP:
-            machine_type: n2-standard-16
-            zone: us-central1-c
-            boot_disk_size: 50
-          AWS:
-            machine_type: m6i.4xlarge
-            zone: us-east-1a
-          Azure:
-            machine_type: Standard_D16s_v5
-            zone: eastus
-            boot_disk_type: Premium_LRS
-        disk_spec:
-          GCP:
-            disk_size: 500
-            disk_type: pd-ssd
-            num_striped_disks: 1
-            mount_point: /scratch
-          AWS:
-            disk_size: 500
-            disk_type: gp2
-            num_striped_disks: 1
-            mount_point: /scratch
-          Azure:
-            disk_size: 500
-            disk_type: Premium_LRS
-            num_striped_disks: 1
-            mount_point: /scratch
+        vm_spec: *default_dual_core
+        disk_spec: *default_500_gb
 """
 
 
@@ -209,10 +120,10 @@ def GetConfig(user_config):
 
 def CheckPrerequisites(_):
   """Verifies that benchmark flags is correct."""
-  if hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value not in [
-      hammerdb.NON_OPTIMIZED,
-      hammerdb.MINIMUM_RECOVERY,
-  ]:
+  if (
+      hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value
+      != hammerdb.NON_OPTIMIZED
+  ):
     raise errors.Setup.InvalidFlagConfigurationError(
         'Non-optimized hammerdbcli_optimized_server_configuration'
         ' is not implemented.'
@@ -227,12 +138,10 @@ def Prepare(benchmark_spec):
       required to run the benchmark.
   """
   db = benchmark_spec.relational_db
+  assert db is not None
   vm = db.client_vm
-  num_cpus = None
-  if hasattr(db, 'server_vm'):
-    server_vm = db.server_vm
-    num_cpus = server_vm.NumCpusForBenchmark()
-  hammerdb.SetDefaultConfig(num_cpus)
+  num_cpus = linux_hammerdb_benchmark.GetNumCpus(db)
+  linux_hammerdb.SetDefaultConfig(num_cpus)
   vm.Install('hammerdb')
 
   retryable_exceptions = Exception
@@ -279,61 +188,12 @@ def Prepare(benchmark_spec):
       if FLAGS.hammerdbcli_restart_before_run:
         db.RestartDatabase()
       return
-    except retryable_exceptions as e:
+    except retryable_exceptions as e:  # pylint: disable=broad-exception-caught
       if tries >= max_retries - 1:
         raise e
       else:
         logging.info('Wait 60 seconds before retrying prepare step.')
         time.sleep(60)
-
-
-def SetMinimumRecover(db):
-  """Change sql server settings to make TPM nubmers stable."""
-  # https://www.mssqltips.com/sqlservertip/4541/adjust-targetrecoverytime-to-reduce-sql-server-io-spikes/
-  db.client_vm_query_tools.IssueSqlCommand(
-      'ALTER DATABASE tpcc SET TARGET_RECOVERY_TIME = 12000 SECONDS;'
-  )
-  db.client_vm_query_tools.IssueSqlCommand(
-      'ALTER DATABASE tpcc SET AUTO_UPDATE_STATISTICS OFF;'
-  )
-
-  db.client_vm_query_tools.IssueSqlCommand(
-      'ALTER DATABASE SCOPED CONFIGURATION SET MAXDOP = 1;'
-  )
-
-  db.client_vm_query_tools.IssueSqlCommand(
-      'ALTER DATABASE [tpcc] SET DELAYED_DURABILITY = DISABLED WITH NO_WAIT;'
-  )
-
-  db.client_vm_query_tools.IssueSqlCommand(
-      "ALTER DATABASE [tpcc] MODIFY FILE ( NAME = N'tpcc', SIZE = 500 GB,"
-      ' FILEGROWTH = 10%);'
-  )
-
-  db.client_vm_query_tools.IssueSqlCommand(
-      "dbcc shrinkfile('tpcc_log',truncateonly)"
-  )
-
-  db.client_vm_query_tools.IssueSqlCommand(
-      "alter database tpcc modify file (name='tpcc_log', size=64000)"
-  )
-
-  # Verify the setting changed
-  db.client_vm_query_tools.IssueSqlCommand("dbcc loginfo('tpcc')")
-  db.client_vm_query_tools.IssueSqlCommand(
-      'SELECT name,target_recovery_time_in_seconds FROM sys.databases;'
-  )
-
-
-def _PreRun(db: relational_db.BaseRelationalDb):
-  """Prepares the database for the benchmark run."""
-  db.ClearWaitStats()
-  db.LogDatabaseDebugInfo()
-
-
-def _PostRun(db: relational_db.BaseRelationalDb):
-  """Records the database metrics after the benchmark run."""
-  db.LogDatabaseDebugInfo()
 
 
 def Run(benchmark_spec):
@@ -348,14 +208,9 @@ def Run(benchmark_spec):
   """
   client_vms = benchmark_spec.vm_groups['clients']
   db = benchmark_spec.relational_db
+  assert db is not None
 
-  if (
-      hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value
-      == hammerdb.MINIMUM_RECOVERY
-  ):
-    SetMinimumRecover(db)
-
-  _PreRun(db)
+  linux_hammerdb_benchmark.PreRun(db)
   start_time = datetime.datetime.now()
 
   stop_event = threading.Event()
@@ -379,9 +234,9 @@ def Run(benchmark_spec):
       collection_thread.join()
 
   end_time = datetime.datetime.now()
-  _PostRun(db)
-  samples.extend(db.CollectMetrics(start_time, end_time))
+  linux_hammerdb_benchmark.PostRun(db)
 
+  samples.extend(db.CollectMetrics(start_time, end_time))
   metadata = GetMetadata()
   for sample in samples:
     sample.metadata.update(metadata)
@@ -389,7 +244,7 @@ def Run(benchmark_spec):
 
 
 def GetMetadata():
-  metadata = hammerdb.GetMetadata(sql_engine_utils.SQLSERVER)
+  metadata = linux_hammerdb.GetMetadata(sql_engine_utils.SQLSERVER)
   # columnar engine not applicable to sqlserver.
   metadata.pop('hammerdbcli_load_tpch_tables_to_columnar_engine', None)
   return metadata

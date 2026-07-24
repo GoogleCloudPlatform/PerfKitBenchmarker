@@ -96,26 +96,8 @@ hammerdbcli:
         disk_spec: *default_500_gb
       clients:
         os_type: debian11
-        vm_spec:
-          GCP:
-            machine_type: n1-standard-8
-            zone: us-central1-c
-          AWS:
-            machine_type: m4.xlarge
-            zone: us-east-1a
-          Azure:
-            machine_type: Standard_D4_v3
-            zone: eastus
-        disk_spec:
-          GCP:
-            disk_size: 500
-            disk_type: pd-ssd
-          AWS:
-            disk_size: 500
-            disk_type: gp2
-          Azure:
-            disk_size: 500
-            disk_type: StandardSSD_LRS
+        vm_spec: *default_dual_core
+        disk_spec: *default_500_gb
 """
 
 
@@ -166,7 +148,7 @@ def _PrepareAlloyDb(db: gcp_alloy_db.GCPAlloyRelationalDb) -> None:
       db.AddTableToColumnarEngine(table, database_name=db_name)
 
 
-def _GetNumCpus(db: relational_db.BaseRelationalDb) -> int | None:
+def GetNumCpus(db: relational_db.BaseRelationalDb) -> int | None:
   """Returns the number of CPUs for the database."""
   if hasattr(db, 'server_vm'):
     return db.server_vm.NumCpusForBenchmark()
@@ -184,8 +166,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   assert len(client_vms) == 1
   client_vm = client_vms[0]
   db = benchmark_spec.relational_db
+  assert db is not None
 
-  hammerdb.SetDefaultConfig(_GetNumCpus(db))  # pyrefly: ignore[bad-argument-type]
+  hammerdb.SetDefaultConfig(GetNumCpus(db))
 
   client_vm.Install('hammerdb')
 
@@ -370,13 +353,13 @@ def _CheckAlloyDbColumnarEngine(
   return hammerdb.ParseResults(script=script, stdout=stdout, vm=client_vm)
 
 
-def _PreRun(db: relational_db.BaseRelationalDb) -> None:
+def PreRun(db: relational_db.BaseRelationalDb) -> None:
   """Prepares the database for the benchmark run."""
   db.ClearWaitStats()
   db.LogDatabaseDebugInfo()
 
 
-def _PostRun(db: relational_db.BaseRelationalDb) -> None:
+def PostRun(db: relational_db.BaseRelationalDb) -> None:
   """Records the database metrics after the benchmark run."""
   db.LogDatabaseDebugInfo()
 
@@ -396,9 +379,8 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """
   client_vm = benchmark_spec.vm_groups['clients'][0]
   db = benchmark_spec.relational_db
-  num_cpus = (
-      db.server_vm.NumCpusForBenchmark() if hasattr(db, 'server_vm') else None
-  )
+  assert db is not None
+  num_cpus = GetNumCpus(db)
   script = hammerdb.HAMMERDB_SCRIPT.value
   timeout = hammerdb.HAMMERDB_RUN_TIMEOUT.value
 
@@ -410,14 +392,14 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
 
   samples = []
   try:
-    _PreRun(db)  # pyrefly: ignore[bad-argument-type]
+    PreRun(db)
     start_time = datetime.datetime.now()
     stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)  # pyrefly: ignore[missing-attribute]
     end_time = datetime.datetime.now()
     current_samples = hammerdb.ParseResults(
         script=script, stdout=stdout, vm=client_vm
     )
-    _PostRun(db)  # pyrefly: ignore[bad-argument-type]
+    PostRun(db)
     if (
         db.engine == sql_engine_utils.ALLOYDB
         and db.enable_columnar_engine_recommendation  # pyrefly: ignore[missing-attribute]

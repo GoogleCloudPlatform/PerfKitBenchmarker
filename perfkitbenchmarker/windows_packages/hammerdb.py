@@ -30,8 +30,6 @@ from perfkitbenchmarker.linux_packages import hammerdb as linux_hammerdb
 
 FLAGS = flags.FLAGS
 
-P3RF_CLOUD_SQL_TEST_DIR = linux_hammerdb.P3RF_CLOUD_SQL_TEST_DIR
-
 # Installation paths and sources etc.
 HAMMERDB = 'HammerDB-{0}'
 HAMMERDB_DIR = HAMMERDB + '-Win'
@@ -95,20 +93,6 @@ def _GetFileContent(vm, file_path: str) -> str:
   return stdout
 
 
-def ParseTpcCTimeProfileResultsFromFile(stdout: str) -> List[sample.Sample]:
-  """Extracts latency result from time profile file."""
-  return linux_hammerdb.ParseTpcCTimeProfileResultsFromFile(stdout)
-
-
-def ParseTpcCTPMResultsFromFile(stdout: str) -> List[sample.Sample]:
-  """Parse TPCC TPM metrics per seconds."""
-  return linux_hammerdb.ParseTpcCTPMResultsFromFile(stdout)
-
-
-def SetDefaultConfig(num_cpus: int | None):
-  return linux_hammerdb.SetDefaultConfig(num_cpus)
-
-
 def ParseTpcCResults(stdout: str, vm) -> List[sample.Sample]:
   """Extract results from the TPC-C script."""
   tpcc_metrics = linux_hammerdb.ParseBasicTpcCResults(stdout)
@@ -116,19 +100,16 @@ def ParseTpcCResults(stdout: str, vm) -> List[sample.Sample]:
     tpcc_results = _GetFileContent(
         vm, ntpath.join(vm.temp_dir, '..', 'hdbxtprofile.log')
     )
-    tpcc_metrics += ParseTpcCTimeProfileResultsFromFile(tpcc_results)
+    tpcc_metrics += linux_hammerdb.ParseTpcCTimeProfileResultsFromFile(
+        tpcc_results
+    )
 
   if linux_hammerdb.TPCC_LOG_TRANSACTIONS.value:
     tpcc_results = _GetFileContent(
         vm, ntpath.join(vm.temp_dir, '..', 'hdbtcount.log')
     )
-    tpcc_metrics += ParseTpcCTPMResultsFromFile(tpcc_results)
+    tpcc_metrics += linux_hammerdb.ParseTpcCTPMResultsFromFile(tpcc_results)
   return tpcc_metrics
-
-
-def ParseTpcHResults(stdout: str) -> List[sample.Sample]:
-  """Extract results from the TPC-H script."""
-  return linux_hammerdb.ParseTpcHResults(stdout)
 
 
 @vm_util.Retry(poll_interval=10, max_retries=3)
@@ -264,7 +245,7 @@ def Run(
   stdout = script[0].Run(vm, timeout=timeout)
 
   if hammerdb_script == linux_hammerdb.HAMMERDB_SCRIPT_TPC_H:
-    return ParseTpcHResults(stdout)
+    return linux_hammerdb.ParseTpcHResults(stdout)
   else:
     return ParseTpcCResults(stdout, vm)
 
@@ -278,11 +259,6 @@ def PushTestFile(vm, data_file: str, path: str):
           data_file,
       ),
   )
-
-
-def GetMetadata(db_engine: str):
-  """Returns the meta data needed for hammerdb."""
-  return linux_hammerdb.GetMetadata(db_engine)
 
 
 def CollectDbPerformanceCounters(
