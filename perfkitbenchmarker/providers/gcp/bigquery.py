@@ -63,6 +63,10 @@ BQ_JDBC_JAVA_FLAGS = {
     'GOOGLE_JDBC': '--add-opens=java.base/java.nio=ALL-UNNAMED',
 }
 
+BQ_ODBC_INTERFACES = ['GOOGLE_ODBC']
+BQ_ODBC_CLIENT_FILE = 'odbc-client'
+
+
 
 class GenericClientInterface(edw_service.EdwClientInterface):
   """Generic Client Interface class for BigQuery.
@@ -105,6 +109,8 @@ def GetBigQueryClientInterface(
     return JavaClientInterface(project_id, dataset_id)
   if gcp_flags.BQ_CLIENT_INTERFACE.value in BQ_JDBC_INTERFACES:
     return JdbcClientInterface(project_id, dataset_id)
+  if gcp_flags.BQ_CLIENT_INTERFACE.value in BQ_ODBC_INTERFACES:
+    return OdbcClientInterface(project_id, dataset_id)
   if gcp_flags.BQ_CLIENT_INTERFACE.value == 'PYTHON':
     return PythonClientInterface(project_id, dataset_id)
   raise RuntimeError('Unknown BigQuery Client Interface requested.')
@@ -277,6 +283,57 @@ class JdbcClientInterface(GenericClientInterface):
       query_command += ' --print_results true'
     stdout, _ = self.client_vm.RemoteCommand(query_command)  # pyrefly: ignore[missing-attribute]
     details = copy.copy(self.GetMetadata())  # Copy the base metadata
+    details.update(json.loads(stdout)['details'])
+    return json.loads(stdout)['performance'], details
+
+
+class OdbcClientInterface(GenericClientInterface):
+  """ODBC Client Interface class for BigQuery."""
+
+  def SetProvisionedAttributes(self, benchmark_spec):
+    super().SetProvisionedAttributes(benchmark_spec)
+    self.project_id = re.split(
+        r'\.', benchmark_spec.edw_service.cluster_identifier
+    )[0]
+    self.dataset_id = re.split(
+        r'\.', benchmark_spec.edw_service.cluster_identifier
+    )[1]
+
+  def Prepare(self, package_name: str) -> None:
+    """Prepares the client vm to execute query."""
+    # Install system dependencies
+    self.client_vm.InstallPackages('unixodbc unixodbc-dev unzip libcurl4-openssl-dev libssl-dev')
+
+    # Push the service account file and client binary to runner VM
+    self.client_vm.InstallPreprovisionedPackageData(
+        package_name, [FLAGS.gcp_service_account_key_file, BQ_ODBC_CLIENT_FILE], ''
+    )
+    self.client_vm.RemoteCommand(f'chmod +x {BQ_ODBC_CLIENT_FILE}')
+
+    # Dynamically download and extract Google ODBC Driver
+    driver_url = 'https://storage.googleapis.com/bq-driver-releases/odbc/ODBCDriverforBigQuery_linux_latest.zip'
+    self.client_vm.RemoteCommand(f'wget -q -O driver.zip {driver_url}')
+    self.client_vm.RemoteCommand('mkdir -p opt/google-odbc && unzip -q driver.zip -d opt/google-odbc/')
+    
+    # Find the driver library and register it in odbcinst.ini
+    odbcinst_setup = (
+        'DRIVER_PATH=$(find $(pwd)/opt/google-odbc/ -name "libgoogle_cloud_odbc_bq_driver.so" | head -n 1) && '
+        'echo "[Google BigQuery ODBC Driver]\\nDescription=Google BigQuery ODBC Driver\\nDriver=$DRIVER_PATH\\n" | sudo tee /etc/odbcinst.ini'
+    )
+    self.client_vm.RemoteCommand(odbcinst_setup)
+
+
+  def ExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
+    """Executes a query and returns performance details."""
+    query_command = (
+        f'./{BQ_ODBC_CLIENT_FILE} --project {self.project_id} '
+        f'--credentials_file {FLAGS.gcp_service_account_key_file} '
+        f'--dataset {self.dataset_id} --query_file {query_name}'
+    )
+    stdout, _ = self.client_vm.RemoteCommand(query_command)
+    details = copy.copy(self.GetMetadata())
     details.update(json.loads(stdout)['details'])
     return json.loads(stdout)['performance'], details
 
