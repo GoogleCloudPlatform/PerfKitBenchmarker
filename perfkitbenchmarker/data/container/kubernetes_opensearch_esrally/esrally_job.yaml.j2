@@ -1,0 +1,80 @@
+# opensearch-benchmark Kubernetes Job
+# Rendered by kubernetes_opensearch_esrally_benchmark.py Run().
+#
+# Template variables:
+#   k8s_namespace      - Kubernetes namespace (default: 'default')
+#   race_id            - Unique test-execution identifier string
+#   target_hosts       - OpenSearch Service host:port
+#   esrally_track      - opensearch-benchmark workload name, e.g. geonames
+#   esrally_challenge  - test-procedure name, e.g. append-no-conflicts
+#   esrally_version    - opensearch-benchmark pip package version, e.g. 1.7.0
+#
+# The Job installs opensearch-benchmark at runtime, runs the test in
+# benchmark-only pipeline against the OpenSearch headless Service, then
+# prints test_execution.json between PKB sentinel markers so Run() can
+# parse the results.
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: esrally-pkb
+  namespace: {{ k8s_namespace | default('default') }}
+  labels:
+    pkb: "true"
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        pkb: "true"
+    spec:
+      nodeSelector:
+        pkb_nodepool: clients
+      restartPolicy: Never
+      containers:
+      - name: esrally
+        image: python:3.11-slim
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+          limits:
+            memory: "8Gi"
+            cpu: "4"
+        env:
+        - name: BENCHMARK_HOME
+          value: /var/benchmark
+        command:
+        - bash
+        - -c
+        - |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          echo "[pkb] Installing system dependencies (git)..."
+          apt-get update -qq && apt-get install -y --no-install-recommends git > /dev/null
+          echo "[pkb] Installing opensearch-benchmark {{ esrally_version }}..."
+          pip install opensearch-benchmark=={{ esrally_version }} --quiet
+
+          echo "[pkb] Running opensearch-benchmark (workload={{ esrally_track }}, test-procedure={{ esrally_challenge }})..."
+          opensearch-benchmark execute-test \
+            --pipeline=benchmark-only \
+            --target-host="{{ target_hosts }}" \
+            --workload="{{ esrally_track }}" \
+            --test-procedure="{{ esrally_challenge }}" \
+            --workload-params="number_of_replicas:0" \
+            --test-execution-id="{{ race_id }}"
+
+          echo "[pkb] Test complete. Locating test_execution.json..."
+          # Use -path in find (not grep) to avoid non-zero exit with pipefail.
+          TEST_JSON=$(find /root /var/benchmark \
+            -path "*{{ race_id }}*" -name "test_execution.json" 2>/dev/null | head -1)
+          if [ -z "$TEST_JSON" ]; then
+            echo "[pkb-error] test_execution.json not found. Listing all benchmark files:"
+            find /root /var/benchmark -maxdepth 8 -type f 2>/dev/null | sort | head -50
+            exit 1
+          fi
+          echo "[pkb] Found: $TEST_JSON"
+          echo "=== PKB_RACE_JSON_BEGIN ==="
+          cat "$TEST_JSON"
+          echo ""
+          echo "=== PKB_RACE_JSON_END ==="
