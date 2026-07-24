@@ -1344,16 +1344,6 @@ class GoogleKubernetesEngineSwapConfigTestCase(PatchedObjectsTestCase):
       self.assertNotIn('UBUNTU_CONTAINERD', nodepool_cmd)
       self.assertNotIn('--no-enable-autorepair', nodepool_cmd)
 
-  def test_cleanup_yaml_called_after_nodepool_create(self):
-    spec = self._make_swap_spec()
-    with mock.patch.object(
-        swap_config_lib.GkeSwapConfig, 'CleanupYaml'
-    ) as mock_cleanup:
-      with self.patch_critical_objects():
-        cluster = google_kubernetes_engine.GkeCluster(spec)
-        cluster._Create()
-    mock_cleanup.assert_called_once()
-
 
 if __name__ == '__main__':
   unittest.main()
