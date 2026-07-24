@@ -1201,7 +1201,7 @@ class AzureVirtualMachine(  # pyrefly: ignore[invalid-inheritance]
       self.ip_addresses = response['publicIps'].split(',')
       self.ip_address = self.ip_addresses[0]
 
-    created_time = response.get('systemData', {}).get('createdAt')
+    created_time = response.get('timeCreated')
     if created_time:
       self.official_create_time = int(
           dateutil.parser.parse(created_time).timestamp()

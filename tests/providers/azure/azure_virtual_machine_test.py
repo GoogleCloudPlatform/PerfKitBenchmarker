@@ -160,14 +160,8 @@ class AzureVirtualMachineTest(pkb_common_test_case.PkbCommonTestCase):
     fake_response = {
         'privateIps': '10.0.0.1',
         'publicIps': '1.2.3.4',
-        'storageProfile': {
-            'osDisk': {
-                'name': 'fake_os_disk'
-            }
-        },
-        'systemData': {
-            'createdAt': '2026-07-15T12:00:00.000Z'
-        }
+        'storageProfile': {'osDisk': {'name': 'fake_os_disk'}},
+        'timeCreated': '2026-07-15T12:00:00.000Z',
     }
 
     with mock.patch.object(
