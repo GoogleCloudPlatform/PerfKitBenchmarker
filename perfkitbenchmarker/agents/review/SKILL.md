@@ -31,7 +31,17 @@ rules.
 ## 2. Configuration & Flags
 
 -   **Benchmark Spec Over Flags:** Prefer using `BENCHMARK_CONFIG` and `spec`
-    over creating custom flags with `FLAGS.define_`.
+    over creating custom flags for resources with `FLAGS.define_`, especially
+    for variables common to a base spec & multiple of its cloud specific
+    implementations. For those values, flags can be used for convenience &
+    should also feature in the `_ApplyFlags()` function of a spec. Flags are
+    required when internal to `_benchmark.py` files / not resources, and can be
+    used for some implementation specific features.
+-   **Expose in Metadata:** Flags & spec values which can affect the results of
+    a file should be exposed in metadata. Some flags which don't affect results
+    don't need to be exposed in metadata. Fetching real values from a cloud
+    resource rather than relying on a flag directly can also be preferable for
+    metadata.
 -   **Single-Use Flags:** Mark flags private if used only in one file.
 -   **Namespace Custom Flags:** Flags must be explicit (e.g.,
     `gke_python_benchmark_threads` has the prefix `gke_python_benchmark`).
@@ -41,9 +51,20 @@ rules.
 ## 3. Reliability & Error Handling
 
 -   **Fail Fast:** Fail loudly and fast over silently swallowing errors.
--   **Strict Execution Rules:** Use `raise_on_failure=True` universally for
-    shell commands.
--   **Retry Mechanics:** NEVER use `time.sleep()`. Always use `vm_util.Retry`.
+-   **Strict Execution Rules:** Use `raise_on_failure=False` with caution, as
+    generally we should fail (see also "Fail Fast"). Some patterns that are a
+    good use for `raise_on_failure=False`:
+    -   `_Delete/Cleanup`: We often do want to ignore delete failures rather
+        than fail the benchmark.
+    -   `_Exists/IsReady`: Often a failure in these functions means a resource
+        doesn't exist or This should generally be followed by some if statement
+        which handles specific failures, eg "if not present, return"
+    -   The `raise_on_failure=False` call is frequently followed by an if
+        statement which checks for specific messages & handles them. If no
+        specific messages is found, an error is thrown.
+-   **Retry Mechanics:** Use `vm_util.Retry` for/while loops which continue
+    running a command until they succeed. Short `time.sleep()`s can be ok
+    approximation.
 -   **Teardown Safety:** All resource teardowns must be idempotent.
 
 ## 4. Coding Standards
@@ -56,3 +77,13 @@ rules.
 ## 5. Performance Metrics
 
 -   **Metadata Reporting:** Variations MUST be reported in `Sample.metadata`.
+
+## 6. Resource specific comments
+
+-   **Resource README.md:** For files in resources/ & providers/, see
+    ../resources/README.md for more guidelines.
+
+## 7. Benchmark specific comments
+
+-   **Benchmark README.md:** For files in linux_benchmarks/, see
+    ../linux_benchmarks/README.md for more guidelines.
