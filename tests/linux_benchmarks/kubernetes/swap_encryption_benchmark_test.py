@@ -17,14 +17,22 @@ After the Zac review refactor:
   - _ParseCipher / _DetectSwapDevice / GetResourceMetadata live in
     swap_daemonset, not in the benchmark module.
   - The benchmark module exposes only GetConfig / Prepare / Run / Cleanup.
+Additions tested here:
+  - _PhaseSelected(): '3b' phase token included/excluded correctly
+  - _KERNEL_VERSION, _KERNEL_MEMORY_MB flags registered with defaults
 """
 
 import unittest
 from unittest import mock
 
-from perfkitbenchmarker.linux_benchmarks.kubernetes import swap_encryption_benchmark
+from absl.testing import flagsaver
+from perfkitbenchmarker.linux_benchmarks.kubernetes.swap_encryption import (
+    swap_encryption_benchmark,
+)
 from perfkitbenchmarker.resources.container_service import swap_daemonset
 from tests import pkb_common_test_case
+
+# pylint: disable=protected-access
 
 
 def _make_daemonset():
@@ -34,6 +42,7 @@ def _make_daemonset():
       namespace='default',
       label='app=test',
       nodepool='benchmark',
+      image='ubuntu:22.04',
   )
 
 
@@ -117,7 +126,7 @@ class DetectSwapDeviceTest(pkb_common_test_case.PkbCommonTestCase):
 class GetResourceMetadataTest(pkb_common_test_case.PkbCommonTestCase):
   """Tests for SwapDaemonSet.GetResourceMetadata()."""
 
-  def _make_ds_with_responses(
+  def _make_ds_with_responses(  # pylint: disable=missing-function-docstring
       self,
       swap_path='/dev/dm-0',
       kver='5.15.0-gke-1234',
@@ -163,6 +172,101 @@ class GetResourceMetadataTest(pkb_common_test_case.PkbCommonTestCase):
     ds.PodExec = mock.Mock(side_effect=Exception('timeout'))
     with self.assertRaises(Exception):
       ds.GetResourceMetadata()
+
+
+class SetupSwapRoutingTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for SwapDaemonSet.SetupSwap() routing logic."""
+
+  def _ds_with_mocked_setups(self):
+    ds = _make_daemonset()
+    ds._SetupGkeSwap = mock.Mock()
+    ds._SetupEksSwap = mock.Mock()
+    return ds
+
+  def test_setup_swap_routes_gcp_to_gke(self):
+    ds = self._ds_with_mocked_setups()
+    ds.CLOUD = 'GCP'
+    ds.SetupSwap(
+        swap_type='hyperdisk',
+        enable_dmcrypt=True,
+        swap_size_gb=32,
+    )
+    ds._SetupGkeSwap.assert_called_once_with('hyperdisk', True, 32)
+    ds._SetupEksSwap.assert_not_called()
+
+  def test_setup_swap_routes_aws_to_eks(self):
+    ds = self._ds_with_mocked_setups()
+    ds.CLOUD = 'AWS'
+    ds.SetupSwap(
+        swap_type='instance_store',
+        enable_dmcrypt=False,
+        swap_size_gb=64,
+    )
+    ds._SetupEksSwap.assert_called_once_with('instance_store', 64, '')
+    ds._SetupGkeSwap.assert_not_called()
+
+  def test_setup_swap_passes_io2_volume_id_to_eks(self):
+    ds = self._ds_with_mocked_setups()
+    ds.CLOUD = 'AWS'
+    ds.SetupSwap(
+        swap_type='io2',
+        enable_dmcrypt=False,
+        swap_size_gb=0,
+        io2_volume_id='vol-0abc123',
+    )
+    ds._SetupEksSwap.assert_called_once_with('io2', 0, 'vol-0abc123')
+
+  def test_setup_swap_raises_on_unknown_cloud(self):
+    ds = self._ds_with_mocked_setups()
+    ds.CLOUD = 'azure'
+    with self.assertRaises(Exception):
+      ds.SetupSwap(
+          swap_type='auto',
+          enable_dmcrypt=False,
+          swap_size_gb=16,
+      )
+
+
+class PhaseSelectedKernelBuildTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for _PhaseSelected() with the '3b' phase token."""
+
+  @flagsaver.flagsaver(swap_encryption_phases=['all'])
+  def test_phase_selected_all_includes_3b(self):
+    self.assertTrue(swap_encryption_benchmark._PhaseSelected('3b'))
+
+  @flagsaver.flagsaver(swap_encryption_phases=['3b'])
+  def test_phase_selected_explicit_3b_only(self):
+    self.assertTrue(swap_encryption_benchmark._PhaseSelected('3b'))
+    self.assertFalse(swap_encryption_benchmark._PhaseSelected('fio'))
+    self.assertFalse(swap_encryption_benchmark._PhaseSelected('2a'))
+
+  @flagsaver.flagsaver(swap_encryption_phases=['fio'])
+  def test_phase_selected_explicit_fio_excludes_3b(self):
+    self.assertFalse(swap_encryption_benchmark._PhaseSelected('3b'))
+
+  @flagsaver.flagsaver(swap_encryption_phases=['2a', '3b'])
+  def test_phase_selected_multi_explicit(self):
+    self.assertTrue(swap_encryption_benchmark._PhaseSelected('2a'))
+    self.assertTrue(swap_encryption_benchmark._PhaseSelected('3b'))
+    self.assertFalse(swap_encryption_benchmark._PhaseSelected('fio'))
+
+
+class KernelVersionFlagTest(pkb_common_test_case.PkbCommonTestCase):
+  """Verify specific flags are registered with valid defaults."""
+
+  def test_kernel_version_flag_has_default(self):
+    self.assertIsNotNone(swap_encryption_benchmark._KERNEL_VERSION.value)
+
+  def test_kernel_version_flag_default_is_string(self):
+    self.assertIsInstance(swap_encryption_benchmark._KERNEL_VERSION.value, str)
+
+  def test_kernel_memory_mb_flag_positive(self):
+    self.assertGreater(swap_encryption_benchmark._KERNEL_MEMORY_MB.value, 0)
+
+  def test_kernel_memory_mb_flag_is_int(self):
+    self.assertIsInstance(
+        swap_encryption_benchmark._KERNEL_MEMORY_MB.value, int
+    )
 
 
 if __name__ == '__main__':
