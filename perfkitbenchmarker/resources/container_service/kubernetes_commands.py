@@ -961,7 +961,7 @@ def GetTotalCpuMillicores(label_selector: str | None = None) -> float | None:
   """Returns total CPU millicores across all pods via kubectl top pods.
 
   Args:
-    label_selector: The label selector for the pods.
+    label_selector: Optional label selector to restrict the pods queried.
 
   Returns:
     Total CPU millicores, or None if the command fails or output is empty.
@@ -970,7 +970,9 @@ def GetTotalCpuMillicores(label_selector: str | None = None) -> float | None:
     cmd = ['top', 'pods', '--no-headers']
     if label_selector:
       cmd.extend(['-l', label_selector])
-    stdout, _, rc = kubectl.RunKubectlCommand(cmd, raise_on_failure=False)
+    stdout, _, rc = kubectl.RunKubectlCommand(
+        cmd, raise_on_failure=False
+    )
     if rc != 0 or not stdout.strip():
       return None
 
@@ -991,3 +993,32 @@ def GetTotalCpuMillicores(label_selector: str | None = None) -> float | None:
   except (ValueError, IndexError) as e:
     logging.debug('[startup/cpu] Parse error: %s', e)
     return None
+
+
+def WaitForCrd(crd_name: str, timeout: int) -> None:
+  """Waits for a CustomResourceDefinition to be registered on the API server.
+
+  Args:
+    crd_name: The name of the CRD to wait for.
+    timeout: The timeout in seconds.
+
+  Raises:
+    RuntimeError: If the CRD never registers within the timeout.
+  """
+
+  @vm_util.Retry(
+      timeout=timeout,
+      retryable_exceptions=(errors.VmUtil.IssueCommandError,),
+  )
+  def _Poll():
+    # Let a failing `get crd` raise IssueCommandError naturally and use
+    # that as the retry signal. We do NOT pass raise_on_failure=False
+    # because it causes IssueCommand to return 0 on fail.
+    kubectl.RunKubectlCommand(['get', 'crd', crd_name])
+
+  try:
+    _Poll()
+  except vm_util.RetryError as e:
+    raise RuntimeError(
+        f'CRD ({crd_name}) never registered within {timeout}s.'
+    ) from e

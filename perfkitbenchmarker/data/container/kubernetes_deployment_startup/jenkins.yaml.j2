@@ -22,7 +22,7 @@ spec:
           - containerPort: 8080
           readinessProbe:
             httpGet:
-              path: /
+              path: /login
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 1
