@@ -6,6 +6,7 @@ metadata:
     app: {{ name }}
 spec:
   replicas: 1
+  progressDeadlineSeconds: 1200
   selector:
     matchLabels:
       app: {{ name }}
@@ -22,10 +23,11 @@ spec:
           - containerPort: 8080
           readinessProbe:
             httpGet:
-              path: /
+              path: /login
               port: 8080
             initialDelaySeconds: 10
-            periodSeconds: 1
+            periodSeconds: 5
+            timeoutSeconds: 10
           resources:
             requests:
               cpu: "100m"
