@@ -16,9 +16,10 @@
 import calendar
 import collections
 import datetime
+import enum
 import math
 import time
-from typing import Any, Dict, List, NewType
+from typing import Any, NewType
 
 import numpy as np
 from perfkitbenchmarker import errors
@@ -116,7 +117,7 @@ def GeoMean(iterable):
 
 
 # The Sample is converted via collections.namedtuple._asdict for publishing
-SampleDict = NewType('SampleDict', Dict[str, Any])
+SampleDict = NewType('SampleDict', dict[str, Any])
 
 
 class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):  # pyrefly: ignore[bad-class-definition]
@@ -148,7 +149,7 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):  # pyrefly: igno
         **kwargs,
     )
 
-  def asdict(self) -> Dict[str, Any]:  # pylint:disable=invalid-name
+  def asdict(self) -> dict[str, Any]:  # pylint:disable=invalid-name
     """Converts the Sample to a dictionary."""
     return self._asdict()
 
@@ -157,7 +158,7 @@ _Histogram = collections.OrderedDict
 
 
 def MakeHistogram(
-    values: List[float], round_bottom: float = 0.0, round_to_sig_fig: int = 3
+    values: list[float], round_bottom: float = 0.0, round_to_sig_fig: int = 3
 ) -> _Histogram[float, int]:
   """Take a list of float values and returns a ordered dict of values and frequency.
 
@@ -233,8 +234,8 @@ def CreateHistogramSample(
 
 
 def CreateTimeSeriesSample(
-    values: List[Any],
-    timestamps: List[float],
+    values: list[Any],
+    timestamps: list[float],
     metric: str,
     units: str,
     interval: float,
@@ -282,3 +283,119 @@ def ConvertDateTimeToUnixMs(date: datetime.datetime):
   # Convert the datetime to UTC timezone first.
   date_utc = date.astimezone(pytz.utc)
   return calendar.timegm(date_utc.timetuple()) * 1000
+
+
+class Aggregation(str, enum.Enum):
+  """Aggregation strategy for sample group selection."""
+
+  MAX = 'max'
+  MIN = 'min'
+
+
+class SampleGroupCollector:
+  """Encapsulates samples grouped by a key (e.g., parameter sweep iterations).
+
+  Provides utilities to collect samples across multiple groups/runs, preserve
+  their execution order, and extract/annotate best sample sets (e.g., the
+  group achieving maximum throughput or minimum latency).
+
+  Attributes:
+    all_samples: Flat list of all samples across every group, in execution
+      order.
+  """
+
+  def __init__(self):
+    """Initializes a SampleGroupCollector."""
+    self.all_samples: list[Sample] = []
+    self._samples_by_group: dict[Any, list[Sample]] = collections.OrderedDict()
+
+  def Add(self, group_key: Any, samples: list[Sample]) -> None:
+    """Records samples for a single group iteration."""
+    self.all_samples.extend(samples)
+    self._samples_by_group.setdefault(group_key, []).extend(samples)
+
+  def SamplesByGroup(self) -> dict[Any, list[Sample]]:
+    """Returns samples grouped by key."""
+    return {
+        group_key: list(samples)
+        for group_key, samples in self._samples_by_group.items()
+    }
+
+  def _GetMetricValue(
+      self, samples: list[Sample], metric: str
+  ) -> float | None:
+    """Returns the metric value from a list of samples, if present.
+
+    Subclasses can override this method to support custom value extraction
+    (e.g., computing a mean from a metadata list).
+
+    Args:
+      samples: List of samples to search for the target metric.
+      metric: Target metric name to find.
+
+    Returns:
+      The metric value as a float, or None if the metric is not present.
+    """
+    for s in samples:
+      if s.metric == metric:
+        return s.value
+    return None
+
+  def GetBestSamples(
+      self,
+      metric: str,
+      prefix: str,
+      aggregation: Aggregation,
+  ) -> list[Sample]:
+    """Returns prefixed duplicates of the best (e.g., max/min) group's samples.
+
+    The winning group's original samples are annotated with
+    metadata[metadata_key] = True. A duplicate of each sample in that group is
+    returned with its metric name prefixed by the prefix.
+
+    Args:
+      metric: Target metric name to evaluate.
+      prefix: Prefix applied to duplicated sample metrics and used as the
+        boolean metadata key.
+      aggregation: Aggregation strategy (see Aggregation enum).
+
+    Returns:
+      A list of prefixed duplicate samples from the winning group.
+
+    Raises:
+      ValueError: If no sample group produced the target metric.
+    """
+    best_samples = None
+    best_value = None
+    for group_samples in self._samples_by_group.values():
+      val = self._GetMetricValue(group_samples, metric)
+      if val is None:
+        continue
+      if best_value is None:
+        best_value = val
+        best_samples = group_samples
+      elif aggregation == Aggregation.MAX and val > best_value:
+        best_value = val
+        best_samples = group_samples
+      elif aggregation == Aggregation.MIN and val < best_value:
+        best_value = val
+        best_samples = group_samples
+
+    if best_samples is None:
+      raise ValueError(f'No sample group produced the metric "{metric}".')
+
+    metadata_key = prefix.rstrip('_')
+    metric_prefix = prefix if prefix.endswith('_') else f'{prefix}_'
+
+    prefixed_samples = []
+    for s in best_samples:
+      s.metadata[metadata_key] = True
+      prefixed_samples.append(
+          Sample(
+              f'{metric_prefix}{s.metric}',
+              s.value,
+              s.unit,
+              dict(s.metadata),
+          )
+      )
+    return prefixed_samples

@@ -92,5 +92,103 @@ class TestPercentileCalculator(unittest.TestCase):
       sample.PercentileCalculator([3], percentiles=['a'])
 
 
+class TestSampleGroupCollector(unittest.TestCase):
+
+  def _MakeRunSamples(self, tps, latency, group_key):
+    metadata = {'group': group_key}
+    return [
+        sample.Sample('tps', tps, 'tps', dict(metadata)),
+        sample.Sample('latency', latency, 'ms', dict(metadata)),
+    ]
+
+  def testAddGroupsSamples(self):
+    collector = sample.SampleGroupCollector()
+    run_1 = self._MakeRunSamples(tps=100.0, latency=5.0, group_key='a')
+    run_2 = self._MakeRunSamples(tps=200.0, latency=2.5, group_key='b')
+    collector.Add('a', run_1)
+    collector.Add('b', run_2)
+
+    self.assertEqual(collector.all_samples, run_1 + run_2)
+    grouped = collector.SamplesByGroup()
+    self.assertEqual(set(grouped.keys()), {'a', 'b'})
+    self.assertEqual(grouped['a'], run_1)
+    self.assertEqual(grouped['b'], run_2)
+
+  def testMaxAggregation(self):
+    collector = sample.SampleGroupCollector()
+    collector.Add(
+        'a', self._MakeRunSamples(tps=100.0, latency=5.0, group_key='a')
+    )
+    collector.Add(
+        'b', self._MakeRunSamples(tps=300.0, latency=2.0, group_key='b')
+    )
+    collector.Add(
+        'c', self._MakeRunSamples(tps=200.0, latency=3.0, group_key='c')
+    )
+
+    best_samples = collector.GetBestSamples(
+        'tps', 'max_tps', sample.Aggregation.MAX
+    )
+    metrics = sorted(s.metric for s in best_samples)
+    self.assertEqual(metrics, ['max_tps_latency', 'max_tps_tps'])
+
+    tps_sample = [s for s in best_samples if s.metric == 'max_tps_tps'][0]
+    self.assertEqual(tps_sample.value, 300.0)
+    self.assertEqual(tps_sample.metadata['group'], 'b')
+    self.assertTrue(tps_sample.metadata['max_tps'])
+
+  def testMinAggregation(self):
+    collector = sample.SampleGroupCollector()
+    collector.Add(
+        'a', self._MakeRunSamples(tps=100.0, latency=5.0, group_key='a')
+    )
+    collector.Add(
+        'b', self._MakeRunSamples(tps=300.0, latency=2.0, group_key='b')
+    )
+    collector.Add(
+        'c', self._MakeRunSamples(tps=200.0, latency=3.0, group_key='c')
+    )
+
+    best_samples = collector.GetBestSamples(
+        'latency', 'min_latency', sample.Aggregation.MIN
+    )
+    lat_sample = [s for s in best_samples if s.metric == 'min_latency_latency'][
+        0
+    ]
+    self.assertEqual(lat_sample.value, 2.0)
+    self.assertEqual(lat_sample.metadata['group'], 'b')
+    self.assertTrue(lat_sample.metadata['min_latency'])
+
+  def testAnnotatesWinningGroup(self):
+    collector = sample.SampleGroupCollector()
+    losing_run = self._MakeRunSamples(tps=100.0, latency=5.0, group_key='a')
+    winning_run = self._MakeRunSamples(tps=300.0, latency=2.0, group_key='b')
+    collector.Add('a', losing_run)
+    collector.Add('b', winning_run)
+
+    collector.GetBestSamples('tps', 'max_tps', sample.Aggregation.MAX)
+    for s in winning_run:
+      self.assertTrue(s.metadata.get('max_tps'))
+    for s in losing_run:
+      self.assertNotIn('max_tps', s.metadata)
+
+  def testNoMetricFoundRaises(self):
+    collector = sample.SampleGroupCollector()
+    collector.Add(
+        'a', self._MakeRunSamples(tps=100.0, latency=5.0, group_key='a')
+    )
+    with self.assertRaisesRegex(
+        ValueError, 'No sample group produced the metric "nonexistent"'
+    ):
+      collector.GetBestSamples('nonexistent', 'max_tps', sample.Aggregation.MAX)
+
+  def testEmptyCollectorRaises(self):
+    collector = sample.SampleGroupCollector()
+    with self.assertRaisesRegex(
+        ValueError, 'No sample group produced the metric "tps"'
+    ):
+      collector.GetBestSamples('tps', 'max_tps', sample.Aggregation.MAX)
+
+
 if __name__ == '__main__':
   unittest.main()
