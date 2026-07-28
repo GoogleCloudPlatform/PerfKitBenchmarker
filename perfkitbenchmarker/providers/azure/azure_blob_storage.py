@@ -157,7 +157,7 @@ class AzureBlobStorageService(object_storage_service.ObjectStorageService):
                 'type': 'Lifecycle',
                 'definition': {
                     'actions': {
-                        'version': {
+                        'baseBlob': {
                             'delete': {'daysAfterCreationGreaterThan': ttl_days}
                         }
                     },
