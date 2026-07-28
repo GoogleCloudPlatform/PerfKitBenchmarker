@@ -288,6 +288,7 @@
 -   Add a kubernetes-native benchmark for MySQL using sysbench
 -   Add kubernetes_management benchmark for measuring GKE/EKS/AKS management
     plane API responsiveness.
+-   Add support for Clickhouse running on GKE.
 
 ### Enhancements:
 

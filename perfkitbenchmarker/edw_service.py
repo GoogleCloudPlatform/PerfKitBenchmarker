@@ -102,6 +102,21 @@ TRINO_EPHEMERAL_STORAGE = flags.DEFINE_integer(
     'Amount of ephemeral storage in GiB used by each Trino worker. If not set,'
     ' defaults to worker memory.',
 )
+CLICKHOUSE_MEMORY = flags.DEFINE_integer(
+    'clickhouse_memory',
+    32,
+    'Amount of memory in GiB used by each ClickHouse worker.',
+)
+CLICKHOUSE_NUM_REPLICAS = flags.DEFINE_integer(
+    'clickhouse_num_replicas',
+    None,
+    'Number of ClickHouse replicas. If not set, defaults to 3x num_shards.',
+)
+CLICKHOUSE_NUM_SHARDS = flags.DEFINE_integer(
+    'clickhouse_num_shards',
+    1,
+    'Number of ClickHouse shards.',
+)
 flags.DEFINE_integer(
     'edw_suite_iterations', 1, 'Number of suite iterations to perform.'
 )

@@ -1,0 +1,29 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: {{ cluster_name }}
+  namespace: clickhouse
+spec:
+  configuration:
+    zookeeper:
+      keeper:
+        name: keeper-cluster
+        namespace: clickhouse
+    clusters:
+      - name: {{ cluster_name }}
+        layout:
+          shardsCount: {{ num_shards }}
+          replicasCount: {{ num_replicas }}
+  defaults:
+    templates:
+      podTemplate: clickhouse-pod-template
+  templates:
+    podTemplates:
+      - name: clickhouse-pod-template
+        spec:
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:24.10
+              resources:
+                limits:
+                  memory: {{ memory }}G

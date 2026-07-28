@@ -1,0 +1,33 @@
+apiVersion: clickhouse-keeper.altinity.com/v1
+kind: ClickHouseKeeperInstallation
+metadata:
+  name: keeper-cluster
+  namespace: clickhouse
+spec:
+  configuration:
+    clusters:
+      - name: keeper-cluster
+        layout:
+          replicasCount: 3
+  defaults:
+    templates:
+      podTemplate: keeper-pod-template
+      volumeClaimTemplate: keeper-volume-template
+  templates:
+    podTemplates:
+      - name: keeper-pod-template
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              image: clickhouse/clickhouse-keeper:24.10
+    volumeClaimTemplates:
+      - name: keeper-volume-template
+        spec:
+          storageClassName: dynamic-rwo
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+
+
