@@ -1818,75 +1818,132 @@ class MemtierTestCase(
         matchers.HAS('--server ip2'), timeout=mock.ANY
     )
 
-  def testRunOverAllClientVMsSingleIp(self):
+  def testLoad3Ips(self):
     vm1 = mock.Mock()
     vm2 = mock.Mock()
-    vm1.ip_address = 'vm1'
-    vm2.ip_address = 'vm2'
+    vm3 = mock.Mock()
+    test_vms = [vm1, vm2, vm3]
+    vm1.RobustRemoteCommand.return_value = ('', '')
+    vm2.RobustRemoteCommand.return_value = ('', '')
+    vm3.RobustRemoteCommand.return_value = ('', '')
+
+    memtier.Load(test_vms, ['ip1', 'ip2', 'ip3'], 9999)
+
+    vm1.RobustRemoteCommand.assert_called_with(
+        matchers.HAS('--server ip1'), timeout=mock.ANY
+    )
+    vm2.RobustRemoteCommand.assert_called_with(
+        matchers.HAS('--server ip2'), timeout=mock.ANY
+    )
+    vm3.RobustRemoteCommand.assert_called_with(
+        matchers.HAS('--server ip3'), timeout=mock.ANY
+    )
+
+  def testLoad8Ips(self):
+    vms = [mock.Mock() for _ in range(8)]
+    for vm in vms:
+      vm.RobustRemoteCommand.return_value = ('', '')
+    ips = [f'ip{i}' for i in range(1, 9)]
+
+    memtier.Load(vms, ips, 9999)
+
+    for i, vm in enumerate(vms):
+      vm.RobustRemoteCommand.assert_called_with(
+          matchers.HAS(f'--server ip{i+1}'), timeout=mock.ANY
+      )
+
+  def testRunOverAllClientVMs_2Vms_1Ip_2Ports(self):
+    vms = [mock.Mock() for _ in range(2)]
+    for i, vm in enumerate(vms):
+      vm.ip_address = f'vm{i+1}'
+    ips = ['ip1']
+    ports = [6379, 6380]
     with mock.patch.object(memtier, '_Run') as mock_run:
-      memtier.RunOverAllClientVMs([vm1, vm2], ['ip1'], [6379, 6380], 1, 4, 50)
+      memtier.RunOverAllClientVMs(vms, ips, ports, 1, 4, 50)
 
       self.assertEqual(mock_run.call_count, 2)
-      # Both ports connect to the same single IP
-      mock_run.assert_any_call(
-          vm=vm1,
-          server_ip='ip1',
-          server_port=6379,
-          threads=4,
-          pipeline=1,
-          clients=50,
-          password=None,
-          unique_id='0',
-          retry_on_failure=False,
-      )
-      mock_run.assert_any_call(
-          vm=vm2,
-          server_ip='ip1',
-          server_port=6380,
-          threads=4,
-          pipeline=1,
-          clients=50,
-          password=None,
-          unique_id='1',
-          retry_on_failure=False,
-      )
+      for i in range(2):
+        mock_run.assert_any_call(
+            vm=vms[i],
+            server_ip='ip1',
+            server_port=ports[i],
+            threads=4,
+            pipeline=1,
+            clients=50,
+            password=None,
+            unique_id=str(i),
+            retry_on_failure=False,
+        )
 
-  def testRunOverAllClientVMsMultiIp(self):
+  def testRunOverAllClientVMs_2Vms_2Ips_2Ports(self):
+    vms = [mock.Mock() for _ in range(2)]
+    for i, vm in enumerate(vms):
+      vm.ip_address = f'vm{i+1}'
+    ips = ['ip1', 'ip2']
+    ports = [6379, 6380]
+    with mock.patch.object(memtier, '_Run') as mock_run:
+      memtier.RunOverAllClientVMs(vms, ips, ports, 1, 4, 50)
+
+      self.assertEqual(mock_run.call_count, 2)
+      for i in range(2):
+        mock_run.assert_any_call(
+            vm=vms[i],
+            server_ip=ips[i],
+            server_port=ports[i],
+            threads=4,
+            pipeline=1,
+            clients=50,
+            password=None,
+            unique_id=str(i),
+            retry_on_failure=False,
+        )
+
+  def testRunOverAllClientVMs_1Vm_8Ips_8Ports(self):
     vm1 = mock.Mock()
-    vm2 = mock.Mock()
     vm1.ip_address = 'vm1'
-    vm2.ip_address = 'vm2'
-    # Mocking _Run because it involves a lot of VM interaction
-    with mock.patch.object(memtier, '_Run') as mock_run:
-      memtier.RunOverAllClientVMs(
-          [vm1, vm2], ['ip1', 'ip2'], [6379, 6380], 1, 4, 50
-      )
+    ips = [f'ip{i}' for i in range(1, 9)]
+    ports = [6379 + i for i in range(8)]
 
-      self.assertEqual(mock_run.call_count, 2)
-      # Port 6379 is index 0 -> client_index 0 -> ip1
-      mock_run.assert_any_call(
-          vm=vm1,
-          server_ip='ip1',
-          server_port=6379,
-          threads=4,
-          pipeline=1,
-          clients=50,
-          password=None,
-          unique_id='0',
-          retry_on_failure=False,
-      )
-      # Port 6380 is index 1 -> client_index 1 -> ip2
-      mock_run.assert_any_call(
-          vm=vm2,
-          server_ip='ip2',
-          server_port=6380,
-          threads=4,
-          pipeline=1,
-          clients=50,
-          password=None,
-          unique_id='1',
-          retry_on_failure=False,
-      )
+    with mock.patch.object(memtier, '_Run') as mock_run:
+      memtier.RunOverAllClientVMs([vm1], ips, ports, 1, 4, 50)
+
+      self.assertEqual(mock_run.call_count, 8)
+      for i in range(8):
+        mock_run.assert_any_call(
+            vm=vm1,
+            server_ip=ips[i],
+            server_port=ports[i],
+            threads=4,
+            pipeline=1,
+            clients=50,
+            password=None,
+            unique_id=str(i),
+            retry_on_failure=True,
+        )
+
+  def testRunOverAllClientVMs_6Vms_8Ips_8Ports(self):
+    vms = [mock.Mock() for _ in range(6)]
+    for i, vm in enumerate(vms):
+      vm.ip_address = f'vm{i+1}'
+    ips = [f'ip{i}' for i in range(1, 9)]
+    ports = [6379 + i for i in range(8)]
+
+    with mock.patch.object(memtier, '_Run') as mock_run:
+      memtier.RunOverAllClientVMs(vms, ips, ports, 1, 4, 50)
+
+      self.assertEqual(mock_run.call_count, 8)
+      for i in range(8):
+        mock_run.assert_any_call(
+            vm=vms[i % 6],
+            server_ip=ips[i],
+            server_port=ports[i],
+            threads=4,
+            pipeline=1,
+            clients=50,
+            password=None,
+            unique_id=str(i),
+            retry_on_failure=False,
+        )
 
   @parameterized.named_parameters(
       {

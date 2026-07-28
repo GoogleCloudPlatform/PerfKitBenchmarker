@@ -546,6 +546,17 @@ def RunOverAllClientVMs(
   """
 
   def DistributeClientsToPorts(port_index):
+    # Distribute client VMs and server IPs (NICs) round-robin based on
+    # port_index.
+    # target_ip wraps around the available server IPs (NICs).
+    #
+    # NOTE: For equal load distribution across all NICs, the number of ports
+    # (connections) must be a multiple of the server NIC count.
+    # If they are not multiples, some NICs will receive more connections than
+    # others.
+    # Example: 80 connections (ports) and 6 NICs (IPs).
+    # 2 NICs will get 14 connections (80 // 6 + 1), and 4 NICs will get 13
+    # connections (80 // 6).
     client_index = port_index % len(client_vms)
 
     if MEMTIER_SERVER_SELECTION.value == 'uniform':
@@ -554,9 +565,16 @@ def RunOverAllClientVMs(
       port = random.choice(ports)
 
     vm = client_vms[client_index]
+    target_ip = server_ips[port_index % len(server_ips)]
+    logging.info(
+        'Client VM %s running memtier against Server IP %s:%d',
+        vm.name,
+        target_ip,
+        port,
+    )
     return _Run(
         vm=vm,
-        server_ip=server_ips[client_index % len(server_ips)],
+        server_ip=target_ip,
         server_port=port,
         threads=threads,
         pipeline=pipeline,

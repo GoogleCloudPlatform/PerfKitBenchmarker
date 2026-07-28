@@ -21,6 +21,7 @@ Redis homepage: http://redis.io/
 memtier_benchmark homepage: https://github.com/RedisLabs/memtier_benchmark
 """
 
+import logging
 from typing import Any, Dict, List
 
 from absl import flags
@@ -159,6 +160,12 @@ def StartServices(bm_spec: _BenchmarkSpec) -> None:
   server_vm = bm_spec.vm_groups['servers'][0]
   all_server_vms = bm_spec.vm_groups['servers']  # for cluster mode
 
+  logging.info(
+      'Starting services. Server VMs: %s, Client VMs: %s',
+      [vm.name for vm in all_server_vms],
+      [vm.name for vm in client_vms],
+  )
+
   for vm in all_server_vms:
     redis_server.Start(vm)
 
@@ -191,6 +198,17 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
   server_vm: virtual_machine.BaseVirtualMachine | None = None
   if 'servers' in bm_spec.vm_groups:
     server_vm = bm_spec.vm_groups['servers'][0]
+
+  server_names = (
+      [vm.name for vm in bm_spec.vm_groups['servers']]
+      if 'servers' in bm_spec.vm_groups
+      else []
+  )
+  logging.info(
+      'Running benchmark. Server VMs: %s, Client VMs: %s',
+      server_names,
+      [vm.name for vm in client_vms],
+  )
   measure_cpu_on_server_vm = server_vm and REDIS_MEMTIER_MEASURE_CPU.value
 
   benchmark_metadata = {}
