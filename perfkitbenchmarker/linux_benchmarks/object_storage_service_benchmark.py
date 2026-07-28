@@ -1383,13 +1383,9 @@ def MultiStreamRWBenchmark(
     )
     logging.info('Finished multi-stream re-read test.')
 
-  # Pre-cleanup here, whre we know what the files are.
-  # Also records delete latencies, even though that's not really documented.
-  keep_bucket = (
-      FLAGS.object_storage_objects_written_file_prefix is not None
-      or FLAGS.object_storage_dont_delete_bucket
-  )
-  if not keep_bucket:
+  # If we aren't writing the objects written file, we delete the objects.
+  # Even if we are preserving the bucket, delete the objects anyway.
+  if not FLAGS.object_storage_objects_written_file_prefix:
     MultiStreamDelete(
         results, metadata, vms, command_builder, service, bucket_name
     )
