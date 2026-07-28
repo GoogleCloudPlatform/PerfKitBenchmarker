@@ -72,14 +72,14 @@ spec:
             cpu: "1000m"
         ports:
         - containerPort: 8080
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8080
-          initialDelaySeconds: 15
-          periodSeconds: 30
-          timeoutSeconds: 10
-          failureThreshold: 6
+        #livenessProbe:
+        #  httpGet:
+        #    path: /healthz
+        #    port: 8080
+        #  initialDelaySeconds: 15
+        #  periodSeconds: 30
+        #  timeoutSeconds: 10
+        #  failureThreshold: 6
         readinessProbe:
           httpGet:
             path: /healthz
@@ -103,6 +103,10 @@ spec:
             value: "{{ ns }}"
           - name: SANDBOX_ROUTER_URL
             value: "http://sandbox-router-svc.{{ ns }}.svc.cluster.local:8080"
+          - name: SANDBOX_IO_WORKERS
+            value: "200"
+          - name: FASTAPI_WORKERS
+            value: "200"
 ---
 apiVersion: v1
 kind: Service

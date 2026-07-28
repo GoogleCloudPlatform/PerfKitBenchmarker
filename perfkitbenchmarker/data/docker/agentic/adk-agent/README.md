@@ -1,6 +1,6 @@
 # ADK Agent Container
 
-FastAPI service deployed inside the GKE cluster that serves as the
+FastAPI service deployed inside the Kubernetes cluster that serves as the
 orchestrator for Agent Sandbox benchmarks. PKB benchmark modules
 communicate with this service via HTTP to trigger benchmark runs.
 

@@ -167,6 +167,7 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
             warmpool_name=_WARMPOOL_NAME,
             replicas=density,
             label=_WARMPOOL_LABEL,
+            wait_timeout=600,
         )
 
     # POST to agent API
@@ -330,6 +331,10 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     )
 
     logging.info("Emitted %d samples for density=%d.", len(samples), density)
+    psi_data = utils.ScrapePsi(ns)
+    for k, v in psi_data.items():
+        samples.append(utils.MakeSample(f"{BENCHMARK_NAME}_{k}", v, "percent", ns, extra))
+
     return samples
 
 

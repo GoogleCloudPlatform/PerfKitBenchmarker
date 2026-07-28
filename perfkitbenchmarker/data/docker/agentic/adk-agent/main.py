@@ -141,14 +141,11 @@ logger = logging.getLogger(__name__)
 # =========================================================================
 # --- Adaptive ThreadPool based on Agent CPU ---
 def _compute_thread_count() -> int:
-    """Compute a recommended max worker count for ThreadPoolExecutor.
-
-    Heuristic: use ~2x the detected CPU count to provide overlap for blocking
-    I/O (port-forward, file upload) while avoiding CPU oversubscription.
-    Cap between 2 and 64 workers.
-    """
-    cpu = os.cpu_count() or 1
-    return max(2, min(64, cpu * 2))
+    """Compute a recommended max worker count for ThreadPoolExecutor."""
+    env_val = os.getenv("FASTAPI_WORKERS")
+    if env_val:
+        return int(env_val)
+    return max(2, min(64, 2 * (os.cpu_count() or 1)))
 
 
 @asynccontextmanager

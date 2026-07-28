@@ -398,6 +398,10 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     )
 
     logging.info("Emitted %d samples for batch_size=%d.", len(samples), batch_size)
+    psi_data = utils.ScrapePsi(ns)
+    for k, v in psi_data.items():
+        samples.append(utils.MakeSample(f"{BENCHMARK_NAME}_{k}", v, "percent", ns, extra))
+
     return samples
 
 

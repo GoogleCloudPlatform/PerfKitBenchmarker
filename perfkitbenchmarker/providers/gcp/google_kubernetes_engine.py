@@ -21,6 +21,7 @@ import re
 import time
 import typing
 from typing import Any
+import time
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -119,6 +120,38 @@ class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
         f'--location={self.region}',
     ).Issue()
 
+
+  def _WaitForRepository(self, timeout=300, poll_interval=5):
+    """Wait for the AR repository to be queryable.
+
+    After creation, AR repos may not be immediately visible to Cloud
+    Build workers in other zones. Polls until confirmed, preventing
+    push failures during RemoteBuild().
+    """
+    repo_name = self.name
+    location = self.region
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+      describe_cmd = util.GcloudCommand(
+          self, 'artifacts', 'repositories', 'describe', repo_name,
+          '--location', location,
+      )
+      stdout, _, retcode = describe_cmd.Issue(
+          raise_on_failure=False, timeout=15,
+      )
+      if retcode == 0 and stdout.strip():
+        logging.info('AR repo %s confirmed available.', repo_name)
+        return
+      logging.info(
+          'Waiting for AR repo %s to propagate (%ds remaining)...',
+          repo_name, int(deadline - time.time()),
+      )
+      time.sleep(poll_interval)
+    logging.warning(
+        'AR repo %s not confirmed after %ds. Proceeding anyway.',
+        repo_name, timeout,
+    )
+
   def RemoteBuild(self, image: container.ContainerImage):
     """Builds the image remotely.
 
@@ -132,6 +165,7 @@ class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
       logging.info('Skipping container image build (--skip_container_image_build). '
                    'Assuming image exists: %s', full_tag)
       return
+    self._WaitForRepository()
     if gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value:
       build_cmd = util.GcloudCommand(
           self, 'builds', 'submit',

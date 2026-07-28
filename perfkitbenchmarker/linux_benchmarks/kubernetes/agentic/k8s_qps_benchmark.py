@@ -120,7 +120,7 @@ flags.DEFINE_integer(
 
 flags.DEFINE_float(
     "k8s_qps_provision_timeout_s",
-    180.0,
+    300.0,
     "Max seconds to wait for pool pods to reach Running.",
 )
 
@@ -378,6 +378,10 @@ def _RunAgent(benchmark_spec: object) -> list[sample.Sample]:
     )
 
     logging.info("Emitted %d samples for target_qps=%s.", len(samples), target_qps)
+    psi_data = utils.ScrapePsi(ns)
+    for k, v in psi_data.items():
+        samples.append(utils.MakeSample(f"{BENCHMARK_NAME}_{k}", v, "percent", ns, extra))
+
     return samples
 
 
@@ -654,6 +658,10 @@ def _RunRawClaim(benchmark_spec: object) -> list[sample.Sample]:
     _DeleteBenchmarkClaims(ns)
 
     logging.info("Emitted %d samples for target_qps=%s.", len(samples), target_qps)
+    psi_data = utils.ScrapePsi(ns)
+    for k, v in psi_data.items():
+        samples.append(utils.MakeSample(f"{BENCHMARK_NAME}_{k}", v, "percent", ns, extra))
+
     return samples
 
 

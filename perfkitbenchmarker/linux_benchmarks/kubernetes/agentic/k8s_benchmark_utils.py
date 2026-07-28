@@ -253,7 +253,16 @@ def BuildMetadata(namespace: str, extra: dict | None = None) -> dict[str, object
 
 
 def MakeSample(metric: str, value: float, unit: str, namespace: str, extra_metadata: dict | None = None) -> sample.Sample:
-    """Create a single sample.Sample with standard metadata."""
+    """Create a single sample.Sample with standard metadata and auto-appended units."""
+    unit_suffixes = {
+        "seconds": "_s", "ms": "_ms", "MB": "_mb", "bytes": "_bytes",
+        "MB/s": "_mbps", "pods/sec": "_pods_per_sec", "requests/sec": "_qps",
+        "count": "_count", "percent": "_percent"
+    }
+    suffix = unit_suffixes.get(unit, "")
+    if suffix and not metric.endswith(suffix):
+        metric = f"{metric}{suffix}"
+        
     return sample.Sample(
         metric=metric,
         value=value,
@@ -514,3 +523,39 @@ def StopPortForward() -> None:
     """Stop the port-forward subprocess and clean up."""
     _port_forward_manager.stop()
     logging.info("Port-forward stopped.")
+
+def ScrapePsi(namespace: str) -> dict:
+    """Scrape Pressure Stall Information (PSI) from psi-reader DaemonSet."""
+    stdout, _, rc = RunKubectl([
+        "get", "pods", "-n", namespace, "-l", "app=psi-reader",
+        "-o", "jsonpath={.items[*].metadata.name}"
+    ], raise_on_failure=False)
+    
+    if rc != 0 or not stdout.strip():
+        return {}
+
+    pod_names = stdout.strip().split()
+    psi_metrics = {}
+
+    for resource in ["cpu", "memory", "io"]:
+        avg10_list = []
+        avg60_list = []
+        for pod in pod_names:
+            out, _, r = RunKubectl([
+                "exec", pod, "-n", namespace, "--", "cat", f"/host/sys/fs/cgroup/{resource}.pressure"
+            ], raise_on_failure=False)
+            if r == 0 and out:
+                for line in out.splitlines():
+                    if line.startswith("some"):
+                        parts = line.split()
+                        try:
+                            avg10_list.append(float(parts[1].split("=")[1]))
+                            avg60_list.append(float(parts[2].split("=")[1]))
+                        except (IndexError, ValueError):
+                            pass
+        if avg10_list:
+            psi_metrics[f"psi_{resource}_some_avg10"] = round(sum(avg10_list) / len(avg10_list), 2)
+        if avg60_list:
+            psi_metrics[f"psi_{resource}_some_avg60"] = round(sum(avg60_list) / len(avg60_list), 2)
+
+    return psi_metrics
