@@ -423,6 +423,7 @@ class TclScriptParameters:
       script_type,
       db_engine_version=None,
       db_engine=None,
+      db_service=None,
   ):
     if ':' in ip:
       ip = ip.replace(':', '\\:')
@@ -1072,6 +1073,7 @@ def SetupConfig(
     user: str,
     is_managed_azure: bool,
     db_engine_version: str | None = None,
+    db_service: str | None = None,
 ):
   """Sets up the necessary scripts on the VM with the necessary parameters."""
   db_engine = sql_engine_utils.GetDbEngineType(db_engine)
@@ -1100,6 +1102,7 @@ def SetupConfig(
         script_type=script.script_type,
         db_engine_version=db_engine_version,
         db_engine=db_engine,
+        db_service=db_service,
     )
     script.Install(vm, script_parameters)
 
