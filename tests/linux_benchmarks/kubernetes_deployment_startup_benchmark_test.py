@@ -11,16 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import threading
 import unittest
 from unittest import mock
 
 from absl.testing import flagsaver
 from perfkitbenchmarker import errors
-from perfkitbenchmarker.linux_benchmarks import (
-    kubernetes_deployment_startup_benchmark as bench,
-)
+from perfkitbenchmarker.linux_benchmarks import kubernetes_deployment_startup_benchmark as bench
 from tests import pkb_common_test_case
 
 
@@ -46,6 +43,7 @@ def _make_spec(image='test_image', config=None):
 def _default_conditions():
   return [
       _make_condition('pod-0', 'PodReadyToStartContainers', 1000),
+      _make_condition('pod-0', 'PodRunning', 1015),
       _make_condition('pod-0', 'Ready', 1030),
   ]
 
@@ -62,7 +60,7 @@ def _run_with_conditions(conditions, flag_kwargs=None, config=None):
       'GetStatusConditionsForResourceType',
       return_value=conditions,
   ), mock.patch.object(
-      bench.kubernetes_commands, 'GetTotalCpuMillicores', return_value=None
+      bench.kubernetes_commands, 'GetTotalCpuMillicores', return_value=100.0
   ), flagsaver.flagsaver(**flag_kwargs):
     return bench.Run(_make_spec(config=config))
 
@@ -79,8 +77,10 @@ class MaxPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
     """max_pod_ready_time equals worst pod across all replicas."""
     conditions = [
         _make_condition('pod-0', 'PodReadyToStartContainers', 1000),
+        _make_condition('pod-0', 'PodRunning', 1010),
         _make_condition('pod-0', 'Ready', 1020),
         _make_condition('pod-1', 'PodReadyToStartContainers', 1000),
+        _make_condition('pod-1', 'PodRunning', 1010),
         _make_condition('pod-1', 'Ready', 1035),
     ]
     samples = _run_with_conditions(conditions)
@@ -91,8 +91,10 @@ class MaxPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
     """Preserves original test: 2 pods with times 10 and 13; max=13."""
     conditions = [
         _make_condition('pod1', 'PodReadyToStartContainers', 10),
+        _make_condition('pod1', 'PodRunning', 15),
         _make_condition('pod1', 'Ready', 20),
         _make_condition('pod2', 'PodReadyToStartContainers', 12),
+        _make_condition('pod2', 'PodRunning', 17),
         _make_condition('pod2', 'Ready', 25),
     ]
     samples = _run_with_conditions(conditions)
@@ -110,11 +112,12 @@ class MaxPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
         'GetStatusConditionsForResourceType',
         return_value=_default_conditions(),
     ), mock.patch.object(
-        bench.kubernetes_commands, 'GetTotalCpuMillicores', return_value=None
+        bench.kubernetes_commands, 'GetTotalCpuMillicores', return_value=100.0
     ), flagsaver.flagsaver(cloud='GCP'):
+      bench.Prepare(_make_spec())
       bench.Run(_make_spec())
     mock_apply.assert_called_with(
-        bench.DEPLOYMENT_YAML.value, name='startup', image='test_image'
+        bench._DEPLOYMENT_YAML.value, name='startup', image='test_image'
     )
     mock_wait.assert_called_with('deployment/startup', timeout=600)
 
@@ -131,8 +134,10 @@ class PerPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
     """One per_pod_ready_time sample per pod."""
     conditions = [
         _make_condition('pod-0', 'PodReadyToStartContainers', 1000),
+        _make_condition('pod-0', 'PodRunning', 1010),
         _make_condition('pod-0', 'Ready', 1025),
         _make_condition('pod-1', 'PodReadyToStartContainers', 1000),
+        _make_condition('pod-1', 'PodRunning', 1015),
         _make_condition('pod-1', 'Ready', 1040),
     ]
     samples = _run_with_conditions(conditions)
@@ -143,6 +148,7 @@ class PerPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
     """per_pod_ready_time metadata contains pod_name."""
     conditions = [
         _make_condition('pod-abc', 'PodReadyToStartContainers', 1000),
+        _make_condition('pod-abc', 'PodRunning', 1015),
         _make_condition('pod-abc', 'Ready', 1030),
     ]
     samples = _run_with_conditions(conditions)
@@ -153,11 +159,75 @@ class PerPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
     """per_pod_ready_time value equals end_time - start_time."""
     conditions = [
         _make_condition('pod-x', 'PodReadyToStartContainers', 2000),
+        _make_condition('pod-x', 'PodRunning', 2010),
         _make_condition('pod-x', 'Ready', 2045),
     ]
     samples = _run_with_conditions(conditions)
     per_pod = [s for s in samples if s.metric == 'per_pod_ready_time']
     self.assertAlmostEqual(per_pod[0].value, 45)
+
+
+class StartupLatencyTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for startup_latency metric."""
+
+  def testEmitsStartupLatency(self):
+    """startup_latency is always emitted."""
+    samples = _run_with_conditions(_default_conditions())
+    self.assertIn('startup_latency', {s.metric for s in samples})
+
+  def testStartupLatencyValue(self):
+    """startup_latency equals worst pod across all replicas."""
+    conditions = [
+        _make_condition('pod-0', 'PodReadyToStartContainers', 1000),
+        _make_condition('pod-0', 'PodRunning', 1015),
+        _make_condition('pod-0', 'Ready', 1020),
+        _make_condition('pod-1', 'PodReadyToStartContainers', 1000),
+        _make_condition('pod-1', 'PodRunning', 1030),
+        _make_condition('pod-1', 'Ready', 1040),
+    ]
+    samples = _run_with_conditions(conditions)
+    by_metric = {s.metric: s.value for s in samples}
+    self.assertAlmostEqual(by_metric['startup_latency'], 10)
+
+
+class PerPodStartupLatencyTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for per_pod_startup_latency metric."""
+
+  def testEmitsOnePerPod(self):
+    """One per_pod_startup_latency sample per pod."""
+    conditions = [
+        _make_condition('pod-0', 'PodReadyToStartContainers', 1000),
+        _make_condition('pod-0', 'PodRunning', 1020),
+        _make_condition('pod-0', 'Ready', 1025),
+        _make_condition('pod-1', 'PodReadyToStartContainers', 1000),
+        _make_condition('pod-1', 'PodRunning', 1035),
+        _make_condition('pod-1', 'Ready', 1045),
+    ]
+    samples = _run_with_conditions(conditions)
+    per_pod = [s for s in samples if s.metric == 'per_pod_startup_latency']
+    self.assertLen(per_pod, 2)
+
+  def testPerPodCarriesPodName(self):
+    """per_pod_startup_latency metadata contains pod_name."""
+    conditions = [
+        _make_condition('pod-abc', 'PodReadyToStartContainers', 1000),
+        _make_condition('pod-abc', 'PodRunning', 1025),
+        _make_condition('pod-abc', 'Ready', 1030),
+    ]
+    samples = _run_with_conditions(conditions)
+    per_pod = [s for s in samples if s.metric == 'per_pod_startup_latency']
+    self.assertEqual(per_pod[0].metadata['pod_name'], 'pod-abc')
+
+  def testPerPodValue(self):
+    """per_pod_startup_latency value equals end_time - start_time."""
+    conditions = [
+        _make_condition('pod-x', 'PodReadyToStartContainers', 2000),
+        _make_condition('pod-x', 'PodRunning', 2040),
+        _make_condition('pod-x', 'Ready', 2055),
+    ]
+    samples = _run_with_conditions(conditions)
+    per_pod = [s for s in samples if s.metric == 'per_pod_startup_latency']
+    self.assertAlmostEqual(per_pod[0].value, 15)
 
 
 class SampleMetadataTest(pkb_common_test_case.PkbCommonTestCase):
@@ -177,7 +247,8 @@ class SampleMetadataTest(pkb_common_test_case.PkbCommonTestCase):
     )
     pod_samples = [
         s for s in samples
-        if s.metric in ('max_pod_ready_time', 'per_pod_ready_time')
+        if s.metric in ('max_pod_ready_time', 'per_pod_ready_time',
+                        'startup_latency', 'per_pod_startup_latency')
     ]
     for s in pod_samples:
       self.assertEqual(s.metadata['scenario'], 'baseline')
@@ -220,11 +291,11 @@ class CpuUtilizationCollectorTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testNoSamplesWhenNoReadings(self):
     """No CPU samples emitted when no readings collected."""
-    collector, samples, stop = self._MakeCollector()
+    collector, _, stop = self._MakeCollector()
     collector._readings = []
     stop.set()
-    collector.ObserveCpuUtilization()
-    self.assertEqual(samples, [])
+    with self.assertRaisesRegex(RuntimeError, 'zero CPU utilization'):
+      collector.ObserveCpuUtilization()
 
   def testObserveIgnoresIssueCommandError(self):
     """_Observe continues on IssueCommandError."""
