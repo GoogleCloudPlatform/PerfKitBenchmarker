@@ -382,14 +382,16 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
       '--file-mode=777',
       '--implicit-dirs',
       '--rename-dir-limit=200000',
+      '--write-global-max-blocks=-1',
   ]
   FILE_CACHE_OPTIONS = [
       '--cache-dir=/tmp/gcsfuse-cache-path',
       '--file-cache-max-size-mb=-1',
       '--file-cache-cache-file-for-range-read=true',
   ]
+  # Bypass TTL expiration and cache metadata indefinitely.
   ENABLE_METADATA_CACHE_OPTIONS = [
-      '--write-global-max-blocks=-1',
+      '--metadata-cache-ttl-secs=-1',
   ]
   DISABLE_METADATA_CACHE_OPTIONS = [
       '--metadata-cache-ttl-secs=0',

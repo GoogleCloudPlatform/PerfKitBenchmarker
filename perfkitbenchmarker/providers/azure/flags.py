@@ -194,10 +194,19 @@ BLOBFUSE_BLOCK_SIZE_MB = flags.DEFINE_float(
     2,
     'The blobfuse block size in MB. Defaults to 2.',
 )
-BLOBFUSE_CONFIG_FILE_PATH = flags.DEFINE_string(
-    'blobfuse_config_file_path',
+BLOBFUSE_CONFIG_FILE = flags.DEFINE_string(
+    'blobfuse_config_file',
     'fio_config.yaml.j2',
     'The name of the blobfuse config file. Defaults to fio_config.yaml.j2.',
+)
+BLOBFUSE_MOUNT_CONFIG_FILE = flags.DEFINE_enum(
+    'blobfuse_mount_config_file',
+    'prefill_config.yaml',
+    ['prefill_config.yaml', 'blobfuse_config.yaml'],
+    'The blobfuse config file to mount in AzureSetUpBlobFuseDiskStrategy. Can'
+    ' be either prefill_config.yaml (default) or'
+    ' blobfuse_config.yaml (which is rendered from'
+    ' --blobfuse_config_file).',
 )
 FLAG_K8S_INFERENCE_BLOBSTORAGE_ACCOUNT = flags.DEFINE_string(
     'k8s_inference_server_blobstorage_account',

@@ -143,7 +143,7 @@ def _Run(headnode, ranks, ppn):
   """
   results = []
   stdout, _ = headnode.RemoteCommand(
-      f'cd {BENCHMARK_DIR} && '
+      f'cd {BENCHMARK_DIR} && ulimit -n 65535 && '
       'mpirun --hostfile ~/MACHINEFILE -oversubscribe '
       f'-n {ranks} -npernode {ppn} '
       f'io500/io500 io500.ini')

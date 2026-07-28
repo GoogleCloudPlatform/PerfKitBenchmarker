@@ -81,7 +81,7 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec):
     test_vm.RemoteCommand(
         # pyrefly: ignore[missing-attribute]
         f'sudo blobfuse2 mount {disk.mount_point} '
-        f'--config-file=blobfuse2_config.yaml '
+        f'--config-file=blobfuse_config.yaml '
         f'--container-name={disk.bucket_name} {opts}'
     )
   test_vm.Install('fio')

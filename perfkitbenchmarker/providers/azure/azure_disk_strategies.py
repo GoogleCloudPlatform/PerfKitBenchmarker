@@ -405,19 +405,20 @@ class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
     }
     self.vm.RenderTemplate(
         template_path=data.ResourcePath(
-            f'blobfuse2/{FLAGS.blobfuse_config_file_path}'
+            f'blobfuse2/{FLAGS.blobfuse_config_file}'
         ),
-        remote_path='blobfuse2_config.yaml',
+        remote_path='blobfuse_config.yaml',
         context=context,
     )
     self.vm.RenderTemplate(
         template_path=data.ResourcePath('blobfuse2/prefill_config.yaml.j2'),
-        remote_path='blobfuse2_prefill_config.yaml',
+        remote_path='prefill_config.yaml',
         context=context,
     )
+    config_file = FLAGS.blobfuse_mount_config_file
     self.vm.RemoteCommand(
         f'sudo blobfuse2 mount {target} '
-        '--config-file=blobfuse2_prefill_config.yaml '
+        f'--config-file={config_file} '
         f'--container-name={bucket_name} {opts}'
     )
     self.vm.scratch_disks.append(blob_client)

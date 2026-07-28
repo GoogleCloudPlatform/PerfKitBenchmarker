@@ -660,6 +660,8 @@ fuse_io500:
     scratch_dir: fuse_dir
     openmpi_version: 4.1.6
     mpi_ranks_list: [1, 2, 4, 8, 16, 32, 64, 128, 192]
+    blobfuse_mount_config_file: blobfuse_config.yaml
+    blobfuse_config_file: io500_config.yaml.j2
     io500_max_total_size: 1649267441664
   vm_groups:
     default:
