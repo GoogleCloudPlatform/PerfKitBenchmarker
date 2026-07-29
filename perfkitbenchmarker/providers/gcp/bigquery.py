@@ -20,14 +20,17 @@ import logging
 import os
 import random
 import re
+import shlex
 from typing import Any, override
 
 from absl import flags
+from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import google_cloud_sdk
+from perfkitbenchmarker.linux_packages import mcp_toolbox_for_db
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import util as gcp_util
 
@@ -47,9 +50,37 @@ BQ_CA_AGENT = flags.DEFINE_string(
     'projects/{project}/locations/{location}/dataAgents/{agent_id}',
 )
 
+BQ_CA_CLIENT = flags.DEFINE_enum(
+    'bq_ca_client',
+    'bq_data_agent',
+    ['bq_data_agent', 'claude'],
+    'The conversational analytics client to use for BigQuery.',
+)
+
+BQ_CA_CLAUDE_MODEL = flags.DEFINE_string(
+    'bq_ca_claude_model',
+    '',
+    'Model to use for Claude Client in Conversational Analytics benchmarking.',
+)
+
 BQ_CLIENT_FILE = 'bq-jdbc-simba-client-1.8-temp-labels.jar'
 BQ_PYTHON_CLIENT_FILE = 'bq_python_driver.py'
 BQ_PYTHON_CLIENT_DIR = 'edw/bigquery/clients/python'
+CLAUDE_PYTHON_DRIVER_FILE = 'claude_python_driver.py'
+CLAUDE_CLIENT_SYSTEM_PROMPT = (
+    'You are a helpful assistant. You must generate your final response in'
+    ' JSON format. The JSON object must contain the following keys:\n'
+    '- "thoughts": A list of strings representing your thoughts or reasoning'
+    ' steps.\n'
+    '- "generated_sql": The SQL query you generated to answer the user\'s'
+    ' question.\n'
+    '- "retrieved_data": The data retrieved from running the generated SQL'
+    ' query.\n'
+    '- "text_answer": A text summary answering the user\'s question based on'
+    ' the retrieved data.'
+)
+
+
 DEFAULT_TABLE_EXPIRATION = 3600 * 24 * 365  # seconds
 
 BQ_JDBC_INTERFACES = ['SIMBA_JDBC', 'GOOGLE_JDBC']
@@ -421,7 +452,7 @@ class PythonClientInterface(GenericClientInterface):
     super().__init__(*args, **kwargs)
     self.destination: str | None = None
     self.key_file_name = FLAGS.gcp_service_account_key_file
-    if '/' in FLAGS.gcp_service_account_key_file:
+    if self.key_file_name and '/' in self.key_file_name:
       self.key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
 
   @override
@@ -434,12 +465,13 @@ class PythonClientInterface(GenericClientInterface):
   def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query."""
     # Push the service account file to the working directory on client vm
-    if '/' in FLAGS.gcp_service_account_key_file:
-      self.client_vm.PushFile(FLAGS.gcp_service_account_key_file)  # pyrefly: ignore[missing-attribute]
-    else:
-      self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
-          package_name, [FLAGS.gcp_service_account_key_file], ''
-      )
+    if FLAGS.gcp_service_account_key_file:
+      if '/' in FLAGS.gcp_service_account_key_file:
+        self.client_vm.PushFile(FLAGS.gcp_service_account_key_file)  # pyrefly: ignore[missing-attribute]
+      else:
+        self.client_vm.InstallPreprovisionedPackageData(  # pyrefly: ignore[missing-attribute]
+            package_name, [FLAGS.gcp_service_account_key_file], ''
+        )
 
     # Install dependencies for driver
     self.client_vm.Install('pip')  # pyrefly: ignore[missing-attribute]
@@ -555,6 +587,136 @@ class ConversationalAnalyticsClientInterface(
     )
 
 
+class ClaudeConversationalAnalyticsClientInterface(
+    edw_service.BaseClaudeConversationalAnalyticsClientInterface,
+):
+  """ClaudeConversationalAnalyticsClientInterface for BigQuery."""
+
+  def __init__(self, project_id: str, dataset_id: str):
+    super().__init__()
+    self.project_id = project_id
+    self.dataset_id = dataset_id
+    self.python_client_interface = PythonClientInterface(project_id, dataset_id)
+    self.claude_dir = None
+    self.mcp_toolbox_path = None
+    self.benchmark_name: str | None = None
+
+  @override
+  def SetProvisionedAttributes(
+      self, benchmark_spec: bm_spec.BenchmarkSpec
+  ) -> None:
+    super().SetProvisionedAttributes(benchmark_spec)
+    self.python_client_interface.SetProvisionedAttributes(benchmark_spec)
+    self.benchmark_name = benchmark_spec.name
+
+  def _ConstructClaudeSystemPrompt(self) -> str:
+    """Construct the system prompt for Claude."""
+    prompt = CLAUDE_CLIENT_SYSTEM_PROMPT
+    if edw_service.CA_DATASET.value == 'ecomm':
+      prompt += '\nPlease only use the ecomm dataset.'
+    elif edw_service.CA_DATASET.value == 'call_center':
+      prompt += (
+          '\nPlease only use call_center, retail_banking and zendesk datasets.'
+      )
+    return prompt
+
+  def GetMcpConfig(self) -> str:
+    if not self.mcp_toolbox_path:
+      raise RuntimeError('mcp_toolbox_path is not set.')
+    env = {'BIGQUERY_PROJECT': self.project_id}
+    config = {
+        'mcpServers': {
+            'google-data-cloud-genai-mcp-server': {
+                'command': self.mcp_toolbox_path,
+                'args': ['--prebuilt', 'bigquery', '--stdio'],
+                'env': env,
+            }
+        }
+    }
+    return json.dumps(config)
+
+  def GetClaudeDir(self) -> str:
+    if not self.claude_dir:
+      raise RuntimeError('claude_dir is not set.')
+    return self.claude_dir
+
+  @property
+  def fetches_results_immediately(self) -> bool:
+    return True
+
+  @override
+  def _GetQueryFileName(self, query_name: str) -> str:
+    """Generate a filename from a query name inside Claude directory."""
+    base_filename = os.path.basename(super()._GetQueryFileName(query_name))
+    return os.path.join(self.GetClaudeDir(), base_filename)
+
+  @override
+  def InstallSdk(self) -> None:
+    """Install the Claude Code SDK in the venv."""
+    assert self.client_vm is not None
+    self.client_vm.RemoteCommand(
+        'source .venv/bin/activate && pip install claude-agent-sdk'
+        ' python-dotenv'
+    )
+
+  @override
+  def Prepare(self, package_name: str = '') -> None:
+    """Prepare the client VM for Claude conversational analytics."""
+    assert self.client_vm is not None
+
+    home_dir = self.client_vm.RemoteCommand('echo $HOME')[0].strip()
+    self.claude_dir = os.path.join(home_dir, 'claude_ca')
+    self.client_vm.RemoteCommand(f'mkdir -p {self.claude_dir}')
+
+    self.mcp_toolbox_path = mcp_toolbox_for_db.Install(self.client_vm)
+
+    # Call python_client_interface.Prepare to setup common Python dependencies
+    # and service account key file.
+    self.python_client_interface.Prepare(package_name)
+
+    # Call BaseClaude...Prepare to install Claude SDK and setup .mcp.json
+    super().Prepare(package_name)
+
+    # Push Claude driver script to claude_dir
+    self.client_vm.PushDataFile(
+        os.path.join(
+            edw_service.EDW_PYTHON_DRIVER_LIB_DIR,
+            CLAUDE_PYTHON_DRIVER_FILE,
+        ),
+        os.path.join(self.claude_dir, CLAUDE_PYTHON_DRIVER_FILE),
+    )
+
+    # Copy edw_python_driver_lib.py to claude_dir
+    self.client_vm.RemoteCommand(
+        f'cp {os.path.join(home_dir, edw_service.EDW_PYTHON_DRIVER_LIB_FILE)}'
+        f' {self.claude_dir}'
+    )
+
+    # Install .env file to claude_dir
+    if not self.benchmark_name:
+      raise ValueError('benchmark_name not set, cannot install .env for Claude')
+    self.client_vm.InstallPreprovisionedBenchmarkData(
+        self.benchmark_name, ['.env'], self.claude_dir
+    )
+
+  @override
+  def _GetConversationalAnalyticsCommand(self, remote_query_file: str) -> str:
+    claude_dir = self.GetClaudeDir()
+
+    cmd = (
+        f'cd {claude_dir} && '
+        'source ../.venv/bin/activate && '
+        f'python3 {CLAUDE_PYTHON_DRIVER_FILE} single '
+        f'--system_prompt={shlex.quote(self._ConstructClaudeSystemPrompt())} '
+    )
+
+    if BQ_CA_CLAUDE_MODEL.value:
+      cmd += f'--model={BQ_CA_CLAUDE_MODEL.value} '
+
+    cmd += f'--print_results --query_file={remote_query_file}'
+    return cmd
+
+
 class Bigquery(edw_service.EdwService):
   """Object representing a Bigquery cluster.
 
@@ -576,9 +738,13 @@ class Bigquery(edw_service.EdwService):
   @override
   def GetConversationalAnalyticsClientInterface(
       self,
-  ) -> ConversationalAnalyticsClientInterface:
+  ) -> edw_service.BaseConversationalAnalyticsClientInterface:
     """Returns the Conversational Analytics Client Interface instance."""
     project_id, dataset_id = _SplitClusterIdentifier(self.cluster_identifier)
+    if BQ_CA_CLIENT.value == 'claude':
+      return ClaudeConversationalAnalyticsClientInterface(
+          project_id, dataset_id
+      )
     return ConversationalAnalyticsClientInterface(project_id, dataset_id)
 
   def _Create(self):

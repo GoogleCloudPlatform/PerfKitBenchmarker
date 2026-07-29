@@ -209,7 +209,7 @@ flags.DEFINE_boolean(
     'False',
     'If set, the benchmark will collect service-specific metrics from the'
     ' remote service after the benchmark has completed. Additional delay may be'
-    ' incurred due to the need to wait for metadata propogation.',
+    ' incurred due to the need to wait for metadata propagation.',
 )
 flags.DEFINE_enum(
     'edw_bq_feature_config',
@@ -252,6 +252,13 @@ EDW_CONVERSATIONAL_ANALYTICS_QUESTIONS_FILE = flags.DEFINE_string(
     None,
     'Filename of the conversational analytics questions CSV (resolved via'
     ' data_search_paths).',
+)
+CA_DATASET = flags.DEFINE_enum(
+    'ca_dataset',
+    'ecomm',
+    ['ecomm', 'call_center'],
+    'The dataset to run for conversational analytics benchmarking: ecomm or'
+    ' call_center.',
 )
 EDW_SEARCH_INDEX_NAME = flags.DEFINE_string(
     'edw_search_index_name',
@@ -584,6 +591,45 @@ class BaseConversationalAnalyticsClientInterface(EdwClientInterface):
           f'Failed to parse Conversational Analytics response: {stdout}'
       ) from e
     return self._ParseConversationalAnalyticsResults(results, query_name)
+
+
+class BaseClaudeConversationalAnalyticsClientInterface(
+    BaseConversationalAnalyticsClientInterface
+):
+  """Base class for Claude Conversational Analytics Client Interface."""
+
+  def InstallSdk(self) -> None:
+    """Install the Claude Code SDK on the client VM."""
+    raise NotImplementedError
+
+  def GetMcpConfig(self) -> str:
+    """Return a JSON string representing the contents in .mcp.json."""
+    raise NotImplementedError
+
+  def GetClaudeDir(self) -> str:
+    """Return the main directory for Claude to work on."""
+    raise NotImplementedError
+
+  def Prepare(self, package_name: str = '') -> None:
+    """Prepares the client VM for Claude conversational analytics."""
+    del package_name
+    self.InstallSdk()
+    mcp_config = self.GetMcpConfig()
+    claude_dir = self.GetClaudeDir()
+    mcp_config_path = os.path.join(claude_dir, '.mcp.json')
+    vm_util.CreateRemoteFile(self.client_vm, mcp_config, mcp_config_path)
+
+  def _ParseConversationalAnalyticsResults(
+      self, results: dict[str, Any], query_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    execution_time, metadata = super()._ParseConversationalAnalyticsResults(
+        results, query_name
+    )
+    details = results.get('details', {})
+    query_results = details.get('query_results', {})
+    metadata['total_cost_usd'] = query_results.get('total_cost_usd')
+    metadata['usage'] = query_results.get('usage')
+    return execution_time, metadata
 
 
 class EdwService(resource.BaseResource):

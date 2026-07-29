@@ -252,5 +252,43 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
     )
 
 
+class ConcreteClaudeClientInterface(
+    edw_service.BaseClaudeConversationalAnalyticsClientInterface
+):
+  """Fake Claude client interface for testing."""
+
+  fetches_results_immediately = True
+
+
+class BaseClaudeConversationalAnalyticsClientInterfaceTest(
+    pkb_common_test_case.PkbCommonTestCase
+):
+
+  def setUp(self):
+    super().setUp()
+    self.client = ConcreteClaudeClientInterface()
+
+  def testParseConversationalAnalyticsResultsIncludingCost(self):
+    results = {
+        'query_wall_time_in_secs': 5.0,
+        'details': {
+            'job_id': 'job_123',
+            'query_results': {
+                'text_response': 'The total sales is $1000.',
+                'generated_sql': 'SELECT sum(sales) FROM t',
+                'retrieved_data': [['1000']],
+                'total_cost_usd': 0.05,
+                'usage': {'input_tokens': 100},
+            },
+        },
+    }
+    execution_time, metadata = self.client._ParseConversationalAnalyticsResults(
+        results, 'test query'
+    )
+    self.assertEqual(execution_time, 5.0)
+    self.assertEqual(metadata['total_cost_usd'], 0.05)
+    self.assertEqual(metadata['usage'], {'input_tokens': 100})
+
+
 if __name__ == '__main__':
   unittest.main()
