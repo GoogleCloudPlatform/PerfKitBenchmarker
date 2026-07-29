@@ -21,7 +21,6 @@ import re
 import time
 import typing
 from typing import Any
-import time
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -561,7 +560,7 @@ class GkeCluster(BaseGkeCluster):
     if self.enable_aam:
       cmd.args.append('--auto-monitoring-scope=ALL')
 
-    # --- PKB Extension: additional cluster create flags ---
+    # Add arbitrary additional flags (e.g., --enable-pod-snapshots)
     for additional_flag in gcp_flags.GKE_ADDITIONAL_FLAGS.value:
       cmd.args.append(additional_flag)
 
@@ -580,11 +579,8 @@ class GkeCluster(BaseGkeCluster):
           'container', 'node-pools', 'create', name, '--cluster', self.name
       )
       self._AddNodeParamsToCmd(nodepool, cmd)
-      self._AddNodeParamsToCmd(
-          nodepool,
-          cmd,
-      )
-      # --- PKB Extension: additional node pool create flags ---
+
+      # Add arbitrary additional node pool flags (e.g., --max-pods-per-node=250)
       for additional_flag in gcp_flags.GKE_ADDITIONAL_NODEPOOL_FLAGS.value:
         cmd.args.append(additional_flag)
 

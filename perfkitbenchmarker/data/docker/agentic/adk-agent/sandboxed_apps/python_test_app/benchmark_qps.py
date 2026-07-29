@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Minimal QPS benchmark script (Scheduling Throughput).
 
-Runs inside the GKE Agent Sandbox to validate claim readiness.
+Runs inside the Agent Sandbox to validate claim readiness.
 Executes a trivial operation and reports status.  The orchestrator-side
 timing (orchestrator_total_ms) serves as the primary TTFE measurement —
 when the warm pool drains, that metric spikes because fresh pods must be
@@ -17,8 +17,8 @@ result = sum(range(10_000))
 
 elapsed_ms = (time.perf_counter() - t0) * 1000
 
+status = "success" if result == 49995000 else "fail"
 print(json.dumps({
-    "sandbox_status": "ok",
-    "sandbox_qps_exec_ms": round(elapsed_ms, 3),
-    "sandbox_compute_result": result,
+    "sandbox_status": status,
+    "sandbox_exec_ms": round(elapsed_ms, 3),
 }))

@@ -184,16 +184,11 @@ def _build_arm64_on_vm(project_id: str, region: str, image_path: str, subnet_cid
     cidr = subnet_cidr or "10.200.0.0/24"
 
     # Absolute path to adk-agent Dockerfile directory.
-    # Walk up from script location to find repo root (contains pkb.py).
-    _repo = os.path.dirname(os.path.abspath(__file__))
-    for _ in range(10):
-        if os.path.isfile(os.path.join(_repo, "pkb.py")):
-            break
-        _repo = os.path.dirname(_repo)
-    adk_dir = os.path.join(
-        _repo, "perfkitbenchmarker", "data",
-        "docker", "agentic", "adk-agent"
-    )
+    # Resolved strictly relative to this script's location.
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    adk_dir = os.path.normpath(os.path.join(
+        script_dir, "..", "..", "data", "docker", "agentic", "adk-agent"
+    ))
 
     logger.info("Building ARM64 image natively on ARM VM")
     logger.info("  VM: %s (%s in %s)", vm_name, machine_type, zone)

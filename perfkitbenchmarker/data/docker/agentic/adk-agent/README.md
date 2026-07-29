@@ -7,7 +7,7 @@ communicate with this service via HTTP to trigger benchmark runs.
 ## Architecture
 
 ```
-PKB (host machine)                    GKE Cluster
+PKB (host machine)                    Kubernetes Cluster
 -----------------                     -----------
 benchmark.Run()
   -> HTTP POST /benchmark/...  -->  main.py (FastAPI)
@@ -25,7 +25,7 @@ benchmark.Run()
 | File | Purpose |
 |------|---------|
 | `main.py` | FastAPI service with benchmark endpoints |
-| `gke_performance_agent/agent.py` | ADK agent definition with MockLlm and BenchmarkGkeCodeExecutor |
+| `performance_agent/agent.py` | ADK agent definition with MockLlm and BenchmarkGkeCodeExecutor |
 | `sandboxed_apps/python_test_app/benchmark_density.py` | Python density benchmark (runs inside gVisor sandbox) |
 | `sandboxed_apps/python_test_app/benchmark_payload.py` | Payload transfer benchmark (runs inside gVisor sandbox) |
 | `sandboxed_apps/python_test_app/benchmark_qps.py` | QPS validation script (runs inside gVisor sandbox) |

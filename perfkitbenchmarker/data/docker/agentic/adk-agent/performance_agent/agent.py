@@ -1,12 +1,12 @@
-"""GKE Performance Agent -- ADK agent definition for sandbox benchmarking.
+"""Performance Agent -- ADK agent definition for sandbox benchmarking.
 
 EXECUTION CONTEXT:
-    This file runs INSIDE the GKE cluster, NOT on the PKB orchestrator machine.
+    This file runs INSIDE the Kubernetes cluster, NOT on the PKB orchestrator machine.
     It is packaged into a container image (see ../Dockerfile) and deployed as
     the 'adk-agent' Deployment in the benchmark namespace.
 
     Execution flow:
-      PKB machine                          GKE Cluster
+      PKB machine                          Kubernetes Cluster
       ----------                           -----------
       benchmark.Run()
         -> CallAgentApi("/benchmark/...")   -> main.py (FastAPI)
@@ -52,7 +52,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 agent_dir = os.path.join(basedir, "..")
 
 # Load generated.env (rendered by gke_image_build_utils._GenerateEnvFile from PKB flags).
-# In GKE, K8s manifest env vars take precedence.
+# In K8s, manifest env vars take precedence.
 load_dotenv(os.path.join(agent_dir, "generated.env"))
 
 # =========================================================================
@@ -274,13 +274,13 @@ gke_executor = BenchmarkGkeCodeExecutor(
     sandbox_template="python-sandbox-template",
 )
 
-gke_performance_agent = LlmAgent(
-    name="gke_performance_agent",  # Must be a valid identifier (no dashes)
+performance_agent = LlmAgent(
+    name="performance_agent",  # Must be a valid identifier (no dashes)
     model=MockLlm(model="mock-model"),
     code_executor=gke_executor,
 )
 
-root_agent = gke_performance_agent
+root_agent = performance_agent
 
 app = App(
     name=root_agent.name,
