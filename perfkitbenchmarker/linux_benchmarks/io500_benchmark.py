@@ -253,6 +253,8 @@ def Run(benchmark_spec):
     )
 
     results.extend(_Run(headnode, int(total_ranks), ppn))
+    if FLAGS.object_storage_fuse_log_trace:
+      headnode.RemoteCommand('sudo bash -c "cat /tmp/logs/*"')
   return results
 
 
