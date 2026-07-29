@@ -28,6 +28,8 @@ from tests import pkb_common_test_case
 
 FLAGS = flags.FLAGS
 
+_TEST_AGENT_ID = 'projects/test/locations/us-central1/dataAgents/test-agent'
+
 _TEST_CONFIG = """
 edw_conversational_analytics_benchmark:
   description: Conversational Analytics performance benchmark using BigQuery.
@@ -78,14 +80,23 @@ class EdwConversationalAnalyticsBenchmarkTest(
     self.mock_create_remote_file = self.create_remote_file_patcher.start()
     self.addCleanup(self.create_remote_file_patcher.stop)
 
-  @flagsaver.flagsaver(bq_ca_agent='')
+  @flagsaver.flagsaver(bq_ca_data_agent='')
   def testCheckPrerequisitesRaisesValueErrorWhenFlagMissing(self):
     mock_config = mock.Mock()
     mock_config.edw_service.type = 'bigquery'
     with self.assertRaisesRegex(
-        errors.Config.InvalidValue, 'Missing required flag: --bq_ca_agent'
+        errors.Config.InvalidValue, 'Missing required flag: --bq_ca_data_agent'
     ):
       edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
+
+  @flagsaver.flagsaver(bq_ca_data_agent='', bq_ca_client='claude')
+  def testCheckPrerequisitesDoesNotRaiseValueErrorWhenBqCaClientNotDataAgentAndFlagMissing(
+      self,
+  ):
+    mock_config = mock.Mock()
+    mock_config.edw_service.type = 'bigquery'
+    # Should not raise error
+    edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
 
   def testCheckPrerequisitesRaisesValueErrorWhenEdwServiceMissing(self):
     with self.assertRaisesRegex(
@@ -116,7 +127,7 @@ class EdwConversationalAnalyticsBenchmarkTest(
       edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
 
   @flagsaver.flagsaver(
-      bq_ca_agent='projects/test/locations/us-central1/dataAgents/test-agent',
+      bq_ca_data_agent=_TEST_AGENT_ID,
       gcp_service_account_key_file='fake-key.json',
       data_search_paths=['cloud/performance/artemis/data'],
   )
@@ -185,9 +196,9 @@ class EdwConversationalAnalyticsBenchmarkTest(
     return ca_iter, gt_iter, predict_iter
 
   @flagsaver.flagsaver(
-      bq_ca_agent='projects/test/locations/us-central1/dataAgents/test-agent',
+      bq_ca_data_agent=_TEST_AGENT_ID,
       edw_suite_iterations=2,
-      dataset='call_center',
+      ca_dataset='call_center',
   )
   @mock.patch.object(
       edw_conversational_analytics_benchmark._BenchmarkPerformanceSuite,
@@ -233,9 +244,9 @@ class EdwConversationalAnalyticsBenchmarkTest(
     self.assertIs(suite_1, suite_2)
 
   @flagsaver.flagsaver(
-      bq_ca_agent='projects/test/locations/us-central1/dataAgents/test-agent',
+      bq_ca_data_agent=_TEST_AGENT_ID,
       edw_suite_iterations=2,
-      dataset='call_center',
+      ca_dataset='call_center',
   )
   @mock.patch.object(
       edw_conversational_analytics_benchmark._BenchmarkPerformanceSuite,
@@ -365,9 +376,9 @@ class EdwConversationalAnalyticsBenchmarkTest(
     )
 
   @flagsaver.flagsaver(
-      bq_ca_agent='projects/test/locations/us-central1/dataAgents/test-agent',
+      bq_ca_data_agent=_TEST_AGENT_ID,
       edw_suite_iterations=1,
-      dataset='call_center',
+      ca_dataset='call_center',
   )
   @mock.patch.object(
       edw_conversational_analytics_benchmark._BenchmarkPerformanceSuite,
@@ -405,9 +416,9 @@ class EdwConversationalAnalyticsBenchmarkTest(
     )
 
   @flagsaver.flagsaver(
-      bq_ca_agent='projects/test/locations/us-central1/dataAgents/test-agent',
+      bq_ca_data_agent=_TEST_AGENT_ID,
       edw_suite_iterations=1,
-      dataset='call_center',
+      ca_dataset='call_center',
   )
   @mock.patch.object(
       edw_conversational_analytics_benchmark._BenchmarkPerformanceSuite,
@@ -449,9 +460,9 @@ class EdwConversationalAnalyticsBenchmarkTest(
     self.assertTrue(samples)
 
   @flagsaver.flagsaver(
-      bq_ca_agent='projects/test/locations/us-central1/dataAgents/test-agent',
+      bq_ca_data_agent=_TEST_AGENT_ID,
       edw_suite_iterations=1,
-      dataset='call_center',
+      ca_dataset='call_center',
   )
   @mock.patch.object(
       edw_conversational_analytics_benchmark._BenchmarkPerformanceSuite,
@@ -808,7 +819,7 @@ class EdwConversationalAnalyticsBenchmarkTest(
   @flagsaver.flagsaver(
       snowflake_ca_semantic_view='my-snowflake-semantic-view',
       edw_suite_iterations=2,
-      dataset='call_center',
+      ca_dataset='call_center',
   )
   @mock.patch.object(
       edw_conversational_analytics_benchmark._BenchmarkPerformanceSuite,

@@ -22,10 +22,17 @@ from typing import Any
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import edw_benchmark_results_aggregator as results_aggregator
+from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.gcp import bigquery
 
 BENCHMARK_NAME = 'edw_conversational_analytics_benchmark'
+
+ENV_FILE = '.env'
+BENCHMARK_DATA = {
+    ENV_FILE: '06408f3c2b35c44ef7491331b147ea753517d08648edff9e3ab6c3655f2d48dc'
+}
 
 BENCHMARK_CONFIG = """
 edw_conversational_analytics_benchmark:
@@ -41,13 +48,6 @@ edw_conversational_analytics_benchmark:
     client:
       vm_spec: *default_dual_core
 """
-
-_DATASET = flags.DEFINE_enum(
-    'dataset',
-    'ecomm',
-    ['ecomm', 'call_center'],
-    'The dataset to run: ecomm or call_center.',
-)
 
 FLAGS = flags.FLAGS
 
@@ -92,7 +92,7 @@ class _BenchmarkPerformanceSuite:
     question_list = [
         q
         for q in edw_service_instance.GetConversationalAnalyticsQuestionList()
-        if q.db_id == _DATASET.value
+        if q.db_id == edw_service.CA_DATASET.value
     ]
 
     ca_expected_queries = [q.question for q in question_list]
@@ -209,10 +209,10 @@ class _BenchmarkPerformanceSuite:
       raise errors.Benchmarks.RunError('Ground Truth query execution failed.')
 
     benchmark_metadata = {
-        'dataset': _DATASET.value,
+        'dataset': edw_service.CA_DATASET.value,
     }
-    if FLAGS.bq_ca_agent:
-      benchmark_metadata['agent'] = FLAGS.bq_ca_agent
+    if bigquery.BQ_CA_DATA_AGENT.value:
+      benchmark_metadata['agent'] = bigquery.BQ_CA_DATA_AGENT.value
     if FLAGS.snowflake_ca_semantic_view:
       benchmark_metadata['agent'] = FLAGS.snowflake_ca_semantic_view
     benchmark_metadata.update(self.edw_service_instance.GetMetadata())
@@ -274,8 +274,13 @@ def CheckPrerequisites(benchmark_config):
   edw_service_type = benchmark_config.edw_service.type
 
   if edw_service_type == 'bigquery':
-    if not FLAGS.bq_ca_agent:
-      raise errors.Config.InvalidValue('Missing required flag: --bq_ca_agent')
+    if (
+        bigquery.BQ_CA_CLIENT.value == 'bq_data_agent'
+        and not bigquery.BQ_CA_DATA_AGENT.value
+    ):
+      raise errors.Config.InvalidValue(
+          'Missing required flag: --bq_ca_data_agent'
+      )
   elif edw_service_type.startswith('snowflake'):
     if not FLAGS.snowflake_ca_semantic_view:
       raise errors.Config.InvalidValue(

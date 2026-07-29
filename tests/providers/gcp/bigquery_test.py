@@ -557,7 +557,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
       self, response_dict, expected_error_msg
   ):
     FLAGS.gcp_service_account_key_file = '/path/to/SERVICE_ACCOUNT_KEY_FILE'
-    FLAGS.bq_ca_agent = 'AGENT_ID'
+    FLAGS.bq_ca_data_agent = 'AGENT_ID'
     interface = bigquery.ConversationalAnalyticsClientInterface(
         PROJECT_ID, DATASET_ID
     )
@@ -637,7 +637,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testConversationalAnalyticsClientInterfaceExecuteQuerySuccess(self):
     FLAGS.gcp_service_account_key_file = '/path/to/SERVICE_ACCOUNT_KEY_FILE'
-    FLAGS.bq_ca_agent = 'AGENT_ID'
+    FLAGS.bq_ca_data_agent = 'AGENT_ID'
     interface = bigquery.ConversationalAnalyticsClientInterface(
         PROJECT_ID, DATASET_ID
     )
@@ -680,7 +680,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testConversationalAnalyticsClientInterfaceExecuteQueryInvalidJson(self):
     FLAGS.gcp_service_account_key_file = '/path/to/SERVICE_ACCOUNT_KEY_FILE'
-    FLAGS.bq_ca_agent = 'AGENT_ID'
+    FLAGS.bq_ca_data_agent = 'AGENT_ID'
     interface = bigquery.ConversationalAnalyticsClientInterface(
         PROJECT_ID, DATASET_ID
     )

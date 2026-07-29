@@ -43,8 +43,8 @@ INITIALIZE_SEARCH_TABLE_PARTITIONED = flags.DEFINE_bool(
     ' benchmarking.',
 )
 
-BQ_CA_AGENT = flags.DEFINE_string(
-    'bq_ca_agent',
+BQ_CA_DATA_AGENT = flags.DEFINE_string(
+    'bq_ca_data_agent',
     None,
     'The full resource name of the agent to use, e.g. '
     'projects/{project}/locations/{location}/dataAgents/{agent_id}',
@@ -581,7 +581,7 @@ class ConversationalAnalyticsClientInterface(
     return (
         'source .venv/bin/activate && python3 bq_ca_driver.py single '
         f'--project={self.project_id} '
-        f'--agent={BQ_CA_AGENT.value} '
+        f'--agent={BQ_CA_DATA_AGENT.value} '
         f'--credentials_file={key_file} '
         f'--print_results --query_file={remote_query_file}'
     )
