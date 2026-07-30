@@ -1158,7 +1158,7 @@ def _CheckRedisReachable(vm, server_ip: str, server_port: int) -> None:
   """Checks if redis server is reachable."""
   logging.info('Checking reachability of %s:%s', server_ip, server_port)
   # Output: Connection to xxxx:yyy:zzzz:wwww:: 6379 port [tcp/redis] succeeded!
-  cmd = f'nc -zv {server_ip} {server_port} 2>&1 | grep succeeded'
+  cmd = f'nc -zv {server_ip} {server_port} 2>&1 | grep -E "succeeded|open"'
   vm.RemoteCommand(cmd)
 
 
