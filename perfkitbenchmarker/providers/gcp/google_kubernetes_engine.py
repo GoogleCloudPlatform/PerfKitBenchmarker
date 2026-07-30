@@ -170,11 +170,12 @@ class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
           self, 'builds', 'submit',
           '--config', gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value,
           '--substitutions', f'_IMAGE={full_tag}',
+          '--suppress-logs',
           image.directory,
       )
     else:
       build_cmd = util.GcloudCommand(
-          self, 'builds', 'submit', '--tag', full_tag, image.directory,
+          self, 'builds', 'submit', '--tag', full_tag, '--suppress-logs', image.directory,
       )
     build_cmd.Issue(timeout=None)
 

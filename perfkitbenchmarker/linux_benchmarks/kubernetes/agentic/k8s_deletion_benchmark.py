@@ -1,3 +1,17 @@
+# Copyright 2026 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """PKB Benchmark: GKE Agent Deletion & Cleanup .
 
 Atomic single-point measurement of bulk deletion efficiency and IP
@@ -45,6 +59,7 @@ import time
 import uuid
 
 from absl import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import configs
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     k8s_benchmark_utils as utils,
@@ -152,11 +167,11 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(drain_timeout))
     time.sleep(2)
 
-    t_wall_start = time.time()
+    t_wall_start = time.monotonic()
 
     # 1. Provision N pods
     logging.info("Provisioning %d pods...", batch_size)
-    provision_start = time.time()
+    provision_start = time.monotonic()
     _PatchReplicas(ns, warmpool_name, batch_size)
 
     deadline = time.time() + provision_timeout
@@ -168,7 +183,7 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
             break
         time.sleep(3)
 
-    provision_time = time.time() - provision_start
+    provision_time = time.monotonic() - provision_start
     final_running = utils.CountPods(ns, label, phase="Running")
 
     logging.info(
@@ -203,13 +218,13 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     _PatchReplicas(ns, warmpool_name, 0)
 
     # 4. Poll: track pod disappearance and IP reclamation
-    t_delete = time.time()
+    t_delete = time.monotonic()
     deadline_drain = t_delete + drain_timeout
     pod_gone_times = {}  # pod_name -> elapsed_s when first absent
     ip_reclaim_time = None
 
     while time.time() < deadline_drain:
-        elapsed = time.time() - t_delete
+        elapsed = time.monotonic() - t_delete
 
         # Current pod names still present
         current_pods = set(_GetPodNames(ns, label))
@@ -242,7 +257,7 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
 
         time.sleep(poll_interval)
 
-    total_drain_time = time.time() - t_delete
+    total_drain_time = time.monotonic() - t_delete
 
     # Pods we never saw disappear (stuck) get the full drain time
     for pn in pod_names_before:
@@ -266,7 +281,7 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
         ip_after,
     )
 
-    wall_time = time.time() - t_wall_start
+    wall_time = time.monotonic() - t_wall_start
 
     # 6. Build samples
     run_id = str(uuid.uuid4())[:8]

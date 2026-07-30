@@ -1,3 +1,17 @@
+# Copyright 2026 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """PKB Benchmark: GKE Agent QPS Saturation .
 
 Atomic single-point measurement of scheduling throughput on a pre-provisioned
@@ -61,6 +75,7 @@ import time
 import uuid
 
 from absl import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
 from perfkitbenchmarker.resources.container_service import kubectl
@@ -243,10 +258,10 @@ def _RunAgent(benchmark_spec: object) -> list[sample.Sample]:
         "sandbox_exec_timeout_s": FLAGS.k8s_qps_sandbox_exec_timeout_s,
     }
 
-    t0 = time.time()
+    t0 = time.monotonic()
     api_timeout = int(step_duration + 300)
     result = utils.CallAgentApi("/benchmark/python/qps", payload, timeout=api_timeout)
-    wall_time = time.time() - t0
+    wall_time = time.monotonic() - t0
 
     # Record pool state after burst
     pool_after = utils.CountPods(ns, _WARMPOOL_LABEL, phase="Running")
@@ -443,10 +458,10 @@ def _RunRawClaim(benchmark_spec: object) -> list[sample.Sample]:
         with lock:
             claim_results.append(result)
 
-    t0 = time.time()
+    t0 = time.monotonic()
     threads = []
     for i in range(total_claims):
-        fire_time = time.time() - t0
+        fire_time = time.monotonic() - t0
         t = threading.Thread(target=_fire_and_wait, args=(i, fire_time), daemon=True)
         threads.append(t)
         t.start()
@@ -459,7 +474,7 @@ def _RunRawClaim(benchmark_spec: object) -> list[sample.Sample]:
     for t in threads:
         t.join(timeout=claim_timeout + 30)
 
-    wall_time = time.time() - t0
+    wall_time = time.monotonic() - t0
     actual_qps = round(total_claims / wall_time, 2) if wall_time > 0 else 0
 
     # Record pool state after burst
@@ -770,8 +785,8 @@ def _DeleteBenchmarkClaims(namespace: str) -> int:
     )
 
     # Wait for claims to be fully removed
-    t0 = time.time()
-    while time.time() - t0 < 120:
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < 120:
         stdout, _, _ = utils.RunKubectl(
             [
                 "get",
@@ -791,7 +806,7 @@ def _DeleteBenchmarkClaims(namespace: str) -> int:
             break
         time.sleep(2)
 
-    logging.info("Claims cleaned up in %.1fs", time.time() - t0)
+    logging.info("Claims cleaned up in %.1fs", time.monotonic() - t0)
     return count
 
 

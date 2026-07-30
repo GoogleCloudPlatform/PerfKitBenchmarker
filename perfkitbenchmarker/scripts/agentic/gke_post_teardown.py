@@ -21,6 +21,13 @@ import subprocess
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
+import re
+import os
+
+def _get_owner():
+    return re.sub(r'[^a-z0-9]', '', os.environ.get("USER", "default").lower())[:8]
+OWNER = _get_owner()
+
 
 def _run(cmd: list[str], check: bool = False, timeout: int = 300) -> object:
     logger.info("CMD: %s", " ".join(cmd))
@@ -59,7 +66,7 @@ def revoke_cloudbuild_sa_permissions(project_id: str) -> None:
 
 def teardown_snapshot_bucket(project_id: str, region: str) -> None:
     logger.info("=== Deleting Snapshot Bucket ===")
-    bucket_name = f"agent-sandbox-snapshots-{project_id}"
+    bucket_name = f"agent-sandbox-snaps-{project_id}-{OWNER}"[:63].strip("-")
     _run(["gcloud", "storage", "rm", f"gs://{bucket_name}/**",
           f"--project={project_id}", "--quiet"])
     _run(["gcloud", "storage", "buckets", "delete", f"gs://{bucket_name}",
@@ -73,7 +80,7 @@ def teardown_images(project_id: str, region: str) -> None:
     # (Provision creates it, Teardown deletes it). If you skip PKB Teardown,
     # run: gcloud artifacts repositories delete adk-repo --location=<region>
     # Only "agent-sandbox" (Chrome + Router images) needs manual cleanup here.
-    for repo in ["agent-sandbox"]:
+    for repo in [f"agent-sandbox-{OWNER}", f"adk-repo-{OWNER}"]:
         _run(["gcloud", "artifacts", "repositories", "delete", repo,
               f"--location={region}", f"--project={project_id}", "--quiet"])
     logger.info("AR repos deleted.")

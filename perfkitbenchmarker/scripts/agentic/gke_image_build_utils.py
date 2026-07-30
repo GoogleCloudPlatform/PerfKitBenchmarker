@@ -332,6 +332,7 @@ substitutions:
             f"--config={cloudbuild_path}",
             f"--substitutions=_IMAGE_PATH={image_path},_PLATFORM=linux/{target_arch}",
             f"--project={project}",
+            "--suppress-logs",
         ]
     )
 

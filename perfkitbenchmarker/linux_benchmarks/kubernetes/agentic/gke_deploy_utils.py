@@ -19,6 +19,11 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.scripts.agentic import gke_image_build_utils
+import re
+
+def _GetSanitizedOwner() -> str:
+    raw = getattr(FLAGS, "owner", os.environ.get("USER", "default"))
+    return re.sub(r'[^a-z0-9]', '', raw.lower())[:8]
 
 FLAGS = flags.FLAGS
 
@@ -154,10 +159,11 @@ def _DeriveImagePaths(project: str, region: str, arch: str) -> dict[str, str]:
     Returns:
         Dict with keys: adk_agent, sandbox_router, chromium.
     """
+    owner = _GetSanitizedOwner()
     return {
-        "adk_agent": f"{region}-docker.pkg.dev/{project}/adk-repo/adk-agent:{arch}",
-        "sandbox_router": f"{region}-docker.pkg.dev/{project}/agent-sandbox/sandbox-router:{arch}",
-        "chromium": f"{region}-docker.pkg.dev/{project}/agent-sandbox/chrome-sandbox:{arch}",
+        "adk_agent": f"{region}-docker.pkg.dev/{project}/adk-repo-{owner}/adk-agent:{arch}",
+        "sandbox_router": f"{region}-docker.pkg.dev/{project}/agent-sandbox-{owner}/sandbox-router:{arch}",
+        "chromium": f"{region}-docker.pkg.dev/{project}/agent-sandbox-{owner}/chrome-sandbox:{arch}",
     }
 
 def DeployWorkloads(benchmark_spec: object | None = None) -> None:
@@ -281,7 +287,8 @@ def DeploySnapshots(benchmark_spec: object | None = None) -> None:
             "Ensure benchmark_spec has a container_cluster with a zone."
         )
 
-    bucket_name = "agent-sandbox-snapshots-{}".format(project)
+    owner = _GetSanitizedOwner()
+    bucket_name = f"agent-sandbox-snaps-{project}-{owner}"[:63].strip("-")
     snapshot_folder = "benchmark-snapshots"
     ksa_name = FLAGS.k8s_snapshot_ksa_name
 

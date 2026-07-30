@@ -25,6 +25,12 @@ from perfkitbenchmarker.scripts.agentic import gke_image_build_utils
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
+import re
+import os
+def _get_owner():
+    return re.sub(r'[^a-z0-9]', '', os.environ.get("USER", "default").lower())[:8]
+OWNER = _get_owner()
+
 
 def _run(cmd: list[str], check: bool = True, timeout: int = 300) -> object:
     logger.info("CMD: %s", " ".join(cmd))
@@ -63,15 +69,17 @@ def create_artifact_registry(project_id: str, region: str) -> None:
     # "adk-repo" is no longer needed here -- PKB creates its own AR repo
     # via container_registry during the Provision stage.
     # Only "agent-sandbox" is needed for Chrome/Router images.
-    for repo in ["agent-sandbox"]:
+    for repo in [f"agent-sandbox-{OWNER}", f"adk-repo-{OWNER}"]:
         if _exists(["gcloud", "artifacts", "repositories", "describe", repo,
                     f"--location={region}", f"--project={project_id}"]):
             logger.info("AR repo %s already exists.", repo)
             continue
-        _run(["gcloud", "artifacts", "repositories", "create", repo,
+        res = _run(["gcloud", "artifacts", "repositories", "create", repo,
               "--repository-format=docker",
-              f"--location={region}", f"--project={project_id}"])
-        logger.info("AR repo %s created.", repo)
+              f"--location={region}", f"--project={project_id}"], check=False)
+        if res.returncode != 0 and "ALREADY_EXISTS" not in res.stderr:
+            raise RuntimeError(f"Failed to create repo {repo}: {res.stderr}")
+        logger.info("AR repo %s ready.", repo)
 
 
 def grant_cloudbuild_sa_permissions(project_id: str) -> None:
@@ -131,10 +139,10 @@ def build_sandbox_images(project_id: str, region: str, target_arch: str, arm_bui
     """Build Chrome Sandbox and Sandbox Router images via Cloud Build."""
     logger.info("=== Building Sandbox Images (arch=%s) ===", target_arch)
     chrome_image = (
-        f"{region}-docker.pkg.dev/{project_id}/agent-sandbox/chrome-sandbox:{target_arch}"
+        f"{region}-docker.pkg.dev/{project_id}/agent-sandbox-{OWNER}/chrome-sandbox:{target_arch}"
     )
     router_image = (
-        f"{region}-docker.pkg.dev/{project_id}/agent-sandbox/sandbox-router:{target_arch}"
+        f"{region}-docker.pkg.dev/{project_id}/agent-sandbox-{OWNER}/sandbox-router:{target_arch}"
     )
 
     gke_image_build_utils._BuildChromeSandboxImage(
@@ -154,7 +162,7 @@ def build_sandbox_images(project_id: str, region: str, target_arch: str, arm_bui
     # Build ARM64 base image (heavy pip deps, one-time)
     if target_arch == "arm64":
         arm_base_image = (
-            f"{region}-docker.pkg.dev/{project_id}/adk-repo/adk-agent:{target_arch}"
+            f"{region}-docker.pkg.dev/{project_id}/adk-repo-{OWNER}/adk-agent:{target_arch}"
         )
         _build_arm64_on_vm(project_id, region, arm_base_image, arm_builder_subnet_cidr)
         logger.info("  ARM64 ADK Agent: %s", arm_base_image)

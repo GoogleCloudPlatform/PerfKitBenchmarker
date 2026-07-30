@@ -17,8 +17,10 @@ Usage (Binary Search):
 import argparse
 import json
 import re
+import ipaddress
 import logging
 import os
+import statistics
 import subprocess
 import sys
 import time
@@ -165,20 +167,26 @@ VARIANT_DESC = {
 # Helpers
 # ============================================================
 def get_my_ip():
-    try:
-        return (
-            urllib.request.urlopen("https://ifconfig.me", timeout=10)
-            .read()
-            .decode()
-            .strip()
-        )
-    except Exception:
-        return (
-            urllib.request.urlopen("https://api.ipify.org", timeout=10)
-            .read()
-            .decode()
-            .strip()
-        )
+    # GKE master-authorized-networks accepts IPv4 CIDRs only, so an IPv6 answer
+    # (what ifconfig.me returns on a dual-stack network) must be rejected rather
+    # than passed through as "<addr>/32".
+    endpoints = (
+        "https://api.ipify.org",
+        "https://ipv4.icanhazip.com",
+        "https://ifconfig.me",
+    )
+    for url in endpoints:
+        try:
+            ip = urllib.request.urlopen(url, timeout=10).read().decode().strip()
+            ipaddress.IPv4Address(ip)
+            return ip
+        except Exception:
+            continue
+    raise RuntimeError(
+        "Could not determine a public IPv4 address from any of: "
+        + ", ".join(endpoints)
+        + ". An IPv4 address is required for --master-authorized-networks."
+    )
 
 
 def run_cmd(cmd, check=True):
@@ -256,8 +264,9 @@ def _read_yaml_flags(config_path, benchmark, flag_name, flag_type="list"):
 
 def get_variant_uri(benchmark, variant):
     bench_short = benchmark.replace("k8s_", "")[:4]
-    clean_var = re.sub(r"[^a-zA-Z0-9]", "", variant)[:8]
-    return f"{bench_short}{clean_var}"
+    clean_var = re.sub(r"[^a-zA-Z0-9]", "", variant)[:4]
+    owner = re.sub(r"[^a-z0-9]", "", os.environ.get("USER", "default").lower())[:4]
+    return f"{bench_short}{clean_var}{owner}"
 
 
 def run_pkb(
@@ -291,7 +300,6 @@ def run_pkb(
             parts.append("--gce_network_name=" + args.network)
         my_ip = get_my_ip()
         gke_flag_list = [
-            "--workload-pool=" + args.project + ".svc.id.goog",
             "--enable-master-authorized-networks",
             "--master-authorized-networks=" + my_ip + "/32",
         ]
@@ -323,12 +331,33 @@ def run_pkb(
     return run_cmd(cmd, check=check)
 
 
-def get_metric_from_results(benchmark, variant, sweep_label, sweep_val, target_metric):
-    """Parse the PKB JSON output to find the metric and return (value, all_found_metrics)."""
+def get_results_path(benchmark, variant):
     uri = get_variant_uri(benchmark, variant)
-    results_file = os.path.join(
+    return os.path.join(
         RESULTS_BASE, benchmark, "runs", uri, "perfkitbenchmarker_results.json"
     )
+
+
+def count_result_lines(benchmark, variant):
+    """Line count of the results NDJSON, used to isolate one run's output.
+
+    PKB appends to a single file per run_uri (--json_write_mode=a), so records
+    from earlier probes at the same density are still present. Callers snapshot
+    this before a run and pass it as start_line so a crashed run reads as
+    "no metrics" instead of silently inheriting an earlier probe's value.
+    """
+    path = get_results_path(benchmark, variant)
+    if not os.path.exists(path):
+        return 0
+    with open(path, "r") as f:
+        return sum(1 for _ in f)
+
+
+def get_metric_from_results(
+    benchmark, variant, sweep_label, sweep_val, target_metric, start_line=0
+):
+    """Parse the PKB JSON output to find the metric and return (value, all_found_metrics)."""
+    results_file = get_results_path(benchmark, variant)
 
     if not os.path.exists(results_file):
         return None, []
@@ -337,6 +366,9 @@ def get_metric_from_results(benchmark, variant, sweep_label, sweep_val, target_m
     all_metrics = set()
 
     with open(results_file, "r") as f:
+        for _ in range(start_line):
+            if f.readline() == "":
+                break
         for line in f:
             if not line.strip():
                 continue
@@ -425,6 +457,115 @@ def do_static_sweep(benchmark, variant, sweep_values, args, passthrough_flags=No
         logger.info("All sweep values completed successfully")
 
 
+def _probe_once(
+    benchmark, variant, args, bench_cfg, mid, passthrough_flags
+):
+    """Run one measurement at `mid`. Returns (metric_val, found_metrics).
+
+    metric_val is None when the run produced no usable measurement (crash), which
+    the caller must treat differently from a measured SLA breach.
+    """
+    start_line = count_result_lines(benchmark, variant)
+    run_pkb(
+        benchmark,
+        variant,
+        "run,cleanup",
+        args,
+        extra_flags=f"{bench_cfg['sweep_flag']}={mid}",
+        passthrough_flags=passthrough_flags,
+        check=False,
+    )
+
+    if bench_cfg["drain_between"] and bench_cfg["warmpool"]:
+        logger.info("Draining between sweep levels...")
+        drain_warmpool(bench_cfg["warmpool"], bench_cfg["pod_label"], args.namespace)
+        time.sleep(5)
+
+    return get_metric_from_results(
+        benchmark,
+        variant,
+        bench_cfg["sweep_label"],
+        mid,
+        args.threshold_metric,
+        start_line=start_line,
+    )
+
+
+def evaluate_probe(
+    benchmark, variant, args, bench_cfg, mid, threshold, passthrough_flags
+):
+    """Decide PASS/FAIL at `mid`, re-running only on failure.
+
+    Asymmetric by design: a false FAIL is unrecoverable under bisection because it
+    truncates the whole upper branch, while a false PASS self-corrects at the next
+    (higher) probe. So passes are accepted immediately and only failures pay for
+    repeats. Returns (passed, decision_value, samples, note).
+    """
+    samples = []
+    metric_val, found_metrics = _probe_once(
+        benchmark, variant, args, bench_cfg, mid, passthrough_flags
+    )
+    samples.append(metric_val)
+
+    if metric_val is not None and metric_val <= threshold:
+        return True, metric_val, samples, ""
+
+    if metric_val is None and not found_metrics:
+        note = "crash"
+    elif metric_val is None:
+        # Metric absent while other metrics were emitted: usually a partially
+        # failed run (aggregates suppressed, PSI still emitted), not a typo.
+        note = "no-metric"
+    else:
+        note = "over-threshold"
+
+    for attempt in range(1, args.failure_retries + 1):
+        logger.info(
+            "Probe at %s failed (%s). Confirmation re-run %d/%d.",
+            mid,
+            note,
+            attempt,
+            args.failure_retries,
+        )
+        retry_val, _ = _probe_once(
+            benchmark, variant, args, bench_cfg, mid, passthrough_flags
+        )
+        samples.append(retry_val)
+        if retry_val is not None and retry_val <= threshold:
+            logger.info(
+                "Confirmation re-run PASSED (%s <= %s) — first result was noise.",
+                retry_val,
+                threshold,
+            )
+            return True, retry_val, samples, f"pass-on-retry-{attempt}"
+
+    measured = [s for s in samples if s is not None]
+    decision_value = _aggregate(measured, args) if measured else None
+    return False, decision_value, samples, note
+
+
+def _aggregate(values, args):
+    """Combine repeated measurements at one density into a decision value."""
+    if len(values) == 1:
+        return values[0]
+    mode = args.retry_aggregate
+    if mode == "median":
+        return statistics.median(values)
+    if mode == "mean":
+        return statistics.fmean(values)
+    if mode == "min":
+        return min(values)
+    if mode == "max":
+        return max(values)
+    if mode == "weighted":
+        # Weights apply oldest-first and are renormalised to len(values).
+        weights = [float(w) for w in args.retry_weights.split(",")]
+        weights = (weights + [weights[-1]] * len(values))[: len(values)]
+        total = sum(weights)
+        return sum(v * w for v, w in zip(values, weights)) / total
+    return values[-1]
+
+
 def do_binary_search(benchmark, variant, args, passthrough_flags=None):
     bench_cfg = BENCHMARKS[benchmark]
     sweep_flag = bench_cfg["sweep_flag"]
@@ -446,11 +587,27 @@ def do_binary_search(benchmark, variant, args, passthrough_flags=None):
     target_metric = args.threshold_metric
     threshold = args.threshold_value
 
+    if convergence <= 0:
+        sys.exit(
+            "--search-convergence must be > 0; a value of 0 never terminates "
+            "and each iteration costs a full benchmark run."
+        )
+    if low >= high:
+        sys.exit(f"--search-min ({low}) must be < --search-max ({high}).")
+    if args.failure_retries < 0:
+        sys.exit("--failure-retries must be >= 0.")
+
     logger.info("=== BINARY SEARCH SWEEP: %s / %s ===", benchmark, variant)
     logger.info("  Range: [%s, %s], Convergence: %s", low, high, convergence)
     logger.info("  Target: %s <= %s", target_metric, threshold)
+    logger.info(
+        "  Failure re-runs: %d (aggregate=%s)",
+        args.failure_retries,
+        args.retry_aggregate,
+    )
 
     best_val = None
+    lowest_fail = None
     search_history = []
     step_num = 1
 
@@ -469,75 +626,63 @@ def do_binary_search(benchmark, variant, args, passthrough_flags=None):
                 current_range,
             )
 
-            extra = f"{sweep_flag}={mid}"
-            rc = run_pkb(
+            passed, decision_value, samples, note = evaluate_probe(
                 benchmark,
                 variant,
-                "run,cleanup",
                 args,
-                extra_flags=extra,
-                passthrough_flags=passthrough_flags,
-                check=False,
+                bench_cfg,
+                mid,
+                threshold,
+                passthrough_flags,
             )
 
-            if do_drain and warmpool:
-                logger.info("Draining between sweep levels...")
-                drain_warmpool(warmpool, pod_label, args.namespace)
-                time.sleep(5)
-
-            # Evaluate metric
-            metric_val, found_metrics = get_metric_from_results(
-                benchmark, variant, sweep_label, mid, target_metric
-            )
-
-            status = ""
-            metric_val_str = ""
-
-            if not found_metrics:
-                logger.warning(
-                    "No metrics found for %s=%s. Assuming run failed/crashed (saturation). Searching lower.",
-                    sweep_label,
-                    mid,
+            metric_val_str = "N/A" if decision_value is None else str(decision_value)
+            if len(samples) > 1:
+                metric_val_str += (
+                    " (" + ", ".join("N/A" if s is None else f"{s:g}" for s in samples) + ")"
                 )
-                status = "Crashed/No Data"
-                metric_val_str = "N/A"
-                if is_float:
-                    high = mid
-                else:
-                    high = mid - 1
-            elif metric_val is None:
-                logger.error("Metric '%s' NOT FOUND in results!", target_metric)
-                logger.error(
-                    "Available metrics for this run were:\n  %s",
-                    "\n  ".join(found_metrics),
-                )
-                logger.error(
-                    "Please check for typos in --threshold-metric. Aborting binary search."
-                )
-                sys.exit(1)
-            elif metric_val <= threshold:
+
+            if passed:
                 logger.info(
-                    "Metric %s = %s <= %s. Success! Searching higher.",
-                    target_metric,
-                    metric_val,
+                    "Density %s PASSED (%s <= %s). Searching higher.",
+                    mid,
+                    decision_value,
                     threshold,
                 )
-                status = "Success"
-                metric_val_str = str(metric_val)
+                status = "Success" if not note else f"Success ({note})"
                 best_val = mid
                 if is_float:
                     low = mid
                 else:
                     low = mid + 1
             else:
-                logger.info(
-                    "Metric %s = %s > %s. Failed SLA. Searching lower.",
-                    target_metric,
-                    metric_val,
-                    threshold,
-                )
-                status = "Failed SLA"
-                metric_val_str = str(metric_val)
+                if note == "crash":
+                    logger.warning(
+                        "Density %s produced no metrics after %d attempt(s) — "
+                        "treating as saturation. NOTE: an infrastructure failure is "
+                        "indistinguishable from saturation here; check the run log.",
+                        mid,
+                        len(samples),
+                    )
+                    status = "Crashed/No Data"
+                elif note == "no-metric":
+                    logger.warning(
+                        "Metric '%s' absent at density %s though other metrics were "
+                        "emitted — partial run failure. Treating as saturation. If this "
+                        "occurs at EVERY density, check --threshold-metric for a typo.",
+                        target_metric,
+                        mid,
+                    )
+                    status = "Partial/No Metric"
+                else:
+                    logger.info(
+                        "Density %s FAILED (%s > %s). Searching lower.",
+                        mid,
+                        decision_value,
+                        threshold,
+                    )
+                    status = "Failed SLA"
+                lowest_fail = mid if lowest_fail is None else min(lowest_fail, mid)
                 if is_float:
                     high = mid
                 else:
@@ -600,13 +745,67 @@ def do_binary_search(benchmark, variant, args, passthrough_flags=None):
             print(format_row(row))
         print("=" * len(header_str) + "\n")
 
-    if best_val is not None:
-        logger.info(
-            "=== BINARY SEARCH COMPLETE: Optimal %s = %s ===", sweep_label, best_val
+    # Persist the search history next to the results so a verdict can be audited
+    # after the fact; previously it existed only on stdout.
+    try:
+        history_path = os.path.join(
+            os.path.dirname(get_results_path(benchmark, variant)),
+            "search_history.json",
         )
+        with open(history_path, "w") as f:
+            json.dump(
+                {
+                    "benchmark": benchmark,
+                    "variant": variant,
+                    "threshold_metric": target_metric,
+                    "threshold_value": threshold,
+                    "search_min": args.search_min,
+                    "search_max": args.search_max,
+                    "convergence": convergence,
+                    "failure_retries": args.failure_retries,
+                    "retry_aggregate": args.retry_aggregate,
+                    "optimal": best_val,
+                    "lowest_failing": lowest_fail,
+                    "steps": search_history,
+                },
+                f,
+                indent=2,
+            )
+        logger.info("Search history written to %s", history_path)
+    except OSError as e:
+        logger.warning("Could not write search history: %s", e)
+
+    if best_val is not None:
+        # Report the bracket, not just the point estimate: the true threshold lies
+        # between the highest pass and the lowest fail, and is only resolved to
+        # within `convergence`.
+        if lowest_fail is not None:
+            logger.info(
+                "=== BINARY SEARCH COMPLETE: Optimal %s = %s "
+                "(highest passing; lowest failing = %s; true threshold in [%s, %s), "
+                "resolved to +/-%s) ===",
+                sweep_label,
+                best_val,
+                lowest_fail,
+                best_val,
+                lowest_fail,
+                convergence,
+            )
+        else:
+            logger.info(
+                "=== BINARY SEARCH COMPLETE: Optimal %s = %s "
+                "(no failure observed — the true threshold is at or above "
+                "--search-max=%s, so this is a LOWER BOUND, not a ceiling) ===",
+                sweep_label,
+                best_val,
+                args.search_max,
+            )
     else:
         logger.warning(
-            "=== BINARY SEARCH COMPLETE: No value satisfied the threshold ==="
+            "=== BINARY SEARCH COMPLETE: No value satisfied the threshold. "
+            "Every probe failed, including the lowest (%s) — the true threshold is "
+            "at or below --search-min, so widen the range downward. ===",
+            args.search_min,
         )
 
 
@@ -652,7 +851,7 @@ def main():
     )
     parser.add_argument("--project", required=True, help="GCP Project ID")
     parser.add_argument("--region", default="us-east1", help="GCP Region")
-    parser.add_argument("--owner", default="CHANGE-ME", help="Owner tag for resources")
+    parser.add_argument("--owner", default=os.environ.get("USER", "default"), help="Owner tag for resources")
     parser.add_argument("--network", default=None, help="Existing VPC network name")
     parser.add_argument("--subnet", default=None, help="Existing Subnet name")
     parser.add_argument("--namespace", default="agentic", help="Kubernetes namespace")
@@ -700,6 +899,35 @@ def main():
         default=2000.0,
         help="Maximum acceptable value for the metric.",
     )
+    parser.add_argument(
+        "--failure-retries",
+        type=int,
+        default=0,
+        help=(
+            "On a FAILED probe only, re-run the same density up to N times before "
+            "accepting the failure. Passes are accepted immediately. 0 (default) "
+            "preserves the previous single-shot behaviour."
+        ),
+    )
+    parser.add_argument(
+        "--retry-aggregate",
+        default="median",
+        choices=["median", "mean", "min", "max", "weighted", "last"],
+        help=(
+            "How to combine repeated measurements at one density into the reported "
+            "value once all retries have failed. Note this only affects reporting: "
+            "any single passing re-run already short-circuits to PASS."
+        ),
+    )
+    parser.add_argument(
+        "--retry-weights",
+        default="0.2,0.8",
+        help=(
+            "Comma-separated weights for --retry-aggregate=weighted, applied "
+            "oldest-measurement-first and renormalised (e.g. '0.2,0.8' trusts the "
+            "re-run over the initial measurement)."
+        ),
+    )
 
     args, passthrough = parser.parse_known_args()
     passthrough_flags = [f for f in passthrough if f != "--"] if passthrough else None
@@ -732,8 +960,11 @@ def main():
     logger.info("OPTIMIZATION SWEEP")
     logger.info("  Project:    %s", args.project)
     logger.info("  Region:     %s", args.region)
+    logger.info("  Network:    %s", args.network or "(PKB Managed)")
+    logger.info("  Subnet:     %s", args.subnet or "(PKB Managed)")
     logger.info("  Namespace:  %s", args.namespace)
     logger.info("  Benchmark:  %s", benchmark)
+    logger.info("  Sweep flag: %s", bench_cfg["sweep_flag"])
     logger.info("  Variants:   %s", variants)
     logger.info("  Stages:     %s", stages)
     logger.info("  Mode:       %s", args.search_mode)

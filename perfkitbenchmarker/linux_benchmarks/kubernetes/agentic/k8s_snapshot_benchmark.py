@@ -1,3 +1,17 @@
+# Copyright 2026 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """PKB Benchmark: GKE Agent Pod Snapshot Saturation .
 
 Atomic single-point measurement of GKE Pod Snapshot create/restore latency
@@ -227,7 +241,7 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     )
 
     template_path = _GetTemplatePath()
-    t0 = time.time()
+    t0 = time.monotonic()
 
     # Run the snapshot/restore cycle
     step_result = _RunSnapshotCycle(
@@ -241,7 +255,7 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
         template_path=template_path,
     )
 
-    wall_time = time.time() - t0
+    wall_time = time.monotonic() - t0
 
     # Build samples
     run_id = str(uuid.uuid4())[:8]
@@ -405,7 +419,7 @@ def _RunSnapshotCycle(
 
         # 2. Create source claims and wait for Running + preload
         logging.info("Creating %d source SandboxClaim(s)", burst_size)
-        t0_sources = time.time()
+        t0_sources = time.monotonic()
         workers = min(burst_size, 50)
         with ThreadPoolExecutor(max_workers=workers) as pool:
             for sname in source_names:
@@ -488,7 +502,7 @@ def _RunSnapshotCycle(
 
         # 3. Trigger snapshots concurrently
         logging.info("Triggering %d snapshot(s)", burst_size)
-        t0_snap = time.time()
+        t0_snap = time.monotonic()
         with ThreadPoolExecutor(max_workers=workers) as pool:
             snap_futs = [
                 pool.submit(
@@ -521,7 +535,7 @@ def _RunSnapshotCycle(
 
         # 4. Create restore claims concurrently
         logging.info("Creating %d restore SandboxClaim(s)", burst_size)
-        t0_burst = time.time()
+        t0_burst = time.monotonic()
         with ThreadPoolExecutor(max_workers=workers) as pool:
             create_futs = [
                 pool.submit(_ApplyClaim, rname, namespace, step_template)
@@ -821,7 +835,7 @@ def _MeasureSingleSource(name: str, namespace: str, t0: float, pod_timeout: int,
             raise_on_failure=False,
         )
         if stdout == "Running":
-            result["startup_time_s"] = round(time.time() - t0, 3)
+            result["startup_time_s"] = round(time.monotonic() - t0, 3)
             break
         time.sleep(1)
     else:
@@ -833,7 +847,7 @@ def _MeasureSingleSource(name: str, namespace: str, t0: float, pod_timeout: int,
         result["error"] = f"Preload did not complete within {pod_timeout}s"
         return result
 
-    result["preload_complete_time_s"] = round(time.time() - t0, 3)
+    result["preload_complete_time_s"] = round(time.monotonic() - t0, 3)
 
     # Let counter tick
     time.sleep(3)
@@ -923,7 +937,7 @@ def _TriggerAndWaitSnapshot(trigger_name: str, target_pod: str, namespace: str, 
             raise_on_failure=False,
         )
         if stdout == "Complete":
-            result["snapshot_time_s"] = round(time.time() - t0, 3)
+            result["snapshot_time_s"] = round(time.monotonic() - t0, 3)
             return result
         time.sleep(2)
     result["error"] = f"Snapshot {trigger_name} did not complete within {timeout_s}s"
@@ -950,7 +964,7 @@ def _MeasureSingleRestore(name: str, namespace: str, t0: float, snapshot_counter
             raise_on_failure=False,
         )
         if stdout == "Running":
-            result["restore_time_s"] = round(time.time() - t0, 3)
+            result["restore_time_s"] = round(time.monotonic() - t0, 3)
             break
         time.sleep(1)
     else:
@@ -968,7 +982,7 @@ def _MeasureSingleRestore(name: str, namespace: str, t0: float, snapshot_counter
         if rc == 0:
             matches = re.findall(r"Count:\s*(\d+)", stdout)
             if matches:
-                result["ttfe_s"] = round(time.time() - t0, 3)
+                result["ttfe_s"] = round(time.monotonic() - t0, 3)
                 result["restore_counter"] = int(matches[0])
                 if (
                     snapshot_counter is not None

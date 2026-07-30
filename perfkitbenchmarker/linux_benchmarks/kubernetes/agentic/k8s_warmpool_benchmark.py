@@ -1,3 +1,17 @@
+# Copyright 2026 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """PKB Benchmark: GKE Agent Warmpool Scale-Up.
 
 Atomic single-point measurement of warm pool provisioning speed on a
@@ -51,6 +65,7 @@ import time
 import uuid
 
 from absl import flags
+from perfkitbenchmarker import sample
 from datetime import datetime, timezone
 from perfkitbenchmarker import configs
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
@@ -158,12 +173,12 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
 
     logging.info("=== Run: scaling %s to %d replicas ===", warmpool_name, target)
 
-    t_wall_start = time.time()
+    t_wall_start = time.monotonic()
 
     # 1. Measure drain time (should be near-zero since Prepare drained)
-    t0 = time.time()
+    t0 = time.monotonic()
     utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(FLAGS.k8s_warmpool_drain_timeout_s))
-    drain_time_s = round(time.time() - t0, 2)
+    drain_time_s = round(time.monotonic() - t0, 2)
 
     time.sleep(2)
 
@@ -183,13 +198,13 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     )
 
     # 3. Poll until ready or timeout
-    t_scale = time.time()
-    scale_start_epoch = t_scale
+    t_scale = time.monotonic()
+    scale_start_epoch = time.time()
     deadline = t_scale + threshold_s
     first_pod_time = None
 
     while time.time() < deadline:
-        elapsed = time.time() - t_scale
+        elapsed = time.monotonic() - t_scale
         running = utils.CountPods(ns, label, "Running")
         pending = utils.CountPods(ns, label, "Pending")
 
@@ -211,7 +226,7 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
 
         time.sleep(poll_interval)
 
-    total_time = round(time.time() - t_scale, 2)
+    total_time = round(time.monotonic() - t_scale, 2)
     final_running = utils.CountPods(ns, label, "Running")
     final_pending = utils.CountPods(ns, label, "Pending")
     rate = round(final_running / total_time, 2) if total_time > 0 else 0
@@ -227,7 +242,7 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     # 4. Scrape pod lifecycle timestamps
     lifecycle = _ScrapeLifecycle(ns, label, scale_start_epoch)
 
-    wall_time = round(time.time() - t_wall_start, 2)
+    wall_time = round(time.monotonic() - t_wall_start, 2)
 
     # 5. Build samples
     run_id = str(uuid.uuid4())[:8]

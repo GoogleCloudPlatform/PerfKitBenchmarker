@@ -1,3 +1,17 @@
+# Copyright 2026 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """PKB Benchmark: GKE Agent Python Sandbox Density .
 
 Atomic single-point measurement of Python sandbox density on a
@@ -57,6 +71,7 @@ import time
 import uuid
 
 from absl import flags
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import configs
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     k8s_benchmark_utils as utils,
@@ -178,9 +193,9 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
         "sandbox_exec_timeout_s": FLAGS.k8s_python_density_exec_timeout,
     }
 
-    t0 = time.time()
+    t0 = time.monotonic()
     result = utils.CallAgentApi("/benchmark/python/density", payload)
-    wall_time = time.time() - t0
+    wall_time = time.monotonic() - t0
 
     successful = result.get("successful_sessions", 0)
     failed = result.get("failed_sessions", 0)
