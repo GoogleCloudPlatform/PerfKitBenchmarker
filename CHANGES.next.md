@@ -478,6 +478,8 @@
     to allow `hostNetwork` and custom sysctls.
 -   Add ARM tolerations to the memtier job for `kubernetes_redis_memtier`.
 -   Record service reported VM creation times on GCP, AWS, and Azure.
+-   Add `kubernetes_nginx_global_conf` and `kubernetes_nginx_server_conf` flags
+    to `kubernetes_nginx_benchmark` for specifying custom nginx configs.
 
 ### Bug fixes and maintenance updates:
 

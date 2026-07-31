@@ -46,6 +46,24 @@ flags.DEFINE_string(
     None,
     "A custom runtimeClassName to apply to the nginx pods.",
 )
+flags.DEFINE_string(
+    "kubernetes_nginx_global_conf",
+    None,
+    "Path or PKB resource name for the Nginx global config file. "
+    "If not specified, falls back to --nginx_global_conf.",
+)
+flags.DEFINE_string(
+    "kubernetes_nginx_server_conf",
+    None,
+    "Path or PKB resource name for the Nginx proxy server config file. "
+    "If not specified, falls back to --nginx_server_conf.",
+)
+flags.DEFINE_string(
+    "kubernetes_nginx_file_server_conf",
+    None,
+    "Path or PKB resource name for the Nginx file server config file. "
+    "If not specified, falls back to --nginx_file_server_conf.",
+)
 
 BENCHMARK_NAME = "kubernetes_nginx"
 BENCHMARK_CONFIG = """
@@ -171,9 +189,15 @@ def _CreateNginxConfigMapDir():
   """
   temp_dir = tempfile.TemporaryDirectory()
 
-  global_conf_path = data.ResourcePath("nginx/global.conf")
-  proxy_conf_path = data.ResourcePath("nginx/rp_apigw.conf")
-  upstream_conf_path = data.ResourcePath("nginx/file_server.conf")
+  global_conf_path = data.ResourcePath(
+      FLAGS.kubernetes_nginx_global_conf or FLAGS.nginx_global_conf
+  )
+  proxy_conf_path = data.ResourcePath(
+      FLAGS.kubernetes_nginx_server_conf or FLAGS.nginx_server_conf
+  )
+  upstream_conf_path = data.ResourcePath(
+      FLAGS.kubernetes_nginx_file_server_conf or FLAGS.nginx_file_server_conf
+  )
 
   proxy_conf_content = _MergeNginxConfigs(global_conf_path, proxy_conf_path)
   # Upstream always uses HTTP regardless of SSL setting
