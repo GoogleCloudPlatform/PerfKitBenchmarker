@@ -704,7 +704,7 @@ class EdwConversationalAnalyticsBenchmarkTest(
     q = mock.Mock(question='What is the revenue?', db_id='ecomm')
     query_client = mock.Mock()
     query_client.client_vm = mock.Mock()
-    query_client.ExecuteQuery.return_value = (
+    query_client.TryExecuteQuery.return_value = (
         1.5,
         {'query_results': 'results'},
     )
@@ -719,7 +719,7 @@ class EdwConversationalAnalyticsBenchmarkTest(
     self.mock_create_remote_file.assert_called_once_with(
         query_client.client_vm, 'SELECT 1;', 'ecomm_predict.sql'
     )
-    query_client.ExecuteQuery.assert_called_once_with(
+    query_client.TryExecuteQuery.assert_called_once_with(
         'ecomm_predict.sql', print_results=True
     )
     predict_iteration_performance.add_query_performance.assert_called_once_with(
@@ -741,7 +741,7 @@ class EdwConversationalAnalyticsBenchmarkTest(
     q = mock.Mock(question='What is the revenue?', db_id='ecomm')
     query_client = mock.Mock()
     query_client.client_vm = mock.Mock()
-    query_client.ExecuteQuery.return_value = (
+    query_client.TryExecuteQuery.return_value = (
         1.5,
         {'query_results': 'results'},
     )

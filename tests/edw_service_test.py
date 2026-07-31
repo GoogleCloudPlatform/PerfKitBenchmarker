@@ -251,6 +251,37 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
         {'fetches_results_immediately': 'True'},
     )
 
+  def testTryExecuteQueryCatchesRemoteCommandError(self) -> None:
+    class TestClientInterface(edw_service.EdwClientInterface):
+
+      def ExecuteQuery(self, query_name: str, print_results: bool = False):
+        raise edw_service.errors.VirtualMachine.RemoteCommandError(
+            'Syntax error in AI generated SQL'
+        )
+
+    # Arrange
+    client = TestClientInterface()
+
+    # Act
+    execution_time, details = client.TryExecuteQuery('test_query')
+
+    # Assert
+    self.assertEqual(execution_time, -1.0)
+    self.assertEqual(details, {})
+
+  def testTryExecuteQueryRaisesOtherExceptions(self) -> None:
+    class TestClientInterface(edw_service.EdwClientInterface):
+
+      def ExecuteQuery(self, query_name: str, print_results: bool = False):
+        raise RuntimeError('Unexpected failure')
+
+    # Arrange
+    client = TestClientInterface()
+
+    # Act / Assert
+    with self.assertRaises(RuntimeError):
+      client.TryExecuteQuery('test_query')
+
 
 class ConcreteClaudeClientInterface(
     edw_service.BaseClaudeConversationalAnalyticsClientInterface

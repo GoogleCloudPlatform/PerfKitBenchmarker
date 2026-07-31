@@ -411,6 +411,33 @@ class EdwClientInterface:
     """
     raise NotImplementedError
 
+  def TryExecuteQuery(
+      self, query_name: str, print_results: bool = False
+  ) -> tuple[float, dict[str, Any]]:
+    """Execute a query safely by not failing fast on errors.
+
+    The primary use case is running AI-generated queries which are inherently
+    non-deterministic hence can contain errors e.g. syntax error that fail the
+    driver which will fail the benchmark as well. Benchmarks that test such
+    AI-generated SQLs should be able to catch and report such failures, instead
+    of being failed by such errors, so we need a safer version of ExecuteQuery
+    which makes the assumption that the queries are potentially invalid and
+    RemoteCommand errors from driver should be caught instead of being raised.
+
+    Args:
+      query_name: String name of the query to execute.
+      print_results: Whether to include query results in execution details.
+
+    Returns:
+      A tuple of (execution_time, execution details). Returns (-1.0, {}) on
+      failure, or the result of ExecuteQuery on success.
+    """
+    try:
+      return self.ExecuteQuery(query_name, print_results=print_results)
+    except errors.VirtualMachine.RemoteCommandError as e:
+      logging.warning('ExecuteQuery failed for query %s: %s', query_name, e)
+      return -1.0, {}
+
   def ExecuteSimultaneous(
       self, submission_interval: int, queries: List[str]
   ) -> str:

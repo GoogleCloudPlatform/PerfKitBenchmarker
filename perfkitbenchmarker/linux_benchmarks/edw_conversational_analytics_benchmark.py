@@ -199,9 +199,6 @@ class _BenchmarkPerformanceSuite:
 
   def BuildResults(self) -> list[Any]:
     """Builds and returns the list of performance samples."""
-    if self.predict_query_performance:
-      if _ShouldFailBenchmarkForQueryFailure(self.predict_query_performance):
-        raise errors.Benchmarks.RunError('Predict query execution failed.')
     if (
         self.gt_query_performance
         and not self.gt_query_performance.is_successful()
@@ -400,7 +397,7 @@ def _RunPredictQuery(
   """Execute predict SQL and record performance."""
   sql_file_name = f'{q.db_id}_predict.sql'
   vm_util.CreateRemoteFile(query_client.client_vm, predict_sql, sql_file_name)
-  predict_execution_time, predict_metadata = query_client.ExecuteQuery(
+  predict_execution_time, predict_metadata = query_client.TryExecuteQuery(
       sql_file_name, print_results=True
   )
   predict_metadata['question'] = q.question
@@ -415,29 +412,6 @@ def _RunPredictQuery(
   predict_iteration_performance.add_query_performance(
       f'{q.question}_predict', predict_execution_time, predict_metadata
   )
-
-
-def _ShouldFailBenchmarkForQueryFailure(predict_query_performance) -> bool:
-  """Returns True if there are failures that should fail the benchmark.
-
-  Failures caused by empty predict SQL or too large results do not fail
-  the benchmark.
-
-  Args:
-    predict_query_performance: The predict query benchmark performance.
-  """
-  for (
-      iteration_perf
-  ) in predict_query_performance.iteration_performances.values():
-    if isinstance(
-        iteration_perf, results_aggregator.EdwPowerIterationPerformance
-    ):
-      for query_perf in iteration_perf.performance.values():
-        if not query_perf.is_successful():
-          if query_perf.metadata.get('predict_sql'):
-            if not query_perf.metadata.get('is_result_too_large'):
-              return True
-  return False
 
 
 def Run(benchmark_spec) -> list[Any]:
