@@ -14,6 +14,7 @@
 
 """Contains classes/functions related to Google Cloud Storage."""
 
+import json
 import logging
 import ntpath
 import os
@@ -157,9 +158,20 @@ class GoogleCloudStorageService(object_storage_service.ObjectStorageService):
     if FLAGS.project:
       command.extend(['--project', FLAGS.project])
     if object_storage_service.OBJECT_TTL_DAYS.value:
-      command.extend(
-          ['--retention', f'{object_storage_service.OBJECT_TTL_DAYS.value}d']
+      lifecycle_config = {
+          'rule': [{
+              'action': {'type': 'Delete'},
+              'condition': {
+                  'age': object_storage_service.OBJECT_TTL_DAYS.value
+              },
+          }]
+      }
+      lifecycle_file_path = os.path.join(
+          temp_dir.GetRunDirPath(), f'{bucket_name}_lifecycle.json'
       )
+      with open(lifecycle_file_path, 'w') as f:
+        json.dump(lifecycle_config, f)
+      command.extend([f'--lifecycle-file={lifecycle_file_path}'])
     command.extend([f'gs://{bucket_name}'])
 
     _, stderr, ret_code = vm_util.IssueCommand(command, raise_on_failure=False)
