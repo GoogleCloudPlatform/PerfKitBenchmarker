@@ -46,11 +46,11 @@ deployment_groups:
         - protocol: tcp
         - protocol: udp
         - protocol: icmp
+      nic_type: "IRDMA"
 
   - id: h4d_startup
     source: modules/scripts/startup-script
     settings:
-      install_cloud_rdma_drivers: true
       set_ofi_cloud_rdma_tunables: true
 
   - id: compute_nodeset
@@ -69,21 +69,7 @@ deployment_groups:
       instance_image_custom: true
       on_host_maintenance: TERMINATE
       enable_spot_vm: {{ enabe_spot_vm }}
-      additional_networks:
-        $(concat(
-          [{
-            network=null,
-            subnetwork=rdma-network.subnetwork_self_link,
-            subnetwork_project=vars.project_id,
-            nic_type="IRDMA",
-            queue_count=null,
-            network_ip=null,
-            stack_type=null,
-            access_config=null,
-            ipv6_access_config=[],
-            alias_ip_range=[]
-          }]
-        ))
+      additional_networks: $(rdma-network.instance_additional_networks)
       instance_image:
         family: {{ image_family }}
         project: {{ image_project }}
