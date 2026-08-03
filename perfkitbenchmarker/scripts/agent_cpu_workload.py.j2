@@ -1,0 +1,102 @@
+"""Agent CPU Workload script for SWE-bench LLM solver benchmark."""
+
+import json
+import os
+import re
+import subprocess
+import time
+
+from google import genai
+
+TASK_ID = '{{ task_id }}'
+REPO_DIRECTORY = '{{ repo_directory }}'
+GCP_PROJECT = '{{ gcp_project }}'
+GCP_LOCATION = '{{ gcp_location }}'
+MODEL_NAME = '{{ model_name }}'
+MAX_TURNS = {{ max_turns }}
+
+PROBLEM_STATEMENT = """{{ problem_statement }}"""
+
+
+def RunWorkload() -> None:
+  """Executes the LLM solver loop and prints telemetry output."""
+  client = genai.Client(
+      vertexai=True, project=GCP_PROJECT, location=GCP_LOCATION
+  )
+  config = genai.types.GenerateContentConfig(temperature=0.0)
+  chat = client.chats.create(model=MODEL_NAME, config=config)
+
+  prompt = (
+      f'Issue:\n{PROBLEM_STATEMENT}\n\nYou are an autonomous software engineer'
+      f' fixing this bug in ./{REPO_DIRECTORY} repository.\nOutput shell'
+      ' commands inside ```bash...``` code blocks to inspect files, edit code,'
+      ' or run tests.\nDo NOT output DONE until you have executed code edits'
+      ' and verified that tests pass.'
+  )
+
+  start_wall_time = time.perf_counter()
+  start_cpu_time = os.times()
+  turns = 0
+
+  for _ in range(MAX_TURNS):
+    turns += 1
+    print(f'\n--- Turn {turns} ---', flush=True)
+    max_retries = 5
+    for attempt in range(max_retries):
+      try:
+        response = chat.send_message(prompt)
+        break
+      except genai.errors.APIError as e:
+        if e.code != 429 or attempt == max_retries - 1:
+          raise
+        wait = 15 * (attempt + 1)
+        print(f"Vertex API 429 Too Many Requests (Rate Limit). Retrying in {wait}s...", flush=True)
+        time.sleep(wait)
+    response_text = response.text or ''
+    print(f'LLM Response snippet: {response_text[:200]}...', flush=True)
+
+    if re.search(r'\bDONE\b', response_text) and turns > 1:
+      break
+
+    command_match = re.search(
+        r'```bash\s*\n(.*?)\n```', response_text, re.DOTALL
+    )
+    if not command_match:
+      prompt = (
+          'Please output your proposed bash inspection or edit commands inside'
+          ' a ```bash...``` code block.'
+      )
+      continue
+
+    command = command_match.group(1).strip()
+    print(f'Executing command => {command}', flush=True)
+    command_result = subprocess.run(
+        command,
+        cwd=REPO_DIRECTORY,
+        shell=True,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    print(f'Exit code: {command_result.returncode}', flush=True)
+
+    prompt = (
+        f'Executed Command: {command}\n'
+        f'STDOUT:\n{command_result.stdout[:1000]}\n'
+        f'STDERR:\n{command_result.stderr[:1000]}'
+    )
+
+  wall_time = time.perf_counter() - start_wall_time
+  cpu_time = sum(os.times()[:4]) - sum(start_cpu_time[:4])
+
+  results = {
+      'turns_taken': turns,
+      'elapsed_wall_time_seconds': wall_time,
+      'total_cpu_seconds': cpu_time,
+  }
+  with open('telemetry_results.json', 'w') as f:
+    json.dump(results, f)
+
+
+if __name__ == '__main__':
+  RunWorkload()
