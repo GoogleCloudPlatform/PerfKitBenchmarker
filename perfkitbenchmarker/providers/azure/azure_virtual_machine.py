@@ -26,7 +26,6 @@ operate on the VM: boot, shutdown, etc.
 
 import abc
 import collections
-import itertools
 import json
 import logging
 import ntpath
@@ -769,7 +768,7 @@ class AzureVirtualMachine(  # pyrefly: ignore[invalid-inheritance]
       self.max_local_disks = NUM_LOCAL_VOLUMES.get(self.machine_type, 1)
     else:
       self.max_local_disks = 0
-    self.lun_counter = itertools.count()
+    self.lun_counter = 0
     self._deleted = False
     self.resource_group = azure_network.GetResourceGroup()
 

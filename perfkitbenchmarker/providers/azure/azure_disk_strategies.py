@@ -105,7 +105,8 @@ class AzureCreateRemoteDiskStrategy(AzureCreateDiskStrategy):
       for _ in range(disk_spec.num_striped_disks):
         disk_number = self.vm.remote_disk_counter + 1 + self.vm.max_local_disks
         self.vm.remote_disk_counter += 1
-        lun = next(self.vm.lun_counter)
+        lun = self.vm.lun_counter
+        self.vm.lun_counter += 1
         data_disk = azure_disk.AzureDisk(disk_spec, self.vm, lun)
         # TODO(arushigaur) Clean code to avoid using
         # disk_number as it is used for windows only
