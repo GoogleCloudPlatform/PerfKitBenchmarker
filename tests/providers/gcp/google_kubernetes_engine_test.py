@@ -780,6 +780,21 @@ class GoogleKubernetesEngineWithTpusTestCase(PatchedObjectsTestCase):
       self.assertEqual(cluster.default_nodepool.tpu_topology, '2x2x1')
       self.assertEqual(cluster.default_nodepool.tpu_count, 4)
 
+  def testGetResourceMetadata(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects():
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      metadata = cluster.GetResourceMetadata()
+      expected = {
+          'tpu_topology': '2x2x1',
+          'tpu_type': 'tpu-v6e-slice',
+          'tpu_count': 4,
+          'gpu_type': 'tpu-v6e-slice',
+          'gpu_count': 4,
+          'machine_type': 'ct6e-standard-4t',
+      }
+      self.assertEqual(metadata, {**metadata, **expected})
+
 
 class GoogleKubernetesEngineGetNodesTestCase(GoogleKubernetesEngineTestCase):
 

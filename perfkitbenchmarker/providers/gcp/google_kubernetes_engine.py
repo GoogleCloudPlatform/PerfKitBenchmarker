@@ -199,6 +199,15 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     metadata['project'] = self.project
     if self.release_channel:
       metadata['release_channel'] = self.release_channel
+    if self.tpu_topology and self.tpu_type:
+      metadata['tpu_topology'] = self.tpu_topology
+      metadata['tpu_type'] = self.tpu_type
+      metadata['tpu_count'] = self.tpu_count
+      assert self.gpu_type is None and self.gpu_count is None, (
+          'Cannot set both TPU and GPU resources.'
+      )
+      metadata['gpu_type'] = self.tpu_type
+      metadata['gpu_count'] = self.tpu_count
     return metadata
 
   def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
