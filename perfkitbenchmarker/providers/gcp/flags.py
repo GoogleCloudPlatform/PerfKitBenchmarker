@@ -281,7 +281,7 @@ GCE_VM_SERVICE_ACCOUNT = flags.DEFINE_string(
     'Service account to use for authorization from a GCE VM.',
 )
 # TODO(user): Replace usages of this flag with --gce_vm_service_account.
-flags.DEFINE_string(
+GCP_SERVICE_ACCOUNT = flags.DEFINE_string(
     'gcp_service_account', None, 'Service account to use for authorization.'
 )
 GCP_SERVICE_ACCOUNT_KEY_FILE = flags.DEFINE_string(

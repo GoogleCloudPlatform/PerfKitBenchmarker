@@ -16,10 +16,11 @@
 import json
 import unittest
 from unittest import mock
-from absl import flags
+from absl.testing import flagsaver
 from absl.testing import parameterized
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.gcp import bigquery
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from tests import pkb_common_test_case
 
 PACKAGE_NAME = 'PACKAGE_NAME'
@@ -92,8 +93,6 @@ _BASE_BIGQUERY_SPEC = {
     'type': 'bigquery',
     'cluster_identifier': 'bigquerypkb.tpcds_100G',
 }
-
-FLAGS = flags.FLAGS
 
 
 EDW_SERVICE_SPEC = mock.Mock(
@@ -277,45 +276,51 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
-    FLAGS.cloud = 'GCP'
-    FLAGS.run_uri = _TEST_RUN_URI
-    FLAGS.zones = [_GCP_ZONE_US_CENTRAL_1_C]
+    self.enter_context(
+        flagsaver.flagsaver(
+            cloud='GCP',
+            run_uri=_TEST_RUN_URI,
+            zones=[_GCP_ZONE_US_CENTRAL_1_C],
+        )
+    )
 
   def testGetBigQueryClientInterfaceGeneric(self):
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
     self.assertEqual(interface.project_id, PROJECT_ID)
     self.assertEqual(interface.dataset_id, DATASET_ID)
 
+  @flagsaver.flagsaver((gcp_flags.BQ_CLIENT_INTERFACE, 'CLI'))
   def testGetBigQueryClientInterfaceCli(self):
-    FLAGS.bq_client_interface = 'CLI'
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
     self.assertIsInstance(interface, bigquery.CliClientInterface)
 
+  @flagsaver.flagsaver((gcp_flags.BQ_CLIENT_INTERFACE, 'JAVA'))
   def testGetBigQueryClientInterfaceJava(self):
-    FLAGS.bq_client_interface = 'JAVA'
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
     self.assertIsInstance(interface, bigquery.JavaClientInterface)
 
   def testGenericClientInterfaceGetMetada(self):
-    FLAGS.bq_client_interface = 'CLI'
-    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
-    self.assertDictEqual(interface.GetMetadata(), {'client': 'CLI'})
-    FLAGS.bq_client_interface = 'JAVA'
-    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
-    self.assertDictEqual(interface.GetMetadata(), {'client': 'JAVA'})
+    with flagsaver.flagsaver((gcp_flags.BQ_CLIENT_INTERFACE, 'CLI')):
+      interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+      self.assertDictEqual(interface.GetMetadata(), {'client': 'CLI'})
+    with flagsaver.flagsaver((gcp_flags.BQ_CLIENT_INTERFACE, 'JAVA')):
+      interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+      self.assertDictEqual(interface.GetMetadata(), {'client': 'JAVA'})
 
+  @flagsaver.flagsaver(
+      (gcp_flags.BQ_CLIENT_INTERFACE, 'CLI'),
+      (gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, 'SERVICE_ACCOUNT_KEY_FILE'),
+      (gcp_flags.GCP_SERVICE_ACCOUNT, 'SERVICE_ACCOUNT'),
+  )
   def testCliClientInterfacePrepare(self):
-    FLAGS.bq_client_interface = 'CLI'
-    FLAGS.gcp_service_account_key_file = 'SERVICE_ACCOUNT_KEY_FILE'
-    FLAGS.gcp_service_account = 'SERVICE_ACCOUNT'
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
     self.assertIsInstance(interface, bigquery.CliClientInterface)
     bm_spec = FakeBenchmarkSpec(FakeRemoteVMForCliClientInterfacePrepare())
     interface.SetProvisionedAttributes(bm_spec)
     interface.Prepare(PACKAGE_NAME)
 
+  @flagsaver.flagsaver((gcp_flags.BQ_CLIENT_INTERFACE, 'CLI'))
   def testCliClientInterfaceExecuteQuery(self):
-    FLAGS.bq_client_interface = 'CLI'
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
     self.assertIsInstance(interface, bigquery.CliClientInterface)
     bm_spec = FakeBenchmarkSpec(FakeRemoteVMForCliClientInterfaceExecuteQuery())
@@ -324,19 +329,22 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(performance, 1.0)
     self.assertDictEqual(details, {'client': 'CLI', 'job_id': 'JOB_ID'})
 
+  @flagsaver.flagsaver(
+      (gcp_flags.BQ_CLIENT_INTERFACE, 'JAVA'),
+      (gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, 'SERVICE_ACCOUNT_KEY_FILE'),
+  )
   def testJavaClientInterfacePrepare(self):
-    FLAGS.bq_client_interface = 'JAVA'
-    FLAGS.gcp_service_account_key_file = 'SERVICE_ACCOUNT_KEY_FILE'
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
     self.assertIsInstance(interface, bigquery.JavaClientInterface)
     bm_spec = FakeBenchmarkSpec(FakeRemoteVMForJavaClientInterfacePrepare())
     interface.SetProvisionedAttributes(bm_spec)
     interface.Prepare(PACKAGE_NAME)
 
+  @flagsaver.flagsaver(
+      (gcp_flags.BQ_CLIENT_INTERFACE, 'JAVA'),
+      (gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, 'SERVICE_ACCOUNT_KEY_FILE'),
+  )
   def testJavaClientInterfaceExecuteQuery(self):
-    FLAGS.bq_client_interface = 'JAVA'
-    FLAGS.gcp_service_account_key_file = 'SERVICE_ACCOUNT_KEY_FILE'
-
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
     self.assertIsInstance(interface, bigquery.JavaClientInterface)
 
@@ -348,10 +356,11 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(performance, 1.0)
     self.assertDictEqual(details, {'client': 'JAVA', 'job_id': 'JOB_ID'})
 
+  @flagsaver.flagsaver(
+      (gcp_flags.BQ_CLIENT_INTERFACE, 'JAVA'),
+      (gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, 'SERVICE_ACCOUNT_KEY_FILE'),
+  )
   def testJavaClientInterfaceExecuteThroughputWithoutLabels(self):
-    FLAGS.bq_client_interface = 'JAVA'
-    FLAGS.gcp_service_account_key_file = 'SERVICE_ACCOUNT_KEY_FILE'
-
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
     self.assertIsInstance(interface, bigquery.JavaClientInterface)
 
@@ -362,10 +371,11 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     response = interface.ExecuteThroughput(QUERY_STREAMS)
     self.assertDictEqual(json.loads(response), THROUGHPUT_RESPONSE_OBJECT)
 
+  @flagsaver.flagsaver(
+      (gcp_flags.BQ_CLIENT_INTERFACE, 'JAVA'),
+      (gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, 'SERVICE_ACCOUNT_KEY_FILE'),
+  )
   def testJavaClientInterfaceExecuteThroughputWithLabels(self):
-    FLAGS.bq_client_interface = 'JAVA'
-    FLAGS.gcp_service_account_key_file = 'SERVICE_ACCOUNT_KEY_FILE'
-
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
     self.assertIsInstance(interface, bigquery.JavaClientInterface)
 
@@ -553,11 +563,16 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
           ),
       ),
   )
+  @flagsaver.flagsaver(
+      (
+          gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE,
+          '/path/to/SERVICE_ACCOUNT_KEY_FILE',
+      ),
+      (bigquery.BQ_CA_DATA_AGENT, 'AGENT_ID'),
+  )
   def testConversationalAnalyticsClientInterfaceExecuteQueryValidationErrors(
       self, response_dict, expected_error_msg
   ):
-    FLAGS.gcp_service_account_key_file = '/path/to/SERVICE_ACCOUNT_KEY_FILE'
-    FLAGS.bq_ca_data_agent = 'AGENT_ID'
     interface = bigquery.ConversationalAnalyticsClientInterface(
         PROJECT_ID, DATASET_ID
     )
@@ -587,8 +602,13 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     ])
     mock_vm.PushFile.assert_called_once_with(mock.ANY, expected_query_file)
 
+  @flagsaver.flagsaver(
+      (
+          gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE,
+          '/path/to/SERVICE_ACCOUNT_KEY_FILE',
+      )
+  )
   def testGetQueryFileName(self):
-    FLAGS.gcp_service_account_key_file = '/path/to/SERVICE_ACCOUNT_KEY_FILE'
     interface = bigquery.ConversationalAnalyticsClientInterface(
         PROJECT_ID, DATASET_ID
     )
@@ -600,8 +620,13 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     # (for hash) + 4 (for .txt) = 45
     self.assertLen(filename, 45)
 
+  @flagsaver.flagsaver(
+      (
+          gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE,
+          '/path/to/SERVICE_ACCOUNT_KEY_FILE',
+      )
+  )
   def testParseConversationalAnalyticsResultsSuccess(self):
-    FLAGS.gcp_service_account_key_file = '/path/to/SERVICE_ACCOUNT_KEY_FILE'
     interface = bigquery.ConversationalAnalyticsClientInterface(
         PROJECT_ID, DATASET_ID
     )
@@ -635,9 +660,14 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(metadata['job_id'], 'job_123')
     self.assertNotIn('error', metadata)
 
+  @flagsaver.flagsaver(
+      (
+          gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE,
+          '/path/to/SERVICE_ACCOUNT_KEY_FILE',
+      ),
+      (bigquery.BQ_CA_DATA_AGENT, 'AGENT_ID'),
+  )
   def testConversationalAnalyticsClientInterfaceExecuteQuerySuccess(self):
-    FLAGS.gcp_service_account_key_file = '/path/to/SERVICE_ACCOUNT_KEY_FILE'
-    FLAGS.bq_ca_data_agent = 'AGENT_ID'
     interface = bigquery.ConversationalAnalyticsClientInterface(
         PROJECT_ID, DATASET_ID
     )
@@ -678,9 +708,14 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     ])
     mock_vm.PushFile.assert_called_once_with(mock.ANY, expected_query_file)
 
+  @flagsaver.flagsaver(
+      (
+          gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE,
+          '/path/to/SERVICE_ACCOUNT_KEY_FILE',
+      ),
+      (bigquery.BQ_CA_DATA_AGENT, 'AGENT_ID'),
+  )
   def testConversationalAnalyticsClientInterfaceExecuteQueryInvalidJson(self):
-    FLAGS.gcp_service_account_key_file = '/path/to/SERVICE_ACCOUNT_KEY_FILE'
-    FLAGS.bq_ca_data_agent = 'AGENT_ID'
     interface = bigquery.ConversationalAnalyticsClientInterface(
         PROJECT_ID, DATASET_ID
     )
