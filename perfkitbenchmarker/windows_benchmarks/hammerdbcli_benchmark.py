@@ -25,11 +25,11 @@ import time
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.linux_benchmarks import hammerdbcli_benchmark as linux_hammerdb_benchmark
 from perfkitbenchmarker.linux_packages import hammerdb as linux_hammerdb
 from perfkitbenchmarker.windows_packages import hammerdb
-
 
 FLAGS = flags.FLAGS
 
@@ -120,6 +120,7 @@ def GetConfig(user_config):
 
 def CheckPrerequisites(_):
   """Verifies that benchmark flags is correct."""
+  linux_hammerdb.CheckPrerequisites(_)
   if (
       hammerdb.HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value
       != hammerdb.NON_OPTIMIZED
@@ -210,37 +211,69 @@ def Run(benchmark_spec):
   db = benchmark_spec.relational_db
   assert db is not None
 
-  linux_hammerdb_benchmark.PreRun(db)
-  start_time = datetime.datetime.now()
-
-  stop_event = threading.Event()
-  collection_thread = None
-  if db.engine_type == sql_engine_utils.SQLSERVER and db.is_managed_db:
-    collection_thread = threading.Thread(
-        target=hammerdb.CollectDbPerformanceCounters, args=(db, stop_event)
-    )
-    collection_thread.start()
-
-  try:
-    samples = hammerdb.Run(
-        client_vms[0],
-        sql_engine_utils.SQLSERVER,
-        hammerdb.HAMMERDB_SCRIPT.value,
-        timeout=linux_hammerdb.HAMMERDB_RUN_TIMEOUT.value,
-    )
-  finally:
-    if collection_thread:
-      stop_event.set()
-      collection_thread.join()
-
-  end_time = datetime.datetime.now()
-  linux_hammerdb_benchmark.PostRun(db)
-
-  samples.extend(db.CollectMetrics(start_time, end_time))
+  script = hammerdb.HAMMERDB_SCRIPT.value
   metadata = GetMetadata()
-  for sample in samples:
-    sample.metadata.update(metadata)
-  return samples
+  virtual_users_list = linux_hammerdb.GetNumVirtualUsersList()
+  metadata['hammerdbcli_virtual_users_list'] = virtual_users_list
+
+  collector = sample.SampleGroupCollector()
+  for num_virtual_users in virtual_users_list:
+    # The schema is built once during Prepare with the first virtual user
+    # count. Reconfigure the run script when sweeping additional counts.
+    if len(virtual_users_list) > 1:
+      hammerdb.ConfigureRunScript(
+          client_vms[0],
+          sql_engine_utils.SQLSERVER,
+          script,
+          num_virtual_users,
+          db.endpoint,
+          db.port,
+          db.spec.database_password,
+          db.spec.database_username,
+          FLAGS.cloud == 'Azure' and FLAGS.use_managed_db,
+      )
+
+    linux_hammerdb_benchmark.PreRun(db)
+    start_time = datetime.datetime.now()
+
+    stop_event = threading.Event()
+    collection_thread = None
+    if db.engine_type == sql_engine_utils.SQLSERVER and db.is_managed_db:
+      collection_thread = threading.Thread(
+          target=hammerdb.CollectDbPerformanceCounters, args=(db, stop_event)
+      )
+      collection_thread.start()
+
+    try:
+      current_samples = hammerdb.Run(
+          client_vms[0],
+          sql_engine_utils.SQLSERVER,
+          script,
+          timeout=linux_hammerdb.HAMMERDB_RUN_TIMEOUT.value,
+      )
+    finally:
+      if collection_thread:
+        stop_event.set()
+        collection_thread.join()
+
+    end_time = datetime.datetime.now()
+    linux_hammerdb_benchmark.PostRun(db)
+
+    current_samples.extend(db.CollectMetrics(start_time, end_time))
+    run_metadata = dict(metadata)
+    run_metadata['hammerdbcli_vu'] = num_virtual_users
+    for s in current_samples:
+      s.metadata.update(run_metadata)
+    collector.Add(num_virtual_users, current_samples)
+
+  results = list(collector.all_samples)
+  if len(virtual_users_list) > 1:
+    results.extend(
+        collector.GetBestSamples(
+            linux_hammerdb.TPM, 'max_tpm', sample.Aggregation.MAX
+        )
+    )
+  return results
 
 
 def GetMetadata():

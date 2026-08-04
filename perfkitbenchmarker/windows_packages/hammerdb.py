@@ -25,6 +25,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import hammerdb as linux_hammerdb
 
@@ -191,6 +192,39 @@ def SetupConfig(
   for script in windows_scripts:
     if script.script_type == linux_hammerdb.BUILD_SCRIPT_TYPE:
       script.Run(vm, timeout=linux_hammerdb.HAMMERDB_BUILD_TIMEOUT.value + 600)
+
+
+def ConfigureRunScript(
+    vm: virtual_machine.BaseVirtualMachine,
+    db_engine: str,
+    hammerdb_script: str,
+    num_virtual_users: int,
+    ip: str,
+    port: int,
+    password: str,
+    user: str,
+    is_managed_azure: bool,
+):
+  """Re-installs the run (benchmark) script for a specific virtual user count."""
+  db_engine = sql_engine_utils.GetDbEngineType(db_engine)
+  run_script = linux_hammerdb.SCRIPT_MAPPING[db_engine][hammerdb_script][-1]
+  run_script = WindowsHammerDbTclScript(
+      run_script.tcl_script_name,
+      run_script.needed_parameters,
+      run_script.path,
+      run_script.script_type,
+  )
+  script_parameters = WindowsTclScriptParameters(
+      ip,
+      port,
+      password,
+      user,
+      is_managed_azure,
+      hammerdb_script,
+      run_script.script_type,
+      num_virtual_users=num_virtual_users,
+  )
+  run_script.Install(vm, script_parameters)
 
 
 @vm_util.Retry(poll_interval=10, max_retries=3)

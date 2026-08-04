@@ -13,7 +13,9 @@
 # limitations under the License.
 """Module containing pgbench installation, cleanup and run functions."""
 
+import datetime
 import socket
+import statistics
 import time
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
@@ -86,6 +88,21 @@ def MakeSamplesFromOutput(
   return [tps_sample, latency_sample]
 
 
+class PgBenchResults(sample.SampleGroupCollector):
+  """Encapsulates pgbench samples grouped by client count."""
+
+  def _GetMetricValue(
+      self, samples: list[sample.Sample], metric: str
+  ) -> float | None:
+    """Returns the mean TPS from a pgbench tps_array sample, if present."""
+    for s in samples:
+      if s.metric == metric and 'tps' in s.metadata:
+        tps_values = s.metadata['tps']
+        if tps_values:
+          return statistics.mean(tps_values)
+    return None
+
+
 def RunPgBench(
     benchmark_spec,
     relational_db,
@@ -99,7 +116,7 @@ def RunPgBench(
     metadata,
     file=None,
     path=None,
-):
+) -> PgBenchResults:
   """Run Pgbench on the client VM.
 
   Args:
@@ -115,6 +132,9 @@ def RunPgBench(
     metadata: Metadata of the benchmark
     file: Filename of the benchmark
     path: File path of the benchmar.
+
+  Returns:
+    A PgBenchResults containing all samples grouped by client count.
   """
   # AWS DNS sometimes timeout when running the benchmark
   # https://stackoverflow.com/questions/58179080/occasional-temporary-failure-in-name-resolution-while-connecting-to-aws-aurora
@@ -145,6 +165,8 @@ def RunPgBench(
 
   if job_counts and len(client_counts) != len(job_counts):
     raise ValueError('Length of clients and jobs must be the same.')
+
+  results = PgBenchResults()
   for i in range(len(client_counts)):
     time.sleep(seconds_to_pause)
     client = client_counts[i]
@@ -153,13 +175,19 @@ def RunPgBench(
     else:
       jobs = min(client, 16)
 
+    start_time = datetime.datetime.now()
     command = (
         f'ulimit -n 10000 && pgbench {connection_string} --client={client} '
         f'--jobs={jobs} --time={seconds_per_test} --progress=1 '
-        '-r' + extended_protocol
+        '-r'
+        + extended_protocol
     )
     if file and path:
       command = f'cd {path} && {command} --file={file}'
     _, stderr = vm.RobustRemoteCommand(command)
+    end_time = datetime.datetime.now()
     samples = MakeSamplesFromOutput(stderr, client, jobs, metadata)
+    samples.extend(relational_db.CollectMetrics(start_time, end_time))
     publisher.PublishRunStageSamples(benchmark_spec, samples)
+    results.Add(client, samples)
+  return results

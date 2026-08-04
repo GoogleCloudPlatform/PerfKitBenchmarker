@@ -24,6 +24,7 @@ from typing import Any, FrozenSet, List
 from absl import flags
 from dateutil import parser
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
@@ -162,8 +163,10 @@ HAMMERDB_TPCC_DURATION = flags.DEFINE_integer(
 )
 
 HAMMERDB_TPCC_NUM_WAREHOUSE = flags.DEFINE_integer(
-    'hammerdbcli_tpcc_num_warehouse', None, 'Number of warehouses set in TPCC. '
-    'If unset, it defaults to 5 for managed and num_cpus*25 for unmanaged.'
+    'hammerdbcli_tpcc_num_warehouse',
+    None,
+    'Number of warehouses set in TPCC. '
+    'If unset, it defaults to 5 for managed and num_cpus*25 for unmanaged.',
 )
 
 HAMMERDB_TPCC_ALL_WAREHOUSE = flags.DEFINE_bool(
@@ -179,8 +182,13 @@ LOAD_TPCH_TABLES_TO_COLUMNAR_ENGINE = flags.DEFINE_bool(
     'Load the table to columnar engine.',
 )
 
-HAMMERDB_NUM_VU = flags.DEFINE_integer(
-    'hammerdbcli_num_vu', None, 'Number of virtual users'
+HAMMERDB_NUM_VU = flags.DEFINE_list(
+    'hammerdbcli_num_vu',
+    None,
+    'Number of virtual users. Accepts a comma-separated list (e.g. 4,8,16) to '
+    'sweep multiple virtual user counts within a single run. When multiple '
+    'values are provided, the run with the highest TPM is additionally '
+    'reported as a separate set of "max_tpm"-prefixed samples.',
 )
 HAMMERDB_BUILD_TPCC_NUM_VU = flags.DEFINE_integer(
     'hammerdbcli_build_tpcc_num_vu',
@@ -234,18 +242,28 @@ HAMMERDB_SERVER_CONFIGURATION = flags.DEFINE_string(
 )
 
 
+def GetNumVirtualUsersList() -> list[int]:
+  """Returns the list of virtual user counts to run.
+
+  Defaults to [1] when the flag is unset (e.g. before SetDefaultConfig runs).
+  """
+  if not HAMMERDB_NUM_VU.value:
+    return [1]
+  return [int(num_virtual_users) for num_virtual_users in HAMMERDB_NUM_VU.value]
+
+
 def SetDefaultConfig(num_cpus: int | None):
   """Set the default configurations of unfilled flags."""
   if HAMMERDB_NUM_VU.value is None:
     if HAMMERDB_SCRIPT.value == HAMMERDB_SCRIPT_TPC_H:
-      FLAGS.hammerdbcli_num_vu = 1
+      FLAGS.hammerdbcli_num_vu = ['1']
     elif HAMMERDB_SCRIPT.value == HAMMERDB_SCRIPT_TPC_C:
       if FLAGS.use_managed_db or num_cpus is None:
-        FLAGS.hammerdbcli_num_vu = 4
+        FLAGS.hammerdbcli_num_vu = ['4']
       else:
-        FLAGS.hammerdbcli_num_vu = num_cpus * 2
+        FLAGS.hammerdbcli_num_vu = [str(num_cpus * 2)]
   if HAMMERDB_BUILD_TPCC_NUM_VU.value is None:
-    FLAGS.hammerdbcli_build_tpcc_num_vu = HAMMERDB_NUM_VU.value
+    FLAGS.hammerdbcli_build_tpcc_num_vu = max(GetNumVirtualUsersList())
   if HAMMERDB_TPCC_NUM_WAREHOUSE.value is None:
     if FLAGS.use_managed_db or num_cpus is None:
       FLAGS.hammerdbcli_tpcc_num_warehouse = 5
@@ -255,7 +273,15 @@ def SetDefaultConfig(num_cpus: int | None):
 
 def CheckPrerequisites(_):
   """Verifies that benchmark setup is correct."""
-  pass
+  if (
+      len(GetNumVirtualUsersList()) > 1
+      and HAMMERDB_SCRIPT.value != HAMMERDB_SCRIPT_TPC_C
+  ):
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'A list of virtual users (--hammerdbcli_num_vu) is only supported for '
+        f'the {HAMMERDB_SCRIPT_TPC_C} script, but got '
+        f'"{HAMMERDB_SCRIPT.value}".'
+    )
 
 
 # define Hammerdb exception
@@ -423,8 +449,11 @@ class TclScriptParameters:
       script_type,
       db_engine_version=None,
       db_engine=None,
+      num_virtual_users=None,
       db_service=None,
   ):
+    if num_virtual_users is None:
+      num_virtual_users = GetNumVirtualUsersList()[0]
     if ':' in ip:
       ip = ip.replace(':', '\\:')
 
@@ -443,7 +472,7 @@ class TclScriptParameters:
       if script_type == BUILD_SCRIPT_TYPE:
         tpch_user_param = HAMMERDB_BUILD_TPCH_NUM_VU.value
       else:
-        tpch_user_param = HAMMERDB_NUM_VU.value
+        tpch_user_param = num_virtual_users
 
       self.map_search_to_replace.update({
           SCRIPT_PARAMETER_TPCH_DEGREE_OF_PARALLEL: (
@@ -464,7 +493,7 @@ class TclScriptParameters:
           SCRIPT_PARAMETER_TPCC_DURATION: HAMMERDB_TPCC_DURATION.value,
           SCRIPT_PARAMETER_TPCC_RAMPUP: HAMMERDB_TPCC_RAMPUP.value,
           SCRIPT_PARAMETER_TPCC_BUILD_USERS: HAMMERDB_BUILD_TPCC_NUM_VU.value,
-          SCRIPT_PARAMETER_TPCC_USERS: HAMMERDB_NUM_VU.value,
+          SCRIPT_PARAMETER_TPCC_USERS: num_virtual_users,
           SCRIPT_PARAMETER_TPCC_NUM_WAREHOUSE: (
               HAMMERDB_TPCC_NUM_WAREHOUSE.value
           ),
@@ -834,12 +863,12 @@ def ParseResults(
   """Parse HammerDB results using the appropriate parser for the script type.
 
   Args:
-    script:  An enumeration from HAMMERDB_SCRIPT indicating which
-      script to run.  Must have been prior setup with SetupConfig method on the
-      vm to work.
+    script:  An enumeration from HAMMERDB_SCRIPT indicating which script to run.
+      Must have been prior setup with SetupConfig method on the vm to work.
     stdout:  Output from hammerdb.Run
     vm:  The virtual machine to run on that has Install and SetupConfig already
       invoked on it.
+
   Returns:
     A list of samples
   Raises:
@@ -1080,8 +1109,9 @@ def SetupConfig(
 
   if db_engine not in SCRIPT_MAPPING:
     raise ValueError(
-        '{} is currently not supported for running '
-        'hammerdb benchmarks.'.format(db_engine)
+        '{} is currently not supported for running hammerdb benchmarks.'.format(
+            db_engine
+        )
     )
 
   if hammerdb_script not in SCRIPT_MAPPING[db_engine]:
@@ -1091,6 +1121,7 @@ def SetupConfig(
 
   scripts = SCRIPT_MAPPING[db_engine][hammerdb_script]
 
+  num_virtual_users = GetNumVirtualUsersList()[0]
   for script in scripts:
     script_parameters = TclScriptParameters(
         ip=ip,
@@ -1102,6 +1133,7 @@ def SetupConfig(
         script_type=script.script_type,
         db_engine_version=db_engine_version,
         db_engine=db_engine,
+        num_virtual_users=num_virtual_users,
         db_service=db_service,
     )
     script.Install(vm, script_parameters)
@@ -1109,6 +1141,36 @@ def SetupConfig(
   # Run all the build script or scripts before actual run phase
   for i in range(len(scripts) - 1):
     scripts[i].Run(vm)
+
+
+def ConfigureRunScript(
+    vm: virtual_machine.BaseVirtualMachine,
+    db_engine: str,
+    hammerdb_script: str,
+    num_virtual_users: int,
+    ip: str,
+    port: str,
+    password: str,
+    user: str,
+    is_managed_azure: bool,
+    db_engine_version: str | None = None,
+):
+  """Re-installs the run (benchmark) script for a specific virtual user count."""
+  db_engine = sql_engine_utils.GetDbEngineType(db_engine)
+  run_script = SCRIPT_MAPPING[db_engine][hammerdb_script][-1]
+  script_parameters = TclScriptParameters(
+      ip=ip,
+      port=port,
+      password=password,
+      user=user,
+      is_managed_azure=is_managed_azure,
+      hammerdb_script=hammerdb_script,
+      script_type=run_script.script_type,
+      db_engine_version=db_engine_version,
+      db_engine=db_engine,
+      num_virtual_users=num_virtual_users,
+  )
+  run_script.Install(vm, script_parameters)
 
 
 def Run(
@@ -1162,40 +1224,41 @@ def RunValidation(
   return scripts[-1].Run(vm, timeout=timeout) if scripts else ''
 
 
-def GetMetadata(db_engine: str):
+def GetMetadata(db_engine: str) -> dict[str, Any]:
   """Returns the meta data needed for hammerdb."""
   script = HAMMERDB_SCRIPT.value
-  metadata = {
+  metadata: dict[str, Any] = {
       'hammerdbcli_script': script,
   }
 
   metadata['hammerdbcli_version'] = HAMMERDB_VERSION.value
-  metadata['hammerdbcli_vu'] = HAMMERDB_NUM_VU.value  # pyrefly: ignore[bad-assignment]
+  metadata['hammerdbcli_vu'] = GetNumVirtualUsersList()
   if not FLAGS.use_managed_db and HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value:
     metadata['hammerdbcli_optimized_server_configuration'] = (
         HAMMERDB_OPTIMIZED_SERVER_CONFIGURATION.value
     )
 
   if script == HAMMERDB_SCRIPT_TPC_H:
-    metadata['hammerdbcli_scale_factor'] = HAMMERDB_TPCH_SCALE_FACTOR.value  # pyrefly: ignore[bad-assignment]
+    metadata['hammerdbcli_scale_factor'] = HAMMERDB_TPCH_SCALE_FACTOR.value
     metadata['hammerdbcli_load_tpch_tables_to_columnar_engine'] = (
-        LOAD_TPCH_TABLES_TO_COLUMNAR_ENGINE.value  # pyrefly: ignore[bad-assignment]
+        LOAD_TPCH_TABLES_TO_COLUMNAR_ENGINE.value
     )
-    metadata['hammerdbcli_build_tpch_num_vu'] = HAMMERDB_BUILD_TPCH_NUM_VU.value  # pyrefly: ignore[bad-assignment]
+    metadata['hammerdbcli_build_tpch_num_vu'] = HAMMERDB_BUILD_TPCH_NUM_VU.value
     if db_engine == sql_engine_utils.POSTGRES:
       metadata['hammerdbcli_degree_of_parallel'] = (
-          HAMMERDB_TPCH_DEGREE_OF_PARALLEL.value  # pyrefly: ignore[bad-assignment]
+          HAMMERDB_TPCH_DEGREE_OF_PARALLEL.value
       )
   elif script == HAMMERDB_SCRIPT_TPC_C:
-    metadata['hammerdbcli_num_warehouse'] = HAMMERDB_TPCC_NUM_WAREHOUSE.value  # pyrefly: ignore[bad-assignment]
-    metadata['hammerdbcli_all_warehouse'] = HAMMERDB_TPCC_ALL_WAREHOUSE.value  # pyrefly: ignore[bad-assignment]
-    metadata['hammerdbcli_rampup'] = HAMMERDB_TPCC_RAMPUP.value  # pyrefly: ignore[bad-assignment]
-    metadata['hammerdbcli_duration'] = HAMMERDB_TPCC_DURATION.value  # pyrefly: ignore[bad-assignment]
-    metadata['hammerdbcli_tpcc_time_profile'] = HAMMERDB_TPCC_TIME_PROFILE.value  # pyrefly: ignore[bad-assignment]
-    metadata['hammerdbcli_tpcc_log_transactions'] = TPCC_LOG_TRANSACTIONS.value  # pyrefly: ignore[bad-assignment]
+    metadata['hammerdbcli_num_warehouse'] = HAMMERDB_TPCC_NUM_WAREHOUSE.value
+    metadata['hammerdbcli_all_warehouse'] = HAMMERDB_TPCC_ALL_WAREHOUSE.value
+    metadata['hammerdbcli_rampup'] = HAMMERDB_TPCC_RAMPUP.value
+    metadata['hammerdbcli_duration'] = HAMMERDB_TPCC_DURATION.value
+    metadata['hammerdbcli_tpcc_time_profile'] = HAMMERDB_TPCC_TIME_PROFILE.value
+    metadata['hammerdbcli_tpcc_log_transactions'] = TPCC_LOG_TRANSACTIONS.value
     if HAMMERDB_BUILD_TPCC_NUM_VU.value is None:
-      FLAGS.hammerdbcli_build_tpcc_num_vu = HAMMERDB_NUM_VU.value
-    metadata['hammerdbcli_build_tpcc_num_vu'] = HAMMERDB_BUILD_TPCC_NUM_VU.value  # pyrefly: ignore[bad-assignment]
+      FLAGS.hammerdbcli_build_tpcc_num_vu = max(GetNumVirtualUsersList())
+    metadata['hammerdbcli_build_tpcc_num_vu'] = HAMMERDB_BUILD_TPCC_NUM_VU.value
     metadata['hammerdbcli_restart_before_run'] = (
-        HAMMERDB_RESTART_BEFORE_RUN.value)  # pyrefly: ignore[bad-assignment]
+        HAMMERDB_RESTART_BEFORE_RUN.value
+    )
   return metadata
