@@ -25,6 +25,8 @@ from typing import Any, Dict
 
 from absl import flags
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import events
+from perfkitbenchmarker import stages
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
@@ -392,10 +394,22 @@ def GCESimulateMaintenanceFactory(
     return GCESimulateMaintenanceToolForWindows(vm)
   return GCESimulateMaintenanceTool(vm)  # pytype: disable=wrong-arg-types
 
+TRIGGER = None
+
+
+def SetupTrigger(unused_sender, benchmark_spec):
+  """Unregisters the old trigger and creates a fresh one for each iteration."""
+  global TRIGGER
+  if TRIGGER:
+    TRIGGER.Unregister()
+  TRIGGER = MaintenanceEventTrigger()
+  TRIGGER.Register()
+  TRIGGER.SetUpTrigger(unused_sender, benchmark_spec)
+
 
 def Register(parsed_flags):
   """Registers the simulate maintenance trigger if FLAGS.simulate_maintenance is set."""
   if not parsed_flags.simulate_maintenance:
     return
-  trigger = MaintenanceEventTrigger()
-  trigger.Register()
+  # Delegate the actual instantiation to the before_phase hook
+  events.before_phase.connect(SetupTrigger, stages.RUN, weak=False)

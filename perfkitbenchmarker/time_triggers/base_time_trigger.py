@@ -144,6 +144,13 @@ class BaseTimeTrigger(metaclass=abc.ABCMeta):
     events.benchmark_samples_created.connect(self.AppendSamples, weak=False)
     events.all_samples_created.connect(self.UpdateMetadata, weak=False)
 
+  def Unregister(self):
+    """Disconnects signals so the trigger doesn't leak between iterations."""
+    events.before_phase.disconnect(self.SetUpTrigger)
+    events.trigger_phase.disconnect(self.RunTrigger)
+    events.benchmark_samples_created.disconnect(self.AppendSamples)
+    events.all_samples_created.disconnect(self.UpdateMetadata)
+
   @property
   def trigger_name(self) -> str:
     return ''
