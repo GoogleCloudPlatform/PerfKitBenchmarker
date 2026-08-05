@@ -330,16 +330,17 @@ def CreateMockVM(hostname='Hostname', vm_id='12345', ip_address='1.2.3.4'):
 class DefaultMetadataProviderTestCase(unittest.TestCase):
 
   def setUp(self):
-    p = mock.patch(publisher.__name__ + '.FLAGS')
-    self.mock_flags = p.start()
-    self.mock_flags.configure_mock(
-        metadata=[],
-        num_striped_disks=1,
-        sysctl=[],
-        set_files=[],
-        simulate_maintenance=False,
+    super().setUp()
+    self.enterContext(
+        flagsaver.flagsaver(
+            metadata=[],
+            num_striped_disks=1,
+            sysctl=[],
+            set_files=[],
+            simulate_maintenance=False,
+            hostname_metadata=True,
+        )
     )
-    self.addCleanup(p.stop)
 
     self.maxDiff = None
     p = mock.patch(publisher.__name__ + '.version', VERSION='v1')
@@ -476,6 +477,11 @@ class DefaultMetadataProviderTestCase(unittest.TestCase):
         'vm_names': 'Hostname,foo,bar',
     }
     self._RunTest(mock_spec, expected)
+
+  @flagsaver.flagsaver(project='my-project')
+  def testAddMetadata_Project(self):
+    expected = self.default_meta | {'project': 'my-project'}
+    self._RunTest(self.mock_spec, expected)
 
   @flagsaver.flagsaver(throw_on_metadata_conflict=False)
   def testDontOverrideMetadata(self):

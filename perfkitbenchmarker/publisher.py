@@ -282,6 +282,8 @@ class DefaultMetadataProvider(MetadataProvider):
       new_metadata['hostnames'] = ','.join(
           [vm.hostname for vm in benchmark_spec.vms]
       )
+    if FLAGS.project:
+      new_metadata['project'] = FLAGS.project
     if benchmark_spec.container_cluster:
       cluster = benchmark_spec.container_cluster
       for k, v in cluster.GetResourceMetadata().items():

@@ -480,6 +480,7 @@
 -   Record service reported VM creation times on GCP, AWS, and Azure.
 -   Add `kubernetes_nginx_global_conf` and `kubernetes_nginx_server_conf` flags
     to `kubernetes_nginx_benchmark` for specifying custom nginx configs.
+-   Add the GCP project to metadata if it is specified.
 
 ### Bug fixes and maintenance updates:
 
