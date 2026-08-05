@@ -157,13 +157,14 @@ def load_variant_data(results_dir, metric_prefix, sweep_label, benchmark):
     all_data = {}
     import re
     bench_short = benchmark.replace("k8s_", "")[:4]
-    uri_to_variant = {}
+
+    # Map 4-char, 8-char, and 12-char variant prefixes to variant names
+    prefix_to_variant = {}
     for v in VARIANT_DESC.keys():
-        clean_var_8 = re.sub(r"[^a-zA-Z0-9]", "", v)[:8]
-        uri_to_variant[f"{bench_short}{clean_var_8}"] = v
-        clean_var_12 = re.sub(r"[^a-zA-Z0-9]", "", v)[:12]
-        if clean_var_12 not in uri_to_variant:
-            uri_to_variant[clean_var_12] = v
+        clean_var = re.sub(r"[^a-zA-Z0-9]", "", v)
+        prefix_to_variant[clean_var[:4]] = v
+        prefix_to_variant[clean_var[:8]] = v
+        prefix_to_variant[clean_var[:12]] = v
 
     runs_dir = Path(results_dir) / "runs"
     if not runs_dir.is_dir():
@@ -174,7 +175,15 @@ def load_variant_data(results_dir, metric_prefix, sweep_label, benchmark):
         if not variant_dir.is_dir():
             continue
         raw_name = variant_dir.name
-        variant_name = uri_to_variant.get(raw_name, raw_name)
+        variant_name = raw_name
+
+        # Extract the variant by matching the prefix after the benchmark short name
+        if raw_name.startswith(bench_short):
+            remainder = raw_name[len(bench_short):]
+            for length in [8, 4]:
+                if remainder[:length] in prefix_to_variant:
+                    variant_name = prefix_to_variant[remainder[:length]]
+                    break
 
         results_file = variant_dir / "perfkitbenchmarker_results.json"
         if not results_file.is_file():
