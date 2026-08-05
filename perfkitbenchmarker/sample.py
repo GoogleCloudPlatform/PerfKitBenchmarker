@@ -351,7 +351,8 @@ class SampleGroupCollector:
 
     The winning group's original samples are annotated with
     metadata[metadata_key] = True. A duplicate of each sample in that group is
-    returned with its metric name prefixed by the prefix.
+    returned with its metric name prefixed by the prefix and without the
+    metadata_key entry in its metadata.
 
     Args:
       metric: Target metric name to evaluate.
@@ -389,13 +390,15 @@ class SampleGroupCollector:
 
     prefixed_samples = []
     for s in best_samples:
+      sample_metadata = dict(s.metadata)
+      sample_metadata.pop(metadata_key, None)
       s.metadata[metadata_key] = True
       prefixed_samples.append(
           Sample(
               f'{metric_prefix}{s.metric}',
               s.value,
               s.unit,
-              dict(s.metadata),
+              sample_metadata,
           )
       )
     return prefixed_samples

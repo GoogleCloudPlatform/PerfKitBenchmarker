@@ -135,7 +135,7 @@ class TestSampleGroupCollector(unittest.TestCase):
     tps_sample = [s for s in best_samples if s.metric == 'max_tps_tps'][0]
     self.assertEqual(tps_sample.value, 300.0)
     self.assertEqual(tps_sample.metadata['group'], 'b')
-    self.assertTrue(tps_sample.metadata['max_tps'])
+    self.assertNotIn('max_tps', tps_sample.metadata)
 
   def testMinAggregation(self):
     collector = sample.SampleGroupCollector()
@@ -157,7 +157,7 @@ class TestSampleGroupCollector(unittest.TestCase):
     ]
     self.assertEqual(lat_sample.value, 2.0)
     self.assertEqual(lat_sample.metadata['group'], 'b')
-    self.assertTrue(lat_sample.metadata['min_latency'])
+    self.assertNotIn('min_latency', lat_sample.metadata)
 
   def testAnnotatesWinningGroup(self):
     collector = sample.SampleGroupCollector()
