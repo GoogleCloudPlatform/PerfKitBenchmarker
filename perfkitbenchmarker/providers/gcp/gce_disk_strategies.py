@@ -443,7 +443,7 @@ class SetUpGcsFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):
     self.vm.RemoteCommand(f'sudo gcsfuse -o {opts} {bucket_name} {target}')
     # Increase kernel read-ahead size
     self.vm.RemoteCommand(
-        'echo 1024 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'
+        'echo 32768 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'
         f' {target})/read_ahead_kb'
     )
     self.vm.scratch_disks.append(gcs_client)
