@@ -92,7 +92,7 @@ class BaseClusterSpec(spec.BaseSpec):
       config_values['template'] = flag_values.cluster_template_file
     if flag_values['cluster_unmanaged_provision'].present:
       config_values['unmanaged'] = flag_values.cluster_unmanaged_provision
-    cloud = config_values['cloud']
+    cloud = config_values.get('cloud')
     # only apply to workers
     if flag_values['num_vms'].present:
       config_values['workers']['vm_count'] = flag_values['num_vms'].value
@@ -406,7 +406,9 @@ class BaseCluster(resource.BaseResource):
     except errors.Setup.BadPreprovisionedDataError:
       logging.warning(
           'Cannot find preprovisioned squash image %s in preprovisioned bucket.'
-          ' Attempting to build from dockerfile.')
+          ' Attempting to build from dockerfile.',
+          image,
+      )
       headnode.PushFile(data.ResourcePath(dockerfile), 'Dockerfile')
       tmp_image = str(uuid.uuid4()).split('-')[0]
       image_path = os.path.join(install_path, image)

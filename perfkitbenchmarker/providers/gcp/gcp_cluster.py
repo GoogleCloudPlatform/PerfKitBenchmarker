@@ -72,38 +72,45 @@ class GceCluster(cluster.BaseCluster):
     """
     self._RenderClusterConfig()
 
-  def _RenderClusterConfig(self):
-    """Render the config file that will be used to create the cluster."""
+  def _GetTemplateParameters(self):
+    """Returns parameters that will be used to render the cluster config."""
     tags = util.GetDefaultTags(FLAGS.timeout_minutes)
     controller_tags = tags.copy()
     controller_tags['ssh-keys'] = 'perfkit:' + self._pub_key
     compute_tags = tags.copy()
     compute_tags['ssh-keys'] = 'root:' + self._pub_key
+
+    # Disable SMT when possible (default in cluster toolkit)
+    if FLAGS['disable_smt'].present and FLAGS.disable_smt:
+      threads_per_core = 1
+    else:
+      threads_per_core = 2
+
+    return {
+        'name': self.name,
+        'zone': self.zone,
+        'region': util.GetRegionFromZone(self.zone),
+        'num_workers': self.num_workers,
+        'worker_machine_type': self.worker_machine_type,
+        'headnode_machine_type': self.headnode_machine_type,
+        'image_family': self.workers_spec.image_family,  # pyrefly: ignore[missing-attribute]
+        'image_project': self.workers_spec.image_project,  # pyrefly: ignore[missing-attribute]
+        'project': self.project,
+        # boot disk of headnode is also mounted as NFS
+        'nfs_size': self.headnode_spec.boot_disk_size,
+        'compute_tags': compute_tags,
+        'controller_tags': controller_tags,
+        'enabe_spot_vm': FLAGS.gce_preemptible_vms,
+        'threads_per_core': threads_per_core,
+    }
+
+  def _RenderClusterConfig(self):
+    """Render the config file that will be used to create the cluster."""
     with open(data.ResourcePath(self.template)) as content:
       template = jinja2.Template(
           content.read(), undefined=jinja2.StrictUndefined
       )
-      # Disable SMT when possible (default in cluster toolkit)
-      threads_per_core = 0
-      if FLAGS['disable_smt'].present:
-        threads_per_core = 1 if FLAGS.disable_smt else 2
-      self._config = template.render(
-          name=self.name,
-          zone=self.zone,
-          region=util.GetRegionFromZone(self.zone),
-          num_workers=self.num_workers,
-          worker_machine_type=self.worker_machine_type,
-          headnode_machine_type=self.headnode_machine_type,
-          image_family=self.workers_spec.image_family,  # pyrefly: ignore[missing-attribute]
-          image_project=self.workers_spec.image_project,  # pyrefly: ignore[missing-attribute]
-          project=self.project,
-          # boot disk of headnode is also mounted as NFS
-          nfs_size=self.headnode_spec.boot_disk_size,
-          compute_tags=compute_tags,
-          controller_tags=controller_tags,
-          enabe_spot_vm=FLAGS.gce_preemptible_vms,
-          threads_per_core=threads_per_core,
-      )
+      self._config = template.render(self._GetTemplateParameters())
 
   def _Create(self):
     """Create GCP cluster with cluster toolkit."""
@@ -196,7 +203,7 @@ class GceCluster(cluster.BaseCluster):
           ' ~/.ssh/config'
       )
       vm.RemoteCommand('chmod 600 ~/.ssh/config')
-      vm.has_private_key: bool = True  # pyrefly: ignore[bad-assignment]
+      vm.has_private_key = True
 
 
 class H4dCluster(GceCluster):
