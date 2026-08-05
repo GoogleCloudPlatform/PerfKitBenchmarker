@@ -175,7 +175,9 @@ class BaseCluster(resource.BaseResource):
     self.unmanaged: bool = cluster_spec.unmanaged
     self.spec: BaseClusterSpec = cluster_spec
     self.worker_machine_type: str = self.machine_type
-    self.headnode_machine_type: str = cluster_spec.headnode.vm_spec.machine_type
+    self.headnode_machine_type: str = (
+        cluster_spec.headnode.vm_spec.machine_type
+    )
     self.headnode_spec: virtual_machine_spec.BaseVmSpec = (
         cluster_spec.headnode.vm_spec
     )
@@ -415,7 +417,18 @@ class BaseCluster(resource.BaseResource):
       headnode.RemoteCommand(
           f'docker build --network=host -t {tmp_image} .; '
           f'enroot import -o {image_path} dockerd://{tmp_image}; '
-          f'docker rmi {tmp_image}')
+          f'docker rmi {tmp_image}'
+      )
+
+  def WaitForJobs(self) -> None:
+    """Waits for cluster jobs to complete."""
+    pass
+
+  def GetInstallationNode(
+      self,
+  ) -> linux_virtual_machine.BaseLinuxVirtualMachine:
+    """Returns the VM where software installation should happen."""
+    return self.worker_vms[0]
 
 
 Cluster = typing.TypeVar('Cluster', bound=BaseCluster)
