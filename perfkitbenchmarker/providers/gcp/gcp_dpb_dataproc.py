@@ -306,7 +306,19 @@ class GcpDpbDataproc(GcpDpbBaseDataproc):
         self._service_reported_cluster_ready_time,
     ) = self._ParseClusterCreateTime(stdout)
     if retcode:
-      util.CheckGcloudResponseKnownFailures(stderr, retcode)
+      try:
+        util.CheckGcloudResponseKnownFailures(stderr, retcode)
+      except (
+          errors.Benchmarks.QuotaFailure,
+          errors.Benchmarks.InsufficientCapacityCloudFailure,
+      ):
+        # If cluster creation fails with either of these, Dataproc control
+        # plane, instead of cleaning up the mess, leaves it half-created with
+        # lots of VMs idling around and using up quota until deleted manually.
+        # Hence enabling self.created to destroy the cluster for good on
+        # Teardown.
+        self.created = True
+        raise
       raise errors.Resource.CreationError(stderr)
     self.resource_ready_time = time.time()
 
