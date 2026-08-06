@@ -81,6 +81,11 @@ _KAFKA_PRODUCER_BATCH_SIZE = flags.DEFINE_integer(
     1024 * 128 * 1,  # 128 KB
     'Batch size of the producer in bytes, default is 128 KB.',
 )
+_KAFKA_PRODUCER_THROUGHPUT = flags.DEFINE_integer(
+    'kafka_producer_throughput',
+    -1,
+    'Throughput of the producer in records/sec. Use -1 to disable throttling.',
+)
 _KAFKA_CONSUMER_FETCH_SIZE = flags.DEFINE_integer(
     'kafka_consumer_fetch_size',
     1024 * 1024 * 50,  # 50 MB
@@ -300,7 +305,7 @@ def _RunProducer(
       f'--topic={topic_name} '
       f'--num-records={num_records} '
       f'--record-size={_KAFKA_RECORD_SIZE.value} '
-      '--throughput=-1 '
+      f'--throughput={_KAFKA_PRODUCER_THROUGHPUT.value} '
       f'--bootstrap-server {bootstrap_server} '
       f'--reporting-interval={_KAFKA_REPORTING_INTERVAL.value} '
       '--command-config /tmp/producer.properties '
