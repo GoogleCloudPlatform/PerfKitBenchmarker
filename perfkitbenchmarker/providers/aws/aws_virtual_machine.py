@@ -817,17 +817,19 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     response = self._RunDescribeInstancesCommand()
     instance = response['Reservations'][0]['Instances'][0]
     self.internal_ip = instance['PrivateIpAddress']
-    launch_time = instance.get('LaunchTime')
-    if launch_time:
-      self.official_create_time = int(
-          dateutil.parser.parse(launch_time).timestamp()
-      )
     for network_interface in instance.get('NetworkInterfaces', []):
       # Ensures primary NIC is first
       if network_interface['Attachment']['DeviceIndex'] == 0:
         self.internal_ips = [
             network_interface['PrivateIpAddress']
         ] + self.internal_ips
+        # EC2 does not provide a direct way to get the official create time.
+        # However, we can use the attach time of the primary NIC to get it.
+        attach_time = network_interface['Attachment'].get('AttachTime')
+        if attach_time:
+          self.official_create_time = int(
+              dateutil.parser.parse(attach_time).timestamp()
+          )
       else:
         if aws_flags.AWS_DISABLE_NON_PRIMARY_NIC_SOURCE_DEST_CHECK.value:
           cmd = util.AWS_PREFIX + [
