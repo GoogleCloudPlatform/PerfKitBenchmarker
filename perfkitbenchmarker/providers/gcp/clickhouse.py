@@ -3,8 +3,13 @@
 Requires: A container_cluster also initialized by PKB.
 """
 
+import copy
+import hashlib
+import json
 import logging
+import os
 from typing import Any
+import uuid
 
 from absl import flags
 from perfkitbenchmarker import edw_service
@@ -21,22 +26,110 @@ FLAGS = flags.FLAGS
 class ClickhouseClientInterface(edw_service.EdwClientInterface):
   """Python Client Interface class for ClickHouse."""
 
+  def __init__(
+      self,
+      address: str = '127.0.0.1',
+      port: int = 9000,
+      http_port: int = 8123,
+      user: str = 'external',
+      password: str = '',
+  ):
+    super().__init__()
+    self.address = address
+    self.port = port
+    self.http_port = http_port
+    self.user = user
+    self.password = password
+
   def Prepare(self, package_name: str) -> None:
     """Prepares the client vm to execute query."""
-    del package_name
+    assert self.client_vm
+    self.client_vm.RemoteCommand('curl https://clickhouse.com/ | sh')
+    self.client_vm.RemoteCommand('sudo ./clickhouse install')
+    # Give access to non-root users.
+    self.client_vm.RemoteCommand('chmod a+rx ~')
+    self.client_vm.RemoteCommand('sudo mkdir -p /var/lib/clickhouse/user_files')
+    self.client_vm.RemoteCommand(
+        'sudo chmod 755 /var/lib/clickhouse /var/lib/clickhouse/user_files'
+    )
 
-  def _RunClientCommand(self, command: str, additional_args: list[str]) -> str:
-    del command
-    del additional_args
-    return ''
+    # Install dependencies for python driver
+    self.client_vm.Install('pip')
+    self.client_vm.RemoteCommand(
+        'sudo apt-get -qq update && DEBIAN_FRONTEND=noninteractive sudo apt-get'
+        ' -qq install python3.12-venv'
+    )
+    self.client_vm.RemoteCommand('python3 -m venv .venv')
+    self.client_vm.RemoteCommand(
+        'source .venv/bin/activate && pip install clickhouse-connect absl-py'
+    )
+
+    # Push driver script and common library to client vm
+    self.client_vm.PushDataFile(
+        os.path.join(
+            _CLICKHOUSE_PYTHON_CLIENT_DIR, _CLICKHOUSE_PYTHON_CLIENT_FILE
+        )
+    )
+    self.client_vm.PushDataFile(
+        os.path.join(
+            edw_service.EDW_PYTHON_DRIVER_LIB_DIR,
+            edw_service.EDW_PYTHON_DRIVER_LIB_FILE,
+        )
+    )
+
+  def _RunClientCommand(
+      self,
+      base: str,
+      additional_args: list[str] | None = None,
+      port: int | None = None,
+  ) -> tuple[str, str]:
+    """Runs a command adding common arguments."""
+    if port is None:
+      port = self.port
+    cmd = [
+        base,
+        f'--host={self.address}',
+        f'--port={port}',
+        f'--user={self.user}',
+        f'--password={self.password}',
+    ]
+    if additional_args:
+      cmd.extend(additional_args)
+    assert self.client_vm
+    return self.client_vm.RemoteCommand(' '.join(cmd))
+
+  def _RunPythonClientCommand(
+      self, command: str, additional_args: list[str]
+  ) -> str:
+    """Runs a command on the clickhouse python client."""
+    stdout = self._RunClientCommand(
+        f'.venv/bin/python {_CLICKHOUSE_PYTHON_CLIENT_FILE} {command}',
+        port=self.http_port,
+        additional_args=additional_args,
+    )[0]
+    return stdout
+
+  def ExecuteViaClickhouseClient(self, statement: str) -> str:
+    """Executes a SQL statement via clickhouse-client and returns stdout."""
+    stdout = self._RunClientCommand(
+        'clickhouse-client',
+        port=self.port,
+        additional_args=[f'--query="{statement}"'],
+    )[0]
+    return stdout
 
   def ExecuteQuery(
       self, query_name: str, print_results: bool = False
   ) -> tuple[float, dict[str, Any]]:
-    """Executes a query and returns performance details."""
-    del query_name
-    del print_results
-    return 0, {}
+    """Executes a query file and returns performance details."""
+    args = [f'--query_file={query_name}']
+    if print_results:
+      args.append('--print_results')
+    stdout = self._RunPythonClientCommand('single', args)
+    json_output = json.loads(stdout)
+    details = copy.copy(self.GetMetadata())
+    details.update(json_output['details'])
+    return json_output['query_wall_time_in_secs'], details
 
   def ExecuteThroughput(
       self,
@@ -44,9 +137,9 @@ class ClickhouseClientInterface(edw_service.EdwClientInterface):
       labels: dict[str, str] | None = None,
   ) -> str:
     """Executes queries simultaneously on client and return performance details."""
-    del concurrency_streams
-    del labels
-    return ''
+    del labels  # Currently not supported by clickhouse python api
+    args = [f"--query_streams='{json.dumps(concurrency_streams)}'"]
+    return self._RunPythonClientCommand('throughput', args)
 
   def GetMetadata(self) -> dict[str, str]:
     return {
@@ -55,6 +148,8 @@ class ClickhouseClientInterface(edw_service.EdwClientInterface):
 
 
 _NAMESPACE = 'clickhouse'
+_CLICKHOUSE_PYTHON_CLIENT_FILE = 'ch_python_driver.py'
+_CLICKHOUSE_PYTHON_CLIENT_DIR = 'edw/clickhouse/clients/python'
 _KEEPER_CHART = 'container/clickhouse/keeper-cluster.yaml.j2'
 _CLICKHOUSE_CHART = 'container/clickhouse/clickhouse-cluster.yaml.j2'
 _LOADBALANCER_CHART = 'container/loadbalancer.yaml.j2'
@@ -71,9 +166,6 @@ class Clickhouse(edw_service.EdwService):
     """Initialize the ClickHouse object."""
     super().__init__(edw_service_spec)
     self.name: str = f'pkb-{FLAGS.run_uri}'
-    self.address: str = ''
-    self.port: int = 9000
-    self.address: str = ''
     self.project: str = FLAGS.project
     # Following advice from:
     # https://clickhouse.com/docs/guides/sizing-and-hardware-recommendations
@@ -84,8 +176,19 @@ class Clickhouse(edw_service.EdwService):
     self.num_replicas: int = (
         edw_service.CLICKHOUSE_NUM_REPLICAS.value or 3 * self.num_shards
     )
+    self.address = '127.0.0.1'
+    self.user = 'external'
+    self.password = str(uuid.uuid4())[-8:]
+    self.port: int = 9000
+    self.http_port: int = 8123
     self.client_interface: ClickhouseClientInterface = (
-        ClickhouseClientInterface()
+        ClickhouseClientInterface(
+            address=self.address,
+            port=self.port,
+            http_port=self.http_port,
+            user=self.user,
+            password=self.password,
+        )
     )
 
   def IsUserManaged(self, edw_service_spec) -> bool:
@@ -94,6 +197,12 @@ class Clickhouse(edw_service.EdwService):
 
   def _Create(self) -> None:
     """Creates the ClickHouse cluster on GKE following operator workflow."""
+    self._InstallClickhouse()
+    self._WaitForDeployment()
+    self._CreateLoadBalancer()
+
+  def _InstallClickhouse(self) -> None:
+    """Installs ClickHouse and operator dependencies."""
     kubectl.RunKubectlCommand(['create', 'namespace', _NAMESPACE, '-o', 'yaml'])
     service_account = util.GetDefaultComputeServiceAccount(self.project)
     cmd = [
@@ -167,20 +276,26 @@ class Clickhouse(edw_service.EdwService):
     kubernetes_commands.ApplyManifest(_KEEPER_CHART)
 
     # 4. Deploy the actual ClickHouse cluster
+    password_sha256_hex = hashlib.sha256(
+        self.password.encode('utf-8')
+    ).hexdigest()
     kubernetes_commands.ApplyManifest(
         _CLICKHOUSE_CHART,
         cluster_name=self.name,
         num_shards=self.num_shards,
         num_replicas=self.num_replicas,
         memory=self.memory,
+        user=self.user,
+        password_sha256_hex=password_sha256_hex,
     )
 
   def _GetClickhouseReplicaPrefix(self) -> str:
     """Returns the resource prefix for ClickHouse server replicas created by the operator."""
     return f'chi-{self.name}-{self.name}'
 
-  def _IsReady(self) -> bool:
-    """Checks if ClickHouse pods are ready."""
+  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableCreationError,))
+  def _WaitForDeployment(self) -> None:
+    """Waits for ClickHouse pods to be ready."""
     try:
       kubernetes_commands.WaitForRollout(
           f'statefulset.apps/{self._GetClickhouseReplicaPrefix()}-0-0',
@@ -193,13 +308,25 @@ class Clickhouse(edw_service.EdwService):
           condition_name='Ready',
           timeout=60 * 4 + 20 * self.node_count,
       )
-      return True
     except errors.VmUtil.IssueCommandError as e:
-      if 'not found' not in str(e):
-        logging.exception(
-            'ClickHouse is not ready and gave unexpected error: %s', e
-        )
+      if 'not found' in str(e):
+        raise errors.Resource.RetryableCreationError(
+            f'ClickHouse resource not found yet: {e}'
+        ) from e
+      raise
+
+  def _IsReady(self) -> bool:
+    """Checks if ClickHouse is ready by querying the HTTP endpoint."""
+    # Check via curl / HTTP because the client_vm isn't set yet.
+    url = (
+        f'http://{self.address}:{self.http_port}/?'
+        f'user={self.user}&password={self.password}&query=SELECT+version()'
+    )
+    cmd = ['curl', url]
+    stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
+    if retcode:
       return False
+    return '.' in str(stdout)
 
   def _CreateLoadBalancer(self) -> None:
     """Creates a Kubernetes LoadBalancer service for ClickHouse."""
@@ -211,9 +338,18 @@ class Clickhouse(edw_service.EdwService):
     )
     manifest_dicts[0]['spec']['selector'] = {
         'clickhouse.altinity.com/app': 'chop',
+        'clickhouse.altinity.com/chi': self.name,
+        'clickhouse.altinity.com/ready': 'yes',
     }
+    manifest_dicts[0]['spec']['ports'].append({
+        'name': 'http-port',
+        'protocol': 'TCP',
+        'port': self.http_port,
+        'targetPort': self.http_port,
+    })
     kubernetes_commands.ApplyYaml(manifest_dicts)
     self.address = self._GetLoadBalancerIP()
+    self.client_interface.address = self.address
     logging.info(
         'Clickhouse running & accessible at %s:%d', self.address, self.port
     )
@@ -236,11 +372,6 @@ class Clickhouse(edw_service.EdwService):
           'Load Balancer IP for service %s is not ready.' % self.name
       )
     return out
-
-  def _PostCreate(self) -> None:
-    """Gets the ClickHouse service port and deploys a load balancer."""
-    super()._PostCreate()
-    self._CreateLoadBalancer()
 
   def _Delete(self) -> None:
     """Deletes the cluster and associated operator components."""

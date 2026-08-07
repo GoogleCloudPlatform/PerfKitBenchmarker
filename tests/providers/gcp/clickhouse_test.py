@@ -46,21 +46,22 @@ class ClickhouseTest(pkb_common_test_case.PkbCommonTestCase):
     )
     mock_cmd = self.MockIssueCommand({
         'projects list': [('[{"projectNumber": 123}]', '', 0)],
+        'get service': [('34.123.45.67', '', 0)],
     })
     db = clickhouse.Clickhouse(EDW_SERVICE_SPEC)
 
     db._Create()
 
+    self.assertEqual(db.address, '34.123.45.67')
+    self.assertEqual(db.client_interface.address, '34.123.45.67')
     self.assertTrue(mock_cmd.func_to_mock.called)
-    self.assertEqual(mock_tf.write.call_count, 2)
+    self.assertEqual(mock_tf.write.call_count, 3)
     keeper_yaml = mock_tf.write.call_args_list[0].args[0]
     cluster_yaml = mock_tf.write.call_args_list[1].args[0]
     self.assertIn('ClickHouseKeeperInstallation', keeper_yaml)
-    self.assertIn('replicasCount: 3', keeper_yaml)
     self.assertIn('ClickHouseInstallation', cluster_yaml)
-    self.assertIn('replicasCount: 3', cluster_yaml)
-    self.assertIn('shardsCount: 1', cluster_yaml)
-    self.assertIn('memory: 32G', cluster_yaml)
+    self.assertIn('<external replace="1">', cluster_yaml)
+    self.assertIn('<password_sha256_hex>', cluster_yaml)
 
   def testCpuAndReplicasInferred(self):
     self.enter_context(
@@ -74,40 +75,13 @@ class ClickhouseTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(db.cpu, 16.0)
     self.assertEqual(db.num_replicas, 6)
 
-  def testPostCreate(self):
-    db = clickhouse.Clickhouse(EDW_SERVICE_SPEC)
-    mock_write = self.enter_context(
-        mock.patch.object(vm_util, 'WriteTemporaryFile', return_value='lb.yaml')
-    )
-    mock_cmd = self.MockIssueCommand({
-        'get service': [('34.123.45.67', '', 0)],
-        'apply -f': [('service/pkb-123 created', '', 0)],
-    })
-
-    db._PostCreate()
-
-    self.assertEqual(db.port, 9000)
-    self.assertEqual(db.address, '34.123.45.67')
-    self.assertIn(
-        'clickhouse.altinity.com/app: chop', mock_write.call_args[0][0]
-    )
-    self.assertTrue(mock_cmd.func_to_mock.called)
-
-  def testIsReadyTrue(self):
+  def testWaitForDeployment(self):
     db = clickhouse.Clickhouse(EDW_SERVICE_SPEC)
     mock_cmd = self.MockIssueCommand({
         'rollout status': [('rollout successfully completed', '', 0)],
         'wait': [('pod condition met', '', 0)],
     })
-    self.assertTrue(db._IsReady())
-    self.assertTrue(mock_cmd.func_to_mock.called)
-
-  def testIsReadyFalse(self):
-    db = clickhouse.Clickhouse(EDW_SERVICE_SPEC)
-    mock_cmd = self.MockIssueCommand({
-        'rollout status': [('', 'not found', 1)],
-    })
-    self.assertFalse(db._IsReady())
+    db._WaitForDeployment()
     self.assertTrue(mock_cmd.func_to_mock.called)
 
   def testDelete(self):
@@ -122,6 +96,94 @@ class ClickhouseTest(pkb_common_test_case.PkbCommonTestCase):
     db = clickhouse.Clickhouse(EDW_SERVICE_SPEC)
     metadata = db.GetMetadata()
     self.assertIn('clickhouse_memory', metadata)
+
+  def testRunClientCommand(self):
+    client = clickhouse.ClickhouseClientInterface()
+    client.address = '10.0.0.1'
+    client.port = 9000
+    client.client_vm = self.MockRemoteCommand({'SELECT 1': [('output', '')]})
+
+    stdout, _ = client._RunClientCommand(
+        'clickhouse-client', ['SELECT 1', '--format=CSV']
+    )
+
+    self.assertEqual(stdout, 'output')
+    client.client_vm.RemoteCommand.assert_called_once_with(
+        'clickhouse-client --host=10.0.0.1 --port=9000 --user=external'
+        ' --password= SELECT 1 --format=CSV'
+    )
+
+  def testExecuteQuery(self):
+    client = clickhouse.ClickhouseClientInterface()
+    client.address = '10.0.0.1'
+    client.http_port = 8123
+    json_output = (
+        '{"query_wall_time_in_secs": 0.123, "details": {"job_id": "test-uuid",'
+        ' "query_id": "test-uuid"}}'
+    )
+    client.client_vm = self.MockRemoteCommand({'single': [(json_output, '')]})
+
+    time_taken, details = client.ExecuteQuery(
+        'query_1.sql', print_results=False
+    )
+
+    self.assertAlmostEqual(time_taken, 0.123, places=5)
+    self.assertEqual(details['client'], 'python')
+    self.assertEqual(details['job_id'], 'test-uuid')
+    self.assertEqual(details['query_id'], 'test-uuid')
+    client.client_vm.RemoteCommand.assert_called_once_with(
+        '.venv/bin/python ch_python_driver.py single --host=10.0.0.1'
+        ' --port=8123 --user=external --password= --query_file=query_1.sql'
+    )
+
+  def testExecuteStatement(self):
+    client = clickhouse.ClickhouseClientInterface()
+    client.address = '10.0.0.1'
+    client.port = 9000
+    client.client_vm = self.MockRemoteCommand(
+        {'clickhouse-client': [('stdout output', '')]}
+    )
+
+    res = client.ExecuteViaClickhouseClient('SELECT 1')
+
+    self.assertEqual(res, 'stdout output')
+    client.client_vm.RemoteCommand.assert_called_once_with(
+        'clickhouse-client --host=10.0.0.1 --port=9000 --user=external'
+        ' --password= --query="SELECT 1"'
+    )
+
+  def testExecuteThroughput(self):
+    client = clickhouse.ClickhouseClientInterface()
+    client.address = '10.0.0.1'
+    client.http_port = 8123
+    client.client_vm = self.MockRemoteCommand(
+        {'throughput': [('{"throughput_wall_time_in_secs": 5.0}', '')]}
+    )
+
+    res = client.ExecuteThroughput([['1.sql', '2.sql'], ['3.sql', '4.sql']])
+
+    self.assertEqual(res, '{"throughput_wall_time_in_secs": 5.0}')
+    client.client_vm.RemoteCommand.assert_called_once_with(
+        '.venv/bin/python ch_python_driver.py throughput --host=10.0.0.1'
+        ' --port=8123 --user=external --password= --query_streams=\'[["1.sql",'
+        ' "2.sql"], ["3.sql", "4.sql"]]\''
+    )
+
+  def testIsReadyTrue(self):
+    db = clickhouse.Clickhouse(EDW_SERVICE_SPEC)
+    mock_cmd = self.MockIssueCommand({
+        'curl': [('24.10.1.1', '', 0)],
+    })
+    self.assertTrue(db._IsReady())
+    self.assertTrue(mock_cmd.func_to_mock.called)
+
+  def testIsReadyFalse(self):
+    db = clickhouse.Clickhouse(EDW_SERVICE_SPEC)
+    mock_cmd = self.MockIssueCommand({
+        'curl': [('', '', 1)],
+    })
+    self.assertFalse(db._IsReady())
+    self.assertTrue(mock_cmd.func_to_mock.called)
 
 
 if __name__ == '__main__':

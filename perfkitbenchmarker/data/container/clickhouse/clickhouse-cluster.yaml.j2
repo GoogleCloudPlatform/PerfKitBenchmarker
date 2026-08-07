@@ -5,6 +5,20 @@ metadata:
   namespace: clickhouse
 spec:
   configuration:
+    files:
+      users.d/{{ user }}.xml: |
+        <clickhouse>
+          <users>
+            <{{ user }} replace="1">
+              <password_sha256_hex>{{ password_sha256_hex }}</password_sha256_hex>
+              <profile>default</profile>
+              <networks>
+                <ip>0.0.0.0/0</ip>
+                <ip>::/0</ip>
+              </networks>
+            </{{ user }}>
+          </users>
+        </clickhouse>
     zookeeper:
       keeper:
         name: keeper-cluster
