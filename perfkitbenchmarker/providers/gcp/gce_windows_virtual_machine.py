@@ -232,9 +232,11 @@ class WindowsGceVirtualMachine(
 
   def DiskDriveIsLocal(self, device, model):
     """Helper method to determine if a disk drive is a local ssd to stripe."""
+    model_lower = model.lower().strip()
     if (
-        model.lower().strip() == 'nvme_card'
-        or model.lower().strip() == 'google ephemeraldisk'
+        model_lower == 'nvme_card'
+        or (model_lower.startswith('nvme_card') and model_lower[9:].isdigit())
+        or model_lower == 'google ephemeraldisk'
     ):
       return True
     return False
