@@ -34,6 +34,7 @@ not in benchmark files.
 """
 
 import logging
+import posixpath
 import textwrap
 from typing import Any, Optional
 
@@ -587,3 +588,92 @@ class SwapDaemonSet(resource.BaseResource):
 
     self.pod_name = recovered_pod
     return recovered_pod
+
+  def SetupSwap(
+      self,
+      swap_type: str,
+      enable_dmcrypt: bool,
+      swap_size_gb: int,
+      io2_volume_id: str = '',
+  ) -> None:
+    """Configure swap on the cluster node.
+
+    Subclasses should override this method to provide cloud-specific
+    implementations.
+
+    Args:
+      swap_type: The type of swap to configure.
+      enable_dmcrypt: Whether to enable dm-crypt.
+      swap_size_gb: Size of the swap in GB.
+      io2_volume_id: Optional io2 volume ID for AWS.
+    """
+    raise NotImplementedError()
+
+  def EnableZswap(self) -> None:
+    """Enable zswap with lz4 compressor and 20% pool limit inside the pod."""
+    logging.info('[swap_encryption] Enabling zswap (lz4, 20%% pool)')
+    for cmd in [
+        'echo 1      > /sys/module/zswap/parameters/enabled',
+        'echo lz4    > /sys/module/zswap/parameters/compressor',
+        'echo 20     > /sys/module/zswap/parameters/max_pool_percent',
+        'echo z3fold > /sys/module/zswap/parameters/zpool',
+    ]:
+      self.PodExec(cmd, ignore_failure=True)
+
+  def SetupPlainSwapFile(self, size_gb: int) -> None:
+    """Fallback: create a loop-device-backed swapfile.
+
+    A plain file on overlayfs cannot be used as swap (EINVAL). A loop
+    device presents a proper block device to the mm subsystem.
+
+    Args:
+      size_gb: Swap file size in GB.
+    """
+    logging.info('[swap_encryption] Creating %dGB loop-device swap', size_gb)
+    swapfile_path = posixpath.join(vm_util.VM_TMP_DIR, 'pkb_swapfile')
+    self.PodExec(
+        textwrap.dedent(f"""
+    fallocate -l {size_gb}G {swapfile_path} && \\
+    chmod 600 {swapfile_path} && \\
+    LOOP=$(losetup -f) && \\
+    losetup "$LOOP" {swapfile_path} && \\
+    mkswap "$LOOP" && \\
+    swapon "$LOOP" && \\
+    echo "swap loop device: $LOOP"
+  """),
+    )
+
+  def GetActiveSwapDevice(self, explicit_device: str = '') -> str:
+    """Return the active swap device path on the cluster node.
+
+    Args:
+      explicit_device: If non-empty, returned directly without probing.
+
+    Returns:
+      Full device path, e.g. '/dev/mapper/swap_encrypted'.
+
+    Raises:
+      errors.Benchmarks.RunError: if no active swap device is found.
+    """
+    if explicit_device:
+      return explicit_device
+    dm_out, _ = self.PodExec(
+        textwrap.dedent("""
+            ACTIVE=$(awk 'NR==2{print $1}' /proc/swaps 2>/dev/null)
+            if [ -n "$ACTIVE" ]
+            then
+              echo "$ACTIVE"
+            elif test -e /dev/mapper/swap_encrypted
+            then
+              echo /dev/mapper/swap_encrypted
+            fi
+        """),
+        ignore_failure=True,
+    )
+    dev = dm_out.strip().splitlines()[-1].strip() if dm_out.strip() else ''
+    if dev:
+      return dev
+    raise errors.Benchmarks.RunError(
+        '[swap_encryption] No active swap device found in the benchmark pod. '
+        'Use --swap_encryption_device to specify one.'
+    )

@@ -42,6 +42,7 @@ from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
+from perfkitbenchmarker import resource
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.resources.container_service import swap_daemonset
 
@@ -110,7 +111,10 @@ def Prepare(spec: _BenchmarkSpec) -> None:
   Args:
     spec: PKB BenchmarkSpec with spec.container_cluster already created.
   """
-  daemonset = swap_daemonset.SwapDaemonSet(
+  daemonset_class = resource.GetResourceClass(
+      swap_daemonset.SwapDaemonSet, CLOUD=spec.container_cluster.CLOUD
+  )
+  daemonset = daemonset_class(
       name=_DS_NAME,
       namespace=_DS_NAMESPACE,
       label=_DS_LABEL,
