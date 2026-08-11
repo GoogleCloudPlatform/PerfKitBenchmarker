@@ -155,6 +155,9 @@ def Run(benchmark_spec):
   spanner: gcp_spanner.GcpSpannerInstance = benchmark_spec.relational_db
   executor: ycsb.YCSBExecutor = benchmark_spec.executor
 
+  executor.environment = getattr(executor, 'environment', {})
+  executor.environment['GOOGLE_CLOUD_SPANNER_ENABLE_MULTIPLEXED_SESSIONS'] = 'true'
+
   run_kwargs = {
       'table': BENCHMARK_TABLE,
       'zeropadding': BENCHMARK_ZERO_PADDING,
