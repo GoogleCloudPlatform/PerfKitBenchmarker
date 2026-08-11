@@ -22,6 +22,7 @@ import os
 from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import events
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import sample
@@ -112,7 +113,16 @@ class _OTELCollector(base_collector.BaseCollector):
     vm.RemoteCommand(f'cd {windows_otel_dir}; git checkout {GIT_TAG}')
 
     build_path = ntpath.join(windows_otel_dir, 'cmd', 'otelopscol', '')
-    vm.RemoteCommand(f'cd {windows_otel_dir}; go build {build_path}')
+    for _ in range(3):
+      _, _, retcode = vm.RemoteCommandWithReturnCode(
+          f'cd {windows_otel_dir}; go build {build_path}', ignore_failure=True
+      )
+      if retcode == 0:
+        break
+    else:
+      raise errors.VirtualMachine.RemoteCommandError(
+          'Failed to build OTEL collector on Windows after 3 attempts'
+      )
 
   def _CollectorRunCommand(self, vm, collector_file):
     """See base class."""
