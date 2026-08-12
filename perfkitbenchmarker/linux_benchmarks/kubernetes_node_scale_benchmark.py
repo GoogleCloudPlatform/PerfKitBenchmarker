@@ -60,6 +60,16 @@ _SCALE_UP_TIMEOUT_SECONDS = 3 * 60 * 60  # 3 hours
 _SCALE_DOWN_TIMEOUT_SECONDS = 2 * 60 * 60  # 2 hours
 _POLL_INTERVAL_SECONDS = 60
 
+P = sample.Percentile
+
+_TARGET_METRICS = [
+    P(50),
+    P(90),
+    P(99),
+    P(99.9),
+    P(100),
+]
+
 
 def CheckPrerequisites(_):
   """Validates flags and config."""
@@ -415,22 +425,10 @@ def _SummarizeNodeDeletionTimes(
   """
   if not deletion_times:
     return []
-  summaries = kubernetes_scale_benchmark.SummarizeTimestamps(
-      list(deletion_times.values())
+  base_sample = sample.Sample('node_delete_', 0, 'seconds', {'phase': phase})
+  return sample.SummarizePercentiles(
+      list(deletion_times.values()), base_sample, _TARGET_METRICS
   )
-  target_percentiles = {'p50', 'p90', 'p99', 'p99.9', 'p100'}
-  samples: list[sample.Sample] = []
-  for name, value in summaries.items():
-    if name in target_percentiles:
-      samples.append(
-          sample.Sample(
-              f'node_delete_{name}',
-              value,
-              'seconds',
-              metadata={'phase': phase},
-          )
-      )
-  return samples
 
 
 def _ScaleDeployment(replicas: int) -> None:

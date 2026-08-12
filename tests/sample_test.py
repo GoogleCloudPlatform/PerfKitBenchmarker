@@ -92,6 +92,44 @@ class TestPercentileCalculator(unittest.TestCase):
       sample.PercentileCalculator([3], percentiles=['a'])
 
 
+class TestSummarizeTimestamps(unittest.TestCase):
+
+  def testSummarizeTimestamps(self):
+    latencies = [float(x) for x in range(0, 101)]
+    metrics = [
+        sample.NpAggregation.MEAN,
+        sample.Percentile(0),
+        sample.Percentile(10),
+        sample.Percentile(50),
+        sample.Percentile(90),
+        sample.Percentile(95),
+        sample.Percentile(99.9),
+        sample.Percentile(100),
+    ]
+    base_sample = sample.Sample('test_', 0, 'seconds')
+    samples = sample.SummarizePercentiles(
+        latencies, base_sample, metrics=metrics
+    )
+
+    sample_dict = {s.metric: s.value for s in samples}
+
+    self.assertEqual(sample_dict['test_mean'], 50.0)
+    self.assertEqual(sample_dict['test_p0'], 0.0)
+    self.assertEqual(sample_dict['test_p50'], 50.0)
+    self.assertEqual(sample_dict['test_p100'], 100.0)
+    self.assertEqual(sample_dict['test_p99.9'], 99.9)
+
+    # mean + 7 percentiles (0, 10, 50, 90, 95, 99.9, 100)
+    self.assertEqual(len(samples), 8)
+
+  def testEmptyLatencies(self):
+    base_sample = sample.Sample('test_', 0, 'seconds')
+    samples = sample.SummarizePercentiles(
+        [], base_sample, metrics=[sample.NpAggregation.MEAN]
+    )
+    self.assertEqual(samples, [])
+
+
 class TestSampleGroupCollector(unittest.TestCase):
 
   def _MakeRunSamples(self, tps, latency, group_key):

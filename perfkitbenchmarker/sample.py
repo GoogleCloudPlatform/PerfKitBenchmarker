@@ -15,6 +15,8 @@
 
 import calendar
 import collections
+from collections.abc import Sequence
+import dataclasses
 import datetime
 import enum
 import math
@@ -51,6 +53,31 @@ TIME_SERIES_METADATA = [
     TIMESTAMPS,
     INTERVAL,
 ]
+
+
+class NpAggregation(enum.Enum):
+  MEAN = 'mean'
+
+
+@dataclasses.dataclass
+class Percentile:
+  """Represents a percentile value (0-100)."""
+
+  value: float
+  label: str
+
+  def __init__(self, val: float):
+    try:
+      self.value = float(val)
+    except ValueError as e:
+      raise ValueError(f'{val} is not a valid percentile.') from e
+    if not (0 <= self.value <= 100):
+      raise ValueError(f'{val} must be between 0 and 100.')
+
+    if self.value.is_integer():
+      self.label = 'p' + str(int(self.value))
+    else:
+      self.label = 'p' + str(self.value)
 
 
 def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
@@ -152,6 +179,55 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):  # pyrefly: igno
   def asdict(self) -> dict[str, Any]:  # pylint:disable=invalid-name
     """Converts the Sample to a dictionary."""
     return self._asdict()
+
+
+def SummarizePercentiles(
+    numbers: Sequence[float],
+    base_sample: Sample,
+    metrics: Sequence[NpAggregation | Percentile],
+) -> list[Sample]:
+  """Returns a few summary statistics samples about a list of numbers.
+
+  Args:
+    numbers: A list of numbers to aggregate.
+    base_sample: A Sample object to pull metric (as prefix), unit, and metadata
+      from.
+    metrics: A list of metrics to include (e.g., NpAggregation.MEAN,
+      Percentile(50)).
+
+  Returns:
+    A list of Sample objects representing the summary statistics.
+  """
+  if not numbers:
+    return []
+  samples = []
+  prefix = base_sample.metric
+
+  if NpAggregation.MEAN in metrics:
+    samples.append(
+        Sample(
+            prefix + 'mean',
+            np.mean(numbers),
+            base_sample.unit,
+            base_sample.metadata,
+        )
+    )
+
+  percentiles = [m for m in metrics if isinstance(m, Percentile)]
+  if percentiles:
+    float_percentiles = [p.value for p in percentiles]
+    results = np.percentile(numbers, float_percentiles)
+    for i, p in enumerate(percentiles):
+      samples.append(
+          Sample(
+              prefix + p.label,
+              results[i],
+              base_sample.unit,
+              base_sample.metadata,
+          )
+      )
+
+  return samples
 
 
 _Histogram = collections.OrderedDict
@@ -321,9 +397,7 @@ class SampleGroupCollector:
         for group_key, samples in self._samples_by_group.items()
     }
 
-  def _GetMetricValue(
-      self, samples: list[Sample], metric: str
-  ) -> float | None:
+  def _GetMetricValue(self, samples: list[Sample], metric: str) -> float | None:
     """Returns the metric value from a list of samples, if present.
 
     Subclasses can override this method to support custom value extraction

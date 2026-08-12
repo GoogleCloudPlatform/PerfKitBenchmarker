@@ -6,7 +6,6 @@ import time
 
 from absl import flags
 from absl import logging
-import numpy as np
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
@@ -74,6 +73,19 @@ _SPECIFY_NODEPOOL = flags.DEFINE_string(
 MANIFEST_TEMPLATE = 'container/kubernetes_scale/kubernetes_scale.yaml.j2'
 DEFAULT_IMAGE = 'busybox:1.37'
 NVIDIA_GPU_IMAGE = 'nvidia/cuda:11.0.3-runtime-ubuntu20.04'
+
+P = sample.Percentile
+
+_TARGET_METRICS = [
+    sample.NpAggregation.MEAN,
+    P(0),
+    P(10),
+    P(50),
+    P(90),
+    P(95),
+    P(99.9),
+    P(100),
+]
 
 
 def _GetImage(cluster: container_cluster.BaseContainerCluster) -> str:
@@ -470,15 +482,11 @@ def ParseStatusChanges(
     )
     if not REPORT_PERCENTILES.value:
       continue
-    summaries = SummarizeTimestamps(timestamps)
-    for percentile, value in summaries.items():
-      samples.append(
-          sample.Sample(
-              prefix + percentile,
-              value - start_time,
-              'seconds',
-          )
-      )
+    latencies = [t - start_time for t in timestamps]
+    base_sample = sample.Sample(prefix, 0, 'seconds')
+    samples.extend(
+        sample.SummarizePercentiles(latencies, base_sample, _TARGET_METRICS)
+    )
 
   if not REPORT_LATENCIES.value:
     return samples
@@ -496,17 +504,6 @@ def ParseStatusChanges(
         )
     )
   return samples
-
-
-def SummarizeTimestamps(timestamps: list[float]) -> dict[str, float]:
-  """Returns a few metrics about a list of timestamps."""
-  percentiles = [0, 10, 50, 90, 95, 99.9, 100]
-  summary = {
-      'mean': np.mean(timestamps),
-  }
-  for percentile in percentiles:
-    summary[f'p{percentile}'] = np.percentile(timestamps, percentile)
-  return summary  # pyrefly: ignore[bad-return]
 
 
 def Cleanup(bm_spec: benchmark_spec.BenchmarkSpec):
