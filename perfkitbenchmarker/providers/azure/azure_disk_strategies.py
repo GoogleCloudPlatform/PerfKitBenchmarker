@@ -358,10 +358,15 @@ class AzLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
           f'No matching Lustre client package found for kernel {kernel_version}'
       )
     vm.InstallPackages(f'{package_name}={kernel_version}')
+    vm.InstallPackages(
+        'libyaml-dev libreadline-dev libnl-3-dev libnl-genl-3-dev'
+        ' libkeyutils-dev'
+    )
     vm.RemoteCommand('sudo modprobe lustre')
 
     super().SetUpDiskOnLinux()
-    vm.RemoteCommand('echo "module load mpi/hpcx" >> .bashrc')
+    if not FLAGS.openmpi_version:
+      vm.RemoteCommand('echo "module load mpi/hpcx" >> .bashrc')
 
 
 class AzureSetUpBlobFuseDiskStrategy(disk_strategies.SetUpDiskStrategy):

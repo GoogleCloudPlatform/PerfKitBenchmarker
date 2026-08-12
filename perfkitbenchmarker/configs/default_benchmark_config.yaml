@@ -662,7 +662,6 @@ fuse_io500:
     mpi_ranks_list: [1, 2, 4, 8, 16, 32, 64, 128, 192]
     blobfuse_mount_config_file: blobfuse_config.yaml
     blobfuse_config_file: io500_config.yaml.j2
-    io500_max_total_size: 1649267441664
   vm_groups:
     default:
       vm_spec:
@@ -673,6 +672,17 @@ fuse_io500:
         Azure:
           boot_disk_size: 2000
       vm_count: 1
+
+io500_lustre:
+  name: io500
+  flags:
+    io500_tests: [ior_easy_write, ior_easy_read]
+    data_disk_type: lustre
+    scratch_dir: lustre_dir
+    openmpi_version: 4.1.6
+    mpi_ranks_list: [1, 2, 4, 8, 16, 32, 64, 128, 192]
+    blobfuse_mount_config_file: blobfuse_config.yaml
+    blobfuse_config_file: io500_config.yaml.j2
 
 gpu_jobs_provisioning:
   name: jobs_benchmark
