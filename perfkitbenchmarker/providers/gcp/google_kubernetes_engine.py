@@ -406,6 +406,7 @@ class GkeCluster(BaseGkeCluster):
             'NCCL fast socket is only supported on secondary node pools.'
         )
     self.image_type = gcp_flags.GKE_IMAGE_TYPE.value
+    self._cached_nodepool_vm_ids: dict[str, str] | None = None
 
   def InitializeNodePoolForCloud(
       self,
@@ -472,6 +473,46 @@ class GkeCluster(BaseGkeCluster):
           gcp_flags.GKE_AUTOSCALING_PROFILE.value
       )
 
+    # Lazily fetch and cache VM IDs of nodepools for Vapor pipeline
+    if self._cached_nodepool_vm_ids is None:
+      self._cached_nodepool_vm_ids = {}
+      try:
+        nodepools = dict(self.nodepools)
+        if self.default_nodepool and 'default' not in nodepools:
+          nodepools[self.default_nodepool.name] = self.default_nodepool
+
+        for nodepool_name in nodepools:
+          cmd = util.GcloudCommand(None, 'compute', 'instances', 'list')
+          cmd.flags['project'] = self.project
+          # PKB assumes node names contain -<nodepool_name>- in
+          # GetNodePoolFromNodeName
+          cmd.flags['filter'] = f'name ~ ^gke-{self.name}-{nodepool_name}-'
+          cmd.flags['format'] = 'json'
+          stdout, _, _ = cmd.Issue()
+          if stdout:
+            nodes_info = json.loads(stdout)
+            if nodes_info:
+              vm_ids = [
+                  str(node.get('id')) for node in nodes_info if node.get('id')
+              ]
+              if vm_ids:
+                # Use default_vm_ids for default nodepool to match convention
+                vm_ids_prefix = (
+                    'default_'
+                    if nodepool_name == 'default'
+                    else f'{nodepool_name}_'
+                )
+                if nodepool_name == 'default':
+                  self._cached_nodepool_vm_ids['vm_ids'] = ','.join(
+                      sorted(vm_ids)
+                  )
+                self._cached_nodepool_vm_ids[f'{vm_ids_prefix}vm_ids'] = (
+                    ','.join(sorted(vm_ids))
+                )
+      except Exception as e:  # pylint: disable=broad-exception-caught
+        logging.warning('Failed to fetch GKE VM IDs for metadata: %s', e)
+
+    result.update(self._cached_nodepool_vm_ids)
     return result
 
   def _Create(self):
