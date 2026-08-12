@@ -73,6 +73,10 @@ GCP_DATABASE_VERSION_MAPPING = {
         '2019_Enterprise': 'SQLSERVER_2019_ENTERPRISE',
         '2019_Express': 'SQLSERVER_2019_EXPRESS',
         '2019_Web': 'SQLSERVER_2019_WEB',
+        '2022_Standard': 'SQLSERVER_2022_STANDARD',
+        '2022_Enterprise': 'SQLSERVER_2022_ENTERPRISE',
+        '2022_Express': 'SQLSERVER_2022_EXPRESS',
+        '2022_Web': 'SQLSERVER_2022_WEB',
     },
 }
 
