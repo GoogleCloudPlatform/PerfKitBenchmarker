@@ -158,6 +158,13 @@ _SCALEUP_CLIENTS_TEST = flags.DEFINE_boolean(
     ' benchmark mode to work',
 )
 
+_SYSBENCH_OPEN_FILE_LIMIT = flags.DEFINE_integer(
+    'sysbench_open_file_limit',
+    None,
+    'Override the default linux open file limit (ulimit -n) for sysbench'
+    ' execution.',
+)
+
 _SCALEUP_CLIENTS_TEST_NUM_CLIENTS = flags.DEFINE_integer(
     'sysbench_scaleup_clients_test_num_clients',
     1,
@@ -381,14 +388,24 @@ def _IsValidFlag(flag):
   )
 
 
+def _GetUlimitCommand() -> str:
+  """Returns the ulimit command prefix if an open file limit is set."""
+  if _SYSBENCH_OPEN_FILE_LIMIT.value:
+    return f'ulimit -n {_SYSBENCH_OPEN_FILE_LIMIT.value} && '
+  return ''
+
+
 def _GetSysbenchPrepareCommand(
     db: relational_db.BaseRelationalDb, num_vms: int, vm_index: int
 ) -> str:
   """Returns the sysbench command used to load the database."""
   # TODO(ruwa): Migrate to use sysbench.BuildLoadCommand()
+  ulimit_cmd = _GetUlimitCommand()
   data_load_cmd_tokens = [
-      'cd ~/sysbench/ && nice',  # run with a niceness of lower priority
-      '-15',  # to encourage cpu time for ssh commands
+      # Run with a niceness of lower priority to encourage CPU time for SSH
+      # commands.
+      f'cd ~/sysbench/ && {ulimit_cmd}nice',
+      '-15',
       'sysbench',
       _GetSysbenchTestParameter(),
       '--tables=%d' % FLAGS.sysbench_tables,
@@ -662,6 +679,7 @@ def _GetSysbenchRunCommand(
   if duration <= 0:
     raise ValueError('Duration must be greater than zero.')
 
+  ulimit_cmd = _GetUlimitCommand()
   run_cmd_tokens = [
       'nice',  # run with a niceness of lower priority
       '-15',  # to encourage cpu time for ssh commands
@@ -696,7 +714,7 @@ def _GetSysbenchRunCommand(
   ) and not spanner_read_committed:
     run_cmd_tokens.append('--trx_level=%s' % _TXN_ISOLATION_LEVEL.value)
   run_cmd = ' '.join(run_cmd_tokens + _GetCommonSysbenchOptions(db) + ['run'])
-  run_cmd = 'cd ~/sysbench/ && ' + run_cmd
+  run_cmd = f'cd ~/sysbench/ && {ulimit_cmd}' + run_cmd
   return run_cmd
 
 
