@@ -186,7 +186,7 @@ class GCECreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
       return SetUpGcsFuseDiskStrategy(self.vm, self.disk_spec)
 
     elif self.disk_spec.disk_type == disk.NFS:
-      return disk_strategies.SetUpNFSDiskStrategy(self.vm, self.disk_spec)
+      return GCPSetUpNFSDiskStrategy(self.vm, self.disk_spec)
 
     elif self.disk_spec.disk_type == disk.HYPERDISK_ML:
       return SetUpHyperdiskMLDiskStrategy(self.vm, self.disk_spec)
@@ -537,3 +537,15 @@ class GcpLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
     self.vm.InstallPackages('lustre-client-utils/lustre-client-ubuntu-noble')
     self.vm.RemoteCommand('sudo modprobe lustre')
     super().SetUpDiskOnLinux()
+
+
+class GCPSetUpNFSDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
+  """Strategies to set up NFS disks on GCP."""
+
+  def SetUpDiskOnLinux(self):
+    """Performs Linux specific setup of NFS disk."""
+    super().SetUpDiskOnLinux()
+    self.vm.RemoteCommand(
+        'echo 20480 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'
+        f' {self.disk_spec.mount_point})/read_ahead_kb'
+    )

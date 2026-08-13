@@ -1,0 +1,30 @@
+# Patch to enable POSIX direct I/O (--posix.odirect) for the ior-hard-write phase in IO500.
+#
+# Context & Rationale:
+# When running the IO500 benchmark on POSIX/NFS storage systems, ior-hard-write does in-cache updates.
+# In cache updates for ior hard leads to corrupted data and ultimatley ior hard read returns INVALID results.
+# This patch enables the ior-hard-write to bypass client-side page caching.
+
+diff --git a/src/phase_ior_hard_write.c b/src/phase_ior_hard_write.c
+index 91ea568..51b62b6 100644
+--- a/src/phase_ior_hard_write.c
++++ b/src/phase_ior_hard_write.c
+@@ -1,5 +1,6 @@
+ #include <sys/stat.h>
+ #include <unistd.h>
++#include <string.h>
+
+ #include <ior.h>
+ #include <io500-phase.h>
+@@ -45,6 +46,11 @@ static double run(void){
+ //  u_argv_push_default_if_set(argv, "-U",             /* use hints file */
+ //                          d.hintsFileName, o.hintsFileName);
+
++  char *api = o.api ? o.api : d.api;
++  if (api == NULL || strcmp(api, "POSIX") == 0) {
++    u_argv_push(argv, "--posix.odirect");
++  }
++
+   o.command = u_flatten_argv(argv);
+
+   PRINT_PAIR("exe", "%s\n", o.command);

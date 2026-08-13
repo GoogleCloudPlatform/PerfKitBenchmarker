@@ -467,6 +467,10 @@ class GCENFSDiskTest(GCEDiskTest):
               ' hard,nconnect=3,nfsvers=1,retrans=1,rsize=10,timeo=100,wsize=11"'
               ' | sudo tee -a /etc/fstab'
           ],
+          [
+              'echo 20480 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'
+              ' /scratch)/read_ahead_kb'
+          ],
       ]
       self.CompareCallArgs(expected_commands, issue_command.call_args_list)
       self.assertEqual(

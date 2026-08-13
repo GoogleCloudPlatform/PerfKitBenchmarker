@@ -24,6 +24,7 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import hpc_util
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import sample
@@ -37,6 +38,16 @@ _IO500_TESTS = flags.DEFINE_list(
     'ior_easy_read, ior_hard_write, ior_hard_read, mdtest_easy_write, '
     'mdtest_easy_stat, mdtest_easy_delete, mdtest_hard_write, '
     'mdtest_hard_stat, mdtest_hard_read, mdtest_hard_delete, find')
+
+_IOR_HARD_WRITE_DIRECT_IO = flags.DEFINE_boolean(
+    'ior_hard_write_direct_io',
+    False,
+    'Whether to apply the Direct I/O patch to the ior-hard-write phase.',
+)
+
+_IO500_INI_FILE = flags.DEFINE_string(
+    'io500_ini_file', 'io500',
+    'The base name of the INI file template to use.')
 
 _IO500_MAX_TOTAL_SIZE = flags.DEFINE_integer(
     'io500_max_total_size',
@@ -88,6 +99,11 @@ def Prepare(benchmark_spec):
   """
   vms = benchmark_spec.vms
   headnode = benchmark_spec.vm_groups['default'][0]
+  if FLAGS.data_disk_type == 'nfs' and not _IOR_HARD_WRITE_DIRECT_IO.value:
+    raise errors.Config.InvalidValue(
+        'IO500 on NFS requires direct I/O for the ior-hard-write phase. Set'
+        ' --ior_hard_write_direct_io=True.'
+    )
   # Install mpi across nodes.
   background_tasks.RunThreaded(lambda vm: vm.Install('openmpi'), vms)
   background_tasks.RunThreaded(lambda vm: vm.Install('build_tools'), vms)
@@ -102,8 +118,22 @@ def Prepare(benchmark_spec):
   headnode.RobustRemoteCommand(
       f'cd {BENCHMARK_DIR} && git clone {GIT_REPO} -b io500-isc24 && '
       'cd io500 && '
-      'sed -i "s/778dca8/aaba722/g" prepare.sh && '
-      './prepare.sh')
+      'sed -i "s/778dca8/aaba722/g" prepare.sh')
+
+  if _IOR_HARD_WRITE_DIRECT_IO.value:
+    patch_local_path = data.ResourcePath('io500/ior_hard_write_direct_io.patch')
+    remote_patch_path = os.path.join(
+        BENCHMARK_DIR, 'io500', 'ior_hard_write_direct_io.patch'
+    )
+    headnode.PushFile(patch_local_path, remote_patch_path)
+    headnode.RemoteCommand(
+        f'cd {BENCHMARK_DIR}/io500 && patch -p1 <'
+        ' ior_hard_write_direct_io.patch'
+    )
+
+  headnode.RobustRemoteCommand(
+      f'cd {BENCHMARK_DIR}/io500 && ./prepare.sh'
+  )
 
   # Package and distribute compiled folder to all other VMs in parallel
   if len(vms) > 1:
@@ -146,7 +176,7 @@ def _Run(headnode, ranks, ppn):
       f'cd {BENCHMARK_DIR} && ulimit -n 65535 && '
       'mpirun --hostfile ~/MACHINEFILE -oversubscribe '
       f'-n {ranks} -npernode {ppn} '
-      f'io500/io500 io500.ini')
+      f'io500/io500 {_IO500_INI_FILE.value}.ini')
   for line in stdout.splitlines():
     invalid = '[INVALID]' in line
     if invalid:
@@ -157,16 +187,22 @@ def _Run(headnode, ranks, ppn):
       if val == '0.000':
         # if we skip a test (by modifying config file), value will be 0.000.
         continue
+      if _IOR_HARD_WRITE_DIRECT_IO.value and metric == 'ior-hard-write':
+        metric = 'ior-hard-write-direct'
       results.append(
           sample.Sample(
-              metric, val, unit,
+              metric,
+              val,
+              unit,
               {
                   'ranks': ranks,
                   'ppn': ppn,
                   'duration': duration,
-                  'invalid': '[INVALID]' in line
-              }
-          ))
+                  'invalid': '[INVALID]' in line,
+                  'ior_hard_write_direct_io': _IOR_HARD_WRITE_DIRECT_IO.value,
+              },
+          )
+      )
     elif line.startswith('[SCORE ]'):
       # Parse summary line
       # This is mostly useless, unless we run standard parameters.
@@ -175,7 +211,8 @@ def _Run(headnode, ranks, ppn):
       metadata = {
           'ranks': ranks,
           'ppn': ppn,
-          'invalid': '[INVALID]' in line
+          'invalid': '[INVALID]' in line,
+          'ior_hard_write_direct_io': _IOR_HARD_WRITE_DIRECT_IO.value,
       }
       results.extend([
           sample.Sample('BANDWIDTH', raw_result[0], raw_result[1], metadata),
@@ -200,6 +237,7 @@ def Run(benchmark_spec):
   num_nodes = len(vms)
   results = []
   num_cpus = headnode.NumCpusForBenchmark()
+  io500_ini_filename = f'{_IO500_INI_FILE.value}.ini'
 
   # Pre-stage directories for object storage to resolve consistency issues
   # across multiple VMs (for AWS S3 Mountpoint).
@@ -226,8 +264,8 @@ def Run(benchmark_spec):
           vms,
       )
 
-  local_path = data.ResourcePath('io500/io500.ini.j2')
-  remote_path = f'{BENCHMARK_DIR}/io500.ini'
+  local_path = data.ResourcePath(f'io500/{io500_ini_filename}.j2')
+  remote_path = f'{BENCHMARK_DIR}/{io500_ini_filename}'
   tests_to_run = _IO500_TESTS.value
   run_all = 'all' in tests_to_run
 
@@ -235,7 +273,10 @@ def Run(benchmark_spec):
     ppn = math.ceil(float(total_ranks) / num_nodes)
     # BlockSize * total_ranks = max total size, which must be a multiple of
     # TransferSize.
-    block_size = _IO500_MAX_TOTAL_SIZE.value // int(total_ranks)
+    transfer_size = 4194304  # 4MiB transfer size of ior easy from ini files.
+    block_size = (
+        _IO500_MAX_TOTAL_SIZE.value // int(total_ranks) // transfer_size
+    ) * transfer_size
     io500_context = {
         'directory': headnode.scratch_disks[0].mount_point,
         'block_size': block_size,
