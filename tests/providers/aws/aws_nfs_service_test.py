@@ -205,7 +205,11 @@ class AwsNfsServiceTest(BaseTest):
     nfs = self._CreateFiler()
     self.assertEqual(_FILE_ID, nfs.filer_id)
     self.issue_cmd.CreateFiler.assert_called_with(
-        _NFS_TOKEN, _TIER, _THROUGHPUT_MODE, _PROVISIONED_THROUGHPUT
+        _NFS_TOKEN,
+        _TIER,
+        _THROUGHPUT_MODE,
+        _PROVISIONED_THROUGHPUT,
+        availability_zone_name='us-east-1d',
     )
 
   def testDeleteFiler(self):
@@ -250,7 +254,11 @@ class AwsNfsServiceTest(BaseTest):
     nfs.Create()
     nfs.Delete()
     self.issue_cmd.CreateFiler.assert_called_with(
-        _NFS_TOKEN, _TIER, _THROUGHPUT_MODE, _PROVISIONED_THROUGHPUT
+        _NFS_TOKEN,
+        _TIER,
+        _THROUGHPUT_MODE,
+        _PROVISIONED_THROUGHPUT,
+        availability_zone_name='us-east-1d',
     )
     self.issue_cmd.AddTagsToFiler.assert_called_with(_FILE_ID)
     self.issue_cmd.WaitUntilFilerAvailable.assert_called_with(_FILE_ID)

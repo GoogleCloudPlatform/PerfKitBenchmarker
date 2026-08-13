@@ -47,6 +47,12 @@ from perfkitbenchmarker.providers.aws import util
 
 FLAGS = flags.FLAGS
 
+flags.DEFINE_boolean(
+    'aws_efs_one_zone',
+    True,
+    'Whether to provision an EFS One Zone file system instead of Multi-AZ.',
+)
+
 
 class AwsNFSDiskSpec(disk.BaseNFSDiskSpec):
   CLOUD = provider_info.AWS
@@ -139,8 +145,15 @@ class AwsNfsService(nfs_service.BaseNfsService):
         )
         return
     token = FLAGS.aws_efs_token or 'nfs-token-%s' % FLAGS.run_uri
+    kwargs = {}
+    if FLAGS.aws_efs_one_zone:
+      kwargs['availability_zone_name'] = self.zone
     self.filer_id = self.aws_commands.CreateFiler(
-        token, self.nfs_tier, self.throughput_mode, self.provisioned_throughput
+        token,
+        self.nfs_tier,
+        self.throughput_mode,
+        self.provisioned_throughput,
+        **kwargs,
     )
     self.aws_commands.AddTagsToFiler(self.filer_id)
     logging.info(
@@ -210,9 +223,17 @@ class AwsEfsCommands:
     return file_systems[0]
 
   def CreateFiler(
-      self, token, nfs_tier, throughput_mode, provisioned_throughput
+      self,
+      token,
+      nfs_tier,
+      throughput_mode,
+      provisioned_throughput,
+      availability_zone_name=None,
   ):
+    """Creates an AWS EFS file system."""
     args = ['create-file-system', '--creation-token', token]
+    if availability_zone_name:
+      args += ['--availability-zone-name', availability_zone_name]
     if nfs_tier is not None:
       args += ['--performance-mode', nfs_tier]
     args += ['--throughput-mode', throughput_mode]

@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Run FIO Benchmark on raw devices."""
+
 from absl import flags
 from perfkitbenchmarker import benchmark_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks.fio import constants
+from perfkitbenchmarker.linux_benchmarks.fio import fio_scenario_parser
 from perfkitbenchmarker.linux_benchmarks.fio import flags as fio_flags
 from perfkitbenchmarker.linux_benchmarks.fio import utils
 
@@ -33,6 +35,12 @@ fio_nfs:
       vm_spec: *default_dual_core
       disk_spec: *default_500_gb
       vm_count: 1
+  flags:
+    fio_working_set_size: 300
+    data_disk_type: nfs
+    data_disk_size: 1024
+    fio_generate_scenarios: rand_4k_read_300G_iodepth-1_numjobs-1,rand_4k_write_300G_iodepth-1_numjobs-1
+    fio_runtime: 300
 """
 JOB_FILE = 'fio-parent.job'
 
@@ -52,6 +60,18 @@ def CheckPrerequisites(benchmark_config):
     errors.Setup.InvalidFlagConfigurationError(
         'fio_nfs_benchmark requires --fio_fill_size to be set.'
     )
+  if fio_flags.FIO_TARGET_MODE.value:
+    errors.Setup.InvalidFlagConfigurationError(
+        'fio_nfs_benchmark is only against NFS. Please don\'t use'
+        ' --fio_target_mode.'
+    )
+  if not fio_flags.FIO_GENERATE_SCENARIOS.value:
+    errors.Setup.InvalidFlagConfigurationError(
+        'fio_nfs_benchmark requires --fio_generate_scenarios.'
+    )
+  parser = fio_scenario_parser.FioScenarioParser()
+  for scenario in fio_flags.FIO_GENERATE_SCENARIOS.value:
+    parser.ValidateScenarioString(scenario)
 
 
 def Prepare(spec: benchmark_spec.BenchmarkSpec):
@@ -61,12 +81,6 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec):
         'FIO NFS benchmark can\'t have more than one scratch disk.'
     )
   vm.Install('fio')
-  utils.WriteFile(
-      vm,
-      disk=vm.scratch_disks[0],
-      fill_size=fio_flags.FIO_FILL_SIZE.value,
-      exec_path=constants.FIO_PATH,
-  )
 
 
 def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
