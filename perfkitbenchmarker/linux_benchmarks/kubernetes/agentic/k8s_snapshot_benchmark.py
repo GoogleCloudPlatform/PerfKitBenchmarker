@@ -828,7 +828,7 @@ def _MeasureSingleSource(name: str, namespace: str, t0: float, pod_timeout: int,
 
     # Wait for Running
     deadline = t0 + pod_timeout
-    while time.time() < deadline:
+    while time.monotonic() < deadline:
         stdout, _, rc = utils.RunKubectl(
             ["get", "pod", name, "-n", namespace, "-o", "jsonpath={.status.phase}"],
             timeout=10,
@@ -857,8 +857,8 @@ def _MeasureSingleSource(name: str, namespace: str, t0: float, pod_timeout: int,
 
 def _WaitForPreload(name: str, namespace: str, timeout_s: float, preload_mode: str) -> bool:
     """Wait for preload to complete."""
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
         stdout, _, rc = utils.RunKubectl(
             ["logs", name, "-n", namespace, "--tail=20"],
             timeout=10,
@@ -922,7 +922,7 @@ def _TriggerAndWaitSnapshot(trigger_name: str, target_pod: str, namespace: str, 
         return result
 
     deadline = t0 + timeout_s
-    while time.time() < deadline:
+    while time.monotonic() < deadline:
         stdout, _, rc = utils.RunKubectl(
             [
                 "get",
@@ -957,7 +957,7 @@ def _MeasureSingleRestore(name: str, namespace: str, t0: float, snapshot_counter
 
     # Wait for Running
     deadline = t0 + pod_timeout
-    while time.time() < deadline:
+    while time.monotonic() < deadline:
         stdout, _, rc = utils.RunKubectl(
             ["get", "pod", name, "-n", namespace, "-o", "jsonpath={.status.phase}"],
             timeout=10,
@@ -973,7 +973,7 @@ def _MeasureSingleRestore(name: str, namespace: str, t0: float, snapshot_counter
 
     # Wait for first Count (TTFE)
     ttfe_deadline = t0 + pod_timeout
-    while time.time() < ttfe_deadline:
+    while time.monotonic() < ttfe_deadline:
         stdout, _, rc = utils.RunKubectl(
             ["logs", name, "-n", namespace, "--tail=50"],
             timeout=10,

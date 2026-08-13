@@ -497,9 +497,25 @@ def evaluate_probe(
     """Decide PASS/FAIL at `mid`, re-running only on failure.
 
     Asymmetric by design: a false FAIL is unrecoverable under bisection because it
-    truncates the whole upper branch, while a false PASS self-corrects at the next
-    (higher) probe. So passes are accepted immediately and only failures pay for
-    repeats. Returns (passed, decision_value, samples, note).
+    truncates the whole upper branch, while a false PASS only sends the search
+    higher. So passes are accepted immediately and only failures pay for repeats.
+
+    But a false PASS is NOT harmless, because the reported answer is the highest
+    density that passed — so a false PASS at the boundary becomes the verdict rather
+    than self-correcting. Accepting the first passing re-run therefore biases the
+    reported threshold upward, by roughly one bisection step.
+
+    `--failure-retries` is the guard: it is the number of confirming re-runs, and
+    ALL of them must pass. Default 2, because one failure plus one pass is an observed
+    rate of 1/2 — an interval wide enough to be uninformative about whether the
+    threshold is met.
+
+    Requiring all N to pass also makes a genuine failure *cheaper*, not dearer: the
+    first non-passing confirmation ends the probe, since all-must-pass can no longer
+    be met. A saturated density therefore costs 2 runs, where accept-on-any-pass
+    spent 3.
+
+    Returns (passed, decision_value, samples, note).
     """
     samples = []
     metric_val, found_metrics = _probe_once(
@@ -519,25 +535,48 @@ def evaluate_probe(
     else:
         note = "over-threshold"
 
-    for attempt in range(1, args.failure_retries + 1):
+    required = args.failure_retries
+    confirmed = 0
+    for attempt in range(1, required + 1):
         logger.info(
-            "Probe at %s failed (%s). Confirmation re-run %d/%d.",
+            "Probe at %s failed (%s). Confirmation re-run %d of %d — all must pass.",
             mid,
             note,
             attempt,
-            args.failure_retries,
+            required,
         )
         retry_val, _ = _probe_once(
             benchmark, variant, args, bench_cfg, mid, passthrough_flags
         )
         samples.append(retry_val)
-        if retry_val is not None and retry_val <= threshold:
+        if retry_val is None or retry_val > threshold:
+            # All confirmations must pass, so one miss settles it. Stop here rather
+            # than spending the rest of the budget on a verdict that cannot change.
             logger.info(
-                "Confirmation re-run PASSED (%s <= %s) — first result was noise.",
+                "Confirmation %d of %d did not pass (%s) — failure stands.",
+                attempt,
+                required,
                 retry_val,
-                threshold,
             )
-            return True, retry_val, samples, f"pass-on-retry-{attempt}"
+            if confirmed:
+                note = f"{note}-unconfirmed-{confirmed}of{required}"
+            break
+        confirmed += 1
+        logger.info(
+            "Confirmation %d of %d PASSED (%s <= %s).",
+            attempt,
+            required,
+            retry_val,
+            threshold,
+        )
+    else:
+        if required:
+            logger.info(
+                "All %d confirmations passed at %s — the first result was noise.",
+                required,
+                mid,
+            )
+            return True, samples[-1], samples, f"pass-on-{required}-confirmations"
 
     measured = [s for s in samples if s is not None]
     decision_value = _aggregate(measured, args) if measured else None
@@ -601,10 +640,17 @@ def do_binary_search(benchmark, variant, args, passthrough_flags=None):
     logger.info("  Range: [%s, %s], Convergence: %s", low, high, convergence)
     logger.info("  Target: %s <= %s", target_metric, threshold)
     logger.info(
-        "  Failure re-runs: %d (aggregate=%s)",
+        "  Confirmations to overturn a failure: %d (all must pass, aggregate=%s)",
         args.failure_retries,
         args.retry_aggregate,
     )
+    if args.failure_retries == 1:
+        logger.warning(
+            "  --failure-retries=1: one FAIL plus one PASS will be recorded as a "
+            "PASS. That is an observed rate of 1/2 (95%% CI 9-91%%) and says nothing "
+            "about meeting the threshold, so the reported optimum will be biased "
+            "upward. Prefer the default of 2."
+        )
 
     best_val = None
     lowest_fail = None
@@ -902,11 +948,17 @@ def main():
     parser.add_argument(
         "--failure-retries",
         type=int,
-        default=0,
+        default=2,
         help=(
-            "On a FAILED probe only, re-run the same density up to N times before "
-            "accepting the failure. Passes are accepted immediately. 0 (default) "
-            "preserves the previous single-shot behaviour."
+            "Number of confirming re-runs on a FAILED probe. ALL of them must pass "
+            "for the failure to be overturned. Default 2; use 0 for single-shot, "
+            "where a failure is final. A first-sample pass is always accepted "
+            "immediately, so a clean sweep costs nothing extra. Why all-must-pass: "
+            "the reported optimum is the highest passing density, so accepting the "
+            "first passing re-run lets one noisy sample at the boundary become the "
+            "verdict rather than self-correcting, biasing the result upward by about "
+            "one bisection step. All-must-pass also makes a real failure cheaper — "
+            "the first non-passing confirmation ends the probe."
         ),
     )
     parser.add_argument(

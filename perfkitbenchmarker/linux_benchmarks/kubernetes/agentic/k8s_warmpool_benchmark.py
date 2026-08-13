@@ -203,7 +203,7 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     deadline = t_scale + threshold_s
     first_pod_time = None
 
-    while time.time() < deadline:
+    while time.monotonic() < deadline:
         elapsed = time.monotonic() - t_scale
         running = utils.CountPods(ns, label, "Running")
         pending = utils.CountPods(ns, label, "Pending")

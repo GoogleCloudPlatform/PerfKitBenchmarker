@@ -470,6 +470,9 @@ def _GetPodNames(namespace: str, label: str) -> list[str]:
         timeout=30,
         raise_on_failure=False,
     )
+    if rc != 0:
+        logging.warning("kubectl get pods failed during poll, assuming pods still exist.")
+        return ["__API_ERROR__"]
     if not stdout or not stdout.strip():
         return []
     return stdout.split()
@@ -495,6 +498,8 @@ def _CountAllocatedIPs(namespace: str, label: str) -> int:
         timeout=30,
         raise_on_failure=False,
     )
+    if rc != 0:
+        return -1
     if not stdout or not stdout.strip():
         return 0
     return len([ip for ip in stdout.split() if ip])
