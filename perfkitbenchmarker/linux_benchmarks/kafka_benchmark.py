@@ -100,7 +100,7 @@ _KAFKA_NUM_THREADS = flags.DEFINE_list(
 )
 _KAFKA_REPORTING_INTERVAL = flags.DEFINE_integer(
     'kafka_reporting_interval',
-    20_000,
+    5_000,
     'Interval in milliseconds at which the performance test reports progress.',
 )
 _KAFKA_CONSUMER_TIMEOUT_MS = flags.DEFINE_integer(
