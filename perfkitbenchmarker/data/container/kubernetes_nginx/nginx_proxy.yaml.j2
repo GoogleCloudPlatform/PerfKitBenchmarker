@@ -23,7 +23,7 @@ spec:
               - key: pkb_nodepool
                 operator: In
                 values:
-                - nginx
+                - servers
       initContainers:
       - name: setup-ssl
         image: {{ nginx_image }}

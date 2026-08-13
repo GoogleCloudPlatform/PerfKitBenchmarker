@@ -27,7 +27,7 @@ spec:
               - key: pkb_nodepool
                 operator: In
                 values:
-                - nginx
+                - servers
         podAntiAffinity:
           # Schedule 1 Nginx pod per node
           requiredDuringSchedulingIgnoredDuringExecution:

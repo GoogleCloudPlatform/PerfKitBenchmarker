@@ -473,7 +473,7 @@ class GkeCluster(BaseGkeCluster):
           gcp_flags.GKE_AUTOSCALING_PROFILE.value
       )
 
-    # Lazily fetch and cache VM IDs of nodepools for Vapor pipeline
+    # Lazily fetch and cache VM IDs of nodepools
     if self._cached_nodepool_vm_ids is None:
       self._cached_nodepool_vm_ids = {}
       try:

@@ -80,7 +80,7 @@ kubernetes_nginx:
     vm_count: 1
     vm_spec: *default_dual_core
     nodepools:
-      nginx:
+      servers:
         vm_count: 1
         vm_spec:
           GCP:
@@ -121,7 +121,7 @@ def GetConfig(user_config):
     for cloud in vm_spec:
       vm_spec[cloud]["machine_type"] = FLAGS.nginx_client_machine_type
   if FLAGS.nginx_server_machine_type:
-    vm_spec = config["container_cluster"]["nodepools"]["nginx"]["vm_spec"]
+    vm_spec = config["container_cluster"]["nodepools"]["servers"]["vm_spec"]
     for cloud in vm_spec:
       vm_spec[cloud]["machine_type"] = FLAGS.nginx_server_machine_type
   if FLAGS.nginx_upstream_server_machine_type:
@@ -287,7 +287,9 @@ def _PrepareCluster(benchmark_spec):
   )
 
   # 3. Deploy Proxy (reverse proxy in front of upstream)
-  proxy_replicas = benchmark_spec.container_cluster.nodepools["nginx"].num_nodes
+  proxy_replicas = (
+      benchmark_spec.container_cluster.nodepools["servers"].num_nodes
+  )
   kubernetes_commands.ApplyManifest(
       "container/kubernetes_nginx/nginx_proxy.yaml.j2",
       nginx_image=container_image,

@@ -50,7 +50,7 @@ class KubernetesNginxBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     """Tests GetConfig with default options."""
     config = kubernetes_nginx_benchmark.GetConfig({})
     self.assertEqual(
-        config["container_cluster"]["nodepools"]["nginx"]["vm_spec"]["GCP"][
+        config["container_cluster"]["nodepools"]["servers"]["vm_spec"]["GCP"][
             "machine_type"
         ],
         "n2-standard-4",
@@ -69,7 +69,7 @@ class KubernetesNginxBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         "c4-standard-32",
     )
     self.assertEqual(
-        config["container_cluster"]["nodepools"]["nginx"]["vm_spec"]["GCP"][
+        config["container_cluster"]["nodepools"]["servers"]["vm_spec"]["GCP"][
             "machine_type"
         ],
         "c4-standard-8",
