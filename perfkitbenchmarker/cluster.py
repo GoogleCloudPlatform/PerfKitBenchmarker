@@ -247,12 +247,14 @@ class BaseCluster(resource.BaseResource):
 
     Returns:
       A tuple of stdout and stderr from running the command.
-
-    Raises:
-      RemoteCommandError: If there was a problem issuing the command.
     """
+    slurm_path = (
+        'export PATH=$PATH:/usr/local/bin:/usr/local/sbin:'
+        '/apps/slurm/current/bin:/apps/slurm/bin:'
+        '/opt/slurm/bin:/usr/local/slurm/bin; '
+    )
     return self.headnode_vm.RemoteCommand(
-        f'{env} srun -N {self.num_workers} {command}',
+        f'{slurm_path}{env} srun -N {self.num_workers} {command}',
         ignore_failure=ignore_failure,
         timeout=timeout,
         **kwargs,
@@ -372,14 +374,19 @@ class BaseCluster(resource.BaseResource):
   @vm_util.Retry(
       fuzz=0,
       timeout=1800,
-      max_retries=5,
+      max_retries=30,
       retryable_exceptions=(errors.Resource.RetryableCreationError,),
   )
   def _WaitForClusterReady(self):
     if self.unmanaged:
       return
+    slurm_path = (
+        'export PATH=$PATH:/usr/local/bin:/usr/local/sbin:'
+        '/apps/slurm/current/bin:/apps/slurm/bin:'
+        '/opt/slurm/bin:/usr/local/slurm/bin; '
+    )
     if not self.headnode_vm.TryRemoteCommand(
-        f'srun -N {self.num_workers} hostname'
+        f'{slurm_path}srun -N {self.num_workers} hostname'
     ):
       raise errors.Resource.RetryableCreationError('Cluster not ready.')
 
