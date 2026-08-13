@@ -24,6 +24,7 @@ from perfkitbenchmarker import cloud_tpu
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.gcp import flags as gcp_flags
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
@@ -66,9 +67,11 @@ class GcpTpu(cloud_tpu.BaseTpu):
       cmd.flags['version'] = self.spec.tpu_tf_version
     if self.spec.tpu_zone:
       cmd.flags['zone'] = self.spec.tpu_zone
+    if gcp_flags.GCE_RESERVATION_ID.value:
+      cmd.flags['reservation'] = gcp_flags.GCE_RESERVATION_ID.value
     cmd.flags['project'] = self.project
     self.create_start_time = time.time()
-    _, stderr, retcode = cmd.Issue(raise_on_failure=False)
+    _, stderr, retcode = cmd.Issue(timeout=TPU_TIMEOUT, raise_on_failure=False)
     self.create_time = time.time() - self.create_start_time  # pyrefly: ignore[bad-assignment]
 
     if _INSUFFICIENT_CAPACITY in stderr:

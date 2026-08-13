@@ -17,6 +17,7 @@ import builtins
 import contextlib
 import unittest
 from absl import flags
+from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
@@ -83,6 +84,15 @@ class GcpTpuTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--topology 2x2', command_string)
       self.assertIn('--version nightly', command_string)
       self.assertIn('--zone us-central1-a', command_string)
+
+  @flagsaver.flagsaver(gce_reservation_id='test-reservation')
+  def testCreateWithReservation(self):
+    with self._PatchCriticalObjects() as issue_command:
+      tpu = gcp_tpu.GcpTpu(self.mock_tpu_spec)
+      tpu._Create()
+      self.assertEqual(issue_command.call_count, 1)
+      command_string = ' '.join(issue_command.call_args[0][0])
+      self.assertIn('--reservation test-reservation', command_string)
 
   def testStockout(self):
     stderr = """Create request issued for: [pkb-tpu-train-9baf32202]
