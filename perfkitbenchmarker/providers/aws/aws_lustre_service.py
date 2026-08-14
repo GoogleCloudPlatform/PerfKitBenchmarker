@@ -101,12 +101,32 @@ class AwsLustreService(lustre_service.BaseLustreService):
 
   def _IsReady(self):
     try:
-      return (
-          self._Describe()['FileSystems'][0].get('Lifecycle', None)
-          == 'AVAILABLE'
-      )
-    except errors.Error:
+      response = self._Describe()
+    except errors.Error as e:
+      logging.warning('Error describing Lustre file system %s: %s', self.id, e)
       return False
+    if not response or not response.get('FileSystems'):
+      return False
+    fs = response['FileSystems'][0]
+    lifecycle = fs.get('Lifecycle')
+    if lifecycle == 'AVAILABLE':
+      return True
+    if lifecycle in ('FAILED', 'MISCONFIGURED'):
+      error_msg = (
+          fs.get('FailureDetails', {}).get('Message')
+          or fs.get('LifecycleTransitionReason')
+          or f'Lifecycle is {lifecycle}'
+      )
+      if 'insufficient capacity' in error_msg.lower():
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+            f'Lustre file system {self.id} failed with status {lifecycle}:'
+            f' {error_msg}'
+        )
+      raise errors.Resource.CreationError(
+          f'Lustre file system {self.id} failed with status {lifecycle}:'
+          f' {error_msg}'
+      )
+    return False
 
   def _Describe(self):
     return self._Command(
@@ -122,5 +142,8 @@ class AwsLustreService(lustre_service.BaseLustreService):
         cmd, raise_on_failure=False, timeout=1800
     )
     if retcode:
-      raise errors.Error('Error running command %s : %s' % (verb, stderr))
+      raise errors.Error(
+          'Error running command %s (return code %s): %s'
+          % (verb, retcode, stderr)
+      )
     return json.loads(stdout)
