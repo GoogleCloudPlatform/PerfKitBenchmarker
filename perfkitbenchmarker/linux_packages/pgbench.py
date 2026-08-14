@@ -17,9 +17,17 @@ import datetime
 import socket
 import statistics
 import time
+from absl import flags
 from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
+
+_PGBENCH_OPEN_FILE_LIMIT = flags.DEFINE_integer(
+    'pgbench_open_file_limit',
+    None,
+    'Override the default linux open file limit (ulimit -n) for pgbench'
+    ' execution.',
+)
 
 APT_PACKAGES = (
     'postgresql-client-common',
@@ -176,8 +184,13 @@ def RunPgBench(
       jobs = min(client, 16)
 
     start_time = datetime.datetime.now()
+    ulimit_cmd = (
+        f'ulimit -n {_PGBENCH_OPEN_FILE_LIMIT.value} && '
+        if _PGBENCH_OPEN_FILE_LIMIT.value
+        else ''
+    )
     command = (
-        f'ulimit -n 10000 && pgbench {connection_string} --client={client} '
+        f'{ulimit_cmd}pgbench {connection_string} --client={client} '
         f'--jobs={jobs} --time={seconds_per_test} --progress=1 '
         '-r'
         + extended_protocol
