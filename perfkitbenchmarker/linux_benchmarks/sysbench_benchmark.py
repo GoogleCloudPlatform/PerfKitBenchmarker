@@ -275,6 +275,15 @@ def GetConfig(user_config):
   return config
 
 
+def CheckPrerequisites(_):
+  """Verifies that benchmark flags are compatible."""
+  if len(FLAGS.sysbench_run_threads) > 1 and _SCALEUP_CLIENTS_TEST.value:
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'A list of thread counts (--sysbench_run_threads) is mutually exclusive'
+        ' with --sysbench_scaleup_clients_test.'
+    )
+
+
 # TODO(chunla) Move this to engine specific module
 def _GetCommonSysbenchOptions(db: relational_db.BaseRelationalDb):
   """Get Sysbench options."""
@@ -867,7 +876,7 @@ def Run(benchmark_spec):
     Results.
   """
   logging.info('Start benchmarking, Cloud Provider is %s.', FLAGS.cloud)
-  results = []
+  collector = sample.SampleGroupCollector()
   client_vms = benchmark_spec.vm_groups['clients']
   db = benchmark_spec.relational_db
 
@@ -884,7 +893,13 @@ def Run(benchmark_spec):
     )
     end_time = datetime.datetime.now()
     current_results.extend(db.CollectMetrics(start_time, end_time))
-    results.extend(current_results)
+    collector.Add(thread_count, current_results)
+
+  results = list(collector.all_samples)
+  if len(FLAGS.sysbench_run_threads) > 1:
+    results.extend(
+        collector.GetBestSamples('tps', 'max_tps', sample.Aggregation.MAX)
+    )
   return results
 
 

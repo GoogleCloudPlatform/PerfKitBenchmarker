@@ -424,5 +424,83 @@ class SpannerBenchmarkTestCase(
       self.assertNotIn('--trx_level=', command)
 
 
+_SYSBENCH_CONFIG = textwrap.dedent("""
+sysbench:
+  relational_db:
+    engine: postgres
+    db_spec: *default_dual_core
+    db_disk_spec: *default_500_gb
+  vm_groups:
+    clients:
+      vm_spec: *default_dual_core
+""")
+
+
+def _MakeSysbenchRunSamples(tps, qps, thread_count):
+  """Builds a (tps, qps) sample pair for one sysbench run."""
+  metadata = {'sysbench_thread_count': thread_count}
+  return [
+      sample.Sample('tps', tps, 'tps', dict(metadata)),
+      sample.Sample('qps', qps, 'qps', dict(metadata)),
+  ]
+
+
+class SysbenchRunTestCase(pkb_common_test_case.PkbCommonTestCase):
+
+  @flagsaver.flagsaver(sysbench_run_threads=[8, 16])
+  def testRunSweepOutputsMaxTpsSamples(self):
+    FLAGS.run_uri = 'test_uri'
+    benchmark_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        _SYSBENCH_CONFIG, 'sysbench'
+    )
+    benchmark_spec.ConstructRelationalDb()
+    benchmark_spec.ConstructVirtualMachines()
+    assert benchmark_spec.relational_db is not None
+
+    self.enter_context(
+        mock.patch.object(
+            benchmark_spec.relational_db, 'CollectMetrics', return_value=[]
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            benchmark_spec.relational_db, 'GetResourceMetadata', return_value={}
+        )
+    )
+    self.enter_context(
+        mock.patch.object(
+            sysbench_benchmark, '_GetDatabaseSize', return_value=100
+        )
+    )
+
+    run_8 = _MakeSysbenchRunSamples(tps=1000.0, qps=10000.0, thread_count=8)
+    run_16 = _MakeSysbenchRunSamples(tps=2500.0, qps=25000.0, thread_count=16)
+    self.enter_context(
+        mock.patch.object(
+            sysbench_benchmark, '_RunSysbench', side_effect=[run_8, run_16]
+        )
+    )
+
+    results = sysbench_benchmark.Run(benchmark_spec)
+
+    # Should contain 4 raw samples + 2 max_tps duplicates from the 16-thread run
+    metrics = sorted(s.metric for s in results)
+    self.assertEqual(
+        metrics,
+        [
+            'max_tps_qps',
+            'max_tps_tps',
+            'qps',
+            'qps',
+            'tps',
+            'tps',
+        ],
+    )
+    max_tps_sample = [s for s in results if s.metric == 'max_tps_tps'][0]
+    self.assertEqual(max_tps_sample.value, 2500.0)
+    self.assertEqual(max_tps_sample.metadata['sysbench_thread_count'], 16)
+    self.assertNotIn('max_tps', max_tps_sample.metadata)
+
+
 if __name__ == '__main__':
   unittest.main()

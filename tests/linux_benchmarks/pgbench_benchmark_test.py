@@ -16,6 +16,7 @@
 import os
 import unittest
 import mock
+from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import pgbench_benchmark
 from perfkitbenchmarker.linux_packages import pgbench
 
@@ -64,6 +65,95 @@ class PgbenchBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(latency_sample.value, -1)
     self.assertEqual(latency_sample.unit, 'ms')
     self.assertDictEqual(latency_sample.metadata, expected_latency_metadata)
+
+
+def _MakeRunSamples(tps_values, latency_values, num_clients, num_jobs):
+  """Builds a (tps_array, latency_array) sample pair for one pgbench run."""
+  tps_sample = sample.Sample(
+      'tps_array',
+      -1,
+      'tps',
+      {'clients': num_clients, 'jobs': num_jobs, 'tps': tps_values},
+  )
+  latency_sample = sample.Sample(
+      'latency_array',
+      -1,
+      'ms',
+      {'clients': num_clients, 'jobs': num_jobs, 'latency': latency_values},
+  )
+  return [tps_sample, latency_sample]
+
+
+class PgBenchResultsTestCase(unittest.TestCase):
+
+  def testMaxTpsSamplesSelectsHighestMeanTps(self):
+    results = pgbench.PgBenchResults()
+    results.Add(
+        8,
+        _MakeRunSamples(
+            tps_values=[10.0, 20.0],
+            latency_values=[1.0, 2.0],
+            num_clients=8,
+            num_jobs=8,
+        ),
+    )
+    results.Add(
+        16,
+        _MakeRunSamples(
+            tps_values=[30.0, 40.0],
+            latency_values=[3.0, 4.0],
+            num_clients=16,
+            num_jobs=16,
+        ),
+    )
+    results.Add(
+        32,
+        _MakeRunSamples(
+            tps_values=[20.0, 30.0],
+            latency_values=[5.0, 6.0],
+            num_clients=32,
+            num_jobs=32,
+        ),
+    )
+
+    max_samples = results.GetBestSamples(
+        'tps_array', 'max_tps', sample.Aggregation.MAX
+    )
+
+    # One max_tps_ duplicate per sample in the winning (16-client) run.
+    metrics = sorted(s.metric for s in max_samples)
+    self.assertEqual(metrics, ['max_tps_latency_array', 'max_tps_tps_array'])
+
+    max_tps_sample = [
+        s for s in max_samples if s.metric == 'max_tps_tps_array'
+    ][0]
+    self.assertEqual(max_tps_sample.metadata['clients'], 16)
+    self.assertNotIn('max_tps', max_tps_sample.metadata)
+
+  def testMaxTpsSamplesAnnotatesWinningRun(self):
+    results = pgbench.PgBenchResults()
+    losing_run = _MakeRunSamples(
+        tps_values=[10.0, 20.0],
+        latency_values=[1.0, 2.0],
+        num_clients=8,
+        num_jobs=8,
+    )
+    winning_run = _MakeRunSamples(
+        tps_values=[30.0, 40.0],
+        latency_values=[3.0, 4.0],
+        num_clients=16,
+        num_jobs=16,
+    )
+    results.Add(8, losing_run)
+    results.Add(16, winning_run)
+
+    results.GetBestSamples('tps_array', 'max_tps', sample.Aggregation.MAX)
+
+    # Only the winning run's original samples get the max_tps annotation.
+    for s in winning_run:
+      self.assertTrue(s.metadata.get('max_tps'))
+    for s in losing_run:
+      self.assertNotIn('max_tps', s.metadata)
 
 
 if __name__ == '__main__':

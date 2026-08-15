@@ -1,3 +1,17 @@
+# Copyright 2026 PerfKitBenchmarker Authors. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Runs the HammerDB relational database benchmark."""
 
 import datetime
@@ -17,7 +31,6 @@ from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.linux_packages import hammerdb
 from perfkitbenchmarker.providers.gcp import gcp_alloy_db
-
 
 # Update this version when changing a config
 # TODO(chunla) Consider adding checks to make sure this version gets updated.
@@ -111,6 +124,11 @@ def GetConfig(user_config: dict[Any, Any]) -> dict[Any, Any]:
     loaded benchmark configuration
   """
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+
+
+def CheckPrerequisites(benchmark_config: bm_spec.BenchmarkSpec) -> None:
+  """Verifies that the required flag configuration is correct."""
+  hammerdb.CheckPrerequisites(benchmark_config)
 
 
 def _PrepareServer(db: iaas_relational_db.IAASRelationalDb):
@@ -305,7 +323,7 @@ def SetPostgresOptimizedServerConfiguration(
       '~/',
       config,
       MAX_CONNECTIONS,
-      str(hammerdb.HAMMERDB_NUM_VU.value + 10),  # pyrefly: ignore[unsupported-operation]
+      str(max(hammerdb.GetNumVirtualUsersList()) + 10),
   )
   hammerdb.SearchAndReplaceGuestFile(
       server_vm, '~/', config, SHARED_BUFFER_SIZE, str(shared_buffer_size)
@@ -367,6 +385,27 @@ def PostRun(db: relational_db.BaseRelationalDb) -> None:
   db.LogDatabaseDebugInfo()
 
 
+def _ReconfigureRunScriptForVirtualUsers(
+    db: relational_db.BaseRelationalDb,
+    client_vm: virtual_machine.BaseVirtualMachine,
+    script: str,
+    num_virtual_users: int,
+) -> None:
+  """Re-installs the HammerDB run script for a specific virtual user count."""
+  hammerdb.ConfigureRunScript(
+      vm=client_vm,
+      db_engine=db.engine,
+      hammerdb_script=script,
+      num_virtual_users=num_virtual_users,
+      ip=db.endpoint,
+      port=db.port,
+      password=db.spec.database_password,
+      user=db.spec.database_username,
+      is_managed_azure=(FLAGS.cloud == 'Azure' and FLAGS.use_managed_db),
+      db_engine_version=db.spec.engine_version,
+  )
+
+
 def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   """Run the Hammerdbcli benchmark.
 
@@ -392,35 +431,54 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   metadata = hammerdb.GetMetadata(db.engine)  # pyrefly: ignore[missing-attribute]
   # Consider if we should have separate versioning for each config.
   metadata['hammerdbcli_config_version'] = CONFIG_VERSION
+  virtual_users_list = hammerdb.GetNumVirtualUsersList()
+  metadata['hammerdbcli_virtual_users_list'] = virtual_users_list
 
-  samples = []
+  collector = sample.SampleGroupCollector()
   try:
-    PreRun(db)
-    start_time = datetime.datetime.now()
-    stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)  # pyrefly: ignore[missing-attribute]
-    end_time = datetime.datetime.now()
-    current_samples = hammerdb.ParseResults(
-        script=script, stdout=stdout, vm=client_vm
-    )
-    PostRun(db)
-    if (
-        db.engine == sql_engine_utils.ALLOYDB
-        and db.enable_columnar_engine_recommendation  # pyrefly: ignore[missing-attribute]
-    ):
-      database_name = hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[script]
-      current_samples = _CheckAlloyDbColumnarEngine(
-          db, client_vm, script, timeout, database_name  # pyrefly: ignore[bad-argument-type]
+    for num_virtual_users in virtual_users_list:
+      # The schema is built once during Prepare with the first virtual user
+      # count. Reconfigure the run script when sweeping additional counts.
+      if len(virtual_users_list) > 1:
+        _ReconfigureRunScriptForVirtualUsers(
+            db, client_vm, script, num_virtual_users
+        )
+      PreRun(db)
+      start_time = datetime.datetime.now()
+      stdout = hammerdb.Run(client_vm, db.engine, script, timeout=timeout)  # pyrefly: ignore[missing-attribute]
+      end_time = datetime.datetime.now()
+      current_samples = hammerdb.ParseResults(
+          script=script, stdout=stdout, vm=client_vm
       )
-    current_samples.extend(db.CollectMetrics(start_time, end_time))  # pyrefly: ignore[missing-attribute]
+      PostRun(db)
+      if (
+          db.engine == sql_engine_utils.ALLOYDB
+          and db.enable_columnar_engine_recommendation  # pyrefly: ignore[missing-attribute]
+      ):
+        database_name = hammerdb.MAP_SCRIPT_TO_DATABASE_NAME[script]
+        current_samples = _CheckAlloyDbColumnarEngine(
+            db, client_vm, script, timeout, database_name  # pyrefly: ignore[bad-argument-type]
+        )
+      current_samples.extend(db.CollectMetrics(start_time, end_time))  # pyrefly: ignore[missing-attribute]
 
-    for s in current_samples:
-      s.metadata.update(metadata)
-    samples += current_samples
+      run_metadata = dict(metadata)
+      run_metadata['hammerdbcli_vu'] = num_virtual_users
+      for s in current_samples:
+        s.metadata.update(run_metadata)
+      collector.Add(num_virtual_users, current_samples)
+
+    results = list(collector.all_samples)
+    if len(virtual_users_list) > 1:
+      results.extend(
+          collector.GetBestSamples(
+              hammerdb.TPM, 'max_tpm', sample.Aggregation.MAX
+          )
+      )
   finally:
     if _ENABLE_HAMMERDBCLI_VALIDATION.value:
       hammerdb.RunValidation(client_vm, db.engine, script, timeout=timeout)  # pyrefly: ignore[bad-argument-type]
 
-  return samples
+  return results
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
