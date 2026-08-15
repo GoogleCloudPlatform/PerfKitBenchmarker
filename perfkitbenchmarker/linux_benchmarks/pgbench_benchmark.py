@@ -33,11 +33,12 @@ This benchmark is written for pgbench 9.5, which is the default
 (as of 10/2017) version installed on Ubuntu 16.04.
 """
 
-import datetime
 import re
 from absl import flags
 from perfkitbenchmarker import configs
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import flag_util
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker.linux_packages import pgbench
 
@@ -167,8 +168,17 @@ def CheckPrerequisites(benchmark_config):
 
   Raises:
     perfkitbenchmarker.data.ResourceNotFound: On missing resource.
+    errors.Setup.InvalidFlagConfigurationError: On incompatible flags.
   """
   del benchmark_config
+  if FLAGS.pgbench_job_counts and (
+      len(FLAGS.pgbench_client_counts) != len(FLAGS.pgbench_job_counts)
+  ):
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'pgbench_client_counts and pgbench_job_counts must have the same'
+        f' length, got {len(FLAGS.pgbench_client_counts)} and'
+        f' {len(FLAGS.pgbench_job_counts)}.'
+    )
 
 
 def UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec):
@@ -365,8 +375,7 @@ def Run(benchmark_spec):
   db_size = GetDbSize(relational_db, TEST_DB_NAME)
   common_metadata = GetMetaData(db_size, benchmark_spec)
 
-  start_time = datetime.datetime.now()
-  pgbench.RunPgBench(
+  pgbench_results = pgbench.RunPgBench(
       benchmark_spec,
       relational_db,
       benchmark_spec.vms[0],
@@ -378,8 +387,17 @@ def Run(benchmark_spec):
       benchmark_spec.pgbench_protocol,
       common_metadata,
   )
-  end_time = datetime.datetime.now()
-  return relational_db.CollectMetrics(start_time, end_time)
+
+  results = list(pgbench_results.all_samples)
+
+  if len(benchmark_spec.client_counts) > 1:
+    results.extend(
+        pgbench_results.GetBestSamples(
+            'tps_array', 'max_tps', sample.Aggregation.MAX
+        )
+    )
+
+  return results
 
 
 def GetMetaData(db_size, benchmark_spec):
