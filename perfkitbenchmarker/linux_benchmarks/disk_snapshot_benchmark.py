@@ -25,6 +25,7 @@ from perfkitbenchmarker import configs
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import sample
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_benchmarks import unmanaged_mysql_sysbench_benchmark
 from perfkitbenchmarker.linux_benchmarks.fio import utils as fio_utils
 from perfkitbenchmarker.linux_packages import fio
@@ -135,7 +136,7 @@ def MeasureRestoreSnapshotTime(
         if device['DevicePath'] > latest_restore_disk_device_path:
           latest_restore_disk_device_path = device['DevicePath']
 
-  vm.RemoteCommand(
+  vm_util.Retry(poll_interval=1, timeout=300)(vm.RemoteCommand)(
       f'sudo dd if={latest_restore_disk_device_path} of=/dev/null bs=4k count=1'
   )
   latest_restore_disk.restore_first_byte_end_time = time.time()
