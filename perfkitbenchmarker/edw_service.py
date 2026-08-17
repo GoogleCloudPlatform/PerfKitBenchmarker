@@ -522,6 +522,17 @@ class EdwClientInterface:
     """Returns the client interface metadata."""
     raise NotImplementedError
 
+  def GetTableStats(self, table_name: str) -> tuple[float, int]:
+    """Gets the size in gigabytes and row count of the table.
+
+    Args:
+      table_name: Name of the table to get stats of.
+
+    Returns:
+      A tuple of (size_in_gb, row_count).
+    """
+    raise NotImplementedError
+
 
 class BaseConversationalAnalyticsClientInterface(EdwClientInterface):
   """Base class for Conversational Analytics EDW client interfaces."""

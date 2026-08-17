@@ -22,6 +22,8 @@ from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
 FLAGS = flags.FLAGS
 
+_BYTES_PER_GB = 1024 * 1024 * 1024
+
 
 class ClickhouseClientInterface(edw_service.EdwClientInterface):
   """Python Client Interface class for ClickHouse."""
@@ -145,6 +147,18 @@ class ClickhouseClientInterface(edw_service.EdwClientInterface):
     return {
         'client': 'python',
     }
+
+  def GetTableStats(self, table_name: str) -> tuple[float, int]:
+    """Gets the size in gigabytes and row count of the table."""
+    query = (
+        'SELECT total_bytes, total_rows'
+        f" FROM system.tables WHERE table = '{table_name}'"
+    )
+    stdout = self.ExecuteViaClickhouseClient(query)
+    if not stdout or not stdout.strip():
+      raise ValueError(f'Table stats for {table_name} were not returned.')
+    parts = stdout.strip().split()
+    return int(parts[0]) / _BYTES_PER_GB, int(parts[1])
 
 
 _NAMESPACE = 'clickhouse'

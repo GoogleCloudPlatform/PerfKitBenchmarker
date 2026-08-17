@@ -386,6 +386,42 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     response = interface.ExecuteThroughput(QUERY_STREAMS, THROUGHPUT_LABELS)
     self.assertDictEqual(json.loads(response), THROUGHPUT_RESPONSE_OBJECT)
 
+  def testGenericClientInterfaceGetTableStats(self):
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.MockIssueCommand({
+        'bq show': [
+            (
+                json.dumps({
+                    'numBytes': str(10 * 1024 * 1024 * 1024),
+                    'numRows': '100',
+                }),
+                '',
+                0,
+            ),
+        ]
+    })
+    mock_vm = mock.MagicMock()
+    bm_spec = FakeBenchmarkSpec(mock_vm)
+    interface.SetProvisionedAttributes(bm_spec)
+
+    size, rows = interface.GetTableStats('hits')
+    self.assertEqual(size, 10.0)
+    self.assertEqual(rows, 100)
+
+  def testGenericClientInterfaceGetTableStatsRaisesErrorWhenMissing(self):
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.MockIssueCommand({
+        'bq show': [
+            (json.dumps({}), '', 0),
+        ]
+    })
+    mock_vm = mock.MagicMock()
+    bm_spec = FakeBenchmarkSpec(mock_vm)
+    interface.SetProvisionedAttributes(bm_spec)
+
+    with self.assertRaises(ValueError):
+      interface.GetTableStats('hits')
+
   @parameterized.named_parameters(
       dict(
           testcase_name='NoLocationNoTableFormat',
@@ -598,16 +634,14 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
             f'--project={PROJECT_ID} --agent=AGENT_ID '
             '--credentials_file=SERVICE_ACCOUNT_KEY_FILE --print_results '
             f'--query_file={expected_query_file}'
-        )
+        ),
     ])
     mock_vm.PushFile.assert_called_once_with(mock.ANY, expected_query_file)
 
-  @flagsaver.flagsaver(
-      (
-          gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE,
-          '/path/to/SERVICE_ACCOUNT_KEY_FILE',
-      )
-  )
+  @flagsaver.flagsaver((
+      gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE,
+      '/path/to/SERVICE_ACCOUNT_KEY_FILE',
+  ))
   def testGetQueryFileName(self):
     interface = bigquery.ConversationalAnalyticsClientInterface(
         PROJECT_ID, DATASET_ID
@@ -620,12 +654,10 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     # (for hash) + 4 (for .txt) = 45
     self.assertLen(filename, 45)
 
-  @flagsaver.flagsaver(
-      (
-          gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE,
-          '/path/to/SERVICE_ACCOUNT_KEY_FILE',
-      )
-  )
+  @flagsaver.flagsaver((
+      gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE,
+      '/path/to/SERVICE_ACCOUNT_KEY_FILE',
+  ))
   def testParseConversationalAnalyticsResultsSuccess(self):
     interface = bigquery.ConversationalAnalyticsClientInterface(
         PROJECT_ID, DATASET_ID
@@ -642,8 +674,8 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
                 'progress_messages': ['progress 1'],
                 'time_to_first_token_secs': 1.0,
                 'total_stream_time_secs': 4.0,
-            }
-        }
+            },
+        },
     }
     execution_time, metadata = interface._ParseConversationalAnalyticsResults(
         results, 'test query'
@@ -683,8 +715,8 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
                 'text_response': 'The total sales is $1000.',
                 'generated_sql': 'SELECT sum(sales) FROM t',
                 'retrieved_data': [['1000']],
-            }
-        }
+            },
+        },
     }
 
     mock_vm.RemoteCommand.side_effect = [
@@ -704,7 +736,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
             f'--project={PROJECT_ID} --agent=AGENT_ID '
             '--credentials_file=SERVICE_ACCOUNT_KEY_FILE --print_results '
             f'--query_file={expected_query_file}'
-        )
+        ),
     ])
     mock_vm.PushFile.assert_called_once_with(mock.ANY, expected_query_file)
 

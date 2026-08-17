@@ -185,6 +185,35 @@ class ClickhouseTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertFalse(db._IsReady())
     self.assertTrue(mock_cmd.func_to_mock.called)
 
+  def testGetTableStats(self):
+    client = clickhouse.ClickhouseClientInterface()
+    client.address = '10.0.0.1'
+    client.port = 9000
+    client.client_vm = self.MockRemoteCommand(
+        {'clickhouse-client': [('10737418240\t100000000\n', '')]}
+    )
+
+    size, rows = client.GetTableStats('hits')
+
+    self.assertEqual(size, 10.0)
+    self.assertEqual(rows, 100000000)
+    client.client_vm.RemoteCommand.assert_called_once_with(
+        'clickhouse-client --host=10.0.0.1 --port=9000 --user=external'
+        ' --password= --query="SELECT total_bytes, total_rows FROM'
+        ' system.tables WHERE table = \'hits\'"'
+    )
+
+  def testGetTableStatsRaisesErrorWhenMissing(self):
+    client = clickhouse.ClickhouseClientInterface()
+    client.address = '10.0.0.1'
+    client.port = 9000
+    client.client_vm = self.MockRemoteCommand(
+        {'clickhouse-client': [('', '')]}
+    )
+
+    with self.assertRaises(ValueError):
+      client.GetTableStats('hits')
+
 
 if __name__ == '__main__':
   unittest.main()

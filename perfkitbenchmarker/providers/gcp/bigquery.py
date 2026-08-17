@@ -95,6 +95,9 @@ BQ_JDBC_JAVA_FLAGS = {
 }
 
 
+_BYTES_PER_GB = 1024 * 1024 * 1024
+
+
 class GenericClientInterface(edw_service.EdwClientInterface):
   """Generic Client Interface class for BigQuery.
 
@@ -113,6 +116,32 @@ class GenericClientInterface(edw_service.EdwClientInterface):
 
   def RunQueryWithResults(self, query_name: str) -> str:
     raise NotImplementedError
+
+  def GetTableStats(self, table_name: str) -> tuple[float, int]:
+    """Gets the size in gigabytes and row count of the table using bq show.
+
+    Args:
+      table_name: Name of the table to get stats of.
+
+    Returns:
+      Tuple of (size_in_gb, row_count).
+    """
+    target = f'{self.project_id}:{self.dataset_id}.{table_name}'
+
+    stdout, _, _ = vm_util.IssueCommand(
+        ['bq', 'show', '--format=prettyjson', target]
+    )
+    table_meta = json.loads(stdout)
+    num_bytes = table_meta.get('numBytes', None)
+    num_rows = table_meta.get('numRows', None)
+    if num_bytes is None or num_rows is None:
+      raise ValueError(
+          f'numBytes or numRows for {target} was not returned in bq show'
+          ' output.'
+      )
+    return int(num_bytes) / _BYTES_PER_GB, int(
+        table_meta['numRows']
+    )
 
 
 def GetBigQueryClientInterface(
