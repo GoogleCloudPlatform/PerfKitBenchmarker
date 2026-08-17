@@ -289,6 +289,7 @@
 -   Add kubernetes_management benchmark for measuring GKE/EKS/AKS management
     plane API responsiveness.
 -   Add support for Clickhouse running on GKE.
+-   dpb_sparksql_benchmark now requires passing --dpb_sparksql_queries_url flag.
 
 ### Enhancements:
 

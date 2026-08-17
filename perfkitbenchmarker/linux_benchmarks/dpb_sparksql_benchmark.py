@@ -168,6 +168,8 @@ def CheckPrerequisites(benchmark_config):
   Raises:
     Config.InvalidValue: On encountering invalid configuration.
   """
+  if not dpb_sparksql_benchmark_helper.QUERIES_URL.value:
+    raise errors.Config.InvalidValue('--dpb_sparksql_queries_url is mandatory.')
   if not FLAGS.dpb_sparksql_data and FLAGS.dpb_sparksql_create_hive_tables:
     raise errors.Config.InvalidValue(
         'You must pass dpb_sparksql_data with dpb_sparksql_create_hive_tables'

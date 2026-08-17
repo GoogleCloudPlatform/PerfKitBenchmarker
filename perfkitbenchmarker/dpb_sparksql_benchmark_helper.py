@@ -23,7 +23,6 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import temp_dir
-from perfkitbenchmarker import vm_util
 
 BENCHMARK_NAMES = {'tpcds_2_4': 'TPC-DS', 'tpch': 'TPC-H'}
 
@@ -109,15 +108,12 @@ flags.DEFINE_enum(
     'counter-intuitive results and Spark reads more data than necessary to '
     "populate it's cache.",
 )
-_QUERIES_URL = flags.DEFINE_string(
+QUERIES_URL = flags.DEFINE_string(
     'dpb_sparksql_queries_url',
     None,
     'Object Storage (e.g. GCS or S3) directory URL where the benchmark query '
     'files are contained. Their name must be their query number alone (e.g: '
-    '"1" or "14a") without any prefix or extension. If omitted, queries will '
-    'be fetched from databricks/spark-sql-perf Github repo and use the '
-    '--dpb_sparksql_query flag to decide whether to get TPC-DS or TPC-H '
-    'queries.',
+    '"1" or "14a") without any prefix or extension.',
 )
 DUMP_SPARK_CONF = flags.DEFINE_bool(
     'dpb_sparksql_dump_spark_conf',
@@ -138,8 +134,6 @@ SPARK_SQL_DISTCP_SCRIPT = os.path.join(SCRIPT_DIR, 'spark_sql_distcp.py')
 SPARK_TABLE_SCRIPT = os.path.join(SCRIPT_DIR, 'spark_table.py')
 SPARK_SQL_RUNNER_SCRIPT = os.path.join(SCRIPT_DIR, 'spark_sql_runner.py')
 QUERIES_SCRIPT = os.path.join(SCRIPT_DIR, QUERIES_PY_BASENAME)
-SPARK_SQL_PERF_GIT = 'https://github.com/databricks/spark-sql-perf.git'
-SPARK_SQL_PERF_GIT_COMMIT = '6b2bf9f9ad6f6c2f620062fda78cded203f619c8'
 QUERIES_SUB_PATTERN = (
     r'^#[\s]*spark_sql_queries:start[\s]*$.*^#[\s]*spark_sql_queries:end[\s]*$'
 )
@@ -187,7 +181,7 @@ def Prepare(benchmark_spec):
   """Copies scripts and all the queries to cloud."""
   cluster = benchmark_spec.dpb_service
   storage_service = cluster.storage_service
-  queries = _FetchQueryContents(storage_service)
+  queries = _FetchQueryContents(cluster.region)
   rendered_runner_filepath = _RenderRunnerScriptWithQueries(queries)
   benchmark_spec.query_streams = GetStreams()
 
@@ -221,16 +215,14 @@ def Prepare(benchmark_spec):
     benchmark_spec.data_dir = FLAGS.dpb_sparksql_data
 
 
-def _FetchQueryContents(
-    storage_service: object_storage_service.ObjectStorageService,
-) -> dict[str, str]:
+def _FetchQueryContents(region: str) -> dict[str, str]:
   """Fetches query contents into a dict from a source depending on flags passed.
 
   Queries are selected using --dpb_sparksql_query, --dpb_sparksql_order and
   --dpb_sparksql_queries_url.
 
   Args:
-    storage_service: object_storage_service to stage queries into.
+    region: The region to initialize the dynamically created storage service in.
 
   Returns:
     A dict where the key corresponds to the query ID and value to the actual
@@ -239,26 +231,30 @@ def _FetchQueryContents(
   Raises:
     PrepareException if a requested query is not found.
   """
-  if _QUERIES_URL.value:
-    return _FetchQueryFilesFromUrl(storage_service, _QUERIES_URL.value)
-  return _FetchQueriesFromRepo()
+  if not QUERIES_URL.value:
+    raise ValueError('--dpb_sparksql_queries_url is mandatory.')
+  return _FetchQueryFilesFromUrl(QUERIES_URL.value, region)
 
 
-def _FetchQueryFilesFromUrl(
-    storage_service: object_storage_service.ObjectStorageService,
-    queries_url: str,
-) -> dict[str, str]:
+def _FetchQueryFilesFromUrl(queries_url: str, region: str) -> dict[str, str]:
   """Checks if relevant query files from queries_url exist.
 
   Args:
-    storage_service: object_storage_service to fetch query files.
     queries_url: Object Storage directory URL where the benchmark queries are
       contained.
+    region: The zone where the storage service is located.
 
   Returns:
     A dict where the key corresponds to the query ID and value to the actual
     query SQL.
   """
+  queries_url = re.sub(r'^s3a://', 's3://', queries_url)
+  storage_cloud = 'AWS' if queries_url.startswith('s3://') else 'GCP'
+  storage_service = object_storage_service.GetObjectStorageClass(
+      storage_cloud
+  )()
+  storage_service.PrepareService(region)
+
   temp_run_dir = temp_dir.GetRunDirPath()
   spark_sql_queries = os.path.join(temp_run_dir, 'spark_sql_queries')
   query_paths = {q: os.path.join(queries_url, q) for q in GetQueryIdsToStage()}
@@ -267,7 +263,7 @@ def _FetchQueryFilesFromUrl(
   for q in query_paths:
     try:
       local_path = os.path.join(spark_sql_queries, q)
-      storage_service.Copy(query_paths[q], os.path.join(spark_sql_queries, q))
+      storage_service.Copy(query_paths[q], local_path)
       with open(local_path) as f:
         queries[q] = f.read()
     except errors.VmUtil.IssueCommandError:  # Handling query not found
@@ -276,43 +272,6 @@ def _FetchQueryFilesFromUrl(
     raise errors.Benchmarks.PrepareException(
         'Could not find queries {}'.format(', '.join(sorted(queries_missing)))
     )
-  return queries
-
-
-def _FetchQueriesFromRepo() -> dict[str, str]:
-  """Fetches queries from default Github repo to object storage."""
-  temp_run_dir = temp_dir.GetRunDirPath()
-  spark_sql_perf_dir = os.path.join(temp_run_dir, 'spark_sql_perf_dir')
-  queries = {}
-
-  # Clone repo
-  vm_util.IssueCommand(['git', 'clone', SPARK_SQL_PERF_GIT, spark_sql_perf_dir])
-  vm_util.IssueCommand(
-      ['git', 'checkout', SPARK_SQL_PERF_GIT_COMMIT], cwd=spark_sql_perf_dir
-  )
-  query_dir = os.path.join(
-      spark_sql_perf_dir, 'src', 'main', 'resources', FLAGS.dpb_sparksql_query
-  )
-
-  # Search repo for queries
-  queries_to_stage = GetQueryIdsToStage()
-  for dir_name, _, files in os.walk(query_dir):
-    for filename in files:
-      query_id = GetQueryId(filename)
-      if query_id:
-        # only load specified queries
-        if query_id in queries_to_stage:
-          query_path = os.path.join(dir_name, filename)
-          with open(query_path) as f:
-            queries[query_id] = f.read()
-
-  # Validate all requested queries are present.
-  missing_queries = set(queries_to_stage) - set(queries.keys())
-  if missing_queries:
-    raise errors.Benchmarks.PrepareException(
-        'Could not find queries {}'.format(missing_queries)
-    )
-
   return queries
 
 
