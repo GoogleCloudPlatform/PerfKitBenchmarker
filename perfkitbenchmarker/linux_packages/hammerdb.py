@@ -365,9 +365,9 @@ class HammerDbTclScript:
       vm.RemoteCommand(f'sudo rm -f {TRANSACTION_COUNT_LOCATION}')
     # When VU is over LINUX_OPEN_FILE_LIMIT the hammerdbcli will fail
     # due to exceeding the default open file limit on linux.
-    # Increase the Open file limit to a large number.
+    # Increase the Open file limit inside sudo to apply to the elevated process.
     if _HAMMERDB_SET_LINUX_OPEN_FILE_LIMIT.value:
-      cmd = f'ulimit -n {_HAMMERDB_SET_LINUX_OPEN_FILE_LIMIT.value} &&'
+      cmd = f'ulimit -n {_HAMMERDB_SET_LINUX_OPEN_FILE_LIMIT.value} && '
 
     # RobustRemoteCommand is required as there might be ssh 255 error
     # RemoteCommandWithReturnCode will retry ssh 255 error
@@ -375,9 +375,8 @@ class HammerDbTclScript:
     stdout, _ = vm.RobustRemoteCommand(
         InDir(
             HAMMERDB_RUN_LOCATION,
-            'PATH="$PATH:/opt/mssql-tools/bin" &&'
-            + cmd
-            + 'sudo -E ./hammerdbcli auto {}'.format(script_location),
+            'PATH="$PATH:/opt/mssql-tools/bin" && '
+            f'sudo -E bash -c "{cmd}./hammerdbcli auto {script_location}"',
         ),
         timeout=timeout,
     )
