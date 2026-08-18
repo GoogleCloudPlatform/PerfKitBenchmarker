@@ -77,6 +77,11 @@ flags.DEFINE_integer(
     18000,
     'The time to wait for an EMR job to finish, in seconds',
 )
+AWS_EMR_APPLICATIONS = flags.DEFINE_list(
+    'aws_emr_applications',
+    ['Spark'],
+    'List of applications to install on EMR.',
+)
 USE_AWS_SPOT_INSTANCES = flags.DEFINE_boolean(
     'aws_spot_instances',
     False,

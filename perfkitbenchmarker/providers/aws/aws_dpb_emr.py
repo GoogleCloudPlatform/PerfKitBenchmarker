@@ -37,6 +37,7 @@ from perfkitbenchmarker.providers.aws import aws_disk
 from perfkitbenchmarker.providers.aws import aws_dpb_emr_serverless_prices
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
+from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
 
@@ -304,13 +305,15 @@ class AwsDpbEmr(dpb_service.BaseDpbService):
         '--use-default-roles',
         '--instance-groups',
         json.dumps(instance_groups),
-        '--application',
-        'Name=Spark',
-        'Name=Hadoop',
-        'Name=Hive',
+    ]
+    if aws_flags.AWS_EMR_APPLICATIONS.value:
+      cmd.append('--applications')
+      for app in aws_flags.AWS_EMR_APPLICATIONS.value:
+        cmd.append(f'Name={app}')
+    cmd.extend([
         '--log-uri',
         self.base_dir,
-    ]
+    ])
 
     ec2_attributes = [
         'KeyName=' + aws_virtual_machine.AwsKeyFileManager.GetKeyNameForRun(),

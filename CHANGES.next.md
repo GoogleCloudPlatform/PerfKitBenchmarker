@@ -129,6 +129,10 @@
     'Autopilot' to 'Auto'.
 -   Duplicate metadata for all samples.
 -   Move many kubernetes benchmarks to their own folder within linux_benchmarks.
+-   AWS EMR clusters now will be created with only Spark application enabled by
+    default (now it might require to explicitly pass
+    --aws_emr_applications=Spark,Hadoop,Hive to get some older benchmarks
+    working).
 
 ### New features:
 
