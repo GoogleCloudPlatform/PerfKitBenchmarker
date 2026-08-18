@@ -100,6 +100,7 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
     self.partition_count = 0
     if self.strategy == PARTITION:
       self.partition_count = FLAGS.aws_partition_count
+    self.arn: str | None = None
 
   def _Create(self):
     """Creates the Placement Group."""
@@ -144,4 +145,6 @@ class AwsPlacementGroup(placement_group.BasePlacementGroup):
     response = json.loads(stdout)
     placement_groups = response['PlacementGroups']
     assert len(placement_groups) < 2, 'Too many placement groups.'
+    if placement_groups:
+      self.arn = placement_groups[0]['GroupArn']
     return bool(placement_groups)

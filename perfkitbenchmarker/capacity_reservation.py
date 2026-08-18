@@ -15,7 +15,10 @@
 """Module containing abstract class for a capacity reservation for VMs."""
 
 from absl import flags
+from perfkitbenchmarker import placement_group
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import virtual_machine_spec
+
 
 FLAGS = flags.FLAGS
 
@@ -44,6 +47,9 @@ class BaseCapacityReservation(resource.BaseResource):
 
   RESOURCE_TYPE = 'BaseCapacityReservation'
 
-  def __init__(self, vm_group):
+  def __init__(
+      self, vm_group: list[virtual_machine_spec.BaseVmSpec],
+      pg: placement_group.BasePlacementGroup | None = None):
     super().__init__()
     self.vm_group = vm_group
+    self.placement_group = pg

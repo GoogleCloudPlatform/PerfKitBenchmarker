@@ -1428,6 +1428,16 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
         )
     )
 
+    if self.proxy_jump:
+      scp_cmd = [
+          'scp',
+          '-pr',
+          '-F',
+          os.path.join(vm_util.GetTempDir(), 'ssh_config')
+      ]
+      # ssh_config already sets username
+      remote_location = '%s:%s' % (self.name, remote_path)
+
     simplified_cmd = ['scp']
     if copy_to:
       simplified_cmd.extend([file_path, remote_location])

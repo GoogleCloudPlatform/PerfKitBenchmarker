@@ -2,7 +2,7 @@
 
 import json
 import os
-from typing import Tuple
+from typing import Any, Tuple
 
 from absl import flags as absl_flags
 import jinja2
@@ -13,13 +13,20 @@ from perfkitbenchmarker import linux_packages
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import regex_util
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_capacity_reservation
 from perfkitbenchmarker.providers.aws import aws_network
+from perfkitbenchmarker.providers.aws import aws_placement_group
 from perfkitbenchmarker.providers.aws import aws_virtual_machine
 from perfkitbenchmarker.providers.aws import flags
 from perfkitbenchmarker.providers.aws import util
 
 
 FLAGS = absl_flags.FLAGS
+
+
+def _NoReboot():
+  """No-op function to override the Reboot function."""
+  pass
 
 
 class AWSClusterSpec(cluster.BaseClusterSpec):
@@ -69,7 +76,7 @@ class AWSCluster(cluster.BaseCluster):
         '-c',
         f'printf "{self.region}\n{self._key_manager.GetKeyNameForRun()}\n'
         # The follownig does not matter as this step only creates the network.
-        'slurm\nalinux2\nt2.micro\n1\nqueue1\n1\nt2.micro\n1\ny\n'
+        'slurm\nalinux2\n\n1\nqueue1\n1\n\n1\ny\n'
         f'{self.zone}\n1\n" '
         f'| pcluster configure --config {subnet_config_path}',
     ])
@@ -156,32 +163,35 @@ class AWSCluster(cluster.BaseCluster):
     # But the tool does not take care of vpc cleanup.
     self._vpc._Delete()  # pylint: disable=protected-access
 
+  def _GetTemplateParameters(self) -> dict[str, Any]:
+    """Returns the parameters to be used for rendering the cluster config."""
+    return {
+        'name': self.name,
+        'os_type': self.os_type.replace('amazonlinux', 'alinux'),
+        'region': self.region,
+        'num_workers': self.num_workers,
+        'worker_machine_type': self.worker_machine_type,
+        'headnode_machine_type': self.headnode_machine_type,
+        'headnode_subnet_id': self._headnode_subnet_id,
+        'worker_subnet_id': self._worker_subnet_id,
+        'ssh_key': self._key_manager.GetKeyNameForRun(),
+        'tags': util.MakeDefaultTags(FLAGS.timeout_minutes),
+        # boot disk of headnode is also mounted as NFS
+        'nfs_size': self.headnode_spec.boot_disk_size,
+        'efa_enabled': FLAGS.aws_efa,
+        'enable_spot_vm': FLAGS.aws_spot_instances,
+        # Expose enable_smt flag for consistency across clouds.
+        'enable_smt': not FLAGS.disable_smt,
+        'preprovisioned_bucket': FLAGS.aws_preprovisioned_data_bucket or '*'
+    }
+
   def _RenderClusterConfig(self):
     """Render the config file that will be used to create the cluster."""
-    tags = util.MakeDefaultTags(FLAGS.timeout_minutes)
     with open(data.ResourcePath(self.template)) as content:
       template = jinja2.Template(
           content.read(), undefined=jinja2.StrictUndefined
       )
-      self._config = template.render(
-          name=self.name,
-          os_type=self.os_type.replace('amazonlinux', 'alinux'),
-          region=self.region,
-          num_workers=self.num_workers,
-          worker_machine_type=self.worker_machine_type,
-          headnode_machine_type=self.headnode_machine_type,
-          headnode_subnet_id=self._headnode_subnet_id,
-          worker_subnet_id=self._worker_subnet_id,
-          ssh_key=self._key_manager.GetKeyNameForRun(),
-          tags=tags,
-          # boot disk of headnode is also mounted as NFS
-          nfs_size=self.headnode_spec.boot_disk_size,
-          efa_enabled=FLAGS.aws_efa,
-          enable_spot_vm=FLAGS.aws_spot_instances,
-          # Expose enable_smt flag for consistency across clouds.
-          enable_smt=not FLAGS.disable_smt,
-          preprovisioned_bucket=FLAGS.aws_preprovisioned_data_bucket or '*'
-      )
+      self._config = template.render(self._GetTemplateParameters())
 
   def _Create(self):
     with open(self._config_path, 'w') as config_file:
@@ -254,8 +264,12 @@ class AWSCluster(cluster.BaseCluster):
       if instance['nodeType'] == 'HeadNode':
         continue
       vm = self.InstantiateVm(self.workers_spec)
+      # IP may change for pcluster workers, use hostname instead.
       self.worker_vms.append(vm)
       _PopulateVM(vm, instance)
+      vm.internal_ips = [
+          f'queue1-st-{self.name}-{len(self.worker_vms)}'
+      ] + vm.internal_ips
       vm.ip_address = vm.internal_ips[0]
       vm.proxy_jump = self.headnode_vm.name  # pyrefly: ignore[missing-attribute]
       vm.has_private_key = True
@@ -271,6 +285,8 @@ class AWSCluster(cluster.BaseCluster):
       vm.RemoteCommand(
           f'sudo ln -s {self.nfs_path} {linux_packages.INSTALL_DIR}'
       )
+      # Rebooting a cluster VM will reset it completely.
+      vm.Reboot = _NoReboot
       vm.PrepareVMEnvironment()
 
     # Since worker uses headnode as proxy, setup headnode to avoid potential
@@ -352,3 +368,50 @@ class AWSP6Cluster(AWSCluster):
     return super().RemoteCommand(
         command, ignore_failure, timeout,
         env + 'export FI_PROVIDER=efa; ', **kwargs)
+
+
+class AWSOnDemandCapacityReservationCluster(AWSCluster):
+  """Class representing a On-Demand Capacity Reservation cluster."""
+
+  TYPE = 'on-demand-capacity-reservation'
+  DEFAULT_TEMPLATE = 'cluster/aws_on_demand_capacity_reservation.yaml.j2'
+
+  def __init__(self, cluster_spec: AWSClusterSpec):
+    super().__init__(cluster_spec)
+    self._reservation = None
+    self._placement_group = None
+
+  def _CreateDependencies(self):
+    self._placement_group = aws_placement_group.AwsPlacementGroup(
+        aws_placement_group.AwsPlacementGroupSpec(
+            'AwsPlacementGroupSpec', flag_values=FLAGS, zone=self.zone
+        )
+    )
+    self._placement_group.Create()
+    reservation_spec = self.workers_spec
+    reservation_spec.OS_TYPE = self.os_type  # pyrefly: ignore[missing-attribute]
+    self._reservation = aws_capacity_reservation.AwsCapacityReservation(
+        [reservation_spec] * self.num_workers,
+        self._placement_group,
+    )
+    self._reservation.Create()
+    super()._CreateDependencies()
+
+  def _DeleteDependencies(self):
+    if self._reservation:
+      self._reservation.Delete()
+    if self._placement_group:
+      self._placement_group.Delete()
+    super()._DeleteDependencies()
+
+  def _GetTemplateParameters(self) -> dict[str, Any]:
+    params = super()._GetTemplateParameters()
+    if self._reservation:
+      params.update({
+          'capacity_reservation_id': self._reservation.capacity_reservation_id,
+      })
+    if self._placement_group:
+      params.update({
+          'placement_group_id': self._placement_group.name,
+      })
+    return params

@@ -44,10 +44,12 @@ import logging
 from absl import flags
 from perfkitbenchmarker import capacity_reservation
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import os_types
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.providers.aws import aws_placement_group
 from perfkitbenchmarker.providers.aws import util
+
 
 FLAGS = flags.FLAGS
 _INSUFFICIENT_CAPACITY = 'InsufficientInstanceCapacity'
@@ -70,19 +72,23 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
 
   CLOUD = provider_info.AWS
 
-  def __init__(self, vm_group):
+  def __init__(
+      self,
+      vm_group: list[virtual_machine_spec.BaseVmSpec],
+      pg: aws_placement_group.AwsPlacementGroup | None = None,
+  ):
     if not vm_group:
       raise InvalidVmGroupSizeError(
           'AwsCapacityReservation must be initialized with at least one '
           'VM in the vm_group.'
       )
 
-    super().__init__(vm_group)
-    self.zone_or_region = vm_group[0].zone
+    super().__init__(vm_group, pg)
+    self.zone_or_region: str = str(vm_group[0].zone or '')
     self.region = util.GetRegionFromZone(self.zone_or_region)
     self.machine_type = vm_group[0].machine_type
-    self.os_type = vm_group[0].OS_TYPE
     self.vm_count = len(vm_group)
+    self.placement_group: aws_placement_group.AwsPlacementGroup | None = pg
 
   def _Create(self):
     """Creates the AWS CapacaityReservation.
@@ -100,19 +106,9 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
     as the zone attributes on the VM, and the VM's network instance.
 
     Raises:
-      UnsupportedOsTypeError: If creating a capacity reservation for the
-        given os type is not supported.
       CreationError: If a capacity reservation cannot be created in the
         region (typically indicates a stockout).
     """
-    if self.os_type in os_types.LINUX_OS_TYPES:
-      instance_platform = 'Linux/UNIX'
-    elif self.os_type in os_types.WINDOWS_OS_TYPES:
-      instance_platform = 'Windows'
-    else:
-      raise UnsupportedOsTypeError(
-          'Unsupported os_type for AWS CapacityReservation: %s.' % self.os_type
-      )
 
     # If the user did not specify an AZ, we need to try to create the
     # CapacityReservation in a specifc AZ until it succeeds.
@@ -131,7 +127,7 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
           'ec2',
           'create-capacity-reservation',
           '--instance-type=%s' % self.machine_type,
-          '--instance-platform=%s' % instance_platform,
+          '--instance-platform=Linux/UNIX',
           '--availability-zone=%s' % zone,
           '--instance-count=%s' % self.vm_count,
           '--instance-match-criteria=targeted',
@@ -139,6 +135,10 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
           '--end-date-type=limited',
           '--end-date=%s' % end_date.isoformat(),
       ]
+      if self.placement_group:
+        cmd += [
+            '--placement-group-arn=%s' % self.placement_group.arn,
+        ]
       stdout, stderr, retcode = vm_util.IssueCommand(
           cmd, raise_on_failure=False
       )
@@ -159,7 +159,6 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
       self.capacity_reservation_id = json_output['CapacityReservation'][
           'CapacityReservationId'
       ]
-      self._UpdateVmsInGroup(self.capacity_reservation_id, zone)
       return
     raise CreationError(
         'Unable to create CapacityReservation in any of the '
@@ -190,22 +189,3 @@ class AwsCapacityReservation(capacity_reservation.BaseCapacityReservation):
 
     json_output = json.loads(stdout)
     return json_output['CapacityReservations'][0]['State'] == 'active'
-
-  def _UpdateVmsInGroup(self, capacity_reservation_id, zone):
-    """Updates the VMs in a group with necessary reservation details.
-
-    AWS virtual machines need to reference the capacity reservation id
-    during creation, so it is set on all VMs in the group. Additionally,
-    this class may determine which zone to run in, so that needs to be
-    updated too (on the VM, and the VM's network instance).
-
-    Args:
-      capacity_reservation_id: ID of the reservation created by this instance.
-      zone: Zone chosen by this class, or if it was supplied, the zone provided
-        by the user. In the latter case, setting the zone is equivalent to a
-        no-op.
-    """
-    for vm in self.vm_group:
-      vm.capacity_reservation_id = capacity_reservation_id
-      vm.zone = zone
-      vm.network.zone = zone

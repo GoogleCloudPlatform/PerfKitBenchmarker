@@ -6,6 +6,7 @@ import unittest
 from absl import flags
 import freezegun
 import mock
+from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_capacity_reservation
 from perfkitbenchmarker.providers.aws import util
@@ -36,15 +37,11 @@ CREATE_STDOUT_SUCCESSFUL = """
 """
 
 
-class FakeAwsVirtualMachine:
-
-  def __init__(self):
-    self.zone = 'us-west-1'
-    self.region = 'us-west-1'
-    self.machine_type = 'fake_machine_type'
-    self.OS_TYPE = 'ubuntu2004'  # pylint: disable=invalid-name
-    self.network = mock.MagicMock()
-    self.capacity_reservation_id = None
+def FakeAwsVirtualMachine():
+  vm_spec = virtual_machine_spec.BaseVmSpec('fake_vm')
+  vm_spec.zone = 'us-west-1'
+  vm_spec.machine_type = 'fake_machine_type'
+  return vm_spec
 
 
 class AwsCapacityReservationTest(pkb_common_test_case.PkbCommonTestCase):
@@ -110,23 +107,6 @@ class AwsCapacityReservationTest(pkb_common_test_case.PkbCommonTestCase):
       )
       self.assertEqual(issue_command.call_count, 1)
       self.assertIn(expected_command, command_string)
-
-  def test_update_vms_in_group(self):
-    vm_1 = FakeAwsVirtualMachine()
-    vm_2 = FakeAwsVirtualMachine()
-    vm_3 = FakeAwsVirtualMachine()
-    vm_group = [vm_1, vm_2, vm_3]
-
-    capacity_reservation = aws_capacity_reservation.AwsCapacityReservation(
-        vm_group
-    )
-    capacity_reservation.capacity_reservation_id = 'foo'
-
-    capacity_reservation._UpdateVmsInGroup('foo', 'us-west-1z')
-    for vm in vm_group:
-      self.assertEqual('foo', vm.capacity_reservation_id)
-      self.assertEqual('us-west-1z', vm.zone)
-      self.assertEqual('us-west-1z', vm.network.zone)
 
 
 if __name__ == '__main__':

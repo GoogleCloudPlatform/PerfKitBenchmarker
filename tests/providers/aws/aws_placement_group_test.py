@@ -28,6 +28,7 @@ EXISTS_ONE_RESPONSE = {
         'GroupName': GROUP_NAME,
         'State': 'available',
         'Strategy': STRATEGY,
+        'GroupArn': 'arn-foo',
     }]
 }
 EXISTS_TWO_RESPONSE = {'PlacementGroups': ['seat', 'filler']}
