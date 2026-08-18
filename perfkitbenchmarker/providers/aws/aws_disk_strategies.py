@@ -573,6 +573,16 @@ class AwsLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
     if FLAGS.aws_efa:
       cmd += ' --install-efa'
     vm.RemoteCommand(cmd)
+    # Apply best practices
+    # https://docs.aws.amazon.com/fsx/latest/LustreGuide/performance-tips.html
+    vm.RemoteCommand(
+        'sudo touch /etc/modprobe.d/modprobe.conf; '
+        'sudo chmod 766 /etc/modprobe.d/modprobe.conf; '
+        'echo "options ptlrpc ptlrpcd_per_cpt_max=32" >> '
+        '/etc/modprobe.d/modprobe.conf; '
+        'echo "options ksocklnd credits=2560" >> /etc/modprobe.d/modprobe.conf',
+        ignore_failure=True,
+    )
     vm.RemoteCommand('sudo modprobe lustre')
     if FLAGS.aws_efa:
       stdout, _ = vm.RemoteCommand('ip -br -4 a sh | grep $(hostname -i)')
@@ -602,18 +612,15 @@ class AwsLustreSetupDiskStrategy(disk_strategies.SetUpLustreDiskStrategy):
       vm.RemoteCommand('sudo lnetctl set discovery 1')
       vm.RemoteCommand('sudo modprobe lustre;  sudo lnetctl net show')
     super().SetUpDiskOnLinux()
-    # Apply best practices
-    # https://docs.aws.amazon.com/fsx/latest/LustreGuide/performance-tips.html
     vm.RemoteCommand('sudo lctl set_param ldlm.namespaces.*.lru_max_age=600000')
-    vm.RemoteCommand('sudo lctl set_param ldlm.namespaces.*.lru_size=18000')
+    stdout, _ = vm.RemoteCommand('nproc')
+    lru_size = 100 * int(stdout.strip())
     vm.RemoteCommand(
-        'sudo touch /etc/modprobe.d/modprobe.conf; '
-        'sudo chmod 766 /etc/modprobe.d/modprobe.conf; '
-        'echo "options ptlrpc ptlrpcd_per_cpt_max=32" >> '
-        '/etc/modprobe.d/modprobe.conf'
-    )
-    vm.RemoteCommand(
-        'echo "options ksocklnd credits=2560" >> /etc/modprobe.d/modprobe.conf'
+        f'sudo lctl set_param ldlm.namespaces.*.lru_size={lru_size}'
     )
     vm.RemoteCommand('sudo lctl set_param osc.*OST*.max_rpcs_in_flight=32')
     vm.RemoteCommand('sudo lctl set_param mdc.*.max_rpcs_in_flight=64')
+    vm.RemoteCommand('sudo lctl set_param mdc.*.max_mod_rpcs_in_flight=50')
+    vm.RemoteCommand('sudo lctl set_param llite.*.statahead_max=512')
+    vm.RemoteCommand('sudo lctl set_param llite.*.statahead_agl=1')
+    vm.RemoteCommand('sudo lctl set_param llite.*.statahead_xattr=1')

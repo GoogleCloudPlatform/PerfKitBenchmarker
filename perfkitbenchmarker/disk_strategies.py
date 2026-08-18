@@ -316,6 +316,13 @@ class SetUpLustreDiskStrategy(SetUpDiskStrategy):
     )
     lustre_disk.UpdateDevicePath(self.disk_spec.mount_point)
     self.vm.scratch_disks.append(lustre_disk)
+    # Stripe over all OSTs. Consider updating to a flag for smaller files.
+    self.vm.RemoteCommand(
+        f'sudo lfs setstripe -c -1 {self.disk_spec.mount_point}'
+    )
+    self.vm.RemoteCommand(
+        'sudo lctl set_param osc.*.max_dirty_mb=2000', ignore_failure=True
+    )
 
 
 class SetUpSMBDiskStrategy(SetUpDiskStrategy):
