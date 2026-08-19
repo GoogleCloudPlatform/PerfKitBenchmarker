@@ -31,7 +31,7 @@ BENCHMARK_NAME = 'edw_conversational_analytics_benchmark'
 
 ENV_FILE = '.env'
 BENCHMARK_DATA = {
-    ENV_FILE: '06408f3c2b35c44ef7491331b147ea753517d08648edff9e3ab6c3655f2d48dc'
+    ENV_FILE: '0a557c7d85632be330ce0d04da99570774b7d7576b07bd6118b99d05d97dcda1'
 }
 
 BENCHMARK_CONFIG = """
