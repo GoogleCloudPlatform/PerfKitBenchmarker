@@ -250,6 +250,8 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
       cmd_string.append('--availability-type=REGIONAL')
     else:
       cmd_string.append('--availability-type=ZONAL')
+    if self.zone:
+      cmd_string.append(f'--zone={self.zone}')
     self._IssueAlloyDbCreateCommand(cmd_string)
 
     cmd_string = [
