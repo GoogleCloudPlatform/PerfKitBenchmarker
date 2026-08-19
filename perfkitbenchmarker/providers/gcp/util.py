@@ -511,7 +511,7 @@ _QUOTA_EXCEEDED_REGEX = re.compile(
 # https://cloud.google.com/compute/docs/resource-error#resource_availability
 _NOT_ENOUGH_RESOURCES_ERROR_REGEXES: Sequence[re.Pattern[str]] = (
     re.compile(
-        r'does not have enough resources available to fulfill (the )?request'
+        r'not (have )?enough resources available to fulfill (the )?request'
     ),
     # Not actually regex so escape as best practice
     re.compile(re.escape('ZONE_RESOURCE_POOL_EXHAUSTED')),

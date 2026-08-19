@@ -81,5 +81,7 @@ class GceLustreService(lustre_service.BaseLustreService):
     cmd.flags.update(args)
     stdout, stderr, retcode = cmd.Issue(raise_on_failure=False, timeout=1800)
     if retcode:
+      # Only matters for Create, but doesn't hurt for other commands.
+      util.CheckGcloudResponseKnownFailures(stderr, retcode)
       raise errors.Error('Error running command %s : %s' % (verb, stderr))
     return json.loads(stdout)
