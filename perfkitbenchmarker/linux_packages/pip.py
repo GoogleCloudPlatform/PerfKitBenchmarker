@@ -28,7 +28,6 @@ from packaging import version
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import python
-import requests
 
 # NOTE: versionless (latest) URL is in root directory and versions have their
 # own subdirectories.
@@ -52,22 +51,24 @@ def _DownloadAndInstallPip(vm):
   python_version = version.Version(python_version)
   # At the time of Aug 2024 pypi has special get-pips for versions up
   # through 3.7. To be future proof check for the existence of a versioned
-  # URL using requests.
+  # URL using curl.
   versioned_url = GET_PIP_VERSIONED_URL.format(python_version=python_version)
 
-  # Retry in case there are various temporary network issues.
+  # Retry in case of transient network issues.
   @vm_util.Retry(
       max_retries=5,
-      retryable_exceptions=(ConnectionError,)
+      retryable_exceptions=(errors.VirtualMachine.RemoteCommandError,),
   )
-  def GetPipUrl():
-    return requests.get(versioned_url)
+  def _GetPipUrl():
+    if vm.TryRemoteCommand(f'curl -s -f -I {versioned_url}'):
+      return versioned_url
+    if vm.TryRemoteCommand(f'curl -s -f -I {GET_PIP_URL}'):
+      return GET_PIP_URL
+    raise errors.VirtualMachine.RemoteCommandError(
+        f'Could not contact both {versioned_url} and {GET_PIP_URL}'
+    )
 
-  response = GetPipUrl()
-  if response.ok:
-    get_pip_url = versioned_url
-  else:
-    get_pip_url = GET_PIP_URL
+  get_pip_url = _GetPipUrl()
 
   # get_pip can suffer from various network issues.
   @vm_util.Retry(

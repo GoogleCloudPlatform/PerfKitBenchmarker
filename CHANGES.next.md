@@ -489,6 +489,8 @@
 
 ### Bug fixes and maintenance updates:
 
+-   Check for PIP reachability from VMs where it is actually needed rather than
+    from PKB.
 -   Fix server IP distribution logic in Redis Memtier benchmark for single
     client VM setups.
 -   Update `sysbench_thread_init_timeout` default to 180 seconds.

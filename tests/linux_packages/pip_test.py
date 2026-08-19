@@ -6,7 +6,6 @@ import mock
 from perfkitbenchmarker.linux_packages import pip
 from perfkitbenchmarker.linux_packages import python
 from tests import pkb_common_test_case
-import requests
 
 # executed remote commands
 NEED_PIP_37 = [
@@ -42,21 +41,13 @@ EXISTING_PIP_38 = [
 ]
 
 
-def _TestResponse(status_code: int) -> requests.Response:
-  response = requests.Response()
-  response.status_code = status_code
-  return response
-
-
-VERSIONED_PYPI_RESPONSES = {
-    'https://bootstrap.pypa.io/pip/3.7/get-pip.py': _TestResponse(200),
-    'https://bootstrap.pypa.io/pip/3.8/get-pip.py': _TestResponse(404),
-}
-
 _INSTALL_PIP_FROM_PYPI = {
     'python3 -m pip --version': False,
     'sudo pip --version': True,
     'sudo pip3 --version': True,
+    'curl -s -f -I https://bootstrap.pypa.io/pip/3.7/get-pip.py': True,
+    'curl -s -f -I https://bootstrap.pypa.io/pip/3.8/get-pip.py': False,
+    'curl -s -f -I https://bootstrap.pypa.io/pip/get-pip.py': True,
 }
 
 _ALREADY_HAS_PIP = {
@@ -73,13 +64,11 @@ class PipTest(pkb_common_test_case.PkbCommonTestCase):
       ('need_pip_38', _INSTALL_PIP_FROM_PYPI, '3.8', NEED_PIP_38),
       ('existing_pip_38', _ALREADY_HAS_PIP, '3.8', EXISTING_PIP_38),
   )
-  @mock.patch.object(requests, 'get', side_effect=VERSIONED_PYPI_RESPONSES.get)
   def testInstall(
       self,
       try_remote_command_side_effects: dict[str, bool],
       python_version: str,
       expected_commands: list[str],
-      requests_get: mock.Mock,
   ):
     self.enter_context(
         mock.patch.object(
@@ -94,35 +83,6 @@ class PipTest(pkb_common_test_case.PkbCommonTestCase):
     vm.RemoteCommand.assert_has_calls(
         [mock.call(cmd) for cmd in expected_commands]
     )
-
-    if not try_remote_command_side_effects['python3 -m pip --version']:
-      requests_get.assert_called_once()
-
-  @mock.patch.object(
-      requests,
-      'get',
-      side_effect=[
-          ConnectionResetError('unable to connect'),
-          _TestResponse(200),
-      ],
-  )
-  def testNetworkRetries(
-      self,
-      requests_get: mock.Mock,
-  ):
-    self.enter_context(
-        mock.patch.object(python, 'GetPythonVersion', return_value='3.7')
-    )
-    vm = mock.Mock()
-    vm.TryRemoteCommand.side_effect = _INSTALL_PIP_FROM_PYPI.get
-
-    pip.Install(vm)
-
-    vm.RemoteCommand.assert_has_calls(
-        [mock.call(cmd) for cmd in NEED_PIP_37]
-    )
-
-    requests_get.assert_called()
 
 
 if __name__ == '__main__':
