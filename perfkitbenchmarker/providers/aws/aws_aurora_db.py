@@ -46,21 +46,6 @@ _AURORA_ENGINES = [
 
 _STATUS_WAIT_TIMEOUT_SECONDS = 30 * 60
 
-# Before adding other DBClusterIdentifier metrics, check _CollectProviderMetric
-# to make sure it is supported. Note that VolumeBytesUsed is polled very
-# infrequently, and requires a 2-hour sleep to get a reliable number.
-_AURORA_ONLY_METRICS = [
-    aws_relational_db.AwsMetricSpec(
-        provider_name='VolumeBytesUsed',
-        sample_name='disk_bytes_used',
-        unit='GB',
-        conversion_func=lambda x: x / (1024 * 1024 * 1024),
-        dimensions={'DBClusterIdentifier': ''},
-        time_period=3600,
-        time_period_padding=datetime.timedelta(hours=12),
-    ),
-]
-
 
 class AuroraStatusChangeError(Exception):
   """Error raised when the Aurora cluster status is not the expected one."""
@@ -373,7 +358,7 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
 
   def _GetMetricsToCollect(self) -> list[relational_db.MetricSpec]:
     """Returns a list of metrics to collect."""
-    metrics = aws_relational_db.RDS_COMMON_METRICS + _AURORA_ONLY_METRICS
+    metrics = aws_relational_db.RDS_COMMON_METRICS
     for metric in metrics:
       if 'DBClusterIdentifier' in metric.dimensions:
         metric.dimensions['DBClusterIdentifier'] = self.cluster_id
@@ -384,33 +369,17 @@ class AwsAuroraRelationalDb(aws_relational_db.BaseAwsRelationalDb):
   def CollectMetrics(
       self, start_time: datetime.datetime, end_time: datetime.datetime
   ) -> list[sample.Sample]:
-    """Collects and returns performance metrics after the run phase.
-
-    Note that this method is overridden to stop the DB and downgrade VMs before
-    waiting for cost saving measures and assumes that no further tests will be
-    run on the DB or the clients. This is needed since the volume size
-    metrics are polled very infrequently.
-
-    Args:
-      start_time: The start time of the run phase.
-      end_time: The end time of the run phase.
-
-    Returns:
-      A list of sample.Sample instances containing the collected metrics.
-    """
-    self.Stop()
-    for vm in self.client_vms:
-      if hasattr(vm, 'DowngradeToCheapInstance'):
-        vm.DowngradeToCheapInstance()
-
-    logging.info(
-        'Sleeping for %d seconds to allow volume stats to be collected.',
-        aws_flags.AURORA_METRICS_COLLECTION_SLEEP_SECONDS.value,
-    )
-    time.sleep(aws_flags.AURORA_METRICS_COLLECTION_SLEEP_SECONDS.value)
-
+    """Collects and returns performance metrics after a run phase."""
     results = super().CollectMetrics(start_time, end_time)
-
-    self.Start()
+    results.extend(
+        self._CreateSamples(
+            [
+                (start_time, self.simulated_dataset_size_gb),
+                (end_time, self.simulated_dataset_size_gb),
+            ],
+            'disk_bytes_used',
+            'GB',
+        )
+    )
 
     return results

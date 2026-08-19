@@ -185,8 +185,17 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   client_vm = client_vms[0]
   db = benchmark_spec.relational_db
   assert db is not None
-
   hammerdb.SetDefaultConfig(GetNumCpus(db))
+
+  if hammerdb.HAMMERDB_SCRIPT.value == hammerdb.HAMMERDB_SCRIPT_TPC_C:
+    # TPC-C: ~100MB per warehouse including tables, indexes, and page overhead
+    warehouses = hammerdb.HAMMERDB_TPCC_NUM_WAREHOUSE.value or 5
+    db.simulated_dataset_size_gb = (warehouses * 100.0) / 1024.0
+  elif hammerdb.HAMMERDB_SCRIPT.value == hammerdb.HAMMERDB_SCRIPT_TPC_H:
+    # TPC-H: 1 Scale Factor = 1 GB raw data nominal size
+    db.simulated_dataset_size_gb = float(
+        hammerdb.HAMMERDB_TPCH_SCALE_FACTOR.value
+    )
 
   client_vm.Install('hammerdb')
 

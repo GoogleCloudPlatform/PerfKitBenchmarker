@@ -15,19 +15,21 @@
 """Tests for pgbench benchmark."""
 import os
 import unittest
+from absl import flags
+from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import pgbench_benchmark
 from perfkitbenchmarker.linux_packages import pgbench
+from tests import pkb_common_test_case
+
+FLAGS = flags.FLAGS
 
 
-class PgbenchBenchmarkTestCase(unittest.TestCase):
+class PgbenchBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
-    p = mock.patch(pgbench_benchmark.__name__ + '.FLAGS')
-    p.start()
-    self.addCleanup(p.stop)
-
+    super().setUp()
     path = os.path.join(
         os.path.dirname(__file__), '../data', 'pgbench.stderr.txt'
     )
@@ -65,6 +67,23 @@ class PgbenchBenchmarkTestCase(unittest.TestCase):
     self.assertEqual(latency_sample.value, -1)
     self.assertEqual(latency_sample.unit, 'ms')
     self.assertDictEqual(latency_sample.metadata, expected_latency_metadata)
+
+  @flagsaver.flagsaver(pgbench_scale_factor=250)
+  def testPrepareSetsSimulatedDatasetSizeGb(self):
+    benchmark_spec = mock.Mock()
+    benchmark_spec.vm_groups = {'clients': [mock.Mock()]}
+    benchmark_spec.relational_db = mock.Mock()
+    benchmark_spec.vms = [mock.Mock()]
+
+    with mock.patch.object(pgbench_benchmark, 'CreateDatabase'):
+      pgbench_benchmark.Prepare(benchmark_spec)
+
+    expected_gb = (250 * 16.0) / 1024.0
+    self.assertAlmostEqual(
+        benchmark_spec.relational_db.simulated_dataset_size_gb,
+        expected_gb,
+        places=4,
+    )
 
 
 def _MakeRunSamples(tps_values, latency_values, num_clients, num_jobs):

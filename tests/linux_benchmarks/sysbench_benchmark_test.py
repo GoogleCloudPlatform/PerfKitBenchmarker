@@ -447,9 +447,8 @@ def _MakeSysbenchRunSamples(tps, qps, thread_count):
 
 class SysbenchRunTestCase(pkb_common_test_case.PkbCommonTestCase):
 
-  @flagsaver.flagsaver(sysbench_run_threads=[8, 16])
+  @flagsaver.flagsaver(sysbench_run_threads=[8, 16], run_uri='test_uri')
   def testRunSweepOutputsMaxTpsSamples(self):
-    FLAGS.run_uri = 'test_uri'
     benchmark_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
         _SYSBENCH_CONFIG, 'sysbench'
     )
@@ -457,7 +456,7 @@ class SysbenchRunTestCase(pkb_common_test_case.PkbCommonTestCase):
     benchmark_spec.ConstructVirtualMachines()
     assert benchmark_spec.relational_db is not None
 
-    self.enter_context(
+    mock_collect_metrics = self.enter_context(
         mock.patch.object(
             benchmark_spec.relational_db, 'CollectMetrics', return_value=[]
         )
@@ -483,6 +482,9 @@ class SysbenchRunTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     results = sysbench_benchmark.Run(benchmark_spec)
 
+    # CollectMetrics should be called for each thread count step in the sweep.
+    self.assertEqual(mock_collect_metrics.call_count, 2)
+
     # Should contain 4 raw samples + 2 max_tps duplicates from the 16-thread run
     metrics = sorted(s.metric for s in results)
     self.assertEqual(
@@ -500,6 +502,62 @@ class SysbenchRunTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(max_tps_sample.value, 2500.0)
     self.assertEqual(max_tps_sample.metadata['sysbench_thread_count'], 16)
     self.assertNotIn('max_tps', max_tps_sample.metadata)
+
+  @flagsaver.flagsaver(
+      sysbench_testname='oltp_read_write',
+      sysbench_tables=8,
+      sysbench_table_size=500000,
+  )
+  def testPrepareSetsSimulatedDatasetSizeGb_Oltp(self):
+    benchmark_spec = mock.Mock()
+    benchmark_spec.vm_groups = {'clients': [mock.Mock()]}
+    benchmark_spec.relational_db = mock.Mock()
+    self.enter_context(mock.patch.object(sysbench_benchmark, '_PrepareClients'))
+    self.enter_context(
+        mock.patch.object(sysbench_benchmark, '_PrepareDatabase')
+    )
+    self.enter_context(
+        mock.patch.object(
+            sysbench_benchmark, '_LoadDatabaseInParallel', return_value=[]
+        )
+    )
+
+    sysbench_benchmark.Prepare(benchmark_spec)
+
+    expected_gb = (8 * 500000 * 250.0) / (1024.0**3)
+    self.assertAlmostEqual(
+        benchmark_spec.relational_db.simulated_dataset_size_gb,
+        expected_gb,
+        places=4,
+    )
+
+  @flagsaver.flagsaver(
+      sysbench_testname='tpcc',
+      sysbench_tables=2,
+      sysbench_scale=50,
+  )
+  def testPrepareSetsSimulatedDatasetSizeGb_Tpcc(self):
+    benchmark_spec = mock.Mock()
+    benchmark_spec.vm_groups = {'clients': [mock.Mock()]}
+    benchmark_spec.relational_db = mock.Mock()
+    self.enter_context(mock.patch.object(sysbench_benchmark, '_PrepareClients'))
+    self.enter_context(
+        mock.patch.object(sysbench_benchmark, '_PrepareDatabase')
+    )
+    self.enter_context(
+        mock.patch.object(
+            sysbench_benchmark, '_LoadDatabaseInParallel', return_value=[]
+        )
+    )
+
+    sysbench_benchmark.Prepare(benchmark_spec)
+
+    expected_gb = (2 * 50 * 100.0) / 1024.0
+    self.assertAlmostEqual(
+        benchmark_spec.relational_db.simulated_dataset_size_gb,
+        expected_gb,
+        places=4,
+    )
 
 
 if __name__ == '__main__':

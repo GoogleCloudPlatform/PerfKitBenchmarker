@@ -49,7 +49,6 @@ from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import util
 
-
 FLAGS = flags.FLAGS
 
 HVM = 'hvm'
@@ -796,7 +795,8 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
     describe_cmd = util.AWS_PREFIX + [
         'ec2',
         'describe-instances',
-        '--region=%s' % self.region,]
+        '--region=%s' % self.region,
+    ]
     if self.client_token:
       describe_cmd.append(
           f'--filter=Name=client-token,Values={self.client_token}'
@@ -1079,10 +1079,7 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
             'SubnetId': self.network.subnet.id,
         })
         # Only allowed for single NIC instances.
-        if (
-            self.assign_external_ip
-            and self.network_eni_count == 1
-        ):
+        if self.assign_external_ip and self.network_eni_count == 1:
           eni_params['AssociatePublicIpAddress'] = True
         if aws_flags.AWS_NIC_QUEUE_COUNTS.value:
           eni_params['EnaQueueCount'] = aws_flags.AWS_NIC_QUEUE_COUNTS.value[
@@ -1669,23 +1666,6 @@ class AwsVirtualMachine(virtual_machine.BaseVirtualMachine):
   def DiskCreatedOnVMCreation(self, data_disk):
     """Returns whether the disk type has been created during VM creation."""
     return self.DiskTypeCreatedOnVMCreation(data_disk.disk_type)
-
-  def DowngradeToCheapInstance(self):
-    """Downgrades the VM to a cheap instance type (e.g., t3.micro)."""
-    logging.info('Downgrading instance %s to t3.micro', self.id)
-    self.Stop()
-    cmd = util.AWS_PREFIX + [
-        'ec2',
-        'modify-instance-attribute',
-        '--region',
-        self.region,
-        '--instance-id',
-        self.id,
-        '--instance-type',
-        'Value=t3.micro',
-    ]
-    vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
-    self.Start()
 
 
 class ClearBasedAwsVirtualMachine(

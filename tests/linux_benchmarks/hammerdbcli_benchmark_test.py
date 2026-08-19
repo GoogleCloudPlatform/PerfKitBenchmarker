@@ -15,7 +15,9 @@
 import textwrap
 import unittest
 from absl import flags
+from absl.testing import flagsaver
 import mock
+from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks import hammerdbcli_benchmark
 from perfkitbenchmarker.linux_packages import hammerdb
@@ -48,16 +50,18 @@ class HammerdbcliBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def setUp(self):
     super().setUp()
-    FLAGS.run_uri = 'test_uri'
+    self.enter_context(flagsaver.flagsaver(run_uri='test_uri'))
     self.benchmark_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
         _HAMMERDB_CONFIG, 'hammerdbcli'
     )
     self.benchmark_spec.ConstructRelationalDb()
     self.benchmark_spec.ConstructVirtualMachines()
+    assert self.benchmark_spec.relational_db is not None
+    self.relational_db: relational_db.BaseRelationalDb = (
+        self.benchmark_spec.relational_db
+    )
     self.enter_context(
-        mock.patch.object(
-            self.benchmark_spec.relational_db, 'CollectMetrics', return_value=[]
-        )
+        mock.patch.object(self.relational_db, 'CollectMetrics', return_value=[])
     )
     self.enter_context(
         mock.patch.object(
@@ -105,6 +109,52 @@ class HammerdbcliBenchmarkTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(max_tpm_sample.value, 80000.0)
     self.assertEqual(max_tpm_sample.metadata['hammerdbcli_vu'], 16)
     self.assertNotIn('max_tpm', max_tpm_sample.metadata)
+
+  @flagsaver.flagsaver(
+      hammerdbcli_script='tpc_c',
+      hammerdbcli_tpcc_num_warehouse=250,
+  )
+  def testPrepareSetsSimulatedDatasetSizeGb_Tpcc(self):
+    self.enter_context(
+        mock.patch.object(
+            self.benchmark_spec.vm_groups['clients'][0], 'Install'
+        )
+    )
+    self.enter_context(mock.patch.object(hammerdb, 'SetupConfig'))
+    self.enter_context(
+        mock.patch.object(hammerdbcli_benchmark, '_PrepareServer')
+    )
+
+    hammerdbcli_benchmark.Prepare(self.benchmark_spec)
+
+    expected_gb = (250 * 100.0) / 1024.0
+    self.assertAlmostEqual(
+        self.relational_db.simulated_dataset_size_gb,
+        expected_gb,
+        places=4,
+    )
+
+  @flagsaver.flagsaver(
+      hammerdbcli_script='tpc_h',
+      hammerdbcli_tpch_scale_factor=15,
+  )
+  def testPrepareSetsSimulatedDatasetSizeGb_Tpch(self):
+    self.enter_context(
+        mock.patch.object(
+            self.benchmark_spec.vm_groups['clients'][0], 'Install'
+        )
+    )
+    self.enter_context(mock.patch.object(hammerdb, 'SetupConfig'))
+    self.enter_context(
+        mock.patch.object(hammerdbcli_benchmark, '_PrepareServer')
+    )
+
+    hammerdbcli_benchmark.Prepare(self.benchmark_spec)
+
+    self.assertEqual(
+        self.relational_db.simulated_dataset_size_gb,
+        15.0,
+    )
 
 
 if __name__ == '__main__':

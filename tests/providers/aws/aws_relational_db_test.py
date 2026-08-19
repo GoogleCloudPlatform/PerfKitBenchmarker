@@ -32,6 +32,7 @@ from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import providers
 from perfkitbenchmarker import relational_db
 from perfkitbenchmarker import relational_db_spec
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import sql_engine_utils
 from perfkitbenchmarker import virtual_machine_spec
 from perfkitbenchmarker import vm_util
@@ -684,24 +685,27 @@ class AwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     db = self.CreateAuroraDbFromSpec()
     db.cluster_id = 'pkb-db-cluster-123'
     db.client_vms = [mock.Mock()]
-    mock_stop = self.enter_context(mock.patch.object(db, 'Stop'))
-    mock_start = self.enter_context(mock.patch.object(db, 'Start'))
-    self.enter_context(mock.patch.object(time, 'sleep'))
     mock_super_collect = self.enter_context(
         mock.patch.object(
             aws_relational_db.BaseAwsRelationalDb,
             'CollectMetrics',
-            return_value=['sample'],
+            return_value=[sample.Sample('cpu_utilization_average', 50.0, '%')],
         )
     )
+    db.simulated_dataset_size_gb = 12.5
 
-    results = db.CollectMetrics(mock.Mock(), mock.Mock())
+    now = datetime.datetime.now()
+    results = db.CollectMetrics(now, now)
 
-    self.assertEqual(results, ['sample'])
-    mock_stop.assert_called_once()
-    mock_start.assert_called_once()
     mock_super_collect.assert_called_once()
-    db.client_vms[0].DowngradeToCheapInstance.assert_called_once()
+    sample_metrics = [s.metric for s in results]
+    self.assertIn('cpu_utilization_average', sample_metrics)
+    self.assertIn('disk_bytes_used_average', sample_metrics)
+    size_sample = next(
+        s for s in results if s.metric == 'disk_bytes_used_average'
+    )
+    self.assertEqual(size_sample.value, 12.5)
+    self.assertEqual(size_sample.unit, 'GB')
 
 
 class ConstructAwsRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):

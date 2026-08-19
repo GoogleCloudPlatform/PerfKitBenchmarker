@@ -228,6 +228,7 @@ def Prepare(benchmark_spec):
   UpdateBenchmarkSpecWithPrepareStageFlags(benchmark_spec)
 
   db = benchmark_spec.relational_db
+  db.simulated_dataset_size_gb = (FLAGS.pgbench_scale_factor * 16.0) / 1024.0
 
   CreateDatabase(benchmark_spec, DEFAULT_DB_NAME, TEST_DB_NAME)
 

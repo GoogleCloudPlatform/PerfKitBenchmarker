@@ -611,6 +611,17 @@ def Prepare(benchmark_spec) -> List[sample.Sample]:
   client_vms = benchmark_spec.vm_groups['clients']
   db: relational_db.BaseRelationalDb = benchmark_spec.relational_db
 
+  if _GetSysbenchTestParameter() == 'tpcc':
+    # sysbench-tpcc: ~100MB per warehouse (scale)
+    db.simulated_dataset_size_gb = (
+        FLAGS.sysbench_tables * FLAGS.sysbench_scale * 100.0
+    ) / 1024.0
+  else:
+    # sysbench OLTP: ~250 bytes per row
+    db.simulated_dataset_size_gb = (
+        FLAGS.sysbench_tables * FLAGS.sysbench_table_size * 250.0
+    ) / (1024.0**3)
+
   _PrepareClients(db, client_vms)
 
   if _SKIP_LOAD_STAGE.value or db.restored:

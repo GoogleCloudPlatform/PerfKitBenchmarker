@@ -351,6 +351,7 @@ class BaseRelationalDb(resource.BaseResource):
     self.endpoint = ''
     self.replica_endpoint = ''
     self.client_vms = []
+    self.simulated_dataset_size_gb = 0.0
 
   @property
   def client_vm(self):
