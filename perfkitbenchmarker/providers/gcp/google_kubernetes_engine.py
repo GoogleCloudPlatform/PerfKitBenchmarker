@@ -502,10 +502,6 @@ class GkeCluster(BaseGkeCluster):
                     if nodepool_name == 'default'
                     else f'{nodepool_name}_'
                 )
-                if nodepool_name == 'default':
-                  self._cached_nodepool_vm_ids['vm_ids'] = ','.join(
-                      sorted(vm_ids)
-                  )
                 self._cached_nodepool_vm_ids[f'{vm_ids_prefix}vm_ids'] = (
                     ','.join(sorted(vm_ids))
                 )
