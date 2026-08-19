@@ -34,6 +34,7 @@ class KafkaBenchmarkTestCaseBase(pkb_common_test_case.PkbCommonTestCase):
     self.broker_vm = mock.MagicMock(spec=virtual_machine.BaseVirtualMachine)
     self.broker_vm.internal_ip = '10.0.0.1'
     self.broker_vm.NumCpusForBenchmark.return_value = 16
+    self.broker_vm.scratch_disks = [mock.MagicMock(mount_point='/scratch')]
 
     self.producer_vm = mock.MagicMock(spec=virtual_machine.BaseVirtualMachine)
     self.producer_vm.internal_ip = '10.0.0.2'
@@ -46,6 +47,7 @@ class KafkaBenchmarkTestCaseBase(pkb_common_test_case.PkbCommonTestCase):
     self.controller_vm = mock.MagicMock(spec=virtual_machine.BaseVirtualMachine)
     self.controller_vm.internal_ip = '10.0.0.4'
     self.controller_vm.NumCpusForBenchmark.return_value = 16
+    self.controller_vm.scratch_disks = [mock.MagicMock(mount_point='/scratch')]
 
     self.benchmark_spec = mock.MagicMock(spec=bm_spec.BenchmarkSpec)
     self.benchmark_spec.vms = [
@@ -900,7 +902,7 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
     free_gb = kafka_benchmark._GetBrokerFreeDiskSpaceGb(self.broker_vm)
 
     self.broker_vm.RemoteCommand.assert_called_once_with(
-        "df -k / | tail -1 | awk '{print $4}'", ignore_failure=True
+        "df -k /scratch | tail -1 | awk '{print $4}'", ignore_failure=True
     )
     self.assertEqual(free_gb, 0.0)
 

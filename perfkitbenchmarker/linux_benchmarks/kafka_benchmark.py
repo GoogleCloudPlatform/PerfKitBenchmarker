@@ -40,6 +40,7 @@ kafka:
   vm_groups:
     broker:
       vm_spec: *default_dual_core
+      disk_spec: *default_500_gb
     producer:
       vm_spec: *default_dual_core
     consumer:
@@ -188,6 +189,9 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   )
   time.sleep(5)
 
+  broker_data_dir = (
+      f'{broker_vm.scratch_disks[0].mount_point}/kraft-broker-logs'
+  )
   broker_config = (
       'process.roles=broker\n'
       'node.id=2\n'
@@ -197,7 +201,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       'controller.listener.names=CONTROLLER\n'
       'inter.broker.listener.name=PLAINTEXT\n'
       'listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT\n'
-      'log.dirs=/tmp/kraft-broker-logs\n'
+      f'log.dirs={broker_data_dir}\n'
       f'file.delete.delay.ms={_KAFKA_FILE_DELETE_DELAY_MS.value}\n'
       f'log.segment.delete.delay.ms={_KAFKA_FILE_DELETE_DELAY_MS.value}\n'
       f'offsets.topic.replication.factor={_KAFKA_REPLICATION_FACTOR.value}\n'
@@ -703,17 +707,18 @@ def _ParseConsumerResults(
 def _GetBrokerFreeDiskSpaceGb(
     broker_vm: virtual_machine.BaseVirtualMachine,
 ) -> float:
-  """Returns the free disk space on the broker VM root filesystem in GB.
+  """Returns the free disk space on the broker VM data disk in GB.
 
   Args:
     broker_vm: The broker VM instance to query.
 
   Returns:
-    The available disk space across the root filesystem in gigabytes, or 0.0
+    The available disk space across the data disk in gigabytes, or 0.0
     if the query fails.
   """
+  disk_path = broker_vm.scratch_disks[0].mount_point
   stdout, _ = broker_vm.RemoteCommand(
-      "df -k / | tail -1 | awk '{print $4}'", ignore_failure=True
+      f"df -k {disk_path} | tail -1 | awk '{{print $4}}'", ignore_failure=True
   )
   try:
     return float(stdout.strip()) / (1024 * 1024)
