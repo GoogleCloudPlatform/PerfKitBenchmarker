@@ -321,7 +321,7 @@ class AwsVirtualMachineTest(BaseTest):
 
     aws_machine = self._CallCreateScratchDisk(disk.NFS)
     aws_machine.SetupAllScratchDisks()
-    aws_machine.RemoteCommand.assert_called_with(install_nfs)
+    aws_machine.RemoteCommand.assert_any_call(install_nfs)
     self.assertEqual(
         [mock.call(mount_cmd), mock.call(fstab_cmd)],
         aws_machine.RemoteHostCommand.call_args_list,

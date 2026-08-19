@@ -235,6 +235,10 @@ class AWSSetUpNFSDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
 
     _WaitForDnsResolution()
     super().SetUpDiskOnLinux()
+    self.vm.RemoteCommand(
+        'echo 15360 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'
+        f' {self.disk_spec.mount_point})/read_ahead_kb'
+    )
 
 
 class AWSSetupDiskStrategy(disk_strategies.SetUpDiskStrategy):

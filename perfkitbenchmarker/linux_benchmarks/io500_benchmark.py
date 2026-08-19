@@ -19,6 +19,7 @@ See https://github.com/IO500/io500 for more info.
 import logging
 import math
 import os
+import time
 
 from absl import flags
 from perfkitbenchmarker import background_tasks
@@ -56,6 +57,19 @@ _IO500_MAX_TOTAL_SIZE = flags.DEFINE_integer(
     'BlockSize in io500.ini. Default is 1536GiB.',
 )
 
+_NUMBER_OF_CLIENTS_LIST = flags.DEFINE_list(
+    'number_of_clients_list',
+    [],
+    'List of client VM counts to iterate over for client scaling. '
+    'Mutually exclusive with --mpi_ranks_list.',
+)
+
+_MPI_RANKS_LIST = flags.DEFINE_list(
+    'mpi_ranks_list',
+    [],
+    'Total mpi ranks to use. By default, same as total cores available.',
+)
+
 # Section names in io500.ini.j2 that can be run
 RUNNABLE_SECTIONS = [
     'ior_easy_write', 'ior_easy_read',
@@ -84,10 +98,19 @@ SUMMARY_REGEX = (r'\[SCORE \] Bandwidth ([\d\.]*) ([\w\/]*) : '
 RESULT_REGEX = r'\[RESULT\]\s+([\w\-]*)\s+([\d\.]+) ([\w\/]+) : time ([\d\.]+)'
 IO500_OUTPUT = 'data'
 BENCHMARK_DIR = '/opt/pkb'
+TRANSFER_SIZE_4MIB = 4194304
 
 
 def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
+
+
+def CheckPrerequisites():
+  """Performs input verification checks."""
+  if _MPI_RANKS_LIST.value and _NUMBER_OF_CLIENTS_LIST.value:
+    raise errors.Config.InvalidValue(
+        'Specify only one of --mpi_ranks_list or --number_of_clients_list.'
+    )
 
 
 def Prepare(benchmark_spec):
@@ -153,7 +176,7 @@ def Prepare(benchmark_spec):
     background_tasks.RunThreaded(DistributeBinary, vms[1:])
 
 
-def _Run(headnode, ranks, ppn):
+def _Run(headnode, ranks, ppn, num_clients):
   """Runs io500 with specified number of ranks.
 
   Sample output:
@@ -167,6 +190,7 @@ def _Run(headnode, ranks, ppn):
     headnode: VirtualMachine object to run io500.
     ranks: Total ranks to run.
     ppn: Process per node.
+    num_clients: Number of clients.
 
   Returns:
     List of sample.Sample object.
@@ -197,6 +221,7 @@ def _Run(headnode, ranks, ppn):
               {
                   'ranks': ranks,
                   'ppn': ppn,
+                  'num_clients': num_clients,
                   'duration': duration,
                   'invalid': '[INVALID]' in line,
                   'ior_hard_write_direct_io': _IOR_HARD_WRITE_DIRECT_IO.value,
@@ -269,33 +294,49 @@ def Run(benchmark_spec):
   tests_to_run = _IO500_TESTS.value
   run_all = 'all' in tests_to_run
 
-  for total_ranks in FLAGS.mpi_ranks_list or [num_nodes * num_cpus]:
-    ppn = math.ceil(float(total_ranks) / num_nodes)
-    # BlockSize * total_ranks = max total size, which must be a multiple of
-    # TransferSize.
-    transfer_size = 4194304  # 4MiB transfer size of ior easy from ini files.
-    block_size = (
-        _IO500_MAX_TOTAL_SIZE.value // int(total_ranks) // transfer_size
-    ) * transfer_size
-    io500_context = {
-        'directory': headnode.scratch_disks[0].mount_point,
-        'block_size': block_size,
-    }
-    for section in RUNNABLE_SECTIONS:
-      should_run = run_all or section in tests_to_run
-      io500_context[f'run_{section}'] = 'TRUE' if should_run else 'FALSE'
-    logging.info('io500 context for ranks %s: %s', total_ranks, io500_context)
+  client_counts = (
+      [int(c) for c in _NUMBER_OF_CLIENTS_LIST.value]
+      if _NUMBER_OF_CLIENTS_LIST.value
+      else [len(vms)]
+  )
 
-    background_tasks.RunThreaded(
-        lambda vm, ctx=io500_context: vm.RenderTemplate(
-            template_path=local_path, remote_path=remote_path, context=ctx
-        ),
-        vms,
+  for num_clients in client_counts:
+    active_vms = vms[:num_clients]
+    hpc_util.CreateMachineFile(active_vms)
+    machinefile_content, _ = headnode.RemoteCommand('cat ~/MACHINEFILE')
+    logging.info(
+        'Generated MACHINEFILE for %s active clients:\n%s',
+        len(active_vms),
+        machinefile_content.strip(),
     )
+    num_nodes = len(active_vms)
+    for total_ranks in _MPI_RANKS_LIST.value or [num_nodes * num_cpus]:
+      ppn = math.ceil(float(total_ranks) / num_nodes)
+      # BlockSize * total_ranks = max total size, which must be a multiple of
+      # TransferSize.
+      block_size = (
+          _IO500_MAX_TOTAL_SIZE.value // int(total_ranks) // TRANSFER_SIZE_4MIB
+      ) * TRANSFER_SIZE_4MIB
+      io500_context = {
+          'directory': headnode.scratch_disks[0].mount_point,
+          'block_size': block_size,
+      }
+      for section in RUNNABLE_SECTIONS:
+        should_run = run_all or section in tests_to_run
+        io500_context[f'run_{section}'] = 'TRUE' if should_run else 'FALSE'
+      logging.info('io500 context for ranks %s: %s', total_ranks, io500_context)
 
-    results.extend(_Run(headnode, int(total_ranks), ppn))
-    if FLAGS.object_storage_fuse_log_trace:
-      headnode.RemoteCommand('sudo bash -c "cat /tmp/logs/*"')
+      background_tasks.RunThreaded(
+          lambda vm, ctx=io500_context: vm.RenderTemplate(
+              template_path=local_path, remote_path=remote_path, context=ctx
+          ),
+          active_vms,
+      )
+
+      results.extend(_Run(headnode, int(total_ranks), ppn, num_clients))
+      if FLAGS.object_storage_fuse_log_trace:
+        headnode.RemoteCommand('sudo bash -c "cat /tmp/logs/*"')
+      time.sleep(60)
   return results
 
 
