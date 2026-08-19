@@ -15,6 +15,7 @@
 
 import unittest
 
+import immutabledict
 from perfkitbenchmarker import sample
 
 
@@ -60,6 +61,16 @@ class SampleTestCase(unittest.TestCase):
     instance = sample.Sample(metric='Test', value='1.0', unit='Mbps')
     self.assertIsInstance(instance.value, float)
     self.assertEqual(1.0, instance.value)
+
+  def testImmutableMetadataConvertedToDict(self):
+    metadata = immutabledict.immutabledict({'origin': 'unit test'})
+    instance = sample.Sample(
+        metric='Test', value=1.0, unit='Mbps', metadata=metadata
+    )
+    self.assertIsInstance(instance.metadata, dict)
+    self.assertNotIsInstance(instance.metadata, immutabledict.immutabledict)
+    instance.metadata['new_key'] = 'new_value'
+    self.assertEqual(instance.metadata['new_key'], 'new_value')
 
 
 class TestPercentileCalculator(unittest.TestCase):
