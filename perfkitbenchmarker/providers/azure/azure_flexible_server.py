@@ -200,6 +200,10 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
     if status == 'Succeeded':
       return
     if status == 'Failed':
+      if 'ServerDropping' in stdout:
+        raise errors.Resource.RetryableCreationError(
+            f'Azure async operation failed (retryable): {stdout}'
+        )
       raise errors.Resource.CreationError(
           f'Azure async operation failed: {stdout}'
       )
