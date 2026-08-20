@@ -154,7 +154,9 @@ def Prepare(benchmark_spec):
         ' ior_hard_write_direct_io.patch'
     )
 
-  headnode.RobustRemoteCommand(
+  # ./prepare.sh builds IOR & mdtest binaries. autoreconf inside prepare.sh
+  # can segfault on some VM runs, so retry.
+  vm_util.Retry(max_retries=5)(headnode.RobustRemoteCommand)(
       f'cd {BENCHMARK_DIR}/io500 && ./prepare.sh'
   )
 
