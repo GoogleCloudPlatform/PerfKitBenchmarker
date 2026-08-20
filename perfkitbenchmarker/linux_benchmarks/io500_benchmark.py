@@ -105,7 +105,7 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def CheckPrerequisites():
+def CheckPrerequisites(_=None):
   """Performs input verification checks."""
   if _MPI_RANKS_LIST.value and _NUMBER_OF_CLIENTS_LIST.value:
     raise errors.Config.InvalidValue(
