@@ -202,6 +202,19 @@ PORT_START = 20000
 REMOTE_SCRIPTS_DIR = 'netperf_test_scripts'
 REMOTE_SCRIPT = 'netperf_test.py'
 
+P = sample.Percentile
+
+_SELECTED_METRICS = [
+    P(50),
+    P(90),
+    P(99),
+    sample.Aggregation.AVERAGE,
+    sample.Aggregation.STDDEV,
+    sample.Aggregation.MIN,
+    sample.Aggregation.MAX,
+    sample.Aggregation.TOTAL,
+]
+
 # By default, Container-Optimized OS (COS) host firewall allows only
 # outgoing connections and incoming SSH connections. To allow incoming
 # connections from VMs running netperf, we need to add iptables rules
@@ -703,36 +716,24 @@ def RunNetperf(
     # Extract the throughput values from the samples
     throughputs = [s.value for s in throughput_samples]
     # Compute some stats on the throughput values
-    throughput_stats = sample.PercentileCalculator(
-        throughputs,
-        [
-            P(50),
-            P(90),
-            P(99),
-            sample.Aggregation.AVERAGE,
-            sample.Aggregation.STDDEV,
-            sample.Aggregation.MIN,
-            sample.Aggregation.MAX,
-            sample.Aggregation.TOTAL,
-        ],
+    base_sample = sample.Sample(
+        f'{benchmark_name}_Throughput_', 0, throughput_unit, metadata
     )
-    # Create samples for throughput stats
-    for stat, value in throughput_stats.items():
-      samples.append(
-          sample.Sample(
-              f'{benchmark_name}_Throughput_{stat}',
-              float(value),
-              throughput_unit,
-              metadata,
-          )
-      )
+    samples.extend(
+        sample.SummarizePercentiles(throughputs, base_sample, _SELECTED_METRICS)
+    )
     # Create formatted output, following {benchmark_name}_Throughput_Xstream(s)
     # for TCP stream throughput metrics
     if benchmark_name.upper() == 'TCP_STREAM':
+      total_throughput = next(
+          s.value
+          for s in samples
+          if s.metric == f'{benchmark_name}_Throughput_total'
+      )
       samples.append(
           sample.Sample(
               f'{benchmark_name}_Throughput_{len(parsed_output)}streams',
-              throughput_stats['total'],
+              total_throughput,
               throughput_unit,
               metadata,
           )

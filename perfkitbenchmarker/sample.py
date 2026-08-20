@@ -27,7 +27,6 @@ import numpy as np
 from perfkitbenchmarker import errors
 import pytz
 
-
 # Add this flag to the metadata to hide logging to console.
 DISABLE_CONSOLE_LOG = 'disable_console_log'
 
@@ -93,51 +92,6 @@ class Percentile:
 
   def __hash__(self):
     return hash((self.value, self.label))
-
-
-def PercentileCalculator(
-    numbers: Sequence[float], metrics: Sequence[Percentile | Aggregation]
-) -> dict[str, float]:
-  """Computes percentiles, stddev and mean on a set of numbers.
-
-  Args:
-    numbers: A sequence of numbers to compute percentiles for.
-    metrics: A list of metrics to include (e.g., Aggregation.MEAN,
-      Percentile(50)).
-
-  Returns:
-    A dictionary of percentiles.
-  """
-  if not numbers:
-    raise ValueError("Can't compute percentiles of empty list.")
-
-  result = {}
-  np_array = np.array(numbers)
-
-  for metric in metrics:
-    if isinstance(metric, Percentile):
-      val = np.percentile(np_array, metric.value)
-    elif not isinstance(metric, Aggregation):
-      raise ValueError(f'Invalid metric type: {type(metric)}')
-    elif metric == Aggregation.STDDEV:
-      count = len(np_array)
-      if count > 1:
-        val = np.std(np_array, ddof=1)
-      else:
-        val = 0
-    elif metric == Aggregation.AVERAGE or metric == Aggregation.MEAN:
-      val = np.mean(np_array)
-    elif metric == Aggregation.MIN:
-      val = np.min(np_array)
-    elif metric == Aggregation.MAX:
-      val = np.max(np_array)
-    elif metric == Aggregation.TOTAL:
-      val = np.sum(np_array)
-    else:
-      raise ValueError(f'Unsupported aggregation: {metric}')
-    result[str(metric)] = val
-
-  return result
 
 
 def GeoMean(iterable):
@@ -213,23 +167,42 @@ def SummarizePercentiles(
   Returns:
     A list of Sample objects representing the summary statistics.
   """
-  if not numbers:
-    return []
-
-  stats = PercentileCalculator(numbers, metrics)
+  np_array = np.array(numbers)
+  if not np_array.size:
+    raise ValueError("Can't compute percentiles of empty list.")
 
   samples = []
-  prefix = base_sample.metric
 
-  for key, val in stats.items():
+  for metric in metrics:
+    if isinstance(metric, Percentile):
+      val = np.percentile(np_array, metric.value)
+    elif not isinstance(metric, Aggregation):
+      raise ValueError(f'Invalid metric type: {type(metric)}')
+    elif metric == Aggregation.STDDEV:
+      count = len(np_array)
+      if count > 1:
+        val = np.std(np_array, ddof=1)
+      else:
+        val = 0
+    elif metric == Aggregation.AVERAGE or metric == Aggregation.MEAN:
+      val = np.mean(np_array)
+    elif metric == Aggregation.MIN:
+      val = np.min(np_array)
+    elif metric == Aggregation.MAX:
+      val = np.max(np_array)
+    elif metric == Aggregation.TOTAL:
+      val = np.sum(np_array)
+    else:
+      raise ValueError(f'Unsupported aggregation: {metric}')
     samples.append(
         Sample(
-            prefix + key,
+            base_sample.metric + str(metric),
             val,
             base_sample.unit,
             base_sample.metadata,
         )
     )
+
   return samples
 
 

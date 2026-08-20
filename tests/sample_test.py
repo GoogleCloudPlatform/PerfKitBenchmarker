@@ -64,47 +64,9 @@ class SampleTestCase(unittest.TestCase):
     self.assertEqual(1.0, instance.value)
 
 
-class TestPercentileCalculator(unittest.TestCase):
+class TestSummarizePercentiles(unittest.TestCase):
 
-  def testPercentileCalculator(self):
-    numbers = list(range(0, 1001))
-    percentiles = sample.PercentileCalculator(
-        numbers,
-        metrics=[
-            P(0),
-            P(1),
-            P(99.9),
-            P(100),
-            sample.Aggregation.AVERAGE,
-            sample.Aggregation.STDDEV,
-        ],
-    )
-
-    self.assertAlmostEqual(percentiles['p0'], 0)
-    self.assertAlmostEqual(percentiles['p1'], 10)
-    self.assertAlmostEqual(percentiles['p99.9'], 999)
-    self.assertAlmostEqual(percentiles['p100'], 1000)
-    self.assertAlmostEqual(percentiles['average'], 500)
-
-    # 4 percentiles we requested, plus average and stddev
-    self.assertEqual(len(percentiles), 6)
-
-  def testNoNumbers(self):
-    with self.assertRaises(ValueError):
-      sample.PercentileCalculator([], metrics=[P(0), P(1), P(99)])
-
-  def testOutOfRangePercentile(self):
-    with self.assertRaises(ValueError):
-      sample.PercentileCalculator([3], metrics=[P(-1)])
-
-  def testWrongTypePercentile(self):
-    with self.assertRaises(ValueError):
-      sample.PercentileCalculator([3], metrics=['a'])  # pyrefly: ignore[bad-argument-type]
-
-
-class TestSummarizeTimestamps(unittest.TestCase):
-
-  def testSummarizeTimestamps(self):
+  def testSummarizePercentilesTo100(self):
     latencies = [float(x) for x in range(0, 101)]
     metrics = [
         sample.Aggregation.MEAN,
@@ -134,10 +96,48 @@ class TestSummarizeTimestamps(unittest.TestCase):
 
   def testEmptyLatencies(self):
     base_sample = sample.Sample('test_', 0, 'seconds')
+    with self.assertRaises(ValueError):
+      sample.SummarizePercentiles(
+          [], base_sample, metrics=[sample.Aggregation.MEAN]
+      )
+
+  def testSummarizePercentiles_LargeRange(self):
+    numbers = list(range(0, 1001))
+    metrics = [
+        sample.Percentile(0),
+        sample.Percentile(1),
+        sample.Percentile(99.9),
+        sample.Percentile(100),
+        sample.Aggregation.AVERAGE,
+    ]
+    base_sample = sample.Sample('test_', 0, 'seconds')
     samples = sample.SummarizePercentiles(
-        [], base_sample, metrics=[sample.Aggregation.MEAN]
+        numbers, base_sample, metrics=metrics
     )
-    self.assertEqual(samples, [])
+
+    sample_dict = {s.metric: s.value for s in samples}
+
+    self.assertAlmostEqual(sample_dict['test_p0'], 0)
+    self.assertAlmostEqual(sample_dict['test_p1'], 10)
+    self.assertAlmostEqual(sample_dict['test_p99.9'], 999)
+    self.assertAlmostEqual(sample_dict['test_p100'], 1000)
+    self.assertAlmostEqual(sample_dict['test_average'], 500)
+
+    self.assertEqual(len(samples), 5)
+
+  def testPercentileValidation(self):
+    with self.assertRaises(ValueError):
+      sample.Percentile(-1)
+
+  def testPercentileStr(self):
+    p = sample.Percentile(50)
+    self.assertEqual(str(p), 'p50')
+    p2 = sample.Percentile(99.9)
+    self.assertEqual(str(p2), 'p99.9')
+
+  def testAggregationStr(self):
+    self.assertEqual(str(sample.Aggregation.AVERAGE), 'average')
+    self.assertEqual(str(sample.Aggregation.STDDEV), 'stddev')
 
 
 class TestSampleGroupCollector(unittest.TestCase):

@@ -54,7 +54,7 @@ from perfkitbenchmarker import sample
 from perfkitbenchmarker import units
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gcs
-from perfkitbenchmarker.sample import PercentileCalculator  # noqa
+
 
 # Object Naming Schemes
 SEQUENTIAL_BY_STREAM = 'sequential_by_stream'
@@ -1576,21 +1576,14 @@ def CheckPrerequisites(benchmark_config):
 def _AppendPercentilesToResults(
     output_results, input_results, metric_name, metric_unit, metadata
 ):
-  # PercentileCalculator will (correctly) raise an exception on empty
-  # input, but an empty input list makes semantic sense here.
+  # An empty input list makes semantic sense here.
   if len(input_results) == 0:
     return
 
-  percentiles = PercentileCalculator(input_results, PERCENTILES_LIST)
-  for percentile in PERCENTILES_LIST:
-    output_results.append(
-        sample.Sample(
-            '%s %s' % (metric_name, str(percentile)),
-            percentiles[str(percentile)],
-            metric_unit,
-            metadata,
-        )
-    )
+  base_sample = sample.Sample('%s ' % metric_name, 0, metric_unit, metadata)
+  output_results.extend(
+      sample.SummarizePercentiles(input_results, base_sample, PERCENTILES_LIST)
+  )
 
 
 def CLIThroughputBenchmark(

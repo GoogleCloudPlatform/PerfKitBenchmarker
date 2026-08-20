@@ -83,6 +83,19 @@ PORT_START = 20000
 REMOTE_SCRIPTS_DIR = 'netperf_test_scripts'
 REMOTE_SCRIPT = 'netperf_test.py'
 
+P = sample.Percentile
+
+_SELECTED_METRICS = [
+    P(50),
+    P(90),
+    P(99),
+    sample.Aggregation.MIN,
+    sample.Aggregation.MAX,
+    sample.Aggregation.AVERAGE,
+    sample.Aggregation.STDDEV,
+    sample.Aggregation.TOTAL,
+]
+
 
 def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
@@ -301,30 +314,15 @@ def RunNetperf(
   # Extract the throughput values from the samples
   throughputs = [s.value for s in throughput_samples]
   # Compute some stats on the throughput values
-  throughput_stats = sample.PercentileCalculator(
-      throughputs,
-      [
-          P(50),
-          P(90),
-          P(99),
-          sample.Aggregation.AVERAGE,
-          sample.Aggregation.STDDEV,
-      ],
+  base_sample = sample.Sample(
+      '%s_%s_Throughput_' % (iteration, benchmark_name),
+      0,
+      throughput_unit,
+      metadata,
   )
-  throughput_stats['min'] = min(throughputs)
-  throughput_stats['max'] = max(throughputs)
-  # Calculate aggregate throughput
-  throughput_stats['total'] = throughput_stats['average'] * len(throughputs)
-  # Create samples for throughput stats
-  for stat, value in throughput_stats.items():
-    local_results.append(
-        sample.Sample(
-            '%s_%s_Throughput_%s' % (iteration, benchmark_name, stat),
-            float(value),
-            throughput_unit,
-            metadata,
-        )
-    )
+  local_results.extend(
+      sample.SummarizePercentiles(throughputs, base_sample, _SELECTED_METRICS)
+  )
   results[iteration] = (
       local_results,
       begin_starting_processes,
