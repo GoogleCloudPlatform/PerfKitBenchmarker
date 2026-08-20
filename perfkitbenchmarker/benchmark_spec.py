@@ -738,6 +738,7 @@ class BenchmarkSpec:
       self.lustre_service = lustre_class(
           disk_spec, group_spec.vm_spec.zone
       )  # pytype: disable=not-instantiable
+      self.resources.append(self.lustre_service)
       break
 
   def ConstructSmbService(self):
