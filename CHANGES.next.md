@@ -708,3 +708,4 @@
 -   Document "what are resources?" in a README
 -   Add support for measuring VM create to data disk visibility.
 -   Add GKE postgres sysbench default benchmark config alias.
+-   Standardize around numpy for some aggregation methods with e.g. netperf.

@@ -73,13 +73,19 @@ class BidirectionalNetworkBenchmarkTestCase(
     self._AssertSample(
         netperf_run, header + 'stddev', numpy.std(values, ddof=1), MBPS
     )
-    self._AssertSample(netperf_run, header + 'p90', values[7], MBPS)
+    self._AssertSample(
+        netperf_run, header + 'p90', numpy.percentile(values, 90), MBPS
+    )
     self._AssertSample(
         netperf_run, header + 'average', numpy.mean(values), MBPS
     )
-    self._AssertSample(netperf_run, header + 'p50', values[4], MBPS)
+    self._AssertSample(
+        netperf_run, header + 'p50', numpy.percentile(values, 50), MBPS
+    )
     self._AssertSample(netperf_run, header + 'total', sum(values), MBPS)
-    self._AssertSample(netperf_run, header + 'p99', values[7], MBPS)
+    self._AssertSample(
+        netperf_run, header + 'p99', numpy.percentile(values, 99), MBPS
+    )
 
   def _AssertSample(self, results, metric, value, unit):
     """Asserts results contains a sample matching metric/value/unit."""

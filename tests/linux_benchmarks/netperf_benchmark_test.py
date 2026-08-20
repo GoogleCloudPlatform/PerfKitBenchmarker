@@ -232,9 +232,9 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
 
     self.assertListEqual(
         [
-            ('TCP_STREAM_Throughput_p50', 3000.0, 'Mbits/sec'),
-            ('TCP_STREAM_Throughput_p90', 4000.0, 'Mbits/sec'),
-            ('TCP_STREAM_Throughput_p99', 4000.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_p50', 2500.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_p90', 3700.0, 'Mbits/sec'),
+            ('TCP_STREAM_Throughput_p99', 3969.9999999999995, 'Mbits/sec'),
             ('TCP_STREAM_Throughput_average', 2500.0, 'Mbits/sec'),
             ('TCP_STREAM_Throughput_stddev', 1290.9944487358057, 'Mbits/sec'),
             ('TCP_STREAM_Throughput_min', 1000.0, 'Mbits/sec'),

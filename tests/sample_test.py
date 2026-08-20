@@ -17,6 +17,8 @@ import unittest
 
 from perfkitbenchmarker import sample
 
+P = sample.Percentile
+
 
 class SampleTestCase(unittest.TestCase):
 
@@ -67,29 +69,37 @@ class TestPercentileCalculator(unittest.TestCase):
   def testPercentileCalculator(self):
     numbers = list(range(0, 1001))
     percentiles = sample.PercentileCalculator(
-        numbers, percentiles=[0, 1, 99.9, 100]
+        numbers,
+        metrics=[
+            P(0),
+            P(1),
+            P(99.9),
+            P(100),
+            sample.Aggregation.AVERAGE,
+            sample.Aggregation.STDDEV,
+        ],
     )
 
-    self.assertEqual(percentiles['p0'], 0)
-    self.assertEqual(percentiles['p1'], 10)
-    self.assertEqual(percentiles['p99.9'], 999)
-    self.assertEqual(percentiles['p100'], 1000)
-    self.assertEqual(percentiles['average'], 500)
+    self.assertAlmostEqual(percentiles['p0'], 0)
+    self.assertAlmostEqual(percentiles['p1'], 10)
+    self.assertAlmostEqual(percentiles['p99.9'], 999)
+    self.assertAlmostEqual(percentiles['p100'], 1000)
+    self.assertAlmostEqual(percentiles['average'], 500)
 
     # 4 percentiles we requested, plus average and stddev
     self.assertEqual(len(percentiles), 6)
 
   def testNoNumbers(self):
     with self.assertRaises(ValueError):
-      sample.PercentileCalculator([], percentiles=[0, 1, 99])
+      sample.PercentileCalculator([], metrics=[P(0), P(1), P(99)])
 
   def testOutOfRangePercentile(self):
     with self.assertRaises(ValueError):
-      sample.PercentileCalculator([3], percentiles=[-1])
+      sample.PercentileCalculator([3], metrics=[P(-1)])
 
   def testWrongTypePercentile(self):
     with self.assertRaises(ValueError):
-      sample.PercentileCalculator([3], percentiles=['a'])
+      sample.PercentileCalculator([3], metrics=['a'])  # pyrefly: ignore[bad-argument-type]
 
 
 class TestSummarizeTimestamps(unittest.TestCase):
@@ -97,14 +107,14 @@ class TestSummarizeTimestamps(unittest.TestCase):
   def testSummarizeTimestamps(self):
     latencies = [float(x) for x in range(0, 101)]
     metrics = [
-        sample.NpAggregation.MEAN,
-        sample.Percentile(0),
-        sample.Percentile(10),
-        sample.Percentile(50),
-        sample.Percentile(90),
-        sample.Percentile(95),
-        sample.Percentile(99.9),
-        sample.Percentile(100),
+        sample.Aggregation.MEAN,
+        P(0),
+        P(10),
+        P(50),
+        P(90),
+        P(95),
+        P(99.9),
+        P(100),
     ]
     base_sample = sample.Sample('test_', 0, 'seconds')
     samples = sample.SummarizePercentiles(
@@ -125,7 +135,7 @@ class TestSummarizeTimestamps(unittest.TestCase):
   def testEmptyLatencies(self):
     base_sample = sample.Sample('test_', 0, 'seconds')
     samples = sample.SummarizePercentiles(
-        [], base_sample, metrics=[sample.NpAggregation.MEAN]
+        [], base_sample, metrics=[sample.Aggregation.MEAN]
     )
     self.assertEqual(samples, [])
 

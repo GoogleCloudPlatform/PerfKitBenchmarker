@@ -39,6 +39,8 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import netperf
 import six
 
+P = sample.Percentile
+
 flags.DEFINE_integer(
     'netperf_max_iter',
     None,
@@ -701,11 +703,19 @@ def RunNetperf(
     # Extract the throughput values from the samples
     throughputs = [s.value for s in throughput_samples]
     # Compute some stats on the throughput values
-    throughput_stats = sample.PercentileCalculator(throughputs, [50, 90, 99])
-    throughput_stats['min'] = min(throughputs)
-    throughput_stats['max'] = max(throughputs)
-    # Calculate aggregate throughput
-    throughput_stats['total'] = throughput_stats['average'] * len(throughputs)
+    throughput_stats = sample.PercentileCalculator(
+        throughputs,
+        [
+            P(50),
+            P(90),
+            P(99),
+            sample.Aggregation.AVERAGE,
+            sample.Aggregation.STDDEV,
+            sample.Aggregation.MIN,
+            sample.Aggregation.MAX,
+            sample.Aggregation.TOTAL,
+        ],
+    )
     # Create samples for throughput stats
     for stat, value in throughput_stats.items():
       samples.append(

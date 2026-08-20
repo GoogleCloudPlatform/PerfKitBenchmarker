@@ -326,18 +326,19 @@ DOWNLOAD_DIRECTORY = posixpath.join(SCRIPT_DIR, 'temp')
 THROUGHPUT_UNIT = 'Mbps'
 LATENCY_UNIT = 'seconds'
 NA_UNIT = 'na'
+P = sample.Percentile
 PERCENTILES_LIST = [
-    'p0.1',
-    'p1',
-    'p5',
-    'p10',
-    'p50',
-    'p90',
-    'p95',
-    'p99',
-    'p99.9',
-    'average',
-    'stddev',
+    P(0.1),
+    P(1),
+    P(5),
+    P(10),
+    P(50),
+    P(90),
+    P(95),
+    P(99),
+    P(99.9),
+    sample.Aggregation.AVERAGE,
+    sample.Aggregation.STDDEV,
 ]
 
 UPLOAD_THROUGHPUT_VIA_CLI = 'upload throughput via cli Mbps'
@@ -462,8 +463,8 @@ def _JsonStringToPercentileResults(
   for percentile in PERCENTILES_LIST:
     results.append(
         sample.Sample(
-            '%s %s' % (metric_name, percentile),
-            float(result[percentile]),
+            '%s %s' % (metric_name, str(percentile)),
+            float(result[str(percentile)]),
             metric_unit,
             metadata,
         )
@@ -989,8 +990,8 @@ def SingleStreamThroughputBenchmark(
     for percentile in PERCENTILES_LIST:
       results.append(
           sample.Sample(
-              '%s %s' % (sample_name, percentile),
-              8 * float(result[percentile]) / 1000 / 1000,
+              '%s %s' % (sample_name, str(percentile)),
+              8 * float(result[str(percentile)]) / 1000 / 1000,
               THROUGHPUT_UNIT,
               metadata,
           )
@@ -1580,12 +1581,12 @@ def _AppendPercentilesToResults(
   if len(input_results) == 0:
     return
 
-  percentiles = PercentileCalculator(input_results)
+  percentiles = PercentileCalculator(input_results, PERCENTILES_LIST)
   for percentile in PERCENTILES_LIST:
     output_results.append(
         sample.Sample(
-            '%s %s' % (metric_name, percentile),
-            percentiles[percentile],
+            '%s %s' % (metric_name, str(percentile)),
+            percentiles[str(percentile)],
             metric_unit,
             metadata,
         )

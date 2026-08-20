@@ -77,7 +77,7 @@ NVIDIA_GPU_IMAGE = 'nvidia/cuda:11.0.3-runtime-ubuntu20.04'
 P = sample.Percentile
 
 _TARGET_METRICS = [
-    sample.NpAggregation.MEAN,
+    sample.Aggregation.MEAN,
     P(0),
     P(10),
     P(50),

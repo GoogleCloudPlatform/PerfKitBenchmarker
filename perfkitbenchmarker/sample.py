@@ -27,7 +27,6 @@ import numpy as np
 from perfkitbenchmarker import errors
 import pytz
 
-PERCENTILES_LIST = 0.1, 1, 5, 10, 50, 90, 95, 99, 99.9
 
 # Add this flag to the metadata to hide logging to console.
 DISABLE_CONSOLE_LOG = 'disable_console_log'
@@ -55,8 +54,18 @@ TIME_SERIES_METADATA = [
 ]
 
 
-class NpAggregation(enum.Enum):
+class Aggregation(str, enum.Enum):
+  """Aggregation strategy for sample group selection or metric aggregation."""
+
+  MAX = 'max'
+  MIN = 'min'
   MEAN = 'mean'
+  STDDEV = 'stddev'
+  AVERAGE = 'average'
+  TOTAL = 'total'
+
+  def __str__(self):
+    return self.value
 
 
 @dataclasses.dataclass
@@ -79,48 +88,54 @@ class Percentile:
     else:
       self.label = 'p' + str(self.value)
 
+  def __str__(self):
+    return self.label
 
-def PercentileCalculator(numbers, percentiles=PERCENTILES_LIST):
+  def __hash__(self):
+    return hash((self.value, self.label))
+
+
+def PercentileCalculator(
+    numbers: Sequence[float], metrics: Sequence[Percentile | Aggregation]
+) -> dict[str, float]:
   """Computes percentiles, stddev and mean on a set of numbers.
 
   Args:
     numbers: A sequence of numbers to compute percentiles for.
-    percentiles: If given, a list of percentiles to compute. Can be floats, ints
-      or longs.
+    metrics: A list of metrics to include (e.g., Aggregation.MEAN,
+      Percentile(50)).
 
   Returns:
     A dictionary of percentiles.
-
-  Raises:
-    ValueError, if numbers is empty or if a percentile is outside of
-    [0, 100].
   """
-
-  # 'if not numbers' will fail if numbers is an np.Array or pd.Series.
-  if not len(numbers):
+  if not numbers:
     raise ValueError("Can't compute percentiles of empty list.")
 
-  numbers_sorted = sorted(numbers)
-  count = len(numbers_sorted)
-  total = sum(numbers_sorted)
   result = {}
-  for percentile in percentiles:
-    float(percentile)  # verify type
-    if percentile < 0.0 or percentile > 100.0:
-      raise ValueError('Invalid percentile %s' % percentile)
+  np_array = np.array(numbers)
 
-    percentile_string = 'p%s' % str(percentile)
-    index = int(count * float(percentile) / 100.0)
-    index = min(index, count - 1)  # Correction to handle 100th percentile.
-    result[percentile_string] = numbers_sorted[index]
-
-  average = total / float(count)
-  result['average'] = average
-  if count > 1:
-    total_of_squares = sum([(i - average) ** 2 for i in numbers])
-    result['stddev'] = (total_of_squares / (count - 1)) ** 0.5
-  else:
-    result['stddev'] = 0
+  for metric in metrics:
+    if isinstance(metric, Percentile):
+      val = np.percentile(np_array, metric.value)
+    elif not isinstance(metric, Aggregation):
+      raise ValueError(f'Invalid metric type: {type(metric)}')
+    elif metric == Aggregation.STDDEV:
+      count = len(np_array)
+      if count > 1:
+        val = np.std(np_array, ddof=1)
+      else:
+        val = 0
+    elif metric == Aggregation.AVERAGE or metric == Aggregation.MEAN:
+      val = np.mean(np_array)
+    elif metric == Aggregation.MIN:
+      val = np.min(np_array)
+    elif metric == Aggregation.MAX:
+      val = np.max(np_array)
+    elif metric == Aggregation.TOTAL:
+      val = np.sum(np_array)
+    else:
+      raise ValueError(f'Unsupported aggregation: {metric}')
+    result[str(metric)] = val
 
   return result
 
@@ -184,7 +199,7 @@ class Sample(collections.namedtuple('Sample', _SAMPLE_FIELDS)):  # pyrefly: igno
 def SummarizePercentiles(
     numbers: Sequence[float],
     base_sample: Sample,
-    metrics: Sequence[NpAggregation | Percentile],
+    metrics: Sequence[Aggregation | Percentile],
 ) -> list[Sample]:
   """Returns a few summary statistics samples about a list of numbers.
 
@@ -192,7 +207,7 @@ def SummarizePercentiles(
     numbers: A list of numbers to aggregate.
     base_sample: A Sample object to pull metric (as prefix), unit, and metadata
       from.
-    metrics: A list of metrics to include (e.g., NpAggregation.MEAN,
+    metrics: A list of metrics to include (e.g., Aggregation.MEAN,
       Percentile(50)).
 
   Returns:
@@ -200,33 +215,21 @@ def SummarizePercentiles(
   """
   if not numbers:
     return []
+
+  stats = PercentileCalculator(numbers, metrics)
+
   samples = []
   prefix = base_sample.metric
 
-  if NpAggregation.MEAN in metrics:
+  for key, val in stats.items():
     samples.append(
         Sample(
-            prefix + 'mean',
-            np.mean(numbers),
+            prefix + key,
+            val,
             base_sample.unit,
             base_sample.metadata,
         )
     )
-
-  percentiles = [m for m in metrics if isinstance(m, Percentile)]
-  if percentiles:
-    float_percentiles = [p.value for p in percentiles]
-    results = np.percentile(numbers, float_percentiles)
-    for i, p in enumerate(percentiles):
-      samples.append(
-          Sample(
-              prefix + p.label,
-              results[i],
-              base_sample.unit,
-              base_sample.metadata,
-          )
-      )
-
   return samples
 
 
@@ -359,13 +362,6 @@ def ConvertDateTimeToUnixMs(date: datetime.datetime):
   # Convert the datetime to UTC timezone first.
   date_utc = date.astimezone(pytz.utc)
   return calendar.timegm(date_utc.timetuple()) * 1000
-
-
-class Aggregation(str, enum.Enum):
-  """Aggregation strategy for sample group selection."""
-
-  MAX = 'max'
-  MIN = 'min'
 
 
 class SampleGroupCollector:

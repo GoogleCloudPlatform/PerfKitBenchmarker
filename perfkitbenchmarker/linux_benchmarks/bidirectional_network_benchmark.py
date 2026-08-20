@@ -32,6 +32,8 @@ from perfkitbenchmarker import data
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_packages import netperf
 
+P = sample.Percentile
+
 flags.DEFINE_list(
     'bidirectional_network_tests',
     ['TCP_STREAM', 'TCP_MAERTS', 'TCP_MAERTS'],
@@ -299,7 +301,16 @@ def RunNetperf(
   # Extract the throughput values from the samples
   throughputs = [s.value for s in throughput_samples]
   # Compute some stats on the throughput values
-  throughput_stats = sample.PercentileCalculator(throughputs, [50, 90, 99])
+  throughput_stats = sample.PercentileCalculator(
+      throughputs,
+      [
+          P(50),
+          P(90),
+          P(99),
+          sample.Aggregation.AVERAGE,
+          sample.Aggregation.STDDEV,
+      ],
+  )
   throughput_stats['min'] = min(throughputs)
   throughput_stats['max'] = max(throughputs)
   # Calculate aggregate throughput

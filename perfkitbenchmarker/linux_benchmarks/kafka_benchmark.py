@@ -22,6 +22,7 @@ import time
 from typing import Any, Mapping
 
 from absl import flags
+import numpy as np
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
@@ -613,9 +614,7 @@ def _CreateProducerIngressSample(
 
   p95_ingress = 0.0
   if aggregated_throughputs:
-    p95_ingress = sample.PercentileCalculator(aggregated_throughputs, [95])[
-        'p95'
-    ]
+    p95_ingress = np.percentile(aggregated_throughputs, 95)
   elif thread_mb:
     p95_ingress = sum(thread_mb)
 
