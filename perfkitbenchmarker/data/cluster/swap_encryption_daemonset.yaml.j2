@@ -13,9 +13,13 @@ data:
     # Installs measurement tools, verifies the swap device, then writes /tmp/pkb_ready.
     set -euo pipefail
 
-    echo "[pkb] Installing measurement tools..."
-    # Only tools needed for Phase 1 (raw-device fio) and Phase 2 (CPU/I/O overhead).
-    # Workload benchmarks (redis, opensearch, kernel-build) run in separate pods.
+    echo "[pkb] Installing benchmark measurement tools..."
+    # Phase 1 tools: fio (raw-device I/O), cryptsetup/mdadm (dm-crypt inspection),
+    # sysstat (vmstat/pidstat), nvme-cli (NVMe telemetry).
+    # Phase 2 tools: stress-ng (CPU/I/O overhead), cgroup-tools (cgroup v1 guard),
+    # util-linux (taskset/ionice).
+    # Phase 3b tools: gcc/make/bc/flex/bison/libelf-dev/libssl-dev (kernel build).
+    # Workload benchmarks (redis, opensearch) run in separate PKB benchmark pods.
     PKB_APT_OK=0
     for _attempt in 1 2 3; do
       DEBIAN_FRONTEND=noninteractive apt-get update -qq 2>&1 || true
@@ -25,15 +29,30 @@ data:
         mdadm \
         sysstat \
         nvme-cli \
+        stress-ng \
+        cgroup-tools \
+        util-linux \
+        gcc \
+        make \
+        bc \
+        flex \
+        bison \
+        libelf-dev \
+        libssl-dev \
         2>&1 && PKB_APT_OK=1 && break
       echo "[pkb] apt-get attempt $_attempt failed, retrying in 15s..." >&2
       sleep 15
     done
-    if [ "$PKB_APT_OK" != "1" ] || ! command -v fio >/dev/null 2>&1; then
-      echo "[pkb] FATAL: fio not installed after 3 attempts" >&2
+    if [ "$PKB_APT_OK" != "1" ] || \
+       ! command -v fio >/dev/null 2>&1 || \
+       ! command -v stress-ng >/dev/null 2>&1 || \
+       ! command -v make >/dev/null 2>&1; then
+      echo "[pkb] FATAL: critical tools (fio, stress-ng, make) not installed after 3 attempts" >&2
       exit 1
     fi
-    echo "[pkb] fio installed: $(fio --version 2>&1 | head -1)"
+    echo "[pkb] fio: $(fio --version 2>&1 | head -1)"
+    echo "[pkb] stress-ng: $(stress-ng --version 2>&1 | head -1)"
+    echo "[pkb] gcc: $(gcc --version 2>&1 | head -1)"
 
     echo "[pkb] Verifying swap device is active..."
     PKB_SWAP_FOUND=0
@@ -53,7 +72,7 @@ data:
       exit 1
     fi
 
-    echo "[pkb] Measurement tools ready. Writing ready sentinel."
+    echo "[pkb] Benchmark tools ready. Writing ready sentinel."
     touch /tmp/pkb_ready
     exec sleep infinity
 ---
