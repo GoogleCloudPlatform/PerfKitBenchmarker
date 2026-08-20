@@ -46,6 +46,12 @@ _IOR_HARD_WRITE_DIRECT_IO = flags.DEFINE_boolean(
     'Whether to apply the Direct I/O patch to the ior-hard-write phase.',
 )
 
+_IOR_EASY_DIRECT_IO = flags.DEFINE_boolean(
+    'ior_easy_direct_io',
+    False,
+    'Whether to enable Direct I/O (posix.odirect) for the ior-easy phase.',
+)
+
 _IO500_INI_FILE = flags.DEFINE_string(
     'io500_ini_file', 'io500',
     'The base name of the INI file template to use.')
@@ -154,6 +160,17 @@ def Prepare(benchmark_spec):
         ' ior_hard_write_direct_io.patch'
     )
 
+  if _IOR_EASY_DIRECT_IO.value:
+    patch_local_path = data.ResourcePath('io500/ior_easy_direct_io.patch')
+    remote_patch_path = os.path.join(
+        BENCHMARK_DIR, 'io500', 'ior_easy_direct_io.patch'
+    )
+    headnode.PushFile(patch_local_path, remote_patch_path)
+    headnode.RemoteCommand(
+        f'cd {BENCHMARK_DIR}/io500 && patch -p1 <'
+        ' ior_easy_direct_io.patch'
+    )
+
   # ./prepare.sh builds IOR & mdtest binaries. autoreconf inside prepare.sh
   # can segfault on some VM runs, so retry.
   vm_util.Retry(max_retries=5)(headnode.RobustRemoteCommand)(
@@ -215,6 +232,10 @@ def _Run(headnode, ranks, ppn, num_clients):
         continue
       if _IOR_HARD_WRITE_DIRECT_IO.value and metric == 'ior-hard-write':
         metric = 'ior-hard-write-direct'
+      if _IOR_EASY_DIRECT_IO.value and metric == 'ior-easy-write':
+        metric = 'ior-easy-write-direct'
+      if _IOR_EASY_DIRECT_IO.value and metric == 'ior-easy-read':
+        metric = 'ior-easy-read-direct'
       results.append(
           sample.Sample(
               metric,
@@ -227,6 +248,7 @@ def _Run(headnode, ranks, ppn, num_clients):
                   'duration': duration,
                   'invalid': '[INVALID]' in line,
                   'ior_hard_write_direct_io': _IOR_HARD_WRITE_DIRECT_IO.value,
+                  'ior_easy_direct_io': _IOR_EASY_DIRECT_IO.value,
               },
           )
       )
@@ -240,6 +262,7 @@ def _Run(headnode, ranks, ppn, num_clients):
           'ppn': ppn,
           'invalid': '[INVALID]' in line,
           'ior_hard_write_direct_io': _IOR_HARD_WRITE_DIRECT_IO.value,
+          'ior_easy_direct_io': _IOR_EASY_DIRECT_IO.value,
       }
       results.extend([
           sample.Sample('BANDWIDTH', raw_result[0], raw_result[1], metadata),

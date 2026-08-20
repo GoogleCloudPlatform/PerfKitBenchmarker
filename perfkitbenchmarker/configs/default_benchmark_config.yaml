@@ -681,6 +681,7 @@ io500_lustre:
     scratch_dir: lustre_dir
     openmpi_version: 4.1.6
     mpi_ranks_list: [1, 2, 4, 8, 16, 32, 64, 128, 192]
+    ior_easy_direct_io: True
 
 gpu_jobs_provisioning:
   name: jobs_benchmark

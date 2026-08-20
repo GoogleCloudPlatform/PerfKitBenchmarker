@@ -1,0 +1,53 @@
+# Patch to enable POSIX direct I/O (--posix.odirect) for the ior-easy-write and ior-easy-read phases in IO500.
+#
+# Context & Rationale:
+# IO500 does not support posix.odirect in io500.ini.
+# This patch modifies IO500's ior-easy phases to pass --posix.odirect to the underlying ior binary.
+
+diff --git a/src/phase_ior_easy_read.c b/src/phase_ior_easy_read.c
+index 095b455..dc89f41 100644
+--- a/src/phase_ior_easy_read.c
++++ b/src/phase_ior_easy_read.c
+@@ -1,6 +1,7 @@
+ #include <sys/stat.h>
+ #include <unistd.h>
+ #include <mpi.h>
++#include <string.h>
+
+ #include <io500-phase.h>
+ #include <phase_ior.h>
+@@ -36,6 +37,11 @@ static double run(void){
+   u_argv_push_default_if_set_api_options(argv, "-a", d.api, o.api);
+   u_argv_push(argv, "-O");
+   u_argv_push_printf(argv, "saveRankPerformanceDetailsCSV=%s/ior-easy-read.csv", opt.resdir);
++
++  char *api = o.api ? o.api : d.api;
++  if (api == NULL || strcmp(api, "POSIX") == 0) {
++    u_argv_push(argv, "--posix.odirect");
++  }
+ //  u_argv_push_default_if_set(argv, "-U",		/* use hints file */
+ //			     d.hintsFileName, o.hintsFileName);
+ //  u_argv_push_default_if_set_api_options(argv, "-a",	/* backend API */
+diff --git a/src/phase_ior_easy_write.c b/src/phase_ior_easy_write.c
+index 4cd347f..2079d52 100644
+--- a/src/phase_ior_easy_write.c
++++ b/src/phase_ior_easy_write.c
+@@ -1,5 +1,6 @@
+ #include <sys/stat.h>
+ #include <unistd.h>
++#include <string.h>
+
+ #include <ior.h>
+ #include <io500-phase.h>
+@@ -38,6 +39,11 @@ static double run(void){
+   u_argv_push_default_if_set_api_options(argv, "-a", d.api, o.api);
+   u_argv_push(argv, "-O");
+   u_argv_push_printf(argv, "saveRankPerformanceDetailsCSV=%s/ior-easy-write.csv", opt.resdir);
++
++  char *api = o.api ? o.api : d.api;
++  if (api == NULL || strcmp(api, "POSIX") == 0) {
++    u_argv_push(argv, "--posix.odirect");
++  }
+ //  u_argv_push_default_if_set(argv, "-U",		/* use hints file */
+ //			     d.hintsFileName, o.hintsFileName);
+ //  u_argv_push_default_if_set_api_options(argv, "-a",	/* backend API */
