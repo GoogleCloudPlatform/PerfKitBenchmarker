@@ -185,7 +185,7 @@ class Clickhouse(edw_service.EdwService):
     # https://clickhouse.com/docs/guides/sizing-and-hardware-recommendations
     # default cpu & replicas off memory & shards.
     self.memory: int = edw_service.CLICKHOUSE_MEMORY.value
-    self.cpu: float = self.memory / 4.0
+    self.cpu: float = (edw_service.CLICKHOUSE_CPU.value or self.memory / 4.0)
     self.num_shards: int = edw_service.CLICKHOUSE_NUM_SHARDS.value
     self.num_replicas: int = (
         edw_service.CLICKHOUSE_NUM_REPLICAS.value or 3 * self.num_shards

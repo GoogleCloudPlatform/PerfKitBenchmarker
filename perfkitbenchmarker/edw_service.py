@@ -107,6 +107,12 @@ CLICKHOUSE_MEMORY = flags.DEFINE_integer(
     32,
     'Amount of memory in GiB used by each ClickHouse worker.',
 )
+CLICKHOUSE_CPU = flags.DEFINE_float(
+    'clickhouse_cpu',
+    None,
+    'Amount of CPU used by each ClickHouse worker. If not specified, is derived'
+    ' as 1/4 of clickhouse memory.',
+)
 CLICKHOUSE_NUM_REPLICAS = flags.DEFINE_integer(
     'clickhouse_num_replicas',
     None,
@@ -245,7 +251,7 @@ EDW_SEARCH_DATA_LOCATION = flags.DEFINE_string(
     'edw_search_data_location',
     None,
     'Cloud directory of bucket to source ongoing load data '
-    'for EDW search benchmarks (without rare token).'
+    'for EDW search benchmarks (without rare token).',
 )
 EDW_CONVERSATIONAL_ANALYTICS_QUESTIONS_FILE = flags.DEFINE_string(
     'conversational_analytics_questions_file',
@@ -1137,9 +1143,7 @@ class EdwService(resource.BaseResource):
         new_question_list.append(q)
 
     if not new_question_list:
-      raise errors.Benchmarks.RunError(
-          f'Loaded 0 questions from {csv_path}.'
-      )
+      raise errors.Benchmarks.RunError(f'Loaded 0 questions from {csv_path}.')
 
     self._conversational_analytics_questions = new_question_list
     logging.info(
