@@ -41,7 +41,7 @@ fio_object_storage:
     fio_fill_size: 100G
     fio_ioengine: sync
     fio_ramptime: 0
-    fio_runtime: 30
+    fio_runtime: 900
     gcloud_scopes: https://www.googleapis.com/auth/devstorage.full_control
 """
 
