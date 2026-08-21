@@ -13,7 +13,7 @@ benchmark.Run()
   -> HTTP POST /benchmark/...  -->  main.py (FastAPI)
                                       -> Runner(agent=root_agent)
                                         -> MockLlm yields code
-                                        -> BenchmarkGkeCodeExecutor
+                                        -> BenchmarkExecutor
                                           -> SandboxClient.create_sandbox()
                                           -> sandbox.files.write("script.py", code)
                                           -> sandbox.commands.run("python3 script.py")
@@ -25,7 +25,7 @@ benchmark.Run()
 | File | Purpose |
 |------|---------|
 | `main.py` | FastAPI service with benchmark endpoints |
-| `performance_agent/agent.py` | ADK agent definition with MockLlm and BenchmarkGkeCodeExecutor |
+| `performance_agent/agent.py` | ADK agent definition with MockLlm and BenchmarkExecutor |
 | `sandboxed_apps/python_test_app/benchmark_density.py` | Python density benchmark (runs inside gVisor sandbox) |
 | `sandboxed_apps/python_test_app/benchmark_payload.py` | Payload transfer benchmark (runs inside gVisor sandbox) |
 | `sandboxed_apps/python_test_app/benchmark_qps.py` | QPS validation script (runs inside gVisor sandbox) |

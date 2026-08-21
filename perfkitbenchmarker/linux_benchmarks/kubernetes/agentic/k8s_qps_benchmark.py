@@ -66,7 +66,6 @@ Samples emitted (per run):
 
 from __future__ import annotations
 
-
 import json
 import os
 import logging
@@ -78,7 +77,6 @@ from absl import flags
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
-from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     k8s_benchmark_utils as utils,
 )
@@ -152,11 +150,9 @@ flags.DEFINE_float(
     "Max seconds to wait for a raw claim to bind " "(only used with mode=raw_claim).",
 )
 
-
 # ---------------------------------------------------------------------------
 # Lifecycle
 # ---------------------------------------------------------------------------
-
 
 def GetConfig(user_config: dict) -> dict:
     """Load and return benchmark config.
@@ -164,7 +160,6 @@ def GetConfig(user_config: dict) -> dict:
     No vm_groups — PKB skips Provision() and Teardown().
     """
     return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-
 
 def Prepare(benchmark_spec: object) -> None:
     """Deploy workloads and verify agent API."""
@@ -177,7 +172,6 @@ def Prepare(benchmark_spec: object) -> None:
         utils.CheckAgentHealthz(required=False)
     utils.EnsurePortForward()
     logging.info("Prepare complete.")
-
 
 def Run(benchmark_spec: object) -> list[sample.Sample]:
     """Execute a single QPS measurement and return samples.
@@ -202,10 +196,10 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     mode = FLAGS.k8s_qps_mode
 
     if mode == "raw_claim":
+        # Bypass the agent and test raw K8s API scheduling throughput
         return _RunRawClaim(benchmark_spec)
     else:
         return _RunAgent(benchmark_spec)
-
 
 def Cleanup(benchmark_spec: object) -> None:
     """Delete benchmark claims and drain warm pool."""
@@ -225,11 +219,9 @@ def Cleanup(benchmark_spec: object) -> None:
     utils.StopPortForward()
     logging.info("Cleanup complete.")
 
-
 # ---------------------------------------------------------------------------
 # Agent mode
 # ---------------------------------------------------------------------------
-
 
 def _RunAgent(benchmark_spec: object) -> list[sample.Sample]:
     """Fire QPS burst via the orchestrator API."""
@@ -267,7 +259,7 @@ def _RunAgent(benchmark_spec: object) -> list[sample.Sample]:
     pool_after = utils.CountPods(ns, _WARMPOOL_LABEL, phase="Running")
 
     # Extract response fields
-    aggregate = result.get("aggregate", {})
+    aggregate = result.get("aggregate") or {}
     successful = result.get("successful_requests", 0)
     failed = result.get("failed_requests", 0)
     total = result.get("total_requests", 0)
@@ -285,6 +277,8 @@ def _RunAgent(benchmark_spec: object) -> list[sample.Sample]:
     # Build samples
     run_id = str(uuid.uuid4())[:8]
 
+    # Dictionary of extra metadata key-value pairs appended to every sample.
+    # Used for downstream dashboard filtering and correlating runs.
     extra = {
         "run_id": run_id,
         "target_qps": target_qps,
@@ -300,19 +294,18 @@ def _RunAgent(benchmark_spec: object) -> list[sample.Sample]:
         "wall_time_s": round(wall_time, 2),
     }
 
+    # 'samples' is a list of PKB sample.Sample objects to be returned by Run().
+    # 'aggregate' is the dictionary of metrics calculated and returned by the FastAPI agent.
     samples = []
 
     # TTFE latency stats
-    _emit(samples, aggregate, "ttfe_mean_ms", "ttfe_mean", "ms", ns, extra)
-    _emit(samples, aggregate, "ttfe_p50_ms", "ttfe_p50", "ms", ns, extra)
-    _emit(samples, aggregate, "ttfe_p95_ms", "ttfe_p95", "ms", ns, extra)
-    _emit(samples, aggregate, "ttfe_p99_ms", "ttfe_p99", "ms", ns, extra)
-    _emit(samples, aggregate, "ttfe_min_ms", "ttfe_min", "ms", ns, extra)
-    _emit(samples, aggregate, "ttfe_max_ms", "ttfe_max", "ms", ns, extra)
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, aggregate, "ttfe", ["mean", "p50", "p95", "p99", "min", "max"], "ms", ns, extra)
+
+    
+
 
     # Claim latency stats
-    _emit(samples, aggregate, "claim_mean_ms", "claim_mean", "ms", ns, extra)
-    _emit(samples, aggregate, "claim_p95_ms", "claim_p95", "ms", ns, extra)
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, aggregate, "claim", ["mean", "p95"], "ms", ns, extra)
 
     # Throughput and counts
     samples.append(
@@ -399,11 +392,9 @@ def _RunAgent(benchmark_spec: object) -> list[sample.Sample]:
 
     return samples
 
-
 # ---------------------------------------------------------------------------
 # Raw claim mode
 # ---------------------------------------------------------------------------
-
 
 def _RunRawClaim(benchmark_spec: object) -> list[sample.Sample]:
     """Fire SandboxClaims directly at target_qps (no agent)."""
@@ -496,6 +487,8 @@ def _RunRawClaim(benchmark_spec: object) -> list[sample.Sample]:
     # Build samples
     run_id = str(uuid.uuid4())[:8]
 
+    # Dictionary of extra metadata key-value pairs appended to every sample.
+    # Used for downstream dashboard filtering and correlating runs.
     extra = {
         "run_id": run_id,
         "target_qps": target_qps,
@@ -511,6 +504,8 @@ def _RunRawClaim(benchmark_spec: object) -> list[sample.Sample]:
         "wall_time_s": round(wall_time, 2),
     }
 
+    # 'samples' is a list of PKB sample.Sample objects to be returned by Run().
+    # 'aggregate' is the dictionary of metrics calculated and returned by the FastAPI agent.
     samples = []
 
     # TTFE latency stats (computed from raw claim results)
@@ -679,11 +674,9 @@ def _RunRawClaim(benchmark_spec: object) -> list[sample.Sample]:
 
     return samples
 
-
 # ---------------------------------------------------------------------------
 # Raw claim helpers
 # ---------------------------------------------------------------------------
-
 
 def _CreateClaim(namespace: str, template: str, claim_name: str) -> float:
     """Create a single SandboxClaim via kubectl and return creation timestamp."""
@@ -709,7 +702,7 @@ def _CreateClaim(namespace: str, template: str, claim_name: str) -> float:
     try:
         with open(tmp_path, "w") as f:
             f.write(manifest)
-        stdout, stderr, retcode = kubectl.RunKubectlCommand(
+        stdout, stderr, retcode = utils.RunKubectl(
             ["apply", "-f", tmp_path],
             timeout=30,
             raise_on_failure=False,
@@ -723,7 +716,6 @@ def _CreateClaim(namespace: str, template: str, claim_name: str) -> float:
             f"Failed to create claim {claim_name}: {stderr.strip()}"
         )
     return t_create
-
 
 def _WaitClaimBound(namespace: str, claim_name: str, timeout_s: float) -> float | None:
     """Wait for a SandboxClaim to reach Bound phase. Returns timestamp or None."""
@@ -746,7 +738,6 @@ def _WaitClaimBound(namespace: str, claim_name: str, timeout_s: float) -> float 
             return time.time()
         time.sleep(0.1)
     return None
-
 
 def _DeleteBenchmarkClaims(namespace: str) -> int:
     """Delete SandboxClaims labelled created-by=pkb-qps-benchmark."""
@@ -809,11 +800,9 @@ def _DeleteBenchmarkClaims(namespace: str) -> int:
     logging.info("Claims cleaned up in %.1fs", time.monotonic() - t0)
     return count
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
 
 def _percentile(sorted_values: list[float], pct: float) -> float:
     """Calculate percentile (0-100) with linear interpolation."""
@@ -824,18 +813,3 @@ def _percentile(sorted_values: list[float], pct: float) -> float:
     hi = min(lo + 1, len(sorted_values) - 1)
     frac = idx - lo
     return sorted_values[lo] * (1 - frac) + sorted_values[hi] * frac
-
-
-def _emit(samples: list, data: dict, data_key: str, metric_suffix: str, unit: str, namespace: str, extra: dict) -> None:
-    """Emit a sample if the key exists in the data dict."""
-    value = data.get(data_key)
-    if value is not None:
-        samples.append(
-            utils.MakeSample(
-                f"{BENCHMARK_NAME}_{metric_suffix}",
-                value,
-                unit,
-                namespace,
-                extra,
-            )
-        )

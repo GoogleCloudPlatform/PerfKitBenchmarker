@@ -1,20 +1,20 @@
-# GKE Agent Sandbox Benchmarks
+# Kubernetes Agent Sandbox Benchmarks
 
-PKB benchmark modules for measuring GKE Agent Sandbox performance under
-gVisor isolation. Each benchmark is an atomic single-point measurement
+PKB benchmark modules for measuring Kubernetes Agent Sandbox performance under
+gVisor isolation. Each benchmark is a standalone PKB benchmark
 designed to be invoked repeatedly by the sweep runner with varying parameters.
 
 ## Benchmarks
 
-| Benchmark | Module | Agent API | Measures |
-|-----------|--------|:---------:|----------|
-| Python Density | `k8s_python_density_benchmark.py` | Yes | CEL, TTFE, RSS, per-type latency (compute/syscall/import) |
-| Payload Transfer | `k8s_payload_benchmark.py` | Yes | Generation, serialization, stdout write, throughput |
-| Chromium Density | `k8s_chromium_density_benchmark.py` | Yes | Navigate, evaluate, click, fill, screenshot latency |
-| QPS Saturation | `k8s_qps_benchmark.py` | Yes/No | TTFE at controlled request rates, warm pool drain detection |
-| Warmpool Scale-Up | `k8s_warmpool_benchmark.py` | No | Provisioning speed, pod lifecycle timestamps |
-| Deletion & Cleanup | `k8s_deletion_benchmark.py` | No | Per-pod deletion latency, IP reclamation timing |
-| Pod Snapshot | `k8s_snapshot_benchmark.py` | No | Snapshot/restore latency, TTFE, correctness verification |
+| Benchmark | Module | Measures |
+|-----------|--------|----------|
+| Python Density | `k8s_python_density_benchmark.py` | CEL, TTFE, RSS, per-type latency (compute/syscall/import) |
+| Payload Transfer | `k8s_payload_benchmark.py` | Generation, serialization, stdout write, throughput |
+| Chromium Density | `k8s_chromium_density_benchmark.py` | Navigate, evaluate, click, fill, screenshot latency |
+| QPS Saturation | `k8s_qps_benchmark.py` | TTFE at controlled request rates, warm pool drain detection |
+| Warmpool Scale-Up | `k8s_warmpool_benchmark.py` | Provisioning speed, pod lifecycle timestamps |
+| Deletion & Cleanup | `k8s_deletion_benchmark.py` | Per-pod deletion latency, IP reclamation timing |
+| Pod Snapshot | `k8s_snapshot_benchmark.py` | Snapshot/restore latency, TTFE, correctness verification |
 
 ## Shared Utilities
 

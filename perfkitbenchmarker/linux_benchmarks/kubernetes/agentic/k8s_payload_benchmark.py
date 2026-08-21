@@ -76,7 +76,6 @@ Samples emitted (per run):
 
 from __future__ import annotations
 
-
 import logging
 import time
 import uuid
@@ -142,11 +141,9 @@ flags.DEFINE_bool(
     "Patch SandboxWarmPool replicas to match concurrent_sessions before measurement.",
 )
 
-
 # ---------------------------------------------------------------------------
 # Lifecycle
 # ---------------------------------------------------------------------------
-
 
 def GetConfig(user_config: dict) -> dict:
     """Load and return benchmark config.
@@ -154,7 +151,6 @@ def GetConfig(user_config: dict) -> dict:
     No vm_groups — PKB skips Provision() and Teardown().
     """
     return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-
 
 def Prepare(benchmark_spec: object) -> None:
     """Deploy workloads and verify agent API."""
@@ -164,7 +160,6 @@ def Prepare(benchmark_spec: object) -> None:
     utils.CheckAgentHealthz(required=False)
     utils.EnsurePortForward()
     logging.info("Prepare complete.")
-
 
 def Run(benchmark_spec: object) -> list[sample.Sample]:
     """Execute a single payload transfer measurement and return samples.
@@ -213,7 +208,7 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
 
     successful = result.get("successful_sessions", 0)
     failed = result.get("failed_sessions", 0)
-    agg = result.get("aggregate", {})
+    agg = result.get("aggregate") or {}
 
     logging.info(
         "API response: %d successful, %d failed sessions (%.1fs)",
@@ -225,6 +220,8 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     # Build samples
     run_id = str(uuid.uuid4())[:8]
 
+    # Dictionary of extra metadata key-value pairs appended to every sample.
+    # Used for downstream dashboard filtering and correlating runs.
     extra = {
         "run_id": run_id,
         "payload_size_mb": payload_size_mb,
@@ -238,63 +235,14 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     samples = []
 
     # Orchestrator-side transfer latency
-    _emit(
-        samples,
-        agg,
-        "orchestrator_transfer_mean_ms",
-        "orchestrator_transfer_mean",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "orchestrator_transfer_p50_ms",
-        "orchestrator_transfer_p50",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "orchestrator_transfer_p95_ms",
-        "orchestrator_transfer_p95",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "orchestrator_transfer_p99_ms",
-        "orchestrator_transfer_p99",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "orchestrator_transfer_min_ms",
-        "orchestrator_transfer_min",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "orchestrator_transfer_max_ms",
-        "orchestrator_transfer_max",
-        "ms",
-        ns,
-        extra,
-    )
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, agg, "orchestrator_transfer", ["mean", "p50", "p95", "p99", "min", "max"], "ms", ns, extra)
+
+    
+
 
     # Payload metadata
-    _emit(
+    utils.EmitSampleIfPresent(
+        BENCHMARK_NAME,
         samples,
         agg,
         "sandbox_payload_size_bytes",
@@ -303,7 +251,8 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
         ns,
         extra,
     )
-    _emit(
+    utils.EmitSampleIfPresent(
+        BENCHMARK_NAME,
         samples,
         agg,
         "sandbox_payload_encoded_size_bytes",
@@ -312,7 +261,8 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
         ns,
         extra,
     )
-    _emit(
+    utils.EmitSampleIfPresent(
+        BENCHMARK_NAME,
         samples,
         agg,
         "sandbox_payload_iterations",
@@ -323,262 +273,37 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     )
 
     # Generation time (os.urandom)
-    _emit(
-        samples,
-        agg,
-        "sandbox_generation_time_mean_ms",
-        "sandbox_generation_time_mean",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_generation_time_p50_ms",
-        "sandbox_generation_time_p50",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_generation_time_p95_ms",
-        "sandbox_generation_time_p95",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_generation_time_p99_ms",
-        "sandbox_generation_time_p99",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_generation_time_min_ms",
-        "sandbox_generation_time_min",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_generation_time_max_ms",
-        "sandbox_generation_time_max",
-        "ms",
-        ns,
-        extra,
-    )
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, agg, "sandbox_generation_time", ["mean", "p50", "p95", "p99", "min", "max"], "ms", ns, extra)
+
+    
+
 
     # Serialization time (base64 encode)
-    _emit(
-        samples,
-        agg,
-        "sandbox_serialization_time_mean_ms",
-        "sandbox_serialization_time_mean",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_serialization_time_p50_ms",
-        "sandbox_serialization_time_p50",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_serialization_time_p95_ms",
-        "sandbox_serialization_time_p95",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_serialization_time_p99_ms",
-        "sandbox_serialization_time_p99",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_serialization_time_min_ms",
-        "sandbox_serialization_time_min",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_serialization_time_max_ms",
-        "sandbox_serialization_time_max",
-        "ms",
-        ns,
-        extra,
-    )
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, agg, "sandbox_serialization_time", ["mean", "p50", "p95", "p99", "min", "max"], "ms", ns, extra)
+
+    
+
 
     # Stdout write time (gVisor Gofer write syscall)
-    _emit(
-        samples,
-        agg,
-        "sandbox_stdout_time_mean_ms",
-        "sandbox_stdout_time_mean",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_stdout_time_p50_ms",
-        "sandbox_stdout_time_p50",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_stdout_time_p95_ms",
-        "sandbox_stdout_time_p95",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_stdout_time_p99_ms",
-        "sandbox_stdout_time_p99",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_stdout_time_min_ms",
-        "sandbox_stdout_time_min",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_stdout_time_max_ms",
-        "sandbox_stdout_time_max",
-        "ms",
-        ns,
-        extra,
-    )
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, agg, "sandbox_stdout_time", ["mean", "p50", "p95", "p99", "min", "max"], "ms", ns, extra)
+
+    
+
 
     # Transfer time (serialization + stdout write — threshold metric)
-    _emit(
-        samples,
-        agg,
-        "sandbox_transfer_time_mean_ms",
-        "sandbox_transfer_time_mean",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_transfer_time_p50_ms",
-        "sandbox_transfer_time_p50",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_transfer_time_p95_ms",
-        "sandbox_transfer_time_p95",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_transfer_time_p99_ms",
-        "sandbox_transfer_time_p99",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_transfer_time_min_ms",
-        "sandbox_transfer_time_min",
-        "ms",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_transfer_time_max_ms",
-        "sandbox_transfer_time_max",
-        "ms",
-        ns,
-        extra,
-    )
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, agg, "sandbox_transfer_time", ["mean", "p50", "p95", "p99", "min", "max"], "ms", ns, extra)
+
+    
+
 
     # Throughput
-    _emit(
-        samples,
-        agg,
-        "sandbox_throughput_mean_mbps",
-        "sandbox_throughput_mean",
-        "MB/s",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_throughput_p50_mbps",
-        "sandbox_throughput_p50",
-        "MB/s",
-        ns,
-        extra,
-    )
-    _emit(
-        samples,
-        agg,
-        "sandbox_throughput_min_mbps",
-        "sandbox_throughput_min",
-        "MB/s",
-        ns,
-        extra,
-    )
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, agg, "sandbox_throughput", ["mean", "p50", "min"], "MB/s", ns, extra)
+
 
     # RSS
-    _emit(samples, agg, "sandbox_rss_start_mb", "sandbox_rss_start", "MB", ns, extra)
-    _emit(samples, agg, "sandbox_rss_end_mb", "sandbox_rss_end", "MB", ns, extra)
-    _emit(samples, agg, "sandbox_rss_growth_mb", "sandbox_rss_growth", "MB", ns, extra)
+    utils.EmitSampleIfPresent(BENCHMARK_NAME, samples, agg, "sandbox_rss_start_mb", "sandbox_rss_start", "MB", ns, extra)
+    utils.EmitSampleIfPresent(BENCHMARK_NAME, samples, agg, "sandbox_rss_end_mb", "sandbox_rss_end", "MB", ns, extra)
+    utils.EmitSampleIfPresent(BENCHMARK_NAME, samples, agg, "sandbox_rss_growth_mb", "sandbox_rss_growth", "MB", ns, extra)
 
     # Wall time
     samples.append(
@@ -600,7 +325,6 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
 
     return samples
 
-
 def Cleanup(benchmark_spec: object) -> None:
     """Clean up after measurement. Scale warm pool to 0."""
     ns = FLAGS.k8s_agentic_namespace
@@ -614,35 +338,3 @@ def Cleanup(benchmark_spec: object) -> None:
 
     utils.StopPortForward()
     logging.info("Cleanup complete (cluster persists).")
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _emit(samples: list, agg: dict, agg_key: str, metric_suffix: str, unit: str, namespace: str, extra: dict) -> None:
-    """Emit a sample if the key exists in the aggregate dict.
-
-    Args:
-        samples: List to append the new sample.Sample to.
-        agg: Aggregate metrics dict returned by the agent API response.
-        agg_key: Key to look up in `agg` (e.g. "orchestrator_cel_mean_ms").
-        metric_suffix: Suffix appended to BENCHMARK_NAME to form the metric
-            name (e.g. "orchestrator_cel_mean").
-        unit: Unit string for the sample (e.g. "ms", "MB", "seconds").
-        namespace: Kubernetes namespace (included in sample metadata).
-        extra: Dict of additional metadata key-value pairs attached to
-            every sample (density, session counts, wall time, etc.).
-    """
-    value = agg.get(agg_key)
-    if value is not None:
-        samples.append(
-            utils.MakeSample(
-                f"{BENCHMARK_NAME}_{metric_suffix}",
-                value,
-                unit,
-                namespace,
-                extra,
-            )
-        )

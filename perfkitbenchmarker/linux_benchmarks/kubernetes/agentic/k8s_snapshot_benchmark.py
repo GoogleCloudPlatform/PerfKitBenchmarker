@@ -47,7 +47,6 @@ Samples emitted (per run):
 
 from __future__ import annotations
 
-
 import json
 import logging
 import os
@@ -61,7 +60,6 @@ from jinja2 import Template
 from absl import flags
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import data
-from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker import sample
 from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import (
     k8s_benchmark_utils as utils,
@@ -123,11 +121,9 @@ flags.DEFINE_string(
     "'script:<path>' to run a custom startup script.",
 )
 
-
 # ---------------------------------------------------------------------------
 # Lifecycle
 # ---------------------------------------------------------------------------
-
 
 def GetConfig(user_config: dict) -> dict:
     """Load and return benchmark config.
@@ -135,7 +131,6 @@ def GetConfig(user_config: dict) -> dict:
     No vm_groups — PKB skips Provision() and Teardown().
     """
     return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-
 
 def Prepare(benchmark_spec: object) -> None:
     """Deploy workloads, snapshot infra, and validate readiness."""
@@ -216,7 +211,6 @@ def Prepare(benchmark_spec: object) -> None:
     utils.EnsurePortForward()
     logging.info("Prepare complete.")
 
-
 def Run(benchmark_spec: object) -> list[sample.Sample]:
     """Execute a single snapshot/restore measurement and return samples.
 
@@ -260,6 +254,8 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     # Build samples
     run_id = str(uuid.uuid4())[:8]
 
+    # Dictionary of extra metadata key-value pairs appended to every sample.
+    # Used for downstream dashboard filtering and correlating runs.
     extra = {
         "run_id": run_id,
         "preload_mb": preload_mb,
@@ -276,22 +272,19 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     samples = []
 
     # Snapshot metrics
-    _emit(samples, step_result, "snapshot_p50_s", "snapshot_p50", "seconds", ns, extra)
-    _emit(samples, step_result, "snapshot_p95_s", "snapshot_p95", "seconds", ns, extra)
-    _emit(samples, step_result, "snapshot_max_s", "snapshot_max", "seconds", ns, extra)
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, step_result, "snapshot", ["p50", "p95", "max"], "seconds", ns, extra)
+
 
     # Restore metrics
-    _emit(samples, step_result, "restore_p50_s", "restore_p50", "seconds", ns, extra)
-    _emit(samples, step_result, "restore_p95_s", "restore_p95", "seconds", ns, extra)
-    _emit(samples, step_result, "restore_max_s", "restore_max", "seconds", ns, extra)
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, step_result, "restore", ["p50", "p95", "max"], "seconds", ns, extra)
+
 
     # TTFE metrics
-    _emit(samples, step_result, "ttfe_p50_s", "ttfe_p50", "seconds", ns, extra)
-    _emit(samples, step_result, "ttfe_p95_s", "ttfe_p95", "seconds", ns, extra)
-    _emit(samples, step_result, "ttfe_max_s", "ttfe_max", "seconds", ns, extra)
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, step_result, "ttfe", ["p50", "p95", "max"], "seconds", ns, extra)
+
 
     # Startup time
-    _emit(samples, step_result, "startup_time_s", "startup_time", "seconds", ns, extra)
+    utils.EmitSampleIfPresent(BENCHMARK_NAME, samples, step_result, "startup_time_s", "startup_time", "seconds", ns, extra)
 
     # Restore correctness
     correct = step_result.get("restore_correct_count")
@@ -324,7 +317,6 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
 
     return samples
 
-
 def Cleanup(benchmark_spec: object) -> None:
     """Clean up any leftover benchmark resources."""
     ns = FLAGS.k8s_agentic_namespace
@@ -352,11 +344,9 @@ def Cleanup(benchmark_spec: object) -> None:
     utils.StopPortForward()
     logging.info("Cleanup complete.")
 
-
 # ---------------------------------------------------------------------------
 # Core snapshot/restore logic
 # ---------------------------------------------------------------------------
-
 
 def _RunSnapshotCycle(
     namespace: str,
@@ -369,6 +359,11 @@ def _RunSnapshotCycle(
     template_path: str,
 ) -> dict:
     """Execute one full snapshot/restore cycle and return a result dict.
+
+    Architecture flow:
+      1. Source Pod: The original pod that boots up and runs the preload script.
+      2. Snapshot: Captures the memory/state of the Source Pod.
+      3. Restore Pod: A new pod created from the Snapshot, resuming execution.
 
     Handles source creation, snapshot, restore, TTFE measurement,
     correctness verification, and cleanup.
@@ -422,23 +417,23 @@ def _RunSnapshotCycle(
         t0_sources = time.monotonic()
         workers = min(burst_size, 50)
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            for sname in source_names:
-                pool.submit(_ApplyClaim, sname, namespace, step_template)
+            for source_name in source_names:
+                pool.submit(_ApplyClaim, source_name, namespace, step_template)
 
         logging.info("Waiting for %d source pod(s) Running + preload", burst_size)
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            source_futs = [
+            source_futures = [
                 pool.submit(
                     _MeasureSingleSource,
-                    sname,
+                    source_name,
                     namespace,
                     t0_sources,
                     pod_timeout,
                     preload_mode,
                 )
-                for sname in source_names
+                for source_name in source_names
             ]
-            source_results = [f.result() for f in source_futs]
+            source_results = [f.result() for f in source_futures]
 
         src_failed = [r for r in source_results if r.get("error")]
         if src_failed:
@@ -468,7 +463,7 @@ def _RunSnapshotCycle(
             logging.info("skip_snapshot mode: measuring cold-start TTFE")
             ttfe_times = []
             burst_results = []
-            for i, sname in enumerate(source_names):
+            for i, source_name in enumerate(source_names):
                 startup = source_results[i]["startup_time_s"]
                 counter = source_results[i]["snapshot_counter"]
                 preload_done = source_results[i].get("preload_complete_time_s")
@@ -476,8 +471,8 @@ def _RunSnapshotCycle(
                 ttfe_times.append(ttfe_s)
                 burst_results.append(
                     {
-                        "pod": sname,
-                        "source_pod": sname,
+                        "pod": source_name,
+                        "source_pod": source_name,
                         "startup_time_s": startup,
                         "snapshot_counter": None,
                         "snapshot_time_s": None,
@@ -504,17 +499,17 @@ def _RunSnapshotCycle(
         logging.info("Triggering %d snapshot(s)", burst_size)
         t0_snap = time.monotonic()
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            snap_futs = [
+            snap_futures = [
                 pool.submit(
                     _TriggerAndWaitSnapshot,
-                    tname,
-                    sname,
+                    trigger_name,
+                    source_name,
                     namespace,
                     t0_snap,
                 )
-                for tname, sname in zip(trigger_names, source_names)
+                for trigger_name, source_name in zip(trigger_names, source_names)
             ]
-            snap_results = [f.result() for f in snap_futs]
+            snap_results = [f.result() for f in snap_futures]
 
         snap_failed = [r for r in snap_results if r.get("error")]
         snap_times = [
@@ -537,28 +532,28 @@ def _RunSnapshotCycle(
         logging.info("Creating %d restore SandboxClaim(s)", burst_size)
         t0_burst = time.monotonic()
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            create_futs = [
-                pool.submit(_ApplyClaim, rname, namespace, step_template)
-                for rname in restore_names
+            create_futures = [
+                pool.submit(_ApplyClaim, restore_name, namespace, step_template)
+                for restore_name in restore_names
             ]
-            for f in create_futs:
+            for f in create_futures:
                 f.result()
 
         # 5. Poll restore pods for Running + TTFE
         logging.info("Measuring restore + TTFE across %d pod(s)", burst_size)
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            measure_futs = [
+            measure_futures = [
                 pool.submit(
                     _MeasureSingleRestore,
-                    rname,
+                    restore_name,
                     namespace,
                     t0_burst,
                     min_counter,
                     pod_timeout,
                 )
-                for rname in restore_names
+                for restore_name in restore_names
             ]
-            burst_results = [f.result() for f in measure_futs]
+            burst_results = [f.result() for f in measure_futures]
 
         # Merge source + snapshot info
         for i in range(burst_size):
@@ -610,11 +605,9 @@ def _RunSnapshotCycle(
 
     return result
 
-
 # ---------------------------------------------------------------------------
 # Kubernetes interaction helpers
 # ---------------------------------------------------------------------------
-
 
 def _ApplyClaim(name: str, namespace: str, template_name: str) -> None:
     """Create a SandboxClaim."""
@@ -638,7 +631,7 @@ def _ApplyClaim(name: str, namespace: str, template_name: str) -> None:
     try:
         with open(tmp_path, "w") as f:
             f.write(manifest)
-        stdout, stderr, retcode = kubectl.RunKubectlCommand(
+        stdout, stderr, retcode = utils.RunKubectl(
             ["apply", "-f", tmp_path],
             timeout=30,
             raise_on_failure=False,
@@ -648,7 +641,6 @@ def _ApplyClaim(name: str, namespace: str, template_name: str) -> None:
             os.unlink(tmp_path)
     if not stdout.strip():
         raise RuntimeError(f"Failed to create SandboxClaim {name}: {stderr}")
-
 
 def _RenderAndApplyTemplate(
     template_path: str,
@@ -690,7 +682,7 @@ def _RenderAndApplyTemplate(
     try:
         with open(tmp_path, "w") as f:
             f.write(rendered)
-        stdout, stderr, retcode = kubectl.RunKubectlCommand(
+        stdout, stderr, retcode = utils.RunKubectl(
             ["apply", "-f", tmp_path],
             timeout=30,
             raise_on_failure=False,
@@ -703,11 +695,9 @@ def _RenderAndApplyTemplate(
         return False
     return True
 
-
 def _get_sandbox_node_selector() -> dict[str, str]:
     """Return the nodeSelector for sandbox pods."""
     return {"pkb_nodepool": "sandbox"}
-
 
 def _get_sandbox_tolerations() -> list[dict[str, str]]:
     """Return tolerations for sandbox pods."""
@@ -720,7 +710,6 @@ def _get_sandbox_tolerations() -> list[dict[str, str]]:
         },
     ]
 
-
 def _RenderAndApplyScriptTemplate(
     template_name: str,
     namespace: str,
@@ -728,7 +717,12 @@ def _RenderAndApplyScriptTemplate(
     preload_mb: int,
     preload_mode: str,
 ) -> bool:
-    """Render a SandboxTemplate that runs a user-provided startup script."""
+    """Render a SandboxTemplate that runs a user-provided startup script.
+    
+    Args:
+        preload_mode: String schema must be 'script:<absolute_path_to_script>'.
+                      e.g., 'script:/tmp/startup.sh'.
+    """
     script_path = preload_mode.split(":", 1)[1]
     if not os.path.isfile(script_path):
         logging.error("Script not found: %s", script_path)
@@ -803,7 +797,7 @@ def _RenderAndApplyScriptTemplate(
     try:
         with open(tmp_path, "w") as f:
             f.write(manifest)
-        stdout, stderr, retcode = kubectl.RunKubectlCommand(
+        stdout, stderr, retcode = utils.RunKubectl(
             ["apply", "-f", tmp_path],
             timeout=30,
             raise_on_failure=False,
@@ -814,7 +808,6 @@ def _RenderAndApplyScriptTemplate(
     if retcode != 0:
         logging.warning("kubectl apply stderr: %s", stderr)
     return retcode == 0
-
 
 def _MeasureSingleSource(name: str, namespace: str, t0: float, pod_timeout: int, preload_mode: str) -> dict:
     """Wait for a source pod to be Running and preloaded."""
@@ -854,7 +847,6 @@ def _MeasureSingleSource(name: str, namespace: str, t0: float, pod_timeout: int,
     result["snapshot_counter"] = _GetLastCounter(name, namespace)
     return result
 
-
 def _WaitForPreload(name: str, namespace: str, timeout_s: float, preload_mode: str) -> bool:
     """Wait for preload to complete."""
     deadline = time.monotonic() + timeout_s
@@ -871,7 +863,6 @@ def _WaitForPreload(name: str, namespace: str, timeout_s: float, preload_mode: s
         time.sleep(2)
     return False
 
-
 def _GetLastCounter(name: str, namespace: str) -> int | None:
     """Extract the last Count: N value from pod logs."""
     stdout, _, rc = utils.RunKubectl(
@@ -883,7 +874,6 @@ def _GetLastCounter(name: str, namespace: str) -> int | None:
         return None
     matches = re.findall(r"Count:\s*(\d+)", stdout)
     return int(matches[-1]) if matches else None
-
 
 def _TriggerAndWaitSnapshot(trigger_name: str, target_pod: str, namespace: str, t0: float, timeout_s: int = 300) -> dict:
     """Create a snapshot trigger and wait for Complete."""
@@ -909,7 +899,7 @@ def _TriggerAndWaitSnapshot(trigger_name: str, target_pod: str, namespace: str, 
     try:
         with open(tmp_path, "w") as f:
             f.write(manifest)
-        stdout, stderr, retcode = kubectl.RunKubectlCommand(
+        stdout, stderr, retcode = utils.RunKubectl(
             ["apply", "-f", tmp_path],
             timeout=30,
             raise_on_failure=False,
@@ -942,7 +932,6 @@ def _TriggerAndWaitSnapshot(trigger_name: str, target_pod: str, namespace: str, 
         time.sleep(2)
     result["error"] = f"Snapshot {trigger_name} did not complete within {timeout_s}s"
     return result
-
 
 def _MeasureSingleRestore(name: str, namespace: str, t0: float, snapshot_counter: int | None, pod_timeout: int) -> dict:
     """Measure restore_time and TTFE for a single pod."""
@@ -995,7 +984,6 @@ def _MeasureSingleRestore(name: str, namespace: str, t0: float, snapshot_counter
     result["error"] = f"Pod {name}: no Count output within timeout"
     return result
 
-
 def _CleanupStep(source_names: list[str], restore_names: list[str], trigger_names: list[str], template_name: str, namespace: str) -> None:
     """Delete source claims, restore claims, triggers, snapshots, and template."""
     to_delete = [("sandboxtemplate", template_name)]
@@ -1026,11 +1014,9 @@ def _CleanupStep(source_names: list[str], restore_names: list[str], trigger_name
         raise_on_failure=False,
     )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
 
 def _GetTemplatePath() -> str:
     """Return the absolute path to the snapshot SandboxTemplate template."""
@@ -1038,7 +1024,6 @@ def _GetTemplatePath() -> str:
         data.ResourcePath("k8s_agents/manifests"),
         "snapshot-sandbox-template.yaml.j2",
     )
-
 
 def _Percentile(values: list[float], pct: float) -> float:
     """Calculate percentile (0-100) from a list of values."""
@@ -1050,18 +1035,3 @@ def _Percentile(values: list[float], pct: float) -> float:
     hi = min(lo + 1, len(s) - 1)
     frac = idx - lo
     return s[lo] * (1 - frac) + s[hi] * frac
-
-
-def _emit(samples: list, data: dict, data_key: str, metric_suffix: str, unit: str, namespace: str, extra: dict) -> None:
-    """Emit a sample if the key exists in the data dict."""
-    value = data.get(data_key)
-    if value is not None:
-        samples.append(
-            utils.MakeSample(
-                f"{BENCHMARK_NAME}_{metric_suffix}",
-                value,
-                unit,
-                namespace,
-                extra,
-            )
-        )

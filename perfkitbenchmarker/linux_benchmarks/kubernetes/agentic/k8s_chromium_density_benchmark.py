@@ -53,7 +53,6 @@ Samples emitted (per run):
 
 from __future__ import annotations
 
-
 import logging
 import time
 import uuid
@@ -125,11 +124,9 @@ flags.DEFINE_integer(
     "Max seconds to wait for warm pool pods to reach Running.",
 )
 
-
 # ---------------------------------------------------------------------------
 # Lifecycle
 # ---------------------------------------------------------------------------
-
 
 def GetConfig(user_config: dict) -> dict:
     """Load and return benchmark config.
@@ -137,7 +134,6 @@ def GetConfig(user_config: dict) -> dict:
     No vm_groups — PKB skips Provision() and Teardown().
     """
     return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
-
 
 def Prepare(benchmark_spec: object) -> None:
     """Deploy workloads and verify agent API."""
@@ -147,7 +143,6 @@ def Prepare(benchmark_spec: object) -> None:
     utils.CheckAgentHealthz(required=False)
     utils.EnsurePortForward()
     logging.info("Prepare complete.")
-
 
 def Run(benchmark_spec: object) -> list[sample.Sample]:
     """Execute a single Chromium density measurement and return samples.
@@ -189,7 +184,7 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
 
     successful = result.get("successful_sessions", 0)
     failed = result.get("failed_sessions", 0)
-    agg = result.get("aggregate", {})
+    agg = result.get("aggregate") or {}
 
     logging.info(
         "API response: %d successful, %d failed sessions (%.1fs)",
@@ -201,6 +196,8 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     # Build samples
     run_id = str(uuid.uuid4())[:8]
 
+    # Dictionary of extra metadata key-value pairs appended to every sample.
+    # Used for downstream dashboard filtering and correlating runs.
     extra = {
         "run_id": run_id,
         "density": density,
@@ -214,23 +211,22 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     samples = []
 
     # Per-task-type latency: mean and P95 for each
-    _emit(samples, agg, "interaction_mean_ms", "interaction_mean", "ms", ns, extra)
-    _emit(samples, agg, "interaction_p95_ms", "interaction_p95", "ms", ns, extra)
-    _emit(samples, agg, "navigate_mean_ms", "navigate_mean", "ms", ns, extra)
-    _emit(samples, agg, "navigate_p95_ms", "navigate_p95", "ms", ns, extra)
-    _emit(samples, agg, "evaluate_mean_ms", "evaluate_mean", "ms", ns, extra)
-    _emit(samples, agg, "evaluate_p95_ms", "evaluate_p95", "ms", ns, extra)
-    _emit(samples, agg, "fill_mean_ms", "fill_mean", "ms", ns, extra)
-    _emit(samples, agg, "fill_p95_ms", "fill_p95", "ms", ns, extra)
-    _emit(samples, agg, "click_mean_ms", "click_mean", "ms", ns, extra)
-    _emit(samples, agg, "click_p95_ms", "click_p95", "ms", ns, extra)
-    _emit(samples, agg, "screenshot_mean_ms", "screenshot_mean", "ms", ns, extra)
-    _emit(samples, agg, "screenshot_p95_ms", "screenshot_p95", "ms", ns, extra)
-    _emit(samples, agg, "cold_start_mean_ms", "cold_start_mean", "ms", ns, extra)
-    _emit(samples, agg, "cold_start_p95_ms", "cold_start_p95", "ms", ns, extra)
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, agg, "interaction", ["mean", "p95"], "ms", ns, extra)
+    
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, agg, "navigate", ["mean", "p95"], "ms", ns, extra)
+    
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, agg, "evaluate", ["mean", "p95"], "ms", ns, extra)
+    
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, agg, "fill", ["mean", "p95"], "ms", ns, extra)
+    
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, agg, "click", ["mean", "p95"], "ms", ns, extra)
+    
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, agg, "screenshot", ["mean", "p95"], "ms", ns, extra)
+    
+    utils.EmitPercentileStats(BENCHMARK_NAME, samples, agg, "cold_start", ["mean", "p95"], "ms", ns, extra)
 
     # RSS memory
-    _emit(samples, agg, "rss_end_mb", "rss_end", "MB", ns, extra)
+    utils.EmitSampleIfPresent(BENCHMARK_NAME, samples, agg, "rss_end_mb", "rss_end", "MB", ns, extra)
 
     # Session counts (always emitted, even on total failure)
     samples.append(
@@ -270,7 +266,6 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
 
     return samples
 
-
 def Cleanup(benchmark_spec: object) -> None:
     """Clean up after measurement. Delete claims and drain warm pool."""
     ns = FLAGS.k8s_agentic_namespace
@@ -281,7 +276,8 @@ def Cleanup(benchmark_spec: object) -> None:
         [
             "delete",
             "sandboxclaims",
-            "--all",
+            "-l",
+            _WARMPOOL_LABEL,
             "-n",
             ns,
             "--ignore-not-found=true",
@@ -300,34 +296,3 @@ def Cleanup(benchmark_spec: object) -> None:
     utils.StopPortForward()
     logging.info("Cleanup complete (cluster persists).")
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _emit(samples: list, agg: dict, agg_key: str, metric_suffix: str, unit: str, namespace: str, extra: dict) -> None:
-    """Emit a sample if the key exists in the aggregate dict.
-
-    Args:
-        samples: List to append the new sample.Sample to.
-        agg: Aggregate metrics dict returned by the agent API response.
-        agg_key: Key to look up in `agg` (e.g. "orchestrator_cel_mean_ms").
-        metric_suffix: Suffix appended to BENCHMARK_NAME to form the metric
-            name (e.g. "orchestrator_cel_mean").
-        unit: Unit string for the sample (e.g. "ms", "MB", "seconds").
-        namespace: Kubernetes namespace (included in sample metadata).
-        extra: Dict of additional metadata key-value pairs attached to
-            every sample (density, session counts, wall time, etc.).
-    """
-    value = agg.get(agg_key)
-    if value is not None:
-        samples.append(
-            utils.MakeSample(
-                f"{BENCHMARK_NAME}_{metric_suffix}",
-                value,
-                unit,
-                namespace,
-                extra,
-            )
-        )

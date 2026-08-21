@@ -1,6 +1,6 @@
-# GKE Agentic Benchmark Scripts
+# Kubernetes Agentic Benchmark Scripts
 
-Standalone scripts for managing the GKE Agent Sandbox benchmarking lifecycle.
+Standalone scripts for managing the Kubernetes Agent Sandbox benchmarking lifecycle.
 These scripts run outside of PKB and interact with GCP APIs directly.
 
 ## Scripts
