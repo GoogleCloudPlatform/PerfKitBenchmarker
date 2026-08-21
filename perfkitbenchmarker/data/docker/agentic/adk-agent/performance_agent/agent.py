@@ -12,7 +12,7 @@ EXECUTION CONTEXT:
         -> CallAgentApi("/benchmark/...")   -> main.py (FastAPI)
                                               -> Runner(agent=root_agent)
                                                 -> MockLlm yields code
-                                                -> BenchmarkGkeCodeExecutor._execute_in_sandbox()
+                                                -> BenchmarkExecutor._execute_in_sandbox()
                                                   -> SandboxClient.create_sandbox()
                                                   -> sandbox.files.write("script.py", code)
                                                   -> sandbox.commands.run("python3 script.py")
@@ -184,7 +184,7 @@ def _sandbox_io_workers() -> int:
 _SANDBOX_POOL = ThreadPoolExecutor(max_workers=_sandbox_io_workers())
 
 
-class BenchmarkGkeCodeExecutor(GkeCodeExecutor):
+class BenchmarkExecutor(GkeCodeExecutor):
     def _execute_in_sandbox(self, code: str) -> CodeExecutionResult:
         """Executes code in a sandbox with benchmark instrumentation."""
         logging.info("Executing in benchmark-instrumented sandbox.")
@@ -266,7 +266,7 @@ class BenchmarkGkeCodeExecutor(GkeCodeExecutor):
             logging.info("SANDBOX_TIMINGS_DELETE: delete_ms=%.3f", delete_ms)
 
 
-gke_executor = BenchmarkGkeCodeExecutor(
+kubernetes_executor = BenchmarkExecutor(
     cluster_name=os.getenv("CLUSTER_NAME"),
     location=os.getenv("GOOGLE_CLOUD_LOCATION"),
     namespace=os.getenv("AGENTIC_NAMESPACE"),
@@ -277,7 +277,7 @@ gke_executor = BenchmarkGkeCodeExecutor(
 performance_agent = LlmAgent(
     name="performance_agent",  # Must be a valid identifier (no dashes)
     model=MockLlm(model="mock-model"),
-    code_executor=gke_executor,
+    code_executor=kubernetes_executor,
 )
 
 root_agent = performance_agent
