@@ -23,10 +23,10 @@ k8s_agents/
 |   |-- snapshot-crds.yaml.j2          # PodSnapshot StorageConfig + Policy
 |   +-- snapshot-sandbox-template.yaml.j2  # Snapshot-specific SandboxTemplate
 +-- workloads/                       # Benchmark workload scripts
-    +-- vibe_coding/                    # Startup scripts for snapshot benchmarks
+    +-- startup_scripts/                 # Startup scripts for snapshot benchmarks
         |-- README.md
-        |-- startup_pip_fastapi.sh
-        +-- startup_npm_vite.sh
+        |-- pip_fastapi.sh
+        +-- npm_vite.sh
 ```
 
 ## Manifests
@@ -42,3 +42,7 @@ Each variant YAML contains all 7 benchmark keys with cluster and
 node pool specifications. See `variants/variant_reference_guide.md`
 for detailed descriptions of what each variant tests and its expected
 impact on each benchmark.
+
+## Startup Scripts
+
+The `workloads/startup_scripts/` directory contains pluggable bash scripts used exclusively by the Pod Snapshot benchmark. They simulate an AI agent initializing a fresh environment (installing dependencies, starting servers) before a snapshot is taken. Users select which script to run via the `--k8s_snapshot_preload_mode` flag to test different memory and I/O footprints (e.g., lightweight Python vs. heavyweight Node.js).

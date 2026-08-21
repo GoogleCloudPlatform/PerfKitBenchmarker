@@ -1,5 +1,5 @@
 #!/bin/bash
-# Vibe Coding Startup Script — npm + Vite dev server
+# Agent Startup Script — npm + Vite dev server
 #
 # Simulates a typical agentic sandbox "vibe coding" cold-start:
 #   1. Install Node.js dependencies (bun/npm)
@@ -13,14 +13,14 @@
 # Usage (cold-start only):
 #   python sweeps/snapshot_saturation_search.py \
 #     --skip_snapshot \
-#     --preload_mode=script:workloads/vibe_coding/startup_npm_vite.sh \
+#     --preload_mode=script:workloads/startup_scripts/npm_vite.sh \
 #     --burst_size=3 \
 #     --search_mode=binary --search_min=10 --search_max=30 \
 #     --ttfe_threshold_s=120
 #
 # Usage (with snapshot/restore):
 #   python sweeps/snapshot_saturation_search.py \
-#     --preload_mode=script:workloads/vibe_coding/startup_npm_vite.sh \
+#     --preload_mode=script:workloads/startup_scripts/npm_vite.sh \
 #     --burst_size=3 \
 #     --search_mode=binary --search_min=10 --search_max=30 \
 #     --ttfe_threshold_s=120 --restore_threshold_s=10
@@ -31,10 +31,10 @@
 
 set -e
 
-echo "[vibe-coding] Installing Node.js..."
+echo "[agent-startup] Installing Node.js..."
 apt-get update -qq && apt-get install -y -qq nodejs npm > /dev/null 2>&1
 
-echo "[vibe-coding] Creating project scaffold..."
+echo "[agent-startup] Creating project scaffold..."
 mkdir -p /tmp/vibe-project && cd /tmp/vibe-project
 
 # Create a minimal package.json with Vite
@@ -59,26 +59,26 @@ cat > index.html << 'EOF'
 </html>
 EOF
 
-echo "[vibe-coding] Installing npm dependencies..."
+echo "[agent-startup] Installing npm dependencies..."
 npm install --prefer-offline 2>&1 | tail -5
 
-echo "[vibe-coding] Starting Vite dev server..."
+echo "[agent-startup] Starting Vite dev server..."
 npx vite --host 0.0.0.0 --port 5173 &
 VITE_PID=$!
 
-echo "[vibe-coding] Waiting for server to be ready..."
+echo "[agent-startup] Waiting for server to be ready..."
 MAX_WAIT=60
 ELAPSED=0
 while ! curl -s http://localhost:5173 > /dev/null 2>&1; do
     sleep 1
     ELAPSED=$((ELAPSED + 1))
     if [ $ELAPSED -ge $MAX_WAIT ]; then
-        echo "[vibe-coding] ERROR: Server did not start within ${MAX_WAIT}s"
+        echo "[agent-startup] ERROR: Server did not start within ${MAX_WAIT}s"
         exit 1
     fi
 done
 
-echo "[vibe-coding] First page served successfully (${ELAPSED}s)"
+echo "[agent-startup] First page served successfully (${ELAPSED}s)"
 
 # Kill the vite server — we only needed to measure startup time
 kill $VITE_PID 2>/dev/null || true
