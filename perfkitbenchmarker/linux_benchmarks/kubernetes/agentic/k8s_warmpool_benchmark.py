@@ -247,6 +247,8 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     # 5. Build samples
     run_id = str(uuid.uuid4())[:8]
 
+    # Dictionary of extra metadata key-value pairs appended to every sample.
+    # Used for downstream dashboard filtering and correlating runs.
     extra = {
         "run_id": run_id,
         "target_replicas": target,
@@ -423,7 +425,13 @@ def _ScrapeLifecycle(namespace: str, label: str, scale_start_epoch: float) -> di
 
 
 def _EmitLifecycleSamples(samples: list, lifecycle: dict, namespace: str, extra: dict) -> None:
-    """Emit pod lifecycle percentile samples for all three phases."""
+    """Emit pod lifecycle percentile samples for all three phases.
+    
+    Unlike the generic EmitPercentileStats utility which parses flat API
+    responses, this is a specialized helper that parses the nested dictionary 
+    structure returned by _ScrapeLifecycle() containing P50/P95/Max metrics 
+    for pod creation, scheduling, and running phases.
+    """
     _PHASE_MAP = [
         ("time_to_created_s", "time_to_created"),
         ("time_to_scheduled_s", "time_to_scheduled"),

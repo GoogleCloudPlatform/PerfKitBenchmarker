@@ -165,7 +165,7 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
 
     # Drain to 0 for clean measurement (moved from Prepare for sweep compatibility)
     utils.DrainWarmPool(ns, warmpool_name, label, timeout=int(drain_timeout))
-    time.sleep(2)
+    time.sleep(2)  # Brief buffer to let K8s API cache settle after drain
 
     t_wall_start = time.monotonic()
 
@@ -174,14 +174,14 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     provision_start = time.monotonic()
     _PatchReplicas(ns, warmpool_name, batch_size)
 
-    deadline = time.time() + provision_timeout
-    while time.time() < deadline:
+    deadline = time.monotonic() + provision_timeout
+    while time.monotonic() < deadline:
         running = utils.CountPods(ns, label, phase="Running")
         pct = (running / batch_size * 100) if batch_size > 0 else 0
         logging.info("Provisioning... %d/%d (%.0f%%)", running, batch_size, pct)
         if running >= batch_size:
             break
-        time.sleep(3)
+        time.sleep(poll_interval)
 
     provision_time = time.monotonic() - provision_start
     final_running = utils.CountPods(ns, label, phase="Running")
@@ -260,17 +260,20 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     total_drain_time = time.monotonic() - t_delete
 
     # Pods we never saw disappear (stuck) get the full drain time
+    stuck_pods_count = 0
     for pn in pod_names_before:
         if pn not in pod_gone_times:
             pod_gone_times[pn] = total_drain_time
+            stuck_pods_count += 1
 
     # 5. Compute per-pod deletion latencies
     deletion_latencies = sorted(pod_gone_times.values())
     n = len(deletion_latencies)
 
     ip_after = _CountAllocatedIPs(ns, label)
+    actual_deleted = len(pod_names_before) - stuck_pods_count
     deletion_rate = (
-        (len(pod_names_before) / total_drain_time) if total_drain_time > 0 else 0
+        (actual_deleted / total_drain_time) if total_drain_time > 0 else 0
     )
 
     logging.info(
@@ -286,6 +289,8 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     # 6. Build samples
     run_id = str(uuid.uuid4())[:8]
 
+    # Dictionary of extra metadata key-value pairs appended to every sample.
+    # Used for downstream dashboard filtering and correlating runs.
     extra = {
         "run_id": run_id,
         "batch_size": batch_size,
@@ -354,6 +359,15 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
             )
         )
 
+    samples.append(
+        utils.MakeSample(
+            f"{BENCHMARK_NAME}_stuck_pods_count",
+            float(stuck_pods_count),
+            "count",
+            ns,
+            extra,
+        )
+    )
     samples.append(
         utils.MakeSample(
             f"{BENCHMARK_NAME}_rate",
