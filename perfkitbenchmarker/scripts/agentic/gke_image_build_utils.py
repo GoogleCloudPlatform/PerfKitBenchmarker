@@ -341,7 +341,6 @@ def _RunCmd(cmd: list[str], cwd: str | None = None) -> str:
     """Run a shell command, raising on failure."""
     logger.info("  CMD: %s", " ".join(cmd))
     env = os.environ.copy()
-    env["CLOUDSDK_AUTH_DISABLE_SSL_VALIDATION"] = "true"
     proc = subprocess.run(
         cmd,
         capture_output=True,

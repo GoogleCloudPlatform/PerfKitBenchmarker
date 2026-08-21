@@ -17,7 +17,7 @@ from absl import flags
 from jinja2 import Template
 from perfkitbenchmarker import data
 from perfkitbenchmarker import vm_util
-from perfkitbenchmarker.resources.container_service import kubectl
+from perfkitbenchmarker.linux_benchmarks.kubernetes.agentic import k8s_benchmark_utils as utils
 from perfkitbenchmarker.scripts.agentic import gke_image_build_utils
 import re
 
@@ -107,9 +107,7 @@ def _RenderAndApply(template_name: str, **kwargs: object) -> bool:
     rendered = template.render(**kwargs)
 
     # Write rendered YAML to tmp dir (RunKubectlCommand does not support stdin)
-    tmp_dir = os.path.join(
-        data.ResourcePath(_MANIFESTS_DIR), "tmp"
-    )
+    tmp_dir = os.path.join(vm_util.GetTempDir(), "manifests_tmp")
     os.makedirs(tmp_dir, exist_ok=True)
 
     # Strip .j2 extension for the rendered file
@@ -118,7 +116,7 @@ def _RenderAndApply(template_name: str, **kwargs: object) -> bool:
     with open(rendered_path, "w") as f:
         f.write(rendered)
 
-    stdout, stderr, retcode = kubectl.RunKubectlCommand(
+    stdout, stderr, retcode = utils.RunKubectl(
         ["apply", "-f", rendered_path],
         raise_on_failure=False,
     )
@@ -344,7 +342,7 @@ def DeploySnapshots(benchmark_spec: object | None = None) -> None:
         )
 
     # 3. Create KSA (skip if exists)
-    stdout, _, _ = kubectl.RunKubectlCommand(
+    stdout, _, _ = utils.RunKubectl(
         ["get", "serviceaccount", ksa_name, "--namespace", ns],
         raise_on_failure=False,
     )
@@ -352,7 +350,7 @@ def DeploySnapshots(benchmark_spec: object | None = None) -> None:
         logging.info("ServiceAccount %s already exists in %s.", ksa_name, ns)
     else:
         logging.info("Creating ServiceAccount %s in %s...", ksa_name, ns)
-        kubectl.RunKubectlCommand(
+        utils.RunKubectl(
             ["create", "serviceaccount", ksa_name, "--namespace", ns],
             raise_on_failure=True,
         )
@@ -380,7 +378,7 @@ def DeploySnapshots(benchmark_spec: object | None = None) -> None:
 
 def _CreateNamespace(ns: str) -> None:
     """Create namespace if it doesn't exist."""
-    kubectl.RunKubectlCommand(
+    utils.RunKubectl(
         ["create", "namespace", ns],
         raise_on_failure=False,
     )
@@ -394,7 +392,7 @@ def _InstallCRDs() -> None:
         "/releases/download/{}".format(version)
     )
     logging.info("Installing Agent Sandbox CRDs (%s)", version)
-    kubectl.RunKubectlCommand(
+    utils.RunKubectl(
         [
             "apply",
             "-f", "{}/manifest.yaml".format(base_url),
@@ -494,7 +492,7 @@ def _WaitForAgentReady(ns: str) -> None:
     """
     timeout = FLAGS.k8s_agentic_deploy_timeout
     logging.info("Waiting for adk-agent rollout (timeout=%ds)...", timeout)
-    _, stderr, retcode = kubectl.RunKubectlCommand(
+    _, stderr, retcode = utils.RunKubectl(
         [
             "rollout", "status", "deployment/adk-agent",
             "-n", ns,

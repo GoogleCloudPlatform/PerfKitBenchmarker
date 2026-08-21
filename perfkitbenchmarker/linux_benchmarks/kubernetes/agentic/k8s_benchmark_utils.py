@@ -14,6 +14,10 @@ import subprocess
 import time
 import urllib.request
 import urllib.error
+import atexit
+import os as _os
+import signal
+import threading
 
 from absl import flags
 from perfkitbenchmarker import sample
@@ -46,7 +50,7 @@ flags.DEFINE_bool(
 flags.DEFINE_string(
     "k8s_agentic_benchmark_note",
     "",
-    "Arbitrary note string attached to every sample for tagging runs.",
+    "Arbitrary note string attached to every sample for tagging runs (e.g., 'nightly_run_v2'). Useful for filtering in downstream dashboards.",
 )
 
 flags.DEFINE_string(
@@ -63,7 +67,7 @@ flags.DEFINE_integer(
 
 
 # ---------------------------------------------------------------------------
-# Agent API helpers
+# Agent API helpers (Interacts with the Agent's custom FastAPI service)
 # ---------------------------------------------------------------------------
 
 
@@ -220,7 +224,7 @@ def set_benchmark_spec(benchmark_spec: object) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Sample construction
+# PKB Sample Construction
 # ---------------------------------------------------------------------------
 
 
@@ -253,7 +257,10 @@ def BuildMetadata(namespace: str, extra: dict | None = None) -> dict[str, object
 
 
 def MakeSample(metric: str, value: float, unit: str, namespace: str, extra_metadata: dict | None = None) -> sample.Sample:
-    """Create a single sample.Sample with standard metadata and auto-appended units."""
+    """Create a perfkitbenchmarker.sample.Sample object.
+    
+    This is PKB's standard data structure for emitting telemetry.
+    """
     unit_suffixes = {
         "seconds": "_s", "ms": "_ms", "MB": "_mb", "bytes": "_bytes",
         "MB/s": "_mbps", "pods/sec": "_pods_per_sec", "requests/sec": "_qps",
@@ -316,13 +323,11 @@ flags.DEFINE_float(
 # Port-forward manager
 # ---------------------------------------------------------------------------
 
-import atexit
-import os as _os
-import signal
-import threading
 
 
-_PID_FILE = "/tmp/pkb_portforward.pid"
+def _get_pid_file() -> str:
+    port = FLAGS.k8s_agentic_portforward_local_port
+    return f"/tmp/pkb_portforward_{port}.pid"
 
 
 class _PortForwardManager:
@@ -433,7 +438,7 @@ class _PortForwardManager:
     def _write_pid_file(self, pid: int) -> None:
         """Write PID to file for orphan detection."""
         try:
-            with open(_PID_FILE, "w") as f:
+            with open(_get_pid_file(), "w") as f:
                 f.write(str(pid))
         except Exception:
             pass
@@ -441,15 +446,15 @@ class _PortForwardManager:
     def _cleanup_pid_file(self) -> None:
         """Remove PID file."""
         try:
-            _os.unlink(_PID_FILE)
+            _os.unlink(_get_pid_file())
         except OSError:
             pass
 
     def _kill_orphan(self) -> None:
         """Kill a port-forward process left by a previous PKB run."""
         try:
-            if _os.path.exists(_PID_FILE):
-                with open(_PID_FILE, "r") as f:
+            if _os.path.exists(_get_pid_file()):
+                with open(_get_pid_file(), "r") as f:
                     pid = int(f.read().strip())
                 logging.info("Killing orphan port-forward (PID %d)", pid)
                 _os.kill(pid, signal.SIGTERM)
@@ -559,3 +564,36 @@ def ScrapePsi(namespace: str) -> dict:
             psi_metrics[f"psi_{resource}_some_avg60"] = round(sum(avg60_list) / len(avg60_list), 2)
 
     return psi_metrics
+
+
+def EmitSampleIfPresent(benchmark_name: str, samples: list[sample.Sample], data: dict, data_key: str, metric_suffix: str, unit: str, namespace: str, extra_metadata: dict) -> None:
+    """Emit a sample if the key exists in the data dict and is not None.
+
+    Args:
+        benchmark_name: The BENCHMARK_NAME variable.
+        samples: List to append the new sample.Sample to.
+        data: Dictionary containing the raw metrics.
+        data_key: Key to look up in the data dictionary.
+        metric_suffix: Suffix to append to the benchmark name.
+        unit: Unit string for the sample.
+        namespace: Kubernetes namespace (included in sample metadata).
+        extra_metadata: Dict of additional metadata key-value pairs.
+    """
+    value = data.get(data_key)
+    if value is not None:
+        samples.append(MakeSample(f"{benchmark_name}_{metric_suffix}", value, unit, namespace, extra_metadata))
+
+
+def EmitPercentileStats(benchmark_name: str, samples: list[sample.Sample], data: dict, base_key: str, stats: list[str], unit: str, namespace: str, extra_metadata: dict) -> None:
+    """Emits specific percentile samples for a given base metric."""
+    for stat in stats:
+        data_key = f"{base_key}_{stat}"
+        if unit == "ms":
+            data_key += "_ms"
+        elif unit == "MB/s":
+            data_key += "_mbps"
+        elif unit == "seconds":
+            data_key += "_s"
+        
+        metric_suffix = f"{base_key}_{stat}"
+        EmitSampleIfPresent(benchmark_name, samples, data, data_key, metric_suffix, unit, namespace, extra_metadata)
