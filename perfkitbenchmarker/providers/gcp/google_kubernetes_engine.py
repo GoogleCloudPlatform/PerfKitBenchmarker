@@ -119,15 +119,64 @@ class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
         f'--location={self.region}',
     ).Issue()
 
-  def RemoteBuild(self, image: container.ContainerImage):
-    """Builds the image remotely."""
-    if not gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value:
-      full_tag = self.GetFullRegistryTag(image.name)
-    else:
-      full_tag = gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value
-    build_cmd = util.GcloudCommand(
-        self, 'builds', 'submit', '--tag', full_tag, image.directory
+
+  def _WaitForRepository(self, timeout=300, poll_interval=5):
+    """Wait for the AR repository to be queryable.
+
+    After creation, AR repos may not be immediately visible to Cloud
+    Build workers in other zones. Polls until confirmed, preventing
+    push failures during RemoteBuild().
+    """
+    repo_name = self.name
+    location = self.region
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+      describe_cmd = util.GcloudCommand(
+          self, 'artifacts', 'repositories', 'describe', repo_name,
+          '--location', location,
+      )
+      stdout, _, retcode = describe_cmd.Issue(
+          raise_on_failure=False, timeout=15,
+      )
+      if retcode == 0 and stdout.strip():
+        logging.info('AR repo %s confirmed available.', repo_name)
+        return
+      logging.info(
+          'Waiting for AR repo %s to propagate (%ds remaining)...',
+          repo_name, int(deadline - time.time()),
+      )
+      time.sleep(poll_interval)
+    logging.warning(
+        'AR repo %s not confirmed after %ds. Proceeding anyway.',
+        repo_name, timeout,
     )
+
+  def RemoteBuild(self, image: container.ContainerImage):
+    """Builds the image remotely.
+
+    If --container_remote_build_config is set, uses it as the
+    --config argument to `gcloud builds submit` and passes the
+    image tag via --substitutions _IMAGE=<tag>.
+    Otherwise uses the simple --tag shorthand.
+    """
+    full_tag = self.GetFullRegistryTag(image.name)
+    if gcp_flags.SKIP_CONTAINER_IMAGE_BUILD.value:
+      logging.info('Skipping container image build (--skip_container_image_build). '
+                   'Assuming image exists: %s', full_tag)
+      return
+    self._WaitForRepository()
+    if gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value:
+      build_cmd = util.GcloudCommand(
+          self, 'builds', 'submit',
+          '--config', gcp_flags.CONTAINER_REMOTE_BUILD_CONFIG.value,
+          '--substitutions', f'_IMAGE={full_tag}',
+          '--suppress-logs',
+          image.directory,
+      )
+    else:
+      build_cmd = util.GcloudCommand(
+          self, 'builds', 'submit', '--tag', full_tag, '--suppress-logs', image.directory,
+      )
     build_cmd.Issue(timeout=None)
 
 
@@ -558,6 +607,10 @@ class GkeCluster(BaseGkeCluster):
     if self.enable_aam:
       cmd.args.append('--auto-monitoring-scope=ALL')
 
+    # Add arbitrary additional flags (e.g., --enable-pod-snapshots)
+    for additional_flag in gcp_flags.GKE_ADDITIONAL_FLAGS.value:
+      cmd.args.append(additional_flag)
+
     self._RunClusterCreateCommand(cmd)
     self._GetKubeconfig()
     self._CreateCustomComputeClass(self.default_nodepool)
@@ -573,6 +626,11 @@ class GkeCluster(BaseGkeCluster):
           'container', 'node-pools', 'create', name, '--cluster', self.name
       )
       self._AddNodeParamsToCmd(nodepool, cmd)
+
+      # Add arbitrary additional node pool flags (e.g., --max-pods-per-node=250)
+      for additional_flag in gcp_flags.GKE_ADDITIONAL_NODEPOOL_FLAGS.value:
+        cmd.args.append(additional_flag)
+
       self._IssueResourceCreationCommand(cmd)
       self._CreateCustomComputeClass(nodepool)
 
