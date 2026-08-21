@@ -210,23 +210,12 @@ def drain_warmpool(warmpool_name, pod_label, namespace):
         f"kubectl delete sandboxclaims --all -n {namespace} --ignore-not-found=true",
         check=False,
     )
-    for _ in range(100):
-        result = subprocess.run(
-            f"kubectl get pods -n {namespace} -l {pod_label} --no-headers 2>/dev/null | wc -l",
-            shell=True,
-            capture_output=True,
-            text=True,
-        )
-        try:
-            count = int(result.stdout.strip())
-        except ValueError:
-            count = 0
-        if count == 0:
-            logger.info("Warm pool drained (0 pods)")
-            return
-        logger.info("  Draining... %d pods remaining", count)
-        time.sleep(3)
-    logger.warning("Drain timeout: pods may still be terminating")
+    logger.info("Waiting for pods to terminate...")
+    run_cmd(
+        f"kubectl wait --for=delete pod -l {pod_label} -n {namespace} --timeout=300s",
+        check=False,
+    )
+    logger.info("Warm pool drained")
 
 
 def _read_yaml_flags(config_path, benchmark, flag_name, flag_type="list"):
@@ -626,11 +615,13 @@ def do_binary_search(benchmark, variant, args, passthrough_flags=None):
     target_metric = args.threshold_metric
     threshold = args.threshold_value
 
-    if convergence <= 0:
+    if convergence <= 0 and is_float:
         sys.exit(
-            "--search-convergence must be > 0; a value of 0 never terminates "
-            "and each iteration costs a full benchmark run."
+            "--search-convergence must be > 0 for float sweeps; a value of 0 "
+            "never terminates. For integer sweeps, 0 is allowed."
         )
+    elif convergence < 0:
+        sys.exit("--search-convergence must be >= 0.")
     if low >= high:
         sys.exit(f"--search-min ({low}) must be < --search-max ({high}).")
     if args.failure_retries < 0:

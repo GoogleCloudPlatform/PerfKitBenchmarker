@@ -13,6 +13,7 @@ import csv
 import json
 import os
 import sys
+import statistics
 from collections import defaultdict
 from pathlib import Path
 
@@ -252,22 +253,12 @@ def discover_metrics(all_data):
     return sorted(all_metrics)
 
 
-def get_median(values):
-    if not values:
-        return None
-    s = sorted(values)
-    n = len(s)
-    if n % 2 == 1:
-        return s[n // 2]
-    return (s[n // 2 - 1] + s[n // 2]) / 2.0
-
-
 def aggregate_runs(runs, all_metrics):
     aggregated = {}
     for metric in all_metrics:
         vals = [r[metric] for r in runs if metric in r and r[metric] is not None]
         if vals:
-            aggregated[metric] = get_median(vals)
+            aggregated[metric] = statistics.median(vals)
     return aggregated
 
 
