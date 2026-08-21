@@ -1,0 +1,49 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: sched-tuner
+  namespace: {{ ns }}
+spec:
+  selector:
+    matchLabels:
+      app: sched-tuner
+  template:
+    metadata:
+      labels:
+        app: sched-tuner
+    spec:
+      nodeSelector:
+        pkb_nodepool: sandbox
+      tolerations:
+      - key: "sandbox.gke.io/runtime"
+        operator: "Equal"
+        value: "gvisor"
+        effect: "NoSchedule"
+      hostPID: true
+      initContainers:
+      - name: sysctl-tuner
+        image: busybox:1.36
+        command: ["sh", "-c"]
+        args:
+          - |
+            echo 2212926 > /proc/sys/kernel/sched_migration_cost_ns
+            echo 4656091 > /proc/sys/kernel/sched_min_granularity_ns
+            echo 26403982 > /proc/sys/kernel/sched_wakeup_granularity_ns
+            echo "Scheduler tunables applied."
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: proc
+          mountPath: /proc
+      containers:
+      - name: pause
+        image: registry.k8s.io/pause:3.9
+        resources:
+          requests:
+            cpu: "1m"
+            memory: "4Mi"
+      volumes:
+      - name: proc
+        hostPath:
+          path: /proc
