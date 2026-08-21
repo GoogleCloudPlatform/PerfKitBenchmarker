@@ -716,6 +716,8 @@ class BenchmarkSpec:
         )
       logging.debug('NFS service %s', self.nfs_service)
       break
+    if self.nfs_service:
+      self.resources.append(self.nfs_service)
 
   def ConstructLustreService(self):
     """Construct the Lustre service object.

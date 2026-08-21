@@ -76,7 +76,6 @@ class GceNfsService(nfs_service.BaseNfsService):
         args += ['--protocol', 'NFS_V3']
     try:
       self._NfsCommand('create', *args)
-      self._WaitUntilReady()
     except errors.Error as ex:
       # if this NFS service already exists reuse it
       if self._Exists():

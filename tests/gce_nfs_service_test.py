@@ -132,10 +132,9 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreate(self):
     nfs = self._NfsService()
-    self._SetResponses(_CREATE_RES, _DescribeResult())
+    self._SetResponses(_CREATE_RES)
     nfs._Create()
-    describe_cmd = ['describe', _NFS_NAME]
-    self.assertMultipleCommands(_CreateCmd(), describe_cmd)
+    self.assertCommandCalled(*_CreateCmd())
 
   def testCreateWithErrors(self):
     self._SetResponses(_ERROR, _ERROR)
@@ -147,22 +146,20 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreateWithNfsVersion4(self):
     nfs = self._NfsService(nfs_version='4.1')
-    self._SetResponses(_CREATE_RES, _DescribeResult())
+    self._SetResponses(_CREATE_RES)
     nfs._Create()
     expected_create_cmd = _CreateCmd() + ['--protocol', 'NFS_V4_1']
-    describe_cmd = ['describe', _NFS_NAME]
-    self.assertMultipleCommands(expected_create_cmd, describe_cmd)
+    self.assertCommandCalled(*expected_create_cmd)
 
   def testCreateWithNfsVersion3(self):
     nfs = self._NfsService(nfs_version='3')
-    self._SetResponses(_CREATE_RES, _DescribeResult())
+    self._SetResponses(_CREATE_RES)
     nfs._Create()
     expected_create_cmd = _CreateCmd() + ['--protocol', 'NFS_V3']
-    describe_cmd = ['describe', _NFS_NAME]
-    self.assertMultipleCommands(expected_create_cmd, describe_cmd)
+    self.assertCommandCalled(*expected_create_cmd)
 
   def testCreate2TBDisk(self):
-    self._SetResponses(_CREATE_RES, _DescribeResult())
+    self._SetResponses(_CREATE_RES)
     nfs = self._NfsService(disk_size=2048)
     nfs._Create()
     cmd = self.issue_cmd.call_args_list[0][0][0]
