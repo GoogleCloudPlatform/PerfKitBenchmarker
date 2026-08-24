@@ -132,16 +132,22 @@ class GenericClientInterface(edw_service.EdwClientInterface):
         ['bq', 'show', '--format=prettyjson', target]
     )
     table_meta = json.loads(stdout)
+    num_physical_bytes = table_meta.get('numTotalPhysicalBytes', None)
     num_bytes = table_meta.get('numBytes', None)
     num_rows = table_meta.get('numRows', None)
-    if num_bytes is None or num_rows is None:
-      raise ValueError(
-          f'numBytes or numRows for {target} was not returned in bq show'
-          ' output.'
-      )
-    return int(num_bytes) / _BYTES_PER_GB, int(
-        table_meta['numRows']
+    logging.info(
+        'Table %s stats: physical bytes=%s, logical bytes=%s, num rows=%s',
+        target,
+        num_physical_bytes,
+        num_bytes,
+        num_rows,
     )
+    if num_physical_bytes is None or num_rows is None:
+      raise ValueError(
+          f'numTotalPhysicalBytes or numRows for {target} was not returned in '
+          'bq show output.'
+      )
+    return int(num_physical_bytes) / _BYTES_PER_GB, int(num_rows)
 
 
 def GetBigQueryClientInterface(

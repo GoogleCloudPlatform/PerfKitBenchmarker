@@ -392,7 +392,8 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
         'bq show': [
             (
                 json.dumps({
-                    'numBytes': str(10 * 1024 * 1024 * 1024),
+                    'numTotalPhysicalBytes': str(10 * 1024 * 1024 * 1024),
+                    'numBytes': str(50 * 1024 * 1024 * 1024),
                     'numRows': '100',
                 }),
                 '',
