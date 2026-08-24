@@ -22,7 +22,6 @@ import time
 from typing import Any, Mapping
 
 from absl import flags
-import numpy as np
 from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import sample
@@ -589,7 +588,7 @@ def _CreateProducerIngressSample(
     threads_progress_mb: list[list[float]],
     metadata: dict[str, Any],
 ) -> list[sample.Sample]:
-  """Creates producer P95 maximum sustained ingress scale sample.
+  """Creates producer mean sustained ingress scale sample.
 
   Args:
     metrics: The metrics dictionary to attach to each sample.
@@ -597,7 +596,7 @@ def _CreateProducerIngressSample(
     metadata: The metadata dictionary to attach to each sample.
 
   Returns:
-    A list of sample.Sample objects for producer P95 maximum sustained ingress
+    A list of sample.Sample objects for producer mean sustained ingress
     scale.
   """
   results = []
@@ -612,17 +611,28 @@ def _CreateProducerIngressSample(
         )
     ]
 
-  p95_ingress = 0.0
+  mean_ingress = 0.0
   if aggregated_throughputs:
-    p95_ingress = np.percentile(aggregated_throughputs, 95)
+    # Discard the initial warmup and final cooldown events if there are enough
+    # samples
+    if len(aggregated_throughputs) > 2:
+      steady_state = aggregated_throughputs[1:-1]
+    else:
+      logging.info(
+          'Warm up and cool down were not discarded because of lack of'
+          ' sufficient samples.'
+      )
+      steady_state = aggregated_throughputs
+    if len(steady_state) > 0:
+      mean_ingress = sum(steady_state) / len(steady_state)
   elif thread_mb:
-    p95_ingress = sum(thread_mb)
+    mean_ingress = sum(thread_mb)
 
-  if p95_ingress > 0.0 or thread_mb:
+  if mean_ingress > 0.0 or thread_mb:
     results.append(
         sample.Sample(
-            'Producer P95 Maximum sustained ingress scale',
-            p95_ingress,
+            'Producer sustained ingress scale',
+            mean_ingress,
             'MB/s',
             metadata.copy(),
         )

@@ -398,9 +398,9 @@ class KafkaBenchmarkResultParserTest(pkb_common_test_case.PkbCommonTestCase):
           'ms',
       ),
       (
-          'P95Ingress',
+          'SustainedIngress',
           3,
-          'Producer P95 Maximum sustained ingress scale',
+          'Producer sustained ingress scale',
           5.0,
           'MB/s',
       ),
@@ -506,10 +506,10 @@ class KafkaBenchmarkResultParserTest(pkb_common_test_case.PkbCommonTestCase):
           'ms',
       ),
       (
-          'P95Ingress',
+          'SustainedIngress',
           7,
-          'Producer P95 Maximum sustained ingress scale',
-          1.4455,
+          'Producer sustained ingress scale',
+          1.225,
           'MB/s',
       ),
   )
@@ -561,7 +561,7 @@ class KafkaBenchmarkResultParserTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(results[4].value, 3.5)
     self.assertEqual(results[5].value, 4.5)
     self.assertEqual(results[6].value, 5.5)
-    self.assertEqual(results[7].value, 2.07)
+    self.assertEqual(results[7].value, 2.1)
 
   def testParseProducerResultsSyntheticLog(self):
     stdout = """1000 records sent, 50.0 records/sec (5.0 MB/sec), 3.0 ms avg latency, 10.0 ms max latency.
@@ -594,8 +594,8 @@ class KafkaBenchmarkResultParserTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(results[5].value, 6.0)
     # p99.9 latency average: (172 + 180 + 169) / 3 = 173.6666... -> 173.67
     self.assertAlmostEqual(results[6].value, 173.66666666666666, places=2)
-    # P95 maximum sustained ingress scale: 23.7 (95th %-ile of [18.0, 24.0])
-    self.assertAlmostEqual(results[7].value, 23.7, places=2)
+    # Producer sustained ingress scale
+    self.assertAlmostEqual(results[7].value, 21.0, places=2)
     self.assertEqual(results[7].unit, 'MB/s')
 
   def testParseProducerResultsTrailingMetricsWithPercentiles(self):
@@ -636,9 +636,9 @@ class KafkaBenchmarkResultParserTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(results[0].value, 300.0)
     self.assertEqual(results[1].value, 3.0)
     self.assertEqual(
-        results[4].metric, 'Producer P95 Maximum sustained ingress scale'
+        results[4].metric, 'Producer sustained ingress scale'
     )
-    self.assertEqual(results[4].value, 3.9)
+    self.assertEqual(results[4].value, 3.0)
 
   def testParseProducerResultsWithInvalidNumRecords(self):
     stdout = (
@@ -651,9 +651,9 @@ class KafkaBenchmarkResultParserTest(pkb_common_test_case.PkbCommonTestCase):
     results = kafka_benchmark._ParseProducerResults(stdout, metadata)
     self.assertLen(results, 1)
     self.assertEqual(
-        results[0].metric, 'Producer P95 Maximum sustained ingress scale'
+        results[0].metric, 'Producer sustained ingress scale'
     )
-    self.assertEqual(results[0].value, 3.9)
+    self.assertEqual(results[0].value, 3.0)
 
   def testParseProducerResultsMetadataCopy(self):
     metadata = {'key': 'initial'}
