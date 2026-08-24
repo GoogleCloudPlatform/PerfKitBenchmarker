@@ -41,6 +41,7 @@ fio_nfs:
     data_disk_size: 1024
     fio_generate_scenarios: rand_4k_read_300G_iodepth-1_numjobs-1,rand_4k_write_300G_iodepth-1_numjobs-1
     fio_runtime: 300
+    nfs_version: '4.1'
 """
 JOB_FILE = 'fio-parent.job'
 
