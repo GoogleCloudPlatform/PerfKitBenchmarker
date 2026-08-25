@@ -77,7 +77,9 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.client_vm.OS_TYPE = 'ubuntu2204'
     return db
 
-  @flagsaver.flagsaver(aws_aurora_dsql_recovery_point_arn='arn:foo')
+  @flagsaver.flagsaver(
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN, 'arn:foo')
+  )
   def testCreateFromBackup(self):
     """Tests that the create from backup command is correct."""
     db = self.CreateDbFromSpec()
@@ -85,6 +87,7 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(
         vm_util,
         'IssueCommand',
+        autospec=True,
         return_value=(start_restore_response, '', 0),
     ) as issue_command:
       db._Create()
@@ -109,15 +112,19 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       )
       self.assertEqual(db.restore_job_id, '1')
 
-  @flagsaver.flagsaver(aws_aurora_dsql_recovery_point_arn=None)
-  @mock.patch.object(util, 'MakeDefaultTags', return_value={})
+  @flagsaver.flagsaver(
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN, '')
+  )
+  @mock.patch.object(util, 'MakeDefaultTags', autospec=True, return_value={})
   def testCreateFromRaw(self, mock_make_tags):
     """Tests that the create from raw command is correct."""
+    del mock_make_tags
     db = self.CreateDbFromSpec()
     create_cluster_response = '{"identifier": "cluster-id"}'
     with mock.patch.object(
         vm_util,
         'IssueCommand',
+        autospec=True,
         return_value=(create_cluster_response, '', 0),
     ) as issue_command:
       db._Create()
@@ -138,6 +145,7 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(
         util,
         'MakeDefaultTags',
+        autospec=True,
         return_value={'tag1': 'value1', 'tag2': 'value2'},
     ):
       db = self.CreateDbFromSpec()
@@ -150,11 +158,12 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(
         vm_util,
         'IssueCommand',
+        autospec=True,
         return_value=(json.dumps(describe_response), '', 0),
     ) as issue_command:
       db = self.CreateDbFromSpec()
       db.cluster_id = 'fake_cluster_id'
-      result = db._DescribeCluster()
+      result = db._DescribeCluster('us-east-1', 'fake_cluster_id')
       self.assertEqual(result, describe_response)
       command_args = issue_command.call_args[0][0]
       self.assertEqual(command_args[4], 'get-cluster')
@@ -162,33 +171,41 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--region', command_args)
       self.assertIn('us-east-1', command_args)
 
-  @flagsaver.flagsaver(aws_aurora_dsql_recovery_point_arn=None)
+  @flagsaver.flagsaver(
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN, '')
+  )
   def testIsReadyFromRawActive(self):
     """Tests that _IsReady returns true when cluster is active."""
     describe_response = {'identifier': 'fake_cluster_id', 'status': 'ACTIVE'}
     with mock.patch.object(
         vm_util,
         'IssueCommand',
+        autospec=True,
         return_value=(json.dumps(describe_response), '', 0),
     ):
       db = self.CreateDbFromSpec()
       db.cluster_id = 'fake_cluster_id'
       self.assertTrue(db._IsReady())
 
-  @flagsaver.flagsaver(aws_aurora_dsql_recovery_point_arn=None)
+  @flagsaver.flagsaver(
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN, '')
+  )
   def testIsReadyFromRawNotActive(self):
     """Tests that _IsReady returns false when cluster is not active."""
     describe_response = {'identifier': 'fake_cluster_id', 'status': 'CREATING'}
     with mock.patch.object(
         vm_util,
         'IssueCommand',
+        autospec=True,
         return_value=(json.dumps(describe_response), '', 0),
     ):
       db = self.CreateDbFromSpec()
       db.cluster_id = 'fake_cluster_id'
       self.assertFalse(db._IsReady())
 
-  @flagsaver.flagsaver(aws_aurora_dsql_recovery_point_arn='arn:foo')
+  @flagsaver.flagsaver(
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN, 'arn:foo')
+  )
   def testIsReadyFromBackupCompleted(self):
     """Tests _IsReady with backup restore completed."""
     db = self.CreateDbFromSpec()
@@ -200,6 +217,7 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(
         vm_util,
         'IssueCommand',
+        autospec=True,
         return_value=(describe_restore_response, '', 0),
     ) as issue_command:
       self.assertTrue(db._IsReady())
@@ -214,7 +232,50 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--region', restore_call)
       self.assertIn('us-east-1', restore_call)
 
-  @flagsaver.flagsaver(aws_aurora_dsql_recovery_point_arn='arn:foo')
+  @flagsaver.flagsaver(
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN, 'arn:foo'),
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_PEER_REGION, 'us-east-2'),
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_WITNESS_REGION, 'us-west-2'),
+  )
+  def testIsReadyFromBackupCompletedMultiRegion(self):
+    """Tests _IsReady with multi-region backup restore completed."""
+    db = self.CreateDbFromSpec()
+    db.restore_job_id = '1'
+    describe_restore_response = (
+        '{"Status": "COMPLETED", "CreatedResourceArn":'
+        ' "arn:aws:dsql:us-east-1:123456789012:cluster/restored-cluster-id"}'
+    )
+    describe_cluster_response = {
+        'identifier': 'restored-cluster-id',
+        'status': 'ACTIVE',
+        'multiRegionProperties': {
+            'witnessRegion': 'us-west-2',
+            'clusters': [
+                'arn:aws:dsql:us-east-2:123456789012:cluster/peer-cluster-id'
+            ],
+        },
+    }
+    with mock.patch.object(
+        vm_util,
+        'IssueCommand',
+        autospec=True,
+        side_effect=[
+            (describe_restore_response, '', 0),
+            (json.dumps(describe_cluster_response), '', 0),
+        ],
+    ) as issue_command:
+      self.assertTrue(db._IsReady())
+      self.assertEqual(db.cluster_id, 'restored-cluster-id')
+      self.assertEqual(
+          db.cluster_arn,
+          'arn:aws:dsql:us-east-1:123456789012:cluster/restored-cluster-id',
+      )
+      self.assertEqual(db.peer_cluster_id, 'peer-cluster-id')
+      self.assertEqual(issue_command.call_count, 2)
+
+  @flagsaver.flagsaver(
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN, 'arn:foo')
+  )
   def testIsReadyFromBackupPending(self):
     """Tests _IsReady with backup restore pending."""
     db = self.CreateDbFromSpec()
@@ -223,11 +284,14 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(
         vm_util,
         'IssueCommand',
+        autospec=True,
         return_value=(describe_restore_response, '', 0),
     ):
       self.assertFalse(db._IsReady())
 
-  @flagsaver.flagsaver(aws_aurora_dsql_recovery_point_arn='arn:foo')
+  @flagsaver.flagsaver(
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN, 'arn:foo')
+  )
   def testIsReadyFromBackupFailed(self):
     """Tests _IsReady with backup restore failed."""
     db = self.CreateDbFromSpec()
@@ -236,12 +300,15 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(
         vm_util,
         'IssueCommand',
+        autospec=True,
         return_value=(describe_restore_response, '', 0),
     ):
       with self.assertRaises(errors.Resource.CreationError):
         db._IsReady()
 
-  @flagsaver.flagsaver(aws_aurora_dsql_recovery_point_arn='arn:foo')
+  @flagsaver.flagsaver(
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN, 'arn:foo')
+  )
   def testPostCreateFromBackup(self):
     """Tests _PostCreate with backup."""
     db = self.CreateDbFromSpec()
@@ -251,6 +318,7 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(
         vm_util,
         'IssueCommand',
+        autospec=True,
         return_value=('', '', 0),
     ) as issue_command:
       db._PostCreate()
@@ -265,13 +333,16 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
           tag_call[0][0],
       )
 
-  @flagsaver.flagsaver(aws_aurora_dsql_recovery_point_arn=None)
+  @flagsaver.flagsaver(
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN, '')
+  )
   def testPostCreateFromRaw(self):
     """Tests _PostCreate with raw creation."""
     db = self.CreateDbFromSpec()
     with mock.patch.object(
         vm_util,
         'IssueCommand',
+        autospec=True,
     ) as issue_command:
       db._PostCreate()
       issue_command.assert_not_called()
@@ -282,6 +353,7 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     with mock.patch.object(
         vm_util,
         'IssueCommand',
+        autospec=True,
         return_value=(json.dumps(describe_response), '', 0),
     ):
       db = self.CreateDbFromSpec()
@@ -290,7 +362,9 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testDoesNotExist(self):
     """Tests that _Exists returns false when cluster does not exist."""
-    with mock.patch.object(vm_util, 'IssueCommand', return_value=('', '', 1)):
+    with mock.patch.object(
+        vm_util, 'IssueCommand', autospec=True, return_value=('', '', 1)
+    ):
       db = self.CreateDbFromSpec()
       db.cluster_id = 'fake_cluster_id'
       self.assertFalse(db._Exists())
@@ -301,9 +375,9 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.cluster_id = 'fake_cluster_id'
 
     with mock.patch.object(
-        vm_util, 'IssueCommand'
+        vm_util, 'IssueCommand', autospec=True
     ) as issue_command, mock.patch.object(
-        db, '_Exists', side_effect=[True, False]
+        db, '_ClusterExists', autospec=True, side_effect=[True, False]
     ):
       db._Delete()
       command_args = issue_command.call_args[0][0]
@@ -311,6 +385,33 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--identifier=fake_cluster_id', command_args)
       self.assertIn('--region', command_args)
       self.assertIn('us-east-1', command_args)
+
+  @flagsaver.flagsaver(
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_PEER_REGION, 'us-east-2'),
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_WITNESS_REGION, 'us-west-2'),
+  )
+  def testDeleteMultiRegion(self):
+    """Tests that delete command is called for both regions in multi-region setup."""
+    db = self.CreateDbFromSpec()
+    db.cluster_id = 'fake_cluster_id'
+    db.peer_cluster_id = 'fake_peer_cluster_id'
+
+    with mock.patch.object(
+        vm_util, 'IssueCommand', autospec=True
+    ) as issue_command, mock.patch.object(
+        db,
+        '_ClusterExists',
+        autospec=True,
+        side_effect=[True, False, True, False],
+    ):
+      db._Delete()
+      self.assertEqual(issue_command.call_count, 2)
+      first_call_args = issue_command.call_args_list[0].args[0]
+      second_call_args = issue_command.call_args_list[1].args[0]
+      self.assertIn('us-east-1', first_call_args)
+      self.assertIn('--identifier=fake_cluster_id', first_call_args)
+      self.assertIn('us-east-2', second_call_args)
+      self.assertIn('--identifier=fake_peer_cluster_id', second_call_args)
 
   def testGetHostname(self):
     """Tests that hostname is formatted correctly."""
@@ -355,6 +456,71 @@ class AwsAuroraDsqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
     db.cluster_id = 'fake_cluster_id'
     metadata = db.GetResourceMetadata()
     self.assertEqual(metadata['dsql_cluster_id'], 'fake_cluster_id')
+
+  @flagsaver.flagsaver(
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_PEER_REGION, 'us-east-2'),
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_WITNESS_REGION, 'us-west-2'),
+  )
+  def testGetResourceMetadataMultiRegion(self):
+    """Tests that multi-region attributes are added to metadata."""
+    db = self.CreateDbFromSpec()
+    db.cluster_id = 'fake_cluster_id'
+    db.peer_cluster_id = 'fake_peer_cluster_id'
+    metadata = db.GetResourceMetadata()
+    self.assertEqual(
+        metadata,
+        {
+            'dsql_cluster_id': 'fake_cluster_id',
+            'dsql_peer_cluster_id': 'fake_peer_cluster_id',
+            'aws_aurora_dsql_peer_region': 'us-east-2',
+            'aws_aurora_dsql_witness_region': 'us-west-2',
+        },
+    )
+
+  @flagsaver.flagsaver(
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_RECOVERY_POINT_ARN, 'arn:foo'),
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_PEER_REGION, 'us-east-2'),
+      (aws_aurora_dsql_db.AWS_AURORA_DSQL_WITNESS_REGION, 'us-west-2'),
+  )
+  def testCreateFromBackupMultiRegion(self):
+    """Tests that the create from backup command for multi-region is correct."""
+    db = self.CreateDbFromSpec()
+    with self.subTest('init'):
+      self.assertTrue(db.is_multi_region)
+      self.assertEqual(db.peer_region, 'us-east-2')
+      self.assertEqual(db.witness_region, 'us-west-2')
+
+    start_restore_response = '{"RestoreJobId": "1"}'
+    with mock.patch.object(
+        vm_util,
+        'IssueCommand',
+        autospec=True,
+        return_value=(start_restore_response, '', 0),
+    ) as issue_command:
+      db._Create()
+      self.assertEqual(issue_command.call_count, 1)
+      expected_cmd = db._GetRestoreCommandMultiRegion()
+      issue_command.assert_called_once_with(expected_cmd)
+      cmd_str = ' '.join(expected_cmd)
+      with self.subTest('command'):
+        self.assertIn('start-restore-job', cmd_str)
+        self.assertIn('--recovery-point-arn arn:foo', cmd_str)
+        self.assertIn('--region us-east-1', cmd_str)
+        self.assertIn('--metadata', cmd_str)
+
+      with self.subTest('metadata'):
+        metadata_index = expected_cmd.index('--metadata') + 1
+        metadata = json.loads(expected_cmd[metadata_index])
+        self.assertEqual(metadata['witnessRegion'], 'us-west-2')
+        self.assertEqual(metadata['useMultiRegionOrchestration'], 'true')
+        self.assertEqual(json.loads(metadata['peerRegions']), ['us-east-2'])
+        self.assertEqual(
+            json.loads(metadata['regionalConfig']),
+            [
+                {'region': 'us-east-1', 'isDeletionProtectionEnabled': False},
+                {'region': 'us-east-2', 'isDeletionProtectionEnabled': False},
+            ],
+        )
 
 
 class AwsAuroraDsqlSpecTestCase(pkb_common_test_case.PkbCommonTestCase):

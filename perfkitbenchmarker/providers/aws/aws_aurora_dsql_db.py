@@ -36,6 +36,19 @@ AWS_AURORA_DSQL_RECOVERY_POINT_ARN = flags.DEFINE_string(
     'The ARN of the recovery point to restore AWS Aurora DSQL cluster from. If '
     'not provided, a new cluster is created from scratch.',
 )
+AWS_AURORA_DSQL_PEER_REGION = flags.DEFINE_string(
+    'aws_aurora_dsql_peer_region',
+    '',
+    (
+        'Region to create a peer DSQL cluster. Peer cluster is equal to initial'
+        ' cluster and can serve R/W traffic as well.'
+    ),
+)
+AWS_AURORA_DSQL_WITNESS_REGION = flags.DEFINE_string(
+    'aws_aurora_dsql_witness_region',
+    '',
+    'The AWS Aurora DSQL witness region. Witness region cannot serve traffic.',
+)
 DEFAULT_AURORA_DSQL_POSTGRES_VERSION = '16.2'
 
 _MAP_ENGINE_TO_DEFAULT_VERSION = {
@@ -74,11 +87,18 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
 
   def __init__(self, dsql_spec: AwsAuroraDsqlSpec):
     super().__init__(dsql_spec)
-    self.cluster_id = None
-    self.cluster_arn = None
+    self.cluster_id: str | None = None
+    self.cluster_arn: str | None = None
     self.assigned_name = f'pkb-{FLAGS.run_uri}'
     self.use_backup = bool(AWS_AURORA_DSQL_RECOVERY_POINT_ARN.value)
-    self.restore_job_id = None
+    self.restore_job_id: str | None = None
+    self.peer_region = AWS_AURORA_DSQL_PEER_REGION.value
+    self.witness_region = AWS_AURORA_DSQL_WITNESS_REGION.value
+    self.is_multi_region = bool(
+        AWS_AURORA_DSQL_PEER_REGION.value
+        and AWS_AURORA_DSQL_WITNESS_REGION.value
+    )
+    self.peer_cluster_id: str | None = None
 
   @functools.cached_property
   def account_id(self) -> str:
@@ -96,18 +116,11 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     formatted_tags_str = ','.join(formatted_tags_list)
     return [formatted_tags_str]
 
-  def _Create(self) -> None:
-    """Creates AWS Aurora DSQL cluster, from backup if recovery point ARN is provided."""
-    if not self.use_backup:
-      self._CreateRawCluster()
-      return
-    if self.restore_job_id:
-      logging.info(
-          'Restore job %s already exists. Skipping creation.',
-          self.restore_job_id,
-      )
-      return
-    cmd = util.AWS_PREFIX + [
+  def _GetRestoreCommandRegional(self) -> list[str]:
+    """Returns the command to restore a AWS Aurora DSQL regional cluster from backup."""
+    assert self.region
+    assert AWS_AURORA_DSQL_RECOVERY_POINT_ARN.value
+    return util.AWS_PREFIX + [
         'backup',
         'start-restore-job',
         '--recovery-point-arn',
@@ -120,16 +133,69 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
             'AWSBackupDefaultServiceRole'
         ),
         '--metadata',
-        '{"regionalConfig": "[{\\"region\\": \\"%s\\",'
-        ' \\"isDeletionProtectionEnabled\\": false}]"}'
-        % self.region,
+        (
+            f'{{"regionalConfig": "[{{\\"region\\": \\"{self.region}\\",'
+            f' \\"isDeletionProtectionEnabled\\": false}}]"}}'
+        ),
     ]
+
+  def _GetRestoreCommandMultiRegion(self) -> list[str]:
+    """Returns the command to restore an AWS Aurora DSQL multi-region cluster from backup."""
+    assert self.region
+    assert AWS_AURORA_DSQL_RECOVERY_POINT_ARN.value
+    return util.AWS_PREFIX + [
+        'backup',
+        'start-restore-job',
+        '--recovery-point-arn',
+        AWS_AURORA_DSQL_RECOVERY_POINT_ARN.value,
+        '--region',
+        self.region,
+        '--iam-role-arn',
+        (
+            f'arn:aws:iam::{self.account_id}:role/service-role/'
+            'AWSBackupDefaultServiceRole'
+        ),
+        '--metadata',
+        (
+            f'{{"witnessRegion": "{self.witness_region}",'
+            f' "useMultiRegionOrchestration": "true",'
+            f' "peerRegions": "[\\"{self.peer_region}\\"]",'
+            f' "regionalConfig": "[{{\\"region\\": \\"{self.region}\\",'
+            f' \\"isDeletionProtectionEnabled\\": false}},'
+            f'{{\\"region\\": \\"{self.peer_region}\\",'
+            f' \\"isDeletionProtectionEnabled\\": false}}]"}}'
+        ),
+    ]
+
+  def _RestoreFromBackup(self) -> None:
+    """Restores AWS Aurora DSQL cluster from backup."""
+    if self.restore_job_id:
+      logging.info(
+          'Restore job %s already exists. Skipping creation.',
+          self.restore_job_id,
+      )
+      return
+    if self.is_multi_region:
+      cmd = self._GetRestoreCommandMultiRegion()
+    else:
+      cmd = self._GetRestoreCommandRegional()
     stdout, _, _ = vm_util.IssueCommand(cmd)  # pyrefly: ignore[bad-argument-type]
     response = json.loads(stdout)
     self.restore_job_id = response['RestoreJobId']
     if self.restore_job_id:
       # Mark created so we don't try to create it again on a retry.
       self.created = True
+
+  def _Create(self) -> None:
+    """Creates AWS Aurora DSQL cluster, from backup if recovery point ARN is provided."""
+    if self.use_backup:
+      self._RestoreFromBackup()
+      return
+    if self.is_multi_region:
+      raise errors.Config.InvalidValue(
+          'Raw creation for MR is not supported yet.'
+      )
+    self._CreateRawCluster()
 
   def _DescribeRestoreJob(self, job_id: str) -> dict[str, Any]:
     """Describes the restore job."""
@@ -186,16 +252,15 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     # one returned by the create-cluster command.
     self.cluster_id = response['identifier']
 
-  def _DescribeCluster(self) -> dict[str, Any] | None:
-    if not self.cluster_id:
-      logging.info('Cluster id is not set.')
-      return None
+  def _DescribeCluster(
+      self, region: str, cluster_id: str
+  ) -> dict[str, Any] | None:
     cmd = util.AWS_PREFIX + [
         'dsql',
         'get-cluster',
-        '--identifier=%s' % self.cluster_id,
+        '--identifier=%s' % cluster_id,
         '--region',
-        self.region,
+        region,
     ]
     stdout, _, retcode = vm_util.IssueCommand(cmd, raise_on_failure=False)
     if retcode != 0:
@@ -203,27 +268,52 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     json_output: dict[str, Any] = json.loads(stdout)
     return json_output
 
+  def _FindPeerClusterId(self) -> str | None:
+    """Finds peer cluster ID from multi-region properties of primary cluster."""
+    assert self.cluster_id
+    assert self.region
+    cluster_desc = self._DescribeCluster(self.region, self.cluster_id)
+    if not cluster_desc:
+      return None
+    peer_clusters = cluster_desc.get('multiRegionProperties', {}).get(
+        'clusters', []
+    )
+    for peer_arn in peer_clusters:
+      if peer_arn.split(':')[3] == self.peer_region:
+        return peer_arn.split('/')[-1]
+    return None
+
+  def _IsRestoreReady(self) -> bool:
+    """Returns true if the restore job is complete and cluster properties are set."""
+    if not self.restore_job_id:
+      return False
+    job_description = self._DescribeRestoreJob(self.restore_job_id)
+    status = job_description['Status']
+    if status in ['ABORTED', 'FAILED']:
+      raise errors.Resource.CreationError(
+          f'Restore job {self.restore_job_id} failed with status {status}'
+      )
+    if status != 'COMPLETED':
+      return False
+
+    self.cluster_arn = job_description['CreatedResourceArn']
+    self.cluster_id = self.cluster_arn.split('/')[-1]
+    if self.is_multi_region:
+      self.peer_cluster_id = self._FindPeerClusterId()
+      if not self.peer_cluster_id:
+        return False
+    return True
+
   def _IsReady(
       self, timeout=aws_relational_db.IS_READY_TIMEOUT, poll_interval=5
   ) -> bool:
     """Returns true if the cluster is ready."""
     if self.use_backup:
-      if not self.restore_job_id:
-        return False
-      job_description = self._DescribeRestoreJob(self.restore_job_id)
-      status = job_description['Status']
-      if status == 'COMPLETED':
-        self.cluster_id = job_description['CreatedResourceArn'].split('/')[-1]
-        self.cluster_arn = job_description['CreatedResourceArn']
-        return True
-      if status in ['ABORTED', 'FAILED']:
-        raise errors.Resource.CreationError(
-            f'Restore job {self.restore_job_id} failed with status {status}'
-        )
+      return self._IsRestoreReady()
+    if not self.cluster_id:
       return False
-    else:
-      json_output = self._DescribeCluster()
-      return bool(json_output and json_output['status'] == 'ACTIVE')
+    json_output = self._DescribeCluster(self.region, self.cluster_id)
+    return bool(json_output and json_output['status'] == 'ACTIVE')
 
   def _PostCreate(self) -> None:
     """Add tags if we are restoring from backup."""
@@ -233,26 +323,35 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
 
   def _Exists(self) -> bool:
     """Returns true if the underlying cluster exists."""
-    json_output = self._DescribeCluster()
+    if not self.cluster_id:
+      return False
+    if self.is_multi_region and self.peer_cluster_id:
+      return self._ClusterExists(
+          self.region, self.cluster_id
+      ) or self._ClusterExists(self.peer_region, self.peer_cluster_id)
+    return self._ClusterExists(self.region, self.cluster_id)
+
+  def _ClusterExists(self, region: str, cluster_id: str) -> bool:
+    """Returns true if the specified cluster exists in the specified region."""
+    json_output = self._DescribeCluster(region=region, cluster_id=cluster_id)
     if json_output:
       return True
     return False
 
-  def _Delete(self) -> None:
-    """Deletes the DSQL cluster."""
-
+  def _DeleteClusterInRegion(self, region: str, cluster_id: str) -> None:
+    """Deletes the DSQL cluster in the specified region."""
     logging.info(
         'Deleting DSQL cluster %s in region %s',
-        self.cluster_id,
-        self.region,
+        cluster_id,
+        region,
     )
 
     cmd = util.AWS_PREFIX + [
         'dsql',
         'delete-cluster',
-        '--identifier=%s' % self.cluster_id,
+        '--identifier=%s' % cluster_id,
         '--region',
-        self.region,
+        region,
     ]
     vm_util.IssueCommand(cmd, raise_on_failure=False)
 
@@ -263,10 +362,17 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
         retryable_exceptions=(errors.Resource.RetryableDeletionError,),
     )
     def WaitUntilClusterDeleted():
-      if self._Exists():
+      if self._ClusterExists(region=region, cluster_id=cluster_id):
         raise errors.Resource.RetryableDeletionError('Not yet deleted')
 
     WaitUntilClusterDeleted()
+
+  def _Delete(self) -> None:
+    """Deletes the DSQL cluster."""
+    if self.cluster_id:
+      self._DeleteClusterInRegion(self.region, self.cluster_id)
+    if self.is_multi_region and self.peer_cluster_id:
+      self._DeleteClusterInRegion(self.peer_region, self.peer_cluster_id)
 
   def _GetHostname(self) -> str:
     """Returns endpoint of DSQL cluster."""
@@ -321,4 +427,8 @@ class AwsAuroraDsqlRelationalDb(aws_relational_db.BaseAwsRelationalDb):
     metadata = {
         'dsql_cluster_id': self.cluster_id,
     }
+    if self.is_multi_region:
+      metadata['dsql_peer_cluster_id'] = self.peer_cluster_id
+      metadata['aws_aurora_dsql_peer_region'] = self.peer_region
+      metadata['aws_aurora_dsql_witness_region'] = self.witness_region
     return metadata
