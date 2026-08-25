@@ -676,7 +676,6 @@ fuse_io500:
 io500_lustre:
   name: io500
   flags:
-    io500_tests: [ior_easy_write, ior_easy_read]
     data_disk_type: lustre
     scratch_dir: lustre_dir
     openmpi_version: 4.1.6
