@@ -117,9 +117,9 @@ class _MemorySizeParser(flag_util.UnitsParser):
 _MEMORY_SIZE_PARSER = _MemorySizeParser()
 _UNITS_SERIALIZER = flag_util.UnitsSerializer()
 _DEFAULT_MEMORY_SIZE_MIN = units.Quantity('1 KiB')
-# Multichase will OOM at high thread counts if using much more than 50%.
-_DEFAULT_MEMORY_SIZE_MAX = units.Quantity('50%')
-_DEFAULT_STRIDE_SIZE = units.Quantity('512 bytes')
+# Multichase will OOM on long chases with more than 25% of total RAM.
+_DEFAULT_MEMORY_SIZE_MAX = units.Quantity('25%')
+_DEFAULT_STRIDE_SIZE = units.Quantity('1 KiB')
 
 
 def _DefineMemorySizeFlag(name, default, help, flag_values=FLAGS, **kwargs):
@@ -241,7 +241,7 @@ flags.DEFINE_string(
 )
 flags.DEFINE_string(
     'multichase_additional_flags',
-    '-T 8m',
+    '-T 8m -L',
     "Additional flags to use when executing multichase. Example: '-O 16 -y'.",
 )
 flags.DEFINE_bool(
