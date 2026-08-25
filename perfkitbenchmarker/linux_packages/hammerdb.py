@@ -354,9 +354,10 @@ class HammerDbTclScript:
       timeout: int | None = 60 * 60 * 6,
   ) -> str:
     """Run hammerdbcli script."""
+    # Resolve '~' to user's home directory so the path is absolute under sudo.
     script_location = '{}/{}'.format(
         LocalWorkingDirectory(), self.tcl_script_name
-    )
+    ).replace('~', f'/home/{vm.user_name}')
     cmd = ''
 
     if TPCC_LOG_TRANSACTIONS.value:
@@ -376,7 +377,8 @@ class HammerDbTclScript:
         InDir(
             HAMMERDB_RUN_LOCATION,
             'PATH="$PATH:/opt/mssql-tools/bin" && '
-            f'sudo -E bash -c "{cmd}./hammerdbcli auto {script_location}"',
+            f'sudo -E bash -c "{cmd}./hammerdbcli auto '
+            f'{script_location}"',
         ),
         timeout=timeout,
     )
