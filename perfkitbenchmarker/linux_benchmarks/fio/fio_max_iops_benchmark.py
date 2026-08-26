@@ -39,7 +39,7 @@ fio_max_iops:
     fio_runtime: 120
 """
 IODEPTH = 256
-NUMJOBS = [4, 8, 16, 32, 64, 128, 256]
+NUMJOBS = [4, 8, 16, 32, 64, 128, 150, 200, 220, 240, 256]
 
 
 def GetConfig(user_config):
