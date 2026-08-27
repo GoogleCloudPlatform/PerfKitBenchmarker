@@ -71,7 +71,15 @@ hammerdbcli:
     vm_groups:
       controller:
         os_type: windows2022_desktop
-        vm_spec: *default_dual_core
+        vm_spec:
+          GCP:
+            machine_type: n2-standard-4
+            zone: us-central1-b
+        disk_spec:
+          GCP:
+            disk_type: pd-ssd
+            disk_size: 500
+            mount_point: /scratch
       servers_replicas:
         os_type: windows2022_desktop_sqlserver_2019_standard
         vm_spec: *default_dual_core

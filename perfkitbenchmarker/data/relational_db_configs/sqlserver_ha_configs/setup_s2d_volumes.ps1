@@ -69,6 +69,25 @@ try {
   Invoke-Command -ComputerName $ad_dc.HostName -Credential $domainCredential -ArgumentList $passwordSecureString -ScriptBlock {
         New-ADUser -Name 'sql_server' -Description 'SQL Agent and SQL Admin account.' -AccountPassword $args[0] -Enabled $true -PasswordNeverExpires $true
   }
+
+  Write-Host 'Check shared disk ownership (MW cluster)'
+  $clusterDisks = Get-ClusterResource | Where-Object { $_.ResourceType -eq 'Physical Disk' -or $_.ResourceType.Name -eq 'Physical Disk' }
+  foreach ($disk in $clusterDisks) {
+    if ($disk.OwnerNode -ne $localServerName) {
+      Write-Host "Moving Disk Ownership for $($disk.Name) to $localServerName"
+      Move-ClusterGroup -Name $disk.OwnerGroup -Node $localServerName
+      Start-Sleep -Seconds 15
+    }
+  }
+  Write-Host 'Check CSV Coordinator Owner Node (S2D cluster)'
+  $clusterSharedVolumes = Get-ClusterSharedVolume
+  foreach ($csv in $clusterSharedVolumes) {
+    if ($csv.OwnerNode -ne $localServerName) {
+      Write-Host "Moving CSV Coordinator Owner Node for $($csv.Name) to $localServerName"
+      Move-ClusterSharedVolume -Name $csv.Name -Node $localServerName
+      Start-Sleep -Seconds 15
+    }
+  }
 }
 catch {
   Write-Host $_.Exception.Message

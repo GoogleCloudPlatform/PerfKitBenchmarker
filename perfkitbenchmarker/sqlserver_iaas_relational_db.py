@@ -20,6 +20,7 @@ database.
 import logging
 import ntpath
 import os
+import time
 
 from absl import flags
 from perfkitbenchmarker import data
@@ -924,10 +925,12 @@ def ConfigureSQLServer(vm, username: str, password: str):
       "N'Software\\Microsoft\\MSSQLServer\\MSSQLServer', "
       f"N'DefaultLog', REG_SZ, N'{vm.assigned_disk_letter}:\\'\""
   )
-  vm.RemoteCommand("net stop SQLSERVERAGENT /y", ignore_failure=True)
-  vm.RemoteCommand("net stop mssqlserver /y")
-  vm.RemoteCommand("net start mssqlserver")
-  vm.RemoteCommand("net start SQLSERVERAGENT", ignore_failure=True)
+  vm.RemoteCommand("Stop-Service -Name SQLSERVERAGENT -Force",
+                   ignore_failure=True)
+  vm.RemoteCommand("Stop-Service -Name MSSQLSERVER -Force")
+  time.sleep(10)
+  vm.RemoteCommand("Start-Service -Name MSSQLSERVER")
+  vm.RemoteCommand("Start-Service -Name SQLSERVERAGENT", ignore_failure=True)
 
 
 def _TuneForSQL(vm):
