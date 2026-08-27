@@ -111,6 +111,40 @@ class ResourceTest(pkb_common_test_case.PkbCommonTestCase):
     test_resource.Delete()
     mock_delete.assert_not_called()
 
+  def testDeleteResourceBadCreateButExists(self):
+    test_resource = CreateRaisesNonFreezeRestoreResource()
+    mock_exists = self.enter_context(
+        mock.patch.object(test_resource, '_Exists', side_effect=[True, False])
+    )
+    mock_delete = self.enter_context(
+        mock.patch.object(test_resource, '_Delete')
+    )
+
+    with self.assertRaises(errors.Resource.CreationError):
+      test_resource.Create()
+    self.assertFalse(test_resource.created)
+
+    test_resource.Delete()
+    mock_delete.assert_called_once()
+    self.assertEqual(mock_exists.call_count, 2)
+
+  def testDeleteResourceBadCreateAndNotExists(self):
+    test_resource = CreateRaisesNonFreezeRestoreResource()
+    mock_exists = self.enter_context(
+        mock.patch.object(test_resource, '_Exists', return_value=False)
+    )
+    mock_delete = self.enter_context(
+        mock.patch.object(test_resource, '_Delete')
+    )
+
+    with self.assertRaises(errors.Resource.CreationError):
+      test_resource.Create()
+    self.assertFalse(test_resource.created)
+
+    test_resource.Delete()
+    mock_delete.assert_not_called()
+    mock_exists.assert_called_once()
+
   def testUserManagedLifeCycleIsCorrect(self):
     test_resource = NonFreezeRestoreResource()
     test_resource.user_managed = True
