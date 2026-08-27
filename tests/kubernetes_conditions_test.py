@@ -218,6 +218,61 @@ class KubernetesConditionsTest(pkb_common_test_case.PkbCommonTestCase):
         {'machine_type': 'n2-standard-4'},
     )
 
+  def testPodStatusConditionsMultiContainer(self):
+    stdout = json.dumps({
+        'items': [
+            {
+                'metadata': {'name': 'pod-multi'},
+                'status': {
+                    'containerStatuses': [
+                        {
+                            'state': {
+                                'running': {'startedAt': '1970-01-01T00:01:19Z'}
+                            }
+                        },
+                        {
+                            'state': {
+                                'running': {'startedAt': '1970-01-01T00:02:19Z'}
+                            }
+                        }
+                    ]
+                },
+            },
+            {
+                'metadata': {'name': 'pod-multi-partial'},
+                'status': {
+                    'containerStatuses': [
+                        {
+                            'state': {
+                                'running': {'startedAt': '1970-01-01T00:01:19Z'}
+                            }
+                        },
+                        {
+                            'state': {
+                                'waiting': {'reason': 'ContainerCreating'}
+                            }
+                        }
+                    ]
+                },
+            }
+        ]
+    })
+    self.enter_context(
+        mock.patch.object(
+            kubectl,
+            'RunKubectlCommand',
+            return_value=(stdout, '', 0),
+        )
+    )
+    conditions = kubernetes_conditions.GetStatusConditionsForResourceType(
+        'pod',
+        frozenset(),
+    )
+    self.assertLen(conditions, 1)
+    self.assertEqual(conditions[0].event, 'PodRunning')
+    self.assertEqual(conditions[0].epoch_time, 139)  # 00:02:19 is 139 seconds
+    self.assertEqual(conditions[0].resource_name, 'pod-multi')
+
 
 if __name__ == '__main__':
   unittest.main()

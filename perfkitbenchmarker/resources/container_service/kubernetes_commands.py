@@ -961,7 +961,7 @@ def GetTotalCpuMillicores(label_selector: str | None = None) -> float | None:
   """Returns total CPU millicores across all pods via kubectl top pods.
 
   Args:
-    label_selector: The label selector for the pods.
+    label_selector: Optional label selector to restrict the pods queried.
 
   Returns:
     Total CPU millicores, or None if the command fails or output is empty.
@@ -970,7 +970,9 @@ def GetTotalCpuMillicores(label_selector: str | None = None) -> float | None:
     cmd = ['top', 'pods', '--no-headers']
     if label_selector:
       cmd.extend(['-l', label_selector])
-    stdout, _, rc = kubectl.RunKubectlCommand(cmd, raise_on_failure=False)
+    stdout, _, rc = kubectl.RunKubectlCommand(
+        cmd, raise_on_failure=False
+    )
     if rc != 0 or not stdout.strip():
       return None
 
@@ -991,3 +993,4 @@ def GetTotalCpuMillicores(label_selector: str | None = None) -> float | None:
   except (ValueError, IndexError) as e:
     logging.debug('[startup/cpu] Parse error: %s', e)
     return None
+

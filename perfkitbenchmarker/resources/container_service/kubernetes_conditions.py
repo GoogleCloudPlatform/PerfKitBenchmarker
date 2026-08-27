@@ -64,12 +64,61 @@ class KubernetesStatusCondition:
     )
 
 
+def _GetPodRunningCondition(item: dict[str, Any]) -> dict[str, Any] | None:
+  """Synthesizes a 'PodRunning' pseudo-condition for a pod item.
+
+  Kubernetes does not report a 'PodRunning' entry in .status.conditions
+  (pod phase transitions aren't conditions). The closest equivalent
+  timestamp is when the pod's container(s) actually started running,
+  available at .status.containerStatuses[].state.running.startedAt. This
+  is used to compute Startup Latency (PodRunning -> Ready), distinct from
+  Max Pod Ready Time (PodReadyToStartContainers -> Ready).
+
+  For multi-container pods, the latest startedAt across containers is
+  used (the pod isn't fully "running" until all containers are).
+
+  Args:
+    item: A single pod item from `kubectl get pod -o json`.
+
+  Returns:
+    A synthetic condition dict compatible with KubernetesStatusCondition, or
+    None if no container has started running yet.
+  """
+  container_statuses = item.get('status', {}).get('containerStatuses', [])
+  if not container_statuses:
+    return None
+
+  started_at_times = [
+      cs.get('state', {}).get('running', {}).get('startedAt')
+      for cs in container_statuses
+      if cs.get('state', {}).get('running', {}).get('startedAt')
+  ]
+
+  # All containers must be running for the pod to be considered running.
+  if len(started_at_times) != len(container_statuses):
+    return None
+
+  # Kubernetes timestamps are RFC3339 (e.g. "2023-01-01T12:00:00Z"), which are
+  # lexicographically sortable. We can assume consistency from the apiserver.
+  # See: https://kubernetes.io/docs/reference/kubernetes-api/ \
+  #   common-definitions/time/
+  return {
+      'type': 'PodRunning',
+      'lastTransitionTime': max(started_at_times),
+  }
+
+
 def GetStatusConditionsForResourceType(
     resource_type: str,
     resources_to_ignore: abc.Set[str] = frozenset(),
     suppress_logging: bool = False,
 ) -> list[KubernetesStatusCondition]:
   """Returns the status conditions for a resource type.
+
+  For pods, this also includes a synthetic 'PodRunning' condition (see
+  _GetPodRunningCondition) alongside the real .status.conditions entries,
+  so callers can compute Startup Latency the same way they compute
+  Max Pod Ready Time.
 
   Args:
     resource_type: The type of the resource to get the status conditions for.
@@ -103,6 +152,10 @@ def GetStatusConditionsForResourceType(
       ]
     name_to_metadata[name] = found_metadata
     conditions = item.get('status', {}).get('conditions')
+    if resource_type == 'pod':
+      pod_running_condition = _GetPodRunningCondition(item)
+      if pod_running_condition is not None:
+        conditions = list(conditions or []) + [pod_running_condition]
     if name is not None and conditions is not None:
       name_to_conditions[name] = conditions
 

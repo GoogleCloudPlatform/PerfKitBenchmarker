@@ -58,6 +58,14 @@ class BaseContainerCluster(resource.BaseResource):
     self.enable_vpa: bool = cluster_spec.enable_vpa
     self.enable_aam: bool = cluster_spec.enable_aam
 
+  @classmethod
+  def SupportsVpa(cls) -> bool:
+    """Returns True if the cluster supports Vertical Pod Autoscaling."""
+    # TODO(user): Implement and validate VPA support for other cloud
+    # providers so we can compare across providers. This is temporarily False
+    # by default.
+    return False
+
   @property
   def num_nodes(self) -> int:
     return self.default_nodepool.num_nodes

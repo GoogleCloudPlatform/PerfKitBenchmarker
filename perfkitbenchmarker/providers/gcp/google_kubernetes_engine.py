@@ -159,6 +159,11 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     else:
       self.region: str = util.GetRegionFromZone(self.zones[0])
 
+  @classmethod
+  def SupportsVpa(cls) -> bool:
+    """Returns True if the cluster supports Vertical Pod Autoscaling."""
+    return True
+
   def InitializeNodePoolForCloud(
       self,
       vm_config: virtual_machine_spec.BaseVmSpec,
