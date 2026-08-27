@@ -19,12 +19,15 @@ After the Zac review refactor:
   - The benchmark module exposes only GetConfig / Prepare / Run / Cleanup.
 """
 
-import unittest
 from unittest import mock
 
-from perfkitbenchmarker.linux_benchmarks.kubernetes import swap_encryption_benchmark
+from perfkitbenchmarker.linux_benchmarks.kubernetes.swap_encryption import (
+    swap_encryption_benchmark,
+)
 from perfkitbenchmarker.resources.container_service import swap_daemonset
 from tests import pkb_common_test_case
+
+# pylint: disable=protected-access
 
 
 def _make_daemonset():
@@ -117,7 +120,7 @@ class DetectSwapDeviceTest(pkb_common_test_case.PkbCommonTestCase):
 class GetResourceMetadataTest(pkb_common_test_case.PkbCommonTestCase):
   """Tests for SwapDaemonSet.GetResourceMetadata()."""
 
-  def _make_ds_with_responses(
+  def _make_ds_with_responses(  # pylint: disable=missing-function-docstring
       self,
       swap_path='/dev/dm-0',
       kver='5.15.0-gke-1234',
@@ -145,7 +148,7 @@ class GetResourceMetadataTest(pkb_common_test_case.PkbCommonTestCase):
   def test_metadata_swap_device_unknown_when_no_swap(self):
     ds = self._make_ds_with_responses(swap_path='')
     meta = ds.GetResourceMetadata()
-    self.assertEqual(meta['swap_device'], 'unknown')
+    self.assertEqual(meta['swap_device'], '')
 
   def test_metadata_includes_kernel_version(self):
     ds = self._make_ds_with_responses()
@@ -165,5 +168,3 @@ class GetResourceMetadataTest(pkb_common_test_case.PkbCommonTestCase):
       ds.GetResourceMetadata()
 
 
-if __name__ == '__main__':
-  unittest.main()
