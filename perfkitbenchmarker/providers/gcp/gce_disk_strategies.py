@@ -544,7 +544,9 @@ class GCPSetUpNFSDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
 
   def SetUpDiskOnLinux(self):
     """Performs Linux specific setup of NFS disk."""
+    start_time = time.time()
     super().SetUpDiskOnLinux()
+    self.nfs_service.time_to_mount = time.time() - start_time
     self.vm.RemoteCommand(
         'echo 20480 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'
         f' {self.disk_spec.mount_point})/read_ahead_kb'

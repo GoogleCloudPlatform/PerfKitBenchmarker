@@ -46,6 +46,7 @@ from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import resource
+from perfkitbenchmarker import sample
 
 flags.DEFINE_string('nfs_tier', None, 'NFS Mode')
 flags.DEFINE_string('nfs_version', None, 'NFS Version')
@@ -89,6 +90,7 @@ class BaseNfsService(resource.BaseResource):
     self.zone = zone
     self.server_directory = '/'
     self.nfs_tier = FLAGS.nfs_tier or self.DEFAULT_TIER
+    self.time_to_mount: float | None = None
     if self.nfs_tier and self.NFS_TIERS and self.nfs_tier not in self.NFS_TIERS:
       # NFS service does not have to have a list of nfs_tiers nor does it have
       # to be implemented by a provider
@@ -119,6 +121,23 @@ class BaseNfsService(resource.BaseResource):
   def GetRemoteAddress(self):
     """The NFS server's address."""
     pass
+
+  def GetSamples(self) -> list[sample.Sample]:
+    """Gets samples relating to the provisioning of the resource."""
+    samples = super().GetSamples()
+    metadata = self.GetResourceMetadata()
+    metadata['resource_type'] = self.RESOURCE_TYPE
+    metadata['resource_class'] = self.__class__.__name__
+    if self.time_to_mount is not None:
+      samples.append(
+          sample.Sample(
+              'Time to Mount',
+              self.time_to_mount,
+              'seconds',
+              metadata,
+          )
+      )
+    return samples
 
 
 class StaticNfsService(BaseNfsService):

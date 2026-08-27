@@ -35,12 +35,14 @@ Lifecycle:
 
 import json
 import logging
+import time
 
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import sample
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_network
 from perfkitbenchmarker.providers.aws import util
@@ -80,6 +82,9 @@ class AwsNfsService(nfs_service.BaseNfsService):
     self.mount_id = None
     self.throughput_mode = FLAGS.efs_throughput_mode
     self.provisioned_throughput = FLAGS.efs_provisioned_throughput
+    self.time_to_resolve_dns: float | None = None
+    self.create_mount_target_time: float | None = None
+    self.mount_attach_time: float | None = None
 
   @property
   def network(self):
@@ -107,11 +112,10 @@ class AwsNfsService(nfs_service.BaseNfsService):
         self.security_group,
     )
     self._CreateFiler()
+
+  def _WaitUntilRunning(self):
     logging.info('Waiting for filer to start up')
     self.aws_commands.WaitUntilFilerAvailable(self.filer_id)
-    # create the mount point but do not wait for it, superclass will call the
-    # _IsReady() method.
-    self._CreateMount()
 
   def _Delete(self):
     # deletes on the file-system and mount-target are immediate
@@ -120,6 +124,11 @@ class AwsNfsService(nfs_service.BaseNfsService):
       return
     self._DeleteFiler()
 
+  def _Exists(self):
+    if not self.filer_id:
+      return False
+    return self.aws_commands.Exists(self.filer_id)
+
   def GetRemoteAddress(self):
     if self.filer_id is None:
       raise errors.Resource.RetryableGetError('Filer not created')
@@ -127,8 +136,43 @@ class AwsNfsService(nfs_service.BaseNfsService):
         name=self.filer_id, region=self.region
     )
 
+  def GetSamples(self) -> list[sample.Sample]:
+    """Gets samples relating to the provisioning of the resource."""
+    samples = super().GetSamples()
+    metadata = self.GetResourceMetadata()
+    metadata['resource_type'] = self.RESOURCE_TYPE
+    metadata['resource_class'] = self.__class__.__name__
+    if self.time_to_resolve_dns is not None:
+      samples.append(
+          sample.Sample(
+              'Time to Resolve DNS',
+              self.time_to_resolve_dns,
+              'seconds',
+              metadata,
+          )
+      )
+    if self.create_mount_target_time is not None:
+      samples.append(
+          sample.Sample(
+              'Time to Create Mount Target',
+              self.create_mount_target_time,
+              'seconds',
+              metadata,
+          )
+      )
+    if self.mount_attach_time is not None:
+      samples.append(
+          sample.Sample(
+              'Time to Attach Mount',
+              self.mount_attach_time,
+              'seconds',
+              metadata,
+          )
+      )
+    return samples
+
   def _IsReady(self):
-    return self.aws_commands.IsMountAvailable(self.mount_id)
+    return self.aws_commands.IsAvailable(self.filer_id)
 
   def _CreateFiler(self):
     """Creates the AWS EFS service."""
@@ -155,6 +199,8 @@ class AwsNfsService(nfs_service.BaseNfsService):
         self.provisioned_throughput,
         **kwargs,
     )
+
+  def _PostCreate(self):
     self.aws_commands.AddTagsToFiler(self.filer_id)
     logging.info(
         'Created filer %s with address %s',
@@ -162,18 +208,23 @@ class AwsNfsService(nfs_service.BaseNfsService):
         self.GetRemoteAddress(),
     )
 
-  def _CreateMount(self):
+  def CreateAndWaitForMountTarget(self):
     """Creates an NFS mount point on an EFS service."""
     if self.mount_id:
-      logging.warning('_CreateMount() already called for %s', self.mount_id)
+      logging.warning(
+          'CreateMountTarget() already called for %s', self.mount_id
+      )
       return
     if not self.filer_id:
       raise errors.Resource.CreationError('Did not create a filer first')
     logging.info('Creating NFS mount point')
-    self.mount_id = self.aws_commands.CreateMount(
+    start_time = time.time()
+    self.mount_id = self.aws_commands.CreateMountTarget(
         self.filer_id, self.subnet_id, self.security_group
     )
     logging.info('Mount target %s starting up', self.mount_id)
+    self.aws_commands.WaitUntilMountTargetAvailable(self.mount_id)
+    self.create_mount_target_time = time.time() - start_time
 
   def _DeleteMount(self):
     """Deletes the EFS mount point."""
@@ -198,7 +249,6 @@ class AwsNfsService(nfs_service.BaseNfsService):
       )
     logging.info('Deleting NFS filer %s', self.filer_id)
     self.aws_commands.DeleteFiler(self.filer_id)
-    self.filer_id = None
 
 
 class AwsEfsCommands:
@@ -246,16 +296,34 @@ class AwsEfsCommands:
     args = ['create-tags', '--file-system-id', filer_id, '--tags'] + tags
     self._IssueAwsCommand(args, False)
 
-  @vm_util.Retry()
+  @vm_util.Retry(timeout=600, poll_interval=1)
   def WaitUntilFilerAvailable(self, filer_id):
-    if not self._IsAvailable(
-        'describe-file-systems', '--file-system-id', 'FileSystems', filer_id
-    ):
+    if not self.IsAvailable(filer_id):
       raise errors.Resource.RetryableCreationError(
           '{} not ready'.format(filer_id)
       )
 
-  @vm_util.Retry()
+  def IsAvailable(self, filer_id):
+    return self._IsAvailable(
+        'describe-file-systems', '--file-system-id', 'FileSystems', filer_id
+    )
+
+  def Exists(self, filer_id):
+    describe = self._IssueAwsCommand(
+        ['describe-file-systems', '--file-system-id', filer_id]
+    )
+    if not describe:
+      return False
+    return True
+
+  @vm_util.Retry(timeout=600, poll_interval=1)
+  def WaitUntilMountTargetAvailable(self, mount_target_id):
+    if not self.IsMountAvailable(mount_target_id):
+      raise errors.Resource.RetryableCreationError(
+          '{} not ready'.format(mount_target_id)
+      )
+
+  @vm_util.Retry(timeout=600, poll_interval=1)
   def DeleteFiler(self, file_system_id):
     args = self.efs_prefix + [
         'delete-file-system',
@@ -266,7 +334,7 @@ class AwsEfsCommands:
     if retcode and 'FileSystemInUse' in stderr:
       raise Exception("Mount Point hasn't finished deleting.")
 
-  def CreateMount(self, file_system_id, subnet_id, security_group=None):
+  def CreateMountTarget(self, file_system_id, subnet_id, security_group=None):
     args = [
         'create-mount-target',
         '--file-system-id',

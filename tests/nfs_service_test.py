@@ -95,6 +95,21 @@ class NfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     nfs_disk = nfs.CreateNfsDisk()
     self.assertEqual('4.1', nfs_disk.nfs_version)
 
+  def testGetSamplesNoTimeToMount(self):
+    nfs = self._NewNfsResource()
+    self.assertEqual(nfs.GetSamples(), [])
+
+  def testGetSamplesWithTimeToMount(self):
+    nfs = self._NewNfsResource()
+    nfs.time_to_mount = 12.5
+    samples = nfs.GetSamples()
+    self.assertLen(samples, 1)
+    self.assertEqual(samples[0].metric, 'Time to Mount')
+    self.assertEqual(samples[0].value, 12.5)
+    self.assertEqual(samples[0].unit, 'seconds')
+    self.assertEqual(samples[0].metadata['resource_type'], 'BaseNfsService')
+    self.assertEqual(samples[0].metadata['resource_class'], '_DemoNfsService')
+
 
 class UnmanagedNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
 

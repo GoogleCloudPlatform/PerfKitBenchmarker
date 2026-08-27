@@ -178,8 +178,8 @@ class AwsNfsServiceTest(BaseTest):
   def _CreateMount(self):
     nfs = self._CreateNfsService()
     nfs.filer_id = _FILE_ID
-    self.issue_cmd.CreateMount.return_value = _MOUNT_ID
-    nfs._CreateMount()
+    self.issue_cmd.CreateMountTarget.return_value = _MOUNT_ID
+    nfs.CreateAndWaitForMountTarget()
     return nfs
 
   # create NFS resource
@@ -200,6 +200,78 @@ class AwsNfsServiceTest(BaseTest):
     nfs = self._CreateNfsService()
     self.assertEqual('generalPurpose', nfs.nfs_tier)
 
+  def testGetSamplesNoTimeToResolveDns(self):
+    nfs = self._CreateNfsService()
+    self.assertEqual(nfs.GetSamples(), [])
+
+  def testGetSamplesWithTimeToResolveDns(self):
+    nfs = self._CreateNfsService()
+    nfs.time_to_resolve_dns = 5.2
+    samples = nfs.GetSamples()
+    self.assertLen(samples, 1)
+    self.assertEqual(samples[0].metric, 'Time to Resolve DNS')
+    self.assertEqual(samples[0].value, 5.2)
+    self.assertEqual(samples[0].unit, 'seconds')
+    self.assertEqual(samples[0].metadata['resource_type'], 'BaseNfsService')
+    self.assertEqual(samples[0].metadata['resource_class'], 'AwsNfsService')
+
+  def testGetSamplesWithCreateMountTargetTime(self):
+    nfs = self._CreateNfsService()
+    nfs.create_mount_target_time = 2.0
+    samples = nfs.GetSamples()
+    self.assertLen(samples, 1)
+    self.assertEqual(samples[0].metric, 'Time to Create Mount Target')
+    self.assertEqual(samples[0].value, 2.0)
+    self.assertEqual(samples[0].unit, 'seconds')
+    self.assertEqual(samples[0].metadata['resource_type'], 'BaseNfsService')
+    self.assertEqual(samples[0].metadata['resource_class'], 'AwsNfsService')
+
+  def testGetSamplesWithMountAttachTime(self):
+    nfs = self._CreateNfsService()
+    nfs.mount_attach_time = 1.5
+    samples = nfs.GetSamples()
+    self.assertLen(samples, 1)
+    self.assertEqual(samples[0].metric, 'Time to Attach Mount')
+    self.assertEqual(samples[0].value, 1.5)
+    self.assertEqual(samples[0].unit, 'seconds')
+    self.assertEqual(samples[0].metadata['resource_type'], 'BaseNfsService')
+    self.assertEqual(samples[0].metadata['resource_class'], 'AwsNfsService')
+
+  def testGetSamplesWithAllMetrics(self):
+    nfs = self._CreateNfsService()
+    nfs.time_to_mount = 10.1
+    nfs.time_to_resolve_dns = 3.4
+    nfs.create_mount_target_time = 2.0
+    nfs.mount_attach_time = 1.5
+    samples = nfs.GetSamples()
+    self.assertLen(samples, 4)
+    metrics = {s.metric: s.value for s in samples}
+    self.assertEqual(metrics['Time to Mount'], 10.1)
+    self.assertEqual(metrics['Time to Resolve DNS'], 3.4)
+    self.assertEqual(metrics['Time to Create Mount Target'], 2.0)
+    self.assertEqual(metrics['Time to Attach Mount'], 1.5)
+
+  def testIsReady(self):
+    nfs = self._CreateNfsService()
+    nfs.filer_id = _FILE_ID
+    self.issue_cmd.IsAvailable.return_value = True
+    self.assertTrue(nfs._IsReady())
+    self.issue_cmd.IsAvailable.assert_called_with(_FILE_ID)
+
+    self.issue_cmd.IsAvailable.return_value = False
+    self.assertFalse(nfs._IsReady())
+
+  def testExists(self):
+    nfs = self._CreateNfsService()
+    self.assertFalse(nfs._Exists())
+    nfs.filer_id = _FILE_ID
+    self.issue_cmd.Exists.return_value = True
+    self.assertTrue(nfs._Exists())
+    self.issue_cmd.Exists.assert_called_with(_FILE_ID)
+
+    self.issue_cmd.Exists.return_value = False
+    self.assertFalse(nfs._Exists())
+
   # tests for file system resource
   def testCreateFiler(self):
     nfs = self._CreateFiler()
@@ -219,25 +291,26 @@ class AwsNfsServiceTest(BaseTest):
 
   def testDeleteFilerWithoutDeletingMountFirst(self):
     nfs = self._CreateFiler()
-    nfs._CreateMount()
+    nfs.CreateAndWaitForMountTarget()
     self.issue_cmd.reset_mock()
     with self.assertRaises(errors.Resource.RetryableDeletionError):
       nfs._DeleteFiler()
     self.issue_cmd.assert_not_called()
 
   # tests for mount resource
-  def testCreateMount(self):
+  def testCreateMountTarget(self):
     nfs = self._CreateMount()
     self.assertEqual(_MOUNT_ID, nfs.mount_id)
-    self.issue_cmd.CreateMount.assert_called_with(
+    self.issue_cmd.CreateMountTarget.assert_called_with(
         _FILE_ID, _SUBNET_ID, _SECURITY_GROUP_ID
     )
+    self.issue_cmd.WaitUntilMountTargetAvailable.assert_called_with(_MOUNT_ID)
 
   def testCreateMountNoFiler(self):
     nfs = self._CreateNfsService()
     self.issue_cmd.reset_mock()
     with self.assertRaises(errors.Resource.CreationError):
-      nfs._CreateMount()
+      nfs.CreateAndWaitForMountTarget()
     self.issue_cmd.assert_not_called()
 
   def testDeleteMount(self):
@@ -250,8 +323,10 @@ class AwsNfsServiceTest(BaseTest):
     # summation of the testCreate and testDelete calls
     nfs = self._CreateNfsService()
     self.issue_cmd.CreateFiler.return_value = _FILE_ID
-    self.issue_cmd.CreateMount.return_value = _MOUNT_ID
+    self.issue_cmd.CreateMountTarget.return_value = _MOUNT_ID
+    self.issue_cmd.Exists.side_effect = [True, False]
     nfs.Create()
+    nfs.CreateAndWaitForMountTarget()
     nfs.Delete()
     self.issue_cmd.CreateFiler.assert_called_with(
         _NFS_TOKEN,
@@ -262,9 +337,12 @@ class AwsNfsServiceTest(BaseTest):
     )
     self.issue_cmd.AddTagsToFiler.assert_called_with(_FILE_ID)
     self.issue_cmd.WaitUntilFilerAvailable.assert_called_with(_FILE_ID)
-    self.issue_cmd.CreateMount.assert_called_with(
+    self.issue_cmd.IsAvailable.assert_called_with(_FILE_ID)
+    self.issue_cmd.Exists.assert_called_with(_FILE_ID)
+    self.issue_cmd.CreateMountTarget.assert_called_with(
         _FILE_ID, _SUBNET_ID, _SECURITY_GROUP_ID
     )
+    self.issue_cmd.WaitUntilMountTargetAvailable.assert_called_with(_MOUNT_ID)
     self.issue_cmd.DeleteMount.assert_called_with(_MOUNT_ID)
     self.issue_cmd.DeleteFiler.assert_called_with(_FILE_ID)
 
@@ -295,7 +373,7 @@ class AwsVirtualMachineTest(BaseTest):
   def _CallCreateScratchDisk(self, fs_type):
     nfs = self._CreateNfsService()
     self.issue_cmd.CreateFiler.return_value = _FILE_ID
-    self.issue_cmd.CreateMount.return_value = _MOUNT_ID
+    self.issue_cmd.CreateMountTarget.return_value = _MOUNT_ID
     nfs.Create()
     self._SetBmSpec(nfs)
     aws_machine = self._CreateMockVm()
@@ -424,14 +502,34 @@ class AwsEfsCommandsTest(BaseTest):
     self.aws.WaitUntilFilerAvailable(_FILE_ID)
     self.assertCalled('describe-file-systems', '--file-system-id', _FILE_ID)
 
+  def testIsAvailable(self):
+    self._SetResponse(_FILER.describe)
+    self.aws.IsAvailable(_FILE_ID)
+    self.assertCalled('describe-file-systems', '--file-system-id', _FILE_ID)
+
+  def testExists(self):
+    self._SetResponse(_FILER.describe)
+    self.assertTrue(self.aws.Exists(_FILE_ID))
+    self.assertCalled('describe-file-systems', '--file-system-id', _FILE_ID)
+
+  def testExistsFalse(self):
+    self.issue_cmd.return_value = ('', 'File system not found', 1)
+    self.assertFalse(self.aws.Exists(_FILE_ID))
+    self.assertCalled('describe-file-systems', '--file-system-id', _FILE_ID)
+
   def testMountAvailable(self):
     self._SetResponse(_MOUNT.describe)
     self.aws.IsMountAvailable(_MOUNT_ID)
     self.assertCalled('describe-mount-targets', '--mount-target-id', _MOUNT_ID)
 
-  def testCreateMount(self):
+  def testWaitUntilMountTargetAvailable(self):
+    self._SetResponse(_MOUNT.describe)
+    self.aws.WaitUntilMountTargetAvailable(_MOUNT_ID)
+    self.assertCalled('describe-mount-targets', '--mount-target-id', _MOUNT_ID)
+
+  def testCreateMountTarget(self):
     self._SetResponse(_MOUNT.create)
-    self.aws.CreateMount(_FILE_ID, _SUBNET_ID, _SECURITY_GROUP_ID)
+    self.aws.CreateMountTarget(_FILE_ID, _SUBNET_ID, _SECURITY_GROUP_ID)
     self.assertCalled(
         'create-mount-target',
         '--file-system-id',

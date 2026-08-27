@@ -29,6 +29,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.aws import aws_disk
+from perfkitbenchmarker.providers.aws import aws_nfs_service
 from perfkitbenchmarker.providers.aws import flags as aws_flags
 from perfkitbenchmarker.providers.aws import s3
 from perfkitbenchmarker.providers.aws import util
@@ -214,6 +215,8 @@ class CreateNonResourceDiskStrategy(  # pyrefly: ignore[inconsistent-inheritance
 class AWSSetUpNFSDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
   """Strategies to prepare NFS disks on AWS."""
 
+  nfs_service: aws_nfs_service.AwsNfsService
+
   def SetUpDiskOnLinux(self):
     nfs_disk = self.nfs_service.CreateNfsDisk()
     device_path = nfs_disk.GetDevicePath()
@@ -223,8 +226,8 @@ class AWSSetUpNFSDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
     )
 
     @vm_util.Retry(
-        poll_interval=60,
-        max_retries=10,
+        poll_interval=1,
+        max_retries=600,
         retryable_exceptions=(errors.Resource.CreationError,),
     )
     def _WaitForDnsResolution():
@@ -232,9 +235,26 @@ class AWSSetUpNFSDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
         raise errors.Resource.CreationError(
             f'DNS for {host} not resolved yet on VM.'
         )
+      if self.nfs_service.create_start_time is not None:
+        self.nfs_service.time_to_resolve_dns = (
+            time.time() - self.nfs_service.create_start_time
+        )
 
-    _WaitForDnsResolution()
+    background_tasks.RunParallelThreads(
+        [
+            (self.nfs_service.CreateAndWaitForMountTarget, (), {}),
+            (_WaitForDnsResolution, (), {}),
+        ],
+        max_concurrency=2,
+    )
+    mount_start_time = time.time()
     super().SetUpDiskOnLinux()
+    self.nfs_service.mount_attach_time = time.time() - mount_start_time
+    if self.nfs_service.create_mount_target_time is not None:
+      self.nfs_service.time_to_mount = (
+          self.nfs_service.create_mount_target_time
+          + self.nfs_service.mount_attach_time
+      )
     self.vm.RemoteCommand(
         'echo 15360 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'
         f' {self.disk_spec.mount_point})/read_ahead_kb'
