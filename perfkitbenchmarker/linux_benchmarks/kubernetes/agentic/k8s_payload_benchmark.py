@@ -227,8 +227,6 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
         "payload_size_mb": payload_size_mb,
         "payload_iterations": iterations,
         "concurrent_sessions": concurrent,
-        "successful_sessions": successful,
-        "failed_sessions": failed,
         "wall_time_s": round(wall_time, 2),
     }
 
@@ -306,6 +304,24 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     utils.EmitSampleIfPresent(BENCHMARK_NAME, samples, agg, "sandbox_rss_growth_mb", "sandbox_rss_growth", "MB", ns, extra)
 
     # Wall time
+    samples.append(
+        utils.MakeSample(
+            f"{BENCHMARK_NAME}_successful_sessions",
+            float(successful),
+            "count",
+            ns,
+            extra,
+        )
+    )
+    samples.append(
+        utils.MakeSample(
+            f"{BENCHMARK_NAME}_failed_sessions",
+            float(failed),
+            "count",
+            ns,
+            extra,
+        )
+    )
     samples.append(
         utils.MakeSample(
             f"{BENCHMARK_NAME}_wall_time",

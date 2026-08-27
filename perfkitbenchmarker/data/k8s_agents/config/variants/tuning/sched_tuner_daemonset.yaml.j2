@@ -27,6 +27,12 @@ spec:
         command: ["sh", "-c"]
         args:
           - |
+            # Standard Linux/GKE Defaults:
+            # sched_migration_cost_ns: 500000
+            # sched_min_granularity_ns: 3000000
+            # sched_wakeup_granularity_ns: 4000000
+
+            # Tuned values for high-density container workloads:
             echo 2212926 > /proc/sys/kernel/sched_migration_cost_ns
             echo 4656091 > /proc/sys/kernel/sched_min_granularity_ns
             echo 26403982 > /proc/sys/kernel/sched_wakeup_granularity_ns

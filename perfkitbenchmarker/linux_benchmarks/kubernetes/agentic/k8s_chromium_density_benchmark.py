@@ -201,8 +201,6 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     extra = {
         "run_id": run_id,
         "density": density,
-        "successful_sessions": successful,
-        "failed_sessions": failed,
         "task_count": FLAGS.k8s_chromium_density_task_count,
         "warmup_tasks": FLAGS.k8s_chromium_density_warmup_tasks,
         "wall_time_s": round(wall_time, 2),

@@ -211,8 +211,6 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     extra = {
         "run_id": run_id,
         "density": density,
-        "successful_sessions": successful,
-        "failed_sessions": failed,
         "sample_count": FLAGS.k8s_python_density_sample_count,
         "sample_warmup": FLAGS.k8s_python_density_sample_warmup,
         "wall_time_s": round(wall_time, 2),
@@ -256,6 +254,24 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
 
 
     # Wall time
+    samples.append(
+        utils.MakeSample(
+            f"{BENCHMARK_NAME}_successful_sessions",
+            float(successful),
+            "count",
+            ns,
+            extra,
+        )
+    )
+    samples.append(
+        utils.MakeSample(
+            f"{BENCHMARK_NAME}_failed_sessions",
+            float(failed),
+            "count",
+            ns,
+            extra,
+        )
+    )
     samples.append(
         utils.MakeSample(
             f"{BENCHMARK_NAME}_wall_time",
