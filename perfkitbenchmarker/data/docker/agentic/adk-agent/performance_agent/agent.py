@@ -285,5 +285,6 @@ root_agent = performance_agent
 app = App(
     name=root_agent.name,
     root_agent=root_agent,
+    # Uncomment to enable tracing when needed.
     # enable_tracing=True,
 )

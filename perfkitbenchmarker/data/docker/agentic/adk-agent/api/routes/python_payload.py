@@ -23,7 +23,7 @@ async def benchmark_python_payload(req: PayloadBenchmarkRequest):
         os.environ["SANDBOX_EXEC_TIMEOUT_S"] = str(req.sandbox_exec_timeout_s)
 
         logger.info("Starting Payload benchmark: payload_size_mb=%s iterations=%d concurrent_sessions=%d", req.payload_size_mb, req.payload_iterations, req.concurrent_sessions)
-        prompt = "start"
+        prompt = "(Unused non-empty prompt just to satisfy ADK Runner.run_async requirements)"
         
         thread_tasks = [
             asyncio.create_task(asyncio.to_thread(lambda sid=i: asyncio.run(run_single_session(sid, prompt))))

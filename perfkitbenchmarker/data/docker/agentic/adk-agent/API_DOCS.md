@@ -97,7 +97,7 @@ Raw ADK agent interaction.
 **Request Example:**
 ```json
 {
-  "prompt": "start"
+  "prompt": "(Unused now, as agent has a MockLLM)"
 }
 ```
 **Response Schema:**

@@ -126,6 +126,10 @@ class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
     After creation, AR repos may not be immediately visible to Cloud
     Build workers in other zones. Polls until confirmed, preventing
     push failures during RemoteBuild().
+    
+    Args:
+      timeout: The maximum time in seconds to wait for the repository to be queryable.
+      poll_interval: The time in seconds to wait between polling attempts.    
     """
     repo_name = self.name
     location = self.region
@@ -158,6 +162,9 @@ class GoogleArtifactRegistry(container_registry.BaseContainerRegistry):
     --config argument to `gcloud builds submit` and passes the
     image tag via --substitutions _IMAGE=<tag>.
     Otherwise uses the simple --tag shorthand.
+    
+    Args:
+      image: The container image object containing the name and directory to build.
     """
     full_tag = self.GetFullRegistryTag(image.name)
     if gcp_flags.SKIP_CONTAINER_IMAGE_BUILD.value:

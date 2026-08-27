@@ -223,7 +223,7 @@ def Run(benchmark_spec: object) -> list[sample.Sample]:
     pod_gone_times = {}  # pod_name -> elapsed_s when first absent
     ip_reclaim_time = None
 
-    while time.time() < deadline_drain:
+    while time.monotonic() < deadline_drain:
         elapsed = time.monotonic() - t_delete
 
         # Current pod names still present

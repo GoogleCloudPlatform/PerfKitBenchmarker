@@ -23,7 +23,7 @@ async def benchmark_python_density(req: BenchmarkRequest):
         os.environ["SANDBOX_EXEC_TIMEOUT_S"] = str(req.sandbox_exec_timeout_s)
 
         logger.info("Starting Python benchmark: sample_count=%d sample_warmup=%d concurrent_sessions=%d", req.sample_count, req.sample_warmup, req.concurrent_sessions)
-        prompt = "start"
+        prompt = "(Unused non-empty prompt just to satisfy ADK Runner.run_async requirements)"
         
         thread_tasks = [
             asyncio.create_task(asyncio.to_thread(lambda sid=i: asyncio.run(run_single_session(sid, prompt))))
