@@ -275,7 +275,8 @@ def Run(bm_spec: _BenchmarkSpec) -> List[sample.Sample]:
       for server_vm in bm_spec.vm_groups['servers']:
         redis_server.VerifyRedisAof(server_vm)
 
-  return result_with_maximum_total_ops_throughput + all_results + top_results
+  res = result_with_maximum_total_ops_throughput or []
+  return res + all_results + top_results
 
 
 def Cleanup(bm_spec: _BenchmarkSpec) -> None:
