@@ -163,6 +163,7 @@ def load_variant_data(results_dir, metric_prefix, sweep_label, benchmark):
     prefix_to_variant = {}
     for v in VARIANT_DESC.keys():
         clean_var = re.sub(r"[^a-zA-Z0-9]", "", v)
+        prefix_to_variant[clean_var[:4]] = v
         prefix_to_variant[clean_var] = v
 
     runs_dir = Path(results_dir) / "runs"
@@ -370,12 +371,32 @@ def generate_report(benchmark, description, sweep_label, metric_prefix,
     lines.append("## Saturation & Verdict Matrix")
     lines.append("")
     lines.append(f"Shows the **{short_name(verdict_metric, metric_prefix)}** delta vs baseline across the saturation curve.")
-    lines.append("Includes **CPU Contention (PSI)** to identify when the node becomes CPU-starved.")
-    lines.append("Format: `[Delta %] <br> *(CPU PSI: X%)*`")
+    lines.append("Includes relevant **Pressure Stall Information (PSI)** to identify node-level starvation.")
+    lines.append("Format: `[Delta %] <br> *(PSI: X%)*`")
     lines.append("")
 
-    # Find the CPU PSI metric (avg10 is best for immediate contention)
-    psi_metric = next((m for m in all_metrics if "psi_cpu_some_avg10" in m), None)
+    # Auto-detect relevant PSI metrics (only show if pressure > 0.5% at any point)
+    psi_metrics_to_show = []
+    for psi_type, label in [("cpu", "CPU"), ("memory", "Mem"), ("io", "IO")]:
+        metric_name = next((m for m in all_metrics if f"psi_{psi_type}_some_avg10" in m), None)
+        if metric_name:
+            is_relevant = False
+            for variant in variants + ["baseline"]:
+                for sv in sweep_vals:
+                    val = aggregated_data.get(variant, {}).get(sv, {}).get(metric_name)
+                    if val is not None and val > 0.5:
+                        is_relevant = True
+                        break
+                if is_relevant: break
+            
+            if is_relevant:
+                psi_metrics_to_show.append((label, metric_name))
+                
+    # Fallback: if no resource was pressured, default to showing CPU
+    if not psi_metrics_to_show:
+        cpu_metric = next((m for m in all_metrics if "psi_cpu_some_avg10" in m), None)
+        if cpu_metric:
+            psi_metrics_to_show.append(("CPU", cpu_metric))
 
     header = "| Variant | " + " | ".join(f"{sweep_label}={sv}" for sv in sweep_vals) + " |"
     sep = "|--------|" + "|".join("------:" for _ in sweep_vals) + "|"
@@ -389,8 +410,6 @@ def generate_report(benchmark, description, sweep_label, metric_prefix,
             d_info = v_deltas.get(verdict_metric, {})
             delta = d_info.get("delta_pct")
 
-            psi_val = aggregated_data.get(variant, {}).get(sv, {}).get(psi_metric) if psi_metric else None
-
             cell = ""
             if delta is not None:
                 icon = "✅" if delta < -5 else ("❌" if delta > 5 else "➖")
@@ -398,8 +417,16 @@ def generate_report(benchmark, description, sweep_label, metric_prefix,
             else:
                 cell += "N/A"
 
-            if psi_val is not None:
-                cell += f"<br>*(CPU: {psi_val:.1f}%)*"
+            # Append all relevant PSI metrics
+            psi_strings = []
+            for label, metric_name in psi_metrics_to_show:
+                if metric_name:
+                    val = aggregated_data.get(variant, {}).get(sv, {}).get(metric_name)
+                    if val is not None:
+                        psi_strings.append(f"{label}: {val:.1f}%")
+            
+            if psi_strings:
+                cell += f"<br>*({', '.join(psi_strings)})*"
 
             row += f" {cell} |"
         lines.append(row)
