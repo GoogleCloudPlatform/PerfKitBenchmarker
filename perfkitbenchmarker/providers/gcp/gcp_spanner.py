@@ -79,6 +79,11 @@ flags.DEFINE_string(
     'database created if unset. cloud_spanner_instance flag is '
     'mandatory to use this flag.',
 )
+_DIRECT_PATH = flags.DEFINE_bool(
+    'cloud_spanner_directpath',
+    False,
+    'If true, use direct path to connect to Cloud Spanner.',
+)
 _MAX_COMMIT_DELAY = flags.DEFINE_integer(
     'cloud_spanner_max_commit_delay',
     None,
@@ -842,6 +847,8 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
       metadata['gcp_spanner_default_backup_schedule_type'] = (
           self._default_backup_schedule_type
       )
+    if _DIRECT_PATH.value:
+      metadata['gcp_spanner_direct_path'] = True
     if _MAX_COMMIT_DELAY.value:
       metadata['gcp_spanner_max_commit_delay'] = _MAX_COMMIT_DELAY.value
     return metadata
@@ -984,6 +991,17 @@ class GcpSpannerInstance(relational_db.BaseRelationalDb):
     result = np.linalg.solve(a, b)
     return int(sum(result) * self.nodes)
 
+  def _PostCreate(self):
+    super()._PostCreate()
+    if _DIRECT_PATH.value:
+      command = (
+          'echo "export GOOGLE_SPANNER_ENABLE_DIRECT_ACCESS=true" | sudo tee -a'
+          ' /etc/environment'
+      )
+      background_tasks.RunThreaded(
+          lambda vm: vm.RemoteCommand(command), self.client_vms
+      )
+
 
 class GoogleSqlGcpSpannerInstance(GcpSpannerInstance):
   """GoogleSQL-based Spanner instance."""
@@ -1000,6 +1018,14 @@ class GoogleSqlGcpSpannerInstance(GcpSpannerInstance):
     if self.spec.db_flags:
       self._ApplyDbFlags()
     self._SetEndpoint()
+    if _DIRECT_PATH.value:
+      command = (
+          'echo "export GOOGLE_SPANNER_ENABLE_DIRECT_ACCESS=true" | sudo tee -a'
+          ' /etc/environment'
+      )
+      background_tasks.RunThreaded(
+          lambda vm: vm.RemoteCommand(command), self.client_vms
+      )
 
   def GetDefaultPort(self) -> int:
     return 0  # Port is unused

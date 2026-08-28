@@ -418,6 +418,8 @@ class SpannerPostgresCliQueryTools(PostgresCliQueryTools):
         '&> /dev/null &'
     )
 
+    if FLAGS.cloud_spanner_directpath:
+      command = 'GOOGLE_SPANNER_ENABLE_DIRECT_ACCESS=true ' + command
     self.vm.RemoteCommand(command)
     # Connections need some time to startup, or the run command fails.
     time.sleep(_PGADAPTER_CONNECT_WAIT_SEC)
