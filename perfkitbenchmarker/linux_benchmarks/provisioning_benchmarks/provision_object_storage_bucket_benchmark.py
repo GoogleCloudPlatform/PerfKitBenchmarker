@@ -18,6 +18,7 @@ import time
 from typing import List
 
 from absl import flags
+from perfkitbenchmarker import benchmark_spec as bm_spec
 from perfkitbenchmarker import configs
 from perfkitbenchmarker import object_storage_service
 from perfkitbenchmarker import providers
@@ -56,8 +57,8 @@ def _GetBucketName() -> str:
   return FLAGS.object_storage_bucket_name or 'pkb%s' % FLAGS.run_uri
 
 
-def Prepare(_) -> None:
-  pass
+def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
+  benchmark_spec.always_call_cleanup = True
 
 
 def Run(_) -> List[sample.Sample]:
