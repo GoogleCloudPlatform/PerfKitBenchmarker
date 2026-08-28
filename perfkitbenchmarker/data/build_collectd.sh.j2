@@ -32,9 +32,12 @@ function install_deps_debian() {
   export DEBIAN_FRONTEND=noninteractive
   sudo apt-get install -q -y \
     autoconf \
+    automake \
     bison \
     flex \
     libtool \
+    libtool-ltdl \
+    libltdl-dev \
     pkg-config \
     build-essential
 }
