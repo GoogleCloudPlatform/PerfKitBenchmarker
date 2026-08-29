@@ -35,6 +35,12 @@ from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
+USE_ALPHA_GCLOUD = flags.DEFINE_boolean(
+    'use_alpha_gcloud',
+    False,
+    'Whether to use the alpha version of the gcloud API.',
+)
+
 RATE_LIMITED_MESSAGE = 'Rate Limit Exceeded'
 
 # When too many read reqeusts are issued, receive a message like:
@@ -317,7 +323,7 @@ class GcloudCommand:
     self.additional_flags = []
     self._AddCommonFlags(common_resource)
     self.rate_limited = False
-    self.use_alpha_gcloud = False
+    self.use_alpha_gcloud = USE_ALPHA_GCLOUD.value
     self.use_beta_gcloud = False
 
   def GetCommand(self):
@@ -345,8 +351,7 @@ class GcloudCommand:
     cmd.extend(self.additional_flags)
     if self.use_alpha_gcloud and len(cmd) > 1 and cmd[1] != 'alpha':
       cmd.insert(1, 'alpha')
-
-    if self.use_beta_gcloud and len(cmd) > 1 and cmd[1] != 'beta':
+    elif self.use_beta_gcloud and len(cmd) > 1 and cmd[1] != 'beta':
       cmd.insert(1, 'beta')
     return cmd
 

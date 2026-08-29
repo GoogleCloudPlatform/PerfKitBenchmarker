@@ -96,6 +96,40 @@ class GcloudCommandTestCase(pkb_common_test_case.PkbCommonTestCase):
         ],
     )
 
+  @flagsaver.flagsaver(use_alpha_gcloud=True)
+  def testCommonFlagsWithAlphaGcloud(self):
+    cmd = util.GcloudCommand(None, 'compute', 'images', 'list')
+    self.assertEqual(
+        cmd.GetCommand(),
+        [
+            'path/gcloud',
+            'alpha',
+            'compute',
+            'images',
+            'list',
+            '--format',
+            'json',
+            '--quiet',
+        ],
+    )
+
+  @flagsaver.flagsaver(use_alpha_gcloud=True)
+  def testAlphaNotDuplicatedIfAlreadyPresent(self):
+    cmd = util.GcloudCommand(None, 'alpha', 'compute', 'images', 'list')
+    self.assertEqual(
+        cmd.GetCommand(),
+        [
+            'path/gcloud',
+            'alpha',
+            'compute',
+            'images',
+            'list',
+            '--format',
+            'json',
+            '--quiet',
+        ],
+    )
+
   def testCommonFlagsWithResource(self):
     gce_resource = GceResource(project=None)
     cmd = util.GcloudCommand(

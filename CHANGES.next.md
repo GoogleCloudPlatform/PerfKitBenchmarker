@@ -486,6 +486,7 @@
 -   Add `kubernetes_nginx_global_conf` and `kubernetes_nginx_server_conf` flags
     to `kubernetes_nginx_benchmark` for specifying custom nginx configs.
 -   Add the GCP project to metadata if it is specified.
+-   Add flag to support using alpha for all gcloud commands.
 
 ### Bug fixes and maintenance updates:
 
