@@ -52,6 +52,7 @@ GCP_DATABASE_VERSION_MAPPING = {
         '5.7': 'MYSQL_5_7',
         '8.0': 'MYSQL_8_0',
         '8.0.31': 'MYSQL_8_0_31',
+        '8.4': 'MYSQL_8_4',
     },
     sql_engine_utils.POSTGRES: {
         '9.6': 'POSTGRES_9_6',
@@ -81,7 +82,7 @@ GCP_DATABASE_VERSION_MAPPING = {
 }
 
 
-DEFAULT_MYSQL_VERSION = '8.0'
+DEFAULT_MYSQL_VERSION = '8.4'
 DEFAULT_POSTGRES_VERSION = '17'
 DEFAULT_SQL_SERVER_VERSION = '2017_Standard'
 

@@ -471,12 +471,14 @@ class MysqlCliQueryTools(ISQLQueryTools):
         or self.connection_properties.engine_version.startswith('5.7')
         or self.connection_properties.engine_version == '8.0'
         or self.connection_properties.engine_version.startswith('8.0')
+        or self.connection_properties.engine_version == '8.4'
+        or self.connection_properties.engine_version.startswith('8.4')
     ):
       mysql_name = 'mysqlclient'
     else:
       raise ValueError(
-          'Invalid database engine version: %s. Only 5.6, 5.7 '
-          'and 8.0 are supported.'
+          'Invalid database engine version: %s. Only 5.6, 5.7, 8.0 '
+          'and 8.4 are supported.'
           % self.connection_properties.engine_version
       )
     self.vm.Install(mysql_name)
