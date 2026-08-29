@@ -876,6 +876,13 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(call_count, 1)
     self.assertIn('--on-host-maintenance', cmd)
 
+  def testEnableVsockFlag(self):
+    """Tests that gce_enable_vsock sets vsock-mode and uses alpha gcloud."""
+    cmd, call_count = self._CreateVmCommand(gce_enable_vsock=True)
+    self.assertEqual(call_count, 1)
+    self.assertIn('gcloud alpha compute instances create', cmd)
+    self.assertIn('--vsock-mode enabled', cmd)
+
   def testGcpInstanceMetadataFlag(self):
     cmd, call_count = self._CreateVmCommand(
         gcp_instance_metadata=['k1:v1', 'k2:v2,k3:v3'], owner='test-owner'

@@ -207,6 +207,11 @@ GCE_CREATE_LOG_HTTP = flags.DEFINE_boolean(
     False,
     'If True, pass --log-http to gcloud compute instance create.',
 )
+GCE_ENABLE_VSOCK = flags.DEFINE_boolean(
+    'gce_enable_vsock',
+    False,
+    'Whether to enable VSOCK mode on the GCE VM.',
+)
 GCE_NODE_GROUP = flags.DEFINE_string(
     'gce_node_group',
     None,

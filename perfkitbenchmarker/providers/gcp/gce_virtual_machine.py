@@ -730,6 +730,9 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
       self.metadata['gce_egress_bandwidth_tier'] = (
           self.gce_egress_bandwidth_tier
       )
+    if gcp_flags.GCE_ENABLE_VSOCK.value:
+      cmd.use_alpha_gcloud = True
+      cmd.flags['vsock-mode'] = 'enabled'
 
     # TODO(pclay): remove when on-host-maintenance gets promoted to GA
     maintenance_flag = 'maintenance-policy'
