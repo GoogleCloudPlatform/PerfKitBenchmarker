@@ -45,7 +45,7 @@ DISABLE_HA = 'Disabled'
 ENABLE_HA = 'ZoneRedundant'
 
 DEFAULT_MYSQL_VERSION = '8.4'
-DEFAULT_POSTGRES_VERSION = '17'
+DEFAULT_POSTGRES_VERSION = '18'
 
 IS_READY_TIMEOUT = 60 * 60 * 1  # 1 hour (might take some time to prepare)
 
