@@ -306,6 +306,7 @@ TYPE_2_PROVIDER = dict([
     ('spectrum', 'aws'),
     ('trino', 'gcp'),
     ('clickhouse', 'gcp'),
+    ('looker', 'gcp'),
     ('snowflake_aws', 'aws'),
     ('snowflake_azure', 'azure'),
     ('snowflakeexternal_aws', 'aws'),
@@ -324,6 +325,7 @@ TYPE_2_MODULE = dict([
     ('spectrum', 'perfkitbenchmarker.providers.aws.spectrum'),
     ('trino', 'perfkitbenchmarker.providers.gcp.trino'),
     ('clickhouse', 'perfkitbenchmarker.providers.gcp.clickhouse'),
+    ('looker', 'perfkitbenchmarker.providers.gcp.looker'),
     ('snowflake_aws', 'perfkitbenchmarker.providers.aws.snowflake_aws'),
     (
         'snowflake_azure',

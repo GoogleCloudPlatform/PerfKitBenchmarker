@@ -85,7 +85,7 @@ class EdwConversationalAnalyticsBenchmarkTest(
     mock_config = mock.Mock()
     mock_config.edw_service.type = 'bigquery'
     with self.assertRaisesRegex(
-        errors.Config.InvalidValue, 'Missing required flag: --bq_ca_data_agent'
+        errors.Config.InvalidValue, 'Missing required flags: --bq_ca_data_agent'
     ):
       edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
 
@@ -122,9 +122,29 @@ class EdwConversationalAnalyticsBenchmarkTest(
     mock_config.edw_service.type = 'snowflake_aws'
     with self.assertRaisesRegex(
         errors.Config.InvalidValue,
-        'Missing required flag: --snowflake_ca_semantic_view',
+        'Missing required flags: --snowflake_ca_semantic_view',
     ):
       edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
+
+  def testCheckPrerequisitesRaisesValueErrorWhenLookerFlagsMissing(self):
+    mock_config = mock.Mock()
+    mock_config.edw_service.type = 'looker'
+    with self.assertRaisesRegex(
+        errors.Config.InvalidValue,
+        'Missing required flags: --looker_ca_data_agent, --looker_base_url,'
+        ' --looker_model_name',
+    ):
+      edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
+
+  @flagsaver.flagsaver(
+      looker_ca_data_agent='test-agent',
+      looker_base_url='https://example.looker.com',
+      looker_model_name='test-model',
+  )
+  def testCheckPrerequisitesDoesNotRaiseWhenLookerFlagsPresent(self):
+    mock_config = mock.Mock()
+    mock_config.edw_service.type = 'looker'
+    edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
 
   @flagsaver.flagsaver(
       bq_ca_data_agent=_TEST_AGENT_ID,
@@ -929,6 +949,116 @@ class EdwConversationalAnalyticsBenchmarkTest(
           sample.metadata.get('agent'), 'my-snowflake-semantic-view'
       )
       self.assertEqual(sample.metadata.get('client'), 'Snowflake')
+
+  @mock.patch.object(
+      edw_conversational_analytics_benchmark, '_RunConversationalQuery'
+  )
+  @mock.patch.object(
+      edw_conversational_analytics_benchmark, '_RunGroundTruthQuery'
+  )
+  @mock.patch.object(
+      edw_conversational_analytics_benchmark, '_RetrievePredictQuery'
+  )
+  @mock.patch.object(edw_conversational_analytics_benchmark, '_RunPredictQuery')
+  def testRunIterationLooker(
+      self, mock_run_predict, mock_retrieve_predict, mock_run_gt, mock_run_ca
+  ):
+    # Arrange
+    question_list = [mock.Mock(), mock.Mock()]
+    ca_client = mock.Mock()
+    ca_client.fetches_results_immediately = True
+    query_client = mock.Mock()
+    looker_service = mock.Mock(SERVICE_TYPE='looker')
+    mock_retrieve_predict.return_value = 'SELECT 1;'
+
+    suite = edw_conversational_analytics_benchmark._BenchmarkPerformanceSuite(
+        run_ground_truth=False,
+        edw_service_instance=looker_service,
+        ca_client=ca_client,
+        query_client=query_client,
+        question_list=question_list,
+        ca_expected_queries=['q1', 'q2'],
+        ca_performance=mock.Mock(),
+        predict_expected_queries=['q1_predict', 'q2_predict'],
+        predict_query_performance=mock.Mock(),
+        gt_expected_queries=[],
+        gt_query_performance=None,
+    )
+
+    # Act
+    ca_perf, gt_perf, predict_perf = suite.RunIteration(iteration_id='1')
+
+    # Assert
+    self.assertEqual(mock_run_ca.call_count, 2)
+    self.assertEqual(mock_retrieve_predict.call_count, 2)
+    self.assertEqual(mock_run_predict.call_count, 2)
+    mock_run_gt.assert_not_called()
+    self.assertIsNotNone(ca_perf)
+    self.assertIsNone(gt_perf)
+    self.assertIsNotNone(predict_perf)
+
+  @flagsaver.flagsaver(
+      looker_ca_data_agent='test-agent',
+      looker_base_url='https://example.looker.com',
+      looker_model_name='test-model',
+      edw_suite_iterations=1,
+      ca_dataset='call_center',
+  )
+  @mock.patch.object(
+      edw_conversational_analytics_benchmark._BenchmarkPerformanceSuite,
+      'RunIteration',
+      autospec=True,
+  )
+  def testRunLooker(self, mock_run_iteration):
+    # Arrange
+    mock_looker_service = mock.Mock(SERVICE_TYPE='looker')
+    mock_looker_service.GetMetadata.return_value = {'service_meta': 'val'}
+    mock_looker_client = mock.Mock()
+    mock_looker_service.GetClientInterface.return_value = mock_looker_client
+
+    questions = [
+        edw_service.ConversationalAnalyticsQuestion(
+            question='What is the total revenue?',
+            db_id='call_center',
+            ground_truth_sql='SELECT 1;',
+        )
+    ]
+    mock_looker_service.GetConversationalAnalyticsQuestionList.return_value = (
+        questions
+    )
+
+    mock_ca_client = mock.Mock()
+    mock_ca_client.fetches_results_immediately = True
+    mock_ca_client.GetMetadata.return_value = {'client': 'Looker'}
+
+    looker_spec = mock.Mock(
+        edw_service=mock_looker_service,
+        ca_client=mock_ca_client,
+        vms=[self.mock_client_interface.client_vm],
+    )
+
+    ca_iter = results_aggregator.EdwPowerIterationPerformance('1', 1)
+    ca_iter.add_query_performance('What is the total revenue?', 1.5, {})
+    predict_iter = results_aggregator.EdwPowerIterationPerformance('1', 1)
+    predict_iter.add_query_performance(
+        'What is the total revenue?_predict', 1.0, {}
+    )
+
+    mock_run_iteration.return_value = (ca_iter, None, predict_iter)
+
+    # Act
+    samples = edw_conversational_analytics_benchmark.Run(looker_spec)
+
+    # Assert
+    self.assertEqual(mock_run_iteration.call_count, 1)
+    suite = mock_run_iteration.call_args[0][0]
+    self.assertFalse(suite.run_ground_truth)
+    self.assertEqual(suite.gt_expected_queries, [])
+    self.assertIsNone(suite.gt_query_performance)
+
+    for sample in samples:
+      self.assertFalse(sample.metadata.get('run_ground_truth'))
+      self.assertNotIn('_gt', sample.metric)
 
 
 if __name__ == '__main__':

@@ -26,17 +26,26 @@ from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import bigquery
+from perfkitbenchmarker.providers.gcp import looker
 
 BENCHMARK_NAME = 'edw_conversational_analytics_benchmark'
 
 ENV_FILE = '.env'
+LOOKER_CLIENT_SECRET_FILE = 'looker_client_secret.txt'
 BENCHMARK_DATA = {
-    ENV_FILE: '0a557c7d85632be330ce0d04da99570774b7d7576b07bd6118b99d05d97dcda1'
+    ENV_FILE: (
+        '0a557c7d85632be330ce0d04da99570774b7d7576b07bd6118b99d05d97dcda1'
+    ),
+    LOOKER_CLIENT_SECRET_FILE: (
+        '6f1564ff9b7d0d1e220680c64ffb7183e7cc642f53153f22e2224e904c12286d'
+    ),
 }
 
 BENCHMARK_CONFIG = """
 edw_conversational_analytics_benchmark:
   description: Conversational Analytics performance benchmark using BigQuery.
+  flags:
+    gcloud_scopes: cloud-platform
   edw_service:
     type: bigquery
     cluster_identifier: _cluster_id_
@@ -53,6 +62,12 @@ FLAGS = flags.FLAGS
 
 _QUERY_RESULT_SIZE_LIMIT_BYTES = 800 * 1024
 
+_CA_ENV_FILE = flags.DEFINE_string(
+    'ca_env_file',
+    ENV_FILE,
+    'The name of the environment file to install for Conversational Analytics.',
+)
+
 
 @dataclasses.dataclass
 class _BenchmarkPerformanceSuite:
@@ -65,7 +80,10 @@ class _BenchmarkPerformanceSuite:
   ca_expected_queries: list[str]
   ca_performance: results_aggregator.EdwBenchmarkPerformance
   gt_expected_queries: list[str]
-  gt_query_performance: results_aggregator.EdwBenchmarkPerformance
+  gt_query_performance: (
+      results_aggregator.EdwBenchmarkPerformance | None
+  )
+  run_ground_truth: bool = True
   predict_expected_queries: list[str] | None = None
   predict_query_performance: (
       results_aggregator.EdwBenchmarkPerformance | None
@@ -95,6 +113,13 @@ class _BenchmarkPerformanceSuite:
         if q.db_id == edw_service.CA_DATASET.value
     ]
 
+    # TODO(shuninglin): Temporarily allow Looker to run without GT due to
+    # lack of GT queries. See:
+    # https://buganizer.corp.google.com/issues/541264911#comment17
+    run_ground_truth = (
+        edw_service_instance.SERVICE_TYPE != looker.Looker.SERVICE_TYPE
+    )
+
     ca_expected_queries = [q.question for q in question_list]
 
     ca_performance = results_aggregator.EdwBenchmarkPerformance(
@@ -102,11 +127,15 @@ class _BenchmarkPerformanceSuite:
         expected_queries=ca_expected_queries,
     )
 
-    gt_expected_queries = [f'{q.question}_gt' for q in question_list]
-    gt_query_performance = results_aggregator.EdwBenchmarkPerformance(
-        total_iterations=FLAGS.edw_suite_iterations,
-        expected_queries=gt_expected_queries,
-    )
+    if run_ground_truth:
+      gt_expected_queries = [f'{q.question}_gt' for q in question_list]
+      gt_query_performance = results_aggregator.EdwBenchmarkPerformance(
+          total_iterations=FLAGS.edw_suite_iterations,
+          expected_queries=gt_expected_queries,
+      )
+    else:
+      gt_expected_queries = []
+      gt_query_performance = None
 
     predict_expected_queries = [f'{q.question}_predict' for q in question_list]
     predict_query_performance = results_aggregator.EdwBenchmarkPerformance(
@@ -123,6 +152,7 @@ class _BenchmarkPerformanceSuite:
         ca_performance=ca_performance,
         gt_expected_queries=gt_expected_queries,
         gt_query_performance=gt_query_performance,
+        run_ground_truth=run_ground_truth,
         predict_expected_queries=predict_expected_queries,
         predict_query_performance=predict_query_performance,
     )
@@ -146,7 +176,7 @@ class _BenchmarkPerformanceSuite:
         - ca_iteration_performance: EdwPowerIterationPerformance containing
           conversational analytics query performance.
         - gt_iteration_performance: EdwPowerIterationPerformance or None if the
-          service is a competitor.
+          service does not run ground truth.
         - predict_iteration_performance: EdwPowerIterationPerformance containing
           predict SQL query performance.
     """
@@ -160,10 +190,15 @@ class _BenchmarkPerformanceSuite:
         total_queries=len(self.predict_expected_queries),  # pyrefly: ignore[bad-argument-type]
     )
 
-    gt_iteration_performance = results_aggregator.EdwPowerIterationPerformance(
-        iteration_id=iteration_id,
-        total_queries=len(self.gt_expected_queries),  # pyrefly: ignore[bad-argument-type]
-    )
+    if self.run_ground_truth:
+      gt_iteration_performance = (
+          results_aggregator.EdwPowerIterationPerformance(
+              iteration_id=iteration_id,
+              total_queries=len(self.gt_expected_queries),  # pyrefly: ignore[bad-argument-type]
+          )
+      )
+    else:
+      gt_iteration_performance = None
 
     for q in self.question_list:
       _RunConversationalQuery(q, self.ca_client, ca_iteration_performance)
@@ -189,7 +224,8 @@ class _BenchmarkPerformanceSuite:
               },
           )
 
-      _RunGroundTruthQuery(q, self.query_client, gt_iteration_performance)
+      if gt_iteration_performance is not None:
+        _RunGroundTruthQuery(q, self.query_client, gt_iteration_performance)
 
     return (
         ca_iteration_performance,
@@ -200,16 +236,20 @@ class _BenchmarkPerformanceSuite:
   def BuildResults(self) -> list[Any]:
     """Builds and returns the list of performance samples."""
     if (
-        self.gt_query_performance
+        self.run_ground_truth
+        and self.gt_query_performance
         and not self.gt_query_performance.is_successful()
     ):
       raise errors.Benchmarks.RunError('Ground Truth query execution failed.')
 
     benchmark_metadata = {
         'dataset': edw_service.CA_DATASET.value,
+        'run_ground_truth': self.run_ground_truth,
     }
     if bigquery.BQ_CA_DATA_AGENT.value:
       benchmark_metadata['agent'] = bigquery.BQ_CA_DATA_AGENT.value
+    if looker.LOOKER_CA_DATA_AGENT.value:
+      benchmark_metadata['agent'] = looker.LOOKER_CA_DATA_AGENT.value
     if FLAGS.snowflake_ca_semantic_view:
       benchmark_metadata['agent'] = FLAGS.snowflake_ca_semantic_view
     benchmark_metadata.update(self.edw_service_instance.GetMetadata())
@@ -240,16 +280,18 @@ class _BenchmarkPerformanceSuite:
                 metadata=benchmark_metadata
             )
         )
-    results.extend(
-        self.gt_query_performance.get_all_query_performance_samples(
-            metadata=benchmark_metadata
+    if self.gt_query_performance:
+      results.extend(
+          self.gt_query_performance.get_all_query_performance_samples(
+              metadata=benchmark_metadata
+          )
+      )
+      if self.gt_query_performance.is_successful():
+        results.extend(
+            self.gt_query_performance.get_queries_geomean_performance_samples(
+                metadata=benchmark_metadata
+            )
         )
-    )
-    results.extend(
-        self.gt_query_performance.get_queries_geomean_performance_samples(
-            metadata=benchmark_metadata
-        )
-    )
 
     return results
 
@@ -270,19 +312,30 @@ def CheckPrerequisites(benchmark_config):
     )
   edw_service_type = benchmark_config.edw_service.type
 
+  missing_flags = []
   if edw_service_type == 'bigquery':
     if (
         bigquery.BQ_CA_CLIENT.value == 'bq_data_agent'
         and not bigquery.BQ_CA_DATA_AGENT.value
     ):
-      raise errors.Config.InvalidValue(
-          'Missing required flag: --bq_ca_data_agent'
-      )
+      missing_flags.append('--bq_ca_data_agent')
+  elif edw_service_type == 'looker':
+    required_flags = [
+        looker.LOOKER_CA_DATA_AGENT,
+        looker.LOOKER_BASE_URL,
+        looker.LOOKER_MODEL_NAME,
+    ]
+    for flag in required_flags:
+      if not flag.value:
+        missing_flags.append(f'--{flag.name}')
   elif edw_service_type.startswith('snowflake'):
     if not FLAGS.snowflake_ca_semantic_view:
-      raise errors.Config.InvalidValue(
-          'Missing required flag: --snowflake_ca_semantic_view'
-      )
+      missing_flags.append('--snowflake_ca_semantic_view')
+
+  if missing_flags:
+    raise errors.Config.InvalidValue(
+        f'Missing required flags: {", ".join(missing_flags)}'
+    )
 
 
 def Prepare(benchmark_spec):
