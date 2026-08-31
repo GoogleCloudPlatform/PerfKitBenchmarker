@@ -119,11 +119,11 @@ class MaxPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
       bench.Prepare(_make_spec())
       bench.Run(_make_spec())
     mock_apply.assert_called_with(
-        'container/kubernetes_deployment_startup/slowjvmstartup.yaml.j2',
+        'container/kubernetes_deployment_startup/jenkins.yaml.j2',
         name='startup',
         image='test_image',
     )
-    mock_wait.assert_called_with('deployment/startup', timeout=600)
+    mock_wait.assert_called_with('deployment/startup', timeout=1200)
 
   def testApplyManifestAndWaitForRolloutCalledVllm(self):
     """Verify ApplyManifest and WaitForRollout for vllm workload."""
@@ -151,7 +151,7 @@ class MaxPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
         gpu_memory_utilization=0.5,
         memory_limit='8Gi',
     )
-    mock_wait.assert_called_with('deployment/vllm-startup', timeout=600)
+    mock_wait.assert_called_with('deployment/vllm-startup', timeout=1200)
 
   def testApplyManifestAndWaitForRolloutCalledOptimized(self):
     """Verify ApplyManifest and WaitForRollout for use_cpu_startup_boost=True."""
@@ -171,7 +171,7 @@ class MaxPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
         cloud='GCP',
         kubernetes_deployment_startup_use_cpu_startup_boost=True,
         kubernetes_deployment_startup_workload='jvm',
-        kubernetes_deployment_startup_boost_factor=2,
+        kubernetes_deployment_startup_boost_factor=3,
     ):
       bench.Prepare(_make_spec())
       bench.Run(_make_spec())
@@ -179,18 +179,18 @@ class MaxPodReadyTimeTest(pkb_common_test_case.PkbCommonTestCase):
         ['get', 'crd', 'verticalpodautoscalers.autoscaling.k8s.io'], timeout=180
     )
     mock_apply.assert_any_call(
-        'container/kubernetes_deployment_startup/slowjvmstartup_vpa.yaml.j2',
+        'container/kubernetes_deployment_startup/jenkins_vpa.yaml.j2',
         name='startup',
-        boost_factor=2,
+        boost_factor=3,
         max_allowed_cpu='1',
         duration_seconds=120,
     )
     mock_apply.assert_any_call(
-        'container/kubernetes_deployment_startup/slowjvmstartup.yaml.j2',
+        'container/kubernetes_deployment_startup/jenkins.yaml.j2',
         name='startup',
         image='test_image',
     )
-    mock_wait.assert_called_with('deployment/startup', timeout=600)
+    mock_wait.assert_called_with('deployment/startup', timeout=1200)
 
   def testRaisesWhenNoPodsReady(self):
     """RuntimeError raised when no pod conditions found."""
