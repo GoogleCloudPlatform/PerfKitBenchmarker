@@ -75,9 +75,23 @@ hammerdbcli:
           GCP:
             machine_type: n2-standard-4
             zone: us-central1-b
+          AWS:
+            machine_type: m7i.large
+            zone: us-east-1a
+          Azure:
+            machine_type: Standard_D2s_v6
+            zone: eastus
         disk_spec:
           GCP:
             disk_type: pd-ssd
+            disk_size: 500
+            mount_point: /scratch
+          AWS:
+            disk_type: gp3
+            disk_size: 500
+            mount_point: /scratch
+          Azure:
+            disk_type: PremiumV2_LRS
             disk_size: 500
             mount_point: /scratch
       servers_replicas:
