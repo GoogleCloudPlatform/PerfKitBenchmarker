@@ -10,21 +10,22 @@ SELECT name
 FROM sys.databases d
 WHERE
   d.state = 0
-    OPEN db_cursor;
+  AND HAS_DBACCESS(name) = 1;
+
+OPEN db_cursor;
 
 FETCH NEXT FROM db_cursor INTO @dbname;
 
-WHILE @@FETCH_STATUS
-= 0
-  BEGIN
-SET
-  @cmd = 'USE '
-    + QUOTENAME(@dbname)
-    + '; SELECT DB_NAME() as databasename,* FROM sys.database_scoped_configurations'
-      EXEC sp_executesql @cmd;
+WHILE @@FETCH_STATUS = 0
+BEGIN
+  SET @cmd =
+      'USE '
+      + QUOTENAME(@dbname)
+      + '; SELECT DB_NAME() as databasename,* FROM'
+      + ' sys.database_scoped_configurations';
+  EXEC sp_executesql @cmd;
 
-FETCH NEXT FROM db_cursor INTO @dbname;
-
+  FETCH NEXT FROM db_cursor INTO @dbname;
 END;
 
 CLOSE db_cursor;

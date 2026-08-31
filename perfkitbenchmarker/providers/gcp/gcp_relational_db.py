@@ -134,6 +134,7 @@ _SQLSERVER_METRICS = [
     ('sqlserver/memory/buffer_cache_hit_ratio', '%', lambda x: x * 100),
     ('sqlserver/memory/memory_grants_pending', 'count', None),
     ('sqlserver/memory/free_list_stall_count', 'count', None),
+    ('sqlserver/transactions/batch_request_count', 'count', None),
 ]
 # pyformat: enable
 

@@ -254,15 +254,23 @@ CAPTURE_IO_STATS_SQL = (
 
 CAPTURE_TRACE_STATUS_SQL = 'DBCC TRACESTATUS(-1)'
 CAPTURE_SERVER_EVENT_SESSIONS_SQL = 'SELECT * FROM sys.server_event_sessions'
+CAPTURE_SYS_CONFIGURATIONS_SQL = 'SELECT * FROM sys.configurations'
+CAPTURE_SYS_INFO_SQL = (
+    'SELECT cpu_count,hyperthread_ratio,physical_memory_kb,virtual_memory_kb,'
+    'max_workers_count,virtual_machine_type_desc,softnuma_configuration_desc,'
+    'sql_memory_model_desc,socket_count,cores_per_socket,numa_node_count,'
+    'container_type_desc FROM sys.dm_os_sys_info'
+)
 CAPTURE_PERFORMANCE_COUNTERS_SQL = (
     'SELECT SYSDATETIME() AS CURRENTTIME,'
     '[cntr_value] AS countervalue,counter_name '
     'FROM sys.dm_os_performance_counters '
-    "WHERE [object_name] LIKE '%Manager%' "
-    "AND [counter_name] IN ('Page life expectancy',"
+    "WHERE ([object_name] LIKE '%Manager%' OR [object_name] LIKE"
+    " '%SQL Statistics%') AND [counter_name] IN ('Page life expectancy',"
     "'Buffer cache hit ratio','Buffer cache hit ratio base',"
     "'Lazy writes/sec','Memory Grants Pending','Free list stalls/sec',"
-    "'Target Server Memory (KB)','Total Server Memory (KB)')"
+    "'Target Server Memory (KB)','Total Server Memory (KB)',"
+    "'Batch Requests/sec')"
 )
 SELECT_VERSION_SQL = 'SELECT @@VERSION'
 
@@ -475,6 +483,20 @@ class BaseRelationalDb(resource.BaseResource):
         CAPTURE_SERVER_EVENT_SESSIONS_SQL
     )
 
+  def QuerySysConfigurations(self) -> tuple[str, str]:
+    if self.engine_type != sql_engine_utils.SQLSERVER:
+      return ('', '')
+    logging.info('Querying sys configurations')
+    return self.client_vm_query_tools.IssueSqlCommand(
+        CAPTURE_SYS_CONFIGURATIONS_SQL
+    )
+
+  def QuerySysInfo(self) -> tuple[str, str]:
+    if self.engine_type != sql_engine_utils.SQLSERVER:
+      return ('', '')
+    logging.info('Querying sys info')
+    return self.client_vm_query_tools.IssueSqlCommand(CAPTURE_SYS_INFO_SQL)
+
   def QueryPerfSnapReport(self) -> tuple[str, str]:
     """Queries PerfSnap report if supported by the engine."""
     return ('', '')
@@ -488,6 +510,8 @@ class BaseRelationalDb(resource.BaseResource):
         (self.QueryDatabaseScopedConfigurations, 'DB Configuration'),
         (self.QueryTraceStatus, 'Trace Status'),
         (self.QueryServerEventSessions, 'Server Event Sessions'),
+        (self.QuerySysConfigurations, 'Sys Configurations'),
+        (self.QuerySysInfo, 'Sys Info'),
         (self.QueryPerfSnapReport, 'PerfSnap Report'),
     ]
 
