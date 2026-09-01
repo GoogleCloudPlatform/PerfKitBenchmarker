@@ -128,6 +128,7 @@ _MACHINE_TYPE_PREFIX_TO_ARM_ARCH = {
     'r8g': 'graviton4',
     'i8g': 'graviton4',
     'm9g': 'graviton5',
+    'r9g': 'graviton5',
     't4g': 'graviton2',
     'im4g': 'graviton2',
     'is4ge': 'graviton2',
