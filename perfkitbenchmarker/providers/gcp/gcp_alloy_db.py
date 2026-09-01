@@ -444,6 +444,7 @@ class GCPAlloyRelationalDb(relational_db.BaseRelationalDb):
       flags_updated = True
     return flags_updated
 
+  @vm_util.Retry(timeout=UPDATE_TIMEOUT)
   def RestartInstance(self):
     cmd_string = [
         'instances',
