@@ -27,9 +27,6 @@ _DPDK_INSTALL_PLATFORM = flags.DEFINE_string(
 
 DPDK_GIT_REPO = 'https://github.com/DPDK/dpdk.git'
 DPDK_GIT_REPO_TAG = 'v26.03'
-DPDK_AWS_DRIVER_GIT_REPO = 'https://github.com/amzn/amzn-drivers'
-DPDK_AWS_DRIVER_GIT_REPO_TAG = 'ena_linux_2.16.1'
-DPDK_AWS_VFIO_DRIVER_DIR = 'amzn-drivers/userspace/dpdk/enav2-vfio-patch'
 
 
 def _Install(vm):
@@ -60,20 +57,6 @@ def AptInstall(vm):
       'build-essential ninja-build meson git pciutils pkg-config'
       ' python3-pyelftools libnuma-dev'
   )
-  # https://github.com/amzn/amzn-drivers/tree/master/userspace/dpdk#6-vfio-pci-and-igb_uio
-  if vm.CLOUD == 'AWS':
-    vm.RemoteCommand(f'git clone {DPDK_AWS_DRIVER_GIT_REPO}')
-    vm.RemoteCommand(
-        f'cd amzn-drivers && git checkout {DPDK_AWS_DRIVER_GIT_REPO_TAG}'
-    )
-    vm.RemoteCommand(
-        "sudo sed -i 's/^Types: deb$/Types: deb deb-src/'"
-        ' /etc/apt/sources.list.d/ubuntu.sources'
-    )
-    vm.RemoteCommand('sudo apt update')
-    vm.RobustRemoteCommand(
-        f'cd {DPDK_AWS_VFIO_DRIVER_DIR} && sudo ./get-vfio-with-wc.sh'
-    )
   _Install(vm)
 
 
@@ -82,18 +65,6 @@ def YumInstall(vm):
   vm.Install('pip')
   vm.InstallPackages('git kernel-devel kernel-headers libatomic numactl-devel')
   vm.RemoteCommand('sudo pip3 install meson ninja pyelftools')
-  if vm.CLOUD == 'AWS':
-    vm.RemoteCommand(f'git clone {DPDK_AWS_DRIVER_GIT_REPO}')
-    vm.RemoteCommand(
-        f'cd amzn-drivers && git checkout {DPDK_AWS_DRIVER_GIT_REPO_TAG}'
-    )
-    vm.RemoteCommand(
-        'sudo sed -i "s/linux-image-unsigned-/linux-image-/g"'
-        f' {DPDK_AWS_VFIO_DRIVER_DIR}/get-vfio-with-wc.sh'
-    )
-    vm.RobustRemoteCommand(
-        f'cd {DPDK_AWS_VFIO_DRIVER_DIR} && sudo ./get-vfio-with-wc.sh'
-    )
   _Install(vm)
 
 
