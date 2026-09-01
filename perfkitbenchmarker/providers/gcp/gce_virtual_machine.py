@@ -1526,13 +1526,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     all_vms = json.loads(stdout)
     num_teardown_skipped_vms = 0
     for vm_json in all_vms:
-      for item in vm_json['metadata']['items']:
-        if (
-            item['key'] == PKB_SKIPPED_TEARDOWN_METADATA_KEY
-            and item['value'] == 'true'
-        ):
-          num_teardown_skipped_vms += 1
-          continue
+      try:
+        for item in vm_json['metadata']['items']:
+          if (
+              item['key'] == PKB_SKIPPED_TEARDOWN_METADATA_KEY
+              and item['value'] == 'true'
+          ):
+            num_teardown_skipped_vms += 1
+            break
+      except KeyError:
+        logging.warning(
+            'VM %s does not have expected metadata structure, skipping.',
+            vm_json.get('name', 'UNKNOWN'),
+        )
     return num_teardown_skipped_vms
 
   def UpdateTimeoutMetadata(self):

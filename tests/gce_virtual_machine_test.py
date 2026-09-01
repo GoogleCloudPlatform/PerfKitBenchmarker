@@ -451,6 +451,74 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(fake_rets):
       self.assertEqual(vm._Exists(), expected)
 
+  def testGetNumTeardownSkippedVms(self):
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type='test_machine_type',
+        project='p',
+    )
+    vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+    vm.zone = 'us-central1-a'
+    vms_json = [
+        {
+            'name': 'vm-skipped-1',
+            'metadata': {
+                'items': [
+                    {'key': 'pkb_skipped_teardown', 'value': 'true'},
+                ]
+            },
+        },
+        {
+            'name': 'vm-not-skipped',
+            'metadata': {
+                'items': [
+                    {'key': 'pkb_skipped_teardown', 'value': 'false'},
+                ]
+            },
+        },
+        {
+            'name': 'vm-missing-metadata',
+        },
+        {
+            'name': 'vm-missing-items',
+            'metadata': {},
+        },
+        {
+            'name': 'vm-malformed-item',
+            'metadata': {'items': [{'invalid': 'format'}]},
+        },
+        {
+            'name': 'vm-skipped-2',
+            'metadata': {
+                'items': [
+                    {'key': 'other_key', 'value': 'val'},
+                    {'key': 'pkb_skipped_teardown', 'value': 'true'},
+                ]
+            },
+        },
+    ]
+    fake_rets = [(json.dumps(vms_json), '', 0)]
+    with PatchCriticalObjects(fake_rets):
+      with self.assertLogs(level='WARNING') as logs:
+        count = vm.GetNumTeardownSkippedVms()
+        self.assertEqual(count, 2)
+        log_output = '\n'.join(logs.output)
+        self.assertIn(
+            'VM vm-missing-metadata does not have expected metadata structure,'
+            ' skipping.',
+            log_output,
+        )
+        self.assertIn(
+            'VM vm-missing-items does not have expected metadata structure,'
+            ' skipping.',
+            log_output,
+        )
+        self.assertIn(
+            'VM vm-malformed-item does not have expected metadata structure,'
+            ' skipping.',
+            log_output,
+        )
+
 
 def _CreateFakeDiskMetadata(image, fake_disk):
   fake_disk = copy.copy(fake_disk)
