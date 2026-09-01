@@ -37,6 +37,19 @@ from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
 
+_LUSTRE_SET_STRIPE = flags.DEFINE_boolean(
+    'lustre_set_stripe',
+    False,
+    'Whether to set stripe count to -1 on the Lustre mount point.',
+)
+_LUSTRE_MAX_DIRTY_MB = flags.DEFINE_integer(
+    'lustre_max_dirty_mb',
+    None,
+    'The max dirty mb to set on osc.*.max_dirty_mb for Lustre.',
+    lower_bound=1,
+    upper_bound=2048,
+)
+
 FLAGS = flags.FLAGS
 
 virtual_machine = Any  # virtual_machine.py imports this module.
@@ -316,13 +329,15 @@ class SetUpLustreDiskStrategy(SetUpDiskStrategy):
     )
     lustre_disk.UpdateDevicePath(self.disk_spec.mount_point)
     self.vm.scratch_disks.append(lustre_disk)
-    # Stripe over all OSTs. Consider updating to a flag for smaller files.
-    self.vm.RemoteCommand(
-        f'sudo lfs setstripe -c -1 {self.disk_spec.mount_point}'
-    )
-    self.vm.RemoteCommand(
-        'sudo lctl set_param osc.*.max_dirty_mb=2000', ignore_failure=True
-    )
+    if FLAGS.lustre_set_stripe:
+      self.vm.RemoteCommand(
+          f'sudo lfs setstripe -c -1 {self.disk_spec.mount_point}'
+      )
+    if FLAGS.lustre_max_dirty_mb:
+      self.vm.RemoteCommand(
+          f'sudo lctl set_param osc.*.max_dirty_mb={FLAGS.lustre_max_dirty_mb}',
+          ignore_failure=True,
+      )
 
 
 class SetUpSMBDiskStrategy(SetUpDiskStrategy):

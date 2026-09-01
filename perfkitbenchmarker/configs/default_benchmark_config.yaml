@@ -603,11 +603,10 @@ fio_object_storage_latency_20000mb:
 fio_managed_lustre_latency_20000mb:
   name: fio_managed_lustre
   flags:
-    fio_generate_scenarios: rand_4k_read_20000MB_iodepth-1_numjobs-1
+    fio_generate_scenarios: rand_4k_read_20000MB_iodepth-1_numjobs-1,rand_4k_write_20000MB_iodepth-1_numjobs-1
     fio_fill_size: 20000M
     fio_fill_block_size: 2M
     fio_nr_files: 10000
-    fio_runtime: 0
 
 fio_remote_ssd_max_iops:
   name: fio
@@ -681,6 +680,8 @@ io500_lustre:
     openmpi_version: 4.1.6
     mpi_ranks_list: [1, 2, 4, 8, 16, 32, 64, 128, 192]
     ior_easy_direct_io: True
+    lustre_set_stripe: True
+    lustre_max_dirty_mb: 2000
 
 gpu_jobs_provisioning:
   name: jobs_benchmark
