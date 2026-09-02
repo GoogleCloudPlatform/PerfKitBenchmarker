@@ -3,6 +3,7 @@
 import json
 import logging
 from typing import Any
+import urllib.error
 import urllib.request
 
 from absl import flags
@@ -41,6 +42,7 @@ flags.DEFINE_string(
 FLAGS = flags.FLAGS
 
 
+@vm_util.Retry(max_retries=10, retryable_exceptions=(urllib.error.HTTPError,))
 def FetchSwebenchTaskSpec(task_id: str) -> dict[str, Any]:
   """Fetches task specifications programmatically from HuggingFace REST API."""
   url = (
