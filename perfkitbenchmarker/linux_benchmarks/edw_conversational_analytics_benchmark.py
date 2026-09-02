@@ -321,10 +321,11 @@ def CheckPrerequisites(benchmark_config):
       missing_flags.append('--bq_ca_data_agent')
   elif edw_service_type == 'looker':
     required_flags = [
-        looker.LOOKER_CA_DATA_AGENT,
         looker.LOOKER_BASE_URL,
         looker.LOOKER_MODEL_NAME,
     ]
+    if looker.LOOKER_CA_CLIENT.value == 'looker_data_agent':
+      required_flags.append(looker.LOOKER_CA_DATA_AGENT)
     for flag in required_flags:
       if not flag.value:
         missing_flags.append(f'--{flag.name}')

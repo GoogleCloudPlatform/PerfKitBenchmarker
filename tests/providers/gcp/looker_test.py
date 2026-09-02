@@ -390,6 +390,177 @@ class ConversationalAnalyticsClientInterfaceTest(
       self.assertEqual(metadata['error'], expected_error_msg)
 
 
+class ClaudeConversationalAnalyticsClientInterfaceTest(
+    pkb_common_test_case.PkbCommonTestCase
+):
+
+  def test_inheritance_and_properties(self):
+    # Arrange & Act
+    interface = looker.ClaudeConversationalAnalyticsClientInterface(
+        base_url=_BASE_URL, model_name=_MODEL_NAME
+    )
+
+    # Assert
+    self.assertIsInstance(
+        interface, edw_service.BaseClaudeConversationalAnalyticsClientInterface
+    )
+    self.assertTrue(interface.fetches_results_immediately)
+
+  def test_set_provisioned_attributes(self):
+    # Arrange
+    interface = looker.ClaudeConversationalAnalyticsClientInterface(
+        base_url=_BASE_URL, model_name=_MODEL_NAME
+    )
+    mock_vm = mock.MagicMock()
+    bm_spec = mock.Mock(name='test_benchmark', vms=[mock_vm])
+    bm_spec.name = 'test_benchmark'
+
+    # Act
+    interface.SetProvisionedAttributes(bm_spec)
+
+    # Assert
+    self.assertEqual(interface.benchmark_name, 'test_benchmark')
+    self.assertEqual(interface.client_vm, mock_vm)
+    self.assertEqual(
+        interface.python_client_interface.benchmark_name, 'test_benchmark'
+    )
+    self.assertEqual(interface.python_client_interface.client_vm, mock_vm)
+
+  def test_construct_claude_system_prompt_ecomm(self):
+    # Arrange
+    with flagsaver.flagsaver((edw_service.CA_DATASET, 'ecomm')):
+      interface = looker.ClaudeConversationalAnalyticsClientInterface(
+          base_url=_BASE_URL, model_name=_MODEL_NAME
+      )
+
+      # Act
+      prompt = interface._ConstructClaudeSystemPrompt()
+
+      # Assert
+      self.assertIn('thelook_adwords', prompt)
+      self.assertIn('events', prompt)
+
+  def test_construct_claude_system_prompt_call_center(self):
+    # Arrange
+    with flagsaver.flagsaver((edw_service.CA_DATASET, 'call_center')):
+      interface = looker.ClaudeConversationalAnalyticsClientInterface(
+          base_url=_BASE_URL, model_name=_MODEL_NAME
+      )
+
+      # Act
+      prompt = interface._ConstructClaudeSystemPrompt()
+
+      # Assert
+      self.assertIn('call_center', prompt)
+      self.assertIn('transcript', prompt)
+
+  @mock.patch.object(looker, '_LoadLookerClientSecret')
+  def test_get_mcp_config(self, mock_load_secret):
+    # Arrange
+    mock_load_secret.return_value = 'test_client_secret'
+    interface = looker.ClaudeConversationalAnalyticsClientInterface(
+        base_url=_BASE_URL,
+        model_name=_MODEL_NAME,
+        client_id='test_client_id',
+    )
+    interface.mcp_toolbox_path = '/usr/local/bin/toolbox'
+
+    # Act
+    config_json = interface.GetMcpConfig()
+    config = json.loads(config_json)
+
+    # Assert
+    expected_env = {
+        'LOOKER_BASE_URL': _BASE_URL,
+        'LOOKER_CLIENT_ID': 'test_client_id',
+        'LOOKER_CLIENT_SECRET': 'test_client_secret',
+        'LOOKER_VERIFY_SSL': 'true',
+    }
+    self.assertEqual(
+        config['mcpServers']['looker-toolbox']['env'], expected_env
+    )
+
+  def test_get_mcp_config_raises_when_path_not_set(self):
+    # Arrange
+    interface = looker.ClaudeConversationalAnalyticsClientInterface(
+        base_url=_BASE_URL, model_name=_MODEL_NAME
+    )
+
+    # Act & Assert
+    with self.assertRaises(RuntimeError):
+      interface.GetMcpConfig()
+
+  def test_get_claude_dir(self):
+    # Arrange
+    interface = looker.ClaudeConversationalAnalyticsClientInterface(
+        base_url=_BASE_URL, model_name=_MODEL_NAME
+    )
+    interface.claude_dir = '/home/user/claude_ca'
+
+    # Act & Assert
+    self.assertEqual(interface.GetClaudeDir(), '/home/user/claude_ca')
+
+  def test_get_claude_dir_raises_when_not_set(self):
+    # Arrange
+    interface = looker.ClaudeConversationalAnalyticsClientInterface(
+        base_url=_BASE_URL, model_name=_MODEL_NAME
+    )
+
+    # Act & Assert
+    with self.assertRaises(RuntimeError):
+      interface.GetClaudeDir()
+
+  def test_get_query_file_name(self):
+    # Arrange
+    interface = looker.ClaudeConversationalAnalyticsClientInterface(
+        base_url=_BASE_URL, model_name=_MODEL_NAME
+    )
+    interface.claude_dir = '/home/user/claude_ca'
+
+    # Act
+    filename = interface._GetQueryFileName('test_query')
+
+    # Assert
+    self.assertTrue(filename.startswith('/home/user/claude_ca/'))
+    self.assertTrue(filename.endswith('.txt'))
+
+  def test_get_conversational_analytics_command_default(self):
+    # Arrange
+    interface = looker.ClaudeConversationalAnalyticsClientInterface(
+        base_url=_BASE_URL, model_name=_MODEL_NAME
+    )
+    interface.claude_dir = '/home/user/claude_ca'
+
+    # Act
+    cmd = interface._GetConversationalAnalyticsCommand(
+        '/home/user/claude_ca/query.txt'
+    )
+
+    # Assert
+    self.assertIn(f'python3 {looker.CLAUDE_PYTHON_DRIVER_FILE} single', cmd)
+    self.assertIn('--allowed_tools=mcp__looker-toolbox__*', cmd)
+    self.assertIn('--print_results', cmd)
+    self.assertNotIn('--model=', cmd)
+
+  def test_get_conversational_analytics_command_with_custom_model(self):
+    # Arrange
+    with flagsaver.flagsaver(
+        (looker.LOOKER_CA_CLAUDE_MODEL, 'claude-sonnet-4-5')
+    ):
+      interface = looker.ClaudeConversationalAnalyticsClientInterface(
+          base_url=_BASE_URL, model_name=_MODEL_NAME
+      )
+      interface.claude_dir = '/home/user/claude_ca'
+
+      # Act
+      cmd = interface._GetConversationalAnalyticsCommand(
+          '/home/user/claude_ca/query.txt'
+      )
+
+      # Assert
+      self.assertIn('--model=claude-sonnet-4-5', cmd)
+
+
 class LookerServiceTest(pkb_common_test_case.PkbCommonTestCase):
 
   def test_init(self):
@@ -444,6 +615,26 @@ class LookerServiceTest(pkb_common_test_case.PkbCommonTestCase):
       )
       self.assertEqual(ca_interface.base_url, _BASE_URL)
       self.assertEqual(ca_interface.model_name, _MODEL_NAME)
+
+  def test_get_conversational_analytics_client_interface_claude(self):
+    # Arrange & Act
+    with flagsaver.flagsaver(
+        (looker.LOOKER_BASE_URL, _BASE_URL),
+        (looker.LOOKER_MODEL_NAME, _MODEL_NAME),
+        (looker.LOOKER_CLIENT_ID, 'test_client_id'),
+        (looker.LOOKER_CA_CLIENT, 'claude'),
+    ):
+      spec = mock.Mock()
+      service = looker.Looker(spec)
+      ca_interface = service.GetConversationalAnalyticsClientInterface()
+
+      # Assert
+      self.assertIsInstance(
+          ca_interface, looker.ClaudeConversationalAnalyticsClientInterface
+      )
+      self.assertEqual(ca_interface.base_url, _BASE_URL)
+      self.assertEqual(ca_interface.model_name, _MODEL_NAME)
+      self.assertEqual(ca_interface.client_id, 'test_client_id')
 
 
 if __name__ == '__main__':

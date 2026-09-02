@@ -98,6 +98,35 @@ class EdwConversationalAnalyticsBenchmarkTest(
     # Should not raise error
     edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
 
+  @flagsaver.flagsaver(
+      looker_ca_data_agent='',
+      looker_base_url='https://instance.looker.com',
+      looker_model_name='model',
+      looker_ca_client='claude',
+  )
+  def testCheckPrerequisitesDoesNotRaiseValueErrorWhenLookerCaClientNotDataAgentAndFlagMissing(
+      self,
+  ):
+    mock_config = mock.Mock()
+    mock_config.edw_service.type = 'looker'
+    # Should not raise error
+    edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
+
+  @flagsaver.flagsaver(
+      looker_ca_data_agent='',
+      looker_base_url='https://instance.looker.com',
+      looker_model_name='model',
+      looker_ca_client='looker_data_agent',
+  )
+  def testCheckPrerequisitesRaisesValueErrorWhenLookerCaDataAgentMissing(self):
+    mock_config = mock.Mock()
+    mock_config.edw_service.type = 'looker'
+    with self.assertRaisesRegex(
+        errors.Config.InvalidValue,
+        'Missing required flags: --looker_ca_data_agent',
+    ):
+      edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
+
   def testCheckPrerequisitesRaisesValueErrorWhenEdwServiceMissing(self):
     with self.assertRaisesRegex(
         errors.Config.InvalidValue,
@@ -131,8 +160,8 @@ class EdwConversationalAnalyticsBenchmarkTest(
     mock_config.edw_service.type = 'looker'
     with self.assertRaisesRegex(
         errors.Config.InvalidValue,
-        'Missing required flags: --looker_ca_data_agent, --looker_base_url,'
-        ' --looker_model_name',
+        'Missing required flags: --looker_base_url, --looker_model_name,'
+        ' --looker_ca_data_agent',
     ):
       edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
 
