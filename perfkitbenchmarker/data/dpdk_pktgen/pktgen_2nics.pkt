@@ -19,14 +19,22 @@ range 1 dst port 5678 5678 5678 0
 range 1 size <PACKET_SIZE> <PACKET_SIZE> <PACKET_SIZE> 0
 clr
 # BEGIN_SENDER_CONFIG
-# Send an initial burst (one or a few packets suffice) to trigger the
-# installation of HW flow entries so the next traffic is entirely processed in
-# hw. Don't wait too long because entries expire in 5 seconds.
-set all count 500
-start all
-sleep 2
+# copybara:strip_begin(internal)
+# Warmup port 0 separately to avoid Andromeda software punt queue overflow. The host vSwitch may drop packets if too many new flows arrive simultaneously.
+# copybara:strip_end
+# Warm up Port 0
+set 0 count 500
+start 0
+sleep 1
+# Warm up Port 1
+set 1 count 500
+start 1
+sleep 1
+# Stop warmup and let buffers settle
 stop all
+sleep 0.5
 set all count 0
+# Start unthrottled line-rate benchmark
 start all
 # END_SENDER_CONFIG
 sleep <DURATION>
