@@ -56,7 +56,7 @@ all: PerfKitBenchmarker will run all of the above stages (provision,
 """
 
 import collections
-from collections.abc import Mapping, MutableSequence
+from collections.abc import Mapping
 import copy
 import itertools
 import json
@@ -179,11 +179,11 @@ def ValidateRetriesAndRunStages(flags_dict):
 
 
 def ParseSkipTeardownConditions(
-    skip_teardown_conditions: Collection[str],
+    skip_teardown_conditions: Collection[str] | None,
 ) -> Mapping[str, Mapping[str, float | None]]:
   """Parses the skip_teardown_conditions flag.
 
-  Used by the validator below and flag_util.ShouldTeardown to separate
+  Used by the validator below and ShouldTeardown to separate
   conditions passed by the --skip_teardown_conditions flag into three tokens:
       metric, lower bound, upper_bound
 
@@ -198,6 +198,8 @@ def ParseSkipTeardownConditions(
   Raises:
     ValueError: if any condition is invalid
   """
+  if not skip_teardown_conditions:
+    return {}
   parsed_conditions = {}
   pattern = re.compile(
       r"""
@@ -322,57 +324,82 @@ def MetricMeetsConditions(
   return False
 
 
+def _GetCollectorSamples(collector: Any) -> list[Mapping[str, Any]]:
+  """Extracts samples from collector, tolerating mock objects in tests."""
+  samples = []
+  published_samples = getattr(collector, 'published_samples', None)
+  if isinstance(published_samples, list):
+    samples.extend(published_samples)
+  current_samples = getattr(collector, 'samples', None)
+  if isinstance(current_samples, list):
+    samples.extend(current_samples)
+  return samples
+
+
 def ShouldTeardown(
-    skip_teardown_conditions: Mapping[str, Mapping[str, float | None]],
-    samples: MutableSequence[Mapping[str, Any]],
-    vms: Sequence[virtual_machine.BaseVirtualMachine] | None = None,
-    skip_teardown_zonal_vm_limit: int | None = None,
-    skip_teardown_on_command_timeout: bool = False,
+    spec: bm_spec.BenchmarkSpec,
+    collector: Any,
 ) -> bool:
-  """Checks all samples against all skip teardown conditions.
+  """Checks whether the benchmark should proceed with teardown.
 
   Args:
-    skip_teardown_conditions: list of tuples of: (metric, lower_bound,
-      upper_bound)
-    samples: list of samples to check against the conditions
-    vms: list of VMs brought up by the benchmark
-    skip_teardown_zonal_vm_limit: the maximum number of VMs in the zone that can
-      be left behind.
-    skip_teardown_on_command_timeout: a boolean indicating whether to skip
-      teardown if the failure substatus is COMMAND_TIMEOUT
+    spec: Benchmark spec for the current run.
+    collector: Sample collector containing samples for the current run.
 
   Returns:
     True if the benchmark should teardown as usual, False if it should skip due
     to a condition being met.
   """
+  skip_teardown_conditions = ParseSkipTeardownConditions(
+      pkb_flags.SKIP_TEARDOWN_CONDITIONS.value
+  )
+  skip_teardown_on_command_timeout = (
+      pkb_flags.SKIP_TEARDOWN_ON_COMMAND_TIMEOUT.value
+  )
   if not skip_teardown_conditions and not skip_teardown_on_command_timeout:
     return True
-  if skip_teardown_on_command_timeout:
-    for status_sample in samples:
-      if (
-          status_sample['metadata'].get('failed_substatus')
-          == benchmark_status.FailedSubstatus.COMMAND_TIMEOUT
-      ):
-        logging.warning(
-            'Skipping TEARDOWN phase due to COMMAND_TIMEOUT substatus.'
-        )
-        return False
-  if skip_teardown_zonal_vm_limit:
-    for vm in vms:  # pyrefly: ignore[not-iterable]
+
+  vms = spec.vms
+  skip_teardown_zonal_vm_limit = pkb_flags.SKIP_TEARDOWN_ZONAL_VM_LIMIT.value
+  if skip_teardown_zonal_vm_limit and vms:
+    for vm in vms:
       num_lingering_vms = vm.GetNumTeardownSkippedVms()
       if (
           num_lingering_vms is not None
-          and num_lingering_vms + len(vms) > skip_teardown_zonal_vm_limit  # pyrefly: ignore[bad-argument-type]
+          and num_lingering_vms + len(vms) > skip_teardown_zonal_vm_limit
       ):
         logging.warning(
             'Too many lingering VMs: tearing down resources regardless of skip'
             ' teardown conditions.'
         )
         return True
-  for metric_sample in samples:
-    if MetricMeetsConditions(metric_sample, skip_teardown_conditions):
-      logging.warning('Skipping TEARDOWN phase.')
+
+  samples = _GetCollectorSamples(collector)
+
+  if skip_teardown_on_command_timeout:
+    failed_substatus = getattr(spec, 'failed_substatus', None)
+    if failed_substatus == benchmark_status.FailedSubstatus.COMMAND_TIMEOUT:
+      logging.warning(
+          'Skipping TEARDOWN phase due to COMMAND_TIMEOUT substatus.'
+      )
       return False
+    for status_sample in samples:
+      if (
+          isinstance(status_sample, Mapping)
+          and status_sample.get('metadata', {}).get('failed_substatus')
+          == benchmark_status.FailedSubstatus.COMMAND_TIMEOUT
+      ):
+        logging.warning(
+            'Skipping TEARDOWN phase due to COMMAND_TIMEOUT substatus.'
+        )
+        return False
+
+  if skip_teardown_conditions:
+    for metric_sample in samples:
+      if MetricMeetsConditions(metric_sample, skip_teardown_conditions):
+        logging.warning('Skipping TEARDOWN phase.')
+        return False
+
   return True
 
 
@@ -1205,16 +1232,7 @@ def RunBenchmark(
           if stages.TEARDOWN in FLAGS.run_stage:
             # This function will only do anything if --capture_vm_logs is passed
             CaptureVMLogs(spec.vms)
-            skip_teardown_conditions = ParseSkipTeardownConditions(
-                pkb_flags.SKIP_TEARDOWN_CONDITIONS.value
-            )
-            should_teardown = ShouldTeardown(
-                skip_teardown_conditions,
-                collector.published_samples + collector.samples,  # pyrefly: ignore[bad-argument-type]
-                spec.vms,
-                pkb_flags.SKIP_TEARDOWN_ZONAL_VM_LIMIT.value,
-                pkb_flags.SKIP_TEARDOWN_ON_COMMAND_TIMEOUT.value,
-            )
+            should_teardown = ShouldTeardown(spec, collector)
             if should_teardown:
               current_run_stage = stages.TEARDOWN
               DoTeardownPhase(spec, collector, detailed_timer)
@@ -1256,7 +1274,12 @@ def RunBenchmark(
         if stages.CLEANUP in FLAGS.run_stage and spec.always_call_cleanup:
           DoCleanupPhase(spec, detailed_timer)
 
-        if (
+        should_teardown = ShouldTeardown(spec, collector)
+
+        if not should_teardown:
+          for vm in spec.vms:
+            vm.UpdateTimeoutMetadata()
+        elif (
             FLAGS.always_teardown_on_exception
             and stages.TEARDOWN not in FLAGS.run_stage
         ):

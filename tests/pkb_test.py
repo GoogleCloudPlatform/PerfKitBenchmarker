@@ -29,6 +29,7 @@ from perfkitbenchmarker import publisher
 from perfkitbenchmarker import sample
 from perfkitbenchmarker import stages
 from perfkitbenchmarker import test_util
+from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.linux_packages import linux_boot
 from perfkitbenchmarker.providers.gcp import util as gcp_utils
 from tests import pkb_common_test_case
@@ -865,99 +866,72 @@ class TestConditionalSkipTeardown(parameterized.TestCase):
       ).asdict(),
   ]
 
+  def setUp(self):
+    super().setUp()
+    self.spec = mock.MagicMock(vms=[], failed_substatus=None)
+    self.collector = mock.MagicMock(samples=self.SAMPLES, published_samples=[])
+
   @parameterized.named_parameters(
       {
           'testcase_name': 'no_conditions_met',
-          'conditions': {
-              'metric1': {'lower_bound': 1.5, 'upper_bound': None},
-              'metric2': {'lower_bound': None, 'upper_bound': 1.5},
-          },
+          'conditions': ['metric1>1.5', 'metric2<1.5'],
       },
       {
           'testcase_name': 'upper_greater_than_lower',
-          'conditions': {
-              'metric1': {'lower_bound': 1.5, 'upper_bound': 2.5},
-          },
+          'conditions': ['metric1>1.5', 'metric1<2.5'],
       },
       {
           'testcase_name': 'upper_less_than_lower',
-          'conditions': {
-              'metric1': {'lower_bound': 1.5, 'upper_bound': 0.5},
-          },
-      },
-      {
-          'testcase_name': 'neither_bound',
-          'conditions': {
-              'metric1': {'lower_bound': None, 'upper_bound': None},
-          },
+          'conditions': ['metric1>1.5', 'metric1<0.5'],
       },
       {
           'testcase_name': 'no_flag_passed',
-          'conditions': {},
+          'conditions': [],
       },
   )
   def testTeardownAsUsual(self, conditions):
-    self.assertTrue(
-        pkb.ShouldTeardown(
-            skip_teardown_conditions=conditions,
-            samples=self.SAMPLES,  # pyrefly: ignore[bad-argument-type]
-        )
-    )
+    with flagsaver.flagsaver(skip_teardown_conditions=conditions):
+      self.assertTrue(pkb.ShouldTeardown(self.spec, self.collector))
 
   @parameterized.named_parameters(
       {
           'testcase_name': 'less_test',
-          'conditions': {
-              'metric1': {'lower_bound': None, 'upper_bound': 1.5},
-          },
+          'conditions': ['metric1<1.5'],
       },
       {
           'testcase_name': 'greater_test',
-          'conditions': {
-              'metric2': {'lower_bound': 1.5, 'upper_bound': None},
-          },
+          'conditions': ['metric2>1.5'],
       },
       {
           'testcase_name': 'multiple_conditions',
-          'conditions': {
-              'metric1': {'lower_bound': None, 'upper_bound': 1.5},
-              'metric2': {'lower_bound': 1.5, 'upper_bound': None},
-          },
+          'conditions': ['metric1<1.5', 'metric2>1.5'],
       },
       {
           'testcase_name': 'upper_greater_than_lower',
-          'conditions': {
-              'metric1': {'lower_bound': 0.5, 'upper_bound': 1.5},
-          },
+          'conditions': ['metric1>0.5', 'metric1<1.5'],
       },
       {
           'testcase_name': 'upper_less_than_lower',
-          'conditions': {
-              'metric1': {'lower_bound': 2.5, 'upper_bound': 1.5},
-          },
+          'conditions': ['metric1>2.5', 'metric1<1.5'],
       },
       {
           'testcase_name': 'zero_bound',
-          'conditions': {
-              'metricminus10': {'lower_bound': None, 'upper_bound': 0.0},
-          },
+          'conditions': ['metricminus10<0.0'],
       },
       {
           'testcase_name': 'skip_teardown_on_command_timeout',
-          'conditions': {},
+          'conditions': [],
           'skip_teardown_on_command_timeout': True,
       },
   )
   def testSkipTeardown(
       self, conditions, skip_teardown_on_command_timeout=False
   ):
-    self.assertFalse(
-        pkb.ShouldTeardown(
-            skip_teardown_conditions=conditions,
-            samples=self.SAMPLES,  # pyrefly: ignore[bad-argument-type]
-            skip_teardown_on_command_timeout=skip_teardown_on_command_timeout,
-        )
-    )
+    with flagsaver.flagsaver(
+        skip_teardown_conditions=conditions,
+        skip_teardown_on_command_timeout=skip_teardown_on_command_timeout,
+    ):
+      self.assertFalse(pkb.ShouldTeardown(self.spec, self.collector))
 
   @parameterized.named_parameters(
       {
@@ -984,18 +958,92 @@ class TestConditionalSkipTeardown(parameterized.TestCase):
   ):
     test_vm = mock.MagicMock()
     test_vm.GetNumTeardownSkippedVms.return_value = 1
-    test_conditions = {
-        'metric1': {'lower_bound': None, 'upper_bound': 1.5},
-    }
-    self.assertEqual(
-        expected_result,
-        pkb.ShouldTeardown(
-            skip_teardown_conditions=test_conditions,
-            samples=self.SAMPLES,  # pyrefly: ignore[bad-argument-type]
-            vms=[test_vm] * num_vms,
-            skip_teardown_zonal_vm_limit=zonal_vm_limit,
+    self.spec.vms = [test_vm] * num_vms
+    with flagsaver.flagsaver(
+        skip_teardown_conditions=['metric1<1.5'],
+        skip_teardown_zonal_vm_limit=zonal_vm_limit,
+    ):
+      self.assertEqual(
+          expected_result,
+          pkb.ShouldTeardown(self.spec, self.collector),
+      )
+
+  def testShouldTeardownOnCommandTimeoutWithFailedSubstatus(self):
+    self.spec.failed_substatus = (
+        benchmark_status.FailedSubstatus.COMMAND_TIMEOUT
+    )
+    mock_collector = mock.MagicMock(samples=[], published_samples=[])
+    with flagsaver.flagsaver(skip_teardown_on_command_timeout=True):
+      self.assertFalse(pkb.ShouldTeardown(self.spec, mock_collector))
+
+  def testShouldTeardownOnCommandTimeoutZonalLimitExceeded(self):
+    test_vm = mock.MagicMock()
+    test_vm.GetNumTeardownSkippedVms.return_value = 1
+    self.spec.vms = [test_vm]
+    self.spec.failed_substatus = (
+        benchmark_status.FailedSubstatus.COMMAND_TIMEOUT
+    )
+    mock_collector = mock.MagicMock(samples=[], published_samples=[])
+    with flagsaver.flagsaver(
+        skip_teardown_on_command_timeout=True,
+        skip_teardown_zonal_vm_limit=1,
+    ):
+      self.assertTrue(pkb.ShouldTeardown(self.spec, mock_collector))
+
+
+class SkipTeardownOnCommandTimeoutTest(pkb_common_test_case.PkbCommonTestCase):
+
+  @flagsaver.flagsaver(skip_teardown_on_command_timeout=True)
+  def testSkipTeardownOnCommandTimeout(self):
+    self.enter_context(
+        mock.patch.object(
+            pkb,
+            'DoProvisionPhase',
+            side_effect=vm_util.TimeoutExceededRetryError(),
         )
     )
+    test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        pkb_common_test_case.SIMPLE_CONFIG, 'cluster_boot'
+    )
+    self.enter_context(mock.patch.object(test_bm_spec, 'Pickle'))
+    mock_vm = mock.MagicMock()
+    test_bm_spec.unmanaged_vm_groups = {'default': [mock_vm]}
+    mock_delete = self.enter_context(
+        mock.patch.object(test_bm_spec, 'Delete')
+    )
+    collector = publisher.SampleCollector()
+
+    with self.assertRaises(vm_util.TimeoutExceededRetryError):
+      pkb.RunBenchmark(test_bm_spec, collector, False)
+
+    mock_delete.assert_not_called()
+    mock_vm.UpdateTimeoutMetadata.assert_called_once()
+
+  @flagsaver.flagsaver(skip_teardown_on_command_timeout=False)
+  def testTeardownAsUsualOnCommandTimeout(self):
+    self.enter_context(
+        mock.patch.object(
+            pkb,
+            'DoProvisionPhase',
+            side_effect=vm_util.TimeoutExceededRetryError(),
+        )
+    )
+    test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        pkb_common_test_case.SIMPLE_CONFIG, 'cluster_boot'
+    )
+    self.enter_context(mock.patch.object(test_bm_spec, 'Pickle'))
+    mock_vm = mock.MagicMock()
+    test_bm_spec.unmanaged_vm_groups = {'default': [mock_vm]}
+    mock_delete = self.enter_context(
+        mock.patch.object(test_bm_spec, 'Delete')
+    )
+    collector = publisher.SampleCollector()
+
+    with self.assertRaises(vm_util.TimeoutExceededRetryError):
+      pkb.RunBenchmark(test_bm_spec, collector, False)
+
+    mock_delete.assert_called_once()
+    mock_vm.UpdateTimeoutMetadata.assert_not_called()
 
 
 if __name__ == '__main__':
