@@ -734,6 +734,105 @@ class KafkaBenchmarkResultParserTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(results[0].metadata['key'], 'initial')
 
 
+class KafkaBenchmarkCreateProducerIngressSampleTest(
+    pkb_common_test_case.PkbCommonTestCase
+):
+  """Tests for _CreateProducerIngressSample."""
+
+  def testEmptyThreadsProgressMbUsesThreadMb(self):
+    metrics = {'mb': [10.0, 20.0]}
+    threads_progress_mb = []
+    metadata = {}
+    samples = kafka_benchmark._CreateProducerIngressSample(
+        metrics, threads_progress_mb, metadata
+    )
+    self.assertLen(samples, 1)
+    self.assertEqual(samples[0].value, 30.0)
+    self.assertEqual(
+        samples[0].metric, 'Producer sustained ingress scale'
+    )
+
+  def testWindowSizeNotMet(self):
+    # Only 3 intervals (len == 3 > 2), so it discards the last (idx 2)
+    # and first (idx 0) warmup, leaving just [50.0].
+    metrics = {'mb': []}
+    threads_progress_mb = [[10.0, 50.0, 10.0]]
+    metadata = {}
+    samples = kafka_benchmark._CreateProducerIngressSample(
+        metrics, threads_progress_mb, metadata
+    )
+    self.assertLen(samples, 1)
+    self.assertEqual(samples[0].value, 50.0)
+
+  def testSteadyStateFound(self):
+    metrics = {'mb': []}
+    # 7 intervals. Final (1.0) is discarded -> candidates:
+    # [1.0, 50.0, 100.0, 101.0, 100.0, 99.0].
+    # Window of 4: [100.0, 101.0, 100.0, 99.0] -> CV < 10% -> start_idx = 2
+    threads_progress_mb = [[1.0, 50.0, 100.0, 101.0, 100.0, 99.0, 1.0]]
+    metadata = {}
+    samples = kafka_benchmark._CreateProducerIngressSample(
+        metrics, threads_progress_mb, metadata
+    )
+    self.assertLen(samples, 1)
+    self.assertEqual(samples[0].value, 100.0)
+
+  def testNoSteadyStateFoundDefaultsToStripWarmup(self):
+    metrics = {'mb': []}
+    # 6 intervals. Final (1.0) is discarded -> candidates:
+    # [1.0, 50.0, 100.0, 10.0, 200.0].
+    # Window of 4: [50.0, 100.0, 10.0, 200.0] -> CV > 10%.
+    # Never finds steady state below 0.10 CV, defaults start_idx to 1.
+    # steady_state = [50.0, 100.0, 10.0, 200.0], avg = 90.0.
+    threads_progress_mb = [[1.0, 50.0, 100.0, 10.0, 200.0, 1.0]]
+    metadata = {}
+    samples = kafka_benchmark._CreateProducerIngressSample(
+        metrics, threads_progress_mb, metadata
+    )
+    self.assertLen(samples, 1)
+    self.assertEqual(samples[0].value, 90.0)
+
+  def testZeroIngressReturnsEmpty(self):
+    metrics = {'mb': []}
+    threads_progress_mb = [[0.0, 0.0, 0.0, 0.0]]
+    samples = kafka_benchmark._CreateProducerIngressSample(
+        metrics, threads_progress_mb, {}
+    )
+    self.assertEmpty(samples)
+
+
+class KafkaBenchmarkIsP99WithinSlaTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for _IsP99WithinSla."""
+
+  @flagsaver.flagsaver(kafka_p99_latency_threshold=100)
+  def testP99ThresholdMet(self):
+    samples = [
+        sample.Sample('Producer p99 Latency', 99.0, 'ms'),
+    ]
+    self.assertTrue(kafka_benchmark._IsP99WithinSla(samples))
+
+  @flagsaver.flagsaver(kafka_p99_latency_threshold=100)
+  def testP99ThresholdBreached(self):
+    samples = [
+        sample.Sample('Producer p99 Latency', 101.0, 'ms'),
+    ]
+    self.assertFalse(kafka_benchmark._IsP99WithinSla(samples))
+
+  @flagsaver.flagsaver(kafka_p99_latency_threshold=0)
+  def testP99ThresholdDisabledViaZero(self):
+    samples = [
+        sample.Sample('Producer p99 Latency', 999.0, 'ms'),
+    ]
+    self.assertTrue(kafka_benchmark._IsP99WithinSla(samples))
+
+  @flagsaver.flagsaver(kafka_p99_latency_threshold=100)
+  def testNoP99MetricPresent(self):
+    samples = [
+        sample.Sample('Producer Max Latency', 105.0, 'ms'),
+    ]
+    self.assertTrue(kafka_benchmark._IsP99WithinSla(samples))
+
+
 class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
   """Tests for _RunSingleTrial and Run."""
 
@@ -974,7 +1073,7 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
       results = kafka_benchmark.Run(self.benchmark_spec)
       self.assertLen(mock_single.call_args_list, 9)
       expected_calls = [
-          mock.call(self.benchmark_spec, 2**i, 10_000_000) for i in range(9)
+          mock.call(self.benchmark_spec, 2**i, 15_000_000) for i in range(9)
       ]
       mock_single.assert_has_calls(expected_calls)
       self.assertLen(results, 2)
@@ -1002,7 +1101,7 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
       results = kafka_benchmark.Run(self.benchmark_spec)
       self.assertLen(mock_single.call_args_list, 4)
       expected_calls = [
-          mock.call(self.benchmark_spec, t, 10_000_000) for t in [1, 2, 4, 3]
+          mock.call(self.benchmark_spec, t, 15_000_000) for t in [1, 2, 4, 3]
       ]
       mock_single.assert_has_calls(expected_calls)
       self.assertLen(results, 2)
@@ -1083,13 +1182,13 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
       results = kafka_benchmark.Run(self.benchmark_spec)
 
       expected_calls = [
-          mock.call(self.benchmark_spec, 1, 10_000_000),
-          mock.call(self.benchmark_spec, 2, 10_000_000),
-          mock.call(self.benchmark_spec, 4, 10_000_000),
-          mock.call(self.benchmark_spec, 8, 10_000_000),
+          mock.call(self.benchmark_spec, 1, 15_000_000),
+          mock.call(self.benchmark_spec, 2, 15_000_000),
+          mock.call(self.benchmark_spec, 4, 15_000_000),
+          mock.call(self.benchmark_spec, 8, 15_000_000),
           # Binary search
-          mock.call(self.benchmark_spec, 6, 10_000_000),
-          mock.call(self.benchmark_spec, 7, 10_000_000),
+          mock.call(self.benchmark_spec, 6, 15_000_000),
+          mock.call(self.benchmark_spec, 7, 15_000_000),
       ]
       self.assertEqual(mock_single.call_args_list, expected_calls)
       self.assertLen(results, 2)
@@ -1130,13 +1229,13 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
       results = kafka_benchmark.Run(self.benchmark_spec)
 
       expected_calls = [
-          mock.call(self.benchmark_spec, 1, 10_000_000),
-          mock.call(self.benchmark_spec, 2, 10_000_000),
-          mock.call(self.benchmark_spec, 4, 10_000_000),
-          mock.call(self.benchmark_spec, 8, 10_000_000),
+          mock.call(self.benchmark_spec, 1, 15_000_000),
+          mock.call(self.benchmark_spec, 2, 15_000_000),
+          mock.call(self.benchmark_spec, 4, 15_000_000),
+          mock.call(self.benchmark_spec, 8, 15_000_000),
           # Binary search
-          mock.call(self.benchmark_spec, 6, 10_000_000),
-          mock.call(self.benchmark_spec, 5, 10_000_000),
+          mock.call(self.benchmark_spec, 6, 15_000_000),
+          mock.call(self.benchmark_spec, 5, 15_000_000),
       ]
       self.assertEqual(mock_single.call_args_list, expected_calls)
       self.assertLen(results, 2)

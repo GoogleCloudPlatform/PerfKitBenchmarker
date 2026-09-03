@@ -71,7 +71,7 @@ _KAFKA_REPLICATION_FACTOR = flags.DEFINE_integer(
 )
 _KAFKA_NUM_RECORDS = flags.DEFINE_integer(
     'kafka_num_records',
-    10_000_000,  # 10 million
+    15_000_000,  # 15 million
     'Number of records to produce/consume per thread.',
 )
 _KAFKA_RECORD_SIZE = flags.DEFINE_integer(
@@ -86,6 +86,13 @@ _KAFKA_PRODUCER_THROUGHPUT = flags.DEFINE_integer(
     'kafka_producer_throughput',
     -1,
     'Throughput of the producer in records/sec. Use -1 to disable throttling.',
+)
+_KAFKA_P99_LATENCY_THRESHOLD = flags.DEFINE_integer(
+    'kafka_p99_latency_threshold',
+    100,
+    'The p99 latency SLA threshold (in milliseconds). If set, optimal '
+    'throughput must also maintain a P99 latency within this boundary. '
+    'To bypass this check, set this flag to 0.',
 )
 _KAFKA_CONSUMER_FETCH_SIZE = flags.DEFINE_integer(
     'kafka_consumer_fetch_size',
@@ -613,17 +620,41 @@ def _CreateProducerIngressSample(
 
   mean_ingress = 0.0
   if aggregated_throughputs:
-    # Discard the initial warmup and final cooldown events if there are enough
-    # samples
-    if len(aggregated_throughputs) > 2:
-      steady_state = aggregated_throughputs[1:-1]
-    else:
+    window_size = 4
+    cv_threshold = 0.10
+
+    # Discard final partial sample to form our viable search space.
+    candidates = (
+        aggregated_throughputs[:-1]
+        if len(aggregated_throughputs) > 2
+        else aggregated_throughputs
+    )
+
+    # Base case: discard initial warmup if we have enough samples.
+    start_idx = 1 if len(aggregated_throughputs) > 2 else 0
+
+    # Slide window to find steady state (coefficient of variation < 10%).
+    # The loop seamlessly ignores cases where len(candidates) < window_size.
+    for i in range(1, len(candidates) - window_size + 1):
+      window = candidates[i : i + window_size]
+      window_mean = sum(window) / window_size
+
+      if window_mean > 0:
+        variance = sum((x - window_mean) ** 2 for x in window) / window_size
+        std_dev = variance ** 0.5
+
+        if (std_dev / window_mean) < cv_threshold:
+          start_idx = i
+          break
+
+    if len(aggregated_throughputs) <= 2:
       logging.info(
           'Warm up and cool down were not discarded because of lack of'
           ' sufficient samples.'
       )
-      steady_state = aggregated_throughputs
-    if len(steady_state) > 0:
+
+    steady_state = candidates[start_idx:]
+    if steady_state:
       mean_ingress = sum(steady_state) / len(steady_state)
   elif thread_mb:
     mean_ingress = sum(thread_mb)
@@ -915,6 +946,27 @@ def _IsThroughputImproved(
   return not (throughput_stalled or throughput_declined)
 
 
+def _IsP99WithinSla(trial_samples: list[sample.Sample]) -> bool:
+  """Checks if the p99 latency in the trial is within the requested SLA.
+
+  Args:
+    trial_samples: A list of samples containing producer metrics.
+
+  Returns:
+    True if the p99 latency is less than or equal to the threshold, or if no
+    threshold flag is set.
+  """
+  if not _KAFKA_P99_LATENCY_THRESHOLD.value:
+    return True
+
+  for s in trial_samples:
+    if s.metric == 'Producer p99 Latency':
+      if s.value > _KAFKA_P99_LATENCY_THRESHOLD.value:
+        return False
+
+  return True
+
+
 def _CoarseSearch(
     benchmark_spec: bm_spec.BenchmarkSpec,
     num_records: int,
@@ -943,7 +995,9 @@ def _CoarseSearch(
       winning_samples = trial_samples
 
     if prev_samples:
-      if not _IsThroughputImproved(trial_samples, prev_samples):
+      if not _IsThroughputImproved(
+          trial_samples, prev_samples
+      ) or not _IsP99WithinSla(trial_samples):
         last_failed_threads = num_threads
         last_pass_threads = prev_threads
         break
@@ -982,7 +1036,9 @@ def _BinarySearch(
     mid = (low + high + 1) // 2
     trial_samples = _RunSingleTrial(benchmark_spec, mid, num_records)
 
-    if not _IsThroughputImproved(trial_samples, current_best_samples):
+    if not _IsThroughputImproved(
+        trial_samples, current_best_samples
+    ) or not _IsP99WithinSla(trial_samples):
       high = mid - 1
     else:
       low = mid
