@@ -21,9 +21,9 @@ from typing import Any, override
 
 from absl import flags
 from perfkitbenchmarker import benchmark_spec as bm_spec
-from perfkitbenchmarker import data
 from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import provider_info
+from perfkitbenchmarker import virtual_machine
 from perfkitbenchmarker.linux_packages import mcp_toolbox_for_db
 
 FLAGS = flags.FLAGS
@@ -83,18 +83,33 @@ CLAUDE_CLIENT_SYSTEM_PROMPT = (
     ' the retrieved data.'
 )
 LOOKER_CLIENT_SECRET_FILE = 'looker_client_secret.txt'
+LOOKER_CLIENT_SECRET_PLACEHOLDER = 'LOOKER_CLIENT_SECRET_PLACEHOLDER'
 
 
-def _LoadLookerClientSecret(
-    secret_file: str = LOOKER_CLIENT_SECRET_FILE,
-) -> str:
-  """Load Looker client secret from file."""
-  secret_path = data.ResourcePath(secret_file)
-  with open(secret_path, 'r') as f:
-    secret = f.read().strip()
-  if not secret:
-    raise ValueError(f'Looker client secret file at {secret_path} is empty.')
-  return secret
+def _InjectLookerClientSecret(
+    client_vm: virtual_machine.BaseVirtualMachine,
+    secret_path: str,
+    mcp_config_path: str,
+) -> None:
+  """Inject Looker client secret into .mcp.json directly on the client VM."""
+  inject_cmd = (
+      'python3 -c "'
+      'import json\n'
+      f'with open({secret_path!r}) as sf:\n'
+      '    secret = sf.read().strip()\n'
+      'if not secret:\n'
+      f'    raise ValueError(\'Looker client secret file at \'\n'
+      f'                     \'{secret_path} is empty.\')\n'
+      f'with open({mcp_config_path!r}, \'r+\') as mf:\n'
+      '    cfg = json.load(mf)\n'
+      '    env = cfg[\'mcpServers\'][\'looker-toolbox\'][\'env\']\n'
+      '    env[\'LOOKER_CLIENT_SECRET\'] = secret\n'
+      '    mf.seek(0)\n'
+      '    mf.truncate()\n'
+      '    json.dump(cfg, mf, indent=2)\n'
+      '"'
+  )
+  client_vm.RemoteCommand(inject_cmd)
 
 
 class PythonClientInterface(edw_service.EdwClientInterface):
@@ -272,11 +287,10 @@ class ClaudeConversationalAnalyticsClientInterface(
   def GetMcpConfig(self) -> str:
     if not self.mcp_toolbox_path:
       raise RuntimeError('mcp_toolbox_path is not set.')
-    client_secret = _LoadLookerClientSecret()
     env = {
         'LOOKER_BASE_URL': self.base_url,
         'LOOKER_CLIENT_ID': self.client_id,
-        'LOOKER_CLIENT_SECRET': client_secret,
+        'LOOKER_CLIENT_SECRET': LOOKER_CLIENT_SECRET_PLACEHOLDER,
         'LOOKER_VERIFY_SSL': 'true',
     }
     config = {
@@ -330,6 +344,12 @@ class ClaudeConversationalAnalyticsClientInterface(
 
     # Call BaseClaude...Prepare to install Claude SDK and setup .mcp.json
     super().Prepare(package_name)
+
+    # Inject Looker client secret into .mcp.json on client VM to avoid leaking
+    # the secret in logs.
+    secret_path = os.path.join(home_dir, LOOKER_CLIENT_SECRET_FILE)
+    mcp_config_path = os.path.join(self.claude_dir, '.mcp.json')
+    _InjectLookerClientSecret(self.client_vm, secret_path, mcp_config_path)
 
     # Push Claude driver script to claude_dir
     self.client_vm.PushDataFile(

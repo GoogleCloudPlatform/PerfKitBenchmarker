@@ -94,26 +94,6 @@ class PythonClientInterfaceTest(pkb_common_test_case.PkbCommonTestCase):
         ),
     ])
 
-  @mock.patch('builtins.open', mock.mock_open(read_data='test_secret\n'))
-  @mock.patch.object(
-      looker.data,
-      'ResourcePath',
-      return_value='/path/looker_client_secret.txt',
-  )
-  def test_load_looker_client_secret(self, mock_resource_path):
-    secret = looker._LoadLookerClientSecret()
-    self.assertEqual(secret, 'test_secret')
-
-  @mock.patch('builtins.open', mock.mock_open(read_data='   \n'))
-  @mock.patch.object(
-      looker.data,
-      'ResourcePath',
-      return_value='/path/looker_client_secret.txt',
-  )
-  def test_load_looker_client_secret_empty_raises(self, mock_resource_path):
-    with self.assertRaises(ValueError):
-      looker._LoadLookerClientSecret()
-
   @parameterized.named_parameters(
       ('with_print_results', True),
       ('without_print_results', False),
@@ -454,10 +434,26 @@ class ClaudeConversationalAnalyticsClientInterfaceTest(
       self.assertIn('call_center', prompt)
       self.assertIn('transcript', prompt)
 
-  @mock.patch.object(looker, '_LoadLookerClientSecret')
-  def test_get_mcp_config(self, mock_load_secret):
+  def test_inject_looker_client_secret(self):
     # Arrange
-    mock_load_secret.return_value = 'test_client_secret'
+    mock_vm = mock.MagicMock()
+
+    # Act
+    looker._InjectLookerClientSecret(
+        mock_vm,
+        '/home/user/looker_client_secret.txt',
+        '/home/user/claude_ca/.mcp.json',
+    )
+
+    # Assert
+    mock_vm.RemoteCommand.assert_called_once()
+    cmd = mock_vm.RemoteCommand.call_args.args[0]
+    self.assertIn('/home/user/looker_client_secret.txt', cmd)
+    self.assertIn('/home/user/claude_ca/.mcp.json', cmd)
+    self.assertIn('LOOKER_CLIENT_SECRET', cmd)
+
+  def test_get_mcp_config(self):
+    # Arrange
     interface = looker.ClaudeConversationalAnalyticsClientInterface(
         base_url=_BASE_URL,
         model_name=_MODEL_NAME,
@@ -473,7 +469,7 @@ class ClaudeConversationalAnalyticsClientInterfaceTest(
     expected_env = {
         'LOOKER_BASE_URL': _BASE_URL,
         'LOOKER_CLIENT_ID': 'test_client_id',
-        'LOOKER_CLIENT_SECRET': 'test_client_secret',
+        'LOOKER_CLIENT_SECRET': looker.LOOKER_CLIENT_SECRET_PLACEHOLDER,
         'LOOKER_VERIFY_SSL': 'true',
     }
     self.assertEqual(
@@ -559,6 +555,37 @@ class ClaudeConversationalAnalyticsClientInterfaceTest(
 
       # Assert
       self.assertIn('--model=claude-sonnet-4-5', cmd)
+
+  @mock.patch.object(
+      looker.mcp_toolbox_for_db,
+      'Install',
+      return_value='/usr/local/bin/toolbox',
+      autospec=True,
+  )
+  @mock.patch.object(looker, '_InjectLookerClientSecret', autospec=True)
+  def test_prepare(self, mock_inject_secret, mock_toolbox_install):
+    # Arrange
+    interface = looker.ClaudeConversationalAnalyticsClientInterface(
+        base_url=_BASE_URL,
+        model_name=_MODEL_NAME,
+        client_id='test_client_id',
+    )
+    mock_vm = mock.MagicMock()
+    mock_vm.RemoteCommand.return_value = ('/home/user\n', '')
+    bm_spec = mock.Mock(name='test_benchmark', vms=[mock_vm])
+    bm_spec.name = 'test_benchmark'
+    interface.SetProvisionedAttributes(bm_spec)
+
+    # Act
+    interface.Prepare('edw_common')
+
+    # Assert
+    mock_toolbox_install.assert_called_once_with(mock_vm)
+    mock_inject_secret.assert_called_once_with(
+        mock_vm,
+        '/home/user/looker_client_secret.txt',
+        '/home/user/claude_ca/.mcp.json',
+    )
 
 
 class LookerServiceTest(pkb_common_test_case.PkbCommonTestCase):
