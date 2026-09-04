@@ -3,13 +3,12 @@
 
 from absl import flags
 from perfkitbenchmarker import configs
-from perfkitbenchmarker import vm_util
 
 FLAGS = flags.FLAGS
 
-BENCHMARK_NAME = 'seven_benchmark'
+BENCHMARK_NAME = 'seven_zip_benchmark'
 BENCHMARK_CONFIG = """
-seven_benchmark:
+seven_zip_benchmark:
   description: Runs the 7-Zip LZMA benchmark on Windows.
   vm_groups:
     default:
@@ -36,7 +35,6 @@ def GetConfig(user_config):
 
 def Prepare(benchmark_spec):
   del benchmark_spec
-  return []
 
 
 def Run(benchmark_spec):
@@ -44,6 +42,5 @@ def Run(benchmark_spec):
   return []
 
 
-def Cleanup(benchmark_spec):
-  del benchmark_spec
-  return []
+def Cleanup(unused_benchmark_spec):
+  pass
