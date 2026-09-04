@@ -868,7 +868,7 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
           self.broker_vm, '10.0.0.1:9092', expected_topic
       )
       mock_prod.assert_called_once_with(
-          self.producer_vm, '10.0.0.1:9092', expected_topic, 8, 50_000
+          self.producer_vm, '10.0.0.1:9092', expected_topic, 8, 50_000, None
       )
       mock_cons.assert_called_once_with(
           self.consumer_vm, '10.0.0.1:9092', expected_topic, 8, 50_000
@@ -1071,7 +1071,7 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
         kafka_benchmark, '_RunSingleTrial', side_effect=_mock_single
     ) as mock_single, mock.patch.object(time, 'sleep'):
       results = kafka_benchmark.Run(self.benchmark_spec)
-      self.assertLen(mock_single.call_args_list, 9)
+      self.assertLen(mock_single.call_args_list, 10)
       expected_calls = [
           mock.call(self.benchmark_spec, 2**i, 15_000_000) for i in range(9)
       ]
@@ -1099,7 +1099,7 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
         kafka_benchmark, '_RunSingleTrial', side_effect=_mock_single
     ) as mock_single, mock.patch.object(time, 'sleep'):
       results = kafka_benchmark.Run(self.benchmark_spec)
-      self.assertLen(mock_single.call_args_list, 4)
+      self.assertLen(mock_single.call_args_list, 5)
       expected_calls = [
           mock.call(self.benchmark_spec, t, 15_000_000) for t in [1, 2, 4, 3]
       ]
@@ -1116,7 +1116,10 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
         kafka_benchmark, '_RunSingleTrial', return_value=[mock_sample]
     ) as mock_single, mock.patch.object(time, 'sleep'):
       results = kafka_benchmark.Run(self.benchmark_spec)
-      mock_single.assert_called_once_with(self.benchmark_spec, 8, 12345)
+      mock_single.assert_has_calls([
+          mock.call(self.benchmark_spec, num_threads=1, num_records=1_000_000),
+          mock.call(self.benchmark_spec, 8, 12345),
+      ])
       self.assertEqual(results, [mock_sample])
 
   @flagsaver.flagsaver(
@@ -1138,10 +1141,10 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
         kafka_benchmark, '_RunSingleTrial', side_effect=_mock_single
     ) as mock_single, mock.patch.object(time, 'sleep'):
       results = kafka_benchmark.Run(self.benchmark_spec)
-      self.assertLen(mock_single.call_args_list, 3)
+      self.assertLen(mock_single.call_args_list, 4)
       expected_calls = [
-          mock.call(self.benchmark_spec, t, 12345) for t in [2, 4, 8]
-      ]
+          mock.call(self.benchmark_spec, num_threads=1, num_records=1_000_000)
+      ] + [mock.call(self.benchmark_spec, t, 12345) for t in [2, 4, 8]]
       mock_single.assert_has_calls(expected_calls)
       self.assertLen(results, 2)
       self.assertEqual(results[0].value, 800.0)
@@ -1182,6 +1185,7 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
       results = kafka_benchmark.Run(self.benchmark_spec)
 
       expected_calls = [
+          mock.call(self.benchmark_spec, num_threads=1, num_records=1_000_000),
           mock.call(self.benchmark_spec, 1, 15_000_000),
           mock.call(self.benchmark_spec, 2, 15_000_000),
           mock.call(self.benchmark_spec, 4, 15_000_000),
@@ -1229,6 +1233,7 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
       results = kafka_benchmark.Run(self.benchmark_spec)
 
       expected_calls = [
+          mock.call(self.benchmark_spec, num_threads=1, num_records=1_000_000),
           mock.call(self.benchmark_spec, 1, 15_000_000),
           mock.call(self.benchmark_spec, 2, 15_000_000),
           mock.call(self.benchmark_spec, 4, 15_000_000),

@@ -125,6 +125,19 @@ _KAFKA_FILE_DELETE_DELAY_MS = flags.DEFINE_integer(
 
 _SUMMARY_PERCENTILE_REGEX = re.compile(r'\b\d+(?:\.\d+)?th\b')
 
+_PRODUCER_THROUGHPUT_RECORDS = 'Producer Throughput (Records/sec)'
+_PRODUCER_THROUGHPUT_MB = 'Producer Throughput (MB/sec)'
+_PRODUCER_AVG_LATENCY = 'Producer Avg Latency'
+_PRODUCER_MAX_LATENCY = 'Producer Max Latency'
+_PRODUCER_P95_LATENCY = 'Producer p95 Latency'
+_PRODUCER_P99_LATENCY = 'Producer p99 Latency'
+_PRODUCER_P99_9_LATENCY = 'Producer p99.9 Latency'
+_PRODUCER_SUSTAINED_INGRESS = 'Producer sustained ingress scale'
+_CONSUMER_THROUGHPUT_MB = 'Consumer Throughput (MB/sec)'
+_CONSUMER_THROUGHPUT_RECORDS = 'Consumer Throughput (Records/sec)'
+
+_THROUGHPUT_MARGIN = 0.03
+
 
 def _InstallKafka(vm):
   """Installs Kafka on a VM.
@@ -290,6 +303,7 @@ def _RunProducer(
     topic_name: str,
     num_threads: int,
     num_records: int,
+    target_throughput: int | None = None,
 ) -> str:
   """Runs the Kafka producer performance test across multiple threads.
 
@@ -299,10 +313,16 @@ def _RunProducer(
     topic_name: The topic to produce records to.
     num_threads: The number of concurrent producer threads.
     num_records: The number of records to produce.
+    target_throughput: The target throughput in records/sec.
 
   Returns:
     The concatenated standard output from all producer threads.
   """
+  throughput_to_use = (
+      target_throughput
+      if target_throughput is not None
+      else _KAFKA_PRODUCER_THROUGHPUT.value
+  )
   producer_vm.RemoteCommand(
       f'echo "batch.size={_KAFKA_PRODUCER_BATCH_SIZE.value}" >'
       ' /tmp/producer.properties && echo "acks=all" >>'
@@ -316,7 +336,7 @@ def _RunProducer(
       f'--topic={topic_name} '
       f'--num-records={num_records} '
       f'--record-size={_KAFKA_RECORD_SIZE.value} '
-      f'--throughput={_KAFKA_PRODUCER_THROUGHPUT.value} '
+      f'--throughput={throughput_to_use} '
       f'--bootstrap-server {bootstrap_server} '
       f'--reporting-interval={_KAFKA_REPORTING_INTERVAL.value} '
       '--command-config /tmp/producer.properties '
@@ -504,7 +524,7 @@ def _CreateProducerThroughputSamples(
   if thread_rps:
     results.append(
         sample.Sample(
-            'Producer Throughput (Records/sec)',
+            _PRODUCER_THROUGHPUT_RECORDS,
             sum(thread_rps),
             'records/sec',
             metadata.copy(),
@@ -513,7 +533,7 @@ def _CreateProducerThroughputSamples(
   if thread_mb:
     results.append(
         sample.Sample(
-            'Producer Throughput (MB/sec)',
+            _PRODUCER_THROUGHPUT_MB,
             sum(thread_mb),
             'MB/sec',
             metadata.copy(),
@@ -545,7 +565,7 @@ def _CreateProducerLatencySamples(
   if thread_avg_lat:
     results.append(
         sample.Sample(
-            'Producer Avg Latency',
+            _PRODUCER_AVG_LATENCY,
             sum(thread_avg_lat) / len(thread_avg_lat),
             'ms',
             metadata.copy(),
@@ -554,7 +574,7 @@ def _CreateProducerLatencySamples(
   if thread_max_lat:
     results.append(
         sample.Sample(
-            'Producer Max Latency',
+            _PRODUCER_MAX_LATENCY,
             max(thread_max_lat),
             'ms',
             metadata.copy(),
@@ -563,7 +583,7 @@ def _CreateProducerLatencySamples(
   if thread_p95:
     results.append(
         sample.Sample(
-            'Producer p95 Latency',
+            _PRODUCER_P95_LATENCY,
             sum(thread_p95) / len(thread_p95),
             'ms',
             metadata.copy(),
@@ -572,7 +592,7 @@ def _CreateProducerLatencySamples(
   if thread_p99:
     results.append(
         sample.Sample(
-            'Producer p99 Latency',
+            _PRODUCER_P99_LATENCY,
             sum(thread_p99) / len(thread_p99),
             'ms',
             metadata.copy(),
@@ -581,7 +601,7 @@ def _CreateProducerLatencySamples(
   if thread_p99_9:
     results.append(
         sample.Sample(
-            'Producer p99.9 Latency',
+            _PRODUCER_P99_9_LATENCY,
             sum(thread_p99_9) / len(thread_p99_9),
             'ms',
             metadata.copy(),
@@ -662,7 +682,7 @@ def _CreateProducerIngressSample(
   if mean_ingress > 0.0 or thread_mb:
     results.append(
         sample.Sample(
-            'Producer sustained ingress scale',
+            _PRODUCER_SUSTAINED_INGRESS,
             mean_ingress,
             'MB/s',
             metadata.copy(),
@@ -727,7 +747,7 @@ def _ParseConsumerResults(
   if mb_per_sec_values:
     results.append(
         sample.Sample(
-            'Consumer Throughput (MB/sec)',
+            _CONSUMER_THROUGHPUT_MB,
             sum(mb_per_sec_values),
             'MB/sec',
             metadata.copy(),
@@ -735,7 +755,7 @@ def _ParseConsumerResults(
     )
     results.append(
         sample.Sample(
-            'Consumer Throughput (Records/sec)',
+            _CONSUMER_THROUGHPUT_RECORDS,
             sum(records_per_sec_values),
             'records/sec',
             metadata.copy(),
@@ -837,6 +857,7 @@ def _RunSingleTrial(
     benchmark_spec: bm_spec.BenchmarkSpec,
     num_threads: int,
     num_records: int,
+    target_throughput: int | None = None,
 ) -> list[sample.Sample]:
   """Runs a single trial with the specified number of concurrent threads.
 
@@ -844,6 +865,7 @@ def _RunSingleTrial(
     benchmark_spec: The benchmark specification.
     num_threads: The number of threads to use for the benchmark.
     num_records: The number of records to produce/consume.
+    target_throughput: The target throughput in records/sec.
 
   Returns:
     A list of samples.
@@ -869,6 +891,7 @@ def _RunSingleTrial(
           trial_topic_name,
           num_threads,
           num_records,
+          target_throughput,
       )
       consumer_future = executor.submit(
           _RunConsumer,
@@ -912,9 +935,9 @@ def _GetThroughputs(
   producer_mb = 0.0
   consumer_mb = 0.0
   for s in samples:
-    if getattr(s, 'metric', '') == 'Producer Throughput (MB/sec)':
+    if getattr(s, 'metric', '') == _PRODUCER_THROUGHPUT_MB:
       producer_mb = getattr(s, 'value', 0.0)
-    elif getattr(s, 'metric', '') == 'Consumer Throughput (MB/sec)':
+    elif getattr(s, 'metric', '') == _CONSUMER_THROUGHPUT_MB:
       consumer_mb = getattr(s, 'value', 0.0)
   return producer_mb, consumer_mb
 
@@ -922,7 +945,7 @@ def _GetThroughputs(
 def _IsThroughputImproved(
     curr_samples: abc.Sequence[sample.Sample],
     prev_samples: abc.Sequence[sample.Sample],
-    margin: float = 0.05,
+    margin: float = _THROUGHPUT_MARGIN,
 ) -> bool:
   """Returns True if current samples show adequate throughput improvement.
 
@@ -960,7 +983,7 @@ def _IsP99WithinSla(trial_samples: list[sample.Sample]) -> bool:
     return True
 
   for s in trial_samples:
-    if s.metric == 'Producer p99 Latency':
+    if s.metric == _PRODUCER_P99_LATENCY:
       if s.value > _KAFKA_P99_LATENCY_THRESHOLD.value:
         return False
 
@@ -980,33 +1003,34 @@ def _CoarseSearch(
     thread_counts: The sequence of thread counts to try.
 
   Returns:
-    A tuple of (winning samples, last pass thread count, last failed thread
+    A tuple of (winning samples, last success thread count, last failed thread
     count).
   """
-  winning_samples: list[sample.Sample] = []
-  last_pass_threads = None
+  best_samples: list[sample.Sample] = []
+  last_success_threads = None
   last_failed_threads = None
   prev_threads = None
   prev_samples = []
 
   for num_threads in thread_counts:
     trial_samples = _RunSingleTrial(benchmark_spec, num_threads, num_records)
-    if not winning_samples:
-      winning_samples = trial_samples
 
-    if prev_samples:
-      if not _IsThroughputImproved(
-          trial_samples, prev_samples
-      ) or not _IsP99WithinSla(trial_samples):
-        last_failed_threads = num_threads
-        last_pass_threads = prev_threads
-        break
+    # Capture the very first run as a baseline, even if it fails SLA.
+    if not best_samples:
+      best_samples = trial_samples
 
-    winning_samples = trial_samples
+    if not _IsP99WithinSla(trial_samples) or (
+        prev_samples and not _IsThroughputImproved(trial_samples, prev_samples)
+    ):
+      last_failed_threads = num_threads
+      last_success_threads = prev_threads
+      break
+
+    best_samples = trial_samples
     prev_samples = trial_samples
     prev_threads = num_threads
 
-  return winning_samples, last_pass_threads, last_failed_threads
+  return best_samples, last_success_threads, last_failed_threads
 
 
 def _BinarySearch(
@@ -1015,13 +1039,13 @@ def _BinarySearch(
     low_threads: int,
     high_threads: int,
     best_samples: list[sample.Sample],
-) -> list[sample.Sample]:
+) -> tuple[list[sample.Sample], int, int]:
   """Runs binary search for optimal thread count between low and high.
 
   Args:
     benchmark_spec: The benchmark specification.
     num_records: The number of records to produce/consume.
-    low_threads: The lower bound thread count (e.g. last pass).
+    low_threads: The lower bound thread count (e.g. last success).
     high_threads: The upper bound thread count (e.g. last failed).
     best_samples: The samples from the lower bound thread count.
 
@@ -1031,6 +1055,8 @@ def _BinarySearch(
   low = low_threads
   high = high_threads - 1
   current_best_samples = best_samples
+  last_success_threads = low_threads
+  last_failed_threads = high_threads
 
   while low < high:
     mid = (low + high + 1) // 2
@@ -1040,9 +1066,90 @@ def _BinarySearch(
         trial_samples, current_best_samples
     ) or not _IsP99WithinSla(trial_samples):
       high = mid - 1
+      last_failed_threads = mid
     else:
       low = mid
+      last_success_threads = mid
       current_best_samples = trial_samples
+
+  return current_best_samples, last_success_threads, last_failed_threads
+
+
+def _BinarySearchThroughput(
+    benchmark_spec: bm_spec.BenchmarkSpec,
+    num_records: int,
+    last_success_threads: int | None,
+    last_failed_threads: int | None,
+    best_samples: list[sample.Sample],
+) -> list[sample.Sample]:
+  """Runs binary search to find the optimal throughput on last failed threads by throttling the producer.
+
+  Args:
+    benchmark_spec: The benchmark specification.
+    num_records: The number of records to produce/consume.
+    last_success_threads: The last passing thread count.
+    last_failed_threads: The last failing thread count.
+    best_samples: The samples from the best run so far.
+
+  Returns:
+    A list of samples corresponding to the optimal throughput.
+  """
+  if not best_samples:
+    return best_samples
+
+  baseline_throughput = 0.0
+  for s in best_samples:
+    if s.metric == _PRODUCER_THROUGHPUT_RECORDS:
+      baseline_throughput = float(s.value)
+      break
+
+  if baseline_throughput <= 0.0:
+    return best_samples
+
+  if last_success_threads is not None and last_failed_threads is not None:
+    target_thread_count = last_failed_threads
+    low = baseline_throughput
+    high = (
+        baseline_throughput
+        * float(last_failed_threads)
+        / float(last_success_threads)
+    )
+  elif last_success_threads is None and last_failed_threads is not None:
+    target_thread_count = last_failed_threads
+    low = 0.0
+    high = baseline_throughput
+  else:
+    return best_samples
+
+  logging.info(
+      'Running binary search on throughput for thread count %s between %s and'
+      ' %s records/sec',
+      target_thread_count,
+      low,
+      high,
+  )
+
+  current_best_samples = best_samples
+
+  while (high / max(low, 1.0)) > (1.0 + _THROUGHPUT_MARGIN):
+    mid = (low + high) / 2.0
+
+    trial_samples = _RunSingleTrial(
+        benchmark_spec,
+        target_thread_count,
+        num_records,
+        target_throughput=max(1, int(mid / target_thread_count)),
+    )
+
+    is_improved = not _IsP99WithinSla(
+        current_best_samples
+    ) or _IsThroughputImproved(trial_samples, current_best_samples)
+
+    if _IsP99WithinSla(trial_samples) and is_improved:
+      low = mid
+      current_best_samples = trial_samples
+    else:
+      high = mid
 
   return current_best_samples
 
@@ -1062,17 +1169,32 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     thread_counts = [2**i for i in range(9)]
 
   num_records = int(_KAFKA_NUM_RECORDS.value)
+  # Warmup
+  _RunSingleTrial(benchmark_spec, num_threads=1, num_records=1_000_000)
 
-  winning_samples, last_pass, last_failed = _CoarseSearch(
+  best_samples, last_success_threads, last_failed_threads = _CoarseSearch(
       benchmark_spec, num_records, thread_counts
   )
 
-  if last_pass is not None and last_failed is not None:
-    winning_samples = _BinarySearch(
-        benchmark_spec, num_records, last_pass, last_failed, winning_samples
+  if last_success_threads is not None and last_failed_threads is not None:
+    best_samples, last_success_threads, last_failed_threads = _BinarySearch(
+        benchmark_spec,
+        num_records,
+        last_success_threads,
+        last_failed_threads,
+        best_samples,
     )
 
-  return winning_samples
+  if last_success_threads is not None or last_failed_threads is not None:
+    best_samples = _BinarySearchThroughput(
+        benchmark_spec,
+        num_records,
+        last_success_threads,
+        last_failed_threads,
+        best_samples,
+    )
+
+  return best_samples
 
 
 def Cleanup(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
