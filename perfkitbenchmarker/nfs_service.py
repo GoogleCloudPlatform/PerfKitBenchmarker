@@ -91,6 +91,7 @@ class BaseNfsService(resource.BaseResource):
     self.server_directory = '/'
     self.nfs_tier = FLAGS.nfs_tier or self.DEFAULT_TIER
     self.time_to_mount: float | None = None
+    self.time_to_resolve_dns: float | None = None
     if self.nfs_tier and self.NFS_TIERS and self.nfs_tier not in self.NFS_TIERS:
       # NFS service does not have to have a list of nfs_tiers nor does it have
       # to be implemented by a provider
@@ -105,6 +106,16 @@ class BaseNfsService(resource.BaseResource):
         self.zone,
         self.DEFAULT_NFS_VERSION,
     )
+
+  @property
+  def time_to_mountable(self) -> float | None:
+    """Time in seconds until the NFS service is mountable."""
+    if self.resource_ready_time is None or self.create_start_time is None:
+      return None
+    time_to_ready = self.resource_ready_time - self.create_start_time
+    if not self.time_to_resolve_dns:
+      return time_to_ready
+    return time_to_ready + self.time_to_resolve_dns
 
   def CreateNfsDisk(self):
     mount_point = '%s:%s' % (self.GetRemoteAddress(), self.server_directory)
@@ -133,6 +144,15 @@ class BaseNfsService(resource.BaseResource):
           sample.Sample(
               'Time to Mount',
               self.time_to_mount,
+              'seconds',
+              metadata,
+          )
+      )
+    if self.time_to_mountable is not None:
+      samples.append(
+          sample.Sample(
+              'Time To Mountable',
+              self.time_to_mountable,
               'seconds',
               metadata,
           )

@@ -249,12 +249,7 @@ class AWSSetUpNFSDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
     )
     mount_start_time = time.time()
     super().SetUpDiskOnLinux()
-    self.nfs_service.mount_attach_time = time.time() - mount_start_time
-    if self.nfs_service.create_mount_target_time is not None:
-      self.nfs_service.time_to_mount = (
-          self.nfs_service.create_mount_target_time
-          + self.nfs_service.mount_attach_time
-      )
+    self.nfs_service.time_to_mount = time.time() - mount_start_time
     self.vm.RemoteCommand(
         'echo 15360 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'
         f' {self.disk_spec.mount_point})/read_ahead_kb'
