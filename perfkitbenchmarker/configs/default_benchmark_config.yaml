@@ -838,13 +838,22 @@ nginx_network_saturated_workload:
   flags:
     nginx_content_size: 256000
 
-# copybara:strip_begin(internal)
-# The benchmark measure latency of Kafka by sending constant load of 200 MB/sec throughput which is
-# achieved with 4 threads and 1024 byte record size and 51200 records per second.
-# copybara:strip_end
 kafka_latency:
   name: kafka
   flags:
     kafka_record_size: 1024
     kafka_num_threads: '4'
     kafka_producer_throughput:  51200
+
+dpdk_pktgen_multi_nic_gcp:
+  name: dpdk_pktgen
+  flags:
+    gce_subnet_name: default,dpdk0,dpdk1
+    gce_nic_types: GVNIC,GVNIC,GVNIC
+    gce_nic_queue_counts: default,default,default
+    dpdk_pktgen_max_lcores: 128
+    dpdk_pktgen_tx_rx_lcores_list: ['[4:2]#[6:8];[2:4]#[8:6]']
+    dpdk_pktgen_tx_burst: 8
+    dpdk_pktgen_rx_burst: 128
+    dpdk_pktgen_num_flows: 10
+    dpdk_pktgen_num_memory_channels_per_numa: 2

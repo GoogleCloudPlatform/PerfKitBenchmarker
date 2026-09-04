@@ -19,9 +19,6 @@ range 1 dst port 5678 5678 5678 0
 range 1 size <PACKET_SIZE> <PACKET_SIZE> <PACKET_SIZE> 0
 clr
 # BEGIN_SENDER_CONFIG
-# copybara:strip_begin(internal)
-# Warmup port 0 separately to avoid Andromeda software punt queue overflow. The host vSwitch may drop packets if too many new flows arrive simultaneously.
-# copybara:strip_end
 # Warm up Port 0
 set 0 count 500
 start 0
