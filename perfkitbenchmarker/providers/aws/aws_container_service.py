@@ -53,6 +53,7 @@ class EcrRepository(resource.BaseResource):
     if self._Exists():
       self.user_managed = True
       return
+    tags = util.MakeFormattedDefaultTags()
     create_cmd = util.AWS_PREFIX + [
         'ecr',
         'create-repository',
@@ -61,6 +62,8 @@ class EcrRepository(resource.BaseResource):
         '--repository-name',
         self.name,
     ]
+    if tags:
+      create_cmd.extend(['--tags', *tags])
     _, stderr, retcode = vm_util.IssueCommand(
         create_cmd, raise_on_failure=False
     )
@@ -70,7 +73,7 @@ class EcrRepository(resource.BaseResource):
       if 'InstanceLimitExceeded' in stderr or 'VpcLimitExceeded' in stderr:
         raise errors.Benchmarks.QuotaFailure(stderr)
       raise errors.Resource.CreationError(
-          'Failed to create EKS Cluster: {} return code: {}'.format(
+          'Failed to create ECR repository: {} return code: {}'.format(
               retcode, stderr
           )
       )
@@ -363,9 +366,7 @@ class EcsTask(container_lib.BaseContainer):
     def _WaitForExit():
       task = self._GetTask()
       if task['lastStatus'] != 'STOPPED':
-        raise container_errors.RetriableContainerError(
-            'Task is not STOPPED.'
-        )
+        raise container_errors.RetriableContainerError('Task is not STOPPED.')
       return task
 
     return _WaitForExit()
@@ -375,9 +376,7 @@ class EcsTask(container_lib.BaseContainer):
     assert self.arn is not None
     task_id = self.arn.split('/')[-1]
     log_stream = 'pkb/{name}/{task_id}'.format(name=self.name, task_id=task_id)
-    return str(
-        aws_logs.GetLogStreamAsString(self.region, log_stream, 'pkb')
-    )
+    return str(aws_logs.GetLogStreamAsString(self.region, log_stream, 'pkb'))
 
 
 class EcsService(container_lib.BaseContainerService):
