@@ -94,6 +94,35 @@ REDIS_AOF_VERIFY = flags.DEFINE_bool(
     'If true, execute redis-check-aof to verify the AOF backups. This depends'
     ' on enabling --redis_aof. Default is set to False.',
 )
+MAX_MEMORY_FRACTION = flags.DEFINE_float(
+    'redis_max_memory_fraction',
+    0.7,
+    'The fraction of server VM total memory to allocate to Redis instances'
+    ' when AOF is disabled. Defaults to 0.7.',
+)
+flags.DEFINE_alias('redis_maxmemory_fraction', 'redis_max_memory_fraction')
+
+MAX_MEMORY_RECLAIM_FRACTION = flags.DEFINE_float(
+    'redis_max_memory_reclaim_fraction',
+    0.33,
+    'The maximum fraction of total memory that the proactive memory reclaimer'
+    ' is allowed to target. Defaults to 0.33.',
+)
+flags.DEFINE_alias(
+    'reclaimer_max_reclaim_global_fraction',
+    'redis_max_memory_reclaim_fraction',
+)
+
+RECLAIM_STALE_FRACTION_PER_CYCLE = flags.DEFINE_float(
+    'redis_reclaim_stale_fraction_per_cycle',
+    0.05,
+    'The fraction of stale memory to attempt to reclaim each cycle'
+    ' (proactive reclaimer stale fraction). Defaults to 0.05 (5%).',
+)
+flags.DEFINE_alias(
+    'reclaimer_stale_fraction_per_period',
+    'redis_reclaim_stale_fraction_per_cycle',
+)
 
 
 # Default port for Redis
@@ -143,6 +172,29 @@ def CheckPrerequisites():
     raise errors.Setup.InvalidFlagConfigurationError(
         'Sweeping redis_server_io_threads is not supported for cluster mode or'
         ' session storage configurations.'
+    )
+
+  if MAX_MEMORY_FRACTION.value is not None and (
+      MAX_MEMORY_FRACTION.value <= 0.0 or MAX_MEMORY_FRACTION.value > 1.0
+  ):
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'redis_max_memory_fraction must be between 0.0 and 1.0.'
+    )
+
+  if MAX_MEMORY_RECLAIM_FRACTION.value is not None and (
+      MAX_MEMORY_RECLAIM_FRACTION.value <= 0.0
+      or MAX_MEMORY_RECLAIM_FRACTION.value > 1.0
+  ):
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'redis_max_memory_reclaim_fraction must be between 0.0 and 1.0.'
+    )
+
+  if RECLAIM_STALE_FRACTION_PER_CYCLE.value is not None and (
+      RECLAIM_STALE_FRACTION_PER_CYCLE.value <= 0.0
+      or RECLAIM_STALE_FRACTION_PER_CYCLE.value > 1.0
+  ):
+    raise errors.Setup.InvalidFlagConfigurationError(
+        'redis_reclaim_stale_fraction_per_cycle must be between 0.0 and 1.0.'
     )
 
   return True
@@ -284,17 +336,19 @@ def _BuildStartCommand(vm, port: int) -> str:
   if _EVICTION_POLICY.value:
     cmd_args.append(f'--maxmemory-policy {_EVICTION_POLICY.value}')
 
-  # If aof is not enabled, set maxmemory to 70% of server VM's total memory
-  # divided by the number of processes. This is to ensure that the redis
-  # instances don't consume too much memory and cause the server VM to become
-  # unresponsive.
+  # If aof is not enabled, set maxmemory to the configured fraction
+  # (default 70%) of server VM's total memory divided by the number of
+  # processes. This is to ensure that the redis instances don't consume too
+  # much memory and cause the server VM to become unresponsive.
   # If aof is enabled, deduct 10.5GB from the maxmemory to account
   # for the AOF and OS overheads.
   num_processes = _GetNumProcesses(vm)
   if REDIS_AOF.value:
     max_memory_per_instance = int(vm.total_memory_kb - 11024384)
   else:
-    max_memory_per_instance = int(vm.total_memory_kb * 0.7 / num_processes)
+    max_memory_per_instance = int(
+        vm.total_memory_kb * MAX_MEMORY_FRACTION.value / num_processes
+    )
   cmd_args.append(f'--maxmemory {max_memory_per_instance}kb')
   return cmd.format(redis_dir=redis_dir, args=' '.join(cmd_args))
 
@@ -375,6 +429,12 @@ def GetMetadata(vm) -> Dict[str, Any]:
       'redis_server_enable_snapshots': _ENABLE_SNAPSHOTS.value,
       'redis_server_num_processes': num_processes,
       'redis_aof': REDIS_AOF.value,
+      'redis_eviction_policy': _EVICTION_POLICY.value,
+      'redis_max_memory_fraction': MAX_MEMORY_FRACTION.value,
+      'redis_max_memory_reclaim_fraction': MAX_MEMORY_RECLAIM_FRACTION.value,
+      'redis_reclaim_stale_fraction_per_cycle': (
+          RECLAIM_STALE_FRACTION_PER_CYCLE.value
+      ),
   }
 
 
