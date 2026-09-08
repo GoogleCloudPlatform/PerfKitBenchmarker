@@ -217,7 +217,7 @@ flags.DEFINE_boolean(
     ' remote service after the benchmark has completed. Additional delay may be'
     ' incurred due to the need to wait for metadata propagation.',
 )
-flags.DEFINE_enum(
+EDW_BQ_FEATURE_CONFIG = flags.DEFINE_enum(
     'edw_bq_feature_config',
     'default',
     ['default', 'job_optional'],
@@ -225,6 +225,13 @@ flags.DEFINE_enum(
     'Currently supported: default (no special features), job_optional '
     '(enables job_creation_optional query preview feature). '
     'Only supported for Python client.',
+)
+EDW_BQ_QUERY_RESULTS_FORMAT = flags.DEFINE_string(
+    'edw_bq_query_results_format',
+    None,
+    'Format for query results. Supported values: ARROW, DEFAULT (or omit for'
+    ' DEFAULT struct format). Only supported for Python client. See:'
+    ' https://cloud.google.com/python/docs/reference/bigquery/latest/google.cloud.bigquery.client.Client#google_cloud_bigquery_client_Client_query_and_wait',
 )
 EDW_BQ_RESERVATION = flags.DEFINE_string(
     'edw_bq_reservation',

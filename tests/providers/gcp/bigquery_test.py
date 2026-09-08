@@ -18,6 +18,7 @@ import unittest
 from unittest import mock
 from absl.testing import flagsaver
 from absl.testing import parameterized
+from perfkitbenchmarker import edw_service
 from perfkitbenchmarker import errors
 from perfkitbenchmarker.providers.gcp import bigquery
 from perfkitbenchmarker.providers.gcp import flags as gcp_flags
@@ -763,6 +764,162 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
 
     with self.assertRaises(errors.Benchmarks.RunError):
       interface.ExecuteQuery(QUERY_NAME)
+
+  @flagsaver.flagsaver((gcp_flags.BQ_CLIENT_INTERFACE, 'PYTHON'))
+  def testGetBigQueryClientInterfacePython(self):
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertIsInstance(interface, bigquery.PythonClientInterface)
+
+  @flagsaver.flagsaver((gcp_flags.BQ_CLIENT_INTERFACE, 'PYTHON'))
+  def testPythonClientInterfaceGetMetadataDefault(self):
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertDictEqual(
+        interface.GetMetadata(),
+        {'client': 'PYTHON', 'edw_bq_reservation': 'default'},
+    )
+
+  @flagsaver.flagsaver(
+      (gcp_flags.BQ_CLIENT_INTERFACE, 'PYTHON'),
+      (edw_service.EDW_BQ_RESERVATION, 'projects/p/locations/l/reservations/r'),
+      (edw_service.EDW_BQ_QUERY_RESULTS_FORMAT, 'ARROW'),
+  )
+  def testPythonClientInterfaceGetMetadataWithCustomFlags(self):
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertDictEqual(
+        interface.GetMetadata(),
+        {
+            'client': 'PYTHON',
+            'edw_bq_reservation': 'projects/p/locations/l/reservations/r',
+            'edw_bq_query_results_format': 'ARROW',
+        },
+    )
+
+  @flagsaver.flagsaver(
+      (gcp_flags.BQ_CLIENT_INTERFACE, 'PYTHON'),
+      (gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, 'key.json'),
+  )
+  def testPythonClientInterfaceExecuteQueryDefault(self):
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertIsInstance(interface, bigquery.PythonClientInterface)
+    mock_vm = mock.MagicMock()
+    bm_spec = FakeBenchmarkSpec(mock_vm)
+    interface.SetProvisionedAttributes(bm_spec)
+    mock_vm.RobustRemoteCommand.return_value = (
+        json.dumps({
+            'query_wall_time_in_secs': 2.5,
+            'details': {'job_id': 'JOB_123'},
+        }),
+        None,
+    )
+    execution_time, details = interface.ExecuteQuery(QUERY_NAME)
+    self.assertEqual(execution_time, 2.5)
+    self.assertDictEqual(
+        details,
+        {
+            'client': 'PYTHON',
+            'edw_bq_reservation': 'default',
+            'job_id': 'JOB_123',
+        },
+    )
+    mock_vm.RobustRemoteCommand.assert_called_once_with(
+        '.venv/bin/python bq_python_driver.py single --project PROJECT_ID'
+        ' --credentials_file key.json --dataset DATASET_ID --query_file'
+        ' QUERY_NAME --feature_config default'
+    )
+
+  @flagsaver.flagsaver(
+      (gcp_flags.BQ_CLIENT_INTERFACE, 'PYTHON'),
+      (gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, '/path/to/key.json'),
+      (edw_service.EDW_BQ_FEATURE_CONFIG, 'job_optional'),
+      (edw_service.EDW_BQ_RESERVATION, 'projects/p/locations/l/reservations/r'),
+      (edw_service.EDW_BQ_QUERY_RESULTS_FORMAT, 'ARROW'),
+  )
+  def testPythonClientInterfaceExecuteQueryWithFlags(self):
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertIsInstance(interface, bigquery.PythonClientInterface)
+    interface.destination = 'project.dataset.table'
+    mock_vm = mock.MagicMock()
+    bm_spec = FakeBenchmarkSpec(mock_vm)
+    interface.SetProvisionedAttributes(bm_spec)
+    mock_vm.RobustRemoteCommand.return_value = (
+        json.dumps({
+            'query_wall_time_in_secs': 1.2,
+            'details': {'job_id': 'JOB_456'},
+        }),
+        None,
+    )
+    execution_time, details = interface.ExecuteQuery(
+        QUERY_NAME, print_results=True
+    )
+    self.assertEqual(execution_time, 1.2)
+    self.assertDictEqual(
+        details,
+        {
+            'client': 'PYTHON',
+            'edw_bq_reservation': 'projects/p/locations/l/reservations/r',
+            'edw_bq_query_results_format': 'ARROW',
+            'job_id': 'JOB_456',
+        },
+    )
+    mock_vm.RobustRemoteCommand.assert_called_once_with(
+        '.venv/bin/python bq_python_driver.py single --project PROJECT_ID'
+        ' --credentials_file key.json --dataset DATASET_ID --query_file'
+        ' QUERY_NAME --feature_config job_optional --reservation'
+        ' projects/p/locations/l/reservations/r --query_results_format ARROW'
+        ' --print_results --destination project.dataset.table'
+    )
+
+  @flagsaver.flagsaver(
+      (gcp_flags.BQ_CLIENT_INTERFACE, 'PYTHON'),
+      (gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, 'key.json'),
+      (edw_service.EDW_BQ_FEATURE_CONFIG, 'job_optional'),
+      (edw_service.EDW_BQ_RESERVATION, 'projects/p/locations/l/reservations/r'),
+      (edw_service.EDW_BQ_QUERY_RESULTS_FORMAT, 'ARROW'),
+  )
+  def testPythonClientInterfaceExecuteThroughput(self):
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertIsInstance(interface, bigquery.PythonClientInterface)
+    mock_vm = mock.MagicMock()
+    bm_spec = FakeBenchmarkSpec(mock_vm)
+    interface.SetProvisionedAttributes(bm_spec)
+    mock_vm.RobustRemoteCommand.return_value = (
+        json.dumps(THROUGHPUT_RESPONSE_OBJECT),
+        None,
+    )
+    response = interface.ExecuteThroughput(QUERY_STREAMS, THROUGHPUT_LABELS)
+    self.assertDictEqual(json.loads(response), THROUGHPUT_RESPONSE_OBJECT)
+    mock_vm.RobustRemoteCommand.assert_called_once_with(
+        '.venv/bin/python bq_python_driver.py throughput --project PROJECT_ID'
+        ' --credentials_file key.json --dataset DATASET_ID'
+        f" --query_streams='{json.dumps(QUERY_STREAMS)}'"
+        ' --feature_config job_optional --labels'
+        f" '{json.dumps(THROUGHPUT_LABELS)}'"
+        ' --reservation projects/p/locations/l/reservations/r'
+        ' --query_results_format ARROW'
+    )
+
+  @flagsaver.flagsaver(
+      (gcp_flags.BQ_CLIENT_INTERFACE, 'PYTHON'),
+      (gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, 'key.json'),
+      (edw_service.EDW_BQ_QUERY_RESULTS_FORMAT, 'ARROW'),
+  )
+  def testPythonClientInterfaceRunQueryWithResults(self):
+    interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
+    self.assertIsInstance(interface, bigquery.PythonClientInterface)
+    mock_vm = mock.MagicMock()
+    bm_spec = FakeBenchmarkSpec(mock_vm)
+    interface.SetProvisionedAttributes(bm_spec)
+    mock_vm.RobustRemoteCommand.return_value = (
+        json.dumps({'results': [1, 2, 3]}),
+        None,
+    )
+    response = interface.RunQueryWithResults(QUERY_NAME)
+    self.assertEqual(json.loads(response), {'results': [1, 2, 3]})
+    mock_vm.RobustRemoteCommand.assert_called_once_with(
+        '.venv/bin/python bq_python_driver.py single --project PROJECT_ID'
+        ' --credentials_file key.json --dataset DATASET_ID --query_file'
+        ' QUERY_NAME --print_results --query_results_format ARROW'
+    )
 
 
 if __name__ == '__main__':

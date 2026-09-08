@@ -500,6 +500,12 @@ class PythonClientInterface(GenericClientInterface):
     base_metadata = super().GetMetadata()
     reservation = edw_service.EDW_BQ_RESERVATION.value or 'default'
     base_metadata.update({'edw_bq_reservation': reservation})
+    if edw_service.EDW_BQ_QUERY_RESULTS_FORMAT.value:
+      base_metadata.update({
+          'edw_bq_query_results_format': (
+              edw_service.EDW_BQ_QUERY_RESULTS_FORMAT.value
+          )
+      })
     return base_metadata
 
   def Prepare(self, package_name: str) -> None:
@@ -548,6 +554,11 @@ class PythonClientInterface(GenericClientInterface):
     )
     if edw_service.EDW_BQ_RESERVATION.value:
       cmd += f' --reservation {edw_service.EDW_BQ_RESERVATION.value}'
+    if edw_service.EDW_BQ_QUERY_RESULTS_FORMAT.value:
+      cmd += (
+          ' --query_results_format'
+          f' {edw_service.EDW_BQ_QUERY_RESULTS_FORMAT.value}'
+      )
     if print_results:
       cmd += ' --print_results'
     if self.destination:
@@ -573,6 +584,11 @@ class PythonClientInterface(GenericClientInterface):
     )
     if edw_service.EDW_BQ_RESERVATION.value:
       cmd += f' --reservation {edw_service.EDW_BQ_RESERVATION.value}'
+    if edw_service.EDW_BQ_QUERY_RESULTS_FORMAT.value:
+      cmd += (
+          ' --query_results_format'
+          f' {edw_service.EDW_BQ_QUERY_RESULTS_FORMAT.value}'
+      )
     stdout, _ = self.client_vm.RobustRemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
@@ -583,6 +599,11 @@ class PythonClientInterface(GenericClientInterface):
         f' {self.project_id} --credentials_file {self.key_file_name} --dataset'
         f' {self.dataset_id} --query_file {query_name} --print_results'
     )
+    if edw_service.EDW_BQ_QUERY_RESULTS_FORMAT.value:
+      cmd += (
+          ' --query_results_format'
+          f' {edw_service.EDW_BQ_QUERY_RESULTS_FORMAT.value}'
+      )
     stdout, _ = self.client_vm.RobustRemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
