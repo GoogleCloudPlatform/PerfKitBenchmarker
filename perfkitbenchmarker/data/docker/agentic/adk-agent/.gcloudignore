@@ -1,0 +1,25 @@
+# This file tells gcloud builds submit which files to exclude from the upload.
+# Without it, gcloud ignores .dockerignore and uploads everything (including .venv).
+
+.git
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.tox/
+.cache/
+.coverage
+htmlcov/
+*.log
+.env
+.adk/
+sessions.db
+tmp/
+.DS_Store
