@@ -1542,18 +1542,26 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     return num_teardown_skipped_vms
 
   def UpdateTimeoutMetadata(self):
-    """Updates the timeout metadata for the VM."""
+    """Updates the timeout metadata and labels for the VM."""
     new_timeout = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
         minutes=pkb_flags.SKIP_TEARDOWN_KEEP_UP_MINUTES.value
     )
     new_timeout = new_timeout.strftime(resource.METADATA_TIME_FORMAT)
-    args = ['compute', 'instances', 'add-metadata', self.name]
-    cmd = util.GcloudCommand(self, *args)
-    cmd.flags['metadata'] = (
+    tags = (
         f'{resource.TIMEOUT_METADATA_KEY}={new_timeout},'
         f'{PKB_SKIPPED_TEARDOWN_METADATA_KEY}=true'
     )
-    cmd.Issue()
+    metadata_cmd = util.GcloudCommand(
+        self, 'compute', 'instances', 'add-metadata', self.name
+    )
+    metadata_cmd.flags['metadata'] = tags
+    metadata_cmd.Issue()
+
+    labels_cmd = util.GcloudCommand(
+        self, 'compute', 'instances', 'add-labels', self.name
+    )
+    labels_cmd.flags['labels'] = tags
+    labels_cmd.Issue()
 
 
 class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):

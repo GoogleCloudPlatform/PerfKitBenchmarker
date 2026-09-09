@@ -519,6 +519,27 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
             log_output,
         )
 
+  def testUpdateTimeoutMetadata(self):
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type='test_machine_type',
+        project='p',
+    )
+    vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+    vm.zone = 'us-central1-a'
+    fake_rets = [('', '', 0), ('', '', 0)]
+    with PatchCriticalObjects(fake_rets) as issue_cmd:
+      vm.UpdateTimeoutMetadata()
+      self.assertEqual(issue_cmd.call_count, 2)
+      metadata_cmd = ' '.join(issue_cmd.call_args_list[0][0][0])
+      labels_cmd = ' '.join(issue_cmd.call_args_list[1][0][0])
+      self.assertIn('compute instances add-metadata', metadata_cmd)
+      self.assertIn('--metadata timeout_utc=', metadata_cmd)
+      self.assertIn('pkb_skipped_teardown=true', metadata_cmd)
+      self.assertIn('compute instances add-labels', labels_cmd)
+      self.assertIn('--labels timeout_utc=', labels_cmd)
+      self.assertIn('pkb_skipped_teardown=true', labels_cmd)
+
 
 def _CreateFakeDiskMetadata(image, fake_disk):
   fake_disk = copy.copy(fake_disk)
