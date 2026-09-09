@@ -337,7 +337,7 @@ class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):
     """
     if vm is None:
       vm = mock.create_autospec(virtual_machine.BaseVirtualMachine)
-    vm.RemoteCommand.mock_command = mock_command.MockRemoteCommand(
+    vm.RemoteCommand.mock_command = mock_command.MockRemoteCommand(  # pyrefly: ignore[missing-attribute]
         call_to_response, vm
     )
     return vm
@@ -361,7 +361,7 @@ class PkbCommonTestCase(parameterized.TestCase, absltest.TestCase):
     """
     if cli is None:
       cli = mock.create_autospec(command_interface.CommandInterface)
-    cli.RunCommand.mock_command = mock_command.MockCommand(
+    cli.RunCommand.mock_command = mock_command.MockCommand(  # pyrefly: ignore[missing-attribute]
         call_to_response, cli.RunCommand, ('', '', 0)  # pyrefly: ignore[bad-argument-type]
     )
     return cli

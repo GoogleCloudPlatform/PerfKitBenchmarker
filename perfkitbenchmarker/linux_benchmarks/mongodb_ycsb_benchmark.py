@@ -479,10 +479,10 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
   arbiter = None
   clients = benchmark_spec.vm_groups['clients']
 
-  server_partials = [functools.partial(_PrepareServer, primary)]
+  server_partials = [functools.partial(_PrepareServer, primary)]  # pyrefly: ignore[bad-argument-type]
   arbiter_partial = []
   client_partials = [
-      functools.partial(_PrepareClient, client) for client in clients
+      functools.partial(_PrepareClient, client) for client in clients  # pyrefly: ignore[bad-argument-type]
   ]
 
   if not FLAGS.mongodb_primary_only:
@@ -491,14 +491,14 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       server_vms.append(secondary)
       secondary_2 = benchmark_spec.vm_groups['secondary_2'][0]
       server_vms.append(secondary_2)
-      server_partials += [functools.partial(_PrepareServer, secondary)]
-      server_partials += [functools.partial(_PrepareServer, secondary_2)]
+      server_partials += [functools.partial(_PrepareServer, secondary)]  # pyrefly: ignore[bad-argument-type]
+      server_partials += [functools.partial(_PrepareServer, secondary_2)]  # pyrefly: ignore[bad-argument-type]
     else:
       secondary = benchmark_spec.vm_groups['secondary'][0]
       server_vms.append(secondary)
       arbiter = benchmark_spec.vm_groups['arbiter'][0]
-      server_partials += [functools.partial(_PrepareServer, secondary)]
-      arbiter_partial += [functools.partial(_PrepareArbiter, arbiter)]
+      server_partials += [functools.partial(_PrepareServer, secondary)]  # pyrefly: ignore[bad-argument-type]
+      arbiter_partial += [functools.partial(_PrepareArbiter, arbiter)]  # pyrefly: ignore[bad-argument-type]
 
   background_tasks.RunThreaded(
       (lambda f: f()), server_partials + arbiter_partial + client_partials

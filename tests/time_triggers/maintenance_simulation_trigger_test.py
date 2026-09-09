@@ -109,7 +109,7 @@ class MaintenanceSimulationTest(pkb_common_test_case.PkbCommonTestCase):
     event = base_disruption_trigger.DisruptionEvent(
         start_time=0.0, end_time=0.0, total_time=10.0
     )
-    trigger.gce_simulate_maintenance_helpers[
+    trigger.gce_simulate_maintenance_helpers[  # pyrefly: ignore[missing-attribute]
         vm
     ].CollectLMNotificationsTime.return_value = event
     trigger.capture_live_migration_timestamps = True

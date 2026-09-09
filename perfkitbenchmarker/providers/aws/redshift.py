@@ -366,8 +366,8 @@ class Redshift(edw_service.EdwService):
     )
 
   def _CreateDependencies(self):
-    self.cluster_subnet_group.Create()
-    self.cluster_parameter_group.Create()
+    self.cluster_subnet_group.Create()  # pyrefly: ignore[missing-attribute]
+    self.cluster_parameter_group.Create()  # pyrefly: ignore[missing-attribute]
 
   def _Create(self):
     """Create the redshift cluster resource."""
@@ -538,9 +538,9 @@ class Redshift(edw_service.EdwService):
           '--snapshot-identifier',
           snapshot_identifier,
           '--cluster-subnet-group-name',
-          self.cluster_subnet_group.name,
+          self.cluster_subnet_group.name,  # pyrefly: ignore[missing-attribute]
           '--cluster-parameter-group-name',
-          self.cluster_parameter_group.name,
+          self.cluster_parameter_group.name,  # pyrefly: ignore[missing-attribute]
           '--publicly-accessible',
           '--automated-snapshot-retention-period=1',
       ]
@@ -625,8 +625,8 @@ class Redshift(edw_service.EdwService):
 
   def _DeleteDependencies(self):
     """Delete dependencies of a redshift cluster."""
-    self.cluster_subnet_group.Delete()
-    self.cluster_parameter_group.Delete()
+    self.cluster_subnet_group.Delete()  # pyrefly: ignore[missing-attribute]
+    self.cluster_parameter_group.Delete()  # pyrefly: ignore[missing-attribute]
 
   def GetMetadata(self):
     """Return a dictionary of the metadata for this cluster."""

@@ -75,7 +75,7 @@ class GetCallStringTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(result, '_ReturnArgs(blue, 5, x=8)')
 
   def testSinglePartial(self):
-    _ReturnArgs2 = functools.partial(_ReturnArgs, 1, x=2)
+    _ReturnArgs2 = functools.partial(_ReturnArgs, 1, x=2)  # pyrefly: ignore[unexpected-keyword]
     result = background_tasks._GetCallString((_ReturnArgs2, (), {}))
     self.assertEqual(result, '_ReturnArgs(1, x=2)')
     result = background_tasks._GetCallString(
@@ -84,7 +84,7 @@ class GetCallStringTestCase(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(result, '_ReturnArgs(1, blue, 5, x=8)')
 
   def testDoublePartial(self):
-    _ReturnArgs2 = functools.partial(_ReturnArgs, 1, x=2)
+    _ReturnArgs2 = functools.partial(_ReturnArgs, 1, x=2)  # pyrefly: ignore[unexpected-keyword]
     _ReturnArgs3 = functools.partial(_ReturnArgs2, 3, x=4)
     result = background_tasks._GetCallString((_ReturnArgs3, (), {}))
     self.assertEqual(result, '_ReturnArgs(1, 3, x=4)')

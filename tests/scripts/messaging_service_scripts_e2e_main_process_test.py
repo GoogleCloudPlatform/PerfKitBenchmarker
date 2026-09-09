@@ -210,8 +210,8 @@ class MessagingServiceScriptsE2EMainProcessTest(
     worker = main_process.PublisherWorker()
     with mock.patch.object(main_process.BaseWorker, '_read_subprocess_output'):
       await worker.start()
-    worker.subprocess_out_reader.poll.side_effect = [False, True]
-    worker.subprocess_out_reader.recv.return_value = 'hola'
+    worker.subprocess_out_reader.poll.side_effect = [False, True]  # pyrefly: ignore[missing-attribute]
+    worker.subprocess_out_reader.recv.return_value = 'hola'  # pyrefly: ignore[missing-attribute]
     self.assertEqual(await worker._read_subprocess_output(str), 'hola')
     sleep_mock.assert_called_once_with(worker.SLEEP_TIME)
     self.assertEqual(self._GetSubprocessOutReader(worker).poll.call_count, 2)
@@ -228,7 +228,7 @@ class MessagingServiceScriptsE2EMainProcessTest(
     worker = main_process.PublisherWorker()
     with mock.patch.object(main_process.BaseWorker, '_read_subprocess_output'):
       await worker.start()
-    worker.subprocess_out_reader.poll.side_effect = itertools.repeat(False)
+    worker.subprocess_out_reader.poll.side_effect = itertools.repeat(False)  # pyrefly: ignore[missing-attribute]
     self._GetSubprocessOutReader(worker).recv.assert_not_called()
     with self.assertRaises(errors.EndToEnd.SubprocessTimeoutError):
       await worker._read_subprocess_output(str, 0.2)
@@ -244,8 +244,8 @@ class MessagingServiceScriptsE2EMainProcessTest(
     worker = main_process.PublisherWorker()
     with mock.patch.object(main_process.BaseWorker, '_read_subprocess_output'):
       await worker.start()
-    worker.subprocess_out_reader.poll.return_value = True
-    worker.subprocess_out_reader.recv.return_value = 42
+    worker.subprocess_out_reader.poll.return_value = True  # pyrefly: ignore[missing-attribute]
+    worker.subprocess_out_reader.recv.return_value = 42  # pyrefly: ignore[missing-attribute]
     with self.assertRaises(errors.EndToEnd.ReceivedUnexpectedObjectError):
       await worker._read_subprocess_output(str)
     self._GetSubprocessOutReader(worker).recv.assert_called_once_with()

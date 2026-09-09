@@ -756,7 +756,7 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     # This flag is mutually exclusive with any of these flags:
     # --address, --network, --network-tier, --subnet, --private-network-ip.
     # gcloud compute instances create ... --network-interface=
-    for idx, net_resource in enumerate(net_resources):  # pyrefly: ignore[bad-argument-type]
+    for idx, net_resource in enumerate(net_resources):  # pyrefly: ignore[bad-argument-type, not-iterable]
       gce_nic_type = self.gce_nic_types[idx].upper()
       gce_nic_queue_count_arg = []
       if gcp_flags.GCE_NIC_QUEUE_COUNTS.value[idx] != 'default':
