@@ -61,7 +61,7 @@ KAFKA_BROKER_PORT = 9092
 FLAGS = flags.FLAGS
 _KAFKA_NUM_PARTITIONS = flags.DEFINE_integer(
     'kafka_num_partitions',
-    256,
+    16,
     'Number of partitions for the topic.',
 )
 _KAFKA_REPLICATION_FACTOR = flags.DEFINE_integer(
@@ -87,23 +87,23 @@ _KAFKA_PRODUCER_THROUGHPUT = flags.DEFINE_integer(
     -1,
     'Throughput of the producer in records/sec. Use -1 to disable throttling.',
 )
-_KAFKA_P99_LATENCY_THRESHOLD = flags.DEFINE_integer(
-    'kafka_p99_latency_threshold',
+_KAFKA_P95_LATENCY_THRESHOLD = flags.DEFINE_integer(
+    'kafka_p95_latency_threshold',
     100,
-    'The p99 latency SLA threshold (in milliseconds). If set, optimal '
-    'throughput must also maintain a P99 latency within this boundary. '
+    'The p95 latency SLA threshold (in milliseconds). If set, optimal '
+    'throughput must also maintain a P95 latency within this boundary. '
     'To bypass this check, set this flag to 0.',
 )
 _KAFKA_CONSUMER_FETCH_SIZE = flags.DEFINE_integer(
     'kafka_consumer_fetch_size',
-    1024 * 1024 * 50,  # 50 MB
+    1024 * 1024 * 5,  # 5 MB
     'Fetch size of the consumer in bytes, default is 5 MB.',
 )
 _KAFKA_NUM_THREADS = flags.DEFINE_list(
     'kafka_num_threads',
     None,
-    'List of thread counts to use for the benchmark (e.g. 8,16,32). If None '
-    'or empty, sweeps through powers of 2 from 1 up to 256 iteratively, then '
+    'List of thread counts to use for the benchmark (e.g. 4,8,16). If None '
+    'or empty, sweeps through powers of 2 from 1 up to 16 iteratively, then '
     'refines the optimal thread count via binary search.',
 )
 _KAFKA_REPORTING_INTERVAL = flags.DEFINE_integer(
@@ -121,6 +121,12 @@ _KAFKA_FILE_DELETE_DELAY_MS = flags.DEFINE_integer(
     60_000,
     'Delay in milliseconds before deleting file segments and log segments on'
     ' the broker once marked for deletion after a topic drop.',
+)
+_KAFKA_CONSUMER_START_DELAY = flags.DEFINE_integer(
+    'kafka_consumer_start_delay',
+    1,
+    'Delay in seconds before starting the consumer. This allows the producer '
+    'to populate the topic before consumption begins.',
 )
 
 _SUMMARY_PERCENTILE_REGEX = re.compile(r'\b\d+(?:\.\d+)?th\b')
@@ -884,6 +890,10 @@ def _RunSingleTrial(
   try:
     # Execute producer and consumer workloads concurrently against the broker.
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+      def _RunConsumerDelayed(*args, **kwargs):
+        time.sleep(_KAFKA_CONSUMER_START_DELAY.value)
+        return _RunConsumer(*args, **kwargs)
+
       producer_future = executor.submit(
           _RunProducer,
           producer_vm,
@@ -894,7 +904,7 @@ def _RunSingleTrial(
           target_throughput,
       )
       consumer_future = executor.submit(
-          _RunConsumer,
+          _RunConsumerDelayed,
           consumer_vm,
           bootstrap_server,
           trial_topic_name,
@@ -910,6 +920,8 @@ def _RunSingleTrial(
         'kafka_producer_batch_size': int(_KAFKA_PRODUCER_BATCH_SIZE.value),
         'kafka_consumer_fetch_size': int(_KAFKA_CONSUMER_FETCH_SIZE.value),
         'kafka_num_threads': num_threads,
+        'kafka_partitions': int(_KAFKA_NUM_PARTITIONS.value),
+        'kafka_replication_factor': int(_KAFKA_REPLICATION_FACTOR.value),
     }
 
     trial_results = []
@@ -969,22 +981,22 @@ def _IsThroughputImproved(
   return not (throughput_stalled or throughput_declined)
 
 
-def _IsP99WithinSla(trial_samples: list[sample.Sample]) -> bool:
-  """Checks if the p99 latency in the trial is within the requested SLA.
+def _IsP95WithinSla(trial_samples: list[sample.Sample]) -> bool:
+  """Checks if the p95 latency in the trial is within the requested SLA.
 
   Args:
     trial_samples: A list of samples containing producer metrics.
 
   Returns:
-    True if the p99 latency is less than or equal to the threshold, or if no
+    True if the p95 latency is less than or equal to the threshold, or if no
     threshold flag is set.
   """
-  if not _KAFKA_P99_LATENCY_THRESHOLD.value:
+  if not _KAFKA_P95_LATENCY_THRESHOLD.value:
     return True
 
   for s in trial_samples:
-    if s.metric == _PRODUCER_P99_LATENCY:
-      if s.value > _KAFKA_P99_LATENCY_THRESHOLD.value:
+    if s.metric == _PRODUCER_P95_LATENCY:
+      if s.value > _KAFKA_P95_LATENCY_THRESHOLD.value:
         return False
 
   return True
@@ -1019,7 +1031,7 @@ def _CoarseSearch(
     if not best_samples:
       best_samples = trial_samples
 
-    if not _IsP99WithinSla(trial_samples) or (
+    if not _IsP95WithinSla(trial_samples) or (
         prev_samples and not _IsThroughputImproved(trial_samples, prev_samples)
     ):
       last_failed_threads = num_threads
@@ -1064,7 +1076,7 @@ def _BinarySearch(
 
     if not _IsThroughputImproved(
         trial_samples, current_best_samples
-    ) or not _IsP99WithinSla(trial_samples):
+    ) or not _IsP95WithinSla(trial_samples):
       high = mid - 1
       last_failed_threads = mid
     else:
@@ -1141,11 +1153,11 @@ def _BinarySearchThroughput(
         target_throughput=max(1, int(mid / target_thread_count)),
     )
 
-    is_improved = not _IsP99WithinSla(
+    is_improved = not _IsP95WithinSla(
         current_best_samples
     ) or _IsThroughputImproved(trial_samples, current_best_samples)
 
-    if _IsP99WithinSla(trial_samples) and is_improved:
+    if _IsP95WithinSla(trial_samples) and is_improved:
       low = mid
       current_best_samples = trial_samples
     else:
@@ -1166,7 +1178,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
   if _KAFKA_NUM_THREADS.value:
     thread_counts = sorted(int(t) for t in _KAFKA_NUM_THREADS.value)
   else:
-    thread_counts = [2**i for i in range(9)]
+    thread_counts = [2**i for i in range(5)]
 
   num_records = int(_KAFKA_NUM_RECORDS.value)
   # Warmup

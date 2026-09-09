@@ -192,7 +192,7 @@ class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
     kafka_benchmark._CreateTopic(self.broker_vm, '10.0.0.1:9092', 'test-topic')
     self.broker_vm.RemoteCommand.assert_called_once_with(
         f'cd {kafka_benchmark.KAFKA_DIR} && bin/kafka-topics.sh --create'
-        ' --topic test-topic --bootstrap-server 10.0.0.1:9092 --partitions=256'
+        ' --topic test-topic --bootstrap-server 10.0.0.1:9092 --partitions=16'
         ' --replication-factor=1 --config min.insync.replicas=1'
         ' --if-not-exists'
     )
@@ -801,36 +801,36 @@ class KafkaBenchmarkCreateProducerIngressSampleTest(
     self.assertEmpty(samples)
 
 
-class KafkaBenchmarkIsP99WithinSlaTest(pkb_common_test_case.PkbCommonTestCase):
-  """Tests for _IsP99WithinSla."""
+class KafkaBenchmarkIsP95WithinSlaTest(pkb_common_test_case.PkbCommonTestCase):
+  """Tests for _IsP95WithinSla."""
 
-  @flagsaver.flagsaver(kafka_p99_latency_threshold=100)
-  def testP99ThresholdMet(self):
+  @flagsaver.flagsaver(kafka_p95_latency_threshold=100)
+  def testP95ThresholdMet(self):
     samples = [
-        sample.Sample('Producer p99 Latency', 99.0, 'ms'),
+        sample.Sample('Producer p95 Latency', 99.0, 'ms'),
     ]
-    self.assertTrue(kafka_benchmark._IsP99WithinSla(samples))
+    self.assertTrue(kafka_benchmark._IsP95WithinSla(samples))
 
-  @flagsaver.flagsaver(kafka_p99_latency_threshold=100)
-  def testP99ThresholdBreached(self):
+  @flagsaver.flagsaver(kafka_p95_latency_threshold=100)
+  def testP95ThresholdBreached(self):
     samples = [
-        sample.Sample('Producer p99 Latency', 101.0, 'ms'),
+        sample.Sample('Producer p95 Latency', 101.0, 'ms'),
     ]
-    self.assertFalse(kafka_benchmark._IsP99WithinSla(samples))
+    self.assertFalse(kafka_benchmark._IsP95WithinSla(samples))
 
-  @flagsaver.flagsaver(kafka_p99_latency_threshold=0)
-  def testP99ThresholdDisabledViaZero(self):
+  @flagsaver.flagsaver(kafka_p95_latency_threshold=0)
+  def testP95ThresholdDisabledViaZero(self):
     samples = [
-        sample.Sample('Producer p99 Latency', 999.0, 'ms'),
+        sample.Sample('Producer p95 Latency', 999.0, 'ms'),
     ]
-    self.assertTrue(kafka_benchmark._IsP99WithinSla(samples))
+    self.assertTrue(kafka_benchmark._IsP95WithinSla(samples))
 
-  @flagsaver.flagsaver(kafka_p99_latency_threshold=100)
-  def testNoP99MetricPresent(self):
+  @flagsaver.flagsaver(kafka_p95_latency_threshold=100)
+  def testNoP95MetricPresent(self):
     samples = [
         sample.Sample('Producer Max Latency', 105.0, 'ms'),
     ]
-    self.assertTrue(kafka_benchmark._IsP99WithinSla(samples))
+    self.assertTrue(kafka_benchmark._IsP95WithinSla(samples))
 
 
 class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
@@ -886,6 +886,8 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
               kafka_benchmark._KAFKA_CONSUMER_FETCH_SIZE.value
           ),
           'kafka_num_threads': 8,
+          'kafka_partitions': 16,
+          'kafka_replication_factor': 1,
       }
       mock_parse_prod.assert_called_once_with('prod_out', expected_metadata)
       mock_parse_cons.assert_called_once_with('cons_out', expected_metadata)
@@ -1071,13 +1073,13 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
         kafka_benchmark, '_RunSingleTrial', side_effect=_mock_single
     ) as mock_single, mock.patch.object(time, 'sleep'):
       results = kafka_benchmark.Run(self.benchmark_spec)
-      self.assertLen(mock_single.call_args_list, 10)
+      self.assertLen(mock_single.call_args_list, 6)
       expected_calls = [
-          mock.call(self.benchmark_spec, 2**i, 15_000_000) for i in range(9)
+          mock.call(self.benchmark_spec, 2**i, 15_000_000) for i in range(5)
       ]
       mock_single.assert_has_calls(expected_calls)
       self.assertLen(results, 2)
-      self.assertEqual(results[0].value, 25600.0)
+      self.assertEqual(results[0].value, 1600.0)
 
   def testRunSweepEarlyStopping(self):
     trial_data = {
