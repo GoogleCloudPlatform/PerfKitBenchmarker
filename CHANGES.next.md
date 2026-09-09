@@ -487,6 +487,8 @@
     to `kubernetes_nginx_benchmark` for specifying custom nginx configs.
 -   Add the GCP project to metadata if it is specified.
 -   Add flag to support using alpha for all gcloud commands.
+-   Add `--edw_bq_api_timeout` flag to support BigQuery API timeout in Python
+    client.
 
 ### Bug fixes and maintenance updates:
 
