@@ -233,6 +233,13 @@ EDW_BQ_QUERY_RESULTS_FORMAT = flags.DEFINE_string(
     ' DEFAULT struct format). Only supported for Python client. See:'
     ' https://cloud.google.com/python/docs/reference/bigquery/latest/google.cloud.bigquery.client.Client#google_cloud_bigquery_client_Client_query_and_wait',
 )
+EDW_BQ_API_TIMEOUT = flags.DEFINE_integer(
+    'edw_bq_api_timeout',
+    None,
+    'The number of seconds to wait for the underlying HTTP transport before'
+    ' using retry. Only supported for Python client. See:'
+    ' https://cloud.google.com/python/docs/reference/bigquery/latest/google.cloud.bigquery.client.Client#google_cloud_bigquery_client_Client_query_and_wait',
+)
 EDW_BQ_RESERVATION = flags.DEFINE_string(
     'edw_bq_reservation',
     None,
