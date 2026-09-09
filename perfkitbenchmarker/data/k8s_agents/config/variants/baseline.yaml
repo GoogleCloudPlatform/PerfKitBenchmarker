@@ -1,0 +1,346 @@
+# UC-B Baseline: c4-standard-8, gVisor, all defaults
+# No tuning knobs applied. This is the reference measurement.
+
+k8s_python_density:
+  description: >
+    UC-B Baseline: Python sandbox density on c4-standard-8 with default settings.
+  flags:
+    gke_additional_flags:
+      - "--enable-dataplane-v2"
+      - "--enable-ip-alias"
+      - "--release-channel=None"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+      - "--no-enable-autoupgrade"
+      - "--no-enable-autorepair"
+    container_cluster_version: "1.36.0-gke.3070003"
+    gce_subnet_region: "us-east1"
+    k8s_agentic_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_agentic_gvisor: true
+    k8s_agentic_agent_api_url: "http://localhost:8080"
+    k8s_agentic_benchmark_note: "baseline"
+  container_registry:
+    cloud: GCP
+    spec:
+      GCP:
+        zone: us-east1-c
+  container_specs:
+    adk_agent:
+      image: agentic/adk-agent
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-east1-c
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-east1-c
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor
+
+k8s_chromium_density:
+  description: >
+    UC-C Baseline: Chromium Browser Density on c4-standard-8 with default settings.
+  flags:
+    gke_additional_flags:
+      - "--enable-dataplane-v2"
+      - "--enable-ip-alias"
+      - "--release-channel=None"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+      - "--no-enable-autoupgrade"
+      - "--no-enable-autorepair"
+    container_cluster_version: "1.36.0-gke.3070003"
+    gce_subnet_region: "us-east1"
+    k8s_agentic_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_agentic_gvisor: true
+    k8s_agentic_agent_api_url: "http://localhost:8080"
+    k8s_agentic_benchmark_note: "baseline"
+  container_registry:
+    cloud: GCP
+    spec:
+      GCP:
+        zone: us-east1-c
+  container_specs:
+    adk_agent:
+      image: agentic/adk-agent
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-east1-c
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-east1-c
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor
+
+k8s_payload:
+  description: >
+    UC-D Baseline: Payload Transfer on c4-standard-8 with default settings.
+  flags:
+    gke_additional_flags:
+      - "--enable-dataplane-v2"
+      - "--enable-ip-alias"
+      - "--release-channel=None"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+      - "--no-enable-autoupgrade"
+      - "--no-enable-autorepair"
+    container_cluster_version: "1.36.0-gke.3070003"
+    gce_subnet_region: "us-east1"
+    k8s_agentic_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_agentic_gvisor: true
+    k8s_agentic_agent_api_url: "http://localhost:8080"
+    k8s_agentic_benchmark_note: "baseline"
+  container_registry:
+    cloud: GCP
+    spec:
+      GCP:
+        zone: us-east1-c
+  container_specs:
+    adk_agent:
+      image: agentic/adk-agent
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-east1-c
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-east1-c
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor
+
+k8s_qps:
+  description: >
+    UC-F Baseline: QPS Saturation on c4-standard-8 with default settings.
+  flags:
+    gke_additional_flags:
+      - "--enable-dataplane-v2"
+      - "--enable-ip-alias"
+      - "--release-channel=None"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+      - "--no-enable-autoupgrade"
+      - "--no-enable-autorepair"
+    container_cluster_version: "1.36.0-gke.3070003"
+    gce_subnet_region: "us-east1"
+    k8s_agentic_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_agentic_gvisor: true
+    k8s_agentic_agent_api_url: "http://localhost:8080"
+    k8s_agentic_benchmark_note: "baseline"
+  container_registry:
+    cloud: GCP
+    spec:
+      GCP:
+        zone: us-east1-c
+  container_specs:
+    adk_agent:
+      image: agentic/adk-agent
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-east1-c
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-east1-c
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor
+
+k8s_warmpool:
+  description: >
+    UC-E Baseline: Warmpool Scale-Up on c4-standard-8 with default settings.
+  flags:
+    gke_additional_flags:
+      - "--enable-dataplane-v2"
+      - "--enable-ip-alias"
+      - "--release-channel=None"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+      - "--no-enable-autoupgrade"
+      - "--no-enable-autorepair"
+    container_cluster_version: "1.36.0-gke.3070003"
+    gce_subnet_region: "us-east1"
+    k8s_agentic_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_agentic_gvisor: true
+    k8s_agentic_agent_api_url: "http://localhost:8080"
+    k8s_agentic_benchmark_note: "baseline"
+  container_registry:
+    cloud: GCP
+    spec:
+      GCP:
+        zone: us-east1-c
+  container_specs:
+    adk_agent:
+      image: agentic/adk-agent
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-east1-c
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-east1-c
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor
+
+k8s_deletion:
+  description: >
+    UC-G Baseline: Deletion & Cleanup on c4-standard-8 with default settings.
+  flags:
+    gke_additional_flags:
+      - "--enable-dataplane-v2"
+      - "--enable-ip-alias"
+      - "--release-channel=None"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+      - "--no-enable-autoupgrade"
+      - "--no-enable-autorepair"
+    container_cluster_version: "1.36.0-gke.3070003"
+    gce_subnet_region: "us-east1"
+    k8s_agentic_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_agentic_gvisor: true
+    k8s_agentic_agent_api_url: "http://localhost:8080"
+    k8s_agentic_benchmark_note: "baseline"
+  container_registry:
+    cloud: GCP
+    spec:
+      GCP:
+        zone: us-east1-c
+  container_specs:
+    adk_agent:
+      image: agentic/adk-agent
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-east1-c
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-east1-c
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor
+
+k8s_snapshot:
+  description: >
+    UC-A Baseline: Pod Snapshot saturation on c4-standard-8 with default settings.
+  flags:
+    gke_additional_flags:
+      - "--enable-pod-snapshots"
+      - "--enable-dataplane-v2"
+      - "--enable-ip-alias"
+      - "--release-channel=None"
+    gke_additional_nodepool_flags:
+      - "--max-pods-per-node=250"
+      - "--no-enable-autoupgrade"
+      - "--no-enable-autorepair"
+    container_cluster_version: "1.36.0-gke.3070003"
+    gce_subnet_region: "us-east1"
+    k8s_agentic_namespace: "agentic"
+    agent_sandbox_version: "v0.4.6"
+    k8s_agentic_gvisor: true
+    k8s_agentic_agent_api_url: "http://localhost:8080"
+    k8s_agentic_benchmark_note: "baseline"
+  container_registry:
+    cloud: GCP
+    spec:
+      GCP:
+        zone: us-east1-c
+  container_specs:
+    adk_agent:
+      image: agentic/adk-agent
+  container_cluster:
+    cloud: GCP
+    type: Kubernetes
+    vm_count: 1
+    vm_spec:
+      GCP:
+        machine_type: c4-standard-8
+        zone: us-east1-c
+        boot_disk_type: hyperdisk-balanced
+        boot_disk_size: 50
+    nodepools:
+      sandbox:
+        vm_count: 1
+        vm_spec:
+          GCP:
+            machine_type: c4-standard-8
+            zone: us-east1-c
+            boot_disk_type: hyperdisk-balanced
+            boot_disk_size: 100
+        sandbox_config:
+          type: gvisor
