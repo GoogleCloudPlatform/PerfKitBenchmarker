@@ -61,7 +61,7 @@ KAFKA_BROKER_PORT = 9092
 FLAGS = flags.FLAGS
 _KAFKA_NUM_PARTITIONS = flags.DEFINE_integer(
     'kafka_num_partitions',
-    16,
+    256,
     'Number of partitions for the topic.',
 )
 _KAFKA_REPLICATION_FACTOR = flags.DEFINE_integer(

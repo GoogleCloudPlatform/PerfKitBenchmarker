@@ -192,7 +192,8 @@ class KafkaBenchmarkTopicAndCommandsTest(KafkaBenchmarkTestCaseBase):
     kafka_benchmark._CreateTopic(self.broker_vm, '10.0.0.1:9092', 'test-topic')
     self.broker_vm.RemoteCommand.assert_called_once_with(
         f'cd {kafka_benchmark.KAFKA_DIR} && bin/kafka-topics.sh --create'
-        ' --topic test-topic --bootstrap-server 10.0.0.1:9092 --partitions=16'
+        ' --topic test-topic --bootstrap-server 10.0.0.1:9092'
+        f' --partitions={kafka_benchmark._KAFKA_NUM_PARTITIONS.value}'
         ' --replication-factor=1 --config min.insync.replicas=1'
         ' --if-not-exists'
     )
@@ -886,7 +887,7 @@ class KafkaBenchmarkRunTest(KafkaBenchmarkTestCaseBase):
               kafka_benchmark._KAFKA_CONSUMER_FETCH_SIZE.value
           ),
           'kafka_num_threads': 8,
-          'kafka_partitions': 16,
+          'kafka_partitions': kafka_benchmark._KAFKA_NUM_PARTITIONS.value,
           'kafka_replication_factor': 1,
       }
       mock_parse_prod.assert_called_once_with('prod_out', expected_metadata)
