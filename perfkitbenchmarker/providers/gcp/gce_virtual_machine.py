@@ -1712,20 +1712,6 @@ class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
     return path
 
 
-class Debian11BasedGceVirtualMachine(
-    BaseLinuxGceVirtualMachine,
-    linux_vm.Debian11Mixin,
-):
-  DEFAULT_X86_IMAGE_FAMILY = 'debian-11'
-  DEFAULT_IMAGE_PROJECT = 'debian-cloud'
-
-  @property
-  def DEFAULT_ARM_IMAGE_FAMILY(self):  # pyrefly: ignore[bad-override]
-    raise errors.Config.InvalidValue(
-        'GCE does not support Debian 11 on ARM during LTS.'
-    )
-
-
 class Debian12BasedGceVirtualMachine(
     BaseLinuxGceVirtualMachine, linux_vm.Debian12Mixin
 ):

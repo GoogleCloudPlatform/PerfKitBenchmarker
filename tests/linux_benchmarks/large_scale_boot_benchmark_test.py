@@ -85,7 +85,7 @@ class LargeScaleBootBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         'cloud': 'GCP',
         'num_launchers': 2,
         'expected_boots_per_launcher': 3,
-        'boot_os_type': 'debian11',
+        'boot_os_type': 'debian12',
         'boot_machine_type': 'n1-standard-2',
         'launcher_machine_type': 'n1-standard-16',
         'vms_contact_launcher': True,

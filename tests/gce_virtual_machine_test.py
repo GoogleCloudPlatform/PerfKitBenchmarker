@@ -750,7 +750,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertNotIn('image_family', vm_metadata)
 
   def testSkipExistenceCheck(self):
-    vm_class = gce_virtual_machine.Debian11BasedGceVirtualMachine
+    vm_class = gce_virtual_machine.Debian12BasedGceVirtualMachine
     spec = gce_virtual_machine.GceVmSpec(
         _COMPONENT, machine_type='fake-machine-type'
     )

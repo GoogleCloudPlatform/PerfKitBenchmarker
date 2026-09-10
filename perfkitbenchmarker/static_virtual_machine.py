@@ -372,12 +372,6 @@ class Fedora37BasedStaticVirtualMachine(
   pass
 
 
-class Debian11BasedStaticVirtualMachine(
-    StaticVirtualMachine, linux_virtual_machine.Debian11Mixin
-):
-  pass
-
-
 class Debian12BasedStaticVirtualMachine(
     StaticVirtualMachine, linux_virtual_machine.Debian12Mixin
 ):

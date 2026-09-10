@@ -30,8 +30,6 @@ COS125 = 'cos125'
 COS121 = 'cos121'
 COS117 = 'cos117'
 CORE_OS = 'core_os'
-DEBIAN11 = 'debian11'
-DEBIAN11_BACKPORTS = 'debian11_backports'
 DEBIAN12 = 'debian12'
 DEBIAN13 = 'debian13'
 FEDORA36 = 'fedora36'
@@ -141,8 +139,6 @@ CONTAINER_OS_TYPES = [
 ]
 
 DEBIAN_OS_TYPES = [
-    DEBIAN11,
-    DEBIAN11_BACKPORTS,
     DEBIAN12,
     DEBIAN13,
     UBUNTU2004,

@@ -404,12 +404,6 @@ class DebianBasedIbmCloudVirtualMachine(
     super().PrepareVMEnvironment()
 
 
-class Debian11BasedIbmCloudVirtualMachine(
-    DebianBasedIbmCloudVirtualMachine, linux_virtual_machine.Debian11Mixin
-):
-  IMAGE_NAME_PREFIX = 'ibm-debian-11-'
-
-
 class Ubuntu2004BasedIbmCloudVirtualMachine(
     IbmCloudVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin
 ):

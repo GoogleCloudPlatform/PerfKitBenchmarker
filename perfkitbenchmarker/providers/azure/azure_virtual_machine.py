@@ -1346,15 +1346,6 @@ class AzureVirtualMachine(  # pyrefly: ignore[invalid-inheritance]
     )
 
 
-class Debian11BasedAzureVirtualMachine(
-    AzureVirtualMachine, linux_virtual_machine.Debian11Mixin
-):
-  # From https://wiki.debian.org/Cloud/MicrosoftAzure
-  GEN2_IMAGE_URN = 'Debian:debian-11:11-gen2:latest'
-  GEN1_IMAGE_URN = 'Debian:debian-11:11:latest'
-  ARM_IMAGE_URN = 'Debian:debian-11:11-backports-arm64:latest'
-
-
 class Debian12BasedAzureVirtualMachine(
     AzureVirtualMachine, linux_virtual_machine.Debian12Mixin
 ):

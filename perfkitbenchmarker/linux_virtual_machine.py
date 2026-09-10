@@ -3208,20 +3208,6 @@ class BaseDebianMixin(BaseLinuxMixin):
       self.Reboot()
 
 
-class Debian11Mixin(BaseDebianMixin, os_mixin.DeprecatedOsMixin):
-  """Class holding Debian 11 specific VM methods and attributes."""
-
-  OS_TYPE = os_types.DEBIAN11
-  ALTERNATIVE_OS = os_types.DEBIAN12
-  END_OF_LIFE = '2026-08-31'
-
-  def PrepareVMEnvironment(self):
-    # Missing in some images. Required by PrepareVMEnvironment to determine
-    # partitioning.
-    self.InstallPackages('fdisk')
-    super().PrepareVMEnvironment()
-
-
 class Debian12Mixin(BaseDebianMixin):
   """Class holding Debian 12 specific VM methods and attributes."""
 
@@ -3244,12 +3230,6 @@ class Debian13Mixin(BaseDebianMixin):
     # partitioning.
     self.InstallPackages('fdisk')
     super().PrepareVMEnvironment()
-
-
-class Debian11BackportsMixin(Debian11Mixin):
-  """Debian 11 with backported kernel."""
-
-  OS_TYPE = os_types.DEBIAN11_BACKPORTS
 
 
 class BaseUbuntuMixin(BaseDebianMixin):

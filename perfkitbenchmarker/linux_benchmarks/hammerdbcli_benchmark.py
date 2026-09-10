@@ -108,7 +108,7 @@ hammerdbcli:
             zone: eastus
         disk_spec: *default_500_gb
       clients:
-        os_type: debian11
+        os_type: debian12
         vm_spec: *default_dual_core
         disk_spec: *default_500_gb
 """

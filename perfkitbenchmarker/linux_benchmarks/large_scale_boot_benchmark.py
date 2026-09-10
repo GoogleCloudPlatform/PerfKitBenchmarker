@@ -70,7 +70,7 @@ large_scale_boot:
           zone: eastus
           boot_disk_type: StandardSSD_LRS
       vm_count: 1
-      os_type: debian11
+      os_type: debian12
     clients:
       vm_spec:
         GCP:
@@ -81,7 +81,7 @@ large_scale_boot:
         Azure:
           machine_type: Standard_D2_v3
           boot_disk_type: StandardSSD_LRS
-      os_type: debian11
+      os_type: debian12
       vm_count: 1
 """
 
@@ -101,9 +101,9 @@ flags.register_validator(
 )
 flags.DEFINE_string(
     'boot_os_type',
-    'debian11',
+    'debian12',
     'OS to boot on the VMs. '
-    'Defaults to debian11. OS on launcher server VM is set '
+    'Defaults to debian12. OS on launcher server VM is set '
     'using os_type flag.',
 )
 flags.DEFINE_string(

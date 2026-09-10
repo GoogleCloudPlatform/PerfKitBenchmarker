@@ -1688,21 +1688,6 @@ class CoreOsBasedAwsVirtualMachine(
   DEFAULT_USER_NAME = 'core'
 
 
-class Debian11BasedAwsVirtualMachine(
-    AwsVirtualMachine, linux_virtual_machine.Debian11Mixin
-):
-  # From https://wiki.debian.org/Cloud/AmazonEC2Image/Bullseye
-  IMAGE_NAME_FILTER_PATTERN = 'debian-11-{alternate_architecture}-*'
-  IMAGE_OWNER = DEBIAN_IMAGE_PROJECT
-  DEFAULT_USER_NAME = 'admin'
-
-
-class Debian11BackportsBasedAwsVirtualMachine(
-    Debian11BasedAwsVirtualMachine, linux_virtual_machine.Debian11BackportsMixin
-):
-  IMAGE_NAME_FILTER_PATTERN = 'debian-11-backports-{alternate_architecture}-*'
-
-
 class Debian12BasedAwsVirtualMachine(
     AwsVirtualMachine, linux_virtual_machine.Debian12Mixin
 ):

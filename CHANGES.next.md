@@ -85,6 +85,7 @@
     via SDK, instead only supporting deployment via CLI.
 -   Remove EOL CentOS 7 and RHEL 7.
 -   Remove EOL Debian 9 and 10.
+-   Remove EOL Debian 11.
 -   Remove EOL Ubuntu 16, 18, and 23.10.
 -   Remove Broken Juju and Ubuntu Container OS types.
 -   Remove support for installing Python 2 in VMs.

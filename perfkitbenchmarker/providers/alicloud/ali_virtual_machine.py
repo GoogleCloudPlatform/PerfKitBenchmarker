@@ -488,12 +488,6 @@ class AliCloudKeyFileManager:
     return keyfile.strip()
 
 
-class Debian113BasedAliVirtualMachine(
-    AliVirtualMachine, linux_virtual_machine.Debian11Mixin
-):
-  IMAGE_NAME_FILTER = 'debian_11_3_x64_20G*alibase*.vhd'
-
-
 class Ubuntu2004BasedAliVirtualMachine(
     AliVirtualMachine, linux_virtual_machine.Ubuntu2004Mixin
 ):

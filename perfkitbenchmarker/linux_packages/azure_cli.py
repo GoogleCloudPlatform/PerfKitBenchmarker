@@ -81,7 +81,6 @@ SUPPORTED_APT_DISTROS = [
     os_types.UBUNTU2004,
     os_types.UBUNTU2204,
     os_types.UBUNTU2404,
-    os_types.DEBIAN11,
     os_types.DEBIAN12,
 ]
 
