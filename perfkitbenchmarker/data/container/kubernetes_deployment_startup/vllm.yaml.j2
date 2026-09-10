@@ -27,6 +27,7 @@ metadata:
     app: {{ name }}
 spec:
   replicas: 1
+  progressDeadlineSeconds: 1200
   selector:
     matchLabels:
       app: {{ name }}
@@ -49,7 +50,8 @@ spec:
               path: /health
               port: 8000
             initialDelaySeconds: 10
-            periodSeconds: 1
+            periodSeconds: 5
+            timeoutSeconds: 10
           resources:
             requests:
               cpu: "2"

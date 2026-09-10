@@ -1,0 +1,22 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: {{ name }}
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind: Deployment
+    name: {{ name }}
+  updatePolicy:
+    updateMode: "Off"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: '*'
+        controlledResources: ["cpu"]
+        maxAllowed:
+          cpu: {{ max_allowed_cpu }}
+  startupBoost:
+    cpu:
+      type: "Factor"
+      durationSeconds: {{ duration_seconds }}
+      factor: {{ boost_factor }}

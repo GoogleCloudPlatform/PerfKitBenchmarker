@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Benchmark for measuring time to start up a deployment on Kubernetes."""
+
 import collections
 from collections.abc import Callable
 import logging
@@ -34,7 +35,7 @@ BENCHMARK_NAME = 'kubernetes_deployment_startup'
 BENCHMARK_CONFIG = """
 kubernetes_deployment_startup:
   description: >
-    Measures the time it takes for a slow-starting JVM application or vLLM
+    Measures the time it takes for a slow-starting JVM application (Jenkins) or vLLM
     to become ready in a Kubernetes cluster. Supports CPU Startup Boost via
     VPA on GKE (scenario=cpu_startup_boost).
   container_cluster:
@@ -43,7 +44,8 @@ kubernetes_deployment_startup:
     vm_spec: *default_dual_core
   container_specs:
     kubernetes_deployment_startup:
-      image: slowjvmstartup
+      image: jenkins/jenkins:lts
+      static_image: true
   container_registry:
     cloud: GCP
     spec:
@@ -54,14 +56,14 @@ kubernetes_deployment_startup:
 # Flags
 _DEPLOYMENT_YAML = flags.DEFINE_string(
     'kubernetes_deployment_startup_yaml',
-    'container/kubernetes_deployment_startup/slowjvmstartup.yaml.j2',
+    'container/kubernetes_deployment_startup/jenkins.yaml.j2',
     'Deployment yaml for JVM workload.',
 )
 _IMAGE = flags.DEFINE_string(
     'kubernetes_deployment_startup_image',
     None,
     'Container image for the workload. If omitted, defaults to the image '
-    'configured in the benchmark config (e.g. "slowjvmstartup") for the '
+    'configured in the benchmark config (e.g. "jenkins/jenkins:lts") for the '
     'JVM workload, and '
     '"public.ecr.aws/q9t5s3a7/vllm-cpu-release-repo:latest" for the vLLM '
     'workload.',
@@ -72,7 +74,7 @@ _WORKLOAD = flags.DEFINE_enum(
     ['jvm', 'vllm'],
     'Workload type to deploy.',
 )
-_USE_CPU_STARTUP_BOOST = flags.DEFINE_bool(
+_USE_CPU_STARTUP_BOOST = flags.DEFINE_boolean(
     'kubernetes_deployment_startup_use_cpu_startup_boost',
     False,
     'Whether to enable GKE VPA CPU Startup Boost (GCP only).',
@@ -92,7 +94,7 @@ _VLLM_MEMORY_LIMIT = flags.DEFINE_string(
 
 _BOOST_FACTOR = flags.DEFINE_integer(
     'kubernetes_deployment_startup_boost_factor',
-    2,
+    3,
     'CPU Startup Boost factor for VPA (scenario=cpu_startup_boost only, '
     'GCP only).',
     lower_bound=1,
@@ -100,7 +102,7 @@ _BOOST_FACTOR = flags.DEFINE_integer(
 )
 _VPA_YAML = flags.DEFINE_string(
     'kubernetes_deployment_startup_vpa_yaml',
-    'container/kubernetes_deployment_startup/slowjvmstartup_vpa.yaml.j2',
+    'container/kubernetes_deployment_startup/jenkins_vpa.yaml.j2',
     'VPA manifest for CPU Startup Boost (scenario=cpu_startup_boost, '
     'GCP only).',
 )
@@ -121,6 +123,7 @@ _VPA_DURATION_SECONDS = flags.DEFINE_integer(
     'How long, in seconds, the VPA keeps the CPU boost applied before '
     + 'scaling back down (startupBoost.cpu.durationSeconds). If unset, '
     + 'defaults to _VPA_DEFAULT_DURATION_SECONDS.',
+
     lower_bound=1,
 )
 
@@ -173,11 +176,11 @@ def GetConfig(user_config: dict[str, Any]) -> dict[str, Any]:
   if image is not None:
     config['container_specs']['kubernetes_deployment_startup']['image'] = image
 
-  # enable VPA on the cluster for the cpu_startup_boost scenario.
+  # enable VPA on the cluster if CPU startup boost is requested.
   if _USE_CPU_STARTUP_BOOST.value:
     config['container_cluster']['enable_vpa'] = True
     logging.info(
-        '[startup] scenario=cpu_startup_boost: enable_vpa=True on cluster '
+        '[startup] use_cpu_startup_boost=True: enable_vpa=True on cluster '
         'config'
     )
 
@@ -191,7 +194,7 @@ def CheckPrerequisites(benchmark_config: dict[str, Any]) -> None:
     benchmark_config: The loaded benchmark configuration.
 
   Raises:
-    ValueError: If scenario=cpu_startup_boost is used on a cluster that does not
+    ValueError: If use_cpu_startup_boost=True is used on a cluster that does not
       support VPA.
   """
   if _USE_CPU_STARTUP_BOOST.value:
@@ -202,7 +205,7 @@ def CheckPrerequisites(benchmark_config: dict[str, Any]) -> None:
     )
     if not cluster_class.SupportsVpa():  # type: ignore[attr-defined]
       raise ValueError(
-          '--kubernetes_deployment_startup_scenario=cpu_startup_boost '
+          '--kubernetes_deployment_startup_use_cpu_startup_boost '
           f'requires a cluster that supports VPA. Got cloud={cloud}, '
           f'type={cluster_type}.'
       )
@@ -211,7 +214,7 @@ def CheckPrerequisites(benchmark_config: dict[str, Any]) -> None:
 def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   """Prepares the Kubernetes cluster for the benchmark.
 
-  For scenario=cpu_startup_boost (either workload), first deploys a
+  If use_cpu_startup_boost=True (either workload), first deploys a
   VerticalPodAutoscaler manifest with a startup boost policy targeting
   the active Deployment, and only then deploys the Deployment itself.
 
@@ -223,11 +226,11 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
   If the Deployment (and its first pod) were applied before the VPA
   object exists, that pod's initial CPU request would never be boosted,
   and this benchmark would end up measuring an unboosted startup even
-  though scenario=cpu_startup_boost was requested. The VPA is safe to create
+  though use_cpu_startup_boost=True was requested. The VPA is safe to create
   before its targetRef Deployment exists -- it simply waits for the
   target to appear.
 
-  For scenario=cpu_startup_boost, also waits for the VerticalPodAutoscaler
+  If use_cpu_startup_boost=True, also waits for the VerticalPodAutoscaler
   CRD to be registered before applying the VPA manifest -- GKE installs VPA CRDs
   asynchronously after cluster creation, and that install can still be in
   flight even once the cluster and kube-dns report ready (see
@@ -237,7 +240,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
     benchmark_spec: The benchmark specification.
 
   Raises:
-    RuntimeError: If scenario=cpu_startup_boost and the VerticalPodAutoscaler
+    RuntimeError: If use_cpu_startup_boost=True and the VerticalPodAutoscaler
       CRD never registers within the wait timeout.
   """
   del benchmark_spec  # Unused.
@@ -247,7 +250,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
       _VLLM_DEPLOYMENT_NAME if workload == 'vllm' else _JVM_DEPLOYMENT_NAME
   )
 
-  # apply VPA with startup boost for cpu_startup_boost scenario BEFORE the
+  # apply VPA with startup boost if requested BEFORE the
   # deployment, for either workload, so the boost's admission-time
   # mutation applies to the very first pod this benchmark measures (see
   # docstring above). Sizing (CPU ceiling / boost duration) is
@@ -258,7 +261,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec):
         ['get', 'crd', _VPA_CRD_NAME], timeout=_VPA_CRD_WAIT_TIMEOUT_SECS
     )
     logging.info(
-        '[startup] scenario=cpu_startup_boost workload=%s: VPA boost_factor=%d'
+        '[startup] use_cpu_startup_boost=True workload=%s: VPA boost_factor=%d'
         + ' applied first',
         workload,
         _BOOST_FACTOR.value,
@@ -392,16 +395,16 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
     required by the doc but useful for percentile analysis across
     replicas.)
 
-  The deployment of the workload occurs here in Run(). For
-  scenario=cpu_startup_boost, the VPA object was already created during
+  The deployment of the workload occurs here in Run(). If
+  use_cpu_startup_boost=True, the VPA object was already created during
   Prepare(), so the admission webhook
   will automatically intercept the new pods created by this Run() phase.
 
   Required metrics fail loudly rather than silently degrading: if a
-  metric can't be computed at all for the whole run, this raises instead
-  of logging a warning and returning partial results. (A silent warning
+  metric can't be computed at all for the whole run, this raises instead of
+  logging a warning and returning partial results. (A silent warning
   here is exactly what let a prior VPA-ordering bug ship a "successful"
-  cpu_startup_boost-scenario run that never actually applied the CPU boost.)
+  boosted run that never actually applied the CPU boost.)
 
   Args:
     benchmark_spec: The benchmark specification.
@@ -429,7 +432,12 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       'workload': workload,
       'cloud': FLAGS.cloud,
       'deployment_name': deployment_name,
+      'image': image,
   }
+  if workload == 'vllm':
+    base_metadata['vllm_gpu_memory_utilization'] = 0.5
+    base_metadata['vllm_memory_limit'] = _VLLM_MEMORY_LIMIT.value
+
   if use_cpu_startup_boost:
     base_metadata['boost_factor'] = _BOOST_FACTOR.value
     base_metadata['vpa_max_cpu'] = _GetVpaMaxCpu(workload)
@@ -454,6 +462,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       cpu_collector.ObserveCpuUtilization()
     except Exception as e:  # pylint: disable=broad-except
       collector_errors.append(e)
+
   try:
     collector_thread = threading.Thread(
         target=_RunCollector,
@@ -479,7 +488,7 @@ def Run(benchmark_spec: bm_spec.BenchmarkSpec) -> list[sample.Sample]:
       )
 
     kubernetes_commands.WaitForRollout(
-        f'deployment/{deployment_name}', timeout=600
+        f'deployment/{deployment_name}', timeout=1200
     )
 
   finally:
@@ -565,28 +574,26 @@ class _CpuUtilizationCollector:
       )
     peak = max(readings)
     mean = sum(readings) / len(readings)
-    self._samples.extend(
-        [
-            sample.Sample(
-                'cpu_utilization_peak_millicores',
-                peak,
-                'millicores',
-                {**self._base_metadata},
-            ),
-            sample.Sample(
-                'cpu_utilization_mean_millicores',
-                mean,
-                'millicores',
-                {**self._base_metadata},
-            ),
-            sample.Sample(
-                'cpu_utilization_reading_count',
-                len(readings),
-                'count',
-                {**self._base_metadata},
-            ),
-        ]
-    )
+    self._samples.extend([
+        sample.Sample(
+            'cpu_utilization_peak_millicores',
+            peak,
+            'millicores',
+            {**self._base_metadata},
+        ),
+        sample.Sample(
+            'cpu_utilization_mean_millicores',
+            mean,
+            'millicores',
+            {**self._base_metadata},
+        ),
+        sample.Sample(
+            'cpu_utilization_reading_count',
+            len(readings),
+            'count',
+            {**self._base_metadata},
+        ),
+    ])
 
   def _PollCpuMillicoresSample(self) -> list[sample.Sample]:
     """Issues kubectl top pods and returns a transient sample list.
