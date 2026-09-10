@@ -33,9 +33,15 @@ spec:
       requests:
         cpu: "{{ client_cpu_request }}"
         memory: "{{ client_memory_request }}"
+      {% if client_cpu_limit != 'None' or client_memory_limit != 'None' %}
       limits:
+        {% if client_cpu_limit != 'None' %}
         cpu: "{{ client_cpu_limit }}"
+        {% endif %}
+        {% if client_memory_limit != 'None' %}
         memory: "{{ client_memory_limit }}"
+        {% endif %}
+      {% endif %}
     env:
     - name: PGHOST
       value: postgres-standalone
