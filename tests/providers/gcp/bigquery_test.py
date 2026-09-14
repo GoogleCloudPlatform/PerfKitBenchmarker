@@ -782,6 +782,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
       (gcp_flags.BQ_CLIENT_INTERFACE, 'PYTHON'),
       (edw_service.EDW_BQ_RESERVATION, 'projects/p/locations/l/reservations/r'),
       (edw_service.EDW_BQ_QUERY_RESULTS_FORMAT, 'ARROW'),
+      (edw_service.EDW_BQ_API_TIMEOUT, 120),
   )
   def testPythonClientInterfaceGetMetadataWithCustomFlags(self):
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
@@ -791,6 +792,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
             'client': 'PYTHON',
             'edw_bq_reservation': 'projects/p/locations/l/reservations/r',
             'edw_bq_query_results_format': 'ARROW',
+            'edw_bq_api_timeout': 120,
         },
     )
 
@@ -833,6 +835,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
       (edw_service.EDW_BQ_FEATURE_CONFIG, 'job_optional'),
       (edw_service.EDW_BQ_RESERVATION, 'projects/p/locations/l/reservations/r'),
       (edw_service.EDW_BQ_QUERY_RESULTS_FORMAT, 'ARROW'),
+      (edw_service.EDW_BQ_API_TIMEOUT, 120),
   )
   def testPythonClientInterfaceExecuteQueryWithFlags(self):
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
@@ -858,6 +861,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
             'client': 'PYTHON',
             'edw_bq_reservation': 'projects/p/locations/l/reservations/r',
             'edw_bq_query_results_format': 'ARROW',
+            'edw_bq_api_timeout': 120,
             'job_id': 'JOB_456',
         },
     )
@@ -866,7 +870,8 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
         ' --credentials_file key.json --dataset DATASET_ID --query_file'
         ' QUERY_NAME --feature_config job_optional --reservation'
         ' projects/p/locations/l/reservations/r --query_results_format ARROW'
-        ' --print_results --destination project.dataset.table'
+        ' --api_timeout 120 --print_results --destination'
+        ' project.dataset.table'
     )
 
   @flagsaver.flagsaver(
@@ -875,6 +880,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
       (edw_service.EDW_BQ_FEATURE_CONFIG, 'job_optional'),
       (edw_service.EDW_BQ_RESERVATION, 'projects/p/locations/l/reservations/r'),
       (edw_service.EDW_BQ_QUERY_RESULTS_FORMAT, 'ARROW'),
+      (edw_service.EDW_BQ_API_TIMEOUT, 120),
   )
   def testPythonClientInterfaceExecuteThroughput(self):
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
@@ -895,13 +901,14 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
         ' --feature_config job_optional --labels'
         f" '{json.dumps(THROUGHPUT_LABELS)}'"
         ' --reservation projects/p/locations/l/reservations/r'
-        ' --query_results_format ARROW'
+        ' --query_results_format ARROW --api_timeout 120'
     )
 
   @flagsaver.flagsaver(
       (gcp_flags.BQ_CLIENT_INTERFACE, 'PYTHON'),
       (gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, 'key.json'),
       (edw_service.EDW_BQ_QUERY_RESULTS_FORMAT, 'ARROW'),
+      (edw_service.EDW_BQ_API_TIMEOUT, 120),
   )
   def testPythonClientInterfaceRunQueryWithResults(self):
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
@@ -919,6 +926,7 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
         '.venv/bin/python bq_python_driver.py single --project PROJECT_ID'
         ' --credentials_file key.json --dataset DATASET_ID --query_file'
         ' QUERY_NAME --print_results --query_results_format ARROW'
+        ' --api_timeout 120'
     )
 
 
