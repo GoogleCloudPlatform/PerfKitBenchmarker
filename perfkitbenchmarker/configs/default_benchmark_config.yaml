@@ -855,5 +855,5 @@ dpdk_pktgen_multi_nic_gcp:
     dpdk_pktgen_tx_rx_lcores_list: ['[4:2]#[6:8];[2:4]#[8:6]']
     dpdk_pktgen_tx_burst: 8
     dpdk_pktgen_rx_burst: 128
-    dpdk_pktgen_num_flows: 10
+    dpdk_pktgen_num_flows: 12
     dpdk_pktgen_num_memory_channels_per_numa: 2

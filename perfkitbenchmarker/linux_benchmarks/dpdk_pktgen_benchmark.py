@@ -245,11 +245,7 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       ),
       [sender_vm, receiver_vm],
   )
-  receiver_vm.RemoteCommand(
-      'sudo sed -i "s/start all//g"'
-      f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
-  )
-  # Remove sender config from receiver pktgen.pkt file.
+  # Remove the sender-only commands from the receiver's pktgen.pkt file.
   receiver_vm.RemoteCommand(
       'sudo sed -i "/# BEGIN_SENDER_CONFIG/,/# END_SENDER_CONFIG/d" '
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
@@ -261,9 +257,10 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
   )
 
-  # Ensure receiver runs longer than sender. Receiver starts 1 second before
-  # sender, and sender has a 2 seconds small packet tranimission of 500 for
-  # warmup. So make receiver duration 5 seconds longer.
+  # Ensure the receiver outlives the sender so it keeps counting until after
+  # the last packet arrives. The receiver is started 1 second before the sender
+  # and both sides run the same warmup timeline, so 5 extra seconds leaves a
+  # comfortable margin here.
   receiver_vm.RemoteCommand(
       f'sudo sed -i "s/<DURATION>/{_DPDK_PKTGEN_DURATION.value+5}/g"'
       f' {dpdk_pktgen.DPDK_PKTGEN_GIT_REPO_DIR}/pktgen.pkt'
