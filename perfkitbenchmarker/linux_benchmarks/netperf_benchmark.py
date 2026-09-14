@@ -193,7 +193,10 @@ OUTPUT_SELECTOR = (
     'P99_LATENCY,STDDEV_LATENCY,MIN_LATENCY,MAX_LATENCY,'
     'CONFIDENCE_ITERATION,THROUGHPUT_CONFID,'
     'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS,'
-    'TRANSPORT_MSS'
+    'TRANSPORT_MSS,REMOTE_BYTES_RECVD,LOCAL_BYTES_SENT,'
+    'LOCAL_BYTES_PER_SEND,REMOTE_BYTES_PER_RECV,'
+    'LOCAL_SEND_THROUGHPUT,LOCAL_RECV_THROUGHPUT,'
+    'REMOTE_SEND_THROUGHPUT,REMOTE_RECV_THROUGHPUT'
 )
 
 # Command ports are even (id*2), data ports are odd (id*2 + 1)
@@ -431,12 +434,36 @@ def ParseNetperfOutput(
     meta_keys.extend([
         ('Local Transport Retransmissions', 'netperf_retransmissions'),
         ('Remote Transport Retransmissions', 'netserver_retransmissions'),
-        ('Transport MSS bytes', 'netperf_mss'),
+        ('Local Bytes Sent', 'local_bytes_sent'),
+        ('Local Bytes Per Send', 'local_bytes_per_send'),
+        ('Transport MSS bytes', 'netperf_mss')
+    ])
+  if 'UDP' in benchmark_name:
+    meta_keys.extend([
+        ('Remote Bytes Received', 'remote_bytes_received'),
+        ('Local Bytes Sent', 'local_bytes_sent'),
+        ('Local Bytes Per Send', 'local_bytes_per_send'),
+        ('Local Send Throughput', 'local_send_throughput'),
+        ('Local Recv Throughput', 'local_recv_throughput'),
+        ('Remote Send Throughput', 'remote_send_throughput'),
+        ('Remote Recv Throughput', 'remote_recv_throughput')
     ])
 
   metadata.update(
-      {meta_key: results[netperf_key] for netperf_key, meta_key in meta_keys}
+      {meta_key: results[netperf_key] for netperf_key, meta_key in meta_keys if netperf_key in results}
   )
+
+  if 'UDP' in benchmark_name:
+    bytes_lost = int(metadata['local_bytes_sent']) - int(metadata.get('remote_bytes_received', 0))
+    packets_lost = bytes_lost / float(metadata['local_bytes_per_send']) if float(metadata.get('local_bytes_per_send', 1)) else 0
+    metadata['bytes_lost'] = bytes_lost
+    metadata['packets_lost'] = packets_lost
+
+  if 'TCP' in benchmark_name:
+    metadata['local_bytes_sent'] = int(metadata.get('local_bytes_sent', 0))
+    metadata['netperf_mss'] = int(metadata.get('netperf_mss', 0))
+    metadata['netserver_retransmissions'] = int(metadata.get('netserver_retransmissions', 0))
+    metadata['netperf_retransmissions'] = int(metadata.get('netperf_retransmissions', 0))
 
   # Create the throughput sample
   throughput = float(results['Throughput'])
@@ -689,29 +716,91 @@ def RunNetperf(
     # They should all have the same units
     throughput_unit = throughput_samples[0].unit
 
+    if 'UDP' in benchmark_name.upper():
+      packets_lost_list = []
+      bytes_lost_list = []
+      remote_bytes_recieved = []
+      local_bytes_sent = []
+      local_bytes_per_send = float(throughput_samples[0].metadata.get('local_bytes_per_send', 1))
+      remote_receive_throughput = []
+      local_send_throughput = []
+      for s in throughput_samples:
+        packets_lost_list.append(s.metadata.get('packets_lost', 0))
+        bytes_lost_list.append(s.metadata.get('bytes_lost', 0))
+        remote_bytes_recieved.append(int(s.metadata.get('remote_bytes_received', 0)))
+        local_bytes_sent.append(int(s.metadata.get('local_bytes_sent', 0)))
+        remote_receive_throughput.append(float(s.metadata.get('remote_recv_throughput', 0)))
+        local_send_throughput.append(float(s.metadata.get('local_send_throughput', 0)))
+
+      packets_lost_total = sum(packets_lost_list)
+      bytes_lost_total = sum(bytes_lost_list)
+      remote_receive_throughput_total = sum(remote_receive_throughput)
+      local_send_throughput_total = sum(local_send_throughput)
+      packets_lost_average = packets_lost_total / len(packets_lost_list) if packets_lost_list else 0
+      bytes_lost_average = bytes_lost_total / len(bytes_lost_list) if bytes_lost_list else 0
+      
+      metadata['netperf_packets_lost_total'] = packets_lost_total
+      metadata['netperf_packets_lost_average_per_stream'] = packets_lost_average
+      metadata['netperf_bytes_lost_total'] = bytes_lost_total
+      metadata['netperf_bytes_lost_average_per_stream'] = bytes_lost_average
+      metadata['netperf_total_packets_sent'] = sum(local_bytes_sent) / local_bytes_per_send
+      metadata['netperf_total_packets_received'] = sum(remote_bytes_recieved) / local_bytes_per_send
+      metadata['netperf_local_send_throughput_total'] = local_send_throughput_total
+      metadata['netperf_remote_receive_throughput_total'] = remote_receive_throughput_total
+
     if 'TCP' in benchmark_name.upper():
       netperf_retransmissions = 0
       netserver_retransmissions = 0
       netperf_mss = None
+      
+      local_bytes_sent_list = []
+      netperf_mss_list = []
+      local_bytes_per_send = float(throughput_samples[0].metadata.get('local_bytes_per_send', 0))
+
       for throughput_sample in throughput_samples:
-        if throughput_sample.metadata['netserver_retransmissions'] == '-1':
+        if throughput_sample.metadata.get('netserver_retransmissions') == '-1':
           continue
+          
         netperf_retransmissions += int(
-            throughput_sample.metadata['netperf_retransmissions']
+            throughput_sample.metadata.get('netperf_retransmissions', 0)
         )
         netserver_retransmissions += int(
-            throughput_sample.metadata['netserver_retransmissions']
+            throughput_sample.metadata.get('netserver_retransmissions', 0)
         )
-        sample_netperf_mss = throughput_sample.metadata['netperf_mss']
+        sample_netperf_mss = throughput_sample.metadata.get('netperf_mss')
         if netperf_mss is None:
           netperf_mss = sample_netperf_mss
         elif netperf_mss != sample_netperf_mss:
           raise ValueError(
               'Netperf MSS values do not match for multiple netperf threads.'
           )
+
+        if 'local_bytes_sent' in throughput_sample.metadata:
+          local_bytes_sent_list.append(throughput_sample.metadata['local_bytes_sent'])
+        if 'netperf_mss' in throughput_sample.metadata:
+          netperf_mss_list.append(throughput_sample.metadata['netperf_mss'])
+
       metadata['netperf_retransmissions'] = netperf_retransmissions
       metadata['netserver_retransmissions'] = netserver_retransmissions
       metadata['netperf_mss'] = netperf_mss if netperf_mss else 'unknown'
+      
+      if local_bytes_sent_list:
+        local_bytes_sent_total = sum(local_bytes_sent_list)
+        local_bytes_sent_average = local_bytes_sent_total / len(local_bytes_sent_list)
+        
+        metadata['netperf_local_bytes_per_send'] = local_bytes_per_send
+        metadata['netperf_retransmissions_total'] = netperf_retransmissions
+        metadata['netserver_retransmissions_total'] = netserver_retransmissions
+        metadata['netperf_local_bytes_sent_total'] = local_bytes_sent_total
+        metadata['netperf_local_bytes_sent_average_per_stream'] = local_bytes_sent_average
+        metadata['netperf_retransmissions_average_per_stream'] = netperf_retransmissions / len(throughput_samples)
+        metadata['netserver_retransmissions_average_per_stream'] = netserver_retransmissions / len(throughput_samples)
+        
+      if netperf_mss_list:
+        if all(i == netperf_mss_list[0] for i in netperf_mss_list):
+            metadata['netperf_mss'] = netperf_mss_list[0]
+        else:
+            metadata['netperf_mss_average'] = sum(netperf_mss_list) / len(netperf_mss_list)
 
     # Extract the throughput values from the samples
     throughputs = [s.value for s in throughput_samples]
