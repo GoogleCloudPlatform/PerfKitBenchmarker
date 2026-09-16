@@ -651,6 +651,12 @@ class BaseClaudeConversationalAnalyticsClientInterface(
 ):
   """Base class for Claude Conversational Analytics Client Interface."""
 
+  def GetMetadata(self) -> dict[str, str]:
+    """Returns the client interface metadata."""
+    metadata = super().GetMetadata()
+    metadata['ca_client'] = 'claude'
+    return metadata
+
   def InstallSdk(self) -> None:
     """Install the Claude Code SDK on the client VM."""
     raise NotImplementedError
