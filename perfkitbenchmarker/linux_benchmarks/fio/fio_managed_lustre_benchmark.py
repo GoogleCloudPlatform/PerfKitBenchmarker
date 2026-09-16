@@ -76,7 +76,7 @@ def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
       vm.scratch_disks,
       fio_flags.FIO_GENERATE_SCENARIOS.value,
       benchmark_params,
-      job_file='fio-object-storage.job',
+      job_file='fio-fuse-lustre.job',
   )
   samples = utils.RunTest(
       vm, constants.FIO_PATH, job_file_str, latency_measure='lat'

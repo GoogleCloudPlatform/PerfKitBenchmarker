@@ -600,12 +600,12 @@ fio_object_storage_latency_20000mb:
     fio_nr_files: 10000
     fio_runtime: 0
 
-fio_managed_lustre_latency_20000mb:
+fio_managed_lustre_latency_40000kb:
   name: fio_managed_lustre
   flags:
-    fio_generate_scenarios: rand_4k_read_20000MB_iodepth-1_numjobs-1,rand_4k_write_20000MB_iodepth-1_numjobs-1
-    fio_fill_size: 20000M
-    fio_fill_block_size: 2M
+    fio_generate_scenarios: rand_4k_read_40000KB_iodepth-1_numjobs-1,rand_4k_write_40000KB_iodepth-1_numjobs-1
+    fio_fill_size: 40000K
+    fio_fill_block_size: 4K
     fio_nr_files: 10000
 
 fio_remote_ssd_max_iops:
