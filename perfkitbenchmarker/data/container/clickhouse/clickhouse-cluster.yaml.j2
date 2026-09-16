@@ -8,6 +8,11 @@ spec:
     files:
       users.d/{{ user }}.xml: |
         <clickhouse>
+          <profiles>
+            <default>
+              <allow_experimental_json_type>1</allow_experimental_json_type>
+            </default>
+          </profiles>
           <users>
             <{{ user }} replace="1">
               <password_sha256_hex>{{ password_sha256_hex }}</password_sha256_hex>
