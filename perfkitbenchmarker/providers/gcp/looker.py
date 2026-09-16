@@ -211,6 +211,13 @@ class ConversationalAnalyticsClientInterface(
     return True
 
   @override
+  def GetMetadata(self) -> dict[str, str]:
+    """Get the Metadata attributes for the Client Interface."""
+    metadata = super().GetMetadata()
+    metadata['ca_client'] = 'looker_data_agent'
+    return metadata
+
+  @override
   def Prepare(self, package_name: str) -> None:
     """Prepare the client vm by installing looker-sdk and pushing driver."""
     assert self.client_vm is not None
@@ -312,6 +319,13 @@ class ClaudeConversationalAnalyticsClientInterface(
   @property
   def fetches_results_immediately(self) -> bool:
     return True
+
+  @override
+  def GetMetadata(self) -> dict[str, str]:
+    """Get the Metadata attributes for the Client Interface."""
+    metadata = super().GetMetadata()
+    metadata['ca_claude_model'] = LOOKER_CA_CLAUDE_MODEL.value
+    return metadata
 
   @override
   def _GetQueryFileName(self, query_name: str) -> str:
