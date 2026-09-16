@@ -923,5 +923,166 @@ class RangeListUtilTest(parameterized.TestCase):
       linux_virtual_machine.ParseRangeList('10-x')
 
 
+class RemoteHostCommandWithReturnCodeTest(
+    pkb_common_test_case.PkbCommonTestCase
+):
+
+  def setUp(self):
+    super().setUp()
+    self.vm = CreateTestLinuxVm()
+    self.vm.user_name = 'test_user'
+    self.vm.ssh_port = 22
+    self.vm.ip_address = '1.2.3.4'
+    self.vm.is_static = False
+    FLAGS.ssh_reuse_connections = True
+    FLAGS.ssh_control_path = '/tmp/ssh_ctrl'
+    FLAGS.use_ipv6 = False
+    FLAGS.ssh_options = []
+    FLAGS.ssh_connect_timeout = 5
+    FLAGS.ssh_server_alive_interval = 30
+    FLAGS.ssh_server_alive_count_max = 10
+
+  def testDefaultSshCommand(self):
+    expected_prefix = [
+        'ssh',
+        '-A',
+        '-p',
+        '22',
+        'test_user@1.2.3.4',
+        '-2',
+        '-o',
+        'UserKnownHostsFile=/dev/null',
+        '-o',
+        'StrictHostKeyChecking=no',
+        '-o',
+        'IdentitiesOnly=yes',
+        '-o',
+        'PreferredAuthentications=publickey',
+        '-o',
+        'PasswordAuthentication=no',
+        '-o',
+        'ConnectTimeout=5',
+        '-o',
+        'GSSAPIAuthentication=no',
+        '-o',
+        'ServerAliveInterval=30',
+        '-o',
+        'ServerAliveCountMax=10',
+        '-i',
+        '/tmp/pkb/id_rsa',
+        '-o',
+        'ControlPath="/tmp/ssh_ctrl"',
+        '-o',
+        'ControlMaster=auto',
+        '-o',
+        'ControlPersist=30m',
+    ]
+    with mock.patch.object(
+        vm_util, 'GetPrivateKeyPath', return_value='/tmp/pkb/id_rsa'
+    ), mock.patch.object(
+        vm_util, 'IssueCommand', return_value=('hello\n', '', 0)
+    ) as mock_issue:
+      self.vm.RemoteHostCommandWithReturnCode('echo hello')
+      mock_issue.assert_called_once_with(
+          expected_prefix + ['echo hello'],
+          timeout=None,
+          should_pre_log=False,
+          raise_on_failure=False,
+          suppress_logging=False,
+          stack_level=mock.ANY,
+          log_to_short_log=False,
+      )
+
+  def testStaticVmSshCommand(self):
+    self.vm.is_static = True
+    self.vm.ssh_private_key = '/static/path/key'
+    FLAGS.ssh_reuse_connections = False
+    expected_prefix = [
+        'ssh',
+        '-A',
+        '-p',
+        '22',
+        'test_user@1.2.3.4',
+        '-2',
+        '-o',
+        'UserKnownHostsFile=/dev/null',
+        '-o',
+        'StrictHostKeyChecking=no',
+        '-o',
+        'IdentitiesOnly=yes',
+        '-o',
+        'PreferredAuthentications=publickey',
+        '-o',
+        'PasswordAuthentication=no',
+        '-o',
+        'ConnectTimeout=5',
+        '-o',
+        'GSSAPIAuthentication=no',
+        '-o',
+        'ServerAliveInterval=30',
+        '-o',
+        'ServerAliveCountMax=10',
+        '-i',
+        '/static/path/key',
+    ]
+    with mock.patch.object(
+        vm_util, 'IssueCommand', return_value=('', '', 0)
+    ) as mock_issue:
+      self.vm.RemoteHostCommandWithReturnCode('ls -l')
+      mock_issue.assert_called_once_with(
+          expected_prefix + ['ls -l'],
+          timeout=None,
+          should_pre_log=False,
+          raise_on_failure=False,
+          suppress_logging=False,
+          stack_level=mock.ANY,
+          log_to_short_log=False,
+      )
+
+  def testExplicitIpAddress(self):
+    FLAGS.ssh_reuse_connections = False
+    with mock.patch.object(
+        vm_util, 'GetPrivateKeyPath', return_value='/tmp/pkb/id_rsa'
+    ), mock.patch.object(
+        vm_util, 'IssueCommand', return_value=('', '', 0)
+    ) as mock_issue:
+      self.vm.RemoteHostCommandWithReturnCode('uptime', ip_address='10.0.0.1')
+      cmd = mock_issue.call_args[0][0]
+      self.assertEqual(cmd[:5], ['ssh', '-A', '-p', '22', 'test_user@10.0.0.1'])
+      self.assertEqual(cmd[-1], 'uptime')
+
+  def testLoginShell(self):
+    FLAGS.ssh_reuse_connections = False
+    with mock.patch.object(
+        vm_util, 'GetPrivateKeyPath', return_value='/tmp/pkb/id_rsa'
+    ), mock.patch.object(
+        vm_util, 'IssueCommand', return_value=('', '', 0)
+    ) as mock_issue:
+      self.vm.RemoteHostCommandWithReturnCode(
+          'echo $PATH', login_shell=True
+      )
+      cmd = mock_issue.call_args[0][0]
+      self.assertEqual(cmd[-3:], ['-t', '-t', 'bash -l -c "echo $PATH"'])
+
+  def testProxyJump(self):
+    self.vm.proxy_jump = 'jump-vm'
+    self.vm.name = 'target-vm'
+    with mock.patch.object(
+        vm_util, 'GetTempDir', return_value='/tmp/pkb'
+    ), mock.patch.object(
+        vm_util, 'IssueCommand', return_value=('', '', 0)
+    ) as mock_issue:
+      self.vm.RemoteHostCommandWithReturnCode('hostname')
+      mock_issue.assert_called_once_with(
+          ['ssh', '-F', '/tmp/pkb/ssh_config', 'target-vm', 'hostname'],
+          timeout=None,
+          should_pre_log=False,
+          raise_on_failure=False,
+          suppress_logging=False,
+          stack_level=mock.ANY,
+          log_to_short_log=False,
+      )
+
+
 if __name__ == '__main__':
   unittest.main()

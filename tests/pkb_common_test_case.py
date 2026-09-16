@@ -187,7 +187,7 @@ class TestVirtualMachine(
     pass
 
   def GetConnectionIp(self):
-    pass
+    return self.ip_address or self.internal_ip
 
 
 class UbuntuTestVirtualMachine(TestVirtualMachine):
