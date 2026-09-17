@@ -496,8 +496,8 @@ class PythonClientInterface(GenericClientInterface):
       self.key_file_name = os.path.basename(FLAGS.gcp_service_account_key_file)
 
   @override
-  def GetMetadata(self) -> dict[str, str]:
-    base_metadata = super().GetMetadata()
+  def GetMetadata(self) -> dict[str, Any]:
+    base_metadata: dict[str, Any] = super().GetMetadata()
     reservation = edw_service.EDW_BQ_RESERVATION.value or 'default'
     base_metadata.update({'edw_bq_reservation': reservation})
     if edw_service.EDW_BQ_QUERY_RESULTS_FORMAT.value:
@@ -505,6 +505,10 @@ class PythonClientInterface(GenericClientInterface):
           'edw_bq_query_results_format': (
               edw_service.EDW_BQ_QUERY_RESULTS_FORMAT.value
           )
+      })
+    if edw_service.EDW_BQ_API_TIMEOUT.value is not None:
+      base_metadata.update({
+          'edw_bq_api_timeout': edw_service.EDW_BQ_API_TIMEOUT.value
       })
     return base_metadata
 
@@ -559,6 +563,8 @@ class PythonClientInterface(GenericClientInterface):
           ' --query_results_format'
           f' {edw_service.EDW_BQ_QUERY_RESULTS_FORMAT.value}'
       )
+    if edw_service.EDW_BQ_API_TIMEOUT.value is not None:
+      cmd += f' --api_timeout {edw_service.EDW_BQ_API_TIMEOUT.value}'
     if print_results:
       cmd += ' --print_results'
     if self.destination:
@@ -589,6 +595,8 @@ class PythonClientInterface(GenericClientInterface):
           ' --query_results_format'
           f' {edw_service.EDW_BQ_QUERY_RESULTS_FORMAT.value}'
       )
+    if edw_service.EDW_BQ_API_TIMEOUT.value is not None:
+      cmd += f' --api_timeout {edw_service.EDW_BQ_API_TIMEOUT.value}'
     stdout, _ = self.client_vm.RobustRemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
@@ -604,6 +612,8 @@ class PythonClientInterface(GenericClientInterface):
           ' --query_results_format'
           f' {edw_service.EDW_BQ_QUERY_RESULTS_FORMAT.value}'
       )
+    if edw_service.EDW_BQ_API_TIMEOUT.value is not None:
+      cmd += f' --api_timeout {edw_service.EDW_BQ_API_TIMEOUT.value}'
     stdout, _ = self.client_vm.RobustRemoteCommand(cmd)  # pyrefly: ignore[missing-attribute]
     return stdout
 
