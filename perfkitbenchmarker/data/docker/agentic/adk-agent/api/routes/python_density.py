@@ -1,0 +1,103 @@
+"""FastAPI route for Python density benchmark."""
+
+import asyncio
+import logging
+import os
+
+from api import utils
+import fastapi
+import pydantic
+
+logger = logging.getLogger(__name__)
+router = fastapi.APIRouter()
+
+
+class BenchmarkRequest(pydantic.BaseModel):
+  """Request payload for Python density benchmark."""
+
+  sample_count: int = pydantic.Field(
+      default=100, ge=1, description="Sample count per sandbox session"
+  )
+  sample_warmup: int = pydantic.Field(
+      default=5, ge=0, description="Warmup iterations per sandbox session"
+  )
+  concurrent_sessions: int = pydantic.Field(
+      default=1, ge=1, description="Number of parallel sandbox sessions"
+  )
+  sandbox_exec_timeout_s: int = pydantic.Field(
+      default=60,
+      ge=10,
+      description="Sandbox command execution timeout in seconds",
+  )
+
+
+@router.post("/benchmark/python/density")
+async def benchmark_python_density(req: BenchmarkRequest):
+  """Run concurrent Python density benchmark sessions."""
+  async with utils.benchmark_lock:
+    os.environ["BENCHMARK_MODE"] = "density"
+    os.environ["SAMPLE_COUNT"] = str(req.sample_count)
+    os.environ["SAMPLE_WARMUP"] = str(req.sample_warmup)
+    os.environ["SANDBOX_EXEC_TIMEOUT_S"] = str(req.sandbox_exec_timeout_s)
+
+    logger.info(
+        "Starting Python benchmark: sample_count=%d sample_warmup=%d"
+        " concurrent_sessions=%d",
+        req.sample_count,
+        req.sample_warmup,
+        req.concurrent_sessions,
+    )
+    prompt = (
+        "(Unused non-empty prompt just to satisfy ADK Runner.run_async"
+        " requirements)"
+    )
+
+    thread_tasks = [
+        asyncio.create_task(
+            asyncio.to_thread(
+                lambda sid=i: asyncio.run(utils.run_single_session(sid, prompt))
+            )
+        )
+        for i in range(req.concurrent_sessions)
+    ]
+    session_results = await asyncio.gather(*thread_tasks)
+
+  successful = [r for r in session_results if "error" not in r]
+  failed = [r for r in session_results if "error" in r]
+  aggregate = {}
+  if successful:
+    orch_times = sorted(r["orchestrator_total_ms"] for r in successful)
+    aggregate.update(utils.percentile_stats(orch_times, "orchestrator_cel"))
+    sandbox_keys = [k for k in successful[0] if k.startswith("sandbox_")]
+    for key in sandbox_keys:
+      sample_val = successful[0].get(key)
+      if isinstance(sample_val, list):
+        pooled = []
+        for r in successful:
+          val = r.get(key)
+          if isinstance(val, list):
+            pooled.extend(val)
+        pooled.sort()
+        if pooled:
+          base = key[:-3] if key.endswith("_ms") else key
+          aggregate.update(utils.percentile_stats(pooled, base))
+      elif isinstance(sample_val, (int, float)):
+        vals = [
+            r[key]
+            for r in successful
+            if key in r and isinstance(r[key], (int, float))
+        ]
+        if vals:
+          if key.endswith("_cel_ms"):
+            base = key[:-3]
+            aggregate.update(utils.percentile_stats(sorted(vals), base))
+          else:
+            aggregate[key] = round(sum(vals) / len(vals), 6)
+
+  return {
+      "concurrent_sessions": req.concurrent_sessions,
+      "successful_sessions": len(successful),
+      "failed_sessions": len(failed),
+      "aggregate": aggregate,
+      "sessions": session_results,
+  }
