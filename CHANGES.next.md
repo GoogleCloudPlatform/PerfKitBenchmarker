@@ -490,6 +490,7 @@
 -   Add flag to support using alpha for all gcloud commands.
 -   Add `--edw_bq_api_timeout` flag to support BigQuery API timeout in Python
     client.
+-   Add subnetwork support to GKE cluster creation.
 
 ### Bug fixes and maintenance updates:
 

@@ -235,6 +235,15 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
           '--labels foo=bar,timeout=yesterday', issue_command.all_commands
       )
 
+  def testCreateWithSubnetwork(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      assert cluster.default_nodepool.network is not None
+      cluster.default_nodepool.network.primary_subnet_name = 'fakesubnet'
+      cluster._Create()
+      self.assertIn('--subnetwork fakesubnet', issue_command.all_commands)
+
   def testCreateQuotaExceeded(self):
     spec = self.create_kubernetes_engine_spec()
     with self.patch_critical_objects(

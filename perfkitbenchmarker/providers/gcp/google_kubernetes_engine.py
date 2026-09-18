@@ -519,8 +519,13 @@ class GkeCluster(BaseGkeCluster):
   def _Create(self):
     """Creates the cluster."""
     cmd = self._GcloudCommand('container', 'clusters', 'create', self.name)
-    if self.default_nodepool.network:  # pyrefly: ignore[missing-attribute]
-      cmd.flags['network'] = self.default_nodepool.network.network_resource.name  # pyrefly: ignore[missing-attribute]
+    if self.default_nodepool.network:
+      network = typing.cast(
+          gce_network.GceNetwork, self.default_nodepool.network
+      )
+      cmd.flags['network'] = network.network_resource.name
+      if network.primary_subnet_name:
+        cmd.flags['subnetwork'] = network.primary_subnet_name
 
     if gcp_flags.GKE_ENABLE_SHIELDED_NODES.value:
       cmd.args.append('--enable-shielded-nodes')
@@ -1100,8 +1105,11 @@ class GkeAutopilotCluster(BaseGkeCluster):
         self.name,
         '--no-autoprovisioning-enable-insecure-kubelet-readonly-port',
     )
-    if self.default_nodepool.network:  # pyrefly: ignore[missing-attribute]
-      cmd.flags['network'] = self.default_nodepool.network.network_resource.name  # pyrefly: ignore[missing-attribute]
+    if self.default_nodepool.network:
+      network = typing.cast(
+          gce_network.GceNetwork, self.default_nodepool.network
+      )
+      cmd.flags['network'] = network.network_resource.name
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     if self.enable_aam:

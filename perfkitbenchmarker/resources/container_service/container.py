@@ -189,6 +189,7 @@ class BaseNodePoolConfig:
     self.gpu_type: str | None = vm_spec.gpu_type
     self.gpu_count: int | None = vm_spec.gpu_count
     # pylint: disable=g-missing-from-attributes
+    self.network: Any | None = None
     self.sandbox_config: container_spec_lib.SandboxSpec | None = None
     self.swap_config: swap_config_spec.SwapConfigSpec | None = None
     self.max_local_disks: int | None
