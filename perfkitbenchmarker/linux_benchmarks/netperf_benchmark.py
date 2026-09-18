@@ -165,6 +165,13 @@ _HISTOGRAM_PERCENTILES = flags.DEFINE_multi_float(
     'Default histogram percentiles are '
     'p10, p50, p90, p99, p99.9, p99.99, and p99.999.',
 )
+# Command ports are even (id*2), data ports are odd (id*2 + 1)
+_PORT_START = flags.DEFINE_integer(
+    'netperf_port_start',
+    20200,
+    'The starting port for netperf command and data ports. Command ports are '
+    'even (id*2), data ports are odd (id*2 + 1).',
+)
 
 FLAGS = flags.FLAGS
 
@@ -195,9 +202,6 @@ OUTPUT_SELECTOR = (
     'LOCAL_TRANSPORT_RETRANS,REMOTE_TRANSPORT_RETRANS,'
     'TRANSPORT_MSS'
 )
-
-# Command ports are even (id*2), data ports are odd (id*2 + 1)
-PORT_START = 20000
 
 REMOTE_SCRIPTS_DIR = 'netperf_test_scripts'
 REMOTE_SCRIPT = 'netperf_test.py'
@@ -290,11 +294,13 @@ def PrepareServerVM(server_vm, client_vm_internal_ips, client_vm_ip_address):
   # Start the netserver processes
   if vm_util.ShouldRunOnExternalIpAddress():
     # Open all of the command and data ports
-    server_vm.AllowPort(PORT_START, PORT_START + num_streams * 2 - 1)
+    server_vm.AllowPort(
+        _PORT_START.value, _PORT_START.value + num_streams * 2 - 1
+    )
 
-  port_end = PORT_START + num_streams * 2 - 1
+  port_end = _PORT_START.value + num_streams * 2 - 1
   netserver_cmd = (
-      f'for i in $(seq {PORT_START} 2 {port_end}); do '
+      f'for i in $(seq {_PORT_START.value} 2 {port_end}); do '
       f'{netperf.NETSERVER_PATH} -p $i & done'
   )
   server_vm.RemoteCommand(netserver_cmd)
@@ -589,9 +595,10 @@ def RunNetperf(
     # TODO(dlott): Analyze process start delta of netperf processes on the
     # remote machine.
 
+    port_start = _PORT_START.value + (server_ip_idx * 2 * num_streams)
     remote_cmd = (
         f'./{REMOTE_SCRIPT} --netperf_cmd="{netperf_cmd}" '
-        f'--num_streams={num_streams} --port_start={PORT_START+(server_ip_idx*2*num_streams)}'
+        f'--num_streams={num_streams} --port_start={port_start}'
     )
 
     if (

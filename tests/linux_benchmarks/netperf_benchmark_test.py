@@ -263,6 +263,36 @@ class NetperfBenchmarkTestCase(parameterized.TestCase, unittest.TestCase):
     call_args_list = vm_spec.vms[0].RobustRemoteCommand.call_args_list
     self.assertIn('-l 5', call_args_list[0][0][0])
     self.assertIn('-l 60', call_args_list[1][0][0])
+    self.assertIn('--port_start=20200', call_args_list[1][0][0])
+
+  @flagsaver.flagsaver(
+      netperf_benchmarks=['TCP_STREAM'],
+      netperf_num_streams=[1],
+      netperf_port_start=25000,
+  )
+  def testPortStartFlag(self):
+    self._ConfigureIpTypes(run_external=True, run_internal=False)
+    vm_spec = mock.MagicMock(spec=benchmark_spec.BenchmarkSpec)
+    client_vm = mock.MagicMock()
+    server_vm = mock.MagicMock()
+    server_vm.image = None
+    vm_spec.vms = [client_vm, server_vm]
+    client_vm.RobustRemoteCommand.side_effect = [(self.expected_stdout[0], '')]
+    server_vm.GetInternalIPs.return_value = ['test_ip']
+    client_vm.GetInternalIPs.return_value = ['test_ip']
+    server_vm.GetExternalIPs.return_value = ['test_ip']
+    client_vm.GetExternalIPs.return_value = ['test_ip']
+
+    netperf_benchmark.PrepareServerVM(server_vm, ['test_ip'], ['test_ip'])
+    server_vm.AllowPort.assert_called_once_with(25000, 25001)
+    server_vm.RemoteCommand.assert_called_once()
+    self.assertIn('seq 25000 2 25001', server_vm.RemoteCommand.call_args[0][0])
+
+    netperf_benchmark.Run(vm_spec)
+    self.assertIn(
+        '--port_start=25000',
+        client_vm.RobustRemoteCommand.call_args[0][0],
+    )
 
 
 if __name__ == '__main__':
