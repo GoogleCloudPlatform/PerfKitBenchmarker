@@ -1,10 +1,7 @@
 # Copyright 2026 PerfKitBenchmarker Authors. All Rights Reserved.
 """7-Zip LZMA benchmark for Windows."""
 
-from absl import flags
 from perfkitbenchmarker import configs
-
-FLAGS = flags.FLAGS
 
 BENCHMARK_NAME = 'seven_zip_benchmark'
 BENCHMARK_CONFIG = """
