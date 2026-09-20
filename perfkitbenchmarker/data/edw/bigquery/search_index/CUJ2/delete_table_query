@@ -1,0 +1,2 @@
+-- TODO: Remove hardcoded table name
+DROP TABLE prototype_CUJ2_benchmark_100GB_and_growing
