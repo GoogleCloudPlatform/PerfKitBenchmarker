@@ -20,6 +20,7 @@ from absl import flags
 from absl.testing import flagsaver
 import mock
 from perfkitbenchmarker import benchmark_spec
+from perfkitbenchmarker import flags as pkb_flags
 from perfkitbenchmarker import context
 from perfkitbenchmarker import flag_alias
 from perfkitbenchmarker import pkb  # pylint: disable=unused-import # noqa
@@ -123,6 +124,15 @@ class _BenchmarkSpecTestCase(pkb_common_test_case.PkbCommonTestCase):
     FLAGS.temp_dir = 'tmp'
     FLAGS.ignore_package_requirements = True
     self.addCleanup(context.SetThreadBenchmarkSpec, None)
+
+
+class GetResourceTagsTestCase(_BenchmarkSpecTestCase):
+
+  @mock.patch('getpass.getuser', return_value='Name_Surname')
+  def testOwnerFromGetuserIsSanitized(self, _):
+    FLAGS.owner = pkb_flags.GetCurrentUser()
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(SIMPLE_CONFIG)
+    self.assertEqual('name_surname', spec.GetResourceTags()['owner'])
 
 
 class GenericTestCase(_BenchmarkSpecTestCase):
