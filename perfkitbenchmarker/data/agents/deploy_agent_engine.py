@@ -37,6 +37,7 @@ class DeploymentConfig[AgentConfigT](BaseDeploymentConfig):
   run_uri: str
   agent_config: AgentConfigT
   initial_prompt: str | None = None
+  model_location: str | None = None
 
 
 def _import_agent_module(agent: str, framework: str) -> Any:
@@ -97,12 +98,14 @@ def run_deployment[AgentConfigT](
   if not os.path.exists(wheel_name):
     raise ValueError(f"Wheel file not found at {wheel_name}")
 
-  deploy_config = {
+  deploy_config: dict[str, Any] = {
       "staging_bucket": staging_bucket,
       "requirements": [f"./{wheel_name}"],
       "extra_packages": [wheel_name],
       "display_name": display_name,
   }
+  if config.model_location:
+    deploy_config["env_vars"] = {"GOOGLE_CLOUD_LOCATION": config.model_location}
 
   create_start = time.monotonic()
   remote_agent = client.agent_engines.create(

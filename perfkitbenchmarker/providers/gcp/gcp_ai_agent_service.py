@@ -421,6 +421,7 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
         'framework': self.spec.framework,
         'staging_bucket': self._staging_bucket,
         'agent_config': self.agent_config,
+        'model_location': self.spec.model_location,
     })
     initial_prompt = self._GetInitialPromptText()
     if initial_prompt:
@@ -438,8 +439,6 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
     )
 
     # 4. Trigger deployment script on VM
-    # TODO(odiego): Honor model_location. There are models with only global
-    # endpoints.
     location = self.region
     command_parts = [
         f'export GOOGLE_CLOUD_PROJECT={self.project}',
