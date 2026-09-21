@@ -2,13 +2,10 @@
 
 import os
 from typing import Any, override
-import urllib.parse
 
-from absl import logging
 import adk_utils
 import common_utils
 from google.adk.agents import llm_agent
-from google.cloud import storage
 
 
 class AgentHandler(adk_utils.AdkAgentHandler):
@@ -34,25 +31,9 @@ class AgentHandler(adk_utils.AdkAgentHandler):
   def export_results(
       self, output_dir: str, response_text: str, generic_metrics: dict[str, Any]
   ) -> None:
-    answer_file = "answer.txt"
-    with open(answer_file, "w") as f:
-      f.write(response_text)
-
-    target_answer_path = os.path.join(output_dir, answer_file)
-
-    if target_answer_path.startswith("gs://"):
-      parsed_url = urllib.parse.urlparse(target_answer_path)
-      bucket_name = parsed_url.netloc
-      blob_path = parsed_url.path.strip("/")
-      storage_client = storage.Client()
-      bucket = storage_client.bucket(bucket_name)
-      blob = bucket.blob(blob_path)
-      blob.upload_from_filename(answer_file)
-      logging.info("Successfully uploaded answer to %s", target_answer_path)
-
     results = {
         "metrics": generic_metrics,
-        "artifacts": {"answer": target_answer_path},
+        "artifacts": {"answer": os.path.join(output_dir, "answer.txt")},
         "response": response_text,
     }
     target_path = os.path.join(output_dir, "results.json")
