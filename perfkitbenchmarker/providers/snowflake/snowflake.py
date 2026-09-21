@@ -293,6 +293,10 @@ class ConversationalAnalyticsClientInterface(
   def fetches_results_immediately(self) -> bool:
     return False
 
+  @property
+  def ca_client_name(self) -> str:
+    return 'snowflake_cortex_analyst'
+
   def Prepare(self, package_name: str) -> None:
     """Prepares the client vm by installing packages and driver."""
     assert self.client_vm is not None

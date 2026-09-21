@@ -628,6 +628,10 @@ class ConversationalAnalyticsClientInterface(
   def fetches_results_immediately(self) -> bool:
     return True
 
+  @property
+  def ca_client_name(self) -> str:
+    return 'bq_data_agent'
+
   @override
   def Prepare(self, package_name: str) -> None:
     """Prepares the client vm by installing geminidataanalytics package and driver."""
@@ -714,6 +718,13 @@ class ClaudeConversationalAnalyticsClientInterface(
   @property
   def fetches_results_immediately(self) -> bool:
     return True
+
+  @override
+  def GetMetadata(self) -> dict[str, str]:
+    """Get the Metadata attributes for the Client Interface."""
+    metadata = super().GetMetadata()
+    metadata['ca_claude_model'] = BQ_CA_CLAUDE_MODEL.value
+    return metadata
 
   @override
   def _GetQueryFileName(self, query_name: str) -> str:

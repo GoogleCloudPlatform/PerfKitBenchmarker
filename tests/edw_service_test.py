@@ -245,10 +245,17 @@ class EdwServiceTest(pkb_common_test_case.PkbCommonTestCase):
       def fetches_results_immediately(self) -> bool:
         return True
 
+      @property
+      def ca_client_name(self) -> str:
+        return 'test_ca_client'
+
     ca_client = TestCaClientInterface()
     self.assertEqual(
         ca_client.GetMetadata(),
-        {'fetches_results_immediately': 'True'},
+        {
+            'fetches_results_immediately': 'True',
+            'ca_client': 'test_ca_client',
+        },
     )
 
   def testTryExecuteQueryCatchesRemoteCommandError(self) -> None:
@@ -319,6 +326,9 @@ class BaseClaudeConversationalAnalyticsClientInterfaceTest(
     self.assertEqual(execution_time, 5.0)
     self.assertEqual(metadata['total_cost_usd'], 0.05)
     self.assertEqual(metadata['usage'], {'input_tokens': 100})
+
+  def testGetMetadataReportsClaudeCaClient(self):
+    self.assertEqual(self.client.GetMetadata()['ca_client'], 'claude')
 
 
 if __name__ == '__main__':

@@ -564,10 +564,16 @@ class BaseConversationalAnalyticsClientInterface(EdwClientInterface):
     """Returns True if the client fetches query results immediately."""
     raise NotImplementedError
 
+  @property
+  def ca_client_name(self) -> str:
+    """Returns the name of the conversational analytics client."""
+    raise NotImplementedError
+
   def GetMetadata(self) -> dict[str, str]:
     """Returns the client interface metadata."""
     metadata = {
-        'fetches_results_immediately': str(self.fetches_results_immediately)
+        'fetches_results_immediately': str(self.fetches_results_immediately),
+        'ca_client': self.ca_client_name,
     }
     return metadata
 
@@ -657,6 +663,11 @@ class BaseClaudeConversationalAnalyticsClientInterface(
     BaseConversationalAnalyticsClientInterface
 ):
   """Base class for Claude Conversational Analytics Client Interface."""
+
+  @property
+  def ca_client_name(self) -> str:
+    """Returns the name of the conversational analytics client."""
+    return 'claude'
 
   def InstallSdk(self) -> None:
     """Install the Claude Code SDK on the client VM."""
