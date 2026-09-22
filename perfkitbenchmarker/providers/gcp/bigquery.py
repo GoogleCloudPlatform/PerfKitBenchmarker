@@ -137,9 +137,11 @@ class GenericClientInterface(edw_service.EdwClientInterface):
         ['bq', 'show', '--format=prettyjson', target]
     )
     table_meta = json.loads(stdout)
-    num_physical_bytes = table_meta.get('numTotalPhysicalBytes', None)
-    num_bytes = table_meta.get('numBytes', None)
-    num_rows = table_meta.get('numRows', None)
+    num_physical_bytes = table_meta.get('numActivePhysicalBytes')
+    if num_physical_bytes is None:
+      num_physical_bytes = table_meta.get('numTotalPhysicalBytes')
+    num_bytes = table_meta.get('numBytes')
+    num_rows = table_meta.get('numRows')
     logging.info(
         'Table %s stats: physical bytes=%s, logical bytes=%s, num rows=%s',
         target,
@@ -149,8 +151,8 @@ class GenericClientInterface(edw_service.EdwClientInterface):
     )
     if num_physical_bytes is None or num_rows is None:
       raise ValueError(
-          f'numTotalPhysicalBytes or numRows for {target} was not returned in '
-          'bq show output.'
+          f'numActivePhysicalBytes/numTotalPhysicalBytes or numRows for '
+          f'{target} was not returned in bq show output.'
       )
     return int(num_physical_bytes) / _BYTES_PER_GB, int(num_rows)
 

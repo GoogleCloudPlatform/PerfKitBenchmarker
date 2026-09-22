@@ -387,39 +387,75 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
     response = interface.ExecuteThroughput(QUERY_STREAMS, THROUGHPUT_LABELS)
     self.assertDictEqual(json.loads(response), THROUGHPUT_RESPONSE_OBJECT)
 
-  def testGenericClientInterfaceGetTableStats(self):
+  @parameterized.named_parameters(
+      dict(
+          testcase_name='PrefersActivePhysicalBytes',
+          bq_show_json={
+              'numActivePhysicalBytes': str(34 * 1024 * 1024 * 1024),
+              'numTotalPhysicalBytes': str(364 * 1024 * 1024 * 1024),
+              'numBytes': str(944 * 1024 * 1024 * 1024),
+              'numRows': '1000000000',
+          },
+          expected_size=34.0,
+          expected_rows=1000000000,
+      ),
+      dict(
+          testcase_name='FallsBackToTotalPhysicalBytesWhenActiveAbsent',
+          bq_show_json={
+              'numTotalPhysicalBytes': str(10 * 1024 * 1024 * 1024),
+              'numBytes': str(50 * 1024 * 1024 * 1024),
+              'numRows': '100',
+          },
+          expected_size=10.0,
+          expected_rows=100,
+      ),
+      dict(
+          testcase_name='FallsBackToTotalPhysicalBytesWhenActiveIsNone',
+          bq_show_json={
+              'numActivePhysicalBytes': None,
+              'numTotalPhysicalBytes': str(10 * 1024 * 1024 * 1024),
+              'numRows': '100',
+          },
+          expected_size=10.0,
+          expected_rows=100,
+      ),
+      dict(
+          testcase_name='ZeroActivePhysicalBytesDoesNotFallBackToTotal',
+          bq_show_json={
+              'numActivePhysicalBytes': '0',
+              'numTotalPhysicalBytes': str(10 * 1024 * 1024 * 1024),
+              'numRows': '0',
+          },
+          expected_size=0.0,
+          expected_rows=0,
+      ),
+  )
+  def testGenericClientInterfaceGetTableStats(
+      self, bq_show_json, expected_size, expected_rows
+  ):
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
-    self.MockIssueCommand({
-        'bq show': [
-            (
-                json.dumps({
-                    'numTotalPhysicalBytes': str(10 * 1024 * 1024 * 1024),
-                    'numBytes': str(50 * 1024 * 1024 * 1024),
-                    'numRows': '100',
-                }),
-                '',
-                0,
-            ),
-        ]
-    })
-    mock_vm = mock.MagicMock()
-    bm_spec = FakeBenchmarkSpec(mock_vm)
-    interface.SetProvisionedAttributes(bm_spec)
+    self.MockIssueCommand({'bq show': [(json.dumps(bq_show_json), '', 0)]})
 
     size, rows = interface.GetTableStats('hits')
-    self.assertEqual(size, 10.0)
-    self.assertEqual(rows, 100)
+    self.assertEqual(size, expected_size)
+    self.assertEqual(rows, expected_rows)
 
-  def testGenericClientInterfaceGetTableStatsRaisesErrorWhenMissing(self):
+  @parameterized.named_parameters(
+      dict(testcase_name='EmptyResponse', bq_show_json={}),
+      dict(
+          testcase_name='MissingNumRows',
+          bq_show_json={'numActivePhysicalBytes': '1024'},
+      ),
+      dict(
+          testcase_name='MissingPhysicalBytes',
+          bq_show_json={'numRows': '100', 'numBytes': '1024'},
+      ),
+  )
+  def testGenericClientInterfaceGetTableStatsRaisesErrorWhenMissing(
+      self, bq_show_json
+  ):
     interface = bigquery.GetBigQueryClientInterface(PROJECT_ID, DATASET_ID)
-    self.MockIssueCommand({
-        'bq show': [
-            (json.dumps({}), '', 0),
-        ]
-    })
-    mock_vm = mock.MagicMock()
-    bm_spec = FakeBenchmarkSpec(mock_vm)
-    interface.SetProvisionedAttributes(bm_spec)
+    self.MockIssueCommand({'bq show': [(json.dumps(bq_show_json), '', 0)]})
 
     with self.assertRaises(ValueError):
       interface.GetTableStats('hits')
