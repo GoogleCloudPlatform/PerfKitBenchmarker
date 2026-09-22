@@ -31,7 +31,7 @@ fio_managed_lustre:
     default:
       vm_spec: *default_dual_core
       disk_spec: *default_500_gb
-      vm_count: 2
+      vm_count: 1
   flags:
     boot_disk_size: 300
     data_disk_type: lustre
@@ -59,13 +59,10 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec):
   Args:
     spec: The benchmark specification.
   """
-  writer_vm = spec.vm_groups['default'][1]
-  writer_vm.Install('fio')
-  utils.PrefillIfEnabled(writer_vm, constants.FIO_PATH, use_directory=True)
   test_vm = spec.vm_groups['default'][0]
   test_vm.Install('fio')
-  for vm in spec.vm_groups['default']:
-    vm.RecordAdditionalMetadata()
+  utils.PrefillIfEnabled(test_vm, constants.FIO_PATH, use_directory=True)
+  test_vm.RecordAdditionalMetadata()
 
 
 def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
