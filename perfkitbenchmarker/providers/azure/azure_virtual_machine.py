@@ -1098,7 +1098,13 @@ class AzureVirtualMachine(  # pyrefly: ignore[invalid-inheritance]
           not self.use_dedicated_host
           and 'OverconstrainedZonalAllocationRequest' in stderr
       ):
-        raise errors.Benchmarks.UnsupportedConfigError(stderr)
+        logging.warning(
+            'Creation failed with a claim of an unsupported configuration. '
+            'However Azure can report this in stocked out zones when it is a '
+            'perfectly valid configuration according to list-skus. Classifying '
+            'as InsufficientCapacityCloudFailure.'
+        )
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(stderr)
       elif _SKU_NOT_AVAILABLE in stderr:
         raise errors.Benchmarks.UnsupportedConfigError(stderr)
       else:
