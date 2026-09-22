@@ -429,6 +429,15 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
           expected_size=0.0,
           expected_rows=0,
       ),
+      dict(
+          testcase_name='FallsBackToNumBytesWhenPhysicalBytesAbsent',
+          bq_show_json={
+              'numBytes': str(50 * 1024 * 1024 * 1024),
+              'numRows': '100',
+          },
+          expected_size=50.0,
+          expected_rows=100,
+      ),
   )
   def testGenericClientInterfaceGetTableStats(
       self, bq_show_json, expected_size, expected_rows
@@ -447,8 +456,8 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
           bq_show_json={'numActivePhysicalBytes': '1024'},
       ),
       dict(
-          testcase_name='MissingPhysicalBytes',
-          bq_show_json={'numRows': '100', 'numBytes': '1024'},
+          testcase_name='MissingAllBytes',
+          bq_show_json={'numRows': '100'},
       ),
   )
   def testGenericClientInterfaceGetTableStatsRaisesErrorWhenMissing(

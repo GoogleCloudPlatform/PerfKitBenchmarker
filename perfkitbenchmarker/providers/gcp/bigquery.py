@@ -139,6 +139,11 @@ class GenericClientInterface(edw_service.EdwClientInterface):
     table_meta = json.loads(stdout)
     num_physical_bytes = table_meta.get('numActivePhysicalBytes')
     if num_physical_bytes is None:
+      logging.warning(
+          'numActivePhysicalBytes from bq show output is None for %s, using'
+          ' numTotalPhysicalBytes instead.',
+          target,
+      )
       num_physical_bytes = table_meta.get('numTotalPhysicalBytes')
     num_bytes = table_meta.get('numBytes')
     num_rows = table_meta.get('numRows')
@@ -149,10 +154,17 @@ class GenericClientInterface(edw_service.EdwClientInterface):
         num_bytes,
         num_rows,
     )
+    if num_physical_bytes is None and num_bytes is not None:
+      logging.warning(
+          'numTotalPhysicalBytes from bq show output is None for %s, using'
+          ' numBytes instead.',
+          target,
+      )
+      num_physical_bytes = num_bytes
     if num_physical_bytes is None or num_rows is None:
       raise ValueError(
-          f'numActivePhysicalBytes/numTotalPhysicalBytes or numRows for '
-          f'{target} was not returned in bq show output.'
+          'numTotalPhysicalBytes (and its backups) or numRows for'
+          f' {target} was not returned in bq show output.'
       )
     return int(num_physical_bytes) / _BYTES_PER_GB, int(num_rows)
 
@@ -509,9 +521,9 @@ class PythonClientInterface(GenericClientInterface):
           )
       })
     if edw_service.EDW_BQ_API_TIMEOUT.value is not None:
-      base_metadata.update({
-          'edw_bq_api_timeout': edw_service.EDW_BQ_API_TIMEOUT.value
-      })
+      base_metadata.update(
+          {'edw_bq_api_timeout': edw_service.EDW_BQ_API_TIMEOUT.value}
+      )
     return base_metadata
 
   def Prepare(self, package_name: str) -> None:
