@@ -31,7 +31,7 @@ fio_object_storage:
     default:
       vm_spec: *default_dual_core
       disk_spec: *default_500_gb
-      vm_count: 2
+      vm_count: 1
   flags:
     boot_disk_size: 300
     data_disk_type: object_storage
@@ -63,10 +63,9 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec):
   Args:
     spec: The benchmark specification.
   """
-  writer_vm = spec.vm_groups['default'][1]
-  writer_vm.Install('fio')
-  utils.PrefillIfEnabled(writer_vm, constants.FIO_PATH, use_directory=True)
   test_vm = spec.vm_groups['default'][0]
+  test_vm.Install('fio')
+  utils.PrefillIfEnabled(test_vm, constants.FIO_PATH, use_directory=True)
 
   if test_vm.CLOUD == 'Azure':  # pyrefly: ignore[missing-argument]
     # Unmount and remount with different blobfuse config.
@@ -84,7 +83,6 @@ def Prepare(spec: benchmark_spec.BenchmarkSpec):
         f'--config-file=blobfuse_config.yaml '
         f'--container-name={disk.bucket_name} {opts}'
     )
-  test_vm.Install('fio')
 
 
 def Run(spec: benchmark_spec.BenchmarkSpec) -> list[sample.Sample]:
