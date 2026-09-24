@@ -22,7 +22,7 @@ import logging
 from absl import flags
 from perfkitbenchmarker.linux_benchmarks import lssd_workloads_util
 from perfkitbenchmarker.linux_benchmarks import unmanaged_mysql_sysbench_benchmark as base_benchmark
-
+from perfkitbenchmarker.linux_packages import mysql80
 
 FLAGS = flags.FLAGS
 
@@ -67,6 +67,16 @@ def InstallPackages(benchmark_spec):
   server = benchmark_spec.vm_groups['server'][0]
   if lssd_workloads_util.LSSD_WORKLOAD_PRECONDITION_DISK.value:
     server.InstallPackages('fio')
+
+  config_path = mysql80.GetOSDependentDefaults(server.OS_TYPE)[  # pyrefly: ignore[missing-argument]
+      mysql80.MYSQL_CONFIG_PATH
+  ]
+  server.RemoteCommand(f'sudo mkdir -p {MYSQL_DATA_DIR}/tmp')
+  server.RemoteCommand(f'sudo chown mysql:mysql {MYSQL_DATA_DIR}/tmp')
+  server.RemoteCommand(
+      f"sudo sed -i 's|^tmpdir.*|tmpdir = {MYSQL_DATA_DIR}/tmp\\ninnodb_tmpdir"
+      f" = {MYSQL_DATA_DIR}/tmp|' {config_path}"
+  )
 
 
 def StartServices(benchmark_spec):
