@@ -77,6 +77,7 @@ AZURE_NVME_TYPES = [
     r'(Standard_L[0-9]+s_v2)',
     r'(Standard_L[0-9]+a?s_v3)',
     r'(Standard_L[0-9]+a?s_v4)',
+    r'(Standard_L[0-9]+aos_v4)',
     r'(Standard_D[0-9]+[ap]?ds_v6)',
     r'(Standard_D[0-9]+[ap]?ds_v7)',
 ]

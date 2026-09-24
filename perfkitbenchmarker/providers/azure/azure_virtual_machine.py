@@ -96,6 +96,13 @@ NUM_LOCAL_VOLUMES: dict[str, int] = {
     'Standard_L64as_v4': 8,
     'Standard_L80as_v4': 10,
     'Standard_L96as_v4': 12,
+    'Standard_L2aos_v4': 3,
+    'Standard_L4aos_v4': 3,
+    'Standard_L8aos_v4': 6,
+    'Standard_L12aos_v4': 9,
+    'Standard_L16aos_v4': 6,
+    'Standard_L24aos_v4': 9,
+    'Standard_L32aos_v4': 12,
     'Standard_D2ds_v6': 1,
     'Standard_D4ds_v6': 1,
     'Standard_D8ds_v6': 1,
@@ -214,6 +221,8 @@ TRUSTED_LAUNCH_UNSUPPORTED_TYPES = [
 EARLY_NVME_MACHINE_FAMILIES = [
     r'Standard_Ei?bd?s_v5',
     r'Standard_La?s_v4',
+    # Laosv4 is NVMe-only; it has no SCSI local temp disk.
+    r'Standard_Laos_v4',
     r'Standard_Md?s_v3',
 ]
 
