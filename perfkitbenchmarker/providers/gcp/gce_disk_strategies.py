@@ -188,6 +188,9 @@ class GCECreateNonResourceDiskStrategy(disk_strategies.EmptyCreateDiskStrategy):
     elif self.disk_spec.disk_type == disk.NFS:
       return GCPSetUpNFSDiskStrategy(self.vm, self.disk_spec)
 
+    elif self.disk_spec.disk_type == disk.NETAPP_VOLUMES:
+      return GCPSetUpNetAppVolumesDiskStrategy(self.vm, self.disk_spec)
+
     elif self.disk_spec.disk_type == disk.HYPERDISK_ML:
       return SetUpHyperdiskMLDiskStrategy(self.vm, self.disk_spec)
 
@@ -551,3 +554,8 @@ class GCPSetUpNFSDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
         'echo 20480 | sudo tee /sys/class/bdi/0:$(stat -c "%d"'
         f' {self.disk_spec.mount_point})/read_ahead_kb'
     )
+
+
+class GCPSetUpNetAppVolumesDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
+  """Strategies to set up NetApp Volumes disks on GCP."""
+  pass

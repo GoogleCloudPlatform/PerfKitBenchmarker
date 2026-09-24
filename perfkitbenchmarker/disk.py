@@ -106,6 +106,7 @@ RAM = 'ram'
 # refers to disks that come from a cloud/unmanaged NFS or SMB service
 NFS = 'nfs'
 SMB = 'smb'
+NETAPP_VOLUMES = 'netapp_volumes'
 
 # Disks that live on a network and attaches to multiple VMs
 HYPERDISK_ML = 'hyperdisk-ml'
@@ -151,7 +152,7 @@ def GetMultiAttachDiskClass(cloud: str):
 
 
 def IsRemoteDisk(disk_type):
-  return disk_type not in [LOCAL, NFS, SMB, RAM]
+  return disk_type not in [LOCAL, NFS, SMB, RAM, NETAPP_VOLUMES]
 
 
 class BaseDiskSpec(spec.BaseSpec):
@@ -317,7 +318,7 @@ class BaseNFSDiskSpec(BaseDiskSpec):
     self.mount_point: str = None  # pyrefly: ignore[bad-assignment]
     self.nfs_version: str | None = None
     super().__init__(*args, **kwargs)
-    self.disk_type = NFS
+    self.disk_type = self.DISK_TYPE
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):

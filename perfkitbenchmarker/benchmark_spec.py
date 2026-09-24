@@ -698,7 +698,7 @@ class BenchmarkSpec:
       if not group_spec.disk_spec or not group_spec.vm_count:
         continue
       disk_spec = group_spec.disk_spec
-      if disk_spec.disk_type != disk.NFS:
+      if disk_spec.disk_type not in (disk.NFS, disk.NETAPP_VOLUMES):
         continue
       # Choose which nfs_service to create.
       if disk_spec.nfs_ip_address:
@@ -706,7 +706,9 @@ class BenchmarkSpec:
       elif disk_spec.nfs_managed:
         cloud = group_spec.cloud
         providers.LoadProvider(cloud)
-        nfs_class = nfs_service.GetNfsServiceClass(cloud)
+        nfs_class = nfs_service.GetNfsServiceClass(
+            cloud, disk_spec.disk_type
+        )
         self.nfs_service = nfs_class(
             disk_spec, group_spec.vm_spec.zone
         )  # pytype: disable=not-instantiable

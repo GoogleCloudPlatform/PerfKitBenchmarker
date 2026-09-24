@@ -30,6 +30,7 @@ class GceNfsService(nfs_service.BaseNfsService):
   """Resource for GCE NFS service."""
 
   CLOUD = provider_info.GCP
+  SERVICE_TYPE = disk.NFS
   NFS_TIERS = (STANDARD, PREMIUM, ZONAL, REGIONAL, HIGH_SCALE_SSD, ENTERPRISE)
   DEFAULT_TIER = 'STANDARD'
   user_managed = False

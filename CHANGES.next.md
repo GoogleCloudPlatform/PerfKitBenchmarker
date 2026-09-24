@@ -713,3 +713,4 @@
 -   Add support for measuring VM create to data disk visibility.
 -   Add GKE postgres sysbench default benchmark config alias.
 -   Standardize around numpy for some aggregation methods with e.g. netperf.
+-   Add support for Netapp Volumes.

@@ -58,19 +58,23 @@ _MOUNT_NFS_RE = re.compile(r'.*type nfs \((.*?)\)', re.MULTILINE)
 UNMANAGED = 'Unmanaged'
 
 
-def GetNfsServiceClass(cloud):
+def GetNfsServiceClass(cloud, service_type=None):
   """Get the NFS service corresponding to the cloud.
 
   Args:
     cloud: The name of the cloud to supply the NFS service.
+    service_type: Optional service type to distinguish between NFS services.
 
   Returns:
     The NFS service class for this cloud.
 
-  Raises:
-    NotImplementedError: No service found for this cloud.
   """
-  return resource.GetResourceClass(BaseNfsService, CLOUD=cloud)
+  # TODO(arushigaur): Add SERVICE_TYPE = disk.NFS to Filestore, EFS, and Azure
+  # NFS classes, then remove the 'or disk.NFS' fallback clause.
+  service_type = service_type or disk.NFS
+  return resource.GetResourceClass(
+      BaseNfsService, CLOUD=cloud, SERVICE_TYPE=service_type
+  )
 
 
 class BaseNfsService(resource.BaseResource):
@@ -80,7 +84,9 @@ class BaseNfsService(resource.BaseResource):
   # "nfs_tier" values if applicable.
   CLOUD = 'Unknown'
   NFS_TIERS = None
+  SERVICE_TYPE = disk.NFS
   RESOURCE_TYPE = 'BaseNfsService'
+  REQUIRED_ATTRS = ['CLOUD', 'SERVICE_TYPE']
   DEFAULT_NFS_VERSION = None
   DEFAULT_TIER = None
 

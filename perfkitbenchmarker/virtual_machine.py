@@ -515,7 +515,10 @@ class BaseVirtualMachine(os_mixin.BaseOsMixin, resource.BaseResource):
     if any(spec.disk_type == disk.RAM for spec in self.disk_specs):
       disk_strategies.SetUpRamDiskStrategy(self, self.disk_specs[0]).SetUpDisk()
       return
-    if any(spec.disk_type == disk.NFS for spec in self.disk_specs):
+    if any(
+        spec.disk_type in (disk.NFS, disk.NETAPP_VOLUMES)
+        for spec in self.disk_specs
+    ):
       disk_strategies.SetUpNFSDiskStrategy(self, self.disk_specs[0]).SetUpDisk()
       return
 

@@ -1323,7 +1323,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     """Formats a disk attached to the VM."""
     # Some images may automount one local disk, but we don't
     # want to fail if this wasn't the case.
-    if disk.NFS == disk_type:
+    if disk_type in (disk.NFS, disk.NETAPP_VOLUMES):
       return
     if disk.SMB == disk_type:
       return
@@ -1356,7 +1356,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
   ):
     """Mounts a formatted disk in the VM."""
     mount_options = '-o %s' % mount_options if mount_options else ''
-    if disk.NFS == disk_type:
+    if disk_type in (disk.NFS, disk.NETAPP_VOLUMES):
       mount_options = '-t nfs %s' % mount_options
       fs_type = 'nfs'
     elif disk.LUSTRE == disk_type:

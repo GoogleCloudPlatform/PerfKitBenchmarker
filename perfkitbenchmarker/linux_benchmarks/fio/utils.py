@@ -382,7 +382,7 @@ def RunTest(
 
 def AgainstNFS():
   """Check whether we're running against an NFS target."""
-  return FLAGS.data_disk_type == 'nfs'
+  return FLAGS.data_disk_type in (disk_lib.NFS, disk_lib.NETAPP_VOLUMES)
 
 
 def WriteFile(
