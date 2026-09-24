@@ -556,6 +556,8 @@ class GCPSetUpNFSDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
     )
 
 
-class GCPSetUpNetAppVolumesDiskStrategy(disk_strategies.SetUpNFSDiskStrategy):
+class GCPSetUpNetAppVolumesDiskStrategy(
+    disk_strategies.SetUpNetAppDiskStrategy
+):
   """Strategies to set up NetApp Volumes disks on GCP."""
   pass

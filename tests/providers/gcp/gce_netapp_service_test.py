@@ -4,6 +4,7 @@ from unittest import mock
 
 from absl import flags
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_netapp_service
 from perfkitbenchmarker.providers.gcp import gce_network
@@ -68,7 +69,7 @@ class GceNetAppServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.addCleanup(patcher.stop)
     return mock_method
 
-  def _NetAppService(self, disk_size=1024, **kwargs):
+  def _NetAppService(self, disk_size=1024, spec_kwargs=None, **kwargs):
     for key, value in kwargs.items():
       FLAGS[key].parse(value)
     spec = gce_netapp_service.GceNetAppDiskSpec(
@@ -76,6 +77,7 @@ class GceNetAppServiceTest(pkb_common_test_case.PkbCommonTestCase):
         FLAGS,
         disk_size=disk_size,
         disk_type=disk.NETAPP_VOLUMES,
+        **(spec_kwargs or {}),
     )
     return gce_netapp_service.GceNetAppService(spec, _ZONE)
 
@@ -86,21 +88,52 @@ class GceNetAppServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(address, '10.198.0.2')
 
   def testGetResourceMetadata(self):
-    service = self._NetAppService(disk_size=500, nfs_tier='PREMIUM')
+    service = self._NetAppService(
+        disk_size=500, gcp_netapp_service_level='PREMIUM'
+    )
     metadata = service.GetResourceMetadata()
     self.assertEqual(metadata['netapp_service_level'], 'PREMIUM')
     self.assertEqual(metadata['netapp_pool_capacity_gib'], 2048)
 
+  def testDefaultServiceLevel(self):
+    service = self._NetAppService()
+    self.assertEqual(service.disk_spec.netapp_service_level, 'PREMIUM')
+
+  def testInvalidServiceLevel(self):
+    with self.assertRaises(flags.IllegalFlagValueError):
+      FLAGS['gcp_netapp_service_level'].parse('NonExistentTier')
+
+  def testServiceLevelFromDiskSpec(self):
+    service = self._NetAppService(
+        spec_kwargs={'netapp_service_level': 'EXTREME'}
+    )
+    self.assertEqual(service.disk_spec.netapp_service_level, 'EXTREME')
+
+  def testFlagOverridesDiskSpec(self):
+    service = self._NetAppService(
+        spec_kwargs={'netapp_service_level': 'EXTREME'},
+        gcp_netapp_service_level='STANDARD',
+    )
+    self.assertEqual(service.disk_spec.netapp_service_level, 'STANDARD')
+
+  def testInvalidServiceLevelInDiskSpec(self):
+    with self.assertRaises(errors.Config.InvalidValue):
+      self._NetAppService(
+          spec_kwargs={'netapp_service_level': 'NonExistentTier'}
+      )
+
   def testCreate(self):
 
-    service = self._NetAppService(disk_size=500, nfs_tier='PREMIUM')
+    service = self._NetAppService(
+        disk_size=500, gcp_netapp_service_level='PREMIUM'
+    )
     self.issue_cmd.side_effect = [
         ('', '', 0),  # vpc-peerings connect
         ('', '', 0),  # storage pool create
         (json.dumps(_DescribePoolResult()), '', 0),  # pool describe ready
         ('', '', 0),  # volume create
-        (json.dumps(_DescribeVolumeResult()), '', 0),
-        (json.dumps(_DescribeVolumeResult()), '', 0),
+        (json.dumps(_DescribeVolumeResult()), '', 0),  # (_WaitUntilRunning)
+        (json.dumps(_DescribeVolumeResult()), '', 0),  # (_WaitUntilReady)
     ]
     service.Create()
 
@@ -110,7 +143,7 @@ class GceNetAppServiceTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertIn('--capacity', pool_create_args)
     self.assertIn('2048GiB', pool_create_args)
     self.assertIn('--service-level', pool_create_args)
-    self.assertIn('premium', pool_create_args)
+    self.assertIn('PREMIUM', pool_create_args)
     self.assertIn('--zone', pool_create_args)
     self.assertIn(_ZONE, pool_create_args)
 
@@ -122,7 +155,7 @@ class GceNetAppServiceTest(pkb_common_test_case.PkbCommonTestCase):
     service.created = True
     self.issue_cmd.side_effect = [
         ('', '', 0),  # volume delete
-        # volume describe (_Exists check after delete)
+        # volume describe (called by _Exists check after delete)
         ('', 'Volume not found', 1),
         ('', '', 0),  # pool delete
     ]

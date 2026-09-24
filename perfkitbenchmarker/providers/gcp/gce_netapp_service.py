@@ -1,44 +1,101 @@
 """Resource for GCP NetApp Volumes service."""
 
+import enum
 import json
 import logging
 
 from absl import flags
 from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
-from perfkitbenchmarker import nfs_service
+from perfkitbenchmarker import netapp_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 
 FLAGS = flags.FLAGS
 
-STANDARD = 'STANDARD'
-PREMIUM = 'PREMIUM'
-EXTREME = 'EXTREME'
-FLEX = 'FLEX'
+
+@enum.unique
+class GceNetAppServiceLevel(enum.Enum):
+  """Service levels supported by GCP NetApp Volumes (GCNV)."""
+
+  STANDARD = 'STANDARD'
+  PREMIUM = 'PREMIUM'
+  EXTREME = 'EXTREME'
+  FLEX = 'FLEX'
+
+
+_DEFAULT_SERVICE_LEVEL = GceNetAppServiceLevel.PREMIUM
+
+_SERVICE_LEVEL = flags.DEFINE_enum_class(
+    'gcp_netapp_service_level',
+    None,
+    GceNetAppServiceLevel,
+    'GCNV service level. Determines throughput per TiB of provisioned'
+    f' capacity. Defaults to {_DEFAULT_SERVICE_LEVEL.value}.',
+)
 
 
 class GceNetAppError(errors.Error):
   """Raised when a GCNV gcloud command fails."""
 
 
-class GceNetAppDiskSpec(disk.BaseNFSDiskSpec):
+class GceNetAppDiskSpec(disk.BaseNetAppDiskSpec):
+  """Object holding the information needed to create a GCNV volume."""
+
+  netapp_service_level: str
+
   CLOUD = provider_info.GCP
   DISK_TYPE = disk.NETAPP_VOLUMES
 
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    """Overrides config values with flag values.
 
-class GceNetAppService(nfs_service.BaseNfsService):
+    Args:
+      config_values: dict mapping config option names to provided values. Is
+        modified by this function.
+      flag_values: flags.FlagValues. Runtime flags that may override the
+        provided config values.
+    """
+    super()._ApplyFlags(config_values, flag_values)
+    if flag_values['gcp_netapp_service_level'].present:
+      config_values['netapp_service_level'] = (
+          flag_values.gcp_netapp_service_level.value
+      )
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    """Gets decoder classes and constructor args for each configurable option.
+
+    Returns:
+      dict. Maps option name string to a (ConfigOptionDecoder class, dict) pair.
+    """
+    result = super()._GetOptionDecoderConstructions()
+    valid_levels = [level.value for level in GceNetAppServiceLevel]
+    result.update({
+        'netapp_service_level': (
+            option_decoders.EnumDecoder,
+            {
+                'valid_values': valid_levels,
+                'default': _DEFAULT_SERVICE_LEVEL.value,
+            },
+        ),
+    })
+    return result
+
+
+class GceNetAppService(netapp_service.BaseNetAppService):
   """Resource for GCP NetApp Volumes service."""
 
+  disk_spec: GceNetAppDiskSpec
+
   CLOUD = provider_info.GCP
-  SERVICE_TYPE = disk.NETAPP_VOLUMES
-  NFS_TIERS = (STANDARD, PREMIUM, EXTREME, FLEX)
-  DEFAULT_TIER = PREMIUM
   user_managed = False
 
-  def __init__(self, disk_spec, zone):
+  def __init__(self, disk_spec: GceNetAppDiskSpec, zone):
     super().__init__(disk_spec, zone)
     self.pool_name = f'pkb-pool-{FLAGS.run_uri}'
     self.volume_name = f'pkb-vol-{FLAGS.run_uri}'
@@ -51,21 +108,15 @@ class GceNetAppService(nfs_service.BaseNfsService):
     return network.network_resource.name
 
   @property
-  def service_level(self) -> str:
-    """Returns lower-case service level / tier."""
-    return (self.nfs_tier or self.DEFAULT_TIER).lower()
-
-  @property
   def pool_capacity_gib(self) -> int:
-    """Calculates pool capacity (minimum 2048 GiB, or 1024 GiB for Flex).
-
-    Storage pool limits:
-    https://docs.cloud.google.com/netapp/volumes/docs/quotas#storage_pool_limits
-    """
-    min_capacity = 1024 if self.service_level == 'flex' else 2048
+    """Calculates pool capacity (minimum 2048 GiB, or 1024 GiB for Flex)."""
+    service_level = self.disk_spec.netapp_service_level
+    min_capacity = (
+        1024 if service_level == GceNetAppServiceLevel.FLEX.value else 2048
+    )
     return max(self.disk_spec.disk_size, min_capacity)
 
-  def GetRemoteAddress(self):
+  def _GetRemoteAddress(self):
     """Gets mount IP address for GCNV Volume."""
     details = self._DescribeVolume()
 
@@ -80,11 +131,14 @@ class GceNetAppService(nfs_service.BaseNfsService):
           return opt['exportPath'].split(':')[0]
         if 'exportFull' in opt and opt['exportFull']:
           return opt['exportFull'].split(':')[0]
-    raise errors.Error(f'Could not find mount IP for volume {self.volume_name}')
+    raise errors.Error(
+        f'Could not find mount IP for volume {self.volume_name}. Volume'
+        f' details: {details}'
+    )
 
   def GetResourceMetadata(self):
     result = super().GetResourceMetadata()
-    result['netapp_service_level'] = self.nfs_tier or self.DEFAULT_TIER
+    result['netapp_service_level'] = self.disk_spec.netapp_service_level
     result['netapp_pool_capacity_gib'] = self.pool_capacity_gib
     return result
 
@@ -114,14 +168,17 @@ class GceNetAppService(nfs_service.BaseNfsService):
         '--capacity',
         f'{self.pool_capacity_gib}GiB',
         '--service-level',
-        self.service_level,
+        self.disk_spec.netapp_service_level,
         '--network',
         f'name={self.network}',
         '--labels',
         tags,
         '--async',
     ]
-    self._NetAppCommand(*pool_cmd)
+    try:
+      self._NetAppCommand(*pool_cmd)
+    except GceNetAppError as ex:
+      raise errors.Resource.RetryableCreationError(ex)
     self._WaitUntilPoolReady()
 
   def _Create(self):
@@ -131,7 +188,7 @@ class GceNetAppService(nfs_service.BaseNfsService):
         self.volume_name,
         self.pool_name,
     )
-    nfs_version = self.disk_spec.nfs_version
+    nfs_version = self.disk_spec.nfs_version or self.DEFAULT_NFS_VERSION
     protocol = (
         'NFSV4' if nfs_version and str(nfs_version).startswith('4') else 'NFSV3'
     )
@@ -159,7 +216,10 @@ class GceNetAppService(nfs_service.BaseNfsService):
         tags,
         '--async',
     ]
-    self._NetAppCommand(*vol_cmd)
+    try:
+      self._NetAppCommand(*vol_cmd)
+    except GceNetAppError as ex:
+      raise errors.Resource.RetryableCreationError(ex)
 
   def _Delete(self):
     logging.info('Deleting GCNV Volume %s', self.volume_name)
@@ -200,16 +260,14 @@ class GceNetAppService(nfs_service.BaseNfsService):
     """Describes GCNV Volume state details."""
     try:
       return self._NetAppCommand('volumes', 'describe', self.volume_name)
-    except GceNetAppError as ex:
-      logging.debug('Volume describe failed: %s', ex)
+    except GceNetAppError:
       return {}
 
   def _DescribePool(self):
     """Describes GCNV Storage Pool state details."""
     try:
       return self._NetAppCommand('storage-pools', 'describe', self.pool_name)
-    except GceNetAppError as ex:
-      logging.debug('Storage pool describe failed: %s', ex)
+    except GceNetAppError:
       return {}
 
   def _NetAppCommand(self, *args):

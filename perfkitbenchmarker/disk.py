@@ -318,7 +318,7 @@ class BaseNFSDiskSpec(BaseDiskSpec):
     self.mount_point: str = None  # pyrefly: ignore[bad-assignment]
     self.nfs_version: str | None = None
     super().__init__(*args, **kwargs)
-    self.disk_type = self.DISK_TYPE
+    self.disk_type = NFS
 
   @classmethod
   def _ApplyFlags(cls, config_values, flag_values):
@@ -384,6 +384,19 @@ class BaseNFSDiskSpec(BaseDiskSpec):
         'nfs_nconnect': (option_decoders.IntDecoder, {'default': None}),
     })
     return result
+
+
+class BaseNetAppDiskSpec(BaseNFSDiskSpec):
+  """Stores the information needed to create a base NetApp Disk Spec."""
+
+  SPEC_TYPE = 'BaseDiskSpec'
+  CLOUD = None
+  DISK_TYPE = NETAPP_VOLUMES
+  SPEC_ATTRS = ['CLOUD', 'DISK_TYPE']
+
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.disk_type = self.DISK_TYPE
 
 
 class BaseSMBDiskSpec(BaseDiskSpec):
@@ -831,6 +844,10 @@ class NfsDisk(NetworkDisk):
   def Attach(self, vm):
     self.vm = vm
     self.vm.Install('nfs_utils')
+
+
+class NetAppDisk(NfsDisk):
+  """Provides options for mounting NetApp Volumes drives."""
 
 
 class SmbDisk(NetworkDisk):

@@ -46,6 +46,7 @@ from perfkitbenchmarker import lustre_service
 from perfkitbenchmarker import managed_memory_store
 from perfkitbenchmarker import managed_vm_group
 from perfkitbenchmarker import messaging_service
+from perfkitbenchmarker import netapp_service
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import non_relational_db
 from perfkitbenchmarker import os_types
@@ -205,6 +206,7 @@ class BenchmarkSpec:
     self.example_resource = None
     self.multi_attach_disk = None
     self.nfs_service = None
+    self.netapp_service = None
     self.lustre_service = None
     self.smb_service = None
     self.messaging_service = None
@@ -357,6 +359,7 @@ class BenchmarkSpec:
     self.ConstructBaseJob()
     self.ConstructVPNService()
     self.ConstructNfsService()
+    self.ConstructNetAppService()
     self.ConstructLustreService()
     self.ConstructSmbService()
     self.ConstructDataDiscoveryService()
@@ -698,7 +701,7 @@ class BenchmarkSpec:
       if not group_spec.disk_spec or not group_spec.vm_count:
         continue
       disk_spec = group_spec.disk_spec
-      if disk_spec.disk_type not in (disk.NFS, disk.NETAPP_VOLUMES):
+      if disk_spec.disk_type != disk.NFS:
         continue
       # Choose which nfs_service to create.
       if disk_spec.nfs_ip_address:
@@ -720,6 +723,30 @@ class BenchmarkSpec:
       break
     if self.nfs_service:
       self.resources.append(self.nfs_service)
+
+  def ConstructNetAppService(self):
+    """Construct the NetApp service object.
+
+    Creates a NetApp Service only if a NetApp disk is found in the disk_specs.
+    """
+    if self.netapp_service:
+      logging.info('NetApp service already created: %s', self.netapp_service)
+      return
+    for group_spec in self.vms_to_boot.values():
+      if not group_spec.disk_spec or not group_spec.vm_count:
+        continue
+      disk_spec = group_spec.disk_spec
+      if disk_spec.disk_type != disk.NETAPP_VOLUMES:
+        continue
+      cloud = group_spec.cloud
+      providers.LoadProvider(cloud)
+      netapp_class = netapp_service.GetNetAppServiceClass(cloud)
+      self.netapp_service = netapp_class(
+          disk_spec, group_spec.vm_spec.zone
+      )
+      self.resources.append(self.netapp_service)
+      logging.debug('NetApp service %s', self.netapp_service)
+      break
 
   def ConstructLustreService(self):
     """Construct the Lustre service object.
@@ -1070,6 +1097,8 @@ class BenchmarkSpec:
     # do after network setup but before VM created
     if self.nfs_service and self.nfs_service.CLOUD != nfs_service.UNMANAGED:
       self.nfs_service.Create()
+    if self.netapp_service:
+      self.netapp_service.Create()
     if self.lustre_service:
       self.lustre_service.Create()
     if self.smb_service:
@@ -1222,6 +1251,8 @@ class BenchmarkSpec:
       self.base_job.Delete()
     if self.nfs_service:
       self.nfs_service.Delete()
+    if self.netapp_service:
+      self.netapp_service.Delete()
     if self.lustre_service:
       self.lustre_service.Delete()
     if self.smb_service:

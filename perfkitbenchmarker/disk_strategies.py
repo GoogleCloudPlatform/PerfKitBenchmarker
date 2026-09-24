@@ -32,7 +32,9 @@ from absl import flags
 from perfkitbenchmarker import background_tasks
 from perfkitbenchmarker import context as pkb_context
 from perfkitbenchmarker import disk
+from perfkitbenchmarker import errors
 from perfkitbenchmarker import lustre_service
+from perfkitbenchmarker import netapp_service
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import os_types
 from perfkitbenchmarker import vm_util
@@ -298,6 +300,40 @@ class SetUpNFSDiskStrategy(SetUpDiskStrategy):
     )
     nfs_disk.UpdateDevicePath(self.disk_spec.mount_point)
     self.vm.scratch_disks.append(nfs_disk)
+
+
+class SetUpNetAppDiskStrategy(SetUpDiskStrategy):
+  """Strategies to set up NetApp Volumes disks."""
+
+  def __init__(
+      self,
+      vm,
+      disk_spec: disk.BaseDiskSpec,
+      service: netapp_service.BaseNetAppService | None = None,
+  ):
+    super().__init__(vm, disk_spec)
+    netapp_svc = service or getattr(
+        pkb_context.GetThreadBenchmarkSpec(), 'netapp_service', None
+    )
+    if not netapp_svc:
+      raise errors.Resource.CreationError(
+          'NetApp service is not initialized on BenchmarkSpec.'
+      )
+    self.netapp_service: netapp_service.BaseNetAppService = netapp_svc
+
+  def SetUpDiskOnLinux(self):
+    """Performs Linux specific setup of NetApp volume disk."""
+    self.vm.Install('nfs_utils')
+    netapp_disk = self.netapp_service.CreateNetAppDisk()
+    self.vm.MountDisk(
+        netapp_disk.GetDevicePath(),
+        self.disk_spec.mount_point,
+        self.disk_spec.disk_type,
+        netapp_disk.mount_options,
+        netapp_disk.fstab_options,
+    )
+    netapp_disk.UpdateDevicePath(self.disk_spec.mount_point)
+    self.vm.scratch_disks.append(netapp_disk)
 
 
 class SetUpLustreDiskStrategy(SetUpDiskStrategy):
