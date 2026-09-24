@@ -89,7 +89,10 @@ class BaseAgent(abc.ABC):
   def __init__(self, spec: benchmark_spec.BenchmarkSpec):
     self.spec = spec
     self.client_vm = spec.vms[0]
-    self.agent_service = spec.ai_agent_service
+    assert spec.ai_agent_service is not None
+    self.agent_service: ai_agent_service.BaseAiAgentService = (
+        spec.ai_agent_service
+    )
     self.framework = _FRAMEWORK.value
     self.model = _MODEL.value
     self.model_location = _MODEL_LOCATION.value
@@ -97,7 +100,7 @@ class BaseAgent(abc.ABC):
         'framework': self.framework,
         'model': self.model,
         'agent': self.agent_name,
-        'agent_deployment': self.agent_service.DEPLOYMENT_TYPE,  # pyrefly: ignore[missing-attribute]
+        'agent_deployment': self.agent_service.DEPLOYMENT_TYPE,
     }
 
   def BeforeCreateAgent(self) -> None:
@@ -119,11 +122,11 @@ class BaseAgent(abc.ABC):
 
   def Prepare(self) -> None:
     """Configures the VM before running."""
-    self.agent_service.agent_config = self._GetDefaultAgentConfig()  # pyrefly: ignore[missing-attribute]
+    self.agent_service.agent_config = self._GetDefaultAgentConfig()
 
     self.BeforeCreateAgent()
     self.spec.always_call_cleanup = True  # pyrefly: ignore[missing-attribute]
-    self.agent_service.Create()  # pyrefly: ignore[missing-attribute]
+    self.agent_service.Create()
     self.UploadValidatorScript()
     self.PostPrepare()
 
@@ -171,10 +174,10 @@ class BaseAgent(abc.ABC):
         if prompt.agent_config is not None
         else self._GetDefaultAgentConfig()
     )
-    output_path = os.path.join(self.agent_service.base_dir, 'output', prompt.id)  # pyrefly: ignore[missing-attribute]
+    output_path = os.path.join(self.agent_service.base_dir, 'output', prompt.id)
 
     start_time = time.monotonic()
-    self.agent_service.Execute(  # pyrefly: ignore[missing-attribute]
+    self.agent_service.Execute(
         output_path,
         prompt=prompt.text,
         agent_config=agent_config,
@@ -184,7 +187,7 @@ class BaseAgent(abc.ABC):
     job_wall_time = time.monotonic() - start_time
 
     prompt_results = _FetchOutputFromObjectStorage(
-        self.agent_service, output_path  # pyrefly: ignore[bad-argument-type]
+        self.agent_service, output_path
     )
 
     samples = []
@@ -333,4 +336,4 @@ class BaseAgent(abc.ABC):
 
   def Cleanup(self):
     """Hook for cleanup. Deletes Agent Service resource by default."""
-    self.agent_service.Delete()  # pyrefly: ignore[missing-attribute]
+    self.agent_service.Delete()
