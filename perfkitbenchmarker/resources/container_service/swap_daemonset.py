@@ -37,7 +37,6 @@ import logging
 import posixpath
 import textwrap
 from typing import Any, Optional
-
 from absl import flags
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import resource
@@ -45,11 +44,7 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
 
-_DAEMONSET_IMAGE = flags.DEFINE_string(
-    'swap_encryption_daemonset_image',
-    'ubuntu:22.04',
-    'Container image for the privileged benchmark DaemonSet.',
-)
+FLAGS = flags.FLAGS
 
 
 def _ParseCipher(dmsetup_status: str) -> str:
@@ -113,7 +108,7 @@ class SwapDaemonSet(resource.BaseResource):
     self.namespace = namespace
     self.label = label
     self.nodepool = nodepool
-    self.image = _DAEMONSET_IMAGE.value
+    self.image = FLAGS.swap_encryption_daemonset_image
     # Active pod tracking — updated by WaitForPod / RecoverPod.
     self.pod_name: Optional[str] = None
     # Per-run accumulators read by Run() for the degradation gate.
@@ -330,24 +325,49 @@ class SwapDaemonSet(resource.BaseResource):
     Raises on error rather than silently swallowing failures.
 
     Returns:
-      Dict with keys: swap_device, kernel_version, swap_cipher.
+      Dict with keys: swap_device, kernel_version, swap_cipher, memory_gb,
+      swap_gb.
 
     Raises:
       errors.Benchmarks.RunError: if the pod is not reachable or commands fail.
     """
+    if getattr(self, '_cached_metadata', None):
+      return self._cached_metadata
+
     swap_dev = self._DetectSwapDevice()
-    kver, _ = self.PodExec('uname -r')
+    kver, _ = self.PodExec('uname -r', ignore_failure=True)
     cipher = ''
     if swap_dev:
       dm_out, _ = self.PodExec(
-          f'dmsetup status {swap_dev} 2>/dev/null || echo not_encrypted'
+          f'dmsetup status {swap_dev} 2>/dev/null || echo not_encrypted',
+          ignore_failure=True,
       )
       cipher = _ParseCipher(dm_out)
-    return {
-        'swap_device': swap_dev or 'unknown',
+
+    mem_out, _ = self.PodExec(
+        "awk '/MemTotal/{print $2}' /proc/meminfo", ignore_failure=True
+    )
+    swap_out, _ = self.PodExec(
+        "awk 'NR>1{sum+=$3} END{print sum+0}' /proc/swaps", ignore_failure=True
+    )
+
+    try:
+      mem_gb = round(int(mem_out.strip()) / (1024 * 1024), 1)
+    except ValueError:
+      mem_gb = 0
+    try:
+      swap_gb = round(int(swap_out.strip()) / (1024 * 1024), 1)
+    except ValueError:
+      swap_gb = 0
+
+    self._cached_metadata = {
+        'swap_device': swap_dev,
         'kernel_version': kver.strip(),
         'swap_cipher': cipher,
+        'memory_gb': mem_gb,
+        'swap_gb': swap_gb,
     }
+    return self._cached_metadata
 
   def _DetectSwapDevice(self) -> str:
     """Return the first active swap device name (e.g. 'dm-0') or empty string.

@@ -29,10 +29,10 @@ Architecture:
 
   Cleanup() is empty — PKB auto-deletes spec.resources (SwapDaemonSet).
 
-Subsequent PRs add phases:
+Additional workloads include:
   PR3: fio microbenchmarks on raw swap device (Tier 1)
   PR4: stress-ng CPU overhead + I/O interference (Tier 2)
-  PR5: kernel build under cgroup memory constraint (Phase 3b)
+  Kernel build under cgroup memory constraint
 """
 
 import logging
@@ -53,7 +53,7 @@ BENCHMARK_CONFIG = """
 swap_encryption:
   description: >
     Verify dm-crypt encrypted swap on GKE/EKS. Subsequent PRs add fio,
-    stress-ng, and kernel build phases.
+    stress-ng, and kernel build workloads.
   container_cluster:
     cloud: GCP
     type: Kubernetes
