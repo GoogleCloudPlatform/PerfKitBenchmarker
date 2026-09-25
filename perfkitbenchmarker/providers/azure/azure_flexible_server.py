@@ -122,67 +122,26 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
 
   def _Create(self) -> None:
     """Creates the Azure database instance."""
-    ha_flag = ENABLE_HA if self.spec.high_availability else DISABLE_HA
-    # Consider adding --zone and maybe --standby-zone for parity with GCP.
-    cmd = [
-        azure.AZURE_PATH,
-        self.GetAzCommandForEngine(),
-        self.SERVER_TYPE,
-        'create',
-        '--resource-group',
-        self.resource_group.name,
-        '--name',
-        self.instance_id,
-        '--location',
-        self.region,
-        '--high-availability',
-        ha_flag,
-        '--admin-user',
-        self.spec.database_username,
-        '--admin-password',
-        self.spec.database_password,
-        '--storage-size',
-        str(self.spec.db_disk_spec.disk_size),
-        '--sku-name',
-        self.spec.db_spec.machine_type,
-        '--tier',
-        self.spec.db_tier,
-        '--version',
-        self.spec.engine_version,
-        '--yes',
-    ]
     if (
         self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_POSTGRES
         and self.storage_type == azure_disk.PREMIUM_STORAGE_V2
     ):
-      # Postgres PremiumV2_LRS requires creation through REST API.
-      self._CreatePremiumSsdV2()
-      return
-    if self.storage_type:
-      cmd.extend([
-          '--storage-type',
-          self.storage_type,
-      ])
-    if (
-        self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_MYSQL
-        and self.spec.db_disk_spec.provisioned_iops is not None
-    ):
-      cmd.extend([
-          '--auto-scale-iops',
-          'Disabled',
-      ])
-    if self.spec.db_disk_spec.provisioned_iops:
-      cmd.extend([
-          '--iops',
-          str(self.spec.db_disk_spec.provisioned_iops),
-      ])
-    if self.spec.db_disk_spec.provisioned_throughput:
-      cmd.extend([
-          '--throughput',
-          str(self.spec.db_disk_spec.provisioned_throughput),
-      ])
+      try:
+        self._CreatePremiumSsdV2()
+        return
+      except errors.Resource.CreationError as e:
+        if self._IsFallbackableError(e):
+          logging.warning(
+              'Failed to create Postgres PremiumV2_LRS instance: %s. '
+              'Falling back to Premium_LRS.',
+              e,
+          )
+          self._FallbackToPremiumLrs()
+          # Fall through to _CreateStandard()
+        else:
+          raise
 
-    vm_util.IssueCommand(cmd, timeout=CREATE_AZURE_DB_TIMEOUT)
+    self._CreateStandard()
 
   @vm_util.Retry(
       timeout=CREATE_AZURE_DB_TIMEOUT,
@@ -257,17 +216,113 @@ class AzureFlexibleServer(azure_relational_db.AzureRelationalDb):
         json.dumps(body),
         '--verbose',
     ]
-    _, stderr, _ = vm_util.IssueCommand(
+    stdout, stderr, retcode = vm_util.IssueCommand(
         cmd, timeout=CREATE_AZURE_DB_TIMEOUT, raise_on_failure=False
     )
+    if retcode != 0:
+      raise errors.Resource.CreationError(
+          f'Azure REST API call failed (retcode={retcode}). '
+          f'Stdout: {stdout}, Stderr: {stderr}'
+      )
     match = re.search(r"'Azure-AsyncOperation': '([^']*)'", stderr)
     if not match:
       raise errors.Resource.CreationError(
           'Could not find Azure-AsyncOperation header in az rest verbose'
-          ' output.'
+          f' output. Stdout: {stdout}, Stderr: {stderr}'
       )
     async_operation_url = match.group(1)
     self._WaitForAzureAsyncOperation(async_operation_url)
+
+  def _IsFallbackableError(self, error: Exception) -> bool:
+    """Returns True if the error is fallbackable."""
+    error_str = str(error)
+    return (
+        'SkuNotAvailable' in error_str
+        or 'ServerDropping' in error_str
+        or 'AvailabilityZone' in error_str
+        or 'not enough resources' in error_str.lower()
+    )
+
+  def _FallbackToPremiumLrs(self) -> None:
+    """Falls back to Premium_LRS storage."""
+    logging.info('Initiating deletion of failed instance %s', self.instance_id)
+    try:
+      self._Delete()
+    except Exception as e:  # pylint: disable=broad-except
+      logging.warning(
+          'Failed to delete failed instance %s: %s', self.instance_id, e
+      )
+
+    old_instance_id = self.instance_id
+    self.instance_id = f'{self.instance_id}-fb'
+    self.storage_type = azure_disk.PREMIUM_STORAGE
+    logging.info(
+        'Falling back from %s (PremiumV2_LRS) to %s (Premium_LRS)',
+        old_instance_id,
+        self.instance_id,
+    )
+
+  def _CreateStandard(self) -> None:
+    """Creates standard Azure database instance (MySQL or Postgres Premium)."""
+    ha_flag = ENABLE_HA if self.spec.high_availability else DISABLE_HA
+    cmd = [
+        azure.AZURE_PATH,
+        self.GetAzCommandForEngine(),
+        self.SERVER_TYPE,
+        'create',
+        '--resource-group',
+        self.resource_group.name,
+        '--name',
+        self.instance_id,
+        '--location',
+        self.region,
+        '--high-availability',
+        ha_flag,
+        '--admin-user',
+        self.spec.database_username,
+        '--admin-password',
+        self.spec.database_password,
+        '--storage-size',
+        str(self.spec.db_disk_spec.disk_size),
+        '--sku-name',
+        self.spec.db_spec.machine_type,
+        '--tier',
+        self.spec.db_tier,
+        '--version',
+        self.spec.engine_version,
+        '--yes',
+    ]
+    if self.storage_type:
+      cmd.extend([
+          '--storage-type',
+          self.storage_type,
+      ])
+    if (
+        self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_MYSQL
+        and self.spec.db_disk_spec.provisioned_iops is not None
+    ):
+      cmd.extend([
+          '--auto-scale-iops',
+          'Disabled',
+      ])
+
+    is_postgres = self.spec.engine == sql_engine_utils.FLEXIBLE_SERVER_POSTGRES
+    is_premium_v2 = self.storage_type == azure_disk.PREMIUM_STORAGE_V2
+
+    if self.spec.db_disk_spec.provisioned_iops:
+      if not is_postgres or is_premium_v2:
+        cmd.extend([
+            '--iops',
+            str(self.spec.db_disk_spec.provisioned_iops),
+        ])
+    if self.spec.db_disk_spec.provisioned_throughput:
+      if not is_postgres or is_premium_v2:
+        cmd.extend([
+            '--throughput',
+            str(self.spec.db_disk_spec.provisioned_throughput),
+        ])
+
+    vm_util.IssueCommand(cmd, timeout=CREATE_AZURE_DB_TIMEOUT)
 
   def GetAzCommandForEngine(self) -> str:
     engine = self.spec.engine
