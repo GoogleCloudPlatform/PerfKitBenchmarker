@@ -345,6 +345,23 @@ class GcpAlloyDbTest(pkb_common_test_case.PkbCommonTestCase):
           mock.call('SELECT perfsnap.report(1, 2);', ignore_failure=True),
       ])
 
+  def testExistsTrue(self):
+    self.mock_cmd.Issue.return_value = ('{"state": "READY"}', '', 0)
+    self.assertTrue(self.db._Exists())
+
+  def testExistsFalse(self):
+    self.mock_cmd.Issue.side_effect = errors.VmUtil.IssueCommandError(
+        'NOT_FOUND: Resource not found'
+    )
+    self.assertFalse(self.db._Exists())
+
+  def testExistsOtherError(self):
+    self.mock_cmd.Issue.side_effect = errors.VmUtil.IssueCommandError(
+        'Some other error'
+    )
+    with self.assertRaises(errors.VmUtil.IssueCommandError):
+      self.db._Exists()
+
 
 if __name__ == '__main__':
   unittest.main()
