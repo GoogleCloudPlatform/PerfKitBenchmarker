@@ -1,13 +1,13 @@
 # Copyright 2017 PerfKitBenchmarker Authors. All rights reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Apache License, Version 2.0 (the 'License');
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #   http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
+# distributed under the License is distributed on an 'AS IS' BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
@@ -15,9 +15,7 @@
 
 import json
 import logging
-import os
 import posixpath
-import stat
 from typing import Any, Optional, Union
 
 from absl import flags
@@ -35,6 +33,7 @@ from perfkitbenchmarker.providers.gcp import gce_virtual_machine
 from perfkitbenchmarker.resources.container_service import container as container_service_lib
 from perfkitbenchmarker.resources.container_service import kubectl
 from perfkitbenchmarker.resources.container_service import kubernetes_commands
+from perfkitbenchmarker.resources.container_service import kubernetes_pod_mixin
 from perfkitbenchmarker.resources.kubernetes import flags as k8s_flags
 from perfkitbenchmarker.resources.kubernetes import kubernetes_disk
 from perfkitbenchmarker.resources.kubernetes import kubernetes_pod_spec
@@ -55,7 +54,9 @@ def _IsKubectlErrorEphemeral(retcode: int, stderr: str) -> bool:
   )
 
 
-class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
+class KubernetesVirtualMachine(
+    virtual_machine.BaseVirtualMachine, kubernetes_pod_mixin.KubernetesPodMixin
+):
   """Object representing a Kubernetes POD.
 
   Attributes:
@@ -86,6 +87,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     """
     super().__init__(vm_spec)
     self.name: str = self.name.replace('_', '-')
+
     self.user_name: str = FLAGS.username
     self.image: str | None = self.image or self.DEFAULT_IMAGE
     self.host_network: bool = vm_spec.host_network
@@ -121,6 +123,13 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
     if self.sriov_network:
       metadata.update({'annotations': {'sriov_network': self.sriov_network}})
     return metadata
+
+  def _GetPodNameAndNamespace(self) -> tuple[str, str]:
+    return self.name, ''
+
+  def _RunPodCommand(self, cmd: str) -> tuple[str, str, int]:
+    stdout, stderr = self.RemoteCommand(cmd)
+    return stdout, stderr, 0
 
   def _CreateDependencies(self):
     self._CheckPrerequisites()
@@ -448,8 +457,8 @@ class DebianBasedKubernetesVirtualMachine(
       login_shell: If true, runs commands in a login shell.
       timeout: The timeout for the command.
       ip_address: Should always be None; incompatible with Kubernetes.
-      should_pre_log: Whether to output a "Running command" log statement.
-      stack_level: The number of stack frames to skip for an "interesting"
+      should_pre_log: Whether to output a 'Running command' log statement.
+      stack_level: The number of stack frames to skip for an 'interesting'
         callsite to be logged.
 
     Returns:
@@ -523,80 +532,6 @@ class DebianBasedKubernetesVirtualMachine(
     self.RemoteHostCopy(file_name, source_path, copy_to=False)
     target.RemoteHostCopy(file_name, remote_path)  # pytype: disable=attribute-error
 
-  def RemoteHostCopy(
-      self,
-      file_path: str,
-      remote_path: str = '',
-      copy_to: bool = True,
-      retries: int | None = None,
-  ):
-    """Copies a file to or from the VM.
-
-    Args:
-      file_path: Local path to file.
-      remote_path: Optional path of where to copy file on remote host.
-      copy_to: True to copy to vm, False to copy from vm.
-      retries: Number of attempts for the copy
-
-    Raises:
-      RemoteCommandError: If there was a problem copying the file.
-    """
-    if copy_to:
-      file_name = posixpath.basename(file_path)
-      src_spec, dest_spec = file_path, '%s:%s' % (self.name, file_name)
-    else:
-      remote_path, _ = self.RemoteCommand('readlink -f %s' % remote_path)
-      remote_path = remote_path.strip()
-      file_name = posixpath.basename(remote_path)
-      try:
-        # kubectl cannot copy into a directory. Only to a new file
-        # https://github.com/kubernetes/kubernetes/pull/81782
-        if stat.S_ISDIR(os.stat(file_path).st_mode):
-          file_path = os.path.join(file_path, file_name)
-      except FileNotFoundError:
-        # file_path is already a non-existent file
-        pass
-      src_spec, dest_spec = '%s:%s' % (self.name, remote_path), file_path
-    if retries is None:
-      retries = FLAGS.ssh_retries
-    for _ in range(retries):
-      cmd = [
-          FLAGS.kubectl,
-          '--kubeconfig=%s' % FLAGS.kubeconfig,
-          'cp',
-          src_spec,
-          dest_spec,
-      ]
-      stdout, stderr, retcode = vm_util.IssueCommand(
-          cmd, raise_on_failure=False
-      )
-      if not _IsKubectlErrorEphemeral(retcode, stderr):
-        break
-      logging.info('Retrying ephemeral connection issue\n:%s', stderr)
-    if retcode:
-      error_text = (
-          'Got non-zero return code (%s) executing %s\nSTDOUT: %sSTDERR: %s'
-          % (retcode, ' '.join(cmd), stdout, stderr)
-      )
-      raise errors.VirtualMachine.RemoteCommandError(error_text)
-    if copy_to:
-      remote_path = remote_path or file_name
-      self.RemoteCommand(
-          'mv %s %s; chmod 755 %s' % (file_name, remote_path, remote_path)
-      )
-    # TODO(pclay): Validate directories
-    if not stat.S_ISDIR(os.stat(file_path).st_mode):
-      # Validate file sizes
-      # Sometimes kubectl cp seems to gracefully truncate the file.
-      local_size = os.path.getsize(file_path)
-      stdout, _ = self.RemoteCommand(f'stat -c %s {remote_path}')
-      remote_size = int(stdout)
-      if local_size != remote_size:
-        raise errors.VirtualMachine.RemoteCommandError(
-            f'Failed to copy {file_name}. '
-            f'Remote size {remote_size} != local size {local_size}'
-        )
-
   def PrepareVMEnvironment(self):
     # Install sudo as most PrepareVMEnvironment assume it exists.
     self._InstallPrepareVmEnvironmentDependencies()
@@ -611,7 +546,7 @@ class DebianBasedKubernetesVirtualMachine(
       self.RemoteCommand('mkdir -p ~/.ssh')
       with open(self.ssh_public_key) as f:
         key = f.read()
-        self.RemoteCommand('echo "%s" >> ~/.ssh/authorized_keys' % key)
+        self.RemoteCommand("echo '%s' >> ~/.ssh/authorized_keys" % key)
 
     # Ubuntu docker images are based on Minimal Ubuntu
     # https://wiki.ubuntu.com/Minimal
