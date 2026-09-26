@@ -300,7 +300,10 @@ def CollectDbPerformanceCounters(
     stop_event: threading.Event,
 ):
   """Background task to collect DB performance counters."""
-  while not stop_event.is_set():
+  # Wait for timeout (default 1 minute) or until stop_event is set before each
+  # query, including the first one. Querying immediately races with the main
+  # thread launching the HammerDB run: both fork a child process to issue a
+  # WinRM command, and forking while another thread holds a lock can deadlock
+  # the forked child.
+  while not stop_event.wait(_COUNTER_QUERY_TIMEOUT):
     db.QueryPerformanceCounters()
-    # Wait for timeout (default 1 minute) or until stop_event is set.
-    stop_event.wait(_COUNTER_QUERY_TIMEOUT)

@@ -147,6 +147,24 @@ class HammerdbcliBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
     self.assertEqual(max_tpm_sample.metadata['hammerdbcli_vu'], 16)
     self.assertNotIn('max_tpm', max_tpm_sample.metadata)
 
+  def testCollectDbPerformanceCountersWaitsBeforeFirstQuery(self):
+    self.enter_context(mock.patch.object(hammerdb, '_COUNTER_QUERY_TIMEOUT', 5))
+    manager = mock.Mock()
+    # The first wait times out, triggering one query. The second wait returns
+    # True because stop_event is set, ending the loop.
+    manager.stop_event.wait.side_effect = [False, True]
+
+    hammerdb.CollectDbPerformanceCounters(manager.db, manager.stop_event)
+
+    self.assertEqual(
+        manager.mock_calls,
+        [
+            mock.call.stop_event.wait(5),
+            mock.call.db.QueryPerformanceCounters(),
+            mock.call.stop_event.wait(5),
+        ],
+    )
+
 
 if __name__ == '__main__':
   unittest.main()
