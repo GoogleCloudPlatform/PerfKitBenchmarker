@@ -1761,6 +1761,8 @@ def RunBenchmarks():
     logging.info(
         'To run again with this setup, please use --run_uri=%s', FLAGS.run_uri
     )
+    for spec in benchmark_specs:
+      spec.PrintExistingResources()
 
   if FLAGS.archive_bucket:
     archive.ArchiveRun(

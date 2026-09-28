@@ -1344,6 +1344,13 @@ class BenchmarkSpec:
       samples.extend(resource.GetSamples())
     return samples
 
+  def PrintExistingResources(self) -> None:
+    """Prints all still active resources in the benchmark."""
+    if not self.resources:
+      return
+    resources_str = '\n'.join(repr(resource) for resource in self.resources)
+    logging.info('The following resources are still active:\n%s', resources_str)
+
   def StartBackgroundWorkload(self):
     targets = [(vm.StartBackgroundWorkload, (), {}) for vm in self.vms]
     background_tasks.RunParallelThreads(targets, len(targets))
@@ -1529,3 +1536,18 @@ class BenchmarkSpec:
       self.memory_store.CheckPrerequisites()
     if hasattr(self, 'ai_agent_service') and self.ai_agent_service:
       self.ai_agent_service.CheckPrerequisites()
+
+
+def PrintExistingResources(
+    benchmark_specs: list[BenchmarkSpec] | BenchmarkSpec,
+) -> None:
+  """Prints all still active resources for the benchmark spec(s)."""
+  if isinstance(benchmark_specs, BenchmarkSpec):
+    benchmark_specs = [benchmark_specs]
+  all_resources = []
+  for spec in benchmark_specs:
+    all_resources.extend(spec.resources)
+  if not all_resources:
+    return
+  resources_str = '\n'.join(str(resource) for resource in all_resources)
+  logging.info('The following resources are still active:\n%s', resources_str)

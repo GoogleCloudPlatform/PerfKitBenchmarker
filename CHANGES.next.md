@@ -490,6 +490,8 @@
 -   Add flag to support using alpha for all gcloud commands.
 -   Add `--edw_bq_api_timeout` flag to support BigQuery API timeout in Python
     client.
+-   Log still running resources at end of benchmark if teardown phase is
+    skipped.
 
 ### Bug fixes and maintenance updates:
 
