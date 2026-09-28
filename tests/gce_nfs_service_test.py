@@ -5,7 +5,6 @@ import unittest
 from unittest import mock
 
 from absl import flags
-from perfkitbenchmarker import disk
 from perfkitbenchmarker import errors
 from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_network
@@ -99,7 +98,7 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
   def _NfsService(self, disk_size=1024, **kwargs):
     for key, value in kwargs.items():
       FLAGS[key].parse(value)
-    spec = disk.BaseNFSDiskSpec(
+    spec = gce_nfs_service.GceNFSDiskSpec(
         'test_component', FLAGS, disk_size=disk_size
     )
     return gce_nfs_service.GceNfsService(spec, _ZONE)
@@ -157,6 +156,68 @@ class GceNfsServiceTest(pkb_common_test_case.PkbCommonTestCase):
     nfs._Create()
     expected_create_cmd = _CreateCmd() + ['--protocol', 'NFS_V3']
     self.assertCommandCalled(*expected_create_cmd)
+
+  def testCreateWithCustomPerformance(self):
+    nfs = self._NfsService(
+        nfs_tier='ZONAL', filestore_provisioned_iops_per_tb=17000
+    )
+    self._SetResponses(_CREATE_RES)
+    nfs._Create()
+    expected_create_cmd = _CreateCmd(tier='ZONAL') + [
+        '--performance',
+        'max-iops-per-tb=17000',
+    ]
+    self.assertCommandCalled(*expected_create_cmd)
+
+  def testCreateWithCustomPerformanceFromSpec(self):
+    FLAGS['nfs_tier'].parse('ZONAL')
+    spec = gce_nfs_service.GceNFSDiskSpec(
+        'test_component', FLAGS, disk_size=1024, provisioned_iops_per_tb=17000
+    )
+    nfs = gce_nfs_service.GceNfsService(spec, _ZONE)
+    self._SetResponses(_CREATE_RES)
+    nfs._Create()
+    expected_create_cmd = _CreateCmd(tier='ZONAL') + [
+        '--performance',
+        'max-iops-per-tb=17000',
+    ]
+    self.assertCommandCalled(*expected_create_cmd)
+
+  def testCreateWithoutCustomPerformance(self):
+    nfs = self._NfsService(nfs_tier='ZONAL')
+    self._SetResponses(_CREATE_RES)
+    nfs._Create()
+    self.assertCommandCalled(*_CreateCmd(tier='ZONAL'))
+
+  def testCustomPerformanceOnUnsupportedTierRaises(self):
+    with self.assertRaises(errors.Config.InvalidValue):
+      self._NfsService(
+          nfs_tier='PREMIUM', filestore_provisioned_iops_per_tb=17000
+      )
+
+  def testCustomPerformanceNotInServiceMetadata(self):
+    nfs = self._NfsService(
+        nfs_tier='ZONAL', filestore_provisioned_iops_per_tb=17000
+    )
+    self.assertNotIn(
+        'filestore_provisioned_iops_per_tb', nfs.GetResourceMetadata()
+    )
+
+  def testNoCustomPerformanceNotInNfsDiskMetadata(self):
+    nfs = self._NfsService(nfs_tier='ZONAL')
+    self._SetResponses(_DescribeResult())
+    self.assertNotIn(
+        'filestore_provisioned_iops_per_tb',
+        nfs.CreateNfsDisk().GetResourceMetadata(),
+    )
+
+  def testCustomPerformanceInNfsDiskMetadata(self):
+    nfs = self._NfsService(
+        nfs_tier='ZONAL', filestore_provisioned_iops_per_tb=17000
+    )
+    self._SetResponses(_DescribeResult())
+    disk_metadata = nfs.CreateNfsDisk().GetResourceMetadata()
+    self.assertEqual(17000, disk_metadata['filestore_provisioned_iops_per_tb'])
 
   def testCreate2TBDisk(self):
     self._SetResponses(_CREATE_RES)

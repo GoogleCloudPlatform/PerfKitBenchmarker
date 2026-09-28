@@ -9,6 +9,7 @@ from perfkitbenchmarker import errors
 from perfkitbenchmarker import nfs_service
 from perfkitbenchmarker import provider_info
 from perfkitbenchmarker import vm_util
+from perfkitbenchmarker.configs import option_decoders
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 
@@ -21,9 +22,45 @@ REGIONAL = 'REGIONAL'
 HIGH_SCALE_SSD = 'high-scale-ssd'
 ENTERPRISE = 'enterprise'
 
+# Filestore custom performance is only supported on the zonal and regional
+# service tiers. See https://cloud.google.com/filestore/docs/custom-performance.
+CUSTOM_PERFORMANCE_TIERS = (ZONAL, REGIONAL)
+
+FILESTORE_PROVISIONED_IOPS_PER_TB = flags.DEFINE_integer(
+    'filestore_provisioned_iops_per_tb',
+    None,
+    'Max IOPS per TiB to provision via Filestore custom performance. ZONAL and '
+    'REGIONAL tiers only. If unset, the tier default performance is used.',
+)
+
 
 class GceNFSDiskSpec(disk.BaseNFSDiskSpec):
+  """Stores the information needed to create a GCE Filestore NFS disk."""
+
   CLOUD = provider_info.GCP
+
+  def __init__(self, *args, **kwargs):
+    self.provisioned_iops_per_tb: int | None = None
+    super().__init__(*args, **kwargs)
+
+  @classmethod
+  def _ApplyFlags(cls, config_values, flag_values):
+    super()._ApplyFlags(config_values, flag_values)
+    if flag_values['filestore_provisioned_iops_per_tb'].present:
+      config_values['provisioned_iops_per_tb'] = (
+          flag_values.filestore_provisioned_iops_per_tb
+      )
+
+  @classmethod
+  def _GetOptionDecoderConstructions(cls):
+    result = super()._GetOptionDecoderConstructions()
+    result.update({
+        'provisioned_iops_per_tb': (
+            option_decoders.IntDecoder,
+            {'default': None, 'none_ok': True},
+        ),
+    })
+    return result
 
 
 class GceNfsService(nfs_service.BaseNfsService):
@@ -39,6 +76,16 @@ class GceNfsService(nfs_service.BaseNfsService):
     super().__init__(disk_spec, zone)
     self.name = 'nfs-%s' % FLAGS.run_uri
     self.server_directory = '/vol0'
+    self.provisioned_iops_per_tb = disk_spec.provisioned_iops_per_tb
+    if (
+        self.provisioned_iops_per_tb
+        and self.nfs_tier not in CUSTOM_PERFORMANCE_TIERS
+    ):
+      raise errors.Config.InvalidValue(
+          'filestore_provisioned_iops_per_tb is only supported for the '
+          f'{CUSTOM_PERFORMANCE_TIERS} tiers, but nfs_tier is '
+          f'"{self.nfs_tier}".'
+      )
 
   @property
   def network(self):
@@ -51,6 +98,14 @@ class GceNfsService(nfs_service.BaseNfsService):
 
   def GetRemoteAddress(self):
     return self._Describe()['networks'][0]['ipAddresses'][0]
+
+  def CreateNfsDisk(self):
+    nfs_disk = super().CreateNfsDisk()
+    if self.provisioned_iops_per_tb:
+      nfs_disk.metadata['filestore_provisioned_iops_per_tb'] = (
+          self.provisioned_iops_per_tb
+      )
+    return nfs_disk
 
   def _Create(self):
     logging.info('Creating NFS server %s', self.name)
@@ -69,6 +124,11 @@ class GceNfsService(nfs_service.BaseNfsService):
     ]
     if self.nfs_tier:
       args += ['--tier', self.nfs_tier]
+    if self.provisioned_iops_per_tb:
+      args += [
+          '--performance',
+          'max-iops-per-tb=%s' % self.provisioned_iops_per_tb,
+      ]
     nfs_version = self.disk_spec.nfs_version
     if nfs_version:
       if nfs_version.startswith('4'):
