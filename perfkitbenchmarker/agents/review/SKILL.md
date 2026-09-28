@@ -62,9 +62,12 @@ rules. If there are no comments to add, grant approval.
     -   The `raise_on_failure=False` call is frequently followed by an if
         statement which checks for specific messages & handles them. If no
         specific messages is found, an error is thrown.
--   **Retry Mechanics:** Use `vm_util.Retry` for/while loops which continue
-    running a command until they succeed. Short `time.sleep()`s can be ok
-    approximation.
+-   **Retry Mechanics:** Require using the Python `@vm_util.Retry` decorator
+    when managing flaky commands and waits, instead of `for`/`while` loops (in
+    Python or shell) which continue running a command until they succeed.
+    `time.sleep()` is not okay in threads and not okay in timed `Run` phases,
+    but can be okay if the timing is not important, such as when waiting for the
+    system to calm down after provisioning/pre-loading.
 -   **Teardown Safety:** All resource teardowns must be idempotent.
 
 ## 4. Coding Standards
