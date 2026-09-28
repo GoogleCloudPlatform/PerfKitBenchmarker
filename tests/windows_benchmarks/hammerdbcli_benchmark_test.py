@@ -165,6 +165,32 @@ class HammerdbcliBenchmarkTest(pkb_common_test_case.PkbCommonTestCase):
         ],
     )
 
+  def testGetConfigHighAvailabilityManagedDbDisablesControllerVm(self):
+    FLAGS.db_high_availability = True
+    FLAGS.use_managed_db = True
+
+    config = hammerdbcli_benchmark.GetConfig({})
+    vm_groups = config['relational_db']['vm_groups']
+
+    self.assertEqual(vm_groups['controller']['vm_count'], 0)
+    self.assertEqual(vm_groups['servers_replicas']['vm_count'], 0)
+
+    benchmark_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
+        _WINDOWS_HAMMERDB_CONFIG, 'hammerdbcli'
+    )
+    self.assertNotIn('controller', benchmark_spec.vms_to_boot)
+
+  def testGetConfigHighAvailabilityUnmanagedDbEnablesControllerVm(self):
+    FLAGS.db_high_availability = True
+    FLAGS.use_managed_db = False
+
+    config = hammerdbcli_benchmark.GetConfig({})
+    vm_groups = config['relational_db']['vm_groups']
+
+    self.assertEqual(vm_groups['controller']['vm_count'], 1)
+    self.assertEqual(vm_groups['servers_replicas']['vm_count'], 1)
+    self.assertEqual(vm_groups['servers']['vm_count'], 1)
+
 
 if __name__ == '__main__':
   unittest.main()

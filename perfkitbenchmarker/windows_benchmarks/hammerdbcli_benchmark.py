@@ -121,7 +121,7 @@ def GetConfig(user_config):
   config = configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
   config['relational_db']['vm_groups']['controller']['vm_count'] = 0
   config['relational_db']['vm_groups']['servers_replicas']['vm_count'] = 0
-  if FLAGS.db_high_availability:
+  if FLAGS.db_high_availability and not FLAGS.use_managed_db:
     # We need two additional vms for sql ha deployment.
     # First vm to act as the second node in sql cluster
     # and additional vm to act as a domain controller.
