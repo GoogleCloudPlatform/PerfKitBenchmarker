@@ -14,6 +14,7 @@
 """Tests for perfkitbenchmarker.benchmark_spec."""
 
 import inspect
+import logging
 import unittest
 
 from absl import flags
@@ -134,6 +135,60 @@ class GenericTestCase(_BenchmarkSpecTestCase):
     test_resource.GetSamples.return_value = [fake_sample]
     spec.resources = [test_resource]
     self.assertEqual(spec.GetSamples(), [fake_sample])
+
+
+class _FakeResource(pkb_common_test_case.TestResource):
+
+  def __init__(self, name: str, connection_msg: str = ''):
+    super().__init__()
+    self._name = name
+    self._connection_msg = connection_msg
+
+  def __repr__(self) -> str:
+    return f'<{self._name}>'
+
+  def GetConnectionMessage(self) -> str:
+    return self._connection_msg
+
+
+class _FakeVm(pkb_common_test_case.TestVirtualMachine):
+
+  def __init__(self, name: str, connection_msg: str = ''):
+    super().__init__(pkb_common_test_case.CreateTestVmSpec())
+    self._name = name
+    self._connection_msg = connection_msg
+
+  def __repr__(self) -> str:
+    return f'<{self._name}>'
+
+  def GetConnectionMessage(self) -> str:
+    return self._connection_msg
+
+
+class PrintExistingResourcesTestCase(_BenchmarkSpecTestCase):
+
+  @mock.patch.object(logging, 'info')
+  def testPrintExistingResources_activeResourcesAndVms(
+      self, mock_logging_info
+  ):
+    spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml()
+    res_with_msg = _FakeResource('ResourceWithMsg', 'connect msg')
+    res_no_msg = _FakeResource('ResourceNoMsg', '')
+    vm_shared = _FakeVm('SharedVm', 'vm connect msg')
+    vm_only = _FakeVm('VmOnly', 'vm only connect msg')
+
+    spec.resources = [res_with_msg, res_no_msg, vm_shared]
+    spec.vms = [vm_shared, vm_only]  # pyrefly: ignore[read-only]
+    spec.PrintExistingResources()
+    expected_output = '\n'.join([
+        '<ResourceWithMsg>. Connect to it with: connect msg',
+        '<ResourceNoMsg>',
+        '<SharedVm>. Connect to it with: vm connect msg',
+        '<VmOnly>. Connect to it with: vm only connect msg',
+    ])
+    mock_logging_info.assert_called_once_with(
+        'The following resources are still active:\n%s', expected_output
+    )
 
 
 class ConstructEdwServiceTestCase(_BenchmarkSpecTestCase):

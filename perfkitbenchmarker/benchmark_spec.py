@@ -1344,11 +1344,24 @@ class BenchmarkSpec:
       samples.extend(resource.GetSamples())
     return samples
 
+  def _FormatResource(self, resource: resource_type.BaseResource) -> str:
+    resource_str = repr(resource)
+    connection_msg = resource.GetConnectionMessage()
+    if connection_msg:
+      return f'{resource_str}. Connect to it with: {connection_msg}'
+    return resource_str
+
   def PrintExistingResources(self) -> None:
     """Prints all still active resources in the benchmark."""
-    if not self.resources:
+    all_resources = list(self.resources)
+    for vm in self.vms:
+      if vm not in all_resources:
+        all_resources.append(vm)
+    if not all_resources:
       return
-    resources_str = '\n'.join(repr(resource) for resource in self.resources)
+    resources_str = '\n'.join(
+        self._FormatResource(resource) for resource in all_resources
+    )
     logging.info('The following resources are still active:\n%s', resources_str)
 
   def StartBackgroundWorkload(self):
@@ -1537,17 +1550,3 @@ class BenchmarkSpec:
     if hasattr(self, 'ai_agent_service') and self.ai_agent_service:
       self.ai_agent_service.CheckPrerequisites()
 
-
-def PrintExistingResources(
-    benchmark_specs: list[BenchmarkSpec] | BenchmarkSpec,
-) -> None:
-  """Prints all still active resources for the benchmark spec(s)."""
-  if isinstance(benchmark_specs, BenchmarkSpec):
-    benchmark_specs = [benchmark_specs]
-  all_resources = []
-  for spec in benchmark_specs:
-    all_resources.extend(spec.resources)
-  if not all_resources:
-    return
-  resources_str = '\n'.join(str(resource) for resource in all_resources)
-  logging.info('The following resources are still active:\n%s', resources_str)

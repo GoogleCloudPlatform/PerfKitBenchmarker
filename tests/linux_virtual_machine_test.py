@@ -1038,6 +1038,7 @@ class RemoteHostCommandWithReturnCodeTest(
           stack_level=mock.ANY,
           log_to_short_log=False,
       )
+    self.assertEqual(self.vm.GenerateSshCommandPrefix(), expected_prefix)
 
   def testExplicitIpAddress(self):
     FLAGS.ssh_reuse_connections = False

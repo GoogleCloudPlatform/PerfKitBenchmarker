@@ -208,9 +208,9 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
       metadata['tpu_topology'] = self.tpu_topology
       metadata['tpu_type'] = self.tpu_type
       metadata['tpu_count'] = self.tpu_count
-      assert self.gpu_type is None and self.gpu_count is None, (
-          'Cannot set both TPU and GPU resources.'
-      )
+      assert (
+          self.gpu_type is None and self.gpu_count is None
+      ), 'Cannot set both TPU and GPU resources.'
       metadata['gpu_type'] = self.tpu_type
       metadata['gpu_count'] = self.tpu_count
     return metadata
@@ -277,6 +277,20 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     env = os.environ.copy()
     env['KUBECONFIG'] = FLAGS.kubeconfig
     cmd.IssueRetryable(env=env)
+
+  @property
+  def _location_flag(self) -> str:
+    if len(self.zones) == 1 and getattr(self, 'CLUSTER_TYPE', None) != 'Auto':
+      return f'--zone={self.zones[0]}'
+    return f'--region={self.region}'
+
+  def GetConnectionMessage(self) -> str:
+    """Returns a message explaining how to connect to the cluster."""
+    return (
+        f'Option 1: kubectl get pods --kubeconfig={FLAGS.kubeconfig}\n'
+        f'Option 2: gcloud container clusters get-credentials {self.name} '
+        f'--project={self.project} {self._location_flag}'
+    )
 
   def _IsDeleting(self):
     cmd = self._GcloudCommand('container', 'clusters', 'describe', self.name)
@@ -380,12 +394,8 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
     super()._ModifyPodSpecPlacementYaml(pod_spec_yaml, name, machine_type)
     if self.tpu_count:
       for c in pod_spec_yaml['containers']:
-        c['resources']['limits']['google.com/tpu'] = (
-            str(self.tpu_count)
-        )
-        c['resources']['requests']['google.com/tpu'] = (
-            str(self.tpu_count)
-        )
+        c['resources']['limits']['google.com/tpu'] = str(self.tpu_count)
+        c['resources']['requests']['google.com/tpu'] = str(self.tpu_count)
 
 
 class GkeCluster(BaseGkeCluster):
@@ -1082,6 +1092,10 @@ class GkeAutopilotCluster(BaseGkeCluster):
     # Nodepools are not supported for Autopilot clusters, but default vm_spec
     # still used for pod spec input.
     self.nodepools = {}
+
+  @property
+  def _location_flag(self) -> str:
+    return f'--region={self.region}'
 
   def _GcloudCommand(self, *args, **kwargs) -> util.GcloudCommand:
     """Creates a gcloud command."""

@@ -540,6 +540,30 @@ class GceVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--labels timeout_utc=', labels_cmd)
       self.assertIn('pkb_skipped_teardown=true', labels_cmd)
 
+  def testGetConnectionMessage(self):
+    spec = gce_virtual_machine.GceVmSpec(
+        _COMPONENT,
+        machine_type='test_machine_type',
+        project='p',
+        zone='us-central1-a',
+    )
+    vm = pkb_common_test_case.TestGceLinuxVirtualMachine(spec)
+    vm.name = 'test-vm'
+    vm.user_name = 'test_user'
+    vm.ssh_port = 22
+    vm.ip_address = '1.2.3.4'
+    with mock.patch.object(
+        vm_util, 'GetPrivateKeyPath', return_value='/path/to/key'
+    ), mock.patch.object(
+        vm_util, 'GetSshOptions', return_value=['-i', '/path/to/key']
+    ):
+      self.assertEqual(
+          vm.GetConnectionMessage(),
+          'Option 1: ssh -A -p 22 test_user@1.2.3.4 -i /path/to/key\n'
+          'Option 2: gcloud compute ssh test-vm --project=p'
+          ' --zone=us-central1-a',
+      )
+
 
 def _CreateFakeDiskMetadata(image, fake_disk):
   fake_disk = copy.copy(fake_disk)

@@ -1563,6 +1563,19 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
     labels_cmd.flags['labels'] = tags
     labels_cmd.Issue()
 
+  def GetConnectionMessage(self) -> str:
+    """Returns a message explaining how to connect to the VM."""
+    internal_ip_flag = (
+        ' --internal-ip'
+        if self.can_connect_via_internal_ip or not self.ip_address
+        else ''
+    )
+    return (
+        f'Option 1: {super().GetConnectionMessage()}\n'
+        f'Option 2: gcloud compute ssh {self.name} '
+        f'--project={self.project} --zone={self.zone}{internal_ip_flag}'
+    )
+
 
 class BaseLinuxGceVirtualMachine(GceVirtualMachine, linux_vm.BaseLinuxMixin):
   """Class supporting Linux GCE virtual machines.

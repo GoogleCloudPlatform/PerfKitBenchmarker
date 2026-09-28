@@ -1570,6 +1570,37 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
     kwargs = vm_util.IncrementStackLevel(**kwargs)
     return self.RemoteHostCommandWithReturnCode(*args, **kwargs)
 
+  def GenerateSshCommandPrefix(
+      self,
+      ip_address: str | None = None
+  ) -> list[str]:
+    """Generates the SSH command prefix to connect to the VM."""
+    if ip_address is None:
+      ip_address = self.GetConnectionIp()
+    user_host = '%s@%s' % (self.user_name, ip_address)
+    ssh_cmd = ['ssh', '-A', '-p', str(self.ssh_port), user_host]
+    ssh_private_key = (
+        self.ssh_private_key if self.is_static else vm_util.GetPrivateKeyPath()
+    )
+    ssh_cmd.extend(vm_util.GetSshOptions(ssh_private_key))
+    # TODO(yuyanting): Revisit implementing with "-o ProxyJump".
+    # Current proxy implementation relies on ssh_config file being generated,
+    # which happens at the end of the Provision stage. This causes circular
+    # depencency for regular VM (and thus only used in cluster provisioned VMs).
+    if self.proxy_jump:
+      ssh_cmd = [
+          'ssh',
+          '-F',
+          os.path.join(vm_util.GetTempDir(), 'ssh_config'),
+          self.name,
+      ]
+
+    return ssh_cmd
+
+  def GetConnectionMessage(self) -> str:
+    """Returns a message explaining how to connect to the VM."""
+    return ' '.join(self.GenerateSshCommandPrefix())
+
   def RemoteHostCommandWithReturnCode(
       self,
       command: str,
@@ -1620,26 +1651,7 @@ class BaseLinuxMixin(os_mixin.BaseOsMixin):
       # newlines are escaped.
       command = command.replace('\n', '\\n')
 
-    if ip_address is None:
-      ip_address = self.GetConnectionIp()
-    user_host = '%s@%s' % (self.user_name, ip_address)
-    ssh_cmd = ['ssh', '-A', '-p', str(self.ssh_port), user_host]
-    ssh_private_key = (
-        self.ssh_private_key if self.is_static else vm_util.GetPrivateKeyPath()
-    )
-    ssh_cmd.extend(vm_util.GetSshOptions(ssh_private_key))
-    # TODO(yuyanting): Revisit implementing with "-o ProxyJump".
-    # Current proxy implementation relies on ssh_config file being generated,
-    # which happens at the end of the Provision stage. This causes circular
-    # depencency for regular VM (and thus only used in cluster provisioned VMs).
-    if self.proxy_jump:
-      ssh_cmd = [
-          'ssh',
-          '-F',
-          os.path.join(vm_util.GetTempDir(), 'ssh_config'),
-          self.name,
-      ]
-
+    ssh_cmd = self.GenerateSshCommandPrefix(ip_address)
     if should_pre_log:
       log_message = f'Running on {self.name} via ssh: {command}'
       log_util.LogToShortLogAndRoot(log_message, stacklevel=stack_level)

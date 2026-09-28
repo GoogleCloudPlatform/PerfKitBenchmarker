@@ -585,3 +585,8 @@ class BaseResource(metaclass=AutoRegisterResourceMeta):
       ValueError: If there is a validation issue.
     """
     pass
+
+  def GetConnectionMessage(self) -> str:
+    """Returns a message explaining how to connect to the resource, if any."""
+    return ''
+
