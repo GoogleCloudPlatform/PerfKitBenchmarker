@@ -13,7 +13,7 @@
 # limitations under the License.
 """Module containing numactl installation and cleanup functions."""
 
-from typing import Dict, Pattern, Union
+from typing import Dict, Pattern, Set, Union
 from perfkitbenchmarker import linux_virtual_machine
 from perfkitbenchmarker import regex_util
 
@@ -26,6 +26,36 @@ def _ParseNuma(vm, regex: Union[str, Pattern[str]]) -> Dict[int, str]:
   out, _ = vm.RemoteCommand('numactl --hardware')
   matches = regex_util.ExtractAllMatches(regex, out)
   return {int(m[0]): m[1] for m in matches}
+
+
+def GetNumaCpus(vm) -> Dict[int, Set[int]]:
+  """Get the set of available vCPUs on each available NUMA node of the VM.
+
+  Only vCPUs available to the current process (see vm.GetCpusAllowedSet()) and
+  NUMA nodes listed in Mems_allowed_list are included.
+
+  Args:
+    vm: VirtualMachine.
+
+  Returns:
+    A dictionary, key is the numa node, value is the set of available vCPUs on
+    the node.
+  """
+  allowed_cpu_set = vm.GetCpusAllowedSet()
+  all_numa_cpus = {}
+  for node, cpus_in_numa_str in _ParseNuma(vm, NUMA_CPUS_REGEX).items():
+    cpus_in_numa_csv = cpus_in_numa_str.strip().replace(' ', ',')
+    cpu_set_in_numa = linux_virtual_machine.ParseRangeList(cpus_in_numa_csv)
+    all_numa_cpus[node] = allowed_cpu_set & cpu_set_in_numa
+  stdout, _ = vm.RemoteCommand('cat /proc/self/status | grep Mems_allowed_list')
+  available_numa_nodes = linux_virtual_machine.ParseRangeList(
+      stdout.split(':\t')[-1]
+  )
+  return {
+      node: cpus
+      for node, cpus in all_numa_cpus.items()
+      if node in available_numa_nodes
+  }
 
 
 def GetNuma(vm) -> Dict[int, int]:
@@ -44,24 +74,7 @@ def GetNuma(vm) -> Dict[int, int]:
     A dictionary, key is the numa node, value is the number of available vCPUs
     on the node.
   """
-  all_numa_map = {}
-  allowed_cpu_set = vm.GetCpusAllowedSet()
-  for node, cpus_in_numa_str in _ParseNuma(vm, NUMA_CPUS_REGEX).items():
-    cpus_in_numa_csv = cpus_in_numa_str.strip().replace(' ', ',')
-    cpu_set_in_numa = linux_virtual_machine.ParseRangeList(cpus_in_numa_csv)
-    allowed_cpus_in_numa = allowed_cpu_set & cpu_set_in_numa
-    all_numa_map[node] = len(allowed_cpus_in_numa)
-  stdout, _ = vm.RemoteCommand('cat /proc/self/status | grep Mems_allowed_list')
-  available_numa_nodes = linux_virtual_machine.ParseRangeList(
-      stdout.split(':\t')[-1]
-  )
-
-  numa_map = {}
-  for node, num_cpus in all_numa_map.items():
-    if node in available_numa_nodes:
-      numa_map[node] = num_cpus
-
-  return numa_map
+  return {node: len(cpus) for node, cpus in GetNumaCpus(vm).items()}
 
 
 def GetNumaMemory(vm) -> Dict[int, int]:

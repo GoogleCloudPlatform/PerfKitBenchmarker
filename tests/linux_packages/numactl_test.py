@@ -95,6 +95,45 @@ class NumactlTest(parameterized.TestCase):
     self.assertEqual(expected_cpus, actual_cpus)
 
   @parameterized.named_parameters(
+      ('singlenode', SINGLE_NUMA_NODE, {0: set(range(8))}, '0', set(range(8))),
+      (
+          'twonode',
+          TWO_NUMA_NODES,
+          {
+              0: set(range(0, 15)) | set(range(30, 45)),
+              1: set(range(15, 30)) | set(range(45, 60)),
+          },
+          '0-1',
+          set(range(60)),
+      ),
+      (
+          'twonode_with_subset_cpus',
+          TWO_NUMA_NODES,
+          {0: {0, 1, 2, 3}, 1: {15, 16, 17, 18}},
+          '0-1',
+          {0, 1, 2, 3, 15, 16, 17, 18},
+      ),
+      (
+          'twonode_with_cpus_allowed_in_only_one_numa_node',
+          TWO_NUMA_NODES,
+          {1: {15, 16, 17, 18}},
+          '1',
+          {15, 16, 17, 18},
+      ),
+  )
+  def testGetNumaCpus(
+      self, numactl_text, expected_cpus, mems_allowed_list, cpu_allowed_set
+  ):
+    responses = {
+        'numactl --hardware': numactl_text,
+        'cat /proc/self/status | grep Mems_allowed_list': (
+            f'Mems_allowed_list:\t{mems_allowed_list}'
+        ),
+    }
+    actual_cpus = numactl.GetNumaCpus(MockVm(responses, cpu_allowed_set))
+    self.assertEqual(expected_cpus, actual_cpus)
+
+  @parameterized.named_parameters(
       ('singlenode', SINGLE_NUMA_NODE, {0: 32116}, '0', None, None),
       ('twonode', TWO_NUMA_NODES, {0: 120889, 1: 120931}, '0-1', None, None),
       (
