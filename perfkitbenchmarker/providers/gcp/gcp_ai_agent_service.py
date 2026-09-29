@@ -579,6 +579,7 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
     return config
 
   @override
+  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableGetError,))
   def Execute(
       self,
       output_dir: str,
@@ -614,7 +615,17 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
         f' GOOGLE_CLOUD_LOCATION={location} && cd workload/{agent_framework}'
         ' && python3 run_agent_engine.py --config_file run_config.yaml'
     )
-    stdout, _ = self.client_vm.RemoteCommand(command)
+    try:
+      stdout, _ = self.client_vm.RemoteCommand(command)
+    except (
+        errors.VirtualMachine.RemoteCommandError,
+        errors.VmUtil.IssueCommandError,
+    ) as e:
+      if '503' in str(e):
+        raise errors.Resource.RetryableGetError(
+            f'Transient 503 error from Vertex AI Agent Engine: {e}'
+        ) from e
+      raise
 
     logging.info(
         'Agent execution finished. Raw output:\n%s',
