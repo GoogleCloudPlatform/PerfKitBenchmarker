@@ -617,7 +617,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
 
   def testCreateUbuntu2004(self):
     vm_class = typing.cast(
-        type(gce_virtual_machine.GceVirtualMachine),
+        type(gce_virtual_machine.GceVirtualMachine),  # pyrefly: ignore[invalid-annotation]
         virtual_machine.GetVmClass(provider_info.GCP, os_types.UBUNTU2004),
     )
     fake_image = 'fake-ubuntu2004'

@@ -72,7 +72,7 @@ class GceWindowsVirtualMachineTestCase(pkb_common_test_case.PkbCommonTestCase):
   )
   def testWindowsConfig(self, os_type, gvnic, family, project):
     vm_class = typing.cast(
-        type(gce_windows_virtual_machine.WindowsGceVirtualMachine),
+        type(gce_windows_virtual_machine.WindowsGceVirtualMachine),  # pyrefly: ignore[invalid-annotation]
         virtual_machine.GetVmClass(provider_info.GCP, os_type),
     )
     vm = vm_class(self.spec)
