@@ -10,6 +10,10 @@ verbosity = 1
 scc = TRUE
 dataPacketType = timestamp
 
+# Running writes to 20m to make sure we hit physical disk in NFS.
+[debug]
+stonewall-time = 1200
+
 [ior-easy]
 API =
 blockSize = {{ block_size }}
