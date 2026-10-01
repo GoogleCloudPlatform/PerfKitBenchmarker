@@ -352,6 +352,7 @@ def RunTest(
     )
   else:
     assert len(disks) == 1
+    vm.RemoteCommand('sudo ulimit -n 65535')
     fio_command = (
         f'sudo {exec_path} --output-format=json'
         f' --random_generator={fio_flags.FIO_RNG.value}'
