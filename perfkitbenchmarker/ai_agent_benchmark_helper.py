@@ -52,6 +52,7 @@ class Prompt:
 class PromptResults:
   metrics: dict[str, float | None]
   artifacts: dict[str, str]
+  response: str | None = None
 
 
 class MissingArtifactError(Exception):
@@ -71,6 +72,7 @@ def _FetchOutputFromObjectStorage(
   return PromptResults(
       metrics=results_dict['metrics'],
       artifacts=results_dict['artifacts'],
+      response=results_dict.get('response'),
   )
 
 
