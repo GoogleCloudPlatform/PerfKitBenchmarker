@@ -552,23 +552,23 @@ class BaseRelationalDb(resource.BaseResource):
     Raises:
        RelationalDbPropertyNotSetError: if any expected metadata is missing.
     """
+    clients_vm_group = self.spec.vm_groups.get('clients')
+    client_vm_spec = getattr(clients_vm_group, 'vm_spec', None)
+    client_disk_spec = getattr(clients_vm_group, 'disk_spec', None)
+
     metadata = {
-        'zone': self.spec.db_spec.zone,
-        'disk_type': self.spec.db_disk_spec.disk_type,
-        'disk_size': self.spec.db_disk_spec.disk_size,
+        'zone': getattr(self.spec.db_spec, 'zone', None),
+        'disk_type': getattr(self.spec.db_disk_spec, 'disk_type', None),
+        'disk_size': getattr(self.spec.db_disk_spec, 'disk_size', None),
         'engine': self.spec.engine,
         'high_availability': self.spec.high_availability,
         'backup_enabled': self.spec.backup_enabled,
         'engine_version': self.spec.engine_version,
-        'client_vm_zone': self.spec.vm_groups['clients'].vm_spec.zone,
+        'client_vm_zone': getattr(client_vm_spec, 'zone', None),
         'use_managed_db': self.is_managed_db,
         'instance_id': self.instance_id,
-        'client_vm_disk_type': (
-            self.spec.vm_groups['clients'].disk_spec.disk_type
-        ),
-        'client_vm_disk_size': (
-            self.spec.vm_groups['clients'].disk_spec.disk_size
-        ),
+        'client_vm_disk_type': getattr(client_disk_spec, 'disk_type', None),
+        'client_vm_disk_size': getattr(client_disk_spec, 'disk_size', None),
     }
 
     if (
@@ -596,30 +596,25 @@ class BaseRelationalDb(resource.BaseResource):
       metadata.update({
           'compute_units': self.spec.db_spec.compute_units,
       })
-    else:
+    elif self.spec.db_spec is not None:
       raise RelationalDbPropertyNotSetError(
           'Machine type of the database must be set.'
       )
 
-    if (
-        hasattr(self.spec.vm_groups['clients'].vm_spec, 'machine_type')
-        and self.spec.vm_groups['clients'].vm_spec.machine_type
+    if hasattr(client_vm_spec, 'machine_type') and client_vm_spec.machine_type:
+      metadata.update({
+          'client_vm_machine_type': client_vm_spec.machine_type,
+      })
+    elif hasattr(client_vm_spec, 'cpus') and (
+        hasattr(client_vm_spec, 'memory')
     ):
       metadata.update({
-          'client_vm_machine_type': (
-              self.spec.vm_groups['clients'].vm_spec.machine_type
-          ),
-      })
-    elif hasattr(self.spec.vm_groups['clients'].vm_spec, 'cpus') and (
-        hasattr(self.spec.vm_groups['clients'].vm_spec, 'memory')
-    ):
-      metadata.update({
-          'client_vm_cpus': self.spec.vm_groups['clients'].vm_spec.cpus,
+          'client_vm_cpus': client_vm_spec.cpus,
       })
       metadata.update({
-          'client_vm_memory': self.spec.vm_groups['clients'].vm_spec.memory,
+          'client_vm_memory': client_vm_spec.memory,
       })
-    else:
+    elif client_vm_spec is not None:
       raise RelationalDbPropertyNotSetError(
           'Machine type of the client VM must be set.'
       )

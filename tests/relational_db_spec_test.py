@@ -330,6 +330,7 @@ class RelationalDbFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
       ('AwsRdsMysql', 'AWS', 'mysql', 'AwsRelationalDbSpec'),
       ('CloudSqlPostgres', 'GCP', 'postgres', 'RelationalDbSpec'),
       ('AzureFlexibleServer', 'Azure', 'flexible-server-postgres', 'RelationalDbSpec'),
+      ('AzureDatabricksLakebase', 'Azure', 'lakebase-postgres', 'AzureDatabricksLakebaseSpec'),
       ('AzureSqlManagedInstance', 'Azure', 'sqlserver', 'RelationalDbSpec'),
   ])
   # pyformat: enable

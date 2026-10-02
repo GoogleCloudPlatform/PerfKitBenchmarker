@@ -1,4 +1,4 @@
-"""Tests for relational_db."""
+"""Unit tests for the BaseRelationalDb class in relational_db."""
 
 import unittest
 from absl import flags

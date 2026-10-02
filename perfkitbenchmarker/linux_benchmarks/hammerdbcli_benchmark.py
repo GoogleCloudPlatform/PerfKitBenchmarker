@@ -212,7 +212,11 @@ def Prepare(benchmark_spec: bm_spec.BenchmarkSpec) -> None:
       port=db.port,  # pyrefly: ignore[missing-attribute]
       password=db.spec.database_password,  # pyrefly: ignore[missing-attribute]
       user=db.spec.database_username,  # pyrefly: ignore[missing-attribute]
-      is_managed_azure=(FLAGS.cloud == 'Azure' and FLAGS.use_managed_db),
+      is_managed_azure=(
+          FLAGS.cloud == 'Azure'
+          and FLAGS.use_managed_db
+          and db.engine != sql_engine_utils.LAKEBASE_POSTGRES
+      ),
       db_engine_version=db.spec.engine_version,  # pyrefly: ignore[missing-attribute]
       db_service=db_service,
   )
@@ -410,7 +414,11 @@ def _ReconfigureRunScriptForVirtualUsers(
       port=db.port,
       password=db.spec.database_password,
       user=db.spec.database_username,
-      is_managed_azure=(FLAGS.cloud == 'Azure' and FLAGS.use_managed_db),
+      is_managed_azure=(
+          FLAGS.cloud == 'Azure'
+          and FLAGS.use_managed_db
+          and db.engine != sql_engine_utils.LAKEBASE_POSTGRES
+      ),
       db_engine_version=db.spec.engine_version,
   )
 

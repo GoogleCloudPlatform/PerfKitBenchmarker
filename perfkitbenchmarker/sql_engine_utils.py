@@ -29,6 +29,7 @@ SECOND = 'seconds'
 
 FLEXIBLE_SERVER_MYSQL = 'flexible-server-mysql'
 FLEXIBLE_SERVER_POSTGRES = 'flexible-server-postgres'
+LAKEBASE_POSTGRES = 'lakebase-postgres'
 
 TIMESCALEDB = 'timescaledb'
 OMNI = 'omni'
@@ -63,6 +64,7 @@ ALL_ENGINES = [
     SPANNER_POSTGRES,
     FLEXIBLE_SERVER_MYSQL,
     FLEXIBLE_SERVER_POSTGRES,
+    LAKEBASE_POSTGRES,
     ALLOYDB,
 ]
 
@@ -606,6 +608,7 @@ def GetDbEngineType(db_engine: str) -> str:
       db_engine == AWS_AURORA_POSTGRES_ENGINE
       or db_engine == AURORA_DSQL_POSTGRES
       or db_engine == FLEXIBLE_SERVER_POSTGRES
+      or db_engine == LAKEBASE_POSTGRES
   ):
     return POSTGRES
   elif (
