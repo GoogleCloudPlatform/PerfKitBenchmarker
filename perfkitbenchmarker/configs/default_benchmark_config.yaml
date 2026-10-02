@@ -600,6 +600,15 @@ fio_object_storage_latency_20000mb:
     fio_nr_files: 10000
     fio_runtime: 0
 
+fio_object_storage_latency_10000_10MB:
+  name: fio_object_storage
+  flags:
+    fio_generate_scenarios: rand_4k_read_100000MB_iodepth-1_numjobs-1
+    fio_fill_size: 100000M
+    fio_fill_block_size: 2M
+    fio_nr_files: 10000
+    blobfuse_block_size_mb: 0.00390625  # 4KB
+
 fio_managed_lustre_latency_10000_10MB:
   name: fio_managed_lustre
   flags:

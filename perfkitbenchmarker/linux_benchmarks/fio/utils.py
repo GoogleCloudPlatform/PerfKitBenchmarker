@@ -352,12 +352,11 @@ def RunTest(
     )
   else:
     assert len(disks) == 1
-    vm.RemoteCommand('sudo ulimit -n 65535')
     fio_command = (
-        f'sudo {exec_path} --output-format=json'
+        f'sudo sh -c "ulimit -n 65535 && {exec_path} --output-format=json'
         f' --random_generator={fio_flags.FIO_RNG.value}'
         f' --{latency_measure}_percentiles=1 --directory={disks[0].mount_point}'
-        f' {remote_fio_job_file_path}'
+        f' {remote_fio_job_file_path}"'
     )
   logging.info('FIO Results:')
   start_time = time.time()
