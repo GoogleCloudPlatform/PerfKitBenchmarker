@@ -1001,10 +1001,8 @@ class GceVirtualMachine(virtual_machine.BaseVirtualMachine):
         and _INSUFFICIENT_HOST_CAPACITY in stderr
     ):
       if self.num_vms_per_host:
-        raise errors.Resource.CreationError(
-            'Failed to create host: %d vms of type %s per host exceeds '
-            'memory capacity limits of the host'
-            % (self.num_vms_per_host, self.machine_type)
+        raise errors.Benchmarks.InsufficientCapacityCloudFailure(
+            f'Failed to create host: {stderr}'
         )
       else:
         logging.warning(

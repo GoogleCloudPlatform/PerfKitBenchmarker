@@ -1309,6 +1309,30 @@ message: The zone 'projects/artemis-prod/zones/us-central1-b' does not have enou
         vm._CreateDependencies()
         vm._Create()
 
+  def testDedicatedHostInsufficientCapacityFloatsStderr(self):
+    fake_stderr = (
+        "The zone 'projects/fake-project/zones/fake-zone' does not have enough "
+        'resources available to fulfill the request. Try a different zone, or '
+        'try again later.'
+    )
+    fake_rets = [('stdout', fake_stderr, 1)]
+    with PatchCriticalObjects(fake_rets):
+      FLAGS.gce_node_group = 'fake-node-group'
+      spec = gce_virtual_machine.GceVmSpec(
+          _COMPONENT,
+          machine_type='c4a-highmem-16',
+          use_dedicated_host=True,
+          num_vms_per_host=1,
+      )
+      vm = pkb_common_test_case.TestGceVirtualMachine(spec)
+      self.addCleanup(vm.host_list.clear)
+      with self.assertRaises(
+          errors.Benchmarks.InsufficientCapacityCloudFailure
+      ) as cm:
+        vm._CreateDependencies()
+        vm._Create()
+      self.assertIn(f'Failed to create host: {fake_stderr}', str(cm.exception))
+
   def testVmWithoutGpu(self):
     with PatchCriticalObjects() as issue_command:
       spec = gce_virtual_machine.GceVmSpec(
