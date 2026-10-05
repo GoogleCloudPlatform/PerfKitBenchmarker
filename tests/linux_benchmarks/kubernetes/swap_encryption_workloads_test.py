@@ -341,23 +341,17 @@ class RunKernelBuildTest(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertAlmostEqual(ratio_sample.value, 2.0)
 
-  def test_cgroup_none_still_returns_samples(self):
-    """Builds run even when cgroup setup fails; ratio sample still emitted."""
+  def test_cgroup_none_fails_fast(self):
+    """Builds fail fast when cgroup setup fails."""
     ds = self._make_ds(cgroup_mode='CGROUP_NONE')
-    with mock.patch(
-        'time.time', side_effect=[0.0, 60.0, 60.0, 60.0, 90.0, 90.0, 90.0]
+    with self.assertRaisesRegex(
+        errors.Benchmarks.RunError,
+        r'Failed to initialize cgroups for kernel build \(CGROUP_NONE\).',
     ):
-      samples = workloads.RunKernelBuild(
+      workloads.RunKernelBuild(
           ds, self._META, kernel_version='6.1.38', kernel_memory_mb=512
       )
-    self.assertLen(samples, 3)
-    constrained = next(
-        s
-        for s in samples
-        if s.metric == 'kernel_build_elapsed_sec'
-        and s.metadata.get('build_variant') == 'constrained'
-    )
-    self.assertEqual(constrained.metadata['cgroup_mode'], 'CGROUP_NONE')
+
 
   def test_zero_unconstrained_time_skips_ratio(self):
     """No ratio sample when unconstrained elapsed is 0 (avoid division)."""
@@ -379,3 +373,7 @@ class RunKernelBuildTest(pkb_common_test_case.PkbCommonTestCase):
     )
     for s in samples:
       self.assertEqual(s.metadata.get('kernel_version'), '5.15.120')
+
+
+if __name__ == '__main__':
+  unittest.main()

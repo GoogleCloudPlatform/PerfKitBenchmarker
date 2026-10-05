@@ -197,10 +197,10 @@ _BenchmarkSpec = bm_spec_lib.BenchmarkSpec
 # Benchmark identity
 # ---------------------------------------------------------------------------
 
-BENCHMARK_NAME = 'swap_encryption'
+BENCHMARK_NAME = 'modular_swap_benchmark'
 
 BENCHMARK_CONFIG = """
-swap_encryption:
+modular_swap_benchmark:
   description: >
     fio microbenchmarks (Tier 1) on swap-encrypted GKE/EKS nodes. Swap-enabled 'benchmark' nodepool declared in BENCHMARK_CONFIG;
     GKE cluster creation applies --system-config-from-file (dm-crypt swapConfig)
@@ -511,6 +511,10 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:  # pylint: disable=invalid
         '--swap_encryption_workloads=%s',
         ','.join(_WORKLOADS.value),
     )
+
+  if _WorkloadSelected('redis'):
+    logging.info('[swap_encryption] Workload: redis benchmark')
+    results += _workloads.RunRedis(daemonset, base_metadata)
 
   # ── Kernel build under memory constraint ───────────────────────────────────
   if _WorkloadSelected('kernel_build'):

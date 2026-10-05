@@ -1000,7 +1000,7 @@ def RunKernelBuild(
   daemonset.PodExec(
       textwrap.dedent("""
     command -v make >/dev/null 2>&1 && command -v cgexec >/dev/null 2>&1 || {
-      apt-get install -y -qq build-essential cgroup-tools 2>/dev/null || true
+      apt-get install -y -qq build-essential cgroup-tools
     }
   """),
       timeout=180,
@@ -1025,9 +1025,9 @@ def RunKernelBuild(
        echo {mem_bytes} > /sys/fs/cgroup/memory/pkb_kernelbuild/memory.limit_in_bytes 2>/dev/null; then
       echo CGROUPV1
     elif [ -d /sys/fs/cgroup/system.slice ] || [ -f /sys/fs/cgroup/cgroup.controllers ]; then
-      mkdir -p /sys/fs/cgroup/pkb_kernelbuild 2>/dev/null || true
-      echo {mem_bytes} > /sys/fs/cgroup/pkb_kernelbuild/memory.max 2>/dev/null || true
-      echo $$ > /sys/fs/cgroup/pkb_kernelbuild/cgroup.procs 2>/dev/null || true
+      mkdir -p /sys/fs/cgroup/pkb_kernelbuild && \
+      echo {mem_bytes} > /sys/fs/cgroup/pkb_kernelbuild/memory.max && \
+      echo $$ > /sys/fs/cgroup/pkb_kernelbuild/cgroup.procs && \
       echo CGROUPV2
     else
       echo CGROUP_NONE
@@ -1055,11 +1055,16 @@ def RunKernelBuild(
       )
     elif use_cgroup and cgroup_mode == 'CGROUPV2':
       cmd = textwrap.dedent(f"""
-        mkdir -p /sys/fs/cgroup/pkb_kernelbuild 2>/dev/null || true
-        echo {mem_bytes} > /sys/fs/cgroup/pkb_kernelbuild/memory.max 2>/dev/null || true
-        echo $$ > /sys/fs/cgroup/pkb_kernelbuild/cgroup.procs 2>/dev/null || true
+        set -e
+        mkdir -p /sys/fs/cgroup/pkb_kernelbuild
+        echo {mem_bytes} > /sys/fs/cgroup/pkb_kernelbuild/memory.max
+        echo $$ > /sys/fs/cgroup/pkb_kernelbuild/cgroup.procs
         make -C {src} -j$(nproc) vmlinux 2>&1
       """)
+    elif use_cgroup:
+      raise errors.Benchmarks.RunError(
+          'Failed to initialize cgroups for kernel build (CGROUP_NONE).'
+      )
     else:
       cmd = f'make -C {src} -j$(nproc) vmlinux 2>&1'
     t0 = time.time()
@@ -1108,3 +1113,137 @@ _KERNEL_MEMORY_MB = flags.DEFINE_integer(
     512,
     'Memory limit in MB for the cgroup used during the constrained build.',
 )
+
+
+def RunRedis(
+    daemonset: Any,
+    base_metadata: dict[str, Any],
+    redis_memory_mb: int = 2048,
+) -> list[sample.Sample]:
+  """Measure redis performance under normal swap environment.
+
+  Args:
+    daemonset: Active SwapDaemonSet resource.
+    base_metadata: Shared metadata dict from BuildMetadata().
+    redis_memory_mb: cgroup memory limit in MB for redis-server.
+
+  Returns:
+    List of Sample objects from memtier benchmark.
+  """
+  results = []
+  daemonset.PodExec(
+      textwrap.dedent("""
+    command -v redis-server >/dev/null 2>&1 && command -v memtier_benchmark >/dev/null 2>&1 && command -v cgexec >/dev/null 2>&1 || {
+      apt-get update -qq
+      apt-get install -y -qq redis-server memtier-benchmark cgroup-tools
+    }
+  """),
+      timeout=180,
+  )
+
+  daemonset.PodExec(
+      'pkill -9 redis-server 2>/dev/null || true',
+      ignore_failure=True,
+      _retries=0,
+  )
+
+  mem_bytes = redis_memory_mb * 1024 * 1024
+  cgroup_setup_out, _ = daemonset.PodExec(
+      textwrap.dedent(f"""
+    if [ -d /sys/fs/cgroup/memory ] && \
+       mkdir -p /sys/fs/cgroup/memory/pkb_redis 2>/dev/null && \
+       echo {mem_bytes} > /sys/fs/cgroup/memory/pkb_redis/memory.limit_in_bytes 2>/dev/null; then
+      echo CGROUPV1
+    elif [ -d /sys/fs/cgroup/system.slice ] || [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+      mkdir -p /sys/fs/cgroup/pkb_redis && \
+      echo {mem_bytes} > /sys/fs/cgroup/pkb_redis/memory.max && \
+      echo CGROUPV2
+    else
+      echo CGROUP_NONE
+    fi
+  """),
+      timeout=30,
+  )
+  cgroup_mode = (
+      cgroup_setup_out.strip().splitlines()[-1]
+      if cgroup_setup_out.strip()
+      else 'CGROUP_NONE'
+  )
+  logging.info(
+      '[swap_encryption] cgroup mode for redis: %s (mem_limit=%dMB)',
+      cgroup_mode,
+      redis_memory_mb,
+  )
+
+  if cgroup_mode == 'CGROUPV1':
+    redis_cmd = 'cgexec -g memory:pkb_redis redis-server --daemonize yes'
+  elif cgroup_mode == 'CGROUPV2':
+    redis_cmd = textwrap.dedent(f"""
+      set -e
+      echo $$ > /sys/fs/cgroup/pkb_redis/cgroup.procs
+      redis-server --daemonize yes
+    """)
+  else:
+    raise errors.Benchmarks.RunError(
+        'Failed to initialize cgroups for Redis (CGROUP_NONE).'
+    )
+
+  daemonset.PodExec(redis_cmd)
+
+  @vm_util.Retry(poll_interval=1, max_retries=15, timeout=20)
+  def _wait_for_redis():
+    out, _ = daemonset.PodExec('redis-cli ping', ignore_failure=True)
+    if 'PONG' not in out:
+      raise RuntimeError('waiting for redis-server to start')
+
+  _wait_for_redis()
+
+  # Calculate data size to exceed RAM limit by ~20%.
+  # RAM limit is redis_memory_mb (e.g. 2048 MB).
+  # We want ~2400 MB of data. If key-size is 32 and data-size is 1024,
+  # total bytes per record is ~1056. Number of keys needed: 2400 * 1024 * 1024 / 1056 = ~2,383,000 keys.
+  # Let's use 2,500,000 keys of 1024 bytes data-size to generate ~2.5GB.
+  num_keys = int((redis_memory_mb * 1.2 * 1024 * 1024) / 1056)
+  logging.info(
+      '[swap_encryption] Populating redis with %d keys to exceed %d MB RAM',
+      num_keys,
+      redis_memory_mb,
+  )
+
+  try:
+    # Population phase
+    daemonset.PodExec(
+        f'memtier_benchmark -p 6379 -t 4 -c 50 -d 1024 --key-maximum={num_keys}'
+        ' --key-pattern=G:G --ratio=1:0 -n allkeys',
+        timeout=600,
+    )
+    # Test phase
+    out, _ = daemonset.PodExec(
+        f'memtier_benchmark -p 6379 -t 4 -c 50 -d 1024 --key-maximum={num_keys}'
+        ' --key-pattern=R:R --ratio=1:10 --test-time=30',
+        timeout=300,
+    )
+    parsed = memtier.MemtierResult.Parse(out, None)
+    # Add metadata to samples
+    for sample_obj in parsed.GetSamples(base_metadata):
+      sample_obj.metadata.update({
+          'cgroup_mode': cgroup_mode,
+          'memory_limit_mb': redis_memory_mb,
+          'workload': 'redis',
+      })
+      results.append(sample_obj)
+  except Exception as e:  # pylint: disable=broad-exception-caught  # pylint: disable=broad-except
+    logging.error('[swap_encryption] Failed to run or parse memtier: %s', e)
+    raise
+  finally:
+    daemonset.PodExec(
+        'pkill -9 redis-server 2>/dev/null || true',
+        ignore_failure=True,
+        _retries=0,
+    )
+  return results
+
+
+# ===========================================================================
+# Workload: kernel build under memory constraint
+# ===========================================================================
