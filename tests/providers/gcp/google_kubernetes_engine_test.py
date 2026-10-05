@@ -1358,7 +1358,6 @@ class GoogleKubernetesEngineSwapConfigTestCase(PatchedObjectsTestCase):
       self.assertNotIn('--system-config-from-file', nodepool_cmd)
       self.assertNotIn('UBUNTU_CONTAINERD', nodepool_cmd)
       self.assertNotIn('--no-enable-autorepair', nodepool_cmd)
-
   def test_cleanup_yaml_called_after_nodepool_create(self):
     spec = self._make_swap_spec()
     with mock.patch.object(
