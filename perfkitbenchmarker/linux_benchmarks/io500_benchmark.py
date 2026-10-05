@@ -117,6 +117,10 @@ def CheckPrerequisites(_=None):
     raise errors.Config.InvalidValue(
         'Specify only one of --mpi_ranks_list or --number_of_clients_list.'
     )
+  if any(int(r) < 1 for r in _MPI_RANKS_LIST.value):
+    raise errors.Config.InvalidValue(
+        f'--mpi_ranks_list={_MPI_RANKS_LIST.value} values must be positive.'
+    )
 
 
 def Prepare(benchmark_spec):
@@ -284,7 +288,6 @@ def Run(benchmark_spec):
   """
   vms = benchmark_spec.vm_groups['default']
   headnode = vms[0]
-  num_nodes = len(vms)
   results = []
   num_cpus = headnode.NumCpusForBenchmark()
   io500_ini_filename = f'{_IO500_INI_FILE.value}.ini'
@@ -327,20 +330,25 @@ def Run(benchmark_spec):
 
   for num_clients in client_counts:
     active_vms = vms[:num_clients]
-    hpc_util.CreateMachineFile(active_vms)
-    machinefile_content, _ = headnode.RemoteCommand('cat ~/MACHINEFILE')
-    logging.info(
-        'Generated MACHINEFILE for %s active clients:\n%s',
-        len(active_vms),
-        machinefile_content.strip(),
-    )
     num_nodes = len(active_vms)
-    for total_ranks in _MPI_RANKS_LIST.value or [num_nodes * num_cpus]:
-      ppn = math.ceil(float(total_ranks) / num_nodes)
+    for total_ranks in [int(r) for r in _MPI_RANKS_LIST.value] or [
+        num_nodes * num_cpus
+    ]:
+      ppn = math.ceil(total_ranks / num_nodes)
+      # Only list the VMs these ranks need, so 1 rank runs on the headnode only.
+      run_vms = active_vms[: math.ceil(total_ranks / ppn)]
+      hpc_util.CreateMachineFile(run_vms)
+      machinefile_content, _ = headnode.RemoteCommand('cat ~/MACHINEFILE')
+      logging.info(
+          'Generated MACHINEFILE for %s ranks on %s VMs:\n%s',
+          total_ranks,
+          len(run_vms),
+          machinefile_content.strip(),
+      )
       # BlockSize * total_ranks = max total size, which must be a multiple of
       # TransferSize.
       block_size = (
-          _IO500_MAX_TOTAL_SIZE.value // int(total_ranks) // TRANSFER_SIZE_4MIB
+          _IO500_MAX_TOTAL_SIZE.value // total_ranks // TRANSFER_SIZE_4MIB
       ) * TRANSFER_SIZE_4MIB
       io500_context = {
           'directory': headnode.scratch_disks[0].mount_point,
@@ -355,10 +363,10 @@ def Run(benchmark_spec):
           lambda vm, ctx=io500_context: vm.RenderTemplate(
               template_path=local_path, remote_path=remote_path, context=ctx
           ),
-          active_vms,
+          run_vms,
       )
 
-      results.extend(_Run(headnode, int(total_ranks), ppn, num_clients))
+      results.extend(_Run(headnode, total_ranks, ppn, len(run_vms)))
       if FLAGS.object_storage_fuse_log_trace:
         headnode.RemoteCommand('sudo bash -c "cat /tmp/logs/*"')
       time.sleep(60)
