@@ -96,7 +96,7 @@ class KubernetesVirtualMachine(virtual_machine.BaseVirtualMachine):
         kubernetes_resources_spec.KubernetesResourcesSpec
     ] = vm_spec.resource_requests
     self.cloud: str = (
-        self.CLOUD  # pytype: disable=annotation-type-mismatch
+        self.CLOUD
         if isinstance(self.CLOUD, str)
         else FLAGS.cloud
     )
@@ -521,7 +521,7 @@ class DebianBasedKubernetesVirtualMachine(
     """
     file_name = vm_util.PrependTempDir(posixpath.basename(source_path))
     self.RemoteHostCopy(file_name, source_path, copy_to=False)
-    target.RemoteHostCopy(file_name, remote_path)  # pytype: disable=attribute-error
+    target.RemoteHostCopy(file_name, remote_path)  # pyrefly: ignore[missing-attribute]
 
   def RemoteHostCopy(
       self,
@@ -684,7 +684,7 @@ class DebianBasedKubernetesVirtualMachine(
     """Returns whether or not preprovisioned data is available."""
     if self.cloud == 'GCP' and FLAGS.gcp_preprovisioned_data_bucket:
       stat_function = gce_virtual_machine.GenerateStatPreprovisionedDataCommand
-      gce_virtual_machine.GceVirtualMachine.InstallCli(self)  # pytype: disable=wrong-arg-types
+      gce_virtual_machine.GceVirtualMachine.InstallCli(self)  # pyrefly: ignore[bad-argument-type]
       # We assume that gsutil is installed to /usr/bin/gsutil on GCE VMs
       # ln -f is idempotent and can be called multiple times
       self.RemoteCommand(
@@ -693,12 +693,12 @@ class DebianBasedKubernetesVirtualMachine(
       )
     elif self.cloud == 'AWS' and FLAGS.aws_preprovisioned_data_bucket:
       stat_function = aws_virtual_machine.GenerateStatPreprovisionedDataCommand
-      aws_virtual_machine.AwsVirtualMachine.InstallCli(self)  # pytype: disable=wrong-arg-types
+      aws_virtual_machine.AwsVirtualMachine.InstallCli(self)  # pyrefly: ignore[bad-argument-type]
     elif self.cloud == 'Azure' and FLAGS.azure_preprovisioned_data_account:
       stat_function = (
           azure_virtual_machine.GenerateStatPreprovisionedDataCommand
       )
-      azure_virtual_machine.AzureVirtualMachine.InstallCli(self)  # pytype: disable=wrong-arg-types
+      azure_virtual_machine.AzureVirtualMachine.InstallCli(self)  # pyrefly: ignore[bad-argument-type]
     else:
       return False
     return self.TryRemoteCommand(stat_function(module_name, filename))

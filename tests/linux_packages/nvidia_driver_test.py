@@ -143,7 +143,7 @@ class NvidiaDriverTestCase(unittest.TestCase, test_util.SamplesTestMixin):
     vm = mock.MagicMock()
     vm.RemoteCommand = mock.MagicMock(return_value=(nvidia_smi_output, ''))
     self.assertRaisesRegex(
-        nvidia_driver.HeterogeneousGpuTypesError,  # pytype: disable=wrong-arg-count
+        nvidia_driver.HeterogeneousGpuTypesError,
         'PKB only supports one type of gpu per VM',
         nvidia_driver.GetGpuType,
         vm,

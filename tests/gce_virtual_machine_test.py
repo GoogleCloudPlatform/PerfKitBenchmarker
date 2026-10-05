@@ -675,7 +675,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)
     ) as issue_command:
-      vm = vm_class(spec)  # pytype: disable=not-instantiable
+      vm = vm_class(spec)
       vm._CreateDependencies()
       vm._Create()
       vm.created = True
@@ -720,7 +720,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image, fake_disk)
     ) as issue_command:
-      vm = vm_class(spec)  # pytype: disable=not-instantiable
+      vm = vm_class(spec)
       vm._CreateDependencies()
       vm._Create()
       vm.created = True
@@ -756,7 +756,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)
     ) as issue_command:
-      vm = vm_class(spec)  # pytype: disable=not-instantiable
+      vm = vm_class(spec)
       vm._CreateDependencies()
       vm._Create()
       vm.created = True
@@ -779,7 +779,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
         _COMPONENT, machine_type='fake-machine-type'
     )
     with PatchCriticalObjects([('[{"name": "fake-operation"}]', '', 0)] * 10):
-      vm = vm_class(spec)  # pytype: disable=not-instantiable
+      vm = vm_class(spec)
       vm._CreateDependencies()
       vm._Create()
       self.assertTrue(vm.skip_existence_check)
@@ -795,7 +795,7 @@ class GceVirtualMachineOsTypesTestCase(pkb_common_test_case.PkbCommonTestCase):
     with PatchCriticalObjects(
         self._CreateFakeReturnValues(fake_image)
     ) as issue_command:
-      vm = vm_class(spec)  # pytype: disable=not-instantiable
+      vm = vm_class(spec)
       vm._CreateDependencies()
       vm._Create()
       vm.created = True
@@ -1002,7 +1002,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertEqual(call_count, 1)
     actual_metadata = (
-        re.compile(r'--metadata\s+(.*)(\s+--)?').search(cmd).group(1)  # pytype: disable=attribute-error  # re-none
+        re.compile(r'--metadata\s+(.*)(\s+--)?').search(cmd).group(1)  # pyrefly: ignore[missing-attribute]
     )
     self.assertIn('k1=v1', actual_metadata)
     self.assertIn('k2=v2', actual_metadata)
@@ -1016,7 +1016,7 @@ class GCEVMFlagsTestCase(pkb_common_test_case.PkbCommonTestCase):
     )
     self.assertEqual(call_count, 1)
     actual_metadata_from_file = (
-        re.compile(r'--metadata-from-file\s+(.*)(\s+--)?').search(cmd).group(1)  # pytype: disable=attribute-error  # re-none
+        re.compile(r'--metadata-from-file\s+(.*)(\s+--)?').search(cmd).group(1)  # pyrefly: ignore[missing-attribute]
     )
     self.assertIn('k1=p1', actual_metadata_from_file)
     self.assertIn('k2=p2', actual_metadata_from_file)

@@ -448,7 +448,7 @@ def _PreparePostgreSQLCluster(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   stdout, _, _ = vm_util.IssueCommand(get_ip_cmd)
   service_ip = stdout.strip() if stdout else 'postgres-standalone-0'
 
-  bm_spec.postgres_service_ip = service_ip  # pytype: disable=attribute-error
+  bm_spec.postgres_service_ip = service_ip  # pyrefly: ignore[missing-attribute]
   logging.info('PostgreSQL service available at: %s', service_ip)
 
 
@@ -550,7 +550,7 @@ def _LoadDatabase(bm_spec: benchmark_spec.BenchmarkSpec) -> None:
   Args:
       bm_spec: Benchmark specification.
   """
-  postgres_ip = bm_spec.postgres_service_ip  # pytype: disable=attribute-error
+  postgres_ip = bm_spec.postgres_service_ip  # pyrefly: ignore[missing-attribute]
 
   # Run in client pod
   # Manually construct command to avoid VM-specific paths and secure password
@@ -683,7 +683,7 @@ def Run(bm_spec: benchmark_spec.BenchmarkSpec) -> List[sample.Sample]:
   Returns:
       List of performance samples.
   """
-  postgres_ip = bm_spec.postgres_service_ip  # pytype: disable=attribute-error
+  postgres_ip = bm_spec.postgres_service_ip  # pyrefly: ignore[missing-attribute]
   samples = []
 
   # Get list of workload types to run

@@ -40,7 +40,7 @@ def GetConfig(user_config):
   return configs.LoadConfig(BENCHMARK_CONFIG, user_config, BENCHMARK_NAME)
 
 
-def _GetService() -> object_storage_service.ObjectStorageService:  # pytype: disable=not-instantiable
+def _GetService() -> object_storage_service.ObjectStorageService:
   """Get a ready to use instance of ObjectStorageService."""
   cloud = FLAGS.cloud
   providers.LoadProvider(cloud)

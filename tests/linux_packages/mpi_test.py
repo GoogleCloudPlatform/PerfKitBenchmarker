@@ -254,9 +254,9 @@ class MpiTestCase(pkb_common_test_case.PkbCommonTestCase):
     with self.assertRaises(errors.VirtualMachine.RemoteCommandError):
       mpi.RunMpiStats(vm, request)
     # pytyping thinks that vm.RemoteCommand is a Callable but it is a Mock
-    last_command = vm.RemoteCommand.call_args[0][0]  # pytype: disable=attribute-error
+    last_command = vm.RemoteCommand.call_args[0][0]
     self.assertRegex(last_command, 'tail.*/var/log/')
-    vm.RemoteCommand.assert_called_once()  # pytype: disable=attribute-error
+    vm.RemoteCommand.assert_called_once()
 
   def testParseMpiPinning(self):
     lines = ReadMpiOutput('mpi_debug_output.txt').splitlines()

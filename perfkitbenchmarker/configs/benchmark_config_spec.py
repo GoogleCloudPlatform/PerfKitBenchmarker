@@ -104,12 +104,11 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
         flag_values,
         **dpb_service_config,
     )
-    # pytype: disable=attribute-error
     non_default_legacy_runtime_engine = (
-        result.dataproc_serverless_runtime_engine != 'default'
+        result.dataproc_serverless_runtime_engine != 'default'  # pyrefly: ignore[missing-attribute]
     )
     non_default_engine = (
-        result.dataproc_serverless_engine
+        result.dataproc_serverless_engine  # pyrefly: ignore[missing-attribute]
         != dpb_constants.DATAPROC_DEFAULT_ENGINE
     )
     if non_default_legacy_runtime_engine and non_default_engine:
@@ -118,7 +117,6 @@ class _DpbServiceDecoder(option_decoders.TypeVerifier):
           ' not compatible with newer "dataproc_serverless_engine" config (for'
           ' Lightning Engine).'
       )
-    # pytype: enable=attribute-error
     return result
 
 

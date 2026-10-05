@@ -392,7 +392,7 @@ def GCESimulateMaintenanceFactory(
   """Factory method for GCESimulateMaintenanceTool  ."""
   if isinstance(vm, WindowsGceVirtualMachine):
     return GCESimulateMaintenanceToolForWindows(vm)
-  return GCESimulateMaintenanceTool(vm)  # pytype: disable=wrong-arg-types
+  return GCESimulateMaintenanceTool(vm)  # pyrefly: ignore[bad-argument-type]
 
 TRIGGER = None
 

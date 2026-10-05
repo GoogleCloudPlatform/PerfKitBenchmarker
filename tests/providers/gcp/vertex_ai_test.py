@@ -113,7 +113,7 @@ class VertexAiCliInterfaceTest(VertexAiTest):
             ignore_failure=True,
             timeout=60 * 60,
         ),
-    ])  # pytype: disable=attribute-error
+    ])
     self.assertEqual(
         self.pkb_ai.model_resource_name,
         '1234',
@@ -160,7 +160,7 @@ class VertexAiCliInterfaceTest(VertexAiTest):
         self.pkb_ai.vm,
     )
     self.pkb_ai._Create()
-    self.assertEqual(cli.RunCommand.mock_command.progress_through_calls['curl'], 2)  # pytype: disable=attribute-error
+    self.assertEqual(cli.RunCommand.mock_command.progress_through_calls['curl'], 2)  # pyrefly: ignore[missing-attribute]
 
   def test_model_inited(self):
     # Assert on values from setup
@@ -418,8 +418,8 @@ deployedModels:
         self.endpoint.vm,
     )
     self.endpoint._Delete()
-    self.assertLen(cli.RunCommand.call_args_list, 3)  # pytype: disable=attribute-error
-    mock_cmd = cli.RunCommand.mock_command  # pytype: disable=attribute-error
+    self.assertLen(cli.RunCommand.call_args_list, 3)  # pyrefly: ignore[missing-attribute]
+    mock_cmd = cli.RunCommand.mock_command  # pyrefly: ignore[missing-attribute]
     self.assertEqual(
         mock_cmd.progress_through_calls['gcloud ai endpoints delete'], 1
     )
@@ -446,8 +446,8 @@ createTime: '2024-09-26T21:51:53.955656Z'
         self.endpoint.vm,
     )
     self.endpoint._Delete()
-    self.assertLen(cli.RunCommand.call_args_list, 2)  # pytype: disable=attribute-error
-    mock_cmd = cli.RunCommand.mock_command  # pytype: disable=attribute-error
+    self.assertLen(cli.RunCommand.call_args_list, 2)  # pyrefly: ignore[missing-attribute]
+    mock_cmd = cli.RunCommand.mock_command  # pyrefly: ignore[missing-attribute]
     self.assertEqual(
         mock_cmd.progress_through_calls['gcloud ai endpoints delete'], 1
     )

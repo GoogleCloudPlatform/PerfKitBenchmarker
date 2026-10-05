@@ -8,9 +8,7 @@ https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/servicebus/azure-ser
 import time
 
 from absl import flags
-# pytype: disable=import-error
-from azure import servicebus
-# pytype: enable=import-error
+from azure import servicebus  # pyrefly: ignore[missing-import]
 
 from perfkitbenchmarker.scripts.messaging_service_scripts.common import client
 

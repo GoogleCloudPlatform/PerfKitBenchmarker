@@ -726,7 +726,7 @@ def _GetArmArch(machine_type) -> str | None:
   return None
 
 
-class AzureVirtualMachine(  # pyrefly: ignore[invalid-inheritance]
+class AzureVirtualMachine(
     virtual_machine.BaseVirtualMachine, metaclass=abc.ABCMeta
 ):
   """Object representing an Azure Virtual Machine."""

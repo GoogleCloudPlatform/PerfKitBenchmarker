@@ -55,7 +55,7 @@ def _GetTestRedisInstance():
       FLAGS.managed_memory_store_service_type,
       managed_memory_store.REDIS,
   )
-  instance = redis_class(test_spec)  # pytype: disable=not-instantiable
+  instance = redis_class(test_spec)
   instance._ip = '0.0.0.0'
   instance._port = 1234
   return instance

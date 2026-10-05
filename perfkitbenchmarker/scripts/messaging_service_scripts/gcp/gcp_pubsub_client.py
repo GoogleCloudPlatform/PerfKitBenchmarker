@@ -60,7 +60,7 @@ class GCPPubSubClient(client.BaseMessagingServiceClient):
         self.project, self.subscription
     )
 
-  def generate_message(self, seq: int, message_size: int) -> bytes:  # pytype: disable=signature-mismatch  # overriding-return-type-checks
+  def generate_message(self, seq: int, message_size: int) -> bytes:  # pyrefly: ignore[bad-override]
     return super().generate_message(seq, message_size).encode('utf-8')
 
   def publish_message(self, message: bytes) -> str:

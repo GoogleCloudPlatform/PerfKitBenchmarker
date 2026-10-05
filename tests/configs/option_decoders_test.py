@@ -63,7 +63,7 @@ class ConfigOptionDecoderTestCase(unittest.TestCase):
       pass
 
     with self.assertRaises(TypeError):
-      IncompleteDerivedClass(option=_OPTION)  # pytype: disable=not-instantiable
+      IncompleteDerivedClass(option=_OPTION)  # pyrefly: ignore[bad-instantiation]
 
 
 class TypeVerifierTestCase(unittest.TestCase):

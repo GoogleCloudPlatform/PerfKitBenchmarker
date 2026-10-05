@@ -422,10 +422,10 @@ def GenerateJobFileString(
     # All scenarios supply iodepth and numjobs.
     # Remove iodepth and numjobs from scenario name to prevent redundancy.
     for scenario in scenarios:
-      scenario['name'] = scenario['name'].replace(  # pytype: disable=attribute-error
+      scenario['name'] = scenario['name'].replace(
           f'_iodepth-{scenario["iodepth"]}', ''
       )
-      scenario['name'] = scenario['name'].replace(  # pytype: disable=attribute-error
+      scenario['name'] = scenario['name'].replace(
           f'_numjobs-{scenario["numjobs"]}', ''
       )
 

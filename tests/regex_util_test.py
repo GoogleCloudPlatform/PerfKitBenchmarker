@@ -50,7 +50,7 @@ class ExtractGroupTestCase(unittest.TestCase):
     string = 'test 12a3de text'
     self.assertRaisesRegex(
         IndexError,
-        'No such group 3 in',  # pytype: disable=wrong-arg-count
+        'No such group 3 in',
         regex_util.ExtractGroup,
         regex,
         string,

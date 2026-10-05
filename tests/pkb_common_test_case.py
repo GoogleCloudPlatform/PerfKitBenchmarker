@@ -207,13 +207,13 @@ class TestLinuxVirtualMachine(
     pass
 
 
-class TestGceLinuxVirtualMachine(  # pytype: disable=signature-mismatch  # overriding-return-type-checks
+class TestGceLinuxVirtualMachine(
     gce_virtual_machine.GceVirtualMachine, TestLinuxVirtualMachine
 ):
   """Test class that has VM methods for a GCE virtual machine."""
 
 
-class TestGceVirtualMachine(TestOsMixin, gce_virtual_machine.GceVirtualMachine):  # pytype: disable=signature-mismatch  # overriding-return-type-checks
+class TestGceVirtualMachine(TestOsMixin, gce_virtual_machine.GceVirtualMachine):
   pass
 
   def _PreemptibleMetadataKeyValue(self):

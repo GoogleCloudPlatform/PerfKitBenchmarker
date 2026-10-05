@@ -399,7 +399,7 @@ def _FuncArgCount(f, builtin=1):
     # Check for bound methods.
     has_bound_self = 1 if getattr(f, method_self, None) is not None else 0
 
-    return f.__code__.co_argcount - has_bound_self  # pyrefly: ignore[missing-attribute]
+    return f.__code__.co_argcount - has_bound_self
 
   except AttributeError:
     # Probably missing __call__ or func_code
