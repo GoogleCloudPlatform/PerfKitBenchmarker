@@ -349,6 +349,7 @@ def Prepare(spec: _BenchmarkSpec) -> None:  # pylint: disable=invalid-name
       namespace=_DS_NAMESPACE,
       label=_DS_LABEL,
       nodepool=_BENCHMARK_NODEPOOL,
+      image=FLAGS.swap_encryption_daemonset_image,
   )
   # Register before Create() so PKB auto-deletes on failure/cleanup.
   spec.resources.append(daemonset)
@@ -509,6 +510,16 @@ def Run(spec: _BenchmarkSpec) -> list[sample.Sample]:  # pylint: disable=invalid
         '[swap_encryption] Skipping Tier 1 (fio) — not selected by '
         '--swap_encryption_workloads=%s',
         ','.join(_WORKLOADS.value),
+    )
+
+  # ── Kernel build under memory constraint ───────────────────────────────────
+  if _WorkloadSelected('kernel_build'):
+    logging.info('[swap_encryption] Workload: kernel build under memory cap')
+    results += _workloads.RunKernelBuild(
+        daemonset,
+        base_metadata,
+        kernel_version=_workloads._KERNEL_VERSION.value,  # pylint: disable=protected-access
+        kernel_memory_mb=_workloads._KERNEL_MEMORY_MB.value,  # pylint: disable=protected-access
     )
 
   # ── Cost estimate ─────────────────────────────────────────────────────────
