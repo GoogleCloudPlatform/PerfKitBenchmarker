@@ -347,6 +347,18 @@ class ConversationalAnalyticsClientInterface(
         f'--print_results --query_file={remote_query_file}'
     )
 
+  @override
+  def _ParseConversationalAnalyticsResults(
+      self, results: dict[str, Any], query_name: str
+  ) -> tuple[float, dict[str, Any]]:
+    execution_time, metadata = super()._ParseConversationalAnalyticsResults(
+        results, query_name
+    )
+    details = results.get('details', {})
+    query_results = details.get('query_results', {})
+    metadata['model_names'] = query_results.get('model_names', [])
+    return execution_time, metadata
+
 
 def GetSnowflakeClientInterface(
     warehouse: str,
