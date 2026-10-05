@@ -234,6 +234,20 @@ class GoogleKubernetesEngineTestCase(PatchedObjectsTestCase):
       self.assertIn(
           '--labels foo=bar,timeout=yesterday', issue_command.all_commands
       )
+      self.assertIn(
+          '--subnetwork pkb-network-abc9876', issue_command.all_commands
+      )
+
+  def testCreateWithCustomSubnetwork(self):
+    spec = self.create_kubernetes_engine_spec()
+    with self.patch_critical_objects() as issue_command:
+      cluster = google_kubernetes_engine.GkeCluster(spec)
+      assert isinstance(
+          cluster.default_nodepool.network, gce_network.GceNetwork
+      )
+      cluster.default_nodepool.network.primary_subnet_name = 'my-custom-subnet'
+      cluster._Create()
+      self.assertIn('--subnetwork my-custom-subnet', issue_command.all_commands)
 
   def testCreateQuotaExceeded(self):
     spec = self.create_kubernetes_engine_spec()
@@ -1049,6 +1063,9 @@ class GoogleKubernetesEngineAutopilotTestCase(PatchedObjectsTestCase):
       self.assertIn('--format json', issue_command.all_commands)
       self.assertIn(
           '--labels foo=bar,timeout=yesterday', issue_command.all_commands
+      )
+      self.assertIn(
+          '--subnetwork pkb-network-abc9876', issue_command.all_commands
       )
       self.assertNotIn('--machine-type', issue_command.all_commands)
       self.assertNotIn('--num-nodes', issue_command.all_commands)

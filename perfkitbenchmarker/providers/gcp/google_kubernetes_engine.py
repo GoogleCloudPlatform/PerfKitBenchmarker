@@ -171,7 +171,7 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
   ):
     super().InitializeNodePoolForCloud(vm_config, nodepool_config)
     vm_config = typing.cast(gce_virtual_machine.GceVmSpec, vm_config)
-    nodepool_config.network = gce_network.GceNetwork.GetNetwork(vm_config)  # pyrefly: ignore[missing-attribute]
+    nodepool_config.network = gce_network.GceNetwork.GetNetwork(vm_config)
     if nodepool_config.tpu_topology:
       if self.tpu_topology:
         raise errors.Config.InvalidValue(
@@ -221,6 +221,14 @@ class BaseGkeCluster(kubernetes_cluster.KubernetesCluster):
 
   def _RunClusterCreateCommand(self, cmd: util.GcloudCommand):
     """Adds flags to the cluster create command and runs it."""
+    if self.default_nodepool.network:
+      network = typing.cast(
+          gce_network.GceNetwork, self.default_nodepool.network
+      )
+      cmd.flags['network'] = network.network_resource.name
+      if network.primary_subnet_name:
+        cmd.flags['subnetwork'] = network.primary_subnet_name
+
     # All combinations of cluster-version and release-channel are supported.
     # Specifying one uses default for the other. Specifying both can be needed
     # as some versions are only supported in some release channels.
@@ -529,9 +537,6 @@ class GkeCluster(BaseGkeCluster):
   def _Create(self):
     """Creates the cluster."""
     cmd = self._GcloudCommand('container', 'clusters', 'create', self.name)
-    if self.default_nodepool.network:  # pyrefly: ignore[missing-attribute]
-      cmd.flags['network'] = self.default_nodepool.network.network_resource.name  # pyrefly: ignore[missing-attribute]
-
     if gcp_flags.GKE_ENABLE_SHIELDED_NODES.value:
       cmd.args.append('--enable-shielded-nodes')
     else:
@@ -1114,8 +1119,6 @@ class GkeAutopilotCluster(BaseGkeCluster):
         self.name,
         '--no-autoprovisioning-enable-insecure-kubelet-readonly-port',
     )
-    if self.default_nodepool.network:  # pyrefly: ignore[missing-attribute]
-      cmd.flags['network'] = self.default_nodepool.network.network_resource.name  # pyrefly: ignore[missing-attribute]
     cmd.flags['labels'] = util.MakeFormattedDefaultTags()
 
     if self.enable_aam:

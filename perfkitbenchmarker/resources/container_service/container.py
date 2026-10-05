@@ -157,6 +157,7 @@ class BaseNodePoolConfig:
     sandbox_config: Optional SandboxSpec for sandboxed node pools.
     swap_config: Optional SwapConfigSpec for the node pool.
     gke_swap_config: Optional cloud-specific swap config instance.
+    network: Optional cloud-specific network instance for the node pool.
   """
 
   def __init__(
@@ -191,6 +192,8 @@ class BaseNodePoolConfig:
     # pylint: disable=g-missing-from-attributes
     self.sandbox_config: container_spec_lib.SandboxSpec | None = None
     self.swap_config: swap_config_spec.SwapConfigSpec | None = None
+    # Defined by GceVmSpec. Used by google_kubernetes_engine.
+    self.network: Any | None = None
     self.max_local_disks: int | None
     self.ssd_interface: str | None
     self.threads_per_core: int
