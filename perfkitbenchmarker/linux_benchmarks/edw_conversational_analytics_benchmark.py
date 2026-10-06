@@ -319,6 +319,11 @@ def CheckPrerequisites(benchmark_config):
         and not bigquery.BQ_CA_DATA_AGENT.value
     ):
       missing_flags.append('--bq_ca_data_agent')
+    if (
+        bigquery.BQ_CA_CLIENT.value == 'claude'
+        and not FLAGS.gcp_service_account_key_file
+    ):
+      missing_flags.append('--gcp_service_account_key_file')
   elif edw_service_type == 'looker':
     required_flags = [
         looker.LOOKER_BASE_URL,

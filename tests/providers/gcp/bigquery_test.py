@@ -979,6 +979,57 @@ class BigqueryTestCase(pkb_common_test_case.PkbCommonTestCase):
         ' --api_timeout 120'
     )
 
+  @flagsaver.flagsaver((gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, 'key.json'))
+  def testClaudeGetMcpConfigIncludesCredentials(self):
+    interface = bigquery.ClaudeConversationalAnalyticsClientInterface(
+        PROJECT_ID, DATASET_ID
+    )
+    interface.mcp_toolbox_path = '/home/perfkit/toolbox'
+    interface.key_file_path = '/home/perfkit/key.json'
+
+    config = json.loads(interface.GetMcpConfig())
+
+    self.assertEqual(
+        config['mcpServers']['google-data-cloud-genai-mcp-server']['env'][
+            'GOOGLE_APPLICATION_CREDENTIALS'
+        ],
+        '/home/perfkit/key.json',
+    )
+
+  @flagsaver.flagsaver((gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, 'key.json'))
+  def testClaudeGetMcpConfigRaisesWhenKeyFilePathNotSet(self):
+    interface = bigquery.ClaudeConversationalAnalyticsClientInterface(
+        PROJECT_ID, DATASET_ID
+    )
+    interface.mcp_toolbox_path = '/home/perfkit/toolbox'
+
+    with self.assertRaisesRegex(RuntimeError, 'key_file_path is not set'):
+      interface.GetMcpConfig()
+
+  @flagsaver.flagsaver(
+      (gcp_flags.GCP_SERVICE_ACCOUNT_KEY_FILE, '/local/path/key.json')
+  )
+  def testClaudePrepareSetsKeyFilePathFromHomeDir(self):
+    interface = bigquery.ClaudeConversationalAnalyticsClientInterface(
+        PROJECT_ID, DATASET_ID
+    )
+    mock_vm = mock.MagicMock()
+    mock_vm.RemoteCommand.return_value = ('/home/perfkit\n', '')
+    interface.SetProvisionedAttributes(FakeBenchmarkSpec(mock_vm))
+
+    with (
+        mock.patch.object(
+            bigquery.mcp_toolbox_for_db,
+            'Install',
+            return_value='/home/perfkit/toolbox',
+        ),
+        mock.patch.object(interface.python_client_interface, 'Prepare'),
+        mock.patch.object(edw_service.vm_util, 'CreateRemoteFile'),
+    ):
+      interface.Prepare(PACKAGE_NAME)
+
+    self.assertEqual(interface.key_file_path, '/home/perfkit/key.json')
+
 
 if __name__ == '__main__':
   unittest.main()

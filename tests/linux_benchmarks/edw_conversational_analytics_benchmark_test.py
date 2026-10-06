@@ -98,6 +98,18 @@ class EdwConversationalAnalyticsBenchmarkTest(
     # Should not raise error
     edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
 
+  @flagsaver.flagsaver(bq_ca_client='claude', gcp_service_account_key_file='')
+  def testCheckPrerequisitesRaisesValueErrorWhenGcpServiceAccountKeyFileMissing(
+      self,
+  ):
+    mock_config = mock.Mock()
+    mock_config.edw_service.type = 'bigquery'
+    with self.assertRaisesRegex(
+        errors.Config.InvalidValue,
+        'Missing required flags: --gcp_service_account_key_file',
+    ):
+      edw_conversational_analytics_benchmark.CheckPrerequisites(mock_config)
+
   @flagsaver.flagsaver(
       looker_ca_data_agent='',
       looker_base_url='https://instance.looker.com',

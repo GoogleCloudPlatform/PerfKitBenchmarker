@@ -688,6 +688,7 @@ class ClaudeConversationalAnalyticsClientInterface(
     self.python_client_interface = PythonClientInterface(project_id, dataset_id)
     self.claude_dir = None
     self.mcp_toolbox_path = None
+    self.key_file_path: str | None = None
     self.benchmark_name: str | None = None
 
   @override
@@ -712,7 +713,12 @@ class ClaudeConversationalAnalyticsClientInterface(
   def GetMcpConfig(self) -> str:
     if not self.mcp_toolbox_path:
       raise RuntimeError('mcp_toolbox_path is not set.')
-    env = {'BIGQUERY_PROJECT': self.project_id}
+    if not self.key_file_path:
+      raise RuntimeError('GCP service account key_file_path is not set.')
+    env = {
+        'BIGQUERY_PROJECT': self.project_id,
+        'GOOGLE_APPLICATION_CREDENTIALS': self.key_file_path,
+    }
     config = {
         'mcpServers': {
             'google-data-cloud-genai-mcp-server': {
@@ -769,6 +775,10 @@ class ClaudeConversationalAnalyticsClientInterface(
     # Call python_client_interface.Prepare to setup common Python dependencies
     # and service account key file.
     self.python_client_interface.Prepare(package_name)
+    # The key file is pushed to the home directory of the client VM.
+    self.key_file_path = os.path.join(
+        home_dir, self.python_client_interface.key_file_name
+    )
 
     # Call BaseClaude...Prepare to install Claude SDK and setup .mcp.json
     super().Prepare(package_name)
