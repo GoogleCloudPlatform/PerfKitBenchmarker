@@ -180,6 +180,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
   def testDiskMetadata(self):
     FLAGS['db_disk_throughput'].parse(1200)
     FLAGS['db_disk_iops'].parse(10000)
+    FLAGS['db_disable_smt'].parse(True)
     test_spec = inspect.cleandoc("""
     cluster_boot:
       relational_db:
@@ -218,6 +219,7 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       metadata = spec.relational_db.GetResourceMetadata()  # pyrefly: ignore[missing-attribute]
       self.assertEqual(metadata['disk_iops'], 10000)
       self.assertEqual(metadata['disk_throughput_mb'], 1200)
+      self.assertTrue(metadata['disable_smt'])
 
   def testCorrectVmGroupsPresent(self):
     with PatchCriticalObjects():
@@ -245,6 +247,23 @@ class GcpMysqlRelationalDbTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--project fakeproject', command_string)
       self.assertIn('--tier=db-n1-standard-1', command_string)
       self.assertIn('--no-backup', command_string)
+
+  def testCreateWithDisableSmt(self):
+    FLAGS['db_disable_smt'].parse(True)
+    with PatchCriticalObjects() as issue_command:
+      db = gcp_relational_db.GCPRelationalDb(self.mock_db_spec)
+      CreateMockClientVM(db)
+      db._Create()
+      self.assertEqual(issue_command.call_count, 1)
+      command_string = ' '.join(issue_command.call_args[0][0])
+
+      self.assertTrue(
+          command_string.startswith(
+              'gcloud beta sql instances create pkb-db-instance-123'
+          ),
+          command_string,
+      )
+      self.assertIn('--threads-per-core 1', command_string)
 
   def testDelete(self):
     with PatchCriticalObjects() as issue_command:

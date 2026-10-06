@@ -230,6 +230,12 @@ SERVER_GCE_SSD_INTERFACE = flags.DEFINE_enum(
 ENABLE_DATA_CACHE = flags.DEFINE_bool(
     'gcp_db_enable_data_cache', False, 'Whether to enable data cache.'
 )
+DISABLE_SMT = flags.DEFINE_bool(
+    'db_disable_smt',
+    False,
+    'Whether to disable SMT (Simultaneous Multithreading) on the database'
+    ' instance.',
+)
 METRICS_TIME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 
 

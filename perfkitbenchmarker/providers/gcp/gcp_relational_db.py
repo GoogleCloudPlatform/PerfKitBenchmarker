@@ -42,7 +42,6 @@ from perfkitbenchmarker import vm_util
 from perfkitbenchmarker.providers.gcp import gce_network
 from perfkitbenchmarker.providers.gcp import util
 
-
 FLAGS = flags.FLAGS
 
 GCP_DATABASE_VERSION_MAPPING = {
@@ -314,6 +313,8 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
         cmd.flags['enable-data-cache'] = True
       else:
         cmd.flags['no-enable-data-cache'] = True
+    if relational_db.DISABLE_SMT.value:
+      cmd.flags['threads-per-core'] = 1
 
     _, stderr, retcode = cmd.Issue(
         timeout=CREATION_TIMEOUT,
@@ -593,6 +594,8 @@ class GCPRelationalDb(relational_db.BaseRelationalDb):
       metadata['db_flags'] = metadata.get('db_flags', []) + [
           'enable-data-cache'
       ]
+    if relational_db.DISABLE_SMT.value:
+      metadata['disable_smt'] = True
     return metadata
 
   @staticmethod

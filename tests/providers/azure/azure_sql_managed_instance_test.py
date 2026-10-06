@@ -125,6 +125,7 @@ class AzureSqlManagedInstanceInitTestCase(
     FLAGS['managed_db_tier'].parse('BusinessCritical')
     FLAGS['db_family'].parse('Gen8IM')
     FLAGS['db_cpus'].parse(8)
+    FLAGS['db_memory'].parse('64GiB')
     FLAGS['db_disk_size'].parse(1024)
     FLAGS['db_disk_iops'].parse(10000)
     FLAGS['db_engine_version'].parse('SQLServer2022')
@@ -145,6 +146,8 @@ class AzureSqlManagedInstanceInitTestCase(
       self.assertEqual(instance.family, 'Gen8IM')
     with self.subTest(name='cpus'):
       self.assertEqual(instance.cpus, 8)
+    with self.subTest(name='memory'):
+      self.assertEqual(instance.memory, 65536)
     with self.subTest(name='disk_size'):
       self.assertEqual(instance.disk_size, 1024)
     with self.subTest(name='disk_iops'):
@@ -176,9 +179,8 @@ class AzureSqlManagedInstanceInitTestCase(
             vm_spec: *default_dual_core
             disk_spec: *default_500_gb
     """)
-    FLAGS['managed_db_tier'].parse('BusinessCritical')
+    FLAGS['managed_db_tier'].parse('InvalidTier')
     FLAGS['db_cpus'].parse(8)
-    FLAGS['db_memory'].parse('64GiB')
     with self.assertRaises(errors.Config.InvalidValue):
       self.test_bm_spec = pkb_common_test_case.CreateBenchmarkSpecFromYaml(
           yaml_string=test_spec, benchmark_name='hammerdbcli'
@@ -296,6 +298,18 @@ class AzureSqlManagedInstanceTestCase(pkb_common_test_case.PkbCommonTestCase):
       self.assertIn('--gpv2 true', cmd_str)
     with self.subTest(name='memory'):
       self.assertIn('--memory 32', cmd_str)
+
+  @flagsaver.flagsaver(run_uri='test_uri')
+  def testDelete(self):
+    mock_show = self.enter_context(
+        mock.patch.object(
+            self.instance, '_AzServerShow', return_value={'state': 'Ready'}
+        )
+    )
+    self.assertTrue(self.instance._Exists())
+    self.instance._Delete()
+    self.assertFalse(self.instance._Exists())
+    mock_show.assert_called_once()
 
 
 if __name__ == '__main__':

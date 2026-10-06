@@ -70,6 +70,7 @@ class AzureSqlManagedInstance(azure_relational_db.AzureRelationalDb):
 
     self.resource_group = azure_network.GetResourceGroup(self.region)
     self.subnet: azure_network.AzureSubnet = None  # pyrefly: ignore[bad-assignment]
+    self._deleted = False
 
   def _CheckPrerequisites(self):
     if self.tier not in _VALID_TIERS:
@@ -79,11 +80,6 @@ class AzureSqlManagedInstance(azure_relational_db.AzureRelationalDb):
     if self.version not in _VALID_VERSIONS:
       raise errors.Config.InvalidValue(
           f'Invalid version: {self.version}, must be one of {_VALID_VERSIONS}'
-      )
-    if self.tier == _BUSINESS_CRITICAL_TIER and self.memory is not None:
-      raise errors.Config.InvalidValue(
-          'Memory cannot be specified for Business Critical tier, got'
-          f' {self.memory}'
       )
 
   def GetResourceMetadata(self) -> dict[str, Any]:
@@ -235,10 +231,13 @@ class AzureSqlManagedInstance(azure_relational_db.AzureRelationalDb):
           '--zone-redundant',
           'true',
       ])
-    if self.tier == 'GeneralPurpose':
+    if self.tier == _GENERAL_PURPOSE_TIER:
       cmd.extend([
           '--gpv2',
           'true',
+      ])
+    if self.memory is not None:
+      cmd.extend([
           '--memory',
           str(self.memory // 1024),
       ])
@@ -300,3 +299,8 @@ class AzureSqlManagedInstance(azure_relational_db.AzureRelationalDb):
 
   def _Delete(self) -> None:
     self._deleted = True
+
+  def _Exists(self) -> bool:
+    if self._deleted:
+      return False
+    return super()._Exists()
