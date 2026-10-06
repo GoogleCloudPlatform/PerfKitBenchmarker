@@ -579,7 +579,7 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
     return config
 
   @override
-  @vm_util.Retry(retryable_exceptions=(errors.Resource.RetryableGetError,))
+  @vm_util.Retry(retryable_exceptions=(errors.Benchmarks.QuotaFailure,))
   def Execute(
       self,
       output_dir: str,
@@ -615,17 +615,23 @@ class VertexAiAgentEngineAiAgentService(GcpAiAgentService):
         f' GOOGLE_CLOUD_LOCATION={location} && cd workload/{agent_framework}'
         ' && python3 run_agent_engine.py --config_file run_config.yaml'
     )
-    try:
-      stdout, _ = self.client_vm.RemoteCommand(command)
-    except (
-        errors.VirtualMachine.RemoteCommandError,
-        errors.VmUtil.IssueCommandError,
-    ) as e:
-      if '503' in str(e):
-        raise errors.Resource.RetryableGetError(
-            f'Transient 503 error from Vertex AI Agent Engine: {e}'
-        ) from e
-      raise
+    stdout, stderr = self.client_vm.RemoteCommand(
+        command, raise_on_failure=False
+    )
+    if stderr:
+      if (
+          '503' in stderr
+          or '429' in stderr
+          or 'RESOURCE_EXHAUSTED' in stderr
+          or 'ResourceExhausted' in stderr
+          or 'Quota exceeded' in stderr
+      ):
+        raise errors.Benchmarks.QuotaFailure(
+            f'Transient 429 or 503 error from Vertex AI Agent Engine: {stderr}'
+        )
+      raise errors.VirtualMachine.RemoteCommandError(
+          f'Failed to run agent on Vertex AI Agent Engine: {stderr}'
+      )
 
     logging.info(
         'Agent execution finished. Raw output:\n%s',
