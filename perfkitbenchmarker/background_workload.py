@@ -29,7 +29,7 @@ class AutoRegisterBackgroundWorkloadMeta(type):
 
   def __init__(cls, name, bases, dct):
     super().__init__(name, bases, dct)
-    BACKGROUND_WORKLOADS.append(cls)  # pytype: disable=container-type-mismatch
+    BACKGROUND_WORKLOADS.append(cls)  # pyrefly: ignore[bad-argument-type]
 
 
 class BaseBackgroundWorkload(

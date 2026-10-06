@@ -279,7 +279,7 @@ class StaticVirtualMachine(virtual_machine.BaseVirtualMachine):
       )
 
       vm_class = GetStaticVmClass(os_type)
-      vm = vm_class(vm_spec)  # pytype: disable=not-instantiable
+      vm = vm_class(vm_spec)
       cls.vm_pool.append(vm)
 
   @classmethod

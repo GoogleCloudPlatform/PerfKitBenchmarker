@@ -62,7 +62,7 @@ def _PickleQuantity(q):
 
 
 def _UnPickleQuantity(inp):
-  return _UNIT_REGISTRY.Quantity.from_tuple(inp)  # pyrefly: ignore[missing-attribute]
+  return _UNIT_REGISTRY.Quantity.from_tuple(inp)
 
 
 six.moves.copyreg.pickle(_UNIT_REGISTRY.Quantity, _PickleQuantity)

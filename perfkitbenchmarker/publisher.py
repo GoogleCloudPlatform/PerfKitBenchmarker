@@ -880,7 +880,7 @@ class ElasticsearchPublisher(SamplePublisher):
     """Publish samples to Elasticsearch service."""
     try:
       # pylint:disable=g-import-not-at-top
-      from elasticsearch import Elasticsearch  # pytype: disable=import-error
+      from elasticsearch import Elasticsearch  # pyrefly: ignore[missing-import]
       # pylint:enable=g-import-not-at-top
     except ImportError:
       raise ImportError(

@@ -3397,7 +3397,7 @@ class ContainerizedDebianMixin(BaseDebianMixin):
         % (CONTAINER_WORK_DIR, vm_util.VM_TMP_DIR, CONTAINER_MOUNT_DIR)
     ]
     for sd in self.scratch_disks:
-      init_docker_cmd.append('-v %s:%s ' % (sd.mount_point, sd.mount_point))  # pyrefly: ignore[bad-argument-type]
+      init_docker_cmd.append('-v %s:%s ' % (sd.mount_point, sd.mount_point))
     init_docker_cmd.append('%s sleep infinity ' % self.BASE_DOCKER_IMAGE)  # pyrefly: ignore[bad-argument-type]
     init_docker_cmd = ''.join(init_docker_cmd)
 

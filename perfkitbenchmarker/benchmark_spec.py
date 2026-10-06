@@ -475,7 +475,7 @@ class BenchmarkSpec:
       )
     self.relational_db = relational_db_class(
         self.config.relational_db
-    )  # pytype: disable=not-instantiable
+    )
     # ^Disabled as BaseRelationalDb is abstract & therefore not instantiatable.
     self.resources.append(self.relational_db)
 
@@ -516,7 +516,7 @@ class BenchmarkSpec:
     cloud = group_spec.cloud
     providers.LoadProvider(cloud)
     tpu_class = cloud_tpu.GetTpuClass(cloud)
-    return tpu_class(group_spec)  # pytype: disable=not-instantiable
+    return tpu_class(group_spec)
 
   def ConstructTpu(self):
     """Constructs the BenchmarkSpec's cloud TPU objects."""
@@ -555,7 +555,7 @@ class BenchmarkSpec:
     # Check if a new instance needs to be created or restored from snapshot
     self.edw_service = edw_service_class(
         self.config.edw_service
-    )  # pytype: disable=not-instantiable
+    )
     if self.container_cluster:
       assert isinstance(
           self.container_cluster, kubernetes_cluster.KubernetesCluster
@@ -576,7 +576,7 @@ class BenchmarkSpec:
     )
     self.edw_compute_resource = edw_compute_resource_class(  # pyrefly: ignore[not-callable]
         self.config.edw_compute_resource
-    )  # pytype: disable=not-instantiable
+    )
     self.resources.append(self.edw_compute_resource)
 
   def ConstructExampleResource(self):
@@ -589,7 +589,7 @@ class BenchmarkSpec:
     )
     self.example_resource = example_resource_class(  # pyrefly: ignore[not-callable]
         self.config.example_resource
-    )  # pytype: disable=not-instantiable
+    )
     self.resources.append(self.example_resource)
 
   def ConstructBaseJob(self):
@@ -603,7 +603,7 @@ class BenchmarkSpec:
 
     self.base_job = job_class(  # pyrefly: ignore[not-callable]
         self.config.base_job, self.container_registry
-    )  # pytype: disable=not-instantiable
+    )
     self.resources.append(self.base_job)
 
   def ConstructManagedAiModel(self):
@@ -621,7 +621,7 @@ class BenchmarkSpec:
     ][0]
     self.ai_model = model_class(  # pyrefly: ignore[not-callable]
         vm, self.config.ai_model
-    )  # pytype: disable=not-instantiable
+    )
     self.resources.append(self.ai_model)
 
   def ConstructPinecone(self):
@@ -633,7 +633,7 @@ class BenchmarkSpec:
     model_class = pinecone_resource.GetPineconeResourceClass(cloud)
     self.pinecone = model_class(  # pyrefly: ignore[not-callable]
         self.config.pinecone
-    )  # pytype: disable=not-instantiable
+    )
     self.pinecone.SetVms(self.vm_groups)
     self.resources.append(self.pinecone)
 
@@ -644,7 +644,7 @@ class BenchmarkSpec:
     cloud = self.config.vvs.cloud  # pyrefly: ignore[missing-attribute]
     providers.LoadProvider(cloud)
     model_class = vvs_resource.GetVVSResourceClass(cloud)
-    self.vvs = model_class(self.config.vvs)  # pytype: disable=not-instantiable
+    self.vvs = model_class(self.config.vvs)  # pyrefly: ignore[not-callable]
     self.vvs.SetVms(self.vm_groups)
     self.resources.append(self.vvs)
 
@@ -663,7 +663,7 @@ class BenchmarkSpec:
     )
     self.memory_store = managed_memory_store_class(
         self.config.memory_store
-    )  # pytype: disable=not-instantiable
+    )
     self.memory_store.SetVms(self.vm_groups)
     self.resources.append(self.memory_store)
 
@@ -686,7 +686,7 @@ class BenchmarkSpec:
     )
     self.ai_agent_service = deployment_class(
         vm, self.config.ai_agent_service
-    )  # pytype: disable=not-instantiable
+    )
     self.resources.append(self.ai_agent_service)
 
   def ConstructNfsService(self):
@@ -714,7 +714,7 @@ class BenchmarkSpec:
         )
         self.nfs_service = nfs_class(
             disk_spec, group_spec.vm_spec.zone
-        )  # pytype: disable=not-instantiable
+        )
       else:
         self.nfs_service = nfs_service.UnmanagedNfsService(
             disk_spec, self.vms[0]
@@ -768,7 +768,7 @@ class BenchmarkSpec:
       lustre_class = lustre_service.GetLustreServiceClass(cloud)
       self.lustre_service = lustre_class(
           disk_spec, group_spec.vm_spec.zone
-      )  # pytype: disable=not-instantiable
+      )
       self.resources.append(self.lustre_service)
       break
 
@@ -792,7 +792,7 @@ class BenchmarkSpec:
       smb_class = smb_service.GetSmbServiceClass(cloud)
       self.smb_service = smb_class(
           disk_spec, group_spec.vm_spec.zone
-      )  # pytype: disable=not-instantiable
+      )
       logging.debug('SMB service %s', self.smb_service)
       break
 
@@ -843,7 +843,7 @@ class BenchmarkSpec:
       ][:vm_count]
       for vm_spec in specs:
         static_vm_class = static_vm.GetStaticVmClass(vm_spec.os_type)
-        vms.append(static_vm_class(vm_spec))  # pytype: disable=not-instantiable
+        vms.append(static_vm_class(vm_spec))
 
     os_type = group_spec.os_type
     cloud = group_spec.cloud
@@ -866,7 +866,7 @@ class BenchmarkSpec:
         vm_configs.append(vm_config)
       group = managed_vm_group_class(
           group_spec, vm_configs
-      )  # pytype: disable=not-instantiable
+      )
       self.managed_vm_groups[group_name] = group
       # Report resource provisioning times.
       self.resources.append(group)
@@ -913,7 +913,7 @@ class BenchmarkSpec:
       providers.LoadProvider(cloud)
       capacity_reservation_class = capacity_reservation.GetResourceClass(cloud)
       self.capacity_reservations.append(
-          capacity_reservation_class(vm_group)  # pytype: disable=not-instantiable
+          capacity_reservation_class(vm_group)
       )
 
   def _CheckBenchmarkSupport(self, cloud):
@@ -973,7 +973,7 @@ class BenchmarkSpec:
         for vm in vms:
           vm.controller = clouds[group_spec.cloud]
 
-        jujuvm.units.extend(vms)  # pytype: disable=attribute-error
+        jujuvm.units.extend(vms)
         if jujuvm and jujuvm not in self.vms:
           self.unmanaged_vm_groups[
               '%s_juju_controller' % group_spec.cloud
@@ -1437,7 +1437,7 @@ class BenchmarkSpec:
     if placement_group_class:
       return placement_group_class(
           placement_group_spec
-      )  # pytype: disable=not-instantiable
+      )
     else:
       return None
 
@@ -1465,7 +1465,7 @@ class BenchmarkSpec:
           % (os_type, cloud)
       )
 
-    return vm_class(vm_spec)  # pytype: disable=not-instantiable
+    return vm_class(vm_spec)
 
   def DeleteVm(self, vm):
     """Deletes a single vm and scratch disk if required.
